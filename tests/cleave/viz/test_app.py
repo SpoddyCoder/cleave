@@ -8,7 +8,7 @@ import pygame
 
 from cleave.config_schema.layers import DEFAULT_LAYER_SLOTS
 from tests.support.config import TEST_LAYER_STEMS
-from cleave.extract import STEM_NAMES
+from cleave.stems import STEM_NAMES
 from cleave.stem_pcm import LIVE_PROJECTM_FPS, samples_per_frame
 from cleave.viz.app import (
     LiveVisualizerRuntime,

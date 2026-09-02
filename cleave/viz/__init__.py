@@ -38,7 +38,7 @@ def launch(
     import sys
 
     from cleave.config import load_config
-    from cleave.paths import repo_root
+    from cleave.paths import resource_dir
     from cleave.preset_playlist import scan_all_layers
     from cleave.projectm import ProjectMLibraryError
     from cleave.viz.app import VisualizerApp, build_runtime_base
@@ -50,7 +50,7 @@ def launch(
 
     try:
         cleanup_unreferenced_user_presets(project_dir)
-        cfg = load_config(config_path, repo_root())
+        cfg = load_config(config_path, resource_dir())
         playlists = scan_all_layers(cfg)
         runtime = build_runtime_base(cfg, project_dir, audio_path, playlists)
         VisualizerApp(runtime).run()

@@ -2,9 +2,9 @@
 
 Move Cleave from checkout-based development to versioned GitHub Releases.
 
-Phase 1 is done (`v0.1.0`). Phase 2 product decisions are locked in this doc; freeze scripts and Windows native-build details still get a dedicated analysis before implementing. Phases 3 and 4 stay directions until then.
+Phase 1 is done (`v0.1.0`). Phase 2 is done (Windows play/render onedir zip, manual freeze). No tag and no `__version__` bump for Phase 2; it is not a GitHub Release. Product decisions stay locked below. Phase 3.1 workflow and tag upload are landed; remaining gate is `workflow_dispatch` plus the 2.2 GPU checklist. Phase 3.2 (installer) stays a sketch until that proof. Phase 4 stays a direction until the Windows release pipeline ships.
 
-Related: [README.md](../README.md) (current Linux/WSL setup), [completed/user-data-and-config-plan.md](completed/user-data-and-config-plan.md) (install vs user data), [cleave/paths.py](../cleave/paths.py), [cleave/projectm.py](../cleave/projectm.py).
+Related: [README.md](../README.md) (current Linux/WSL setup), [completed/user-data-and-config-plan.md](completed/user-data-and-config-plan.md) (install vs user data), [cleave/paths.py](../cleave/paths.py), [cleave/projectm.py](../cleave/projectm.py), [windows-freeze.md](windows-freeze.md) (paths, spec, FFmpeg sidecar, ctypes names, libprojectM build recommendation).
 
 ---
 
@@ -15,12 +15,14 @@ Decide these once, then reuse. Refine per phase rather than reinventing them.
 - **Versioning.** Semver. While pre-1.0, versions are `0.x` (`0.1.0`, `0.2.0`, ...); breaking changes are allowed on minor bumps until 1.0. Single source of truth: `cleave.__version__` in [cleave/__init__.py](../cleave/__init__.py). Tags are `vX.Y.Z` and must match that string. [pyproject.toml](../pyproject.toml) reads the same attr (`[tool.setuptools.dynamic]`); this is metadata only, not a pip install.
 - **Changelog.** [CHANGELOG.md](../CHANGELOG.md) in Keep a Changelog format (`## [Unreleased]`, then `## [X.Y.Z] - YYYY-MM-DD` with Added / Changed / Fixed / Removed as appropriate). Each GitHub Release body is that version's section, extracted by [scripts/changelog_section.py](../scripts/changelog_section.py).
 - **User data vs install.** Frozen or zip installs must not write projects, presets, or configs into the app folder. Linux data stays XDG (`~/.local/share/cleave/`, config in `~/.config/cleave/`). Windows data mirrors that tree under `Documents\cleave\`; only the global settings file lives in `%APPDATA%\cleave\`. macOS Application Support is Phase 4. See the user-data plan.
-- **Editor vs `separate`.** Play and offline render need pygame, OpenGL, libprojectM, and FFmpeg. Stem split needs Demucs and PyTorch (and optionally CUDA). Treat GPU torch as a later extra, not a requirement of the first binary.
-- **Native deps.** libprojectM 4.2+ (core + playlist) and FFmpeg are not Python packages. Every binary OS needs a build or sidecar story. Current ctypes loaders only search Linux `.so` paths.
+- **Editor vs `separate`.** Play and offline render need pygame, OpenGL, libprojectM, and FFmpeg. Stem split needs Demucs and PyTorch (and optionally CUDA). The first Windows freeze does not bundle torch. GPU torch stays a later extra.
+- **Native deps.** libprojectM 4.2+ (core + playlist) and FFmpeg are not Python packages. Every binary OS needs a build or sidecar story. Frozen/Windows ctypes search is beside the exe, then `PROJECTM_LIB` / `PROJECTM_PLAYLIST_LIB`. Linux checkout still uses env, pkg-config, then system `.so` paths.
 - **Build where you ship.** Produce Windows artifacts on Windows, macOS on macOS, Linux on Linux. Do not cross-compile the GUI stack from WSL.
 - **Licenses.** Bundling FFmpeg, libprojectM, pygame/SDL, and preset packs means shipping their licenses and attribution, not only Cleave's MIT [LICENSE](../LICENSE).
 - **GPU in CI.** GitHub-hosted runners cannot validate live compositing. Automate freeze and unit tests; keep a short manual GPU checklist per OS.
-- **Preset packs.** Milkdrop presets and textures are large and separately licensed. First-run download vs a huge installer is an open product choice, not a freeze detail.
+- **CI cost (public repo).** Standard GitHub-hosted runners are free and unlimited on a public repository, including `windows-latest`, `ubuntu-latest`, and `macos-latest`. Do not use larger runners (extra CPU, RAM, GPU, or static IPs); those are billed even on public repos. Windows and macOS minute multipliers apply only when minutes are billed (private repos). Keep freeze jobs on the standard labels.
+- **Artifact storage.** Actions minutes for a freeze job are free; workflow artifact and cache storage are not unlimited. Ship the binary as a GitHub Release asset, not as a long-lived Actions artifact. Prefer attaching with `gh release upload` in the freeze job. If a workflow artifact is needed for a later job, give it a short retention and delete it once the Release upload succeeds. Do not upload intermediate freeze trees. Actions cache is a separate 10 GB per-repository allowance: cache pip/vcpkg keys, not FFmpeg zips or onedir output.
+- **Preset packs.** Milkdrop presets and textures are large and separately licensed. First-run download vs a huge installer is an open product choice, not a freeze detail. Do not put preset packs in workflow artifacts.
 
 ---
 
@@ -32,11 +34,11 @@ Shipped as [`v0.1.0`](https://github.com/SpoddyCoder/cleave/releases/tag/v0.1.0)
 
 What it is: unpack a tagged source archive, install the repo's requirement files, run from the tree (`python -m cleave` / `cleave.py`). Same checkout workflow as development, pinned to a tag.
 
-What it is not: pip-installable. No AppImage, `.deb`, or frozen binary (those are Phase 4 / later). No helper install script. No extra release assets.
+What it is not: pip-installable. No AppImage, `.deb`, or Linux frozen binary (those are Phase 4). No helper install script. No installer (Phase 3.2).
 
 ### Assets
 
-GitHub's automatic source zip and tarball on the tag are the only assets. Requirement pins already in the repo ([requirements.txt](../requirements.txt), [requirements-dev.txt](../requirements-dev.txt), [requirements-torch-cpu.txt](../requirements-torch-cpu.txt), [requirements-torch-cu130.txt](../requirements-torch-cu130.txt)) travel with the archive.
+GitHub's automatic source zip and tarball on the tag. Later tags also attach the Windows onedir zip from the freeze job (`cleave-<version>-windows-x64.zip`). [`v0.1.0`](https://github.com/SpoddyCoder/cleave/releases/tag/v0.1.0) is source-only. Requirement pins already in the repo ([requirements.txt](../requirements.txt), [requirements-dev.txt](../requirements-dev.txt), [requirements-torch-cpu.txt](../requirements-torch-cpu.txt), [requirements-torch-cu130.txt](../requirements-torch-cu130.txt)) travel with the source archive.
 
 Milkdrop presets and textures are not in the archive. Users follow [README.md](../README.md) "Get Some Milkdrop Presets".
 
@@ -56,7 +58,7 @@ This is the single source of truth for cutting a Phase 1 release:
 2. Set `__version__` in [cleave/__init__.py](../cleave/__init__.py) to `X.Y.Z`.
 3. Commit those changes to `main`.
 4. `git tag vX.Y.Z && git push --tags` (tag the commit that is on `main`).
-5. CI ([.github/workflows/release.yml](../.github/workflows/release.yml)) runs unit tests via the reusable [tests.yml](../.github/workflows/tests.yml) workflow, checks that the tag matches `cleave.__version__`, extracts the changelog section, and publishes a GitHub Release. Source zip/tarball attach automatically.
+5. CI ([.github/workflows/release.yml](../.github/workflows/release.yml)): unit tests via [tests.yml](../.github/workflows/tests.yml), then `publish` checks that the tag matches `cleave.__version__`, extracts the changelog section, and creates the GitHub Release (source zip/tarball attach automatically). Then `freeze` calls [windows-freeze.yml](../.github/workflows/windows-freeze.yml) with `release_tag` set to the tag and uploads `cleave-<version>-windows-x64.zip` onto that Release. If freeze fails, the source Release still exists and can be retried.
 6. Spot-check the archive: unpack, install requirements, run `cleave --version`, confirm presets still come from the README steps.
 
 ### Done when
@@ -65,29 +67,69 @@ Met. A Linux/WSL user can unpack a tagged source archive from GitHub, install th
 
 ---
 
-## Phase 2 - Windows MVP
+## Phase 2 - Windows MVP (done)
 
 Goal: a usable Windows build of play (and ideally render) that you can hand to a tester. Manual build is fine. Unsigned is fine.
 
-This is the first freeze, so most of the porting work lands here even if CI does not. Phase 2 bundles relocatable paths ([cleave/paths.py](../cleave/paths.py)) with that freeze, but path relocation is separable and could land before any freezing. Phases are not re-ordered.
+This is the first freeze, so most of the porting work lands here even if CI does not. Two slices, then one zip. Do not tag a `separate`-only Windows release. Phases 1-4 are not re-ordered. Do not freeze Demucs or PyTorch. Testers separate on Linux/WSL (or use an existing project) and copy `projects/` onto Windows. `separate` (CPU torch in-box vs "install torch yourself" vs skip) stays a later product choice, not a 2.2 gate. CUDA `separate` stays in Later.
+
+### 2.1 Shared Windows foundation (done)
+
+Landed in the tree. Manual proof on a native Windows box (not WSL): `cleave.exe --version` prints `cleave 0.1.0`; `cleave.exe --help` lists `separate` / `play` / `render` / `backup` / `restore`. No GPU, libprojectM DLLs, FFmpeg sidecar, or torch were required for that proof. No tag and no `__version__` bump; 2.1 is not a GitHub Release.
+
+What landed:
+
+- Relocatable roots in [cleave/paths.py](../cleave/paths.py): `is_frozen()`, `install_dir()` (exe dir / sidecars), `resource_dir()` (`sys._MEIPASS` / bundled files). Runtime template YAML and fonts use `resource_dir()`, not `repo_root()`.
+- Windows data root `Documents\cleave\` (Known Folder, `CLEAVE_DATA` still overrides). User config `%APPDATA%\cleave\config.yaml`. Preset/texture defaults follow `data_dir()`.
+- Frozen FFmpeg lookup in [cleave/ffmpeg.py](../cleave/ffmpeg.py): beside the exe only; no PATH fallback. Checkout still uses PATH.
+- ctypes: frozen or `win32` searches `install_dir()` first (`projectM-4.dll` / `projectM-4-playlist.dll`), then env vars. Linux checkout order is unchanged.
+- [packaging/cleave.spec](../packaging/cleave.spec): PyInstaller onedir, pygame and soxr collected, excludes `torch` / `demucs` / `beat_this` / `librosa` / `matplotlib`. `datas`: `cleave-viz.yaml` and `assets/fonts/` (including `MaterialIcons-Regular.ttf`).
+- Stem-split guard in [cleave/separate.py](../cleave/separate.py) (`require_stem_split`) for a short frozen error.
+- Design note: [windows-freeze.md](windows-freeze.md).
+
+How the 2.1 freeze was built (reuse this env on the same Windows machine):
+
+- Native clone or copy at `C:\src\cleave` (not `\\wsl$\` and not WSL Python).
+- Venv with `pyinstaller`, `pygame`, `PyYAML`, `numpy` only. Do not `pip install -r requirements.txt` (that pulls torch).
+- `pyinstaller packaging/cleave.spec` from the repo root. Output: `dist\cleave\cleave.exe` next to `_internal\`.
+- Sidecars (ffmpeg, DLLs) are a post-build copy into `dist\cleave\`, not `_internal`. 2.1 did not copy them.
+
+### 2.2 Play and render freeze (done)
+
+Phase 2 milestone. Manual freeze on a native Windows box (not WSL). No tag and no `__version__` bump; 2.2 is not a GitHub Release.
+
+What landed:
+
+- Torch-free play/render import graph: stem types in [cleave/stems.py](../cleave/stems.py); PCM resample via soxr in [cleave/pcm_io.py](../cleave/pcm_io.py). Analyse still uses librosa in [cleave/extract.py](../cleave/extract.py). Frozen `separate` and raw-audio `play` raise `STEM_SPLIT_MISSING_FROZEN`.
+- Frozen Documents lookup uses `LONG` (not `HRESULT` from `ctypes.wintypes`). Pattern-mask plasma VAOs skip stripped `in_uv` on NVIDIA.
+- [packaging/cleave.spec](../packaging/cleave.spec) collects pygame and soxr. Post-build copy into `dist\cleave\` (not `_internal`): `ffmpeg.exe`, `projectM-4.dll`, `projectM-4-playlist.dll`, extra non-system DLLs, `licenses/ffmpeg/`, `licenses/libprojectM/`.
+- How to freeze: [windows-freeze.md](windows-freeze.md) (vcpkg + VS 2022 shared `x64-windows`; testers do not compile libprojectM).
+
+Manual GPU proof (met):
+
+- Unpack the onedir zip (or run from `dist\cleave\`).
+- `cleave.exe play <existing-project>` opens the editor.
+- Short `cleave.exe render` writes an MP4.
+- `cleave.exe separate` and raw-audio `play` print the short stem-split message, not a traceback.
+- Support matrix: 64-bit Windows, GPU driver. Unsigned is fine (SmartScreen: Run anyway). Overlay tofu (system monospace vs bundled Material Icons) is a follow-up in [todos.md](todos.md), not a 2.2 gate.
 
 ### Locked
 
-- **Layout.** Unpack a zip (built on a Windows machine) and run from that folder. Relocatable app paths (`sys.frozen` or equivalent) so the checkout layout in [cleave/paths.py](../cleave/paths.py) is not required. Not Program Files (that is Phase 3). Installer, signing, and CI wait for Phase 3.
+- **Layout.** Unpack a zip (built on a Windows machine) and run from that folder. Relocatable app paths as in 2.1. Not Program Files (that is Phase 3). Installer, signing, and CI wait for Phase 3.
 - **One exe, CLI subcommands.** PyInstaller onedir with `cleave.exe`. Testers run it from cmd the same way as Linux (`cleave.exe play ...`, `cleave.exe render ...`). Drag-and-drop onto the window waits for Phase 3. Not two executables.
 - **User data.** `Documents\cleave\` mirrors Linux `~/.local/share/cleave/`: `projects/`, `presets/` (including `favourites/`, `blacklist/`, `roles/`), `textures/`, and anything else that lives under the data root today. `CLEAVE_DATA` still overrides the data root.
 - **User config.** Only the global settings file goes in AppData (`%APPDATA%\cleave\config.yaml`), matching Linux `~/.config/cleave/config.yaml`.
 - **FFmpeg.** Ship a Windows `ffmpeg.exe` next to `cleave.exe`. Look beside the exe first, not PATH. Clear error if it is missing. Include the FFmpeg license in the zip.
 - **libprojectM.** Maintainer builds 4.2+ DLLs (core + playlist) once per release and ships them next to the exe. Windows ctypes loader searches beside the exe, then `PROJECTM_LIB`. Testers do not compile or install Visual Studio. Include libprojectM licenses. pygame/SDL travel inside the freeze.
-- **Support matrix.** Document in one paragraph: 64-bit Windows, GPU driver, what `separate` does (CPU in-box, skipped, or "install torch yourself").
+- **No torch in the MVP zip.** The first Windows freeze does not bundle Demucs or PyTorch. Support matrix: 64-bit Windows, GPU driver, and that testers bring an existing project (separate outside the app).
 
 ### Leave open
 
-Whether MVP includes `separate`, whether a seed preset/texture pack ships in the zip versus a documented copy into `Documents\cleave\`, and the exact Windows libprojectM build (vcpkg, CMake, or MSYS2).
+Whether a seed preset/texture pack ships in the zip versus a documented copy into `Documents\cleave\`. Overlay Latin/box-drawing TTF (see [todos.md](todos.md)). Do not ship MinGW DLLs unless ctypes names and extra runtimes are updated to match.
 
 ### Done when
 
-A tester on a typical Windows box can unzip, run `cleave.exe play` / `cleave.exe render` from cmd, load a project (or separate outside the app), and render a short clip.
+Met. A tester on a typical Windows box can unzip, run `cleave.exe play` / `cleave.exe render` from cmd, load an existing project, and render a short clip.
 
 ---
 
@@ -95,19 +137,52 @@ A tester on a typical Windows box can unzip, run `cleave.exe play` / `cleave.exe
 
 Goal: Windows is a first-class release target. Building it does not depend on a particular desktop.
 
-Sketch:
+Two slices, same pattern as Phase 2. Lock the product rules below, then plan 3.1 in detail. Keep 3.2 as a sketch until 3.1 has produced a zip a tester has run. Do not mix installer branding into the CI freeze.
 
-- PyInstaller freeze spec and scripts in the repo, run from GitHub Actions on `windows-latest`.
-- Tag pipeline: tests, freeze, attach the Windows artifact to the GitHub Release beside the Phase 1 source assets.
-- Installer wrapping the onedir folder (Inno Setup, WiX, or similar) into Program Files. User data stays in `Documents\cleave\`; settings stay in AppData.
-- Drag-and-drop a source file or project onto the Cleave window (or the exe) to play. CLI subcommands remain.
-- Better failure modes: missing GPU, missing FFmpeg, missing preset root, SmartScreen on an unsigned build.
-- Short Windows smoke checklist (open editor, one layer, one render) that a human still runs; CI will not replace it.
-- Optional: Authenticode signing if a certificate is available. Without it, document SmartScreen and keep shipping.
+### 3.1 CI freeze zip
 
-Leave open: exact CI jobs, cache strategy for libprojectM/FFmpeg, installer branding, and whether CUDA `separate` is ever in the Windows artifact or stays a documented extra.
+Automate the 2.2 recipe on standard `windows-latest` (not a larger runner). The freeze spec already lives in [packaging/cleave.spec](../packaging/cleave.spec); the layout, sidecars, and ctypes names are in [windows-freeze.md](windows-freeze.md).
 
-Done when: a tag produces a Windows installer (or a clearly documented zip) on GitHub without a manual freeze step, and the MVP tester path still works.
+- Workflow: [.github/workflows/windows-freeze.yml](../.github/workflows/windows-freeze.yml) (`workflow_dispatch` and `workflow_call`, not every push) on standard `windows-latest`. PyInstaller onedir via [packaging/cleave.spec](../packaging/cleave.spec), then [scripts/windows_stage_freeze.py](../scripts/windows_stage_freeze.py) copies sidecars into `dist\cleave\` (not `_internal`). Zip that folder as `cleave-<version>-windows-x64.zip`. Headless smoke only (`--version`, `--help`, frozen `separate` message); no GPU compositing.
+- Dispatch uploads the zip as a 5-day Actions artifact (`cleave-windows-x64`). Tag pipeline: [release.yml](../.github/workflows/release.yml) runs tests, `publish` creates the GitHub Release, then `freeze` calls this workflow with `release_tag` set to the tag. A non-empty `release_tag` uses `gh release upload` and does not retain a workflow artifact. Prove the freeze with dispatch before cutting a tag.
+- Cache pip only (`actions/setup-python` with `requirements-freeze.txt`). Do not cache FFmpeg zips or freeze output. Committed libprojectM DLLs; no vcpkg in the job.
+- Better failure modes in the app: missing GPU, missing FFmpeg, missing preset root. Document SmartScreen for an unsigned build.
+- Short Windows smoke checklist (open editor, one layer, one render) that a human still runs; CI will not replace GPU compositing.
+
+Drag-and-drop onto the pygame window can land on `main` during 3.1. It is not a 3.1 gate. Drop onto the exe (file associations) waits for 3.2.
+
+Done when: `workflow_dispatch` on `windows-latest` produces a zip that passes the 2.2 GPU checklist (`cleave.exe play` on an existing project, short `render`, frozen `separate` message), and the tag job is wired to upload that zip. Proving the freeze does not require a version bump. The first tag after this lands is a Phase 1 source release plus the Windows zip. No installer.
+
+The workflow and tag upload are landed. Remaining gate: dispatch a zip and run the 2.2 GPU checklist on a Windows box with a GPU driver.
+
+### 3.2 Installer
+
+Wrap the same onedir tree into Program Files (Inno Setup, WiX, or similar). The installer copies 3.1's folder; it does not get a second freeze layout.
+
+- Shortcuts and uninstall. CLI subcommands remain (`cleave.exe play ...`).
+- Drag-and-drop a source file or project onto the exe, and optional file associations, live here. Window drop may already exist from 3.1.
+- User data stays in `Documents\cleave\`; settings stay in AppData. Program Files is read-only; `install_dir()` is still the parent of the exe.
+
+Done when: a tag produces the installer without a manual freeze step, and the 2.2 tester path still works from Program Files. The zip may stay as a second Release asset or be dropped.
+
+### Locked
+
+- **Layout.** The Release freeze is the 2.2 onedir: `cleave.exe` and sidecars beside each other, bundled files in `_internal`. The installer copies that tree into Program Files. Do not invent a second freeze layout. `install_dir()` stays the parent of the exe.
+- **User data.** Unchanged from Phase 2: `Documents\cleave\` (projects, presets, textures). `CLEAVE_DATA` still overrides. Global settings stay in `%APPDATA%\cleave\config.yaml`.
+- **When to freeze.** Tag and `workflow_dispatch` only. Never on every push.
+- **Assets.** Upload the Windows binary as a GitHub Release asset, not a long-lived Actions artifact. Source zip/tarball from Phase 1 stay.
+- **One exe, CLI subcommands.** Still PyInstaller onedir with `cleave.exe`. Not two executables. Not torch.
+- **Signing.** Optional. Without a certificate, document SmartScreen and keep shipping unsigned.
+
+### Leave open
+
+Installer tool and branding. Whether the zip remains once the installer exists. Whether CUDA `separate` is ever in the Windows artifact (stays Later). Authenticode if a certificate appears.
+
+**Resolved** (exact CI steps): committed libprojectM DLLs in [packaging/windows/](../packaging/windows/); FFmpeg downloaded by [scripts/windows_stage_freeze.py](../scripts/windows_stage_freeze.py) from a pinned Gyan essentials URL (`FFMPEG_URL` / `FFMPEG_SHA256` in that script). Not vcpkg in the job, not a committed FFmpeg binary.
+
+### Done when
+
+3.1 and 3.2 are both met: a tag produces a Windows installer on GitHub without a manual freeze, and the MVP tester path still works.
 
 ---
 
@@ -120,7 +195,7 @@ Sketch:
 - **Linux:** AppImage (closest to a single executable) and/or a `.deb` for Ubuntu. Build on the oldest Ubuntu you intend to support so glibc does not strand users. Keep the existing checkout workflow for development.
 - **macOS:** `.app` in a `.dmg`. Apple Silicon at minimum; Intel as a second build if needed. OpenGL is deprecated but still the current stack. Notarization and codesign are required for anyone who did not compile it themselves.
 - Per-OS data dirs and libprojectM (`.so` / `.dylib`) using the relocatable work from Phase 2, not a third path scheme.
-- CI matrix next to the Windows job: Linux and macOS freeze on tag. Same limit: no GPU compositing on hosted runners.
+- CI matrix next to the Windows job: Linux and macOS freeze on tag, on standard `ubuntu-latest` / `macos-latest` (not larger runners). Same limits: no GPU compositing on hosted runners; Release assets, not long-lived workflow artifacts.
 - FFmpeg: bundled sidecar vs distro package on Linux is a product choice; macOS should bundle or fail clearly, like Windows.
 
 Leave open: AppImage vs `.deb` vs both, universal2 vs separate Mac archs, Homebrew cask later, and whether Linux binaries replace or sit beside the Phase 1 source Release.
@@ -144,4 +219,4 @@ Do not block Phases 1-4 on these. Revisit after binaries exist.
 
 ## Suggested order of analysis
 
-Phase 1 is done. Phase 2 product decisions are locked above. When Phase 2 implementation starts, write a short design note covering: relocatable paths, the Windows libprojectM build, and the PyInstaller spec. Later notes: CI and installer (Phase 3), Linux packaging plus macOS signing (Phase 4). Keep remaining implementation choices in that note, not in this overview.
+Phase 1 and Phase 2 are done. Phase 3.1 workflow and tag upload are landed; remaining gate is `workflow_dispatch` plus the 2.2 GPU checklist (see [windows-freeze.md](windows-freeze.md)). Do not plan 3.2 (installer, Program Files) in detail until that zip exists and a tester has run it. Later: Linux packaging plus macOS signing (Phase 4). Keep freeze implementation choices in that note, not in this overview.

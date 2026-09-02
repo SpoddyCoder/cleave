@@ -7,7 +7,7 @@ from pathlib import Path
 
 import numpy as np
 
-from cleave.extract import STEM_NAMES, StemSource, stem_paths
+from cleave.stems import STEM_NAMES, StemSource, stem_paths
 from cleave.pcm_io import SAMPLE_RATE_HZ, load_wav_pcm_44k
 from cleave.project import mix_path
 

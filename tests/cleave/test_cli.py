@@ -23,7 +23,7 @@ from cleave.cli import (
     main,
 )
 from cleave.viz.render import RenderResult
-from cleave.extract import STEM_NAMES, stems_dir
+from cleave.stems import STEM_NAMES, stems_dir
 from cleave.project import write_manifest
 
 
@@ -40,9 +40,9 @@ def test_format_elapsed() -> None:
     assert _format_elapsed(3723.6) == "62 mins 4 secs"
 
 
-def test_cli_beat_detection_stem_choices_match_extract() -> None:
+def test_cli_beat_detection_stem_choices_match_stems() -> None:
     from cleave import cli
-    from cleave.extract import BEAT_DETECTION_STEM_CHOICES
+    from cleave.stems import BEAT_DETECTION_STEM_CHOICES
 
     assert cli.BEAT_DETECTION_STEM_CHOICES == BEAT_DETECTION_STEM_CHOICES
 
@@ -58,6 +58,29 @@ build_parser()
 heavy = [name for name in ("pygame", "torch", "librosa") if name in sys.modules]
 if heavy:
     raise SystemExit(f"unexpected heavy imports: {heavy}")
+"""
+    env = {**os.environ, "PYTHONPATH": str(repo_root)}
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
+        cwd=str(repo_root),
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_import_separate_does_not_import_torch() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    script = """
+import sys
+import cleave.separate
+
+if "torch" in sys.modules:
+    raise SystemExit("unexpected torch import")
+if "cleave.analyse" in sys.modules:
+    raise SystemExit("unexpected analyse import")
 """
     env = {**os.environ, "PYTHONPATH": str(repo_root)}
     result = subprocess.run(
@@ -278,6 +301,48 @@ def test_cmd_play_calls_launch(
         project.resolve(),
         config=None,
     )
+
+
+def test_cmd_play_existing_project_does_not_import_torch(tmp_path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    _complete_project(tmp_path)
+    script = """
+import os
+import sys
+from unittest.mock import patch
+from cleave.cli import build_parser, cmd_play
+
+with patch("cleave.viz.launch"):
+    cmd_play(build_parser().parse_args(["play", "my-track"]))
+if "torch" in sys.modules:
+    raise SystemExit("unexpected torch import")
+"""
+    env = {**os.environ, "PYTHONPATH": str(repo_root), "CLEAVE_DATA": str(tmp_path)}
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
+        cwd=str(repo_root),
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_cmd_play_missing_torch_on_raw_audio(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    monkeypatch.setattr("cleave.separate.stem_split_available", lambda: False)
+    monkeypatch.setattr("cleave.separate.is_frozen", lambda: True)
+    audio = tmp_path / "song.flac"
+    audio.write_bytes(b"audio")
+
+    with pytest.raises(SystemExit) as exc:
+        cmd_play(build_parser().parse_args(["play", str(audio)]))
+    assert exc.value.code == 1
+    err = capsys.readouterr().err
+    assert "not in this Windows build" in err
 
 
 def test_cmd_separate_high_quality_completion_message(

@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from cleave.extract import StemSource
+from cleave.stems import StemSource
 from cleave.preset_playlist import PresetPlaylist
 
 

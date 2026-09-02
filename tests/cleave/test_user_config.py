@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import pytest
@@ -198,6 +199,35 @@ def test_persist_editor_settings_writes_visualizer_editor_fields(
 def test_user_config_path_respects_xdg_config_home(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
+    monkeypatch.setattr(sys, "platform", "linux")
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
     expected = (tmp_path / "cleave" / "config.yaml").resolve()
+    assert user_config_path() == expected
+
+
+def test_user_config_path_linux_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(sys, "platform", "linux")
+    monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+    expected = (Path.home() / ".config" / "cleave" / "config.yaml").resolve()
+    assert user_config_path() == expected
+
+
+def test_user_config_path_windows_appdata(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(sys, "platform", "win32")
+    appdata = tmp_path / "AppData" / "Roaming"
+    monkeypatch.setenv("APPDATA", str(appdata))
+    expected = (appdata / "cleave" / "config.yaml").resolve()
+    assert user_config_path() == expected
+
+
+def test_user_config_path_windows_without_appdata(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.delenv("APPDATA", raising=False)
+    expected = (
+        Path.home() / "AppData" / "Roaming" / "cleave" / "config.yaml"
+    ).resolve()
     assert user_config_path() == expected

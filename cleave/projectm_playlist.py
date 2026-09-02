@@ -5,10 +5,12 @@ from __future__ import annotations
 import ctypes
 import os
 import subprocess
+import sys
 from collections.abc import Callable
 from ctypes import CFUNCTYPE, POINTER, c_bool, c_char_p, c_int, c_uint32, c_void_p
 from pathlib import Path
 
+from cleave.paths import install_sidecar_lib_paths, native_lib_sidecar_first
 from cleave.projectm import ProjectM
 
 _lib: ctypes.CDLL | None = None
@@ -27,6 +29,12 @@ class ProjectMPlaylistLibraryError(OSError):
 
 
 _PKG_CONFIG_NAMES = ("projectM-4-playlist", "libprojectM-playlist")
+
+PLAYLIST_WINDOWS_DLL = "projectM-4-playlist.dll"
+PLAYLIST_LINUX_SONAMES = (
+    "libprojectM-4-playlist.so",
+    "libprojectM-4-playlist-4.so",
+)
 
 
 def _pkg_config_candidates() -> list[str]:
@@ -60,26 +68,23 @@ def _pkg_config_candidates() -> list[str]:
     return []
 
 
-def _library_candidates() -> list[str]:
-    candidates: list[str] = []
-    env_path = os.environ.get("PROJECTM_PLAYLIST_LIB")
-    if env_path:
-        candidates.append(env_path)
-    candidates.extend(_pkg_config_candidates())
+def _linux_system_candidates() -> list[str]:
     local_lib = Path.home() / ".local/lib"
-    candidates.extend(
-        [
-            str(local_lib / "libprojectM-4-playlist.so"),
-            "/usr/local/lib/libprojectM-4-playlist.so",
-            "/usr/lib/x86_64-linux-gnu/libprojectM-4-playlist.so",
-            "libprojectM-4-playlist.so",
-            str(local_lib / "libprojectM-4-playlist-4.so"),
-            "/usr/local/lib/libprojectM-4-playlist-4.so",
-            "/usr/lib/x86_64-linux-gnu/libprojectM-4-playlist-4.so",
-            "libprojectM-4-playlist-4.so",
-        ]
-    )
+    names = PLAYLIST_LINUX_SONAMES
+    candidates: list[str] = []
+    for name in names:
+        candidates.extend(
+            [
+                str(local_lib / name),
+                f"/usr/local/lib/{name}",
+                f"/usr/lib/x86_64-linux-gnu/{name}",
+                name,
+            ]
+        )
+    return candidates
 
+
+def _dedupe_candidates(candidates: list[str]) -> list[str]:
     seen: set[str] = set()
     ordered: list[str] = []
     for path in candidates:
@@ -87,6 +92,30 @@ def _library_candidates() -> list[str]:
             seen.add(path)
             ordered.append(path)
     return ordered
+
+
+def library_candidates() -> list[str]:
+    """Return ordered libprojectM playlist library search paths."""
+    candidates: list[str] = []
+    env_path = os.environ.get("PROJECTM_PLAYLIST_LIB")
+    sidecar_names = (
+        (PLAYLIST_WINDOWS_DLL,)
+        if sys.platform == "win32"
+        else PLAYLIST_LINUX_SONAMES
+    )
+    if native_lib_sidecar_first():
+        candidates.extend(install_sidecar_lib_paths(*sidecar_names))
+        if env_path:
+            candidates.append(env_path)
+        if sys.platform != "win32":
+            candidates.extend(_pkg_config_candidates())
+            candidates.extend(_linux_system_candidates())
+    else:
+        if env_path:
+            candidates.append(env_path)
+        candidates.extend(_pkg_config_candidates())
+        candidates.extend(_linux_system_candidates())
+    return _dedupe_candidates(candidates)
 
 
 _REQUIRED_SYMBOLS = (
@@ -216,7 +245,7 @@ def _get_lib() -> ctypes.CDLL:
         return _lib
 
     errors: list[str] = []
-    for path in _library_candidates():
+    for path in library_candidates():
         try:
             loaded = ctypes.CDLL(path)
             _bind_functions(loaded, path)

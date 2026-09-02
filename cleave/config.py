@@ -17,8 +17,9 @@ import yaml
 _YAML_DUMP_WIDTH = 2**31 - 1
 
 from cleave.blend_modes import BlendMode
+from cleave.paths import default_preset_root, default_texture_paths, resource_dir
 from cleave.effects.constants import clamp_effect_pct
-from cleave.extract import StemSource
+from cleave.stems import StemSource
 from cleave.config_schema.descriptors import (
     as_mapping,
     require_non_negative_number,
@@ -70,7 +71,6 @@ from cleave.config_schema.render import (
     DEFAULT_HDR_COMPOSITING,
     DEFAULT_HIGHLIGHT_ROLLOFF_APPLY_MODE,
     DEFAULT_HIGHLIGHT_ROLLOFF_CURVE,
-    DEFAULT_PRESET_ROOT,
     DEFAULT_RENDER_FPS,
     DEFAULT_RENDER_HEIGHT,
     DEFAULT_RENDER_OVERLAY_ANIMATION_TYPE,
@@ -99,7 +99,6 @@ from cleave.config_schema.render import (
     DEFAULT_RENDER_POST_FX_FADE_OUT,
     DEFAULT_RENDER_POST_FX_LOCKED,
     DEFAULT_RENDER_WIDTH,
-    DEFAULT_TEXTURE_PATHS,
     HIGHLIGHT_ROLLOFF_APPLY_MODES,
     HIGHLIGHT_ROLLOFF_CURVES,
     RENDER_OVERLAY_ANIMATION_TYPES,
@@ -417,14 +416,12 @@ def project_viz_config_path(project_dir: Path) -> Path:
 
 
 def ensure_project_viz_config(project_dir: Path) -> Path:
-    """Copy the repo template into *project_dir* when cleave-viz.yaml is missing."""
-    from cleave.paths import repo_root
-
+    """Copy the bundled template into *project_dir* when cleave-viz.yaml is missing."""
     dst = project_viz_config_path(project_dir)
     if dst.is_file():
         return dst
 
-    src = repo_root() / VIZ_CONFIG_FILENAME
+    src = resource_dir() / VIZ_CONFIG_FILENAME
     if not src.is_file():
         raise FileNotFoundError(f"config template not found: {src}")
 
@@ -449,7 +446,7 @@ def find_config_path(
     config_path: Path | None = None,
     project_root: Path | None = None,
 ) -> Path | None:
-    """Locate config: CLI override, project cleave-viz.yaml, then repo template."""
+    """Locate config: CLI override, project cleave-viz.yaml, then bundled template."""
     if config_path is not None:
         return _expand_path(config_path)
 
@@ -458,9 +455,7 @@ def find_config_path(
     if local_path.is_file():
         return local_path.resolve()
 
-    from cleave.paths import repo_root
-
-    template = repo_root() / VIZ_CONFIG_FILENAME
+    template = resource_dir() / VIZ_CONFIG_FILENAME
     if template.is_file():
         return template.resolve()
 
@@ -479,7 +474,7 @@ def _parse_paths(data: dict[str, Any], user_cfg: UserConfig) -> PathsConfig:
     elif user_cfg.preset_root is not None:
         preset_root = user_cfg.preset_root
     else:
-        preset_root = _expand_path(DEFAULT_PRESET_ROOT)
+        preset_root = default_preset_root()
 
     if "texture_paths" in paths:
         raw_texture_paths = paths["texture_paths"]
@@ -491,7 +486,7 @@ def _parse_paths(data: dict[str, Any], user_cfg: UserConfig) -> PathsConfig:
     elif user_cfg.texture_paths is not None:
         texture_paths = user_cfg.texture_paths
     else:
-        texture_paths = tuple(_expand_path(path) for path in DEFAULT_TEXTURE_PATHS)
+        texture_paths = default_texture_paths()
 
     return PathsConfig(preset_root=preset_root, texture_paths=texture_paths)
 

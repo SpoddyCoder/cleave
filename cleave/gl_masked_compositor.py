@@ -119,6 +119,22 @@ void main() {
 }
 """
 
+# Plasma samples gl_FragCoord only. A dedicated VS keeps in_uv out of the
+# linked program so NVIDIA cannot strip it and Mesa cannot keep an unused UV
+# slot. Shared quad buffer is still (x, y, u, v); VAO skips UV with 2x4.
+_PLASMA_VERT = """
+#version 330
+in vec2 in_vert;
+void main() {
+    gl_Position = vec4(in_vert, 0.0, 1.0);
+}
+"""
+
+# Shared interleaved quad: two float32 positions, then two skipped UV floats.
+# ModernGL 5.12: ``2x4`` is two 4-byte pads (8 bytes), not ``2x2``.
+_QUAD_UV_VAO = "2f 2f"
+_QUAD_POS_VAO = "2f 2x4"
+
 _MASKED_FRAG = """
 #version 330
 uniform sampler2DArray layers;
@@ -235,7 +251,6 @@ _PLASMA_HARD_FRAG = (
     + """
 uniform int invert;
 uniform int active_flags[8];
-in vec2 uv;
 out vec4 fragColor;
 
 void main() {
@@ -275,7 +290,6 @@ uniform int invert;
 uniform int output_layer;
 uniform int active_flags[8];
 uniform float feather_power;
-in vec2 uv;
 out vec4 fragColor;
 
 void main() {
@@ -809,11 +823,11 @@ class GlMaskedCompositor:
             fragment_shader=_SOFT_FRAG,
         )
         self._plasma_hard_prog = self._ctx.program(
-            vertex_shader=_QUAD_VERT,
+            vertex_shader=_PLASMA_VERT,
             fragment_shader=_PLASMA_HARD_FRAG,
         )
         self._plasma_soft_prog = self._ctx.program(
-            vertex_shader=_QUAD_VERT,
+            vertex_shader=_PLASMA_VERT,
             fragment_shader=_PLASMA_SOFT_FRAG,
         )
         # Binary float32 quad: (x, y, u, v) per vertex covering NDC [-1,1] x [-1,1].
@@ -830,19 +844,19 @@ class GlMaskedCompositor:
         )
         self._quad_vao = self._ctx.vertex_array(
             self._masked_prog,
-            [(self._quad_buffer, "2f 2f", "in_vert", "in_uv")],
+            [(self._quad_buffer, _QUAD_UV_VAO, "in_vert", "in_uv")],
         )
         self._soft_quad_vao = self._ctx.vertex_array(
             self._soft_prog,
-            [(self._quad_buffer, "2f 2f", "in_vert", "in_uv")],
+            [(self._quad_buffer, _QUAD_UV_VAO, "in_vert", "in_uv")],
         )
         self._plasma_hard_vao = self._ctx.vertex_array(
             self._plasma_hard_prog,
-            [(self._quad_buffer, "2f 2f", "in_vert", "in_uv")],
+            [(self._quad_buffer, _QUAD_POS_VAO, "in_vert")],
         )
         self._plasma_soft_vao = self._ctx.vertex_array(
             self._plasma_soft_prog,
-            [(self._quad_buffer, "2f 2f", "in_vert", "in_uv")],
+            [(self._quad_buffer, _QUAD_POS_VAO, "in_vert")],
         )
         self._soft_transition_prog = self._ctx.program(
             vertex_shader=_QUAD_VERT,
@@ -850,7 +864,7 @@ class GlMaskedCompositor:
         )
         self._soft_transition_vao = self._ctx.vertex_array(
             self._soft_transition_prog,
-            [(self._quad_buffer, "2f 2f", "in_vert", "in_uv")],
+            [(self._quad_buffer, _QUAD_UV_VAO, "in_vert", "in_uv")],
         )
         self._layout_soft_prog = self._ctx.program(
             vertex_shader=_QUAD_VERT,
@@ -858,7 +872,7 @@ class GlMaskedCompositor:
         )
         self._layout_soft_vao = self._ctx.vertex_array(
             self._layout_soft_prog,
-            [(self._quad_buffer, "2f 2f", "in_vert", "in_uv")],
+            [(self._quad_buffer, _QUAD_UV_VAO, "in_vert", "in_uv")],
         )
         self._ensure_layer_array()
 

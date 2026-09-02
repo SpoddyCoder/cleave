@@ -14,7 +14,7 @@ from cleave.config_schema.editor import clamp_beat_sensitivity
 from cleave.config_schema.validators import parse_blend_mode
 from cleave.effects.constants import clamp_effect_pct
 from cleave.effects.registry import validate_effect_entry
-from cleave.extract import STEM_SOURCES, StemSource
+from cleave.stems import STEM_SOURCES, StemSource
 
 PresetSwitchingMode = Literal["off", "on"]
 PresetSwitchingTrigger = Literal["timer", "projectm", "timeline"]

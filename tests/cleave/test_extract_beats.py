@@ -10,8 +10,8 @@ import numpy as np
 from cleave.extract import extract_beats_downbeats
 
 
-@patch("cleave.extract.File2Beats")
-@patch("cleave.extract.torch.cuda.is_available", return_value=False)
+@patch("beat_this.inference.File2Beats")
+@patch("torch.cuda.is_available", return_value=False)
 def test_extract_beats_downbeats_uses_file2beats(
     _cuda: object,
     mock_file2beats_cls: MagicMock,

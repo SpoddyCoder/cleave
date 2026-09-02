@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -26,14 +27,22 @@ USER_CONFIG_FILENAME = "config.yaml"
 
 
 def user_config_path() -> Path:
-    """Return the default user config file path."""
+    """Return the default user config file path.
+
+    Windows: ``%APPDATA%\\cleave\\config.yaml``. Linux: XDG
+    (``XDG_CONFIG_HOME/cleave`` or ``~/.config/cleave``).
+    """
+    if sys.platform == "win32":
+        appdata = os.environ.get("APPDATA")
+        if appdata:
+            return (Path(appdata) / "cleave" / USER_CONFIG_FILENAME).resolve()
+        return (
+            Path.home() / "AppData" / "Roaming" / "cleave" / USER_CONFIG_FILENAME
+        ).resolve()
     xdg_config_home = os.environ.get("XDG_CONFIG_HOME")
     if xdg_config_home:
         return (Path(xdg_config_home) / "cleave" / USER_CONFIG_FILENAME).resolve()
     return (Path.home() / ".config" / "cleave" / USER_CONFIG_FILENAME).resolve()
-
-
-USER_CONFIG_PATH = user_config_path()
 
 
 @dataclass(frozen=True)

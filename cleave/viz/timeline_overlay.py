@@ -8,7 +8,7 @@ from typing import Literal
 import pygame
 
 from cleave.cue_roles import CueRole
-from cleave.extract import StemSource
+from cleave.stems import StemSource
 from cleave.timeline import (
     LEVEL_EPS,
     SlotCue,

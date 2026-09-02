@@ -12,11 +12,11 @@ from cleave.config_schema.layers import (
     next_layer_slot,
 )
 from cleave.effects.runtime import EffectRuntime
-from cleave.extract import STEM_SOURCES
+from cleave.stems import STEM_SOURCES
 from cleave.gl_compositor import GlCompositor
 from cleave.gl_masked_compositor import GlMaskedCompositor
 from cleave.gl_post_process import GlPostProcess
-from cleave.paths import repo_root
+from cleave.paths import resource_dir
 from cleave.preset_playlist import PresetPlaylist, scan_single_layer
 from cleave.signals import Signals
 from cleave.viz.controls import TuningControls
@@ -202,7 +202,7 @@ def make_tuning_controls(
         "on_save_new_config": factory.on_save_new_config,
         "on_overwrite_config": factory.on_overwrite_config,
         "launch_config_path": cfg.config_path,
-        "repo_root_example": repo_root() / VIZ_CONFIG_FILENAME,
+        "repo_root_example": resource_dir() / VIZ_CONFIG_FILENAME,
     }
     if modal_host is not None:
         kwargs["modal_host"] = modal_host

@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 from cleave import __version__
 
 if TYPE_CHECKING:
-    from cleave.extract import StemSource
+    from cleave.stems import StemSource
     from cleave.viz.render import RenderSegment
 
 # Parser/help constants (must match defining modules; avoid importing them for -h).
@@ -55,7 +55,7 @@ def _render_scope_clause(segment: RenderSegment | None) -> str:
 
 
 def _optional_beat_detection_stem(args: argparse.Namespace) -> StemSource | None:
-    from cleave.extract import parse_beat_detection_stem
+    from cleave.stems import parse_beat_detection_stem
 
     raw = getattr(args, "beat_detection_stem", None)
     if raw is None:

@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 import pygame
 
-from cleave.extract import stem_overlay_header
+from cleave.stems import stem_overlay_header
 from cleave.viz.material_icons import (
     FILE_GLYPH,
     FOLDER_GLYPH,

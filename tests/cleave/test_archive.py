@@ -16,7 +16,7 @@ from cleave.archive import (
     resolve_backup_output,
     restore_project,
 )
-from cleave.extract import STEM_NAMES, stems_dir
+from cleave.stems import STEM_NAMES, stems_dir
 from cleave.project import PROJECT_FILENAME, load_manifest, write_manifest
 
 

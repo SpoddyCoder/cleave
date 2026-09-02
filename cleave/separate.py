@@ -11,10 +11,9 @@ from pathlib import Path
 
 from typing import cast
 
-from cleave.analyse import run_analyse
 from cleave.config import ensure_project_viz_config
-from cleave.extract import STEM_SOURCES, StemSource, stem_paths, stems_dir
-from cleave.paths import project_dir, project_slug, resolve_project
+from cleave.stems import STEM_SOURCES, StemSource, stem_paths, stems_dir
+from cleave.paths import is_frozen, project_dir, project_slug, resolve_project
 from cleave.project import load_manifest, manifest_path, mix_path, write_manifest
 from cleave.signals import SIGNALS_VERSION
 
@@ -92,6 +91,37 @@ def resolve_separate_target(path_or_slug: Path | str) -> tuple[Path, Path]:
         return project_dir(slug).resolve(), audio_path
     project = resolve_project(path_or_slug)
     return project, mix_path(project)
+
+
+STEM_SPLIT_MISSING_FROZEN = (
+    "Stem split is not in this Windows build. "
+    "Copy a project from Linux and play that instead."
+)
+STEM_SPLIT_MISSING_CHECKOUT = (
+    "Stem split requires PyTorch and Demucs, which are not installed."
+)
+
+
+def stem_split_available() -> bool:
+    """Return True when PyTorch can be imported (Demucs/analyse extra)."""
+    try:
+        import torch  # noqa: F401
+    except ImportError:
+        return False
+    return True
+
+
+def stem_split_missing_message() -> str:
+    """Short error when stem split is required but the extra is missing."""
+    if is_frozen():
+        return STEM_SPLIT_MISSING_FROZEN
+    return STEM_SPLIT_MISSING_CHECKOUT
+
+
+def require_stem_split() -> None:
+    """Raise :class:`RuntimeError` when Demucs/analyse extras are missing."""
+    if not stem_split_available():
+        raise RuntimeError(stem_split_missing_message())
 
 
 def _validate_audio_path(audio_path: Path) -> None:
@@ -205,10 +235,16 @@ def run_separate(
         return project_dir
 
     run_demucs = force or not stems_complete
+    need_analyse = run_demucs or not signals_done or stem_mismatch
+    if need_analyse:
+        require_stem_split()
+
     if run_demucs:
         _run_demucs(audio_path, project_dir, high_quality=high_quality, force=force)
 
-    if run_demucs or not signals_done or stem_mismatch:
+    if need_analyse:
+        from cleave.analyse import run_analyse
+
         source = resolve_beat_detection_stem(project_dir, beat_detection_stem)
         print("Extracting signals (may take a while on longer tracks)...", flush=True)
         run_analyse(

@@ -29,6 +29,10 @@ from pathlib import Path
 import numpy as np
 
 from cleave.config import DEFAULT_BEAT_SENSITIVITY, clamp_beat_sensitivity
+from cleave.paths import (
+    install_sidecar_lib_paths,
+    native_lib_sidecar_first,
+)
 
 PROJECTM_MONO = 1
 PROJECTM_STEREO = 2
@@ -72,6 +76,9 @@ class ProjectMLibraryError(OSError):
 
 _PKG_CONFIG_NAMES = ("projectM-4", "libprojectM")
 
+CORE_WINDOWS_DLL = "projectM-4.dll"
+CORE_LINUX_SONAME = "libprojectM-4.so"
+
 
 def _pkg_config_candidates() -> list[str]:
     for pkg_name in _PKG_CONFIG_NAMES:
@@ -108,22 +115,17 @@ def _pkg_config_candidates() -> list[str]:
     return []
 
 
-def _library_candidates() -> list[str]:
-    candidates: list[str] = []
-    env_path = os.environ.get("PROJECTM_LIB")
-    if env_path:
-        candidates.append(env_path)
-    candidates.extend(_pkg_config_candidates())
+def _linux_system_candidates() -> list[str]:
     local_lib = Path.home() / ".local/lib"
-    candidates.extend(
-        [
-            str(local_lib / "libprojectM-4.so"),
-            "/usr/local/lib/libprojectM-4.so",
-            "/usr/lib/x86_64-linux-gnu/libprojectM-4.so",
-            "libprojectM-4.so",
-        ]
-    )
+    return [
+        str(local_lib / CORE_LINUX_SONAME),
+        f"/usr/local/lib/{CORE_LINUX_SONAME}",
+        f"/usr/lib/x86_64-linux-gnu/{CORE_LINUX_SONAME}",
+        CORE_LINUX_SONAME,
+    ]
 
+
+def _dedupe_candidates(candidates: list[str]) -> list[str]:
     seen: set[str] = set()
     ordered: list[str] = []
     for path in candidates:
@@ -131,6 +133,28 @@ def _library_candidates() -> list[str]:
             seen.add(path)
             ordered.append(path)
     return ordered
+
+
+def library_candidates() -> list[str]:
+    """Return ordered libprojectM core library search paths."""
+    candidates: list[str] = []
+    env_path = os.environ.get("PROJECTM_LIB")
+    sidecar_names = (
+        (CORE_WINDOWS_DLL,) if sys.platform == "win32" else (CORE_LINUX_SONAME,)
+    )
+    if native_lib_sidecar_first():
+        candidates.extend(install_sidecar_lib_paths(*sidecar_names))
+        if env_path:
+            candidates.append(env_path)
+        if sys.platform != "win32":
+            candidates.extend(_pkg_config_candidates())
+            candidates.extend(_linux_system_candidates())
+    else:
+        if env_path:
+            candidates.append(env_path)
+        candidates.extend(_pkg_config_candidates())
+        candidates.extend(_linux_system_candidates())
+    return _dedupe_candidates(candidates)
 
 
 _REQUIRED_SYMBOLS = (
@@ -345,7 +369,7 @@ def _get_lib() -> ctypes.CDLL:
         return _lib
 
     errors: list[str] = []
-    for path in _library_candidates():
+    for path in library_candidates():
         try:
             loaded = ctypes.CDLL(path)
             _bind_functions(loaded, path)

@@ -2,12 +2,20 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pygame
 
-from cleave.paths import repo_root
+from cleave.paths import resource_dir
 from cleave.viz.theme import tuning_ui_metrics
 
-FONT_PATH = repo_root() / "assets/fonts/MaterialIcons-Regular.ttf"
+_FONT_RELATIVE = Path("assets/fonts/MaterialIcons-Regular.ttf")
+
+
+def font_path() -> Path:
+    """Return the bundled Material Icons TTF (checkout or frozen resources)."""
+    return resource_dir() / _FONT_RELATIVE
+
 
 FOLDER_GLYPH = "\ue2c7"
 FILE_GLYPH = "\ue24d"
@@ -33,7 +41,7 @@ _font_cache: dict[int, pygame.font.Font] = {}
 
 def material_font(size: int) -> pygame.font.Font:
     if size not in _font_cache:
-        _font_cache[size] = pygame.font.Font(str(FONT_PATH), size)
+        _font_cache[size] = pygame.font.Font(str(font_path()), size)
     return _font_cache[size]
 
 

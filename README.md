@@ -6,7 +6,7 @@ Stem-separated music visualizer. Layer together drums, bass, vocal and other ste
 
 Comprehensive visual editor allows you to browse and tune presets in real time - automate preset switching, layer in effects, post processing and a whole bunch more. Render the final output in high definition and high frame rates using `ffmpeg`.
 
-Built on [projectM](https://github.com/projectM-visualizer/projectM) and [Demucs](https://github.com/facebookresearch/demucs) amongst [others](#attribution). Developed on WSL2; should run on any Linux with a display.
+Built on [projectM](https://github.com/projectM-visualizer/projectM) and [Demucs](https://github.com/facebookresearch/demucs) amongst [others](#attribution). Developed on WSL2; Linux with a display is the current checkout setup. A Windows play/render zip is documented under [Windows zip](#windows-zip).
 
 ## Requirements
 
@@ -67,11 +67,32 @@ pip install -r requirements-dev.txt
 
 ### Releases
 
-GitHub Releases are tagged source archives (`vX.Y.Z`). Pick a tag, unpack it, and follow Setup above (plus [Get Some Milkdrop Presets](#get-some-milkdrop-presets)). System deps (Python 3.10+, FFmpeg, libprojectM 4.2+) are not bundled. `cleave --version` reports the running version.
+GitHub Releases are tagged source archives (`vX.Y.Z`) for Linux/WSL. Pick a tag, unpack it, and follow Setup above (plus [Get Some Milkdrop Presets](#get-some-milkdrop-presets)). System deps (Python 3.10+, FFmpeg, libprojectM 4.2+) are not bundled. `cleave --version` reports the running version.
+
+From the next tagged release, a Windows x64 zip (`cleave-<version>-windows-x64.zip`) is attached as well. [`v0.1.0`](https://github.com/SpoddyCoder/cleave/releases/tag/v0.1.0) is source-only. Until then, testers can download a zip from Actions via `workflow_dispatch` on [.github/workflows/windows-freeze.yml](.github/workflows/windows-freeze.yml) (5-day artifact).
 
 `main` is the integration trunk. User-visible work lands there and adds a bullet under `[Unreleased]` in [CHANGELOG.md](CHANGELOG.md) in the same change. `cleave.__version__` stays at the last shipped tag until a milestone. Then Unreleased becomes a dated `X.Y.Z` section, the version is bumped, and `vX.Y.Z` is tagged from `main`. No calendar cadence. Do not collect work on a long-lived release or `develop` branch.
 
 How to cut a tag: [docs/structured-releases.md](docs/structured-releases.md).
+
+### Windows zip
+
+Unpack `cleave-<version>-windows-x64.zip` and run from that folder (not Program Files):
+
+```
+cleave.exe play <project>
+cleave.exe render <project>
+```
+
+The build is unsigned. If SmartScreen warns, choose Run anyway.
+
+User data lives in `Documents\cleave\` (same `projects/`, `presets/`, `textures/` tree as Linux). Settings: `%APPDATA%\cleave\config.yaml`. Override the data root with `CLEAVE_DATA`.
+
+Stem split is not in the Windows zip. Separate on Linux and copy the project into `Documents\cleave\projects\`. `cleave.exe separate` and raw-audio `play` print a short message rather than splitting.
+
+Milkdrop presets still go under `Documents\cleave\presets` (see [Get Some Milkdrop Presets](#get-some-milkdrop-presets); use that path instead of `~/.local/share/cleave/`).
+
+Maintainers: [docs/windows-freeze.md](docs/windows-freeze.md).
 
 ## Quick Start
 
@@ -194,18 +215,30 @@ The project directory stores all files required in a self-contained bundle...
 * `presets/` - presets used by the project are copied into the project directory
 
 ### Configuration
-Cleave uses the XDG standard for user data and configuration, default locations...
+Cleave uses OS user-data directories. Default locations...
+
+Linux (XDG):
 
 * User data: `~/.local/share/cleave/`
   * `projects/`
   * `presets/`
   * `presets/favourites/`
   * `presets/blacklist/`
-* Override the data root with `CLEAVE_DATA` (e.g. `CLEAVE_DATA=.` for a dev checkout).
 * Configuration: `~/.config/cleave/config.yaml`
   * Editor settings (preview quality, panel width, fade)
-* When a project omits `paths`, preset browsing defaults to `~/.local/share/cleave/presets`.
+
+Windows (checkout or the [Windows zip](#windows-zip)):
+
+* User data: `Documents\cleave\` (same `projects/`, `presets/`, `textures/` tree)
+* Configuration: `%APPDATA%\cleave\config.yaml`
+
+On every OS:
+
+* Override the data root with `CLEAVE_DATA` (e.g. `CLEAVE_DATA=.` for a dev checkout).
+* When a project omits `paths`, preset browsing defaults to `<data root>/presets`.
   * `paths.preset_root` in `cleave-viz.yaml` overrides this default when set.
+
+Windows freeze layout and FFmpeg/libprojectM sidecars: [docs/windows-freeze.md](docs/windows-freeze.md).
 
 ---
 
