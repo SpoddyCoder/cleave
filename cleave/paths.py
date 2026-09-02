@@ -72,7 +72,7 @@ def windows_documents_dir() -> Path:
     """Return the Windows Documents known folder, or ``~/Documents``."""
     try:
         from ctypes import POINTER, Structure, byref, c_wchar_p, windll
-        from ctypes.wintypes import BYTE, DWORD, HANDLE, HRESULT, WORD
+        from ctypes.wintypes import BYTE, DWORD, HANDLE, LONG, WORD
 
         class GUID(Structure):
             _fields_ = [
@@ -92,7 +92,7 @@ def windows_documents_dir() -> Path:
             HANDLE,
             POINTER(c_wchar_p),
         ]
-        get_path.restype = HRESULT
+        get_path.restype = LONG
         result = get_path(byref(folder_id), 0, None, byref(path_ptr))
         if result != 0 or not path_ptr.value:
             raise OSError(f"SHGetKnownFolderPath failed: {result}")
@@ -100,7 +100,7 @@ def windows_documents_dir() -> Path:
             return Path(path_ptr.value)
         finally:
             windll.ole32.CoTaskMemFree(path_ptr)
-    except (AttributeError, OSError, ValueError):
+    except (AttributeError, ImportError, OSError, ValueError):
         return Path.home() / "Documents"
 
 

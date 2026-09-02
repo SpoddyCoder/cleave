@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import ast
+import builtins
 import sys
 from pathlib import Path
 
@@ -20,6 +22,7 @@ from cleave.paths import (
     resource_dir,
     resolve_project,
     validate_project_slug,
+    windows_documents_dir,
 )
 
 
@@ -72,6 +75,32 @@ def test_data_dir_windows_documents_fallback(monkeypatch: pytest.MonkeyPatch) ->
     )
     expected = (Path.home() / "Documents" / "cleave").resolve()
     assert data_dir() == expected
+
+
+def test_windows_documents_dir_does_not_import_hresult_from_wintypes() -> None:
+    source = (repo_root() / "cleave" / "paths.py").read_text(encoding="utf-8")
+    wintypes_imports: list[set[str]] = []
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.ImportFrom) and node.module == "ctypes.wintypes":
+            names = {alias.name for alias in node.names}
+            assert "HRESULT" not in names
+            wintypes_imports.append(names)
+    assert wintypes_imports, "expected ctypes.wintypes import in cleave/paths.py"
+    assert "HRESULT" not in source
+
+
+def test_windows_documents_dir_import_error_falls_back(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    real_import = builtins.__import__
+
+    def fail_ctypes(name: str, *args: object, **kwargs: object) -> object:
+        if name == "ctypes" or name.startswith("ctypes."):
+            raise ImportError("simulated ctypes miss")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", fail_ctypes)
+    assert windows_documents_dir() == Path.home() / "Documents"
 
 
 def test_default_preset_root_follows_data_dir(
