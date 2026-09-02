@@ -9,7 +9,7 @@ import numpy as np
 
 from cleave.blend_modes import BlendMode
 from cleave.cue_roles import CUE_ROLE_BLEND, CueRole
-from cleave.extract import StemSource
+from cleave.stems import StemSource
 from cleave.signals import Signals
 from cleave.timeline import LEVEL_QUANTUM, clamp_level, quantize_level
 

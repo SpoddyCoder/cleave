@@ -30,7 +30,7 @@ from cleave.config_schema.render import (
     DEFAULT_RENDER_HEIGHT,
     DEFAULT_RENDER_WIDTH,
 )
-from cleave.extract import STEM_NAMES, stems_dir
+from cleave.stems import STEM_NAMES, stems_dir
 from cleave.project import write_manifest
 from cleave.separate import project_stems_complete
 

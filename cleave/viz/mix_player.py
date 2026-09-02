@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 from pygame._sdl2 import AUDIO_F32, AudioDevice, get_audio_device_names
 
-from cleave.extract import StemSource
+from cleave.stems import StemSource
 from cleave.viz.transport_clock import TransportClock
 
 if TYPE_CHECKING:

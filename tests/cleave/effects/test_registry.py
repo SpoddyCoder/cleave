@@ -13,7 +13,7 @@ from cleave.effects.registry import (
     validate_effect_entry,
 )
 from cleave.effects.handlers import EFFECT_HANDLERS
-from cleave.extract import STEM_SOURCES
+from cleave.stems import STEM_SOURCES
 
 
 def test_effect_ids_and_driver_slugs() -> None:

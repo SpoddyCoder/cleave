@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from cleave.extract import STEM_SOURCES, StemSource
+from cleave.stems import STEM_SOURCES, StemSource
 
 EFFECT_IDS = frozenset({"pulse", "flash", "hue", "grit"})
 

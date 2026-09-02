@@ -19,7 +19,7 @@ _YAML_DUMP_WIDTH = 2**31 - 1
 from cleave.blend_modes import BlendMode
 from cleave.paths import default_preset_root, default_texture_paths, resource_dir
 from cleave.effects.constants import clamp_effect_pct
-from cleave.extract import StemSource
+from cleave.stems import StemSource
 from cleave.config_schema.descriptors import (
     as_mapping,
     require_non_negative_number,

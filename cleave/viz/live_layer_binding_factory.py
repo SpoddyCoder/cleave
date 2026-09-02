@@ -9,7 +9,7 @@ from pathlib import Path
 from cleave.config import CleaveConfig
 from cleave.config_snapshot import next_unnamed_path, write_session_snapshot
 from cleave.effects.runtime import EffectRuntime
-from cleave.extract import StemSource
+from cleave.stems import StemSource
 from cleave.gl_compositor import GlCompositor
 from cleave.gl_post_process import GlPostProcess
 from cleave.milk_textures import sync_project_textures

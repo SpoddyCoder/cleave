@@ -82,7 +82,7 @@ What landed:
 - Frozen FFmpeg lookup in [cleave/ffmpeg.py](../cleave/ffmpeg.py): beside the exe only; no PATH fallback. Checkout still uses PATH.
 - ctypes: frozen or `win32` searches `install_dir()` first (`projectM-4.dll` / `projectM-4-playlist.dll`), then env vars. Linux checkout order is unchanged.
 - [packaging/cleave.spec](../packaging/cleave.spec): PyInstaller onedir, pygame collected, excludes `torch` / `demucs` / `beat_this` / `librosa` / `matplotlib`. `datas`: `cleave-viz.yaml` and `assets/fonts/` (including `MaterialIcons-Regular.ttf`).
-- Stem-split guard in [cleave/separate.py](../cleave/separate.py) (`require_stem_split`) for a short frozen error. Import graph still bypasses it (see 2.2 leftover).
+- Stem-split guard in [cleave/separate.py](../cleave/separate.py) (`require_stem_split`) for a short frozen error.
 - Design note: [windows-freeze.md](windows-freeze.md).
 
 How the 2.1 freeze was built (reuse this env on the same Windows machine):
@@ -92,18 +92,16 @@ How the 2.1 freeze was built (reuse this env on the same Windows machine):
 - `pyinstaller packaging/cleave.spec` from the repo root. Output: `dist\cleave\cleave.exe` next to `_internal\`.
 - Sidecars (ffmpeg, DLLs) are a post-build copy into `dist\cleave\`, not `_internal`. 2.1 did not copy them.
 
-Proven leftover (fix in 2.2 before play/render proof): `cleave.exe separate <wav>` dies with `ModuleNotFoundError: No module named 'librosa'` instead of the short "not in this Windows build" message. `cmd_separate` imports [cleave/config.py](../cleave/config.py), which loads [cleave/effects/](../cleave/effects/) then [cleave/extract.py](../cleave/extract.py) (`import librosa` at module level) before `require_stem_split` runs. Play/render will hit the same class of bug via [cleave/pcm_io.py](../cleave/pcm_io.py) (librosa resample). Do not bundle torch. Either lazy-import / move `StemSource` off `extract.py` and replace PCM resample (soxr is already a dependency), or bundle `librosa` only. Friendly `separate` / raw-audio `play` failure is a 2.2 gate, not optional polish.
-
 ### 2.2 Play and render freeze (next)
 
 This is the Phase 2 milestone. Start from [windows-freeze.md](windows-freeze.md). Build on Windows; do not cross-compile from WSL.
 
 Do, in order:
 
-1. **Torch-free import graph.** Existing-project `play` must not import torch or (unless you choose to bundle it) librosa. `play` on a raw audio file, and `separate`, must fail with the short frozen message, not a PyInstaller traceback. Cover this with unit tests on Linux (monkeypatch frozen, assert no `librosa`/`torch` import on the complete-project path).
+1. **Torch-free import graph.** (done in tree) Stem types and paths live in [cleave/stems.py](../cleave/stems.py). PCM resample uses soxr in [cleave/pcm_io.py](../cleave/pcm_io.py). Analyse still uses librosa in [cleave/extract.py](../cleave/extract.py). Existing-project play/render do not import torch or librosa. Frozen `separate` and raw-audio `play` raise `STEM_SPLIT_MISSING_FROZEN`. Covered by unit tests on Linux (block librosa/torch, assert the complete-project import path stays clean).
 2. **libprojectM 4.2+ DLLs.** Maintainer build on Windows. Recommendation in the freeze note: vcpkg + Visual Studio 2022, `x64-windows` shared triplet, names `projectM-4.dll` and `projectM-4-playlist.dll`. Confirm version is 4.2+ (needs `_opengl_render_frame_fbo` and `_set_frame_time`). Copy those DLLs plus any non-system dependents (`dumpbin /dependents`; zlib is the usual extra) next to `cleave.exe`. Include libprojectM licenses under `licenses/libprojectM/`. Testers do not install Visual Studio. Document the VS 2022 x64 C++ redistributable (or app-local `vcruntime140.dll` / `msvcp140.dll`).
 3. **FFmpeg sidecar.** Copy a 64-bit Windows `ffmpeg.exe` next to `cleave.exe` and its license into `licenses/ffmpeg/`. Frozen lookup already prefers that path.
-4. **Freeze play/render.** Reuse [packaging/cleave.spec](../packaging/cleave.spec). pygame/SDL already collect. Add hiddenimports only if play/render miss modules (moderngl, PyOpenGL, and similar). Keep torch/Demucs excluded. After `pyinstaller`, copy ffmpeg + DLLs + licenses into `dist\cleave\`, then zip that folder.
+4. **Freeze play/render.** Reuse [packaging/cleave.spec](../packaging/cleave.spec). pygame/SDL and soxr already collect. Add hiddenimports only if play/render miss modules (moderngl, PyOpenGL, and similar). Keep torch/Demucs/librosa/matplotlib excluded. After `pyinstaller`, copy ffmpeg + DLLs + licenses into `dist\cleave\`, then zip that folder.
 5. **Manual GPU proof.** Copy an existing Linux/WSL project (stems + `signals.json`) onto the Windows box. `cleave.exe play <project>` must open the editor. Short `cleave.exe render` must write an MP4. Support matrix: 64-bit Windows, GPU driver. Unsigned is fine (SmartScreen: Run anyway).
 
 Do not: bundle torch/Demucs; tag a release unless asked; add a CI freeze job (Phase 3); put sidecars in `_internal`; require testers to compile libprojectM.
@@ -181,4 +179,4 @@ Do not block Phases 1-4 on these. Revisit after binaries exist.
 
 ## Suggested order of analysis
 
-Phase 1 and 2.1 are done. Phase 2 product decisions are locked above. Next is 2.2 (import-graph fix, libprojectM Windows DLLs, FFmpeg sidecar, play/render freeze, tester zip) using [windows-freeze.md](windows-freeze.md). Later notes: CI and installer (Phase 3), Linux packaging plus macOS signing (Phase 4). Keep remaining implementation choices in that note, not in this overview.
+Phase 1 and 2.1 are done. Phase 2 product decisions are locked above. Next is 2.2 (libprojectM Windows DLLs, FFmpeg sidecar, play/render freeze, tester zip) using [windows-freeze.md](windows-freeze.md); the torch-free import graph is in the tree. Later notes: CI and installer (Phase 3), Linux packaging plus macOS signing (Phase 4). Keep remaining implementation choices in that note, not in this overview.

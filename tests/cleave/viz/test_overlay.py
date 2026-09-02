@@ -10,7 +10,7 @@ from cleave.config_schema.layers import (
     MAX_LAYER_COUNT,
 )
 from tests.support.config import TEST_LAYER_STEMS
-from cleave.extract import STEM_NAMES
+from cleave.stems import STEM_NAMES
 from cleave.viz.frame_rate import FPS_DISPLAY_LABEL
 from cleave.viz.focus_nav import MainFocus
 from cleave.viz.row_kinds import RowDescriptor, RowKind

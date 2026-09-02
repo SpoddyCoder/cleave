@@ -9,7 +9,7 @@ import pygame
 
 from cleave.config_schema.layers import DEFAULT_LAYER_SLOTS
 from tests.support.config import TEST_LAYER_STEMS
-from cleave.extract import STEM_NAMES
+from cleave.stems import STEM_NAMES
 from cleave.viz.app import LiveVisualizerRuntime, VisualizerSeed
 from cleave.viz.focus_nav import MainFocus, TimelineFocus
 from cleave.viz.controls import TuningControls

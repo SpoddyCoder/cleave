@@ -14,7 +14,7 @@ from cleave.config_schema.layers import (
     preset_switching_trigger_display,
 )
 from cleave.cue_roles import CUE_ROLE_MARKER_HELP_ENTRIES
-from cleave.extract import stem_control_label
+from cleave.stems import stem_control_label
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
 from cleave.viz.row_sections import apply_expand_toggle
 from cleave.viz.row_spec import FitStrategy, RowPresentStyle, RowSpec

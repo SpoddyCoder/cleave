@@ -7,7 +7,7 @@ from typing import Any
 from cleave.blend_modes import BLEND_MODES, BlendMode
 from cleave.cue_roles import CUE_ROLES, CueRole
 from cleave.cut_types import CUT_TYPES, CutType
-from cleave.extract import StemSource
+from cleave.stems import StemSource
 
 
 def validate_blend_mode(raw: Any, *, path: str) -> BlendMode:

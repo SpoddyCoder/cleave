@@ -12,7 +12,7 @@ from cleave.config_schema.layers import (
     next_layer_slot,
 )
 from cleave.effects.runtime import EffectRuntime
-from cleave.extract import STEM_SOURCES
+from cleave.stems import STEM_SOURCES
 from cleave.gl_compositor import GlCompositor
 from cleave.gl_masked_compositor import GlMaskedCompositor
 from cleave.gl_post_process import GlPostProcess

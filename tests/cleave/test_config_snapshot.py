@@ -53,7 +53,7 @@ from cleave.config_snapshot import (
     persisted_session_signature,
     write_session_snapshot,
 )
-from cleave.extract import STEM_NAMES
+from cleave.stems import STEM_NAMES
 from cleave.preset_playlist import playlist_at_dir
 from cleave.timeline import SlotCue, TimelineLane
 from cleave.viz.session import (

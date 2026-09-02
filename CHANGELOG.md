@@ -17,6 +17,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Land P0-P4 architecture work: session is the sole live layer authority, compositor live/offline share one contract, and the tuning panel is a RowSpec registry (`row_spec` / `row_specs/`). Config parse and defaults live in `config_schema/`.
 - Document trunk-based releases: `main` is the integration trunk; user-visible notes land under Unreleased; tags are cut from `main` at milestones.
 - Default preset and texture paths follow the data root on every OS (including `XDG_DATA_HOME` on Linux).
+- Play and render no longer import librosa at load (stem types in `cleave.stems`, PCM resample via soxr). Frozen `separate` and raw-audio `play` fail with a short stem-split message.
 
 ## [0.1.0] - 2026-08-31
 

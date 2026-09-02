@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 
 from cleave.cue_roles import CUE_ROLE_BLEND
-from cleave.extract import StemSource
+from cleave.stems import StemSource
 from cleave.signals import Signals
 from cleave.timeline import (
     LEVEL_QUANTUM,
