@@ -9,7 +9,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 
-- Windows CI freeze prep: committed libprojectM 4.2 DLLs, LGPL license tree, and [packaging/windows/README.md](packaging/windows/README.md); [requirements-freeze.txt](requirements-freeze.txt) pins torch-free PyInstaller deps.
+- Windows x64 zip (`cleave-<version>-windows-x64.zip`) on tagged GitHub Releases, from the next tag ([`v0.1.0`](https://github.com/SpoddyCoder/cleave/releases/tag/v0.1.0) is source-only). Until then, `workflow_dispatch` on [.github/workflows/windows-freeze.yml](.github/workflows/windows-freeze.yml) uploads a 5-day Actions artifact. Unpack, SmartScreen "Run anyway", `cleave.exe play` / `render` from that folder. Stem split is not in the zip; copy a project from Linux.
 - Relocatable install and resource paths for frozen builds, Windows defaults under `Documents\cleave\` and `%APPDATA%\cleave\`, and a PyInstaller onedir skeleton ([docs/windows-freeze.md](docs/windows-freeze.md)).
 - Manual Windows play/render freeze: unpack a zip, `cleave.exe play` an existing project, short `cleave.exe render` to MP4. Stem split is not in this build.
 - FFmpeg lookup beside the frozen executable (checkout still uses PATH).
