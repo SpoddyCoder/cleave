@@ -1,8 +1,8 @@
 # Windows freeze (Phase 2)
 
-How Cleave locates files when frozen, how testers unpack a Windows onedir zip, and how to build libprojectM 4.2+ DLLs for Phase 2.2. Product decisions live in [structured-releases.md](structured-releases.md). This note is the implementation design for 2.1 (paths, FFmpeg sidecar, PyInstaller skeleton) and the Windows native-build analysis for 2.2.
+How Cleave locates files when frozen, how testers unpack a Windows onedir zip, and how to build libprojectM 4.2+ DLLs for Phase 2.2. Product decisions and 2.2 pickup live in [structured-releases.md](structured-releases.md). This note is the implementation design: 2.1 paths/spec/FFmpeg/ctypes (done) and the Windows native-build analysis for 2.2.
 
-2.1 does not ship a zip. Testers will freeze on a Windows machine later. Do not cross-compile the GUI stack from WSL.
+2.1 is proven on a native Windows box: `cleave.exe --version` and `cleave.exe --help`. Do not cross-compile the GUI stack from WSL. 2.2 still builds on Windows, copies sidecars next to the exe, and proves play/render.
 
 Related: [cleave/paths.py](../cleave/paths.py), [cleave/ffmpeg.py](../cleave/ffmpeg.py), [packaging/cleave.spec](../packaging/cleave.spec), [cleave/projectm.py](../cleave/projectm.py), [cleave/projectm_playlist.py](../cleave/projectm_playlist.py).
 
@@ -51,14 +51,14 @@ cleave/
 
 Sidecars must sit next to `cleave.exe`. Files in `_internal` are bundled resources. Mixing those two is a common freeze bug.
 
-Manual 2.1 proof (no GPU, no DLLs, no torch):
+Manual 2.1 proof (met; no GPU, no DLLs, no torch):
 
 ```
 cleave.exe --version
 cleave.exe --help
 ```
 
-Phase 2.2 proof: `cleave.exe play <existing-project>` and a short `cleave.exe render` on a Windows box with a GPU driver. Copy `projects/` from Linux; do not run `separate` in this zip.
+Phase 2.2 proof: `cleave.exe play <existing-project>` and a short `cleave.exe render` on a Windows box with a GPU driver. Copy `projects/` from Linux; do not run `separate` in this zip. Fix the librosa import graph first (see PyInstaller spec below); 2.1 `separate` currently traceback instead of the short frozen message.
 
 ---
 
@@ -88,7 +88,12 @@ Then copy `ffmpeg.exe` (and 2.2 DLLs) into `dist/cleave/`, not `dist/cleave/_int
 
 `play` on an existing project (stems + `signals.json`) must not import torch. `play` on raw audio, and `separate`, fail with a short message that stem split is not in this Windows build; copy a project from Linux.
 
-`librosa` is excluded here because analysis is not in the zip. Phase 2.2 play/render still loads stem PCM through [cleave/pcm_io.py](../cleave/pcm_io.py), which currently imports librosa for resample. 2.2 must either bundle librosa or replace that resample path. Do not add torch.
+`librosa` is excluded because analysis is not in the zip. That exclude is not freeze-safe yet:
+
+- [cleave/cli.py](../cleave/cli.py) `cmd_separate` imports [cleave/config.py](../cleave/config.py), which loads [cleave/effects/](../cleave/effects/) then [cleave/extract.py](../cleave/extract.py) (`import librosa` at module level). Proven on Windows: `cleave.exe separate <wav>` raises `ModuleNotFoundError: No module named 'librosa'` instead of `require_stem_split`.
+- Phase 2.2 play/render loads stem PCM through [cleave/pcm_io.py](../cleave/pcm_io.py), which imports librosa for resample.
+
+2.2 must make those paths work without torch. Prefer lazy imports and soxr (already in [requirements.txt](../requirements.txt)) over bundling librosa. Do not add torch.
 
 ---
 
@@ -110,7 +115,7 @@ Linux frozen names stay `libprojectM-4.so` and `libprojectM-4-playlist.so` (plus
 
 ## Windows libprojectM 4.2+ build
 
-Do not run this build in 2.1. 2.2 copies the DLLs next to `cleave.exe`. Testers must not compile Visual Studio.
+Do not run this build until 2.2. 2.2 copies the DLLs next to `cleave.exe`. Testers must not compile Visual Studio.
 
 ### Recommendation
 
@@ -152,10 +157,10 @@ Then zip `dist/cleave/`.
 
 ## Seed presets and textures
 
-Still open: whether a seed preset/texture pack ships in the zip, or testers copy packs into `Documents\cleave\presets` and `Documents\cleave\textures` (same tree as Linux `~/.local/share/cleave/`). First-run download is Later. 2.1 does not decide this.
+Still open: whether a seed preset/texture pack ships in the zip, or testers copy packs into `Documents\cleave\presets` and `Documents\cleave\textures` (same tree as Linux `~/.local/share/cleave/`). First-run download is Later. 2.2 may choose either; do not block play/render on a bundled pack.
 
 ---
 
 ## Out of scope here
 
-libprojectM Windows build execution; pygame GPU editor proof; play/render freeze proof; torch in the zip; installer/signing/CI freeze; macOS Application Support.
+Installer, signing, and CI freeze (Phase 3); torch in the zip; macOS Application Support. 2.2 owns libprojectM build execution, pygame GPU editor proof, and play/render freeze proof.

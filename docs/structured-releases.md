@@ -2,9 +2,9 @@
 
 Move Cleave from checkout-based development to versioned GitHub Releases.
 
-Phase 1 is done (`v0.1.0`). Phase 2 product decisions are locked in this doc. Implement Phase 2 as two slices (foundation, then play/render freeze); freeze scripts and Windows native-build details still get a dedicated analysis before 2.2. Phases 3 and 4 stay directions until then.
+Phase 1 is done (`v0.1.0`). Phase 2.1 is done (relocatable paths, Windows data dirs, PyInstaller onedir skeleton, `cleave.exe --version` / `--help` on a native Windows box). Phase 2.2 is next: libprojectM DLLs plus play/render freeze into one tester zip. Product decisions stay locked below. Phases 3 and 4 stay directions until 2.2 ships.
 
-Related: [README.md](../README.md) (current Linux/WSL setup), [completed/user-data-and-config-plan.md](completed/user-data-and-config-plan.md) (install vs user data), [cleave/paths.py](../cleave/paths.py), [cleave/projectm.py](../cleave/projectm.py), [windows-freeze.md](windows-freeze.md) (Phase 2 relocatable paths, FFmpeg sidecar, PyInstaller spec, Windows libprojectM build analysis).
+Related: [README.md](../README.md) (current Linux/WSL setup), [completed/user-data-and-config-plan.md](completed/user-data-and-config-plan.md) (install vs user data), [cleave/paths.py](../cleave/paths.py), [cleave/projectm.py](../cleave/projectm.py), [windows-freeze.md](windows-freeze.md) (paths, spec, FFmpeg sidecar, ctypes names, libprojectM build recommendation).
 
 ---
 
@@ -16,7 +16,7 @@ Decide these once, then reuse. Refine per phase rather than reinventing them.
 - **Changelog.** [CHANGELOG.md](../CHANGELOG.md) in Keep a Changelog format (`## [Unreleased]`, then `## [X.Y.Z] - YYYY-MM-DD` with Added / Changed / Fixed / Removed as appropriate). Each GitHub Release body is that version's section, extracted by [scripts/changelog_section.py](../scripts/changelog_section.py).
 - **User data vs install.** Frozen or zip installs must not write projects, presets, or configs into the app folder. Linux data stays XDG (`~/.local/share/cleave/`, config in `~/.config/cleave/`). Windows data mirrors that tree under `Documents\cleave\`; only the global settings file lives in `%APPDATA%\cleave\`. macOS Application Support is Phase 4. See the user-data plan.
 - **Editor vs `separate`.** Play and offline render need pygame, OpenGL, libprojectM, and FFmpeg. Stem split needs Demucs and PyTorch (and optionally CUDA). The first Windows freeze does not bundle torch. GPU torch stays a later extra.
-- **Native deps.** libprojectM 4.2+ (core + playlist) and FFmpeg are not Python packages. Every binary OS needs a build or sidecar story. Current ctypes loaders only search Linux `.so` paths.
+- **Native deps.** libprojectM 4.2+ (core + playlist) and FFmpeg are not Python packages. Every binary OS needs a build or sidecar story. Frozen/Windows ctypes search is beside the exe, then `PROJECTM_LIB` / `PROJECTM_PLAYLIST_LIB`. Linux checkout still uses env, pkg-config, then system `.so` paths.
 - **Build where you ship.** Produce Windows artifacts on Windows, macOS on macOS, Linux on Linux. Do not cross-compile the GUI stack from WSL.
 - **Licenses.** Bundling FFmpeg, libprojectM, pygame/SDL, and preset packs means shipping their licenses and attribution, not only Cleave's MIT [LICENSE](../LICENSE).
 - **GPU in CI.** GitHub-hosted runners cannot validate live compositing. Automate freeze and unit tests; keep a short manual GPU checklist per OS.
@@ -69,17 +69,44 @@ Met. A Linux/WSL user can unpack a tagged source archive from GitHub, install th
 
 Goal: a usable Windows build of play (and ideally render) that you can hand to a tester. Manual build is fine. Unsigned is fine.
 
-This is the first freeze, so most of the porting work lands here even if CI does not. Implement as two slices, then one zip. Do not tag a `separate`-only Windows release. Phases 1-4 are not re-ordered.
+This is the first freeze, so most of the porting work lands here even if CI does not. Two slices, then one zip. Do not tag a `separate`-only Windows release. Phases 1-4 are not re-ordered. Do not freeze Demucs or PyTorch. Testers separate on Linux/WSL (or use an existing project) and copy `projects/` onto Windows. `separate` (CPU torch in-box vs "install torch yourself" vs skip) stays a later product choice, not a 2.2 gate. CUDA `separate` stays in Later.
 
-### Build order
+### 2.1 Shared Windows foundation (done)
 
-**2.1 Shared Windows foundation.** Relocatable paths (`sys.frozen` or equivalent) so the checkout layout in [cleave/paths.py](../cleave/paths.py) is not required; default data root `Documents\cleave\`; global settings in `%APPDATA%\cleave\`; FFmpeg beside the exe; ctypes search beside the exe then `PROJECTM_LIB`; PyInstaller onedir skeleton. Prove with `cleave.exe --version` and CLI help. No GPU, libprojectM, or torch required. Design note: [windows-freeze.md](windows-freeze.md) (relocatable paths, Windows libprojectM build analysis, PyInstaller spec). The libprojectM build itself lands in 2.2.
+Landed in the tree. Manual proof on a native Windows box (not WSL): `cleave.exe --version` prints `cleave 0.1.0`; `cleave.exe --help` lists `separate` / `play` / `render` / `backup` / `restore`. No GPU, libprojectM DLLs, FFmpeg sidecar, or torch were required for that proof. No tag and no `__version__` bump; 2.1 is not a GitHub Release.
 
-**2.2 Play and render freeze.** Ship libprojectM 4.2+ DLLs (core + playlist) next to the exe, pygame/SDL inside the freeze, and a tester zip. This is the Phase 2 milestone.
+What landed:
 
-Do not freeze Demucs or PyTorch in 2.1 or 2.2. A torch freeze is a different problem and would inflate the one locked `cleave.exe` for every play tester. Testers separate on Linux/WSL (or use an existing project) and copy `projects/` onto Windows. `play` must open an existing project without torch. `play` on a raw audio file, and `separate`, fail clearly if torch is not in the freeze.
+- Relocatable roots in [cleave/paths.py](../cleave/paths.py): `is_frozen()`, `install_dir()` (exe dir / sidecars), `resource_dir()` (`sys._MEIPASS` / bundled files). Runtime template YAML and fonts use `resource_dir()`, not `repo_root()`.
+- Windows data root `Documents\cleave\` (Known Folder, `CLEAVE_DATA` still overrides). User config `%APPDATA%\cleave\config.yaml`. Preset/texture defaults follow `data_dir()`.
+- Frozen FFmpeg lookup in [cleave/ffmpeg.py](../cleave/ffmpeg.py): beside the exe only; no PATH fallback. Checkout still uses PATH.
+- ctypes: frozen or `win32` searches `install_dir()` first (`projectM-4.dll` / `projectM-4-playlist.dll`), then env vars. Linux checkout order is unchanged.
+- [packaging/cleave.spec](../packaging/cleave.spec): PyInstaller onedir, pygame collected, excludes `torch` / `demucs` / `beat_this` / `librosa` / `matplotlib`. `datas`: `cleave-viz.yaml` and `assets/fonts/` (including `MaterialIcons-Regular.ttf`).
+- Stem-split guard in [cleave/separate.py](../cleave/separate.py) (`require_stem_split`) for a short frozen error. Import graph still bypasses it (see 2.2 leftover).
+- Design note: [windows-freeze.md](windows-freeze.md).
 
-`separate` (CPU torch in-box vs "install torch yourself" vs skip) stays a later product choice, not a 2.2 gate. CUDA `separate` stays in Later.
+How the 2.1 freeze was built (reuse this env on the same Windows machine):
+
+- Native clone or copy at `C:\src\cleave` (not `\\wsl$\` and not WSL Python).
+- Venv with `pyinstaller`, `pygame`, `PyYAML`, `numpy` only. Do not `pip install -r requirements.txt` (that pulls torch).
+- `pyinstaller packaging/cleave.spec` from the repo root. Output: `dist\cleave\cleave.exe` next to `_internal\`.
+- Sidecars (ffmpeg, DLLs) are a post-build copy into `dist\cleave\`, not `_internal`. 2.1 did not copy them.
+
+Proven leftover (fix in 2.2 before play/render proof): `cleave.exe separate <wav>` dies with `ModuleNotFoundError: No module named 'librosa'` instead of the short "not in this Windows build" message. `cmd_separate` imports [cleave/config.py](../cleave/config.py), which loads [cleave/effects/](../cleave/effects/) then [cleave/extract.py](../cleave/extract.py) (`import librosa` at module level) before `require_stem_split` runs. Play/render will hit the same class of bug via [cleave/pcm_io.py](../cleave/pcm_io.py) (librosa resample). Do not bundle torch. Either lazy-import / move `StemSource` off `extract.py` and replace PCM resample (soxr is already a dependency), or bundle `librosa` only. Friendly `separate` / raw-audio `play` failure is a 2.2 gate, not optional polish.
+
+### 2.2 Play and render freeze (next)
+
+This is the Phase 2 milestone. Start from [windows-freeze.md](windows-freeze.md). Build on Windows; do not cross-compile from WSL.
+
+Do, in order:
+
+1. **Torch-free import graph.** Existing-project `play` must not import torch or (unless you choose to bundle it) librosa. `play` on a raw audio file, and `separate`, must fail with the short frozen message, not a PyInstaller traceback. Cover this with unit tests on Linux (monkeypatch frozen, assert no `librosa`/`torch` import on the complete-project path).
+2. **libprojectM 4.2+ DLLs.** Maintainer build on Windows. Recommendation in the freeze note: vcpkg + Visual Studio 2022, `x64-windows` shared triplet, names `projectM-4.dll` and `projectM-4-playlist.dll`. Confirm version is 4.2+ (needs `_opengl_render_frame_fbo` and `_set_frame_time`). Copy those DLLs plus any non-system dependents (`dumpbin /dependents`; zlib is the usual extra) next to `cleave.exe`. Include libprojectM licenses under `licenses/libprojectM/`. Testers do not install Visual Studio. Document the VS 2022 x64 C++ redistributable (or app-local `vcruntime140.dll` / `msvcp140.dll`).
+3. **FFmpeg sidecar.** Copy a 64-bit Windows `ffmpeg.exe` next to `cleave.exe` and its license into `licenses/ffmpeg/`. Frozen lookup already prefers that path.
+4. **Freeze play/render.** Reuse [packaging/cleave.spec](../packaging/cleave.spec). pygame/SDL already collect. Add hiddenimports only if play/render miss modules (moderngl, PyOpenGL, and similar). Keep torch/Demucs excluded. After `pyinstaller`, copy ffmpeg + DLLs + licenses into `dist\cleave\`, then zip that folder.
+5. **Manual GPU proof.** Copy an existing Linux/WSL project (stems + `signals.json`) onto the Windows box. `cleave.exe play <project>` must open the editor. Short `cleave.exe render` must write an MP4. Support matrix: 64-bit Windows, GPU driver. Unsigned is fine (SmartScreen: Run anyway).
+
+Do not: bundle torch/Demucs; tag a release unless asked; add a CI freeze job (Phase 3); put sidecars in `_internal`; require testers to compile libprojectM.
 
 ### Locked
 
@@ -93,7 +120,7 @@ Do not freeze Demucs or PyTorch in 2.1 or 2.2. A torch freeze is a different pro
 
 ### Leave open
 
-Whether a seed preset/texture pack ships in the zip versus a documented copy into `Documents\cleave\`, and the exact Windows libprojectM build (vcpkg, CMake, or MSYS2).
+Whether a seed preset/texture pack ships in the zip versus a documented copy into `Documents\cleave\`. libprojectM build tool is recommended (vcpkg + VS 2022) in [windows-freeze.md](windows-freeze.md); confirm at 2.2 build time if the vcpkg port is 4.2+. Do not ship MinGW DLLs unless ctypes names and extra runtimes are updated to match.
 
 ### Done when
 
@@ -154,4 +181,4 @@ Do not block Phases 1-4 on these. Revisit after binaries exist.
 
 ## Suggested order of analysis
 
-Phase 1 is done. Phase 2 product decisions are locked above. Start with 2.1 (paths, FFmpeg sidecar, freeze skeleton, design note in [windows-freeze.md](windows-freeze.md)), then 2.2 (libprojectM Windows build and play/render freeze). Later notes: CI and installer (Phase 3), Linux packaging plus macOS signing (Phase 4). Keep remaining implementation choices in that note, not in this overview.
+Phase 1 and 2.1 are done. Phase 2 product decisions are locked above. Next is 2.2 (import-graph fix, libprojectM Windows DLLs, FFmpeg sidecar, play/render freeze, tester zip) using [windows-freeze.md](windows-freeze.md). Later notes: CI and installer (Phase 3), Linux packaging plus macOS signing (Phase 4). Keep remaining implementation choices in that note, not in this overview.
