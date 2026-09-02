@@ -10,6 +10,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 ### Added
 
 - Relocatable install and resource paths for frozen builds, Windows defaults under `Documents\cleave\` and `%APPDATA%\cleave\`, and a PyInstaller onedir skeleton ([docs/windows-freeze.md](docs/windows-freeze.md)).
+- Manual Windows play/render freeze: unpack a zip, `cleave.exe play` an existing project, short `cleave.exe render` to MP4. Stem split is not in this build.
 - FFmpeg lookup beside the frozen executable (checkout still uses PATH).
 
 ### Changed
