@@ -3,6 +3,10 @@
 Aspirational ideas. Not scheduled; revisit when the core workflow feels solid.
 
 
+## Nuitka freeze
+
+Phase 2 Windows MVP ships PyInstaller ([structured-releases.md](structured-releases.md)). Revisit Nuitka after a working Windows zip exists, for possible faster startup and a tighter native binary. Same onedir layout, sidecars, and data dirs; not a reason to reopen the Phase 2 freezer choice.
+
 ## Undo feature
 
 Session undo/redo for timeline and config edits.

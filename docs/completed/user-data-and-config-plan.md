@@ -41,7 +41,7 @@ Gaps:
 
 ## Target layout
 
-Default to XDG-style paths on Linux. Map to platform equivalents when Cleave ships beyond WSL/Linux (macOS Application Support, Windows `%APPDATA%`).
+Default to XDG-style paths on Linux. Windows (Phase 2 in [structured-releases.md](../structured-releases.md)): data root is `Documents\cleave\` (same `projects/`, `presets/`, `textures/` tree as Linux `~/.local/share/cleave/`); only the global settings file lives in `%APPDATA%\cleave\config.yaml`. macOS Application Support is Phase 4.
 
 ```
 ~/.config/cleave/config.yaml       # user preferences and default paths

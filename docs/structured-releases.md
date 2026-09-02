@@ -2,7 +2,7 @@
 
 Move Cleave from checkout-based development to versioned GitHub Releases.
 
-Phase 1 is specified below. Later phases are still directions: do a dedicated analysis before implementing them. Tooling, installers, and CI details for those phases stay open until then.
+Phase 1 is specified below. Phase 2 product decisions are locked in this doc; freeze scripts and Windows native-build details still get a dedicated analysis before implementing. Phases 3 and 4 stay directions until then.
 
 Related: [README.md](../README.md) (current Linux/WSL setup), [completed/user-data-and-config-plan.md](completed/user-data-and-config-plan.md) (install vs user data), [cleave/paths.py](../cleave/paths.py), [cleave/projectm.py](../cleave/projectm.py).
 
@@ -14,7 +14,7 @@ Decide these once, then reuse. Refine per phase rather than reinventing them.
 
 - **Versioning.** Semver. While pre-1.0, versions are `0.x` (`0.1.0`, `0.2.0`, ...); breaking changes are allowed on minor bumps until 1.0. Single source of truth: `cleave.__version__` in [cleave/__init__.py](../cleave/__init__.py). Tags are `vX.Y.Z` and must match that string. [pyproject.toml](../pyproject.toml) reads the same attr (`[tool.setuptools.dynamic]`); this is metadata only, not a pip install.
 - **Changelog.** [CHANGELOG.md](../CHANGELOG.md) in Keep a Changelog format (`## [Unreleased]`, then `## [X.Y.Z] - YYYY-MM-DD` with Added / Changed / Fixed / Removed as appropriate). Each GitHub Release body is that version's section, extracted by [scripts/changelog_section.py](../scripts/changelog_section.py).
-- **User data vs install.** Frozen or zip installs must not write projects, presets, or configs into the app folder. Platform data dirs (`%APPDATA%`, XDG, Application Support) need to exist before Windows/macOS binaries are useful. See the user-data plan.
+- **User data vs install.** Frozen or zip installs must not write projects, presets, or configs into the app folder. Linux data stays XDG (`~/.local/share/cleave/`, config in `~/.config/cleave/`). Windows data mirrors that tree under `Documents\cleave\`; only the global settings file lives in `%APPDATA%\cleave\`. macOS Application Support is Phase 4. See the user-data plan.
 - **Editor vs `separate`.** Play and offline render need pygame, OpenGL, libprojectM, and FFmpeg. Stem split needs Demucs and PyTorch (and optionally CUDA). Treat GPU torch as a later extra, not a requirement of the first binary.
 - **Native deps.** libprojectM 4.2+ (core + playlist) and FFmpeg are not Python packages. Every binary OS needs a build or sidecar story. Current ctypes loaders only search Linux `.so` paths.
 - **Build where you ship.** Produce Windows artifacts on Windows, macOS on macOS, Linux on Linux. Do not cross-compile the GUI stack from WSL.
@@ -69,18 +69,23 @@ Goal: a usable Windows build of play (and ideally render) that you can hand to a
 
 This is the first freeze, so most of the porting work lands here even if CI does not. Phase 2 bundles relocatable paths ([cleave/paths.py](../cleave/paths.py)) with that freeze, but path relocation is separable and could land before any freezing. Phases are not re-ordered.
 
-Sketch:
+### Locked
 
-- Relocatable app paths (`sys.frozen` / equivalent) so the checkout layout in [cleave/paths.py](../cleave/paths.py) is not required.
-- Windows data dir and a Windows libprojectM loader (`.dll`, plus `PROJECTM_LIB` already supported).
-- Onedir folder with a `cleave.exe` (or similar), not a one-file unpack-every-launch binary.
-- FFmpeg next to the exe or a clear error if it is missing.
-- Document the support matrix in one paragraph: 64-bit Windows, GPU driver, what `separate` does (CPU in-box, skipped, or "install torch yourself").
-- Ship as a zip on the GitHub Release, built on a Windows machine. Installer, signing, and CI wait for Phase 3.
+- **Layout.** Unpack a zip (built on a Windows machine) and run from that folder. Relocatable app paths (`sys.frozen` or equivalent) so the checkout layout in [cleave/paths.py](../cleave/paths.py) is not required. Not Program Files (that is Phase 3). Installer, signing, and CI wait for Phase 3.
+- **One exe, CLI subcommands.** PyInstaller onedir with `cleave.exe`. Testers run it from cmd the same way as Linux (`cleave.exe play ...`, `cleave.exe render ...`). Drag-and-drop onto the window waits for Phase 3. Not two executables.
+- **User data.** `Documents\cleave\` mirrors Linux `~/.local/share/cleave/`: `projects/`, `presets/` (including `favourites/`, `blacklist/`, `roles/`), `textures/`, and anything else that lives under the data root today. `CLEAVE_DATA` still overrides the data root.
+- **User config.** Only the global settings file goes in AppData (`%APPDATA%\cleave\config.yaml`), matching Linux `~/.config/cleave/config.yaml`.
+- **FFmpeg.** Ship a Windows `ffmpeg.exe` next to `cleave.exe`. Look beside the exe first, not PATH. Clear error if it is missing. Include the FFmpeg license in the zip.
+- **libprojectM.** Maintainer builds 4.2+ DLLs (core + playlist) once per release and ships them next to the exe. Windows ctypes loader searches beside the exe, then `PROJECTM_LIB`. Testers do not compile or install Visual Studio. Include libprojectM licenses. pygame/SDL travel inside the freeze.
+- **Support matrix.** Document in one paragraph: 64-bit Windows, GPU driver, what `separate` does (CPU in-box, skipped, or "install torch yourself").
 
-Leave open: PyInstaller vs Nuitka vs another freezer, whether MVP includes `separate`, how libprojectM is compiled on Windows, and whether presets ship in the zip.
+### Leave open
 
-Done when: a tester on a typical Windows box can unzip, launch the editor, load a project (or separate outside the app), and render a short clip.
+Whether MVP includes `separate`, whether a seed preset/texture pack ships in the zip versus a documented copy into `Documents\cleave\`, and the exact Windows libprojectM build (vcpkg, CMake, or MSYS2).
+
+### Done when
+
+A tester on a typical Windows box can unzip, run `cleave.exe play` / `cleave.exe render` from cmd, load a project (or separate outside the app), and render a short clip.
 
 ---
 
@@ -90,9 +95,10 @@ Goal: Windows is a first-class release target. Building it does not depend on a 
 
 Sketch:
 
-- Freeze spec (or equivalent) and scripts in the repo, run from GitHub Actions on `windows-latest`.
+- PyInstaller freeze spec and scripts in the repo, run from GitHub Actions on `windows-latest`.
 - Tag pipeline: tests, freeze, attach the Windows artifact to the GitHub Release beside the Phase 1 source assets.
-- Installer wrapping the onedir folder (Inno Setup, WiX, or similar) so users are not hunting for the exe inside a zip.
+- Installer wrapping the onedir folder (Inno Setup, WiX, or similar) into Program Files. User data stays in `Documents\cleave\`; settings stay in AppData.
+- Drag-and-drop a source file or project onto the Cleave window (or the exe) to play. CLI subcommands remain.
 - Better failure modes: missing GPU, missing FFmpeg, missing preset root, SmartScreen on an unsigned build.
 - Short Windows smoke checklist (open editor, one layer, one render) that a human still runs; CI will not replace it.
 - Optional: Authenticode signing if a certificate is available. Without it, document SmartScreen and keep shipping.
@@ -126,6 +132,7 @@ Done when: a tag attaches Linux, Windows, and macOS artifacts (plus source) and 
 Do not block Phases 1-4 on these. Revisit after binaries exist.
 
 - CUDA/GPU `separate` as an optional extra or second download.
+- Nuitka freeze for possible startup and runtime gains (Phase 2 ships PyInstaller). See [roadmap.md](roadmap.md).
 - In-app version string and a "check GitHub for updates" hint (full auto-update is a different project).
 - Hosted preset/texture packs with a first-run downloader.
 - Apple Developer and Windows code-signing accounts, if Phase 3/4 shipped unsigned.
@@ -135,4 +142,4 @@ Do not block Phases 1-4 on these. Revisit after binaries exist.
 
 ## Suggested order of analysis
 
-Phase 1 is specified in this doc. When a later phase starts, write a short design note (or expand this doc) covering: relocatable paths and Windows native deps (Phase 2), CI and installer (Phase 3), Linux packaging plus macOS signing (Phase 4). Keep implementation choices in that note, not in this overview.
+Phase 1 is specified in this doc. Phase 2 product decisions are locked above. When Phase 2 implementation starts, write a short design note covering: relocatable paths, the Windows libprojectM build, and the PyInstaller spec. Later notes: CI and installer (Phase 3), Linux packaging plus macOS signing (Phase 4). Keep remaining implementation choices in that note, not in this overview.
