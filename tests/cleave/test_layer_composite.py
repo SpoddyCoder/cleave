@@ -6,7 +6,15 @@ import inspect
 
 from cleave.blend_modes import BLEND_MODES
 from cleave.gl_compositor import GlCompositor
-from cleave.gl_masked_compositor import GlMaskedCompositor
+from cleave.gl_masked_compositor import (
+    GlMaskedCompositor,
+    _PLASMA_HARD_FRAG,
+    _PLASMA_SOFT_FRAG,
+    _PLASMA_VERT,
+    _QUAD_POS_VAO,
+    _QUAD_UV_VAO,
+    _QUAD_VERT,
+)
 from cleave.layer_blend import opacity_in_alpha
 from cleave.layer_composite import LayerCompositor, LayerCompositeRequest
 from cleave.pattern_mask_transition import (
@@ -70,3 +78,22 @@ def test_transition_tracker_clear_when_duration_zero() -> None:
         duration=0.0,
         from_slots=(True, True),
     )
+
+
+def test_plasma_shaders_are_position_only() -> None:
+    assert "in_uv" not in _PLASMA_VERT
+    assert "in vec2 uv" not in _PLASMA_HARD_FRAG
+    assert "in vec2 uv" not in _PLASMA_SOFT_FRAG
+    assert "in vec2 in_uv" in _QUAD_VERT
+
+
+def test_quad_vao_layouts_skip_uv_only_for_plasma() -> None:
+    assert _QUAD_UV_VAO == "2f 2f"
+    assert _QUAD_POS_VAO == "2f 2x4"
+    source = inspect.getsource(GlMaskedCompositor.init)
+    assert '_QUAD_POS_VAO, "in_vert"' in source
+    assert source.count("_QUAD_POS_VAO") == 2
+    assert source.count("_QUAD_UV_VAO") == 4
+    assert '_QUAD_UV_VAO, "in_vert", "in_uv"' in source
+    assert "_quad_vao_content" not in source
+    assert "in_uv" not in source.split("_plasma_hard_vao")[1].split("_soft_transition_prog")[0]
