@@ -19,6 +19,10 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Default preset and texture paths follow the data root on every OS (including `XDG_DATA_HOME` on Linux).
 - Play and render no longer import librosa at load (stem types in `cleave.stems`, PCM resample via soxr). Frozen `separate` and raw-audio `play` fail with a short stem-split message.
 
+### Fixed
+
+- Frozen Windows `play` no longer crashes resolving Documents (`HRESULT` is not in `ctypes.wintypes` on Python 3.10).
+
 ## [0.1.0] - 2026-08-31
 
 ### Added
