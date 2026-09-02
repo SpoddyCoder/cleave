@@ -20,7 +20,9 @@ Decide these once, then reuse. Refine per phase rather than reinventing them.
 - **Build where you ship.** Produce Windows artifacts on Windows, macOS on macOS, Linux on Linux. Do not cross-compile the GUI stack from WSL.
 - **Licenses.** Bundling FFmpeg, libprojectM, pygame/SDL, and preset packs means shipping their licenses and attribution, not only Cleave's MIT [LICENSE](../LICENSE).
 - **GPU in CI.** GitHub-hosted runners cannot validate live compositing. Automate freeze and unit tests; keep a short manual GPU checklist per OS.
-- **Preset packs.** Milkdrop presets and textures are large and separately licensed. First-run download vs a huge installer is an open product choice, not a freeze detail.
+- **CI cost (public repo).** Standard GitHub-hosted runners are free and unlimited on a public repository, including `windows-latest`, `ubuntu-latest`, and `macos-latest`. Do not use larger runners (extra CPU, RAM, GPU, or static IPs); those are billed even on public repos. Windows and macOS minute multipliers apply only when minutes are billed (private repos). Keep freeze jobs on the standard labels.
+- **Artifact storage.** Actions minutes for a freeze job are free; workflow artifact and cache storage are not unlimited. Ship the binary as a GitHub Release asset, not as a long-lived Actions artifact. Prefer attaching with `gh release upload` in the freeze job. If a workflow artifact is needed for a later job, give it a short retention and delete it once the Release upload succeeds. Do not upload intermediate freeze trees. Actions cache is a separate 10 GB per-repository allowance: cache pip/vcpkg keys, not FFmpeg zips or onedir output.
+- **Preset packs.** Milkdrop presets and textures are large and separately licensed. First-run download vs a huge installer is an open product choice, not a freeze detail. Do not put preset packs in workflow artifacts.
 
 ---
 
@@ -137,15 +139,16 @@ Goal: Windows is a first-class release target. Building it does not depend on a 
 
 Sketch:
 
-- PyInstaller freeze spec and scripts in the repo, run from GitHub Actions on `windows-latest`.
-- Tag pipeline: tests, freeze, attach the Windows artifact to the GitHub Release beside the Phase 1 source assets.
+- PyInstaller freeze spec and scripts in the repo, run from GitHub Actions on standard `windows-latest` (not a larger runner).
+- Tag pipeline: tests, freeze, attach the Windows zip or installer to the GitHub Release beside the Phase 1 source assets. Freeze on tag (and maybe `workflow_dispatch`), not on every push, so large binaries are not produced or stored on ordinary CI.
+- Same job uploads the Release asset and does not leave the zip as a retained workflow artifact (see [Across all phases](#across-all-phases)).
 - Installer wrapping the onedir folder (Inno Setup, WiX, or similar) into Program Files. User data stays in `Documents\cleave\`; settings stay in AppData.
 - Drag-and-drop a source file or project onto the Cleave window (or the exe) to play. CLI subcommands remain.
 - Better failure modes: missing GPU, missing FFmpeg, missing preset root, SmartScreen on an unsigned build.
 - Short Windows smoke checklist (open editor, one layer, one render) that a human still runs; CI will not replace it.
 - Optional: Authenticode signing if a certificate is available. Without it, document SmartScreen and keep shipping.
 
-Leave open: exact CI jobs, cache strategy for libprojectM/FFmpeg, installer branding, and whether CUDA `separate` is ever in the Windows artifact or stays a documented extra.
+Leave open: exact CI jobs, installer branding, and whether CUDA `separate` is ever in the Windows artifact or stays a documented extra. Cache keys for pip/vcpkg stay inside the 10 GB Actions cache cap; do not cache the freeze output.
 
 Done when: a tag produces a Windows installer (or a clearly documented zip) on GitHub without a manual freeze step, and the MVP tester path still works.
 
@@ -160,7 +163,7 @@ Sketch:
 - **Linux:** AppImage (closest to a single executable) and/or a `.deb` for Ubuntu. Build on the oldest Ubuntu you intend to support so glibc does not strand users. Keep the existing checkout workflow for development.
 - **macOS:** `.app` in a `.dmg`. Apple Silicon at minimum; Intel as a second build if needed. OpenGL is deprecated but still the current stack. Notarization and codesign are required for anyone who did not compile it themselves.
 - Per-OS data dirs and libprojectM (`.so` / `.dylib`) using the relocatable work from Phase 2, not a third path scheme.
-- CI matrix next to the Windows job: Linux and macOS freeze on tag. Same limit: no GPU compositing on hosted runners.
+- CI matrix next to the Windows job: Linux and macOS freeze on tag, on standard `ubuntu-latest` / `macos-latest` (not larger runners). Same limits: no GPU compositing on hosted runners; Release assets, not long-lived workflow artifacts.
 - FFmpeg: bundled sidecar vs distro package on Linux is a product choice; macOS should bundle or fail clearly, like Windows.
 
 Leave open: AppImage vs `.deb` vs both, universal2 vs separate Mac archs, Homebrew cask later, and whether Linux binaries replace or sit beside the Phase 1 source Release.
