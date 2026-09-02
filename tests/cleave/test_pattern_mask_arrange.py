@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import numpy as np
 
-from cleave.extract import StemSource
+from cleave.stems import StemSource
 from cleave.preset_playlist import PresetPlaylist
 from cleave.signals import Signals
 from cleave.song_markers import SongMarker

@@ -23,7 +23,7 @@ from cleave.cli import (
     main,
 )
 from cleave.viz.render import RenderResult
-from cleave.extract import STEM_NAMES, stems_dir
+from cleave.stems import STEM_NAMES, stems_dir
 from cleave.project import write_manifest
 
 
@@ -40,9 +40,9 @@ def test_format_elapsed() -> None:
     assert _format_elapsed(3723.6) == "62 mins 4 secs"
 
 
-def test_cli_beat_detection_stem_choices_match_extract() -> None:
+def test_cli_beat_detection_stem_choices_match_stems() -> None:
     from cleave import cli
-    from cleave.extract import BEAT_DETECTION_STEM_CHOICES
+    from cleave.stems import BEAT_DETECTION_STEM_CHOICES
 
     assert cli.BEAT_DETECTION_STEM_CHOICES == BEAT_DETECTION_STEM_CHOICES
 

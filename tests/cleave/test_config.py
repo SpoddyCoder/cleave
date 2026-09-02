@@ -74,7 +74,7 @@ from cleave.config_schema.timeline import parse_timeline_section, persist_timeli
 from cleave.user_config import EditorSettings
 from cleave.viz.session import TuningSession
 from cleave.paths import default_preset_root, default_texture_paths, repo_root, resource_dir
-from cleave.extract import STEM_NAMES
+from cleave.stems import STEM_NAMES
 from cleave.timeline import SlotCue, TimelineLane
 from tests.support.config import (
     TEST_LAYER_STEMS,

@@ -20,23 +20,26 @@ SPECDIR = Path(SPECPATH).resolve()
 REPO = SPECDIR.parent
 
 pygame_datas, pygame_binaries, pygame_hiddenimports = collect_all("pygame")
+soxr_datas, soxr_binaries, soxr_hiddenimports = collect_all("soxr")
 
 datas = [
     (str(REPO / "cleave-viz.yaml"), "."),
     (str(REPO / "assets" / "fonts"), "assets/fonts"),
 ]
 datas += pygame_datas
+datas += soxr_datas
 
 a = Analysis(
     [str(REPO / "cleave.py")],
     pathex=[str(REPO)],
-    binaries=pygame_binaries,
+    binaries=pygame_binaries + soxr_binaries,
     datas=datas,
-    hiddenimports=list(pygame_hiddenimports),
+    hiddenimports=list(pygame_hiddenimports) + list(soxr_hiddenimports),
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
     excludes=[
+        # Analyse extras. Play/render do not import these (cleave.stems + soxr).
         "torch",
         "demucs",
         "beat_this",

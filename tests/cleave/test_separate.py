@@ -9,7 +9,7 @@ import pytest
 import yaml
 
 from cleave.config import VIZ_CONFIG_FILENAME
-from cleave.extract import STEM_NAMES, stems_dir
+from cleave.stems import STEM_NAMES, stems_dir
 from cleave.project import (
     PROJECT_FILENAME,
     load_manifest,

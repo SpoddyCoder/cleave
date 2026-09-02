@@ -5,7 +5,7 @@ from __future__ import annotations
 import random
 from collections.abc import Mapping, Sequence
 
-from cleave.extract import StemSource
+from cleave.stems import StemSource
 from cleave.signals import Signals
 from cleave.timeline import TimelineLane
 from cleave.timeline_presets.arrange import PHRASE_SEC_MIN, compose_timeline

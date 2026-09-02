@@ -58,7 +58,7 @@ cleave.exe --version
 cleave.exe --help
 ```
 
-Phase 2.2 proof: `cleave.exe play <existing-project>` and a short `cleave.exe render` on a Windows box with a GPU driver. Copy `projects/` from Linux; do not run `separate` in this zip. Fix the librosa import graph first (see PyInstaller spec below); 2.1 `separate` currently traceback instead of the short frozen message.
+Phase 2.2 proof: `cleave.exe play <existing-project>` and a short `cleave.exe render` on a Windows box with a GPU driver. Copy `projects/` from Linux; do not run `separate` in this zip. Frozen `separate` and raw-audio `play` raise the short stem-split message.
 
 ---
 
@@ -81,19 +81,14 @@ pyinstaller packaging/cleave.spec
 Then copy `ffmpeg.exe` (and 2.2 DLLs) into `dist/cleave/`, not `dist/cleave/_internal/`.
 
 - Entry: [cleave.py](../cleave.py) (`cleave.cli:main`).
-- Collect pygame (SDL binaries and hiddenimports travel with that hook).
+- Collect pygame (SDL binaries and hiddenimports travel with that hook) and soxr (native resample in [cleave/pcm_io.py](../cleave/pcm_io.py)).
 - `datas`: repo-root `cleave-viz.yaml` and `assets/fonts/` (includes `MaterialIcons-Regular.ttf` and its license).
 - `excludes`: `torch`, `demucs`, `beat_this`, `librosa`, `matplotlib`. Stem split is not in this freeze.
 - No CI freeze job in 2.1. PyInstaller is not on the default test path.
 
-`play` on an existing project (stems + `signals.json`) must not import torch. `play` on raw audio, and `separate`, fail with a short message that stem split is not in this Windows build; copy a project from Linux.
+`play` on an existing project (stems + `signals.json`) must not import torch or librosa. `play` on raw audio, and `separate`, fail with a short message that stem split is not in this Windows build; copy a project from Linux.
 
-`librosa` is excluded because analysis is not in the zip. That exclude is not freeze-safe yet:
-
-- [cleave/cli.py](../cleave/cli.py) `cmd_separate` imports [cleave/config.py](../cleave/config.py), which loads [cleave/effects/](../cleave/effects/) then [cleave/extract.py](../cleave/extract.py) (`import librosa` at module level). Proven on Windows: `cleave.exe separate <wav>` raises `ModuleNotFoundError: No module named 'librosa'` instead of `require_stem_split`.
-- Phase 2.2 play/render loads stem PCM through [cleave/pcm_io.py](../cleave/pcm_io.py), which imports librosa for resample.
-
-2.2 must make those paths work without torch. Prefer lazy imports and soxr (already in [requirements.txt](../requirements.txt)) over bundling librosa. Do not add torch.
+`librosa` is excluded because analysis is not in the zip. Play/render stay freeze-safe: stem types and paths live in [cleave/stems.py](../cleave/stems.py); PCM resample uses soxr in [cleave/pcm_io.py](../cleave/pcm_io.py). [cleave/extract.py](../cleave/extract.py) imports librosa for analyse only. Frozen `separate` reaches `require_stem_split` and raises `STEM_SPLIT_MISSING_FROZEN`.
 
 ---
 

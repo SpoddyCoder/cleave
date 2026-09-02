@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import cast
 
 from cleave.config import ensure_project_viz_config
-from cleave.extract import STEM_SOURCES, StemSource, stem_paths, stems_dir
+from cleave.stems import STEM_SOURCES, StemSource, stem_paths, stems_dir
 from cleave.paths import is_frozen, project_dir, project_slug, resolve_project
 from cleave.project import load_manifest, manifest_path, mix_path, write_manifest
 from cleave.signals import SIGNALS_VERSION

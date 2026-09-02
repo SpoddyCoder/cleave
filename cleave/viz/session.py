@@ -65,7 +65,7 @@ from cleave.config_schema.timeline import (
     DEFAULT_VISUAL_LIMITER_THRESHOLD,
     TimelinePlacementSnap,
 )
-from cleave.extract import StemSource
+from cleave.stems import StemSource
 from cleave.preset_playlist import PresetPlaylist, preset_browse_floor
 from cleave.projectm_health import PresetSkipNotifyTracker, ProjectMLogNotifyTracker
 from cleave.song_markers import SongMarker
