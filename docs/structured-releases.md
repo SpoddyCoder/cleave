@@ -2,7 +2,7 @@
 
 Move Cleave from checkout-based development to versioned GitHub Releases.
 
-Phase 1 is done (`v0.1.0`). Phase 2 is done (Windows play/render onedir zip, manual freeze). No tag and no `__version__` bump for Phase 2; it is not a GitHub Release. Product decisions stay locked below. Phases 3 and 4 stay directions until a Windows release pipeline ships.
+Phase 1 is done (`v0.1.0`). Phase 2 is done (Windows play/render onedir zip, manual freeze). No tag and no `__version__` bump for Phase 2; it is not a GitHub Release. Product decisions stay locked below. Phase 3 is next (CI freeze zip, then installer). Phase 4 stays a direction until the Windows release pipeline ships.
 
 Related: [README.md](../README.md) (current Linux/WSL setup), [completed/user-data-and-config-plan.md](completed/user-data-and-config-plan.md) (install vs user data), [cleave/paths.py](../cleave/paths.py), [cleave/projectm.py](../cleave/projectm.py), [windows-freeze.md](windows-freeze.md) (paths, spec, FFmpeg sidecar, ctypes names, libprojectM build recommendation).
 
@@ -137,20 +137,49 @@ Met. A tester on a typical Windows box can unzip, run `cleave.exe play` / `cleav
 
 Goal: Windows is a first-class release target. Building it does not depend on a particular desktop.
 
-Sketch:
+Two slices, same pattern as Phase 2. Lock the product rules below, then plan 3.1 in detail. Keep 3.2 as a sketch until 3.1 has produced a zip a tester has run. Do not mix installer branding into the CI freeze.
 
-- PyInstaller freeze spec and scripts in the repo, run from GitHub Actions on standard `windows-latest` (not a larger runner).
-- Tag pipeline: tests, freeze, attach the Windows zip or installer to the GitHub Release beside the Phase 1 source assets. Freeze on tag (and maybe `workflow_dispatch`), not on every push, so large binaries are not produced or stored on ordinary CI.
-- Same job uploads the Release asset and does not leave the zip as a retained workflow artifact (see [Across all phases](#across-all-phases)).
-- Installer wrapping the onedir folder (Inno Setup, WiX, or similar) into Program Files. User data stays in `Documents\cleave\`; settings stay in AppData.
-- Drag-and-drop a source file or project onto the Cleave window (or the exe) to play. CLI subcommands remain.
-- Better failure modes: missing GPU, missing FFmpeg, missing preset root, SmartScreen on an unsigned build.
-- Short Windows smoke checklist (open editor, one layer, one render) that a human still runs; CI will not replace it.
-- Optional: Authenticode signing if a certificate is available. Without it, document SmartScreen and keep shipping.
+### 3.1 CI freeze zip
 
-Leave open: exact CI jobs, installer branding, and whether CUDA `separate` is ever in the Windows artifact or stays a documented extra. Cache keys for pip/vcpkg stay inside the 10 GB Actions cache cap; do not cache the freeze output.
+Automate the 2.2 recipe on standard `windows-latest` (not a larger runner). The freeze spec already lives in [packaging/cleave.spec](../packaging/cleave.spec); the layout, sidecars, and ctypes names are in [windows-freeze.md](windows-freeze.md).
 
-Done when: a tag produces a Windows installer (or a clearly documented zip) on GitHub without a manual freeze step, and the MVP tester path still works.
+- PyInstaller onedir, then post-build copy of `ffmpeg.exe`, `projectM-4.dll`, `projectM-4-playlist.dll`, extra non-system DLLs, and license trees into `dist\cleave\` (not `_internal`). Zip that folder.
+- Freeze on tag and on `workflow_dispatch`, not on every push. Prove the freeze with dispatch before cutting a tag.
+- Tag pipeline: existing tests and source Release (Phase 1), then attach the Windows zip beside the source assets. Same job uploads with `gh release upload` and does not leave the zip as a retained workflow artifact (see [Across all phases](#across-all-phases)).
+- Cache pip/vcpkg keys inside the 10 GB Actions cache cap. Do not cache FFmpeg zips or freeze output.
+- Better failure modes in the app: missing GPU, missing FFmpeg, missing preset root. Document SmartScreen for an unsigned build.
+- Short Windows smoke checklist (open editor, one layer, one render) that a human still runs; CI will not replace GPU compositing.
+
+Drag-and-drop onto the pygame window can land on `main` during 3.1. It is not a 3.1 gate. Drop onto the exe (file associations) waits for 3.2.
+
+Done when: `workflow_dispatch` on `windows-latest` produces a zip that passes the 2.2 GPU checklist (`cleave.exe play` on an existing project, short `render`, frozen `separate` message), and the tag job is wired to upload that zip. Proving the freeze does not require a version bump. The first tag after this lands is a Phase 1 source release plus the Windows zip. No installer.
+
+### 3.2 Installer
+
+Wrap the same onedir tree into Program Files (Inno Setup, WiX, or similar). The installer copies 3.1's folder; it does not get a second freeze layout.
+
+- Shortcuts and uninstall. CLI subcommands remain (`cleave.exe play ...`).
+- Drag-and-drop a source file or project onto the exe, and optional file associations, live here. Window drop may already exist from 3.1.
+- User data stays in `Documents\cleave\`; settings stay in AppData. Program Files is read-only; `install_dir()` is still the parent of the exe.
+
+Done when: a tag produces the installer without a manual freeze step, and the 2.2 tester path still works from Program Files. The zip may stay as a second Release asset or be dropped.
+
+### Locked
+
+- **Layout.** The Release freeze is the 2.2 onedir: `cleave.exe` and sidecars beside each other, bundled files in `_internal`. The installer copies that tree into Program Files. Do not invent a second freeze layout. `install_dir()` stays the parent of the exe.
+- **User data.** Unchanged from Phase 2: `Documents\cleave\` (projects, presets, textures). `CLEAVE_DATA` still overrides. Global settings stay in `%APPDATA%\cleave\config.yaml`.
+- **When to freeze.** Tag and `workflow_dispatch` only. Never on every push.
+- **Assets.** Upload the Windows binary as a GitHub Release asset, not a long-lived Actions artifact. Source zip/tarball from Phase 1 stay.
+- **One exe, CLI subcommands.** Still PyInstaller onedir with `cleave.exe`. Not two executables. Not torch.
+- **Signing.** Optional. Without a certificate, document SmartScreen and keep shipping unsigned.
+
+### Leave open
+
+Exact CI steps (vcpkg in the job vs cached libprojectM DLLs, which FFmpeg build to fetch). Installer tool and branding. Whether the zip remains once the installer exists. Whether CUDA `separate` is ever in the Windows artifact (stays Later). Authenticode if a certificate appears.
+
+### Done when
+
+3.1 and 3.2 are both met: a tag produces a Windows installer on GitHub without a manual freeze, and the MVP tester path still works.
 
 ---
 
@@ -187,4 +216,4 @@ Do not block Phases 1-4 on these. Revisit after binaries exist.
 
 ## Suggested order of analysis
 
-Phase 1 and Phase 2 are done. Next is Phase 3 (CI freeze, installer, Program Files) using [windows-freeze.md](windows-freeze.md). Later: Linux packaging plus macOS signing (Phase 4). Keep remaining implementation choices in that note, not in this overview.
+Phase 1 and Phase 2 are done. Next is Phase 3.1 (CI freeze zip) using [windows-freeze.md](windows-freeze.md). Do not plan 3.2 (installer, Program Files) in detail until that zip exists and a tester has run it. Later: Linux packaging plus macOS signing (Phase 4). Keep freeze implementation choices in that note, not in this overview.
