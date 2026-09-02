@@ -54,3 +54,13 @@ jobs:
           gh release create "$GITHUB_REF_NAME" \
             --title "$GITHUB_REF_NAME" \
             --notes-file release-notes.md
+
+  # After the Release exists so gh release upload can attach the zip.
+  # If freeze fails, the source Release still exists and can be retried.
+  freeze:
+    needs: publish
+    uses: ./.github/workflows/windows-freeze.yml
+    permissions:
+      contents: write
+    with:
+      release_tag: ${{ github.ref_name }}

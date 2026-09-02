@@ -2,7 +2,7 @@
 
 Move Cleave from checkout-based development to versioned GitHub Releases.
 
-Phase 1 is done (`v0.1.0`). Phase 2 is done (Windows play/render onedir zip, manual freeze). No tag and no `__version__` bump for Phase 2; it is not a GitHub Release. Product decisions stay locked below. Phase 3 is next (CI freeze zip, then installer). Phase 4 stays a direction until the Windows release pipeline ships.
+Phase 1 is done (`v0.1.0`). Phase 2 is done (Windows play/render onedir zip, manual freeze). No tag and no `__version__` bump for Phase 2; it is not a GitHub Release. Product decisions stay locked below. Phase 3.1 workflow and tag upload are landed; remaining gate is `workflow_dispatch` plus the 2.2 GPU checklist. Phase 3.2 (installer) stays a sketch until that proof. Phase 4 stays a direction until the Windows release pipeline ships.
 
 Related: [README.md](../README.md) (current Linux/WSL setup), [completed/user-data-and-config-plan.md](completed/user-data-and-config-plan.md) (install vs user data), [cleave/paths.py](../cleave/paths.py), [cleave/projectm.py](../cleave/projectm.py), [windows-freeze.md](windows-freeze.md) (paths, spec, FFmpeg sidecar, ctypes names, libprojectM build recommendation).
 
@@ -34,11 +34,11 @@ Shipped as [`v0.1.0`](https://github.com/SpoddyCoder/cleave/releases/tag/v0.1.0)
 
 What it is: unpack a tagged source archive, install the repo's requirement files, run from the tree (`python -m cleave` / `cleave.py`). Same checkout workflow as development, pinned to a tag.
 
-What it is not: pip-installable. No AppImage, `.deb`, or frozen binary (those are Phase 4 / later). No helper install script. No extra release assets.
+What it is not: pip-installable. No AppImage, `.deb`, or Linux frozen binary (those are Phase 4). No helper install script. No installer (Phase 3.2).
 
 ### Assets
 
-GitHub's automatic source zip and tarball on the tag are the only assets. Requirement pins already in the repo ([requirements.txt](../requirements.txt), [requirements-dev.txt](../requirements-dev.txt), [requirements-torch-cpu.txt](../requirements-torch-cpu.txt), [requirements-torch-cu130.txt](../requirements-torch-cu130.txt)) travel with the archive.
+GitHub's automatic source zip and tarball on the tag. Later tags also attach the Windows onedir zip from the freeze job (`cleave-<version>-windows-x64.zip`). [`v0.1.0`](https://github.com/SpoddyCoder/cleave/releases/tag/v0.1.0) is source-only. Requirement pins already in the repo ([requirements.txt](../requirements.txt), [requirements-dev.txt](../requirements-dev.txt), [requirements-torch-cpu.txt](../requirements-torch-cpu.txt), [requirements-torch-cu130.txt](../requirements-torch-cu130.txt)) travel with the source archive.
 
 Milkdrop presets and textures are not in the archive. Users follow [README.md](../README.md) "Get Some Milkdrop Presets".
 
@@ -58,7 +58,7 @@ This is the single source of truth for cutting a Phase 1 release:
 2. Set `__version__` in [cleave/__init__.py](../cleave/__init__.py) to `X.Y.Z`.
 3. Commit those changes to `main`.
 4. `git tag vX.Y.Z && git push --tags` (tag the commit that is on `main`).
-5. CI ([.github/workflows/release.yml](../.github/workflows/release.yml)) runs unit tests via the reusable [tests.yml](../.github/workflows/tests.yml) workflow, checks that the tag matches `cleave.__version__`, extracts the changelog section, and publishes a GitHub Release. Source zip/tarball attach automatically.
+5. CI ([.github/workflows/release.yml](../.github/workflows/release.yml)): unit tests via [tests.yml](../.github/workflows/tests.yml), then `publish` checks that the tag matches `cleave.__version__`, extracts the changelog section, and creates the GitHub Release (source zip/tarball attach automatically). Then `freeze` calls [windows-freeze.yml](../.github/workflows/windows-freeze.yml) with `release_tag` set to the tag and uploads `cleave-<version>-windows-x64.zip` onto that Release. If freeze fails, the source Release still exists and can be retried.
 6. Spot-check the archive: unpack, install requirements, run `cleave --version`, confirm presets still come from the README steps.
 
 ### Done when
@@ -143,16 +143,17 @@ Two slices, same pattern as Phase 2. Lock the product rules below, then plan 3.1
 
 Automate the 2.2 recipe on standard `windows-latest` (not a larger runner). The freeze spec already lives in [packaging/cleave.spec](../packaging/cleave.spec); the layout, sidecars, and ctypes names are in [windows-freeze.md](windows-freeze.md).
 
-- PyInstaller onedir, then post-build copy of `ffmpeg.exe`, `projectM-4.dll`, `projectM-4-playlist.dll`, extra non-system DLLs, and license trees into `dist\cleave\` (not `_internal`). Zip that folder.
-- Freeze on tag and on `workflow_dispatch`, not on every push. Prove the freeze with dispatch before cutting a tag.
-- Tag pipeline: existing tests and source Release (Phase 1), then attach the Windows zip beside the source assets. Same job uploads with `gh release upload` and does not leave the zip as a retained workflow artifact (see [Across all phases](#across-all-phases)).
-- Cache pip/vcpkg keys inside the 10 GB Actions cache cap. Do not cache FFmpeg zips or freeze output.
+- Workflow: [.github/workflows/windows-freeze.yml](../.github/workflows/windows-freeze.yml) (`workflow_dispatch` and `workflow_call`, not every push) on standard `windows-latest`. PyInstaller onedir via [packaging/cleave.spec](../packaging/cleave.spec), then [scripts/windows_stage_freeze.py](../scripts/windows_stage_freeze.py) copies sidecars into `dist\cleave\` (not `_internal`). Zip that folder as `cleave-<version>-windows-x64.zip`. Headless smoke only (`--version`, `--help`, frozen `separate` message); no GPU compositing.
+- Dispatch uploads the zip as a 5-day Actions artifact (`cleave-windows-x64`). Tag pipeline: [release.yml](../.github/workflows/release.yml) runs tests, `publish` creates the GitHub Release, then `freeze` calls this workflow with `release_tag` set to the tag. A non-empty `release_tag` uses `gh release upload` and does not retain a workflow artifact. Prove the freeze with dispatch before cutting a tag.
+- Cache pip only (`actions/setup-python` with `requirements-freeze.txt`). Do not cache FFmpeg zips or freeze output. Committed libprojectM DLLs; no vcpkg in the job.
 - Better failure modes in the app: missing GPU, missing FFmpeg, missing preset root. Document SmartScreen for an unsigned build.
 - Short Windows smoke checklist (open editor, one layer, one render) that a human still runs; CI will not replace GPU compositing.
 
 Drag-and-drop onto the pygame window can land on `main` during 3.1. It is not a 3.1 gate. Drop onto the exe (file associations) waits for 3.2.
 
 Done when: `workflow_dispatch` on `windows-latest` produces a zip that passes the 2.2 GPU checklist (`cleave.exe play` on an existing project, short `render`, frozen `separate` message), and the tag job is wired to upload that zip. Proving the freeze does not require a version bump. The first tag after this lands is a Phase 1 source release plus the Windows zip. No installer.
+
+The workflow and tag upload are landed. Remaining gate: dispatch a zip and run the 2.2 GPU checklist on a Windows box with a GPU driver.
 
 ### 3.2 Installer
 
@@ -175,7 +176,9 @@ Done when: a tag produces the installer without a manual freeze step, and the 2.
 
 ### Leave open
 
-Exact CI steps (vcpkg in the job vs cached libprojectM DLLs, which FFmpeg build to fetch). Installer tool and branding. Whether the zip remains once the installer exists. Whether CUDA `separate` is ever in the Windows artifact (stays Later). Authenticode if a certificate appears.
+Installer tool and branding. Whether the zip remains once the installer exists. Whether CUDA `separate` is ever in the Windows artifact (stays Later). Authenticode if a certificate appears.
+
+**Resolved** (exact CI steps): committed libprojectM DLLs in [packaging/windows/](../packaging/windows/); FFmpeg downloaded by [scripts/windows_stage_freeze.py](../scripts/windows_stage_freeze.py) from a pinned Gyan essentials URL (`FFMPEG_URL` / `FFMPEG_SHA256` in that script). Not vcpkg in the job, not a committed FFmpeg binary.
 
 ### Done when
 
@@ -216,4 +219,4 @@ Do not block Phases 1-4 on these. Revisit after binaries exist.
 
 ## Suggested order of analysis
 
-Phase 1 and Phase 2 are done. Next is Phase 3.1 (CI freeze zip) using [windows-freeze.md](windows-freeze.md). Do not plan 3.2 (installer, Program Files) in detail until that zip exists and a tester has run it. Later: Linux packaging plus macOS signing (Phase 4). Keep freeze implementation choices in that note, not in this overview.
+Phase 1 and Phase 2 are done. Phase 3.1 workflow and tag upload are landed; remaining gate is `workflow_dispatch` plus the 2.2 GPU checklist (see [windows-freeze.md](windows-freeze.md)). Do not plan 3.2 (installer, Program Files) in detail until that zip exists and a tester has run it. Later: Linux packaging plus macOS signing (Phase 4). Keep freeze implementation choices in that note, not in this overview.

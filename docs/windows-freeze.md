@@ -1,10 +1,10 @@
 # Windows freeze (Phase 2)
 
-How Cleave locates files when frozen, how testers unpack a Windows onedir zip, and how to build libprojectM 4.2+ DLLs. Product decisions live in [structured-releases.md](structured-releases.md). This note is the implementation design for the Phase 2 freeze (paths, spec, FFmpeg, ctypes, libprojectM).
+How Cleave locates files when frozen, how testers unpack a Windows onedir zip, and how to build libprojectM 4.2+ DLLs. Product decisions live in [structured-releases.md](structured-releases.md). This note is the implementation design for the freeze (paths, spec, FFmpeg, ctypes, libprojectM). Phase 3.1 CI is [.github/workflows/windows-freeze.yml](../.github/workflows/windows-freeze.yml).
 
-Do not cross-compile the GUI stack from WSL. Build on Windows, copy sidecars next to the exe, then zip `dist/cleave/`.
+Do not cross-compile the GUI stack from WSL. Build on Windows, run [scripts/windows_stage_freeze.py](../scripts/windows_stage_freeze.py), then zip `dist/cleave/` (CI does the same on `windows-latest`).
 
-Related: [cleave/paths.py](../cleave/paths.py), [cleave/ffmpeg.py](../cleave/ffmpeg.py), [packaging/cleave.spec](../packaging/cleave.spec), [cleave/projectm.py](../cleave/projectm.py), [cleave/projectm_playlist.py](../cleave/projectm_playlist.py).
+Related: [cleave/paths.py](../cleave/paths.py), [cleave/ffmpeg.py](../cleave/ffmpeg.py), [packaging/cleave.spec](../packaging/cleave.spec), [scripts/windows_stage_freeze.py](../scripts/windows_stage_freeze.py), [cleave/projectm.py](../cleave/projectm.py), [cleave/projectm_playlist.py](../cleave/projectm_playlist.py).
 
 ---
 
@@ -66,7 +66,9 @@ Phase 2.2 proof (met): `cleave.exe play <existing-project>` and a short `cleave.
 
 Frozen lookup: `install_dir() / "ffmpeg.exe"` (Windows) or `install_dir() / "ffmpeg"` (Linux freeze). If missing, raise `FileNotFoundError` naming that path. No PATH fallback when frozen. Checkout still uses `shutil.which` and the "not on PATH" error.
 
-Do not commit a Windows FFmpeg binary. After freeze, copy an official Windows build (essentials or full, 64-bit) next to `cleave.exe`, and drop its license files into `licenses/ffmpeg/` in the zip. FFmpeg licensing depends on the build (LGPL vs GPL); ship whatever the chosen binary requires.
+Do not commit a Windows FFmpeg binary. [scripts/windows_stage_freeze.py](../scripts/windows_stage_freeze.py) downloads a pinned official Windows essentials build, verifies SHA-256, copies `ffmpeg.exe` next to `cleave.exe`, and drops that build's LICENSE/COPYING/NOTICE files into `licenses/ffmpeg/`. URL and checksum are the `FFMPEG_URL` and `FFMPEG_SHA256` constants at the top of that script. The zip is cached at `.cache/ffmpeg-windows.zip` (gitignored).
+
+Pinned build: GyanD/codexffmpeg 9.0.1 essentials (64-bit Windows, static, GPLv3; the gyan.dev release essentials zip, versioned GitHub asset). Essentials includes libx264 and aac for Cleave's MP4 render. Ship the zip's LICENSE (GPLv3) with the freeze.
 
 ---
 
@@ -78,17 +80,34 @@ Do not commit a Windows FFmpeg binary. After freeze, copy an official Windows bu
 pyinstaller packaging/cleave.spec
 ```
 
-Then copy `ffmpeg.exe` (and 2.2 DLLs) into `dist/cleave/`, not `dist/cleave/_internal/`.
+Then stage sidecars (not into `dist/cleave/_internal/`):
+
+```
+python scripts/windows_stage_freeze.py --dist dist/cleave
+```
+
+That copies `packaging/windows/*.dll` and libprojectM licenses, fetches the pinned FFmpeg zip, and asserts `cleave.exe`, `ffmpeg.exe`, and the projectM DLLs sit in the onedir root. Use `--no-exe-check` only in tests that have no exe.
 
 - Entry: [cleave.py](../cleave.py) (`cleave.cli:main`).
 - Collect pygame (SDL binaries and hiddenimports travel with that hook) and soxr (native resample in [cleave/pcm_io.py](../cleave/pcm_io.py)).
 - `datas`: repo-root `cleave-viz.yaml` and `assets/fonts/` (includes `MaterialIcons-Regular.ttf` and its license).
 - `excludes`: `torch`, `demucs`, `beat_this`, `librosa`, `matplotlib`. Stem split is not in this freeze.
-- No CI freeze job in 2.1. PyInstaller is not on the default test path.
 
 `play` on an existing project (stems + `signals.json`) must not import torch or librosa. `play` on raw audio, and `separate`, fail with a short message that stem split is not in this Windows build; copy a project from Linux.
 
 `librosa` is excluded because analysis is not in the zip. Play/render stay freeze-safe: stem types and paths live in [cleave/stems.py](../cleave/stems.py); PCM resample uses soxr in [cleave/pcm_io.py](../cleave/pcm_io.py). [cleave/extract.py](../cleave/extract.py) imports librosa for analyse only. Frozen `separate` reaches `require_stem_split` and raises `STEM_SPLIT_MISSING_FROZEN`.
+
+---
+
+## CI freeze (Phase 3.1)
+
+Same recipe as the manual steps above, on standard `windows-latest`. Workflow: [.github/workflows/windows-freeze.yml](../.github/workflows/windows-freeze.yml) (`workflow_dispatch` and `workflow_call`, not every push).
+
+- Pip cache only (`requirements-freeze.txt`); do not cache FFmpeg zips or freeze output.
+- Sidecars: committed libprojectM DLLs from [packaging/windows/](../packaging/windows/) (convention in that directory's [README.md](../packaging/windows/README.md)); FFmpeg from `FFMPEG_URL` / `FFMPEG_SHA256` at the top of [scripts/windows_stage_freeze.py](../scripts/windows_stage_freeze.py). No vcpkg in the job. Do not commit `ffmpeg.exe`.
+- Headless smoke: `cleave.exe --version` must print `cleave X.Y.Z`, `--help` lists `separate` / `play` / `render` / `backup` / `restore`, and `cleave.exe separate` with a dummy file prints `STEM_SPLIT_MISSING_FROZEN` (no traceback). No GPU compositing.
+- Zip layout is `cleave/cleave.exe` inside `cleave-<version>-windows-x64.zip`.
+- Dispatch uploads a 5-day Actions artifact (`cleave-windows-x64`). Tag pipeline: [.github/workflows/release.yml](../.github/workflows/release.yml) calls this workflow after `publish` with `release_tag` set to the tag; a non-empty `release_tag` uses `gh release upload` and does not retain a workflow artifact.
 
 ---
 
@@ -140,11 +159,13 @@ Ship libprojectM licenses next to FFmpeg's under `licenses/libprojectM/`.
 
 ### Where files go
 
-Build on Windows, same machine (or same arch) that runs PyInstaller. After `pyinstaller packaging/cleave.spec`, copy:
+The projectM pair is committed in [packaging/windows/](../packaging/windows/) (`projectM-4.dll`, `projectM-4-playlist.dll`, LGPL tree under `licenses/libprojectM/`). CI and local freezes copy `packaging/windows/*.dll`. Rebuild notes and `dumpbin` dependents: [packaging/windows/README.md](../packaging/windows/README.md). Put extra non-system DLLs (if `dumpbin /dependents` reports any) in that same directory so the script copies them with the projectM pair. Do not commit `ffmpeg.exe`.
 
-- `ffmpeg.exe` -> `dist/cleave/`
-- `projectM-4.dll`, `projectM-4-playlist.dll`, and extra non-system DLLs -> `dist/cleave/`
-- license trees -> `dist/cleave/licenses/`
+Build on Windows, same machine (or same arch) that runs PyInstaller. After `pyinstaller packaging/cleave.spec`:
+
+```
+python scripts/windows_stage_freeze.py --dist dist/cleave
+```
 
 Then zip `dist/cleave/`.
 
@@ -158,4 +179,4 @@ Still open: whether a seed preset/texture pack ships in the zip, or testers copy
 
 ## Out of scope here
 
-Installer, signing, and CI freeze (Phase 3); torch in the zip; macOS Application Support. Overlay Latin/box-drawing TTF is [todos.md](todos.md).
+Installer and signing (Phase 3.2); torch in the zip; macOS Application Support. Overlay Latin/box-drawing TTF is [todos.md](todos.md).

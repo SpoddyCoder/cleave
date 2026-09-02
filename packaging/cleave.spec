@@ -7,9 +7,9 @@ Build on Windows (do not cross-compile from WSL)::
 
 Output: dist/cleave/cleave.exe plus _internal/.
 
-Post-build (not done by this spec): copy ffmpeg.exe, projectM-4.dll,
-and projectM-4-playlist.dll into dist/cleave/ next to cleave.exe, not
-into _internal. See docs/windows-freeze.md.
+Post-build (not done by this spec): run scripts/windows_stage_freeze.py
+to copy DLLs, licenses, and a pinned FFmpeg sidecar into dist/cleave/
+next to cleave.exe, not into _internal. See docs/windows-freeze.md.
 """
 
 from pathlib import Path
