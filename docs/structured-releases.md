@@ -2,7 +2,7 @@
 
 Move Cleave from checkout-based development to versioned GitHub Releases.
 
-Phase 1 is specified below. Phase 2 product decisions are locked in this doc; freeze scripts and Windows native-build details still get a dedicated analysis before implementing. Phases 3 and 4 stay directions until then.
+Phase 1 is done (`v0.1.0`). Phase 2 product decisions are locked in this doc; freeze scripts and Windows native-build details still get a dedicated analysis before implementing. Phases 3 and 4 stay directions until then.
 
 Related: [README.md](../README.md) (current Linux/WSL setup), [completed/user-data-and-config-plan.md](completed/user-data-and-config-plan.md) (install vs user data), [cleave/paths.py](../cleave/paths.py), [cleave/projectm.py](../cleave/projectm.py).
 
@@ -24,9 +24,11 @@ Decide these once, then reuse. Refine per phase rather than reinventing them.
 
 ---
 
-## Phase 1 - Tagged source releases (Linux)
+## Phase 1 - Tagged source releases (Linux) (done)
 
 Goal: a repeatable GitHub Release that a Linux/WSL user can unpack and run from, without a frozen binary.
+
+Shipped as [`v0.1.0`](https://github.com/SpoddyCoder/cleave/releases/tag/v0.1.0) (2026-08-31). Later source tags still follow the procedure below.
 
 What it is: unpack a tagged source archive, install the repo's requirement files, run from the tree (`python -m cleave` / `cleave.py`). Same checkout workflow as development, pinned to a tag.
 
@@ -59,7 +61,7 @@ This is the single source of truth for cutting a Phase 1 release:
 
 ### Done when
 
-Someone who is not the maintainer can unpack a tagged Linux source archive from GitHub, install the requirement files, and run play/render with the existing system deps (Python 3.10+, FFmpeg, libprojectM 4.2+).
+Met. A Linux/WSL user can unpack a tagged source archive from GitHub, install the requirement files, and run play/render with the existing system deps (Python 3.10+, FFmpeg, libprojectM 4.2+).
 
 ---
 
@@ -142,4 +144,4 @@ Do not block Phases 1-4 on these. Revisit after binaries exist.
 
 ## Suggested order of analysis
 
-Phase 1 is specified in this doc. Phase 2 product decisions are locked above. When Phase 2 implementation starts, write a short design note covering: relocatable paths, the Windows libprojectM build, and the PyInstaller spec. Later notes: CI and installer (Phase 3), Linux packaging plus macOS signing (Phase 4). Keep remaining implementation choices in that note, not in this overview.
+Phase 1 is done. Phase 2 product decisions are locked above. When Phase 2 implementation starts, write a short design note covering: relocatable paths, the Windows libprojectM build, and the PyInstaller spec. Later notes: CI and installer (Phase 3), Linux packaging plus macOS signing (Phase 4). Keep remaining implementation choices in that note, not in this overview.
