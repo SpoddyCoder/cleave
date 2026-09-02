@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import TYPE_CHECKING
 
-from cleave.extract import stem_overlay_header
+from cleave.stems import stem_overlay_header
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
 from cleave.viz.row_sections import (
     RENDER_OVERLAY_SECTION_KINDS,

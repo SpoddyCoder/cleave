@@ -33,3 +33,6 @@ cleave-env/
 # scratch / local temp
 tmp/
 tmp.txt
+
+# local freeze sidecar cache (FFmpeg zip; never commit)
+.cache/

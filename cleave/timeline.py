@@ -12,7 +12,7 @@ from cleave.blend_modes import BlendMode
 from cleave.cue_roles import CueRole
 from cleave.cut_types import CutType
 from cleave.easing import smoothstep
-from cleave.extract import STEM_SOURCES, StemSource
+from cleave.stems import STEM_SOURCES, StemSource
 
 RECORD_DEBOUNCE_SEC = 0.08
 # Epsilon for apply-cut scoping against song marker times (not fade selection).

@@ -1,0 +1,34 @@
+libprojectM (projectM Music Visualizer)
+========================================
+
+Shipped binaries
+----------------
+
+- projectM-4.dll (core renderer)
+- projectM-4-playlist.dll (playlist helper; depends on projectM-4.dll)
+
+Version: 4.2.0 (embedded in projectM-4.dll; Cleave requires libprojectM 4.2+).
+
+Upstream
+--------
+
+- Project: https://github.com/projectM-visualizer/projectm
+- License: GNU Lesser General Public License v2.1 (LGPL-2.1); full text in LICENSE.txt
+- Source for this build: projectM 4.x via vcpkg port `projectm`
+
+Build recipe (maintainer)
+-------------------------
+
+- Toolchain: Visual Studio 2022, x64
+- Package manager: vcpkg triplet `x64-windows` (shared / DLL)
+- Typical vcpkg install: `vcpkg install projectm:x64-windows` (enable Playlist component if split)
+- Copy `projectM-4.dll` and `projectM-4-playlist.dll` from the vcpkg `bin/` tree into packaging/windows/
+
+After copying new DLLs, run `dumpbin /dependents projectM-4.dll` and
+`dumpbin /dependents projectM-4-playlist.dll` on Windows. Ship any non-system
+dependency DLLs beside cleave.exe in the freeze output (zlib is common on some
+vcpkg builds; the DLLs currently in this tree only require the MSVC CRT and
+Windows system DLLs).
+
+Visual C++ Redistributable (VS 2022 x64) is required on tester machines unless
+app-local vcruntime/msvcp copies are added to the onedir root.

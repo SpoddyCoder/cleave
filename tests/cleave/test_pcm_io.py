@@ -48,3 +48,30 @@ def test_load_mix_pcm_stereo_interleaved(tmp_path: Path) -> None:
     pcm, sr = load_mix_pcm(path)
     assert sr == SAMPLE_RATE_HZ
     np.testing.assert_array_equal(pcm, np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float32))
+
+
+def test_load_wav_pcm_44k_resamples_mono(tmp_path: Path) -> None:
+    path = tmp_path / "mono-22k.wav"
+    orig_sr = SAMPLE_RATE_HZ // 2
+    mono = np.linspace(-0.5, 0.5, orig_sr, dtype=np.float32)
+    _write_wav(path, mono, orig_sr)
+    out, channels = load_wav_pcm_44k(path)
+    assert channels == 1
+    assert out.dtype == np.float32
+    assert out.shape == (SAMPLE_RATE_HZ,)
+
+
+def test_load_wav_pcm_44k_resamples_stereo(tmp_path: Path) -> None:
+    path = tmp_path / "stereo-22k.wav"
+    orig_sr = SAMPLE_RATE_HZ // 2
+    stereo = np.column_stack(
+        [
+            np.linspace(-0.5, 0.5, orig_sr, dtype=np.float32),
+            np.linspace(0.5, -0.5, orig_sr, dtype=np.float32),
+        ]
+    )
+    _write_wav(path, stereo, orig_sr)
+    out, channels = load_wav_pcm_44k(path)
+    assert channels == 2
+    assert out.dtype == np.float32
+    assert out.shape == (SAMPLE_RATE_HZ * 2,)

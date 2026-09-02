@@ -16,7 +16,7 @@ from cleave.config_schema.render import (
     default_chroma_boost_runtime_values,
     default_highlight_rolloff_runtime_values,
 )
-from cleave.extract import STEM_NAMES, StemSource
+from cleave.stems import STEM_NAMES, StemSource
 from cleave.paths import repo_root
 from cleave.preset_playlist import playlist_at_dir
 from cleave.viz.session import ChromaBoostRuntime, HighlightRolloffRuntime, LayerRuntime, RenderPostFxRuntime

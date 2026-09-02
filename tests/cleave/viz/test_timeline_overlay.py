@@ -7,7 +7,7 @@ import pytest
 
 from cleave.config_schema.layers import DEFAULT_LAYER_SLOTS
 from tests.support.config import TEST_LAYER_STEMS
-from cleave.extract import STEM_NAMES
+from cleave.stems import STEM_NAMES
 from cleave.timeline import (
     LEVEL_EPS,
     SlotCue,

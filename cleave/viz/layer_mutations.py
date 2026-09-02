@@ -12,7 +12,7 @@ from cleave.config_schema.layers import (
     PRESET_SWITCHING_TRIGGERS,
     clamp_easter_egg,
 )
-from cleave.extract import STEM_SOURCES
+from cleave.stems import STEM_SOURCES
 from cleave.preset_playlist import is_top_level_browse_dir
 from cleave.viz.live_layer_bindings import LiveLayerBindings
 from cleave.viz.preset_list_populate import needed_preset_count

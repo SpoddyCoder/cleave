@@ -8,9 +8,13 @@ from pathlib import Path
 import librosa
 import numpy as np
 
-from cleave.extract import (
+from cleave.stems import (
     StemSource,
     beat_detection_audio_path,
+    stem_control_label,
+    stem_paths,
+)
+from cleave.extract import (
     extract_bass,
     extract_beats_downbeats,
     extract_drums_onset,
@@ -18,8 +22,6 @@ from cleave.extract import (
     extract_mix_rms,
     extract_other,
     extract_vocals,
-    stem_control_label,
-    stem_paths,
 )
 from cleave.project import mix_path
 from cleave.resample import TARGET_HZ, resample_to_100hz

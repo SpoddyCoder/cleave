@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
 from cleave.config_schema.descriptors import PersistCtx, as_mapping, dump_section_fields
@@ -127,9 +126,6 @@ DEFAULT_RENDER_FPS = 30
 DEFAULT_RENDER_WIDTH = 1280
 DEFAULT_RENDER_HEIGHT = 720
 DEFAULT_HDR_COMPOSITING = True
-
-DEFAULT_PRESET_ROOT = Path("~/.local/share/cleave/presets")
-DEFAULT_TEXTURE_PATHS = (Path("~/.local/share/cleave/textures"),)
 
 
 def parse_render_section(data: dict[str, Any]) -> Any | None:

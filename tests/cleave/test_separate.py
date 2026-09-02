@@ -9,7 +9,7 @@ import pytest
 import yaml
 
 from cleave.config import VIZ_CONFIG_FILENAME
-from cleave.extract import STEM_NAMES, stems_dir
+from cleave.stems import STEM_NAMES, stems_dir
 from cleave.project import (
     PROJECT_FILENAME,
     load_manifest,
@@ -127,7 +127,7 @@ def test_run_separate_writes_project_viz_config(
     (project / "signals.json").write_text('{"version": 4}')
 
     with patch("cleave.separate._run_demucs") as run_demucs, patch(
-        "cleave.separate.run_analyse"
+        "cleave.analyse.run_analyse"
     ) as run_analyse:
         run_separate(audio)
 
@@ -152,13 +152,43 @@ def test_run_separate_noop_when_stems_and_signals_exist(
     (project / "signals.json").write_text('{"version": 4}')
 
     with patch("cleave.separate._run_demucs") as run_demucs, patch(
-        "cleave.separate.run_analyse"
+        "cleave.analyse.run_analyse"
     ) as run_analyse:
         result = run_separate(audio)
 
     assert result == project.resolve()
     run_demucs.assert_not_called()
     run_analyse.assert_not_called()
+
+
+def test_run_separate_complete_project_skips_stem_split_check(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    monkeypatch.setattr("cleave.separate.stem_split_available", lambda: False)
+    audio = tmp_path / "my-track.flac"
+    audio.write_bytes(b"audio")
+
+    project = tmp_path / "projects" / "my-track"
+    project.mkdir(parents=True)
+    _write_stub_stems(project)
+    (project / "signals.json").write_text('{"version": 4}')
+
+    result = run_separate(audio)
+    assert result == project.resolve()
+
+
+def test_run_separate_missing_torch_message(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    monkeypatch.setattr("cleave.separate.stem_split_available", lambda: False)
+    monkeypatch.setattr("cleave.separate.is_frozen", lambda: True)
+    audio = tmp_path / "my-track.flac"
+    audio.write_bytes(b"audio")
+
+    with pytest.raises(RuntimeError, match="not in this Windows build"):
+        run_separate(audio)
 
 
 def test_run_separate_analyse_only_when_stems_exist_stale_signals(
@@ -180,7 +210,7 @@ def test_run_separate_analyse_only_when_stems_exist_stale_signals(
     (project / "signals.json").write_text('{"version": 2}')
 
     with patch("cleave.separate._run_demucs") as run_demucs, patch(
-        "cleave.separate.run_analyse", return_value=project / "signals.json"
+        "cleave.analyse.run_analyse", return_value=project / "signals.json"
     ) as run_analyse:
         result = run_separate("my-track")
 
@@ -209,7 +239,7 @@ def test_run_separate_analyse_only_when_stems_exist_no_signals(
     )
 
     with patch("cleave.separate._run_demucs") as run_demucs, patch(
-        "cleave.separate.run_analyse", return_value=project / "signals.json"
+        "cleave.analyse.run_analyse", return_value=project / "signals.json"
     ) as run_analyse:
         result = run_separate("my-track")
 
@@ -241,7 +271,7 @@ def test_run_separate_reanalyses_on_explicit_beat_stem_mismatch(
     )
 
     with patch("cleave.separate._run_demucs") as run_demucs, patch(
-        "cleave.separate.run_analyse", return_value=project / "signals.json"
+        "cleave.analyse.run_analyse", return_value=project / "signals.json"
     ) as run_analyse:
         result = run_separate("my-track", beat_detection_stem="drums")
 
@@ -267,7 +297,7 @@ def test_run_separate_skips_when_explicit_beat_stem_matches_stored(
     )
 
     with patch("cleave.separate._run_demucs") as run_demucs, patch(
-        "cleave.separate.run_analyse"
+        "cleave.analyse.run_analyse"
     ) as run_analyse:
         result = run_separate(audio, beat_detection_stem="drums")
 
@@ -291,7 +321,7 @@ def test_run_separate_skips_when_flag_omitted_even_if_stored_is_drums(
     )
 
     with patch("cleave.separate._run_demucs") as run_demucs, patch(
-        "cleave.separate.run_analyse"
+        "cleave.analyse.run_analyse"
     ) as run_analyse:
         result = run_separate(audio)
 
@@ -355,7 +385,7 @@ def test_run_separate_force_runs_demucs_and_analyse(
     (project / "signals.json").write_text("{}")
 
     with patch("cleave.separate._run_demucs") as run_demucs, patch(
-        "cleave.separate.run_analyse", return_value=project / "signals.json"
+        "cleave.analyse.run_analyse", return_value=project / "signals.json"
     ) as run_analyse:
         result = run_separate("my-track", force=True)
 
@@ -389,7 +419,7 @@ def test_run_separate_force_uses_stored_beat_detection_stem(
     )
 
     with patch("cleave.separate._run_demucs") as run_demucs, patch(
-        "cleave.separate.run_analyse", return_value=project / "signals.json"
+        "cleave.analyse.run_analyse", return_value=project / "signals.json"
     ) as run_analyse:
         result = run_separate("my-track", force=True)
 
@@ -421,7 +451,7 @@ def test_run_separate_force_explicit_beat_stem_overrides_stored(
     )
 
     with patch("cleave.separate._run_demucs") as run_demucs, patch(
-        "cleave.separate.run_analyse", return_value=project / "signals.json"
+        "cleave.analyse.run_analyse", return_value=project / "signals.json"
     ) as run_analyse:
         result = run_separate(
             "my-track", force=True, beat_detection_stem="bass"
@@ -458,7 +488,7 @@ def test_run_separate_creates_project_and_renders(
             (target / f"{name}.wav").write_bytes(shutil_copy.read_bytes())
 
     with patch("cleave.separate.subprocess.run", side_effect=fake_run), patch(
-        "cleave.separate.run_analyse", return_value=project / "signals.json"
+        "cleave.analyse.run_analyse", return_value=project / "signals.json"
     ):
         result = run_separate(audio)
 
@@ -510,7 +540,7 @@ def test_run_separate_force_deletes_stale_mix(
             (target / f"{name}.wav").write_bytes(b"wav")
 
     with patch("cleave.separate.subprocess.run", side_effect=fake_run), patch(
-        "cleave.separate.run_analyse", return_value=project / "signals.json"
+        "cleave.analyse.run_analyse", return_value=project / "signals.json"
     ):
         run_separate(new_audio, force=True)
 
@@ -549,7 +579,7 @@ def test_run_separate_force_preserves_song_markers(
             (target / f"{name}.wav").write_bytes(b"wav")
 
     with patch("cleave.separate.subprocess.run", side_effect=fake_run), patch(
-        "cleave.separate.run_analyse", return_value=project / "signals.json"
+        "cleave.analyse.run_analyse", return_value=project / "signals.json"
     ):
         run_separate("song", force=True)
 

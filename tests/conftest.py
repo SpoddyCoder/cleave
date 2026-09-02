@@ -8,7 +8,7 @@ import pygame
 import pytest
 
 import cleave.viz.controls  # noqa: F401 - preload before effects.runtime imports
-from cleave.extract import STEM_NAMES, stems_dir
+from cleave.stems import STEM_NAMES, stems_dir
 from cleave.signals import Signals
 from tests.support.config import write_minimal_config
 from tests.support.signals import make_onset_signals, make_signals

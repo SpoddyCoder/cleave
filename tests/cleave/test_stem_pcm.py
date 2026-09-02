@@ -9,8 +9,8 @@ import numpy as np
 import pytest
 import soundfile as sf
 
-from cleave.extract import STEM_NAMES, stems_dir
-from cleave.pcm_io import SAMPLE_RATE_HZ, _to_mono_float32
+from cleave.stems import STEM_NAMES, stems_dir
+from cleave.pcm_io import SAMPLE_RATE_HZ
 from cleave.project import write_manifest
 from cleave.stem_pcm import (
     StemPcmBank,
@@ -68,27 +68,6 @@ def test_slice_pcm_non_positive_n_samples(n_samples: int) -> None:
     out = bank.slice_pcm("other", t_sec=0.0, n_samples=n_samples)
     assert out.size == 0
     assert out.dtype == np.float32
-
-
-def test_to_mono_float32_mono_passthrough() -> None:
-    mono = np.array([0.5, -0.25, 1.0], dtype=np.float64)
-    out = _to_mono_float32(mono)
-    np.testing.assert_array_equal(out, mono.astype(np.float32))
-    assert out.dtype == np.float32
-    assert out.flags["C_CONTIGUOUS"]
-
-
-def test_to_mono_float32_stereo_mean() -> None:
-    stereo = np.array([[1.0, 3.0], [0.0, 2.0]], dtype=np.float32)
-    out = _to_mono_float32(stereo)
-    np.testing.assert_array_equal(out, np.array([2.0, 1.0], dtype=np.float32))
-
-
-def test_to_mono_float32_output_is_float32_contiguous() -> None:
-    stereo = np.arange(6, dtype=np.float64).reshape(3, 2)
-    out = _to_mono_float32(stereo)
-    assert out.dtype == np.float32
-    assert out.flags["C_CONTIGUOUS"]
 
 
 def test_samples_per_frame_matches_sample_rate_over_fps() -> None:

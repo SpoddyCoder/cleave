@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 
 from cleave.analyse import run_analyse
-from cleave.extract import STEM_NAMES, stems_dir
+from cleave.stems import STEM_NAMES, stems_dir
 from cleave.project import write_manifest
 
 
