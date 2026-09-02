@@ -96,7 +96,8 @@ zip at `.cache/ffmpeg-windows.zip` (gitignored).
 runs on standard `windows-latest` (`workflow_dispatch` and `workflow_call`, not
 every push). Pip cache only (`requirements-freeze.txt`); no FFmpeg or freeze-tree
 cache. Headless smoke (`cleave.exe --version` / `--help` / frozen `separate`
-message). No GPU compositing.
+message). No GPU compositing. Dispatch zip GPU proof (play an existing
+project) is met; see [docs/windows-freeze.md](../../docs/windows-freeze.md).
 
 1. Install Python deps from [requirements-freeze.txt](../../requirements-freeze.txt)
    (no torch, demucs, librosa, or analyse stack).

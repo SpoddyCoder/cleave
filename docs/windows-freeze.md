@@ -1,4 +1,4 @@
-# Windows freeze (Phase 2)
+# Windows freeze
 
 How Cleave locates files when frozen, how testers unpack a Windows onedir zip, and how to build libprojectM 4.2+ DLLs. Product decisions live in [structured-releases.md](structured-releases.md). This note is the implementation design for the freeze (paths, spec, FFmpeg, ctypes, libprojectM). Phase 3.1 CI is [.github/workflows/windows-freeze.yml](../.github/workflows/windows-freeze.yml).
 
@@ -60,6 +60,8 @@ cleave.exe --help
 
 Phase 2.2 proof (met): `cleave.exe play <existing-project>` and a short `cleave.exe render` on a Windows box with a GPU driver. Copy `projects/` from Linux; do not run `separate` in this zip. Frozen `separate` and raw-audio `play` raise the short stem-split message. Overlay tofu is a [todos.md](todos.md) follow-up, not a freeze-layout bug.
 
+Phase 3.1 GPU proof (met): the same play path from a `workflow_dispatch` zip built on `windows-latest` (`cleave.exe play` on an existing project). CI headless smoke covers `--version`, `--help`, and frozen `separate`. Overlay tofu is still [todos.md](todos.md).
+
 ---
 
 ## FFmpeg sidecar
@@ -108,6 +110,7 @@ Same recipe as the manual steps above, on standard `windows-latest`. Workflow: [
 - Headless smoke: `cleave.exe --version` must print `cleave X.Y.Z`, `--help` lists `separate` / `play` / `render` / `backup` / `restore`, and `cleave.exe separate` with a dummy file prints `STEM_SPLIT_MISSING_FROZEN` (no traceback). No GPU compositing.
 - Zip layout is `cleave/cleave.exe` inside `cleave-<version>-windows-x64.zip`.
 - Dispatch uploads a 5-day Actions artifact (`cleave-windows-x64`). Tag pipeline: [.github/workflows/release.yml](../.github/workflows/release.yml) calls this workflow after `publish` with `release_tag` set to the tag; a non-empty `release_tag` uses `gh release upload` and does not retain a workflow artifact.
+- GPU proof: unpack the dispatch zip on a Windows box with a GPU driver and run `cleave.exe play` on an existing project (met). A short `cleave.exe render` is the same 2.2 path if you want extra coverage.
 
 ---
 
