@@ -194,18 +194,30 @@ The project directory stores all files required in a self-contained bundle...
 * `presets/` - presets used by the project are copied into the project directory
 
 ### Configuration
-Cleave uses the XDG standard for user data and configuration, default locations...
+Cleave uses OS user-data directories. Default locations...
+
+Linux (XDG):
 
 * User data: `~/.local/share/cleave/`
   * `projects/`
   * `presets/`
   * `presets/favourites/`
   * `presets/blacklist/`
-* Override the data root with `CLEAVE_DATA` (e.g. `CLEAVE_DATA=.` for a dev checkout).
 * Configuration: `~/.config/cleave/config.yaml`
   * Editor settings (preview quality, panel width, fade)
-* When a project omits `paths`, preset browsing defaults to `~/.local/share/cleave/presets`.
+
+Windows (source checkout today; a frozen zip later):
+
+* User data: `Documents\cleave\` (same `projects/`, `presets/`, `textures/` tree)
+* Configuration: `%APPDATA%\cleave\config.yaml`
+
+On every OS:
+
+* Override the data root with `CLEAVE_DATA` (e.g. `CLEAVE_DATA=.` for a dev checkout).
+* When a project omits `paths`, preset browsing defaults to `<data root>/presets`.
   * `paths.preset_root` in `cleave-viz.yaml` overrides this default when set.
+
+Windows freeze layout and FFmpeg/libprojectM sidecars: [docs/windows-freeze.md](docs/windows-freeze.md).
 
 ---
 

@@ -7,8 +7,6 @@ from typing import Literal, TypedDict
 
 import librosa
 import numpy as np
-import torch
-from beat_this.inference import File2Beats
 
 from cleave.project import mix_path
 
@@ -140,6 +138,9 @@ def extract_beats_downbeats(path: Path | str) -> tuple[np.ndarray, np.ndarray]:
 
     Runs Beat This! (`File2Beats`) on *path* (mix or a stem wav).
     """
+    import torch
+    from beat_this.inference import File2Beats
+
     device = "cuda" if torch.cuda.is_available() else "cpu"
     file2beats = File2Beats(checkpoint_path="final0", device=device, dbn=False)
     beats, downbeats = file2beats(str(path))

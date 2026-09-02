@@ -73,7 +73,7 @@ from cleave.config_schema.render import (
 from cleave.config_schema.timeline import parse_timeline_section, persist_timeline
 from cleave.user_config import EditorSettings
 from cleave.viz.session import TuningSession
-from cleave.paths import repo_root
+from cleave.paths import default_preset_root, default_texture_paths, repo_root, resource_dir
 from cleave.extract import STEM_NAMES
 from cleave.timeline import SlotCue, TimelineLane
 from tests.support.config import (
@@ -407,7 +407,26 @@ def test_find_config_path_project_config(tmp_path: Path) -> None:
 
 def test_find_config_path_repo_template_fallback(tmp_path: Path) -> None:
     found = find_config_path(project_root=tmp_path / "no-config-here")
+    assert found == (resource_dir() / VIZ_CONFIG_FILENAME).resolve()
     assert found == (repo_root() / VIZ_CONFIG_FILENAME).resolve()
+
+
+def test_load_config_defaults_follow_data_dir(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path / "data"))
+    user_cfg_path = tmp_path / "user-config.yaml"
+    project_dir = tmp_path / "project"
+    write_minimal_config(project_dir, tmp_path / "unused-presets")
+    cfg_path = project_dir / VIZ_CONFIG_FILENAME
+    data = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    del data["paths"]
+    with cfg_path.open("w", encoding="utf-8") as handle:
+        dump_yaml(data, handle)
+
+    cfg = load_config(project_root=project_dir, user_config_path=user_cfg_path)
+    assert cfg.paths.preset_root == default_preset_root()
+    assert cfg.paths.texture_paths == default_texture_paths()
 
 
 def test_load_config_project_paths_override_user_paths(tmp_path: Path) -> None:
