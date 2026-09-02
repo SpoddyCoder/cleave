@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import math
 import os
-import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -19,7 +18,8 @@ from cleave.config import (
     render_fps,
     render_output_size,
 )
-from cleave.paths import default_project_config, repo_root, resolve_project
+from cleave.ffmpeg import ffmpeg_executable
+from cleave.paths import default_project_config, resource_dir, resolve_project
 from cleave.preset_playlist import scan_all_layers
 from cleave.project import load_manifest, manifest_path, mix_path
 from cleave.separate import project_stems_complete, signals_complete
@@ -185,16 +185,14 @@ def render(
     """Render project visuals to an MP4 muxed with the project mix audio."""
     project = validate_render_project(project_dir, config=config)
     config_path = _resolve_render_config_path(config, project)
-    cfg = load_config(config_path, repo_root())
+    cfg = load_config(config_path, resource_dir())
 
     if output is not None:
         output_path = Path(output).expanduser()
         if output_path.suffix.lower() != ".mp4":
             raise ValueError("output path must end with .mp4")
 
-    ffmpeg = shutil.which("ffmpeg")
-    if ffmpeg is None:
-        raise FileNotFoundError("ffmpeg not found on PATH")
+    ffmpeg = ffmpeg_executable()
 
     audio_path = mix_path(project)
     playlists = scan_all_layers(cfg)

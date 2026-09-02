@@ -360,7 +360,7 @@ def test_default_output_path_suffix_only_for_partial_segments(tmp_path: Path) ->
 
 
 @patch.object(render_mod, "pygame")
-@patch.object(render_mod, "shutil")
+@patch.object(render_mod, "ffmpeg_executable", return_value="/usr/bin/ffmpeg")
 @patch.object(render_mod, "subprocess")
 @patch.object(render_mod, "init_gl_resources_render")
 @patch.object(render_mod, "build_runtime_base")
@@ -372,11 +372,10 @@ def test_render_default_passes_viz_quality_false_to_init_gl(
     mock_build: MagicMock,
     mock_init_gl: MagicMock,
     mock_subprocess: MagicMock,
-    mock_shutil: MagicMock,
+    _mock_ffmpeg: MagicMock,
     _mock_pygame: MagicMock,
     tmp_path: Path,
 ) -> None:
-    mock_shutil.which.return_value = "/usr/bin/ffmpeg"
     project = _setup_render_project(
         tmp_path,
         render_width=1920,
@@ -413,7 +412,7 @@ def test_render_default_passes_viz_quality_false_to_init_gl(
 
 
 @patch.object(render_mod, "pygame")
-@patch.object(render_mod, "shutil")
+@patch.object(render_mod, "ffmpeg_executable", return_value="/usr/bin/ffmpeg")
 @patch.object(render_mod, "subprocess")
 @patch.object(render_mod, "init_gl_resources_render")
 @patch.object(render_mod, "build_runtime_base")
@@ -425,11 +424,10 @@ def test_render_viz_quality_passes_flag_to_init_gl(
     mock_build: MagicMock,
     mock_init_gl: MagicMock,
     mock_subprocess: MagicMock,
-    mock_shutil: MagicMock,
+    _mock_ffmpeg: MagicMock,
     _mock_pygame: MagicMock,
     tmp_path: Path,
 ) -> None:
-    mock_shutil.which.return_value = "/usr/bin/ffmpeg"
     project = _setup_render_project(
         tmp_path,
         render_width=1920,
@@ -466,7 +464,7 @@ def test_render_viz_quality_passes_flag_to_init_gl(
 
 
 @patch.object(render_mod, "pygame")
-@patch.object(render_mod, "shutil")
+@patch.object(render_mod, "ffmpeg_executable", return_value="/usr/bin/ffmpeg")
 @patch.object(render_mod, "subprocess")
 @patch.object(render_mod, "init_gl_resources_render")
 @patch.object(render_mod, "build_runtime_base")
@@ -478,11 +476,10 @@ def test_render_frame_count_and_ffmpeg_args(
     mock_build: MagicMock,
     mock_init_gl: MagicMock,
     mock_subprocess: MagicMock,
-    mock_shutil: MagicMock,
+    _mock_ffmpeg: MagicMock,
     _mock_pygame: MagicMock,
     tmp_path: Path,
 ) -> None:
-    mock_shutil.which.return_value = "/usr/bin/ffmpeg"
     project = _setup_render_project(tmp_path)
     width, height, fps = 4, 4, 10
     duration_sec = 2.0
@@ -529,7 +526,7 @@ def test_render_frame_count_and_ffmpeg_args(
 
 
 @patch.object(render_mod, "pygame")
-@patch.object(render_mod, "shutil")
+@patch.object(render_mod, "ffmpeg_executable", return_value="/usr/bin/ffmpeg")
 @patch.object(render_mod, "subprocess")
 @patch.object(render_mod, "init_gl_resources_render")
 @patch.object(render_mod, "build_runtime_base")
@@ -541,11 +538,10 @@ def test_render_segment_frame_count_tick_times_and_ffmpeg_trim(
     mock_build: MagicMock,
     mock_init_gl: MagicMock,
     mock_subprocess: MagicMock,
-    mock_shutil: MagicMock,
+    _mock_ffmpeg: MagicMock,
     _mock_pygame: MagicMock,
     tmp_path: Path,
 ) -> None:
-    mock_shutil.which.return_value = "/usr/bin/ffmpeg"
     project = _setup_render_project(tmp_path)
     width, height, fps = 4, 4, 10
     duration_sec = 60.0
@@ -598,7 +594,7 @@ def test_render_segment_frame_count_tick_times_and_ffmpeg_trim(
 
 
 @patch.object(render_mod, "pygame")
-@patch.object(render_mod, "shutil")
+@patch.object(render_mod, "ffmpeg_executable", return_value="/usr/bin/ffmpeg")
 @patch.object(render_mod, "subprocess")
 @patch.object(render_mod, "init_gl_resources_render")
 @patch.object(render_mod, "build_runtime_base")
@@ -618,7 +614,7 @@ def test_render_cue_at_beat_aligns_with_file_timeline_and_mux(
     mock_build: MagicMock,
     mock_init_gl: MagicMock,
     mock_subprocess: MagicMock,
-    mock_shutil: MagicMock,
+    _mock_ffmpeg: MagicMock,
     _mock_pygame: MagicMock,
     tmp_path: Path,
     start_sec: int | None,
@@ -627,7 +623,6 @@ def test_render_cue_at_beat_aligns_with_file_timeline_and_mux(
     beat_t: float,
 ) -> None:
     """Cue at on-grid beat t flips at round(t*fps); tick times match ffmpeg mux."""
-    mock_shutil.which.return_value = "/usr/bin/ffmpeg"
     fps = 30
     project = _setup_render_project(tmp_path, render_fps=fps)
     width, height = 4, 4
@@ -695,7 +690,7 @@ def test_render_cue_at_beat_aligns_with_file_timeline_and_mux(
 
 @patch("cleave.viz.frame_finish.live_frame_fade_alpha", return_value=1.0)
 @patch.object(render_mod, "pygame")
-@patch.object(render_mod, "shutil")
+@patch.object(render_mod, "ffmpeg_executable", return_value="/usr/bin/ffmpeg")
 @patch.object(render_mod, "subprocess")
 @patch.object(render_mod, "init_gl_resources_render")
 @patch.object(render_mod, "build_runtime_base")
@@ -707,12 +702,11 @@ def test_render_segment_fade_alpha_uses_full_duration(
     mock_build: MagicMock,
     mock_init_gl: MagicMock,
     mock_subprocess: MagicMock,
-    mock_shutil: MagicMock,
+    _mock_ffmpeg: MagicMock,
     _mock_pygame: MagicMock,
     mock_fade_alpha: MagicMock,
     tmp_path: Path,
 ) -> None:
-    mock_shutil.which.return_value = "/usr/bin/ffmpeg"
     project = _setup_render_project(tmp_path)
     width, height, fps = 4, 4, 10
     duration_sec = 60.0
@@ -742,7 +736,7 @@ def test_render_segment_fade_alpha_uses_full_duration(
 
 
 @patch.object(render_mod, "pygame")
-@patch.object(render_mod, "shutil")
+@patch.object(render_mod, "ffmpeg_executable", return_value="/usr/bin/ffmpeg")
 @patch.object(render_mod, "subprocess")
 @patch.object(render_mod, "init_gl_resources_render")
 @patch.object(render_mod, "build_runtime_base")
@@ -754,11 +748,10 @@ def test_render_ffmpeg_preset_veryslow_when_high_quality(
     mock_build: MagicMock,
     mock_init_gl: MagicMock,
     mock_subprocess: MagicMock,
-    mock_shutil: MagicMock,
+    _mock_ffmpeg: MagicMock,
     _mock_pygame: MagicMock,
     tmp_path: Path,
 ) -> None:
-    mock_shutil.which.return_value = "/usr/bin/ffmpeg"
     project = _setup_render_project(tmp_path)
     width, height, fps = 4, 4, 10
     duration_sec = 2.0
@@ -790,7 +783,7 @@ def test_render_ffmpeg_preset_veryslow_when_high_quality(
 
 @patch("cleave.viz.frame_finish.live_frame_fade_alpha", side_effect=lambda *_a, **_k: 0.5)
 @patch.object(render_mod, "pygame")
-@patch.object(render_mod, "shutil")
+@patch.object(render_mod, "ffmpeg_executable", return_value="/usr/bin/ffmpeg")
 @patch.object(render_mod, "subprocess")
 @patch.object(render_mod, "init_gl_resources_render")
 @patch.object(render_mod, "build_runtime_base")
@@ -802,12 +795,11 @@ def test_render_applies_fade_via_compositor(
     mock_build: MagicMock,
     mock_init_gl: MagicMock,
     mock_subprocess: MagicMock,
-    mock_shutil: MagicMock,
+    _mock_ffmpeg: MagicMock,
     _mock_pygame: MagicMock,
     _mock_fade_alpha: MagicMock,
     tmp_path: Path,
 ) -> None:
-    mock_shutil.which.return_value = "/usr/bin/ffmpeg"
     project = _setup_render_project(tmp_path)
     width, height, fps = 4, 4, 10
     duration_sec = 2.0
@@ -853,7 +845,7 @@ def test_render_output_must_be_mp4(tmp_path: Path) -> None:
 @patch("cleave.viz.frame_finish.build_overlay_layers")
 @patch("cleave.viz.frame_finish.composite_render_overlay_with_alpha")
 @patch.object(render_mod, "pygame")
-@patch.object(render_mod, "shutil")
+@patch.object(render_mod, "ffmpeg_executable", return_value="/usr/bin/ffmpeg")
 @patch.object(render_mod, "subprocess")
 @patch.object(render_mod, "init_gl_resources_render")
 @patch.object(render_mod, "build_runtime_base")
@@ -867,14 +859,13 @@ def test_render_calls_overlay_compositing_when_enabled(
     mock_build: MagicMock,
     mock_init_gl: MagicMock,
     mock_subprocess: MagicMock,
-    mock_shutil: MagicMock,
+    _mock_ffmpeg: MagicMock,
     _mock_pygame: MagicMock,
     mock_composite: MagicMock,
     mock_build_layers: MagicMock,
     _mock_overlay_alpha: MagicMock,
     tmp_path: Path,
 ) -> None:
-    mock_shutil.which.return_value = "/usr/bin/ffmpeg"
     project = _setup_render_project(tmp_path)
     width, height, fps = 4, 4, 10
     duration_sec = 2.0
@@ -936,7 +927,7 @@ def test_render_calls_overlay_compositing_when_enabled(
 @patch("cleave.viz.frame_finish.build_overlay_layers")
 @patch("cleave.viz.frame_finish.composite_render_overlay_with_alpha")
 @patch.object(render_mod, "pygame")
-@patch.object(render_mod, "shutil")
+@patch.object(render_mod, "ffmpeg_executable", return_value="/usr/bin/ffmpeg")
 @patch.object(render_mod, "subprocess")
 @patch.object(render_mod, "init_gl_resources_render")
 @patch.object(render_mod, "build_runtime_base")
@@ -950,13 +941,12 @@ def test_render_skips_overlay_when_disabled(
     mock_build: MagicMock,
     mock_init_gl: MagicMock,
     mock_subprocess: MagicMock,
-    mock_shutil: MagicMock,
+    _mock_ffmpeg: MagicMock,
     _mock_pygame: MagicMock,
     mock_composite: MagicMock,
     mock_build_layers: MagicMock,
     tmp_path: Path,
 ) -> None:
-    mock_shutil.which.return_value = "/usr/bin/ffmpeg"
     project = _setup_render_project(tmp_path)
 
     overlay_cfg = _overlay_cfg(enabled=False)
@@ -1005,7 +995,7 @@ def test_render_skips_overlay_when_disabled(
 )
 @patch("cleave.viz.frame_finish.composite_render_overlay_with_alpha")
 @patch.object(render_mod, "pygame")
-@patch.object(render_mod, "shutil")
+@patch.object(render_mod, "ffmpeg_executable", return_value="/usr/bin/ffmpeg")
 @patch.object(render_mod, "subprocess")
 @patch.object(render_mod, "init_gl_resources_render")
 @patch.object(render_mod, "build_runtime_base")
@@ -1019,13 +1009,12 @@ def test_render_composites_default_overlay_when_render_absent(
     mock_build: MagicMock,
     mock_init_gl: MagicMock,
     mock_subprocess: MagicMock,
-    mock_shutil: MagicMock,
+    _mock_ffmpeg: MagicMock,
     _mock_pygame: MagicMock,
     mock_composite: MagicMock,
     _mock_overlay_alpha: MagicMock,
     tmp_path: Path,
 ) -> None:
-    mock_shutil.which.return_value = "/usr/bin/ffmpeg"
     project = _setup_render_project(tmp_path)
     width, height = 4, 4
     duration_sec = 60.0
@@ -1060,7 +1049,7 @@ def test_render_composites_default_overlay_when_render_absent(
 
 
 @patch.object(render_mod, "pygame")
-@patch.object(render_mod, "shutil")
+@patch.object(render_mod, "ffmpeg_executable", return_value="/usr/bin/ffmpeg")
 @patch.object(render_mod, "subprocess")
 @patch.object(render_mod, "init_gl_resources_render")
 @patch.object(render_mod, "build_runtime_base")
@@ -1072,11 +1061,10 @@ def test_render_ffmpeg_ignores_upscale_uses_render_resolution(
     mock_build: MagicMock,
     mock_init_gl: MagicMock,
     mock_subprocess: MagicMock,
-    mock_shutil: MagicMock,
+    _mock_ffmpeg: MagicMock,
     _mock_pygame: MagicMock,
     tmp_path: Path,
 ) -> None:
-    mock_shutil.which.return_value = "/usr/bin/ffmpeg"
     project = _setup_render_project(
         tmp_path,
         render_fps=10,
@@ -1133,7 +1121,7 @@ def test_render_ffmpeg_ignores_upscale_uses_render_resolution(
 
 
 @patch.object(render_mod, "pygame")
-@patch.object(render_mod, "shutil")
+@patch.object(render_mod, "ffmpeg_executable", return_value="/usr/bin/ffmpeg")
 @patch.object(render_mod, "subprocess")
 @patch.object(render_mod, "init_gl_resources_render")
 @patch.object(render_mod, "build_runtime_base")
@@ -1145,11 +1133,10 @@ def test_render_ffmpeg_uses_explicit_render_resolution(
     mock_build: MagicMock,
     mock_init_gl: MagicMock,
     mock_subprocess: MagicMock,
-    mock_shutil: MagicMock,
+    _mock_ffmpeg: MagicMock,
     _mock_pygame: MagicMock,
     tmp_path: Path,
 ) -> None:
-    mock_shutil.which.return_value = "/usr/bin/ffmpeg"
     project = _setup_render_project(
         tmp_path, render_fps=10, render_width=1920, render_height=1080
     )
@@ -1190,7 +1177,7 @@ def test_render_ffmpeg_uses_explicit_render_resolution(
 
 
 @patch.object(render_mod, "pygame")
-@patch.object(render_mod, "shutil")
+@patch.object(render_mod, "ffmpeg_executable", return_value="/usr/bin/ffmpeg")
 @patch.object(render_mod, "subprocess")
 @patch.object(render_mod, "init_gl_resources_render")
 @patch.object(render_mod, "build_runtime_base")
@@ -1202,11 +1189,10 @@ def test_render_present_content_every_frame_at_upscale_one(
     mock_build: MagicMock,
     mock_init_gl: MagicMock,
     mock_subprocess: MagicMock,
-    mock_shutil: MagicMock,
+    _mock_ffmpeg: MagicMock,
     _mock_pygame: MagicMock,
     tmp_path: Path,
 ) -> None:
-    mock_shutil.which.return_value = "/usr/bin/ffmpeg"
     project = _setup_render_project(tmp_path)
     content_w, content_h, fps = 4, 4, 10
     upscale = 1.0
@@ -1248,7 +1234,7 @@ def test_render_present_content_every_frame_at_upscale_one(
 )
 @patch("cleave.viz.frame_finish.build_overlay_layers")
 @patch.object(render_mod, "pygame")
-@patch.object(render_mod, "shutil")
+@patch.object(render_mod, "ffmpeg_executable", return_value="/usr/bin/ffmpeg")
 @patch.object(render_mod, "subprocess")
 @patch.object(render_mod, "init_gl_resources_render")
 @patch.object(render_mod, "build_runtime_base")
@@ -1262,13 +1248,12 @@ def test_render_upscale_overlay_frame_order_uses_content_dims(
     mock_build: MagicMock,
     mock_init_gl: MagicMock,
     mock_subprocess: MagicMock,
-    mock_shutil: MagicMock,
+    _mock_ffmpeg: MagicMock,
     _mock_pygame: MagicMock,
     mock_build_layers: MagicMock,
     _mock_overlay_alpha: MagicMock,
     tmp_path: Path,
 ) -> None:
-    mock_shutil.which.return_value = "/usr/bin/ffmpeg"
     project = _setup_render_project(tmp_path)
     content_w, content_h, fps = 4, 4, 10
     upscale = 2.0

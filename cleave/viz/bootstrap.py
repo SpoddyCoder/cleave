@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from cleave.config import find_config_path
-from cleave.paths import default_project_config, repo_root
+from cleave.paths import default_project_config, resource_dir
 from cleave.project import resolve_mix_path as _resolve_mix_path
 from cleave.signals import Signals, load_signals
 
@@ -27,7 +27,7 @@ def resolve_config_path(
     default_cfg = default_project_config(project_dir)
     if default_cfg.is_file():
         return default_cfg
-    return find_config_path(None, repo_root())
+    return find_config_path(None, resource_dir())
 
 
 def resolve_mix_path(project_dir: Path) -> Path:
