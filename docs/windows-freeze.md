@@ -1,8 +1,8 @@
 # Windows freeze (Phase 2)
 
-How Cleave locates files when frozen, how testers unpack a Windows onedir zip, and how to build libprojectM 4.2+ DLLs for Phase 2.2. Product decisions and 2.2 pickup live in [structured-releases.md](structured-releases.md). This note is the implementation design: 2.1 paths/spec/FFmpeg/ctypes (done) and the Windows native-build analysis for 2.2.
+How Cleave locates files when frozen, how testers unpack a Windows onedir zip, and how to build libprojectM 4.2+ DLLs. Product decisions live in [structured-releases.md](structured-releases.md). This note is the implementation design for the Phase 2 freeze (paths, spec, FFmpeg, ctypes, libprojectM).
 
-2.1 is proven on a native Windows box: `cleave.exe --version` and `cleave.exe --help`. Do not cross-compile the GUI stack from WSL. 2.2 still builds on Windows, copies sidecars next to the exe, and proves play/render.
+Do not cross-compile the GUI stack from WSL. Build on Windows, copy sidecars next to the exe, then zip `dist/cleave/`.
 
 Related: [cleave/paths.py](../cleave/paths.py), [cleave/ffmpeg.py](../cleave/ffmpeg.py), [packaging/cleave.spec](../packaging/cleave.spec), [cleave/projectm.py](../cleave/projectm.py), [cleave/projectm_playlist.py](../cleave/projectm_playlist.py).
 
@@ -39,11 +39,11 @@ PyInstaller onedir, one `cleave.exe`, CLI subcommands (`cleave.exe play ...`). U
 cleave/
   cleave.exe
   ffmpeg.exe                 # copied after freeze; not inside _internal
-  projectM-4.dll             # Phase 2.2
-  projectM-4-playlist.dll    # Phase 2.2
+  projectM-4.dll
+  projectM-4-playlist.dll
   licenses/
     ffmpeg/
-    libprojectM/             # Phase 2.2
+    libprojectM/
   _internal/                 # sys._MEIPASS: Python, pygame/SDL, datas
     cleave-viz.yaml
     assets/fonts/
@@ -58,7 +58,7 @@ cleave.exe --version
 cleave.exe --help
 ```
 
-Phase 2.2 proof: `cleave.exe play <existing-project>` and a short `cleave.exe render` on a Windows box with a GPU driver. Copy `projects/` from Linux; do not run `separate` in this zip. Frozen `separate` and raw-audio `play` raise the short stem-split message.
+Phase 2.2 proof (met): `cleave.exe play <existing-project>` and a short `cleave.exe render` on a Windows box with a GPU driver. Copy `projects/` from Linux; do not run `separate` in this zip. Frozen `separate` and raw-audio `play` raise the short stem-split message. Overlay tofu is a [todos.md](todos.md) follow-up, not a freeze-layout bug.
 
 ---
 
@@ -110,7 +110,7 @@ Linux frozen names stay `libprojectM-4.so` and `libprojectM-4-playlist.so` (plus
 
 ## Windows libprojectM 4.2+ build
 
-Do not run this build until 2.2. 2.2 copies the DLLs next to `cleave.exe`. Testers must not compile Visual Studio.
+Copy the DLLs next to `cleave.exe` after freeze. Testers must not compile Visual Studio.
 
 ### Recommendation
 
@@ -152,10 +152,10 @@ Then zip `dist/cleave/`.
 
 ## Seed presets and textures
 
-Still open: whether a seed preset/texture pack ships in the zip, or testers copy packs into `Documents\cleave\presets` and `Documents\cleave\textures` (same tree as Linux `~/.local/share/cleave/`). First-run download is Later. 2.2 may choose either; do not block play/render on a bundled pack.
+Still open: whether a seed preset/texture pack ships in the zip, or testers copy packs into `Documents\cleave\presets` and `Documents\cleave\textures` (same tree as Linux `~/.local/share/cleave/`). First-run download is Later. Play/render do not require a pack in the zip.
 
 ---
 
 ## Out of scope here
 
-Installer, signing, and CI freeze (Phase 3); torch in the zip; macOS Application Support. 2.2 owns libprojectM build execution, pygame GPU editor proof, and play/render freeze proof.
+Installer, signing, and CI freeze (Phase 3); torch in the zip; macOS Application Support. Overlay Latin/box-drawing TTF is [todos.md](todos.md).
