@@ -1,8 +1,8 @@
 # Windows freeze
 
-How Cleave locates files when frozen, how testers unpack a Windows onedir zip, and how to build libprojectM 4.2+ DLLs. Product decisions live in [structured-releases.md](structured-releases.md). This note is the implementation design for the freeze (paths, spec, FFmpeg, ctypes, libprojectM). Phase 3.1 CI is [.github/workflows/windows-freeze.yml](../.github/workflows/windows-freeze.yml).
+How Cleave locates files when frozen, how testers unpack a Windows onedir zip, and how to build libprojectM 4.2+ DLLs. Product decisions live in [structured-releases.md](structured-releases.md). This note is the implementation design for the freeze (paths, spec, FFmpeg, ctypes, libprojectM). Phase 3.1 CI is [.github/workflows/windows-freeze.yml](../.github/workflows/windows-freeze.yml). The same workflow builds the Phase 3.2 installer after the zip.
 
-Do not cross-compile the GUI stack from WSL. Build on Windows, run [scripts/windows_stage_freeze.py](../scripts/windows_stage_freeze.py), then zip `dist/cleave/` (CI does the same on `windows-latest`).
+Do not cross-compile the GUI stack from WSL. Build on Windows, run [scripts/windows_stage_freeze.py](../scripts/windows_stage_freeze.py), then zip `dist/cleave/` and compile [packaging/windows/cleave.iss](../packaging/windows/cleave.iss) (CI does the same on `windows-latest`).
 
 Related: [cleave/paths.py](../cleave/paths.py), [cleave/ffmpeg.py](../cleave/ffmpeg.py), [packaging/cleave.spec](../packaging/cleave.spec), [scripts/windows_stage_freeze.py](../scripts/windows_stage_freeze.py), [cleave/projectm.py](../cleave/projectm.py), [cleave/projectm_playlist.py](../cleave/projectm_playlist.py).
 
@@ -33,7 +33,7 @@ Preset and texture defaults are `data_dir() / "presets"` and `data_dir() / "text
 
 ## Onedir layout testers unpack
 
-PyInstaller onedir, one `cleave.exe`, CLI subcommands (`cleave.exe play ...`). Unpack the zip and run from that folder. Not Program Files (Phase 3).
+PyInstaller onedir, one `cleave.exe`, CLI subcommands (`cleave.exe play ...`). Unpack the zip and run from that folder. The installer copies this same tree into Program Files.
 
 ```
 cleave/
@@ -109,7 +109,8 @@ Same recipe as the manual steps above, on standard `windows-latest`. Workflow: [
 - Sidecars: committed libprojectM DLLs from [packaging/windows/](../packaging/windows/) (convention in that directory's [README.md](../packaging/windows/README.md)); FFmpeg from `FFMPEG_URL` / `FFMPEG_SHA256` at the top of [scripts/windows_stage_freeze.py](../scripts/windows_stage_freeze.py). No vcpkg in the job. Do not commit `ffmpeg.exe`.
 - Headless smoke: `cleave.exe --version` must print `cleave X.Y.Z`, `--help` lists `separate` / `play` / `render` / `backup` / `restore`, and `cleave.exe separate` with a dummy file prints `STEM_SPLIT_MISSING_FROZEN` (no traceback). No GPU compositing.
 - Zip layout is `cleave/cleave.exe` inside `cleave-<version>-windows-x64.zip`.
-- Dispatch uploads a 5-day Actions artifact (`cleave-windows-x64`). Tag pipeline: [.github/workflows/release.yml](../.github/workflows/release.yml) calls this workflow after `publish` with `release_tag` set to the tag; a non-empty `release_tag` uses `gh release upload` and does not retain a workflow artifact.
+- After the zip, Inno Setup wraps the same `dist\cleave\` tree into `cleave-<version>-windows-x64-setup.exe` (see Installer below).
+- Dispatch uploads 5-day Actions artifacts (`cleave-windows-x64` zip, `cleave-windows-x64-setup` installer). Tag pipeline: [.github/workflows/release.yml](../.github/workflows/release.yml) calls this workflow after `publish` with `release_tag` set to the tag; a non-empty `release_tag` uses `gh release upload` for both assets and does not retain a workflow artifact.
 - GPU proof: unpack the dispatch zip on a Windows box with a GPU driver and run `cleave.exe play` on an existing project (met). A short `cleave.exe render` is the same 2.2 path if you want extra coverage.
 
 ---
@@ -174,6 +175,33 @@ Then zip `dist/cleave/`.
 
 ---
 
+## Installer (Phase 3.2)
+
+Inno Setup 6 wraps the staged onedir tree. No second freeze and no second layout: `iscc` reads `dist\cleave\` exactly as [scripts/windows_stage_freeze.py](../scripts/windows_stage_freeze.py) leaves it, so `install_dir()` stays the parent of `cleave.exe` (now under Program Files by default).
+
+- Script: [packaging/windows/cleave.iss](../packaging/windows/cleave.iss). Source `dist\cleave\*` with `recursesubdirs`; `DestDir: {app}`. Override the source with `/DDistDir=...` if needed.
+- `AppId` is a fixed GUID chosen once (`{caf89057-3432-458e-a1de-1dba1176a4ba}`). Never change it. `AppVersion` comes from the build (`iscc /DAppVersion=X.Y.Z`), read from `cleave.__version__`; the `.iss` `#error`s if it is missing.
+- `DefaultDirName={autopf}\Cleave`, `ArchitecturesAllowed=x64compatible`, `ArchitecturesInstallIn64BitMode=x64compatible`, `PrivilegesRequired=admin` with `PrivilegesRequiredOverridesAllowed=dialog` so a non-admin can install per user.
+- `OutputBaseFilename=cleave-<version>-windows-x64-setup` at the repo root (same place as the zip).
+- Tasks (both unchecked by default): `desktopicon` (`{autodesktop}\Cleave`), `addtopath` (append `{app}` to HKLM PATH when admin, HKCU when per-user; remove that entry on uninstall without duplicating PATH).
+- Start Menu shortcut `{autoprograms}\Cleave` targets `cleave.exe` with no arguments, which prints help.
+- Uninstall removes `{app}` only. User data (`Documents\cleave\`) and `%APPDATA%\cleave\` survive. The finished and uninstall pages say so.
+
+CI in [.github/workflows/windows-freeze.yml](../.github/workflows/windows-freeze.yml), after the zip step and reusing the same `dist\cleave\`:
+
+```
+choco install innosetup -y --no-progress
+iscc /DAppVersion=<version> packaging\windows\cleave.iss
+```
+
+Headless smoke: `setup.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /DIR=<temp> /TASKS=`, run `<temp>\cleave.exe --version`, then `unins000.exe /VERYSILENT` and assert `<temp>` is gone or empty. No GPU. `/TASKS=` leaves PATH unchanged on the runner. Dispatch uploads a 5-day `cleave-windows-x64-setup` artifact; a non-empty `release_tag` uses `gh release upload` for the setup exe next to the zip.
+
+Drop onto the exe needs the argv normalisation in [cleave/cli.py](../cleave/cli.py) (single existing path with no subcommand runs `play`), plus a pause before exit when a frozen process owns its console, or an Explorer-launched error vanishes with the window.
+
+GPU proof is still a human checklist: install from the setup exe, `cleave.exe play` on an existing project from the Start Menu shortcut and from a terminal, drop a project folder onto `cleave.exe`, then uninstall cleanly.
+
+---
+
 ## Seed presets and textures
 
 Still open: whether a seed preset/texture pack ships in the zip, or testers copy packs into `Documents\cleave\presets` and `Documents\cleave\textures` (same tree as Linux `~/.local/share/cleave/`). First-run download is Later. Play/render do not require a pack in the zip.
@@ -182,4 +210,4 @@ Still open: whether a seed preset/texture pack ships in the zip, or testers copy
 
 ## Out of scope here
 
-Installer and signing (Phase 3.2); torch in the zip; macOS Application Support. Overlay Latin/box-drawing TTF is [todos.md](todos.md).
+Signing; torch in the zip; macOS Application Support. Overlay Latin/box-drawing TTF is [todos.md](todos.md).

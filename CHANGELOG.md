@@ -13,6 +13,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Relocatable install and resource paths for frozen builds, Windows defaults under `Documents\cleave\` and `%APPDATA%\cleave\`, and a PyInstaller onedir skeleton ([docs/windows-freeze.md](docs/windows-freeze.md)).
 - Manual Windows play/render freeze: unpack a zip, `cleave.exe play` an existing project, short `cleave.exe render` to MP4. Stem split is not in this build.
 - FFmpeg lookup beside the frozen executable (checkout still uses PATH).
+- Bare path or project slug on the CLI (`cleave song`, drop a file on `cleave.exe`) opens play. Frozen Windows builds pause on error when the process owns its console.
+- Windows installer (`cleave-<version>-windows-x64-setup.exe`) on tagged GitHub Releases and `workflow_dispatch` (5-day Actions artifact). Default install dir is Program Files\Cleave. Unsigned: SmartScreen "Run anyway". Uninstall leaves `Documents\cleave\` and `%APPDATA%\cleave\` in place. The zip remains as a second asset.
 
 ### Changed
 

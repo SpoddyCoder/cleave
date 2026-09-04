@@ -13,6 +13,7 @@ import pytest
 
 from cleave import __version__
 from cleave.cli import (
+    COMMANDS,
     _format_elapsed,
     build_parser,
     cmd_backup,
@@ -21,6 +22,8 @@ from cleave.cli import (
     cmd_restore,
     cmd_separate,
     main,
+    normalise_argv,
+    owns_console,
 )
 from cleave.viz.render import RenderResult
 from cleave.stems import STEM_NAMES, stems_dir
@@ -101,6 +104,136 @@ def test_cli_version_prints_and_exits_zero(
         main(["--version"])
     assert exc.value.code == 0
     assert capsys.readouterr().out.strip() == f"cleave {__version__}"
+
+
+def test_no_args_prints_help(capsys: pytest.CaptureFixture[str]) -> None:
+    with pytest.raises(SystemExit) as exc:
+        main([])
+    assert exc.value.code == 0
+    out = capsys.readouterr().out
+    assert "usage: cleave" in out
+    assert "play" in out
+    assert "separate" in out
+
+
+def test_bare_unknown_arg_still_errors(capsys: pytest.CaptureFixture[str]) -> None:
+    with pytest.raises(SystemExit) as exc:
+        main(["definitely-not-a-project-or-file"])
+    assert exc.value.code != 0
+    err = capsys.readouterr().err
+    assert "invalid choice" in err or "the following arguments are required" in err
+
+
+def test_normalise_argv_empty_and_known_commands() -> None:
+    parser = build_parser()
+    choices = next(
+        action.choices
+        for action in parser._actions
+        if getattr(action, "choices", None) and action.dest == "command"
+    )
+    assert set(COMMANDS) == set(choices)
+    assert normalise_argv([]) == []
+    assert normalise_argv(["--version"]) == ["--version"]
+    assert normalise_argv(["play", "song"]) == ["play", "song"]
+    assert normalise_argv(["separate", "song"]) == ["separate", "song"]
+    assert normalise_argv(["render", "song"]) == ["render", "song"]
+    assert normalise_argv(["nope"]) == ["nope"]
+    assert normalise_argv(["foo", "bar"]) == ["foo", "bar"]
+
+
+def test_normalise_argv_prepends_play_for_file(tmp_path: Path) -> None:
+    audio = tmp_path / "song.flac"
+    audio.write_bytes(b"audio")
+    assert normalise_argv([str(audio)]) == ["play", str(audio)]
+
+
+def test_normalise_argv_prepends_play_for_directory(tmp_path: Path) -> None:
+    folder = tmp_path / "project"
+    folder.mkdir()
+    assert normalise_argv([str(folder)]) == ["play", str(folder)]
+
+
+def test_normalise_argv_prepends_play_for_slug(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    (tmp_path / "projects" / "song").mkdir(parents=True)
+    assert normalise_argv(["song"]) == ["play", "song"]
+
+
+def test_owns_console_false_off_windows() -> None:
+    if sys.platform == "win32":
+        pytest.skip("Linux/macOS gate only")
+    assert owns_console() is False
+
+
+def test_error_does_not_pause_when_not_frozen() -> None:
+    with patch("builtins.input") as pause_input:
+        with pytest.raises(SystemExit):
+            main(["definitely-not-a-project-or-file"])
+    pause_input.assert_not_called()
+
+
+def test_error_pauses_when_frozen_and_owns_console(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("cleave.cli.is_frozen", lambda: True)
+    monkeypatch.setattr("cleave.cli.owns_console", lambda: True)
+    with patch("builtins.input") as pause_input:
+        with pytest.raises(SystemExit) as exc:
+            main(["definitely-not-a-project-or-file"])
+        assert exc.value.code != 0
+    pause_input.assert_called_once_with("Press Enter to close...")
+
+
+def test_error_does_not_pause_when_frozen_in_terminal(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("cleave.cli.is_frozen", lambda: True)
+    monkeypatch.setattr("cleave.cli.owns_console", lambda: False)
+    with patch("builtins.input") as pause_input:
+        with pytest.raises(SystemExit):
+            main(["definitely-not-a-project-or-file"])
+    pause_input.assert_not_called()
+
+
+def test_version_does_not_pause_when_frozen(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr("cleave.cli.is_frozen", lambda: True)
+    monkeypatch.setattr("cleave.cli.owns_console", lambda: True)
+    with patch("builtins.input") as pause_input:
+        with pytest.raises(SystemExit) as exc:
+            main(["--version"])
+        assert exc.value.code == 0
+    pause_input.assert_not_called()
+    assert capsys.readouterr().out.strip() == f"cleave {__version__}"
+
+
+def test_no_args_help_does_not_pause_when_frozen(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr("cleave.cli.is_frozen", lambda: True)
+    monkeypatch.setattr("cleave.cli.owns_console", lambda: True)
+    with patch("builtins.input") as pause_input:
+        with pytest.raises(SystemExit) as exc:
+            main([])
+        assert exc.value.code == 0
+    pause_input.assert_not_called()
+    assert "usage: cleave" in capsys.readouterr().out
+
+
+def test_handled_error_pauses_when_frozen_and_owns_console(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    monkeypatch.setattr("cleave.cli.is_frozen", lambda: True)
+    monkeypatch.setattr("cleave.cli.owns_console", lambda: True)
+    with patch("builtins.input") as pause_input:
+        with pytest.raises(SystemExit) as exc:
+            main(["play", "missing-project"])
+        assert exc.value.code == 1
+    pause_input.assert_called_once_with("Press Enter to close...")
 
 
 def test_separate_parser_uses_target_arg() -> None:
@@ -301,6 +434,41 @@ def test_cmd_play_calls_launch(
         project.resolve(),
         config=None,
     )
+
+
+def test_bare_path_runs_play(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    project = _complete_project(tmp_path)
+
+    with patch("cleave.viz.launch") as launch:
+        main(["my-track"])
+
+    launch.assert_called_once_with(
+        project.resolve(),
+        config=None,
+    )
+
+
+def test_bare_file_runs_play(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    audio = tmp_path / "song.flac"
+    audio.write_bytes(b"audio")
+    project = tmp_path / "projects" / "song"
+
+    with (
+        patch("cleave.separate.run_separate", return_value=project.resolve()) as run_separate,
+        patch("cleave.viz.launch") as launch,
+    ):
+        main([str(audio)])
+
+    run_separate.assert_called_once_with(
+        Path(str(audio)), high_quality=False, beat_detection_stem=None
+    )
+    launch.assert_called_once_with(project.resolve(), config=None)
 
 
 def test_cmd_play_existing_project_does_not_import_torch(tmp_path: Path) -> None:

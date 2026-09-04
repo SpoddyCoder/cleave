@@ -2,7 +2,7 @@
 
 Move Cleave from checkout-based development to versioned GitHub Releases.
 
-Phase 1 is done (`v0.1.0`). Phase 2 is done (Windows play/render onedir zip, manual freeze). No tag and no `__version__` bump for Phase 2; it is not a GitHub Release. Phase 3.1 is done (CI freeze zip, dispatch GPU proof). No tag and no `__version__` bump for 3.1; the first tag after this lands is a Phase 1 source release plus the Windows zip. Phase 3.2 (installer) is next. Phase 4 stays a direction until the Windows installer ships.
+Phase 1 is done (`v0.1.0`). Phase 2 is done (Windows play/render onedir zip, manual freeze). No tag and no `__version__` bump for Phase 2; it is not a GitHub Release. Phase 3.1 is done (CI freeze zip, dispatch GPU proof). The 3.2 installer script and freeze-job steps exist; GPU proof from Program Files is still a human checklist, so Phase 3 is not done. No tag and no `__version__` bump for this slice. The first tag after this lands is a Phase 1 source release plus the Windows zip and setup exe. Phase 4 stays a direction until that GPU proof lands.
 
 Related: [README.md](../README.md) (current Linux/WSL setup), [completed/user-data-and-config-plan.md](completed/user-data-and-config-plan.md) (install vs user data), [cleave/paths.py](../cleave/paths.py), [cleave/projectm.py](../cleave/projectm.py), [windows-freeze.md](windows-freeze.md) (paths, spec, FFmpeg sidecar, ctypes names, libprojectM build recommendation).
 
@@ -38,7 +38,7 @@ What it is not: pip-installable. No AppImage, `.deb`, or Linux frozen binary (th
 
 ### Assets
 
-GitHub's automatic source zip and tarball on the tag. Later tags also attach the Windows onedir zip from the freeze job (`cleave-<version>-windows-x64.zip`). [`v0.1.0`](https://github.com/SpoddyCoder/cleave/releases/tag/v0.1.0) is source-only. Requirement pins already in the repo ([requirements.txt](../requirements.txt), [requirements-dev.txt](../requirements-dev.txt), [requirements-torch-cpu.txt](../requirements-torch-cpu.txt), [requirements-torch-cu130.txt](../requirements-torch-cu130.txt)) travel with the source archive.
+GitHub's automatic source zip and tarball on the tag. Later tags also attach the Windows onedir zip and installer from the freeze job (`cleave-<version>-windows-x64.zip`, `cleave-<version>-windows-x64-setup.exe`). [`v0.1.0`](https://github.com/SpoddyCoder/cleave/releases/tag/v0.1.0) is source-only. Requirement pins already in the repo ([requirements.txt](../requirements.txt), [requirements-dev.txt](../requirements-dev.txt), [requirements-torch-cpu.txt](../requirements-torch-cpu.txt), [requirements-torch-cu130.txt](../requirements-torch-cu130.txt)) travel with the source archive.
 
 Milkdrop presets and textures are not in the archive. Users follow [README.md](../README.md) "Get Some Milkdrop Presets".
 
@@ -58,7 +58,7 @@ This is the single source of truth for cutting a Phase 1 release:
 2. Set `__version__` in [cleave/__init__.py](../cleave/__init__.py) to `X.Y.Z`.
 3. Commit those changes to `main`.
 4. `git tag vX.Y.Z && git push --tags` (tag the commit that is on `main`).
-5. CI ([.github/workflows/release.yml](../.github/workflows/release.yml)): unit tests via [tests.yml](../.github/workflows/tests.yml), then `publish` checks that the tag matches `cleave.__version__`, extracts the changelog section, and creates the GitHub Release (source zip/tarball attach automatically). Then `freeze` calls [windows-freeze.yml](../.github/workflows/windows-freeze.yml) with `release_tag` set to the tag and uploads `cleave-<version>-windows-x64.zip` onto that Release. If freeze fails, the source Release still exists and can be retried.
+5. CI ([.github/workflows/release.yml](../.github/workflows/release.yml)): unit tests via [tests.yml](../.github/workflows/tests.yml), then `publish` checks that the tag matches `cleave.__version__`, extracts the changelog section, and creates the GitHub Release (source zip/tarball attach automatically). Then `freeze` calls [windows-freeze.yml](../.github/workflows/windows-freeze.yml) with `release_tag` set to the tag and uploads `cleave-<version>-windows-x64.zip` and `cleave-<version>-windows-x64-setup.exe` onto that Release. If freeze fails, the source Release still exists and can be retried.
 6. Spot-check the archive: unpack, install requirements, run `cleave --version`, confirm presets still come from the README steps.
 
 ### Done when
@@ -137,7 +137,7 @@ Met. A tester on a typical Windows box can unzip, run `cleave.exe play` / `cleav
 
 Goal: Windows is a first-class release target. Building it does not depend on a particular desktop.
 
-Two slices, same pattern as Phase 2. 3.1 is done. Keep 3.2 as a sketch until you plan the installer. Do not mix installer branding into the CI freeze.
+Two slices, same pattern as Phase 2. 3.1 is done; the 3.2 script and CI job exist below. GPU proof from Program Files is still a human checklist. Do not mix installer branding into the CI freeze.
 
 ### 3.1 CI freeze zip (done)
 
@@ -149,7 +149,7 @@ Automate the 2.2 recipe on standard `windows-latest` (not a larger runner). The 
 - SmartScreen documented for an unsigned build ([README.md](../README.md) Windows zip). Friendlier in-app messages for missing GPU or preset root stay a follow-up, not a 3.1 gate. Missing FFmpeg already names the expected path.
 - Short Windows smoke checklist (open editor, one layer, one render) that a human still runs; CI will not replace GPU compositing.
 
-Drag-and-drop onto the pygame window can land on `main` independently of 3.1. It is not a gate. Drop onto the exe (file associations) waits for 3.2.
+Drag-and-drop onto the pygame window can land on `main` independently of 3.1. It is not a gate. Drop onto the exe is argv normalisation (3.2.1). File associations stay out.
 
 ### Done when
 
@@ -157,13 +157,38 @@ Met. `workflow_dispatch` on `windows-latest` produced a zip that opened `cleave.
 
 ### 3.2 Installer
 
-Wrap the same onedir tree into Program Files (Inno Setup, WiX, or similar). The installer copies 3.1's folder; it does not get a second freeze layout.
+Wrap the same onedir tree into Program Files. The installer packages 3.1's staged `dist\cleave\`; it does not get a second freeze layout. Tool: Inno Setup 6 ([packaging/windows/cleave.iss](../packaging/windows/cleave.iss)). Mechanics live in [windows-freeze.md](windows-freeze.md).
 
-- Shortcuts and uninstall. CLI subcommands remain (`cleave.exe play ...`).
-- Drag-and-drop a source file or project onto the exe, and optional file associations, live here. Window drop may already exist from 3.1.
-- User data stays in `Documents\cleave\`; settings stay in AppData. Program Files is read-only; `install_dir()` is still the parent of the exe.
+The `.iss` and freeze-job installer steps exist. GPU proof (install from the setup exe, play from Start Menu and a terminal, drop a project folder, uninstall) is still a human checklist; do not treat Phase 3 as done until that lands.
 
-Done when: a tag produces the installer without a manual freeze step, and the 2.2 tester path still works from Program Files. The zip may stay as a second Release asset or be dropped.
+#### 3.2.1 Bare-path entry and drop
+
+Without argv normalisation, `cleave.exe <path>` is an argparse error (`command` is required), so dropping a file on the exe fails ugly.
+
+- Normalise argv in [cleave/cli.py](../cleave/cli.py) `main`: a single argument that is not a known subcommand and resolves to an existing path or project slug runs `play`. One place, unit-testable on Linux.
+- Frozen raw audio still prints the short stem-split message, not a traceback or argparse usage.
+- Explorer launches (double-click, drop) close the console on exit. When frozen and the process owns its console, pause on error before exiting so the message is readable.
+- No arguments prints help (same pause rule). Start Menu shortcut targets that.
+- pygame window drop (`DROPFILE`) stays optional and is not a gate.
+
+#### 3.2.2 Local installer build
+
+- [packaging/windows/cleave.iss](../packaging/windows/cleave.iss) compiled by `iscc` against a staged `dist\cleave\`. Output `cleave-<version>-windows-x64-setup.exe` at the repo root. Version passed in from `cleave.__version__`; fixed `AppId` GUID forever so later versions upgrade in place.
+- Default `{autopf}\Cleave` (per-machine, elevated), 64-bit only. Start Menu shortcut; desktop icon optional and off. Optional "add to PATH" task, off by default, so `cleave play ...` works from any terminal.
+- Ships the same `licenses/` tree; the licence page shows Cleave's [LICENSE](../LICENSE).
+- Uninstall removes the install dir only. It never touches `Documents\cleave\` or `%APPDATA%\cleave\`, and says so.
+- Remaining proof that Program Files stays read-only: install, run play and a short render as a normal user, confirm nothing is written under the install dir.
+
+#### 3.2.3 CI and Release wiring
+
+- [windows-freeze.yml](../.github/workflows/windows-freeze.yml) builds the installer after the zip, reusing the same staged tree. The job installs Inno Setup on the runner (`choco install innosetup`).
+- Headless installer smoke: silent install into a temp dir, run the installed `cleave.exe --version`, silent uninstall, assert the dir is gone.
+- Upload the setup exe as a Release asset next to the zip, same `release_tag` rule as 3.1. Dispatch keeps the short-retention artifacts. The zip stays.
+- Unsigned: document SmartScreen for the setup exe as well as the zip.
+
+Manual GPU proof (one pass, not CI): install from the setup exe, launch play on an existing project from the Start Menu shortcut and from a terminal, drop a project folder onto `cleave.exe`, then uninstall cleanly.
+
+Remaining: that GPU proof, and that the 2.2 tester path still works from Program Files.
 
 ### Locked
 
@@ -176,13 +201,13 @@ Done when: a tag produces the installer without a manual freeze step, and the 2.
 
 ### Leave open
 
-Installer tool and branding. Whether the zip remains once the installer exists. Whether CUDA `separate` is ever in the Windows artifact (stays Later). Authenticode if a certificate appears.
+Installer branding. Whether audio file associations (a "Play with Cleave" shell verb, never a default handler) ship as an optional installer task or stay out. Whether CUDA `separate` is ever in the Windows artifact (stays Later). Authenticode if a certificate appears.
 
 **Resolved** (exact CI steps): committed libprojectM DLLs in [packaging/windows/](../packaging/windows/); FFmpeg downloaded by [scripts/windows_stage_freeze.py](../scripts/windows_stage_freeze.py) from a pinned Gyan essentials URL (`FFMPEG_URL` / `FFMPEG_SHA256` in that script). Not vcpkg in the job, not a committed FFmpeg binary.
 
 ### Done when
 
-3.1 and 3.2 are both met: a tag produces a Windows installer on GitHub without a manual freeze, and the MVP tester path still works.
+3.1 is met. 3.2 script and CI exist; remaining gate is GPU proof from Program Files. A tag will attach the installer without a manual freeze. The zip stays as a second Release asset.
 
 ---
 
@@ -219,4 +244,4 @@ Do not block Phases 1-4 on these. Revisit after binaries exist.
 
 ## Suggested order of analysis
 
-Phase 1, Phase 2, and Phase 3.1 are done. Next is Phase 3.2 (installer, Program Files). Later: Linux packaging plus macOS signing (Phase 4). Keep freeze implementation choices in [windows-freeze.md](windows-freeze.md), not in this overview.
+Phase 1, Phase 2, and Phase 3.1 are done. The 3.2 installer script and CI job are in tree; remaining 3.2 gate is GPU proof from Program Files. Later: Linux packaging plus macOS signing (Phase 4). Keep freeze implementation choices in [windows-freeze.md](windows-freeze.md), not in this overview.

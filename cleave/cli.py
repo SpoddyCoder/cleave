@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from cleave import __version__
+from cleave.paths import is_frozen, resolve_project
 
 if TYPE_CHECKING:
     from cleave.stems import StemSource
@@ -20,6 +21,8 @@ BEAT_DETECTION_STEM_CHOICES = ("drums", "full-mix", "bass", "vocals", "other")
 SIGNALS_FILENAME = "signals.json"
 _TARGET_HELP = "Source audio file or cleave project (path or slug)"
 _PROJECT_DIR_HELP = "Cleave project directory (path or slug)"
+COMMANDS = ("separate", "play", "render", "backup", "restore")
+_PAUSE_PROMPT = "Press Enter to close..."
 
 
 class _CleaveHelpFormatter(argparse.RawDescriptionHelpFormatter):
@@ -32,6 +35,75 @@ class _CleaveHelpFormatter(argparse.RawDescriptionHelpFormatter):
 def _exit_error(message: str) -> None:
     print(message, file=sys.stderr)
     sys.exit(1)
+
+
+def owns_console() -> bool:
+    """Return True when this process is the only one attached to the console.
+
+    Explorer-launched Windows apps own a fresh console (count == 1). A
+    terminal session shares the console with the shell (count > 1).
+    """
+    if sys.platform != "win32":
+        return False
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        buf = (wintypes.DWORD * 2)()
+        get_list = ctypes.windll.kernel32.GetConsoleProcessList
+        get_list.argtypes = [ctypes.POINTER(wintypes.DWORD), wintypes.DWORD]
+        get_list.restype = wintypes.DWORD
+        count = int(get_list(buf, len(buf)))
+    except (AttributeError, OSError, TypeError, ValueError):
+        return False
+    return count == 1
+
+
+def _is_error_exit(exc: SystemExit) -> bool:
+    code = exc.code
+    if code is None:
+        return False
+    try:
+        return int(code) != 0
+    except (TypeError, ValueError):
+        return True
+
+
+def _pause_on_frozen_console_error() -> None:
+    if not is_frozen() or not owns_console():
+        return
+    try:
+        sys.stderr.flush()
+        sys.stdout.flush()
+        input(_PAUSE_PROMPT)
+    except EOFError:
+        pass
+
+
+def _is_play_target(arg: str) -> bool:
+    if Path(arg).exists():
+        return True
+    try:
+        resolve_project(arg)
+    except (FileNotFoundError, OSError, ValueError):
+        return False
+    return True
+
+
+def normalise_argv(argv: list[str]) -> list[str]:
+    """Prepend ``play`` when a single positional is an existing path or project."""
+    argv = list(argv)
+    positional = [i for i, arg in enumerate(argv) if not arg.startswith("-")]
+    if len(positional) != 1:
+        return argv
+    index = positional[0]
+    target = argv[index]
+    if target in COMMANDS:
+        return argv
+    if not _is_play_target(target):
+        return argv
+    argv.insert(index, "play")
+    return argv
 
 
 def _format_elapsed(seconds: float) -> str:
@@ -389,6 +461,15 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> None:
-    parser = build_parser()
-    args = parser.parse_args(argv)
-    args.func(args)
+    try:
+        parser = build_parser()
+        raw = sys.argv[1:] if argv is None else list(argv)
+        if not raw:
+            parser.print_help()
+            raise SystemExit(0)
+        args = parser.parse_args(normalise_argv(raw))
+        args.func(args)
+    except SystemExit as exc:
+        if _is_error_exit(exc):
+            _pause_on_frozen_console_error()
+        raise
