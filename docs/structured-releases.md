@@ -111,7 +111,7 @@ Manual GPU proof (met):
 - `cleave.exe play <existing-project>` opens the editor.
 - Short `cleave.exe render` writes an MP4.
 - `cleave.exe separate` and raw-audio `play` print the short stem-split message, not a traceback.
-- Support matrix: 64-bit Windows, GPU driver. Unsigned is fine (SmartScreen: Run anyway). Overlay tofu (system monospace vs bundled Material Icons) is a follow-up in [todos.md](todos.md), not a 2.2 gate.
+- Support matrix: 64-bit Windows, GPU driver. Unsigned is fine (SmartScreen: Run anyway).
 
 ### Locked
 
@@ -125,7 +125,7 @@ Manual GPU proof (met):
 
 ### Leave open
 
-Whether a seed preset/texture pack ships in the zip versus a documented copy into `Documents\cleave\`. Overlay Latin/box-drawing TTF (see [todos.md](todos.md)). Do not ship MinGW DLLs unless ctypes names and extra runtimes are updated to match.
+Whether a seed preset/texture pack ships in the zip versus a documented copy into `Documents\cleave\`. Do not ship MinGW DLLs unless ctypes names and extra runtimes are updated to match.
 
 ### Done when
 

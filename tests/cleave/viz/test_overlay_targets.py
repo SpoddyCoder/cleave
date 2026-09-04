@@ -9,7 +9,7 @@ import pygame
 from cleave.gl_compositor import OverlayTextureSlot
 from cleave.viz.help_overlay import HelpOverlay
 from cleave.viz.overlay_draw import OverlayDrawer
-from cleave.viz.overlay_primitives import ComposedPanel
+from cleave.viz.overlay_primitives import ComposedPanel, overlay_font
 from cleave.viz.overlay_profiler import OverlayProfiler
 from cleave.viz.overlay_upload import OverlayGpuState, UploadPlan, UploadSignature
 from cleave.viz.row_kinds import RowDescriptor, RowKind
@@ -163,7 +163,7 @@ def test_draw_tuning_modal_path_clears_full_viewport() -> None:
     compositor.upload_overlay_texture.return_value = 99
 
     overlay = MagicMock()
-    overlay._font_get.return_value = pygame.font.SysFont("monospace", 14)
+    overlay._font_get.return_value = overlay_font(14)
     overlay._line_gap = 2
     modal_host = MagicMock()
     modal_host.active = True

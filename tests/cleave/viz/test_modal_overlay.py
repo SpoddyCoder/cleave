@@ -13,12 +13,13 @@ from cleave.viz.modal import (
     ModalViewState,
     capital_case_modal_option,
 )
+from cleave.viz.overlay_primitives import overlay_font
 from cleave.viz.theme import HIGHLIGHT, LABEL, MODAL_SCRIM_ALPHA, VALUE
 from cleave.viz.ui_tint import blit_tint
 
 
 def _font() -> pygame.font.Font:
-    return pygame.font.SysFont("monospace", 17)
+    return overlay_font(17)
 
 
 def _keydown(key: int) -> pygame.event.Event:

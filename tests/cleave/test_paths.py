@@ -192,9 +192,18 @@ def test_default_project_config() -> None:
     assert default_project_config(project) == project / VIZ_CONFIG_FILENAME
 
 
-def test_material_icons_ttf_is_present() -> None:
-    ttf = repo_root() / "assets" / "fonts" / "MaterialIcons-Regular.ttf"
-    assert ttf.is_file()
+@pytest.mark.parametrize(
+    "relative",
+    [
+        "assets/fonts/MaterialIcons-Regular.ttf",
+        "assets/fonts/MaterialIcons-LICENSE",
+        "assets/fonts/DejaVuSansMono.ttf",
+        "assets/fonts/DejaVuSansMono-Bold.ttf",
+        "assets/fonts/DejaVuSansMono-LICENSE",
+    ],
+)
+def test_bundled_font_asset_is_present(relative: str) -> None:
+    assert (repo_root() / relative).is_file()
 
 
 @pytest.mark.parametrize(

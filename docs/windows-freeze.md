@@ -58,9 +58,9 @@ cleave.exe --version
 cleave.exe --help
 ```
 
-Phase 2.2 proof (met): `cleave.exe play <existing-project>` and a short `cleave.exe render` on a Windows box with a GPU driver. Copy `projects/` from Linux; do not run `separate` in this zip. Frozen `separate` and raw-audio `play` raise the short stem-split message. Overlay tofu is a [todos.md](todos.md) follow-up, not a freeze-layout bug.
+Phase 2.2 proof (met): `cleave.exe play <existing-project>` and a short `cleave.exe render` on a Windows box with a GPU driver. Copy `projects/` from Linux; do not run `separate` in this zip. Frozen `separate` and raw-audio `play` raise the short stem-split message.
 
-Phase 3.1 GPU proof (met): the same play path from a `workflow_dispatch` zip built on `windows-latest` (`cleave.exe play` on an existing project). CI headless smoke covers `--version`, `--help`, and frozen `separate`. Overlay tofu is still [todos.md](todos.md).
+Phase 3.1 GPU proof (met): the same play path from a `workflow_dispatch` zip built on `windows-latest` (`cleave.exe play` on an existing project). CI headless smoke covers `--version`, `--help`, and frozen `separate`.
 
 ---
 
@@ -92,7 +92,7 @@ That copies `packaging/windows/*.dll` and libprojectM licenses, fetches the pinn
 
 - Entry: [cleave.py](../cleave.py) (`cleave.cli:main`).
 - Collect pygame (SDL binaries and hiddenimports travel with that hook) and soxr (native resample in [cleave/pcm_io.py](../cleave/pcm_io.py)).
-- `datas`: repo-root `cleave-viz.yaml` and `assets/fonts/` (includes `MaterialIcons-Regular.ttf` and its license).
+- `datas`: repo-root `cleave-viz.yaml` and `assets/fonts/` (includes `MaterialIcons-Regular.ttf`, `DejaVuSansMono.ttf`, `DejaVuSansMono-Bold.ttf`, and their licenses).
 - `excludes`: `torch`, `demucs`, `beat_this`, `librosa`, `matplotlib`. Stem split is not in this freeze.
 
 `play` on an existing project (stems + `signals.json`) must not import torch or librosa. `play` on raw audio, and `separate`, fail with a short message that stem split is not in this Windows build; copy a project from Linux.
@@ -221,4 +221,4 @@ Still open: whether a seed preset/texture pack ships in the zip, or testers copy
 
 ## Out of scope here
 
-Signing; torch in the zip; macOS Application Support. Overlay Latin/box-drawing TTF is [todos.md](todos.md).
+Signing; torch in the zip; macOS Application Support.

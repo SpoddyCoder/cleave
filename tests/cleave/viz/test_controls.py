@@ -38,6 +38,7 @@ from tests.support.viz import (
     make_test_cfg,
     make_track_block,
     noop_layer_bindings,
+    overlay_font,
     stub_playback_state,
 )
 from cleave.viz.controls import (
@@ -92,16 +93,10 @@ from cleave.viz.tuning_panel_draw import (
     track_header_prefix_width,
 )
 from cleave.viz.tuning_view_state import TuningViewState
-from tests.support.viz import baseline_tuning_ui_metrics
 
 
 def _keydown(key: int, *, mod: int = 0) -> pygame.event.Event:
     return pygame.event.Event(pygame.KEYDOWN, key=key, mod=mod)
-
-
-def _overlay_font() -> pygame.font.Font:
-    pygame.font.init()
-    return pygame.font.SysFont("monospace", baseline_tuning_ui_metrics().font_size)
 
 
 def _make_playlist(name: str, count: int = 3) -> PresetPlaylist:
@@ -855,7 +850,7 @@ def test_config_header_truncates_long_paths() -> None:
     header_row = next(
         i for i in range(len(view.layout)) if view.layout.kind(i) == RowKind.CONFIG_HEADER
     )
-    font = _overlay_font()
+    font = overlay_font()
     panel_w = baseline_tuning_ui_metrics().panel_content_max_width
     label = fit_row_text(font, view, header_row, max_content_width=panel_w)
     icon_budget = row_icon_prefix_width(font.get_linesize())
@@ -893,7 +888,7 @@ def test_preset_row_truncates_long_filenames() -> None:
         notification_remaining_sec=0.0,
     )
     preset_row = _row(view, "layer_1", RowKind.TRACK_PRESET)
-    font = _overlay_font()
+    font = overlay_font()
     panel_w = baseline_tuning_ui_metrics().panel_content_max_width
     label = fit_row_text(font, view, preset_row, max_content_width=panel_w)
     prefix_w = preset_row_prefix_width(font, font.get_linesize())
@@ -930,7 +925,7 @@ def test_fit_row_text_config_and_preset_share_panel_width() -> None:
         i for i in range(len(view.layout)) if view.layout.kind(i) == RowKind.CONFIG_HEADER
     )
     preset_row = _row(view, "layer_1", RowKind.TRACK_PRESET)
-    font = _overlay_font()
+    font = overlay_font()
     panel_w = baseline_tuning_ui_metrics().panel_content_max_width
     config_label = fit_row_text(font, view, header_row, max_content_width=panel_w)
     preset_label = fit_row_text(font, view, preset_row, max_content_width=panel_w)
@@ -4514,7 +4509,7 @@ def test_solo_visibility_icon_same_width_as_normal() -> None:
 
 
 def test_track_header_prefix_width_matches_visibility_icon() -> None:
-    font = _overlay_font()
+    font = overlay_font()
     line_h = font.get_linesize()
     assert track_header_prefix_width(font) == visibility_icon_prefix_width(line_h)
     soloed = render_visibility_icon(enabled=True, solo=True, line_height=line_h)

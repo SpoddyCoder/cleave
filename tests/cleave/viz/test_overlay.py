@@ -13,6 +13,7 @@ from tests.support.config import TEST_LAYER_STEMS
 from cleave.stems import STEM_NAMES
 from cleave.viz.frame_rate import FPS_DISPLAY_LABEL
 from cleave.viz.focus_nav import MainFocus
+from cleave.viz.overlay_primitives import overlay_font
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.row_spec import row_is_pinned
 from cleave.viz.material_icons import (
@@ -259,7 +260,7 @@ def test_help_hint_layout_avoids_scrollbar_column() -> None:
 
 def test_bottom_row_highlight_width_reserves_help_hint() -> None:
     pygame.init()
-    font = pygame.font.SysFont("monospace", 14)
+    font = overlay_font(14)
     panel_w = 400
     padding = 8
     hint_w = font.size(HELP_HINT_LABEL)[0]
@@ -483,7 +484,7 @@ def test_fps_color_ignores_transport_focus() -> None:
 
 def test_settings_header_highlight_width_reserves_fps() -> None:
     pygame.init()
-    font = pygame.font.SysFont("monospace", 14)
+    font = overlay_font(14)
     panel_w = 400
     padding = 8
     fps = 30.0

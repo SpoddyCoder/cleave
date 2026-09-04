@@ -19,6 +19,7 @@ from cleave.timeline import (
     stem_abbreviation,
 )
 from cleave.viz.material_icons import visibility_icon_slot_width
+from cleave.viz.overlay_primitives import overlay_font
 from cleave.viz.row_present_renderers import render_visibility_icon
 from cleave.viz.theme import (
     ARMED_BG,
@@ -213,7 +214,7 @@ def _draw(
 
 def test_row_prefix_width_includes_monitor_eye_slot() -> None:
     pygame.init()
-    font = pygame.font.SysFont("monospace", timeline_ui_metrics().font_size)
+    font = overlay_font(timeline_ui_metrics().font_size)
     layer_num_w = font.render(layer_num_prefix(4), True, (255, 255, 255)).get_width()
     abbrev_w = font.render(stem_abbrev_label("drums"), True, (255, 255, 255)).get_width()
     row_h = 20
@@ -229,7 +230,7 @@ def test_layer_num_width_probe_scales_with_eight_layers() -> None:
     defaults = {slot: True for slot in order}
     _draw(overlay, surface, _view_state(layer_z_order=order, defaults=defaults))
 
-    font = pygame.font.SysFont("monospace", timeline_ui_metrics().font_size)
+    font = overlay_font(timeline_ui_metrics().font_size)
     expected = font.render(layer_num_prefix(8), True, (255, 255, 255)).get_width()
     assert overlay._layer_num_width == expected
 
@@ -1209,7 +1210,7 @@ def test_blit_role_glyph_xor_inverts_destination_rgb() -> None:
     panel = pygame.Surface((48, 48), pygame.SRCALPHA)
     bg = (40, 80, 120)
     panel.fill((*bg, 255))
-    font = pygame.font.SysFont("monospace", 16, bold=True)
+    font = overlay_font(16, bold=True)
     touched = blit_role_glyph_xor(panel, "L", x=8, y=8, font=font)
     assert touched is not None
     expected = (bg[0] ^ 255, bg[1] ^ 255, bg[2] ^ 255)
@@ -1337,9 +1338,7 @@ def test_role_glyph_xor_drawn_late_on_upload_not_static() -> None:
         bar_width,
         max(1, row_h - BAR_VERTICAL_INSET * 2),
     )
-    bold = pygame.font.SysFont(
-        "monospace", timeline_ui_metrics().font_size, bold=True
-    )
+    bold = overlay_font(timeline_ui_metrics().font_size, bold=True)
     glyph_w, glyph_h = bold.size("L")
     # On cue (baseline 0 -> level 1): glyph to the right of the tick, bar bottom.
     glyph_x, glyph_y = role_glyph_anchor(
