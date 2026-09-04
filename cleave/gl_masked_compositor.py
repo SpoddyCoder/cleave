@@ -67,8 +67,10 @@ from OpenGL.GL import (
     GL_COLOR_BUFFER_BIT,
     GL_COLOR_WRITEMASK,
     GL_DEPTH_TEST,
+    GL_DRAW_FRAMEBUFFER,
     GL_FRAMEBUFFER,
     GL_FRAMEBUFFER_BINDING,
+    GL_LINEAR,
     GL_READ_BUFFER,
     GL_READ_FRAMEBUFFER,
     GL_READ_FRAMEBUFFER_BINDING,
@@ -76,20 +78,22 @@ from OpenGL.GL import (
     GL_SCISSOR_TEST,
     GL_TEXTURE0,
     GL_TEXTURE_2D,
-    GL_TEXTURE_2D_ARRAY,
     GL_VIEWPORT,
     glActiveTexture,
     glBindFramebuffer,
     glBindTexture,
     glBlendEquation,
     glBlendFunc,
+    glBlitFramebuffer,
     glClear,
     glClearColor,
     glColorMask,
-    glCopyTexSubImage3D,
+    glDeleteFramebuffers,
     glDeleteTextures,
     glDisable,
     glEnable,
+    glFramebufferTextureLayer,
+    glGenFramebuffers,
     glGetIntegerv,
     glIsEnabled,
     glReadBuffer,
@@ -474,6 +478,15 @@ def _gl_int(param: int) -> int:
         return int(value)
 
 
+def _gl_name(gen_fn, count: int = 1) -> int:
+    # PyOpenGL may return int, a 1-element sequence, or a 0-d numpy scalar.
+    names = gen_fn(count)
+    try:
+        return int(names[0])
+    except (TypeError, IndexError):
+        return int(names)
+
+
 @dataclass(frozen=True)
 class _MaskCacheKey:
     mask_type: str
@@ -640,6 +653,7 @@ class GlMaskedCompositor:
         self._plasma_soft_prog: moderngl.Program | None = None
         self._layer_array_id: int = 0
         self._layer_array_mgl: moderngl.TextureArray | None = None
+        self._layer_array_fbo_id: int = 0
         self._mask_texture_id: int = 0
         self._mask_width: int = 0
         self._mask_height: int = 0
@@ -881,6 +895,9 @@ class GlMaskedCompositor:
             self.init()
 
     def _release_layer_array(self) -> None:
+        if self._layer_array_fbo_id:
+            glDeleteFramebuffers(1, [self._layer_array_fbo_id])
+            self._layer_array_fbo_id = 0
         if self._layer_array_mgl is not None:
             self._layer_array_mgl.release()
             self._layer_array_mgl = None
@@ -1046,7 +1063,11 @@ class GlMaskedCompositor:
         assert self._ctx is not None
         cached = self._layer_tex_mgl.get(layer.texture_id)
         if cached is not None:
-            return cached
+            if cached.size == (layer.width, layer.height):
+                return cached
+            # A resized layer FBO may reuse the same GL texture name.
+            cached.release()
+            del self._layer_tex_mgl[layer.texture_id]
         dtype = self._color_format.moderngl_external_dtype
         tex = self._ctx.external_texture(
             layer.texture_id,
@@ -1619,7 +1640,14 @@ class GlMaskedCompositor:
         *,
         keep_disabled_visible: bool = False,
     ) -> list[float]:
-        """Copy each layer colour attachment into a texture-array slice.
+        """Blit each layer colour attachment into a texture-array slice.
+
+        Layer FBOs are sized by live preview quality and are usually smaller
+        than the content target, so the copy must scale the layer's own
+        ``width`` x ``height`` onto the full content-sized slice. Copying a
+        content-sized region out of a smaller layer FBO reads outside the read
+        framebuffer, which drivers resolve differently (corner-anchored content
+        on NVIDIA, a dropped copy on Mesa).
 
         Returns the opacity uniform list (length MAX_LAYER_COUNT, unused slots 0).
         Disabled slots keep a black slice and opacity 0, unless
@@ -1631,6 +1659,12 @@ class GlMaskedCompositor:
         opacities = [0.0] * MAX_LAYER_COUNT
         width = self.content_width
         height = self.content_height
+        if not self._layer_array_fbo_id:
+            self._layer_array_fbo_id = _gl_name(glGenFramebuffers)
+        # glBlitFramebuffer honours the scissor test; the compositor may leave
+        # it enabled from the previous pass.
+        glDisable(GL_SCISSOR_TEST)
+        glColorMask(True, True, True, True)
         for index, layer in enumerate(layers):
             if index >= MAX_LAYER_COUNT:
                 break
@@ -1646,19 +1680,27 @@ class GlMaskedCompositor:
                 opacities[index] = float(layer.opacity)
             glBindFramebuffer(GL_READ_FRAMEBUFFER, layer.fbo_id)
             glReadBuffer(GL_COLOR_ATTACHMENT0)
-            glBindTexture(GL_TEXTURE_2D_ARRAY, self._layer_array_id)
-            glCopyTexSubImage3D(
-                GL_TEXTURE_2D_ARRAY,
-                0,
-                0,
+            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, self._layer_array_fbo_id)
+            glFramebufferTextureLayer(
+                GL_DRAW_FRAMEBUFFER,
+                GL_COLOR_ATTACHMENT0,
+                self._layer_array_id,
                 0,
                 index,
+            )
+            glBlitFramebuffer(
+                0,
+                0,
+                int(layer.width),
+                int(layer.height),
                 0,
                 0,
                 width,
                 height,
+                GL_COLOR_BUFFER_BIT,
+                GL_LINEAR,
             )
-        glBindTexture(GL_TEXTURE_2D_ARRAY, 0)
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0)
         glBindFramebuffer(GL_READ_FRAMEBUFFER, 0)
         return opacities
 

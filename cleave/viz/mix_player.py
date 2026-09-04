@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import ctypes
+import os
+import sys
 import threading
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -19,6 +23,10 @@ else:
 FREQUENCY_HZ = 44100
 NUM_CHANNELS = 2
 DEFAULT_CHUNKSIZE = 4096
+# Pick an output endpoint by exact or substring name match.
+AUDIO_DEVICE_ENV = "CLEAVE_AUDIO_DEVICE"
+# Print the device list, the chosen endpoint, and mix PCM levels to stderr.
+AUDIO_DEBUG_ENV = "CLEAVE_AUDIO_DEBUG"
 CLICK_DURATION_SEC = 0.05
 CLICK_ACCENT_DURATION_SEC = 0.18
 CLICK_AMPLITUDE = 0.5
@@ -172,9 +180,161 @@ def copy_mono_pcm_chunk_as_stereo(
     return frames_written, read_index + frames_written
 
 
-def _default_output_device() -> str:
-    names = get_audio_device_names(False)
+class _SdlAudioSpec(ctypes.Structure):
+    _fields_ = [
+        ("freq", ctypes.c_int),
+        ("format", ctypes.c_uint16),
+        ("channels", ctypes.c_uint8),
+        ("silence", ctypes.c_uint8),
+        ("samples", ctypes.c_uint16),
+        ("padding", ctypes.c_uint16),
+        ("size", ctypes.c_uint32),
+        ("callback", ctypes.c_void_p),
+        ("userdata", ctypes.c_void_p),
+    ]
+
+
+_SDL_LIBRARY_PATTERNS = (
+    ("SDL2.dll",)
+    if sys.platform == "win32"
+    else ("libSDL2-2*.dylib",)
+    if sys.platform == "darwin"
+    else ("libSDL2-2*.so*",)
+)
+_SDL_LIBRARY_FALLBACKS = (
+    ("SDL2.dll",)
+    if sys.platform == "win32"
+    else ("libSDL2-2.0.dylib",)
+    if sys.platform == "darwin"
+    else ("libSDL2-2.0.so.0", "libSDL2.so")
+)
+
+
+def _sdl_library_paths() -> list[str]:
+    """Candidate paths for the SDL library pygame itself loaded.
+
+    A second SDL copy has its own subsystem state and reports the audio
+    subsystem as uninitialized, so prefer the shared object shipped beside
+    pygame (wheels bundle a hash-suffixed name) over a bare library name.
+    """
+    import pygame
+
+    package = Path(pygame.__file__).resolve().parent
+    search = [
+        package,
+        package.parent,
+        package.parent / "pygame.libs",
+        package / ".libs",
+    ]
+    paths: list[str] = []
+    for directory in search:
+        for pattern in _SDL_LIBRARY_PATTERNS:
+            paths.extend(sorted(str(p) for p in directory.glob(pattern)))
+    paths.extend(_SDL_LIBRARY_FALLBACKS)
+    return paths
+
+
+def sdl_default_output_device() -> str:
+    """Endpoint name SDL reports as the system default output, or ``""``.
+
+    ``pygame._sdl2.AudioDevice`` requires a non-empty device name, so it cannot
+    ask SDL for the default the way ``SDL_OpenAudioDevice(NULL, ...)`` does.
+    Read the default straight from the already-loaded SDL library instead.
+    Returns ``""`` whenever SDL cannot answer; callers fall back to the
+    enumerated device list.
+    """
+    for path in _sdl_library_paths():
+        try:
+            lib = ctypes.CDLL(path)
+            get_info = lib.SDL_GetDefaultAudioInfo
+        except (OSError, AttributeError):
+            continue
+        get_info.restype = ctypes.c_int
+        get_info.argtypes = [
+            ctypes.POINTER(ctypes.c_char_p),
+            ctypes.POINTER(_SdlAudioSpec),
+            ctypes.c_int,
+        ]
+        name_ptr = ctypes.c_char_p()
+        spec = _SdlAudioSpec()
+        if get_info(ctypes.byref(name_ptr), ctypes.byref(spec), 0) != 0:
+            continue
+        if not name_ptr.value:
+            continue
+        default = name_ptr.value.decode("utf-8", "replace")
+        try:
+            sdl_free = lib.SDL_free
+        except AttributeError:
+            sdl_free = None
+        if sdl_free is not None:
+            sdl_free.argtypes = [ctypes.c_void_p]
+            sdl_free.restype = None
+            sdl_free(name_ptr)
+        return default
+    return ""
+
+
+def select_output_device(
+    names: Sequence[str],
+    *,
+    requested: str = "",
+    sdl_default: str = "",
+) -> str:
+    """Choose an SDL output endpoint from *names*.
+
+    An explicit *requested* name wins (exact, then case-insensitive substring).
+    Otherwise prefer the system default; enumeration order is arbitrary on
+    Windows WASAPI, so ``names[0]`` is a last resort, not the default endpoint.
+    """
+    if requested:
+        for name in names:
+            if name == requested:
+                return name
+        lowered = requested.lower()
+        for name in names:
+            if lowered in name.lower():
+                return name
+        return requested
+    if sdl_default and sdl_default in names:
+        return sdl_default
     return names[0] if names else ""
+
+
+def pcm_level_summary(pcm: np.ndarray) -> tuple[float, float]:
+    """Peak and RMS amplitude of *pcm* (``(0.0, 0.0)`` when empty)."""
+    if pcm.size == 0:
+        return 0.0, 0.0
+    peak = float(np.max(np.abs(pcm)))
+    rms = float(np.sqrt(np.mean(np.square(pcm, dtype=np.float64))))
+    return peak, rms
+
+
+def audio_debug_lines(
+    *,
+    names: Sequence[str],
+    requested: str,
+    sdl_default: str,
+    chosen: str,
+    sample_rate: int,
+    chunksize: int,
+    total_frames: int,
+    peak: float,
+    rms: float,
+) -> list[str]:
+    """Lines describing device selection and mix PCM levels."""
+    lines = [
+        f"audio: devices={len(names)}",
+        *(f"audio:   [{i}] {name}" for i, name in enumerate(names)),
+        f"audio: sdl default={sdl_default or '<unknown>'}",
+        f"audio: {AUDIO_DEVICE_ENV}={requested or '<unset>'}",
+        f"audio: chosen={chosen or '<sdl default>'}",
+        f"audio: request rate={sample_rate} channels={NUM_CHANNELS} "
+        f"chunksize={chunksize}",
+        f"audio: mix frames={total_frames} "
+        f"duration={total_frames / sample_rate:.1f}s "
+        f"peak={peak:.6f} rms={rms:.6f}",
+    ]
+    return lines
 
 
 class MixPlayer:
@@ -347,8 +507,28 @@ class MixPlayer:
             self._fill_output_buffer(out)
 
         self._callback = callback
+        names = get_audio_device_names(False)
+        requested = os.environ.get(AUDIO_DEVICE_ENV, "").strip()
+        sdl_default = sdl_default_output_device()
+        devicename = select_output_device(
+            names, requested=requested, sdl_default=sdl_default
+        )
+        if os.environ.get(AUDIO_DEBUG_ENV, "").strip():
+            peak, rms = pcm_level_summary(self._pcm)
+            for line in audio_debug_lines(
+                names=names,
+                requested=requested,
+                sdl_default=sdl_default,
+                chosen=devicename,
+                sample_rate=self._sample_rate,
+                chunksize=self._chunksize,
+                total_frames=self._total_frames,
+                peak=peak,
+                rms=rms,
+            ):
+                print(line, file=sys.stderr, flush=True)
         self._device = AudioDevice(
-            devicename=_default_output_device(),
+            devicename=devicename,
             iscapture=False,
             frequency=self._sample_rate,
             audioformat=AUDIO_F32,
@@ -358,6 +538,8 @@ class MixPlayer:
             callback=callback,
         )
         obtained = getattr(self._device, "chunksize", None)
+        if os.environ.get(AUDIO_DEBUG_ENV, "").strip():
+            print(f"audio: opened chunksize={obtained}", file=sys.stderr, flush=True)
         with self._lock:
             self._clock.set_latency_frames(
                 estimate_output_latency_frames(obtained, self._chunksize)
