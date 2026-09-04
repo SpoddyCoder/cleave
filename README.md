@@ -69,7 +69,7 @@ pip install -r requirements-dev.txt
 
 GitHub Releases are tagged source archives (`vX.Y.Z`) for Linux/WSL. Pick a tag, unpack it, and follow Setup above (plus [Get Some Milkdrop Presets](#get-some-milkdrop-presets)). System deps (Python 3.10+, FFmpeg, libprojectM 4.2+) are not bundled. `cleave --version` reports the running version.
 
-From the next tagged release, a Windows x64 zip (`cleave-<version>-windows-x64.zip`) and installer (`cleave-<version>-windows-x64-setup.exe`) are attached as well. [`v0.1.0`](https://github.com/SpoddyCoder/cleave/releases/tag/v0.1.0) is source-only. Until then, testers can download both from Actions via `workflow_dispatch` on [.github/workflows/windows-freeze.yml](.github/workflows/windows-freeze.yml) (5-day artifacts).
+The next tagged release attaches a Windows x64 zip (`cleave-<version>-windows-x64.zip`) and installer (`cleave-<version>-windows-x64-setup.exe`) as well. [`v0.1.0`](https://github.com/SpoddyCoder/cleave/releases/tag/v0.1.0) is source-only. Until a tag is cut, testers can download both from Actions via `workflow_dispatch` on [.github/workflows/windows-freeze.yml](.github/workflows/windows-freeze.yml) (5-day artifacts).
 
 `main` is the integration trunk. User-visible work lands there and adds a bullet under `[Unreleased]` in [CHANGELOG.md](CHANGELOG.md) in the same change. `cleave.__version__` stays at the last shipped tag until a milestone. Then Unreleased becomes a dated `X.Y.Z` section, the version is bumped, and `vX.Y.Z` is tagged from `main`. No calendar cadence. Do not collect work on a long-lived release or `develop` branch.
 
