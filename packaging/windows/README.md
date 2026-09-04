@@ -1,8 +1,9 @@
 # Windows freeze sidecars (Phase 3.1)
 
-Prebuilt native binaries and license trees for the Cleave Windows onedir zip.
-End users unpack the zip and run `cleave.exe` as in [README.md](../../README.md)
-(Windows zip). This file is the sidecar convention for maintainers.
+Prebuilt native binaries and license trees for the Cleave Windows onedir zip
+and installer. End users run `cleave.exe` as in [README.md](../../README.md)
+(Windows zip and installer). This file is the sidecar convention for
+maintainers.
 
 PyInstaller bundles Python and pygame/SDL into `dist/cleave/_internal/`; these
 files are copied **next to** `cleave.exe` after the freeze. See
@@ -13,6 +14,7 @@ files are copied **next to** `cleave.exe` after the freeze. See
 
 ```
 packaging/windows/
+  cleave.iss                     # Inno Setup 6 installer (Phase 3.2)
   projectM-4.dll                 # libprojectM core (committed)
   projectM-4-playlist.dll        # libprojectM playlist (committed)
   licenses/
@@ -104,10 +106,27 @@ project) is met; see [docs/windows-freeze.md](../../docs/windows-freeze.md).
 2. Run `pyinstaller packaging/cleave.spec`.
 3. Run `python scripts/windows_stage_freeze.py --dist dist/cleave`.
 4. Zip `dist/cleave/` as `cleave-<version>-windows-x64.zip` (archive root is a
-   `cleave/` folder). Dispatch uploads that zip as a 5-day Actions artifact
-   (`cleave-windows-x64`). `workflow_call` with a non-empty `release_tag` input
-   uses `gh release upload` and does not retain a workflow artifact.
+   `cleave/` folder). Then compile [cleave.iss](cleave.iss) to
+   `cleave-<version>-windows-x64-setup.exe`. Dispatch uploads both as 5-day
+   Actions artifacts (`cleave-windows-x64`, `cleave-windows-x64-setup`).
+   `workflow_call` with a non-empty `release_tag` input uses `gh release upload`
+   for both and does not retain a workflow artifact.
 
 Updating libprojectM for a release: rebuild on Windows with vcpkg, replace the
 two DLLs in `packaging/windows/`, refresh `NOTICE.txt` and `dumpbin` notes if
 the dependency set changes, and commit.
+
+## Installer
+
+[cleave.iss](cleave.iss) is the Inno Setup 6 script. Compile it on Windows after
+staging `dist\cleave\` (same tree as the zip; no second freeze layout). Version
+comes from `cleave.__version__`; do not hardcode it in the `.iss`.
+
+```
+iscc /DAppVersion=X.Y.Z packaging\windows\cleave.iss
+```
+
+Output at the repo root: `cleave-<version>-windows-x64-setup.exe`. CI runs this
+after the zip step in
+[.github/workflows/windows-freeze.yml](../../.github/workflows/windows-freeze.yml).
+Details: [docs/windows-freeze.md](../../docs/windows-freeze.md).

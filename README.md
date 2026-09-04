@@ -69,26 +69,26 @@ pip install -r requirements-dev.txt
 
 GitHub Releases are tagged source archives (`vX.Y.Z`) for Linux/WSL. Pick a tag, unpack it, and follow Setup above (plus [Get Some Milkdrop Presets](#get-some-milkdrop-presets)). System deps (Python 3.10+, FFmpeg, libprojectM 4.2+) are not bundled. `cleave --version` reports the running version.
 
-From the next tagged release, a Windows x64 zip (`cleave-<version>-windows-x64.zip`) is attached as well. [`v0.1.0`](https://github.com/SpoddyCoder/cleave/releases/tag/v0.1.0) is source-only. Until then, testers can download a zip from Actions via `workflow_dispatch` on [.github/workflows/windows-freeze.yml](.github/workflows/windows-freeze.yml) (5-day artifact).
+From the next tagged release, a Windows x64 zip (`cleave-<version>-windows-x64.zip`) and installer (`cleave-<version>-windows-x64-setup.exe`) are attached as well. [`v0.1.0`](https://github.com/SpoddyCoder/cleave/releases/tag/v0.1.0) is source-only. Until then, testers can download both from Actions via `workflow_dispatch` on [.github/workflows/windows-freeze.yml](.github/workflows/windows-freeze.yml) (5-day artifacts).
 
 `main` is the integration trunk. User-visible work lands there and adds a bullet under `[Unreleased]` in [CHANGELOG.md](CHANGELOG.md) in the same change. `cleave.__version__` stays at the last shipped tag until a milestone. Then Unreleased becomes a dated `X.Y.Z` section, the version is bumped, and `vX.Y.Z` is tagged from `main`. No calendar cadence. Do not collect work on a long-lived release or `develop` branch.
 
 How to cut a tag: [docs/structured-releases.md](docs/structured-releases.md).
 
-### Windows zip
+### Windows zip and installer
 
-Unpack `cleave-<version>-windows-x64.zip` and run from that folder (not Program Files):
+The installer (`cleave-<version>-windows-x64-setup.exe`) defaults to `Program Files\Cleave`. Uninstall removes only the program folder; it does not delete `Documents\cleave\` or `%APPDATA%\cleave\`. The zip (`cleave-<version>-windows-x64.zip`) is the same onedir tree without an installer: unpack and run from that folder.
 
 ```
 cleave.exe play <project>
 cleave.exe render <project>
 ```
 
-The build is unsigned. If SmartScreen warns, choose Run anyway.
+The build is unsigned. If SmartScreen warns on the setup exe or the zip, choose Run anyway.
 
 User data lives in `Documents\cleave\` (same `projects/`, `presets/`, `textures/` tree as Linux). Settings: `%APPDATA%\cleave\config.yaml`. Override the data root with `CLEAVE_DATA`.
 
-Stem split is not in the Windows zip. Separate on Linux and copy the project into `Documents\cleave\projects\`. `cleave.exe separate` and raw-audio `play` print a short message rather than splitting.
+Stem split is not in the Windows zip or installer. Separate on Linux and copy the project into `Documents\cleave\projects\`. `cleave.exe separate` and raw-audio `play` print a short message rather than splitting.
 
 Milkdrop presets still go under `Documents\cleave\presets` (see [Get Some Milkdrop Presets](#get-some-milkdrop-presets); use that path instead of `~/.local/share/cleave/`).
 

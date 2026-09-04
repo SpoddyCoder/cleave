@@ -55,7 +55,7 @@ jobs:
             --title "$GITHUB_REF_NAME" \
             --notes-file release-notes.md
 
-  # After the Release exists so gh release upload can attach the zip.
+  # After the Release exists so gh release upload can attach the zip and setup.
   # If freeze fails, the source Release still exists and can be retried.
   freeze:
     needs: publish
