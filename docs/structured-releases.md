@@ -2,7 +2,7 @@
 
 Move Cleave from checkout-based development to versioned GitHub Releases.
 
-Phase 1 is done (`v0.1.0`). Phase 2 is done (Windows play/render onedir zip, manual freeze). No tag and no `__version__` bump for Phase 2; it is not a GitHub Release. Phase 3.1 is done (CI freeze zip, dispatch GPU proof). The 3.2 installer script and freeze-job steps exist; GPU proof from Program Files is still a human checklist, so Phase 3 is not done. No tag and no `__version__` bump for this slice. The first tag after this lands is a Phase 1 source release plus the Windows zip and setup exe. Phase 4 stays a direction until that GPU proof lands.
+Phase 1 is done (`v0.1.0`). Phase 2 is done (Windows play/render onedir zip, manual freeze). Phase 3 is done (3.1 CI freeze zip, 3.2 installer and argv normalisation, GPU proof from zip and Program Files). No tag and no `__version__` bump for Phases 2-3 beyond the existing `v0.1.0` source release. The next milestone tag ships Phase 1 source plus the Windows zip and setup exe. Phase 4 (Linux and macOS binaries) is next.
 
 Related: [README.md](../README.md) (current Linux/WSL setup), [completed/user-data-and-config-plan.md](completed/user-data-and-config-plan.md) (install vs user data), [cleave/paths.py](../cleave/paths.py), [cleave/projectm.py](../cleave/projectm.py), [windows-freeze.md](windows-freeze.md) (paths, spec, FFmpeg sidecar, ctypes names, libprojectM build recommendation).
 
@@ -133,11 +133,11 @@ Met. A tester on a typical Windows box can unzip, run `cleave.exe play` / `cleav
 
 ---
 
-## Phase 3 - Windows release + CI
+## Phase 3 - Windows release + CI (done)
 
 Goal: Windows is a first-class release target. Building it does not depend on a particular desktop.
 
-Two slices, same pattern as Phase 2. 3.1 is done; the 3.2 script and CI job exist below. GPU proof from Program Files is still a human checklist. Do not mix installer branding into the CI freeze.
+Two slices, same pattern as Phase 2. 3.1 automated the CI freeze zip; 3.2 added the Inno Setup installer, argv normalisation, and Release wiring. GPU proof from zip and Program Files is met. Do not mix installer branding into the CI freeze.
 
 ### 3.1 CI freeze zip (done)
 
@@ -147,21 +147,19 @@ Automate the 2.2 recipe on standard `windows-latest` (not a larger runner). The 
 - Dispatch uploads the zip as a 5-day Actions artifact (`cleave-windows-x64`). Tag pipeline: [release.yml](../.github/workflows/release.yml) runs tests, `publish` creates the GitHub Release, then `freeze` calls this workflow with `release_tag` set to the tag. A non-empty `release_tag` uses `gh release upload` and does not retain a workflow artifact.
 - Cache pip only (`actions/setup-python` with `requirements-freeze.txt`). Do not cache FFmpeg zips or freeze output. Committed libprojectM DLLs; no vcpkg in the job.
 - SmartScreen documented for an unsigned build ([README.md](../README.md) Windows zip). Friendlier in-app messages for missing GPU or preset root stay a follow-up, not a 3.1 gate. Missing FFmpeg already names the expected path.
-- Short Windows smoke checklist (open editor, one layer, one render) that a human still runs; CI will not replace GPU compositing.
+- GPU compositing is not validated in CI; manual GPU proof from the dispatch zip is met (see 3.2).
 
-Drag-and-drop onto the pygame window can land on `main` independently of 3.1. It is not a gate. Drop onto the exe is argv normalisation (3.2.1). File associations stay out.
+Drag-and-drop onto the pygame window can land on `main` independently of 3.1. It is not a gate. Drop onto the exe is argv normalisation (3.2.1, done). File associations stay out.
 
 ### Done when
 
 Met. `workflow_dispatch` on `windows-latest` produced a zip that opened `cleave.exe play` on an existing project (GPU). Headless CI smoke covers `--version`, `--help`, and the frozen `separate` message. The tag job is wired to upload that zip. No version bump and no installer. The first tag after this lands is a Phase 1 source release plus the Windows zip.
 
-### 3.2 Installer
+### 3.2 Installer (done)
 
 Wrap the same onedir tree into Program Files. The installer packages 3.1's staged `dist\cleave\`; it does not get a second freeze layout. Tool: Inno Setup 6 ([packaging/windows/cleave.iss](../packaging/windows/cleave.iss)). Mechanics live in [windows-freeze.md](windows-freeze.md).
 
-The `.iss` and freeze-job installer steps exist. GPU proof (install from the setup exe, play from Start Menu and a terminal, drop a project folder, uninstall) is still a human checklist; do not treat Phase 3 as done until that lands.
-
-#### 3.2.1 Bare-path entry and drop
+#### 3.2.1 Bare-path entry and drop (done)
 
 Without argv normalisation, `cleave.exe <path>` is an argparse error (`command` is required), so dropping a file on the exe fails ugly.
 
@@ -171,24 +169,28 @@ Without argv normalisation, `cleave.exe <path>` is an argparse error (`command` 
 - No arguments prints help (same pause rule). Start Menu shortcut targets that.
 - pygame window drop (`DROPFILE`) stays optional and is not a gate.
 
-#### 3.2.2 Local installer build
+#### 3.2.2 Local installer build (done)
 
 - [packaging/windows/cleave.iss](../packaging/windows/cleave.iss) compiled by `iscc` against a staged `dist\cleave\`. Output `cleave-<version>-windows-x64-setup.exe` at the repo root. Version passed in from `cleave.__version__`; fixed `AppId` GUID forever so later versions upgrade in place.
 - Default `{autopf}\Cleave` (per-machine, elevated), 64-bit only. Start Menu shortcut; desktop icon optional and off. Optional "add to PATH" task, off by default, so `cleave play ...` works from any terminal.
 - Ships the same `licenses/` tree; the licence page shows Cleave's [LICENSE](../LICENSE).
 - Uninstall removes the install dir only. It never touches `Documents\cleave\` or `%APPDATA%\cleave\`, and says so.
-- Remaining proof that Program Files stays read-only: install, run play and a short render as a normal user, confirm nothing is written under the install dir.
+- Program Files stays read-only: install, run play and a short render as a normal user, confirm nothing is written under the install dir (met).
 
-#### 3.2.3 CI and Release wiring
+#### 3.2.3 CI and Release wiring (done)
 
 - [windows-freeze.yml](../.github/workflows/windows-freeze.yml) builds the installer after the zip, reusing the same staged tree. The job installs Inno Setup on the runner (`choco install innosetup`).
 - Headless installer smoke: silent install into a temp dir, run the installed `cleave.exe --version`, silent uninstall, assert the dir is gone.
 - Upload the setup exe as a Release asset next to the zip, same `release_tag` rule as 3.1. Dispatch keeps the short-retention artifacts. The zip stays.
 - Unsigned: document SmartScreen for the setup exe as well as the zip.
 
-Manual GPU proof (one pass, not CI): install from the setup exe, launch play on an existing project from the Start Menu shortcut and from a terminal, drop a project folder onto `cleave.exe`, then uninstall cleanly.
+Manual GPU proof (met):
 
-Remaining: that GPU proof, and that the 2.2 tester path still works from Program Files.
+- Install from the setup exe into Program Files (read-only install dir).
+- `cleave.exe play` on an existing project from the Start Menu shortcut, from a terminal, and by dropping a project folder onto `cleave.exe`.
+- Audio plays on the system default output device; pattern mask compositing works at default `balanced` preview quality. Silent-playback debugging: [windows-freeze.md](windows-freeze.md) (Audio output device).
+- The 2.2 tester path still works from the dispatch zip and from Program Files.
+- Uninstall removes the install dir only; `Documents\cleave\` and `%APPDATA%\cleave\` survive.
 
 ### Locked
 
@@ -207,11 +209,13 @@ Installer branding. Whether audio file associations (a "Play with Cleave" shell 
 
 ### Done when
 
-3.1 is met. 3.2 script and CI exist; remaining gate is GPU proof from Program Files. A tag will attach the installer without a manual freeze. The zip stays as a second Release asset.
+Met. A tag produces the zip and installer without a manual freeze. Testers can run play from the zip or Program Files. GPU proof from zip and setup exe is met.
 
 ---
 
 ## Phase 4 - Linux and macOS binaries
+
+Next work. Phase 1-3 are done on `main`; the next tag still attaches Windows assets per Phase 3 while Phase 4 adds Linux and macOS binaries.
 
 Goal: the same play/render product as Windows, as native artifacts. Source+requirements Linux remains available from Phase 1.
 
@@ -244,4 +248,4 @@ Do not block Phases 1-4 on these. Revisit after binaries exist.
 
 ## Suggested order of analysis
 
-Phase 1, Phase 2, and Phase 3.1 are done. The 3.2 installer script and CI job are in tree; remaining 3.2 gate is GPU proof from Program Files. Later: Linux packaging plus macOS signing (Phase 4). Keep freeze implementation choices in [windows-freeze.md](windows-freeze.md), not in this overview.
+Phase 1, Phase 2, and Phase 3 are done. Next: Phase 4 (Linux and macOS binaries). Keep freeze implementation choices in [windows-freeze.md](windows-freeze.md), not in this overview.

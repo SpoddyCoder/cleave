@@ -98,8 +98,8 @@ zip at `.cache/ffmpeg-windows.zip` (gitignored).
 runs on standard `windows-latest` (`workflow_dispatch` and `workflow_call`, not
 every push). Pip cache only (`requirements-freeze.txt`); no FFmpeg or freeze-tree
 cache. Headless smoke (`cleave.exe --version` / `--help` / frozen `separate`
-message). No GPU compositing. Dispatch zip GPU proof (play an existing
-project) is met; see [docs/windows-freeze.md](../../docs/windows-freeze.md).
+message). No GPU compositing. Dispatch zip and installer GPU proof (play an
+existing project) are met; see [docs/windows-freeze.md](../../docs/windows-freeze.md).
 
 1. Install Python deps from [requirements-freeze.txt](../../requirements-freeze.txt)
    (no torch, demucs, librosa, or analyse stack).
@@ -129,4 +129,7 @@ iscc /DAppVersion=X.Y.Z packaging\windows\cleave.iss
 Output at the repo root: `cleave-<version>-windows-x64-setup.exe`. CI runs this
 after the zip step in
 [.github/workflows/windows-freeze.yml](../../.github/workflows/windows-freeze.yml).
-Details: [docs/windows-freeze.md](../../docs/windows-freeze.md).
+Dispatch uploads a 5-day `cleave-windows-x64-setup` artifact; a non-empty
+`release_tag` uses `gh release upload` for the setup exe next to the zip.
+
+GPU proof from the setup exe is met. Full installer details: [docs/windows-freeze.md](../../docs/windows-freeze.md).

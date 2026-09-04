@@ -111,7 +111,7 @@ Same recipe as the manual steps above, on standard `windows-latest`. Workflow: [
 - Zip layout is `cleave/cleave.exe` inside `cleave-<version>-windows-x64.zip`.
 - After the zip, Inno Setup wraps the same `dist\cleave\` tree into `cleave-<version>-windows-x64-setup.exe` (see Installer below).
 - Dispatch uploads 5-day Actions artifacts (`cleave-windows-x64` zip, `cleave-windows-x64-setup` installer). Tag pipeline: [.github/workflows/release.yml](../.github/workflows/release.yml) calls this workflow after `publish` with `release_tag` set to the tag; a non-empty `release_tag` uses `gh release upload` for both assets and does not retain a workflow artifact.
-- GPU proof: unpack the dispatch zip on a Windows box with a GPU driver and run `cleave.exe play` on an existing project (met). A short `cleave.exe render` is the same 2.2 path if you want extra coverage.
+- GPU proof (met): unpack the dispatch zip or install from the setup exe on a Windows box with a GPU driver; run `cleave.exe play` on an existing project (audio on the default output device; pattern mask at default `balanced` preview quality). A short `cleave.exe render` is the same 2.2 path if you want extra coverage.
 
 ---
 
@@ -207,9 +207,9 @@ iscc /DAppVersion=<version> packaging\windows\cleave.iss
 
 Headless smoke: `setup.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /DIR=<temp> /TASKS=`, run `<temp>\cleave.exe --version`, then `unins000.exe /VERYSILENT` and assert `<temp>` is gone or empty. No GPU. `/TASKS=` leaves PATH unchanged on the runner. Dispatch uploads a 5-day `cleave-windows-x64-setup` artifact; a non-empty `release_tag` uses `gh release upload` for the setup exe next to the zip.
 
-Drop onto the exe needs the argv normalisation in [cleave/cli.py](../cleave/cli.py) (single existing path with no subcommand runs `play`), plus a pause before exit when a frozen process owns its console, or an Explorer-launched error vanishes with the window.
+Drop onto the exe uses the argv normalisation in [cleave/cli.py](../cleave/cli.py) (single existing path with no subcommand runs `play`), plus a pause before exit when a frozen process owns its console, or an Explorer-launched error vanishes with the window.
 
-GPU proof is still a human checklist: install from the setup exe, `cleave.exe play` on an existing project from the Start Menu shortcut and from a terminal, drop a project folder onto `cleave.exe`, then uninstall cleanly.
+Manual GPU proof (met): install from the setup exe into Program Files; `cleave.exe play` on an existing project from the Start Menu shortcut, a terminal, and by dropping a project folder onto `cleave.exe`; audio on the default output device; pattern mask at default `balanced` preview quality; same behaviour from the dispatch zip and the installer; uninstall removes the install dir only. See [Audio output device](#audio-output-device) for silent-playback debugging.
 
 ---
 
