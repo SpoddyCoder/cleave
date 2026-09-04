@@ -115,6 +115,17 @@ Same recipe as the manual steps above, on standard `windows-latest`. Workflow: [
 
 ---
 
+## Audio output device
+
+[cleave/viz/mix_player.py](../cleave/viz/mix_player.py) opens one SDL output device by name, because `pygame._sdl2.AudioDevice` rejects an empty name and so cannot ask SDL for the default the way `SDL_OpenAudioDevice(NULL, ...)` does. `sdl_default_output_device()` reads the default endpoint from the SDL library pygame already loaded (`SDL_GetDefaultAudioInfo`, SDL 2.24+) and `select_output_device` prefers it. SDL's enumeration order is arbitrary on Windows WASAPI, so the first enumerated name is only a last resort; picking it can send playback to a silent endpoint (digital output, an HDMI monitor with no speakers) while the transport clock still advances.
+
+Two environment variables help when playback is silent or lands on the wrong endpoint:
+
+- `CLEAVE_AUDIO_DEBUG=1` prints the enumerated devices, SDL's default, the chosen endpoint, the requested format, and the mix PCM peak/RMS to stderr.
+- `CLEAVE_AUDIO_DEVICE=<name>` forces an endpoint by exact or case-insensitive substring match (for example `CLEAVE_AUDIO_DEVICE=Speakers`).
+
+---
+
 ## ctypes search (code in 2.1; DLLs in 2.2)
 
 [cleave/projectm.py](../cleave/projectm.py) and [cleave/projectm_playlist.py](../cleave/projectm_playlist.py):

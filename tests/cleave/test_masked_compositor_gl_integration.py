@@ -698,3 +698,52 @@ def test_hard_plasma_slot_change_is_mid_morph_at_quarter(gl_context) -> None:
     _assert_hard_weight_field_mid_morph(
         comp, masked, _four_solid_layers(comp), mask_type="plasma", seed=7
     )
+
+
+def test_hard_composite_stretches_preview_scaled_layer(gl_context) -> None:
+    """Live preview quality gives back layers a smaller FBO than the content."""
+    comp, masked = gl_context
+    full = comp.create_layer_fbo("full", W, H, opacity=1.0, blend_mode="black-key")
+    small = comp.create_layer_fbo(
+        "small", W // 2, H // 2, opacity=1.0, blend_mode="black-key"
+    )
+    _fill_layer(full, (1.0, 0.0, 0.0))
+    _fill_layer(small, (0.0, 0.0, 1.0))
+
+    _run(
+        masked,
+        comp,
+        [full, small],
+        mask_type="strips",
+        feather_pct=0,
+        density=1.0,
+    )
+
+    # Right strip belongs to the half-size layer; it must cover the full strip,
+    # not just the bottom-left quarter of it.
+    for y in (2, H // 2, H - 3):
+        px = _read_content_pixel(comp, 3 * W // 4, y)
+        assert px[2] > 200 and px[0] < 40, f"y={y} px={px}"
+
+
+def test_soft_composite_stretches_preview_scaled_layer(gl_context) -> None:
+    comp, masked = gl_context
+    full = comp.create_layer_fbo("full", W, H, opacity=1.0, blend_mode="black-key")
+    small = comp.create_layer_fbo(
+        "small", W // 2, H // 2, opacity=1.0, blend_mode="black-key"
+    )
+    _fill_layer(full, (1.0, 0.0, 0.0))
+    _fill_layer(small, (0.0, 0.0, 1.0))
+
+    _run(
+        masked,
+        comp,
+        [full, small],
+        mask_type="strips",
+        feather_pct=100,
+        density=1.0,
+    )
+
+    for y in (2, H - 3):
+        px = _read_content_pixel(comp, 3 * W // 4, y)
+        assert px[2] > 100, f"y={y} px={px}"

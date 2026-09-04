@@ -9,9 +9,12 @@ from cleave.viz.mix_player import (
     DEFAULT_CHUNKSIZE,
     FREQUENCY_HZ,
     MixPlayer,
+    audio_debug_lines,
     copy_mono_pcm_chunk_as_stereo,
     copy_stereo_pcm_chunk,
     estimate_output_latency_frames,
+    pcm_level_summary,
+    select_output_device,
 )
 
 
@@ -328,3 +331,57 @@ def test_mix_player_click_carries_across_chunk_boundary() -> None:
     spill_end = chunk_frames + int(0.1 * FREQUENCY_HZ)
     assert np.max(np.abs(left[spill_start:spill_end])) > 0.1
     assert player._click_tail is None or len(player._click_tail) == 0
+
+def test_select_output_device_prefers_sdl_default() -> None:
+    names = ["Digital Output (S/PDIF)", "Speakers (Realtek Audio)"]
+    assert (
+        select_output_device(names, sdl_default="Speakers (Realtek Audio)")
+        == "Speakers (Realtek Audio)"
+    )
+
+
+def test_select_output_device_falls_back_to_first_name() -> None:
+    names = ["Digital Output (S/PDIF)", "Speakers (Realtek Audio)"]
+    assert select_output_device(names) == "Digital Output (S/PDIF)"
+    assert select_output_device(names, sdl_default="Unplugged HDMI") == names[0]
+    assert select_output_device([]) == ""
+
+
+def test_select_output_device_requested_wins_over_default() -> None:
+    names = ["Digital Output (S/PDIF)", "Speakers (Realtek Audio)"]
+    assert (
+        select_output_device(
+            names, requested="realtek", sdl_default="Digital Output (S/PDIF)"
+        )
+        == "Speakers (Realtek Audio)"
+    )
+    exact = select_output_device(names, requested=names[0], sdl_default=names[1])
+    assert exact == names[0]
+    assert select_output_device(names, requested="Odd Device") == "Odd Device"
+
+
+def test_pcm_level_summary_reports_silence_and_signal() -> None:
+    assert pcm_level_summary(np.zeros(0, dtype=np.float32)) == (0.0, 0.0)
+    assert pcm_level_summary(np.zeros(16, dtype=np.float32)) == (0.0, 0.0)
+    peak, rms = pcm_level_summary(np.array([0.5, -0.5], dtype=np.float32))
+    assert peak == pytest.approx(0.5)
+    assert rms == pytest.approx(0.5)
+
+
+def test_audio_debug_lines_include_devices_and_levels() -> None:
+    lines = audio_debug_lines(
+        names=["Speakers", "HDMI"],
+        requested="",
+        sdl_default="HDMI",
+        chosen="HDMI",
+        sample_rate=FREQUENCY_HZ,
+        chunksize=DEFAULT_CHUNKSIZE,
+        total_frames=FREQUENCY_HZ * 2,
+        peak=0.0,
+        rms=0.0,
+    )
+    text = "\n".join(lines)
+    assert "[0] Speakers" in text
+    assert "[1] HDMI" in text
+    assert "chosen=HDMI" in text
+    assert "peak=0.000000" in text
