@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 import pygame
 
+from cleave.paths import resource_dir
 from cleave.viz.overlay_upload import UploadPlan, UploadSignature
 from cleave.viz.theme import (
     BACKGROUND,
@@ -14,13 +16,24 @@ from cleave.viz.theme import (
     BORDER_WIDTH,
 )
 
+_FONT_RELATIVE = Path("assets/fonts/DejaVuSansMono.ttf")
+_FONT_BOLD_RELATIVE = Path("assets/fonts/DejaVuSansMono-Bold.ttf")
+
 _font_cache: dict[tuple[int, bool], pygame.font.Font] = {}
+
+
+def overlay_font_path(*, bold: bool = False) -> Path:
+    """Return the bundled overlay monospace TTF (checkout or frozen resources)."""
+    relative = _FONT_BOLD_RELATIVE if bold else _FONT_RELATIVE
+    return resource_dir() / relative
 
 
 def overlay_font(size: int, *, bold: bool = False) -> pygame.font.Font:
     key = (size, bold)
     if key not in _font_cache:
-        _font_cache[key] = pygame.font.SysFont("monospace", size, bold=bold)
+        if not pygame.font.get_init():
+            pygame.font.init()
+        _font_cache[key] = pygame.font.Font(str(overlay_font_path(bold=bold)), size)
     return _font_cache[key]
 
 

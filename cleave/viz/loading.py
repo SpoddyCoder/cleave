@@ -13,6 +13,7 @@ from OpenGL.GL import (
 )
 
 from cleave.gl_compositor import GlCompositor
+from cleave.viz.overlay_primitives import overlay_font
 from cleave.viz.theme import BACKGROUND, VALUE
 
 _FONT_SIZE = 28
@@ -22,9 +23,7 @@ _loading_font: pygame.font.Font | None = None
 def _loading_font_get() -> pygame.font.Font:
     global _loading_font
     if _loading_font is None:
-        if not pygame.font.get_init():
-            pygame.font.init()
-        _loading_font = pygame.font.SysFont("monospace", _FONT_SIZE)
+        _loading_font = overlay_font(_FONT_SIZE)
     return _loading_font
 
 

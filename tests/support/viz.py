@@ -20,6 +20,7 @@ from cleave.viz.session import (
     default_render_overlay_card_runtime,
 )
 from cleave.viz.playback import PlaybackState
+from cleave.viz.overlay_primitives import overlay_font as production_overlay_font
 from cleave.viz.theme import TuningUiMetrics, tuning_ui_metrics
 from cleave.viz.tuning_view_state import RenderOverlayCardBlock, TrackBlock
 
@@ -80,8 +81,7 @@ def keydown(key: int, *, mod: int = 0) -> pygame.event.Event:
 
 
 def overlay_font() -> pygame.font.Font:
-    pygame.font.init()
-    return pygame.font.SysFont("monospace", baseline_tuning_ui_metrics().font_size)
+    return production_overlay_font(baseline_tuning_ui_metrics().font_size)
 
 
 def make_playlist(name: str, count: int = 3) -> PresetPlaylist:
