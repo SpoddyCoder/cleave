@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Architecture principles
 
-Conventions established by [docs/completed/architecture-refactor.md](docs/completed/architecture-refactor.md). Complements [.cursor/rules/project-context.mdc](.cursor/rules/project-context.mdc) and [.cursor/rules/no-backward-compatibility.mdc](.cursor/rules/no-backward-compatibility.mdc). Current assessment: [docs/architecture-review.md](docs/architecture-review.md).
+Conventions established by [docs/completed/architecture-refactor.md](docs/completed/architecture-refactor.md). Complements [.cursor/rules/project-context.mdc](.cursor/rules/project-context.mdc), [.cursor/rules/editor-first.mdc](.cursor/rules/editor-first.mdc), and [.cursor/rules/no-backward-compatibility.mdc](.cursor/rules/no-backward-compatibility.mdc). Current assessment: [docs/architecture-review.md](docs/architecture-review.md).
 
 ## Principles
 
