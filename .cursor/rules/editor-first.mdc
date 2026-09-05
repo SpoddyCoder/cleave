@@ -1,0 +1,29 @@
+---
+description: Editor is first-class; CLI is optional. New work must have an in-window path.
+alwaysApply: true
+---
+
+# Editor first
+
+Windows is the majority audience. Those users run the frozen editor as a standalone app (Start Menu, desktop, drop a file on `cleave.exe`). They do not have a terminal. Linux checkout and scripted CLI remain supported; they are not the default product surface.
+
+## New user-facing work
+
+- Design the in-editor path first: overlay, centered modal, or [cleave/viz/loading.py](cleave/viz/loading.py) loading screen. Reuse those, not a native Windows menu bar.
+- Share logic in non-viz modules. The editor presents; `cleave.exe <command>` may call the same functions and print to stderr when a console exists.
+- Do not ship a feature whose only progress or error channel is stdout/stderr. Explorer, Start Menu, and drop must work with no console.
+- Long jobs the editor starts (stem split, weight download, offline render, backup) show named status in the window, plus a progress bar when the work reports bytes or fraction. Failures use a modal or panel notification, not a vanished console.
+- CLI-only is fine for CI, `--help` / `--version`, and headless smoke. That does not replace the editor path for the same job.
+
+## Do not
+
+```
+# Bad: play on a wav finishes Demucs in the console, then opens the editor
+run_separate(wav)   # tqdm / print only
+launch(project)
+
+# Good: window first; same run_separate reports into the loading screen
+open_window()
+run_separate(wav, on_progress=draw_loading)
+continue_boot(project)
+```
