@@ -42,6 +42,7 @@ from cleave.config_schema.editor import (
     EditorPreviewQuality,
     clamp_beat_sensitivity,
     clamp_upscale,
+    editor_display_size,
     parse_project_editor_section,
 )
 from cleave.config_schema.layers import (
@@ -202,11 +203,11 @@ class EditorConfig:
     residual_latency_ms: int = DEFAULT_RESIDUAL_LATENCY_MS
     @property
     def display_width(self) -> int:
-        return max(1, round(self.width * self.upscale))
+        return editor_display_size(self.width, self.height, upscale=self.upscale)[0]
 
     @property
     def display_height(self) -> int:
-        return max(1, round(self.height * self.upscale))
+        return editor_display_size(self.width, self.height, upscale=self.upscale)[1]
 
 
 @dataclass(frozen=True)

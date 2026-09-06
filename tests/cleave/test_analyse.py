@@ -90,7 +90,9 @@ def test_run_analyse_writes_version_4_full_mix(
     assert len(data["other"]["rms"]) > 0
     assert data["beat_times"] == [0.5, 1.0, 1.5]
     assert data["downbeat_times"] == [0.5, 1.5]
-    beats_downbeats.assert_called_once_with(project / "mix.wav")
+    beats_downbeats.assert_called_once_with(
+        project / "mix.wav", on_progress=None
+    )
 
 
 @patch("cleave.analyse.extract_mix_rms", return_value=_stub_signal())
@@ -124,7 +126,9 @@ def test_run_analyse_uses_beat_detection_stem_path(
     data = json.loads(signals_path.read_text(encoding="utf-8"))
 
     assert data["beat_detection_stem"] == "drums"
-    beats_downbeats.assert_called_once_with(stems_dir(project) / "drums.wav")
+    beats_downbeats.assert_called_once_with(
+        stems_dir(project) / "drums.wav", on_progress=None
+    )
 
 
 @patch("cleave.analyse.extract_mix_rms", return_value=_stub_signal())

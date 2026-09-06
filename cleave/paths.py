@@ -127,6 +127,17 @@ def default_preset_root() -> Path:
     return (data_dir() / "presets").resolve()
 
 
+def model_cache_dir() -> Path:
+    """Return the torch-hub weight cache under :func:`data_dir`.
+
+    Creates the directory if it does not exist. Demucs and Beat This download
+    checkpoints here on first run.
+    """
+    path = (data_dir() / "models").resolve()
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
 def default_texture_paths() -> tuple[Path, ...]:
     """Return the default texture search paths under :func:`data_dir`."""
     return ((data_dir() / "textures").resolve(),)
