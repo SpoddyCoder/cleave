@@ -106,6 +106,10 @@ STEM_SPLIT_MISSING_FROZEN = (
 STEM_SPLIT_MISSING_CHECKOUT = (
     "Stem split requires PyTorch and Demucs, which are not installed."
 )
+TORCHCODEC_AUDIO_IO_ERROR = (
+    "Could not finish stem split: audio I/O tried to load TorchCodec, "
+    "which this Windows build does not ship."
+)
 
 
 def stem_split_available() -> bool:
@@ -193,6 +197,45 @@ def _load_track_with_sidecar_ffmpeg(
     return torch.from_numpy(pcm).view(-1, audio_channels).t().contiguous()
 
 
+def _looks_like_torchcodec_error(exc: BaseException) -> bool:
+    """True when *exc* (or a chained cause) names TorchCodec."""
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        text = f"{type(current).__name__}: {current}".lower()
+        if "torchcodec" in text or "libtorchcodec" in text:
+            return True
+        current = current.__cause__ or current.__context__
+    return False
+
+
+def _reraise_torchcodec(exc: BaseException) -> None:
+    """Re-raise TorchCodec failures with :data:`TORCHCODEC_AUDIO_IO_ERROR`."""
+    if _looks_like_torchcodec_error(exc):
+        raise RuntimeError(TORCHCODEC_AUDIO_IO_ERROR) from exc
+
+
+def _save_stem_wav(wav, dest: Path, samplerate: int) -> None:
+    """Write a Demucs source tensor as 16-bit PCM wav via soundfile.
+
+    Avoids Demucs torchaudio wav export, which loads TorchCodec
+    FFmpeg DLLs the freeze does not ship. Demucs layout is
+    ``(channels, samples)``; soundfile wants ``(samples, channels)``.
+    """
+    import numpy as np
+    import soundfile as sf
+
+    array = np.asarray(wav.detach().cpu().numpy(), dtype=np.float32)
+    if array.ndim == 2:
+        array = array.T
+    peak = float(np.abs(array).max()) if array.size else 0.0
+    if peak > 0.0:
+        array = array / max(1.01 * peak, 1.0)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    sf.write(str(dest), array, samplerate, subtype="PCM_16")
+
+
 def _write_demucs_stems(
     audio_path: Path,
     dest_paths: Mapping[str, Path],
@@ -206,13 +249,14 @@ def _write_demucs_stems(
     Imports stay lazy so play/render never load torch. Frozen: sidecar
     ffmpeg is on PATH for the Demucs call, and mix load uses that binary
     rather than Demucs ``load_track`` (which also needs ``ffprobe``).
+    Stem wavs are written with soundfile, not Demucs torchaudio export
+    (TorchCodec).
     """
     from cleave.ffmpeg import sidecar_ffmpeg_on_path
 
     with sidecar_ffmpeg_on_path():
         import torch
         from demucs.apply import apply_model
-        from demucs.audio import save_audio
         from demucs.pretrained import get_model
 
         torch.hub.set_dir(str(model_cache_dir()))
@@ -245,13 +289,18 @@ def _write_demucs_stems(
         except SystemExit as exc:
             raise RuntimeError(f"demucs failed to load {audio_path}") from exc
         except Exception as exc:
+            _reraise_torchcodec(exc)
             raise RuntimeError(f"demucs failed for {audio_path}") from exc
 
-        for index, name in enumerate(model_obj.sources):
-            dest = dest_paths.get(name)
-            if dest is None:
-                continue
-            save_audio(sources[index], str(dest), samplerate=model_obj.samplerate)
+        try:
+            for index, name in enumerate(model_obj.sources):
+                dest = dest_paths.get(name)
+                if dest is None:
+                    continue
+                _save_stem_wav(sources[index], dest, model_obj.samplerate)
+        except Exception as exc:
+            _reraise_torchcodec(exc)
+            raise RuntimeError(f"demucs failed to write stems for {audio_path}") from exc
 
         missing_src = [name for name, dst in dest_paths.items() if not dst.is_file()]
         if missing_src:

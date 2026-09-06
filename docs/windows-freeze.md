@@ -29,7 +29,7 @@ User data is never written into the app folder.
 
 Preset and texture defaults are `data_dir() / "presets"` and `data_dir() / "textures"` ([cleave/paths.py](../cleave/paths.py) `default_preset_root` / `default_texture_paths`). First write still creates directories; import does not.
 
-Stem split calls Demucs in-process (`demucs.pretrained.get_model` and `demucs.apply.apply_model` in [cleave/separate.py](../cleave/separate.py)), not `python -m demucs`. Frozen mix load uses the sidecar ffmpeg CLI rather than Demucs `load_track`. Before model load, Demucs and Beat This call `torch.hub.set_dir` so checkpoints land in `data_dir() / "models"` (`model_cache_dir()`). First-run download still happens; weights are not baked into the freeze.
+Stem split calls Demucs in-process (`demucs.pretrained.get_model` and `demucs.apply.apply_model` in [cleave/separate.py](../cleave/separate.py)), not `python -m demucs`. Frozen mix load uses the sidecar ffmpeg CLI rather than Demucs `load_track`. Stem wavs are written with soundfile (16-bit PCM), not Demucs `save_audio` / torchaudio. Beat This runs as `Audio2Beats` on audio already loaded with librosa/soundfile, not `File2Beats` (`torchaudio.load`). Before model load, Demucs and Beat This call `torch.hub.set_dir` so checkpoints land in `data_dir() / "models"` (`model_cache_dir()`). First-run download still happens; weights are not baked into the freeze.
 
 ---
 
@@ -70,7 +70,7 @@ Phase 3.1 GPU proof (met): the same play path from a `workflow_dispatch` zip bui
 
 Frozen lookup: `install_dir() / "ffmpeg.exe"` (Windows) or `install_dir() / "ffmpeg"` (Linux freeze). If missing, raise `FileNotFoundError` naming that path. No PATH fallback when frozen. Checkout still uses `shutil.which` and the "not on PATH" error.
 
-Demucs 4.0.1 `load_track` (`demucs.audio.AudioFile`) shells out to `ffmpeg` and `ffprobe` by name on PATH, then falls back to torchaudio/torchcodec (shared FFmpeg DLLs). The freeze ships static `ffmpeg.exe` only, not ffprobe or those DLLs. Frozen stem split prepends `install_dir()` to PATH (`sidecar_ffmpeg_on_path` in [cleave/ffmpeg.py](../cleave/ffmpeg.py)) and decodes the mix with `ffmpeg_executable()` into a tensor for `apply_model`. Checkout still uses Demucs `load_track` and PATH ffmpeg. A missing sidecar raises `FileNotFoundError` naming `install_dir() / ffmpeg.exe`.
+Demucs 4.0.1 `load_track` (`demucs.audio.AudioFile`) shells out to `ffmpeg` and `ffprobe` by name on PATH, then falls back to torchaudio/torchcodec (shared FFmpeg DLLs). `save_audio` always uses `torchaudio.save`, which loads TorchCodec. The freeze ships static `ffmpeg.exe` only, not ffprobe or those DLLs. Frozen stem split prepends `install_dir()` to PATH (`sidecar_ffmpeg_on_path` in [cleave/ffmpeg.py](../cleave/ffmpeg.py)) and decodes the mix with `ffmpeg_executable()` into a tensor for `apply_model`. Checkout still uses Demucs `load_track` and PATH ffmpeg for mix decode. Both frozen and checkout write stem wavs with soundfile. A missing sidecar raises `FileNotFoundError` naming `install_dir() / ffmpeg.exe`.
 
 Do not commit a Windows FFmpeg binary. [scripts/windows_stage_freeze.py](../scripts/windows_stage_freeze.py) downloads a pinned official Windows essentials build, verifies SHA-256, copies `ffmpeg.exe` next to `cleave.exe`, and drops that build's LICENSE/COPYING/NOTICE files into `licenses/ffmpeg/`. URL and checksum are the `FFMPEG_URL` and `FFMPEG_SHA256` constants at the top of that script. The zip is cached at `.cache/ffmpeg-windows.zip` (gitignored).
 
