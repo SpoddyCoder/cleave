@@ -2,20 +2,24 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from pathlib import Path
-from unittest.mock import patch
+from typing import Iterator
+from unittest.mock import MagicMock, patch
 
 import pytest
 import yaml
 
 from cleave.config import VIZ_CONFIG_FILENAME
 from cleave.stems import STEM_NAMES, stems_dir
+from cleave.paths import model_cache_dir
 from cleave.project import (
     PROJECT_FILENAME,
     load_manifest,
     rewrite_manifest_slug,
     write_manifest,
 )
+from cleave.model_weights import WeightDownloadError
 from cleave.separate import (
     _run_demucs,
     project_stems_complete,
@@ -30,6 +34,36 @@ def _write_stub_stems(project: Path) -> None:
     base.mkdir(parents=True, exist_ok=True)
     for name in STEM_NAMES:
         (base / f"{name}.wav").write_bytes(b"wav")
+
+
+@contextmanager
+def _mock_demucs_writes_stems() -> Iterator[dict[str, MagicMock]]:
+    """Stub the Demucs Python API so ``save_audio`` writes dummy stem wavs."""
+    model_obj = MagicMock()
+    model_obj.sources = ["drums", "bass", "other", "vocals"]
+    model_obj.audio_channels = 2
+    model_obj.samplerate = 44100
+
+    def fake_save_audio(_wav: object, path: str, **_kwargs: object) -> None:
+        dest = Path(path)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(b"wav")
+
+    with (
+        patch("cleave.separate.ensure_weight_files") as ensure,
+        patch("torch.hub.set_dir") as set_dir,
+        patch("torch.cuda.is_available", return_value=False),
+        patch("demucs.pretrained.get_model", return_value=model_obj) as get_model,
+        patch("demucs.separate.load_track", return_value=MagicMock()),
+        patch("demucs.apply.apply_model", return_value=[MagicMock()]),
+        patch("demucs.audio.save_audio", side_effect=fake_save_audio),
+    ):
+        yield {
+            "ensure": ensure,
+            "set_dir": set_dir,
+            "get_model": get_model,
+            "model": model_obj,
+        }
 
 
 def test_project_stems_complete_false_when_missing(tmp_path: Path) -> None:
@@ -217,7 +251,10 @@ def test_run_separate_analyse_only_when_stems_exist_stale_signals(
     assert result == project.resolve()
     run_demucs.assert_not_called()
     run_analyse.assert_called_once_with(
-        project.resolve(), high_quality=False, beat_detection_stem="full_mix"
+        project.resolve(),
+        high_quality=False,
+        beat_detection_stem="full_mix",
+        on_progress=None,
     )
 
 
@@ -246,8 +283,39 @@ def test_run_separate_analyse_only_when_stems_exist_no_signals(
     assert result == project.resolve()
     run_demucs.assert_not_called()
     run_analyse.assert_called_once_with(
-        project.resolve(), high_quality=False, beat_detection_stem="full_mix"
+        project.resolve(),
+        high_quality=False,
+        beat_detection_stem="full_mix",
+        on_progress=None,
     )
+
+
+def test_run_separate_reports_progress_phases(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    audio = tmp_path / "song.flac"
+    audio.write_bytes(b"audio")
+    messages: list[tuple[str, float | None]] = []
+    fake_analyse = MagicMock()
+
+    def on_progress(message: str, fraction: float | None) -> None:
+        messages.append((message, fraction))
+
+    with (
+        patch("cleave.separate._run_demucs") as run_demucs,
+        patch("cleave.separate.require_stem_split"),
+        patch.dict("sys.modules", {"cleave.analyse": fake_analyse}),
+    ):
+        run_separate(audio, on_progress=on_progress)
+
+    assert messages == [
+        ("Separating stems...", None),
+        ("Extracting signals...", None),
+    ]
+    assert run_demucs.call_args.kwargs["on_progress"] is on_progress
+    fake_analyse.run_analyse.assert_called_once()
+    assert fake_analyse.run_analyse.call_args.kwargs["on_progress"] is on_progress
 
 
 def test_run_separate_reanalyses_on_explicit_beat_stem_mismatch(
@@ -278,7 +346,10 @@ def test_run_separate_reanalyses_on_explicit_beat_stem_mismatch(
     assert result == project.resolve()
     run_demucs.assert_not_called()
     run_analyse.assert_called_once_with(
-        project.resolve(), high_quality=False, beat_detection_stem="drums"
+        project.resolve(),
+        high_quality=False,
+        beat_detection_stem="drums",
+        on_progress=None,
     )
 
 
@@ -347,23 +418,103 @@ def test_run_demucs_skips_copy_when_mix_in_project(
         demucs_model="htdemucs",
     )
 
-    demucs_out = tmp_path / "demucs-out" / "htdemucs" / "my-track"
-    demucs_out.mkdir(parents=True)
-    for name in STEM_NAMES:
-        (demucs_out / f"{name}.wav").write_bytes(b"wav")
-
-    def fake_run(cmd: list[str], *, check: bool) -> None:
-        out_flag = cmd.index("-o")
-        out_root = Path(cmd[out_flag + 1])
-        target = out_root / "htdemucs" / "my-track"
-        target.mkdir(parents=True, exist_ok=True)
-        for name in STEM_NAMES:
-            (target / f"{name}.wav").write_bytes(b"wav")
-
-    with patch("cleave.separate.subprocess.run", side_effect=fake_run):
+    with _mock_demucs_writes_stems() as mocks:
         _run_demucs(mix, project, high_quality=False, force=True)
 
+    mocks["get_model"].assert_called_once_with("htdemucs")
+    mocks["set_dir"].assert_called_once_with(str(model_cache_dir()))
+    mocks["ensure"].assert_called_once()
+    assert mocks["ensure"].call_args.args[0].label == "Demucs htdemucs"
     assert mix.read_bytes() == b"mix"
+    for name in STEM_NAMES:
+        assert (stems_dir(project) / f"{name}.wav").is_file()
+
+
+def test_run_demucs_high_quality_loads_htdemucs_ft(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    project = tmp_path / "projects" / "my-track"
+    project.mkdir(parents=True)
+    mix = project / "my-track.flac"
+    mix.write_bytes(b"mix")
+
+    with _mock_demucs_writes_stems() as mocks:
+        _run_demucs(mix, project, high_quality=True, force=True)
+
+    mocks["get_model"].assert_called_once_with("htdemucs_ft")
+    mocks["ensure"].assert_called_once()
+    assert mocks["ensure"].call_args.args[0].label == "Demucs htdemucs_ft"
+    assert load_manifest(project).demucs_model == "htdemucs_ft"
+
+
+def test_run_demucs_wraps_get_model_failure(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    project = tmp_path / "projects" / "my-track"
+    project.mkdir(parents=True)
+    mix = project / "my-track.flac"
+    mix.write_bytes(b"mix")
+
+    with (
+        patch("cleave.separate.ensure_weight_files"),
+        patch("torch.hub.set_dir"),
+        patch("torch.cuda.is_available", return_value=False),
+        patch("demucs.pretrained.get_model", side_effect=RuntimeError("hub down")),
+        patch("demucs.separate.load_track"),
+        patch("demucs.apply.apply_model"),
+        patch("demucs.audio.save_audio"),
+        pytest.raises(RuntimeError, match="demucs failed"),
+    ):
+        _run_demucs(mix, project, high_quality=False, force=True)
+
+
+def test_run_demucs_propagates_weight_download_error(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    project = tmp_path / "projects" / "my-track"
+    project.mkdir(parents=True)
+    mix = project / "my-track.flac"
+    mix.write_bytes(b"mix")
+    err = WeightDownloadError(
+        "Failed to download Demucs htdemucs. "
+        "A network connection is required the first time."
+    )
+
+    with (
+        patch("cleave.separate.ensure_weight_files", side_effect=err),
+        patch("torch.hub.set_dir"),
+        patch("torch.cuda.is_available", return_value=False),
+        patch("demucs.pretrained.get_model"),
+        pytest.raises(WeightDownloadError, match="network connection is required"),
+    ):
+        _run_demucs(mix, project, high_quality=False, force=True)
+
+
+def test_run_demucs_raises_when_stems_not_written(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    project = tmp_path / "projects" / "my-track"
+    project.mkdir(parents=True)
+    mix = project / "my-track.flac"
+    mix.write_bytes(b"mix")
+    model_obj = MagicMock()
+    model_obj.sources = ["drums", "bass", "other", "vocals"]
+
+    with (
+        patch("cleave.separate.ensure_weight_files"),
+        patch("torch.hub.set_dir"),
+        patch("torch.cuda.is_available", return_value=False),
+        patch("demucs.pretrained.get_model", return_value=model_obj),
+        patch("demucs.separate.load_track", return_value=MagicMock()),
+        patch("demucs.apply.apply_model", return_value=[MagicMock()]),
+        patch("demucs.audio.save_audio"),
+        pytest.raises(RuntimeError, match="missing stem files"),
+    ):
+        _run_demucs(mix, project, high_quality=False, force=True)
 
 
 def test_run_separate_force_runs_demucs_and_analyse(
@@ -391,10 +542,17 @@ def test_run_separate_force_runs_demucs_and_analyse(
 
     assert result == project.resolve()
     run_demucs.assert_called_once_with(
-        mix.resolve(), project.resolve(), high_quality=False, force=True
+        mix.resolve(),
+        project.resolve(),
+        high_quality=False,
+        force=True,
+        on_progress=None,
     )
     run_analyse.assert_called_once_with(
-        project.resolve(), high_quality=False, beat_detection_stem="full_mix"
+        project.resolve(),
+        high_quality=False,
+        beat_detection_stem="full_mix",
+        on_progress=None,
     )
 
 
@@ -426,7 +584,10 @@ def test_run_separate_force_uses_stored_beat_detection_stem(
     assert result == project.resolve()
     run_demucs.assert_called_once()
     run_analyse.assert_called_once_with(
-        project.resolve(), high_quality=False, beat_detection_stem="drums"
+        project.resolve(),
+        high_quality=False,
+        beat_detection_stem="drums",
+        on_progress=None,
     )
 
 
@@ -460,7 +621,10 @@ def test_run_separate_force_explicit_beat_stem_overrides_stored(
     assert result == project.resolve()
     run_demucs.assert_called_once()
     run_analyse.assert_called_once_with(
-        project.resolve(), high_quality=False, beat_detection_stem="bass"
+        project.resolve(),
+        high_quality=False,
+        beat_detection_stem="bass",
+        on_progress=None,
     )
 
 
@@ -472,22 +636,8 @@ def test_run_separate_creates_project_and_renders(
     audio.write_bytes(b"audio")
 
     project = tmp_path / "projects" / "song"
-    demucs_out = tmp_path / "demucs-out" / "htdemucs" / "song"
-    demucs_out.mkdir(parents=True)
-    for name in STEM_NAMES:
-        (demucs_out / f"{name}.wav").write_bytes(b"wav")
 
-    def fake_run(cmd: list[str], *, check: bool) -> None:
-        out_flag = cmd.index("-o")
-        out_root = Path(cmd[out_flag + 1])
-        target = out_root / "htdemucs" / "song"
-        target.parent.mkdir(parents=True, exist_ok=True)
-        for name in STEM_NAMES:
-            shutil_copy = demucs_out / f"{name}.wav"
-            target.mkdir(parents=True, exist_ok=True)
-            (target / f"{name}.wav").write_bytes(shutil_copy.read_bytes())
-
-    with patch("cleave.separate.subprocess.run", side_effect=fake_run), patch(
+    with _mock_demucs_writes_stems(), patch(
         "cleave.analyse.run_analyse", return_value=project / "signals.json"
     ):
         result = run_separate(audio)
@@ -526,20 +676,7 @@ def test_run_separate_force_deletes_stale_mix(
     new_audio = tmp_path / "song.wav"
     new_audio.write_bytes(b"new")
 
-    demucs_out = tmp_path / "demucs-out" / "htdemucs" / "song"
-    demucs_out.mkdir(parents=True)
-    for name in STEM_NAMES:
-        (demucs_out / f"{name}.wav").write_bytes(b"wav")
-
-    def fake_run(cmd: list[str], *, check: bool) -> None:
-        out_flag = cmd.index("-o")
-        out_root = Path(cmd[out_flag + 1])
-        target = out_root / "htdemucs" / "song"
-        target.mkdir(parents=True, exist_ok=True)
-        for name in STEM_NAMES:
-            (target / f"{name}.wav").write_bytes(b"wav")
-
-    with patch("cleave.separate.subprocess.run", side_effect=fake_run), patch(
+    with _mock_demucs_writes_stems(), patch(
         "cleave.analyse.run_analyse", return_value=project / "signals.json"
     ):
         run_separate(new_audio, force=True)
@@ -570,15 +707,7 @@ def test_run_separate_force_preserves_song_markers(
     )
     rewrite_manifest_slug(project, "song", restored_from="archived-slug")
 
-    def fake_run(cmd: list[str], *, check: bool) -> None:
-        out_flag = cmd.index("-o")
-        out_root = Path(cmd[out_flag + 1])
-        target = out_root / "htdemucs" / "song"
-        target.mkdir(parents=True, exist_ok=True)
-        for name in STEM_NAMES:
-            (target / f"{name}.wav").write_bytes(b"wav")
-
-    with patch("cleave.separate.subprocess.run", side_effect=fake_run), patch(
+    with _mock_demucs_writes_stems(), patch(
         "cleave.analyse.run_analyse", return_value=project / "signals.json"
     ):
         run_separate("song", force=True)

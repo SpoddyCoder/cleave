@@ -7,7 +7,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -35,6 +35,12 @@ def _write_stub_stems(project: Path) -> None:
     base.mkdir(parents=True, exist_ok=True)
     for name in STEM_NAMES:
         (base / f"{name}.wav").write_bytes(b"wav")
+
+
+def _mock_loading_window() -> MagicMock:
+    window = MagicMock()
+    window.quit_requested = False
+    return window
 
 
 def test_format_elapsed() -> None:
@@ -229,11 +235,17 @@ def test_handled_error_pauses_when_frozen_and_owns_console(
     monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
     monkeypatch.setattr("cleave.cli.is_frozen", lambda: True)
     monkeypatch.setattr("cleave.cli.owns_console", lambda: True)
-    with patch("builtins.input") as pause_input:
+    window = _mock_loading_window()
+    with (
+        patch("cleave.viz.open_loading_window", return_value=window),
+        patch("cleave.viz.continue_launch"),
+        patch("builtins.input") as pause_input,
+    ):
         with pytest.raises(SystemExit) as exc:
             main(["play", "missing-project"])
         assert exc.value.code == 1
     pause_input.assert_called_once_with("Press Enter to close...")
+    window.update.assert_called()
 
 
 def test_separate_parser_uses_target_arg() -> None:
@@ -421,16 +433,52 @@ def _complete_project(tmp_path: Path, slug: str = "my-track") -> Path:
     return project
 
 
-def test_cmd_play_calls_launch(
+def test_cmd_play_opens_window_before_separate(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
     project = _complete_project(tmp_path)
+    window = _mock_loading_window()
+    order: list[str] = []
 
-    with patch("cleave.viz.launch") as launch:
+    def open_win() -> MagicMock:
+        order.append("window")
+        return window
+
+    def separate(*_args: object, **_kwargs: object) -> Path:
+        order.append("separate")
+        return project.resolve()
+
+    def cont(*_args: object, **_kwargs: object) -> None:
+        order.append("continue")
+
+    with (
+        patch("cleave.viz.open_loading_window", side_effect=open_win),
+        patch("cleave.separate.run_separate", side_effect=separate) as run_separate,
+        patch("cleave.viz.continue_launch", side_effect=cont) as continue_launch,
+    ):
         cmd_play(build_parser().parse_args(["play", "my-track"]))
 
-    launch.assert_called_once_with(
+    assert order == ["window", "separate", "continue"]
+    continue_launch.assert_called_once_with(window, project.resolve(), config=None)
+    assert run_separate.call_args.kwargs["on_progress"] is window.update
+
+
+def test_cmd_play_continues_into_existing_project(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    project = _complete_project(tmp_path)
+    window = _mock_loading_window()
+
+    with (
+        patch("cleave.viz.open_loading_window", return_value=window),
+        patch("cleave.viz.continue_launch") as continue_launch,
+    ):
+        cmd_play(build_parser().parse_args(["play", "my-track"]))
+
+    continue_launch.assert_called_once_with(
+        window,
         project.resolve(),
         config=None,
     )
@@ -441,11 +489,16 @@ def test_bare_path_runs_play(
 ) -> None:
     monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
     project = _complete_project(tmp_path)
+    window = _mock_loading_window()
 
-    with patch("cleave.viz.launch") as launch:
+    with (
+        patch("cleave.viz.open_loading_window", return_value=window),
+        patch("cleave.viz.continue_launch") as continue_launch,
+    ):
         main(["my-track"])
 
-    launch.assert_called_once_with(
+    continue_launch.assert_called_once_with(
+        window,
         project.resolve(),
         config=None,
     )
@@ -458,17 +511,22 @@ def test_bare_file_runs_play(
     audio = tmp_path / "song.flac"
     audio.write_bytes(b"audio")
     project = tmp_path / "projects" / "song"
+    window = _mock_loading_window()
 
     with (
         patch("cleave.separate.run_separate", return_value=project.resolve()) as run_separate,
-        patch("cleave.viz.launch") as launch,
+        patch("cleave.viz.open_loading_window", return_value=window),
+        patch("cleave.viz.continue_launch") as continue_launch,
     ):
         main([str(audio)])
 
     run_separate.assert_called_once_with(
-        Path(str(audio)), high_quality=False, beat_detection_stem=None
+        Path(str(audio)),
+        high_quality=False,
+        beat_detection_stem=None,
+        on_progress=window.update,
     )
-    launch.assert_called_once_with(project.resolve(), config=None)
+    continue_launch.assert_called_once_with(window, project.resolve(), config=None)
 
 
 def test_cmd_play_existing_project_does_not_import_torch(tmp_path: Path) -> None:
@@ -477,10 +535,15 @@ def test_cmd_play_existing_project_does_not_import_torch(tmp_path: Path) -> None
     script = """
 import os
 import sys
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 from cleave.cli import build_parser, cmd_play
 
-with patch("cleave.viz.launch"):
+window = MagicMock()
+window.quit_requested = False
+with (
+    patch("cleave.viz.open_loading_window", return_value=window),
+    patch("cleave.viz.continue_launch"),
+):
     cmd_play(build_parser().parse_args(["play", "my-track"]))
 if "torch" in sys.modules:
     raise SystemExit("unexpected torch import")
@@ -505,12 +568,21 @@ def test_cmd_play_missing_torch_on_raw_audio(
     monkeypatch.setattr("cleave.separate.is_frozen", lambda: True)
     audio = tmp_path / "song.flac"
     audio.write_bytes(b"audio")
+    window = _mock_loading_window()
 
-    with pytest.raises(SystemExit) as exc:
+    with (
+        patch("cleave.viz.open_loading_window", return_value=window),
+        patch("cleave.viz.continue_launch") as continue_launch,
+        pytest.raises(SystemExit) as exc,
+    ):
         cmd_play(build_parser().parse_args(["play", str(audio)]))
     assert exc.value.code == 1
     err = capsys.readouterr().err
     assert "not in this Windows build" in err
+    window.update.assert_called()
+    error_messages = [str(call.args[0]) for call in window.update.call_args_list if call.args]
+    assert any("not in this Windows build" in msg for msg in error_messages)
+    continue_launch.assert_not_called()
 
 
 def test_cmd_separate_high_quality_completion_message(
@@ -798,12 +870,17 @@ def test_cmd_play_calls_run_separate_when_incomplete(
 
     with (
         patch("cleave.separate.run_separate", return_value=project.resolve()) as run_separate,
-        patch("cleave.viz.launch"),
+        patch("cleave.viz.open_loading_window", return_value=_mock_loading_window()) as open_win,
+        patch("cleave.viz.continue_launch"),
     ):
         cmd_play(build_parser().parse_args(["play", "my-track"]))
 
+    open_win.assert_called_once_with()
     run_separate.assert_called_once_with(
-        Path("my-track"), high_quality=False, beat_detection_stem=None
+        Path("my-track"),
+        high_quality=False,
+        beat_detection_stem=None,
+        on_progress=open_win.return_value.update,
     )
 
 
@@ -812,15 +889,20 @@ def test_cmd_play_forwards_high_quality_to_run_separate(
 ) -> None:
     monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
     project = _complete_project(tmp_path)
+    window = _mock_loading_window()
 
     with (
         patch("cleave.separate.run_separate", return_value=project.resolve()) as run_separate,
-        patch("cleave.viz.launch"),
+        patch("cleave.viz.open_loading_window", return_value=window),
+        patch("cleave.viz.continue_launch"),
     ):
         cmd_play(build_parser().parse_args(["play", "my-track", "--high-quality"]))
 
     run_separate.assert_called_once_with(
-        Path("my-track"), high_quality=True, beat_detection_stem=None
+        Path("my-track"),
+        high_quality=True,
+        beat_detection_stem=None,
+        on_progress=window.update,
     )
 
 
@@ -829,18 +911,60 @@ def test_cmd_play_forwards_beat_detection_stem(
 ) -> None:
     monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
     project = _complete_project(tmp_path)
+    window = _mock_loading_window()
 
     with (
         patch("cleave.separate.run_separate", return_value=project.resolve()) as run_separate,
-        patch("cleave.viz.launch"),
+        patch("cleave.viz.open_loading_window", return_value=window),
+        patch("cleave.viz.continue_launch"),
     ):
         cmd_play(
             build_parser().parse_args(["play", "my-track", "-bds", "vocals"])
         )
 
     run_separate.assert_called_once_with(
-        Path("my-track"), high_quality=False, beat_detection_stem="vocals"
+        Path("my-track"),
+        high_quality=False,
+        beat_detection_stem="vocals",
+        on_progress=window.update,
     )
+
+
+def test_cmd_play_quit_during_separate_skips_continue(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    project = _complete_project(tmp_path)
+    window = _mock_loading_window()
+
+    def separate(*_args: object, **_kwargs: object) -> Path:
+        window.quit_requested = True
+        return project.resolve()
+
+    with (
+        patch("cleave.viz.open_loading_window", return_value=window),
+        patch("cleave.separate.run_separate", side_effect=separate),
+        patch("cleave.viz.continue_launch") as continue_launch,
+    ):
+        cmd_play(build_parser().parse_args(["play", "my-track"]))
+
+    continue_launch.assert_not_called()
+    window.close.assert_called_once()
+
+
+def test_launch_opens_window_then_continues(tmp_path: Path) -> None:
+    from cleave import viz
+
+    window = _mock_loading_window()
+    project = tmp_path / "proj"
+    with (
+        patch.object(viz, "open_loading_window", return_value=window) as open_win,
+        patch.object(viz, "continue_launch") as continue_launch,
+    ):
+        viz.launch(project, config=None)
+
+    open_win.assert_called_once_with()
+    continue_launch.assert_called_once_with(window, project, config=None)
 
 
 def test_backup_parser_uses_project_dir_destination_and_options() -> None:
