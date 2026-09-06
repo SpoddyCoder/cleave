@@ -69,6 +69,31 @@ def test_parse_layers_preset_switching_on() -> None:
     assert layers["layer_1"].preset_switching_trigger == "projectm"
 
 
+@pytest.mark.parametrize(
+    ("yaml_value", "loaded", "expected"),
+    [
+        ("on", True, "on"),
+        ("off", False, "off"),
+        ('"on"', "on", "on"),
+        ('"off"', "off", "off"),
+    ],
+)
+def test_parse_layers_preset_switching_yaml_on_off(
+    yaml_value: str, loaded: bool | str, expected: str
+) -> None:
+    text = (
+        "layers:\n"
+        "  layer_1:\n"
+        "    stem: drums\n"
+        "    preset: drums/a.milk\n"
+        f"    preset_switching: {yaml_value}\n"
+    )
+    data = yaml.safe_load(text)
+    assert data["layers"]["layer_1"]["preset_switching"] == loaded
+    layers = parse_layers_section(data, ParseCtx(preset_root=Path("/tmp/presets")))
+    assert layers["layer_1"].preset_switching == expected
+
+
 def test_parse_layers_rejects_legacy_modes() -> None:
     preset_root = Path("/tmp/presets")
     for mode in ("none", "projectm", "timeline", "user_defined"):
