@@ -15,7 +15,7 @@
 #   Never both. Skipped when include_freeze is false (no zip, no Inno, no
 #   Release upload from that run).
 #
-# Separate-capable freeze (Phase 3.3.1 engineering smoke, not a Release asset):
+# Separate-capable freeze (Phase 3.3.1 done; not a Release asset until 3.3.2):
 #   freeze-separate builds packaging/cleave-separate.spec on its own
 #   checkout (the two specs both write dist/cleave/). Never gh release upload.
 
@@ -354,7 +354,7 @@ jobs:
 
   freeze-separate:
     # Isolated job: cleave-separate.spec also writes dist/cleave/. Own checkout.
-    # 3.3.1 headless proof only. No installer, no gh release upload.
+    # 3.3.1 headless proof. No installer. Release upload is 3.3.2.
     if: ${{ inputs.include_separate == true || inputs.include_separate == 'true' }}
     runs-on: windows-latest
     timeout-minutes: 180
