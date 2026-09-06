@@ -18,6 +18,7 @@ from cleave.viz.app import (
     _timeline_strip_fade,
     _timeline_strip_visible,
     _tuning_view_state_needed,
+    init_gl_resources_cheap,
 )
 from cleave.viz.focus_nav import MainFocus, TimelineFocus
 from cleave.viz.input_dispatch import key_handler_for_runtime
@@ -107,6 +108,18 @@ def _run_seed(*, upscale: float = 2.0) -> VisualizerSeed:
         preset_root=MagicMock(),
         playlists={},
     )
+
+
+def _boot_window(seed: VisualizerSeed, compositor: MagicMock) -> MagicMock:
+    window = MagicMock()
+    window.display_width = seed.display_width
+    window.display_height = seed.display_height
+    window.quit_requested = False
+    window.compositor = compositor
+    window.overlay_surface = pygame.Surface(
+        (seed.display_width, seed.display_height), pygame.SRCALPHA
+    )
+    return window
 
 
 def _timeline_open_runtime(compositor: MagicMock) -> LiveVisualizerRuntime:
@@ -207,7 +220,6 @@ def _heavy_init_side_effect(
 
 @patch("cleave.viz.app.current_sec", return_value=0.0)
 @patch("cleave.viz.app.pygame")
-@patch("cleave.viz.app.draw_loading_screen")
 @patch("cleave.viz.app.init_gl_resources_heavy")
 @patch("cleave.viz.app.init_gl_resources_cheap")
 @patch.object(VisualizerApp, "tick_frame")
@@ -215,18 +227,19 @@ def test_run_boot_order_audio_starts_after_first_frame(
     mock_tick_frame: MagicMock,
     mock_init_cheap: MagicMock,
     mock_init_heavy: MagicMock,
-    mock_draw_loading: MagicMock,
     mock_pygame: MagicMock,
     _mock_current_sec: MagicMock,
 ) -> None:
-    compositor = recording_compositor()
     seed = _run_seed()
+    loading_compositor = MagicMock()
+    window = _boot_window(seed, loading_compositor)
 
     call_order: list[str] = []
     overlay_surface = pygame.Surface((seed.display_width, seed.display_height), pygame.SRCALPHA)
 
     def cheap_side_effect(
         rt: VisualizerSeed,
+        compositor: MagicMock | None = None,
     ) -> tuple[MagicMock, MagicMock, MagicMock, pygame.Surface]:
         call_order.append("init_cheap")
         return compositor, MagicMock(), MagicMock(), overlay_surface
@@ -245,7 +258,7 @@ def test_run_boot_order_audio_starts_after_first_frame(
 
     mock_init_cheap.side_effect = cheap_side_effect
     mock_init_heavy.side_effect = heavy_with_start
-    mock_draw_loading.side_effect = lambda *_a, **_k: call_order.append("loading_screen")
+    window.update.side_effect = lambda *_a, **_k: call_order.append("loading_screen")
     mock_tick_frame.side_effect = lambda *_a, **_k: call_order.append("tick_frame")
 
     quit_event = MagicMock()
@@ -256,9 +269,12 @@ def test_run_boot_order_audio_starts_after_first_frame(
     mock_pygame.time.Clock.return_value.tick.return_value = 33
 
     app = VisualizerApp(seed)
-    app.run()
+    app.run(window)
 
-    mock_init_cheap.assert_called_once_with(seed)
+    loading_compositor.destroy.assert_called_once()
+    window.adopt_display_size.assert_not_called()
+    mock_pygame.display.set_mode.assert_not_called()
+    mock_init_cheap.assert_called_once_with(seed, compositor=loading_compositor)
     mock_init_heavy.assert_called_once()
     mock_tick_frame.assert_called()
     assert mock_tick_frame.call_args_list[0] == call(
@@ -270,12 +286,11 @@ def test_run_boot_order_audio_starts_after_first_frame(
     assert isinstance(app._runtime, LiveVisualizerRuntime)
     app._runtime.mix_player.start.assert_called_once()
     assert call_order.index("tick_frame") < call_order.index("mix_start")
-    assert mock_draw_loading.call_count >= 1
+    assert call_order.count("loading_screen") >= 1
 
 
 @patch("cleave.viz.app.current_sec", return_value=0.0)
 @patch("cleave.viz.app.pygame")
-@patch("cleave.viz.app.draw_loading_screen")
 @patch("cleave.viz.app.init_gl_resources_heavy")
 @patch("cleave.viz.app.init_gl_resources_cheap")
 @patch.object(VisualizerApp, "tick_frame")
@@ -283,14 +298,13 @@ def test_run_pygame_quit_clean_exits_via_try_quit(
     mock_tick_frame: MagicMock,
     mock_init_cheap: MagicMock,
     mock_init_heavy: MagicMock,
-    mock_draw_loading: MagicMock,
     mock_pygame: MagicMock,
     _mock_current_sec: MagicMock,
 ) -> None:
-    compositor = recording_compositor()
     seed = _run_seed()
+    window = _boot_window(seed, MagicMock())
 
-    mock_init_cheap.side_effect = lambda rt: (
+    mock_init_cheap.side_effect = lambda rt, compositor=None: (
         compositor,
         MagicMock(),
         MagicMock(),
@@ -325,7 +339,7 @@ def test_run_pygame_quit_clean_exits_via_try_quit(
     mock_pygame.time.Clock.return_value.tick.return_value = 33
 
     app = VisualizerApp(seed)
-    app.run()
+    app.run(window)
 
     assert controls.try_quit.call_count == 1
     controls.consume_pending_exit.assert_called()
@@ -335,7 +349,6 @@ def test_run_pygame_quit_clean_exits_via_try_quit(
 
 @patch("cleave.viz.app.current_sec", return_value=0.0)
 @patch("cleave.viz.app.pygame")
-@patch("cleave.viz.app.draw_loading_screen")
 @patch("cleave.viz.app.init_gl_resources_heavy")
 @patch("cleave.viz.app.init_gl_resources_cheap")
 @patch.object(VisualizerApp, "tick_frame")
@@ -343,14 +356,13 @@ def test_run_ctrl_q_clean_exits(
     mock_tick_frame: MagicMock,
     mock_init_cheap: MagicMock,
     mock_init_heavy: MagicMock,
-    mock_draw_loading: MagicMock,
     mock_pygame: MagicMock,
     _mock_current_sec: MagicMock,
 ) -> None:
-    compositor = recording_compositor()
     seed = _run_seed()
+    window = _boot_window(seed, MagicMock())
 
-    mock_init_cheap.side_effect = lambda rt: (
+    mock_init_cheap.side_effect = lambda rt, compositor=None: (
         compositor,
         MagicMock(),
         MagicMock(),
@@ -388,14 +400,13 @@ def test_run_ctrl_q_clean_exits(
     mock_pygame.KMOD_CTRL = pygame.KMOD_CTRL
     mock_pygame.time.Clock.return_value.tick.return_value = 33
 
-    VisualizerApp(seed).run()
+    VisualizerApp(seed).run(window)
 
     assert controls.try_quit.call_count == 1
 
 
 @patch("cleave.viz.app.current_sec", return_value=0.0)
 @patch("cleave.viz.app.pygame")
-@patch("cleave.viz.app.draw_loading_screen")
 @patch("cleave.viz.app.init_gl_resources_heavy")
 @patch("cleave.viz.app.init_gl_resources_cheap")
 @patch.object(VisualizerApp, "tick_frame")
@@ -403,14 +414,13 @@ def test_run_pygame_quit_dirty_stays_open(
     mock_tick_frame: MagicMock,
     mock_init_cheap: MagicMock,
     mock_init_heavy: MagicMock,
-    mock_draw_loading: MagicMock,
     mock_pygame: MagicMock,
     _mock_current_sec: MagicMock,
 ) -> None:
-    compositor = recording_compositor()
     seed = _run_seed()
+    window = _boot_window(seed, MagicMock())
 
-    mock_init_cheap.side_effect = lambda rt: (
+    mock_init_cheap.side_effect = lambda rt, compositor=None: (
         compositor,
         MagicMock(),
         MagicMock(),
@@ -446,7 +456,7 @@ def test_run_pygame_quit_dirty_stays_open(
 
     app = VisualizerApp(seed)
     try:
-        app.run()
+        app.run(window)
         raise AssertionError("expected main loop to continue")
     except RuntimeError as exc:
         assert str(exc) == "still running"
@@ -459,7 +469,6 @@ def test_run_pygame_quit_dirty_stays_open(
 
 @patch("cleave.viz.app.current_sec", return_value=0.0)
 @patch("cleave.viz.app.pygame")
-@patch("cleave.viz.app.draw_loading_screen")
 @patch("cleave.viz.app.init_gl_resources_heavy")
 @patch("cleave.viz.app.init_gl_resources_cheap")
 @patch.object(VisualizerApp, "tick_frame")
@@ -467,14 +476,13 @@ def test_run_main_loop_stays_open_without_quit_event(
     mock_tick_frame: MagicMock,
     mock_init_cheap: MagicMock,
     mock_init_heavy: MagicMock,
-    mock_draw_loading: MagicMock,
     mock_pygame: MagicMock,
     _mock_current_sec: MagicMock,
 ) -> None:
-    compositor = recording_compositor()
     seed = _run_seed()
+    window = _boot_window(seed, MagicMock())
 
-    mock_init_cheap.side_effect = lambda rt: (
+    mock_init_cheap.side_effect = lambda rt, compositor=None: (
         compositor,
         MagicMock(),
         MagicMock(),
@@ -507,12 +515,86 @@ def test_run_main_loop_stays_open_without_quit_event(
     mock_pygame.time.Clock.return_value.tick.return_value = 33
 
     try:
-        VisualizerApp(seed).run()
+        VisualizerApp(seed).run(window)
         raise AssertionError("expected main loop to continue")
     except RuntimeError as exc:
         assert str(exc) == "still running"
 
     controls.try_quit.assert_not_called()
+
+
+@patch("cleave.viz.app.current_sec", return_value=0.0)
+@patch("cleave.viz.app.pygame")
+@patch("cleave.viz.app.init_gl_resources_heavy")
+@patch("cleave.viz.app.init_gl_resources_cheap")
+@patch.object(VisualizerApp, "tick_frame")
+def test_run_resizes_when_loading_window_size_differs(
+    mock_tick_frame: MagicMock,
+    mock_init_cheap: MagicMock,
+    mock_init_heavy: MagicMock,
+    mock_pygame: MagicMock,
+    _mock_current_sec: MagicMock,
+) -> None:
+    seed = _run_seed()
+    loading = MagicMock()
+    window = _boot_window(seed, loading)
+    window.display_width = seed.display_width // 2
+    window.display_height = seed.display_height // 2
+
+    mock_init_cheap.side_effect = lambda rt, compositor=None: (
+        compositor,
+        MagicMock(),
+        MagicMock(),
+        pygame.Surface((seed.display_width, seed.display_height), pygame.SRCALPHA),
+    )
+    mock_init_heavy.side_effect = _heavy_init_side_effect
+    mock_tick_frame.side_effect = lambda *_a, **_k: None
+    mock_pygame.event.get.side_effect = [[], RuntimeError("still running")]
+    mock_pygame.QUIT = pygame.QUIT
+    mock_pygame.time.Clock.return_value.tick.return_value = 33
+
+    try:
+        VisualizerApp(seed).run(window)
+    except RuntimeError:
+        pass
+
+    window.adopt_display_size.assert_called_once_with(
+        seed.display_width, seed.display_height
+    )
+    loading.destroy.assert_called_once()
+    mock_pygame.display.set_mode.assert_not_called()
+    mock_init_cheap.assert_called_once_with(seed, compositor=loading)
+
+
+@patch("cleave.viz.app._make_masked_compositor")
+@patch("cleave.viz.app.GlPostProcess")
+@patch("cleave.viz.app._make_compositor")
+def test_init_gl_resources_cheap_reuses_loading_compositor(
+    mock_make_compositor: MagicMock,
+    mock_post_cls: MagicMock,
+    mock_make_masked: MagicMock,
+) -> None:
+    seed = _run_seed()
+    loading = MagicMock()
+    post = MagicMock()
+    mock_post_cls.return_value = post
+    mock_make_masked.return_value = MagicMock()
+
+    compositor, post_process, _masked, overlay = init_gl_resources_cheap(
+        seed, compositor=loading
+    )
+
+    mock_make_compositor.assert_not_called()
+    loading.destroy.assert_not_called()
+    loading.set_display_size.assert_called_once_with(
+        seed.display_width, seed.display_height
+    )
+    loading.set_content_size.assert_called_once_with(seed.width, seed.height)
+    loading.set_color_format.assert_called_once()
+    post.init.assert_called_once()
+    assert compositor is loading
+    assert post_process is post
+    assert overlay.get_size() == (seed.display_width, seed.display_height)
 
 
 @patch("cleave.viz.app.OverlayDrawer.draw_tuning")

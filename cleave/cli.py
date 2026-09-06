@@ -199,19 +199,30 @@ def cmd_separate(args: argparse.Namespace) -> None:
 def cmd_play(args: argparse.Namespace) -> None:
     os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
     from cleave.separate import run_separate
-    from cleave.viz import launch
+    from cleave.viz import continue_launch, open_loading_window
 
+    window = open_loading_window()
+    if window.quit_requested:
+        window.close()
+        return
     target = Path(args.target)
     try:
         project_dir = run_separate(
             target,
             high_quality=args.high_quality,
             beat_detection_stem=_optional_beat_detection_stem(args),
+            on_progress=window.update,
         )
     except (FileNotFoundError, ValueError, RuntimeError) as e:
+        window.update(f"error: {e}")
         _exit_error(f"error: {e}")
 
-    launch(
+    if window.quit_requested:
+        window.close()
+        return
+
+    continue_launch(
+        window,
         project_dir,
         config=args.config,
     )
