@@ -1,6 +1,6 @@
 # Windows freeze
 
-How Cleave locates files when frozen, how testers unpack a Windows onedir zip, and how to build libprojectM 4.2+ DLLs. Product decisions live in [structured-releases.md](structured-releases.md). This note is the implementation design for the freeze (paths, spec, FFmpeg, ctypes, libprojectM). Phase 3.1 CI is [.github/workflows/windows-freeze.yml](../.github/workflows/windows-freeze.yml). The same workflow builds the Phase 3.2 installer after the zip. The CPU `separate` spec is [packaging/cleave-separate.spec](../packaging/cleave-separate.spec). The `freeze-separate` job smokes `cleave.exe separate` on dispatch (3.3.1); shipping it as a Release asset is 3.3.2.
+How Cleave locates files when frozen, how testers unpack a Windows onedir zip, and how to build libprojectM 4.2+ DLLs. Product decisions live in [structured-releases.md](structured-releases.md). This note is the implementation design for the freeze (paths, spec, FFmpeg, ctypes, libprojectM). Phase 3.1 CI is [.github/workflows/windows-freeze.yml](../.github/workflows/windows-freeze.yml). The same workflow builds the Phase 3.2 installer after the zip. The CPU `separate` spec is [packaging/cleave-separate.spec](../packaging/cleave-separate.spec). Phase 3.3.1 is done: the `freeze-separate` job smokes `cleave.exe separate` on dispatch. Shipping that zip as a Release asset is 3.3.2.
 
 Do not cross-compile the GUI stack from WSL. Build on Windows, run [scripts/windows_stage_freeze.py](../scripts/windows_stage_freeze.py), then zip `dist/cleave/` and compile [packaging/windows/cleave.iss](../packaging/windows/cleave.iss) (CI does the same on `windows-latest` for the lean play/render spec).
 
@@ -111,7 +111,7 @@ Both this spec and [packaging/cleave-separate.spec](../packaging/cleave-separate
 
 [packaging/cleave-separate.spec](../packaging/cleave-separate.spec) is a dedicated spec so the lean file cannot collect torch. Same product layout: one `cleave.exe`, `install_dir()` is the parent of the exe, sidecars still come from [scripts/windows_stage_freeze.py](../scripts/windows_stage_freeze.py). Weights stay in user data (`model_cache_dir()`); they are not datas in the spec.
 
-This spec is engineering for 3.3.1. CI smokes it from the `freeze-separate` job (below). Release assets are 3.3.2. Do not `pip install -r requirements.txt` in the freeze venv: that file has no torch extra index and can pull a CUDA wheel from PyPI.
+3.3.1 landed this spec. CI smokes it from the `freeze-separate` job (below). Release assets are 3.3.2. Do not `pip install -r requirements.txt` in the freeze venv: that file has no torch extra index and can pull a CUDA wheel from PyPI.
 
 ### Venv install order (Windows)
 
@@ -162,7 +162,7 @@ Same recipe as the lean play/render steps above (`packaging/cleave.spec`), on st
 - Dispatch uploads 5-day Actions artifacts (`cleave-windows-x64` zip, `cleave-windows-x64-setup` installer). Tag pipeline: [.github/workflows/release.yml](../.github/workflows/release.yml) calls this workflow after `publish` with `release_tag` set to the tag; a non-empty `release_tag` uses `gh release upload` for both assets and does not retain a workflow artifact.
 - GPU proof (met): unpack the dispatch zip or install from the setup exe on a Windows box with a GPU driver; run `cleave.exe play` on an existing project (audio on the default output device; pattern mask at default `balanced` preview quality). A short `cleave.exe render` is the same 2.2 path if you want extra coverage.
 
-## CI separate freeze (Phase 3.3.1)
+## CI separate freeze (Phase 3.3.1, done)
 
 Second job in the same workflow, `freeze-separate`, on standard `windows-latest`. Own checkout and `dist/cleave/` tree (both specs write that path). Input `include_separate` defaults to true on `workflow_dispatch` and false on `workflow_call`, so tag [release.yml](../.github/workflows/release.yml) does not wait on CPU Demucs (it does not pass `include_separate`, so the call default applies). Pass `include_separate: true` on a call if you want the smoke on a tag; it still does not `gh release upload`. Dispatch can uncheck `include_freeze` to retry only this job.
 
