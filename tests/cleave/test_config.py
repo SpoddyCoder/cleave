@@ -562,6 +562,14 @@ def test_repo_template_omits_editor_fields_and_paths() -> None:
     assert "render" in data
 
 
+def test_load_config_repo_template() -> None:
+    cfg = load_config(config_path=repo_root() / VIZ_CONFIG_FILENAME)
+    assert cfg.layers["layer_1"].preset_switching == "on"
+    assert cfg.layers["layer_1"].preset_switching_trigger == "projectm"
+    for layer in cfg.layers.values():
+        assert layer.preset_switching in ("off", "on")
+
+
 def test_ensure_project_viz_config_sets_project_name(tmp_path: Path) -> None:
     project = tmp_path / "projects" / "song"
     dst = ensure_project_viz_config(project)
@@ -571,6 +579,14 @@ def test_ensure_project_viz_config_sets_project_name(tmp_path: Path) -> None:
     assert data["editor"]["name"] == "song"
     assert "preview_quality" not in data["editor"]
     assert "paths" not in data
+
+
+def test_ensure_project_viz_config_is_loadable(tmp_path: Path) -> None:
+    project = tmp_path / "projects" / "song"
+    ensure_project_viz_config(project)
+    cfg = load_config(project_root=project)
+    assert cfg.layers["layer_1"].preset_switching == "on"
+    assert cfg.layers["layer_1"].preset_switching_trigger == "projectm"
 
 
 def test_ensure_project_viz_config_skips_existing(tmp_path: Path) -> None:

@@ -100,6 +100,9 @@ DEFAULT_BLEND_MODE: dict[StemSource, BlendMode] = {
 
 
 def _parse_preset_switching(raw: Any, label: str) -> PresetSwitchingMode:
+    # YAML 1.1 loads unquoted on/off/yes/no as booleans.
+    if isinstance(raw, bool):
+        raw = "on" if raw else "off"
     mode = str(raw)
     if mode not in PRESET_SWITCHING_MODES:
         allowed = ", ".join(PRESET_SWITCHING_MODES)
