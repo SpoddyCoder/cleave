@@ -79,6 +79,9 @@ def extract_beats_downbeats(path: Path | str) -> tuple[np.ndarray, np.ndarray]:
     import torch
     from beat_this.inference import File2Beats
 
+    from cleave.paths import model_cache_dir
+
+    torch.hub.set_dir(str(model_cache_dir()))
     device = "cuda" if torch.cuda.is_available() else "cpu"
     file2beats = File2Beats(checkpoint_path="final0", device=device, dbn=False)
     beats, downbeats = file2beats(str(path))

@@ -17,6 +17,7 @@ from cleave.paths import (
     default_texture_paths,
     install_dir,
     is_frozen,
+    model_cache_dir,
     project_slug,
     repo_root,
     resource_dir,
@@ -109,6 +110,30 @@ def test_default_preset_root_follows_data_dir(
     monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
     assert default_preset_root() == (tmp_path / "presets").resolve()
     assert default_texture_paths() == ((tmp_path / "textures").resolve(),)
+
+
+def test_model_cache_dir_creates_models_under_data_dir(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    expected = (tmp_path / "models").resolve()
+    assert not expected.exists()
+    result = model_cache_dir()
+    assert result == expected
+    assert expected.is_dir()
+    assert model_cache_dir() == expected
+
+
+def test_model_cache_dir_follows_windows_data_dir(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.delenv("CLEAVE_DATA", raising=False)
+    docs = tmp_path / "Docs"
+    monkeypatch.setattr("cleave.paths.windows_documents_dir", lambda: docs)
+    expected = (docs / "cleave" / "models").resolve()
+    assert model_cache_dir() == expected
+    assert expected.is_dir()
 
 
 def test_default_preset_root_follows_windows_data_dir(

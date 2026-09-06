@@ -55,6 +55,34 @@ def test_pyinstaller_spec_collects_soxr_and_excludes_analyse() -> None:
         assert f'"{name}"' in spec
 
 
+def test_separate_module_import_does_not_load_torch() -> None:
+    result = _run_isolated(
+        """
+        import ast
+        import sys
+        from pathlib import Path
+
+        import cleave.separate
+
+        heavy = [name for name in ("librosa", "torch", "demucs") if name in sys.modules]
+        if heavy:
+            raise SystemExit(f"unexpected imports: {heavy}")
+
+        source = Path(cleave.separate.__file__).read_text(encoding="utf-8")
+        for node in ast.parse(source).body:
+            if isinstance(node, ast.Import):
+                names = [alias.name.split(".", 1)[0] for alias in node.names]
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                names = [node.module.split(".", 1)[0]]
+            else:
+                continue
+            if any(name in ("torch", "demucs") for name in names):
+                raise SystemExit(f"module-level import: {names}")
+        """
+    )
+    assert result.returncode == 0, result.stderr
+
+
 def test_play_path_modules_do_not_import_librosa_or_torch() -> None:
     result = _run_isolated(
         """
