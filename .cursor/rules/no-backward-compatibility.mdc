@@ -1,28 +1,16 @@
 ---
-description: Default to clean implementation; no backward-compatibility remnants unless requested
+description: Default to a clean break; no compatibility remnants unless requested
 alwaysApply: true
 ---
 
 # No backward compatibility (default)
 
-Unless the user explicitly asks for backward compatibility or a migration path, assume none is required.
+Unless the user asks for compatibility or a migration path, implement the current design only.
 
-## Clean implementation
+- Rename identifiers, files, functions, and docs to match; update all references in the same change.
+- Remove superseded code, config keys, and docs. No aliases, wrappers, parallel paths, or commented-out old code.
+- Do not add "previously" / "formerly" prose, dual naming, or deprecated aliases.
 
-- Implement and document the **current** design only.
-- Rename identifiers, files, functions, and docs to match the new approach; update all references in the same change.
-- Remove superseded code, config keys, and docs — do not leave aliases, wrappers, or parallel paths.
+Phrases like "no backward compatibility", "clean break", or "full rename" are confirmation: replace fully without asking again.
 
-## Do not add unless requested
-
-- Prose or comments such as "previously", "formerly", "replaces", migration guides, or changelog-style history.
-- Dual naming (`oldX` / `newX`), deprecated aliases, or comments explaining the old design.
-- Commented-out old code kept "for reference".
-
-## Explicit confirmation
-
-When the user says "no backward compatibility", "clean break", "full rename", or similar, treat that as confirmation—execute a full replacement without asking again.
-
-## When to ask first
-
-Before **large** changes, ask whether backward compatibility matters if the change affects
+Ask first only when a large change would drop existing project YAML or user files and the user has not already waived compatibility.
