@@ -152,7 +152,7 @@ CUDA binaries are dropped after collect: names matching `cudart`, `cublas`, `cud
 
 ## CI freeze (Phase 3.1)
 
-Same recipe as the lean play/render steps above (`packaging/cleave.spec`), on standard `windows-latest`. Workflow: [.github/workflows/windows-freeze.yml](../.github/workflows/windows-freeze.yml) (`workflow_dispatch` and `workflow_call`, not every push). This job is the default Windows artifact path. The separate spec is a second job (`freeze-separate`), not a switch of this one.
+Same recipe as the lean play/render steps above (`packaging/cleave.spec`), on standard `windows-latest`. Workflow: [.github/workflows/windows-freeze.yml](../.github/workflows/windows-freeze.yml) (`workflow_dispatch` and `workflow_call`, not every push). This job is the default Windows artifact path when `include_freeze` is true (default true on dispatch and on `workflow_call`). The separate spec is a second job (`freeze-separate`), not a switch of this one. Uncheck `include_freeze` on dispatch to skip zip, installer, and Release upload and run only `freeze-separate`.
 
 - Pip cache only (`requirements-freeze.txt`); do not cache FFmpeg zips or freeze output.
 - Sidecars: committed libprojectM DLLs from [packaging/windows/](../packaging/windows/) (convention in that directory's [README.md](../packaging/windows/README.md)); FFmpeg from `FFMPEG_URL` / `FFMPEG_SHA256` at the top of [scripts/windows_stage_freeze.py](../scripts/windows_stage_freeze.py). No vcpkg in the job. Do not commit `ffmpeg.exe`.
@@ -164,7 +164,9 @@ Same recipe as the lean play/render steps above (`packaging/cleave.spec`), on st
 
 ## CI separate freeze (Phase 3.3.1)
 
-Second job in the same workflow, `freeze-separate`, on standard `windows-latest`. Own checkout and `dist/cleave/` tree (both specs write that path). Input `include_separate` defaults to true on `workflow_dispatch` and false on `workflow_call`, so tag [release.yml](../.github/workflows/release.yml) does not wait on CPU Demucs. Pass `include_separate: true` on a call if you want the smoke on a tag; it still does not `gh release upload`.
+Second job in the same workflow, `freeze-separate`, on standard `windows-latest`. Own checkout and `dist/cleave/` tree (both specs write that path). Input `include_separate` defaults to true on `workflow_dispatch` and false on `workflow_call`, so tag [release.yml](../.github/workflows/release.yml) does not wait on CPU Demucs (it does not pass `include_separate`, so the call default applies). Pass `include_separate: true` on a call if you want the smoke on a tag; it still does not `gh release upload`. Dispatch can uncheck `include_freeze` to retry only this job.
+
+If both `include_freeze` and `include_separate` are false, `require-job` fails so the run is not a silent no-op.
 
 Install order matches the venv recipe above: [requirements-freeze.txt](../requirements-freeze.txt), then [requirements-torch-cpu.txt](../requirements-torch-cpu.txt), then the analyse pins (demucs, beat-this, librosa, einops, rotary-embedding-torch, tqdm, setuptools). Do not `pip install -r requirements.txt`. Pip cache keys those two requirement files; do not cache FFmpeg zips, freeze output, or torch wheels as workflow artifacts. Model weights download on first run into `CLEAVE_DATA` (`models/`); they are not baked into the freeze.
 

@@ -2,25 +2,34 @@
 # Triggers: workflow_dispatch (tester zip + setup exe) and workflow_call
 # (Release upload). Not on push. Tag wiring lives in release.yml (not this file).
 #
+# Job selection:
+#   include_freeze and include_separate are independent. Dispatch defaults both
+#   true. workflow_call defaults include_freeze true and include_separate false
+#   so tag pipelines do not wait on CPU Demucs. Both false fails require-job
+#   (not a silent no-op).
+#
 # Publish (lean freeze job):
 #   workflow_call inputs are unset on workflow_dispatch. A later step copies
 #   inputs.release_tag into RELEASE_TAG (empty when missing). Non-empty:
 #   gh release upload of the zip and setup exe. Empty: 5-day Actions artifacts.
-#   Never both.
+#   Never both. Skipped when include_freeze is false (no zip, no Inno, no
+#   Release upload from that run).
 #
 # Separate-capable freeze (Phase 3.3.1 engineering smoke, not a Release asset):
 #   freeze-separate builds packaging/cleave-separate.spec on its own
-#   checkout (the two specs both write dist/cleave/). include_separate
-#   defaults true on workflow_dispatch and false on workflow_call so tag
-#   pipelines do not wait on CPU Demucs. Never gh release upload.
+#   checkout (the two specs both write dist/cleave/). Never gh release upload.
 
 name: Windows freeze
 
 on:
   workflow_dispatch:
     inputs:
+      include_freeze:
+        description: "Freeze the lean play/render spec (zip + installer)"
+        type: boolean
+        default: true
       include_separate:
-        description: "Also freeze and smoke the CPU separate spec (slow CPU Demucs; no Release upload)"
+        description: "Freeze and smoke the CPU separate spec (slow CPU Demucs; no Release upload)"
         type: boolean
         default: true
   workflow_call:
@@ -30,8 +39,13 @@ on:
         required: false
         type: string
         default: ""
+      include_freeze:
+        description: "Run the lean play/render freeze (zip + installer; Release upload when release_tag is set)"
+        required: false
+        type: boolean
+        default: true
       include_separate:
-        description: "Also freeze and smoke the CPU separate spec. Never uploads a Release asset."
+        description: "Freeze and smoke the CPU separate spec. Never uploads a Release asset."
         required: false
         type: boolean
         default: false
@@ -40,7 +54,18 @@ permissions:
   contents: write
 
 jobs:
+  require-job:
+    # Both checkboxes off would skip freeze and freeze-separate with a green no-op.
+    if: ${{ (inputs.include_freeze != true && inputs.include_freeze != 'true') && (inputs.include_separate != true && inputs.include_separate != 'true') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail when both jobs are off
+        run: |
+          echo "Set include_freeze and/or include_separate. Both false is a no-op."
+          exit 1
+
   freeze:
+    if: ${{ inputs.include_freeze == true || inputs.include_freeze == 'true' }}
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
