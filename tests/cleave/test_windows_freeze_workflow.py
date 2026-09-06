@@ -38,9 +38,33 @@ def _job_body(text: str, job_id: str) -> str:
     return body
 
 
+def _input_defaults(section: str) -> dict[str, str]:
+    defaults: dict[str, str] = {}
+    current: str | None = None
+    for line in section.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        if (
+            line.startswith("      ")
+            and not line.startswith("        ")
+            and stripped.endswith(":")
+        ):
+            current = stripped[:-1]
+            continue
+        if current is not None and stripped.startswith("default:"):
+            defaults[current] = stripped.split(":", 1)[1].strip()
+            current = None
+    return defaults
+
+
 def test_lean_freeze_job_unchanged_default_path() -> None:
     text = _FREEZE_WORKFLOW.read_text(encoding="utf-8")
     freeze = _job_body(text, "freeze")
+    assert (
+        "if: ${{ inputs.include_freeze == true || inputs.include_freeze == 'true' }}"
+        in freeze
+    )
     assert "pyinstaller packaging/cleave.spec" in freeze
     assert "packaging/cleave-separate.spec" not in freeze
     assert "requirements-torch-cpu.txt" not in freeze
@@ -83,21 +107,34 @@ def test_separate_job_is_isolated_cpu_smoke() -> None:
     assert "iscc" not in separate.lower()
 
 
-def test_include_separate_defaults_dispatch_true_call_false() -> None:
+def test_include_defaults_dispatch_both_true_call_freeze_only() -> None:
     text = _FREEZE_WORKFLOW.read_text(encoding="utf-8")
     dispatch_idx = text.index("workflow_dispatch:")
     call_idx = text.index("workflow_call:")
     dispatch = text[dispatch_idx:call_idx]
-    call = text[call_idx:text.index("permissions:")]
-    assert "include_separate:" in dispatch
-    assert "default: true" in dispatch
-    assert "include_separate:" in call
-    assert "default: false" in call
+    call = text[call_idx : text.index("permissions:")]
+    dispatch_defaults = _input_defaults(dispatch)
+    call_defaults = _input_defaults(call)
+    assert dispatch_defaults["include_freeze"] == "true"
+    assert dispatch_defaults["include_separate"] == "true"
+    assert call_defaults["include_freeze"] == "true"
+    assert call_defaults["include_separate"] == "false"
     assert "release_tag:" in call
+
+
+def test_require_job_fails_when_both_off() -> None:
+    text = _FREEZE_WORKFLOW.read_text(encoding="utf-8")
+    guard = _job_body(text, "require-job")
+    assert "include_freeze != true" in guard
+    assert "include_separate != true" in guard
+    assert "runs-on: ubuntu-latest" in guard
+    assert "exit 1" in guard
+    assert "windows-latest" not in guard
 
 
 def test_release_yml_does_not_enable_separate_job() -> None:
     text = _RELEASE_WORKFLOW.read_text(encoding="utf-8")
     assert "windows-freeze.yml" in text
     assert "include_separate:" not in text
+    assert "include_freeze:" not in text
     assert "release_tag:" in text
