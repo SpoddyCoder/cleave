@@ -79,10 +79,11 @@ def extract_beats_downbeats(
 ) -> tuple[np.ndarray, np.ndarray]:
     """Beat and downbeat times in seconds from a wav path.
 
-    Runs Beat This! (`File2Beats`) on *path* (mix or a stem wav).
+    Loads *path* with librosa/soundfile, then runs Beat This! (`Audio2Beats`).
+    Does not pass a file path into Beat This (that path uses TorchCodec I/O).
     """
     import torch
-    from beat_this.inference import File2Beats
+    from beat_this.inference import Audio2Beats
 
     from cleave.model_weights import beat_this_weight_spec, ensure_weight_files
     from cleave.paths import model_cache_dir
@@ -90,8 +91,18 @@ def extract_beats_downbeats(
     torch.hub.set_dir(str(model_cache_dir()))
     ensure_weight_files(beat_this_weight_spec(), on_progress=on_progress)
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    file2beats = File2Beats(checkpoint_path="final0", device=device, dbn=False)
-    beats, downbeats = file2beats(str(path))
+    signal, sr = _load(path)
+    try:
+        audio2beats = Audio2Beats(checkpoint_path="final0", device=device, dbn=False)
+        beats, downbeats = audio2beats(signal, sr)
+    except Exception as exc:
+        text = f"{type(exc).__name__}: {exc}".lower()
+        if "torchcodec" in text or "libtorchcodec" in text:
+            raise RuntimeError(
+                "Could not finish beat detection: audio I/O tried to load "
+                "TorchCodec, which this Windows build does not ship."
+            ) from exc
+        raise RuntimeError(f"beat detection failed for {path}: {exc}") from exc
     return (
         np.asarray(beats, dtype=np.float64),
         np.asarray(downbeats, dtype=np.float64),

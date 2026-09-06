@@ -25,11 +25,13 @@ from cleave.model_weights import WeightDownloadError
 from cleave.separate import (
     _load_demucs_track,
     _run_demucs,
+    _save_stem_wav,
     _write_demucs_stems,
     project_stems_complete,
     resolve_separate_target,
     run_separate,
     signals_complete,
+    TORCHCODEC_AUDIO_IO_ERROR,
 )
 
 
@@ -42,14 +44,14 @@ def _write_stub_stems(project: Path) -> None:
 
 @contextmanager
 def _mock_demucs_writes_stems() -> Iterator[dict[str, MagicMock]]:
-    """Stub the Demucs Python API so ``save_audio`` writes dummy stem wavs."""
+    """Stub the Demucs Python API so stem wavs are written without torchaudio."""
     model_obj = MagicMock()
     model_obj.sources = ["drums", "bass", "other", "vocals"]
     model_obj.audio_channels = 2
     model_obj.samplerate = 44100
 
-    def fake_save_audio(_wav: object, path: str, **_kwargs: object) -> None:
-        dest = Path(path)
+    def fake_save_stem(_wav: object, dest: Path, _samplerate: int) -> None:
+        dest = Path(dest)
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_bytes(b"wav")
 
@@ -60,7 +62,7 @@ def _mock_demucs_writes_stems() -> Iterator[dict[str, MagicMock]]:
         patch("demucs.pretrained.get_model", return_value=model_obj) as get_model,
         patch("demucs.separate.load_track", return_value=MagicMock()),
         patch("demucs.apply.apply_model", return_value=[MagicMock()]),
-        patch("demucs.audio.save_audio", side_effect=fake_save_audio),
+        patch("cleave.separate._save_stem_wav", side_effect=fake_save_stem),
     ):
         yield {
             "ensure": ensure,
@@ -468,7 +470,6 @@ def test_run_demucs_wraps_get_model_failure(
         patch("demucs.pretrained.get_model", side_effect=RuntimeError("hub down")),
         patch("demucs.separate.load_track"),
         patch("demucs.apply.apply_model"),
-        patch("demucs.audio.save_audio"),
         pytest.raises(RuntimeError, match="demucs failed"),
     ):
         _run_demucs(mix, project, high_quality=False, force=True)
@@ -515,7 +516,7 @@ def test_run_demucs_raises_when_stems_not_written(
         patch("demucs.pretrained.get_model", return_value=model_obj),
         patch("demucs.separate.load_track", return_value=MagicMock()),
         patch("demucs.apply.apply_model", return_value=[MagicMock()]),
-        patch("demucs.audio.save_audio"),
+        patch("cleave.separate._save_stem_wav"),
         pytest.raises(RuntimeError, match="missing stem files"),
     ):
         _run_demucs(mix, project, high_quality=False, force=True)
@@ -767,8 +768,8 @@ def test_write_demucs_stems_frozen_prepends_install_dir_and_skips_load_track(
         result.returncode = 0
         return result
 
-    def fake_save_audio(_wav: object, path: str, **_kwargs: object) -> None:
-        dest = Path(path)
+    def fake_save_stem(_wav: object, dest: Path, _samplerate: int) -> None:
+        dest = Path(dest)
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_bytes(b"wav")
 
@@ -785,12 +786,14 @@ def test_write_demucs_stems_frozen_prepends_install_dir_and_skips_load_track(
         patch("demucs.pretrained.get_model", side_effect=fake_get_model),
         patch("demucs.separate.load_track") as load_track,
         patch("demucs.apply.apply_model", return_value=[MagicMock()]),
-        patch("demucs.audio.save_audio", side_effect=fake_save_audio),
+        patch("demucs.audio.save_audio") as save_audio,
+        patch("cleave.separate._save_stem_wav", side_effect=fake_save_stem),
         patch("cleave.separate.subprocess.run", side_effect=fake_run),
     ):
         _write_demucs_stems(audio, dest_paths, model="htdemucs")
 
     load_track.assert_not_called()
+    save_audio.assert_not_called()
     path = seen["path"]
     assert isinstance(path, str)
     assert path.split(os.pathsep)[0] == str(tmp_path.resolve())
@@ -809,3 +812,109 @@ def test_load_demucs_track_checkout_uses_load_track(
         wav = _load_demucs_track(audio, 2, 44100)
     load_track.assert_called_once_with(audio, 2, 44100)
     assert wav is fake
+
+
+def test_separate_module_does_not_use_torchaudio_or_save_audio() -> None:
+    import ast
+
+    source = Path(__file__).resolve().parents[2] / "cleave" / "separate.py"
+    tree = ast.parse(source.read_text(encoding="utf-8"))
+    names: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            names.update(alias.name.split(".", 1)[0] for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            names.add(node.module.split(".", 1)[0])
+            names.update(alias.name for alias in node.names)
+        elif isinstance(node, ast.Name):
+            names.add(node.id)
+        elif isinstance(node, ast.Attribute):
+            names.add(node.attr)
+    assert "save_audio" not in names
+    assert "torchaudio" not in names
+
+
+def test_save_stem_wav_writes_pcm_without_torchaudio(tmp_path: Path) -> None:
+    import soundfile as sf
+    import torch
+
+    wav = torch.zeros(2, 64)
+    wav[0, 0] = 0.5
+    dest = tmp_path / "drums.wav"
+    with patch("torchaudio.save") as ta_save:
+        _save_stem_wav(wav, dest, 44100)
+    ta_save.assert_not_called()
+    data, sr = sf.read(dest, always_2d=True)
+    assert sr == 44100
+    assert data.shape == (64, 2)
+
+
+def test_write_demucs_stems_skips_save_audio(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    monkeypatch.setattr(sys, "frozen", False, raising=False)
+    model_obj = MagicMock()
+    model_obj.sources = ["drums", "bass", "other", "vocals"]
+    model_obj.audio_channels = 2
+    model_obj.samplerate = 44100
+    audio = tmp_path / "mix.wav"
+    audio.write_bytes(b"RIFF")
+    dest_paths = {
+        name: tmp_path / "stems" / f"{name}.wav" for name in model_obj.sources
+    }
+
+    def fake_save_stem(_wav: object, dest: Path, _samplerate: int) -> None:
+        Path(dest).parent.mkdir(parents=True, exist_ok=True)
+        Path(dest).write_bytes(b"wav")
+
+    with (
+        patch("cleave.separate.ensure_weight_files"),
+        patch("torch.hub.set_dir"),
+        patch("torch.cuda.is_available", return_value=False),
+        patch("demucs.pretrained.get_model", return_value=model_obj),
+        patch("demucs.separate.load_track", return_value=MagicMock()),
+        patch("demucs.apply.apply_model", return_value=[MagicMock()]),
+        patch("demucs.audio.save_audio") as save_audio,
+        patch("cleave.separate._save_stem_wav", side_effect=fake_save_stem) as save_stem,
+    ):
+        _write_demucs_stems(audio, dest_paths, model="htdemucs")
+
+    save_audio.assert_not_called()
+    assert save_stem.call_count == 4
+
+
+def test_write_demucs_stems_torchcodec_error_is_friendly(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    monkeypatch.setattr(sys, "frozen", False, raising=False)
+    model_obj = MagicMock()
+    model_obj.sources = ["drums", "bass", "other", "vocals"]
+    model_obj.audio_channels = 2
+    model_obj.samplerate = 44100
+    audio = tmp_path / "mix.wav"
+    audio.write_bytes(b"RIFF")
+    dest_paths = {
+        name: tmp_path / "stems" / f"{name}.wav" for name in model_obj.sources
+    }
+
+    with (
+        patch("cleave.separate.ensure_weight_files"),
+        patch("torch.hub.set_dir"),
+        patch("torch.cuda.is_available", return_value=False),
+        patch("demucs.pretrained.get_model", return_value=model_obj),
+        patch("demucs.separate.load_track", return_value=MagicMock()),
+        patch("demucs.apply.apply_model", return_value=[MagicMock()]),
+        patch(
+            "cleave.separate._save_stem_wav",
+            side_effect=RuntimeError(
+                "Could not load libtorchcodec. Failed to load dynlib/dll "
+                "libtorchcodec_core8.dll"
+            ),
+        ),
+        pytest.raises(RuntimeError, match="this Windows build does not ship") as caught,
+    ):
+        _write_demucs_stems(audio, dest_paths, model="htdemucs")
+
+    assert str(caught.value) == TORCHCODEC_AUDIO_IO_ERROR

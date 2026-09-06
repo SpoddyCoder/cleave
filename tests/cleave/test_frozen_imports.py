@@ -249,6 +249,15 @@ def test_demucs_api_imports_stay_inside_write_demucs_stems() -> None:
 def test_extract_module_import_does_not_load_torch() -> None:
     source = (REPO_ROOT / "cleave" / "extract.py").read_text(encoding="utf-8")
     assert _module_level_imported_roots(source).isdisjoint({"torch", "demucs", "beat_this"})
+    assert "File2Beats" not in source
+    extract_names: set[str] = set()
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.alias):
+            extract_names.add(node.name)
+        elif isinstance(node, ast.Name):
+            extract_names.add(node.id)
+    assert "File2Beats" not in extract_names
+    assert "torchaudio" not in extract_names
     result = _run_isolated(
         """
         import sys
