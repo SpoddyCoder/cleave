@@ -57,8 +57,7 @@ jobs:
 
   # After the Release exists so gh release upload can attach the zip and setup.
   # If freeze fails, the source Release still exists and can be retried.
-  # include_separate defaults to false: CPU Demucs smoke is dispatch-only
-  # so tags do not wait on it. 3.3.2 attaches the extra as a Release asset.
+  # freeze waits on CPU Demucs smoke, then uploads both assets.
   freeze:
     needs: publish
     uses: ./.github/workflows/windows-freeze.yml

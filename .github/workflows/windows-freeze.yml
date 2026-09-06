@@ -1,37 +1,21 @@
-# Windows onedir freeze and Inno Setup installer (Phase 3.1 / 3.2).
+# Windows onedir freeze and Inno Setup installer (Phase 3.3.2).
 # Triggers: workflow_dispatch (tester zip + setup exe) and workflow_call
 # (Release upload). Not on push. Tag wiring lives in release.yml (not this file).
 #
-# Job selection:
-#   include_freeze and include_separate are independent. Dispatch defaults both
-#   true. workflow_call defaults include_freeze true and include_separate false
-#   so tag pipelines do not wait on CPU Demucs. Both false fails require-job
-#   (not a silent no-op).
+# One job named freeze on standard windows-latest: CPU-torch spec
+# (packaging/cleave.spec), headless --version/--help, then cleave.exe separate
+# on the fixture wav, zip, Inno setup, then publish.
 #
-# Publish (lean freeze job):
+# Publish:
 #   workflow_call inputs are unset on workflow_dispatch. A later step copies
 #   inputs.release_tag into RELEASE_TAG (empty when missing). Non-empty:
-#   gh release upload of the zip and setup exe. Empty: 5-day Actions artifacts.
-#   Never both. Skipped when include_freeze is false (no zip, no Inno, no
-#   Release upload from that run).
-#
-# Separate-capable freeze (Phase 3.3.1 done; not a Release asset until 3.3.2):
-#   freeze-separate builds packaging/cleave-separate.spec on its own
-#   checkout (the two specs both write dist/cleave/). Never gh release upload.
+#   gh release upload of the zip and setup exe. Empty: 5-day Actions artifacts
+#   (cleave-windows-x64 and cleave-windows-x64-setup). Never both.
 
 name: Windows freeze
 
 on:
   workflow_dispatch:
-    inputs:
-      include_freeze:
-        description: "Freeze the lean play/render spec (zip + installer)"
-        type: boolean
-        default: true
-      include_separate:
-        description: "Freeze and smoke the CPU separate spec (slow CPU Demucs; no Release upload)"
-        type: boolean
-        default: true
   workflow_call:
     inputs:
       release_tag:
@@ -39,34 +23,14 @@ on:
         required: false
         type: string
         default: ""
-      include_freeze:
-        description: "Run the lean play/render freeze (zip + installer; Release upload when release_tag is set)"
-        required: false
-        type: boolean
-        default: true
-      include_separate:
-        description: "Freeze and smoke the CPU separate spec. Never uploads a Release asset."
-        required: false
-        type: boolean
-        default: false
 
 permissions:
   contents: write
 
 jobs:
-  require-job:
-    # Both checkboxes off would skip freeze and freeze-separate with a green no-op.
-    if: ${{ (inputs.include_freeze != true && inputs.include_freeze != 'true') && (inputs.include_separate != true && inputs.include_separate != 'true') }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Fail when both jobs are off
-        run: |
-          echo "Set include_freeze and/or include_separate. Both false is a no-op."
-          exit 1
-
   freeze:
-    if: ${{ inputs.include_freeze == true || inputs.include_freeze == 'true' }}
     runs-on: windows-latest
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
 
@@ -74,10 +38,18 @@ jobs:
         with:
           python-version: "3.10"
           cache: pip
-          cache-dependency-path: requirements-freeze.txt
+          cache-dependency-path: |
+            requirements-freeze.txt
+            requirements-torch-cpu.txt
 
       - name: Install freeze dependencies
         run: python -m pip install -r requirements-freeze.txt
+
+      - name: Install CPU torch
+        run: python -m pip install -r requirements-torch-cpu.txt
+
+      - name: Install analyse extras
+        run: python -m pip install demucs==4.0.1 beat-this==1.1.0 librosa==0.11.0 einops==0.8.2 rotary-embedding-torch==0.9.1 tqdm==4.67.3 setuptools==80.8.0
 
       - name: PyInstaller onedir
         run: pyinstaller packaging/cleave.spec
@@ -90,14 +62,12 @@ jobs:
           CLEAVE_DATA: ${{ runner.temp }}/cleave-smoke-data
         shell: python
         run: |
-          import os
           import subprocess
           import sys
           from pathlib import Path
 
           sys.path.insert(0, ".")
           import cleave
-          from cleave.separate import STEM_SPLIT_MISSING_FROZEN
 
           exe = Path("dist") / "cleave" / "cleave.exe"
           if not exe.is_file():
@@ -134,27 +104,53 @@ jobs:
               if command not in help_text:
                   raise SystemExit(f"--help missing {command!r}:\n{help_text}")
 
-          dummy = Path(os.environ["CLEAVE_DATA"]) / "smoke.wav"
-          dummy.parent.mkdir(parents=True, exist_ok=True)
-          dummy.write_bytes(b"audio")
+          print("smoke ok")
+
+      - name: Headless separate smoke
+        timeout-minutes: 90
+        env:
+          CLEAVE_DATA: ${{ runner.temp }}/cleave-smoke-data
+        shell: python
+        run: |
+          import os
+          import subprocess
+          import sys
+          from pathlib import Path
+
+          sys.path.insert(0, ".")
+          from cleave.paths import project_slug
+
+          exe = Path("dist") / "cleave" / "cleave.exe"
+          wav = Path("tests") / "fixtures" / "smoke-separate.wav"
+          wav = wav.resolve()
+          if not wav.is_file():
+              raise SystemExit(f"missing {wav}")
+          if not exe.is_file():
+              raise SystemExit(f"missing {exe}")
+
           separate = subprocess.run(
-              [str(exe), "separate", str(dummy)],
-              capture_output=True,
-              text=True,
+              [str(exe), "separate", str(wav)],
               check=False,
           )
-          separate_text = (separate.stdout or "") + (separate.stderr or "")
-          if STEM_SPLIT_MISSING_FROZEN not in separate_text:
-              raise SystemExit(
-                  "separate missing frozen stem-split message:\n"
-                  f"{separate_text}"
-              )
-          if "Traceback" in separate_text or "ModuleNotFoundError" in separate_text:
-              raise SystemExit(f"separate printed a traceback:\n{separate_text}")
-          if separate.returncode == 0:
-              raise SystemExit("separate should exit non-zero")
+          if separate.returncode != 0:
+              raise SystemExit(f"separate exited {separate.returncode}")
 
-          print("smoke ok")
+          project = (
+              Path(os.environ["CLEAVE_DATA"]) / "projects" / project_slug(wav)
+          )
+          check = subprocess.run(
+              [
+                  sys.executable,
+                  str(Path("scripts") / "assert_separate_project.py"),
+                  str(project),
+              ],
+              check=False,
+          )
+          if check.returncode != 0:
+              raise SystemExit(
+                  f"assert_separate_project exited {check.returncode}"
+              )
+          print("separate smoke ok")
 
       - name: Zip onedir
         shell: python
@@ -351,164 +347,3 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: gh release upload "$RELEASE_TAG" "$SETUP_NAME"
-
-  freeze-separate:
-    # Isolated job: cleave-separate.spec also writes dist/cleave/. Own checkout.
-    # 3.3.1 headless proof. No installer. Release upload is 3.3.2.
-    if: ${{ inputs.include_separate == true || inputs.include_separate == 'true' }}
-    runs-on: windows-latest
-    timeout-minutes: 180
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.10"
-          cache: pip
-          cache-dependency-path: |
-            requirements-freeze.txt
-            requirements-torch-cpu.txt
-
-      - name: Install freeze dependencies
-        run: python -m pip install -r requirements-freeze.txt
-
-      - name: Install CPU torch
-        run: python -m pip install -r requirements-torch-cpu.txt
-
-      - name: Install analyse extras
-        run: python -m pip install demucs==4.0.1 beat-this==1.1.0 librosa==0.11.0 einops==0.8.2 rotary-embedding-torch==0.9.1 tqdm==4.67.3 setuptools==80.8.0
-
-      - name: PyInstaller onedir
-        run: pyinstaller packaging/cleave-separate.spec
-
-      - name: Stage sidecars
-        run: python scripts/windows_stage_freeze.py --dist dist/cleave
-
-      - name: Headless smoke
-        env:
-          CLEAVE_DATA: ${{ runner.temp }}/cleave-smoke-data
-        shell: python
-        run: |
-          import subprocess
-          import sys
-          from pathlib import Path
-
-          sys.path.insert(0, ".")
-          import cleave
-
-          exe = Path("dist") / "cleave" / "cleave.exe"
-          if not exe.is_file():
-              raise SystemExit(f"missing {exe}")
-
-          expected_version = f"cleave {cleave.__version__}"
-          version = subprocess.run(
-              [str(exe), "--version"],
-              capture_output=True,
-              text=True,
-              check=False,
-          )
-          version_text = (version.stdout or "").strip()
-          if version.returncode != 0:
-              raise SystemExit(
-                  f"--version exited {version.returncode}: {version_text}\n"
-                  f"{version.stderr}"
-              )
-          if version_text != expected_version:
-              raise SystemExit(
-                  f"--version expected {expected_version!r}, got {version_text!r}"
-              )
-
-          help_run = subprocess.run(
-              [str(exe), "--help"],
-              capture_output=True,
-              text=True,
-              check=False,
-          )
-          help_text = (help_run.stdout or "") + (help_run.stderr or "")
-          if help_run.returncode != 0:
-              raise SystemExit(f"--help exited {help_run.returncode}:\n{help_text}")
-          for command in ("separate", "play", "render", "backup", "restore"):
-              if command not in help_text:
-                  raise SystemExit(f"--help missing {command!r}:\n{help_text}")
-
-          print("smoke ok")
-
-      - name: Headless separate smoke
-        timeout-minutes: 90
-        env:
-          CLEAVE_DATA: ${{ runner.temp }}/cleave-smoke-data
-        shell: python
-        run: |
-          import os
-          import subprocess
-          import sys
-          from pathlib import Path
-
-          sys.path.insert(0, ".")
-          from cleave.paths import project_slug
-
-          exe = Path("dist") / "cleave" / "cleave.exe"
-          wav = Path("tests") / "fixtures" / "smoke-separate.wav"
-          wav = wav.resolve()
-          if not wav.is_file():
-              raise SystemExit(f"missing {wav}")
-          if not exe.is_file():
-              raise SystemExit(f"missing {exe}")
-
-          separate = subprocess.run(
-              [str(exe), "separate", str(wav)],
-              check=False,
-          )
-          if separate.returncode != 0:
-              raise SystemExit(f"separate exited {separate.returncode}")
-
-          project = (
-              Path(os.environ["CLEAVE_DATA"]) / "projects" / project_slug(wav)
-          )
-          check = subprocess.run(
-              [
-                  sys.executable,
-                  str(Path("scripts") / "assert_separate_project.py"),
-                  str(project),
-              ],
-              check=False,
-          )
-          if check.returncode != 0:
-              raise SystemExit(
-                  f"assert_separate_project exited {check.returncode}"
-              )
-          print("separate smoke ok")
-
-      - name: Zip onedir
-        shell: python
-        run: |
-          import os
-          import sys
-          import zipfile
-          from pathlib import Path
-
-          sys.path.insert(0, ".")
-          import cleave
-
-          dist = Path("dist") / "cleave"
-          zip_name = f"cleave-{cleave.__version__}-windows-x64-separate.zip"
-          zip_path = Path(zip_name)
-          with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
-              for path in dist.rglob("*"):
-                  if not path.is_file():
-                      continue
-                  arcname = Path("cleave") / path.relative_to(dist)
-                  zf.write(path, arcname.as_posix())
-          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as fh:
-              fh.write(f"ZIP_NAME={zip_name}\n")
-          print(f"wrote {zip_path} ({zip_path.stat().st_size} bytes)")
-
-      - name: Upload separate zip as workflow artifact
-        if: ${{ github.event_name == 'workflow_dispatch' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: cleave-windows-x64-separate
-          path: ${{ env.ZIP_NAME }}
-          retention-days: 5
-          if-no-files-found: error
-

@@ -77,32 +77,39 @@ dist/cleave/
 
 ## How files get into `dist/cleave/`
 
-### Manual freeze (Phase 2 recipe)
+### Manual freeze
 
-From a native Windows checkout (not WSL):
+From a native Windows checkout (not WSL). Do not `pip install -r requirements.txt` (that file has no torch extra index and can pull a CUDA wheel).
 
 1. `pip install -r requirements-freeze.txt`
-2. `pyinstaller packaging/cleave.spec`
-3. `python scripts/windows_stage_freeze.py --dist dist/cleave`
+2. `pip install -r requirements-torch-cpu.txt`
+3. `pip install demucs==4.0.1 beat-this==1.1.0 librosa==0.11.0 einops==0.8.2 rotary-embedding-torch==0.9.1 tqdm==4.67.3 setuptools==80.8.0`
+4. `pyinstaller packaging/cleave.spec`
+5. `python scripts/windows_stage_freeze.py --dist dist/cleave`
    (copies `packaging/windows/*.dll` and libprojectM licenses, fetches pinned
    FFmpeg, asserts sidecars sit next to `cleave.exe` not under `_internal/`)
-4. Zip `dist\cleave\`.
+6. Zip `dist\cleave\`.
 
 Commit extra non-system DLLs from `dumpbin /dependents` into
-[packaging/windows/](./) so step 3 copies them. The script caches the FFmpeg
+[packaging/windows/](./) so step 5 copies them. The script caches the FFmpeg
 zip at `.cache/ffmpeg-windows.zip` (gitignored).
 
-### CI freeze (Phase 3.1)
+### CI freeze
 
 [.github/workflows/windows-freeze.yml](../../.github/workflows/windows-freeze.yml)
-runs on standard `windows-latest` (`workflow_dispatch` and `workflow_call`, not
-every push). Pip cache only (`requirements-freeze.txt`); no FFmpeg or freeze-tree
-cache. Headless smoke (`cleave.exe --version` / `--help` / frozen `separate`
-message). No GPU compositing. Dispatch zip and installer GPU proof (play an
-existing project) are met; see [docs/windows-freeze.md](../../docs/windows-freeze.md).
+runs one `freeze` job on standard `windows-latest` (`workflow_dispatch` and
+`workflow_call`, not every push). Pip cache on
+[requirements-freeze.txt](../../requirements-freeze.txt) and
+[requirements-torch-cpu.txt](../../requirements-torch-cpu.txt); no FFmpeg,
+freeze-tree, or torch-wheel cache. Headless smoke (`cleave.exe --version` /
+`--help`, then `cleave.exe separate` on
+[tests/fixtures/smoke-separate.wav](../../tests/fixtures/smoke-separate.wav)).
+No GPU compositing. See [docs/windows-freeze.md](../../docs/windows-freeze.md).
 
-1. Install Python deps from [requirements-freeze.txt](../../requirements-freeze.txt)
-   (no torch, demucs, librosa, or analyse stack).
+1. Install [requirements-freeze.txt](../../requirements-freeze.txt), then
+   [requirements-torch-cpu.txt](../../requirements-torch-cpu.txt), then the
+   analyse pins (demucs, beat-this, librosa, einops, rotary-embedding-torch,
+   tqdm, setuptools). Do not `pip install -r requirements.txt`.
 2. Run `pyinstaller packaging/cleave.spec`.
 3. Run `python scripts/windows_stage_freeze.py --dist dist/cleave`.
 4. Zip `dist/cleave/` as `cleave-<version>-windows-x64.zip` (archive root is a
