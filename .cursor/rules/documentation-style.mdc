@@ -1,12 +1,13 @@
 ---
-description: Markdown and prose emphasis in repo docs
-alwaysApply: true
+description: Markdown style for repo docs
+globs: "**/*.md"
+alwaysApply: false
 ---
 
-# Documentation style (Markdown)
+# Documentation style
 
-- Audience: humans. Prefer clarity and brevity; use technical terms only when they aid precision.
-- One emphasis style per span (eg: no stacked bold + backticks).
-  - Links: `[path/to/file](path/to/file)` — no backticks on link text.
-  - Literals (paths, commands, env vars): backticks when not linked; bold for plain emphasis only.
-- No emojis, em-dashes, or other non-ASCII punctuation.
+- Write for humans. Technical terms only when they aid precision.
+- One emphasis style per span (no stacked bold + backticks).
+- Links: `[path/to/file](path/to/file)` with no backticks on link text.
+- Literals (paths, commands, env vars): backticks when not linked; bold for plain emphasis only.
+- ASCII only: no emojis, em-dashes, or other non-ASCII punctuation.
