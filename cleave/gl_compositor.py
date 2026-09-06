@@ -440,6 +440,32 @@ class GlCompositor:
         for layer in self._layers:
             self._replace_layer_framebuffer(layer, layer.width, layer.height)
 
+    def set_content_size(self, width: int, height: int) -> None:
+        """Reallocate the content FBO; no-op when unchanged. Same GL context."""
+        width = int(width)
+        height = int(height)
+        if width == self.content_width and height == self.content_height:
+            return
+        if self._initialized:
+            require_supported_color_format(self._color_format, width, height)
+        self.content_width = width
+        self.content_height = height
+        if not self._initialized:
+            return
+        self._destroy_content_fbo()
+        self._allocate_content_fbo()
+
+    def set_display_size(self, width: int, height: int) -> None:
+        """Update the display viewport; no-op when unchanged. Same GL context."""
+        width = int(width)
+        height = int(height)
+        if width == self.display_width and height == self.display_height:
+            return
+        self.display_width = width
+        self.display_height = height
+        if self._initialized:
+            self.setup_gl_state()
+
     def _replace_layer_framebuffer(
         self,
         layer: LayerFbo,

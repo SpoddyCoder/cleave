@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import TypedDict
 
@@ -71,7 +72,11 @@ def extract_drums_onset(path: Path | str) -> tuple[np.ndarray, np.ndarray]:
     return values, times
 
 
-def extract_beats_downbeats(path: Path | str) -> tuple[np.ndarray, np.ndarray]:
+def extract_beats_downbeats(
+    path: Path | str,
+    *,
+    on_progress: Callable[[str, float | None], None] | None = None,
+) -> tuple[np.ndarray, np.ndarray]:
     """Beat and downbeat times in seconds from a wav path.
 
     Runs Beat This! (`File2Beats`) on *path* (mix or a stem wav).
@@ -79,9 +84,11 @@ def extract_beats_downbeats(path: Path | str) -> tuple[np.ndarray, np.ndarray]:
     import torch
     from beat_this.inference import File2Beats
 
+    from cleave.model_weights import beat_this_weight_spec, ensure_weight_files
     from cleave.paths import model_cache_dir
 
     torch.hub.set_dir(str(model_cache_dir()))
+    ensure_weight_files(beat_this_weight_spec(), on_progress=on_progress)
     device = "cuda" if torch.cuda.is_available() else "cpu"
     file2beats = File2Beats(checkpoint_path="final0", device=device, dbn=False)
     beats, downbeats = file2beats(str(path))

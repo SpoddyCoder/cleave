@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import dataclasses
-import sys
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -38,7 +37,7 @@ from cleave.viz.layer_visibility import apply_layer_visibility, build_timeline_v
 from cleave.viz.preset_switching import advance_timeline_preset_switching
 from cleave.viz.modal import ModalHost
 from cleave.viz.overlay_draw import OverlayDrawer
-from cleave.viz.loading import draw_loading_screen
+from cleave.viz.loading import LoadingWindow, open_loading_window
 from cleave.viz.help_overlay import HelpOverlay
 from cleave.viz.tuning_panel_draw import TuningOverlay
 from cleave.viz.timeline_controls import TimelineControls
@@ -183,11 +182,25 @@ def _make_masked_compositor(seed: VisualizerSeed) -> GlMaskedCompositor:
     return c
 
 
+def _adopt_loading_compositor(
+    seed: VisualizerSeed, compositor: GlCompositor
+) -> GlCompositor:
+    """Reconfigure the loading-screen compositor for the project; same GL context."""
+    compositor.set_display_size(seed.display_width, seed.display_height)
+    compositor.set_content_size(seed.width, seed.height)
+    compositor.set_color_format(_compositor_color_format(seed))
+    return compositor
+
+
 def _init_compositor_and_post(
     seed: VisualizerSeed,
+    compositor: GlCompositor | None = None,
 ) -> tuple[GlCompositor, GlPostProcess, GlMaskedCompositor]:
     color_format = _compositor_color_format(seed)
-    compositor = _make_compositor(seed)
+    if compositor is None:
+        compositor = _make_compositor(seed)
+    else:
+        compositor = _adopt_loading_compositor(seed, compositor)
     post_process = GlPostProcess(color_format=color_format)
     post_process.init()
     masked_compositor = _make_masked_compositor(seed)
@@ -196,8 +209,11 @@ def _init_compositor_and_post(
 
 def init_gl_resources_cheap(
     seed: VisualizerSeed,
+    compositor: GlCompositor | None = None,
 ) -> tuple[GlCompositor, GlPostProcess, GlMaskedCompositor, pygame.Surface]:
-    compositor, post_process, masked_compositor = _init_compositor_and_post(seed)
+    compositor, post_process, masked_compositor = _init_compositor_and_post(
+        seed, compositor=compositor
+    )
     overlay_surface = pygame.Surface(
         (seed.display_width, seed.display_height), pygame.SRCALPHA
     )
@@ -624,46 +640,36 @@ class VisualizerApp:
                 display_fps=display_fps,
             )
 
-    def run(self) -> None:
+    def run(self, window: LoadingWindow | None = None) -> None:
         if not isinstance(self._runtime, VisualizerSeed):
             raise TypeError("run() requires a VisualizerSeed from build_runtime_base()")
 
         seed = self._runtime
-
-        pygame.init()
-
-        try:
-            pygame.display.set_mode(
-                (seed.display_width, seed.display_height), pygame.OPENGL | pygame.DOUBLEBUF
+        if window is None:
+            window = open_loading_window(
+                width=seed.display_width, height=seed.display_height
             )
-        except pygame.error as exc:
-            print(f"error: failed to open OpenGL window: {exc}", file=sys.stderr)
-            pygame.quit()
-            sys.exit(1)
-
         pygame.display.set_caption(seed.window_title)
+        if (
+            window.display_width != seed.display_width
+            or window.display_height != seed.display_height
+        ):
+            window.adopt_display_size(seed.display_width, seed.display_height)
         clock = pygame.time.Clock()
 
         rt: LiveVisualizerRuntime | None = None
         try:
             compositor, post_process, masked_compositor, overlay_surface = (
-                init_gl_resources_cheap(seed)
+                init_gl_resources_cheap(seed, compositor=window.compositor)
             )
-            draw_loading_screen(
-                compositor, "Loading...", seed.display_width, seed.display_height
-            )
-
-            quit_during_load = False
+            window.compositor = compositor
+            window.overlay_surface = overlay_surface
+            window.display_width = seed.display_width
+            window.display_height = seed.display_height
+            window.update("Loading...")
 
             def on_progress(message: str) -> None:
-                nonlocal quit_during_load
-                for event in pygame.event.get():
-                    if event.type == pygame.QUIT:
-                        quit_during_load = True
-                        return
-                draw_loading_screen(
-                    compositor, message, seed.display_width, seed.display_height
-                )
+                window.update(message)
 
             rt = init_gl_resources_heavy(
                 seed,
@@ -674,7 +680,7 @@ class VisualizerApp:
                 on_progress=on_progress,
             )
             self._runtime = rt
-            if quit_during_load:
+            if window.quit_requested:
                 return
 
             self.tick_frame(

@@ -1,10 +1,10 @@
 # Windows freeze
 
-How Cleave locates files when frozen, how testers unpack a Windows onedir zip, and how to build libprojectM 4.2+ DLLs. Product decisions live in [structured-releases.md](structured-releases.md). This note is the implementation design for the freeze (paths, spec, FFmpeg, ctypes, libprojectM). Phase 3.1 CI is [.github/workflows/windows-freeze.yml](../.github/workflows/windows-freeze.yml). The same workflow builds the Phase 3.2 installer after the zip.
+How Cleave locates files when frozen, how testers unpack a Windows onedir zip, and how to build libprojectM 4.2+ DLLs. Product decisions live in [structured-releases.md](structured-releases.md). This note is the implementation design for the freeze (paths, spec, FFmpeg, ctypes, libprojectM). Phase 3.1 CI is [.github/workflows/windows-freeze.yml](../.github/workflows/windows-freeze.yml). The same workflow builds the Phase 3.2 installer after the zip. The CPU `separate` spec is [packaging/cleave-separate.spec](../packaging/cleave-separate.spec). The `freeze-separate` job smokes `cleave.exe separate` on dispatch (3.3.1); shipping it as a Release asset is 3.3.2.
 
-Do not cross-compile the GUI stack from WSL. Build on Windows, run [scripts/windows_stage_freeze.py](../scripts/windows_stage_freeze.py), then zip `dist/cleave/` and compile [packaging/windows/cleave.iss](../packaging/windows/cleave.iss) (CI does the same on `windows-latest`).
+Do not cross-compile the GUI stack from WSL. Build on Windows, run [scripts/windows_stage_freeze.py](../scripts/windows_stage_freeze.py), then zip `dist/cleave/` and compile [packaging/windows/cleave.iss](../packaging/windows/cleave.iss) (CI does the same on `windows-latest` for the lean play/render spec).
 
-Related: [cleave/paths.py](../cleave/paths.py), [cleave/ffmpeg.py](../cleave/ffmpeg.py), [packaging/cleave.spec](../packaging/cleave.spec), [scripts/windows_stage_freeze.py](../scripts/windows_stage_freeze.py), [cleave/projectm.py](../cleave/projectm.py), [cleave/projectm_playlist.py](../cleave/projectm_playlist.py).
+Related: [cleave/paths.py](../cleave/paths.py), [cleave/ffmpeg.py](../cleave/ffmpeg.py), [packaging/cleave.spec](../packaging/cleave.spec), [packaging/cleave-separate.spec](../packaging/cleave-separate.spec), [scripts/windows_stage_freeze.py](../scripts/windows_stage_freeze.py), [cleave/projectm.py](../cleave/projectm.py), [cleave/projectm_playlist.py](../cleave/projectm_playlist.py).
 
 ---
 
@@ -76,9 +76,9 @@ Pinned build: GyanD/codexffmpeg 9.0.1 essentials (64-bit Windows, static, GPLv3;
 
 ---
 
-## PyInstaller spec
+## PyInstaller spec (play/render)
 
-[packaging/cleave.spec](../packaging/cleave.spec) is an onedir skeleton. Run it on Windows:
+[packaging/cleave.spec](../packaging/cleave.spec) is the default onedir freeze (play/render, no torch). Run it on Windows:
 
 ```
 pyinstaller packaging/cleave.spec
@@ -92,7 +92,7 @@ python scripts/windows_stage_freeze.py --dist dist/cleave
 
 That copies `packaging/windows/*.dll` and libprojectM licenses, fetches the pinned FFmpeg zip, and asserts `cleave.exe`, `ffmpeg.exe`, and the projectM DLLs sit in the onedir root. Use `--no-exe-check` only in tests that have no exe.
 
-- Entry: [cleave.py](../cleave.py) (`cleave.cli:main`).
+- Entry: [cleave.py](../cleave.py) (`cleave.cli:main`). EXE name `cleave`. COLLECT name `cleave` (writes `dist/cleave/`).
 - Collect pygame (SDL binaries and hiddenimports travel with that hook) and soxr (native resample in [cleave/pcm_io.py](../cleave/pcm_io.py)).
 - `datas`: repo-root `cleave-viz.yaml` and `assets/fonts/` (includes `MaterialIcons-Regular.ttf`, `DejaVuSansMono.ttf`, `DejaVuSansMono-Bold.ttf`, and their licenses).
 - `excludes`: `torch`, `demucs`, `beat_this`, `librosa`, `matplotlib`. Stem split is not in this freeze.
@@ -101,11 +101,56 @@ That copies `packaging/windows/*.dll` and libprojectM licenses, fetches the pinn
 
 `librosa` is excluded because analysis is not in the zip. Play/render stay freeze-safe: stem types and paths live in [cleave/stems.py](../cleave/stems.py); PCM resample uses soxr in [cleave/pcm_io.py](../cleave/pcm_io.py). [cleave/extract.py](../cleave/extract.py) imports librosa for analyse only. Frozen `separate` reaches `require_stem_split` and raises `STEM_SPLIT_MISSING_FROZEN`.
 
+Both this spec and [packaging/cleave-separate.spec](../packaging/cleave-separate.spec) write `dist/cleave/`. Build one at a time. Do not copy a separate freeze tree over a lean tree (or the reverse) in the same `dist/cleave/`.
+
+---
+
+## Separate-capable freeze (CPU torch)
+
+[packaging/cleave-separate.spec](../packaging/cleave-separate.spec) is a dedicated spec so the lean file cannot collect torch. Same product layout: one `cleave.exe`, `install_dir()` is the parent of the exe, sidecars still come from [scripts/windows_stage_freeze.py](../scripts/windows_stage_freeze.py). Weights stay in user data (`model_cache_dir()`); they are not datas in the spec.
+
+This spec is engineering for 3.3.1. CI smokes it from the `freeze-separate` job (below). Release assets are 3.3.2. Do not `pip install -r requirements.txt` in the freeze venv: that file has no torch extra index and can pull a CUDA wheel from PyPI.
+
+### Venv install order (Windows)
+
+Use a venv that is not the lean play/render freeze venv. From the repo root:
+
+```
+python -m pip install -r requirements-freeze.txt
+python -m pip install -r requirements-torch-cpu.txt
+python -m pip install demucs==4.0.1 beat-this==1.1.0 librosa==0.11.0 einops==0.8.2 rotary-embedding-torch==0.9.1 tqdm==4.67.3 setuptools==80.8.0
+```
+
+1. [requirements-freeze.txt](../requirements-freeze.txt) is the play/render freeze set (PyInstaller, pygame, soxr, numpy, soundfile, ...). It does not install torch.
+2. [requirements-torch-cpu.txt](../requirements-torch-cpu.txt) pins CPU `torch` / `torchaudio` / `torchcodec` and sets `--extra-index-url https://download.pytorch.org/whl/cpu`. Install this before Demucs so pip does not resolve a CUDA wheel from PyPI.
+3. Analyse extras from [requirements.txt](../requirements.txt) that the lean freeze omitted: `demucs`, `beat-this`, `librosa`, plus the model helpers those packages need (`einops`, `rotary-embedding-torch`, `tqdm`, `setuptools`). Their remaining deps (numba, scipy, scikit-learn, julius, lameenc, openunmix, audioread, ...) come in as transitive installs.
+
+Do not install `matplotlib`. librosa lists it as the `display` extra; [cleave/extract.py](../cleave/extract.py) and [cleave/analyse.py](../cleave/analyse.py) do not import it. The separate spec excludes `matplotlib` (and Beat This training extras: `pytorch_lightning`, `mir_eval`, `madmom`).
+
+### Freeze and stage
+
+```
+pyinstaller packaging/cleave-separate.spec
+python scripts/windows_stage_freeze.py --dist dist/cleave
+```
+
+COLLECT `name="cleave"`, so output is `dist/cleave/cleave.exe` plus `_internal/`, same as the lean spec. Stage into that folder. `console=True`, `upx=False`.
+
+### What the spec collects
+
+`collect_all` for pygame and soxr (same as lean), then torch, torchaudio, torchcodec, demucs, beat_this, librosa, and the installed packages those need that carry binaries or package data: soundfile, audioread, numba, scipy, sklearn, julius, lameenc, openunmix, einops, rotary_embedding_torch, omegaconf, dora, joblib, pooch.
+
+Hidden imports cover Demucs pickle/load (`demucs.pretrained`, `demucs.hdemucs`, `demucs.htdemucs`, `demucs.apply`, `demucs.audio`), Beat This inference (`beat_this.inference`, `beat_this.model.beat_tracker`), librosa / soundfile / audioread, and numpy 2 `_core` internals.
+
+Same `datas` as the lean spec: `cleave-viz.yaml` and `assets/fonts/`. Demucs `remote/*.yaml` travels with `collect_all("demucs")`.
+
+CUDA binaries are dropped after collect: names matching `cudart`, `cublas`, `cudnn`, `nccl`, `nvrtc`, and similar (`torch_cuda`, `c10_cuda`, ...). The `torch` Python package is not excluded. CPU wheels already omit CUDA; the filter is so PyInstaller does not copy stubs.
+
 ---
 
 ## CI freeze (Phase 3.1)
 
-Same recipe as the manual steps above, on standard `windows-latest`. Workflow: [.github/workflows/windows-freeze.yml](../.github/workflows/windows-freeze.yml) (`workflow_dispatch` and `workflow_call`, not every push).
+Same recipe as the lean play/render steps above (`packaging/cleave.spec`), on standard `windows-latest`. Workflow: [.github/workflows/windows-freeze.yml](../.github/workflows/windows-freeze.yml) (`workflow_dispatch` and `workflow_call`, not every push). This job is the default Windows artifact path. The separate spec is a second job (`freeze-separate`), not a switch of this one.
 
 - Pip cache only (`requirements-freeze.txt`); do not cache FFmpeg zips or freeze output.
 - Sidecars: committed libprojectM DLLs from [packaging/windows/](../packaging/windows/) (convention in that directory's [README.md](../packaging/windows/README.md)); FFmpeg from `FFMPEG_URL` / `FFMPEG_SHA256` at the top of [scripts/windows_stage_freeze.py](../scripts/windows_stage_freeze.py). No vcpkg in the job. Do not commit `ffmpeg.exe`.
@@ -114,6 +159,16 @@ Same recipe as the manual steps above, on standard `windows-latest`. Workflow: [
 - After the zip, Inno Setup wraps the same `dist\cleave\` tree into `cleave-<version>-windows-x64-setup.exe` (see Installer below).
 - Dispatch uploads 5-day Actions artifacts (`cleave-windows-x64` zip, `cleave-windows-x64-setup` installer). Tag pipeline: [.github/workflows/release.yml](../.github/workflows/release.yml) calls this workflow after `publish` with `release_tag` set to the tag; a non-empty `release_tag` uses `gh release upload` for both assets and does not retain a workflow artifact.
 - GPU proof (met): unpack the dispatch zip or install from the setup exe on a Windows box with a GPU driver; run `cleave.exe play` on an existing project (audio on the default output device; pattern mask at default `balanced` preview quality). A short `cleave.exe render` is the same 2.2 path if you want extra coverage.
+
+## CI separate freeze (Phase 3.3.1)
+
+Second job in the same workflow, `freeze-separate`, on standard `windows-latest`. Own checkout and `dist/cleave/` tree (both specs write that path). Input `include_separate` defaults to true on `workflow_dispatch` and false on `workflow_call`, so tag [release.yml](../.github/workflows/release.yml) does not wait on CPU Demucs. Pass `include_separate: true` on a call if you want the smoke on a tag; it still does not `gh release upload`.
+
+Install order matches the venv recipe above: [requirements-freeze.txt](../requirements-freeze.txt), then [requirements-torch-cpu.txt](../requirements-torch-cpu.txt), then the analyse pins (demucs, beat-this, librosa, einops, rotary-embedding-torch, tqdm, setuptools). Do not `pip install -r requirements.txt`. Pip cache keys those two requirement files; do not cache FFmpeg zips, freeze output, or torch wheels as workflow artifacts. Model weights download on first run into `CLEAVE_DATA` (`models/`); they are not baked into the freeze.
+
+Headless smoke: `cleave.exe --version` and `--help` as in the lean job, then `cleave.exe separate` on [tests/fixtures/smoke-separate.wav](../tests/fixtures/smoke-separate.wav) (2 s PCM sine). Assert `stems/{drums,bass,vocals,other}.wav` exist and `signals.json` `version` equals `SIGNALS_VERSION` ([cleave/signals.py](../cleave/signals.py); checker [scripts/assert_separate_project.py](../scripts/assert_separate_project.py)). The separate step has a 90-minute timeout. No CUDA. No GPU compositing. No installer.
+
+Dispatch uploads a 5-day Actions artifact named `cleave-windows-x64-separate` (`cleave-<version>-windows-x64-separate.zip`). Not a GitHub Release asset (3.3.2).
 
 ---
 
@@ -223,4 +278,4 @@ Still open: whether a seed preset/texture pack ships in the zip, or testers copy
 
 ## Out of scope here
 
-Signing; torch in the zip; macOS Application Support.
+Signing; CUDA torch; shipping the separate freeze as a Release asset (3.3.2); macOS Application Support.

@@ -6,7 +6,8 @@ import json
 import shutil
 from pathlib import Path
 
-from typing import Mapping, cast
+from collections.abc import Callable, Mapping
+from typing import cast
 
 from cleave.config import ensure_project_viz_config
 from cleave.stems import STEM_SOURCES, StemSource, stem_paths, stems_dir
@@ -17,6 +18,7 @@ from cleave.paths import (
     project_slug,
     resolve_project,
 )
+from cleave.model_weights import demucs_weight_spec, ensure_weight_files
 from cleave.project import load_manifest, manifest_path, mix_path, write_manifest
 from cleave.signals import SIGNALS_VERSION
 
@@ -139,6 +141,7 @@ def _write_demucs_stems(
     dest_paths: Mapping[str, Path],
     *,
     model: str,
+    on_progress: Callable[[str, float | None], None] | None = None,
 ) -> None:
     """Load *model* in-process and write stem wavs into *dest_paths*.
 
@@ -152,6 +155,7 @@ def _write_demucs_stems(
     from demucs.separate import load_track
 
     torch.hub.set_dir(str(model_cache_dir()))
+    ensure_weight_files(demucs_weight_spec(model), on_progress=on_progress)
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     try:
@@ -197,6 +201,7 @@ def _run_demucs(
     *,
     high_quality: bool,
     force: bool,
+    on_progress: Callable[[str, float | None], None] | None = None,
 ) -> None:
     """Separate *audio_path* with Demucs and write stems into *project_dir*."""
     audio_path = Path(audio_path)
@@ -232,7 +237,12 @@ def _run_demucs(
         demucs_model=model,
     )
 
-    _write_demucs_stems(audio_path, stem_paths(project_dir), model=model)
+    _write_demucs_stems(
+        audio_path,
+        stem_paths(project_dir),
+        model=model,
+        on_progress=on_progress,
+    )
 
 
 def run_separate(
@@ -241,10 +251,13 @@ def run_separate(
     high_quality: bool = False,
     force: bool = False,
     beat_detection_stem: StemSource | None = None,
+    on_progress: Callable[[str, float | None], None] | None = None,
 ) -> Path:
     """Separate and/or analyse a Cleave project from an audio file or project slug.
 
     *beat_detection_stem* is ``None`` when the CLI flag was omitted.
+    *on_progress* receives ``(message, fraction)``; ``fraction`` is ``None`` for
+    named waits. When omitted, existing stdout messages are unchanged.
     """
     project_dir, audio_path = resolve_separate_target(target)
     ensure_project_viz_config(project_dir)
@@ -262,17 +275,32 @@ def run_separate(
         require_stem_split()
 
     if run_demucs:
-        _run_demucs(audio_path, project_dir, high_quality=high_quality, force=force)
+        if on_progress is not None:
+            on_progress("Separating stems...", None)
+        _run_demucs(
+            audio_path,
+            project_dir,
+            high_quality=high_quality,
+            force=force,
+            on_progress=on_progress,
+        )
 
     if need_analyse:
         from cleave.analyse import run_analyse
 
         source = resolve_beat_detection_stem(project_dir, beat_detection_stem)
-        print("Extracting signals (may take a while on longer tracks)...", flush=True)
+        if on_progress is not None:
+            on_progress("Extracting signals...", None)
+        else:
+            print(
+                "Extracting signals (may take a while on longer tracks)...",
+                flush=True,
+            )
         run_analyse(
             project_dir,
             high_quality=high_quality,
             beat_detection_stem=source,
+            on_progress=on_progress,
         )
 
     return project_dir

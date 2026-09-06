@@ -171,6 +171,65 @@ def test_set_color_format_reallocates_content_and_layers() -> None:
     compositor._replace_layer_framebuffer.assert_called_once_with(layer, 640, 360)
 
 
+def test_set_content_size_noop_when_unchanged() -> None:
+    compositor = GlCompositor.__new__(GlCompositor)
+    compositor.content_width = 1280
+    compositor.content_height = 720
+    compositor._initialized = True
+    compositor._destroy_content_fbo = MagicMock()
+    compositor._allocate_content_fbo = MagicMock()
+
+    compositor.set_content_size(1280, 720)
+
+    compositor._destroy_content_fbo.assert_not_called()
+    compositor._allocate_content_fbo.assert_not_called()
+
+
+def test_set_content_size_reallocates_content_fbo() -> None:
+    from cleave.gl_color_format import RGBA8
+
+    compositor = GlCompositor.__new__(GlCompositor)
+    compositor.content_width = 640
+    compositor.content_height = 360
+    compositor._initialized = True
+    compositor._color_format = RGBA8
+    compositor._destroy_content_fbo = MagicMock()
+    compositor._allocate_content_fbo = MagicMock()
+
+    compositor.set_content_size(1280, 720)
+
+    assert compositor.content_width == 1280
+    assert compositor.content_height == 720
+    compositor._destroy_content_fbo.assert_called_once()
+    compositor._allocate_content_fbo.assert_called_once()
+
+
+def test_set_display_size_noop_when_unchanged() -> None:
+    compositor = GlCompositor.__new__(GlCompositor)
+    compositor.display_width = 1280
+    compositor.display_height = 720
+    compositor._initialized = True
+    compositor.setup_gl_state = MagicMock()
+
+    compositor.set_display_size(1280, 720)
+
+    compositor.setup_gl_state.assert_not_called()
+
+
+def test_set_display_size_updates_viewport() -> None:
+    compositor = GlCompositor.__new__(GlCompositor)
+    compositor.display_width = 640
+    compositor.display_height = 360
+    compositor._initialized = True
+    compositor.setup_gl_state = MagicMock()
+
+    compositor.set_display_size(1280, 720)
+
+    assert compositor.display_width == 1280
+    assert compositor.display_height == 720
+    compositor.setup_gl_state.assert_called_once()
+
+
 def test_resize_layer_fbo_unknown_name_raises() -> None:
     compositor = GlCompositor.__new__(GlCompositor)
     compositor._layers = []

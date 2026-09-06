@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 
 import librosa
@@ -40,6 +41,7 @@ def run_analyse(
     *,
     high_quality: bool,
     beat_detection_stem: StemSource = "full_mix",
+    on_progress: Callable[[str, float | None], None] | None = None,
 ) -> Path:
     paths = stem_paths(project_dir)
     mix = mix_path(project_dir)
@@ -49,7 +51,9 @@ def run_analyse(
     )
 
     drums_onset = extract_drums_onset(paths["drums"])
-    beats, downbeats = extract_beats_downbeats(beat_audio)
+    beats, downbeats = extract_beats_downbeats(
+        beat_audio, on_progress=on_progress
+    )
     bass = extract_bass(paths["bass"])
     vocals = extract_vocals(paths["vocals"], high_quality=high_quality)
     other = extract_other(paths["other"])

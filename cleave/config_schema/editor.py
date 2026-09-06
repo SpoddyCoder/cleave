@@ -58,6 +58,19 @@ UI_WIDTH_MODES: tuple[UiWidthMode, ...] = ("flexible", "fixed")
 DEFAULT_UI_WIDTH_MODE: UiWidthMode = "flexible"
 
 
+def editor_display_size(
+    width: int = DEFAULT_EDITOR_WIDTH,
+    height: int = DEFAULT_EDITOR_HEIGHT,
+    *,
+    upscale: float = DEFAULT_EDITOR_UPSCALE,
+) -> tuple[int, int]:
+    """Window size from editor content size and upscale (same as ``EditorConfig``)."""
+    return (
+        max(1, round(width * upscale)),
+        max(1, round(height * upscale)),
+    )
+
+
 def clamp_upscale(value: float) -> float:
     return max(UPSCALE_MIN, float(value))
 
