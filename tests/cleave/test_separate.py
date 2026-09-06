@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+import sys
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator
@@ -21,7 +23,9 @@ from cleave.project import (
 )
 from cleave.model_weights import WeightDownloadError
 from cleave.separate import (
+    _load_demucs_track,
     _run_demucs,
+    _write_demucs_stems,
     project_stems_complete,
     resolve_separate_target,
     run_separate,
@@ -718,3 +722,90 @@ def test_run_separate_force_preserves_song_markers(
     assert manifest.restored_from == "archived-slug"
     assert manifest.demucs_model == "htdemucs"
     assert manifest.mix_filename == "song.flac"
+
+
+def test_run_demucs_frozen_missing_ffmpeg_names_sidecar(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    exe = tmp_path / "cleave.exe"
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(sys, "executable", str(exe))
+    monkeypatch.setattr(sys, "platform", "win32")
+    mix = tmp_path / "song.wav"
+    mix.write_bytes(b"RIFF")
+    project = tmp_path / "projects" / "song"
+    with pytest.raises(FileNotFoundError, match=r"ffmpeg\.exe"):
+        _run_demucs(mix, project, high_quality=False, force=True)
+
+
+def test_write_demucs_stems_frozen_prepends_install_dir_and_skips_load_track(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    exe = tmp_path / "cleave.exe"
+    sidecar = tmp_path / "ffmpeg.exe"
+    sidecar.write_bytes(b"")
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(sys, "executable", str(exe))
+    monkeypatch.setattr(sys, "platform", "win32")
+
+    model_obj = MagicMock()
+    model_obj.sources = ["drums", "bass", "other", "vocals"]
+    model_obj.audio_channels = 2
+    model_obj.samplerate = 44100
+    seen: dict[str, object] = {}
+
+    def fake_get_model(_name: str) -> MagicMock:
+        seen["path"] = os.environ["PATH"]
+        return model_obj
+
+    def fake_run(cmd: list[str], **_kwargs: object) -> MagicMock:
+        seen["ffmpeg_cmd"] = cmd
+        result = MagicMock()
+        result.stdout = b"\x00\x00\xcd\xcc\xcc\x3d" * 4
+        result.returncode = 0
+        return result
+
+    def fake_save_audio(_wav: object, path: str, **_kwargs: object) -> None:
+        dest = Path(path)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(b"wav")
+
+    audio = tmp_path / "mix.wav"
+    audio.write_bytes(b"RIFF")
+    dest_paths = {
+        name: tmp_path / "stems" / f"{name}.wav" for name in model_obj.sources
+    }
+
+    with (
+        patch("cleave.separate.ensure_weight_files"),
+        patch("torch.hub.set_dir"),
+        patch("torch.cuda.is_available", return_value=False),
+        patch("demucs.pretrained.get_model", side_effect=fake_get_model),
+        patch("demucs.separate.load_track") as load_track,
+        patch("demucs.apply.apply_model", return_value=[MagicMock()]),
+        patch("demucs.audio.save_audio", side_effect=fake_save_audio),
+        patch("cleave.separate.subprocess.run", side_effect=fake_run),
+    ):
+        _write_demucs_stems(audio, dest_paths, model="htdemucs")
+
+    load_track.assert_not_called()
+    path = seen["path"]
+    assert isinstance(path, str)
+    assert path.split(os.pathsep)[0] == str(tmp_path.resolve())
+    cmd = seen["ffmpeg_cmd"]
+    assert isinstance(cmd, list)
+    assert cmd[0] == str(sidecar.resolve())
+
+
+def test_load_demucs_track_checkout_uses_load_track(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(sys, "frozen", False, raising=False)
+    audio = tmp_path / "mix.wav"
+    fake = MagicMock(name="wav")
+    with patch("demucs.separate.load_track", return_value=fake) as load_track:
+        wav = _load_demucs_track(audio, 2, 44100)
+    load_track.assert_called_once_with(audio, 2, 44100)
+    assert wav is fake

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import subprocess
 from pathlib import Path
 
 from collections.abc import Callable, Mapping
@@ -136,6 +137,62 @@ def _validate_audio_path(audio_path: Path) -> None:
         raise ValueError(f"not a file: {audio_path}")
 
 
+def _load_demucs_track(audio_path: Path, audio_channels: int, samplerate: int):
+    """Load mix audio as a ``(channels, samples)`` float tensor for Demucs.
+
+    Frozen: decode with the sidecar from :func:`cleave.ffmpeg.ffmpeg_executable`
+    (Demucs 4.0.1 ``load_track`` also shells out to ``ffprobe``, which we do
+    not ship). Checkout: ``demucs.separate.load_track``.
+    """
+    if is_frozen():
+        return _load_track_with_sidecar_ffmpeg(
+            audio_path, audio_channels, samplerate
+        )
+    from demucs.separate import load_track
+
+    return load_track(audio_path, audio_channels, samplerate)
+
+
+def _load_track_with_sidecar_ffmpeg(
+    audio_path: Path, audio_channels: int, samplerate: int
+):
+    """Decode *audio_path* with sidecar ffmpeg into a Demucs input tensor."""
+    import numpy as np
+    import torch
+
+    from cleave.ffmpeg import ffmpeg_executable
+
+    ffmpeg = ffmpeg_executable()
+    cmd = [
+        ffmpeg,
+        "-nostdin",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-i",
+        str(audio_path),
+        "-f",
+        "f32le",
+        "-ac",
+        str(audio_channels),
+        "-ar",
+        str(samplerate),
+        "pipe:1",
+    ]
+    try:
+        proc = subprocess.run(cmd, capture_output=True, check=True)
+    except subprocess.CalledProcessError as exc:
+        err = (exc.stderr or b"").decode("utf-8", "replace").strip()
+        detail = f": {err}" if err else ""
+        raise RuntimeError(
+            f"demucs failed to load {audio_path} with {ffmpeg}{detail}"
+        ) from exc
+    pcm = np.frombuffer(proc.stdout, dtype=np.float32).copy()
+    if pcm.size == 0 or pcm.size % audio_channels != 0:
+        raise RuntimeError(f"demucs failed to load {audio_path} with {ffmpeg}")
+    return torch.from_numpy(pcm).view(-1, audio_channels).t().contiguous()
+
+
 def _write_demucs_stems(
     audio_path: Path,
     dest_paths: Mapping[str, Path],
@@ -146,53 +203,61 @@ def _write_demucs_stems(
     """Load *model* in-process and write stem wavs into *dest_paths*.
 
     Uses ``demucs.pretrained.get_model`` and ``demucs.apply.apply_model``.
-    Imports stay lazy so play/render never load torch.
+    Imports stay lazy so play/render never load torch. Frozen: sidecar
+    ffmpeg is on PATH for the Demucs call, and mix load uses that binary
+    rather than Demucs ``load_track`` (which also needs ``ffprobe``).
     """
-    import torch
-    from demucs.apply import apply_model
-    from demucs.audio import save_audio
-    from demucs.pretrained import get_model
-    from demucs.separate import load_track
+    from cleave.ffmpeg import sidecar_ffmpeg_on_path
 
-    torch.hub.set_dir(str(model_cache_dir()))
-    ensure_weight_files(demucs_weight_spec(model), on_progress=on_progress)
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    with sidecar_ffmpeg_on_path():
+        import torch
+        from demucs.apply import apply_model
+        from demucs.audio import save_audio
+        from demucs.pretrained import get_model
 
-    try:
-        model_obj = get_model(model)
-        model_obj.cpu()
-        model_obj.eval()
-        wav = load_track(audio_path, model_obj.audio_channels, model_obj.samplerate)
-        ref = wav.mean(0)
-        wav -= ref.mean()
-        wav /= ref.std()
-        sources = apply_model(
-            model_obj,
-            wav[None],
-            device=device,
-            shifts=1,
-            split=True,
-            overlap=0.25,
-            progress=True,
-        )[0]
-        sources *= ref.std()
-        sources += ref.mean()
-    except SystemExit as exc:
-        raise RuntimeError(f"demucs failed to load {audio_path}") from exc
-    except Exception as exc:
-        raise RuntimeError(f"demucs failed for {audio_path}") from exc
+        torch.hub.set_dir(str(model_cache_dir()))
+        ensure_weight_files(demucs_weight_spec(model), on_progress=on_progress)
+        device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    for index, name in enumerate(model_obj.sources):
-        dest = dest_paths.get(name)
-        if dest is None:
-            continue
-        save_audio(sources[index], str(dest), samplerate=model_obj.samplerate)
+        try:
+            model_obj = get_model(model)
+            model_obj.cpu()
+            model_obj.eval()
+            wav = _load_demucs_track(
+                audio_path, model_obj.audio_channels, model_obj.samplerate
+            )
+            ref = wav.mean(0)
+            wav -= ref.mean()
+            wav /= ref.std()
+            sources = apply_model(
+                model_obj,
+                wav[None],
+                device=device,
+                shifts=1,
+                split=True,
+                overlap=0.25,
+                progress=True,
+            )[0]
+            sources *= ref.std()
+            sources += ref.mean()
+        except FileNotFoundError:
+            raise
+        except SystemExit as exc:
+            raise RuntimeError(f"demucs failed to load {audio_path}") from exc
+        except Exception as exc:
+            raise RuntimeError(f"demucs failed for {audio_path}") from exc
 
-    missing_src = [name for name, dst in dest_paths.items() if not dst.is_file()]
-    if missing_src:
-        raise RuntimeError(
-            f"demucs output missing stem files: {', '.join(missing_src)}"
-        )
+        for index, name in enumerate(model_obj.sources):
+            dest = dest_paths.get(name)
+            if dest is None:
+                continue
+            save_audio(sources[index], str(dest), samplerate=model_obj.samplerate)
+
+        missing_src = [name for name, dst in dest_paths.items() if not dst.is_file()]
+        if missing_src:
+            raise RuntimeError(
+                f"demucs output missing stem files: {', '.join(missing_src)}"
+            )
 
 
 def _run_demucs(
