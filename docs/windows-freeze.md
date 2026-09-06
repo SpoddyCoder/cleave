@@ -141,7 +141,7 @@ Install order matches the venv recipe above: [requirements-freeze.txt](../requir
 - After the zip, Inno Setup wraps the same `dist\cleave\` tree into `cleave-<version>-windows-x64-setup.exe` (see Installer below).
 - Dispatch uploads 5-day Actions artifacts (`cleave-windows-x64` zip, `cleave-windows-x64-setup` installer). A non-empty `release_tag` uses `gh release upload` for both assets and does not retain a workflow artifact. Never both.
 
-GPU proof from zip and Program Files (play an existing project) is met for 3.1/3.2. Drop-a-wav proof on this freeze is the 3.3.2 Done when (not met until a native Windows box confirms it).
+GPU proof from zip and Program Files (play an existing project) is met for 3.1/3.2. Drop-a-wav proof on this freeze is met (3.3.2): dispatch zip and Program Files, named first-run weight download and split in the loading window, then the project opens. Warm-cache second run skips download chatter. `cleave.exe separate` from cmd still writes stems and `signals.json`.
 
 ---
 
