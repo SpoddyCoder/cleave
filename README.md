@@ -6,7 +6,7 @@ Stem-separated music visualizer. Layer together drums, bass, vocal and other ste
 
 Comprehensive visual editor allows you to browse and tune presets in real time - automate preset switching, layer in effects, post processing and a whole bunch more. Render the final output in high definition and high frame rates using `ffmpeg`.
 
-Built on [projectM](https://github.com/projectM-visualizer/projectM) and [Demucs](https://github.com/facebookresearch/demucs) amongst [others](#attribution). Developed on WSL2; Linux with a display is the current checkout setup. A Windows play/render zip is documented under [Windows zip](#windows-zip).
+Built on [projectM](https://github.com/projectM-visualizer/projectM) and [Demucs](https://github.com/facebookresearch/demucs) amongst [others](#attribution). Developed on WSL2; Linux with a display is the current checkout setup. A Windows zip is documented under [Windows zip](#windows-zip).
 
 ## Requirements
 
@@ -79,7 +79,10 @@ How to cut a tag: [docs/structured-releases.md](docs/structured-releases.md).
 
 The installer (`cleave-<version>-windows-x64-setup.exe`) defaults to `Program Files\Cleave`. Uninstall removes only the program folder; it does not delete `Documents\cleave\` or `%APPDATA%\cleave\`. The zip (`cleave-<version>-windows-x64.zip`) is the same onedir tree without an installer: unpack and run from that folder.
 
+Drop a wav onto `cleave.exe`, or run `cleave.exe play <wav>`. First run downloads Demucs and Beat This weights into `Documents\cleave\models` and shows named progress in the loading window. CPU `separate` is slow; a CUDA extra is Phase 3.3.3.
+
 ```
+cleave.exe play <wav>
 cleave.exe play <project>
 cleave.exe render <project>
 ```
@@ -87,8 +90,6 @@ cleave.exe render <project>
 The build is unsigned. If SmartScreen warns on the setup exe or the zip, choose Run anyway.
 
 User data lives in `Documents\cleave\` (same `projects/`, `presets/`, `textures/` tree as Linux). Settings: `%APPDATA%\cleave\config.yaml`. Override the data root with `CLEAVE_DATA`.
-
-Stem split is not in the Windows zip or installer. Separate on Linux and copy the project into `Documents\cleave\projects\`. `cleave.exe separate` and raw-audio `play` print a short message rather than splitting.
 
 Milkdrop presets still go under `Documents\cleave\presets` (see [Get Some Milkdrop Presets](#get-some-milkdrop-presets); use that path instead of `~/.local/share/cleave/`).
 

@@ -15,8 +15,7 @@ from cleave.separate import STEM_SPLIT_MISSING_FROZEN, require_stem_split
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
-_LEAN_SPEC = REPO_ROOT / "packaging" / "cleave.spec"
-_SEPARATE_SPEC = REPO_ROOT / "packaging" / "cleave-separate.spec"
+_SPEC = REPO_ROOT / "packaging" / "cleave.spec"
 _ANALYSE_PACKAGES = ("torch", "demucs", "beat_this", "librosa", "matplotlib")
 
 _BLOCK_HEAVY = f"""
@@ -122,23 +121,6 @@ def _analysis_excludes(spec_text: str) -> tuple[str, ...]:
     raise AssertionError("Analysis excludes not found")
 
 
-def _collect_all_literal_names(spec_text: str) -> set[str]:
-    names: set[str] = set()
-    tree = ast.parse(spec_text)
-    for node in ast.walk(tree):
-        if not (
-            isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Name)
-            and node.func.id == "collect_all"
-            and node.args
-            and isinstance(node.args[0], ast.Constant)
-            and isinstance(node.args[0].value, str)
-        ):
-            continue
-        names.add(node.args[0].value)
-    return names
-
-
 def _module_level_imported_roots(source: str) -> set[str]:
     roots: set[str] = set()
     for node in ast.parse(source).body:
@@ -149,31 +131,19 @@ def _module_level_imported_roots(source: str) -> set[str]:
     return roots
 
 
-def test_pyinstaller_spec_collects_soxr_and_excludes_analyse() -> None:
-    spec = _LEAN_SPEC.read_text(encoding="utf-8")
-    assert 'collect_all("soxr")' in spec
-    for name in ("torch", "demucs", "beat_this", "librosa", "matplotlib"):
-        assert f'"{name}"' in spec
+def test_pyinstaller_spec_collects_cpu_separate_stack() -> None:
+    spec = _SPEC.read_text(encoding="utf-8")
 
-
-def test_pyinstaller_specs_lean_excludes_analyse_separate_collects() -> None:
-    lean = _LEAN_SPEC.read_text(encoding="utf-8")
-    separate = _SEPARATE_SPEC.read_text(encoding="utf-8")
-
-    lean_excludes = set(_analysis_excludes(lean))
-    assert set(_ANALYSE_PACKAGES) <= lean_excludes
-    assert {"pygame", "soxr"} <= _collect_all_literal_names(lean)
-
-    collect = set(_assigned_str_tuple(separate, "COLLECT_PACKAGES"))
+    collect = set(_assigned_str_tuple(spec, "COLLECT_PACKAGES"))
     assert {"pygame", "soxr", "torch", "demucs", "beat_this", "librosa"} <= collect
     assert "matplotlib" not in collect
 
-    separate_excludes = set(_analysis_excludes(separate))
-    assert "matplotlib" in separate_excludes
+    excludes = set(_analysis_excludes(spec))
+    assert "matplotlib" in excludes
     for name in ("torch", "demucs", "beat_this", "librosa"):
-        assert name not in separate_excludes
+        assert name not in excludes
 
-    cuda_markers = set(_assigned_str_tuple(separate, "CUDA_BINARY_MARKERS"))
+    cuda_markers = set(_assigned_str_tuple(spec, "CUDA_BINARY_MARKERS"))
     assert {"cudart", "cublas", "cudnn", "nccl", "nvrtc"} <= cuda_markers
     assert "torch" not in cuda_markers
 

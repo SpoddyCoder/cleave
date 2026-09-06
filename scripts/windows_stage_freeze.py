@@ -2,7 +2,7 @@
 """Copy Windows freeze sidecars into a PyInstaller onedir root.
 
 Reusable from CI and a local Windows freeze. After
-``pyinstaller packaging/cleave.spec``, run::
+``pyinstaller packaging/cleave.spec`` (CPU torch onedir), run::
 
     python scripts/windows_stage_freeze.py [--dist dist/cleave] [--repo-root .]
 
