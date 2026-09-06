@@ -16,7 +16,7 @@ Three roots. Do not treat the checkout layout as the install layout.
 | --- | --- | --- | --- |
 | `install_dir()` | Parent of `sys.executable` (onedir folder root) | Repo root | Sidecars: `ffmpeg.exe`, later `projectM-4.dll` / `projectM-4-playlist.dll` |
 | `resource_dir()` | `sys._MEIPASS` (onedir `_internal`) | Repo root | Bundled files: `cleave-viz.yaml`, `assets/fonts/` |
-| `data_dir()` | User data (not the zip) | Same | Projects, presets, textures |
+| `data_dir()` | User data (not the zip) | Same | Projects, presets, textures, model weights (`models/`) |
 
 `is_frozen()` is `bool(getattr(sys, "frozen", False))`. `repo_root()` is always the checkout (tests and source scans). Runtime code that needs bundled files uses `resource_dir()`.
 
@@ -28,6 +28,8 @@ User data is never written into the app folder.
 - Global settings only: Linux `~/.config/cleave/config.yaml` (or `XDG_CONFIG_HOME`); Windows `%APPDATA%\cleave\config.yaml`.
 
 Preset and texture defaults are `data_dir() / "presets"` and `data_dir() / "textures"` ([cleave/paths.py](../cleave/paths.py) `default_preset_root` / `default_texture_paths`). First write still creates directories; import does not.
+
+Stem split calls Demucs in-process (`demucs.pretrained.get_model` and `demucs.apply.apply_model` in [cleave/separate.py](../cleave/separate.py)), not `python -m demucs`. Before model load, Demucs and Beat This call `torch.hub.set_dir` so checkpoints land in `data_dir() / "models"` (`model_cache_dir()`). First-run download still happens; weights are not baked into the freeze.
 
 ---
 

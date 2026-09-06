@@ -4,16 +4,19 @@ from __future__ import annotations
 
 import json
 import shutil
-import subprocess
-import sys
-import tempfile
 from pathlib import Path
 
-from typing import cast
+from typing import Mapping, cast
 
 from cleave.config import ensure_project_viz_config
 from cleave.stems import STEM_SOURCES, StemSource, stem_paths, stems_dir
-from cleave.paths import is_frozen, project_dir, project_slug, resolve_project
+from cleave.paths import (
+    is_frozen,
+    model_cache_dir,
+    project_dir,
+    project_slug,
+    resolve_project,
+)
 from cleave.project import load_manifest, manifest_path, mix_path, write_manifest
 from cleave.signals import SIGNALS_VERSION
 
@@ -131,6 +134,63 @@ def _validate_audio_path(audio_path: Path) -> None:
         raise ValueError(f"not a file: {audio_path}")
 
 
+def _write_demucs_stems(
+    audio_path: Path,
+    dest_paths: Mapping[str, Path],
+    *,
+    model: str,
+) -> None:
+    """Load *model* in-process and write stem wavs into *dest_paths*.
+
+    Uses ``demucs.pretrained.get_model`` and ``demucs.apply.apply_model``.
+    Imports stay lazy so play/render never load torch.
+    """
+    import torch
+    from demucs.apply import apply_model
+    from demucs.audio import save_audio
+    from demucs.pretrained import get_model
+    from demucs.separate import load_track
+
+    torch.hub.set_dir(str(model_cache_dir()))
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    try:
+        model_obj = get_model(model)
+        model_obj.cpu()
+        model_obj.eval()
+        wav = load_track(audio_path, model_obj.audio_channels, model_obj.samplerate)
+        ref = wav.mean(0)
+        wav -= ref.mean()
+        wav /= ref.std()
+        sources = apply_model(
+            model_obj,
+            wav[None],
+            device=device,
+            shifts=1,
+            split=True,
+            overlap=0.25,
+            progress=True,
+        )[0]
+        sources *= ref.std()
+        sources += ref.mean()
+    except SystemExit as exc:
+        raise RuntimeError(f"demucs failed to load {audio_path}") from exc
+    except Exception as exc:
+        raise RuntimeError(f"demucs failed for {audio_path}") from exc
+
+    for index, name in enumerate(model_obj.sources):
+        dest = dest_paths.get(name)
+        if dest is None:
+            continue
+        save_audio(sources[index], str(dest), samplerate=model_obj.samplerate)
+
+    missing_src = [name for name, dst in dest_paths.items() if not dst.is_file()]
+    if missing_src:
+        raise RuntimeError(
+            f"demucs output missing stem files: {', '.join(missing_src)}"
+        )
+
+
 def _run_demucs(
     audio_path: Path,
     project_dir: Path,
@@ -138,7 +198,7 @@ def _run_demucs(
     high_quality: bool,
     force: bool,
 ) -> None:
-    """Separate *audio_path* with Demucs and copy stems into *project_dir*."""
+    """Separate *audio_path* with Demucs and write stems into *project_dir*."""
     audio_path = Path(audio_path)
     _validate_audio_path(audio_path)
 
@@ -172,45 +232,7 @@ def _run_demucs(
         demucs_model=model,
     )
 
-    with tempfile.TemporaryDirectory() as tmp:
-        tmp_dir = Path(tmp)
-        try:
-            subprocess.run(
-                [
-                    sys.executable,
-                    "-m",
-                    "demucs",
-                    "-n",
-                    model,
-                    "-o",
-                    str(tmp_dir),
-                    str(audio_path),
-                ],
-                check=True,
-            )
-        except subprocess.CalledProcessError as exc:
-            raise RuntimeError(
-                f"demucs failed (exit {exc.returncode}) for {audio_path}"
-            ) from exc
-
-        demucs_out = tmp_dir / model / slug
-        if not demucs_out.is_dir():
-            raise RuntimeError(f"demucs output directory missing: {demucs_out}")
-
-        paths = stem_paths(project_dir)
-        missing_src = [
-            name
-            for name in paths
-            if not (demucs_out / f"{name}.wav").is_file()
-        ]
-        if missing_src:
-            raise RuntimeError(
-                f"demucs output missing stem files in {demucs_out}: "
-                f"{', '.join(missing_src)}"
-            )
-
-        for name, dst in paths.items():
-            shutil.copy2(demucs_out / f"{name}.wav", dst)
+    _write_demucs_stems(audio_path, stem_paths(project_dir), model=model)
 
 
 def run_separate(

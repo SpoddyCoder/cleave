@@ -6,17 +6,23 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import numpy as np
+import pytest
 
 from cleave.extract import extract_beats_downbeats
+from cleave.paths import model_cache_dir
 
 
+@patch("torch.hub.set_dir")
 @patch("beat_this.inference.File2Beats")
 @patch("torch.cuda.is_available", return_value=False)
 def test_extract_beats_downbeats_uses_file2beats(
     _cuda: object,
     mock_file2beats_cls: MagicMock,
+    mock_set_dir: MagicMock,
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
     path = tmp_path / "mix.wav"
     path.write_bytes(b"wav")
     instance = mock_file2beats_cls.return_value
@@ -24,6 +30,7 @@ def test_extract_beats_downbeats_uses_file2beats(
 
     beats, downbeats = extract_beats_downbeats(path)
 
+    mock_set_dir.assert_called_once_with(str(model_cache_dir()))
     mock_file2beats_cls.assert_called_once_with(
         checkpoint_path="final0",
         device="cpu",

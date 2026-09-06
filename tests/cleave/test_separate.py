@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from pathlib import Path
-from unittest.mock import patch
+from typing import Iterator
+from unittest.mock import MagicMock, patch
 
 import pytest
 import yaml
 
 from cleave.config import VIZ_CONFIG_FILENAME
 from cleave.stems import STEM_NAMES, stems_dir
+from cleave.paths import model_cache_dir
 from cleave.project import (
     PROJECT_FILENAME,
     load_manifest,
@@ -30,6 +33,30 @@ def _write_stub_stems(project: Path) -> None:
     base.mkdir(parents=True, exist_ok=True)
     for name in STEM_NAMES:
         (base / f"{name}.wav").write_bytes(b"wav")
+
+
+@contextmanager
+def _mock_demucs_writes_stems() -> Iterator[dict[str, MagicMock]]:
+    """Stub the Demucs Python API so ``save_audio`` writes dummy stem wavs."""
+    model_obj = MagicMock()
+    model_obj.sources = ["drums", "bass", "other", "vocals"]
+    model_obj.audio_channels = 2
+    model_obj.samplerate = 44100
+
+    def fake_save_audio(_wav: object, path: str, **_kwargs: object) -> None:
+        dest = Path(path)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(b"wav")
+
+    with (
+        patch("torch.hub.set_dir") as set_dir,
+        patch("torch.cuda.is_available", return_value=False),
+        patch("demucs.pretrained.get_model", return_value=model_obj) as get_model,
+        patch("demucs.separate.load_track", return_value=MagicMock()),
+        patch("demucs.apply.apply_model", return_value=[MagicMock()]),
+        patch("demucs.audio.save_audio", side_effect=fake_save_audio),
+    ):
+        yield {"set_dir": set_dir, "get_model": get_model, "model": model_obj}
 
 
 def test_project_stems_complete_false_when_missing(tmp_path: Path) -> None:
@@ -347,23 +374,74 @@ def test_run_demucs_skips_copy_when_mix_in_project(
         demucs_model="htdemucs",
     )
 
-    demucs_out = tmp_path / "demucs-out" / "htdemucs" / "my-track"
-    demucs_out.mkdir(parents=True)
-    for name in STEM_NAMES:
-        (demucs_out / f"{name}.wav").write_bytes(b"wav")
-
-    def fake_run(cmd: list[str], *, check: bool) -> None:
-        out_flag = cmd.index("-o")
-        out_root = Path(cmd[out_flag + 1])
-        target = out_root / "htdemucs" / "my-track"
-        target.mkdir(parents=True, exist_ok=True)
-        for name in STEM_NAMES:
-            (target / f"{name}.wav").write_bytes(b"wav")
-
-    with patch("cleave.separate.subprocess.run", side_effect=fake_run):
+    with _mock_demucs_writes_stems() as mocks:
         _run_demucs(mix, project, high_quality=False, force=True)
 
+    mocks["get_model"].assert_called_once_with("htdemucs")
+    mocks["set_dir"].assert_called_once_with(str(model_cache_dir()))
     assert mix.read_bytes() == b"mix"
+    for name in STEM_NAMES:
+        assert (stems_dir(project) / f"{name}.wav").is_file()
+
+
+def test_run_demucs_high_quality_loads_htdemucs_ft(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    project = tmp_path / "projects" / "my-track"
+    project.mkdir(parents=True)
+    mix = project / "my-track.flac"
+    mix.write_bytes(b"mix")
+
+    with _mock_demucs_writes_stems() as mocks:
+        _run_demucs(mix, project, high_quality=True, force=True)
+
+    mocks["get_model"].assert_called_once_with("htdemucs_ft")
+    assert load_manifest(project).demucs_model == "htdemucs_ft"
+
+
+def test_run_demucs_wraps_get_model_failure(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    project = tmp_path / "projects" / "my-track"
+    project.mkdir(parents=True)
+    mix = project / "my-track.flac"
+    mix.write_bytes(b"mix")
+
+    with (
+        patch("torch.hub.set_dir"),
+        patch("torch.cuda.is_available", return_value=False),
+        patch("demucs.pretrained.get_model", side_effect=RuntimeError("hub down")),
+        patch("demucs.separate.load_track"),
+        patch("demucs.apply.apply_model"),
+        patch("demucs.audio.save_audio"),
+        pytest.raises(RuntimeError, match="demucs failed"),
+    ):
+        _run_demucs(mix, project, high_quality=False, force=True)
+
+
+def test_run_demucs_raises_when_stems_not_written(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    project = tmp_path / "projects" / "my-track"
+    project.mkdir(parents=True)
+    mix = project / "my-track.flac"
+    mix.write_bytes(b"mix")
+    model_obj = MagicMock()
+    model_obj.sources = ["drums", "bass", "other", "vocals"]
+
+    with (
+        patch("torch.hub.set_dir"),
+        patch("torch.cuda.is_available", return_value=False),
+        patch("demucs.pretrained.get_model", return_value=model_obj),
+        patch("demucs.separate.load_track", return_value=MagicMock()),
+        patch("demucs.apply.apply_model", return_value=[MagicMock()]),
+        patch("demucs.audio.save_audio"),
+        pytest.raises(RuntimeError, match="missing stem files"),
+    ):
+        _run_demucs(mix, project, high_quality=False, force=True)
 
 
 def test_run_separate_force_runs_demucs_and_analyse(
@@ -472,22 +550,8 @@ def test_run_separate_creates_project_and_renders(
     audio.write_bytes(b"audio")
 
     project = tmp_path / "projects" / "song"
-    demucs_out = tmp_path / "demucs-out" / "htdemucs" / "song"
-    demucs_out.mkdir(parents=True)
-    for name in STEM_NAMES:
-        (demucs_out / f"{name}.wav").write_bytes(b"wav")
 
-    def fake_run(cmd: list[str], *, check: bool) -> None:
-        out_flag = cmd.index("-o")
-        out_root = Path(cmd[out_flag + 1])
-        target = out_root / "htdemucs" / "song"
-        target.parent.mkdir(parents=True, exist_ok=True)
-        for name in STEM_NAMES:
-            shutil_copy = demucs_out / f"{name}.wav"
-            target.mkdir(parents=True, exist_ok=True)
-            (target / f"{name}.wav").write_bytes(shutil_copy.read_bytes())
-
-    with patch("cleave.separate.subprocess.run", side_effect=fake_run), patch(
+    with _mock_demucs_writes_stems(), patch(
         "cleave.analyse.run_analyse", return_value=project / "signals.json"
     ):
         result = run_separate(audio)
@@ -526,20 +590,7 @@ def test_run_separate_force_deletes_stale_mix(
     new_audio = tmp_path / "song.wav"
     new_audio.write_bytes(b"new")
 
-    demucs_out = tmp_path / "demucs-out" / "htdemucs" / "song"
-    demucs_out.mkdir(parents=True)
-    for name in STEM_NAMES:
-        (demucs_out / f"{name}.wav").write_bytes(b"wav")
-
-    def fake_run(cmd: list[str], *, check: bool) -> None:
-        out_flag = cmd.index("-o")
-        out_root = Path(cmd[out_flag + 1])
-        target = out_root / "htdemucs" / "song"
-        target.mkdir(parents=True, exist_ok=True)
-        for name in STEM_NAMES:
-            (target / f"{name}.wav").write_bytes(b"wav")
-
-    with patch("cleave.separate.subprocess.run", side_effect=fake_run), patch(
+    with _mock_demucs_writes_stems(), patch(
         "cleave.analyse.run_analyse", return_value=project / "signals.json"
     ):
         run_separate(new_audio, force=True)
@@ -570,15 +621,7 @@ def test_run_separate_force_preserves_song_markers(
     )
     rewrite_manifest_slug(project, "song", restored_from="archived-slug")
 
-    def fake_run(cmd: list[str], *, check: bool) -> None:
-        out_flag = cmd.index("-o")
-        out_root = Path(cmd[out_flag + 1])
-        target = out_root / "htdemucs" / "song"
-        target.mkdir(parents=True, exist_ok=True)
-        for name in STEM_NAMES:
-            (target / f"{name}.wav").write_bytes(b"wav")
-
-    with patch("cleave.separate.subprocess.run", side_effect=fake_run), patch(
+    with _mock_demucs_writes_stems(), patch(
         "cleave.analyse.run_analyse", return_value=project / "signals.json"
     ):
         run_separate("song", force=True)
