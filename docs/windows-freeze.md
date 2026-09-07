@@ -1,6 +1,6 @@
 # Windows freeze
 
-How Cleave locates files when frozen, how testers unpack a Windows onedir zip, and how to build libprojectM 4.2+ DLLs. Product decisions live in [structured-releases.md](structured-releases.md). This note is the implementation design for the freeze (paths, spec, FFmpeg, ctypes, libprojectM). One spec ([packaging/cleave.spec](../packaging/cleave.spec)) and one CI job ([.github/workflows/windows-freeze.yml](../.github/workflows/windows-freeze.yml)): CPU torch, CUDA binaries filtered, matplotlib excluded. The job zips `dist/cleave/` as `cleave-<version>-windows-x64.zip` and compiles the Phase 3.2 installer (`cleave-<version>-windows-x64-setup.exe`) from that same tree. Phase 3.3.3 adds an optional CUDA payload the installer can download; see [CUDA extra](#cuda-extra-phase-333).
+How Cleave locates files when frozen, how testers unpack a Windows onedir zip, and how to build libprojectM 4.2+ DLLs. Product decisions live in [structured-releases.md](structured-releases.md). This note is the implementation design for the freeze (paths, spec, FFmpeg, ctypes, libprojectM). One spec ([packaging/cleave.spec](../packaging/cleave.spec)) and one CI job ([.github/workflows/windows-freeze.yml](../.github/workflows/windows-freeze.yml)): CPU torch, CUDA binaries filtered, matplotlib excluded. The job zips `dist/cleave/` as `cleave-<version>-windows-x64.zip` and compiles the Phase 3.2 installer (`cleave-<version>-windows-x64-setup.exe`) from that same tree. Phase 3.3.3 adds an optional installer download of pinned PyTorch CUDA wheels from download.pytorch.org; see [CUDA extra](#cuda-extra-phase-333).
 
 Do not cross-compile the GUI stack from WSL. Build on Windows, run [scripts/windows_stage_freeze.py](../scripts/windows_stage_freeze.py), then zip `dist/cleave/` and compile [packaging/windows/cleave.iss](../packaging/windows/cleave.iss). CI does that on `windows-latest`.
 
@@ -245,22 +245,28 @@ Manual GPU proof (met): install from the setup exe into Program Files; `cleave.e
 
 ## CUDA extra (Phase 3.3.3)
 
-Product decision: [structured-releases.md](structured-releases.md) 3.3.3. One setup exe; CUDA torch is not baked in. The portable zip stays CPU-only.
+Product decision: [structured-releases.md](structured-releases.md) 3.3.3. One setup exe; CUDA torch is not baked in. The portable zip stays CPU-only. Cleave does not build or host a CUDA payload.
 
-The payload is the PyTorch CUDA extra ([requirements-torch-cu130.txt](../requirements-torch-cu130.txt), cu130), not NVIDIA's developer CUDA Toolkit from nvidia.com. Do not download that Toolkit. User-facing copy still says "CUDA toolkit".
+The extra is the PyTorch CUDA wheels in [requirements-torch-cu130.txt](../requirements-torch-cu130.txt) (cu130), not NVIDIA's developer CUDA Toolkit from nvidia.com. Do not download that Toolkit. User-facing copy still says "CUDA toolkit". Wheels come from `https://download.pytorch.org/whl/cu130/`. Match the freeze CPython (`cp310`, `win_amd64`):
 
-CI builds that payload on standard `windows-latest` (no GPU needed to freeze) and hosts it for the installer to fetch (a Release asset is fine). Do not wrap it into `cleave-<version>-windows-x64-setup.exe`. Silent and CI installer smoke (`/TASKS=`) must not download it.
+- `torch-2.12.0+cu130-cp310-cp310-win_amd64.whl`
+- `torchaudio-2.11.0+cu130-cp310-cp310-win_amd64.whl`
+- `torchcodec-0.14.0+cu130-cp310-cp310-win_amd64.whl`
+
+Pin those filenames plus SHA-256 in the installer (same pattern as FFmpeg). Do not scrape the PyTorch index at install time. Do not `pip install` into the freeze (no pip in the onedir). Wheels are zip files: download, verify, unpack native libs into `{app}`. Do not wrap them into `cleave-<version>-windows-x64-setup.exe` and do not attach them as Release assets. Silent and CI installer smoke (`/TASKS=`) must not download them.
+
+cu130 on Windows needs NVIDIA driver 580.88 or newer. Document that with the pin.
 
 Installer (Inno):
 
 - Detect an NVIDIA GPU before asking. If none, skip the question and finish a CPU install.
-- If detected, Yes/No with locked copy (X is the measured payload size in GB): NVIDIA graphics card detected - do you wish to download the CUDA toolkit for faster stem splitting? (X GB)
-- Yes: fetch the payload into `{app}` (same tree as `cleave.exe`; `install_dir()` stays the parent of the exe). Uninstall removes `{app}`.
+- If detected, Yes/No with locked copy (X is the summed size of the pinned wheels in GB): NVIDIA graphics card detected - do you wish to download the CUDA toolkit for faster stem splitting? (X GB)
+- Yes: fetch the pinned wheels into `{app}` (same tree as `cleave.exe`; `install_dir()` stays the parent of the exe). Uninstall removes `{app}`.
 - No or download failure: continue. CPU `separate` stays available. Do not fail the install.
 
 Runtime: before importing torch for stem split, prefer the CUDA tree when it is present and usable; otherwise use the bundled CPU torch. Missing extra is a slower split, not `STEM_SPLIT_MISSING_FROZEN`.
 
-Layout internals (detect method, directory name under `{app}`, how the freeze emits the payload) land here when 3.3.3 is implemented. Do not ask testers to unzip into an overlay folder. Do not ship a second setup exe.
+Layout internals (detect method, directory name under `{app}`, exact URL and SHA-256 constants) land here when 3.3.3 is implemented. Do not ask testers to unzip into an overlay folder. Do not ship a second setup exe.
 
 ---
 

@@ -139,4 +139,4 @@ after the zip step in
 Dispatch uploads a 5-day `cleave-windows-x64-setup` artifact; a non-empty
 `release_tag` uses `gh release upload` for the setup exe next to the zip.
 
-GPU proof from the setup exe is met. Full installer details: [docs/windows-freeze.md](../../docs/windows-freeze.md).
+GPU proof from the setup exe is met. Full installer details: [docs/windows-freeze.md](../../docs/windows-freeze.md). Phase 3.3.3 (not implemented yet): the same setup exe may optionally download pinned PyTorch cu130 wheels from download.pytorch.org when it detects an NVIDIA GPU. CI does not build or attach a CUDA payload.
