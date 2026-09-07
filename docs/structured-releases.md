@@ -2,7 +2,7 @@
 
 Move Cleave from checkout-based development to versioned GitHub Releases.
 
-Phase 1 is done (`v0.1.0`). Phase 2 is done (Windows play/render onedir zip, manual freeze). Phase 3.1 and 3.2 are done (CI freeze zip, installer and argv normalisation, GPU proof from zip and Program Files). Phase 3.3.1 is done (frozen CPU `separate` stack, dispatch zip, editor-first split). Phase 3.3.2 is done (CPU `separate` is the only Windows zip and setup exe; lean spec retired). No tag and no `__version__` bump for Phases 2, 3.1, 3.2, 3.3.1, or 3.3.2 beyond the existing `v0.1.0` source release. The next milestone tag ships Phase 1 source plus that Windows zip and setup exe (CPU `separate` plus play/render). Phase 3.3.3 (CUDA extra) is next. Phase 4 (Linux and macOS binaries) follows 3.3.
+Phase 1 is done (`v0.1.0`). Phase 2 is done (Windows play/render onedir zip, manual freeze). Phase 3.1 and 3.2 are done (CI freeze zip, installer and argv normalisation, GPU proof from zip and Program Files). Phase 3.3.1 is done (frozen CPU `separate` stack, dispatch zip, editor-first split). Phase 3.3.2 is done (CPU `separate` is the only Windows zip and setup exe; lean spec retired). No tag and no `__version__` bump for Phases 2, 3.1, 3.2, 3.3.1, or 3.3.2 beyond the existing `v0.1.0` source release. The next milestone tag ships Phase 1 source plus that Windows zip and setup exe (CPU `separate` plus play/render). Phase 3.3.3 (optional CUDA download in the installer) is next. Phase 4 (Linux and macOS binaries) follows 3.3.
 
 Related: [README.md](../README.md) (current Linux/WSL setup), [completed/user-data-and-config-plan.md](completed/user-data-and-config-plan.md) (install vs user data), [cleave/paths.py](../cleave/paths.py), [cleave/projectm.py](../cleave/projectm.py), [windows-freeze.md](windows-freeze.md) (paths, spec, FFmpeg sidecar, ctypes names, libprojectM build recommendation).
 
@@ -16,7 +16,7 @@ Decide these once, then reuse. Refine per phase rather than reinventing them.
 - **Changelog.** [CHANGELOG.md](../CHANGELOG.md) in Keep a Changelog format (`## [Unreleased]`, then `## [X.Y.Z] - YYYY-MM-DD` with Added / Changed / Fixed / Removed as appropriate). Each GitHub Release body is that version's section, extracted by [scripts/changelog_section.py](../scripts/changelog_section.py).
 - **User data vs install.** Frozen or zip installs must not write projects, presets, or configs into the app folder. Linux data stays XDG (`~/.local/share/cleave/`, config in `~/.config/cleave/`). Windows data mirrors that tree under `Documents\cleave\`; only the global settings file lives in `%APPDATA%\cleave\`. macOS Application Support is Phase 4. See the user-data plan.
 - **Editor first.** The frozen Windows editor is the majority product (Start Menu, desktop, drop a file). CLI stays for Linux checkout, scripts, and CI. New user-facing work needs an in-window path; stderr is optional. Stance: [.cursor/rules/editor-first.mdc](../.cursor/rules/editor-first.mdc).
-- **Editor vs `separate`.** Play and offline render need pygame, OpenGL, libprojectM, and FFmpeg. Stem split needs Demucs and PyTorch (CPU or CUDA; CUDA is optional, for faster Demucs). Play/render GPU is OpenGL, unrelated to CUDA torch. Phase 2's first Windows freeze did not bundle torch. Phase 3.3 is the Windows `separate` plan: 3.3.2 is the current Windows product (CPU `separate` in the zip and setup exe; Cleave does not ship without stem split). CUDA remains an optional extra (3.3.3). Drop-a-wav into the editor is the 3.3 ship path; `cleave.exe separate` is the headless/CI path.
+- **Editor vs `separate`.** Play and offline render need pygame, OpenGL, libprojectM, and FFmpeg. Stem split needs Demucs and PyTorch (CPU or CUDA; CUDA is optional, for faster Demucs). Play/render GPU is OpenGL, unrelated to CUDA torch. Phase 2's first Windows freeze did not bundle torch. Phase 3.3 is the Windows `separate` plan: 3.3.2 is the current Windows product (CPU `separate` in the zip and setup exe; Cleave does not ship without stem split). 3.3.3 adds an optional CUDA download in that same installer when an NVIDIA GPU is detected. Drop-a-wav into the editor is the 3.3 ship path; `cleave.exe separate` is the headless/CI path.
 - **Native deps.** libprojectM 4.2+ (core + playlist) and FFmpeg are not Python packages. Every binary OS needs a build or sidecar story. Frozen/Windows ctypes search is beside the exe, then `PROJECTM_LIB` / `PROJECTM_PLAYLIST_LIB`. Linux checkout still uses env, pkg-config, then system `.so` paths.
 - **Build where you ship.** Produce Windows artifacts on Windows, macOS on macOS, Linux on Linux. Do not cross-compile the GUI stack from WSL.
 - **Licenses.** Bundling FFmpeg, libprojectM, pygame/SDL, and preset packs means shipping their licenses and attribution, not only Cleave's MIT [LICENSE](../LICENSE).
@@ -138,7 +138,7 @@ Met. A tester on a typical Windows box can unzip, run `cleave.exe play` / `cleav
 
 Goal: Windows is a first-class release target. Building it does not depend on a particular desktop.
 
-3.1 automated the CI freeze zip; 3.2 added the Inno Setup installer, argv normalisation, and Release wiring. GPU proof from zip and Program Files is met. 3.3.1 made CPU `separate` freeze-safe and editor-first. 3.3.2 retired the lean spec: one freeze job, CPU `separate` zip and setup exe, drop-a-wav proof met. Do not mix installer branding into the CI freeze. CUDA torch is not in the default installer (3.3.3).
+3.1 automated the CI freeze zip; 3.2 added the Inno Setup installer, argv normalisation, and Release wiring. GPU proof from zip and Program Files is met. 3.3.1 made CPU `separate` freeze-safe and editor-first. 3.3.2 retired the lean spec: one freeze job, CPU `separate` zip and setup exe, drop-a-wav proof met. Do not mix installer branding into the CI freeze. CUDA torch is not baked into the setup exe (3.3.3 downloads it when the user opts in).
 
 ### 3.1 CI freeze zip (done)
 
@@ -216,13 +216,13 @@ Met for 3.1 and 3.2. A tag produces the zip and installer without a manual freez
 
 Goal: a Windows user can drop a wav onto the editor (or pass it as the play target) and get a Cleave project (stems plus `signals.json`) without Linux or a terminal. Stem split is the product: the default Windows zip and setup exe include CPU `separate`. Do not ship a play/render-only Windows Release.
 
-`separate` is Demucs plus analyse (librosa envelopes and Beat This). Play and render on an existing project do not import that stack. CPU torch ([requirements-torch-cpu.txt](../requirements-torch-cpu.txt)) is the Windows `separate` that runs everywhere. CUDA ([requirements-torch-cu130.txt](../requirements-torch-cu130.txt)) is an optional extra for faster Demucs, not a second product. Play/render GPU is OpenGL; it is unrelated to CUDA torch.
+`separate` is Demucs plus analyse (librosa envelopes and Beat This). Play and render on an existing project do not import that stack. CPU torch ([requirements-torch-cpu.txt](../requirements-torch-cpu.txt)) is the Windows `separate` that runs everywhere. CUDA ([requirements-torch-cu130.txt](../requirements-torch-cu130.txt)) is an optional download for faster Demucs, not a second product. Play/render GPU is OpenGL; it is unrelated to CUDA torch.
 
 What it is: one Windows product (CPU `separate` plus play/render) with stem split and first-run weight download inside the editor window. Testers no longer need a Linux-separated project.
 
-What it is not: CUDA torch in the default installer. Weights in Program Files. A second freeze layout or a second exe. A play/render-only Release zip or setup exe. Linux/macOS binaries (Phase 4). A CLI-only split that finishes before the window opens.
+What it is not: CUDA torch baked into the setup exe. A second Cleave installer or zip flavour. Weights in Program Files. A second freeze layout or a second exe. A play/render-only Release zip or setup exe. Linux/macOS binaries (Phase 4). A CLI-only split that finishes before the window opens.
 
-Three slices. 3.3.1 is engineering (done); 3.3.2 is the default Windows zip and setup exe (done); 3.3.3 is the CUDA extra (next).
+Three slices. 3.3.1 is engineering (done); 3.3.2 is the default Windows zip and setup exe (done); 3.3.3 is the optional CUDA installer download (next).
 
 #### 3.3.1 Frozen separate stack (CPU) (done)
 
@@ -252,7 +252,7 @@ What landed:
 - The CPU-separate onedir is `cleave-<version>-windows-x64.zip` and `cleave-<version>-windows-x64-setup.exe`. Inno wraps that tree into Program Files. One `cleave.exe`, CLI subcommands unchanged. `install_dir()` stays the parent of the exe. Not a second exe (`cleave-separate.exe`). Not a `-separate` suffix on the Release assets.
 - Lean spec retired. [packaging/cleave.spec](../packaging/cleave.spec) is the CPU-torch freeze (CUDA binaries filtered, matplotlib excluded).
 - CI: one `freeze` job on standard `windows-latest` in [windows-freeze.yml](../.github/workflows/windows-freeze.yml): [requirements-freeze.txt](../requirements-freeze.txt), then [requirements-torch-cpu.txt](../requirements-torch-cpu.txt), analyse pins, PyInstaller, sidecars, `--version` / `--help`, then `cleave.exe separate` on [tests/fixtures/smoke-separate.wav](../tests/fixtures/smoke-separate.wav). Zip, Inno setup, installer smoke. Tag `workflow_call` waits on CPU Demucs and uses `gh release upload`. Dispatch: 5-day artifacts. Do not cache torch wheels as long-lived artifacts.
-- [README.md](../README.md) Windows zip: drop a wav (or `cleave.exe play <wav>`), first-run weights in `Documents\cleave\models`, named progress in the loading window. CPU `separate` is slow; CUDA extra is 3.3.3.
+- [README.md](../README.md) Windows zip: drop a wav (or `cleave.exe play <wav>`), first-run weights in `Documents\cleave\models`, named progress in the loading window. CPU `separate` is slow; optional CUDA download in the installer is 3.3.3.
 
 Manual proof (met): dispatch zip and Program Files install on a typical Windows box (no NVIDIA, no terminal). Drop a short wav onto `cleave.exe`; named download / split progress in the loading window; project opens. Warm-cache second run skips download chatter. `cleave.exe separate` from cmd writes stems and `signals.json`. Uninstall removes the install dir only.
 
@@ -264,37 +264,52 @@ Met. CPU `separate` is the default Windows zip and setup exe. Drop-a-wav from zi
 
 NVIDIA users. Does not block 3.3.2.
 
-- Acceleration overlay on the 3.3.2 install, which already splits on CPU. Second download, not the default installer, not a second product. Detect CUDA at runtime; fall back to CPU if the extra is missing (slower split, not a missing-split error).
-- Pin one CUDA wheel line: [requirements-torch-cu130.txt](../requirements-torch-cu130.txt) (cu130). Document driver expectations with that pin.
-- Same one-exe layout as 3.3.2 (`install_dir()` is the parent of `cleave.exe`).
+One setup exe on the Releases page. The CPU onedir is always installed. CUDA torch is not baked into that exe.
+
+When the wizard detects an NVIDIA GPU, it asks Yes/No with this copy (X is the measured payload size in GB):
+
+NVIDIA graphics card detected - do you wish to download the CUDA toolkit for faster stem splitting? (X GB)
+
+Do not show that question when NVIDIA is not detected. The payload is the PyTorch CUDA extra ([requirements-torch-cu130.txt](../requirements-torch-cu130.txt), cu130), not NVIDIA's developer CUDA Toolkit from nvidia.com. Do not download that Toolkit. Document driver expectations with the cu130 pin.
+
+Yes: the installer fetches the hosted payload into the install dir (Program Files with the app). Uninstall removes it with `{app}`. Same `cleave.exe`; `install_dir()` stays the parent of the exe.
+
+No, download failure, or no NVIDIA: finish the install. Stem split stays on CPU (slower, not a missing-split error). Do not fail the whole install.
+
+Runtime: prefer CUDA torch when that tree is present and usable; otherwise use the bundled CPU torch.
+
+Not a second setup exe, not a second Cleave zip, not a manual unzip into an overlay folder. The portable zip stays CPU-only. Adding CUDA later means running the installer again (in-window fetch is Later).
+
+CI still builds the payload on standard `windows-latest` (no GPU needed to freeze) and hosts it for the installer to fetch (a Release asset is fine). Do not wrap it into the setup exe. Silent and CI installer smoke do not download it.
 
 #### Locked
 
-- **One Windows product.** After 3.3.2 the default zip and setup exe include CPU `separate` plus play/render. Do not ship a play/render-only GitHub Release. CUDA torch stays out of that default installer (3.3.3).
-- **CPU `separate` is the Windows split.** Works without NVIDIA. CUDA is 3.3.3 only.
+- **One Windows product.** After 3.3.2 the default zip and setup exe include CPU `separate` plus play/render. Do not ship a play/render-only GitHub Release. One setup exe; CUDA torch is not baked in (3.3.3 downloads it when NVIDIA is detected and the user says yes).
+- **CPU `separate` is the Windows split.** Works without NVIDIA. CUDA is 3.3.3 only, and only if the installer download succeeded.
 - **One exe.** Still `cleave.exe`. Not `cleave-separate.exe`. CLI subcommands stay for scripts and CI; they are not the Windows default UX.
 - **Editor-first split.** Drop or `play` on a wav opens the window first. Stem split, analyse, and first-run weight download report on the loading screen (name plus bar). Failures stay in the window. Explorer / Start Menu / drop must not depend on a console for that.
 - **Layout.** `install_dir()` stays the parent of the exe. The 3.3.2 freeze is a full onedir, not an overlay onto a lean tree.
 - **Weights in user data.** `Documents\cleave\` (or `CLEAVE_DATA`). First-run download; fail clearly offline. Never Program Files.
 - **Download feedback.** First fetch of each model names it and shows progress in the editor; stderr when a console is attached. Cached hits stay quiet.
 - **Lean freeze is retired.** [packaging/cleave.spec](../packaging/cleave.spec) is the CPU `separate` freeze. `STEM_SPLIT_MISSING_FROZEN` is a runtime guard if frozen torch is missing, not a product smoke testers see on a Release build.
-- **CI.** Standard `windows-latest`. One `freeze` job. CPU torch for 3.3.2. No larger runners. Release assets on tag (zip plus setup). Do not cache torch wheels as long-lived artifacts. Headless smoke keeps `cleave.exe separate` on the fixture wav.
+- **CI.** Standard `windows-latest`. CPU freeze job as in 3.3.2. 3.3.3 adds a payload build on the same runner label (no GPU, no larger runners). Release assets on tag: zip plus setup; the CUDA payload is hosted for the installer to fetch, not a second Cleave. Do not cache torch wheels as long-lived artifacts. Headless smoke keeps `cleave.exe separate` on the fixture wav and does not download CUDA.
+- **Installer CUDA prompt.** Show it only when an NVIDIA GPU is detected. Locked copy above. Skip or fail leaves CPU `separate`. Files land under `{app}` so uninstall removes them.
 
 #### Leave open
 
-How the CUDA extra is overlaid at install time (downloadable zip vs optional installer task). Windowed PE (`console=False` plus attach-to-parent for terminals) can land with 3.3 or beside it; it must not block treating the editor as the split UI.
+Windowed PE (`console=False` plus attach-to-parent for terminals) can land with 3.3 or beside it; it must not block treating the editor as the split UI. Exact NVIDIA detect and payload layout live in [windows-freeze.md](windows-freeze.md).
 
-**Resolved:** one-exe freeze is possible (`cleave.exe` from [packaging/cleave.spec](../packaging/cleave.spec)); do not add `cleave-separate.exe`. One Windows Release product (CPU `separate` is not a second zip or setup exe). The lean spec is retired.
+**Resolved:** one-exe freeze is possible (`cleave.exe` from [packaging/cleave.spec](../packaging/cleave.spec)); do not add `cleave-separate.exe`. One Windows Release product (CPU `separate` is not a second zip or setup exe). The lean spec is retired. CUDA delivery is an optional download in that one installer, not two flavours and not a user-facing overlay zip.
 
 #### Done when
 
-Met. A tester on 64-bit Windows, with no Linux, no NVIDIA requirement, and no terminal, can drop a short wav onto the shipped zip or Program Files install, see named first-run weight download and split progress in the window, then play that project. A later run with cache warm skips the download chatter. `cleave.exe separate` still works from cmd for scripts and CI. The GitHub Release attaches that zip and setup exe only (no play/render-only extra). CUDA extra is 3.3.3 and does not block that.
+Met. A tester on 64-bit Windows, with no Linux, no NVIDIA requirement, and no terminal, can drop a short wav onto the shipped zip or Program Files install, see named first-run weight download and split progress in the window, then play that project. A later run with cache warm skips the download chatter. `cleave.exe separate` still works from cmd for scripts and CI. The GitHub Release attaches that zip and setup exe only (no play/render-only extra). Optional CUDA download in the installer is 3.3.3 and does not block that.
 
 ---
 
 ## Phase 4 - Linux and macOS binaries
 
-After Phase 3.3. Phase 1, Phase 2, 3.1, 3.2, 3.3.1, and 3.3.2 are done on `main`. The next tag attaches the CPU-`separate` Windows zip and setup exe (plus source). Phase 3.3.3 is the CUDA extra. Phase 4 adds Linux and macOS binaries. Windows `separate` is 3.3, not this phase.
+After Phase 3.3. Phase 1, Phase 2, 3.1, 3.2, 3.3.1, and 3.3.2 are done on `main`. The next tag attaches the CPU-`separate` Windows zip and setup exe (plus source). Phase 3.3.3 is the optional CUDA installer download. Phase 4 adds Linux and macOS binaries. Windows `separate` is 3.3, not this phase.
 
 Goal: the same product as Windows (CPU `separate` plus play/render), as native artifacts. Source+requirements Linux remains available from Phase 1.
 
@@ -314,9 +329,10 @@ Done when: a tag attaches Linux, Windows, and macOS artifacts (plus source) and 
 
 ## Later (not a phase yet)
 
-Do not block Phases 1-4 on these. Revisit after binaries exist. CUDA `separate` lives in Phase 3.3.3, not here.
+Do not block Phases 1-4 on these. Revisit after binaries exist. CUDA `separate` lives in Phase 3.3.3 (installer download), not here. In-window CUDA fetch for people who skipped the installer prompt, or who get an NVIDIA GPU later, can land after 3.3.3.
 
 - Nuitka freeze for possible startup and runtime gains (Phase 2 ships PyInstaller). See [roadmap.md](roadmap.md).
+- In-window CUDA fetch for people who skipped the installer prompt, or who get an NVIDIA GPU later (same payload as 3.3.3).
 - In-app version string and a "check GitHub for updates" hint (full auto-update is a different project).
 - Hosted preset/texture packs with a first-run downloader.
 - Apple Developer and Windows code-signing accounts, if Phase 3/4 shipped unsigned.
@@ -326,4 +342,4 @@ Do not block Phases 1-4 on these. Revisit after binaries exist. CUDA `separate` 
 
 ## Suggested order of analysis
 
-Phase 1, Phase 2, Phase 3.1-3.2, 3.3.1, and 3.3.2 are done. Next: Phase 3.3.3 (CUDA extra), then Phase 4 (Linux and macOS binaries). Keep freeze implementation choices in [windows-freeze.md](windows-freeze.md), not in this overview.
+Phase 1, Phase 2, Phase 3.1-3.2, 3.3.1, and 3.3.2 are done. Next: Phase 3.3.3 (optional CUDA download in the installer), then Phase 4 (Linux and macOS binaries). Keep freeze implementation choices in [windows-freeze.md](windows-freeze.md), not in this overview.
