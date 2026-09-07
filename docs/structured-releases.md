@@ -22,7 +22,7 @@ Decide these once, then reuse. Refine per phase rather than reinventing them.
 - **Licenses.** Bundling FFmpeg, libprojectM, pygame/SDL, and preset packs means shipping their licenses and attribution, not only Cleave's MIT [LICENSE](../LICENSE).
 - **GPU in CI.** GitHub-hosted runners cannot validate live compositing. Automate freeze and unit tests; keep a short manual GPU checklist per OS.
 - **CI cost (public repo).** Standard GitHub-hosted runners are free and unlimited on a public repository, including `windows-latest`, `ubuntu-latest`, and `macos-latest`. Do not use larger runners (extra CPU, RAM, GPU, or static IPs); those are billed even on public repos. Windows and macOS minute multipliers apply only when minutes are billed (private repos). Keep freeze jobs on the standard labels.
-- **Artifact storage.** Actions minutes for a freeze job are free; workflow artifact and cache storage are not unlimited. Ship the binary as a GitHub Release asset, not as a long-lived Actions artifact. Prefer attaching with `gh release upload` in the freeze job. If a workflow artifact is needed for a later job, give it a short retention and delete it once the Release upload succeeds. Do not upload intermediate freeze trees. Actions cache is a separate 10 GB per-repository allowance: cache pip/vcpkg keys, not FFmpeg zips or onedir output.
+- **Artifact storage.** Actions minutes for a freeze job are free; workflow artifact and cache storage are not unlimited. Ship the binary as a GitHub Release asset, not as a long-lived Actions artifact. Prefer attaching with `gh release upload` in the freeze job. If a workflow artifact is needed for a later job, give it a short retention and delete it once the Release upload succeeds. Do not upload intermediate freeze trees. Actions cache is a separate 10 GB per-repository allowance: cache pip/vcpkg keys, not FFmpeg zips, CUDA torch wheels, or onedir output. Do not host CUDA torch wheels as Release assets; the installer fetches pinned wheels from download.pytorch.org.
 - **Preset packs.** Milkdrop presets and textures are large and separately licensed. First-run download vs a huge installer is an open product choice, not a freeze detail. Do not put preset packs in workflow artifacts.
 
 ---
@@ -220,7 +220,7 @@ Goal: a Windows user can drop a wav onto the editor (or pass it as the play targ
 
 What it is: one Windows product (CPU `separate` plus play/render) with stem split and first-run weight download inside the editor window. Testers no longer need a Linux-separated project.
 
-What it is not: CUDA torch baked into the setup exe. A second Cleave installer or zip flavour. Weights in Program Files. A second freeze layout or a second exe. A play/render-only Release zip or setup exe. Linux/macOS binaries (Phase 4). A CLI-only split that finishes before the window opens.
+What it is not: CUDA torch baked into the setup exe. A Cleave-hosted CUDA payload. A second Cleave installer or zip flavour. Weights in Program Files. A second freeze layout or a second exe. A play/render-only Release zip or setup exe. Linux/macOS binaries (Phase 4). A CLI-only split that finishes before the window opens.
 
 Three slices. 3.3.1 is engineering (done); 3.3.2 is the default Windows zip and setup exe (done); 3.3.3 is the optional CUDA installer download (next).
 
@@ -264,23 +264,25 @@ Met. CPU `separate` is the default Windows zip and setup exe. Drop-a-wav from zi
 
 NVIDIA users. Does not block 3.3.2.
 
-One setup exe on the Releases page. The CPU onedir is always installed. CUDA torch is not baked into that exe.
+One setup exe on the Releases page. The CPU onedir is always installed. CUDA torch is not baked into that exe. Cleave does not build or host a CUDA payload.
 
-When the wizard detects an NVIDIA GPU, it asks Yes/No with this copy (X is the measured payload size in GB):
+When the wizard detects an NVIDIA GPU, it asks Yes/No with this copy (X is the summed size of the pinned wheels in GB):
 
 NVIDIA graphics card detected - do you wish to download the CUDA toolkit for faster stem splitting? (X GB)
 
-Do not show that question when NVIDIA is not detected. The payload is the PyTorch CUDA extra ([requirements-torch-cu130.txt](../requirements-torch-cu130.txt), cu130), not NVIDIA's developer CUDA Toolkit from nvidia.com. Do not download that Toolkit. Document driver expectations with the cu130 pin.
+Do not show that question when NVIDIA is not detected. The extra is the PyTorch CUDA wheels in [requirements-torch-cu130.txt](../requirements-torch-cu130.txt) (cu130, `cp310` `win_amd64` to match the freeze Python). Fetch them from `https://download.pytorch.org/whl/cu130/`. That is not NVIDIA's developer CUDA Toolkit from nvidia.com. Do not download that Toolkit. Do not pip-install into the freeze (no pip in the onedir). Wheels are zip files: download, verify SHA-256, unpack into `{app}`. Document driver expectations with the cu130 pin (Windows driver 580.88 or newer).
 
-Yes: the installer fetches the hosted payload into the install dir (Program Files with the app). Uninstall removes it with `{app}`. Same `cleave.exe`; `install_dir()` stays the parent of the exe.
+Yes: the installer fetches those pinned wheels into the install dir (Program Files with the app). Uninstall removes them with `{app}`. Same `cleave.exe`; `install_dir()` stays the parent of the exe.
 
 No, download failure, or no NVIDIA: finish the install. Stem split stays on CPU (slower, not a missing-split error). Do not fail the whole install.
 
 Runtime: prefer CUDA torch when that tree is present and usable; otherwise use the bundled CPU torch.
 
-Not a second setup exe, not a second Cleave zip, not a manual unzip into an overlay folder. The portable zip stays CPU-only. Adding CUDA later means running the installer again (in-window fetch is Later).
+Not a second setup exe, not a second Cleave zip, not a Cleave-hosted CUDA asset, not a manual unzip into an overlay folder. The portable zip stays CPU-only. Adding CUDA later means running the installer again (in-window fetch is Later).
 
-CI still builds the payload on standard `windows-latest` (no GPU needed to freeze) and hosts it for the installer to fetch (a Release asset is fine). Do not wrap it into the setup exe. Silent and CI installer smoke do not download it.
+CI does not build or upload a CUDA payload. Silent and CI installer smoke do not download the wheels.
+
+Pin exact wheel filenames and SHA-256 in the installer (same pattern as FFmpeg). Do not scrape the PyTorch index at install time. Exact URLs and checksums live in [windows-freeze.md](windows-freeze.md) when 3.3.3 is implemented.
 
 #### Locked
 
@@ -292,14 +294,14 @@ CI still builds the payload on standard `windows-latest` (no GPU needed to freez
 - **Weights in user data.** `Documents\cleave\` (or `CLEAVE_DATA`). First-run download; fail clearly offline. Never Program Files.
 - **Download feedback.** First fetch of each model names it and shows progress in the editor; stderr when a console is attached. Cached hits stay quiet.
 - **Lean freeze is retired.** [packaging/cleave.spec](../packaging/cleave.spec) is the CPU `separate` freeze. `STEM_SPLIT_MISSING_FROZEN` is a runtime guard if frozen torch is missing, not a product smoke testers see on a Release build.
-- **CI.** Standard `windows-latest`. CPU freeze job as in 3.3.2. 3.3.3 adds a payload build on the same runner label (no GPU, no larger runners). Release assets on tag: zip plus setup; the CUDA payload is hosted for the installer to fetch, not a second Cleave. Do not cache torch wheels as long-lived artifacts. Headless smoke keeps `cleave.exe separate` on the fixture wav and does not download CUDA.
-- **Installer CUDA prompt.** Show it only when an NVIDIA GPU is detected. Locked copy above. Skip or fail leaves CPU `separate`. Files land under `{app}` so uninstall removes them.
+- **CI.** Standard `windows-latest`. CPU freeze job as in 3.3.2. No CUDA payload build and no CUDA Release asset. Do not cache torch wheels as long-lived artifacts. Headless smoke keeps `cleave.exe separate` on the fixture wav and does not download CUDA wheels.
+- **Installer CUDA prompt.** Show it only when an NVIDIA GPU is detected. Locked copy above. Fetch pinned cu130 wheels from download.pytorch.org; skip or fail leaves CPU `separate`. Files land under `{app}` so uninstall removes them. Do not host those wheels on GitHub.
 
 #### Leave open
 
-Windowed PE (`console=False` plus attach-to-parent for terminals) can land with 3.3 or beside it; it must not block treating the editor as the split UI. Exact NVIDIA detect and payload layout live in [windows-freeze.md](windows-freeze.md).
+Windowed PE (`console=False` plus attach-to-parent for terminals) can land with 3.3 or beside it; it must not block treating the editor as the split UI. Exact NVIDIA detect, pinned wheel URLs and SHA-256, and overlay layout live in [windows-freeze.md](windows-freeze.md).
 
-**Resolved:** one-exe freeze is possible (`cleave.exe` from [packaging/cleave.spec](../packaging/cleave.spec)); do not add `cleave-separate.exe`. One Windows Release product (CPU `separate` is not a second zip or setup exe). The lean spec is retired. CUDA delivery is an optional download in that one installer, not two flavours and not a user-facing overlay zip.
+**Resolved:** one-exe freeze is possible (`cleave.exe` from [packaging/cleave.spec](../packaging/cleave.spec)); do not add `cleave-separate.exe`. One Windows Release product (CPU `separate` is not a second zip or setup exe). The lean spec is retired. CUDA delivery is an optional download of pinned PyTorch cu130 wheels from download.pytorch.org in that one installer, not two flavours, not a Cleave-hosted payload, and not a user-facing overlay zip.
 
 #### Done when
 
@@ -332,7 +334,7 @@ Done when: a tag attaches Linux, Windows, and macOS artifacts (plus source) and 
 Do not block Phases 1-4 on these. Revisit after binaries exist. CUDA `separate` lives in Phase 3.3.3 (installer download), not here. In-window CUDA fetch for people who skipped the installer prompt, or who get an NVIDIA GPU later, can land after 3.3.3.
 
 - Nuitka freeze for possible startup and runtime gains (Phase 2 ships PyInstaller). See [roadmap.md](roadmap.md).
-- In-window CUDA fetch for people who skipped the installer prompt, or who get an NVIDIA GPU later (same payload as 3.3.3).
+- In-window CUDA fetch for people who skipped the installer prompt, or who get an NVIDIA GPU later (same pinned PyTorch wheels as 3.3.3).
 - In-app version string and a "check GitHub for updates" hint (full auto-update is a different project).
 - Hosted preset/texture packs with a first-run downloader.
 - Apple Developer and Windows code-signing accounts, if Phase 3/4 shipped unsigned.
