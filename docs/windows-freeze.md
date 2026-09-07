@@ -254,19 +254,21 @@ Windows cu130 does not need separate `nvidia-*` wheels. A platform-tagged pip re
 Pinned wheels (constants in [packaging/windows/cleave.iss](../packaging/windows/cleave.iss)). Do not scrape the PyTorch index at install time. Do not `pip install` into the freeze (no pip in the onedir). Wheels are zip files: download, verify SHA-256, unpack into `{app}\_internal`. Do not wrap them into `cleave-<version>-windows-x64-setup.exe` and do not attach them as Release assets. Silent and CI installer smoke (`/VERYSILENT /TASKS=`) must not download them unless `/CUDA=1` is passed.
 
 - `torch-2.12.0+cu130-cp310-cp310-win_amd64.whl`
-  URL: `https://download.pytorch.org/whl/cu130/torch-2.12.0+cu130-cp310-cp310-win_amd64.whl`
+  URL: `https://download.pytorch.org/whl/cu130/torch-2.12.0%2Bcu130-cp310-cp310-win_amd64.whl`
   SHA-256: `9cde3a3dbe675ee1558e7ee2d6be60aaa2b9562552d1b0a659c8edd6edd29318`
   Size: 1926375050 bytes
 - `torchaudio-2.11.0+cu130-cp310-cp310-win_amd64.whl`
-  URL: `https://download.pytorch.org/whl/cu130/torchaudio-2.11.0+cu130-cp310-cp310-win_amd64.whl`
+  URL: `https://download.pytorch.org/whl/cu130/torchaudio-2.11.0%2Bcu130-cp310-cp310-win_amd64.whl`
   SHA-256: `9bbd4470c74172be32d0e11efbcf5e8dc785f7403b8232c07aac575c8d96715f`
   Size: 1722730 bytes
 - `torchcodec-0.14.0+cu130-cp310-cp310-win_amd64.whl`
-  URL: `https://download.pytorch.org/whl/cu130/torchcodec-0.14.0+cu130-cp310-cp310-win_amd64.whl`
+  URL: `https://download.pytorch.org/whl/cu130/torchcodec-0.14.0%2Bcu130-cp310-cp310-win_amd64.whl`
   SHA-256: `b4cfae4d2fd58467fccc528a1e31a0ec6fed6a4a49b9495dab50d2aada1918cf`
   Size: 3574648 bytes
 
 Sum: 1931672428 bytes (1.80 GiB). The installer prompt uses the hardcoded label `2 GB` (`CudaDownloadSizeLabel` in the `.iss`). Do not sum sizes over the network at install time.
+
+URLs use `%2B` to percent-encode the `+` in the wheel filename. A literal `+` in the URL path is valid per RFC 3986 but Delphi `THTTPClient` (Inno Setup's HTTP stack) and the PyTorch R2 CDN (`download-r2.pytorch.org`, behind a 301 from `download.pytorch.org`) handle `%2B` more reliably. The local temp filename in the `.iss` uses `-` instead of `+` so the on-disk name has no characters that could be reinterpreted by URL-decoding logic.
 
 cu130 on Windows needs NVIDIA driver 580.88 or newer.
 

@@ -62,23 +62,27 @@ const
   EnvironmentKeyMachine =
     'SYSTEM\CurrentControlSet\Control\Session Manager\Environment';
   EnvironmentKeyUser = 'Environment';
-  { Pinned PyTorch cu130 wheels (cp310 win_amd64). docs/windows-freeze.md }
+  { Pinned PyTorch cu130 wheels (cp310 win_amd64). docs/windows-freeze.md
+    URLs percent-encode + as %2B.  A literal + in the URL path is valid
+    per RFC 3986 but Delphi THTTPClient (Inno Setup's HTTP stack) and the
+    PyTorch R2 CDN are more reliable with the encoded form.
+    File constants use - instead of + for a safe temp-dir name. }
   CudaTorchFile =
-    'torch-2.12.0+cu130-cp310-cp310-win_amd64.whl';
+    'torch-2.12.0-cu130-cp310-cp310-win_amd64.whl';
   CudaTorchUrl =
-    'https://download.pytorch.org/whl/cu130/torch-2.12.0+cu130-cp310-cp310-win_amd64.whl';
+    'https://download.pytorch.org/whl/cu130/torch-2.12.0%2Bcu130-cp310-cp310-win_amd64.whl';
   CudaTorchSha256 =
     '9cde3a3dbe675ee1558e7ee2d6be60aaa2b9562552d1b0a659c8edd6edd29318';
   CudaTorchaudioFile =
-    'torchaudio-2.11.0+cu130-cp310-cp310-win_amd64.whl';
+    'torchaudio-2.11.0-cu130-cp310-cp310-win_amd64.whl';
   CudaTorchaudioUrl =
-    'https://download.pytorch.org/whl/cu130/torchaudio-2.11.0+cu130-cp310-cp310-win_amd64.whl';
+    'https://download.pytorch.org/whl/cu130/torchaudio-2.11.0%2Bcu130-cp310-cp310-win_amd64.whl';
   CudaTorchaudioSha256 =
     '9bbd4470c74172be32d0e11efbcf5e8dc785f7403b8232c07aac575c8d96715f';
   CudaTorchcodecFile =
-    'torchcodec-0.14.0+cu130-cp310-cp310-win_amd64.whl';
+    'torchcodec-0.14.0-cu130-cp310-cp310-win_amd64.whl';
   CudaTorchcodecUrl =
-    'https://download.pytorch.org/whl/cu130/torchcodec-0.14.0+cu130-cp310-cp310-win_amd64.whl';
+    'https://download.pytorch.org/whl/cu130/torchcodec-0.14.0%2Bcu130-cp310-cp310-win_amd64.whl';
   CudaTorchcodecSha256 =
     'b4cfae4d2fd58467fccc528a1e31a0ec6fed6a4a49b9495dab50d2aada1918cf';
   CudaDownloadSizeLabel = '2 GB';
@@ -291,11 +295,13 @@ begin
   Result := True;
 end;
 
-function DownloadCudaWheel(const Url, BaseName, Sha256: String): Boolean;
+function DownloadCudaWheel(const Url, BaseName, Sha256: String;
+  var Reason: String): Boolean;
 var
   Dest, Got: String;
 begin
   Result := False;
+  Reason := '';
   Dest := ExpandConstant('{tmp}\') + BaseName;
   CudaLastLogPercent := 0;
   if FileExists(Dest) then
@@ -303,25 +309,29 @@ begin
   try
     DownloadTemporaryFile(Url, BaseName, '', @OnCudaDownloadProgress);
   except
-    Log('CUDA download failed for ' + BaseName + ': ' + GetExceptionMessage);
+    Reason := GetExceptionMessage;
+    Log('CUDA download failed for ' + BaseName + ': ' + Reason);
     if FileExists(Dest) then
       DeleteFile(Dest);
     Exit;
   end;
   if not FileExists(Dest) then
   begin
+    Reason := 'file missing after download';
     Log('CUDA wheel missing after download: ' + BaseName);
     Exit;
   end;
   try
     Got := Lowercase(GetSHA256OfFile(Dest));
   except
+    Reason := 'SHA-256 read failed: ' + GetExceptionMessage;
     Log('CUDA SHA-256 read failed for ' + BaseName + ': ' + GetExceptionMessage);
     DeleteFile(Dest);
     Exit;
   end;
   if CompareText(Got, Lowercase(Sha256)) <> 0 then
   begin
+    Reason := 'SHA-256 mismatch (got ' + Got + ')';
     Log('CUDA SHA-256 mismatch for ' + BaseName + ' got ' + Got);
     DeleteFile(Dest);
     Exit;
@@ -334,15 +344,18 @@ begin
   Result := Exec(Filename, Params, '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
 end;
 
-function ExtractCudaWheel(const WheelPath, DestDir: String): Boolean;
+function ExtractCudaWheel(const WheelPath, DestDir: String;
+  var Reason: String): Boolean;
 var
   ResultCode: Integer;
   Tar, ZipPath, Ps: String;
 begin
   Result := False;
+  Reason := '';
   if not DirExists(DestDir) then
     if not ForceDirectories(DestDir) then
     begin
+      Reason := 'could not create ' + DestDir;
       Log('Could not create CUDA unpack dir ' + DestDir);
       Exit;
     end;
@@ -352,7 +365,10 @@ begin
     Result := RunHidden(Tar, '-xf "' + WheelPath + '" -C "' + DestDir + '"', ResultCode) and
       (ResultCode = 0);
     if not Result then
+    begin
+      Reason := 'tar exit code ' + IntToStr(ResultCode);
       Log('tar extract failed rc=' + IntToStr(ResultCode) + ' for ' + WheelPath);
+    end;
     Exit;
   end;
   Log('tar.exe not found; trying PowerShell Expand-Archive');
@@ -361,6 +377,7 @@ begin
     DeleteFile(ZipPath);
   if not FileCopy(WheelPath, ZipPath, False) then
   begin
+    Reason := 'could not copy wheel to .zip';
     Log('Could not copy wheel to .zip for Expand-Archive: ' + WheelPath);
     Exit;
   end;
@@ -372,7 +389,10 @@ begin
     ResultCode) and (ResultCode = 0);
   DeleteFile(ZipPath);
   if not Result then
+  begin
+    Reason := 'Expand-Archive exit code ' + IntToStr(ResultCode);
     Log('Expand-Archive failed rc=' + IntToStr(ResultCode) + ' for ' + WheelPath);
+  end;
 end;
 
 function DelTreeIfExists(const Path: String): Boolean;
@@ -541,7 +561,7 @@ end;
 
 procedure MaybeInstallCudaExtra;
 var
-  Staging, InternalDir, Tmp: String;
+  Staging, InternalDir, Tmp, Reason: String;
 begin
   if not ShouldDownloadCuda then
   begin
@@ -556,22 +576,52 @@ begin
   Staging := Tmp + '\cuda-unpack';
   InternalDir := ExpandConstant('{app}\_internal');
   DelTreeIfExists(Staging);
-  if not DownloadCudaWheel(CudaTorchUrl, CudaTorchFile, CudaTorchSha256) or
-     not DownloadCudaWheel(CudaTorchaudioUrl, CudaTorchaudioFile, CudaTorchaudioSha256) or
-     not DownloadCudaWheel(CudaTorchcodecUrl, CudaTorchcodecFile, CudaTorchcodecSha256) then
+  Reason := '';
+  if not DownloadCudaWheel(CudaTorchUrl, CudaTorchFile, CudaTorchSha256, Reason) then
   begin
     WarnCudaFailure(
-      'CUDA toolkit download failed. Stem splitting will use the CPU. You can run Setup again to retry.');
+      'CUDA download failed (' + CudaTorchFile + '): ' + Reason + #13#10 +
+      'URL: ' + CudaTorchUrl + #13#10#13#10 +
+      'Stem splitting will use the CPU. You can run Setup again to retry.');
+    Exit;
+  end;
+  if not DownloadCudaWheel(CudaTorchaudioUrl, CudaTorchaudioFile, CudaTorchaudioSha256, Reason) then
+  begin
+    WarnCudaFailure(
+      'CUDA download failed (' + CudaTorchaudioFile + '): ' + Reason + #13#10 +
+      'URL: ' + CudaTorchaudioUrl + #13#10#13#10 +
+      'Stem splitting will use the CPU. You can run Setup again to retry.');
+    Exit;
+  end;
+  if not DownloadCudaWheel(CudaTorchcodecUrl, CudaTorchcodecFile, CudaTorchcodecSha256, Reason) then
+  begin
+    WarnCudaFailure(
+      'CUDA download failed (' + CudaTorchcodecFile + '): ' + Reason + #13#10 +
+      'URL: ' + CudaTorchcodecUrl + #13#10#13#10 +
+      'Stem splitting will use the CPU. You can run Setup again to retry.');
     Exit;
   end;
   if not WizardSilent then
     WizardForm.StatusLabel.Caption := 'Unpacking CUDA toolkit...';
-  if not ExtractCudaWheel(Tmp + '\' + CudaTorchFile, Staging) or
-     not ExtractCudaWheel(Tmp + '\' + CudaTorchaudioFile, Staging) or
-     not ExtractCudaWheel(Tmp + '\' + CudaTorchcodecFile, Staging) then
+  if not ExtractCudaWheel(Tmp + '\' + CudaTorchFile, Staging, Reason) then
   begin
     WarnCudaFailure(
-      'CUDA toolkit unpack failed. Stem splitting will use the CPU. You can run Setup again to retry.');
+      'CUDA unpack failed (' + CudaTorchFile + '): ' + Reason + #13#10#13#10 +
+      'Stem splitting will use the CPU. You can run Setup again to retry.');
+    Exit;
+  end;
+  if not ExtractCudaWheel(Tmp + '\' + CudaTorchaudioFile, Staging, Reason) then
+  begin
+    WarnCudaFailure(
+      'CUDA unpack failed (' + CudaTorchaudioFile + '): ' + Reason + #13#10#13#10 +
+      'Stem splitting will use the CPU. You can run Setup again to retry.');
+    Exit;
+  end;
+  if not ExtractCudaWheel(Tmp + '\' + CudaTorchcodecFile, Staging, Reason) then
+  begin
+    WarnCudaFailure(
+      'CUDA unpack failed (' + CudaTorchcodecFile + '): ' + Reason + #13#10#13#10 +
+      'Stem splitting will use the CPU. You can run Setup again to retry.');
     Exit;
   end;
   if not DirExists(Staging + '\torch') or
@@ -579,19 +629,25 @@ begin
      not DirExists(Staging + '\torchcodec') then
   begin
     WarnCudaFailure(
-      'CUDA toolkit unpack was incomplete. Stem splitting will use the CPU.');
+      'CUDA unpack was incomplete (missing torch, torchaudio, or torchcodec ' +
+      'in staging).' + #13#10#13#10 +
+      'Stem splitting will use the CPU.');
     Exit;
   end;
   if not DirExists(InternalDir) then
   begin
     WarnCudaFailure(
-      'Install folder is missing _internal; CUDA toolkit was not applied. Stem splitting will use the CPU.');
+      'Install folder is missing _internal; CUDA was not applied.' + #13#10 +
+      'Expected: ' + InternalDir + #13#10#13#10 +
+      'Stem splitting will use the CPU.');
     Exit;
   end;
   if not ReplaceCudaPackages(Staging, InternalDir) then
   begin
     WarnCudaFailure(
-      'CUDA toolkit could not replace the CPU torch packages. Stem splitting will use the CPU.');
+      'CUDA could not replace the CPU torch packages ' +
+      '(check Setup log for details).' + #13#10#13#10 +
+      'Stem splitting will use the CPU.');
     Exit;
   end;
   Log('CUDA extra installed under ' + InternalDir);
