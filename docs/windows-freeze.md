@@ -247,26 +247,52 @@ Manual GPU proof (met): install from the setup exe into Program Files; `cleave.e
 
 Product decision: [structured-releases.md](structured-releases.md) 3.3.3. One setup exe; CUDA torch is not baked in. The portable zip stays CPU-only. Cleave does not build or host a CUDA payload.
 
-The extra is the PyTorch CUDA wheels in [requirements-torch-cu130.txt](../requirements-torch-cu130.txt) (cu130), not NVIDIA's developer CUDA Toolkit from nvidia.com. Do not download that Toolkit. User-facing copy still says "CUDA toolkit". Wheels come from `https://download.pytorch.org/whl/cu130/`. Match the freeze CPython (`cp310`, `win_amd64`):
+The extra is the PyTorch CUDA wheels in [requirements-torch-cu130.txt](../requirements-torch-cu130.txt) (cu130), not NVIDIA's developer CUDA Toolkit from nvidia.com. Do not download that Toolkit. User-facing copy still says "CUDA toolkit". Wheels come from `https://download.pytorch.org/whl/cu130/`. Match the freeze CPython (`cp310`, `win_amd64`).
+
+Windows cu130 does not need separate `nvidia-*` wheels. A platform-tagged pip resolve of [requirements-torch-cu130.txt](../requirements-torch-cu130.txt) for `cp310` `win_amd64` yields only the three CUDA wheels below plus pure-Python torch deps already in the CPU freeze (`filelock`, `typing-extensions`, `setuptools`, `sympy`, `networkx`, `jinja2`, `fsspec`, ...). Torch METADATA on that wheel has no `nvidia-*` Requires-Dist. The CUDA 13 runtime DLLs (cudart, cublas, cudnn, cufft, curand, cusolver, cusparse, nvrtc, ...) live inside `torch/lib/` of the Windows torch wheel. Linux cu130 is different: it pulls `nvidia-*` packages.
+
+Pinned wheels (constants in [packaging/windows/cleave.iss](../packaging/windows/cleave.iss)). Do not scrape the PyTorch index at install time. Do not `pip install` into the freeze (no pip in the onedir). Wheels are zip files: download, verify SHA-256, unpack into `{app}\_internal`. Do not wrap them into `cleave-<version>-windows-x64-setup.exe` and do not attach them as Release assets. Silent and CI installer smoke (`/VERYSILENT /TASKS=`) must not download them unless `/CUDA=1` is passed.
 
 - `torch-2.12.0+cu130-cp310-cp310-win_amd64.whl`
+  URL: `https://download.pytorch.org/whl/cu130/torch-2.12.0+cu130-cp310-cp310-win_amd64.whl`
+  SHA-256: `9cde3a3dbe675ee1558e7ee2d6be60aaa2b9562552d1b0a659c8edd6edd29318`
+  Size: 1926375050 bytes
 - `torchaudio-2.11.0+cu130-cp310-cp310-win_amd64.whl`
+  URL: `https://download.pytorch.org/whl/cu130/torchaudio-2.11.0+cu130-cp310-cp310-win_amd64.whl`
+  SHA-256: `9bbd4470c74172be32d0e11efbcf5e8dc785f7403b8232c07aac575c8d96715f`
+  Size: 1722730 bytes
 - `torchcodec-0.14.0+cu130-cp310-cp310-win_amd64.whl`
+  URL: `https://download.pytorch.org/whl/cu130/torchcodec-0.14.0+cu130-cp310-cp310-win_amd64.whl`
+  SHA-256: `b4cfae4d2fd58467fccc528a1e31a0ec6fed6a4a49b9495dab50d2aada1918cf`
+  Size: 3574648 bytes
 
-Pin those filenames plus SHA-256 in the installer (same pattern as FFmpeg). Do not scrape the PyTorch index at install time. Do not `pip install` into the freeze (no pip in the onedir). Wheels are zip files: download, verify, unpack native libs into `{app}`. Do not wrap them into `cleave-<version>-windows-x64-setup.exe` and do not attach them as Release assets. Silent and CI installer smoke (`/TASKS=`) must not download them.
+Sum: 1931672428 bytes (1.80 GiB). The installer prompt uses the hardcoded label `2 GB` (`CudaDownloadSizeLabel` in the `.iss`). Do not sum sizes over the network at install time.
 
-cu130 on Windows needs NVIDIA driver 580.88 or newer. Document that with the pin.
+cu130 on Windows needs NVIDIA driver 580.88 or newer.
 
-Installer (Inno):
+Installer (Inno Setup 6.4+; `DownloadTemporaryFile` and `GetSHA256OfFile`). [packaging/windows/cleave.iss](../packaging/windows/cleave.iss). No extra `[Setup]` download directive. CI already runs `choco install innosetup`.
 
-- Detect an NVIDIA GPU before asking. If none, skip the question and finish a CPU install.
-- If detected, Yes/No with locked copy (X is the summed size of the pinned wheels in GB): NVIDIA graphics card detected - do you wish to download the CUDA toolkit for faster stem splitting? (X GB)
-- Yes: fetch the pinned wheels into `{app}` (same tree as `cleave.exe`; `install_dir()` stays the parent of the exe). Uninstall removes `{app}`.
-- No or download failure: continue. CPU `separate` stays available. Do not fail the install.
+- Detect an NVIDIA GPU before asking. Method: WMI `Win32_VideoController` via `WbemScripting.SWbemLocator` connected to `root\cimv2`. Iterate every adapter (not only index 0). Case-insensitive substring `NVIDIA` on `Name`. COM failure or no adapter: treat as no NVIDIA. `HasNvidiaGpu` stores the result in `NvidiaGpuDetected`.
+- If detected, a Yes/No page (default No) with locked copy: NVIDIA graphics card detected - do you wish to download the CUDA toolkit for faster stem splitting? (`CudaDownloadSizeLabel`, currently 2 GB). The page is skipped when NVIDIA is not detected. Silent and very silent installs skip wizard pages.
+- Yes, or silent `/CUDA=1`: after the CPU onedir is copied (`ssPostInstall`), download the three pinned wheels with `DownloadTemporaryFile` (progress on the Installing page). Verify each file with `GetSHA256OfFile` (lowercase hex). All three must succeed before any package dir is replaced (all-or-nothing: never mix CUDA torch with CPU torchaudio).
+- Unpack with `tar.exe -xf` into a temp staging dir, then replace `{app}\_internal\torch`, `torchaudio`, `torchcodec`, plus torch `functorch` / `torchgen` / matching `*.dist-info`. PowerShell `Expand-Archive` is the fallback if `tar.exe` is missing. CPU dirs are moved aside first and restored if the swap fails.
+- `/CUDA=1` opts in even in `/SILENT` or `/VERYSILENT`, and even when no NVIDIA GPU is detected (the user asked explicitly). The GUI prompt stays NVIDIA-only. CI smoke uses `/VERYSILENT /TASKS=` without `/CUDA=1` and must not download.
+- No, download/hash/unpack failure, or no opt-in: continue. GUI `MsgBox` warn; silent logs only. Do not fail the install. CPU `separate` stays available.
+- Uninstall removes `{app}` (including the replaced packages). No extra uninstall step.
 
-Runtime: before importing torch for stem split, prefer the CUDA tree when it is present and usable; otherwise use the bundled CPU torch. Missing extra is a slower split, not `STEM_SPLIT_MISSING_FROZEN`.
+Runtime: `torch.cuda.is_available()` in [cleave/separate.py](../cleave/separate.py) picks CUDA when the replaced packages work; otherwise CPU. Missing extra is a slower split, not `STEM_SPLIT_MISSING_FROZEN`.
 
-Layout internals (detect method, directory name under `{app}`, exact URL and SHA-256 constants) land here when 3.3.3 is implemented. Do not ask testers to unzip into an overlay folder. Do not ship a second setup exe.
+Layout internals (from wheel zip listings; `torch.cuda.is_available()` was not run here):
+
+The CPU freeze already ships `torch`, `torchaudio`, and `torchcodec` under `_internal` (CUDA binaries filtered). The cu130 wheels are full replacement builds of those packages, not a DLL add-on:
+
+- `torch/_C.cp310-win_amd64.pyd` exists in both CPU and CUDA wheels. `torch/lib/torch_cpu.dll` and `torch/lib/torch_python.dll` differ in size between the two builds. The CUDA wheel adds `torch_cuda.dll`, `c10_cuda.dll`, and the NVIDIA toolkit DLLs under `torch/lib/` (no separate `nvidia-*` package dirs).
+- `torchaudio/lib/libtorchaudio.pyd` is 193 KiB (CPU) vs 1.7 MiB (CUDA). The CUDA wheel also adds `torchaudio/lib/torchaudio_prefixctc.pyd`.
+- `torchcodec` `libtorchcodec_core*.dll` sizes differ between CPU and CUDA builds.
+
+Unpack **replaces** those package directories (and the torch wheel's `functorch` / `torchgen` / `*.dist-info`) under `{app}\_internal`. Mixing CPU `torch_python.dll` with CUDA `torch_cuda.dll` would be a broken native mix.
+
+Do not ask testers to unzip into an overlay folder. Do not ship a second setup exe.
 
 ---
 

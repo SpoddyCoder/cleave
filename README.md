@@ -79,7 +79,7 @@ How to cut a tag: [docs/structured-releases.md](docs/structured-releases.md).
 
 The installer (`cleave-<version>-windows-x64-setup.exe`) defaults to `Program Files\Cleave`. Uninstall removes only the program folder; it does not delete `Documents\cleave\` or `%APPDATA%\cleave\`. The zip (`cleave-<version>-windows-x64.zip`) is the same onedir tree without an installer: unpack and run from that folder.
 
-Drop a wav onto `cleave.exe`, or run `cleave.exe play <wav>`. First run downloads Demucs and Beat This weights into `Documents\cleave\models` and shows named progress in the loading window. CPU `separate` is slow. Phase 3.3.3: when the installer detects an NVIDIA GPU it asks whether to download extra CUDA files from PyTorch for faster stem splitting; skip or fail leaves CPU split. The zip stays CPU-only.
+Drop a wav onto `cleave.exe`, or run `cleave.exe play <wav>`. First run downloads Demucs and Beat This weights into `Documents\cleave\models` and shows named progress in the loading window. CPU `separate` is slow. The installer can download extra CUDA files from PyTorch (about 2 GB) for faster stem splitting when it detects an NVIDIA GPU (driver 580.88 or newer). Default answer is No. Skip or fail leaves CPU split. Silent setup does not download CUDA unless you pass `/CUDA=1` (that switch still downloads if no NVIDIA GPU is present). The zip stays CPU-only.
 
 ```
 cleave.exe play <wav>
