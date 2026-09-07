@@ -262,27 +262,27 @@ Met. CPU `separate` is the default Windows zip and setup exe. Drop-a-wav from zi
 
 #### 3.3.3 CUDA extra (optional) (next)
 
-NVIDIA users. Does not block 3.3.2.
+NVIDIA users. Does not block 3.3.2. Wizard, download, verify, and unpack are in [packaging/windows/cleave.iss](../packaging/windows/cleave.iss). Manual NVIDIA-box proof is still outstanding (todo 8); this phase is not a shipped milestone and is not marked Done.
 
 One setup exe on the Releases page. The CPU onedir is always installed. CUDA torch is not baked into that exe. Cleave does not build or host a CUDA payload.
 
-When the wizard detects an NVIDIA GPU, it asks Yes/No with this copy (X is the summed size of the pinned wheels in GB):
+When the wizard detects an NVIDIA GPU, it asks Yes/No (default No) with this copy. The size is a hardcoded estimate (2 GB), not a live network sum:
 
-NVIDIA graphics card detected - do you wish to download the CUDA toolkit for faster stem splitting? (X GB)
+NVIDIA graphics card detected - do you wish to download the CUDA toolkit for faster stem splitting? (2 GB)
 
-Do not show that question when NVIDIA is not detected. The extra is the PyTorch CUDA wheels in [requirements-torch-cu130.txt](../requirements-torch-cu130.txt) (cu130, `cp310` `win_amd64` to match the freeze Python). Fetch them from `https://download.pytorch.org/whl/cu130/`. That is not NVIDIA's developer CUDA Toolkit from nvidia.com. Do not download that Toolkit. Do not pip-install into the freeze (no pip in the onedir). Wheels are zip files: download, verify SHA-256, unpack into `{app}`. Document driver expectations with the cu130 pin (Windows driver 580.88 or newer).
+Do not show that question when NVIDIA is not detected. Silent and very silent installs skip the page. The extra is the PyTorch CUDA wheels in [requirements-torch-cu130.txt](../requirements-torch-cu130.txt) (cu130, `cp310` `win_amd64` to match the freeze Python). Fetch them from `https://download.pytorch.org/whl/cu130/`. That is not NVIDIA's developer CUDA Toolkit from nvidia.com. Do not download that Toolkit. Do not pip-install into the freeze (no pip in the onedir). Wheels are zip files: download, verify SHA-256, unpack into `{app}\_internal` (replace CPU `torch` / `torchaudio` / `torchcodec`, not overlay DLLs). Document driver expectations with the cu130 pin (Windows driver 580.88 or newer).
 
-Yes: the installer fetches those pinned wheels into the install dir (Program Files with the app). Uninstall removes them with `{app}`. Same `cleave.exe`; `install_dir()` stays the parent of the exe.
+Yes, or silent `/CUDA=1`: the installer fetches those pinned wheels after the CPU tree is copied. Uninstall removes them with `{app}`. Same `cleave.exe`; `install_dir()` stays the parent of the exe. `/CUDA=1` still downloads when no NVIDIA GPU is detected (explicit request). The GUI prompt stays NVIDIA-only.
 
-No, download failure, or no NVIDIA: finish the install. Stem split stays on CPU (slower, not a missing-split error). Do not fail the whole install.
+No, download failure, or no opt-in: finish the install. Stem split stays on CPU (slower, not a missing-split error). Do not fail the whole install.
 
 Runtime: prefer CUDA torch when that tree is present and usable; otherwise use the bundled CPU torch.
 
 Not a second setup exe, not a second Cleave zip, not a Cleave-hosted CUDA asset, not a manual unzip into an overlay folder. The portable zip stays CPU-only. Adding CUDA later means running the installer again (in-window fetch is Later).
 
-CI does not build or upload a CUDA payload. Silent and CI installer smoke do not download the wheels.
+CI does not build or upload a CUDA payload. Silent and CI installer smoke (`/VERYSILENT /TASKS=`) do not download the wheels. `/CUDA=1` is the silent opt-in.
 
-Pin exact wheel filenames and SHA-256 in the installer (same pattern as FFmpeg). Do not scrape the PyTorch index at install time. Exact URLs and checksums live in [windows-freeze.md](windows-freeze.md) when 3.3.3 is implemented.
+Pin exact wheel filenames and SHA-256 in the installer (same pattern as FFmpeg). Do not scrape the PyTorch index at install time. Exact URLs, checksums, the 2 GB label, WMI detect, unpack layout, and `/CUDA=1` are in [windows-freeze.md](windows-freeze.md) and [packaging/windows/cleave.iss](../packaging/windows/cleave.iss).
 
 #### Locked
 
@@ -299,7 +299,7 @@ Pin exact wheel filenames and SHA-256 in the installer (same pattern as FFmpeg).
 
 #### Leave open
 
-Windowed PE (`console=False` plus attach-to-parent for terminals) can land with 3.3 or beside it; it must not block treating the editor as the split UI. Exact NVIDIA detect, pinned wheel URLs and SHA-256, and overlay layout live in [windows-freeze.md](windows-freeze.md).
+Windowed PE (`console=False` plus attach-to-parent for terminals) can land with 3.3 or beside it; it must not block treating the editor as the split UI. NVIDIA detect (WMI `Win32_VideoController`), pinned wheel URLs / SHA-256, and unpack into `{app}\_internal` live in [windows-freeze.md](windows-freeze.md). Manual NVIDIA-box proof of the CUDA extra is still open.
 
 **Resolved:** one-exe freeze is possible (`cleave.exe` from [packaging/cleave.spec](../packaging/cleave.spec)); do not add `cleave-separate.exe`. One Windows Release product (CPU `separate` is not a second zip or setup exe). The lean spec is retired. CUDA delivery is an optional download of pinned PyTorch cu130 wheels from download.pytorch.org in that one installer, not two flavours, not a Cleave-hosted payload, and not a user-facing overlay zip.
 
