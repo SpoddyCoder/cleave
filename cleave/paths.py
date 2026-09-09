@@ -148,6 +148,46 @@ def projects_dir() -> Path:
     return data_dir() / "projects"
 
 
+def drive_roots() -> tuple[Path, ...]:
+    """Return the mounted volumes the file picker can browse.
+
+    Native Windows lists drive letters (``C:\\``, ``D:\\``). POSIX lists the
+    ``/mnt/<letter>`` directories WSL creates for Windows drives, plus ``/`` so
+    the Linux filesystem is never a dead end.
+    """
+    if sys.platform == "win32":
+        return _windows_drive_roots()
+
+    roots: list[Path] = [Path("/")]
+    mnt = Path("/mnt")
+    try:
+        entries = sorted(mnt.iterdir())
+    except OSError:
+        entries = []
+    for entry in entries:
+        if len(entry.name) == 1 and entry.name.isalpha() and entry.is_dir():
+            roots.append(entry)
+    return tuple(roots)
+
+
+def _windows_drive_roots() -> tuple[Path, ...]:
+    try:
+        from ctypes import windll
+
+        mask = windll.kernel32.GetLogicalDrives()
+    except (AttributeError, ImportError, OSError):
+        mask = 0
+
+    roots = [
+        Path(f"{chr(ord('A') + index)}:\\")
+        for index in range(26)
+        if mask & (1 << index)
+    ]
+    if roots:
+        return tuple(roots)
+    return (Path(f"{Path.home().drive or 'C:'}\\"),)
+
+
 def project_dir(slug: str) -> Path:
     """Return the project directory for *slug* under :func:`projects_dir`."""
     return projects_dir() / slug

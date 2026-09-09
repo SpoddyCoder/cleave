@@ -79,9 +79,10 @@ How to cut a tag: [docs/structured-releases.md](docs/structured-releases.md).
 
 The installer (`cleave-<version>-windows-x64-setup.exe`) defaults to `Program Files\Cleave`. Uninstall removes only the program folder; it does not delete `Documents\cleave\` or `%APPDATA%\cleave\`. The zip (`cleave-<version>-windows-x64.zip`) is the same onedir tree without an installer: unpack and run from that folder.
 
-Drop a wav onto `cleave.exe`, or run `cleave.exe play <wav>`. First run downloads Demucs and Beat This weights into `Documents\cleave\models` and shows named progress in the loading window. CPU `separate` is slow. The installer can download extra CUDA files from PyTorch (about 2 GB) for faster stem splitting when it detects an NVIDIA GPU (driver 580.88 or newer). Default answer is No. Skip or fail leaves CPU split. Silent setup does not download CUDA unless you pass `/CUDA=1` (that switch still downloads if no NVIDIA GPU is present). The zip stays CPU-only.
+Launch from the Start Menu or double-click `cleave.exe` to open the editor and browse for a wav or an existing project. You can also drop a wav onto `cleave.exe`, or run `cleave.exe play <wav>`. First run downloads Demucs and Beat This weights into `Documents\cleave\models` and shows named progress in the loading window. CPU `separate` is slow. The installer can download extra CUDA files from PyTorch (about 2 GB) for faster stem splitting when it detects an NVIDIA GPU (driver 580.88 or newer). Default answer is No. Skip or fail leaves CPU split. Silent setup does not download CUDA unless you pass `/CUDA=1` (that switch still downloads if no NVIDIA GPU is present). The zip stays CPU-only.
 
 ```
+cleave.exe play
 cleave.exe play <wav>
 cleave.exe play <project>
 cleave.exe render <project>
@@ -134,7 +135,7 @@ This will separate the track into its component stem tracks (bass, drums, vocals
 
 Available commands...
 
-* `play` play song in the editor, accepts a source audio file or project slug/path.
+* `play` play song in the editor, accepts a source audio file or project slug/path. Omit the target to browse for one in the editor window.
 * `separate` can be run on its own without opening the editor.
 * `render` accepts a project slug or path (not a source audio file).
 * `backup` archives a full project directory (mix, stems, configs, renders etc.) to a `.cleave-tar.gz` file.

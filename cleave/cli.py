@@ -12,6 +12,7 @@ from cleave.paths import is_frozen, resolve_project
 
 if TYPE_CHECKING:
     from cleave.stems import StemSource
+    from cleave.viz.loading import LoadingWindow
     from cleave.viz.render import RenderSegment
 
 # Parser/help constants (must match defining modules; avoid importing them for -h).
@@ -20,6 +21,10 @@ BEAT_DETECTION_STEM_CHOICES = ("drums", "full-mix", "bass", "vocals", "other")
 
 SIGNALS_FILENAME = "signals.json"
 _TARGET_HELP = "Source audio file or cleave project (path or slug)"
+_PLAY_TARGET_HELP = (
+    "Source audio file or cleave project (path or slug). "
+    "Omit to browse for one in the editor window"
+)
 _PROJECT_DIR_HELP = "Cleave project directory (path or slug)"
 COMMANDS = ("separate", "play", "render", "backup", "restore")
 _PAUSE_PROMPT = "Press Enter to close..."
@@ -198,34 +203,74 @@ def cmd_separate(args: argparse.Namespace) -> None:
 
 def cmd_play(args: argparse.Namespace) -> None:
     os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
-    from cleave.separate import run_separate
-    from cleave.viz import continue_launch, open_loading_window
+    from cleave.viz import LaunchError, continue_launch, open_loading_window
 
     window = open_loading_window()
     if window.quit_requested:
         window.close()
         return
-    target = Path(args.target)
+
+    if args.target is None:
+        _play_from_picker(args, window)
+        return
+
     try:
-        project_dir = run_separate(
-            target,
-            high_quality=args.high_quality,
-            beat_detection_stem=_optional_beat_detection_stem(args),
-            on_progress=window.update,
-        )
+        project_dir = _separate_for_play(args, window, Path(args.target))
     except (FileNotFoundError, ValueError, RuntimeError) as e:
         window.update(f"error: {e}")
         _exit_error(f"error: {e}")
 
-    if window.quit_requested:
+    if project_dir is None:
         window.close()
         return
 
-    continue_launch(
-        window,
-        project_dir,
-        config=args.config,
+    try:
+        continue_launch(window, project_dir, config=args.config)
+    except LaunchError as e:
+        _exit_error(f"error: {e}")
+
+
+def _separate_for_play(
+    args: argparse.Namespace,
+    window: LoadingWindow,
+    target: Path,
+) -> Path | None:
+    """Run stem split with progress. None when the user closed the window."""
+    from cleave.separate import run_separate
+
+    project_dir = run_separate(
+        target,
+        high_quality=args.high_quality,
+        beat_detection_stem=_optional_beat_detection_stem(args),
+        on_progress=window.update,
     )
+    if window.quit_requested:
+        return None
+    return project_dir
+
+
+def _play_from_picker(args: argparse.Namespace, window: LoadingWindow) -> None:
+    """Browse, separate, and play, returning to the picker on failure."""
+    from cleave.viz import continue_launch
+    from cleave.viz.file_picker_host import run_file_picker, show_picker_error
+
+    while True:
+        target = run_file_picker(window)
+        if target is None:
+            window.close()
+            return
+        try:
+            project_dir = _separate_for_play(args, window, target.path)
+            if project_dir is None:
+                window.close()
+                return
+            continue_launch(window, project_dir, config=args.config)
+        except (FileNotFoundError, ValueError, RuntimeError) as e:
+            if not show_picker_error(window, str(e)):
+                window.close()
+                return
+            continue
+        return
 
 
 def cmd_render(args: argparse.Namespace) -> None:
@@ -354,7 +399,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     play.add_argument(
         "target",
-        help=_TARGET_HELP,
+        nargs="?",
+        help=_PLAY_TARGET_HELP,
     )
     play.add_argument(
         "-hq",
@@ -476,8 +522,12 @@ def main(argv: list[str] | None = None) -> None:
         parser = build_parser()
         raw = sys.argv[1:] if argv is None else list(argv)
         if not raw:
-            parser.print_help()
-            raise SystemExit(0)
+            # Start Menu and double-click give the frozen exe empty argv; there
+            # is no console to read help from, so open the editor and browse.
+            if not is_frozen():
+                parser.print_help()
+                raise SystemExit(0)
+            raw = ["play"]
         args = parser.parse_args(normalise_argv(raw))
         args.func(args)
     except SystemExit as exc:
