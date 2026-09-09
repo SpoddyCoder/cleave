@@ -225,7 +225,7 @@ Inno Setup 6 wraps the staged onedir tree. No second freeze and no second layout
 - `DefaultDirName={autopf}\Cleave`, `ArchitecturesAllowed=x64compatible`, `ArchitecturesInstallIn64BitMode=x64compatible`, `PrivilegesRequired=admin` with `PrivilegesRequiredOverridesAllowed=dialog` so a non-admin can install per user.
 - `OutputBaseFilename=cleave-<version>-windows-x64-setup` at the repo root (same place as the zip).
 - Tasks (both unchecked by default): `desktopicon` (`{autodesktop}\Cleave`), `addtopath` (append `{app}` to HKLM PATH when admin, HKCU when per-user; remove that entry on uninstall without duplicating PATH).
-- Start Menu shortcut `{autoprograms}\Cleave` targets `cleave.exe` with no arguments, which prints help.
+- Start Menu shortcut `{autoprograms}\Cleave` targets `cleave.exe` with no arguments. That opens the editor window and the in-window file picker, so the user can browse for a wav or a project without a terminal.
 - Uninstall removes `{app}` only. User data (`Documents\cleave\`) and `%APPDATA%\cleave\` survive. The finished and uninstall pages say so.
 
 CI in [.github/workflows/windows-freeze.yml](../.github/workflows/windows-freeze.yml), after the zip step and reusing the same `dist\cleave\`:

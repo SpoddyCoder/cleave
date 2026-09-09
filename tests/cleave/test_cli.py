@@ -216,17 +216,19 @@ def test_version_does_not_pause_when_frozen(
     assert capsys.readouterr().out.strip() == f"cleave {__version__}"
 
 
-def test_no_args_help_does_not_pause_when_frozen(
+def test_frozen_no_args_opens_the_picker_without_pausing(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     monkeypatch.setattr("cleave.cli.is_frozen", lambda: True)
     monkeypatch.setattr("cleave.cli.owns_console", lambda: True)
-    with patch("builtins.input") as pause_input:
-        with pytest.raises(SystemExit) as exc:
-            main([])
-        assert exc.value.code == 0
+    with (
+        patch("cleave.cli.cmd_play") as play,
+        patch("builtins.input") as pause_input,
+    ):
+        main([])
+    play.assert_called_once()
     pause_input.assert_not_called()
-    assert "usage: cleave" in capsys.readouterr().out
+    assert "usage: cleave" not in capsys.readouterr().out
 
 
 def test_handled_error_pauses_when_frozen_and_owns_console(
@@ -1118,3 +1120,199 @@ def test_module_help_lists_subcommands() -> None:
     assert "--start SEC" in render.stdout
     assert "--end SEC" in render.stdout
     assert "-hq" in render.stdout
+
+
+def _audio_target(path: Path):
+    from cleave.open_target import OpenTarget, OpenTargetKind
+
+    return OpenTarget(path=path, kind=OpenTargetKind.AUDIO)
+
+
+def test_play_parser_target_is_optional() -> None:
+    args = build_parser().parse_args(["play"])
+    assert args.target is None
+
+
+def test_play_help_mentions_the_picker() -> None:
+    play = subprocess.run(
+        [sys.executable, "-m", "cleave", "play", "--help"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert "[target]" in play.stdout
+    assert "Omit to browse" in play.stdout
+
+
+def test_checkout_empty_argv_still_prints_help(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    with patch("cleave.cli.is_frozen", return_value=False):
+        with pytest.raises(SystemExit) as exc:
+            main([])
+    assert exc.value.code == 0
+    assert "usage:" in capsys.readouterr().out
+
+
+def test_frozen_empty_argv_becomes_play_with_no_target() -> None:
+    with (
+        patch("cleave.cli.is_frozen", return_value=True),
+        patch("cleave.cli.cmd_play") as play,
+    ):
+        main([])
+    args = play.call_args.args[0]
+    assert args.target is None
+
+
+def test_cmd_play_without_target_uses_picker(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    project = _complete_project(tmp_path)
+    window = _mock_loading_window()
+    song = tmp_path / "song.wav"
+    song.write_bytes(b"RIFF")
+
+    with (
+        patch("cleave.viz.open_loading_window", return_value=window),
+        patch(
+            "cleave.viz.file_picker_host.run_file_picker",
+            return_value=_audio_target(song),
+        ) as picker,
+        patch("cleave.separate.run_separate", return_value=project.resolve()),
+        patch("cleave.viz.continue_launch") as continue_launch,
+    ):
+        cmd_play(build_parser().parse_args(["play"]))
+
+    picker.assert_called_once_with(window)
+    continue_launch.assert_called_once()
+    assert continue_launch.call_args.args[1] == project.resolve()
+
+
+def test_cmd_play_picker_cancel_closes_window(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    window = _mock_loading_window()
+
+    with (
+        patch("cleave.viz.open_loading_window", return_value=window),
+        patch("cleave.viz.file_picker_host.run_file_picker", return_value=None),
+        patch("cleave.viz.continue_launch") as continue_launch,
+    ):
+        cmd_play(build_parser().parse_args(["play"]))
+
+    continue_launch.assert_not_called()
+    window.close.assert_called_once()
+
+
+def test_cmd_play_picker_separate_failure_returns_to_picker(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    project = _complete_project(tmp_path)
+    window = _mock_loading_window()
+    bad = tmp_path / "bad.wav"
+    bad.write_bytes(b"RIFF")
+    good = tmp_path / "good.wav"
+    good.write_bytes(b"RIFF")
+
+    def separate(target: Path, **_kwargs: object) -> Path:
+        if Path(target).name == "bad.wav":
+            raise RuntimeError("demucs blew up")
+        return project.resolve()
+
+    with (
+        patch("cleave.viz.open_loading_window", return_value=window),
+        patch(
+            "cleave.viz.file_picker_host.run_file_picker",
+            side_effect=[_audio_target(bad), _audio_target(good)],
+        ) as picker,
+        patch(
+            "cleave.viz.file_picker_host.show_picker_error", return_value=True
+        ) as error,
+        patch("cleave.separate.run_separate", side_effect=separate),
+        patch("cleave.viz.continue_launch") as continue_launch,
+    ):
+        cmd_play(build_parser().parse_args(["play"]))
+
+    assert picker.call_count == 2
+    assert "demucs blew up" in error.call_args.args[1]
+    continue_launch.assert_called_once()
+    window.close.assert_not_called()
+
+
+def test_cmd_play_picker_error_dismissed_by_quit_closes_window(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    window = _mock_loading_window()
+    song = tmp_path / "song.wav"
+    song.write_bytes(b"RIFF")
+
+    with (
+        patch("cleave.viz.open_loading_window", return_value=window),
+        patch(
+            "cleave.viz.file_picker_host.run_file_picker",
+            return_value=_audio_target(song),
+        ),
+        patch("cleave.viz.file_picker_host.show_picker_error", return_value=False),
+        patch("cleave.separate.run_separate", side_effect=RuntimeError("nope")),
+        patch("cleave.viz.continue_launch") as continue_launch,
+    ):
+        cmd_play(build_parser().parse_args(["play"]))
+
+    continue_launch.assert_not_called()
+    window.close.assert_called_once()
+
+
+def test_cmd_play_picker_launch_failure_returns_to_picker(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from cleave.viz import LaunchError
+
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    project = _complete_project(tmp_path)
+    window = _mock_loading_window()
+    song = tmp_path / "song.wav"
+    song.write_bytes(b"RIFF")
+
+    with (
+        patch("cleave.viz.open_loading_window", return_value=window),
+        patch(
+            "cleave.viz.file_picker_host.run_file_picker",
+            side_effect=[_audio_target(song), None],
+        ) as picker,
+        patch(
+            "cleave.viz.file_picker_host.show_picker_error", return_value=True
+        ) as error,
+        patch("cleave.separate.run_separate", return_value=project.resolve()),
+        patch(
+            "cleave.viz.continue_launch", side_effect=LaunchError("no projectM")
+        ),
+    ):
+        cmd_play(build_parser().parse_args(["play"]))
+
+    assert picker.call_count == 2
+    assert "no projectM" in error.call_args.args[1]
+
+
+def test_cmd_play_argv_target_launch_failure_still_exits(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from cleave.viz import LaunchError
+
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    project = _complete_project(tmp_path)
+    window = _mock_loading_window()
+
+    with (
+        patch("cleave.viz.open_loading_window", return_value=window),
+        patch("cleave.separate.run_separate", return_value=project.resolve()),
+        patch(
+            "cleave.viz.continue_launch", side_effect=LaunchError("no projectM")
+        ),
+    ):
+        with pytest.raises(SystemExit) as exc:
+            cmd_play(build_parser().parse_args(["play", "my-track"]))
+    assert exc.value.code == 1

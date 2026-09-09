@@ -92,7 +92,7 @@ New modules, names indicative:
 
 ### Listing
 
-- Rows: parent `..` (when a parent exists), then directories, then `*.wav` files. Alphabetical within each group.
+- Rows: parent `..` (when a parent exists), then directories, then `*.wav` files. Alphabetical within each group. Shortcuts are not rows; they are the header list described under Roots and shortcuts.
 - At a Windows drive root (`C:\`) or WSL `/mnt/<letter>`, `..` goes to the **drives** listing, not a no-op.
 - The drives listing is one row per mounted volume: `C:\`, `D:\`, ... on frozen Windows; `/mnt/c`, `/mnt/d`, ... on WSL when those dirs exist. Enter a drive row to browse it. Do not list Program Files or `install_dir()` here.
 - Skip dotfiles except `..`.
@@ -113,6 +113,7 @@ Match live overlay list navigation and preset-directory tree keys ([help_content
 | Right | Enter directory (including a project directory, without accepting) | Ctrl+Right on preset dir |
 | Backspace | Parent directory or drives listing | Backspace on preset dir |
 | Enter | Accept wav or project directory; enter a non-project directory | confirm |
+| Tab | Move focus between the shortcut header and the file list | (picker only) |
 | Ctrl+V | Paste a path (see below) | (picker only) |
 | Esc | Cancel. Cold start: quit the app. Mid-session: dismiss picker, stay on current project | Esc |
 
@@ -135,7 +136,7 @@ Do not import [help_content.py](../cleave/viz/help_content.py) into the loading-
 
 Always start in `projects_dir()` (create it if missing, same as the rest of user data). `CLEAVE_DATA` is already respected.
 
-Shortcut rows at the top of the listing, or a small header list, always reachable:
+Shortcuts are a header list above the file rows, not rows mixed into the listing. Tab moves focus between the header and the file list, so a shortcut is always one keystroke away and the listing stays a plain filesystem view:
 
 - **Projects** (`projects_dir()`)
 - **Home** (`Path.home()`)
@@ -176,6 +177,12 @@ The helper returns a `Path` suitable for `resolve_separate_target`.
 4. On `run_separate` or `continue_launch` failure: draw the error, wait for any key or `QUIT`. Any key returns to the picker (same window). `QUIT` closes. Do not `_exit_error` after a picker-driven attempt.
 
 The picker loop must `tick` (same clock idea as the live app) so it does not busy-spin.
+
+Three things in the current code block the retry loop and change in Phase 1:
+
+- [continue_launch](../cleave/viz/__init__.py) reports boot failure by printing to stderr and calling `sys.exit(1)`. It raises a `LaunchError` instead, and the caller decides: an argv target still becomes `_exit_error`, a picker-driven attempt shows the error and returns to the picker.
+- `LoadingWindow.close()` calls `pygame.quit()`, so the retry loop sits above `close()` and reuses one window for every attempt.
+- `LoadingWindow.update` is the only event pump and drops every event except `QUIT`. The picker owns its own pump in the new host helper so `update` stays progress-only.
 
 Caption can stay `Cleave` until `continue_launch` sets `Cleave -- {project}`.
 
@@ -259,15 +266,51 @@ Order inside Phase 3: accept-then-teardown so cancel is cheap. Do not destroy th
 
 User-facing: Start Menu and `cleave play` with no argument open the window, browse, pick a wav or project, then play (separate first if needed). Checkout `cleave` with no args still prints help.
 
-Files (indicative):
+Build order. Each step lands with its own tests and leaves the tree green.
 
-- [cleave/open_target.py](../cleave/open_target.py) (new)
-- [cleave/viz/file_picker.py](../cleave/viz/file_picker.py) (new)
-- [cleave/viz/file_picker_overlay.py](../cleave/viz/file_picker_overlay.py) (new)
-- [cleave/viz/loading.py](../cleave/viz/loading.py) (picker host loop, or a small helper next to it)
-- [cleave/cli.py](../cleave/cli.py) (`play` target optional; frozen empty argv; picker-driven errors return to picker)
-- Tests: [tests/cleave/test_cli.py](../tests/cleave/test_cli.py), [tests/cleave/test_open_target.py](../tests/cleave/test_open_target.py), new `tests/cleave/viz/test_file_picker.py`
-- Docs when it ships: [README.md](../README.md) Windows zip / Start Menu, [windows-freeze.md](windows-freeze.md) shortcut behaviour, [CHANGELOG.md](../CHANGELOG.md) Unreleased. Update the 3.2.1 "no arguments prints help" sentence in [structured-releases.md](structured-releases.md) only as historical note plus current behaviour, or point at this plan; do not rewrite the done-when checklist.
+**1. Accept helper.** New [cleave/open_target.py](../cleave/open_target.py), no viz import:
+
+- `OpenTargetKind` enum: `AUDIO`, `PROJECT`.
+- Frozen dataclass `OpenTarget` with `path` and `kind`.
+- `classify_open_target(path)` returns an `OpenTarget` or `None`. Suffix `.wav` case-insensitive is `AUDIO`; a directory holding `project.yaml` is `PROJECT`; anything else is `None`.
+- `open_target_rejection(path)` returns the short in-window message for a `None` result.
+
+The returned path feeds `resolve_separate_target` with no further massaging. Nothing here may raise on a Windows-style path under POSIX.
+
+**2. Path helpers.** [cleave/paths.py](../cleave/paths.py) has no drive support today. Add:
+
+- `drive_roots()`: drive letters on native Windows, existing `/mnt/<letter>` directories plus `/` on POSIX.
+
+The labelled shortcut header (Projects, Home, Drives, WSL Windows files when `/mnt/c/Users` exists, Documents when frozen) is built in the picker module, since the labels are UI copy. `install_dir()` is never a shortcut.
+
+**3. Picker state.** New [cleave/viz/file_picker.py](../cleave/viz/file_picker.py) with no pygame import at all, not even key constants:
+
+- `PickerAction` enum for the payload-free moves: `MOVE_UP`, `MOVE_DOWN`, `PAGE_UP`, `PAGE_DOWN`, `PARENT`, `ENTER`, `ACCEPT`, `CANCEL`, `TOGGLE_FOCUS`.
+- `paste_path(text)` and `goto_shortcut(shortcut_id)` are separate methods because they carry payloads.
+- `view_state()` returns a `PickerViewState` with rows, current path, shortcut header, focus, and status line.
+- Listing follows the Listing section: group order, dotfiles skipped, 512-row cap plus a truncation note, `project.yaml` probed once per listed directory, `PermissionError` and `OSError` skipped rather than raised.
+- The drives listing is a synthetic location rather than a `Path`, so both a Windows drive root and `/mnt/<letter>` can name it as their parent.
+
+**4. Picker drawing.** New [cleave/viz/file_picker_overlay.py](../cleave/viz/file_picker_overlay.py), shaped like `modal_overlay.draw`: scrim at `MODAL_SCRIM_ALPHA`, centered panel from `overlay_panel_surface` plus `draw_panel_border`, title and path in `LABEL` and `VALUE`, highlighted row in `HIGHLIGHT`, unreadable rows in `DISABLED`, status line in `ERROR_NOTIFICATION`, footer legend always drawn. No import of `tuning_panel_draw` or `help_content.py`.
+
+**5. Picker host.** New [cleave/viz/file_picker_host.py](../cleave/viz/file_picker_host.py) next to loading, owning everything pygame:
+
+- `run_file_picker(window)` returns an `OpenTarget`, or `None` when the user cancels or closes the window.
+- `show_picker_error(window, message)` draws the message and waits for a key; it returns `False` when the event was `QUIT`.
+- Maps pygame keys to `PickerAction`, drives repeat through [KeyRepeatController](../cleave/viz/key_repeat.py) rather than `pygame.key.set_repeat`, reads the clipboard for `Ctrl+V` and strips surrounding quotes, ticks a clock, and draws through the window's compositor and `overlay_surface`.
+
+**6. Launch failure as an exception.** [continue_launch](../cleave/viz/__init__.py) raises `LaunchError` instead of printing and calling `sys.exit(1)`, so the caller chooses between exit and picker retry.
+
+**7. CLI.** [cleave/cli.py](../cleave/cli.py):
+
+- `play.add_argument("target", nargs="?", ...)`, with help saying that omitting it opens the picker.
+- `main` treats empty argv as `play` only when `is_frozen()`. Checkout empty argv still prints help.
+- `cmd_play` with no target loops: picker, then `run_separate(on_progress=window.update)`, then `continue_launch`; a failure at either step calls `show_picker_error` and goes back to the picker.
+- `cmd_play` with an argv target behaves exactly as today, `_exit_error` included.
+
+**8. Tests.** [tests/cleave/test_open_target.py](../tests/cleave/test_open_target.py) and new `tests/cleave/viz/test_file_picker.py`, `tests/cleave/viz/test_file_picker_overlay.py` (offscreen surface, like `test_modal_overlay.py`), plus additions to [tests/cleave/test_cli.py](../tests/cleave/test_cli.py). The host loop is exercised with a mock window and synthesized events; no real window anywhere. Cases are the Phase 1 list under Tests.
+
+**9. Docs.** [README.md](../README.md) Windows zip / Start Menu, [windows-freeze.md](windows-freeze.md) shortcut behaviour, [CHANGELOG.md](../CHANGELOG.md) Unreleased. Update the 3.2.1 "no arguments prints help" sentence in [structured-releases.md](structured-releases.md) only as historical note plus current behaviour, or point at this plan; do not rewrite the done-when checklist.
 
 CLI `--help` should say `play` opens a picker when target is omitted.
 

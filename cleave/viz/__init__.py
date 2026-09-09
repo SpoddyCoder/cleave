@@ -9,6 +9,7 @@ if TYPE_CHECKING:
     from cleave.viz.loading import LoadingWindow
 
 __all__ = [
+    "LaunchError",
     "LoadingWindow",
     "VisualizerApp",
     "build_runtime_base",
@@ -39,6 +40,10 @@ def __getattr__(name: str) -> Any:
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
+class LaunchError(RuntimeError):
+    """Editor boot failed. The caller decides between exiting and retrying."""
+
+
 def open_loading_window(
     *,
     width: int | None = None,
@@ -56,9 +61,11 @@ def continue_launch(
     *,
     config: Path | None = None,
 ) -> None:
-    """Finish editor boot into an already-open loading window."""
-    import sys
+    """Finish editor boot into an already-open loading window.
 
+    Raises :class:`LaunchError` when boot fails, so a CLI target can exit while
+    a picker-driven attempt returns to the picker on the same window.
+    """
     from cleave.config import load_config
     from cleave.paths import resource_dir
     from cleave.preset_playlist import scan_all_layers
@@ -76,14 +83,9 @@ def continue_launch(
         playlists = scan_all_layers(cfg)
         runtime = build_runtime_base(cfg, project_dir, audio_path, playlists)
         VisualizerApp(runtime).run(window)
-    except ProjectMLibraryError as exc:
+    except (ProjectMLibraryError, FileNotFoundError, ValueError) as exc:
         window.update(f"error: {exc}")
-        print(f"error: {exc}", file=sys.stderr)
-        sys.exit(1)
-    except (FileNotFoundError, ValueError) as exc:
-        window.update(f"error: {exc}")
-        print(f"error: {exc}", file=sys.stderr)
-        sys.exit(1)
+        raise LaunchError(str(exc)) from exc
 
 
 def launch(
