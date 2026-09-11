@@ -5,9 +5,9 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
+from collections.abc import Callable, Iterator, Mapping
+from contextlib import contextmanager
 from pathlib import Path
-
-from collections.abc import Callable, Mapping
 from typing import cast
 
 from cleave.config import ensure_project_viz_config
@@ -216,6 +216,82 @@ def _reraise_torchcodec(exc: BaseException) -> None:
         raise RuntimeError(TORCHCODEC_AUDIO_IO_ERROR) from exc
 
 
+_SEP_MESSAGE = "Separating stems..."
+_SEP_FRAC_MODEL = 0.05
+_SEP_FRAC_TRACK = 0.10
+_SEP_FRAC_APPLY_END = 0.90
+
+
+def _report_separation(
+    on_progress: Callable[[str, float | None], None] | None,
+    fraction: float,
+) -> None:
+    if on_progress is not None:
+        on_progress(_SEP_MESSAGE, fraction)
+
+
+@contextmanager
+def _intercept_demucs_tqdm(
+    on_progress: Callable[[str, float | None], None] | None,
+    message: str,
+    frac_start: float,
+    frac_end: float,
+) -> Iterator[None]:
+    """Redirect Demucs ``apply_model`` tqdm into the loading bar."""
+    if on_progress is None:
+        yield
+        return
+
+    import tqdm as tqdm_mod
+
+    original = tqdm_mod.tqdm
+    frac_range = frac_end - frac_start
+    last_frac = [frac_start]
+
+    class _ProgressTqdm:
+        """Drop-in for ``tqdm.tqdm`` that forwards progress to the loading bar."""
+
+        def __init__(self, iterable=None, *args: object, **kwargs: object) -> None:
+            self._iterable = iterable
+            self.total = kwargs.get("total")
+            if self.total is None and iterable is not None:
+                try:
+                    self.total = len(iterable)
+                except TypeError:
+                    pass
+            self.n = 0
+
+        def __iter__(self):  # type: ignore[override]
+            if self._iterable is None:
+                return
+            for item in self._iterable:
+                self.n += 1
+                if self.total and self.total > 0:
+                    frac = frac_start + min(1.0, self.n / self.total) * frac_range
+                    if frac - last_frac[0] >= 0.01 or self.n >= self.total:
+                        last_frac[0] = frac
+                        on_progress(message, min(frac, frac_end))
+                yield item
+
+        def update(self, n: int = 1) -> None:
+            self.n += n
+
+        def close(self) -> None:
+            pass
+
+        def __enter__(self):  # type: ignore[override]
+            return self
+
+        def __exit__(self, *exc: object) -> None:
+            pass
+
+    tqdm_mod.tqdm = _ProgressTqdm  # type: ignore[assignment]
+    try:
+        yield
+    finally:
+        tqdm_mod.tqdm = original  # type: ignore[assignment]
+
+
 def _save_stem_wav(wav, dest: Path, samplerate: int) -> None:
     """Write a Demucs source tensor as 16-bit PCM wav via soundfile.
 
@@ -261,27 +337,33 @@ def _write_demucs_stems(
 
         torch.hub.set_dir(str(model_cache_dir()))
         ensure_weight_files(demucs_weight_spec(model), on_progress=on_progress)
+        _report_separation(on_progress, 0.0)
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
         try:
             model_obj = get_model(model)
             model_obj.cpu()
             model_obj.eval()
+            _report_separation(on_progress, _SEP_FRAC_MODEL)
             wav = _load_demucs_track(
                 audio_path, model_obj.audio_channels, model_obj.samplerate
             )
+            _report_separation(on_progress, _SEP_FRAC_TRACK)
             ref = wav.mean(0)
             wav -= ref.mean()
             wav /= ref.std()
-            sources = apply_model(
-                model_obj,
-                wav[None],
-                device=device,
-                shifts=1,
-                split=True,
-                overlap=0.25,
-                progress=True,
-            )[0]
+            with _intercept_demucs_tqdm(
+                on_progress, _SEP_MESSAGE, _SEP_FRAC_TRACK, _SEP_FRAC_APPLY_END
+            ):
+                sources = apply_model(
+                    model_obj,
+                    wav[None],
+                    device=device,
+                    shifts=1,
+                    split=True,
+                    overlap=0.25,
+                    progress=True,
+                )[0]
             sources *= ref.std()
             sources += ref.mean()
         except FileNotFoundError:
@@ -292,6 +374,7 @@ def _write_demucs_stems(
             _reraise_torchcodec(exc)
             raise RuntimeError(f"demucs failed for {audio_path}") from exc
 
+        _report_separation(on_progress, _SEP_FRAC_APPLY_END)
         try:
             for index, name in enumerate(model_obj.sources):
                 dest = dest_paths.get(name)
@@ -302,6 +385,7 @@ def _write_demucs_stems(
             _reraise_torchcodec(exc)
             raise RuntimeError(f"demucs failed to write stems for {audio_path}") from exc
 
+        _report_separation(on_progress, 1.0)
         missing_src = [name for name, dst in dest_paths.items() if not dst.is_file()]
         if missing_src:
             raise RuntimeError(

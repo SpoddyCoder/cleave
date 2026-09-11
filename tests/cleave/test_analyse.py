@@ -168,6 +168,47 @@ def test_run_analyse_empty_beats_warns_and_persists_empty(
     assert "full-mix downbeat detection produced no useful data" in out
 
 
+@patch("cleave.analyse.extract_mix_rms", return_value=_stub_signal())
+@patch("cleave.analyse.extract_mix_onset", return_value=_stub_signal())
+@patch("cleave.analyse.extract_other", return_value=_stub_other())
+@patch("cleave.analyse.extract_vocals", return_value=_stub_vocals())
+@patch("cleave.analyse.extract_bass", return_value=_stub_bass())
+@patch(
+    "cleave.analyse.extract_beats_downbeats",
+    return_value=(np.array([0.5, 1.0, 1.5]), np.array([0.5, 1.5])),
+)
+@patch("cleave.analyse.extract_drums_onset", return_value=_stub_signal())
+@patch("cleave.analyse._stem_duration_sec", return_value=1.0)
+def test_run_analyse_reports_progress_fraction(
+    _duration: object,
+    _drums: object,
+    _beats: object,
+    _bass: object,
+    _vocals: object,
+    _other: object,
+    _mix_onset: object,
+    _mix_rms: object,
+    tmp_path: Path,
+) -> None:
+    project = tmp_path / "project"
+    _write_project(project)
+
+    reports: list[tuple[str, float | None]] = []
+
+    def on_progress(message: str, fraction: float | None) -> None:
+        reports.append((message, fraction))
+
+    run_analyse(project, high_quality=False, on_progress=on_progress)
+
+    msg = "Extracting signals..."
+    fracs = [f for m, f in reports if m == msg and f is not None]
+    assert len(fracs) >= 2
+    assert fracs[0] == 0.0
+    assert fracs[-1] == 1.0
+    assert all(isinstance(f, float) for f in fracs)
+    assert all(a <= b for a, b in zip(fracs, fracs[1:]))
+
+
 @patch(
     "cleave.extract._rms_envelope",
     return_value=(np.array([0.1, 0.2, 0.3]), np.array([0.0, 0.02, 0.04])),
