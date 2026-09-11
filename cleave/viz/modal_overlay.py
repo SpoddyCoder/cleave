@@ -11,11 +11,14 @@ from cleave.viz.overlay_primitives import draw_panel_border, overlay_panel_surfa
 from cleave.viz.text_fit import wrap_text_to_width
 from cleave.viz.theme import (
     ACTION,
+    BORDER_WIDTH,
     FOCUS_ROW_BG_ALPHA,
     HIGHLIGHT,
     LABEL,
     MODAL_SCRIM_ALPHA,
+    UI_SCALE,
     VALUE,
+    scale_px,
     tuning_ui_metrics,
 )
 from cleave.viz.ui_tint import blit_tint
@@ -29,6 +32,7 @@ _PANEL_MIN_SCREEN_FRACTION = 0.2
 _tuning_ui = tuning_ui_metrics()
 _PANEL_PAD_X = _tuning_ui.modal_panel_pad_x
 _PANEL_PAD_Y = _tuning_ui.modal_panel_pad_y
+_BAR_HEIGHT = scale_px(10, scale=UI_SCALE)
 
 
 def _message_max_width(screen_w: int) -> int:
@@ -99,8 +103,23 @@ def draw(
             line_gap=line_gap,
         )
 
-    if state.options:
+    has_bar = state.progress_fraction is not None
+    if has_bar:
         if has_message or has_labeled:
+            cur_y += line_h + line_gap
+        content_w = panel_w - _PANEL_PAD_X * 2
+        _draw_progress_bar(
+            panel,
+            x=_PANEL_PAD_X,
+            y=cur_y,
+            width=content_w,
+            fraction=state.progress_fraction or 0.0,
+            text_alpha=text_alpha,
+        )
+        cur_y += _BAR_HEIGHT
+
+    if state.options:
+        if has_message or has_labeled or has_bar:
             cur_y += line_h + line_gap
         content_w = panel_w - _PANEL_PAD_X * 2
         _draw_options(
@@ -230,6 +249,7 @@ def _measure_panel(
     content_h = 0
     has_message = state.message is not None
     has_labeled = bool(state.labeled_lines)
+    has_bar = state.progress_fraction is not None
 
     if has_message:
         lines = _message_lines(font, state.message, screen_w=screen_w)
@@ -246,8 +266,13 @@ def _measure_panel(
         content_w = max(content_w, labeled_w)
         content_h += labeled_h
 
-    if state.options:
+    if has_bar:
         if has_message or has_labeled:
+            content_h += line_h + line_gap
+        content_h += _BAR_HEIGHT
+
+    if state.options:
+        if has_message or has_labeled or has_bar:
             content_h += line_h + line_gap
         options_w, options_h = _measure_options(font, state.options, line_gap=line_gap)
         content_w = max(content_w, options_w)
@@ -298,6 +323,29 @@ def _draw_labeled_lines(
         if index + 1 < len(lines):
             cur_y += line_gap
     return cur_y
+
+
+def _draw_progress_bar(
+    surface: pygame.Surface,
+    *,
+    x: int,
+    y: int,
+    width: int,
+    fraction: float,
+    text_alpha: int,
+) -> None:
+    if text_alpha < 2 or width <= 0:
+        return
+    bar = overlay_panel_surface((width, _BAR_HEIGHT), fill_alpha=255)
+    inner_w = width - 2 * BORDER_WIDTH
+    inner_h = _BAR_HEIGHT - 2 * BORDER_WIDTH
+    fill_w = min(inner_w, int(round(inner_w * max(0.0, min(1.0, fraction)))))
+    if fill_w > 0 and inner_h > 0:
+        pygame.draw.rect(
+            bar, VALUE, (BORDER_WIDTH, BORDER_WIDTH, fill_w, inner_h)
+        )
+    draw_panel_border(bar, alpha=int(255 * text_alpha / 255))
+    surface.blit(bar, (x, y))
 
 
 def _option_text(label: str) -> str:

@@ -14,6 +14,7 @@ class ModalKind(Enum):
     SAVE_CHOICE = "save_choice"
     UNSAVED_QUIT = "unsaved_quit"
     CHOICE = "choice"
+    PROGRESS = "progress"
 
 
 def capital_case_modal_option(label: str) -> str:
@@ -67,6 +68,7 @@ class ModalRequest:
     on_dismiss: Callable[[], None] | None = None
     initial_focus_index: int = 0
     labeled_lines: tuple[ModalLabeledLine, ...] = ()
+    progress_fraction: float | None = None
 
 
 @dataclass(frozen=True)
@@ -76,6 +78,7 @@ class ModalViewState:
     options: tuple[str, ...]
     focus_index: int
     labeled_lines: tuple[ModalLabeledLine, ...] = ()
+    progress_fraction: float | None = None
 
 
 _UNSAVED_QUIT_MESSAGE = "Unsaved changes - save changes before exit?"
@@ -105,6 +108,7 @@ class ModalHost:
             ),
             focus_index=self._focus_index,
             labeled_lines=self._request.labeled_lines,
+            progress_fraction=self._request.progress_fraction,
         )
 
     def prompt(self, request: ModalRequest) -> None:
@@ -147,6 +151,7 @@ class ModalHost:
         on_dismiss: Callable[[], None] | None = None,
         *,
         initial_focus_index: int = 0,
+        labeled_lines: Sequence[ModalLabeledLine] = (),
     ) -> None:
         self.prompt(
             ModalRequest(
@@ -155,8 +160,34 @@ class ModalHost:
                 options=options,
                 on_dismiss=on_dismiss,
                 initial_focus_index=initial_focus_index,
+                labeled_lines=tuple(labeled_lines),
             )
         )
+
+    def prompt_progress(
+        self,
+        message: str,
+        *,
+        labeled_lines: Sequence[ModalLabeledLine] = (),
+        fraction: float = 0.0,
+    ) -> None:
+        self.prompt(
+            ModalRequest(
+                kind=ModalKind.PROGRESS,
+                message=message,
+                options=[],
+                labeled_lines=tuple(labeled_lines),
+                progress_fraction=max(0.0, min(1.0, float(fraction))),
+            )
+        )
+
+    def update_progress(self, fraction: float) -> None:
+        if self._request is None or self._request.kind != ModalKind.PROGRESS:
+            return
+        self._request.progress_fraction = max(0.0, min(1.0, float(fraction)))
+
+    def dismiss(self) -> None:
+        self._dismiss()
 
     def prompt_save_choice(
         self,
@@ -230,11 +261,18 @@ class ModalHost:
         if not self.active or event.type != pygame.KEYDOWN:
             return False
 
+        request = self._request
+        assert request is not None
+        if request.kind == ModalKind.PROGRESS:
+            return True
+
         if event.key == pygame.K_ESCAPE:
             self._dismiss()
             return True
 
-        option_count = len(self._request.options)  # type: ignore[union-attr]
+        option_count = len(request.options)
+        if option_count == 0:
+            return True
         if event.key in (pygame.K_UP, pygame.K_LEFT):
             self._focus_index = (self._focus_index - 1) % option_count
             return True
@@ -242,7 +280,7 @@ class ModalHost:
             self._focus_index = (self._focus_index + 1) % option_count
             return True
 
-        if len(self._request.options) == 2:  # type: ignore[union-attr]
+        if option_count == 2:
             if event.key == pygame.K_y:
                 self._focus_index = 0
                 return True

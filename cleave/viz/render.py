@@ -6,6 +6,7 @@ import math
 import os
 import subprocess
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -182,6 +183,7 @@ def render(
     viz_quality: bool = False,
     start_sec: int | None = None,
     end_sec: int | None = None,
+    on_progress: Callable[[str, float | None], None] | None = None,
 ) -> RenderResult:
     """Render project visuals to an MP4 muxed with the project mix audio."""
     project = validate_render_project(project_dir, config=config)
@@ -286,13 +288,17 @@ def render(
 
         panel_cache = RenderOverlaysPanelCache()
 
-        _progress(
+        encode_message = (
             f"Encoding {frame_count} frames ({width}x{height} @ {fps} fps) "
             f"to {output_path.name}..."
         )
+        _progress(encode_message)
+        if on_progress is not None:
+            on_progress(encode_message, 0.0)
         proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
         assert proc.stdin is not None
 
+        last_pct = -1
         for frame_idx in range(frame_count):
             t_sec = (segment.start_frame + frame_idx) / fps
             app.tick_frame(
@@ -313,12 +319,20 @@ def render(
                     f"expected {frame_bytes} frame bytes, got {len(frame)}"
                 )
             proc.stdin.write(frame)
+            if on_progress is not None:
+                frac = (frame_idx + 1) / frame_count
+                pct = int(frac * 100)
+                if pct != last_pct or frame_idx + 1 == frame_count:
+                    last_pct = pct
+                    on_progress(encode_message, frac)
 
         proc.stdin.close()
         proc.stdin = None
         rc = proc.wait()
         if rc != 0:
             raise RuntimeError(f"ffmpeg exited with status {rc}")
+        if on_progress is not None:
+            on_progress(encode_message, 1.0)
 
     finally:
         if runtime is not None:

@@ -29,6 +29,7 @@ from cleave.viz.render_post_fx_bindings import RenderPostFxBindings
 from cleave.viz.render_post_fx_controls import RenderPostFxControls
 from cleave.viz.settings_controls import SettingsControls
 from cleave.viz.project_controls import ProjectControls
+from cleave.viz.project_render_controls import ProjectRenderController
 from cleave.viz.song_marker_controls import SongMarkerController
 from cleave.viz.tap_sync_controls import TapSyncControls, TapSyncUiSnapshot
 from cleave.viz.timeline_phase_controls import TimelinePhaseController
@@ -226,6 +227,14 @@ class TuningControls:
         self.render_pattern_mask = RenderPatternMaskControls(session)
         self.settings = SettingsControls(session, cfg)
         self.project = ProjectControls(session, duration_sec=duration_sec)
+        self.project_render = ProjectRenderController(
+            session,
+            cfg,
+            self._modal_host,
+            duration_sec=duration_sec,
+            playback=playback,
+            project_dir=project_dir,
+        )
         self.layer_mutations = LayerMutations(
             session,
             preset_root=preset_root,
@@ -358,6 +367,8 @@ class TuningControls:
         return self._config_save.consume_pending_exit()
 
     def try_quit(self) -> bool:
+        if self.project_render.busy:
+            self.project_render.abort()
         return self._config_save.try_quit()
 
     def prompt_save_config(self) -> None:
@@ -655,6 +666,9 @@ class TuningControls:
             if kind == RowKind.CONFIG_HEADER:
                 self.prompt_save_config()
                 return True
+            if kind == RowKind.PROJECT_RENDER_ACTION:
+                self.project_render.prompt()
+                return True
 
         return True
 
@@ -762,6 +776,7 @@ class TuningControls:
     def tick(self, dt_sec: float) -> None:
         self._key_repeat.tick(dt_sec)
         self._notification_host.clear_expired()
+        self.project_render.tick()
 
     def build_view_state(
         self,

@@ -7,7 +7,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import ANY, MagicMock, patch
 
 import pytest
 
@@ -676,6 +676,7 @@ def test_cmd_render_calls_render(
         viz_quality=False,
         start_sec=None,
         end_sec=None,
+        on_progress=ANY,
     )
     out = capsys.readouterr().out
     assert f"Rendered to {output.resolve()}" in out
@@ -741,6 +742,7 @@ def test_cmd_render_passes_start_and_end(
         viz_quality=False,
         start_sec=10,
         end_sec=20,
+        on_progress=ANY,
     )
 
 
