@@ -531,3 +531,65 @@ def test_prompt_yes_no_passes_labeled_lines() -> None:
     assert view.message == "Apply timeline preset?"
     assert view.labeled_lines == labeled
     assert view.options == ("Yes", "Cancel")
+
+
+def test_prompt_progress_has_bar_and_ignores_keys() -> None:
+    pygame.init()
+    modal = ModalHost()
+    labeled = (
+        ModalLabeledLine("output", "renders/song.mp4"),
+        ModalLabeledLine("quality", "high"),
+    )
+    modal.prompt_progress(
+        "Rendering project...",
+        labeled_lines=labeled,
+        fraction=0.25,
+    )
+    view = modal.view_state()
+    assert view is not None
+    assert view.kind == ModalKind.PROGRESS
+    assert view.message == "Rendering project..."
+    assert view.options == ()
+    assert view.progress_fraction == 0.25
+    assert view.labeled_lines == labeled
+    assert modal.handle_keydown(_keydown(pygame.K_ESCAPE)) is True
+    assert modal.active is True
+    assert modal.handle_keydown(_keydown(pygame.K_RETURN)) is True
+    assert modal.active is True
+    modal.update_progress(0.8)
+    assert modal.view_state().progress_fraction == 0.8
+
+    font = _font()
+    line_gap = 3
+    line_h = font.get_linesize()
+    screen_w = 1280
+    _, panel_h = modal_overlay._measure_panel(
+        font, modal.view_state(), line_gap=line_gap, screen_w=screen_w
+    )
+    without_bar = ModalViewState(
+        kind=ModalKind.PROGRESS,
+        message="Rendering project...",
+        options=(),
+        focus_index=0,
+        labeled_lines=labeled,
+    )
+    _, height_without = modal_overlay._measure_panel(
+        font, without_bar, line_gap=line_gap, screen_w=screen_w
+    )
+    section_gap = line_h + line_gap
+    assert panel_h - height_without == section_gap + modal_overlay._BAR_HEIGHT
+
+
+def test_prompt_choice_passes_labeled_lines() -> None:
+    modal = ModalHost()
+    labeled = (ModalLabeledLine("output", "renders/song.mp4"),)
+    modal.prompt_choice(
+        "Render complete",
+        [ModalOption("OK", lambda: None)],
+        labeled_lines=labeled,
+    )
+    view = modal.view_state()
+    assert view is not None
+    assert view.message == "Render complete"
+    assert view.labeled_lines == labeled
+    assert view.options == ("Ok",)

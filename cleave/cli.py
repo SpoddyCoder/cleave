@@ -9,6 +9,10 @@ from typing import TYPE_CHECKING
 
 from cleave import __version__
 from cleave.paths import is_frozen, resolve_project
+from cleave.render_progress import (
+    format_render_progress_line,
+    render_progress_env_enabled,
+)
 
 if TYPE_CHECKING:
     from cleave.stems import StemSource
@@ -284,6 +288,11 @@ def cmd_render(args: argparse.Namespace) -> None:
         _exit_error(f"error: {e}")
 
     started = time.perf_counter()
+
+    def on_progress(_message: str, fraction: float | None) -> None:
+        if fraction is not None and render_progress_env_enabled():
+            print(format_render_progress_line(fraction), file=sys.stderr, flush=True)
+
     try:
         result = render(
             project_dir,
@@ -293,6 +302,7 @@ def cmd_render(args: argparse.Namespace) -> None:
             viz_quality=args.viz_quality,
             start_sec=args.start,
             end_sec=args.end,
+            on_progress=on_progress,
         )
     except (FileNotFoundError, ValueError, RuntimeError) as e:
         _exit_error(f"error: {e}")

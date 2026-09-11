@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import patch
 
 import pygame
 
@@ -11,6 +12,8 @@ from cleave.config_schema.project_render import (
     default_project_render_path,
 )
 from cleave.viz.material_icons import FOLDER_GLYPH
+from cleave.viz.modal import ModalKind, ModalLabeledLine
+from cleave.viz.project_render_job import RenderJobStatus
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
 from cleave.viz.row_spec import (
     RowPresentStyle,
@@ -24,6 +27,7 @@ from cleave.viz.theme import ACTION, HIGHLIGHT
 from cleave.viz.tuning_panel_draw import _row_value_color
 from cleave.viz.tuning_view_state import ProjectBlock, view_state_structure_signature
 from tests.cleave.viz.test_controls import (
+    _choose_modal_option,
     _desc,
     _expand_project,
     _expand_project_render,
@@ -286,4 +290,164 @@ def test_start_end_keyboard_steps() -> None:
     assert render.end_sec == 59
     controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
     assert render.end_sec == 49
+
+
+class _ScriptedRenderJob:
+    def __init__(self) -> None:
+        self.fraction = 0.0
+        self.aborted = False
+        self._done = False
+        self._ok = True
+        self._error: str | None = None
+        self.spec = None
+
+    def poll(self) -> RenderJobStatus:
+        return RenderJobStatus(
+            done=self._done,
+            ok=self._ok,
+            fraction=self.fraction,
+            error=self._error,
+        )
+
+    def finish(self, *, ok: bool = True, error: str | None = None) -> None:
+        self._done = True
+        self._ok = ok
+        self.fraction = 1.0 if ok else self.fraction
+        self._error = error
+
+    def abort(self) -> None:
+        self.aborted = True
+        self.finish(ok=False, error="aborted")
+
+
+def _focus_render_action(controls) -> None:
+    _expand_project_render(controls)
+    view = controls.build_view_state(paused=False)
+    action_row = view.layout.find_by_kind(RowKind.PROJECT_RENDER_ACTION)
+    controls.focus_descriptor = _desc(view, action_row)
+
+
+def _wire_fake_job(controls, tmp_path: Path, job: _ScriptedRenderJob) -> Path:
+    snap = tmp_path / "snap.yaml"
+    snap.write_text("editor: {}\n")
+
+    def start_job(spec) -> _ScriptedRenderJob:
+        job.spec = spec
+        return job
+
+    controls.project_render._start_job = start_job
+    controls.project_render._write_snapshot = lambda: snap
+    return snap
+
+
+def test_render_action_enter_opens_yes_cancel_modal() -> None:
+    controls = _make_controls(("layer_1",), duration_sec=60.0)
+    controls.session.project.render.quality = "high"
+    controls.session.project.render.start_sec = 5
+    controls.session.project.render.end_sec = 20
+    _focus_render_action(controls)
+    assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
+    modal_view = controls.modal_host.view_state()
+    assert modal_view is not None
+    assert modal_view.kind == ModalKind.YES_NO
+    assert modal_view.options == ("Yes", "Cancel")
+    assert modal_view.message == "Render the project?"
+    assert modal_view.labeled_lines == (
+        ModalLabeledLine("output", "renders/render.mp4"),
+        ModalLabeledLine("quality", "high"),
+        ModalLabeledLine("start", "5s"),
+        ModalLabeledLine("end", "20s"),
+    )
+
+
+def test_render_action_cancel_does_not_start_job(tmp_path: Path) -> None:
+    controls = _make_controls(("layer_1",), project_dir=tmp_path)
+    job = _ScriptedRenderJob()
+    _wire_fake_job(controls, tmp_path, job)
+    _focus_render_action(controls)
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    _choose_modal_option(controls, "Cancel")
+    assert controls.modal_host.view_state() is None
+    assert job.spec is None
+    assert not controls.project_render.busy
+
+
+@patch("cleave.viz.render.validate_render_project")
+def test_render_confirm_shows_progress_then_success(
+    mock_validate, tmp_path: Path
+) -> None:
+    mock_validate.return_value = tmp_path
+    controls = _make_controls(
+        ("layer_1",), project_dir=tmp_path, duration_sec=60.0
+    )
+    job = _ScriptedRenderJob()
+    _wire_fake_job(controls, tmp_path, job)
+    _focus_render_action(controls)
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    assert not controls.playback.paused
+    _choose_modal_option(controls, "Yes")
+    assert controls.playback.paused is True
+    assert controls.project_render.busy is True
+    modal_view = controls.modal_host.view_state()
+    assert modal_view is not None
+    assert modal_view.kind == ModalKind.PROGRESS
+    assert modal_view.message == "Rendering project..."
+    assert modal_view.options == ()
+    assert modal_view.progress_fraction == 0.0
+    assert modal_view.labeled_lines == (
+        ModalLabeledLine("output", "renders/render.mp4"),
+        ModalLabeledLine("quality", "normal"),
+        ModalLabeledLine("start", "0s"),
+        ModalLabeledLine("end", "60s"),
+    )
+    assert job.spec is not None
+    assert job.spec.output_path == tmp_path / "renders" / "render.mp4"
+    assert job.spec.start_sec == 0
+    assert job.spec.end_sec == 60
+
+    controls.handle_modal_keydown(_keydown(pygame.K_ESCAPE))
+    assert controls.modal_host.view_state() is not None
+    assert controls.modal_host.view_state().kind == ModalKind.PROGRESS
+
+    job.fraction = 0.5
+    controls.tick(0.016)
+    assert controls.modal_host.view_state().progress_fraction == 0.5
+
+    job.finish()
+    controls.tick(0.016)
+    assert controls.project_render.busy is False
+    done = controls.modal_host.view_state()
+    assert done is not None
+    assert done.kind == ModalKind.CHOICE
+    assert done.message == "Render complete"
+    assert done.options == ("Ok",)
+    assert done.labeled_lines == (
+        ModalLabeledLine("output", "renders/render.mp4"),
+    )
+    assert controls.playback.paused is True
+    _choose_modal_option(controls, "Ok")
+    assert controls.modal_host.view_state() is None
+    assert controls.playback.paused is False
+
+
+@patch("cleave.viz.render.validate_render_project")
+def test_render_confirm_failure_shows_error_modal(
+    mock_validate, tmp_path: Path
+) -> None:
+    mock_validate.return_value = tmp_path
+    controls = _make_controls(("layer_1",), project_dir=tmp_path)
+    job = _ScriptedRenderJob()
+    _wire_fake_job(controls, tmp_path, job)
+    _focus_render_action(controls)
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    _choose_modal_option(controls, "Yes")
+    job.finish(ok=False, error="ffmpeg exited with status 1")
+    controls.tick(0.016)
+    view = controls.modal_host.view_state()
+    assert view is not None
+    assert view.kind == ModalKind.CHOICE
+    assert view.message == "Render failed"
+    assert view.labeled_lines == (
+        ModalLabeledLine("error", "ffmpeg exited with status 1"),
+    )
 

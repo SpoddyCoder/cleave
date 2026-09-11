@@ -728,18 +728,27 @@ class VisualizerApp:
                 ):
                     rt.overlay.notify_input()
 
-                pm_fps_governor.observe(measured_fps)
-                pm_fps_governor.apply_if_changed(rt.layers)
-                rt.overlay_profiler.note_projectm_fps(pm_fps_governor.target_fps)
-
                 t_sec = current_sec(rt.playback, rt.seed.duration_sec)
-                self.tick_frame(
-                    t_sec,
-                    paused=rt.playback.paused,
-                    display_fps=frame_rate.display_fps,
-                    n_pcm=samples_for_dt(self._overlay_dt),
-                    dt_sec=self._overlay_dt,
-                )
+                if rt.controls.project_render.busy:
+                    rt.compositor.present_content()
+                    _tick_frame_live_overlay(
+                        rt,
+                        t_sec,
+                        paused=True,
+                        overlay_dt=self._overlay_dt,
+                        display_fps=frame_rate.display_fps,
+                    )
+                else:
+                    pm_fps_governor.observe(measured_fps)
+                    pm_fps_governor.apply_if_changed(rt.layers)
+                    rt.overlay_profiler.note_projectm_fps(pm_fps_governor.target_fps)
+                    self.tick_frame(
+                        t_sec,
+                        paused=rt.playback.paused,
+                        display_fps=frame_rate.display_fps,
+                        n_pcm=samples_for_dt(self._overlay_dt),
+                        dt_sec=self._overlay_dt,
+                    )
 
                 pygame.display.flip()
                 measured_fps = frame_rate.end_frame()
