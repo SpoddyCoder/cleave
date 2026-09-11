@@ -37,6 +37,16 @@ def _toggle_settings_latency_compensation(
     controls.settings.set_latency_compensation_expanded(forward)
 
 
+def _toggle_project(controls: TuningControls, _slot: str | None, forward: bool) -> None:
+    controls.project.set_expanded(forward)
+
+
+def _toggle_project_render(
+    controls: TuningControls, _slot: str | None, forward: bool
+) -> None:
+    controls.project.set_render_expanded(forward)
+
+
 def _toggle_render_overlays(
     controls: TuningControls, _slot: str | None, forward: bool
 ) -> None:
@@ -274,8 +284,18 @@ def _settings_ui_expanded(state: TuningViewState, _slot: str | None) -> bool:
     return state.settings.ui_expanded
 
 
-def _settings_latency_compensation_expanded(state: TuningViewState, _slot: str | None) -> bool:
+def _settings_latency_compensation_expanded(
+    state: TuningViewState, _slot: str | None
+) -> bool:
     return state.settings.latency_compensation_expanded
+
+
+def _project_expanded(state: TuningViewState, _slot: str | None) -> bool:
+    return state.project.expanded
+
+
+def _project_render_expanded(state: TuningViewState, _slot: str | None) -> bool:
+    return state.project.render_expanded
 
 
 def _render_overlays_expanded(state: TuningViewState, _slot: str | None) -> bool:
@@ -435,6 +455,31 @@ SETTINGS_SECTION = ExpandSectionDef(
         SectionNode(leaf_kind=RowKind.SETTINGS_PREVIEW_QUALITY),
         SectionNode(expand=SETTINGS_UI_SECTION),
         SectionNode(expand=SETTINGS_LATENCY_COMPENSATION_SECTION),
+    ),
+)
+
+PROJECT_RENDER_SECTION = ExpandSectionDef(
+    header_kind=RowKind.PROJECT_RENDER_HEADER,
+    context="global",
+    read_expanded=_project_render_expanded,
+    toggle=_toggle_project_render,
+    children=(
+        SectionNode(leaf_kind=RowKind.PROJECT_RENDER_OUTPUT),
+        SectionNode(leaf_kind=RowKind.PROJECT_RENDER_QUALITY),
+        SectionNode(leaf_kind=RowKind.PROJECT_RENDER_START),
+        SectionNode(leaf_kind=RowKind.PROJECT_RENDER_END),
+        SectionNode(leaf_kind=RowKind.PROJECT_RENDER_ACTION),
+    ),
+)
+
+PROJECT_SECTION = ExpandSectionDef(
+    header_kind=RowKind.PROJECT_HEADER,
+    context="global",
+    read_expanded=_project_expanded,
+    toggle=_toggle_project,
+    children=(
+        SectionNode(leaf_kind=RowKind.CONFIG_HEADER),
+        SectionNode(expand=PROJECT_RENDER_SECTION),
     ),
 )
 
@@ -717,7 +762,10 @@ TRACK_SECTION = ExpandSectionDef(
     ),
 )
 
-ROOT_SECTION_NODES: tuple[SectionNode, ...] = (SectionNode(expand=SETTINGS_SECTION),)
+ROOT_SECTION_NODES: tuple[SectionNode, ...] = (
+    SectionNode(expand=SETTINGS_SECTION),
+    SectionNode(expand=PROJECT_SECTION),
+)
 
 RENDER_SECTION_NODES: tuple[SectionNode, ...] = (
     SectionNode(expand=RENDER_OVERLAYS_SECTION),
@@ -883,6 +931,7 @@ def _collect_expand_sections(
 
 _ALL_EXPAND_SECTIONS = _collect_expand_sections(
     SETTINGS_SECTION,
+    PROJECT_SECTION,
     TRACK_SECTION,
     SONG_MARKERS_SECTION,
     BEAT_BAR_GRID_SECTION,
@@ -1070,6 +1119,7 @@ def _assign_expand_indent_depth(
 def _build_row_tree_indent_depth() -> dict[RowKind, int]:
     depths: dict[RowKind, int] = {}
     _assign_expand_indent_depth(depths, SETTINGS_SECTION, 0)
+    _assign_expand_indent_depth(depths, PROJECT_SECTION, 0)
     _assign_expand_indent_depth(depths, TRACK_SECTION, 0)
     for node in RENDER_SECTION_NODES:
         if node.expand is not None:

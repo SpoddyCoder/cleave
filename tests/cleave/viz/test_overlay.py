@@ -50,6 +50,7 @@ from cleave.viz.controls import (
 )
 from tests.support.viz import make_overlay_card_block, make_track_block
 from cleave.viz.tuning_view_state import (
+    ProjectBlock,
     RenderOverlaysBlock,
     RenderTimelineBlock,
     TuningViewState,
@@ -1193,6 +1194,7 @@ def test_delete_layer_row_text_has_tree_prefix() -> None:
 
 def test_action_row_value_color() -> None:
     state = _minimal_view_state(
+        project=ProjectBlock(expanded=True),
         tracks={
             "layer_1": make_track_block(
                 stem="drums",
@@ -1463,8 +1465,8 @@ def test_render_overlay_row_layout_includes_header_and_sub_rows_when_expanded() 
     assert RowKind.RENDER_OVERLAY_CARD_TITLE_FONT_SIZE not in kinds
     assert RowKind.RENDER_OVERLAY_CARD_BODY_FONT_SIZE not in kinds
     header_idx = state.layout.find_by_kind(RowKind.RENDER_OVERLAYS_HEADER)
-    config_idx = state.layout.find_by_kind(RowKind.CONFIG_HEADER)
-    assert config_idx < header_idx
+    project_idx = state.layout.find_by_kind(RowKind.PROJECT_HEADER)
+    assert project_idx < header_idx
 
 
 def test_render_overlay_animation_rows_when_expanded() -> None:

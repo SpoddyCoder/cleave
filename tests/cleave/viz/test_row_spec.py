@@ -115,6 +115,9 @@ _EXPECTED_REPEAT_ROW_KINDS = frozenset(
         RowKind.SETTINGS_UI_WIDTH,
         RowKind.SETTINGS_UI_FADE,
         RowKind.SETTINGS_RESIDUAL_LATENCY_MS,
+        RowKind.PROJECT_RENDER_QUALITY,
+        RowKind.PROJECT_RENDER_START,
+        RowKind.PROJECT_RENDER_END,
         RowKind.TIMELINE_BAR_PHASE,
         RowKind.TIMELINE_HARD_CUTS,
         RowKind.TIMELINE_HARD_CUT_FADE_IN,
@@ -141,7 +144,7 @@ def test_header_row_kinds() -> None:
     assert HEADER_ROW_KINDS == frozenset(
         {
             RowKind.TRANSPORT,
-            RowKind.CONFIG_HEADER,
+            RowKind.PROJECT_HEADER,
             RowKind.SETTINGS_HEADER,
         }
     )
@@ -160,6 +163,9 @@ def test_row_is_pinned() -> None:
     assert row_is_pinned(RowKind.TRANSPORT) is True
     assert row_is_pinned(RowKind.CONFIG_HEADER) is True
     assert row_is_pinned(RowKind.SETTINGS_HEADER) is True
+    assert row_is_pinned(RowKind.PROJECT_HEADER) is True
+    assert row_is_pinned(RowKind.PROJECT_RENDER_HEADER) is True
+    assert row_is_pinned(RowKind.PROJECT_RENDER_QUALITY) is True
     assert row_is_pinned(RowKind.SETTINGS_PREVIEW_QUALITY) is True
     assert row_is_pinned(RowKind.SETTINGS_EDITOR_MODE) is True
     assert row_is_pinned(RowKind.SETTINGS_UI_HEADER) is True
@@ -434,6 +440,8 @@ def test_tree_branch_leading_spaces() -> None:
 
 def test_row_panel_label_settings_header() -> None:
     assert row_panel_label(RowKind.SETTINGS_HEADER) == "Editor Settings"
+    assert row_panel_label(RowKind.PROJECT_HEADER) == "Project"
+    assert row_panel_label(RowKind.PROJECT_RENDER_HEADER) == "Render Project"
 
 
 def test_labeled_row_prefix_settings_children() -> None:
@@ -441,6 +449,9 @@ def test_labeled_row_prefix_settings_children() -> None:
     assert labeled_row_prefix(RowKind.SETTINGS_UI_WIDTH_MODE) == "  └─ width mode: "
     assert labeled_row_prefix(RowKind.SETTINGS_UI_WIDTH) == "  └─ max width: "
     assert labeled_row_prefix(RowKind.SETTINGS_UI_FADE) == "  └─ auto-fade: "
+    assert labeled_row_prefix(RowKind.PROJECT_RENDER_QUALITY) == "  └─ quality: "
+    assert labeled_row_prefix(RowKind.PROJECT_RENDER_START) == "  └─ start: "
+    assert labeled_row_prefix(RowKind.PROJECT_RENDER_END) == "  └─ end: "
 
 
 def test_labeled_row_prefix_track_depths() -> None:

@@ -18,6 +18,7 @@ from cleave.config import (
     render_fps,
     render_output_size,
 )
+from cleave.config_schema.project_render import default_project_render_path
 from cleave.ffmpeg import ffmpeg_executable
 from cleave.paths import default_project_config, resource_dir, resolve_project
 from cleave.preset_playlist import scan_all_layers
@@ -120,13 +121,13 @@ def _default_output_path(
     *,
     duration_sec: float,
 ) -> Path:
-    if _is_partial_segment(segment, duration_sec=duration_sec):
-        return (
-            project
-            / "renders"
-            / f"{name}_{segment.start_sec}-{segment.end_label_sec}s.mp4"
-        )
-    return project / "renders" / f"{name}.mp4"
+    return default_project_render_path(
+        project,
+        name,
+        start_sec=segment.start_sec,
+        end_sec=segment.end_label_sec,
+        duration_sec=duration_sec,
+    )
 
 
 def _resolve_render_config_path(

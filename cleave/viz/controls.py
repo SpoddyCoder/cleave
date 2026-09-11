@@ -28,6 +28,7 @@ from cleave.viz.render_pattern_mask_controls import RenderPatternMaskControls
 from cleave.viz.render_post_fx_bindings import RenderPostFxBindings
 from cleave.viz.render_post_fx_controls import RenderPostFxControls
 from cleave.viz.settings_controls import SettingsControls
+from cleave.viz.project_controls import ProjectControls
 from cleave.viz.song_marker_controls import SongMarkerController
 from cleave.viz.tap_sync_controls import TapSyncControls, TapSyncUiSnapshot
 from cleave.viz.timeline_phase_controls import TimelinePhaseController
@@ -216,6 +217,7 @@ class TuningControls:
             config_save=self._config_save,
             get_notification=self._notification_host.active,
             layers_by_slot=layers_by_slot,
+            project_dir=project_dir,
         )
         self.render_overlays = RenderOverlaysControls(session)
         self.render_post_fx = RenderPostFxControls(
@@ -223,6 +225,7 @@ class TuningControls:
         )
         self.render_pattern_mask = RenderPatternMaskControls(session)
         self.settings = SettingsControls(session, cfg)
+        self.project = ProjectControls(session, duration_sec=duration_sec)
         self.layer_mutations = LayerMutations(
             session,
             preset_root=preset_root,

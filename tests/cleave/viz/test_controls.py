@@ -201,9 +201,16 @@ def _confirm_modal_yes(controls: TuningControls) -> None:
 
 
 def _config_header_row(view: TuningViewState) -> int:
-    return next(
-        i for i in range(len(view.layout)) if view.layout.kind(i) == RowKind.CONFIG_HEADER
-    )
+    return view.layout.find_by_kind(RowKind.CONFIG_HEADER)
+
+
+def _expand_project(controls: TuningControls) -> None:
+    controls.session.project.expanded = True
+
+
+def _expand_project_render(controls: TuningControls) -> None:
+    _expand_project(controls)
+    controls.session.project.render.expanded = True
 
 
 def _choose_save_as_new(controls: TuningControls) -> None:
@@ -770,6 +777,7 @@ def test_move_mode_backspace_cancels_without_applying() -> None:
 
 def test_save_as_new_triggers_notification_without_blocking_input() -> None:
     controls = _make_controls(("layer_1",))
+    _expand_project(controls)
     view = controls.build_view_state(paused=False)
     config_row = _config_header_row(view)
     controls.focus_descriptor = _desc(view, config_row)
@@ -797,6 +805,7 @@ def test_config_header_shows_active_path() -> None:
     launch_path = Path("/tmp/projects/my-track/my-track.yaml")
     controls = _make_controls(("layer_1",))
     controls._config_save._active_config_path = launch_path
+    _expand_project(controls)
     view = controls.build_view_state(paused=False)
     header_row = next(
         i for i in range(len(view.layout)) if view.layout.kind(i) == RowKind.CONFIG_HEADER
@@ -810,6 +819,7 @@ def test_config_header_shows_asterisk_when_dirty() -> None:
     controls = _make_controls(("layer_1",))
     controls._config_save._active_config_path = launch_path
     _mutate_dirty(controls)
+    _expand_project(controls)
     view = controls.build_view_state(paused=False)
     header_row = next(
         i for i in range(len(view.layout)) if view.layout.kind(i) == RowKind.CONFIG_HEADER
@@ -834,6 +844,8 @@ def test_blend_and_opacity_change_sets_dirty_save_clears() -> None:
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.config_dirty
 
+    _expand_project(controls)
+    view = controls.build_view_state(paused=False)
     save_row = _config_header_row(view)
     controls.focus_descriptor = _desc(view, save_row)
     _choose_save_as_new(controls)
@@ -846,6 +858,7 @@ def test_config_header_truncates_long_paths() -> None:
     )
     controls = _make_controls(("layer_1",))
     controls._config_save._active_config_path = long_path
+    _expand_project(controls)
     view = controls.build_view_state(paused=False)
     header_row = next(
         i for i in range(len(view.layout)) if view.layout.kind(i) == RowKind.CONFIG_HEADER
@@ -909,6 +922,7 @@ def test_fit_row_text_config_and_preset_share_panel_width() -> None:
     )
     controls = _make_controls(("layer_1",))
     controls._config_save._active_config_path = long_path
+    _expand_project(controls)
     view = controls.build_view_state(paused=False)
     view.tracks["layer_1"] = make_track_block(
         stem="layer_1",
@@ -940,6 +954,7 @@ def test_save_as_new_updates_active_config_path() -> None:
     controls = _make_controls(("layer_1",))
     controls._config_save._on_save_new_config = lambda: saved_path
 
+    _expand_project(controls)
     view = controls.build_view_state(paused=False)
     save_row = _config_header_row(view)
     controls.focus_descriptor = _desc(view, save_row)
@@ -963,6 +978,7 @@ def test_save_as_new_enables_overwrite_from_root_template() -> None:
     assert controls.build_view_state(paused=False).allow_overwrite is False
 
     controls._config_save._on_save_new_config = lambda: saved_path
+    _expand_project(controls)
     view = controls.build_view_state(paused=False)
     save_row = _config_header_row(view)
     controls.focus_descriptor = _desc(view, save_row)
@@ -980,6 +996,7 @@ def test_repo_root_save_shows_save_as_new_only_modal() -> None:
         launch_config_path=_REPO_ROOT_EXAMPLE,
         repo_root_example=_REPO_ROOT_EXAMPLE,
     )
+    _expand_project(controls)
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = _desc(view, _config_header_row(view))
 
@@ -1008,6 +1025,7 @@ def test_repo_root_save_as_new_requires_confirmation() -> None:
         repo_root_example=_REPO_ROOT_EXAMPLE,
     )
     controls._config_save._on_save_new_config = lambda: saved_path
+    _expand_project(controls)
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = _desc(view, _config_header_row(view))
 
@@ -1029,6 +1047,7 @@ def test_overwrite_after_save_uses_new_active_path() -> None:
     controls._config_save._on_save_new_config = lambda: saved_path
     controls._config_save._on_overwrite_config = lambda path: writes.append(path) or path.name
 
+    _expand_project(controls)
     view = controls.build_view_state(paused=False)
     save_row = _config_header_row(view)
 
@@ -1055,9 +1074,10 @@ def test_navigable_rows_without_overwrite() -> None:
         launch_config_path=_REPO_ROOT_EXAMPLE,
         repo_root_example=_REPO_ROOT_EXAMPLE,
     )
+    _expand_project(controls)
     view = controls.build_view_state(paused=False)
     assert view.allow_overwrite is False
-    assert len(view.layout) == 19
+    assert len(view.layout) == 21
     assert RowDescriptor(RowKind.TIMELINE_PRESETS) not in view.layout.rows
 
     kinds = {view.layout.kind(i) for i in range(len(view.layout))}
@@ -1066,20 +1086,19 @@ def test_navigable_rows_without_overwrite() -> None:
     navigable = view.layout.navigable_indices(view)
     assert any(view.layout.kind(i) == RowKind.CONFIG_HEADER for i in navigable)
 
-    transport_row = next(
-        i for i in range(len(view.layout)) if view.layout.kind(i) == RowKind.TRANSPORT
-    )
+    render_row = view.layout.find_by_kind(RowKind.PROJECT_RENDER_HEADER)
     config_row = _config_header_row(view)
     controls.focus_descriptor = _desc(view, config_row)
     controls.handle_keydown(_keydown(pygame.K_DOWN))
-    assert controls.focus_descriptor == _desc(view, transport_row)
+    assert controls.focus_descriptor == _desc(view, render_row)
 
 
 def test_navigable_rows_with_overwrite() -> None:
     controls = _make_controls(("layer_1",))
+    _expand_project(controls)
     view = controls.build_view_state(paused=False)
     assert view.allow_overwrite is True
-    assert len(view.layout) == 19
+    assert len(view.layout) == 21
     assert RowDescriptor(RowKind.TIMELINE_PRESETS) not in view.layout.rows
 
     config_row = _config_header_row(view)
@@ -1088,6 +1107,7 @@ def test_navigable_rows_with_overwrite() -> None:
 
 def test_save_choice_with_overwrite_includes_cancel() -> None:
     controls = _make_controls(("layer_1",))
+    _expand_project(controls)
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = _desc(view, _config_header_row(view))
     controls.handle_keydown(_keydown(pygame.K_RETURN))
@@ -1111,6 +1131,7 @@ def test_overwrite_shows_confirm_before_write() -> None:
         writes.append(path) or path.name
     )
 
+    _expand_project(controls)
     view = controls.build_view_state(paused=False)
     save_row = _config_header_row(view)
     controls.focus_descriptor = _desc(view, save_row)
@@ -1150,6 +1171,7 @@ def test_overwrite_confirm_yes_writes_launch_path() -> None:
         writes.append(path) or path.name
     )
 
+    _expand_project(controls)
     view = controls.build_view_state(paused=False)
     save_row = _config_header_row(view)
     controls.focus_descriptor = _desc(view, save_row)
@@ -1174,6 +1196,7 @@ def test_overwrite_confirm_esc_dismisses() -> None:
         writes.append(path) or path.name
     )
 
+    _expand_project(controls)
     view = controls.build_view_state(paused=False)
     save_row = _config_header_row(view)
     controls.focus_descriptor = _desc(view, save_row)
@@ -1185,6 +1208,7 @@ def test_overwrite_confirm_esc_dismisses() -> None:
 
 def test_esc_during_confirm_does_not_quit() -> None:
     controls = _make_controls(("layer_1",))
+    _expand_project(controls)
     view = controls.build_view_state(paused=False)
     save_row = _config_header_row(view)
     controls.focus_descriptor = _desc(view, save_row)
@@ -3029,19 +3053,19 @@ def test_render_timeline_submenu_down_from_last_row_wraps_to_settings() -> None:
     assert controls.focus_descriptor == _desc(view, settings_row)
 
 
-def test_render_timeline_submenu_up_from_transport_wraps_to_config_header() -> None:
+def test_render_timeline_submenu_up_from_transport_wraps_to_project_header() -> None:
     stems = ("layer_1", "layer_2", "layer_3", "layer_4")
     controls = _make_controls(stems, timeline_enabled=True)
     controls.session.timeline.panel_open = True
     view = controls.build_view_state(paused=False)
     transport_row = view.layout.find_by_kind(RowKind.TRANSPORT)
-    config_row = view.layout.find_by_kind(RowKind.CONFIG_HEADER)
+    project_row = view.layout.find_by_kind(RowKind.PROJECT_HEADER)
     controls.focus_descriptor = _desc(view, transport_row)
 
     controls.handle_keydown(_keydown(pygame.K_UP))
 
     assert not isinstance(controls.focus_cursor, TimelineFocus)
-    assert controls.focus_descriptor == _desc(view, config_row)
+    assert controls.focus_descriptor == _desc(view, project_row)
 
 
 def test_render_timeline_panel_closed_wrap_unchanged() -> None:
@@ -3302,6 +3326,7 @@ def test_quick_nav_row_indices_anchors_and_open_sections() -> None:
 
     quick = view.layout.quick_nav_indices(view)
     settings_row = view.layout.find_by_kind(RowKind.SETTINGS_HEADER)
+    project_row = view.layout.find_by_kind(RowKind.PROJECT_HEADER)
     layer1_header = next(
         i
         for i in range(len(view.layout))
@@ -3312,6 +3337,7 @@ def test_quick_nav_row_indices_anchors_and_open_sections() -> None:
     transport_row = view.layout.find_by_kind(RowKind.TRANSPORT)
     assert quick == [
         settings_row,
+        project_row,
         transport_row,
         layer1_header,
         render_overlay_row,
@@ -3338,6 +3364,7 @@ def test_quick_nav_row_indices_anchors_and_open_sections() -> None:
     )
     assert quick == [
         settings_row,
+        view.layout.find_by_kind(RowKind.PROJECT_HEADER),
         transport_row,
         layer1_header,
         layer2_header,
@@ -3372,6 +3399,9 @@ def test_ctrl_quick_nav_cycles_headers_and_transport() -> None:
 
     controls.handle_keydown(_keydown(pygame.K_DOWN, mod=pygame.KMOD_CTRL))
     assert controls.focus_descriptor == _desc(view, quick[6])
+
+    controls.handle_keydown(_keydown(pygame.K_DOWN, mod=pygame.KMOD_CTRL))
+    assert controls.focus_descriptor == _desc(view, quick[7])
 
     controls.handle_keydown(_keydown(pygame.K_DOWN, mod=pygame.KMOD_CTRL))
     assert controls.focus_cursor == TimelineFocus(0)
@@ -3417,26 +3447,28 @@ def test_ctrl_quick_nav_from_sub_row_jumps_forward() -> None:
 
     controls.focus_descriptor = _desc(view, preset_row)
     controls.handle_keydown(_keydown(pygame.K_DOWN, mod=pygame.KMOD_CTRL))
-    assert controls.focus_descriptor == _desc(view, quick[3])
+    assert controls.focus_descriptor == _desc(view, quick[4])
 
     controls.focus_descriptor = _desc(view, preset_row)
     controls.handle_keydown(_keydown(pygame.K_UP, mod=pygame.KMOD_CTRL))
-    assert controls.focus_descriptor == _desc(view, quick[2])
+    assert controls.focus_descriptor == _desc(view, quick[3])
 
 
 def test_ctrl_quick_nav_from_config_header_row() -> None:
     controls = _make_controls(("layer_1",))
+    _expand_project(controls)
     view = controls.build_view_state(paused=False)
-    quick = view.layout.quick_nav_indices(view)
     config_row = _config_header_row(view)
+    project_row = view.layout.find_by_kind(RowKind.PROJECT_HEADER)
+    transport_row = view.layout.find_by_kind(RowKind.TRANSPORT)
 
     controls.focus_descriptor = _desc(view, config_row)
     controls.handle_keydown(_keydown(pygame.K_UP, mod=pygame.KMOD_CTRL))
-    assert controls.focus_descriptor == _desc(view, quick[0])
+    assert controls.focus_descriptor == _desc(view, project_row)
 
     controls.focus_descriptor = _desc(view, config_row)
     controls.handle_keydown(_keydown(pygame.K_DOWN, mod=pygame.KMOD_CTRL))
-    assert controls.focus_descriptor == _desc(view, quick[1])
+    assert controls.focus_descriptor == _desc(view, transport_row)
 
 
 def test_ctrl_quick_nav_does_not_affect_normal_up_down() -> None:
@@ -4478,6 +4510,7 @@ def test_shift_left_exits_solo_only_for_active_target() -> None:
 
 def test_save_blocked_while_solo_active() -> None:
     controls = _make_controls(("layer_1",))
+    _expand_project(controls)
     view = controls.build_view_state(paused=False)
     header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
     config_row = _config_header_row(view)
@@ -4495,6 +4528,7 @@ def test_save_blocked_while_solo_active() -> None:
 def test_config_header_greyed_while_solo_active() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.solo_slot = "layer_1"
+    _expand_project(controls)
     view = controls.build_view_state(paused=False)
     config_row = _config_header_row(view)
     assert _row_value_color(view, config_row) == DISABLED
@@ -4690,7 +4724,7 @@ def test_settings_header_is_first_row() -> None:
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
     assert view.layout.kind( 0) == RowKind.SETTINGS_HEADER
-    assert view.layout.kind( 1) == RowKind.CONFIG_HEADER
+    assert view.layout.kind( 1) == RowKind.PROJECT_HEADER
     assert view.layout.kind( 2) == RowKind.TRANSPORT
 
 
@@ -5562,6 +5596,7 @@ def test_marker_only_edit_marks_dirty_and_save_clears(tmp_path: Path) -> None:
     assert controls.config_dirty
     assert load_manifest(project).song_markers == ()
 
+    _expand_project(controls)
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = _desc(view, _config_header_row(view))
     _choose_save_as_new(controls)
@@ -5591,6 +5626,7 @@ def test_overwrite_save_flushes_song_markers(tmp_path: Path) -> None:
     assert controls.config_dirty
     assert load_manifest(project).song_markers == _song_markers(8.0)
 
+    _expand_project(controls)
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = _desc(view, _config_header_row(view))
     _choose_overwrite(controls)
@@ -5629,6 +5665,7 @@ def test_save_as_new_flushes_markers_to_same_project_yaml(tmp_path: Path) -> Non
 
     controls.playback.player.seek(3.0)
     controls.song_markers.drop()
+    _expand_project(controls)
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = _desc(view, _config_header_row(view))
     _choose_save_as_new(controls)

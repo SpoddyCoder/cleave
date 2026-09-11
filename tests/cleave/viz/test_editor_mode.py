@@ -69,6 +69,7 @@ def test_curation_layout_allowlist() -> None:
     assert RowKind.SETTINGS_HEADER in kinds
     assert RowKind.SETTINGS_EDITOR_MODE in kinds
     assert RowKind.TRANSPORT in kinds
+    assert RowKind.PROJECT_HEADER not in kinds
     assert RowKind.CONFIG_HEADER not in kinds
     assert RowKind.RENDER_SECTION_GAP not in kinds
     assert RowKind.RENDER_OVERLAYS_HEADER not in kinds

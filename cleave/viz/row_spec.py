@@ -65,7 +65,9 @@ class RowSpec:
     header_suffix: str | None = None
     fit_strategy: FitStrategy = FitStrategy.PLAIN
     visibility_icon: VisibilityIconFn | None = None
+    header_glyph: str | None = None
     shows_enter_icon: bool = False
+    shows_dirty_suffix: bool = False
     help_title: str = ""
     help_entries: tuple[tuple[str, str], ...] | None = None
     help_description: tuple[str, ...] | None = None
@@ -93,6 +95,7 @@ from cleave.viz.row_specs.render_overlays import (
     overlay_card_panel_label,
 )
 from cleave.viz.row_specs.render_post_fx import SPECS as _RENDER_POST_FX_SPECS
+from cleave.viz.row_specs.project import SPECS as _PROJECT_SPECS
 from cleave.viz.row_specs.settings import (
     SPECS as _SETTINGS_SPECS,
     editor_mode_confirm_pending,
@@ -104,6 +107,7 @@ from cleave.viz.row_specs.transport import SPECS as _TRANSPORT_SPECS
 ROW_SPECS: dict[RowKind, RowSpec] = {
     **_TRANSPORT_SPECS,
     **_SETTINGS_SPECS,
+    **_PROJECT_SPECS,
     **_TRACK_SPECS,
     **_RENDER_OVERLAY_SPECS,
     **_RENDER_POST_FX_SPECS,
@@ -115,6 +119,7 @@ _missing = set(RowKind) - set(ROW_SPECS)
 _duplicate_overlap = (
     len(_TRANSPORT_SPECS)
     + len(_SETTINGS_SPECS)
+    + len(_PROJECT_SPECS)
     + len(_TRACK_SPECS)
     + len(_RENDER_OVERLAY_SPECS)
     + len(_RENDER_POST_FX_SPECS)

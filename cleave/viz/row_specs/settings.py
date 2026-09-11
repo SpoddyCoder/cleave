@@ -1,4 +1,4 @@
-"""Editor settings and config-path row specs."""
+"""Editor settings row specs."""
 
 from __future__ import annotations
 
@@ -116,24 +116,7 @@ def _apply_settings_header(
         controls, desc.kind, desc.slot, forward, card=desc.card
     )
 
-def _format_config_header(state: TuningViewState, _desc: RowDescriptor) -> str:
-    return state.active_config_label
-
 SPECS: dict[RowKind, RowSpec] = {
-    RowKind.CONFIG_HEADER: RowSpec(
-        affordance=RowAffordance.ACTION,
-        panel_label="",
-        present_style=RowPresentStyle.PATH_ICON,
-        format_value=_format_config_header,
-        fit_strategy=FitStrategy.PATH,
-        shows_enter_icon=True,
-        help_title="Save",
-        help_description=(
-            "Active config file.",
-            "Enter or Ctrl+S saves the current session settings.",
-        ),
-        is_header=True,
-    ),
     RowKind.SETTINGS_HEADER: RowSpec(
         affordance=RowAffordance.EXPAND,
         panel_label="Editor Settings",
