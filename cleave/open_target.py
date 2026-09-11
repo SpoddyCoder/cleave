@@ -1,6 +1,6 @@
 """Decide whether a filesystem path is something Cleave can open.
 
-Shared by the in-window file picker, pasted paths, dropped files, and the CLI.
+Shared by the in-window file picker, dropped files, and the CLI.
 No viz import: this must stay usable from headless tests.
 """
 

@@ -1,8 +1,8 @@
 """Run the file picker on an already-open loading window.
 
-Everything pygame lives here: the event pump, key mapping, key repeat, the
-clipboard read, and presenting through the loading compositor.
-:meth:`LoadingWindow.update` stays progress-only.
+Everything pygame lives here: the event pump, key mapping, key repeat, and
+presenting through the loading compositor. :meth:`LoadingWindow.update` stays
+progress-only.
 """
 
 from __future__ import annotations
@@ -56,19 +56,6 @@ def picker_action_for(key: int, mod: int) -> PickerAction | None:
     return None
 
 
-def clipboard_text() -> str | None:
-    """Return clipboard text, or None when the platform gives us nothing."""
-    try:
-        if not pygame.scrap.get_init():
-            pygame.scrap.init()
-        raw = pygame.scrap.get_text()
-    except (AttributeError, NotImplementedError, pygame.error):
-        return None
-    if isinstance(raw, bytes):
-        return raw.decode("utf-8", "replace")
-    return raw
-
-
 def _present(window: LoadingWindow, surface: pygame.Surface) -> None:
     texture_id = window.compositor.upload_overlay_texture(surface)
     glBindFramebuffer(GL_FRAMEBUFFER, 0)
@@ -104,9 +91,6 @@ def run_file_picker(window: LoadingWindow) -> OpenTarget | None:
                 repeat.on_keyup(event.key)
                 continue
             if event.type != pygame.KEYDOWN:
-                continue
-            if mod_ctrl(event.mod) and event.key == pygame.K_v:
-                picker.paste_path(clipboard_text())
                 continue
             action = picker_action_for(event.key, event.mod)
             if action is None:

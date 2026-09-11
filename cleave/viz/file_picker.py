@@ -17,7 +17,6 @@ from cleave.open_target import (
     OpenTarget,
     classify_open_target,
     is_project_target,
-    looks_like_windows_path,
     open_target_rejection,
 )
 from cleave.paths import (
@@ -27,10 +26,13 @@ from cleave.paths import (
     windows_documents_dir,
 )
 
-TITLE = "Open a wav or Cleave project"
-LEGEND = (
-    "Enter open   Right enter folder   Left/Backspace parent   "
-    "Tab shortcuts   Ctrl+V paste path   Esc quit"
+TITLE = "Open a Cleave project or a wav"
+LEGEND: tuple[tuple[str, str], ...] = (
+    ("Enter", "open"),
+    ("Right", "enter folder"),
+    ("Left/Backspace", "parent"),
+    ("Tab", "shortcuts"),
+    ("Esc", "quit"),
 )
 DRIVES_LABEL = "Drives"
 PARENT_LABEL = ".."
@@ -99,9 +101,10 @@ class PickerViewState:
     selected_index: int
     shortcuts: tuple[PickerShortcut, ...]
     selected_shortcut: int
+    active_shortcut: int | None
     focus: PickerFocus
     status: str
-    legend: str
+    legend: tuple[tuple[str, str], ...]
     truncated: bool
 
 
@@ -254,6 +257,17 @@ class FilePicker:
             return None
         return self._rows[self.selected_index]
 
+    def _active_shortcut_index(self) -> int | None:
+        """Return the shortcut that matches the directory being listed."""
+        for index, shortcut in enumerate(self.shortcuts):
+            if shortcut.drives:
+                if self.current is None:
+                    return index
+                continue
+            if shortcut.target is not None and self.current == shortcut.target:
+                return index
+        return None
+
     def view_state(self) -> PickerViewState:
         """Return the immutable snapshot the overlay draws."""
         return PickerViewState(
@@ -263,6 +277,7 @@ class FilePicker:
             selected_index=self.selected_index,
             shortcuts=self.shortcuts,
             selected_shortcut=self.selected_shortcut,
+            active_shortcut=self._active_shortcut_index(),
             focus=self.focus,
             status=self.status,
             legend=LEGEND,
@@ -395,31 +410,3 @@ class FilePicker:
             self.status = open_target_rejection(row.target)
             return None
         return target
-
-    def paste_path(self, text: str | None) -> None:
-        """Navigate to a pasted path. Never accepts on its own."""
-        cleaned = (text or "").strip().strip('"').strip("'")
-        if not cleaned:
-            self.status = "clipboard is empty"
-            return
-
-        path = Path(cleaned).expanduser()
-        if looks_like_windows_path(cleaned) and not path.exists():
-            self.status = (
-                "Windows path. Use /mnt/c/... or the Drives shortcut"
-            )
-            return
-
-        target = classify_open_target(path)
-        if target is None:
-            if path.is_dir():
-                self.navigate_to(path)
-                return
-            self.status = open_target_rejection(path)
-            return
-
-        parent = path.parent
-        self.status = ""
-        self.focus = PickerFocus.LIST
-        self.current = parent
-        self._refresh(keep=path)

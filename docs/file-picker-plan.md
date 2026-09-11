@@ -42,7 +42,6 @@ The rest of the pipeline already accepts either kind of target. [cleave/separate
 | Native `IFileOpenDialog` / zenity / tkinter | Out of v1. Freeze-only native dialog is optional polish after Phase 1, not a substitute for WSL |
 | File associations | Stay out (already deferred in [structured-releases.md](structured-releases.md)) |
 | Other audio extensions | Filter `*.wav` to match current product copy. Widening is a filter change later; `run_separate` already copies any file as the mix |
-| Paste path | `Ctrl+V` (Phase 1). Clipboard text is a path; navigate to it, do not auto-accept |
 | Failed separate / boot | Message on the loading screen, any key returns to the picker; window close still quits |
 | Mid-session open | Phase 3. Phase 1 does not tear down a live session |
 
@@ -86,8 +85,8 @@ Phase 1 does not require Phase 3. Phase 3 reuses the same picker widget.
 
 New modules, names indicative:
 
-- [cleave/open_target.py](../cleave/open_target.py): accept/reject a path (wav vs project dir vs neither). No viz import. Shared by the picker, `DROPFILE`, paste, and tests.
-- [cleave/viz/file_picker.py](../cleave/viz/file_picker.py): directory listing, view-state dataclass, and actions (`move`, `parent`, `enter`, `accept`, `cancel`, `paste_path`, `goto_shortcut`). No pygame, no pygame key constants, fully unit-testable.
+- [cleave/open_target.py](../cleave/open_target.py): accept/reject a path (wav vs project dir vs neither). No viz import. Shared by the picker, `DROPFILE`, and tests.
+- [cleave/viz/file_picker.py](../cleave/viz/file_picker.py): directory listing, view-state dataclass, and actions (`move`, `parent`, `enter`, `accept`, `cancel`, `goto_shortcut`). No pygame, no pygame key constants, fully unit-testable.
 - [cleave/viz/file_picker_overlay.py](../cleave/viz/file_picker_overlay.py): draw the view state onto a surface, upload through the loading or live compositor. Uses `overlay_primitives` and theme roles already used by modal (`LABEL`, `VALUE`, `HIGHLIGHT`, scrim). Host maps pygame keys to picker actions.
 
 ### Listing
@@ -114,7 +113,6 @@ Match live overlay list navigation and preset-directory tree keys ([help_content
 | Backspace | Parent directory or drives listing | Backspace on preset dir |
 | Enter | Accept wav or project directory; enter a non-project directory | confirm |
 | Tab | Move focus between the shortcut header and the file list | (picker only) |
-| Ctrl+V | Paste a path (see below) | (picker only) |
 | Esc | Cancel. Cold start: quit the app. Mid-session: dismiss picker, stay on current project | Esc |
 
 Hold-to-repeat uses [KeyRepeatController](../cleave/viz/key_repeat.py) on Up/Down (and Left/Right if held on a long walk). Do not call `pygame.key.set_repeat`; that would leak into the live editor.
@@ -125,10 +123,11 @@ Ctrl+O is Phase 3 only (live session). Cold start has no other UI to focus.
 
 First-run `projects_dir()` is often empty. Shortcuts and a legend are the UX, not an afterthought.
 
-- Title: `Open a wav or Cleave project`.
-- Current path as a `LABEL`/`VALUE` line.
-- Footer legend, always visible: Enter open, Right enter folder, Left/Backspace parent, Ctrl+V paste path, Esc quit (cold start) or Esc cancel (mid-session).
-- Rejection and paste-failure text on a status line; stay in the picker.
+- Title: `Open a Cleave project or a wav`.
+- Shortcut chips, then current path as a `VALUE` line directly above `..`. A long path keeps the tail (`…/current`).
+- The shortcut for the directory being listed uses `HIGHLIGHT` (Projects on first show).
+- Footer legend, always visible, using help-label colours (`LABEL` key including the colon, `VALUE` description): Enter: open, Right: enter folder, Left/Backspace: parent, Tab: shortcuts, Esc: quit (cold start) or Esc: cancel (mid-session).
+- Rejection text on a status line; stay in the picker.
 
 Do not import [help_content.py](../cleave/viz/help_content.py) into the loading-screen picker. Live help panel gains Open only in Phase 3.
 
@@ -145,17 +144,6 @@ Shortcuts are a header list above the file rows, not rows mixed into the listing
 - Frozen Windows: Documents (`windows_documents_dir()`) in addition to Home; Home covers Desktop as a child
 
 Do not list Program Files or `install_dir()` as a shortcut.
-
-### Paste path
-
-`Ctrl+V` reads clipboard text (pygame/SDL clipboard). Strip surrounding quotes (Explorer "Copy as path"). Then:
-
-- Existing `.wav` or project directory: navigate to that parent, highlight the row. Do not accept until Enter.
-- Existing directory that is not a project: enter it.
-- Windows-style `C:\...` on POSIX: same in-window message as `DROPFILE` (suggest `/mnt/c/...` or the Drives / WSL shortcuts). Do not shell out to `wslpath`.
-- Empty, garbage, or missing path: status-line rejection; stay in the picker.
-
-Paste is a navigation shortcut into the same accept helper. It is not a second open pipeline.
 
 ### Accept / reject
 
@@ -234,7 +222,7 @@ Reload needs a loop around "live session" that does **not** call `pygame.quit()`
 5. `run_separate` with loading-screen progress (wav may need stem split). Failure: error message, any key, back to the picker, window still up.
 6. `build_runtime_base` + heavy GL init + live loop as today.
 
-Help: add Open (`Ctrl+O`) and paste path (`Ctrl+V` while the picker is open) to [help_content.py](../cleave/viz/help_content.py) navigation section.
+Help: add Open (`Ctrl+O`) to [help_content.py](../cleave/viz/help_content.py) navigation section.
 
 Order inside Phase 3: accept-then-teardown so cancel is cheap. Do not destroy the live session until the picker returns a path.
 
@@ -243,7 +231,7 @@ Order inside Phase 3: accept-then-teardown so cancel is cheap. Do not destroy th
 ## Platform traps
 
 - **Windows drive roots.** `Path("C:\\").parent` is still `C:\`. Without a drives listing, a wav on `D:\` is unreachable from the freeze. WSL can walk `/mnt` -> `d`; native Windows cannot.
-- **WSL vs Windows paths.** The picker lists Linux paths (`/mnt/c/Users/...`). A Windows dialog, Explorer drop, or pasted `C:\...` will not open on Linux. Accept helper and paste fail closed with a message, not raise into the frame loop.
+- **WSL vs Windows paths.** The picker lists Linux paths (`/mnt/c/Users/...`). A Windows dialog or Explorer drop of `C:\...` will not open on Linux. Accept helper fails closed with a message, not raise into the frame loop.
 - **WSLg drop.** Dropping from Windows Explorer onto a Linux pygame window is unreliable. The `/mnt/c/Users` and Drives shortcuts are the WSL answer; `DROPFILE` is extra.
 - **Program Files.** Install dir is read-only for normal users. Never start the browser there. User data stays under `Documents\cleave\` ([windows-freeze.md](windows-freeze.md)).
 - **Blocking native dialogs.** If a freeze-only `IFileOpenDialog` is added later, it blocks the pygame loop. Keep it off the frame path and off WSL.
@@ -286,18 +274,18 @@ The labelled shortcut header (Projects, Home, Drives, WSL Windows files when `/m
 **3. Picker state.** New [cleave/viz/file_picker.py](../cleave/viz/file_picker.py) with no pygame import at all, not even key constants:
 
 - `PickerAction` enum for the payload-free moves: `MOVE_UP`, `MOVE_DOWN`, `PAGE_UP`, `PAGE_DOWN`, `PARENT`, `ENTER`, `ACCEPT`, `CANCEL`, `TOGGLE_FOCUS`.
-- `paste_path(text)` and `goto_shortcut(shortcut_id)` are separate methods because they carry payloads.
+- `goto_shortcut(shortcut_id)` is a separate method because it carries a payload.
 - `view_state()` returns a `PickerViewState` with rows, current path, shortcut header, focus, and status line.
 - Listing follows the Listing section: group order, dotfiles skipped, 512-row cap plus a truncation note, `project.yaml` probed once per listed directory, `PermissionError` and `OSError` skipped rather than raised.
 - The drives listing is a synthetic location rather than a `Path`, so both a Windows drive root and `/mnt/<letter>` can name it as their parent.
 
-**4. Picker drawing.** New [cleave/viz/file_picker_overlay.py](../cleave/viz/file_picker_overlay.py), shaped like `modal_overlay.draw`: scrim at `MODAL_SCRIM_ALPHA`, centered panel from `overlay_panel_surface` plus `draw_panel_border`, title and path in `LABEL` and `VALUE`, highlighted row in `HIGHLIGHT`, unreadable rows in `DISABLED`, status line in `ERROR_NOTIFICATION`, footer legend always drawn. No import of `tuning_panel_draw` or `help_content.py`.
+**4. Picker drawing.** New [cleave/viz/file_picker_overlay.py](../cleave/viz/file_picker_overlay.py), shaped like `modal_overlay.draw`: scrim at `MODAL_SCRIM_ALPHA`, centered panel from `overlay_panel_surface` plus `draw_panel_border`, title and path in `LABEL` and `VALUE`, highlighted row in `HIGHLIGHT`, unreadable rows in `DISABLED`, status line in `ERROR_NOTIFICATION`, footer help items as `LABEL` key plus `VALUE` description. No import of `tuning_panel_draw` or `help_content.py`.
 
 **5. Picker host.** New [cleave/viz/file_picker_host.py](../cleave/viz/file_picker_host.py) next to loading, owning everything pygame:
 
 - `run_file_picker(window)` returns an `OpenTarget`, or `None` when the user cancels or closes the window.
 - `show_picker_error(window, message)` draws the message and waits for a key; it returns `False` when the event was `QUIT`.
-- Maps pygame keys to `PickerAction`, drives repeat through [KeyRepeatController](../cleave/viz/key_repeat.py) rather than `pygame.key.set_repeat`, reads the clipboard for `Ctrl+V` and strips surrounding quotes, ticks a clock, and draws through the window's compositor and `overlay_surface`.
+- Maps pygame keys to `PickerAction`, drives repeat through [KeyRepeatController](../cleave/viz/key_repeat.py) rather than `pygame.key.set_repeat`, ticks a clock, and draws through the window's compositor and `overlay_surface`.
 
 **6. Launch failure as an exception.** [continue_launch](../cleave/viz/__init__.py) raises `LaunchError` instead of printing and calling `sys.exit(1)`, so the caller chooses between exit and picker retry.
 
@@ -333,7 +321,6 @@ Phase 1:
 - Accept helper: wav file, project dir, reject `.txt`, reject empty dir, reject dir without `project.yaml`, case-insensitive `.WAV`, Windows-style path on POSIX does not raise.
 - Picker state: listing order, `..`, enter dir, parent, Backspace parent, shortcut to `projects_dir()`, skip dotfiles, Esc cancel.
 - Drives: Windows drive root parent is the drives listing; WSL `/mnt/c` parent can reach other letter mounts when present; `install_dir()` is not a shortcut.
-- Paste: quoted Explorer path navigates to a wav without accepting; missing path rejects; `C:\...` on POSIX messages and stays.
 - CLI: checkout empty argv still help; frozen empty argv becomes play; `play` with no target reaches picker hook (mock window); `play <wav>` and `play <project>` unchanged; `--help` / `--version` still headless.
 - Picker-driven `run_separate` failure: error then any-key returns to picker (mock); argv-target failure still `_exit_error`.
 - `normalise_argv` drop-on-exe unchanged.

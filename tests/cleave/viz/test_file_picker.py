@@ -1,4 +1,4 @@
-"""File picker navigation, listing, drives, and paste."""
+"""File picker navigation, listing, and drives."""
 
 from __future__ import annotations
 
@@ -49,6 +49,8 @@ def test_starts_in_projects_dir_and_creates_it(data_root: Path) -> None:
     picker = FilePicker()
     assert picker.current == projects_dir()
     assert projects_dir().is_dir()
+    assert picker.view_state().active_shortcut == 0
+    assert picker.shortcuts[0].label == "Projects"
 
 
 def test_listing_order_directories_then_wavs(tmp_path: Path) -> None:
@@ -265,44 +267,11 @@ def test_shortcut_drives_entry(data_root: Path, tmp_path: Path) -> None:
     )
     picker.goto_shortcut(drives_index)
     assert picker.current is None
+    assert picker.view_state().active_shortcut == drives_index
 
 
-def test_paste_quoted_wav_navigates_without_accepting(tmp_path: Path) -> None:
-    song = _wav(tmp_path / "music", "song.wav")
-
+def test_active_shortcut_clears_when_not_on_a_shortcut(
+    data_root: Path, tmp_path: Path
+) -> None:
     picker = FilePicker(current=tmp_path)
-    picker.paste_path(f'"{song}"')
-    assert picker.current == song.parent
-    assert picker.selected_row is not None
-    assert picker.selected_row.target == song
-    assert not picker.status
-
-
-def test_paste_plain_directory_enters_it(tmp_path: Path) -> None:
-    plain = tmp_path / "Documents"
-    plain.mkdir()
-
-    picker = FilePicker(current=tmp_path)
-    picker.paste_path(str(plain))
-    assert picker.current == plain
-
-
-def test_paste_missing_path_rejects_and_stays(tmp_path: Path) -> None:
-    picker = FilePicker(current=tmp_path)
-    picker.paste_path(str(tmp_path / "gone.wav"))
-    assert picker.current == tmp_path
-    assert picker.status
-
-
-def test_paste_windows_path_on_posix_messages_and_stays(tmp_path: Path) -> None:
-    picker = FilePicker(current=tmp_path)
-    picker.paste_path(r'"C:\Users\me\song.wav"')
-    assert picker.current == tmp_path
-    assert "/mnt/c" in picker.status
-
-
-def test_paste_empty_clipboard_rejects(tmp_path: Path) -> None:
-    picker = FilePicker(current=tmp_path)
-    picker.paste_path(None)
-    assert picker.status
-    assert picker.current == tmp_path
+    assert picker.view_state().active_shortcut is None
