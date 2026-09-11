@@ -11,6 +11,7 @@ from cleave.viz import file_picker_overlay
 from cleave.viz.file_picker import (
     LEGEND,
     FilePicker,
+    PickerAction,
     PickerFocus,
     PickerRow,
     PickerRowKind,
@@ -62,6 +63,16 @@ def test_row_text_marks_directories_and_projects() -> None:
     assert file_picker_overlay.row_text(audio) == "song.wav"
 
 
+def test_location_text_keeps_the_path_tail() -> None:
+    font = _font()
+    path = "/home/user/very/long/nested/directory/structure/projects/song"
+    fitted = file_picker_overlay.location_text(font, path, 180)
+    assert fitted.startswith("…")
+    assert fitted.endswith("song")
+    assert font.size(fitted)[0] <= 180
+    assert not fitted.endswith("…")
+
+
 def test_draw_paints_a_centered_panel(
     surface: pygame.Surface, tmp_path: Path
 ) -> None:
@@ -80,7 +91,7 @@ def test_draw_handles_status_line_and_shortcut_focus(
     surface: pygame.Surface, tmp_path: Path
 ) -> None:
     picker = FilePicker(current=tmp_path)
-    picker.paste_path(str(tmp_path / "gone.wav"))
+    picker.status = "not a wav or project"
     picker.focus = PickerFocus.SHORTCUTS
     view = picker.view_state()
     assert view.status
@@ -129,7 +140,7 @@ def test_draw_highlights_only_the_selected_shortcut(
     pad_y = file_picker_overlay._PANEL_PAD_Y
     line_h = font.get_linesize()
     step = line_h + file_picker_overlay._tuning_ui.line_gap
-    shortcut_y = panel_y + pad_y + step * 2
+    shortcut_y = panel_y + pad_y + step
     chips = file_picker_overlay.shortcut_chip_layout(
         font, view, x=panel_x + pad_x, content_w=panel_w - pad_x * 2
     )
@@ -149,6 +160,84 @@ def test_draw_highlights_only_the_selected_shortcut(
     assert not _has_color(projects_x, projects_w, HIGHLIGHT)
 
 
+def test_draw_highlights_projects_shortcut_on_first_show(
+    surface: pygame.Surface, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from cleave.viz.theme import ACTION, HIGHLIGHT
+
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path / "cleave"))
+    picker = FilePicker()
+    view = picker.view_state()
+    assert view.focus is PickerFocus.LIST
+    assert view.active_shortcut == 0
+    assert not file_picker_overlay.shortcut_is_selected(view, 0)
+    assert file_picker_overlay.shortcut_is_current(view, 0)
+
+    font = _font()
+    file_picker_overlay.draw(surface, view, font=font)
+
+    width, height = surface.get_size()
+    panel_w = int(width * file_picker_overlay._PANEL_WIDTH_FRACTION)
+    panel_x = (width - panel_w) // 2
+    panel_y = (height - int(height * file_picker_overlay._PANEL_HEIGHT_FRACTION)) // 2
+    pad_x = file_picker_overlay._PANEL_PAD_X
+    pad_y = file_picker_overlay._PANEL_PAD_Y
+    line_h = font.get_linesize()
+    step = line_h + file_picker_overlay._tuning_ui.line_gap
+    shortcut_y = panel_y + pad_y + step
+    chips = file_picker_overlay.shortcut_chip_layout(
+        font, view, x=panel_x + pad_x, content_w=panel_w - pad_x * 2
+    )
+    sample_y = shortcut_y + line_h // 2
+
+    def _has_color(chip_x: int, chip_w: int, color: tuple[int, int, int]) -> bool:
+        for x in range(chip_x, chip_x + chip_w):
+            pixel = surface.get_at((x, sample_y))
+            if pixel[:3] == color:
+                return True
+        return False
+
+    _, _, projects_x, projects_w = chips[0]
+    _, _, home_x, home_w = chips[1]
+    assert _has_color(projects_x, projects_w, HIGHLIGHT)
+    assert _has_color(home_x, home_w, ACTION)
+    assert not _has_color(home_x, home_w, HIGHLIGHT)
+
+
+def test_draw_places_location_directly_above_parent_row(
+    surface: pygame.Surface, tmp_path: Path
+) -> None:
+    from cleave.viz.theme import ACTION, VALUE
+
+    (tmp_path / "song.wav").write_bytes(b"RIFF")
+    picker = FilePicker(current=tmp_path)
+    picker.handle(PickerAction.MOVE_DOWN)
+    font = _font()
+    file_picker_overlay.draw(surface, picker.view_state(), font=font)
+
+    width, height = surface.get_size()
+    panel_w = int(width * file_picker_overlay._PANEL_WIDTH_FRACTION)
+    panel_x = (width - panel_w) // 2
+    panel_y = (height - int(height * file_picker_overlay._PANEL_HEIGHT_FRACTION)) // 2
+    pad_x = file_picker_overlay._PANEL_PAD_X
+    pad_y = file_picker_overlay._PANEL_PAD_Y
+    content_w = panel_w - pad_x * 2
+    line_h = font.get_linesize()
+    step = line_h + file_picker_overlay._tuning_ui.line_gap
+    location_y = panel_y + pad_y + step * 3
+    parent_y = location_y + step
+
+    def _row_has(color: tuple[int, int, int], y: int) -> bool:
+        for dy in range(line_h):
+            for x in range(panel_x + pad_x, panel_x + pad_x + content_w):
+                if surface.get_at((x, y + dy))[:3] == color:
+                    return True
+        return False
+
+    assert _row_has(VALUE, location_y)
+    assert _row_has(ACTION, parent_y)
+
+
 def test_draw_handles_drives_listing(surface: pygame.Surface) -> None:
     picker = FilePicker(current=Path("/"))
     picker.show_drives()
@@ -158,17 +247,16 @@ def test_draw_handles_drives_listing(surface: pygame.Surface) -> None:
 
 def test_legend_wraps_to_a_second_line() -> None:
     font = _font()
-    lines = file_picker_overlay.legend_lines(font, LEGEND, 400)
-    assert len(lines) >= 2
-    assert "Enter open" in lines[0]
-    assert "Esc quit" in lines[-1]
-    assert all("…" not in line for line in lines)
+    rows = file_picker_overlay.legend_rows(font, LEGEND, 400)
+    assert len(rows) >= 2
+    assert rows[0][0] == ("Enter", "open")
+    assert rows[-1][-1] == ("Esc", "quit")
 
 
-def test_draw_legend_uses_label_color(
+def test_draw_legend_uses_label_and_value_colors(
     surface: pygame.Surface, tmp_path: Path
 ) -> None:
-    from cleave.viz.theme import ACTION, LABEL
+    from cleave.viz.theme import ACTION, LABEL, VALUE
 
     picker = FilePicker(current=tmp_path)
     font = _font()
@@ -184,10 +272,10 @@ def test_draw_legend_uses_label_color(
     content_w = panel_w - pad_x * 2
     line_h = font.get_linesize()
     step = line_h + file_picker_overlay._tuning_ui.line_gap
-    lines = file_picker_overlay.legend_lines(font, LEGEND, content_w)
-    assert len(lines) >= 2
+    rows = file_picker_overlay.legend_rows(font, LEGEND, content_w)
+    assert rows
 
-    footer_y = panel_y + panel_h - pad_y - len(lines) * step
+    footer_y = panel_y + panel_h - pad_y - len(rows) * step
 
     def _row_has(color: tuple[int, int, int], y: int) -> bool:
         for x in range(panel_x + pad_x, panel_x + pad_x + content_w):
@@ -195,6 +283,7 @@ def test_draw_legend_uses_label_color(
                 return True
         return False
 
-    assert _row_has(LABEL, footer_y + line_h // 2)
-    assert _row_has(LABEL, footer_y + step + line_h // 2)
-    assert not _row_has(ACTION, footer_y + line_h // 2)
+    sample_y = footer_y + line_h // 2
+    assert _row_has(LABEL, sample_y)
+    assert _row_has(VALUE, sample_y)
+    assert not _row_has(ACTION, sample_y)

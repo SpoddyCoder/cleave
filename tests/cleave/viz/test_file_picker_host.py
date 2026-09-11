@@ -11,7 +11,6 @@ import pytest
 from cleave.open_target import OpenTargetKind
 from cleave.viz.file_picker import PickerAction
 from cleave.viz.file_picker_host import (
-    clipboard_text,
     picker_action_for,
     run_file_picker,
     show_picker_error,
@@ -55,11 +54,7 @@ def test_walk_and_confirm_mapping() -> None:
 
 def test_unmapped_key_is_ignored() -> None:
     assert picker_action_for(pygame.K_q, 0) is None
-
-
-def test_clipboard_failure_returns_none() -> None:
-    with patch("pygame.scrap.get_init", side_effect=pygame.error("no scrap")):
-        assert clipboard_text() is None
+    assert picker_action_for(pygame.K_v, _CTRL) is None
 
 
 def _run_with_events(
@@ -131,28 +126,6 @@ def test_window_close_stops_the_loop(tmp_path: Path) -> None:
 
     assert _run_with_events(window, [[quit_event]], tmp_path) is None
     assert window.quit_requested
-
-
-def test_ctrl_v_pastes_a_path(tmp_path: Path) -> None:
-    song = tmp_path / "music" / "song.wav"
-    song.parent.mkdir()
-    song.write_bytes(b"RIFF")
-    window = _mock_window()
-
-    with patch(
-        "cleave.viz.file_picker_host.clipboard_text", return_value=f'"{song}"'
-    ):
-        target = _run_with_events(
-            window,
-            [
-                [_keydown(pygame.K_v, _CTRL)],
-                [_keydown(pygame.K_RETURN)],
-            ],
-            tmp_path,
-        )
-
-    assert target is not None
-    assert target.path == song
 
 
 def test_show_picker_error_any_key_returns_true(tmp_path: Path) -> None:

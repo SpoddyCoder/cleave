@@ -15,7 +15,7 @@ from cleave.viz.file_picker import (
     PickerViewState,
 )
 from cleave.viz.overlay_primitives import draw_panel_border, overlay_panel_surface
-from cleave.viz.text_fit import fit_text_to_width, wrap_text_to_width
+from cleave.viz.text_fit import fit_path_label_to_width, fit_text_to_width
 from cleave.viz.theme import (
     ACTION,
     DISABLED,
@@ -53,6 +53,11 @@ def visible_slice(total: int, selected: int, capacity: int) -> tuple[int, int]:
     return start, start + capacity
 
 
+def location_text(font: pygame.font.Font, location: str, content_w: int) -> str:
+    """Fit the browse path, keeping the tail so the current folder stays visible."""
+    return fit_path_label_to_width(font, location, content_w)
+
+
 def row_text(row: PickerRow) -> str:
     """Return the display text for *row*, including its kind marker."""
     if row.kind is PickerRowKind.PROJECT:
@@ -82,6 +87,11 @@ def shortcut_is_selected(state: PickerViewState, index: int) -> bool:
     return state.focus is PickerFocus.SHORTCUTS and index == state.selected_shortcut
 
 
+def shortcut_is_current(state: PickerViewState, index: int) -> bool:
+    """True when *index* is the shortcut for the directory being listed."""
+    return state.active_shortcut == index
+
+
 def shortcut_chip_layout(
     font: pygame.font.Font,
     state: PickerViewState,
@@ -106,11 +116,39 @@ def shortcut_chip_layout(
     return tuple(chips)
 
 
-def legend_lines(
-    font: pygame.font.Font, legend: str, content_w: int
-) -> tuple[str, ...]:
-    """Wrap the footer help onto as many lines as the panel width needs."""
-    return tuple(wrap_text_to_width(font, legend, content_w))
+def legend_item_prefix(key: str) -> str:
+    """Return the LABEL-colored help prefix, including the colon and space."""
+    return f"{key}: "
+
+
+def legend_item_width(font: pygame.font.Font, key: str, label: str) -> int:
+    """Return the pixel width of one ``key: label`` help item."""
+    return font.size(f"{legend_item_prefix(key)}{label}")[0]
+
+
+def legend_rows(
+    font: pygame.font.Font,
+    entries: tuple[tuple[str, str], ...],
+    content_w: int,
+) -> tuple[tuple[tuple[str, str], ...], ...]:
+    """Pack help items onto as many lines as the panel width needs."""
+    gap = font.size(_SHORTCUT_SEPARATOR)[0]
+    rows: list[list[tuple[str, str]]] = []
+    current: list[tuple[str, str]] = []
+    used = 0
+    for entry in entries:
+        width = legend_item_width(font, entry[0], entry[1])
+        extra = 0 if not current else gap
+        if current and used + extra + width > content_w:
+            rows.append(current)
+            current = [entry]
+            used = width
+            continue
+        used += extra + width
+        current.append(entry)
+    if current:
+        rows.append(current)
+    return tuple(tuple(row) for row in rows)
 
 
 def draw(
@@ -138,13 +176,17 @@ def draw(
 
     cur_y = _PANEL_PAD_Y
 
-    def _line(text: str, color: tuple[int, int, int], *, y: int) -> None:
-        rendered = font.render(fit_text_to_width(font, text, content_w), True, color)
+    def _line(
+        text: str,
+        color: tuple[int, int, int],
+        *,
+        y: int,
+        fit=fit_text_to_width,
+    ) -> None:
+        rendered = font.render(fit(font, text, content_w), True, color)
         panel.blit(rendered, (_PANEL_PAD_X, y))
 
     _line(state.title, LABEL, y=cur_y)
-    cur_y += step
-    _line(state.location, VALUE, y=cur_y)
     cur_y += step
     _draw_shortcuts(
         panel,
@@ -156,8 +198,10 @@ def draw(
         line_h=line_h,
     )
     cur_y += step * 2
+    _line(state.location, VALUE, y=cur_y, fit=location_text)
+    cur_y += step
 
-    footer = legend_lines(font, state.legend, content_w)
+    footer = legend_rows(font, state.legend, content_w)
     footer_lines = len(footer) + (1 if state.status else 0)
     list_top = cur_y
     list_bottom = panel_h - _PANEL_PAD_Y - footer_lines * step
@@ -183,9 +227,8 @@ def draw(
     if state.status:
         _line(state.status, ERROR_NOTIFICATION, y=footer_y)
         footer_y += step
-    for line in footer:
-        rendered = font.render(line, True, LABEL)
-        panel.blit(rendered, (_PANEL_PAD_X, footer_y))
+    for row in footer:
+        _draw_legend_row(panel, font, row, x=_PANEL_PAD_X, y=footer_y)
         footer_y += step
 
     draw_panel_border(panel)
@@ -206,6 +249,7 @@ def _draw_shortcuts(
         font, state, x=x, content_w=content_w
     ):
         selected = shortcut_is_selected(state, index)
+        current = shortcut_is_current(state, index)
         if selected:
             blit_tint(
                 surface,
@@ -218,5 +262,27 @@ def _draw_shortcuts(
                 HIGHLIGHT,
                 alpha=FOCUS_ROW_BG_ALPHA,
             )
-        rendered = font.render(text, True, HIGHLIGHT if selected else ACTION)
+        color = HIGHLIGHT if selected or current else ACTION
+        rendered = font.render(text, True, color)
         surface.blit(rendered, (chip_x, y))
+
+
+def _draw_legend_row(
+    surface: pygame.Surface,
+    font: pygame.font.Font,
+    entries: tuple[tuple[str, str], ...],
+    *,
+    x: int,
+    y: int,
+) -> None:
+    cursor = x
+    gap = font.size(_SHORTCUT_SEPARATOR)[0]
+    for index, (key, label) in enumerate(entries):
+        if index:
+            cursor += gap
+        prefix_surf = font.render(legend_item_prefix(key), True, LABEL)
+        value_surf = font.render(label, True, VALUE)
+        surface.blit(prefix_surf, (cursor, y))
+        cursor += prefix_surf.get_width()
+        surface.blit(value_surf, (cursor, y))
+        cursor += value_surf.get_width()
