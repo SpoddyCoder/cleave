@@ -324,6 +324,106 @@ def test_run_separate_reports_progress_phases(
     assert fake_analyse.run_analyse.call_args.kwargs["on_progress"] is on_progress
 
 
+def test_write_demucs_stems_reports_progress_phases(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """on_progress receives fractional updates through model, track, apply, save."""
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    monkeypatch.setattr(sys, "frozen", False, raising=False)
+    model_obj = MagicMock()
+    model_obj.sources = ["drums", "bass", "other", "vocals"]
+    model_obj.audio_channels = 2
+    model_obj.samplerate = 44100
+    audio = tmp_path / "mix.wav"
+    audio.write_bytes(b"RIFF")
+    dest_paths = {
+        name: tmp_path / "stems" / f"{name}.wav" for name in model_obj.sources
+    }
+
+    def fake_save_stem(_wav: object, dest: Path, _samplerate: int) -> None:
+        Path(dest).parent.mkdir(parents=True, exist_ok=True)
+        Path(dest).write_bytes(b"wav")
+
+    messages: list[tuple[str, float | None]] = []
+
+    def on_progress(message: str, fraction: float | None) -> None:
+        messages.append((message, fraction))
+
+    with (
+        patch("cleave.separate.ensure_weight_files"),
+        patch("torch.hub.set_dir"),
+        patch("torch.cuda.is_available", return_value=False),
+        patch("demucs.pretrained.get_model", return_value=model_obj),
+        patch("demucs.separate.load_track", return_value=MagicMock()),
+        patch("demucs.apply.apply_model", return_value=[MagicMock()]),
+        patch("cleave.separate._save_stem_wav", side_effect=fake_save_stem),
+    ):
+        _write_demucs_stems(audio, dest_paths, model="htdemucs", on_progress=on_progress)
+
+    msg = "Separating stems..."
+    fractions = [f for m, f in messages if m == msg]
+    assert fractions[0] == 0.0
+    assert fractions[-1] == 1.0
+    assert all(isinstance(f, float) for f in fractions)
+    assert all(a <= b for a, b in zip(fractions, fractions[1:]))
+
+
+def test_intercept_demucs_tqdm_reports_fraction() -> None:
+    """The tqdm wrapper forwards iteration progress into the callback."""
+    from cleave.separate import _intercept_demucs_tqdm
+
+    reports: list[tuple[str, float]] = []
+
+    def on_progress(message: str, fraction: float | None) -> None:
+        if fraction is not None:
+            reports.append((message, fraction))
+
+    items = list(range(10))
+    with _intercept_demucs_tqdm(on_progress, "Working...", 0.2, 0.8):
+        import tqdm as tqdm_mod
+
+        collected = list(tqdm_mod.tqdm(items))
+
+    assert collected == items
+    assert len(reports) > 0
+    assert all(m == "Working..." for m, _ in reports)
+    assert reports[0][1] >= 0.2
+    assert reports[-1][1] <= 0.8
+    assert all(a <= b for (_, a), (_, b) in zip(reports, reports[1:]))
+
+
+def test_intercept_demucs_tqdm_noop_without_callback() -> None:
+    """No-op when on_progress is None; tqdm stays unchanged."""
+    from cleave.separate import _intercept_demucs_tqdm
+
+    import tqdm as tqdm_mod
+
+    original = tqdm_mod.tqdm
+    with _intercept_demucs_tqdm(None, "msg", 0.0, 1.0):
+        assert tqdm_mod.tqdm is original
+    assert tqdm_mod.tqdm is original
+
+
+def test_intercept_demucs_tqdm_restores_on_exception() -> None:
+    """Original tqdm is restored even when the body raises."""
+    from cleave.separate import _intercept_demucs_tqdm
+
+    import tqdm as tqdm_mod
+
+    original = tqdm_mod.tqdm
+
+    def on_progress(m: str, f: float | None) -> None:
+        pass
+
+    try:
+        with _intercept_demucs_tqdm(on_progress, "msg", 0.0, 1.0):
+            assert tqdm_mod.tqdm is not original
+            raise ValueError("boom")
+    except ValueError:
+        pass
+    assert tqdm_mod.tqdm is original
+
+
 def test_run_separate_reanalyses_on_explicit_beat_stem_mismatch(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
