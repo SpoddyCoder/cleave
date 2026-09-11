@@ -16,6 +16,11 @@ from cleave.config import (
     VIZ_CONFIG_FILENAME,
 )
 from cleave.config_schema.editor import DEFAULT_BEAT_SENSITIVITY
+from cleave.config_schema.project_render import (
+    DEFAULT_PROJECT_RENDER_QUALITY,
+    DEFAULT_PROJECT_RENDER_START_SEC,
+    ProjectRenderQuality,
+)
 from cleave.config_schema.layers import (
     DEFAULT_BLEND_MODE,
     DEFAULT_LAYER_ENABLED,
@@ -380,6 +385,20 @@ EDITOR_MODE_PANEL_LABELS: dict[EditorMode, str] = {
 
 
 @dataclass
+class ProjectRenderRuntime:
+    expanded: bool = False
+    quality: ProjectRenderQuality = DEFAULT_PROJECT_RENDER_QUALITY
+    start_sec: int = DEFAULT_PROJECT_RENDER_START_SEC
+    end_sec: int | None = None
+
+
+@dataclass
+class ProjectRuntime:
+    expanded: bool = False
+    render: ProjectRenderRuntime = field(default_factory=ProjectRenderRuntime)
+
+
+@dataclass
 class SettingsRuntime:
     expanded: bool = False
     ui_expanded: bool = False
@@ -437,6 +456,7 @@ class TuningSession:
     timeline: TimelineRuntime = field(default_factory=default_timeline_runtime)
     song_markers: SongMarkerRuntime = field(default_factory=default_song_marker_runtime)
     settings: SettingsRuntime = field(default_factory=SettingsRuntime)
+    project: ProjectRuntime = field(default_factory=ProjectRuntime)
     help_visible: bool = False
     preset_skip_notify_tracker: PresetSkipNotifyTracker = field(
         default_factory=PresetSkipNotifyTracker

@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 from cleave.config_schema.layers import MAX_LAYER_COUNT
 from cleave.viz.row_sections import (
     CURATION_LAYER_SECTION,
+    PROJECT_SECTION,
     SETTINGS_SECTION,
     append_expand_section_rows,
     append_render_section_rows,
@@ -149,7 +150,7 @@ class RowLayout:
         curation = state.settings.editor_mode == "preset_curation"
         append_expand_section_rows(row_list, SETTINGS_SECTION, state)
         if not curation:
-            row_list.append(RowDescriptor(RowKind.CONFIG_HEADER))
+            append_expand_section_rows(row_list, PROJECT_SECTION, state)
         row_list.append(RowDescriptor(RowKind.TRANSPORT))
         # marker_index 0 = persistent error; 1 = timed toast (may stack).
         if state.persistent_notification_message:

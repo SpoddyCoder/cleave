@@ -326,7 +326,12 @@ def sections_for(
 
     behavior = row_spec(row_kind)
 
-    if not behavior.navigable or behavior.affordance == RowAffordance.DISPLAY:
+    if not behavior.navigable:
+        return (nav,)
+    if (
+        behavior.affordance == RowAffordance.DISPLAY
+        and behavior.help_description is None
+    ):
         return (nav,)
 
     primary: HelpSection | None = None
@@ -388,6 +393,17 @@ def sections_for(
             )
         else:
             primary = _SAVE_SECTION
+    elif behavior.affordance == RowAffordance.DISPLAY:
+        entries = behavior.help_entries
+        if entries is None:
+            description = _description_section(row_kind, effect_id=effect_id)
+            if description is not None:
+                return (description, nav)
+            return (nav,)
+        primary = HelpSection(
+            behavior.help_title or "Edit",
+            entries,
+        )
 
     if primary is None:
         return (nav,)

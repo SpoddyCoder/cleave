@@ -15,6 +15,13 @@ from cleave.config_schema.editor import (
     DEFAULT_UI_WIDTH,
     DEFAULT_UI_WIDTH_MODE,
 )
+from cleave.config_schema.project_render import (
+    DEFAULT_PROJECT_RENDER_OUTPUT_LABEL,
+    DEFAULT_PROJECT_RENDER_QUALITY,
+    DEFAULT_PROJECT_RENDER_START_SEC,
+    default_project_render_path,
+    resolved_project_render_end_sec,
+)
 from cleave.config_schema.render import (
     DEFAULT_CHROMA_BOOST_AMOUNT_PCT,
     DEFAULT_CHROMA_BOOST_APPLY_MODE,
@@ -254,6 +261,16 @@ class SettingsBlock:
 
 
 @dataclass
+class ProjectBlock:
+    expanded: bool = False
+    render_expanded: bool = False
+    quality: str = DEFAULT_PROJECT_RENDER_QUALITY
+    start_sec: int = DEFAULT_PROJECT_RENDER_START_SEC
+    end_sec: int = DEFAULT_PROJECT_RENDER_START_SEC
+    output_label: str = DEFAULT_PROJECT_RENDER_OUTPUT_LABEL
+
+
+@dataclass
 class TuningViewState:
     layer_z_order: tuple[str, ...]
     tracks: dict[str, TrackBlock]
@@ -283,6 +300,7 @@ class TuningViewState:
         default_factory=RenderTimelineBlock
     )
     settings: SettingsBlock = field(default_factory=SettingsBlock)
+    project: ProjectBlock = field(default_factory=ProjectBlock)
     timeline_recording: bool = False
     timeline_override_active: bool = False
     help_visible: bool = False
@@ -408,6 +426,10 @@ def view_state_structure_signature(
             "latency_compensation_expanded": session.settings.latency_compensation_expanded,
             "editor_mode": session.settings.editor_mode,
         },
+        "project": {
+            "expanded": session.project.expanded,
+            "render_expanded": session.project.render.expanded,
+        },
         "notification_active": notification_active,
         "persistent_notification_active": persistent_notification_active,
         "layers": layers,
@@ -468,6 +490,7 @@ class _ViewStateStructure:
     layer_z_order: tuple[str, ...]
     tracks: dict[str, TrackBlock]
     settings: SettingsBlock
+    project: ProjectBlock
     render_overlays: RenderOverlaysBlock
     render_post_fx: RenderPostFxBlock
     render_pattern_mask: RenderPatternMaskBlock
@@ -477,6 +500,32 @@ class _ViewStateStructure:
 
 def _card_block_from_runtime(card: RenderOverlayCardRuntime) -> RenderOverlayCardBlock:
     return RenderOverlayCardBlock(runtime=card)
+
+
+def _project_block_from_session(
+    session: TuningSession,
+    *,
+    duration_sec: float,
+    project_dir: Path | None,
+    editor_name: str,
+) -> ProjectBlock:
+    render = session.project.render
+    end_sec = resolved_project_render_end_sec(render.end_sec, duration_sec)
+    root = project_dir if project_dir is not None else Path(".")
+    return ProjectBlock(
+        expanded=session.project.expanded,
+        render_expanded=render.expanded,
+        quality=render.quality,
+        start_sec=render.start_sec,
+        end_sec=end_sec,
+        output_label=default_project_render_path(
+            root,
+            editor_name,
+            start_sec=render.start_sec,
+            end_sec=end_sec,
+            duration_sec=duration_sec,
+        ).as_posix(),
+    )
 
 
 class TuningViewStateBuilder:
@@ -496,6 +545,7 @@ class TuningViewStateBuilder:
         config_save: ConfigSaveController,
         get_notification: Callable[[], PanelNotificationActive],
         layers_by_slot: dict[str, StemLayer] | None = None,
+        project_dir: Path | None = None,
     ) -> None:
         self.session = session
         self.playback = playback
@@ -508,6 +558,7 @@ class TuningViewStateBuilder:
         self._config_save = config_save
         self._get_notification = get_notification
         self._layers_by_slot = layers_by_slot
+        self._project_dir = project_dir
         self._auto_display_cache: dict[Path, PresetPlaylist] = {}
         self._base_preset_list_label_cache: dict[tuple[str, ...], list[str]] = {}
         self._annotated_preset_list_label_cache: dict[
@@ -659,6 +710,12 @@ class TuningViewStateBuilder:
             editor_mode=self.session.settings.editor_mode,
             editor_mode_selection=self.session.settings.editor_mode_selection,
         )
+        project = _project_block_from_session(
+            self.session,
+            duration_sec=self.duration_sec,
+            project_dir=self._project_dir,
+            editor_name=self._config_save.cfg.editor.name,
+        )
         render_overlays = RenderOverlaysBlock(
             expanded=ro.expanded,
             opening_card=_card_block_from_runtime(ro.opening_card),
@@ -756,6 +813,7 @@ class TuningViewStateBuilder:
             render_pattern_mask=render_pattern_mask,
             render_timeline=render_timeline,
             settings=settings,
+            project=project,
         )
         layout = layout_state.layout
         assert layout is not None
@@ -764,6 +822,7 @@ class TuningViewStateBuilder:
             layer_z_order=layer_z_order,
             tracks=tracks,
             settings=settings,
+            project=project,
             render_overlays=render_overlays,
             render_post_fx=render_post_fx,
             render_pattern_mask=render_pattern_mask,
@@ -961,6 +1020,12 @@ class TuningViewStateBuilder:
                 ui_width=self._config_save.cfg.editor.ui_width,
                 ui_fade=self._config_save.cfg.editor.ui_fade,
                 residual_latency_ms=self._config_save.cfg.editor.residual_latency_ms,
+            ),
+            project=_project_block_from_session(
+                self.session,
+                duration_sec=self.duration_sec,
+                project_dir=self._project_dir,
+                editor_name=self._config_save.cfg.editor.name,
             ),
             timeline_recording=tl.recording,
             timeline_override_active=bool(tl.override_slots),

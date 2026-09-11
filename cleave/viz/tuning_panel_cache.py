@@ -11,7 +11,7 @@ from cleave.viz.overlay_primitives import visibility_bucket
 from cleave.viz.overlay_profiler import OverlayDrawCounters
 from cleave.viz.overlay_upload import OverlayGpuState, UploadSignature
 from cleave.viz.row_kinds import RowKind
-from cleave.viz.row_spec import section_locked
+from cleave.viz.row_spec import ROW_SPECS, section_locked
 from cleave.viz.tuning_view_state import TuningViewState
 
 TextFitter = Callable[[pygame.font.Font, str, int], str]
@@ -175,7 +175,10 @@ def row_render_key(
     header_locked = kind in _LOCK_ICON_HEADER_KINDS and section_locked(
         state, state.layout.descriptor(index)
     )
-    config_dirty_suffix = kind == RowKind.CONFIG_HEADER and state.config_dirty
+    field = ROW_SPECS.get(kind)
+    config_dirty_suffix = (
+        field is not None and field.shows_dirty_suffix and state.config_dirty
+    )
     enter_icon_suffix = _row_shows_enter_icon(state, index)
     return RowRenderKey(
         kind=kind,

@@ -528,8 +528,17 @@ def fit_row_text(
         line_h = font.get_linesize()
         text = row_text(state, index)
         if field.fit_strategy == FitStrategy.PATH:
-            icon_w = row_icon_prefix_width(line_h)
-            suffix_w = font.size("*")[0] if state.config_dirty else 0
+            depth = row_tree_indent_depth(kind)
+            prefix_w = (
+                preset_row_prefix_width(font, line_h, depth=depth)
+                if depth > 0
+                else row_icon_prefix_width(line_h)
+            )
+            suffix_w = (
+                font.size("*")[0]
+                if field.shows_dirty_suffix and state.config_dirty
+                else 0
+            )
             enter_w = (
                 action_enter_icon_suffix_width(line_h)
                 if row_shows_action_enter_hint(state, index)
@@ -538,7 +547,7 @@ def fit_row_text(
             return _fit_value(
                 font,
                 text,
-                budget - icon_w - suffix_w - enter_w,
+                budget - prefix_w - suffix_w - enter_w,
                 FitStrategy.PATH,
                 cache=cache,
             )
@@ -834,7 +843,8 @@ def _paint_composite_header(
     field = ctx.field
     assert field is not None
     if field.visibility_icon is None:
-        icon_surf = render_glyph(SETTINGS_GLYPH, color=VALUE, line_height=ctx.line_h)
+        glyph = field.header_glyph if field.header_glyph is not None else SETTINGS_GLYPH
+        icon_surf = render_glyph(glyph, color=VALUE, line_height=ctx.line_h)
         label_surf = render_label_value_row(
             ctx.font,
             prefix=composite_header_prefix_part(ctx.state, ctx.desc),
@@ -901,9 +911,19 @@ def _paint_path_icon(
             counters=ctx.counters,
         )
     else:
-        icon_surf = render_glyph(
-            FILE_GLYPH, color=PRESET_FILE_ICON, line_height=ctx.line_h
-        )
+        if depth > 0:
+            icon_surf = _render_preset_row_prefix(
+                ctx.font,
+                glyph=FILE_GLYPH,
+                icon_color=PRESET_FILE_ICON,
+                line_height=ctx.line_h,
+                depth=depth,
+                counters=ctx.counters,
+            )
+        else:
+            icon_surf = render_glyph(
+                FILE_GLYPH, color=PRESET_FILE_ICON, line_height=ctx.line_h
+            )
     if field.fit_strategy == FitStrategy.PATH:
         path = fit_row_text(
             ctx.font,
@@ -915,7 +935,7 @@ def _paint_path_icon(
         label_surf = render_label_value_row(
             ctx.font,
             prefix=path,
-            value="*" if ctx.state.config_dirty else "",
+            value="*" if field.shows_dirty_suffix and ctx.state.config_dirty else "",
             value_color=CONFIG_DIRTY,
             prefix_color=ctx.color,
             line_height=ctx.line_h,

@@ -17,6 +17,7 @@ from tests.cleave.viz.test_controls import (
     _choose_save_as_new,
     _config_header_row,
     _desc,
+    _expand_project,
     _expand_settings,
     _expand_settings_ui,
     _keydown,
@@ -462,6 +463,7 @@ def test_display_time_mutation_clears_dirty_after_save() -> None:
     _mutate_render_overlay_display_time(controls)
     assert controls.config_dirty
 
+    _expand_project(controls)
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = _desc(view, _config_header_row(view))
     _choose_save_as_new(controls)

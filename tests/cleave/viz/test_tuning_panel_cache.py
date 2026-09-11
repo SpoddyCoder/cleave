@@ -30,7 +30,7 @@ from cleave.viz.tuning_panel_cache import (
     tuning_upload_signature,
 )
 from cleave.viz.tuning_panel_draw import TuningOverlay, tuning_panel_max_dimensions
-from cleave.viz.tuning_view_state import TuningViewState
+from cleave.viz.tuning_view_state import ProjectBlock, TuningViewState
 from tests.cleave.viz.test_overlay import (
     _effects_expanded_view_state,
     _minimal_view_state,
@@ -351,7 +351,9 @@ def test_config_dirty_change_invalidates_config_header_row_key() -> None:
     overlay = TuningOverlay()
     font = overlay._font_get()
     cache = TuningPanelCache()
-    state = _minimal_view_state(config_dirty=False)
+    state = _minimal_view_state(
+        config_dirty=False, project=ProjectBlock(expanded=True)
+    )
     index = state.layout.find_by_kind(RowKind.CONFIG_HEADER)
     line_h = font.get_linesize()
     max_w = 400
@@ -383,7 +385,9 @@ def test_config_dirty_change_misses_warm_row_cache_for_config_header() -> None:
     overlay = TuningOverlay()
     font = overlay._font_get()
     cache = TuningPanelCache()
-    state = _minimal_view_state(config_dirty=False)
+    state = _minimal_view_state(
+        config_dirty=False, project=ProjectBlock(expanded=True)
+    )
     index = state.layout.find_by_kind(RowKind.CONFIG_HEADER)
     line_h = font.get_linesize()
     max_w = 400
