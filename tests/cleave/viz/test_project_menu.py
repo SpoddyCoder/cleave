@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pygame
+import pytest
 
 from cleave.config_schema.project_render import (
     DEFAULT_PROJECT_RENDER_QUALITY,
@@ -89,12 +90,15 @@ def test_project_children_omitted_until_expanded() -> None:
     kinds = [row.kind for row in view.layout.rows]
     assert RowKind.PROJECT_HEADER in kinds
     assert RowKind.CONFIG_HEADER not in kinds
+    assert RowKind.PROJECT_MILKDROP_HEADER not in kinds
     assert RowKind.PROJECT_RENDER_HEADER not in kinds
 
     _expand_project(controls)
     view = controls.build_view_state(paused=False)
     kinds = [row.kind for row in view.layout.rows]
     assert RowKind.CONFIG_HEADER in kinds
+    assert RowKind.PROJECT_MILKDROP_HEADER in kinds
+    assert RowKind.PROJECT_MILKDROP_BEAT_SENSITIVITY not in kinds
     assert RowKind.PROJECT_RENDER_HEADER in kinds
     assert RowKind.PROJECT_RENDER_QUALITY not in kinds
 
@@ -109,6 +113,39 @@ def test_project_render_children_omitted_until_expanded() -> None:
     assert RowKind.PROJECT_RENDER_START in kinds
     assert RowKind.PROJECT_RENDER_END in kinds
     assert RowKind.PROJECT_RENDER_ACTION in kinds
+
+
+def test_project_milkdrop_children_omitted_until_expanded() -> None:
+    controls = _make_controls(("layer_1",))
+    _expand_project(controls)
+    view = controls.build_view_state(paused=False)
+    kinds = [row.kind for row in view.layout.rows]
+    assert RowKind.PROJECT_MILKDROP_HEADER in kinds
+    assert RowKind.PROJECT_MILKDROP_BEAT_SENSITIVITY not in kinds
+
+    controls.session.project.milkdrop_expanded = True
+    view = controls.build_view_state(paused=False)
+    kinds = [row.kind for row in view.layout.rows]
+    assert RowKind.PROJECT_MILKDROP_BEAT_SENSITIVITY in kinds
+    beat_row = view.layout.find_by_kind(RowKind.PROJECT_MILKDROP_BEAT_SENSITIVITY)
+    assert format_row_value(view, view.layout.descriptor(beat_row)) == "2.00"
+
+
+def test_milkdrop_beat_sensitivity_keyboard_steps() -> None:
+    controls = _make_controls(("layer_1",))
+    _expand_project(controls)
+    controls.session.project.milkdrop_expanded = True
+    view = controls.build_view_state(paused=False)
+    beat_row = view.layout.find_by_kind(RowKind.PROJECT_MILKDROP_BEAT_SENSITIVITY)
+    controls.focus_descriptor = view.layout.descriptor(beat_row)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.session.project.milkdrop_beat_sensitivity == pytest.approx(2.1)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+    assert controls.session.project.milkdrop_beat_sensitivity == pytest.approx(2.6)
+    controls.handle_keydown(_keydown(pygame.K_LEFT))
+    assert controls.session.project.milkdrop_beat_sensitivity == pytest.approx(2.5)
+    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    assert controls.session.project.milkdrop_beat_sensitivity == pytest.approx(2.0)
 
 
 def test_project_render_defaults() -> None:
@@ -210,6 +247,11 @@ def test_left_right_on_headers_toggles_expand() -> None:
     controls.focus_descriptor = RowDescriptor(RowKind.PROJECT_HEADER)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.session.project.expanded is True
+    controls.focus_descriptor = RowDescriptor(RowKind.PROJECT_MILKDROP_HEADER)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.session.project.milkdrop_expanded is True
+    controls.handle_keydown(_keydown(pygame.K_LEFT))
+    assert controls.session.project.milkdrop_expanded is False
     controls.focus_descriptor = RowDescriptor(RowKind.PROJECT_RENDER_HEADER)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.session.project.render.expanded is True

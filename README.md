@@ -208,8 +208,8 @@ DIMINUENDO:  FULL ↘↘↘ thin ──── thin ──── ► restore
 `cleave` creates a new directory under `~/.local/share/cleave/projects/` for each song.
 The project directory stores all files required in a self-contained bundle...
 
-* `project.yaml` - project metadata
-* `cleave-viz.yaml` - editor & final render configuration. Not everything in here is surfaced in the editor UI just yet
+* `project.yaml` - project metadata, song markers, and Milkdrop defaults (`milkdrop.beat_sensitivity`)
+* `cleave-viz.yaml` - layer, render, and timeline configuration. Not everything in here is surfaced in the editor UI just yet
 * `signals.json` - audio analysis data (schema version 4) used by `cleave effects` and the opt-in timeline preset conductor; re-run `separate` on existing projects after a schema bump so envelopes stay current
 * `mysong.wav` - original source audio is copied into the project directory
 * `stems/` - separated audio stems
@@ -227,7 +227,7 @@ Linux (XDG):
   * `presets/favourites/`
   * `presets/blacklist/`
 * Configuration: `~/.config/cleave/config.yaml`
-  * Editor settings (preview quality, panel width, fade)
+  * Editor settings (window size, preview quality, panel width, fade)
 
 Windows (checkout or the [Windows zip](#windows-zip)):
 
@@ -250,7 +250,7 @@ Windows freeze layout and FFmpeg/libprojectM sidecars: [docs/windows-freeze.md](
 
 * The editor supports up to eight libprojectM layers at tiered resolutions
 * Composited to **1280x720** content by default (editable `cleave-viz.yaml`)
-* Live preview upscales via `editor.upscale` and runs at display frame rate
+* Live preview upscales via user-config `editor.upscale` and runs at display frame rate
 * Offline render output resolution is set under `render.width` / `render.height` (default **1280x720**) and frame rate under `render.fps`
 * Each layer's libprojectM instance receives PCM from its assigned stem; stereo stems are fed as stereo, mono as mono.
 * Milkdrop draws on black, so cleave treats black as transparent and uses pixel brightness as blend weight (`black-key` default).

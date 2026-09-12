@@ -1283,6 +1283,22 @@ def test_apply_cuts_to_cues_rows_use_action_color() -> None:
     assert _row_value_color(state, soft_row) == ACTION
 
 
+def test_change_window_size_row_uses_action_color() -> None:
+    from cleave.viz.tuning_view_state import SettingsBlock
+
+    state = _minimal_view_state(
+        settings=SettingsBlock(expanded=True, editor_window_expanded=True)
+    )
+    apply_row = state.layout.find_by_kind(RowKind.SETTINGS_EDITOR_WINDOW_APPLY)
+    assert apply_row is not None
+    assert _row_text(state, apply_row) == "  └─ change window size"
+    assert _row_value_color(state, apply_row) == ACTION
+    assert _row_shows_action_enter_hint(state, apply_row) is False
+    state.focus_descriptor = state.layout.descriptor(apply_row)
+    assert _row_value_color(state, apply_row) == HIGHLIGHT
+    assert _row_shows_action_enter_hint(state, apply_row) is True
+
+
 def test_change_editor_mode_row_uses_action_color() -> None:
     from cleave.viz.tuning_view_state import SettingsBlock
 

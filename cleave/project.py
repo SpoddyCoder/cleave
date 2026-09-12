@@ -10,6 +10,10 @@ from typing import Sequence
 
 import yaml
 
+from cleave.config_schema.editor import (
+    DEFAULT_BEAT_SENSITIVITY,
+    clamp_beat_sensitivity,
+)
 from cleave.song_markers import (
     DEFAULT_SONG_MARKER_TYPE,
     SongMarker,
@@ -17,6 +21,7 @@ from cleave.song_markers import (
 )
 
 PROJECT_FILENAME = "project.yaml"
+DEFAULT_PROJECT_SLUG = "render"
 
 
 def _parse_song_markers(raw_markers: object) -> tuple[SongMarker, ...]:
@@ -49,6 +54,24 @@ def _song_markers_to_yaml(markers: Sequence[SongMarker]) -> list[dict]:
     ]
 
 
+def _parse_milkdrop(raw: object) -> MilkdropSettings | None:
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise ValueError("invalid project manifest: milkdrop")
+    beat_raw = raw.get("beat_sensitivity", DEFAULT_BEAT_SENSITIVITY)
+    try:
+        beat = float(beat_raw)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("invalid project manifest: milkdrop.beat_sensitivity") from exc
+    return MilkdropSettings(beat_sensitivity=clamp_beat_sensitivity(beat))
+
+
+@dataclass(frozen=True)
+class MilkdropSettings:
+    beat_sensitivity: float = DEFAULT_BEAT_SENSITIVITY
+
+
 @dataclass(frozen=True)
 class ProjectManifest:
     version: int
@@ -59,6 +82,7 @@ class ProjectManifest:
     demucs_model: str
     restored_from: str | None = None
     song_markers: tuple[SongMarker, ...] = ()
+    milkdrop: MilkdropSettings | None = None
 
     @classmethod
     def from_dict(cls, data: dict) -> ProjectManifest:
@@ -80,6 +104,7 @@ class ProjectManifest:
             demucs_model=str(ingest["demucs_model"]),
             restored_from=restored_from,
             song_markers=_parse_song_markers(data.get("song-markers")),
+            milkdrop=_parse_milkdrop(data.get("milkdrop")),
         )
 
     def to_dict(self) -> dict:
@@ -97,6 +122,10 @@ class ProjectManifest:
             data["restored-from"] = self.restored_from
         if self.song_markers:
             data["song-markers"] = _song_markers_to_yaml(self.song_markers)
+        if self.milkdrop is not None:
+            data["milkdrop"] = {
+                "beat_sensitivity": self.milkdrop.beat_sensitivity,
+            }
         return data
 
 
@@ -153,12 +182,13 @@ def write_manifest(
     demucs_model: str,
     separated_at: datetime | None = None,
     song_markers: Sequence[SongMarker | float] | None = None,
+    milkdrop: MilkdropSettings | None = None,
 ) -> Path:
     """Create or update ``project.yaml`` mix and ingest fields.
 
     When the file already exists, only ``slug``, ``mix.filename``, and
-    ``ingest`` are updated. ``song-markers``, ``restored-from``, and other
-    fields are preserved unless ``song_markers`` is passed explicitly.
+    ``ingest`` are updated. ``song-markers``, ``milkdrop``, ``restored-from``,
+    and other fields are preserved unless passed explicitly.
     """
     when = separated_at or datetime.now(timezone.utc)
     path = manifest_path(project_dir)
@@ -171,6 +201,7 @@ def write_manifest(
             if song_markers is not None
             else existing.song_markers
         )
+        milkdrop_settings = milkdrop if milkdrop is not None else existing.milkdrop
         manifest = replace(
             existing,
             slug=slug,
@@ -179,6 +210,7 @@ def write_manifest(
             separated_at=separated,
             demucs_model=demucs_model,
             song_markers=markers,
+            milkdrop=milkdrop_settings,
         )
     else:
         manifest = ProjectManifest(
@@ -189,6 +221,7 @@ def write_manifest(
             separated_at=separated,
             demucs_model=demucs_model,
             song_markers=coerce_song_markers(song_markers),
+            milkdrop=milkdrop,
         )
     with path.open("w", encoding="utf-8") as handle:
         yaml.safe_dump(manifest.to_dict(), handle, sort_keys=False)
@@ -201,6 +234,21 @@ def save_song_markers(
     """Replace ``song-markers`` in ``project.yaml``, preserving ingest and provenance."""
     manifest = load_manifest(project_dir)
     updated = replace(manifest, song_markers=coerce_song_markers(markers))
+    path = manifest_path(project_dir)
+    with path.open("w", encoding="utf-8") as handle:
+        yaml.safe_dump(updated.to_dict(), handle, sort_keys=False)
+    return path
+
+
+def save_milkdrop_settings(project_dir: Path, beat_sensitivity: float) -> Path:
+    """Replace ``milkdrop`` in ``project.yaml``, preserving ingest and provenance."""
+    manifest = load_manifest(project_dir)
+    updated = replace(
+        manifest,
+        milkdrop=MilkdropSettings(
+            beat_sensitivity=clamp_beat_sensitivity(beat_sensitivity)
+        ),
+    )
     path = manifest_path(project_dir)
     with path.open("w", encoding="utf-8") as handle:
         yaml.safe_dump(updated.to_dict(), handle, sort_keys=False)

@@ -9,6 +9,9 @@ import pytest
 import yaml
 
 from cleave.config_schema.editor import (
+    DEFAULT_EDITOR_HEIGHT,
+    DEFAULT_EDITOR_UPSCALE,
+    DEFAULT_EDITOR_WIDTH,
     DEFAULT_UI_FADE_SEC,
     DEFAULT_UI_WIDTH,
     DEFAULT_UI_WIDTH_MODE,
@@ -37,6 +40,9 @@ def test_load_user_config_missing_file_returns_defaults(tmp_path: Path) -> None:
     assert cfg.path == missing.resolve()
     assert cfg.preset_root is None
     assert cfg.texture_paths is None
+    assert cfg.editor.width == DEFAULT_EDITOR_WIDTH
+    assert cfg.editor.height == DEFAULT_EDITOR_HEIGHT
+    assert cfg.editor.upscale == DEFAULT_EDITOR_UPSCALE
     assert cfg.editor.preview_quality == DEFAULT_EDITOR_PREVIEW_QUALITY
     assert cfg.editor.ui_width_mode == DEFAULT_UI_WIDTH_MODE
     assert cfg.editor.ui_width == DEFAULT_UI_WIDTH
@@ -46,6 +52,9 @@ def test_load_user_config_missing_file_returns_defaults(tmp_path: Path) -> None:
 
 def test_default_editor_settings_matches_schema_defaults() -> None:
     editor = default_editor_settings()
+    assert editor.width == DEFAULT_EDITOR_WIDTH
+    assert editor.height == DEFAULT_EDITOR_HEIGHT
+    assert editor.upscale == DEFAULT_EDITOR_UPSCALE
     assert editor.preview_quality == DEFAULT_EDITOR_PREVIEW_QUALITY
     assert editor.ui_width_mode == DEFAULT_UI_WIDTH_MODE
     assert editor.ui_width == DEFAULT_UI_WIDTH
@@ -131,6 +140,9 @@ def test_write_user_config_preserves_paths_and_rewrites_editor(tmp_path: Path) -
     )
 
     new_editor = EditorSettings(
+        width=1920,
+        height=1080,
+        upscale=1.5,
         preview_quality="ultra-performance",
         ui_width_mode="fixed",
         ui_width=90,
@@ -142,6 +154,9 @@ def test_write_user_config_preserves_paths_and_rewrites_editor(tmp_path: Path) -
     with config_path.open(encoding="utf-8") as fh:
         data = yaml.safe_load(fh)
 
+    assert data["editor"]["width"] == 1920
+    assert data["editor"]["height"] == 1080
+    assert data["editor"]["upscale"] == 1.5
     assert data["editor"]["preview_quality"] == "ultra-performance"
     assert data["editor"]["ui_width_mode"] == "fixed"
     assert data["editor"]["ui_width"] == 90
@@ -154,6 +169,9 @@ def test_write_user_config_preserves_paths_and_rewrites_editor(tmp_path: Path) -
 
 def test_editor_settings_from_config() -> None:
     vis = EditorConfig(
+        width=1920,
+        height=1080,
+        upscale=1.5,
         preview_quality="performance",
         ui_width_mode="fixed",
         ui_width=75,
@@ -162,6 +180,9 @@ def test_editor_settings_from_config() -> None:
     )
     editor = editor_settings_from_config(vis)
     assert editor == EditorSettings(
+        width=1920,
+        height=1080,
+        upscale=1.5,
         preview_quality="performance",
         ui_width_mode="fixed",
         ui_width=75,
@@ -178,6 +199,9 @@ def test_persist_editor_settings_writes_visualizer_editor_fields(
         make_test_cfg(("layer_1",)),
         user_config_path=user_path,
         editor=EditorConfig(
+            width=1920,
+            height=1080,
+            upscale=1.5,
             preview_quality="ultra-performance",
             ui_width_mode="fixed",
             ui_width=88,
@@ -189,6 +213,9 @@ def test_persist_editor_settings_writes_visualizer_editor_fields(
     persist_editor_settings(cfg)
 
     loaded = load_user_config(user_path)
+    assert loaded.editor.width == 1920
+    assert loaded.editor.height == 1080
+    assert loaded.editor.upscale == 1.5
     assert loaded.editor.preview_quality == "ultra-performance"
     assert loaded.editor.ui_width_mode == "fixed"
     assert loaded.editor.ui_width == 88

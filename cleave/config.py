@@ -20,6 +20,12 @@ from cleave.blend_modes import BlendMode
 from cleave.paths import default_preset_root, default_texture_paths, resource_dir
 from cleave.effects.constants import clamp_effect_pct
 from cleave.stems import StemSource
+from cleave.project import (
+    DEFAULT_PROJECT_SLUG,
+    ProjectManifest,
+    load_manifest,
+    manifest_path,
+)
 from cleave.config_schema.descriptors import (
     as_mapping,
     require_non_negative_number,
@@ -42,8 +48,8 @@ from cleave.config_schema.editor import (
     EditorPreviewQuality,
     clamp_beat_sensitivity,
     clamp_upscale,
+    editor_config_from_settings,
     editor_display_size,
-    parse_project_editor_section,
 )
 from cleave.config_schema.layers import (
     DEFAULT_BLEND_MODE,
@@ -191,11 +197,9 @@ class LayerConfig:
 
 @dataclass(frozen=True)
 class EditorConfig:
-    name: str = "render"
     width: int = DEFAULT_EDITOR_WIDTH
     height: int = DEFAULT_EDITOR_HEIGHT
     upscale: float = DEFAULT_EDITOR_UPSCALE
-    beat_sensitivity: float = DEFAULT_BEAT_SENSITIVITY
     preview_quality: EditorPreviewQuality = DEFAULT_EDITOR_PREVIEW_QUALITY
     ui_width_mode: UiWidthMode = DEFAULT_UI_WIDTH_MODE
     ui_width: int = DEFAULT_UI_WIDTH
@@ -380,6 +384,8 @@ class CleaveConfig:
     layer_z_order: list[str] = field(default_factory=lambda: list(DEFAULT_LAYER_Z_ORDER))
     render: RenderConfig | None = None
     timeline: TimelineConfig | None = None
+    milkdrop_beat_sensitivity: float = DEFAULT_BEAT_SENSITIVITY
+    project_slug: str = DEFAULT_PROJECT_SLUG
 
     def layers_in_z_order(self) -> list[tuple[str, LayerConfig]]:
         """Return layers in compositor draw order (bottom-to-top)."""
@@ -426,20 +432,8 @@ def ensure_project_viz_config(project_dir: Path) -> Path:
     if not src.is_file():
         raise FileNotFoundError(f"config template not found: {src}")
 
-    with src.open(encoding="utf-8") as fh:
-        data = yaml.safe_load(fh)
-    if not isinstance(data, dict):
-        raise ValueError(f"config template root must be a mapping: {src}")
-
-    editor_section = data.get("editor")
-    if not isinstance(editor_section, dict):
-        editor_section = {}
-        data["editor"] = editor_section
-    editor_section["name"] = project_dir.name
-
     project_dir.mkdir(parents=True, exist_ok=True)
-    with dst.open("w", encoding="utf-8") as fh:
-        dump_yaml(data, fh)
+    dst.write_bytes(src.read_bytes())
     return dst
 
 
@@ -552,6 +546,24 @@ def _parse_layers(
     return layers, ctx
 
 
+def _manifest_for_config(
+    config_path: Path, project_root: Path | None
+) -> ProjectManifest | None:
+    directories: list[Path] = []
+    if project_root is not None:
+        directories.append(project_root.resolve())
+    directories.append(config_path.parent)
+    seen: set[Path] = set()
+    for directory in directories:
+        resolved = directory.resolve()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        if manifest_path(resolved).is_file():
+            return load_manifest(resolved)
+    return None
+
+
 def load_config(
     config_path: Path | None = None,
     project_root: Path | None = None,
@@ -576,12 +588,19 @@ def load_config(
         raise ValueError(f"config root must be a mapping: {path}")
 
     paths = _parse_paths(data, user_cfg)
-    editor = parse_project_editor_section(data, editor=user_cfg.editor)
+    editor = editor_config_from_settings(user_cfg.editor)
     render = parse_render_section(data)
     layers, parse_ctx = _parse_layers(data, paths.preset_root, path.parent)
     layer_z_order = parse_layer_z_order_section(data, parse_ctx)
     timeline = parse_timeline_section(data, parse_ctx)
     _validate_presets(layers)
+
+    manifest = _manifest_for_config(path, project_root)
+    if manifest is not None and manifest.milkdrop is not None:
+        milkdrop_beat_sensitivity = manifest.milkdrop.beat_sensitivity
+    else:
+        milkdrop_beat_sensitivity = DEFAULT_BEAT_SENSITIVITY
+    project_slug = manifest.slug if manifest is not None else DEFAULT_PROJECT_SLUG
 
     return CleaveConfig(
         paths=paths,
@@ -592,6 +611,8 @@ def load_config(
         layer_z_order=layer_z_order,
         render=render,
         timeline=timeline,
+        milkdrop_beat_sensitivity=milkdrop_beat_sensitivity,
+        project_slug=project_slug,
     )
 
 

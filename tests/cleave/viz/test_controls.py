@@ -14,6 +14,12 @@ import pytest
 
 _MOVE_MODE_KEY = pygame.K_m
 
+from cleave.config_schema.editor import (
+    DEFAULT_EDITOR_HEIGHT,
+    DEFAULT_EDITOR_UPSCALE,
+    DEFAULT_EDITOR_WIDTH,
+    editor_display_size,
+)
 from cleave.config_schema.layers import (
     DEFAULT_LAYER_SLOTS,
     MAX_LAYER_COUNT,
@@ -394,6 +400,12 @@ def _expand_settings(controls: TuningControls) -> None:
 def _expand_settings_ui(controls: TuningControls) -> None:
     _expand_settings(controls)
     controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_HEADER)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
+def _expand_settings_editor_window(controls: TuningControls) -> None:
+    _expand_settings(controls)
+    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_EDITOR_WINDOW_HEADER)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
@@ -1077,20 +1089,21 @@ def test_navigable_rows_without_overwrite() -> None:
     _expand_project(controls)
     view = controls.build_view_state(paused=False)
     assert view.allow_overwrite is False
-    assert len(view.layout) == 21
+    assert len(view.layout) == 22
     assert RowDescriptor(RowKind.TIMELINE_PRESETS) not in view.layout.rows
 
     kinds = {view.layout.kind(i) for i in range(len(view.layout))}
     assert RowKind.CONFIG_HEADER in kinds
+    assert RowKind.PROJECT_MILKDROP_HEADER in kinds
 
     navigable = view.layout.navigable_indices(view)
     assert any(view.layout.kind(i) == RowKind.CONFIG_HEADER for i in navigable)
 
-    render_row = view.layout.find_by_kind(RowKind.PROJECT_RENDER_HEADER)
+    milkdrop_row = view.layout.find_by_kind(RowKind.PROJECT_MILKDROP_HEADER)
     config_row = _config_header_row(view)
     controls.focus_descriptor = _desc(view, config_row)
     controls.handle_keydown(_keydown(pygame.K_DOWN))
-    assert controls.focus_descriptor == _desc(view, render_row)
+    assert controls.focus_descriptor == _desc(view, milkdrop_row)
 
 
 def test_navigable_rows_with_overwrite() -> None:
@@ -1098,7 +1111,7 @@ def test_navigable_rows_with_overwrite() -> None:
     _expand_project(controls)
     view = controls.build_view_state(paused=False)
     assert view.allow_overwrite is True
-    assert len(view.layout) == 21
+    assert len(view.layout) == 22
     assert RowDescriptor(RowKind.TIMELINE_PRESETS) not in view.layout.rows
 
     config_row = _config_header_row(view)
@@ -4740,17 +4753,18 @@ def test_settings_expand_collapse_and_sub_row_visibility() -> None:
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.session.settings.expanded is True
     view = controls.build_view_state(paused=False)
-    assert [view.layout.kind(i) for i in range(5)] == [
+    assert [view.layout.kind(i) for i in range(6)] == [
         RowKind.SETTINGS_HEADER,
+        RowKind.SETTINGS_EDITOR_WINDOW_HEADER,
         RowKind.SETTINGS_UI_HEADER,
         RowKind.SETTINGS_LATENCY_COMPENSATION_HEADER,
         RowKind.SETTINGS_PREVIEW_QUALITY,
         RowKind.SETTINGS_EDITOR_MODE,
     ]
     preview_quality_row = view.layout.find_by_kind(RowKind.SETTINGS_PREVIEW_QUALITY)
-    assert preview_quality_row == 3
+    assert preview_quality_row == 4
     assert preview_quality_row in view.layout.navigable_indices(view)
-    assert view.layout.header_row_count() == 7
+    assert view.layout.header_row_count() == 8
 
     controls.focus_descriptor = _desc(view, preview_quality_row)
     controls.handle_keydown(_keydown(pygame.K_LEFT))
@@ -4779,7 +4793,7 @@ def test_settings_ui_expand_collapse_and_sub_row_visibility() -> None:
     view = controls.build_view_state(paused=False)
     ui_fade_row = view.layout.find_by_kind(RowKind.SETTINGS_UI_FADE)
     assert ui_fade_row in view.layout.navigable_indices(view)
-    assert view.layout.header_row_count() == 10
+    assert view.layout.header_row_count() == 11
 
     controls.focus_descriptor = _desc(view, ui_fade_row)
     controls.handle_keydown(_keydown(pygame.K_LEFT))
@@ -4790,7 +4804,143 @@ def test_settings_ui_expand_collapse_and_sub_row_visibility() -> None:
     assert RowKind.SETTINGS_UI_FADE not in {
         view.layout.kind(i) for i in range(len(view.layout))
     }
-    assert view.layout.header_row_count() == 7
+    assert view.layout.header_row_count() == 8
+
+
+def test_settings_editor_window_expand_collapse_and_sub_row_visibility() -> None:
+    controls = _make_controls(("layer_1",))
+    _expand_settings(controls)
+    view = controls.build_view_state(paused=False)
+    assert RowKind.SETTINGS_EDITOR_WINDOW_WIDTH not in {
+        view.layout.kind(i) for i in range(len(view.layout))
+    }
+
+    header = view.layout.find_by_kind(RowKind.SETTINGS_EDITOR_WINDOW_HEADER)
+    controls.focus_descriptor = _desc(view, header)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.session.settings.editor_window_expanded is True
+    view = controls.build_view_state(paused=False)
+    width_row = view.layout.find_by_kind(RowKind.SETTINGS_EDITOR_WINDOW_WIDTH)
+    apply_row = view.layout.find_by_kind(RowKind.SETTINGS_EDITOR_WINDOW_APPLY)
+    assert width_row in view.layout.navigable_indices(view)
+    assert apply_row in view.layout.navigable_indices(view)
+    assert [
+        view.layout.kind(i)
+        for i in range(header, header + 5)
+    ] == [
+        RowKind.SETTINGS_EDITOR_WINDOW_HEADER,
+        RowKind.SETTINGS_EDITOR_WINDOW_WIDTH,
+        RowKind.SETTINGS_EDITOR_WINDOW_HEIGHT,
+        RowKind.SETTINGS_EDITOR_WINDOW_UPSCALE,
+        RowKind.SETTINGS_EDITOR_WINDOW_APPLY,
+    ]
+
+    controls.focus_descriptor = _desc(view, width_row)
+    controls.handle_keydown(_keydown(pygame.K_LEFT))
+    controls.focus_descriptor = _desc(view, header)
+    controls.handle_keydown(_keydown(pygame.K_LEFT))
+    assert controls.session.settings.editor_window_expanded is False
+    view = controls.build_view_state(paused=False)
+    assert RowKind.SETTINGS_EDITOR_WINDOW_WIDTH not in {
+        view.layout.kind(i) for i in range(len(view.layout))
+    }
+
+
+def test_settings_editor_window_adjusts_width_height_upscale() -> None:
+    controls = _make_controls(("layer_1",))
+    assert controls.cfg.editor.width == DEFAULT_EDITOR_WIDTH
+    assert controls.cfg.editor.height == DEFAULT_EDITOR_HEIGHT
+    assert controls.cfg.editor.upscale == DEFAULT_EDITOR_UPSCALE
+
+    controls.settings.adjust_editor_window_width(forward=True, ctrl=False)
+    assert controls.cfg.editor.width == DEFAULT_EDITOR_WIDTH + 10
+    controls.settings.adjust_editor_window_width(forward=False, ctrl=True)
+    assert controls.cfg.editor.width == DEFAULT_EDITOR_WIDTH - 90
+
+    controls.settings.adjust_editor_window_height(forward=True, ctrl=False)
+    assert controls.cfg.editor.height == DEFAULT_EDITOR_HEIGHT + 10
+    controls.settings.adjust_editor_window_height(forward=False, ctrl=True)
+    assert controls.cfg.editor.height == DEFAULT_EDITOR_HEIGHT - 90
+
+    controls.settings.adjust_editor_window_upscale(forward=True, ctrl=False)
+    assert controls.cfg.editor.upscale == pytest.approx(DEFAULT_EDITOR_UPSCALE + 0.1)
+    controls.settings.adjust_editor_window_upscale(forward=True, ctrl=True)
+    assert controls.cfg.editor.upscale == pytest.approx(DEFAULT_EDITOR_UPSCALE + 0.6)
+
+    from dataclasses import replace as _replace
+
+    controls.cfg.editor = _replace(controls.cfg.editor, width=330)
+    controls.settings.adjust_editor_window_width(forward=False, ctrl=False)
+    assert controls.cfg.editor.width == 320
+    controls.settings.adjust_editor_window_width(forward=False, ctrl=False)
+    assert controls.cfg.editor.width == 320
+
+
+def test_settings_editor_window_apply_opens_confirm_modal() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.settings.adjust_editor_window_width(forward=True, ctrl=True)
+    controls.settings.adjust_editor_window_height(forward=True, ctrl=True)
+    controls.settings.adjust_editor_window_upscale(forward=True, ctrl=False)
+    _expand_settings_editor_window(controls)
+    view = controls.build_view_state(paused=False)
+    apply_row = view.layout.find_by_kind(RowKind.SETTINGS_EDITOR_WINDOW_APPLY)
+    controls.focus_descriptor = _desc(view, apply_row)
+    assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
+    modal_view = controls.modal_host.view_state()
+    assert modal_view is not None
+    assert modal_view.kind == ModalKind.YES_NO
+    assert modal_view.options == ("Yes", "No")
+    assert modal_view.message == (
+        "Restart the application for changes to take effect."
+    )
+    confirm_width = DEFAULT_EDITOR_WIDTH + 100
+    confirm_height = DEFAULT_EDITOR_HEIGHT + 100
+    confirm_upscale = DEFAULT_EDITOR_UPSCALE + 0.1
+    display_w, display_h = editor_display_size(
+        confirm_width, confirm_height, upscale=confirm_upscale
+    )
+    assert modal_view.labeled_lines == (
+        ModalLabeledLine("width", str(confirm_width)),
+        ModalLabeledLine("height", str(confirm_height)),
+        ModalLabeledLine("upscale", f"{confirm_upscale:.1f}"),
+        ModalLabeledLine("display size", f"{display_w}x{display_h}"),
+    )
+
+
+def test_settings_editor_window_apply_persists_on_yes(tmp_path: Path) -> None:
+    from cleave.user_config import load_user_config
+
+    controls = _make_controls(("layer_1",))
+    user_path = tmp_path / "config.yaml"
+    controls.cfg.user_config_path = user_path
+    controls.settings.adjust_editor_window_width(forward=True, ctrl=True)
+    _expand_settings_editor_window(controls)
+    view = controls.build_view_state(paused=False)
+    apply_row = view.layout.find_by_kind(RowKind.SETTINGS_EDITOR_WINDOW_APPLY)
+    controls.focus_descriptor = _desc(view, apply_row)
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    _choose_modal_option(controls, "Yes")
+    loaded = load_user_config(user_path)
+    assert loaded.editor.width == DEFAULT_EDITOR_WIDTH + 100
+    assert loaded.editor.height == DEFAULT_EDITOR_HEIGHT
+    assert loaded.editor.upscale == pytest.approx(DEFAULT_EDITOR_UPSCALE)
+
+
+def test_settings_editor_window_apply_cancel_does_not_persist(
+    tmp_path: Path,
+) -> None:
+    controls = _make_controls(("layer_1",))
+    user_path = tmp_path / "config.yaml"
+    controls.cfg.user_config_path = user_path
+    controls.settings.adjust_editor_window_width(forward=True, ctrl=True)
+    _expand_settings_editor_window(controls)
+    view = controls.build_view_state(paused=False)
+    apply_row = view.layout.find_by_kind(RowKind.SETTINGS_EDITOR_WINDOW_APPLY)
+    controls.focus_descriptor = _desc(view, apply_row)
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    _choose_modal_option(controls, "No")
+    assert controls.cfg.editor.width == DEFAULT_EDITOR_WIDTH + 100
+    assert not user_path.is_file()
 
 
 def test_settings_collapse_from_sub_row_refocuses_header() -> None:

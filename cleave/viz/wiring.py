@@ -97,7 +97,7 @@ class LayerManager:
             slot,
             playlist,
             self.preset_root,
-            self.cfg.editor.beat_sensitivity,
+            self.session.project.milkdrop_beat_sensitivity,
         )
         z_index = len(self.session.layer_z_order)
         width, height = preview_layer_size(

@@ -121,7 +121,7 @@ def test_add_layer_updates_session_and_collections_not_cfg(
     assert stem_layer in manager.layers
     build_single.assert_called_once()
     runtime = build_single.call_args.args[1]
-    assert runtime.beat_sensitivity == manager.cfg.editor.beat_sensitivity
+    assert runtime.beat_sensitivity == manager.session.project.milkdrop_beat_sensitivity
     compositor.resize_layer_fbo.assert_called()
 
 

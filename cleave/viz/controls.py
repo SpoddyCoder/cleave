@@ -51,6 +51,7 @@ from cleave.viz.row_spec import (
     REPEAT_ROW_KINDS,
     ROW_SPECS,
     RowPresentStyle,
+    apply_field_action,
     apply_field_horizontal,
     row_spec,
     row_triggers_layer_delete,
@@ -225,7 +226,7 @@ class TuningControls:
             session, bindings=render_post_fx_bindings
         )
         self.render_pattern_mask = RenderPatternMaskControls(session)
-        self.settings = SettingsControls(session, cfg)
+        self.settings = SettingsControls(session, cfg, self._modal_host)
         self.project = ProjectControls(session, duration_sec=duration_sec)
         self.project_render = ProjectRenderController(
             session,
@@ -587,6 +588,8 @@ class TuningControls:
 
         if event.key == pygame.K_RETURN:
             kind = self.focus_descriptor.kind
+            if apply_field_action(self, self.focus_descriptor):
+                return True
             if kind == RowKind.SETTINGS_EDITOR_MODE:
                 self.editor_mode.prompt_change_editor_mode()
                 return True
@@ -759,6 +762,8 @@ class TuningControls:
                 return True
 
         if event.key == pygame.K_RETURN:
+            if apply_field_action(self, self.focus_descriptor):
+                return True
             if self.focus_descriptor.kind == RowKind.SETTINGS_EDITOR_MODE:
                 self.editor_mode.prompt_change_editor_mode()
                 return True

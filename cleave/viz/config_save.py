@@ -11,7 +11,7 @@ import pygame
 
 from cleave.config import VIZ_CONFIG_FILENAME, CleaveConfig
 from cleave.config_schema.persist import persisted_session_payload
-from cleave.project import save_song_markers
+from cleave.project import save_milkdrop_settings, save_song_markers
 from cleave.viz.modal import ModalHost, ModalKind
 from cleave.viz.session import TuningSession, allow_overwrite_for_path
 
@@ -21,9 +21,10 @@ _DEFAULT_SAVE_FILENAME = "unnamed-1.yaml"
 class ConfigSaveController:
     """Dirty tracking, save dialogs, and deferred quit.
 
-    Viz YAML fields use ``persisted_session_payload``. Song markers are
-    project-scoped (``project.yaml``) and participate in dirty via a separate
-    baseline of marker times; they flush on successful Save, not on each edit.
+    Viz YAML fields use ``persisted_session_payload``. Song markers and
+    milkdrop beat sensitivity are project-scoped (``project.yaml``) and
+    participate in dirty via separate baselines; they flush on successful
+    Save, not on each edit.
     """
 
     def __init__(
@@ -57,6 +58,7 @@ class ConfigSaveController:
 
         self._saved_signature = self._persisted_signature()
         self._saved_song_markers = tuple(session.song_markers.markers)
+        self._saved_milkdrop_beat = session.project.milkdrop_beat_sensitivity
         self._pending_exit = False
         self._quit_after_save = False
         self._on_commit_save: list[Callable[[], None]] = []
@@ -74,20 +76,33 @@ class ConfigSaveController:
         return (
             self._persisted_signature() != self._saved_signature
             or tuple(self.session.song_markers.markers) != self._saved_song_markers
+            or (
+                self.session.project.milkdrop_beat_sensitivity
+                != self._saved_milkdrop_beat
+            )
         )
 
     def clear_config_dirty(self) -> None:
         self._saved_signature = self._persisted_signature()
         self._saved_song_markers = tuple(self.session.song_markers.markers)
+        self._saved_milkdrop_beat = self.session.project.milkdrop_beat_sensitivity
 
     def _flush_song_markers(self) -> None:
         if self._project_dir is None:
             return
         save_song_markers(self._project_dir, self.session.song_markers.markers)
 
+    def _flush_milkdrop(self) -> None:
+        if self._project_dir is None:
+            return
+        save_milkdrop_settings(
+            self._project_dir, self.session.project.milkdrop_beat_sensitivity
+        )
+
     def _commit_save(self) -> None:
-        """Flush project song markers (when available) and clear dirty baselines."""
+        """Flush project.yaml fields (when available) and clear dirty baselines."""
         self._flush_song_markers()
+        self._flush_milkdrop()
         self.clear_config_dirty()
         self._pending_save_dismiss = None
         for callback in self._on_commit_save:

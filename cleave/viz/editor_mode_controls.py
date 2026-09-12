@@ -63,6 +63,8 @@ def _replace_cfg(target: CleaveConfig, fresh: CleaveConfig) -> None:
     target.timeline = fresh.timeline
     target.config_path = fresh.config_path
     target.user_config_path = fresh.user_config_path
+    target.milkdrop_beat_sensitivity = fresh.milkdrop_beat_sensitivity
+    target.project_slug = fresh.project_slug
 
 
 def _merge_session_state(
@@ -87,6 +89,9 @@ def _merge_session_state(
     target.render_post_fx = fresh.render_post_fx
     target.render_post_fx_solo = fresh.render_post_fx_solo
     target.timeline = fresh.timeline
+    target.project.milkdrop_beat_sensitivity = (
+        fresh.project.milkdrop_beat_sensitivity
+    )
 
     target.settings.expanded = preserve_expanded
     target.settings.ui_expanded = preserve_ui_expanded

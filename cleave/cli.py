@@ -446,7 +446,7 @@ def build_parser() -> argparse.ArgumentParser:
         "-o",
         "--output",
         type=Path,
-        help="Output MP4 path (default: <project>/renders/<editor.name>.mp4)",
+        help="Output MP4 path (default: <project>/renders/<project slug>.mp4)",
     )
     render.add_argument(
         "-hq",

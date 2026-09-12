@@ -50,6 +50,7 @@ class FitStrategy(Enum):
 
 
 FieldMutator = Callable[["TuningControls", RowDescriptor, bool, bool, bool], None]
+ActionMutator = Callable[["TuningControls", RowDescriptor], None]
 VisibilityIconFn = Callable[[TuningViewState, RowDescriptor], tuple[bool, bool]]
 
 
@@ -60,6 +61,7 @@ class RowSpec:
     present_style: RowPresentStyle
     format_value: Callable[[TuningViewState, RowDescriptor], str] | None = None
     apply_horizontal: FieldMutator | None = None
+    apply_action: ActionMutator | None = None
     header_prefix: str | None = None
     header_suffix: str | None = None
     fit_strategy: FitStrategy = FitStrategy.PLAIN
@@ -487,4 +489,15 @@ def apply_field_horizontal(
     if spec is None or spec.apply_horizontal is None:
         return False
     spec.apply_horizontal(controls, desc, forward, ctrl, shift)
+    return True
+
+
+def apply_field_action(
+    controls: TuningControls,
+    desc: RowDescriptor,
+) -> bool:
+    spec = ROW_SPECS.get(desc.kind)
+    if spec is None or spec.apply_action is None:
+        return False
+    spec.apply_action(controls, desc)
     return True

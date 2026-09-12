@@ -316,6 +316,9 @@ def test_section_header_descriptor_uses_tree_and_effect_fallback() -> None:
     assert section_header_descriptor(
         RowDescriptor(RowKind.SETTINGS_UI_FADE)
     ) == RowDescriptor(RowKind.SETTINGS_UI_HEADER)
+    assert section_header_descriptor(
+        RowDescriptor(RowKind.SETTINGS_EDITOR_WINDOW_WIDTH)
+    ) == RowDescriptor(RowKind.SETTINGS_EDITOR_WINDOW_HEADER)
 
 
 def test_render_overlay_section_kinds_from_tree() -> None:
