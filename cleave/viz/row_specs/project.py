@@ -1,4 +1,4 @@
-"""Project header, config path, and Render Project row specs."""
+"""Project header, config path, Compositor, and Render Project row specs."""
 
 from __future__ import annotations
 
@@ -57,6 +57,12 @@ def _format_project_milkdrop_beat(
     return f"{state.project.milkdrop_beat_sensitivity:.2f}"
 
 
+def _format_project_compositor_hdr(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return "on" if state.project.compositor_hdr else "off"
+
+
 def _apply_project_header(
     controls: TuningControls,
     desc: RowDescriptor,
@@ -107,6 +113,16 @@ def _apply_project_milkdrop_beat(
     _shift: bool,
 ) -> None:
     controls.project.adjust_milkdrop_beat_sensitivity(forward=forward, ctrl=ctrl)
+
+
+def _apply_project_compositor_hdr(
+    controls: TuningControls,
+    _desc: RowDescriptor,
+    _forward: bool,
+    _ctrl: bool,
+    _shift: bool,
+) -> None:
+    controls.project.toggle_compositor_hdr()
 
 
 SPECS: dict[RowKind, RowSpec] = {
@@ -174,6 +190,39 @@ SPECS: dict[RowKind, RowSpec] = {
         is_pinned=True,
         repeatable=True,
         parent_group="project_milkdrop",
+    ),
+    RowKind.PROJECT_COMPOSITOR_HEADER: RowSpec(
+        affordance=RowAffordance.EXPAND,
+        panel_label="Compositor",
+        present_style=RowPresentStyle.EXPAND_SUBHEADER,
+        apply_horizontal=apply_expand_subheader,
+        fit_strategy=FitStrategy.NONE,
+        help_title="Compositor",
+        help_description=(
+            "Layer composite format for live play and offline render.",
+            "hdr on uses 16-bit float FBOs; off uses 8-bit.",
+            "Preset curation always composites in 8-bit.",
+        ),
+        is_sub_header=True,
+        is_pinned=True,
+        parent_group="project",
+    ),
+    RowKind.PROJECT_COMPOSITOR_HDR: RowSpec(
+        affordance=RowAffordance.VALUE_STEP,
+        panel_label="hdr",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_project_compositor_hdr,
+        apply_horizontal=_apply_project_compositor_hdr,
+        help_title="hdr",
+        help_entries=(("Left/Right", "toggle on/off"),),
+        help_description=(
+            "16-bit float compositing when on; 8-bit when off.",
+            "The HDR display shoulder in frame finish follows this flag.",
+            "Changing it resizes compositor attachments immediately.",
+        ),
+        is_pinned=True,
+        repeatable=True,
+        parent_group="project_compositor",
     ),
     RowKind.PROJECT_RENDER_HEADER: RowSpec(
         affordance=RowAffordance.EXPAND,

@@ -125,7 +125,6 @@ from cleave.config_schema.render.post_fx import (
 DEFAULT_RENDER_FPS = 30
 DEFAULT_RENDER_WIDTH = 1280
 DEFAULT_RENDER_HEIGHT = 720
-DEFAULT_HDR_COMPOSITING = True
 
 
 def parse_render_section(data: dict[str, Any]) -> Any | None:
@@ -161,15 +160,10 @@ def parse_render_section(data: dict[str, Any]) -> Any | None:
         if pattern_mask_raw is not None
         else None
     )
-    hdr_raw = render_map.get("hdr_compositing")
-    hdr_compositing = (
-        DEFAULT_HDR_COMPOSITING if hdr_raw is None else bool(hdr_raw)
-    )
     return RenderConfig(
         fps=fps,
         width=width,
         height=height,
-        hdr_compositing=hdr_compositing,
         overlays=overlays,
         post_fx=post_fx,
         pattern_mask=pattern_mask,
@@ -188,14 +182,13 @@ def persist_render(ctx: PersistCtx) -> dict[str, Any]:
     pattern_mask = dump_section_fields(
         RENDER_PATTERN_MASK_FIELDS, pattern_mask_persist_values(ctx), ctx
     )
-    from cleave.config import render_fps, render_hdr_compositing, render_output_size
+    from cleave.config import render_fps, render_output_size
 
     width, height = render_output_size(ctx.cfg)
     return {
         "fps": render_fps(ctx.cfg),
         "width": width,
         "height": height,
-        "hdr_compositing": render_hdr_compositing(ctx.cfg),
         "overlays": overlays,
         "post_fx": post_fx,
         "pattern_mask": pattern_mask,

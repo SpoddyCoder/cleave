@@ -267,7 +267,7 @@ SPECS: dict[RowKind, RowSpec] = {
             "Compresses bright hotspots during layer compositing.",
             "Prevents stacked black-key layers from washing out to white.",
             "Preserves hue by scaling RGB to the compressed luminance.",
-            "With render.hdr_compositing enabled, a baseline display shoulder",
+            "With compositor hdr on, a baseline display shoulder",
             "runs automatically; composite rolloff here is extra control.",
             "Per-layer rolloff is optional and can stay light.",
         ),

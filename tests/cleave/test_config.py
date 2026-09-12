@@ -39,10 +39,10 @@ from cleave.config import (
     missing_preset_anchor_notification,
     project_viz_config_path,
     render_output_size,
-    render_hdr_compositing,
     _parse_layers,
 )
 from tests.support.config import default_highlight_rolloff_config, default_render_post_fx_config
+from cleave.config_schema.compositor import DEFAULT_COMPOSITOR_HDR
 from cleave.config_schema.descriptors import (
     ParseCtx,
     PersistCtx,
@@ -67,11 +67,9 @@ from cleave.config_schema.layers import (
     template_layer_entry,
 )
 from cleave.config_schema.render import (
-    DEFAULT_HDR_COMPOSITING,
     DEFAULT_RENDER_HEIGHT,
     DEFAULT_RENDER_WIDTH,
     parse_render_section,
-    persist_render,
 )
 from cleave.config_schema.timeline import parse_timeline_section, persist_timeline
 from cleave.user_config import EditorSettings
@@ -576,6 +574,7 @@ def test_repo_template_omits_editor_section_and_paths() -> None:
     assert "paths" not in data
     assert "layers" in data
     assert "render" in data
+    assert "hdr_compositing" not in data.get("render", {})
 
 
 def test_load_config_repo_template() -> None:
@@ -890,47 +889,33 @@ def test_parse_render_width_height_explicit() -> None:
     assert render.height == 1080
 
 
-def test_parse_render_hdr_compositing_defaults_true() -> None:
-    render = parse_render_section({"render": {"fps": 24}})
-    assert render is not None
-    assert render.hdr_compositing is DEFAULT_HDR_COMPOSITING
-
-
-def test_parse_render_hdr_compositing_explicit_false() -> None:
-    render = parse_render_section({"render": {"hdr_compositing": False}})
-    assert render is not None
-    assert render.hdr_compositing is False
-
-
-def test_render_hdr_compositing_false_without_render_section(
+def test_load_config_compositor_hdr_defaults_true_without_project_yaml(
     minimal_project: Path,
 ) -> None:
     cfg = load_config(project_root=minimal_project)
-    assert cfg.render is None
-    assert render_hdr_compositing(cfg) is False
+    assert cfg.compositor_hdr is DEFAULT_COMPOSITOR_HDR
 
 
-def test_persist_render_hdr_compositing_round_trip() -> None:
-    render = parse_render_section(
-        {"render": {"hdr_compositing": False, "fps": 24}}
+def test_load_config_compositor_hdr_from_project_yaml(tmp_path: Path) -> None:
+    from datetime import datetime, timezone
+
+    from cleave.project import save_compositor_settings, write_manifest
+
+    preset_root = tmp_path / "presets"
+    project_dir = tmp_path / "project"
+    write_minimal_config(project_dir, preset_root)
+    write_manifest(
+        project_dir,
+        slug="project",
+        mix_filename="project.wav",
+        original_path=tmp_path / "source.wav",
+        demucs_model="htdemucs",
+        separated_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
     )
-    assert render is not None
-    cfg = CleaveConfig(
-        paths=PathsConfig(preset_root=Path("/tmp"), texture_paths=()),
-        layers={},
-        editor=EditorConfig(),
-        config_path=Path("/tmp/cleave-viz.yaml"),
-        user_config_path=Path("/tmp/user-config.yaml"),
-        render=render,
-    )
-    session = TuningSession(layer_z_order=[])
-    payload = persist_render(PersistCtx(cfg=cfg, session=session, cfg_dir=None))
-    assert payload["hdr_compositing"] is False
+    save_compositor_settings(project_dir, False)
 
-    round_trip = parse_render_section({"render": payload})
-    assert round_trip is not None
-    assert round_trip.hdr_compositing is False
-    assert round_trip.fps == 24
+    cfg = load_config(project_root=project_dir)
+    assert cfg.compositor_hdr is False
 
 
 def test_render_output_size_defaults_without_render_section(
@@ -1957,6 +1942,7 @@ _UI_ONLY_LITERAL_DEFAULTS = frozenset(
         ("SettingsRuntime", "editor_mode"),
         ("ProjectRuntime", "expanded"),
         ("ProjectRuntime", "milkdrop_expanded"),
+        ("ProjectRuntime", "compositor_expanded"),
         ("ProjectRenderRuntime", "expanded"),
         ("LayerRuntime", "effects_expanded"),
         ("LayerRuntime", "expanded"),
@@ -1986,6 +1972,7 @@ _UI_ONLY_LITERAL_DEFAULTS = frozenset(
         ("SettingsBlock", "editor_mode"),
         ("ProjectBlock", "expanded"),
         ("ProjectBlock", "milkdrop_expanded"),
+        ("ProjectBlock", "compositor_expanded"),
         ("ProjectBlock", "render_expanded"),
         ("TuningViewState", "persistent_notification_elapsed_sec"),
         ("TuningViewState", "notification_remaining_sec"),

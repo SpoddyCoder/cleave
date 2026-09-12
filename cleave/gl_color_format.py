@@ -59,24 +59,24 @@ RGBA16F = GlColorFormat(
 )
 
 
-def resolve_compositor_format(hdr_compositing: bool) -> GlColorFormat:
-    return RGBA16F if hdr_compositing else RGBA8
+def resolve_compositor_format(hdr: bool) -> GlColorFormat:
+    return RGBA16F if hdr else RGBA8
 
 
 def resolve_live_compositor_format(
-    hdr_compositing: bool,
+    hdr: bool,
     *,
     preset_curation: bool,
 ) -> GlColorFormat:
     """Live play format: curation always uses 8-bit (no multi-layer HDR stack)."""
     if preset_curation:
         return RGBA8
-    return resolve_compositor_format(hdr_compositing)
+    return resolve_compositor_format(hdr)
 
 
 HDR_UNSUPPORTED_MESSAGE = (
     "HDR compositing requires RGBA16F framebuffer support; "
-    "set render.hdr_compositing: false to use 8-bit compositing"
+    "set compositor.hdr: false to use 8-bit compositing"
 )
 
 

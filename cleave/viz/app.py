@@ -13,7 +13,6 @@ from cleave.config import (
     CleaveConfig,
     missing_preset_anchor_notification,
     render_fps,
-    render_hdr_compositing,
 )
 from cleave.user_config import persist_editor_settings
 from cleave.effects.runtime import EffectRuntime
@@ -153,7 +152,7 @@ def _compositor_color_format(seed: VisualizerSeed) -> GlColorFormat:
     from cleave.viz.editor_mode_controls import is_preset_curation_mode
 
     return resolve_live_compositor_format(
-        render_hdr_compositing(seed.cfg),
+        seed.session.project.compositor_hdr,
         preset_curation=is_preset_curation_mode(seed.session.settings.editor_mode),
     )
 

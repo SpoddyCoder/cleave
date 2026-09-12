@@ -227,7 +227,11 @@ class TuningControls:
         )
         self.render_pattern_mask = RenderPatternMaskControls(session)
         self.settings = SettingsControls(session, cfg, self._modal_host)
-        self.project = ProjectControls(session, duration_sec=duration_sec)
+        self.project = ProjectControls(
+            session,
+            duration_sec=duration_sec,
+            on_compositor_format_changed=self._sync_live_compositor_format,
+        )
         self.project_render = ProjectRenderController(
             session,
             cfg,
@@ -840,7 +844,7 @@ class TuningControls:
         if self._compositor is None or self._post_process is None:
             return
         sync_live_compositor_format(
-            self.cfg,
+            self.session.project.compositor_hdr,
             self.session.settings.editor_mode,
             self._compositor,
             self._post_process,

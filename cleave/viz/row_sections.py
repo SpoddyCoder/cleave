@@ -59,6 +59,12 @@ def _toggle_project_milkdrop(
     controls.project.set_milkdrop_expanded(forward)
 
 
+def _toggle_project_compositor(
+    controls: TuningControls, _slot: str | None, forward: bool
+) -> None:
+    controls.project.set_compositor_expanded(forward)
+
+
 def _toggle_render_overlays(
     controls: TuningControls, _slot: str | None, forward: bool
 ) -> None:
@@ -320,6 +326,10 @@ def _project_milkdrop_expanded(state: TuningViewState, _slot: str | None) -> boo
     return state.project.milkdrop_expanded
 
 
+def _project_compositor_expanded(state: TuningViewState, _slot: str | None) -> bool:
+    return state.project.compositor_expanded
+
+
 def _render_overlays_expanded(state: TuningViewState, _slot: str | None) -> bool:
     return state.render_overlays.expanded
 
@@ -504,6 +514,16 @@ PROJECT_MILKDROP_SECTION = ExpandSectionDef(
     ),
 )
 
+PROJECT_COMPOSITOR_SECTION = ExpandSectionDef(
+    header_kind=RowKind.PROJECT_COMPOSITOR_HEADER,
+    context="global",
+    read_expanded=_project_compositor_expanded,
+    toggle=_toggle_project_compositor,
+    children=(
+        SectionNode(leaf_kind=RowKind.PROJECT_COMPOSITOR_HDR),
+    ),
+)
+
 PROJECT_RENDER_SECTION = ExpandSectionDef(
     header_kind=RowKind.PROJECT_RENDER_HEADER,
     context="global",
@@ -526,6 +546,7 @@ PROJECT_SECTION = ExpandSectionDef(
     children=(
         SectionNode(leaf_kind=RowKind.CONFIG_HEADER),
         SectionNode(expand=PROJECT_MILKDROP_SECTION),
+        SectionNode(expand=PROJECT_COMPOSITOR_SECTION),
         SectionNode(expand=PROJECT_RENDER_SECTION),
     ),
 )

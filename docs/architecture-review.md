@@ -52,7 +52,7 @@ These items are no longer the right targets.
 
 **Uncached full-panel redraw.** Structure signatures, `TuningPanelCache`, and incremental compose are in place (see [ui-performance-improvements.md](completed/ui-performance-improvements.md)). Remaining draw cost is incremental compose and cache invalidation, not the old every-frame rebuild.
 
-**Layer live authority.** `TuningSession` is the only live store for creative layer state (opacity, blend, stem, beat, enabled, locked, effects, preset switching, z-order). `CleaveConfig.layers` is YAML bootstrap for `session_from_cfg` and `scan_all_layers`. GPU objects are copies pushed from session. Persist (`persist_layers`, `persist_layer_z_order`) reads session only. Overlay card title/body text and colours stay on cfg because they are never live-edited. Editor prefs and `project.yaml` song markers and milkdrop remain separate documents. Detail: [Appendix: P0 work](#appendix-p0-work).
+**Layer live authority.** `TuningSession` is the only live store for creative layer state (opacity, blend, stem, beat, enabled, locked, effects, preset switching, z-order). `CleaveConfig.layers` is YAML bootstrap for `session_from_cfg` and `scan_all_layers`. GPU objects are copies pushed from session. Persist (`persist_layers`, `persist_layer_z_order`) reads session only. Overlay card title/body text and colours stay on cfg because they are never live-edited. Editor prefs and `project.yaml` song markers, milkdrop, and compositor remain separate documents. Detail: [Appendix: P0 work](#appendix-p0-work).
 
 **Layer composite contract.** Both GPU compositors implement [layer_composite.py](../cleave/layer_composite.py) `LayerCompositor` against one `LayerCompositeRequest`. Blend, opacity-in-alpha, and HDR format live in [layer_blend.py](../cleave/layer_blend.py) and [gl_color_format.py](../cleave/gl_color_format.py). [layer_pipeline.py](../cleave/viz/layer_pipeline.py) `LayerFramePipeline.composite` is the layer choke point (mask on/off only selects the implementation). Wipes are an explicit `MaskTransition`. Hard composite (feather 0%) still ignores per-layer blend, hue, and flash by design; the soft path applies them. [frame_finish.py](../cleave/viz/frame_finish.py) remains the post-composite choke point. Detail: [Appendix: P0 work](#appendix-p0-work).
 
@@ -62,7 +62,7 @@ These items are no longer the right targets.
 
 **TrackBlock as a thin projection.** [tuning_view_state.py](../cleave/viz/tuning_view_state.py) `TrackBlock` holds a `LayerRuntime` reference plus derived labels and visibility (`preset_dir_label`, `preset_label`, `preset_list_labels`, `preset_empty`, `visible`, `active_preset_list_index`). `RenderOverlayCardBlock` holds a `RenderOverlayCardRuntime` reference. Formatters and draw read `block.runtime.*`. Overlay card title/body text and colours stay on cfg. Session and view dataclass defaults import constants from [cleave/config_schema/](../cleave/config_schema/) submodules.
 
-**Effects consume `LayerEffectState`.** [cleave/effects/](../cleave/effects/) takes `Mapping[str, LayerEffectState]` (`stem`, `effects`, `opacity_pct`) and does not import viz. Editor-mode predicates take `editor_mode: str`. HDR helpers take `(cfg, editor_mode)` because HDR compositing lives on `cfg.render`. The limiter uses `LimiterFrameState`. [frame_finish.py](../cleave/viz/frame_finish.py) and [layer_pipeline.py](../cleave/viz/layer_pipeline.py) unpack session into those slices. Detail: [Appendix: P2 work](#appendix-p2-work).
+**Effects consume `LayerEffectState`.** [cleave/effects/](../cleave/effects/) takes `Mapping[str, LayerEffectState]` (`stem`, `effects`, `opacity_pct`) and does not import viz. Editor-mode predicates take `editor_mode: str`. HDR helpers take `(hdr, editor_mode)`; the live flag is `session.project.compositor_hdr` from `project.yaml`. The limiter uses `LimiterFrameState`. [frame_finish.py](../cleave/viz/frame_finish.py) and [layer_pipeline.py](../cleave/viz/layer_pipeline.py) unpack session into those slices. Detail: [Appendix: P2 work](#appendix-p2-work).
 
 **config_schema package.** Parse, dump, persist, and defaults live in [cleave/config_schema/](../cleave/config_schema/) section modules. `persisted_session_payload` in [persist.py](../cleave/config_schema/persist.py) is the persist choke point. Importers use submodule paths. Detail: [Appendix: P2 work](#appendix-p2-work).
 
@@ -126,7 +126,7 @@ The two P0 items from this review. Invariants also live in [architecture princip
 
 ### Phase 1: session as live layer authority
 
-`TuningSession` is the only live store for creative layer state after `session_from_cfg`. `CleaveConfig.layers` is YAML bootstrap for that builder and for [preset_playlist.py](../cleave/preset_playlist.py) `scan_all_layers` (playlists exist before session). Editor prefs, paths, sizes, and overlay card title/body text and colours stay on cfg because they are never live-edited. `project.yaml` song markers and milkdrop remain a separate document.
+`TuningSession` is the only live store for creative layer state after `session_from_cfg`. `CleaveConfig.layers` is YAML bootstrap for that builder and for [preset_playlist.py](../cleave/preset_playlist.py) `scan_all_layers` (playlists exist before session). Editor prefs, paths, sizes, and overlay card title/body text and colours stay on cfg because they are never live-edited. `project.yaml` song markers, milkdrop, and compositor remain a separate document.
 
 | Path | Change |
 | --- | --- |
@@ -213,7 +213,7 @@ Frame-path helpers take the slices they need. [frame_finish.py](../cleave/viz/fr
 | [state.py](../cleave/effects/state.py) | `LayerEffectState` Protocol |
 | [runtime.py](../cleave/effects/runtime.py) | `update` / `modifiers` / `tick` take `Mapping[str, LayerEffectState]` |
 | [editor_mode_controls.py](../cleave/viz/editor_mode_controls.py) | `is_preset_curation_mode`, `render_sections_active`, `preset_switching_active`, `projectm_notifications_active` take `editor_mode: str`. `curation_focus_slot` still takes session. |
-| [post_fx.py](../cleave/viz/post_fx.py) | HDR helpers take `(cfg, editor_mode)`. HDR compositing lives on `cfg.render`, not `RenderPostFxRuntime`. |
+| [post_fx.py](../cleave/viz/post_fx.py) | HDR helpers take `(hdr, editor_mode)`. HDR compositing lives on `session.project.compositor_hdr` (`project.yaml`), not `RenderPostFxRuntime` or `cfg.render`. |
 | [visual_limiter.py](../cleave/viz/visual_limiter.py) | `LimiterFrameState` (`timeline`, `solo_slot`, `editor_mode`, `layer_z_order`) with `from_session`; used by `visual_limiter_active`, `collect_hot_layers`, `observe_frame_busyness` |
 | [layer_visibility.py](../cleave/viz/layer_visibility.py) | `timeline_levels_apply` takes `LimiterFrameState` |
 
@@ -221,7 +221,7 @@ Frame-path helpers take the slices they need. [frame_finish.py](../cleave/viz/fr
 
 ### Phase 2: config_schema package
 
-Parse, dump, persist, and defaults live in [cleave/config_schema/](../cleave/config_schema/). [__init__.py](../cleave/config_schema/__init__.py) is a package docstring only (no re-exports). Importers use submodule paths (`cleave.config_schema.editor`, `.layers`, `.render`, `.timeline`, `.persist`, `.descriptors`, `.validators`).
+Parse, dump, persist, and defaults live in [cleave/config_schema/](../cleave/config_schema/). [__init__.py](../cleave/config_schema/__init__.py) is a package docstring only (no re-exports). Importers use submodule paths (`cleave.config_schema.editor`, `.layers`, `.render`, `.compositor`, `.timeline`, `.persist`, `.descriptors`, `.validators`).
 
 | Path | Change |
 | --- | --- |
@@ -231,7 +231,8 @@ Parse, dump, persist, and defaults live in [cleave/config_schema/](../cleave/con
 | [layers.py](../cleave/config_schema/layers.py) | Layers, preset switching, hard/soft cut, easter egg; `persist_layers` / `persist_layer_z_order` |
 | [persist.py](../cleave/config_schema/persist.py) | `persisted_session_payload` |
 | [timeline.py](../cleave/config_schema/timeline.py) | `timeline` parse and persist |
-| [render/](../cleave/config_schema/render/) | `parse_render_section`, `persist_render`, fps/size/HDR; overlays, post-FX, pattern mask |
+| [render/](../cleave/config_schema/render/) | `parse_render_section`, `persist_render`, fps/size; overlays, post-FX, pattern mask |
+| [compositor.py](../cleave/config_schema/compositor.py) | `DEFAULT_COMPOSITOR_HDR`; `project.yaml` parse/persist lives in [project.py](../cleave/project.py) |
 
 Descriptor-driven sections remain `editor`, `render.post_fx`, and `render.overlays`. Layers and timeline stay bespoke (nested per-stem layers; per-slot lanes). Function-local imports of [config.py](../cleave/config.py) and [user_config.py](../cleave/user_config.py) dataclasses avoid cycles. Session and view defaults import constants from these submodules.
 

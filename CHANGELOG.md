@@ -7,6 +7,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+- Project > Compositor: `hdr` (16-bit vs 8-bit compositing) lives in `project.yaml` under `compositor:` and is flushed on Save. `cleave-viz.yaml` no longer has `render.hdr_compositing`.
+
 - Project > ProjectM: default beat sensitivity lives in `project.yaml` under `milkdrop:` and is flushed on Save. `cleave-viz.yaml` no longer has an `editor:` block; window size stays in user config.
 
 - Settings > Editor Window: width, height, and upscale live in user config. Confirm **change window size** to save; restart to apply.

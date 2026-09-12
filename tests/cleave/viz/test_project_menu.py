@@ -91,6 +91,7 @@ def test_project_children_omitted_until_expanded() -> None:
     assert RowKind.PROJECT_HEADER in kinds
     assert RowKind.CONFIG_HEADER not in kinds
     assert RowKind.PROJECT_MILKDROP_HEADER not in kinds
+    assert RowKind.PROJECT_COMPOSITOR_HEADER not in kinds
     assert RowKind.PROJECT_RENDER_HEADER not in kinds
 
     _expand_project(controls)
@@ -99,6 +100,8 @@ def test_project_children_omitted_until_expanded() -> None:
     assert RowKind.CONFIG_HEADER in kinds
     assert RowKind.PROJECT_MILKDROP_HEADER in kinds
     assert RowKind.PROJECT_MILKDROP_BEAT_SENSITIVITY not in kinds
+    assert RowKind.PROJECT_COMPOSITOR_HEADER in kinds
+    assert RowKind.PROJECT_COMPOSITOR_HDR not in kinds
     assert RowKind.PROJECT_RENDER_HEADER in kinds
     assert RowKind.PROJECT_RENDER_QUALITY not in kinds
 
@@ -129,6 +132,93 @@ def test_project_milkdrop_children_omitted_until_expanded() -> None:
     assert RowKind.PROJECT_MILKDROP_BEAT_SENSITIVITY in kinds
     beat_row = view.layout.find_by_kind(RowKind.PROJECT_MILKDROP_BEAT_SENSITIVITY)
     assert format_row_value(view, view.layout.descriptor(beat_row)) == "2.00"
+
+
+def test_structure_signature_invalidates_on_project_compositor_expand() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    config_save = controls._config_save
+    session.project.expanded = True
+    sig_before = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    session.project.compositor_expanded = True
+    sig_after = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    assert sig_before != sig_after
+
+
+def test_structure_signature_stable_for_compositor_hdr() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    config_save = controls._config_save
+    sig_before = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    session.project.compositor_hdr = False
+    sig_after = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    assert sig_before == sig_after
+
+
+def test_project_compositor_children_omitted_until_expanded() -> None:
+    controls = _make_controls(("layer_1",))
+    _expand_project(controls)
+    view = controls.build_view_state(paused=False)
+    kinds = [row.kind for row in view.layout.rows]
+    assert RowKind.PROJECT_COMPOSITOR_HEADER in kinds
+    assert RowKind.PROJECT_COMPOSITOR_HDR not in kinds
+
+    controls.session.project.compositor_expanded = True
+    view = controls.build_view_state(paused=False)
+    kinds = [row.kind for row in view.layout.rows]
+    assert RowKind.PROJECT_COMPOSITOR_HDR in kinds
+    hdr_row = view.layout.find_by_kind(RowKind.PROJECT_COMPOSITOR_HDR)
+    assert format_row_value(view, view.layout.descriptor(hdr_row)) == "on"
+
+
+def test_compositor_hdr_keyboard_toggles() -> None:
+    controls = _make_controls(("layer_1",))
+    _expand_project(controls)
+    controls.session.project.compositor_expanded = True
+    view = controls.build_view_state(paused=False)
+    hdr_row = view.layout.find_by_kind(RowKind.PROJECT_COMPOSITOR_HDR)
+    controls.focus_descriptor = view.layout.descriptor(hdr_row)
+    assert controls.session.project.compositor_hdr is True
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.session.project.compositor_hdr is False
+    controls.handle_keydown(_keydown(pygame.K_LEFT))
+    assert controls.session.project.compositor_hdr is True
+
+
+def test_compositor_hdr_toggle_resyncs_live_format() -> None:
+    from unittest.mock import MagicMock
+
+    from cleave.gl_color_format import RGBA8, RGBA16F
+
+    controls = _make_controls(("layer_1",))
+    compositor = MagicMock()
+    post_process = MagicMock()
+    controls._compositor = compositor
+    controls._post_process = post_process
+    controls.session.project.compositor_hdr = True
+    controls.project.toggle_compositor_hdr()
+    assert controls.session.project.compositor_hdr is False
+    compositor.set_color_format.assert_called_with(RGBA8)
+    post_process.set_color_format.assert_called_with(RGBA8)
+    compositor.reset_mock()
+    post_process.reset_mock()
+    controls.project.toggle_compositor_hdr()
+    compositor.set_color_format.assert_called_with(RGBA16F)
+    post_process.set_color_format.assert_called_with(RGBA16F)
+
+
+def test_compositor_header_is_expand_only() -> None:
+    spec = row_spec(RowKind.PROJECT_COMPOSITOR_HEADER)
+    assert spec.can_enable_disable is False
+    assert spec.affordance == RowAffordance.EXPAND
 
 
 def test_milkdrop_beat_sensitivity_keyboard_steps() -> None:
@@ -252,6 +342,11 @@ def test_left_right_on_headers_toggles_expand() -> None:
     assert controls.session.project.milkdrop_expanded is True
     controls.handle_keydown(_keydown(pygame.K_LEFT))
     assert controls.session.project.milkdrop_expanded is False
+    controls.focus_descriptor = RowDescriptor(RowKind.PROJECT_COMPOSITOR_HEADER)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.session.project.compositor_expanded is True
+    controls.handle_keydown(_keydown(pygame.K_LEFT))
+    assert controls.session.project.compositor_expanded is False
     controls.focus_descriptor = RowDescriptor(RowKind.PROJECT_RENDER_HEADER)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.session.project.render.expanded is True

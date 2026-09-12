@@ -2,7 +2,6 @@ render:
   width: 1280
   height: 720
   fps: 60
-  hdr_compositing: true   # normally want to keep this enabled (helps prevent washout in compositing)
   post_fx:
     enabled: false
     fade_in: 15

@@ -15,7 +15,6 @@ from cleave.viz.post_fx import (
     live_frame_fade_alpha,
 )
 from tests.support.config import default_render_post_fx_runtime
-from tests.support.viz import make_test_cfg
 
 HIGHLIGHT_ROLLOFF_CURVES = ("rolloff", "smoothstep", "aces_fit")
 
@@ -244,10 +243,7 @@ def test_apply_chroma_boost_rgb_vibrance_spares_saturated_pixels() -> None:
 
 
 def test_effective_hdr_compositing_off_in_preset_curation() -> None:
-    from cleave.config import RenderConfig
-
-    cfg = make_test_cfg(("layer_1",))
-    cfg.render = RenderConfig(hdr_compositing=True)
-    assert effective_hdr_compositing(cfg, "visualizer") is True
-    assert effective_hdr_compositing(cfg, "preset_curation") is False
+    assert effective_hdr_compositing(True, "visualizer") is True
+    assert effective_hdr_compositing(True, "preset_curation") is False
+    assert effective_hdr_compositing(False, "visualizer") is False
 

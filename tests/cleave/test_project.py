@@ -10,6 +10,7 @@ import yaml
 
 from cleave.project import (
     PROJECT_FILENAME,
+    CompositorSettings,
     MilkdropSettings,
     ProjectManifest,
     load_manifest,
@@ -17,6 +18,7 @@ from cleave.project import (
     mix_path,
     resolve_mix_path,
     rewrite_manifest_slug,
+    save_compositor_settings,
     save_milkdrop_settings,
     save_song_markers,
     write_manifest,
@@ -450,3 +452,126 @@ def test_save_milkdrop_settings_preserves_ingest_and_markers(tmp_path: Path) -> 
     assert [m.time for m in manifest.song_markers] == [10.0, 42.5]
     assert manifest.restored_from == "archived-slug"
     assert manifest.mix_filename == "song.flac"
+
+
+def test_manifest_round_trip_with_compositor(tmp_path: Path) -> None:
+    project = tmp_path / "song"
+    project.mkdir()
+    manifest = ProjectManifest(
+        version=1,
+        slug="song",
+        mix_filename="song.flac",
+        original_path=str((tmp_path / "source.flac").resolve()),
+        separated_at="2026-06-08T20:15:00+00:00",
+        demucs_model="htdemucs",
+        compositor=CompositorSettings(hdr=False),
+    )
+    with (project / PROJECT_FILENAME).open("w", encoding="utf-8") as handle:
+        yaml.safe_dump(manifest.to_dict(), handle, sort_keys=False)
+
+    loaded = load_manifest(project)
+    assert loaded == manifest
+    with (project / PROJECT_FILENAME).open(encoding="utf-8") as handle:
+        data = yaml.safe_load(handle)
+    assert data["compositor"] == {"hdr": False}
+
+
+def test_manifest_omits_compositor_when_none(tmp_path: Path) -> None:
+    project = tmp_path / "song"
+    project.mkdir()
+    write_manifest(
+        project,
+        slug="song",
+        mix_filename="song.flac",
+        original_path=tmp_path / "source.flac",
+        demucs_model="htdemucs",
+    )
+    with (project / PROJECT_FILENAME).open(encoding="utf-8") as handle:
+        data = yaml.safe_load(handle)
+    assert "compositor" not in data
+    assert load_manifest(project).compositor is None
+
+
+def test_write_manifest_update_preserves_compositor(tmp_path: Path) -> None:
+    project = tmp_path / "song"
+    project.mkdir()
+    original = tmp_path / "source.flac"
+    original.write_bytes(b"audio")
+    write_manifest(
+        project,
+        slug="song",
+        mix_filename="song.flac",
+        original_path=original,
+        demucs_model="htdemucs",
+        compositor=CompositorSettings(hdr=False),
+    )
+    write_manifest(
+        project,
+        slug="song",
+        mix_filename="song.wav",
+        original_path=tmp_path / "new-source.wav",
+        demucs_model="htdemucs_ft",
+    )
+    manifest = load_manifest(project)
+    assert manifest.mix_filename == "song.wav"
+    assert manifest.compositor == CompositorSettings(hdr=False)
+
+
+def test_save_compositor_settings_preserves_ingest_and_markers(tmp_path: Path) -> None:
+    project = tmp_path / "song"
+    project.mkdir()
+    original = tmp_path / "source.flac"
+    original.write_bytes(b"audio")
+    write_manifest(
+        project,
+        slug="song",
+        mix_filename="song.flac",
+        original_path=original,
+        demucs_model="htdemucs_ft",
+        song_markers=(10.0, 42.5),
+    )
+    rewrite_manifest_slug(project, "song", restored_from="archived-slug")
+    save_compositor_settings(project, False)
+
+    manifest = load_manifest(project)
+    assert manifest.compositor == CompositorSettings(hdr=False)
+    assert [m.time for m in manifest.song_markers] == [10.0, 42.5]
+    assert manifest.restored_from == "archived-slug"
+    assert manifest.mix_filename == "song.flac"
+
+
+def test_parse_compositor_defaults_hdr_when_section_omits_key(tmp_path: Path) -> None:
+    project = tmp_path / "song"
+    project.mkdir()
+    write_manifest(
+        project,
+        slug="song",
+        mix_filename="song.flac",
+        original_path=tmp_path / "source.flac",
+        demucs_model="htdemucs",
+    )
+    path = project / PROJECT_FILENAME
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    data["compositor"] = {}
+    with path.open("w", encoding="utf-8") as handle:
+        yaml.safe_dump(data, handle, sort_keys=False)
+    assert load_manifest(project).compositor == CompositorSettings(hdr=True)
+
+
+def test_parse_compositor_rejects_non_bool_hdr(tmp_path: Path) -> None:
+    project = tmp_path / "song"
+    project.mkdir()
+    write_manifest(
+        project,
+        slug="song",
+        mix_filename="song.flac",
+        original_path=tmp_path / "source.flac",
+        demucs_model="htdemucs",
+    )
+    path = project / PROJECT_FILENAME
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    data["compositor"] = {"hdr": 1}
+    with path.open("w", encoding="utf-8") as handle:
+        yaml.safe_dump(data, handle, sort_keys=False)
+    with pytest.raises(ValueError, match="compositor.hdr"):
+        load_manifest(project)

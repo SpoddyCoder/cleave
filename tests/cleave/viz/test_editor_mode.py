@@ -181,11 +181,10 @@ def test_enter_curation_expands_layer_one() -> None:
 
 
 def test_editor_mode_change_syncs_compositor_format() -> None:
-    from cleave.config import RenderConfig
     from cleave.gl_color_format import RGBA8, RGBA16F
 
     controls = _make_controls(("layer_1",))
-    controls.cfg.render = RenderConfig(hdr_compositing=True)
+    controls.session.project.compositor_hdr = True
     compositor = MagicMock()
     post_process = MagicMock()
     controls._compositor = compositor

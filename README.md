@@ -208,7 +208,7 @@ DIMINUENDO:  FULL ↘↘↘ thin ──── thin ──── ► restore
 `cleave` creates a new directory under `~/.local/share/cleave/projects/` for each song.
 The project directory stores all files required in a self-contained bundle...
 
-* `project.yaml` - project metadata, song markers, and Milkdrop defaults (`milkdrop.beat_sensitivity`)
+* `project.yaml` - project metadata, song markers, Milkdrop defaults (`milkdrop.beat_sensitivity`), and compositor hdr (`compositor.hdr`)
 * `cleave-viz.yaml` - layer, render, and timeline configuration. Not everything in here is surfaced in the editor UI just yet
 * `signals.json` - audio analysis data (schema version 4) used by `cleave effects` and the opt-in timeline preset conductor; re-run `separate` on existing projects after a schema bump so envelopes stay current
 * `mysong.wav` - original source audio is copied into the project directory
