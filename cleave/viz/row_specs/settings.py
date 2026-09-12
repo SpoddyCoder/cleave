@@ -23,15 +23,9 @@ def _format_settings_preview_quality(
     return state.settings.preview_quality
 
 def _format_settings_editor_mode(
-    state: TuningViewState, _desc: RowDescriptor
+    _state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    from cleave.viz.session import EDITOR_MODE_PANEL_LABELS
-
-    return EDITOR_MODE_PANEL_LABELS[state.settings.editor_mode_selection]  # type: ignore[index]
-
-def editor_mode_confirm_pending(state: TuningViewState) -> bool:
-    """True when Left/Right staged a mode that still needs Enter."""
-    return state.settings.editor_mode_selection != state.settings.editor_mode
+    return "change editor mode"
 
 def _format_settings_ui_width_mode(
     state: TuningViewState, _desc: RowDescriptor
@@ -57,15 +51,6 @@ def _format_settings_measure_latency(
     _state: TuningViewState, _desc: RowDescriptor
 ) -> str:
     return "measure latency"
-
-def _apply_settings_editor_mode(
-    controls: TuningControls,
-    _desc: RowDescriptor,
-    forward: bool,
-    _ctrl: bool,
-    _shift: bool,
-) -> None:
-    controls.editor_mode.cycle_editor_mode_selection(forward=forward)
 
 def _apply_settings_preview_quality(
     controls: TuningControls,
@@ -119,35 +104,30 @@ def _apply_settings_header(
 SPECS: dict[RowKind, RowSpec] = {
     RowKind.SETTINGS_HEADER: RowSpec(
         affordance=RowAffordance.EXPAND,
-        panel_label="Editor Settings",
+        panel_label="Settings",
         present_style=RowPresentStyle.COMPOSITE_HEADER,
         apply_horizontal=_apply_settings_header,
         fit_strategy=FitStrategy.NONE,
-        help_title="Editor Settings",
+        help_title="Settings",
         help_description=("Global editor settings (applies to all projects)",),
         quick_nav_target=True,
         quick_nav_always=True,
         is_header=True,
     ),
     RowKind.SETTINGS_EDITOR_MODE: RowSpec(
-        affordance=RowAffordance.ACTION_PARAMETER,
-        panel_label="editor mode",
-        present_style=RowPresentStyle.ACTION_PARAMETER,
+        affordance=RowAffordance.ACTION,
+        panel_label="change editor mode",
+        present_style=RowPresentStyle.FULL_LINE,
         format_value=_format_settings_editor_mode,
-        apply_horizontal=_apply_settings_editor_mode,
+        fit_strategy=FitStrategy.NONE,
         shows_enter_icon=True,
-        help_title="Editor mode",
-        help_entries=(
-            ("Left/Right", "cycle mode"),
-            ("Enter", "confirm switch"),
-        ),
+        help_title="Change editor mode",
+        help_entries=(("Enter", "choose visualizer or preset curation"),),
         help_description=(
             "Visualizer mode exposes the full tuning panel.",
             "Preset curation mode limits the panel to preset favourites and blacklist.",
-            "Left/Right stages a mode; Enter confirms the switch.",
         ),
         is_pinned=True,
-        repeatable=True,
         parent_group="settings",
     ),
     RowKind.SETTINGS_PREVIEW_QUALITY: RowSpec(

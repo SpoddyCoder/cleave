@@ -252,7 +252,6 @@ class SettingsBlock:
     ui_expanded: bool = False
     latency_compensation_expanded: bool = False
     editor_mode: str = "visualizer"
-    editor_mode_selection: str = "visualizer"
     preview_quality: str = DEFAULT_EDITOR_PREVIEW_QUALITY
     ui_width_mode: str = DEFAULT_UI_WIDTH_MODE
     ui_width: int = DEFAULT_UI_WIDTH
@@ -708,7 +707,6 @@ class TuningViewStateBuilder:
             ui_expanded=self.session.settings.ui_expanded,
             latency_compensation_expanded=self.session.settings.latency_compensation_expanded,
             editor_mode=self.session.settings.editor_mode,
-            editor_mode_selection=self.session.settings.editor_mode_selection,
         )
         project = _project_block_from_session(
             self.session,
@@ -1014,7 +1012,6 @@ class TuningViewStateBuilder:
                 ui_expanded=self.session.settings.ui_expanded,
                 latency_compensation_expanded=self.session.settings.latency_compensation_expanded,
                 editor_mode=self.session.settings.editor_mode,
-                editor_mode_selection=self.session.settings.editor_mode_selection,
                 preview_quality=self._config_save.cfg.editor.preview_quality,
                 ui_width_mode=self._config_save.cfg.editor.ui_width_mode,
                 ui_width=self._config_save.cfg.editor.ui_width,

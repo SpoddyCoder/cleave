@@ -176,11 +176,11 @@ def test_curation_dispatch_passes_navigation_keys() -> None:
     session.settings.editor_mode = "preset_curation"
     session.settings.expanded = True
     runtime.controls.focus_cursor = MainFocus(
-        RowDescriptor(RowKind.SETTINGS_EDITOR_MODE)
+        RowDescriptor(RowKind.SETTINGS_HEADER)
     )
     assert dispatch_keydown(keydown(pygame.K_DOWN), runtime) is True
     assert runtime.controls.focus_cursor == MainFocus(
-        RowDescriptor(RowKind.SETTINGS_PREVIEW_QUALITY)
+        RowDescriptor(RowKind.SETTINGS_UI_HEADER)
     )
 
 

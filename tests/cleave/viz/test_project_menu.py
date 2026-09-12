@@ -23,7 +23,7 @@ from cleave.viz.row_spec import (
     row_full_line_display_text,
     row_spec,
 )
-from cleave.viz.theme import ACTION, HIGHLIGHT
+from cleave.viz.theme import ACTION, HIGHLIGHT, PRESET_ICON
 from cleave.viz.tuning_panel_draw import _row_value_color
 from cleave.viz.tuning_view_state import ProjectBlock, view_state_structure_signature
 from tests.cleave.viz.test_controls import (
@@ -269,6 +269,7 @@ def test_render_output_row_is_read_only() -> None:
     assert spec.present_style == RowPresentStyle.PATH_ICON
     project_spec = row_spec(RowKind.PROJECT_HEADER)
     assert project_spec.header_glyph == FOLDER_GLYPH
+    assert project_spec.header_glyph_color == PRESET_ICON
 
 
 def test_start_end_keyboard_steps() -> None:

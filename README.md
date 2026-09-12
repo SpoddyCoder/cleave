@@ -148,12 +148,12 @@ Note: use `--help` on any command for options.
 * Press `h` to show context sensitive help and controls.
   * The help will change as you move around the interface with the arrow keys.
 * If you're using CPU to render, the editor may run at low frame rates with multiple layers
-  * Change `Editor Settings` -> `preview quality` to help with this.
+  * Change `Settings` -> `preview quality` to help with this.
   * The final render will still be at full quality and full frame rate.
 
 #### Preset curation
 The editor has a preset curation mode that provides a simple way to categorise presets into folders for future use.
-`Editor Settings` -> `editor mode` -> `preset curation`. While focused on a preset **file** row:
+`Settings` -> `change editor mode` -> `preset curation`. While focused on a preset **file** row:
 * `f` - **copy** the preset into `favourites/` (original stays in the pack).
 * `c` - **copy** the preset into a cast role directory (see below for more info on cast roles)
 * `b` - **move** the preset into `blacklist/` (permanently removed from pack).

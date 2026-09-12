@@ -32,7 +32,6 @@ if TYPE_CHECKING:
 
 class RowPresentStyle(Enum):
     LABELED_VALUE = auto()
-    ACTION_PARAMETER = auto()
     EXPAND_SUBHEADER = auto()
     COMPOSITE_HEADER = auto()
     PATH_ICON = auto()
@@ -66,6 +65,7 @@ class RowSpec:
     fit_strategy: FitStrategy = FitStrategy.PLAIN
     visibility_icon: VisibilityIconFn | None = None
     header_glyph: str | None = None
+    header_glyph_color: tuple[int, int, int] | None = None
     shows_enter_icon: bool = False
     shows_dirty_suffix: bool = False
     help_title: str = ""
@@ -96,10 +96,7 @@ from cleave.viz.row_specs.render_overlays import (
 )
 from cleave.viz.row_specs.render_post_fx import SPECS as _RENDER_POST_FX_SPECS
 from cleave.viz.row_specs.project import SPECS as _PROJECT_SPECS
-from cleave.viz.row_specs.settings import (
-    SPECS as _SETTINGS_SPECS,
-    editor_mode_confirm_pending,
-)
+from cleave.viz.row_specs.settings import SPECS as _SETTINGS_SPECS
 from cleave.viz.row_specs.timeline import SPECS as _TIMELINE_SPECS
 from cleave.viz.row_specs.track import SPECS as _TRACK_SPECS
 from cleave.viz.row_specs.transport import SPECS as _TRANSPORT_SPECS
@@ -173,7 +170,6 @@ PRESET_FILE_ROW_KINDS = frozenset({RowKind.TRACK_PRESET, RowKind.TRACK_PRESET_LI
 _SECTION_LOCK_BLOCKING_AFFORDANCES = frozenset(
     {
         RowAffordance.VALUE_STEP,
-        RowAffordance.ACTION_PARAMETER,
         RowAffordance.PATH_DIR,
         RowAffordance.PATH_PRESET,
     }
@@ -352,12 +348,6 @@ def labeled_row_prefix(kind: RowKind, desc: RowDescriptor | None = None) -> str:
 
 
 def row_labeled_display_text(state: TuningViewState, desc: RowDescriptor) -> str:
-    return labeled_row_prefix(desc.kind, desc) + format_row_value(state, desc)
-
-
-def row_action_parameter_display_text(
-    state: TuningViewState, desc: RowDescriptor
-) -> str:
     return labeled_row_prefix(desc.kind, desc) + format_row_value(state, desc)
 
 

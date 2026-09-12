@@ -354,12 +354,10 @@ def sections_for(
             primary = _RENDER_TIMELINE_SECTION
         elif behavior.is_header:
             primary = HelpSection(
-                behavior.help_title or "Editor Settings",
+                behavior.help_title or "Settings",
                 (("Left/Right", "expand/collapse"),),
             )
     elif behavior.affordance == RowAffordance.VALUE_STEP:
-        primary = _value_step_section(row_kind)
-    elif behavior.affordance == RowAffordance.ACTION_PARAMETER:
         primary = _value_step_section(row_kind)
     elif row_kind == RowKind.TRACK_PRESET_LIST_ITEM:
         primary = _PRESET_LIST_ITEM_SECTION

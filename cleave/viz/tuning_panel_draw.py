@@ -16,7 +16,6 @@ from cleave.viz.row_spec import row_is_pinned
 from cleave.viz.row_present_renderers import (
     TREE_INDENT,
     RowPresentContext,
-    action_parameter_label_color,
     compose_surface,
     fit_row_text,
     is_notification_row,
@@ -106,7 +105,6 @@ _notification_elapsed = notification_elapsed
 _notification_accent = notification_accent
 _row_shows_action_enter_hint = row_shows_action_enter_hint
 _row_shows_enter_icon = row_shows_enter_icon
-_action_parameter_label_color = action_parameter_label_color
 
 
 def track_sub_rows_visible(state: TuningViewState, slot: str) -> bool:

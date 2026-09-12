@@ -10,6 +10,7 @@ from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
 from cleave.viz.row_sections import apply_expand_toggle
 from cleave.viz.row_spec import FitStrategy, RowPresentStyle, RowSpec
 from cleave.viz.row_specs.common import apply_expand_subheader
+from cleave.viz.theme import PRESET_ICON
 from cleave.viz.tuning_view_state import TuningViewState
 
 if TYPE_CHECKING:
@@ -103,6 +104,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Project",
         help_description=("Save the session and render this project to video.",),
         header_glyph=FOLDER_GLYPH,
+        header_glyph_color=PRESET_ICON,
         quick_nav_target=True,
         quick_nav_always=True,
         is_header=True,

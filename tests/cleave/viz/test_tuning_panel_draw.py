@@ -41,15 +41,12 @@ def _row_for_style(
     if style == RowPresentStyle.LABELED_VALUE:
         index = layout.find("layer_1", RowKind.TRACK_STEM)
         return index, "└─ driving stem: drums"
-    if style == RowPresentStyle.ACTION_PARAMETER:
-        index = layout.find_by_kind(RowKind.SETTINGS_EDITOR_MODE)
-        return index, "└─ editor mode: visualizer"
     if style == RowPresentStyle.EXPAND_SUBHEADER:
         index = layout.find("layer_1", RowKind.TRACK_EFFECTS_HEADER)
         return index, "└─ cleave effects ▼"
     if style == RowPresentStyle.COMPOSITE_HEADER:
         index = layout.find_by_kind(RowKind.SETTINGS_HEADER)
-        return index, "Editor Settings ▼"
+        return index, "Settings ▼"
     if style == RowPresentStyle.PATH_ICON:
         index = layout.find_by_kind(RowKind.CONFIG_HEADER)
         return index, "cleave-viz.yaml"

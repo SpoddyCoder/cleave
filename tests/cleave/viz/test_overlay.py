@@ -29,7 +29,6 @@ from cleave.viz.tuning_panel_draw import (
     _row_bg_color,
     _row_shows_action_enter_hint,
     _row_text,
-    _action_parameter_label_color,
     _row_value_color,
     bottom_row_highlight_width,
     fit_row_text,
@@ -1284,17 +1283,18 @@ def test_apply_cuts_to_cues_rows_use_action_color() -> None:
     assert _row_value_color(state, soft_row) == ACTION
 
 
-def test_action_parameter_row_value_color() -> None:
+def test_change_editor_mode_row_uses_action_color() -> None:
     from cleave.viz.tuning_view_state import SettingsBlock
 
     state = _minimal_view_state(settings=SettingsBlock(expanded=True))
     mode_row = state.layout.find_by_kind(RowKind.SETTINGS_EDITOR_MODE)
     assert mode_row is not None
-    assert _action_parameter_label_color(state, mode_row) == ACTION
-    assert _row_value_color(state, mode_row) == VALUE
+    assert _row_text(state, mode_row) == "└─ change editor mode"
+    assert _row_value_color(state, mode_row) == ACTION
+    assert _row_shows_action_enter_hint(state, mode_row) is False
     state.focus_descriptor = state.layout.descriptor(mode_row)
-    assert _action_parameter_label_color(state, mode_row) == HIGHLIGHT
     assert _row_value_color(state, mode_row) == HIGHLIGHT
+    assert _row_shows_action_enter_hint(state, mode_row) is True
 
 
 def test_preset_list_populate_uses_full_line_action_colors() -> None:
