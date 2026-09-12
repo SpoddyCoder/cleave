@@ -155,16 +155,7 @@ def test_write_session_snapshot_includes_paths_when_source_has_paths(
     assert data["paths"] == source_paths
 
 
-_EDITOR_USER_CONFIG_KEYS = (
-    "preview_quality",
-    "ui_width_mode",
-    "ui_width",
-    "ui_fade",
-    "residual_latency_ms",
-)
-
-
-def test_write_session_snapshot_editor_omits_editor_fields(
+def test_write_session_snapshot_omits_editor_section(
     tmp_path: Path,
 ) -> None:
     config_path = tmp_path / "cleave.config.yaml"
@@ -186,9 +177,8 @@ def test_write_session_snapshot_editor_omits_editor_fields(
     out_path = tmp_path / "snapshot.yaml"
     write_session_snapshot(out_path, cfg=cfg, session=session)
 
-    visualizer = yaml.safe_load(out_path.read_text(encoding="utf-8"))["editor"]
-    for key in _EDITOR_USER_CONFIG_KEYS:
-        assert key not in visualizer
+    data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
+    assert "editor" not in data
 
 
 def test_write_session_snapshot_includes_locked() -> None:
@@ -529,7 +519,7 @@ def test_write_session_snapshot_uses_session_z_order_when_membership_diverges() 
         assert data["layer_z_order"] == session_order
 
 
-def test_write_session_snapshot_includes_upscale() -> None:
+def test_write_session_snapshot_omits_window_size() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         preset_root = root / "presets"
@@ -570,7 +560,7 @@ def test_write_session_snapshot_includes_upscale() -> None:
         write_session_snapshot(out_path, cfg=cfg, session=session)
 
         data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
-        assert data["editor"]["upscale"] == 2.0
+        assert "editor" not in data
 
 
 def test_write_session_snapshot_sparse_beat_sensitivity() -> None:
@@ -591,7 +581,7 @@ def test_write_session_snapshot_sparse_beat_sensitivity() -> None:
             )
             for slot in DEFAULT_LAYER_SLOTS
             },
-            editor=EditorConfig(beat_sensitivity=2.0),
+            editor=EditorConfig(),
             config_path=config_path,
             user_config_path=root / "user-config.yaml",
         )
@@ -615,7 +605,7 @@ def test_write_session_snapshot_sparse_beat_sensitivity() -> None:
         write_session_snapshot(out_path, cfg=cfg, session=session)
 
         data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
-        assert data["editor"]["beat_sensitivity"] == 2.0
+        assert "editor" not in data
         assert "beat_sensitivity" not in data["layers"]["layer_1"]
         assert data["layers"]["layer_2"]["beat_sensitivity"] == 1.5
 
@@ -1443,13 +1433,6 @@ def test_session_snapshot_full_round_trip(tmp_path: Path) -> None:
     config_path.write_text(
         yaml.safe_dump(
             {
-                "editor": {
-                    "name": "round-trip-test",
-                    "width": 1280,
-                    "height": 720,
-                    "upscale": 1.5,
-                    "beat_sensitivity": 2.2,
-                },
                 "paths": {
                     "preset_root": str(preset_root),
                     "texture_paths": [str(texture_path)],
@@ -1571,6 +1554,23 @@ def test_session_snapshot_full_round_trip(tmp_path: Path) -> None:
         ),
         encoding="utf-8",
     )
+    (root / "project.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "version": 1,
+                "slug": "round-trip-test",
+                "mix": {"filename": "mix.wav"},
+                "ingest": {
+                    "original_path": "/tmp/source.wav",
+                    "separated_at": "2026-01-01T00:00:00+00:00",
+                    "demucs_model": "htdemucs",
+                },
+                "milkdrop": {"beat_sensitivity": 2.2},
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
 
     cfg = load_config(config_path=config_path)
     playlists = _round_trip_playlists(preset_root)
@@ -1609,7 +1609,8 @@ def test_session_snapshot_full_round_trip(tmp_path: Path) -> None:
     }
 
     expected = persisted_session_payload(cfg, session)
-    assert expected["editor"]["upscale"] == 1.5
+    assert "editor" not in expected
+    assert cfg.milkdrop_beat_sensitivity == 2.2
 
     sig_before = persisted_session_signature(cfg, session)
     cfg_upscale_changed = CleaveConfig(
@@ -1619,22 +1620,22 @@ def test_session_snapshot_full_round_trip(tmp_path: Path) -> None:
             width=cfg.editor.width,
             height=cfg.editor.height,
             upscale=2.0,
-            beat_sensitivity=cfg.editor.beat_sensitivity,
         ),
         config_path=cfg.config_path,
         user_config_path=cfg.user_config_path,
         layer_z_order=cfg.layer_z_order,
         render=cfg.render,
         timeline=cfg.timeline,
+        milkdrop_beat_sensitivity=cfg.milkdrop_beat_sensitivity,
+        project_slug=cfg.project_slug,
     )
-    assert persisted_session_signature(cfg_upscale_changed, session) != sig_before
+    assert persisted_session_signature(cfg_upscale_changed, session) == sig_before
 
     snapshot_path = root / "snapshot.yaml"
     write_session_snapshot(snapshot_path, cfg=cfg, session=session)
 
     snapshot_data = yaml.safe_load(snapshot_path.read_text(encoding="utf-8"))
-    assert snapshot_data["editor"]["upscale"] == 1.5
-    assert snapshot_data["editor"]["beat_sensitivity"] == 2.2
+    assert "editor" not in snapshot_data
 
     cfg2 = load_config(config_path=snapshot_path)
     session2 = session_from_cfg(cfg2, _round_trip_playlists(preset_root))

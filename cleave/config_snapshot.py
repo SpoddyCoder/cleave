@@ -96,14 +96,7 @@ def write_session_snapshot(
     original = _load_original_dict(cfg)
     payload = persisted_session_payload(cfg, session)
 
-    orig_editor = original.get("editor")
-    editor_out: dict[str, Any] = {}
-    if isinstance(orig_editor, dict) and "name" in orig_editor:
-        editor_out["name"] = orig_editor["name"]
-    editor_out.update(payload["editor"])
-
     data: dict[str, Any] = {
-        "editor": editor_out,
         "layer_z_order": payload["layer_z_order"],
         "layers": payload["layers"],
         "render": _snapshot_render(payload["render"], original),

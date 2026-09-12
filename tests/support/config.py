@@ -6,7 +6,7 @@ from pathlib import Path
 
 from cleave.config import ChromaBoostConfig, HighlightRolloffConfig, LayerConfig, RenderPostFxConfig, VIZ_CONFIG_FILENAME, dump_yaml
 from cleave.user_config import EditorSettings
-from cleave.config_schema.editor import template_project_editor_section
+from cleave.config_schema.editor import dump_editor_section
 from cleave.config_schema.layers import (
     DEFAULT_LAYER_SLOTS,
     DEFAULT_LAYER_Z_ORDER,
@@ -130,7 +130,6 @@ def write_minimal_config(project_dir: Path, preset_root: Path, **overrides) -> P
     texture_root.mkdir(parents=True, exist_ok=True)
 
     data: dict = {
-        "editor": template_project_editor_section(name="cleave-test"),
         "paths": {
             "preset_root": str(preset_root),
             "texture_paths": [str(texture_root)],
@@ -165,13 +164,7 @@ def write_user_config_file(
     """Write a minimal user config file for merge and path tests."""
     data: dict = {}
     if editor is not None:
-        data["editor"] = {
-            "preview_quality": editor.preview_quality,
-            "ui_width_mode": editor.ui_width_mode,
-            "ui_width": editor.ui_width,
-            "ui_fade": editor.ui_fade,
-            "residual_latency_ms": editor.residual_latency_ms,
-        }
+        data["editor"] = dump_editor_section(editor)
     if preset_root is not None or texture_paths is not None:
         paths: dict = {}
         if preset_root is not None:

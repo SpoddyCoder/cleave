@@ -847,6 +847,37 @@ def test_structure_signature_invalidates_on_visual_limiter_enabled() -> None:
     assert sig_before != sig_after
 
 
+def test_structure_signature_invalidates_on_editor_window_expanded() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    config_save = controls._config_save
+    session.settings.editor_window_expanded = False
+    sig_before = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    session.settings.editor_window_expanded = True
+    sig_after = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    assert sig_before != sig_after
+
+
+def test_structure_signature_invalidates_on_milkdrop_expanded() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    config_save = controls._config_save
+    session.project.expanded = True
+    session.project.milkdrop_expanded = False
+    sig_before = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    session.project.milkdrop_expanded = True
+    sig_after = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    assert sig_before != sig_after
+
+
 def test_structure_signature_invalidates_on_latency_compensation_expanded() -> None:
     controls = _make_controls(("layer_1",))
     session = controls.session

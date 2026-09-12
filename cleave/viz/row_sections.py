@@ -27,6 +27,12 @@ def _toggle_settings(controls: TuningControls, _slot: str | None, forward: bool)
     controls.settings.set_expanded(forward)
 
 
+def _toggle_settings_editor_window(
+    controls: TuningControls, _slot: str | None, forward: bool
+) -> None:
+    controls.settings.set_editor_window_expanded(forward)
+
+
 def _toggle_settings_ui(controls: TuningControls, _slot: str | None, forward: bool) -> None:
     controls.settings.set_ui_expanded(forward)
 
@@ -45,6 +51,12 @@ def _toggle_project_render(
     controls: TuningControls, _slot: str | None, forward: bool
 ) -> None:
     controls.project.set_render_expanded(forward)
+
+
+def _toggle_project_milkdrop(
+    controls: TuningControls, _slot: str | None, forward: bool
+) -> None:
+    controls.project.set_milkdrop_expanded(forward)
 
 
 def _toggle_render_overlays(
@@ -280,6 +292,12 @@ def _settings_expanded(state: TuningViewState, _slot: str | None) -> bool:
     return state.settings.expanded
 
 
+def _settings_editor_window_expanded(
+    state: TuningViewState, _slot: str | None
+) -> bool:
+    return state.settings.editor_window_expanded
+
+
 def _settings_ui_expanded(state: TuningViewState, _slot: str | None) -> bool:
     return state.settings.ui_expanded
 
@@ -296,6 +314,10 @@ def _project_expanded(state: TuningViewState, _slot: str | None) -> bool:
 
 def _project_render_expanded(state: TuningViewState, _slot: str | None) -> bool:
     return state.project.render_expanded
+
+
+def _project_milkdrop_expanded(state: TuningViewState, _slot: str | None) -> bool:
+    return state.project.milkdrop_expanded
 
 
 def _render_overlays_expanded(state: TuningViewState, _slot: str | None) -> bool:
@@ -422,6 +444,19 @@ def _append_song_marker_rows(
         )
 
 
+SETTINGS_EDITOR_WINDOW_SECTION = ExpandSectionDef(
+    header_kind=RowKind.SETTINGS_EDITOR_WINDOW_HEADER,
+    context="global",
+    read_expanded=_settings_editor_window_expanded,
+    toggle=_toggle_settings_editor_window,
+    children=(
+        SectionNode(leaf_kind=RowKind.SETTINGS_EDITOR_WINDOW_WIDTH),
+        SectionNode(leaf_kind=RowKind.SETTINGS_EDITOR_WINDOW_HEIGHT),
+        SectionNode(leaf_kind=RowKind.SETTINGS_EDITOR_WINDOW_UPSCALE),
+        SectionNode(leaf_kind=RowKind.SETTINGS_EDITOR_WINDOW_APPLY),
+    ),
+)
+
 SETTINGS_UI_SECTION = ExpandSectionDef(
     header_kind=RowKind.SETTINGS_UI_HEADER,
     context="global",
@@ -451,10 +486,21 @@ SETTINGS_SECTION = ExpandSectionDef(
     read_expanded=_settings_expanded,
     toggle=_toggle_settings,
     children=(
+        SectionNode(expand=SETTINGS_EDITOR_WINDOW_SECTION),
         SectionNode(expand=SETTINGS_UI_SECTION),
         SectionNode(expand=SETTINGS_LATENCY_COMPENSATION_SECTION),
         SectionNode(leaf_kind=RowKind.SETTINGS_PREVIEW_QUALITY),
         SectionNode(leaf_kind=RowKind.SETTINGS_EDITOR_MODE),
+    ),
+)
+
+PROJECT_MILKDROP_SECTION = ExpandSectionDef(
+    header_kind=RowKind.PROJECT_MILKDROP_HEADER,
+    context="global",
+    read_expanded=_project_milkdrop_expanded,
+    toggle=_toggle_project_milkdrop,
+    children=(
+        SectionNode(leaf_kind=RowKind.PROJECT_MILKDROP_BEAT_SENSITIVITY),
     ),
 )
 
@@ -479,6 +525,7 @@ PROJECT_SECTION = ExpandSectionDef(
     toggle=_toggle_project,
     children=(
         SectionNode(leaf_kind=RowKind.CONFIG_HEADER),
+        SectionNode(expand=PROJECT_MILKDROP_SECTION),
         SectionNode(expand=PROJECT_RENDER_SECTION),
     ),
 )

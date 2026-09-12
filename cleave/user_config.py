@@ -12,6 +12,9 @@ import yaml
 
 from cleave.config import CleaveConfig, EditorConfig, dump_yaml
 from cleave.config_schema.editor import (
+    DEFAULT_EDITOR_HEIGHT,
+    DEFAULT_EDITOR_WIDTH,
+    DEFAULT_EDITOR_UPSCALE,
     DEFAULT_UI_FADE_SEC,
     DEFAULT_UI_WIDTH,
     DEFAULT_UI_WIDTH_MODE,
@@ -47,6 +50,9 @@ def user_config_path() -> Path:
 
 @dataclass(frozen=True)
 class EditorSettings:
+    width: int
+    height: int
+    upscale: float
     preview_quality: EditorPreviewQuality
     ui_width_mode: UiWidthMode
     ui_width: int
@@ -64,6 +70,9 @@ class UserConfig:
 
 def default_editor_settings() -> EditorSettings:
     return EditorSettings(
+        width=DEFAULT_EDITOR_WIDTH,
+        height=DEFAULT_EDITOR_HEIGHT,
+        upscale=DEFAULT_EDITOR_UPSCALE,
         preview_quality=DEFAULT_EDITOR_PREVIEW_QUALITY,
         ui_width_mode=DEFAULT_UI_WIDTH_MODE,
         ui_width=DEFAULT_UI_WIDTH,
@@ -127,6 +136,9 @@ def load_user_config(path: Path | None = None) -> UserConfig:
 
 def editor_settings_from_config(cfg: EditorConfig) -> EditorSettings:
     return EditorSettings(
+        width=cfg.width,
+        height=cfg.height,
+        upscale=cfg.upscale,
         preview_quality=cfg.preview_quality,
         ui_width_mode=cfg.ui_width_mode,
         ui_width=cfg.ui_width,

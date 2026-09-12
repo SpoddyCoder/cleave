@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from cleave.config_schema.editor import clamp_beat_sensitivity
 from cleave.config_schema.project_render import (
     PROJECT_RENDER_QUALITIES,
     project_render_duration_ceil_sec,
@@ -9,9 +10,12 @@ from cleave.config_schema.project_render import (
 )
 from cleave.viz.session import TuningSession
 
+_BEAT_SENSITIVITY_STEP = 0.1
+_BEAT_SENSITIVITY_CTRL_STEP = 0.5
+
 
 class ProjectControls:
-    """Mutations for the Project header and Render Project rows."""
+    """Mutations for Project header, Milkdrop, and Render Project rows."""
 
     def __init__(self, session: TuningSession, *, duration_sec: float) -> None:
         self.session = session
@@ -28,6 +32,20 @@ class ProjectControls:
         if render.expanded == expanded:
             return
         render.expanded = expanded
+
+    def set_milkdrop_expanded(self, expanded: bool) -> None:
+        project = self.session.project
+        if project.milkdrop_expanded == expanded:
+            return
+        project.milkdrop_expanded = expanded
+
+    def adjust_milkdrop_beat_sensitivity(self, *, forward: bool, ctrl: bool) -> None:
+        step = _BEAT_SENSITIVITY_CTRL_STEP if ctrl else _BEAT_SENSITIVITY_STEP
+        delta = step if forward else -step
+        project = self.session.project
+        project.milkdrop_beat_sensitivity = clamp_beat_sensitivity(
+            project.milkdrop_beat_sensitivity + delta
+        )
 
     def cycle_quality(self, *, forward: bool) -> None:
         modes = PROJECT_RENDER_QUALITIES

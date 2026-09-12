@@ -1,4 +1,4 @@
-"""Editor and project-editor YAML parse, serialize, and defaults."""
+"""Editor user-config YAML parse, serialize, and defaults."""
 
 from __future__ import annotations
 
@@ -15,9 +15,11 @@ from cleave.config_schema.descriptors import (
     require_non_negative_number,
 )
 
-DEFAULT_EDITOR_WIDTH = 1280
-DEFAULT_EDITOR_HEIGHT = 720
+DEFAULT_EDITOR_WIDTH = 1920
+DEFAULT_EDITOR_HEIGHT = 1080
 DEFAULT_EDITOR_UPSCALE = 1.0
+EDITOR_WIDTH_MIN = 320
+EDITOR_HEIGHT_MIN = 240
 UPSCALE_MIN = 1.0
 DEFAULT_BEAT_SENSITIVITY = 2.0
 BEAT_SENSITIVITY_MIN = 0.0
@@ -75,6 +77,14 @@ def clamp_upscale(value: float) -> float:
     return max(UPSCALE_MIN, float(value))
 
 
+def clamp_editor_width(value: int | float) -> int:
+    return max(EDITOR_WIDTH_MIN, int(round(value)))
+
+
+def clamp_editor_height(value: int | float) -> int:
+    return max(EDITOR_HEIGHT_MIN, int(round(value)))
+
+
 def clamp_beat_sensitivity(value: float) -> float:
     return max(BEAT_SENSITIVITY_MIN, min(BEAT_SENSITIVITY_MAX, float(value)))
 
@@ -87,10 +97,6 @@ def _parse_upscale(raw: Any, ctx: ParseCtx, label: str) -> float:
     if upscale < UPSCALE_MIN:
         raise ValueError(f"{label} must be >= {UPSCALE_MIN}")
     return clamp_upscale(upscale)
-
-
-def _parse_beat_sensitivity(raw: Any, ctx: ParseCtx, label: str) -> float:
-    return clamp_beat_sensitivity(raw)
 
 
 def clamp_ui_fade(value: float) -> float:
@@ -135,18 +141,22 @@ def _parse_ui_width_mode(
     return value
 
 
-EDITOR_PROJECT_FIELDS: tuple[FieldDescriptor, ...] = (
+EDITOR_FIELDS: tuple[FieldDescriptor, ...] = (
     FieldDescriptor(
         "width",
         DEFAULT_EDITOR_WIDTH,
-        lambda raw, _ctx, _label: int(raw),
-        dump_scalar,
+        lambda raw, ctx, label: clamp_editor_width(
+            int(require_non_negative_number(raw, label, as_int=True))
+        ),
+        lambda value, _ctx: clamp_editor_width(value),
     ),
     FieldDescriptor(
         "height",
         DEFAULT_EDITOR_HEIGHT,
-        lambda raw, _ctx, _label: int(raw),
-        dump_scalar,
+        lambda raw, ctx, label: clamp_editor_height(
+            int(require_non_negative_number(raw, label, as_int=True))
+        ),
+        lambda value, _ctx: clamp_editor_height(value),
     ),
     FieldDescriptor(
         "upscale",
@@ -154,15 +164,6 @@ EDITOR_PROJECT_FIELDS: tuple[FieldDescriptor, ...] = (
         _parse_upscale,
         lambda value, _ctx: clamp_upscale(value),
     ),
-    FieldDescriptor(
-        "beat_sensitivity",
-        DEFAULT_BEAT_SENSITIVITY,
-        _parse_beat_sensitivity,
-        lambda value, _ctx: clamp_beat_sensitivity(value),
-    ),
-)
-
-EDITOR_FIELDS: tuple[FieldDescriptor, ...] = (
     FieldDescriptor(
         "preview_quality",
         DEFAULT_EDITOR_PREVIEW_QUALITY,
@@ -211,6 +212,9 @@ def parse_editor_section(data: dict[str, Any]) -> Any:
     for field in EDITOR_FIELDS:
         parsed[field.yaml_key] = parse_field(editor, field, ctx, "editor")
     return EditorSettings(
+        width=parsed["width"],
+        height=parsed["height"],
+        upscale=parsed["upscale"],
         preview_quality=parsed["preview_quality"],
         ui_width_mode=parsed["ui_width_mode"],
         ui_width=parsed["ui_width"],
@@ -221,6 +225,9 @@ def parse_editor_section(data: dict[str, Any]) -> Any:
 
 def dump_editor_section(editor: Any) -> dict[str, Any]:
     values = {
+        "width": editor.width,
+        "height": editor.height,
+        "upscale": editor.upscale,
         "preview_quality": editor.preview_quality,
         "ui_width_mode": editor.ui_width_mode,
         "ui_width": editor.ui_width,
@@ -231,55 +238,20 @@ def dump_editor_section(editor: Any) -> dict[str, Any]:
     return dump_fields(EDITOR_FIELDS, values, ctx)
 
 
-def parse_project_editor_section(
-    data: dict[str, Any],
-    *,
-    editor: Any | None = None,
-) -> Any:
+def editor_config_from_settings(editor: Any | None = None) -> Any:
+    """Build ``EditorConfig`` from user-config settings only."""
     from cleave.config import EditorConfig
     from cleave.user_config import default_editor_settings
 
     if editor is None:
         editor = default_editor_settings()
-
-    project_editor = as_mapping(data.get("editor"), "editor")
-    ctx = ParseCtx()
-    parsed: dict[str, Any] = {}
-    for field in EDITOR_PROJECT_FIELDS:
-        parsed[field.yaml_key] = parse_field(
-            project_editor, field, ctx, "editor"
-        )
     return EditorConfig(
-        name=str(project_editor.get("name", "render")),
-        width=parsed["width"],
-        height=parsed["height"],
-        upscale=parsed["upscale"],
-        beat_sensitivity=parsed["beat_sensitivity"],
+        width=editor.width,
+        height=editor.height,
+        upscale=editor.upscale,
         preview_quality=editor.preview_quality,
         ui_width_mode=editor.ui_width_mode,
         ui_width=editor.ui_width,
         ui_fade=editor.ui_fade,
         residual_latency_ms=editor.residual_latency_ms,
     )
-
-
-def persist_project_editor_section(ctx: PersistCtx) -> dict[str, Any]:
-    vis = ctx.cfg.editor
-    values = {
-        "width": vis.width,
-        "height": vis.height,
-        "upscale": vis.upscale,
-        "beat_sensitivity": vis.beat_sensitivity,
-    }
-    return dump_fields(EDITOR_PROJECT_FIELDS, values, ctx)
-
-
-def template_project_editor_section(*, name: str = "cleave-viz-example") -> dict[str, Any]:
-    ctx = PersistCtx(cfg=None, session=None)  # type: ignore[arg-type]
-    out = dump_fields(
-        EDITOR_PROJECT_FIELDS,
-        {field.yaml_key: field.default for field in EDITOR_PROJECT_FIELDS},
-        ctx,
-    )
-    out["name"] = name
-    return out

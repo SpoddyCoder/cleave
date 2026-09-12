@@ -9,7 +9,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from cleave.config_schema.editor import (
+    DEFAULT_BEAT_SENSITIVITY,
+    DEFAULT_EDITOR_HEIGHT,
     DEFAULT_EDITOR_PREVIEW_QUALITY,
+    DEFAULT_EDITOR_UPSCALE,
+    DEFAULT_EDITOR_WIDTH,
     DEFAULT_RESIDUAL_LATENCY_MS,
     DEFAULT_UI_FADE_SEC,
     DEFAULT_UI_WIDTH,
@@ -249,10 +253,14 @@ class RenderTimelineBlock:
 @dataclass
 class SettingsBlock:
     expanded: bool = False
+    editor_window_expanded: bool = False
     ui_expanded: bool = False
     latency_compensation_expanded: bool = False
     editor_mode: str = "visualizer"
     preview_quality: str = DEFAULT_EDITOR_PREVIEW_QUALITY
+    editor_window_width: int = DEFAULT_EDITOR_WIDTH
+    editor_window_height: int = DEFAULT_EDITOR_HEIGHT
+    editor_window_upscale: float = DEFAULT_EDITOR_UPSCALE
     ui_width_mode: str = DEFAULT_UI_WIDTH_MODE
     ui_width: int = DEFAULT_UI_WIDTH
     ui_fade: float = DEFAULT_UI_FADE_SEC
@@ -262,6 +270,8 @@ class SettingsBlock:
 @dataclass
 class ProjectBlock:
     expanded: bool = False
+    milkdrop_expanded: bool = False
+    milkdrop_beat_sensitivity: float = DEFAULT_BEAT_SENSITIVITY
     render_expanded: bool = False
     quality: str = DEFAULT_PROJECT_RENDER_QUALITY
     start_sec: int = DEFAULT_PROJECT_RENDER_START_SEC
@@ -421,12 +431,14 @@ def view_state_structure_signature(
         "layer_z_order": list(session.layer_z_order),
         "settings": {
             "expanded": session.settings.expanded,
+            "editor_window_expanded": session.settings.editor_window_expanded,
             "ui_expanded": session.settings.ui_expanded,
             "latency_compensation_expanded": session.settings.latency_compensation_expanded,
             "editor_mode": session.settings.editor_mode,
         },
         "project": {
             "expanded": session.project.expanded,
+            "milkdrop_expanded": session.project.milkdrop_expanded,
             "render_expanded": session.project.render.expanded,
         },
         "notification_active": notification_active,
@@ -506,20 +518,22 @@ def _project_block_from_session(
     *,
     duration_sec: float,
     project_dir: Path | None,
-    editor_name: str,
+    project_slug: str,
 ) -> ProjectBlock:
     render = session.project.render
     end_sec = resolved_project_render_end_sec(render.end_sec, duration_sec)
     root = project_dir if project_dir is not None else Path(".")
     return ProjectBlock(
         expanded=session.project.expanded,
+        milkdrop_expanded=session.project.milkdrop_expanded,
+        milkdrop_beat_sensitivity=session.project.milkdrop_beat_sensitivity,
         render_expanded=render.expanded,
         quality=render.quality,
         start_sec=render.start_sec,
         end_sec=end_sec,
         output_label=default_project_render_path(
             root,
-            editor_name,
+            project_slug,
             start_sec=render.start_sec,
             end_sec=end_sec,
             duration_sec=duration_sec,
@@ -704,6 +718,7 @@ class TuningViewStateBuilder:
         tl = self.session.timeline
         settings = SettingsBlock(
             expanded=self.session.settings.expanded,
+            editor_window_expanded=self.session.settings.editor_window_expanded,
             ui_expanded=self.session.settings.ui_expanded,
             latency_compensation_expanded=self.session.settings.latency_compensation_expanded,
             editor_mode=self.session.settings.editor_mode,
@@ -712,7 +727,7 @@ class TuningViewStateBuilder:
             self.session,
             duration_sec=self.duration_sec,
             project_dir=self._project_dir,
-            editor_name=self._config_save.cfg.editor.name,
+            project_slug=self._config_save.cfg.project_slug,
         )
         render_overlays = RenderOverlaysBlock(
             expanded=ro.expanded,
@@ -1009,10 +1024,14 @@ class TuningViewStateBuilder:
             settings=replace(
                 structure.settings,
                 expanded=self.session.settings.expanded,
+                editor_window_expanded=self.session.settings.editor_window_expanded,
                 ui_expanded=self.session.settings.ui_expanded,
                 latency_compensation_expanded=self.session.settings.latency_compensation_expanded,
                 editor_mode=self.session.settings.editor_mode,
                 preview_quality=self._config_save.cfg.editor.preview_quality,
+                editor_window_width=self._config_save.cfg.editor.width,
+                editor_window_height=self._config_save.cfg.editor.height,
+                editor_window_upscale=self._config_save.cfg.editor.upscale,
                 ui_width_mode=self._config_save.cfg.editor.ui_width_mode,
                 ui_width=self._config_save.cfg.editor.ui_width,
                 ui_fade=self._config_save.cfg.editor.ui_fade,
@@ -1022,7 +1041,7 @@ class TuningViewStateBuilder:
                 self.session,
                 duration_sec=self.duration_sec,
                 project_dir=self._project_dir,
-                editor_name=self._config_save.cfg.editor.name,
+                project_slug=self._config_save.cfg.project_slug,
             ),
             timeline_recording=tl.recording,
             timeline_override_active=bool(tl.override_slots),

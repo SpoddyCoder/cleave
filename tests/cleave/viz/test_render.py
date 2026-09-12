@@ -23,7 +23,6 @@ from cleave.viz.session import (
 )
 from tests.support.config import TEST_LAYER_STEMS, default_render_post_fx_runtime
 from cleave.paths import repo_root
-from cleave.config_schema.editor import template_project_editor_section
 from cleave.config_schema.layers import DEFAULT_LAYER_SLOTS
 from cleave.config_schema.render import (
     DEFAULT_RENDER_FPS,
@@ -562,7 +561,7 @@ def test_render_frame_count_and_ffmpeg_args(
 
     output = render_mod.render(project)
 
-    expected_output = project / "renders" / "cleave-test.mp4"
+    expected_output = project / "renders" / "my-track.mp4"
     assert output.output_path == expected_output.resolve()
     assert mock_app.tick_frame.call_count == frame_count
     assert compositor.read_rgba_frame.call_count == frame_count
@@ -624,7 +623,7 @@ def test_render_segment_frame_count_tick_times_and_ffmpeg_trim(
 
     output = render_mod.render(project, start_sec=start_sec, end_sec=end_sec)
 
-    expected_output = project / "renders" / "cleave-test_10-20s.mp4"
+    expected_output = project / "renders" / "my-track_10-20s.mp4"
     assert output.output_path == expected_output.resolve()
     assert mock_app.tick_frame.call_count == frame_count
     tick_times = [call.args[0] for call in mock_app.tick_frame.call_args_list]
@@ -1125,7 +1124,6 @@ def test_render_ffmpeg_ignores_upscale_uses_render_resolution(
         render_width=1280,
         render_height=720,
         editor={
-            **template_project_editor_section(name="cleave-test"),
             "width": 640,
             "height": 360,
             "upscale": 2.0,

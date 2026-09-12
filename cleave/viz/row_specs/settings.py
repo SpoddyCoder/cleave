@@ -22,6 +22,26 @@ def _format_settings_preview_quality(
 ) -> str:
     return state.settings.preview_quality
 
+def _format_settings_editor_window_width(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return str(state.settings.editor_window_width)
+
+def _format_settings_editor_window_height(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return str(state.settings.editor_window_height)
+
+def _format_settings_editor_window_upscale(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return f"{state.settings.editor_window_upscale:.1f}"
+
+def _format_settings_editor_window_apply(
+    _state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return "change window size"
+
 def _format_settings_editor_mode(
     _state: TuningViewState, _desc: RowDescriptor
 ) -> str:
@@ -61,6 +81,39 @@ def _apply_settings_preview_quality(
 ) -> None:
     controls.settings.cycle_preview_quality(forward=forward)
     controls.layer_lifecycle.apply_preview_resolutions()
+
+def _apply_settings_editor_window_width(
+    controls: TuningControls,
+    _desc: RowDescriptor,
+    forward: bool,
+    ctrl: bool,
+    _shift: bool,
+) -> None:
+    controls.settings.adjust_editor_window_width(forward=forward, ctrl=ctrl)
+
+def _apply_settings_editor_window_height(
+    controls: TuningControls,
+    _desc: RowDescriptor,
+    forward: bool,
+    ctrl: bool,
+    _shift: bool,
+) -> None:
+    controls.settings.adjust_editor_window_height(forward=forward, ctrl=ctrl)
+
+def _apply_settings_editor_window_upscale(
+    controls: TuningControls,
+    _desc: RowDescriptor,
+    forward: bool,
+    ctrl: bool,
+    _shift: bool,
+) -> None:
+    controls.settings.adjust_editor_window_upscale(forward=forward, ctrl=ctrl)
+
+def _apply_settings_editor_window_size(
+    controls: TuningControls,
+    _desc: RowDescriptor,
+) -> None:
+    controls.settings.prompt_apply_editor_window()
 
 def _apply_settings_ui_width_mode(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, _ctrl: bool,
@@ -146,6 +199,91 @@ SPECS: dict[RowKind, RowSpec] = {
         is_pinned=True,
         repeatable=True,
         parent_group="settings",
+    ),
+    RowKind.SETTINGS_EDITOR_WINDOW_HEADER: RowSpec(
+        affordance=RowAffordance.EXPAND,
+        panel_label="Editor Window",
+        present_style=RowPresentStyle.EXPAND_SUBHEADER,
+        apply_horizontal=apply_expand_subheader,
+        fit_strategy=FitStrategy.NONE,
+        help_title="Editor Window",
+        help_description=(
+            "Live window content size and upscale.",
+            "Change window size writes user config; restart to apply.",
+        ),
+        is_sub_header=True,
+        is_pinned=True,
+        parent_group="settings",
+    ),
+    RowKind.SETTINGS_EDITOR_WINDOW_WIDTH: RowSpec(
+        affordance=RowAffordance.VALUE_STEP,
+        panel_label="width",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_settings_editor_window_width,
+        apply_horizontal=_apply_settings_editor_window_width,
+        help_title="Width",
+        help_entries=(
+            ("Left/Right", "adjust width (10 px)"),
+            ("Ctrl + Left/Right", "large step (100 px)"),
+        ),
+        help_description=("Editor content width in pixels.",),
+        is_pinned=True,
+        repeatable=True,
+        parent_group="settings_editor_window",
+    ),
+    RowKind.SETTINGS_EDITOR_WINDOW_HEIGHT: RowSpec(
+        affordance=RowAffordance.VALUE_STEP,
+        panel_label="height",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_settings_editor_window_height,
+        apply_horizontal=_apply_settings_editor_window_height,
+        help_title="Height",
+        help_entries=(
+            ("Left/Right", "adjust height (10 px)"),
+            ("Ctrl + Left/Right", "large step (100 px)"),
+        ),
+        help_description=("Editor content height in pixels.",),
+        is_pinned=True,
+        repeatable=True,
+        parent_group="settings_editor_window",
+    ),
+    RowKind.SETTINGS_EDITOR_WINDOW_UPSCALE: RowSpec(
+        affordance=RowAffordance.VALUE_STEP,
+        panel_label="upscale",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_settings_editor_window_upscale,
+        apply_horizontal=_apply_settings_editor_window_upscale,
+        help_title="Upscale",
+        help_entries=(
+            ("Left/Right", "adjust upscale (0.1)"),
+            ("Ctrl + Left/Right", "large step (0.5)"),
+        ),
+        help_description=(
+            "Multiplies content size to get the on-screen window size.",
+        ),
+        is_pinned=True,
+        repeatable=True,
+        parent_group="settings_editor_window",
+    ),
+    RowKind.SETTINGS_EDITOR_WINDOW_APPLY: RowSpec(
+        affordance=RowAffordance.ACTION,
+        panel_label="change window size",
+        present_style=RowPresentStyle.FULL_LINE,
+        format_value=_format_settings_editor_window_apply,
+        apply_action=_apply_settings_editor_window_size,
+        fit_strategy=FitStrategy.NONE,
+        shows_enter_icon=True,
+        help_title="Change window size",
+        help_entries=(
+            ("Enter", "confirm and save to user config"),
+            ("Esc", "cancel"),
+        ),
+        help_description=(
+            "Writes width, height, and upscale to user config.",
+            "Restart the application for the new window size to take effect.",
+        ),
+        is_pinned=True,
+        parent_group="settings_editor_window",
     ),
     RowKind.SETTINGS_UI_HEADER: RowSpec(
         affordance=RowAffordance.EXPAND,

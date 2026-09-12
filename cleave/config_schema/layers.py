@@ -364,7 +364,7 @@ def parse_layers_section(data: dict[str, Any], ctx: ParseCtx) -> dict[str, Any]:
 def persist_layers(ctx: PersistCtx) -> dict[str, dict[str, Any]]:
     preset_root = ctx.cfg.paths.preset_root
     layers_out: dict[str, dict[str, Any]] = {}
-    global_beat = ctx.cfg.editor.beat_sensitivity
+    global_beat = ctx.session.project.milkdrop_beat_sensitivity
 
     for slot in ctx.session.layer_z_order:
         runtime = ctx.session.layers[slot]

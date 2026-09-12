@@ -10,6 +10,7 @@ from cleave.config import RenderConfig
 from cleave.preset_playlist import PresetPlaylist
 from cleave.viz.layer import StemLayer
 from cleave.viz.layer_pipeline import LayerFramePipeline
+from cleave.viz.layer_preview_resolution import preview_layer_size
 from cleave.viz.session import LayerRuntime, TuningSession
 from tests.support.config import TEST_LAYER_STEMS, default_render_post_fx_runtime
 from tests.support.viz import make_test_cfg
@@ -79,6 +80,7 @@ def test_apply_preview_resolutions_resizes_when_size_changes() -> None:
     layer = _stem_layer("layer_1")
     base_cfg = make_test_cfg(("layer_1",))
     cfg = replace(base_cfg, editor=replace(base_cfg.editor, preview_quality="performance"))
+    preview_w, preview_h = preview_layer_size("performance", 0, cfg.editor)
     session = _session(("layer_1",))
     compositor = MagicMock()
 
@@ -86,14 +88,15 @@ def test_apply_preview_resolutions_resizes_when_size_changes() -> None:
         cfg, session, {"layer_1": layer}, compositor
     )
 
-    layer.pm.set_window_size.assert_called_once_with(960, 540)
-    compositor.resize_layer_fbo.assert_called_once_with("layer_1", 960, 540)
+    layer.pm.set_window_size.assert_called_once_with(preview_w, preview_h)
+    compositor.resize_layer_fbo.assert_called_once_with("layer_1", preview_w, preview_h)
 
 
 def test_apply_preview_resolutions_skips_when_unchanged() -> None:
-    layer = _stem_layer("layer_1", width=960, height=540)
     base_cfg = make_test_cfg(("layer_1",))
     cfg = replace(base_cfg, editor=replace(base_cfg.editor, preview_quality="performance"))
+    preview_w, preview_h = preview_layer_size("performance", 0, cfg.editor)
+    layer = _stem_layer("layer_1", width=preview_w, height=preview_h)
     session = _session(("layer_1",))
     compositor = MagicMock()
 
@@ -166,8 +169,9 @@ def test_build_preview_resolutions_false_viz_quality_uses_preview_sizes(
     )
 
     build_single.assert_called_once()
-    assert build_single.call_args.kwargs["width"] == 960
-    assert build_single.call_args.kwargs["height"] == 540
+    preview_w, preview_h = preview_layer_size("performance", 0, cfg.editor)
+    assert build_single.call_args.kwargs["width"] == preview_w
+    assert build_single.call_args.kwargs["height"] == preview_h
 
 
 @patch.object(LayerFramePipeline, "apply_preview_resolutions")
@@ -195,8 +199,9 @@ def test_build_preview_resolutions_true_builds_at_preview_size(
     )
 
     build_single.assert_called_once()
-    assert build_single.call_args.kwargs["width"] == 960
-    assert build_single.call_args.kwargs["height"] == 540
+    preview_w, preview_h = preview_layer_size("performance", 0, cfg.editor)
+    assert build_single.call_args.kwargs["width"] == preview_w
+    assert build_single.call_args.kwargs["height"] == preview_h
     apply_preview_resolutions.assert_called_once_with(
         cfg, session, {slot: stem_layer}, compositor
     )

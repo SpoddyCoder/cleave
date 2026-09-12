@@ -395,12 +395,15 @@ class ProjectRenderRuntime:
 @dataclass
 class ProjectRuntime:
     expanded: bool = False
+    milkdrop_expanded: bool = False
+    milkdrop_beat_sensitivity: float = DEFAULT_BEAT_SENSITIVITY
     render: ProjectRenderRuntime = field(default_factory=ProjectRenderRuntime)
 
 
 @dataclass
 class SettingsRuntime:
     expanded: bool = False
+    editor_window_expanded: bool = False
     ui_expanded: bool = False
     latency_compensation_expanded: bool = False
     editor_mode: EditorMode = "visualizer"
@@ -680,7 +683,7 @@ def _beat_sensitivity(cfg: CleaveConfig, slot: str) -> float:
     layer = cfg.layers[slot]
     if layer.beat_sensitivity is not None:
         return layer.beat_sensitivity
-    return cfg.editor.beat_sensitivity
+    return cfg.milkdrop_beat_sensitivity
 
 
 def session_from_cfg(
@@ -694,6 +697,9 @@ def session_from_cfg(
         render_post_fx=render_post_fx_runtime_from_cfg(cfg),
         render_pattern_mask=render_pattern_mask_runtime_from_cfg(cfg),
         timeline=timeline_runtime_from_cfg(cfg),
+        project=ProjectRuntime(
+            milkdrop_beat_sensitivity=cfg.milkdrop_beat_sensitivity,
+        ),
         layers={
             slot: LayerRuntime(
                 playlist=playlists[slot],

@@ -34,13 +34,13 @@ def project_render_output_path(
     *,
     duration_sec: float,
     project_dir: Path,
-    editor_name: str,
+    project_slug: str,
 ) -> Path:
     render = session.project.render
     end_sec = resolved_project_render_end_sec(render.end_sec, duration_sec)
     return default_project_render_path(
         project_dir,
-        editor_name,
+        project_slug,
         start_sec=render.start_sec,
         end_sec=end_sec,
         duration_sec=duration_sec,
@@ -196,7 +196,7 @@ class ProjectRenderController:
             self.session,
             duration_sec=self.duration_sec,
             project_dir=self._project_dir,
-            editor_name=self.cfg.editor.name,
+            project_slug=self.cfg.project_slug,
         )
 
     def _finish_job(self) -> None:

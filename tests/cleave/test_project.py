@@ -10,12 +10,14 @@ import yaml
 
 from cleave.project import (
     PROJECT_FILENAME,
+    MilkdropSettings,
     ProjectManifest,
     load_manifest,
     manifest_path,
     mix_path,
     resolve_mix_path,
     rewrite_manifest_slug,
+    save_milkdrop_settings,
     save_song_markers,
     write_manifest,
 )
@@ -362,3 +364,89 @@ def test_save_song_markers_preserves_ingest(tmp_path: Path) -> None:
         {"time": 10.0, "type": "crescendo"},
         {"time": 42.5, "type": "diminuendo"},
     ]
+
+
+def test_manifest_round_trip_with_milkdrop(tmp_path: Path) -> None:
+    project = tmp_path / "song"
+    project.mkdir()
+    manifest = ProjectManifest(
+        version=1,
+        slug="song",
+        mix_filename="song.flac",
+        original_path=str((tmp_path / "source.flac").resolve()),
+        separated_at="2026-06-08T20:15:00+00:00",
+        demucs_model="htdemucs",
+        milkdrop=MilkdropSettings(beat_sensitivity=1.5),
+    )
+    with (project / PROJECT_FILENAME).open("w", encoding="utf-8") as handle:
+        yaml.safe_dump(manifest.to_dict(), handle, sort_keys=False)
+
+    loaded = load_manifest(project)
+    assert loaded == manifest
+    with (project / PROJECT_FILENAME).open(encoding="utf-8") as handle:
+        data = yaml.safe_load(handle)
+    assert data["milkdrop"] == {"beat_sensitivity": 1.5}
+
+
+def test_manifest_omits_milkdrop_when_none(tmp_path: Path) -> None:
+    project = tmp_path / "song"
+    project.mkdir()
+    write_manifest(
+        project,
+        slug="song",
+        mix_filename="song.flac",
+        original_path=tmp_path / "source.flac",
+        demucs_model="htdemucs",
+    )
+    with (project / PROJECT_FILENAME).open(encoding="utf-8") as handle:
+        data = yaml.safe_load(handle)
+    assert "milkdrop" not in data
+    assert load_manifest(project).milkdrop is None
+
+
+def test_write_manifest_update_preserves_milkdrop(tmp_path: Path) -> None:
+    project = tmp_path / "song"
+    project.mkdir()
+    original = tmp_path / "source.flac"
+    original.write_bytes(b"audio")
+    write_manifest(
+        project,
+        slug="song",
+        mix_filename="song.flac",
+        original_path=original,
+        demucs_model="htdemucs",
+        milkdrop=MilkdropSettings(beat_sensitivity=3.25),
+    )
+    write_manifest(
+        project,
+        slug="song",
+        mix_filename="song.wav",
+        original_path=tmp_path / "new-source.wav",
+        demucs_model="htdemucs_ft",
+    )
+    manifest = load_manifest(project)
+    assert manifest.mix_filename == "song.wav"
+    assert manifest.milkdrop == MilkdropSettings(beat_sensitivity=3.25)
+
+
+def test_save_milkdrop_settings_preserves_ingest_and_markers(tmp_path: Path) -> None:
+    project = tmp_path / "song"
+    project.mkdir()
+    original = tmp_path / "source.flac"
+    original.write_bytes(b"audio")
+    write_manifest(
+        project,
+        slug="song",
+        mix_filename="song.flac",
+        original_path=original,
+        demucs_model="htdemucs_ft",
+        song_markers=(10.0, 42.5),
+    )
+    rewrite_manifest_slug(project, "song", restored_from="archived-slug")
+    save_milkdrop_settings(project, 6.0)
+
+    manifest = load_manifest(project)
+    assert manifest.milkdrop == MilkdropSettings(beat_sensitivity=5.0)
+    assert [m.time for m in manifest.song_markers] == [10.0, 42.5]
+    assert manifest.restored_from == "archived-slug"
+    assert manifest.mix_filename == "song.flac"

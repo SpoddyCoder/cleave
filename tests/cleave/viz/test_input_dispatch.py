@@ -180,7 +180,7 @@ def test_curation_dispatch_passes_navigation_keys() -> None:
     )
     assert dispatch_keydown(keydown(pygame.K_DOWN), runtime) is True
     assert runtime.controls.focus_cursor == MainFocus(
-        RowDescriptor(RowKind.SETTINGS_UI_HEADER)
+        RowDescriptor(RowKind.SETTINGS_EDITOR_WINDOW_HEADER)
     )
 
 

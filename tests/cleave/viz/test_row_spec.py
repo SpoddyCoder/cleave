@@ -6,8 +6,14 @@ import inspect
 from types import SimpleNamespace
 
 import pygame
+import pytest
 
-from cleave.config_schema.editor import ui_fade_display
+from cleave.config_schema.editor import (
+    DEFAULT_EDITOR_HEIGHT,
+    DEFAULT_EDITOR_UPSCALE,
+    DEFAULT_EDITOR_WIDTH,
+    ui_fade_display,
+)
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
 from cleave.viz.row_spec import (
     ACTION_ROW_KINDS,
@@ -110,6 +116,9 @@ _EXPECTED_REPEAT_ROW_KINDS = frozenset(
         RowKind.RENDER_PATTERN_MASK_TRANSITION,
         RowKind.RENDER_PATTERN_MASK_SEED,
         RowKind.SETTINGS_PREVIEW_QUALITY,
+        RowKind.SETTINGS_EDITOR_WINDOW_WIDTH,
+        RowKind.SETTINGS_EDITOR_WINDOW_HEIGHT,
+        RowKind.SETTINGS_EDITOR_WINDOW_UPSCALE,
         RowKind.SETTINGS_UI_WIDTH_MODE,
         RowKind.SETTINGS_UI_WIDTH,
         RowKind.SETTINGS_UI_FADE,
@@ -117,6 +126,7 @@ _EXPECTED_REPEAT_ROW_KINDS = frozenset(
         RowKind.PROJECT_RENDER_QUALITY,
         RowKind.PROJECT_RENDER_START,
         RowKind.PROJECT_RENDER_END,
+        RowKind.PROJECT_MILKDROP_BEAT_SENSITIVITY,
         RowKind.TIMELINE_BAR_PHASE,
         RowKind.TIMELINE_HARD_CUTS,
         RowKind.TIMELINE_HARD_CUT_FADE_IN,
@@ -156,6 +166,7 @@ def test_action_row_kinds_match_affordance() -> None:
     assert RowKind.LAYER_MANAGEMENT_ADD in ACTION_ROW_KINDS
     assert RowKind.CONFIG_HEADER in ACTION_ROW_KINDS
     assert RowKind.SETTINGS_EDITOR_MODE in ACTION_ROW_KINDS
+    assert RowKind.SETTINGS_EDITOR_WINDOW_APPLY in ACTION_ROW_KINDS
 
 
 def test_row_is_pinned() -> None:
@@ -167,6 +178,8 @@ def test_row_is_pinned() -> None:
     assert row_is_pinned(RowKind.PROJECT_RENDER_QUALITY) is True
     assert row_is_pinned(RowKind.SETTINGS_PREVIEW_QUALITY) is True
     assert row_is_pinned(RowKind.SETTINGS_EDITOR_MODE) is True
+    assert row_is_pinned(RowKind.SETTINGS_EDITOR_WINDOW_HEADER) is True
+    assert row_is_pinned(RowKind.SETTINGS_EDITOR_WINDOW_WIDTH) is True
     assert row_is_pinned(RowKind.SETTINGS_UI_HEADER) is True
     assert row_is_pinned(RowKind.SETTINGS_UI_FADE) is True
     assert row_is_pinned(RowKind.SETTINGS_UI_WIDTH_MODE) is True
@@ -212,6 +225,10 @@ def test_parent_group_on_row_specs() -> None:
     )
     assert row_spec(RowKind.RENDER_POST_FX_FADE_IN).parent_group == "render_post_fx"
     assert row_spec(RowKind.SETTINGS_PREVIEW_QUALITY).parent_group == "settings"
+    assert row_spec(RowKind.SETTINGS_EDITOR_WINDOW_HEADER).parent_group == "settings"
+    assert row_spec(RowKind.SETTINGS_EDITOR_WINDOW_WIDTH).parent_group == (
+        "settings_editor_window"
+    )
     assert row_spec(RowKind.SETTINGS_UI_WIDTH_MODE).parent_group == "settings_ui"
 
 
@@ -440,11 +457,15 @@ def test_tree_branch_leading_spaces() -> None:
 def test_row_panel_label_settings_header() -> None:
     assert row_panel_label(RowKind.SETTINGS_HEADER) == "Settings"
     assert row_panel_label(RowKind.PROJECT_HEADER) == "Project"
+    assert row_panel_label(RowKind.PROJECT_MILKDROP_HEADER) == "ProjectM"
     assert row_panel_label(RowKind.PROJECT_RENDER_HEADER) == "Render Project"
 
 
 def test_labeled_row_prefix_settings_children() -> None:
     assert labeled_row_prefix(RowKind.SETTINGS_PREVIEW_QUALITY) == "└─ preview quality: "
+    assert labeled_row_prefix(RowKind.SETTINGS_EDITOR_WINDOW_WIDTH) == "  └─ width: "
+    assert labeled_row_prefix(RowKind.SETTINGS_EDITOR_WINDOW_HEIGHT) == "  └─ height: "
+    assert labeled_row_prefix(RowKind.SETTINGS_EDITOR_WINDOW_UPSCALE) == "  └─ upscale: "
     assert labeled_row_prefix(RowKind.SETTINGS_UI_WIDTH_MODE) == "  └─ width mode: "
     assert labeled_row_prefix(RowKind.SETTINGS_UI_WIDTH) == "  └─ max width: "
     assert labeled_row_prefix(RowKind.SETTINGS_UI_FADE) == "  └─ auto-fade: "
@@ -462,6 +483,9 @@ def test_format_row_value_settings() -> None:
     state = _minimal_view_state(
         settings=SettingsBlock(
             preview_quality="performance",
+            editor_window_width=1920,
+            editor_window_height=1080,
+            editor_window_upscale=1.5,
             ui_width_mode="fixed",
             ui_width=320,
             ui_fade=0.0,
@@ -471,6 +495,15 @@ def test_format_row_value_settings() -> None:
         format_row_value(state, RowDescriptor(RowKind.SETTINGS_PREVIEW_QUALITY))
         == "performance"
     )
+    assert format_row_value(
+        state, RowDescriptor(RowKind.SETTINGS_EDITOR_WINDOW_WIDTH)
+    ) == "1920"
+    assert format_row_value(
+        state, RowDescriptor(RowKind.SETTINGS_EDITOR_WINDOW_HEIGHT)
+    ) == "1080"
+    assert format_row_value(
+        state, RowDescriptor(RowKind.SETTINGS_EDITOR_WINDOW_UPSCALE)
+    ) == "1.5"
     assert (
         format_row_value(state, RowDescriptor(RowKind.SETTINGS_UI_WIDTH_MODE))
         == "fixed"
@@ -637,6 +670,22 @@ def test_apply_field_horizontal_adjusts_ui_fade() -> None:
     assert controls.cfg.editor.ui_fade == 6.0
 
 
+def test_apply_field_horizontal_adjusts_editor_window_size() -> None:
+    controls = _make_controls()
+    apply_field_horizontal(
+        controls, RowDescriptor(RowKind.SETTINGS_EDITOR_WINDOW_WIDTH), True, False
+    )
+    assert controls.cfg.editor.width == DEFAULT_EDITOR_WIDTH + 10
+    apply_field_horizontal(
+        controls, RowDescriptor(RowKind.SETTINGS_EDITOR_WINDOW_HEIGHT), True, True
+    )
+    assert controls.cfg.editor.height == DEFAULT_EDITOR_HEIGHT + 100
+    apply_field_horizontal(
+        controls, RowDescriptor(RowKind.SETTINGS_EDITOR_WINDOW_UPSCALE), True, False
+    )
+    assert controls.cfg.editor.upscale == pytest.approx(DEFAULT_EDITOR_UPSCALE + 0.1)
+
+
 def test_apply_field_horizontal_via_controls_keydown() -> None:
     controls = _make_controls()
     controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_HEADER)
@@ -662,6 +711,9 @@ def test_expand_subheader_prefix_preset_switching() -> None:
     assert (
         expand_subheader_prefix(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_HEADER)
         == "└─ highlight rolloff "
+    )
+    assert expand_subheader_prefix(RowKind.SETTINGS_EDITOR_WINDOW_HEADER) == (
+        "└─ Editor Window "
     )
     assert expand_subheader_prefix(RowKind.SETTINGS_UI_HEADER) == "└─ UI "
 
@@ -827,6 +879,9 @@ def test_track_effect_dynamic_label_and_prefix() -> None:
 def test_full_line_delete_layer_prefix() -> None:
     assert full_line_prefix(RowKind.LAYER_MANAGEMENT_DELETE) == "└─ Delete Layer"
     assert full_line_prefix(RowKind.SETTINGS_EDITOR_MODE) == "└─ change editor mode"
+    assert full_line_prefix(RowKind.SETTINGS_EDITOR_WINDOW_APPLY) == (
+        "  └─ change window size"
+    )
     assert row_panel_label(RowKind.LAYER_MANAGEMENT_ADD) == "Add Layer"
 
 

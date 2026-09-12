@@ -174,7 +174,8 @@ def test_run_separate_writes_project_viz_config(
     viz_config = project / VIZ_CONFIG_FILENAME
     assert viz_config.is_file()
     data = yaml.safe_load(viz_config.read_text(encoding="utf-8"))
-    assert data["editor"]["name"] == "my-track"
+    assert "editor" not in data
+    assert "layers" in data
     run_demucs.assert_not_called()
     run_analyse.assert_not_called()
 

@@ -51,6 +51,12 @@ def _format_project_render_action(
     return "render the project"
 
 
+def _format_project_milkdrop_beat(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return f"{state.project.milkdrop_beat_sensitivity:.2f}"
+
+
 def _apply_project_header(
     controls: TuningControls,
     desc: RowDescriptor,
@@ -93,6 +99,16 @@ def _apply_project_render_end(
     controls.project.adjust_end(forward=forward, ctrl=ctrl)
 
 
+def _apply_project_milkdrop_beat(
+    controls: TuningControls,
+    _desc: RowDescriptor,
+    forward: bool,
+    ctrl: bool,
+    _shift: bool,
+) -> None:
+    controls.project.adjust_milkdrop_beat_sensitivity(forward=forward, ctrl=ctrl)
+
+
 SPECS: dict[RowKind, RowSpec] = {
     RowKind.PROJECT_HEADER: RowSpec(
         affordance=RowAffordance.EXPAND,
@@ -124,6 +140,40 @@ SPECS: dict[RowKind, RowSpec] = {
         ),
         is_pinned=True,
         parent_group="project",
+    ),
+    RowKind.PROJECT_MILKDROP_HEADER: RowSpec(
+        affordance=RowAffordance.EXPAND,
+        panel_label="ProjectM",
+        present_style=RowPresentStyle.EXPAND_SUBHEADER,
+        apply_horizontal=apply_expand_subheader,
+        fit_strategy=FitStrategy.NONE,
+        help_title="ProjectM",
+        help_description=(
+            "Project default for ProjectM beat detection.",
+            "Layers without their own beat sensitivity use this value.",
+        ),
+        is_sub_header=True,
+        is_pinned=True,
+        parent_group="project",
+    ),
+    RowKind.PROJECT_MILKDROP_BEAT_SENSITIVITY: RowSpec(
+        affordance=RowAffordance.VALUE_STEP,
+        panel_label="default beat sensitivity",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_project_milkdrop_beat,
+        apply_horizontal=_apply_project_milkdrop_beat,
+        help_title="Default beat sensitivity",
+        help_entries=(
+            ("Left/Right", "adjust (0.1)"),
+            ("Ctrl + Left/Right", "large step (0.5)"),
+        ),
+        help_description=(
+            "Fallback beat sensitivity for layers that do not set their own.",
+            "New layers start at this value.",
+        ),
+        is_pinned=True,
+        repeatable=True,
+        parent_group="project_milkdrop",
     ),
     RowKind.PROJECT_RENDER_HEADER: RowSpec(
         affordance=RowAffordance.EXPAND,

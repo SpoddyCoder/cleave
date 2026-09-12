@@ -239,7 +239,7 @@ def render(
         if output is None:
             output_path = _default_output_path(
                 project,
-                cfg.editor.name,
+                cfg.project_slug,
                 segment,
                 duration_sec=duration_sec,
             )
