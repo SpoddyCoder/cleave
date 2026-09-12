@@ -44,6 +44,7 @@ def _minimal_runtime(compositor: MagicMock, *, upscale: float = 2.0) -> LiveVisu
     controls.tap_sync.active = False
     controls.tap_sync.showing_progress = False
     controls.tap_sync.progress_view.return_value = None
+    controls.project_render.busy = False
     overlay = TuningOverlay()
     modal_host = ModalHost()
     seed = VisualizerSeed(
@@ -193,6 +194,7 @@ def _heavy_init_side_effect(
     controls.tick = MagicMock()
     controls.consume_hide_overlay.return_value = False
     controls.key_repeat_armed = False
+    controls.project_render.busy = False
     timeline_controls = MagicMock()
     timeline_controls.key_repeat_armed = False
     playback = MagicMock()
@@ -316,6 +318,7 @@ def test_run_pygame_quit_clean_exits_via_try_quit(
     controls.tick = MagicMock()
     controls.key_repeat_armed = False
     controls.consume_hide_overlay.return_value = False
+    controls.project_render.busy = False
 
     def heavy_with_controls(
         rt: VisualizerSeed,
@@ -374,6 +377,7 @@ def test_run_ctrl_q_clean_exits(
     controls.tick = MagicMock()
     controls.key_repeat_armed = False
     controls.consume_hide_overlay.return_value = False
+    controls.project_render.busy = False
 
     def heavy_with_controls(
         rt: VisualizerSeed,
@@ -432,6 +436,7 @@ def test_run_pygame_quit_dirty_stays_open(
     controls.tick = MagicMock()
     controls.key_repeat_armed = False
     controls.consume_hide_overlay.return_value = False
+    controls.project_render.busy = False
 
     def heavy_with_controls(
         rt: VisualizerSeed,
@@ -494,6 +499,7 @@ def test_run_main_loop_stays_open_without_quit_event(
     controls.tick = MagicMock()
     controls.key_repeat_armed = False
     controls.consume_hide_overlay.return_value = False
+    controls.project_render.busy = False
 
     def heavy_with_controls(
         rt: VisualizerSeed,
@@ -564,6 +570,74 @@ def test_run_resizes_when_loading_window_size_differs(
     loading.destroy.assert_called_once()
     mock_pygame.display.set_mode.assert_not_called()
     mock_init_cheap.assert_called_once_with(seed, compositor=loading)
+
+
+@patch("cleave.viz.app._tick_frame_live_overlay")
+@patch("cleave.viz.app.current_sec", return_value=0.0)
+@patch("cleave.viz.app.pygame")
+@patch("cleave.viz.app.init_gl_resources_heavy")
+@patch("cleave.viz.app.init_gl_resources_cheap")
+@patch.object(VisualizerApp, "tick_frame")
+def test_run_holds_content_and_overlay_while_project_render_busy(
+    mock_tick_frame: MagicMock,
+    mock_init_cheap: MagicMock,
+    mock_init_heavy: MagicMock,
+    mock_pygame: MagicMock,
+    _mock_current_sec: MagicMock,
+    mock_live_overlay: MagicMock,
+) -> None:
+    seed = _run_seed()
+    window = _boot_window(seed, MagicMock())
+
+    mock_init_cheap.side_effect = lambda rt, compositor=None: (
+        compositor,
+        MagicMock(),
+        MagicMock(),
+        pygame.Surface((seed.display_width, seed.display_height), pygame.SRCALPHA),
+    )
+    controls = MagicMock()
+    controls.try_quit.return_value = True
+    controls.consume_pending_exit.return_value = False
+    controls.tick = MagicMock()
+    controls.key_repeat_armed = False
+    controls.consume_hide_overlay.return_value = False
+    controls.project_render.busy = True
+
+    def heavy_with_controls(
+        rt: VisualizerSeed,
+        comp: MagicMock,
+        post: MagicMock,
+        masked: MagicMock,
+        surface: pygame.Surface,
+        on_progress=None,
+    ) -> LiveVisualizerRuntime:
+        live = _heavy_init_side_effect(rt, comp, post, masked, surface, on_progress)
+        live.controls = controls
+        return live
+
+    mock_init_heavy.side_effect = heavy_with_controls
+    mock_tick_frame.side_effect = lambda *_a, **_k: None
+    mock_pygame.event.get.side_effect = [[], RuntimeError("still running")]
+    mock_pygame.QUIT = pygame.QUIT
+    mock_pygame.time.Clock.return_value.tick.return_value = 33
+
+    app = VisualizerApp(seed)
+    try:
+        app.run(window)
+        raise AssertionError("expected main loop to continue")
+    except RuntimeError as exc:
+        assert str(exc) == "still running"
+
+    mock_tick_frame.assert_called_once()
+    assert mock_tick_frame.call_args == call(
+        0.0,
+        paused=False,
+        n_pcm=samples_per_frame(LIVE_PROJECTM_FPS),
+        dt_sec=0.0,
+    )
+    assert isinstance(app._runtime, LiveVisualizerRuntime)
+    app._runtime.compositor.present_content.assert_called()
+    mock_live_overlay.assert_called()
 
 
 @patch("cleave.viz.app._make_masked_compositor")
