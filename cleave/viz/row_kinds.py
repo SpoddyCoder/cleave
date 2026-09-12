@@ -149,7 +149,6 @@ class RowDescriptor:
 class RowAffordance(Enum):
     EXPAND = auto()
     VALUE_STEP = auto()
-    ACTION_PARAMETER = auto()
     PATH_DIR = auto()
     PATH_PRESET = auto()
     SEEK = auto()

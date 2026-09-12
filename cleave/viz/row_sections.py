@@ -451,10 +451,10 @@ SETTINGS_SECTION = ExpandSectionDef(
     read_expanded=_settings_expanded,
     toggle=_toggle_settings,
     children=(
-        SectionNode(leaf_kind=RowKind.SETTINGS_EDITOR_MODE),
-        SectionNode(leaf_kind=RowKind.SETTINGS_PREVIEW_QUALITY),
         SectionNode(expand=SETTINGS_UI_SECTION),
         SectionNode(expand=SETTINGS_LATENCY_COMPENSATION_SECTION),
+        SectionNode(leaf_kind=RowKind.SETTINGS_PREVIEW_QUALITY),
+        SectionNode(leaf_kind=RowKind.SETTINGS_EDITOR_MODE),
     ),
 )
 

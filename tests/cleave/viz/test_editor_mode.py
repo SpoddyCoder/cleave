@@ -16,6 +16,21 @@ from tests.cleave.viz.test_overlay import _minimal_view_state
 from tests.support.viz import keydown, make_playlist, make_test_cfg, make_track_block
 
 
+def _choose_editor_mode_option(controls, option_label: str) -> None:
+    if not controls.modal_host.active:
+        controls.handle_keydown(keydown(pygame.K_RETURN))
+    view = controls.modal_host.view_state()
+    assert view is not None
+    options = list(view.options)
+    target = options.index(option_label)
+    while view.focus_index != target:
+        key = pygame.K_DOWN if target > view.focus_index else pygame.K_UP
+        controls.handle_keydown(keydown(key))
+        view = controls.modal_host.view_state()
+        assert view is not None
+    controls.handle_keydown(keydown(pygame.K_RETURN))
+
+
 def _curation_view_state(**kwargs: object) -> TuningViewState:
     defaults: dict[str, object] = {
         "settings": SettingsBlock(expanded=True, editor_mode="preset_curation"),
@@ -153,11 +168,13 @@ def test_enter_curation_expands_layer_one() -> None:
     controls.session.settings.expanded = True
     controls.focus_cursor = MainFocus(RowDescriptor(RowKind.SETTINGS_EDITOR_MODE))
 
-    controls.handle_keydown(keydown(pygame.K_RIGHT))
-    assert controls.session.settings.editor_mode == "visualizer"
-    assert controls.session.settings.editor_mode_selection == "preset_curation"
-
     controls.handle_keydown(keydown(pygame.K_RETURN))
+    view = controls.modal_host.view_state()
+    assert view is not None
+    assert view.kind == ModalKind.CHOICE
+    assert list(view.options) == ["Visualizer", "Preset Curation", "Cancel"]
+    assert view.focus_index == 0
+    _choose_editor_mode_option(controls, "Preset Curation")
     assert not controls.modal_host.active
     assert controls.session.settings.editor_mode == "preset_curation"
     assert controls.session.layers["layer_1"].expanded is True
@@ -200,8 +217,7 @@ def test_enter_curation_defaults_full_mix_and_disables_rotation() -> None:
     controls.editor_mode._layer_bindings = mock_bindings
     controls._layer_bindings = mock_bindings
 
-    controls.handle_keydown(keydown(pygame.K_RIGHT))
-    controls.handle_keydown(keydown(pygame.K_RETURN))
+    _choose_editor_mode_option(controls, "Preset Curation")
 
     assert not controls.modal_host.active
     assert controls.session.settings.editor_mode == "preset_curation"
@@ -220,7 +236,6 @@ def test_enter_curation_defaults_full_mix_and_disables_rotation() -> None:
 def test_curation_allowlisted_keys_still_work() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.settings.editor_mode = "preset_curation"
-    controls.session.settings.editor_mode_selection = "preset_curation"
     controls.focus_cursor = MainFocus(
         RowDescriptor(RowKind.TRACK_PRESET, slot="layer_1")
     )
@@ -244,7 +259,6 @@ def test_curation_ignores_layer_lock() -> None:
 
     controls = _make_controls(("layer_1",))
     controls.session.settings.editor_mode = "preset_curation"
-    controls.session.settings.editor_mode_selection = "preset_curation"
     layer = controls.session.layers["layer_1"]
     layer.locked = True
     layer.expanded = True
@@ -272,9 +286,7 @@ def test_dirty_enter_modal_cancel_stays_visualizer() -> None:
     controls.session.settings.expanded = True
     controls.focus_cursor = MainFocus(RowDescriptor(RowKind.SETTINGS_EDITOR_MODE))
 
-    controls.handle_keydown(keydown(pygame.K_RIGHT))
-    assert controls.session.settings.editor_mode == "visualizer"
-    controls.handle_keydown(keydown(pygame.K_RETURN))
+    _choose_editor_mode_option(controls, "Preset Curation")
     assert controls.modal_host.active
     view = controls.modal_host.view_state()
     assert view.kind == ModalKind.CHOICE
@@ -283,14 +295,12 @@ def test_dirty_enter_modal_cancel_stays_visualizer() -> None:
     controls.handle_keydown(keydown(pygame.K_ESCAPE))
     assert not controls.modal_host.active
     assert controls.session.settings.editor_mode == "visualizer"
-    assert controls.session.settings.editor_mode_selection == "visualizer"
 
 
 def test_exit_curation_reloads_and_clears_dirty() -> None:
     controls = _make_controls(("layer_1",))
     session = controls.session
     session.settings.editor_mode = "preset_curation"
-    session.settings.editor_mode_selection = "preset_curation"
     session.layers["layer_1"].opacity_pct = 12
     controls._config_save.clear_config_dirty()
     session.layers["layer_1"].opacity_pct = 99
@@ -319,157 +329,38 @@ def test_exit_curation_reloads_and_clears_dirty() -> None:
     ):
         controls.session.settings.expanded = True
         controls.focus_cursor = MainFocus(RowDescriptor(RowKind.SETTINGS_EDITOR_MODE))
-        controls.handle_keydown(keydown(pygame.K_LEFT))
-        assert controls.session.settings.editor_mode == "preset_curation"
-        assert controls.session.settings.editor_mode_selection == "visualizer"
-        controls.handle_keydown(keydown(pygame.K_RETURN))
+        _choose_editor_mode_option(controls, "Visualizer")
         assert not controls.modal_host.active
 
     assert controls.session.settings.editor_mode == "visualizer"
     assert not controls.config_dirty
 
 
-def test_horizontal_only_stages_editor_mode() -> None:
+def test_editor_mode_modal_cancel_keeps_visualizer() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.settings.expanded = True
     controls.focus_cursor = MainFocus(RowDescriptor(RowKind.SETTINGS_EDITOR_MODE))
 
-    controls.handle_keydown(keydown(pygame.K_RIGHT))
-    assert controls.session.settings.editor_mode == "visualizer"
-    assert controls.session.settings.editor_mode_selection == "preset_curation"
+    controls.handle_keydown(keydown(pygame.K_RETURN))
+    assert controls.modal_host.active
+    _choose_editor_mode_option(controls, "Cancel")
     assert not controls.modal_host.active
-    state = controls.build_view_state(paused=True)
-    assert state.settings.editor_mode_selection == "preset_curation"
-    from cleave.viz.row_spec import editor_mode_confirm_pending, format_row_value
-
-    assert (
-        format_row_value(state, RowDescriptor(RowKind.SETTINGS_EDITOR_MODE))
-        == "preset curation"
-    )
-    assert editor_mode_confirm_pending(state) is True
-
-    controls.handle_keydown(keydown(pygame.K_LEFT))
-    assert controls.session.settings.editor_mode_selection == "visualizer"
-    state = controls.build_view_state(paused=True)
-    assert (
-        format_row_value(state, RowDescriptor(RowKind.SETTINGS_EDITOR_MODE))
-        == "visualizer"
-    )
+    assert controls.session.settings.editor_mode == "visualizer"
 
 
-def test_navigate_away_reverts_editor_mode_selection() -> None:
+def test_editor_mode_modal_same_mode_is_noop() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.settings.expanded = True
     controls.focus_cursor = MainFocus(RowDescriptor(RowKind.SETTINGS_EDITOR_MODE))
 
-    controls.handle_keydown(keydown(pygame.K_RIGHT))
-    assert controls.session.settings.editor_mode_selection == "preset_curation"
-
-    controls.handle_keydown(keydown(pygame.K_DOWN))
+    _choose_editor_mode_option(controls, "Visualizer")
+    assert not controls.modal_host.active
     assert controls.session.settings.editor_mode == "visualizer"
-    assert controls.session.settings.editor_mode_selection == "visualizer"
-    assert controls.focus_descriptor.kind != RowKind.SETTINGS_EDITOR_MODE
-
-
-def test_flexible_mode_expands_for_editor_mode_confirm_suffix() -> None:
-    """Staged confirm icon must widen the editor-mode row (and flexible panels)."""
-    import pygame
-    from cleave.viz.material_icons import action_enter_icon_suffix_width
-    from cleave.viz.theme import panel_content_max_width_px
-    from cleave.viz.tuning_panel_draw import TuningOverlay, fit_row_text
-    from cleave.viz.tuning_view_state import SettingsBlock
-    from tests.cleave.viz.test_overlay import _minimal_view_state
-
-    pygame.init()
-    long_preset = (
-        "very/long/path/to/presets/cream-of-the-crop/"
-        "Some Extremely Long Preset Name That Forces Max Width.milk"
-    )
-    tracks = {
-        "layer_1": make_track_block(
-            stem="drums",
-            preset_dir_label="dir",
-            preset_label=long_preset,
-            blend_mode="black-key",
-            opacity_pct=50,
-            beat_sensitivity=1.0,
-            effects={},
-            expanded=True,
-        )
-    }
-
-    def _compose(
-        *,
-        ui_width_mode: str,
-        editor_mode: str,
-        selection: str,
-    ) -> tuple[int, str, int, int]:
-        state = _minimal_view_state(
-            settings=SettingsBlock(
-                expanded=True,
-                editor_mode=editor_mode,
-                editor_mode_selection=selection,
-                ui_width_mode=ui_width_mode,
-                ui_width=100,
-            ),
-            tracks=tracks,
-            layer_z_order=["layer_1"],
-        )
-        state.focus_cursor = MainFocus(RowDescriptor(RowKind.SETTINGS_EDITOR_MODE))
-        overlay = TuningOverlay()
-        overlay.notify_input()
-        composed = overlay.compose_panel(
-            state, viewport_width=1280, viewport_height=720
-        )
-        assert composed is not None
-        font = overlay._font_get()
-        line_h = font.get_linesize()
-        idx = state.layout.find_by_kind(RowKind.SETTINGS_EDITOR_MODE)
-        text = fit_row_text(
-            font,
-            state,
-            idx,
-            max_content_width=panel_content_max_width_px(100),
-        )
-        _, _, row_w = overlay._build_row_at_index(
-            font,
-            state,
-            idx,
-            max_content_width=panel_content_max_width_px(100),
-            line_h=line_h,
-        )
-        return composed.panel_size[0], text, row_w, line_h
-
-    max_panel_w = panel_content_max_width_px(100) + 2 * TuningOverlay()._padding
-    pending_w, pending_text, pending_row_w, line_h = _compose(
-        ui_width_mode="flexible",
-        editor_mode="visualizer",
-        selection="preset_curation",
-    )
-    _, confirmed_text, confirmed_row_w, _ = _compose(
-        ui_width_mode="flexible",
-        editor_mode="preset_curation",
-        selection="preset_curation",
-    )
-    assert "[Enter to confirm]" not in pending_text
-    assert "preset curation" in pending_text
-    assert "preset curation" in confirmed_text
-    assert pending_row_w == confirmed_row_w + action_enter_icon_suffix_width(line_h)
-    assert pending_w > max_panel_w
-
-    fixed_w, fixed_text, _, _ = _compose(
-        ui_width_mode="fixed",
-        editor_mode="visualizer",
-        selection="preset_curation",
-    )
-    assert fixed_w == max_panel_w
-    assert "[Enter to confirm]" not in fixed_text
 
 
 def test_editor_mode_absent_from_persisted_payload() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.settings.editor_mode = "preset_curation"
-    controls.session.settings.editor_mode_selection = "preset_curation"
     payload = persisted_session_payload(controls.cfg, controls.session)
     assert "editor_mode" not in payload
     settings_blob = payload.get("settings")

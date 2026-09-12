@@ -588,7 +588,7 @@ class TuningControls:
         if event.key == pygame.K_RETURN:
             kind = self.focus_descriptor.kind
             if kind == RowKind.SETTINGS_EDITOR_MODE:
-                self.editor_mode.confirm_editor_mode_selection()
+                self.editor_mode.prompt_change_editor_mode()
                 return True
             if kind == RowKind.SETTINGS_MEASURE_LATENCY:
                 self._tap_sync.prompt_start()
@@ -760,7 +760,7 @@ class TuningControls:
 
         if event.key == pygame.K_RETURN:
             if self.focus_descriptor.kind == RowKind.SETTINGS_EDITOR_MODE:
-                self.editor_mode.confirm_editor_mode_selection()
+                self.editor_mode.prompt_change_editor_mode()
                 return True
 
         return True
@@ -806,16 +806,6 @@ class TuningControls:
         self._apply_focus_cursor(cursor)
 
     def _apply_focus_cursor(self, cursor: FocusCursor) -> None:
-        leaving_editor_mode = (
-            isinstance(self._focus_cursor, MainFocus)
-            and self._focus_cursor.descriptor.kind == RowKind.SETTINGS_EDITOR_MODE
-            and not (
-                isinstance(cursor, MainFocus)
-                and cursor.descriptor.kind == RowKind.SETTINGS_EDITOR_MODE
-            )
-        )
-        if leaving_editor_mode:
-            self.editor_mode.sync_selection_to_mode()
         self._focus_cursor = cursor
         if isinstance(cursor, TimelineFocus):
             tl = self.session.timeline

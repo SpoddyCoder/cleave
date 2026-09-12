@@ -110,7 +110,6 @@ _EXPECTED_REPEAT_ROW_KINDS = frozenset(
         RowKind.RENDER_PATTERN_MASK_TRANSITION,
         RowKind.RENDER_PATTERN_MASK_SEED,
         RowKind.SETTINGS_PREVIEW_QUALITY,
-        RowKind.SETTINGS_EDITOR_MODE,
         RowKind.SETTINGS_UI_WIDTH_MODE,
         RowKind.SETTINGS_UI_WIDTH,
         RowKind.SETTINGS_UI_FADE,
@@ -156,7 +155,7 @@ def test_action_row_kinds_match_affordance() -> None:
     )
     assert RowKind.LAYER_MANAGEMENT_ADD in ACTION_ROW_KINDS
     assert RowKind.CONFIG_HEADER in ACTION_ROW_KINDS
-    assert RowKind.SETTINGS_EDITOR_MODE not in ACTION_ROW_KINDS
+    assert RowKind.SETTINGS_EDITOR_MODE in ACTION_ROW_KINDS
 
 
 def test_row_is_pinned() -> None:
@@ -439,7 +438,7 @@ def test_tree_branch_leading_spaces() -> None:
 
 
 def test_row_panel_label_settings_header() -> None:
-    assert row_panel_label(RowKind.SETTINGS_HEADER) == "Editor Settings"
+    assert row_panel_label(RowKind.SETTINGS_HEADER) == "Settings"
     assert row_panel_label(RowKind.PROJECT_HEADER) == "Project"
     assert row_panel_label(RowKind.PROJECT_RENDER_HEADER) == "Render Project"
 
@@ -827,6 +826,7 @@ def test_track_effect_dynamic_label_and_prefix() -> None:
 
 def test_full_line_delete_layer_prefix() -> None:
     assert full_line_prefix(RowKind.LAYER_MANAGEMENT_DELETE) == "└─ Delete Layer"
+    assert full_line_prefix(RowKind.SETTINGS_EDITOR_MODE) == "└─ change editor mode"
     assert row_panel_label(RowKind.LAYER_MANAGEMENT_ADD) == "Add Layer"
 
 

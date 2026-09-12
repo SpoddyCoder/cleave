@@ -4740,8 +4740,15 @@ def test_settings_expand_collapse_and_sub_row_visibility() -> None:
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.session.settings.expanded is True
     view = controls.build_view_state(paused=False)
+    assert [view.layout.kind(i) for i in range(5)] == [
+        RowKind.SETTINGS_HEADER,
+        RowKind.SETTINGS_UI_HEADER,
+        RowKind.SETTINGS_LATENCY_COMPENSATION_HEADER,
+        RowKind.SETTINGS_PREVIEW_QUALITY,
+        RowKind.SETTINGS_EDITOR_MODE,
+    ]
     preview_quality_row = view.layout.find_by_kind(RowKind.SETTINGS_PREVIEW_QUALITY)
-    assert preview_quality_row == 2
+    assert preview_quality_row == 3
     assert preview_quality_row in view.layout.navigable_indices(view)
     assert view.layout.header_row_count() == 7
 
@@ -5298,7 +5305,6 @@ def test_f_b_allowed_in_projectm_mode() -> None:
 def test_c_on_preset_file_in_curation_mode_prompts_cast() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.settings.editor_mode = "preset_curation"
-    controls.session.settings.editor_mode_selection = "preset_curation"
     current = _focus_preset_file_row(controls)
     mock_curation = MagicMock()
     controls._preset_curation = mock_curation

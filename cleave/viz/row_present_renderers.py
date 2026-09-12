@@ -35,13 +35,11 @@ from cleave.viz.row_spec import (
     RowSpec,
     composite_header_prefix_part,
     composite_header_suffix_part,
-    editor_mode_confirm_pending,
     expand_subheader_prefix,
     format_composite_header_expand_value,
     format_expand_subheader_value,
     format_row_value,
     labeled_row_prefix,
-    row_action_parameter_display_text,
     row_blocked_by_section_lock,
     row_composite_header_display_text,
     row_dynamic_labeled_display_text,
@@ -142,23 +140,13 @@ def row_shows_action_enter_hint(state: TuningViewState, index: int) -> bool:
     field = field_for_index(state, index)
     if field is None or not field.shows_enter_icon:
         return False
-    if field.present_style == RowPresentStyle.ACTION_PARAMETER:
-        return False
     if not row_has_tree_focus(state, index):
         return False
     return row_value_color(state, index) == HIGHLIGHT
 
 
 def row_shows_enter_icon(state: TuningViewState, index: int) -> bool:
-    if row_shows_action_enter_hint(state, index):
-        return True
-    field = field_for_index(state, index)
-    if field is None or not field.shows_enter_icon:
-        return False
-    return (
-        field.present_style == RowPresentStyle.ACTION_PARAMETER
-        and editor_mode_confirm_pending(state)
-    )
+    return row_shows_action_enter_hint(state, index)
 
 
 def append_action_enter_icon(
@@ -216,8 +204,6 @@ def row_text(state: TuningViewState, index: int) -> str:
         return format_row_value(state, desc)
     if style == RowPresentStyle.LABELED_VALUE:
         return row_labeled_display_text(state, desc)
-    if style == RowPresentStyle.ACTION_PARAMETER:
-        return row_action_parameter_display_text(state, desc)
     if style == RowPresentStyle.EXPAND_SUBHEADER:
         return row_expand_subheader_display_text(state, desc)
     if style == RowPresentStyle.COMPOSITE_HEADER:
@@ -476,25 +462,6 @@ def _fit_labeled_sub_row_value(
     return _fit_value(font, value, budget, strategy, cache=cache)
 
 
-def _fit_action_parameter_row_value(
-    font: pygame.font.Font,
-    state: TuningViewState,
-    index: int,
-    *,
-    max_content_width: int = PANEL_CONTENT_MAX_WIDTH,
-    cache: TuningPanelCache | None = None,
-) -> str:
-    kind = state.layout.kind(index)
-    value = format_row_value(state, state.layout.descriptor(index))
-    if state.settings.ui_width_mode == "flexible":
-        return value
-    budget = max_content_width - row_indent(state, index)
-    budget -= font.size(labeled_row_prefix(kind, state.layout.descriptor(index)))[0]
-    if row_shows_enter_icon(state, index):
-        budget -= action_enter_icon_suffix_width(font.get_linesize())
-    return _fit_value(font, value, budget, FitStrategy.PLAIN, cache=cache)
-
-
 def fit_row_text(
     font: pygame.font.Font,
     state: TuningViewState,
@@ -561,14 +528,6 @@ def fit_row_text(
         return row_composite_header_display_text(state, state.layout.descriptor(index))
     if field.present_style == RowPresentStyle.EXPAND_SUBHEADER:
         return row_expand_subheader_display_text(state, state.layout.descriptor(index))
-    if field.present_style == RowPresentStyle.ACTION_PARAMETER:
-        return labeled_row_prefix(kind, state.layout.descriptor(index)) + _fit_action_parameter_row_value(
-            font,
-            state,
-            index,
-            max_content_width=max_content_width,
-            cache=cache,
-        )
     if field.present_style in {
         RowPresentStyle.LABELED_VALUE,
         RowPresentStyle.DYNAMIC,
@@ -712,20 +671,6 @@ def row_bg_color(state: TuningViewState, index: int) -> tuple[int, int, int] | N
     return None
 
 
-def action_parameter_label_color(
-    state: TuningViewState, index: int
-) -> tuple[int, int, int]:
-    """ACTION green label prefix for action-parameter rows (e.g. editor mode)."""
-    kind = state.layout.kind(index)
-    desc = state.layout.descriptor(index)
-    locked_blocked = section_locked(state, desc) and row_blocked_by_section_lock(kind)
-    if locked_blocked:
-        return LOCKED
-    if row_has_tree_focus(state, index):
-        return HIGHLIGHT
-    return ACTION
-
-
 def is_transport_row(state: TuningViewState, index: int) -> bool:
     field = field_for_index(state, index)
     if field is None or field.present_style != RowPresentStyle.FULL_LINE:
@@ -844,7 +789,10 @@ def _paint_composite_header(
     assert field is not None
     if field.visibility_icon is None:
         glyph = field.header_glyph if field.header_glyph is not None else SETTINGS_GLYPH
-        icon_surf = render_glyph(glyph, color=VALUE, line_height=ctx.line_h)
+        glyph_color = (
+            field.header_glyph_color if field.header_glyph_color is not None else VALUE
+        )
+        icon_surf = render_glyph(glyph, color=glyph_color, line_height=ctx.line_h)
         label_surf = render_label_value_row(
             ctx.font,
             prefix=composite_header_prefix_part(ctx.state, ctx.desc),
@@ -970,43 +918,6 @@ def _paint_expand_subheader(
     return surf, None, ctx.indent + surf.get_width()
 
 
-def _paint_action_parameter(
-    ctx: RowPresentContext,
-) -> tuple[pygame.Surface, pygame.Surface | None, int]:
-    prefix = labeled_row_prefix(ctx.kind, ctx.desc)
-    value = _fit_action_parameter_row_value(
-        ctx.font,
-        ctx.state,
-        ctx.index,
-        max_content_width=ctx.max_content_width,
-        cache=ctx.cache,
-    )
-    value_color = ctx.color
-    suffix_surf = None
-    suffix_gap = 0
-    if editor_mode_confirm_pending(ctx.state):
-        suffix_surf = render_action_enter_icon(
-            color=value_color, line_height=ctx.line_h
-        )
-        suffix_gap = ROW_ICON_SUFFIX_GAP
-    locked_blocked = section_locked(
-        ctx.state, ctx.desc
-    ) and row_blocked_by_section_lock(ctx.kind)
-    prefix_color = action_parameter_label_color(ctx.state, ctx.index)
-    surf = render_label_value_row(
-        ctx.font,
-        prefix=prefix,
-        value=value,
-        value_color=value_color,
-        prefix_color=prefix_color,
-        line_height=ctx.line_h,
-        suffix_surf=suffix_surf,
-        suffix_gap=suffix_gap,
-        counters=ctx.counters,
-    )
-    return surf, None, ctx.indent + surf.get_width()
-
-
 def _paint_labeled_value(
     ctx: RowPresentContext,
 ) -> tuple[pygame.Surface, pygame.Surface | None, int]:
@@ -1056,7 +967,6 @@ def _paint_notification(
 ROW_PRESENT_RENDERERS: dict[RowPresentStyle, RowPaint] = {
     RowPresentStyle.LABELED_VALUE: _paint_labeled_value,
     RowPresentStyle.DYNAMIC: _paint_labeled_value,
-    RowPresentStyle.ACTION_PARAMETER: _paint_action_parameter,
     RowPresentStyle.EXPAND_SUBHEADER: _paint_expand_subheader,
     RowPresentStyle.COMPOSITE_HEADER: _paint_composite_header,
     RowPresentStyle.PATH_ICON: _paint_path_icon,
