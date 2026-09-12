@@ -1,7 +1,7 @@
 """Shared content-frame finish for live play and offline render.
 
 After layer compositing, both paths run the same sequence: HDR display
-shoulder (when ``render.hdr_compositing`` is enabled and not in preset
+shoulder (when ``compositor.hdr`` is enabled and not in preset
 curation), visual-limiter busyness sample, optional user highlight rolloff,
 chroma boost, post-FX fade, render overlay composite, then present to the
 display framebuffer.
@@ -190,7 +190,7 @@ def finish_content_frame(
 
     compositor = core.compositor
     editor_mode = session.settings.editor_mode
-    if hdr_display_shoulder_active(core.seed.cfg, editor_mode):
+    if hdr_display_shoulder_active(session.project.compositor_hdr, editor_mode):
         apply_hdr_display_shoulder(
             core.post_process,
             compositor.content_texture_id,

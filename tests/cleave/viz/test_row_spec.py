@@ -127,6 +127,7 @@ _EXPECTED_REPEAT_ROW_KINDS = frozenset(
         RowKind.PROJECT_RENDER_START,
         RowKind.PROJECT_RENDER_END,
         RowKind.PROJECT_MILKDROP_BEAT_SENSITIVITY,
+        RowKind.PROJECT_COMPOSITOR_HDR,
         RowKind.TIMELINE_BAR_PHASE,
         RowKind.TIMELINE_HARD_CUTS,
         RowKind.TIMELINE_HARD_CUT_FADE_IN,
@@ -175,6 +176,8 @@ def test_row_is_pinned() -> None:
     assert row_is_pinned(RowKind.SETTINGS_HEADER) is True
     assert row_is_pinned(RowKind.PROJECT_HEADER) is True
     assert row_is_pinned(RowKind.PROJECT_RENDER_HEADER) is True
+    assert row_is_pinned(RowKind.PROJECT_COMPOSITOR_HEADER) is True
+    assert row_is_pinned(RowKind.PROJECT_COMPOSITOR_HDR) is True
     assert row_is_pinned(RowKind.PROJECT_RENDER_QUALITY) is True
     assert row_is_pinned(RowKind.SETTINGS_PREVIEW_QUALITY) is True
     assert row_is_pinned(RowKind.SETTINGS_EDITOR_MODE) is True
@@ -458,6 +461,7 @@ def test_row_panel_label_settings_header() -> None:
     assert row_panel_label(RowKind.SETTINGS_HEADER) == "Settings"
     assert row_panel_label(RowKind.PROJECT_HEADER) == "Project"
     assert row_panel_label(RowKind.PROJECT_MILKDROP_HEADER) == "ProjectM"
+    assert row_panel_label(RowKind.PROJECT_COMPOSITOR_HEADER) == "Compositor"
     assert row_panel_label(RowKind.PROJECT_RENDER_HEADER) == "Render Project"
 
 
@@ -472,6 +476,7 @@ def test_labeled_row_prefix_settings_children() -> None:
     assert labeled_row_prefix(RowKind.PROJECT_RENDER_QUALITY) == "  └─ quality: "
     assert labeled_row_prefix(RowKind.PROJECT_RENDER_START) == "  └─ start: "
     assert labeled_row_prefix(RowKind.PROJECT_RENDER_END) == "  └─ end: "
+    assert labeled_row_prefix(RowKind.PROJECT_COMPOSITOR_HDR) == "  └─ hdr: "
 
 
 def test_labeled_row_prefix_track_depths() -> None:

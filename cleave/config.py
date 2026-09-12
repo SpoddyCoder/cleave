@@ -72,10 +72,10 @@ from cleave.config_schema.layers import (
     parse_layer_z_order_section,
     parse_layers_section,
 )
+from cleave.config_schema.compositor import DEFAULT_COMPOSITOR_HDR
 from cleave.config_schema.render import (
     CHROMA_BOOST_APPLY_MODES,
     CHROMA_BOOST_VARIANTS,
-    DEFAULT_HDR_COMPOSITING,
     DEFAULT_HIGHLIGHT_ROLLOFF_APPLY_MODE,
     DEFAULT_HIGHLIGHT_ROLLOFF_CURVE,
     DEFAULT_RENDER_FPS,
@@ -317,7 +317,6 @@ class RenderConfig:
     fps: int = DEFAULT_RENDER_FPS
     width: int = DEFAULT_RENDER_WIDTH
     height: int = DEFAULT_RENDER_HEIGHT
-    hdr_compositing: bool = DEFAULT_HDR_COMPOSITING
     overlays: RenderOverlaysConfig | None = None
     post_fx: RenderPostFxConfig | None = None
     pattern_mask: RenderPatternMaskConfig | None = None
@@ -385,6 +384,7 @@ class CleaveConfig:
     render: RenderConfig | None = None
     timeline: TimelineConfig | None = None
     milkdrop_beat_sensitivity: float = DEFAULT_BEAT_SENSITIVITY
+    compositor_hdr: bool = DEFAULT_COMPOSITOR_HDR
     project_slug: str = DEFAULT_PROJECT_SLUG
 
     def layers_in_z_order(self) -> list[tuple[str, LayerConfig]]:
@@ -404,13 +404,6 @@ def render_output_size(cfg: CleaveConfig) -> tuple[int, int]:
     if cfg.render is not None:
         return cfg.render.width, cfg.render.height
     return DEFAULT_RENDER_WIDTH, DEFAULT_RENDER_HEIGHT
-
-
-def render_hdr_compositing(cfg: CleaveConfig) -> bool:
-    """Whether layer and content FBOs use float HDR compositing."""
-    if cfg.render is None:
-        return False
-    return cfg.render.hdr_compositing
 
 
 def _expand_path(path: Path | str) -> Path:
@@ -600,6 +593,10 @@ def load_config(
         milkdrop_beat_sensitivity = manifest.milkdrop.beat_sensitivity
     else:
         milkdrop_beat_sensitivity = DEFAULT_BEAT_SENSITIVITY
+    if manifest is not None and manifest.compositor is not None:
+        compositor_hdr = manifest.compositor.hdr
+    else:
+        compositor_hdr = DEFAULT_COMPOSITOR_HDR
     project_slug = manifest.slug if manifest is not None else DEFAULT_PROJECT_SLUG
 
     return CleaveConfig(
@@ -612,6 +609,7 @@ def load_config(
         render=render,
         timeline=timeline,
         milkdrop_beat_sensitivity=milkdrop_beat_sensitivity,
+        compositor_hdr=compositor_hdr,
         project_slug=project_slug,
     )
 

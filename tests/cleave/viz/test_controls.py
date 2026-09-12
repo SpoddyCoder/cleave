@@ -1089,7 +1089,7 @@ def test_navigable_rows_without_overwrite() -> None:
     _expand_project(controls)
     view = controls.build_view_state(paused=False)
     assert view.allow_overwrite is False
-    assert len(view.layout) == 22
+    assert len(view.layout) == 23
     assert RowDescriptor(RowKind.TIMELINE_PRESETS) not in view.layout.rows
 
     kinds = {view.layout.kind(i) for i in range(len(view.layout))}
@@ -1111,7 +1111,7 @@ def test_navigable_rows_with_overwrite() -> None:
     _expand_project(controls)
     view = controls.build_view_state(paused=False)
     assert view.allow_overwrite is True
-    assert len(view.layout) == 22
+    assert len(view.layout) == 23
     assert RowDescriptor(RowKind.TIMELINE_PRESETS) not in view.layout.rows
 
     config_row = _config_header_row(view)

@@ -367,6 +367,24 @@ def _mutate_milkdrop_expanded(controls: TuningControls) -> None:
     controls.project.set_milkdrop_expanded(True)
 
 
+def _expand_project_compositor(controls: TuningControls) -> None:
+    _expand_project(controls)
+    controls.session.project.compositor_expanded = True
+
+
+def _mutate_compositor_hdr(controls: TuningControls) -> None:
+    _expand_project_compositor(controls)
+    view = controls.build_view_state(paused=False)
+    hdr_row = view.layout.find_by_kind(RowKind.PROJECT_COMPOSITOR_HDR)
+    controls.focus_descriptor = view.layout.descriptor(hdr_row)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
+def _mutate_compositor_expanded(controls: TuningControls) -> None:
+    _expand_project(controls)
+    controls.project.set_compositor_expanded(True)
+
+
 def _mutate_timeline_cues_via_record() -> None:
     tuning = _make_controls(("layer_1",))
     tuning.session.timeline.enabled = True
@@ -426,6 +444,7 @@ _PERSISTED_MUTATIONS: list[
     ("timeline.enabled", _mutate_timeline_enabled, ("layer_1",), {"timeline_enabled": True}),
     ("timeline.locked", _mutate_timeline_locked, ("layer_1",), {}),
     ("project.milkdrop_beat_sensitivity", _mutate_milkdrop_beat_sensitivity, ("layer_1",), {}),
+    ("project.compositor.hdr", _mutate_compositor_hdr, ("layer_1",), {}),
 ]
 
 
@@ -612,6 +631,7 @@ _SESSION_ONLY_MUTATIONS: list[tuple[str, Callable[[TuningControls], None], tuple
     ("timeline.recording", _mutate_timeline_recording_start, ("layer_1",)),
     ("timeline.preview", _mutate_timeline_preview_pause, ("layer_1",)),
     ("project.milkdrop_expanded", _mutate_milkdrop_expanded, ("layer_1",)),
+    ("project.compositor_expanded", _mutate_compositor_expanded, ("layer_1",)),
 ]
 
 
@@ -653,3 +673,26 @@ def test_commit_save_flushes_milkdrop_to_project_yaml(tmp_path: Path) -> None:
     manifest = load_manifest(tmp_path)
     assert manifest.milkdrop is not None
     assert manifest.milkdrop.beat_sensitivity == pytest.approx(3.5)
+
+
+def test_commit_save_flushes_compositor_to_project_yaml(tmp_path: Path) -> None:
+    from datetime import datetime, timezone
+
+    from cleave.project import load_manifest, write_manifest
+
+    write_manifest(
+        tmp_path,
+        slug="song",
+        mix_filename="song.wav",
+        original_path=tmp_path / "source.wav",
+        demucs_model="htdemucs",
+        separated_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+    )
+    controls = _make_controls(("layer_1",), project_dir=tmp_path)
+    controls.session.project.compositor_hdr = False
+    assert controls.config_dirty
+    controls._config_save._commit_save()
+    assert not controls.config_dirty
+    manifest = load_manifest(tmp_path)
+    assert manifest.compositor is not None
+    assert manifest.compositor.hdr is False

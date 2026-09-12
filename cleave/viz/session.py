@@ -15,6 +15,7 @@ from cleave.config import (
     TimelineLimiterConfig,
     VIZ_CONFIG_FILENAME,
 )
+from cleave.config_schema.compositor import DEFAULT_COMPOSITOR_HDR
 from cleave.config_schema.editor import DEFAULT_BEAT_SENSITIVITY
 from cleave.config_schema.project_render import (
     DEFAULT_PROJECT_RENDER_QUALITY,
@@ -397,6 +398,8 @@ class ProjectRuntime:
     expanded: bool = False
     milkdrop_expanded: bool = False
     milkdrop_beat_sensitivity: float = DEFAULT_BEAT_SENSITIVITY
+    compositor_expanded: bool = False
+    compositor_hdr: bool = DEFAULT_COMPOSITOR_HDR
     render: ProjectRenderRuntime = field(default_factory=ProjectRenderRuntime)
 
 
@@ -699,6 +702,7 @@ def session_from_cfg(
         timeline=timeline_runtime_from_cfg(cfg),
         project=ProjectRuntime(
             milkdrop_beat_sensitivity=cfg.milkdrop_beat_sensitivity,
+            compositor_hdr=cfg.compositor_hdr,
         ),
         layers={
             slot: LayerRuntime(

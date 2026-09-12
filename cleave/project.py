@@ -10,6 +10,7 @@ from typing import Sequence
 
 import yaml
 
+from cleave.config_schema.compositor import DEFAULT_COMPOSITOR_HDR
 from cleave.config_schema.editor import (
     DEFAULT_BEAT_SENSITIVITY,
     clamp_beat_sensitivity,
@@ -67,9 +68,27 @@ def _parse_milkdrop(raw: object) -> MilkdropSettings | None:
     return MilkdropSettings(beat_sensitivity=clamp_beat_sensitivity(beat))
 
 
+def _parse_compositor(raw: object) -> CompositorSettings | None:
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise ValueError("invalid project manifest: compositor")
+    if "hdr" not in raw:
+        return CompositorSettings(hdr=DEFAULT_COMPOSITOR_HDR)
+    hdr_raw = raw["hdr"]
+    if not isinstance(hdr_raw, bool):
+        raise ValueError("invalid project manifest: compositor.hdr")
+    return CompositorSettings(hdr=hdr_raw)
+
+
 @dataclass(frozen=True)
 class MilkdropSettings:
     beat_sensitivity: float = DEFAULT_BEAT_SENSITIVITY
+
+
+@dataclass(frozen=True)
+class CompositorSettings:
+    hdr: bool = DEFAULT_COMPOSITOR_HDR
 
 
 @dataclass(frozen=True)
@@ -83,6 +102,7 @@ class ProjectManifest:
     restored_from: str | None = None
     song_markers: tuple[SongMarker, ...] = ()
     milkdrop: MilkdropSettings | None = None
+    compositor: CompositorSettings | None = None
 
     @classmethod
     def from_dict(cls, data: dict) -> ProjectManifest:
@@ -105,6 +125,7 @@ class ProjectManifest:
             restored_from=restored_from,
             song_markers=_parse_song_markers(data.get("song-markers")),
             milkdrop=_parse_milkdrop(data.get("milkdrop")),
+            compositor=_parse_compositor(data.get("compositor")),
         )
 
     def to_dict(self) -> dict:
@@ -125,6 +146,10 @@ class ProjectManifest:
         if self.milkdrop is not None:
             data["milkdrop"] = {
                 "beat_sensitivity": self.milkdrop.beat_sensitivity,
+            }
+        if self.compositor is not None:
+            data["compositor"] = {
+                "hdr": self.compositor.hdr,
             }
         return data
 
@@ -183,12 +208,13 @@ def write_manifest(
     separated_at: datetime | None = None,
     song_markers: Sequence[SongMarker | float] | None = None,
     milkdrop: MilkdropSettings | None = None,
+    compositor: CompositorSettings | None = None,
 ) -> Path:
     """Create or update ``project.yaml`` mix and ingest fields.
 
     When the file already exists, only ``slug``, ``mix.filename``, and
-    ``ingest`` are updated. ``song-markers``, ``milkdrop``, ``restored-from``,
-    and other fields are preserved unless passed explicitly.
+    ``ingest`` are updated. ``song-markers``, ``milkdrop``, ``compositor``,
+    ``restored-from``, and other fields are preserved unless passed explicitly.
     """
     when = separated_at or datetime.now(timezone.utc)
     path = manifest_path(project_dir)
@@ -202,6 +228,9 @@ def write_manifest(
             else existing.song_markers
         )
         milkdrop_settings = milkdrop if milkdrop is not None else existing.milkdrop
+        compositor_settings = (
+            compositor if compositor is not None else existing.compositor
+        )
         manifest = replace(
             existing,
             slug=slug,
@@ -211,6 +240,7 @@ def write_manifest(
             demucs_model=demucs_model,
             song_markers=markers,
             milkdrop=milkdrop_settings,
+            compositor=compositor_settings,
         )
     else:
         manifest = ProjectManifest(
@@ -222,6 +252,7 @@ def write_manifest(
             demucs_model=demucs_model,
             song_markers=coerce_song_markers(song_markers),
             milkdrop=milkdrop,
+            compositor=compositor,
         )
     with path.open("w", encoding="utf-8") as handle:
         yaml.safe_dump(manifest.to_dict(), handle, sort_keys=False)
@@ -249,6 +280,16 @@ def save_milkdrop_settings(project_dir: Path, beat_sensitivity: float) -> Path:
             beat_sensitivity=clamp_beat_sensitivity(beat_sensitivity)
         ),
     )
+    path = manifest_path(project_dir)
+    with path.open("w", encoding="utf-8") as handle:
+        yaml.safe_dump(updated.to_dict(), handle, sort_keys=False)
+    return path
+
+
+def save_compositor_settings(project_dir: Path, hdr: bool) -> Path:
+    """Replace ``compositor`` in ``project.yaml``, preserving ingest and provenance."""
+    manifest = load_manifest(project_dir)
+    updated = replace(manifest, compositor=CompositorSettings(hdr=bool(hdr)))
     path = manifest_path(project_dir)
     with path.open("w", encoding="utf-8") as handle:
         yaml.safe_dump(updated.to_dict(), handle, sort_keys=False)

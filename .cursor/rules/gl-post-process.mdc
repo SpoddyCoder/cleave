@@ -23,9 +23,9 @@ Shader passes in `cleave/gl_post_process.py` share the pygame GL context with th
 
 `*_active()` helpers in `post_fx.py` must check `render.post_fx.enabled`, child mode/strength, and `render_post_fx_solo`. Panel dimming is not enough. Test `enabled=False` on the frame path.
 
-## HDR (`render.hdr_compositing`)
+## HDR (`compositor.hdr`)
 
-When enabled, compositor FBOs use `GL_RGBA16F`. `GlPostProcess` must match (`f2` half-float, `f1` for 8-bit internal). Never `u1` for 8-bit internal buffers. Skip output clamp when wired for `RGBA16F`. 8-bit black-key stacking washes bright layers before tone curves.
+When enabled (project.yaml `compositor.hdr`, default on), compositor FBOs use `GL_RGBA16F`. `GlPostProcess` must match (`f2` half-float, `f1` for 8-bit internal). Never `u1` for 8-bit internal buffers. Skip output clamp when wired for `RGBA16F`. 8-bit black-key stacking washes bright layers before tone curves. Preset curation always uses 8-bit regardless of the flag.
 
 `finish_content_frame` order: HDR display shoulder (not gated on post-FX `enabled`) -> visual-limiter sample -> user highlight rolloff -> user chroma boost -> frame fade -> overlay -> present. Per-layer rolloff/chroma_boost keep frozen compositor source textures for paused live tuning.
 

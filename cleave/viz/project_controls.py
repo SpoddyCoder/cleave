@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from cleave.config_schema.editor import clamp_beat_sensitivity
 from cleave.config_schema.project_render import (
     PROJECT_RENDER_QUALITIES,
@@ -15,11 +17,18 @@ _BEAT_SENSITIVITY_CTRL_STEP = 0.5
 
 
 class ProjectControls:
-    """Mutations for Project header, Milkdrop, and Render Project rows."""
+    """Mutations for Project header, Milkdrop, Compositor, and Render Project rows."""
 
-    def __init__(self, session: TuningSession, *, duration_sec: float) -> None:
+    def __init__(
+        self,
+        session: TuningSession,
+        *,
+        duration_sec: float,
+        on_compositor_format_changed: Callable[[], None] | None = None,
+    ) -> None:
         self.session = session
         self.duration_sec = duration_sec
+        self._on_compositor_format_changed = on_compositor_format_changed
 
     def set_expanded(self, expanded: bool) -> None:
         project = self.session.project
@@ -39,6 +48,12 @@ class ProjectControls:
             return
         project.milkdrop_expanded = expanded
 
+    def set_compositor_expanded(self, expanded: bool) -> None:
+        project = self.session.project
+        if project.compositor_expanded == expanded:
+            return
+        project.compositor_expanded = expanded
+
     def adjust_milkdrop_beat_sensitivity(self, *, forward: bool, ctrl: bool) -> None:
         step = _BEAT_SENSITIVITY_CTRL_STEP if ctrl else _BEAT_SENSITIVITY_STEP
         delta = step if forward else -step
@@ -46,6 +61,12 @@ class ProjectControls:
         project.milkdrop_beat_sensitivity = clamp_beat_sensitivity(
             project.milkdrop_beat_sensitivity + delta
         )
+
+    def toggle_compositor_hdr(self) -> None:
+        project = self.session.project
+        project.compositor_hdr = not project.compositor_hdr
+        if self._on_compositor_format_changed is not None:
+            self._on_compositor_format_changed()
 
     def cycle_quality(self, *, forward: bool) -> None:
         modes = PROJECT_RENDER_QUALITIES

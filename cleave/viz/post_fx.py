@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from cleave.config import CleaveConfig, render_hdr_compositing
 from cleave.config_schema.render import (
     DEFAULT_HIGHLIGHT_ROLLOFF_CURVE,
     HighlightRolloffCurve,
@@ -228,19 +227,19 @@ def apply_highlight_rolloff_rgba(
     return out.tobytes()
 
 
-def effective_hdr_compositing(cfg: CleaveConfig, editor_mode: str) -> bool:
+def effective_hdr_compositing(hdr: bool, editor_mode: str) -> bool:
     """True when the live/offline path should use RGBA16F compositing."""
     if is_preset_curation_mode(editor_mode):
         return False
-    return render_hdr_compositing(cfg)
+    return hdr
 
 
-def hdr_display_shoulder_active(cfg: CleaveConfig, editor_mode: str) -> bool:
-    return effective_hdr_compositing(cfg, editor_mode)
+def hdr_display_shoulder_active(hdr: bool, editor_mode: str) -> bool:
+    return effective_hdr_compositing(hdr, editor_mode)
 
 
 def sync_live_compositor_format(
-    cfg: CleaveConfig,
+    hdr: bool,
     editor_mode: str,
     compositor: GlCompositor,
     post_process: GlPostProcess,
@@ -249,7 +248,7 @@ def sync_live_compositor_format(
 ) -> None:
     """Match compositor/post-process attachments to editor mode (8-bit in curation)."""
     fmt = resolve_live_compositor_format(
-        render_hdr_compositing(cfg),
+        hdr,
         preset_curation=is_preset_curation_mode(editor_mode),
     )
     apply_color_format(fmt, compositor, post_process, masked_compositor)

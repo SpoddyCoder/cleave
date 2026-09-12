@@ -8,6 +8,7 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from cleave.config_schema.compositor import DEFAULT_COMPOSITOR_HDR
 from cleave.config_schema.editor import (
     DEFAULT_BEAT_SENSITIVITY,
     DEFAULT_EDITOR_HEIGHT,
@@ -272,6 +273,8 @@ class ProjectBlock:
     expanded: bool = False
     milkdrop_expanded: bool = False
     milkdrop_beat_sensitivity: float = DEFAULT_BEAT_SENSITIVITY
+    compositor_expanded: bool = False
+    compositor_hdr: bool = DEFAULT_COMPOSITOR_HDR
     render_expanded: bool = False
     quality: str = DEFAULT_PROJECT_RENDER_QUALITY
     start_sec: int = DEFAULT_PROJECT_RENDER_START_SEC
@@ -439,6 +442,7 @@ def view_state_structure_signature(
         "project": {
             "expanded": session.project.expanded,
             "milkdrop_expanded": session.project.milkdrop_expanded,
+            "compositor_expanded": session.project.compositor_expanded,
             "render_expanded": session.project.render.expanded,
         },
         "notification_active": notification_active,
@@ -527,6 +531,8 @@ def _project_block_from_session(
         expanded=session.project.expanded,
         milkdrop_expanded=session.project.milkdrop_expanded,
         milkdrop_beat_sensitivity=session.project.milkdrop_beat_sensitivity,
+        compositor_expanded=session.project.compositor_expanded,
+        compositor_hdr=session.project.compositor_hdr,
         render_expanded=render.expanded,
         quality=render.quality,
         start_sec=render.start_sec,
