@@ -59,6 +59,35 @@ def test_until_dismissed_stays_until_dismissed() -> None:
     assert active.remaining_sec == 0.0
 
 
+def test_set_display_sec_retargets_active_toast() -> None:
+    host = PanelNotificationHost()
+    with patch.object(time, "monotonic", return_value=10.0):
+        host.show("hello", display_sec=0)
+        active = host.active()
+    assert math.isinf(active.remaining_sec)
+
+    with patch.object(time, "monotonic", return_value=12.0):
+        host.set_display_sec(1)
+        active = host.active()
+    assert active.message == "hello"
+    assert active.remaining_sec == pytest.approx(1.0)
+
+    with patch.object(time, "monotonic", return_value=13.1):
+        host.clear_expired()
+        active = host.active()
+    assert active.message is None
+
+
+def test_set_display_sec_until_dismissed_clears_deadline() -> None:
+    host = PanelNotificationHost()
+    with patch.object(time, "monotonic", return_value=10.0):
+        host.show("hello", display_sec=5)
+        host.set_display_sec(0)
+        active = host.active()
+    assert active.message == "hello"
+    assert math.isinf(active.remaining_sec)
+
+
 def test_dismiss_timed_clears_before_deadline() -> None:
     host = PanelNotificationHost()
     with patch.object(time, "monotonic", return_value=10.0):

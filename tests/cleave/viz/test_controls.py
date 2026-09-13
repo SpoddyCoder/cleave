@@ -2436,6 +2436,62 @@ def test_panel_notification_until_dismissed_stays_until_enter() -> None:
         assert controls.focus_descriptor.kind == RowKind.TRANSPORT
 
 
+def test_panel_notification_expires_after_adjusted_duration(tmp_path: Path) -> None:
+    controls = _make_controls(("layer_1",))
+    controls.cfg.user_config_path = tmp_path / "config.yaml"
+    _expand_settings_ui(controls)
+    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY)
+    for _ in range(4):
+        controls.handle_keydown(_keydown(pygame.K_LEFT))
+    assert controls.cfg.editor.notification_display_sec == 1
+
+    with patch.object(time, "monotonic", return_value=200.0):
+        controls.show_notification("Saved")
+        view = controls.build_view_state(paused=False)
+        assert view.notification_message == "Saved"
+
+    with patch.object(time, "monotonic", return_value=200.5):
+        controls.tick(0.0)
+        view = controls.build_view_state(paused=False)
+        assert view.notification_message == "Saved"
+
+    with patch.object(time, "monotonic", return_value=201.1):
+        controls.tick(0.0)
+        view = controls.build_view_state(paused=False)
+        assert view.notification_message is None
+        assert view.notification_remaining_sec == 0.0
+
+
+def test_panel_notification_retargets_when_display_sec_changes(tmp_path: Path) -> None:
+    controls = _make_controls(("layer_1",))
+    controls.cfg.user_config_path = tmp_path / "config.yaml"
+    _expand_settings_ui(controls)
+    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY)
+    for _ in range(5):
+        controls.handle_keydown(_keydown(pygame.K_LEFT))
+    assert controls.cfg.editor.notification_display_sec == 0
+
+    with patch.object(time, "monotonic", return_value=100.0):
+        controls.show_notification("Saved")
+        view = controls.build_view_state(paused=False)
+        assert view.notification_message == "Saved"
+
+    with patch.object(time, "monotonic", return_value=110.0):
+        controls.tick(0.0)
+        view = controls.build_view_state(paused=False)
+        assert view.notification_message == "Saved"
+        controls.handle_keydown(_keydown(pygame.K_RIGHT))
+        assert controls.cfg.editor.notification_display_sec == 1
+        view = controls.build_view_state(paused=False)
+        assert view.notification_message == "Saved"
+        assert view.notification_remaining_sec == pytest.approx(1.0)
+
+    with patch.object(time, "monotonic", return_value=111.1):
+        controls.tick(0.0)
+        view = controls.build_view_state(paused=False)
+        assert view.notification_message is None
+
+
 def test_panel_notification_enter_dismisses_before_timeout() -> None:
     with patch.object(time, "monotonic", return_value=9000.0):
         controls = _make_controls(("layer_1",))
@@ -2448,6 +2504,31 @@ def test_panel_notification_enter_dismisses_before_timeout() -> None:
         view = controls.build_view_state(paused=False)
         assert view.notification_message is None
         assert controls.focus_descriptor.kind == RowKind.TRANSPORT
+
+
+def test_panel_notification_enter_dismisses_without_focusing_toast() -> None:
+    with patch.object(time, "monotonic", return_value=9000.0):
+        controls = _make_controls(("layer_1",))
+        controls.show_notification("Saved")
+        assert controls.focus_descriptor.kind == RowKind.TRANSPORT
+        assert controls.playback.paused is False
+        assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
+        view = controls.build_view_state(paused=False)
+        assert view.notification_message is None
+        assert controls.playback.paused is False
+        assert controls.focus_descriptor.kind == RowKind.TRANSPORT
+
+    with patch.object(time, "monotonic", return_value=9100.0):
+        controls = _make_controls(("layer_1",))
+        _expand_settings_ui(controls)
+        controls.focus_descriptor = RowDescriptor(
+            RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY
+        )
+        controls.show_notification("Saved")
+        assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
+        view = controls.build_view_state(paused=False)
+        assert view.notification_message is None
+        assert controls.focus_descriptor.kind == RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY
 
 
 def test_render_timeline_enable_opens_panel() -> None:

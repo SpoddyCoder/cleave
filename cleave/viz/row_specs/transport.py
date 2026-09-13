@@ -71,7 +71,7 @@ SPECS: dict[RowKind, RowSpec] = {
         shows_enter_icon=True,
         help_title="Notification",
         help_entries=(("Enter", "dismiss"),),
-        help_description=("Status toast; highlight it and press Enter to dismiss.",),
+        help_description=("Status toast; press Enter to dismiss.",),
         is_pinned=True,
     ),
     RowKind.RENDER_SECTION_GAP: RowSpec(

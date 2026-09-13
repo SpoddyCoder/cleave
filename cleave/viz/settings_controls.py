@@ -34,10 +34,12 @@ class SettingsControls:
         cfg: CleaveConfig,
         *,
         on_notification: Callable[[str], None] | None = None,
+        on_notification_display_changed: Callable[[int], None] | None = None,
     ) -> None:
         self.session = session
         self.cfg = cfg
         self._on_notification = on_notification
+        self._on_notification_display_changed = on_notification_display_changed
 
     def set_expanded(self, expanded: bool) -> None:
         settings = self.session.settings
@@ -154,10 +156,14 @@ class SettingsControls:
         delta = step if forward else -step
         current = self.cfg.editor.notification_display_sec
         new_value = clamp_notification_display_sec(current + delta)
+        if new_value == current:
+            return
         self.cfg.editor = replace(
             self.cfg.editor, notification_display_sec=new_value
         )
         persist_editor_settings(self.cfg)
+        if self._on_notification_display_changed is not None:
+            self._on_notification_display_changed(new_value)
 
     def adjust_ui_width(self, *, forward: bool, ctrl: bool) -> None:
         step = 5 if ctrl else 1

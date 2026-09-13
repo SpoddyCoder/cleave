@@ -106,10 +106,21 @@ class PanelNotificationHost:
         now = time.monotonic()
         self._message = message
         self._shown_at = now
+        self._apply_display_sec(display_sec, now=now)
+
+    def set_display_sec(self, display_sec: float) -> None:
+        """Retarget the active timed toast to *display_sec* from now."""
+        if self._message is None:
+            return
+        self._apply_display_sec(display_sec)
+
+    def _apply_display_sec(self, display_sec: float, *, now: float | None = None) -> None:
         if display_sec <= 0:
             self._deadline = None
-        else:
-            self._deadline = now + float(display_sec)
+            return
+        if now is None:
+            now = time.monotonic()
+        self._deadline = now + float(display_sec)
 
     def dismiss_timed(self) -> None:
         self._message = None
