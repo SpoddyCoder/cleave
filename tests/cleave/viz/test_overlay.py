@@ -99,7 +99,6 @@ def _effects_expanded_view_state() -> TuningViewState:
         move_mode_slot=None,
         notification_message=None,
         notification_remaining_sec=0.0,
-        allow_overwrite=False,
     )
 
 

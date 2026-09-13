@@ -134,7 +134,7 @@ pkg_datas, pkg_binaries, pkg_hidden = _collect_packages(COLLECT_PACKAGES)
 pkg_binaries = [entry for entry in pkg_binaries if not _is_cuda_binary(entry)]
 
 datas = [
-    (str(REPO / "cleave-viz.yaml"), "."),
+    (str(REPO / "assets" / "cleave-viz.yaml"), "assets"),
     (str(REPO / "assets" / "fonts"), "assets/fonts"),
 ]
 datas += pkg_datas

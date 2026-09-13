@@ -100,7 +100,7 @@ Optional compensation for unmeasurable residual latency (Bluetooth headphones, O
 ### UX
 
 - Optional, default 0. Calibrate before free-form authoring when wireless gear needs it; snap-on remains the robust default.
-- Machine-scoped, not project-scoped. Residual latency is a property of the current devices, not the song, so it must not live in per-project [cleave-viz.yaml](../cleave-viz.yaml). It persists in `~/.config/cleave/config.yaml` under `editor.residual_latency_ms`.
+- Machine-scoped, not project-scoped. Residual latency is a property of the current devices, not the song, so it must not live in per-project [cleave-viz.yaml](../../assets/cleave-viz.yaml). It persists in `~/.config/cleave/config.yaml` under `editor.residual_latency_ms`.
 - Help copy: "Latency compensation corrects for latency the OS cannot report. Affects live playhead and new timeline cue/song marker placements only. Already saved markers and cues do not move when you change this. Measure latency the OS cannot report."
 - If the value changes while a project already has markers or cues, a short note is enough: existing times unchanged; re-record if placement used a different latency.
 - Calibrate to the sound (or click track), not to existing free-form marks that may have been captured under a wrong latency.

@@ -124,7 +124,7 @@ representative edit then quit flow.
   if no, document that it is template only and not round tripped.
 - Reconcile default mismatches noted in the review (for example
   `DEFAULT_RENDER_POST_FX_FADE_IN` in [cleave/config.py](cleave/config.py) versus
-  the template value in [cleave-viz.yaml](cleave-viz.yaml)). Pick one source of
+  the template value in [cleave-viz.yaml](../../assets/cleave-viz.yaml)). Pick one source of
   truth (the constant), and make the template match or be generated.
 
 Acceptance: a load then save round trip preserves all user tunable fields; a test

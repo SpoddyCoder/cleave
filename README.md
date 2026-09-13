@@ -209,7 +209,7 @@ DIMINUENDO:  FULL ↘↘↘ thin ──── thin ──── ► restore
 The project directory stores all files required in a self-contained bundle...
 
 * `project.yaml` - project metadata, song markers, Milkdrop defaults (`milkdrop.beat_sensitivity`), compositor hdr (`compositor.hdr`), and render output size/fps (`render.width` / `render.height` / `render.fps`)
-* `cleave-viz.yaml` - layer, render, and timeline configuration. Not everything in here is surfaced in the editor UI just yet
+* `cleave-viz.yaml` - layers, timeline, overlays, and post-FX. Save in the editor writes this file and flushes live `project.yaml` fields. Not everything in here is surfaced in the editor UI just yet
 * `signals.json` - audio analysis data (schema version 4) used by `cleave effects` and the opt-in timeline preset conductor; re-run `separate` on existing projects after a schema bump so envelopes stay current
 * `mysong.wav` - original source audio is copied into the project directory
 * `stems/` - separated audio stems

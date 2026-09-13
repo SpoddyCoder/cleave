@@ -115,15 +115,13 @@ def _make_runtime(
     return runtime
 
 
-def test_ctrl_s_opens_save_dialog_from_timeline_context() -> None:
+def test_ctrl_s_saves_immediately_from_timeline_context() -> None:
     runtime = _make_runtime()
     assert dispatch_keydown(
         keydown(pygame.K_s, mod=pygame.KMOD_CTRL),
         runtime,
     ) is True
-    modal_view = runtime.modal_host.view_state()
-    assert modal_view is not None
-    assert modal_view.kind == ModalKind.SAVE_CHOICE
+    assert runtime.modal_host.view_state() is None
 
 
 def test_ctrl_enter_drops_song_marker_from_timeline_context() -> None:

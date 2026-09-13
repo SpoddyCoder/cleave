@@ -30,7 +30,6 @@ def _present_style_view_state() -> TuningViewState:
         },
         notification_message="timeline enabled",
         notification_remaining_sec=5.0,
-        active_config_label="cleave-viz.yaml",
     )
 
 
@@ -49,7 +48,7 @@ def _row_for_style(
         return index, "Settings ▼"
     if style == RowPresentStyle.PATH_ICON:
         index = layout.find_by_kind(RowKind.CONFIG_HEADER)
-        return index, "cleave-viz.yaml"
+        return index, "Save"
     if style == RowPresentStyle.FULL_LINE:
         index = layout.find_by_kind(RowKind.LAYER_MANAGEMENT_ADD)
         return index, "Add Layer"

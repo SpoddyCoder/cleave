@@ -4,8 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from cleave.config import find_config_path
-from cleave.paths import default_project_config, resource_dir
+from cleave.paths import default_project_config
 from cleave.project import resolve_mix_path as _resolve_mix_path
 from cleave.signals import Signals, load_signals
 
@@ -21,13 +20,13 @@ def resolve_config_path(
     config_override: Path | None,
     project_dir: Path,
 ) -> Path | None:
-    """Resolve config: CLI override, project default, then global search."""
+    """Resolve config: CLI override, then project default."""
     if config_override is not None:
         return config_override
     default_cfg = default_project_config(project_dir)
     if default_cfg.is_file():
         return default_cfg
-    return find_config_path(None, resource_dir())
+    return None
 
 
 def resolve_mix_path(project_dir: Path) -> Path:

@@ -50,7 +50,6 @@ from tests.support.config import (
     write_minimal_config,
 )
 from cleave.config_snapshot import (
-    next_unnamed_path,
     persisted_session_payload,
     persisted_session_signature,
     write_session_snapshot,
@@ -68,19 +67,6 @@ from cleave.viz.session import (
     default_render_overlay_card_runtime,
     session_from_cfg,
 )
-
-
-def test_next_unnamed_path_empty_dir(tmp_path: Path) -> None:
-    project_dir = tmp_path / "project"
-    assert next_unnamed_path(project_dir) == project_dir / "unnamed-1.yaml"
-
-
-def test_next_unnamed_path_fills_gaps(tmp_path: Path) -> None:
-    project_dir = tmp_path / "project"
-    project_dir.mkdir()
-    (project_dir / "unnamed-1.yaml").write_text("a\n", encoding="utf-8")
-    (project_dir / "unnamed-3.yaml").write_text("b\n", encoding="utf-8")
-    assert next_unnamed_path(project_dir) == project_dir / "unnamed-4.yaml"
 
 
 def _minimal_snapshot_session(

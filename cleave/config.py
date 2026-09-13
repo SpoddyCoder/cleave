@@ -169,6 +169,11 @@ from cleave.timeline_presets.timeline_cuts import (
 VIZ_CONFIG_FILENAME = "cleave-viz.yaml"
 
 
+def bundled_viz_template_path() -> Path:
+    """Return the shipped creative YAML template (never an active session)."""
+    return resource_dir() / "assets" / VIZ_CONFIG_FILENAME
+
+
 @dataclass(frozen=True)
 class PathsConfig:
     preset_root: Path
@@ -419,7 +424,7 @@ def ensure_project_viz_config(project_dir: Path) -> Path:
     if dst.is_file():
         return dst
 
-    src = resource_dir() / VIZ_CONFIG_FILENAME
+    src = bundled_viz_template_path()
     if not src.is_file():
         raise FileNotFoundError(f"config template not found: {src}")
 
@@ -432,20 +437,18 @@ def find_config_path(
     config_path: Path | None = None,
     project_root: Path | None = None,
 ) -> Path | None:
-    """Locate config: CLI override, project cleave-viz.yaml, then bundled template."""
+    """Locate config: CLI override, then project cleave-viz.yaml."""
     if config_path is not None:
         return _expand_path(config_path)
 
     root = project_root.resolve() if project_root is not None else Path.cwd()
     local_path = root / VIZ_CONFIG_FILENAME
-    if local_path.is_file():
-        return local_path.resolve()
-
-    template = resource_dir() / VIZ_CONFIG_FILENAME
-    if template.is_file():
-        return template.resolve()
-
-    return None
+    if not local_path.is_file():
+        return None
+    resolved = local_path.resolve()
+    if resolved == bundled_viz_template_path().resolve():
+        return None
+    return resolved
 
 
 def _parse_paths(data: dict[str, Any], user_cfg: UserConfig) -> PathsConfig:

@@ -15,7 +15,7 @@ Three roots. Do not treat the checkout layout as the install layout.
 | Helper | Frozen | Checkout | Holds |
 | --- | --- | --- | --- |
 | `install_dir()` | Parent of `sys.executable` (onedir folder root) | Repo root | Sidecars: `ffmpeg.exe`, later `projectM-4.dll` / `projectM-4-playlist.dll` |
-| `resource_dir()` | `sys._MEIPASS` (onedir `_internal`) | Repo root | Bundled files: `cleave-viz.yaml`, `assets/fonts/` |
+| `resource_dir()` | `sys._MEIPASS` (onedir `_internal`) | Repo root | Bundled files: `assets/cleave-viz.yaml`, `assets/fonts/` |
 | `data_dir()` | User data (not the zip) | Same | Projects, presets, textures, model weights (`models/`) |
 
 `is_frozen()` is `bool(getattr(sys, "frozen", False))`. `repo_root()` is always the checkout (tests and source scans). Runtime code that needs bundled files uses `resource_dir()`.
@@ -47,7 +47,7 @@ cleave/
     ffmpeg/
     libprojectM/
   _internal/                 # sys._MEIPASS: Python, pygame/SDL, datas
-    cleave-viz.yaml
+    assets/cleave-viz.yaml
     assets/fonts/
 ```
 
@@ -112,7 +112,7 @@ COLLECT `name="cleave"`, so output is `dist/cleave/cleave.exe` plus `_internal/`
 That copies `packaging/windows/*.dll` and libprojectM licenses, fetches the pinned FFmpeg zip, and asserts `cleave.exe`, `ffmpeg.exe`, and the projectM DLLs sit in the onedir root. Use `--no-exe-check` only in tests that have no exe.
 
 - Entry: [cleave.py](../cleave.py) (`cleave.cli:main`). EXE name `cleave`. COLLECT name `cleave` (writes `dist/cleave/`).
-- `datas`: repo-root `cleave-viz.yaml` and `assets/fonts/` (includes `MaterialIcons-Regular.ttf`, `DejaVuSansMono.ttf`, `DejaVuSansMono-Bold.ttf`, and their licenses).
+- `datas`: `assets/cleave-viz.yaml` and `assets/fonts/` (includes `MaterialIcons-Regular.ttf`, `DejaVuSansMono.ttf`, `DejaVuSansMono-Bold.ttf`, and their licenses).
 - Play on an existing project (stems + `signals.json`) must not import torch or librosa at module load. Drop a wav or `cleave.exe play <wav>` opens the loading window, downloads weights, splits, and analyses.
 
 `librosa` is collected for analyse. Play/render stay freeze-safe on a complete project: stem types and paths live in [cleave/stems.py](../cleave/stems.py); PCM resample uses soxr in [cleave/pcm_io.py](../cleave/pcm_io.py). [cleave/extract.py](../cleave/extract.py) imports librosa for analyse only. `STEM_SPLIT_MISSING_FROZEN` remains a runtime guard if frozen torch is missing; it is not the product smoke.
@@ -123,7 +123,7 @@ That copies `packaging/windows/*.dll` and libprojectM licenses, fetches the pinn
 
 Hidden imports cover Demucs pickle/load (`demucs.pretrained`, `demucs.hdemucs`, `demucs.htdemucs`, `demucs.apply`, `demucs.audio`), Beat This inference (`beat_this.inference`, `beat_this.model.beat_tracker`), librosa / soundfile / audioread, and numpy 2 `_core` internals.
 
-`datas`: `cleave-viz.yaml` and `assets/fonts/`. Demucs `remote/*.yaml` travels with `collect_all("demucs")`.
+`datas`: `assets/cleave-viz.yaml` and `assets/fonts/`. Demucs `remote/*.yaml` travels with `collect_all("demucs")`.
 
 CUDA binaries are dropped after collect: names matching `cudart`, `cublas`, `cudnn`, `nccl`, `nvrtc`, and similar (`torch_cuda`, `c10_cuda`, ...). The `torch` Python package is not excluded. CPU wheels already omit CUDA; the filter is so PyInstaller does not copy stubs.
 

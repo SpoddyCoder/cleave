@@ -17,7 +17,6 @@ from cleave.config_schema.render import (
     default_highlight_rolloff_runtime_values,
 )
 from cleave.stems import STEM_NAMES, StemSource
-from cleave.paths import repo_root
 from cleave.preset_playlist import playlist_at_dir
 from cleave.viz.session import ChromaBoostRuntime, HighlightRolloffRuntime, LayerRuntime, RenderPostFxRuntime
 
@@ -70,10 +69,6 @@ def default_render_post_fx_runtime(**overrides: object) -> RenderPostFxRuntime:
         chroma_boost=chroma_boost,
         **values,
     )  # type: ignore[arg-type]
-
-
-def repo_root_template_path() -> Path:
-    return repo_root() / VIZ_CONFIG_FILENAME
 
 
 def slot_for_stem(stem: str) -> str:

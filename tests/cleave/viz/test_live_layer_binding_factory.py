@@ -140,25 +140,12 @@ def test_is_paused_reads_playback() -> None:
     assert is_paused() is True
 
 
-def test_on_save_new_config_writes_snapshot_and_syncs_textures() -> None:
-    _ctx, factory, _layer = _make_factory()
-    out = Path("/tmp/project/unnamed-1.yaml")
-    with patch(f"{_FACTORY}.next_unnamed_path", return_value=out) as mock_next:
-        with patch(f"{_FACTORY}.write_session_snapshot") as mock_write:
-            with patch(f"{_FACTORY}.sync_project_textures") as mock_sync:
-                result = factory.on_save_new_config()
-    assert result == out
-    mock_next.assert_called_once()
-    mock_write.assert_called_once()
-    mock_sync.assert_called_once()
-
-
-def test_on_overwrite_config_writes_snapshot_and_returns_name() -> None:
+def test_on_save_config_writes_snapshot_and_returns_name() -> None:
     _ctx, factory, _layer = _make_factory()
     path = Path("/tmp/project/active.yaml")
     with patch(f"{_FACTORY}.write_session_snapshot") as mock_write:
         with patch(f"{_FACTORY}.sync_project_textures") as mock_sync:
-            result = factory.on_overwrite_config(path)
+            result = factory.on_save_config(path)
     assert result == "active.yaml"
     mock_write.assert_called_once()
     mock_sync.assert_called_once()

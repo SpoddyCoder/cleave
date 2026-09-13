@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
-from cleave.config import CleaveConfig, VIZ_CONFIG_FILENAME
+from cleave.config import CleaveConfig
 from cleave.config_schema.layers import (
     MAX_LAYER_COUNT,
     MIN_LAYER_COUNT,
@@ -16,7 +16,6 @@ from cleave.stems import STEM_SOURCES
 from cleave.gl_compositor import GlCompositor
 from cleave.gl_masked_compositor import GlMaskedCompositor
 from cleave.gl_post_process import GlPostProcess
-from cleave.paths import resource_dir
 from cleave.preset_playlist import PresetPlaylist, scan_single_layer
 from cleave.signals import Signals
 from cleave.viz.controls import TuningControls
@@ -199,10 +198,8 @@ def make_tuning_controls(
         "beat_times": beat_times,
         "bar_times": bar_times,
         "signals": signals,
-        "on_save_new_config": factory.on_save_new_config,
-        "on_overwrite_config": factory.on_overwrite_config,
+        "on_save_config": factory.on_save_config,
         "launch_config_path": cfg.config_path,
-        "repo_root_example": resource_dir() / VIZ_CONFIG_FILENAME,
     }
     if modal_host is not None:
         kwargs["modal_host"] = modal_host

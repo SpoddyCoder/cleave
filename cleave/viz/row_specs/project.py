@@ -1,4 +1,4 @@
-"""Project header, config path, Compositor, and Render Project row specs."""
+"""Project header, Save, Compositor, and Render Project row specs."""
 
 from __future__ import annotations
 
@@ -23,8 +23,10 @@ if TYPE_CHECKING:
     from cleave.viz.controls import TuningControls
 
 
-def _format_config_header(state: TuningViewState, _desc: RowDescriptor) -> str:
-    return state.active_config_label
+def _format_config_header(
+    _state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return "Save"
 
 
 def _format_project_render_output(
@@ -205,8 +207,8 @@ SPECS: dict[RowKind, RowSpec] = {
         shows_dirty_suffix=True,
         help_title="Save",
         help_description=(
-            "Active config file.",
-            "Enter or Ctrl+S saves the current session settings.",
+            "Save this project.",
+            "Enter or Ctrl+S writes immediately.",
         ),
         is_pinned=True,
         parent_group="project",

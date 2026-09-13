@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from cleave.config import CleaveConfig
-from cleave.config_snapshot import next_unnamed_path, write_session_snapshot
+from cleave.config_snapshot import write_session_snapshot
 from cleave.effects.runtime import EffectRuntime
 from cleave.stems import StemSource
 from cleave.gl_compositor import GlCompositor
@@ -267,14 +267,7 @@ class LiveLayerBindingsFactory:
                     fbo.height,
                 )
 
-    def on_save_new_config(self) -> Path:
-        ctx = self.ctx
-        out_path = next_unnamed_path(ctx.project_dir)
-        write_session_snapshot(out_path, cfg=ctx.cfg, session=ctx.session)
-        self._sync_project_textures()
-        return out_path
-
-    def on_overwrite_config(self, path: Path) -> str:
+    def on_save_config(self, path: Path) -> str:
         ctx = self.ctx
         write_session_snapshot(path, cfg=ctx.cfg, session=ctx.session)
         self._sync_project_textures()
