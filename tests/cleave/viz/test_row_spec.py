@@ -14,6 +14,7 @@ from cleave.config_schema.editor import (
     DEFAULT_EDITOR_WIDTH,
     ui_fade_display,
 )
+from cleave.config_schema.layers import hard_cut_enabled_display
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
 from cleave.viz.row_spec import (
     ACTION_ROW_KINDS,
@@ -51,7 +52,9 @@ from cleave.viz.row_spec import (
 from cleave.viz.tuning_view_state import (
     RenderOverlaysBlock,
     RenderPostFxBlock,
+    RenderTimelineBlock,
     SettingsBlock,
+    TimelineFadeGroupBlock,
 )
 from tests.cleave.viz.test_controls import (
     _keydown,
@@ -738,9 +741,34 @@ def test_row_expand_subheader_display_text() -> None:
     )
 
 
-def test_song_markers_expand_subheader_includes_count() -> None:
-    from cleave.viz.tuning_view_state import RenderTimelineBlock
+def test_format_row_value_timeline_cuts() -> None:
+    state = _minimal_view_state(
+        render_timeline=RenderTimelineBlock(
+            hard_cut_fades=TimelineFadeGroupBlock(
+                enabled=True, fade_in=1.5, fade_out=2.5, crossfade=True
+            ),
+            soft_cut_fades=TimelineFadeGroupBlock(
+                enabled=False, fade_in=0.5, fade_out=3.0, crossfade=False
+            ),
+        )
+    )
+    assert format_row_value(
+        state, RowDescriptor(RowKind.TIMELINE_HARD_CUTS)
+    ) == hard_cut_enabled_display(True)
+    assert format_row_value(
+        state, RowDescriptor(RowKind.TIMELINE_SOFT_CUTS)
+    ) == hard_cut_enabled_display(False)
+    assert (
+        format_row_value(state, RowDescriptor(RowKind.TIMELINE_HARD_CUT_FADE_IN))
+        == "1.5s"
+    )
+    assert (
+        format_row_value(state, RowDescriptor(RowKind.TIMELINE_SOFT_CUT_FADE_OUT))
+        == "3.0s"
+    )
 
+
+def test_song_markers_expand_subheader_includes_count() -> None:
     state = _minimal_view_state(
         render_timeline=RenderTimelineBlock(
             expanded=True,
