@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import re
 from pathlib import Path
 from typing import Any
 
@@ -12,21 +11,6 @@ import yaml
 from cleave.config import CleaveConfig, dump_yaml
 from cleave.config_schema.persist import persisted_session_payload
 from cleave.viz.session import TuningSession
-
-_UNNAMED_PATTERN = re.compile(r"^unnamed-(\d+)\.yaml$")
-
-
-def next_unnamed_path(project_dir: Path) -> Path:
-    """Return the next unused ``unnamed-N.yaml`` in ``project_dir``."""
-    project_dir.mkdir(parents=True, exist_ok=True)
-    max_n = 0
-    for entry in project_dir.iterdir():
-        if not entry.is_file():
-            continue
-        match = _UNNAMED_PATTERN.match(entry.name)
-        if match is not None:
-            max_n = max(max_n, int(match.group(1)))
-    return project_dir / f"unnamed-{max_n + 1}.yaml"
 
 
 def _load_original_dict(cfg: CleaveConfig) -> dict[str, Any]:

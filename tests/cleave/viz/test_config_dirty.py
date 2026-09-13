@@ -14,7 +14,7 @@ from cleave.viz.controls import TuningControls
 from cleave.viz.timeline_controls import TimelineControls
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from tests.cleave.viz.test_controls import (
-    _choose_save_as_new,
+    _save_now,
     _config_header_row,
     _desc,
     _expand_project,
@@ -527,16 +527,14 @@ def test_render_overlay_display_time_keyboard_regression() -> None:
 
 
 def test_display_time_mutation_clears_dirty_after_save() -> None:
-    saved_path = Path("/tmp/projects/my-track/unnamed-2.yaml")
     controls = _make_controls(("layer_1",))
-    controls._config_save._on_save_new_config = lambda: saved_path
     _mutate_render_overlay_display_time(controls)
     assert controls.config_dirty
 
     _expand_project(controls)
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = _desc(view, _config_header_row(view))
-    _choose_save_as_new(controls)
+    _save_now(controls)
     assert not controls.config_dirty
 
 

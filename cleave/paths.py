@@ -47,7 +47,7 @@ def resource_dir() -> Path:
     """Return the directory that holds bundled app files.
 
     Frozen: ``sys._MEIPASS`` (onedir ``_internal``). Checkout: repo root.
-    Template YAML and ``assets/fonts`` live here.
+    Template YAML (``assets/cleave-viz.yaml``) and ``assets/fonts`` live here.
     """
     if is_frozen():
         meipass = getattr(sys, "_MEIPASS", None)

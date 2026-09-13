@@ -843,7 +843,6 @@ def test_row_spec_apply_horizontal_signatures_match_field_mutator() -> None:
 
 def test_format_row_value_path_icon() -> None:
     state = _minimal_view_state(
-        active_config_label="projects/demo/cleave-viz.yaml",
         tracks={
             "layer_1": make_track_block(
                 stem=TEST_LAYER_STEMS["layer_1"],
@@ -858,7 +857,7 @@ def test_format_row_value_path_icon() -> None:
     )
     assert (
         format_row_value(state, RowDescriptor(RowKind.CONFIG_HEADER))
-        == "projects/demo/cleave-viz.yaml"
+        == "Save"
     )
     slot_desc = RowDescriptor(RowKind.TRACK_PRESET_DIR, slot="layer_1")
     assert format_row_value(state, slot_desc) == "presets/wave"

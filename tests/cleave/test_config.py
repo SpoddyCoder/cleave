@@ -33,6 +33,7 @@ from cleave.config import (
     clamp_effect_pct,
     clamp_upscale,
     dump_yaml,
+    bundled_viz_template_path,
     ensure_project_viz_config,
     find_config_path,
     load_config,
@@ -78,7 +79,7 @@ from cleave.config_schema.render import (
 from cleave.config_schema.timeline import parse_timeline_section, persist_timeline
 from cleave.user_config import EditorSettings
 from cleave.viz.session import TuningSession
-from cleave.paths import default_preset_root, default_texture_paths, repo_root, resource_dir
+from cleave.paths import default_preset_root, default_texture_paths, repo_root
 from cleave.stems import STEM_NAMES
 from cleave.timeline import SlotCue, TimelineLane
 from tests.support.config import (
@@ -410,10 +411,28 @@ def test_find_config_path_project_config(tmp_path: Path) -> None:
     assert found == project_config.resolve()
 
 
-def test_find_config_path_repo_template_fallback(tmp_path: Path) -> None:
+def test_find_config_path_missing_project_config_returns_none(tmp_path: Path) -> None:
     found = find_config_path(project_root=tmp_path / "no-config-here")
-    assert found == (resource_dir() / VIZ_CONFIG_FILENAME).resolve()
-    assert found == (repo_root() / VIZ_CONFIG_FILENAME).resolve()
+    assert found is None
+
+
+def test_load_config_missing_project_config_raises(tmp_path: Path) -> None:
+    with pytest.raises(FileNotFoundError, match="no cleave-viz.yaml found"):
+        load_config(project_root=tmp_path / "no-config-here")
+
+
+def test_bundled_template_is_not_repo_root() -> None:
+    template = bundled_viz_template_path()
+    assert template == (repo_root() / "assets" / VIZ_CONFIG_FILENAME).resolve()
+    assert template.is_file()
+    assert not (repo_root() / VIZ_CONFIG_FILENAME).is_file()
+
+
+def test_find_config_path_does_not_use_bundled_template() -> None:
+    template = bundled_viz_template_path()
+    assert find_config_path(project_root=repo_root()) is None
+    assert find_config_path(project_root=template.parent) is None
+    assert find_config_path(config_path=template) == template.resolve()
 
 
 def test_load_config_defaults_follow_data_dir(
@@ -573,7 +592,7 @@ def test_load_config_round_trip(minimal_project: Path) -> None:
 
 
 def test_repo_template_omits_editor_section_and_paths() -> None:
-    data = yaml.safe_load((repo_root() / VIZ_CONFIG_FILENAME).read_text(encoding="utf-8"))
+    data = yaml.safe_load(bundled_viz_template_path().read_text(encoding="utf-8"))
     assert "editor" not in data
     assert "paths" not in data
     assert "layers" in data
@@ -582,7 +601,7 @@ def test_repo_template_omits_editor_section_and_paths() -> None:
 
 
 def test_load_config_repo_template() -> None:
-    cfg = load_config(config_path=repo_root() / VIZ_CONFIG_FILENAME)
+    cfg = load_config(config_path=bundled_viz_template_path())
     assert cfg.layers["layer_1"].preset_switching == "on"
     assert cfg.layers["layer_1"].preset_switching_trigger == "projectm"
     for layer in cfg.layers.values():
@@ -1993,8 +2012,6 @@ _UI_ONLY_LITERAL_DEFAULTS = frozenset(
         ("TuningViewState", "persistent_notification_elapsed_sec"),
         ("TuningViewState", "notification_remaining_sec"),
         ("TuningViewState", "notification_elapsed_sec"),
-        ("TuningViewState", "allow_overwrite"),
-        ("TuningViewState", "active_config_label"),
         ("TuningViewState", "config_dirty"),
         ("TuningViewState", "solo_active"),
         ("TuningViewState", "timeline_recording"),

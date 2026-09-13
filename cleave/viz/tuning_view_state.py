@@ -99,7 +99,6 @@ from cleave.viz.session import (
     LayerRuntime,
     RenderOverlayCardRuntime,
     TuningSession,
-    config_path_display,
     default_render_overlay_card_runtime,
 )
 from cleave.viz.user_presets import (
@@ -302,8 +301,6 @@ class TuningViewState:
     notification_message: str | None = None
     notification_remaining_sec: float = 0.0
     notification_elapsed_sec: float = 0.0
-    allow_overwrite: bool = True
-    active_config_label: str = "cleave-viz.yaml"
     config_dirty: bool = False
     solo_slot: str | None = None
     solo_active: bool = False
@@ -942,10 +939,6 @@ class TuningViewStateBuilder:
             notification_message=notification_message,
             notification_remaining_sec=notification_remaining_sec,
             notification_elapsed_sec=notification_elapsed_sec,
-            allow_overwrite=self._config_save.allow_overwrite(),
-            active_config_label=config_path_display(
-                self._config_save.active_config_path
-            ),
             config_dirty=self._config_save.config_dirty,
             solo_slot=self.session.solo_slot,
             solo_active=self.session.solo_slot is not None,

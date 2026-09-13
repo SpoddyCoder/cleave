@@ -672,3 +672,99 @@ def test_parse_render_rejects_non_int_width(tmp_path: Path) -> None:
         yaml.safe_dump(data, handle, sort_keys=False)
     with pytest.raises(ValueError, match="render.width"):
         load_manifest(project)
+
+
+def _write_unknown_key(project: Path) -> None:
+    path = project / PROJECT_FILENAME
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    data["custom_metadata"] = True
+    data["milkdrop"] = {"beat_sensitivity": 4.0, "extra_pm": "keep"}
+    data["compositor"] = {"hdr": True, "extra_comp": 1}
+    data["render"] = {
+        "width": 1920,
+        "height": 1080,
+        "fps": 60,
+        "extra_render": "keep",
+    }
+    with path.open("w", encoding="utf-8") as handle:
+        yaml.safe_dump(data, handle, sort_keys=False)
+
+
+def _assert_unknown_keys_survive(project: Path) -> None:
+    data = yaml.safe_load(
+        (project / PROJECT_FILENAME).read_text(encoding="utf-8")
+    )
+    assert data["custom_metadata"] is True
+    assert data["milkdrop"]["extra_pm"] == "keep"
+    assert data["compositor"]["extra_comp"] == 1
+    assert data["render"]["extra_render"] == "keep"
+
+
+def _seed_manifest(tmp_path: Path) -> Path:
+    project = tmp_path / "song"
+    project.mkdir()
+    write_manifest(
+        project,
+        slug="song",
+        mix_filename="song.flac",
+        original_path=tmp_path / "source.flac",
+        demucs_model="htdemucs",
+    )
+    _write_unknown_key(project)
+    return project
+
+
+def test_save_song_markers_preserves_unknown_keys(tmp_path: Path) -> None:
+    project = _seed_manifest(tmp_path)
+    save_song_markers(project, (SongMarker(1.5),))
+    _assert_unknown_keys_survive(project)
+    assert load_manifest(project).song_markers == (SongMarker(1.5),)
+
+
+def test_save_milkdrop_settings_preserves_unknown_keys(tmp_path: Path) -> None:
+    project = _seed_manifest(tmp_path)
+    save_milkdrop_settings(project, 2.5)
+    _assert_unknown_keys_survive(project)
+    assert load_manifest(project).milkdrop == MilkdropSettings(2.5)
+
+
+def test_save_compositor_settings_preserves_unknown_keys(tmp_path: Path) -> None:
+    project = _seed_manifest(tmp_path)
+    save_compositor_settings(project, False)
+    _assert_unknown_keys_survive(project)
+    assert load_manifest(project).compositor == CompositorSettings(False)
+
+
+def test_save_render_settings_preserves_unknown_keys(tmp_path: Path) -> None:
+    project = _seed_manifest(tmp_path)
+    save_render_settings(project, width=1280, height=720, fps=24)
+    _assert_unknown_keys_survive(project)
+    assert load_manifest(project).render == ProjectRenderSettings(1280, 720, 24)
+
+
+def test_rewrite_manifest_slug_preserves_unknown_keys(tmp_path: Path) -> None:
+    project = _seed_manifest(tmp_path)
+    rewrite_manifest_slug(project, "new-slug", restored_from="old-slug")
+    _assert_unknown_keys_survive(project)
+    manifest = load_manifest(project)
+    assert manifest.slug == "new-slug"
+    assert manifest.restored_from == "old-slug"
+
+
+def test_write_manifest_update_preserves_unknown_keys(tmp_path: Path) -> None:
+    project = _seed_manifest(tmp_path)
+    rewrite_manifest_slug(project, "song", restored_from="archived-slug")
+    new_original = tmp_path / "new-source.wav"
+    new_original.write_bytes(b"new")
+    write_manifest(
+        project,
+        slug="song",
+        mix_filename="song.wav",
+        original_path=new_original,
+        demucs_model="htdemucs_ft",
+    )
+    _assert_unknown_keys_survive(project)
+    manifest = load_manifest(project)
+    assert manifest.mix_filename == "song.wav"
+    assert manifest.demucs_model == "htdemucs_ft"
+    assert manifest.restored_from == "archived-slug"

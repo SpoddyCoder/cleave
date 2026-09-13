@@ -84,7 +84,7 @@ What landed:
 - Windows data root `Documents\cleave\` (Known Folder, `CLEAVE_DATA` still overrides). User config `%APPDATA%\cleave\config.yaml`. Preset/texture defaults follow `data_dir()`.
 - Frozen FFmpeg lookup in [cleave/ffmpeg.py](../cleave/ffmpeg.py): beside the exe only; no PATH fallback. Checkout still uses PATH.
 - ctypes: frozen or `win32` searches `install_dir()` first (`projectM-4.dll` / `projectM-4-playlist.dll`), then env vars. Linux checkout order is unchanged.
-- [packaging/cleave.spec](../packaging/cleave.spec): PyInstaller onedir, pygame and soxr collected, excludes `torch` / `demucs` / `beat_this` / `librosa` / `matplotlib`. `datas`: `cleave-viz.yaml` and `assets/fonts/` (including `MaterialIcons-Regular.ttf`).
+- [packaging/cleave.spec](../packaging/cleave.spec): PyInstaller onedir, pygame and soxr collected, excludes `torch` / `demucs` / `beat_this` / `librosa` / `matplotlib`. `datas`: `assets/cleave-viz.yaml` and `assets/fonts/` (including `MaterialIcons-Regular.ttf`).
 - Stem-split guard in [cleave/separate.py](../cleave/separate.py) (`require_stem_split`) for a short frozen error.
 - Design note: [windows-freeze.md](windows-freeze.md).
 

@@ -7,9 +7,7 @@ import sys
 from collections.abc import Callable
 from pathlib import Path
 
-import pygame
-
-from cleave.config import VIZ_CONFIG_FILENAME, CleaveConfig
+from cleave.config import CleaveConfig
 from cleave.config_schema.persist import persisted_session_payload
 from cleave.project import (
     save_compositor_settings,
@@ -18,13 +16,11 @@ from cleave.project import (
     save_song_markers,
 )
 from cleave.viz.modal import ModalHost, ModalKind
-from cleave.viz.session import TuningSession, allow_overwrite_for_path
-
-_DEFAULT_SAVE_FILENAME = "unnamed-1.yaml"
+from cleave.viz.session import TuningSession
 
 
 class ConfigSaveController:
-    """Dirty tracking, save dialogs, and deferred quit.
+    """Dirty tracking, immediate Save, and deferred quit.
 
     Viz YAML fields use ``persisted_session_payload``. Song markers,
     milkdrop beat sensitivity, compositor hdr, and render width/height/fps
@@ -40,9 +36,7 @@ class ConfigSaveController:
         *,
         project_dir: Path | None = None,
         launch_config_path: Path | None = None,
-        repo_root_example: Path | None = None,
-        on_save_new_config: Callable[[], Path | None] | None = None,
-        on_overwrite_config: Callable[[Path], str | None] | None = None,
+        on_save_config: Callable[[Path], str | None] | None = None,
         on_notification: Callable[[str], None] | None = None,
         move_mode_signature: Callable[[], dict[str, list[str]] | None] | None = None,
     ) -> None:
@@ -51,13 +45,7 @@ class ConfigSaveController:
         self._modal = modal_host
         self._project_dir = project_dir
         self._active_config_path = launch_config_path
-        self._repo_root_example = (
-            repo_root_example
-            if repo_root_example is not None
-            else Path(VIZ_CONFIG_FILENAME)
-        )
-        self._on_save_new_config = on_save_new_config
-        self._on_overwrite_config = on_overwrite_config
+        self._on_save_config = on_save_config
         self._on_notification = on_notification
         self._move_mode_signature = move_mode_signature
 
@@ -69,9 +57,7 @@ class ConfigSaveController:
         self._saved_render_height = session.project.render.height
         self._saved_render_fps = session.project.render.fps
         self._pending_exit = False
-        self._quit_after_save = False
         self._on_commit_save: list[Callable[[], None]] = []
-        self._pending_save_dismiss: Callable[[], None] | None = None
 
     def add_on_commit_save(self, callback: Callable[[], None]) -> None:
         self._on_commit_save.append(callback)
@@ -79,6 +65,11 @@ class ConfigSaveController:
     @property
     def active_config_path(self) -> Path | None:
         return self._active_config_path
+
+    def _save_destination(self) -> Path:
+        if self._active_config_path is not None:
+            return self._active_config_path
+        return self.cfg.config_path
 
     @property
     def config_dirty(self) -> bool:
@@ -141,7 +132,6 @@ class ConfigSaveController:
         self._flush_compositor()
         self._flush_render()
         self.clear_config_dirty()
-        self._pending_save_dismiss = None
         for callback in self._on_commit_save:
             callback()
 
@@ -152,12 +142,6 @@ class ConfigSaveController:
             if override is not None:
                 payload = {**payload, **override}
         return json.dumps(payload, sort_keys=True, separators=(",", ":"))
-
-    def allow_overwrite(self) -> bool:
-        return allow_overwrite_for_path(
-            self._active_config_path,
-            repo_root_example=self._repo_root_example,
-        )
 
     @property
     def pending_exit(self) -> bool:
@@ -184,90 +168,20 @@ class ConfigSaveController:
             )
         return False
 
-    def prompt_save(self, *, on_dismiss: Callable[[], None] | None = None) -> None:
-        self._pending_save_dismiss = on_dismiss
-        if not self.allow_overwrite():
-            self._modal.prompt_save_as_new(
-                on_save_as_new=self._trigger_save_new,
-                on_dismiss=self._dismiss_save_flow,
-            )
-            return
-
-        self._modal.prompt_save_choice(
-            on_overwrite=self._prompt_overwrite,
-            on_save_as_new=self._trigger_save_new,
-            on_dismiss=self._dismiss_save_flow,
-        )
-
-    def _dismiss_save_flow(self) -> None:
-        dismiss = self._pending_save_dismiss
-        self._pending_save_dismiss = None
-        if dismiss is not None:
-            dismiss()
-        else:
-            self._clear_quit_after_save()
-
-    def _clear_quit_after_save(self) -> None:
-        if self._quit_after_save:
-            self._quit_after_save = False
-
-    def _trigger_save_new(self) -> None:
-        if self._on_save_new_config is not None:
-            saved_path = self._on_save_new_config()
-        else:
-            saved_path = None
-        if saved_path is None:
-            filename = _DEFAULT_SAVE_FILENAME
-        else:
-            self._active_config_path = saved_path
-            filename = saved_path.name
-            self._commit_save()
-        self._show_save_notification(f"Config saved to {filename}")
-        self._finish_quit_after_save()
+    def save(self) -> None:
+        """Write the active creative YAML and flush project.yaml session fields."""
+        target = self._save_destination()
+        if self._on_save_config is not None:
+            self._on_save_config(target)
+        self._commit_save()
+        self._show_save_notification("Saved")
 
     def _quit_save(self) -> None:
-        self._quit_after_save = True
-        self.prompt_save()
+        self.save()
+        self._pending_exit = True
 
     def _quit_discard(self) -> None:
         self._pending_exit = True
-
-    def _finish_quit_after_save(self) -> None:
-        if self._quit_after_save:
-            self._quit_after_save = False
-            self.clear_config_dirty()
-            self._pending_exit = True
-
-    def _prompt_overwrite(self) -> None:
-        active_path = self._active_config_path
-        basename = (
-            active_path.name
-            if active_path is not None
-            else VIZ_CONFIG_FILENAME
-        )
-        message = f"Overwrite {basename}?"
-
-        def on_confirm() -> None:
-            target = active_path or Path(VIZ_CONFIG_FILENAME)
-            if self._on_overwrite_config is not None:
-                written = self._on_overwrite_config(target)
-            else:
-                written = basename
-            if not written:
-                written = basename
-            self._commit_save()
-            self._show_save_notification(f"Config overwritten: {written}")
-            self._finish_quit_after_save()
-
-        def on_cancel() -> None:
-            self._dismiss_save_flow()
-
-        self._modal.prompt_yes_no(
-            message=message,
-            on_confirm=on_confirm,
-            on_cancel=on_cancel,
-            cancel_label="Cancel",
-        )
 
     def _show_save_notification(self, message: str) -> None:
         print(message, file=sys.stderr)

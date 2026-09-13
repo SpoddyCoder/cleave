@@ -195,7 +195,7 @@ class EditorModeController:
 
     def _enter_curation_via_save(self) -> None:
         self._enter_curation_after_save = True
-        self._config_save.prompt_save(on_dismiss=self._cancel_enter_curation)
+        self._config_save.save()
 
     def _enter_curation_via_discard(self) -> None:
         self._reload_active_config(editor_mode="preset_curation", panel_open=False)

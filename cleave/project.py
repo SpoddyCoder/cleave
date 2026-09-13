@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import sys
-from dataclasses import dataclass, replace
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Sequence
 
 import yaml
 
@@ -202,6 +202,38 @@ def manifest_path(project_dir: Path) -> Path:
     return project_dir / PROJECT_FILENAME
 
 
+def _read_manifest_mapping(project_dir: Path) -> dict:
+    path = manifest_path(project_dir)
+    if not path.is_file():
+        raise FileNotFoundError(f"project manifest not found: {path}")
+    with path.open(encoding="utf-8") as handle:
+        data = yaml.safe_load(handle)
+    if not isinstance(data, dict):
+        raise ValueError(f"invalid project manifest: {path}")
+    return data
+
+
+def _write_manifest_mapping(project_dir: Path, data: dict) -> Path:
+    path = manifest_path(project_dir)
+    with path.open("w", encoding="utf-8") as handle:
+        yaml.safe_dump(data, handle, sort_keys=False)
+    return path
+
+
+def _patch_manifest(project_dir: Path, patch: Callable[[dict], None]) -> Path:
+    data = _read_manifest_mapping(project_dir)
+    patch(data)
+    return _write_manifest_mapping(project_dir, data)
+
+
+def _ensure_mapping(data: dict, key: str) -> dict:
+    section = data.get(key)
+    if not isinstance(section, dict):
+        section = {}
+        data[key] = section
+    return section
+
+
 def rewrite_manifest_slug(
     project_dir: Path,
     slug: str,
@@ -209,12 +241,15 @@ def rewrite_manifest_slug(
     restored_from: str | None = None,
 ) -> Path:
     """Update ``project.yaml`` *slug* and optional ``restored-from`` provenance."""
-    manifest = load_manifest(project_dir)
-    updated = replace(manifest, slug=slug, restored_from=restored_from)
-    path = manifest_path(project_dir)
-    with path.open("w", encoding="utf-8") as handle:
-        yaml.safe_dump(updated.to_dict(), handle, sort_keys=False)
-    return path
+
+    def patch(data: dict) -> None:
+        data["slug"] = slug
+        if restored_from is None:
+            data.pop("restored-from", None)
+        else:
+            data["restored-from"] = restored_from
+
+    return _patch_manifest(project_dir, patch)
 
 
 def load_manifest(project_dir: Path) -> ProjectManifest:
@@ -267,101 +302,97 @@ def write_manifest(
     original = str(original_path.resolve())
     separated = when.isoformat()
     if path.is_file():
-        existing = load_manifest(project_dir)
-        markers = (
-            coerce_song_markers(song_markers)
-            if song_markers is not None
-            else existing.song_markers
-        )
-        milkdrop_settings = milkdrop if milkdrop is not None else existing.milkdrop
-        compositor_settings = (
-            compositor if compositor is not None else existing.compositor
-        )
-        render_settings = render if render is not None else existing.render
-        manifest = replace(
-            existing,
-            slug=slug,
-            mix_filename=mix_filename,
-            original_path=original,
-            separated_at=separated,
-            demucs_model=demucs_model,
-            song_markers=markers,
-            milkdrop=milkdrop_settings,
-            compositor=compositor_settings,
-            render=render_settings,
-        )
-    else:
-        manifest = ProjectManifest(
-            version=1,
-            slug=slug,
-            mix_filename=mix_filename,
-            original_path=original,
-            separated_at=separated,
-            demucs_model=demucs_model,
-            song_markers=coerce_song_markers(song_markers),
-            milkdrop=milkdrop,
-            compositor=compositor,
-            render=render,
-        )
+
+        def patch(data: dict) -> None:
+            data["slug"] = slug
+            _ensure_mapping(data, "mix")["filename"] = mix_filename
+            ingest = _ensure_mapping(data, "ingest")
+            ingest["original_path"] = original
+            ingest["separated_at"] = separated
+            ingest["demucs_model"] = demucs_model
+            if song_markers is not None:
+                _set_song_markers(data, coerce_song_markers(song_markers))
+            if milkdrop is not None:
+                _ensure_mapping(data, "milkdrop")["beat_sensitivity"] = (
+                    milkdrop.beat_sensitivity
+                )
+            if compositor is not None:
+                _ensure_mapping(data, "compositor")["hdr"] = compositor.hdr
+            if render is not None:
+                section = _ensure_mapping(data, "render")
+                section["width"] = render.width
+                section["height"] = render.height
+                section["fps"] = render.fps
+
+        return _patch_manifest(project_dir, patch)
+
+    manifest = ProjectManifest(
+        version=1,
+        slug=slug,
+        mix_filename=mix_filename,
+        original_path=original,
+        separated_at=separated,
+        demucs_model=demucs_model,
+        song_markers=coerce_song_markers(song_markers),
+        milkdrop=milkdrop,
+        compositor=compositor,
+        render=render,
+    )
     with path.open("w", encoding="utf-8") as handle:
         yaml.safe_dump(manifest.to_dict(), handle, sort_keys=False)
     return path
+
+
+def _set_song_markers(data: dict, markers: Sequence[SongMarker]) -> None:
+    if markers:
+        data["song-markers"] = _song_markers_to_yaml(markers)
+    else:
+        data.pop("song-markers", None)
 
 
 def save_song_markers(
     project_dir: Path, markers: Sequence[SongMarker | float]
 ) -> Path:
     """Replace ``song-markers`` in ``project.yaml``, preserving ingest and provenance."""
-    manifest = load_manifest(project_dir)
-    updated = replace(manifest, song_markers=coerce_song_markers(markers))
-    path = manifest_path(project_dir)
-    with path.open("w", encoding="utf-8") as handle:
-        yaml.safe_dump(updated.to_dict(), handle, sort_keys=False)
-    return path
+
+    def patch(data: dict) -> None:
+        _set_song_markers(data, coerce_song_markers(markers))
+
+    return _patch_manifest(project_dir, patch)
 
 
 def save_milkdrop_settings(project_dir: Path, beat_sensitivity: float) -> Path:
     """Replace ``milkdrop`` in ``project.yaml``, preserving ingest and provenance."""
-    manifest = load_manifest(project_dir)
-    updated = replace(
-        manifest,
-        milkdrop=MilkdropSettings(
-            beat_sensitivity=clamp_beat_sensitivity(beat_sensitivity)
-        ),
-    )
-    path = manifest_path(project_dir)
-    with path.open("w", encoding="utf-8") as handle:
-        yaml.safe_dump(updated.to_dict(), handle, sort_keys=False)
-    return path
+
+    def patch(data: dict) -> None:
+        _ensure_mapping(data, "milkdrop")["beat_sensitivity"] = (
+            clamp_beat_sensitivity(beat_sensitivity)
+        )
+
+    return _patch_manifest(project_dir, patch)
 
 
 def save_compositor_settings(project_dir: Path, hdr: bool) -> Path:
     """Replace ``compositor`` in ``project.yaml``, preserving ingest and provenance."""
-    manifest = load_manifest(project_dir)
-    updated = replace(manifest, compositor=CompositorSettings(hdr=bool(hdr)))
-    path = manifest_path(project_dir)
-    with path.open("w", encoding="utf-8") as handle:
-        yaml.safe_dump(updated.to_dict(), handle, sort_keys=False)
-    return path
+
+    def patch(data: dict) -> None:
+        _ensure_mapping(data, "compositor")["hdr"] = bool(hdr)
+
+    return _patch_manifest(project_dir, patch)
 
 
 def save_render_settings(
     project_dir: Path, *, width: int, height: int, fps: int
 ) -> Path:
     """Replace ``render`` in ``project.yaml``, preserving ingest and provenance."""
-    manifest = load_manifest(project_dir)
-    updated = replace(
-        manifest,
-        render=ProjectRenderSettings(
-            width=clamp_render_width(width),
-            height=clamp_render_height(height),
-            fps=clamp_render_fps(fps),
-        ),
-    )
-    path = manifest_path(project_dir)
-    with path.open("w", encoding="utf-8") as handle:
-        yaml.safe_dump(updated.to_dict(), handle, sort_keys=False)
-    return path
+
+    def patch(data: dict) -> None:
+        section = _ensure_mapping(data, "render")
+        section["width"] = clamp_render_width(width)
+        section["height"] = clamp_render_height(height)
+        section["fps"] = clamp_render_fps(fps)
+
+    return _patch_manifest(project_dir, patch)
 
 
 def mix_path(project_dir: Path) -> Path:

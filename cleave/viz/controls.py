@@ -90,10 +90,8 @@ class TuningControls:
         project_dir: Path | None = None,
         layer_bindings: LiveLayerBindings | None = None,
         render_post_fx_bindings: RenderPostFxBindings | None = None,
-        on_save_new_config: Callable[[], Path | None] | None = None,
-        on_overwrite_config: Callable[[Path], str | None] | None = None,
+        on_save_config: Callable[[Path], str | None] | None = None,
         launch_config_path: Path | None = None,
-        repo_root_example: Path | None = None,
         modal_host: ModalHost | None = None,
         layer_manager: LayerManager | None = None,
         compositor: GlCompositor | None = None,
@@ -153,9 +151,7 @@ class TuningControls:
             self._modal_host,
             project_dir=project_dir,
             launch_config_path=launch_config_path,
-            repo_root_example=repo_root_example,
-            on_save_new_config=on_save_new_config,
-            on_overwrite_config=on_overwrite_config,
+            on_save_config=on_save_config,
             on_notification=self.show_notification,
             move_mode_signature=self.layer_lifecycle.signature_payload,
         )
@@ -379,7 +375,7 @@ class TuningControls:
     def prompt_save_config(self) -> None:
         if self.session.solo_slot is not None:
             return
-        self._config_save.prompt_save()
+        self._config_save.save()
 
     def handle_keydown(self, event: pygame.event.Event) -> bool:
         """Handle a key down event for the main tuning tree."""

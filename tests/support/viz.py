@@ -72,7 +72,6 @@ class StubMixPlayer:
         return False
 
 
-REPO_ROOT_EXAMPLE = Path("/tmp/cleave-viz.yaml")
 DEFAULT_ACTIVE_CONFIG = Path("/tmp/projects/my-track/active.yaml")
 
 
@@ -196,7 +195,6 @@ def make_controls(
     slots: tuple[str, ...] = ("layer_1", "layer_2"),
     *,
     launch_config_path: Path | None = DEFAULT_ACTIVE_CONFIG,
-    repo_root_example: Path = REPO_ROOT_EXAMPLE,
 ) -> TuningControls:
     preset_root = Path("/tmp/presets")
     cfg = make_test_cfg(slots, preset_root=preset_root)
@@ -219,5 +217,4 @@ def make_controls(
         playback=stub_playback_state(),
         duration_sec=120.0,
         launch_config_path=launch_config_path,
-        repo_root_example=repo_root_example,
     )

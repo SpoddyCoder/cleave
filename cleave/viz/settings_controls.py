@@ -68,12 +68,14 @@ class SettingsControls:
         current = self.cfg.editor.residual_latency_ms
         new_value = clamp_residual_latency_ms(current + delta)
         self.cfg.editor = replace(self.cfg.editor, residual_latency_ms=new_value)
+        persist_editor_settings(self.cfg)
 
     def set_residual_latency_ms(self, ms: int) -> None:
         self.cfg.editor = replace(
             self.cfg.editor,
             residual_latency_ms=clamp_residual_latency_ms(ms),
         )
+        persist_editor_settings(self.cfg)
 
     def adjust_editor_window_width(self, *, forward: bool, ctrl: bool) -> None:
         step = 100 if ctrl else 10
@@ -124,6 +126,7 @@ class SettingsControls:
         else:
             new_mode = modes[(index - 1) % len(modes)]
         self.cfg.editor = replace(self.cfg.editor, preview_quality=new_mode)
+        persist_editor_settings(self.cfg)
 
     def cycle_ui_width_mode(self, *, forward: bool) -> None:
         modes = UI_WIDTH_MODES
@@ -137,6 +140,7 @@ class SettingsControls:
         else:
             new_mode = modes[(index - 1) % len(modes)]
         self.cfg.editor = replace(self.cfg.editor, ui_width_mode=new_mode)
+        persist_editor_settings(self.cfg)
 
     def adjust_ui_fade(self, *, forward: bool, ctrl: bool) -> None:
         step = 5.0 if ctrl else 1.0
@@ -144,6 +148,7 @@ class SettingsControls:
         current = self.cfg.editor.ui_fade
         new_value = clamp_ui_fade(current + delta)
         self.cfg.editor = replace(self.cfg.editor, ui_fade=new_value)
+        persist_editor_settings(self.cfg)
 
     def adjust_ui_width(self, *, forward: bool, ctrl: bool) -> None:
         step = 5 if ctrl else 1
@@ -151,3 +156,4 @@ class SettingsControls:
         current = self.cfg.editor.ui_width
         new_value = clamp_ui_width(current + delta)
         self.cfg.editor = replace(self.cfg.editor, ui_width=new_value)
+        persist_editor_settings(self.cfg)

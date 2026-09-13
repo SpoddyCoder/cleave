@@ -28,7 +28,7 @@ The goal is a layout where the install is read-only and all durable user data li
 | `projects_dir()` | [cleave/paths.py](../cleave/paths.py) | `data_dir() / "projects"` |
 | `GLOBAL_CONFIG_PATH` | [cleave/config.py](../cleave/config.py) | `~/.config/cleave/cleave-viz.yaml` as fallback in `find_config_path` |
 | `DEFAULT_PRESET_ROOT` | [cleave/config_schema.py](../cleave/config_schema.py) | `~/.local/share/cleave/presets` when `paths` omitted |
-| Repo template | [cleave-viz.yaml](../cleave-viz.yaml) | Example project config; copied into new projects |
+| Repo template | [assets/cleave-viz.yaml](../../assets/cleave-viz.yaml) | Example project config; copied into new projects |
 
 Gaps:
 
@@ -75,7 +75,7 @@ projects/<slug>/
 Ships with Cleave. Never written at runtime.
 
 - Python package, shaders, fonts
-- Default config template ([cleave-viz.yaml](../cleave-viz.yaml))
+- Default config template ([assets/cleave-viz.yaml](../../assets/cleave-viz.yaml))
 - Bundled preset submodules under [assets/milkdrop-presets/](../assets/milkdrop-presets/) for tests and optional seed content
 
 Runtime preset browsing should use the user's preset tree (`paths.preset_root`), not mutate files under `assets/`.

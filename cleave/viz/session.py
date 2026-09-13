@@ -13,7 +13,6 @@ from cleave.config import (
     RenderOverlaySlideDirection,
     TimelineFadeGroupConfig,
     TimelineLimiterConfig,
-    VIZ_CONFIG_FILENAME,
 )
 from cleave.config_schema.compositor import DEFAULT_COMPOSITOR_HDR
 from cleave.config_schema.editor import DEFAULT_BEAT_SENSITIVITY
@@ -106,22 +105,6 @@ from cleave.timeline_presets.timeline_cuts import (
     DEFAULT_TIMELINE_PRESET_TIMELINE_CUTS,
     TimelinePresetTimelineCuts,
 )
-
-
-def config_path_display(path: Path | None) -> str:
-    """Active config path for the config header row (truncation happens at draw time)."""
-    return path.as_posix() if path is not None else VIZ_CONFIG_FILENAME
-
-
-def allow_overwrite_for_path(
-    active_path: Path | None,
-    *,
-    repo_root_example: Path,
-) -> bool:
-    """Hide overwrite only for the repo-root template cleave-viz.yaml."""
-    if active_path is None:
-        return False
-    return active_path.resolve() != repo_root_example.resolve()
 
 
 @dataclass

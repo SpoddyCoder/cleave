@@ -10,6 +10,6 @@ Live Milkdrop/libprojectM visualizer editor. The Windows standalone app is the p
 - Entry: `python -m cleave play` (`cleave/viz/`). Commands: `separate`, `play`, `render`, `backup`, `restore`.
 - Layers: up to eight, default four. Live at display rate; offline fps from `render.fps`.
 - Data: `projects/<slug>/` (mix, `project.yaml`, `signals.json`, `stems/`). Override with `CLEAVE_DATA`.
-- Config: parse and defaults in `cleave/config_schema/`. Repo-root `cleave-viz.yaml` is the project template.
+- Config: parse and defaults in `cleave/config_schema/`. Bundled template is `assets/cleave-viz.yaml`; projects copy it as `cleave-viz.yaml`.
 - Stem PCM keeps native mono/stereo for projectM; mix playback is stereo; analysis for `signals.json` is mono.
 - Work list: [docs/todos.md](docs/todos.md). Roadmap: [docs/roadmap.md](docs/roadmap.md). Usage: [README.md](README.md).

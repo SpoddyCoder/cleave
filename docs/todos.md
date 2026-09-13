@@ -8,8 +8,6 @@ Must-do items for Cleave. Everything else is iterative enhancements or listed in
 
 Outstanding bugs and issues.
 
-- **`project.yaml` unknown-key wipe.** `write_manifest`, `save_song_markers`, `save_milkdrop_settings`, `save_compositor_settings`, `save_render_settings`, and `rewrite_manifest_slug` in [cleave/project.py](../cleave/project.py) still rewrite via `ProjectManifest.to_dict()`, so any key not on the dataclass is dropped. Prefer dict-merge updates that only touch the fields each helper owns.
-
 ---
 
 ## Timeline follow-ups

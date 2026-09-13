@@ -47,6 +47,7 @@ from tests.support.viz import (
     overlay_font,
     stub_playback_state,
 )
+from cleave.user_config import load_user_config
 from cleave.viz.controls import (
     NOTIFICATION_TIMELINE_DISABLED_TEXT,
     NOTIFICATION_TIMELINE_ENABLED_TEXT,
@@ -62,8 +63,6 @@ from cleave.viz.session import (
     LayerRuntime,
     TimelineRuntime,
     TuningSession,
-    allow_overwrite_for_path,
-    config_path_display,
 )
 from cleave.viz.row_spec import REPEAT_ROW_KINDS
 from cleave.viz.theme import (
@@ -111,7 +110,6 @@ def _make_playlist(name: str, count: int = 3) -> PresetPlaylist:
     return PresetPlaylist(current_dir=current_dir, paths=paths, index=0)
 
 
-_REPO_ROOT_EXAMPLE = Path("/tmp/cleave-viz.yaml")
 _DEFAULT_ACTIVE_CONFIG = Path("/tmp/projects/my-track/active.yaml")
 
 
@@ -124,7 +122,6 @@ def _make_controls(
     *,
     timeline_enabled: bool = False,
     launch_config_path: Path | None = _DEFAULT_ACTIVE_CONFIG,
-    repo_root_example: Path = _REPO_ROOT_EXAMPLE,
     beat_times: tuple[float, ...] = (),
     bar_times: tuple[float, ...] = (),
     project_dir: Path | None = None,
@@ -155,7 +152,6 @@ def _make_controls(
         duration_sec=duration_sec,
         project_dir=project_dir,
         launch_config_path=launch_config_path,
-        repo_root_example=repo_root_example,
         beat_times=beat_times,
         bar_times=bar_times,
         signals=signals,
@@ -168,7 +164,6 @@ def _make_controls_with_manager(
     can_add: bool = True,
     can_remove: bool = True,
     launch_config_path: Path | None = _DEFAULT_ACTIVE_CONFIG,
-    repo_root_example: Path = _REPO_ROOT_EXAMPLE,
 ) -> tuple[TuningControls, MagicMock]:
     preset_root = Path("/tmp/presets")
     cfg = make_test_cfg(slots, preset_root=preset_root, config_path=launch_config_path or _DEFAULT_ACTIVE_CONFIG)
@@ -195,7 +190,6 @@ def _make_controls_with_manager(
         playback=stub_playback_state(),
         duration_sec=120.0,
         launch_config_path=launch_config_path,
-        repo_root_example=repo_root_example,
         layer_manager=layer_manager,
     )
     return controls, layer_manager
@@ -219,19 +213,9 @@ def _expand_project_render(controls: TuningControls) -> None:
     controls.session.project.render.expanded = True
 
 
-def _choose_save_as_new(controls: TuningControls) -> None:
+def _save_now(controls: TuningControls) -> None:
     controls.handle_keydown(_keydown(pygame.K_RETURN))
-    modal_view = controls.modal_host.view_state()
-    assert modal_view is not None
-    target = modal_view.options.index("Save As New")
-    while controls.modal_host.view_state().focus_index != target:
-        controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    controls.handle_keydown(_keydown(pygame.K_RETURN))
-
-
-def _choose_overwrite(controls: TuningControls) -> None:
-    controls.handle_keydown(_keydown(pygame.K_RETURN))
-    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    assert not controls.modal_host.active
 
 
 def test_build_view_state_passes_fps() -> None:
@@ -409,22 +393,17 @@ def _expand_settings_editor_window(controls: TuningControls) -> None:
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
+def _expand_settings_latency(controls: TuningControls) -> None:
+    _expand_settings(controls)
+    controls.focus_descriptor = RowDescriptor(
+        RowKind.SETTINGS_LATENCY_COMPENSATION_HEADER
+    )
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
 def _focus_index(controls: TuningControls, *, paused: bool = False) -> int:
     view = controls.build_view_state(paused=paused)
     return view.layout.find_descriptor(controls.focus_descriptor)
-
-
-def test_allow_overwrite_for_path_hides_repo_root_template_only() -> None:
-    root = Path("/repo/cleave-viz.yaml")
-    assert allow_overwrite_for_path(root, repo_root_example=root) is False
-    assert (
-        allow_overwrite_for_path(
-            Path("/repo/projects/my-track/foo.yaml"),
-            repo_root_example=root,
-        )
-        is True
-    )
-    assert allow_overwrite_for_path(None, repo_root_example=root) is False
 
 
 def test_focus_navigation_wraps() -> None:
@@ -787,7 +766,7 @@ def test_move_mode_backspace_cancels_without_applying() -> None:
     assert not controls.config_dirty
 
 
-def test_save_as_new_triggers_notification_without_blocking_input() -> None:
+def test_save_triggers_notification_without_blocking_input() -> None:
     controls = _make_controls(("layer_1",))
     _expand_project(controls)
     view = controls.build_view_state(paused=False)
@@ -796,16 +775,11 @@ def test_save_as_new_triggers_notification_without_blocking_input() -> None:
     stderr = io.StringIO()
     with patch.object(time, "monotonic", return_value=1000.0):
         with patch("sys.stderr", stderr):
-            controls.handle_keydown(_keydown(pygame.K_RETURN))
-            modal_view = controls.modal_host.view_state()
-            assert modal_view is not None
-            assert modal_view.kind == ModalKind.SAVE_CHOICE
-            controls.handle_keydown(_keydown(pygame.K_RIGHT))
-            controls.handle_keydown(_keydown(pygame.K_RETURN))
+            _save_now(controls)
 
-        assert "Config saved to unnamed-1.yaml" in stderr.getvalue()
+        assert "Saved" in stderr.getvalue()
         state = controls.build_view_state(paused=False)
-        assert state.notification_message == "Config saved to unnamed-1.yaml"
+        assert state.notification_message == "Saved"
         assert state.notification_remaining_sec == NOTIFICATION_TOTAL_DURATION_SEC
 
         before = controls.focus_descriptor
@@ -813,38 +787,53 @@ def test_save_as_new_triggers_notification_without_blocking_input() -> None:
         assert controls.focus_descriptor != before
 
 
-def test_config_header_shows_active_path() -> None:
-    launch_path = Path("/tmp/projects/my-track/my-track.yaml")
+def test_save_writes_immediately_no_modal() -> None:
+    launch_path = Path("/tmp/projects/my-track/cleave-viz.yaml")
+    writes: list[Path] = []
+    controls = _make_controls(("layer_1",), launch_config_path=launch_path)
+    controls._config_save._on_save_config = lambda path: writes.append(path) or path.name
+    _mutate_dirty(controls)
+    _expand_project(controls)
+    view = controls.build_view_state(paused=False)
+    controls.focus_descriptor = _desc(view, _config_header_row(view))
+    _save_now(controls)
+    assert writes == [launch_path]
+    assert not controls.config_dirty
+    assert not controls.modal_host.active
+
+
+def test_config_header_shows_save() -> None:
     controls = _make_controls(("layer_1",))
-    controls._config_save._active_config_path = launch_path
     _expand_project(controls)
     view = controls.build_view_state(paused=False)
     header_row = next(
         i for i in range(len(view.layout)) if view.layout.kind(i) == RowKind.CONFIG_HEADER
     )
-    assert _row_text(view, header_row) == config_path_display(launch_path)
+    assert _row_text(view, header_row) == "Save"
     assert header_row in view.layout.navigable_indices(view)
+    font = overlay_font()
+    panel_w = baseline_tuning_ui_metrics().panel_content_max_width
+    label = fit_row_text(font, view, header_row, max_content_width=panel_w)
+    icon_budget = row_icon_prefix_width(font.get_linesize())
+    assert label == "Save"
+    assert font.size(label)[0] + icon_budget <= panel_w
 
 
 def test_config_header_shows_asterisk_when_dirty() -> None:
-    launch_path = Path("/tmp/projects/my-track/my-track.yaml")
     controls = _make_controls(("layer_1",))
-    controls._config_save._active_config_path = launch_path
     _mutate_dirty(controls)
     _expand_project(controls)
     view = controls.build_view_state(paused=False)
     header_row = next(
         i for i in range(len(view.layout)) if view.layout.kind(i) == RowKind.CONFIG_HEADER
     )
-    assert _row_text(view, header_row) == config_path_display(launch_path)
+    assert _row_text(view, header_row) == "Save"
     assert view.config_dirty
     assert header_row in view.layout.navigable_indices(view)
 
 
 def test_blend_and_opacity_change_sets_dirty_save_clears() -> None:
-    saved_path = Path("/tmp/projects/my-track/unnamed-2.yaml")
     controls = _make_controls(("layer_1",))
-    controls._config_save._on_save_new_config = lambda: saved_path
     assert not controls.config_dirty
 
     view = controls.build_view_state(paused=False)
@@ -860,28 +849,8 @@ def test_blend_and_opacity_change_sets_dirty_save_clears() -> None:
     view = controls.build_view_state(paused=False)
     save_row = _config_header_row(view)
     controls.focus_descriptor = _desc(view, save_row)
-    _choose_save_as_new(controls)
+    _save_now(controls)
     assert not controls.config_dirty
-
-
-def test_config_header_truncates_long_paths() -> None:
-    long_path = Path(
-        "/very/long/root/projects/my-track/nested/deep/unnamed-99.yaml"
-    )
-    controls = _make_controls(("layer_1",))
-    controls._config_save._active_config_path = long_path
-    _expand_project(controls)
-    view = controls.build_view_state(paused=False)
-    header_row = next(
-        i for i in range(len(view.layout)) if view.layout.kind(i) == RowKind.CONFIG_HEADER
-    )
-    font = overlay_font()
-    panel_w = baseline_tuning_ui_metrics().panel_content_max_width
-    label = fit_row_text(font, view, header_row, max_content_width=panel_w)
-    icon_budget = row_icon_prefix_width(font.get_linesize())
-    assert font.size(label)[0] + icon_budget <= panel_w
-    assert label.startswith("…")
-    assert "…/" not in label
 
 
 def test_preset_row_truncates_long_filenames() -> None:
@@ -925,15 +894,11 @@ def test_preset_row_truncates_long_filenames() -> None:
 
 
 def test_fit_row_text_config_and_preset_share_panel_width() -> None:
-    long_path = Path(
-        "/very/long/root/projects/my-track/nested/deep/unnamed-99.yaml"
-    )
     long_name = (
         "Phat_Zylot_Eo.S. rainbow bubble_mid3-starpoints_spirals_VE "
         "- Bitcore Tweak.milk (1/50)"
     )
     controls = _make_controls(("layer_1",))
-    controls._config_save._active_config_path = long_path
     _expand_project(controls)
     view = controls.build_view_state(paused=False)
     view.tracks["layer_1"] = make_track_block(
@@ -961,134 +926,10 @@ def test_fit_row_text_config_and_preset_share_panel_width() -> None:
     assert font.size(preset_label)[0] + TREE_INDENT + preset_prefix_w <= panel_w
 
 
-def test_save_as_new_updates_active_config_path() -> None:
-    saved_path = Path("/tmp/projects/my-track/unnamed-2.yaml")
+def test_navigable_project_save_row() -> None:
     controls = _make_controls(("layer_1",))
-    controls._config_save._on_save_new_config = lambda: saved_path
-
     _expand_project(controls)
     view = controls.build_view_state(paused=False)
-    save_row = _config_header_row(view)
-    controls.focus_descriptor = _desc(view, save_row)
-    _choose_save_as_new(controls)
-
-    assert controls._config_save._active_config_path == saved_path
-    state = controls.build_view_state(paused=False)
-    header_row = next(
-        i for i in range(len(state.layout)) if state.layout.kind( i) == RowKind.CONFIG_HEADER
-    )
-    assert _row_text(state, header_row) == config_path_display(saved_path)
-
-
-def test_save_as_new_enables_overwrite_from_root_template() -> None:
-    saved_path = Path("/tmp/projects/my-track/unnamed-2.yaml")
-    controls = _make_controls(
-        ("layer_1",),
-        launch_config_path=_REPO_ROOT_EXAMPLE,
-        repo_root_example=_REPO_ROOT_EXAMPLE,
-    )
-    assert controls.build_view_state(paused=False).allow_overwrite is False
-
-    controls._config_save._on_save_new_config = lambda: saved_path
-    _expand_project(controls)
-    view = controls.build_view_state(paused=False)
-    save_row = _config_header_row(view)
-    controls.focus_descriptor = _desc(view, save_row)
-    _choose_save_as_new(controls)
-
-    state = controls.build_view_state(paused=False)
-    assert state.allow_overwrite is True
-    kinds = {state.layout.kind( i) for i in range(len(state.layout))}
-    assert RowKind.CONFIG_HEADER in kinds
-
-
-def test_repo_root_save_shows_save_as_new_only_modal() -> None:
-    controls = _make_controls(
-        ("layer_1",),
-        launch_config_path=_REPO_ROOT_EXAMPLE,
-        repo_root_example=_REPO_ROOT_EXAMPLE,
-    )
-    _expand_project(controls)
-    view = controls.build_view_state(paused=False)
-    controls.focus_descriptor = _desc(view, _config_header_row(view))
-
-    controls.handle_keydown(_keydown(pygame.K_RETURN))
-    modal_view = controls.modal_host.view_state()
-    assert modal_view is not None
-    assert modal_view.kind == ModalKind.SAVE_CHOICE
-    assert modal_view.options == ("Save As New", "Cancel")
-
-    controls.handle_modal_keydown(_keydown(pygame.K_ESCAPE))
-    assert not controls.modal_host.active
-    assert controls._config_save._active_config_path == _REPO_ROOT_EXAMPLE
-
-    controls.handle_keydown(_keydown(pygame.K_RETURN))
-    controls.handle_modal_keydown(_keydown(pygame.K_RIGHT))
-    controls.handle_modal_keydown(_keydown(pygame.K_RETURN))
-    assert not controls.modal_host.active
-    assert controls._config_save._active_config_path == _REPO_ROOT_EXAMPLE
-
-
-def test_repo_root_save_as_new_requires_confirmation() -> None:
-    saved_path = Path("/tmp/projects/my-track/unnamed-1.yaml")
-    controls = _make_controls(
-        ("layer_1",),
-        launch_config_path=_REPO_ROOT_EXAMPLE,
-        repo_root_example=_REPO_ROOT_EXAMPLE,
-    )
-    controls._config_save._on_save_new_config = lambda: saved_path
-    _expand_project(controls)
-    view = controls.build_view_state(paused=False)
-    controls.focus_descriptor = _desc(view, _config_header_row(view))
-
-    controls.handle_keydown(_keydown(pygame.K_RETURN))
-    assert controls._config_save._active_config_path == _REPO_ROOT_EXAMPLE
-
-    controls.handle_keydown(_keydown(pygame.K_RETURN))
-    assert controls._config_save._active_config_path == saved_path
-
-
-def test_overwrite_after_save_uses_new_active_path() -> None:
-    saved_path = Path("/tmp/projects/my-track/unnamed-1.yaml")
-    writes: list[Path] = []
-    controls = _make_controls(
-        ("layer_1",),
-        launch_config_path=_REPO_ROOT_EXAMPLE,
-        repo_root_example=_REPO_ROOT_EXAMPLE,
-    )
-    controls._config_save._on_save_new_config = lambda: saved_path
-    controls._config_save._on_overwrite_config = lambda path: writes.append(path) or path.name
-
-    _expand_project(controls)
-    view = controls.build_view_state(paused=False)
-    save_row = _config_header_row(view)
-
-    with patch.object(time, "monotonic", return_value=3000.0):
-        controls.focus_descriptor = _desc(view, save_row)
-        controls.handle_keydown(_keydown(pygame.K_RETURN))
-        controls.handle_keydown(_keydown(pygame.K_RETURN))
-
-    with patch.object(
-        time, "monotonic", return_value=3000.0 + NOTIFICATION_TOTAL_DURATION_SEC + 1
-    ):
-        state = controls.build_view_state(paused=False)
-        save_row = _config_header_row(state)
-        controls.focus_descriptor = _desc(view, save_row)
-        _choose_overwrite(controls)
-        controls.handle_keydown(_keydown(pygame.K_RETURN))
-
-    assert writes == [saved_path]
-
-
-def test_navigable_rows_without_overwrite() -> None:
-    controls = _make_controls(
-        ("layer_1",),
-        launch_config_path=_REPO_ROOT_EXAMPLE,
-        repo_root_example=_REPO_ROOT_EXAMPLE,
-    )
-    _expand_project(controls)
-    view = controls.build_view_state(paused=False)
-    assert view.allow_overwrite is False
     assert len(view.layout) == 23
     assert RowDescriptor(RowKind.TIMELINE_PRESETS) not in view.layout.rows
 
@@ -1096,91 +937,20 @@ def test_navigable_rows_without_overwrite() -> None:
     assert RowKind.CONFIG_HEADER in kinds
     assert RowKind.PROJECT_MILKDROP_HEADER in kinds
 
-    navigable = view.layout.navigable_indices(view)
-    assert any(view.layout.kind(i) == RowKind.CONFIG_HEADER for i in navigable)
-
-    milkdrop_row = view.layout.find_by_kind(RowKind.PROJECT_MILKDROP_HEADER)
     config_row = _config_header_row(view)
+    assert config_row in view.layout.navigable_indices(view)
+    milkdrop_row = view.layout.find_by_kind(RowKind.PROJECT_MILKDROP_HEADER)
     controls.focus_descriptor = _desc(view, config_row)
     controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert controls.focus_descriptor == _desc(view, milkdrop_row)
 
 
-def test_navigable_rows_with_overwrite() -> None:
-    controls = _make_controls(("layer_1",))
-    _expand_project(controls)
-    view = controls.build_view_state(paused=False)
-    assert view.allow_overwrite is True
-    assert len(view.layout) == 23
-    assert RowDescriptor(RowKind.TIMELINE_PRESETS) not in view.layout.rows
-
-    config_row = _config_header_row(view)
-    assert config_row in view.layout.navigable_indices(view)
-
-
-def test_save_choice_with_overwrite_includes_cancel() -> None:
-    controls = _make_controls(("layer_1",))
-    _expand_project(controls)
-    view = controls.build_view_state(paused=False)
-    controls.focus_descriptor = _desc(view, _config_header_row(view))
-    controls.handle_keydown(_keydown(pygame.K_RETURN))
-    modal_view = controls.modal_host.view_state()
-    assert modal_view is not None
-    assert modal_view.kind == ModalKind.SAVE_CHOICE
-    assert modal_view.options == ("Overwrite", "Save As New", "Cancel")
-
-    controls.handle_modal_keydown(_keydown(pygame.K_RIGHT))
-    controls.handle_modal_keydown(_keydown(pygame.K_RIGHT))
-    assert controls.modal_host.view_state().focus_index == 2
-    controls.handle_modal_keydown(_keydown(pygame.K_RETURN))
-    assert not controls.modal_host.active
-
-
-def test_overwrite_shows_confirm_before_write() -> None:
-    launch_path = Path("/tmp/custom/cleave.config.yaml")
-    writes: list[Path] = []
-    controls = _make_controls(("layer_1",), launch_config_path=launch_path)
-    controls._config_save._on_overwrite_config = lambda path: (
-        writes.append(path) or path.name
-    )
-
-    _expand_project(controls)
-    view = controls.build_view_state(paused=False)
-    save_row = _config_header_row(view)
-    controls.focus_descriptor = _desc(view, save_row)
-    assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
-    modal_view = controls.modal_host.view_state()
-    assert modal_view is not None
-    assert modal_view.kind == ModalKind.SAVE_CHOICE
-    assert writes == []
-
-    controls.handle_keydown(_keydown(pygame.K_RETURN))
-    modal_view = controls.modal_host.view_state()
-    assert modal_view is not None
-    assert modal_view.kind == ModalKind.YES_NO
-    assert modal_view.message == "Overwrite cleave.config.yaml?"
-    assert modal_view.options == ("Yes", "Cancel")
-    assert writes == []
-
-    assert controls.handle_keydown(_keydown(pygame.K_n)) is True
-    modal_view = controls.modal_host.view_state()
-    assert modal_view is not None
-    assert modal_view.kind == ModalKind.YES_NO
-    assert modal_view.message == "Overwrite cleave.config.yaml?"
-    assert modal_view.focus_index == 1
-    assert writes == []
-
-    assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
-    assert not controls.modal_host.active
-    assert writes == []
-
-
-def test_overwrite_confirm_yes_writes_launch_path() -> None:
+def test_save_writes_launch_path() -> None:
     launch_path = Path("/tmp/my-launch.cleave.config.yaml")
     writes: list[Path] = []
     controls = _make_controls(("layer_1",))
     controls._config_save._active_config_path = launch_path
-    controls._config_save._on_overwrite_config = lambda path: (
+    controls._config_save._on_save_config = lambda path: (
         writes.append(path) or path.name
     )
 
@@ -1191,43 +961,13 @@ def test_overwrite_confirm_yes_writes_launch_path() -> None:
     stderr = io.StringIO()
     with patch.object(time, "monotonic", return_value=2000.0):
         with patch("sys.stderr", stderr):
-            _choose_overwrite(controls)
-            controls.handle_keydown(_keydown(pygame.K_RETURN))
+            _save_now(controls)
 
         assert writes == [launch_path]
         assert not controls.modal_host.active
         state = controls.build_view_state(paused=False)
-        assert state.notification_message == "Config overwritten: my-launch.cleave.config.yaml"
-        assert "Config overwritten: my-launch.cleave.config.yaml" in stderr.getvalue()
-
-
-def test_overwrite_confirm_esc_dismisses() -> None:
-    launch_path = Path("/tmp/custom/cleave.config.yaml")
-    writes: list[Path] = []
-    controls = _make_controls(("layer_1",), launch_config_path=launch_path)
-    controls._config_save._on_overwrite_config = lambda path: (
-        writes.append(path) or path.name
-    )
-
-    _expand_project(controls)
-    view = controls.build_view_state(paused=False)
-    save_row = _config_header_row(view)
-    controls.focus_descriptor = _desc(view, save_row)
-    _choose_overwrite(controls)
-    assert controls.handle_keydown(_keydown(pygame.K_ESCAPE)) is True
-    assert not controls.modal_host.active
-    assert writes == []
-
-
-def test_esc_during_confirm_does_not_quit() -> None:
-    controls = _make_controls(("layer_1",))
-    _expand_project(controls)
-    view = controls.build_view_state(paused=False)
-    save_row = _config_header_row(view)
-    controls.focus_descriptor = _desc(view, save_row)
-    _choose_overwrite(controls)
-    assert controls.handle_keydown(_keydown(pygame.K_ESCAPE)) is True
-    assert controls.consume_hide_overlay() is False
+        assert state.notification_message == "Saved"
+        assert "Saved" in stderr.getvalue()
 
 
 def test_esc_requests_overlay_hide() -> None:
@@ -4278,8 +4018,6 @@ def test_locked_sub_rows_use_locked_color() -> None:
         move_mode_slot=view.move_mode_slot,
         notification_message=view.notification_message,
         notification_remaining_sec=view.notification_remaining_sec,
-        active_config_label=view.active_config_label,
-        allow_overwrite=view.allow_overwrite,
     )
     assert _row_value_color(unfocused, header_row) == VALUE
     assert _row_value_color(unfocused, preset_dir_row) == LOCKED
@@ -4293,8 +4031,6 @@ def test_locked_sub_rows_use_locked_color() -> None:
         move_mode_slot=view.move_mode_slot,
         notification_message=view.notification_message,
         notification_remaining_sec=view.notification_remaining_sec,
-        active_config_label=view.active_config_label,
-        allow_overwrite=view.allow_overwrite,
     )
     assert _row_value_color(focused_header, header_row) == HIGHLIGHT
     assert _row_value_color(focused_header, preset_dir_row) == LOCKED
@@ -4317,8 +4053,6 @@ def test_locked_disabled_layer_sub_rows_prefer_locked_color() -> None:
         move_mode_slot=view.move_mode_slot,
         notification_message=view.notification_message,
         notification_remaining_sec=view.notification_remaining_sec,
-        active_config_label=view.active_config_label,
-        allow_overwrite=view.allow_overwrite,
     )
     assert _row_value_color(unfocused, header_row) == DISABLED
     assert _row_value_color(unfocused, preset_dir_row) == LOCKED
@@ -4609,36 +4343,22 @@ def test_try_quit_cancel_and_escape_stay() -> None:
     assert not controls.modal_host.active
 
 
-def test_try_quit_save_chains_through_save_as_new() -> None:
-    saved_path = Path("/tmp/projects/my-track/unnamed-2.yaml")
-    controls = _make_controls(("layer_1",))
-    controls._config_save._on_save_new_config = lambda: saved_path
+def test_try_quit_save_writes_immediately() -> None:
+    launch_path = Path("/tmp/projects/my-track/cleave-viz.yaml")
+    writes: list[Path] = []
+    controls = _make_controls(("layer_1",), launch_config_path=launch_path)
+    controls._config_save._on_save_config = lambda path: writes.append(path) or path.name
     _mutate_dirty(controls)
 
     controls.try_quit()
-    controls.handle_modal_keydown(_keydown(pygame.K_RETURN))
     modal_view = controls.modal_host.view_state()
     assert modal_view is not None
-    assert modal_view.kind == ModalKind.SAVE_CHOICE
-
-    controls.handle_modal_keydown(_keydown(pygame.K_RIGHT))
+    assert modal_view.kind == ModalKind.UNSAVED_QUIT
     controls.handle_modal_keydown(_keydown(pygame.K_RETURN))
-    assert controls.try_quit() is True
-    assert not controls.config_dirty
-
-
-def test_try_quit_save_choice_esc_clears_quit_after_save() -> None:
-    controls = _make_controls(("layer_1",))
-    _mutate_dirty(controls)
-    controls.try_quit()
-    controls.handle_modal_keydown(_keydown(pygame.K_RETURN))
-    assert controls._config_save._quit_after_save is True
-
-    controls.handle_modal_keydown(_keydown(pygame.K_ESCAPE))
-    assert controls._config_save._quit_after_save is False
-    assert controls._config_save._pending_exit is False
-    assert controls.config_dirty
+    assert writes == [launch_path]
     assert not controls.modal_host.active
+    assert not controls.config_dirty
+    assert controls.try_quit() is True
 
 
 def test_stem_row_cycles_sources() -> None:
@@ -4716,21 +4436,6 @@ def test_cycle_stem_to_full_mix() -> None:
 
     view = controls.build_view_state(paused=False)
     assert _row_text(view, _focus_index(controls)) == "└─ driving stem: full-mix"
-
-
-def test_try_quit_overwrite_confirm_esc_clears_quit_after_save() -> None:
-    controls = _make_controls(("layer_1",))
-    _mutate_dirty(controls)
-    controls.try_quit()
-    controls.handle_modal_keydown(_keydown(pygame.K_RETURN))
-    controls.handle_modal_keydown(_keydown(pygame.K_RETURN))
-    assert controls._config_save._quit_after_save is True
-
-    controls.handle_modal_keydown(_keydown(pygame.K_ESCAPE))
-    assert controls._config_save._quit_after_save is False
-    assert controls._config_save._pending_exit is False
-    assert controls.config_dirty
-    assert not controls.modal_host.active
 
 
 def test_settings_header_is_first_row() -> None:
@@ -4926,6 +4631,16 @@ def test_settings_editor_window_apply_persists_on_yes(tmp_path: Path) -> None:
     assert loaded.editor.upscale == pytest.approx(DEFAULT_EDITOR_UPSCALE)
 
 
+def test_settings_editor_window_nudge_does_not_persist(tmp_path: Path) -> None:
+    controls = _make_controls(("layer_1",))
+    user_path = tmp_path / "config.yaml"
+    controls.cfg.user_config_path = user_path
+    controls.settings.adjust_editor_window_width(forward=True, ctrl=True)
+    assert controls.cfg.editor.width == DEFAULT_EDITOR_WIDTH + 100
+    assert not user_path.is_file()
+    assert not controls.config_dirty
+
+
 def test_settings_editor_window_apply_cancel_does_not_persist(
     tmp_path: Path,
 ) -> None:
@@ -5000,6 +4715,22 @@ def test_settings_preview_quality_change_does_not_mark_project_config_dirty() ->
     assert not controls.config_dirty
 
 
+def test_settings_preview_quality_writes_user_config_without_dirty(
+    tmp_path: Path,
+) -> None:
+    user_path = tmp_path / "config.yaml"
+    controls = _make_controls(("layer_1",))
+    controls.cfg.user_config_path = user_path
+    assert not controls.config_dirty
+    _expand_settings(controls)
+    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_PREVIEW_QUALITY)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert not controls.config_dirty
+    assert user_path.is_file()
+    loaded = load_user_config(user_path)
+    assert loaded.editor.preview_quality == controls.cfg.editor.preview_quality
+
+
 def test_cycle_preview_quality_calls_apply_preview_resolutions() -> None:
     controls, layer_manager = _make_controls_with_manager(("layer_1",))
     controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_HEADER)
@@ -5041,6 +4772,36 @@ def test_settings_ui_fade_change_does_not_mark_project_config_dirty() -> None:
     controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_FADE)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert not controls.config_dirty
+
+
+def test_settings_ui_fade_writes_user_config_without_dirty(tmp_path: Path) -> None:
+    user_path = tmp_path / "config.yaml"
+    controls = _make_controls(("layer_1",))
+    controls.cfg.user_config_path = user_path
+    assert not controls.config_dirty
+    _expand_settings_ui(controls)
+    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_FADE)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert not controls.config_dirty
+    assert user_path.is_file()
+    loaded = load_user_config(user_path)
+    assert loaded.editor.ui_fade == controls.cfg.editor.ui_fade
+
+
+def test_settings_residual_latency_writes_user_config_without_dirty(
+    tmp_path: Path,
+) -> None:
+    user_path = tmp_path / "config.yaml"
+    controls = _make_controls(("layer_1",))
+    controls.cfg.user_config_path = user_path
+    assert not controls.config_dirty
+    _expand_settings_latency(controls)
+    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_RESIDUAL_LATENCY_MS)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert not controls.config_dirty
+    assert user_path.is_file()
+    loaded = load_user_config(user_path)
+    assert loaded.editor.residual_latency_ms == controls.cfg.editor.residual_latency_ms
 
 
 def test_settings_adjust_ui_width() -> None:
@@ -5742,9 +5503,7 @@ def test_delete_song_marker_does_not_write_project_yaml(tmp_path: Path) -> None:
 
 def test_marker_only_edit_marks_dirty_and_save_clears(tmp_path: Path) -> None:
     project = _project_with_markers(tmp_path, ())
-    saved_path = project / "unnamed-1.yaml"
     controls = _make_controls(("layer_1",), project_dir=project)
-    controls._config_save._on_save_new_config = lambda: saved_path
     assert not controls.config_dirty
 
     controls.playback.player.seek(12.5)
@@ -5755,15 +5514,15 @@ def test_marker_only_edit_marks_dirty_and_save_clears(tmp_path: Path) -> None:
     _expand_project(controls)
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = _desc(view, _config_header_row(view))
-    _choose_save_as_new(controls)
+    _save_now(controls)
 
     assert not controls.config_dirty
     assert load_manifest(project).song_markers == _song_markers(12.5)
 
 
-def test_overwrite_save_flushes_song_markers(tmp_path: Path) -> None:
+def test_save_flushes_song_markers(tmp_path: Path) -> None:
     project = _project_with_markers(tmp_path, (8.0,))
-    launch = project / "active.yaml"
+    launch = project / "cleave-viz.yaml"
     launch.write_text("editor: {}\n", encoding="utf-8")
     writes: list[Path] = []
     controls = _make_controls(
@@ -5773,7 +5532,7 @@ def test_overwrite_save_flushes_song_markers(tmp_path: Path) -> None:
     )
     controls.session.song_markers.times = [8.0]
     controls.clear_config_dirty()
-    controls._config_save._on_overwrite_config = (
+    controls._config_save._on_save_config = (
         lambda path: writes.append(path) or path.name
     )
 
@@ -5785,8 +5544,7 @@ def test_overwrite_save_flushes_song_markers(tmp_path: Path) -> None:
     _expand_project(controls)
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = _desc(view, _config_header_row(view))
-    _choose_overwrite(controls)
-    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    _save_now(controls)
 
     assert writes == [launch]
     assert load_manifest(project).song_markers == _song_markers(8.0, 40.0)
@@ -5813,21 +5571,18 @@ def test_quit_discard_leaves_project_markers_unchanged(tmp_path: Path) -> None:
     assert load_manifest(project).song_markers == _song_markers(10.0, 20.0)
 
 
-def test_save_as_new_flushes_markers_to_same_project_yaml(tmp_path: Path) -> None:
+def test_save_flushes_markers_to_project_yaml(tmp_path: Path) -> None:
     project = _project_with_markers(tmp_path, ())
-    new_yaml = project / "unnamed-3.yaml"
     controls = _make_controls(("layer_1",), project_dir=project)
-    controls._config_save._on_save_new_config = lambda: new_yaml
 
     controls.playback.player.seek(3.0)
     controls.song_markers.drop()
     _expand_project(controls)
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = _desc(view, _config_header_row(view))
-    _choose_save_as_new(controls)
+    _save_now(controls)
 
     assert load_manifest(project).song_markers == _song_markers(3.0)
-    assert controls._config_save.active_config_path == new_yaml
     assert not controls.config_dirty
 
 

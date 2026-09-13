@@ -11,7 +11,6 @@ import pygame
 
 class ModalKind(Enum):
     YES_NO = "yes_no"
-    SAVE_CHOICE = "save_choice"
     UNSAVED_QUIT = "unsaved_quit"
     CHOICE = "choice"
     PROGRESS = "progress"
@@ -82,7 +81,6 @@ class ModalViewState:
 
 
 _UNSAVED_QUIT_MESSAGE = "Unsaved changes - save changes before exit?"
-_SAVE_CHOICE_MESSAGE = "Save configuration?"
 
 
 class ModalHost:
@@ -188,50 +186,6 @@ class ModalHost:
 
     def dismiss(self) -> None:
         self._dismiss()
-
-    def prompt_save_choice(
-        self,
-        on_overwrite: Callable[[], None],
-        on_save_as_new: Callable[[], None],
-        on_dismiss: Callable[[], None] | None = None,
-    ) -> None:
-        def on_cancel() -> None:
-            if on_dismiss is not None:
-                on_dismiss()
-
-        self.prompt(
-            ModalRequest(
-                kind=ModalKind.SAVE_CHOICE,
-                message=_SAVE_CHOICE_MESSAGE,
-                options=[
-                    ModalOption("Overwrite", on_overwrite),
-                    ModalOption("Save As New", on_save_as_new),
-                    ModalOption("Cancel", on_cancel),
-                ],
-                on_dismiss=on_dismiss,
-            )
-        )
-
-    def prompt_save_as_new(
-        self,
-        on_save_as_new: Callable[[], None],
-        on_dismiss: Callable[[], None] | None = None,
-    ) -> None:
-        def on_cancel() -> None:
-            if on_dismiss is not None:
-                on_dismiss()
-
-        self.prompt(
-            ModalRequest(
-                kind=ModalKind.SAVE_CHOICE,
-                message=_SAVE_CHOICE_MESSAGE,
-                options=[
-                    ModalOption("Save As New", on_save_as_new),
-                    ModalOption("Cancel", on_cancel),
-                ],
-                on_dismiss=on_dismiss,
-            )
-        )
 
     def prompt_unsaved_quit(
         self,
