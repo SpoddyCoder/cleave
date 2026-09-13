@@ -48,11 +48,11 @@ These items are no longer the right targets.
 
 **Snapshot writes bypassed descriptors.** `write_session_snapshot` now takes the full payload from `persisted_session_payload`. The leftover `_snapshot_render` deep-merge only preserves original YAML key order and strips legacy overlay keys. New render fields belong on the descriptor tables, not a second serializer.
 
-**Per-layer width/height vs preview quality.** Live preview and `--viz-quality` both use [layer_preview_resolution.py](../cleave/viz/layer_preview_resolution.py). Default offline render stays full `render.width` x `render.height` per layer.
+**Per-layer width/height vs preview quality.** Live preview and `--viz-quality` both use [layer_preview_resolution.py](../cleave/viz/layer_preview_resolution.py). Default offline render stays full `project.yaml` `render.width` x `render.height` per layer.
 
 **Uncached full-panel redraw.** Structure signatures, `TuningPanelCache`, and incremental compose are in place (see [ui-performance-improvements.md](completed/ui-performance-improvements.md)). Remaining draw cost is incremental compose and cache invalidation, not the old every-frame rebuild.
 
-**Layer live authority.** `TuningSession` is the only live store for creative layer state (opacity, blend, stem, beat, enabled, locked, effects, preset switching, z-order). `CleaveConfig.layers` is YAML bootstrap for `session_from_cfg` and `scan_all_layers`. GPU objects are copies pushed from session. Persist (`persist_layers`, `persist_layer_z_order`) reads session only. Overlay card title/body text and colours stay on cfg because they are never live-edited. Editor prefs and `project.yaml` song markers, milkdrop, and compositor remain separate documents. Detail: [Appendix: P0 work](#appendix-p0-work).
+**Layer live authority.** `TuningSession` is the only live store for creative layer state (opacity, blend, stem, beat, enabled, locked, effects, preset switching, z-order). `CleaveConfig.layers` is YAML bootstrap for `session_from_cfg` and `scan_all_layers`. GPU objects are copies pushed from session. Persist (`persist_layers`, `persist_layer_z_order`) reads session only. Overlay card title/body text and colours stay on cfg because they are never live-edited. Editor prefs and `project.yaml` song markers, milkdrop, compositor, and render output size/fps remain separate documents. Detail: [Appendix: P0 work](#appendix-p0-work).
 
 **Layer composite contract.** Both GPU compositors implement [layer_composite.py](../cleave/layer_composite.py) `LayerCompositor` against one `LayerCompositeRequest`. Blend, opacity-in-alpha, and HDR format live in [layer_blend.py](../cleave/layer_blend.py) and [gl_color_format.py](../cleave/gl_color_format.py). [layer_pipeline.py](../cleave/viz/layer_pipeline.py) `LayerFramePipeline.composite` is the layer choke point (mask on/off only selects the implementation). Wipes are an explicit `MaskTransition`. Hard composite (feather 0%) still ignores per-layer blend, hue, and flash by design; the soft path applies them. [frame_finish.py](../cleave/viz/frame_finish.py) remains the post-composite choke point. Detail: [Appendix: P0 work](#appendix-p0-work).
 
@@ -126,7 +126,7 @@ The two P0 items from this review. Invariants also live in [architecture princip
 
 ### Phase 1: session as live layer authority
 
-`TuningSession` is the only live store for creative layer state after `session_from_cfg`. `CleaveConfig.layers` is YAML bootstrap for that builder and for [preset_playlist.py](../cleave/preset_playlist.py) `scan_all_layers` (playlists exist before session). Editor prefs, paths, sizes, and overlay card title/body text and colours stay on cfg because they are never live-edited. `project.yaml` song markers, milkdrop, and compositor remain a separate document.
+`TuningSession` is the only live store for creative layer state after `session_from_cfg`. `CleaveConfig.layers` is YAML bootstrap for that builder and for [preset_playlist.py](../cleave/preset_playlist.py) `scan_all_layers` (playlists exist before session). Editor prefs, paths, sizes, and overlay card title/body text and colours stay on cfg because they are never live-edited. `project.yaml` song markers, milkdrop, compositor, and render output size/fps remain a separate document.
 
 | Path | Change |
 | --- | --- |
@@ -231,7 +231,8 @@ Parse, dump, persist, and defaults live in [cleave/config_schema/](../cleave/con
 | [layers.py](../cleave/config_schema/layers.py) | Layers, preset switching, hard/soft cut, easter egg; `persist_layers` / `persist_layer_z_order` |
 | [persist.py](../cleave/config_schema/persist.py) | `persisted_session_payload` |
 | [timeline.py](../cleave/config_schema/timeline.py) | `timeline` parse and persist |
-| [render/](../cleave/config_schema/render/) | `parse_render_section`, `persist_render`, fps/size; overlays, post-FX, pattern mask |
+| [render/](../cleave/config_schema/render/) | `parse_render_section`, `persist_render`; overlays, post-FX, pattern mask |
+| [project_render.py](../cleave/config_schema/project_render.py) | Output width/height/fps defaults and clamps; quality/start/end job knobs; `project.yaml` parse/persist lives in [project.py](../cleave/project.py) |
 | [compositor.py](../cleave/config_schema/compositor.py) | `DEFAULT_COMPOSITOR_HDR`; `project.yaml` parse/persist lives in [project.py](../cleave/project.py) |
 
 Descriptor-driven sections remain `editor`, `render.post_fx`, and `render.overlays`. Layers and timeline stay bespoke (nested per-stem layers; per-slot lanes). Function-local imports of [config.py](../cleave/config.py) and [user_config.py](../cleave/user_config.py) dataclasses avoid cycles. Session and view defaults import constants from these submodules.

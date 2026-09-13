@@ -10,6 +10,9 @@ import pytest
 
 from cleave.config_schema.project_render import (
     DEFAULT_PROJECT_RENDER_QUALITY,
+    DEFAULT_RENDER_FPS,
+    DEFAULT_RENDER_HEIGHT,
+    DEFAULT_RENDER_WIDTH,
     default_project_render_path,
 )
 from cleave.viz.material_icons import FOLDER_GLYPH
@@ -78,6 +81,9 @@ def test_structure_signature_stable_for_render_quality_and_range() -> None:
     session.project.render.quality = "high"
     session.project.render.start_sec = 10
     session.project.render.end_sec = 20
+    session.project.render.width = 1280
+    session.project.render.height = 720
+    session.project.render.fps = 24
     sig_after = view_state_structure_signature(
         session, config_save, notification_active=False
     )
@@ -112,6 +118,9 @@ def test_project_render_children_omitted_until_expanded() -> None:
     view = controls.build_view_state(paused=False)
     kinds = [row.kind for row in view.layout.rows]
     assert RowKind.PROJECT_RENDER_OUTPUT in kinds
+    assert RowKind.PROJECT_RENDER_WIDTH in kinds
+    assert RowKind.PROJECT_RENDER_HEIGHT in kinds
+    assert RowKind.PROJECT_RENDER_FPS in kinds
     assert RowKind.PROJECT_RENDER_QUALITY in kinds
     assert RowKind.PROJECT_RENDER_START in kinds
     assert RowKind.PROJECT_RENDER_END in kinds
@@ -245,6 +254,9 @@ def test_project_render_defaults() -> None:
     assert view.project.quality == DEFAULT_PROJECT_RENDER_QUALITY
     assert view.project.start_sec == 0
     assert view.project.end_sec == 120
+    assert view.project.width == DEFAULT_RENDER_WIDTH
+    assert view.project.height == DEFAULT_RENDER_HEIGHT
+    assert view.project.fps == DEFAULT_RENDER_FPS
     assert view.project.output_label.endswith("renders/render.mp4")
     output_row = view.layout.find_by_kind(RowKind.PROJECT_RENDER_OUTPUT)
     assert format_row_value(
@@ -252,6 +264,18 @@ def test_project_render_defaults() -> None:
     ) == view.project.output_label
     quality_row = view.layout.find_by_kind(RowKind.PROJECT_RENDER_QUALITY)
     assert format_row_value(view, view.layout.descriptor(quality_row)) == "normal"
+    width_row = view.layout.find_by_kind(RowKind.PROJECT_RENDER_WIDTH)
+    assert format_row_value(view, view.layout.descriptor(width_row)) == str(
+        DEFAULT_RENDER_WIDTH
+    )
+    height_row = view.layout.find_by_kind(RowKind.PROJECT_RENDER_HEIGHT)
+    assert format_row_value(view, view.layout.descriptor(height_row)) == str(
+        DEFAULT_RENDER_HEIGHT
+    )
+    fps_row = view.layout.find_by_kind(RowKind.PROJECT_RENDER_FPS)
+    assert format_row_value(view, view.layout.descriptor(fps_row)) == str(
+        DEFAULT_RENDER_FPS
+    )
     start_row = view.layout.find_by_kind(RowKind.PROJECT_RENDER_START)
     assert format_row_value(view, view.layout.descriptor(start_row)) == "0s"
     end_row = view.layout.find_by_kind(RowKind.PROJECT_RENDER_END)
@@ -382,6 +406,10 @@ def test_minimal_view_render_labels() -> None:
     assert labeled_row_prefix(RowKind.PROJECT_RENDER_QUALITY) == "  └─ quality: "
     quality = state.layout.find_by_kind(RowKind.PROJECT_RENDER_QUALITY)
     assert format_row_value(state, state.layout.descriptor(quality)) == "high"
+    width = state.layout.find_by_kind(RowKind.PROJECT_RENDER_WIDTH)
+    assert format_row_value(state, state.layout.descriptor(width)) == str(
+        DEFAULT_RENDER_WIDTH
+    )
     output = state.layout.find_by_kind(RowKind.PROJECT_RENDER_OUTPUT)
     assert (
         format_row_value(state, state.layout.descriptor(output))
@@ -428,6 +456,36 @@ def test_start_end_keyboard_steps() -> None:
     assert render.end_sec == 59
     controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
     assert render.end_sec == 49
+
+
+def test_width_height_fps_keyboard_steps() -> None:
+    controls = _make_controls(("layer_1",))
+    _expand_project_render(controls)
+    view = controls.build_view_state(paused=False)
+    width_row = view.layout.find_by_kind(RowKind.PROJECT_RENDER_WIDTH)
+    height_row = view.layout.find_by_kind(RowKind.PROJECT_RENDER_HEIGHT)
+    fps_row = view.layout.find_by_kind(RowKind.PROJECT_RENDER_FPS)
+    render = controls.session.project.render
+
+    controls.focus_descriptor = _desc(view, width_row)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert render.width == DEFAULT_RENDER_WIDTH + 10
+    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+    assert render.width == DEFAULT_RENDER_WIDTH + 110
+
+    controls.focus_descriptor = _desc(view, height_row)
+    controls.handle_keydown(_keydown(pygame.K_LEFT))
+    assert render.height == DEFAULT_RENDER_HEIGHT - 10
+    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    assert render.height == DEFAULT_RENDER_HEIGHT - 110
+
+    controls.focus_descriptor = _desc(view, fps_row)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert render.fps == DEFAULT_RENDER_FPS + 1
+    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+    assert render.fps == DEFAULT_RENDER_FPS + 6
+    controls.handle_keydown(_keydown(pygame.K_LEFT))
+    assert render.fps == DEFAULT_RENDER_FPS + 5
 
 
 class _ScriptedRenderJob:
@@ -492,6 +550,9 @@ def test_render_action_enter_opens_yes_cancel_modal() -> None:
     assert modal_view.message == "Render the project?"
     assert modal_view.labeled_lines == (
         ModalLabeledLine("output", "renders/render.mp4"),
+        ModalLabeledLine("width", str(DEFAULT_RENDER_WIDTH)),
+        ModalLabeledLine("height", str(DEFAULT_RENDER_HEIGHT)),
+        ModalLabeledLine("fps", str(DEFAULT_RENDER_FPS)),
         ModalLabeledLine("quality", "high"),
         ModalLabeledLine("start", "5s"),
         ModalLabeledLine("end", "20s"),
@@ -534,6 +595,9 @@ def test_render_confirm_shows_progress_then_success(
     assert modal_view.progress_fraction == 0.0
     assert modal_view.labeled_lines == (
         ModalLabeledLine("output", "renders/render.mp4"),
+        ModalLabeledLine("width", str(DEFAULT_RENDER_WIDTH)),
+        ModalLabeledLine("height", str(DEFAULT_RENDER_HEIGHT)),
+        ModalLabeledLine("fps", str(DEFAULT_RENDER_FPS)),
         ModalLabeledLine("quality", "normal"),
         ModalLabeledLine("start", "0s"),
         ModalLabeledLine("end", "60s"),
@@ -542,6 +606,9 @@ def test_render_confirm_shows_progress_then_success(
     assert job.spec.output_path == tmp_path / "renders" / "render.mp4"
     assert job.spec.start_sec == 0
     assert job.spec.end_sec == 60
+    assert job.spec.width == DEFAULT_RENDER_WIDTH
+    assert job.spec.height == DEFAULT_RENDER_HEIGHT
+    assert job.spec.fps == DEFAULT_RENDER_FPS
 
     controls.handle_modal_keydown(_keydown(pygame.K_ESCAPE))
     assert controls.modal_host.view_state() is not None

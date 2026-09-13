@@ -63,6 +63,9 @@ def project_render_labeled_lines(
     end_sec = resolved_project_render_end_sec(render.end_sec, duration_sec)
     return (
         ModalLabeledLine("output", project_render_output_label(output_path)),
+        ModalLabeledLine("width", str(render.width)),
+        ModalLabeledLine("height", str(render.height)),
+        ModalLabeledLine("fps", str(render.fps)),
         ModalLabeledLine("quality", render.quality),
         ModalLabeledLine("start", f"{render.start_sec}s"),
         ModalLabeledLine("end", f"{end_sec}s"),
@@ -173,6 +176,9 @@ class ProjectRenderController:
             quality=render.quality,
             start_sec=render.start_sec,
             end_sec=end_sec,
+            width=render.width,
+            height=render.height,
+            fps=render.fps,
         )
         self._snapshot_path = snapshot
         self._output_path = output_path

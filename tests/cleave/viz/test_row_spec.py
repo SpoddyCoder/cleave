@@ -124,6 +124,9 @@ _EXPECTED_REPEAT_ROW_KINDS = frozenset(
         RowKind.SETTINGS_UI_FADE,
         RowKind.SETTINGS_RESIDUAL_LATENCY_MS,
         RowKind.PROJECT_RENDER_QUALITY,
+        RowKind.PROJECT_RENDER_WIDTH,
+        RowKind.PROJECT_RENDER_HEIGHT,
+        RowKind.PROJECT_RENDER_FPS,
         RowKind.PROJECT_RENDER_START,
         RowKind.PROJECT_RENDER_END,
         RowKind.PROJECT_MILKDROP_BEAT_SENSITIVITY,
@@ -474,6 +477,9 @@ def test_labeled_row_prefix_settings_children() -> None:
     assert labeled_row_prefix(RowKind.SETTINGS_UI_WIDTH) == "  └─ max width: "
     assert labeled_row_prefix(RowKind.SETTINGS_UI_FADE) == "  └─ auto-fade: "
     assert labeled_row_prefix(RowKind.PROJECT_RENDER_QUALITY) == "  └─ quality: "
+    assert labeled_row_prefix(RowKind.PROJECT_RENDER_WIDTH) == "  └─ width: "
+    assert labeled_row_prefix(RowKind.PROJECT_RENDER_HEIGHT) == "  └─ height: "
+    assert labeled_row_prefix(RowKind.PROJECT_RENDER_FPS) == "  └─ fps: "
     assert labeled_row_prefix(RowKind.PROJECT_RENDER_START) == "  └─ start: "
     assert labeled_row_prefix(RowKind.PROJECT_RENDER_END) == "  └─ end: "
     assert labeled_row_prefix(RowKind.PROJECT_COMPOSITOR_HDR) == "  └─ hdr: "

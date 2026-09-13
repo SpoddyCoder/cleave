@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from cleave.config import CleaveConfig, LayerConfig, PathsConfig, RenderConfig, EditorConfig
+from cleave.config import CleaveConfig, LayerConfig, PathsConfig, EditorConfig
 from cleave.config_schema.layers import DEFAULT_LAYER_SLOTS
 from cleave.viz.layer_preview_resolution import (
     PREVIEW_MIN_VIZ_SCALE,
@@ -178,7 +178,8 @@ def test_offline_layer_sizes_uses_passed_layer_z_order() -> None:
 def test_render_layer_size_full_quality_uses_render_output() -> None:
     cfg = replace(
         _cfg(),
-        render=RenderConfig(fps=30, width=1920, height=1080),
+        render_width=1920,
+        render_height=1080,
     )
     assert render_layer_size(cfg, 0, viz_quality=False) == (1920, 1080)
     assert render_layer_size(cfg, 3, viz_quality=False) == (1920, 1080)

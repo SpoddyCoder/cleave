@@ -35,7 +35,7 @@ def _load_original_dict(cfg: CleaveConfig) -> dict[str, Any]:
     return data if isinstance(data, dict) else {}
 
 
-_LEGACY_RENDER_KEYS = ("overlay",)
+_LEGACY_RENDER_KEYS = ("overlay", "width", "height", "fps")
 _LEGACY_OVERLAY_CARD_KEYS = ("font", "start_delay", "display_time")
 
 

@@ -122,11 +122,6 @@ from cleave.config_schema.render.post_fx import (
     post_fx_persist_values,
 )
 
-DEFAULT_RENDER_FPS = 30
-DEFAULT_RENDER_WIDTH = 1280
-DEFAULT_RENDER_HEIGHT = 720
-
-
 def parse_render_section(data: dict[str, Any]) -> Any | None:
     from cleave.config import RenderConfig
 
@@ -134,12 +129,6 @@ def parse_render_section(data: dict[str, Any]) -> Any | None:
     if render is None:
         return None
     render_map = as_mapping(render, "render")
-    fps_raw = render_map.get("fps")
-    fps = DEFAULT_RENDER_FPS if fps_raw is None else int(fps_raw)
-    width_raw = render_map.get("width")
-    width = DEFAULT_RENDER_WIDTH if width_raw is None else int(width_raw)
-    height_raw = render_map.get("height")
-    height = DEFAULT_RENDER_HEIGHT if height_raw is None else int(height_raw)
     overlays_raw = render_map.get("overlays")
     post_fx_raw = render_map.get("post_fx")
     pattern_mask_raw = render_map.get("pattern_mask")
@@ -161,9 +150,6 @@ def parse_render_section(data: dict[str, Any]) -> Any | None:
         else None
     )
     return RenderConfig(
-        fps=fps,
-        width=width,
-        height=height,
         overlays=overlays,
         post_fx=post_fx,
         pattern_mask=pattern_mask,
@@ -182,13 +168,7 @@ def persist_render(ctx: PersistCtx) -> dict[str, Any]:
     pattern_mask = dump_section_fields(
         RENDER_PATTERN_MASK_FIELDS, pattern_mask_persist_values(ctx), ctx
     )
-    from cleave.config import render_fps, render_output_size
-
-    width, height = render_output_size(ctx.cfg)
     return {
-        "fps": render_fps(ctx.cfg),
-        "width": width,
-        "height": height,
         "overlays": overlays,
         "post_fx": post_fx,
         "pattern_mask": pattern_mask,

@@ -676,6 +676,9 @@ def test_cmd_render_calls_render(
         viz_quality=False,
         start_sec=None,
         end_sec=None,
+        width=None,
+        height=None,
+        fps=None,
         on_progress=ANY,
     )
     out = capsys.readouterr().out
@@ -742,6 +745,9 @@ def test_cmd_render_passes_start_and_end(
         viz_quality=False,
         start_sec=10,
         end_sec=20,
+        width=None,
+        height=None,
+        fps=None,
         on_progress=ANY,
     )
 
@@ -1121,6 +1127,9 @@ def test_module_help_lists_subcommands() -> None:
     assert "-o OUTPUT, --output OUTPUT" in render.stdout
     assert "--start SEC" in render.stdout
     assert "--end SEC" in render.stdout
+    assert "--width PX" in render.stdout
+    assert "--height PX" in render.stdout
+    assert "--fps N" in render.stdout
     assert "-hq" in render.stdout
 
 

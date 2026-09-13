@@ -73,13 +73,16 @@ from cleave.config_schema.layers import (
     parse_layers_section,
 )
 from cleave.config_schema.compositor import DEFAULT_COMPOSITOR_HDR
+from cleave.config_schema.project_render import (
+    DEFAULT_RENDER_FPS,
+    DEFAULT_RENDER_HEIGHT,
+    DEFAULT_RENDER_WIDTH,
+)
 from cleave.config_schema.render import (
     CHROMA_BOOST_APPLY_MODES,
     CHROMA_BOOST_VARIANTS,
     DEFAULT_HIGHLIGHT_ROLLOFF_APPLY_MODE,
     DEFAULT_HIGHLIGHT_ROLLOFF_CURVE,
-    DEFAULT_RENDER_FPS,
-    DEFAULT_RENDER_HEIGHT,
     DEFAULT_RENDER_OVERLAY_ANIMATION_TYPE,
     DEFAULT_RENDER_OVERLAY_APPEAR_AT,
     DEFAULT_RENDER_OVERLAY_BACKGROUND_COLOUR,
@@ -105,7 +108,6 @@ from cleave.config_schema.render import (
     DEFAULT_RENDER_POST_FX_FADE_IN,
     DEFAULT_RENDER_POST_FX_FADE_OUT,
     DEFAULT_RENDER_POST_FX_LOCKED,
-    DEFAULT_RENDER_WIDTH,
     HIGHLIGHT_ROLLOFF_APPLY_MODES,
     HIGHLIGHT_ROLLOFF_CURVES,
     RENDER_OVERLAY_ANIMATION_TYPES,
@@ -314,9 +316,6 @@ class RenderPatternMaskConfig:
 
 @dataclass(frozen=True)
 class RenderConfig:
-    fps: int = DEFAULT_RENDER_FPS
-    width: int = DEFAULT_RENDER_WIDTH
-    height: int = DEFAULT_RENDER_HEIGHT
     overlays: RenderOverlaysConfig | None = None
     post_fx: RenderPostFxConfig | None = None
     pattern_mask: RenderPatternMaskConfig | None = None
@@ -385,6 +384,9 @@ class CleaveConfig:
     timeline: TimelineConfig | None = None
     milkdrop_beat_sensitivity: float = DEFAULT_BEAT_SENSITIVITY
     compositor_hdr: bool = DEFAULT_COMPOSITOR_HDR
+    render_width: int = DEFAULT_RENDER_WIDTH
+    render_height: int = DEFAULT_RENDER_HEIGHT
+    render_fps: int = DEFAULT_RENDER_FPS
     project_slug: str = DEFAULT_PROJECT_SLUG
 
     def layers_in_z_order(self) -> list[tuple[str, LayerConfig]]:
@@ -393,17 +395,13 @@ class CleaveConfig:
 
 
 def render_fps(cfg: CleaveConfig) -> int:
-    """Offline render output frame rate from config."""
-    if cfg.render is not None:
-        return cfg.render.fps
-    return DEFAULT_RENDER_FPS
+    """Offline render output frame rate from project.yaml."""
+    return cfg.render_fps
 
 
 def render_output_size(cfg: CleaveConfig) -> tuple[int, int]:
-    """Offline render output resolution from config."""
-    if cfg.render is not None:
-        return cfg.render.width, cfg.render.height
-    return DEFAULT_RENDER_WIDTH, DEFAULT_RENDER_HEIGHT
+    """Offline render output resolution from project.yaml."""
+    return cfg.render_width, cfg.render_height
 
 
 def _expand_path(path: Path | str) -> Path:
@@ -597,6 +595,14 @@ def load_config(
         compositor_hdr = manifest.compositor.hdr
     else:
         compositor_hdr = DEFAULT_COMPOSITOR_HDR
+    if manifest is not None and manifest.render is not None:
+        render_width = manifest.render.width
+        render_height = manifest.render.height
+        render_fps = manifest.render.fps
+    else:
+        render_width = DEFAULT_RENDER_WIDTH
+        render_height = DEFAULT_RENDER_HEIGHT
+        render_fps = DEFAULT_RENDER_FPS
     project_slug = manifest.slug if manifest is not None else DEFAULT_PROJECT_SLUG
 
     return CleaveConfig(
@@ -610,6 +616,9 @@ def load_config(
         timeline=timeline,
         milkdrop_beat_sensitivity=milkdrop_beat_sensitivity,
         compositor_hdr=compositor_hdr,
+        render_width=render_width,
+        render_height=render_height,
+        render_fps=render_fps,
         project_slug=project_slug,
     )
 

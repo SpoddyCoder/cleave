@@ -208,7 +208,7 @@ DIMINUENDO:  FULL ↘↘↘ thin ──── thin ──── ► restore
 `cleave` creates a new directory under `~/.local/share/cleave/projects/` for each song.
 The project directory stores all files required in a self-contained bundle...
 
-* `project.yaml` - project metadata, song markers, Milkdrop defaults (`milkdrop.beat_sensitivity`), and compositor hdr (`compositor.hdr`)
+* `project.yaml` - project metadata, song markers, Milkdrop defaults (`milkdrop.beat_sensitivity`), compositor hdr (`compositor.hdr`), and render output size/fps (`render.width` / `render.height` / `render.fps`)
 * `cleave-viz.yaml` - layer, render, and timeline configuration. Not everything in here is surfaced in the editor UI just yet
 * `signals.json` - audio analysis data (schema version 4) used by `cleave effects` and the opt-in timeline preset conductor; re-run `separate` on existing projects after a schema bump so envelopes stay current
 * `mysong.wav` - original source audio is copied into the project directory
@@ -249,9 +249,8 @@ Windows freeze layout and FFmpeg/libprojectM sidecars: [docs/windows-freeze.md](
 ### Compositing
 
 * The editor supports up to eight libprojectM layers at tiered resolutions
-* Composited to **1280x720** content by default (editable `cleave-viz.yaml`)
-* Live preview upscales via user-config `editor.upscale` and runs at display frame rate
-* Offline render output resolution is set under `render.width` / `render.height` (default **1280x720**) and frame rate under `render.fps`
+* Live preview composites at the editor window size (default **1920x1080**; Settings > Editor Window) and upscales via user-config `editor.upscale` at display frame rate
+* Offline render output size and frame rate are Project > Render (default **1920x1080** at **60fps**; stored in `project.yaml`)
 * Each layer's libprojectM instance receives PCM from its assigned stem; stereo stems are fed as stereo, mono as mono.
 * Milkdrop draws on black, so cleave treats black as transparent and uses pixel brightness as blend weight (`black-key` default).
 

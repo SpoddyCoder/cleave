@@ -302,6 +302,9 @@ def cmd_render(args: argparse.Namespace) -> None:
             viz_quality=args.viz_quality,
             start_sec=args.start,
             end_sec=args.end,
+            width=args.width,
+            height=args.height,
+            fps=args.fps,
             on_progress=on_progress,
         )
     except (FileNotFoundError, ValueError, RuntimeError) as e:
@@ -477,6 +480,24 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         metavar="SEC",
         help="Segment end in whole seconds, exclusive (default: full track)",
+    )
+    render.add_argument(
+        "--width",
+        type=int,
+        metavar="PX",
+        help="Output width in pixels (default: project.yaml render.width)",
+    )
+    render.add_argument(
+        "--height",
+        type=int,
+        metavar="PX",
+        help="Output height in pixels (default: project.yaml render.height)",
+    )
+    render.add_argument(
+        "--fps",
+        type=int,
+        metavar="N",
+        help="Output frame rate (default: project.yaml render.fps)",
     )
     render.set_defaults(func=cmd_render)
 
