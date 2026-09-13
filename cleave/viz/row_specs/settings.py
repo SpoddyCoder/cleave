@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from cleave.config_schema.editor import (
     EDITOR_PREVIEW_QUALITY_HELP_ENTRIES,
+    editor_display_size,
     ui_fade_display,
 )
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
@@ -37,10 +38,15 @@ def _format_settings_editor_window_upscale(
 ) -> str:
     return f"{state.settings.editor_window_upscale:.1f}"
 
-def _format_settings_editor_window_apply(
-    _state: TuningViewState, _desc: RowDescriptor
+def _format_settings_editor_window_display_size(
+    state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return "change window size"
+    width, height = editor_display_size(
+        state.settings.editor_window_width,
+        state.settings.editor_window_height,
+        upscale=state.settings.editor_window_upscale,
+    )
+    return f"{width} x {height}"
 
 def _format_settings_editor_mode(
     _state: TuningViewState, _desc: RowDescriptor
@@ -108,12 +114,6 @@ def _apply_settings_editor_window_upscale(
     _shift: bool,
 ) -> None:
     controls.settings.adjust_editor_window_upscale(forward=forward, ctrl=ctrl)
-
-def _apply_settings_editor_window_size(
-    controls: TuningControls,
-    _desc: RowDescriptor,
-) -> None:
-    controls.settings.prompt_apply_editor_window()
 
 def _apply_settings_ui_width_mode(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, _ctrl: bool,
@@ -198,7 +198,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_mode_entries=EDITOR_PREVIEW_QUALITY_HELP_ENTRIES,
         is_pinned=True,
         repeatable=True,
-        parent_group="settings",
+        parent_group="settings_editor_window",
     ),
     RowKind.SETTINGS_EDITOR_WINDOW_HEADER: RowSpec(
         affordance=RowAffordance.EXPAND,
@@ -208,8 +208,9 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="Editor Window",
         help_description=(
-            "Live window content size and upscale.",
-            "Change window size writes user config; restart to apply.",
+            "Live preview quality, window content size, and upscale.",
+            "Width, height, and upscale write user config immediately.",
+            "Restart the application for the new window size to take effect.",
         ),
         is_sub_header=True,
         is_pinned=True,
@@ -265,23 +266,17 @@ SPECS: dict[RowKind, RowSpec] = {
         repeatable=True,
         parent_group="settings_editor_window",
     ),
-    RowKind.SETTINGS_EDITOR_WINDOW_APPLY: RowSpec(
-        affordance=RowAffordance.ACTION,
-        panel_label="change window size",
-        present_style=RowPresentStyle.FULL_LINE,
-        format_value=_format_settings_editor_window_apply,
-        apply_action=_apply_settings_editor_window_size,
-        fit_strategy=FitStrategy.NONE,
-        shows_enter_icon=True,
-        help_title="Change window size",
-        help_entries=(
-            ("Enter", "confirm and save to user config"),
-            ("Esc", "cancel"),
-        ),
+    RowKind.SETTINGS_EDITOR_WINDOW_DISPLAY_SIZE: RowSpec(
+        affordance=RowAffordance.DISPLAY,
+        panel_label="display size",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_settings_editor_window_display_size,
+        help_title="Display size",
         help_description=(
-            "Writes width, height, and upscale to user config.",
-            "Restart the application for the new window size to take effect.",
+            "On-screen window size from width, height, and upscale.",
+            "Not editable; shown for reference.",
         ),
+        navigable=False,
         is_pinned=True,
         parent_group="settings_editor_window",
     ),

@@ -12,6 +12,7 @@ from cleave.config_schema.editor import (
     DEFAULT_EDITOR_HEIGHT,
     DEFAULT_EDITOR_UPSCALE,
     DEFAULT_EDITOR_WIDTH,
+    editor_display_size,
     ui_fade_display,
 )
 from cleave.config_schema.layers import hard_cut_enabled_display
@@ -173,7 +174,7 @@ def test_action_row_kinds_match_affordance() -> None:
     assert RowKind.LAYER_MANAGEMENT_ADD in ACTION_ROW_KINDS
     assert RowKind.CONFIG_HEADER in ACTION_ROW_KINDS
     assert RowKind.SETTINGS_EDITOR_MODE in ACTION_ROW_KINDS
-    assert RowKind.SETTINGS_EDITOR_WINDOW_APPLY in ACTION_ROW_KINDS
+    assert RowKind.SETTINGS_EDITOR_WINDOW_DISPLAY_SIZE not in ACTION_ROW_KINDS
 
 
 def test_row_is_pinned() -> None:
@@ -233,10 +234,16 @@ def test_parent_group_on_row_specs() -> None:
         "render_overlay_body"
     )
     assert row_spec(RowKind.RENDER_POST_FX_FADE_IN).parent_group == "render_post_fx"
-    assert row_spec(RowKind.SETTINGS_PREVIEW_QUALITY).parent_group == "settings"
+    assert row_spec(RowKind.SETTINGS_PREVIEW_QUALITY).parent_group == (
+        "settings_editor_window"
+    )
     assert row_spec(RowKind.SETTINGS_EDITOR_WINDOW_HEADER).parent_group == "settings"
     assert row_spec(RowKind.SETTINGS_EDITOR_WINDOW_WIDTH).parent_group == (
         "settings_editor_window"
+    )
+    assert row_spec(RowKind.SETTINGS_EDITOR_WINDOW_DISPLAY_SIZE).navigable is False
+    assert row_spec(RowKind.SETTINGS_EDITOR_WINDOW_DISPLAY_SIZE).affordance == (
+        RowAffordance.DISPLAY
     )
     assert row_spec(RowKind.SETTINGS_UI_WIDTH_MODE).parent_group == "settings_ui"
 
@@ -472,10 +479,15 @@ def test_row_panel_label_settings_header() -> None:
 
 
 def test_labeled_row_prefix_settings_children() -> None:
-    assert labeled_row_prefix(RowKind.SETTINGS_PREVIEW_QUALITY) == "└─ preview quality: "
+    assert labeled_row_prefix(RowKind.SETTINGS_PREVIEW_QUALITY) == (
+        "  └─ preview quality: "
+    )
     assert labeled_row_prefix(RowKind.SETTINGS_EDITOR_WINDOW_WIDTH) == "  └─ width: "
     assert labeled_row_prefix(RowKind.SETTINGS_EDITOR_WINDOW_HEIGHT) == "  └─ height: "
     assert labeled_row_prefix(RowKind.SETTINGS_EDITOR_WINDOW_UPSCALE) == "  └─ upscale: "
+    assert labeled_row_prefix(RowKind.SETTINGS_EDITOR_WINDOW_DISPLAY_SIZE) == (
+        "  └─ display size: "
+    )
     assert labeled_row_prefix(RowKind.SETTINGS_UI_WIDTH_MODE) == "  └─ width mode: "
     assert labeled_row_prefix(RowKind.SETTINGS_UI_WIDTH) == "  └─ max width: "
     assert labeled_row_prefix(RowKind.SETTINGS_UI_FADE) == "  └─ auto-fade: "
@@ -518,6 +530,10 @@ def test_format_row_value_settings() -> None:
     assert format_row_value(
         state, RowDescriptor(RowKind.SETTINGS_EDITOR_WINDOW_UPSCALE)
     ) == "1.5"
+    display_w, display_h = editor_display_size(1920, 1080, upscale=1.5)
+    assert format_row_value(
+        state, RowDescriptor(RowKind.SETTINGS_EDITOR_WINDOW_DISPLAY_SIZE)
+    ) == f"{display_w} x {display_h}"
     assert (
         format_row_value(state, RowDescriptor(RowKind.SETTINGS_UI_WIDTH_MODE))
         == "fixed"
@@ -586,9 +602,22 @@ def test_row_labeled_display_text_settings() -> None:
         settings=SettingsBlock(preview_quality="balanced", ui_fade=11.0),
     )
     desc = RowDescriptor(RowKind.SETTINGS_PREVIEW_QUALITY)
-    assert row_labeled_display_text(state, desc) == "└─ preview quality: balanced"
+    assert row_labeled_display_text(state, desc) == "  └─ preview quality: balanced"
     fade_desc = RowDescriptor(RowKind.SETTINGS_UI_FADE)
     assert row_labeled_display_text(state, fade_desc) == "  └─ auto-fade: 11s"
+
+
+def test_apply_field_horizontal_display_size_is_not_editable() -> None:
+    controls = _make_controls()
+    assert (
+        apply_field_horizontal(
+            controls,
+            RowDescriptor(RowKind.SETTINGS_EDITOR_WINDOW_DISPLAY_SIZE),
+            True,
+            False,
+        )
+        is False
+    )
 
 
 def test_apply_field_horizontal_unknown_kind_returns_false() -> None:
@@ -917,9 +946,6 @@ def test_track_effect_dynamic_label_and_prefix() -> None:
 def test_full_line_delete_layer_prefix() -> None:
     assert full_line_prefix(RowKind.LAYER_MANAGEMENT_DELETE) == "└─ Delete Layer"
     assert full_line_prefix(RowKind.SETTINGS_EDITOR_MODE) == "└─ change editor mode"
-    assert full_line_prefix(RowKind.SETTINGS_EDITOR_WINDOW_APPLY) == (
-        "  └─ change window size"
-    )
     assert row_panel_label(RowKind.LAYER_MANAGEMENT_ADD) == "Add Layer"
 
 

@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import replace
 
-from cleave.config import CleaveConfig
+from cleave.config import CleaveConfig, EditorConfig
 from cleave.config_schema.editor import (
     UI_WIDTH_MODES,
     EDITOR_PREVIEW_QUALITIES,
@@ -14,13 +15,11 @@ from cleave.config_schema.editor import (
     clamp_ui_fade,
     clamp_ui_width,
     clamp_upscale,
-    editor_display_size,
 )
 from cleave.user_config import persist_editor_settings
-from cleave.viz.modal import ModalHost, ModalLabeledLine
 from cleave.viz.session import TuningSession
 
-_EDITOR_WINDOW_CONFIRM_MESSAGE = (
+EDITOR_WINDOW_RESTART_TOAST = (
     "Restart the application for changes to take effect."
 )
 
@@ -32,11 +31,12 @@ class SettingsControls:
         self,
         session: TuningSession,
         cfg: CleaveConfig,
-        modal_host: ModalHost,
+        *,
+        on_notification: Callable[[str], None] | None = None,
     ) -> None:
         self.session = session
         self.cfg = cfg
-        self._modal = modal_host
+        self._on_notification = on_notification
 
     def set_expanded(self, expanded: bool) -> None:
         settings = self.session.settings
@@ -81,38 +81,36 @@ class SettingsControls:
         step = 100 if ctrl else 10
         delta = step if forward else -step
         current = self.cfg.editor.width
-        new_value = clamp_editor_width(current + delta)
-        self.cfg.editor = replace(self.cfg.editor, width=new_value)
+        self._commit_editor_window(
+            replace(self.cfg.editor, width=clamp_editor_width(current + delta))
+        )
 
     def adjust_editor_window_height(self, *, forward: bool, ctrl: bool) -> None:
         step = 100 if ctrl else 10
         delta = step if forward else -step
         current = self.cfg.editor.height
-        new_value = clamp_editor_height(current + delta)
-        self.cfg.editor = replace(self.cfg.editor, height=new_value)
+        self._commit_editor_window(
+            replace(self.cfg.editor, height=clamp_editor_height(current + delta))
+        )
 
     def adjust_editor_window_upscale(self, *, forward: bool, ctrl: bool) -> None:
         step = 0.5 if ctrl else 0.1
         delta = step if forward else -step
         current = self.cfg.editor.upscale
-        new_value = clamp_upscale(round(current + delta, 1))
-        self.cfg.editor = replace(self.cfg.editor, upscale=new_value)
+        self._commit_editor_window(
+            replace(
+                self.cfg.editor,
+                upscale=clamp_upscale(round(current + delta, 1)),
+            )
+        )
 
-    def prompt_apply_editor_window(self) -> None:
-        editor = self.cfg.editor
-        display_w, display_h = editor_display_size(
-            editor.width, editor.height, upscale=editor.upscale
-        )
-        self._modal.prompt_yes_no(
-            _EDITOR_WINDOW_CONFIRM_MESSAGE,
-            on_confirm=lambda: persist_editor_settings(self.cfg),
-            labeled_lines=(
-                ModalLabeledLine("width", str(editor.width)),
-                ModalLabeledLine("height", str(editor.height)),
-                ModalLabeledLine("upscale", f"{editor.upscale:.1f}"),
-                ModalLabeledLine("display size", f"{display_w}x{display_h}"),
-            ),
-        )
+    def _commit_editor_window(self, editor: EditorConfig) -> None:
+        if editor == self.cfg.editor:
+            return
+        self.cfg.editor = editor
+        persist_editor_settings(self.cfg)
+        if self._on_notification is not None:
+            self._on_notification(EDITOR_WINDOW_RESTART_TOAST)
 
     def cycle_preview_quality(self, *, forward: bool) -> None:
         modes = EDITOR_PREVIEW_QUALITIES
