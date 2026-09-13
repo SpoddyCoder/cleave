@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from cleave.config import CleaveConfig, LayerConfig, PathsConfig, EditorConfig
+from cleave.config_schema.editor import DEFAULT_EDITOR_HEIGHT, DEFAULT_EDITOR_WIDTH
 from cleave.config_schema.layers import DEFAULT_LAYER_SLOTS
 from cleave.viz.layer_preview_resolution import (
     PREVIEW_MIN_VIZ_SCALE,
@@ -183,6 +184,19 @@ def test_render_layer_size_full_quality_uses_render_output() -> None:
     )
     assert render_layer_size(cfg, 0, viz_quality=False) == (1920, 1080)
     assert render_layer_size(cfg, 3, viz_quality=False) == (1920, 1080)
+
+
+def test_render_layer_size_full_quality_uses_output_at_mismatched_aspect() -> None:
+    cfg = replace(
+        _cfg(),
+        render_width=1080,
+        render_height=1920,
+        editor=_visualizer(
+            width=DEFAULT_EDITOR_WIDTH, height=DEFAULT_EDITOR_HEIGHT
+        ),
+    )
+    assert render_layer_size(cfg, 0, viz_quality=False) == (1080, 1920)
+    assert render_layer_size(cfg, 3, viz_quality=False) == (1080, 1920)
 
 
 def test_render_layer_size_viz_quality_uses_preview_scales() -> None:

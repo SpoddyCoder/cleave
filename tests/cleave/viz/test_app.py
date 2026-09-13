@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from unittest.mock import MagicMock, call, patch
 
 import pygame
 
+from cleave.config_schema.editor import DEFAULT_EDITOR_HEIGHT, DEFAULT_EDITOR_WIDTH
 from cleave.config_schema.layers import DEFAULT_LAYER_SLOTS
 from tests.support.config import TEST_LAYER_STEMS
 from cleave.stems import STEM_NAMES
@@ -88,15 +90,20 @@ def _minimal_runtime(compositor: MagicMock, *, upscale: float = 2.0) -> LiveVisu
     return runtime
 
 
-def _run_seed(*, upscale: float = 2.0) -> VisualizerSeed:
-    display_w = int(1280 * upscale)
-    display_h = int(720 * upscale)
+def _run_seed(
+    *,
+    upscale: float = 2.0,
+    width: int = 1280,
+    height: int = 720,
+) -> VisualizerSeed:
+    display_w = int(width * upscale)
+    display_h = int(height * upscale)
     cfg = make_test_cfg(("layer_1",))
     return VisualizerSeed(
         project_dir=MagicMock(),
         audio_path=MagicMock(),
-        width=1280,
-        height=720,
+        width=width,
+        height=height,
         upscale=upscale,
         display_width=display_w,
         display_height=display_h,
@@ -699,6 +706,51 @@ def test_init_gl_resources_render_content_canvas_matches_output(
     assert mock_gl.call_args.kwargs["display_height"] == output_h
     mock_masked.assert_called_once()
     assert mock_masked.call_args.args[:2] == (output_w, output_h)
+
+
+@patch("cleave.viz.app.GlMaskedCompositor")
+@patch("cleave.viz.app.GlPostProcess")
+@patch("cleave.viz.app.GlCompositor")
+@patch("cleave.viz.app._compositor_color_format")
+def test_init_gl_resources_cheap_uses_editor_canvas_not_render_output(
+    mock_format: MagicMock,
+    mock_gl: MagicMock,
+    mock_post: MagicMock,
+    mock_masked: MagicMock,
+) -> None:
+    seed = _run_seed(
+        upscale=1.0,
+        width=DEFAULT_EDITOR_WIDTH,
+        height=DEFAULT_EDITOR_HEIGHT,
+    )
+    seed.cfg = replace(
+        seed.cfg,
+        render_width=1080,
+        render_height=1920,
+        editor=replace(
+            seed.cfg.editor,
+            width=DEFAULT_EDITOR_WIDTH,
+            height=DEFAULT_EDITOR_HEIGHT,
+        ),
+    )
+    seed.session.project.render.width = 1080
+    seed.session.project.render.height = 1920
+    mock_format.return_value = MagicMock()
+    mock_gl.return_value = MagicMock()
+    mock_post.return_value = MagicMock()
+    mock_masked.return_value = MagicMock()
+
+    init_gl_resources_cheap(seed)
+
+    mock_gl.assert_called_once()
+    assert mock_gl.call_args.args[:2] == (DEFAULT_EDITOR_WIDTH, DEFAULT_EDITOR_HEIGHT)
+    assert mock_gl.call_args.kwargs["display_width"] == DEFAULT_EDITOR_WIDTH
+    assert mock_gl.call_args.kwargs["display_height"] == DEFAULT_EDITOR_HEIGHT
+    mock_masked.assert_called_once()
+    assert mock_masked.call_args.args[:2] == (
+        DEFAULT_EDITOR_WIDTH,
+        DEFAULT_EDITOR_HEIGHT,
+    )
 
 
 @patch("cleave.viz.app.OverlayDrawer.draw_tuning")

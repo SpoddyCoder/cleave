@@ -6,6 +6,7 @@ from dataclasses import replace
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+from cleave.config_schema.editor import DEFAULT_EDITOR_HEIGHT, DEFAULT_EDITOR_WIDTH
 from cleave.preset_playlist import PresetPlaylist
 from cleave.viz.layer import StemLayer
 from cleave.viz.layer_pipeline import LayerFramePipeline
@@ -140,6 +141,46 @@ def test_build_preview_resolutions_false_uses_render_output_size(
     assert build_single.call_args.kwargs["height"] == 1080
     compositor.resize_layer_fbo.assert_not_called()
     stem_layer.pm.set_window_size.assert_not_called()
+
+
+@patch.object(LayerFramePipeline, "build_single")
+def test_build_preview_resolutions_false_uses_output_size_at_mismatched_aspect(
+    build_single: MagicMock,
+) -> None:
+    slots = ("layer_1", "layer_2")
+    layers = {slot: _stem_layer(slot) for slot in slots}
+    build_single.side_effect = lambda slot, *_args, **_kwargs: layers[slot]
+    base_cfg = make_test_cfg(slots)
+    cfg = replace(
+        base_cfg,
+        render_width=1080,
+        render_height=1920,
+        editor=replace(
+            base_cfg.editor,
+            width=DEFAULT_EDITOR_WIDTH,
+            height=DEFAULT_EDITOR_HEIGHT,
+            preview_quality="performance",
+        ),
+    )
+    compositor = MagicMock()
+    playlists = {slot: layers[slot].playlist for slot in slots}
+
+    built, by_slot = LayerFramePipeline.build(
+        cfg,
+        compositor,
+        playlists,
+        _session(slots),
+        projectm_fps=30,
+        preview_resolutions=False,
+    )
+
+    assert built == [layers[slot] for slot in slots]
+    assert by_slot == layers
+    assert build_single.call_count == 2
+    for build_call in build_single.call_args_list:
+        assert build_call.kwargs["width"] == 1080
+        assert build_call.kwargs["height"] == 1920
+    compositor.resize_layer_fbo.assert_not_called()
 
 
 @patch.object(LayerFramePipeline, "build_single")
