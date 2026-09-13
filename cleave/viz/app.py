@@ -338,8 +338,8 @@ def init_gl_resources_render(
 ) -> RenderVisualizerRuntime:
     color_format = _compositor_color_format(seed)
     compositor = GlCompositor(
-        seed.width,
-        seed.height,
+        output_width,
+        output_height,
         display_width=output_width,
         display_height=output_height,
         color_format=color_format,
@@ -348,8 +348,8 @@ def init_gl_resources_render(
     post_process = GlPostProcess(color_format=color_format)
     post_process.init()
     masked_compositor = GlMaskedCompositor(
-        seed.width,
-        seed.height,
+        output_width,
+        output_height,
         color_format=color_format,
     )
     masked_compositor.init()

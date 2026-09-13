@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from cleave.viz.frame_finish import finish_content_frame
+from cleave.viz.frame_finish import _composite_one_overlay_card, finish_content_frame
 from tests.support.config import default_render_post_fx_runtime
 
 
@@ -19,6 +19,32 @@ def _make_core(*, hdr: bool = False) -> MagicMock:
     core.compositor.content_height = 720
     core.compositor.content_fbo_id = 99
     return core
+
+
+def test_overlay_card_layout_uses_compositor_content_size() -> None:
+    core = _make_core()
+    core.seed.width = 1920
+    core.seed.height = 1080
+    core.compositor.content_width = 1080
+    core.compositor.content_height = 1920
+    card_cfg = MagicMock()
+
+    with (
+        patch("cleave.viz.frame_finish.live_overlay_alpha", return_value=1.0),
+        patch("cleave.viz.frame_finish.composite_render_overlay_with_alpha") as composite,
+    ):
+        _composite_one_overlay_card(
+            core,
+            1.0,
+            card_cfg=card_cfg,
+            enabled=True,
+            overlay_solo=False,
+            panel_cache=None,
+            song_duration=60.0,
+        )
+
+    composite.assert_called_once()
+    assert composite.call_args.args[3:5] == (1080, 1920)
 
 
 def test_finish_content_frame_applies_highlight_rolloff_when_active() -> None:

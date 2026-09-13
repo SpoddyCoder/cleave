@@ -19,6 +19,7 @@ from cleave.viz.app import (
     _timeline_strip_visible,
     _tuning_view_state_needed,
     init_gl_resources_cheap,
+    init_gl_resources_render,
 )
 from cleave.viz.focus_nav import MainFocus, TimelineFocus
 from cleave.viz.input_dispatch import key_handler_for_runtime
@@ -669,6 +670,35 @@ def test_init_gl_resources_cheap_reuses_loading_compositor(
     assert compositor is loading
     assert post_process is post
     assert overlay.get_size() == (seed.display_width, seed.display_height)
+
+
+@patch("cleave.viz.app.LayerFramePipeline.build", return_value=([], {}))
+@patch("cleave.viz.app.GlMaskedCompositor")
+@patch("cleave.viz.app.GlPostProcess")
+@patch("cleave.viz.app.GlCompositor")
+@patch("cleave.viz.app._compositor_color_format")
+def test_init_gl_resources_render_content_canvas_matches_output(
+    mock_format: MagicMock,
+    mock_gl: MagicMock,
+    mock_post: MagicMock,
+    mock_masked: MagicMock,
+    _mock_build: MagicMock,
+) -> None:
+    seed = _run_seed()
+    mock_format.return_value = MagicMock()
+    mock_gl.return_value = MagicMock()
+    mock_post.return_value = MagicMock()
+    mock_masked.return_value = MagicMock()
+    output_w, output_h = 1080, 1920
+
+    init_gl_resources_render(seed, output_width=output_w, output_height=output_h)
+
+    mock_gl.assert_called_once()
+    assert mock_gl.call_args.args[:2] == (output_w, output_h)
+    assert mock_gl.call_args.kwargs["display_width"] == output_w
+    assert mock_gl.call_args.kwargs["display_height"] == output_h
+    mock_masked.assert_called_once()
+    assert mock_masked.call_args.args[:2] == (output_w, output_h)
 
 
 @patch("cleave.viz.app.OverlayDrawer.draw_tuning")
