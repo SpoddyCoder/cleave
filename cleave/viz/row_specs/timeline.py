@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from cleave.config_schema.layers import hard_cut_enabled_display
 from cleave.config_schema.timeline import (
     TIMELINE_FADE_DURATION_STEP,
     VISUAL_LIMITER_RATIO_STEP,
