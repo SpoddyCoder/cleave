@@ -19,6 +19,16 @@ def _format_panel_notification(state: TuningViewState, desc: RowDescriptor) -> s
         return state.persistent_notification_message or ""
     return state.notification_message or ""
 
+
+def _apply_panel_notification_action(
+    controls: TuningControls, desc: RowDescriptor
+) -> None:
+    if desc.marker_index != 1:
+        return
+    controls.dismiss_notification()
+    if controls.focus_descriptor == desc:
+        controls.focus_descriptor = RowDescriptor(RowKind.TRANSPORT)
+
 def _apply_transport(
     controls: TuningControls,
     _desc: RowDescriptor,
@@ -57,7 +67,11 @@ SPECS: dict[RowKind, RowSpec] = {
         panel_label="",
         present_style=RowPresentStyle.NOTIFICATION,
         format_value=_format_panel_notification,
-        navigable=False,
+        apply_action=_apply_panel_notification_action,
+        shows_enter_icon=True,
+        help_title="Notification",
+        help_entries=(("Enter", "dismiss"),),
+        help_description=("Status toast; highlight it and press Enter to dismiss.",),
         is_pinned=True,
     ),
     RowKind.RENDER_SECTION_GAP: RowSpec(

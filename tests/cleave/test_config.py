@@ -55,11 +55,14 @@ from cleave.config_schema.editor import (
     DEFAULT_EDITOR_HEIGHT,
     DEFAULT_EDITOR_UPSCALE,
     DEFAULT_EDITOR_WIDTH,
+    DEFAULT_NOTIFICATION_DISPLAY_SEC,
     DEFAULT_UI_FADE_SEC,
     DEFAULT_UI_WIDTH,
     DEFAULT_UI_WIDTH_MODE,
     DEFAULT_EDITOR_PREVIEW_QUALITY,
+    clamp_notification_display_sec,
     editor_config_from_settings,
+    notification_display_label,
     parse_editor_section,
 )
 from cleave.config_schema.layers import (
@@ -205,6 +208,14 @@ def test_clamp_editor_width_and_height() -> None:
     assert clamp_editor_height(100) == 240
 
 
+def test_clamp_notification_display_sec() -> None:
+    assert clamp_notification_display_sec(5) == 5
+    assert clamp_notification_display_sec(-1) == 0
+    assert clamp_notification_display_sec(99) == 20
+    assert notification_display_label(0) == "until dismissed"
+    assert notification_display_label(5) == "5s"
+
+
 def test_editor_config_from_settings_defaults() -> None:
     cfg = editor_config_from_settings()
     assert cfg.upscale == DEFAULT_EDITOR_UPSCALE
@@ -214,6 +225,7 @@ def test_editor_config_from_settings_defaults() -> None:
     assert cfg.ui_fade == DEFAULT_UI_FADE_SEC
     assert cfg.ui_width == DEFAULT_UI_WIDTH
     assert cfg.ui_width_mode == DEFAULT_UI_WIDTH_MODE
+    assert cfg.notification_display_sec == DEFAULT_NOTIFICATION_DISPLAY_SEC
 
 
 def test_editor_config_from_settings_uses_user_editor() -> None:
@@ -225,6 +237,7 @@ def test_editor_config_from_settings_uses_user_editor() -> None:
         ui_width_mode="fixed",
         ui_width=80,
         ui_fade=25.0,
+        notification_display_sec=5,
         residual_latency_ms=0,
     )
     cfg = editor_config_from_settings(editor)
@@ -235,6 +248,7 @@ def test_editor_config_from_settings_uses_user_editor() -> None:
     assert cfg.ui_width_mode == "fixed"
     assert cfg.ui_width == 80
     assert cfg.ui_fade == 25.0
+    assert cfg.notification_display_sec == 5
 
 
 def test_parse_editor_section_reads_width_height_upscale() -> None:
@@ -518,6 +532,7 @@ def test_load_config_editor_settings_from_user_config(tmp_path: Path) -> None:
         ui_width_mode="fixed",
         ui_width=80,
         ui_fade=25.0,
+        notification_display_sec=5,
         residual_latency_ms=0,
     )
     user_cfg_path = tmp_path / "user-config.yaml"
@@ -535,6 +550,7 @@ def test_load_config_editor_settings_from_user_config(tmp_path: Path) -> None:
     assert cfg.editor.ui_width_mode == "fixed"
     assert cfg.editor.ui_width == 80
     assert cfg.editor.ui_fade == 25.0
+    assert cfg.editor.notification_display_sec == 5
     assert cfg.user_config_path == user_cfg_path.resolve()
 
 
@@ -547,6 +563,7 @@ def test_load_config_ignores_editor_fields_in_project_yaml(tmp_path: Path) -> No
         ui_width_mode="fixed",
         ui_width=80,
         ui_fade=25.0,
+        notification_display_sec=5,
         residual_latency_ms=0,
     )
     user_cfg_path = tmp_path / "user-config.yaml"

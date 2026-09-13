@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
+import math
 import time
 from typing import NamedTuple
 
 from cleave.easing import ease_out_cubic
 
-# Settled accent-text display after the attention swipe.
-NOTIFICATION_DURATION_SEC = 5.0
 NOTIFICATION_ATTENTION_SWIPE_IN_SEC = 0.25
 NOTIFICATION_ATTENTION_HOLD_SEC = 1.0
 NOTIFICATION_ATTENTION_SWIPE_OUT_SEC = 0.25
@@ -17,9 +16,6 @@ NOTIFICATION_ATTENTION_DURATION_SEC = (
     NOTIFICATION_ATTENTION_SWIPE_IN_SEC
     + NOTIFICATION_ATTENTION_HOLD_SEC
     + NOTIFICATION_ATTENTION_SWIPE_OUT_SEC
-)
-NOTIFICATION_TOTAL_DURATION_SEC = (
-    NOTIFICATION_ATTENTION_DURATION_SEC + NOTIFICATION_DURATION_SEC
 )
 
 
@@ -102,15 +98,22 @@ class PanelNotificationHost:
     def __init__(self) -> None:
         self._message: str | None = None
         self._shown_at = 0.0
-        self._deadline = 0.0
+        self._deadline: float | None = 0.0
         self._persistent_message: str | None = None
         self._persistent_shown_at = 0.0
 
-    def show(self, message: str) -> None:
+    def show(self, message: str, *, display_sec: float) -> None:
         now = time.monotonic()
         self._message = message
         self._shown_at = now
-        self._deadline = now + NOTIFICATION_TOTAL_DURATION_SEC
+        if display_sec <= 0:
+            self._deadline = None
+        else:
+            self._deadline = now + float(display_sec)
+
+    def dismiss_timed(self) -> None:
+        self._message = None
+        self._deadline = 0.0
 
     def set_persistent(self, message: str | None) -> None:
         if message == self._persistent_message:
@@ -119,7 +122,11 @@ class PanelNotificationHost:
         self._persistent_shown_at = time.monotonic() if message is not None else 0.0
 
     def clear_expired(self) -> None:
-        if self._message is not None and time.monotonic() >= self._deadline:
+        if (
+            self._message is not None
+            and self._deadline is not None
+            and time.monotonic() >= self._deadline
+        ):
             self._message = None
 
     def active(self) -> PanelNotificationActive:
@@ -128,12 +135,17 @@ class PanelNotificationHost:
         remaining = 0.0
         elapsed = 0.0
         if self._message is not None:
-            remaining = max(0.0, self._deadline - now)
-            if remaining > 0:
+            if self._deadline is None:
+                remaining = math.inf
                 timed = self._message
                 elapsed = max(0.0, now - self._shown_at)
             else:
-                remaining = 0.0
+                remaining = max(0.0, self._deadline - now)
+                if remaining > 0:
+                    timed = self._message
+                    elapsed = max(0.0, now - self._shown_at)
+                else:
+                    remaining = 0.0
         persistent_elapsed = 0.0
         if self._persistent_message is not None:
             persistent_elapsed = max(0.0, now - self._persistent_shown_at)

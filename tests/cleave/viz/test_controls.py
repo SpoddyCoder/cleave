@@ -18,6 +18,7 @@ from cleave.config_schema.editor import (
     DEFAULT_EDITOR_HEIGHT,
     DEFAULT_EDITOR_UPSCALE,
     DEFAULT_EDITOR_WIDTH,
+    DEFAULT_NOTIFICATION_DISPLAY_SEC,
     editor_display_size,
 )
 from cleave.config_schema.layers import (
@@ -56,7 +57,6 @@ from cleave.viz.controls import (
     SEEK_TINY,
     TuningControls,
 )
-from cleave.viz.panel_notification import NOTIFICATION_TOTAL_DURATION_SEC
 from cleave.viz.settings_controls import EDITOR_WINDOW_RESTART_TOAST
 from cleave.viz.modal import ModalKind, ModalLabeledLine
 from cleave.viz.theme import ERROR_NOTIFICATION, HIGHLIGHT
@@ -781,7 +781,7 @@ def test_save_triggers_notification_without_blocking_input() -> None:
         assert "Saved" in stderr.getvalue()
         state = controls.build_view_state(paused=False)
         assert state.notification_message == "Saved"
-        assert state.notification_remaining_sec == NOTIFICATION_TOTAL_DURATION_SEC
+        assert state.notification_remaining_sec == DEFAULT_NOTIFICATION_DISPLAY_SEC
 
         before = controls.focus_descriptor
         assert controls.handle_keydown(_keydown(pygame.K_DOWN)) is True
@@ -2373,7 +2373,7 @@ def test_timeline_enabled_startup_shows_notification() -> None:
         view = controls.build_view_state(paused=False)
     assert view.notification_message == NOTIFICATION_TIMELINE_ENABLED_TEXT
     assert view.notification_remaining_sec == pytest.approx(
-        NOTIFICATION_TOTAL_DURATION_SEC, abs=0.01
+        DEFAULT_NOTIFICATION_DISPLAY_SEC, abs=0.01
     )
     assert RowKind.PANEL_NOTIFICATION in [row.kind for row in view.layout.rows]
 
@@ -2402,12 +2402,52 @@ def test_panel_notification_expires_after_duration() -> None:
     with patch.object(
         time,
         "monotonic",
-        return_value=5000.0 + NOTIFICATION_TOTAL_DURATION_SEC + 0.1,
+        return_value=5000.0 + DEFAULT_NOTIFICATION_DISPLAY_SEC + 0.1,
     ):
         controls.tick(0.0)
         view = controls.build_view_state(paused=False)
         assert view.notification_message is None
         assert view.notification_remaining_sec == 0.0
+
+
+def test_panel_notification_until_dismissed_stays_until_enter() -> None:
+    controls = _make_controls(("layer_1",))
+    _expand_settings_ui(controls)
+    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY)
+    for _ in range(5):
+        controls.handle_keydown(_keydown(pygame.K_LEFT))
+    assert controls.cfg.editor.notification_display_sec == 0
+
+    with patch.object(time, "monotonic", return_value=8000.0):
+        controls.show_notification("Saved")
+        view = controls.build_view_state(paused=False)
+        assert view.notification_message == "Saved"
+
+    with patch.object(time, "monotonic", return_value=8000.0 + 10_000.0):
+        controls.tick(0.0)
+        view = controls.build_view_state(paused=False)
+        assert view.notification_message == "Saved"
+        toast = RowDescriptor(RowKind.PANEL_NOTIFICATION, marker_index=1)
+        assert toast in view.layout.navigable_descriptors(view)
+        controls.focus_descriptor = toast
+        assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
+        view = controls.build_view_state(paused=False)
+        assert view.notification_message is None
+        assert controls.focus_descriptor.kind == RowKind.TRANSPORT
+
+
+def test_panel_notification_enter_dismisses_before_timeout() -> None:
+    with patch.object(time, "monotonic", return_value=9000.0):
+        controls = _make_controls(("layer_1",))
+        controls.show_notification("Saved")
+        view = controls.build_view_state(paused=False)
+        toast = RowDescriptor(RowKind.PANEL_NOTIFICATION, marker_index=1)
+        assert toast in view.layout.navigable_descriptors(view)
+        controls.focus_descriptor = toast
+        assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
+        view = controls.build_view_state(paused=False)
+        assert view.notification_message is None
+        assert controls.focus_descriptor.kind == RowKind.TRANSPORT
 
 
 def test_render_timeline_enable_opens_panel() -> None:
@@ -4493,6 +4533,9 @@ def test_settings_ui_expand_collapse_and_sub_row_visibility() -> None:
     assert RowKind.SETTINGS_UI_FADE not in {
         view.layout.kind(i) for i in range(len(view.layout))
     }
+    assert RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY not in {
+        view.layout.kind(i) for i in range(len(view.layout))
+    }
 
     ui_header = view.layout.find_by_kind(RowKind.SETTINGS_UI_HEADER)
     controls.focus_descriptor = _desc(view, ui_header)
@@ -4500,8 +4543,10 @@ def test_settings_ui_expand_collapse_and_sub_row_visibility() -> None:
     assert controls.session.settings.ui_expanded is True
     view = controls.build_view_state(paused=False)
     ui_fade_row = view.layout.find_by_kind(RowKind.SETTINGS_UI_FADE)
+    notify_row = view.layout.find_by_kind(RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY)
     assert ui_fade_row in view.layout.navigable_indices(view)
-    assert view.layout.header_row_count() == 10
+    assert notify_row in view.layout.navigable_indices(view)
+    assert view.layout.header_row_count() == 11
 
     controls.focus_descriptor = _desc(view, ui_fade_row)
     controls.handle_keydown(_keydown(pygame.K_LEFT))
@@ -4510,6 +4555,9 @@ def test_settings_ui_expand_collapse_and_sub_row_visibility() -> None:
     assert controls.session.settings.ui_expanded is False
     view = controls.build_view_state(paused=False)
     assert RowKind.SETTINGS_UI_FADE not in {
+        view.layout.kind(i) for i in range(len(view.layout))
+    }
+    assert RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY not in {
         view.layout.kind(i) for i in range(len(view.layout))
     }
     assert view.layout.header_row_count() == 7
@@ -4775,6 +4823,62 @@ def test_settings_ui_fade_writes_user_config_without_dirty(tmp_path: Path) -> No
     assert user_path.is_file()
     loaded = load_user_config(user_path)
     assert loaded.editor.ui_fade == controls.cfg.editor.ui_fade
+
+
+def test_settings_adjust_notification_display() -> None:
+    controls = _make_controls(("layer_1",))
+    assert controls.cfg.editor.notification_display_sec == 5
+    _expand_settings_ui(controls)
+    view = controls.build_view_state(paused=False)
+    row = view.layout.find_by_kind(RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY)
+    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY)
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.cfg.editor.notification_display_sec == 6
+    view = controls.build_view_state(paused=False)
+    assert _row_text(view, row) == "  └─ notification time: 6s"
+
+    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    assert controls.cfg.editor.notification_display_sec == 1
+
+    controls.handle_keydown(_keydown(pygame.K_LEFT))
+    assert controls.cfg.editor.notification_display_sec == 0
+    view = controls.build_view_state(paused=False)
+    assert _row_text(view, row) == "  └─ notification time: until dismissed"
+
+    for _ in range(25):
+        controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.cfg.editor.notification_display_sec == 20
+    view = controls.build_view_state(paused=False)
+    assert _row_text(view, row) == "  └─ notification time: 20s"
+
+
+def test_settings_notification_display_change_does_not_mark_project_config_dirty() -> None:
+    controls = _make_controls(("layer_1",))
+    assert not controls.config_dirty
+    _expand_settings_ui(controls)
+    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert not controls.config_dirty
+
+
+def test_settings_notification_display_writes_user_config_without_dirty(
+    tmp_path: Path,
+) -> None:
+    user_path = tmp_path / "config.yaml"
+    controls = _make_controls(("layer_1",))
+    controls.cfg.user_config_path = user_path
+    assert not controls.config_dirty
+    _expand_settings_ui(controls)
+    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert not controls.config_dirty
+    assert user_path.is_file()
+    loaded = load_user_config(user_path)
+    assert (
+        loaded.editor.notification_display_sec
+        == controls.cfg.editor.notification_display_sec
+    )
 
 
 def test_settings_residual_latency_writes_user_config_without_dirty(
