@@ -223,7 +223,10 @@ class TuningControls:
         )
         self.render_pattern_mask = RenderPatternMaskControls(session)
         self.settings = SettingsControls(
-            session, cfg, on_notification=self.show_notification
+            session,
+            cfg,
+            on_notification=self.show_notification,
+            on_notification_display_changed=self._notification_host.set_display_sec,
         )
         self.project = ProjectControls(
             session,
@@ -666,6 +669,8 @@ class TuningControls:
                     self.layer_mutations.enter_directory(slot)
                 return True
             if kind == RowKind.TRANSPORT:
+                if self._dismiss_timed_notification_if_present():
+                    return True
                 toggle_pause(self.playback, self.duration_sec)
                 return True
             if kind == RowKind.CONFIG_HEADER:
@@ -673,6 +678,8 @@ class TuningControls:
                 return True
             if kind == RowKind.PROJECT_RENDER_ACTION:
                 self.project_render.prompt()
+                return True
+            if self._dismiss_timed_notification_if_present():
                 return True
 
         return True
@@ -768,6 +775,8 @@ class TuningControls:
                 return True
             if self.focus_descriptor.kind == RowKind.SETTINGS_EDITOR_MODE:
                 self.editor_mode.prompt_change_editor_mode()
+                return True
+            if self._dismiss_timed_notification_if_present():
                 return True
 
         return True
@@ -1093,6 +1102,18 @@ class TuningControls:
 
     def dismiss_notification(self) -> None:
         self._notification_host.dismiss_timed()
+
+    def _dismiss_timed_notification_if_present(self) -> bool:
+        if self._notification_host.active().message is None:
+            return False
+        focused_toast = (
+            self.focus_descriptor.kind == RowKind.PANEL_NOTIFICATION
+            and self.focus_descriptor.marker_index == 1
+        )
+        self.dismiss_notification()
+        if focused_toast:
+            self.focus_descriptor = RowDescriptor(RowKind.TRANSPORT)
+        return True
 
     def open_timeline_panel(self, *, enter_submenu: bool = False) -> None:
         tl = self.session.timeline

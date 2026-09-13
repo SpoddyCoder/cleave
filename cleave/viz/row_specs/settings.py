@@ -336,12 +336,12 @@ SPECS: dict[RowKind, RowSpec] = {
         help_entries=(
             ("Left/Right", "adjust how long toasts stay visible"),
             ("Ctrl + Left/Right", "large step"),
-            ("0", "until dismissed; Enter on the toast clears it"),
+            ("0", "until dismissed; Enter clears the toast"),
         ),
         help_description=(
             "How long panel toasts stay visible before they disappear.",
-            "Until dismissed keeps them until you highlight the toast and press Enter.",
-            "Enter on a highlighted toast dismisses it at any remaining time.",
+            "Until dismissed keeps them until you press Enter.",
+            "Enter dismisses the current toast at any remaining time.",
         ),
         is_pinned=True,
         repeatable=True,
