@@ -222,7 +222,9 @@ class TuningControls:
             session, bindings=render_post_fx_bindings
         )
         self.render_pattern_mask = RenderPatternMaskControls(session)
-        self.settings = SettingsControls(session, cfg, self._modal_host)
+        self.settings = SettingsControls(
+            session, cfg, on_notification=self.show_notification
+        )
         self.project = ProjectControls(
             session,
             duration_sec=duration_sec,

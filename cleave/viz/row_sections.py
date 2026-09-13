@@ -460,10 +460,11 @@ SETTINGS_EDITOR_WINDOW_SECTION = ExpandSectionDef(
     read_expanded=_settings_editor_window_expanded,
     toggle=_toggle_settings_editor_window,
     children=(
+        SectionNode(leaf_kind=RowKind.SETTINGS_PREVIEW_QUALITY),
         SectionNode(leaf_kind=RowKind.SETTINGS_EDITOR_WINDOW_WIDTH),
         SectionNode(leaf_kind=RowKind.SETTINGS_EDITOR_WINDOW_HEIGHT),
         SectionNode(leaf_kind=RowKind.SETTINGS_EDITOR_WINDOW_UPSCALE),
-        SectionNode(leaf_kind=RowKind.SETTINGS_EDITOR_WINDOW_APPLY),
+        SectionNode(leaf_kind=RowKind.SETTINGS_EDITOR_WINDOW_DISPLAY_SIZE),
     ),
 )
 
@@ -499,7 +500,6 @@ SETTINGS_SECTION = ExpandSectionDef(
         SectionNode(expand=SETTINGS_EDITOR_WINDOW_SECTION),
         SectionNode(expand=SETTINGS_UI_SECTION),
         SectionNode(expand=SETTINGS_LATENCY_COMPENSATION_SECTION),
-        SectionNode(leaf_kind=RowKind.SETTINGS_PREVIEW_QUALITY),
         SectionNode(leaf_kind=RowKind.SETTINGS_EDITOR_MODE),
     ),
 )

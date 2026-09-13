@@ -148,7 +148,7 @@ Note: use `--help` on any command for options.
 * Press `h` to show context sensitive help and controls.
   * The help will change as you move around the interface with the arrow keys.
 * If you're using CPU to render, the editor may run at low frame rates with multiple layers
-  * Change `Settings` -> `preview quality` to help with this.
+  * Change `Settings` -> `Editor Window` -> `preview quality` to help with this.
   * The final render will still be at full quality and full frame rate.
 
 #### Preset curation

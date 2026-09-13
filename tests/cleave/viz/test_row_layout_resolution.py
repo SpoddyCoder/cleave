@@ -252,7 +252,7 @@ def test_resolve_navigable_render_post_fx_highlight_rolloff_nested_collapsed() -
 
 def test_section_header_descriptor_mappings() -> None:
     assert section_header_descriptor(RowDescriptor(RowKind.SETTINGS_PREVIEW_QUALITY)) == RowDescriptor(
-        RowKind.SETTINGS_HEADER
+        RowKind.SETTINGS_EDITOR_WINDOW_HEADER
     )
     assert section_header_descriptor(
         RowDescriptor(RowKind.RENDER_OVERLAY_CARD_OPACITY)

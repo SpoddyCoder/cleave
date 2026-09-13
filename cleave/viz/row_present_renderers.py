@@ -593,6 +593,13 @@ def row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]:
     locked_blocked = section_locked(state, desc) and row_blocked_by_section_lock(kind)
     affordance = row_spec(kind).affordance
 
+    if (
+        affordance == RowAffordance.DISPLAY
+        and field is not None
+        and field.present_style == RowPresentStyle.LABELED_VALUE
+    ):
+        return LABEL
+
     if kind in RENDER_TIMELINE_SECTION_KINDS:
         if not state.render_timeline.enabled:
             return DISABLED
