@@ -43,6 +43,7 @@ def test_opacity_in_alpha_only_for_add() -> None:
 
 def test_mask_transition_kind_splits_layout_and_weight() -> None:
     assert mask_transition_kind("strips") == "hard_layout"
+    assert mask_transition_kind("bars") == "hard_layout"
     assert mask_transition_kind("radial") == "hard_layout"
     assert mask_transition_kind("checker") == "weight_field"
     assert mask_transition_kind("plasma") == "weight_field"

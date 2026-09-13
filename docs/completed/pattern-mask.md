@@ -2,7 +2,7 @@
 
 Spatial territories for the multi-layer stack: where each stem-driven layer may own the frame, complementary to black-key / add.
 
-**Status:** Done. Shader composite, four patterns, feather, conductor `pattern_mask` mode, and slot-set transition wipes are shipped. Follow-ups moved to [roadmap.md](../roadmap.md).
+**Status:** Done. Shader composite, five patterns, feather, conductor `pattern_mask` mode, and slot-set transition wipes are shipped. Follow-ups moved to [roadmap.md](../roadmap.md).
 
 Related: [pattern-mask-transition-fragility.md](pattern-mask-transition-fragility.md), [roadmap.md](../roadmap.md), [cleave/gl_masked_compositor.py](../../cleave/gl_masked_compositor.py), [cleave/pattern_mask.py](../../cleave/pattern_mask.py), [cleave/blend_modes.py](../../cleave/blend_modes.py).
 
@@ -45,7 +45,7 @@ Pattern masking belongs beside the layer stack, not under [render post-FX](../..
 ```
 RENDER > PATTERN MASK
   enabled
-  type: strips | radial | checker | plasma
+  type: strips | bars | radial | checker | plasma
   density             # multiplier: 1.0x = 1 segment/layer, 10.0x = 10/layer
   feather             # 0-100%; 0% hard territories, 100% maximum overlap
   transition          # seconds; slot-set morph duration
@@ -61,7 +61,8 @@ RENDER > PATTERN MASK
 
 | Pattern | Fit for 4-5 layers |
 | --- | --- |
-| Strips (vertical / horizontal) | One stem per band; readable; easy density |
+| Strips | Vertical bands; one stem per strip; readable; easy density |
+| Bars | Horizontal bands; one stem per bar; readable; easy density |
 | Radial / rings | Stems in wedges or rings |
 | Checker / tiled | Cycle visible layers through tiles; density = tile count |
 | Plasma / soft field | Continuous soft assignment; seedable |
@@ -84,7 +85,7 @@ The timeline preset ([cleave/timeline_presets/mode.py](../../cleave/timeline_pre
 
 When `pattern_mask`, generative Apply uses [cleave/timeline_presets/pattern_mask_arrange.py](../../cleave/timeline_presets/pattern_mask_arrange.py) instead of the character builders, and sets `render.pattern_mask.enabled: true`, `type: strips`, `feather_pct: 0`, and `transition: 1.0`. Density, invert, and seed stay user-tuned in the panel. Every interior song marker starts a section and forces a slot-set change at that time (add, remove, or simultaneous swap; recast does not count). Begin and crescendo collapse to one layer; the section before a crescendo stays at two or more. Sustain, standard, and diminuendo still change the set; diminuendo keeps a low-count bias that may land on one. One-layer states are allowed infrequently elsewhere. The layers-mode crescendo/accent post-passes are skipped.
 
-Strips and radial wipe by interpolating 1D cuts so territories slide, at any feather. Arriving bands grow from a cut and departing bands shrink; feather scales tent width with each interval. Hard checker and plasma dissolve for the morph only; static frames stay hard. Soft checker and plasma stay a dissolve. Apply enables the mask and passes `transition` into `compose_pattern_mask_timeline` as `transition_duration` before compose runs. Add-then-remove overlap is kept only when `t_remove - t_add` is at least one wipe plus one beat; otherwise the section swaps in one step. Isolated add-only and remove-only timing is unchanged. See [pattern-mask-transition-fragility.md](pattern-mask-transition-fragility.md).
+Strips, bars, and radial wipe by interpolating 1D cuts so territories slide, at any feather. Arriving bands grow from a cut and departing bands shrink; feather scales tent width with each interval. Hard checker and plasma dissolve for the morph only; static frames stay hard. Soft checker and plasma stay a dissolve. Apply enables the mask and passes `transition` into `compose_pattern_mask_timeline` as `transition_duration` before compose runs. Add-then-remove overlap is kept only when `t_remove - t_add` is at least one wipe plus one beat; otherwise the section swaps in one step. Isolated add-only and remove-only timing is unchanged. See [pattern-mask-transition-fragility.md](pattern-mask-transition-fragility.md).
 
 When `layers`, Apply keeps the character builders and post-passes; pattern mask is left as the user set it.
 

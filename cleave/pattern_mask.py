@@ -219,6 +219,42 @@ def generate_strips_mask(
     return np.broadcast_to(row, (height, width)).copy()
 
 
+def generate_bars_mask(
+    width: int,
+    height: int,
+    layer_count: int,
+    density: float = DEFAULT_PATTERN_MASK_DENSITY,
+    invert: bool = False,
+    active_flags: tuple[bool, ...] | None = None,
+) -> np.ndarray:
+    """Return a (H, W) uint8 region-index mask of horizontal bars.
+
+    Each element is a layer index in ``0 .. layer_count-1``. Density is a
+    multiplier of segments per active layer (1.0x = one bar per active
+    layer); inactive slots are omitted and neighbors widen. Invert reverses
+    assignment order. Every column is identical.
+    """
+    _validate_mask_dims(width, height, layer_count)
+    width = int(width)
+    height = int(height)
+    layer_count = int(layer_count)
+    flags = _resolve_active_flags(layer_count, active_flags)
+    active = _active_layer_indices(flags)
+    if not active:
+        return np.zeros((height, width), dtype=np.uint8)
+    n_active = len(active)
+    bar_count = _subdivision_count(n_active, density)
+    ys = np.arange(height, dtype=np.int64)
+    bar_index = np.minimum(
+        (ys * bar_count) // height,
+        bar_count - 1,
+    )
+    active_arr = np.asarray(active, dtype=np.uint8)
+    col = active_arr[bar_index % n_active]
+    col = _apply_invert(col, layer_count, invert)
+    return np.broadcast_to(col[:, None], (height, width)).copy()
+
+
 def _radial_default_rotation_radians(wedge_count: int) -> float:
     """Sensible default rotation so wedges avoid flat axis-aligned splits.
 
@@ -293,17 +329,17 @@ def generate_radial_mask(
     return _apply_invert(region, layer_count, invert)
 
 
-_HARD_LAYOUT_1D_TYPES = frozenset({"strips", "radial"})
+_HARD_LAYOUT_1D_TYPES = frozenset({"strips", "bars", "radial"})
 
 
 @dataclass(frozen=True)
 class HardLayout1D:
-    """1D territories for a hard strips or radial frame.
+    """1D territories for a hard strips, bars, or radial frame.
 
     *cuts* is monotonic and includes 0 and 1. *layers[i]* owns
     ``[cuts[i], cuts[i + 1])``. Zero-width intervals are kept (arriving or
     departing) and receive no pixels when rasterized. *rotation* is the
-    radial screen-space offset in radians; strips store 0.0.
+    radial screen-space offset in radians; strips and bars store 0.0.
     """
 
     cuts: tuple[float, ...]
@@ -418,16 +454,16 @@ def hard_layout_1d(
     density: float,
     invert: bool,
 ) -> HardLayout1D:
-    """Return equal-width 1D intervals for a static hard strips or radial frame.
+    """Return equal-width 1D intervals for a static hard strips, bars, or radial frame.
 
-    Layer indices match ``generate_strips_mask`` / ``generate_radial_mask``
-    (invert is applied here). All-inactive flags yield one full-width
-    interval of layer 0. Radial rotation matches those generators for the
-    same segment count.
+    Layer indices match ``generate_strips_mask`` / ``generate_bars_mask`` /
+    ``generate_radial_mask`` (invert is applied here). All-inactive flags
+    yield one full-width interval of layer 0. Radial rotation matches those
+    generators for the same segment count; strips and bars store 0.0.
     """
     if mask_type not in _HARD_LAYOUT_1D_TYPES:
         raise ValueError(
-            f"hard 1D layout requires strips or radial, got {mask_type!r}"
+            f"hard 1D layout requires strips, bars, or radial, got {mask_type!r}"
         )
     flags = tuple(bool(flag) for flag in active_flags)
     if not flags:
@@ -462,7 +498,7 @@ def lerp_hard_layout_1d(
         )
     if old.mask_type not in _HARD_LAYOUT_1D_TYPES:
         raise ValueError(
-            f"hard 1D layout requires strips or radial, got {old.mask_type!r}"
+            f"hard 1D layout requires strips, bars, or radial, got {old.mask_type!r}"
         )
     amount = min(1.0, max(0.0, float(t)))
     aligned = _align_interval_sequences(
@@ -500,12 +536,13 @@ def rasterize_hard_layout_1d(
     """Rasterize *layout* to a (H, W) uint8 layer-index mask.
 
     Strips are a 1-row broadcast (pixel *x* uses the left edge *x / width*).
+    Bars are a 1-column broadcast (pixel *y* uses the bottom edge *y / height*).
     Radial compares screen-space atan2 against *layout.cuts* using
     *layout.rotation*. Zero-width intervals receive no pixels.
     """
     if mask_type not in _HARD_LAYOUT_1D_TYPES:
         raise ValueError(
-            f"hard 1D layout requires strips or radial, got {mask_type!r}"
+            f"hard 1D layout requires strips, bars, or radial, got {mask_type!r}"
         )
     if mask_type != layout.mask_type:
         raise ValueError(
@@ -526,8 +563,13 @@ def rasterize_hard_layout_1d(
         xs = np.arange(width, dtype=np.float64)
         row = _assign_hard_layout_layers(layout, xs / float(width))
         return np.broadcast_to(row, (height, width)).copy()
-    angle = _radial_screen_angle(width, height, layout.rotation)
-    return _assign_hard_layout_layers(layout, angle)
+    elif mask_type == "bars":
+        ys = np.arange(height, dtype=np.float64)
+        col = _assign_hard_layout_layers(layout, ys / float(height))
+        return np.broadcast_to(col[:, None], (height, width)).copy()
+    else:
+        angle = _radial_screen_angle(width, height, layout.rotation)
+        return _assign_hard_layout_layers(layout, angle)
 
 
 def _assign_hard_layout_layers(
@@ -576,13 +618,13 @@ def rasterize_soft_layout_1d(
     ``w * pattern_mask_feather_half_width(feather_pct)``. Zero-width
     arriving or departing intervals contribute no mass. Pixels with zero
     total mass take the hard winner from *cuts*. Strips are a 1-row
-    broadcast. Radial uses screen-space atan2 and wraps in [0, 1).
-    Equal-width layouts match ``generate_soft_weight_fields`` for the same
-    feather.
+    broadcast. Bars are a 1-column broadcast. Radial uses screen-space
+    atan2 and wraps in [0, 1). Equal-width layouts match
+    ``generate_soft_weight_fields`` for the same feather.
     """
     if layout.mask_type not in _HARD_LAYOUT_1D_TYPES:
         raise ValueError(
-            f"soft 1D layout requires strips or radial, got {layout.mask_type!r}"
+            f"soft 1D layout requires strips, bars, or radial, got {layout.mask_type!r}"
         )
     width = int(width)
     height = int(height)
@@ -606,13 +648,25 @@ def rasterize_soft_layout_1d(
             _assign_hard_layout_layers(layout, xs), (height, width)
         )
         return _cover_zero_mass(fields, winner)
-
-    angle = _radial_screen_angle(width, height, layout.rotation)
-    fields = _soft_layout_interval_fields(
-        layout, angle, layer_count, feather_pct, wrap=True
-    )
-    winner = _assign_hard_layout_layers(layout, angle)
-    return _cover_zero_mass(fields, winner)
+    elif layout.mask_type == "bars":
+        ys = (np.arange(height, dtype=np.float64) + 0.5) / float(height)
+        col_fields = _soft_layout_interval_fields(
+            layout, ys, layer_count, feather_pct, wrap=False
+        )
+        fields = np.broadcast_to(
+            col_fields[:, :, None], (layer_count, height, width)
+        ).copy()
+        winner = np.broadcast_to(
+            _assign_hard_layout_layers(layout, ys)[:, None], (height, width)
+        )
+        return _cover_zero_mass(fields, winner)
+    else:
+        angle = _radial_screen_angle(width, height, layout.rotation)
+        fields = _soft_layout_interval_fields(
+            layout, angle, layer_count, feather_pct, wrap=True
+        )
+        winner = _assign_hard_layout_layers(layout, angle)
+        return _cover_zero_mass(fields, winner)
 
 
 def generate_checker_mask(
@@ -825,6 +879,36 @@ def _strips_weight_fields(
     return _cover_zero_mass(fields, winner)
 
 
+def _bars_weight_fields(
+    width: int,
+    height: int,
+    layer_count: int,
+    density: float,
+    active_flags: tuple[bool, ...],
+    feather_pct: int = 100,
+) -> np.ndarray:
+    """Return (N, H, W) float bar weight fields; inactive slots stay 0."""
+    active = _active_layer_indices(active_flags)
+    fields = np.zeros((layer_count, height, width), dtype=np.float64)
+    if not active:
+        return fields
+    n_active = len(active)
+    bar_count = _subdivision_count(n_active, density)
+    half_width = pattern_mask_feather_half_width(feather_pct)
+    ys = (np.arange(height, dtype=np.float64) + 0.5) / height * bar_count
+    for bar in range(bar_count):
+        layer = active[bar % n_active]
+        center = bar + 0.5
+        col = np.maximum(0.0, 1.0 - np.abs(ys - center) / half_width)
+        fields[layer] += col[:, None]
+    bar_index = np.minimum(ys.astype(np.int64), bar_count - 1)
+    active_arr = np.asarray(active, dtype=np.int64)
+    winner = np.broadcast_to(
+        active_arr[bar_index % n_active][:, None], (height, width)
+    )
+    return _cover_zero_mass(fields, winner)
+
+
 def _radial_weight_fields(
     width: int,
     height: int,
@@ -904,6 +988,28 @@ def generate_strips_weights(
     layer_count = int(layer_count)
     flags = _resolve_active_flags(layer_count, active_flags)
     fields = _strips_weight_fields(
+        width, height, layer_count, density, flags, feather_pct=feather_pct
+    )
+    weights = _fields_to_u8_weights(fields)
+    return _invert_weight_layers(weights, invert)
+
+
+def generate_bars_weights(
+    width: int,
+    height: int,
+    layer_count: int,
+    density: float = DEFAULT_PATTERN_MASK_DENSITY,
+    invert: bool = False,
+    active_flags: tuple[bool, ...] | None = None,
+    feather_pct: int = 100,
+) -> np.ndarray:
+    """Return (H, W, N) uint8 soft bar weights (sum ~255 per pixel)."""
+    _validate_mask_dims(width, height, layer_count)
+    width = int(width)
+    height = int(height)
+    layer_count = int(layer_count)
+    flags = _resolve_active_flags(layer_count, active_flags)
+    fields = _bars_weight_fields(
         width, height, layer_count, density, flags, feather_pct=feather_pct
     )
     weights = _fields_to_u8_weights(fields)
@@ -1015,6 +1121,10 @@ def generate_soft_weight_fields(
         fields = _strips_weight_fields(
             width, height, layer_count, density, flags, feather_pct=feather_pct
         )
+    elif mask_type == "bars":
+        fields = _bars_weight_fields(
+            width, height, layer_count, density, flags, feather_pct=feather_pct
+        )
     elif mask_type == "radial":
         fields = _radial_weight_fields(
             width, height, layer_count, density, flags, feather_pct=feather_pct
@@ -1085,6 +1195,15 @@ def generate_hard_mask(
             invert=invert,
             active_flags=active_flags,
         )
+    if mask_type == "bars":
+        return generate_bars_mask(
+            width,
+            height,
+            layer_count,
+            density=density,
+            invert=invert,
+            active_flags=active_flags,
+        )
     if mask_type == "radial":
         return generate_radial_mask(
             width,
@@ -1135,6 +1254,16 @@ def generate_soft_weights(
     """
     if mask_type == "strips":
         return generate_strips_weights(
+            width,
+            height,
+            layer_count,
+            density=density,
+            invert=invert,
+            active_flags=active_flags,
+            feather_pct=feather_pct,
+        )
+    if mask_type == "bars":
+        return generate_bars_weights(
             width,
             height,
             layer_count,

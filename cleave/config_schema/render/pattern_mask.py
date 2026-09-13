@@ -14,10 +14,11 @@ from cleave.config_schema.descriptors import (
     require_non_negative_number,
 )
 
-PatternMaskType = Literal["strips", "radial", "checker", "plasma"]
+PatternMaskType = Literal["strips", "bars", "radial", "checker", "plasma"]
 
 PATTERN_MASK_TYPES: tuple[PatternMaskType, ...] = (
     "strips",
+    "bars",
     "radial",
     "checker",
     "plasma",

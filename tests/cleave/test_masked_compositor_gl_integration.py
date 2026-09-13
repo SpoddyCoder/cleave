@@ -127,6 +127,28 @@ def test_hard_composite_splits_layers_by_strips(gl_context) -> None:
     assert right_px[2] > 200 and right_px[0] < 40, f"right={right_px}"
 
 
+def test_hard_composite_splits_layers_by_bars(gl_context) -> None:
+    comp, masked = gl_context
+    bottom = comp.create_layer_fbo("bottom", W, H, opacity=1.0, blend_mode="black-key")
+    top = comp.create_layer_fbo("top", W, H, opacity=1.0, blend_mode="black-key")
+    _fill_layer(bottom, (1.0, 0.0, 0.0))
+    _fill_layer(top, (0.0, 0.0, 1.0))
+
+    _run(
+        masked,
+        comp,
+        [bottom, top],
+        mask_type="bars",
+        feather_pct=0,
+        density=1.0,
+    )
+
+    bottom_px = _read_content_pixel(comp, W // 2, H // 4)
+    top_px = _read_content_pixel(comp, W // 2, 3 * H // 4)
+    assert bottom_px[0] > 200 and bottom_px[2] < 40, f"bottom={bottom_px}"
+    assert top_px[2] > 200 and top_px[0] < 40, f"top={top_px}"
+
+
 def test_soft_composite_accepts_generated_strips_weights(gl_context) -> None:
     comp, masked = gl_context
     a = comp.create_layer_fbo("a", W, H, opacity=1.0, blend_mode="black-key")
@@ -145,6 +167,26 @@ def test_soft_composite_accepts_generated_strips_weights(gl_context) -> None:
 
     mid = _read_content_pixel(comp, W // 2, H // 2)
     # Soft strips with density 1.0x still light the frame (not all black).
+    assert max(mid[:3]) > 20, f"mid={mid}"
+
+
+def test_soft_composite_accepts_generated_bars_weights(gl_context) -> None:
+    comp, masked = gl_context
+    a = comp.create_layer_fbo("a", W, H, opacity=1.0, blend_mode="black-key")
+    b = comp.create_layer_fbo("b", W, H, opacity=1.0, blend_mode="black-key")
+    _fill_layer(a, (1.0, 1.0, 0.0))
+    _fill_layer(b, (0.0, 1.0, 1.0))
+
+    _run(
+        masked,
+        comp,
+        [a, b],
+        mask_type="bars",
+        feather_pct=100,
+        density=1.0,
+    )
+
+    mid = _read_content_pixel(comp, W // 2, H // 2)
     assert max(mid[:3]) > 20, f"mid={mid}"
 
 

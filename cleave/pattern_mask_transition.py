@@ -14,13 +14,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-HARD_LAYOUT_MASK_TYPES = frozenset({"strips", "radial"})
+HARD_LAYOUT_MASK_TYPES = frozenset({"strips", "bars", "radial"})
 
 MaskTransitionKind = Literal["hard_layout", "weight_field", "clear"]
 
 
 def uses_hard_layout_morph(mask_type: str) -> bool:
-    """Strips/radial lerp 1D cuts; checker/plasma dissolve via weight fields."""
+    """Strips/bars/radial lerp 1D cuts; checker/plasma dissolve via weight fields."""
     return mask_type in HARD_LAYOUT_MASK_TYPES
 
 
@@ -34,7 +34,7 @@ def mask_transition_kind(mask_type: str) -> Literal["hard_layout", "weight_field
 class MaskTransition:
     """Wipe issued by the layer pipeline; compositor does not infer from diffs.
 
-    ``kind`` is ``hard_layout`` (strips/radial 1D cut lerp), ``weight_field``
+    ``kind`` is ``hard_layout`` (strips/bars/radial 1D cut lerp), ``weight_field``
     (checker/plasma dissolve), or ``clear`` (slot-set changed with duration 0).
     ``from_slots`` is the active set before this change (departing morph source).
     """

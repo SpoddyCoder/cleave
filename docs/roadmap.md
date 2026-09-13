@@ -116,7 +116,7 @@ Never-repeat (or short cooldown) in shuffle/random rotation, plus a "previous pr
 
 ## Pattern mask follow-ups
 
-Core v1 is shipped: shader composite, four patterns (strips, radial, checker, plasma), feather, seed, conductor `pattern_mask` mode, and slot-set transition wipes. See [completed/pattern-mask.md](completed/pattern-mask.md).
+Core v1 is shipped: shader composite, five patterns (strips, bars, radial, checker, plasma), feather, seed, conductor `pattern_mask` mode, and slot-set transition wipes. See [completed/pattern-mask.md](completed/pattern-mask.md).
 
 ### Dynamic masks
 
