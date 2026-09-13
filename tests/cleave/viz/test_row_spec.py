@@ -13,6 +13,7 @@ from cleave.config_schema.editor import (
     DEFAULT_EDITOR_UPSCALE,
     DEFAULT_EDITOR_WIDTH,
     editor_display_size,
+    notification_display_label,
     ui_fade_display,
 )
 from cleave.config_schema.layers import hard_cut_enabled_display
@@ -126,6 +127,7 @@ _EXPECTED_REPEAT_ROW_KINDS = frozenset(
         RowKind.SETTINGS_UI_WIDTH_MODE,
         RowKind.SETTINGS_UI_WIDTH,
         RowKind.SETTINGS_UI_FADE,
+        RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY,
         RowKind.SETTINGS_RESIDUAL_LATENCY_MS,
         RowKind.PROJECT_RENDER_QUALITY,
         RowKind.PROJECT_RENDER_WIDTH,
@@ -192,6 +194,7 @@ def test_row_is_pinned() -> None:
     assert row_is_pinned(RowKind.SETTINGS_EDITOR_WINDOW_WIDTH) is True
     assert row_is_pinned(RowKind.SETTINGS_UI_HEADER) is True
     assert row_is_pinned(RowKind.SETTINGS_UI_FADE) is True
+    assert row_is_pinned(RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY) is True
     assert row_is_pinned(RowKind.SETTINGS_UI_WIDTH_MODE) is True
     assert row_is_pinned(RowKind.SETTINGS_UI_WIDTH) is True
     assert row_is_pinned(RowKind.TRACK_HEADER) is False
@@ -491,6 +494,9 @@ def test_labeled_row_prefix_settings_children() -> None:
     assert labeled_row_prefix(RowKind.SETTINGS_UI_WIDTH_MODE) == "  └─ width mode: "
     assert labeled_row_prefix(RowKind.SETTINGS_UI_WIDTH) == "  └─ max width: "
     assert labeled_row_prefix(RowKind.SETTINGS_UI_FADE) == "  └─ auto-fade: "
+    assert labeled_row_prefix(RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY) == (
+        "  └─ notification time: "
+    )
     assert labeled_row_prefix(RowKind.PROJECT_RENDER_QUALITY) == "  └─ quality: "
     assert labeled_row_prefix(RowKind.PROJECT_RENDER_WIDTH) == "  └─ width: "
     assert labeled_row_prefix(RowKind.PROJECT_RENDER_HEIGHT) == "  └─ height: "
@@ -515,6 +521,7 @@ def test_format_row_value_settings() -> None:
             ui_width_mode="fixed",
             ui_width=320,
             ui_fade=0.0,
+            notification_display_sec=0,
         ),
     )
     assert (
@@ -542,6 +549,10 @@ def test_format_row_value_settings() -> None:
     assert (
         format_row_value(state, RowDescriptor(RowKind.SETTINGS_UI_FADE))
         == ui_fade_display(0.0)
+    )
+    assert (
+        format_row_value(state, RowDescriptor(RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY))
+        == notification_display_label(0)
     )
 
 
@@ -605,6 +616,11 @@ def test_row_labeled_display_text_settings() -> None:
     assert row_labeled_display_text(state, desc) == "  └─ preview quality: balanced"
     fade_desc = RowDescriptor(RowKind.SETTINGS_UI_FADE)
     assert row_labeled_display_text(state, fade_desc) == "  └─ auto-fade: 11s"
+    toast_desc = RowDescriptor(RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY)
+    assert (
+        row_labeled_display_text(state, toast_desc)
+        == "  └─ notification time: 5s"
+    )
 
 
 def test_apply_field_horizontal_display_size_is_not_editable() -> None:
@@ -711,6 +727,18 @@ def test_apply_field_horizontal_adjusts_ui_fade() -> None:
 
     apply_field_horizontal(controls, desc, False, True)
     assert controls.cfg.editor.ui_fade == 6.0
+
+
+def test_apply_field_horizontal_adjusts_notification_display() -> None:
+    controls = _make_controls()
+    desc = RowDescriptor(RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY)
+    assert controls.cfg.editor.notification_display_sec == 5
+
+    apply_field_horizontal(controls, desc, True, False)
+    assert controls.cfg.editor.notification_display_sec == 6
+
+    apply_field_horizontal(controls, desc, False, True)
+    assert controls.cfg.editor.notification_display_sec == 1
 
 
 def test_apply_field_horizontal_adjusts_editor_window_size() -> None:

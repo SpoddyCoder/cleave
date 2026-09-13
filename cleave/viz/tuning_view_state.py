@@ -19,6 +19,7 @@ from cleave.config_schema.editor import (
     DEFAULT_UI_FADE_SEC,
     DEFAULT_UI_WIDTH,
     DEFAULT_UI_WIDTH_MODE,
+    DEFAULT_NOTIFICATION_DISPLAY_SEC,
 )
 from cleave.config_schema.project_render import (
     DEFAULT_PROJECT_RENDER_OUTPUT_LABEL,
@@ -267,6 +268,7 @@ class SettingsBlock:
     ui_width_mode: str = DEFAULT_UI_WIDTH_MODE
     ui_width: int = DEFAULT_UI_WIDTH
     ui_fade: float = DEFAULT_UI_FADE_SEC
+    notification_display_sec: int = DEFAULT_NOTIFICATION_DISPLAY_SEC
     residual_latency_ms: int = DEFAULT_RESIDUAL_LATENCY_MS
 
 
@@ -1043,6 +1045,9 @@ class TuningViewStateBuilder:
                 ui_width_mode=self._config_save.cfg.editor.ui_width_mode,
                 ui_width=self._config_save.cfg.editor.ui_width,
                 ui_fade=self._config_save.cfg.editor.ui_fade,
+                notification_display_sec=(
+                    self._config_save.cfg.editor.notification_display_sec
+                ),
                 residual_latency_ms=self._config_save.cfg.editor.residual_latency_ms,
             ),
             project=_project_block_from_session(

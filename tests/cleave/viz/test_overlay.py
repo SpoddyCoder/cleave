@@ -973,7 +973,7 @@ def test_panel_notification_pinned_under_transport() -> None:
     header_idx = active.layout.find("layer_1", RowKind.TRACK_HEADER)
     assert transport_idx < notification_idx < header_idx
     assert row_is_pinned(RowKind.PANEL_NOTIFICATION)
-    assert notification_idx not in active.layout.navigable_indices(active)
+    assert notification_idx in active.layout.navigable_indices(active)
     assert _row_value_color(active, notification_idx) == HIGHLIGHT
     attention_idx = attention.layout.find_by_kind(RowKind.PANEL_NOTIFICATION)
     assert _row_value_color(attention, attention_idx) == NOTIFICATION_ON_FILL
@@ -1005,6 +1005,9 @@ def test_persistent_and_timed_panel_notifications_stack() -> None:
     assert _row_value_color(stacked, timed_idx) == HIGHLIGHT
     assert _row_text(stacked, persistent_idx) == "No presets in bed roles folder"
     assert _row_text(stacked, timed_idx) == "Saved"
+    navigable = stacked.layout.navigable_indices(stacked)
+    assert persistent_idx not in navigable
+    assert timed_idx in navigable
 
 
 def test_draw_panel_notification_without_error() -> None:

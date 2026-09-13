@@ -5,9 +5,7 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
-- Ctrl+S and Project Save write the project's creative YAML immediately (toast, no overwrite or Save As New). Editor prefs persist on change. The bundled template is copied into new projects and is never the live session.
+- Settings > UI: notification time (until dismissed, or 1-20s). Highlight a toast and press Enter to dismiss it at any remaining time.
 
 - Pattern mask: `bars` type (horizontal strips with 1D-cut transitions).
 - Project > Render: width, height, and fps rows with increment controls. Values live in `project.yaml` under `render:` and are flushed on Save. Default is 1920x1080 at 60fps. `cleave-viz.yaml` no longer has `render.width` / `render.height` / `render.fps`.

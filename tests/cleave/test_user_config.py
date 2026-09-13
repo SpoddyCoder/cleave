@@ -16,6 +16,7 @@ from cleave.config_schema.editor import (
     DEFAULT_UI_WIDTH,
     DEFAULT_UI_WIDTH_MODE,
     DEFAULT_EDITOR_PREVIEW_QUALITY,
+    DEFAULT_NOTIFICATION_DISPLAY_SEC,
     DEFAULT_RESIDUAL_LATENCY_MS,
 )
 from dataclasses import replace
@@ -47,6 +48,7 @@ def test_load_user_config_missing_file_returns_defaults(tmp_path: Path) -> None:
     assert cfg.editor.ui_width_mode == DEFAULT_UI_WIDTH_MODE
     assert cfg.editor.ui_width == DEFAULT_UI_WIDTH
     assert cfg.editor.ui_fade == DEFAULT_UI_FADE_SEC
+    assert cfg.editor.notification_display_sec == DEFAULT_NOTIFICATION_DISPLAY_SEC
     assert cfg.editor.residual_latency_ms == DEFAULT_RESIDUAL_LATENCY_MS
 
 
@@ -59,6 +61,7 @@ def test_default_editor_settings_matches_schema_defaults() -> None:
     assert editor.ui_width_mode == DEFAULT_UI_WIDTH_MODE
     assert editor.ui_width == DEFAULT_UI_WIDTH
     assert editor.ui_fade == DEFAULT_UI_FADE_SEC
+    assert editor.notification_display_sec == DEFAULT_NOTIFICATION_DISPLAY_SEC
     assert editor.residual_latency_ms == DEFAULT_RESIDUAL_LATENCY_MS
 
 
@@ -112,6 +115,7 @@ def test_load_user_config_parses_editor_and_paths(tmp_path: Path) -> None:
     assert cfg.editor.ui_width_mode == "fixed"
     assert cfg.editor.ui_width == 80
     assert cfg.editor.ui_fade == 25.0
+    assert cfg.editor.notification_display_sec == DEFAULT_NOTIFICATION_DISPLAY_SEC
     assert cfg.preset_root == preset_root.resolve()
     assert cfg.texture_paths == (texture_a.resolve(), texture_b.resolve())
 
@@ -147,6 +151,7 @@ def test_write_user_config_preserves_paths_and_rewrites_editor(tmp_path: Path) -
         ui_width_mode="fixed",
         ui_width=90,
         ui_fade=30.0,
+        notification_display_sec=12,
         residual_latency_ms=210,
     )
     write_user_config(new_editor, config_path)
@@ -161,6 +166,7 @@ def test_write_user_config_preserves_paths_and_rewrites_editor(tmp_path: Path) -
     assert data["editor"]["ui_width_mode"] == "fixed"
     assert data["editor"]["ui_width"] == 90
     assert data["editor"]["ui_fade"] == 30.0
+    assert data["editor"]["notification_display_sec"] == 12
     assert data["editor"]["residual_latency_ms"] == 210
     assert data["paths"]["preset_root"] == str(preset_root)
     assert data["paths"]["texture_paths"] == [str(tmp_path / "tex.png")]
@@ -176,6 +182,7 @@ def test_editor_settings_from_config() -> None:
         ui_width_mode="fixed",
         ui_width=75,
         ui_fade=22.5,
+        notification_display_sec=8,
         residual_latency_ms=150,
     )
     editor = editor_settings_from_config(vis)
@@ -187,6 +194,7 @@ def test_editor_settings_from_config() -> None:
         ui_width_mode="fixed",
         ui_width=75,
         ui_fade=22.5,
+        notification_display_sec=8,
         residual_latency_ms=150,
     )
 
@@ -206,6 +214,7 @@ def test_persist_editor_settings_writes_visualizer_editor_fields(
             ui_width_mode="fixed",
             ui_width=88,
             ui_fade=17.5,
+            notification_display_sec=3,
             residual_latency_ms=200,
         ),
     )
@@ -220,6 +229,7 @@ def test_persist_editor_settings_writes_visualizer_editor_fields(
     assert loaded.editor.ui_width_mode == "fixed"
     assert loaded.editor.ui_width == 88
     assert loaded.editor.ui_fade == 17.5
+    assert loaded.editor.notification_display_sec == 3
     assert loaded.editor.residual_latency_ms == 200
 
 

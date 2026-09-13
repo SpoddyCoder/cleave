@@ -611,6 +611,14 @@ def _mutate_settings_ui_width_mode(controls: TuningControls) -> None:
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
+def _mutate_settings_notification_display(controls: TuningControls) -> None:
+    _expand_settings_ui(controls)
+    controls.focus_descriptor = RowDescriptor(
+        RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY
+    )
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
 def _mutate_focus_navigation(controls: TuningControls) -> None:
     controls.handle_keydown(_keydown(pygame.K_DOWN))
 
@@ -656,6 +664,7 @@ _SESSION_ONLY_MUTATIONS: list[tuple[str, Callable[[TuningControls], None], tuple
     ("settings.ui_fade", _mutate_settings_ui_fade, ("layer_1",)),
     ("settings.ui_width", _mutate_settings_ui_width, ("layer_1",)),
     ("settings.ui_width_mode", _mutate_settings_ui_width_mode, ("layer_1",)),
+    ("settings.notification_display_sec", _mutate_settings_notification_display, ("layer_1",)),
     ("focus_navigation", _mutate_focus_navigation, ("layer_1",)),
     ("timeline.armed", _mutate_timeline_arm, ("layer_1",)),
     ("timeline.recording", _mutate_timeline_recording_start, ("layer_1",)),

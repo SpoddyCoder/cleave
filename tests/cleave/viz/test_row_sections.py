@@ -317,6 +317,9 @@ def test_section_header_descriptor_uses_tree_and_effect_fallback() -> None:
         RowDescriptor(RowKind.SETTINGS_UI_FADE)
     ) == RowDescriptor(RowKind.SETTINGS_UI_HEADER)
     assert section_header_descriptor(
+        RowDescriptor(RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY)
+    ) == RowDescriptor(RowKind.SETTINGS_UI_HEADER)
+    assert section_header_descriptor(
         RowDescriptor(RowKind.SETTINGS_EDITOR_WINDOW_WIDTH)
     ) == RowDescriptor(RowKind.SETTINGS_EDITOR_WINDOW_HEADER)
 

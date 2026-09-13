@@ -1086,7 +1086,13 @@ class TuningControls:
             seek_to(self.playback, target, self.duration_sec)
 
     def show_notification(self, message: str) -> None:
-        self._notification_host.show(message)
+        self._notification_host.show(
+            message,
+            display_sec=self.cfg.editor.notification_display_sec,
+        )
+
+    def dismiss_notification(self) -> None:
+        self._notification_host.dismiss_timed()
 
     def open_timeline_panel(self, *, enter_submenu: bool = False) -> None:
         tl = self.session.timeline

@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from cleave.config_schema.editor import (
     EDITOR_PREVIEW_QUALITY_HELP_ENTRIES,
     editor_display_size,
+    notification_display_label,
     ui_fade_display,
 )
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
@@ -67,6 +68,11 @@ def _format_settings_ui_fade(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
     return ui_fade_display(state.settings.ui_fade)
+
+def _format_settings_ui_notification_display(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return notification_display_label(state.settings.notification_display_sec)
 
 def _format_settings_residual_latency_ms(
     state: TuningViewState, _desc: RowDescriptor
@@ -132,6 +138,12 @@ def _apply_settings_ui_fade(
     _shift: bool,
 ) -> None:
     controls.settings.adjust_ui_fade(forward=forward, ctrl=ctrl)
+
+def _apply_settings_ui_notification_display(
+    controls: TuningControls, _desc: RowDescriptor, forward: bool, ctrl: bool,
+    _shift: bool,
+) -> None:
+    controls.settings.adjust_notification_display_sec(forward=forward, ctrl=ctrl)
 
 def _apply_settings_residual_latency_ms(
     controls: TuningControls,
@@ -287,7 +299,9 @@ SPECS: dict[RowKind, RowSpec] = {
         apply_horizontal=apply_expand_subheader,
         fit_strategy=FitStrategy.NONE,
         help_title="UI",
-        help_description=("Panel width and auto-fade for the main tuning overlay.",),
+        help_description=(
+            "Panel width, auto-fade, and notification time for the main tuning overlay.",
+        ),
         is_sub_header=True,
         is_pinned=True,
         parent_group="settings",
@@ -307,6 +321,27 @@ SPECS: dict[RowKind, RowSpec] = {
         help_description=(
             "Delay before the overlay panel fades out.",
             "0 keeps it always visible.",
+        ),
+        is_pinned=True,
+        repeatable=True,
+        parent_group="settings_ui",
+    ),
+    RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY: RowSpec(
+        affordance=RowAffordance.VALUE_STEP,
+        panel_label="notification time",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_settings_ui_notification_display,
+        apply_horizontal=_apply_settings_ui_notification_display,
+        help_title="Notification time",
+        help_entries=(
+            ("Left/Right", "adjust how long toasts stay visible"),
+            ("Ctrl + Left/Right", "large step"),
+            ("0", "until dismissed; Enter on the toast clears it"),
+        ),
+        help_description=(
+            "How long panel toasts stay visible before they disappear.",
+            "Until dismissed keeps them until you highlight the toast and press Enter.",
+            "Enter on a highlighted toast dismisses it at any remaining time.",
         ),
         is_pinned=True,
         repeatable=True,

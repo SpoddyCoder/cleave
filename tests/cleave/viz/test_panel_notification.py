@@ -2,17 +2,17 @@
 
 from __future__ import annotations
 
+import math
 import time
 from unittest.mock import patch
 
 import pytest
 
+from cleave.config_schema.editor import DEFAULT_NOTIFICATION_DISPLAY_SEC
 from cleave.viz.panel_notification import (
     NOTIFICATION_ATTENTION_DURATION_SEC,
     NOTIFICATION_ATTENTION_HOLD_SEC,
     NOTIFICATION_ATTENTION_SWIPE_IN_SEC,
-    NOTIFICATION_DURATION_SEC,
-    NOTIFICATION_TOTAL_DURATION_SEC,
     PanelNotificationHost,
     notification_attention,
 )
@@ -21,17 +21,49 @@ from cleave.viz.panel_notification import (
 def test_timed_notification_active_and_expiry() -> None:
     host = PanelNotificationHost()
     with patch.object(time, "monotonic", return_value=10.0):
-        host.show("hello")
+        host.show("hello", display_sec=DEFAULT_NOTIFICATION_DISPLAY_SEC)
         active = host.active()
     assert active.persistent_message is None
     assert active.message == "hello"
-    assert active.remaining_sec == NOTIFICATION_TOTAL_DURATION_SEC
+    assert active.remaining_sec == DEFAULT_NOTIFICATION_DISPLAY_SEC
     assert active.elapsed_sec == 0.0
 
     with patch.object(
-        time, "monotonic", return_value=10.0 + NOTIFICATION_TOTAL_DURATION_SEC + 0.1
+        time,
+        "monotonic",
+        return_value=10.0 + DEFAULT_NOTIFICATION_DISPLAY_SEC + 0.1,
     ):
         host.clear_expired()
+        active = host.active()
+    assert active.message is None
+    assert active.remaining_sec == 0.0
+
+
+def test_until_dismissed_stays_until_dismissed() -> None:
+    host = PanelNotificationHost()
+    with patch.object(time, "monotonic", return_value=10.0):
+        host.show("hello", display_sec=0)
+        active = host.active()
+    assert active.message == "hello"
+    assert math.isinf(active.remaining_sec)
+
+    with patch.object(time, "monotonic", return_value=10.0 + 10_000.0):
+        host.clear_expired()
+        active = host.active()
+    assert active.message == "hello"
+    assert math.isinf(active.remaining_sec)
+
+    host.dismiss_timed()
+    active = host.active()
+    assert active.message is None
+    assert active.remaining_sec == 0.0
+
+
+def test_dismiss_timed_clears_before_deadline() -> None:
+    host = PanelNotificationHost()
+    with patch.object(time, "monotonic", return_value=10.0):
+        host.show("hello", display_sec=20)
+        host.dismiss_timed()
         active = host.active()
     assert active.message is None
     assert active.remaining_sec == 0.0
@@ -41,7 +73,7 @@ def test_persistent_and_timed_stack_in_active() -> None:
     host = PanelNotificationHost()
     with patch.object(time, "monotonic", return_value=50.0):
         host.set_persistent("No presets in bed roles folder")
-        host.show("Saved")
+        host.show("Saved", display_sec=DEFAULT_NOTIFICATION_DISPLAY_SEC)
         active = host.active()
     assert active.persistent_message == "No presets in bed roles folder"
     assert active.persistent_elapsed_sec == 0.0
@@ -109,13 +141,14 @@ def test_notification_attention_phases() -> None:
     assert visual.text_on_fill is False
 
 
-def test_settled_display_covers_notification_duration() -> None:
+def test_settled_display_covers_remaining_after_attention() -> None:
     host = PanelNotificationHost()
     with patch.object(time, "monotonic", return_value=100.0):
-        host.show("warn")
+        host.show("warn", display_sec=DEFAULT_NOTIFICATION_DISPLAY_SEC)
     settled_start = 100.0 + NOTIFICATION_ATTENTION_DURATION_SEC
     with patch.object(time, "monotonic", return_value=settled_start):
         active = host.active()
     assert active.message == "warn"
-    assert active.remaining_sec == pytest.approx(NOTIFICATION_DURATION_SEC)
+    remaining = DEFAULT_NOTIFICATION_DISPLAY_SEC - NOTIFICATION_ATTENTION_DURATION_SEC
+    assert active.remaining_sec == pytest.approx(remaining)
     assert notification_attention(active.elapsed_sec).fill_progress == 0.0

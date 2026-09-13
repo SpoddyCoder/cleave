@@ -39,6 +39,8 @@ def row_draw_visible(state: TuningViewState, desc: RowDescriptor) -> bool:
 
 
 def row_navigable(state: TuningViewState, desc: RowDescriptor) -> bool:
+    if desc.kind == RowKind.PANEL_NOTIFICATION:
+        return desc.marker_index == 1
     if not row_spec(desc.kind).navigable:
         return False
     if not _sub_row_expanded(state, desc):
