@@ -13,6 +13,7 @@ from cleave.project import (
     CompositorSettings,
     MilkdropSettings,
     ProjectManifest,
+    ProjectRenderSettings,
     load_manifest,
     manifest_path,
     mix_path,
@@ -20,6 +21,7 @@ from cleave.project import (
     rewrite_manifest_slug,
     save_compositor_settings,
     save_milkdrop_settings,
+    save_render_settings,
     save_song_markers,
     write_manifest,
 )
@@ -574,4 +576,99 @@ def test_parse_compositor_rejects_non_bool_hdr(tmp_path: Path) -> None:
     with path.open("w", encoding="utf-8") as handle:
         yaml.safe_dump(data, handle, sort_keys=False)
     with pytest.raises(ValueError, match="compositor.hdr"):
+        load_manifest(project)
+
+
+def test_save_render_settings_preserves_ingest_and_markers(tmp_path: Path) -> None:
+    project = tmp_path / "song"
+    project.mkdir()
+    original = tmp_path / "source.flac"
+    original.write_bytes(b"audio")
+    write_manifest(
+        project,
+        slug="song",
+        mix_filename="song.flac",
+        original_path=original,
+        demucs_model="htdemucs_ft",
+        song_markers=(10.0, 42.5),
+    )
+    rewrite_manifest_slug(project, "song", restored_from="archived-slug")
+    save_render_settings(project, width=1280, height=720, fps=24)
+
+    manifest = load_manifest(project)
+    assert manifest.render == ProjectRenderSettings(width=1280, height=720, fps=24)
+    assert [m.time for m in manifest.song_markers] == [10.0, 42.5]
+    assert manifest.restored_from == "archived-slug"
+    assert manifest.mix_filename == "song.flac"
+
+
+def test_write_manifest_preserves_render_settings(tmp_path: Path) -> None:
+    project = tmp_path / "song"
+    project.mkdir()
+    original = tmp_path / "source.flac"
+    original.write_bytes(b"audio")
+    write_manifest(
+        project,
+        slug="song",
+        mix_filename="song.flac",
+        original_path=original,
+        demucs_model="htdemucs",
+        render=ProjectRenderSettings(width=3840, height=2160, fps=48),
+    )
+    write_manifest(
+        project,
+        slug="song",
+        mix_filename="song.wav",
+        original_path=tmp_path / "new-source.wav",
+        demucs_model="htdemucs_ft",
+    )
+    manifest = load_manifest(project)
+    assert manifest.mix_filename == "song.wav"
+    assert manifest.render == ProjectRenderSettings(width=3840, height=2160, fps=48)
+
+
+def test_parse_render_defaults_when_section_omits_keys(tmp_path: Path) -> None:
+    from cleave.config_schema.project_render import (
+        DEFAULT_RENDER_FPS,
+        DEFAULT_RENDER_HEIGHT,
+        DEFAULT_RENDER_WIDTH,
+    )
+
+    project = tmp_path / "song"
+    project.mkdir()
+    write_manifest(
+        project,
+        slug="song",
+        mix_filename="song.flac",
+        original_path=tmp_path / "source.flac",
+        demucs_model="htdemucs",
+    )
+    path = project / PROJECT_FILENAME
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    data["render"] = {}
+    with path.open("w", encoding="utf-8") as handle:
+        yaml.safe_dump(data, handle, sort_keys=False)
+    assert load_manifest(project).render == ProjectRenderSettings(
+        width=DEFAULT_RENDER_WIDTH,
+        height=DEFAULT_RENDER_HEIGHT,
+        fps=DEFAULT_RENDER_FPS,
+    )
+
+
+def test_parse_render_rejects_non_int_width(tmp_path: Path) -> None:
+    project = tmp_path / "song"
+    project.mkdir()
+    write_manifest(
+        project,
+        slug="song",
+        mix_filename="song.flac",
+        original_path=tmp_path / "source.flac",
+        demucs_model="htdemucs",
+    )
+    path = project / PROJECT_FILENAME
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    data["render"] = {"width": "wide"}
+    with path.open("w", encoding="utf-8") as handle:
+        yaml.safe_dump(data, handle, sort_keys=False)
+    with pytest.raises(ValueError, match="render.width"):
         load_manifest(project)

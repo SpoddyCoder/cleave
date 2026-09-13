@@ -6,7 +6,6 @@ from dataclasses import replace
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from cleave.config import RenderConfig
 from cleave.preset_playlist import PresetPlaylist
 from cleave.viz.layer import StemLayer
 from cleave.viz.layer_pipeline import LayerFramePipeline
@@ -118,7 +117,8 @@ def test_build_preview_resolutions_false_uses_render_output_size(
     base_cfg = make_test_cfg((slot,))
     cfg = replace(
         base_cfg,
-        render=RenderConfig(fps=30, width=1920, height=1080),
+        render_width=1920,
+        render_height=1080,
         editor=replace(base_cfg.editor, preview_quality="performance"),
     )
     compositor = MagicMock()
@@ -152,7 +152,8 @@ def test_build_preview_resolutions_false_viz_quality_uses_preview_sizes(
     base_cfg = make_test_cfg((slot,))
     cfg = replace(
         base_cfg,
-        render=RenderConfig(fps=30, width=1920, height=1080),
+        render_width=1920,
+        render_height=1080,
         editor=replace(base_cfg.editor, preview_quality="performance"),
     )
     compositor = MagicMock()

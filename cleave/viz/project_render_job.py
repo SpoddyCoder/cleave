@@ -27,6 +27,9 @@ class ProjectRenderSpec:
     quality: ProjectRenderQuality
     start_sec: int
     end_sec: int
+    width: int
+    height: int
+    fps: int
 
 
 @dataclass(frozen=True)
@@ -141,6 +144,12 @@ def render_job_argv(
             str(spec.start_sec),
             "--end",
             str(spec.end_sec),
+            "--width",
+            str(spec.width),
+            "--height",
+            str(spec.height),
+            "--fps",
+            str(spec.fps),
         ]
     )
     if spec.quality == "high":

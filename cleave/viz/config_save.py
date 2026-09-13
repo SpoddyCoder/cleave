@@ -11,7 +11,12 @@ import pygame
 
 from cleave.config import VIZ_CONFIG_FILENAME, CleaveConfig
 from cleave.config_schema.persist import persisted_session_payload
-from cleave.project import save_compositor_settings, save_milkdrop_settings, save_song_markers
+from cleave.project import (
+    save_compositor_settings,
+    save_milkdrop_settings,
+    save_render_settings,
+    save_song_markers,
+)
 from cleave.viz.modal import ModalHost, ModalKind
 from cleave.viz.session import TuningSession, allow_overwrite_for_path
 
@@ -22,9 +27,9 @@ class ConfigSaveController:
     """Dirty tracking, save dialogs, and deferred quit.
 
     Viz YAML fields use ``persisted_session_payload``. Song markers,
-    milkdrop beat sensitivity, and compositor hdr are project-scoped
-    (``project.yaml``) and participate in dirty via separate baselines;
-    they flush on successful Save, not on each edit.
+    milkdrop beat sensitivity, compositor hdr, and render width/height/fps
+    are project-scoped (``project.yaml``) and participate in dirty via
+    separate baselines; they flush on successful Save, not on each edit.
     """
 
     def __init__(
@@ -60,6 +65,9 @@ class ConfigSaveController:
         self._saved_song_markers = tuple(session.song_markers.markers)
         self._saved_milkdrop_beat = session.project.milkdrop_beat_sensitivity
         self._saved_compositor_hdr = session.project.compositor_hdr
+        self._saved_render_width = session.project.render.width
+        self._saved_render_height = session.project.render.height
+        self._saved_render_fps = session.project.render.fps
         self._pending_exit = False
         self._quit_after_save = False
         self._on_commit_save: list[Callable[[], None]] = []
@@ -82,6 +90,9 @@ class ConfigSaveController:
                 != self._saved_milkdrop_beat
             )
             or self.session.project.compositor_hdr != self._saved_compositor_hdr
+            or self.session.project.render.width != self._saved_render_width
+            or self.session.project.render.height != self._saved_render_height
+            or self.session.project.render.fps != self._saved_render_fps
         )
 
     def clear_config_dirty(self) -> None:
@@ -89,6 +100,9 @@ class ConfigSaveController:
         self._saved_song_markers = tuple(self.session.song_markers.markers)
         self._saved_milkdrop_beat = self.session.project.milkdrop_beat_sensitivity
         self._saved_compositor_hdr = self.session.project.compositor_hdr
+        self._saved_render_width = self.session.project.render.width
+        self._saved_render_height = self.session.project.render.height
+        self._saved_render_fps = self.session.project.render.fps
 
     def _flush_song_markers(self) -> None:
         if self._project_dir is None:
@@ -109,11 +123,23 @@ class ConfigSaveController:
             self._project_dir, self.session.project.compositor_hdr
         )
 
+    def _flush_render(self) -> None:
+        if self._project_dir is None:
+            return
+        render = self.session.project.render
+        save_render_settings(
+            self._project_dir,
+            width=render.width,
+            height=render.height,
+            fps=render.fps,
+        )
+
     def _commit_save(self) -> None:
         """Flush project.yaml fields (when available) and clear dirty baselines."""
         self._flush_song_markers()
         self._flush_milkdrop()
         self._flush_compositor()
+        self._flush_render()
         self.clear_config_dirty()
         self._pending_save_dismiss = None
         for callback in self._on_commit_save:

@@ -38,6 +38,7 @@ from cleave.config import (
     load_config,
     missing_preset_anchor_notification,
     project_viz_config_path,
+    render_fps,
     render_output_size,
     _parse_layers,
 )
@@ -66,9 +67,12 @@ from cleave.config_schema.layers import (
     next_layer_slot,
     template_layer_entry,
 )
-from cleave.config_schema.render import (
+from cleave.config_schema.project_render import (
+    DEFAULT_RENDER_FPS,
     DEFAULT_RENDER_HEIGHT,
     DEFAULT_RENDER_WIDTH,
+)
+from cleave.config_schema.render import (
     parse_render_section,
 )
 from cleave.config_schema.timeline import parse_timeline_section, persist_timeline
@@ -875,18 +879,14 @@ def test_parse_render_post_fx_locked_true() -> None:
     assert render.post_fx.locked is True
 
 
-def test_parse_render_width_height_defaults() -> None:
-    render = parse_render_section({"render": {"fps": 24}})
+def test_parse_render_section_ignores_legacy_size_keys() -> None:
+    render = parse_render_section(
+        {"render": {"fps": 24, "width": 640, "height": 360}}
+    )
     assert render is not None
-    assert render.width == DEFAULT_RENDER_WIDTH
-    assert render.height == DEFAULT_RENDER_HEIGHT
-
-
-def test_parse_render_width_height_explicit() -> None:
-    render = parse_render_section({"render": {"width": 1920, "height": 1080}})
-    assert render is not None
-    assert render.width == 1920
-    assert render.height == 1080
+    assert not hasattr(render, "width")
+    assert not hasattr(render, "height")
+    assert not hasattr(render, "fps")
 
 
 def test_load_config_compositor_hdr_defaults_true_without_project_yaml(
@@ -918,25 +918,41 @@ def test_load_config_compositor_hdr_from_project_yaml(tmp_path: Path) -> None:
     assert cfg.compositor_hdr is False
 
 
-def test_render_output_size_defaults_without_render_section(
+def test_load_config_render_size_defaults_without_project_yaml(
     minimal_project: Path,
 ) -> None:
     cfg = load_config(project_root=minimal_project)
+    assert cfg.render_width == DEFAULT_RENDER_WIDTH
+    assert cfg.render_height == DEFAULT_RENDER_HEIGHT
+    assert cfg.render_fps == DEFAULT_RENDER_FPS
     assert render_output_size(cfg) == (DEFAULT_RENDER_WIDTH, DEFAULT_RENDER_HEIGHT)
+    assert render_fps(cfg) == DEFAULT_RENDER_FPS
 
 
-def test_render_output_size_reads_render_section() -> None:
-    render = parse_render_section({"render": {"width": 3840, "height": 2160}})
-    assert render is not None
-    cfg = CleaveConfig(
-        paths=PathsConfig(preset_root=Path("/tmp"), texture_paths=()),
-        layers={},
-        editor=EditorConfig(),
-        config_path=Path("/tmp/cleave-viz.yaml"),
-        user_config_path=Path("/tmp/user-config.yaml"),
-        render=render,
+def test_load_config_render_size_from_project_yaml(tmp_path: Path) -> None:
+    from datetime import datetime, timezone
+
+    from cleave.project import save_render_settings, write_manifest
+
+    preset_root = tmp_path / "presets"
+    project_dir = tmp_path / "project"
+    write_minimal_config(project_dir, preset_root)
+    write_manifest(
+        project_dir,
+        slug="project",
+        mix_filename="project.wav",
+        original_path=tmp_path / "source.wav",
+        demucs_model="htdemucs",
+        separated_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
     )
+    save_render_settings(project_dir, width=3840, height=2160, fps=24)
+
+    cfg = load_config(project_root=project_dir)
+    assert cfg.render_width == 3840
+    assert cfg.render_height == 2160
+    assert cfg.render_fps == 24
     assert render_output_size(cfg) == (3840, 2160)
+    assert render_fps(cfg) == 24
 
 
 def test_parse_render_post_fx_defaults() -> None:

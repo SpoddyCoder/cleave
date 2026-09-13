@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from cleave.config_schema.project_render import PROJECT_RENDER_QUALITY_HELP_ENTRIES
+from cleave.config_schema.project_render import (
+    PROJECT_RENDER_QUALITY_HELP_ENTRIES,
+    RENDER_FPS_STEP,
+    RENDER_FPS_STEP_LARGE,
+    RENDER_SIZE_STEP,
+    RENDER_SIZE_STEP_LARGE,
+)
 from cleave.viz.material_icons import FOLDER_GLYPH
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
 from cleave.viz.row_sections import apply_expand_toggle
@@ -25,6 +31,24 @@ def _format_project_render_output(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
     return state.project.output_label
+
+
+def _format_project_render_width(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return str(state.project.width)
+
+
+def _format_project_render_height(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return str(state.project.height)
+
+
+def _format_project_render_fps(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return str(state.project.fps)
 
 
 def _format_project_render_quality(
@@ -73,6 +97,36 @@ def _apply_project_header(
     apply_expand_toggle(
         controls, desc.kind, desc.slot, forward, card=desc.card
     )
+
+
+def _apply_project_render_width(
+    controls: TuningControls,
+    _desc: RowDescriptor,
+    forward: bool,
+    ctrl: bool,
+    _shift: bool,
+) -> None:
+    controls.project.adjust_width(forward=forward, ctrl=ctrl)
+
+
+def _apply_project_render_height(
+    controls: TuningControls,
+    _desc: RowDescriptor,
+    forward: bool,
+    ctrl: bool,
+    _shift: bool,
+) -> None:
+    controls.project.adjust_height(forward=forward, ctrl=ctrl)
+
+
+def _apply_project_render_fps(
+    controls: TuningControls,
+    _desc: RowDescriptor,
+    forward: bool,
+    ctrl: bool,
+    _shift: bool,
+) -> None:
+    controls.project.adjust_fps(forward=forward, ctrl=ctrl)
 
 
 def _apply_project_render_quality(
@@ -232,7 +286,8 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="Render Project",
         help_description=(
-            "Choose quality and a time range, then render this project to MP4.",
+            "Choose output size, frame rate, quality, and a time range,",
+            "then render this project to MP4.",
         ),
         is_sub_header=True,
         is_pinned=True,
@@ -251,6 +306,54 @@ SPECS: dict[RowKind, RowSpec] = {
             "Not editable.",
         ),
         is_pinned=True,
+        parent_group="project_render",
+    ),
+    RowKind.PROJECT_RENDER_WIDTH: RowSpec(
+        affordance=RowAffordance.VALUE_STEP,
+        panel_label="width",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_project_render_width,
+        apply_horizontal=_apply_project_render_width,
+        help_title="Render width",
+        help_entries=(
+            ("Left/Right", f"adjust width ({RENDER_SIZE_STEP} px)"),
+            ("Ctrl + Left/Right", f"large step ({RENDER_SIZE_STEP_LARGE} px)"),
+        ),
+        help_description=("Offline render output width in pixels.",),
+        is_pinned=True,
+        repeatable=True,
+        parent_group="project_render",
+    ),
+    RowKind.PROJECT_RENDER_HEIGHT: RowSpec(
+        affordance=RowAffordance.VALUE_STEP,
+        panel_label="height",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_project_render_height,
+        apply_horizontal=_apply_project_render_height,
+        help_title="Render height",
+        help_entries=(
+            ("Left/Right", f"adjust height ({RENDER_SIZE_STEP} px)"),
+            ("Ctrl + Left/Right", f"large step ({RENDER_SIZE_STEP_LARGE} px)"),
+        ),
+        help_description=("Offline render output height in pixels.",),
+        is_pinned=True,
+        repeatable=True,
+        parent_group="project_render",
+    ),
+    RowKind.PROJECT_RENDER_FPS: RowSpec(
+        affordance=RowAffordance.VALUE_STEP,
+        panel_label="fps",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_project_render_fps,
+        apply_horizontal=_apply_project_render_fps,
+        help_title="Render fps",
+        help_entries=(
+            ("Left/Right", f"adjust fps ({RENDER_FPS_STEP})"),
+            ("Ctrl + Left/Right", f"large step ({RENDER_FPS_STEP_LARGE})"),
+        ),
+        help_description=("Offline render output frame rate.",),
+        is_pinned=True,
+        repeatable=True,
         parent_group="project_render",
     ),
     RowKind.PROJECT_RENDER_QUALITY: RowSpec(
@@ -307,7 +410,7 @@ SPECS: dict[RowKind, RowSpec] = {
         shows_enter_icon=True,
         help_title="Render the project",
         help_entries=(("Enter", "confirm render"),),
-        help_description=("Write an MP4 using the path, quality, and range above.",),
+        help_description=("Write an MP4 using the path, size, fps, quality, and range above.",),
         is_pinned=True,
         parent_group="project_render",
     ),

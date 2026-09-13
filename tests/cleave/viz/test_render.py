@@ -24,13 +24,12 @@ from cleave.viz.session import (
 from tests.support.config import TEST_LAYER_STEMS, default_render_post_fx_runtime
 from cleave.paths import repo_root
 from cleave.config_schema.layers import DEFAULT_LAYER_SLOTS
-from cleave.config_schema.render import (
-    DEFAULT_RENDER_FPS,
+from cleave.config_schema.project_render import (
     DEFAULT_RENDER_HEIGHT,
     DEFAULT_RENDER_WIDTH,
 )
 from cleave.stems import STEM_NAMES, stems_dir
-from cleave.project import write_manifest
+from cleave.project import ProjectRenderSettings, write_manifest
 from cleave.separate import project_stems_complete
 
 render_mod = importlib.import_module("cleave.viz.render")
@@ -128,10 +127,13 @@ def _mock_render_runtime(
     seed.display_height = height if display_height is None else display_height
     seed.duration_sec = duration_sec
     seed.pcm_bank = MagicMock()
-    seed.cfg = MagicMock()
     render_w = DEFAULT_RENDER_WIDTH if output_width is None else output_width
     render_h = DEFAULT_RENDER_HEIGHT if output_height is None else output_height
-    seed.cfg.render = RenderConfig(fps=fps, width=render_w, height=render_h)
+    seed.cfg = MagicMock()
+    seed.cfg.render_width = render_w
+    seed.cfg.render_height = render_h
+    seed.cfg.render_fps = fps
+    seed.cfg.render = RenderConfig()
     seed.session = TuningSession(
         layer_z_order=list(DEFAULT_LAYER_SLOTS),
         render_overlays=replace(
@@ -176,12 +178,7 @@ def _setup_render_project(
 ) -> Path:
     preset_root = tmp_path / "presets"
     project = tmp_path / "my-track"
-    render: dict[str, int] = {"fps": render_fps}
-    if render_width is not None:
-        render["width"] = render_width
-    if render_height is not None:
-        render["height"] = render_height
-    overrides: dict = {"render": render}
+    overrides: dict = {}
     if editor is not None:
         overrides["editor"] = editor
     write_minimal_config(project, preset_root, **overrides)
@@ -195,6 +192,11 @@ def _setup_render_project(
         mix_filename="my-track.flac",
         original_path=tmp_path / "source.flac",
         demucs_model="htdemucs",
+        render=ProjectRenderSettings(
+            width=DEFAULT_RENDER_WIDTH if render_width is None else render_width,
+            height=DEFAULT_RENDER_HEIGHT if render_height is None else render_height,
+            fps=render_fps,
+        ),
     )
     return project
 
@@ -928,8 +930,8 @@ def test_render_calls_overlay_compositing_when_enabled(
     base_cfg = load_config(project / VIZ_CONFIG_FILENAME, repo_root())
     mock_load_config.return_value = replace(
         base_cfg,
+        render_fps=fps,
         render=RenderConfig(
-            fps=fps,
             overlays=_overlays_cfg(
                 opening=overlay_cfg,
                 closing=_closing_overlay_cfg(enabled=False),
@@ -1004,11 +1006,10 @@ def test_render_skips_overlay_when_disabled(
 
     overlay_cfg = _overlay_cfg(enabled=False)
     base_cfg = load_config(project / VIZ_CONFIG_FILENAME, repo_root())
-    fps = base_cfg.render.fps if base_cfg.render is not None else 10
+    fps = base_cfg.render_fps
     mock_load_config.return_value = replace(
         base_cfg,
         render=RenderConfig(
-            fps=fps,
             overlays=_overlays_cfg(
                 opening=overlay_cfg,
                 closing=_closing_overlay_cfg(enabled=False),
@@ -1072,7 +1073,8 @@ def test_render_composites_default_overlay_when_render_absent(
     width, height = 4, 4
     duration_sec = 60.0
     start_sec, end_sec = 10, 12
-    frame_count = (end_sec - start_sec) * DEFAULT_RENDER_FPS
+    fps = 10
+    frame_count = (end_sec - start_sec) * fps
 
     base_cfg = load_config(project / VIZ_CONFIG_FILENAME, repo_root())
     mock_load_config.return_value = replace(base_cfg, render=None)
@@ -1081,7 +1083,7 @@ def test_render_composites_default_overlay_when_render_absent(
     compositor.read_rgba_frame.return_value = _render_frame_bytes()
 
     seed, runtime = _mock_render_runtime(
-        width=width, height=height, fps=DEFAULT_RENDER_FPS, duration_sec=duration_sec
+        width=width, height=height, fps=fps, duration_sec=duration_sec
     )
     runtime.compositor = compositor
     mock_build.return_value = seed
@@ -1319,10 +1321,10 @@ def test_render_upscale_overlay_frame_order_uses_content_dims(
     base_cfg = load_config(project / VIZ_CONFIG_FILENAME, repo_root())
     mock_load_config.return_value = replace(
         base_cfg,
+        render_fps=fps,
+        render_width=render_w,
+        render_height=render_h,
         render=RenderConfig(
-            fps=fps,
-            width=render_w,
-            height=render_h,
             overlays=_overlays_cfg(
                 opening=overlay_cfg,
                 closing=_closing_overlay_cfg(enabled=False),

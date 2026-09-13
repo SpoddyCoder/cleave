@@ -19,6 +19,9 @@ def _spec(tmp_path: Path, *, quality: str = "normal") -> ProjectRenderSpec:
         quality=quality,  # type: ignore[arg-type]
         start_sec=10,
         end_sec=40,
+        width=1920,
+        height=1080,
+        fps=60,
     )
 
 
@@ -40,6 +43,9 @@ def test_render_job_argv_checkout_normal(tmp_path: Path) -> None:
     assert "--viz-quality" not in argv
     assert argv[argv.index("--start") + 1] == "10"
     assert argv[argv.index("--end") + 1] == "40"
+    assert argv[argv.index("--width") + 1] == "1920"
+    assert argv[argv.index("--height") + 1] == "1080"
+    assert argv[argv.index("--fps") + 1] == "60"
     assert argv[argv.index("-o") + 1].endswith("song.mp4")
 
 

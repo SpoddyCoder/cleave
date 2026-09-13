@@ -7,6 +7,13 @@ from collections.abc import Callable
 from cleave.config_schema.editor import clamp_beat_sensitivity
 from cleave.config_schema.project_render import (
     PROJECT_RENDER_QUALITIES,
+    RENDER_FPS_STEP,
+    RENDER_FPS_STEP_LARGE,
+    RENDER_SIZE_STEP,
+    RENDER_SIZE_STEP_LARGE,
+    clamp_render_fps,
+    clamp_render_height,
+    clamp_render_width,
     project_render_duration_ceil_sec,
     resolved_project_render_end_sec,
 )
@@ -95,3 +102,21 @@ class ProjectControls:
         ceil = project_render_duration_ceil_sec(self.duration_sec)
         new_end = max(render.start_sec + 1, min(current + delta, ceil))
         render.end_sec = None if new_end == ceil else new_end
+
+    def adjust_width(self, *, forward: bool, ctrl: bool) -> None:
+        step = RENDER_SIZE_STEP_LARGE if ctrl else RENDER_SIZE_STEP
+        delta = step if forward else -step
+        render = self.session.project.render
+        render.width = clamp_render_width(render.width + delta)
+
+    def adjust_height(self, *, forward: bool, ctrl: bool) -> None:
+        step = RENDER_SIZE_STEP_LARGE if ctrl else RENDER_SIZE_STEP
+        delta = step if forward else -step
+        render = self.session.project.render
+        render.height = clamp_render_height(render.height + delta)
+
+    def adjust_fps(self, *, forward: bool, ctrl: bool) -> None:
+        step = RENDER_FPS_STEP_LARGE if ctrl else RENDER_FPS_STEP
+        delta = step if forward else -step
+        render = self.session.project.render
+        render.fps = clamp_render_fps(render.fps + delta)

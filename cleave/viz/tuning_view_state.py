@@ -24,6 +24,9 @@ from cleave.config_schema.project_render import (
     DEFAULT_PROJECT_RENDER_OUTPUT_LABEL,
     DEFAULT_PROJECT_RENDER_QUALITY,
     DEFAULT_PROJECT_RENDER_START_SEC,
+    DEFAULT_RENDER_FPS,
+    DEFAULT_RENDER_HEIGHT,
+    DEFAULT_RENDER_WIDTH,
     default_project_render_path,
     resolved_project_render_end_sec,
 )
@@ -279,6 +282,9 @@ class ProjectBlock:
     quality: str = DEFAULT_PROJECT_RENDER_QUALITY
     start_sec: int = DEFAULT_PROJECT_RENDER_START_SEC
     end_sec: int = DEFAULT_PROJECT_RENDER_START_SEC
+    width: int = DEFAULT_RENDER_WIDTH
+    height: int = DEFAULT_RENDER_HEIGHT
+    fps: int = DEFAULT_RENDER_FPS
     output_label: str = DEFAULT_PROJECT_RENDER_OUTPUT_LABEL
 
 
@@ -537,6 +543,9 @@ def _project_block_from_session(
         quality=render.quality,
         start_sec=render.start_sec,
         end_sec=end_sec,
+        width=render.width,
+        height=render.height,
+        fps=render.fps,
         output_label=default_project_render_path(
             root,
             project_slug,

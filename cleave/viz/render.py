@@ -19,7 +19,12 @@ from cleave.config import (
     render_fps,
     render_output_size,
 )
-from cleave.config_schema.project_render import default_project_render_path
+from cleave.config_schema.project_render import (
+    clamp_render_fps,
+    clamp_render_height,
+    clamp_render_width,
+    default_project_render_path,
+)
 from cleave.ffmpeg import ffmpeg_executable
 from cleave.paths import default_project_config, resource_dir, resolve_project
 from cleave.preset_playlist import scan_all_layers
@@ -183,12 +188,21 @@ def render(
     viz_quality: bool = False,
     start_sec: int | None = None,
     end_sec: int | None = None,
+    width: int | None = None,
+    height: int | None = None,
+    fps: int | None = None,
     on_progress: Callable[[str, float | None], None] | None = None,
 ) -> RenderResult:
     """Render project visuals to an MP4 muxed with the project mix audio."""
     project = validate_render_project(project_dir, config=config)
     config_path = _resolve_render_config_path(config, project)
     cfg = load_config(config_path, resource_dir())
+    if width is not None:
+        cfg.render_width = clamp_render_width(width)
+    if height is not None:
+        cfg.render_height = clamp_render_height(height)
+    if fps is not None:
+        cfg.render_fps = clamp_render_fps(fps)
 
     if output is not None:
         output_path = Path(output).expanduser()

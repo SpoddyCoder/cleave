@@ -20,6 +20,9 @@ from cleave.config_schema.editor import DEFAULT_BEAT_SENSITIVITY
 from cleave.config_schema.project_render import (
     DEFAULT_PROJECT_RENDER_QUALITY,
     DEFAULT_PROJECT_RENDER_START_SEC,
+    DEFAULT_RENDER_FPS,
+    DEFAULT_RENDER_HEIGHT,
+    DEFAULT_RENDER_WIDTH,
     ProjectRenderQuality,
 )
 from cleave.config_schema.layers import (
@@ -391,6 +394,9 @@ class ProjectRenderRuntime:
     quality: ProjectRenderQuality = DEFAULT_PROJECT_RENDER_QUALITY
     start_sec: int = DEFAULT_PROJECT_RENDER_START_SEC
     end_sec: int | None = None
+    width: int = DEFAULT_RENDER_WIDTH
+    height: int = DEFAULT_RENDER_HEIGHT
+    fps: int = DEFAULT_RENDER_FPS
 
 
 @dataclass
@@ -703,6 +709,11 @@ def session_from_cfg(
         project=ProjectRuntime(
             milkdrop_beat_sensitivity=cfg.milkdrop_beat_sensitivity,
             compositor_hdr=cfg.compositor_hdr,
+            render=ProjectRenderRuntime(
+                width=cfg.render_width,
+                height=cfg.render_height,
+                fps=cfg.render_fps,
+            ),
         ),
         layers={
             slot: LayerRuntime(

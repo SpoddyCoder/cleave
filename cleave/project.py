@@ -15,6 +15,14 @@ from cleave.config_schema.editor import (
     DEFAULT_BEAT_SENSITIVITY,
     clamp_beat_sensitivity,
 )
+from cleave.config_schema.project_render import (
+    DEFAULT_RENDER_FPS,
+    DEFAULT_RENDER_HEIGHT,
+    DEFAULT_RENDER_WIDTH,
+    clamp_render_fps,
+    clamp_render_height,
+    clamp_render_width,
+)
 from cleave.song_markers import (
     DEFAULT_SONG_MARKER_TYPE,
     SongMarker,
@@ -81,6 +89,27 @@ def _parse_compositor(raw: object) -> CompositorSettings | None:
     return CompositorSettings(hdr=hdr_raw)
 
 
+def _parse_render_int(raw: object, label: str) -> int:
+    if isinstance(raw, bool) or not isinstance(raw, int):
+        raise ValueError(f"invalid project manifest: {label}")
+    return raw
+
+
+def _parse_render(raw: object) -> ProjectRenderSettings | None:
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise ValueError("invalid project manifest: render")
+    width_raw = raw.get("width", DEFAULT_RENDER_WIDTH)
+    height_raw = raw.get("height", DEFAULT_RENDER_HEIGHT)
+    fps_raw = raw.get("fps", DEFAULT_RENDER_FPS)
+    return ProjectRenderSettings(
+        width=clamp_render_width(_parse_render_int(width_raw, "render.width")),
+        height=clamp_render_height(_parse_render_int(height_raw, "render.height")),
+        fps=clamp_render_fps(_parse_render_int(fps_raw, "render.fps")),
+    )
+
+
 @dataclass(frozen=True)
 class MilkdropSettings:
     beat_sensitivity: float = DEFAULT_BEAT_SENSITIVITY
@@ -89,6 +118,13 @@ class MilkdropSettings:
 @dataclass(frozen=True)
 class CompositorSettings:
     hdr: bool = DEFAULT_COMPOSITOR_HDR
+
+
+@dataclass(frozen=True)
+class ProjectRenderSettings:
+    width: int = DEFAULT_RENDER_WIDTH
+    height: int = DEFAULT_RENDER_HEIGHT
+    fps: int = DEFAULT_RENDER_FPS
 
 
 @dataclass(frozen=True)
@@ -103,6 +139,7 @@ class ProjectManifest:
     song_markers: tuple[SongMarker, ...] = ()
     milkdrop: MilkdropSettings | None = None
     compositor: CompositorSettings | None = None
+    render: ProjectRenderSettings | None = None
 
     @classmethod
     def from_dict(cls, data: dict) -> ProjectManifest:
@@ -126,6 +163,7 @@ class ProjectManifest:
             song_markers=_parse_song_markers(data.get("song-markers")),
             milkdrop=_parse_milkdrop(data.get("milkdrop")),
             compositor=_parse_compositor(data.get("compositor")),
+            render=_parse_render(data.get("render")),
         )
 
     def to_dict(self) -> dict:
@@ -150,6 +188,12 @@ class ProjectManifest:
         if self.compositor is not None:
             data["compositor"] = {
                 "hdr": self.compositor.hdr,
+            }
+        if self.render is not None:
+            data["render"] = {
+                "width": self.render.width,
+                "height": self.render.height,
+                "fps": self.render.fps,
             }
         return data
 
@@ -209,12 +253,14 @@ def write_manifest(
     song_markers: Sequence[SongMarker | float] | None = None,
     milkdrop: MilkdropSettings | None = None,
     compositor: CompositorSettings | None = None,
+    render: ProjectRenderSettings | None = None,
 ) -> Path:
     """Create or update ``project.yaml`` mix and ingest fields.
 
     When the file already exists, only ``slug``, ``mix.filename``, and
     ``ingest`` are updated. ``song-markers``, ``milkdrop``, ``compositor``,
-    ``restored-from``, and other fields are preserved unless passed explicitly.
+    ``render``, ``restored-from``, and other fields are preserved unless
+    passed explicitly.
     """
     when = separated_at or datetime.now(timezone.utc)
     path = manifest_path(project_dir)
@@ -231,6 +277,7 @@ def write_manifest(
         compositor_settings = (
             compositor if compositor is not None else existing.compositor
         )
+        render_settings = render if render is not None else existing.render
         manifest = replace(
             existing,
             slug=slug,
@@ -241,6 +288,7 @@ def write_manifest(
             song_markers=markers,
             milkdrop=milkdrop_settings,
             compositor=compositor_settings,
+            render=render_settings,
         )
     else:
         manifest = ProjectManifest(
@@ -253,6 +301,7 @@ def write_manifest(
             song_markers=coerce_song_markers(song_markers),
             milkdrop=milkdrop,
             compositor=compositor,
+            render=render,
         )
     with path.open("w", encoding="utf-8") as handle:
         yaml.safe_dump(manifest.to_dict(), handle, sort_keys=False)
@@ -290,6 +339,25 @@ def save_compositor_settings(project_dir: Path, hdr: bool) -> Path:
     """Replace ``compositor`` in ``project.yaml``, preserving ingest and provenance."""
     manifest = load_manifest(project_dir)
     updated = replace(manifest, compositor=CompositorSettings(hdr=bool(hdr)))
+    path = manifest_path(project_dir)
+    with path.open("w", encoding="utf-8") as handle:
+        yaml.safe_dump(updated.to_dict(), handle, sort_keys=False)
+    return path
+
+
+def save_render_settings(
+    project_dir: Path, *, width: int, height: int, fps: int
+) -> Path:
+    """Replace ``render`` in ``project.yaml``, preserving ingest and provenance."""
+    manifest = load_manifest(project_dir)
+    updated = replace(
+        manifest,
+        render=ProjectRenderSettings(
+            width=clamp_render_width(width),
+            height=clamp_render_height(height),
+            fps=clamp_render_fps(fps),
+        ),
+    )
     path = manifest_path(project_dir)
     with path.open("w", encoding="utf-8") as handle:
         yaml.safe_dump(updated.to_dict(), handle, sort_keys=False)

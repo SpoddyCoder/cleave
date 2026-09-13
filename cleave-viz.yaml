@@ -1,7 +1,4 @@
 render:
-  width: 1280
-  height: 720
-  fps: 60
   post_fx:
     enabled: false
     fade_in: 15

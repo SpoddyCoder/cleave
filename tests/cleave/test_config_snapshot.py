@@ -32,11 +32,7 @@ from cleave.config_schema.layers import (
     DEFAULT_LAYER_SLOTS,
     template_layer_entry,
 )
-from cleave.config_schema.render import (
-    DEFAULT_RENDER_HEIGHT,
-    DEFAULT_RENDER_WIDTH,
-    parse_render_section,
-)
+from cleave.config_schema.render import parse_render_section
 from cleave.config_schema.timeline import parse_timeline_section
 from tests.support.config import (
     TEST_LAYER_STEMS,
@@ -878,11 +874,12 @@ def test_write_session_snapshot_persists_render_overlay(tmp_path: Path) -> None:
     write_session_snapshot(out_path, cfg=cfg, session=session)
 
     data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
-    assert data["render"]["width"] == DEFAULT_RENDER_WIDTH
-    assert data["render"]["height"] == DEFAULT_RENDER_HEIGHT
     overlays = data["render"]["overlays"]
     opening = overlays["opening-card"]
     assert "overlay" not in data["render"]
+    assert "width" not in data["render"]
+    assert "height" not in data["render"]
+    assert "fps" not in data["render"]
     assert opening["enabled"] is True
     assert opening["title"]["content"] == "My Title"
     assert opening["body"]["content"] == "Line one\nLine two\n"
