@@ -10,7 +10,7 @@ With timeline preset mode `pattern_mask`, generative Apply sets `render.pattern_
 
 ## Contract
 
-Strips and radial (any feather): store old and target [HardLayout1D](../cleave/pattern_mask.py) layouts and lerp cuts each frame. Feather 0% rasterizes at content resolution, uploads the R8 mask, and draws the hard composite shader. Feather above 0% evaluates tents from those cuts in a composite shader (no weight-field upload). Territories slide. Mid-transition retarget snapshots the current lerped layout as the new old.
+Strips, bars, and radial (any feather): store old and target [HardLayout1D](../cleave/pattern_mask.py) layouts and lerp cuts each frame. Feather 0% rasterizes at content resolution, uploads the R8 mask, and draws the hard composite shader. Feather above 0% evaluates tents from those cuts in a composite shader (no weight-field upload). Territories slide. Mid-transition retarget snapshots the current lerped layout as the new old.
 
 Hard checker and plasma (feather 0%): no 1D cuts. During the morph only, the soft transition shader dissolves; static frames stay hard.
 

@@ -184,7 +184,7 @@ SPECS: dict[RowKind, RowSpec] = {
         apply_horizontal=_apply_render_pattern_mask_density,
         help_title="Density",
         help_description=(
-            "Segments per active layer (1.0x = one strip/wedge/tile per layer).",
+            "Segments per active layer (1.0x = one strip/bar/wedge/tile per layer).",
             "Higher multiplies how many segments cycle through visible layers.",
         ),
         repeatable=True,

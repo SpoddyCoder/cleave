@@ -14,7 +14,7 @@ least ``transition_duration`` plus one beat; otherwise the section swaps
 in one step. Isolated add-only and remove-only gaps are unchanged.
 
 ``LayerFramePipeline.composite`` turns a slot-set change into an explicit
-``MaskTransition`` (``hard_layout`` for strips/radial, ``weight_field`` for
+``MaskTransition`` (``hard_layout`` for strips/bars/radial, ``weight_field`` for
 checker/plasma, or ``clear`` when duration is 0). The masked compositor
 applies that command; it does not infer wipes from slot diffs.
 

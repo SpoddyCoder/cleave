@@ -31,6 +31,8 @@ from cleave.config_schema.render import (
     persist_render,
 )
 from cleave.pattern_mask import (
+    generate_bars_mask,
+    generate_bars_weights,
     generate_checker_mask,
     generate_checker_weights,
     generate_hard_mask,
@@ -64,61 +66,124 @@ def _assert_valid_hard_mask(
     assert int(mask.max()) < layer_count
 
 
-def test_generate_strips_mask_shape_and_dtype() -> None:
-    mask = generate_strips_mask(128, 72, layer_count=4, density=2.0, invert=False)
+_1D_MASK_FNS = {
+    "strips": generate_strips_mask,
+    "bars": generate_bars_mask,
+}
+_1D_WEIGHT_FNS = {
+    "strips": generate_strips_weights,
+    "bars": generate_bars_weights,
+}
+
+
+def _1d_axis(mask_type: str) -> str:
+    return "x" if mask_type == "strips" else "y"
+
+
+def _assert_1d_invariant(arr: np.ndarray, mask_type: str) -> None:
+    if _1d_axis(mask_type) == "x":
+        assert np.array_equal(arr, np.broadcast_to(arr[0], arr.shape))
+        return
+    if arr.ndim == 2:
+        assert np.array_equal(arr, np.broadcast_to(arr[:, :1], arr.shape))
+        return
+    assert np.array_equal(arr, np.broadcast_to(arr[:, :1, :], arr.shape))
+
+
+def _1d_line(arr: np.ndarray, mask_type: str) -> np.ndarray:
+    if _1d_axis(mask_type) == "x":
+        return arr[0]
+    return arr[:, 0]
+
+
+@pytest.mark.parametrize("mask_type", ("strips", "bars"))
+def test_generate_1d_layout_mask_shape_and_dtype(mask_type: str) -> None:
+    generate = _1D_MASK_FNS[mask_type]
+    mask = generate(128, 72, layer_count=4, density=2.0, invert=False)
     _assert_valid_hard_mask(mask, height=72, width=128, layer_count=4)
-    # Vertical strips: every row identical.
-    assert np.array_equal(mask, np.broadcast_to(mask[0], mask.shape))
+    _assert_1d_invariant(mask, mask_type)
+    if mask_type == "strips":
+        assert not np.array_equal(mask, np.broadcast_to(mask[:, :1], mask.shape))
+    else:
+        assert not np.array_equal(mask, np.broadcast_to(mask[0], mask.shape))
 
 
-def test_generate_strips_mask_density_controls_strip_count() -> None:
-    low = generate_strips_mask(100, 40, layer_count=4, density=1.0)
-    high = generate_strips_mask(100, 40, layer_count=4, density=10.0)
+@pytest.mark.parametrize(
+    "mask_type,width,height",
+    (("strips", 100, 40), ("bars", 40, 100)),
+)
+def test_generate_1d_layout_mask_density_controls_segment_count(
+    mask_type: str, width: int, height: int
+) -> None:
+    generate = _1D_MASK_FNS[mask_type]
+    low = generate(width, height, layer_count=4, density=1.0)
+    high = generate(width, height, layer_count=4, density=10.0)
     assert len(np.unique(low)) == 4
     assert len(np.unique(high)) == 4
-    low_transitions = int(np.sum(low[0, 1:] != low[0, :-1]))
-    high_transitions = int(np.sum(high[0, 1:] != high[0, :-1]))
+    low_line = _1d_line(low, mask_type)
+    high_line = _1d_line(high, mask_type)
+    low_transitions = int(np.sum(low_line[1:] != low_line[:-1]))
+    high_transitions = int(np.sum(high_line[1:] != high_line[:-1]))
     assert high_transitions > low_transitions
     # 1.0x = one segment per layer; 10.0x = ten segments per layer.
-    assert low_transitions == 3  # 4 strips -> 3 boundaries
-    assert high_transitions == 39  # 40 strips -> 39 boundaries
+    assert low_transitions == 3  # 4 segments -> 3 boundaries
+    assert high_transitions == 39  # 40 segments -> 39 boundaries
 
 
-def test_generate_strips_mask_invert_reverses_assignment() -> None:
-    base = generate_strips_mask(64, 32, layer_count=4, density=2.0, invert=False)
-    inverted = generate_strips_mask(64, 32, layer_count=4, density=2.0, invert=True)
+@pytest.mark.parametrize("mask_type", ("strips", "bars"))
+def test_generate_1d_layout_mask_invert_reverses_assignment(mask_type: str) -> None:
+    generate = _1D_MASK_FNS[mask_type]
+    base = generate(64, 32, layer_count=4, density=2.0, invert=False)
+    inverted = generate(64, 32, layer_count=4, density=2.0, invert=True)
     assert np.array_equal(inverted, (3 - base.astype(np.int64)).astype(np.uint8))
 
 
-def test_generate_strips_mask_rejects_invalid_args() -> None:
+@pytest.mark.parametrize("mask_type", ("strips", "bars"))
+def test_generate_1d_layout_mask_rejects_invalid_args(mask_type: str) -> None:
+    generate = _1D_MASK_FNS[mask_type]
     with pytest.raises(ValueError, match="width"):
-        generate_strips_mask(0, 16, layer_count=2)
+        generate(0, 16, layer_count=2)
     with pytest.raises(ValueError, match="height"):
-        generate_strips_mask(16, 0, layer_count=2)
+        generate(16, 0, layer_count=2)
     with pytest.raises(ValueError, match="layer_count"):
-        generate_strips_mask(16, 16, layer_count=0)
+        generate(16, 16, layer_count=0)
 
 
-def test_strips_active_flags_omit_inactive_slot() -> None:
-    """Inactive strip channels stay unused; neighbors widen to fill the frame."""
+@pytest.mark.parametrize(
+    "mask_type,width,height,lo,hi",
+    (("strips", 90, 20, (0, 15), (0, 75)), ("bars", 20, 90, (15, 0), (75, 0))),
+)
+def test_1d_layout_active_flags_omit_inactive_slot(
+    mask_type: str,
+    width: int,
+    height: int,
+    lo: tuple[int, int],
+    hi: tuple[int, int],
+) -> None:
+    """Inactive channels stay unused; neighbors widen to fill the frame."""
     flags = (True, False, True)
-    mask = generate_strips_mask(
-        90, 20, layer_count=3, density=1.0, active_flags=flags
+    mask = _1D_MASK_FNS[mask_type](
+        width, height, layer_count=3, density=1.0, active_flags=flags
     )
     used = set(int(v) for v in np.unique(mask))
     assert used == {0, 2}
     assert 1 not in used
-    # Two strips for two active slots: left = slot 0, right = slot 2.
-    assert int(mask[0, 15]) == 0
-    assert int(mask[0, 75]) == 2
+    assert int(mask[lo]) == 0
+    assert int(mask[hi]) == 2
 
 
-def test_strips_soft_weights_zero_inactive_channel() -> None:
+@pytest.mark.parametrize(
+    "mask_type,width,height",
+    (("strips", 64, 16), ("bars", 16, 64)),
+)
+def test_1d_layout_soft_weights_zero_inactive_channel(
+    mask_type: str, width: int, height: int
+) -> None:
     flags = (True, False, True)
-    weights = generate_strips_weights(
-        64, 16, layer_count=3, density=1.0, active_flags=flags
+    weights = _1D_WEIGHT_FNS[mask_type](
+        width, height, layer_count=3, density=1.0, active_flags=flags
     )
-    assert weights.shape == (16, 64, 3)
+    assert weights.shape == (height, width, 3)
     assert int(weights[:, :, 1].max()) == 0
     assert int(weights[:, :, 0].max()) > 0
     assert int(weights[:, :, 2].max()) > 0
@@ -377,6 +442,10 @@ def test_generate_hard_mask_dispatches_types() -> None:
             mask_type, 32, 24, 3, density=1.5, invert=False, seed=1
         )
         _assert_valid_hard_mask(mask, height=24, width=32, layer_count=3)
+    assert np.array_equal(
+        generate_hard_mask("bars", 24, 32, 3, density=1.5),
+        generate_bars_mask(24, 32, 3, density=1.5),
+    )
 
 
 def test_generate_hard_mask_rejects_unknown_type() -> None:
@@ -395,11 +464,16 @@ def _assert_valid_soft_weights(
     assert float(np.mean(np.abs(sums - 255))) < 1.0
 
 
-def test_generate_strips_weights_shape_and_sum() -> None:
-    weights = generate_strips_weights(64, 32, layer_count=4, density=2.0)
-    _assert_valid_soft_weights(weights, height=32, width=64, layer_count=4)
-    # Vertical strips: every row identical.
-    assert np.array_equal(weights, np.broadcast_to(weights[0], weights.shape))
+@pytest.mark.parametrize(
+    "mask_type,width,height",
+    (("strips", 64, 32), ("bars", 32, 64)),
+)
+def test_generate_1d_layout_weights_shape_and_sum(
+    mask_type: str, width: int, height: int
+) -> None:
+    weights = _1D_WEIGHT_FNS[mask_type](width, height, layer_count=4, density=2.0)
+    _assert_valid_soft_weights(weights, height=height, width=width, layer_count=4)
+    _assert_1d_invariant(weights, mask_type)
 
 
 def test_generate_radial_weights_shape_and_sum() -> None:
@@ -427,6 +501,15 @@ def test_generate_soft_weights_dispatches_types() -> None:
             mask_type, 24, 16, 3, density=1.5, invert=False, seed=2
         )
         _assert_valid_soft_weights(weights, height=16, width=24, layer_count=3)
+    assert np.array_equal(
+        generate_soft_weights("bars", 16, 24, 3, density=1.5, feather_pct=50),
+        generate_bars_weights(16, 24, 3, density=1.5, feather_pct=50),
+    )
+    fields = generate_soft_weight_fields(
+        "bars", 16, 24, 3, density=1.5, feather_pct=50
+    )
+    assert fields.shape == (3, 24, 16)
+    assert np.array_equal(fields, np.broadcast_to(fields[:, :, :1], fields.shape))
 
 
 def test_generate_soft_weights_invert_reverses_layers() -> None:
@@ -628,30 +711,44 @@ def _overlap_pixel_count(weights: np.ndarray) -> int:
     return int(np.sum(np.count_nonzero(weights, axis=2) > 1))
 
 
-def test_strips_feather_zero_has_no_two_layer_mix() -> None:
-    weights = generate_strips_weights(
-        80, 16, layer_count=2, density=1.0, feather_pct=0
+@pytest.mark.parametrize(
+    "mask_type,width,height",
+    (("strips", 80, 16), ("bars", 16, 80)),
+)
+def test_1d_layout_feather_zero_has_no_two_layer_mix(
+    mask_type: str, width: int, height: int
+) -> None:
+    weights = _1D_WEIGHT_FNS[mask_type](
+        width, height, layer_count=2, density=1.0, feather_pct=0
     )
-    _assert_valid_soft_weights(weights, height=16, width=80, layer_count=2)
+    _assert_valid_soft_weights(weights, height=height, width=width, layer_count=2)
     assert _overlap_pixel_count(weights) == 0
 
 
-def test_strips_feather_100_matches_default_soft() -> None:
-    current = generate_strips_weights(64, 16, layer_count=2, density=1.0)
-    full = generate_strips_weights(
-        64, 16, layer_count=2, density=1.0, feather_pct=100
-    )
+@pytest.mark.parametrize(
+    "mask_type,width,height",
+    (("strips", 64, 16), ("bars", 16, 64)),
+)
+def test_1d_layout_feather_100_matches_default_soft(
+    mask_type: str, width: int, height: int
+) -> None:
+    generate = _1D_WEIGHT_FNS[mask_type]
+    current = generate(width, height, layer_count=2, density=1.0)
+    full = generate(width, height, layer_count=2, density=1.0, feather_pct=100)
     assert np.array_equal(current, full)
     assert _overlap_pixel_count(full) > 0
 
 
-def test_strips_feather_mid_narrower_overlap_than_100() -> None:
-    mid = generate_strips_weights(
-        80, 16, layer_count=2, density=1.0, feather_pct=50
-    )
-    full = generate_strips_weights(
-        80, 16, layer_count=2, density=1.0, feather_pct=100
-    )
+@pytest.mark.parametrize(
+    "mask_type,width,height",
+    (("strips", 80, 16), ("bars", 16, 80)),
+)
+def test_1d_layout_feather_mid_narrower_overlap_than_100(
+    mask_type: str, width: int, height: int
+) -> None:
+    generate = _1D_WEIGHT_FNS[mask_type]
+    mid = generate(width, height, layer_count=2, density=1.0, feather_pct=50)
+    full = generate(width, height, layer_count=2, density=1.0, feather_pct=100)
     mid_overlap = _overlap_pixel_count(mid)
     full_overlap = _overlap_pixel_count(full)
     assert mid_overlap > 0
@@ -715,40 +812,52 @@ def _strip_run_count(row: np.ndarray, layer: int) -> int:
     return entered
 
 
-def test_hard_layout_strips_two_to_three_moves_before_half() -> None:
+@pytest.mark.parametrize(
+    "mask_type,width,height",
+    (("strips", 120, 16), ("bars", 16, 120)),
+)
+def test_hard_layout_1d_two_to_three_moves_before_half(
+    mask_type: str, width: int, height: int
+) -> None:
     old_flags = (True, True, False)
     new_flags = (True, True, True)
-    width, height = 120, 16
     at_0 = _rasterize_lerp(
-        "strips", old_flags, new_flags, 0.0, width=width, height=height
+        mask_type, old_flags, new_flags, 0.0, width=width, height=height
     )
     at_25 = _rasterize_lerp(
-        "strips", old_flags, new_flags, 0.25, width=width, height=height
+        mask_type, old_flags, new_flags, 0.25, width=width, height=height
     )
-    # Rightmost band is the arriving third strip; it must already differ.
     assert not np.array_equal(at_25, at_0)
-    assert int(at_0[0, -1]) == 1
-    assert int(at_25[0, -1]) == 2
+    far_0 = _1d_line(at_0, mask_type)[-1]
+    far_25 = _1d_line(at_25, mask_type)[-1]
+    assert int(far_0) == 1
+    assert int(far_25) == 2
     assert 2 in set(int(v) for v in np.unique(at_25))
 
 
-def test_hard_layout_strips_territories_stay_contiguous() -> None:
+@pytest.mark.parametrize(
+    "mask_type,width,height",
+    (("strips", 120, 12), ("bars", 12, 120)),
+)
+def test_hard_layout_1d_territories_stay_contiguous(
+    mask_type: str, width: int, height: int
+) -> None:
     old_flags = (True, True, False)
     new_flags = (True, True, True)
     for density in (1.0, 2.0):
-        old = hard_layout_1d("strips", old_flags, density, False)
-        new = hard_layout_1d("strips", new_flags, density, False)
+        old = hard_layout_1d(mask_type, old_flags, density, False)
+        new = hard_layout_1d(mask_type, new_flags, density, False)
         layout = lerp_hard_layout_1d(old, new, 0.25)
-        mask = rasterize_hard_layout_1d(layout, 120, 12, "strips")
-        row = mask[0]
-        assert np.array_equal(mask, np.broadcast_to(row, mask.shape))
+        mask = rasterize_hard_layout_1d(layout, width, height, mask_type)
+        _assert_1d_invariant(mask, mask_type)
+        line = _1d_line(mask, mask_type)
         for layer in (0, 1, 2):
             interval_count = sum(
                 1
                 for index, owner in enumerate(layout.layers)
                 if owner == layer and layout.cuts[index + 1] > layout.cuts[index]
             )
-            assert _strip_run_count(row, layer) == interval_count
+            assert _strip_run_count(line, layer) == interval_count
 
 
 def test_hard_layout_endpoints_match_generators() -> None:
@@ -756,12 +865,19 @@ def test_hard_layout_endpoints_match_generators() -> None:
         ("strips", (True, True, False), (True, True, True), 1.0, False),
         ("strips", (True, True, False), (True, True, True), 1.0, True),
         ("strips", (True, True, False), (True, True, True), 2.0, False),
+        ("bars", (True, True, False), (True, True, True), 1.0, False),
+        ("bars", (True, True, False), (True, True, True), 1.0, True),
+        ("bars", (True, True, False), (True, True, True), 2.0, False),
         ("radial", (True, True, False), (True, True, True), 1.0, False),
         ("radial", (True, True, False), (True, True, True), 1.0, True),
         ("radial", (True, False, True, True), (True, True, True, True), 2.0, False),
     )
     width, height = 64, 48
-    generators = {"strips": generate_strips_mask, "radial": generate_radial_mask}
+    generators = {
+        "strips": generate_strips_mask,
+        "bars": generate_bars_mask,
+        "radial": generate_radial_mask,
+    }
     for mask_type, old_flags, new_flags, density, invert in cases:
         layer_count = len(old_flags)
         generate = generators[mask_type]
@@ -819,40 +935,42 @@ def test_hard_layout_endpoints_match_generators() -> None:
         assert np.array_equal(at_1, expected_new)
 
 
-def test_hard_layout_identity_swap_shrinks_then_grows() -> None:
+@pytest.mark.parametrize(
+    "mask_type,width,height",
+    (("strips", 120, 8), ("bars", 8, 120)),
+)
+def test_hard_layout_identity_swap_shrinks_then_grows(
+    mask_type: str, width: int, height: int
+) -> None:
     """Same-count swap 0,1 -> 0,2: B shrinks and C grows in that band."""
     old_flags = (True, True, False)
     new_flags = (True, False, True)
-    width, height = 120, 8
+    generate = _1D_MASK_FNS[mask_type]
     at_0 = _rasterize_lerp(
-        "strips", old_flags, new_flags, 0.0, width=width, height=height
+        mask_type, old_flags, new_flags, 0.0, width=width, height=height
     )
     at_25 = _rasterize_lerp(
-        "strips", old_flags, new_flags, 0.25, width=width, height=height
+        mask_type, old_flags, new_flags, 0.25, width=width, height=height
     )
     at_1 = _rasterize_lerp(
-        "strips", old_flags, new_flags, 1.0, width=width, height=height
+        mask_type, old_flags, new_flags, 1.0, width=width, height=height
     )
     assert np.array_equal(
         at_0,
-        generate_strips_mask(
-            width, height, 3, density=1.0, active_flags=old_flags
-        ),
+        generate(width, height, 3, density=1.0, active_flags=old_flags),
     )
     assert np.array_equal(
         at_1,
-        generate_strips_mask(
-            width, height, 3, density=1.0, active_flags=new_flags
-        ),
+        generate(width, height, 3, density=1.0, active_flags=new_flags),
     )
-    # Left half stays layer 0. Right band: B still owns the interior,
-    # C has already taken a sliver at the right edge.
-    assert int(at_25[0, 20]) == 0
-    assert int(at_25[0, 70]) == 1
-    assert int(at_25[0, 115]) == 2
-    assert int(at_0[0, 115]) == 1
-    assert _strip_run_count(at_25[0], 1) == 1
-    assert _strip_run_count(at_25[0], 2) == 1
+    line_25 = _1d_line(at_25, mask_type)
+    line_0 = _1d_line(at_0, mask_type)
+    assert int(line_25[20]) == 0
+    assert int(line_25[70]) == 1
+    assert int(line_25[115]) == 2
+    assert int(line_0[115]) == 1
+    assert _strip_run_count(line_25, 1) == 1
+    assert _strip_run_count(line_25, 2) == 1
 
 
 def _soft_layout_lerp_fields(
@@ -883,6 +1001,9 @@ def test_soft_layout_endpoints_match_generators() -> None:
         ("strips", (True, True, False), (True, True, True), 1.0, False, 50),
         ("strips", (True, True, False), (True, True, True), 1.0, True, 100),
         ("strips", (True, True, False), (True, True, True), 2.0, False, 100),
+        ("bars", (True, True, False), (True, True, True), 1.0, False, 50),
+        ("bars", (True, True, False), (True, True, True), 1.0, True, 100),
+        ("bars", (True, True, False), (True, True, True), 2.0, False, 100),
         ("radial", (True, True, False), (True, True, True), 1.0, False, 50),
         ("radial", (True, True, False), (True, True, True), 1.0, True, 100),
         ("radial", (True, False, True, True), (True, True, True, True), 2.0, False, 100),
@@ -936,20 +1057,39 @@ def test_soft_layout_endpoints_match_generators() -> None:
         np.testing.assert_allclose(at_1, expected_new, atol=1e-12, rtol=1e-12)
 
 
-def test_soft_layout_strips_two_to_three_moves_before_half() -> None:
+@pytest.mark.parametrize(
+    "mask_type,width,height",
+    (("strips", 120, 16), ("bars", 16, 120)),
+)
+def test_soft_layout_1d_two_to_three_moves_before_half(
+    mask_type: str, width: int, height: int
+) -> None:
     old_flags = (True, True, False)
     new_flags = (True, True, True)
-    width, height = 120, 16
     at_0 = _soft_layout_lerp_fields(
-        "strips", old_flags, new_flags, 0.0, width=width, height=height, feather_pct=50
+        mask_type, old_flags, new_flags, 0.0, width=width, height=height, feather_pct=50
     )
     at_25 = _soft_layout_lerp_fields(
-        "strips", old_flags, new_flags, 0.25, width=width, height=height, feather_pct=50
+        mask_type, old_flags, new_flags, 0.25, width=width, height=height, feather_pct=50
     )
-    # Right-hand band is the arriving third strip; it must already dominate.
-    assert at_25[2, 0, -1] > at_0[2, 0, -1]
-    assert at_25[2, 0, -1] > at_25[1, 0, -1]
-    # Not a global mix: left stays layer 0, layer 2 has not leaked into it.
-    assert at_25[0, 0, 0] > at_25[2, 0, 0]
-    assert at_25[2, 0, width // 6] < at_25[0, 0, width // 6]
+    if _1d_axis(mask_type) == "x":
+        far_new_0 = at_0[2, 0, -1]
+        far_new_25 = at_25[2, 0, -1]
+        far_old_25 = at_25[1, 0, -1]
+        near_keep = at_25[0, 0, 0]
+        near_new = at_25[2, 0, 0]
+        sixth_new = at_25[2, 0, width // 6]
+        sixth_keep = at_25[0, 0, width // 6]
+    else:
+        far_new_0 = at_0[2, -1, 0]
+        far_new_25 = at_25[2, -1, 0]
+        far_old_25 = at_25[1, -1, 0]
+        near_keep = at_25[0, 0, 0]
+        near_new = at_25[2, 0, 0]
+        sixth_new = at_25[2, height // 6, 0]
+        sixth_keep = at_25[0, height // 6, 0]
+    assert far_new_25 > far_new_0
+    assert far_new_25 > far_old_25
+    assert near_keep > near_new
+    assert sixth_new < sixth_keep
     assert not np.allclose(at_25, at_0)

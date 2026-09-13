@@ -391,6 +391,7 @@ uniform int interval_count;
 uniform float feather_half;
 uniform float rotation;
 uniform int is_radial;
+uniform int is_bars;
 in vec2 uv;
 out vec4 fragColor;
 
@@ -399,6 +400,9 @@ float layout_coord() {
         vec2 p = gl_FragCoord.xy - 0.5 * resolution;
         float angle = atan(p.y, p.x);
         return mod((angle + 3.141592653589793 + rotation) * 0.15915494309189535, 1.0);
+    }
+    if (is_bars != 0) {
+        return gl_FragCoord.y / resolution.y;
     }
     return gl_FragCoord.x / resolution.x;
 }
@@ -1960,6 +1964,7 @@ class GlMaskedCompositor:
         )
         program["rotation"].value = float(layout.rotation)
         program["is_radial"].value = 1 if layout.mask_type == "radial" else 0
+        program["is_bars"].value = 1 if layout.mask_type == "bars" else 0
         program["resolution"].value = (
             float(self.content_width),
             float(self.content_height),

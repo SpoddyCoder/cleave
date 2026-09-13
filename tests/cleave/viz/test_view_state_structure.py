@@ -771,18 +771,18 @@ def test_pattern_mask_seed_row_only_for_plasma() -> None:
     controls = _make_controls(("layer_1",))
     session = controls.session
     session.render_pattern_mask.expanded = True
-    session.render_pattern_mask.type = "strips"
     builder = controls._view_state
-
-    view_strips = builder.build(paused=False)
     seed = RowDescriptor(RowKind.RENDER_PATTERN_MASK_SEED)
     feather = RowDescriptor(RowKind.RENDER_PATTERN_MASK_FEATHER)
-    assert feather in view_strips.layout.rows
-    assert seed not in view_strips.layout.rows
+
+    for mask_type in ("strips", "bars", "radial", "checker"):
+        session.render_pattern_mask.type = mask_type
+        view = builder.build(paused=False)
+        assert feather in view.layout.rows
+        assert seed not in view.layout.rows
 
     session.render_pattern_mask.type = "plasma"
     view_plasma = builder.build(paused=False)
-    assert view_plasma.layout is not view_strips.layout
     assert seed in view_plasma.layout.rows
     assert feather in view_plasma.layout.rows
 
