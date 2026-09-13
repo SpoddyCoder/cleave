@@ -111,7 +111,10 @@ class SubprocessRenderJob:
 
 def write_render_snapshot(cfg: CleaveConfig, session: TuningSession) -> Path:
     """Write live session YAML for the child ``cleave render`` to load."""
-    fd, name = tempfile.mkstemp(prefix="cleave-render-", suffix=".yaml")
+    project_dir = cfg.config_path.parent
+    fd, name = tempfile.mkstemp(
+        prefix="cleave-render-", suffix=".yaml", dir=str(project_dir)
+    )
     os.close(fd)
     path = Path(name)
     try:

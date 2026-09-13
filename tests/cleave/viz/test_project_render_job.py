@@ -3,12 +3,17 @@
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 from cleave.render_progress import (
     format_render_progress_line,
     parse_render_progress_line,
 )
-from cleave.viz.project_render_job import ProjectRenderSpec, render_job_argv
+from cleave.viz.project_render_job import (
+    ProjectRenderSpec,
+    render_job_argv,
+    write_render_snapshot,
+)
 
 
 def _spec(tmp_path: Path, *, quality: str = "normal") -> ProjectRenderSpec:
@@ -68,3 +73,23 @@ def test_render_job_argv_viz_quality(tmp_path: Path) -> None:
     )
     assert "--viz-quality" in argv
     assert "--hq" not in argv
+
+
+@patch("cleave.viz.project_render_job.write_session_snapshot")
+def test_write_render_snapshot_places_file_in_project_dir(
+    mock_write: MagicMock, tmp_path: Path
+) -> None:
+    project_dir = tmp_path / "song"
+    project_dir.mkdir()
+    cfg = MagicMock()
+    cfg.config_path = project_dir / "cleave-viz.yaml"
+    session = MagicMock()
+
+    path = write_render_snapshot(cfg, session)
+    try:
+        assert path.parent.resolve() == project_dir.resolve()
+        assert path.name.startswith("cleave-render-")
+        assert path.suffix == ".yaml"
+        mock_write.assert_called_once_with(path, cfg=cfg, session=session)
+    finally:
+        path.unlink(missing_ok=True)

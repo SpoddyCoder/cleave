@@ -26,7 +26,7 @@ from cleave.config_schema.project_render import (
     default_project_render_path,
 )
 from cleave.ffmpeg import ffmpeg_executable
-from cleave.paths import default_project_config, resource_dir, resolve_project
+from cleave.paths import default_project_config, resolve_project
 from cleave.preset_playlist import scan_all_layers
 from cleave.project import load_manifest, manifest_path, mix_path
 from cleave.separate import project_stems_complete, signals_complete
@@ -196,7 +196,7 @@ def render(
     """Render project visuals to an MP4 muxed with the project mix audio."""
     project = validate_render_project(project_dir, config=config)
     config_path = _resolve_render_config_path(config, project)
-    cfg = load_config(config_path, resource_dir())
+    cfg = load_config(config_path, project)
     if width is not None:
         cfg.render_width = clamp_render_width(width)
     if height is not None:
