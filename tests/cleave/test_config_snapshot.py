@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -25,15 +26,19 @@ from cleave.config import (
     _parse_layers,
     load_config,
 )
+from cleave.config_schema.compositor import DEFAULT_COMPOSITOR_HDR
 from cleave.config_schema.descriptors import (
     ParseCtx,
 )
+from cleave.config_schema.editor import DEFAULT_BEAT_SENSITIVITY
 from cleave.config_schema.layers import (
     DEFAULT_LAYER_SLOTS,
     template_layer_entry,
 )
 from cleave.config_schema.render import parse_render_section
 from cleave.config_schema.timeline import parse_timeline_section
+from cleave.paths import resource_dir
+from cleave.project import CompositorSettings, MilkdropSettings, write_manifest
 from tests.support.config import (
     TEST_LAYER_STEMS,
     default_render_post_fx_config,
@@ -42,6 +47,7 @@ from tests.support.config import (
     layer_runtimes,
     make_preset_dirs,
     slot_for_stem,
+    write_minimal_config,
 )
 from cleave.config_snapshot import (
     next_unnamed_path,
@@ -1639,3 +1645,53 @@ def test_session_snapshot_full_round_trip(tmp_path: Path) -> None:
     actual = persisted_session_payload(cfg2, session2)
 
     assert actual == expected
+
+
+def test_load_config_snapshot_resolves_switching_list_and_manifest_from_project(
+    tmp_path: Path,
+) -> None:
+    """Child-process parse: snapshot must live in the project, loaded with project_root."""
+    manifest_beat = 3.5
+    manifest_hdr = False
+    assert manifest_beat != DEFAULT_BEAT_SENSITIVITY
+    assert manifest_hdr is not DEFAULT_COMPOSITOR_HDR
+    project_dir = tmp_path / "song"
+    pack_root = tmp_path / "pack-presets"
+    config_path = write_minimal_config(project_dir, pack_root)
+    foo = project_dir / "presets" / "foo.milk"
+    foo.parent.mkdir(parents=True)
+    foo.write_text("MILK\n", encoding="utf-8")
+    write_manifest(
+        project_dir,
+        slug="song",
+        mix_filename="song.wav",
+        original_path=tmp_path / "source.wav",
+        demucs_model="htdemucs",
+        separated_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        milkdrop=MilkdropSettings(beat_sensitivity=manifest_beat),
+        compositor=CompositorSettings(hdr=manifest_hdr),
+    )
+
+    cfg = load_config(config_path, project_dir)
+    session = session_from_cfg(cfg, _round_trip_playlists(pack_root))
+    session.layers["layer_1"].preset_switching = "on"
+    session.layers["layer_1"].preset_list = [str(foo.resolve())]
+
+    snapshot_path = project_dir / "cleave-render-snapshot.yaml"
+    write_session_snapshot(snapshot_path, cfg=cfg, session=session)
+
+    loaded = load_config(snapshot_path, project_dir)
+    assert loaded.layers["layer_1"].preset_switching_list == [foo.resolve()]
+    assert loaded.milkdrop_beat_sensitivity == manifest_beat
+    assert loaded.compositor_hdr is manifest_hdr
+
+    tmp_copy = tmp_path / "outside" / "cleave-render-snapshot.yaml"
+    tmp_copy.parent.mkdir()
+    tmp_copy.write_text(snapshot_path.read_text(encoding="utf-8"), encoding="utf-8")
+    loaded_tmp = load_config(tmp_copy, resource_dir())
+    assert foo.resolve() not in loaded_tmp.layers["layer_1"].preset_switching_list
+    assert loaded_tmp.layers["layer_1"].preset_switching_list == [
+        (tmp_copy.parent / "presets" / "foo.milk").resolve()
+    ]
+    assert loaded_tmp.milkdrop_beat_sensitivity == DEFAULT_BEAT_SENSITIVITY
+    assert loaded_tmp.compositor_hdr is DEFAULT_COMPOSITOR_HDR
