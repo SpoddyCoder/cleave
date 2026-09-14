@@ -10,8 +10,11 @@ import pytest
 
 from cleave.config_schema.editor import (
     DEFAULT_EDITOR_HEIGHT,
+    DEFAULT_EDITOR_PREVIEW_QUALITY,
     DEFAULT_EDITOR_UPSCALE,
     DEFAULT_EDITOR_WIDTH,
+    DEFAULT_NOTIFICATION_DISPLAY_SEC,
+    DEFAULT_UI_WIDTH_MODE,
     editor_display_size,
     notification_display_label,
     ui_fade_display,
@@ -617,9 +620,8 @@ def test_row_labeled_display_text_settings() -> None:
     fade_desc = RowDescriptor(RowKind.SETTINGS_UI_FADE)
     assert row_labeled_display_text(state, fade_desc) == "  └─ auto-fade: 11s"
     toast_desc = RowDescriptor(RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY)
-    assert (
-        row_labeled_display_text(state, toast_desc)
-        == "  └─ notification time: 5s"
+    assert row_labeled_display_text(state, toast_desc) == (
+        f"  └─ notification time: {DEFAULT_NOTIFICATION_DISPLAY_SEC}s"
     )
 
 
@@ -649,13 +651,13 @@ def test_apply_field_horizontal_unknown_kind_returns_false() -> None:
 def test_apply_field_horizontal_cycles_preview_quality() -> None:
     controls = _make_controls()
     desc = RowDescriptor(RowKind.SETTINGS_PREVIEW_QUALITY)
-    assert controls.cfg.editor.preview_quality == "balanced"
+    assert controls.cfg.editor.preview_quality == DEFAULT_EDITOR_PREVIEW_QUALITY
 
     assert apply_field_horizontal(controls, desc, True, False) is True
-    assert controls.cfg.editor.preview_quality == "performance"
+    assert controls.cfg.editor.preview_quality == "balanced"
 
     apply_field_horizontal(controls, desc, False, False)
-    assert controls.cfg.editor.preview_quality == "balanced"
+    assert controls.cfg.editor.preview_quality == DEFAULT_EDITOR_PREVIEW_QUALITY
 
 
 def test_apply_field_horizontal_preview_quality_calls_preview_resolutions() -> None:
@@ -732,13 +734,22 @@ def test_apply_field_horizontal_adjusts_ui_fade() -> None:
 def test_apply_field_horizontal_adjusts_notification_display() -> None:
     controls = _make_controls()
     desc = RowDescriptor(RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY)
-    assert controls.cfg.editor.notification_display_sec == 5
+    assert (
+        controls.cfg.editor.notification_display_sec
+        == DEFAULT_NOTIFICATION_DISPLAY_SEC
+    )
 
     apply_field_horizontal(controls, desc, True, False)
-    assert controls.cfg.editor.notification_display_sec == 6
+    assert (
+        controls.cfg.editor.notification_display_sec
+        == DEFAULT_NOTIFICATION_DISPLAY_SEC + 1
+    )
 
     apply_field_horizontal(controls, desc, False, True)
-    assert controls.cfg.editor.notification_display_sec == 1
+    assert (
+        controls.cfg.editor.notification_display_sec
+        == DEFAULT_NOTIFICATION_DISPLAY_SEC + 1 - 5
+    )
 
 
 def test_apply_field_horizontal_adjusts_editor_window_size() -> None:
@@ -768,7 +779,8 @@ def test_apply_field_horizontal_via_controls_keydown() -> None:
     controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_WIDTH_MODE)
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert controls.cfg.editor.ui_width_mode == "fixed"
+    assert controls.cfg.editor.ui_width_mode != DEFAULT_UI_WIDTH_MODE
+    assert controls.cfg.editor.ui_width_mode == "flexible"
 
 
 def test_expand_subheader_prefix_preset_switching() -> None:

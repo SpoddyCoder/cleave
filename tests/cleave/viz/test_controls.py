@@ -16,9 +16,12 @@ _MOVE_MODE_KEY = pygame.K_m
 
 from cleave.config_schema.editor import (
     DEFAULT_EDITOR_HEIGHT,
+    DEFAULT_EDITOR_PREVIEW_QUALITY,
     DEFAULT_EDITOR_UPSCALE,
     DEFAULT_EDITOR_WIDTH,
     DEFAULT_NOTIFICATION_DISPLAY_SEC,
+    DEFAULT_UI_WIDTH,
+    DEFAULT_UI_WIDTH_MODE,
     editor_display_size,
 )
 from cleave.config_schema.layers import (
@@ -2414,7 +2417,7 @@ def test_panel_notification_until_dismissed_stays_until_enter() -> None:
     controls = _make_controls(("layer_1",))
     _expand_settings_ui(controls)
     controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY)
-    for _ in range(5):
+    for _ in range(DEFAULT_NOTIFICATION_DISPLAY_SEC):
         controls.handle_keydown(_keydown(pygame.K_LEFT))
     assert controls.cfg.editor.notification_display_sec == 0
 
@@ -2441,7 +2444,7 @@ def test_panel_notification_expires_after_adjusted_duration(tmp_path: Path) -> N
     controls.cfg.user_config_path = tmp_path / "config.yaml"
     _expand_settings_ui(controls)
     controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY)
-    for _ in range(4):
+    for _ in range(DEFAULT_NOTIFICATION_DISPLAY_SEC - 1):
         controls.handle_keydown(_keydown(pygame.K_LEFT))
     assert controls.cfg.editor.notification_display_sec == 1
 
@@ -2467,7 +2470,7 @@ def test_panel_notification_retargets_when_display_sec_changes(tmp_path: Path) -
     controls.cfg.user_config_path = tmp_path / "config.yaml"
     _expand_settings_ui(controls)
     controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY)
-    for _ in range(5):
+    for _ in range(DEFAULT_NOTIFICATION_DISPLAY_SEC):
         controls.handle_keydown(_keydown(pygame.K_LEFT))
     assert controls.cfg.editor.notification_display_sec == 0
 
@@ -4797,10 +4800,15 @@ def test_settings_collapse_from_sub_row_refocuses_header() -> None:
 
 def test_settings_cycle_preview_quality() -> None:
     controls = _make_controls(("layer_1",))
-    assert controls.cfg.editor.preview_quality == "balanced"
+    assert controls.cfg.editor.preview_quality == DEFAULT_EDITOR_PREVIEW_QUALITY
     _expand_settings_editor_window(controls)
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_PREVIEW_QUALITY)
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.cfg.editor.preview_quality == "balanced"
+    view = controls.build_view_state(paused=False)
+    assert _row_text(view, _focus_index(controls)) == "  └─ preview quality: balanced"
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.cfg.editor.preview_quality == "performance"
@@ -4814,14 +4822,9 @@ def test_settings_cycle_preview_quality() -> None:
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.cfg.editor.preview_quality == "full-quality"
-    view = controls.build_view_state(paused=False)
-    assert _row_text(view, _focus_index(controls)) == "  └─ preview quality: full-quality"
-
-    controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert controls.cfg.editor.preview_quality == "balanced"
 
     controls.handle_keydown(_keydown(pygame.K_LEFT))
-    assert controls.cfg.editor.preview_quality == "full-quality"
+    assert controls.cfg.editor.preview_quality == "ultra-performance"
 
 
 def test_settings_preview_quality_change_does_not_mark_project_config_dirty() -> None:
@@ -4908,16 +4911,31 @@ def test_settings_ui_fade_writes_user_config_without_dirty(tmp_path: Path) -> No
 
 def test_settings_adjust_notification_display() -> None:
     controls = _make_controls(("layer_1",))
-    assert controls.cfg.editor.notification_display_sec == 5
+    assert (
+        controls.cfg.editor.notification_display_sec
+        == DEFAULT_NOTIFICATION_DISPLAY_SEC
+    )
     _expand_settings_ui(controls)
     view = controls.build_view_state(paused=False)
     row = view.layout.find_by_kind(RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY)
     controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY)
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert controls.cfg.editor.notification_display_sec == 6
+    assert (
+        controls.cfg.editor.notification_display_sec
+        == DEFAULT_NOTIFICATION_DISPLAY_SEC + 1
+    )
     view = controls.build_view_state(paused=False)
-    assert _row_text(view, row) == "  └─ notification time: 6s"
+    assert (
+        _row_text(view, row)
+        == f"  └─ notification time: {DEFAULT_NOTIFICATION_DISPLAY_SEC + 1}s"
+    )
+
+    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    assert (
+        controls.cfg.editor.notification_display_sec
+        == DEFAULT_NOTIFICATION_DISPLAY_SEC + 1 - 5
+    )
 
     controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
     assert controls.cfg.editor.notification_display_sec == 1
@@ -4980,19 +4998,19 @@ def test_settings_residual_latency_writes_user_config_without_dirty(
 
 def test_settings_adjust_ui_width() -> None:
     controls = _make_controls(("layer_1",))
-    assert controls.cfg.editor.ui_width == 110
+    assert controls.cfg.editor.ui_width == DEFAULT_UI_WIDTH
     _expand_settings_ui(controls)
     view = controls.build_view_state(paused=False)
     ui_width_row = view.layout.find_by_kind(RowKind.SETTINGS_UI_WIDTH)
     controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_WIDTH)
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert controls.cfg.editor.ui_width == 111
+    assert controls.cfg.editor.ui_width == DEFAULT_UI_WIDTH + 1
     view = controls.build_view_state(paused=False)
-    assert _row_text(view, ui_width_row) == "  └─ max width: 111"
+    assert _row_text(view, ui_width_row) == f"  └─ max width: {DEFAULT_UI_WIDTH + 1}"
 
     controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
-    assert controls.cfg.editor.ui_width == 106
+    assert controls.cfg.editor.ui_width == DEFAULT_UI_WIDTH + 1 - 5
 
     for _ in range(86):
         controls.handle_keydown(_keydown(pygame.K_LEFT))
@@ -5010,19 +5028,19 @@ def test_settings_ui_width_change_does_not_mark_project_config_dirty() -> None:
 
 def test_settings_cycle_ui_width_mode() -> None:
     controls = _make_controls(("layer_1",))
-    assert controls.cfg.editor.ui_width_mode == "flexible"
+    assert controls.cfg.editor.ui_width_mode == DEFAULT_UI_WIDTH_MODE
     _expand_settings_ui(controls)
     view = controls.build_view_state(paused=False)
     mode_row = view.layout.find_by_kind(RowKind.SETTINGS_UI_WIDTH_MODE)
     controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_WIDTH_MODE)
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert controls.cfg.editor.ui_width_mode == "fixed"
+    assert controls.cfg.editor.ui_width_mode == "flexible"
     view = controls.build_view_state(paused=False)
-    assert _row_text(view, mode_row) == "  └─ width mode: fixed"
+    assert _row_text(view, mode_row) == "  └─ width mode: flexible"
 
     controls.handle_keydown(_keydown(pygame.K_LEFT))
-    assert controls.cfg.editor.ui_width_mode == "flexible"
+    assert controls.cfg.editor.ui_width_mode == "fixed"
 
 
 def test_settings_ui_width_mode_change_does_not_mark_project_config_dirty() -> None:

@@ -583,7 +583,9 @@ def test_write_session_snapshot_sparse_beat_sensitivity() -> None:
                         preset_root / TEST_LAYER_STEMS[slot], index=0
                     ),
                     browse_floor=preset_root / TEST_LAYER_STEMS[slot],
-                    beat_sensitivity=1.5 if slot == "layer_2" else 2.0,
+                    beat_sensitivity=(
+                        1.5 if slot == "layer_2" else DEFAULT_BEAT_SENSITIVITY
+                    ),
                 )
                 for slot in DEFAULT_LAYER_SLOTS
             },
