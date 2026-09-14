@@ -12,6 +12,7 @@ Live Milkdrop/libprojectM editor. Windows app is the product; CLI is for checkou
 - Data: `projects/<slug>/`. Override with `CLEAVE_DATA`. Config: `cleave/config_schema/`. Template: `assets/cleave-viz.yaml`.
 - Stem PCM stays native mono/stereo for projectM; mix playback is stereo; analysis is mono.
 - Work list: [docs/todos.md](docs/todos.md).
+- User-visible change: same-edit bullet under `## [Unreleased]` in [CHANGELOG.md](CHANGELOG.md) (`### Added` / `Changed` / `Fixed` / `Removed`). Skip refactors, tests, and docs. Do not bump `cleave.__version__` or cut a tag unless asked.
 
 ## Locate, then search
 
