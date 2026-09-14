@@ -33,7 +33,11 @@ def _sub_row_expanded(state: TuningViewState, desc: RowDescriptor) -> bool:
 
 
 def row_draw_visible(state: TuningViewState, desc: RowDescriptor) -> bool:
-    if desc.kind in {RowKind.PANEL_NOTIFICATION, RowKind.RENDER_SECTION_GAP}:
+    if desc.kind in {
+        RowKind.PANEL_NOTIFICATION,
+        RowKind.TRANSPORT_GAP,
+        RowKind.RENDER_SECTION_GAP,
+    }:
         return True
     return _sub_row_expanded(state, desc)
 
@@ -153,6 +157,7 @@ class RowLayout:
         append_expand_section_rows(row_list, SETTINGS_SECTION, state)
         if not curation:
             append_expand_section_rows(row_list, PROJECT_SECTION, state)
+        row_list.append(RowDescriptor(RowKind.TRANSPORT_GAP))
         row_list.append(RowDescriptor(RowKind.TRANSPORT))
         # marker_index 0 = persistent error; 1 = timed toast (may stack).
         if state.persistent_notification_message:

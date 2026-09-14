@@ -1034,6 +1034,15 @@ def test_build_row_layout_includes_add_before_render_gap() -> None:
     assert add_idx < gap_idx < overlay_idx
 
 
+def test_build_row_layout_includes_gap_between_project_and_transport() -> None:
+    state = _minimal_view_state()
+    project_idx = state.layout.find_by_kind(RowKind.PROJECT_HEADER)
+    gap_idx = state.layout.find_by_kind(RowKind.TRANSPORT_GAP)
+    transport_idx = state.layout.find_by_kind(RowKind.TRANSPORT)
+    assert project_idx < gap_idx < transport_idx
+    assert gap_idx not in state.layout.navigable_indices(state)
+
+
 def test_build_row_layout_omits_add_at_max_layers() -> None:
     slots = tuple(f"layer_{i}" for i in range(1, MAX_LAYER_COUNT + 1))
     tracks = {

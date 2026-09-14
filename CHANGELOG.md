@@ -31,6 +31,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- Blank row between Project and the transport icons on the live overlay.
 - New-install defaults: preview quality `full-quality`, UI width mode `fixed`, max width 140, notification time 10s, and ProjectM default beat sensitivity 1.0. Existing user config and `project.yaml` files keep their saved values.
 - Default editor window size is 1920x1080 (user config; restart to apply). Existing user config files keep their saved size.
 - Project menu section is ProjectM (was Milkdrop). The `project.yaml` key stays `milkdrop:`.

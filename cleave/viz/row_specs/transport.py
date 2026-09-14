@@ -74,6 +74,14 @@ SPECS: dict[RowKind, RowSpec] = {
         help_description=("Status toast; press Enter to dismiss.",),
         is_pinned=True,
     ),
+    RowKind.TRANSPORT_GAP: RowSpec(
+        affordance=RowAffordance.DISPLAY,
+        panel_label="",
+        present_style=RowPresentStyle.SPACER,
+        fit_strategy=FitStrategy.NONE,
+        navigable=False,
+        is_pinned=True,
+    ),
     RowKind.RENDER_SECTION_GAP: RowSpec(
         affordance=RowAffordance.DISPLAY,
         panel_label="",

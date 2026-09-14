@@ -145,6 +145,7 @@ class RowKind(Enum):
     SETTINGS_RESIDUAL_LATENCY_MS = auto()
     SETTINGS_MEASURE_LATENCY = auto()
     CONFIG_HEADER = auto()
+    TRANSPORT_GAP = auto()
     TRANSPORT = auto()
 
 
