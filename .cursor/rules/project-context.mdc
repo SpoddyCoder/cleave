@@ -1,15 +1,29 @@
 ---
-description: Cleave product map and where to look
+description: Cleave product map, module index, and how to start a change
 alwaysApply: true
 ---
 
 # Cleave
 
-Live Milkdrop/libprojectM visualizer editor. The Windows standalone app is the product; CLI is for checkout, scripts, and CI.
+Live Milkdrop/libprojectM editor. Windows app is the product; CLI is for checkout, scripts, and CI.
 
-- Entry: `python -m cleave play` (`cleave/viz/`). Commands: `separate`, `play`, `render`, `backup`, `restore`.
+- Entry: `python -m cleave play`. Commands: `separate`, `play`, `render`, `backup`, `restore`.
 - Layers: up to eight, default four. Live at display rate; offline fps from `render.fps`.
-- Data: `projects/<slug>/` (mix, `project.yaml`, `signals.json`, `stems/`). Override with `CLEAVE_DATA`.
-- Config: parse and defaults in `cleave/config_schema/`. Bundled template is `assets/cleave-viz.yaml`; projects copy it as `cleave-viz.yaml`.
-- Stem PCM keeps native mono/stereo for projectM; mix playback is stereo; analysis for `signals.json` is mono.
-- Work list: [docs/todos.md](docs/todos.md). Roadmap: [docs/roadmap.md](docs/roadmap.md). Usage: [README.md](README.md).
+- Data: `projects/<slug>/`. Override with `CLEAVE_DATA`. Config: `cleave/config_schema/`. Template: `assets/cleave-viz.yaml`.
+- Stem PCM stays native mono/stereo for projectM; mix playback is stereo; analysis is mono.
+- Work list: [docs/todos.md](docs/todos.md).
+
+## Locate, then search
+
+Do not glob `**/*.py`, grep the repo root, spawn an explore subagent, or read `docs/architecture-review.md` to find a home. `docs/completed/` is cursorignored. Open the files below, then grep only that directory. Tests: `tests/cleave/` mirrors `cleave/`; overlay tests are `tests/cleave/viz/`.
+
+- Panel row: `cleave/viz/row_kinds.py`, `row_specs/<domain>.py` (transport, settings, project, track, render_overlays, render_post_fx, pattern_mask, timeline), `row_sections.py`
+- Mutation / input: `cleave/viz/layer_mutations.py`, matching `*_controls.py`, `wiring.py`
+- Draw / type: `row_present_renderers.py`, `overlay_primitives.py`, `theme.py` (not `tuning_panel_draw.py` first)
+- Live state / YAML: `cleave/viz/session.py`, `cleave/config.py`, `config_schema/<section>.py`, `config_schema/persist.py`
+- Frame / GPU: `cleave/viz/layer_pipeline.py`, `frame_finish.py`, `cleave/gl_*.py`, `layer_composite.py`
+- Effect: `cleave/effects/registry.py`, `handlers.py`, handler module
+- Timeline generate: `cleave/timeline_presets/`
+- Timeline strip UI: `cleave/viz/timeline_overlay.py` (not `RowLayout`)
+- Runtime / window: `cleave/viz/app.py`, `bootstrap.py`, `loading.py`
+- CLI / IO: `cleave/cli.py`, `paths.py`, `stems.py`, `separate.py`

@@ -1,0 +1,21 @@
+---
+description: Adding or changing a persisted YAML/session field, panel row, overlay card, effect, post-FX pass, or config default. Exact files to edit; do not grep for a serializer or draw branch.
+alwaysApply: false
+---
+
+# Change touchpoints
+
+Open these files; do not search for a parallel serializer or a `RowKind` branch in draw/controls.
+
+**Persisted knob (config + UI)**
+
+1. Default + parse in the matching `cleave/config_schema/` submodule (not `__init__.py`).
+2. Session field in `cleave/viz/session.py`; import the default constant (no new literals).
+3. Persist only via `persisted_session_payload` in `config_schema/persist.py`.
+4. `RowKind` in `row_kinds.py`; `SPECS` in `row_specs/<domain>.py`; placement in `row_sections.py`.
+5. Mutate via `LayerMutations` or public `*_controls`. Wire new controllers in `wiring.py`.
+6. If the field gates row presence, add it to `view_state_structure_signature()` in `tuning_view_state.py` and a `test_structure_signature_invalidates_on_*` test in `tests/cleave/viz/test_view_state_structure.py`.
+
+**Effect:** `effects/registry.py` + handler module + `handlers.py`. No branch in `effects/runtime.py`. Consume `LayerEffectState`; do not import viz.
+
+**Post-FX / overlay `enabled`:** skip the block on the frame path (`frame_finish.py` / `post_fx.py`), not only dim the panel. Post-FX children check `session.render_post_fx.enabled`. Overlay cards gate per card.

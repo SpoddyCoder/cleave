@@ -1,24 +1,25 @@
 ---
-description: Visualizer architecture invariants
-alwaysApply: true
+description: Persist, session authority, effects registry, frame path, and config-schema invariants
+globs:
+  - cleave/**/*.py
+  - tests/cleave/**/*.py
+alwaysApply: false
 ---
 
 # Architecture
 
-For a change that spans modules (new feature, config or effect type, overlay section), prefer a cohesive abstraction over bolting onto an existing class. Assessment: [docs/architecture-review.md](docs/architecture-review.md).
+Prefer a cohesive abstraction over bolting onto an existing class when a change spans packages. Read [docs/architecture-review.md](docs/architecture-review.md) only for that case. Overlay draw/rows: [live-tuning-ui.mdc](live-tuning-ui.mdc).
 
-- **Persist once.** New persisted fields go through `persisted_session_payload` in `cleave/config_schema/persist.py`. No parallel serializer.
-- **Session owns live creative state.** After `session_from_cfg`, `TuningSession` owns layer creative fields. `CleaveConfig` is YAML bootstrap, immutable paths, editor prefs, and overlay card copy/colours that are never live-edited. Do not read leftover `cfg.layers` creative fields on the frame path or persist.
+- **Persist once.** New persisted fields go through `persisted_session_payload` in `cleave/config_schema/persist.py`.
+- **Session owns live creative state.** After `session_from_cfg`, `TuningSession` owns layer creative fields. `CleaveConfig` is YAML bootstrap, immutable paths, editor prefs, and overlay card copy/colours. Do not read leftover `cfg.layers` creative fields on the frame path or persist.
 - **Dirty tracking is computed.** Mutate session; never reintroduce `mark_config_dirty()`.
-- **Thin feature controllers.** `TuningControls` coordinates focus and input; feature work lives in dedicated `*_controls` modules. `make_tuning_controls` only assembles.
-- **MVC.** Session dataclasses, `TuningViewStateBuilder`, `tuning_panel_draw`.
+- **Thin feature controllers.** `TuningControls` coordinates focus and input; feature work lives in `*_controls`. `make_tuning_controls` in `wiring.py` only assembles.
 - **Readiness in types.** Prefer `VisualizerSeed` / `VisualizerCore` / live and render runtimes over optional fields plus `assert`.
 - **Typed DI.** Pass small typed contexts (`FocusContext`), not dicts of lambdas or `setattr` by string.
 - **Public APIs across modules.** No cross-module underscore imports.
-- **One default per setting.** Defaults live in `cleave/config_schema/` submodules. Session and view-state dataclasses import those constants; do not restate literals. `tests/cleave/test_config.py` source-scans for this.
+- **One default per setting.** Defaults live in `cleave/config_schema/` submodules. Session and view-state dataclasses import those constants. `tests/cleave/test_config.py` source-scans for this.
 - **Descriptor-driven config.** `editor`, `render.post_fx`, and `render.overlays` use descriptors. `layers` and `timeline` use bespoke parse. Importers use submodule paths; `config_schema/__init__.py` has no re-exports.
 - **Registry-driven effects.** New effect = registry entry + handler module. No per-effect branches in `cleave/effects/runtime.py`. `cleave/effects/` does not import viz; it consumes `LayerEffectState`.
-- **Panel rows are registered.** New row: `RowKind` + `RowSpec` + `SectionNode`. Draw via `RowPresentStyle` renderers. Mutate through public `LayerMutations` and public sub-controllers, never underscore methods on `TuningControls`. No per-`RowKind` branches in `tuning_panel_draw.py` or `controls.py`. Overlay opening/closing cards share card-neutral `RowKind` values instanced by `RowDescriptor.card`. Fields that gate row presence must be in `view_state_structure_signature()`.
-- **Shared frame path.** Live and offline call `frame_finish`. Layer composite goes through `LayerFramePipeline.composite`. Wipes are an explicit `MaskTransition`; compositors do not infer them. Overlay chrome lives in `overlay_primitives`; timeline, help, and modal must not import `tuning_panel_draw`. Do not fold the timeline strip into `RowLayout`.
-- **projectM time is monotonic.** `ProjectMFrameClock` (seconds since first frame) via `set_frame_time`. Song playhead is for PCM, timeline, and effects only.
+- **Shared frame path.** Live and offline call `frame_finish`. Layer composite goes through `LayerFramePipeline.composite`. Wipes are an explicit `MaskTransition`.
+- **projectM time is monotonic.** `ProjectMFrameClock` via `set_frame_time`. Song playhead is for PCM, timeline, and effects only.
 - **`enabled` gates the frame path.** `render.post_fx` children respect the parent `enabled`. Overlay cards each have their own `enabled`.

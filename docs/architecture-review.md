@@ -1,5 +1,7 @@
 # Architecture review
 
+Start implementation from [.cursor/rules/project-context.mdc](../.cursor/rules/project-context.mdc). Read this review only when adding a cross-module abstraction.
+
 Pragmatic assessment of the Cleave codebase from a Python software architecture perspective. Focus is on high-value refactors, not perfection. Reviewed against the current tree (August 2026).
 
 Related: [architecture principles](../.cursor/rules/architecture-principles.mdc), [todos.md](todos.md), completed [architecture refactor](completed/architecture-refactor.md) and [architecture improvements](completed/architecture-improvements.md).

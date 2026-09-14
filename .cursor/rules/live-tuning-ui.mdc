@@ -1,6 +1,8 @@
 ---
-description: Live tuning overlay layout and typography
-globs: cleave/viz/**/*.py,cleave.py,tests/**/test_viz*.py,tests/cleave/viz/**/*.py
+description: Live tuning overlay layout, row registry, typography, and keyboard dispatch
+globs:
+  - cleave/viz/**/*.py
+  - tests/cleave/viz/**/*.py
 alwaysApply: false
 ---
 

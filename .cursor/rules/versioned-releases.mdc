@@ -1,6 +1,6 @@
 ---
-description: Trunk-based releases; changelog on main; version only at tag time
-alwaysApply: true
+description: Changelog Unreleased bullets, version bumps, git tags, GitHub Releases, develop/GitFlow vs trunk-based main
+alwaysApply: false
 ---
 
 # Versioned releases
