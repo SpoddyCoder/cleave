@@ -712,11 +712,7 @@ def test_move_mode_swaps_z_order() -> None:
     controls = _make_controls(("layer_1", "layer_2", "layer_3"))
 
     view = controls.build_view_state(paused=False)
-    header_row = next(
-        i
-        for i in range(15)
-        if view.layout.kind(i) == RowKind.TRACK_HEADER and view.layout.slot( i) == "layer_2"
-    )
+    header_row = _row(view, "layer_2", RowKind.TRACK_HEADER)
     controls.focus_descriptor = _desc(view, header_row)
     assert controls.handle_keydown(_keydown(_MOVE_MODE_KEY)) is True
     assert controls.layer_lifecycle.move_mode_slot == "layer_2"
@@ -734,11 +730,7 @@ def test_move_mode_esc_cancels_without_applying() -> None:
     controls = _make_controls(("layer_1", "layer_2", "layer_3"))
 
     view = controls.build_view_state(paused=False)
-    header_row = next(
-        i
-        for i in range(15)
-        if view.layout.kind(i) == RowKind.TRACK_HEADER and view.layout.slot( i) == "layer_2"
-    )
+    header_row = _row(view, "layer_2", RowKind.TRACK_HEADER)
     controls.focus_descriptor = _desc(view, header_row)
     controls.handle_keydown(_keydown(_MOVE_MODE_KEY))
     controls.handle_keydown(_keydown(pygame.K_UP))
@@ -754,11 +746,7 @@ def test_move_mode_backspace_cancels_without_applying() -> None:
     controls = _make_controls(("layer_1", "layer_2", "layer_3"))
 
     view = controls.build_view_state(paused=False)
-    header_row = next(
-        i
-        for i in range(15)
-        if view.layout.kind(i) == RowKind.TRACK_HEADER and view.layout.slot( i) == "layer_2"
-    )
+    header_row = _row(view, "layer_2", RowKind.TRACK_HEADER)
     controls.focus_descriptor = _desc(view, header_row)
     controls.handle_keydown(_keydown(_MOVE_MODE_KEY))
     controls.handle_keydown(_keydown(pygame.K_DOWN))
@@ -934,7 +922,7 @@ def test_navigable_project_save_row() -> None:
     controls = _make_controls(("layer_1",))
     _expand_project(controls)
     view = controls.build_view_state(paused=False)
-    assert len(view.layout) == 23
+    assert len(view.layout) == 24
     assert RowDescriptor(RowKind.TIMELINE_PRESETS) not in view.layout.rows
 
     kinds = {view.layout.kind(i) for i in range(len(view.layout))}
@@ -4200,11 +4188,7 @@ def test_locked_not_toggleable_during_move_mode() -> None:
 def test_ctrl_quick_nav_blocked_during_move_mode() -> None:
     controls = _make_controls(("layer_1", "layer_2", "layer_3"))
     view = controls.build_view_state(paused=False)
-    bass_header = next(
-        i
-        for i in range(15)
-        if view.layout.kind(i) == RowKind.TRACK_HEADER and view.layout.slot( i) == "layer_2"
-    )
+    bass_header = _row(view, "layer_2", RowKind.TRACK_HEADER)
     controls.focus_descriptor = _desc(view, bass_header)
     controls.handle_keydown(_keydown(_MOVE_MODE_KEY))
     assert controls.layer_lifecycle.move_mode_slot == "layer_2"
@@ -5056,11 +5040,7 @@ def test_settings_ui_width_mode_change_does_not_mark_project_config_dirty() -> N
 def test_move_mode_swap_calls_apply_preview_resolutions() -> None:
     controls, layer_manager = _make_controls_with_manager(("layer_1", "layer_2", "layer_3"))
     view = controls.build_view_state(paused=False)
-    header_row = next(
-        i
-        for i in range(15)
-        if view.layout.kind(i) == RowKind.TRACK_HEADER and view.layout.slot(i) == "layer_2"
-    )
+    header_row = _row(view, "layer_2", RowKind.TRACK_HEADER)
     controls.focus_descriptor = _desc(view, header_row)
     controls.handle_keydown(_keydown(_MOVE_MODE_KEY))
     layer_manager.apply_preview_resolutions.reset_mock()
