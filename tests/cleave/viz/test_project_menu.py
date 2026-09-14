@@ -8,6 +8,7 @@ from unittest.mock import patch
 import pygame
 import pytest
 
+from cleave.config_schema.editor import DEFAULT_BEAT_SENSITIVITY
 from cleave.config_schema.project_render import (
     DEFAULT_PROJECT_RENDER_QUALITY,
     DEFAULT_RENDER_FPS,
@@ -140,7 +141,9 @@ def test_project_milkdrop_children_omitted_until_expanded() -> None:
     kinds = [row.kind for row in view.layout.rows]
     assert RowKind.PROJECT_MILKDROP_BEAT_SENSITIVITY in kinds
     beat_row = view.layout.find_by_kind(RowKind.PROJECT_MILKDROP_BEAT_SENSITIVITY)
-    assert format_row_value(view, view.layout.descriptor(beat_row)) == "2.00"
+    assert format_row_value(view, view.layout.descriptor(beat_row)) == (
+        f"{DEFAULT_BEAT_SENSITIVITY:.2f}"
+    )
 
 
 def test_structure_signature_invalidates_on_project_compositor_expand() -> None:
@@ -238,13 +241,21 @@ def test_milkdrop_beat_sensitivity_keyboard_steps() -> None:
     beat_row = view.layout.find_by_kind(RowKind.PROJECT_MILKDROP_BEAT_SENSITIVITY)
     controls.focus_descriptor = view.layout.descriptor(beat_row)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert controls.session.project.milkdrop_beat_sensitivity == pytest.approx(2.1)
+    assert controls.session.project.milkdrop_beat_sensitivity == pytest.approx(
+        DEFAULT_BEAT_SENSITIVITY + 0.1
+    )
     controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
-    assert controls.session.project.milkdrop_beat_sensitivity == pytest.approx(2.6)
+    assert controls.session.project.milkdrop_beat_sensitivity == pytest.approx(
+        DEFAULT_BEAT_SENSITIVITY + 0.6
+    )
     controls.handle_keydown(_keydown(pygame.K_LEFT))
-    assert controls.session.project.milkdrop_beat_sensitivity == pytest.approx(2.5)
+    assert controls.session.project.milkdrop_beat_sensitivity == pytest.approx(
+        DEFAULT_BEAT_SENSITIVITY + 0.5
+    )
     controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
-    assert controls.session.project.milkdrop_beat_sensitivity == pytest.approx(2.0)
+    assert controls.session.project.milkdrop_beat_sensitivity == pytest.approx(
+        DEFAULT_BEAT_SENSITIVITY
+    )
 
 
 def test_project_render_defaults() -> None:

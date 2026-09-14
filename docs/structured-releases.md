@@ -189,7 +189,7 @@ Manual GPU proof (met):
 
 - Install from the setup exe into Program Files (read-only install dir).
 - `cleave.exe play` on an existing project from the Start Menu shortcut, from a terminal, and by dropping a project folder onto `cleave.exe`.
-- Audio plays on the system default output device; pattern mask compositing works at default `balanced` preview quality. Silent-playback debugging: [windows-freeze.md](windows-freeze.md) (Audio output device).
+- Audio plays on the system default output device; pattern mask compositing works at default `full-quality` preview quality. Silent-playback debugging: [windows-freeze.md](windows-freeze.md) (Audio output device).
 - The 2.2 tester path still works from the dispatch zip and from Program Files.
 - Uninstall removes the install dir only; `Documents\cleave\` and `%APPDATA%\cleave\` survive.
 
