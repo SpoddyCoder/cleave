@@ -4567,8 +4567,8 @@ def test_settings_header_is_first_row() -> None:
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
     assert view.layout.kind( 0) == RowKind.SETTINGS_HEADER
-    assert view.layout.kind( 1) == RowKind.PROJECT_HEADER
-    assert view.layout.kind( 2) == RowKind.TRANSPORT_GAP
+    assert view.layout.kind( 1) == RowKind.TRANSPORT_GAP
+    assert view.layout.kind( 2) == RowKind.PROJECT_HEADER
     assert view.layout.kind( 3) == RowKind.TRANSPORT
 
 
