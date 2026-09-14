@@ -155,9 +155,9 @@ class RowLayout:
         row_list: list[RowDescriptor] = []
         curation = state.settings.editor_mode == "preset_curation"
         append_expand_section_rows(row_list, SETTINGS_SECTION, state)
+        row_list.append(RowDescriptor(RowKind.TRANSPORT_GAP))
         if not curation:
             append_expand_section_rows(row_list, PROJECT_SECTION, state)
-        row_list.append(RowDescriptor(RowKind.TRANSPORT_GAP))
         row_list.append(RowDescriptor(RowKind.TRANSPORT))
         # marker_index 0 = persistent error; 1 = timed toast (may stack).
         if state.persistent_notification_message:
