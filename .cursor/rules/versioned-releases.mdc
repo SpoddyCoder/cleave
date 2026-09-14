@@ -1,5 +1,5 @@
 ---
-description: Changelog Unreleased bullets, version bumps, git tags, GitHub Releases, develop/GitFlow vs trunk-based main
+description: Cutting a release only (version bump, dated changelog section, git tag, GitHub Release). Unreleased bullets are always-on in project-context.
 alwaysApply: false
 ---
 
@@ -7,8 +7,7 @@ alwaysApply: false
 
 `main` is the integration trunk. Tags (`vX.Y.Z`) are frozen snapshots. Process: [docs/structured-releases.md](docs/structured-releases.md).
 
-- Land user-visible work on `main` (short feature branches are fine).
-- Add a bullet under `## [Unreleased]` in [CHANGELOG.md](CHANGELOG.md) in the same change. Skip for internal refactors, tests, and docs with no user-facing behaviour change.
+- Land user-visible work on `main` (short feature branches are fine). Unreleased bullets: [project-context.mdc](project-context.mdc).
 - Do not bump `cleave.__version__`, add a dated `## [X.Y.Z]` section, tag, or GitHub Release unless asked to cut a release. `__version__` is last-shipped until a cut.
 - Do not introduce a long-lived `develop` or `release/*` trunk, GitFlow, or holding features off `main`.
 

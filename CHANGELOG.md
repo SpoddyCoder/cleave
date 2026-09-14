@@ -5,6 +5,10 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
 - Settings > UI: notification time (until dismissed, or 1-20s). Enter dismisses a toast before it times out.
 
 - Pattern mask: `bars` type (horizontal strips with 1D-cut transitions).
