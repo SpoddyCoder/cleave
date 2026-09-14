@@ -1,0 +1,24 @@
+# Local / generated data (also gitignored)
+projects/
+presets/
+textures/
+.cache/
+tmp/
+__pycache__/
+.pytest_cache/
+
+# Binaries and fonts; agents should not index these
+*.dll
+*.so
+*.pyd
+*.ttf
+*.otf
+*.woff
+*.woff2
+*.wav
+*.mp3
+*.raw
+assets/fonts/
+
+# Historical design write-ups. Open a named path only if the user asks about a past plan.
+docs/completed/

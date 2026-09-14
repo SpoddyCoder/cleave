@@ -13,6 +13,7 @@ globs:
   - tests/cleave/viz/test_post_fx.py
   - tests/cleave/viz/test_frame_finish.py
   - tests/cleave/viz/test_layer_pipeline.py
+alwaysApply: false
 ---
 
 # GPU post-processing (moderngl)
