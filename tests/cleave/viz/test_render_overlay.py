@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -35,9 +36,11 @@ from cleave.viz.render_overlay import (
     panel_position,
     panel_surface_key,
 )
+from cleave.config_schema.render.overlays import _overlay_card_persist_values
 from cleave.viz.session import (
     RenderOverlayAnimationRuntime,
     RenderOverlayCardRuntime,
+    _card_runtime_from_cfg,
 )
 from cleave.viz.theme import FADE_DURATION_SEC
 
@@ -227,6 +230,7 @@ def test_build_live_overlay_config_overrides_runtime_fields() -> None:
         body_font="dejavuserif",
         opacity_pct=75,
         border_width=4,
+        title_content="Live title override",
         animation=RenderOverlayAnimationRuntime(
             type="slide",
             slide_direction="right",
@@ -236,7 +240,8 @@ def test_build_live_overlay_config_overrides_runtime_fields() -> None:
     )
     merged = build_live_overlay_config(base, runtime)
     assert merged.enabled is True
-    assert merged.title.content == base.title.content
+    assert merged.title.content == "Live title override"
+    assert merged.title.content != base.title.content
     assert merged.body.content == base.body.content
     assert merged.animation.appear_at == 20.0
     assert merged.animation.display_time == 40.0
@@ -256,6 +261,22 @@ def test_build_live_overlay_config_overrides_runtime_fields() -> None:
     assert merged.background.opacity == 0.75
     assert merged.background.border.colour == base.background.border.colour
     assert merged.background.border.width == 4
+
+
+def test_card_runtime_from_cfg_reads_title_content() -> None:
+    base = _overlay_cfg()
+    card = replace(base, title=replace(base.title, content="From YAML"))
+    runtime = _card_runtime_from_cfg(card)
+    assert runtime.title_content == "From YAML"
+
+
+def test_overlay_card_persist_values_uses_runtime_title_content() -> None:
+    base = _overlay_cfg()
+    runtime = _card_runtime_from_cfg(base)
+    runtime.title_content = "Persisted title"
+    values = _overlay_card_persist_values(runtime, base)
+    assert values["title"]["content"] == "Persisted title"
+    assert values["title"]["content"] != base.title.content
 
 
 def test_panel_position_corners() -> None:

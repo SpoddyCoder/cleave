@@ -578,7 +578,7 @@ def _overlay_card_persist_values(
     return {
         "enabled": runtime.enabled,
         "title": {
-            "content": base_card.title.content,
+            "content": runtime.title_content,
             "font": runtime.title_font,
             "font_size": runtime.title_font_size,
             "colour": base_card.title.colour,
@@ -662,6 +662,7 @@ def default_render_overlay_card_runtime_values(
         "body_font": DEFAULT_RENDER_OVERLAY_FONT,
         "opacity_pct": int(round(DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY * 100)),
         "border_width": DEFAULT_RENDER_OVERLAY_BORDER_WIDTH,
+        "title_content": DEFAULT_RENDER_OVERLAY_TITLE,
         "animation": animation,
         "animation_expanded": False,
     }
