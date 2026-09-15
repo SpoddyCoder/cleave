@@ -80,6 +80,17 @@ def test_on_keyup_disarms() -> None:
     assert repeats == []
 
 
+def test_disarm_clears_armed_state() -> None:
+    controller = KeyRepeatController()
+    repeats: list[tuple[int, int]] = []
+    _arm(controller, repeats)
+
+    controller.disarm()
+    assert controller.is_armed is False
+    controller.tick(INITIAL_DELAY_SEC + 1.0)
+    assert repeats == []
+
+
 def test_is_armed_while_held() -> None:
     controller = KeyRepeatController()
     assert controller.is_armed is False
@@ -101,6 +112,19 @@ def test_up_down_keys_arm_repeat() -> None:
         )
         controller.tick(INITIAL_DELAY_SEC)
         assert repeats == [(key, 0)]
+
+
+def test_backspace_key_arms_repeat() -> None:
+    controller = KeyRepeatController()
+    repeats: list[tuple[int, int]] = []
+    controller.on_keydown(
+        pygame.K_BACKSPACE,
+        0,
+        on_repeat=lambda k, mod: repeats.append((k, mod)),
+    )
+    assert controller.is_armed is True
+    controller.tick(INITIAL_DELAY_SEC)
+    assert repeats == [(pygame.K_BACKSPACE, 0)]
 
 
 def test_comma_period_keys_arm_repeat() -> None:

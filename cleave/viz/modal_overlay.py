@@ -868,7 +868,7 @@ def _draw_text_panel(
         if index + 1 < len(visible_lines):
             cur_y += line_gap
 
-    if state.editing:
+    if state.editing and state.caret_visible:
         caret_line_text = (
             visible_lines[visible_caret_line] if visible_lines else ""
         )
