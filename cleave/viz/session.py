@@ -151,6 +151,7 @@ class RenderOverlayCardRuntime:
     body_font: str
     opacity_pct: int
     border_width: int
+    title_content: str
     animation: RenderOverlayAnimationRuntime | RenderOverlayClosingAnimationRuntime
     animation_expanded: bool = False
 
@@ -492,6 +493,7 @@ def _card_runtime_from_cfg(card: Any) -> RenderOverlayCardRuntime:
         body_font=card.body.font,
         opacity_pct=int(round(card.background.opacity * 100)),
         border_width=card.background.border.width,
+        title_content=card.title.content,
         animation=animation,
     )
 

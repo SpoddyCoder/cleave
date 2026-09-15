@@ -11,7 +11,7 @@ alwaysApply: false
 Prefer a cohesive abstraction over bolting onto an existing class when a change spans packages. Read [docs/architecture-review.md](docs/architecture-review.md) only for that case. Overlay draw/rows: [live-tuning-ui.mdc](live-tuning-ui.mdc).
 
 - **Persist once.** New persisted fields go through `persisted_session_payload` in `cleave/config_schema/persist.py`.
-- **Session owns live creative state.** After `session_from_cfg`, `TuningSession` owns layer creative fields. `CleaveConfig` is YAML bootstrap, immutable paths, editor prefs, and overlay card copy/colours. Do not read leftover `cfg.layers` creative fields on the frame path or persist.
+- **Session owns live creative state.** After `session_from_cfg`, `TuningSession` owns layer creative fields. `CleaveConfig` is YAML bootstrap, immutable paths, and editor prefs; overlay card colours remain on config, title content is session-owned. Do not read leftover `cfg.layers` creative fields on the frame path or persist.
 - **Dirty tracking is computed.** Mutate session; never reintroduce `mark_config_dirty()`.
 - **Thin feature controllers.** `TuningControls` coordinates focus and input; feature work lives in `*_controls`. `make_tuning_controls` in `wiring.py` only assembles.
 - **Readiness in types.** Prefer `VisualizerSeed` / `VisualizerCore` / live and render runtimes over optional fields plus `assert`.

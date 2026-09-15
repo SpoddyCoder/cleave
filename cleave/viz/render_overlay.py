@@ -144,7 +144,7 @@ def build_live_overlay_config(
     return RenderOverlayCardConfig(
         enabled=runtime.enabled,
         title=RenderOverlayTextBlockConfig(
-            content=base.title.content,
+            content=runtime.title_content,
             font=runtime.title_font,
             font_size=runtime.title_font_size,
             colour=base.title.colour,

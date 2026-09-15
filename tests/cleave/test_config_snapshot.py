@@ -831,6 +831,7 @@ def _snapshot_fixture(tmp_path: Path) -> tuple[CleaveConfig, TuningSession, Path
         body_font="ubuntumono",
         opacity_pct=75,
         border_width=4,
+        title_content="My Title",
         animation=RenderOverlayAnimationRuntime(
             type="fade",
             slide_direction="left",
@@ -1132,7 +1133,7 @@ def test_write_session_snapshot_render_overlay_without_cfg_render(tmp_path: Path
 
     data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
     opening = data["render"]["overlays"]["opening-card"]
-    assert opening["title"]["content"] == "Cleave Final Render"
+    assert opening["title"]["content"] == "My Title"
     assert opening["position"] == "top-right"
     assert opening["title"]["font-size"] == 14
 
