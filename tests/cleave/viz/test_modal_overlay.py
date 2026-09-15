@@ -11,10 +11,11 @@ from cleave.viz.modal import (
     ModalLabeledLine,
     ModalOption,
     ModalViewState,
+    TextFocusRegion,
     capital_case_modal_option,
 )
 from cleave.viz.overlay_primitives import overlay_font
-from cleave.viz.theme import HIGHLIGHT, LABEL, MODAL_SCRIM_ALPHA, VALUE
+from cleave.viz.theme import FOCUS_ROW_BG_ALPHA, HIGHLIGHT, LABEL, MODAL_SCRIM_ALPHA, VALUE
 from cleave.viz.ui_tint import blit_tint
 
 
@@ -593,3 +594,342 @@ def test_prompt_choice_passes_labeled_lines() -> None:
     assert view.message == "Render complete"
     assert view.labeled_lines == labeled
     assert view.options == ("Ok",)
+
+
+def _prompt_text(
+    modal: ModalHost,
+    *,
+    cta: str = "Change text...",
+    initial: str = "hello",
+    single_line: bool = True,
+) -> None:
+    modal.prompt_text(
+        cta,
+        initial,
+        on_confirm=lambda _draft: None,
+        on_cancel=lambda: None,
+        single_line=single_line,
+    )
+
+
+def _highlight_tint_rgb() -> tuple[int, int, int]:
+    tint_probe = pygame.Surface((4, 4), pygame.SRCALPHA)
+    tint_probe.fill((0, 0, 0, 255))
+    blit_tint(tint_probe, (0, 0, 4, 4), HIGHLIGHT, alpha=FOCUS_ROW_BG_ALPHA)
+    return tint_probe.get_at((2, 2))[:3]
+
+
+def _draw_text_panel_for_tests(
+    font: pygame.font.Font,
+    view: ModalViewState,
+    *,
+    line_gap: int = 3,
+    screen_w: int = 1280,
+    screen_h: int = 720,
+) -> pygame.Surface:
+    panel_w, panel_h = modal_overlay._measure_text_panel(
+        font, view, line_gap=line_gap, screen_w=screen_w, screen_h=screen_h
+    )
+    panel = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
+    panel.fill((0, 0, 0, 255))
+    modal_overlay._draw_text_panel(
+        panel,
+        font,
+        view,
+        line_gap=line_gap,
+        screen_w=screen_w,
+        screen_h=screen_h,
+        text_alpha=255,
+        panel_w=panel_w,
+    )
+    return panel
+
+
+def _text_field_origin(
+    font: pygame.font.Font,
+    view: ModalViewState,
+    *,
+    line_gap: int,
+    screen_w: int,
+    screen_h: int,
+) -> tuple[int, int, int]:
+    line_h = font.get_linesize()
+    section_gap = line_h + line_gap
+    cta_h = modal_overlay._lines_block_height(
+        len(modal_overlay._text_cta_lines(view)), line_h, line_gap
+    )
+    panel_w, _ = modal_overlay._measure_text_panel(
+        font, view, line_gap=line_gap, screen_w=screen_w, screen_h=screen_h
+    )
+    content_w = panel_w - modal_overlay._PANEL_PAD_X * 2
+    field_x = modal_overlay._PANEL_PAD_X
+    field_y = modal_overlay._PANEL_PAD_Y + cta_h + section_gap
+    return field_x, field_y, content_w
+
+
+def _text_button_rects(
+    font: pygame.font.Font,
+    view: ModalViewState,
+    *,
+    line_gap: int,
+    screen_w: int,
+    screen_h: int,
+) -> tuple[pygame.Rect, pygame.Rect]:
+    line_h = font.get_linesize()
+    section_gap = line_h + line_gap
+    field_x, field_y, content_w = _text_field_origin(
+        font, view, line_gap=line_gap, screen_w=screen_w, screen_h=screen_h
+    )
+    del field_x, content_w
+    field_lines = modal_overlay._text_field_lines(font, view, screen_w=screen_w)
+    field_h = modal_overlay._lines_block_height(len(field_lines), line_h, line_gap)
+    button_y = field_y + field_h + section_gap
+    confirm_w, cancel_w = modal_overlay._text_button_widths(font)
+    total_w = modal_overlay._text_buttons_width(font)
+    panel_w, _ = modal_overlay._measure_text_panel(
+        font, view, line_gap=line_gap, screen_w=screen_w, screen_h=screen_h
+    )
+    row_content_w = panel_w - modal_overlay._PANEL_PAD_X * 2
+    row_x = modal_overlay._PANEL_PAD_X + max(0, (row_content_w - total_w) // 2)
+    return (
+        pygame.Rect(row_x, button_y, confirm_w, line_h),
+        pygame.Rect(
+            row_x + confirm_w + modal_overlay._TEXT_BUTTON_GAP,
+            button_y,
+            cancel_w,
+            line_h,
+        ),
+    )
+
+
+def _rect_has_color(
+    surface: pygame.Surface,
+    rect: pygame.Rect,
+    color: tuple[int, int, int],
+) -> bool:
+    for x in range(rect.x, rect.x + rect.w):
+        for y in range(rect.y, rect.y + rect.h):
+            if surface.get_at((x, y))[:3] == color:
+                return True
+    return False
+
+
+def test_text_modal_shows_cta_and_draft() -> None:
+    pygame.init()
+    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    font = _font()
+    modal = ModalHost()
+    _prompt_text(modal, cta="Change text...", initial="hello", single_line=True)
+    view = modal.view_state()
+    assert view is not None
+    assert view.kind == ModalKind.TEXT
+    assert view.cta == "Change text..."
+    assert view.draft == "hello"
+
+    modal_overlay.draw(surface, view, font=font)
+
+    sw, sh = surface.get_size()
+    panel_w, panel_h = modal_overlay._measure_text_panel(
+        font, view, line_gap=3, screen_w=sw, screen_h=sh
+    )
+    expected_x = (sw - panel_w) // 2
+    expected_y = (sh - panel_h) // 2
+    left_margin = expected_x
+    right_margin = sw - (expected_x + panel_w)
+    top_margin = expected_y
+    bottom_margin = sh - (expected_y + panel_h)
+    assert abs(left_margin - right_margin) <= 1
+    assert abs(top_margin - bottom_margin) <= 1
+
+
+def test_text_modal_hint_only_when_editing() -> None:
+    pygame.init()
+    font = _font()
+    line_gap = 3
+    line_h = font.get_linesize()
+    screen_w = 1280
+    screen_h = 720
+    modal = ModalHost()
+    _prompt_text(modal, initial="hello", single_line=True)
+    editing = modal.view_state()
+    assert editing is not None
+    assert editing.editing is True
+    modal.handle_keydown(_keydown(pygame.K_ESCAPE))
+    navigating = modal.view_state()
+    assert navigating is not None
+    assert navigating.editing is False
+
+    _, height_editing = modal_overlay._measure_text_panel(
+        font, editing, line_gap=line_gap, screen_w=screen_w, screen_h=screen_h
+    )
+    _, height_navigating = modal_overlay._measure_text_panel(
+        font, navigating, line_gap=line_gap, screen_w=screen_w, screen_h=screen_h
+    )
+    assert height_editing - height_navigating == line_h + line_gap
+
+
+def test_text_modal_focused_button_highlighted() -> None:
+    pygame.init()
+    font = _font()
+    line_gap = 3
+    expected = _highlight_tint_rgb()
+    modal = ModalHost()
+    _prompt_text(modal, initial="hello", single_line=True)
+    modal.handle_keydown(_keydown(pygame.K_ESCAPE))
+    modal.handle_keydown(_keydown(pygame.K_DOWN))
+    view = modal.view_state()
+    assert view is not None
+    assert view.focus_region == TextFocusRegion.BUTTONS
+    assert view.button_index == 0
+
+    panel = _draw_text_panel_for_tests(font, view, line_gap=line_gap)
+    confirm, cancel = _text_button_rects(
+        font, view, line_gap=line_gap, screen_w=1280, screen_h=720
+    )
+    assert _rect_has_color(panel, confirm, expected)
+    assert not _rect_has_color(panel, cancel, expected)
+
+    modal.handle_keydown(_keydown(pygame.K_RIGHT))
+    view = modal.view_state()
+    assert view is not None
+    assert view.button_index == 1
+    panel = _draw_text_panel_for_tests(font, view, line_gap=line_gap)
+    confirm, cancel = _text_button_rects(
+        font, view, line_gap=line_gap, screen_w=1280, screen_h=720
+    )
+    assert _rect_has_color(panel, cancel, expected)
+    assert not _rect_has_color(panel, confirm, expected)
+
+
+def test_text_modal_existing_yes_no_unchanged() -> None:
+    pygame.init()
+    font = _font()
+    line_gap = 3
+    line_h = font.get_linesize()
+    screen_w = 1280
+    with_message = ModalViewState(
+        kind=ModalKind.YES_NO,
+        message="Save configuration?",
+        options=("Yes", "No"),
+        focus_index=0,
+    )
+    options_only = ModalViewState(
+        kind=ModalKind.YES_NO,
+        message=None,
+        options=("Yes", "No"),
+        focus_index=0,
+    )
+    _, height_with_message = modal_overlay._measure_panel(
+        font, with_message, line_gap=line_gap, screen_w=screen_w
+    )
+    _, height_options_only = modal_overlay._measure_panel(
+        font, options_only, line_gap=line_gap, screen_w=screen_w
+    )
+    assert height_with_message - height_options_only == line_h + line_h + line_gap
+
+    view = ModalViewState(
+        kind=ModalKind.YES_NO,
+        message="Save?",
+        options=("Yes", "No"),
+        focus_index=0,
+    )
+    panel_w, _ = modal_overlay._measure_panel(
+        font, view, line_gap=line_gap, screen_w=screen_w
+    )
+    assert panel_w >= modal_overlay._panel_min_width(screen_w)
+    assert modal_overlay._panel_min_width(screen_w) == int(screen_w * 0.2)
+
+    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    modal = ModalHost()
+    modal.prompt_yes_no("Overwrite cleave-viz.yaml?", on_confirm=lambda: None)
+    yes_no = modal.view_state()
+    assert yes_no is not None
+    modal_overlay.draw(surface, yes_no, font=font)
+
+
+def test_text_modal_field_highlight_when_navigating() -> None:
+    pygame.init()
+    font = _font()
+    line_gap = 3
+    line_h = font.get_linesize()
+    expected = _highlight_tint_rgb()
+    modal = ModalHost()
+    _prompt_text(modal, initial="hello", single_line=True)
+    modal.handle_keydown(_keydown(pygame.K_ESCAPE))
+    view = modal.view_state()
+    assert view is not None
+    assert view.editing is False
+    assert view.focus_region == TextFocusRegion.FIELD
+
+    panel = _draw_text_panel_for_tests(font, view, line_gap=line_gap)
+    field_x, field_y, _content_w = _text_field_origin(
+        font, view, line_gap=line_gap, screen_w=1280, screen_h=720
+    )
+    del field_x
+    highlight_x, _, highlight_w, _ = modal_overlay._focus_highlight_rect(
+        font, panel_width=panel.get_width(), y=field_y, line_h=line_h
+    )
+    field_rect = pygame.Rect(highlight_x, field_y, highlight_w, line_h)
+    assert _rect_has_color(panel, field_rect, expected)
+
+
+def test_text_modal_caret_position() -> None:
+    pygame.init()
+    font = _font()
+    line_gap = 3
+    line_h = font.get_linesize()
+    modal = ModalHost()
+    _prompt_text(modal, initial="hello", single_line=True)
+    modal.handle_keydown(_keydown(pygame.K_LEFT))
+    modal.handle_keydown(_keydown(pygame.K_LEFT))
+    view = modal.view_state()
+    assert view is not None
+    assert view.draft == "hello"
+    assert view.caret_index == 3
+    assert view.editing is True
+
+    panel = _draw_text_panel_for_tests(font, view, line_gap=line_gap)
+    field_x, field_y, content_w = _text_field_origin(
+        font, view, line_gap=line_gap, screen_w=1280, screen_h=720
+    )
+    prefix_w = font.size(view.draft[: view.caret_index])[0]
+    assert prefix_w < content_w
+    caret_x = field_x + prefix_w
+    mid_y = field_y + line_h // 2
+    assert panel.get_at((caret_x, mid_y))[:3] == HIGHLIGHT
+    assert panel.get_at((caret_x + 1, mid_y))[:3] == HIGHLIGHT
+
+
+def test_text_modal_single_line_scroll_keeps_caret_in_clip() -> None:
+    pygame.init()
+    font = _font()
+    line_gap = 3
+    line_h = font.get_linesize()
+    draft = "M" * 80
+    modal = ModalHost()
+    _prompt_text(modal, initial=draft, single_line=True)
+    view = modal.view_state()
+    assert view is not None
+    assert view.caret_index == len(draft)
+    assert view.single_line is True
+
+    field_x, field_y, content_w = _text_field_origin(
+        font, view, line_gap=line_gap, screen_w=1280, screen_h=720
+    )
+    text_w = font.size(draft)[0]
+    assert text_w > content_w
+    scroll_x = modal_overlay._single_line_scroll_x(
+        font, draft, view.caret_index, content_w
+    )
+    assert scroll_x > 0
+    unclipped_caret_x = field_x + text_w
+    caret_x = unclipped_caret_x - scroll_x
+    assert field_x <= caret_x <= field_x + content_w - modal_overlay._CARET_WIDTH
+    assert caret_x != field_x
+    assert unclipped_caret_x > field_x + content_w
+
+    panel = _draw_text_panel_for_tests(font, view, line_gap=line_gap)
+    mid_y = field_y + line_h // 2
+    assert panel.get_at((caret_x, mid_y))[:3] == HIGHLIGHT
+    assert panel.get_at((field_x, mid_y))[:3] != HIGHLIGHT
+    assert modal_overlay._single_line_scroll_x(font, "", 0, content_w) == 0
