@@ -327,4 +327,5 @@ def test_section_header_descriptor_uses_tree_and_effect_fallback() -> None:
 def test_render_overlay_section_kinds_from_tree() -> None:
     assert RowKind.RENDER_OVERLAYS_HEADER in RENDER_OVERLAY_SECTION_KINDS
     assert RowKind.RENDER_OVERLAY_CARD_TITLE_FONT in RENDER_OVERLAY_SECTION_KINDS
+    assert RowKind.RENDER_OVERLAY_CARD_TITLE_TEXT in RENDER_OVERLAY_SECTION_KINDS
     assert RowKind.RENDER_OVERLAY_CARD_BODY_FONT in RENDER_OVERLAY_SECTION_KINDS

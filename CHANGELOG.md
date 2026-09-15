@@ -9,6 +9,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 
+- Credits card title text row under each card's title section in the panel. Enter opens a text dialog; Confirm updates the title; Save persists it. Section lock blocks editing.
+
 - Settings > UI: notification time (until dismissed, or 1-20s). Enter dismisses a toast before it times out.
 
 - Pattern mask: `bars` type (horizontal strips with 1D-cut transitions).
