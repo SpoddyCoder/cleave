@@ -6,12 +6,18 @@ from dataclasses import dataclass
 
 import pygame
 
-from cleave.viz.modal import ModalLabeledLine, ModalViewState
+from cleave.viz.modal import (
+    ModalKind,
+    ModalLabeledLine,
+    ModalViewState,
+    TextFocusRegion,
+)
 from cleave.viz.overlay_primitives import draw_panel_border, overlay_panel_surface
 from cleave.viz.text_fit import wrap_text_to_width
 from cleave.viz.theme import (
     ACTION,
     BORDER_WIDTH,
+    DISABLED,
     FOCUS_ROW_BG_ALPHA,
     HIGHLIGHT,
     LABEL,
@@ -33,6 +39,10 @@ _tuning_ui = tuning_ui_metrics()
 _PANEL_PAD_X = _tuning_ui.modal_panel_pad_x
 _PANEL_PAD_Y = _tuning_ui.modal_panel_pad_y
 _BAR_HEIGHT = scale_px(10, scale=UI_SCALE)
+_TEXT_BUTTON_LABELS = ("Confirm", "Cancel")
+_TEXT_BUTTON_GAP = scale_px(24, scale=UI_SCALE)
+_EDITING_HINT = "press ESC to stop editing"
+_CARET_WIDTH = 2
 
 
 def _message_max_width(screen_w: int) -> int:
@@ -67,6 +77,27 @@ def draw(
     scrim = pygame.Surface((sw, sh), pygame.SRCALPHA)
     scrim.fill((0, 0, 0, MODAL_SCRIM_ALPHA))
     surface.blit(scrim, (0, 0))
+
+    if state.kind == ModalKind.TEXT:
+        panel_w, panel_h = _measure_text_panel(
+            font, state, line_gap=line_gap, screen_w=sw, screen_h=sh
+        )
+        panel_x = (sw - panel_w) // 2
+        panel_y = (sh - panel_h) // 2
+        panel = overlay_panel_surface((panel_w, panel_h))
+        _draw_text_panel(
+            panel,
+            font,
+            state,
+            line_gap=line_gap,
+            screen_w=sw,
+            screen_h=sh,
+            text_alpha=text_alpha,
+            panel_w=panel_w,
+        )
+        draw_panel_border(panel, alpha=int(255 * text_alpha / 255))
+        surface.blit(panel, (panel_x, panel_y))
+        return
 
     panel_w, panel_h = _measure_panel(
         font, state, line_gap=line_gap, screen_w=sw
@@ -443,3 +474,427 @@ def _draw_options(
             option_surf.set_alpha(text_alpha)
             surface.blit(option_surf, (text_x, cur_y))
         cur_y += line_h + line_gap
+
+
+def _lines_block_height(count: int, line_h: int, line_gap: int) -> int:
+    if count <= 0:
+        return 0
+    return count * line_h + (count - 1) * line_gap
+
+
+def _text_cta_lines(state: ModalViewState) -> tuple[str, ...]:
+    cta = state.cta if state.cta is not None else ""
+    if state.editing:
+        return (cta, _EDITING_HINT)
+    return (cta,)
+
+
+def _text_field_lines(
+    font: pygame.font.Font,
+    state: ModalViewState,
+    *,
+    screen_w: int,
+) -> list[str]:
+    draft = state.draft if state.draft is not None else ""
+    if state.single_line:
+        return [draft]
+    if not draft:
+        return [""]
+    lines = _message_lines(font, draft, screen_w=screen_w)
+    return lines if lines else [""]
+
+
+def _text_button_widths(font: pygame.font.Font) -> tuple[int, int]:
+    return (
+        font.size(_option_text(_TEXT_BUTTON_LABELS[0]))[0],
+        font.size(_option_text(_TEXT_BUTTON_LABELS[1]))[0],
+    )
+
+
+def _text_buttons_width(font: pygame.font.Font) -> int:
+    confirm_w, cancel_w = _text_button_widths(font)
+    return confirm_w + _TEXT_BUTTON_GAP + cancel_w
+
+
+def _text_max_field_lines(
+    *,
+    line_h: int,
+    line_gap: int,
+    screen_h: int | None,
+    cta_line_count: int,
+) -> int | None:
+    if screen_h is None:
+        return None
+    max_panel_h = max(1, int(screen_h * _MESSAGE_MAX_SCREEN_FRACTION))
+    cta_h = _lines_block_height(cta_line_count, line_h, line_gap)
+    section_gap = line_h + line_gap
+    overhead = _PANEL_PAD_Y * 2 + cta_h + section_gap * 2 + line_h
+    max_field_h = max(line_h, max_panel_h - overhead)
+    stride = line_h + line_gap
+    return max(1, (max_field_h + line_gap) // stride)
+
+
+def _visible_field_lines(
+    lines: list[str], caret_line: int, max_lines: int | None
+) -> tuple[list[str], int]:
+    if max_lines is None or len(lines) <= max_lines:
+        return lines, max(0, min(caret_line, max(0, len(lines) - 1)))
+    caret_line = max(0, min(caret_line, len(lines) - 1))
+    start = max(0, min(caret_line - max_lines + 1, len(lines) - max_lines))
+    return lines[start : start + max_lines], caret_line - start
+
+
+def _caret_line_column(
+    text: str, lines: list[str], caret_index: int
+) -> tuple[int, int]:
+    """Map caret_index in *text* to (line, column) in wrapped *lines*.
+
+    Hard newlines sit at the end of the preceding visual line. Spaces dropped
+    at wrap points sit at the end of the line before the wrap.
+    """
+    caret_index = max(0, min(caret_index, len(text)))
+    if not lines:
+        return 0, 0
+    if not text:
+        return 0, 0
+
+    src = 0
+    last_i = len(lines) - 1
+    for line_i, line in enumerate(lines):
+        if not line:
+            if caret_index <= src:
+                return line_i, 0
+            if src < len(text) and text[src] == "\n":
+                src += 1
+                continue
+            return line_i, 0
+
+        while (
+            src < len(text)
+            and text[src].isspace()
+            and text[src] != "\n"
+            and not text.startswith(line, src)
+        ):
+            if caret_index == src:
+                return line_i, 0
+            src += 1
+
+        line_start = src
+        if text.startswith(line, src):
+            src += len(line)
+        else:
+            found = text.find(line, src)
+            newline = text.find("\n", src)
+            if found >= 0 and (newline < 0 or found <= newline):
+                line_start = found
+                src = found + len(line)
+            else:
+                src = min(len(text), src + len(line))
+        line_end = src
+
+        if line_start <= caret_index <= line_end:
+            return line_i, caret_index - line_start
+
+        trail = src
+        while (
+            trail < len(text)
+            and text[trail].isspace()
+            and text[trail] != "\n"
+        ):
+            trail += 1
+        if line_end < caret_index < trail:
+            return line_i, len(line)
+
+        src = trail
+        if src < len(text) and text[src] == "\n":
+            if caret_index == src:
+                return line_i, len(line)
+            src += 1
+
+    return last_i, len(lines[last_i])
+
+
+def _single_line_scroll_x(
+    font: pygame.font.Font,
+    line: str,
+    column: int,
+    content_w: int,
+) -> int:
+    """Horizontal offset so the caret stays inside the field clip.
+
+    Prefers showing the start of the string until the caret would leave the
+    right edge. Empty and non-overflowing lines do not scroll.
+    """
+    if not line or content_w <= 0:
+        return 0
+    text_w = font.size(line)[0]
+    if text_w <= content_w:
+        return 0
+    column = max(0, min(column, len(line)))
+    caret_x = font.size(line[:column])[0]
+    visible_caret_w = max(0, content_w - _CARET_WIDTH)
+    return max(0, caret_x - visible_caret_w)
+
+
+def _measure_text_panel(
+    font: pygame.font.Font,
+    state: ModalViewState,
+    *,
+    line_gap: int,
+    screen_w: int,
+    screen_h: int | None = None,
+) -> tuple[int, int]:
+    line_h = font.get_linesize()
+    section_gap = line_h + line_gap
+    wrap_w = _message_max_width(screen_w)
+
+    cta_lines = _text_cta_lines(state)
+    cta_w = max((font.size(line)[0] for line in cta_lines), default=0)
+    cta_h = _lines_block_height(len(cta_lines), line_h, line_gap)
+
+    field_lines = _text_field_lines(font, state, screen_w=screen_w)
+    field_w = max((font.size(line)[0] for line in field_lines), default=0)
+    field_w = min(field_w, wrap_w)
+    caret_line, _ = _caret_line_column(
+        state.draft if state.draft is not None else "",
+        field_lines,
+        state.caret_index,
+    )
+    max_field_lines = _text_max_field_lines(
+        line_h=line_h,
+        line_gap=line_gap,
+        screen_h=screen_h,
+        cta_line_count=len(cta_lines),
+    )
+    visible_lines, _ = _visible_field_lines(
+        field_lines, caret_line, max_field_lines
+    )
+    field_h = _lines_block_height(len(visible_lines), line_h, line_gap)
+
+    buttons_w = _text_buttons_width(font)
+    buttons_h = line_h
+
+    content_w = max(cta_w, field_w, buttons_w)
+    content_h = cta_h + section_gap + field_h + section_gap + buttons_h
+    return (
+        max(content_w + _PANEL_PAD_X * 2, _panel_min_width(screen_w)),
+        content_h + _PANEL_PAD_Y * 2,
+    )
+
+
+def _blit_text_line(
+    surface: pygame.Surface,
+    font: pygame.font.Font,
+    text: str,
+    color: tuple[int, int, int],
+    *,
+    x: int,
+    y: int,
+    text_alpha: int,
+    clip_w: int | None = None,
+    scroll_x: int = 0,
+) -> None:
+    if text_alpha < 2 or not text:
+        return
+    line_surf = font.render(text, True, color)
+    line_surf.set_alpha(text_alpha)
+    scroll_x = max(0, scroll_x)
+    blit_x = x - scroll_x
+    needs_clip = clip_w is not None and (
+        scroll_x > 0 or line_surf.get_width() > clip_w
+    )
+    if needs_clip:
+        prev_clip = surface.get_clip()
+        surface.set_clip(pygame.Rect(x, y, clip_w, line_surf.get_height()))
+        surface.blit(line_surf, (blit_x, y))
+        surface.set_clip(prev_clip)
+    else:
+        surface.blit(line_surf, (blit_x, y))
+
+
+def _draw_field_caret(
+    panel: pygame.Surface,
+    font: pygame.font.Font,
+    *,
+    field_x: int,
+    field_y: int,
+    line: str,
+    column: int,
+    line_index: int,
+    line_h: int,
+    line_gap: int,
+    text_alpha: int,
+    scroll_x: int = 0,
+) -> None:
+    if text_alpha < 2:
+        return
+    column = max(0, min(column, len(line)))
+    x = field_x + font.size(line[:column])[0] - max(0, scroll_x)
+    y = field_y + line_index * (line_h + line_gap)
+    pygame.draw.rect(panel, HIGHLIGHT, (x, y, _CARET_WIDTH, line_h))
+
+
+def _draw_text_buttons(
+    panel: pygame.Surface,
+    font: pygame.font.Font,
+    state: ModalViewState,
+    *,
+    y: int,
+    panel_w: int,
+    text_alpha: int,
+) -> None:
+    line_h = font.get_linesize()
+    confirm_w, cancel_w = _text_button_widths(font)
+    total_w = confirm_w + _TEXT_BUTTON_GAP + cancel_w
+    content_w = panel_w - _PANEL_PAD_X * 2
+    row_x = _PANEL_PAD_X + max(0, (content_w - total_w) // 2)
+    buttons_focused = state.focus_region == TextFocusRegion.BUTTONS
+    field_focused = state.focus_region == TextFocusRegion.FIELD
+    widths = (confirm_w, cancel_w)
+    x = row_x
+    for index, label in enumerate(_TEXT_BUTTON_LABELS):
+        width = widths[index]
+        focused = buttons_focused and state.button_index == index
+        if focused:
+            color = HIGHLIGHT
+        elif field_focused:
+            color = DISABLED
+        else:
+            color = VALUE
+        if focused and text_alpha >= 2:
+            tint_alpha = int(FOCUS_ROW_BG_ALPHA * text_alpha / 255)
+            blit_tint(
+                panel,
+                (x, y, width, line_h),
+                HIGHLIGHT,
+                alpha=tint_alpha,
+            )
+        _blit_text_line(
+            panel,
+            font,
+            _option_text(label),
+            color,
+            x=x,
+            y=y,
+            text_alpha=text_alpha,
+        )
+        x += width + _TEXT_BUTTON_GAP
+
+
+def _draw_text_panel(
+    panel: pygame.Surface,
+    font: pygame.font.Font,
+    state: ModalViewState,
+    *,
+    line_gap: int,
+    screen_w: int,
+    text_alpha: int,
+    panel_w: int,
+    screen_h: int | None = None,
+) -> None:
+    line_h = font.get_linesize()
+    section_gap = line_h + line_gap
+    x = _PANEL_PAD_X
+    content_w = panel_w - _PANEL_PAD_X * 2
+    cur_y = _PANEL_PAD_Y
+
+    cta_lines = _text_cta_lines(state)
+    for index, line in enumerate(cta_lines):
+        color = DISABLED if index > 0 else LABEL
+        _blit_text_line(
+            panel,
+            font,
+            line,
+            color,
+            x=x,
+            y=cur_y,
+            text_alpha=text_alpha,
+            clip_w=content_w,
+        )
+        cur_y += line_h
+        if index + 1 < len(cta_lines):
+            cur_y += line_gap
+    cur_y += section_gap
+
+    draft = state.draft if state.draft is not None else ""
+    field_lines = _text_field_lines(font, state, screen_w=screen_w)
+    caret_line, caret_col = _caret_line_column(draft, field_lines, state.caret_index)
+    max_field_lines = _text_max_field_lines(
+        line_h=line_h,
+        line_gap=line_gap,
+        screen_h=screen_h,
+        cta_line_count=len(cta_lines),
+    )
+    visible_lines, visible_caret_line = _visible_field_lines(
+        field_lines, caret_line, max_field_lines
+    )
+    field_h = _lines_block_height(len(visible_lines), line_h, line_gap)
+    field_y = cur_y
+    scroll_x = 0
+    if state.single_line:
+        field_line = visible_lines[0] if visible_lines else ""
+        scroll_x = _single_line_scroll_x(font, field_line, caret_col, content_w)
+
+    navigating_field = (
+        not state.editing and state.focus_region == TextFocusRegion.FIELD
+    )
+    if navigating_field and text_alpha >= 2:
+        tint_alpha = int(FOCUS_ROW_BG_ALPHA * text_alpha / 255)
+        blit_tint(
+            panel,
+            _focus_highlight_rect(
+                font,
+                panel_width=panel.get_width(),
+                y=field_y,
+                line_h=field_h,
+            ),
+            HIGHLIGHT,
+            alpha=tint_alpha,
+        )
+
+    for index, line in enumerate(visible_lines):
+        _blit_text_line(
+            panel,
+            font,
+            line,
+            VALUE,
+            x=x,
+            y=cur_y,
+            text_alpha=text_alpha,
+            clip_w=content_w,
+            scroll_x=scroll_x,
+        )
+        cur_y += line_h
+        if index + 1 < len(visible_lines):
+            cur_y += line_gap
+
+    if state.editing:
+        caret_line_text = (
+            visible_lines[visible_caret_line] if visible_lines else ""
+        )
+        prev_clip = panel.get_clip()
+        panel.set_clip(pygame.Rect(x, field_y, content_w, field_h))
+        _draw_field_caret(
+            panel,
+            font,
+            field_x=x,
+            field_y=field_y,
+            line=caret_line_text,
+            column=caret_col,
+            line_index=visible_caret_line,
+            line_h=line_h,
+            line_gap=line_gap,
+            text_alpha=text_alpha,
+            scroll_x=scroll_x,
+        )
+        panel.set_clip(prev_clip)
+
+    cur_y = field_y + field_h + section_gap
+    _draw_text_buttons(
+        panel,
+        font,
+        state,
+        y=cur_y,
+        panel_w=panel_w,
+        text_alpha=text_alpha,
+    )
