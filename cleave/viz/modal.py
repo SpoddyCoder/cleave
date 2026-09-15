@@ -8,7 +8,7 @@ from enum import Enum
 
 import pygame
 
-from cleave.viz.key_repeat import mod_shift
+from cleave.viz.key_repeat import KeyRepeatController, mod_shift
 
 
 class ModalKind(Enum):
@@ -93,12 +93,62 @@ class TextModalState:
     on_confirm: Callable[[str], None]
     on_cancel: Callable[[], None] | None
     initial: str
+    caret_blink_sec: float = 0.0
+
+
+_TEXT_EDIT_REPEAT_KEYS = frozenset(
+    {
+        pygame.K_LEFT,
+        pygame.K_RIGHT,
+        pygame.K_UP,
+        pygame.K_DOWN,
+        pygame.K_BACKSPACE,
+    }
+)
+_CARET_BLINK_CYCLE_SEC = 1.0
+_CARET_BLINK_VISIBLE_SEC = 0.5
+
+
+def _reset_caret_blink(state: TextModalState) -> None:
+    state.caret_blink_sec = 0.0
+
+
+def _text_caret_visible(state: TextModalState) -> bool:
+    if not state.editing:
+        return False
+    return (state.caret_blink_sec % _CARET_BLINK_CYCLE_SEC) < _CARET_BLINK_VISIBLE_SEC
 
 
 def _insert_text_at_caret(state: TextModalState, text: str) -> None:
     caret = state.caret_index
     state.draft = state.draft[:caret] + text + state.draft[caret:]
     state.caret_index = caret + len(text)
+    _reset_caret_blink(state)
+
+
+def _apply_text_edit_key(state: TextModalState, key: int) -> None:
+    _reset_caret_blink(state)
+    if key == pygame.K_BACKSPACE:
+        if state.caret_index > 0:
+            caret = state.caret_index
+            state.draft = state.draft[:caret - 1] + state.draft[caret:]
+            state.caret_index = caret - 1
+        return
+    if key == pygame.K_LEFT:
+        state.caret_index = max(0, state.caret_index - 1)
+        return
+    if key == pygame.K_RIGHT:
+        state.caret_index = min(len(state.draft), state.caret_index + 1)
+        return
+    if key == pygame.K_UP:
+        if not state.single_line:
+            state.caret_index = _logical_line_start(state.draft, state.caret_index)
+        return
+    if key == pygame.K_DOWN:
+        if not state.single_line:
+            state.caret_index = _next_logical_line_start(
+                state.draft, state.caret_index
+            )
 
 
 @dataclass
@@ -127,6 +177,7 @@ class ModalViewState:
     caret_index: int = 0
     focus_region: TextFocusRegion | None = None
     button_index: int = 0
+    caret_visible: bool = True
 
 
 _UNSAVED_QUIT_MESSAGE = "Unsaved changes - save changes before exit?"
@@ -135,14 +186,26 @@ _UNSAVED_QUIT_MESSAGE = "Unsaved changes - save changes before exit?"
 class ModalHost:
     """Modal prompt host; consumes keys while active."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        on_start_text_input: Callable[[], None] | None = None,
+        on_stop_text_input: Callable[[], None] | None = None,
+    ) -> None:
         self._request: ModalRequest | None = None
         self._text_state: TextModalState | None = None
         self._focus_index = 0
+        self._on_start_text_input = on_start_text_input
+        self._on_stop_text_input = on_stop_text_input
+        self._text_input_started = False
+        self._text_key_repeat = KeyRepeatController()
 
     @property
     def active(self) -> bool:
         return self._request is not None
+
+    @property
+    def text_key_repeat_armed(self) -> bool:
+        return self._text_key_repeat.is_armed
 
     def view_state(self) -> ModalViewState | None:
         if self._request is None:
@@ -161,6 +224,7 @@ class ModalHost:
                 caret_index=text.caret_index,
                 focus_region=text.focus_region,
                 button_index=text.button_index,
+                caret_visible=_text_caret_visible(text),
             )
         return ModalViewState(
             kind=self._request.kind,
@@ -175,6 +239,7 @@ class ModalHost:
         )
 
     def prompt(self, request: ModalRequest) -> None:
+        self._stop_text_input()
         self._request = request
         self._text_state = None
         self._focus_index = clamp_modal_focus_index(
@@ -279,6 +344,7 @@ class ModalHost:
             on_cancel=on_cancel,
             initial=initial,
         )
+        self._start_text_input()
 
     def dismiss(self) -> None:
         self._dismiss()
@@ -346,6 +412,22 @@ class ModalHost:
 
         return True
 
+    def handle_keyup(self, event: pygame.event.Event) -> bool:
+        """Return True when a TEXT modal consumed the event."""
+        if event.type != pygame.KEYUP or self._request is None:
+            return False
+        if self._request.kind != ModalKind.TEXT:
+            return False
+        self._text_key_repeat.on_keyup(event.key)
+        return True
+
+    def tick(self, dt_sec: float) -> None:
+        self._text_key_repeat.tick(dt_sec)
+        state = self._text_state
+        if state is None or not state.editing:
+            return
+        state.caret_blink_sec += dt_sec
+
     def handle_text_input(self, text: str) -> bool:
         if not self.active or self._request is None:
             return False
@@ -373,40 +455,30 @@ class ModalHost:
         state: TextModalState,
     ) -> bool:
         if event.key == pygame.K_ESCAPE:
-            state.editing = False
-            state.focus_region = TextFocusRegion.FIELD
+            self._leave_text_edit(state)
             return True
         if event.key == pygame.K_RETURN:
             if mod_shift(event.mod):
                 if not state.single_line:
                     _insert_text_at_caret(state, "\n")
                 return True
-            state.editing = False
-            state.focus_region = TextFocusRegion.FIELD
+            self._leave_text_edit(state)
             return True
-        if event.key == pygame.K_BACKSPACE:
-            if state.caret_index > 0:
-                caret = state.caret_index
-                state.draft = state.draft[:caret - 1] + state.draft[caret:]
-                state.caret_index = caret - 1
-            return True
-        if event.key == pygame.K_LEFT:
-            state.caret_index = max(0, state.caret_index - 1)
-            return True
-        if event.key == pygame.K_RIGHT:
-            state.caret_index = min(len(state.draft), state.caret_index + 1)
-            return True
-        if event.key == pygame.K_UP:
-            if not state.single_line:
-                state.caret_index = _logical_line_start(state.draft, state.caret_index)
-            return True
-        if event.key == pygame.K_DOWN:
-            if not state.single_line:
-                state.caret_index = _next_logical_line_start(
-                    state.draft, state.caret_index
-                )
+        if event.key in _TEXT_EDIT_REPEAT_KEYS:
+            _apply_text_edit_key(state, event.key)
+            self._text_key_repeat.on_keydown(
+                event.key,
+                event.mod,
+                on_repeat=lambda key, _mod: self._repeat_text_edit_key(key),
+            )
             return True
         return True
+
+    def _repeat_text_edit_key(self, key: int) -> None:
+        state = self._text_state
+        if state is None or not state.editing:
+            return
+        _apply_text_edit_key(state, key)
 
     def _handle_text_navigate_keydown(
         self,
@@ -431,6 +503,8 @@ class ModalHost:
         if event.key == pygame.K_RETURN:
             if state.focus_region == TextFocusRegion.FIELD:
                 state.editing = True
+                _reset_caret_blink(state)
+                self._start_text_input()
                 return True
             if state.button_index == 0:
                 on_confirm = state.on_confirm
@@ -442,7 +516,28 @@ class ModalHost:
             return True
         return True
 
+    def _leave_text_edit(self, state: TextModalState) -> None:
+        self._stop_text_input()
+        state.editing = False
+        state.focus_region = TextFocusRegion.FIELD
+
+    def _start_text_input(self) -> None:
+        if self._text_input_started:
+            return
+        self._text_input_started = True
+        if self._on_start_text_input is not None:
+            self._on_start_text_input()
+
+    def _stop_text_input(self) -> None:
+        self._text_key_repeat.disarm()
+        if not self._text_input_started:
+            return
+        self._text_input_started = False
+        if self._on_stop_text_input is not None:
+            self._on_stop_text_input()
+
     def _dismiss_text(self, *, invoke_cancel: bool) -> None:
+        self._stop_text_input()
         state = self._text_state
         self._text_state = None
         self._request = None
@@ -451,6 +546,7 @@ class ModalHost:
             state.on_cancel()
 
     def _dismiss(self) -> None:
+        self._stop_text_input()
         request = self._request
         self._request = None
         self._text_state = None
@@ -462,6 +558,7 @@ class ModalHost:
         request = self._request
         if request is None:
             return
+        self._stop_text_input()
         focus_index = self._focus_index
         self._request = None
         self._text_state = None

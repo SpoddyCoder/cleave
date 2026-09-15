@@ -4,11 +4,16 @@ from __future__ import annotations
 
 import pygame
 
+from cleave.viz.key_repeat import INITIAL_DELAY_SEC
 from cleave.viz.modal import ModalHost, TextFocusRegion
 
 
 def _keydown(key: int, mod: int = 0) -> pygame.event.Event:
     return pygame.event.Event(pygame.KEYDOWN, key=key, mod=mod)
+
+
+def _keyup(key: int) -> pygame.event.Event:
+    return pygame.event.Event(pygame.KEYUP, key=key)
 
 
 def _open_text(
@@ -306,3 +311,307 @@ def test_handle_text_input_without_text_modal_returns_false() -> None:
     modal.prompt_yes_no("Overwrite?", on_confirm=lambda: None)
     assert modal.handle_text_input("x") is False
     assert modal.active
+
+
+def _host_with_text_callbacks() -> tuple[ModalHost, list[str], list[str]]:
+    starts: list[str] = []
+    stops: list[str] = []
+    modal = ModalHost(
+        on_start_text_input=lambda: starts.append("start"),
+        on_stop_text_input=lambda: stops.append("stop"),
+    )
+    return modal, starts, stops
+
+
+def test_prompt_text_fires_start_once() -> None:
+    modal, starts, stops = _host_with_text_callbacks()
+    _open_text(modal)
+    assert starts == ["start"]
+    assert stops == []
+
+
+def test_escape_from_edit_stops_and_reenter_starts() -> None:
+    modal, starts, stops = _host_with_text_callbacks()
+    _open_text(modal)
+    modal.handle_keydown(_keydown(pygame.K_ESCAPE))
+    view = modal.view_state()
+    assert view is not None
+    assert view.editing is False
+    assert starts == ["start"]
+    assert stops == ["stop"]
+
+    modal.handle_keydown(_keydown(pygame.K_RETURN))
+    view = modal.view_state()
+    assert view is not None
+    assert view.editing is True
+    assert starts == ["start", "start"]
+    assert stops == ["stop"]
+
+
+def test_dismiss_from_navigate_does_not_double_stop() -> None:
+    modal, starts, stops = _host_with_text_callbacks()
+    _open_text(modal)
+    modal.handle_keydown(_keydown(pygame.K_ESCAPE))
+    modal.handle_keydown(_keydown(pygame.K_ESCAPE))
+    assert not modal.active
+    assert starts == ["start"]
+    assert stops == ["stop"]
+
+
+def test_cancel_and_confirm_do_not_double_stop() -> None:
+    modal, starts, stops = _host_with_text_callbacks()
+    _open_text(modal)
+    modal.handle_keydown(_keydown(pygame.K_ESCAPE))
+    modal.handle_keydown(_keydown(pygame.K_DOWN))
+    modal.handle_keydown(_keydown(pygame.K_RIGHT))
+    modal.handle_keydown(_keydown(pygame.K_RETURN))
+    assert not modal.active
+    assert starts == ["start"]
+    assert stops == ["stop"]
+
+    modal, starts, stops = _host_with_text_callbacks()
+    _open_text(modal)
+    modal.handle_keydown(_keydown(pygame.K_ESCAPE))
+    modal.handle_keydown(_keydown(pygame.K_DOWN))
+    modal.handle_keydown(_keydown(pygame.K_RETURN))
+    assert not modal.active
+    assert starts == ["start"]
+    assert stops == ["stop"]
+
+
+def test_dismiss_while_editing_fires_stop() -> None:
+    modal, starts, stops = _host_with_text_callbacks()
+    _open_text(modal)
+    modal.dismiss()
+    assert not modal.active
+    assert starts == ["start"]
+    assert stops == ["stop"]
+
+
+def test_prompt_replacing_text_modal_fires_stop() -> None:
+    modal, starts, stops = _host_with_text_callbacks()
+    _open_text(modal)
+    modal.prompt_yes_no("Overwrite?", on_confirm=lambda: None)
+    assert starts == ["start"]
+    assert stops == ["stop"]
+
+
+def test_shift_enter_does_not_fire_stop() -> None:
+    modal, starts, stops = _host_with_text_callbacks()
+    _open_text(modal, single_line=False)
+    modal.handle_keydown(_keydown(pygame.K_RETURN, pygame.KMOD_SHIFT))
+    view = modal.view_state()
+    assert view is not None
+    assert view.editing is True
+    assert starts == ["start"]
+    assert stops == []
+
+
+def test_yes_no_prompt_does_not_fire_start_or_stop() -> None:
+    modal, starts, stops = _host_with_text_callbacks()
+    modal.prompt_yes_no("Overwrite?", on_confirm=lambda: None)
+    assert starts == []
+    assert stops == []
+    modal.handle_keydown(_keydown(pygame.K_ESCAPE))
+    assert starts == []
+    assert stops == []
+
+
+def test_textinput_event_text_applied_via_handle_text_input() -> None:
+    modal = ModalHost()
+    _open_text(modal, initial="ab")
+    event = pygame.event.Event(pygame.TEXTINPUT, text="c")
+    assert modal.handle_text_input(event.text) is True
+    view = modal.view_state()
+    assert view is not None
+    assert view.draft == "abc"
+    assert view.caret_index == 3
+
+
+def test_backspace_keydown_while_editing_arms_and_keyup_disarms() -> None:
+    modal = ModalHost()
+    _open_text(modal, initial="hello")
+    assert modal.handle_keydown(_keydown(pygame.K_BACKSPACE)) is True
+    assert modal.text_key_repeat_armed is True
+    view = modal.view_state()
+    assert view is not None
+    assert view.draft == "hell"
+    assert modal.handle_keyup(_keyup(pygame.K_BACKSPACE)) is True
+    assert modal.text_key_repeat_armed is False
+
+
+def test_arrow_keydown_while_editing_arms_and_keyup_disarms() -> None:
+    for key in (pygame.K_LEFT, pygame.K_RIGHT, pygame.K_UP, pygame.K_DOWN):
+        modal = ModalHost()
+        _open_text(modal, initial="hello")
+        assert modal.handle_keydown(_keydown(key)) is True
+        assert modal.text_key_repeat_armed is True
+        assert modal.handle_keyup(_keyup(key)) is True
+        assert modal.text_key_repeat_armed is False
+
+
+def test_leave_edit_disarms_repeat_without_keyup() -> None:
+    modal = ModalHost()
+    _open_text(modal, initial="hello")
+    modal.handle_keydown(_keydown(pygame.K_BACKSPACE))
+    assert modal.text_key_repeat_armed is True
+    modal.handle_keydown(_keydown(pygame.K_ESCAPE))
+    view = modal.view_state()
+    assert view is not None
+    assert view.editing is False
+    assert modal.text_key_repeat_armed is False
+
+
+def test_dismiss_while_armed_disarms_repeat() -> None:
+    modal = ModalHost()
+    _open_text(modal, initial="hello")
+    modal.handle_keydown(_keydown(pygame.K_BACKSPACE))
+    assert modal.text_key_repeat_armed is True
+    modal.dismiss()
+    assert not modal.active
+    assert modal.text_key_repeat_armed is False
+
+
+def test_prompt_replacing_text_modal_disarms_repeat() -> None:
+    modal = ModalHost()
+    _open_text(modal, initial="hello")
+    modal.handle_keydown(_keydown(pygame.K_LEFT))
+    assert modal.text_key_repeat_armed is True
+    modal.prompt_yes_no("Overwrite?", on_confirm=lambda: None)
+    assert modal.text_key_repeat_armed is False
+
+
+def test_yes_no_arrow_does_not_arm_text_repeat() -> None:
+    modal = ModalHost()
+    modal.prompt_yes_no("Overwrite?", on_confirm=lambda: None)
+    assert modal.handle_keydown(_keydown(pygame.K_LEFT)) is True
+    assert modal.handle_keydown(_keydown(pygame.K_RIGHT)) is True
+    assert modal.handle_keydown(_keydown(pygame.K_UP)) is True
+    assert modal.handle_keydown(_keydown(pygame.K_DOWN)) is True
+    assert modal.text_key_repeat_armed is False
+    assert modal.handle_keyup(_keyup(pygame.K_LEFT)) is False
+
+
+def test_navigate_does_not_arm_text_repeat() -> None:
+    modal = ModalHost()
+    _open_text(modal, initial="hello")
+    modal.handle_keydown(_keydown(pygame.K_ESCAPE))
+    view = modal.view_state()
+    assert view is not None
+    assert view.editing is False
+    modal.handle_keydown(_keydown(pygame.K_BACKSPACE))
+    modal.handle_keydown(_keydown(pygame.K_LEFT))
+    modal.handle_keydown(_keydown(pygame.K_DOWN))
+    assert modal.text_key_repeat_armed is False
+
+
+def test_tick_fires_backspace() -> None:
+    modal = ModalHost()
+    _open_text(modal, initial="hello")
+    modal.handle_keydown(_keydown(pygame.K_BACKSPACE))
+    view = modal.view_state()
+    assert view is not None
+    assert view.draft == "hell"
+    assert view.caret_index == 4
+    modal.tick(INITIAL_DELAY_SEC)
+    view = modal.view_state()
+    assert view is not None
+    assert view.draft == "hel"
+    assert view.caret_index == 3
+    assert modal.text_key_repeat_armed is True
+
+
+def test_space_inserts_while_editing() -> None:
+    modal = ModalHost()
+    _open_text(modal, initial="ab")
+    event = pygame.event.Event(pygame.TEXTINPUT, text=" ")
+    assert modal.handle_text_input(event.text) is True
+    view = modal.view_state()
+    assert view is not None
+    assert view.draft == "ab "
+    assert view.caret_index == 3
+
+
+def test_caret_visible_on_open_and_blinks() -> None:
+    modal = ModalHost()
+    _open_text(modal, initial="hello")
+    view = modal.view_state()
+    assert view is not None
+    assert view.editing is True
+    assert view.caret_visible is True
+
+    modal.tick(0.49)
+    view = modal.view_state()
+    assert view is not None
+    assert view.caret_visible is True
+
+    modal.tick(0.02)
+    view = modal.view_state()
+    assert view is not None
+    assert view.caret_visible is False
+
+    modal.tick(0.49)
+    view = modal.view_state()
+    assert view is not None
+    assert view.caret_visible is True
+
+
+def test_edit_actions_reset_caret_blink() -> None:
+    modal = ModalHost()
+    _open_text(modal, initial="ab", single_line=False)
+    modal.tick(0.6)
+    view = modal.view_state()
+    assert view is not None
+    assert view.caret_visible is False
+
+    assert modal.handle_text_input("c") is True
+    view = modal.view_state()
+    assert view is not None
+    assert view.caret_visible is True
+    assert view.draft == "abc"
+
+    modal.tick(0.6)
+    assert modal.view_state().caret_visible is False
+    modal.handle_keydown(_keydown(pygame.K_LEFT))
+    modal.handle_keyup(_keyup(pygame.K_LEFT))
+    assert modal.view_state().caret_visible is True
+
+    modal.tick(0.6)
+    assert modal.view_state().caret_visible is False
+    modal.handle_keydown(_keydown(pygame.K_BACKSPACE))
+    modal.handle_keyup(_keyup(pygame.K_BACKSPACE))
+    assert modal.view_state().caret_visible is True
+
+    modal.tick(0.6)
+    assert modal.view_state().caret_visible is False
+    modal.handle_keydown(_keydown(pygame.K_RETURN, pygame.KMOD_SHIFT))
+    view = modal.view_state()
+    assert view is not None
+    assert view.caret_visible is True
+    assert "\n" in view.draft
+
+
+def test_caret_hidden_when_not_editing() -> None:
+    modal = ModalHost()
+    _open_text(modal, initial="hello")
+    modal.handle_keydown(_keydown(pygame.K_ESCAPE))
+    view = modal.view_state()
+    assert view is not None
+    assert view.editing is False
+    assert view.caret_visible is False
+    modal.tick(0.1)
+    view = modal.view_state()
+    assert view is not None
+    assert view.caret_visible is False
+
+
+def test_reenter_edit_resets_caret_blink() -> None:
+    modal = ModalHost()
+    _open_text(modal, initial="hello")
+    modal.tick(0.6)
+    modal.handle_keydown(_keydown(pygame.K_ESCAPE))
+    modal.handle_keydown(_keydown(pygame.K_RETURN))
+    view = modal.view_state()
+    assert view is not None
+    assert view.editing is True
+    assert view.caret_visible is True

@@ -119,6 +119,8 @@ def dispatch_keydown(event: pygame.event.Event, runtime: LiveVisualizerRuntime) 
 def dispatch_keyup(event: pygame.event.Event, runtime: LiveVisualizerRuntime) -> None:
     if event.type != pygame.KEYUP:
         return
+    if runtime.modal_host.handle_keyup(event):
+        return
     key_handler = key_handler_for_runtime(runtime, event.key)
     key_handler.handle_keyup(event)
 

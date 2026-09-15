@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pygame
 
 from cleave.viz import modal_overlay
@@ -888,6 +890,64 @@ def test_text_modal_caret_position() -> None:
     assert view.caret_index == 3
     assert view.editing is True
 
+    panel = _draw_text_panel_for_tests(font, view, line_gap=line_gap)
+    field_x, field_y, content_w = _text_field_origin(
+        font, view, line_gap=line_gap, screen_w=1280, screen_h=720
+    )
+    prefix_w = font.size(view.draft[: view.caret_index])[0]
+    assert prefix_w < content_w
+    caret_x = field_x + prefix_w
+    mid_y = field_y + line_h // 2
+    assert panel.get_at((caret_x, mid_y))[:3] == HIGHLIGHT
+    assert panel.get_at((caret_x + 1, mid_y))[:3] == HIGHLIGHT
+    assert view.caret_visible is True
+
+
+def test_text_modal_caret_hidden_when_not_visible() -> None:
+    pygame.init()
+    font = _font()
+    line_gap = 3
+    line_h = font.get_linesize()
+    modal = ModalHost()
+    _prompt_text(modal, initial="hello", single_line=True)
+    modal.handle_keydown(_keydown(pygame.K_LEFT))
+    modal.handle_keydown(_keydown(pygame.K_LEFT))
+    view = modal.view_state()
+    assert view is not None
+    assert view.editing is True
+    assert view.caret_index == 3
+    hidden = replace(view, caret_visible=False)
+
+    panel = _draw_text_panel_for_tests(font, hidden, line_gap=line_gap)
+    field_x, field_y, content_w = _text_field_origin(
+        font, hidden, line_gap=line_gap, screen_w=1280, screen_h=720
+    )
+    prefix_w = font.size(hidden.draft[: hidden.caret_index])[0]
+    assert prefix_w < content_w
+    caret_x = field_x + prefix_w
+    mid_y = field_y + line_h // 2
+    assert panel.get_at((caret_x, mid_y))[:3] != HIGHLIGHT
+    assert panel.get_at((caret_x + 1, mid_y))[:3] != HIGHLIGHT
+
+
+def test_text_modal_caret_shown_when_visible() -> None:
+    pygame.init()
+    font = _font()
+    line_gap = 3
+    line_h = font.get_linesize()
+    view = ModalViewState(
+        kind=ModalKind.TEXT,
+        message=None,
+        options=(),
+        focus_index=0,
+        cta="Change text...",
+        draft="hello",
+        single_line=True,
+        editing=True,
+        caret_index=3,
+        focus_region=TextFocusRegion.FIELD,
+        caret_visible=True,
+    )
     panel = _draw_text_panel_for_tests(font, view, line_gap=line_gap)
     field_x, field_y, content_w = _text_field_origin(
         font, view, line_gap=line_gap, screen_w=1280, screen_h=720
