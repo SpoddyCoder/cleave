@@ -593,6 +593,10 @@ class TuningControls:
 
         if event.key == pygame.K_RETURN:
             kind = self.focus_descriptor.kind
+            if section_lock_blocks_mutation(self.session, self.focus_descriptor):
+                spec = ROW_SPECS.get(kind)
+                if spec is not None and spec.apply_action is not None:
+                    return True
             if apply_field_action(self, self.focus_descriptor):
                 return True
             if kind == RowKind.SETTINGS_EDITOR_MODE:
@@ -771,6 +775,10 @@ class TuningControls:
                 return True
 
         if event.key == pygame.K_RETURN:
+            if section_lock_blocks_mutation(self.session, self.focus_descriptor):
+                spec = ROW_SPECS.get(self.focus_descriptor.kind)
+                if spec is not None and spec.apply_action is not None:
+                    return True
             if apply_field_action(self, self.focus_descriptor):
                 return True
             if self.focus_descriptor.kind == RowKind.SETTINGS_EDITOR_MODE:

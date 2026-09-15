@@ -433,6 +433,11 @@ def test_render_overlay_sub_header_help_expand_collapse() -> None:
         assert "adjust value" not in entries.values()
 
 
+def test_render_overlay_title_text_help() -> None:
+    section = _keyboard_section(sections_for(RowKind.RENDER_OVERLAY_CARD_TITLE_TEXT))
+    assert dict(section.entries)["Enter"] == "edit title"
+
+
 def test_layer_management_add_help() -> None:
     section = _keyboard_section(sections_for(RowKind.LAYER_MANAGEMENT_ADD))
     assert section.title == KEYBOARD_CONTROLS_SECTION_TITLE

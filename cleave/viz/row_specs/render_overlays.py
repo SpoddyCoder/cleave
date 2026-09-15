@@ -59,6 +59,12 @@ def _format_overlay_card_title_margin_bottom(
 ) -> str:
     return f"{_overlay_card_block(state, desc).runtime.title_margin_bottom}px"
 
+def _format_overlay_card_title_content(
+    state: TuningViewState, desc: RowDescriptor
+) -> str:
+    content = _overlay_card_block(state, desc).runtime.title_content
+    return content.replace("\n", " ").replace("\r", " ")
+
 def _format_overlay_card_body_font_size(
     state: TuningViewState, desc: RowDescriptor
 ) -> str:
@@ -146,6 +152,22 @@ def _apply_overlay_card_title_margin_bottom(
     card = _overlay_card_block_session(controls, desc)
     _overlay_card_controls(controls, desc).set_title_margin_bottom(
         card.title_margin_bottom + delta
+    )
+
+def _apply_overlay_card_title_text_action(
+    controls: TuningControls,
+    desc: RowDescriptor,
+) -> None:
+    from cleave.viz.row_spec import section_lock_blocks_mutation
+    if section_lock_blocks_mutation(controls.session, desc):
+        return
+    card_controls = _overlay_card_controls(controls, desc)
+    current_title = _overlay_card_block_session(controls, desc).title_content
+    controls.modal_host.prompt_text(
+        cta="Change text...",
+        initial=current_title,
+        on_confirm=card_controls.set_title_content,
+        single_line=True,
     )
 
 def _apply_overlay_card_body_font_size(
@@ -431,6 +453,19 @@ SPECS: dict[RowKind, RowSpec] = {
         ),
         repeatable=True,
         parent_group="render_overlay_title",
+    ),
+    RowKind.RENDER_OVERLAY_CARD_TITLE_TEXT: RowSpec(
+        affordance=RowAffordance.ACTION,
+        panel_label="title text",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_overlay_card_title_content,
+        apply_action=_apply_overlay_card_title_text_action,
+        shows_enter_icon=True,
+        help_title="Title text",
+        help_entries=(("Enter", "edit title"),),
+        help_description=("Open a dialog to change this card's title.",),
+        parent_group="render_overlay_title",
+        blocked_by_section_lock=True,
     ),
     RowKind.RENDER_OVERLAY_CARD_BODY_HEADER: RowSpec(
         affordance=RowAffordance.EXPAND,
