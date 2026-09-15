@@ -993,3 +993,62 @@ def test_text_modal_single_line_scroll_keeps_caret_in_clip() -> None:
     assert panel.get_at((caret_x, mid_y))[:3] == HIGHLIGHT
     assert panel.get_at((field_x, mid_y))[:3] != HIGHLIGHT
     assert modal_overlay._single_line_scroll_x(font, "", 0, content_w) == 0
+
+
+def test_text_modal_caret_visible_at_end_when_panel_expands() -> None:
+    pygame.init()
+    font = _font()
+    line_gap = 3
+    line_h = font.get_linesize()
+    screen_w = 1280
+    screen_h = 720
+    min_panel_w = modal_overlay._panel_min_width(screen_w)
+    wrap_w = modal_overlay._message_max_width(screen_w)
+    cta = "Change text..."
+    min_content_w = max(
+        min_panel_w - modal_overlay._PANEL_PAD_X * 2,
+        font.size(cta)[0],
+        font.size(modal_overlay._EDITING_HINT)[0],
+        modal_overlay._text_buttons_width(font),
+    )
+    draft = "W"
+    while font.size(draft)[0] <= min_content_w:
+        draft += "W"
+    assert font.size(draft)[0] + modal_overlay._CARET_WIDTH < wrap_w
+
+    modal = ModalHost()
+    _prompt_text(modal, cta=cta, initial=draft, single_line=True)
+    view = modal.view_state()
+    assert view is not None
+    assert view.caret_index == len(draft)
+    assert view.editing is True
+    assert view.caret_visible is True
+
+    panel_w, _ = modal_overlay._measure_text_panel(
+        font, view, line_gap=line_gap, screen_w=screen_w, screen_h=screen_h
+    )
+    assert panel_w > min_panel_w
+
+    def _assert_caret_in_field(state: ModalViewState) -> None:
+        panel = _draw_text_panel_for_tests(
+            font, state, line_gap=line_gap, screen_w=screen_w, screen_h=screen_h
+        )
+        field_x, field_y, content_w = _text_field_origin(
+            font, state, line_gap=line_gap, screen_w=screen_w, screen_h=screen_h
+        )
+        prefix_w = font.size(state.draft[: state.caret_index])[0]
+        scroll_x = modal_overlay._single_line_scroll_x(
+            font, state.draft, state.caret_index, content_w
+        )
+        caret_x = field_x + prefix_w - scroll_x
+        mid_y = field_y + line_h // 2
+        assert field_x <= caret_x <= field_x + content_w - modal_overlay._CARET_WIDTH
+        assert panel.get_at((caret_x, mid_y))[:3] == HIGHLIGHT
+        assert panel.get_at((caret_x + 1, mid_y))[:3] == HIGHLIGHT
+
+    _assert_caret_in_field(view)
+    modal.handle_keydown(_keydown(pygame.K_LEFT))
+    moved = modal.view_state()
+    assert moved is not None
+    assert moved.caret_index == len(draft) - 1
+    _assert_caret_in_field(moved)

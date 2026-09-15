@@ -628,7 +628,7 @@ def _single_line_scroll_x(
     if not line or content_w <= 0:
         return 0
     text_w = font.size(line)[0]
-    if text_w <= content_w:
+    if text_w + _CARET_WIDTH <= content_w:
         return 0
     column = max(0, min(column, len(line)))
     caret_x = font.size(line[:column])[0]
@@ -654,6 +654,7 @@ def _measure_text_panel(
 
     field_lines = _text_field_lines(font, state, screen_w=screen_w)
     field_w = max((font.size(line)[0] for line in field_lines), default=0)
+    field_w += _CARET_WIDTH
     field_w = min(field_w, wrap_w)
     caret_line, _ = _caret_line_column(
         state.draft if state.draft is not None else "",
