@@ -149,8 +149,18 @@ class RenderOverlayCardRuntime:
     title_margin_bottom: int
     body_font_size: int
     body_font: str
+    body_content: str
     opacity_pct: int
     border_width: int
+    title_content: str
+    title_colour: tuple[int, int, int]
+    title_background_colour: tuple[int, int, int] | None
+    body_colour: tuple[int, int, int]
+    body_background_colour: tuple[int, int, int] | None
+    background_colour: tuple[int, int, int]
+    background_margin: int
+    background_padding: int
+    border_colour: tuple[int, int, int]
     animation: RenderOverlayAnimationRuntime | RenderOverlayClosingAnimationRuntime
     animation_expanded: bool = False
 
@@ -490,8 +500,18 @@ def _card_runtime_from_cfg(card: Any) -> RenderOverlayCardRuntime:
         title_margin_bottom=card.title.margin_bottom,
         body_font_size=card.body.font_size,
         body_font=card.body.font,
+        body_content=card.body.content,
         opacity_pct=int(round(card.background.opacity * 100)),
         border_width=card.background.border.width,
+        title_content=card.title.content,
+        title_colour=card.title.colour,
+        title_background_colour=card.title.background_colour,
+        body_colour=card.body.colour,
+        body_background_colour=card.body.background_colour,
+        background_colour=card.background.colour,
+        background_margin=card.background.margin,
+        background_padding=card.background.padding,
+        border_colour=card.background.border.colour,
         animation=animation,
     )
 

@@ -113,9 +113,9 @@ def panel_surface_key(cfg: RenderOverlayCardConfig) -> tuple:
 
 
 def build_live_overlay_config(
-    base: RenderOverlayCardConfig, runtime: RenderOverlayCardRuntime
+    runtime: RenderOverlayCardRuntime,
 ) -> RenderOverlayCardConfig:
-    """Merge static YAML fields with live-tuned runtime overrides."""
+    """Build overlay card config from live-tuned session runtime."""
     from cleave.config import (
         RenderOverlayAnimationConfig,
         RenderOverlayBackgroundConfig,
@@ -144,29 +144,29 @@ def build_live_overlay_config(
     return RenderOverlayCardConfig(
         enabled=runtime.enabled,
         title=RenderOverlayTextBlockConfig(
-            content=base.title.content,
+            content=runtime.title_content,
             font=runtime.title_font,
             font_size=runtime.title_font_size,
-            colour=base.title.colour,
-            background_colour=base.title.background_colour,
+            colour=runtime.title_colour,
+            background_colour=runtime.title_background_colour,
             margin_bottom=runtime.title_margin_bottom,
         ),
         body=RenderOverlayTextBlockConfig(
-            content=base.body.content,
+            content=runtime.body_content,
             font=runtime.body_font,
             font_size=runtime.body_font_size,
-            colour=base.body.colour,
-            background_colour=base.body.background_colour,
+            colour=runtime.body_colour,
+            background_colour=runtime.body_background_colour,
         ),
         animation=animation,
         position=runtime.position,
         background=RenderOverlayBackgroundConfig(
-            margin=base.background.margin,
-            padding=base.background.padding,
-            colour=base.background.colour,
+            margin=runtime.background_margin,
+            padding=runtime.background_padding,
+            colour=runtime.background_colour,
             opacity=runtime.opacity_pct / 100.0,
             border=RenderOverlayBorderConfig(
-                colour=base.background.border.colour,
+                colour=runtime.border_colour,
                 width=runtime.border_width,
             ),
         ),

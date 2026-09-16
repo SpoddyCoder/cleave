@@ -1485,7 +1485,11 @@ def test_render_overlay_row_layout_includes_header_and_sub_rows_when_expanded() 
     assert RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER in kinds
     assert RowKind.RENDER_OVERLAY_CARD_BODY_HEADER in kinds
     assert RowKind.RENDER_OVERLAY_CARD_OPACITY in kinds
+    assert RowKind.RENDER_OVERLAY_CARD_BACKGROUND_COLOUR in kinds
+    assert RowKind.RENDER_OVERLAY_CARD_BACKGROUND_MARGIN in kinds
+    assert RowKind.RENDER_OVERLAY_CARD_BACKGROUND_PADDING in kinds
     assert RowKind.RENDER_OVERLAY_CARD_BORDER_WIDTH in kinds
+    assert RowKind.RENDER_OVERLAY_CARD_BORDER_COLOUR in kinds
     assert RowKind.RENDER_OVERLAY_CARD_TIME not in kinds
     assert RowKind.RENDER_OVERLAY_CARD_DISPLAY_TIME not in kinds
     assert RowKind.RENDER_OVERLAY_CARD_TITLE_FONT_SIZE not in kinds
@@ -1545,9 +1549,15 @@ def test_render_overlay_title_and_body_font_rows_when_expanded() -> None:
     kinds = [row.kind for row in state.layout.rows]
     assert RowKind.RENDER_OVERLAY_CARD_TITLE_FONT_SIZE in kinds
     assert RowKind.RENDER_OVERLAY_CARD_TITLE_FONT in kinds
+    assert RowKind.RENDER_OVERLAY_CARD_TITLE_TEXT in kinds
+    assert RowKind.RENDER_OVERLAY_CARD_TITLE_COLOUR in kinds
+    assert RowKind.RENDER_OVERLAY_CARD_TITLE_BACKGROUND_COLOUR in kinds
     assert RowKind.RENDER_OVERLAY_CARD_TITLE_MARGIN_BOTTOM in kinds
     assert RowKind.RENDER_OVERLAY_CARD_BODY_FONT_SIZE in kinds
     assert RowKind.RENDER_OVERLAY_CARD_BODY_FONT in kinds
+    assert RowKind.RENDER_OVERLAY_CARD_BODY_TEXT in kinds
+    assert RowKind.RENDER_OVERLAY_CARD_BODY_COLOUR in kinds
+    assert RowKind.RENDER_OVERLAY_CARD_BODY_BACKGROUND_COLOUR in kinds
 
 
 def test_render_overlay_collapsed_hides_sub_rows() -> None:

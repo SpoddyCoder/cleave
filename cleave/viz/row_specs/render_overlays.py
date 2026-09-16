@@ -4,9 +4,15 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from cleave.config_schema.descriptors import parse_hex_colour, rgb_to_hex
 from cleave.config_schema.render import (
     RENDER_OVERLAY_ANIMATION_TYPE_HELP_ENTRIES,
     RENDER_OVERLAY_SLIDE_DIRECTION_HELP_ENTRIES,
+)
+from cleave.viz.colour_parse import (
+    parse_hex_colour_or_none,
+    validate_hex_colour,
+    validate_optional_hex_colour,
 )
 from cleave.viz.fonts import render_overlay_font_display
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
@@ -59,6 +65,30 @@ def _format_overlay_card_title_margin_bottom(
 ) -> str:
     return f"{_overlay_card_block(state, desc).runtime.title_margin_bottom}px"
 
+def _format_overlay_card_title_content(
+    state: TuningViewState, desc: RowDescriptor
+) -> str:
+    content = _overlay_card_block(state, desc).runtime.title_content
+    return content.replace("\n", " ").replace("\r", " ")
+
+def _format_overlay_card_colour(
+    state: TuningViewState, desc: RowDescriptor, field: str
+) -> str:
+    colour = getattr(_overlay_card_block(state, desc).runtime, field)
+    if colour is None:
+        return "none"
+    return rgb_to_hex(colour)
+
+def _format_overlay_card_title_colour(
+    state: TuningViewState, desc: RowDescriptor
+) -> str:
+    return _format_overlay_card_colour(state, desc, "title_colour")
+
+def _format_overlay_card_title_background_colour(
+    state: TuningViewState, desc: RowDescriptor
+) -> str:
+    return _format_overlay_card_colour(state, desc, "title_background_colour")
+
 def _format_overlay_card_body_font_size(
     state: TuningViewState, desc: RowDescriptor
 ) -> str:
@@ -69,6 +99,22 @@ def _format_overlay_card_body_font(
 ) -> str:
     return render_overlay_font_display(_overlay_card_block(state, desc).runtime.body_font)
 
+def _format_overlay_card_body_content(
+    state: TuningViewState, desc: RowDescriptor
+) -> str:
+    content = _overlay_card_block(state, desc).runtime.body_content
+    return content.replace("\n", " ").replace("\r", " ")
+
+def _format_overlay_card_body_colour(
+    state: TuningViewState, desc: RowDescriptor
+) -> str:
+    return _format_overlay_card_colour(state, desc, "body_colour")
+
+def _format_overlay_card_body_background_colour(
+    state: TuningViewState, desc: RowDescriptor
+) -> str:
+    return _format_overlay_card_colour(state, desc, "body_background_colour")
+
 def _format_overlay_card_opacity(
     state: TuningViewState, desc: RowDescriptor
 ) -> str:
@@ -78,6 +124,26 @@ def _format_overlay_card_border_width(
     state: TuningViewState, desc: RowDescriptor
 ) -> str:
     return f"{_overlay_card_block(state, desc).runtime.border_width}px"
+
+def _format_overlay_card_background_colour(
+    state: TuningViewState, desc: RowDescriptor
+) -> str:
+    return _format_overlay_card_colour(state, desc, "background_colour")
+
+def _format_overlay_card_background_margin(
+    state: TuningViewState, desc: RowDescriptor
+) -> str:
+    return f"{_overlay_card_block(state, desc).runtime.background_margin}px"
+
+def _format_overlay_card_background_padding(
+    state: TuningViewState, desc: RowDescriptor
+) -> str:
+    return f"{_overlay_card_block(state, desc).runtime.background_padding}px"
+
+def _format_overlay_card_border_colour(
+    state: TuningViewState, desc: RowDescriptor
+) -> str:
+    return _format_overlay_card_colour(state, desc, "border_colour")
 
 def _format_overlay_card_time(
     state: TuningViewState, desc: RowDescriptor
@@ -148,6 +214,73 @@ def _apply_overlay_card_title_margin_bottom(
         card.title_margin_bottom + delta
     )
 
+def _apply_overlay_card_title_text_action(
+    controls: TuningControls,
+    desc: RowDescriptor,
+) -> None:
+    from cleave.viz.row_spec import section_lock_blocks_mutation
+    if section_lock_blocks_mutation(controls.session, desc):
+        return
+    card_controls = _overlay_card_controls(controls, desc)
+    current_title = _overlay_card_block_session(controls, desc).title_content
+    controls.modal_host.prompt_text(
+        cta="Change text...",
+        initial=current_title,
+        on_confirm=card_controls.set_title_content,
+        single_line=True,
+    )
+
+_OVERLAY_COLOUR_CTA = "Change colour (#rgb or #rrggbb)..."
+
+
+def _apply_overlay_card_colour_action(
+    controls: TuningControls,
+    desc: RowDescriptor,
+    *,
+    field: str,
+    optional: bool = False,
+) -> None:
+    from cleave.viz.row_spec import section_lock_blocks_mutation
+    if section_lock_blocks_mutation(controls.session, desc):
+        return
+    card_controls = _overlay_card_controls(controls, desc)
+    current = getattr(_overlay_card_block_session(controls, desc), field)
+    setter = getattr(card_controls, f"set_{field}")
+
+    def _on_confirm(draft: str) -> None:
+        if optional:
+            setter(parse_hex_colour_or_none(draft))
+        else:
+            setter(parse_hex_colour(draft, "colour"))
+
+    if current is None:
+        initial = ""
+    else:
+        initial = rgb_to_hex(current)
+    controls.modal_host.prompt_text(
+        cta=_OVERLAY_COLOUR_CTA,
+        initial=initial,
+        on_confirm=_on_confirm,
+        single_line=True,
+        validate=(
+            validate_optional_hex_colour if optional else validate_hex_colour
+        ),
+    )
+
+def _apply_overlay_card_title_colour_action(
+    controls: TuningControls,
+    desc: RowDescriptor,
+) -> None:
+    _apply_overlay_card_colour_action(controls, desc, field="title_colour")
+
+def _apply_overlay_card_title_background_colour_action(
+    controls: TuningControls,
+    desc: RowDescriptor,
+) -> None:
+    _apply_overlay_card_colour_action(
+        controls, desc, field="title_background_colour", optional=True
+    )
+
 def _apply_overlay_card_body_font_size(
     controls: TuningControls,
     desc: RowDescriptor,
@@ -170,6 +303,36 @@ def _apply_overlay_card_body_font(
     _shift: bool,
 ) -> None:
     _overlay_card_controls(controls, desc).cycle_body_font(forward=forward)
+
+def _apply_overlay_card_body_text_action(
+    controls: TuningControls,
+    desc: RowDescriptor,
+) -> None:
+    from cleave.viz.row_spec import section_lock_blocks_mutation
+    if section_lock_blocks_mutation(controls.session, desc):
+        return
+    card_controls = _overlay_card_controls(controls, desc)
+    current_body = _overlay_card_block_session(controls, desc).body_content
+    controls.modal_host.prompt_text(
+        cta="Change text...",
+        initial=current_body,
+        on_confirm=card_controls.set_body_content,
+        single_line=False,
+    )
+
+def _apply_overlay_card_body_colour_action(
+    controls: TuningControls,
+    desc: RowDescriptor,
+) -> None:
+    _apply_overlay_card_colour_action(controls, desc, field="body_colour")
+
+def _apply_overlay_card_body_background_colour_action(
+    controls: TuningControls,
+    desc: RowDescriptor,
+) -> None:
+    _apply_overlay_card_colour_action(
+        controls, desc, field="body_background_colour", optional=True
+    )
 
 def _apply_overlay_card_opacity(
     controls: TuningControls,
@@ -194,6 +357,46 @@ def _apply_overlay_card_border_width(
     delta = step if forward else -step
     card = _overlay_card_block_session(controls, desc)
     _overlay_card_controls(controls, desc).set_border_width(card.border_width + delta)
+
+def _apply_overlay_card_background_colour_action(
+    controls: TuningControls,
+    desc: RowDescriptor,
+) -> None:
+    _apply_overlay_card_colour_action(controls, desc, field="background_colour")
+
+def _apply_overlay_card_background_margin(
+    controls: TuningControls,
+    desc: RowDescriptor,
+    forward: bool,
+    ctrl: bool,
+    _shift: bool,
+) -> None:
+    step = 10 if ctrl else 1
+    delta = step if forward else -step
+    card = _overlay_card_block_session(controls, desc)
+    _overlay_card_controls(controls, desc).set_background_margin(
+        card.background_margin + delta
+    )
+
+def _apply_overlay_card_background_padding(
+    controls: TuningControls,
+    desc: RowDescriptor,
+    forward: bool,
+    ctrl: bool,
+    _shift: bool,
+) -> None:
+    step = 10 if ctrl else 1
+    delta = step if forward else -step
+    card = _overlay_card_block_session(controls, desc)
+    _overlay_card_controls(controls, desc).set_background_padding(
+        card.background_padding + delta
+    )
+
+def _apply_overlay_card_border_colour_action(
+    controls: TuningControls,
+    desc: RowDescriptor,
+) -> None:
+    _apply_overlay_card_colour_action(controls, desc, field="border_colour")
 
 def _apply_overlay_card_time(
     controls: TuningControls,
@@ -432,6 +635,47 @@ SPECS: dict[RowKind, RowSpec] = {
         repeatable=True,
         parent_group="render_overlay_title",
     ),
+    RowKind.RENDER_OVERLAY_CARD_TITLE_TEXT: RowSpec(
+        affordance=RowAffordance.ACTION,
+        panel_label="title text",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_overlay_card_title_content,
+        apply_action=_apply_overlay_card_title_text_action,
+        shows_enter_icon=True,
+        help_title="Title text",
+        help_entries=(("Enter", "edit title"),),
+        help_description=("Open a dialog to change this card's title.",),
+        parent_group="render_overlay_title",
+        blocked_by_section_lock=True,
+    ),
+    RowKind.RENDER_OVERLAY_CARD_TITLE_COLOUR: RowSpec(
+        affordance=RowAffordance.ACTION,
+        panel_label="title colour",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_overlay_card_title_colour,
+        apply_action=_apply_overlay_card_title_colour_action,
+        shows_enter_icon=True,
+        help_title="Title colour",
+        help_entries=(("Enter", "edit colour"),),
+        help_description=("Hex colour of this credits card title.",),
+        parent_group="render_overlay_title",
+        blocked_by_section_lock=True,
+    ),
+    RowKind.RENDER_OVERLAY_CARD_TITLE_BACKGROUND_COLOUR: RowSpec(
+        affordance=RowAffordance.ACTION,
+        panel_label="title background",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_overlay_card_title_background_colour,
+        apply_action=_apply_overlay_card_title_background_colour_action,
+        shows_enter_icon=True,
+        help_title="Title background",
+        help_entries=(("Enter", "edit colour"),),
+        help_description=(
+            "Optional hex background colour of this credits card title.",
+        ),
+        parent_group="render_overlay_title",
+        blocked_by_section_lock=True,
+    ),
     RowKind.RENDER_OVERLAY_CARD_BODY_HEADER: RowSpec(
         affordance=RowAffordance.EXPAND,
         panel_label="body",
@@ -466,6 +710,47 @@ SPECS: dict[RowKind, RowSpec] = {
         repeatable=True,
         parent_group="render_overlay_body",
     ),
+    RowKind.RENDER_OVERLAY_CARD_BODY_TEXT: RowSpec(
+        affordance=RowAffordance.ACTION,
+        panel_label="body text",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_overlay_card_body_content,
+        apply_action=_apply_overlay_card_body_text_action,
+        shows_enter_icon=True,
+        help_title="Body text",
+        help_entries=(("Enter", "edit body"),),
+        help_description=("Open a dialog to change this card's body.",),
+        parent_group="render_overlay_body",
+        blocked_by_section_lock=True,
+    ),
+    RowKind.RENDER_OVERLAY_CARD_BODY_COLOUR: RowSpec(
+        affordance=RowAffordance.ACTION,
+        panel_label="body colour",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_overlay_card_body_colour,
+        apply_action=_apply_overlay_card_body_colour_action,
+        shows_enter_icon=True,
+        help_title="Body colour",
+        help_entries=(("Enter", "edit colour"),),
+        help_description=("Hex colour of this credits card body.",),
+        parent_group="render_overlay_body",
+        blocked_by_section_lock=True,
+    ),
+    RowKind.RENDER_OVERLAY_CARD_BODY_BACKGROUND_COLOUR: RowSpec(
+        affordance=RowAffordance.ACTION,
+        panel_label="body background",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_overlay_card_body_background_colour,
+        apply_action=_apply_overlay_card_body_background_colour_action,
+        shows_enter_icon=True,
+        help_title="Body background",
+        help_entries=(("Enter", "edit colour"),),
+        help_description=(
+            "Optional hex background colour of this credits card body.",
+        ),
+        parent_group="render_overlay_body",
+        blocked_by_section_lock=True,
+    ),
     RowKind.RENDER_OVERLAY_CARD_OPACITY: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
         panel_label="background opacity",
@@ -474,6 +759,45 @@ SPECS: dict[RowKind, RowSpec] = {
         apply_horizontal=_apply_overlay_card_opacity,
         help_title="Background opacity",
         help_description=("Background opacity of this credits card box.",),
+        repeatable=True,
+        parent_group="render_overlay",
+    ),
+    RowKind.RENDER_OVERLAY_CARD_BACKGROUND_COLOUR: RowSpec(
+        affordance=RowAffordance.ACTION,
+        panel_label="background colour",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_overlay_card_background_colour,
+        apply_action=_apply_overlay_card_background_colour_action,
+        shows_enter_icon=True,
+        help_title="Background colour",
+        help_entries=(("Enter", "edit colour"),),
+        help_description=("Hex colour of this credits card box.",),
+        parent_group="render_overlay",
+        blocked_by_section_lock=True,
+    ),
+    RowKind.RENDER_OVERLAY_CARD_BACKGROUND_MARGIN: RowSpec(
+        affordance=RowAffordance.VALUE_STEP,
+        panel_label="background margin",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_overlay_card_background_margin,
+        apply_horizontal=_apply_overlay_card_background_margin,
+        help_title="Background margin",
+        help_description=(
+            "Gap between this credits card box and the screen edge.",
+        ),
+        repeatable=True,
+        parent_group="render_overlay",
+    ),
+    RowKind.RENDER_OVERLAY_CARD_BACKGROUND_PADDING: RowSpec(
+        affordance=RowAffordance.VALUE_STEP,
+        panel_label="background padding",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_overlay_card_background_padding,
+        apply_horizontal=_apply_overlay_card_background_padding,
+        help_title="Background padding",
+        help_description=(
+            "Inner space between this credits card border and its text.",
+        ),
         repeatable=True,
         parent_group="render_overlay",
     ),
@@ -489,6 +813,21 @@ SPECS: dict[RowKind, RowSpec] = {
         ),
         repeatable=True,
         parent_group="render_overlay",
+    ),
+    RowKind.RENDER_OVERLAY_CARD_BORDER_COLOUR: RowSpec(
+        affordance=RowAffordance.ACTION,
+        panel_label="border colour",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_overlay_card_border_colour,
+        apply_action=_apply_overlay_card_border_colour_action,
+        shows_enter_icon=True,
+        help_title="Border colour",
+        help_entries=(("Enter", "edit colour"),),
+        help_description=(
+            "Hex colour of the border around this credits card box.",
+        ),
+        parent_group="render_overlay",
+        blocked_by_section_lock=True,
     ),
     RowKind.RENDER_OVERLAY_CARD_TIME: RowSpec(
         affordance=RowAffordance.VALUE_STEP,

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import tempfile
+from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -60,7 +61,6 @@ from cleave.timeline import SlotCue, TimelineLane
 from cleave.viz.session import (
     LayerRuntime,
     RenderOverlayAnimationRuntime,
-    RenderOverlayCardRuntime,
     RenderOverlayClosingAnimationRuntime,
     RenderOverlaysRuntime,
     TuningSession,
@@ -818,12 +818,10 @@ def _snapshot_fixture(tmp_path: Path) -> tuple[CleaveConfig, TuningSession, Path
             post_fx=default_render_post_fx_config(enabled=True, fade_in=30.0, fade_out=4.0),
         ),
     )
-    opening = RenderOverlayCardRuntime(
+    opening = replace(
+        default_render_overlay_card_runtime(),
         enabled=True,
-        expanded=False,
         position="top-right",
-        title_expanded=False,
-        body_expanded=False,
         title_font_size=14,
         title_font="dejavusans",
         title_margin_bottom=6,
@@ -831,6 +829,10 @@ def _snapshot_fixture(tmp_path: Path) -> tuple[CleaveConfig, TuningSession, Path
         body_font="ubuntumono",
         opacity_pct=75,
         border_width=4,
+        background_margin=33,
+        background_padding=9,
+        title_content="My Title",
+        body_content="Line one\nLine two",
         animation=RenderOverlayAnimationRuntime(
             type="fade",
             slide_direction="left",
@@ -887,11 +889,11 @@ def test_write_session_snapshot_persists_render_overlay(tmp_path: Path) -> None:
     assert opening["body"]["font"] == "ubuntumono"
     assert opening["title"]["font-colour"] == "#ffffff"
     assert opening["body"]["colour"] == "#ffffff"
-    assert opening["background"]["margin"] == 10
-    assert opening["background"]["padding"] == 10
-    assert opening["background"]["colour"] == "#223344"
+    assert opening["background"]["margin"] == 33
+    assert opening["background"]["padding"] == 9
+    assert opening["background"]["colour"] == "#000000"
     assert opening["background"]["opacity"] == 0.75
-    assert opening["background"]["border"]["colour"] == "#223344"
+    assert opening["background"]["border"]["colour"] == "#ffffff"
     assert opening["background"]["border"]["width"] == 4
     assert "closing-card" in overlays
 
@@ -905,6 +907,8 @@ def test_write_session_snapshot_persists_render_overlay(tmp_path: Path) -> None:
     assert round_trip.overlays.opening_card.title.margin_bottom == 6
     assert round_trip.overlays.opening_card.body.font_size == 18
     assert round_trip.overlays.opening_card.body.font == "ubuntumono"
+    assert round_trip.overlays.opening_card.background.margin == 33
+    assert round_trip.overlays.opening_card.background.padding == 9
     assert round_trip.overlays.opening_card.background.opacity == 0.75
     assert round_trip.overlays.opening_card.background.border.width == 4
 
@@ -1132,7 +1136,7 @@ def test_write_session_snapshot_render_overlay_without_cfg_render(tmp_path: Path
 
     data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
     opening = data["render"]["overlays"]["opening-card"]
-    assert opening["title"]["content"] == "Cleave Final Render"
+    assert opening["title"]["content"] == "My Title"
     assert opening["position"] == "top-right"
     assert opening["title"]["font-size"] == 14
 

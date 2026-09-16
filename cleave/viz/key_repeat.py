@@ -20,6 +20,7 @@ _REPEAT_KEYS = frozenset(
         pygame.K_DOWN,
         pygame.K_COMMA,
         pygame.K_PERIOD,
+        pygame.K_BACKSPACE,
     }
 )
 
@@ -82,6 +83,9 @@ class KeyRepeatController:
     def on_keyup(self, key: int) -> None:
         if self._active is not None and self._active.key == key:
             self._active = None
+
+    def disarm(self) -> None:
+        self._active = None
 
     @property
     def is_armed(self) -> bool:

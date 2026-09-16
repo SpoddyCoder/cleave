@@ -246,7 +246,10 @@ def init_gl_resources_heavy(
     mix_player = MixPlayer(mix_pcm, sample_rate)
     playback = init_playback(mix_player)
 
-    modal_host = ModalHost()
+    modal_host = ModalHost(
+        on_start_text_input=pygame.key.start_text_input,
+        on_stop_text_input=pygame.key.stop_text_input,
+    )
     layer_manager = LayerManager(
         cfg=seed.cfg,
         session=seed.session,
@@ -714,6 +717,9 @@ class VisualizerApp:
                                 rt.overlay.notify_input()
                     elif event.type == pygame.KEYUP:
                         dispatch_keyup(event, rt)
+                    elif event.type == pygame.TEXTINPUT:
+                        if rt.modal_host.handle_text_input(event.text):
+                            rt.overlay.notify_input()
 
                 if rt.controls.consume_pending_exit():
                     running = False
@@ -721,9 +727,11 @@ class VisualizerApp:
                 self._overlay_dt = clock.tick() / 1000.0
                 rt.controls.tick(self._overlay_dt)
                 rt.timeline_controls.tick(self._overlay_dt)
+                rt.modal_host.tick(self._overlay_dt)
                 if (
                     rt.controls.key_repeat_armed
                     or rt.timeline_controls.key_repeat_armed
+                    or rt.modal_host.text_key_repeat_armed
                 ):
                     rt.overlay.notify_input()
 

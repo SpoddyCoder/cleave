@@ -34,8 +34,7 @@ RENDER_OVERLAY_POSITIONS: tuple[RenderOverlayPosition, ...] = (
 DEFAULT_RENDER_OVERLAY_TITLE = "Cleave Final Render"
 DEFAULT_RENDER_OVERLAY_BODY = (
     "Place anything you like here\n"
-    "Like musician names, year of release etc.\n"
-    "Edit the cleave-viz.yaml to modify this message, colours etc."
+    "Like musician names, year of release etc."
 )
 DEFAULT_RENDER_OVERLAY_APPEAR_AT = 10.0
 DEFAULT_RENDER_OVERLAY_DISAPPEAR_AT = 0.0
@@ -554,17 +553,7 @@ def default_render_overlays_config() -> Any:
     return parse_render_overlays_section({})
 
 
-def render_overlays_base(cfg: Any) -> Any:
-    if cfg.render is not None and cfg.render.overlays is not None:
-        return cfg.render.overlays
-    return default_render_overlays_config()
-
-
-def _overlay_card_persist_values(
-    runtime: Any,
-    base_card: Any,
-) -> dict[str, Any]:
-    bg = base_card.background
+def _overlay_card_persist_values(runtime: Any) -> dict[str, Any]:
     anim = runtime.animation
     animation_values: dict[str, Any] = {
         "type": anim.type,
@@ -578,30 +567,30 @@ def _overlay_card_persist_values(
     return {
         "enabled": runtime.enabled,
         "title": {
-            "content": base_card.title.content,
+            "content": runtime.title_content,
             "font": runtime.title_font,
             "font_size": runtime.title_font_size,
-            "colour": base_card.title.colour,
-            "background_colour": base_card.title.background_colour,
+            "colour": runtime.title_colour,
+            "background_colour": runtime.title_background_colour,
             "margin_bottom": runtime.title_margin_bottom,
         },
         "body": {
-            "content": base_card.body.content,
+            "content": runtime.body_content,
             "font": runtime.body_font,
             "font_size": runtime.body_font_size,
-            "colour": base_card.body.colour,
-            "background_colour": base_card.body.background_colour,
+            "colour": runtime.body_colour,
+            "background_colour": runtime.body_background_colour,
             "margin_bottom": 0,
         },
         "animation": animation_values,
         "position": runtime.position,
         "background": {
-            "margin": bg.margin,
-            "padding": bg.padding,
-            "colour": bg.colour,
+            "margin": runtime.background_margin,
+            "padding": runtime.background_padding,
+            "colour": runtime.background_colour,
             "opacity": runtime.opacity_pct / 100.0,
             "border": {
-                "colour": bg.border.colour,
+                "colour": runtime.border_colour,
                 "width": runtime.border_width,
             },
         },
@@ -610,15 +599,10 @@ def _overlay_card_persist_values(
 
 def overlays_persist_values(ctx: PersistCtx) -> dict[str, Any]:
     runtime = ctx.session.render_overlays
-    base = render_overlays_base(ctx.cfg)
     return {
         "locked": runtime.locked,
-        "opening_card": _overlay_card_persist_values(
-            runtime.opening_card, base.opening_card
-        ),
-        "closing_card": _overlay_card_persist_values(
-            runtime.closing_card, base.closing_card
-        ),
+        "opening_card": _overlay_card_persist_values(runtime.opening_card),
+        "closing_card": _overlay_card_persist_values(runtime.closing_card),
     }
 
 
@@ -660,8 +644,18 @@ def default_render_overlay_card_runtime_values(
         "title_margin_bottom": DEFAULT_RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
         "body_font_size": DEFAULT_RENDER_OVERLAY_BODY_FONT_SIZE,
         "body_font": DEFAULT_RENDER_OVERLAY_FONT,
+        "body_content": DEFAULT_RENDER_OVERLAY_BODY,
         "opacity_pct": int(round(DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY * 100)),
         "border_width": DEFAULT_RENDER_OVERLAY_BORDER_WIDTH,
+        "title_content": DEFAULT_RENDER_OVERLAY_TITLE,
+        "title_colour": DEFAULT_RENDER_OVERLAY_TEXT_COLOUR,
+        "title_background_colour": None,
+        "body_colour": DEFAULT_RENDER_OVERLAY_TEXT_COLOUR,
+        "body_background_colour": None,
+        "background_colour": DEFAULT_RENDER_OVERLAY_BACKGROUND_COLOUR,
+        "background_margin": DEFAULT_RENDER_OVERLAY_BACKGROUND_MARGIN,
+        "background_padding": DEFAULT_RENDER_OVERLAY_BACKGROUND_PADDING,
+        "border_colour": DEFAULT_RENDER_OVERLAY_BORDER_COLOUR,
         "animation": animation,
         "animation_expanded": False,
     }

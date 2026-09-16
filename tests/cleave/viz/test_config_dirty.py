@@ -181,6 +181,18 @@ def _mutate_render_overlay_title_margin_bottom(controls: TuningControls) -> None
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
+def _mutate_render_overlay_title_content(controls: TuningControls) -> None:
+    controls.render_overlays.opening_card.set_title_content("Custom overlay title")
+
+
+def _mutate_render_overlay_title_colour(controls: TuningControls) -> None:
+    controls.render_overlays.opening_card.set_title_colour((255, 0, 0))
+
+
+def _mutate_render_overlay_body_content(controls: TuningControls) -> None:
+    controls.render_overlays.opening_card.set_body_content("Custom overlay body")
+
+
 def _mutate_render_overlay_body_font_size(controls: TuningControls) -> None:
     _expand_render_overlay(controls)
     controls.session.render_overlays.opening_card.body_expanded = True
@@ -215,6 +227,24 @@ def _mutate_render_overlay_border_width(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(
         RowKind.RENDER_OVERLAY_CARD_BORDER_WIDTH, card="opening_card"
+    )
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
+def _mutate_render_overlay_background_margin(controls: TuningControls) -> None:
+    _expand_render_overlay(controls)
+    view = controls.build_view_state(paused=False)
+    controls.focus_descriptor = RowDescriptor(
+        RowKind.RENDER_OVERLAY_CARD_BACKGROUND_MARGIN, card="opening_card"
+    )
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
+def _mutate_render_overlay_background_padding(controls: TuningControls) -> None:
+    _expand_render_overlay(controls)
+    view = controls.build_view_state(paused=False)
+    controls.focus_descriptor = RowDescriptor(
+        RowKind.RENDER_OVERLAY_CARD_BACKGROUND_PADDING, card="opening_card"
     )
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
@@ -450,10 +480,15 @@ _PERSISTED_MUTATIONS: list[
     ("render_overlay.locked", _mutate_render_overlay_locked, ("layer_1",), {}),
     ("render_overlay.position", _mutate_render_overlay_position, ("layer_1",), {}),
     ("render_overlay.title_font_size", _mutate_render_overlay_title_font_size, ("layer_1",), {}),
+    ("render_overlay.title_content", _mutate_render_overlay_title_content, ("layer_1",), {}),
+    ("render_overlay.title_colour", _mutate_render_overlay_title_colour, ("layer_1",), {}),
+    ("render_overlay.body_content", _mutate_render_overlay_body_content, ("layer_1",), {}),
     ("render_overlay.title_margin_bottom", _mutate_render_overlay_title_margin_bottom, ("layer_1",), {}),
     ("render_overlay.body_font_size", _mutate_render_overlay_body_font_size, ("layer_1",), {}),
     ("render_overlay.opacity_pct", _mutate_render_overlay_opacity, ("layer_1",), {}),
     ("render_overlay.border_width", _mutate_render_overlay_border_width, ("layer_1",), {}),
+    ("render_overlay.background_margin", _mutate_render_overlay_background_margin, ("layer_1",), {}),
+    ("render_overlay.background_padding", _mutate_render_overlay_background_padding, ("layer_1",), {}),
     ("render_overlay.animation.appear_at", _mutate_render_overlay_start_delay, ("layer_1",), {}),
     ("render_overlay.animation.display_time", _mutate_render_overlay_display_time, ("layer_1",), {}),
     ("render_post_fx.enabled", _mutate_render_post_fx_enabled, ("layer_1",), {}),

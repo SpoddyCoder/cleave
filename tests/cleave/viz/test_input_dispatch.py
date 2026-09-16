@@ -17,6 +17,7 @@ from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.session import LayerRuntime, TuningSession
 from cleave.viz.input_dispatch import (
     dispatch_keydown,
+    dispatch_keyup,
     dispatch_should_notify_overlay,
     key_handler_for_runtime,
 )
@@ -296,3 +297,44 @@ def test_notify_overlay_when_main_context() -> None:
     runtime = _make_runtime(submenu_focused=False)
     assert dispatch_should_notify_overlay(keydown(pygame.K_LEFT), runtime) is True
     assert dispatch_should_notify_overlay(keydown(pygame.K_t), runtime) is False
+
+
+def test_h_does_not_toggle_help_while_text_editing() -> None:
+    runtime = _make_runtime(
+        submenu_focused=False, panel_open=False, help_visible=False
+    )
+    runtime.modal_host.prompt_text(
+        "Change text...",
+        "ab",
+        on_confirm=lambda _s: None,
+    )
+    assert dispatch_keydown(keydown(pygame.K_h), runtime) is True
+    assert runtime.seed.session.help_visible is False
+    view = runtime.modal_host.view_state()
+    assert view is not None
+    assert view.editing is True
+    assert view.draft == "ab"
+
+    event = pygame.event.Event(pygame.TEXTINPUT, text="h")
+    assert runtime.modal_host.handle_text_input(event.text) is True
+    view = runtime.modal_host.view_state()
+    assert view is not None
+    assert view.draft == "abh"
+    assert runtime.seed.session.help_visible is False
+
+
+def test_keyup_while_text_editing_disarms_modal_repeat() -> None:
+    runtime = _make_runtime(submenu_focused=False, panel_open=False)
+    runtime.modal_host.prompt_text(
+        "Change text...",
+        "hello",
+        on_confirm=lambda _s: None,
+    )
+    assert dispatch_keydown(keydown(pygame.K_BACKSPACE), runtime) is True
+    assert runtime.modal_host.text_key_repeat_armed is True
+    dispatch_keyup(
+        pygame.event.Event(pygame.KEYUP, key=pygame.K_BACKSPACE),
+        runtime,
+    )
+    assert runtime.modal_host.text_key_repeat_armed is False
+    assert runtime.controls.key_repeat_armed is False

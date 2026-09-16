@@ -40,7 +40,7 @@ The live event loop ([cleave/viz/app.py](../cleave/viz/app.py)) pumps KEYDOWN / 
 | Dialog regions | (1) CTA from the callee, display-only (2) multiline field, constrained to one line when asked (3) Confirm and Cancel on one row |
 | Focus stops | Two: the field, and the Confirm/Cancel row. CTA is not a stop. Up/Down move 2 <-> 3. Left/Right on 3 only |
 | Open | Field focused, already in edit mode, caret at end, current value shown. No extra Enter to start typing |
-| Edit vs navigate | Esc or Enter leaves edit (keeps the draft, returns to field highlight). Does not confirm or revert |
+| Edit vs navigate | Esc discards the draft and leaves edit (field highlight). Enter leaves edit and highlights Confirm. Neither confirms nor closes |
 | Newline | Shift+Enter while editing, and only when `single_line` is false. Ignored for title |
 | Confirm / Cancel | Enter on a focused button. Esc while navigating (or Cancel) dismisses and restores the launch value |
 | Typing | pygame `TEXTINPUT` plus `start_text_input` / `stop_text_input`. Do not trust KEYDOWN `unicode` |
@@ -93,12 +93,13 @@ Title uses `cta="Change text..."`, `single_line=True`. Body uses the same CTA, `
 ### Edit
 
 - Field loses the navigate highlight; a caret shows the insert point.
-- CTA gains a second line: `press ESC to stop editing` (exact copy locked above).
+- CTA gains a second line: `Press Enter to confirm or ESC to cancel` (exact copy locked above).
 - Arrows move the caret (Up/Down are visual lines when multiline).
 - Backspace deletes backward.
 - Shift+Enter inserts a newline unless `single_line`.
 - Printable input comes from `TEXTINPUT`.
-- Esc or Enter: leave edit, keep draft, restore field highlight.
+- Esc: discard the draft (restore the launch value), leave edit, restore field highlight. Modal stays open.
+- Enter: leave edit, keep draft, highlight Confirm.
 - Hold-repeat for arrows and Backspace via [KeyRepeatController](../cleave/viz/key_repeat.py). Extend `_REPEAT_KEYS` or arm a text-edit repeat set; do not call `pygame.key.set_repeat`.
 
 Single-line overflow scrolls horizontally with the caret. Multiline wraps to the panel content width and scrolls vertically if needed. Cap panel height (about half the viewport, same idea as the current message cap) so a long body cannot cover the screen.
@@ -149,7 +150,7 @@ The host supports multiline internally. Only the title row ships. Each step belo
 - `handle_keydown` branches: PROGRESS / YES_NO / CHOICE unchanged; TEXT implements navigate vs edit. Esc-in-edit does not call `on_dismiss`.
 - `view_state()` grows optional text fields so draw stays a pure function. Existing kinds keep `options` / `message` / `labeled_lines`.
 
-Tests in [tests/cleave/viz/test_confirm.py](../tests/cleave/viz/test_confirm.py) (or a sibling `test_text_modal.py`): open shows initial; type via a test hook that applies a text event; Shift+Enter inserts or no-ops; Esc-edit keeps draft; Esc-nav / Cancel restores; Confirm returns the draft; Left/Right only on the button row; Y/N do nothing; `single_line` rejects newlines in the draft.
+Tests in [tests/cleave/viz/test_confirm.py](../tests/cleave/viz/test_confirm.py) (or a sibling `test_text_modal.py`): open shows initial; type via a test hook that applies a text event; Shift+Enter inserts or no-ops; Esc-edit discards draft; Enter-edit jumps to Confirm; Esc-nav / Cancel restores; Confirm returns the draft; Left/Right only on the button row; Y/N do nothing; `single_line` rejects newlines in the draft.
 
 **1.2 Draw.** Extend [cleave/viz/modal_overlay.py](../cleave/viz/modal_overlay.py):
 
@@ -192,7 +193,7 @@ User-facing: under each card's body section, **body text** opens the same dialog
 - Replace `DEFAULT_RENDER_OVERLAY_BODY` copy that tells the user to edit YAML.
 - Changelog.
 
-If 1.2 shipped a short field, this is when wrap + vertical scroll must be real: default body is three lines, users will add more. Tests: Shift+Enter inserts; Up/Down in edit move between lines; Up/Down in navigate still switch field vs buttons; a long body does not exceed the panel cap.
+If 1.2 shipped a short field, this is when wrap + vertical scroll must be real: default body is two lines, users will add more. Tests: Shift+Enter inserts; Up/Down in edit move between lines; Up/Down in navigate still switch field vs buttons; a long body does not exceed the panel cap.
 
 ### Phase 3 - Remaining YAML-only overlay strings
 
@@ -207,13 +208,103 @@ Everything left on the credits card that is still config-only and is a string. T
 | `background.colour` | card (beside opacity) | background colour | required hex |
 | `background.border.colour` | card (beside border width) | border colour | required hex |
 
-Each row is `ACTION` + enter icon, opens `prompt_text` with `single_line=True` and CTA `Change colour...`. Confirm runs `parse_hex_colour`; on failure stay in the dialog with a one-line error (do not close). Session fields + persist + `build_live_overlay_config` for each. Card-parameterized kinds, same as title.
+Each row is `ACTION` + enter icon, opens `prompt_text` with `single_line=True` and CTA `Change colour (#rgb or #rrggbb)...`. Confirm runs `parse_hex_colour`; on failure stay in the dialog with a one-line error (do not close). Session fields + persist + `build_live_overlay_config` for each. Card-parameterized kinds, same as title.
 
 Build order: one colour through session/persist/merge/row (prove the pattern), then the rest in one pass.
 
 Not this widget, but the same "YAML-only overlay" gap: `background.margin` and `background.padding` should become `VALUE_STEP` rows (px, Ctrl for x10) in this phase so a Windows user never needs YAML for a credits card. They are not text fields.
 
 Changelog once colours (and margin/padding if included) are in the panel. Update the architecture principle so overlay copy **and** colours are session-owned.
+
+Each step below lands with tests and leaves the tree green.
+
+**3.1 Validation error line in the text modal.** The text modal currently has no mechanism to reject a Confirm and show an error. Add a one-line error display.
+
+- `TextModalState` gains `error: str | None = None`.
+- On Confirm, the caller's `on_confirm` currently receives the draft directly. Add an optional `validate: Callable[[str], str | None]` parameter to `prompt_text`. When present, Confirm calls `validate(draft)` first. If it returns a non-None string (the error message), set `error` on `TextModalState` and stay open (do not dismiss). If it returns None, proceed as today.
+- Draw: when `error` is set, show it below the field in `HIGHLIGHT` (notification yellow). Clear `error` on the next `TEXTINPUT` or Backspace (any draft mutation) so stale errors disappear as the user types.
+- Enter (from edit or Confirm) runs `validate` first. On failure stay in the field in edit mode with the caret active so the user can correct immediately. On success, Enter from edit still highlights Confirm; Enter on Confirm dismisses.
+- `view_state()` exposes the error string so `modal_overlay.py` draw stays a pure function.
+
+Tests: Confirm with a failing validator keeps the dialog open, stays in the field, and shows a caret; draft edit clears the error; Confirm with a passing validator dismisses; Confirm with no validator still works as before (backward compatible).
+
+**3.2 Hex-colour validation helper.** A thin wrapper around `parse_hex_colour` that returns the error string (or None) and the parsed tuple, suitable for the `validate` parameter.
+
+- `cleave/viz/colour_parse.py` (new, small module):
+  - `validate_hex_colour(draft: str) -> str | None` -- returns None on success, or a user-facing message like `"invalid hex colour (use #rgb or #rrggbb)"` on failure.
+  - `validate_optional_hex_colour(draft: str) -> str | None` -- same, but also accepts an empty string (maps to `None` colour).
+  - `parse_hex_colour_or_none(draft: str) -> tuple[int, int, int] | None` -- returns the tuple or None for an empty string; raises on bad input (callers already validated).
+
+Tests in `tests/cleave/viz/test_colour_parse.py`: `#fff` ok, `#aabbcc` ok, `#gg0000` error, empty string ok for optional / error for required, missing `#` error.
+
+**3.3 Session fields for all six colours.** No UI rows yet.
+
+Add to `RenderOverlayCardRuntime`:
+- `title_colour: tuple[int, int, int]` (default `DEFAULT_RENDER_OVERLAY_TEXT_COLOUR`)
+- `title_background_colour: tuple[int, int, int] | None` (default `None`)
+- `body_colour: tuple[int, int, int]` (default `DEFAULT_RENDER_OVERLAY_TEXT_COLOUR`)
+- `body_background_colour: tuple[int, int, int] | None` (default `None`)
+- `background_colour: tuple[int, int, int]` (default `DEFAULT_RENDER_OVERLAY_BACKGROUND_COLOUR`)
+- `border_colour: tuple[int, int, int]` (default `DEFAULT_RENDER_OVERLAY_BORDER_COLOUR`)
+
+Touchpoints:
+- `default_render_overlay_card_runtime_values` adds the six keys.
+- `_card_runtime_from_cfg` reads the colour values from cfg: `card.title.colour`, `card.title.background_colour`, `card.body.colour`, `card.body.background_colour`, `card.background.colour`, `card.background.border.colour`.
+- `build_live_overlay_config` in [render_overlay.py](../cleave/viz/render_overlay.py) replaces the six `base.*` colour reads with `runtime.*` reads.
+- `_overlay_card_persist_values` writes `runtime.title_colour` (etc.) instead of `base_card.title.colour` (etc.). The `base_card` parameter can be dropped entirely once all six colours and margin/padding are session-owned (step 3.6).
+- Setters on `RenderOverlayCardControls`: `set_title_colour`, `set_title_background_colour`, `set_body_colour`, `set_body_background_colour`, `set_background_colour`, `set_border_colour`. Each takes a `tuple[int, int, int]` (or `| None` for the optional ones).
+
+Tests: session round-trip, persist payload includes the colours, `build_live_overlay_config` uses runtime colours, mutating a colour dirties save. Update [test_render_overlay.py](../tests/cleave/viz/test_render_overlay.py) merge assertions that currently check `base.title.colour` pass-through.
+
+**3.4 First colour row (title colour).** Prove the full pattern end to end before adding the remaining five.
+
+- `RowKind.RENDER_OVERLAY_CARD_TITLE_COLOUR`.
+- `RowSpec`: `ACTION`, `LABELED_VALUE`, `shows_enter_icon=True`, `blocked_by_section_lock=True`, `parent_group="render_overlay_title"`.
+- `format_value`: `rgb_to_hex(runtime.title_colour)`.
+- `apply_action`: check section lock, then call `prompt_text` with `cta="Change colour (#rgb or #rrggbb)..."`, `single_line=True`, `initial=rgb_to_hex(current)`, `validate=validate_hex_colour`. On confirm, parse and call `set_title_colour`.
+- Section placement: child of the title expand section in `_build_render_overlay_card_section`, after title text (before font).
+- Help: `help_entries=(("Enter", "edit colour"),)`.
+
+Tests: row present under title, Enter opens TEXT modal, Confirm with `#ff0000` updates session, Confirm with `bad` stays open (error shown), Cancel does not change, section lock blocks Enter.
+
+**3.5 Remaining five colour rows.** Same pattern as 3.4, one `RowKind` per colour.
+
+| RowKind | Parent group | Placement |
+| --- | --- | --- |
+| `RENDER_OVERLAY_CARD_TITLE_BACKGROUND_COLOUR` | `render_overlay_title` | after title colour |
+| `RENDER_OVERLAY_CARD_BODY_COLOUR` | `render_overlay_body` | after body text |
+| `RENDER_OVERLAY_CARD_BODY_BACKGROUND_COLOUR` | `render_overlay_body` | after body colour |
+| `RENDER_OVERLAY_CARD_BACKGROUND_COLOUR` | `render_overlay` | after opacity (beside it semantically) |
+| `RENDER_OVERLAY_CARD_BORDER_COLOUR` | `render_overlay` | after border width (beside it semantically) |
+
+Optional colours (`title_background_colour`, `body_background_colour`) use `validate_optional_hex_colour`; the row value shows `none` when `None` and the hex string otherwise. Empty-string Confirm clears the colour.
+
+Format helpers and apply-action functions follow the title-colour template. One `_apply_overlay_card_colour_action` helper can be shared with a field-name parameter to reduce boilerplate.
+
+Tests: one test per row for presence and Confirm/Cancel; optional rows also test empty-string -> None.
+
+**3.6 Margin and padding VALUE_STEP rows.** These are not text fields but close the last YAML-only gap.
+
+- `RowKind.RENDER_OVERLAY_CARD_BACKGROUND_MARGIN`, `RowKind.RENDER_OVERLAY_CARD_BACKGROUND_PADDING`.
+- Session fields: `background_margin: int` and `background_padding: int` on `RenderOverlayCardRuntime`, defaults from `DEFAULT_RENDER_OVERLAY_BACKGROUND_MARGIN` / `DEFAULT_RENDER_OVERLAY_BACKGROUND_PADDING`.
+- Load from cfg in `_card_runtime_from_cfg`: `card.background.margin`, `card.background.padding`.
+- `build_live_overlay_config` reads `runtime.background_margin` / `runtime.background_padding` instead of `base.background.margin` / `base.background.padding`.
+- `_overlay_card_persist_values` writes the runtime values. The `base_card` parameter can now be removed from `_overlay_card_persist_values` since every field is session-owned.
+- Setters: `set_background_margin(margin: int)` and `set_background_padding(padding: int)` on `RenderOverlayCardControls`, clamped to `max(0, value)`.
+- `RowSpec`: `VALUE_STEP`, `LABELED_VALUE`, `repeatable=True`, Ctrl for x10 step, `parent_group="render_overlay"`.
+- Placement: margin after background colour; padding after margin.
+- Help: standard Left/Right + Ctrl description.
+
+Tests: row presence, Left/Right mutates, persist, `build_live_overlay_config` reads runtime.
+
+After 3.6, `_overlay_card_persist_values` no longer needs `base_card`. Remove the parameter and the `render_overlays_base` call in `overlays_persist_values`.
+
+**3.7 Architecture, changelog, cleanup.**
+
+- [architecture-principles.mdc](../.cursor/rules/architecture-principles.mdc): replace "overlay card colours remain on config" with a statement that overlay card copy, colours, margin, and padding are all session-owned.
+- [CHANGELOG.md](../CHANGELOG.md): one Unreleased Added bullet: "Credits card colours, margin, and padding editable in the panel".
+- Confirm `build_live_overlay_config` no longer reads any field from `base` except those that are truly immutable (none remain after 3.6; the function should take only `runtime` or keep `base` as dead code guard).
+- Run full test suite to confirm no regressions.
 
 ---
 
@@ -225,7 +316,19 @@ Phase 1.1-1.3: host and draw only; no `RowKind`.
 
 Phase 1.4: persist and live merge; no modal.
 
-Phase 1.5 / 2 / 3: row presence, Enter opens TEXT, Confirm vs Cancel, section lock, dirty flag, Save payload.
+Phase 1.5 / 2: row presence, Enter opens TEXT, Confirm vs Cancel, section lock, dirty flag, Save payload.
+
+Phase 3.1: validate callback on text modal; error display and clear on edit.
+
+Phase 3.2: `test_colour_parse.py` for `validate_hex_colour`, `validate_optional_hex_colour`, and `parse_hex_colour_or_none`.
+
+Phase 3.3: session round-trip for all six colour fields; persist payload includes colours; `build_live_overlay_config` uses runtime colours; mutating a colour dirties save. Update existing merge assertions in `test_render_overlay.py`.
+
+Phase 3.4: title-colour row presence, Enter opens TEXT modal, Confirm with valid hex updates session, Confirm with invalid hex stays open (error set), Cancel does not change, section lock blocks.
+
+Phase 3.5: one test per remaining colour row for presence and Confirm/Cancel; optional rows also test empty string -> None.
+
+Phase 3.6: margin/padding row presence, Left/Right mutates session, persist payload, `build_live_overlay_config` reads runtime values.
 
 Do not launch the editor for routine checks.
 

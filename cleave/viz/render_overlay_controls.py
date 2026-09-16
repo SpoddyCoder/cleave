@@ -113,6 +113,40 @@ class RenderOverlayCardControls:
     def set_title_margin_bottom(self, margin: int) -> None:
         self._card().title_margin_bottom = max(0, margin)
 
+    def set_title_content(self, content: str) -> None:
+        self._card().title_content = content
+
+    def set_title_colour(self, colour: tuple[int, int, int]) -> None:
+        self._card().title_colour = colour
+
+    def set_title_background_colour(
+        self, colour: tuple[int, int, int] | None
+    ) -> None:
+        self._card().title_background_colour = colour
+
+    def set_body_content(self, content: str) -> None:
+        self._card().body_content = content
+
+    def set_body_colour(self, colour: tuple[int, int, int]) -> None:
+        self._card().body_colour = colour
+
+    def set_body_background_colour(
+        self, colour: tuple[int, int, int] | None
+    ) -> None:
+        self._card().body_background_colour = colour
+
+    def set_background_colour(self, colour: tuple[int, int, int]) -> None:
+        self._card().background_colour = colour
+
+    def set_background_margin(self, margin: int) -> None:
+        self._card().background_margin = max(0, margin)
+
+    def set_background_padding(self, padding: int) -> None:
+        self._card().background_padding = max(0, padding)
+
+    def set_border_colour(self, colour: tuple[int, int, int]) -> None:
+        self._card().border_colour = colour
+
     def set_body_font_size(self, size: int) -> None:
         self._card().body_font_size = max(1, size)
 

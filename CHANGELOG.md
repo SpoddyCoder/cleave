@@ -9,6 +9,10 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 
+- Credits card title text row under each card's title section in the panel. Enter opens a text dialog; Confirm updates the title; Save persists it. Section lock blocks editing.
+- Credits card body text row under each card's body section in the panel. Enter opens a text dialog; Confirm updates the body; Save persists it. Section lock blocks editing.
+- Credits card colours, background margin, and padding in the panel. Colour rows open a hex dialog; Confirm updates the colour; Save persists it. Empty Confirm clears optional backgrounds. Margin and padding are px value rows (Ctrl for x10). Section lock blocks editing.
+
 - Settings > UI: notification time (until dismissed, or 1-20s). Enter dismisses a toast before it times out.
 
 - Pattern mask: `bars` type (horizontal strips with 1D-cut transitions).
@@ -31,6 +35,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- Text dialog hint is `Press Enter to confirm or ESC to cancel`. Enter while typing highlights Confirm; Esc discards the typed draft without closing. Invalid input shows a yellow error under the field and keeps the caret in the input.
+- Overlay colour dialog CTA includes the accepted hex formats: `Change colour (#rgb or #rrggbb)...`.
 - Blank row under Settings on the live overlay; Project sits just above the transport icons.
 - New-install defaults: preview quality `full-quality`, UI width mode `fixed`, max width 140, notification time 10s, and ProjectM default beat sensitivity 1.0. Existing user config and `project.yaml` files keep their saved values.
 - Default editor window size is 1920x1080 (user config; restart to apply). Existing user config files keep their saved size.
@@ -46,6 +52,9 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- Text dialog Up/Down while editing move the caret between lines instead of jumping to the start of the current line.
+
+- Text dialog caret stays visible at the end of a long single-line draft when the panel grows past its minimum width.
 - Settings > UI notification time now hides toasts after the chosen duration, including when you change the value while a toast is showing. Enter dismisses the toast before the timer elapses.
 - Opening Timeline > timeline cuts no longer crashes (`hard_cut_enabled_display` was missing from the cuts row formatters).
 - Panel Render and `cleave render` at a non-16:9 output no longer stretch opening and closing cards (encode canvas matches output size). Editor export writes the session snapshot in the project directory so presets and `project.yaml` match CLI render.

@@ -433,6 +433,44 @@ def test_render_overlay_sub_header_help_expand_collapse() -> None:
         assert "adjust value" not in entries.values()
 
 
+def test_render_overlay_title_text_help() -> None:
+    section = _keyboard_section(sections_for(RowKind.RENDER_OVERLAY_CARD_TITLE_TEXT))
+    assert dict(section.entries)["Enter"] == "edit title"
+
+
+def test_render_overlay_title_colour_help() -> None:
+    section = _keyboard_section(sections_for(RowKind.RENDER_OVERLAY_CARD_TITLE_COLOUR))
+    assert dict(section.entries)["Enter"] == "edit colour"
+
+
+def test_render_overlay_remaining_colour_rows_help() -> None:
+    for kind in (
+        RowKind.RENDER_OVERLAY_CARD_TITLE_BACKGROUND_COLOUR,
+        RowKind.RENDER_OVERLAY_CARD_BODY_COLOUR,
+        RowKind.RENDER_OVERLAY_CARD_BODY_BACKGROUND_COLOUR,
+        RowKind.RENDER_OVERLAY_CARD_BACKGROUND_COLOUR,
+        RowKind.RENDER_OVERLAY_CARD_BORDER_COLOUR,
+    ):
+        section = _keyboard_section(sections_for(kind))
+        assert dict(section.entries)["Enter"] == "edit colour"
+
+
+def test_render_overlay_background_margin_and_padding_help() -> None:
+    for kind in (
+        RowKind.RENDER_OVERLAY_CARD_BACKGROUND_MARGIN,
+        RowKind.RENDER_OVERLAY_CARD_BACKGROUND_PADDING,
+    ):
+        section = _keyboard_section(sections_for(kind))
+        entries = dict(section.entries)
+        assert entries["Left/Right"] == "adjust value"
+        assert entries["Ctrl + Left/Right"] == "large step"
+
+
+def test_render_overlay_body_text_help() -> None:
+    section = _keyboard_section(sections_for(RowKind.RENDER_OVERLAY_CARD_BODY_TEXT))
+    assert dict(section.entries)["Enter"] == "edit body"
+
+
 def test_layer_management_add_help() -> None:
     section = _keyboard_section(sections_for(RowKind.LAYER_MANAGEMENT_ADD))
     assert section.title == KEYBOARD_CONTROLS_SECTION_TITLE
