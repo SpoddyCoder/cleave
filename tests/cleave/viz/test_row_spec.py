@@ -102,6 +102,8 @@ _EXPECTED_REPEAT_ROW_KINDS = frozenset(
         RowKind.RENDER_OVERLAY_CARD_BODY_FONT_SIZE,
         RowKind.RENDER_OVERLAY_CARD_BODY_FONT,
         RowKind.RENDER_OVERLAY_CARD_OPACITY,
+        RowKind.RENDER_OVERLAY_CARD_BACKGROUND_MARGIN,
+        RowKind.RENDER_OVERLAY_CARD_BACKGROUND_PADDING,
         RowKind.RENDER_OVERLAY_CARD_BORDER_WIDTH,
         RowKind.RENDER_OVERLAY_CARD_TIME,
         RowKind.RENDER_OVERLAY_CARD_DISPLAY_TIME,
@@ -278,6 +280,21 @@ def test_render_overlay_remaining_colour_rows_are_locked_actions() -> None:
         assert spec.parent_group == group
 
 
+def test_render_overlay_background_margin_and_padding_are_value_steps() -> None:
+    for kind, label in (
+        (RowKind.RENDER_OVERLAY_CARD_BACKGROUND_MARGIN, "background margin"),
+        (RowKind.RENDER_OVERLAY_CARD_BACKGROUND_PADDING, "background padding"),
+    ):
+        spec = row_spec(kind)
+        assert spec.affordance == RowAffordance.VALUE_STEP
+        assert spec.present_style == RowPresentStyle.LABELED_VALUE
+        assert spec.repeatable is True
+        assert spec.format_value is not None
+        assert spec.apply_horizontal is not None
+        assert spec.panel_label == label
+        assert spec.parent_group == "render_overlay"
+
+
 def test_render_overlay_body_text_is_locked_action() -> None:
     spec = row_spec(RowKind.RENDER_OVERLAY_CARD_BODY_TEXT)
     assert spec.affordance == RowAffordance.ACTION
@@ -330,6 +347,12 @@ def test_parent_group_on_row_specs() -> None:
         "render_overlay_body"
     )
     assert row_spec(RowKind.RENDER_OVERLAY_CARD_BACKGROUND_COLOUR).parent_group == (
+        "render_overlay"
+    )
+    assert row_spec(RowKind.RENDER_OVERLAY_CARD_BACKGROUND_MARGIN).parent_group == (
+        "render_overlay"
+    )
+    assert row_spec(RowKind.RENDER_OVERLAY_CARD_BACKGROUND_PADDING).parent_group == (
         "render_overlay"
     )
     assert row_spec(RowKind.RENDER_OVERLAY_CARD_BORDER_COLOUR).parent_group == (
@@ -486,6 +509,12 @@ def test_render_value_children_blocked_by_section_lock() -> None:
     ) is True
     assert row_blocked_by_section_lock(
         RowKind.RENDER_OVERLAY_CARD_BACKGROUND_COLOUR
+    ) is True
+    assert row_blocked_by_section_lock(
+        RowKind.RENDER_OVERLAY_CARD_BACKGROUND_MARGIN
+    ) is True
+    assert row_blocked_by_section_lock(
+        RowKind.RENDER_OVERLAY_CARD_BACKGROUND_PADDING
     ) is True
     assert row_blocked_by_section_lock(RowKind.RENDER_OVERLAY_CARD_BORDER_COLOUR) is True
     assert row_blocked_by_section_lock(RowKind.RENDER_POST_FX_FADE_IN) is True
@@ -693,6 +722,8 @@ def test_format_row_value_track_and_render() -> None:
                 body_background_colour=None,
                 background_colour=(1, 2, 3),
                 border_colour=(4, 5, 6),
+                background_margin=40,
+                background_padding=20,
             ),
         ),
         render_post_fx=RenderPostFxBlock(fade_in=2.5, fade_out=3.0),
@@ -747,6 +778,18 @@ def test_format_row_value_track_and_render() -> None:
         state,
         RowDescriptor(RowKind.RENDER_OVERLAY_CARD_BORDER_COLOUR, card="opening_card"),
     ) == "#040506"
+    assert format_row_value(
+        state,
+        RowDescriptor(
+            RowKind.RENDER_OVERLAY_CARD_BACKGROUND_MARGIN, card="opening_card"
+        ),
+    ) == "40px"
+    assert format_row_value(
+        state,
+        RowDescriptor(
+            RowKind.RENDER_OVERLAY_CARD_BACKGROUND_PADDING, card="opening_card"
+        ),
+    ) == "20px"
     assert (
         format_row_value(
             state,
@@ -839,6 +882,39 @@ def test_apply_field_horizontal_render_overlay_opacity() -> None:
 
     assert apply_field_horizontal(controls, desc, True, False) is True
     assert controls.session.render_overlays.opening_card.opacity_pct == before + 1
+
+
+def test_apply_field_horizontal_render_overlay_background_margin() -> None:
+    controls = _make_controls()
+    desc = RowDescriptor(
+        RowKind.RENDER_OVERLAY_CARD_BACKGROUND_MARGIN, card="opening_card"
+    )
+    before = controls.session.render_overlays.opening_card.background_margin
+
+    assert apply_field_horizontal(controls, desc, True, False) is True
+    assert (
+        controls.session.render_overlays.opening_card.background_margin == before + 1
+    )
+    assert apply_field_horizontal(controls, desc, True, True) is True
+    assert (
+        controls.session.render_overlays.opening_card.background_margin == before + 11
+    )
+    controls.session.render_overlays.opening_card.background_margin = 0
+    assert apply_field_horizontal(controls, desc, False, False) is True
+    assert controls.session.render_overlays.opening_card.background_margin == 0
+
+
+def test_apply_field_horizontal_render_overlay_background_padding() -> None:
+    controls = _make_controls()
+    desc = RowDescriptor(
+        RowKind.RENDER_OVERLAY_CARD_BACKGROUND_PADDING, card="opening_card"
+    )
+    before = controls.session.render_overlays.opening_card.background_padding
+
+    assert apply_field_horizontal(controls, desc, True, False) is True
+    assert (
+        controls.session.render_overlays.opening_card.background_padding == before + 1
+    )
 
 
 def test_overlay_cards_share_kinds_and_isolate_runtime() -> None:

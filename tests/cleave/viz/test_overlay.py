@@ -1486,6 +1486,8 @@ def test_render_overlay_row_layout_includes_header_and_sub_rows_when_expanded() 
     assert RowKind.RENDER_OVERLAY_CARD_BODY_HEADER in kinds
     assert RowKind.RENDER_OVERLAY_CARD_OPACITY in kinds
     assert RowKind.RENDER_OVERLAY_CARD_BACKGROUND_COLOUR in kinds
+    assert RowKind.RENDER_OVERLAY_CARD_BACKGROUND_MARGIN in kinds
+    assert RowKind.RENDER_OVERLAY_CARD_BACKGROUND_PADDING in kinds
     assert RowKind.RENDER_OVERLAY_CARD_BORDER_WIDTH in kinds
     assert RowKind.RENDER_OVERLAY_CARD_BORDER_COLOUR in kinds
     assert RowKind.RENDER_OVERLAY_CARD_TIME not in kinds

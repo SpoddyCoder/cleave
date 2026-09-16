@@ -138,6 +138,12 @@ class RenderOverlayCardControls:
     def set_background_colour(self, colour: tuple[int, int, int]) -> None:
         self._card().background_colour = colour
 
+    def set_background_margin(self, margin: int) -> None:
+        self._card().background_margin = max(0, margin)
+
+    def set_background_padding(self, padding: int) -> None:
+        self._card().background_padding = max(0, padding)
+
     def set_border_colour(self, colour: tuple[int, int, int]) -> None:
         self._card().border_colour = colour
 

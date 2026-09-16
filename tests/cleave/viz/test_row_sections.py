@@ -346,6 +346,8 @@ def test_render_overlay_section_kinds_from_tree() -> None:
         RENDER_OVERLAY_SECTION_KINDS
     )
     assert RowKind.RENDER_OVERLAY_CARD_BACKGROUND_COLOUR in RENDER_OVERLAY_SECTION_KINDS
+    assert RowKind.RENDER_OVERLAY_CARD_BACKGROUND_MARGIN in RENDER_OVERLAY_SECTION_KINDS
+    assert RowKind.RENDER_OVERLAY_CARD_BACKGROUND_PADDING in RENDER_OVERLAY_SECTION_KINDS
     assert RowKind.RENDER_OVERLAY_CARD_BORDER_COLOUR in RENDER_OVERLAY_SECTION_KINDS
 
 
@@ -385,9 +387,11 @@ def test_render_overlay_card_colours_follow_opacity_and_border() -> None:
     ]
     opacity = leaf_kinds.index(RowKind.RENDER_OVERLAY_CARD_OPACITY)
     background = leaf_kinds.index(RowKind.RENDER_OVERLAY_CARD_BACKGROUND_COLOUR)
+    margin = leaf_kinds.index(RowKind.RENDER_OVERLAY_CARD_BACKGROUND_MARGIN)
+    padding = leaf_kinds.index(RowKind.RENDER_OVERLAY_CARD_BACKGROUND_PADDING)
     border_width = leaf_kinds.index(RowKind.RENDER_OVERLAY_CARD_BORDER_WIDTH)
     border_colour = leaf_kinds.index(RowKind.RENDER_OVERLAY_CARD_BORDER_COLOUR)
-    assert opacity < background < border_width < border_colour
+    assert opacity < background < margin < padding < border_width < border_colour
 
 
 def test_render_overlay_body_text_is_first_body_child() -> None:

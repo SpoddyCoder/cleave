@@ -1230,6 +1230,64 @@ def test_render_overlay_font_rows_nested_indent() -> None:
     assert _row_indent(view, border_colour) == TREE_INDENT * 2
 
 
+def test_render_overlay_background_margin_and_padding_placement() -> None:
+    controls = _make_controls()
+    controls.session.render_overlays.expanded = True
+    controls.session.render_overlays.opening_card.expanded = True
+    view = controls.build_view_state(paused=False)
+    colour = view.layout.find_by_kind(
+        RowKind.RENDER_OVERLAY_CARD_BACKGROUND_COLOUR, card="opening_card"
+    )
+    margin = view.layout.find_by_kind(
+        RowKind.RENDER_OVERLAY_CARD_BACKGROUND_MARGIN, card="opening_card"
+    )
+    padding = view.layout.find_by_kind(
+        RowKind.RENDER_OVERLAY_CARD_BACKGROUND_PADDING, card="opening_card"
+    )
+    border_width = view.layout.find_by_kind(
+        RowKind.RENDER_OVERLAY_CARD_BORDER_WIDTH, card="opening_card"
+    )
+    assert colour < margin < padding < border_width
+    assert _row_indent(view, margin) == TREE_INDENT * 2
+    assert _row_indent(view, padding) == TREE_INDENT * 2
+
+
+def test_render_overlay_background_margin_row() -> None:
+    controls = _make_controls()
+    controls.session.render_overlays.expanded = True
+    controls.session.render_overlays.opening_card.expanded = True
+    controls.session.render_overlays.opening_card.background_margin = 40
+    view = controls.build_view_state(paused=False)
+    margin_row = view.layout.find_by_kind(
+        RowKind.RENDER_OVERLAY_CARD_BACKGROUND_MARGIN
+    )
+    assert _row_text(view, margin_row) == "  └─ background margin: 40px"
+
+    controls.focus_descriptor = _desc(view, margin_row)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.session.render_overlays.opening_card.background_margin == 41
+    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    assert controls.session.render_overlays.opening_card.background_margin == 31
+
+
+def test_render_overlay_background_padding_row() -> None:
+    controls = _make_controls()
+    controls.session.render_overlays.expanded = True
+    controls.session.render_overlays.opening_card.expanded = True
+    controls.session.render_overlays.opening_card.background_padding = 20
+    view = controls.build_view_state(paused=False)
+    padding_row = view.layout.find_by_kind(
+        RowKind.RENDER_OVERLAY_CARD_BACKGROUND_PADDING
+    )
+    assert _row_text(view, padding_row) == "  └─ background padding: 20px"
+
+    controls.focus_descriptor = _desc(view, padding_row)
+    controls.handle_keydown(_keydown(pygame.K_LEFT))
+    assert controls.session.render_overlays.opening_card.background_padding == 19
+    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+    assert controls.session.render_overlays.opening_card.background_padding == 29
+
+
 def _expand_overlay_card_title(controls: TuningControls, card: str) -> None:
     overlays = controls.session.render_overlays
     overlays.expanded = True
@@ -1722,7 +1780,7 @@ def test_render_overlay_background_colour_row_present_and_confirm_cancel() -> No
         field="background_colour",
         expand="card",
         after_kind=RowKind.RENDER_OVERLAY_CARD_OPACITY,
-        before_kind=RowKind.RENDER_OVERLAY_CARD_BORDER_WIDTH,
+        before_kind=RowKind.RENDER_OVERLAY_CARD_BACKGROUND_MARGIN,
         label="background colour",
         nested=False,
     )

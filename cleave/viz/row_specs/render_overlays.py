@@ -130,6 +130,16 @@ def _format_overlay_card_background_colour(
 ) -> str:
     return _format_overlay_card_colour(state, desc, "background_colour")
 
+def _format_overlay_card_background_margin(
+    state: TuningViewState, desc: RowDescriptor
+) -> str:
+    return f"{_overlay_card_block(state, desc).runtime.background_margin}px"
+
+def _format_overlay_card_background_padding(
+    state: TuningViewState, desc: RowDescriptor
+) -> str:
+    return f"{_overlay_card_block(state, desc).runtime.background_padding}px"
+
 def _format_overlay_card_border_colour(
     state: TuningViewState, desc: RowDescriptor
 ) -> str:
@@ -353,6 +363,34 @@ def _apply_overlay_card_background_colour_action(
     desc: RowDescriptor,
 ) -> None:
     _apply_overlay_card_colour_action(controls, desc, field="background_colour")
+
+def _apply_overlay_card_background_margin(
+    controls: TuningControls,
+    desc: RowDescriptor,
+    forward: bool,
+    ctrl: bool,
+    _shift: bool,
+) -> None:
+    step = 10 if ctrl else 1
+    delta = step if forward else -step
+    card = _overlay_card_block_session(controls, desc)
+    _overlay_card_controls(controls, desc).set_background_margin(
+        card.background_margin + delta
+    )
+
+def _apply_overlay_card_background_padding(
+    controls: TuningControls,
+    desc: RowDescriptor,
+    forward: bool,
+    ctrl: bool,
+    _shift: bool,
+) -> None:
+    step = 10 if ctrl else 1
+    delta = step if forward else -step
+    card = _overlay_card_block_session(controls, desc)
+    _overlay_card_controls(controls, desc).set_background_padding(
+        card.background_padding + delta
+    )
 
 def _apply_overlay_card_border_colour_action(
     controls: TuningControls,
@@ -736,6 +774,32 @@ SPECS: dict[RowKind, RowSpec] = {
         help_description=("Hex colour of this credits card box.",),
         parent_group="render_overlay",
         blocked_by_section_lock=True,
+    ),
+    RowKind.RENDER_OVERLAY_CARD_BACKGROUND_MARGIN: RowSpec(
+        affordance=RowAffordance.VALUE_STEP,
+        panel_label="background margin",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_overlay_card_background_margin,
+        apply_horizontal=_apply_overlay_card_background_margin,
+        help_title="Background margin",
+        help_description=(
+            "Gap between this credits card box and the screen edge.",
+        ),
+        repeatable=True,
+        parent_group="render_overlay",
+    ),
+    RowKind.RENDER_OVERLAY_CARD_BACKGROUND_PADDING: RowSpec(
+        affordance=RowAffordance.VALUE_STEP,
+        panel_label="background padding",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_overlay_card_background_padding,
+        apply_horizontal=_apply_overlay_card_background_padding,
+        help_title="Background padding",
+        help_description=(
+            "Inner space between this credits card border and its text.",
+        ),
+        repeatable=True,
+        parent_group="render_overlay",
     ),
     RowKind.RENDER_OVERLAY_CARD_BORDER_WIDTH: RowSpec(
         affordance=RowAffordance.VALUE_STEP,

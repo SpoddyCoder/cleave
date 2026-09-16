@@ -231,6 +231,24 @@ def _mutate_render_overlay_border_width(controls: TuningControls) -> None:
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
+def _mutate_render_overlay_background_margin(controls: TuningControls) -> None:
+    _expand_render_overlay(controls)
+    view = controls.build_view_state(paused=False)
+    controls.focus_descriptor = RowDescriptor(
+        RowKind.RENDER_OVERLAY_CARD_BACKGROUND_MARGIN, card="opening_card"
+    )
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
+def _mutate_render_overlay_background_padding(controls: TuningControls) -> None:
+    _expand_render_overlay(controls)
+    view = controls.build_view_state(paused=False)
+    controls.focus_descriptor = RowDescriptor(
+        RowKind.RENDER_OVERLAY_CARD_BACKGROUND_PADDING, card="opening_card"
+    )
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
 def _mutate_render_overlay_start_delay(controls: TuningControls) -> None:
     _expand_render_overlay(controls)
     controls.session.render_overlays.opening_card.animation_expanded = True
@@ -469,6 +487,8 @@ _PERSISTED_MUTATIONS: list[
     ("render_overlay.body_font_size", _mutate_render_overlay_body_font_size, ("layer_1",), {}),
     ("render_overlay.opacity_pct", _mutate_render_overlay_opacity, ("layer_1",), {}),
     ("render_overlay.border_width", _mutate_render_overlay_border_width, ("layer_1",), {}),
+    ("render_overlay.background_margin", _mutate_render_overlay_background_margin, ("layer_1",), {}),
+    ("render_overlay.background_padding", _mutate_render_overlay_background_padding, ("layer_1",), {}),
     ("render_overlay.animation.appear_at", _mutate_render_overlay_start_delay, ("layer_1",), {}),
     ("render_overlay.animation.display_time", _mutate_render_overlay_display_time, ("layer_1",), {}),
     ("render_post_fx.enabled", _mutate_render_post_fx_enabled, ("layer_1",), {}),
