@@ -152,7 +152,7 @@ def build_live_overlay_config(
             margin_bottom=runtime.title_margin_bottom,
         ),
         body=RenderOverlayTextBlockConfig(
-            content=base.body.content,
+            content=runtime.body_content,
             font=runtime.body_font,
             font_size=runtime.body_font_size,
             colour=base.body.colour,

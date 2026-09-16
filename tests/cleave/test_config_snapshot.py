@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import tempfile
+from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -60,7 +61,6 @@ from cleave.timeline import SlotCue, TimelineLane
 from cleave.viz.session import (
     LayerRuntime,
     RenderOverlayAnimationRuntime,
-    RenderOverlayCardRuntime,
     RenderOverlayClosingAnimationRuntime,
     RenderOverlaysRuntime,
     TuningSession,
@@ -818,12 +818,10 @@ def _snapshot_fixture(tmp_path: Path) -> tuple[CleaveConfig, TuningSession, Path
             post_fx=default_render_post_fx_config(enabled=True, fade_in=30.0, fade_out=4.0),
         ),
     )
-    opening = RenderOverlayCardRuntime(
+    opening = replace(
+        default_render_overlay_card_runtime(),
         enabled=True,
-        expanded=False,
         position="top-right",
-        title_expanded=False,
-        body_expanded=False,
         title_font_size=14,
         title_font="dejavusans",
         title_margin_bottom=6,
@@ -832,6 +830,7 @@ def _snapshot_fixture(tmp_path: Path) -> tuple[CleaveConfig, TuningSession, Path
         opacity_pct=75,
         border_width=4,
         title_content="My Title",
+        body_content="Line one\nLine two",
         animation=RenderOverlayAnimationRuntime(
             type="fade",
             slide_direction="left",

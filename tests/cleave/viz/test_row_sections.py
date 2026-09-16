@@ -6,6 +6,7 @@ from cleave.effects.registry import effect_roster
 from cleave.viz.row_layout import row_draw_visible
 from cleave.viz.row_sections import (
     RENDER_OVERLAYS_SECTION,
+    RENDER_OVERLAY_OPENING_CARD_SECTION,
     RENDER_OVERLAY_SECTION_KINDS,
     RENDER_POST_FX_SECTION,
     append_track_section_rows,
@@ -329,3 +330,14 @@ def test_render_overlay_section_kinds_from_tree() -> None:
     assert RowKind.RENDER_OVERLAY_CARD_TITLE_FONT in RENDER_OVERLAY_SECTION_KINDS
     assert RowKind.RENDER_OVERLAY_CARD_TITLE_TEXT in RENDER_OVERLAY_SECTION_KINDS
     assert RowKind.RENDER_OVERLAY_CARD_BODY_FONT in RENDER_OVERLAY_SECTION_KINDS
+    assert RowKind.RENDER_OVERLAY_CARD_BODY_TEXT in RENDER_OVERLAY_SECTION_KINDS
+
+
+def test_render_overlay_body_text_is_first_body_child() -> None:
+    body_section = next(
+        node.expand
+        for node in RENDER_OVERLAY_OPENING_CARD_SECTION.children
+        if node.expand is not None
+        and node.expand.header_kind == RowKind.RENDER_OVERLAY_CARD_BODY_HEADER
+    )
+    assert body_section.children[0].leaf_kind == RowKind.RENDER_OVERLAY_CARD_BODY_TEXT

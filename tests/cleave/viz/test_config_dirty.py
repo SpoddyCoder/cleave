@@ -185,6 +185,10 @@ def _mutate_render_overlay_title_content(controls: TuningControls) -> None:
     controls.render_overlays.opening_card.set_title_content("Custom overlay title")
 
 
+def _mutate_render_overlay_body_content(controls: TuningControls) -> None:
+    controls.render_overlays.opening_card.set_body_content("Custom overlay body")
+
+
 def _mutate_render_overlay_body_font_size(controls: TuningControls) -> None:
     _expand_render_overlay(controls)
     controls.session.render_overlays.opening_card.body_expanded = True
@@ -455,6 +459,7 @@ _PERSISTED_MUTATIONS: list[
     ("render_overlay.position", _mutate_render_overlay_position, ("layer_1",), {}),
     ("render_overlay.title_font_size", _mutate_render_overlay_title_font_size, ("layer_1",), {}),
     ("render_overlay.title_content", _mutate_render_overlay_title_content, ("layer_1",), {}),
+    ("render_overlay.body_content", _mutate_render_overlay_body_content, ("layer_1",), {}),
     ("render_overlay.title_margin_bottom", _mutate_render_overlay_title_margin_bottom, ("layer_1",), {}),
     ("render_overlay.body_font_size", _mutate_render_overlay_body_font_size, ("layer_1",), {}),
     ("render_overlay.opacity_pct", _mutate_render_overlay_opacity, ("layer_1",), {}),

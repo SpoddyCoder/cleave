@@ -7,10 +7,12 @@ from dataclasses import dataclass
 import pygame
 
 from cleave.viz.modal import (
+    ModalHost,
     ModalKind,
     ModalLabeledLine,
     ModalViewState,
     TextFocusRegion,
+    caret_line_column,
 )
 from cleave.viz.overlay_primitives import draw_panel_border, overlay_panel_surface
 from cleave.viz.text_fit import wrap_text_to_width
@@ -59,6 +61,20 @@ def _message_lines(
     return wrap_text_to_width(font, message, _message_max_width(screen_w))
 
 
+def bind_text_field_wrap(
+    host: ModalHost, font: pygame.font.Font, screen_w: int
+) -> None:
+    """Give the host the same wrap field draw uses (content width cap)."""
+
+    def wrap_draft(draft: str) -> list[str]:
+        if not draft:
+            return [""]
+        lines = _message_lines(font, draft, screen_w=screen_w)
+        return lines if lines else [""]
+
+    host.set_text_field_wrap(wrap_draft)
+
+
 def draw(
     surface: pygame.Surface,
     state: ModalViewState,
@@ -66,6 +82,7 @@ def draw(
     font: pygame.font.Font,
     line_gap: int | None = None,
     text_alpha: int = 255,
+    modal_host: ModalHost | None = None,
 ) -> None:
     """Draw a centered modal with full-viewport scrim."""
     if text_alpha < 2:
@@ -79,6 +96,8 @@ def draw(
     surface.blit(scrim, (0, 0))
 
     if state.kind == ModalKind.TEXT:
+        if modal_host is not None:
+            bind_text_field_wrap(modal_host, font, sw)
         panel_w, panel_h = _measure_text_panel(
             font, state, line_gap=line_gap, screen_w=sw, screen_h=sh
         )
@@ -544,76 +563,6 @@ def _visible_field_lines(
     return lines[start : start + max_lines], caret_line - start
 
 
-def _caret_line_column(
-    text: str, lines: list[str], caret_index: int
-) -> tuple[int, int]:
-    """Map caret_index in *text* to (line, column) in wrapped *lines*.
-
-    Hard newlines sit at the end of the preceding visual line. Spaces dropped
-    at wrap points sit at the end of the line before the wrap.
-    """
-    caret_index = max(0, min(caret_index, len(text)))
-    if not lines:
-        return 0, 0
-    if not text:
-        return 0, 0
-
-    src = 0
-    last_i = len(lines) - 1
-    for line_i, line in enumerate(lines):
-        if not line:
-            if caret_index <= src:
-                return line_i, 0
-            if src < len(text) and text[src] == "\n":
-                src += 1
-                continue
-            return line_i, 0
-
-        while (
-            src < len(text)
-            and text[src].isspace()
-            and text[src] != "\n"
-            and not text.startswith(line, src)
-        ):
-            if caret_index == src:
-                return line_i, 0
-            src += 1
-
-        line_start = src
-        if text.startswith(line, src):
-            src += len(line)
-        else:
-            found = text.find(line, src)
-            newline = text.find("\n", src)
-            if found >= 0 and (newline < 0 or found <= newline):
-                line_start = found
-                src = found + len(line)
-            else:
-                src = min(len(text), src + len(line))
-        line_end = src
-
-        if line_start <= caret_index <= line_end:
-            return line_i, caret_index - line_start
-
-        trail = src
-        while (
-            trail < len(text)
-            and text[trail].isspace()
-            and text[trail] != "\n"
-        ):
-            trail += 1
-        if line_end < caret_index < trail:
-            return line_i, len(line)
-
-        src = trail
-        if src < len(text) and text[src] == "\n":
-            if caret_index == src:
-                return line_i, len(line)
-            src += 1
-
-    return last_i, len(lines[last_i])
-
-
 def _single_line_scroll_x(
     font: pygame.font.Font,
     line: str,
@@ -656,7 +605,7 @@ def _measure_text_panel(
     field_w = max((font.size(line)[0] for line in field_lines), default=0)
     field_w += _CARET_WIDTH
     field_w = min(field_w, wrap_w)
-    caret_line, _ = _caret_line_column(
+    caret_line, _ = caret_line_column(
         state.draft if state.draft is not None else "",
         field_lines,
         state.caret_index,
@@ -819,7 +768,7 @@ def _draw_text_panel(
 
     draft = state.draft if state.draft is not None else ""
     field_lines = _text_field_lines(font, state, screen_w=screen_w)
-    caret_line, caret_col = _caret_line_column(draft, field_lines, state.caret_index)
+    caret_line, caret_col = caret_line_column(draft, field_lines, state.caret_index)
     max_field_lines = _text_max_field_lines(
         line_h=line_h,
         line_gap=line_gap,

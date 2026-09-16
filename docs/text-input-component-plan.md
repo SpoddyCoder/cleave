@@ -192,7 +192,7 @@ User-facing: under each card's body section, **body text** opens the same dialog
 - Replace `DEFAULT_RENDER_OVERLAY_BODY` copy that tells the user to edit YAML.
 - Changelog.
 
-If 1.2 shipped a short field, this is when wrap + vertical scroll must be real: default body is three lines, users will add more. Tests: Shift+Enter inserts; Up/Down in edit move between lines; Up/Down in navigate still switch field vs buttons; a long body does not exceed the panel cap.
+If 1.2 shipped a short field, this is when wrap + vertical scroll must be real: default body is two lines, users will add more. Tests: Shift+Enter inserts; Up/Down in edit move between lines; Up/Down in navigate still switch field vs buttons; a long body does not exceed the panel cap.
 
 ### Phase 3 - Remaining YAML-only overlay strings
 

@@ -39,8 +39,8 @@ from cleave.viz.render_overlay import (
 from cleave.config_schema.render.overlays import _overlay_card_persist_values
 from cleave.viz.session import (
     RenderOverlayAnimationRuntime,
-    RenderOverlayCardRuntime,
     _card_runtime_from_cfg,
+    default_render_overlay_card_runtime,
 )
 from cleave.viz.theme import FADE_DURATION_SEC
 
@@ -217,12 +217,10 @@ def test_build_live_overlay_config_overrides_runtime_fields() -> None:
         opacity=0.25,
         border_width=1,
     )
-    runtime = RenderOverlayCardRuntime(
+    runtime = replace(
+        default_render_overlay_card_runtime(),
         enabled=True,
-        expanded=False,
         position="bottom-right",
-        title_expanded=False,
-        body_expanded=False,
         title_font_size=14,
         title_font="dejavusans",
         title_margin_bottom=6,
@@ -231,6 +229,7 @@ def test_build_live_overlay_config_overrides_runtime_fields() -> None:
         opacity_pct=75,
         border_width=4,
         title_content="Live title override",
+        body_content="Live body override",
         animation=RenderOverlayAnimationRuntime(
             type="slide",
             slide_direction="right",
@@ -242,7 +241,8 @@ def test_build_live_overlay_config_overrides_runtime_fields() -> None:
     assert merged.enabled is True
     assert merged.title.content == "Live title override"
     assert merged.title.content != base.title.content
-    assert merged.body.content == base.body.content
+    assert merged.body.content == "Live body override"
+    assert merged.body.content != base.body.content
     assert merged.animation.appear_at == 20.0
     assert merged.animation.display_time == 40.0
     assert merged.animation.type == "slide"
@@ -270,6 +270,13 @@ def test_card_runtime_from_cfg_reads_title_content() -> None:
     assert runtime.title_content == "From YAML"
 
 
+def test_card_runtime_from_cfg_reads_body_content() -> None:
+    base = _overlay_cfg()
+    card = replace(base, body=replace(base.body, content="Body from YAML"))
+    runtime = _card_runtime_from_cfg(card)
+    assert runtime.body_content == "Body from YAML"
+
+
 def test_overlay_card_persist_values_uses_runtime_title_content() -> None:
     base = _overlay_cfg()
     runtime = _card_runtime_from_cfg(base)
@@ -277,6 +284,15 @@ def test_overlay_card_persist_values_uses_runtime_title_content() -> None:
     values = _overlay_card_persist_values(runtime, base)
     assert values["title"]["content"] == "Persisted title"
     assert values["title"]["content"] != base.title.content
+
+
+def test_overlay_card_persist_values_uses_runtime_body_content() -> None:
+    base = _overlay_cfg()
+    runtime = _card_runtime_from_cfg(base)
+    runtime.body_content = "Persisted body"
+    values = _overlay_card_persist_values(runtime, base)
+    assert values["body"]["content"] == "Persisted body"
+    assert values["body"]["content"] != base.body.content
 
 
 def test_panel_position_corners() -> None:

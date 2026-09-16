@@ -9,7 +9,7 @@ import pygame
 from cleave.gl_compositor import OverlayTextureSlot
 from cleave.viz.help_overlay import HelpOverlay
 from cleave.viz.overlay_draw import OverlayDrawer
-from cleave.viz.overlay_primitives import ComposedPanel, overlay_font
+from cleave.viz.overlay_primitives import ComposedPanel
 from cleave.viz.overlay_profiler import OverlayProfiler
 from cleave.viz.overlay_upload import OverlayGpuState, UploadPlan, UploadSignature
 from cleave.viz.row_kinds import RowDescriptor, RowKind
@@ -163,14 +163,14 @@ def test_draw_tuning_modal_path_clears_full_viewport() -> None:
     compositor.upload_overlay_texture.return_value = 99
 
     overlay = MagicMock()
-    overlay._font_get.return_value = overlay_font(14)
+    overlay._font_get.return_value = MagicMock()
     overlay._line_gap = 2
     modal_host = MagicMock()
     modal_host.active = True
     modal_host.view_state.return_value = MagicMock()
     overlay_surface = _overlay_surface_mock()
 
-    with patch("cleave.viz.overlay_draw.modal_overlay.draw"):
+    with patch("cleave.viz.overlay_draw.modal_overlay.draw") as draw_modal:
         OverlayDrawer.draw_tuning(
             compositor,
             overlay,
@@ -183,6 +183,7 @@ def test_draw_tuning_modal_path_clears_full_viewport() -> None:
     overlay.draw.assert_called_once()
     overlay.compose_panel.assert_not_called()
     compositor.draw_overlay.assert_called_once_with(99, 0, 0, 1280, 720)
+    assert draw_modal.call_args.kwargs["modal_host"] is modal_host
 
 
 def _mock_timeline_compose(

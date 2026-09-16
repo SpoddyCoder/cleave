@@ -438,6 +438,11 @@ def test_render_overlay_title_text_help() -> None:
     assert dict(section.entries)["Enter"] == "edit title"
 
 
+def test_render_overlay_body_text_help() -> None:
+    section = _keyboard_section(sections_for(RowKind.RENDER_OVERLAY_CARD_BODY_TEXT))
+    assert dict(section.entries)["Enter"] == "edit body"
+
+
 def test_layer_management_add_help() -> None:
     section = _keyboard_section(sections_for(RowKind.LAYER_MANAGEMENT_ADD))
     assert section.title == KEYBOARD_CONTROLS_SECTION_TITLE

@@ -34,8 +34,7 @@ RENDER_OVERLAY_POSITIONS: tuple[RenderOverlayPosition, ...] = (
 DEFAULT_RENDER_OVERLAY_TITLE = "Cleave Final Render"
 DEFAULT_RENDER_OVERLAY_BODY = (
     "Place anything you like here\n"
-    "Like musician names, year of release etc.\n"
-    "Edit the cleave-viz.yaml to modify this message, colours etc."
+    "Like musician names, year of release etc."
 )
 DEFAULT_RENDER_OVERLAY_APPEAR_AT = 10.0
 DEFAULT_RENDER_OVERLAY_DISAPPEAR_AT = 0.0
@@ -586,7 +585,7 @@ def _overlay_card_persist_values(
             "margin_bottom": runtime.title_margin_bottom,
         },
         "body": {
-            "content": base_card.body.content,
+            "content": runtime.body_content,
             "font": runtime.body_font,
             "font_size": runtime.body_font_size,
             "colour": base_card.body.colour,
@@ -660,6 +659,7 @@ def default_render_overlay_card_runtime_values(
         "title_margin_bottom": DEFAULT_RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
         "body_font_size": DEFAULT_RENDER_OVERLAY_BODY_FONT_SIZE,
         "body_font": DEFAULT_RENDER_OVERLAY_FONT,
+        "body_content": DEFAULT_RENDER_OVERLAY_BODY,
         "opacity_pct": int(round(DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY * 100)),
         "border_width": DEFAULT_RENDER_OVERLAY_BORDER_WIDTH,
         "title_content": DEFAULT_RENDER_OVERLAY_TITLE,

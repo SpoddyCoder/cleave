@@ -589,6 +589,7 @@ def _build_render_overlay_card_section(card: str) -> ExpandSectionDef:
         read_expanded=_read_overlay_card_body_expanded,
         toggle=_toggle_overlay_card_body,
         children=(
+            SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_BODY_TEXT),
             SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_BODY_FONT),
             SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_BODY_FONT_SIZE),
         ),

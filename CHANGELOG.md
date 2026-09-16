@@ -10,6 +10,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 ### Added
 
 - Credits card title text row under each card's title section in the panel. Enter opens a text dialog; Confirm updates the title; Save persists it. Section lock blocks editing.
+- Credits card body text row under each card's body section in the panel. Enter opens a text dialog; Confirm updates the body; Save persists it. Section lock blocks editing.
 
 - Settings > UI: notification time (until dismissed, or 1-20s). Enter dismisses a toast before it times out.
 
@@ -47,6 +48,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Play and render on a complete project no longer import librosa at load (stem types in `cleave.stems`, PCM resample via soxr).
 
 ### Fixed
+
+- Text dialog Up/Down while editing move the caret between lines instead of jumping to the start of the current line.
 
 - Text dialog caret stays visible at the end of a long single-line draft when the panel grows past its minimum width.
 - Settings > UI notification time now hides toasts after the chosen duration, including when you change the value while a toast is showing. Enter dismisses the toast before the timer elapses.
