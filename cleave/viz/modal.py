@@ -613,6 +613,9 @@ class ModalHost:
         state: TextModalState,
     ) -> bool:
         if event.key == pygame.K_ESCAPE:
+            state.draft = state.initial
+            state.caret_index = len(state.initial)
+            state.error = None
             self._leave_text_edit(state)
             return True
         if event.key == pygame.K_RETURN:
@@ -620,7 +623,11 @@ class ModalHost:
                 if not state.single_line:
                     _insert_text_at_caret(state, "\n")
                 return True
-            self._leave_text_edit(state)
+            if self._show_text_validation_error(state):
+                return True
+            self._leave_text_edit(
+                state, focus_region=TextFocusRegion.BUTTONS
+            )
             return True
         if event.key in _TEXT_EDIT_REPEAT_KEYS:
             _apply_text_edit_key(state, event.key, self._text_field_wrap)
@@ -672,20 +679,38 @@ class ModalHost:
         return True
 
     def _confirm_text(self, state: TextModalState) -> None:
-        if state.validate is not None:
-            error = state.validate(state.draft)
-            if error is not None:
-                state.error = error
-                return
+        if self._show_text_validation_error(state):
+            return
         on_confirm = state.on_confirm
         draft = state.draft
         self._dismiss_text(invoke_cancel=False)
         on_confirm(draft)
 
-    def _leave_text_edit(self, state: TextModalState) -> None:
+    def _show_text_validation_error(self, state: TextModalState) -> bool:
+        if state.validate is None:
+            return False
+        error = state.validate(state.draft)
+        if error is None:
+            return False
+        state.error = error
+        state.focus_region = TextFocusRegion.FIELD
+        if not state.editing:
+            state.editing = True
+            self._start_text_input()
+        _reset_caret_blink(state)
+        return True
+
+    def _leave_text_edit(
+        self,
+        state: TextModalState,
+        *,
+        focus_region: TextFocusRegion = TextFocusRegion.FIELD,
+    ) -> None:
         self._stop_text_input()
         state.editing = False
-        state.focus_region = TextFocusRegion.FIELD
+        state.focus_region = focus_region
+        if focus_region == TextFocusRegion.BUTTONS:
+            state.button_index = 0
 
     def _start_text_input(self) -> None:
         if self._text_input_started:

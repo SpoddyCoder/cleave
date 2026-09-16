@@ -40,7 +40,7 @@ The live event loop ([cleave/viz/app.py](../cleave/viz/app.py)) pumps KEYDOWN / 
 | Dialog regions | (1) CTA from the callee, display-only (2) multiline field, constrained to one line when asked (3) Confirm and Cancel on one row |
 | Focus stops | Two: the field, and the Confirm/Cancel row. CTA is not a stop. Up/Down move 2 <-> 3. Left/Right on 3 only |
 | Open | Field focused, already in edit mode, caret at end, current value shown. No extra Enter to start typing |
-| Edit vs navigate | Esc or Enter leaves edit (keeps the draft, returns to field highlight). Does not confirm or revert |
+| Edit vs navigate | Esc discards the draft and leaves edit (field highlight). Enter leaves edit and highlights Confirm. Neither confirms nor closes |
 | Newline | Shift+Enter while editing, and only when `single_line` is false. Ignored for title |
 | Confirm / Cancel | Enter on a focused button. Esc while navigating (or Cancel) dismisses and restores the launch value |
 | Typing | pygame `TEXTINPUT` plus `start_text_input` / `stop_text_input`. Do not trust KEYDOWN `unicode` |
@@ -93,12 +93,13 @@ Title uses `cta="Change text..."`, `single_line=True`. Body uses the same CTA, `
 ### Edit
 
 - Field loses the navigate highlight; a caret shows the insert point.
-- CTA gains a second line: `press ESC to stop editing` (exact copy locked above).
+- CTA gains a second line: `Press Enter to confirm or ESC to cancel` (exact copy locked above).
 - Arrows move the caret (Up/Down are visual lines when multiline).
 - Backspace deletes backward.
 - Shift+Enter inserts a newline unless `single_line`.
 - Printable input comes from `TEXTINPUT`.
-- Esc or Enter: leave edit, keep draft, restore field highlight.
+- Esc: discard the draft (restore the launch value), leave edit, restore field highlight. Modal stays open.
+- Enter: leave edit, keep draft, highlight Confirm.
 - Hold-repeat for arrows and Backspace via [KeyRepeatController](../cleave/viz/key_repeat.py). Extend `_REPEAT_KEYS` or arm a text-edit repeat set; do not call `pygame.key.set_repeat`.
 
 Single-line overflow scrolls horizontally with the caret. Multiline wraps to the panel content width and scrolls vertically if needed. Cap panel height (about half the viewport, same idea as the current message cap) so a long body cannot cover the screen.
@@ -149,7 +150,7 @@ The host supports multiline internally. Only the title row ships. Each step belo
 - `handle_keydown` branches: PROGRESS / YES_NO / CHOICE unchanged; TEXT implements navigate vs edit. Esc-in-edit does not call `on_dismiss`.
 - `view_state()` grows optional text fields so draw stays a pure function. Existing kinds keep `options` / `message` / `labeled_lines`.
 
-Tests in [tests/cleave/viz/test_confirm.py](../tests/cleave/viz/test_confirm.py) (or a sibling `test_text_modal.py`): open shows initial; type via a test hook that applies a text event; Shift+Enter inserts or no-ops; Esc-edit keeps draft; Esc-nav / Cancel restores; Confirm returns the draft; Left/Right only on the button row; Y/N do nothing; `single_line` rejects newlines in the draft.
+Tests in [tests/cleave/viz/test_confirm.py](../tests/cleave/viz/test_confirm.py) (or a sibling `test_text_modal.py`): open shows initial; type via a test hook that applies a text event; Shift+Enter inserts or no-ops; Esc-edit discards draft; Enter-edit jumps to Confirm; Esc-nav / Cancel restores; Confirm returns the draft; Left/Right only on the button row; Y/N do nothing; `single_line` rejects newlines in the draft.
 
 **1.2 Draw.** Extend [cleave/viz/modal_overlay.py](../cleave/viz/modal_overlay.py):
 
@@ -221,10 +222,11 @@ Each step below lands with tests and leaves the tree green.
 
 - `TextModalState` gains `error: str | None = None`.
 - On Confirm, the caller's `on_confirm` currently receives the draft directly. Add an optional `validate: Callable[[str], str | None]` parameter to `prompt_text`. When present, Confirm calls `validate(draft)` first. If it returns a non-None string (the error message), set `error` on `TextModalState` and stay open (do not dismiss). If it returns None, proceed as today.
-- Draw: when `error` is set, show it below the field in `DISABLED` (or a warm accent if one exists in theme; reuse `ACTION` red if not). Clear `error` on the next `TEXTINPUT` or Backspace (any draft mutation) so stale errors disappear as the user types.
+- Draw: when `error` is set, show it below the field in `HIGHLIGHT` (notification yellow). Clear `error` on the next `TEXTINPUT` or Backspace (any draft mutation) so stale errors disappear as the user types.
+- Enter (from edit or Confirm) runs `validate` first. On failure stay in the field in edit mode with the caret active so the user can correct immediately. On success, Enter from edit still highlights Confirm; Enter on Confirm dismisses.
 - `view_state()` exposes the error string so `modal_overlay.py` draw stays a pure function.
 
-Tests: Confirm with a failing validator keeps the dialog open; draft edit clears the error; Confirm with a passing validator dismisses; Confirm with no validator still works as before (backward compatible).
+Tests: Confirm with a failing validator keeps the dialog open, stays in the field, and shows a caret; draft edit clears the error; Confirm with a passing validator dismisses; Confirm with no validator still works as before (backward compatible).
 
 **3.2 Hex-colour validation helper.** A thin wrapper around `parse_hex_colour` that returns the error string (or None) and the parsed tuple, suitable for the `validate` parameter.
 
