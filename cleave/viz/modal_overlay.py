@@ -508,6 +508,13 @@ def _text_cta_lines(state: ModalViewState) -> tuple[str, ...]:
     return (cta,)
 
 
+def _text_error_line(state: ModalViewState) -> str | None:
+    error = state.error
+    if error:
+        return error
+    return None
+
+
 def _text_field_lines(
     font: pygame.font.Font,
     state: ModalViewState,
@@ -541,6 +548,7 @@ def _text_max_field_lines(
     line_gap: int,
     screen_h: int | None,
     cta_line_count: int,
+    has_error: bool = False,
 ) -> int | None:
     if screen_h is None:
         return None
@@ -548,6 +556,8 @@ def _text_max_field_lines(
     cta_h = _lines_block_height(cta_line_count, line_h, line_gap)
     section_gap = line_h + line_gap
     overhead = _PANEL_PAD_Y * 2 + cta_h + section_gap * 2 + line_h
+    if has_error:
+        overhead += line_h + line_gap
     max_field_h = max(line_h, max_panel_h - overhead)
     stride = line_h + line_gap
     return max(1, (max_field_h + line_gap) // stride)
@@ -605,6 +615,7 @@ def _measure_text_panel(
     field_w = max((font.size(line)[0] for line in field_lines), default=0)
     field_w += _CARET_WIDTH
     field_w = min(field_w, wrap_w)
+    error_line = _text_error_line(state)
     caret_line, _ = caret_line_column(
         state.draft if state.draft is not None else "",
         field_lines,
@@ -615,6 +626,7 @@ def _measure_text_panel(
         line_gap=line_gap,
         screen_h=screen_h,
         cta_line_count=len(cta_lines),
+        has_error=error_line is not None,
     )
     visible_lines, _ = _visible_field_lines(
         field_lines, caret_line, max_field_lines
@@ -625,7 +637,11 @@ def _measure_text_panel(
     buttons_h = line_h
 
     content_w = max(cta_w, field_w, buttons_w)
+    if error_line is not None:
+        content_w = max(content_w, min(font.size(error_line)[0], wrap_w))
     content_h = cta_h + section_gap + field_h + section_gap + buttons_h
+    if error_line is not None:
+        content_h += line_h + line_gap
     return (
         max(content_w + _PANEL_PAD_X * 2, _panel_min_width(screen_w)),
         content_h + _PANEL_PAD_Y * 2,
@@ -768,12 +784,14 @@ def _draw_text_panel(
 
     draft = state.draft if state.draft is not None else ""
     field_lines = _text_field_lines(font, state, screen_w=screen_w)
+    error_line = _text_error_line(state)
     caret_line, caret_col = caret_line_column(draft, field_lines, state.caret_index)
     max_field_lines = _text_max_field_lines(
         line_h=line_h,
         line_gap=line_gap,
         screen_h=screen_h,
         cta_line_count=len(cta_lines),
+        has_error=error_line is not None,
     )
     visible_lines, visible_caret_line = _visible_field_lines(
         field_lines, caret_line, max_field_lines
@@ -839,7 +857,21 @@ def _draw_text_panel(
         )
         panel.set_clip(prev_clip)
 
-    cur_y = field_y + field_h + section_gap
+    cur_y = field_y + field_h
+    if error_line is not None:
+        cur_y += line_gap
+        _blit_text_line(
+            panel,
+            font,
+            error_line,
+            ACTION,
+            x=x,
+            y=cur_y,
+            text_alpha=text_alpha,
+            clip_w=content_w,
+        )
+        cur_y += line_h
+    cur_y += section_gap
     _draw_text_buttons(
         panel,
         font,

@@ -889,9 +889,9 @@ def test_write_session_snapshot_persists_render_overlay(tmp_path: Path) -> None:
     assert opening["body"]["colour"] == "#ffffff"
     assert opening["background"]["margin"] == 10
     assert opening["background"]["padding"] == 10
-    assert opening["background"]["colour"] == "#223344"
+    assert opening["background"]["colour"] == "#000000"
     assert opening["background"]["opacity"] == 0.75
-    assert opening["background"]["border"]["colour"] == "#223344"
+    assert opening["background"]["border"]["colour"] == "#ffffff"
     assert opening["background"]["border"]["width"] == 4
     assert "closing-card" in overlays
 

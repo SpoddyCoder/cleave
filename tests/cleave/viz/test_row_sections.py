@@ -315,6 +315,9 @@ def test_section_header_descriptor_uses_tree_and_effect_fallback() -> None:
         RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_FONT)
     ) == RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER)
     assert section_header_descriptor(
+        RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_COLOUR)
+    ) == RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER)
+    assert section_header_descriptor(
         RowDescriptor(RowKind.SETTINGS_UI_FADE)
     ) == RowDescriptor(RowKind.SETTINGS_UI_HEADER)
     assert section_header_descriptor(
@@ -329,8 +332,22 @@ def test_render_overlay_section_kinds_from_tree() -> None:
     assert RowKind.RENDER_OVERLAYS_HEADER in RENDER_OVERLAY_SECTION_KINDS
     assert RowKind.RENDER_OVERLAY_CARD_TITLE_FONT in RENDER_OVERLAY_SECTION_KINDS
     assert RowKind.RENDER_OVERLAY_CARD_TITLE_TEXT in RENDER_OVERLAY_SECTION_KINDS
+    assert RowKind.RENDER_OVERLAY_CARD_TITLE_COLOUR in RENDER_OVERLAY_SECTION_KINDS
     assert RowKind.RENDER_OVERLAY_CARD_BODY_FONT in RENDER_OVERLAY_SECTION_KINDS
     assert RowKind.RENDER_OVERLAY_CARD_BODY_TEXT in RENDER_OVERLAY_SECTION_KINDS
+
+
+def test_render_overlay_title_colour_follows_title_text() -> None:
+    title_section = next(
+        node.expand
+        for node in RENDER_OVERLAY_OPENING_CARD_SECTION.children
+        if node.expand is not None
+        and node.expand.header_kind == RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER
+    )
+    assert title_section.children[0].leaf_kind == RowKind.RENDER_OVERLAY_CARD_TITLE_TEXT
+    assert title_section.children[1].leaf_kind == (
+        RowKind.RENDER_OVERLAY_CARD_TITLE_COLOUR
+    )
 
 
 def test_render_overlay_body_text_is_first_body_child() -> None:

@@ -577,6 +577,7 @@ def _build_render_overlay_card_section(card: str) -> ExpandSectionDef:
         toggle=_toggle_overlay_card_title,
         children=(
             SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_TITLE_TEXT),
+            SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_TITLE_COLOUR),
             SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_TITLE_FONT),
             SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_TITLE_FONT_SIZE),
             SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_TITLE_MARGIN_BOTTOM),

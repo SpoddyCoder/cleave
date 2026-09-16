@@ -229,6 +229,17 @@ def test_render_overlay_title_text_is_locked_action() -> None:
     assert spec.parent_group == "render_overlay_title"
 
 
+def test_render_overlay_title_colour_is_locked_action() -> None:
+    spec = row_spec(RowKind.RENDER_OVERLAY_CARD_TITLE_COLOUR)
+    assert spec.affordance == RowAffordance.ACTION
+    assert spec.present_style == RowPresentStyle.LABELED_VALUE
+    assert spec.shows_enter_icon is True
+    assert spec.apply_action is not None
+    assert spec.blocked_by_section_lock is True
+    assert spec.panel_label == "title colour"
+    assert spec.parent_group == "render_overlay_title"
+
+
 def test_render_overlay_body_text_is_locked_action() -> None:
     spec = row_spec(RowKind.RENDER_OVERLAY_CARD_BODY_TEXT)
     assert spec.affordance == RowAffordance.ACTION
@@ -260,6 +271,9 @@ def test_parent_group_on_row_specs() -> None:
         "render_overlay_title"
     )
     assert row_spec(RowKind.RENDER_OVERLAY_CARD_TITLE_TEXT).parent_group == (
+        "render_overlay_title"
+    )
+    assert row_spec(RowKind.RENDER_OVERLAY_CARD_TITLE_COLOUR).parent_group == (
         "render_overlay_title"
     )
     assert row_spec(RowKind.RENDER_OVERLAY_CARD_BODY_FONT).parent_group == (
@@ -408,6 +422,7 @@ def test_render_value_children_blocked_by_section_lock() -> None:
     assert row_blocked_by_section_lock(RowKind.RENDER_OVERLAY_CARD_POSITION) is True
     assert row_blocked_by_section_lock(RowKind.RENDER_OVERLAY_CARD_TITLE_FONT) is True
     assert row_blocked_by_section_lock(RowKind.RENDER_OVERLAY_CARD_TITLE_TEXT) is True
+    assert row_blocked_by_section_lock(RowKind.RENDER_OVERLAY_CARD_TITLE_COLOUR) is True
     assert row_blocked_by_section_lock(RowKind.RENDER_OVERLAY_CARD_BODY_TEXT) is True
     assert row_blocked_by_section_lock(RowKind.RENDER_POST_FX_FADE_IN) is True
     assert row_blocked_by_section_lock(RowKind.RENDER_POST_FX_CHROMA_BOOST_AMOUNT) is True
@@ -608,7 +623,7 @@ def test_format_row_value_track_and_render() -> None:
         render_overlays=RenderOverlaysBlock(
             opening_card=make_overlay_card_block(
                 position="top-left", opacity_pct=80, title_content="A\nB\rC",
-                body_content="X\nY\rZ",
+                body_content="X\nY\rZ", title_colour=(255, 0, 0),
             ),
         ),
         render_post_fx=RenderPostFxBlock(fade_in=2.5, fade_out=3.0),
@@ -629,6 +644,10 @@ def test_format_row_value_track_and_render() -> None:
         state,
         RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_TEXT, card="opening_card"),
     ) == "A B C"
+    assert format_row_value(
+        state,
+        RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_COLOUR, card="opening_card"),
+    ) == "#ff0000"
     assert format_row_value(
         state,
         RowDescriptor(RowKind.RENDER_OVERLAY_CARD_BODY_TEXT, card="opening_card"),

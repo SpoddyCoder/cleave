@@ -253,13 +253,15 @@ def test_build_live_overlay_config_overrides_runtime_fields() -> None:
     assert merged.title.margin_bottom == 6
     assert merged.body.font_size == 12
     assert merged.body.font == "dejavuserif"
-    assert merged.title.colour == base.title.colour
-    assert merged.body.colour == base.body.colour
+    assert merged.title.colour == runtime.title_colour
+    assert merged.title.background_colour == runtime.title_background_colour
+    assert merged.body.colour == runtime.body_colour
+    assert merged.body.background_colour == runtime.body_background_colour
     assert merged.background.margin == base.background.margin
     assert merged.background.padding == base.background.padding
-    assert merged.background.colour == base.background.colour
+    assert merged.background.colour == runtime.background_colour
     assert merged.background.opacity == 0.75
-    assert merged.background.border.colour == base.background.border.colour
+    assert merged.background.border.colour == runtime.border_colour
     assert merged.background.border.width == 4
 
 
@@ -293,6 +295,81 @@ def test_overlay_card_persist_values_uses_runtime_body_content() -> None:
     values = _overlay_card_persist_values(runtime, base)
     assert values["body"]["content"] == "Persisted body"
     assert values["body"]["content"] != base.body.content
+
+
+def test_card_runtime_from_cfg_reads_colours() -> None:
+    base = _overlay_cfg()
+    card = replace(
+        base,
+        title=replace(
+            base.title,
+            colour=(10, 20, 30),
+            background_colour=(40, 50, 60),
+        ),
+        body=replace(
+            base.body,
+            colour=(70, 80, 90),
+            background_colour=(100, 110, 120),
+        ),
+        background=replace(
+            base.background,
+            colour=(130, 140, 150),
+            border=replace(base.background.border, colour=(160, 170, 180)),
+        ),
+    )
+    runtime = _card_runtime_from_cfg(card)
+    assert runtime.title_colour == (10, 20, 30)
+    assert runtime.title_background_colour == (40, 50, 60)
+    assert runtime.body_colour == (70, 80, 90)
+    assert runtime.body_background_colour == (100, 110, 120)
+    assert runtime.background_colour == (130, 140, 150)
+    assert runtime.border_colour == (160, 170, 180)
+
+
+def test_overlay_card_persist_values_uses_runtime_colours() -> None:
+    base = _overlay_cfg()
+    runtime = _card_runtime_from_cfg(base)
+    runtime.title_colour = (1, 2, 3)
+    runtime.title_background_colour = (4, 5, 6)
+    runtime.body_colour = (7, 8, 9)
+    runtime.body_background_colour = None
+    runtime.background_colour = (11, 12, 13)
+    runtime.border_colour = (14, 15, 16)
+    values = _overlay_card_persist_values(runtime, base)
+    assert values["title"]["colour"] == (1, 2, 3)
+    assert values["title"]["background_colour"] == (4, 5, 6)
+    assert values["body"]["colour"] == (7, 8, 9)
+    assert values["body"]["background_colour"] is None
+    assert values["background"]["colour"] == (11, 12, 13)
+    assert values["background"]["border"]["colour"] == (14, 15, 16)
+    assert values["title"]["colour"] != base.title.colour
+    assert values["background"]["colour"] != base.background.colour
+    assert values["background"]["margin"] == base.background.margin
+    assert values["background"]["padding"] == base.background.padding
+
+
+def test_build_live_overlay_config_uses_runtime_colours() -> None:
+    base = _overlay_cfg()
+    runtime = replace(
+        default_render_overlay_card_runtime(),
+        title_colour=(9, 8, 7),
+        title_background_colour=(6, 5, 4),
+        body_colour=(3, 2, 1),
+        body_background_colour=None,
+        background_colour=(21, 22, 23),
+        border_colour=(24, 25, 26),
+    )
+    merged = build_live_overlay_config(base, runtime)
+    assert merged.title.colour == (9, 8, 7)
+    assert merged.title.background_colour == (6, 5, 4)
+    assert merged.body.colour == (3, 2, 1)
+    assert merged.body.background_colour is None
+    assert merged.background.colour == (21, 22, 23)
+    assert merged.background.border.colour == (24, 25, 26)
+    assert merged.title.colour != base.title.colour
+    assert merged.background.colour != base.background.colour
+    assert merged.background.margin == base.background.margin
+    assert merged.background.padding == base.background.padding
 
 
 def test_panel_position_corners() -> None:

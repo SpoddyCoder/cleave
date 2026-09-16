@@ -1196,6 +1196,7 @@ def test_render_overlay_font_rows_nested_indent() -> None:
     view = controls.build_view_state(paused=False)
     title_header = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER)
     title_text = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_TITLE_TEXT)
+    title_colour = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_TITLE_COLOUR)
     title_font_size = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_TITLE_FONT_SIZE)
     title_font = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_TITLE_FONT)
     body_header = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_BODY_HEADER)
@@ -1204,6 +1205,7 @@ def test_render_overlay_font_rows_nested_indent() -> None:
     body_font = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_BODY_FONT)
     assert _row_indent(view, title_header) == TREE_INDENT * 2
     assert _row_indent(view, title_text) == TREE_INDENT * 3
+    assert _row_indent(view, title_colour) == TREE_INDENT * 3
     assert _row_indent(view, title_font_size) == TREE_INDENT * 3
     assert _row_indent(view, title_font) == TREE_INDENT * 3
     assert _row_indent(view, body_header) == TREE_INDENT * 2
@@ -1318,6 +1320,153 @@ def test_render_overlay_title_text_lock_blocks_enter() -> None:
     view = controls.build_view_state(paused=False)
     row = view.layout.find_by_kind(
         RowKind.RENDER_OVERLAY_CARD_TITLE_TEXT, card="opening_card"
+    )
+    controls.focus_descriptor = _desc(view, row)
+    controls.session.render_overlays.locked = True
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    assert controls.modal_host.view_state() is None
+
+
+def _replace_text_modal_draft(controls: TuningControls, text: str) -> None:
+    view = controls.modal_host.view_state()
+    assert view is not None
+    for _ in range(len(view.draft)):
+        controls.handle_keydown(_keydown(pygame.K_BACKSPACE))
+    if text:
+        controls.modal_host.handle_text_input(text)
+
+
+def _confirm_text_modal(controls: TuningControls) -> None:
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    controls.handle_keydown(_keydown(pygame.K_DOWN))
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+
+
+def test_render_overlay_title_colour_row_present_for_both_cards() -> None:
+    controls = _make_controls()
+    _expand_overlay_card_title(controls, "opening_card")
+    _expand_overlay_card_title(controls, "closing_card")
+    view = controls.build_view_state(paused=False)
+    opening_text = view.layout.find_by_kind(
+        RowKind.RENDER_OVERLAY_CARD_TITLE_TEXT, card="opening_card"
+    )
+    opening_colour = view.layout.find_by_kind(
+        RowKind.RENDER_OVERLAY_CARD_TITLE_COLOUR, card="opening_card"
+    )
+    opening_font = view.layout.find_by_kind(
+        RowKind.RENDER_OVERLAY_CARD_TITLE_FONT, card="opening_card"
+    )
+    closing_text = view.layout.find_by_kind(
+        RowKind.RENDER_OVERLAY_CARD_TITLE_TEXT, card="closing_card"
+    )
+    closing_colour = view.layout.find_by_kind(
+        RowKind.RENDER_OVERLAY_CARD_TITLE_COLOUR, card="closing_card"
+    )
+    closing_font = view.layout.find_by_kind(
+        RowKind.RENDER_OVERLAY_CARD_TITLE_FONT, card="closing_card"
+    )
+    assert view.layout.descriptor(opening_colour).card == "opening_card"
+    assert view.layout.descriptor(closing_colour).card == "closing_card"
+    assert opening_text < opening_colour < opening_font
+    assert closing_text < closing_colour < closing_font
+
+
+def test_render_overlay_title_colour_formats_hex() -> None:
+    controls = _make_controls()
+    _expand_overlay_card_title(controls, "opening_card")
+    controls.session.render_overlays.opening_card.title_colour = (255, 0, 0)
+    view = controls.build_view_state(paused=False)
+    row = view.layout.find_by_kind(
+        RowKind.RENDER_OVERLAY_CARD_TITLE_COLOUR, card="opening_card"
+    )
+    assert _row_text(view, row) == "    └─ title colour: #ff0000"
+
+
+def test_render_overlay_title_colour_enter_opens_single_line_modal() -> None:
+    controls = _make_controls()
+    _expand_overlay_card_title(controls, "opening_card")
+    controls.session.render_overlays.opening_card.title_colour = (255, 255, 255)
+    view = controls.build_view_state(paused=False)
+    row = view.layout.find_by_kind(
+        RowKind.RENDER_OVERLAY_CARD_TITLE_COLOUR, card="opening_card"
+    )
+    controls.focus_descriptor = _desc(view, row)
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    modal = controls.modal_host.view_state()
+    assert modal is not None
+    assert modal.kind == ModalKind.TEXT
+    assert modal.single_line is True
+    assert modal.cta == "Change colour (#rgb or #rrggbb)..."
+    assert modal.draft == "#ffffff"
+    assert modal.editing is True
+
+
+def test_render_overlay_title_colour_confirm_updates_session() -> None:
+    controls = _make_controls()
+    _expand_overlay_card_title(controls, "opening_card")
+    controls.session.render_overlays.opening_card.title_colour = (255, 255, 255)
+    view = controls.build_view_state(paused=False)
+    row = view.layout.find_by_kind(
+        RowKind.RENDER_OVERLAY_CARD_TITLE_COLOUR, card="opening_card"
+    )
+    controls.focus_descriptor = _desc(view, row)
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    _replace_text_modal_draft(controls, "#ff0000")
+    _confirm_text_modal(controls)
+    assert controls.modal_host.view_state() is None
+    assert controls.session.render_overlays.opening_card.title_colour == (255, 0, 0)
+
+
+def test_render_overlay_title_colour_confirm_invalid_stays_open() -> None:
+    controls = _make_controls()
+    _expand_overlay_card_title(controls, "opening_card")
+    controls.session.render_overlays.opening_card.title_colour = (255, 255, 255)
+    view = controls.build_view_state(paused=False)
+    row = view.layout.find_by_kind(
+        RowKind.RENDER_OVERLAY_CARD_TITLE_COLOUR, card="opening_card"
+    )
+    controls.focus_descriptor = _desc(view, row)
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    _replace_text_modal_draft(controls, "bad")
+    _confirm_text_modal(controls)
+    modal = controls.modal_host.view_state()
+    assert modal is not None
+    assert modal.kind == ModalKind.TEXT
+    assert modal.error == "invalid hex colour (use #rgb or #rrggbb)"
+    assert controls.session.render_overlays.opening_card.title_colour == (
+        255,
+        255,
+        255,
+    )
+
+
+def test_render_overlay_title_colour_cancel_keeps_session() -> None:
+    controls = _make_controls()
+    _expand_overlay_card_title(controls, "closing_card")
+    controls.session.render_overlays.closing_card.title_colour = (255, 255, 255)
+    view = controls.build_view_state(paused=False)
+    row = view.layout.find_by_kind(
+        RowKind.RENDER_OVERLAY_CARD_TITLE_COLOUR, card="closing_card"
+    )
+    controls.focus_descriptor = _desc(view, row)
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    _replace_text_modal_draft(controls, "#ff0000")
+    controls.handle_keydown(_keydown(pygame.K_ESCAPE))
+    controls.handle_keydown(_keydown(pygame.K_ESCAPE))
+    assert controls.modal_host.view_state() is None
+    assert controls.session.render_overlays.closing_card.title_colour == (
+        255,
+        255,
+        255,
+    )
+
+
+def test_render_overlay_title_colour_lock_blocks_enter() -> None:
+    controls = _make_controls()
+    _expand_overlay_card_title(controls, "opening_card")
+    view = controls.build_view_state(paused=False)
+    row = view.layout.find_by_kind(
+        RowKind.RENDER_OVERLAY_CARD_TITLE_COLOUR, card="opening_card"
     )
     controls.focus_descriptor = _desc(view, row)
     controls.session.render_overlays.locked = True
