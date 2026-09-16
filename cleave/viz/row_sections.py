@@ -578,6 +578,7 @@ def _build_render_overlay_card_section(card: str) -> ExpandSectionDef:
         children=(
             SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_TITLE_TEXT),
             SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_TITLE_COLOUR),
+            SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_TITLE_BACKGROUND_COLOUR),
             SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_TITLE_FONT),
             SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_TITLE_FONT_SIZE),
             SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_TITLE_MARGIN_BOTTOM),
@@ -591,6 +592,8 @@ def _build_render_overlay_card_section(card: str) -> ExpandSectionDef:
         toggle=_toggle_overlay_card_body,
         children=(
             SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_BODY_TEXT),
+            SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_BODY_COLOUR),
+            SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_BODY_BACKGROUND_COLOUR),
             SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_BODY_FONT),
             SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_BODY_FONT_SIZE),
         ),
@@ -632,7 +635,9 @@ def _build_render_overlay_card_section(card: str) -> ExpandSectionDef:
             SectionNode(expand=animation_section),
             SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_POSITION),
             SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_OPACITY),
+            SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_BACKGROUND_COLOUR),
             SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_BORDER_WIDTH),
+            SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_BORDER_COLOUR),
             SectionNode(expand=title_section),
             SectionNode(expand=body_section),
         ),

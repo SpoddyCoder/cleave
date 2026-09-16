@@ -1197,21 +1197,37 @@ def test_render_overlay_font_rows_nested_indent() -> None:
     title_header = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER)
     title_text = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_TITLE_TEXT)
     title_colour = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_TITLE_COLOUR)
+    title_background = view.layout.find_by_kind(
+        RowKind.RENDER_OVERLAY_CARD_TITLE_BACKGROUND_COLOUR
+    )
     title_font_size = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_TITLE_FONT_SIZE)
     title_font = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_TITLE_FONT)
     body_header = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_BODY_HEADER)
     body_text = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_BODY_TEXT)
+    body_colour = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_BODY_COLOUR)
+    body_background = view.layout.find_by_kind(
+        RowKind.RENDER_OVERLAY_CARD_BODY_BACKGROUND_COLOUR
+    )
     body_font_size = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_BODY_FONT_SIZE)
     body_font = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_BODY_FONT)
+    background_colour = view.layout.find_by_kind(
+        RowKind.RENDER_OVERLAY_CARD_BACKGROUND_COLOUR
+    )
+    border_colour = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_BORDER_COLOUR)
     assert _row_indent(view, title_header) == TREE_INDENT * 2
     assert _row_indent(view, title_text) == TREE_INDENT * 3
     assert _row_indent(view, title_colour) == TREE_INDENT * 3
+    assert _row_indent(view, title_background) == TREE_INDENT * 3
     assert _row_indent(view, title_font_size) == TREE_INDENT * 3
     assert _row_indent(view, title_font) == TREE_INDENT * 3
     assert _row_indent(view, body_header) == TREE_INDENT * 2
     assert _row_indent(view, body_text) == TREE_INDENT * 3
+    assert _row_indent(view, body_colour) == TREE_INDENT * 3
+    assert _row_indent(view, body_background) == TREE_INDENT * 3
     assert _row_indent(view, body_font_size) == TREE_INDENT * 3
     assert _row_indent(view, body_font) == TREE_INDENT * 3
+    assert _row_indent(view, background_colour) == TREE_INDENT * 2
+    assert _row_indent(view, border_colour) == TREE_INDENT * 2
 
 
 def _expand_overlay_card_title(controls: TuningControls, card: str) -> None:
@@ -1585,6 +1601,248 @@ def test_render_overlay_body_text_lock_blocks_enter() -> None:
     controls.session.render_overlays.locked = True
     controls.handle_keydown(_keydown(pygame.K_RETURN))
     assert controls.modal_host.view_state() is None
+
+
+def _expand_overlay_card(controls: TuningControls, card: str) -> None:
+    overlays = controls.session.render_overlays
+    overlays.expanded = True
+    getattr(overlays, card).expanded = True
+
+
+def _focus_overlay_colour_row(
+    controls: TuningControls, kind: RowKind, card: str
+):
+    view = controls.build_view_state(paused=False)
+    row = view.layout.find_by_kind(kind, card=card)
+    controls.focus_descriptor = _desc(view, row)
+    return view, row
+
+
+def _assert_overlay_colour_row_present_confirm_cancel(
+    *,
+    kind: RowKind,
+    field: str,
+    expand: str,
+    after_kind: RowKind,
+    before_kind: RowKind,
+    label: str,
+    nested: bool,
+) -> None:
+    controls = _make_controls()
+    if expand == "title":
+        _expand_overlay_card_title(controls, "opening_card")
+        _expand_overlay_card_title(controls, "closing_card")
+    elif expand == "body":
+        _expand_overlay_card_body(controls, "opening_card")
+        _expand_overlay_card_body(controls, "closing_card")
+    else:
+        _expand_overlay_card(controls, "opening_card")
+        _expand_overlay_card(controls, "closing_card")
+    opening_card = controls.session.render_overlays.opening_card
+    closing_card = controls.session.render_overlays.closing_card
+    setattr(opening_card, field, (255, 255, 255))
+    setattr(closing_card, field, (255, 255, 255))
+    view = controls.build_view_state(paused=False)
+    opening_after = view.layout.find_by_kind(after_kind, card="opening_card")
+    opening_colour = view.layout.find_by_kind(kind, card="opening_card")
+    opening_before = view.layout.find_by_kind(before_kind, card="opening_card")
+    closing_after = view.layout.find_by_kind(after_kind, card="closing_card")
+    closing_colour = view.layout.find_by_kind(kind, card="closing_card")
+    closing_before = view.layout.find_by_kind(before_kind, card="closing_card")
+    assert view.layout.descriptor(opening_colour).card == "opening_card"
+    assert view.layout.descriptor(closing_colour).card == "closing_card"
+    assert opening_after < opening_colour < opening_before
+    assert closing_after < closing_colour < closing_before
+    prefix = "    └─ " if nested else "  └─ "
+    assert _row_text(view, opening_colour) == f"{prefix}{label}: #ffffff"
+
+    controls.focus_descriptor = _desc(view, opening_colour)
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    modal = controls.modal_host.view_state()
+    assert modal is not None
+    assert modal.kind == ModalKind.TEXT
+    assert modal.single_line is True
+    assert modal.cta == "Change colour (#rgb or #rrggbb)..."
+    assert modal.draft == "#ffffff"
+    _replace_text_modal_draft(controls, "#ff0000")
+    _confirm_text_modal(controls)
+    assert controls.modal_host.view_state() is None
+    assert getattr(opening_card, field) == (255, 0, 0)
+
+    view = controls.build_view_state(paused=False)
+    closing_colour = view.layout.find_by_kind(kind, card="closing_card")
+    controls.focus_descriptor = _desc(view, closing_colour)
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    _replace_text_modal_draft(controls, "#00ff00")
+    controls.handle_keydown(_keydown(pygame.K_ESCAPE))
+    controls.handle_keydown(_keydown(pygame.K_ESCAPE))
+    assert controls.modal_host.view_state() is None
+    assert getattr(closing_card, field) == (255, 255, 255)
+
+
+def test_render_overlay_title_background_colour_row_present_and_confirm_cancel() -> None:
+    _assert_overlay_colour_row_present_confirm_cancel(
+        kind=RowKind.RENDER_OVERLAY_CARD_TITLE_BACKGROUND_COLOUR,
+        field="title_background_colour",
+        expand="title",
+        after_kind=RowKind.RENDER_OVERLAY_CARD_TITLE_COLOUR,
+        before_kind=RowKind.RENDER_OVERLAY_CARD_TITLE_FONT,
+        label="title background",
+        nested=True,
+    )
+
+
+def test_render_overlay_body_colour_row_present_and_confirm_cancel() -> None:
+    _assert_overlay_colour_row_present_confirm_cancel(
+        kind=RowKind.RENDER_OVERLAY_CARD_BODY_COLOUR,
+        field="body_colour",
+        expand="body",
+        after_kind=RowKind.RENDER_OVERLAY_CARD_BODY_TEXT,
+        before_kind=RowKind.RENDER_OVERLAY_CARD_BODY_BACKGROUND_COLOUR,
+        label="body colour",
+        nested=True,
+    )
+
+
+def test_render_overlay_body_background_colour_row_present_and_confirm_cancel() -> None:
+    _assert_overlay_colour_row_present_confirm_cancel(
+        kind=RowKind.RENDER_OVERLAY_CARD_BODY_BACKGROUND_COLOUR,
+        field="body_background_colour",
+        expand="body",
+        after_kind=RowKind.RENDER_OVERLAY_CARD_BODY_COLOUR,
+        before_kind=RowKind.RENDER_OVERLAY_CARD_BODY_FONT,
+        label="body background",
+        nested=True,
+    )
+
+
+def test_render_overlay_background_colour_row_present_and_confirm_cancel() -> None:
+    _assert_overlay_colour_row_present_confirm_cancel(
+        kind=RowKind.RENDER_OVERLAY_CARD_BACKGROUND_COLOUR,
+        field="background_colour",
+        expand="card",
+        after_kind=RowKind.RENDER_OVERLAY_CARD_OPACITY,
+        before_kind=RowKind.RENDER_OVERLAY_CARD_BORDER_WIDTH,
+        label="background colour",
+        nested=False,
+    )
+
+
+def test_render_overlay_border_colour_row_present_and_confirm_cancel() -> None:
+    _assert_overlay_colour_row_present_confirm_cancel(
+        kind=RowKind.RENDER_OVERLAY_CARD_BORDER_COLOUR,
+        field="border_colour",
+        expand="card",
+        after_kind=RowKind.RENDER_OVERLAY_CARD_BORDER_WIDTH,
+        before_kind=RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER,
+        label="border colour",
+        nested=False,
+    )
+
+
+def test_render_overlay_optional_colour_formats_none() -> None:
+    controls = _make_controls()
+    _expand_overlay_card_title(controls, "opening_card")
+    _expand_overlay_card_body(controls, "opening_card")
+    controls.session.render_overlays.opening_card.title_background_colour = None
+    controls.session.render_overlays.opening_card.body_background_colour = None
+    view = controls.build_view_state(paused=False)
+    title_bg = view.layout.find_by_kind(
+        RowKind.RENDER_OVERLAY_CARD_TITLE_BACKGROUND_COLOUR, card="opening_card"
+    )
+    body_bg = view.layout.find_by_kind(
+        RowKind.RENDER_OVERLAY_CARD_BODY_BACKGROUND_COLOUR, card="opening_card"
+    )
+    assert _row_text(view, title_bg) == "    └─ title background: none"
+    assert _row_text(view, body_bg) == "    └─ body background: none"
+    controls.focus_descriptor = _desc(view, title_bg)
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    modal = controls.modal_host.view_state()
+    assert modal is not None
+    assert modal.draft == ""
+
+
+def test_render_overlay_optional_colour_empty_confirm_clears() -> None:
+    controls = _make_controls()
+    _expand_overlay_card_title(controls, "opening_card")
+    _expand_overlay_card_body(controls, "opening_card")
+    opening = controls.session.render_overlays.opening_card
+    opening.title_background_colour = (10, 20, 30)
+    opening.body_background_colour = (40, 50, 60)
+    for kind, field in (
+        (
+            RowKind.RENDER_OVERLAY_CARD_TITLE_BACKGROUND_COLOUR,
+            "title_background_colour",
+        ),
+        (
+            RowKind.RENDER_OVERLAY_CARD_BODY_BACKGROUND_COLOUR,
+            "body_background_colour",
+        ),
+    ):
+        view, _row = _focus_overlay_colour_row(controls, kind, "opening_card")
+        controls.handle_keydown(_keydown(pygame.K_RETURN))
+        modal = controls.modal_host.view_state()
+        assert modal is not None
+        assert modal.draft != ""
+        _replace_text_modal_draft(controls, "")
+        _confirm_text_modal(controls)
+        assert controls.modal_host.view_state() is None
+        assert getattr(opening, field) is None
+
+
+def test_render_overlay_remaining_colour_rows_invalid_hex_stays_open() -> None:
+    controls = _make_controls()
+    _expand_overlay_card_title(controls, "opening_card")
+    _expand_overlay_card_body(controls, "opening_card")
+    opening = controls.session.render_overlays.opening_card
+    opening.title_background_colour = (255, 255, 255)
+    opening.body_colour = (255, 255, 255)
+    opening.body_background_colour = (255, 255, 255)
+    opening.background_colour = (255, 255, 255)
+    opening.border_colour = (255, 255, 255)
+    for kind, field in (
+        (
+            RowKind.RENDER_OVERLAY_CARD_TITLE_BACKGROUND_COLOUR,
+            "title_background_colour",
+        ),
+        (RowKind.RENDER_OVERLAY_CARD_BODY_COLOUR, "body_colour"),
+        (
+            RowKind.RENDER_OVERLAY_CARD_BODY_BACKGROUND_COLOUR,
+            "body_background_colour",
+        ),
+        (RowKind.RENDER_OVERLAY_CARD_BACKGROUND_COLOUR, "background_colour"),
+        (RowKind.RENDER_OVERLAY_CARD_BORDER_COLOUR, "border_colour"),
+    ):
+        _focus_overlay_colour_row(controls, kind, "opening_card")
+        controls.handle_keydown(_keydown(pygame.K_RETURN))
+        _replace_text_modal_draft(controls, "bad")
+        _confirm_text_modal(controls)
+        modal = controls.modal_host.view_state()
+        assert modal is not None
+        assert modal.kind == ModalKind.TEXT
+        assert modal.error == "invalid hex colour (use #rgb or #rrggbb)"
+        assert getattr(opening, field) == (255, 255, 255)
+        controls.handle_keydown(_keydown(pygame.K_ESCAPE))
+        controls.handle_keydown(_keydown(pygame.K_ESCAPE))
+        assert controls.modal_host.view_state() is None
+
+
+def test_render_overlay_remaining_colour_rows_lock_blocks_enter() -> None:
+    controls = _make_controls()
+    _expand_overlay_card_title(controls, "opening_card")
+    _expand_overlay_card_body(controls, "opening_card")
+    for kind in (
+        RowKind.RENDER_OVERLAY_CARD_TITLE_BACKGROUND_COLOUR,
+        RowKind.RENDER_OVERLAY_CARD_BODY_COLOUR,
+        RowKind.RENDER_OVERLAY_CARD_BODY_BACKGROUND_COLOUR,
+        RowKind.RENDER_OVERLAY_CARD_BACKGROUND_COLOUR,
+        RowKind.RENDER_OVERLAY_CARD_BORDER_COLOUR,
+    ):
+        _focus_overlay_colour_row(controls, kind, "opening_card")
+        controls.session.render_overlays.locked = True
+        controls.handle_keydown(_keydown(pygame.K_RETURN))
+        assert controls.modal_host.view_state() is None
+        controls.session.render_overlays.locked = False
 
 
 def test_render_overlay_title_header_toggles_expansion() -> None:
