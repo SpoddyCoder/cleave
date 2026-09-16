@@ -43,7 +43,6 @@ from cleave.config_schema.render.overlays import (
     default_render_overlays_runtime_values,
     overlays_persist_values,
     parse_render_overlays_section,
-    render_overlays_base,
 )
 from cleave.config_schema.render.pattern_mask import (
     DEFAULT_RENDER_PATTERN_MASK_DENSITY,

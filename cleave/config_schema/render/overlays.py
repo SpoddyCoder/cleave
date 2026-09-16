@@ -553,17 +553,7 @@ def default_render_overlays_config() -> Any:
     return parse_render_overlays_section({})
 
 
-def render_overlays_base(cfg: Any) -> Any:
-    if cfg.render is not None and cfg.render.overlays is not None:
-        return cfg.render.overlays
-    return default_render_overlays_config()
-
-
-def _overlay_card_persist_values(
-    runtime: Any,
-    base_card: Any,
-) -> dict[str, Any]:
-    bg = base_card.background
+def _overlay_card_persist_values(runtime: Any) -> dict[str, Any]:
     anim = runtime.animation
     animation_values: dict[str, Any] = {
         "type": anim.type,
@@ -595,8 +585,8 @@ def _overlay_card_persist_values(
         "animation": animation_values,
         "position": runtime.position,
         "background": {
-            "margin": bg.margin,
-            "padding": bg.padding,
+            "margin": runtime.background_margin,
+            "padding": runtime.background_padding,
             "colour": runtime.background_colour,
             "opacity": runtime.opacity_pct / 100.0,
             "border": {
@@ -609,15 +599,10 @@ def _overlay_card_persist_values(
 
 def overlays_persist_values(ctx: PersistCtx) -> dict[str, Any]:
     runtime = ctx.session.render_overlays
-    base = render_overlays_base(ctx.cfg)
     return {
         "locked": runtime.locked,
-        "opening_card": _overlay_card_persist_values(
-            runtime.opening_card, base.opening_card
-        ),
-        "closing_card": _overlay_card_persist_values(
-            runtime.closing_card, base.closing_card
-        ),
+        "opening_card": _overlay_card_persist_values(runtime.opening_card),
+        "closing_card": _overlay_card_persist_values(runtime.closing_card),
     }
 
 
@@ -668,6 +653,8 @@ def default_render_overlay_card_runtime_values(
         "body_colour": DEFAULT_RENDER_OVERLAY_TEXT_COLOUR,
         "body_background_colour": None,
         "background_colour": DEFAULT_RENDER_OVERLAY_BACKGROUND_COLOUR,
+        "background_margin": DEFAULT_RENDER_OVERLAY_BACKGROUND_MARGIN,
+        "background_padding": DEFAULT_RENDER_OVERLAY_BACKGROUND_PADDING,
         "border_colour": DEFAULT_RENDER_OVERLAY_BORDER_COLOUR,
         "animation": animation,
         "animation_expanded": False,

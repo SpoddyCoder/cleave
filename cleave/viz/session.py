@@ -158,6 +158,8 @@ class RenderOverlayCardRuntime:
     body_colour: tuple[int, int, int]
     body_background_colour: tuple[int, int, int] | None
     background_colour: tuple[int, int, int]
+    background_margin: int
+    background_padding: int
     border_colour: tuple[int, int, int]
     animation: RenderOverlayAnimationRuntime | RenderOverlayClosingAnimationRuntime
     animation_expanded: bool = False
@@ -507,6 +509,8 @@ def _card_runtime_from_cfg(card: Any) -> RenderOverlayCardRuntime:
         body_colour=card.body.colour,
         body_background_colour=card.body.background_colour,
         background_colour=card.background.colour,
+        background_margin=card.background.margin,
+        background_padding=card.background.padding,
         border_colour=card.background.border.colour,
         animation=animation,
     )

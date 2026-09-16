@@ -275,6 +275,12 @@ def test_section_header_descriptor_mappings() -> None:
     assert section_header_descriptor(
         RowDescriptor(RowKind.RENDER_OVERLAY_CARD_BACKGROUND_COLOUR)
     ) == RowDescriptor(RowKind.RENDER_OVERLAY_CARD_HEADER)
+    assert section_header_descriptor(
+        RowDescriptor(RowKind.RENDER_OVERLAY_CARD_BACKGROUND_MARGIN)
+    ) == RowDescriptor(RowKind.RENDER_OVERLAY_CARD_HEADER)
+    assert section_header_descriptor(
+        RowDescriptor(RowKind.RENDER_OVERLAY_CARD_BACKGROUND_PADDING)
+    ) == RowDescriptor(RowKind.RENDER_OVERLAY_CARD_HEADER)
     assert section_header_descriptor(RowDescriptor(RowKind.RENDER_POST_FX_FADE_OUT)) == RowDescriptor(
         RowKind.RENDER_POST_FX_HEADER
     )

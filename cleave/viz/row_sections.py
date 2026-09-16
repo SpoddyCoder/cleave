@@ -636,6 +636,8 @@ def _build_render_overlay_card_section(card: str) -> ExpandSectionDef:
             SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_POSITION),
             SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_OPACITY),
             SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_BACKGROUND_COLOUR),
+            SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_BACKGROUND_MARGIN),
+            SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_BACKGROUND_PADDING),
             SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_BORDER_WIDTH),
             SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_BORDER_COLOUR),
             SectionNode(expand=title_section),

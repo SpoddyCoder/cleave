@@ -829,6 +829,8 @@ def _snapshot_fixture(tmp_path: Path) -> tuple[CleaveConfig, TuningSession, Path
         body_font="ubuntumono",
         opacity_pct=75,
         border_width=4,
+        background_margin=33,
+        background_padding=9,
         title_content="My Title",
         body_content="Line one\nLine two",
         animation=RenderOverlayAnimationRuntime(
@@ -887,8 +889,8 @@ def test_write_session_snapshot_persists_render_overlay(tmp_path: Path) -> None:
     assert opening["body"]["font"] == "ubuntumono"
     assert opening["title"]["font-colour"] == "#ffffff"
     assert opening["body"]["colour"] == "#ffffff"
-    assert opening["background"]["margin"] == 10
-    assert opening["background"]["padding"] == 10
+    assert opening["background"]["margin"] == 33
+    assert opening["background"]["padding"] == 9
     assert opening["background"]["colour"] == "#000000"
     assert opening["background"]["opacity"] == 0.75
     assert opening["background"]["border"]["colour"] == "#ffffff"
@@ -905,6 +907,8 @@ def test_write_session_snapshot_persists_render_overlay(tmp_path: Path) -> None:
     assert round_trip.overlays.opening_card.title.margin_bottom == 6
     assert round_trip.overlays.opening_card.body.font_size == 18
     assert round_trip.overlays.opening_card.body.font == "ubuntumono"
+    assert round_trip.overlays.opening_card.background.margin == 33
+    assert round_trip.overlays.opening_card.background.padding == 9
     assert round_trip.overlays.opening_card.background.opacity == 0.75
     assert round_trip.overlays.opening_card.background.border.width == 4
 

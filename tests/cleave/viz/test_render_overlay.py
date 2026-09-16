@@ -230,6 +230,8 @@ def test_build_live_overlay_config_overrides_runtime_fields() -> None:
         border_width=4,
         title_content="Live title override",
         body_content="Live body override",
+        background_margin=12,
+        background_padding=8,
         animation=RenderOverlayAnimationRuntime(
             type="slide",
             slide_direction="right",
@@ -237,7 +239,7 @@ def test_build_live_overlay_config_overrides_runtime_fields() -> None:
             display_time=40.0,
         ),
     )
-    merged = build_live_overlay_config(base, runtime)
+    merged = build_live_overlay_config(runtime)
     assert merged.enabled is True
     assert merged.title.content == "Live title override"
     assert merged.title.content != base.title.content
@@ -257,8 +259,10 @@ def test_build_live_overlay_config_overrides_runtime_fields() -> None:
     assert merged.title.background_colour == runtime.title_background_colour
     assert merged.body.colour == runtime.body_colour
     assert merged.body.background_colour == runtime.body_background_colour
-    assert merged.background.margin == base.background.margin
-    assert merged.background.padding == base.background.padding
+    assert merged.background.margin == 12
+    assert merged.background.padding == 8
+    assert merged.background.margin != base.background.margin
+    assert merged.background.padding != base.background.padding
     assert merged.background.colour == runtime.background_colour
     assert merged.background.opacity == 0.75
     assert merged.background.border.colour == runtime.border_colour
@@ -283,7 +287,7 @@ def test_overlay_card_persist_values_uses_runtime_title_content() -> None:
     base = _overlay_cfg()
     runtime = _card_runtime_from_cfg(base)
     runtime.title_content = "Persisted title"
-    values = _overlay_card_persist_values(runtime, base)
+    values = _overlay_card_persist_values(runtime)
     assert values["title"]["content"] == "Persisted title"
     assert values["title"]["content"] != base.title.content
 
@@ -292,7 +296,7 @@ def test_overlay_card_persist_values_uses_runtime_body_content() -> None:
     base = _overlay_cfg()
     runtime = _card_runtime_from_cfg(base)
     runtime.body_content = "Persisted body"
-    values = _overlay_card_persist_values(runtime, base)
+    values = _overlay_card_persist_values(runtime)
     assert values["body"]["content"] == "Persisted body"
     assert values["body"]["content"] != base.body.content
 
@@ -326,6 +330,17 @@ def test_card_runtime_from_cfg_reads_colours() -> None:
     assert runtime.border_colour == (160, 170, 180)
 
 
+def test_card_runtime_from_cfg_reads_background_margin_and_padding() -> None:
+    base = _overlay_cfg()
+    card = replace(
+        base,
+        background=replace(base.background, margin=15, padding=7),
+    )
+    runtime = _card_runtime_from_cfg(card)
+    assert runtime.background_margin == 15
+    assert runtime.background_padding == 7
+
+
 def test_overlay_card_persist_values_uses_runtime_colours() -> None:
     base = _overlay_cfg()
     runtime = _card_runtime_from_cfg(base)
@@ -335,7 +350,7 @@ def test_overlay_card_persist_values_uses_runtime_colours() -> None:
     runtime.body_background_colour = None
     runtime.background_colour = (11, 12, 13)
     runtime.border_colour = (14, 15, 16)
-    values = _overlay_card_persist_values(runtime, base)
+    values = _overlay_card_persist_values(runtime)
     assert values["title"]["colour"] == (1, 2, 3)
     assert values["title"]["background_colour"] == (4, 5, 6)
     assert values["body"]["colour"] == (7, 8, 9)
@@ -344,8 +359,8 @@ def test_overlay_card_persist_values_uses_runtime_colours() -> None:
     assert values["background"]["border"]["colour"] == (14, 15, 16)
     assert values["title"]["colour"] != base.title.colour
     assert values["background"]["colour"] != base.background.colour
-    assert values["background"]["margin"] == base.background.margin
-    assert values["background"]["padding"] == base.background.padding
+    assert values["background"]["margin"] == runtime.background_margin
+    assert values["background"]["padding"] == runtime.background_padding
 
 
 def test_build_live_overlay_config_uses_runtime_colours() -> None:
@@ -359,7 +374,7 @@ def test_build_live_overlay_config_uses_runtime_colours() -> None:
         background_colour=(21, 22, 23),
         border_colour=(24, 25, 26),
     )
-    merged = build_live_overlay_config(base, runtime)
+    merged = build_live_overlay_config(runtime)
     assert merged.title.colour == (9, 8, 7)
     assert merged.title.background_colour == (6, 5, 4)
     assert merged.body.colour == (3, 2, 1)
@@ -368,8 +383,31 @@ def test_build_live_overlay_config_uses_runtime_colours() -> None:
     assert merged.background.border.colour == (24, 25, 26)
     assert merged.title.colour != base.title.colour
     assert merged.background.colour != base.background.colour
-    assert merged.background.margin == base.background.margin
-    assert merged.background.padding == base.background.padding
+    assert merged.background.margin == runtime.background_margin
+    assert merged.background.padding == runtime.background_padding
+
+
+def test_overlay_card_persist_values_uses_runtime_margin_and_padding() -> None:
+    base = _overlay_cfg(margin=10, padding=10)
+    runtime = _card_runtime_from_cfg(base)
+    runtime.background_margin = 33
+    runtime.background_padding = 9
+    values = _overlay_card_persist_values(runtime)
+    assert values["background"]["margin"] == 33
+    assert values["background"]["padding"] == 9
+    assert values["background"]["margin"] != base.background.margin
+    assert values["background"]["padding"] != base.background.padding
+
+
+def test_build_live_overlay_config_uses_runtime_margin_and_padding() -> None:
+    runtime = replace(
+        default_render_overlay_card_runtime(),
+        background_margin=18,
+        background_padding=5,
+    )
+    merged = build_live_overlay_config(runtime)
+    assert merged.background.margin == 18
+    assert merged.background.padding == 5
 
 
 def test_panel_position_corners() -> None:

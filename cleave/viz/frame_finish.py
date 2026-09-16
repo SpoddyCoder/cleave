@@ -6,11 +6,9 @@ curation), visual-limiter busyness sample, optional user highlight rolloff,
 chroma boost, post-FX fade, render overlay composite, then present to the
 display framebuffer.
 
-When ``cfg.render`` is absent, overlay resolution matches live WYSIWYG:
-``render_overlays_base(cfg)`` falls back to ``default_render_overlays_config()``,
-merged with session bootstrap values from ``session_from_cfg`` (same as config
-snapshot overlay persistence). Offline render uses the frozen bootstrap session;
-live play may mutate ``session.render_overlays`` at runtime.
+Overlay cards are built from ``session.render_overlays``. Config is YAML
+bootstrap via ``session_from_cfg``. Offline render uses the frozen bootstrap
+session; live play may mutate ``session.render_overlays`` at runtime.
 """
 
 from __future__ import annotations
@@ -20,8 +18,7 @@ from typing import TYPE_CHECKING, Literal
 
 import pygame
 
-from cleave.config import CleaveConfig, RenderOverlayCardConfig
-from cleave.config_schema.render import render_overlays_base
+from cleave.config import RenderOverlayCardConfig
 
 if TYPE_CHECKING:
     from cleave.viz.app import VisualizerCore
@@ -82,26 +79,20 @@ def ensure_render_overlay_panel(
 
 
 def resolve_overlay_card_config(
-    cfg: CleaveConfig,
     session: TuningSession,
     card: OverlayCardName,
 ) -> RenderOverlayCardConfig:
-    base = render_overlays_base(cfg)
     if card == "opening":
-        return build_live_overlay_config(
-            base.opening_card, session.render_overlays.opening_card
-        )
-    return build_live_overlay_config(
-        base.closing_card, session.render_overlays.closing_card
-    )
+        return build_live_overlay_config(session.render_overlays.opening_card)
+    return build_live_overlay_config(session.render_overlays.closing_card)
 
 
 def resolve_overlay_configs(
-    cfg: CleaveConfig, session: TuningSession
+    session: TuningSession,
 ) -> tuple[RenderOverlayCardConfig, RenderOverlayCardConfig]:
     return (
-        resolve_overlay_card_config(cfg, session, "opening"),
-        resolve_overlay_card_config(cfg, session, "closing"),
+        resolve_overlay_card_config(session, "opening"),
+        resolve_overlay_card_config(session, "closing"),
     )
 
 
@@ -149,7 +140,7 @@ def _composite_render_overlay(
     panel_cache: RenderOverlaysPanelCache | None,
     song_duration: float | None,
 ) -> None:
-    opening_cfg, closing_cfg = resolve_overlay_configs(core.seed.cfg, session)
+    opening_cfg, closing_cfg = resolve_overlay_configs(session)
     sections_on = render_sections_active(session.settings.editor_mode)
     overlays = session.render_overlays
     opening_cache = None if panel_cache is None else panel_cache.opening

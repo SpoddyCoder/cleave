@@ -113,9 +113,9 @@ def panel_surface_key(cfg: RenderOverlayCardConfig) -> tuple:
 
 
 def build_live_overlay_config(
-    base: RenderOverlayCardConfig, runtime: RenderOverlayCardRuntime
+    runtime: RenderOverlayCardRuntime,
 ) -> RenderOverlayCardConfig:
-    """Merge static YAML fields with live-tuned runtime overrides."""
+    """Build overlay card config from live-tuned session runtime."""
     from cleave.config import (
         RenderOverlayAnimationConfig,
         RenderOverlayBackgroundConfig,
@@ -161,8 +161,8 @@ def build_live_overlay_config(
         animation=animation,
         position=runtime.position,
         background=RenderOverlayBackgroundConfig(
-            margin=base.background.margin,
-            padding=base.background.padding,
+            margin=runtime.background_margin,
+            padding=runtime.background_padding,
             colour=runtime.background_colour,
             opacity=runtime.opacity_pct / 100.0,
             border=RenderOverlayBorderConfig(

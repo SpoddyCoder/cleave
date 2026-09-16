@@ -33,7 +33,7 @@ from cleave.project import ProjectRenderSettings, write_manifest
 from cleave.separate import project_stems_complete
 
 render_mod = importlib.import_module("cleave.viz.render")
-from cleave.viz.frame_finish import resolve_overlay_card_config, resolve_overlay_configs
+from cleave.viz.frame_finish import resolve_overlay_configs
 from cleave.viz.render import (  # noqa: E402
     RenderSegment,
     _default_output_path,
@@ -1027,7 +1027,7 @@ def test_render_calls_overlay_compositing_when_enabled(
     render_mod.render(project)
 
     expected_opening, expected_closing = resolve_overlay_configs(
-        mock_load_config.return_value, runtime.seed.session
+        runtime.seed.session
     )
     expected_cfg = expected_opening
     mock_build_layers.assert_called_once_with(expected_cfg)
