@@ -11,6 +11,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 - Credits card title text row under each card's title section in the panel. Enter opens a text dialog; Confirm updates the title; Save persists it. Section lock blocks editing.
 - Credits card body text row under each card's body section in the panel. Enter opens a text dialog; Confirm updates the body; Save persists it. Section lock blocks editing.
+- Credits card colour rows in the panel for title background, body colour, body background, background colour, and border colour. Enter opens a hex dialog; Confirm updates the colour; Save persists it. Empty Confirm clears optional backgrounds. Section lock blocks editing.
 
 - Settings > UI: notification time (until dismissed, or 1-20s). Enter dismisses a toast before it times out.
 

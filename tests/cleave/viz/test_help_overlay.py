@@ -443,6 +443,18 @@ def test_render_overlay_title_colour_help() -> None:
     assert dict(section.entries)["Enter"] == "edit colour"
 
 
+def test_render_overlay_remaining_colour_rows_help() -> None:
+    for kind in (
+        RowKind.RENDER_OVERLAY_CARD_TITLE_BACKGROUND_COLOUR,
+        RowKind.RENDER_OVERLAY_CARD_BODY_COLOUR,
+        RowKind.RENDER_OVERLAY_CARD_BODY_BACKGROUND_COLOUR,
+        RowKind.RENDER_OVERLAY_CARD_BACKGROUND_COLOUR,
+        RowKind.RENDER_OVERLAY_CARD_BORDER_COLOUR,
+    ):
+        section = _keyboard_section(sections_for(kind))
+        assert dict(section.entries)["Enter"] == "edit colour"
+
+
 def test_render_overlay_body_text_help() -> None:
     section = _keyboard_section(sections_for(RowKind.RENDER_OVERLAY_CARD_BODY_TEXT))
     assert dict(section.entries)["Enter"] == "edit body"
