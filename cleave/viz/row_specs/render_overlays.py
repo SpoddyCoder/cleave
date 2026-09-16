@@ -75,6 +75,12 @@ def _format_overlay_card_body_font(
 ) -> str:
     return render_overlay_font_display(_overlay_card_block(state, desc).runtime.body_font)
 
+def _format_overlay_card_body_content(
+    state: TuningViewState, desc: RowDescriptor
+) -> str:
+    content = _overlay_card_block(state, desc).runtime.body_content
+    return content.replace("\n", " ").replace("\r", " ")
+
 def _format_overlay_card_opacity(
     state: TuningViewState, desc: RowDescriptor
 ) -> str:
@@ -192,6 +198,22 @@ def _apply_overlay_card_body_font(
     _shift: bool,
 ) -> None:
     _overlay_card_controls(controls, desc).cycle_body_font(forward=forward)
+
+def _apply_overlay_card_body_text_action(
+    controls: TuningControls,
+    desc: RowDescriptor,
+) -> None:
+    from cleave.viz.row_spec import section_lock_blocks_mutation
+    if section_lock_blocks_mutation(controls.session, desc):
+        return
+    card_controls = _overlay_card_controls(controls, desc)
+    current_body = _overlay_card_block_session(controls, desc).body_content
+    controls.modal_host.prompt_text(
+        cta="Change text...",
+        initial=current_body,
+        on_confirm=card_controls.set_body_content,
+        single_line=False,
+    )
 
 def _apply_overlay_card_opacity(
     controls: TuningControls,
@@ -500,6 +522,19 @@ SPECS: dict[RowKind, RowSpec] = {
         help_description=("Font used for this credits card body.",),
         repeatable=True,
         parent_group="render_overlay_body",
+    ),
+    RowKind.RENDER_OVERLAY_CARD_BODY_TEXT: RowSpec(
+        affordance=RowAffordance.ACTION,
+        panel_label="body text",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_overlay_card_body_content,
+        apply_action=_apply_overlay_card_body_text_action,
+        shows_enter_icon=True,
+        help_title="Body text",
+        help_entries=(("Enter", "edit body"),),
+        help_description=("Open a dialog to change this card's body.",),
+        parent_group="render_overlay_body",
+        blocked_by_section_lock=True,
     ),
     RowKind.RENDER_OVERLAY_CARD_OPACITY: RowSpec(
         affordance=RowAffordance.VALUE_STEP,

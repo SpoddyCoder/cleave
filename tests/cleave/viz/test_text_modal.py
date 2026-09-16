@@ -239,6 +239,156 @@ def test_up_down_toggle_focus_region_resets_button_index() -> None:
     assert view.button_index == 0
 
 
+def test_up_in_edit_moves_to_previous_line_same_column() -> None:
+    modal = ModalHost()
+    _open_text(modal, initial="ab\ncd", single_line=False)
+    view = modal.view_state()
+    assert view is not None
+    assert view.editing is True
+    assert view.caret_index == 5
+
+    modal.handle_keydown(_keydown(pygame.K_UP))
+    view = modal.view_state()
+    assert view is not None
+    assert view.editing is True
+    assert view.focus_region == TextFocusRegion.FIELD
+    assert view.caret_index == 2
+
+
+def test_down_in_edit_moves_to_next_line_same_column() -> None:
+    modal = ModalHost()
+    _open_text(modal, initial="ab\ncd", single_line=False)
+    for _ in range(4):
+        modal.handle_keydown(_keydown(pygame.K_LEFT))
+    view = modal.view_state()
+    assert view is not None
+    assert view.caret_index == 1
+
+    modal.handle_keydown(_keydown(pygame.K_DOWN))
+    view = modal.view_state()
+    assert view is not None
+    assert view.editing is True
+    assert view.focus_region == TextFocusRegion.FIELD
+    assert view.caret_index == 4
+
+
+def test_up_on_first_line_stays_in_edit() -> None:
+    modal = ModalHost()
+    _open_text(modal, initial="ab\ncd", single_line=False)
+    for _ in range(4):
+        modal.handle_keydown(_keydown(pygame.K_LEFT))
+    view = modal.view_state()
+    assert view is not None
+    assert view.caret_index == 1
+    assert view.editing is True
+
+    modal.handle_keydown(_keydown(pygame.K_UP))
+    view = modal.view_state()
+    assert view is not None
+    assert view.editing is True
+    assert view.focus_region == TextFocusRegion.FIELD
+    assert view.caret_index == 1
+
+
+def test_down_on_last_line_stays_in_edit() -> None:
+    modal = ModalHost()
+    _open_text(modal, initial="ab\ncd", single_line=False)
+    view = modal.view_state()
+    assert view is not None
+    assert view.caret_index == 5
+    assert view.editing is True
+
+    modal.handle_keydown(_keydown(pygame.K_DOWN))
+    view = modal.view_state()
+    assert view is not None
+    assert view.editing is True
+    assert view.focus_region == TextFocusRegion.FIELD
+    assert view.caret_index == 5
+
+
+def test_up_down_clamp_column_to_shorter_line() -> None:
+    modal = ModalHost()
+    _open_text(modal, initial="hello\nhi", single_line=False)
+    modal.handle_keydown(_keydown(pygame.K_UP))
+    modal.handle_keydown(_keydown(pygame.K_RIGHT))
+    modal.handle_keydown(_keydown(pygame.K_RIGHT))
+    view = modal.view_state()
+    assert view is not None
+    assert view.caret_index == 4
+
+    modal.handle_keydown(_keydown(pygame.K_DOWN))
+    view = modal.view_state()
+    assert view is not None
+    assert view.editing is True
+    assert view.caret_index == 8
+
+
+def test_single_line_up_down_noop_in_edit() -> None:
+    modal = ModalHost()
+    _open_text(modal, initial="hello", single_line=True)
+    modal.handle_keydown(_keydown(pygame.K_LEFT))
+    view = modal.view_state()
+    assert view is not None
+    assert view.caret_index == 4
+    assert view.editing is True
+
+    modal.handle_keydown(_keydown(pygame.K_UP))
+    view = modal.view_state()
+    assert view is not None
+    assert view.editing is True
+    assert view.focus_region == TextFocusRegion.FIELD
+    assert view.caret_index == 4
+    assert view.draft == "hello"
+
+    modal.handle_keydown(_keydown(pygame.K_DOWN))
+    view = modal.view_state()
+    assert view is not None
+    assert view.editing is True
+    assert view.focus_region == TextFocusRegion.FIELD
+    assert view.caret_index == 4
+    assert "\n" not in view.draft
+
+
+def _wrap_chunks(width: int):
+    def wrap(draft: str) -> list[str]:
+        lines: list[str] = []
+        for para in draft.split("\n"):
+            if not para:
+                lines.append("")
+                continue
+            for index in range(0, len(para), width):
+                lines.append(para[index : index + width])
+        return lines or [""]
+
+    return wrap
+
+
+def test_up_down_use_bound_visual_wrap_lines() -> None:
+    modal = ModalHost()
+    modal.set_text_field_wrap(_wrap_chunks(2))
+    _open_text(modal, initial="abcd", single_line=False)
+    view = modal.view_state()
+    assert view is not None
+    assert view.caret_index == 4
+
+    modal.handle_keydown(_keydown(pygame.K_UP))
+    view = modal.view_state()
+    assert view is not None
+    assert view.editing is True
+    assert view.focus_region == TextFocusRegion.FIELD
+    assert view.caret_index == 2
+
+    modal.handle_keydown(_keydown(pygame.K_LEFT))
+    view = modal.view_state()
+    assert view is not None
+    assert view.caret_index == 1
+    modal.handle_keydown(_keydown(pygame.K_DOWN))
+    view = modal.view_state()
+    assert view is not None
+    assert view.caret_index == 3
+    assert view.draft == "abcd"
+
+
 def test_y_and_n_noop_in_edit_and_navigate() -> None:
     modal = ModalHost()
     confirmed, cancelled = _open_text(modal, initial="hello")

@@ -200,6 +200,7 @@ class OverlayDrawer:
                 modal_view,
                 font=overlay._font_get(),
                 line_gap=overlay._line_gap,
+                modal_host=modal_host,
             )
             tex_id = _upload(overlay_surface)
             _present(tex_id, 0, 0, viewport_w, viewport_h)

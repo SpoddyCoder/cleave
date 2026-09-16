@@ -47,18 +47,161 @@ def clamp_modal_focus_index(index: int, option_count: int) -> int:
     return index
 
 
-def _logical_line_start(text: str, index: int) -> int:
-    newline = text.rfind("\n", 0, index)
-    if newline < 0:
+def text_field_lines(
+    draft: str,
+    *,
+    single_line: bool,
+    wrap: Callable[[str], list[str]] | None = None,
+) -> list[str]:
+    """Visual lines for caret movement: wrap when provided, else ``split("\\n")``."""
+    if single_line:
+        return [draft]
+    if wrap is not None:
+        lines = wrap(draft)
+        return lines if lines else [""]
+    return draft.split("\n")
+
+
+def caret_line_column(
+    text: str, lines: list[str], caret_index: int
+) -> tuple[int, int]:
+    """Map caret_index in *text* to (line, column) in wrapped *lines*.
+
+    Hard newlines sit at the end of the preceding visual line. Spaces dropped
+    at wrap points sit at the end of the line before the wrap.
+    """
+    caret_index = max(0, min(caret_index, len(text)))
+    if not lines:
+        return 0, 0
+    if not text:
+        return 0, 0
+
+    src = 0
+    last_i = len(lines) - 1
+    for line_i, line in enumerate(lines):
+        if not line:
+            if caret_index <= src:
+                return line_i, 0
+            if src < len(text) and text[src] == "\n":
+                src += 1
+                continue
+            return line_i, 0
+
+        while (
+            src < len(text)
+            and text[src].isspace()
+            and text[src] != "\n"
+            and not text.startswith(line, src)
+        ):
+            if caret_index == src:
+                return line_i, 0
+            src += 1
+
+        line_start = src
+        if text.startswith(line, src):
+            src += len(line)
+        else:
+            found = text.find(line, src)
+            newline = text.find("\n", src)
+            if found >= 0 and (newline < 0 or found <= newline):
+                line_start = found
+                src = found + len(line)
+            else:
+                src = min(len(text), src + len(line))
+        line_end = src
+
+        if line_start <= caret_index <= line_end:
+            return line_i, caret_index - line_start
+
+        trail = src
+        while (
+            trail < len(text)
+            and text[trail].isspace()
+            and text[trail] != "\n"
+        ):
+            trail += 1
+        if line_end < caret_index < trail:
+            return line_i, len(line)
+
+        src = trail
+        if src < len(text) and text[src] == "\n":
+            if caret_index == src:
+                return line_i, len(line)
+            src += 1
+
+    return last_i, len(lines[last_i])
+
+
+def caret_index_for_line_column(
+    text: str, lines: list[str], line: int, column: int
+) -> int:
+    """Source index for *column* on visual *line* in wrapped *lines*."""
+    if not lines:
         return 0
-    return newline + 1
+    line = max(0, min(line, len(lines) - 1))
+    src = 0
+    for line_i, line_text in enumerate(lines):
+        if not line_text:
+            if line_i == line:
+                return src
+            if src < len(text) and text[src] == "\n":
+                src += 1
+            continue
+
+        while (
+            src < len(text)
+            and text[src].isspace()
+            and text[src] != "\n"
+            and not text.startswith(line_text, src)
+        ):
+            src += 1
+
+        line_start = src
+        if text.startswith(line_text, src):
+            src += len(line_text)
+        else:
+            found = text.find(line_text, src)
+            newline = text.find("\n", src)
+            if found >= 0 and (newline < 0 or found <= newline):
+                line_start = found
+                src = found + len(line_text)
+            else:
+                src = min(len(text), src + len(line_text))
+        line_end = src
+
+        if line_i == line:
+            return min(line_start + max(0, column), line_end)
+
+        trail = src
+        while (
+            trail < len(text)
+            and text[trail].isspace()
+            and text[trail] != "\n"
+        ):
+            trail += 1
+        src = trail
+        if src < len(text) and text[src] == "\n":
+            src += 1
+
+    return len(text)
 
 
-def _next_logical_line_start(text: str, index: int) -> int:
-    newline = text.find("\n", index)
-    if newline < 0:
-        return len(text)
-    return newline + 1
+def _move_caret_vertical(
+    state: TextModalState,
+    delta: int,
+    wrap: Callable[[str], list[str]] | None,
+) -> None:
+    if state.single_line:
+        return
+    lines = text_field_lines(state.draft, single_line=False, wrap=wrap)
+    line, column = caret_line_column(state.draft, lines, state.caret_index)
+    target = line + delta
+    if target < 0 or target >= len(lines):
+        return
+    dest_col = min(column, len(lines[target]))
+    state.caret_index = caret_index_for_line_column(
+        state.draft, lines, target, dest_col
+    )
 
 
 @dataclass
@@ -126,7 +269,11 @@ def _insert_text_at_caret(state: TextModalState, text: str) -> None:
     _reset_caret_blink(state)
 
 
-def _apply_text_edit_key(state: TextModalState, key: int) -> None:
+def _apply_text_edit_key(
+    state: TextModalState,
+    key: int,
+    wrap: Callable[[str], list[str]] | None = None,
+) -> None:
     _reset_caret_blink(state)
     if key == pygame.K_BACKSPACE:
         if state.caret_index > 0:
@@ -141,14 +288,10 @@ def _apply_text_edit_key(state: TextModalState, key: int) -> None:
         state.caret_index = min(len(state.draft), state.caret_index + 1)
         return
     if key == pygame.K_UP:
-        if not state.single_line:
-            state.caret_index = _logical_line_start(state.draft, state.caret_index)
+        _move_caret_vertical(state, -1, wrap)
         return
     if key == pygame.K_DOWN:
-        if not state.single_line:
-            state.caret_index = _next_logical_line_start(
-                state.draft, state.caret_index
-            )
+        _move_caret_vertical(state, 1, wrap)
 
 
 @dataclass
@@ -198,6 +341,13 @@ class ModalHost:
         self._on_stop_text_input = on_stop_text_input
         self._text_input_started = False
         self._text_key_repeat = KeyRepeatController()
+        self._text_field_wrap: Callable[[str], list[str]] | None = None
+
+    def set_text_field_wrap(
+        self, wrap: Callable[[str], list[str]] | None
+    ) -> None:
+        """Use the same wrap as field draw; None falls back to logical lines."""
+        self._text_field_wrap = wrap
 
     @property
     def active(self) -> bool:
@@ -465,7 +615,7 @@ class ModalHost:
             self._leave_text_edit(state)
             return True
         if event.key in _TEXT_EDIT_REPEAT_KEYS:
-            _apply_text_edit_key(state, event.key)
+            _apply_text_edit_key(state, event.key, self._text_field_wrap)
             self._text_key_repeat.on_keydown(
                 event.key,
                 event.mod,
@@ -478,7 +628,7 @@ class ModalHost:
         state = self._text_state
         if state is None or not state.editing:
             return
-        _apply_text_edit_key(state, key)
+        _apply_text_edit_key(state, key, self._text_field_wrap)
 
     def _handle_text_navigate_keydown(
         self,

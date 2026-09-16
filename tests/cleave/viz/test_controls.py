@@ -1199,6 +1199,7 @@ def test_render_overlay_font_rows_nested_indent() -> None:
     title_font_size = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_TITLE_FONT_SIZE)
     title_font = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_TITLE_FONT)
     body_header = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_BODY_HEADER)
+    body_text = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_BODY_TEXT)
     body_font_size = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_BODY_FONT_SIZE)
     body_font = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_BODY_FONT)
     assert _row_indent(view, title_header) == TREE_INDENT * 2
@@ -1206,6 +1207,7 @@ def test_render_overlay_font_rows_nested_indent() -> None:
     assert _row_indent(view, title_font_size) == TREE_INDENT * 3
     assert _row_indent(view, title_font) == TREE_INDENT * 3
     assert _row_indent(view, body_header) == TREE_INDENT * 2
+    assert _row_indent(view, body_text) == TREE_INDENT * 3
     assert _row_indent(view, body_font_size) == TREE_INDENT * 3
     assert _row_indent(view, body_font) == TREE_INDENT * 3
 
@@ -1316,6 +1318,119 @@ def test_render_overlay_title_text_lock_blocks_enter() -> None:
     view = controls.build_view_state(paused=False)
     row = view.layout.find_by_kind(
         RowKind.RENDER_OVERLAY_CARD_TITLE_TEXT, card="opening_card"
+    )
+    controls.focus_descriptor = _desc(view, row)
+    controls.session.render_overlays.locked = True
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    assert controls.modal_host.view_state() is None
+
+
+def _expand_overlay_card_body(controls: TuningControls, card: str) -> None:
+    overlays = controls.session.render_overlays
+    overlays.expanded = True
+    getattr(overlays, card).expanded = True
+    getattr(overlays, card).body_expanded = True
+
+
+def test_render_overlay_body_text_row_present_for_both_cards() -> None:
+    controls = _make_controls()
+    _expand_overlay_card_body(controls, "opening_card")
+    _expand_overlay_card_body(controls, "closing_card")
+    view = controls.build_view_state(paused=False)
+    opening = view.layout.find_by_kind(
+        RowKind.RENDER_OVERLAY_CARD_BODY_TEXT, card="opening_card"
+    )
+    closing = view.layout.find_by_kind(
+        RowKind.RENDER_OVERLAY_CARD_BODY_TEXT, card="closing_card"
+    )
+    opening_font = view.layout.find_by_kind(
+        RowKind.RENDER_OVERLAY_CARD_BODY_FONT, card="opening_card"
+    )
+    closing_font = view.layout.find_by_kind(
+        RowKind.RENDER_OVERLAY_CARD_BODY_FONT, card="closing_card"
+    )
+    assert view.layout.descriptor(opening).card == "opening_card"
+    assert view.layout.descriptor(closing).card == "closing_card"
+    assert opening < opening_font
+    assert closing < closing_font
+
+
+def test_render_overlay_body_text_formats_newlines_as_spaces() -> None:
+    controls = _make_controls()
+    _expand_overlay_card_body(controls, "opening_card")
+    controls.session.render_overlays.opening_card.body_content = "Line one\nLine two"
+    view = controls.build_view_state(paused=False)
+    row = view.layout.find_by_kind(
+        RowKind.RENDER_OVERLAY_CARD_BODY_TEXT, card="opening_card"
+    )
+    assert _row_text(view, row) == "    └─ body text: Line one Line two"
+
+
+def test_render_overlay_body_text_enter_opens_multiline_modal() -> None:
+    controls = _make_controls()
+    _expand_overlay_card_body(controls, "opening_card")
+    controls.session.render_overlays.opening_card.body_content = "Opening body"
+    view = controls.build_view_state(paused=False)
+    row = view.layout.find_by_kind(
+        RowKind.RENDER_OVERLAY_CARD_BODY_TEXT, card="opening_card"
+    )
+    controls.focus_descriptor = _desc(view, row)
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    modal = controls.modal_host.view_state()
+    assert modal is not None
+    assert modal.kind == ModalKind.TEXT
+    assert modal.single_line is False
+    assert modal.cta == "Change text..."
+    assert modal.draft == "Opening body"
+    assert modal.editing is True
+
+
+def test_render_overlay_body_text_confirm_updates_session() -> None:
+    controls = _make_controls()
+    _expand_overlay_card_body(controls, "opening_card")
+    controls.session.render_overlays.opening_card.body_content = "Opening body"
+    view = controls.build_view_state(paused=False)
+    row = view.layout.find_by_kind(
+        RowKind.RENDER_OVERLAY_CARD_BODY_TEXT, card="opening_card"
+    )
+    controls.focus_descriptor = _desc(view, row)
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    controls.modal_host.handle_text_input(" edited")
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    controls.handle_keydown(_keydown(pygame.K_DOWN))
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    assert controls.modal_host.view_state() is None
+    assert (
+        controls.session.render_overlays.opening_card.body_content
+        == "Opening body edited"
+    )
+
+
+def test_render_overlay_body_text_cancel_keeps_session() -> None:
+    controls = _make_controls()
+    _expand_overlay_card_body(controls, "closing_card")
+    controls.session.render_overlays.closing_card.body_content = "Closing body"
+    view = controls.build_view_state(paused=False)
+    row = view.layout.find_by_kind(
+        RowKind.RENDER_OVERLAY_CARD_BODY_TEXT, card="closing_card"
+    )
+    controls.focus_descriptor = _desc(view, row)
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    controls.modal_host.handle_text_input(" edited")
+    controls.handle_keydown(_keydown(pygame.K_ESCAPE))
+    controls.handle_keydown(_keydown(pygame.K_ESCAPE))
+    assert controls.modal_host.view_state() is None
+    assert controls.session.render_overlays.closing_card.body_content == (
+        "Closing body"
+    )
+
+
+def test_render_overlay_body_text_lock_blocks_enter() -> None:
+    controls = _make_controls()
+    _expand_overlay_card_body(controls, "opening_card")
+    view = controls.build_view_state(paused=False)
+    row = view.layout.find_by_kind(
+        RowKind.RENDER_OVERLAY_CARD_BODY_TEXT, card="opening_card"
     )
     controls.focus_descriptor = _desc(view, row)
     controls.session.render_overlays.locked = True

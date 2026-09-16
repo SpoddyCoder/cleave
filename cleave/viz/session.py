@@ -149,6 +149,7 @@ class RenderOverlayCardRuntime:
     title_margin_bottom: int
     body_font_size: int
     body_font: str
+    body_content: str
     opacity_pct: int
     border_width: int
     title_content: str
@@ -491,6 +492,7 @@ def _card_runtime_from_cfg(card: Any) -> RenderOverlayCardRuntime:
         title_margin_bottom=card.title.margin_bottom,
         body_font_size=card.body.font_size,
         body_font=card.body.font,
+        body_content=card.body.content,
         opacity_pct=int(round(card.background.opacity * 100)),
         border_width=card.background.border.width,
         title_content=card.title.content,

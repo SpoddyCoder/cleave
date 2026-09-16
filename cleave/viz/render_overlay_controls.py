@@ -116,6 +116,9 @@ class RenderOverlayCardControls:
     def set_title_content(self, content: str) -> None:
         self._card().title_content = content
 
+    def set_body_content(self, content: str) -> None:
+        self._card().body_content = content
+
     def set_body_font_size(self, size: int) -> None:
         self._card().body_font_size = max(1, size)
 
