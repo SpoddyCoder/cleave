@@ -17,7 +17,14 @@ from cleave.viz.modal import (
     capital_case_modal_option,
 )
 from cleave.viz.overlay_primitives import overlay_font
-from cleave.viz.theme import FOCUS_ROW_BG_ALPHA, HIGHLIGHT, LABEL, MODAL_SCRIM_ALPHA, VALUE
+from cleave.viz.theme import (
+    ACTION,
+    FOCUS_ROW_BG_ALPHA,
+    HIGHLIGHT,
+    LABEL,
+    MODAL_SCRIM_ALPHA,
+    VALUE,
+)
 from cleave.viz.ui_tint import blit_tint
 
 
@@ -685,7 +692,10 @@ def _text_button_rects(
     del field_x, content_w
     field_lines = modal_overlay._text_field_lines(font, view, screen_w=screen_w)
     field_h = modal_overlay._lines_block_height(len(field_lines), line_h, line_gap)
-    button_y = field_y + field_h + section_gap
+    error_extra = 0
+    if modal_overlay._text_error_line(view) is not None:
+        error_extra = line_h + line_gap
+    button_y = field_y + field_h + error_extra + section_gap
     confirm_w, cancel_w = modal_overlay._text_button_widths(font)
     total_w = modal_overlay._text_buttons_width(font)
     panel_w, _ = modal_overlay._measure_text_panel(
@@ -1052,3 +1062,55 @@ def test_text_modal_caret_visible_at_end_when_panel_expands() -> None:
     assert moved is not None
     assert moved.caret_index == len(draft) - 1
     _assert_caret_in_field(moved)
+
+
+def test_text_modal_error_shown_only_when_set() -> None:
+    pygame.init()
+    font = _font()
+    line_gap = 3
+    line_h = font.get_linesize()
+    screen_w = 1280
+    screen_h = 720
+    plain = ModalViewState(
+        kind=ModalKind.TEXT,
+        message=None,
+        options=(),
+        focus_index=0,
+        cta="Change colour (#rgb or #rrggbb)...",
+        draft="#gg0000",
+        single_line=True,
+        editing=False,
+        caret_index=7,
+        focus_region=TextFocusRegion.BUTTONS,
+        button_index=0,
+        caret_visible=False,
+        error=None,
+    )
+    with_error = replace(
+        plain, error="invalid hex colour (use #rgb or #rrggbb)"
+    )
+
+    _, height_plain = modal_overlay._measure_text_panel(
+        font, plain, line_gap=line_gap, screen_w=screen_w, screen_h=screen_h
+    )
+    _, height_error = modal_overlay._measure_text_panel(
+        font, with_error, line_gap=line_gap, screen_w=screen_w, screen_h=screen_h
+    )
+    assert height_error - height_plain == line_h + line_gap
+
+    panel_plain = _draw_text_panel_for_tests(font, plain, line_gap=line_gap)
+    panel_error = _draw_text_panel_for_tests(font, with_error, line_gap=line_gap)
+    full_plain = pygame.Rect(0, 0, panel_plain.get_width(), panel_plain.get_height())
+    assert not _rect_has_color(panel_plain, full_plain, ACTION)
+
+    field_x, field_y, content_w = _text_field_origin(
+        font, with_error, line_gap=line_gap, screen_w=screen_w, screen_h=screen_h
+    )
+    field_lines = modal_overlay._text_field_lines(
+        font, with_error, screen_w=screen_w
+    )
+    field_h = modal_overlay._lines_block_height(len(field_lines), line_h, line_gap)
+    error_rect = pygame.Rect(
+        field_x, field_y + field_h + line_gap, content_w, line_h
+    )
+    assert _rect_has_color(panel_error, error_rect, ACTION)

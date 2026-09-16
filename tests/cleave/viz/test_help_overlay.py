@@ -438,6 +438,11 @@ def test_render_overlay_title_text_help() -> None:
     assert dict(section.entries)["Enter"] == "edit title"
 
 
+def test_render_overlay_title_colour_help() -> None:
+    section = _keyboard_section(sections_for(RowKind.RENDER_OVERLAY_CARD_TITLE_COLOUR))
+    assert dict(section.entries)["Enter"] == "edit colour"
+
+
 def test_render_overlay_body_text_help() -> None:
     section = _keyboard_section(sections_for(RowKind.RENDER_OVERLAY_CARD_BODY_TEXT))
     assert dict(section.entries)["Enter"] == "edit body"

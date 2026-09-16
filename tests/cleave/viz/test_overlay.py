@@ -1545,6 +1545,8 @@ def test_render_overlay_title_and_body_font_rows_when_expanded() -> None:
     kinds = [row.kind for row in state.layout.rows]
     assert RowKind.RENDER_OVERLAY_CARD_TITLE_FONT_SIZE in kinds
     assert RowKind.RENDER_OVERLAY_CARD_TITLE_FONT in kinds
+    assert RowKind.RENDER_OVERLAY_CARD_TITLE_TEXT in kinds
+    assert RowKind.RENDER_OVERLAY_CARD_TITLE_COLOUR in kinds
     assert RowKind.RENDER_OVERLAY_CARD_TITLE_MARGIN_BOTTOM in kinds
     assert RowKind.RENDER_OVERLAY_CARD_BODY_FONT_SIZE in kinds
     assert RowKind.RENDER_OVERLAY_CARD_BODY_FONT in kinds

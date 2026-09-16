@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import pygame
 
 from cleave.viz.key_repeat import INITIAL_DELAY_SEC
@@ -22,6 +24,7 @@ def _open_text(
     cta: str = "Change text...",
     initial: str = "hello",
     single_line: bool = False,
+    validate: Callable[[str], str | None] | None = None,
 ) -> tuple[list[str], list[str]]:
     confirmed: list[str] = []
     cancelled: list[str] = []
@@ -31,8 +34,15 @@ def _open_text(
         on_confirm=confirmed.append,
         on_cancel=lambda: cancelled.append("cancel"),
         single_line=single_line,
+        validate=validate,
     )
     return confirmed, cancelled
+
+
+def _confirm_text(modal: ModalHost) -> None:
+    modal.handle_keydown(_keydown(pygame.K_ESCAPE))
+    modal.handle_keydown(_keydown(pygame.K_DOWN))
+    modal.handle_keydown(_keydown(pygame.K_RETURN))
 
 
 def test_prompt_text_open_shows_initial() -> None:
@@ -48,6 +58,7 @@ def test_prompt_text_open_shows_initial() -> None:
     assert view.single_line is True
     assert view.message is None
     assert view.options == ()
+    assert view.error is None
 
 
 def test_handle_text_input_inserts_at_caret() -> None:
@@ -167,6 +178,80 @@ def test_cancel_button_calls_on_cancel() -> None:
     assert not modal.active
     assert cancelled == ["cancel"]
     assert confirmed == []
+
+
+def test_confirm_failing_validator_keeps_dialog_open() -> None:
+    modal = ModalHost()
+    confirmed, cancelled = _open_text(
+        modal, initial="bad", validate=lambda _draft: "invalid hex colour"
+    )
+    _confirm_text(modal)
+    assert modal.active
+    view = modal.view_state()
+    assert view is not None
+    assert view.error == "invalid hex colour"
+    assert view.draft == "bad"
+    assert view.focus_region == TextFocusRegion.BUTTONS
+    assert view.button_index == 0
+    assert confirmed == []
+    assert cancelled == []
+
+
+def test_draft_edit_clears_error() -> None:
+    modal = ModalHost()
+    confirmed, cancelled = _open_text(
+        modal, initial="bad", validate=lambda _draft: "nope"
+    )
+    _confirm_text(modal)
+    view = modal.view_state()
+    assert view is not None
+    assert view.error == "nope"
+
+    modal.handle_keydown(_keydown(pygame.K_UP))
+    modal.handle_keydown(_keydown(pygame.K_RETURN))
+    assert modal.handle_text_input("x") is True
+    view = modal.view_state()
+    assert view is not None
+    assert view.error is None
+    assert view.draft == "badx"
+
+    modal.handle_keydown(_keydown(pygame.K_ESCAPE))
+    modal.handle_keydown(_keydown(pygame.K_DOWN))
+    modal.handle_keydown(_keydown(pygame.K_RETURN))
+    view = modal.view_state()
+    assert view is not None
+    assert view.error == "nope"
+    modal.handle_keydown(_keydown(pygame.K_UP))
+    modal.handle_keydown(_keydown(pygame.K_RETURN))
+    modal.handle_keydown(_keydown(pygame.K_BACKSPACE))
+    view = modal.view_state()
+    assert view is not None
+    assert view.error is None
+    assert view.draft == "bad"
+    assert confirmed == []
+    assert cancelled == []
+    assert modal.active
+
+
+def test_confirm_passing_validator_dismisses() -> None:
+    modal = ModalHost()
+    confirmed, cancelled = _open_text(
+        modal, initial="ok", validate=lambda _draft: None
+    )
+    _confirm_text(modal)
+    assert not modal.active
+    assert confirmed == ["ok"]
+    assert cancelled == []
+
+
+def test_confirm_without_validator_still_commits() -> None:
+    modal = ModalHost()
+    confirmed, cancelled = _open_text(modal, initial="hello")
+    modal.handle_text_input("!")
+    _confirm_text(modal)
+    assert not modal.active
+    assert confirmed == ["hello!"]
+    assert cancelled == []
 
 
 def test_confirm_button_commits_draft() -> None:

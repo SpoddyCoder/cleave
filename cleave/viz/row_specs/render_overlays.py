@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from cleave.config_schema.descriptors import parse_hex_colour, rgb_to_hex
 from cleave.config_schema.render import (
     RENDER_OVERLAY_ANIMATION_TYPE_HELP_ENTRIES,
     RENDER_OVERLAY_SLIDE_DIRECTION_HELP_ENTRIES,
 )
+from cleave.viz.colour_parse import validate_hex_colour
 from cleave.viz.fonts import render_overlay_font_display
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
 from cleave.viz.row_sections import apply_expand_toggle
@@ -64,6 +66,11 @@ def _format_overlay_card_title_content(
 ) -> str:
     content = _overlay_card_block(state, desc).runtime.title_content
     return content.replace("\n", " ").replace("\r", " ")
+
+def _format_overlay_card_title_colour(
+    state: TuningViewState, desc: RowDescriptor
+) -> str:
+    return rgb_to_hex(_overlay_card_block(state, desc).runtime.title_colour)
 
 def _format_overlay_card_body_font_size(
     state: TuningViewState, desc: RowDescriptor
@@ -174,6 +181,27 @@ def _apply_overlay_card_title_text_action(
         initial=current_title,
         on_confirm=card_controls.set_title_content,
         single_line=True,
+    )
+
+def _apply_overlay_card_title_colour_action(
+    controls: TuningControls,
+    desc: RowDescriptor,
+) -> None:
+    from cleave.viz.row_spec import section_lock_blocks_mutation
+    if section_lock_blocks_mutation(controls.session, desc):
+        return
+    card_controls = _overlay_card_controls(controls, desc)
+    current = _overlay_card_block_session(controls, desc).title_colour
+
+    def _on_confirm(draft: str) -> None:
+        card_controls.set_title_colour(parse_hex_colour(draft, "colour"))
+
+    controls.modal_host.prompt_text(
+        cta="Change colour (#rgb or #rrggbb)...",
+        initial=rgb_to_hex(current),
+        on_confirm=_on_confirm,
+        single_line=True,
+        validate=validate_hex_colour,
     )
 
 def _apply_overlay_card_body_font_size(
@@ -486,6 +514,19 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Title text",
         help_entries=(("Enter", "edit title"),),
         help_description=("Open a dialog to change this card's title.",),
+        parent_group="render_overlay_title",
+        blocked_by_section_lock=True,
+    ),
+    RowKind.RENDER_OVERLAY_CARD_TITLE_COLOUR: RowSpec(
+        affordance=RowAffordance.ACTION,
+        panel_label="title colour",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_overlay_card_title_colour,
+        apply_action=_apply_overlay_card_title_colour_action,
+        shows_enter_icon=True,
+        help_title="Title colour",
+        help_entries=(("Enter", "edit colour"),),
+        help_description=("Hex colour of this credits card title.",),
         parent_group="render_overlay_title",
         blocked_by_section_lock=True,
     ),

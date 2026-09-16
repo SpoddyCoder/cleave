@@ -34,6 +34,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- Overlay colour dialog CTA includes the accepted hex formats: `Change colour (#rgb or #rrggbb)...`.
 - Blank row under Settings on the live overlay; Project sits just above the transport icons.
 - New-install defaults: preview quality `full-quality`, UI width mode `fixed`, max width 140, notification time 10s, and ProjectM default beat sensitivity 1.0. Existing user config and `project.yaml` files keep their saved values.
 - Default editor window size is 1920x1080 (user config; restart to apply). Existing user config files keep their saved size.

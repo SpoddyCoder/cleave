@@ -236,6 +236,8 @@ class TextModalState:
     on_confirm: Callable[[str], None]
     on_cancel: Callable[[], None] | None
     initial: str
+    validate: Callable[[str], str | None] | None = None
+    error: str | None = None
     caret_blink_sec: float = 0.0
 
 
@@ -266,6 +268,7 @@ def _insert_text_at_caret(state: TextModalState, text: str) -> None:
     caret = state.caret_index
     state.draft = state.draft[:caret] + text + state.draft[caret:]
     state.caret_index = caret + len(text)
+    state.error = None
     _reset_caret_blink(state)
 
 
@@ -280,6 +283,7 @@ def _apply_text_edit_key(
             caret = state.caret_index
             state.draft = state.draft[:caret - 1] + state.draft[caret:]
             state.caret_index = caret - 1
+            state.error = None
         return
     if key == pygame.K_LEFT:
         state.caret_index = max(0, state.caret_index - 1)
@@ -321,6 +325,7 @@ class ModalViewState:
     focus_region: TextFocusRegion | None = None
     button_index: int = 0
     caret_visible: bool = True
+    error: str | None = None
 
 
 _UNSAVED_QUIT_MESSAGE = "Unsaved changes - save changes before exit?"
@@ -375,6 +380,7 @@ class ModalHost:
                 focus_region=text.focus_region,
                 button_index=text.button_index,
                 caret_visible=_text_caret_visible(text),
+                error=text.error,
             )
         return ModalViewState(
             kind=self._request.kind,
@@ -473,6 +479,7 @@ class ModalHost:
         on_cancel: Callable[[], None] | None = None,
         *,
         single_line: bool = False,
+        validate: Callable[[str], str | None] | None = None,
     ) -> None:
         self.prompt(
             ModalRequest(
@@ -493,6 +500,7 @@ class ModalHost:
             on_confirm=on_confirm,
             on_cancel=on_cancel,
             initial=initial,
+            validate=validate,
         )
         self._start_text_input()
 
@@ -657,14 +665,22 @@ class ModalHost:
                 self._start_text_input()
                 return True
             if state.button_index == 0:
-                on_confirm = state.on_confirm
-                draft = state.draft
-                self._dismiss_text(invoke_cancel=False)
-                on_confirm(draft)
+                self._confirm_text(state)
             else:
                 self._dismiss_text(invoke_cancel=True)
             return True
         return True
+
+    def _confirm_text(self, state: TextModalState) -> None:
+        if state.validate is not None:
+            error = state.validate(state.draft)
+            if error is not None:
+                state.error = error
+                return
+        on_confirm = state.on_confirm
+        draft = state.draft
+        self._dismiss_text(invoke_cancel=False)
+        on_confirm(draft)
 
     def _leave_text_edit(self, state: TextModalState) -> None:
         self._stop_text_input()
