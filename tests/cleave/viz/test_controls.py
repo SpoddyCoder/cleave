@@ -1360,7 +1360,6 @@ def test_render_overlay_title_text_confirm_updates_session() -> None:
     controls.handle_keydown(_keydown(pygame.K_RETURN))
     controls.modal_host.handle_text_input(" edited")
     controls.handle_keydown(_keydown(pygame.K_RETURN))
-    controls.handle_keydown(_keydown(pygame.K_DOWN))
     controls.handle_keydown(_keydown(pygame.K_RETURN))
     assert controls.modal_host.view_state() is None
     assert (
@@ -1412,7 +1411,6 @@ def _replace_text_modal_draft(controls: TuningControls, text: str) -> None:
 
 def _confirm_text_modal(controls: TuningControls) -> None:
     controls.handle_keydown(_keydown(pygame.K_RETURN))
-    controls.handle_keydown(_keydown(pygame.K_DOWN))
     controls.handle_keydown(_keydown(pygame.K_RETURN))
 
 
@@ -1620,7 +1618,6 @@ def test_render_overlay_body_text_confirm_updates_session() -> None:
     controls.handle_keydown(_keydown(pygame.K_RETURN))
     controls.modal_host.handle_text_input(" edited")
     controls.handle_keydown(_keydown(pygame.K_RETURN))
-    controls.handle_keydown(_keydown(pygame.K_DOWN))
     controls.handle_keydown(_keydown(pygame.K_RETURN))
     assert controls.modal_host.view_state() is None
     assert (

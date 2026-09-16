@@ -18,7 +18,6 @@ from cleave.viz.modal import (
 )
 from cleave.viz.overlay_primitives import overlay_font
 from cleave.viz.theme import (
-    ACTION,
     FOCUS_ROW_BG_ALPHA,
     HIGHLIGHT,
     LABEL,
@@ -766,6 +765,9 @@ def test_text_modal_hint_only_when_editing() -> None:
     editing = modal.view_state()
     assert editing is not None
     assert editing.editing is True
+    assert modal_overlay._EDITING_HINT == (
+        "Press Enter to confirm or ESC to cancel"
+    )
     modal.handle_keydown(_keydown(pygame.K_ESCAPE))
     navigating = modal.view_state()
     assert navigating is not None
@@ -1098,11 +1100,7 @@ def test_text_modal_error_shown_only_when_set() -> None:
     )
     assert height_error - height_plain == line_h + line_gap
 
-    panel_plain = _draw_text_panel_for_tests(font, plain, line_gap=line_gap)
     panel_error = _draw_text_panel_for_tests(font, with_error, line_gap=line_gap)
-    full_plain = pygame.Rect(0, 0, panel_plain.get_width(), panel_plain.get_height())
-    assert not _rect_has_color(panel_plain, full_plain, ACTION)
-
     field_x, field_y, content_w = _text_field_origin(
         font, with_error, line_gap=line_gap, screen_w=screen_w, screen_h=screen_h
     )
@@ -1113,4 +1111,4 @@ def test_text_modal_error_shown_only_when_set() -> None:
     error_rect = pygame.Rect(
         field_x, field_y + field_h + line_gap, content_w, line_h
     )
-    assert _rect_has_color(panel_error, error_rect, ACTION)
+    assert _rect_has_color(panel_error, error_rect, HIGHLIGHT)

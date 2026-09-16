@@ -40,8 +40,7 @@ def _open_text(
 
 
 def _confirm_text(modal: ModalHost) -> None:
-    modal.handle_keydown(_keydown(pygame.K_ESCAPE))
-    modal.handle_keydown(_keydown(pygame.K_DOWN))
+    modal.handle_keydown(_keydown(pygame.K_RETURN))
     modal.handle_keydown(_keydown(pygame.K_RETURN))
 
 
@@ -123,22 +122,24 @@ def test_handle_text_input_rejects_newline_when_single_line() -> None:
     assert view.caret_index == 2
 
 
-def test_escape_in_edit_keeps_draft() -> None:
+def test_escape_in_edit_discards_draft() -> None:
     modal = ModalHost()
     confirmed, cancelled = _open_text(modal, initial="hello")
     modal.handle_text_input("!")
     assert modal.handle_keydown(_keydown(pygame.K_ESCAPE)) is True
     view = modal.view_state()
     assert view is not None
-    assert view.draft == "hello!"
+    assert view.draft == "hello"
+    assert view.caret_index == len("hello")
     assert view.editing is False
     assert view.focus_region == TextFocusRegion.FIELD
+    assert view.error is None
     assert modal.active
     assert confirmed == []
     assert cancelled == []
 
 
-def test_enter_in_edit_keeps_draft() -> None:
+def test_enter_in_edit_jumps_to_confirm() -> None:
     modal = ModalHost()
     confirmed, cancelled = _open_text(modal, initial="hello")
     modal.handle_text_input("!")
@@ -147,10 +148,32 @@ def test_enter_in_edit_keeps_draft() -> None:
     assert view is not None
     assert view.draft == "hello!"
     assert view.editing is False
-    assert view.focus_region == TextFocusRegion.FIELD
+    assert view.focus_region == TextFocusRegion.BUTTONS
+    assert view.button_index == 0
     assert modal.active
     assert confirmed == []
     assert cancelled == []
+
+
+def test_enter_in_edit_highlights_confirm_not_last_button() -> None:
+    modal = ModalHost()
+    _open_text(modal, initial="hello")
+    modal.handle_keydown(_keydown(pygame.K_RETURN))
+    modal.handle_keydown(_keydown(pygame.K_RIGHT))
+    view = modal.view_state()
+    assert view is not None
+    assert view.button_index == 1
+    modal.handle_keydown(_keydown(pygame.K_UP))
+    modal.handle_keydown(_keydown(pygame.K_RETURN))
+    view = modal.view_state()
+    assert view is not None
+    assert view.editing is True
+    modal.handle_keydown(_keydown(pygame.K_RETURN))
+    view = modal.view_state()
+    assert view is not None
+    assert view.editing is False
+    assert view.focus_region == TextFocusRegion.BUTTONS
+    assert view.button_index == 0
 
 
 def test_escape_in_navigate_cancels() -> None:
@@ -180,19 +203,66 @@ def test_cancel_button_calls_on_cancel() -> None:
     assert confirmed == []
 
 
-def test_confirm_failing_validator_keeps_dialog_open() -> None:
+def test_confirm_failing_validator_stays_in_field() -> None:
     modal = ModalHost()
     confirmed, cancelled = _open_text(
         modal, initial="bad", validate=lambda _draft: "invalid hex colour"
     )
-    _confirm_text(modal)
+    assert modal.handle_keydown(_keydown(pygame.K_RETURN)) is True
     assert modal.active
     view = modal.view_state()
     assert view is not None
     assert view.error == "invalid hex colour"
     assert view.draft == "bad"
+    assert view.editing is True
+    assert view.focus_region == TextFocusRegion.FIELD
+    assert view.caret_visible is True
+    assert confirmed == []
+    assert cancelled == []
+    assert modal.handle_text_input("x") is True
+    view = modal.view_state()
+    assert view is not None
+    assert view.error is None
+    assert view.draft == "badx"
+    assert view.editing is True
+
+
+def test_enter_in_edit_with_valid_draft_jumps_to_confirm() -> None:
+    modal = ModalHost()
+    confirmed, cancelled = _open_text(
+        modal, initial="ok", validate=lambda _draft: None
+    )
+    assert modal.handle_keydown(_keydown(pygame.K_RETURN)) is True
+    view = modal.view_state()
+    assert view is not None
+    assert view.error is None
+    assert view.editing is False
     assert view.focus_region == TextFocusRegion.BUTTONS
     assert view.button_index == 0
+    assert modal.active
+    assert confirmed == []
+    assert cancelled == []
+
+
+def test_confirm_button_failing_validator_returns_to_field() -> None:
+    modal = ModalHost()
+    confirmed, cancelled = _open_text(
+        modal, initial="bad", validate=lambda _draft: "invalid hex colour"
+    )
+    modal.handle_keydown(_keydown(pygame.K_ESCAPE))
+    modal.handle_keydown(_keydown(pygame.K_DOWN))
+    view = modal.view_state()
+    assert view is not None
+    assert view.editing is False
+    assert view.focus_region == TextFocusRegion.BUTTONS
+    modal.handle_keydown(_keydown(pygame.K_RETURN))
+    view = modal.view_state()
+    assert view is not None
+    assert modal.active
+    assert view.error == "invalid hex colour"
+    assert view.editing is True
+    assert view.focus_region == TextFocusRegion.FIELD
+    assert view.caret_visible is True
     assert confirmed == []
     assert cancelled == []
 
@@ -202,27 +272,23 @@ def test_draft_edit_clears_error() -> None:
     confirmed, cancelled = _open_text(
         modal, initial="bad", validate=lambda _draft: "nope"
     )
-    _confirm_text(modal)
+    modal.handle_keydown(_keydown(pygame.K_RETURN))
     view = modal.view_state()
     assert view is not None
     assert view.error == "nope"
+    assert view.editing is True
 
-    modal.handle_keydown(_keydown(pygame.K_UP))
-    modal.handle_keydown(_keydown(pygame.K_RETURN))
     assert modal.handle_text_input("x") is True
     view = modal.view_state()
     assert view is not None
     assert view.error is None
     assert view.draft == "badx"
 
-    modal.handle_keydown(_keydown(pygame.K_ESCAPE))
-    modal.handle_keydown(_keydown(pygame.K_DOWN))
     modal.handle_keydown(_keydown(pygame.K_RETURN))
     view = modal.view_state()
     assert view is not None
     assert view.error == "nope"
-    modal.handle_keydown(_keydown(pygame.K_UP))
-    modal.handle_keydown(_keydown(pygame.K_RETURN))
+    assert view.editing is True
     modal.handle_keydown(_keydown(pygame.K_BACKSPACE))
     view = modal.view_state()
     assert view is not None
@@ -258,8 +324,7 @@ def test_confirm_button_commits_draft() -> None:
     modal = ModalHost()
     confirmed, cancelled = _open_text(modal, initial="hello")
     modal.handle_text_input("!")
-    modal.handle_keydown(_keydown(pygame.K_ESCAPE))
-    modal.handle_keydown(_keydown(pygame.K_DOWN))
+    modal.handle_keydown(_keydown(pygame.K_RETURN))
     view = modal.view_state()
     assert view is not None
     assert view.focus_region == TextFocusRegion.BUTTONS
@@ -290,8 +355,7 @@ def test_left_right_on_field_are_noop_in_navigate() -> None:
 def test_left_right_on_buttons_cycle() -> None:
     modal = ModalHost()
     _open_text(modal)
-    modal.handle_keydown(_keydown(pygame.K_ESCAPE))
-    modal.handle_keydown(_keydown(pygame.K_DOWN))
+    modal.handle_keydown(_keydown(pygame.K_RETURN))
     view = modal.view_state()
     assert view is not None
     assert view.button_index == 0
@@ -486,8 +550,7 @@ def test_y_and_n_noop_in_edit_and_navigate() -> None:
     assert view.draft == "hello"
     assert view.focus_region == TextFocusRegion.FIELD
 
-    modal.handle_keydown(_keydown(pygame.K_ESCAPE))
-    modal.handle_keydown(_keydown(pygame.K_DOWN))
+    modal.handle_keydown(_keydown(pygame.K_RETURN))
     modal.handle_keydown(_keydown(pygame.K_RIGHT))
     modal.handle_keydown(_keydown(pygame.K_y))
     modal.handle_keydown(_keydown(pygame.K_n))
@@ -519,9 +582,7 @@ def test_backspace_at_caret_zero_is_noop() -> None:
 def test_confirm_allows_empty_string() -> None:
     modal = ModalHost()
     confirmed, cancelled = _open_text(modal, initial="")
-    modal.handle_keydown(_keydown(pygame.K_ESCAPE))
-    modal.handle_keydown(_keydown(pygame.K_DOWN))
-    modal.handle_keydown(_keydown(pygame.K_RETURN))
+    _confirm_text(modal)
     assert confirmed == [""]
     assert cancelled == []
     assert not modal.active
@@ -596,8 +657,7 @@ def test_dismiss_from_navigate_does_not_double_stop() -> None:
 def test_cancel_and_confirm_do_not_double_stop() -> None:
     modal, starts, stops = _host_with_text_callbacks()
     _open_text(modal)
-    modal.handle_keydown(_keydown(pygame.K_ESCAPE))
-    modal.handle_keydown(_keydown(pygame.K_DOWN))
+    modal.handle_keydown(_keydown(pygame.K_RETURN))
     modal.handle_keydown(_keydown(pygame.K_RIGHT))
     modal.handle_keydown(_keydown(pygame.K_RETURN))
     assert not modal.active
@@ -606,8 +666,7 @@ def test_cancel_and_confirm_do_not_double_stop() -> None:
 
     modal, starts, stops = _host_with_text_callbacks()
     _open_text(modal)
-    modal.handle_keydown(_keydown(pygame.K_ESCAPE))
-    modal.handle_keydown(_keydown(pygame.K_DOWN))
+    modal.handle_keydown(_keydown(pygame.K_RETURN))
     modal.handle_keydown(_keydown(pygame.K_RETURN))
     assert not modal.active
     assert starts == ["start"]

@@ -43,7 +43,7 @@ _PANEL_PAD_Y = _tuning_ui.modal_panel_pad_y
 _BAR_HEIGHT = scale_px(10, scale=UI_SCALE)
 _TEXT_BUTTON_LABELS = ("Confirm", "Cancel")
 _TEXT_BUTTON_GAP = scale_px(24, scale=UI_SCALE)
-_EDITING_HINT = "press ESC to stop editing"
+_EDITING_HINT = "Press Enter to confirm or ESC to cancel"
 _CARET_WIDTH = 2
 
 
@@ -864,7 +864,7 @@ def _draw_text_panel(
             panel,
             font,
             error_line,
-            ACTION,
+            HIGHLIGHT,
             x=x,
             y=cur_y,
             text_alpha=text_alpha,
