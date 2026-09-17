@@ -9,17 +9,21 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [0.2.0] - 2026-09-17
+
+### Added
+
 - Credits card title text row under each card's title section in the panel. Enter opens a text dialog; Confirm updates the title; Save persists it. Section lock blocks editing.
 - Credits card body text row under each card's body section in the panel. Enter opens a text dialog; Confirm updates the body; Save persists it. Section lock blocks editing.
 - Credits card colours, background margin, and padding in the panel. Colour rows open a hex dialog; Confirm updates the colour; Save persists it. Empty Confirm clears optional backgrounds. Margin and padding are px value rows (Ctrl for x10). Section lock blocks editing.
-
 - Settings > UI: notification time (until dismissed, or 1-20s). Enter dismisses a toast before it times out.
-
 - Pattern mask: `bars` type (horizontal strips with 1D-cut transitions).
 - Project > Render: width, height, and fps rows with increment controls. Values live in `project.yaml` under `render:` and are flushed on Save. Default is 1920x1080 at 60fps. `cleave-viz.yaml` no longer has `render.width` / `render.height` / `render.fps`.
-
 - Project > ProjectM: default beat sensitivity lives in `project.yaml` under `milkdrop:` and is flushed on Save. `cleave-viz.yaml` no longer has an `editor:` block; window size stays in user config.
-
 - Settings > Editor Window: preview quality, width, height, upscale, and a display-size readout. Width, height, and upscale persist on change; a warning toast notes that restart is required to apply the new window size.
 - Project menu on the live overlay (just above the transport icons): Save, plus a Render Project submenu for output path, quality, start/end, and a render action. Enter confirms the chosen settings, then encodes with a progress modal and a completion dialog.
 - `cleave play` with no target, the Windows Start Menu shortcut, and double-clicking `cleave.exe` open the editor window and browse for a Cleave project or a wav. Keyboard only: arrows and Page Up/Down move, Right enters a folder, Left or Backspace goes to the parent (drive roots step out to a drives listing), Enter opens, Tab reaches the Projects, Home, Drives, and Windows-files shortcuts, Esc quits. A failed stem split or boot shows the error in the window and returns to the picker instead of exiting.
@@ -53,7 +57,6 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 ### Fixed
 
 - Text dialog Up/Down while editing move the caret between lines instead of jumping to the start of the current line.
-
 - Text dialog caret stays visible at the end of a long single-line draft when the panel grows past its minimum width.
 - Settings > UI notification time now hides toasts after the chosen duration, including when you change the value while a toast is showing. Enter dismisses the toast before the timer elapses.
 - Opening Timeline > timeline cuts no longer crashes (`hard_cut_enabled_display` was missing from the cuts row formatters).
@@ -80,5 +83,6 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Project backup and restore (`.cleave-tar.gz`).
 - XDG user-data and config directories (`~/.local/share/cleave/`, `~/.config/cleave/`), with `CLEAVE_DATA` override.
 
-[unreleased]: https://github.com/SpoddyCoder/cleave/compare/v0.1.0...HEAD
+[unreleased]: https://github.com/SpoddyCoder/cleave/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/SpoddyCoder/cleave/releases/tag/v0.2.0
 [0.1.0]: https://github.com/SpoddyCoder/cleave/releases/tag/v0.1.0

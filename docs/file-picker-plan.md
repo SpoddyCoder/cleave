@@ -1,5 +1,7 @@
 # File picker plan
 
+Phase 1 is done (loading-screen picker, optional `play` target, frozen no-args). Phase 2 (`DROPFILE`) and Phase 3 (mid-session open) are still open.
+
 Let the user open a wav or a Cleave project from inside the visualizer, on WSL2 checkout and on the frozen Windows zip or installer, without a terminal.
 
 Related: [editor-first](../.cursor/rules/editor-first.mdc), [architecture principles](../.cursor/rules/architecture-principles.mdc), [structured-releases.md](structured-releases.md), [windows-freeze.md](windows-freeze.md).
@@ -250,7 +252,7 @@ Order inside Phase 3: accept-then-teardown so cancel is cheap. Do not destroy th
 
 ## Phases
 
-### Phase 1 - Loading-screen picker and optional play target
+### Phase 1 - Loading-screen picker and optional play target (done)
 
 User-facing: Start Menu and `cleave play` with no argument open the window, browse, pick a wav or project, then play (separate first if needed). Checkout `cleave` with no args still prints help.
 

@@ -2,7 +2,7 @@
 
 Move Cleave from checkout-based development to versioned GitHub Releases.
 
-Phase 1 is done (`v0.1.0`). Phase 2 is done (Windows play/render onedir zip, manual freeze). Phase 3.1 and 3.2 are done (CI freeze zip, installer and argv normalisation, GPU proof from zip and Program Files). Phase 3.3.1 is done (frozen CPU `separate` stack, dispatch zip, editor-first split). Phase 3.3.2 is done (CPU `separate` is the only Windows zip and setup exe; lean spec retired). No tag and no `__version__` bump for Phases 2, 3.1, 3.2, 3.3.1, or 3.3.2 beyond the existing `v0.1.0` source release. The next milestone tag ships Phase 1 source plus that Windows zip and setup exe (CPU `separate` plus play/render). Phase 3.3.3 (optional CUDA download in the installer) is next. Phase 4 (Linux and macOS binaries) follows 3.3.
+Phase 1 is done (`v0.1.0`, source-only). Phase 2 is done (Windows play/render onedir zip, manual freeze). Phase 3.1 and 3.2 are done (CI freeze zip, installer and argv normalisation, GPU proof from zip and Program Files). Phase 3.3.1 is done (frozen CPU `separate` stack, dispatch zip, editor-first split). Phase 3.3.2 is done (CPU `separate` is the only Windows zip and setup exe; lean spec retired). Phases 2, 3.1, 3.2, 3.3.1, and 3.3.2 landed on `main` with no tag beyond `v0.1.0`. [`v0.2.0`](https://github.com/SpoddyCoder/cleave/releases/tag/v0.2.0) is the first tag that attaches the Windows zip and setup exe (CPU `separate` plus play/render). The installer can download optional CUDA wheels (Phase 3.3.3); manual NVIDIA-box proof is still outstanding. Phase 4 (Linux and macOS binaries) follows 3.3.
 
 Related: [README.md](../README.md) (current Linux/WSL setup), [completed/user-data-and-config-plan.md](completed/user-data-and-config-plan.md) (install vs user data), [cleave/paths.py](../cleave/paths.py), [cleave/projectm.py](../cleave/projectm.py), [windows-freeze.md](windows-freeze.md) (paths, spec, FFmpeg sidecar, ctypes names, libprojectM build recommendation).
 
@@ -167,7 +167,7 @@ Without argv normalisation, `cleave.exe <path>` is an argparse error (`command` 
 - Normalise argv in [cleave/cli.py](../cleave/cli.py) `main`: a single argument that is not a known subcommand and resolves to an existing path or project slug runs `play`. One place, unit-testable on Linux.
 - Frozen raw audio still prints the short stem-split message, not a traceback or argparse usage.
 - Explorer launches (double-click, drop) close the console on exit. When frozen and the process owns its console, pause on error before exiting so the message is readable.
-- No arguments prints help (same pause rule). Start Menu shortcut targets that.
+- No arguments printed help (same pause rule). Start Menu shortcut targeted that. Frozen no-args and `cleave play` with no target now open the in-window picker ([file-picker-plan.md](file-picker-plan.md) Phase 1).
 - pygame window drop (`DROPFILE`) stays optional and is not a gate.
 
 #### 3.2.2 Local installer build (done)
@@ -212,7 +212,7 @@ Installer branding. Whether audio file associations (a "Play with Cleave" shell 
 
 Met for 3.1 and 3.2. A tag produces the zip and installer without a manual freeze. Testers can run play from the zip or Program Files. GPU proof from zip and setup exe is met.
 
-### 3.3 Windows stem split / `separate` (3.3.1 and 3.3.2 done; 3.3.3 next)
+### 3.3 Windows stem split / `separate` (3.3.1 and 3.3.2 done; 3.3.3 in v0.2.0, NVIDIA proof outstanding)
 
 Goal: a Windows user can drop a wav onto the editor (or pass it as the play target) and get a Cleave project (stems plus `signals.json`) without Linux or a terminal. Stem split is the product: the default Windows zip and setup exe include CPU `separate`. Do not ship a play/render-only Windows Release.
 
@@ -222,7 +222,7 @@ What it is: one Windows product (CPU `separate` plus play/render) with stem spli
 
 What it is not: CUDA torch baked into the setup exe. A Cleave-hosted CUDA payload. A second Cleave installer or zip flavour. Weights in Program Files. A second freeze layout or a second exe. A play/render-only Release zip or setup exe. Linux/macOS binaries (Phase 4). A CLI-only split that finishes before the window opens.
 
-Three slices. 3.3.1 is engineering (done); 3.3.2 is the default Windows zip and setup exe (done); 3.3.3 is the optional CUDA installer download (next).
+Three slices. 3.3.1 is engineering (done); 3.3.2 is the default Windows zip and setup exe (done); 3.3.3 is the optional CUDA installer download (in `v0.2.0`; NVIDIA-box proof still outstanding).
 
 #### 3.3.1 Frozen separate stack (CPU) (done)
 
@@ -260,9 +260,9 @@ Manual proof (met): dispatch zip and Program Files install on a typical Windows 
 
 Met. CPU `separate` is the default Windows zip and setup exe. Drop-a-wav from zip and Program Files works. Lean spec retired.
 
-#### 3.3.3 CUDA extra (optional) (next)
+#### 3.3.3 CUDA extra (optional) (in v0.2.0; NVIDIA proof outstanding)
 
-NVIDIA users. Does not block 3.3.2. Wizard, download, verify, and unpack are in [packaging/windows/cleave.iss](../packaging/windows/cleave.iss). Manual NVIDIA-box proof is still outstanding (todo 8); this phase is not a shipped milestone and is not marked Done.
+NVIDIA users. Does not block 3.3.2. Wizard, download, verify, and unpack are in [packaging/windows/cleave.iss](../packaging/windows/cleave.iss) and ship in the `v0.2.0` installer. Manual NVIDIA-box proof is still outstanding; this phase is not marked Done.
 
 One setup exe on the Releases page. The CPU onedir is always installed. CUDA torch is not baked into that exe. Cleave does not build or host a CUDA payload.
 
@@ -311,7 +311,7 @@ Met. A tester on 64-bit Windows, with no Linux, no NVIDIA requirement, and no te
 
 ## Phase 4 - Linux and macOS binaries
 
-After Phase 3.3. Phase 1, Phase 2, 3.1, 3.2, 3.3.1, and 3.3.2 are done on `main`. The next tag attaches the CPU-`separate` Windows zip and setup exe (plus source). Phase 3.3.3 is the optional CUDA installer download. Phase 4 adds Linux and macOS binaries. Windows `separate` is 3.3, not this phase.
+After Phase 3.3. Phase 1, Phase 2, 3.1, 3.2, 3.3.1, and 3.3.2 are done on `main`. `v0.2.0` attaches the CPU-`separate` Windows zip and setup exe (plus source). Phase 3.3.3 is the optional CUDA installer download in that installer; NVIDIA-box proof is still outstanding. Phase 4 adds Linux and macOS binaries. Windows `separate` is 3.3, not this phase.
 
 Goal: the same product as Windows (CPU `separate` plus play/render), as native artifacts. Source+requirements Linux remains available from Phase 1.
 
@@ -344,4 +344,4 @@ Do not block Phases 1-4 on these. Revisit after binaries exist. CUDA `separate` 
 
 ## Suggested order of analysis
 
-Phase 1, Phase 2, Phase 3.1-3.2, 3.3.1, and 3.3.2 are done. Next: Phase 3.3.3 (optional CUDA download in the installer), then Phase 4 (Linux and macOS binaries). Keep freeze implementation choices in [windows-freeze.md](windows-freeze.md), not in this overview.
+Phase 1, Phase 2, Phase 3.1-3.2, 3.3.1, and 3.3.2 are done. `v0.2.0` attaches the Windows zip and setup exe. Next: Phase 3.3.3 NVIDIA-box proof of the optional CUDA installer download, then Phase 4 (Linux and macOS binaries). Keep freeze implementation choices in [windows-freeze.md](windows-freeze.md), not in this overview.

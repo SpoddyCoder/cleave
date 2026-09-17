@@ -2,7 +2,7 @@
 
 Make Cleave's three config files feel like a normal desktop app: machine preferences, one project document, and a hidden template. Stop leftover "the YAML is the app" save verbs that let users lose work.
 
-Related: [user-data-and-config-plan.md](completed/user-data-and-config-plan.md), [cleave/user_config.py](../cleave/user_config.py), [cleave/project.py](../cleave/project.py), [cleave/viz/config_save.py](../cleave/viz/config_save.py), [architecture principles](../.cursor/rules/architecture-principles.mdc), [editor-first](../.cursor/rules/editor-first.mdc).
+Related: [user-data-and-config-plan.md](user-data-and-config-plan.md), [cleave/user_config.py](../cleave/user_config.py), [cleave/project.py](../cleave/project.py), [cleave/viz/config_save.py](../cleave/viz/config_save.py), [architecture principles](../../.cursor/rules/architecture-principles.mdc), [editor-first](../../.cursor/rules/editor-first.mdc).
 
 The older user-data plan still holds for install vs user data vs per-track creative config. Field ownership has already moved (window size is user config; beat sensitivity and render size are `project.yaml`). This plan is about save verbs, the repo-root template, and the mistakes those create.
 
@@ -20,7 +20,7 @@ There are three durable files:
 | `project.yaml` | `projects/<slug>/` | Song identity: mix/ingest, song markers, ProjectM beat sensitivity, compositor HDR, render width/height/fps. |
 | Creative YAML | `projects/<slug>/cleave-viz.yaml` (also repo-root template) | Layers, timeline, overlay and post-FX. |
 
-The bundled [assets/cleave-viz.yaml](../assets/cleave-viz.yaml) is the shipped example. New projects copy it via [ensure_project_viz_config](../cleave/config.py). [find_config_path](../cleave/config.py) still falls back to that bundled file as a live session when the project has no copy.
+The bundled [assets/cleave-viz.yaml](../../assets/cleave-viz.yaml) is the shipped example. New projects copy it via [ensure_project_viz_config](../cleave/config.py). [find_config_path](../cleave/config.py) still falls back to that bundled file as a live session when the project has no copy.
 
 Users should not have to know which file holds which knob. Today they must, because Save, Settings, and the example template each behave differently.
 
@@ -54,7 +54,7 @@ The Project row help still says "Active config file."
 
 Live-edited fields (song markers, beat sensitivity, HDR, render size/fps) stay in the session until `_commit_save`. One Save writes both the creative YAML and those `project.yaml` keys. Mix/ingest metadata is written at separate/restore time, not from the editor.
 
-Those helpers rewrite the whole file from [ProjectManifest.to_dict](../cleave/project.py). Keys the dataclass does not know are dropped. That is the [todos.md](todos.md) unknown-key wipe.
+Those helpers rewrite the whole file from [ProjectManifest.to_dict](../cleave/project.py). Keys the dataclass does not know are dropped. That is the [todos.md](../todos.md) unknown-key wipe.
 
 ---
 
@@ -87,7 +87,7 @@ Internally two project YAML files can remain. The UI must not mention both names
 - **One creative file per project.** Always `projects/<slug>/cleave-viz.yaml` (or a later rename). Ctrl+S writes that file immediately. No Overwrite vs Save As New. No second `Overwrite filename?` confirm.
 - **Confirm only when discarding work.** Unsaved quit is Save / Don't Save / Cancel. Picking Save from that dialog writes immediately; do not chain into another save modal.
 - **The folder is the document.** Duplicate looks via Duplicate Project / [backup](../cleave/archive.py), not sibling YAML names.
-- **Never open the template as the live session.** If there is no project, show the picker ([file-picker-plan.md](file-picker-plan.md)).
+- **Never open the template as the live session.** If there is no project, show the picker ([file-picker-plan.md](../file-picker-plan.md)).
 - **Do not autosave the project over itself.** Explicit Save is correct for a live experiment. A crash-recovery sidecar can wait.
 - **Dict-merge `project.yaml`.** Each helper touches only the keys it owns. Same idea as [write_user_config](../cleave/user_config.py).
 - **Keep current field ownership.** Window/UI/preview/latency in user config; ingest/markers/beat/HDR/output size in `project.yaml`; layers/timeline/overlays in the creative YAML. Do not put editor prefs back on the Save path.
@@ -120,7 +120,7 @@ Internally two project YAML files can remain. The UI must not mention both names
 - Crash-recovery sidecar for unsaved project edits.
 - Live window resize so the apply-and-restart modal can go.
 - Named arrangements / scenes per project, with an in-window picker.
-- Last-opened project and last browse directory in user config (also in [file-picker-plan.md](file-picker-plan.md)).
+- Last-opened project and last browse directory in user config (also in [file-picker-plan.md](../file-picker-plan.md)).
 - Whether unconfirmed window-size nudges persist on quit. Today they do, because shutdown dumps all of `cfg.editor`.
 
 ---
@@ -129,7 +129,7 @@ Internally two project YAML files can remain. The UI must not mention both names
 
 ### 1. Hide the template
 
-Move [assets/cleave-viz.yaml](../assets/cleave-viz.yaml) out of the repo root into a bundled resource path that [resource_dir](../cleave/paths.py) already serves in the freeze. [ensure_project_viz_config](../cleave/config.py) already copies from there.
+Move [assets/cleave-viz.yaml](../../assets/cleave-viz.yaml) out of the repo root into a bundled resource path that [resource_dir](../cleave/paths.py) already serves in the freeze. [ensure_project_viz_config](../cleave/config.py) already copies from there.
 
 Stop [find_config_path](../cleave/config.py) and [resolve_config_path](../cleave/viz/bootstrap.py) from returning the template as the active session. Tests that assert repo-root and resource path are the same file need to follow the new location. CLI `--config` override can stay for CI.
 
@@ -155,7 +155,7 @@ Change `write_manifest`, `save_song_markers`, `save_milkdrop_settings`, `save_co
 
 ### 5. Copy and tests
 
-Update overlay help, README project-layout notes, and [song-markers.md](completed/song-markers.md) (it still describes Save As New). Extend tests that cover dirty tracking, overwrite, double-confirm (`test_overwrite_shows_confirm_before_write`), and `unnamed-N.yaml` so they assert immediate Save and that prefs still do not mark dirty.
+Update overlay help, README project-layout notes, and [song-markers.md](song-markers.md) (it still describes Save As New). Extend tests that cover dirty tracking, overwrite, double-confirm (`test_overwrite_shows_confirm_before_write`), and `unnamed-N.yaml` so they assert immediate Save and that prefs still do not mark dirty.
 
 ---
 
@@ -173,7 +173,7 @@ Update overlay help, README project-layout notes, and [song-markers.md](complete
 
 ## Out of scope
 
-- Moving `projects/` out of a checkout (`CLEAVE_DATA` / Documents) beyond what [user-data-and-config-plan.md](completed/user-data-and-config-plan.md) and the freeze already do.
+- Moving `projects/` out of a checkout (`CLEAVE_DATA` / Documents) beyond what [user-data-and-config-plan.md](user-data-and-config-plan.md) and the freeze already do.
 - Merging the two project YAML files.
-- Undo/redo ([roadmap.md](roadmap.md)).
-- Mid-session Open ([file-picker-plan.md](file-picker-plan.md) Phase 3). That work should reuse the same unsaved-project prompt once this plan lands.
+- Undo/redo ([roadmap.md](../roadmap.md)).
+- Mid-session Open ([file-picker-plan.md](../file-picker-plan.md) Phase 3). That work should reuse the same unsaved-project prompt once this plan lands.
