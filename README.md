@@ -2,87 +2,82 @@
 
 [![Tests](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml/badge.svg)](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml)
 
-Stem-separated music visualizer. Layer together drums, bass, vocal and other stems - each driving Milkdrop presets to create your own unique visual masterpieces. 
+Stem-separated music visualizer. Layer together drums, bass, vocal and other stems - each driving Milkdrop presets to create your own unique visual masterpieces.
 
-Comprehensive visual editor allows you to browse and tune presets in real time - automate preset switching, layer in effects, post processing and a whole bunch more. Render the final output in high definition and high frame rates using `ffmpeg`.
+The visual editor lets you browse and tune presets in real time - automate preset switching, layer in effects, post processing and more. Render the final output in high definition and high frame rates using FFmpeg.
 
-Built on [projectM](https://github.com/projectM-visualizer/projectM) and [Demucs](https://github.com/facebookresearch/demucs) amongst [others](#attribution). 
+Built on [projectM](https://github.com/projectM-visualizer/projectM) and [Demucs](https://github.com/facebookresearch/demucs) amongst [others](#attribution).
 
+## Download & Install
 
-## Download
-See the [releases page](https://github.com/SpoddyCoder/cleave/releases) to download a Windows installer or standalone executable. For more info see the [Windows zip and installer](#windows-zip-and-installer) section below.
+Grab the latest release from the [releases page](https://github.com/SpoddyCoder/cleave/releases).
 
-Linux is supported, but requires you to install dependencies yourself, there is no standalone package (yet), see below for setup instructions.
+**Windows** - download the installer or standalone zip. See [Windows Install Details](#windows-install-details) below for more info.
 
-Cleave is currently in development, it is very usable, but may not maintain backward compatibility until the first major v1.0.0 release.
+**Linux** - no standalone package yet. See [Linux Setup](#linux-setup) for how to install from source.
 
-## Quick Start
+Cleave is in active development. It is very usable, but may not maintain backward compatibility until v1.0.0.
+
+## Getting Started
 
 ### Get Some Milkdrop Presets
 
-Clone or place Milkdrop preset packs in the default location...
+Cleave needs Milkdrop preset packs. Clone a couple of popular ones into the default location...
 
-Windows...
+Windows:
+```
+cd %USERPROFILE%\Documents\Cleave\presets
+git clone https://github.com/projectM-visualizer/presets-cream-of-the-crop
+git clone https://github.com/projectM-visualizer/presets-milkdrop-original
+```
 
-
+Linux:
 ```bash
 mkdir -p ~/.local/share/cleave/presets
 cd ~/.local/share/cleave/presets
 git clone https://github.com/projectM-visualizer/presets-cream-of-the-crop
 git clone https://github.com/projectM-visualizer/presets-milkdrop-original
+```
 
+Optionally grab the texture pack too:
+```bash
+# Windows: cd %USERPROFILE%\Documents\Cleave\textures
+# Linux:
 mkdir -p ~/.local/share/cleave/textures
 cd ~/.local/share/cleave/textures
 git clone https://github.com/projectM-visualizer/presets-milkdrop-texture-pack
 ```
 
-Note: There are many thousands of Milkdrop presets available, these are just a few of the best.
+There are many thousands of Milkdrop presets available online - these are just a few of the best.
 
-### `cleave` a track
+### Open a Track
 
+Windows - drop a `.wav` file onto `cleave.exe`, or launch it and browse for a file from the editor window.
+
+Linux:
 ```bash
 ./cleave.py play ~/music/mysong.wav
 ```
 
-This will separate the track into its component stem tracks (bass, drums, vocals, other), perform some audio analysis, then open the editor.
+This will separate the track into its component stems (bass, drums, vocals, other), perform audio analysis, then open the editor. First run downloads model weights and shows progress in the loading window.
 
----
+## Using the Editor
 
-## Using `cleave`
-
-### CLI
-
-```bash
-./cleave.py --help
-```
-
-Available commands...
-
-* `play` play song in the editor, accepts a source audio file or project slug/path. Omit the target to browse for one in the editor window.
-* `separate` can be run on its own without opening the editor.
-* `render` accepts a project slug or path (not a source audio file).
-* `backup` archives a full project directory (mix, stems, configs, renders etc.) to a `.cleave-tar.gz` file.
-* `restore` unpacks a `.cleave-tar.gz` archive into `projects/<slug>/` (slug from `project.yaml`).
-
-Note: use `--help` on any command for options.
-
-### Editor
-
-* Press `h` to show context sensitive help and controls.
-  * The help will change as you move around the interface with the arrow keys.
-* If you're using CPU to render, the editor may run at low frame rates with multiple layers
-  * Change `Settings` -> `Editor Window` -> `preview quality` to help with this.
+* Press `h` at any time to show context-sensitive help and controls.
+  * The help changes as you move around the interface with the arrow keys.
+* If you are using CPU rendering, the editor may run at low frame rates with multiple layers.
+  * Change `Settings` > `Editor Window` > `preview quality` to help with this.
   * The final render will still be at full quality and full frame rate.
 
-#### Preset curation
-The editor has a preset curation mode that provides a simple way to categorise presets into folders for future use.
-`Settings` -> `change editor mode` -> `preset curation`. While focused on a preset **file** row:
+### Preset Curation
+
+The editor has a preset curation mode for sorting presets into folders.
+`Settings` > `change editor mode` > `preset curation`. While focused on a preset **file** row:
 * `f` - **copy** the preset into `favourites/` (original stays in the pack).
-* `c` - **copy** the preset into a cast role directory (see below for more info on cast roles)
+* `c` - **copy** the preset into a cast role directory.
 * `b` - **move** the preset into `blacklist/` (permanently removed from pack).
-* All preset folders live under `paths.preset_root` (default `~/.local/share/cleave/presets/`).
-  * Browse them in the Editor like any other pack folder. 
-* Subdirectories inside `favourites/` or `blacklist/` appear as destination choices in the confirm modal, which makes it easy to categorise them in any way you choose, eg:
+* Browse curated folders in the editor like any other pack folder.
+* Subdirectories inside `favourites/` or `blacklist/` appear as destination choices in the confirm modal, so you can categorise however you like:
 ```
 favourites/a-tier/
 favourites/b-tier/
@@ -90,117 +85,39 @@ favourites/lots-of-black/
 favourites/full-colour-wash/
 ```
 
-#### Timeline layer automation
-The timeline provides a comprehensive way to automate layer visibility, preset choice, opacity and blend.
-When enabled, the standard layer visibility controls are disabled, the timeline takes over.
+### Timeline
 
-##### `Song Markers`
-* Provide a simple way to mark specific points in the song for preset cuts.
-* Press `Ctrl + Enter` to drop a song marker at any point in the song.
-* These can be used as snap points and are also used by the `timeline preset` as anchor points for generation.
+The timeline automates layer visibility, preset choice, opacity and blend over the course of a song. When enabled, the standard layer visibility controls are disabled and the timeline takes over.
 
-##### `Beat / Bar Grid`
+**Song Markers** - mark specific points in the song for preset cuts. Press `Ctrl + Enter` to drop a marker. These act as snap points and anchor points for timeline preset generation.
 
-* Powered by Beat This! an AI beat detection library.
-* By default it will use the full-mix stem for analysis.
-  * Choose a different stem with the `--beat-detection-stem` switch.
-* You can snap cues to the grid either on record or after record.
+**Beat / Bar Grid** - powered by Beat This!, an AI beat detection library. By default it uses the full-mix stem for analysis. Choose a different stem with the `--beat-detection-stem` switch. You can snap cues to the grid during or after recording.
 
-##### `Timeline Presets`
+**Timeline Presets** - generate a complete layered visualisation of a song. For best results, curate presets into Roles and place song markers first. See [docs/technical-details.md](docs/technical-details.md) for details on song marker types (crescendo, diminuendo, etc).
 
-* This makes it easy to generate a complete layered visualisation of a song.
-* For best results you should curate presets into Roles.
-* If song markers are available, they will be used to drive the preset generation (do this for best results).
-* There are multiple song marker types:
-  * `-` standard song marker, no special behaviour.
-  * `crescendo` - used to denote where the visual intensity should build t, before crashing off to low intensity.
-  * `dimininuendo` - used to denote where the visual intensity should  reduce to, before returning to normal intensity.
-  * `begin` - used to denote where crescendo or dimininuendo ramp should begin.
-  * `sustain` - used to denote where crescendo or dimininuendo should hit maximum / minimum intensity.
+## CLI
 
-```
-CRESCENDO:   thin ↗↗↗ FULL ──── FULL ──── ► solo
-             begin   sustain         crescendo
-
-DIMINUENDO:  FULL ↘↘↘ thin ──── thin ──── ► restore
-             begin   sustain         diminuendo
+```bash
+./cleave.py --help
 ```
 
-### Project Directory
+Available commands:
 
-`cleave` creates a new directory under `~/.local/share/cleave/projects/` for each song.
-The project directory stores all files required in a self-contained bundle...
+* `play` - open a song in the editor. Accepts a source audio file or project slug/path. Omit the target to browse from the editor window.
+* `separate` - run stem separation without opening the editor.
+* `render` - render a project to video. Accepts a project slug or path.
+* `backup` - archive a project directory to a `.cleave-tar.gz` file.
+* `restore` - unpack a `.cleave-tar.gz` archive into `projects/<slug>/`.
 
-* `project.yaml` - project metadata, song markers, Milkdrop defaults (`milkdrop.beat_sensitivity`), compositor hdr (`compositor.hdr`), and render output size/fps (`render.width` / `render.height` / `render.fps`)
-* `cleave-viz.yaml` - layers, timeline, overlays, and post-FX. Save in the editor writes this file and flushes live `project.yaml` fields. Not everything in here is surfaced in the editor UI just yet
-* `signals.json` - audio analysis data (schema version 4) used by `cleave effects` and the opt-in timeline preset conductor; re-run `separate` on existing projects after a schema bump so envelopes stay current
-* `mysong.wav` - original source audio is copied into the project directory
-* `stems/` - separated audio stems
-* `renders/` - final output renders
-* `presets/` - presets used by the project are copied into the project directory
-
-### Configuration
-Cleave uses OS user-data directories. Default locations...
-
-Linux (XDG):
-
-* User data: `~/.local/share/cleave/`
-  * `projects/`
-  * `presets/`
-  * `presets/favourites/`
-  * `presets/blacklist/`
-* Configuration: `~/.config/cleave/config.yaml`
-  * Editor settings (window size, preview quality, panel width, fade)
-
-Windows (checkout or the [Windows zip](#windows-zip)):
-
-* User data: `Documents\Cleave\` (same `projects/`, `presets/`, `textures/` tree)
-* Configuration: `%APPDATA%\Cleave\config.yaml`
-
-On every OS:
-
-* Override the data root with `CLEAVE_DATA` (e.g. `CLEAVE_DATA=.` for a dev checkout).
-* When a project omits `paths`, preset browsing defaults to `<data root>/presets`.
-  * `paths.preset_root` in `cleave-viz.yaml` overrides this default when set.
-
-Windows freeze layout and FFmpeg/libprojectM sidecars: [docs/windows-freeze.md](docs/windows-freeze.md).
+Use `--help` on any command for more options.
 
 ---
 
-## Additional Details
+## Windows Install Details
 
-### Compositing
+The installer (`cleave-<version>-windows-x64-setup.exe`) defaults to `Program Files\Cleave`. Uninstall removes only the program folder; it does not delete your data or settings. The zip (`cleave-<version>-windows-x64.zip`) is the same thing without an installer - unpack and run from that folder.
 
-* The editor supports up to eight libprojectM layers at tiered resolutions
-* Live preview composites at the editor window size (default **1920x1080**; Settings > Editor Window) and upscales via user-config `editor.upscale` at display frame rate
-* Offline render output size and frame rate are Project > Render (default **1920x1080** at **60fps**; stored in `project.yaml`)
-* Each layer's libprojectM instance receives PCM from its assigned stem; stereo stems are fed as stereo, mono as mono.
-* Milkdrop draws on black, so cleave treats black as transparent and uses pixel brightness as blend weight (`black-key` default).
-
-### Cleave effects
-
-Signal-driven compositor modifiers on top of each layer. Tune depths (0-100%).
-
-| Stem | Effects |
-| --- | --- |
-| Drums | pulse, flash, grit |
-| Bass | pulse (sub_bass, mid_bass), flash, grit |
-| Vocals | pulse, hue (pitch), flash, grit |
-| Other | pulse, flash, grit |
-
-### Render overlay
-* TODO: Document
-
-### Post-processing
-* TODO: Document
-
----
-
-## Windows zip and installer
-
-The installer (`cleave-<version>-windows-x64-setup.exe`) defaults to `Program Files\Cleave`. Uninstall removes only the program folder; it does not delete `Documents\Cleave\` or `%APPDATA%\Cleave\`. The zip (`cleave-<version>-windows-x64.zip`) is the same onedir tree without an installer: unpack and run from that folder.
-
-Launch from the Start Menu or double-click `cleave.exe` to open the editor and browse for a wav or an existing project. You can also drop a wav onto `cleave.exe`, or run `cleave.exe play <wav>`. First run downloads Demucs and Beat This weights into `Documents\Cleave\models` and shows named progress in the loading window. CPU `separate` is slow. The installer can download extra CUDA files from PyTorch (about 2 GB) for faster stem splitting when it detects an NVIDIA GPU (driver 580.88 or newer). Default answer is No. Skip or fail leaves CPU split. Silent setup does not download CUDA unless you pass `/CUDA=1` (that switch still downloads if no NVIDIA GPU is present). The zip stays CPU-only.
+Launch from the Start Menu or double-click `cleave.exe` to open the editor. You can also drop a `.wav` onto `cleave.exe`, or run from the command line:
 
 ```
 cleave.exe play
@@ -209,16 +126,17 @@ cleave.exe play <project>
 cleave.exe render <project>
 ```
 
-The build is unsigned. If SmartScreen warns on the setup exe or the zip, choose Run anyway.
+The build is unsigned. If SmartScreen warns on the setup exe or the zip, choose "Run anyway".
 
-User data lives in `Documents\Cleave\` (same `projects/`, `presets/`, `textures/` tree as Linux). Settings: `%APPDATA%\Cleave\config.yaml`. Override the data root with `CLEAVE_DATA`.
+### CUDA (NVIDIA GPU)
 
-Milkdrop presets still go under `Documents\Cleave\presets` (see [Get Some Milkdrop Presets](#get-some-milkdrop-presets); use that path instead of `~/.local/share/cleave/`).
+Stem separation on CPU is slow. The installer can download CUDA files from PyTorch (about 2 GB) for much faster splitting when it detects an NVIDIA GPU (driver 580.88 or newer). Default answer is No. Skip or fail leaves CPU split working fine. Silent setup does not download CUDA unless you pass `/CUDA=1`. The zip stays CPU-only.
 
-Maintainers: [docs/windows-freeze.md](docs/windows-freeze.md).
+---
 
 ## Linux Setup
-Developed on WSL2, but should work on any Linux with a display. 
+
+Developed on WSL2, but should work on any Linux with a display.
 
 ### Requirements
 
@@ -233,25 +151,9 @@ Developed on WSL2, but should work on any Linux with a display.
 ./wsl-builder.sh media ffmpeg,libprojectm
 ```
 
-### WSL2 Trobleshooting
-If you are experiencing audio glitches try disabling `systemd-timesyncd`.
-[microsoft/wslg#1257](https://github.com/microsoft/wslg/issues/1257). 
+### Python Dependencies
 
-If the visual editor feels sluggish and CPU-bound, check that Mesa is using the GPU (not software `llvmpipe`)...
-
-```bash
-glxinfo | grep "OpenGL renderer"
-# bad:  llvmpipe
-# good: D3D12
-
-# if you see llvmpipe, force Mesa's D3D12 driver...
-export GALLIUM_DRIVER=d3d12
-```
-[microsoft/wslg#1332](https://github.com/microsoft/wslg/issues/1332)
-
-### Configure + Install Python Deps
-
-Create a virtual environment...
+Create a virtual environment:
 
 ```bash
 # using venv
@@ -263,7 +165,7 @@ conda create -n cleave python=3.10
 conda activate cleave
 ```
 
-Install dependencies...
+Install dependencies:
 
 ```bash
 # CUDA 13.0 (Linux + NVIDIA GPU)
@@ -275,6 +177,43 @@ pip install -r requirements.txt
 # for development and tests
 pip install -r requirements-dev.txt
 ```
+
+### WSL2 Troubleshooting
+
+If you experience audio glitches, try disabling `systemd-timesyncd`.
+[microsoft/wslg#1257](https://github.com/microsoft/wslg/issues/1257).
+
+If the editor feels sluggish and CPU-bound, check that Mesa is using the GPU (not software `llvmpipe`):
+
+```bash
+glxinfo | grep "OpenGL renderer"
+# bad:  llvmpipe
+# good: D3D12
+
+# if you see llvmpipe, force Mesa's D3D12 driver:
+export GALLIUM_DRIVER=d3d12
+```
+[microsoft/wslg#1332](https://github.com/microsoft/wslg/issues/1332)
+
+---
+
+## Project & Data Locations
+
+Cleave creates a project directory for each song, storing stems, configs and renders together.
+
+**Windows**: `Documents\Cleave\` (projects, presets, textures). Settings: `%APPDATA%\Cleave\config.yaml`.
+
+**Linux**: `~/.local/share/cleave/` (projects, presets, textures). Settings: `~/.config/cleave/config.yaml`.
+
+Override the data root with `CLEAVE_DATA` on any OS.
+
+A project directory contains:
+* `project.yaml` - metadata, song markers, render settings
+* `cleave-viz.yaml` - layers, timeline, overlays, post-FX (saved from the editor)
+* `signals.json` - audio analysis data used by effects and the timeline conductor
+* The original audio file, plus `stems/`, `renders/`, and `presets/` folders
+
+For compositing, effects, and rendering internals see [docs/technical-details.md](docs/technical-details.md). For the Windows build process see [docs/windows-freeze.md](docs/windows-freeze.md).
 
 ---
 
