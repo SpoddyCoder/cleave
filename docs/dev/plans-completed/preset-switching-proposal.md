@@ -1,6 +1,6 @@
 # Preset switching proposal
 
-Proposal for per-layer automatic preset rotation. Supersedes the [Auto-switching presets (projectM mode)](roadmap.md#auto-switching-presets-projectm-mode) roadmap item; Cleave-native preset cycling is out of scope (see [Decisions](#decisions)).
+Proposal for per-layer automatic preset rotation. Supersedes the [Auto-switching presets (projectM mode)](../roadmap.md#auto-switching-presets-projectm-mode) roadmap item; Cleave-native preset cycling is out of scope (see [Decisions](#decisions)).
 
 **Status:** Implemented through v2 (none, projectM, user-defined list with add/remove UI). Shuffle toggle shipped; v3 subtree rotation set and filters not scheduled.
 
@@ -14,7 +14,7 @@ Today each layer loads one Milkdrop preset and holds it until the user browses t
         pm.set_hard_cut_enabled(False)
 ```
 
-Cleave's [cleave/preset_playlist.py](cleave/preset_playlist.py) `PresetPlaylist` is a **browsing** model (directory navigation, sibling stepping). It is not projectM's rotation engine.
+Cleave's [cleave/preset_playlist.py](../../../cleave/preset_playlist.py) `PresetPlaylist` is a **browsing** model (directory navigation, sibling stepping). It is not projectM's rotation engine.
 
 This proposal adds a per-layer **preset switching** mode with three values:
 
@@ -61,7 +61,7 @@ Separate shared library from the core. Per layer:
 
 Also provides shuffle, history, gitignore-style filters, retry on load failure, and switched/failed callbacks.
 
-Cleave today binds only core libprojectM symbols in [cleave/projectm.py](cleave/projectm.py). It does not link or wrap the playlist library yet.
+Cleave today binds only core libprojectM symbols in [cleave/projectm.py](../../../cleave/projectm.py). It does not link or wrap the playlist library yet.
 
 ## Proposed modes (detail)
 
@@ -104,7 +104,7 @@ preset switching: none | projectM | user-defined
 | **projectM** | Child row for rotation set (`directory` in v1; `subtree` later); shuffle toggle in a later phase. Timing parameters in v1.1+ (see phasing). |
 | **user-defined** | Expandable sub-row listing selected presets; affordances to add (from current browse position) and remove entries |
 
-Row placement follows [live-tuning-ui](.cursor/rules/live-tuning-ui.mdc): insert after preset file, before stem row.
+Row placement follows [live-tuning-ui](../../../.cursor/rules/live-tuning-ui.mdc): insert after preset file, before stem row.
 
 **v1 UI:** preset switching row plus rotation set child row for **projectM** (`directory` only).
 
@@ -124,13 +124,13 @@ Layer lock rules should match other preset sub-rows (blocked when layer locked).
 
 **Manual preset browse while auto mode is active:** preset dir and preset file rows are locked. User must switch to **none** to browse manually.
 
-**Empty rotation set:** keep the active mode, stay on the current preset, and show a panel notification via `TuningControls.show_notification` / [cleave/viz/panel_notification.py](cleave/viz/panel_notification.py).
+**Empty rotation set:** keep the active mode, stay on the current preset, and show a panel notification via `TuningControls.show_notification` / [cleave/viz/panel_notification.py](../../../cleave/viz/panel_notification.py).
 
-**Offline render:** same code path as live; projectM user frame time is already set per frame in [cleave/viz/layer_pipeline.py](cleave/viz/layer_pipeline.py).
+**Offline render:** same code path as live; projectM user frame time is already set per frame in [cleave/viz/layer_pipeline.py](../../../cleave/viz/layer_pipeline.py).
 
 ## Config (sketch)
 
-New fields per layer, parsed and persisted through [cleave/config_schema.py](cleave/config_schema.py) / `persisted_session_payload`:
+New fields per layer, parsed and persisted through [cleave/config_schema.py](../../../cleave/config_schema.py) / `persisted_session_payload`:
 
 ```yaml
 layers:
@@ -162,14 +162,14 @@ Mode is on/off (`none` | `projectM`); `preset_switching_rotation_set` selects th
 ### Dependencies
 
 - Bind libprojectM **playlist** shared library (separate from core; verify soname on the dev machine).
-- Extend [cleave/projectm.py](cleave/projectm.py): unlock, duration/hard-cut getters and setters, playlist library wrappers.
+- Extend [cleave/projectm.py](../../../cleave/projectm.py): unlock, duration/hard-cut getters and setters, playlist library wrappers.
 - Playlist switched/failed callbacks (if used) require stable ctypes references per layer. Callbacks fire on the render thread; no extra GIL assumptions beyond normal ctypes usage.
 
 ### Architecture alignment
 
-- New persisted fields through `persisted_session_payload` in [cleave/config_schema.py](cleave/config_schema.py).
-- Per-layer session state in [cleave/viz/session.py](cleave/viz/session.py); view model in [cleave/viz/tuning_view_state.py](cleave/viz/tuning_view_state.py); row in [cleave/viz/row_layout.py](cleave/viz/row_layout.py); input in [cleave/viz/controls.py](cleave/viz/controls.py).
-- Layer build and preset-change wiring in [cleave/viz/layer_pipeline.py](cleave/viz/layer_pipeline.py) and [cleave/viz/wiring.py](cleave/viz/wiring.py) (`on_preset_change` currently re-locks after every manual pick).
+- New persisted fields through `persisted_session_payload` in [cleave/config_schema.py](../../../cleave/config_schema.py).
+- Per-layer session state in [cleave/viz/session.py](../../../cleave/viz/session.py); view model in [cleave/viz/tuning_view_state.py](../../../cleave/viz/tuning_view_state.py); row in [cleave/viz/row_layout.py](../../../cleave/viz/row_layout.py); input in [cleave/viz/controls.py](../../../cleave/viz/controls.py).
+- Layer build and preset-change wiring in [cleave/viz/layer_pipeline.py](../../../cleave/viz/layer_pipeline.py) and [cleave/viz/wiring.py](../../../cleave/viz/wiring.py) (`on_preset_change` currently re-locks after every manual pick).
 
 ### Suggested phasing
 

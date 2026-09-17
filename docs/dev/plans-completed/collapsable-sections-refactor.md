@@ -2,7 +2,7 @@
 
 Implementation guide for unifying expand/collapse and value-gated rows in the live tuning panel. Use the lexicon below in issues, rules, and feature requests.
 
-Related: [docs/todos.md](docs/todos.md) ("Review Child Menus"), [.cursor/rules/live-tuning-ui.mdc](.cursor/rules/live-tuning-ui.mdc).
+Related: [../todos.md](../todos.md) ("Review Child Menus"), [live-tuning-ui.mdc](../../../.cursor/rules/live-tuning-ui.mdc).
 
 ---
 
@@ -24,7 +24,7 @@ Not: value toggles without an arrow (hard cut enabled), mode cycling rows.
 
 Examples: projectm-only preset switching params; hard-cut duration/sensitivity when hard cut is on; highlight rolloff params when mode is not `off`.
 
-**Structure signature:** predicates run when `RowLayout.build()` runs, which happens only when `view_state_structure_signature()` changes ([cleave/viz/tuning_view_state.py](cleave/viz/tuning_view_state.py)). If the gating field is missing from the signature, sibling rows stay stale until some unrelated change forces a rebuild. Add every field that controls conditional row presence to the signature; add a matching test in [tests/cleave/viz/test_view_state_structure.py](tests/cleave/viz/test_view_state_structure.py).
+**Structure signature:** predicates run when `RowLayout.build()` runs, which happens only when `view_state_structure_signature()` changes ([cleave/viz/tuning_view_state.py](../../../cleave/viz/tuning_view_state.py)). If the gating field is missing from the signature, sibling rows stay stale until some unrelated change forces a rebuild. Add every field that controls conditional row presence to the signature; add a matching test in [tests/cleave/viz/test_view_state_structure.py](../../../tests/cleave/viz/test_view_state_structure.py).
 
 ### Panel anchor (exception)
 
@@ -42,7 +42,7 @@ Every collapsible or gated instance in the live tuning UI today, mapped to the l
 
 | UI label / row | Type | Session state field | `RowKind` | Depth | Mechanism |
 | --- | --- | --- | --- | --- | --- |
-| Editor Settings | Expandable section | `session.settings.expanded` | `SETTINGS_HEADER` | 0 (pinned header) | Toggle in [cleave/viz/controls.py](cleave/viz/controls.py); children **build-time** omit |
+| Editor Settings | Expandable section | `session.settings.expanded` | `SETTINGS_HEADER` | 0 (pinned header) | Toggle in [cleave/viz/controls.py](../../../cleave/viz/controls.py); children **build-time** omit |
 | render mode | Child (expandable) | (parent gate only) | `SETTINGS_RENDER_MODE` | 1 | Section tree under `SETTINGS_SECTION` |
 | UI fade | Child (expandable) | (parent gate only) | `SETTINGS_UI_FADE` | 1 | Section tree under `SETTINGS_SECTION` |
 | Layer N: STEM | Expandable section | `LayerRuntime.expanded` | `TRACK_HEADER` | 0 (per slot) | Toggle `_set_expanded`; children via `TRACK_SECTION` tree walk |
@@ -68,9 +68,9 @@ Every collapsible or gated instance in the live tuning UI today, mapped to the l
 | body font / size | Child (expandable) | (parent gates) | `RENDER_OVERLAY_BODY_*` | 2 | Nested under `RENDER_OVERLAY_BODY_SECTION` |
 | Render: POST FX | Expandable section | `RenderPostFxRuntime.expanded` | `RENDER_POST_FX_HEADER` | 0 (render) | `RenderPostFxControls.set_expanded`; `RENDER_POST_FX_SECTION` tree walk |
 | fade in / fade out | Child (expandable) | (parent gate) | `RENDER_POST_FX_FADE_IN`, `RENDER_POST_FX_FADE_OUT` | 1 | `RENDER_POST_FX_SECTION` tree walk |
-| Render: TIMELINE | Panel anchor | `TimelineRuntime.panel_open` (view: `render_timeline.expanded`) | `RENDER_TIMELINE_HEADER` | 0 (render) | `_open_timeline_panel` / `close_timeline_panel`; **no** `RowLayout` children; content in [cleave/viz/timeline_overlay.py](cleave/viz/timeline_overlay.py) |
+| Render: TIMELINE | Panel anchor | `TimelineRuntime.panel_open` (view: `render_timeline.expanded`) | `RENDER_TIMELINE_HEADER` | 0 (render) | `_open_timeline_panel` / `close_timeline_panel`; **no** `RowLayout` children; content in [cleave/viz/timeline_overlay.py](../../../cleave/viz/timeline_overlay.py) |
 
-**`parent_group`** on `RowBehavior` in [cleave/viz/row_semantics.py](cleave/viz/row_semantics.py) remains for layer-lock rules. **`TRACK_SUB_ROW_KINDS`** is still derived from `parent_group == "track"` for lock checks in [cleave/viz/row_layout.py](cleave/viz/row_layout.py). Focus fallback and draw indent come from the section tree in [cleave/viz/row_sections.py](cleave/viz/row_sections.py) (`section_header_from_section_tree`, `row_tree_indent_depth`, `kinds_in_expand_section`).
+**`parent_group`** on `RowBehavior` in [cleave/viz/row_semantics.py](../../../cleave/viz/row_semantics.py) remains for layer-lock rules. **`TRACK_SUB_ROW_KINDS`** is still derived from `parent_group == "track"` for lock checks in [cleave/viz/row_layout.py](../../../cleave/viz/row_layout.py). Focus fallback and draw indent come from the section tree in [cleave/viz/row_sections.py](../../../cleave/viz/row_sections.py) (`section_header_from_section_tree`, `row_tree_indent_depth`, `kinds_in_expand_section`).
 
 **Hybrid visibility today:** track-block sub-rows (preset dir through effects header) are always present in `RowLayout.build()` but hidden when the layer is collapsed via `_sub_row_expanded` / `row_draw_visible`. Preset-switching submenu, effect rows, settings/render children, and layer delete use **build-time omission**. Target: one tree walk with **build-time omission** everywhere.
 
@@ -82,16 +82,16 @@ The live tuning panel has **partial** sharing, not a single composition layer.
 
 | Mechanism | Location | Role today |
 | --- | --- | --- |
-| `RowAffordance.EXPAND` | [cleave/viz/row_semantics.py](cleave/viz/row_semantics.py) | Marks arrow headers; `expandable_row_kinds()` |
-| `parent_group` on `RowBehavior` | [cleave/viz/row_semantics.py](cleave/viz/row_semantics.py) | Layer-lock grouping (`TRACK_SUB_ROW_KINDS`) |
-| `sub_row_expand_visible()` | [cleave/viz/row_sections.py](cleave/viz/row_sections.py) | Tree-walk visibility for expand sections |
-| `expand_arrow_for_header()` | [cleave/viz/row_sections.py](cleave/viz/row_sections.py) | Shared expand arrow for `EXPAND_HEADER_KINDS` draw and help text |
-| `RowLayout.build()` | [cleave/viz/row_layout.py](cleave/viz/row_layout.py) | Walks root section tree; build-time omission for collapsed/conditional rows |
-| Per-section bools | [cleave/viz/session.py](cleave/viz/session.py) | `expanded`, `effects_expanded`, `preset_switching_expanded`, `title_expanded`, `body_expanded`, `panel_open`, etc. |
-| Bespoke toggles | [cleave/viz/controls.py](cleave/viz/controls.py) | Long `_apply_horizontal` if-chain per `RowKind` |
-| Duplicated arrow draw | [cleave/viz/tuning_panel_draw.py](cleave/viz/tuning_panel_draw.py) | `_track_header_expand_suffix` for width budgeting; per-kind value labels |
+| `RowAffordance.EXPAND` | [cleave/viz/row_semantics.py](../../../cleave/viz/row_semantics.py) | Marks arrow headers; `expandable_row_kinds()` |
+| `parent_group` on `RowBehavior` | [cleave/viz/row_semantics.py](../../../cleave/viz/row_semantics.py) | Layer-lock grouping (`TRACK_SUB_ROW_KINDS`) |
+| `sub_row_expand_visible()` | [cleave/viz/row_sections.py](../../../cleave/viz/row_sections.py) | Tree-walk visibility for expand sections |
+| `expand_arrow_for_header()` | [cleave/viz/row_sections.py](../../../cleave/viz/row_sections.py) | Shared expand arrow for `EXPAND_HEADER_KINDS` draw and help text |
+| `RowLayout.build()` | [cleave/viz/row_layout.py](../../../cleave/viz/row_layout.py) | Walks root section tree; build-time omission for collapsed/conditional rows |
+| Per-section bools | [cleave/viz/session.py](../../../cleave/viz/session.py) | `expanded`, `effects_expanded`, `preset_switching_expanded`, `title_expanded`, `body_expanded`, `panel_open`, etc. |
+| Bespoke toggles | [cleave/viz/controls.py](../../../cleave/viz/controls.py) | Long `_apply_horizontal` if-chain per `RowKind` |
+| Duplicated arrow draw | [cleave/viz/tuning_panel_draw.py](../../../cleave/viz/tuning_panel_draw.py) | `_track_header_expand_suffix` for width budgeting; per-kind value labels |
 
-View-state mirrors session expand flags in [cleave/viz/tuning_view_state.py](cleave/viz/tuning_view_state.py) (`TrackBlock`, `RenderOverlayBlock`, `SettingsBlock`, etc.). Timeline `panel_open` is exposed as `RenderTimelineBlock.expanded` for draw only.
+View-state mirrors session expand flags in [cleave/viz/tuning_view_state.py](../../../cleave/viz/tuning_view_state.py) (`TrackBlock`, `RenderOverlayBlock`, `SettingsBlock`, etc.). Timeline `panel_open` is exposed as `RenderTimelineBlock.expanded` for draw only.
 
 Nesting works (layer → preset switching → params; overlay → title/body → font rows) but each new level adds manual frozensets, build branches, toggle handlers, and draw paths.
 
@@ -99,7 +99,7 @@ Nesting works (layer → preset switching → params; overlay → title/body →
 
 ## Target architecture overview
 
-Introduce a small **section composition** layer in [cleave/viz/row_sections.py](cleave/viz/row_sections.py) between semantics and layout.
+Introduce a small **section composition** layer in [cleave/viz/row_sections.py](../../../cleave/viz/row_sections.py) between semantics and layout.
 
 ### `ExpandSectionDef`
 
@@ -155,7 +155,7 @@ Existing control classes (`RenderOverlayControls.set_expanded`, etc.) can remain
 
 ### Draw
 
-Single `expand_arrow_glyph()` in [cleave/viz/tuning_panel_draw.py](cleave/viz/tuning_panel_draw.py) or [cleave/viz/theme.py](cleave/viz/theme.py). Section label helpers consult registry for indent depth (`└─` prefix level) instead of hard-coded per-kind strings.
+Single `expand_arrow_glyph()` in [cleave/viz/tuning_panel_draw.py](../../../cleave/viz/tuning_panel_draw.py) or [cleave/viz/theme.py](../../../cleave/viz/theme.py). Section label helpers consult registry for indent depth (`└─` prefix level) instead of hard-coded per-kind strings.
 
 ---
 
@@ -167,7 +167,7 @@ Execute in order; keep unit tests green after each step.
   Create this file: lexicon, inventory table, how-to recipes, non-goals.
 
 - [x] **Step 1 — Shared draw + toggle primitives**  
-  Add `expand_arrow_glyph(expanded: bool) -> str`. Add `apply_expand_toggle(session, header_kind, slot, forward)` and `apply_panel_anchor_toggle(session, header_kind, forward)` delegating to registries (initially hard-coded maps mirroring today's behavior). Wire [cleave/viz/controls.py](cleave/viz/controls.py) `_apply_horizontal` through these helpers. No layout changes; behavior identical.
+  Add `expand_arrow_glyph(expanded: bool) -> str`. Add `apply_expand_toggle(session, header_kind, slot, forward)` and `apply_panel_anchor_toggle(session, header_kind, forward)` delegating to registries (initially hard-coded maps mirroring today's behavior). Wire [cleave/viz/controls.py](../../../cleave/viz/controls.py) `_apply_horizontal` through these helpers. No layout changes; behavior identical.
 
 - [x] **Step 2 — Introduce `row_sections.py` with expand registry**  
   Define `SectionNode`, `ExpandSectionDef`, root tree constant. First migration: **Settings** (smallest: one level, global context). Replace Settings branches in `RowLayout.build` and `_sub_row_expanded` with tree walk.
@@ -192,13 +192,13 @@ Execute in order; keep unit tests green after each step.
   Attach to preset switching and hard-cut row groups in the section tree. Delete duplicated `if` blocks in `RowLayout.build`. Extend `section_header_descriptor()` to derive from tree parent pointers where possible.
 
 - [x] **Step 6 — Panel anchor documentation and thin wiring**  
-  Register `RENDER_TIMELINE_HEADER` as `PanelAnchorDef`; keep `_open_timeline_panel` / `close_timeline_panel`. Document panel anchor vs expandable section in this doc and [.cursor/rules/live-tuning-ui.mdc](.cursor/rules/live-tuning-ui.mdc). Do **not** move timeline rows into `RowLayout`.
+  Register `RENDER_TIMELINE_HEADER` as `PanelAnchorDef`; keep `_open_timeline_panel` / `close_timeline_panel`. Document panel anchor vs expandable section in this doc and [.cursor/rules/live-tuning-ui.mdc](../../../.cursor/rules/live-tuning-ui.mdc). Do **not** move timeline rows into `RowLayout`.
 
 - [x] **Step 7 — Cleanup and conventions**  
-  Remove dead frozensets (`RENDER_OVERLAY_TITLE_NESTED_KINDS`, etc.) once tree is source of truth. Add focused unit tests for `row_sections`: visibility with nested expand + conditional predicates; focus fallback parent resolution. Update [tests/cleave/viz/test_config_dirty.py](tests/cleave/viz/test_config_dirty.py) helpers if expand paths change.
+  Remove dead frozensets (`RENDER_OVERLAY_TITLE_NESTED_KINDS`, etc.) once tree is source of truth. Add focused unit tests for `row_sections`: visibility with nested expand + conditional predicates; focus fallback parent resolution. Update [tests/cleave/viz/test_config_dirty.py](../../../tests/cleave/viz/test_config_dirty.py) helpers if expand paths change.
 
 - [x] **Step 8 — Update project docs**  
-  Resolve [docs/todos.md](docs/todos.md) "Review Child Menus" (done or link here). Keep how-to recipes in this doc current.
+  Resolve [../todos.md](../todos.md) "Review Child Menus" (done or link here). Keep how-to recipes in this doc current.
 
 ---
 
@@ -225,7 +225,7 @@ When `collapse_on_disable` is true (render overlay and post-FX today), `expand_s
 
 ### Draw: panel fields vs expand arrows
 
-Panel labels, value strings, and tree branch glyphs come from [cleave/viz/row_fields.py](cleave/viz/row_fields.py) (`panel_label`, `format_value`, `labeled_row_prefix`). Branch text is `tree_branch_prefix(row_tree_indent_depth(kind))`; `panel_label` holds human text only (no embedded `└─`). Pixel indent comes from `row_tree_indent_depth()` in [cleave/viz/row_sections.py](cleave/viz/row_sections.py). [cleave/viz/tuning_panel_draw.py](cleave/viz/tuning_panel_draw.py) dispatches on `RowPresentStyle`; expand arrows for expandable headers use `expand_arrow_for_header` or `format_value` on `EXPAND_SUBHEADER` kinds. Panel anchor `RENDER_TIMELINE_HEADER` stays separate (`state.render_timeline.expanded`).
+Panel labels, value strings, and tree branch glyphs come from [cleave/viz/row_fields.py](../../../cleave/viz/row_fields.py) (`panel_label`, `format_value`, `labeled_row_prefix`). Branch text is `tree_branch_prefix(row_tree_indent_depth(kind))`; `panel_label` holds human text only (no embedded `└─`). Pixel indent comes from `row_tree_indent_depth()` in [cleave/viz/row_sections.py](../../../cleave/viz/row_sections.py). [cleave/viz/tuning_panel_draw.py](../../../cleave/viz/tuning_panel_draw.py) dispatches on `RowPresentStyle`; expand arrows for expandable headers use `expand_arrow_for_header` or `format_value` on `EXPAND_SUBHEADER` kinds. Panel anchor `RENDER_TIMELINE_HEADER` stays separate (`state.render_timeline.expanded`).
 
 ### Root section lists
 
@@ -239,9 +239,9 @@ Three registries split tuning panel concerns:
 
 | Registry | Module | Owns |
 | --- | --- | --- |
-| Semantics | [cleave/viz/row_semantics.py](cleave/viz/row_semantics.py) | affordance, navigation, help |
-| Structure | [cleave/viz/row_sections.py](cleave/viz/row_sections.py) | tree nesting, expand/collapse, visibility, `row_tree_indent_depth` |
-| Fields | [cleave/viz/row_fields.py](cleave/viz/row_fields.py) | `panel_label`, `format_value`, `apply_horizontal`, `present_style` |
+| Semantics | [cleave/viz/row_semantics.py](../../../cleave/viz/row_semantics.py) | affordance, navigation, help |
+| Structure | [cleave/viz/row_sections.py](../../../cleave/viz/row_sections.py) | tree nesting, expand/collapse, visibility, `row_tree_indent_depth` |
+| Fields | [cleave/viz/row_fields.py](../../../cleave/viz/row_fields.py) | `panel_label`, `format_value`, `apply_horizontal`, `present_style` |
 
 Each `RowKind` in the layout (except `RENDER_SECTION_GAP`) registers a `RowFieldDef`. Tree chrome is `tree_branch_prefix(row_tree_indent_depth(kind))`; labels in `panel_label` have no embedded `└─`.
 
@@ -262,35 +262,35 @@ Left/Right mutations register `apply_horizontal` on the field def; expand toggle
 
 ### New expandable section
 
-1. Add `RowKind` header with `RowAffordance.EXPAND` in [cleave/viz/row_semantics.py](cleave/viz/row_semantics.py).
-2. Add session bool (session-only; list in dirty-test exclusions if applicable) in [cleave/viz/session.py](cleave/viz/session.py).
-3. Register `ExpandSectionDef` in [cleave/viz/row_sections.py](cleave/viz/row_sections.py):
+1. Add `RowKind` header with `RowAffordance.EXPAND` in [cleave/viz/row_semantics.py](../../../cleave/viz/row_semantics.py).
+2. Add session bool (session-only; list in dirty-test exclusions if applicable) in [cleave/viz/session.py](../../../cleave/viz/session.py).
+3. Register `ExpandSectionDef` in [cleave/viz/row_sections.py](../../../cleave/viz/row_sections.py):
    - `read_expanded` and `toggle` wired to session/view state
    - `children` as `SectionNode` leaves and nested `expand` / `conditional` nodes
    - optional `collapse_on_disable` when disable should hide children and show a collapsed arrow
    - optional `append_dynamic_children` for roster-driven leaf rows
 4. Attach the section under the correct parent in the section tree (`ROOT_SECTION_NODES`, `TRACK_SECTION`, `RENDER_SECTION_NODES`, or a nested `SectionNode(expand=...)`).
-5. Register `RowFieldDef` in [cleave/viz/row_fields.py](cleave/viz/row_fields.py) with `EXPAND_SUBHEADER` (nested subsection) or `COMPOSITE_HEADER` (top-level render/layer header) as appropriate; set `panel_label` (and `header_prefix` / `header_suffix` for composite headers). Expand arrows are automatic via `format_value` or `expand_arrow_for_header`.
+5. Register `RowFieldDef` in [cleave/viz/row_fields.py](../../../cleave/viz/row_fields.py) with `EXPAND_SUBHEADER` (nested subsection) or `COMPOSITE_HEADER` (top-level render/layer header) as appropriate; set `panel_label` (and `header_prefix` / `header_suffix` for composite headers). Expand arrows are automatic via `format_value` or `expand_arrow_for_header`.
 6. Ensure the section `*_expanded` flag (or disable state when using `collapse_on_disable`) is in `view_state_structure_signature()` so child rows appear and disappear immediately.
-7. No new branches in [cleave/viz/tuning_panel_draw.py](cleave/viz/tuning_panel_draw.py) or [cleave/viz/controls.py](cleave/viz/controls.py) (`apply_expand_toggle` handles expand input).
+7. No new branches in [cleave/viz/tuning_panel_draw.py](../../../cleave/viz/tuning_panel_draw.py) or [cleave/viz/controls.py](../../../cleave/viz/controls.py) (`apply_expand_toggle` handles expand input).
 
 ### New conditional rows
 
-1. Add `RowKind` leaf rows with `RowBehavior` in [cleave/viz/row_semantics.py](cleave/viz/row_semantics.py).
+1. Add `RowKind` leaf rows with `RowBehavior` in [cleave/viz/row_semantics.py](../../../cleave/viz/row_semantics.py).
 2. Define a `ConditionalRowsDef` with a named predicate; attach as `SectionNode(conditional=...)` under the correct parent in the section tree.
-3. Register `RowFieldDef` in [cleave/viz/row_fields.py](cleave/viz/row_fields.py) with `LABELED_VALUE`, `format_value`, and `apply_horizontal`.
-4. Add each predicate input field to `view_state_structure_signature()` in [cleave/viz/tuning_view_state.py](cleave/viz/tuning_view_state.py) (layer fields under `layers`, render fields under `render_post_fx` / `render_overlay`, etc.). Without this, show/hide lags until another structural change rebuilds the layout.
-5. Add `test_structure_signature_invalidates_on_*` (and optionally a layout row-presence test) in [tests/cleave/viz/test_view_state_structure.py](tests/cleave/viz/test_view_state_structure.py).
+3. Register `RowFieldDef` in [cleave/viz/row_fields.py](../../../cleave/viz/row_fields.py) with `LABELED_VALUE`, `format_value`, and `apply_horizontal`.
+4. Add each predicate input field to `view_state_structure_signature()` in [cleave/viz/tuning_view_state.py](../../../cleave/viz/tuning_view_state.py) (layer fields under `layers`, render fields under `render_post_fx` / `render_overlay`, etc.). Without this, show/hide lags until another structural change rebuilds the layout.
+5. Add `test_structure_signature_invalidates_on_*` (and optionally a layout row-presence test) in [tests/cleave/viz/test_view_state_structure.py](../../../tests/cleave/viz/test_view_state_structure.py).
 6. No arrow, no expanded bool, no parallel predicate map, no new draw or control branches.
 
 ### New value row
 
 Standard leaf row (parameter, toggle display, or step value):
 
-1. Add `RowKind` and `RowBehavior` in [cleave/viz/row_semantics.py](cleave/viz/row_semantics.py).
-2. Add session or config field if persisted ([cleave/viz/session.py](cleave/viz/session.py) / [cleave/config_schema.py](cleave/config_schema.py)).
-3. Attach as a `SectionNode` leaf under the correct parent in [cleave/viz/row_sections.py](cleave/viz/row_sections.py) (or under a `ConditionalRowsDef` when value-gated).
-4. Register `RowFieldDef` in [cleave/viz/row_fields.py](cleave/viz/row_fields.py): `panel_label`, `present_style` (usually `LABELED_VALUE`), `format_value`, `apply_horizontal`.
+1. Add `RowKind` and `RowBehavior` in [cleave/viz/row_semantics.py](../../../cleave/viz/row_semantics.py).
+2. Add session or config field if persisted ([cleave/viz/session.py](../../../cleave/viz/session.py) / [cleave/config_schema.py](../../../cleave/config_schema.py)).
+3. Attach as a `SectionNode` leaf under the correct parent in [cleave/viz/row_sections.py](../../../cleave/viz/row_sections.py) (or under a `ConditionalRowsDef` when value-gated).
+4. Register `RowFieldDef` in [cleave/viz/row_fields.py](../../../cleave/viz/row_fields.py): `panel_label`, `present_style` (usually `LABELED_VALUE`), `format_value`, `apply_horizontal`.
 5. No new branches in `tuning_panel_draw.py` or `controls.py`.
 
 ### New panel anchor
@@ -317,6 +317,6 @@ Rare. Register `PanelAnchorDef` in `row_sections.py` with `content_host`; implem
 ## Success criteria
 
 1. Shared vocabulary (expandable section, conditional rows, panel anchor) used in docs and rules.
-2. Adding a nested expandable subsection requires section-tree registry, session bool, row kinds, and `RowFieldDef` in [cleave/viz/row_fields.py](cleave/viz/row_fields.py) only (no new control/draw branches).
+2. Adding a nested expandable subsection requires section-tree registry, session bool, row kinds, and `RowFieldDef` in [cleave/viz/row_fields.py](../../../cleave/viz/row_fields.py) only (no new control/draw branches).
 3. Nesting depth limited only by the section tree, not special-case code paths.
 4. Timeline behavior unchanged; documented as panel anchor exception.

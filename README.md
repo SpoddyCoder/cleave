@@ -93,7 +93,7 @@ The timeline automates layer visibility, preset choice, opacity and blend over t
 
 **Beat / Bar Grid** - powered by Beat This!, an AI beat detection library. By default it uses the full-mix stem for analysis. Choose a different stem with the `--beat-detection-stem` switch. You can snap cues to the grid during or after recording.
 
-**Timeline Presets** - generate a complete layered visualisation of a song. For best results, curate presets into Roles and place song markers first. See [docs/technical-details.md](docs/technical-details.md) for details on song marker types (crescendo, diminuendo, etc).
+**Timeline Presets** - generate a complete layered visualisation of a song. For best results, curate presets into Roles and place song markers first. See [docs/user-guide/compositing-and-effects.md](docs/user-guide/compositing-and-effects.md) for details on song marker types (crescendo, diminuendo, etc).
 
 ## CLI
 
@@ -213,7 +213,7 @@ A project directory contains:
 * `signals.json` - audio analysis data used by effects and the timeline conductor
 * The original audio file, plus `stems/`, `renders/`, and `presets/` folders
 
-For compositing, effects, and rendering internals see [docs/technical-details.md](docs/technical-details.md). For the Windows build process see [docs/windows-freeze.md](docs/windows-freeze.md).
+For compositing, effects, and rendering internals see [docs/user-guide/compositing-and-effects.md](docs/user-guide/compositing-and-effects.md). For the Windows build process see [docs/dev/windows-freeze.md](docs/dev/windows-freeze.md).
 
 ---
 

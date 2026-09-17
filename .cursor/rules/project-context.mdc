@@ -11,12 +11,12 @@ Live Milkdrop/libprojectM editor. Windows app is the product; CLI is for checkou
 - Layers: up to eight, default four. Live at display rate; offline fps from `render.fps`.
 - Data: `projects/<slug>/`. Override with `CLEAVE_DATA`. Config: `cleave/config_schema/`. Template: `assets/cleave-viz.yaml`.
 - Stem PCM stays native mono/stereo for projectM; mix playback is stereo; analysis is mono.
-- Work list: [docs/todos.md](docs/todos.md).
+- Work list: [docs/dev/todos.md](docs/dev/todos.md).
 - User-visible change: same-edit bullet under `## [Unreleased]` in [CHANGELOG.md](CHANGELOG.md) (`### Added` / `Changed` / `Fixed` / `Removed`). Skip refactors, tests, and docs. Do not bump `cleave.__version__` or cut a tag unless asked.
 
 ## Locate, then search
 
-Do not glob `**/*.py`, grep the repo root, spawn an explore subagent, or read `docs/architecture-review.md` to find a home. `docs/completed/` is cursorignored. Open the files below, then grep only that directory. Tests: `tests/cleave/` mirrors `cleave/`; overlay tests are `tests/cleave/viz/`.
+Do not glob `**/*.py`, grep the repo root, spawn an explore subagent, or read `docs/dev/architecture-review.md` to find a home. `docs/dev/plans-completed/` is cursorignored. Open the files below, then grep only that directory. Tests: `tests/cleave/` mirrors `cleave/`; overlay tests are `tests/cleave/viz/`.
 
 - Panel row: `cleave/viz/row_kinds.py`, `row_specs/<domain>.py` (transport, settings, project, track, render_overlays, render_post_fx, pattern_mask, timeline), `row_sections.py`
 - Mutation / input: `cleave/viz/layer_mutations.py`, matching `*_controls.py`, `wiring.py`

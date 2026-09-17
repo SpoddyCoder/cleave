@@ -625,7 +625,7 @@ Remove "four libprojectM layers". Update to "up to eight Milkdrop layers" or equ
 - Note num keys 1-8.
 - Update timeline strip focus-ring `0..3` comment to `0..N-1`.
 
-### 8.5 `docs/roadmap.md` / `docs/todos.md`
+### 8.5 `docs/dev/roadmap.md` / `docs/dev/todos.md`
 
 - [x]
 
@@ -656,7 +656,7 @@ to four layers as the permanent stack size.
 | `cleave/viz/app.py` | Construct and pass `LayerManager` in `init_gl_resources_heavy` |
 | `.cursor/rules/project-context.mdc` | Remove four-layer cap language |
 | `.cursor/rules/live-tuning-ui.mdc` | Update row docs, num keys, slot refs |
-| `docs/roadmap.md` / `docs/todos.md` | Remove fixed-layer entries |
+| `docs/dev/roadmap.md` / `docs/dev/todos.md` | Remove fixed-layer entries |
 
 ---
 

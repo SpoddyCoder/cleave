@@ -1,5 +1,5 @@
 ; Inno Setup 6 installer for the staged Windows onedir tree.
-; Mechanics: docs/windows-freeze.md
+; Mechanics: docs/dev/windows-freeze.md
 ; Compile on Windows after staging dist\cleave\:
 ;   iscc /DAppVersion=X.Y.Z packaging\windows\cleave.iss
 ; AppVersion is injected from cleave.__version__; never hardcode it here.
@@ -62,7 +62,7 @@ const
   EnvironmentKeyMachine =
     'SYSTEM\CurrentControlSet\Control\Session Manager\Environment';
   EnvironmentKeyUser = 'Environment';
-  { Pinned PyTorch cu130 wheels (cp310 win_amd64). docs/windows-freeze.md
+  { Pinned PyTorch cu130 wheels (cp310 win_amd64). docs/dev/windows-freeze.md
     URLs percent-encode + as %2B.  A literal + in the URL path is valid
     per RFC 3986 but Delphi THTTPClient (Inno Setup's HTTP stack) and the
     PyTorch R2 CDN are more reliable with the encoded form.

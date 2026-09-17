@@ -4,7 +4,8 @@ description: >-
   Prepare Cleave's next versioned GitHub Release from Unreleased changelog
   notes: bump cleave.__version__, date a Keep a Changelog section, update
   LICENSE (Licensed Work version and Change Date), leave empty Added/Changed/Fixed
-  headings, fix doc drift, and move finished plans to docs/completed/. Use when asked
+  headings, fix doc drift, and move finished plans to
+  docs/dev/plans-completed/. Use when asked
   to cut a release, ship the next full
   release, bump the version, or move Unreleased into a dated X.Y.Z section.
   Suggests a commit message. Does not commit, tag, or publish.
@@ -12,7 +13,7 @@ description: >-
 
 # Cut a release
 
-Prepare the tree for the next `vX.Y.Z` tag. Product SOP (tag, CI, freeze): [docs/structured-releases.md](../../../docs/structured-releases.md). Stance: [versioned-releases.mdc](../../rules/versioned-releases.mdc).
+Prepare the tree for the next `vX.Y.Z` tag. Product SOP (tag, CI, freeze): [docs/dev/structured-releases.md](../../../docs/dev/structured-releases.md). Stance: [versioned-releases.mdc](../../rules/versioned-releases.mdc).
 
 Copy this checklist and tick it as you go:
 
@@ -85,37 +86,44 @@ Prefer `main`. If HEAD is not `main`, say so and continue only if the user alrea
 
 ## 3. Documentation
 
-Style: [documentation-style.mdc](../../rules/documentation-style.mdc). Living references stay in `docs/`. Do not rewrite [docs/structured-releases.md](../../../docs/structured-releases.md) history; only fix sentences that the new tag makes false.
+Style: [documentation-style.mdc](../../rules/documentation-style.mdc). Living references stay in `docs/dev/`. Do not rewrite [docs/dev/structured-releases.md](../../../docs/dev/structured-releases.md) history; only fix sentences that the new tag makes false.
+
+Tree:
+
+- [docs/user-guide/](../../../docs/user-guide/) - end-user pages
+- [docs/dev/](../../../docs/dev/) - living development notes, todos, roadmap
+- [docs/dev/plans/](../../../docs/dev/plans/) - outstanding plans
+- [docs/dev/plans-completed/](../../../docs/dev/plans-completed/) - shipped plans
 
 ### Drift
 
 Read Unreleased (now the dated section) and check these for "until a tag", "next tagged release", "source-only", "no `__version__` bump", or "testers use Actions artifacts until then":
 
 - [README.md](../../../README.md) (Releases / Windows zip)
-- [docs/structured-releases.md](../../../docs/structured-releases.md) (lead, Phase 1 assets, "next milestone tag")
-- [docs/todos.md](../../../docs/todos.md)
-- [docs/windows-freeze.md](../../../docs/windows-freeze.md) only if a user-facing sentence is now wrong
+- [docs/dev/structured-releases.md](../../../docs/dev/structured-releases.md) (lead, current product, remaining work)
+- [docs/dev/todos.md](../../../docs/dev/todos.md)
+- [docs/dev/windows-freeze.md](../../../docs/dev/windows-freeze.md) only if a user-facing sentence is now wrong
 
 After the first tag that attaches the Windows zip and setup exe, README should describe those as Release assets, not as "the next tag will attach them". `v0.1.0` staying source-only is historical and can remain.
 
-Leave `docs/todos.md` items that are still open. Strike or remove only work this cut actually shipped, and only when the todo would otherwise claim it is still outstanding.
+Leave `docs/dev/todos.md` items that are still open. Strike or remove only work this cut actually shipped, and only when the todo would otherwise claim it is still outstanding.
 
 ### Completed plans
 
-Live design plans sit in `docs/*-plan.md` (and similar). Living references never move: `structured-releases.md`, `windows-freeze.md`, `roadmap.md`, `todos.md`, `architecture-review.md`, `projectm-api-coverage.md`.
+Live design plans sit in `docs/dev/plans/`. Living references never move out of `docs/dev/`: `structured-releases.md`, `windows-freeze.md`, `roadmap.md`, `todos.md`, `architecture-review.md`, `projectm-api-coverage.md`.
 
-Move a plan to `docs/completed/` only when remaining work is shipped **or** explicitly parked in `todos.md` / `roadmap.md`. Mixed plans (shipped Phase 1, later phases still open) stay live; mark shipped slices done in-place, or park leftovers in todos/roadmap.
+Move a plan to `docs/dev/plans-completed/` only when remaining work is shipped **or** explicitly parked in `todos.md` / `roadmap.md`. Mixed plans: extract shipped slices to `plans-completed/`; leave outstanding slices in `plans/`.
 
-`docs/completed/` is in `.cursorignore`. List it and `git mv` via Shell with `required_permissions: ["all"]`:
+`docs/dev/plans-completed/` is in `.cursorignore`. List it and `git mv` via Shell with `required_permissions: ["all"]`:
 
 ```bash
-git mv docs/<plan>.md docs/completed/<plan>.md
+git mv docs/dev/plans/<plan>.md docs/dev/plans-completed/<plan>.md
 ```
 
 Then:
 
-- In the moved file, sibling links that were `foo.md` become `../foo.md`. Links to repo-root paths (`../cleave/...`) stay.
-- In live docs, rules, and README, retarget inbound links to `completed/<plan>.md`.
+- In the moved file, sibling links that were `../foo.md` (living `docs/dev/` files) stay. Links to repo-root paths (`../../../cleave/...`) stay. Links to other outstanding plans become `../plans/<plan>.md`.
+- In live docs, rules, and README, retarget inbound links to `docs/dev/plans-completed/<plan>.md`.
 - Do not rewrite the moved plan's design content.
 
 ### Other docs hygiene

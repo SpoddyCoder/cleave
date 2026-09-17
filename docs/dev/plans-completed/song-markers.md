@@ -2,7 +2,7 @@
 
 Manual markers at major song transitions. They solve a different problem from beat snap: **structure vs pulse**. Sparse, user-placed song markers for guaranteed pops at section changes, not rhythmic grid alignment.
 
-Related: [timeline-idea.md](timeline-idea.md), [live-tuning-ui](../.cursor/rules/live-tuning-ui.mdc).
+Related: [timeline-idea.md](timeline-idea.md), [live-tuning-ui](../../../.cursor/rules/live-tuning-ui.mdc).
 
 Naming: use **song markers** everywhere in UI, docs, and code identifiers. Reserve **cue** for per-lane timeline visibility transitions (`SlotCue`).
 

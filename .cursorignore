@@ -21,4 +21,4 @@ __pycache__/
 assets/fonts/
 
 # Historical design write-ups. Open a named path only if the user asks about a past plan.
-docs/completed/
+docs/dev/plans-completed/

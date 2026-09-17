@@ -4,7 +4,7 @@ Generative timeline authoring: visuals tied to the song, readable multi-layer co
 
 **Status:** Done. Rich cues (levels, blend, role), stem conductor, and the closed-loop visual limiter are shipped. Follow-ups (preset reactivity fingerprints, reprise and auto form) moved to [roadmap.md](../roadmap.md). Record still punches 0/1 remains in [todos.md](../todos.md).
 
-Related: [song-markers.md](song-markers.md), [roadmap.md](../roadmap.md), [cleave/timeline_presets/](../../cleave/timeline_presets/), [cleave/signals.py](../../cleave/signals.py).
+Related: [song-markers.md](song-markers.md), [roadmap.md](../roadmap.md), [cleave/timeline_presets/](../../../cleave/timeline_presets/), [cleave/signals.py](../../../cleave/signals.py).
 
 Naming: **cue** remains a per-lane transition. **Song markers** remain project-scoped structure points in `project.yaml`.
 
@@ -12,30 +12,30 @@ Naming: **cue** remains a per-lane transition. **Song markers** remain project-s
 
 ## Shipped baseline
 
-- Generative characters (Breathing, Dialogue, Arc, Pulse) in [cleave/timeline_presets/](../../cleave/timeline_presets/) arrange layer levels with phrase grids, motif voice-leading, density bias, and crescendos driven by song markers typed `crescendo` (optional `begin` / `sustain` set the rise window).
+- Generative characters (Breathing, Dialogue, Arc, Pulse) in [cleave/timeline_presets/](../../../cleave/timeline_presets/) arrange layer levels with phrase grids, motif voice-leading, density bias, and crescendos driven by song markers typed `crescendo` (optional `begin` / `sustain` set the rise window).
 - Beat This! downbeats in `signals.json` drive the bar grid; manual song markers act as hard section walls and soft latch (~5s) at generation time.
-- Each layer is its own projectM instance fed stem PCM; black-key (and other) blends stack them in [cleave/gl_compositor.py](../../cleave/gl_compositor.py).
-- Cue levels drive continuous opacity: `lane_level_breakpoints` / `lane_level_envelope` in [cleave/timeline.py](../../cleave/timeline.py) feed `layer.timeline_level` via `apply_layer_visibility` in [cleave/viz/layer_visibility.py](../../cleave/viz/layer_visibility.py). The strip draws the same breakpoints as variable-height bars.
+- Each layer is its own projectM instance fed stem PCM; black-key (and other) blends stack them in [cleave/gl_compositor.py](../../../cleave/gl_compositor.py).
+- Cue levels drive continuous opacity: `lane_level_breakpoints` / `lane_level_envelope` in [cleave/timeline.py](../../../cleave/timeline.py) feed `layer.timeline_level` via `apply_layer_visibility` in [cleave/viz/layer_visibility.py](../../../cleave/viz/layer_visibility.py). The strip draws the same breakpoints as variable-height bars.
 - `preset_switching: timeline` advances a seek-stable rotation on each rise from zero; per-cue `role` casts from `preset_root/roles/<role>/` when set.
-- Per-stem envelopes in `signals.json` (version 4) drive live Cleave effects ([cleave/effects/](../../cleave/effects/)) and, when the staged conductor row is on, generative timeline Apply via [cleave/timeline_presets/conductor.py](../../cleave/timeline_presets/conductor.py).
-- Closed-loop visual limiter ducks overlapping busyness at runtime ([cleave/viz/visual_limiter.py](../../cleave/viz/visual_limiter.py)).
+- Per-stem envelopes in `signals.json` (version 4) drive live Cleave effects ([cleave/effects/](../../../cleave/effects/)) and, when the staged conductor row is on, generative timeline Apply via [cleave/timeline_presets/conductor.py](../../../cleave/timeline_presets/conductor.py).
+- Closed-loop visual limiter ducks overlapping busyness at runtime ([cleave/viz/visual_limiter.py](../../../cleave/viz/visual_limiter.py)).
 
 ---
 
 ## Idea 1: Arrangement as a mix, not a gate (done)
 
-Cues are level keyframes with optional blend and role (`SlotCue(t, level, blend?, role?)`), fade groups become constant-slope ramps on a piecewise-linear envelope, the strip draws variable-height bars, and crescendo ramps entrants in from `LEVEL_QUANTUM` through every quantised step to a full stack. Layer opacity stays the static fader; the lane multiplies into `fbo.opacity` as before. Per-cue blend writes `LayerFbo.blend_mode` each frame ([cleave/blend_modes.py](../../cleave/blend_modes.py)); per-cue role casts from `preset_root/roles/<role>/` on rises from zero. Blend and role are authored on on / visible cues (the next period), not on disable cues; off cues are stripped of both in `canonicalize`.
+Cues are level keyframes with optional blend and role (`SlotCue(t, level, blend?, role?)`), fade groups become constant-slope ramps on a piecewise-linear envelope, the strip draws variable-height bars, and crescendo ramps entrants in from `LEVEL_QUANTUM` through every quantised step to a full stack. Layer opacity stays the static fader; the lane multiplies into `fbo.opacity` as before. Per-cue blend writes `LayerFbo.blend_mode` each frame ([cleave/blend_modes.py](../../../cleave/blend_modes.py)); per-cue role casts from `preset_root/roles/<role>/` on rises from zero. Blend and role are authored on on / visible cues (the next period), not on disable cues; off cues are stripped of both in `canonicalize`.
 
 ### What landed
 
-1. Cue model and persist: `level` required in YAML; optional `blend` / `role`; baseline is `float | None` ([cleave/config_schema.py](../../cleave/config_schema.py)).
+1. Cue model and persist: `level` required in YAML; optional `blend` / `role`; baseline is `float | None` ([cleave/config_schema.py](../../../cleave/config_schema.py)).
 2. Envelope: `lane_level_breakpoints` / `lane_level_envelope` replace edge-only fade alpha; rise completes at cue time, fall starts at cue time; slopes scale with level delta.
 3. Runtime: `timeline_level` / `timeline_level_multiplier`; levels apply even when both fade groups are disabled (piecewise-constant envelope).
 4. Preset-switch trigger: rise from zero only; `cue.t - fade_in * cue.level`.
 5. Generator: `cues_from_states` emits level mappings; crescendo climbs each entrant from `LEVEL_QUANTUM` to full.
 6. Strip: polygon fill from breakpoints; committed eye alpha follows level.
 7. Blend: held like level via `lane_blend_at`; applied per frame in `apply_layer_visibility` with layer static fallback.
-8. Role: event property on on-transitions; seek-stable per-role pools in [cleave/viz/preset_switching.py](../../cleave/viz/preset_switching.py); empty pool falls back to the main rotation.
+8. Role: event property on on-transitions; seek-stable per-role pools in [cleave/viz/preset_switching.py](../../../cleave/viz/preset_switching.py); empty pool falls back to the main rotation.
 9. Strip authoring: `,` / `.` select on cues (`level > 0`, including mid-on changes; offs skipped); `Shift` / `Ctrl` + `,` / `.` nudge selected cue timeline opacity by 1% / 10% (floor 10% so the cue is not erased; multiplies into the layer opacity fader; YAML field stays `level`); `b` / `c` cycle blend and cast on those only; selected tick highlight, role glyphs on on cues, and badge readout (`opacity N%`).
 
 ### User effort
@@ -46,7 +46,7 @@ None for 0/1 lanes. Partial timeline opacity comes from generative Apply (cresce
 
 ## Idea 2: Stem conductor (done)
 
-Opt-in staged `conductor` row under timeline preset. When on and `signals.json` is present (version 4), Apply builds a [StemConductor](../../cleave/timeline_presets/conductor.py) from full-mix energy ranks and per-slot stem presence, scales the character budget, biases solo rotation and chord picks toward active stems, emits continuous cue levels quantised to `LEVEL_QUANTUM` (active slots never land between 0 and 0.25; near-silent phrases keep one slot at 0.25), and assigns per-slot cast roles and blends on on-cues (`cast_for_state`: drums with activity -> pulse/add; highest non-pulse -> lead; rest -> bed; near-silent -> bed; one lead max). Missing signals notify and fall through to plain arrangement. `other` carries `rms` alongside `spectral_centroid`.
+Opt-in staged `conductor` row under timeline preset. When on and `signals.json` is present (version 4), Apply builds a [StemConductor](../../../cleave/timeline_presets/conductor.py) from full-mix energy ranks and per-slot stem presence, scales the character budget, biases solo rotation and chord picks toward active stems, emits continuous cue levels quantised to `LEVEL_QUANTUM` (active slots never land between 0 and 0.25; near-silent phrases keep one slot at 0.25), and assigns per-slot cast roles and blends on on-cues (`cast_for_state`: drums with activity -> pulse/add; highest non-pulse -> lead; rest -> bed; near-silent -> bed; one lead max). Missing signals notify and fall through to plain arrangement. `other` carries `rms` alongside `spectral_centroid`.
 
 ### What landed
 
@@ -98,7 +98,7 @@ Run `separate` (required for beats and v4 envelopes; re-run on existing projects
 
 ## Closed-loop visual limiter (done)
 
-Runtime sidechain-style limiter shared by live play and offline render. After the composite (and HDR display shoulder when active), [cleave/viz/visual_limiter.py](../../cleave/viz/visual_limiter.py) samples a downsampled luma grid, combines mean luma with mean absolute frame delta into busyness, and on the next frame multiplies a separate `StemLayer.limiter_gain` into opacity (authored `timeline_level` and strip eyes are unchanged). Active when timeline levels apply and `timeline.limiter.enabled` is true; skipped for blank visualizers, preset curation, solo, recording, preview, and when the panel toggle is off.
+Runtime sidechain-style limiter shared by live play and offline render. After the composite (and HDR display shoulder when active), [cleave/viz/visual_limiter.py](../../../cleave/viz/visual_limiter.py) samples a downsampled luma grid, combines mean luma with mean absolute frame delta into busyness, and on the next frame multiplies a separate `StemLayer.limiter_gain` into opacity (authored `timeline_level` and strip eyes are unchanged). Active when timeline levels apply and `timeline.limiter.enabled` is true; skipped for blank visualizers, preset curation, solo, recording, preview, and when the panel toggle is off.
 
 ### Panel (Render: TIMELINE)
 
@@ -126,10 +126,10 @@ Attack, duck gain, and delta weight stay fixed (not panel knobs).
 
 ### What landed
 
-1. Sensor in [cleave/viz/frame_finish.py](../../cleave/viz/frame_finish.py) after the HDR shoulder, before highlight rolloff / chroma / fade / overlay.
+1. Sensor in [cleave/viz/frame_finish.py](../../../cleave/viz/frame_finish.py) after the HDR shoulder, before highlight rolloff / chroma / fade / overlay.
 2. Controller state on `VisualizerCore.visual_limiter` (gains / hysteresis; not YAML): role/z-order victim pick, playhead-timed attack/release ramps, seek reset. Trip and release times come from session `timeline.limiter`.
-3. Actuator: `limiter_gain` on [cleave/viz/layer.py](../../cleave/viz/layer.py); opacity multiply in [cleave/viz/layer_pipeline.py](../../cleave/viz/layer_pipeline.py); gains applied in `tick_frame_core` after `apply_layer_visibility`.
-4. Priority via `lane_role_at` in [cleave/timeline.py](../../cleave/timeline.py): duck `bed` before `accent` before `pulse` before `lead`; missing role ranks as `pulse`; ties break on lower level, then earlier `layer_z_order`.
+3. Actuator: `limiter_gain` on [cleave/viz/layer.py](../../../cleave/viz/layer.py); opacity multiply in [cleave/viz/layer_pipeline.py](../../../cleave/viz/layer_pipeline.py); gains applied in `tick_frame_core` after `apply_layer_visibility`.
+4. Priority via `lane_role_at` in [cleave/timeline.py](../../../cleave/timeline.py): duck `bed` before `accent` before `pulse` before `lead`; missing role ranks as `pulse`; ties break on lower level, then earlier `layer_z_order`.
 
 ### Fixed constants
 

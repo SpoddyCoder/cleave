@@ -2,7 +2,7 @@
 
 Stronger automatic beat and bar grids via [Beat This!](https://github.com/CPJKU/beat_this).
 
-Tracked under [todos.md](todos.md) (Stronger beat and downbeat detection).
+Tracked under [todos.md](../todos.md) (Stronger beat and downbeat detection).
 
 ## Goal
 
@@ -19,10 +19,10 @@ Prefer [Beat This!](https://github.com/CPJKU/beat_this) (ISMIR 2024, CPJKU) over
 
 ## Implemented
 
-- Analyse: [cleave/extract.py](../cleave/extract.py) `extract_beats_downbeats` runs Beat This! on a configurable source (default mix; `--beat-detection-stem` / `-bds`).
-- Persist: `signals.json` version 3 with `beat_times` and `downbeat_times` ([cleave/analyse.py](../cleave/analyse.py), [cleave/signals.py](../cleave/signals.py)). Non-v3 is stale for `separate.signals_complete`.
-- Wiring: [cleave/viz/wiring.py](../cleave/viz/wiring.py) sets `bar_times` from `signals.downbeat_times`.
-- Bar snap nudge: [cleave/timeline.py](../cleave/timeline.py) `shift_bars_by_beats` shifts each downbeat by N beats on the beat grid; [cleave/viz/timeline_snap_controls.py](../cleave/viz/timeline_snap_controls.py) offers `+0`/`+1`/`+2`/`+3`.
+- Analyse: [cleave/extract.py](../../../cleave/extract.py) `extract_beats_downbeats` runs Beat This! on a configurable source (default mix; `--beat-detection-stem` / `-bds`).
+- Persist: `signals.json` version 3 with `beat_times` and `downbeat_times` ([cleave/analyse.py](../../../cleave/analyse.py), [cleave/signals.py](../../../cleave/signals.py)). Non-v3 is stale for `separate.signals_complete`.
+- Wiring: [cleave/viz/wiring.py](../../../cleave/viz/wiring.py) sets `bar_times` from `signals.downbeat_times`.
+- Bar snap nudge: [cleave/timeline.py](../../../cleave/timeline.py) `shift_bars_by_beats` shifts each downbeat by N beats on the beat grid; [cleave/viz/timeline_snap_controls.py](../../../cleave/viz/timeline_snap_controls.py) offers `+0`/`+1`/`+2`/`+3`.
 
 Re-analyse: `cleave separate <slug>` or `cleave play` (stems reused).
 
@@ -54,6 +54,6 @@ Demucs stems + mix
 
 ## Out of scope / known limits
 
-- Quiet intros, drum-sparse sections, half-time and double-time flips, unusual meters: better models help; they do not remove the need for later sparse song anchors ([todos.md](todos.md)).
+- Quiet intros, drum-sparse sections, half-time and double-time flips, unusual meters: better models help; they do not remove the need for later sparse song anchors ([todos.md](../todos.md)).
 - New effect drivers keyed to beats (e.g. explicit beat flash): possible later as a separate roster entry, not part of this swap.
 - Manual dense cueing: not the goal; automation first.

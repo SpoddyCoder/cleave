@@ -6,7 +6,7 @@ matplotlib excluded. Same entry (cleave.py), EXE name cleave, COLLECT
 name cleave (writes dist/cleave/cleave.exe).
 
 Build on Windows (do not cross-compile from WSL). Venv install order is in
-docs/windows-freeze.md (freeze requirements, then CPU torch, then analyse
+docs/dev/windows-freeze.md (freeze requirements, then CPU torch, then analyse
 extras). Then::
 
     pyinstaller packaging/cleave.spec

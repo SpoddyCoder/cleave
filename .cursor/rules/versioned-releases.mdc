@@ -5,7 +5,7 @@ alwaysApply: false
 
 # Versioned releases
 
-`main` is the integration trunk. Tags (`vX.Y.Z`) are frozen snapshots. Process: [docs/structured-releases.md](docs/structured-releases.md). When asked to cut a release, follow [.cursor/skills/cut-release/SKILL.md](../skills/cut-release/SKILL.md) (prepare changelog, version, LICENSE, and docs; do not commit or tag unless the user asks).
+`main` is the integration trunk. Tags (`vX.Y.Z`) are frozen snapshots. Process: [docs/dev/structured-releases.md](docs/dev/structured-releases.md). When asked to cut a release, follow [.cursor/skills/cut-release/SKILL.md](../skills/cut-release/SKILL.md) (prepare changelog, version, LICENSE, and docs; do not commit or tag unless the user asks).
 
 - Land user-visible work on `main` (short feature branches are fine). Unreleased bullets: [project-context.mdc](project-context.mdc).
 - Do not bump `cleave.__version__`, add a dated `## [X.Y.Z]` section, tag, or GitHub Release unless asked to cut a release. `__version__` is last-shipped until a cut.

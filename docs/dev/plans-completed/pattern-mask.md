@@ -4,7 +4,7 @@ Spatial territories for the multi-layer stack: where each stem-driven layer may 
 
 **Status:** Done. Shader composite, five patterns, feather, conductor `pattern_mask` mode, and slot-set transition wipes are shipped. Follow-ups moved to [roadmap.md](../roadmap.md).
 
-Related: [pattern-mask-transition-fragility.md](pattern-mask-transition-fragility.md), [roadmap.md](../roadmap.md), [cleave/gl_masked_compositor.py](../../cleave/gl_masked_compositor.py), [cleave/pattern_mask.py](../../cleave/pattern_mask.py), [cleave/blend_modes.py](../../cleave/blend_modes.py).
+Related: [pattern-mask-transition-fragility.md](pattern-mask-transition-fragility.md), [roadmap.md](../roadmap.md), [cleave/gl_masked_compositor.py](../../../cleave/gl_masked_compositor.py), [cleave/pattern_mask.py](../../../cleave/pattern_mask.py), [cleave/blend_modes.py](../../../cleave/blend_modes.py).
 
 ---
 
@@ -14,7 +14,7 @@ Give each visible layer a **spatial territory** on screen: drums in one region, 
 
 This is not a MilkDrop3 `.milk2` clone. MD3 is a strong two-preset mashup. Cleave's difference is a typical stack of four stems plus optional full mix (up to eight layers). The feature scales with that stack, not as dual blend.
 
-Complements existing compositing: black-key / add (and other [blend modes](../../cleave/blend_modes.py)) stay **how** a layer writes; the pattern mask is **where** it may write.
+Complements existing compositing: black-key / add (and other [blend modes](../../../cleave/blend_modes.py)) stay **how** a layer writes; the pattern mask is **where** it may write.
 
 ---
 
@@ -30,13 +30,13 @@ Layer count is not a mask parameter. It comes from the session. Geometry knobs (
 
 ## Shipped architecture
 
-- Shader composite path in [cleave/gl_masked_compositor.py](../../cleave/gl_masked_compositor.py) alongside the fixed-function compositor in [cleave/gl_compositor.py](../../cleave/gl_compositor.py). Unmasked layers use fixed-function; masked layers use the shader path.
-- Pattern generators and upload helpers in [cleave/pattern_mask.py](../../cleave/pattern_mask.py).
-- Panel: `RENDER > PATTERN MASK` sibling to POST FX and OVERLAYS ([cleave/viz/render_pattern_mask_controls.py](../../cleave/viz/render_pattern_mask_controls.py)).
-- YAML: `render.pattern_mask` in [cleave/config_schema.py](../../cleave/config_schema.py).
-- Frame path: [cleave/viz/layer_pipeline.py](../../cleave/viz/layer_pipeline.py).
+- Shader composite path in [cleave/gl_masked_compositor.py](../../../cleave/gl_masked_compositor.py) alongside the fixed-function compositor in [cleave/gl_compositor.py](../../../cleave/gl_compositor.py). Unmasked layers use fixed-function; masked layers use the shader path.
+- Pattern generators and upload helpers in [cleave/pattern_mask.py](../../../cleave/pattern_mask.py).
+- Panel: `RENDER > PATTERN MASK` sibling to POST FX and OVERLAYS ([cleave/viz/render_pattern_mask_controls.py](../../../cleave/viz/render_pattern_mask_controls.py)).
+- YAML: `render.pattern_mask` in [cleave/config_schema.py](../../../cleave/config_schema.py).
+- Frame path: [cleave/viz/layer_pipeline.py](../../../cleave/viz/layer_pipeline.py).
 
-Pattern masking belongs beside the layer stack, not under [render post-FX](../../cleave/viz/post_fx.py) (single-buffer polish on an already-composited frame).
+Pattern masking belongs beside the layer stack, not under [render post-FX](../../../cleave/viz/post_fx.py) (single-buffer polish on an already-composited frame).
 
 ---
 
@@ -81,9 +81,9 @@ Feather 0% gives clean territories. Feather 100% gives MD3-like plasma blends wi
 
 ## Conductor integration (done)
 
-The timeline preset ([cleave/timeline_presets/mode.py](../../cleave/timeline_presets/mode.py)) stages `timeline.preset.mode` (`layers` or `pattern_mask`).
+The timeline preset ([cleave/timeline_presets/mode.py](../../../cleave/timeline_presets/mode.py)) stages `timeline.preset.mode` (`layers` or `pattern_mask`).
 
-When `pattern_mask`, generative Apply uses [cleave/timeline_presets/pattern_mask_arrange.py](../../cleave/timeline_presets/pattern_mask_arrange.py) instead of the character builders, and sets `render.pattern_mask.enabled: true`, `type: strips`, `feather_pct: 0`, and `transition: 1.0`. Density, invert, and seed stay user-tuned in the panel. Every interior song marker starts a section and forces a slot-set change at that time (add, remove, or simultaneous swap; recast does not count). Begin and crescendo collapse to one layer; the section before a crescendo stays at two or more. Sustain, standard, and diminuendo still change the set; diminuendo keeps a low-count bias that may land on one. One-layer states are allowed infrequently elsewhere. The layers-mode crescendo/accent post-passes are skipped.
+When `pattern_mask`, generative Apply uses [cleave/timeline_presets/pattern_mask_arrange.py](../../../cleave/timeline_presets/pattern_mask_arrange.py) instead of the character builders, and sets `render.pattern_mask.enabled: true`, `type: strips`, `feather_pct: 0`, and `transition: 1.0`. Density, invert, and seed stay user-tuned in the panel. Every interior song marker starts a section and forces a slot-set change at that time (add, remove, or simultaneous swap; recast does not count). Begin and crescendo collapse to one layer; the section before a crescendo stays at two or more. Sustain, standard, and diminuendo still change the set; diminuendo keeps a low-count bias that may land on one. One-layer states are allowed infrequently elsewhere. The layers-mode crescendo/accent post-passes are skipped.
 
 Strips, bars, and radial wipe by interpolating 1D cuts so territories slide, at any feather. Arriving bands grow from a cut and departing bands shrink; feather scales tent width with each interval. Hard checker and plasma dissolve for the morph only; static frames stay hard. Soft checker and plasma stay a dissolve. Apply enables the mask and passes `transition` into `compose_pattern_mask_timeline` as `transition_duration` before compose runs. Add-then-remove overlap is kept only when `t_remove - t_add` is at least one wipe plus one beat; otherwise the section swaps in one step. Isolated add-only and remove-only timing is unchanged. See [pattern-mask-transition-fragility.md](pattern-mask-transition-fragility.md).
 

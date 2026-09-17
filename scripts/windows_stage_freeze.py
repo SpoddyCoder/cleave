@@ -29,7 +29,7 @@ URL and SHA-256 are ``FFMPEG_URL`` and ``FFMPEG_SHA256`` below. The downloaded
 zip is cached at ``<repo-root>/.cache/ffmpeg-windows.zip`` (gitignored).
 Do not commit FFmpeg binaries.
 
-See docs/windows-freeze.md.
+See docs/dev/windows-freeze.md.
 """
 
 from __future__ import annotations

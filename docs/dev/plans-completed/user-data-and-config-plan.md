@@ -2,7 +2,7 @@
 
 High-level plan for separating application install, user preferences, and per-track creative config. Intended as direction for future work; backward compatibility is not required.
 
-Related: [cleave/paths.py](../cleave/paths.py), [cleave/config.py](../cleave/config.py), [architecture principles](../.cursor/rules/architecture-principles.mdc).
+Related: [cleave/paths.py](../../../cleave/paths.py), [cleave/config.py](../../../cleave/config.py), [architecture principles](../../../.cursor/rules/architecture-principles.mdc).
 
 ---
 
@@ -14,7 +14,7 @@ Cleave today mixes three concerns in one checkout:
 2. **User state** (projects, quarantined presets, editor preferences, custom data roots)
 3. **Per-track creative config** (layers, timeline, render overlay, effects)
 
-`projects/` under the repo root (gitignored) and planned preset quarantine under [assets/milkdrop-presets/](../assets/milkdrop-presets/) both put user-mutable data beside the install tree. That is workable for local dev but is an anti-pattern for re-cloning, zip installs, and "delete the app folder without losing my work."
+`projects/` under the repo root (gitignored) and planned preset quarantine under [assets/milkdrop-presets/](../../../assets/milkdrop-presets/) both put user-mutable data beside the install tree. That is workable for local dev but is an anti-pattern for re-cloning, zip installs, and "delete the app folder without losing my work."
 
 The goal is a layout where the install is read-only and all durable user data lives outside it by default.
 
@@ -24,17 +24,17 @@ The goal is a layout where the install is read-only and all durable user data li
 
 | Mechanism | Location | Role today |
 | --- | --- | --- |
-| `data_dir()` | [cleave/paths.py](../cleave/paths.py) | `CLEAVE_DATA` override, else **repo root** |
-| `projects_dir()` | [cleave/paths.py](../cleave/paths.py) | `data_dir() / "projects"` |
-| `GLOBAL_CONFIG_PATH` | [cleave/config.py](../cleave/config.py) | `~/.config/cleave/cleave-viz.yaml` as fallback in `find_config_path` |
-| `DEFAULT_PRESET_ROOT` | [cleave/config_schema.py](../cleave/config_schema.py) | `~/.local/share/cleave/presets` when `paths` omitted |
-| Repo template | [assets/cleave-viz.yaml](../../assets/cleave-viz.yaml) | Example project config; copied into new projects |
+| `data_dir()` | [cleave/paths.py](../../../cleave/paths.py) | `CLEAVE_DATA` override, else **repo root** |
+| `projects_dir()` | [cleave/paths.py](../../../cleave/paths.py) | `data_dir() / "projects"` |
+| `GLOBAL_CONFIG_PATH` | [cleave/config.py](../../../cleave/config.py) | `~/.config/cleave/cleave-viz.yaml` as fallback in `find_config_path` |
+| `DEFAULT_PRESET_ROOT` | [cleave/config_schema.py](../../../cleave/config_schema.py) | `~/.local/share/cleave/presets` when `paths` omitted |
+| Repo template | [assets/cleave-viz.yaml](../../../assets/cleave-viz.yaml) | Example project config; copied into new projects |
 
 Gaps:
 
 - Default `data_dir()` is still the repo root, so new users get `projects/` in the checkout unless they set `CLEAVE_DATA`.
 - `GLOBAL_CONFIG_PATH` uses the same filename and shape as project config; there is no layered merge (user defaults + project overrides).
-- Editor settings (`preview_quality`, `ui_width`, `ui_width_mode`, `ui_fade`) live under `editor:` in project yaml and are persisted with the track via [persisted_session_payload](../cleave/config_schema.py).
+- Editor settings (`preview_quality`, `ui_width`, `ui_width_mode`, `ui_fade`) live under `editor:` in project yaml and are persisted with the track via [persisted_session_payload](../../../cleave/config_schema.py).
 - Preset quarantine was sketched under shipped assets; quarantine is user curation of a preset library, not app content.
 
 ---
@@ -75,8 +75,8 @@ projects/<slug>/
 Ships with Cleave. Never written at runtime.
 
 - Python package, shaders, fonts
-- Default config template ([assets/cleave-viz.yaml](../../assets/cleave-viz.yaml))
-- Bundled preset submodules under [assets/milkdrop-presets/](../assets/milkdrop-presets/) for tests and optional seed content
+- Default config template ([assets/cleave-viz.yaml](../../../assets/cleave-viz.yaml))
+- Bundled preset submodules under [assets/milkdrop-presets/](../../../assets/milkdrop-presets/) for tests and optional seed content
 
 Runtime preset browsing should use the user's preset tree (`paths.preset_root`), not mutate files under `assets/`.
 
@@ -113,7 +113,7 @@ Not stored in the repo checkout by default.
 
 Replace single-file fallback with explicit merge order:
 
-1. **Code defaults** ([cleave/config_schema.py](../cleave/config_schema.py))
+1. **Code defaults** ([cleave/config_schema.py](../../../cleave/config_schema.py))
 2. **User config** (`~/.config/cleave/config.yaml`)
 3. **Project config** (`projects/<slug>/cleave-viz.yaml`) — wins for creative fields
 
@@ -142,7 +142,7 @@ Revisit `editor.width` / `height`: treat as project if tied to export intent, us
 
 **Intent:** hotkey moves a preset out of the active directory into quarantine so projectM rotation and browsing skip it (too dark, broken, etc.).
 
-**Do not** implement quarantine under [assets/milkdrop-presets/](../assets/milkdrop-presets/). That tree is shipped app content.
+**Do not** implement quarantine under [assets/milkdrop-presets/](../../../assets/milkdrop-presets/). That tree is shipped app content.
 
 **Recommended location:**
 
@@ -187,19 +187,19 @@ Ordered for incremental delivery; each phase can land independently.
 
 - Change `data_dir()` default from `repo_root()` to `~/.local/share/cleave`.
 - Create directory on first use (`projects/`, etc.).
-- Update README and [.gitignore](../.gitignore) (repo `projects/` becomes dev-only via explicit `CLEAVE_DATA`).
+- Update README and [.gitignore](../../../.gitignore) (repo `projects/` becomes dev-only via explicit `CLEAVE_DATA`).
 - Migrate or ignore existing repo-root test projects (no compatibility layer required).
 
 ### Phase 2: User config file
 
 - Introduce `~/.config/cleave/config.yaml` with a dedicated schema section (e.g. `user:` or top-level editor fields).
 - Implement merge in `load_config`.
-- Stop persisting editor settings from [cleave/viz/settings_controls.py](../cleave/viz/settings_controls.py) into project yaml.
+- Stop persisting editor settings from [cleave/viz/settings_controls.py](../../../cleave/viz/settings_controls.py) into project yaml.
 - Trim editor fields from project template and golden project configs.
 
 ### Phase 3: Quarantine
 
-- Add `quarantine_dir()` (or per-root helper) in [cleave/paths.py](../cleave/paths.py).
+- Add `quarantine_dir()` (or per-root helper) in [cleave/paths.py](../../../cleave/paths.py).
 - Hotkey handler in live tuning; playlist exclusion.
 - Tests for move + rotation skip (no GL).
 

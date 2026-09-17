@@ -7,8 +7,8 @@ maintainers.
 
 PyInstaller bundles Python and pygame/SDL into `dist/cleave/_internal/`; these
 files are copied **next to** `cleave.exe` after the freeze. See
-[docs/windows-freeze.md](../../docs/windows-freeze.md) and
-[docs/structured-releases.md](../../docs/structured-releases.md).
+[docs/dev/windows-freeze.md](../../docs/dev/windows-freeze.md) and
+[docs/dev/structured-releases.md](../../docs/dev/structured-releases.md).
 
 ## Repo layout
 
@@ -104,7 +104,7 @@ runs one `freeze` job on standard `windows-latest` (`workflow_dispatch` and
 freeze-tree, or torch-wheel cache. Headless smoke (`cleave.exe --version` /
 `--help`, then `cleave.exe separate` on
 [tests/fixtures/smoke-separate.wav](../../tests/fixtures/smoke-separate.wav)).
-No GPU compositing. See [docs/windows-freeze.md](../../docs/windows-freeze.md).
+No GPU compositing. See [docs/dev/windows-freeze.md](../../docs/dev/windows-freeze.md).
 
 1. Install [requirements-freeze.txt](../../requirements-freeze.txt), then
    [requirements-torch-cpu.txt](../../requirements-torch-cpu.txt), then the
@@ -139,4 +139,4 @@ after the zip step in
 Dispatch uploads a 5-day `cleave-windows-x64-setup` artifact; a non-empty
 `release_tag` uses `gh release upload` for the setup exe next to the zip.
 
-GPU proof from the setup exe is met. Full installer details: [docs/windows-freeze.md](../../docs/windows-freeze.md). The same setup exe can optionally download pinned PyTorch cu130 wheels from download.pytorch.org when it detects an NVIDIA GPU, or when silent setup is given `/CUDA=1`. CI does not build or attach a CUDA payload and does not pass `/CUDA=1`.
+GPU proof from the setup exe is met. Full installer details: [docs/dev/windows-freeze.md](../../docs/dev/windows-freeze.md). The same setup exe can optionally download pinned PyTorch cu130 wheels from download.pytorch.org when it detects an NVIDIA GPU, or when silent setup is given `/CUDA=1`. CI does not build or attach a CUDA payload and does not pass `/CUDA=1`.

@@ -19,7 +19,7 @@ Extend cues beyond visibility toggles so timeline events can control more layer 
 
 Classify presets by how they **respond** to audio, not only by how they look, then cast presets to the stem driving that slot. A preset that erupts on kick drums is a great drums layer and a dead bass bed; a static luma histogram cannot tell those apart.
 
-From [completed/improved-timeline-presets.md](completed/improved-timeline-presets.md). Ship fingerprints first, then automatic casting.
+From [plans-completed/improved-timeline-presets.md](plans-completed/improved-timeline-presets.md). Ship fingerprints first, then automatic casting.
 
 ### Intent
 
@@ -40,7 +40,7 @@ Classify each preset by how it responds to audio (silence, bass, transients, sus
 | Lead | high busyness or brightness | at most one hot at a time |
 | Accent | short bright bursts, high delta | chorus hits, marker edges |
 
-Cast on each on-transition in [cleave/viz/preset_switching.py](../cleave/viz/preset_switching.py) through the cue `role` field: when set, index `role_rotations[role]` by per-role occurrence; when unset or the pool is empty, use the main rotation.
+Cast on each on-transition in [cleave/viz/preset_switching.py](../../cleave/viz/preset_switching.py) through the cue `role` field: when set, index `role_rotations[role]` by per-role occurrence; when unset or the pool is empty, use the main rotation.
 
 Timeline rotation advance already keys off committed on-transitions.
 
@@ -54,7 +54,7 @@ Curate favourites once. Casting is automatic on Apply and playback.
 
 Detect song form automatically, and when the song repeats, bring back the **same** arrangement: same cast, same milk files, same blend plan, with one thing escalated. Recognition is what makes a video read as composed; random-but-musical still reads as random.
 
-From [completed/improved-timeline-presets.md](completed/improved-timeline-presets.md). Can ship in halves: suggested markers first (useful alone), cluster reprise second.
+From [plans-completed/improved-timeline-presets.md](plans-completed/improved-timeline-presets.md). Can ship in halves: suggested markers first (useful alone), cluster reprise second.
 
 ### Intent
 
@@ -65,8 +65,8 @@ From [completed/improved-timeline-presets.md](completed/improved-timeline-preset
 
 ### Design sketch
 
-1. At analyse time in [cleave/extract.py](../cleave/extract.py) and [cleave/analyse.py](../cleave/analyse.py), compute a beat-synchronous self-similarity matrix from chroma plus MFCC (librosa, no new heavy dependency), and write segment boundaries plus similarity cluster ids into `signals.json` (schema version bump).
-2. Boundaries become **suggested song markers**, shown as today's red ticks and saved to `project.yaml` under the same deferred-write model as [completed/song-markers.md](completed/song-markers.md). The user corrects a few if needed.
+1. At analyse time in [cleave/extract.py](../../cleave/extract.py) and [cleave/analyse.py](../../cleave/analyse.py), compute a beat-synchronous self-similarity matrix from chroma plus MFCC (librosa, no new heavy dependency), and write segment boundaries plus similarity cluster ids into `signals.json` (schema version bump).
+2. Boundaries become **suggested song markers**, shown as today's red ticks and saved to `project.yaml` under the same deferred-write model as [plans-completed/song-markers.md](plans-completed/song-markers.md). The user corrects a few if needed.
 3. `compose_timeline` generates one arrangement **per cluster**, not per section, and replays it at each recurrence with a deterministic variation seeded by occurrence index: add a layer, raise the lead, tighten switch rate.
 4. Non-repeating material (bridge, breakdown) is identifiable precisely because it is unlike everything else in the matrix, so it gets the contrast treatment: solo one stem, or cut to black and re-enter on the next bar.
 5. Section roles bias the conductor curve rather than replacing it:
@@ -96,7 +96,7 @@ Emit MIDI notes or CC from drum onsets (and other signals in `signals.json`) to 
 
 ## projectM beat sensitivity
 
-Cleave multiplies PCM by beat sensitivity in [cleave/projectm.py](../cleave/projectm.py) `feed_pcm` (default 1.0). That is intentional: after projectM's 2023 audio rewrite ([69d2134](https://github.com/projectM-visualizer/projectm/commit/69d2134fa2c39901eb354eac546c09e1be5c794b)), `projectm_set_beat_sensitivity` became a store-only stub. Older projectM applied sensitivity as a PCM scale via `BeatDetect::GetPCMScale()` (see [issue #161](https://github.com/projectM-visualizer/projectm/issues/161)); Cleave recreates that outside the library so presets stay reactive.
+Cleave multiplies PCM by beat sensitivity in [cleave/projectm.py](../../cleave/projectm.py) `feed_pcm` (default 1.0). That is intentional: after projectM's 2023 audio rewrite ([69d2134](https://github.com/projectM-visualizer/projectm/commit/69d2134fa2c39901eb354eac546c09e1be5c794b)), `projectm_set_beat_sensitivity` became a store-only stub. Older projectM applied sensitivity as a PCM scale via `BeatDetect::GetPCMScale()` (see [issue #161](https://github.com/projectM-visualizer/projectm/issues/161)); Cleave recreates that outside the library so presets stay reactive.
 
 Side effect: louder PCM also affects hard-cut detection, so the beat-sensitivity knob is not fully independent of hard-cut sensitivity.
 
@@ -108,7 +108,7 @@ Inspired by [MilkDrop3](https://github.com/milkdrop2077/MilkDrop3) hardcut modes
 
 ## Geometric transition wipes
 
-Layer-local wipe shaders (plasma, checkerboard, curtain, and similar) when a layer changes preset, beyond projectM's soft crossfade. Implement in the OpenGL compositor during A-to-B preset changes. Reuse the pattern-mask shader library ([cleave/gl_masked_compositor.py](../cleave/gl_masked_compositor.py), [cleave/pattern_mask.py](../cleave/pattern_mask.py)); same generators, different trigger (preset change on one layer vs territory layout across the stack). See [completed/pattern-mask.md](completed/pattern-mask.md).
+Layer-local wipe shaders (plasma, checkerboard, curtain, and similar) when a layer changes preset, beyond projectM's soft crossfade. Implement in the OpenGL compositor during A-to-B preset changes. Reuse the pattern-mask shader library ([cleave/gl_masked_compositor.py](../../cleave/gl_masked_compositor.py), [cleave/pattern_mask.py](../../cleave/pattern_mask.py)); same generators, different trigger (preset change on one layer vs territory layout across the stack). See [plans-completed/pattern-mask.md](plans-completed/pattern-mask.md).
 
 ## Preset rotation history
 
@@ -116,7 +116,7 @@ Never-repeat (or short cooldown) in shuffle/random rotation, plus a "previous pr
 
 ## Pattern mask follow-ups
 
-Core v1 is shipped: shader composite, five patterns (strips, bars, radial, checker, plasma), feather, seed, conductor `pattern_mask` mode, and slot-set transition wipes. See [completed/pattern-mask.md](completed/pattern-mask.md).
+Core v1 is shipped: shader composite, five patterns (strips, bars, radial, checker, plasma), feather, seed, conductor `pattern_mask` mode, and slot-set transition wipes. See [plans-completed/pattern-mask.md](plans-completed/pattern-mask.md).
 
 ### Dynamic masks
 

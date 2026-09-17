@@ -1,8 +1,8 @@
 # libprojectM API coverage in Cleave
 
-Audit of exported libprojectM 4.x symbols vs [cleave/projectm.py](../cleave/projectm.py) and [cleave/projectm_playlist.py](../cleave/projectm_playlist.py). Status values: **bound** (ctypes argtypes/restype), **used** (called from Cleave), **ignored** (deliberately unused), **future** (candidate for later work).
+Audit of exported libprojectM 4.x symbols vs [cleave/projectm.py](../../cleave/projectm.py) and [cleave/projectm_playlist.py](../../cleave/projectm_playlist.py). Status values: **bound** (ctypes argtypes/restype), **used** (called from Cleave), **ignored** (deliberately unused), **future** (candidate for later work).
 
-Related: [todos.md](todos.md) (projectM robustness item).
+Living API audit, not a todo list. Related: [todos.md](todos.md).
 
 ## Core library (`libprojectM-4`)
 
@@ -46,7 +46,7 @@ Related: [todos.md](todos.md) (projectM robustness item).
 | `projectm_get_preset_start_clean` | future | Read-back |
 | `projectm_set_preset_locked` | bound, used | Manual browse / mode none |
 | `projectm_get_preset_locked` | bound, ignored | Not surfaced in UI |
-| `projectm_set_mesh_size` | future | Tie to `render_mode` ([todos.md](todos.md)) |
+| `projectm_set_mesh_size` | future | Tie to `render_mode` |
 | `projectm_get_mesh_size` | future | Diagnostics |
 | `projectm_set_aspect_correction` | ignored | Cleave controls aspect via compositor |
 | `projectm_get_aspect_correction` | ignored | |
@@ -99,12 +99,12 @@ Related: [todos.md](todos.md) (projectM robustness item).
 
 - Per-instance `projectm_set_preset_switch_failed_event_callback` enqueues individual load failures.
 - Connected playlist `projectm_playlist_set_preset_switch_failed_event_callback` enqueues **exhausted** failures (`exhausted=True`).
-- [cleave/projectm_health.py](../cleave/projectm_health.py) drains queues each frame before layer render; rate-limited skip notifications and rotation-stall message via panel notification sink.
-- Warning+ libprojectM log lines are queued in [cleave/projectm.py](../cleave/projectm.py) and drained to panel toasts (`projectM: ...`) once per unique message per session.
+- [cleave/projectm_health.py](../../cleave/projectm_health.py) drains queues each frame before layer render; rate-limited skip notifications and rotation-stall message via panel notification sink.
+- Warning+ libprojectM log lines are queued in [cleave/projectm.py](../../cleave/projectm.py) and drained to panel toasts (`projectM: ...`) once per unique message per session.
 
 ## PCM feeding
 
-libprojectM 4.x keeps a **576**-sample circular buffer per channel; presets read **480** waveform samples and a **512**-bin spectrum from it. Cleave slices each frame's song playhead interval (`samples_per_frame` offline, `samples_for_dt` live) and, when that interval exceeds `projectm_pcm_get_max_samples`, folds it with block-peak aggregation in [cleave/stem_pcm.py](../cleave/stem_pcm.py) `fold_pcm_to_max_samples` before [cleave/viz/layer_pipeline.py](../cleave/viz/layer_pipeline.py) calls `feed_pcm`. Without folding, low-FPS frames only retain the tail of the timeslice in the ring buffer.
+libprojectM 4.x keeps a **576**-sample circular buffer per channel; presets read **480** waveform samples and a **512**-bin spectrum from it. Cleave slices each frame's song playhead interval (`samples_per_frame` offline, `samples_for_dt` live) and, when that interval exceeds `projectm_pcm_get_max_samples`, folds it with block-peak aggregation in [cleave/stem_pcm.py](../../cleave/stem_pcm.py) `fold_pcm_to_max_samples` before [cleave/viz/layer_pipeline.py](../../cleave/viz/layer_pipeline.py) calls `feed_pcm`. Without folding, low-FPS frames only retain the tail of the timeslice in the ring buffer.
 
 ## Environment
 
