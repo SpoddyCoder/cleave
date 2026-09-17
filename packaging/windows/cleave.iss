@@ -36,7 +36,7 @@ SolidCompression=yes
 WizardStyle=modern
 DisableProgramGroupPage=yes
 ChangesEnvironment=yes
-; Uninstall removes {app} only. Documents\cleave\ and %APPDATA%\cleave\ stay.
+; Uninstall removes {app} only. Documents\Cleave\ and %APPDATA%\Cleave\ stay.
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -53,9 +53,9 @@ Name: "{autoprograms}\Cleave"; Filename: "{app}\cleave.exe"; WorkingDir: "{app}"
 Name: "{autodesktop}\Cleave"; Filename: "{app}\cleave.exe"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Messages]
-FinishedLabel=Setup has finished installing [name] on your computer.%n%nUninstall removes only the program folder. Projects in Documents\cleave\ and settings in %%APPDATA%%\cleave\ are left in place.
-UninstalledAllLabel=[name] was successfully removed from your computer.%n%nProjects in Documents\cleave\ and settings in %%APPDATA%%\cleave\ were left in place.
-ConfirmUninstall=Remove %1 from your computer?%n%nProjects in Documents\cleave\ and settings in %%APPDATA%%\cleave\ will be left in place.
+FinishedLabel=Setup has finished installing [name] on your computer.%n%nUninstall removes only the program folder. Projects in Documents\Cleave\ and settings in %%APPDATA%%\Cleave\ are left in place.
+UninstalledAllLabel=[name] was successfully removed from your computer.%n%nProjects in Documents\Cleave\ and settings in %%APPDATA%%\Cleave\ were left in place.
+ConfirmUninstall=Remove %1 from your computer?%n%nProjects in Documents\Cleave\ and settings in %%APPDATA%%\Cleave\ will be left in place.
 
 [Code]
 const

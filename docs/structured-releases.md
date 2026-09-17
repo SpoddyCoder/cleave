@@ -14,7 +14,7 @@ Decide these once, then reuse. Refine per phase rather than reinventing them.
 
 - **Versioning.** Semver. While pre-1.0, versions are `0.x` (`0.1.0`, `0.2.0`, ...); breaking changes are allowed on minor bumps until 1.0. Single source of truth: `cleave.__version__` in [cleave/__init__.py](../cleave/__init__.py). Tags are `vX.Y.Z` and must match that string. [pyproject.toml](../pyproject.toml) reads the same attr (`[tool.setuptools.dynamic]`); this is metadata only, not a pip install.
 - **Changelog.** [CHANGELOG.md](../CHANGELOG.md) in Keep a Changelog format (`## [Unreleased]`, then `## [X.Y.Z] - YYYY-MM-DD` with Added / Changed / Fixed / Removed as appropriate). Each GitHub Release body is that version's section, extracted by [scripts/changelog_section.py](../scripts/changelog_section.py).
-- **User data vs install.** Frozen or zip installs must not write projects, presets, or configs into the app folder. Linux data stays XDG (`~/.local/share/cleave/`, config in `~/.config/cleave/`). Windows data mirrors that tree under `Documents\cleave\`; only the global settings file lives in `%APPDATA%\cleave\`. macOS Application Support is Phase 4. See the user-data plan.
+- **User data vs install.** Frozen or zip installs must not write projects, presets, or configs into the app folder. Linux data stays XDG (`~/.local/share/cleave/`, config in `~/.config/cleave/`). Windows data mirrors that tree under `Documents\Cleave\`; only the global settings file lives in `%APPDATA%\Cleave\`. macOS Application Support is Phase 4. See the user-data plan.
 - **Editor first.** The frozen Windows editor is the majority product (Start Menu, desktop, drop a file). CLI stays for Linux checkout, scripts, and CI. New user-facing work needs an in-window path; stderr is optional. Stance: [.cursor/rules/editor-first.mdc](../.cursor/rules/editor-first.mdc).
 - **Editor vs `separate`.** Play and offline render need pygame, OpenGL, libprojectM, and FFmpeg. Stem split needs Demucs and PyTorch (CPU or CUDA; CUDA is optional, for faster Demucs). Play/render GPU is OpenGL, unrelated to CUDA torch. Phase 2's first Windows freeze did not bundle torch. Phase 3.3 is the Windows `separate` plan: 3.3.2 is the current Windows product (CPU `separate` in the zip and setup exe; Cleave does not ship without stem split). 3.3.3 adds an optional CUDA download in that same installer when an NVIDIA GPU is detected. Drop-a-wav into the editor is the 3.3 ship path; `cleave.exe separate` is the headless/CI path.
 - **Native deps.** libprojectM 4.2+ (core + playlist) and FFmpeg are not Python packages. Every binary OS needs a build or sidecar story. Frozen/Windows ctypes search is beside the exe, then `PROJECTM_LIB` / `PROJECTM_PLAYLIST_LIB`. Linux checkout still uses env, pkg-config, then system `.so` paths.
@@ -81,7 +81,7 @@ Landed in the tree. Manual proof on a native Windows box (not WSL): `cleave.exe 
 What landed:
 
 - Relocatable roots in [cleave/paths.py](../cleave/paths.py): `is_frozen()`, `install_dir()` (exe dir / sidecars), `resource_dir()` (`sys._MEIPASS` / bundled files). Runtime template YAML and fonts use `resource_dir()`, not `repo_root()`.
-- Windows data root `Documents\cleave\` (Known Folder, `CLEAVE_DATA` still overrides). User config `%APPDATA%\cleave\config.yaml`. Preset/texture defaults follow `data_dir()`.
+- Windows data root `Documents\Cleave\` (Known Folder, `CLEAVE_DATA` still overrides). User config `%APPDATA%\Cleave\config.yaml`. Preset/texture defaults follow `data_dir()`.
 - Frozen FFmpeg lookup in [cleave/ffmpeg.py](../cleave/ffmpeg.py): beside the exe only; no PATH fallback. Checkout still uses PATH.
 - ctypes: frozen or `win32` searches `install_dir()` first (`projectM-4.dll` / `projectM-4-playlist.dll`), then env vars. Linux checkout order is unchanged.
 - [packaging/cleave.spec](../packaging/cleave.spec): PyInstaller onedir, pygame and soxr collected, excludes `torch` / `demucs` / `beat_this` / `librosa` / `matplotlib`. `datas`: `assets/cleave-viz.yaml` and `assets/fonts/` (including `MaterialIcons-Regular.ttf`).
@@ -118,15 +118,15 @@ Manual GPU proof (met):
 
 - **Layout.** Unpack a zip (built on a Windows machine) and run from that folder. Relocatable app paths as in 2.1. Not Program Files (that is Phase 3). Installer, signing, and CI wait for Phase 3.
 - **One exe, CLI subcommands.** PyInstaller onedir with `cleave.exe`. Testers run it from cmd the same way as Linux (`cleave.exe play ...`, `cleave.exe render ...`). Drag-and-drop onto the window waits for Phase 3. Not two executables.
-- **User data.** `Documents\cleave\` mirrors Linux `~/.local/share/cleave/`: `projects/`, `presets/` (including `favourites/`, `blacklist/`, `roles/`), `textures/`, and anything else that lives under the data root today. `CLEAVE_DATA` still overrides the data root.
-- **User config.** Only the global settings file goes in AppData (`%APPDATA%\cleave\config.yaml`), matching Linux `~/.config/cleave/config.yaml`.
+- **User data.** `Documents\Cleave\` mirrors Linux `~/.local/share/cleave/`: `projects/`, `presets/` (including `favourites/`, `blacklist/`, `roles/`), `textures/`, and anything else that lives under the data root today. `CLEAVE_DATA` still overrides the data root.
+- **User config.** Only the global settings file goes in AppData (`%APPDATA%\Cleave\config.yaml`), matching Linux `~/.config/cleave/config.yaml`.
 - **FFmpeg.** Ship a Windows `ffmpeg.exe` next to `cleave.exe`. Look beside the exe first, not PATH. Clear error if it is missing. Include the FFmpeg license in the zip.
 - **libprojectM.** Maintainer builds 4.2+ DLLs (core + playlist) once per release and ships them next to the exe. Windows ctypes loader searches beside the exe, then `PROJECTM_LIB`. Testers do not compile or install Visual Studio. Include libprojectM licenses. pygame/SDL travel inside the freeze.
 - **No torch in the MVP zip.** The first Windows freeze does not bundle Demucs or PyTorch. Support matrix: 64-bit Windows, GPU driver, and that testers bring an existing project (separate outside the app).
 
 ### Leave open
 
-Whether a seed preset/texture pack ships in the zip versus a documented copy into `Documents\cleave\`. Do not ship MinGW DLLs unless ctypes names and extra runtimes are updated to match.
+Whether a seed preset/texture pack ships in the zip versus a documented copy into `Documents\Cleave\`. Do not ship MinGW DLLs unless ctypes names and extra runtimes are updated to match.
 
 ### Done when
 
@@ -175,7 +175,7 @@ Without argv normalisation, `cleave.exe <path>` is an argparse error (`command` 
 - [packaging/windows/cleave.iss](../packaging/windows/cleave.iss) compiled by `iscc` against a staged `dist\cleave\`. Output `cleave-<version>-windows-x64-setup.exe` at the repo root. Version passed in from `cleave.__version__`; fixed `AppId` GUID forever so later versions upgrade in place.
 - Default `{autopf}\Cleave` (per-machine, elevated), 64-bit only. Start Menu shortcut; desktop icon optional and off. Optional "add to PATH" task, off by default, so `cleave play ...` works from any terminal.
 - Ships the same `licenses/` tree; the licence page shows Cleave's [LICENSE](../LICENSE).
-- Uninstall removes the install dir only. It never touches `Documents\cleave\` or `%APPDATA%\cleave\`, and says so.
+- Uninstall removes the install dir only. It never touches `Documents\Cleave\` or `%APPDATA%\Cleave\`, and says so.
 - Program Files stays read-only: install, run play and a short render as a normal user, confirm nothing is written under the install dir (met).
 
 #### 3.2.3 CI and Release wiring (done)
@@ -191,12 +191,12 @@ Manual GPU proof (met):
 - `cleave.exe play` on an existing project from the Start Menu shortcut, from a terminal, and by dropping a project folder onto `cleave.exe`.
 - Audio plays on the system default output device; pattern mask compositing works at default `full-quality` preview quality. Silent-playback debugging: [windows-freeze.md](windows-freeze.md) (Audio output device).
 - The 2.2 tester path still works from the dispatch zip and from Program Files.
-- Uninstall removes the install dir only; `Documents\cleave\` and `%APPDATA%\cleave\` survive.
+- Uninstall removes the install dir only; `Documents\Cleave\` and `%APPDATA%\Cleave\` survive.
 
 ### Locked
 
 - **Layout.** The Release freeze is the 2.2 onedir: `cleave.exe` and sidecars beside each other, bundled files in `_internal`. The installer copies that tree into Program Files. Do not invent a second freeze layout. `install_dir()` stays the parent of the exe.
-- **User data.** Unchanged from Phase 2: `Documents\cleave\` (projects, presets, textures). `CLEAVE_DATA` still overrides. Global settings stay in `%APPDATA%\cleave\config.yaml`.
+- **User data.** Unchanged from Phase 2: `Documents\Cleave\` (projects, presets, textures). `CLEAVE_DATA` still overrides. Global settings stay in `%APPDATA%\Cleave\config.yaml`.
 - **When to freeze.** Tag and `workflow_dispatch` only. Never on every push.
 - **Assets.** Upload the Windows binary as a GitHub Release asset, not a long-lived Actions artifact. Source zip/tarball from Phase 1 stay.
 - **One exe, CLI subcommands.** Still PyInstaller onedir with `cleave.exe`. Not two executables. For 3.1 and 3.2 the Release zip and setup exe were the 2.2 play/render freeze (no torch). 3.3.2 shipped the CPU `separate` freeze under those names.
@@ -231,13 +231,13 @@ Engineering foundation. Not a tester ship gate (that is 3.3.2). No tag and no `_
 What landed:
 
 - In-process Demucs (`demucs.pretrained.get_model` + `apply_model`) in [cleave/separate.py](../cleave/separate.py). Frozen mix load uses sidecar `ffmpeg.exe`; stem wavs are written with soundfile. Beat This uses `Audio2Beats` on librosa-loaded audio. Collect details: [windows-freeze.md](windows-freeze.md).
-- Weights in user data (`model_cache_dir()` under `Documents\cleave\models` on Windows). `torch.hub.set_dir` before Demucs and Beat This load. First-run download; not baked into the freeze.
+- Weights in user data (`model_cache_dir()` under `Documents\Cleave\models` on Windows). `torch.hub.set_dir` before Demucs and Beat This load. First-run download; not baked into the freeze.
 - Editor window first on raw audio ([cleave/viz/loading.py](../cleave/viz/loading.py) `open_loading_window` / `LoadingWindow`; [cleave/viz/__init__.py](../cleave/viz/__init__.py) `continue_launch`). Named status plus a bar when fraction is known. `cleave separate` stays headless (stderr).
 - First-run fetch names Demucs `htdemucs` / `htdemucs_ft` and Beat This `final0`, with a size hint and a bar when hub reports bytes. Cached hits stay quiet. Offline: in-window or stderr error that a network is required the first time ([cleave/model_weights.py](../cleave/model_weights.py)).
 - Lean freeze still excluded `torch` / `demucs` / `beat_this` / `librosa` / `matplotlib`. `STEM_SPLIT_MISSING_FROZEN` was that artifact's message.
 - What 3.3.1 shipped: dedicated spec `packaging/cleave-separate.spec` (one `cleave.exe`, CUDA binaries filtered). `freeze-separate` in [windows-freeze.yml](../.github/workflows/windows-freeze.yml) smoked `cleave.exe separate` on [tests/fixtures/smoke-separate.wav](../tests/fixtures/smoke-separate.wav). Dispatch inputs `include_freeze` and `include_separate` were independent (both default true on dispatch; tag `workflow_call` left separate off). No `gh release upload` for the separate zip.
 
-Manual proof (met): dispatch `cleave-windows-x64-separate` zip on a native Windows box. `cleave.exe play <wav>` opens the window, downloads weights into `Documents\cleave\models`, splits, analyses, then opens the editor. `cleave.exe separate` from cmd writes stems and `signals.json`. Lean zip still printed `STEM_SPLIT_MISSING_FROZEN`.
+Manual proof (met): dispatch `cleave-windows-x64-separate` zip on a native Windows box. `cleave.exe play <wav>` opens the window, downloads weights into `Documents\Cleave\models`, splits, analyses, then opens the editor. `cleave.exe separate` from cmd writes stems and `signals.json`. Lean zip still printed `STEM_SPLIT_MISSING_FROZEN`.
 
 #### Done when
 
@@ -252,7 +252,7 @@ What landed:
 - The CPU-separate onedir is `cleave-<version>-windows-x64.zip` and `cleave-<version>-windows-x64-setup.exe`. Inno wraps that tree into Program Files. One `cleave.exe`, CLI subcommands unchanged. `install_dir()` stays the parent of the exe. Not a second exe (`cleave-separate.exe`). Not a `-separate` suffix on the Release assets.
 - Lean spec retired. [packaging/cleave.spec](../packaging/cleave.spec) is the CPU-torch freeze (CUDA binaries filtered, matplotlib excluded).
 - CI: one `freeze` job on standard `windows-latest` in [windows-freeze.yml](../.github/workflows/windows-freeze.yml): [requirements-freeze.txt](../requirements-freeze.txt), then [requirements-torch-cpu.txt](../requirements-torch-cpu.txt), analyse pins, PyInstaller, sidecars, `--version` / `--help`, then `cleave.exe separate` on [tests/fixtures/smoke-separate.wav](../tests/fixtures/smoke-separate.wav). Zip, Inno setup, installer smoke. Tag `workflow_call` waits on CPU Demucs and uses `gh release upload`. Dispatch: 5-day artifacts. Do not cache torch wheels as long-lived artifacts.
-- [README.md](../README.md) Windows zip: drop a wav (or `cleave.exe play <wav>`), first-run weights in `Documents\cleave\models`, named progress in the loading window. CPU `separate` is slow; optional CUDA download in the installer is 3.3.3.
+- [README.md](../README.md) Windows zip: drop a wav (or `cleave.exe play <wav>`), first-run weights in `Documents\Cleave\models`, named progress in the loading window. CPU `separate` is slow; optional CUDA download in the installer is 3.3.3.
 
 Manual proof (met): dispatch zip and Program Files install on a typical Windows box (no NVIDIA, no terminal). Drop a short wav onto `cleave.exe`; named download / split progress in the loading window; project opens. Warm-cache second run skips download chatter. `cleave.exe separate` from cmd writes stems and `signals.json`. Uninstall removes the install dir only.
 
@@ -291,7 +291,7 @@ Pin exact wheel filenames and SHA-256 in the installer (same pattern as FFmpeg).
 - **One exe.** Still `cleave.exe`. Not `cleave-separate.exe`. CLI subcommands stay for scripts and CI; they are not the Windows default UX.
 - **Editor-first split.** Drop or `play` on a wav opens the window first. Stem split, analyse, and first-run weight download report on the loading screen (name plus bar). Failures stay in the window. Explorer / Start Menu / drop must not depend on a console for that.
 - **Layout.** `install_dir()` stays the parent of the exe. The 3.3.2 freeze is a full onedir, not an overlay onto a lean tree.
-- **Weights in user data.** `Documents\cleave\` (or `CLEAVE_DATA`). First-run download; fail clearly offline. Never Program Files.
+- **Weights in user data.** `Documents\Cleave\` (or `CLEAVE_DATA`). First-run download; fail clearly offline. Never Program Files.
 - **Download feedback.** First fetch of each model names it and shows progress in the editor; stderr when a console is attached. Cached hits stay quiet.
 - **Lean freeze is retired.** [packaging/cleave.spec](../packaging/cleave.spec) is the CPU `separate` freeze. `STEM_SPLIT_MISSING_FROZEN` is a runtime guard if frozen torch is missing, not a product smoke testers see on a Release build.
 - **CI.** Standard `windows-latest`. CPU freeze job as in 3.3.2. No CUDA payload build and no CUDA Release asset. Do not cache torch wheels as long-lived artifacts. Headless smoke keeps `cleave.exe separate` on the fixture wav and does not download CUDA wheels.

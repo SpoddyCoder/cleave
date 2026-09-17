@@ -1,4 +1,4 @@
-# `cleave`
+# `Cleave`
 
 [![Tests](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml/badge.svg)](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml)
 
@@ -6,101 +6,24 @@ Stem-separated music visualizer. Layer together drums, bass, vocal and other ste
 
 Comprehensive visual editor allows you to browse and tune presets in real time - automate preset switching, layer in effects, post processing and a whole bunch more. Render the final output in high definition and high frame rates using `ffmpeg`.
 
-Built on [projectM](https://github.com/projectM-visualizer/projectM) and [Demucs](https://github.com/facebookresearch/demucs) amongst [others](#attribution). Developed on WSL2; Linux with a display is the current checkout setup. A Windows zip is documented under [Windows zip](#windows-zip).
+Built on [projectM](https://github.com/projectM-visualizer/projectM) and [Demucs](https://github.com/facebookresearch/demucs) amongst [others](#attribution). 
 
-## Requirements
 
-* Python 3.10+
-* FFmpeg
-* libprojectM 4.2+ (needs `_opengl_render_frame_fbo` and `_set_frame_time`)
-* Optional: NVIDIA GPU + CUDA for faster Demucs separation
-* WSL2: [wsl-builds](https://github.com/spoddycoder/wsl-builds) simplifies deps...
+## Download
+See the [releases page](https://github.com/SpoddyCoder/cleave/releases) to download a Windows installer or standalone executable. For more info see the [Windows zip and installer](#windows-zip-and-installer) section below.
 
-```bash
-./wsl-stacker.sh spoddycoder dev-ai
-./wsl-builder.sh media ffmpeg,libprojectm
-```
+Linux is supported, but requires you to install dependencies yourself, there is no standalone package (yet), see below for setup instructions.
 
-### WSL2 Audio
-If you are experiencing audio glitches try disabling `systemd-timesyncd`.
-[microsoft/wslg#1257](https://github.com/microsoft/wslg/issues/1257). 
-
-### WSL2 OpenGL + GPU
-If the visual editor feels sluggish and CPU-bound, check that Mesa is using the GPU (not software `llvmpipe`)...
-
-```bash
-glxinfo | grep "OpenGL renderer"
-# bad:  llvmpipe
-# good: D3D12
-
-# if you see llvmpipe, force Mesa's D3D12 driver...
-export GALLIUM_DRIVER=d3d12
-```
-[microsoft/wslg#1332](https://github.com/microsoft/wslg/issues/1332)
-
-## Setup
-
-Create a virtual environment...
-
-```bash
-# using venv
-python3 -m venv cleave
-source cleave/bin/activate
-
-# or using conda
-conda create -n cleave python=3.10
-conda activate cleave
-```
-
-Install dependencies...
-
-```bash
-# CUDA 13.0 (Linux + NVIDIA GPU)
-pip install -r requirements-torch-cu130.txt
-# or CPU-only
-pip install -r requirements-torch-cpu.txt
-# rest of deps
-pip install -r requirements.txt
-# for development and tests
-pip install -r requirements-dev.txt
-```
-
-### Releases
-
-GitHub Releases are tagged source archives (`vX.Y.Z`) for Linux/WSL. Pick a tag, unpack it, and follow Setup above (plus [Get Some Milkdrop Presets](#get-some-milkdrop-presets)). System deps (Python 3.10+, FFmpeg, libprojectM 4.2+) are not bundled. `cleave --version` reports the running version.
-
-From [`v0.2.0`](https://github.com/SpoddyCoder/cleave/releases/tag/v0.2.0) on, each tag also attaches a Windows x64 zip (`cleave-<version>-windows-x64.zip`) and installer (`cleave-<version>-windows-x64-setup.exe`). [`v0.1.0`](https://github.com/SpoddyCoder/cleave/releases/tag/v0.1.0) is source-only. Maintainers can still build both via `workflow_dispatch` on [.github/workflows/windows-freeze.yml](.github/workflows/windows-freeze.yml) (5-day artifacts).
-
-`main` is the integration trunk. User-visible work lands there and adds a bullet under `[Unreleased]` in [CHANGELOG.md](CHANGELOG.md) in the same change. `cleave.__version__` stays at the last shipped tag until a milestone. Then Unreleased becomes a dated `X.Y.Z` section, the version is bumped, and `vX.Y.Z` is tagged from `main`. No calendar cadence. Do not collect work on a long-lived release or `develop` branch.
-
-How to cut a tag: [docs/structured-releases.md](docs/structured-releases.md).
-
-### Windows zip and installer
-
-The installer (`cleave-<version>-windows-x64-setup.exe`) defaults to `Program Files\Cleave`. Uninstall removes only the program folder; it does not delete `Documents\cleave\` or `%APPDATA%\cleave\`. The zip (`cleave-<version>-windows-x64.zip`) is the same onedir tree without an installer: unpack and run from that folder.
-
-Launch from the Start Menu or double-click `cleave.exe` to open the editor and browse for a wav or an existing project. You can also drop a wav onto `cleave.exe`, or run `cleave.exe play <wav>`. First run downloads Demucs and Beat This weights into `Documents\cleave\models` and shows named progress in the loading window. CPU `separate` is slow. The installer can download extra CUDA files from PyTorch (about 2 GB) for faster stem splitting when it detects an NVIDIA GPU (driver 580.88 or newer). Default answer is No. Skip or fail leaves CPU split. Silent setup does not download CUDA unless you pass `/CUDA=1` (that switch still downloads if no NVIDIA GPU is present). The zip stays CPU-only.
-
-```
-cleave.exe play
-cleave.exe play <wav>
-cleave.exe play <project>
-cleave.exe render <project>
-```
-
-The build is unsigned. If SmartScreen warns on the setup exe or the zip, choose Run anyway.
-
-User data lives in `Documents\cleave\` (same `projects/`, `presets/`, `textures/` tree as Linux). Settings: `%APPDATA%\cleave\config.yaml`. Override the data root with `CLEAVE_DATA`.
-
-Milkdrop presets still go under `Documents\cleave\presets` (see [Get Some Milkdrop Presets](#get-some-milkdrop-presets); use that path instead of `~/.local/share/cleave/`).
-
-Maintainers: [docs/windows-freeze.md](docs/windows-freeze.md).
+Cleave is currently in development, it is very usable, but may not maintain backward compatibility until the first major v1.0.0 release.
 
 ## Quick Start
 
 ### Get Some Milkdrop Presets
 
 Clone or place Milkdrop preset packs in the default location...
+
+Windows...
+
 
 ```bash
 mkdir -p ~/.local/share/cleave/presets
@@ -231,8 +154,8 @@ Linux (XDG):
 
 Windows (checkout or the [Windows zip](#windows-zip)):
 
-* User data: `Documents\cleave\` (same `projects/`, `presets/`, `textures/` tree)
-* Configuration: `%APPDATA%\cleave\config.yaml`
+* User data: `Documents\Cleave\` (same `projects/`, `presets/`, `textures/` tree)
+* Configuration: `%APPDATA%\Cleave\config.yaml`
 
 On every OS:
 
@@ -270,6 +193,88 @@ Signal-driven compositor modifiers on top of each layer. Tune depths (0-100%).
 
 ### Post-processing
 * TODO: Document
+
+---
+
+## Windows zip and installer
+
+The installer (`cleave-<version>-windows-x64-setup.exe`) defaults to `Program Files\Cleave`. Uninstall removes only the program folder; it does not delete `Documents\Cleave\` or `%APPDATA%\Cleave\`. The zip (`cleave-<version>-windows-x64.zip`) is the same onedir tree without an installer: unpack and run from that folder.
+
+Launch from the Start Menu or double-click `cleave.exe` to open the editor and browse for a wav or an existing project. You can also drop a wav onto `cleave.exe`, or run `cleave.exe play <wav>`. First run downloads Demucs and Beat This weights into `Documents\Cleave\models` and shows named progress in the loading window. CPU `separate` is slow. The installer can download extra CUDA files from PyTorch (about 2 GB) for faster stem splitting when it detects an NVIDIA GPU (driver 580.88 or newer). Default answer is No. Skip or fail leaves CPU split. Silent setup does not download CUDA unless you pass `/CUDA=1` (that switch still downloads if no NVIDIA GPU is present). The zip stays CPU-only.
+
+```
+cleave.exe play
+cleave.exe play <wav>
+cleave.exe play <project>
+cleave.exe render <project>
+```
+
+The build is unsigned. If SmartScreen warns on the setup exe or the zip, choose Run anyway.
+
+User data lives in `Documents\Cleave\` (same `projects/`, `presets/`, `textures/` tree as Linux). Settings: `%APPDATA%\Cleave\config.yaml`. Override the data root with `CLEAVE_DATA`.
+
+Milkdrop presets still go under `Documents\Cleave\presets` (see [Get Some Milkdrop Presets](#get-some-milkdrop-presets); use that path instead of `~/.local/share/cleave/`).
+
+Maintainers: [docs/windows-freeze.md](docs/windows-freeze.md).
+
+## Linux Setup
+Developed on WSL2, but should work on any Linux with a display. 
+
+### Requirements
+
+* Python 3.10+
+* FFmpeg
+* libprojectM 4.2+ (needs `_opengl_render_frame_fbo` and `_set_frame_time`)
+* Optional: NVIDIA GPU + CUDA for faster Demucs separation
+* WSL2: [wsl-builds](https://github.com/spoddycoder/wsl-builds) simplifies deps...
+
+```bash
+./wsl-stacker.sh spoddycoder dev-ai
+./wsl-builder.sh media ffmpeg,libprojectm
+```
+
+### WSL2 Trobleshooting
+If you are experiencing audio glitches try disabling `systemd-timesyncd`.
+[microsoft/wslg#1257](https://github.com/microsoft/wslg/issues/1257). 
+
+If the visual editor feels sluggish and CPU-bound, check that Mesa is using the GPU (not software `llvmpipe`)...
+
+```bash
+glxinfo | grep "OpenGL renderer"
+# bad:  llvmpipe
+# good: D3D12
+
+# if you see llvmpipe, force Mesa's D3D12 driver...
+export GALLIUM_DRIVER=d3d12
+```
+[microsoft/wslg#1332](https://github.com/microsoft/wslg/issues/1332)
+
+### Configure + Install Python Deps
+
+Create a virtual environment...
+
+```bash
+# using venv
+python3 -m venv cleave
+source cleave/bin/activate
+
+# or using conda
+conda create -n cleave python=3.10
+conda activate cleave
+```
+
+Install dependencies...
+
+```bash
+# CUDA 13.0 (Linux + NVIDIA GPU)
+pip install -r requirements-torch-cu130.txt
+# or CPU-only
+pip install -r requirements-torch-cpu.txt
+# rest of deps
+pip install -r requirements.txt
+# for development and tests
+pip install -r requirements-dev.txt
+```
 
 ---
 

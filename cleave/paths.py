@@ -9,6 +9,12 @@ from pathlib import Path
 # Repo root when running from a checkout (`cleave/` package lives here).
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 
+# Windows Documents and %APPDATA% folder (matches Program Files\Cleave).
+WINDOWS_APP_FOLDER = "Cleave"
+
+# XDG data and config directory name (lowercase by convention).
+XDG_APP_FOLDER = "cleave"
+
 # FOLDERID_Documents {FDD39AD0-238F-46AF-ADB4-6C85480369C7}
 _FOLDERID_DOCUMENTS = (
     0xFDD39AD0,
@@ -108,18 +114,18 @@ def data_dir() -> Path:
     """Return Cleave data root.
 
     ``CLEAVE_DATA`` overrides on every OS. Otherwise Windows uses
-    ``Documents/cleave``; Linux uses XDG (``XDG_DATA_HOME/cleave`` or
+    ``Documents/Cleave``; Linux uses XDG (``XDG_DATA_HOME/cleave`` or
     ``~/.local/share/cleave``).
     """
     override = os.environ.get("CLEAVE_DATA")
     if override:
         return Path(override).expanduser().resolve()
     if sys.platform == "win32":
-        return (windows_documents_dir() / "cleave").resolve()
+        return (windows_documents_dir() / WINDOWS_APP_FOLDER).resolve()
     xdg_data_home = os.environ.get("XDG_DATA_HOME")
     if xdg_data_home:
-        return (Path(xdg_data_home) / "cleave").resolve()
-    return (Path.home() / ".local" / "share" / "cleave").resolve()
+        return (Path(xdg_data_home) / XDG_APP_FOLDER).resolve()
+    return (Path.home() / ".local" / "share" / XDG_APP_FOLDER).resolve()
 
 
 def default_preset_root() -> Path:

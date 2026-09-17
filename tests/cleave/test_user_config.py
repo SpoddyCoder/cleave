@@ -255,7 +255,7 @@ def test_user_config_path_windows_appdata(
     monkeypatch.setattr(sys, "platform", "win32")
     appdata = tmp_path / "AppData" / "Roaming"
     monkeypatch.setenv("APPDATA", str(appdata))
-    expected = (appdata / "cleave" / "config.yaml").resolve()
+    expected = (appdata / "Cleave" / "config.yaml").resolve()
     assert user_config_path() == expected
 
 
@@ -265,6 +265,6 @@ def test_user_config_path_windows_without_appdata(
     monkeypatch.setattr(sys, "platform", "win32")
     monkeypatch.delenv("APPDATA", raising=False)
     expected = (
-        Path.home() / "AppData" / "Roaming" / "cleave" / "config.yaml"
+        Path.home() / "AppData" / "Roaming" / "Cleave" / "config.yaml"
     ).resolve()
     assert user_config_path() == expected

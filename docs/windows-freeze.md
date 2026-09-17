@@ -24,8 +24,8 @@ User data is never written into the app folder.
 
 - `CLEAVE_DATA` overrides the data root on every OS.
 - Linux (when unset): `XDG_DATA_HOME/cleave` or `~/.local/share/cleave`.
-- Windows (when unset): Known Folder Documents (`FOLDERID_Documents` via ctypes) `/cleave`, fallback `Path.home() / "Documents" / "cleave"`.
-- Global settings only: Linux `~/.config/cleave/config.yaml` (or `XDG_CONFIG_HOME`); Windows `%APPDATA%\cleave\config.yaml`.
+- Windows (when unset): Known Folder Documents (`FOLDERID_Documents` via ctypes) `/Cleave`, fallback `Path.home() / "Documents" / "Cleave"`.
+- Global settings only: Linux `~/.config/cleave/config.yaml` (or `XDG_CONFIG_HOME`); Windows `%APPDATA%\Cleave\config.yaml`.
 
 Preset and texture defaults are `data_dir() / "presets"` and `data_dir() / "textures"` ([cleave/paths.py](../cleave/paths.py) `default_preset_root` / `default_texture_paths`). First write still creates directories; import does not.
 
@@ -226,7 +226,7 @@ Inno Setup 6 wraps the staged onedir tree. No second freeze and no second layout
 - `OutputBaseFilename=cleave-<version>-windows-x64-setup` at the repo root (same place as the zip).
 - Tasks (both unchecked by default): `desktopicon` (`{autodesktop}\Cleave`), `addtopath` (append `{app}` to HKLM PATH when admin, HKCU when per-user; remove that entry on uninstall without duplicating PATH).
 - Start Menu shortcut `{autoprograms}\Cleave` targets `cleave.exe` with no arguments. That opens the editor window and the in-window file picker, so the user can browse for a wav or a project without a terminal.
-- Uninstall removes `{app}` only. User data (`Documents\cleave\`) and `%APPDATA%\cleave\` survive. The finished and uninstall pages say so.
+- Uninstall removes `{app}` only. User data (`Documents\Cleave\`) and `%APPDATA%\Cleave\` survive. The finished and uninstall pages say so.
 
 CI in [.github/workflows/windows-freeze.yml](../.github/workflows/windows-freeze.yml), after the zip step and reusing the same `dist\cleave\`:
 
@@ -300,7 +300,7 @@ Do not ask testers to unzip into an overlay folder. Do not ship a second setup e
 
 ## Seed presets and textures
 
-Still open: whether a seed preset/texture pack ships in the zip, or testers copy packs into `Documents\cleave\presets` and `Documents\cleave\textures` (same tree as Linux `~/.local/share/cleave/`). First-run download is Later. Play/render do not require a pack in the zip.
+Still open: whether a seed preset/texture pack ships in the zip, or testers copy packs into `Documents\Cleave\presets` and `Documents\Cleave\textures` (same tree as Linux `~/.local/share/cleave/`). First-run download is Later. Play/render do not require a pack in the zip.
 
 ---
 

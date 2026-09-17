@@ -35,7 +35,7 @@ The rest of the pipeline already accepts either kind of target. [cleave/separate
 | Primary UI | In-window keyboard file browser, not a native OS dialog |
 | Mouse | Out. Keyboard only, matching the live overlay |
 | Accept | `*.wav` file, or a directory that contains `project.yaml` |
-| Default root | `projects_dir()` (`~/.local/share/cleave/projects` on Linux/WSL, `Documents\cleave\projects` when frozen) |
+| Default root | `projects_dir()` (`~/.local/share/cleave/projects` on Linux/WSL, `Documents\Cleave\projects` when frozen) |
 | Walk off root | Yes, so a wav on the Desktop or another drive is reachable |
 | Drives | First-class. Frozen Windows lists drive letters; WSL lists `/mnt/<letter>` mounts. `C:\`.parent is a drives listing, not a dead end |
 | Frozen no-args | Becomes `play` with no target: open window, then picker |
@@ -235,7 +235,7 @@ Order inside Phase 3: accept-then-teardown so cancel is cheap. Do not destroy th
 - **Windows drive roots.** `Path("C:\\").parent` is still `C:\`. Without a drives listing, a wav on `D:\` is unreachable from the freeze. WSL can walk `/mnt` -> `d`; native Windows cannot.
 - **WSL vs Windows paths.** The picker lists Linux paths (`/mnt/c/Users/...`). A Windows dialog or Explorer drop of `C:\...` will not open on Linux. Accept helper fails closed with a message, not raise into the frame loop.
 - **WSLg drop.** Dropping from Windows Explorer onto a Linux pygame window is unreliable. The `/mnt/c/Users` and Drives shortcuts are the WSL answer; `DROPFILE` is extra.
-- **Program Files.** Install dir is read-only for normal users. Never start the browser there. User data stays under `Documents\cleave\` ([windows-freeze.md](windows-freeze.md)).
+- **Program Files.** Install dir is read-only for normal users. Never start the browser there. User data stays under `Documents\Cleave\` ([windows-freeze.md](windows-freeze.md)).
 - **Blocking native dialogs.** If a freeze-only `IFileOpenDialog` is added later, it blocks the pygame loop. Keep it off the frame path and off WSL.
 - **Verification.** Unit tests for picker logic, accept helper, and CLI. Do not launch the editor for routine checks. Frozen Start Menu, `DROPFILE`, drives, and Program Files proof need a Windows box.
 

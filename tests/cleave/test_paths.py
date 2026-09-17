@@ -64,7 +64,7 @@ def test_data_dir_windows_known_folder(
     monkeypatch.delenv("CLEAVE_DATA", raising=False)
     docs = tmp_path / "Documents"
     monkeypatch.setattr("cleave.paths.windows_documents_dir", lambda: docs)
-    assert data_dir() == (docs / "cleave").resolve()
+    assert data_dir() == (docs / "Cleave").resolve()
 
 
 def test_data_dir_windows_documents_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -74,7 +74,7 @@ def test_data_dir_windows_documents_fallback(monkeypatch: pytest.MonkeyPatch) ->
         "cleave.paths.windows_documents_dir",
         lambda: Path.home() / "Documents",
     )
-    expected = (Path.home() / "Documents" / "cleave").resolve()
+    expected = (Path.home() / "Documents" / "Cleave").resolve()
     assert data_dir() == expected
 
 
@@ -131,7 +131,7 @@ def test_model_cache_dir_follows_windows_data_dir(
     monkeypatch.delenv("CLEAVE_DATA", raising=False)
     docs = tmp_path / "Docs"
     monkeypatch.setattr("cleave.paths.windows_documents_dir", lambda: docs)
-    expected = (docs / "cleave" / "models").resolve()
+    expected = (docs / "Cleave" / "models").resolve()
     assert model_cache_dir() == expected
     assert expected.is_dir()
 
@@ -143,8 +143,8 @@ def test_default_preset_root_follows_windows_data_dir(
     monkeypatch.delenv("CLEAVE_DATA", raising=False)
     docs = tmp_path / "Docs"
     monkeypatch.setattr("cleave.paths.windows_documents_dir", lambda: docs)
-    assert default_preset_root() == (docs / "cleave" / "presets").resolve()
-    assert default_texture_paths() == ((docs / "cleave" / "textures").resolve(),)
+    assert default_preset_root() == (docs / "Cleave" / "presets").resolve()
+    assert default_texture_paths() == ((docs / "Cleave" / "textures").resolve(),)
 
 
 def test_is_frozen_false_by_default() -> None:

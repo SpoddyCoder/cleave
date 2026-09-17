@@ -11,6 +11,7 @@ from typing import Any
 import yaml
 
 from cleave.config import CleaveConfig, EditorConfig, dump_yaml
+from cleave.paths import WINDOWS_APP_FOLDER, XDG_APP_FOLDER
 from cleave.config_schema.editor import (
     DEFAULT_EDITOR_HEIGHT,
     DEFAULT_EDITOR_WIDTH,
@@ -33,20 +34,20 @@ USER_CONFIG_FILENAME = "config.yaml"
 def user_config_path() -> Path:
     """Return the default user config file path.
 
-    Windows: ``%APPDATA%\\cleave\\config.yaml``. Linux: XDG
+    Windows: ``%APPDATA%\\Cleave\\config.yaml``. Linux: XDG
     (``XDG_CONFIG_HOME/cleave`` or ``~/.config/cleave``).
     """
     if sys.platform == "win32":
         appdata = os.environ.get("APPDATA")
         if appdata:
-            return (Path(appdata) / "cleave" / USER_CONFIG_FILENAME).resolve()
+            return (Path(appdata) / WINDOWS_APP_FOLDER / USER_CONFIG_FILENAME).resolve()
         return (
-            Path.home() / "AppData" / "Roaming" / "cleave" / USER_CONFIG_FILENAME
+            Path.home() / "AppData" / "Roaming" / WINDOWS_APP_FOLDER / USER_CONFIG_FILENAME
         ).resolve()
     xdg_config_home = os.environ.get("XDG_CONFIG_HOME")
     if xdg_config_home:
-        return (Path(xdg_config_home) / "cleave" / USER_CONFIG_FILENAME).resolve()
-    return (Path.home() / ".config" / "cleave" / USER_CONFIG_FILENAME).resolve()
+        return (Path(xdg_config_home) / XDG_APP_FOLDER / USER_CONFIG_FILENAME).resolve()
+    return (Path.home() / ".config" / XDG_APP_FOLDER / USER_CONFIG_FILENAME).resolve()
 
 
 @dataclass(frozen=True)
