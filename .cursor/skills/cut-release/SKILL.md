@@ -2,9 +2,10 @@
 name: cut-release
 description: >-
   Prepare Cleave's next versioned GitHub Release from Unreleased changelog
-  notes: bump cleave.__version__, date a Keep a Changelog section, leave empty
-  Added/Changed/Fixed headings, fix doc drift, and move finished plans to
-  docs/completed/. Use when asked to cut a release, ship the next full
+  notes: bump cleave.__version__, date a Keep a Changelog section, update
+  LICENSE (Licensed Work version and Change Date), leave empty Added/Changed/Fixed
+  headings, fix doc drift, and move finished plans to docs/completed/. Use when asked
+  to cut a release, ship the next full
   release, bump the version, or move Unreleased into a dated X.Y.Z section.
   Suggests a commit message. Does not commit, tag, or publish.
 ---
@@ -18,7 +19,7 @@ Copy this checklist and tick it as you go:
 ```
 Cut progress:
 - [ ] Choose X.Y.Z
-- [ ] Changelog + version
+- [ ] Changelog + version + LICENSE
 - [ ] Docs drift + completed plans
 - [ ] Tests + release-notes preview
 - [ ] Suggest commit message (do not commit)
@@ -57,7 +58,10 @@ Prefer `main`. If HEAD is not `main`, say so and continue only if the user alrea
 1. Move every Unreleased bullet into a new `## [X.Y.Z] - YYYY-MM-DD` block, keeping `### Added` / `Changed` / `Fixed` / `Removed` that have bullets. Drop empty groups from the dated section.
 2. Keep bullet wording. You may collapse extra blank lines inside a group. Do not add, drop, or rewrite notes during the cut. Do not edit older dated sections.
 3. Set `__version__` in `cleave/__init__.py` to `X.Y.Z`.
-4. Leave this empty Unreleased block (headings present, no bullets). Omit `### Removed` unless the user asks:
+4. Update [LICENSE](../../../LICENSE) BSL parameters for this release (do not change Licensor, Additional Use Grant, or Change License):
+   - **Licensed Work:** `Cleave X.Y.Z (and all subsequent versions until` / `separately licensed)` on the next line (same wrapping as today).
+   - **Change Date:** four calendar years after the release date (`YYYY-MM-DD` from step 1), spelled like `September 17, 2030` (full month name, day without leading zero, four-digit year).
+5. Leave this empty Unreleased block (headings present, no bullets). Omit `### Removed` unless the user asks:
 
 ```markdown
 ## [Unreleased]
@@ -69,7 +73,7 @@ Prefer `main`. If HEAD is not `main`, say so and continue only if the user alrea
 ### Fixed
 ```
 
-5. Update the link refs at the bottom. Keep the existing GitHub org/repo from those lines:
+6. Update the link refs at the bottom. Keep the existing GitHub org/repo from those lines:
 
 ```markdown
 [unreleased]: https://github.com/ORG/REPO/compare/vX.Y.Z...HEAD
@@ -135,26 +139,27 @@ Also:
 
 - `git status` / `git diff`: only intended files. Warn on unrelated dirty files; do not revert them.
 - Confirm you did not edit `pyproject.toml` version or hardcode `AppVersion` in `cleave.iss`.
+- Confirm `LICENSE` **Licensed Work** is `Cleave X.Y.Z` and **Change Date** is four years after the dated changelog section.
 
 Useful, still in-tree only:
 
 - If Unreleased mixed several milestones, do not split versions unless the user asked. One dated section for this cut.
 - If README still tells testers to grab 5-day Actions artifacts *instead of* a Release, fix that once this tag will attach the zip.
-- Do not refresh requirement pins, licenses, or freeze sidecars unless the user asked; note them in the handoff if they look stale.
+- Do not refresh requirement pins or freeze sidecars unless the user asked; note them in the handoff if they look stale.
 
 ## 5. Handoff (no commit)
 
 In the reply:
 
 1. Version, date, and a one-line summary of what this cut ships.
-2. Files changed (changelog, `__init__.py`, docs, moved plans).
+2. Files changed (changelog, `__init__.py`, `LICENSE`, docs, moved plans).
 3. Preview of the GitHub Release body (`scripts/changelog_section.py` output).
 4. A suggested commit message. Do not run `git commit`. Prefer:
 
 ```
 Cut X.Y.Z.
 
-Move Unreleased notes into a dated changelog section and set cleave.__version__.
+Move Unreleased notes into a dated changelog section, set cleave.__version__, and update LICENSE.
 ```
 
 Tune the second line if docs moves or README drift dominated.

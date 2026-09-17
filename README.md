@@ -273,6 +273,13 @@ Signal-driven compositor modifiers on top of each layer. Tune depths (0-100%).
 
 ---
 
+## License
+
+Cleave is source-available under the [Business Source License 1.1](LICENSE).
+You may use it freely for any purpose. Commercial distribution of the software
+itself (or modified versions) is not permitted. Each release converts to GPLv3
+four years after its release date. See [LICENSE](LICENSE) for the full text.
+
 ## Attribution
 
 * [Milkdrop / projectM](https://github.com/projectM-visualizer/projectM) - visualizer engine
