@@ -14,6 +14,8 @@ import pytest
 from cleave import __version__
 from cleave.cli import (
     COMMANDS,
+    _exit_error,
+    _fatal_message_box,
     _format_elapsed,
     build_parser,
     cmd_backup,
@@ -132,7 +134,7 @@ def test_no_args_prints_help(capsys: pytest.CaptureFixture[str]) -> None:
 def test_bare_unknown_arg_still_errors(capsys: pytest.CaptureFixture[str]) -> None:
     with pytest.raises(SystemExit) as exc:
         main(["definitely-not-a-project-or-file"])
-    assert exc.value.code != 0
+    assert exc.value.code == 1
     err = capsys.readouterr().err
     assert "invalid choice" in err or "the following arguments are required" in err
 
@@ -208,6 +210,65 @@ def test_error_does_not_pause_when_frozen_in_terminal(
         with pytest.raises(SystemExit):
             main(["definitely-not-a-project-or-file"])
     pause_input.assert_not_called()
+
+
+def test_error_does_not_pause_when_frozen_without_console(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("cleave.cli.is_frozen", lambda: True)
+    monkeypatch.setattr("cleave.cli.owns_console", lambda: False)
+    monkeypatch.setattr("cleave.cli.attach_parent_console", lambda: False)
+    with patch("builtins.input") as pause_input:
+        with patch("cleave.cli._fatal_message_box") as box:
+            with pytest.raises(SystemExit) as exc:
+                main(["definitely-not-a-project-or-file"])
+            assert exc.value.code == 1
+    pause_input.assert_not_called()
+    box.assert_called_once()
+
+
+def test_exit_error_calls_fatal_message_box() -> None:
+    with patch("cleave.cli._fatal_message_box") as box:
+        with pytest.raises(SystemExit) as exc:
+            _exit_error("boom")
+    assert exc.value.code == 1
+    box.assert_called_once_with("boom")
+
+
+def test_fatal_message_box_when_frozen_without_console(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setattr("cleave.cli.is_frozen", lambda: True)
+    monkeypatch.setattr("cleave.cli._parent_console_attached", False)
+    windll = MagicMock()
+    with patch("ctypes.windll", windll, create=True):
+        _fatal_message_box("boom")
+    windll.user32.MessageBoxW.assert_called_once_with(0, "boom", "Cleave", 0x10)
+
+
+def test_fatal_message_box_skipped_when_console_attached(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setattr("cleave.cli.is_frozen", lambda: True)
+    monkeypatch.setattr("cleave.cli._parent_console_attached", True)
+    windll = MagicMock()
+    with patch("ctypes.windll", windll, create=True):
+        _fatal_message_box("boom")
+    windll.user32.MessageBoxW.assert_not_called()
+
+
+def test_fatal_message_box_skipped_when_not_frozen(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setattr("cleave.cli.is_frozen", lambda: False)
+    monkeypatch.setattr("cleave.cli._parent_console_attached", False)
+    windll = MagicMock()
+    with patch("ctypes.windll", windll, create=True):
+        _fatal_message_box("boom")
+    windll.user32.MessageBoxW.assert_not_called()
 
 
 def test_version_does_not_pause_when_frozen(
@@ -1334,6 +1395,18 @@ def test_cmd_play_argv_target_launch_failure_still_exits(
     ):
         with pytest.raises(SystemExit) as exc:
             cmd_play(build_parser().parse_args(["play", "my-track"]))
+    assert exc.value.code == 1
+
+
+def test_cmd_play_open_gl_failure_exits() -> None:
+    from cleave.viz import LaunchError
+
+    with patch(
+        "cleave.viz.open_loading_window",
+        side_effect=LaunchError("failed to open OpenGL window: no gl"),
+    ):
+        with pytest.raises(SystemExit) as exc:
+            cmd_play(build_parser().parse_args(["play"]))
     assert exc.value.code == 1
 
 

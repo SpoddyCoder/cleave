@@ -5,6 +5,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 import pygame
+import pytest
 
 from cleave.viz.loading import (
     LoadingWindow,
@@ -320,3 +321,18 @@ def test_adopt_display_size_resizes_only_when_changed(
     assert window.display_width == 1280
     assert window.display_height == 720
     assert window.overlay_surface.get_size() == (1280, 720)
+
+
+@patch("cleave.viz.loading.pygame.quit")
+@patch("cleave.viz.loading.pygame.display.set_mode")
+def test_set_gl_mode_raises_launch_error(
+    mock_set_mode: MagicMock,
+    mock_quit: MagicMock,
+) -> None:
+    from cleave.viz import LaunchError
+    from cleave.viz.loading import _set_gl_mode
+
+    mock_set_mode.side_effect = pygame.error("no gl")
+    with pytest.raises(LaunchError, match="failed to open OpenGL window"):
+        _set_gl_mode(640, 360)
+    mock_quit.assert_called_once()

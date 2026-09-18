@@ -20,8 +20,6 @@ The Windows product is one `cleave.exe`: CPU stem split in the zip and installer
 2. **Phase 4** Linux and macOS binaries (same product as Windows: CPU `separate` plus play/render).
 3. **Later** (do not block 3.3.3 or Phase 4): Nuitka freeze ([roadmap.md](roadmap.md)); in-window CUDA fetch after a skipped installer prompt; in-app version string; hosted preset/texture packs; code signing; crash/log upload, delta updates, stores.
 
-Windowed PE (`console=False` plus attach-to-parent for terminals) can land with 3.3 or beside it; it must not block treating the editor as the split UI.
-
 ### Phase 3.3.3 (CUDA extra)
 
 One setup exe. The CPU onedir is always installed. CUDA torch is not baked in. Cleave does not build or host a CUDA payload. The portable zip stays CPU-only.

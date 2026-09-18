@@ -13,6 +13,7 @@ from cleave.render_progress import (
     format_render_progress_line,
     render_progress_env_enabled,
 )
+from cleave.win_console import attach_parent_console
 
 if TYPE_CHECKING:
     from cleave.stems import StemSource
@@ -32,6 +33,8 @@ _PLAY_TARGET_HELP = (
 _PROJECT_DIR_HELP = "Cleave project directory (path or slug)"
 COMMANDS = ("separate", "play", "render", "backup", "restore")
 _PAUSE_PROMPT = "Press Enter to close..."
+_MB_ICONERROR = 0x00000010
+_parent_console_attached = False
 
 
 class _CleaveHelpFormatter(argparse.RawDescriptionHelpFormatter):
@@ -41,16 +44,31 @@ class _CleaveHelpFormatter(argparse.RawDescriptionHelpFormatter):
         return super()._format_action(action)
 
 
+def _fatal_message_box(message: str) -> None:
+    """Show a Windows error dialog when a frozen GUI launch has no console."""
+    if sys.platform != "win32" or not is_frozen() or _parent_console_attached:
+        return
+    import ctypes
+
+    ctypes.windll.user32.MessageBoxW(0, message, "Cleave", _MB_ICONERROR)
+
+
 def _exit_error(message: str) -> None:
     print(message, file=sys.stderr)
+    _fatal_message_box(message)
     sys.exit(1)
+
+
+def _parser_error(message: str) -> None:
+    _exit_error(message)
 
 
 def owns_console() -> bool:
     """Return True when this process is the only one attached to the console.
 
-    Explorer-launched Windows apps own a fresh console (count == 1). A
-    terminal session shares the console with the shell (count > 1).
+    Windowed frozen builds attach to a parent terminal when one exists
+    (count > 1, so this is False) and have no console on GUI launch
+    (also False). True only when this process alone owns a console.
     """
     if sys.platform != "win32":
         return False
@@ -209,7 +227,11 @@ def cmd_play(args: argparse.Namespace) -> None:
     os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
     from cleave.viz import LaunchError, continue_launch, open_loading_window
 
-    window = open_loading_window()
+    try:
+        window = open_loading_window()
+    except LaunchError as e:
+        _exit_error(f"error: {e}")
+        return
     if window.quit_requested:
         window.close()
         return
@@ -562,8 +584,11 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> None:
+    global _parent_console_attached
+    _parent_console_attached = attach_parent_console()
     try:
         parser = build_parser()
+        parser.error = _parser_error  # type: ignore[method-assign]
         raw = sys.argv[1:] if argv is None else list(argv)
         if not raw:
             # Start Menu and double-click give the frozen exe empty argv; there

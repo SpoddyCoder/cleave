@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import math
+import sys
 from dataclasses import replace
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -1463,3 +1464,21 @@ def test_render_upscale_overlay_frame_order_uses_content_dims(
     for frame_idx in range(frame_count):
         start = frame_idx * len(expected_per_frame)
         assert call_order[start : start + len(expected_per_frame)] == expected_per_frame
+
+
+def test_ffmpeg_popen_hides_console_on_win32(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(render_mod.sys, "platform", "win32")
+    monkeypatch.setattr(
+        render_mod.subprocess, "CREATE_NO_WINDOW", 0x08000000, raising=False
+    )
+    kwargs = render_mod._ffmpeg_popen_kwargs()
+    assert kwargs["creationflags"] == 0x08000000
+    assert kwargs["stdin"] is render_mod.subprocess.PIPE
+
+
+def test_ffmpeg_popen_has_no_creationflags_off_windows() -> None:
+    if sys.platform == "win32":
+        pytest.skip("Linux/macOS gate only")
+    kwargs = render_mod._ffmpeg_popen_kwargs()
+    assert "creationflags" not in kwargs
+    assert kwargs["stdin"] is render_mod.subprocess.PIPE

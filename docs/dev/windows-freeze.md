@@ -107,7 +107,9 @@ pyinstaller packaging/cleave.spec
 python scripts/windows_stage_freeze.py --dist dist/cleave
 ```
 
-COLLECT `name="cleave"`, so output is `dist/cleave/cleave.exe` plus `_internal/`. Stage into that folder. `console=True`, `upx=False`.
+COLLECT `name="cleave"`, so output is `dist/cleave/cleave.exe` plus `_internal/`. Stage into that folder. `console=False` (windowed PE), `upx=False`.
+
+The exe does not open a terminal on Start Menu, desktop, or drop-on-exe. [cleave/win_console.py](../../cleave/win_console.py) `attach_parent_console()` attaches to the parent console when launched from cmd or PowerShell, so `--help`, `--version`, and CLI output still print. If attach fails (Explorer / Start Menu), pre-window fatal errors use a Windows message box (`MessageBoxW`). In-window errors stay in the editor.
 
 That copies `packaging/windows/*.dll` and libprojectM licenses, fetches the pinned FFmpeg zip, and asserts `cleave.exe`, `ffmpeg.exe`, and the projectM DLLs sit in the onedir root. Use `--no-exe-check` only in tests that have no exe.
 
@@ -237,7 +239,7 @@ iscc /DAppVersion=<version> packaging\windows\cleave.iss
 
 Headless smoke: `setup.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /DIR=<temp> /TASKS=`, run `<temp>\cleave.exe --version`, then `unins000.exe /VERYSILENT` and assert `<temp>` is gone or empty. No GPU. `/TASKS=` leaves PATH unchanged on the runner. Dispatch uploads a 5-day `cleave-windows-x64-setup` artifact; a non-empty `release_tag` uses `gh release upload` for the setup exe next to the zip.
 
-Drop onto the exe uses the argv normalisation in [cleave/cli.py](../../cleave/cli.py) (single existing path with no subcommand runs `play`), plus a pause before exit when a frozen process owns its console, or an Explorer-launched error vanishes with the window.
+Drop onto the exe uses the argv normalisation in [cleave/cli.py](../../cleave/cli.py) (single existing path with no subcommand runs `play`). Frozen errors in a parent terminal print to that console. Explorer-launched fatal errors before the window opens use a message box.
 
 Manual GPU proof (met): install from the setup exe into Program Files; `cleave.exe play` on an existing project from the Start Menu shortcut, a terminal, and by dropping a project folder onto `cleave.exe`; audio on the default output device; pattern mask at default `full-quality` preview quality; same behaviour from the dispatch zip and the installer; uninstall removes the install dir only. See [Audio output device](#audio-output-device) for silent-playback debugging.
 

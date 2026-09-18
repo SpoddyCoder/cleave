@@ -93,16 +93,15 @@ def test_resolve_mix_path_uses_manifest(tmp_path: Path) -> None:
     assert resolve_mix_path(project) == mix_file.resolve()
 
 
-def test_resolve_mix_path_missing_manifest_exits(tmp_path: Path) -> None:
+def test_resolve_mix_path_missing_manifest_raises(tmp_path: Path) -> None:
     project = tmp_path / "song"
     project.mkdir()
 
-    with pytest.raises(SystemExit) as exc_info:
+    with pytest.raises(FileNotFoundError, match="no project mix"):
         resolve_mix_path(project)
-    assert exc_info.value.code == 1
 
 
-def test_resolve_mix_path_missing_mix_exits(tmp_path: Path, capsys) -> None:
+def test_resolve_mix_path_missing_mix_raises(tmp_path: Path) -> None:
     project = tmp_path / "song"
     project.mkdir()
     write_manifest(
@@ -113,10 +112,8 @@ def test_resolve_mix_path_missing_mix_exits(tmp_path: Path, capsys) -> None:
         demucs_model="htdemucs",
     )
 
-    with pytest.raises(SystemExit) as exc_info:
+    with pytest.raises(FileNotFoundError, match="audio not found"):
         resolve_mix_path(project)
-    assert exc_info.value.code == 1
-    assert "audio not found" in capsys.readouterr().err
 
 
 def test_manifest_round_trip_yaml(tmp_path: Path) -> None:

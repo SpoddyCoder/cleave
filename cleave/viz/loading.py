@@ -9,7 +9,6 @@ draw phase messages, then hand the same display to ``continue_launch``.
 
 from __future__ import annotations
 
-import sys
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
@@ -228,9 +227,10 @@ def _set_gl_mode(width: int, height: int) -> None:
     try:
         pygame.display.set_mode((width, height), _GL_DISPLAY_FLAGS)
     except pygame.error as exc:
-        print(f"error: failed to open OpenGL window: {exc}", file=sys.stderr)
         pygame.quit()
-        sys.exit(1)
+        from cleave.viz import LaunchError
+
+        raise LaunchError(f"failed to open OpenGL window: {exc}") from exc
 
 
 @dataclass

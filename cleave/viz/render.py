@@ -179,6 +179,13 @@ def validate_render_project(
     return project
 
 
+def _ffmpeg_popen_kwargs() -> dict[str, object]:
+    kwargs: dict[str, object] = {"stdin": subprocess.PIPE}
+    if sys.platform == "win32":
+        kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+    return kwargs
+
+
 def render(
     project_dir: Path | str,
     *,
@@ -309,7 +316,7 @@ def render(
         _progress(encode_message)
         if on_progress is not None:
             on_progress(encode_message, 0.0)
-        proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+        proc = subprocess.Popen(cmd, **_ffmpeg_popen_kwargs())  # type: ignore[call-arg]
         assert proc.stdin is not None
 
         last_pct = -1

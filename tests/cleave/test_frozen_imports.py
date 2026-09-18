@@ -147,6 +147,9 @@ def test_pyinstaller_spec_collects_cpu_separate_stack() -> None:
     assert {"cudart", "cublas", "cudnn", "nccl", "nvrtc"} <= cuda_markers
     assert "torch" not in cuda_markers
 
+    assert "console=False" in spec
+    assert "console=True" not in spec
+
 
 def test_model_weights_import_does_not_load_torch() -> None:
     result = _run_isolated(

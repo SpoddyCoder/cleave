@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import sys
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -402,14 +401,9 @@ def mix_path(project_dir: Path) -> Path:
 
 def resolve_mix_path(project_dir: Path) -> Path:
     if not manifest_path(project_dir).is_file():
-        print(
-            "error: no project mix; run separate first",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+        raise FileNotFoundError("no project mix; run separate first")
 
     path = mix_path(project_dir)
     if not path.is_file():
-        print(f"error: audio not found: {path}", file=sys.stderr)
-        sys.exit(1)
+        raise FileNotFoundError(f"audio not found: {path}")
     return path
