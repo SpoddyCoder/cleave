@@ -144,6 +144,13 @@ def model_cache_dir() -> Path:
     return path
 
 
+def ensure_data_dirs() -> None:
+    """Create the user data directory tree if any parts are missing."""
+    root = data_dir()
+    for name in ("projects", "presets", "textures", "models"):
+        (root / name).mkdir(parents=True, exist_ok=True)
+
+
 def default_texture_paths() -> tuple[Path, ...]:
     """Return the default texture search paths under :func:`data_dir`."""
     return ((data_dir() / "textures").resolve(),)

@@ -214,6 +214,10 @@ def cmd_play(args: argparse.Namespace) -> None:
         window.close()
         return
 
+    from cleave.paths import ensure_data_dirs
+
+    ensure_data_dirs()
+
     if args.target is None:
         _play_from_picker(args, window)
         return

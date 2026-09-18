@@ -15,6 +15,7 @@ from cleave.paths import (
     default_preset_root,
     default_project_config,
     default_texture_paths,
+    ensure_data_dirs,
     install_dir,
     is_frozen,
     model_cache_dir,
@@ -110,6 +111,35 @@ def test_default_preset_root_follows_data_dir(
     monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
     assert default_preset_root() == (tmp_path / "presets").resolve()
     assert default_texture_paths() == ((tmp_path / "textures").resolve(),)
+
+
+def test_ensure_data_dirs_creates_tree(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    ensure_data_dirs()
+    for name in ("projects", "presets", "textures", "models"):
+        assert (tmp_path / name).is_dir()
+
+
+def test_ensure_data_dirs_idempotent(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    ensure_data_dirs()
+    ensure_data_dirs()
+    for name in ("projects", "presets", "textures", "models"):
+        assert (tmp_path / name).is_dir()
+
+
+def test_ensure_data_dirs_partial(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    (tmp_path / "presets").mkdir()
+    ensure_data_dirs()
+    for name in ("projects", "presets", "textures", "models"):
+        assert (tmp_path / name).is_dir()
 
 
 def test_model_cache_dir_creates_models_under_data_dir(
