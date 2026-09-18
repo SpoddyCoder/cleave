@@ -9,8 +9,6 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 
-- Business Source License 1.1 (BSL 1.1) with GPLv3 conversion after four years.
-
 ### Changed
 
 - Windows user data and settings folders are `Documents\Cleave\` and `%APPDATA%\Cleave\` (same casing as `Program Files\Cleave`).

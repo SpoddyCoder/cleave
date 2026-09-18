@@ -78,4 +78,4 @@ Decide these once, then reuse.
 5. CI ([.github/workflows/release.yml](../../.github/workflows/release.yml)): unit tests via [tests.yml](../../.github/workflows/tests.yml), then `publish` checks that the tag matches `cleave.__version__`, extracts the changelog section, and creates the GitHub Release (source zip/tarball attach automatically). Then `freeze` calls [windows-freeze.yml](../../.github/workflows/windows-freeze.yml) with `release_tag` set to the tag and uploads `cleave-<version>-windows-x64.zip` and `cleave-<version>-windows-x64-setup.exe` onto that Release. If freeze fails, the source Release still exists and can be retried.
 6. Spot-check the archive: unpack, install requirements, run `cleave --version`, confirm presets still come from the README steps.
 
-Prepare the tree with [.cursor/skills/cut-release/SKILL.md](../../.cursor/skills/cut-release/SKILL.md) (changelog, version, LICENSE, docs). Do not commit or tag unless asked.
+Prepare the tree with [.cursor/skills/cut-release/SKILL.md](../../.cursor/skills/cut-release/SKILL.md) (changelog, version, docs). Do not commit or tag unless asked.

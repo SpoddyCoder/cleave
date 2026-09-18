@@ -219,10 +219,12 @@ For compositing, effects, and rendering internals see [docs/user-guide/compositi
 
 ## License
 
-Cleave is source-available under the [Business Source License 1.1](LICENSE).
-You may use it freely for any purpose. Commercial distribution of the software
-itself (or modified versions) is not permitted. Each release converts to GPLv3
-four years after its release date. See [LICENSE](LICENSE) for the full text.
+Cleave is source-available under the [Apache License 2.0](LICENSE) with
+[Commons Clause](LICENSE). You may use it freely for any purpose, including
+work whose output you sell. Commercial distribution of Cleave itself (selling
+the software, or a product whose value comes substantially from Cleave) is
+not permitted. Output you create with Cleave is yours. See [LICENSE](LICENSE)
+for the full text.
 
 ## Attribution
 
