@@ -10,6 +10,7 @@ import pytest
 
 from cleave.win_console import (
     ATTACH_PARENT_PROCESS,
+    FILE_TYPE_PIPE,
     STD_ERROR_HANDLE,
     STD_INPUT_HANDLE,
     STD_OUTPUT_HANDLE,
@@ -95,4 +96,48 @@ def test_attach_parent_console_failure_uses_devnull(
     sys.stderr.write("silent")
     sys.stdout.close()
     sys.stderr.close()
+    kernel32.SetStdHandle.assert_not_called()
+    kernel32.AttachConsole.assert_called_once_with(ATTACH_PARENT_PROCESS)
+
+
+def test_attach_parent_console_keeps_redirected_pipes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setattr(sys, "stdin", sys.stdin)
+    monkeypatch.setattr(sys, "stdout", sys.stdout)
+    monkeypatch.setattr(sys, "stderr", sys.stderr)
+
+    kernel32 = MagicMock()
+    kernel32.GetStdHandle.side_effect = lambda n: {
+        STD_INPUT_HANDLE: 10,
+        STD_OUTPUT_HANDLE: 11,
+        STD_ERROR_HANDLE: 12,
+    }[n]
+    kernel32.GetFileType.return_value = FILE_TYPE_PIPE
+    windll = MagicMock(kernel32=kernel32)
+    fake_msvcrt = MagicMock()
+    fake_msvcrt.open_osfhandle.side_effect = lambda handle, _flags: 100 + handle
+
+    bound: dict[int, MagicMock] = {}
+
+    def fake_open(name: object, mode: str = "r", **_kwargs: object) -> MagicMock:
+        if not isinstance(name, int):
+            raise AssertionError(f"unexpected open({name!r}, {mode!r})")
+        stream = MagicMock()
+        stream.fileno.return_value = name
+        bound[name] = stream
+        return stream
+
+    with (
+        patch("ctypes.windll", windll, create=True),
+        patch.dict(sys.modules, {"msvcrt": fake_msvcrt}),
+        patch("builtins.open", fake_open),
+    ):
+        assert attach_parent_console() is True
+
+    assert sys.stdin is bound[110]
+    assert sys.stdout is bound[111]
+    assert sys.stderr is bound[112]
+    kernel32.AttachConsole.assert_not_called()
     kernel32.SetStdHandle.assert_not_called()

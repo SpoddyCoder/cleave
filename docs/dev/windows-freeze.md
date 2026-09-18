@@ -109,7 +109,7 @@ python scripts/windows_stage_freeze.py --dist dist/cleave
 
 COLLECT `name="cleave"`, so output is `dist/cleave/cleave.exe` plus `_internal/`. Stage into that folder. `console=False` (windowed PE), `upx=False`.
 
-The exe does not open a terminal on Start Menu, desktop, or drop-on-exe. [cleave/win_console.py](../../cleave/win_console.py) `attach_parent_console()` attaches to the parent console when launched from cmd or PowerShell, so `--help`, `--version`, and CLI output still print. If attach fails (Explorer / Start Menu), pre-window fatal errors use a Windows message box (`MessageBoxW`). In-window errors stay in the editor.
+The exe does not open a terminal on Start Menu, desktop, or drop-on-exe. [cleave/win_console.py](../../cleave/win_console.py) `attach_parent_console()` keeps redirected stdout/stderr (pipes and files, including CI `capture_output`) and otherwise attaches to the parent console when launched from cmd or PowerShell, so `--help`, `--version`, and CLI output still print. If attach fails (Explorer / Start Menu), pre-window fatal errors use a Windows message box (`MessageBoxW`). In-window errors stay in the editor.
 
 That copies `packaging/windows/*.dll` and libprojectM licenses, fetches the pinned FFmpeg zip, and asserts `cleave.exe`, `ffmpeg.exe`, and the projectM DLLs sit in the onedir root. Use `--no-exe-check` only in tests that have no exe.
 
