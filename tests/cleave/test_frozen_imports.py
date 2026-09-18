@@ -416,6 +416,7 @@ def test_frozen_cmd_play_raw_audio_uses_short_message(tmp_path: Path) -> None:
         with (
             patch("cleave.viz.open_loading_window", return_value=window),
             patch("cleave.viz.continue_launch"),
+            patch("cleave.starter_packs.starter_packs_needed", return_value=False),
         ):
             cmd_play(build_parser().parse_args(["play", {str(audio)!r}]))
         """,

@@ -22,33 +22,7 @@ Cleave is in active development. It is very usable, but may not maintain backwar
 
 ### Get Some Milkdrop Presets
 
-Cleave needs Milkdrop preset packs. Clone a couple of popular ones into the default location...
-
-Windows:
-```
-cd %USERPROFILE%\Documents\Cleave\presets
-git clone https://github.com/projectM-visualizer/presets-cream-of-the-crop
-git clone https://github.com/projectM-visualizer/presets-milkdrop-original
-```
-
-Linux:
-```bash
-mkdir -p ~/.local/share/cleave/presets
-cd ~/.local/share/cleave/presets
-git clone https://github.com/projectM-visualizer/presets-cream-of-the-crop
-git clone https://github.com/projectM-visualizer/presets-milkdrop-original
-```
-
-Optionally grab the texture pack too:
-```bash
-# Windows: cd %USERPROFILE%\Documents\Cleave\textures
-# Linux:
-mkdir -p ~/.local/share/cleave/textures
-cd ~/.local/share/cleave/textures
-git clone https://github.com/projectM-visualizer/presets-milkdrop-texture-pack
-```
-
-There are many thousands of Milkdrop presets available online - these are just a few of the best.
+Cleave needs Milkdrop preset packs to display visualizations. On first launch, when none are present, the editor offers to download starter preset and texture packs (about 60 MB). You can skip this and add packs later; see [Project & Data Locations](#project--data-locations).
 
 ### Open a Track
 
@@ -206,6 +180,34 @@ Cleave creates a project directory for each song, storing stems, configs and ren
 **Linux**: `~/.local/share/cleave/` (projects, presets, textures). Settings: `~/.config/cleave/config.yaml`.
 
 Override the data root with `CLEAVE_DATA` on any OS.
+
+To add starter packs yourself (instead of the first-launch download), clone them into those folders:
+
+Windows:
+```
+cd %USERPROFILE%\Documents\Cleave\presets
+git clone https://github.com/projectM-visualizer/presets-cream-of-the-crop
+git clone https://github.com/projectM-visualizer/presets-milkdrop-original
+```
+
+Linux:
+```bash
+mkdir -p ~/.local/share/cleave/presets
+cd ~/.local/share/cleave/presets
+git clone https://github.com/projectM-visualizer/presets-cream-of-the-crop
+git clone https://github.com/projectM-visualizer/presets-milkdrop-original
+```
+
+Optionally grab the texture pack too:
+```bash
+# Windows: cd %USERPROFILE%\Documents\Cleave\textures
+# Linux:
+mkdir -p ~/.local/share/cleave/textures
+cd ~/.local/share/cleave/textures
+git clone https://github.com/projectM-visualizer/presets-milkdrop-texture-pack
+```
+
+There are many thousands of Milkdrop presets available online - these are just a few of the best.
 
 A project directory contains:
 * `project.yaml` - metadata, song markers, render settings

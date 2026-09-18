@@ -43,6 +43,13 @@ def _mock_loading_window() -> MagicMock:
     return window
 
 
+@pytest.fixture(autouse=True)
+def _skip_starter_pack_prompt(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "cleave.starter_packs.starter_packs_needed", lambda: False
+    )
+
+
 def test_format_elapsed() -> None:
     assert _format_elapsed(0.4) == "0 mins 0 secs"
     assert _format_elapsed(65.4) == "1 mins 5 secs"
@@ -545,6 +552,7 @@ window.quit_requested = False
 with (
     patch("cleave.viz.open_loading_window", return_value=window),
     patch("cleave.viz.continue_launch"),
+    patch("cleave.starter_packs.starter_packs_needed", return_value=False),
 ):
     cmd_play(build_parser().parse_args(["play", "my-track"]))
 if "torch" in sys.modules:
@@ -1327,3 +1335,50 @@ def test_cmd_play_argv_target_launch_failure_still_exits(
         with pytest.raises(SystemExit) as exc:
             cmd_play(build_parser().parse_args(["play", "my-track"]))
     assert exc.value.code == 1
+
+
+def test_cmd_play_prompts_for_starter_packs_when_needed(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    monkeypatch.setattr(
+        "cleave.starter_packs.starter_packs_needed", lambda: True
+    )
+    project = _complete_project(tmp_path)
+    window = _mock_loading_window()
+
+    with (
+        patch("cleave.viz.open_loading_window", return_value=window),
+        patch("cleave.viz.starter_pack_host.run_starter_pack_prompt") as prompt,
+        patch("cleave.separate.run_separate", return_value=project.resolve()),
+        patch("cleave.viz.continue_launch") as continue_launch,
+    ):
+        cmd_play(build_parser().parse_args(["play", "my-track"]))
+
+    prompt.assert_called_once_with(window)
+    continue_launch.assert_called_once()
+
+
+def test_cmd_play_starter_pack_quit_closes_window(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    monkeypatch.setattr(
+        "cleave.starter_packs.starter_packs_needed", lambda: True
+    )
+    window = _mock_loading_window()
+
+    def prompt(host_window: MagicMock) -> None:
+        host_window.quit_requested = True
+
+    with (
+        patch("cleave.viz.open_loading_window", return_value=window),
+        patch("cleave.viz.starter_pack_host.run_starter_pack_prompt", side_effect=prompt),
+        patch("cleave.viz.continue_launch") as continue_launch,
+        patch("cleave.separate.run_separate") as separate,
+    ):
+        cmd_play(build_parser().parse_args(["play", "my-track"]))
+
+    continue_launch.assert_not_called()
+    separate.assert_not_called()
+    window.close.assert_called_once()

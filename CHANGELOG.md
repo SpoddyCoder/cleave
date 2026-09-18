@@ -9,6 +9,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 
+- Offer to download starter Milkdrop preset and texture packs on launch when the presets directory is empty.
 - Auto-create user data directories (projects, presets, textures, models) on launch.
 
 ### Changed
@@ -16,6 +17,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Windows user data and settings folders are `Documents\Cleave\` and `%APPDATA%\Cleave\` (same casing as `Program Files\Cleave`).
 
 ### Fixed
+
+- Starter pack download progress bar no longer disappears between updates.
 
 ## [0.2.0] - 2026-09-17
 

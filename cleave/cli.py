@@ -215,8 +215,17 @@ def cmd_play(args: argparse.Namespace) -> None:
         return
 
     from cleave.paths import ensure_data_dirs
+    from cleave.starter_packs import starter_packs_needed
 
     ensure_data_dirs()
+
+    if starter_packs_needed():
+        from cleave.viz.starter_pack_host import run_starter_pack_prompt
+
+        run_starter_pack_prompt(window)
+        if window.quit_requested:
+            window.close()
+            return
 
     if args.target is None:
         _play_from_picker(args, window)
