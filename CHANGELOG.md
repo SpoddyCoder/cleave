@@ -15,6 +15,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- Visual limiter, credits-card animation, highlight rolloff, and chroma boost headers show the child enabled/type/mode value while collapsed.
 - Frozen Windows `cleave.exe` no longer opens a terminal window. Start Menu, desktop, and drop-on-exe stay window-only. Terminal users still get CLI output. Explorer-launched fatal errors use a message box.
 - Layer preset switching header shows the trigger type and Left/Right only expands or collapses. Trigger options are off, timer, projectM, and timeline; off hides the other switching rows.
 - Windows user data and settings folders are `Documents\Cleave\` and `%APPDATA%\Cleave\` (same casing as `Program Files\Cleave`).

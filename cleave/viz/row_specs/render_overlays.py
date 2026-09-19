@@ -538,6 +538,7 @@ SPECS: dict[RowKind, RowSpec] = {
         affordance=RowAffordance.EXPAND,
         panel_label="animation",
         present_style=RowPresentStyle.EXPAND_SUBHEADER,
+        format_value=_format_overlay_card_animation_type,
         apply_horizontal=apply_expand_subheader,
         fit_strategy=FitStrategy.NONE,
         help_title="Card animation",

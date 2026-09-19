@@ -55,11 +55,14 @@ from cleave.viz.row_spec import (
     tree_branch_prefix,
 )
 from cleave.viz.tuning_view_state import (
+    ChromaBoostBlock,
+    HighlightRolloffBlock,
     RenderOverlaysBlock,
     RenderPostFxBlock,
     RenderTimelineBlock,
     SettingsBlock,
     TimelineFadeGroupBlock,
+    VisualLimiterBlock,
 )
 from tests.cleave.viz.test_controls import (
     _keydown,
@@ -68,7 +71,11 @@ from tests.cleave.viz.test_controls import (
 )
 from tests.cleave.viz.test_overlay import _minimal_view_state
 from tests.support.config import TEST_LAYER_STEMS
-from tests.support.viz import make_overlay_card_block, make_track_block, noop_layer_bindings
+from tests.support.viz import (
+    make_overlay_card_block,
+    make_track_block,
+    noop_layer_bindings,
+)
 
 
 def _track_lock_state(locked: bool) -> SimpleNamespace:
@@ -1024,7 +1031,17 @@ def test_expand_subheader_prefix_preset_switching() -> None:
     )
     assert (
         expand_subheader_prefix(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_HEADER)
-        == "└─ highlight rolloff "
+        == "└─ highlight rolloff"
+    )
+    assert (
+        expand_subheader_prefix(RowKind.RENDER_POST_FX_CHROMA_BOOST_HEADER)
+        == "└─ chroma boost"
+    )
+    assert expand_subheader_prefix(RowKind.TIMELINE_VISUAL_LIMITER_HEADER) == (
+        "└─ visual limiter"
+    )
+    assert expand_subheader_prefix(RowKind.RENDER_OVERLAY_CARD_ANIMATION_HEADER) == (
+        "  └─ animation"
     )
     assert expand_subheader_prefix(RowKind.SETTINGS_EDITOR_WINDOW_HEADER) == (
         "└─ Editor Window "
@@ -1052,6 +1069,53 @@ def test_row_expand_subheader_display_text() -> None:
         row_expand_subheader_display_text(state, desc)
         == "└─ preset switching: projectM ▶"
     )
+
+
+def test_expand_subheader_shows_child_status_value() -> None:
+    state = _minimal_view_state()
+    assert row_expand_subheader_display_text(
+        state, RowDescriptor(RowKind.TIMELINE_VISUAL_LIMITER_HEADER)
+    ) == "└─ visual limiter: on ▶"
+    assert row_expand_subheader_display_text(
+        state,
+        RowDescriptor(
+            RowKind.RENDER_OVERLAY_CARD_ANIMATION_HEADER, card="opening_card"
+        ),
+    ) == "  └─ animation: fade ▶"
+    assert row_expand_subheader_display_text(
+        state, RowDescriptor(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_HEADER)
+    ) == "└─ highlight rolloff: composite ▶"
+    assert row_expand_subheader_display_text(
+        state, RowDescriptor(RowKind.RENDER_POST_FX_CHROMA_BOOST_HEADER)
+    ) == "└─ chroma boost: off ▶"
+
+    state = _minimal_view_state(
+        render_timeline=RenderTimelineBlock(
+            limiter=VisualLimiterBlock(enabled=False)
+        ),
+        render_overlays=RenderOverlaysBlock(
+            opening_card=make_overlay_card_block(animation_type="slide")
+        ),
+        render_post_fx=RenderPostFxBlock(
+            highlight_rolloff=HighlightRolloffBlock(mode="per_layer"),
+            chroma_boost=ChromaBoostBlock(mode="composite"),
+        ),
+    )
+    assert row_expand_subheader_display_text(
+        state, RowDescriptor(RowKind.TIMELINE_VISUAL_LIMITER_HEADER)
+    ) == "└─ visual limiter: off ▶"
+    assert row_expand_subheader_display_text(
+        state,
+        RowDescriptor(
+            RowKind.RENDER_OVERLAY_CARD_ANIMATION_HEADER, card="opening_card"
+        ),
+    ) == "  └─ animation: slide ▶"
+    assert row_expand_subheader_display_text(
+        state, RowDescriptor(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_HEADER)
+    ) == "└─ highlight rolloff: per_layer ▶"
+    assert row_expand_subheader_display_text(
+        state, RowDescriptor(RowKind.RENDER_POST_FX_CHROMA_BOOST_HEADER)
+    ) == "└─ chroma boost: composite ▶"
 
 
 def test_format_row_value_timeline_cuts() -> None:

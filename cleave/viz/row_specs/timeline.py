@@ -697,6 +697,7 @@ SPECS: dict[RowKind, RowSpec] = {
         affordance=RowAffordance.EXPAND,
         panel_label="visual limiter",
         present_style=RowPresentStyle.EXPAND_SUBHEADER,
+        format_value=_format_visual_limiter_enabled,
         apply_horizontal=apply_expand_subheader,
         fit_strategy=FitStrategy.NONE,
         help_title="Visual limiter",
