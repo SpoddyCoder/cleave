@@ -155,6 +155,9 @@ class TuningControls:
             on_notification=self.show_notification,
             move_mode_signature=self.layer_lifecycle.signature_payload,
         )
+        layers_by_slot = (
+            layer_manager.layers_by_slot if layer_manager is not None else {}
+        )
         self.preset_list = PresetListController(
             session,
             preset_root,
@@ -165,6 +168,7 @@ class TuningControls:
             on_notification=self.show_notification,
             get_active_config_path=lambda: self._config_save.active_config_path,
             on_focus_preset_item=self._focus_preset_list_item,
+            layers_by_slot=layers_by_slot,
         )
         curation_index = PresetCurationIndex.build(preset_root)
         self._preset_curation = PresetCurationController(
@@ -173,9 +177,6 @@ class TuningControls:
             self._modal_host,
             layer_bindings,
             curation_index,
-        )
-        layers_by_slot = (
-            layer_manager.layers_by_slot if layer_manager is not None else {}
         )
         self._timeline_presets = TimelinePresetController(
             session,

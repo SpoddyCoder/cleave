@@ -596,13 +596,19 @@ class TuningViewStateBuilder:
         self._structure: _ViewStateStructure | None = None
 
     def _sync_auto_preset_paths(self) -> None:
-        """Mirror StemLayer playing paths onto session for panel display."""
-        if not self._layers_by_slot:
+        """Mirror the playing switching preset onto session for panel display."""
+        if not isinstance(self._layers_by_slot, dict) or not self._layers_by_slot:
             return
+        from cleave.viz.preset_switching import playing_switching_preset_path
+
         for slot, stem in self._layers_by_slot.items():
             runtime = self.session.layers.get(slot)
-            if runtime is not None:
-                runtime.auto_preset_path = stem.auto_preset_path
+            if runtime is None:
+                continue
+            playing = playing_switching_preset_path(stem)
+            if playing is not None:
+                stem.auto_preset_path = playing
+            runtime.auto_preset_path = stem.auto_preset_path
 
     def _preset_list_paths_key(self) -> tuple[tuple[str, ...], ...]:
         return tuple(
@@ -677,9 +683,12 @@ class TuningViewStateBuilder:
         active = layer.auto_preset_path
         if active is None:
             current = layer.playlist.current
-            if current is None:
+            if current is not None:
+                active = current.resolve()
+            elif layer.preset_switching == "on":
+                return 0
+            else:
                 return None
-            active = current.resolve()
         target = active.resolve()
         target_str = str(target)
         target_posix = target.as_posix()
@@ -692,6 +701,8 @@ class TuningViewStateBuilder:
                     return index
             except OSError:
                 continue
+        if layer.preset_switching == "on" and layer.auto_preset_path is None:
+            return 0
         return None
 
     def _build_structure(

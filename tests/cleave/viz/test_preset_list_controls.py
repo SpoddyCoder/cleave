@@ -187,6 +187,68 @@ def test_prompt_populate_timer_omits_cue_roles() -> None:
         )
 
 
+def test_add_current_uses_playing_auto_preset_not_browse() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        project = Path(tmp) / "project"
+        root = Path(tmp) / "packs"
+        browse = root / "pack" / "demo.milk"
+        playing = root / "pack" / "later.milk"
+        _write(browse, "milk")
+        _write(playing, "milk")
+        controller, session, modal = _make_controller(
+            preset_root=root,
+            project_dir=project,
+        )
+        session.layers["layer_1"].auto_preset_path = playing.resolve()
+        assert controller.current_preset_path("layer_1") == playing.resolve()
+        assert controller.resolve_file_path(
+            "layer_1",
+            RowKind.TRACK_PRESET,
+            RowDescriptor(RowKind.TRACK_PRESET, slot="layer_1"),
+        ) == playing.resolve()
+        controller.add_current("layer_1")
+        view = modal.view_state()
+        assert view is not None
+        assert view.message == "Add preset: later.milk?"
+        modal.handle_keydown(keydown(pygame.K_RETURN))
+        dest = project / "presets" / "later.milk"
+        assert dest.is_file()
+        assert session.layers["layer_1"].preset_list == [str(dest.resolve())]
+
+
+def test_add_current_uses_projectm_playlist_position_not_stale_first() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        project = Path(tmp) / "project"
+        root = Path(tmp) / "packs"
+        first = root / "pack" / "first.milk"
+        later = root / "pack" / "later.milk"
+        _write(first, "milk")
+        _write(later, "milk")
+        from unittest.mock import MagicMock
+
+        from cleave.viz.layer import StemLayer
+
+        stem = MagicMock(spec=StemLayer)
+        stem.auto_preset_path = first.resolve()
+        stem.preset_rotation = None
+        playlist = MagicMock()
+        playlist.get_position.return_value = 1
+        playlist.item.side_effect = lambda index: (first, later)[index]
+        stem.projectm_playlist = playlist
+        controller, session, modal = _make_controller(
+            preset_root=root,
+            project_dir=project,
+            preset_list=[str(first.resolve()), str(later.resolve())],
+        )
+        controller._layers_by_slot = {"layer_1": stem}
+        session.layers["layer_1"].auto_preset_path = first.resolve()
+        assert controller.current_preset_path("layer_1") == later.resolve()
+        controller.add_current("layer_1")
+        view = modal.view_state()
+        assert view is not None
+        assert view.message == "Add preset: later.milk?"
+
+
 def test_add_current_copies_into_user_presets() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         project = Path(tmp) / "project"

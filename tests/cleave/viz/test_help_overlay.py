@@ -300,7 +300,7 @@ def test_preset_list_help() -> None:
     assert description.title == "preset list"
     assert description.lines == (
         "Ordered presets used for automatic switching on this layer.",
-        "Expand to reorder, delete, or add the current browse preset.",
+        "Expand to reorder, delete, or add the currently playing preset.",
     )
     assert not description.entries
     assert keyboard.title == KEYBOARD_CONTROLS_SECTION_TITLE

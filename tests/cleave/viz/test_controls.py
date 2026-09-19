@@ -4542,6 +4542,29 @@ def test_active_preset_list_item_uses_highlight_color() -> None:
     assert _row_value_color(view, idle_row) == HIGHLIGHT
 
 
+def test_first_preset_list_item_highlighted_when_auto_unset() -> None:
+    controls = _make_controls(("layer_1",))
+    layer = controls.session.layers["layer_1"]
+    layer.preset_switching = "on"
+    layer.preset_switching_trigger = "projectm"
+    layer.preset_switching_expanded = True
+    listed = Path("/tmp/user/presets/copy-a.milk").resolve()
+    layer.preset_list = [str(listed)]
+    layer.preset_list_expanded = True
+    layer.auto_preset_path = None
+    controls.focus_descriptor = RowDescriptor(RowKind.TRANSPORT)
+    view = controls.build_view_state(paused=False)
+    assert view.tracks["layer_1"].active_preset_list_index == 0
+    item_row = view.layout.find_descriptor(
+        RowDescriptor(
+            RowKind.TRACK_PRESET_LIST_ITEM,
+            slot="layer_1",
+            preset_index=0,
+        )
+    )
+    assert _row_value_color(view, item_row) == HIGHLIGHT
+
+
 def test_row_value_color_dim_for_focused_empty_preset() -> None:
     state = TuningViewState(
         layer_z_order=("layer_1",),

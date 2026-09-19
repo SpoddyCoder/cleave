@@ -634,6 +634,37 @@ def test_builder_shows_off_root_auto_preset_without_crashing(
     assert view.tracks["layer_1"].preset_label.startswith("copied.milk")
 
 
+def test_builder_syncs_playing_list_preset_from_projectm_position() -> None:
+    from unittest.mock import MagicMock
+
+    from cleave.viz.layer import StemLayer
+
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    layer = session.layers["layer_1"]
+    layer.preset_switching = "on"
+    layer.preset_switching_trigger = "projectm"
+    layer.preset_switching_expanded = True
+    a = Path("/tmp/presets/list-a.milk").resolve()
+    b = Path("/tmp/presets/list-b.milk").resolve()
+    layer.preset_list = [str(a), str(b)]
+    layer.preset_list_expanded = True
+    layer.auto_preset_path = a
+
+    stem = MagicMock(spec=StemLayer)
+    stem.auto_preset_path = a
+    stem.preset_rotation = None
+    playlist = MagicMock()
+    playlist.get_position.return_value = 1
+    playlist.item.side_effect = lambda index: (a, b)[index]
+    stem.projectm_playlist = playlist
+    controls._view_state._layers_by_slot = {"layer_1": stem}
+
+    view = controls.build_view_state(paused=False)
+    assert session.layers["layer_1"].auto_preset_path == b
+    assert view.tracks["layer_1"].active_preset_list_index == 1
+
+
 def test_structure_signature_invalidates_on_persistent_notification() -> None:
     controls = _make_controls(("layer_1",))
     session = controls.session

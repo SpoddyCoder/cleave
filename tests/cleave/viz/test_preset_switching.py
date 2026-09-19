@@ -15,6 +15,7 @@ from cleave.viz.preset_switching import (
     advance_preset_switching,
     apply_preset_switching,
     load_manual_preset_clean,
+    playing_switching_preset_path,
     reanchor_list_preset_after_browse,
     reapply_projectm_preset_switching,
 )
@@ -71,6 +72,18 @@ def _session(
     return session
 
 
+def _mock_projectm_playlist(
+    *, paths: tuple[Path, ...] = _MILK, position: int = 0
+) -> MagicMock:
+    playlist = MagicMock()
+    playlist.size.return_value = len(paths)
+    playlist.get_position.return_value = position
+    playlist.item.side_effect = (
+        lambda index: paths[index] if 0 <= index < len(paths) else None
+    )
+    return playlist
+
+
 def test_load_manual_preset_clean_forces_black_boot_then_restores() -> None:
     layer = _stem_layer()
     layer.playlist.load_into = MagicMock()
@@ -110,9 +123,7 @@ def test_apply_on_empty_list_notifies_and_holds() -> None:
 @patch("cleave.viz.preset_switching.ProjectMPlaylist")
 def test_apply_projectm_trigger_feeds_list(mock_playlist_cls: MagicMock) -> None:
     layer = _stem_layer()
-    playlist = MagicMock()
-    playlist.size.return_value = 3
-    playlist.item.side_effect = list(_MILK)
+    playlist = _mock_projectm_playlist()
     mock_playlist_cls.create.return_value = playlist
     apply_preset_switching(
         layer, mode="on", trigger="projectm", preset_list=_LIST
@@ -120,7 +131,30 @@ def test_apply_projectm_trigger_feeds_list(mock_playlist_cls: MagicMock) -> None
     playlist.add_presets.assert_called_once_with(list(_MILK), allow_duplicates=True)
     playlist.set_shuffle.assert_called_once_with(False)
     assert layer.projectm_playlist is playlist
+    assert layer.auto_preset_path == _MILK[0].resolve()
     layer.pm.lock_preset.assert_called_with(False)
+
+
+@patch("cleave.viz.preset_switching.ProjectMPlaylist")
+def test_apply_projectm_records_first_list_item_when_browse_not_in_list(
+    mock_playlist_cls: MagicMock,
+) -> None:
+    layer = _stem_layer()
+    listed = (
+        Path("/tmp/user/presets/copy-a.milk"),
+        Path("/tmp/user/presets/copy-b.milk"),
+        Path("/tmp/user/presets/copy-c.milk"),
+    )
+    playlist = _mock_projectm_playlist(paths=listed)
+    mock_playlist_cls.create.return_value = playlist
+    apply_preset_switching(
+        layer,
+        mode="on",
+        trigger="projectm",
+        preset_list=[str(path) for path in listed],
+    )
+    assert layer.auto_preset_path == listed[0].resolve()
+    layer.pm.load_preset.assert_called_with(listed[0].resolve(), smooth=False)
 
 
 def test_apply_timer_trigger_builds_rotation() -> None:
@@ -155,9 +189,7 @@ def test_apply_projectm_trigger_works_with_timeline_enabled(
     mock_playlist_cls: MagicMock,
 ) -> None:
     layer = _stem_layer()
-    playlist = MagicMock()
-    playlist.size.return_value = 3
-    playlist.item.side_effect = list(_MILK)
+    playlist = _mock_projectm_playlist()
     mock_playlist_cls.create.return_value = playlist
     session = _session(trigger="projectm", timeline_enabled=True)
     apply_preset_switching(
@@ -351,9 +383,7 @@ def test_reapply_projectm_only_when_trigger_projectm(
     mock_playlist_cls: MagicMock,
 ) -> None:
     layer = _stem_layer()
-    playlist = MagicMock()
-    playlist.size.return_value = 3
-    playlist.item.side_effect = list(_MILK)
+    playlist = _mock_projectm_playlist()
     mock_playlist_cls.create.return_value = playlist
     session = _session(trigger="projectm")
     apply_preset_switching(
@@ -373,6 +403,14 @@ def test_reapply_projectm_only_when_trigger_projectm(
 def test_active_auto_preset_path_prefers_auto() -> None:
     layer = _stem_layer()
     layer.auto_preset_path = _MILK[2].resolve()
+    assert active_auto_preset_path(layer) == _MILK[2].resolve()
+
+
+def test_playing_switching_preset_path_prefers_playlist_position() -> None:
+    layer = _stem_layer()
+    layer.auto_preset_path = _MILK[0].resolve()
+    layer.projectm_playlist = _mock_projectm_playlist(position=2)
+    assert playing_switching_preset_path(layer) == _MILK[2].resolve()
     assert active_auto_preset_path(layer) == _MILK[2].resolve()
 
 

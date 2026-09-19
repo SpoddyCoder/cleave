@@ -7,6 +7,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from cleave.preset_playlist import milk_files_in_dir
+from cleave.viz.layer import StemLayer
 from cleave.viz.live_layer_bindings import LiveLayerBindings
 from cleave.viz.modal import ModalHost, ModalOption
 from cleave.viz.preset_list_populate import (
@@ -16,6 +17,7 @@ from cleave.viz.preset_list_populate import (
     populate_from_directory,
     repopulate_preset_lists,
 )
+from cleave.viz.preset_switching import playing_switching_preset_path
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.session import TuningSession
 from cleave.viz.user_presets import (
@@ -41,6 +43,7 @@ class PresetListController:
         on_notification: Callable[[str], None] | None = None,
         get_active_config_path: Callable[[], Path | None] | None = None,
         on_focus_preset_item: Callable[[str, int], None] | None = None,
+        layers_by_slot: dict[str, StemLayer] | None = None,
     ) -> None:
         self.session = session
         self.preset_root = preset_root
@@ -51,15 +54,29 @@ class PresetListController:
         self._on_notification = on_notification
         self._get_active_config_path = get_active_config_path
         self._on_focus_preset_item = on_focus_preset_item
+        self._layers_by_slot = layers_by_slot
         self.move_mode_preset: tuple[str, int] | None = None
         self._move_mode_original_preset_list: list[str] | None = None
+
+    def current_preset_path(self, slot: str) -> Path | None:
+        """Playing auto-switch preset when set, otherwise the browse selection."""
+        if isinstance(self._layers_by_slot, dict):
+            stem = self._layers_by_slot.get(slot)
+            if stem is not None:
+                playing = playing_switching_preset_path(stem)
+                if playing is not None:
+                    return playing
+        layer = self.session.layers[slot]
+        if layer.auto_preset_path is not None:
+            return layer.auto_preset_path
+        return layer.playlist.current
 
     def resolve_file_path(
         self, slot: str, kind: RowKind, desc: RowDescriptor
     ) -> Path | None:
         layer = self.session.layers[slot]
         if kind == RowKind.TRACK_PRESET:
-            return layer.playlist.current
+            return self.current_preset_path(slot)
         if kind == RowKind.TRACK_PRESET_LIST_ITEM:
             index = desc.preset_index
             if index is None or index < 0 or index >= len(layer.preset_list):
@@ -223,10 +240,9 @@ class PresetListController:
             self._unlock_preset_after_modal(slot)
 
     def add_current(self, slot: str) -> None:
-        playlist = self.session.layers[slot].playlist
-        if playlist.current is None:
+        src_path = self.current_preset_path(slot)
+        if src_path is None:
             return
-        src_path = playlist.current
         if self._layer_bindings is not None:
             self._layer_bindings.lock_preset_for_modal(slot)
         self._modal.prompt_yes_no(

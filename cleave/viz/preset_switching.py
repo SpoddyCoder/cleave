@@ -492,8 +492,9 @@ def reset_projectm_preset_timer(
 
 
 def active_auto_preset_path(layer: StemLayer) -> Path | None:
-    if layer.auto_preset_path is not None:
-        return layer.auto_preset_path
+    playing = playing_switching_preset_path(layer)
+    if playing is not None:
+        return playing
     current = layer.playlist.current
     if current is None:
         return None
@@ -555,17 +556,46 @@ def _record_auto_preset(layer: StemLayer, path: Path) -> None:
     layer.auto_preset_path = path.resolve()
 
 
+def playing_switching_preset_path(layer: StemLayer) -> Path | None:
+    """Preset currently playing from the switching list, if any.
+
+    projectM position and timer/timeline rotation win over a stale
+    ``auto_preset_path`` (browse can sit on the first list entry while the
+    list has already advanced).
+    """
+    playlist = layer.projectm_playlist
+    if playlist is not None:
+        item = playlist.item(playlist.get_position())
+        if item is not None:
+            return item.resolve()
+    rotation = layer.preset_rotation
+    if rotation is not None:
+        path = rotation.path_for(layer.list_switch_index)
+        if path is not None:
+            return path.resolve()
+    if layer.auto_preset_path is not None:
+        return layer.auto_preset_path
+    return None
+
+
 def _sync_projectm_playlist_position(layer: StemLayer) -> None:
     playlist = layer.projectm_playlist
-    path = active_auto_preset_path(layer)
-    if playlist is None or path is None:
+    if playlist is None:
         return
-    target = path.resolve()
-    for index in range(playlist.size()):
-        item = playlist.item(index)
-        if item is not None and item.resolve() == target:
-            playlist.set_position(index, hard_cut=True)
-            return
+    target_path = layer.auto_preset_path
+    if target_path is None and layer.playlist.current is not None:
+        target_path = layer.playlist.current
+    if target_path is not None:
+        target = target_path.resolve()
+        for index in range(playlist.size()):
+            item = playlist.item(index)
+            if item is not None and item.resolve() == target:
+                playlist.set_position(index, hard_cut=True)
+                _record_auto_preset(layer, item)
+                return
+    item = playlist.item(playlist.get_position())
+    if item is not None:
+        _record_auto_preset(layer, item)
 
 
 def _anchor_index(layer: StemLayer, paths: Sequence[Path]) -> int:

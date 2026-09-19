@@ -399,7 +399,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="preset list",
         help_description=(
             "Ordered presets used for automatic switching on this layer.",
-            "Expand to reorder, delete, or add the current browse preset.",
+            "Expand to reorder, delete, or add the currently playing preset.",
         ),
         is_sub_header=True,
         parent_group="track",
@@ -430,9 +430,9 @@ SPECS: dict[RowKind, RowSpec] = {
         shows_enter_icon=True,
         help_title="Add Current Preset",
         help_description=(
-            "Add the layer's current browse preset to the end of the list.",
+            "Add the layer's currently playing preset to the end of the list.",
             "Copies the preset file into the project presets folder.",
-            "U on any row in the layer is the same action.",
+            "P on any row in the layer is the same action.",
         ),
         parent_group="track",
         blocked_by_section_lock=True,
