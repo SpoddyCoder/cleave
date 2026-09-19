@@ -409,6 +409,7 @@ def view_state_structure_signature(
             "preset_list_expanded": layer.preset_list_expanded,
             "preset_switching": layer.preset_switching,
             "preset_switching_trigger": layer.preset_switching_trigger,
+            "preset_switching_expanded": layer.preset_switching_expanded,
             "preset_duration": layer.preset_duration,
             "soft_cut_duration": layer.soft_cut_duration,
             "hard_cut_duration": layer.hard_cut_duration,

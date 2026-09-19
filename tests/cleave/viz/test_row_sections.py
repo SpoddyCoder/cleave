@@ -39,6 +39,8 @@ def _track_block(**overrides: object) -> TrackBlock:
         effects={},
         expanded=True,
         preset_switching="on",
+        preset_switching_trigger="timer",
+        preset_switching_expanded=True,
         hard_cut_enabled=True,
     )
     base.update(overrides)
@@ -57,10 +59,23 @@ def test_track_layout_collapsed_layer() -> None:
 
 
 def test_track_layout_collapsed_preset_switching() -> None:
-    kinds = _track_row_kinds(preset_switching="off")
+    kinds = _track_row_kinds(preset_switching_expanded=False)
     assert RowKind.TRACK_PRESET_SWITCHING in kinds
     assert RowKind.TRACK_PRESET_SWITCHING_TRIGGER not in kinds
     assert RowKind.TRACK_PRESET_DURATION not in kinds
+
+
+def test_track_layout_trigger_off_hides_switching_rows() -> None:
+    kinds = _track_row_kinds(
+        preset_switching="off",
+        preset_switching_trigger="off",
+        preset_switching_expanded=True,
+    )
+    assert RowKind.TRACK_PRESET_SWITCHING in kinds
+    assert RowKind.TRACK_PRESET_SWITCHING_TRIGGER in kinds
+    assert RowKind.TRACK_PRESET_DURATION not in kinds
+    assert RowKind.TRACK_PRESET_START_CLEAN not in kinds
+    assert RowKind.TRACK_PRESET_LIST not in kinds
 
 
 def test_track_layout_collapsed_effects() -> None:
@@ -73,6 +88,7 @@ def test_track_layout_conditional_rows_when_predicates_pass() -> None:
     timer_kinds = _track_row_kinds(
         preset_switching="on",
         preset_switching_trigger="timer",
+        preset_switching_expanded=True,
         effects_expanded=False,
         preset_list_expanded=True,
     )
@@ -132,9 +148,14 @@ def test_track_layout_conditional_rows_when_predicates_pass() -> None:
 
 
 def test_track_layout_omits_conditional_rows_when_predicates_fail() -> None:
-    none_kinds = _track_row_kinds(preset_switching="off")
+    none_kinds = _track_row_kinds(
+        preset_switching="off",
+        preset_switching_trigger="off",
+        preset_switching_expanded=True,
+    )
     assert RowKind.TRACK_PRESET_DURATION not in none_kinds
-    assert RowKind.TRACK_PRESET_SWITCHING_TRIGGER not in none_kinds
+    assert RowKind.TRACK_PRESET_LIST not in none_kinds
+    assert RowKind.TRACK_PRESET_SWITCHING_TRIGGER in none_kinds
     assert RowKind.TRACK_PRESET_LIST_POPULATE not in none_kinds
 
     collapsed_list = _track_row_kinds(
@@ -259,7 +280,12 @@ def test_sub_row_expand_visible_nested_sections() -> None:
 
 def test_layout_omits_conditional_rows_when_predicate_fails() -> None:
     none_mode = _minimal_view_state(
-        tracks={"layer_1": _track_block(preset_switching="off")},
+        tracks={
+            "layer_1": _track_block(
+                preset_switching="off",
+                preset_switching_trigger="off",
+            )
+        },
     )
     duration = RowDescriptor(RowKind.TRACK_PRESET_DURATION, slot="layer_1")
     assert duration not in none_mode.layout.rows

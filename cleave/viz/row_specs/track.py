@@ -6,11 +6,9 @@ from typing import TYPE_CHECKING
 
 from cleave.blend_modes import BLEND_MODE_HELP_ENTRIES
 from cleave.config_schema.layers import (
-    PRESET_SWITCHING_MODE_HELP_ENTRIES,
     PRESET_SWITCHING_TRIGGER_HELP_ENTRIES,
     hard_cut_enabled_display,
     preset_start_clean_display,
-    preset_switching_display,
     preset_switching_trigger_display,
 )
 from cleave.cue_roles import CUE_ROLE_MARKER_HELP_ENTRIES
@@ -43,7 +41,9 @@ def _format_track_beat(state: TuningViewState, desc: RowDescriptor) -> str:
 def _format_track_preset_switching_mode(
     state: TuningViewState, desc: RowDescriptor
 ) -> str:
-    return preset_switching_display(_track_block(state, desc).runtime.preset_switching)
+    return preset_switching_trigger_display(
+        _track_block(state, desc).runtime.preset_switching_trigger
+    )
 
 def _format_track_preset_switching_trigger(
     state: TuningViewState, desc: RowDescriptor
@@ -126,14 +126,6 @@ def _apply_track_beat(
     controls.layer_mutations.set_beat(
         desc.slot, controls.session.layers[desc.slot].beat_sensitivity + delta
     )
-
-def _apply_track_preset_switching_mode(
-    controls: TuningControls, desc: RowDescriptor, forward: bool, _ctrl: bool,
-    _shift: bool,
-) -> None:
-    if desc.slot is None:
-        return
-    controls.layer_mutations.cycle_preset_switching(desc.slot, forward=forward)
 
 def _apply_track_preset_switching_trigger(
     controls: TuningControls,
@@ -366,20 +358,18 @@ SPECS: dict[RowKind, RowSpec] = {
         parent_group="track",
     ),
     RowKind.TRACK_PRESET_SWITCHING: RowSpec(
-        affordance=RowAffordance.VALUE_STEP,
+        affordance=RowAffordance.EXPAND,
         panel_label="preset switching",
         present_style=RowPresentStyle.EXPAND_SUBHEADER,
         format_value=_format_track_preset_switching_mode,
-        apply_horizontal=_apply_track_preset_switching_mode,
+        apply_horizontal=apply_expand_subheader,
         fit_strategy=FitStrategy.NONE,
         help_title="Preset switching",
-        help_entries=(("Left/Right", "off / on"),),
         help_description=(
-            "When on, advances through this layer's ordered preset list.",
-            "The trigger chooses timer, projectM, or timeline on-transitions.",
+            "Automatic preset list advances for this layer.",
+            "The header shows the trigger. Left/Right expands or collapses.",
         ),
-        help_mode_entries=PRESET_SWITCHING_MODE_HELP_ENTRIES,
-        repeatable=True,
+        is_sub_header=True,
         parent_group="track",
     ),
     RowKind.TRACK_PRESET_SWITCHING_TRIGGER: RowSpec(
@@ -391,7 +381,8 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Trigger",
         help_entries=(("Left/Right", "cycle trigger"),),
         help_description=(
-            "How the ordered preset list advances while switching is on.",
+            "How the ordered preset list advances.",
+            "Off disables switching and hides the other rows.",
             "Timeline trigger needs Render: TIMELINE enabled.",
         ),
         help_mode_entries=PRESET_SWITCHING_TRIGGER_HELP_ENTRIES,

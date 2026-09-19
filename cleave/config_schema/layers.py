@@ -17,16 +17,10 @@ from cleave.effects.registry import validate_effect_entry
 from cleave.stems import STEM_SOURCES, StemSource
 
 PresetSwitchingMode = Literal["off", "on"]
-PresetSwitchingTrigger = Literal["timer", "projectm", "timeline"]
+PresetSwitchingTrigger = Literal["off", "timer", "projectm", "timeline"]
 PRESET_SWITCHING_MODES: tuple[PresetSwitchingMode, ...] = ("off", "on")
-PRESET_SWITCHING_MODE_HELP_ENTRIES: tuple[tuple[PresetSwitchingMode, str], ...] = (
-    ("off", "keeps the current browse preset; no automatic switching."),
-    (
-        "on",
-        "advances through the layer preset list (timer, projectM, or timeline).",
-    ),
-)
 PRESET_SWITCHING_TRIGGERS: tuple[PresetSwitchingTrigger, ...] = (
+    "off",
     "timer",
     "projectm",
     "timeline",
@@ -34,6 +28,10 @@ PRESET_SWITCHING_TRIGGERS: tuple[PresetSwitchingTrigger, ...] = (
 PRESET_SWITCHING_TRIGGER_HELP_ENTRIES: tuple[
     tuple[PresetSwitchingTrigger, str], ...
 ] = (
+    (
+        "off",
+        "keeps the current browse preset; no automatic switching.",
+    ),
     (
         "timer",
         "advance by playhead / duration.",
@@ -48,7 +46,8 @@ PRESET_SWITCHING_TRIGGER_HELP_ENTRIES: tuple[
     ),
 )
 DEFAULT_PRESET_SWITCHING: PresetSwitchingMode = "off"
-DEFAULT_PRESET_SWITCHING_TRIGGER: PresetSwitchingTrigger = "timer"
+DEFAULT_PRESET_SWITCHING_TRIGGER: PresetSwitchingTrigger = "off"
+PRESET_SWITCHING_TRIGGER_WHEN_ON: PresetSwitchingTrigger = "timer"
 DEFAULT_PRESET_DURATION = 30.0
 DEFAULT_SOFT_CUT_DURATION = 0.0
 DEFAULT_HARD_CUT_DURATION = 20.0
@@ -113,11 +112,43 @@ def _parse_preset_switching(raw: Any, label: str) -> PresetSwitchingMode:
 def _parse_preset_switching_trigger(
     raw: Any, label: str
 ) -> PresetSwitchingTrigger:
+    # YAML 1.1 loads unquoted on/off/yes/no as booleans.
+    if isinstance(raw, bool):
+        raw = "on" if raw else "off"
     trigger = str(raw)
     if trigger not in PRESET_SWITCHING_TRIGGERS:
         allowed = ", ".join(PRESET_SWITCHING_TRIGGERS)
         raise ValueError(f"{label} must be one of: {allowed}")
     return trigger  # type: ignore[return-value]
+
+
+def preset_switching_mode_for_trigger(
+    trigger: PresetSwitchingTrigger,
+) -> PresetSwitchingMode:
+    return "off" if trigger == "off" else "on"
+
+
+def resolve_layer_preset_switching(
+    layer_raw: dict[str, Any], slot: str
+) -> tuple[PresetSwitchingMode, PresetSwitchingTrigger]:
+    switching = _parse_preset_switching(
+        layer_raw.get("preset_switching", DEFAULT_PRESET_SWITCHING),
+        f"layers.{slot}.preset_switching",
+    )
+    if "preset_switching_trigger" in layer_raw:
+        trigger = _parse_preset_switching_trigger(
+            layer_raw["preset_switching_trigger"],
+            f"layers.{slot}.preset_switching_trigger",
+        )
+    else:
+        trigger = (
+            DEFAULT_PRESET_SWITCHING_TRIGGER
+            if switching == "off"
+            else PRESET_SWITCHING_TRIGGER_WHEN_ON
+        )
+    if switching == "off" or trigger == "off":
+        return "off", "off"
+    return "on", trigger
 
 
 def hard_cut_enabled_display(enabled: bool) -> str:
@@ -132,11 +163,9 @@ def clamp_easter_egg(value: float) -> float:
     return max(EASTER_EGG_MIN, min(EASTER_EGG_MAX, float(value)))
 
 
-def preset_switching_display(mode: PresetSwitchingMode) -> str:
-    return "on" if mode == "on" else "off"
-
-
 def preset_switching_trigger_display(trigger: PresetSwitchingTrigger) -> str:
+    if trigger == "off":
+        return "off"
     if trigger == "projectm":
         return "projectM"
     if trigger == "timeline":
@@ -304,15 +333,8 @@ def parse_layers_section(data: dict[str, Any], ctx: ParseCtx) -> dict[str, Any]:
 
         stem = _parse_stem(slot, layer_raw)
         beat_raw = layer_raw.get("beat_sensitivity")
-        preset_switching = _parse_preset_switching(
-            layer_raw.get("preset_switching", DEFAULT_PRESET_SWITCHING),
-            f"layers.{slot}.preset_switching",
-        )
-        preset_switching_trigger = _parse_preset_switching_trigger(
-            layer_raw.get(
-                "preset_switching_trigger", DEFAULT_PRESET_SWITCHING_TRIGGER
-            ),
-            f"layers.{slot}.preset_switching_trigger",
+        preset_switching, preset_switching_trigger = resolve_layer_preset_switching(
+            layer_raw, slot
         )
         preset_duration = float(
             layer_raw.get("preset_duration", DEFAULT_PRESET_DURATION)

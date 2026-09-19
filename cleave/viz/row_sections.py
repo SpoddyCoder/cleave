@@ -139,7 +139,7 @@ def _toggle_track_header(controls: TuningControls, slot: str | None, forward: bo
 def _toggle_preset_switching(controls: TuningControls, slot: str | None, forward: bool) -> None:
     if slot is None:
         return
-    controls.layer_mutations.cycle_preset_switching(slot, forward=forward)
+    controls.set_preset_switching_expanded(slot, forward)
 
 
 def _toggle_effects_header(controls: TuningControls, slot: str | None, forward: bool) -> None:
@@ -385,7 +385,7 @@ def _track_header_expanded(state: TuningViewState, slot: str | None) -> bool:
 def _track_preset_switching_expanded(state: TuningViewState, slot: str | None) -> bool:
     if slot is None:
         return True
-    return state.tracks[slot].runtime.preset_switching == "on"
+    return state.tracks[slot].runtime.preset_switching_expanded
 
 
 def _track_effects_expanded(state: TuningViewState, slot: str | None) -> bool:
@@ -744,6 +744,14 @@ RENDER_PATTERN_MASK_SECTION = ExpandSectionDef(
     ),
 )
 
+def _preset_switching_active(
+    state: TuningViewState, desc: RowDescriptor
+) -> bool:
+    if desc.slot is None:
+        return False
+    return state.tracks[desc.slot].runtime.preset_switching_trigger != "off"
+
+
 def _preset_switching_projectm_trigger(
     state: TuningViewState, desc: RowDescriptor
 ) -> bool:
@@ -757,7 +765,10 @@ def _preset_switching_uses_duration(
 ) -> bool:
     if desc.slot is None:
         return False
-    return state.tracks[desc.slot].runtime.preset_switching_trigger != "timeline"
+    return state.tracks[desc.slot].runtime.preset_switching_trigger not in (
+        "off",
+        "timeline",
+    )
 
 
 def _hard_cut_enabled(state: TuningViewState, desc: RowDescriptor) -> bool:
@@ -803,6 +814,17 @@ PRESET_SWITCHING_PROJECTM_TRIGGER = ConditionalRowsDef(
     ),
 )
 
+PRESET_SWITCHING_ACTIVE = ConditionalRowsDef(
+    name="preset_switching_active",
+    predicate=_preset_switching_active,
+    children=(
+        SectionNode(conditional=PRESET_SWITCHING_USES_DURATION),
+        SectionNode(conditional=PRESET_SWITCHING_PROJECTM_TRIGGER),
+        SectionNode(leaf_kind=RowKind.TRACK_PRESET_START_CLEAN),
+        SectionNode(expand=PRESET_LIST_SECTION),
+    ),
+)
+
 TRACK_PRESET_SWITCHING_SECTION = ExpandSectionDef(
     header_kind=RowKind.TRACK_PRESET_SWITCHING,
     context="per_slot",
@@ -810,10 +832,7 @@ TRACK_PRESET_SWITCHING_SECTION = ExpandSectionDef(
     toggle=_toggle_preset_switching,
     children=(
         SectionNode(leaf_kind=RowKind.TRACK_PRESET_SWITCHING_TRIGGER),
-        SectionNode(conditional=PRESET_SWITCHING_USES_DURATION),
-        SectionNode(conditional=PRESET_SWITCHING_PROJECTM_TRIGGER),
-        SectionNode(leaf_kind=RowKind.TRACK_PRESET_START_CLEAN),
-        SectionNode(expand=PRESET_LIST_SECTION),
+        SectionNode(conditional=PRESET_SWITCHING_ACTIVE),
     ),
 )
 

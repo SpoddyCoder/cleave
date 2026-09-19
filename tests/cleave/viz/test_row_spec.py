@@ -79,7 +79,6 @@ _EXPECTED_REPEAT_ROW_KINDS = frozenset(
         RowKind.TRANSPORT,
         RowKind.TRACK_PRESET_DIR,
         RowKind.TRACK_PRESET,
-        RowKind.TRACK_PRESET_SWITCHING,
         RowKind.TRACK_PRESET_SWITCHING_TRIGGER,
                         RowKind.TRACK_PRESET_DURATION,
         RowKind.TRACK_SOFT_CUT_DURATION,
@@ -412,6 +411,7 @@ def test_locked_navigable_sub_row_kinds() -> None:
     )
     assert navigable == frozenset(
         {
+            RowKind.TRACK_PRESET_SWITCHING,
             RowKind.TRACK_PRESET_LIST,
             RowKind.TRACK_EFFECTS_HEADER,
             RowKind.LAYER_MANAGEMENT_DELETE,
@@ -427,7 +427,6 @@ def test_track_value_rows_blocked_by_section_lock() -> None:
         {
             RowKind.TRACK_PRESET_DIR,
             RowKind.TRACK_PRESET,
-            RowKind.TRACK_PRESET_SWITCHING,
             RowKind.TRACK_PRESET_SWITCHING_TRIGGER,
             RowKind.TRACK_PRESET_DURATION,
             RowKind.TRACK_SOFT_CUT_DURATION,
@@ -454,6 +453,7 @@ def test_track_value_rows_blocked_by_section_lock() -> None:
 
 def test_only_effects_header_navigable_when_section_locked() -> None:
     navigable_when_locked = {
+        RowKind.TRACK_PRESET_SWITCHING,
         RowKind.TRACK_PRESET_LIST,
         RowKind.TRACK_EFFECTS_HEADER,
         RowKind.LAYER_MANAGEMENT_DELETE,
@@ -710,6 +710,7 @@ def test_format_row_value_track_and_render() -> None:
                 beat_sensitivity=1.25,
                 effects={},
                 preset_switching="on",
+                preset_switching_trigger="timer",
                 preset_duration=45.0,
             )
         },
@@ -731,7 +732,7 @@ def test_format_row_value_track_and_render() -> None:
     slot_desc = RowDescriptor(RowKind.TRACK_BLEND, slot="layer_1")
     assert format_row_value(state, slot_desc) == "add"
     mode_desc = RowDescriptor(RowKind.TRACK_PRESET_SWITCHING, slot="layer_1")
-    assert format_row_value(state, mode_desc) == "on"
+    assert format_row_value(state, mode_desc) == "timer"
     duration_desc = RowDescriptor(RowKind.TRACK_PRESET_DURATION, slot="layer_1")
     assert format_row_value(state, duration_desc) == "45s"
     assert format_row_value(
@@ -1037,6 +1038,19 @@ def test_row_expand_subheader_display_text() -> None:
     assert (
         row_expand_subheader_display_text(state, desc)
         == "└─ preset switching: off ▶"
+    )
+    state = _minimal_view_state(
+        tracks={
+            "layer_1": make_track_block(
+                preset_switching="on",
+                preset_switching_trigger="projectm",
+                preset_switching_expanded=False,
+            )
+        }
+    )
+    assert (
+        row_expand_subheader_display_text(state, desc)
+        == "└─ preset switching: projectM ▶"
     )
 
 

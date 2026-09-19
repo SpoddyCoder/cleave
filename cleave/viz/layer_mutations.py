@@ -8,9 +8,9 @@ from pathlib import Path
 from cleave.blend_modes import BLEND_MODES
 from cleave.config import clamp_beat_sensitivity, clamp_effect_pct
 from cleave.config_schema.layers import (
-    PRESET_SWITCHING_MODES,
     PRESET_SWITCHING_TRIGGERS,
     clamp_easter_egg,
+    preset_switching_mode_for_trigger,
 )
 from cleave.stems import STEM_SOURCES
 from cleave.preset_playlist import is_top_level_browse_dir
@@ -104,24 +104,6 @@ class LayerMutations:
         if bindings is not None:
             bindings.on_preset_change(slot, playlist)
 
-    def cycle_preset_switching(self, slot: str, *, forward: bool) -> None:
-        layer = self.session.layers[slot]
-        modes = PRESET_SWITCHING_MODES
-        try:
-            index = modes.index(layer.preset_switching)
-        except ValueError:
-            index = 0
-        if forward:
-            layer.preset_switching = modes[(index + 1) % len(modes)]
-        else:
-            layer.preset_switching = modes[(index - 1) % len(modes)]
-        if layer.preset_switching == "on":
-            layer.preset_list_expanded = True
-        self._warn_if_timeline_trigger_disabled(slot)
-        bindings = self._bindings()
-        if bindings is not None:
-            bindings.on_preset_switching_change(slot)
-
     def cycle_preset_switching_trigger(self, slot: str, *, forward: bool) -> None:
         layer = self.session.layers[slot]
         options = PRESET_SWITCHING_TRIGGERS
@@ -129,12 +111,23 @@ class LayerMutations:
             index = options.index(layer.preset_switching_trigger)
         except ValueError:
             index = 0
+        previous = layer.preset_switching_trigger
         if forward:
             layer.preset_switching_trigger = options[(index + 1) % len(options)]
         else:
             layer.preset_switching_trigger = options[(index - 1) % len(options)]
-        if not self._warn_if_timeline_trigger_disabled(slot) and layer.preset_list:
-            self._notify("Preset list may need adjusting")
+        layer.preset_switching = preset_switching_mode_for_trigger(
+            layer.preset_switching_trigger
+        )
+        if layer.preset_switching == "on":
+            layer.preset_list_expanded = True
+        if not self._warn_if_timeline_trigger_disabled(slot):
+            if (
+                previous != "off"
+                and layer.preset_switching_trigger != "off"
+                and layer.preset_list
+            ):
+                self._notify("Preset list may need adjusting")
         bindings = self._bindings()
         if bindings is not None:
             bindings.on_preset_switching_change(slot)

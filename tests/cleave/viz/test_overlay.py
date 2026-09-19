@@ -1336,6 +1336,8 @@ def test_preset_list_populate_uses_full_line_action_colors() -> None:
                 effects={},
                 expanded=True,
                 preset_switching="on",
+                preset_switching_trigger="timer",
+                preset_switching_expanded=True,
                 preset_list_expanded=True,
             )
         },

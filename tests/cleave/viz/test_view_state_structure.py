@@ -526,6 +526,7 @@ def test_structure_signature_invalidates_on_preset_switching_trigger() -> None:
     config_save = controls._config_save
     session.layers["layer_1"].preset_switching = "on"
     session.layers["layer_1"].preset_switching_trigger = "timer"
+    session.layers["layer_1"].preset_switching_expanded = True
     sig_timer = view_state_structure_signature(
         session, config_save, notification_active=False
     )
@@ -540,10 +541,26 @@ def test_structure_signature_invalidates_on_preset_switching_trigger() -> None:
     )
     assert sig_projectm != sig_timeline
     session.layers["layer_1"].preset_switching = "off"
+    session.layers["layer_1"].preset_switching_trigger = "off"
     sig_off = view_state_structure_signature(
         session, config_save, notification_active=False
     )
     assert sig_timeline != sig_off
+
+
+def test_structure_signature_invalidates_on_preset_switching_expanded() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    config_save = controls._config_save
+    session.layers["layer_1"].preset_switching_expanded = False
+    sig_collapsed = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    session.layers["layer_1"].preset_switching_expanded = True
+    sig_expanded = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    assert sig_collapsed != sig_expanded
 
 
 def test_structure_signature_invalidates_on_auto_preset_path() -> None:
@@ -647,6 +664,8 @@ def test_timeline_mode_row_set_unchanged_when_timeline_enabled_toggles() -> None
     session = controls.session
     session.layers["layer_1"].expanded = True
     session.layers["layer_1"].preset_switching = "on"
+    session.layers["layer_1"].preset_switching_trigger = "timer"
+    session.layers["layer_1"].preset_switching_expanded = True
     session.timeline.enabled = True
     builder = controls._view_state
     kinds_on = [desc.kind for desc in builder.build(paused=False).layout.rows]
@@ -1140,6 +1159,8 @@ def test_collapsed_preset_list_omits_item_rows() -> None:
     session = controls.session
     layer = session.layers["layer_1"]
     layer.preset_switching = "on"
+    layer.preset_switching_trigger = "timer"
+    layer.preset_switching_expanded = True
     layer.preset_list = [f"/tmp/preset-{i}.milk" for i in range(5)]
     layer.preset_list_expanded = False
     view = controls.build_view_state(paused=False)

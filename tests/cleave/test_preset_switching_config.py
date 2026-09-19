@@ -92,6 +92,37 @@ def test_parse_layers_preset_switching_yaml_on_off(
     assert data["layers"]["layer_1"]["preset_switching"] == loaded
     layers = parse_layers_section(data, ParseCtx(preset_root=Path("/tmp/presets")))
     assert layers["layer_1"].preset_switching == expected
+    if expected == "off":
+        assert layers["layer_1"].preset_switching_trigger == "off"
+
+
+@pytest.mark.parametrize(
+    ("yaml_value", "loaded", "expected"),
+    [
+        ("off", False, "off"),
+        ('"off"', "off", "off"),
+        ("timer", "timer", "timer"),
+        ("projectm", "projectm", "projectm"),
+    ],
+)
+def test_parse_layers_preset_switching_trigger_yaml(
+    yaml_value: str, loaded: bool | str, expected: str
+) -> None:
+    text = (
+        "layers:\n"
+        "  layer_1:\n"
+        "    stem: drums\n"
+        "    preset: drums/a.milk\n"
+        "    preset_switching: \"on\"\n"
+        f"    preset_switching_trigger: {yaml_value}\n"
+    )
+    data = yaml.safe_load(text)
+    assert data["layers"]["layer_1"]["preset_switching_trigger"] == loaded
+    layers = parse_layers_section(data, ParseCtx(preset_root=Path("/tmp/presets")))
+    assert layers["layer_1"].preset_switching_trigger == expected
+    assert layers["layer_1"].preset_switching == (
+        "off" if expected == "off" else "on"
+    )
 
 
 def test_parse_layers_rejects_legacy_modes() -> None:

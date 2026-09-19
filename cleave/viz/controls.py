@@ -1039,6 +1039,12 @@ class TuningControls:
             else NOTIFICATION_TIMELINE_DISABLED_TEXT
         )
 
+    def set_preset_switching_expanded(self, slot: str, expanded: bool) -> None:
+        layer = self.session.layers[slot]
+        if layer.preset_switching_expanded == expanded:
+            return
+        layer.preset_switching_expanded = expanded
+
     def set_effects_expanded(self, slot: str, expanded: bool) -> None:
         layer = self.session.layers[slot]
         if layer.effects_expanded == expanded:

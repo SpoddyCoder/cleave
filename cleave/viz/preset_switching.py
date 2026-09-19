@@ -141,7 +141,7 @@ def apply_preset_switching(
         layer.projectm_playlist.destroy()
         layer.projectm_playlist = None
 
-    if mode != "on":
+    if mode != "on" or trigger == "off":
         _clear_list_rotation(layer)
         layer.auto_preset_path = None
         pm.lock_preset(True)

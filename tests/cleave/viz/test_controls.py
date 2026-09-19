@@ -4471,8 +4471,10 @@ def test_move_mode_colors_preset_list_item() -> None:
     controls = _make_controls(("layer_1",))
     layer = controls.session.layers["layer_1"]
     layer.preset_switching = "on"
+    layer.preset_switching_trigger = "timer"
     layer.preset_list = ["/tmp/presets/a.milk", "/tmp/presets/b.milk"]
     layer.preset_list_expanded = True
+    layer.preset_switching_expanded = True
 
     view = controls.build_view_state(paused=False)
     item_row = view.layout.find_descriptor(
@@ -4504,6 +4506,8 @@ def test_active_preset_list_item_uses_highlight_color() -> None:
     controls = _make_controls(("layer_1",))
     layer = controls.session.layers["layer_1"]
     layer.preset_switching = "on"
+    layer.preset_switching_trigger = "timer"
+    layer.preset_switching_expanded = True
     a = Path("/tmp/presets/list-a.milk").resolve()
     b = Path("/tmp/presets/list-b.milk").resolve()
     layer.preset_list = [str(a), str(b)]
@@ -5777,17 +5781,18 @@ def test_projectm_mode_allows_preset_browse() -> None:
 
 
 
-def test_trigger_row_hidden_when_switching_off() -> None:
+def test_trigger_row_hidden_when_menu_collapsed() -> None:
     controls = _make_controls(("layer_1",))
+    controls.session.layers["layer_1"].expanded = True
     view = controls.build_view_state(paused=False)
     with pytest.raises(ValueError, match="TRACK_PRESET_SWITCHING_TRIGGER"):
         _row(view, "layer_1", RowKind.TRACK_PRESET_SWITCHING_TRIGGER)
 
 
-def test_trigger_row_visible_when_switching_on() -> None:
+def test_trigger_row_visible_when_menu_expanded() -> None:
     controls = _make_controls(("layer_1",))
-    controls.session.layers["layer_1"].preset_switching = "on"
     controls.session.layers["layer_1"].expanded = True
+    controls.session.layers["layer_1"].preset_switching_expanded = True
     view = controls.build_view_state(paused=False)
     _row(view, "layer_1", RowKind.TRACK_PRESET_SWITCHING_TRIGGER)
 
@@ -5831,8 +5836,11 @@ def test_persistent_and_timed_notifications_stack() -> None:
 
 def test_preset_duration_ctrl_step_is_ten_seconds() -> None:
     controls = _make_controls(("layer_1",))
-    controls.session.layers["layer_1"].preset_switching = "on"
-    controls.session.layers["layer_1"].expanded = True
+    layer = controls.session.layers["layer_1"]
+    layer.preset_switching = "on"
+    layer.preset_switching_trigger = "timer"
+    layer.preset_switching_expanded = True
+    layer.expanded = True
     view = controls.build_view_state(paused=False)
     row = _row(view, "layer_1", RowKind.TRACK_PRESET_DURATION)
     controls.focus_descriptor = view.layout.descriptor(row)
@@ -5849,6 +5857,7 @@ def test_hard_cut_enabled_cycles_and_hides_child_rows() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.layers["layer_1"].preset_switching = "on"
     controls.session.layers["layer_1"].preset_switching_trigger = "projectm"
+    controls.session.layers["layer_1"].preset_switching_expanded = True
     controls.session.layers["layer_1"].expanded = True
     switched: list[str] = []
     controls._layer_bindings = noop_layer_bindings(
@@ -5880,6 +5889,7 @@ def test_easter_egg_steps_with_standard_and_large_increments() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.layers["layer_1"].preset_switching = "on"
     controls.session.layers["layer_1"].preset_switching_trigger = "projectm"
+    controls.session.layers["layer_1"].preset_switching_expanded = True
     controls.session.layers["layer_1"].expanded = True
     switched: list[str] = []
     controls._layer_bindings = noop_layer_bindings(
@@ -5901,6 +5911,8 @@ def test_easter_egg_steps_with_standard_and_large_increments() -> None:
 def test_preset_start_clean_cycles_yes_no() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.layers["layer_1"].preset_switching = "on"
+    controls.session.layers["layer_1"].preset_switching_trigger = "timer"
+    controls.session.layers["layer_1"].preset_switching_expanded = True
     controls.session.layers["layer_1"].expanded = True
     view = controls.build_view_state(paused=False)
     row = _row(view, "layer_1", RowKind.TRACK_PRESET_START_CLEAN)
@@ -5919,6 +5931,7 @@ def test_hard_cut_sensitivity_steps_like_beat_sensitivity() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.layers["layer_1"].preset_switching = "on"
     controls.session.layers["layer_1"].preset_switching_trigger = "projectm"
+    controls.session.layers["layer_1"].preset_switching_expanded = True
     controls.session.layers["layer_1"].expanded = True
     controls.session.layers["layer_1"].hard_cut_enabled = True
     view = controls.build_view_state(paused=False)
@@ -5957,6 +5970,8 @@ def _focus_user_preset_item_row(
 ) -> tuple[RowDescriptor, Path]:
     layer = controls.session.layers["layer_1"]
     layer.preset_switching = "on"
+    layer.preset_switching_trigger = "timer"
+    layer.preset_switching_expanded = True
     layer.preset_list_expanded = True
     layer.expanded = True
     path = preset_path or Path("/tmp/projects/my-track/user-preset-0.milk")
@@ -6520,7 +6535,7 @@ def test_placement_snap_row_cycles() -> None:
     view = controls.build_view_state(paused=False)
     assert "bar" in _row_text(view, row)
 
-def test_preset_switching_row_cycles_off_on() -> None:
+def test_preset_switching_row_toggles_expand() -> None:
     from tests.support.viz import make_controls, keydown, noop_layer_bindings
     import pygame
     from cleave.viz.row_kinds import RowDescriptor, RowKind
@@ -6534,12 +6549,18 @@ def test_preset_switching_row_cycles_off_on() -> None:
     controls.focus_cursor = MainFocus(
         RowDescriptor(RowKind.TRACK_PRESET_SWITCHING, slot="layer_1")
     )
-    assert controls.session.layers["layer_1"].preset_switching == "off"
+    layer = controls.session.layers["layer_1"]
+    assert layer.preset_switching == "off"
+    assert layer.preset_switching_trigger == "off"
+    assert layer.preset_switching_expanded is False
     controls.handle_keydown(keydown(pygame.K_RIGHT))
-    assert controls.session.layers["layer_1"].preset_switching == "on"
-    assert switched == ["layer_1"]
-    controls.handle_keydown(keydown(pygame.K_RIGHT))
-    assert controls.session.layers["layer_1"].preset_switching == "off"
+    assert layer.preset_switching_expanded is True
+    assert layer.preset_switching == "off"
+    assert layer.preset_switching_trigger == "off"
+    assert switched == []
+    controls.handle_keydown(keydown(pygame.K_LEFT))
+    assert layer.preset_switching_expanded is False
+    assert layer.preset_switching == "off"
 
 
 def test_preset_switching_trigger_cycles() -> None:
@@ -6549,24 +6570,33 @@ def test_preset_switching_trigger_cycles() -> None:
     from cleave.viz.focus_nav import MainFocus
 
     controls = make_controls(("layer_1",))
-    controls.session.layers["layer_1"].preset_switching = "on"
+    layer = controls.session.layers["layer_1"]
+    layer.preset_switching = "on"
+    layer.preset_switching_trigger = "timer"
+    layer.preset_switching_expanded = True
     controls.session.timeline.enabled = True
     controls.focus_cursor = MainFocus(
         RowDescriptor(RowKind.TRACK_PRESET_SWITCHING_TRIGGER, slot="layer_1")
     )
-    assert controls.session.layers["layer_1"].preset_switching_trigger == "timer"
+    assert layer.preset_switching_trigger == "timer"
     controls.handle_keydown(keydown(pygame.K_RIGHT))
-    assert controls.session.layers["layer_1"].preset_switching_trigger == "projectm"
+    assert layer.preset_switching_trigger == "projectm"
+    assert layer.preset_switching == "on"
     controls.handle_keydown(keydown(pygame.K_RIGHT))
-    assert controls.session.layers["layer_1"].preset_switching_trigger == "timeline"
+    assert layer.preset_switching_trigger == "timeline"
     controls.handle_keydown(keydown(pygame.K_RIGHT))
-    assert controls.session.layers["layer_1"].preset_switching_trigger == "timer"
+    assert layer.preset_switching_trigger == "off"
+    assert layer.preset_switching == "off"
+    controls.handle_keydown(keydown(pygame.K_RIGHT))
+    assert layer.preset_switching_trigger == "timer"
+    assert layer.preset_switching == "on"
 
 
 def test_timeline_trigger_hides_duration_row() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.layers["layer_1"].preset_switching = "on"
     controls.session.layers["layer_1"].preset_switching_trigger = "timeline"
+    controls.session.layers["layer_1"].preset_switching_expanded = True
     controls.session.layers["layer_1"].expanded = True
     view = controls.build_view_state(paused=False)
     with pytest.raises(ValueError, match="TRACK_PRESET_DURATION"):

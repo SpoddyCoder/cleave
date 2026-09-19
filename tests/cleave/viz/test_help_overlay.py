@@ -6,7 +6,6 @@ from cleave.blend_modes import BLEND_MODE_HELP_ENTRIES, BLEND_MODES
 from cleave.cue_roles import CUE_ROLE_MARKER_HELP_ENTRIES
 from cleave.config_schema.editor import EDITOR_PREVIEW_QUALITY_HELP_ENTRIES
 from cleave.config_schema.layers import (
-    PRESET_SWITCHING_MODE_HELP_ENTRIES,
     PRESET_SWITCHING_TRIGGER_HELP_ENTRIES,
 )
 from cleave.config_schema.render import (
@@ -228,19 +227,18 @@ def test_blend_mode_help_lists_modes() -> None:
     assert [mode for mode, _ in description.entries] == list(BLEND_MODES)
 
 
-def test_switching_mode_help_lists_modes() -> None:
-    description = _description_section(
-        sections_for(RowKind.TRACK_PRESET_SWITCHING)
-    )
+def test_switching_header_help_is_expand_collapse() -> None:
+    sections = sections_for(RowKind.TRACK_PRESET_SWITCHING)
+    description = _description_section(sections)
+    keyboard = _keyboard_section(sections)
     assert description is not None
     assert description.title == "Preset switching"
     assert description.lines == (
-        "When on, advances through this layer's ordered preset list.",
-        "The trigger chooses timer, projectM, or timeline on-transitions.",
+        "Automatic preset list advances for this layer.",
+        "The header shows the trigger. Left/Right expands or collapses.",
     )
-    assert description.entries == PRESET_SWITCHING_MODE_HELP_ENTRIES
-    modes = [mode for mode, _ in description.entries]
-    assert modes == ["off", "on"]
+    assert not description.entries
+    assert keyboard.entries == (("Left/Right", "expand/collapse"),)
 
 
 
