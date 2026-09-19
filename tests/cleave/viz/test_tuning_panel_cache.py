@@ -167,6 +167,8 @@ def test_active_preset_list_index_changes_row_render_color_state() -> None:
             effects={},
             expanded=True,
             preset_switching="on",
+            preset_switching_trigger="timer",
+            preset_switching_expanded=True,
             preset_list=["/tmp/a.milk", "/tmp/b.milk"],
             preset_list_labels=["a.milk", "b.milk"],
             preset_list_expanded=True,
