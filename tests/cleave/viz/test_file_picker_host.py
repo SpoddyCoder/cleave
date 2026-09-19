@@ -50,6 +50,7 @@ def test_walk_and_confirm_mapping() -> None:
     assert picker_action_for(pygame.K_KP_ENTER, 0) is PickerAction.ACCEPT
     assert picker_action_for(pygame.K_TAB, 0) is PickerAction.TOGGLE_FOCUS
     assert picker_action_for(pygame.K_ESCAPE, 0) is PickerAction.CANCEL
+    assert picker_action_for(pygame.K_q, _CTRL) is PickerAction.CANCEL
 
 
 def test_unmapped_key_is_ignored() -> None:
@@ -118,6 +119,13 @@ def test_loop_accepts_a_project(tmp_path: Path) -> None:
 def test_escape_cancels(tmp_path: Path) -> None:
     window = _mock_window()
     assert _run_with_events(window, [[_keydown(pygame.K_ESCAPE)]], tmp_path) is None
+
+
+def test_ctrl_q_cancels(tmp_path: Path) -> None:
+    window = _mock_window()
+    assert (
+        _run_with_events(window, [[_keydown(pygame.K_q, _CTRL)]], tmp_path) is None
+    )
 
 
 def test_window_close_stops_the_loop(tmp_path: Path) -> None:

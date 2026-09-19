@@ -51,7 +51,7 @@ def picker_action_for(key: int, mod: int) -> PickerAction | None:
         return PickerAction.ACCEPT
     if key == pygame.K_TAB:
         return PickerAction.TOGGLE_FOCUS
-    if key == pygame.K_ESCAPE:
+    if key == pygame.K_ESCAPE or (key == pygame.K_q and ctrl):
         return PickerAction.CANCEL
     return None
 

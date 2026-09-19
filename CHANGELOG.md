@@ -9,6 +9,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 
+- Open-file picker: Ctrl+Q quits, same as Esc.
 - Offer to download starter Milkdrop preset and texture packs on launch when the presets directory is empty.
 - Auto-create user data directories (projects, presets, textures, models) on launch.
 
