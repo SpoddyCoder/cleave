@@ -374,12 +374,6 @@ def default_song_marker_runtime() -> SongMarkerRuntime:
 
 EditorMode = Literal["visualizer", "preset_curation"]
 
-EDITOR_MODES: tuple[EditorMode, ...] = ("visualizer", "preset_curation")
-EDITOR_MODE_PANEL_LABELS: dict[EditorMode, str] = {
-    "visualizer": "visualizer",
-    "preset_curation": "preset curation",
-}
-
 
 @dataclass
 class ProjectRenderRuntime:

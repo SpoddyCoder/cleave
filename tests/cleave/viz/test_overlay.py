@@ -1315,7 +1315,13 @@ def test_change_editor_mode_row_uses_action_color() -> None:
     state = _minimal_view_state(settings=SettingsBlock(expanded=True))
     mode_row = state.layout.find_by_kind(RowKind.SETTINGS_EDITOR_MODE)
     assert mode_row is not None
-    assert _row_text(state, mode_row) == "└─ change editor mode"
+    assert _row_text(state, mode_row) == "└─ Switch to Preset Curation"
+    curation = _minimal_view_state(
+        settings=SettingsBlock(expanded=True, editor_mode="preset_curation")
+    )
+    curation_row = curation.layout.find_by_kind(RowKind.SETTINGS_EDITOR_MODE)
+    assert curation_row is not None
+    assert _row_text(curation, curation_row) == "└─ Switch to Visual Editor"
     assert _row_value_color(state, mode_row) == ACTION
     assert _row_shows_action_enter_hint(state, mode_row) is False
     state.focus_descriptor = state.layout.descriptor(mode_row)

@@ -10,6 +10,7 @@ from cleave.config_schema.editor import (
     notification_display_label,
     ui_fade_display,
 )
+from cleave.viz.editor_mode_controls import editor_mode_switch_label
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
 from cleave.viz.row_sections import apply_expand_toggle
 from cleave.viz.row_spec import FitStrategy, RowPresentStyle, RowSpec
@@ -50,9 +51,9 @@ def _format_settings_editor_window_display_size(
     return f"{width} x {height}"
 
 def _format_settings_editor_mode(
-    _state: TuningViewState, _desc: RowDescriptor
+    state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return "change editor mode"
+    return editor_mode_switch_label(state.settings.editor_mode)
 
 def _format_settings_ui_width_mode(
     state: TuningViewState, _desc: RowDescriptor
@@ -181,16 +182,16 @@ SPECS: dict[RowKind, RowSpec] = {
     ),
     RowKind.SETTINGS_EDITOR_MODE: RowSpec(
         affordance=RowAffordance.ACTION,
-        panel_label="change editor mode",
+        panel_label="Switch to Preset Curation",
         present_style=RowPresentStyle.FULL_LINE,
         format_value=_format_settings_editor_mode,
         fit_strategy=FitStrategy.NONE,
         shows_enter_icon=True,
-        help_title="Change editor mode",
-        help_entries=(("Enter", "choose visualizer or preset curation"),),
+        help_title="Switch editor mode",
+        help_entries=(("Enter", "confirm the switch"),),
         help_description=(
-            "Visualizer mode exposes the full tuning panel.",
-            "Preset curation mode limits the panel to preset favourites and blacklist.",
+            "Visual Editor exposes the full tuning panel.",
+            "Preset Curation limits the panel to preset favourites and blacklist.",
         ),
         is_pinned=True,
         parent_group="settings",

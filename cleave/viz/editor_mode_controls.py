@@ -12,13 +12,7 @@ from cleave.project import load_manifest
 from cleave.viz.config_save import ConfigSaveController
 from cleave.viz.live_layer_bindings import LiveLayerBindings
 from cleave.viz.modal import ModalHost, ModalOption
-from cleave.viz.session import (
-    EDITOR_MODE_PANEL_LABELS,
-    EDITOR_MODES,
-    EditorMode,
-    TuningSession,
-    session_from_cfg,
-)
+from cleave.viz.session import EditorMode, TuningSession, session_from_cfg
 
 if TYPE_CHECKING:
     from cleave.viz.wiring import LayerManager
@@ -26,10 +20,28 @@ if TYPE_CHECKING:
 _ENTER_CURATION_DIRTY_MESSAGE = (
     "Save changes before entering preset curation mode?"
 )
+_SWITCH_TO_CURATION_LABEL = "Switch to Preset Curation"
+_SWITCH_TO_VISUAL_LABEL = "Switch to Visual Editor"
+_SWITCH_TO_CURATION_PROMPT = "Switch the editor to Preset Curation mode?"
+_SWITCH_TO_VISUAL_PROMPT = "Switch the editor to Visual Editor mode?"
 
 
 def is_preset_curation_mode(editor_mode: str) -> bool:
     return editor_mode == "preset_curation"
+
+
+def editor_mode_switch_label(editor_mode: str) -> str:
+    """Button label for leaving the current editor mode."""
+    if is_preset_curation_mode(editor_mode):
+        return _SWITCH_TO_VISUAL_LABEL
+    return _SWITCH_TO_CURATION_LABEL
+
+
+def editor_mode_switch_prompt(editor_mode: str) -> str:
+    """Confirm message for leaving the current editor mode."""
+    if is_preset_curation_mode(editor_mode):
+        return _SWITCH_TO_VISUAL_PROMPT
+    return _SWITCH_TO_CURATION_PROMPT
 
 
 def render_sections_active(editor_mode: str) -> bool:
@@ -143,32 +155,17 @@ class EditorModeController:
 
     def prompt_change_editor_mode(self) -> None:
         current = self.session.settings.editor_mode
-        options = [
-            ModalOption(
-                EDITOR_MODE_PANEL_LABELS[mode],
-                lambda selected=mode: self._apply_editor_mode(selected),
-            )
-            for mode in EDITOR_MODES
-        ]
-        options.append(ModalOption("Cancel", lambda: None))
-        try:
-            initial = EDITOR_MODES.index(current)
-        except ValueError:
-            initial = 0
+        if is_preset_curation_mode(current):
+            on_confirm = self.request_exit_to_visualizer
+        else:
+            on_confirm = self.request_enter_curation
         self._modal.prompt_choice(
-            "Change editor mode",
-            options,
-            initial_focus_index=initial,
+            editor_mode_switch_prompt(current),
+            [
+                ModalOption("OK", on_confirm),
+                ModalOption("Cancel", lambda: None),
+            ],
         )
-
-    def _apply_editor_mode(self, selected: EditorMode) -> None:
-        current = self.session.settings.editor_mode
-        if selected == current:
-            return
-        if selected == "preset_curation":
-            self.request_enter_curation()
-            return
-        self.request_exit_to_visualizer()
 
     def request_enter_curation(self) -> None:
         if is_preset_curation_mode(self.session.settings.editor_mode):

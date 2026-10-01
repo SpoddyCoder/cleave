@@ -172,9 +172,10 @@ def test_enter_curation_expands_layer_one() -> None:
     view = controls.modal_host.view_state()
     assert view is not None
     assert view.kind == ModalKind.CHOICE
-    assert list(view.options) == ["Visualizer", "Preset Curation", "Cancel"]
+    assert view.message == "Switch the editor to Preset Curation mode?"
+    assert list(view.options) == ["Ok", "Cancel"]
     assert view.focus_index == 0
-    _choose_editor_mode_option(controls, "Preset Curation")
+    _choose_editor_mode_option(controls, "Ok")
     assert not controls.modal_host.active
     assert controls.session.settings.editor_mode == "preset_curation"
     assert controls.session.layers["layer_1"].expanded is True
@@ -216,7 +217,7 @@ def test_enter_curation_defaults_full_mix_and_disables_rotation() -> None:
     controls.editor_mode._layer_bindings = mock_bindings
     controls._layer_bindings = mock_bindings
 
-    _choose_editor_mode_option(controls, "Preset Curation")
+    _choose_editor_mode_option(controls, "Ok")
 
     assert not controls.modal_host.active
     assert controls.session.settings.editor_mode == "preset_curation"
@@ -285,7 +286,7 @@ def test_dirty_enter_modal_cancel_stays_visualizer() -> None:
     controls.session.settings.expanded = True
     controls.focus_cursor = MainFocus(RowDescriptor(RowKind.SETTINGS_EDITOR_MODE))
 
-    _choose_editor_mode_option(controls, "Preset Curation")
+    _choose_editor_mode_option(controls, "Ok")
     assert controls.modal_host.active
     view = controls.modal_host.view_state()
     assert view.kind == ModalKind.CHOICE
@@ -328,7 +329,12 @@ def test_exit_curation_reloads_and_clears_dirty() -> None:
     ):
         controls.session.settings.expanded = True
         controls.focus_cursor = MainFocus(RowDescriptor(RowKind.SETTINGS_EDITOR_MODE))
-        _choose_editor_mode_option(controls, "Visualizer")
+        controls.handle_keydown(keydown(pygame.K_RETURN))
+        view = controls.modal_host.view_state()
+        assert view is not None
+        assert view.message == "Switch the editor to Visual Editor mode?"
+        assert list(view.options) == ["Ok", "Cancel"]
+        _choose_editor_mode_option(controls, "Ok")
         assert not controls.modal_host.active
 
     assert controls.session.settings.editor_mode == "visualizer"
@@ -343,16 +349,6 @@ def test_editor_mode_modal_cancel_keeps_visualizer() -> None:
     controls.handle_keydown(keydown(pygame.K_RETURN))
     assert controls.modal_host.active
     _choose_editor_mode_option(controls, "Cancel")
-    assert not controls.modal_host.active
-    assert controls.session.settings.editor_mode == "visualizer"
-
-
-def test_editor_mode_modal_same_mode_is_noop() -> None:
-    controls = _make_controls(("layer_1",))
-    controls.session.settings.expanded = True
-    controls.focus_cursor = MainFocus(RowDescriptor(RowKind.SETTINGS_EDITOR_MODE))
-
-    _choose_editor_mode_option(controls, "Visualizer")
     assert not controls.modal_host.active
     assert controls.session.settings.editor_mode == "visualizer"
 

@@ -1294,7 +1294,7 @@ def test_track_effect_dynamic_label_and_prefix() -> None:
 
 def test_full_line_delete_layer_prefix() -> None:
     assert full_line_prefix(RowKind.LAYER_MANAGEMENT_DELETE) == "└─ Delete Layer"
-    assert full_line_prefix(RowKind.SETTINGS_EDITOR_MODE) == "└─ change editor mode"
+    assert full_line_prefix(RowKind.SETTINGS_EDITOR_MODE) == "└─ Switch to Preset Curation"
     assert row_panel_label(RowKind.LAYER_MANAGEMENT_ADD) == "Add Layer"
 
 

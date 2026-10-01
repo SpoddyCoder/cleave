@@ -46,7 +46,7 @@ This will separate the track into its component stems (bass, drums, vocals, othe
 ### Preset Curation
 
 The editor has a preset curation mode for sorting presets into folders.
-`Settings` > `change editor mode` > `preset curation`. While focused on a preset **file** row:
+`Settings` > `Switch to Preset Curation`. While focused on a preset **file** row:
 * `f` - **copy** the preset into `favourites/` (original stays in the pack).
 * `c` - **copy** the preset into a cast role directory.
 * `b` - **move** the preset into `blacklist/` (permanently removed from pack).
