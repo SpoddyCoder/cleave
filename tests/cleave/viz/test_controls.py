@@ -922,7 +922,7 @@ def test_navigable_project_save_row() -> None:
     controls = _make_controls(("layer_1",))
     _expand_project(controls)
     view = controls.build_view_state(paused=False)
-    assert len(view.layout) == 24
+    assert len(view.layout) == 23
     assert RowDescriptor(RowKind.TIMELINE_PRESETS) not in view.layout.rows
 
     kinds = {view.layout.kind(i) for i in range(len(view.layout))}
