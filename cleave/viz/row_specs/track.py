@@ -423,7 +423,7 @@ SPECS: dict[RowKind, RowSpec] = {
     ),
     RowKind.TRACK_PRESET_LIST_ADD: RowSpec(
         affordance=RowAffordance.ACTION,
-        panel_label="add current preset",
+        panel_label="Add Current Preset",
         present_style=RowPresentStyle.FULL_LINE,
         apply_horizontal=noop_horizontal,
         fit_strategy=FitStrategy.NONE,
@@ -439,7 +439,7 @@ SPECS: dict[RowKind, RowSpec] = {
     ),
     RowKind.TRACK_PRESET_LIST_POPULATE: RowSpec(
         affordance=RowAffordance.ACTION,
-        panel_label="populate presets",
+        panel_label="Populate Presets",
         present_style=RowPresentStyle.FULL_LINE,
         apply_horizontal=noop_horizontal,
         fit_strategy=FitStrategy.NONE,

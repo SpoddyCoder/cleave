@@ -74,7 +74,7 @@ def _format_project_render_end(
 def _format_project_render_action(
     _state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return "render the project"
+    return "Render the Project"
 
 
 def _format_project_milkdrop_beat(
@@ -406,11 +406,11 @@ SPECS: dict[RowKind, RowSpec] = {
     ),
     RowKind.PROJECT_RENDER_ACTION: RowSpec(
         affordance=RowAffordance.ACTION,
-        panel_label="render the project",
+        panel_label="Render the Project",
         present_style=RowPresentStyle.FULL_LINE,
         format_value=_format_project_render_action,
         shows_enter_icon=True,
-        help_title="Render the project",
+        help_title="Render the Project",
         help_entries=(("Enter", "confirm render"),),
         help_description=("Write an MP4 using the path, size, fps, quality, and range above.",),
         is_pinned=True,

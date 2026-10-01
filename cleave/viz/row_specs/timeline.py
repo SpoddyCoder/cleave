@@ -680,11 +680,11 @@ SPECS: dict[RowKind, RowSpec] = {
     ),
     RowKind.TIMELINE_PRESETS: RowSpec(
         affordance=RowAffordance.ACTION,
-        panel_label="apply timeline preset",
+        panel_label="Apply Timeline Preset",
         present_style=RowPresentStyle.FULL_LINE,
         fit_strategy=FitStrategy.NONE,
         shows_enter_icon=True,
-        help_title="Apply timeline preset",
+        help_title="Apply Timeline Preset",
         help_entries=(("Enter", "apply timeline preset"),),
         help_description=(
             "Apply the staged character, density, snaps, cuts, re-populate,",
@@ -775,11 +775,11 @@ SPECS: dict[RowKind, RowSpec] = {
     ),
     RowKind.TIMELINE_RESET: RowSpec(
         affordance=RowAffordance.ACTION,
-        panel_label="reset timeline",
+        panel_label="Reset Timeline",
         present_style=RowPresentStyle.FULL_LINE,
         fit_strategy=FitStrategy.NONE,
         shows_enter_icon=True,
-        help_title="Reset timeline",
+        help_title="Reset Timeline",
         help_entries=(("Enter", "reset timeline"),),
         help_description=(
             "Clear all timeline cues and set every layer",
@@ -864,11 +864,11 @@ SPECS: dict[RowKind, RowSpec] = {
     ),
     RowKind.TIMELINE_SNAP_TO_BEATS: RowSpec(
         affordance=RowAffordance.ACTION,
-        panel_label="snap to beats",
+        panel_label="Snap to Beats",
         present_style=RowPresentStyle.FULL_LINE,
         fit_strategy=FitStrategy.NONE,
         shows_enter_icon=True,
-        help_title="Snap to beats",
+        help_title="Snap to Beats",
         help_entries=(("Enter", "snap cues to beats"),),
         help_description=(
             "Snap all timeline cues to the nearest beat.",
@@ -877,11 +877,11 @@ SPECS: dict[RowKind, RowSpec] = {
     ),
     RowKind.TIMELINE_SNAP_TO_BARS: RowSpec(
         affordance=RowAffordance.ACTION,
-        panel_label="snap to bars",
+        panel_label="Snap to Bars",
         present_style=RowPresentStyle.FULL_LINE,
         fit_strategy=FitStrategy.NONE,
         shows_enter_icon=True,
-        help_title="Snap to bars",
+        help_title="Snap to Bars",
         help_entries=(("Enter", "snap cues to bars"),),
         help_description=(
             "Snap all timeline cues to the nearest bar.",
@@ -890,11 +890,11 @@ SPECS: dict[RowKind, RowSpec] = {
     ),
     RowKind.TIMELINE_SNAP_TO_SONG_MARKERS: RowSpec(
         affordance=RowAffordance.ACTION,
-        panel_label="snap to song markers",
+        panel_label="Snap to Song Markers",
         present_style=RowPresentStyle.FULL_LINE,
         fit_strategy=FitStrategy.NONE,
         shows_enter_icon=True,
-        help_title="Snap to song markers",
+        help_title="Snap to Song Markers",
         help_entries=(("Enter", "snap cues to song markers"),),
         help_description=(
             "Pull closest cues within proximity onto song markers.",
@@ -1039,11 +1039,11 @@ SPECS: dict[RowKind, RowSpec] = {
     ),
     RowKind.TIMELINE_APPLY_SOFT_CUTS: RowSpec(
         affordance=RowAffordance.ACTION,
-        panel_label="apply soft cuts to cues",
+        panel_label="Apply Soft Cuts to Cues",
         present_style=RowPresentStyle.FULL_LINE,
         fit_strategy=FitStrategy.NONE,
         shows_enter_icon=True,
-        help_title="Apply soft cuts to cues",
+        help_title="Apply Soft Cuts to Cues",
         help_entries=(("Enter", "apply soft cuts"),),
         help_description=(
             "Set cut type soft on all cues, song-marker cues, or all except markers.",
@@ -1052,11 +1052,11 @@ SPECS: dict[RowKind, RowSpec] = {
     ),
     RowKind.TIMELINE_APPLY_HARD_CUTS: RowSpec(
         affordance=RowAffordance.ACTION,
-        panel_label="apply hard cuts to cues",
+        panel_label="Apply Hard Cuts to Cues",
         present_style=RowPresentStyle.FULL_LINE,
         fit_strategy=FitStrategy.NONE,
         shows_enter_icon=True,
-        help_title="Apply hard cuts to cues",
+        help_title="Apply Hard Cuts to Cues",
         help_entries=(("Enter", "apply hard cuts"),),
         help_description=(
             "Set cut type hard on all cues, song-marker cues, or all except markers.",

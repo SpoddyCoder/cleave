@@ -429,7 +429,7 @@ def test_minimal_view_render_labels() -> None:
     action = state.layout.find_by_kind(RowKind.PROJECT_RENDER_ACTION)
     assert (
         row_full_line_display_text(state, state.layout.descriptor(action))
-        == "  └─ render the project"
+        == "  └─ Render the Project"
     )
     project = state.layout.find_by_kind(RowKind.PROJECT_HEADER)
     assert (

@@ -2902,7 +2902,7 @@ def test_timeline_snap_song_markers_is_plain_action_row() -> None:
     view = controls.build_view_state(paused=False)
     snap_row = view.layout.find_by_kind(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS)
     text = _row_text(view, snap_row)
-    assert "snap to song markers" in text
+    assert "Snap to Song Markers" in text
     assert "▶" not in text
     assert "▼" not in text
     controls.focus_descriptor = _desc(view, snap_row)

@@ -1172,10 +1172,10 @@ def test_composite_header_render_overlay_metadata() -> None:
 def test_preset_list_populate_is_full_line_action() -> None:
     field = row_spec(RowKind.TRACK_PRESET_LIST_POPULATE)
     assert field.present_style == RowPresentStyle.FULL_LINE
-    assert field.panel_label == "populate presets"
+    assert field.panel_label == "Populate Presets"
     add_field = row_spec(RowKind.TRACK_PRESET_LIST_ADD)
     assert add_field.present_style == RowPresentStyle.FULL_LINE
-    assert add_field.panel_label == "add current preset"
+    assert add_field.panel_label == "Add Current Preset"
 
 
 def test_preset_list_add_populate_share_list_item_tree_chrome() -> None:
@@ -1186,12 +1186,12 @@ def test_preset_list_add_populate_share_list_item_tree_chrome() -> None:
     branch = tree_branch_prefix(item_depth)
     assert branch == "    └─ "
     assert full_line_prefix(RowKind.TRACK_PRESET_LIST_ADD) == (
-        branch + "add current preset"
+        branch + "Add Current Preset"
     )
     populate_depth = row_tree_indent_depth(RowKind.TRACK_PRESET_LIST_POPULATE)
     populate_branch = tree_branch_prefix(populate_depth)
     assert full_line_prefix(RowKind.TRACK_PRESET_LIST_POPULATE) == (
-        populate_branch + "populate presets"
+        populate_branch + "Populate Presets"
     )
     assert labeled_row_prefix(RowKind.TRACK_PRESET_LIST_ITEM).startswith(branch)
 

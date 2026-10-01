@@ -83,7 +83,7 @@ def _format_settings_residual_latency_ms(
 def _format_settings_measure_latency(
     _state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return "measure latency"
+    return "Measure Latency"
 
 def _apply_settings_preview_quality(
     controls: TuningControls,
@@ -419,12 +419,12 @@ SPECS: dict[RowKind, RowSpec] = {
     ),
     RowKind.SETTINGS_MEASURE_LATENCY: RowSpec(
         affordance=RowAffordance.ACTION,
-        panel_label="measure latency",
+        panel_label="Measure Latency",
         present_style=RowPresentStyle.FULL_LINE,
         format_value=_format_settings_measure_latency,
         fit_strategy=FitStrategy.NONE,
         shows_enter_icon=True,
-        help_title="Measure latency",
+        help_title="Measure Latency",
         help_entries=(
             ("Enter", "start calibration / tap on each bar beat"),
             ("Esc", "cancel"),

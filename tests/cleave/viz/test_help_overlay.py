@@ -269,7 +269,7 @@ def test_timeline_reset_help_lists_choices() -> None:
     sections = sections_for(RowKind.TIMELINE_RESET)
     description = _description_section(sections)
     assert description is not None
-    assert description.title == "Reset timeline"
+    assert description.title == "Reset Timeline"
     assert description.entries == TIMELINE_RESET_HELP_ENTRIES
     assert [name for name, _ in description.entries] == ["All Off", "All On"]
     keyboard = _keyboard_section(sections)
