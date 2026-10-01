@@ -434,7 +434,7 @@ def test_minimal_view_render_labels() -> None:
     project = state.layout.find_by_kind(RowKind.PROJECT_HEADER)
     assert (
         row_composite_header_display_text(state, state.layout.descriptor(project))
-        == "Project ▼"
+        == "Project Settings ▼"
     )
 
 

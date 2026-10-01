@@ -5,7 +5,7 @@ How Cleave stacks Milkdrop layers, applies stem-driven effects, and adds render 
 ## Compositing
 
 - Up to eight libprojectM layers, at tiered resolutions.
-- Live preview composites at the editor window size (default 1920x1080; Settings > Editor Window) and upscales via `editor.upscale` at display frame rate.
+- Live preview composites at the editor window size (default 1920x1080; Cleave Settings > Editor Window) and upscales via `editor.upscale` at display frame rate.
 - Offline render size and frame rate are Project > Render (default 1920x1080 at 60fps; stored in `project.yaml`).
 - Each layer's libprojectM instance receives PCM from its assigned stem; stereo stems are fed as stereo, mono as mono.
 - Milkdrop draws on black, so Cleave treats black as transparent and uses pixel brightness as blend weight (`black-key` default).

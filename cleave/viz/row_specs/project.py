@@ -184,12 +184,12 @@ def _apply_project_compositor_hdr(
 SPECS: dict[RowKind, RowSpec] = {
     RowKind.PROJECT_HEADER: RowSpec(
         affordance=RowAffordance.EXPAND,
-        panel_label="Project",
+        panel_label="Project Settings",
         present_style=RowPresentStyle.COMPOSITE_HEADER,
         apply_horizontal=_apply_project_header,
         header_suffix="",
         fit_strategy=FitStrategy.NONE,
-        help_title="Project",
+        help_title="Project Settings",
         help_description=("Save the session and render this project to video.",),
         header_glyph=FOLDER_GLYPH,
         header_glyph_color=PRESET_ICON,

@@ -170,11 +170,11 @@ def _apply_settings_header(
 SPECS: dict[RowKind, RowSpec] = {
     RowKind.SETTINGS_HEADER: RowSpec(
         affordance=RowAffordance.EXPAND,
-        panel_label="Settings",
+        panel_label="Cleave Settings",
         present_style=RowPresentStyle.COMPOSITE_HEADER,
         apply_horizontal=_apply_settings_header,
         fit_strategy=FitStrategy.NONE,
-        help_title="Settings",
+        help_title="Cleave Settings",
         help_description=("Global editor settings (applies to all projects)",),
         quick_nav_target=True,
         quick_nav_always=True,

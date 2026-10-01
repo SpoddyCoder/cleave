@@ -45,7 +45,7 @@ def _row_for_style(
         return index, "└─ cleave effects ▼"
     if style == RowPresentStyle.COMPOSITE_HEADER:
         index = layout.find_by_kind(RowKind.SETTINGS_HEADER)
-        return index, "Settings ▼"
+        return index, "Cleave Settings ▼"
     if style == RowPresentStyle.PATH_ICON:
         index = layout.find_by_kind(RowKind.CONFIG_HEADER)
         return index, "Save"

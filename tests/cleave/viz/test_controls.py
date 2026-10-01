@@ -5269,10 +5269,9 @@ def test_cycle_stem_to_full_mix() -> None:
 def test_settings_header_is_first_row() -> None:
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
-    assert view.layout.kind( 0) == RowKind.SETTINGS_HEADER
-    assert view.layout.kind( 1) == RowKind.TRANSPORT_GAP
-    assert view.layout.kind( 2) == RowKind.PROJECT_HEADER
-    assert view.layout.kind( 3) == RowKind.TRANSPORT
+    assert view.layout.kind(0) == RowKind.SETTINGS_HEADER
+    assert view.layout.kind(1) == RowKind.PROJECT_HEADER
+    assert view.layout.kind(2) == RowKind.TRANSPORT
 
 
 def test_settings_expand_collapse_and_sub_row_visibility() -> None:
@@ -5300,7 +5299,7 @@ def test_settings_expand_collapse_and_sub_row_visibility() -> None:
     editor_mode_row = view.layout.find_by_kind(RowKind.SETTINGS_EDITOR_MODE)
     assert editor_mode_row == 4
     assert editor_mode_row in view.layout.navigable_indices(view)
-    assert view.layout.header_row_count() == 8
+    assert view.layout.header_row_count() == 7
 
     controls.focus_descriptor = _desc(view, editor_mode_row)
     controls.handle_keydown(_keydown(pygame.K_LEFT))
@@ -5311,7 +5310,7 @@ def test_settings_expand_collapse_and_sub_row_visibility() -> None:
     assert RowKind.SETTINGS_EDITOR_MODE not in {
         view.layout.kind(i) for i in range(len(view.layout))
     }
-    assert view.layout.header_row_count() == 4
+    assert view.layout.header_row_count() == 3
 
 
 def test_settings_ui_expand_collapse_and_sub_row_visibility() -> None:
@@ -5334,7 +5333,7 @@ def test_settings_ui_expand_collapse_and_sub_row_visibility() -> None:
     notify_row = view.layout.find_by_kind(RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY)
     assert ui_fade_row in view.layout.navigable_indices(view)
     assert notify_row in view.layout.navigable_indices(view)
-    assert view.layout.header_row_count() == 12
+    assert view.layout.header_row_count() == 11
 
     controls.focus_descriptor = _desc(view, ui_fade_row)
     controls.handle_keydown(_keydown(pygame.K_LEFT))
@@ -5348,7 +5347,7 @@ def test_settings_ui_expand_collapse_and_sub_row_visibility() -> None:
     assert RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY not in {
         view.layout.kind(i) for i in range(len(view.layout))
     }
-    assert view.layout.header_row_count() == 8
+    assert view.layout.header_row_count() == 7
 
 
 def test_settings_editor_window_expand_collapse_and_sub_row_visibility() -> None:

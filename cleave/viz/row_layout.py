@@ -35,7 +35,6 @@ def _sub_row_expanded(state: TuningViewState, desc: RowDescriptor) -> bool:
 def row_draw_visible(state: TuningViewState, desc: RowDescriptor) -> bool:
     if desc.kind in {
         RowKind.PANEL_NOTIFICATION,
-        RowKind.TRANSPORT_GAP,
         RowKind.RENDER_SECTION_GAP,
     }:
         return True
@@ -72,7 +71,7 @@ def _quick_nav_section_open(state: TuningViewState, desc: RowDescriptor) -> bool
 def quick_nav_stop_included(state: TuningViewState, desc: RowDescriptor) -> bool:
     """Whether Ctrl+Up/Down should land on this main-panel descriptor.
 
-    Section tops (Settings, Transport, Layer 1, Render: OVERLAY) always stop.
+    Section tops (Cleave Settings, Transport, Layer 1, Render: OVERLAY) always stop.
     Other quick-nav headers stop only when open.
     """
     spec = row_spec(desc.kind)
@@ -155,7 +154,6 @@ class RowLayout:
         row_list: list[RowDescriptor] = []
         curation = state.settings.editor_mode == "preset_curation"
         append_expand_section_rows(row_list, SETTINGS_SECTION, state)
-        row_list.append(RowDescriptor(RowKind.TRANSPORT_GAP))
         if not curation:
             append_expand_section_rows(row_list, PROJECT_SECTION, state)
         row_list.append(RowDescriptor(RowKind.TRANSPORT))

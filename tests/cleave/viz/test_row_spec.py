@@ -192,7 +192,6 @@ def test_action_row_kinds_match_affordance() -> None:
 
 def test_row_is_pinned() -> None:
     assert row_is_pinned(RowKind.TRANSPORT) is True
-    assert row_is_pinned(RowKind.TRANSPORT_GAP) is True
     assert row_is_pinned(RowKind.CONFIG_HEADER) is True
     assert row_is_pinned(RowKind.SETTINGS_HEADER) is True
     assert row_is_pinned(RowKind.PROJECT_HEADER) is True
@@ -623,8 +622,8 @@ def test_tree_branch_leading_spaces() -> None:
 
 
 def test_row_panel_label_settings_header() -> None:
-    assert row_panel_label(RowKind.SETTINGS_HEADER) == "Settings"
-    assert row_panel_label(RowKind.PROJECT_HEADER) == "Project"
+    assert row_panel_label(RowKind.SETTINGS_HEADER) == "Cleave Settings"
+    assert row_panel_label(RowKind.PROJECT_HEADER) == "Project Settings"
     assert row_panel_label(RowKind.PROJECT_MILKDROP_HEADER) == "ProjectM"
     assert row_panel_label(RowKind.PROJECT_COMPOSITOR_HEADER) == "Compositor"
     assert row_panel_label(RowKind.PROJECT_RENDER_HEADER) == "Render Project"
@@ -1230,7 +1229,6 @@ def test_row_specs_total_over_row_kind() -> None:
 
 def test_spacer_kind_is_registered() -> None:
     assert RowKind.RENDER_SECTION_GAP in ROW_SPECS
-    assert RowKind.TRANSPORT_GAP in ROW_SPECS
 
 
 def test_row_spec_apply_horizontal_signatures_match_field_mutator() -> None:
