@@ -26,7 +26,7 @@ from cleave.paths import (
     windows_documents_dir,
 )
 
-TITLE = "Open a Cleave project or a wav"
+TITLE = "Open a Cleave project, or select a wav to create a new project..."
 LEGEND: tuple[tuple[str, str], ...] = (
     ("Enter", "open"),
     ("Right", "enter folder"),
@@ -300,12 +300,12 @@ class FilePicker:
             self._toggle_focus()
         elif action is PickerAction.PARENT:
             if self.focus is PickerFocus.SHORTCUTS:
-                self._move(-1)
+                self._move_shortcut(-1)
             else:
                 self.go_parent()
         elif action is PickerAction.ENTER:
             if self.focus is PickerFocus.SHORTCUTS:
-                self._move(1)
+                self._move_shortcut(1)
             else:
                 self._enter()
         elif action is PickerAction.ACCEPT:
@@ -317,16 +317,28 @@ class FilePicker:
     def _move(self, delta: int) -> None:
         self.status = ""
         if self.focus is PickerFocus.SHORTCUTS:
-            count = len(self.shortcuts)
-            if count:
-                self.selected_shortcut = max(
-                    0, min(count - 1, self.selected_shortcut + delta)
-                )
+            # Down returns to the listing. Up and paging stay put; Left/Right
+            # move between shortcuts.
+            if delta == 1:
+                self.focus = PickerFocus.LIST
+                self.selected_index = 0
+            return
+        if delta == -1 and self.selected_index <= 0:
+            self.focus = PickerFocus.SHORTCUTS
             return
         if not self._rows:
             return
         self.selected_index = max(
             0, min(len(self._rows) - 1, self.selected_index + delta)
+        )
+
+    def _move_shortcut(self, delta: int) -> None:
+        self.status = ""
+        count = len(self.shortcuts)
+        if not count:
+            return
+        self.selected_shortcut = max(
+            0, min(count - 1, self.selected_shortcut + delta)
         )
 
     def _toggle_focus(self) -> None:

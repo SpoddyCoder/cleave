@@ -159,13 +159,16 @@ def test_cancel_sets_flag(tmp_path: Path) -> None:
 def test_move_clamps_to_listing(tmp_path: Path) -> None:
     _wav(tmp_path, "song.wav")
     picker = FilePicker(current=tmp_path)
+    last = len(picker.rows) - 1
 
-    for _ in range(10):
+    for _ in range(last + 5):
         picker.handle(PickerAction.MOVE_DOWN)
-    assert picker.selected_index == len(picker.rows) - 1
-    for _ in range(10):
+    assert picker.selected_index == last
+    assert picker.focus is PickerFocus.LIST
+    for _ in range(last):
         picker.handle(PickerAction.MOVE_UP)
     assert picker.selected_index == 0
+    assert picker.focus is PickerFocus.LIST
 
 
 def test_listing_capped_with_note(tmp_path: Path) -> None:
@@ -232,15 +235,42 @@ def test_shortcut_focus_left_right_move_selection(
     assert picker.current == tmp_path
 
 
-def test_shortcut_focus_up_down_move_selection(
+def test_up_from_first_row_focuses_shortcuts_and_down_returns(
     data_root: Path, tmp_path: Path
 ) -> None:
+    for name in ("a", "b", "c"):
+        (tmp_path / name).mkdir()
     picker = FilePicker(current=tmp_path)
+    picker.handle(PickerAction.MOVE_DOWN)
+    picker.handle(PickerAction.MOVE_DOWN)
+    picker.handle(PickerAction.MOVE_DOWN)
+    assert picker.selected_index == 3
+
     picker.handle(PickerAction.TOGGLE_FOCUS)
     picker.handle(PickerAction.MOVE_DOWN)
-    assert picker.selected_shortcut == 1
+    assert picker.focus is PickerFocus.LIST
+    assert picker.selected_index == 0
+
+    picker.handle(PickerAction.PAGE_UP)
+    assert picker.focus is PickerFocus.LIST
+    assert picker.selected_index == 0
+
+    assert picker.view_state().title == (
+        "Open a Cleave project, or select a wav to create a new project..."
+    )
     picker.handle(PickerAction.MOVE_UP)
+    assert picker.focus is PickerFocus.SHORTCUTS
     assert picker.selected_shortcut == 0
+    picker.handle(PickerAction.MOVE_UP)
+    assert picker.focus is PickerFocus.SHORTCUTS
+    assert picker.selected_shortcut == 0
+    picker.handle(PickerAction.PAGE_DOWN)
+    assert picker.focus is PickerFocus.SHORTCUTS
+
+    picker.handle(PickerAction.MOVE_DOWN)
+    assert picker.focus is PickerFocus.LIST
+    assert picker.selected_index == 0
+    assert picker.current == tmp_path
 
 
 def test_shortcut_focus_and_jump(data_root: Path, tmp_path: Path) -> None:

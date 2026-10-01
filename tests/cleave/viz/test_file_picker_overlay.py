@@ -10,6 +10,7 @@ import pytest
 from cleave.viz import file_picker_overlay
 from cleave.viz.file_picker import (
     LEGEND,
+    TITLE,
     FilePicker,
     PickerAction,
     PickerFocus,
@@ -17,10 +18,35 @@ from cleave.viz.file_picker import (
     PickerRowKind,
 )
 from cleave.viz.overlay_primitives import overlay_font
+from cleave.viz.text_fit import wrap_text_to_width
 
 
 def _font() -> pygame.font.Font:
     return overlay_font(20)
+
+
+def _panel_box(surface: pygame.Surface, font: pygame.font.Font) -> dict[str, int]:
+    width, height = surface.get_size()
+    panel_w = int(width * file_picker_overlay._PANEL_WIDTH_FRACTION)
+    panel_h = int(height * file_picker_overlay._PANEL_HEIGHT_FRACTION)
+    pad_x = file_picker_overlay._PANEL_PAD_X
+    pad_y = file_picker_overlay._PANEL_PAD_Y
+    content_w = panel_w - pad_x * 2
+    line_h = font.get_linesize()
+    step = line_h + file_picker_overlay._tuning_ui.line_gap
+    title_lines = len(wrap_text_to_width(font, TITLE, content_w)) or 1
+    return {
+        "panel_x": (width - panel_w) // 2,
+        "panel_y": (height - panel_h) // 2,
+        "panel_w": panel_w,
+        "panel_h": panel_h,
+        "pad_x": pad_x,
+        "pad_y": pad_y,
+        "content_w": content_w,
+        "line_h": line_h,
+        "step": step,
+        "title_lines": title_lines,
+    }
 
 
 @pytest.fixture
@@ -132,19 +158,12 @@ def test_draw_highlights_only_the_selected_shortcut(
 
     file_picker_overlay.draw(surface, view, font=font)
 
-    width, height = surface.get_size()
-    panel_w = int(width * file_picker_overlay._PANEL_WIDTH_FRACTION)
-    panel_x = (width - panel_w) // 2
-    panel_y = (height - int(height * file_picker_overlay._PANEL_HEIGHT_FRACTION)) // 2
-    pad_x = file_picker_overlay._PANEL_PAD_X
-    pad_y = file_picker_overlay._PANEL_PAD_Y
-    line_h = font.get_linesize()
-    step = line_h + file_picker_overlay._tuning_ui.line_gap
-    shortcut_y = panel_y + pad_y + step
+    box = _panel_box(surface, font)
+    shortcut_y = box["panel_y"] + box["pad_y"] + box["title_lines"] * box["step"]
     chips = file_picker_overlay.shortcut_chip_layout(
-        font, view, x=panel_x + pad_x, content_w=panel_w - pad_x * 2
+        font, view, x=box["panel_x"] + box["pad_x"], content_w=box["content_w"]
     )
-    sample_y = shortcut_y + line_h // 2
+    sample_y = shortcut_y + box["line_h"] // 2
 
     def _has_color(chip_x: int, chip_w: int, color: tuple[int, int, int]) -> bool:
         for x in range(chip_x, chip_x + chip_w):
@@ -176,19 +195,12 @@ def test_draw_highlights_projects_shortcut_on_first_show(
     font = _font()
     file_picker_overlay.draw(surface, view, font=font)
 
-    width, height = surface.get_size()
-    panel_w = int(width * file_picker_overlay._PANEL_WIDTH_FRACTION)
-    panel_x = (width - panel_w) // 2
-    panel_y = (height - int(height * file_picker_overlay._PANEL_HEIGHT_FRACTION)) // 2
-    pad_x = file_picker_overlay._PANEL_PAD_X
-    pad_y = file_picker_overlay._PANEL_PAD_Y
-    line_h = font.get_linesize()
-    step = line_h + file_picker_overlay._tuning_ui.line_gap
-    shortcut_y = panel_y + pad_y + step
+    box = _panel_box(surface, font)
+    shortcut_y = box["panel_y"] + box["pad_y"] + box["title_lines"] * box["step"]
     chips = file_picker_overlay.shortcut_chip_layout(
-        font, view, x=panel_x + pad_x, content_w=panel_w - pad_x * 2
+        font, view, x=box["panel_x"] + box["pad_x"], content_w=box["content_w"]
     )
-    sample_y = shortcut_y + line_h // 2
+    sample_y = shortcut_y + box["line_h"] // 2
 
     def _has_color(chip_x: int, chip_w: int, color: tuple[int, int, int]) -> bool:
         for x in range(chip_x, chip_x + chip_w):
@@ -207,7 +219,7 @@ def test_draw_highlights_projects_shortcut_on_first_show(
 def test_draw_places_location_directly_above_parent_row(
     surface: pygame.Surface, tmp_path: Path
 ) -> None:
-    from cleave.viz.theme import ACTION, VALUE
+    from cleave.viz.theme import ACTION, PRESET_ICON, VALUE
 
     (tmp_path / "song.wav").write_bytes(b"RIFF")
     picker = FilePicker(current=tmp_path)
@@ -215,27 +227,58 @@ def test_draw_places_location_directly_above_parent_row(
     font = _font()
     file_picker_overlay.draw(surface, picker.view_state(), font=font)
 
-    width, height = surface.get_size()
-    panel_w = int(width * file_picker_overlay._PANEL_WIDTH_FRACTION)
-    panel_x = (width - panel_w) // 2
-    panel_y = (height - int(height * file_picker_overlay._PANEL_HEIGHT_FRACTION)) // 2
-    pad_x = file_picker_overlay._PANEL_PAD_X
-    pad_y = file_picker_overlay._PANEL_PAD_Y
-    content_w = panel_w - pad_x * 2
-    line_h = font.get_linesize()
-    step = line_h + file_picker_overlay._tuning_ui.line_gap
-    location_y = panel_y + pad_y + step * 3
-    parent_y = location_y + step
+    box = _panel_box(surface, font)
+    location_y = box["panel_y"] + box["pad_y"] + (box["title_lines"] + 2) * box["step"]
+    parent_y = location_y + box["step"]
+    content_right = box["panel_x"] + box["pad_x"] + box["content_w"]
 
     def _row_has(color: tuple[int, int, int], y: int) -> bool:
-        for dy in range(line_h):
-            for x in range(panel_x + pad_x, panel_x + pad_x + content_w):
+        for dy in range(box["line_h"]):
+            for x in range(box["panel_x"] + box["pad_x"], content_right):
                 if surface.get_at((x, y + dy))[:3] == color:
                     return True
         return False
 
+    assert _row_has(PRESET_ICON, location_y)
     assert _row_has(VALUE, location_y)
     assert _row_has(ACTION, parent_y)
+
+
+def test_long_listing_leaves_a_blank_line_above_help(
+    surface: pygame.Surface, tmp_path: Path
+) -> None:
+    from cleave.viz.theme import LABEL, VALUE
+
+    for index in range(40):
+        (tmp_path / f"dir{index:02d}").mkdir()
+    picker = FilePicker(current=tmp_path)
+    font = _font()
+    view = picker.view_state()
+    file_picker_overlay.draw(surface, view, font=font)
+
+    box = _panel_box(surface, font)
+    footer = file_picker_overlay.legend_rows(font, view.legend, box["content_w"])
+    list_top = box["pad_y"] + (box["title_lines"] + 3) * box["step"]
+    list_bottom = box["panel_h"] - box["pad_y"] - (len(footer) + 1) * box["step"]
+    capacity = max(1, (list_bottom - list_top) // box["step"])
+    assert len(view.rows) > capacity > 1
+
+    last_row_y = box["panel_y"] + list_top + (capacity - 1) * box["step"]
+    blank_y = box["panel_y"] + box["panel_h"] - box["pad_y"] - (len(footer) + 1) * box["step"]
+    help_y = blank_y + box["step"]
+    content_right = box["panel_x"] + box["pad_x"] + box["content_w"]
+
+    def _row_has(color: tuple[int, int, int], y: int) -> bool:
+        for dy in range(box["line_h"]):
+            for x in range(box["panel_x"] + box["pad_x"], content_right):
+                if surface.get_at((x, y + dy))[:3] == color:
+                    return True
+        return False
+
+    assert _row_has(VALUE, last_row_y)
+    assert not _row_has(VALUE, blank_y)
+    assert not _row_has(LABEL, blank_y)
+    assert _row_has(LABEL, help_y)
 
 
 def test_draw_handles_drives_listing(surface: pygame.Surface) -> None:

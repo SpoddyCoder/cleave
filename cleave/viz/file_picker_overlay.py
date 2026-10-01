@@ -14,8 +14,13 @@ from cleave.viz.file_picker import (
     PickerRowKind,
     PickerViewState,
 )
+from cleave.viz.material_icons import FOLDER_GLYPH, render_glyph, row_icon_prefix_width
 from cleave.viz.overlay_primitives import draw_panel_border, overlay_panel_surface
-from cleave.viz.text_fit import fit_path_label_to_width, fit_text_to_width
+from cleave.viz.text_fit import (
+    fit_path_label_to_width,
+    fit_text_to_width,
+    wrap_text_to_width,
+)
 from cleave.viz.theme import (
     ACTION,
     DISABLED,
@@ -24,6 +29,7 @@ from cleave.viz.theme import (
     HIGHLIGHT,
     LABEL,
     MODAL_SCRIM_ALPHA,
+    PRESET_ICON,
     VALUE,
     tuning_ui_metrics,
 )
@@ -186,8 +192,9 @@ def draw(
         rendered = font.render(fit(font, text, content_w), True, color)
         panel.blit(rendered, (_PANEL_PAD_X, y))
 
-    _line(state.title, LABEL, y=cur_y)
-    cur_y += step
+    for line in wrap_text_to_width(font, state.title, content_w) or (state.title,):
+        _line(line, LABEL, y=cur_y)
+        cur_y += step
     _draw_shortcuts(
         panel,
         state,
@@ -198,13 +205,22 @@ def draw(
         line_h=line_h,
     )
     cur_y += step * 2
-    _line(state.location, VALUE, y=cur_y, fit=location_text)
+    _draw_location(
+        panel,
+        state.location,
+        font=font,
+        x=_PANEL_PAD_X,
+        y=cur_y,
+        content_w=content_w,
+        line_h=line_h,
+    )
     cur_y += step
 
     footer = legend_rows(font, state.legend, content_w)
     footer_lines = len(footer) + (1 if state.status else 0)
     list_top = cur_y
-    list_bottom = panel_h - _PANEL_PAD_Y - footer_lines * step
+    # One empty row between the last listing line and the help block.
+    list_bottom = panel_h - _PANEL_PAD_Y - (footer_lines + 1) * step
     capacity = max(1, int((list_bottom - list_top) // step))
     start, end = visible_slice(len(state.rows), state.selected_index, capacity)
 
@@ -233,6 +249,24 @@ def draw(
 
     draw_panel_border(panel)
     surface.blit(panel, ((screen_w - panel_w) // 2, (screen_h - panel_h) // 2))
+
+
+def _draw_location(
+    surface: pygame.Surface,
+    location: str,
+    *,
+    font: pygame.font.Font,
+    x: int,
+    y: int,
+    content_w: int,
+    line_h: int,
+) -> None:
+    icon = render_glyph(FOLDER_GLYPH, color=PRESET_ICON, line_height=line_h)
+    surface.blit(icon, (x, y))
+    prefix_w = row_icon_prefix_width(line_h)
+    text_w = max(1, content_w - prefix_w)
+    rendered = font.render(location_text(font, location, text_w), True, VALUE)
+    surface.blit(rendered, (x + prefix_w, y))
 
 
 def _draw_shortcuts(
