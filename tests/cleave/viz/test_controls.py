@@ -6644,7 +6644,9 @@ def test_timeline_trigger_while_disabled_shows_warning() -> None:
     controls.handle_keydown(keydown(pygame.K_RIGHT))
     assert controls.session.layers["layer_1"].preset_switching_trigger == "timeline"
     view = controls.build_view_state(paused=False)
-    assert view.notification_message == NOTIFICATION_TIMELINE_TRIGGER_DISABLED_TEXT
+    assert view.notification_message == (
+        f"Layer 1: {NOTIFICATION_TIMELINE_TRIGGER_DISABLED_TEXT}"
+    )
 
 
 def test_populate_modal_options_keyed_by_timeline_trigger() -> None:
@@ -6697,7 +6699,7 @@ def test_step_preset_duration_toasts_when_list_too_short() -> None:
     controls.show_notification = noted.append  # type: ignore[method-assign]
     controls.layer_mutations.step_preset_duration("layer_1", forward=False)
     assert layer.preset_duration == 29.0
-    assert noted == ["Preset list may need more presets"]
+    assert noted == ["Layer 1: Preset list may need more presets"]
 
 
 def test_cycle_preset_switching_trigger_toasts_when_list_nonempty() -> None:
@@ -6710,7 +6712,7 @@ def test_cycle_preset_switching_trigger_toasts_when_list_nonempty() -> None:
     controls.show_notification = noted.append  # type: ignore[method-assign]
     controls.layer_mutations.cycle_preset_switching_trigger("layer_1", forward=True)
     assert layer.preset_switching_trigger != "timer"
-    assert noted == ["Preset list may need adjusting"]
+    assert noted == ["Layer 1: Preset list may need adjusting"]
 
 
 def test_cycle_preset_switching_trigger_skips_list_toast_for_timeline_disabled() -> None:
@@ -6726,4 +6728,4 @@ def test_cycle_preset_switching_trigger_skips_list_toast_for_timeline_disabled()
     controls.show_notification = noted.append  # type: ignore[method-assign]
     controls.layer_mutations.cycle_preset_switching_trigger("layer_1", forward=True)
     assert layer.preset_switching_trigger == "timeline"
-    assert noted == [NOTIFICATION_TIMELINE_TRIGGER_DISABLED_TEXT]
+    assert noted == [f"Layer 1: {NOTIFICATION_TIMELINE_TRIGGER_DISABLED_TEXT}"]

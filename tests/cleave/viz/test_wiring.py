@@ -8,7 +8,6 @@ from unittest.mock import MagicMock, patch
 from cleave.preset_playlist import PresetPlaylist
 from cleave.projectm import ProjectM
 from cleave.viz.layer import StemLayer
-from cleave.viz.preset_switching import EMPTY_PRESET_LIST_NOTIFICATION
 from cleave.viz.session import LayerRuntime, TimelineRuntime, TuningSession
 from cleave.viz.wiring import make_tuning_controls
 from tests.support.viz import make_test_cfg, stub_playback_state
@@ -218,4 +217,7 @@ def test_make_tuning_controls_binds_notification_sink() -> None:
     bindings = controls._layer_bindings
     assert bindings is not None
     bindings.on_preset_switching_change("layer_1")
-    assert controls._notification_host.active().message == EMPTY_PRESET_LIST_NOTIFICATION
+    assert (
+        controls._notification_host.active().message
+        == "Layer 1: No presets in switching list"
+    )

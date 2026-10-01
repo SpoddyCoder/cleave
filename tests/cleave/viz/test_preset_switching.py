@@ -416,3 +416,16 @@ def test_playing_switching_preset_path_prefers_playlist_position() -> None:
 
 def test_empty_notification_constant() -> None:
     assert "list" in EMPTY_PRESET_LIST_NOTIFICATION.lower()
+
+
+def test_layer_notification_uses_panel_number() -> None:
+    from cleave.viz.preset_switching import layer_notification
+
+    assert (
+        layer_notification(
+            ["layer_3", "layer_1"],
+            "layer_1",
+            EMPTY_PRESET_LIST_NOTIFICATION,
+        )
+        == "Layer 2: No presets in switching list"
+    )

@@ -425,6 +425,7 @@ class LayerFramePipeline:
         )
         drain_stem_layers_preset_failures(
             layers,
+            layer_z_order=session.layer_z_order,
             on_notification=notify,
             skip_notify_tracker=session.preset_skip_notify_tracker,
         )

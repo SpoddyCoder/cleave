@@ -31,6 +31,16 @@ from cleave.viz.layer import StemLayer
 EMPTY_PRESET_LIST_NOTIFICATION = "No presets in switching list"
 
 
+def panel_layer_number(layer_z_order: Sequence[str], slot: str) -> int:
+    """1-based layer number shown on the panel (position in z-order)."""
+    return layer_z_order.index(slot) + 1
+
+
+def layer_notification(layer_z_order: Sequence[str], slot: str, message: str) -> str:
+    """Prefix a panel toast with the layer number the user sees."""
+    return f"Layer {panel_layer_number(layer_z_order, slot)}: {message}"
+
+
 def _apply_projectm_timing(
     pm: ProjectM,
     *,

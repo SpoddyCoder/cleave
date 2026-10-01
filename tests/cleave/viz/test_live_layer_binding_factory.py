@@ -15,7 +15,6 @@ from cleave.viz.live_layer_binding_factory import (
     sync_mix_player_solo,
 )
 from cleave.viz.live_layer_bindings import LiveLayerBindings
-from cleave.viz.preset_switching import EMPTY_PRESET_LIST_NOTIFICATION
 from cleave.viz.render_post_fx_bindings import RenderPostFxBindings
 from cleave.viz.session import LayerRuntime, TuningSession
 from tests.support.viz import make_test_cfg, stub_playback_state
@@ -118,7 +117,7 @@ def test_notification_sink_is_settable_and_read_at_call_time() -> None:
         assert seen == []
         ctx.notification_sink = seen.append
         bindings.on_preset_switching_change("layer_1")
-    assert seen == [EMPTY_PRESET_LIST_NOTIFICATION]
+    assert seen == ["Layer 1: No presets in switching list"]
 
 
 def test_empty_list_notify_skips_in_curation_mode() -> None:

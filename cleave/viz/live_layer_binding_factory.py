@@ -25,6 +25,7 @@ from cleave.viz.playback import PlaybackState, current_sec, seek
 from cleave.viz.preset_switching import (
     EMPTY_PRESET_LIST_NOTIFICATION,
     apply_preset_switching,
+    layer_notification,
     load_manual_preset_clean,
     reanchor_list_preset_after_browse,
     reapply_projectm_preset_switching,
@@ -278,12 +279,18 @@ class LiveLayerBindingsFactory:
             return "off"
         return self.ctx.session.layers[slot].preset_switching
 
-    def _notify_empty_preset_list(self) -> None:
+    def _notify_empty_preset_list(self, slot: str) -> None:
         if not preset_switching_active(self.ctx.session.settings.editor_mode):
             return
         notify = self.ctx.notification_sink
         if notify is not None:
-            notify(EMPTY_PRESET_LIST_NOTIFICATION)
+            notify(
+                layer_notification(
+                    self.ctx.session.layer_z_order,
+                    slot,
+                    EMPTY_PRESET_LIST_NOTIFICATION,
+                )
+            )
 
     def _apply_preset_switching(self, slot: str) -> None:
         ctx = self.ctx
@@ -301,7 +308,7 @@ class LiveLayerBindingsFactory:
             hard_cut_enabled=runtime.hard_cut_enabled,
             hard_cut_duration=runtime.hard_cut_duration,
             hard_cut_sensitivity=runtime.hard_cut_sensitivity,
-            on_empty=self._notify_empty_preset_list,
+            on_empty=lambda: self._notify_empty_preset_list(slot),
             session=ctx.session,
         )
 

@@ -12,7 +12,6 @@ from cleave.projectm_health import (
     drain_stem_layers_preset_failures,
 )
 from cleave.viz.layer import StemLayer
-from cleave.viz.preset_switching import EMPTY_PRESET_LIST_NOTIFICATION
 
 
 def _layer_with_failures(*failures: PresetLoadFailure) -> StemLayer:
@@ -34,13 +33,19 @@ def test_drain_notifies_skipped_preset_rate_limited() -> None:
     notify = MagicMock()
 
     drain_stem_layers_preset_failures(
-        [layer], on_notification=notify, skip_notify_tracker=tracker
+        [layer],
+        layer_z_order=("layer_1",),
+        on_notification=notify,
+        skip_notify_tracker=tracker,
     )
-    notify.assert_called_once_with("Skipped preset: a.milk")
+    notify.assert_called_once_with("Layer 1: Skipped preset: a.milk")
 
     notify.reset_mock()
     drain_stem_layers_preset_failures(
-        [layer], on_notification=notify, skip_notify_tracker=tracker
+        [layer],
+        layer_z_order=("layer_1",),
+        on_notification=notify,
+        skip_notify_tracker=tracker,
     )
     notify.assert_not_called()
 
@@ -48,9 +53,12 @@ def test_drain_notifies_skipped_preset_rate_limited() -> None:
         time.monotonic() - PRESET_SKIP_NOTIFICATION_INTERVAL_SEC - 1
     )
     drain_stem_layers_preset_failures(
-        [layer], on_notification=notify, skip_notify_tracker=tracker
+        [layer],
+        layer_z_order=("layer_1",),
+        on_notification=notify,
+        skip_notify_tracker=tracker,
     )
-    notify.assert_called_once_with("Skipped preset: a.milk")
+    notify.assert_called_once_with("Layer 1: Skipped preset: a.milk")
 
 
 def test_drain_notifies_exhausted_rotation() -> None:
@@ -62,5 +70,9 @@ def test_drain_notifies_exhausted_rotation() -> None:
         )
     )
     notify = MagicMock()
-    drain_stem_layers_preset_failures([layer], on_notification=notify)
-    notify.assert_called_once_with(EMPTY_PRESET_LIST_NOTIFICATION)
+    drain_stem_layers_preset_failures(
+        [layer],
+        layer_z_order=("layer_1",),
+        on_notification=notify,
+    )
+    notify.assert_called_once_with("Layer 1: No presets in switching list")

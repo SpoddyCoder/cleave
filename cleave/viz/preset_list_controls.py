@@ -17,7 +17,10 @@ from cleave.viz.preset_list_populate import (
     populate_from_directory,
     repopulate_preset_lists,
 )
-from cleave.viz.preset_switching import playing_switching_preset_path
+from cleave.viz.preset_switching import (
+    layer_notification,
+    playing_switching_preset_path,
+)
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.session import TuningSession
 from cleave.viz.user_presets import (
@@ -231,8 +234,12 @@ class PresetListController:
             if self._on_notification is not None:
                 if timeline_trigger_disabled:
                     self._on_notification(
-                        f"Populated {count} presets; "
-                        "enable Render: TIMELINE to switch"
+                        layer_notification(
+                            self.session.layer_z_order,
+                            slot,
+                            f"Populated {count} presets; "
+                            "enable Render: TIMELINE to switch",
+                        )
                     )
                 else:
                     self._on_notification(f"Populated {count} presets")

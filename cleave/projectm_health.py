@@ -4,13 +4,16 @@ from __future__ import annotations
 
 import sys
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from cleave.projectm import drain_log_messages
 from cleave.viz.layer import StemLayer
-from cleave.viz.preset_switching import EMPTY_PRESET_LIST_NOTIFICATION
+from cleave.viz.preset_switching import (
+    EMPTY_PRESET_LIST_NOTIFICATION,
+    layer_notification,
+)
 
 PRESET_SKIP_NOTIFICATION_INTERVAL_SEC = 10.0
 PROJECTM_LOG_NOTIFICATION_PREFIX = "projectM: "
@@ -51,6 +54,7 @@ def drain_projectm_log_notifications(
 def drain_stem_layers_preset_failures(
     layers: list[StemLayer],
     *,
+    layer_z_order: Sequence[str],
     on_notification: Callable[[str], None] | None = None,
     skip_notify_tracker: PresetSkipNotifyTracker | None = None,
 ) -> None:
@@ -66,7 +70,13 @@ def drain_stem_layers_preset_failures(
         for failure in failures:
             if failure.exhausted:
                 if on_notification is not None:
-                    on_notification(EMPTY_PRESET_LIST_NOTIFICATION)
+                    on_notification(
+                        layer_notification(
+                            layer_z_order,
+                            layer.slot,
+                            EMPTY_PRESET_LIST_NOTIFICATION,
+                        )
+                    )
                 continue
             if on_notification is None:
                 continue
@@ -74,5 +84,11 @@ def drain_stem_layers_preset_failures(
             if now - last < PRESET_SKIP_NOTIFICATION_INTERVAL_SEC:
                 continue
             basename = Path(failure.filename).name if failure.filename else "preset"
-            on_notification(f"Skipped preset: {basename}")
+            on_notification(
+                layer_notification(
+                    layer_z_order,
+                    layer.slot,
+                    f"Skipped preset: {basename}",
+                )
+            )
             tracker.last_notify[layer.slot] = now

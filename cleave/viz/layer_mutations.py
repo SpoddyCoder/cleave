@@ -16,6 +16,7 @@ from cleave.stems import STEM_SOURCES
 from cleave.preset_playlist import is_top_level_browse_dir
 from cleave.viz.live_layer_bindings import LiveLayerBindings
 from cleave.viz.preset_list_populate import needed_preset_count
+from cleave.viz.preset_switching import layer_notification
 from cleave.viz.session import TuningSession
 
 NOTIFICATION_TIMELINE_TRIGGER_DISABLED_TEXT = (
@@ -54,7 +55,13 @@ class LayerMutations:
             and layer.preset_switching_trigger == "timeline"
             and not self.session.timeline.enabled
         ):
-            self._notify(NOTIFICATION_TIMELINE_TRIGGER_DISABLED_TEXT)
+            self._notify(
+                layer_notification(
+                    self.session.layer_z_order,
+                    slot,
+                    NOTIFICATION_TIMELINE_TRIGGER_DISABLED_TEXT,
+                )
+            )
             return True
         return False
 
@@ -127,7 +134,13 @@ class LayerMutations:
                 and layer.preset_switching_trigger != "off"
                 and layer.preset_list
             ):
-                self._notify("Preset list may need adjusting")
+                self._notify(
+                    layer_notification(
+                        self.session.layer_z_order,
+                        slot,
+                        "Preset list may need adjusting",
+                    )
+                )
         bindings = self._bindings()
         if bindings is not None:
             bindings.on_preset_switching_change(slot)
@@ -149,7 +162,13 @@ class LayerMutations:
                 trigger=layer.preset_switching_trigger,
             )
         ):
-            self._notify("Preset list may need more presets")
+            self._notify(
+                layer_notification(
+                    self.session.layer_z_order,
+                    slot,
+                    "Preset list may need more presets",
+                )
+            )
         bindings = self._bindings()
         if bindings is not None:
             bindings.on_preset_switching_change(slot)
