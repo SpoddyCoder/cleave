@@ -24,8 +24,8 @@ from cleave.viz.transport_clock import MAX_RESIDUAL_LATENCY_SEC
 
 _TAP_SYNC_CONFIRM_MESSAGE = (
     "Measure Latency: "
-    "A 140 BPM click track will play. "
-    "Tap Enter on each bar beat (beat 1) until the latency is detected."
+    "A 140 BPM click track will play: a long low tone, then three short clicks. "
+    "Tap Enter on each long low tone until the latency is detected."
 )
 
 

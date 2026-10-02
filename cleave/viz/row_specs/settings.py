@@ -426,12 +426,12 @@ SPECS: dict[RowKind, RowSpec] = {
         shows_enter_icon=True,
         help_title="Measure Latency",
         help_entries=(
-            ("Enter", "start calibration / tap on each bar beat"),
+            ("Enter", "start calibration / tap the long low tone"),
             ("Esc", "cancel"),
         ),
         help_description=(
-            "Plays a 140 BPM click track.",
-            "Measurement is confirmed when four consistent taps are detected.",
+            "Plays a 140 BPM click track: one long low tone, then three short clicks.",
+            "Tap Enter on the long low tone. Four consistent taps confirm the measurement.",
         ),
         is_pinned=True,
         parent_group="settings_latency_compensation",

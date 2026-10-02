@@ -7,6 +7,7 @@ import pytest
 from cleave.viz.tap_sync import (
     CONSISTENCY_WINDOW,
     MAX_ACCENT_ACCEPT_SEC,
+    MAX_ACCENT_EARLY_SEC,
     MAX_DELTA_SPREAD_SEC,
     METRONOME_BPM,
     METRONOME_QUARTER_SEC,
@@ -114,6 +115,36 @@ def test_accept_tap_for_accent_enforces_strictly_increasing_indices() -> None:
     rewind_index, rewind_delta = accept_tap_for_accent(bar_sec + 0.2, accents, late_index)
     assert rewind_index is None
     assert rewind_delta is None
+
+
+def test_accept_tap_for_accent_ignores_short_click_before_long_tone() -> None:
+    """The short click one beat before the long tone must not take that tone."""
+    bar_sec = 4.0 * 60.0 / METRONOME_BPM
+    quarter = bar_sec / 4.0
+    accents = (0.0, bar_sec, 2 * bar_sec)
+    index, delta = accept_tap_for_accent(0.05, accents, None)
+    assert index == 0
+    assert delta == pytest.approx(0.05)
+
+    stolen_index, stolen_delta = accept_tap_for_accent(
+        bar_sec - quarter, accents, index
+    )
+    assert stolen_index is None
+    assert stolen_delta is None
+
+    next_index, next_delta = accept_tap_for_accent(bar_sec + 0.05, accents, index)
+    assert next_index == 1
+    assert next_delta == pytest.approx(0.05)
+    assert quarter > MAX_ACCENT_EARLY_SEC
+
+
+def test_short_click_before_long_tone_does_not_match_on_its_own() -> None:
+    bar_sec = 4.0 * 60.0 / METRONOME_BPM
+    quarter = bar_sec / 4.0
+    accents = (0.0, bar_sec, 2 * bar_sec)
+    index, delta = accept_tap_for_accent(bar_sec - quarter, accents, None)
+    assert index is None
+    assert delta is None
 
 
 def test_accept_tap_for_accent_rejects_taps_beyond_max_distance() -> None:

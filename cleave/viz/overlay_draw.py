@@ -129,7 +129,7 @@ def _tap_sync_progress_view_state(
     return modal_overlay.InfoPanelViewState(
         title_lines=(
             "Detection in progress",
-            "Tap Enter on each bar beat",
+            "Tap Enter on the long low tone",
         ),
         body_lines=(
             f"Streak: {progress.streak}/{CONSISTENCY_WINDOW}",

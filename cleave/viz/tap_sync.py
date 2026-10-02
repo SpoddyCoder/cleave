@@ -11,7 +11,11 @@ from cleave.viz.transport_clock import MAX_RESIDUAL_LATENCY_SEC
 MIN_TAP_COUNT = 4
 CONSISTENCY_WINDOW = 4
 MAX_DELTA_SPREAD_SEC = 0.030
+# Late taps still belong to the long bar tone (output latency).
 MAX_ACCENT_ACCEPT_SEC = 0.75
+# Early window stays inside one quarter (140 BPM quarter is ~0.43s) so the
+# short click before the bar tone cannot claim it.
+MAX_ACCENT_EARLY_SEC = 0.25
 METRONOME_BPM = 140
 METRONOME_BEATS_PER_BAR = 4
 METRONOME_QUARTER_SEC = 60.0 / METRONOME_BPM
@@ -73,7 +77,8 @@ def _nearest_forward_accent_index(
     accent_times: Sequence[float],
     last_accent_index: int | None,
     *,
-    max_accept_sec: float = MAX_ACCENT_ACCEPT_SEC,
+    max_early_sec: float = MAX_ACCENT_EARLY_SEC,
+    max_late_sec: float = MAX_ACCENT_ACCEPT_SEC,
 ) -> int | None:
     if not accent_times:
         return None
@@ -83,12 +88,13 @@ def _nearest_forward_accent_index(
     best_index: int | None = None
     best_distance = float("inf")
     for index in range(start, len(accent_times)):
-        distance = abs(tap_sec - accent_times[index])
+        delta = tap_sec - accent_times[index]
+        if delta < -max_early_sec or delta > max_late_sec:
+            continue
+        distance = abs(delta)
         if distance < best_distance:
             best_distance = distance
             best_index = index
-    if best_index is None or best_distance > max_accept_sec:
-        return None
     return best_index
 
 
@@ -97,14 +103,21 @@ def accept_tap_for_accent(
     accent_times: Sequence[float],
     last_accent_index: int | None,
     *,
-    max_accept_sec: float = MAX_ACCENT_ACCEPT_SEC,
+    max_early_sec: float = MAX_ACCENT_EARLY_SEC,
+    max_late_sec: float = MAX_ACCENT_ACCEPT_SEC,
 ) -> tuple[int | None, float | None]:
-    """Accept a tap when it maps to a new forward accent within *max_accept_sec*."""
+    """Accept a tap when it maps to a new forward accent.
+
+    Early taps must fall inside *max_early_sec* (less than one quarter, so the
+    short click before the long bar tone does not take it). Late taps may be
+    as far as *max_late_sec* to cover output latency.
+    """
     index = _nearest_forward_accent_index(
         tap_sec,
         accent_times,
         last_accent_index,
-        max_accept_sec=max_accept_sec,
+        max_early_sec=max_early_sec,
+        max_late_sec=max_late_sec,
     )
     if index is None:
         return None, None
