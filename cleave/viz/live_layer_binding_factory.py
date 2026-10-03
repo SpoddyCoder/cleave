@@ -23,14 +23,13 @@ from cleave.viz.live_layer_bindings import LiveLayerBindings
 from cleave.viz.mix_player import MixPlayer
 from cleave.viz.playback import PlaybackState, current_sec, seek
 from cleave.viz.preset_switching import (
+    BROWSING_PAUSED_NOTIFICATION,
     EMPTY_PRESET_LIST_NOTIFICATION,
     apply_preset_switching,
     layer_notification,
     load_manual_preset_clean,
-    reanchor_list_preset_after_browse,
     reapply_projectm_preset_switching,
     resync_timeline_preset_switching,
-    sync_manual_browse_with_list,
 )
 from cleave.viz.render_post_fx_bindings import RenderPostFxBindings
 from cleave.viz.session import TuningSession
@@ -75,6 +74,7 @@ class LiveLayerBindingsFactory:
         return LiveLayerBindings(
             on_preset_change=self.on_preset_change,
             on_preset_switching_change=self.on_preset_switching_change,
+            on_switching_resume=self.on_switching_resume,
             lock_preset_for_modal=self.lock_preset_for_modal,
             unlock_preset_after_modal=self.unlock_preset_after_modal,
             on_stem_change=self.on_stem_change,
@@ -104,50 +104,47 @@ class LiveLayerBindingsFactory:
         layer.playlist = playlist
         runtime = ctx.session.layers[slot]
         mode = self._effective_preset_switching(slot)
-        projectm_trigger = (
-            mode == "on" and runtime.preset_switching_trigger == "projectm"
-        )
-        if projectm_trigger:
-            current = playlist.current
-            if current is not None:
-                layer.auto_preset_path = current.resolve()
-            self._apply_preset_switching(slot)
-            return
-        if playlist.current is None:
+        if mode != "on" and playlist.current is None:
+            layer.switching_paused = False
             return
         load_manual_preset_clean(
             layer, preset_start_clean=runtime.preset_start_clean
         )
-        if mode != "on":
+        if mode == "on":
+            entered_pause = not layer.switching_paused
+            layer.switching_paused = True
             layer.pm.lock_preset(True)
+            layer.pm.set_hard_cut_enabled(False)
+            if entered_pause:
+                self._notify_browsing_paused(slot)
             return
-        if runtime.preset_switching_trigger in ("timer", "timeline"):
-            reanchor_list_preset_after_browse(
-                layer,
-                ctx.session,
-                self._song_time(),
-                preset_list=runtime.preset_list,
-            )
-            return
-        layer.pm.lock_preset(False)
-        sync_manual_browse_with_list(layer)
+        layer.pm.lock_preset(True)
+        layer.switching_paused = False
 
     def on_preset_switching_change(self, slot: str) -> None:
+        self._apply_preset_switching(slot)
+
+    def on_switching_resume(self, slot: str) -> None:
+        self.ctx.layers_by_slot[slot].switching_paused = False
         self._apply_preset_switching(slot)
 
     def lock_preset_for_modal(self, slot: str) -> None:
         self.ctx.layers_by_slot[slot].pm.lock_preset(True)
 
     def unlock_preset_after_modal(self, slot: str) -> None:
+        layer = self.ctx.layers_by_slot[slot]
+        if layer.switching_paused:
+            layer.pm.lock_preset(True)
+            return
         mode = self._effective_preset_switching(slot)
         runtime = self.ctx.session.layers[slot]
         projectm_trigger = (
             mode == "on" and runtime.preset_switching_trigger == "projectm"
         )
         if projectm_trigger:
-            self.ctx.layers_by_slot[slot].pm.lock_preset(False)
+            layer.pm.lock_preset(False)
         else:
-            self.ctx.layers_by_slot[slot].pm.lock_preset(True)
+            layer.pm.lock_preset(True)
 
     def on_stem_change(self, slot: str, stem: StemSource) -> None:
         ctx = self.ctx
@@ -291,6 +288,18 @@ class LiveLayerBindingsFactory:
                     EMPTY_PRESET_LIST_NOTIFICATION,
                 )
             )
+
+    def _notify_browsing_paused(self, slot: str) -> None:
+        notify = self.ctx.notification_sink
+        if notify is None:
+            return
+        notify(
+            layer_notification(
+                self.ctx.session.layer_z_order,
+                slot,
+                BROWSING_PAUSED_NOTIFICATION,
+            )
+        )
 
     def _apply_preset_switching(self, slot: str) -> None:
         ctx = self.ctx

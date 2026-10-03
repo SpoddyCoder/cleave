@@ -433,6 +433,9 @@ class LayerRuntime:
     # Playing auto-switch preset (panel display); not persisted. Mirrored from
     # StemLayer.auto_preset_path while the live layer map is available.
     auto_preset_path: Path | None = None
+    # Browse pause while switching is on; not persisted. Mirrored from
+    # StemLayer.switching_paused while the live layer map is available.
+    switching_paused: bool = False
 
 
 @dataclass

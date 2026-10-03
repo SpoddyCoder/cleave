@@ -16,6 +16,7 @@ class RowKind(Enum):
     TRACK_PRESET = auto()
     TRACK_PRESET_SWITCHING = auto()
     TRACK_PRESET_SWITCHING_TRIGGER = auto()
+    TRACK_PRESET_SWITCHING_RESUME = auto()
     TRACK_PRESET_LIST = auto()
     TRACK_PRESET_LIST_ITEM = auto()
     TRACK_PRESET_LIST_ADD = auto()

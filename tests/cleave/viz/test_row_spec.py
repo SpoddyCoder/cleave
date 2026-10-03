@@ -385,6 +385,7 @@ def test_track_sub_row_kinds() -> None:
             RowKind.TRACK_PRESET,
             RowKind.TRACK_PRESET_SWITCHING,
             RowKind.TRACK_PRESET_SWITCHING_TRIGGER,
+            RowKind.TRACK_PRESET_SWITCHING_RESUME,
             RowKind.TRACK_PRESET_LIST,
             RowKind.TRACK_PRESET_LIST_ITEM,
             RowKind.TRACK_PRESET_LIST_ADD,
@@ -449,6 +450,7 @@ def test_track_value_rows_blocked_by_section_lock() -> None:
             RowKind.TRACK_PRESET_LIST_ITEM,
             RowKind.TRACK_PRESET_LIST_ADD,
             RowKind.TRACK_PRESET_LIST_POPULATE,
+            RowKind.TRACK_PRESET_SWITCHING_RESUME,
         }
     )
     for kind in blocked:
@@ -484,6 +486,7 @@ def test_preset_list_actions_are_action_rows() -> None:
     for kind in (
         RowKind.TRACK_PRESET_LIST_POPULATE,
         RowKind.TRACK_PRESET_LIST_ADD,
+        RowKind.TRACK_PRESET_SWITCHING_RESUME,
     ):
         assert kind in ACTION_ROW_KINDS
         assert kind not in LABELED_SUB_ROW_KINDS
@@ -1176,6 +1179,56 @@ def test_preset_list_populate_is_full_line_action() -> None:
     add_field = row_spec(RowKind.TRACK_PRESET_LIST_ADD)
     assert add_field.present_style == RowPresentStyle.FULL_LINE
     assert add_field.panel_label == "Add Current Preset"
+
+
+def test_resume_switching_row_only_while_paused() -> None:
+    from cleave.viz.row_sections import append_track_section_rows, row_tree_indent_depth
+
+    spec = row_spec(RowKind.TRACK_PRESET_SWITCHING_RESUME)
+    assert spec.affordance == RowAffordance.ACTION
+    assert spec.panel_label == "Resume Switching"
+    assert spec.shows_enter_icon is True
+    assert spec.blocked_by_section_lock is True
+    assert spec.parent_group == "track"
+    assert row_tree_indent_depth(RowKind.TRACK_PRESET_SWITCHING_RESUME) == (
+        row_tree_indent_depth(RowKind.TRACK_PRESET_SWITCHING_TRIGGER)
+    )
+
+    def kinds(*, paused: bool, list_expanded: bool) -> list[RowKind]:
+        state = _minimal_view_state(
+            tracks={
+                "layer_1": make_track_block(
+                    stem=TEST_LAYER_STEMS["layer_1"],
+                    preset_dir_label="dir",
+                    preset_label="preset.milk",
+                    blend_mode="add",
+                    opacity_pct=50,
+                    beat_sensitivity=1.0,
+                    effects={},
+                    expanded=True,
+                    preset_switching="on",
+                    preset_switching_trigger="timer",
+                    preset_switching_expanded=True,
+                    preset_list=["/tmp/a.milk"],
+                    preset_list_expanded=list_expanded,
+                    switching_paused=paused,
+                )
+            }
+        )
+        rows: list[RowDescriptor] = []
+        append_track_section_rows(rows, state, "layer_1")
+        return [row.kind for row in rows]
+
+    hidden = kinds(paused=False, list_expanded=True)
+    assert RowKind.TRACK_PRESET_SWITCHING_RESUME not in hidden
+    collapsed = kinds(paused=True, list_expanded=False)
+    assert RowKind.TRACK_PRESET_SWITCHING_RESUME in collapsed
+    assert RowKind.TRACK_PRESET_LIST_ADD not in collapsed
+    expanded = kinds(paused=True, list_expanded=True)
+    assert RowKind.TRACK_PRESET_SWITCHING_RESUME in expanded
+    assert expanded.index(RowKind.TRACK_PRESET_SWITCHING_RESUME) > expanded.index(
+        RowKind.TRACK_PRESET_LIST_POPULATE
+    )
 
 
 def test_preset_list_add_populate_share_list_item_tree_chrome() -> None:

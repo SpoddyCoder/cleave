@@ -9,6 +9,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 
+- Resume Switching row. Enter on a preset list item auditions it and pauses switching.
 - Open-file picker: Ctrl+Q quits, same as Esc.
 - Offer to download starter Milkdrop preset and texture packs on launch when the presets directory is empty.
 - Auto-create user data directories (projects, presets, textures, models) on launch.
@@ -28,6 +29,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- Browsing and adding presets while timer, projectM, or timeline switching is on keeps the browsed preset loaded. Add Current Preset adds what is showing.
 - Measure Latency counts Enter on the long low tone. The short click just before that tone no longer takes the beat, so the long tone itself registers.
 - Frozen Windows `--version` / `--help` print to redirected stdout again (pipes and files), so headless freeze smoke can read `cleave X.Y.Z`.
 - Starter pack download progress bar no longer disappears between updates.

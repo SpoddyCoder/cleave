@@ -16,7 +16,6 @@ from cleave.viz.preset_switching import (
     apply_preset_switching,
     load_manual_preset_clean,
     playing_switching_preset_path,
-    reanchor_list_preset_after_browse,
     reapply_projectm_preset_switching,
 )
 from cleave.viz.session import LayerRuntime, TuningSession
@@ -328,8 +327,33 @@ def test_advance_skips_when_switching_off() -> None:
     layer.pm.load_preset.assert_not_called()
 
 
-def test_reanchor_after_browse_preserves_current() -> None:
-    layer = _stem_layer(index=1)
+def test_apply_clears_switching_paused() -> None:
+    layer = _stem_layer()
+    layer.switching_paused = True
+    apply_preset_switching(layer, mode="off", preset_list=_LIST)
+    assert layer.switching_paused is False
+
+    layer.switching_paused = True
+    on_empty = MagicMock()
+    apply_preset_switching(
+        layer,
+        mode="on",
+        trigger="timer",
+        preset_list=[],
+        on_empty=on_empty,
+    )
+    on_empty.assert_called_once()
+    assert layer.switching_paused is False
+
+    layer.switching_paused = True
+    apply_preset_switching(
+        layer, mode="on", trigger="timer", preset_list=_LIST
+    )
+    assert layer.switching_paused is False
+
+
+def test_advance_while_paused_moves_index_without_loading() -> None:
+    layer = _stem_layer()
     session = _session(trigger="timer", duration=10.0)
     apply_preset_switching(
         layer,
@@ -339,17 +363,19 @@ def test_reanchor_after_browse_preserves_current() -> None:
         preset_duration=10.0,
         session=session,
     )
-    reanchor_list_preset_after_browse(
-        layer, session, 10.0, preset_list=_LIST
+    layer.switching_paused = True
+    layer.playlist = PresetPlaylist(
+        current_dir=Path("/tmp/presets/drums"), paths=_MILK, index=2
     )
+    layer.pm.load_preset.reset_mock()
+    advance_preset_switching(session, {"layer_1": layer}, 10.0)
     assert layer.list_switch_index == 1
-    assert layer.preset_rotation is not None
-    # browsed b.milk at index 1 while count==1 => anchor 0 keeps b at count 1
-    assert layer.preset_rotation.path_for(1) == _MILK[1]
+    layer.pm.load_preset.assert_not_called()
+    assert layer.switching_paused is True
 
 
-def test_reanchor_timeline_uses_zero_based_section_index() -> None:
-    layer = _stem_layer(index=0)
+def test_advance_timeline_while_paused_moves_index_without_loading() -> None:
+    layer = _stem_layer()
     session = _session(trigger="timeline", timeline_enabled=True)
     session.timeline.lanes["layer_1"] = TimelineLane(
         baseline=0.0,
@@ -366,16 +392,52 @@ def test_reanchor_timeline_uses_zero_based_section_index() -> None:
         preset_list=_LIST,
         session=session,
     )
-    # Browse to c.milk during the first on-section (transition count 1 -> index 0).
-    layer.playlist = PresetPlaylist(
-        current_dir=Path("/tmp/presets/drums"), paths=_MILK, index=2
+    layer.switching_paused = True
+    layer.pm.load_preset.reset_mock()
+    advance_preset_switching(session, {"layer_1": layer}, 3.5)
+    assert layer.list_switch_index == 1
+    layer.pm.load_preset.assert_not_called()
+
+
+def test_playing_switching_preset_path_uses_browse_while_paused() -> None:
+    layer = _stem_layer(index=1)
+    layer.switching_paused = True
+    layer.auto_preset_path = _MILK[0].resolve()
+    layer.projectm_playlist = _mock_projectm_playlist(position=2)
+    assert playing_switching_preset_path(layer) == _MILK[1].resolve()
+    assert active_auto_preset_path(layer) == _MILK[1].resolve()
+
+
+def test_reapply_skips_paused_layer() -> None:
+    layer = _stem_layer()
+    playlist = _mock_projectm_playlist()
+    layer.projectm_playlist = playlist
+    layer.switching_paused = True
+    session = _session(trigger="projectm")
+    layer.pm.lock_preset.reset_mock()
+    layer.pm.load_preset.reset_mock()
+    reapply_projectm_preset_switching(
+        session, {"layer_1": layer}, preset_root=Path("/tmp/presets"), delta_sec=-1.0
     )
-    reanchor_list_preset_after_browse(
-        layer, session, 1.5, preset_list=_LIST
+    layer.pm.lock_preset.assert_not_called()
+    layer.pm.load_preset.assert_not_called()
+    playlist.destroy.assert_not_called()
+    assert layer.switching_paused is True
+    assert layer.projectm_playlist is playlist
+
+
+@patch("cleave.viz.preset_switching.apply_preset_switching")
+def test_reapply_skips_paused_layer_without_playlist(
+    mock_apply: MagicMock,
+) -> None:
+    layer = _stem_layer()
+    layer.switching_paused = True
+    session = _session(trigger="projectm")
+    reapply_projectm_preset_switching(
+        session, {"layer_1": layer}, preset_root=Path("/tmp/presets"), delta_sec=1.0
     )
-    assert layer.list_switch_index == 0
-    assert layer.preset_rotation is not None
-    assert layer.preset_rotation.path_for(0) == _MILK[2]
+    mock_apply.assert_not_called()
+    assert layer.switching_paused is True
 
 
 @patch("cleave.viz.preset_switching.ProjectMPlaylist")

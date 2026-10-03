@@ -124,7 +124,7 @@ def test_reapply_projectm_preset_switching_noop_in_curation_mode() -> None:
     mock_apply.assert_not_called()
 
 
-def test_on_preset_change_rebuilds_projectm_playlist() -> None:
+def test_on_preset_change_pauses_projectm_switching() -> None:
     session = _session(mode="on", trigger="projectm", timeline_enabled=False)
     layer = _layer(session)
     playlist = session.layers["layer_1"].playlist
@@ -132,10 +132,13 @@ def test_on_preset_change_rebuilds_projectm_playlist() -> None:
         controls = _make_controls(session, layer)
         bindings = controls._layer_bindings
         assert bindings is not None
+        playlist.load_into = MagicMock()
         bindings.on_preset_change("layer_1", playlist)
-    mock_apply.assert_called_once()
-    assert mock_apply.call_args.kwargs["mode"] == "on"
-    assert mock_apply.call_args.kwargs["trigger"] == "projectm"
+    mock_apply.assert_not_called()
+    playlist.load_into.assert_called_once_with(layer.pm, smooth=False)
+    assert layer.switching_paused is True
+    layer.pm.lock_preset.assert_called_with(True)
+    layer.pm.set_hard_cut_enabled.assert_called_with(False)
 
 
 def test_on_preset_change_forces_clean_boot_for_timer() -> None:
@@ -143,15 +146,15 @@ def test_on_preset_change_forces_clean_boot_for_timer() -> None:
     layer = _layer(session)
     playlist = session.layers["layer_1"].playlist
     with patch(f"{_FACTORY}.apply_preset_switching") as mock_apply:
-        with patch(f"{_FACTORY}.reanchor_list_preset_after_browse") as mock_reanchor:
-            controls = _make_controls(session, layer)
-            bindings = controls._layer_bindings
-            assert bindings is not None
-            playlist.load_into = MagicMock()
-            bindings.on_preset_change("layer_1", playlist)
+        controls = _make_controls(session, layer)
+        bindings = controls._layer_bindings
+        assert bindings is not None
+        playlist.load_into = MagicMock()
+        bindings.on_preset_change("layer_1", playlist)
     mock_apply.assert_not_called()
     playlist.load_into.assert_called_once_with(layer.pm, smooth=False)
-    mock_reanchor.assert_called_once()
+    assert layer.switching_paused is True
+    layer.pm.lock_preset.assert_called_with(True)
 
 
 def test_on_seek_reapplies_projectm_preset_switching() -> None:
@@ -167,36 +170,34 @@ def test_on_seek_reapplies_projectm_preset_switching() -> None:
     mock_reapply.assert_called_once()
 
 
-def test_on_preset_change_timeline_trigger_reanchors_and_stays_locked() -> None:
+def test_on_preset_change_timeline_trigger_pauses_and_stays_locked() -> None:
     session = _session(mode="on", trigger="timeline", timeline_enabled=True)
     layer = _layer(session)
     playlist = session.layers["layer_1"].playlist
-    with patch(
-        f"{_FACTORY}.reanchor_list_preset_after_browse",
-        side_effect=lambda *args, **kwargs: layer.pm.lock_preset(True),
-    ) as mock_reanchor:
+    with patch(f"{_FACTORY}.apply_preset_switching") as mock_apply:
         controls = _make_controls(session, layer)
         bindings = controls._layer_bindings
         assert bindings is not None
         playlist.load_into = MagicMock()
         bindings.on_preset_change("layer_1", playlist)
-    mock_reanchor.assert_called_once()
+    mock_apply.assert_not_called()
+    assert layer.switching_paused is True
     layer.pm.lock_preset.assert_called_with(True)
+    layer.pm.set_hard_cut_enabled.assert_called_with(False)
 
 
-def test_on_preset_change_timer_reanchors_with_timeline_enabled() -> None:
+def test_on_preset_change_timer_pauses_with_timeline_enabled() -> None:
     session = _session(mode="on", trigger="timer", timeline_enabled=True)
     layer = _layer(session)
     playlist = session.layers["layer_1"].playlist
     with patch(f"{_FACTORY}.apply_preset_switching") as mock_apply:
-        with patch(f"{_FACTORY}.reanchor_list_preset_after_browse") as mock_reanchor:
-            controls = _make_controls(session, layer)
-            bindings = controls._layer_bindings
-            assert bindings is not None
-            playlist.load_into = MagicMock()
-            bindings.on_preset_change("layer_1", playlist)
+        controls = _make_controls(session, layer)
+        bindings = controls._layer_bindings
+        assert bindings is not None
+        playlist.load_into = MagicMock()
+        bindings.on_preset_change("layer_1", playlist)
     mock_apply.assert_not_called()
-    mock_reanchor.assert_called_once()
+    assert layer.switching_paused is True
 
 
 def test_unlock_preset_after_modal_keeps_indexed_locked() -> None:

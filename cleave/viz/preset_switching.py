@@ -29,6 +29,9 @@ from cleave.timeline import (
 from cleave.viz.layer import StemLayer
 
 EMPTY_PRESET_LIST_NOTIFICATION = "No presets in switching list"
+BROWSING_PAUSED_NOTIFICATION = (
+    "Browsing presets, switching paused - use the resume button to continue."
+)
 
 
 def panel_layer_number(layer_z_order: Sequence[str], slot: str) -> int:
@@ -95,6 +98,8 @@ def reapply_projectm_preset_switching(
     if not preset_switching_active(session.settings.editor_mode):
         return
     for slot, layer in layers_by_slot.items():
+        if layer.switching_paused:
+            continue
         runtime = session.layers[slot]
         if runtime.preset_switching != "on":
             continue
@@ -145,6 +150,7 @@ def apply_preset_switching(
     on_empty: Callable[[], None] | None = None,
     session=None,
 ) -> None:
+    layer.switching_paused = False
     pm = layer.pm
 
     if layer.projectm_playlist is not None:
@@ -345,7 +351,7 @@ def _advance_timeline_indexed(
             continue
         path = rotation.path_for(index)
         layer.list_switch_index = index
-        if path is None:
+        if layer.switching_paused or path is None:
             continue
         if (
             layer.auto_preset_path is not None
@@ -379,7 +385,7 @@ def _advance_timer_indexed(
             continue
         path = rotation.path_for(count)
         layer.list_switch_index = count
-        if path is None:
+        if layer.switching_paused or path is None:
             continue
         if (
             layer.auto_preset_path is not None
@@ -391,53 +397,6 @@ def _advance_timer_indexed(
             path,
             preset_start_clean=runtime.preset_start_clean,
         )
-
-
-def reanchor_list_preset_after_browse(
-    layer: StemLayer,
-    session,
-    t_sec: float,
-    *,
-    preset_list: list[str] | None = None,
-) -> None:
-    """Keep the browsed preset; next index advance starts from the following entry."""
-    pm = layer.pm
-    pm.lock_preset(True)
-    pm.set_hard_cut_enabled(False)
-
-    paths = _preset_paths(preset_list)
-    if not paths:
-        _clear_list_rotation(layer)
-        return
-
-    index = 0
-    runtime = session.layers.get(layer.slot)
-    if (
-        runtime is not None
-        and runtime.preset_switching_trigger == "timeline"
-    ):
-        hard_cut_fades, soft_cut_fades = _timeline_fade_groups(session)
-        lane = session.timeline.lanes.get(layer.slot) or empty_lane()
-        index = _timeline_list_index(
-            lane_on_transition_count(
-                lane,
-                t_sec,
-                hard_cut_fades=hard_cut_fades,
-                soft_cut_fades=soft_cut_fades,
-            )
-        )
-    elif (
-        runtime is not None
-        and runtime.preset_switching_trigger == "timer"
-    ):
-        duration = max(0.001, float(runtime.preset_duration))
-        index = int(math.floor(max(0.0, t_sec) / duration))
-
-    browse_index = _anchor_index(layer, paths)
-    anchor = (browse_index - index) % len(paths)
-    layer.rotation_anchor = anchor
-    layer.list_switch_index = index
-    layer.preset_rotation = PresetRotation(paths=tuple(paths), anchor=anchor)
 
 
 def load_manual_preset_clean(
@@ -454,15 +413,6 @@ def load_manual_preset_clean(
     layer.playlist.load_into(pm, smooth=False)
     pm.set_preset_start_clean(preset_start_clean)
     layer.auto_preset_path = current.resolve()
-
-
-def sync_manual_browse_with_list(layer: StemLayer) -> None:
-    """Align list-switching state after manual preset browse (projectM trigger)."""
-    current = layer.playlist.current
-    if current is None:
-        return
-    layer.auto_preset_path = current.resolve()
-    _sync_projectm_playlist_position(layer)
 
 
 def restart_projectm_preset_timer(layer: StemLayer) -> None:
@@ -569,10 +519,15 @@ def _record_auto_preset(layer: StemLayer, path: Path) -> None:
 def playing_switching_preset_path(layer: StemLayer) -> Path | None:
     """Preset currently playing from the switching list, if any.
 
+    While ``switching_paused``, the browse playlist current is playing.
     projectM position and timer/timeline rotation win over a stale
-    ``auto_preset_path`` (browse can sit on the first list entry while the
-    list has already advanced).
+    ``auto_preset_path`` when switching is running.
     """
+    if layer.switching_paused:
+        current = layer.playlist.current
+        if current is None:
+            return None
+        return current.resolve()
     playlist = layer.projectm_playlist
     if playlist is not None:
         item = playlist.item(playlist.get_position())

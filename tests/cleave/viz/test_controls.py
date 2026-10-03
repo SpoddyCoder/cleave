@@ -4502,6 +4502,45 @@ def test_move_mode_colors_preset_list_item() -> None:
     assert _row_bg_color(view, sibling_row) != MOVE_MODE
 
 
+def test_preset_list_enter_auditions_item_and_resumes() -> None:
+    controls = _make_controls(("layer_1",))
+    auditioned: list[tuple[str, int]] = []
+    resumed: list[str] = []
+
+    def audition(slot: str, index: int) -> None:
+        auditioned.append((slot, index))
+
+    def resume(slot: str) -> None:
+        resumed.append(slot)
+
+    controls.preset_list.audition = audition
+    controls.preset_list.resume = resume
+
+    controls.focus_descriptor = RowDescriptor(
+        RowKind.TRACK_PRESET_LIST_ITEM,
+        slot="layer_1",
+        preset_index=2,
+    )
+    assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
+    assert auditioned == [("layer_1", 2)]
+
+    controls.session.layers["layer_1"].locked = True
+    assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
+    assert auditioned == [("layer_1", 2)]
+
+    controls.session.layers["layer_1"].locked = False
+    controls.focus_descriptor = RowDescriptor(
+        RowKind.TRACK_PRESET_SWITCHING_RESUME,
+        slot="layer_1",
+    )
+    assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
+    assert resumed == ["layer_1"]
+
+    controls.session.layers["layer_1"].locked = True
+    assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
+    assert resumed == ["layer_1"]
+
+
 def test_active_preset_list_item_uses_highlight_color() -> None:
     controls = _make_controls(("layer_1",))
     layer = controls.session.layers["layer_1"]

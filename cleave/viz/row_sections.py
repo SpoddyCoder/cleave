@@ -744,6 +744,14 @@ RENDER_PATTERN_MASK_SECTION = ExpandSectionDef(
     ),
 )
 
+def _preset_switching_paused(
+    state: TuningViewState, desc: RowDescriptor
+) -> bool:
+    if desc.slot is None:
+        return False
+    return state.tracks[desc.slot].runtime.switching_paused
+
+
 def _preset_switching_active(
     state: TuningViewState, desc: RowDescriptor
 ) -> bool:
@@ -814,6 +822,14 @@ PRESET_SWITCHING_PROJECTM_TRIGGER = ConditionalRowsDef(
     ),
 )
 
+PRESET_SWITCHING_PAUSED = ConditionalRowsDef(
+    name="preset_switching_paused",
+    predicate=_preset_switching_paused,
+    children=(
+        SectionNode(leaf_kind=RowKind.TRACK_PRESET_SWITCHING_RESUME),
+    ),
+)
+
 PRESET_SWITCHING_ACTIVE = ConditionalRowsDef(
     name="preset_switching_active",
     predicate=_preset_switching_active,
@@ -833,6 +849,7 @@ TRACK_PRESET_SWITCHING_SECTION = ExpandSectionDef(
     children=(
         SectionNode(leaf_kind=RowKind.TRACK_PRESET_SWITCHING_TRIGGER),
         SectionNode(conditional=PRESET_SWITCHING_ACTIVE),
+        SectionNode(conditional=PRESET_SWITCHING_PAUSED),
     ),
 )
 
@@ -1144,6 +1161,7 @@ PRESET_SWITCHING_CHILD_KINDS = frozenset(
         RowKind.TRACK_PRESET_LIST_ITEM,
         RowKind.TRACK_PRESET_LIST_ADD,
         RowKind.TRACK_PRESET_LIST_POPULATE,
+        RowKind.TRACK_PRESET_SWITCHING_RESUME,
     }
 )
 RENDER_TIMELINE_SECTION_KINDS = frozenset(
@@ -1232,6 +1250,9 @@ def _build_row_tree_indent_depth() -> dict[RowKind, int]:
     depths[RowKind.TRACK_PRESET_LIST_ITEM] = preset_list_item_depth
     depths[RowKind.TRACK_PRESET_LIST_ADD] = preset_list_item_depth
     depths[RowKind.TRACK_PRESET_LIST_POPULATE] = preset_list_item_depth
+    depths[RowKind.TRACK_PRESET_SWITCHING_RESUME] = depths[
+        RowKind.TRACK_PRESET_SWITCHING_TRIGGER
+    ]
     depths[RowKind.SONG_MARKERS_HEADER] = 1
     depths[RowKind.SONG_MARKER_ITEM] = 2
     depths[RowKind.TIMELINE_RESET] = 1

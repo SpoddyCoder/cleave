@@ -2000,6 +2000,7 @@ _UI_ONLY_LITERAL_DEFAULTS = frozenset(
         ("LayerRuntime", "expanded"),
         ("LayerRuntime", "preset_list_expanded"),
         ("LayerRuntime", "preset_switching_expanded"),
+        ("LayerRuntime", "switching_paused"),
         ("TuningSession", "render_overlay_solo"),
         ("TuningSession", "render_post_fx_solo"),
         ("TuningSession", "help_visible"),

@@ -13,6 +13,7 @@ from cleave.preset_playlist import PresetPlaylist
 class LiveLayerBindings:
     on_preset_change: Callable[[str, PresetPlaylist], None]
     on_preset_switching_change: Callable[[str], None]
+    on_switching_resume: Callable[[str], None]
     lock_preset_for_modal: Callable[[str], None]
     unlock_preset_after_modal: Callable[[str], None]
     on_stem_change: Callable[[str, StemSource], None]

@@ -372,6 +372,21 @@ SPECS: dict[RowKind, RowSpec] = {
         is_sub_header=True,
         parent_group="track",
     ),
+    RowKind.TRACK_PRESET_SWITCHING_RESUME: RowSpec(
+        affordance=RowAffordance.ACTION,
+        panel_label="Resume Switching",
+        present_style=RowPresentStyle.FULL_LINE,
+        apply_horizontal=noop_horizontal,
+        fit_strategy=FitStrategy.NONE,
+        shows_enter_icon=True,
+        help_title="Resume Switching",
+        help_description=(
+            "Ends the browse pause.",
+            "Switching continues from the current time.",
+        ),
+        parent_group="track",
+        blocked_by_section_lock=True,
+    ),
     RowKind.TRACK_PRESET_SWITCHING_TRIGGER: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
         panel_label="trigger",
@@ -414,6 +429,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="preset list entry",
         help_description=(
             "Preset in this layer's switching list.",
+            "Enter auditions this preset and pauses switching.",
             "[F/B] indicates favourited/blacklisted.",
             "[R:X] indicates the chosen role.",
         ),
@@ -430,7 +446,8 @@ SPECS: dict[RowKind, RowSpec] = {
         shows_enter_icon=True,
         help_title="Add Current Preset",
         help_description=(
-            "Add the layer's currently playing preset to the end of the list.",
+            "Add the layer's currently playing or browsed preset to the end of the list.",
+            "While switching is paused, that is the browsed preset.",
             "Copies the preset file into the project presets folder.",
             "P on any row in the layer is the same action.",
         ),

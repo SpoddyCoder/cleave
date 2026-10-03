@@ -6,7 +6,7 @@ import shutil
 from collections.abc import Callable
 from pathlib import Path
 
-from cleave.preset_playlist import milk_files_in_dir
+from cleave.preset_playlist import milk_files_in_dir, scan_preset_playlist
 from cleave.viz.layer import StemLayer
 from cleave.viz.live_layer_bindings import LiveLayerBindings
 from cleave.viz.modal import ModalHost, ModalOption
@@ -245,6 +245,20 @@ class PresetListController:
                     self._on_notification(f"Populated {count} presets")
         finally:
             self._unlock_preset_after_modal(slot)
+
+    def resume(self, slot: str) -> None:
+        if self._layer_bindings is None:
+            return
+        self._layer_bindings.on_switching_resume(slot)
+
+    def audition(self, slot: str, index: int) -> None:
+        layer = self.session.layers[slot]
+        if index < 0 or index >= len(layer.preset_list):
+            return
+        playlist = scan_preset_playlist(Path(layer.preset_list[index]))
+        layer.playlist = playlist
+        if self._layer_bindings is not None:
+            self._layer_bindings.on_preset_change(slot, playlist)
 
     def add_current(self, slot: str) -> None:
         src_path = self.current_preset_path(slot)

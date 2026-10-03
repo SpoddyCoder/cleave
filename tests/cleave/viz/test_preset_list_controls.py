@@ -229,6 +229,7 @@ def test_add_current_uses_projectm_playlist_position_not_stale_first() -> None:
         from cleave.viz.layer import StemLayer
 
         stem = MagicMock(spec=StemLayer)
+        stem.switching_paused = False
         stem.auto_preset_path = first.resolve()
         stem.preset_rotation = None
         playlist = MagicMock()
@@ -290,3 +291,109 @@ def test_confirm_delete_unlinks_unreferenced_user_preset() -> None:
         controller.confirm_delete("layer_1", 0)
         assert session.layers["layer_1"].preset_list == []
         assert not dest.exists()
+
+
+def test_current_preset_path_uses_browsed_preset_while_paused() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        project = Path(tmp) / "project"
+        root = Path(tmp) / "packs"
+        browse = root / "pack" / "demo.milk"
+        playing = root / "pack" / "later.milk"
+        _write(browse, "milk")
+        _write(playing, "milk")
+        from unittest.mock import MagicMock
+
+        from cleave.viz.layer import StemLayer
+
+        controller, session, modal = _make_controller(
+            preset_root=root,
+            project_dir=project,
+        )
+        session.layers["layer_1"].auto_preset_path = playing.resolve()
+        stem = MagicMock(spec=StemLayer)
+        stem.switching_paused = True
+        stem.playlist = session.layers["layer_1"].playlist
+        stem.auto_preset_path = playing.resolve()
+        stem.projectm_playlist = None
+        stem.preset_rotation = None
+        controller._layers_by_slot = {"layer_1": stem}
+        assert controller.current_preset_path("layer_1") == browse.resolve()
+        controller.add_current("layer_1")
+        view = modal.view_state()
+        assert view is not None
+        assert view.message == "Add preset: demo.milk?"
+
+
+def test_audition_pauses_switching_and_resume_clears_it() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp) / "packs"
+        current = root / "pack" / "demo.milk"
+        other = root / "pack" / "other.milk"
+        _write(current, "milk")
+        _write(other, "milk")
+        from unittest.mock import MagicMock
+
+        from cleave.projectm import ProjectM
+        from cleave.viz.layer import StemLayer
+        from cleave.viz.live_layer_binding_factory import (
+            LiveLayerBindingContext,
+            LiveLayerBindingsFactory,
+        )
+        from tests.support.viz import make_test_cfg, stub_playback_state
+
+        controller, session, _modal = _make_controller(
+            preset_root=root,
+            preset_list=[str(other.resolve())],
+        )
+        session.layers["layer_1"].preset_switching = "on"
+        session.layers["layer_1"].preset_switching_trigger = "timer"
+        pm = ProjectM.__new__(ProjectM)
+        pm.lock_preset = MagicMock()
+        pm.load_preset = MagicMock()
+        pm.set_preset_start_clean = MagicMock()
+        pm.set_hard_cut_enabled = MagicMock()
+        stem = StemLayer(
+            slot="layer_1",
+            pm=pm,
+            fbo=MagicMock(),
+            playlist=session.layers["layer_1"].playlist,
+        )
+        seen: list[str] = []
+        ctx = LiveLayerBindingContext(
+            session=session,
+            cfg=make_test_cfg(("layer_1",), preset_root=root),
+            preset_root=root,
+            project_dir=root.parent,
+            layers_by_slot={"layer_1": stem},
+            layers=[stem],
+            playback=stub_playback_state(),
+            duration_sec=120.0,
+            signals=None,
+            effect_runtime=MagicMock(),
+            notification_sink=seen.append,
+        )
+        controller._layer_bindings = LiveLayerBindingsFactory(ctx).layer_bindings()
+        controller.audition("layer_1", 5)
+        controller.audition("layer_1", -1)
+        assert stem.switching_paused is False
+        assert seen == []
+        assert session.layers["layer_1"].playlist.current is not None
+        assert session.layers["layer_1"].playlist.current.resolve() == current.resolve()
+
+        controller.audition("layer_1", 0)
+        assert stem.switching_paused is True
+        assert stem.playlist.current is not None
+        assert stem.playlist.current.resolve() == other.resolve()
+        assert session.layers["layer_1"].playlist is stem.playlist
+        pm.load_preset.assert_called_with(other.resolve(), smooth=False)
+        assert seen == [
+            "Layer 1: Browsing presets, switching paused - "
+            "use the resume button to continue."
+        ]
+
+        controller.audition("layer_1", 0)
+        assert len(seen) == 1
+
+        controller.resume("layer_1")
+        assert stem.switching_paused is False
+        assert len(seen) == 1

@@ -563,6 +563,54 @@ def test_structure_signature_invalidates_on_preset_switching_expanded() -> None:
     assert sig_collapsed != sig_expanded
 
 
+def test_structure_signature_invalidates_on_switching_paused() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    config_save = controls._config_save
+    layer = session.layers["layer_1"]
+    sig_before = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    layer.switching_paused = True
+    sig_after = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    assert sig_before != sig_after
+
+
+def test_builder_mirrors_switching_paused_into_layout() -> None:
+    from unittest.mock import MagicMock
+
+    from cleave.viz.layer import StemLayer
+
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    layer = session.layers["layer_1"]
+    layer.preset_switching = "on"
+    layer.preset_switching_trigger = "timer"
+    layer.preset_switching_expanded = True
+    layer.preset_list_expanded = False
+    stem = MagicMock(spec=StemLayer)
+    stem.switching_paused = False
+    stem.auto_preset_path = None
+    stem.preset_rotation = None
+    stem.projectm_playlist = None
+    stem.playlist = layer.playlist
+    controls._view_state._layers_by_slot = {"layer_1": stem}
+
+    hidden = controls.build_view_state(paused=False)
+    hidden_kinds = {desc.kind for desc in hidden.layout.rows}
+    assert RowKind.TRACK_PRESET_SWITCHING_RESUME not in hidden_kinds
+    assert session.layers["layer_1"].switching_paused is False
+
+    stem.switching_paused = True
+    shown = controls.build_view_state(paused=False)
+    shown_kinds = {desc.kind for desc in shown.layout.rows}
+    assert session.layers["layer_1"].switching_paused is True
+    assert RowKind.TRACK_PRESET_SWITCHING_RESUME in shown_kinds
+    assert RowKind.TRACK_PRESET_LIST_ADD not in shown_kinds
+
+
 def test_structure_signature_invalidates_on_auto_preset_path() -> None:
     controls = _make_controls(("layer_1",))
     session = controls.session
@@ -652,6 +700,7 @@ def test_builder_syncs_playing_list_preset_from_projectm_position() -> None:
     layer.auto_preset_path = a
 
     stem = MagicMock(spec=StemLayer)
+    stem.switching_paused = False
     stem.auto_preset_path = a
     stem.preset_rotation = None
     playlist = MagicMock()

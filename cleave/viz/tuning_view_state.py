@@ -431,6 +431,7 @@ def view_state_structure_signature(
                 if layer.auto_preset_path is None
                 else str(layer.auto_preset_path)
             ),
+            "switching_paused": layer.switching_paused,
         }
     ro = session.render_overlays
     pp = session.render_post_fx
@@ -609,6 +610,7 @@ class TuningViewStateBuilder:
             if playing is not None:
                 stem.auto_preset_path = playing
             runtime.auto_preset_path = stem.auto_preset_path
+            runtime.switching_paused = stem.switching_paused
 
     def _preset_list_paths_key(self) -> tuple[tuple[str, ...], ...]:
         return tuple(

@@ -25,3 +25,4 @@ class StemLayer:
     preset_rotation: PresetRotation | None = None
     list_switch_index: int = 0
     rotation_anchor: int = 0
+    switching_paused: bool = False

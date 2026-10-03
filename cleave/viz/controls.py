@@ -626,6 +626,25 @@ class TuningControls:
                         return True
                     self.preset_list.add_current(slot)
                 return True
+            if kind == RowKind.TRACK_PRESET_LIST_ITEM:
+                slot = self.focus_descriptor.slot
+                index = self.focus_descriptor.preset_index
+                if slot is not None and index is not None:
+                    if section_lock_blocks_mutation(
+                        self.session, self.focus_descriptor
+                    ):
+                        return True
+                    self.preset_list.audition(slot, index)
+                return True
+            if kind == RowKind.TRACK_PRESET_SWITCHING_RESUME:
+                slot = self.focus_descriptor.slot
+                if slot is not None:
+                    if section_lock_blocks_mutation(
+                        self.session, self.focus_descriptor
+                    ):
+                        return True
+                    self.preset_list.resume(slot)
+                return True
             if kind == RowKind.TRACK_PRESET_LIST_POPULATE:
                 slot = self.focus_descriptor.slot
                 if slot is not None:

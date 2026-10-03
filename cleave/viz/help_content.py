@@ -138,6 +138,7 @@ _USER_PRESET_ADD_SHORTCUT = ("P", "add current preset to switching list")
 _PRESET_LIST_ITEM_SECTION = HelpSection(
     "Edit",
     (
+        ("Enter", "audition preset and pause switching"),
         ("M", "reorder in list"),
         ("Delete", "remove preset"),
         *_PRESET_CURATION_SHORTCUTS,
@@ -147,6 +148,11 @@ _PRESET_LIST_ITEM_SECTION = HelpSection(
 _PRESET_LIST_ADD_SECTION = HelpSection(
     "Add Current Preset",
     (("Enter", "add current preset"),),
+)
+
+_PRESET_SWITCHING_RESUME_SECTION = HelpSection(
+    "Resume Switching",
+    (("Enter", "resume switching"),),
 )
 
 
@@ -363,6 +369,8 @@ def sections_for(
         primary = _PRESET_LIST_ITEM_SECTION
     elif row_kind == RowKind.TRACK_PRESET_LIST_ADD:
         primary = _PRESET_LIST_ADD_SECTION
+    elif row_kind == RowKind.TRACK_PRESET_SWITCHING_RESUME:
+        primary = _PRESET_SWITCHING_RESUME_SECTION
     elif behavior.affordance == RowAffordance.PATH_DIR:
         primary = _preset_dir_section(
             switching_on=preset_switching == "on"

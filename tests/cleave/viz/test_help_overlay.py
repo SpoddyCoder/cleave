@@ -315,6 +315,7 @@ def test_preset_list_entry_help() -> None:
     assert description.title == "preset list entry"
     assert description.lines == (
         "Preset in this layer's switching list.",
+        "Enter auditions this preset and pauses switching.",
         "[F/B] indicates favourited/blacklisted.",
         "[R:X] indicates the chosen role.",
     )
@@ -323,6 +324,7 @@ def test_preset_list_entry_help() -> None:
     assert keyboard.title == KEYBOARD_CONTROLS_SECTION_TITLE
     entries = dict(keyboard.entries)
     assert entries == {
+        "Enter": "audition preset and pause switching",
         "M": "reorder in list",
         "Delete": "remove preset",
         "F": "favourite preset",
@@ -330,6 +332,31 @@ def test_preset_list_entry_help() -> None:
         "C": "cast preset (bed/pulse/lead/accent)",
         "R": "remove favourite / restore blacklist / remove cast",
     }
+
+
+def test_preset_list_add_and_resume_switching_help() -> None:
+    add_sections = sections_for(RowKind.TRACK_PRESET_LIST_ADD)
+    add_description = _description_section(add_sections)
+    add_keyboard = _keyboard_section(add_sections)
+    assert add_description is not None
+    assert add_description.lines == (
+        "Add the layer's currently playing or browsed preset to the end of the list.",
+        "While switching is paused, that is the browsed preset.",
+        "Copies the preset file into the project presets folder.",
+        "P on any row in the layer is the same action.",
+    )
+    assert dict(add_keyboard.entries) == {"Enter": "add current preset"}
+
+    resume_sections = sections_for(RowKind.TRACK_PRESET_SWITCHING_RESUME)
+    resume_description = _description_section(resume_sections)
+    resume_keyboard = _keyboard_section(resume_sections)
+    assert resume_description is not None
+    assert resume_description.title == "Resume Switching"
+    assert resume_description.lines == (
+        "Ends the browse pause.",
+        "Switching continues from the current time.",
+    )
+    assert dict(resume_keyboard.entries) == {"Enter": "resume switching"}
 
 
 def test_highlight_rolloff_mode_help_lists_modes() -> None:
