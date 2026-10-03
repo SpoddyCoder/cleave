@@ -15,6 +15,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- Layer preset directory shows `[..]` when a parent is available and `>` before the counter when a child directory is available.
 - Green Enter action rows use capital case, matching Add Layer and Switch to Preset Curation.
 - Panel headers read Cleave Settings and Project Settings, with no blank line between them. Transport stays directly under Project Settings.
 - Preset switching warnings name the layer: empty switching list, skipped preset, list too short or needing adjustment, populate while timeline is off, and timeline trigger while timeline is off.

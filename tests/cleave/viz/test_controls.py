@@ -4229,7 +4229,7 @@ def test_directory_pack_hop_then_enter_ctrl_left_still_ascends() -> None:
     controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
     assert playlist.current_dir.resolve() == child.resolve()
     view = controls.build_view_state(paused=False)
-    assert "[▲]" in view.tracks["layer_1"].preset_dir_label
+    assert "[..]" in view.tracks["layer_1"].preset_dir_label
 
     controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
     assert playlist.current_dir.resolve() == other.resolve()
@@ -4247,7 +4247,7 @@ def test_directory_enter_then_ctrl_left_ascends_within_pack() -> None:
     controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
     assert playlist.current_dir.resolve() == child.resolve()
     view = controls.build_view_state(paused=False)
-    assert "[▲]" in view.tracks["layer_1"].preset_dir_label
+    assert "[..]" in view.tracks["layer_1"].preset_dir_label
 
     controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
     assert playlist.current_dir.resolve() == siblings[0].resolve()
@@ -4304,7 +4304,7 @@ def test_directory_ctrl_arrows_follow_browse_while_auto_preset_elsewhere() -> No
     assert layer.playlist.current_dir.resolve() == child.resolve()
     after_down = controls.build_view_state(paused=False).tracks["layer_1"]
     assert "roles/" not in after_down.preset_dir_label
-    assert "[▲]" in after_down.preset_dir_label
+    assert "[..]" in after_down.preset_dir_label
     assert after_down.preset_label.startswith("cast.milk")
 
     controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
@@ -4630,7 +4630,7 @@ def test_scan_file_anchor_builds_parent_directory_playlist() -> None:
         assert playlist.paths == (first.resolve(), second.resolve())
         assert playlist.index == 1
         assert preset_filename_display(playlist) == "beta.milk (2/2)"
-        assert directory_display(playlist, root) == "[▲]pack/Aurora/ (1/1)"
+        assert directory_display(playlist, root) == "[..]pack/Aurora/ (1/1)"
 
 
 def _header_row(

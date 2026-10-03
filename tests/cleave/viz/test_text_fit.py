@@ -191,33 +191,44 @@ def test_fit_counter_label_suffix_only_when_budget_tiny() -> None:
 
 def test_fit_counter_label_preserves_directory_tree_marker() -> None:
     font = overlay_font()
-    for marker in ("[▲]", "[▼]", "[▲▼]"):
-        label = f"{marker}presets/very/long/directory/path/for/testing/ (12/99)"
-        suffix = " (12/99)"
-        reserved = f"{marker}{suffix}"
+    head = "presets/very/long/directory/path/for/testing/"
+    cases = (
+        ("[..]", " (12/99)"),
+        ("", " > (12/99)"),
+        ("[..]", " > (12/99)"),
+        ("", " >"),
+    )
+    for prefix, suffix in cases:
+        label = f"{prefix}{head}{suffix}"
+        reserved = f"{prefix}{suffix}"
         width = font.size(reserved)[0] + font.size("…testing/")[0]
         fitted = fit_counter_label_to_width(font, label, width)
-        assert fitted.startswith(marker)
+        if prefix:
+            assert fitted.startswith(prefix)
         assert fitted.endswith(suffix)
+        assert fitted[: -len(suffix)].endswith("/")
         assert font.size(fitted)[0] <= width
+        tiny = fit_counter_label_to_width(font, label, max(font.size(reserved)[0] - 1, 0))
+        assert tiny == reserved
 
 
 def test_fit_counter_label_both_tree_markers_reserve_full_width() -> None:
-    """Both-direction prefix is longer; truncation must keep the whole marker."""
+    """Parent prefix and child '>' are reserved with the counter."""
     font = overlay_font()
-    label = "[▲▼]presets/very/long/directory/path/for/testing/ (3/9)"
-    reserved = "[▲▼] (3/9)"
-    single = "[▲] (3/9)"
-    # Budget fits both arrows + counter + a short head; if the fitter reserved
-    # only a single-arrow width, the second triangle would be truncated away.
+    label = "[..]presets/very/long/directory/path/for/testing/ > (3/9)"
+    reserved = "[..] > (3/9)"
+    counter_only = "[..] (3/9)"
+    # Budget fits prefix, child marker, counter, and a short head. If '>' stayed
+    # in the path head, a tiny budget would drop it.
     width = font.size(reserved)[0] + font.size("…testing/")[0]
     fitted = fit_counter_label_to_width(font, label, width)
-    assert fitted.startswith("[▲▼]")
-    assert fitted.endswith(" (3/9)")
+    assert fitted.startswith("[..]")
+    assert fitted.endswith(" > (3/9)")
+    assert fitted[: -len(" > (3/9)")].endswith("/")
     assert font.size(fitted)[0] <= width
     tiny = fit_counter_label_to_width(font, label, font.size(reserved)[0] - 1)
     assert tiny == reserved
-    assert tiny != single
+    assert tiny != counter_only
 
 
 def test_wrap_text_to_width_keeps_short_line() -> None:

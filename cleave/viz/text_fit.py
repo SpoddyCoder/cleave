@@ -6,15 +6,19 @@ import re
 
 import pygame
 
-# Must-include directory tree prefix: "[▲]", "[▼]", or "[▲▼]".
-_TREE_MARKER_PREFIX = re.compile(r"^(\[▲▼\]|\[▲\]|\[▼\])")
+# Must-include parent-directory prefix: "[..]".
+_TREE_MARKER_PREFIX = re.compile(r"^(\[\.\.\])")
 
 # Playlist counter and/or must-include curation markers after a filename or path.
 # Counter: " (N/TOTAL)".
+# Child directory: " >" immediately before the counter, or a bare trailing " >".
 # Markers: FBU bracket (e.g. " [FBU]") and/or role cast brackets (e.g. " [R:B]").
-# Combined suffixes: " [FBU]", " [FBU] [R:B]", " [R:B] [R:L]", " (2/5) [F] [R:B]".
+# Combined suffixes: " [FBU]", " [FBU] [R:B]", " [R:B] [R:L]", " (2/5) [F] [R:B]",
+# " > (2/5)", " > (2/5) [F] [R:B]".
 _META_SUFFIX = re.compile(
-    r"(?: \((\d+)/(\d+)\))(?: \[[FBU]+\])?(?: \[R:[BPLA]\])*$"
+    r"(?: >)?(?: \((\d+)/(\d+)\))(?: \[[FBU]+\])?(?: \[R:[BPLA]\])*$"
+    r"|"
+    r" >$"
     r"|"
     r"(?: \[[FBU]+\])(?: \[R:[BPLA]\])*$"
     r"|"

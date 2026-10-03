@@ -9,7 +9,7 @@ import pygame
 from cleave.paths import resource_dir
 from cleave.viz.overlay_primitives import overlay_font, overlay_font_path
 
-_TREE_GLYPHS = "▶▼└─▲…"
+_TREE_GLYPHS = "▶▼└─…"
 
 
 def _opaque_pixel_count(surface: pygame.Surface) -> int:

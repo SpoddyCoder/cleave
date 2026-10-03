@@ -150,19 +150,19 @@ def directory_tree_marker(
     preset_root: Path,
     *,
     browse_floor: Path | None = None,
-) -> str:
-    """Must-include prefix: ``[▲]``, ``[▼]``, or ``[▲▼]`` for parent/child."""
+) -> tuple[str, str]:
+    """Parent prefix and child suffix for the directory row.
+
+    Prefix is ``[..]`` when a parent directory is available, else empty.
+    Suffix is `` >`` when a child directory is available, else empty.
+    """
     can_up = _can_go_parent(
         current_dir, preset_root, browse_floor=browse_floor
     )
     can_down = bool(list_navigable_dirs(current_dir))
-    if can_up and can_down:
-        return "[▲▼]"
-    if can_up:
-        return "[▲]"
-    if can_down:
-        return "[▼]"
-    return ""
+    prefix = "[..]" if can_up else ""
+    child = " >" if can_down else ""
+    return prefix, child
 
 
 @dataclass
@@ -198,11 +198,11 @@ class PresetPlaylist:
             # preset_root; show an absolute path instead of crashing the panel.
             rel = self.current_dir.resolve().as_posix().rstrip("/") + "/"
         siblings = list_browse_siblings(self.current_dir, preset_root)
-        marker = directory_tree_marker(
+        prefix, child = directory_tree_marker(
             self.current_dir, preset_root, browse_floor=browse_floor
         )
         if not siblings:
-            return f"{marker}{rel} (1/1)"
+            return f"{prefix}{rel}{child} (1/1)"
         resolved_current = self.current_dir.resolve()
         try:
             position = (
@@ -215,7 +215,7 @@ class PresetPlaylist:
             )
         except StopIteration:
             position = 1
-        return f"{marker}{rel} ({position}/{len(siblings)})"
+        return f"{prefix}{rel}{child} ({position}/{len(siblings)})"
 
     def directory_display_label(
         self,
