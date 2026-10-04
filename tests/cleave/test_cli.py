@@ -1220,8 +1220,9 @@ def test_play_help_mentions_the_picker() -> None:
         text=True,
         check=True,
     )
-    assert "[target]" in play.stdout
-    assert "Omit to browse" in play.stdout
+    help_text = " ".join(play.stdout.split())
+    assert "[target]" in help_text
+    assert "Omit to browse" in help_text
 
 
 def test_checkout_empty_argv_still_prints_help(
