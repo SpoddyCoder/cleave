@@ -462,10 +462,9 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         shows_enter_icon=True,
         help_title="Populate Presets",
+        help_entries=(("Enter", "open directory selection modal"),),
         help_description=(
-            "Replace the entire preset list from the current directory "
-            "(random or sequential) or random cue marker role pools.",
-            "Enter opens a choice modal.",
+            "Replace the entire preset list with ones chosen from a directory.",
         ),
         parent_group="track",
         blocked_by_section_lock=True,

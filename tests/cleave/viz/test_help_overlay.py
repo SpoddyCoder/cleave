@@ -360,6 +360,19 @@ def test_preset_list_add_and_resume_switching_help() -> None:
     assert dict(resume_keyboard.entries) == {"Enter": "resume switching"}
 
 
+def test_preset_list_populate_help() -> None:
+    sections = sections_for(RowKind.TRACK_PRESET_LIST_POPULATE)
+    description = _description_section(sections)
+    keyboard = _keyboard_section(sections)
+    assert description is not None
+    assert description.lines == (
+        "Replace the entire preset list with ones chosen from a directory.",
+    )
+    assert dict(keyboard.entries) == {
+        "Enter": "open directory selection modal",
+    }
+
+
 def test_highlight_rolloff_mode_help_lists_modes() -> None:
     description = _description_section(
         sections_for(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_MODE)

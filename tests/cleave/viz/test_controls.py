@@ -6810,12 +6810,12 @@ def test_populate_modal_options_keyed_by_timeline_trigger() -> None:
     controls.preset_list.project_dir = Path("/tmp/project")
     controls.preset_list.prompt_populate("layer_1")
     assert prompted
-    assert prompted[0][0] == "Populate the preset list with 1 presets?"
+    assert prompted[0][0] == "Populate the preset list with 1 presets from?"
     labels = prompted[0][1]
     assert labels == [
         "Using Cue Marker Roles (random)",
-        "From Current Directory (random)",
-        "From Current Directory (sequential)",
+        "Current Directory (random)",
+        "Current Directory (sequential)",
         "Cancel",
     ]
 
@@ -6824,11 +6824,11 @@ def test_populate_modal_options_keyed_by_timeline_trigger() -> None:
     controls.session.timeline.enabled = True
     controls.preset_list.prompt_populate("layer_1")
     # 120s song / 30s duration = 4 needed; fixture browse dir has 1 milk
-    assert prompted[0][0] == "Populate the preset list with 1 presets?"
+    assert prompted[0][0] == "Populate the preset list with 1 presets from?"
     labels = prompted[0][1]
     assert labels == [
-        "From Current Directory (random)",
-        "From Current Directory (sequential)",
+        "Current Directory (random)",
+        "Current Directory (sequential)",
         "Cancel",
     ]
     assert "Using Cue Marker Roles (random)" not in labels

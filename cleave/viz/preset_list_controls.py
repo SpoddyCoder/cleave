@@ -170,11 +170,11 @@ class PresetListController:
         options.extend(
             [
                 ModalOption(
-                    "From Current Directory (random)",
+                    "Current Directory (random)",
                     action=lambda: self.confirm_populate(slot, "directory_random"),
                 ),
                 ModalOption(
-                    "From Current Directory (sequential)",
+                    "Current Directory (sequential)",
                     action=lambda: self.confirm_populate(
                         slot, "directory_sequential"
                     ),
@@ -188,7 +188,7 @@ class PresetListController:
             )
         )
         self._modal.prompt_choice(
-            f"Populate the preset list with {populate_count} presets?",
+            f"Populate the preset list with {populate_count} presets from?",
             options,
             on_dismiss=lambda: self._unlock_preset_after_modal(slot),
         )

@@ -162,11 +162,11 @@ def test_prompt_populate_timeline_trigger_includes_cue_roles() -> None:
         controller.prompt_populate("layer_1")
         view = modal.view_state()
         assert view is not None
-        assert view.message == "Populate the preset list with 1 presets?"
+        assert view.message == "Populate the preset list with 1 presets from?"
         assert view.options == (
             "Using Cue Marker Roles (Random)",
-            "From Current Directory (Random)",
-            "From Current Directory (Sequential)",
+            "Current Directory (Random)",
+            "Current Directory (Sequential)",
             "Cancel",
         )
 
@@ -181,8 +181,8 @@ def test_prompt_populate_timer_omits_cue_roles() -> None:
         view = modal.view_state()
         assert view is not None
         assert view.options == (
-            "From Current Directory (Random)",
-            "From Current Directory (Sequential)",
+            "Current Directory (Random)",
+            "Current Directory (Sequential)",
             "Cancel",
         )
 
