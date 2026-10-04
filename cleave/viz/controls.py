@@ -1071,6 +1071,12 @@ class TuningControls:
             return
         layer.effects_expanded = expanded
 
+    def set_compositing_expanded(self, slot: str, expanded: bool) -> None:
+        layer = self.session.layers[slot]
+        if layer.compositing_expanded == expanded:
+            return
+        layer.compositing_expanded = expanded
+
     def set_preset_list_expanded(self, slot: str, expanded: bool) -> None:
         layer = self.session.layers[slot]
         if layer.preset_list_expanded == expanded:

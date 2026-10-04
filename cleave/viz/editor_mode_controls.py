@@ -49,6 +49,11 @@ def render_sections_active(editor_mode: str) -> bool:
     return not is_preset_curation_mode(editor_mode)
 
 
+def layer_compositing_active(editor_mode: str, pattern_mask_enabled: bool) -> bool:
+    """False when pattern mask replaces per-layer blend mode and base opacity."""
+    return render_sections_active(editor_mode) and not pattern_mask_enabled
+
+
 def preset_switching_active(editor_mode: str) -> bool:
     """False in preset curation: auto rotation must not run or notify."""
     return not is_preset_curation_mode(editor_mode)

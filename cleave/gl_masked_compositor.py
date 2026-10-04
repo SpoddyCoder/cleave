@@ -18,6 +18,10 @@ winning colour is scaled by opacity only.
 Soft path (feather above 0%): one pass per layer. Spatial weights modulate
 opacity, then the layer's GL blend mode, hue tint, and flash (same contract
 as ``GlCompositor.draw_layer``).
+
+Under a pattern mask, layer blend mode and layer opacity do not apply.
+The frame path forces identity blend (``black-key``) and treats each layer's
+base opacity as 100% before effect pulse, timeline level, and limiter gain.
 """
 
 from __future__ import annotations

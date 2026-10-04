@@ -160,6 +160,8 @@ SPECS: dict[RowKind, RowSpec] = {
         help_description=(
             "Spatial territories for visible layers during composite.",
             "Feather 0% assigns each pixel to one layer; 100% blends at edges.",
+            "Replaces layer compositing, so each layer's Compositing rows",
+            "(blend mode, opacity) are greyed out and ignored.",
         ),
         quick_nav_target=True,
         can_enable_disable=True,

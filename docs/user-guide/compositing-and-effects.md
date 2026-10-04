@@ -9,6 +9,7 @@ How Cleave stacks Milkdrop layers, applies stem-driven effects, and adds render 
 - Offline render size and frame rate are Project > Render (default 1920x1080 at 60fps; stored in `project.yaml`).
 - Each layer's libprojectM instance receives PCM from its assigned stem; stereo stems are fed as stereo, mono as mono.
 - Milkdrop draws on black, so Cleave treats black as transparent and uses pixel brightness as blend weight (`black-key` default).
+- Each layer's blend mode and opacity live under a Compositing submenu. While Pattern Mask is enabled, those rows are greyed out and ignored: blend is identity (`black-key`) and the layer's opacity is treated as 100%. Effect pulse, timeline level, and limiter gain still apply.
 
 ## Effects
 

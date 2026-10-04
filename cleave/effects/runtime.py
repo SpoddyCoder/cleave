@@ -53,11 +53,15 @@ class EffectRuntime:
                 handler.update(state, signals, row, t_sec)
 
     def modifiers(
-        self, layers: Mapping[str, LayerEffectState]
+        self,
+        layers: Mapping[str, LayerEffectState],
+        *,
+        ignore_base_opacity: bool = False,
     ) -> dict[str, LayerModifiers]:
         out: dict[str, LayerModifiers] = {}
         for slot, layer in layers.items():
-            mod = LayerModifiers(opacity=layer.opacity_pct / 100.0)
+            base = 1.0 if ignore_base_opacity else layer.opacity_pct / 100.0
+            mod = LayerModifiers(opacity=base)
             for row in effect_roster(layer.stem):
                 pct = layer.effects.get(row.effect_id, {}).get(row.driver_slug, 0)
                 if pct <= 0:

@@ -605,7 +605,8 @@ def test_bottom_row_highlight_stops_before_help_hint() -> None:
         BACKGROUND, BACKGROUND_ALPHA, HIGHLIGHT, FOCUS_ROW_BG_ALPHA
     )
     mid_y = hint_layout.y + line_h // 2
-    tinted = panel.get_at((overlay._padding + highlight_w // 2, mid_y))[:3]
+    # Sample near the left edge so label glyphs cannot obscure the tint.
+    tinted = panel.get_at((overlay._padding + 2, mid_y))[:3]
     under_help = panel.get_at((hint_layout.x + 2, mid_y))[:3]
     assert tinted == expected_tint
     # Help CTA must not sit on the focus tint (glyph AA may occupy the 1ch gap).

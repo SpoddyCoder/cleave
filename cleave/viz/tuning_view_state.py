@@ -408,6 +408,7 @@ def view_state_structure_signature(
         layers[slot] = {
             "expanded": layer.expanded,
             "effects_expanded": layer.effects_expanded,
+            "compositing_expanded": layer.compositing_expanded,
             "preset_list_expanded": layer.preset_list_expanded,
             "preset_switching": layer.preset_switching,
             "preset_switching_trigger": layer.preset_switching_trigger,

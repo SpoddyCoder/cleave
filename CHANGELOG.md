@@ -17,6 +17,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- Layer blend mode and opacity live under a Compositing submenu. While Pattern Mask is enabled those rows are greyed out and ignored.
 - New-install defaults: UI width mode `flexible`, max width 160, auto-fade 10s. Existing user config files keep saved values.
 - Layer preset directory shows `[..]` when a parent is available and `>` before the counter when a child directory is available.
 - Green Enter action rows use capital case, matching Add Layer and Switch to Preset Curation.

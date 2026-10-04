@@ -2027,6 +2027,7 @@ _UI_ONLY_LITERAL_DEFAULTS = frozenset(
         ("ProjectRuntime", "compositor_expanded"),
         ("ProjectRenderRuntime", "expanded"),
         ("LayerRuntime", "effects_expanded"),
+        ("LayerRuntime", "compositing_expanded"),
         ("LayerRuntime", "expanded"),
         ("LayerRuntime", "preset_list_expanded"),
         ("LayerRuntime", "preset_switching_expanded"),

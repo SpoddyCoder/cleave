@@ -222,6 +222,7 @@ def test_blend_mode_help_lists_modes() -> None:
     assert description.title == "Blend mode"
     assert description.lines == (
         "How this layer is composited onto the layers below it.",
+        "Ignored while PATTERN MASK is enabled.",
     )
     assert description.entries == BLEND_MODE_HELP_ENTRIES
     assert [mode for mode, _ in description.entries] == list(BLEND_MODES)
@@ -414,6 +415,26 @@ def test_stem_row_help() -> None:
     assert section.title == KEYBOARD_CONTROLS_SECTION_TITLE
     assert dict(section.entries)["Left/Right"] == "cycle stem source"
     assert "Effects reset when the stem changes." in description.lines
+
+
+def test_compositing_header_and_opacity_help() -> None:
+    header = _description_section(sections_for(RowKind.TRACK_COMPOSITING_HEADER))
+    opacity = _description_section(sections_for(RowKind.TRACK_OPACITY))
+    mask = _description_section(sections_for(RowKind.RENDER_PATTERN_MASK_HEADER))
+    assert header is not None
+    assert header.title == "Compositing"
+    assert header.lines == (
+        "Blend mode and opacity for this layer.",
+        "Greyed out and ignored while PATTERN MASK is enabled.",
+    )
+    assert opacity is not None
+    assert opacity.lines == (
+        "Opacity of this layer.",
+        "Ignored while PATTERN MASK is enabled.",
+    )
+    assert mask is not None
+    assert "Replaces layer compositing, so each layer's Compositing rows" in mask.lines
+    assert "(blend mode, opacity) are greyed out and ignored." in mask.lines
 
 
 def test_cleave_effects_help() -> None:

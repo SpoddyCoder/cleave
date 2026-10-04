@@ -324,7 +324,7 @@ def test_apply_layer_visibility_cue_blend_then_curation_forces_black_key() -> No
 
     session.settings.editor_mode = "preset_curation"
     apply_layer_visibility(session, layers_by_slot, 1.0)
-    assert layers_by_slot["layer_1"].fbo.blend_mode == "screen"
+    assert layers_by_slot["layer_1"].fbo.blend_mode == "black-key"
     apply_effect_modifiers(
         session,
         {"layer_1": layers_by_slot["layer_1"]},
@@ -334,6 +334,56 @@ def test_apply_layer_visibility_cue_blend_then_curation_forces_black_key() -> No
         update=False,
     )
     assert layers_by_slot["layer_1"].fbo.blend_mode == "black-key"
+
+
+def test_pattern_mask_forces_black_key_and_full_base_opacity() -> None:
+    from cleave.effects.runtime import EffectRuntime
+
+    session = _session(
+        layer_enabled={slot: True for slot in DEFAULT_LAYER_SLOTS},
+        timeline_enabled=True,
+        lanes={
+            "layer_1": TimelineLane(
+                baseline=0.0,
+                cues=[SlotCue(t=1.0, level=0.5, blend="add")],
+            ),
+        },
+    )
+    session.render_pattern_mask.enabled = True
+    session.layers["layer_1"].blend_mode = "screen"
+    session.layers["layer_1"].opacity_pct = 0
+    layers_by_slot = {slot: _stem_layer(slot) for slot in DEFAULT_LAYER_SLOTS}
+    layer = layers_by_slot["layer_1"]
+    layer.fbo.enabled = True
+    layer.limiter_gain = 0.8
+
+    apply_layer_visibility(session, layers_by_slot, 1.0)
+    assert layer.fbo.blend_mode == "black-key"
+    assert layer.timeline_level == pytest.approx(0.5)
+
+    apply_effect_modifiers(
+        session,
+        layers_by_slot,
+        EffectRuntime(),
+        None,
+        1.0,
+        update=False,
+    )
+    assert layer.fbo.opacity == pytest.approx(0.5 * 0.8)
+
+    session.render_pattern_mask.enabled = False
+    session.layers["layer_1"].opacity_pct = 40
+    apply_layer_visibility(session, layers_by_slot, 1.0)
+    assert layer.fbo.blend_mode == "add"
+    apply_effect_modifiers(
+        session,
+        layers_by_slot,
+        EffectRuntime(),
+        None,
+        1.0,
+        update=False,
+    )
+    assert layer.fbo.opacity == pytest.approx(0.4 * 0.5 * 0.8)
 
 
 def test_apply_layer_visibility_fades_enable_before_on_cue() -> None:

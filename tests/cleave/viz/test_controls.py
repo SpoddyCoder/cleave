@@ -432,6 +432,7 @@ def test_focus_navigation_wraps() -> None:
 
 def test_opacity_clamps() -> None:
     controls = _make_controls(("layer_1",))
+    controls.session.layers["layer_1"].compositing_expanded = True
     view = controls.build_view_state(paused=False)
     opacity_row = _row(view, "layer_1", RowKind.TRACK_OPACITY)
     controls.focus_descriptor = _desc(view, opacity_row)
@@ -693,6 +694,7 @@ def test_beat_sensitivity_clamps() -> None:
 
 def test_opacity_ctrl_step_is_ten_percent() -> None:
     controls = _make_controls(("layer_1",))
+    controls.session.layers["layer_1"].compositing_expanded = True
     view = controls.build_view_state(paused=False)
     opacity_row = _row(view, "layer_1", RowKind.TRACK_OPACITY)
     controls.focus_descriptor = _desc(view, opacity_row)
@@ -827,6 +829,7 @@ def test_config_header_shows_asterisk_when_dirty() -> None:
 
 def test_blend_and_opacity_change_sets_dirty_save_clears() -> None:
     controls = _make_controls(("layer_1",))
+    controls.session.layers["layer_1"].compositing_expanded = True
     assert not controls.config_dirty
 
     view = controls.build_view_state(paused=False)
@@ -923,7 +926,7 @@ def test_navigable_project_save_row() -> None:
     controls = _make_controls(("layer_1",))
     _expand_project(controls)
     view = controls.build_view_state(paused=False)
-    assert len(view.layout) == 23
+    assert len(view.layout) == 22
     assert RowDescriptor(RowKind.TIMELINE_PRESETS) not in view.layout.rows
 
     kinds = {view.layout.kind(i) for i in range(len(view.layout))}
@@ -4693,6 +4696,7 @@ def _sub_rows_for_stem(view: TuningViewState, stem: str) -> list[int]:
         RowKind.TRACK_PRESET,
         RowKind.TRACK_STEM,
         RowKind.TRACK_BEAT,
+        RowKind.TRACK_COMPOSITING_HEADER,
         RowKind.TRACK_BLEND,
         RowKind.TRACK_OPACITY,
         RowKind.TRACK_EFFECTS_HEADER,
@@ -4815,12 +4819,14 @@ def test_locked_expanded_skips_sub_rows_in_nav() -> None:
     visible = view.layout.visible_indices(view)
     navigable = view.layout.navigable_indices(view)
     effects_header = _row(view, "layer_1", RowKind.TRACK_EFFECTS_HEADER)
+    compositing_header = _row(view, "layer_1", RowKind.TRACK_COMPOSITING_HEADER)
     stem_row = _row(view, "layer_1", RowKind.TRACK_STEM)
     assert effects_header in navigable
+    assert compositing_header in navigable
     assert stem_row not in navigable
     for row in sub_rows:
         assert row in visible
-        if row == effects_header:
+        if row in (effects_header, compositing_header):
             continue
         assert row not in navigable
 
@@ -5023,6 +5029,61 @@ def test_effect_pulse_row_label() -> None:
     assert _row_text(view, pulse_row) == "  └─ pulse (onset): 35%"
 
 
+def test_compositing_header_toggles_children() -> None:
+    controls = _make_controls(("layer_1",))
+    view = controls.build_view_state(paused=False)
+    header_row = _row(view, "layer_1", RowKind.TRACK_COMPOSITING_HEADER)
+    assert _row_text(view, header_row) == "└─ compositing ▶"
+    assert all(view.layout.kind(i) != RowKind.TRACK_BLEND for i in range(len(view.layout)))
+
+    controls.focus_descriptor = _desc(view, header_row)
+    assert controls.handle_keydown(_keydown(pygame.K_RIGHT)) is True
+    view = controls.build_view_state(paused=False)
+    header_row = _row(view, "layer_1", RowKind.TRACK_COMPOSITING_HEADER)
+    assert _row_text(view, header_row) == "└─ compositing ▼"
+    assert controls.session.layers["layer_1"].compositing_expanded is True
+    blend_row = _row(view, "layer_1", RowKind.TRACK_BLEND)
+    opacity_row = _row(view, "layer_1", RowKind.TRACK_OPACITY)
+    assert _row_indent(view, blend_row) == TREE_INDENT * 2
+    assert _row_indent(view, opacity_row) == TREE_INDENT * 2
+
+    controls.focus_descriptor = _desc(view, header_row)
+    assert controls.handle_keydown(_keydown(pygame.K_LEFT)) is True
+    view = controls.build_view_state(paused=False)
+    assert controls.session.layers["layer_1"].compositing_expanded is False
+    assert all(view.layout.kind(i) != RowKind.TRACK_OPACITY for i in range(len(view.layout)))
+
+
+def test_compositing_rows_dim_only_in_pattern_mask_mode() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.layers["layer_1"].compositing_expanded = True
+    view = controls.build_view_state(paused=False)
+    kinds = (
+        RowKind.TRACK_COMPOSITING_HEADER,
+        RowKind.TRACK_BLEND,
+        RowKind.TRACK_OPACITY,
+    )
+    for kind in kinds:
+        assert _row_value_color(view, _row(view, "layer_1", kind)) != DISABLED
+
+    controls.session.render_pattern_mask.enabled = True
+    view = controls.build_view_state(paused=False)
+    controls.focus_descriptor = view.layout.descriptor(
+        _row(view, "layer_1", RowKind.TRACK_BLEND)
+    )
+    view = controls.build_view_state(paused=False)
+    for kind in kinds:
+        assert _row_value_color(view, _row(view, "layer_1", kind)) == DISABLED
+
+    controls.session.settings.editor_mode = "preset_curation"
+    controls.session.render_pattern_mask.enabled = True
+    view = controls.build_view_state(paused=False)
+    assert all(
+        view.layout.kind(i) != RowKind.TRACK_COMPOSITING_HEADER
+        for i in range(len(view.layout))
+    )
+
+
 def test_effects_header_expand_arrow() -> None:
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
@@ -5050,11 +5111,14 @@ def test_effect_row_nested_indent() -> None:
 def test_stem_row_indent() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.layers["layer_1"].expanded = True
+    controls.session.layers["layer_1"].compositing_expanded = True
     view = controls.build_view_state(paused=False)
     blend_row = _row(view, "layer_1", RowKind.TRACK_BLEND)
     stem_row = _row(view, "layer_1", RowKind.TRACK_STEM)
+    compositing_header = _row(view, "layer_1", RowKind.TRACK_COMPOSITING_HEADER)
     assert _row_indent(view, stem_row) == TREE_INDENT
-    assert _row_indent(view, blend_row) == TREE_INDENT
+    assert _row_indent(view, compositing_header) == TREE_INDENT
+    assert _row_indent(view, blend_row) == TREE_INDENT * 2
 
 
 def test_format_mmss() -> None:

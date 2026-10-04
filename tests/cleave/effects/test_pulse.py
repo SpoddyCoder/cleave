@@ -155,6 +155,39 @@ def test_effect_runtime_bass_multi_pulse_stacking() -> None:
     assert mods["layer_2"].opacity != effective_opacity(1.0, 100, sub_env)
 
 
+def test_modifiers_ignore_base_opacity_still_applies_pulse() -> None:
+    signals = Signals(
+        sample_rate_hz=100.0,
+        duration_sec=0.03,
+        path=__file__,
+        stems={
+            "bass": {
+                "sub_bass": np.array([0.0, 1.0, 0.3, 0.0]),
+                "mid_bass": np.array([0.0, 0.3, 1.0, 0.0]),
+            },
+        },
+    )
+    layers = {
+        "layer_2": _layer(
+            "bass",
+            opacity_pct=0,
+            effects={"pulse": {"sub_bass": 100, "mid_bass": 100}},
+        ),
+    }
+    runtime = EffectRuntime()
+    runtime.update(layers, signals, 0.01)
+    runtime.update(layers, signals, 0.02)
+    ignored = runtime.modifiers(layers, ignore_base_opacity=True)
+    sub_state = runtime._state("layer_2", "pulse", "sub_bass")
+    mid_state = runtime._state("layer_2", "pulse", "mid_bass")
+    assert isinstance(sub_state, PulseEnvelopeState)
+    assert isinstance(mid_state, PulseEnvelopeState)
+    expected = effective_opacity(1.0, 100, sub_state.envelope)
+    expected = effective_opacity(expected, 100, mid_state.envelope)
+    assert ignored["layer_2"].opacity == pytest.approx(expected)
+    assert runtime.modifiers(layers)["layer_2"].opacity == pytest.approx(0.0)
+
+
 @pytest.mark.parametrize(
     ("stem", "key", "driver_slug", "values"),
     [

@@ -413,6 +413,7 @@ class LayerRuntime:
     opacity_pct: int = int(round(DEFAULT_LAYER_OPACITY * 100))
     effects: dict[str, dict[str, int]] = field(default_factory=dict)
     effects_expanded: bool = False
+    compositing_expanded: bool = False
     blend_mode: BlendMode = DEFAULT_BLEND_MODE[DEFAULT_NEW_LAYER_STEM]
     beat_sensitivity: float = DEFAULT_BEAT_SENSITIVITY
     enabled: bool = DEFAULT_LAYER_ENABLED

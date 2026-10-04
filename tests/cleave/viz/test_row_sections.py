@@ -84,6 +84,13 @@ def test_track_layout_collapsed_effects() -> None:
     assert RowKind.TRACK_EFFECT not in kinds
 
 
+def test_track_layout_collapsed_compositing() -> None:
+    kinds = _track_row_kinds(compositing_expanded=False)
+    assert RowKind.TRACK_COMPOSITING_HEADER in kinds
+    assert RowKind.TRACK_BLEND not in kinds
+    assert RowKind.TRACK_OPACITY not in kinds
+
+
 def test_track_layout_conditional_rows_when_predicates_pass() -> None:
     timer_kinds = _track_row_kinds(
         preset_switching="on",
@@ -184,6 +191,7 @@ def test_track_layout_effect_roster_when_expanded() -> None:
 def test_track_layout_row_order_when_fully_expanded() -> None:
     kinds = _track_row_kinds(
         effects_expanded=True,
+        compositing_expanded=True,
         preset_switching_trigger="projectm",
         hard_cut_enabled=True,
         preset_list_expanded=True,
@@ -212,6 +220,7 @@ def test_track_layout_row_order_when_fully_expanded() -> None:
         RowKind.TRACK_PRESET_LIST_ITEM,
         RowKind.TRACK_PRESET_LIST_ADD,
         RowKind.TRACK_PRESET_LIST_POPULATE,
+        RowKind.TRACK_COMPOSITING_HEADER,
         RowKind.TRACK_BLEND,
         RowKind.TRACK_OPACITY,
         RowKind.TRACK_EFFECTS_HEADER,
@@ -337,6 +346,12 @@ def test_section_header_descriptor_uses_tree_and_effect_fallback() -> None:
             RowKind.TRACK_EFFECT, slot="layer_1", effect_id="pulse", driver_slug="onset"
         )
     ) == RowDescriptor(RowKind.TRACK_EFFECTS_HEADER, slot="layer_1")
+    assert section_header_descriptor(
+        RowDescriptor(RowKind.TRACK_BLEND, slot="layer_1")
+    ) == RowDescriptor(RowKind.TRACK_COMPOSITING_HEADER, slot="layer_1")
+    assert section_header_descriptor(
+        RowDescriptor(RowKind.TRACK_OPACITY, slot="layer_1")
+    ) == RowDescriptor(RowKind.TRACK_COMPOSITING_HEADER, slot="layer_1")
     assert section_header_descriptor(
         RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_FONT)
     ) == RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER)

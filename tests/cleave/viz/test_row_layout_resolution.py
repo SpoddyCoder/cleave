@@ -160,6 +160,29 @@ def test_resolve_navigable_track_sub_row_collapsed_block() -> None:
     )
 
 
+def test_resolve_navigable_track_blend_collapsed_compositing() -> None:
+    state = _minimal_view_state(
+        tracks={
+            "layer_1": make_track_block(
+                stem="drums",
+                preset_dir_label="dir",
+                preset_label="preset.milk",
+                blend_mode="black-key",
+                opacity_pct=50,
+                beat_sensitivity=1.0,
+                effects={},
+                expanded=True,
+                compositing_expanded=False,
+            )
+        },
+    )
+    blend = RowDescriptor(RowKind.TRACK_BLEND, slot="layer_1")
+    assert blend not in state.layout.rows
+    assert state.layout.resolve_navigable(blend, state) == RowDescriptor(
+        RowKind.TRACK_COMPOSITING_HEADER, slot="layer_1"
+    )
+
+
 def test_resolve_navigable_track_effect_collapsed_effects() -> None:
     state = _minimal_view_state(
         tracks={

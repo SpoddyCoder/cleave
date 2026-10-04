@@ -30,6 +30,7 @@ from cleave.viz.layer_preview_resolution import (
 )
 from cleave.viz.editor_mode_controls import (
     is_preset_curation_mode,
+    layer_compositing_active,
     projectm_notifications_active,
     render_sections_active,
 )
@@ -79,7 +80,14 @@ def apply_effect_modifiers(
         return
     if update:
         effect_runtime.update(session.layers, signals, t_sec)
-    modifiers = effect_runtime.modifiers(session.layers)
+    ignore_base_opacity = not layer_compositing_active(
+        session.settings.editor_mode,
+        session.render_pattern_mask.enabled,
+    )
+    modifiers = effect_runtime.modifiers(
+        session.layers,
+        ignore_base_opacity=ignore_base_opacity,
+    )
     for slot, layer in layers_by_slot.items():
         if not layer.fbo.enabled:
             continue

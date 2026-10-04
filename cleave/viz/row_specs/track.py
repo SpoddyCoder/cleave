@@ -599,6 +599,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Blend mode",
         help_description=(
             "How this layer is composited onto the layers below it.",
+            "Ignored while PATTERN MASK is enabled.",
         ),
         help_mode_entries=BLEND_MODE_HELP_ENTRIES,
         repeatable=True,
@@ -611,7 +612,10 @@ SPECS: dict[RowKind, RowSpec] = {
         format_value=_format_track_opacity,
         apply_horizontal=_apply_track_opacity,
         help_title="Opacity",
-        help_description=("Opacity of this layer.",),
+        help_description=(
+            "Opacity of this layer.",
+            "Ignored while PATTERN MASK is enabled.",
+        ),
         repeatable=True,
         parent_group="track",
     ),
@@ -627,6 +631,20 @@ SPECS: dict[RowKind, RowSpec] = {
             "Higher values make the visuals more reactive.",
         ),
         repeatable=True,
+        parent_group="track",
+    ),
+    RowKind.TRACK_COMPOSITING_HEADER: RowSpec(
+        affordance=RowAffordance.EXPAND,
+        panel_label="compositing",
+        present_style=RowPresentStyle.EXPAND_SUBHEADER,
+        apply_horizontal=apply_expand_subheader,
+        fit_strategy=FitStrategy.NONE,
+        help_title="Compositing",
+        help_description=(
+            "Blend mode and opacity for this layer.",
+            "Greyed out and ignored while PATTERN MASK is enabled.",
+        ),
+        is_sub_header=True,
         parent_group="track",
     ),
     RowKind.TRACK_EFFECTS_HEADER: RowSpec(

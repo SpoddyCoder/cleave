@@ -148,6 +148,12 @@ def _toggle_effects_header(controls: TuningControls, slot: str | None, forward: 
     controls.set_effects_expanded(slot, forward)
 
 
+def _toggle_compositing(controls: TuningControls, slot: str | None, forward: bool) -> None:
+    if slot is None:
+        return
+    controls.set_compositing_expanded(slot, forward)
+
+
 def _toggle_preset_list(controls: TuningControls, slot: str | None, forward: bool) -> None:
     if slot is None:
         return
@@ -392,6 +398,12 @@ def _track_effects_expanded(state: TuningViewState, slot: str | None) -> bool:
     if slot is None:
         return True
     return state.tracks[slot].runtime.effects_expanded
+
+
+def _track_compositing_expanded(state: TuningViewState, slot: str | None) -> bool:
+    if slot is None:
+        return True
+    return state.tracks[slot].runtime.compositing_expanded
 
 
 def _preset_list_expanded(state: TuningViewState, slot: str | None) -> bool:
@@ -863,6 +875,17 @@ TRACK_EFFECTS_SECTION = ExpandSectionDef(
     append_dynamic_children=_append_track_effect_rows,
 )
 
+TRACK_COMPOSITING_SECTION = ExpandSectionDef(
+    header_kind=RowKind.TRACK_COMPOSITING_HEADER,
+    context="per_slot",
+    read_expanded=_track_compositing_expanded,
+    toggle=_toggle_compositing,
+    children=(
+        SectionNode(leaf_kind=RowKind.TRACK_BLEND),
+        SectionNode(leaf_kind=RowKind.TRACK_OPACITY),
+    ),
+)
+
 TRACK_SECTION = ExpandSectionDef(
     header_kind=RowKind.TRACK_HEADER,
     context="per_slot",
@@ -874,8 +897,7 @@ TRACK_SECTION = ExpandSectionDef(
         SectionNode(leaf_kind=RowKind.TRACK_PRESET_DIR),
         SectionNode(leaf_kind=RowKind.TRACK_PRESET),
         SectionNode(expand=TRACK_PRESET_SWITCHING_SECTION),
-        SectionNode(leaf_kind=RowKind.TRACK_BLEND),
-        SectionNode(leaf_kind=RowKind.TRACK_OPACITY),
+        SectionNode(expand=TRACK_COMPOSITING_SECTION),
         SectionNode(expand=TRACK_EFFECTS_SECTION),
         SectionNode(leaf_kind=RowKind.LAYER_MANAGEMENT_DELETE),
     ),
@@ -1155,6 +1177,7 @@ def kinds_in_expand_section(section: ExpandSectionDef) -> frozenset[RowKind]:
 RENDER_OVERLAY_SECTION_KINDS = kinds_in_expand_section(RENDER_OVERLAYS_SECTION)
 RENDER_POST_FX_SECTION_KINDS = kinds_in_expand_section(RENDER_POST_FX_SECTION)
 RENDER_PATTERN_MASK_SECTION_KINDS = kinds_in_expand_section(RENDER_PATTERN_MASK_SECTION)
+TRACK_COMPOSITING_SECTION_KINDS = kinds_in_expand_section(TRACK_COMPOSITING_SECTION)
 PRESET_SWITCHING_CHILD_KINDS = frozenset(
     kinds_in_expand_section(TRACK_PRESET_SWITCHING_SECTION)
     - {RowKind.TRACK_PRESET_SWITCHING}
@@ -1442,6 +1465,7 @@ _PER_SLOT_SECTION_HEADERS = frozenset(
         RowKind.TRACK_HEADER,
         RowKind.TRACK_PRESET_SWITCHING,
         RowKind.TRACK_EFFECTS_HEADER,
+        RowKind.TRACK_COMPOSITING_HEADER,
     }
 )
 _PER_CARD_SECTION_HEADERS = frozenset(

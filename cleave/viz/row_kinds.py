@@ -32,6 +32,7 @@ class RowKind(Enum):
     TRACK_BLEND = auto()
     TRACK_OPACITY = auto()
     TRACK_BEAT = auto()
+    TRACK_COMPOSITING_HEADER = auto()
     TRACK_EFFECTS_HEADER = auto()
     TRACK_EFFECT = auto()
     LAYER_MANAGEMENT_ADD = auto()

@@ -66,8 +66,13 @@ def _mutate_stem_enabled(controls: TuningControls) -> None:
     controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
 
 
+def _expand_compositing(controls: TuningControls) -> None:
+    controls.session.layers["layer_1"].compositing_expanded = True
+
+
 def _mutate_stem_opacity(controls: TuningControls) -> None:
     _expand_layer_1(controls)
+    _expand_compositing(controls)
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = view.layout.descriptor(_row(view, "layer_1", RowKind.TRACK_OPACITY))
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
@@ -75,6 +80,7 @@ def _mutate_stem_opacity(controls: TuningControls) -> None:
 
 def _mutate_stem_blend_mode(controls: TuningControls) -> None:
     _expand_layer_1(controls)
+    _expand_compositing(controls)
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = view.layout.descriptor(_row(view, "layer_1", RowKind.TRACK_BLEND))
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
@@ -585,6 +591,15 @@ def _mutate_effects_expanded(controls: TuningControls) -> None:
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
+def _mutate_compositing_expanded(controls: TuningControls) -> None:
+    _expand_layer_1(controls)
+    view = controls.build_view_state(paused=False)
+    controls.focus_descriptor = view.layout.descriptor(
+        _row(view, "layer_1", RowKind.TRACK_COMPOSITING_HEADER)
+    )
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
 def _mutate_solo_slot(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = view.layout.descriptor(_row(view, "layer_1", RowKind.TRACK_HEADER))
@@ -695,6 +710,7 @@ def _mutate_timeline_preview_pause(controls: TuningControls) -> None:
 _SESSION_ONLY_MUTATIONS: list[tuple[str, Callable[[TuningControls], None], tuple[str, ...]]] = [
     ("track.expanded", _mutate_track_expanded, ("layer_1", "layer_2")),
     ("track.effects_expanded", _mutate_effects_expanded, ("layer_1",)),
+    ("track.compositing_expanded", _mutate_compositing_expanded, ("layer_1",)),
     ("solo_slot", _mutate_solo_slot, ("layer_1",)),
     ("timeline.panel_open", _mutate_timeline_panel_open, ("layer_1",)),
     ("render_overlay.expanded", _mutate_render_overlay_expanded, ("layer_1",)),

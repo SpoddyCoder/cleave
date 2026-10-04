@@ -88,8 +88,23 @@ def test_structure_signature_invalidates_on_notification() -> None:
     assert sig_inactive != sig_active
 
 
+def test_structure_signature_invalidates_on_compositing_expanded() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    config_save = controls._config_save
+    sig_before = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    session.layers["layer_1"].compositing_expanded = True
+    sig_after = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    assert sig_before != sig_after
+
+
 def test_reused_structure_produces_identical_row_list_and_focus() -> None:
     controls = _make_controls(("layer_1",))
+    controls.session.layers["layer_1"].compositing_expanded = True
     controls.focus_descriptor = RowDescriptor(RowKind.TRACK_BLEND, slot="layer_1")
     view_a = controls.build_view_state(paused=False, fps=30.0)
     view_b = controls.build_view_state(paused=True, fps=60.0, position_sec=42.0)

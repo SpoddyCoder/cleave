@@ -22,7 +22,10 @@ from cleave.timeline import (
     shift_bars_by_beats,
     strip_lane_range,
 )
-from cleave.viz.editor_mode_controls import is_preset_curation_mode
+from cleave.viz.editor_mode_controls import (
+    is_preset_curation_mode,
+    layer_compositing_active,
+)
 from cleave.viz.focus_nav import (
     FocusCursor,
     MainFocus,
@@ -278,20 +281,30 @@ def apply_layer_visibility(
     from cleave.viz.visual_limiter import LimiterFrameState
 
     frame = LimiterFrameState.from_session(session)
+    compositing = layer_compositing_active(
+        session.settings.editor_mode,
+        session.render_pattern_mask.enabled,
+    )
     for slot, layer in layers_by_slot.items():
         if timeline_levels_apply(frame, slot):
             level = timeline_level_multiplier(session, slot, t_sec)
             layer.timeline_level = level
             layer.fbo.enabled = level > LEVEL_EPS
-            cue_blend = lane_blend_at(_lane_for_slot(session, slot), t_sec)
-            if cue_blend is not None:
-                layer.fbo.blend_mode = cue_blend
+            if compositing:
+                cue_blend = lane_blend_at(_lane_for_slot(session, slot), t_sec)
+                if cue_blend is not None:
+                    layer.fbo.blend_mode = cue_blend
+                else:
+                    layer.fbo.blend_mode = session.layers[slot].blend_mode
             else:
-                layer.fbo.blend_mode = session.layers[slot].blend_mode
+                layer.fbo.blend_mode = "black-key"
         else:
             layer.timeline_level = 1.0
             layer.fbo.enabled = effective_layer_enabled(session, slot, t_sec)
-            layer.fbo.blend_mode = session.layers[slot].blend_mode
+            if compositing:
+                layer.fbo.blend_mode = session.layers[slot].blend_mode
+            else:
+                layer.fbo.blend_mode = "black-key"
 
 
 def build_timeline_view_state(

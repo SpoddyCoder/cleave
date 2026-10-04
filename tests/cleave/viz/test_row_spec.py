@@ -404,6 +404,7 @@ def test_track_sub_row_kinds() -> None:
             RowKind.TRACK_BLEND,
             RowKind.TRACK_OPACITY,
             RowKind.TRACK_BEAT,
+            RowKind.TRACK_COMPOSITING_HEADER,
             RowKind.TRACK_EFFECTS_HEADER,
             RowKind.TRACK_EFFECT,
             RowKind.LAYER_MANAGEMENT_DELETE,
@@ -423,6 +424,7 @@ def test_locked_navigable_sub_row_kinds() -> None:
         {
             RowKind.TRACK_PRESET_SWITCHING,
             RowKind.TRACK_PRESET_LIST,
+            RowKind.TRACK_COMPOSITING_HEADER,
             RowKind.TRACK_EFFECTS_HEADER,
             RowKind.LAYER_MANAGEMENT_DELETE,
         }
@@ -466,6 +468,7 @@ def test_only_effects_header_navigable_when_section_locked() -> None:
     navigable_when_locked = {
         RowKind.TRACK_PRESET_SWITCHING,
         RowKind.TRACK_PRESET_LIST,
+        RowKind.TRACK_COMPOSITING_HEADER,
         RowKind.TRACK_EFFECTS_HEADER,
         RowKind.LAYER_MANAGEMENT_DELETE,
     }

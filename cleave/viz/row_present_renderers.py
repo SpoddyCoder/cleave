@@ -51,11 +51,16 @@ from cleave.viz.row_spec import (
     section_locked,
     tree_branch_leading_spaces,
 )
+from cleave.viz.editor_mode_controls import (
+    layer_compositing_active,
+    render_sections_active,
+)
 from cleave.viz.row_sections import (
     RENDER_OVERLAY_SECTION_KINDS,
     RENDER_PATTERN_MASK_SECTION_KINDS,
     RENDER_POST_FX_SECTION_KINDS,
     RENDER_TIMELINE_SECTION_KINDS,
+    TRACK_COMPOSITING_SECTION_KINDS,
     expand_arrow_glyph,
     row_tree_indent_depth,
 )
@@ -637,6 +642,17 @@ def row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]:
 
     if kind in RENDER_PATTERN_MASK_SECTION_KINDS:
         if not state.render_pattern_mask.enabled:
+            return DISABLED
+
+    if kind in TRACK_COMPOSITING_SECTION_KINDS:
+        editor_mode = state.settings.editor_mode
+        if (
+            render_sections_active(editor_mode)
+            and not layer_compositing_active(
+                editor_mode,
+                state.render_pattern_mask.enabled,
+            )
+        ):
             return DISABLED
 
     if (
