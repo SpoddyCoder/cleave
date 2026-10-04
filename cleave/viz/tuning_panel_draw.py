@@ -1056,6 +1056,11 @@ class TuningOverlay:
 
         scrollable_indices = frozenset(metrics.scrollable_indices)
         panel_max_width = panel_content_max_width_px(state.settings.ui_width)
+        margin_x, _ = self._margin
+        viewport_content_max = max(
+            panel_max_width,
+            viewport_width - margin_x * 2 - self._padding * 2,
+        )
         vis_tuple = tuple(visible_indices)
         # Stable order matching layout; viewport rows only for the static signature.
         raster_tuple = tuple(i for i in vis_tuple if i in raster_indices)
@@ -1067,6 +1072,11 @@ class TuningOverlay:
             cache.row_cache_structure = vis_tuple
 
         def max_content_width_for(index: int) -> int:
+            if (
+                state.settings.ui_width_mode == "flexible"
+                and is_notification_row(state, index)
+            ):
+                return viewport_content_max
             return self._max_content_width(
                 index,
                 scrollable_indices=scrollable_indices,
@@ -1194,12 +1204,13 @@ class TuningOverlay:
             # Path rows are fitted to panel_max already. Allow natural
             # action-parameter chrome (e.g. editor-mode confirm) to widen past
             # the configured max, still capped by the viewport.
-            margin_x, _ = self._margin
-            viewport_content_max = max(
-                panel_max_width,
-                viewport_width - margin_x * 2 - self._padding * 2,
-            )
             content_w = min(content_w, viewport_content_max)
+            content_w = max(
+                content_w,
+                panel_content_max_width_px(
+                    min(state.settings.ui_min_width, state.settings.ui_width)
+                ),
+            )
         panel_w = content_w + self._padding * 2
         if panel_w > capacity[0]:
             capacity = (panel_w, capacity[1])

@@ -9,6 +9,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 
+- Settings > UI min width row (default 80). Smallest the flexible panel shrinks to.
 - Resume Switching row. Enter on a preset list item auditions it and pauses switching.
 - Open-file picker: Ctrl+Q quits, same as Esc.
 - Offer to download starter Milkdrop preset and texture packs on launch when the presets directory is empty.
@@ -16,6 +17,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- New-install defaults: UI width mode `flexible`, max width 160, auto-fade 10s. Existing user config files keep saved values.
 - Layer preset directory shows `[..]` when a parent is available and `>` before the counter when a child directory is available.
 - Green Enter action rows use capital case, matching Add Layer and Switch to Preset Curation.
 - Panel headers read Cleave Settings and Project Settings, with no blank line between them. Transport stays directly under Project Settings.
@@ -29,6 +31,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- Warning and error toasts widen the flexible panel the same way other content does.
 - Browsing and adding presets while timer, projectM, or timeline switching is on keeps the browsed preset loaded. Add Current Preset adds what is showing.
 - Measure Latency counts Enter on the long low tone. The short click just before that tone no longer takes the beat, so the long tone itself registers.
 - Frozen Windows `--version` / `--help` print to redirected stdout again (pipes and files), so headless freeze smoke can read `cleave X.Y.Z`.

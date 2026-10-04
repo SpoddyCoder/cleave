@@ -57,10 +57,13 @@ from cleave.config_schema.editor import (
     DEFAULT_EDITOR_WIDTH,
     DEFAULT_NOTIFICATION_DISPLAY_SEC,
     DEFAULT_UI_FADE_SEC,
+    DEFAULT_UI_MIN_WIDTH,
     DEFAULT_UI_WIDTH,
     DEFAULT_UI_WIDTH_MODE,
     DEFAULT_EDITOR_PREVIEW_QUALITY,
     clamp_notification_display_sec,
+    clamp_ui_min_width,
+    dump_editor_section,
     editor_config_from_settings,
     notification_display_label,
     parse_editor_section,
@@ -225,6 +228,8 @@ def test_editor_config_from_settings_defaults() -> None:
     assert cfg.ui_fade == DEFAULT_UI_FADE_SEC
     assert cfg.ui_width == DEFAULT_UI_WIDTH
     assert cfg.ui_width_mode == DEFAULT_UI_WIDTH_MODE
+    assert cfg.ui_min_width == DEFAULT_UI_MIN_WIDTH
+    assert cfg.ui_min_width == 80
     assert cfg.notification_display_sec == DEFAULT_NOTIFICATION_DISPLAY_SEC
 
 
@@ -236,6 +241,7 @@ def test_editor_config_from_settings_uses_user_editor() -> None:
         preview_quality="performance",
         ui_width_mode="fixed",
         ui_width=80,
+        ui_min_width=96,
         ui_fade=25.0,
         notification_display_sec=5,
         residual_latency_ms=0,
@@ -247,8 +253,27 @@ def test_editor_config_from_settings_uses_user_editor() -> None:
     assert cfg.preview_quality == "performance"
     assert cfg.ui_width_mode == "fixed"
     assert cfg.ui_width == 80
+    assert cfg.ui_min_width == 96
     assert cfg.ui_fade == 25.0
     assert cfg.notification_display_sec == 5
+
+
+def test_ui_min_width_clamps_and_round_trips() -> None:
+    assert DEFAULT_UI_MIN_WIDTH == 80
+    assert clamp_ui_min_width(80) == 80
+    assert clamp_ui_min_width(10) == 40
+    assert clamp_ui_min_width(250) == 200
+    assert clamp_ui_min_width(39.4) == 40
+    assert clamp_ui_min_width(200.6) == 200
+
+    settings = parse_editor_section({"editor": {"ui_min_width": 120}})
+    assert settings.ui_min_width == 120
+    dumped = dump_editor_section(settings)
+    assert dumped["ui_min_width"] == 120
+    assert parse_editor_section({"editor": dumped}).ui_min_width == 120
+    assert parse_editor_section({"editor": {"ui_min_width": 10}}).ui_min_width == 40
+    assert parse_editor_section({"editor": {"ui_min_width": 250}}).ui_min_width == 200
+    assert parse_editor_section({"editor": {}}).ui_min_width == 80
 
 
 def test_parse_editor_section_reads_width_height_upscale() -> None:
@@ -531,6 +556,7 @@ def test_load_config_editor_settings_from_user_config(tmp_path: Path) -> None:
         preview_quality="performance",
         ui_width_mode="fixed",
         ui_width=80,
+        ui_min_width=96,
         ui_fade=25.0,
         notification_display_sec=5,
         residual_latency_ms=0,
@@ -549,6 +575,7 @@ def test_load_config_editor_settings_from_user_config(tmp_path: Path) -> None:
     assert cfg.editor.preview_quality == "performance"
     assert cfg.editor.ui_width_mode == "fixed"
     assert cfg.editor.ui_width == 80
+    assert cfg.editor.ui_min_width == 96
     assert cfg.editor.ui_fade == 25.0
     assert cfg.editor.notification_display_sec == 5
     assert cfg.user_config_path == user_cfg_path.resolve()
@@ -562,6 +589,7 @@ def test_load_config_ignores_editor_fields_in_project_yaml(tmp_path: Path) -> No
         preview_quality="performance",
         ui_width_mode="fixed",
         ui_width=80,
+        ui_min_width=96,
         ui_fade=25.0,
         notification_display_sec=5,
         residual_latency_ms=0,
@@ -580,6 +608,7 @@ def test_load_config_ignores_editor_fields_in_project_yaml(tmp_path: Path) -> No
             "preview_quality": "ultra-performance",
             "ui_width_mode": "flexible",
             "ui_width": 200,
+            "ui_min_width": 40,
             "ui_fade": 99,
             "width": 640,
             "height": 360,
@@ -594,6 +623,7 @@ def test_load_config_ignores_editor_fields_in_project_yaml(tmp_path: Path) -> No
     assert cfg.editor.preview_quality == "performance"
     assert cfg.editor.ui_width_mode == "fixed"
     assert cfg.editor.ui_width == 80
+    assert cfg.editor.ui_min_width == 96
     assert cfg.editor.ui_fade == 25.0
     assert cfg.milkdrop_beat_sensitivity == DEFAULT_BEAT_SENSITIVITY
 

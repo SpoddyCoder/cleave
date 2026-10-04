@@ -137,6 +137,7 @@ _EXPECTED_REPEAT_ROW_KINDS = frozenset(
         RowKind.SETTINGS_EDITOR_WINDOW_UPSCALE,
         RowKind.SETTINGS_UI_WIDTH_MODE,
         RowKind.SETTINGS_UI_WIDTH,
+        RowKind.SETTINGS_UI_MIN_WIDTH,
         RowKind.SETTINGS_UI_FADE,
         RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY,
         RowKind.SETTINGS_RESIDUAL_LATENCY_MS,
@@ -208,6 +209,7 @@ def test_row_is_pinned() -> None:
     assert row_is_pinned(RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY) is True
     assert row_is_pinned(RowKind.SETTINGS_UI_WIDTH_MODE) is True
     assert row_is_pinned(RowKind.SETTINGS_UI_WIDTH) is True
+    assert row_is_pinned(RowKind.SETTINGS_UI_MIN_WIDTH) is True
     assert row_is_pinned(RowKind.TRACK_HEADER) is False
     assert row_is_pinned(RowKind.RENDER_OVERLAYS_HEADER) is False
 
@@ -376,6 +378,7 @@ def test_parent_group_on_row_specs() -> None:
         RowAffordance.DISPLAY
     )
     assert row_spec(RowKind.SETTINGS_UI_WIDTH_MODE).parent_group == "settings_ui"
+    assert row_spec(RowKind.SETTINGS_UI_MIN_WIDTH).parent_group == "settings_ui"
 
 
 def test_track_sub_row_kinds() -> None:
@@ -644,6 +647,19 @@ def test_labeled_row_prefix_settings_children() -> None:
     )
     assert labeled_row_prefix(RowKind.SETTINGS_UI_WIDTH_MODE) == "  └─ width mode: "
     assert labeled_row_prefix(RowKind.SETTINGS_UI_WIDTH) == "  └─ max width: "
+    assert labeled_row_prefix(RowKind.SETTINGS_UI_MIN_WIDTH) == "  └─ min width: "
+
+
+def test_settings_ui_min_width_follows_max_width() -> None:
+    state = _minimal_view_state(
+        settings=SettingsBlock(expanded=True, ui_expanded=True),
+    )
+    visible = [
+        state.layout.kind(index)
+        for index in state.layout.visible_indices(state)
+    ]
+    max_index = visible.index(RowKind.SETTINGS_UI_WIDTH)
+    assert visible[max_index + 1] == RowKind.SETTINGS_UI_MIN_WIDTH
     assert labeled_row_prefix(RowKind.SETTINGS_UI_FADE) == "  └─ auto-fade: "
     assert labeled_row_prefix(RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY) == (
         "  └─ notification time: "
@@ -697,6 +713,9 @@ def test_format_row_value_settings() -> None:
         == "fixed"
     )
     assert format_row_value(state, RowDescriptor(RowKind.SETTINGS_UI_WIDTH)) == "320"
+    assert format_row_value(
+        state, RowDescriptor(RowKind.SETTINGS_UI_MIN_WIDTH)
+    ) == "80"
     assert (
         format_row_value(state, RowDescriptor(RowKind.SETTINGS_UI_FADE))
         == ui_fade_display(0.0)
@@ -1020,7 +1039,7 @@ def test_apply_field_horizontal_via_controls_keydown() -> None:
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.cfg.editor.ui_width_mode != DEFAULT_UI_WIDTH_MODE
-    assert controls.cfg.editor.ui_width_mode == "flexible"
+    assert controls.cfg.editor.ui_width_mode == "fixed"
 
 
 def test_expand_subheader_prefix_preset_switching() -> None:

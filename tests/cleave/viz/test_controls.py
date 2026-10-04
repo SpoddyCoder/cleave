@@ -20,6 +20,7 @@ from cleave.config_schema.editor import (
     DEFAULT_EDITOR_UPSCALE,
     DEFAULT_EDITOR_WIDTH,
     DEFAULT_NOTIFICATION_DISPLAY_SEC,
+    DEFAULT_UI_MIN_WIDTH,
     DEFAULT_UI_WIDTH,
     DEFAULT_UI_WIDTH_MODE,
     editor_display_size,
@@ -5372,7 +5373,7 @@ def test_settings_ui_expand_collapse_and_sub_row_visibility() -> None:
     notify_row = view.layout.find_by_kind(RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY)
     assert ui_fade_row in view.layout.navigable_indices(view)
     assert notify_row in view.layout.navigable_indices(view)
-    assert view.layout.header_row_count() == 11
+    assert view.layout.header_row_count() == 12
 
     controls.focus_descriptor = _desc(view, ui_fade_row)
     controls.handle_keydown(_keydown(pygame.K_LEFT))
@@ -5759,6 +5760,49 @@ def test_settings_adjust_ui_width() -> None:
     assert controls.cfg.editor.ui_width == 80
 
 
+def test_settings_adjust_ui_min_width() -> None:
+    controls = _make_controls(("layer_1",))
+    assert controls.cfg.editor.ui_min_width == DEFAULT_UI_MIN_WIDTH
+    _expand_settings_ui(controls)
+    view = controls.build_view_state(paused=False)
+    ui_min_width_row = view.layout.find_by_kind(RowKind.SETTINGS_UI_MIN_WIDTH)
+    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_MIN_WIDTH)
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.cfg.editor.ui_min_width == DEFAULT_UI_MIN_WIDTH + 1
+    view = controls.build_view_state(paused=False)
+    assert _row_text(view, ui_min_width_row) == (
+        f"  └─ min width: {DEFAULT_UI_MIN_WIDTH + 1}"
+    )
+
+    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    assert controls.cfg.editor.ui_min_width == DEFAULT_UI_MIN_WIDTH + 1 - 5
+
+    while controls.cfg.editor.ui_min_width > 40:
+        controls.handle_keydown(_keydown(pygame.K_LEFT))
+    assert controls.cfg.editor.ui_min_width == 40
+    controls.handle_keydown(_keydown(pygame.K_LEFT))
+    assert controls.cfg.editor.ui_min_width == 40
+
+    max_width = controls.cfg.editor.ui_width
+    while controls.cfg.editor.ui_min_width < max_width:
+        controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+    assert controls.cfg.editor.ui_min_width == max_width
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.cfg.editor.ui_min_width == max_width
+    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+    assert controls.cfg.editor.ui_min_width == max_width
+
+
+def test_settings_ui_min_width_change_does_not_mark_project_config_dirty() -> None:
+    controls = _make_controls(("layer_1",))
+    assert not controls.config_dirty
+    _expand_settings_ui(controls)
+    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_MIN_WIDTH)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert not controls.config_dirty
+
+
 def test_settings_ui_width_change_does_not_mark_project_config_dirty() -> None:
     controls = _make_controls(("layer_1",))
     assert not controls.config_dirty
@@ -5777,12 +5821,12 @@ def test_settings_cycle_ui_width_mode() -> None:
     controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_WIDTH_MODE)
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert controls.cfg.editor.ui_width_mode == "flexible"
+    assert controls.cfg.editor.ui_width_mode == "fixed"
     view = controls.build_view_state(paused=False)
-    assert _row_text(view, mode_row) == "  └─ width mode: flexible"
+    assert _row_text(view, mode_row) == "  └─ width mode: fixed"
 
     controls.handle_keydown(_keydown(pygame.K_LEFT))
-    assert controls.cfg.editor.ui_width_mode == "fixed"
+    assert controls.cfg.editor.ui_width_mode == "flexible"
 
 
 def test_settings_ui_width_mode_change_does_not_mark_project_config_dirty() -> None:

@@ -50,16 +50,18 @@ DEFAULT_UI_FADE_SEC = 10.0
 DEFAULT_RESIDUAL_LATENCY_MS = 0
 MAX_RESIDUAL_LATENCY_MS = 2000
 UI_FADE_MAX_SEC = 60.0
-DEFAULT_UI_WIDTH = 140
+DEFAULT_UI_WIDTH = 160
 UI_WIDTH_MIN = 80
 UI_WIDTH_MAX = 200
+DEFAULT_UI_MIN_WIDTH = 80
+UI_MIN_WIDTH_MIN = 40
 DEFAULT_NOTIFICATION_DISPLAY_SEC = 10
 NOTIFICATION_DISPLAY_MAX_SEC = 20
 
 UiWidthMode = Literal["flexible", "fixed"]
 
 UI_WIDTH_MODES: tuple[UiWidthMode, ...] = ("flexible", "fixed")
-DEFAULT_UI_WIDTH_MODE: UiWidthMode = "fixed"
+DEFAULT_UI_WIDTH_MODE: UiWidthMode = "flexible"
 
 
 def editor_display_size(
@@ -115,6 +117,10 @@ def ui_fade_display(sec: float) -> str:
 
 def clamp_ui_width(value: int | float) -> int:
     return max(UI_WIDTH_MIN, min(UI_WIDTH_MAX, int(round(value))))
+
+
+def clamp_ui_min_width(value: int | float) -> int:
+    return max(UI_MIN_WIDTH_MIN, min(UI_WIDTH_MAX, int(round(value))))
 
 
 def clamp_notification_display_sec(value: int | float) -> int:
@@ -197,6 +203,14 @@ EDITOR_FIELDS: tuple[FieldDescriptor, ...] = (
         lambda value, _ctx: clamp_ui_width(value),
     ),
     FieldDescriptor(
+        "ui_min_width",
+        DEFAULT_UI_MIN_WIDTH,
+        lambda raw, ctx, label: clamp_ui_min_width(
+            int(require_non_negative_number(raw, label, as_int=True))
+        ),
+        lambda value, _ctx: clamp_ui_min_width(value),
+    ),
+    FieldDescriptor(
         "ui_fade",
         DEFAULT_UI_FADE_SEC,
         lambda raw, ctx, label: clamp_ui_fade(
@@ -238,6 +252,7 @@ def parse_editor_section(data: dict[str, Any]) -> Any:
         preview_quality=parsed["preview_quality"],
         ui_width_mode=parsed["ui_width_mode"],
         ui_width=parsed["ui_width"],
+        ui_min_width=parsed["ui_min_width"],
         ui_fade=parsed["ui_fade"],
         notification_display_sec=parsed["notification_display_sec"],
         residual_latency_ms=parsed["residual_latency_ms"],
@@ -252,6 +267,7 @@ def dump_editor_section(editor: Any) -> dict[str, Any]:
         "preview_quality": editor.preview_quality,
         "ui_width_mode": editor.ui_width_mode,
         "ui_width": editor.ui_width,
+        "ui_min_width": editor.ui_min_width,
         "ui_fade": editor.ui_fade,
         "notification_display_sec": editor.notification_display_sec,
         "residual_latency_ms": editor.residual_latency_ms,
@@ -274,6 +290,7 @@ def editor_config_from_settings(editor: Any | None = None) -> Any:
         preview_quality=editor.preview_quality,
         ui_width_mode=editor.ui_width_mode,
         ui_width=editor.ui_width,
+        ui_min_width=editor.ui_min_width,
         ui_fade=editor.ui_fade,
         notification_display_sec=editor.notification_display_sec,
         residual_latency_ms=editor.residual_latency_ms,

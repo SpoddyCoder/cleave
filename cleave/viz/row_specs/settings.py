@@ -65,6 +65,11 @@ def _format_settings_ui_width(
 ) -> str:
     return str(state.settings.ui_width)
 
+def _format_settings_ui_min_width(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return str(state.settings.ui_min_width)
+
 def _format_settings_ui_fade(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
@@ -133,6 +138,12 @@ def _apply_settings_ui_width(
     _shift: bool,
 ) -> None:
     controls.settings.adjust_ui_width(forward=forward, ctrl=ctrl)
+
+def _apply_settings_ui_min_width(
+    controls: TuningControls, _desc: RowDescriptor, forward: bool, ctrl: bool,
+    _shift: bool,
+) -> None:
+    controls.settings.adjust_ui_min_width(forward=forward, ctrl=ctrl)
 
 def _apply_settings_ui_fade(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, ctrl: bool,
@@ -377,6 +388,25 @@ SPECS: dict[RowKind, RowSpec] = {
         ),
         help_description=(
             "Maximum width of the main tuning panel.",
+        ),
+        is_pinned=True,
+        repeatable=True,
+        parent_group="settings_ui",
+    ),
+    RowKind.SETTINGS_UI_MIN_WIDTH: RowSpec(
+        affordance=RowAffordance.VALUE_STEP,
+        panel_label="min width",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_settings_ui_min_width,
+        apply_horizontal=_apply_settings_ui_min_width,
+        help_title="Min width",
+        help_entries=(
+            ("Left/Right", "adjust minimum panel width"),
+            ("Ctrl + Left/Right", "large step"),
+        ),
+        help_description=(
+            "Smallest the panel shrinks to in flexible mode.",
+            "Fixed mode stays at the max width.",
         ),
         is_pinned=True,
         repeatable=True,

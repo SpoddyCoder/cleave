@@ -13,6 +13,7 @@ from cleave.config_schema.editor import (
     clamp_editor_width,
     clamp_residual_latency_ms,
     clamp_ui_fade,
+    clamp_ui_min_width,
     clamp_ui_width,
     clamp_notification_display_sec,
     clamp_upscale,
@@ -171,4 +172,15 @@ class SettingsControls:
         current = self.cfg.editor.ui_width
         new_value = clamp_ui_width(current + delta)
         self.cfg.editor = replace(self.cfg.editor, ui_width=new_value)
+        persist_editor_settings(self.cfg)
+
+    def adjust_ui_min_width(self, *, forward: bool, ctrl: bool) -> None:
+        step = 5 if ctrl else 1
+        delta = step if forward else -step
+        current = self.cfg.editor.ui_min_width
+        new_value = min(
+            clamp_ui_min_width(current + delta),
+            self.cfg.editor.ui_width,
+        )
+        self.cfg.editor = replace(self.cfg.editor, ui_min_width=new_value)
         persist_editor_settings(self.cfg)

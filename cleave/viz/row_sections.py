@@ -476,6 +476,7 @@ SETTINGS_UI_SECTION = ExpandSectionDef(
     children=(
         SectionNode(leaf_kind=RowKind.SETTINGS_UI_WIDTH_MODE),
         SectionNode(leaf_kind=RowKind.SETTINGS_UI_WIDTH),
+        SectionNode(leaf_kind=RowKind.SETTINGS_UI_MIN_WIDTH),
         SectionNode(leaf_kind=RowKind.SETTINGS_UI_FADE),
         SectionNode(leaf_kind=RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY),
     ),
