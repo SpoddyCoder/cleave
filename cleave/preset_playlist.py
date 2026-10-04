@@ -191,12 +191,7 @@ class PresetPlaylist:
         *,
         browse_floor: Path | None = None,
     ) -> str:
-        try:
-            rel = to_config_relative(self.current_dir, preset_root).rstrip("/") + "/"
-        except ValueError:
-            # Project presets (and other off-root copies) are not under
-            # preset_root; show an absolute path instead of crashing the panel.
-            rel = self.current_dir.resolve().as_posix().rstrip("/") + "/"
+        rel = to_config_relative(self.current_dir, preset_root).rstrip("/") + "/"
         siblings = list_browse_siblings(self.current_dir, preset_root)
         prefix, child = directory_tree_marker(
             self.current_dir, preset_root, browse_floor=browse_floor
@@ -410,8 +405,16 @@ def preset_filename_display(playlist: PresetPlaylist) -> str:
 
 
 def to_config_relative(path: Path, preset_root: Path) -> str:
-    """Preset path relative to preset_root, using forward slashes."""
-    return path.resolve().relative_to(preset_root.resolve()).as_posix()
+    """Preset path relative to preset_root, using forward slashes.
+
+    Paths outside preset_root (project preset copies) are absolute so they
+    round-trip through config load.
+    """
+    resolved = path.resolve()
+    try:
+        return resolved.relative_to(preset_root.resolve()).as_posix()
+    except ValueError:
+        return resolved.as_posix()
 
 
 def scan_all_layers(cfg: CleaveConfig) -> dict[str, PresetPlaylist]:

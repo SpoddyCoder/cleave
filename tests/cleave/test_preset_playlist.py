@@ -441,6 +441,28 @@ def test_directory_display_label_tree_markers() -> None:
         )
 
 
+def test_config_preset_path_outside_preset_root_is_absolute() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp) / "presets"
+        root.mkdir()
+        project_presets = Path(tmp) / "projects" / "demo" / "presets"
+        project_presets.mkdir(parents=True)
+        milk = project_presets / "Dragon Science.milk"
+        _write_milk(milk)
+
+        playlist = scan_preset_playlist(milk)
+        assert playlist.config_preset_path(root) == milk.resolve().as_posix()
+
+        empty = project_presets / "empty"
+        empty.mkdir()
+        empty_playlist = playlist_at_dir(empty)
+        assert empty_playlist.config_preset_path(root) == (
+            empty.resolve().as_posix() + "/"
+        )
+        label = empty_playlist.directory_display_label(root)
+        assert empty.resolve().as_posix() in label
+
+
 def test_empty_directory_display_and_config_path() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
