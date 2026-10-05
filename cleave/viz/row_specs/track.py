@@ -374,15 +374,14 @@ SPECS: dict[RowKind, RowSpec] = {
     ),
     RowKind.TRACK_PRESET_SWITCHING_RESUME: RowSpec(
         affordance=RowAffordance.ACTION,
-        panel_label="Resume Switching",
+        panel_label="Switching Paused - Enter To Resume",
         present_style=RowPresentStyle.FULL_LINE,
         apply_horizontal=noop_horizontal,
         fit_strategy=FitStrategy.NONE,
         shows_enter_icon=True,
-        help_title="Resume Switching",
+        help_title="Switching Paused - Enter To Resume",
         help_description=(
-            "Ends the browse pause.",
-            "Switching continues from the current time.",
+            "End manual browsing of presets and resume preset switching.",
         ),
         parent_group="track",
         blocked_by_section_lock=True,

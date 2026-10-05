@@ -862,7 +862,6 @@ TRACK_PRESET_SWITCHING_SECTION = ExpandSectionDef(
     children=(
         SectionNode(leaf_kind=RowKind.TRACK_PRESET_SWITCHING_TRIGGER),
         SectionNode(conditional=PRESET_SWITCHING_ACTIVE),
-        SectionNode(conditional=PRESET_SWITCHING_PAUSED),
     ),
 )
 
@@ -896,6 +895,7 @@ TRACK_SECTION = ExpandSectionDef(
         SectionNode(leaf_kind=RowKind.TRACK_BEAT),
         SectionNode(leaf_kind=RowKind.TRACK_PRESET_DIR),
         SectionNode(leaf_kind=RowKind.TRACK_PRESET),
+        SectionNode(conditional=PRESET_SWITCHING_PAUSED),
         SectionNode(expand=TRACK_PRESET_SWITCHING_SECTION),
         SectionNode(expand=TRACK_COMPOSITING_SECTION),
         SectionNode(expand=TRACK_EFFECTS_SECTION),
@@ -1185,7 +1185,6 @@ PRESET_SWITCHING_CHILD_KINDS = frozenset(
         RowKind.TRACK_PRESET_LIST_ITEM,
         RowKind.TRACK_PRESET_LIST_ADD,
         RowKind.TRACK_PRESET_LIST_POPULATE,
-        RowKind.TRACK_PRESET_SWITCHING_RESUME,
     }
 )
 RENDER_TIMELINE_SECTION_KINDS = frozenset(
@@ -1274,9 +1273,6 @@ def _build_row_tree_indent_depth() -> dict[RowKind, int]:
     depths[RowKind.TRACK_PRESET_LIST_ITEM] = preset_list_item_depth
     depths[RowKind.TRACK_PRESET_LIST_ADD] = preset_list_item_depth
     depths[RowKind.TRACK_PRESET_LIST_POPULATE] = preset_list_item_depth
-    depths[RowKind.TRACK_PRESET_SWITCHING_RESUME] = depths[
-        RowKind.TRACK_PRESET_SWITCHING_TRIGGER
-    ]
     depths[RowKind.SONG_MARKERS_HEADER] = 1
     depths[RowKind.SONG_MARKER_ITEM] = 2
     depths[RowKind.TIMELINE_RESET] = 1
@@ -1512,6 +1508,9 @@ def _build_section_header_parent_map() -> dict[RowKind, RowKind]:
     _walk_expand_section_for_headers(TIMELINE_CUTS_SECTION, out)
     _walk_expand_section_for_headers(TIMELINE_PRESETS_SECTION, out)
     _walk_expand_section_for_headers(TIMELINE_VISUAL_LIMITER_SECTION, out)
+    # The pause row sits outside the menu. When it disappears, focus lands on
+    # the preset switching header immediately below it.
+    out[RowKind.TRACK_PRESET_SWITCHING_RESUME] = RowKind.TRACK_PRESET_SWITCHING
     out[RowKind.TIMELINE_SNAP_CUES_HEADER] = RowKind.RENDER_TIMELINE_HEADER
     out[RowKind.TIMELINE_CUTS_HEADER] = RowKind.RENDER_TIMELINE_HEADER
     out[RowKind.TIMELINE_PRESETS_HEADER] = RowKind.RENDER_TIMELINE_HEADER

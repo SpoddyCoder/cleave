@@ -335,6 +335,10 @@ def test_section_header_from_tree_preset_switching_submenu() -> None:
     assert section_header_from_section_tree(hard_cut) == RowDescriptor(
         RowKind.TRACK_PRESET_SWITCHING, slot="layer_1"
     )
+    resume = RowDescriptor(RowKind.TRACK_PRESET_SWITCHING_RESUME, slot="layer_1")
+    assert section_header_from_section_tree(resume) == RowDescriptor(
+        RowKind.TRACK_PRESET_SWITCHING, slot="layer_1"
+    )
 
 
 def test_section_header_descriptor_uses_tree_and_effect_fallback() -> None:

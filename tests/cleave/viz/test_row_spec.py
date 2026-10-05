@@ -1208,15 +1208,24 @@ def test_resume_switching_row_only_while_paused() -> None:
 
     spec = row_spec(RowKind.TRACK_PRESET_SWITCHING_RESUME)
     assert spec.affordance == RowAffordance.ACTION
-    assert spec.panel_label == "Resume Switching"
+    assert spec.panel_label == "Switching Paused - Enter To Resume"
     assert spec.shows_enter_icon is True
     assert spec.blocked_by_section_lock is True
     assert spec.parent_group == "track"
     assert row_tree_indent_depth(RowKind.TRACK_PRESET_SWITCHING_RESUME) == (
-        row_tree_indent_depth(RowKind.TRACK_PRESET_SWITCHING_TRIGGER)
+        row_tree_indent_depth(RowKind.TRACK_PRESET)
+    )
+    assert full_line_prefix(RowKind.TRACK_PRESET_SWITCHING_RESUME) == (
+        tree_branch_prefix(row_tree_indent_depth(RowKind.TRACK_PRESET))
+        + "Switching Paused - Enter To Resume"
     )
 
-    def kinds(*, paused: bool, list_expanded: bool) -> list[RowKind]:
+    def kinds(
+        *,
+        paused: bool,
+        list_expanded: bool,
+        switching_expanded: bool = True,
+    ) -> list[RowKind]:
         state = _minimal_view_state(
             tracks={
                 "layer_1": make_track_block(
@@ -1230,7 +1239,7 @@ def test_resume_switching_row_only_while_paused() -> None:
                     expanded=True,
                     preset_switching="on",
                     preset_switching_trigger="timer",
-                    preset_switching_expanded=True,
+                    preset_switching_expanded=switching_expanded,
                     preset_list=["/tmp/a.milk"],
                     preset_list_expanded=list_expanded,
                     switching_paused=paused,
@@ -1243,13 +1252,23 @@ def test_resume_switching_row_only_while_paused() -> None:
 
     hidden = kinds(paused=False, list_expanded=True)
     assert RowKind.TRACK_PRESET_SWITCHING_RESUME not in hidden
+    menu_closed = kinds(paused=True, list_expanded=False, switching_expanded=False)
+    assert menu_closed.index(RowKind.TRACK_PRESET_SWITCHING_RESUME) == (
+        menu_closed.index(RowKind.TRACK_PRESET) + 1
+    )
+    assert menu_closed.index(RowKind.TRACK_PRESET_SWITCHING) == (
+        menu_closed.index(RowKind.TRACK_PRESET_SWITCHING_RESUME) + 1
+    )
+    assert RowKind.TRACK_PRESET_SWITCHING_TRIGGER not in menu_closed
     collapsed = kinds(paused=True, list_expanded=False)
     assert RowKind.TRACK_PRESET_SWITCHING_RESUME in collapsed
     assert RowKind.TRACK_PRESET_LIST_ADD not in collapsed
     expanded = kinds(paused=True, list_expanded=True)
-    assert RowKind.TRACK_PRESET_SWITCHING_RESUME in expanded
-    assert expanded.index(RowKind.TRACK_PRESET_SWITCHING_RESUME) > expanded.index(
-        RowKind.TRACK_PRESET_LIST_POPULATE
+    assert expanded.index(RowKind.TRACK_PRESET_SWITCHING_RESUME) == (
+        expanded.index(RowKind.TRACK_PRESET) + 1
+    )
+    assert expanded.index(RowKind.TRACK_PRESET_SWITCHING) == (
+        expanded.index(RowKind.TRACK_PRESET_SWITCHING_RESUME) + 1
     )
 
 

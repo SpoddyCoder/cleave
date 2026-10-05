@@ -387,7 +387,7 @@ def test_audition_pauses_switching_and_resume_clears_it() -> None:
         assert session.layers["layer_1"].playlist is stem.playlist
         pm.load_preset.assert_called_with(other.resolve(), smooth=False)
         assert seen == [
-            "Layer 1: Browsing presets, switching paused - "
+            "Browsing presets, switching paused - "
             "use the resume button to continue."
         ]
 

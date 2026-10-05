@@ -10,13 +10,14 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 ### Added
 
 - Settings > UI min width row (default 80). Smallest the flexible panel shrinks to.
-- Resume Switching row. Enter on a preset list item auditions it and pauses switching.
+- Switching Paused row just below the preset file. Enter on a preset list item auditions it and pauses switching.
 - Open-file picker: Ctrl+Q quits, same as Esc.
 - Offer to download starter Milkdrop preset and texture packs on launch when the presets directory is empty.
 - Auto-create user data directories (projects, presets, textures, models) on launch.
 
 ### Changed
 
+- The preset-switching pause toast omits the layer name. Switching Paused - Enter To Resume sits just below the preset file, at the same indent, so it stays visible when the switching menu is collapsed.
 - Populate Presets help says Enter opens the directory selection modal. The choice modal title includes From, and directory options no longer repeat it.
 - Layer blend mode and opacity live under a Compositing submenu. While Pattern Mask is enabled those rows are greyed out and ignored.
 - New-install defaults: UI width mode `flexible`, max width 160, auto-fade 10s. Existing user config files keep saved values.

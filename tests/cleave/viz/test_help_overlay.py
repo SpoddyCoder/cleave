@@ -352,10 +352,9 @@ def test_preset_list_add_and_resume_switching_help() -> None:
     resume_description = _description_section(resume_sections)
     resume_keyboard = _keyboard_section(resume_sections)
     assert resume_description is not None
-    assert resume_description.title == "Resume Switching"
+    assert resume_description.title == "Switching Paused - Enter To Resume"
     assert resume_description.lines == (
-        "Ends the browse pause.",
-        "Switching continues from the current time.",
+        "End manual browsing of presets and resume preset switching.",
     )
     assert dict(resume_keyboard.entries) == {"Enter": "resume switching"}
 

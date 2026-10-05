@@ -116,7 +116,7 @@ class LiveLayerBindingsFactory:
             layer.pm.lock_preset(True)
             layer.pm.set_hard_cut_enabled(False)
             if entered_pause:
-                self._notify_browsing_paused(slot)
+                self._notify_browsing_paused()
             return
         layer.pm.lock_preset(True)
         layer.switching_paused = False
@@ -289,17 +289,11 @@ class LiveLayerBindingsFactory:
                 )
             )
 
-    def _notify_browsing_paused(self, slot: str) -> None:
+    def _notify_browsing_paused(self) -> None:
         notify = self.ctx.notification_sink
         if notify is None:
             return
-        notify(
-            layer_notification(
-                self.ctx.session.layer_z_order,
-                slot,
-                BROWSING_PAUSED_NOTIFICATION,
-            )
-        )
+        notify(BROWSING_PAUSED_NOTIFICATION)
 
     def _apply_preset_switching(self, slot: str) -> None:
         ctx = self.ctx
