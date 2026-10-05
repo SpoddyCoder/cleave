@@ -1,4 +1,4 @@
-"""Keyboard file browser state for opening a wav or a Cleave project.
+"""Keyboard file browser state for opening an audio file or a Cleave project.
 
 Pure state and view state: no pygame import, not even key constants. The host
 maps real key events onto :class:`PickerAction` and the payload-carrying
@@ -13,7 +13,7 @@ from enum import Enum
 from pathlib import Path
 
 from cleave.open_target import (
-    AUDIO_SUFFIX,
+    AUDIO_SUFFIXES,
     OpenTarget,
     classify_open_target,
     is_project_target,
@@ -26,7 +26,7 @@ from cleave.paths import (
     windows_documents_dir,
 )
 
-TITLE = "Open a Cleave project, or select a wav to create a new project..."
+TITLE = "Open a Cleave project, or select an audio file to create a new project..."
 LEGEND: tuple[tuple[str, str], ...] = (
     ("Enter", "open"),
     ("Right", "enter folder"),
@@ -157,7 +157,7 @@ def _list_directory(path: Path) -> tuple[tuple[PickerRow, ...], bool]:
         try:
             if entry.is_dir():
                 directories.append(entry)
-            elif entry.suffix.lower() == AUDIO_SUFFIX and entry.is_file():
+            elif entry.suffix.lower() in AUDIO_SUFFIXES and entry.is_file():
                 audio.append(entry)
         except OSError:
             continue
@@ -188,7 +188,7 @@ def _drive_rows() -> tuple[PickerRow, ...]:
 
 @dataclass
 class FilePicker:
-    """Browse the filesystem and return a wav or project path.
+    """Browse the filesystem and return an audio file or project path.
 
     ``current`` is the directory being listed, or None while showing the
     drives listing.

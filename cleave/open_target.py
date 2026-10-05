@@ -13,7 +13,19 @@ from pathlib import Path
 
 from cleave.project import PROJECT_FILENAME
 
-AUDIO_SUFFIX = ".wav"
+AUDIO_SUFFIXES = frozenset(
+    {
+        ".wav",
+        ".mp3",
+        ".flac",
+        ".m4a",
+        ".aac",
+        ".ogg",
+        ".aiff",
+        ".aif",
+    }
+)
+UNSUPPORTED_AUDIO_FORMAT = "unsupported audio format"
 
 _WINDOWS_ABSOLUTE = re.compile(r"^[A-Za-z]:[\\/]")
 
@@ -37,9 +49,9 @@ class OpenTarget:
 
 
 def is_audio_target(path: Path) -> bool:
-    """True when *path* is a wav file Cleave can separate."""
+    """True when *path* is an audio file Cleave can open."""
     try:
-        return path.suffix.lower() == AUDIO_SUFFIX and path.is_file()
+        return path.suffix.lower() in AUDIO_SUFFIXES and path.is_file()
     except OSError:
         return False
 
@@ -86,4 +98,4 @@ def open_target_rejection(path: Path) -> str:
         return "not found"
     if path.is_dir():
         return f"no {PROJECT_FILENAME} here"
-    return f"not a {AUDIO_SUFFIX} file"
+    return UNSUPPORTED_AUDIO_FORMAT

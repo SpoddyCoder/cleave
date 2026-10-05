@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 from collections.abc import Callable, Iterator, Mapping
@@ -11,6 +12,7 @@ from pathlib import Path
 from typing import cast
 
 from cleave.config import ensure_project_viz_config
+from cleave.open_target import AUDIO_SUFFIXES, UNSUPPORTED_AUDIO_FORMAT
 from cleave.stems import STEM_SOURCES, StemSource, stem_paths, stems_dir
 from cleave.paths import (
     is_frozen,
@@ -93,6 +95,7 @@ def resolve_separate_target(path_or_slug: Path | str) -> tuple[Path, Path]:
     raw = Path(path_or_slug)
     if raw.is_file():
         audio_path = raw.resolve()
+        _require_supported_audio(audio_path)
         slug = project_slug(audio_path)
         return project_dir(slug).resolve(), audio_path
     project = resolve_project(path_or_slug)
@@ -139,6 +142,161 @@ def _validate_audio_path(audio_path: Path) -> None:
         raise FileNotFoundError(f"audio file not found: {audio_path}")
     if not audio_path.is_file():
         raise ValueError(f"not a file: {audio_path}")
+
+
+def _require_supported_audio(audio_path: Path) -> None:
+    """Reject suffixes outside :data:`cleave.open_target.AUDIO_SUFFIXES`."""
+    if audio_path.suffix.lower() not in AUDIO_SUFFIXES:
+        raise ValueError(f"{UNSUPPORTED_AUDIO_FORMAT}: {audio_path.name}")
+
+
+def _same_file(left: Path, right: Path) -> bool:
+    try:
+        return left.resolve() == right.resolve()
+    except OSError:
+        return False
+
+
+def _stored_mix_path(project: Path) -> Path | None:
+    if not manifest_path(project).is_file():
+        return None
+    try:
+        return mix_path(project)
+    except (OSError, ValueError):
+        return None
+
+
+def _is_stored_project_mix(audio_path: Path, project: Path) -> bool:
+    """True when *audio_path* is the mix already recorded for *project*."""
+    stored = _stored_mix_path(project)
+    return stored is not None and _same_file(audio_path, stored)
+
+
+def _mix_slug(audio_path: Path, project: Path) -> str:
+    if manifest_path(project).is_file():
+        return load_manifest(project).slug
+    return project_slug(audio_path)
+
+
+def _normalized_mix_path(project: Path, slug: str) -> Path:
+    return project / f"{slug}.wav"
+
+
+def _needs_audio_prepare(audio_path: Path, project: Path) -> bool:
+    """True when *audio_path* must be copied or decoded into the project mix."""
+    if _is_stored_project_mix(audio_path, project):
+        return False
+    dest = _normalized_mix_path(project, _mix_slug(audio_path, project))
+    return not _same_file(audio_path, dest)
+
+
+def _partial_mix_path(dest: Path) -> Path:
+    return dest.parent / f".{dest.stem}.ingest.wav"
+
+
+def _cleanup_partial(tmp: Path) -> None:
+    try:
+        if tmp.is_file():
+            tmp.unlink()
+    except OSError:
+        pass
+
+
+def _replace_partial(tmp: Path, dest: Path) -> None:
+    try:
+        if not tmp.is_file():
+            raise RuntimeError(f"audio prepare did not write {dest.name}")
+        os.replace(tmp, dest)
+    except Exception:
+        _cleanup_partial(tmp)
+        raise
+
+
+def _copy_wav_atomic(source: Path, dest: Path) -> None:
+    """Copy a WAV into *dest* without re-encoding. Leave *dest* untouched on failure."""
+    if _same_file(source, dest):
+        return
+    tmp = _partial_mix_path(dest)
+    try:
+        shutil.copy2(source, tmp)
+        _replace_partial(tmp, dest)
+    except Exception:
+        _cleanup_partial(tmp)
+        raise
+
+
+def _ffmpeg_to_wav(source: Path, dest: Path) -> None:
+    """Decode *source* to 16-bit PCM WAV at *dest*. Native sample rate, no video."""
+    from cleave.ffmpeg import ffmpeg_executable
+
+    ffmpeg = ffmpeg_executable()
+    tmp = _partial_mix_path(dest)
+    cmd = [
+        ffmpeg,
+        "-nostdin",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-y",
+        "-i",
+        str(source),
+        "-vn",
+        "-acodec",
+        "pcm_s16le",
+        str(tmp),
+    ]
+    try:
+        subprocess.run(cmd, capture_output=True, check=True)
+    except subprocess.CalledProcessError as exc:
+        _cleanup_partial(tmp)
+        err = (exc.stderr or b"").decode("utf-8", "replace").strip()
+        detail = f": {err}" if err else ""
+        raise RuntimeError(
+            f"ffmpeg failed to convert {source} with {ffmpeg}{detail}"
+        ) from exc
+    except Exception:
+        _cleanup_partial(tmp)
+        raise
+    try:
+        _replace_partial(tmp, dest)
+    except RuntimeError as exc:
+        raise RuntimeError(
+            f"ffmpeg failed to convert {source} with {ffmpeg}"
+        ) from exc
+
+
+_PREPARE_MESSAGE = "Preparing audio..."
+
+
+def _prepare_project_mix(
+    audio_path: Path,
+    project: Path,
+    *,
+    on_progress: Callable[[str, float | None], None] | None = None,
+) -> tuple[Path, Path]:
+    """Return ``(mix_for_demucs, original_path)``.
+
+    A mix already stored in the project is used in place, including an older
+    non-wav filename. A new WAV is copied to ``<project>/<slug>.wav``. Any
+    other accepted format is decoded to that WAV. ``original_path`` stays the
+    user's source file, or the path already recorded when the mix is reused.
+    """
+    if _is_stored_project_mix(audio_path, project):
+        return audio_path, Path(load_manifest(project).original_path)
+
+    _require_supported_audio(audio_path)
+    dest = _normalized_mix_path(project, _mix_slug(audio_path, project))
+    if _same_file(audio_path, dest):
+        return dest, audio_path
+
+    if on_progress is not None:
+        on_progress(_PREPARE_MESSAGE, None)
+    project.mkdir(parents=True, exist_ok=True)
+    if audio_path.suffix.lower() == ".wav":
+        _copy_wav_atomic(audio_path, dest)
+    else:
+        _ffmpeg_to_wav(audio_path, dest)
+    return dest, audio_path
 
 
 def _load_demucs_track(audio_path: Path, audio_channels: int, samplerate: int):
@@ -411,32 +569,35 @@ def _run_demucs(
         slug = project_slug(audio_path)
 
     model = "htdemucs_ft" if high_quality else "htdemucs"
-    mix_filename = audio_path.name
 
     project_dir.mkdir(parents=True, exist_ok=True)
     (project_dir / "renders").mkdir(exist_ok=True)
     stems_dir(project_dir).mkdir(exist_ok=True)
 
+    mix_for_demucs, original = _prepare_project_mix(
+        audio_path,
+        project_dir,
+        on_progress=on_progress,
+    )
+    mix_filename = mix_for_demucs.name
+
     if force and manifest_path(project_dir).is_file():
         old_manifest = load_manifest(project_dir)
         if old_manifest.mix_filename != mix_filename:
             stale = project_dir / old_manifest.mix_filename
-            if stale.is_file():
+            if stale.is_file() and not _same_file(stale, mix_for_demucs):
                 stale.unlink()
 
-    mix_dst = project_dir / mix_filename
-    if audio_path.resolve() != mix_dst.resolve():
-        shutil.copy2(audio_path, mix_dst)
     write_manifest(
         project_dir,
         slug=slug,
         mix_filename=mix_filename,
-        original_path=audio_path,
+        original_path=original,
         demucs_model=model,
     )
 
     _write_demucs_stems(
-        audio_path,
+        mix_for_demucs,
         stem_paths(project_dir),
         model=model,
         on_progress=on_progress,
@@ -474,7 +635,10 @@ def run_separate(
 
     if run_demucs:
         if on_progress is not None:
-            on_progress("Separating stems...", None)
+            if _needs_audio_prepare(audio_path, project_dir):
+                on_progress(_PREPARE_MESSAGE, None)
+            else:
+                on_progress("Separating stems...", None)
         _run_demucs(
             audio_path,
             project_dir,

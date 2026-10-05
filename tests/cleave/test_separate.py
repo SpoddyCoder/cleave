@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import subprocess
 import sys
 from contextlib import contextmanager
 from pathlib import Path
@@ -60,7 +61,7 @@ def _mock_demucs_writes_stems() -> Iterator[dict[str, MagicMock]]:
         patch("torch.hub.set_dir") as set_dir,
         patch("torch.cuda.is_available", return_value=False),
         patch("demucs.pretrained.get_model", return_value=model_obj) as get_model,
-        patch("demucs.separate.load_track", return_value=MagicMock()),
+        patch("demucs.separate.load_track", return_value=MagicMock()) as load_track,
         patch("demucs.apply.apply_model", return_value=[MagicMock()]),
         patch("cleave.separate._save_stem_wav", side_effect=fake_save_stem),
     ):
@@ -68,6 +69,7 @@ def _mock_demucs_writes_stems() -> Iterator[dict[str, MagicMock]]:
             "ensure": ensure,
             "set_dir": set_dir,
             "get_model": get_model,
+            "load_track": load_track,
             "model": model_obj,
         }
 
@@ -317,7 +319,7 @@ def test_run_separate_reports_progress_phases(
         run_separate(audio, on_progress=on_progress)
 
     assert messages == [
-        ("Separating stems...", None),
+        ("Preparing audio...", None),
         ("Extracting signals...", None),
     ]
     assert run_demucs.call_args.kwargs["on_progress"] is on_progress
@@ -533,6 +535,8 @@ def test_run_demucs_skips_copy_when_mix_in_project(
     mocks["ensure"].assert_called_once()
     assert mocks["ensure"].call_args.args[0].label == "Demucs htdemucs"
     assert mix.read_bytes() == b"mix"
+    mocks["load_track"].assert_called_once()
+    assert mocks["load_track"].call_args.args[0] == mix
     for name in STEM_NAMES:
         assert (stems_dir(project) / f"{name}.wav").is_file()
 
@@ -543,7 +547,7 @@ def test_run_demucs_high_quality_loads_htdemucs_ft(
     monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
     project = tmp_path / "projects" / "my-track"
     project.mkdir(parents=True)
-    mix = project / "my-track.flac"
+    mix = project / "my-track.wav"
     mix.write_bytes(b"mix")
 
     with _mock_demucs_writes_stems() as mocks:
@@ -561,7 +565,7 @@ def test_run_demucs_wraps_get_model_failure(
     monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
     project = tmp_path / "projects" / "my-track"
     project.mkdir(parents=True)
-    mix = project / "my-track.flac"
+    mix = project / "my-track.wav"
     mix.write_bytes(b"mix")
 
     with (
@@ -582,7 +586,7 @@ def test_run_demucs_propagates_weight_download_error(
     monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
     project = tmp_path / "projects" / "my-track"
     project.mkdir(parents=True)
-    mix = project / "my-track.flac"
+    mix = project / "my-track.wav"
     mix.write_bytes(b"mix")
     err = WeightDownloadError(
         "Failed to download Demucs htdemucs. "
@@ -605,7 +609,7 @@ def test_run_demucs_raises_when_stems_not_written(
     monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
     project = tmp_path / "projects" / "my-track"
     project.mkdir(parents=True)
-    mix = project / "my-track.flac"
+    mix = project / "my-track.wav"
     mix.write_bytes(b"mix")
     model_obj = MagicMock()
     model_obj.sources = ["drums", "bass", "other", "vocals"]
@@ -734,6 +738,19 @@ def test_run_separate_force_explicit_beat_stem_overrides_stored(
     )
 
 
+def _fake_ffmpeg_run(payload: bytes = b"RIFF"):
+    def fake_run(cmd: list[str], **_kwargs: object) -> MagicMock:
+        out = Path(cmd[-1])
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_bytes(payload)
+        result = MagicMock()
+        result.returncode = 0
+        result.stderr = b""
+        return result
+
+    return fake_run
+
+
 def test_run_separate_creates_project_and_renders(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -742,9 +759,17 @@ def test_run_separate_creates_project_and_renders(
     audio.write_bytes(b"audio")
 
     project = tmp_path / "projects" / "song"
+    seen: dict[str, list[str]] = {}
 
-    with _mock_demucs_writes_stems(), patch(
-        "cleave.analyse.run_analyse", return_value=project / "signals.json"
+    def fake_run(cmd: list[str], **kwargs: object) -> MagicMock:
+        seen["cmd"] = cmd
+        return _fake_ffmpeg_run()(cmd, **kwargs)
+
+    with (
+        _mock_demucs_writes_stems() as mocks,
+        patch("cleave.analyse.run_analyse", return_value=project / "signals.json"),
+        patch("cleave.ffmpeg.ffmpeg_executable", return_value="ffmpeg"),
+        patch("cleave.separate.subprocess.run", side_effect=fake_run),
     ):
         result = run_separate(audio)
 
@@ -752,14 +777,36 @@ def test_run_separate_creates_project_and_renders(
     assert project.is_dir()
     assert (project / "renders").is_dir()
     assert stems_dir(project).is_dir()
-    assert (project / "song.flac").read_bytes() == b"audio"
+    assert not (project / "song.flac").exists()
+    assert (project / "song.wav").read_bytes() == b"RIFF"
+    assert not (project / ".song.ingest.wav").exists()
     assert (project / PROJECT_FILENAME).is_file()
     manifest = load_manifest(project)
     assert manifest.slug == "song"
-    assert manifest.mix_filename == "song.flac"
+    assert manifest.mix_filename == "song.wav"
+    assert manifest.original_path == str(audio.resolve())
     assert manifest.demucs_model == "htdemucs"
     for name in STEM_NAMES:
         assert (stems_dir(project) / f"{name}.wav").is_file()
+    cmd = seen["cmd"]
+    assert cmd[:8] == [
+        "ffmpeg",
+        "-nostdin",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-y",
+        "-i",
+        str(audio.resolve()),
+    ]
+    assert cmd[8:] == [
+        "-vn",
+        "-acodec",
+        "pcm_s16le",
+        str(project.resolve() / ".song.ingest.wav"),
+    ]
+    mocks["load_track"].assert_called_once()
+    assert mocks["load_track"].call_args.args[0] == project.resolve() / "song.wav"
 
 
 def test_run_separate_force_deletes_stale_mix(
@@ -791,6 +838,7 @@ def test_run_separate_force_deletes_stale_mix(
     assert (project / "song.wav").read_bytes() == b"new"
     manifest = load_manifest(project)
     assert manifest.mix_filename == "song.wav"
+    assert manifest.original_path == str(new_audio.resolve())
 
 
 def test_run_separate_force_preserves_song_markers(
@@ -824,6 +872,7 @@ def test_run_separate_force_preserves_song_markers(
     assert manifest.restored_from == "archived-slug"
     assert manifest.demucs_model == "htdemucs"
     assert manifest.mix_filename == "song.flac"
+    assert manifest.original_path == str((tmp_path / "elsewhere.flac").resolve())
 
 
 def test_run_demucs_frozen_missing_ffmpeg_names_sidecar(
@@ -1019,3 +1068,208 @@ def test_write_demucs_stems_torchcodec_error_is_friendly(
         _write_demucs_stems(audio, dest_paths, model="htdemucs")
 
     assert str(caught.value) == TORCHCODEC_AUDIO_IO_ERROR
+
+
+def test_run_separate_copies_wav_without_ffmpeg(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    audio = tmp_path / "song.wav"
+    audio.write_bytes(b"RIFFDATA")
+    project = tmp_path / "projects" / "song"
+
+    with (
+        _mock_demucs_writes_stems() as mocks,
+        patch("cleave.analyse.run_analyse", return_value=project / "signals.json"),
+        patch("cleave.separate.subprocess.run") as run,
+    ):
+        run_separate(audio)
+
+    run.assert_not_called()
+    assert audio.read_bytes() == b"RIFFDATA"
+    assert (project / "song.wav").read_bytes() == b"RIFFDATA"
+    assert not (project / ".song.ingest.wav").exists()
+    manifest = load_manifest(project)
+    assert manifest.mix_filename == "song.wav"
+    assert manifest.original_path == str(audio.resolve())
+    mocks["load_track"].assert_called_once()
+    assert mocks["load_track"].call_args.args[0] == project.resolve() / "song.wav"
+
+
+def test_run_separate_preparing_precedes_demucs_on_compressed_input(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    audio = tmp_path / "song.mp3"
+    audio.write_bytes(b"mp3")
+    project = tmp_path / "projects" / "song"
+    messages: list[tuple[str, float | None]] = []
+
+    def on_progress(message: str, fraction: float | None) -> None:
+        messages.append((message, fraction))
+
+    with (
+        _mock_demucs_writes_stems() as mocks,
+        patch("cleave.analyse.run_analyse", return_value=project / "signals.json"),
+        patch("cleave.ffmpeg.ffmpeg_executable", return_value="ffmpeg"),
+        patch("cleave.separate.subprocess.run", side_effect=_fake_ffmpeg_run(b"PCM")),
+    ):
+        run_separate(audio, on_progress=on_progress)
+
+    preparing = [i for i, (message, _) in enumerate(messages) if message == "Preparing audio..."]
+    separating = [i for i, (message, _) in enumerate(messages) if message == "Separating stems..."]
+    assert preparing
+    assert separating
+    assert preparing[0] < separating[0]
+    assert (project / "song.wav").read_bytes() == b"PCM"
+    assert mocks["load_track"].call_args.args[0] == project.resolve() / "song.wav"
+    manifest = load_manifest(project)
+    assert manifest.mix_filename == "song.wav"
+    assert manifest.original_path == str(audio.resolve())
+
+
+def test_run_separate_existing_mix_skips_prepare_status(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    project = tmp_path / "projects" / "song"
+    project.mkdir(parents=True)
+    _write_stub_stems(project)
+    mix = project / "song.flac"
+    mix.write_bytes(b"mix")
+    write_manifest(
+        project,
+        slug="song",
+        mix_filename="song.flac",
+        original_path=tmp_path / "elsewhere.flac",
+        demucs_model="htdemucs",
+    )
+    messages: list[str] = []
+
+    def on_progress(message: str, _fraction: float | None) -> None:
+        messages.append(message)
+
+    with patch("cleave.separate._run_demucs"), patch(
+        "cleave.analyse.run_analyse", return_value=project / "signals.json"
+    ):
+        run_separate("song", force=True, on_progress=on_progress)
+
+    assert messages[0] == "Separating stems..."
+    assert "Preparing audio..." not in messages
+
+
+def test_resolve_separate_target_rejects_unsupported(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    notes = tmp_path / "notes.txt"
+    notes.write_text("hello")
+    with pytest.raises(ValueError, match="unsupported audio format: notes.txt"):
+        resolve_separate_target(notes)
+
+
+def test_run_demucs_rejects_unsupported_before_ffmpeg(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    audio = tmp_path / "song.wma"
+    audio.write_bytes(b"wma")
+    project = tmp_path / "projects" / "song"
+    with (
+        patch("cleave.separate.subprocess.run") as run,
+        pytest.raises(ValueError, match="unsupported audio format: song.wma"),
+    ):
+        _run_demucs(audio, project, high_quality=False, force=False)
+    run.assert_not_called()
+    assert not (project / "song.wav").exists()
+
+
+def test_ffmpeg_failure_removes_partial_and_keeps_existing_mix(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    audio = tmp_path / "song.mp3"
+    audio.write_bytes(b"mp3")
+    project = tmp_path / "projects" / "song"
+    project.mkdir(parents=True)
+    (project / "song.wav").write_bytes(b"keep")
+
+    def fake_run(cmd: list[str], **_kwargs: object) -> MagicMock:
+        Path(cmd[-1]).write_bytes(b"partial")
+        raise subprocess.CalledProcessError(1, cmd, stderr=b"Invalid data found")
+
+    with (
+        patch("cleave.ffmpeg.ffmpeg_executable", return_value="/opt/ffmpeg"),
+        patch("cleave.separate.subprocess.run", side_effect=fake_run),
+        pytest.raises(RuntimeError, match="ffmpeg failed to convert") as caught,
+    ):
+        _run_demucs(audio, project, high_quality=False, force=True)
+
+    message = str(caught.value)
+    assert str(audio.resolve()) in message
+    assert "/opt/ffmpeg" in message
+    assert "Invalid data found" in message
+    assert (project / "song.wav").read_bytes() == b"keep"
+    assert not (project / ".song.ingest.wav").exists()
+    assert not (project / PROJECT_FILENAME).is_file()
+
+
+def test_wav_copy_failure_removes_partial(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    audio = tmp_path / "song.wav"
+    audio.write_bytes(b"RIFFDATA")
+    project = tmp_path / "projects" / "song"
+    project.mkdir(parents=True)
+    (project / "song.wav").write_bytes(b"old")
+
+    def fake_copy(_source: Path, dest: Path) -> None:
+        Path(dest).write_bytes(b"partial")
+        raise OSError("disk full")
+
+    with (
+        patch("cleave.separate.shutil.copy2", side_effect=fake_copy),
+        pytest.raises(OSError, match="disk full"),
+    ):
+        _run_demucs(audio, project, high_quality=False, force=True)
+
+    assert (project / "song.wav").read_bytes() == b"old"
+    assert not (project / ".song.ingest.wav").exists()
+
+
+def test_force_new_compressed_source_replaces_mix_and_preserves_markers(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    project = tmp_path / "projects" / "song"
+    project.mkdir(parents=True)
+    (project / "renders").mkdir()
+    _write_stub_stems(project)
+    (project / "song.flac").write_bytes(b"old-mix")
+    write_manifest(
+        project,
+        slug="song",
+        mix_filename="song.flac",
+        original_path=tmp_path / "song.flac",
+        demucs_model="htdemucs",
+        song_markers=(3.0, 9.5),
+    )
+    audio = tmp_path / "song.ogg"
+    audio.write_bytes(b"ogg")
+
+    with (
+        _mock_demucs_writes_stems() as mocks,
+        patch("cleave.analyse.run_analyse", return_value=project / "signals.json"),
+        patch("cleave.ffmpeg.ffmpeg_executable", return_value="ffmpeg"),
+        patch("cleave.separate.subprocess.run", side_effect=_fake_ffmpeg_run(b"NEWWAV")),
+    ):
+        run_separate(audio, force=True)
+
+    assert not (project / "song.flac").exists()
+    assert (project / "song.wav").read_bytes() == b"NEWWAV"
+    manifest = load_manifest(project)
+    assert manifest.mix_filename == "song.wav"
+    assert manifest.original_path == str(audio.resolve())
+    assert [marker.time for marker in manifest.song_markers] == [3.0, 9.5]
+    assert mocks["load_track"].call_args.args[0] == project.resolve() / "song.wav"

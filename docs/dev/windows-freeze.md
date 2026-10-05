@@ -70,7 +70,7 @@ Phase 3.1 GPU proof (met): the same play path from a `workflow_dispatch` zip bui
 
 Frozen lookup: `install_dir() / "ffmpeg.exe"` (Windows) or `install_dir() / "ffmpeg"` (Linux freeze). If missing, raise `FileNotFoundError` naming that path. No PATH fallback when frozen. Checkout still uses `shutil.which` and the "not on PATH" error.
 
-Demucs 4.0.1 `load_track` (`demucs.audio.AudioFile`) shells out to `ffmpeg` and `ffprobe` by name on PATH, then falls back to torchaudio/torchcodec (shared FFmpeg DLLs). `save_audio` always uses `torchaudio.save`, which loads TorchCodec. The freeze ships static `ffmpeg.exe` only, not ffprobe or those DLLs. Frozen stem split prepends `install_dir()` to PATH (`sidecar_ffmpeg_on_path` in [cleave/ffmpeg.py](../../cleave/ffmpeg.py)) and decodes the mix with `ffmpeg_executable()` into a tensor for `apply_model`. Checkout still uses Demucs `load_track` and PATH ffmpeg for mix decode. Both frozen and checkout write stem wavs with soundfile. A missing sidecar raises `FileNotFoundError` naming `install_dir() / ffmpeg.exe`.
+Demucs 4.0.1 `load_track` (`demucs.audio.AudioFile`) shells out to `ffmpeg` and `ffprobe` by name on PATH, then falls back to torchaudio/torchcodec (shared FFmpeg DLLs). `save_audio` always uses `torchaudio.save`, which loads TorchCodec. The freeze ships static `ffmpeg.exe` only, not ffprobe or those DLLs. Frozen stem split prepends `install_dir()` to PATH (`sidecar_ffmpeg_on_path` in [cleave/ffmpeg.py](../../cleave/ffmpeg.py)) and decodes the mix with `ffmpeg_executable()` into a tensor for `apply_model`. Checkout still uses Demucs `load_track` and PATH ffmpeg for mix decode. Before that, wav sources are copied into the project and other supported inputs (mp3, flac, m4a, aac, ogg, aiff, aif) are converted to PCM WAV with `ffmpeg_executable()` (`-vn`, `pcm_s16le`, native sample rate). An existing project mix stays as stored, including an older non-wav filename. Demucs then runs on that project mix. Both frozen and checkout write stem wavs with soundfile. A missing sidecar raises `FileNotFoundError` naming `install_dir() / ffmpeg.exe`.
 
 Do not commit a Windows FFmpeg binary. [scripts/windows_stage_freeze.py](../../scripts/windows_stage_freeze.py) downloads a pinned official Windows essentials build, verifies SHA-256, copies `ffmpeg.exe` next to `cleave.exe`, and drops that build's LICENSE/COPYING/NOTICE files into `licenses/ffmpeg/`. URL and checksum are the `FFMPEG_URL` and `FFMPEG_SHA256` constants at the top of that script. The zip is cached at `.cache/ffmpeg-windows.zip` (gitignored).
 
@@ -115,7 +115,7 @@ That copies `packaging/windows/*.dll` and libprojectM licenses, fetches the pinn
 
 - Entry: [cleave.py](../../cleave.py) (`cleave.cli:main`). EXE name `cleave`. COLLECT name `cleave` (writes `dist/cleave/`).
 - `datas`: `assets/cleave-viz.yaml` and `assets/fonts/` (includes `MaterialIcons-Regular.ttf`, `DejaVuSansMono.ttf`, `DejaVuSansMono-Bold.ttf`, and their licenses).
-- Play on an existing project (stems + `signals.json`) must not import torch or librosa at module load. Drop a wav or `cleave.exe play <wav>` opens the loading window, downloads weights, splits, and analyses.
+- Play on an existing project (stems + `signals.json`) must not import torch or librosa at module load. Dropping a music file (wav, mp3, flac, m4a, aac, ogg, aiff, or aif) or running `cleave.exe play <audio>` opens the loading window, downloads weights, splits, and analyses. The project mix is PCM WAV.
 
 `librosa` is collected for analyse. Play/render stay freeze-safe on a complete project: stem types and paths live in [cleave/stems.py](../../cleave/stems.py); PCM resample uses soxr in [cleave/pcm_io.py](../../cleave/pcm_io.py). [cleave/extract.py](../../cleave/extract.py) imports librosa for analyse only. `STEM_SPLIT_MISSING_FROZEN` remains a runtime guard if frozen torch is missing; it is not the product smoke.
 
@@ -227,7 +227,7 @@ Inno Setup 6 wraps the staged onedir tree. No second freeze and no second layout
 - `DefaultDirName={autopf}\Cleave`, `ArchitecturesAllowed=x64compatible`, `ArchitecturesInstallIn64BitMode=x64compatible`, `PrivilegesRequired=admin` with `PrivilegesRequiredOverridesAllowed=dialog` so a non-admin can install per user.
 - `OutputBaseFilename=cleave-<version>-windows-x64-setup` at the repo root (same place as the zip).
 - Tasks (both unchecked by default): `desktopicon` (`{autodesktop}\Cleave`), `addtopath` (append `{app}` to HKLM PATH when admin, HKCU when per-user; remove that entry on uninstall without duplicating PATH).
-- Start Menu shortcut `{autoprograms}\Cleave` targets `cleave.exe` with no arguments. That opens the editor window and the in-window file picker, so the user can browse for a wav or a project without a terminal.
+- Start Menu shortcut `{autoprograms}\Cleave` targets `cleave.exe` with no arguments. That opens the editor window and the in-window file picker, so the user can browse for an audio file (wav, mp3, flac, m4a, aac, ogg, aiff, or aif) or a project without a terminal.
 - Uninstall removes `{app}` only. User data (`Documents\Cleave\`) and `%APPDATA%\Cleave\` survive. The finished and uninstall pages say so.
 
 CI in [.github/workflows/windows-freeze.yml](../../.github/workflows/windows-freeze.yml), after the zip step and reusing the same `dist\cleave\`:

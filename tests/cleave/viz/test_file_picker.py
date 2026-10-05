@@ -53,7 +53,7 @@ def test_starts_in_projects_dir_and_creates_it(data_root: Path) -> None:
     assert picker.shortcuts[0].label == "Projects"
 
 
-def test_listing_order_directories_then_wavs(tmp_path: Path) -> None:
+def test_listing_order_directories_then_audio(tmp_path: Path) -> None:
     (tmp_path / "beta").mkdir()
     (tmp_path / "alpha").mkdir()
     _wav(tmp_path, "zz.wav")
@@ -62,6 +62,35 @@ def test_listing_order_directories_then_wavs(tmp_path: Path) -> None:
 
     picker = FilePicker(current=tmp_path)
     assert _labels(picker) == ["..", "alpha", "beta", "aa.wav", "zz.wav"]
+
+
+def test_listing_includes_supported_audio_in_name_order(tmp_path: Path) -> None:
+    for name in (
+        "tune.ogg",
+        "SONG.MP3",
+        "clip.aif",
+        "track.FLAC",
+        "voice.m4a",
+        "radio.aac",
+        "live.aiff",
+        "mix.wav",
+        "notes.txt",
+        "video.mp4",
+    ):
+        _wav(tmp_path, name)
+
+    picker = FilePicker(current=tmp_path)
+    assert _labels(picker) == [
+        "..",
+        "clip.aif",
+        "live.aiff",
+        "mix.wav",
+        "radio.aac",
+        "SONG.MP3",
+        "track.FLAC",
+        "tune.ogg",
+        "voice.m4a",
+    ]
 
 
 def test_dotfiles_skipped(tmp_path: Path) -> None:
@@ -107,6 +136,17 @@ def test_parent_row_walks_up(tmp_path: Path) -> None:
     assert picker.selected_row.kind is PickerRowKind.PARENT
     picker.handle(PickerAction.ACCEPT)
     assert picker.current == tmp_path
+
+
+def test_accept_mp3_returns_audio_target(tmp_path: Path) -> None:
+    song = _wav(tmp_path, "song.mp3")
+
+    picker = FilePicker(current=tmp_path)
+    picker.handle(PickerAction.MOVE_DOWN)
+    target = picker.handle(PickerAction.ACCEPT)
+    assert target is not None
+    assert target.kind is OpenTargetKind.AUDIO
+    assert target.path == song
 
 
 def test_accept_wav_returns_audio_target(tmp_path: Path) -> None:
@@ -256,7 +296,7 @@ def test_up_from_first_row_focuses_shortcuts_and_down_returns(
     assert picker.selected_index == 0
 
     assert picker.view_state().title == (
-        "Open a Cleave project, or select a wav to create a new project..."
+        "Open a Cleave project, or select an audio file to create a new project..."
     )
     picker.handle(PickerAction.MOVE_UP)
     assert picker.focus is PickerFocus.SHORTCUTS

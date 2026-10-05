@@ -8,7 +8,7 @@ Related: [editor-first.mdc](../../../.cursor/rules/editor-first.mdc), [architect
 
 ## Problem
 
-Cold start already opens in-window. `cleave play` with no target, frozen no-args (Start Menu, double-click), and checkout `cleave play` with no target browse for a wav or a project directory, then separate and launch. Drop onto the exe still works via `normalise_argv`.
+Cold start already opens in-window. `cleave play` with no target, frozen no-args (Start Menu, double-click), and checkout `cleave play` with no target browse for an audio file or a project directory, then separate and launch. Supported audio is wav, mp3, flac, m4a, aac, ogg, aiff, and aif. A new project stores a PCM WAV mix; stem split, playback, and render use that WAV. Drop onto the exe still works via `normalise_argv`.
 
 Two gaps remain:
 
@@ -23,7 +23,6 @@ Reuse [cleave/open_target.py](../../../cleave/open_target.py) and the Phase 1 pi
 
 - Persist last browse directory in global user config.
 - Freeze-only native dialog as a shortcut into the same path object.
-- Listing extra audio types (`mp3`, `flac`, and similar) that FFmpeg/Demucs can decode.
 - Optional installer task for a "Play with Cleave" shell verb.
 - Mouse in the picker and live overlay.
 - File associations (deferred in [structured-releases.md](../structured-releases.md)).
@@ -55,7 +54,7 @@ Reload needs a loop around "live session" that does **not** call `pygame.quit()`
 2. If dirty, reuse the unsaved-changes modal pattern in [ConfigSaveController](../../../cleave/viz/config_save.py) (`try_quit` / `UNSAVED_QUIT`). Generalise "pending action after save" rather than adding a second dirty flag. Cancel stays on the current project.
 3. Stop mix player, destroy layer pipeline and GL objects that are per-project. Keep the display and the loading compositor (same adopt path used at boot: [_adopt_loading_compositor](../../../cleave/viz/app.py)). Projects can differ in editor display size; go through `adopt_display_size`.
 4. Show picker (or use the dropped path). Esc returns to the **current** project only if teardown has not started; once teardown starts, picker cancel should quit or re-open the same project. Prefer: prompt and teardown only after a path is accepted, so Esc is cheap.
-5. `run_separate` with loading-screen progress (wav may need stem split). Failure: error message, any key, back to the picker, window still up.
+5. `run_separate` with loading-screen progress (an audio file may need stem split). Failure: error message, any key, back to the picker, window still up.
 6. `build_runtime_base` + heavy GL init + live loop as today.
 
 Help: add Open (`Ctrl+O`) to [help_content.py](../../../cleave/viz/help_content.py) navigation section.
@@ -68,7 +67,7 @@ Do not bolt file browsing onto [TuningControls](../../../cleave/viz/controls.py)
 
 ## Platform traps
 
-- **Windows drive roots.** `Path("C:\\").parent` is still `C:\`. Without a drives listing, a wav on `D:\` is unreachable from the freeze. WSL can walk `/mnt` -> `d`; native Windows cannot.
+- **Windows drive roots.** `Path("C:\\").parent` is still `C:\`. Without a drives listing, an audio file on `D:\` is unreachable from the freeze. WSL can walk `/mnt` -> `d`; native Windows cannot.
 - **WSL vs Windows paths.** The picker lists Linux paths (`/mnt/c/Users/...`). A Windows dialog or Explorer drop of `C:\...` will not open on Linux. Accept helper fails closed with a message, not raise into the frame loop.
 - **WSLg drop.** Dropping from Windows Explorer onto a Linux pygame window is unreliable. The `/mnt/c/Users` and Drives shortcuts are the WSL answer; `DROPFILE` is extra.
 - **Program Files.** Install dir is read-only for normal users. Never start the browser there. User data stays under `Documents\Cleave\` ([windows-freeze.md](../windows-freeze.md)).

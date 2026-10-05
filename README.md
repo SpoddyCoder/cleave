@@ -26,11 +26,11 @@ Cleave needs Milkdrop preset packs to display visualizations. On first launch, w
 
 ### Open a Track
 
-Windows - drop a `.wav` file onto `cleave.exe`, or launch it and browse for a file from the editor window.
+Windows - drop a music file onto `cleave.exe`, or launch it and browse for a file from the editor window. Supported formats are wav, mp3, flac, m4a, aac, ogg, aiff, and aif. Cleave stores a PCM WAV mix in the project.
 
 Linux:
 ```bash
-./cleave.py play ~/music/mysong.wav
+./cleave.py play ~/music/mysong.mp3
 ```
 
 This will separate the track into its component stems (bass, drums, vocals, other), perform audio analysis, then open the editor. First run downloads model weights and shows progress in the loading window.
@@ -91,11 +91,11 @@ Use `--help` on any command for more options.
 
 The installer (`cleave-<version>-windows-x64-setup.exe`) defaults to `Program Files\Cleave`. Uninstall removes only the program folder; it does not delete your data or settings. The zip (`cleave-<version>-windows-x64.zip`) is the same thing without an installer - unpack and run from that folder.
 
-Launch from the Start Menu or double-click `cleave.exe` to open the editor. You can also drop a `.wav` onto `cleave.exe`, or run from the command line:
+Launch from the Start Menu or double-click `cleave.exe` to open the editor. You can also drop a music file (wav, mp3, flac, m4a, aac, ogg, aiff, or aif) onto `cleave.exe`, or run from the command line:
 
 ```
 cleave.exe play
-cleave.exe play <wav>
+cleave.exe play <audio>
 cleave.exe play <project>
 cleave.exe render <project>
 ```

@@ -9,6 +9,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 
+- Open wav, mp3, flac, m4a, aac, ogg, aiff, and aif tracks from the file picker or by dropping them on cleave.exe. New projects store a PCM WAV mix and keep the original file path.
 - Settings > UI min width row (default 80). Smallest the flexible panel shrinks to.
 - Switching Paused row just below the preset file. Enter on a preset list item auditions it and pauses switching.
 - Open-file picker: Ctrl+Q quits, same as Esc.
@@ -26,7 +27,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Panel headers read Cleave Settings and Project Settings, with no blank line between them. Transport stays directly under Project Settings.
 - Preset switching warnings name the layer: empty switching list, skipped preset, list too short or needing adjustment, populate while timeline is off, and timeline trigger while timeline is off.
 - Settings editor-mode row reads Switch to Preset Curation or Switch to Visual Editor for the other mode. Enter asks to confirm with OK or Cancel.
-- Open-file picker title asks for a project or a wav. Up from the first entry focuses shortcuts (Left/Right only; Down returns to the first entry). A blank line sits above the help text, and the current directory shows a folder icon.
+- Open-file picker title asks for a project or an audio file. Up from the first entry focuses shortcuts (Left/Right only; Down returns to the first entry). A blank line sits above the help text, and the current directory shows a folder icon.
 - Visual limiter, credits-card animation, highlight rolloff, and chroma boost headers show the child enabled/type/mode value while collapsed.
 - Frozen Windows `cleave.exe` no longer opens a terminal window. Start Menu, desktop, and drop-on-exe stay window-only. Terminal users still get CLI output. Explorer-launched fatal errors use a message box.
 - Layer preset switching header shows the trigger type and Left/Right only expands or collapses. Trigger options are off, timer, projectM, and timeline; off hides the other switching rows.

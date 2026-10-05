@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from cleave.open_target import (
+    AUDIO_SUFFIXES,
     OpenTargetKind,
     classify_open_target,
     looks_like_windows_path,
@@ -26,16 +29,26 @@ def _project(tmp_path: Path, name: str = "song") -> Path:
     return path
 
 
-def test_wav_file_is_audio(tmp_path: Path) -> None:
-    target = classify_open_target(_wav(tmp_path))
+@pytest.mark.parametrize(
+    "name",
+    [
+        "song.wav",
+        "SONG.WAV",
+        "song.mp3",
+        "song.MP3",
+        "song.flac",
+        "song.m4a",
+        "song.aac",
+        "song.ogg",
+        "song.aiff",
+        "song.AIF",
+    ],
+)
+def test_supported_audio_suffix_is_audio(tmp_path: Path, name: str) -> None:
+    target = classify_open_target(_wav(tmp_path, name))
     assert target is not None
     assert target.kind is OpenTargetKind.AUDIO
-
-
-def test_wav_suffix_is_case_insensitive(tmp_path: Path) -> None:
-    target = classify_open_target(_wav(tmp_path, "SONG.WAV"))
-    assert target is not None
-    assert target.kind is OpenTargetKind.AUDIO
+    assert target.path.suffix.lower() in AUDIO_SUFFIXES
 
 
 def test_project_directory_is_project(tmp_path: Path) -> None:
@@ -46,8 +59,9 @@ def test_project_directory_is_project(tmp_path: Path) -> None:
     assert target.path == project
 
 
-def test_non_wav_file_rejected(tmp_path: Path) -> None:
-    notes = tmp_path / "notes.txt"
+@pytest.mark.parametrize("name", ["notes.txt", "song.wma", "song.mp4", "song"])
+def test_unsupported_file_rejected(tmp_path: Path, name: str) -> None:
+    notes = tmp_path / name
     notes.write_text("hello")
     assert classify_open_target(notes) is None
 
@@ -83,6 +97,6 @@ def test_rejection_messages(tmp_path: Path) -> None:
     notes.write_text("hello")
 
     assert PROJECT_FILENAME in open_target_rejection(empty)
-    assert ".wav" in open_target_rejection(notes)
+    assert open_target_rejection(notes) == "unsupported audio format"
     assert "not found" == open_target_rejection(tmp_path / "gone.wav")
     assert "/mnt/c" in open_target_rejection(Path(r"C:\Music\song.wav"))
