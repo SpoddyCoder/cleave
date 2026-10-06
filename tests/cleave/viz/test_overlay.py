@@ -552,6 +552,38 @@ def test_settings_header_highlight_stops_before_fps() -> None:
     assert under_fps != expected_tint
 
 
+def test_project_header_highlight_uses_full_row_width() -> None:
+    pygame.init()
+    overlay = TuningOverlay()
+    state = _minimal_view_state(
+        fps=30.0,
+        focus_cursor=MainFocus(RowDescriptor(RowKind.PROJECT_HEADER)),
+    )
+    panel = _copy_panel_surface(overlay, state)
+    font = overlay._font_get()
+    metrics = _panel_scroll_metrics(overlay, state)
+    project_idx = state.layout.find_by_kind(RowKind.PROJECT_HEADER)
+    assert project_idx in metrics.header_indices
+    row_index = metrics.header_indices.index(project_idx)
+    line_h = font.get_linesize()
+    mid_y = overlay._padding + row_index * metrics.row_stride + line_h // 2
+    shortened = settings_header_highlight_width(
+        panel_w=panel.get_width(),
+        padding=overlay._padding,
+        font=font,
+        fps=30.0,
+        show_scrollbar=metrics.show_scrollbar,
+    )
+    full_w = panel.get_width() - overlay._padding * 2
+    expected_tint, _ = composite_row_background(
+        BACKGROUND, BACKGROUND_ALPHA, HIGHLIGHT, FOCUS_ROW_BG_ALPHA
+    )
+    past_fps_reserve = overlay._padding + shortened + font.size("M")[0]
+    assert shortened < full_w
+    assert past_fps_reserve < overlay._padding + full_w - 2
+    assert panel.get_at((past_fps_reserve, mid_y))[:3] == expected_tint
+
+
 def test_bottom_row_highlight_stops_before_help_hint() -> None:
     pygame.init()
     overlay = TuningOverlay()

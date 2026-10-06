@@ -27,7 +27,7 @@ from cleave.viz.material_icons import (
 from cleave.viz.overlay_profiler import OverlayDrawCounters
 from cleave.viz.panel_notification import notification_attention
 from cleave.viz.playback import format_mmss
-from cleave.viz.row_kinds import RowAffordance
+from cleave.viz.row_kinds import RowAffordance, RowKind
 from cleave.viz.row_spec import (
     FitStrategy,
     ROW_SPECS,
@@ -702,12 +702,7 @@ def is_transport_row(state: TuningViewState, index: int) -> bool:
 
 
 def is_settings_header_row(state: TuningViewState, index: int) -> bool:
-    field = field_for_index(state, index)
-    return (
-        field is not None
-        and field.present_style == RowPresentStyle.COMPOSITE_HEADER
-        and field.visibility_icon is None
-    )
+    return state.layout.kind(index) == RowKind.SETTINGS_HEADER
 
 
 def is_notification_row(state: TuningViewState, index: int) -> bool:
