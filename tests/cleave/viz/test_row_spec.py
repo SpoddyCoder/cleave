@@ -762,7 +762,7 @@ def test_format_row_value_track_and_render() -> None:
     )
     slot_desc = RowDescriptor(RowKind.TRACK_BLEND, slot="layer_1")
     assert format_row_value(state, slot_desc) == "add"
-    mode_desc = RowDescriptor(RowKind.TRACK_PRESET_SWITCHING, slot="layer_1")
+    mode_desc = RowDescriptor(RowKind.TRACK_PRESET_SWITCHING_TRIGGER, slot="layer_1")
     assert format_row_value(state, mode_desc) == "timer"
     duration_desc = RowDescriptor(RowKind.TRACK_PRESET_DURATION, slot="layer_1")
     assert format_row_value(state, duration_desc) == "45s"
