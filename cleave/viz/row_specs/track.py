@@ -38,13 +38,6 @@ def _format_track_opacity(state: TuningViewState, desc: RowDescriptor) -> str:
 def _format_track_beat(state: TuningViewState, desc: RowDescriptor) -> str:
     return f"{_track_block(state, desc).runtime.beat_sensitivity:.2f}"
 
-def _format_track_preset_switching_mode(
-    state: TuningViewState, desc: RowDescriptor
-) -> str:
-    return preset_switching_trigger_display(
-        _track_block(state, desc).runtime.preset_switching_trigger
-    )
-
 def _format_track_preset_switching_trigger(
     state: TuningViewState, desc: RowDescriptor
 ) -> str:
@@ -361,13 +354,12 @@ SPECS: dict[RowKind, RowSpec] = {
         affordance=RowAffordance.EXPAND,
         panel_label="preset switching",
         present_style=RowPresentStyle.EXPAND_SUBHEADER,
-        format_value=_format_track_preset_switching_mode,
         apply_horizontal=apply_expand_subheader,
         fit_strategy=FitStrategy.NONE,
         help_title="Preset switching",
         help_description=(
             "Automatic preset list advances for this layer.",
-            "The header shows the trigger. Left/Right expands or collapses.",
+            "Left/Right expands or collapses.",
         ),
         is_sub_header=True,
         parent_group="track",

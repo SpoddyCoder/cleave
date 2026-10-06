@@ -236,7 +236,7 @@ def test_switching_header_help_is_expand_collapse() -> None:
     assert description.title == "Preset switching"
     assert description.lines == (
         "Automatic preset list advances for this layer.",
-        "The header shows the trigger. Left/Right expands or collapses.",
+        "Left/Right expands or collapses.",
     )
     assert not description.entries
     assert keyboard.entries == (("Left/Right", "expand/collapse"),)

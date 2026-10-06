@@ -1048,24 +1048,24 @@ def test_apply_field_horizontal_via_controls_keydown() -> None:
 def test_expand_subheader_prefix_preset_switching() -> None:
     assert (
         expand_subheader_prefix(RowKind.TRACK_PRESET_SWITCHING)
-        == "└─ preset switching"
+        == "└─ preset switching "
     )
     assert expand_subheader_prefix(RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER) == (
         "  └─ title "
     )
     assert (
         expand_subheader_prefix(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_HEADER)
-        == "└─ highlight rolloff"
+        == "└─ highlight rolloff "
     )
     assert (
         expand_subheader_prefix(RowKind.RENDER_POST_FX_CHROMA_BOOST_HEADER)
-        == "└─ chroma boost"
+        == "└─ chroma boost "
     )
     assert expand_subheader_prefix(RowKind.TIMELINE_VISUAL_LIMITER_HEADER) == (
-        "└─ visual limiter"
+        "└─ visual limiter "
     )
     assert expand_subheader_prefix(RowKind.RENDER_OVERLAY_CARD_ANIMATION_HEADER) == (
-        "  └─ animation"
+        "  └─ animation "
     )
     assert expand_subheader_prefix(RowKind.SETTINGS_EDITOR_WINDOW_HEADER) == (
         "└─ Editor Window "
@@ -1074,12 +1074,7 @@ def test_expand_subheader_prefix_preset_switching() -> None:
 
 
 def test_row_expand_subheader_display_text() -> None:
-    state = _minimal_view_state()
     desc = RowDescriptor(RowKind.TRACK_PRESET_SWITCHING, slot="layer_1")
-    assert (
-        row_expand_subheader_display_text(state, desc)
-        == "└─ preset switching: off ▶"
-    )
     state = _minimal_view_state(
         tracks={
             "layer_1": make_track_block(
@@ -1091,34 +1086,18 @@ def test_row_expand_subheader_display_text() -> None:
     )
     assert (
         row_expand_subheader_display_text(state, desc)
-        == "└─ preset switching: projectM ▶"
+        == "└─ preset switching ▶"
     )
 
 
-def test_expand_subheader_shows_child_status_value() -> None:
-    state = _minimal_view_state()
-    assert row_expand_subheader_display_text(
-        state, RowDescriptor(RowKind.TIMELINE_VISUAL_LIMITER_HEADER)
-    ) == "└─ visual limiter: on ▶"
-    assert row_expand_subheader_display_text(
-        state,
-        RowDescriptor(
-            RowKind.RENDER_OVERLAY_CARD_ANIMATION_HEADER, card="opening_card"
-        ),
-    ) == "  └─ animation: fade ▶"
-    assert row_expand_subheader_display_text(
-        state, RowDescriptor(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_HEADER)
-    ) == "└─ highlight rolloff: composite ▶"
-    assert row_expand_subheader_display_text(
-        state, RowDescriptor(RowKind.RENDER_POST_FX_CHROMA_BOOST_HEADER)
-    ) == "└─ chroma boost: off ▶"
-
+def test_expand_subheader_omits_child_status_value() -> None:
     state = _minimal_view_state(
         render_timeline=RenderTimelineBlock(
             limiter=VisualLimiterBlock(enabled=False)
         ),
         render_overlays=RenderOverlaysBlock(
-            opening_card=make_overlay_card_block(animation_type="slide")
+            opening_card=make_overlay_card_block(animation_type="slide"),
+            closing_card=make_overlay_card_block(animation_type="slide-fade"),
         ),
         render_post_fx=RenderPostFxBlock(
             highlight_rolloff=HighlightRolloffBlock(mode="per_layer"),
@@ -1127,19 +1106,25 @@ def test_expand_subheader_shows_child_status_value() -> None:
     )
     assert row_expand_subheader_display_text(
         state, RowDescriptor(RowKind.TIMELINE_VISUAL_LIMITER_HEADER)
-    ) == "└─ visual limiter: off ▶"
+    ) == "└─ visual limiter ▶"
     assert row_expand_subheader_display_text(
         state,
         RowDescriptor(
             RowKind.RENDER_OVERLAY_CARD_ANIMATION_HEADER, card="opening_card"
         ),
-    ) == "  └─ animation: slide ▶"
+    ) == "  └─ animation ▶"
+    assert row_expand_subheader_display_text(
+        state,
+        RowDescriptor(
+            RowKind.RENDER_OVERLAY_CARD_ANIMATION_HEADER, card="closing_card"
+        ),
+    ) == "  └─ animation ▶"
     assert row_expand_subheader_display_text(
         state, RowDescriptor(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_HEADER)
-    ) == "└─ highlight rolloff: per_layer ▶"
+    ) == "└─ highlight rolloff ▶"
     assert row_expand_subheader_display_text(
         state, RowDescriptor(RowKind.RENDER_POST_FX_CHROMA_BOOST_HEADER)
-    ) == "└─ chroma boost: composite ▶"
+    ) == "└─ chroma boost ▶"
 
 
 def test_format_row_value_timeline_cuts() -> None:
