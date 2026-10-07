@@ -1038,6 +1038,7 @@ TIMELINE_HARD_CUTS_ACTIVE = ConditionalRowsDef(
         SectionNode(leaf_kind=RowKind.TIMELINE_HARD_CUT_FADE_IN),
         SectionNode(leaf_kind=RowKind.TIMELINE_HARD_CUT_FADE_OUT),
         SectionNode(leaf_kind=RowKind.TIMELINE_HARD_CUT_CROSSFADE),
+        SectionNode(leaf_kind=RowKind.TIMELINE_APPLY_HARD_CUTS),
     ),
 )
 
@@ -1048,6 +1049,7 @@ TIMELINE_SOFT_CUTS_ACTIVE = ConditionalRowsDef(
         SectionNode(leaf_kind=RowKind.TIMELINE_SOFT_CUT_FADE_IN),
         SectionNode(leaf_kind=RowKind.TIMELINE_SOFT_CUT_FADE_OUT),
         SectionNode(leaf_kind=RowKind.TIMELINE_SOFT_CUT_CROSSFADE),
+        SectionNode(leaf_kind=RowKind.TIMELINE_APPLY_SOFT_CUTS),
     ),
 )
 
@@ -1061,8 +1063,6 @@ TIMELINE_CUTS_SECTION = ExpandSectionDef(
         SectionNode(conditional=TIMELINE_HARD_CUTS_ACTIVE),
         SectionNode(leaf_kind=RowKind.TIMELINE_SOFT_CUTS),
         SectionNode(conditional=TIMELINE_SOFT_CUTS_ACTIVE),
-        SectionNode(leaf_kind=RowKind.TIMELINE_APPLY_SOFT_CUTS),
-        SectionNode(leaf_kind=RowKind.TIMELINE_APPLY_HARD_CUTS),
     ),
 )
 
@@ -1354,9 +1354,11 @@ def _build_row_tree_indent_depth() -> dict[RowKind, int]:
     depths[RowKind.TIMELINE_HARD_CUT_FADE_IN] = 3
     depths[RowKind.TIMELINE_HARD_CUT_FADE_OUT] = 3
     depths[RowKind.TIMELINE_HARD_CUT_CROSSFADE] = 3
+    depths[RowKind.TIMELINE_APPLY_HARD_CUTS] = 3
     depths[RowKind.TIMELINE_SOFT_CUT_FADE_IN] = 3
     depths[RowKind.TIMELINE_SOFT_CUT_FADE_OUT] = 3
     depths[RowKind.TIMELINE_SOFT_CUT_CROSSFADE] = 3
+    depths[RowKind.TIMELINE_APPLY_SOFT_CUTS] = 3
     return depths
 
 

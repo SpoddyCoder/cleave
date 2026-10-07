@@ -304,11 +304,11 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     cuts_idx = view_cuts_expanded.layout.rows.index(cuts_header)
     assert view_cuts_expanded.layout.rows.index(hard_cut_fades) == cuts_idx + 1
     assert view_cuts_expanded.layout.rows.index(soft_cut_fades) == cuts_idx + 2
-    assert view_cuts_expanded.layout.rows.index(apply_soft_cuts) == cuts_idx + 3
-    assert view_cuts_expanded.layout.rows.index(apply_hard_cuts) == cuts_idx + 4
+    assert apply_soft_cuts not in view_cuts_expanded.layout.rows
+    assert apply_hard_cuts not in view_cuts_expanded.layout.rows
     assert hard_cut_fade_in not in view_cuts_expanded.layout.rows
     assert soft_cut_fade_in not in view_cuts_expanded.layout.rows
-    assert view_cuts_expanded.layout.rows.index(presets_header) == cuts_idx + 5
+    assert view_cuts_expanded.layout.rows.index(presets_header) == cuts_idx + 3
 
     session.timeline.hard_cut_fades.enabled = True
     session.timeline.soft_cut_fades.enabled = True
@@ -319,12 +319,12 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert view_cuts_enabled.layout.rows.index(hard_cut_fade_in) == cuts_idx + 2
     assert view_cuts_enabled.layout.rows.index(hard_cut_fade_out) == cuts_idx + 3
     assert view_cuts_enabled.layout.rows.index(hard_cut_crossfade) == cuts_idx + 4
-    assert view_cuts_enabled.layout.rows.index(soft_cut_fades) == cuts_idx + 5
-    assert view_cuts_enabled.layout.rows.index(soft_cut_fade_in) == cuts_idx + 6
-    assert view_cuts_enabled.layout.rows.index(soft_cut_fade_out) == cuts_idx + 7
-    assert view_cuts_enabled.layout.rows.index(soft_cut_crossfade) == cuts_idx + 8
-    assert view_cuts_enabled.layout.rows.index(apply_soft_cuts) == cuts_idx + 9
-    assert view_cuts_enabled.layout.rows.index(apply_hard_cuts) == cuts_idx + 10
+    assert view_cuts_enabled.layout.rows.index(apply_hard_cuts) == cuts_idx + 5
+    assert view_cuts_enabled.layout.rows.index(soft_cut_fades) == cuts_idx + 6
+    assert view_cuts_enabled.layout.rows.index(soft_cut_fade_in) == cuts_idx + 7
+    assert view_cuts_enabled.layout.rows.index(soft_cut_fade_out) == cuts_idx + 8
+    assert view_cuts_enabled.layout.rows.index(soft_cut_crossfade) == cuts_idx + 9
+    assert view_cuts_enabled.layout.rows.index(apply_soft_cuts) == cuts_idx + 10
     assert view_cuts_enabled.layout.rows.index(presets_header) == cuts_idx + 11
 
     session.timeline.timeline_presets_expanded = True

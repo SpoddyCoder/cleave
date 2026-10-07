@@ -18,6 +18,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- Apply to Cues sits at the bottom of each cut section and hides when that cut type is disabled.
 - Post-FX fade is an expandable section with fade-in and fade-out start, end, and curve, replacing the two duration rows.
 - The preset-switching pause toast omits the layer name. Switching Paused - Enter To Resume sits just below the preset file, at the same indent, so it stays visible when the switching menu is collapsed.
 - Populate Presets help says Enter opens the directory selection modal. The choice modal title includes From, and directory options no longer repeat it.

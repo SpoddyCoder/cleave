@@ -2124,6 +2124,7 @@ def _focus_timeline_snap_song_markers(controls: TuningControls) -> None:
 def _focus_timeline_apply_soft_cuts(controls: TuningControls) -> None:
     controls.session.timeline.panel_open = True
     controls.session.timeline.cuts_expanded = True
+    controls.session.timeline.soft_cut_fades.enabled = True
     view = controls.build_view_state(paused=False)
     row = view.layout.find_by_kind(RowKind.TIMELINE_APPLY_SOFT_CUTS)
     controls.focus_descriptor = _desc(view, row)
@@ -2132,6 +2133,7 @@ def _focus_timeline_apply_soft_cuts(controls: TuningControls) -> None:
 def _focus_timeline_apply_hard_cuts(controls: TuningControls) -> None:
     controls.session.timeline.panel_open = True
     controls.session.timeline.cuts_expanded = True
+    controls.session.timeline.hard_cut_fades.enabled = True
     view = controls.build_view_state(paused=False)
     row = view.layout.find_by_kind(RowKind.TIMELINE_APPLY_HARD_CUTS)
     controls.focus_descriptor = _desc(view, row)

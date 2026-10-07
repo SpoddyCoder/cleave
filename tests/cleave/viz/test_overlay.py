@@ -52,6 +52,7 @@ from cleave.viz.tuning_view_state import (
     ProjectBlock,
     RenderOverlaysBlock,
     RenderTimelineBlock,
+    TimelineFadeGroupBlock,
     TuningViewState,
 )
 from cleave.config_schema.editor import DEFAULT_UI_FADE_SEC
@@ -1309,6 +1310,8 @@ def test_apply_cuts_to_cues_rows_use_action_color() -> None:
             enabled=True,
             expanded=True,
             cuts_expanded=True,
+            hard_cut_fades=TimelineFadeGroupBlock(enabled=True),
+            soft_cut_fades=TimelineFadeGroupBlock(enabled=True),
         ),
     )
     soft_row = state.layout.find_by_kind(RowKind.TIMELINE_APPLY_SOFT_CUTS)

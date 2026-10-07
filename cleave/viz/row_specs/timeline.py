@@ -1038,11 +1038,11 @@ SPECS: dict[RowKind, RowSpec] = {
     ),
     RowKind.TIMELINE_APPLY_SOFT_CUTS: RowSpec(
         affordance=RowAffordance.ACTION,
-        panel_label="Apply Soft Cuts to Cues",
+        panel_label="Apply to Cues",
         present_style=RowPresentStyle.FULL_LINE,
         fit_strategy=FitStrategy.NONE,
         shows_enter_icon=True,
-        help_title="Apply Soft Cuts to Cues",
+        help_title="Apply to Cues",
         help_entries=(("Enter", "apply soft cuts"),),
         help_description=(
             "Set cut type soft on all cues, song-marker cues, or all except markers.",
@@ -1051,11 +1051,11 @@ SPECS: dict[RowKind, RowSpec] = {
     ),
     RowKind.TIMELINE_APPLY_HARD_CUTS: RowSpec(
         affordance=RowAffordance.ACTION,
-        panel_label="Apply Hard Cuts to Cues",
+        panel_label="Apply to Cues",
         present_style=RowPresentStyle.FULL_LINE,
         fit_strategy=FitStrategy.NONE,
         shows_enter_icon=True,
-        help_title="Apply Hard Cuts to Cues",
+        help_title="Apply to Cues",
         help_entries=(("Enter", "apply hard cuts"),),
         help_description=(
             "Set cut type hard on all cues, song-marker cues, or all except markers.",
