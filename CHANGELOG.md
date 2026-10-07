@@ -34,6 +34,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- Bar phase nudge keeps cues that start before the first detected beat near the song start. They move by one beat instead of jumping to that beat.
 - Project Settings focus highlight spans the full row. The shorter width reserved for the FPS readout stays on Cleave Settings.
 - Play no longer crashes when the current preset lives in the project presets folder.
 - Warning and error toasts widen the flexible panel the same way other content does.

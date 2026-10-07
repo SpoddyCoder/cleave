@@ -650,6 +650,49 @@ def _nearest_beat_index(t: float, beats: np.ndarray) -> int:
     )
 
 
+def _median_beat_interval(beats: np.ndarray) -> float:
+    if beats.size < 2:
+        return 0.0
+    interval = float(np.median(np.diff(beats)))
+    if not np.isfinite(interval) or interval <= 0.0:
+        return 0.0
+    return interval
+
+
+def _beat_index_for_shift(t: float, beats: np.ndarray, interval: float) -> int:
+    """Nearest beat index, extended backward before the first detected beat.
+
+    Index 0 is ``beats[0]``. Negative indices are virtual beats at the median
+    interval, so a cue at song start is not treated as the first detected beat.
+    """
+    first = float(beats[0])
+    if float(t) < first and interval > 0.0:
+        raw = (float(t) - first) / interval
+        lo = int(np.floor(raw))
+        earlier = first + lo * interval
+        later = first + (lo + 1) * interval
+        if (abs(earlier - t), earlier) <= (abs(later - t), later):
+            return lo
+        return lo + 1
+    return _nearest_beat_index(t, beats)
+
+
+def _beat_time_at_shift_index(
+    index: int,
+    beats: np.ndarray,
+    interval: float,
+) -> float:
+    """Beat time for ``index``. Past the last beat clamps; before 0 stays >= 0."""
+    last = len(beats) - 1
+    if index >= len(beats):
+        return float(beats[last])
+    if index >= 0:
+        return float(beats[index])
+    if interval <= 0.0:
+        return float(beats[0])
+    return max(0.0, float(beats[0]) + index * interval)
+
+
 def snap_time_to_grid(t: float, grid: Sequence[float]) -> float:
     """Nearest grid time (earlier on a tie). Empty grid returns ``t`` unchanged."""
     if not grid:
@@ -700,17 +743,23 @@ def shift_lane_cues_by_beats(
     beat_times: Sequence[float],
     delta: int,
 ) -> TimelineLane:
-    """Map each cue to the nearest beat, move by ``delta`` indices, canonicalize."""
+    """Map each cue to the nearest beat, move by ``delta`` indices, canonicalize.
+
+    Cues before the first detected beat step along the median interval extended
+    backward, then clamp at 0. Indices past the last beat stay on that beat.
+    """
     if not lane.cues or not beat_times or delta == 0:
         return TimelineLane(baseline=lane.baseline, cues=list(lane.cues))
 
     beats = np.asarray(beat_times, dtype=np.float64)
-    last = len(beats) - 1
+    interval = _median_beat_interval(beats)
     shifted = [
         replace(
             cue,
-            t=float(
-                beats[max(0, min(last, _nearest_beat_index(cue.t, beats) + delta))]
+            t=_beat_time_at_shift_index(
+                _beat_index_for_shift(cue.t, beats, interval) + delta,
+                beats,
+                interval,
             ),
         )
         for cue in lane.cues

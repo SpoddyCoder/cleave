@@ -171,6 +171,23 @@ def test_shift_lane_cues_by_beats_clamps_and_canonicalizes() -> None:
     assert result_on.cues == [SlotCue(t=1.0, level=1.0)]
 
 
+def test_shift_lane_cues_before_first_beat_keeps_song_start() -> None:
+    # Intro before beat tracking: a cue at 0 shifts by one beat, not onto
+    # the first detected beat.
+    beats = (10.0, 11.0, 12.0, 13.0)
+    lane = _lane(False, (0.0, True), (12.0, False))
+    result = shift_lane_cues_by_beats(lane, beats, 1)
+    assert result.cues == [
+        SlotCue(t=1.0, level=1.0),
+        SlotCue(t=13.0, level=0.0),
+    ]
+    restored = shift_lane_cues_by_beats(result, beats, -1)
+    assert restored.cues == [
+        SlotCue(t=0.0, level=1.0),
+        SlotCue(t=12.0, level=0.0),
+    ]
+
+
 def test_shift_lane_cues_by_beats_empty_noop() -> None:
     lane = _lane(None, (0.4, True))
     assert shift_lane_cues_by_beats(lane, (), 1).cues == [SlotCue(t=0.4, level=1.0)]
