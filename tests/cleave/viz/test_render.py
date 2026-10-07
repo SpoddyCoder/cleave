@@ -17,6 +17,7 @@ from cleave.timeline import SlotCue, TimelineLane, canonicalize
 from cleave.viz.layer_visibility import effective_layer_enabled
 from cleave.viz.session import (
     LayerRuntime,
+    RenderPostFxRuntime,
     TimelineRuntime,
     TuningSession,
     default_render_overlays_runtime,
@@ -56,18 +57,34 @@ def _render_frame_bytes(
     return b"\xff" * (width * height * 4)
 
 
+def _render_post_fx_runtime(
+    *,
+    enabled: bool,
+    fade_in_end: float,
+    fade_out_start: float,
+) -> RenderPostFxRuntime:
+    base = default_render_post_fx_runtime(enabled=enabled, expanded=False)
+    return replace(
+        base,
+        fade=replace(
+            base.fade,
+            fade_in=replace(base.fade.fade_in, end=fade_in_end),
+            fade_out=replace(base.fade.fade_out, start=fade_out_start),
+        ),
+    )
+
+
 def _attach_render_post_fx_session(
     runtime: MagicMock,
     *,
     enabled: bool = False,
-    fade_in: float = 0.0,
-    fade_out: float = 0.0,
+    fade_in_end: float = 0.0,
+    fade_out_start: float = 0.0,
 ) -> None:
-    runtime.seed.session.render_post_fx = default_render_post_fx_runtime(
+    runtime.seed.session.render_post_fx = _render_post_fx_runtime(
         enabled=enabled,
-        expanded=False,
-        fade_in=fade_in,
-        fade_out=fade_out,
+        fade_in_end=fade_in_end,
+        fade_out_start=fade_out_start,
     )
 
 
@@ -146,11 +163,8 @@ def _mock_render_runtime(
                 default_render_overlays_runtime().closing_card, enabled=False
             ),
         ),
-        render_post_fx=default_render_post_fx_runtime(
-            enabled=False,
-            expanded=False,
-            fade_in=0.0,
-            fade_out=0.0,
+        render_post_fx=_render_post_fx_runtime(
+            enabled=False, fade_in_end=0.0, fade_out_start=0.0
         ),
     )
 
@@ -843,7 +857,9 @@ def test_render_segment_fade_alpha_uses_full_duration(
     proc.wait.return_value = 0
     mock_subprocess.Popen.return_value = proc
 
-    _attach_render_post_fx_session(runtime, enabled=True, fade_in=5.0, fade_out=5.0)
+    _attach_render_post_fx_session(
+        runtime, enabled=True, fade_in_end=5.0, fade_out_start=5.0
+    )
 
     render_mod.render(project, start_sec=10, end_sec=20)
 
@@ -938,7 +954,7 @@ def test_render_applies_fade_via_compositor(
     mock_subprocess.Popen.return_value = proc
 
     _attach_render_post_fx_session(
-        runtime, enabled=True, fade_in=1.0, fade_out=1.0
+        runtime, enabled=True, fade_in_end=1.0, fade_out_start=1.0
     )
 
     render_mod.render(project)

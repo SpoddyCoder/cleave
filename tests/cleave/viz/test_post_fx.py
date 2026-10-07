@@ -20,21 +20,24 @@ HIGHLIGHT_ROLLOFF_CURVES = ("rolloff", "smoothstep", "aces_fit")
 
 
 def test_live_frame_fade_alpha_enabled() -> None:
-    alpha = live_frame_fade_alpha(
-        15.0, 100.0, 30.0, 4.0, enabled=True, solo=False
-    )
+    fade = default_render_post_fx_runtime().fade
+    alpha = live_frame_fade_alpha(15.0, 100.0, fade, enabled=True, solo=False)
     assert alpha == fade_alpha(15.0, 100.0, 30.0, 4.0)
+    alpha_out = live_frame_fade_alpha(98.0, 100.0, fade, enabled=True, solo=False)
+    assert alpha_out == fade_alpha(98.0, 100.0, 30.0, 4.0)
 
 
 def test_live_frame_fade_alpha_disabled() -> None:
+    fade = default_render_post_fx_runtime().fade
     assert (
-        live_frame_fade_alpha(0.0, 100.0, 30.0, 4.0, enabled=False, solo=False)
+        live_frame_fade_alpha(0.0, 100.0, fade, enabled=False, solo=False)
         == 1.0
     )
 
 
 def test_live_frame_fade_alpha_solo() -> None:
-    assert live_frame_fade_alpha(0.0, 100.0, 30.0, 4.0, enabled=True, solo=True) == 1.0
+    fade = default_render_post_fx_runtime().fade
+    assert live_frame_fade_alpha(0.0, 100.0, fade, enabled=True, solo=True) == 1.0
 
 
 def test_highlight_rolloff_active() -> None:

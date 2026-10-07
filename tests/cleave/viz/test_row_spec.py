@@ -56,6 +56,8 @@ from cleave.viz.row_spec import (
 )
 from cleave.viz.tuning_view_state import (
     ChromaBoostBlock,
+    FadeBlock,
+    FadeSideBlock,
     HighlightRolloffBlock,
     RenderOverlaysBlock,
     RenderPostFxBlock,
@@ -113,8 +115,12 @@ _EXPECTED_REPEAT_ROW_KINDS = frozenset(
         RowKind.RENDER_OVERLAY_CARD_BORDER_WIDTH,
         RowKind.RENDER_OVERLAY_CARD_TIME,
         RowKind.RENDER_OVERLAY_CARD_DISPLAY_TIME,
-        RowKind.RENDER_POST_FX_FADE_IN,
-        RowKind.RENDER_POST_FX_FADE_OUT,
+        RowKind.RENDER_POST_FX_FADE_IN_START,
+        RowKind.RENDER_POST_FX_FADE_IN_END,
+        RowKind.RENDER_POST_FX_FADE_IN_TYPE,
+        RowKind.RENDER_POST_FX_FADE_OUT_START,
+        RowKind.RENDER_POST_FX_FADE_OUT_END,
+        RowKind.RENDER_POST_FX_FADE_OUT_TYPE,
         RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_MODE,
         RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_CURVE,
         RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD,
@@ -365,7 +371,19 @@ def test_parent_group_on_row_specs() -> None:
     assert row_spec(RowKind.RENDER_OVERLAY_CARD_BORDER_COLOUR).parent_group == (
         "render_overlay"
     )
-    assert row_spec(RowKind.RENDER_POST_FX_FADE_IN).parent_group == "render_post_fx"
+    assert row_spec(RowKind.RENDER_POST_FX_FADE_HEADER).parent_group == "render_post_fx"
+    assert row_spec(RowKind.RENDER_POST_FX_FADE_IN_HEADER).parent_group == (
+        "render_post_fx_fade"
+    )
+    assert row_spec(RowKind.RENDER_POST_FX_FADE_IN_START).parent_group == (
+        "render_post_fx_fade_in"
+    )
+    assert row_spec(RowKind.RENDER_POST_FX_FADE_OUT_HEADER).parent_group == (
+        "render_post_fx_fade"
+    )
+    assert row_spec(RowKind.RENDER_POST_FX_FADE_OUT_END).parent_group == (
+        "render_post_fx_fade_out"
+    )
     assert row_spec(RowKind.SETTINGS_PREVIEW_QUALITY).parent_group == (
         "settings_editor_window"
     )
@@ -532,7 +550,7 @@ def test_render_value_children_blocked_by_section_lock() -> None:
         RowKind.RENDER_OVERLAY_CARD_BACKGROUND_PADDING
     ) is True
     assert row_blocked_by_section_lock(RowKind.RENDER_OVERLAY_CARD_BORDER_COLOUR) is True
-    assert row_blocked_by_section_lock(RowKind.RENDER_POST_FX_FADE_IN) is True
+    assert row_blocked_by_section_lock(RowKind.RENDER_POST_FX_FADE_IN_START) is True
     assert row_blocked_by_section_lock(RowKind.RENDER_POST_FX_CHROMA_BOOST_AMOUNT) is True
     assert row_blocked_by_section_lock(RowKind.TIMELINE_PRESETS) is True
     assert row_blocked_by_section_lock(RowKind.TIMELINE_PRESET_CHARACTER) is True
@@ -575,7 +593,7 @@ def test_render_headers_navigable_when_section_locked() -> None:
 
 def test_section_locked_resolves_render_sections() -> None:
     overlay_desc = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_POSITION)
-    post_fx_desc = RowDescriptor(RowKind.RENDER_POST_FX_FADE_IN)
+    post_fx_desc = RowDescriptor(RowKind.RENDER_POST_FX_FADE_IN_START)
     timeline_desc = RowDescriptor(RowKind.TIMELINE_PRESETS)
     assert section_locked(_render_lock_state(overlay=True), overlay_desc) is True
     assert section_locked(_render_lock_state(), overlay_desc) is False
@@ -758,7 +776,9 @@ def test_format_row_value_track_and_render() -> None:
                 background_padding=20,
             ),
         ),
-        render_post_fx=RenderPostFxBlock(fade_in=2.5, fade_out=3.0),
+        render_post_fx=RenderPostFxBlock(
+            fade=FadeBlock(fade_in=FadeSideBlock(start=2.5)),
+        ),
     )
     slot_desc = RowDescriptor(RowKind.TRACK_BLEND, slot="layer_1")
     assert format_row_value(state, slot_desc) == "add"
@@ -829,9 +849,9 @@ def test_format_row_value_track_and_render() -> None:
         )
         == "80%"
     )
-    assert format_row_value(state, RowDescriptor(RowKind.RENDER_POST_FX_FADE_IN)) == (
-        "2.5s"
-    )
+    assert format_row_value(
+        state, RowDescriptor(RowKind.RENDER_POST_FX_FADE_IN_START)
+    ) == ("2.5s")
     assert format_row_value(
         state, RowDescriptor(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD)
     ) == "78%"
@@ -1052,6 +1072,10 @@ def test_expand_subheader_prefix_preset_switching() -> None:
     )
     assert expand_subheader_prefix(RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER) == (
         "  └─ title "
+    )
+    assert expand_subheader_prefix(RowKind.RENDER_POST_FX_FADE_HEADER) == "└─ fade "
+    assert expand_subheader_prefix(RowKind.RENDER_POST_FX_FADE_IN_HEADER) == (
+        "  └─ fade in "
     )
     assert (
         expand_subheader_prefix(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_HEADER)

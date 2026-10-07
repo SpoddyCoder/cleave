@@ -226,8 +226,7 @@ def finish_content_frame(
     frame_fade_alpha = live_frame_fade_alpha(
         t_sec,
         duration_sec,
-        pp.fade_in,
-        pp.fade_out,
+        pp.fade,
         enabled=pp.enabled and sections_on,
         solo=post_fx_solo,
     )

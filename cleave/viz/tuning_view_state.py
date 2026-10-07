@@ -36,6 +36,11 @@ from cleave.config_schema.render import (
     DEFAULT_CHROMA_BOOST_AMOUNT_PCT,
     DEFAULT_CHROMA_BOOST_APPLY_MODE,
     DEFAULT_CHROMA_BOOST_VARIANT,
+    DEFAULT_FADE_CURVE,
+    DEFAULT_FADE_IN_END,
+    DEFAULT_FADE_IN_START,
+    DEFAULT_FADE_OUT_END,
+    DEFAULT_FADE_OUT_START,
     DEFAULT_HIGHLIGHT_ROLLOFF_APPLY_MODE,
     DEFAULT_HIGHLIGHT_ROLLOFF_CEILING_PCT,
     DEFAULT_HIGHLIGHT_ROLLOFF_CURVE,
@@ -62,6 +67,7 @@ from cleave.config_schema.timeline import (
     DEFAULT_VISUAL_LIMITER_THRESHOLD,
 )
 from cleave.preset_curation import PresetCurationIndex
+from cleave.viz.session import FadeRuntime
 from cleave.preset_playlist import (
     PresetPlaylist,
     preset_filename_display,
@@ -154,6 +160,49 @@ class RenderOverlaysBlock:
 
 
 @dataclass
+class FadeSideBlock:
+    expanded: bool = False
+    start: float = DEFAULT_FADE_IN_START
+    end: float = DEFAULT_FADE_IN_END
+    type: str = DEFAULT_FADE_CURVE
+
+
+def _default_fade_out_side() -> FadeSideBlock:
+    return FadeSideBlock(
+        start=DEFAULT_FADE_OUT_START,
+        end=DEFAULT_FADE_OUT_END,
+        type=DEFAULT_FADE_CURVE,
+    )
+
+
+@dataclass
+class FadeBlock:
+    expanded: bool = False
+    fade_in: FadeSideBlock = field(default_factory=FadeSideBlock)
+    fade_out: FadeSideBlock = field(default_factory=_default_fade_out_side)
+
+
+def _fade_block_from_runtime(fade: FadeRuntime) -> FadeBlock:
+    fade_in = fade.fade_in
+    fade_out = fade.fade_out
+    return FadeBlock(
+        expanded=fade.expanded,
+        fade_in=FadeSideBlock(
+            expanded=fade_in.expanded,
+            start=fade_in.start,
+            end=fade_in.end,
+            type=fade_in.type,
+        ),
+        fade_out=FadeSideBlock(
+            expanded=fade_out.expanded,
+            start=fade_out.start,
+            end=fade_out.end,
+            type=fade_out.type,
+        ),
+    )
+
+
+@dataclass
 class HighlightRolloffBlock:
     expanded: bool = False
     mode: str = DEFAULT_HIGHLIGHT_ROLLOFF_APPLY_MODE
@@ -177,8 +226,7 @@ class ChromaBoostBlock:
 class RenderPostFxBlock:
     enabled: bool = _RO_POST_FX_DEFAULTS["enabled"]
     expanded: bool = _RO_POST_FX_DEFAULTS["expanded"]
-    fade_in: float = _RO_POST_FX_DEFAULTS["fade_in"]
-    fade_out: float = _RO_POST_FX_DEFAULTS["fade_out"]
+    fade: FadeBlock = field(default_factory=FadeBlock)
     highlight_rolloff: HighlightRolloffBlock = field(
         default_factory=HighlightRolloffBlock
     )
@@ -480,6 +528,9 @@ def view_state_structure_signature(
         "render_post_fx": {
             "enabled": pp.enabled,
             "expanded": pp.expanded,
+            "fade_expanded": pp.fade.expanded,
+            "fade_in_expanded": pp.fade.fade_in.expanded,
+            "fade_out_expanded": pp.fade.fade_out.expanded,
             "highlight_rolloff_expanded": pp.highlight_rolloff_expanded,
             "highlight_rolloff_mode": pp.highlight_rolloff.mode,
             "chroma_boost_expanded": pp.chroma_boost_expanded,
@@ -769,6 +820,7 @@ class TuningViewStateBuilder:
         render_post_fx = RenderPostFxBlock(
             enabled=pp.enabled,
             expanded=pp.expanded,
+            fade=_fade_block_from_runtime(pp.fade),
             highlight_rolloff=HighlightRolloffBlock(
                 expanded=pp.highlight_rolloff_expanded,
                 mode=pp.highlight_rolloff.mode,
@@ -969,8 +1021,7 @@ class TuningViewStateBuilder:
             ),
             render_post_fx=replace(
                 structure.render_post_fx,
-                fade_in=pp.fade_in,
-                fade_out=pp.fade_out,
+                fade=_fade_block_from_runtime(pp.fade),
                 highlight_rolloff=replace(
                     structure.render_post_fx.highlight_rolloff,
                     expanded=pp.highlight_rolloff_expanded,

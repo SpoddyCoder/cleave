@@ -10,11 +10,11 @@ from cleave.config_schema.render import (
     DEFAULT_HIGHLIGHT_ROLLOFF_CURVE,
     HighlightRolloffCurve,
 )
-from cleave.easing import fade_alpha
+from cleave.easing import fade_ramp_alpha
 from cleave.gl_color_format import resolve_live_compositor_format
 from cleave.layer_composite import apply_color_format
 from cleave.viz.editor_mode_controls import is_preset_curation_mode
-from cleave.viz.session import RenderPostFxRuntime
+from cleave.viz.session import FadeRuntime, RenderPostFxRuntime
 
 if TYPE_CHECKING:
     from cleave.gl_compositor import GlCompositor
@@ -335,12 +335,17 @@ def chroma_boost_active(pp: RenderPostFxRuntime, *, solo: bool) -> bool:
 def live_frame_fade_alpha(
     t_sec: float,
     duration_sec: float,
-    fade_in: float,
-    fade_out: float,
+    fade: FadeRuntime,
     *,
     enabled: bool,
     solo: bool,
 ) -> float:
     if not enabled or solo:
         return 1.0
-    return fade_alpha(t_sec, duration_sec, fade_in, fade_out)
+    fin = fade.fade_in
+    fout = fade.fade_out
+    alpha_in = fade_ramp_alpha(t_sec, fin.start, fin.end, fin.type)
+    alpha_out = fade_ramp_alpha(
+        duration_sec - t_sec, fout.end, fout.start, fout.type
+    )
+    return alpha_in * alpha_out

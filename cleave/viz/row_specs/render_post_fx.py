@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from cleave.config_schema.render import (
     CHROMA_BOOST_APPLY_MODE_HELP_ENTRIES,
     CHROMA_BOOST_VARIANT_HELP_ENTRIES,
+    FADE_CURVE_HELP_ENTRIES,
     HIGHLIGHT_ROLLOFF_APPLY_MODE_HELP_ENTRIES,
     HIGHLIGHT_ROLLOFF_CURVE_HELP_ENTRIES,
 )
@@ -19,15 +20,38 @@ from cleave.viz.tuning_view_state import TuningViewState
 if TYPE_CHECKING:
     from cleave.viz.controls import TuningControls
 
-def _format_render_post_fx_fade_in(
-    state: TuningViewState, _desc: RowDescriptor
-) -> str:
-    return f"{state.render_post_fx.fade_in:.1f}s"
+def _format_fade_seconds(value: float) -> str:
+    return f"{value:.1f}s"
 
-def _format_render_post_fx_fade_out(
+def _format_render_post_fx_fade_in_start(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return f"{state.render_post_fx.fade_out:.1f}s"
+    return _format_fade_seconds(state.render_post_fx.fade.fade_in.start)
+
+def _format_render_post_fx_fade_in_end(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return _format_fade_seconds(state.render_post_fx.fade.fade_in.end)
+
+def _format_render_post_fx_fade_in_type(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return state.render_post_fx.fade.fade_in.type
+
+def _format_render_post_fx_fade_out_start(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return _format_fade_seconds(state.render_post_fx.fade.fade_out.start)
+
+def _format_render_post_fx_fade_out_end(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return _format_fade_seconds(state.render_post_fx.fade.fade_out.end)
+
+def _format_render_post_fx_fade_out_type(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return state.render_post_fx.fade.fade_out.type
 
 def _format_render_post_fx_highlight_rolloff_mode(
     state: TuningViewState, _desc: RowDescriptor
@@ -79,25 +103,57 @@ def _format_render_post_fx_chroma_boost_amount(
 ) -> str:
     return f"{state.render_post_fx.chroma_boost.amount_pct}%"
 
-def _apply_render_post_fx_fade_in(
+def _fade_step(forward: bool, ctrl: bool) -> float:
+    step = 10.0 if ctrl else 1.0
+    return step if forward else -step
+
+def _apply_render_post_fx_fade_in_start(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, ctrl: bool,
     _shift: bool,
 ) -> None:
-    step = 10.0 if ctrl else 1.0
-    delta = step if forward else -step
-    controls.render_post_fx.set_fade_in(
-        controls.session.render_post_fx.fade_in + delta
+    fin = controls.session.render_post_fx.fade.fade_in
+    controls.render_post_fx.set_fade_start(
+        "fade_in", fin.start + _fade_step(forward, ctrl)
     )
 
-def _apply_render_post_fx_fade_out(
+def _apply_render_post_fx_fade_in_end(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, ctrl: bool,
     _shift: bool,
 ) -> None:
-    step = 10.0 if ctrl else 1.0
-    delta = step if forward else -step
-    controls.render_post_fx.set_fade_out(
-        controls.session.render_post_fx.fade_out + delta
+    fin = controls.session.render_post_fx.fade.fade_in
+    controls.render_post_fx.set_fade_end(
+        "fade_in", fin.end + _fade_step(forward, ctrl)
     )
+
+def _apply_render_post_fx_fade_in_type(
+    controls: TuningControls, _desc: RowDescriptor, forward: bool, _ctrl: bool,
+    _shift: bool,
+) -> None:
+    controls.render_post_fx.cycle_fade_type("fade_in", forward=forward)
+
+def _apply_render_post_fx_fade_out_start(
+    controls: TuningControls, _desc: RowDescriptor, forward: bool, ctrl: bool,
+    _shift: bool,
+) -> None:
+    fout = controls.session.render_post_fx.fade.fade_out
+    controls.render_post_fx.set_fade_start(
+        "fade_out", fout.start + _fade_step(forward, ctrl)
+    )
+
+def _apply_render_post_fx_fade_out_end(
+    controls: TuningControls, _desc: RowDescriptor, forward: bool, ctrl: bool,
+    _shift: bool,
+) -> None:
+    fout = controls.session.render_post_fx.fade.fade_out
+    controls.render_post_fx.set_fade_end(
+        "fade_out", fout.end + _fade_step(forward, ctrl)
+    )
+
+def _apply_render_post_fx_fade_out_type(
+    controls: TuningControls, _desc: RowDescriptor, forward: bool, _ctrl: bool,
+    _shift: bool,
+) -> None:
+    controls.render_post_fx.cycle_fade_type("fade_out", forward=forward)
 
 def _apply_render_post_fx_highlight_rolloff_mode(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, _ctrl: bool,
@@ -230,31 +286,130 @@ SPECS: dict[RowKind, RowSpec] = {
         quick_nav_target=True,
         can_enable_disable=True,
     ),
-    RowKind.RENDER_POST_FX_FADE_IN: RowSpec(
-        affordance=RowAffordance.VALUE_STEP,
-        panel_label="fade in",
-        present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_render_post_fx_fade_in,
-        apply_horizontal=_apply_render_post_fx_fade_in,
-        help_title="Fade in",
+    RowKind.RENDER_POST_FX_FADE_HEADER: RowSpec(
+        affordance=RowAffordance.EXPAND,
+        panel_label="fade",
+        present_style=RowPresentStyle.EXPAND_SUBHEADER,
+        apply_horizontal=apply_expand_subheader,
+        fit_strategy=FitStrategy.NONE,
+        help_title="Fade",
         help_description=(
-            "Duration of the fade-in at the start of the render.",
+            "Fades the picture in from the song start and out toward the song end.",
         ),
-        repeatable=True,
+        is_sub_header=True,
         parent_group="render_post_fx",
     ),
-    RowKind.RENDER_POST_FX_FADE_OUT: RowSpec(
-        affordance=RowAffordance.VALUE_STEP,
-        panel_label="fade out",
-        present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_render_post_fx_fade_out,
-        apply_horizontal=_apply_render_post_fx_fade_out,
-        help_title="Fade out",
+    RowKind.RENDER_POST_FX_FADE_IN_HEADER: RowSpec(
+        affordance=RowAffordance.EXPAND,
+        panel_label="fade in",
+        present_style=RowPresentStyle.EXPAND_SUBHEADER,
+        apply_horizontal=apply_expand_subheader,
+        fit_strategy=FitStrategy.NONE,
+        help_title="Fade in",
         help_description=(
-            "Duration of the fade-out at the end of the render.",
+            "Offsets from the start of the song.",
+            "The picture rises from start to end.",
+        ),
+        is_sub_header=True,
+        parent_group="render_post_fx_fade",
+    ),
+    RowKind.RENDER_POST_FX_FADE_IN_START: RowSpec(
+        affordance=RowAffordance.VALUE_STEP,
+        panel_label="start",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_render_post_fx_fade_in_start,
+        apply_horizontal=_apply_render_post_fx_fade_in_start,
+        help_title="Start",
+        help_description=(
+            "Seconds from the start of the song where the fade-in begins.",
         ),
         repeatable=True,
-        parent_group="render_post_fx",
+        parent_group="render_post_fx_fade_in",
+    ),
+    RowKind.RENDER_POST_FX_FADE_IN_END: RowSpec(
+        affordance=RowAffordance.VALUE_STEP,
+        panel_label="end",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_render_post_fx_fade_in_end,
+        apply_horizontal=_apply_render_post_fx_fade_in_end,
+        help_title="End",
+        help_description=(
+            "Seconds from the start of the song where the fade-in finishes.",
+            "Must be at or after start.",
+        ),
+        repeatable=True,
+        parent_group="render_post_fx_fade_in",
+    ),
+    RowKind.RENDER_POST_FX_FADE_IN_TYPE: RowSpec(
+        affordance=RowAffordance.VALUE_STEP,
+        panel_label="type",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_render_post_fx_fade_in_type,
+        apply_horizontal=_apply_render_post_fx_fade_in_type,
+        help_title="Type",
+        help_entries=(("Left/Right", "cycle type"),),
+        help_description=("Curve used while the picture rises.",),
+        help_mode_entries=FADE_CURVE_HELP_ENTRIES,
+        repeatable=True,
+        parent_group="render_post_fx_fade_in",
+    ),
+    RowKind.RENDER_POST_FX_FADE_OUT_HEADER: RowSpec(
+        affordance=RowAffordance.EXPAND,
+        panel_label="fade out",
+        present_style=RowPresentStyle.EXPAND_SUBHEADER,
+        apply_horizontal=apply_expand_subheader,
+        fit_strategy=FitStrategy.NONE,
+        help_title="Fade out",
+        help_description=(
+            "Offsets counted backward from the end of the song.",
+            "The picture falls from start to end.",
+            "Start is farther from the end than end.",
+        ),
+        is_sub_header=True,
+        parent_group="render_post_fx_fade",
+    ),
+    RowKind.RENDER_POST_FX_FADE_OUT_START: RowSpec(
+        affordance=RowAffordance.VALUE_STEP,
+        panel_label="start",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_render_post_fx_fade_out_start,
+        apply_horizontal=_apply_render_post_fx_fade_out_start,
+        help_title="Start",
+        help_description=(
+            "Seconds counted backward from the song end where the fade-out begins.",
+            "Start is farther from the end than end.",
+        ),
+        repeatable=True,
+        parent_group="render_post_fx_fade_out",
+    ),
+    RowKind.RENDER_POST_FX_FADE_OUT_END: RowSpec(
+        affordance=RowAffordance.VALUE_STEP,
+        panel_label="end",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_render_post_fx_fade_out_end,
+        apply_horizontal=_apply_render_post_fx_fade_out_end,
+        help_title="End",
+        help_description=(
+            "Seconds counted backward from the song end where the fade-out finishes.",
+        ),
+        repeatable=True,
+        parent_group="render_post_fx_fade_out",
+    ),
+    RowKind.RENDER_POST_FX_FADE_OUT_TYPE: RowSpec(
+        affordance=RowAffordance.VALUE_STEP,
+        panel_label="type",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_render_post_fx_fade_out_type,
+        apply_horizontal=_apply_render_post_fx_fade_out_type,
+        help_title="Type",
+        help_entries=(("Left/Right", "cycle type"),),
+        help_description=(
+            "Curve used while the picture falls.",
+            "Times on this fade count backward from the song end.",
+        ),
+        help_mode_entries=FADE_CURVE_HELP_ENTRIES,
+        repeatable=True,
+        parent_group="render_post_fx_fade_out",
     ),
     RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_HEADER: RowSpec(
         affordance=RowAffordance.EXPAND,

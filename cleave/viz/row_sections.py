@@ -118,6 +118,24 @@ def _toggle_render_pattern_mask(
     controls.render_pattern_mask.set_expanded(forward)
 
 
+def _toggle_render_post_fx_fade(
+    controls: TuningControls, _slot: str | None, forward: bool
+) -> None:
+    controls.render_post_fx.set_fade_expanded(forward)
+
+
+def _toggle_render_post_fx_fade_in(
+    controls: TuningControls, _slot: str | None, forward: bool
+) -> None:
+    controls.render_post_fx.set_fade_side_expanded("fade_in", forward)
+
+
+def _toggle_render_post_fx_fade_out(
+    controls: TuningControls, _slot: str | None, forward: bool
+) -> None:
+    controls.render_post_fx.set_fade_side_expanded("fade_out", forward)
+
+
 def _toggle_render_post_fx_highlight_rolloff(
     controls: TuningControls, _slot: str | None, forward: bool
 ) -> None:
@@ -368,6 +386,24 @@ def _render_post_fx_expanded(state: TuningViewState, _slot: str | None) -> bool:
 
 def _render_pattern_mask_expanded(state: TuningViewState, _slot: str | None) -> bool:
     return state.render_pattern_mask.expanded
+
+
+def _render_post_fx_fade_expanded(
+    state: TuningViewState, _slot: str | None
+) -> bool:
+    return state.render_post_fx.fade.expanded
+
+
+def _render_post_fx_fade_in_expanded(
+    state: TuningViewState, _slot: str | None
+) -> bool:
+    return state.render_post_fx.fade.fade_in.expanded
+
+
+def _render_post_fx_fade_out_expanded(
+    state: TuningViewState, _slot: str | None
+) -> bool:
+    return state.render_post_fx.fade.fade_out.expanded
 
 
 def _render_post_fx_highlight_rolloff_expanded(
@@ -721,14 +757,48 @@ RENDER_POST_FX_CHROMA_BOOST_SECTION = ExpandSectionDef(
     ),
 )
 
+RENDER_POST_FX_FADE_IN_SECTION = ExpandSectionDef(
+    header_kind=RowKind.RENDER_POST_FX_FADE_IN_HEADER,
+    context="global",
+    read_expanded=_render_post_fx_fade_in_expanded,
+    toggle=_toggle_render_post_fx_fade_in,
+    children=(
+        SectionNode(leaf_kind=RowKind.RENDER_POST_FX_FADE_IN_START),
+        SectionNode(leaf_kind=RowKind.RENDER_POST_FX_FADE_IN_END),
+        SectionNode(leaf_kind=RowKind.RENDER_POST_FX_FADE_IN_TYPE),
+    ),
+)
+
+RENDER_POST_FX_FADE_OUT_SECTION = ExpandSectionDef(
+    header_kind=RowKind.RENDER_POST_FX_FADE_OUT_HEADER,
+    context="global",
+    read_expanded=_render_post_fx_fade_out_expanded,
+    toggle=_toggle_render_post_fx_fade_out,
+    children=(
+        SectionNode(leaf_kind=RowKind.RENDER_POST_FX_FADE_OUT_START),
+        SectionNode(leaf_kind=RowKind.RENDER_POST_FX_FADE_OUT_END),
+        SectionNode(leaf_kind=RowKind.RENDER_POST_FX_FADE_OUT_TYPE),
+    ),
+)
+
+RENDER_POST_FX_FADE_SECTION = ExpandSectionDef(
+    header_kind=RowKind.RENDER_POST_FX_FADE_HEADER,
+    context="global",
+    read_expanded=_render_post_fx_fade_expanded,
+    toggle=_toggle_render_post_fx_fade,
+    children=(
+        SectionNode(expand=RENDER_POST_FX_FADE_IN_SECTION),
+        SectionNode(expand=RENDER_POST_FX_FADE_OUT_SECTION),
+    ),
+)
+
 RENDER_POST_FX_SECTION = ExpandSectionDef(
     header_kind=RowKind.RENDER_POST_FX_HEADER,
     context="global",
     read_expanded=_render_post_fx_expanded,
     toggle=_toggle_render_post_fx,
     children=(
-        SectionNode(leaf_kind=RowKind.RENDER_POST_FX_FADE_IN),
-        SectionNode(leaf_kind=RowKind.RENDER_POST_FX_FADE_OUT),
+        SectionNode(expand=RENDER_POST_FX_FADE_SECTION),
         SectionNode(expand=RENDER_POST_FX_HIGHLIGHT_ROLLOFF_SECTION),
         SectionNode(expand=RENDER_POST_FX_CHROMA_BOOST_SECTION),
     ),

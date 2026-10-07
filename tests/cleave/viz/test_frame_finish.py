@@ -354,8 +354,8 @@ def test_finish_content_frame_skips_render_sections_in_curation() -> None:
     core.seed.session.render_post_fx.highlight_rolloff.mode = "composite"
     core.seed.session.render_post_fx.chroma_boost.mode = "composite"
     core.seed.session.render_post_fx.chroma_boost.amount_pct = 40
-    core.seed.session.render_post_fx.fade_in = 2.0
-    core.seed.session.render_post_fx.fade_out = 2.0
+    core.seed.session.render_post_fx.fade.fade_in.end = 2.0
+    core.seed.session.render_post_fx.fade.fade_out.start = 2.0
 
     with (
         patch("cleave.viz.frame_finish.apply_hdr_display_shoulder") as shoulder,

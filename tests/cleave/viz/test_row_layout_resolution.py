@@ -5,6 +5,8 @@ from __future__ import annotations
 import pytest
 
 from cleave.viz.tuning_view_state import (
+    FadeBlock,
+    FadeSideBlock,
     HighlightRolloffBlock,
     RenderOverlaysBlock,
     RenderPostFxBlock,
@@ -240,9 +242,9 @@ def test_resolve_navigable_render_overlay_title_nested_collapsed() -> None:
 
 def test_resolve_navigable_render_post_fx_sub_row_collapsed() -> None:
     state = _minimal_view_state(render_post_fx=RenderPostFxBlock(expanded=False))
-    fade_in = RowDescriptor(RowKind.RENDER_POST_FX_FADE_IN)
-    assert fade_in not in state.layout.rows
-    assert state.layout.resolve_navigable(fade_in, state) == RowDescriptor(
+    fade = RowDescriptor(RowKind.RENDER_POST_FX_FADE_HEADER)
+    assert fade not in state.layout.rows
+    assert state.layout.resolve_navigable(fade, state) == RowDescriptor(
         RowKind.RENDER_POST_FX_HEADER
     )
 
@@ -258,6 +260,34 @@ def test_resolve_navigable_render_post_fx_highlight_rolloff_mode_off_hides_param
     assert threshold not in state.layout.rows
     mode = RowDescriptor(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_MODE)
     assert mode in state.layout.rows
+
+
+def test_resolve_navigable_render_post_fx_fade_nested_collapsed() -> None:
+    collapsed_fade = _minimal_view_state(
+        render_post_fx=RenderPostFxBlock(
+            expanded=True,
+            fade=FadeBlock(expanded=False),
+        ),
+    )
+    start = RowDescriptor(RowKind.RENDER_POST_FX_FADE_IN_START)
+    assert start not in collapsed_fade.layout.rows
+    assert collapsed_fade.layout.resolve_navigable(start, collapsed_fade) == (
+        RowDescriptor(RowKind.RENDER_POST_FX_FADE_HEADER)
+    )
+
+    collapsed_side = _minimal_view_state(
+        render_post_fx=RenderPostFxBlock(
+            expanded=True,
+            fade=FadeBlock(
+                expanded=True,
+                fade_in=FadeSideBlock(expanded=False),
+            ),
+        ),
+    )
+    assert start not in collapsed_side.layout.rows
+    assert collapsed_side.layout.resolve_navigable(start, collapsed_side) == (
+        RowDescriptor(RowKind.RENDER_POST_FX_FADE_IN_HEADER)
+    )
 
 
 def test_resolve_navigable_render_post_fx_highlight_rolloff_nested_collapsed() -> None:
@@ -304,9 +334,15 @@ def test_section_header_descriptor_mappings() -> None:
     assert section_header_descriptor(
         RowDescriptor(RowKind.RENDER_OVERLAY_CARD_BACKGROUND_PADDING)
     ) == RowDescriptor(RowKind.RENDER_OVERLAY_CARD_HEADER)
-    assert section_header_descriptor(RowDescriptor(RowKind.RENDER_POST_FX_FADE_OUT)) == RowDescriptor(
-        RowKind.RENDER_POST_FX_HEADER
-    )
+    assert section_header_descriptor(
+        RowDescriptor(RowKind.RENDER_POST_FX_FADE_OUT_START)
+    ) == RowDescriptor(RowKind.RENDER_POST_FX_FADE_OUT_HEADER)
+    assert section_header_descriptor(
+        RowDescriptor(RowKind.RENDER_POST_FX_FADE_OUT_HEADER)
+    ) == RowDescriptor(RowKind.RENDER_POST_FX_FADE_HEADER)
+    assert section_header_descriptor(
+        RowDescriptor(RowKind.RENDER_POST_FX_FADE_HEADER)
+    ) == RowDescriptor(RowKind.RENDER_POST_FX_HEADER)
     assert section_header_descriptor(
         RowDescriptor(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD)
     ) == RowDescriptor(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_HEADER)

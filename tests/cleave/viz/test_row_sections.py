@@ -18,6 +18,8 @@ from cleave.viz.row_sections import (
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.row_spec import section_header_descriptor
 from cleave.viz.tuning_view_state import (
+    FadeBlock,
+    FadeSideBlock,
     HighlightRolloffBlock,
     RenderOverlaysBlock,
     RenderPostFxBlock,
@@ -270,6 +272,26 @@ def test_sub_row_expand_visible_nested_sections() -> None:
     )
     title_font = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_FONT)
     assert sub_row_expand_visible(title_collapsed, title_font) is False
+
+    fade_collapsed = _minimal_view_state(
+        render_post_fx=RenderPostFxBlock(
+            expanded=True,
+            fade=FadeBlock(expanded=False),
+        ),
+    )
+    fade_start = RowDescriptor(RowKind.RENDER_POST_FX_FADE_IN_START)
+    assert sub_row_expand_visible(fade_collapsed, fade_start) is False
+
+    fade_in_collapsed = _minimal_view_state(
+        render_post_fx=RenderPostFxBlock(
+            expanded=True,
+            fade=FadeBlock(
+                expanded=True,
+                fade_in=FadeSideBlock(expanded=False),
+            ),
+        ),
+    )
+    assert sub_row_expand_visible(fade_in_collapsed, fade_start) is False
 
     highlight_collapsed = _minimal_view_state(
         render_post_fx=RenderPostFxBlock(

@@ -5,9 +5,13 @@ from __future__ import annotations
 from cleave.config_schema.render import (
     CHROMA_BOOST_APPLY_MODES,
     CHROMA_BOOST_VARIANTS,
+    FADE_CURVES,
     HIGHLIGHT_ROLLOFF_APPLY_MODES,
     HIGHLIGHT_ROLLOFF_CURVES,
     clamp_chroma_boost_amount_pct,
+    clamp_fade_in_end,
+    clamp_fade_out_start,
+    clamp_fade_seconds,
     clamp_highlight_rolloff_ceiling_pct,
     clamp_highlight_rolloff_desaturation_pct,
     clamp_highlight_rolloff_softness_pct,
@@ -15,7 +19,7 @@ from cleave.config_schema.render import (
     clamp_highlight_rolloff_threshold_pct,
 )
 from cleave.viz.render_post_fx_bindings import RenderPostFxBindings
-from cleave.viz.session import TuningSession
+from cleave.viz.session import FadeSideRuntime, TuningSession
 
 
 class RenderPostFxControls:
@@ -55,11 +59,55 @@ class RenderPostFxControls:
             return
         self.session.render_post_fx_solo = False
 
-    def set_fade_in(self, fade_in: float) -> None:
-        self.session.render_post_fx.fade_in = max(0.0, fade_in)
+    def set_fade_expanded(self, expanded: bool) -> None:
+        fade = self.session.render_post_fx.fade
+        if fade.expanded == expanded:
+            return
+        fade.expanded = expanded
 
-    def set_fade_out(self, fade_out: float) -> None:
-        self.session.render_post_fx.fade_out = max(0.0, fade_out)
+    def set_fade_side_expanded(self, side: str, expanded: bool) -> None:
+        window = self._fade_side(side)
+        if window.expanded == expanded:
+            return
+        window.expanded = expanded
+
+    def set_fade_start(self, side: str, value: float) -> None:
+        window = self._fade_side(side)
+        if side == "fade_in":
+            window.start = clamp_fade_seconds(value)
+            window.end = clamp_fade_in_end(window.end, start=window.start)
+            return
+        window.start = clamp_fade_out_start(value, end=window.end)
+
+    def set_fade_end(self, side: str, value: float) -> None:
+        window = self._fade_side(side)
+        if side == "fade_in":
+            window.end = clamp_fade_in_end(value, start=window.start)
+            return
+        window.end = clamp_fade_seconds(value)
+        window.start = clamp_fade_out_start(window.start, end=window.end)
+
+    def cycle_fade_type(self, side: str, *, forward: bool) -> None:
+        curves = FADE_CURVES
+        window = self._fade_side(side)
+        try:
+            index = curves.index(window.type)
+        except ValueError:
+            index = 0
+        if forward:
+            window.type = curves[(index + 1) % len(curves)]
+        else:
+            window.type = curves[(index - 1) % len(curves)]
+
+    def _fade_side(self, side: str) -> FadeSideRuntime:
+        fade = self.session.render_post_fx.fade
+        if side == "fade_in":
+            return fade.fade_in
+        if side == "fade_out":
+            return fade.fade_out
+        raise ValueError(
+            f"fade side must be 'fade_in' or 'fade_out', got {side!r}"
+        )
 
     def set_highlight_rolloff_expanded(self, expanded: bool) -> None:
         pp = self.session.render_post_fx

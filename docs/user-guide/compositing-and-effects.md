@@ -36,7 +36,7 @@ Default title is `Cleave Final Render`. Use the cards for credits, musician name
 
 ## Post-processing
 
-GPU passes after the layer stack (Render > Post FX). A parent `enabled` flag gates every child. Fade in and fade out times apply to the whole post-FX block.
+GPU passes after the layer stack (Render > Post FX). A parent `enabled` flag gates every child. The fade section fades the picture in from the song start (start and end in seconds) and out counted back from the song end (start and end in seconds), using a curve (linear, smoothstep, ease out cubic, or ease out expo).
 
 **Highlight rolloff** compresses bright peaks. Apply per layer, on the composite (default), or off. Curves: rolloff (Reinhard-style), smoothstep, aces_fit. Threshold, ceiling, strength, softness, and desaturation are percentages.
 

@@ -47,6 +47,7 @@ from cleave.config_schema.render import (
     DEFAULT_RENDER_PATTERN_MASK_LOCKED,
     DEFAULT_RENDER_PATTERN_MASK_TRANSITION,
     DEFAULT_RENDER_POST_FX_LOCKED,
+    FadeCurve,
     HighlightRolloffApplyMode,
     HighlightRolloffCurve,
     PatternMaskType,
@@ -230,11 +231,25 @@ def default_chroma_boost_runtime() -> ChromaBoostRuntime:
 
 
 @dataclass
+class FadeSideRuntime:
+    start: float
+    end: float
+    type: FadeCurve
+    expanded: bool = False
+
+
+@dataclass
+class FadeRuntime:
+    fade_in: FadeSideRuntime
+    fade_out: FadeSideRuntime
+    expanded: bool = False
+
+
+@dataclass
 class RenderPostFxRuntime:
     enabled: bool
     expanded: bool
-    fade_in: float
-    fade_out: float
+    fade: FadeRuntime
     highlight_rolloff: HighlightRolloffRuntime
     highlight_rolloff_expanded: bool = False
     chroma_boost: ChromaBoostRuntime = field(default_factory=default_chroma_boost_runtime)
@@ -242,13 +257,23 @@ class RenderPostFxRuntime:
     locked: bool = DEFAULT_RENDER_POST_FX_LOCKED
 
 
+def _fade_runtime_from_values(values: dict[str, Any]) -> FadeRuntime:
+    return FadeRuntime(
+        fade_in=FadeSideRuntime(**values["fade_in"]),
+        fade_out=FadeSideRuntime(**values["fade_out"]),
+        expanded=values["expanded"],
+    )
+
+
 def default_render_post_fx_runtime() -> RenderPostFxRuntime:
     values = default_render_post_fx_runtime_values()
     highlight_rolloff = HighlightRolloffRuntime(**values.pop("highlight_rolloff"))
     chroma_boost = ChromaBoostRuntime(**values.pop("chroma_boost"))
+    fade = _fade_runtime_from_values(values.pop("fade"))
     return RenderPostFxRuntime(
         highlight_rolloff=highlight_rolloff,
         chroma_boost=chroma_boost,
+        fade=fade,
         **values,
     )
 
@@ -534,12 +559,28 @@ def render_post_fx_runtime_from_cfg(
     if post_fx is not None:
         hr = post_fx.highlight_rolloff
         cb = post_fx.chroma_boost
+        base = default_render_post_fx_runtime()
+        fin = post_fx.fade.fade_in
+        fout = post_fx.fade.fade_out
         return replace(
-            default_render_post_fx_runtime(),
+            base,
             enabled=post_fx.enabled,
             locked=post_fx.locked,
-            fade_in=post_fx.fade_in,
-            fade_out=post_fx.fade_out,
+            fade=replace(
+                base.fade,
+                fade_in=replace(
+                    base.fade.fade_in,
+                    start=fin.start,
+                    end=fin.end,
+                    type=fin.type,
+                ),
+                fade_out=replace(
+                    base.fade.fade_out,
+                    start=fout.start,
+                    end=fout.end,
+                    type=fout.type,
+                ),
+            ),
             highlight_rolloff=replace(
                 default_highlight_rolloff_runtime(),
                 mode=hr.mode,

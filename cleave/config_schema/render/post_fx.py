@@ -17,8 +17,28 @@ from cleave.config_schema.descriptors import (
 
 DEFAULT_RENDER_POST_FX_ENABLED = True
 DEFAULT_RENDER_POST_FX_LOCKED = False
-DEFAULT_RENDER_POST_FX_FADE_IN = 30.0
-DEFAULT_RENDER_POST_FX_FADE_OUT = 4.0
+
+FadeCurve = Literal["linear", "smoothstep", "ease_out_cubic", "ease_out_expo"]
+
+FADE_CURVES: tuple[FadeCurve, ...] = (
+    "linear",
+    "smoothstep",
+    "ease_out_cubic",
+    "ease_out_expo",
+)
+
+FADE_CURVE_HELP_ENTRIES: tuple[tuple[FadeCurve, str], ...] = (
+    ("linear", "constant rate from start to end."),
+    ("smoothstep", "smooth S-curve."),
+    ("ease_out_cubic", "fast start, cubic settle."),
+    ("ease_out_expo", "fast start, exponential settle."),
+)
+
+DEFAULT_FADE_IN_START = 0.0
+DEFAULT_FADE_IN_END = 30.0
+DEFAULT_FADE_OUT_START = 4.0
+DEFAULT_FADE_OUT_END = 0.0
+DEFAULT_FADE_CURVE: FadeCurve = "smoothstep"
 
 HighlightRolloffApplyMode = Literal["off", "per_layer", "composite"]
 
@@ -137,6 +157,18 @@ def clamp_chroma_boost_amount_pct(value: int) -> int:
     )
 
 
+def clamp_fade_seconds(value: float) -> float:
+    return max(0.0, float(value))
+
+
+def clamp_fade_in_end(end: float, *, start: float) -> float:
+    return max(clamp_fade_seconds(end), clamp_fade_seconds(start))
+
+
+def clamp_fade_out_start(start: float, *, end: float) -> float:
+    return max(clamp_fade_seconds(start), clamp_fade_seconds(end))
+
+
 def _parse_chroma_boost_apply_mode(
     value: object,
     _ctx: ParseCtx,
@@ -176,6 +208,19 @@ def _parse_highlight_rolloff_apply_mode(
         raise ValueError(f"{label} must be a string")
     if value not in HIGHLIGHT_ROLLOFF_APPLY_MODES:
         allowed = ", ".join(f"'{mode}'" for mode in HIGHLIGHT_ROLLOFF_APPLY_MODES)
+        raise ValueError(f"{label} must be one of: {allowed}")
+    return value
+
+
+def _parse_fade_curve(
+    value: Any,
+    ctx: ParseCtx,
+    label: str = "render.post_fx.fade.type",
+) -> FadeCurve:
+    if not isinstance(value, str):
+        raise ValueError(f"{label} must be a string")
+    if value not in FADE_CURVES:
+        allowed = ", ".join(f"'{curve}'" for curve in FADE_CURVES)
         raise ValueError(f"{label} must be one of: {allowed}")
     return value
 
@@ -324,6 +369,102 @@ HIGHLIGHT_ROLLOFF_SECTION = SectionDescriptor(
     ),
 )
 
+def _fade_side_section(
+    yaml_key: str,
+    *,
+    default_start: float,
+    default_end: float,
+    fade_in: bool,
+) -> SectionDescriptor:
+    def build(parsed: dict[str, Any]) -> Any:
+        from cleave.config import FadeSideConfig
+
+        if fade_in:
+            start = clamp_fade_seconds(parsed["start"])
+            end = clamp_fade_in_end(parsed["end"], start=start)
+        else:
+            end = clamp_fade_seconds(parsed["end"])
+            start = clamp_fade_out_start(parsed["start"], end=end)
+        return FadeSideConfig(start=start, end=end, type=parsed["type"])
+
+    def default_factory() -> Any:
+        return build(
+            {
+                "start": default_start,
+                "end": default_end,
+                "type": DEFAULT_FADE_CURVE,
+            }
+        )
+
+    return SectionDescriptor(
+        yaml_key=yaml_key,
+        fields=(
+            FieldDescriptor(
+                "start",
+                default_start,
+                lambda raw, ctx, label: float(require_non_negative_number(raw, label)),
+                dump_scalar,
+            ),
+            FieldDescriptor(
+                "end",
+                default_end,
+                lambda raw, ctx, label: float(require_non_negative_number(raw, label)),
+                dump_scalar,
+            ),
+            FieldDescriptor(
+                "type",
+                DEFAULT_FADE_CURVE,
+                _parse_fade_curve,
+                dump_scalar,
+            ),
+        ),
+        build=build,
+        optional=True,
+        default_factory=default_factory,
+    )
+
+
+FADE_IN_SECTION = _fade_side_section(
+    "fade_in",
+    default_start=DEFAULT_FADE_IN_START,
+    default_end=DEFAULT_FADE_IN_END,
+    fade_in=True,
+)
+FADE_OUT_SECTION = _fade_side_section(
+    "fade_out",
+    default_start=DEFAULT_FADE_OUT_START,
+    default_end=DEFAULT_FADE_OUT_END,
+    fade_in=False,
+)
+
+
+def _build_fade_config(parsed: dict[str, Any]) -> Any:
+    from cleave.config import FadeConfig
+
+    return FadeConfig(fade_in=parsed["fade_in"], fade_out=parsed["fade_out"])
+
+
+def _default_fade_config() -> Any:
+    fade_in_factory = FADE_IN_SECTION.default_factory
+    fade_out_factory = FADE_OUT_SECTION.default_factory
+    if fade_in_factory is None or fade_out_factory is None:
+        raise RuntimeError("fade side sections require default_factory")
+    return _build_fade_config(
+        {
+            "fade_in": fade_in_factory(),
+            "fade_out": fade_out_factory(),
+        }
+    )
+
+
+FADE_SECTION = SectionDescriptor(
+    yaml_key="fade",
+    fields=(FADE_IN_SECTION, FADE_OUT_SECTION),
+    build=_build_fade_config,
+    optional=True,
+    default_factory=_default_fade_config,
+)
+
 RENDER_POST_FX_FIELDS: tuple[SchemaField, ...] = (
     FieldDescriptor(
         "enabled",
@@ -337,18 +478,7 @@ RENDER_POST_FX_FIELDS: tuple[SchemaField, ...] = (
         lambda raw, _ctx, _label: bool(raw),
         dump_scalar,
     ),
-    FieldDescriptor(
-        "fade_in",
-        DEFAULT_RENDER_POST_FX_FADE_IN,
-        lambda raw, ctx, label: float(require_non_negative_number(raw, label)),
-        dump_scalar,
-    ),
-    FieldDescriptor(
-        "fade_out",
-        DEFAULT_RENDER_POST_FX_FADE_OUT,
-        lambda raw, ctx, label: float(require_non_negative_number(raw, label)),
-        dump_scalar,
-    ),
+    FADE_SECTION,
     HIGHLIGHT_ROLLOFF_SECTION,
     CHROMA_BOOST_SECTION,
 )
@@ -375,8 +505,18 @@ def post_fx_persist_values(ctx: PersistCtx) -> dict[str, Any]:
     return {
         "enabled": runtime.enabled,
         "locked": runtime.locked,
-        "fade_in": runtime.fade_in,
-        "fade_out": runtime.fade_out,
+        "fade": {
+            "fade_in": {
+                "start": runtime.fade.fade_in.start,
+                "end": runtime.fade.fade_in.end,
+                "type": runtime.fade.fade_in.type,
+            },
+            "fade_out": {
+                "start": runtime.fade.fade_out.start,
+                "end": runtime.fade.fade_out.end,
+                "type": runtime.fade.fade_out.type,
+            },
+        },
         "highlight_rolloff": {
             "mode": runtime.highlight_rolloff.mode,
             "curve": runtime.highlight_rolloff.curve,
@@ -414,12 +554,32 @@ def default_chroma_boost_runtime_values() -> dict[str, Any]:
     }
 
 
+def default_fade_side_runtime_values(start: float, end: float) -> dict[str, Any]:
+    return {
+        "start": start,
+        "end": end,
+        "type": DEFAULT_FADE_CURVE,
+        "expanded": False,
+    }
+
+
+def default_fade_runtime_values() -> dict[str, Any]:
+    return {
+        "expanded": False,
+        "fade_in": default_fade_side_runtime_values(
+            DEFAULT_FADE_IN_START, DEFAULT_FADE_IN_END
+        ),
+        "fade_out": default_fade_side_runtime_values(
+            DEFAULT_FADE_OUT_START, DEFAULT_FADE_OUT_END
+        ),
+    }
+
+
 def default_render_post_fx_runtime_values() -> dict[str, Any]:
     return {
         "enabled": DEFAULT_RENDER_POST_FX_ENABLED,
         "expanded": False,
-        "fade_in": DEFAULT_RENDER_POST_FX_FADE_IN,
-        "fade_out": DEFAULT_RENDER_POST_FX_FADE_OUT,
+        "fade": default_fade_runtime_values(),
         "highlight_rolloff": default_highlight_rolloff_runtime_values(),
         "highlight_rolloff_expanded": False,
         "chroma_boost": default_chroma_boost_runtime_values(),

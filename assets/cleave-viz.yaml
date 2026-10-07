@@ -1,8 +1,15 @@
 render:
   post_fx:
     enabled: false
-    fade_in: 15
-    fade_out: 4
+    fade:
+      fade_in:
+        start: 0
+        end: 15
+        type: smoothstep
+      fade_out:
+        start: 4
+        end: 0
+        type: smoothstep
     highlight_rolloff:
       mode: off
       curve: rolloff

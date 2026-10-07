@@ -762,8 +762,18 @@ def _snapshot_fixture(tmp_path: Path) -> tuple[CleaveConfig, TuningSession, Path
                     "fps": 30,
                     "post_fx": {
                         "enabled": True,
-                        "fade_in": 30,
-                        "fade_out": 4,
+                        "fade": {
+                            "fade_in": {
+                                "start": 0,
+                                "end": 30,
+                                "type": "smoothstep",
+                            },
+                            "fade_out": {
+                                "start": 4,
+                                "end": 0,
+                                "type": "smoothstep",
+                            },
+                        },
                     },
                     "overlays": {
                         "opening-card": _opening_card_yaml(),
@@ -815,7 +825,7 @@ def _snapshot_fixture(tmp_path: Path) -> tuple[CleaveConfig, TuningSession, Path
         user_config_path=root / "user-config.yaml",
         render=RenderConfig(
             overlays=_render_overlays_cfg(),
-            post_fx=default_render_post_fx_config(enabled=True, fade_in=30.0, fade_out=4.0),
+            post_fx=default_render_post_fx_config(enabled=True),
         ),
     )
     opening = replace(
@@ -840,13 +850,16 @@ def _snapshot_fixture(tmp_path: Path) -> tuple[CleaveConfig, TuningSession, Path
             display_time=40.0,
         ),
     )
+    post_fx_runtime = default_render_post_fx_runtime(enabled=True, expanded=False)
     session = TuningSession(
         layer_z_order=list(DEFAULT_LAYER_SLOTS),
-        render_post_fx=default_render_post_fx_runtime(
-            enabled=True,
-            expanded=False,
-            fade_in=12.0,
-            fade_out=3.0,
+        render_post_fx=replace(
+            post_fx_runtime,
+            fade=replace(
+                post_fx_runtime.fade,
+                fade_in=replace(post_fx_runtime.fade.fade_in, end=12.0),
+                fade_out=replace(post_fx_runtime.fade.fade_out, start=3.0),
+            ),
         ),
         render_overlays=RenderOverlaysRuntime(
             expanded=False,
@@ -931,20 +944,31 @@ def test_write_session_snapshot_strips_legacy_overlay_font(tmp_path: Path) -> No
 
 def test_write_session_snapshot_persists_render_post_fx(tmp_path: Path) -> None:
     cfg, session, out_path = _snapshot_fixture(tmp_path)
+    session.render_post_fx.fade.expanded = True
+    session.render_post_fx.fade.fade_in.expanded = True
+    session.render_post_fx.fade.fade_out.expanded = True
     write_session_snapshot(out_path, cfg=cfg, session=session)
 
     data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
     post_fx = data["render"]["post_fx"]
     assert post_fx["enabled"] is True
-    assert post_fx["fade_in"] == 12.0
-    assert post_fx["fade_out"] == 3.0
+    assert "fade_in" not in post_fx
+    assert "fade_out" not in post_fx
+    fade = post_fx["fade"]
+    assert fade["fade_in"] == {"start": 0.0, "end": 12.0, "type": "smoothstep"}
+    assert fade["fade_out"] == {"start": 3.0, "end": 0.0, "type": "smoothstep"}
+    assert "expanded" not in fade
+    assert "expanded" not in fade["fade_in"]
+    assert "expanded" not in fade["fade_out"]
 
     round_trip = parse_render_section(data)
     assert round_trip is not None
     assert round_trip.post_fx is not None
     assert round_trip.post_fx.enabled is True
-    assert round_trip.post_fx.fade_in == 12.0
-    assert round_trip.post_fx.fade_out == 3.0
+    assert round_trip.post_fx.fade.fade_in.start == 0.0
+    assert round_trip.post_fx.fade.fade_in.end == 12.0
+    assert round_trip.post_fx.fade.fade_out.start == 3.0
+    assert round_trip.post_fx.fade.fade_out.end == 0.0
     hr = post_fx["highlight_rolloff"]
     assert hr["mode"] == "composite"
     assert hr["curve"] == "rolloff"
@@ -1471,8 +1495,18 @@ def test_session_snapshot_full_round_trip(tmp_path: Path) -> None:
                     "fps": 30,
                     "post_fx": {
                         "enabled": True,
-                        "fade_in": 30,
-                        "fade_out": 4,
+                        "fade": {
+                            "fade_in": {
+                                "start": 0,
+                                "end": 30,
+                                "type": "smoothstep",
+                            },
+                            "fade_out": {
+                                "start": 4,
+                                "end": 0,
+                                "type": "smoothstep",
+                            },
+                        },
                     },
                     "overlays": {
                         "opening-card": {
@@ -1582,8 +1616,10 @@ def test_session_snapshot_full_round_trip(tmp_path: Path) -> None:
     session.render_overlays.opening_card.animation.appear_at = 8.0
     session.render_overlays.opening_card.position = "top-right"
     session.render_overlays.opening_card.opacity_pct = 80
-    session.render_post_fx.fade_in = 18.0
-    session.render_post_fx.fade_out = 2.0
+    session.render_post_fx.fade.expanded = True
+    session.render_post_fx.fade.fade_in.expanded = True
+    session.render_post_fx.fade.fade_in.end = 18.0
+    session.render_post_fx.fade.fade_out.start = 2.0
     session.timeline.lanes = {
         "layer_1": TimelineLane(
             baseline=0.0,

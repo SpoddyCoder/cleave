@@ -107,8 +107,6 @@ from cleave.config_schema.render import (
     DEFAULT_RENDER_OVERLAYS_LOCKED,
     DEFAULT_RENDER_PATTERN_MASK_LOCKED,
     DEFAULT_RENDER_PATTERN_MASK_TRANSITION,
-    DEFAULT_RENDER_POST_FX_FADE_IN,
-    DEFAULT_RENDER_POST_FX_FADE_OUT,
     DEFAULT_RENDER_POST_FX_LOCKED,
     HIGHLIGHT_ROLLOFF_APPLY_MODES,
     HIGHLIGHT_ROLLOFF_CURVES,
@@ -117,6 +115,7 @@ from cleave.config_schema.render import (
     RENDER_OVERLAY_SLIDE_DIRECTIONS,
     ChromaBoostApplyMode,
     ChromaBoostVariant,
+    FadeCurve,
     HighlightRolloffApplyMode,
     HighlightRolloffCurve,
     PatternMaskType,
@@ -303,10 +302,22 @@ class ChromaBoostConfig:
 
 
 @dataclass(frozen=True)
+class FadeSideConfig:
+    start: float
+    end: float
+    type: FadeCurve
+
+
+@dataclass(frozen=True)
+class FadeConfig:
+    fade_in: FadeSideConfig
+    fade_out: FadeSideConfig
+
+
+@dataclass(frozen=True)
 class RenderPostFxConfig:
     enabled: bool
-    fade_in: float
-    fade_out: float
+    fade: FadeConfig
     highlight_rolloff: HighlightRolloffConfig
     chroma_boost: ChromaBoostConfig
     locked: bool = DEFAULT_RENDER_POST_FX_LOCKED

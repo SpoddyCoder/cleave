@@ -39,8 +39,14 @@ def _minimal_runtime(compositor: MagicMock, *, upscale: float = 2.0) -> LiveVisu
     display_w = int(1280 * upscale)
     display_h = int(720 * upscale)
     session = TuningSession(layer_z_order=[], layers={})
-    session.render_post_fx = default_render_post_fx_runtime(
-        enabled=False, expanded=False, fade_in=0.0, fade_out=0.0
+    post_fx = default_render_post_fx_runtime(enabled=False, expanded=False)
+    session.render_post_fx = replace(
+        post_fx,
+        fade=replace(
+            post_fx.fade,
+            fade_in=replace(post_fx.fade.fade_in, end=0.0),
+            fade_out=replace(post_fx.fade.fade_out, start=0.0),
+        ),
     )
     controls = MagicMock()
     controls.build_view_state.return_value = MagicMock()

@@ -2,6 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
+
+def linear(u: float) -> float:
+    return max(0.0, min(1.0, u))
+
 
 def smoothstep(u: float) -> float:
     u = max(0.0, min(1.0, u))
@@ -28,6 +34,27 @@ def ease_out_back(u: float, *, overshoot: float = 1.525) -> float:
     c1 = overshoot
     c3 = c1 + 1.0
     return 1.0 + c3 * (u - 1.0) ** 3 + c1 * (u - 1.0) ** 2
+
+
+FADE_CURVE_FNS: dict[str, Callable[[float], float]] = {
+    "linear": linear,
+    "smoothstep": smoothstep,
+    "ease_out_cubic": ease_out_cubic,
+    "ease_out_expo": ease_out_expo,
+}
+
+
+def fade_ramp_alpha(elapsed: float, start: float, end: float, curve: str) -> float:
+    """Rising 0 -> 1 ramp between start and end seconds."""
+    if end <= start:
+        return 1.0 if elapsed >= start else 0.0
+    if elapsed < start:
+        return 0.0
+    if elapsed >= end:
+        return 1.0
+    u = (elapsed - start) / (end - start)
+    fn = FADE_CURVE_FNS.get(curve, smoothstep)
+    return fn(u)
 
 
 def fade_alpha(

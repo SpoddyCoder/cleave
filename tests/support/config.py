@@ -2,9 +2,19 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
-from cleave.config import ChromaBoostConfig, HighlightRolloffConfig, LayerConfig, RenderPostFxConfig, VIZ_CONFIG_FILENAME, dump_yaml
+from cleave.config import (
+    ChromaBoostConfig,
+    FadeConfig,
+    FadeSideConfig,
+    HighlightRolloffConfig,
+    LayerConfig,
+    RenderPostFxConfig,
+    VIZ_CONFIG_FILENAME,
+    dump_yaml,
+)
 from cleave.user_config import EditorSettings
 from cleave.config_schema.editor import dump_editor_section
 from cleave.config_schema.layers import (
@@ -13,12 +23,21 @@ from cleave.config_schema.layers import (
     template_layer_entry,
 )
 from cleave.config_schema.render import (
+    DEFAULT_FADE_CURVE,
+    DEFAULT_FADE_IN_END,
+    DEFAULT_FADE_IN_START,
+    DEFAULT_FADE_OUT_END,
+    DEFAULT_FADE_OUT_START,
     default_chroma_boost_runtime_values,
     default_highlight_rolloff_runtime_values,
 )
 from cleave.stems import STEM_NAMES, StemSource
 from cleave.preset_playlist import playlist_at_dir
-from cleave.viz.session import ChromaBoostRuntime, HighlightRolloffRuntime, LayerRuntime, RenderPostFxRuntime
+from cleave.viz.session import (
+    LayerRuntime,
+    RenderPostFxRuntime,
+    default_render_post_fx_runtime as _session_default_render_post_fx_runtime,
+)
 
 TEST_LAYER_STEMS: dict[str, StemSource] = {
     "layer_1": "drums",
@@ -36,11 +55,25 @@ def default_chroma_boost_config() -> ChromaBoostConfig:
     return ChromaBoostConfig(**default_chroma_boost_runtime_values())
 
 
+def default_fade_config() -> FadeConfig:
+    return FadeConfig(
+        fade_in=FadeSideConfig(
+            start=DEFAULT_FADE_IN_START,
+            end=DEFAULT_FADE_IN_END,
+            type=DEFAULT_FADE_CURVE,
+        ),
+        fade_out=FadeSideConfig(
+            start=DEFAULT_FADE_OUT_START,
+            end=DEFAULT_FADE_OUT_END,
+            type=DEFAULT_FADE_CURVE,
+        ),
+    )
+
+
 def default_render_post_fx_config(**overrides: object) -> RenderPostFxConfig:
     values: dict[str, object] = {
         "enabled": True,
-        "fade_in": 30.0,
-        "fade_out": 4.0,
+        "fade": default_fade_config(),
         "highlight_rolloff": default_highlight_rolloff_config(),
         "chroma_boost": default_chroma_boost_config(),
     }
@@ -49,26 +82,10 @@ def default_render_post_fx_config(**overrides: object) -> RenderPostFxConfig:
 
 
 def default_render_post_fx_runtime(**overrides: object) -> RenderPostFxRuntime:
-    values: dict[str, object] = {
-        "enabled": True,
-        "expanded": False,
-        "fade_in": 30.0,
-        "fade_out": 4.0,
-        "highlight_rolloff": HighlightRolloffRuntime(
-            **default_highlight_rolloff_runtime_values()
-        ),
-        "highlight_rolloff_expanded": False,
-        "chroma_boost": ChromaBoostRuntime(**default_chroma_boost_runtime_values()),
-        "chroma_boost_expanded": False,
-    }
-    values.update(overrides)
-    highlight_rolloff = values.pop("highlight_rolloff")
-    chroma_boost = values.pop("chroma_boost")
-    return RenderPostFxRuntime(
-        highlight_rolloff=highlight_rolloff,
-        chroma_boost=chroma_boost,
-        **values,
-    )  # type: ignore[arg-type]
+    runtime = _session_default_render_post_fx_runtime()
+    if not overrides:
+        return runtime
+    return replace(runtime, **overrides)  # type: ignore[arg-type]
 
 
 def slot_for_stem(stem: str) -> str:

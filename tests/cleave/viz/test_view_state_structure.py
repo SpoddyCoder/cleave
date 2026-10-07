@@ -516,6 +516,48 @@ def test_structure_signature_invalidates_on_chroma_boost_mode() -> None:
     assert sig_before != sig_after
 
 
+def test_structure_signature_invalidates_on_render_post_fx_fade_expanded() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    config_save = controls._config_save
+    sig_before = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    session.render_post_fx.fade.expanded = True
+    sig_after = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    assert sig_before != sig_after
+
+
+def test_structure_signature_invalidates_on_render_post_fx_fade_in_expanded() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    config_save = controls._config_save
+    sig_before = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    session.render_post_fx.fade.fade_in.expanded = True
+    sig_after = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    assert sig_before != sig_after
+
+
+def test_structure_signature_invalidates_on_render_post_fx_fade_out_expanded() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    config_save = controls._config_save
+    sig_before = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    session.render_post_fx.fade.fade_out.expanded = True
+    sig_after = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    assert sig_before != sig_after
+
+
 def test_builder_rebuilds_layout_when_highlight_rolloff_mode_changes() -> None:
     controls = _make_controls(("layer_1",))
     session = controls.session

@@ -12,6 +12,8 @@ import yaml
 from cleave.config import (
     VIZ_CONFIG_FILENAME,
     CleaveConfig,
+    FadeConfig,
+    FadeSideConfig,
     LayerConfig,
     PathsConfig,
     RenderOverlayAnimationConfig,
@@ -80,11 +82,12 @@ from cleave.config_schema.project_render import (
     DEFAULT_RENDER_WIDTH,
 )
 from cleave.config_schema.render import (
+    FADE_CURVES,
     parse_render_section,
 )
 from cleave.config_schema.timeline import parse_timeline_section, persist_timeline
 from cleave.user_config import EditorSettings
-from cleave.viz.session import TuningSession
+from cleave.viz.session import TuningSession, render_post_fx_runtime_from_cfg
 from cleave.paths import default_preset_root, default_texture_paths, repo_root
 from cleave.stems import STEM_NAMES
 from cleave.timeline import SlotCue, TimelineLane
@@ -1026,15 +1029,103 @@ def test_parse_render_post_fx_defaults() -> None:
         """\
 render:
   post_fx:
-    fade_in: 12
-    fade_out: 3
+    fade:
+      fade_in:
+        start: 0
+        end: 12
+      fade_out:
+        start: 3
+        end: 0
 """
     )
     render = parse_render_section(data)
     assert render == RenderConfig(
         overlays=None,
-        post_fx=default_render_post_fx_config(enabled=True, fade_in=12.0, fade_out=3.0),
+        post_fx=default_render_post_fx_config(
+            enabled=True,
+            fade=FadeConfig(
+                fade_in=FadeSideConfig(start=0.0, end=12.0, type="smoothstep"),
+                fade_out=FadeSideConfig(start=3.0, end=0.0, type="smoothstep"),
+            ),
+        ),
     )
+
+
+def test_parse_render_post_fx_fade_enforces_window() -> None:
+    data = yaml.safe_load(
+        """\
+render:
+  post_fx:
+    fade:
+      fade_in:
+        start: 10
+        end: 4
+      fade_out:
+        start: 1
+        end: 3
+"""
+    )
+    render = parse_render_section(data)
+    assert render is not None
+    assert render.post_fx is not None
+    fade = render.post_fx.fade
+    assert fade.fade_in.start == 10.0
+    assert fade.fade_in.end == 10.0
+    assert fade.fade_out.end == 3.0
+    assert fade.fade_out.start == 3.0
+
+
+@pytest.mark.parametrize("curve", FADE_CURVES)
+def test_parse_render_post_fx_fade_valid_curves(curve: str) -> None:
+    data = yaml.safe_load(
+        f"""\
+render:
+  post_fx:
+    fade:
+      fade_in:
+        type: {curve}
+"""
+    )
+    render = parse_render_section(data)
+    assert render is not None
+    assert render.post_fx is not None
+    assert render.post_fx.fade.fade_in.type == curve
+
+
+def test_parse_render_post_fx_fade_rejects_invalid_curve() -> None:
+    data = yaml.safe_load(
+        """\
+render:
+  post_fx:
+    fade:
+      fade_in:
+        type: ease_out_back
+"""
+    )
+    with pytest.raises(ValueError, match="type must be one of"):
+        parse_render_section(data)
+
+
+def test_render_post_fx_runtime_from_cfg_copies_fade() -> None:
+    from types import SimpleNamespace
+
+    post_fx = default_render_post_fx_config(
+        fade=FadeConfig(
+            fade_in=FadeSideConfig(start=1.0, end=8.0, type="linear"),
+            fade_out=FadeSideConfig(start=6.0, end=2.0, type="ease_out_expo"),
+        ),
+    )
+    cfg = SimpleNamespace(render=SimpleNamespace(post_fx=post_fx))
+    runtime = render_post_fx_runtime_from_cfg(cfg)
+    assert runtime.fade.expanded is False
+    assert runtime.fade.fade_in.start == 1.0
+    assert runtime.fade.fade_in.end == 8.0
+    assert runtime.fade.fade_in.type == "linear"
+    assert runtime.fade.fade_in.expanded is False
+    assert runtime.fade.fade_out.start == 6.0
+    assert runtime.fade.fade_out.end == 2.0
+    assert runtime.fade.fade_out.type == "ease_out_expo"
+    assert runtime.fade.fade_out.expanded is False
 
 
 def test_parse_render_post_fx_highlight_rolloff_defaults() -> None:
@@ -2005,6 +2096,8 @@ _UI_ONLY_LITERAL_DEFAULTS = frozenset(
         ("RenderOverlayCardRuntime", "animation_expanded"),
         ("RenderPostFxRuntime", "highlight_rolloff_expanded"),
         ("RenderPostFxRuntime", "chroma_boost_expanded"),
+        ("FadeSideRuntime", "expanded"),
+        ("FadeRuntime", "expanded"),
         ("TimelineRuntime", "panel_open"),
         ("TimelineRuntime", "focus_row"),
         ("TimelineRuntime", "recording"),
@@ -2040,6 +2133,8 @@ _UI_ONLY_LITERAL_DEFAULTS = frozenset(
         ("RenderOverlaysBlock", "solo"),
         ("HighlightRolloffBlock", "expanded"),
         ("ChromaBoostBlock", "expanded"),
+        ("FadeSideBlock", "expanded"),
+        ("FadeBlock", "expanded"),
         ("RenderPostFxBlock", "solo"),
         ("RenderTimelineBlock", "expanded"),
         ("RenderTimelineBlock", "bar_phase_offset"),

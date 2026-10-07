@@ -282,17 +282,25 @@ def _mutate_render_post_fx_enabled(controls: TuningControls) -> None:
     controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
 
 
-def _mutate_render_post_fx_fade_in(controls: TuningControls) -> None:
+def _expand_render_post_fx_fade(controls: TuningControls) -> None:
     _expand_render_post_fx(controls)
-    view = controls.build_view_state(paused=False)
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_FADE_IN)
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_FADE_HEADER)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
+def _mutate_render_post_fx_fade_in(controls: TuningControls) -> None:
+    _expand_render_post_fx_fade(controls)
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_FADE_IN_HEADER)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_FADE_IN_END)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
 def _mutate_render_post_fx_fade_out(controls: TuningControls) -> None:
-    _expand_render_post_fx(controls)
-    view = controls.build_view_state(paused=False)
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_FADE_OUT)
+    _expand_render_post_fx_fade(controls)
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_FADE_OUT_HEADER)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_FADE_OUT_START)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
@@ -500,8 +508,8 @@ _PERSISTED_MUTATIONS: list[
     ("render_overlay.animation.display_time", _mutate_render_overlay_display_time, ("layer_1",), {}),
     ("render_post_fx.enabled", _mutate_render_post_fx_enabled, ("layer_1",), {}),
     ("render_post_fx.locked", _mutate_render_post_fx_locked, ("layer_1",), {}),
-    ("render_post_fx.fade_in", _mutate_render_post_fx_fade_in, ("layer_1",), {}),
-    ("render_post_fx.fade_out", _mutate_render_post_fx_fade_out, ("layer_1",), {}),
+    ("render_post_fx.fade.fade_in.end", _mutate_render_post_fx_fade_in, ("layer_1",), {}),
+    ("render_post_fx.fade.fade_out.start", _mutate_render_post_fx_fade_out, ("layer_1",), {}),
     ("render_post_fx.highlight_rolloff.mode", _mutate_render_post_fx_highlight_rolloff_mode, ("layer_1",), {}),
     ("render_post_fx.highlight_rolloff.curve", _mutate_render_post_fx_highlight_rolloff_curve, ("layer_1",), {}),
     ("render_post_fx.highlight_rolloff.threshold_pct", _mutate_render_post_fx_highlight_rolloff_threshold, ("layer_1",), {}),

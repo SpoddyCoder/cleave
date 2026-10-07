@@ -638,12 +638,12 @@ def test_disabled_render_post_fx_can_expand_sub_rows() -> None:
     assert controls.session.render_post_fx.expanded is True
 
     view = controls.build_view_state(paused=False)
-    fade_in_row = view.layout.find_by_kind(RowKind.RENDER_POST_FX_FADE_IN)
-    assert fade_in_row in view.layout.visible_indices(view)
-    assert fade_in_row in view.layout.navigable_indices(view)
+    fade_row = view.layout.find_by_kind(RowKind.RENDER_POST_FX_FADE_HEADER)
+    assert fade_row in view.layout.visible_indices(view)
+    assert fade_row in view.layout.navigable_indices(view)
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
-    assert controls.focus_descriptor == _desc(view, fade_in_row)
+    assert controls.focus_descriptor == _desc(view, fade_row)
 
 
 def test_disabled_render_timeline_can_open_panel() -> None:
@@ -2001,6 +2001,71 @@ def test_transport_icons_play_vs_pause() -> None:
     assert pause_mask.count() > 0
     overlap_px = play_mask.overlap_area(pause_mask, (0, 0))
     assert overlap_px < play_mask.count() or overlap_px < pause_mask.count()
+
+
+def test_render_post_fx_fade_rows_step_window_edges() -> None:
+    controls = _make_controls(("layer_1",))
+    pp = controls.session.render_post_fx
+    pp.expanded = True
+    pp.fade.expanded = True
+    pp.fade.fade_in.expanded = True
+    pp.fade.fade_out.expanded = True
+    view = controls.build_view_state(paused=False)
+
+    fade_in_start = view.layout.find_by_kind(RowKind.RENDER_POST_FX_FADE_IN_START)
+    controls.focus_descriptor = _desc(view, fade_in_start)
+    fin = pp.fade.fade_in
+    start = fin.start
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert fin.start == start + 1.0
+    view = controls.build_view_state(paused=False)
+    assert view.render_post_fx.fade.fade_in.start == fin.start
+
+    fade_in_end = view.layout.find_by_kind(RowKind.RENDER_POST_FX_FADE_IN_END)
+    controls.focus_descriptor = _desc(view, fade_in_end)
+    end = fin.end
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert fin.end == end + 1.0
+    view = controls.build_view_state(paused=False)
+    assert view.render_post_fx.fade.fade_in.end == fin.end
+
+    fade_out_start = view.layout.find_by_kind(RowKind.RENDER_POST_FX_FADE_OUT_START)
+    controls.focus_descriptor = _desc(view, fade_out_start)
+    fout = pp.fade.fade_out
+    fout_start = fout.start
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert fout.start == fout_start + 1.0
+    view = controls.build_view_state(paused=False)
+    assert view.render_post_fx.fade.fade_out.start == fout.start
+
+
+def test_render_post_fx_fade_setters_clamp_and_cycle() -> None:
+    controls = _make_controls(("layer_1",))
+    fade = controls.session.render_post_fx.fade
+    controls.render_post_fx.set_fade_end("fade_in", 12.0)
+    assert fade.fade_in.end == 12.0
+    controls.render_post_fx.set_fade_start("fade_in", 20.0)
+    assert fade.fade_in.start == 20.0
+    assert fade.fade_in.end == 20.0
+    controls.render_post_fx.set_fade_start("fade_in", -3.0)
+    assert fade.fade_in.start == 0.0
+    assert fade.fade_in.end == 20.0
+
+    controls.render_post_fx.set_fade_end("fade_out", 5.0)
+    assert fade.fade_out.end == 5.0
+    assert fade.fade_out.start == 5.0
+    controls.render_post_fx.set_fade_start("fade_out", 1.0)
+    assert fade.fade_out.start == 5.0
+
+    controls.render_post_fx.set_fade_expanded(True)
+    controls.render_post_fx.set_fade_side_expanded("fade_out", True)
+    assert fade.expanded is True
+    assert fade.fade_out.expanded is True
+    assert fade.fade_in.type == "smoothstep"
+    controls.render_post_fx.cycle_fade_type("fade_in", forward=True)
+    assert fade.fade_in.type == "ease_out_cubic"
+    controls.render_post_fx.cycle_fade_type("fade_in", forward=False)
+    assert fade.fade_in.type == "smoothstep"
 
 
 def test_render_post_fx_highlight_rolloff_mode_off_keeps_section_expanded() -> None:
