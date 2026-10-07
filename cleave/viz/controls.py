@@ -683,6 +683,12 @@ class TuningControls:
             if kind == RowKind.TIMELINE_APPLY_HARD_CUTS:
                 self._timeline_cuts.prompt_hard()
                 return True
+            if kind in (
+                RowKind.TIMELINE_REMOVE_SOFT_CUTS,
+                RowKind.TIMELINE_REMOVE_HARD_CUTS,
+            ):
+                self._timeline_cuts.prompt_remove()
+                return True
             if kind == RowKind.TRACK_PRESET_DIR:
                 slot = self.focus_descriptor.slot
                 if slot is not None:

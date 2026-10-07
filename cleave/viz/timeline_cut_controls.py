@@ -1,4 +1,4 @@
-"""Bulk apply hard/soft cut types to timeline cues."""
+"""Bulk apply or clear hard/soft cut types on timeline cues."""
 
 from __future__ import annotations
 
@@ -22,6 +22,20 @@ _ALL_LABEL = "All cues"
 _EXCEPT_MARKERS_LABEL = "All cues except song marker cues"
 _MARKERS_ONLY_LABEL = "Song marker cues only"
 _CANCEL_LABEL = "Cancel"
+
+
+def _prompt_title(cut: CutType) -> str:
+    if cut == "none":
+        return "Remove cuts from cues?"
+    label = "soft" if cut == "soft" else "hard"
+    return f"Apply {label} cuts to cues?"
+
+
+def _applied_prefix(cut: CutType) -> str:
+    if cut == "none":
+        return "Removed cuts from"
+    label = "soft" if cut == "soft" else "hard"
+    return f"Applied {label} cuts to"
 
 
 def apply_cut_to_lanes(
@@ -75,7 +89,7 @@ def apply_cut_to_lanes(
 
 
 class TimelineCutController:
-    """Prompt for and apply hard/soft cut types to committed cues."""
+    """Prompt for and apply or clear hard/soft cut types on committed cues."""
 
     def __init__(
         self,
@@ -94,6 +108,9 @@ class TimelineCutController:
     def prompt_hard(self) -> None:
         self._prompt("hard")
 
+    def prompt_remove(self) -> None:
+        self._prompt("none")
+
     def _prompt(self, cut: CutType) -> None:
         tl = self.session.timeline
         if tl.locked:
@@ -103,7 +120,6 @@ class TimelineCutController:
         if not any(lane.cues for lane in tl.lanes.values()):
             self._notify("No timeline cues to update")
             return
-        label = "soft" if cut == "soft" else "hard"
         dismiss = lambda: None
         options = [
             ModalOption(
@@ -121,7 +137,7 @@ class TimelineCutController:
             ModalOption(_CANCEL_LABEL, dismiss),
         ]
         self._modal.prompt_choice(
-            f"Apply {label} cuts to cues?",
+            _prompt_title(cut),
             options,
             on_dismiss=dismiss,
         )
@@ -139,9 +155,8 @@ class TimelineCutController:
         if count == 0:
             self._notify("No matching cues to update")
             return
-        label = "soft" if cut == "soft" else "hard"
         noun = "cue" if count == 1 else "cues"
-        self._notify(f"Applied {label} cuts to {count} {noun}")
+        self._notify(f"{_applied_prefix(cut)} {count} {noun}")
 
     def _notify(self, message: str) -> None:
         if self._on_notification is not None:

@@ -1316,8 +1316,14 @@ def test_apply_cuts_to_cues_rows_use_action_color() -> None:
     )
     soft_row = state.layout.find_by_kind(RowKind.TIMELINE_APPLY_SOFT_CUTS)
     hard_row = state.layout.find_by_kind(RowKind.TIMELINE_APPLY_HARD_CUTS)
+    remove_soft_row = state.layout.find_by_kind(RowKind.TIMELINE_REMOVE_SOFT_CUTS)
+    remove_hard_row = state.layout.find_by_kind(RowKind.TIMELINE_REMOVE_HARD_CUTS)
     assert _row_value_color(state, soft_row) == ACTION
     assert _row_value_color(state, hard_row) == ACTION
+    assert _row_value_color(state, remove_soft_row) == ACTION
+    assert _row_value_color(state, remove_hard_row) == ACTION
+    assert "Remove from Cues" in _row_text(state, remove_soft_row)
+    assert "Remove from Cues" in _row_text(state, remove_hard_row)
     assert "▶" not in _row_text(state, soft_row)
     assert "▼" not in _row_text(state, soft_row)
     assert "▶" not in _row_text(state, hard_row)

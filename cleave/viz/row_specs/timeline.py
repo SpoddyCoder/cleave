@@ -1062,6 +1062,32 @@ SPECS: dict[RowKind, RowSpec] = {
         ),
         blocked_by_section_lock=True,
     ),
+    RowKind.TIMELINE_REMOVE_SOFT_CUTS: RowSpec(
+        affordance=RowAffordance.ACTION,
+        panel_label="Remove from Cues",
+        present_style=RowPresentStyle.FULL_LINE,
+        fit_strategy=FitStrategy.NONE,
+        shows_enter_icon=True,
+        help_title="Remove from Cues",
+        help_entries=(("Enter", "remove soft cuts"),),
+        help_description=(
+            "Set cut type none on all cues, song-marker cues, or all except markers.",
+        ),
+        blocked_by_section_lock=True,
+    ),
+    RowKind.TIMELINE_REMOVE_HARD_CUTS: RowSpec(
+        affordance=RowAffordance.ACTION,
+        panel_label="Remove from Cues",
+        present_style=RowPresentStyle.FULL_LINE,
+        fit_strategy=FitStrategy.NONE,
+        shows_enter_icon=True,
+        help_title="Remove from Cues",
+        help_entries=(("Enter", "remove hard cuts"),),
+        help_description=(
+            "Set cut type none on all cues, song-marker cues, or all except markers.",
+        ),
+        blocked_by_section_lock=True,
+    ),
     RowKind.SONG_MARKERS_HEADER: RowSpec(
         affordance=RowAffordance.EXPAND,
         panel_label="song markers",

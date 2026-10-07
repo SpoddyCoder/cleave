@@ -131,6 +131,8 @@ class RowKind(Enum):
     TIMELINE_SOFT_CUT_CROSSFADE = auto()
     TIMELINE_APPLY_SOFT_CUTS = auto()
     TIMELINE_APPLY_HARD_CUTS = auto()
+    TIMELINE_REMOVE_SOFT_CUTS = auto()
+    TIMELINE_REMOVE_HARD_CUTS = auto()
     SONG_MARKERS_HEADER = auto()
     SONG_MARKER_ITEM = auto()
     PROJECT_HEADER = auto()

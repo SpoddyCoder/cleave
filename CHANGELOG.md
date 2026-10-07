@@ -9,6 +9,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 
+- Timeline hard and soft cuts include Remove from Cues. It uses the same cue scope choices as Apply to Cues and sets the chosen cues' cut type to none.
 - Open wav, mp3, flac, m4a, aac, ogg, aiff, and aif tracks from the file picker or by dropping them on cleave.exe. New projects store a PCM WAV mix and keep the original file path.
 - Settings > UI min width row (default 80). Smallest the flexible panel shrinks to.
 - Switching Paused row just below the preset file. Enter on a preset list item auditions it and pauses switching.

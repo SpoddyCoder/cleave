@@ -190,6 +190,8 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     soft_cut_crossfade = RowDescriptor(RowKind.TIMELINE_SOFT_CUT_CROSSFADE)
     apply_soft_cuts = RowDescriptor(RowKind.TIMELINE_APPLY_SOFT_CUTS)
     apply_hard_cuts = RowDescriptor(RowKind.TIMELINE_APPLY_HARD_CUTS)
+    remove_soft_cuts = RowDescriptor(RowKind.TIMELINE_REMOVE_SOFT_CUTS)
+    remove_hard_cuts = RowDescriptor(RowKind.TIMELINE_REMOVE_HARD_CUTS)
     limiter_header = RowDescriptor(RowKind.TIMELINE_VISUAL_LIMITER_HEADER)
     limiter_enabled = RowDescriptor(RowKind.TIMELINE_VISUAL_LIMITER_ENABLED)
     limiter_threshold = RowDescriptor(RowKind.TIMELINE_VISUAL_LIMITER_THRESHOLD)
@@ -306,6 +308,8 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert view_cuts_expanded.layout.rows.index(soft_cut_fades) == cuts_idx + 2
     assert apply_soft_cuts not in view_cuts_expanded.layout.rows
     assert apply_hard_cuts not in view_cuts_expanded.layout.rows
+    assert remove_soft_cuts not in view_cuts_expanded.layout.rows
+    assert remove_hard_cuts not in view_cuts_expanded.layout.rows
     assert hard_cut_fade_in not in view_cuts_expanded.layout.rows
     assert soft_cut_fade_in not in view_cuts_expanded.layout.rows
     assert view_cuts_expanded.layout.rows.index(presets_header) == cuts_idx + 3
@@ -320,12 +324,14 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert view_cuts_enabled.layout.rows.index(hard_cut_fade_out) == cuts_idx + 3
     assert view_cuts_enabled.layout.rows.index(hard_cut_crossfade) == cuts_idx + 4
     assert view_cuts_enabled.layout.rows.index(apply_hard_cuts) == cuts_idx + 5
-    assert view_cuts_enabled.layout.rows.index(soft_cut_fades) == cuts_idx + 6
-    assert view_cuts_enabled.layout.rows.index(soft_cut_fade_in) == cuts_idx + 7
-    assert view_cuts_enabled.layout.rows.index(soft_cut_fade_out) == cuts_idx + 8
-    assert view_cuts_enabled.layout.rows.index(soft_cut_crossfade) == cuts_idx + 9
-    assert view_cuts_enabled.layout.rows.index(apply_soft_cuts) == cuts_idx + 10
-    assert view_cuts_enabled.layout.rows.index(presets_header) == cuts_idx + 11
+    assert view_cuts_enabled.layout.rows.index(remove_hard_cuts) == cuts_idx + 6
+    assert view_cuts_enabled.layout.rows.index(soft_cut_fades) == cuts_idx + 7
+    assert view_cuts_enabled.layout.rows.index(soft_cut_fade_in) == cuts_idx + 8
+    assert view_cuts_enabled.layout.rows.index(soft_cut_fade_out) == cuts_idx + 9
+    assert view_cuts_enabled.layout.rows.index(soft_cut_crossfade) == cuts_idx + 10
+    assert view_cuts_enabled.layout.rows.index(apply_soft_cuts) == cuts_idx + 11
+    assert view_cuts_enabled.layout.rows.index(remove_soft_cuts) == cuts_idx + 12
+    assert view_cuts_enabled.layout.rows.index(presets_header) == cuts_idx + 13
 
     session.timeline.timeline_presets_expanded = True
     view_presets_expanded = builder.build(paused=False)
