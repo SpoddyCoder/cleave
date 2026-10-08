@@ -668,11 +668,8 @@ class TuningControls:
             if kind == RowKind.TIMELINE_RESET:
                 self._timeline_presets.prompt_reset()
                 return True
-            if kind == RowKind.TIMELINE_SNAP_TO_BEATS:
-                self._timeline_snap.prompt_beats()
-                return True
-            if kind == RowKind.TIMELINE_SNAP_TO_BARS:
-                self._timeline_snap.prompt_bars()
+            if kind == RowKind.TIMELINE_SNAP_CUES:
+                self._timeline_snap.prompt_cues()
                 return True
             if kind == RowKind.TIMELINE_SNAP_TO_SONG_MARKERS:
                 self._timeline_snap.prompt_song_markers()

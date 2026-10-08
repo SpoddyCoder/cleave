@@ -982,7 +982,9 @@ SONG_MARKERS_SECTION = ExpandSectionDef(
     context="global",
     read_expanded=_song_markers_expanded,
     toggle=_toggle_song_markers,
-    children=(),
+    children=(
+        SectionNode(leaf_kind=RowKind.TIMELINE_SNAP_TO_SONG_MARKERS),
+    ),
     append_dynamic_children=_append_song_marker_rows,
 )
 
@@ -995,9 +997,7 @@ BEAT_BAR_GRID_SECTION = ExpandSectionDef(
         SectionNode(leaf_kind=RowKind.TIMELINE_PLACEMENT_SNAP),
         SectionNode(leaf_kind=RowKind.TIMELINE_BAR_GRID),
         SectionNode(leaf_kind=RowKind.TIMELINE_BAR_PHASE),
-        SectionNode(leaf_kind=RowKind.TIMELINE_SNAP_TO_BEATS),
-        SectionNode(leaf_kind=RowKind.TIMELINE_SNAP_TO_BARS),
-        SectionNode(leaf_kind=RowKind.TIMELINE_SNAP_TO_SONG_MARKERS),
+        SectionNode(leaf_kind=RowKind.TIMELINE_SNAP_CUES),
     ),
 )
 
@@ -1266,8 +1266,7 @@ RENDER_TIMELINE_SECTION_KINDS = frozenset(
         RowKind.TIMELINE_PLACEMENT_SNAP,
         RowKind.TIMELINE_BAR_GRID,
         RowKind.TIMELINE_BAR_PHASE,
-        RowKind.TIMELINE_SNAP_TO_BEATS,
-        RowKind.TIMELINE_SNAP_TO_BARS,
+        RowKind.TIMELINE_SNAP_CUES,
         RowKind.TIMELINE_SNAP_TO_SONG_MARKERS,
         RowKind.TIMELINE_CUTS_HEADER,
         RowKind.TIMELINE_HARD_CUTS,
@@ -1328,7 +1327,7 @@ def _build_row_tree_indent_depth() -> dict[RowKind, int]:
     depths[RowKind.TRACK_PRESET_LIST_ITEM] = preset_list_item_depth
     depths[RowKind.TRACK_PRESET_LIST_ADD] = preset_list_item_depth
     depths[RowKind.TRACK_PRESET_LIST_POPULATE] = preset_list_item_depth
-    depths[RowKind.SONG_MARKERS_HEADER] = 1
+    _assign_expand_indent_depth(depths, SONG_MARKERS_SECTION, 1)
     depths[RowKind.SONG_MARKER_ITEM] = 2
     depths[RowKind.TIMELINE_RESET] = 1
     _assign_expand_indent_depth(depths, BEAT_BAR_GRID_SECTION, 1)

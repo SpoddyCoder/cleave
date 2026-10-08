@@ -19,7 +19,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
-- Timeline beat / bar grid sits above song markers. Snap to Beats, Snap to Bars, and Snap to Song Markers are at the bottom of the beat / bar grid section.
+- Timeline beat / bar grid sits above song markers. Snap Cues there asks whether to snap timeline cues to beats or bars. Snap Cues in the song markers menu pulls nearby cues onto markers.
 - Apply to Cues sits at the bottom of each cut section and hides when that cut type is disabled.
 - Post-FX fade is an expandable section with fade-in and fade-out start, end, and curve, replacing the two duration rows.
 - The preset-switching pause toast omits the layer name. Switching Paused - Enter To Resume sits just below the preset file, at the same indent, so it stays visible when the switching menu is collapsed.
