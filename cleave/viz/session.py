@@ -63,9 +63,11 @@ from cleave.config_schema.render import (
 from cleave.config_schema.timeline import (
     DEFAULT_TIMELINE_CROSSFADE,
     DEFAULT_TIMELINE_ENABLED,
-    DEFAULT_TIMELINE_FADE_IN,
-    DEFAULT_TIMELINE_FADE_OUT,
     DEFAULT_TIMELINE_FADES_ENABLED,
+    DEFAULT_TIMELINE_HARD_FADE_IN,
+    DEFAULT_TIMELINE_HARD_FADE_OUT,
+    DEFAULT_TIMELINE_SOFT_FADE_IN,
+    DEFAULT_TIMELINE_SOFT_FADE_OUT,
     DEFAULT_TIMELINE_LOCKED,
     DEFAULT_TIMELINE_PLACEMENT_SNAP,
     DEFAULT_VISUAL_LIMITER_ENABLED,
@@ -298,13 +300,23 @@ def default_render_pattern_mask_runtime() -> RenderPatternMaskRuntime:
 @dataclass
 class TimelineFadeGroupRuntime:
     enabled: bool = DEFAULT_TIMELINE_FADES_ENABLED
-    fade_in: float = DEFAULT_TIMELINE_FADE_IN
-    fade_out: float = DEFAULT_TIMELINE_FADE_OUT
+    fade_in: float = DEFAULT_TIMELINE_SOFT_FADE_IN
+    fade_out: float = DEFAULT_TIMELINE_SOFT_FADE_OUT
     crossfade: bool = DEFAULT_TIMELINE_CROSSFADE
 
 
-def default_timeline_fade_group_runtime() -> TimelineFadeGroupRuntime:
-    return TimelineFadeGroupRuntime()
+def default_hard_timeline_fade_group_runtime() -> TimelineFadeGroupRuntime:
+    return TimelineFadeGroupRuntime(
+        fade_in=DEFAULT_TIMELINE_HARD_FADE_IN,
+        fade_out=DEFAULT_TIMELINE_HARD_FADE_OUT,
+    )
+
+
+def default_soft_timeline_fade_group_runtime() -> TimelineFadeGroupRuntime:
+    return TimelineFadeGroupRuntime(
+        fade_in=DEFAULT_TIMELINE_SOFT_FADE_IN,
+        fade_out=DEFAULT_TIMELINE_SOFT_FADE_OUT,
+    )
 
 
 @dataclass
@@ -362,10 +374,10 @@ class TimelineRuntime:
     timeline_preset_conductor: bool = DEFAULT_TIMELINE_PRESET_CONDUCTOR
     timeline_preset_mode: TimelinePresetMode = DEFAULT_TIMELINE_PRESET_MODE
     hard_cut_fades: TimelineFadeGroupRuntime = field(
-        default_factory=default_timeline_fade_group_runtime
+        default_factory=default_hard_timeline_fade_group_runtime
     )
     soft_cut_fades: TimelineFadeGroupRuntime = field(
-        default_factory=default_timeline_fade_group_runtime
+        default_factory=default_soft_timeline_fade_group_runtime
     )
     limiter: VisualLimiterRuntime = field(default_factory=default_visual_limiter_runtime)
 
@@ -620,10 +632,8 @@ def render_pattern_mask_runtime_from_cfg(
 
 
 def _fade_group_runtime_from_cfg(
-    group: TimelineFadeGroupConfig | None,
+    group: TimelineFadeGroupConfig,
 ) -> TimelineFadeGroupRuntime:
-    if group is None:
-        return TimelineFadeGroupRuntime()
     return TimelineFadeGroupRuntime(
         enabled=group.enabled,
         fade_in=group.fade_in,

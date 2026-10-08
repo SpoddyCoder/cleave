@@ -56,9 +56,11 @@ from cleave.config_schema.render import (
 from cleave.config_schema.timeline import (
     DEFAULT_TIMELINE_CROSSFADE,
     DEFAULT_TIMELINE_ENABLED,
-    DEFAULT_TIMELINE_FADE_IN,
-    DEFAULT_TIMELINE_FADE_OUT,
     DEFAULT_TIMELINE_FADES_ENABLED,
+    DEFAULT_TIMELINE_HARD_FADE_IN,
+    DEFAULT_TIMELINE_HARD_FADE_OUT,
+    DEFAULT_TIMELINE_SOFT_FADE_IN,
+    DEFAULT_TIMELINE_SOFT_FADE_OUT,
     DEFAULT_TIMELINE_LOCKED,
     DEFAULT_TIMELINE_PLACEMENT_SNAP,
     DEFAULT_VISUAL_LIMITER_ENABLED,
@@ -251,9 +253,23 @@ class RenderPatternMaskBlock:
 @dataclass
 class TimelineFadeGroupBlock:
     enabled: bool = DEFAULT_TIMELINE_FADES_ENABLED
-    fade_in: float = DEFAULT_TIMELINE_FADE_IN
-    fade_out: float = DEFAULT_TIMELINE_FADE_OUT
+    fade_in: float = DEFAULT_TIMELINE_SOFT_FADE_IN
+    fade_out: float = DEFAULT_TIMELINE_SOFT_FADE_OUT
     crossfade: bool = DEFAULT_TIMELINE_CROSSFADE
+
+
+def default_hard_timeline_fade_group_block() -> TimelineFadeGroupBlock:
+    return TimelineFadeGroupBlock(
+        fade_in=DEFAULT_TIMELINE_HARD_FADE_IN,
+        fade_out=DEFAULT_TIMELINE_HARD_FADE_OUT,
+    )
+
+
+def default_soft_timeline_fade_group_block() -> TimelineFadeGroupBlock:
+    return TimelineFadeGroupBlock(
+        fade_in=DEFAULT_TIMELINE_SOFT_FADE_IN,
+        fade_out=DEFAULT_TIMELINE_SOFT_FADE_OUT,
+    )
 
 
 @dataclass
@@ -290,10 +306,10 @@ class RenderTimelineBlock:
     timeline_preset_conductor: bool = DEFAULT_TIMELINE_PRESET_CONDUCTOR
     timeline_preset_mode: TimelinePresetMode = DEFAULT_TIMELINE_PRESET_MODE
     hard_cut_fades: TimelineFadeGroupBlock = field(
-        default_factory=TimelineFadeGroupBlock
+        default_factory=default_hard_timeline_fade_group_block
     )
     soft_cut_fades: TimelineFadeGroupBlock = field(
-        default_factory=TimelineFadeGroupBlock
+        default_factory=default_soft_timeline_fade_group_block
     )
     limiter: VisualLimiterBlock = field(default_factory=VisualLimiterBlock)
     locked: bool = DEFAULT_TIMELINE_LOCKED

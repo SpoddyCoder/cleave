@@ -1349,8 +1349,8 @@ def test_write_session_snapshot_persists_timeline_disabled_without_cues(
             "cuts": {
                 "hard": {
                     "enabled": False,
-                    "fade_in": 2.0,
-                    "fade_out": 2.0,
+                    "fade_in": 0.2,
+                    "fade_out": 0.2,
                     "crossfade": False,
                 },
                 "soft": {

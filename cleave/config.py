@@ -127,9 +127,11 @@ from cleave.config_schema.render import (
 from cleave.config_schema.timeline import (
     DEFAULT_TIMELINE_CROSSFADE,
     DEFAULT_TIMELINE_ENABLED,
-    DEFAULT_TIMELINE_FADE_IN,
-    DEFAULT_TIMELINE_FADE_OUT,
     DEFAULT_TIMELINE_FADES_ENABLED,
+    DEFAULT_TIMELINE_HARD_FADE_IN,
+    DEFAULT_TIMELINE_HARD_FADE_OUT,
+    DEFAULT_TIMELINE_SOFT_FADE_IN,
+    DEFAULT_TIMELINE_SOFT_FADE_OUT,
     DEFAULT_TIMELINE_LOCKED,
     DEFAULT_TIMELINE_PLACEMENT_SNAP,
     DEFAULT_VISUAL_LIMITER_ENABLED,
@@ -345,15 +347,33 @@ class RenderConfig:
 @dataclass(frozen=True)
 class TimelineFadeGroupConfig:
     enabled: bool = DEFAULT_TIMELINE_FADES_ENABLED
-    fade_in: float = DEFAULT_TIMELINE_FADE_IN
-    fade_out: float = DEFAULT_TIMELINE_FADE_OUT
+    fade_in: float = DEFAULT_TIMELINE_SOFT_FADE_IN
+    fade_out: float = DEFAULT_TIMELINE_SOFT_FADE_OUT
     crossfade: bool = DEFAULT_TIMELINE_CROSSFADE
+
+
+def default_hard_timeline_fade_group_config() -> TimelineFadeGroupConfig:
+    return TimelineFadeGroupConfig(
+        fade_in=DEFAULT_TIMELINE_HARD_FADE_IN,
+        fade_out=DEFAULT_TIMELINE_HARD_FADE_OUT,
+    )
+
+
+def default_soft_timeline_fade_group_config() -> TimelineFadeGroupConfig:
+    return TimelineFadeGroupConfig(
+        fade_in=DEFAULT_TIMELINE_SOFT_FADE_IN,
+        fade_out=DEFAULT_TIMELINE_SOFT_FADE_OUT,
+    )
 
 
 @dataclass(frozen=True)
 class TimelineCutsConfig:
-    hard: TimelineFadeGroupConfig = field(default_factory=TimelineFadeGroupConfig)
-    soft: TimelineFadeGroupConfig = field(default_factory=TimelineFadeGroupConfig)
+    hard: TimelineFadeGroupConfig = field(
+        default_factory=default_hard_timeline_fade_group_config
+    )
+    soft: TimelineFadeGroupConfig = field(
+        default_factory=default_soft_timeline_fade_group_config
+    )
 
 
 @dataclass(frozen=True)

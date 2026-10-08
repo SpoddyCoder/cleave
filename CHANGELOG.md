@@ -19,6 +19,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- Timeline cuts menu is Cue fades. Hard-cut fade in and fade out default to 0.2s; soft-cut fades default to 2.0s. Crossfade is Shift for crossfade.
 - Timeline beat / bar grid sits above song markers. Snap Cues there asks whether to snap timeline cues to beats or bars. Snap Cues in the song markers menu pulls nearby cues onto markers.
 - Apply to Cues sits at the bottom of each cut section and hides when that cut type is disabled.
 - Post-FX fade is an expandable section with fade-in and fade-out start, end, and curve, replacing the two duration rows.

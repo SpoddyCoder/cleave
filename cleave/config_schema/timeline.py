@@ -59,8 +59,10 @@ DEFAULT_TIMELINE_ENABLED = True
 DEFAULT_TIMELINE_LOCKED = False
 
 DEFAULT_TIMELINE_FADES_ENABLED = False
-DEFAULT_TIMELINE_FADE_IN = 2.0
-DEFAULT_TIMELINE_FADE_OUT = 2.0
+DEFAULT_TIMELINE_HARD_FADE_IN = 0.2
+DEFAULT_TIMELINE_HARD_FADE_OUT = 0.2
+DEFAULT_TIMELINE_SOFT_FADE_IN = 2.0
+DEFAULT_TIMELINE_SOFT_FADE_OUT = 2.0
 DEFAULT_TIMELINE_CROSSFADE = False
 TIMELINE_FADE_DURATION_MIN = 0.0
 TIMELINE_FADE_DURATION_MAX = 30.0
@@ -233,23 +235,32 @@ def cycle_timeline_crossfade(value: bool, *, forward: bool) -> bool:
     return options[(index + delta) % len(options)]
 
 
-def _parse_timeline_fade_group(raw: Any, label: str) -> Any:
+def _parse_timeline_fade_group(
+    raw: Any,
+    label: str,
+    *,
+    fade_in_default: float,
+    fade_out_default: float,
+) -> Any:
     from cleave.config import TimelineFadeGroupConfig
 
     if raw is None:
-        return TimelineFadeGroupConfig()
+        return TimelineFadeGroupConfig(
+            fade_in=fade_in_default,
+            fade_out=fade_out_default,
+        )
     group_map = as_mapping(raw, label)
     return TimelineFadeGroupConfig(
         enabled=bool(group_map.get("enabled", DEFAULT_TIMELINE_FADES_ENABLED)),
         fade_in=clamp_timeline_fade_duration(
             require_non_negative_number(
-                group_map.get("fade_in", DEFAULT_TIMELINE_FADE_IN),
+                group_map.get("fade_in", fade_in_default),
                 f"{label}.fade_in",
             )
         ),
         fade_out=clamp_timeline_fade_duration(
             require_non_negative_number(
-                group_map.get("fade_out", DEFAULT_TIMELINE_FADE_OUT),
+                group_map.get("fade_out", fade_out_default),
                 f"{label}.fade_out",
             )
         ),
@@ -356,10 +367,14 @@ def parse_timeline_section(data: dict[str, Any], ctx: ParseCtx) -> Any | None:
             hard=_parse_timeline_fade_group(
                 cuts_map.get("hard"),
                 "timeline.cuts.hard",
+                fade_in_default=DEFAULT_TIMELINE_HARD_FADE_IN,
+                fade_out_default=DEFAULT_TIMELINE_HARD_FADE_OUT,
             ),
             soft=_parse_timeline_fade_group(
                 cuts_map.get("soft"),
                 "timeline.cuts.soft",
+                fade_in_default=DEFAULT_TIMELINE_SOFT_FADE_IN,
+                fade_out_default=DEFAULT_TIMELINE_SOFT_FADE_OUT,
             ),
         )
     preset = _parse_timeline_preset(timeline_map.get("preset"))
