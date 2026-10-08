@@ -1095,12 +1095,6 @@ class TuningControls:
             return
         tl.beat_bar_grid_expanded = expanded
 
-    def set_snap_cues_expanded(self, expanded: bool) -> None:
-        tl = self.session.timeline
-        if tl.snap_cues_expanded == expanded:
-            return
-        tl.snap_cues_expanded = expanded
-
     def set_timeline_cuts_expanded(self, expanded: bool) -> None:
         tl = self.session.timeline
         if tl.cuts_expanded == expanded:

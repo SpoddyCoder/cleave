@@ -849,18 +849,6 @@ SPECS: dict[RowKind, RowSpec] = {
         ),
         blocked_by_section_lock=True,
     ),
-    RowKind.TIMELINE_SNAP_CUES_HEADER: RowSpec(
-        affordance=RowAffordance.EXPAND,
-        panel_label="snap cues",
-        present_style=RowPresentStyle.EXPAND_SUBHEADER,
-        apply_horizontal=apply_expand_subheader,
-        fit_strategy=FitStrategy.NONE,
-        help_title="Snap cues",
-        help_description=(
-            "One-shot actions that pull existing timeline cues onto the beat grid or song markers.",
-        ),
-        is_sub_header=True,
-    ),
     RowKind.TIMELINE_SNAP_TO_BEATS: RowSpec(
         affordance=RowAffordance.ACTION,
         panel_label="Snap to Beats",

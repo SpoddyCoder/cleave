@@ -1293,7 +1293,7 @@ def test_snap_to_song_markers_row_uses_action_color() -> None:
         render_timeline=RenderTimelineBlock(
             enabled=True,
             expanded=True,
-            snap_cues_expanded=True,
+            beat_bar_grid_expanded=True,
         ),
     )
     snap_row = state.layout.find_by_kind(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS)

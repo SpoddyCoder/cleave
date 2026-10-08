@@ -661,16 +661,19 @@ def test_disabled_render_timeline_can_open_panel() -> None:
     assert not isinstance(controls.focus_cursor, TimelineFocus)
     view = controls.build_view_state(paused=False)
     header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
+    beat_bar_row = view.layout.find_by_kind(RowKind.TIMELINE_BEAT_BAR_GRID_HEADER)
     markers_row = view.layout.find_by_kind(RowKind.SONG_MARKERS_HEADER)
     presets_header_row = view.layout.find_by_kind(RowKind.TIMELINE_PRESETS_HEADER)
     assert _row_text(view, header_row).endswith(" ▼")
+    assert beat_bar_row in view.layout.visible_indices(view)
+    assert beat_bar_row in view.layout.navigable_indices(view)
     assert markers_row in view.layout.visible_indices(view)
     assert markers_row in view.layout.navigable_indices(view)
     assert presets_header_row in view.layout.visible_indices(view)
     assert presets_header_row in view.layout.navigable_indices(view)
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
-    assert controls.focus_descriptor == _desc(view, markers_row)
+    assert controls.focus_descriptor == _desc(view, beat_bar_row)
 
     controls.focus_descriptor = _desc(view, header_row)
     controls.handle_keydown(_keydown(pygame.K_LEFT))
@@ -2099,7 +2102,7 @@ def _focus_timeline_presets(controls: TuningControls) -> None:
 
 def _focus_timeline_snap_beats(controls: TuningControls) -> None:
     controls.session.timeline.panel_open = True
-    controls.session.timeline.snap_cues_expanded = True
+    controls.session.timeline.beat_bar_grid_expanded = True
     view = controls.build_view_state(paused=False)
     snap_row = view.layout.find_by_kind(RowKind.TIMELINE_SNAP_TO_BEATS)
     controls.focus_descriptor = _desc(view, snap_row)
@@ -2107,7 +2110,7 @@ def _focus_timeline_snap_beats(controls: TuningControls) -> None:
 
 def _focus_timeline_snap_bars(controls: TuningControls) -> None:
     controls.session.timeline.panel_open = True
-    controls.session.timeline.snap_cues_expanded = True
+    controls.session.timeline.beat_bar_grid_expanded = True
     view = controls.build_view_state(paused=False)
     snap_row = view.layout.find_by_kind(RowKind.TIMELINE_SNAP_TO_BARS)
     controls.focus_descriptor = _desc(view, snap_row)
@@ -2115,7 +2118,7 @@ def _focus_timeline_snap_bars(controls: TuningControls) -> None:
 
 def _focus_timeline_snap_song_markers(controls: TuningControls) -> None:
     controls.session.timeline.panel_open = True
-    controls.session.timeline.snap_cues_expanded = True
+    controls.session.timeline.beat_bar_grid_expanded = True
     view = controls.build_view_state(paused=False)
     snap_row = view.layout.find_by_kind(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS)
     controls.focus_descriptor = _desc(view, snap_row)
@@ -2987,7 +2990,7 @@ def test_timeline_snap_song_markers_no_cues_notifies() -> None:
 def test_timeline_snap_song_markers_is_plain_action_row() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.timeline.panel_open = True
-    controls.session.timeline.snap_cues_expanded = True
+    controls.session.timeline.beat_bar_grid_expanded = True
     view = controls.build_view_state(paused=False)
     snap_row = view.layout.find_by_kind(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS)
     text = _row_text(view, snap_row)
@@ -3415,7 +3418,6 @@ def test_render_timeline_down_enters_submenu() -> None:
     controls.session.timeline.panel_open = True
     controls.session.song_markers.expanded = True
     controls.session.timeline.beat_bar_grid_expanded = True
-    controls.session.timeline.snap_cues_expanded = True
     controls.session.timeline.visual_limiter_expanded = True
     view = controls.build_view_state(paused=False)
     header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
@@ -3424,7 +3426,6 @@ def test_render_timeline_down_enters_submenu() -> None:
     phase_row = view.layout.find_by_kind(RowKind.TIMELINE_BAR_PHASE)
     grid_row = view.layout.find_by_kind(RowKind.TIMELINE_BAR_GRID)
     placement_snap_row = view.layout.find_by_kind(RowKind.TIMELINE_PLACEMENT_SNAP)
-    snap_cues_row = view.layout.find_by_kind(RowKind.TIMELINE_SNAP_CUES_HEADER)
     snap_beats_row = view.layout.find_by_kind(RowKind.TIMELINE_SNAP_TO_BEATS)
     snap_bars_row = view.layout.find_by_kind(RowKind.TIMELINE_SNAP_TO_BARS)
     snap_markers_row = view.layout.find_by_kind(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS)
@@ -3450,10 +3451,6 @@ def test_render_timeline_down_enters_submenu() -> None:
     controls.session.timeline.focus_row = 2
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
-    assert controls.focus_descriptor == _desc(view, markers_row)
-    assert not isinstance(controls.focus_cursor, TimelineFocus)
-
-    controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert controls.focus_descriptor == _desc(view, beat_bar_row)
     assert not isinstance(controls.focus_cursor, TimelineFocus)
 
@@ -3470,10 +3467,6 @@ def test_render_timeline_down_enters_submenu() -> None:
     assert not isinstance(controls.focus_cursor, TimelineFocus)
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
-    assert controls.focus_descriptor == _desc(view, snap_cues_row)
-    assert not isinstance(controls.focus_cursor, TimelineFocus)
-
-    controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert controls.focus_descriptor == _desc(view, snap_beats_row)
     assert not isinstance(controls.focus_cursor, TimelineFocus)
 
@@ -3483,6 +3476,10 @@ def test_render_timeline_down_enters_submenu() -> None:
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert controls.focus_descriptor == _desc(view, snap_markers_row)
+    assert not isinstance(controls.focus_cursor, TimelineFocus)
+
+    controls.handle_keydown(_keydown(pygame.K_DOWN))
+    assert controls.focus_descriptor == _desc(view, markers_row)
     assert not isinstance(controls.focus_cursor, TimelineFocus)
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
@@ -3597,7 +3594,7 @@ def test_render_timeline_down_enters_submenu_and_routes_keys() -> None:
     controls.focus_descriptor = _desc(view, header_row)
     controls.session.timeline.focus_row = 2
 
-    for _ in range(11):
+    for _ in range(13):
         controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert isinstance(controls.focus_cursor, TimelineFocus)
     assert controls.session.timeline.focus_row == 0
@@ -3830,7 +3827,6 @@ def test_render_timeline_sub_rows_dim_when_disabled() -> None:
     controls.session.timeline.panel_open = True
     controls.session.song_markers.expanded = True
     controls.session.timeline.beat_bar_grid_expanded = True
-    controls.session.timeline.snap_cues_expanded = True
     controls.session.timeline.cuts_expanded = True
     controls.session.timeline.timeline_presets_expanded = True
     controls.session.timeline.hard_cut_fades.enabled = True
@@ -3844,7 +3840,6 @@ def test_render_timeline_sub_rows_dim_when_disabled() -> None:
         RowKind.TIMELINE_BAR_PHASE,
         RowKind.TIMELINE_BAR_GRID,
         RowKind.TIMELINE_PLACEMENT_SNAP,
-        RowKind.TIMELINE_SNAP_CUES_HEADER,
         RowKind.TIMELINE_SNAP_TO_BEATS,
         RowKind.TIMELINE_SNAP_TO_BARS,
         RowKind.TIMELINE_SNAP_TO_SONG_MARKERS,

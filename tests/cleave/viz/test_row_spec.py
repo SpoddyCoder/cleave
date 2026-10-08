@@ -568,7 +568,7 @@ def test_render_value_children_blocked_by_section_lock() -> None:
     assert row_blocked_by_section_lock(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS) is True
     assert row_blocked_by_section_lock(RowKind.SONG_MARKER_ITEM) is True
     assert row_blocked_by_section_lock(RowKind.SONG_MARKERS_HEADER) is False
-    assert row_blocked_by_section_lock(RowKind.TIMELINE_SNAP_CUES_HEADER) is False
+    assert row_blocked_by_section_lock(RowKind.TIMELINE_BEAT_BAR_GRID_HEADER) is False
     assert row_blocked_by_section_lock(RowKind.TIMELINE_PRESETS_HEADER) is False
 
 
@@ -580,7 +580,7 @@ def test_render_headers_navigable_when_section_locked() -> None:
         RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER,
         RowKind.RENDER_POST_FX_CHROMA_BOOST_HEADER,
         RowKind.SONG_MARKERS_HEADER,
-        RowKind.TIMELINE_SNAP_CUES_HEADER,
+        RowKind.TIMELINE_BEAT_BAR_GRID_HEADER,
         RowKind.TIMELINE_PRESETS_HEADER,
     ):
         assert row_navigable_when_section_locked(kind) is True

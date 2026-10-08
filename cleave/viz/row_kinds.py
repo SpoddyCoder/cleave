@@ -116,7 +116,6 @@ class RowKind(Enum):
     TIMELINE_BAR_PHASE = auto()
     TIMELINE_BAR_GRID = auto()
     TIMELINE_PLACEMENT_SNAP = auto()
-    TIMELINE_SNAP_CUES_HEADER = auto()
     TIMELINE_SNAP_TO_BEATS = auto()
     TIMELINE_SNAP_TO_BARS = auto()
     TIMELINE_SNAP_TO_SONG_MARKERS = auto()

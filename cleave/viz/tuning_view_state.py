@@ -271,7 +271,6 @@ class RenderTimelineBlock:
     bar_phase_offset: int = 0
     show_bar_grid: bool = False
     beat_bar_grid_expanded: bool = False
-    snap_cues_expanded: bool = False
     placement_snap: str = DEFAULT_TIMELINE_PLACEMENT_SNAP
     cuts_expanded: bool = False
     timeline_presets_expanded: bool = False
@@ -547,7 +546,6 @@ def view_state_structure_signature(
             "song_markers_expanded": session.song_markers.expanded,
             "song_marker_count": len(session.song_markers.times),
             "beat_bar_grid_expanded": tl.beat_bar_grid_expanded,
-            "snap_cues_expanded": tl.snap_cues_expanded,
             "cuts_expanded": tl.cuts_expanded,
             "timeline_presets_expanded": tl.timeline_presets_expanded,
             "visual_limiter_expanded": tl.visual_limiter_expanded,
@@ -855,7 +853,6 @@ class TuningViewStateBuilder:
             bar_phase_offset=tl.bar_phase_offset,
             show_bar_grid=tl.show_bar_grid,
             beat_bar_grid_expanded=tl.beat_bar_grid_expanded,
-            snap_cues_expanded=tl.snap_cues_expanded,
             placement_snap=tl.placement_snap,
             cuts_expanded=tl.cuts_expanded,
             timeline_presets_expanded=tl.timeline_presets_expanded,
@@ -1061,7 +1058,6 @@ class TuningViewStateBuilder:
                 bar_phase_offset=tl.bar_phase_offset,
                 show_bar_grid=tl.show_bar_grid,
                 beat_bar_grid_expanded=tl.beat_bar_grid_expanded,
-                snap_cues_expanded=tl.snap_cues_expanded,
                 placement_snap=tl.placement_snap,
                 cuts_expanded=tl.cuts_expanded,
                 timeline_presets_expanded=tl.timeline_presets_expanded,
