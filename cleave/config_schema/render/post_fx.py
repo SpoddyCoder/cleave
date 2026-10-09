@@ -117,6 +117,20 @@ DEFAULT_CHROMA_BOOST_AMOUNT_PCT = 25
 CHROMA_BOOST_AMOUNT_PCT_MIN = 0
 CHROMA_BOOST_AMOUNT_PCT_MAX = 100
 
+DEFAULT_VISUAL_LIMITER_ENABLED = True
+DEFAULT_VISUAL_LIMITER_THRESHOLD = 0.65
+DEFAULT_VISUAL_LIMITER_RATIO = 3.0
+DEFAULT_VISUAL_LIMITER_RELEASE = 0.45
+VISUAL_LIMITER_THRESHOLD_MIN = 0.30
+VISUAL_LIMITER_THRESHOLD_MAX = 0.95
+VISUAL_LIMITER_THRESHOLD_STEP = 0.01
+VISUAL_LIMITER_RATIO_MIN = 1.5
+VISUAL_LIMITER_RATIO_MAX = 8.0
+VISUAL_LIMITER_RATIO_STEP = 0.5
+VISUAL_LIMITER_RELEASE_MIN = 0.2
+VISUAL_LIMITER_RELEASE_MAX = 3.0
+VISUAL_LIMITER_RELEASE_STEP = 0.1
+
 HIGHLIGHT_ROLLOFF_THRESHOLD_PCT_MIN = 0
 HIGHLIGHT_ROLLOFF_THRESHOLD_PCT_MAX = 95
 HIGHLIGHT_ROLLOFF_STRENGTH_PCT_MAX = 200
@@ -154,6 +168,27 @@ def clamp_chroma_boost_amount_pct(value: int) -> int:
     return max(
         CHROMA_BOOST_AMOUNT_PCT_MIN,
         min(CHROMA_BOOST_AMOUNT_PCT_MAX, int(value)),
+    )
+
+
+def clamp_visual_limiter_threshold(value: float) -> float:
+    return max(
+        VISUAL_LIMITER_THRESHOLD_MIN,
+        min(VISUAL_LIMITER_THRESHOLD_MAX, float(value)),
+    )
+
+
+def clamp_visual_limiter_ratio(value: float) -> float:
+    return max(
+        VISUAL_LIMITER_RATIO_MIN,
+        min(VISUAL_LIMITER_RATIO_MAX, float(value)),
+    )
+
+
+def clamp_visual_limiter_release(value: float) -> float:
+    return max(
+        VISUAL_LIMITER_RELEASE_MIN,
+        min(VISUAL_LIMITER_RELEASE_MAX, float(value)),
     )
 
 
@@ -264,6 +299,81 @@ def _build_chroma_boost_config(parsed: dict[str, Any]) -> Any:
         amount_pct=parsed["amount_pct"],
     )
 
+
+def _parse_visual_limiter_enabled(raw: Any, _ctx: ParseCtx, _label: str) -> bool:
+    return bool(raw)
+
+
+def _parse_visual_limiter_threshold(raw: Any, _ctx: ParseCtx, label: str) -> float:
+    return clamp_visual_limiter_threshold(
+        float(require_non_negative_number(raw, label))
+    )
+
+
+def _parse_visual_limiter_ratio(raw: Any, _ctx: ParseCtx, label: str) -> float:
+    return clamp_visual_limiter_ratio(float(require_non_negative_number(raw, label)))
+
+
+def _parse_visual_limiter_release(raw: Any, _ctx: ParseCtx, label: str) -> float:
+    return clamp_visual_limiter_release(
+        float(require_non_negative_number(raw, label))
+    )
+
+
+def _build_visual_limiter_config(parsed: dict[str, Any]) -> Any:
+    from cleave.config import VisualLimiterConfig
+
+    return VisualLimiterConfig(
+        enabled=parsed["enabled"],
+        threshold=parsed["threshold"],
+        ratio=parsed["ratio"],
+        release=parsed["release"],
+    )
+
+
+def _default_visual_limiter_config() -> Any:
+    return _build_visual_limiter_config(
+        {
+            "enabled": DEFAULT_VISUAL_LIMITER_ENABLED,
+            "threshold": DEFAULT_VISUAL_LIMITER_THRESHOLD,
+            "ratio": DEFAULT_VISUAL_LIMITER_RATIO,
+            "release": DEFAULT_VISUAL_LIMITER_RELEASE,
+        }
+    )
+
+
+VISUAL_LIMITER_SECTION = SectionDescriptor(
+    yaml_key="limiter",
+    fields=(
+        FieldDescriptor(
+            "enabled",
+            DEFAULT_VISUAL_LIMITER_ENABLED,
+            _parse_visual_limiter_enabled,
+            dump_scalar,
+        ),
+        FieldDescriptor(
+            "threshold",
+            DEFAULT_VISUAL_LIMITER_THRESHOLD,
+            _parse_visual_limiter_threshold,
+            dump_scalar,
+        ),
+        FieldDescriptor(
+            "ratio",
+            DEFAULT_VISUAL_LIMITER_RATIO,
+            _parse_visual_limiter_ratio,
+            dump_scalar,
+        ),
+        FieldDescriptor(
+            "release",
+            DEFAULT_VISUAL_LIMITER_RELEASE,
+            _parse_visual_limiter_release,
+            dump_scalar,
+        ),
+    ),
+    build=_build_visual_limiter_config,
+    optional=True,
+    default_factory=_default_visual_limiter_config,
+)
 
 CHROMA_BOOST_SECTION = SectionDescriptor(
     yaml_key="chroma_boost",
@@ -481,6 +591,7 @@ RENDER_POST_FX_FIELDS: tuple[SchemaField, ...] = (
     FADE_SECTION,
     HIGHLIGHT_ROLLOFF_SECTION,
     CHROMA_BOOST_SECTION,
+    VISUAL_LIMITER_SECTION,
 )
 
 
@@ -530,6 +641,12 @@ def post_fx_persist_values(ctx: PersistCtx) -> dict[str, Any]:
             "mode": runtime.chroma_boost.mode,
             "variant": runtime.chroma_boost.variant,
             "amount_pct": runtime.chroma_boost.amount_pct,
+        },
+        "limiter": {
+            "enabled": runtime.limiter.enabled,
+            "threshold": runtime.limiter.threshold,
+            "ratio": runtime.limiter.ratio,
+            "release": runtime.limiter.release,
         },
     }
 
@@ -584,5 +701,12 @@ def default_render_post_fx_runtime_values() -> dict[str, Any]:
         "highlight_rolloff_expanded": False,
         "chroma_boost": default_chroma_boost_runtime_values(),
         "chroma_boost_expanded": False,
+        "limiter": {
+            "enabled": DEFAULT_VISUAL_LIMITER_ENABLED,
+            "threshold": DEFAULT_VISUAL_LIMITER_THRESHOLD,
+            "ratio": DEFAULT_VISUAL_LIMITER_RATIO,
+            "release": DEFAULT_VISUAL_LIMITER_RELEASE,
+        },
+        "limiter_expanded": False,
         "locked": DEFAULT_RENDER_POST_FX_LOCKED,
     }

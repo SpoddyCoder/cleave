@@ -7,13 +7,7 @@ from typing import TYPE_CHECKING
 from cleave.config_schema.layers import hard_cut_enabled_display
 from cleave.config_schema.timeline import (
     TIMELINE_FADE_DURATION_STEP,
-    VISUAL_LIMITER_RATIO_STEP,
-    VISUAL_LIMITER_RELEASE_STEP,
-    VISUAL_LIMITER_THRESHOLD_STEP,
     clamp_timeline_fade_duration,
-    clamp_visual_limiter_ratio,
-    clamp_visual_limiter_release,
-    clamp_visual_limiter_threshold,
     cycle_timeline_crossfade,
     cycle_timeline_placement_snap,
     timeline_crossfade_display,
@@ -272,74 +266,6 @@ def _apply_timeline_preset_mode(
         tl.timeline_preset_mode,
         forward=forward,
     )
-
-def _format_visual_limiter_enabled(
-    state: TuningViewState, _desc: RowDescriptor
-) -> str:
-    return timeline_crossfade_display(state.render_timeline.limiter.enabled)
-
-def _apply_visual_limiter_enabled(
-    controls: TuningControls,
-    _desc: RowDescriptor,
-    forward: bool,
-    _ctrl: bool,
-    _shift: bool,
-) -> None:
-    del _ctrl, _shift
-    controls.set_visual_limiter_enabled(forward)
-
-def _format_visual_limiter_threshold(
-    state: TuningViewState, _desc: RowDescriptor
-) -> str:
-    return f"{int(round(state.render_timeline.limiter.threshold * 100))}%"
-
-def _apply_visual_limiter_threshold(
-    controls: TuningControls,
-    _desc: RowDescriptor,
-    forward: bool,
-    _ctrl: bool,
-    _shift: bool,
-) -> None:
-    del _ctrl, _shift
-    lim = controls.session.timeline.limiter
-    delta = VISUAL_LIMITER_THRESHOLD_STEP if forward else -VISUAL_LIMITER_THRESHOLD_STEP
-    lim.threshold = clamp_visual_limiter_threshold(
-        round(lim.threshold + delta, 2)
-    )
-
-def _format_visual_limiter_ratio(
-    state: TuningViewState, _desc: RowDescriptor
-) -> str:
-    return f"{state.render_timeline.limiter.ratio:.1f}:1"
-
-def _apply_visual_limiter_ratio(
-    controls: TuningControls,
-    _desc: RowDescriptor,
-    forward: bool,
-    _ctrl: bool,
-    _shift: bool,
-) -> None:
-    del _ctrl, _shift
-    lim = controls.session.timeline.limiter
-    delta = VISUAL_LIMITER_RATIO_STEP if forward else -VISUAL_LIMITER_RATIO_STEP
-    lim.ratio = clamp_visual_limiter_ratio(round(lim.ratio + delta, 1))
-
-def _format_visual_limiter_release(
-    state: TuningViewState, _desc: RowDescriptor
-) -> str:
-    return f"{state.render_timeline.limiter.release:.1f}s"
-
-def _apply_visual_limiter_release(
-    controls: TuningControls,
-    _desc: RowDescriptor,
-    forward: bool,
-    _ctrl: bool,
-    _shift: bool,
-) -> None:
-    del _ctrl, _shift
-    lim = controls.session.timeline.limiter
-    delta = VISUAL_LIMITER_RELEASE_STEP if forward else -VISUAL_LIMITER_RELEASE_STEP
-    lim.release = clamp_visual_limiter_release(round(lim.release + delta, 1))
 
 def _format_timeline_hard_cut_fades_enabled(
     state: TuningViewState, _desc: RowDescriptor
@@ -691,85 +617,6 @@ SPECS: dict[RowKind, RowSpec] = {
             "conductor, and mode. Crescendo song markers build crescendos.",
             "Overwrites the timeline.",
         ),
-        blocked_by_section_lock=True,
-    ),
-    RowKind.TIMELINE_VISUAL_LIMITER_HEADER: RowSpec(
-        affordance=RowAffordance.EXPAND,
-        panel_label="visual limiter",
-        present_style=RowPresentStyle.EXPAND_SUBHEADER,
-        apply_horizontal=apply_expand_subheader,
-        fit_strategy=FitStrategy.NONE,
-        help_title="Visual limiter",
-        help_description=(
-            "Duck busy stacked layers using post-composite busyness.",
-            "Expand for enabled, threshold, ratio, and release.",
-        ),
-        is_sub_header=True,
-    ),
-    RowKind.TIMELINE_VISUAL_LIMITER_ENABLED: RowSpec(
-        affordance=RowAffordance.VALUE_STEP,
-        panel_label="enabled",
-        present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_visual_limiter_enabled,
-        apply_horizontal=_apply_visual_limiter_enabled,
-        help_title="Visual limiter enabled",
-        help_entries=(("Left/Right", "off / on"),),
-        help_description=(
-            "When off, the limiter is idle and remaining knobs hide.",
-        ),
-        blocked_by_section_lock=True,
-    ),
-    RowKind.TIMELINE_VISUAL_LIMITER_THRESHOLD: RowSpec(
-        affordance=RowAffordance.VALUE_STEP,
-        panel_label="threshold",
-        present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_visual_limiter_threshold,
-        apply_horizontal=_apply_visual_limiter_threshold,
-        help_title="Visual limiter threshold",
-        help_entries=(
-            ("Left", "decrease threshold"),
-            ("Right", "increase threshold"),
-        ),
-        help_description=(
-            "Busyness level above which compression engages.",
-        ),
-        repeatable=True,
-        blocked_by_section_lock=True,
-    ),
-    RowKind.TIMELINE_VISUAL_LIMITER_RATIO: RowSpec(
-        affordance=RowAffordance.VALUE_STEP,
-        panel_label="ratio",
-        present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_visual_limiter_ratio,
-        apply_horizontal=_apply_visual_limiter_ratio,
-        help_title="Visual limiter ratio",
-        help_entries=(
-            ("Left", "decrease ratio"),
-            ("Right", "increase ratio"),
-        ),
-        help_description=(
-            "Compression aggressiveness above the threshold.",
-            "Higher ratios duck hot layers more.",
-        ),
-        repeatable=True,
-        blocked_by_section_lock=True,
-    ),
-    RowKind.TIMELINE_VISUAL_LIMITER_RELEASE: RowSpec(
-        affordance=RowAffordance.VALUE_STEP,
-        panel_label="release",
-        present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_visual_limiter_release,
-        apply_horizontal=_apply_visual_limiter_release,
-        help_title="Visual limiter release",
-        help_entries=(
-            ("Left", "decrease release"),
-            ("Right", "increase release"),
-        ),
-        help_description=(
-            "Envelope release time constant in seconds.",
-            "Controls how quickly ducking eases off.",
-        ),
-        repeatable=True,
         blocked_by_section_lock=True,
     ),
     RowKind.TIMELINE_RESET: RowSpec(

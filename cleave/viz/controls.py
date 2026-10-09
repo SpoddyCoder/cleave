@@ -1104,18 +1104,6 @@ class TuningControls:
             return
         tl.timeline_presets_expanded = expanded
 
-    def set_visual_limiter_expanded(self, expanded: bool) -> None:
-        tl = self.session.timeline
-        if tl.visual_limiter_expanded == expanded:
-            return
-        tl.visual_limiter_expanded = expanded
-
-    def set_visual_limiter_enabled(self, enabled: bool) -> None:
-        lim = self.session.timeline.limiter
-        if lim.enabled == enabled:
-            return
-        lim.enabled = enabled
-
     def do_seek(self, delta_sec: float) -> None:
         if self._layer_bindings is not None:
             self._layer_bindings.on_seek(delta_sec)

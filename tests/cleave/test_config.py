@@ -28,8 +28,8 @@ from cleave.config import (
     TimelineConfig,
     TimelineFadeGroupConfig,
     TimelineCutsConfig,
-    TimelineLimiterConfig,
     TimelinePresetConfig,
+    VisualLimiterConfig,
     EditorConfig,
     clamp_beat_sensitivity,
     clamp_effect_pct,
@@ -84,6 +84,7 @@ from cleave.config_schema.project_render import (
 from cleave.config_schema.render import (
     FADE_CURVES,
     parse_render_section,
+    persist_render,
 )
 from cleave.config_schema.timeline import parse_timeline_section, persist_timeline
 from cleave.user_config import EditorSettings
@@ -1467,20 +1468,17 @@ def test_persist_timeline_placement_snap_round_trip() -> None:
     assert round_trip.placement_snap == "bar"
 
 
-def test_persist_timeline_limiter_round_trip() -> None:
-    from cleave.viz.session import TimelineRuntime, VisualLimiterRuntime
+def test_persist_post_fx_limiter_round_trip() -> None:
+    from cleave.viz.session import VisualLimiterRuntime
 
     session = TuningSession(
         layer_z_order=list(DEFAULT_LAYER_SLOTS),
-        timeline=TimelineRuntime(
-            enabled=True,
-            limiter=VisualLimiterRuntime(
-                enabled=False,
-                threshold=0.72,
-                ratio=4.0,
-                release=0.6,
-            ),
-        ),
+    )
+    session.render_post_fx.limiter = VisualLimiterRuntime(
+        enabled=False,
+        threshold=0.72,
+        ratio=4.0,
+        release=0.6,
     )
     cfg = CleaveConfig(
         paths=PathsConfig(preset_root=Path("/tmp"), texture_paths=()),
@@ -1490,24 +1488,31 @@ def test_persist_timeline_limiter_round_trip() -> None:
         user_config_path=Path("/tmp/user.yaml"),
         layer_z_order=list(DEFAULT_LAYER_SLOTS),
     )
-    payload = persist_timeline(PersistCtx(cfg=cfg, session=session, cfg_dir=None))
-    assert payload["limiter"] == {
+    ctx = PersistCtx(cfg=cfg, session=session, cfg_dir=None)
+    timeline_payload = persist_timeline(ctx)
+    assert "limiter" not in timeline_payload
+    payload = persist_render(ctx)
+    assert payload["post_fx"]["limiter"] == {
         "enabled": False,
         "threshold": 0.72,
         "ratio": 4.0,
         "release": 0.6,
     }
-    round_trip = parse_timeline_section(
-        {"timeline": payload},
-        _timeline_parse_ctx(),
-    )
+    round_trip = parse_render_section({"render": payload})
     assert round_trip is not None
-    assert round_trip.limiter == TimelineLimiterConfig(
+    assert round_trip.post_fx is not None
+    assert round_trip.post_fx.limiter == VisualLimiterConfig(
         enabled=False,
         threshold=0.72,
         ratio=4.0,
         release=0.6,
     )
+    ignored = parse_timeline_section(
+        {"timeline": {"enabled": True, "limiter": {"enabled": False, "threshold": 0.4}}},
+        _timeline_parse_ctx(),
+    )
+    assert ignored is not None
+    assert not hasattr(ignored, "limiter")
 
 
 def test_persist_timeline_preset_round_trip() -> None:
@@ -2107,7 +2112,7 @@ _UI_ONLY_LITERAL_DEFAULTS = frozenset(
         ("TimelineRuntime", "beat_bar_grid_expanded"),
         ("TimelineRuntime", "cuts_expanded"),
         ("TimelineRuntime", "timeline_presets_expanded"),
-        ("TimelineRuntime", "visual_limiter_expanded"),
+        ("RenderPostFxRuntime", "limiter_expanded"),
         ("SongMarkerRuntime", "expanded"),
         ("SettingsRuntime", "expanded"),
         ("SettingsRuntime", "editor_window_expanded"),
@@ -2141,7 +2146,7 @@ _UI_ONLY_LITERAL_DEFAULTS = frozenset(
         ("RenderTimelineBlock", "beat_bar_grid_expanded"),
         ("RenderTimelineBlock", "cuts_expanded"),
         ("RenderTimelineBlock", "timeline_presets_expanded"),
-        ("RenderTimelineBlock", "visual_limiter_expanded"),
+        ("VisualLimiterBlock", "expanded"),
         ("RenderTimelineBlock", "song_markers_expanded"),
         ("SettingsBlock", "expanded"),
         ("SettingsBlock", "editor_window_expanded"),

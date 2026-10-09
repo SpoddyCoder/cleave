@@ -475,7 +475,7 @@ def test_render_timeline_help_has_no_solo() -> None:
 
 def test_visual_limiter_header_help_expand_collapse() -> None:
     section = _keyboard_section(
-        sections_for(RowKind.TIMELINE_VISUAL_LIMITER_HEADER)
+        sections_for(RowKind.RENDER_POST_FX_LIMITER_HEADER)
     )
     assert dict(section.entries)["Left/Right"] == "expand/collapse"
 

@@ -1,10 +1,13 @@
 """Feed-forward visual limiter: proportional compressor on stacked layer opacity.
 
-When enabled and timeline levels apply, measures post-composite busyness
-(mean luma + frame delta) after the HDR display shoulder, runs a gain-
-compensated envelope follower with ratio-based gain reduction, and multiplies
-``StemLayer.limiter_gain`` into opacity. Persisted knobs live under
-``timeline.limiter``; attack and delta weight stay fixed module constants.
+When enabled, measures post-composite busyness (mean luma + frame delta) after
+the HDR display shoulder, runs a gain-compensated envelope follower with
+ratio-based gain reduction, and multiplies ``StemLayer.limiter_gain`` into
+opacity. Detection is always composite busyness. Cue roles weight which hot
+layers absorb the cut when the timeline is on; with the timeline off every
+enabled composited layer ducks at the pulse weight. Persisted knobs live under
+``render.post_fx.limiter``. The Post FX master and solo do not gate this path.
+Attack and delta weight stay fixed module constants.
 """
 
 from __future__ import annotations
@@ -16,7 +19,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from cleave.config_schema.timeline import (
+from cleave.config_schema.render import (
     DEFAULT_VISUAL_LIMITER_RATIO,
     DEFAULT_VISUAL_LIMITER_RELEASE,
     DEFAULT_VISUAL_LIMITER_THRESHOLD,
@@ -31,7 +34,11 @@ if TYPE_CHECKING:
     from cleave.gl_post_process import GlPostProcess
     from cleave.viz.app import VisualizerCore
     from cleave.viz.layer import StemLayer
-    from cleave.viz.session import TimelineRuntime, TuningSession, VisualLimiterRuntime
+    from cleave.viz.session import (
+        TimelineRuntime,
+        TuningSession,
+        VisualLimiterRuntime,
+    )
 
 # Busyness = mean_luma + DELTA_WEIGHT * mean_abs_delta (both in [0, 1]).
 DEFAULT_THRESHOLD = DEFAULT_VISUAL_LIMITER_THRESHOLD
@@ -58,6 +65,7 @@ _PRIORITY_WEIGHT_BY_RANK: tuple[float, ...] = (1.0, 0.7, 0.4, 0.15)
 @dataclass(frozen=True)
 class LimiterFrameState:
     timeline: TimelineRuntime
+    limiter: VisualLimiterRuntime
     solo_slot: str | None
     editor_mode: str
     layer_z_order: Sequence[str]
@@ -66,6 +74,7 @@ class LimiterFrameState:
     def from_session(cls, session: TuningSession) -> LimiterFrameState:
         return cls(
             timeline=session.timeline,
+            limiter=session.render_post_fx.limiter,
             solo_slot=session.solo_slot,
             editor_mode=session.settings.editor_mode,
             layer_z_order=session.layer_z_order,
@@ -123,16 +132,19 @@ class VisualLimiterState:
 
 
 def visual_limiter_active(frame: LimiterFrameState) -> bool:
-    """True when the limiter may duck layers (timeline levels driving opacity)."""
+    """True when the limiter may duck layers.
+
+    Composite busyness is the signal whether or not the timeline is enabled.
+    Preset curation, solo, recording, and timeline preview stay idle. The Post
+    FX master and post-FX solo do not gate this.
+    """
     if is_preset_curation_mode(frame.editor_mode):
         return False
     if frame.solo_slot is not None:
         return False
+    if not frame.limiter.enabled:
+        return False
     tl = frame.timeline
-    if not tl.enabled:
-        return False
-    if not tl.limiter.enabled:
-        return False
     if tl.recording or tl.preview_active:
         return False
     return True
@@ -200,25 +212,53 @@ def distribute_gain(
             state.gains[layer.slot] = gain
 
 
+def _pre_limiter_opacity(layer: StemLayer) -> float:
+    """Opacity before limiter gain, so a ducked layer stays in the hot set."""
+    gain = float(layer.limiter_gain)
+    opacity = float(layer.fbo.opacity)
+    if gain > LEVEL_EPS:
+        return opacity / gain
+    return opacity
+
+
 def collect_hot_layers(
     frame: LimiterFrameState,
     layers_by_slot: dict[str, StemLayer],
     t_sec: float,
 ) -> list[HotLayerRef]:
+    """Layers that absorb gain reduction.
+
+    Timeline on: slots whose timeline level drives opacity and level is above
+    ``LEVEL_EPS``, weighted by the lane role at the playhead (unset is pulse).
+    Timeline off: enabled composited layers, all at the pulse weight. Disabled
+    or zero-contribution layers stay out so they do not dilute gain compensation.
+    """
     hot: list[HotLayerRef] = []
+    timeline_on = frame.timeline.enabled
     for z_index, slot in enumerate(frame.layer_z_order):
-        if not timeline_levels_apply(frame, slot):
-            continue
         layer = layers_by_slot.get(slot)
-        if layer is None or layer.timeline_level <= LEVEL_EPS:
+        if layer is None:
             continue
-        lane = frame.timeline.lanes.get(slot) or empty_lane()
-        role = lane_role_at(lane, t_sec)
+        if timeline_on:
+            if not timeline_levels_apply(frame, slot):
+                continue
+            if layer.timeline_level <= LEVEL_EPS:
+                continue
+            lane = frame.timeline.lanes.get(slot) or empty_lane()
+            role = lane_role_at(lane, t_sec)
+            level = float(layer.timeline_level)
+        else:
+            if not layer.fbo.enabled:
+                continue
+            if _pre_limiter_opacity(layer) <= LEVEL_EPS:
+                continue
+            role = None
+            level = 1.0
         hot.append(
             HotLayerRef(
                 slot=slot,
                 role_rank=role_rank(role),
-                timeline_level=float(layer.timeline_level),
+                timeline_level=level,
                 z_index=z_index,
             )
         )
@@ -356,5 +396,5 @@ def observe_frame_busyness(
         mean_abs_delta=mean_abs_delta,
         t_sec=t_sec,
         hot=hot,
-        params=VisualLimiterParams.from_runtime(frame.timeline.limiter),
+        params=VisualLimiterParams.from_runtime(frame.limiter),
     )

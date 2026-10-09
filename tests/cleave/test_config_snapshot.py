@@ -1370,12 +1370,6 @@ def test_write_session_snapshot_persists_timeline_disabled_without_cues(
             "conductor": False,
             "mode": "layers",
         },
-        "limiter": {
-            "enabled": True,
-            "threshold": 0.65,
-            "ratio": 3.0,
-            "release": 0.45,
-        },
     }
 
 

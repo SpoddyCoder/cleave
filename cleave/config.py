@@ -108,6 +108,10 @@ from cleave.config_schema.render import (
     DEFAULT_RENDER_PATTERN_MASK_LOCKED,
     DEFAULT_RENDER_PATTERN_MASK_TRANSITION,
     DEFAULT_RENDER_POST_FX_LOCKED,
+    DEFAULT_VISUAL_LIMITER_ENABLED,
+    DEFAULT_VISUAL_LIMITER_RATIO,
+    DEFAULT_VISUAL_LIMITER_RELEASE,
+    DEFAULT_VISUAL_LIMITER_THRESHOLD,
     HIGHLIGHT_ROLLOFF_APPLY_MODES,
     HIGHLIGHT_ROLLOFF_CURVES,
     RENDER_OVERLAY_ANIMATION_TYPES,
@@ -134,10 +138,6 @@ from cleave.config_schema.timeline import (
     DEFAULT_TIMELINE_SOFT_FADE_OUT,
     DEFAULT_TIMELINE_LOCKED,
     DEFAULT_TIMELINE_PLACEMENT_SNAP,
-    DEFAULT_VISUAL_LIMITER_ENABLED,
-    DEFAULT_VISUAL_LIMITER_RATIO,
-    DEFAULT_VISUAL_LIMITER_RELEASE,
-    DEFAULT_VISUAL_LIMITER_THRESHOLD,
     TimelinePlacementSnap,
     parse_timeline_section,
 )
@@ -317,11 +317,22 @@ class FadeConfig:
 
 
 @dataclass(frozen=True)
+class VisualLimiterConfig:
+    """Live visual limiter knobs under ``render.post_fx.limiter``."""
+
+    enabled: bool = DEFAULT_VISUAL_LIMITER_ENABLED
+    threshold: float = DEFAULT_VISUAL_LIMITER_THRESHOLD
+    ratio: float = DEFAULT_VISUAL_LIMITER_RATIO
+    release: float = DEFAULT_VISUAL_LIMITER_RELEASE
+
+
+@dataclass(frozen=True)
 class RenderPostFxConfig:
     enabled: bool
     fade: FadeConfig
     highlight_rolloff: HighlightRolloffConfig
     chroma_boost: ChromaBoostConfig
+    limiter: VisualLimiterConfig = field(default_factory=VisualLimiterConfig)
     locked: bool = DEFAULT_RENDER_POST_FX_LOCKED
 
 
@@ -393,16 +404,6 @@ class TimelinePresetConfig:
 
 
 @dataclass(frozen=True)
-class TimelineLimiterConfig:
-    """Live visual limiter knobs under ``timeline.limiter``."""
-
-    enabled: bool = DEFAULT_VISUAL_LIMITER_ENABLED
-    threshold: float = DEFAULT_VISUAL_LIMITER_THRESHOLD
-    ratio: float = DEFAULT_VISUAL_LIMITER_RATIO
-    release: float = DEFAULT_VISUAL_LIMITER_RELEASE
-
-
-@dataclass(frozen=True)
 class TimelineConfig:
     enabled: bool
     lanes: dict[str, TimelineLane]
@@ -410,7 +411,6 @@ class TimelineConfig:
     cuts: TimelineCutsConfig = field(default_factory=TimelineCutsConfig)
     placement_snap: TimelinePlacementSnap = DEFAULT_TIMELINE_PLACEMENT_SNAP
     preset: TimelinePresetConfig = field(default_factory=TimelinePresetConfig)
-    limiter: TimelineLimiterConfig = field(default_factory=TimelineLimiterConfig)
 
 
 @dataclass

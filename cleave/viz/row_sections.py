@@ -148,6 +148,12 @@ def _toggle_render_post_fx_chroma_boost(
     controls.render_post_fx.set_chroma_boost_expanded(forward)
 
 
+def _toggle_render_post_fx_limiter(
+    controls: TuningControls, _slot: str | None, forward: bool
+) -> None:
+    controls.render_post_fx.set_limiter_expanded(forward)
+
+
 def _toggle_track_header(controls: TuningControls, slot: str | None, forward: bool) -> None:
     if slot is None:
         return
@@ -204,16 +210,6 @@ def _toggle_timeline_presets(controls: TuningControls, _slot: str | None, forwar
 
 def _timeline_presets_expanded(state: TuningViewState, _slot: str | None) -> bool:
     return state.render_timeline.timeline_presets_expanded
-
-
-def _toggle_visual_limiter(
-    controls: TuningControls, _slot: str | None, forward: bool
-) -> None:
-    controls.set_visual_limiter_expanded(forward)
-
-
-def _visual_limiter_expanded(state: TuningViewState, _slot: str | None) -> bool:
-    return state.render_timeline.visual_limiter_expanded
 
 
 def _open_timeline_panel(controls: TuningControls, forward: bool) -> None:
@@ -408,6 +404,12 @@ def _render_post_fx_chroma_boost_expanded(
     state: TuningViewState, _slot: str | None
 ) -> bool:
     return state.render_post_fx.chroma_boost.expanded
+
+
+def _render_post_fx_limiter_expanded(
+    state: TuningViewState, _slot: str | None
+) -> bool:
+    return state.render_post_fx.limiter.expanded
 
 
 def _track_header_expanded(state: TuningViewState, slot: str | None) -> bool:
@@ -738,6 +740,33 @@ RENDER_POST_FX_CHROMA_BOOST_ACTIVE = ConditionalRowsDef(
     ),
 )
 
+def _render_post_fx_limiter_enabled(
+    state: TuningViewState, _desc: RowDescriptor
+) -> bool:
+    return state.render_post_fx.limiter.enabled
+
+
+RENDER_POST_FX_LIMITER_ACTIVE = ConditionalRowsDef(
+    name="visual_limiter_enabled",
+    predicate=_render_post_fx_limiter_enabled,
+    children=(
+        SectionNode(leaf_kind=RowKind.RENDER_POST_FX_LIMITER_THRESHOLD),
+        SectionNode(leaf_kind=RowKind.RENDER_POST_FX_LIMITER_RATIO),
+        SectionNode(leaf_kind=RowKind.RENDER_POST_FX_LIMITER_RELEASE),
+    ),
+)
+
+RENDER_POST_FX_LIMITER_SECTION = ExpandSectionDef(
+    header_kind=RowKind.RENDER_POST_FX_LIMITER_HEADER,
+    context="global",
+    read_expanded=_render_post_fx_limiter_expanded,
+    toggle=_toggle_render_post_fx_limiter,
+    children=(
+        SectionNode(leaf_kind=RowKind.RENDER_POST_FX_LIMITER_ENABLED),
+        SectionNode(conditional=RENDER_POST_FX_LIMITER_ACTIVE),
+    ),
+)
+
 RENDER_POST_FX_CHROMA_BOOST_SECTION = ExpandSectionDef(
     header_kind=RowKind.RENDER_POST_FX_CHROMA_BOOST_HEADER,
     context="global",
@@ -793,6 +822,7 @@ RENDER_POST_FX_SECTION = ExpandSectionDef(
         SectionNode(expand=RENDER_POST_FX_FADE_SECTION),
         SectionNode(expand=RENDER_POST_FX_HIGHLIGHT_ROLLOFF_SECTION),
         SectionNode(expand=RENDER_POST_FX_CHROMA_BOOST_SECTION),
+        SectionNode(expand=RENDER_POST_FX_LIMITER_SECTION),
     ),
 )
 
@@ -1070,34 +1100,6 @@ TIMELINE_PRESETS_SECTION = ExpandSectionDef(
 )
 
 
-def _visual_limiter_enabled(
-    state: TuningViewState, _desc: RowDescriptor
-) -> bool:
-    return state.render_timeline.limiter.enabled
-
-
-TIMELINE_VISUAL_LIMITER_ACTIVE = ConditionalRowsDef(
-    name="visual_limiter_enabled",
-    predicate=_visual_limiter_enabled,
-    children=(
-        SectionNode(leaf_kind=RowKind.TIMELINE_VISUAL_LIMITER_THRESHOLD),
-        SectionNode(leaf_kind=RowKind.TIMELINE_VISUAL_LIMITER_RATIO),
-        SectionNode(leaf_kind=RowKind.TIMELINE_VISUAL_LIMITER_RELEASE),
-    ),
-)
-
-TIMELINE_VISUAL_LIMITER_SECTION = ExpandSectionDef(
-    header_kind=RowKind.TIMELINE_VISUAL_LIMITER_HEADER,
-    context="global",
-    read_expanded=_visual_limiter_expanded,
-    toggle=_toggle_visual_limiter,
-    children=(
-        SectionNode(leaf_kind=RowKind.TIMELINE_VISUAL_LIMITER_ENABLED),
-        SectionNode(conditional=TIMELINE_VISUAL_LIMITER_ACTIVE),
-    ),
-)
-
-
 def _collect_expand_sections(
     *roots: ExpandSectionDef,
     extra_nodes: tuple[SectionNode, ...] = (),
@@ -1133,7 +1135,6 @@ _ALL_EXPAND_SECTIONS = _collect_expand_sections(
     SONG_MARKERS_SECTION,
     TIMELINE_CUTS_SECTION,
     TIMELINE_PRESETS_SECTION,
-    TIMELINE_VISUAL_LIMITER_SECTION,
     extra_nodes=RENDER_SECTION_NODES,
 )
 
@@ -1230,6 +1231,7 @@ def kinds_in_expand_section(section: ExpandSectionDef) -> frozenset[RowKind]:
 
 RENDER_OVERLAY_SECTION_KINDS = kinds_in_expand_section(RENDER_OVERLAYS_SECTION)
 RENDER_POST_FX_SECTION_KINDS = kinds_in_expand_section(RENDER_POST_FX_SECTION)
+RENDER_POST_FX_LIMITER_KINDS = kinds_in_expand_section(RENDER_POST_FX_LIMITER_SECTION)
 RENDER_PATTERN_MASK_SECTION_KINDS = kinds_in_expand_section(RENDER_PATTERN_MASK_SECTION)
 TRACK_COMPOSITING_SECTION_KINDS = kinds_in_expand_section(TRACK_COMPOSITING_SECTION)
 PRESET_SWITCHING_CHILD_KINDS = frozenset(
@@ -1256,11 +1258,6 @@ RENDER_TIMELINE_SECTION_KINDS = frozenset(
         RowKind.TIMELINE_PRESET_CONDUCTOR,
         RowKind.TIMELINE_PRESET_MODE,
         RowKind.TIMELINE_PRESETS,
-        RowKind.TIMELINE_VISUAL_LIMITER_HEADER,
-        RowKind.TIMELINE_VISUAL_LIMITER_ENABLED,
-        RowKind.TIMELINE_VISUAL_LIMITER_THRESHOLD,
-        RowKind.TIMELINE_VISUAL_LIMITER_RATIO,
-        RowKind.TIMELINE_VISUAL_LIMITER_RELEASE,
         RowKind.TIMELINE_RESET,
         RowKind.TIMELINE_BEAT_BAR_GRID_HEADER,
         RowKind.TIMELINE_PLACEMENT_SNAP,
@@ -1333,7 +1330,6 @@ def _build_row_tree_indent_depth() -> dict[RowKind, int]:
     _assign_expand_indent_depth(depths, BEAT_BAR_GRID_SECTION, 1)
     _assign_expand_indent_depth(depths, TIMELINE_CUTS_SECTION, 1)
     _assign_expand_indent_depth(depths, TIMELINE_PRESETS_SECTION, 1)
-    _assign_expand_indent_depth(depths, TIMELINE_VISUAL_LIMITER_SECTION, 1)
     depths[RowKind.TIMELINE_HARD_CUT_FADE_IN] = 3
     depths[RowKind.TIMELINE_HARD_CUT_FADE_OUT] = 3
     depths[RowKind.TIMELINE_HARD_CUT_CROSSFADE] = 3
@@ -1498,9 +1494,6 @@ def append_render_section_rows(
                 append_expand_section_rows(row_list, SONG_MARKERS_SECTION, state)
                 append_expand_section_rows(row_list, TIMELINE_CUTS_SECTION, state)
                 append_expand_section_rows(row_list, TIMELINE_PRESETS_SECTION, state)
-                append_expand_section_rows(
-                    row_list, TIMELINE_VISUAL_LIMITER_SECTION, state
-                )
                 row_list.append(RowDescriptor(RowKind.TIMELINE_RESET))
 
 
@@ -1562,14 +1555,12 @@ def _build_section_header_parent_map() -> dict[RowKind, RowKind]:
     _walk_expand_section_for_headers(BEAT_BAR_GRID_SECTION, out)
     _walk_expand_section_for_headers(TIMELINE_CUTS_SECTION, out)
     _walk_expand_section_for_headers(TIMELINE_PRESETS_SECTION, out)
-    _walk_expand_section_for_headers(TIMELINE_VISUAL_LIMITER_SECTION, out)
     # The pause row sits outside the menu. When it disappears, focus lands on
     # the preset switching header immediately below it.
     out[RowKind.TRACK_PRESET_SWITCHING_RESUME] = RowKind.TRACK_PRESET_SWITCHING
     out[RowKind.TIMELINE_BEAT_BAR_GRID_HEADER] = RowKind.RENDER_TIMELINE_HEADER
     out[RowKind.TIMELINE_CUTS_HEADER] = RowKind.RENDER_TIMELINE_HEADER
     out[RowKind.TIMELINE_PRESETS_HEADER] = RowKind.RENDER_TIMELINE_HEADER
-    out[RowKind.TIMELINE_VISUAL_LIMITER_HEADER] = RowKind.RENDER_TIMELINE_HEADER
     return out
 
 

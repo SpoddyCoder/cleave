@@ -48,6 +48,10 @@ from cleave.config_schema.render import (
     DEFAULT_HIGHLIGHT_ROLLOFF_SOFTNESS_PCT,
     DEFAULT_HIGHLIGHT_ROLLOFF_STRENGTH_PCT,
     DEFAULT_HIGHLIGHT_ROLLOFF_THRESHOLD_PCT,
+    DEFAULT_VISUAL_LIMITER_ENABLED,
+    DEFAULT_VISUAL_LIMITER_RATIO,
+    DEFAULT_VISUAL_LIMITER_RELEASE,
+    DEFAULT_VISUAL_LIMITER_THRESHOLD,
     PatternMaskType,
     default_render_overlays_runtime_values,
     default_render_pattern_mask_runtime_values,
@@ -63,10 +67,6 @@ from cleave.config_schema.timeline import (
     DEFAULT_TIMELINE_SOFT_FADE_OUT,
     DEFAULT_TIMELINE_LOCKED,
     DEFAULT_TIMELINE_PLACEMENT_SNAP,
-    DEFAULT_VISUAL_LIMITER_ENABLED,
-    DEFAULT_VISUAL_LIMITER_RATIO,
-    DEFAULT_VISUAL_LIMITER_RELEASE,
-    DEFAULT_VISUAL_LIMITER_THRESHOLD,
 )
 from cleave.preset_curation import PresetCurationIndex
 from cleave.viz.session import FadeRuntime
@@ -225,6 +225,15 @@ class ChromaBoostBlock:
 
 
 @dataclass
+class VisualLimiterBlock:
+    enabled: bool = DEFAULT_VISUAL_LIMITER_ENABLED
+    threshold: float = DEFAULT_VISUAL_LIMITER_THRESHOLD
+    ratio: float = DEFAULT_VISUAL_LIMITER_RATIO
+    release: float = DEFAULT_VISUAL_LIMITER_RELEASE
+    expanded: bool = False
+
+
+@dataclass
 class RenderPostFxBlock:
     enabled: bool = _RO_POST_FX_DEFAULTS["enabled"]
     expanded: bool = _RO_POST_FX_DEFAULTS["expanded"]
@@ -233,6 +242,7 @@ class RenderPostFxBlock:
         default_factory=HighlightRolloffBlock
     )
     chroma_boost: ChromaBoostBlock = field(default_factory=ChromaBoostBlock)
+    limiter: VisualLimiterBlock = field(default_factory=VisualLimiterBlock)
     solo: bool = False
     locked: bool = _RO_POST_FX_DEFAULTS["locked"]
 
@@ -273,14 +283,6 @@ def default_soft_timeline_fade_group_block() -> TimelineFadeGroupBlock:
 
 
 @dataclass
-class VisualLimiterBlock:
-    enabled: bool = DEFAULT_VISUAL_LIMITER_ENABLED
-    threshold: float = DEFAULT_VISUAL_LIMITER_THRESHOLD
-    ratio: float = DEFAULT_VISUAL_LIMITER_RATIO
-    release: float = DEFAULT_VISUAL_LIMITER_RELEASE
-
-
-@dataclass
 class RenderTimelineBlock:
     enabled: bool = DEFAULT_TIMELINE_ENABLED
     expanded: bool = False
@@ -290,7 +292,6 @@ class RenderTimelineBlock:
     placement_snap: str = DEFAULT_TIMELINE_PLACEMENT_SNAP
     cuts_expanded: bool = False
     timeline_presets_expanded: bool = False
-    visual_limiter_expanded: bool = False
     timeline_preset_kind: str = DEFAULT_TIMELINE_PRESET_KIND
     timeline_preset_density: TimelinePresetDensity = DEFAULT_TIMELINE_PRESET_DENSITY
     timeline_preset_cue_snap: TimelinePresetCueSnap = DEFAULT_TIMELINE_PRESET_CUE_SNAP
@@ -311,7 +312,6 @@ class RenderTimelineBlock:
     soft_cut_fades: TimelineFadeGroupBlock = field(
         default_factory=default_soft_timeline_fade_group_block
     )
-    limiter: VisualLimiterBlock = field(default_factory=VisualLimiterBlock)
     locked: bool = DEFAULT_TIMELINE_LOCKED
     song_markers_expanded: bool = False
     song_marker_times: tuple[float, ...] = ()
@@ -550,6 +550,8 @@ def view_state_structure_signature(
             "highlight_rolloff_mode": pp.highlight_rolloff.mode,
             "chroma_boost_expanded": pp.chroma_boost_expanded,
             "chroma_boost_mode": pp.chroma_boost.mode,
+            "limiter_expanded": pp.limiter_expanded,
+            "limiter_enabled": pp.limiter.enabled,
         },
         "render_pattern_mask": {
             "expanded": pm.expanded,
@@ -564,10 +566,8 @@ def view_state_structure_signature(
             "beat_bar_grid_expanded": tl.beat_bar_grid_expanded,
             "cuts_expanded": tl.cuts_expanded,
             "timeline_presets_expanded": tl.timeline_presets_expanded,
-            "visual_limiter_expanded": tl.visual_limiter_expanded,
             "hard_cut_fades_enabled": tl.hard_cut_fades.enabled,
             "soft_cut_fades_enabled": tl.soft_cut_fades.enabled,
-            "visual_limiter_enabled": tl.limiter.enabled,
         },
         "timeline": {"enabled": tl.enabled},
     }
@@ -851,6 +851,13 @@ class TuningViewStateBuilder:
                 variant=pp.chroma_boost.variant,
                 amount_pct=pp.chroma_boost.amount_pct,
             ),
+            limiter=VisualLimiterBlock(
+                expanded=pp.limiter_expanded,
+                enabled=pp.limiter.enabled,
+                threshold=pp.limiter.threshold,
+                ratio=pp.limiter.ratio,
+                release=pp.limiter.release,
+            ),
         )
         render_pattern_mask = RenderPatternMaskBlock(
             enabled=pm.enabled,
@@ -872,7 +879,6 @@ class TuningViewStateBuilder:
             placement_snap=tl.placement_snap,
             cuts_expanded=tl.cuts_expanded,
             timeline_presets_expanded=tl.timeline_presets_expanded,
-            visual_limiter_expanded=tl.visual_limiter_expanded,
             timeline_preset_kind=tl.timeline_preset_kind,
             timeline_preset_density=tl.timeline_preset_density,
             timeline_preset_cue_snap=tl.timeline_preset_cue_snap,
@@ -892,12 +898,6 @@ class TuningViewStateBuilder:
                 fade_in=tl.soft_cut_fades.fade_in,
                 fade_out=tl.soft_cut_fades.fade_out,
                 crossfade=tl.soft_cut_fades.crossfade,
-            ),
-            limiter=VisualLimiterBlock(
-                enabled=tl.limiter.enabled,
-                threshold=tl.limiter.threshold,
-                ratio=tl.limiter.ratio,
-                release=tl.limiter.release,
             ),
             song_markers_expanded=self.session.song_markers.expanded,
             song_marker_times=tuple(self.session.song_markers.times),
@@ -1053,6 +1053,13 @@ class TuningViewStateBuilder:
                     variant=pp.chroma_boost.variant,
                     amount_pct=pp.chroma_boost.amount_pct,
                 ),
+                limiter=VisualLimiterBlock(
+                    expanded=pp.limiter_expanded,
+                    enabled=pp.limiter.enabled,
+                    threshold=pp.limiter.threshold,
+                    ratio=pp.limiter.ratio,
+                    release=pp.limiter.release,
+                ),
                 solo=self.session.render_post_fx_solo,
                 locked=pp.locked,
             ),
@@ -1077,7 +1084,6 @@ class TuningViewStateBuilder:
                 placement_snap=tl.placement_snap,
                 cuts_expanded=tl.cuts_expanded,
                 timeline_presets_expanded=tl.timeline_presets_expanded,
-                visual_limiter_expanded=tl.visual_limiter_expanded,
                 timeline_preset_kind=tl.timeline_preset_kind,
                 timeline_preset_density=tl.timeline_preset_density,
                 timeline_preset_cue_snap=tl.timeline_preset_cue_snap,
@@ -1097,12 +1103,6 @@ class TuningViewStateBuilder:
                     fade_in=tl.soft_cut_fades.fade_in,
                     fade_out=tl.soft_cut_fades.fade_out,
                     crossfade=tl.soft_cut_fades.crossfade,
-                ),
-                limiter=VisualLimiterBlock(
-                    enabled=tl.limiter.enabled,
-                    threshold=tl.limiter.threshold,
-                    ratio=tl.limiter.ratio,
-                    release=tl.limiter.release,
                 ),
                 locked=tl.locked,
                 song_markers_expanded=self.session.song_markers.expanded,

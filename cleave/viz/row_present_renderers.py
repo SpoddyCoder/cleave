@@ -58,6 +58,7 @@ from cleave.viz.editor_mode_controls import (
 from cleave.viz.row_sections import (
     RENDER_OVERLAY_SECTION_KINDS,
     RENDER_PATTERN_MASK_SECTION_KINDS,
+    RENDER_POST_FX_LIMITER_KINDS,
     RENDER_POST_FX_SECTION_KINDS,
     RENDER_TIMELINE_SECTION_KINDS,
     TRACK_COMPOSITING_SECTION_KINDS,
@@ -636,7 +637,10 @@ def row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]:
         ):
             return DISABLED
 
-    if kind in RENDER_POST_FX_SECTION_KINDS:
+    if (
+        kind in RENDER_POST_FX_SECTION_KINDS
+        and kind not in RENDER_POST_FX_LIMITER_KINDS
+    ):
         if not state.render_post_fx.enabled:
             return DISABLED
 

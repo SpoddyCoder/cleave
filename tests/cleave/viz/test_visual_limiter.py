@@ -87,11 +87,17 @@ def _hot(
     )
 
 
-def _stem(slot: str, *, timeline_level: float = 1.0) -> StemLayer:
+def _stem(
+    slot: str,
+    *,
+    timeline_level: float = 1.0,
+    enabled: bool = True,
+    opacity: float = 1.0,
+) -> StemLayer:
     return StemLayer(
         slot=slot,
         pm=MagicMock(),
-        fbo=MagicMock(enabled=timeline_level > 0.0),
+        fbo=MagicMock(enabled=enabled, opacity=opacity),
         playlist=_playlist(slot),
         timeline_level=timeline_level,
     )
@@ -321,15 +327,87 @@ def test_apply_effect_modifiers_includes_limiter_gain() -> None:
 
 
 def test_visual_limiter_inactive_when_disabled() -> None:
-    session = _session(timeline_enabled=True)
+    session = _session(timeline_enabled=False)
     assert visual_limiter_active(LimiterFrameState.from_session(session)) is True
-    session.timeline.limiter.enabled = False
+    session.render_post_fx.limiter.enabled = False
     assert visual_limiter_active(LimiterFrameState.from_session(session)) is False
 
 
-def test_apply_visual_limiter_gains_resets_when_disabled() -> None:
+def test_visual_limiter_active_when_timeline_disabled() -> None:
+    session = _session(timeline_enabled=False)
+    frame = LimiterFrameState.from_session(session)
+    assert visual_limiter_active(frame) is True
+    layers = {
+        "layer_1": _stem("layer_1"),
+        "layer_2": _stem("layer_2", enabled=False),
+        "layer_3": _stem("layer_3", opacity=0.0),
+        "layer_4": _stem("layer_4"),
+    }
+    hot = collect_hot_layers(frame, layers, 1.0)
+    assert [item.slot for item in hot] == ["layer_1", "layer_4"]
+    assert all(item.role_rank == role_rank(None) for item in hot)
+
+    state = VisualLimiterState()
+    for step in range(30):
+        _drive(state, mean_luma=_OVER, t_sec=step * 0.05, hot=hot)
+    assert state.gain_for("layer_1") < 1.0
+    assert state.gain_for("layer_1") == pytest.approx(state.gain_for("layer_4"))
+    assert state.gain_for("layer_2") == pytest.approx(1.0)
+    assert state.gain_for("layer_3") == pytest.approx(1.0)
+
+
+def test_collect_hot_layers_unset_role_is_pulse() -> None:
     session = _session(timeline_enabled=True)
-    session.timeline.limiter.enabled = False
+    session.timeline.lanes = {
+        "layer_1": TimelineLane(
+            baseline=0.0,
+            cues=[SlotCue(t=0.0, level=1.0)],
+        ),
+        "layer_2": TimelineLane(
+            baseline=1.0,
+            cues=[],
+        ),
+    }
+    layers = {
+        "layer_1": _stem("layer_1", timeline_level=1.0),
+        "layer_2": _stem("layer_2", timeline_level=1.0),
+        "layer_3": _stem("layer_3", timeline_level=0.0),
+        "layer_4": _stem("layer_4", timeline_level=0.0, enabled=False),
+    }
+    hot = collect_hot_layers(LimiterFrameState.from_session(session), layers, 1.0)
+    assert [item.slot for item in hot] == ["layer_1", "layer_2"]
+    assert all(item.role_rank == role_rank("pulse") for item in hot)
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda session: setattr(session, "solo_slot", "layer_1"),
+        lambda session: setattr(session.settings, "editor_mode", "preset_curation"),
+        lambda session: setattr(session.timeline, "recording", True),
+        lambda session: setattr(session.timeline, "preview_active", True),
+    ],
+)
+def test_visual_limiter_idle_for_exclusions(mutate) -> None:
+    session = _session(timeline_enabled=True)
+    mutate(session)
+    assert visual_limiter_active(LimiterFrameState.from_session(session)) is False
+    session.timeline.enabled = False
+    assert visual_limiter_active(LimiterFrameState.from_session(session)) is False
+
+
+def test_visual_limiter_ignores_post_fx_master_and_solo() -> None:
+    session = _session(timeline_enabled=False)
+    session.render_post_fx.enabled = False
+    session.render_post_fx_solo = True
+    assert visual_limiter_active(LimiterFrameState.from_session(session)) is True
+    session.timeline.enabled = True
+    assert visual_limiter_active(LimiterFrameState.from_session(session)) is True
+
+
+def test_apply_visual_limiter_gains_resets_when_disabled() -> None:
+    session = _session(timeline_enabled=False)
+    session.render_post_fx.limiter.enabled = False
     state = VisualLimiterState()
     state.gains["layer_1"] = _SAMPLE_GAIN
     layer = _stem("layer_1", timeline_level=1.0)

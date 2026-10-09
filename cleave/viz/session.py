@@ -12,7 +12,6 @@ from cleave.config import (
     RenderOverlayPosition,
     RenderOverlaySlideDirection,
     TimelineFadeGroupConfig,
-    TimelineLimiterConfig,
 )
 from cleave.config_schema.compositor import DEFAULT_COMPOSITOR_HDR
 from cleave.config_schema.editor import DEFAULT_BEAT_SENSITIVITY
@@ -47,6 +46,10 @@ from cleave.config_schema.render import (
     DEFAULT_RENDER_PATTERN_MASK_LOCKED,
     DEFAULT_RENDER_PATTERN_MASK_TRANSITION,
     DEFAULT_RENDER_POST_FX_LOCKED,
+    DEFAULT_VISUAL_LIMITER_ENABLED,
+    DEFAULT_VISUAL_LIMITER_RATIO,
+    DEFAULT_VISUAL_LIMITER_RELEASE,
+    DEFAULT_VISUAL_LIMITER_THRESHOLD,
     FadeCurve,
     HighlightRolloffApplyMode,
     HighlightRolloffCurve,
@@ -70,10 +73,6 @@ from cleave.config_schema.timeline import (
     DEFAULT_TIMELINE_SOFT_FADE_OUT,
     DEFAULT_TIMELINE_LOCKED,
     DEFAULT_TIMELINE_PLACEMENT_SNAP,
-    DEFAULT_VISUAL_LIMITER_ENABLED,
-    DEFAULT_VISUAL_LIMITER_RATIO,
-    DEFAULT_VISUAL_LIMITER_RELEASE,
-    DEFAULT_VISUAL_LIMITER_THRESHOLD,
     TimelinePlacementSnap,
 )
 from cleave.stems import StemSource
@@ -248,6 +247,18 @@ class FadeRuntime:
 
 
 @dataclass
+class VisualLimiterRuntime:
+    enabled: bool = DEFAULT_VISUAL_LIMITER_ENABLED
+    threshold: float = DEFAULT_VISUAL_LIMITER_THRESHOLD
+    ratio: float = DEFAULT_VISUAL_LIMITER_RATIO
+    release: float = DEFAULT_VISUAL_LIMITER_RELEASE
+
+
+def default_visual_limiter_runtime() -> VisualLimiterRuntime:
+    return VisualLimiterRuntime()
+
+
+@dataclass
 class RenderPostFxRuntime:
     enabled: bool
     expanded: bool
@@ -256,6 +267,8 @@ class RenderPostFxRuntime:
     highlight_rolloff_expanded: bool = False
     chroma_boost: ChromaBoostRuntime = field(default_factory=default_chroma_boost_runtime)
     chroma_boost_expanded: bool = False
+    limiter: VisualLimiterRuntime = field(default_factory=default_visual_limiter_runtime)
+    limiter_expanded: bool = False
     locked: bool = DEFAULT_RENDER_POST_FX_LOCKED
 
 
@@ -272,10 +285,12 @@ def default_render_post_fx_runtime() -> RenderPostFxRuntime:
     highlight_rolloff = HighlightRolloffRuntime(**values.pop("highlight_rolloff"))
     chroma_boost = ChromaBoostRuntime(**values.pop("chroma_boost"))
     fade = _fade_runtime_from_values(values.pop("fade"))
+    limiter = VisualLimiterRuntime(**values.pop("limiter"))
     return RenderPostFxRuntime(
         highlight_rolloff=highlight_rolloff,
         chroma_boost=chroma_boost,
         fade=fade,
+        limiter=limiter,
         **values,
     )
 
@@ -320,18 +335,6 @@ def default_soft_timeline_fade_group_runtime() -> TimelineFadeGroupRuntime:
 
 
 @dataclass
-class VisualLimiterRuntime:
-    enabled: bool = DEFAULT_VISUAL_LIMITER_ENABLED
-    threshold: float = DEFAULT_VISUAL_LIMITER_THRESHOLD
-    ratio: float = DEFAULT_VISUAL_LIMITER_RATIO
-    release: float = DEFAULT_VISUAL_LIMITER_RELEASE
-
-
-def default_visual_limiter_runtime() -> VisualLimiterRuntime:
-    return VisualLimiterRuntime()
-
-
-@dataclass
 class TimelineRuntime:
     enabled: bool = DEFAULT_TIMELINE_ENABLED
     locked: bool = DEFAULT_TIMELINE_LOCKED
@@ -358,7 +361,6 @@ class TimelineRuntime:
     placement_snap: TimelinePlacementSnap = DEFAULT_TIMELINE_PLACEMENT_SNAP
     cuts_expanded: bool = False
     timeline_presets_expanded: bool = False
-    visual_limiter_expanded: bool = False
     timeline_preset_kind: str = DEFAULT_TIMELINE_PRESET_KIND
     timeline_preset_density: TimelinePresetDensity = DEFAULT_TIMELINE_PRESET_DENSITY
     timeline_preset_cue_snap: TimelinePresetCueSnap = DEFAULT_TIMELINE_PRESET_CUE_SNAP
@@ -379,7 +381,6 @@ class TimelineRuntime:
     soft_cut_fades: TimelineFadeGroupRuntime = field(
         default_factory=default_soft_timeline_fade_group_runtime
     )
-    limiter: VisualLimiterRuntime = field(default_factory=default_visual_limiter_runtime)
 
 
 def default_timeline_runtime() -> TimelineRuntime:
@@ -570,6 +571,7 @@ def render_post_fx_runtime_from_cfg(
     if post_fx is not None:
         hr = post_fx.highlight_rolloff
         cb = post_fx.chroma_boost
+        lim = post_fx.limiter
         base = default_render_post_fx_runtime()
         fin = post_fx.fade.fade_in
         fout = post_fx.fade.fade_out
@@ -608,6 +610,13 @@ def render_post_fx_runtime_from_cfg(
                 variant=cb.variant,
                 amount_pct=cb.amount_pct,
             ),
+            limiter=replace(
+                default_visual_limiter_runtime(),
+                enabled=lim.enabled,
+                threshold=lim.threshold,
+                ratio=lim.ratio,
+                release=lim.release,
+            ),
         )
     return default_render_post_fx_runtime()
 
@@ -642,19 +651,6 @@ def _fade_group_runtime_from_cfg(
     )
 
 
-def _limiter_runtime_from_cfg(
-    limiter: TimelineLimiterConfig | None,
-) -> VisualLimiterRuntime:
-    if limiter is None:
-        return VisualLimiterRuntime()
-    return VisualLimiterRuntime(
-        enabled=limiter.enabled,
-        threshold=limiter.threshold,
-        ratio=limiter.ratio,
-        release=limiter.release,
-    )
-
-
 def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
     timeline = cfg.timeline
     enabled = True if timeline is None else timeline.enabled
@@ -667,7 +663,6 @@ def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
         else timeline.placement_snap
     )
     preset = None if timeline is None else timeline.preset
-    limiter_cfg = None if timeline is None else timeline.limiter
     preset_kind = (
         DEFAULT_TIMELINE_PRESET_KIND if preset is None else preset.character
     )
@@ -704,7 +699,6 @@ def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
             lanes[slot] = copy_lane(source_lanes[slot])
         else:
             lanes[slot] = empty_lane()
-    limiter = _limiter_runtime_from_cfg(limiter_cfg)
     if cuts is None:
         return TimelineRuntime(
             enabled=enabled,
@@ -719,7 +713,6 @@ def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
             timeline_preset_repopulate=preset_repopulate,
             timeline_preset_conductor=preset_conductor,
             timeline_preset_mode=preset_mode,
-            limiter=limiter,
         )
     return TimelineRuntime(
         enabled=enabled,
@@ -736,7 +729,6 @@ def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
         timeline_preset_mode=preset_mode,
         hard_cut_fades=_fade_group_runtime_from_cfg(cuts.hard),
         soft_cut_fades=_fade_group_runtime_from_cfg(cuts.soft),
-        limiter=limiter,
     )
 
 

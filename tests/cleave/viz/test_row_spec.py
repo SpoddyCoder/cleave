@@ -164,9 +164,9 @@ _EXPECTED_REPEAT_ROW_KINDS = frozenset(
         RowKind.TIMELINE_SOFT_CUT_FADE_IN,
         RowKind.TIMELINE_SOFT_CUT_FADE_OUT,
         RowKind.TIMELINE_SOFT_CUT_CROSSFADE,
-        RowKind.TIMELINE_VISUAL_LIMITER_THRESHOLD,
-        RowKind.TIMELINE_VISUAL_LIMITER_RATIO,
-        RowKind.TIMELINE_VISUAL_LIMITER_RELEASE,
+        RowKind.RENDER_POST_FX_LIMITER_THRESHOLD,
+        RowKind.RENDER_POST_FX_LIMITER_RATIO,
+        RowKind.RENDER_POST_FX_LIMITER_RELEASE,
     }
 )
 
@@ -1084,7 +1084,7 @@ def test_expand_subheader_prefix_preset_switching() -> None:
         expand_subheader_prefix(RowKind.RENDER_POST_FX_CHROMA_BOOST_HEADER)
         == "└─ chroma boost "
     )
-    assert expand_subheader_prefix(RowKind.TIMELINE_VISUAL_LIMITER_HEADER) == (
+    assert expand_subheader_prefix(RowKind.RENDER_POST_FX_LIMITER_HEADER) == (
         "└─ visual limiter "
     )
     assert expand_subheader_prefix(RowKind.RENDER_OVERLAY_CARD_ANIMATION_HEADER) == (
@@ -1115,9 +1115,6 @@ def test_row_expand_subheader_display_text() -> None:
 
 def test_expand_subheader_omits_child_status_value() -> None:
     state = _minimal_view_state(
-        render_timeline=RenderTimelineBlock(
-            limiter=VisualLimiterBlock(enabled=False)
-        ),
         render_overlays=RenderOverlaysBlock(
             opening_card=make_overlay_card_block(animation_type="slide"),
             closing_card=make_overlay_card_block(animation_type="slide-fade"),
@@ -1125,10 +1122,11 @@ def test_expand_subheader_omits_child_status_value() -> None:
         render_post_fx=RenderPostFxBlock(
             highlight_rolloff=HighlightRolloffBlock(mode="per_layer"),
             chroma_boost=ChromaBoostBlock(mode="composite"),
+            limiter=VisualLimiterBlock(enabled=False),
         ),
     )
     assert row_expand_subheader_display_text(
-        state, RowDescriptor(RowKind.TIMELINE_VISUAL_LIMITER_HEADER)
+        state, RowDescriptor(RowKind.RENDER_POST_FX_LIMITER_HEADER)
     ) == "└─ visual limiter ▶"
     assert row_expand_subheader_display_text(
         state,
@@ -1399,29 +1397,29 @@ def test_full_line_delete_layer_prefix() -> None:
 
 
 def test_apply_field_horizontal_visual_limiter_enabled() -> None:
-    controls = _make_controls(timeline_enabled=True)
-    controls.session.timeline.limiter.enabled = True
-    desc = RowDescriptor(RowKind.TIMELINE_VISUAL_LIMITER_ENABLED)
+    controls = _make_controls()
+    controls.session.render_post_fx.limiter.enabled = True
+    desc = RowDescriptor(RowKind.RENDER_POST_FX_LIMITER_ENABLED)
 
     apply_field_horizontal(controls, desc, False, False)
-    assert controls.session.timeline.limiter.enabled is False
+    assert controls.session.render_post_fx.limiter.enabled is False
 
     apply_field_horizontal(controls, desc, True, False)
-    assert controls.session.timeline.limiter.enabled is True
+    assert controls.session.render_post_fx.limiter.enabled is True
 
 
 def test_apply_field_horizontal_visual_limiter_header_expands() -> None:
-    controls = _make_controls(timeline_enabled=True)
-    controls.session.timeline.visual_limiter_expanded = False
-    desc = RowDescriptor(RowKind.TIMELINE_VISUAL_LIMITER_HEADER)
+    controls = _make_controls()
+    controls.session.render_post_fx.limiter_expanded = False
+    desc = RowDescriptor(RowKind.RENDER_POST_FX_LIMITER_HEADER)
 
     apply_field_horizontal(controls, desc, True, False)
-    assert controls.session.timeline.visual_limiter_expanded is True
-    assert controls.session.timeline.limiter.enabled is True
+    assert controls.session.render_post_fx.limiter_expanded is True
+    assert controls.session.render_post_fx.limiter.enabled is True
 
     apply_field_horizontal(controls, desc, False, False)
-    assert controls.session.timeline.visual_limiter_expanded is False
-    assert controls.session.timeline.limiter.enabled is True
+    assert controls.session.render_post_fx.limiter_expanded is False
+    assert controls.session.render_post_fx.limiter.enabled is True
 
 
 def test_apply_field_horizontal_transport_seeks() -> None:

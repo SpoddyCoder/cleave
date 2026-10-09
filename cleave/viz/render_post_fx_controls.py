@@ -17,6 +17,9 @@ from cleave.config_schema.render import (
     clamp_highlight_rolloff_softness_pct,
     clamp_highlight_rolloff_strength_pct,
     clamp_highlight_rolloff_threshold_pct,
+    clamp_visual_limiter_ratio,
+    clamp_visual_limiter_release,
+    clamp_visual_limiter_threshold,
 )
 from cleave.viz.render_post_fx_bindings import RenderPostFxBindings
 from cleave.viz.session import FadeSideRuntime, TuningSession
@@ -225,3 +228,27 @@ class RenderPostFxControls:
             cb.variant = variants[(index + 1) % len(variants)]
         else:
             cb.variant = variants[(index - 1) % len(variants)]
+
+    def set_limiter_expanded(self, expanded: bool) -> None:
+        pp = self.session.render_post_fx
+        if pp.limiter_expanded == expanded:
+            return
+        pp.limiter_expanded = expanded
+
+    def set_limiter_enabled(self, enabled: bool) -> None:
+        lim = self.session.render_post_fx.limiter
+        if lim.enabled == enabled:
+            return
+        lim.enabled = enabled
+
+    def set_limiter_threshold(self, value: float) -> None:
+        lim = self.session.render_post_fx.limiter
+        lim.threshold = clamp_visual_limiter_threshold(value)
+
+    def set_limiter_ratio(self, value: float) -> None:
+        lim = self.session.render_post_fx.limiter
+        lim.ratio = clamp_visual_limiter_ratio(value)
+
+    def set_limiter_release(self, value: float) -> None:
+        lim = self.session.render_post_fx.limiter
+        lim.release = clamp_visual_limiter_release(value)
