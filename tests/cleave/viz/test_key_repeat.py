@@ -114,6 +114,19 @@ def test_up_down_keys_arm_repeat() -> None:
         assert repeats == [(key, 0)]
 
 
+def test_page_keys_arm_repeat() -> None:
+    for key in (pygame.K_PAGEUP, pygame.K_PAGEDOWN):
+        controller = KeyRepeatController()
+        repeats: list[tuple[int, int]] = []
+        controller.on_keydown(
+            key,
+            0,
+            on_repeat=lambda k, mod: repeats.append((k, mod)),
+        )
+        controller.tick(INITIAL_DELAY_SEC)
+        assert repeats == [(key, 0)]
+
+
 def test_backspace_key_arms_repeat() -> None:
     controller = KeyRepeatController()
     repeats: list[tuple[int, int]] = []

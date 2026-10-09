@@ -41,6 +41,8 @@ NAVIGATION_SECTION = HelpSection(
     (
         ("Up/Down", "move row"),
         ("Ctrl + Up/Down", "jump section"),
+        ("Shift + Left/Right", "skip 2s"),
+        ("Ctrl + Left/Right", "skip 30s"),
         ("ESC", "hide UI"),
         ("Ctrl + Q", "quit"),
         ("Ctrl + S", "save"),
@@ -53,6 +55,8 @@ _CURATION_NAVIGATION_SECTION = HelpSection(
     (
         ("Up/Down", "move row"),
         ("Ctrl + Up/Down", "jump section"),
+        ("Shift + Left/Right", "skip 2s"),
+        ("Ctrl + Left/Right", "skip 30s"),
         ("ESC", "hide UI"),
         ("Ctrl + Q", "quit"),
     ),
@@ -69,20 +73,18 @@ _TRANSPORT_SECTION = HelpSection(
     (
         ("Enter", "play/pause"),
         ("Left/Right", "skip 10s"),
-        ("Shift + Left/Right", "skip 2s"),
-        ("Ctrl + Left/Right", "skip 30s"),
     ),
 )
 
 _LAYER_SECTION_BASE: tuple[tuple[str, str], ...] = (
     ("M", "move z-order"),
     ("L", "lock/unlock layer"),
-    ("Shift + Left/Right", "solo layer"),
+    ("S", "solo layer"),
     ("Left/Right", "expand/collapse"),
     ("Delete", "delete layer"),
 )
 
-_LAYER_VISIBILITY_ENTRY = ("Ctrl + Left/Right", "enable/disable layer")
+_LAYER_VISIBILITY_ENTRY = ("E", "enable/disable layer")
 
 _CURATION_LAYER_SECTION = HelpSection(
     "Layer",
@@ -105,15 +107,16 @@ _EDIT_SECTION = HelpSection(
     "Edit",
     (
         ("Left/Right", "adjust value"),
-        ("Ctrl + Left/Right", "large step"),
+        ("PgUp/PgDn", "large step"),
     ),
 )
 
 _PRESET_DIR_SECTION = HelpSection(
     "Edit",
     (
-        ("Left/Right", "next/previous directory"),
-        ("Ctrl + Left/Right", "up/down directory tree"),
+        ("Left/Right", "next/previous"),
+        ("Enter", "open folder"),
+        ("Backspace", "parent"),
     ),
 )
 
@@ -128,7 +131,7 @@ _PRESET_SECTION = HelpSection(
     "Edit",
     (
         ("Left/Right", "next/previous preset"),
-        ("Ctrl + Left/Right", "next/previous large step"),
+        ("PgUp/PgDn", "next/previous large step"),
         *_PRESET_CURATION_SHORTCUTS,
     ),
 )
@@ -173,8 +176,8 @@ _RENDER_SECTION = HelpSection(
     "Render",
     (
         ("Left/Right", "expand/collapse"),
-        ("Ctrl + Left/Right", "enable/disable"),
-        ("Shift + Left/Right", "always on"),
+        ("E", "enable/disable"),
+        ("S", "always on"),
     ),
 )
 
@@ -182,7 +185,7 @@ _RENDER_TIMELINE_SECTION = HelpSection(
     "Render",
     (
         ("Left/Right", "expand/collapse"),
-        ("Ctrl + Left/Right", "enable/disable"),
+        ("E", "enable/disable"),
     ),
 )
 
@@ -223,27 +226,19 @@ def timeline_strip_section(
             entries.append(("Space", "pause"))
 
     if recording:
-        entries.extend(
-            (
-                ("Left/Right", "skip 10s, fills range"),
-                ("Shift + Left/Right", "skip 2s, fills range"),
-                ("Ctrl + Left/Right", "skip 30s, fills range"),
-            )
-        )
+        entries.append(("Left/Right", "skip 10s, fills range"))
     else:
         entries.extend(
             (
-                ("Left/Right", "skip 10s"),
-                ("Shift + Left/Right", "skip 2s"),
-                ("Ctrl + Left/Right", "skip 30s"),
+                ("Left/Right", "previous / next cue"),
+                ("Enter", "seek to cue"),
             )
         )
 
     if not recording:
         entries.extend(
             (
-                (", / .", "select previous / next cue"),
-                ("Shift + , / .", "nudge cue opacity -/+ 1%"),
+                (", / .", "nudge cue opacity -/+ 1%"),
                 ("Ctrl + , / .", "nudge cue opacity -/+ 10%"),
                 ("B", "cycle cue blend"),
                 ("C", "cycle cue cut type"),
@@ -271,7 +266,7 @@ def _value_step_section(row_kind: RowKind) -> HelpSection:
     if row_kind == RowKind.TRACK_EFFECT:
         entries = (
             ("Left/Right", "adjust depth"),
-            ("Ctrl + Left/Right", "large step"),
+            ("PgUp/PgDn", "large step"),
         )
     else:
         entries = _EDIT_SECTION.entries
@@ -354,9 +349,11 @@ def sections_for(
                 timeline_enabled=timeline_enabled,
                 preset_curation=preset_curation,
             )
-        elif behavior.can_enable_disable and behavior.can_solo:
+        elif (
+            behavior.toggle_enabled is not None and behavior.toggle_solo is not None
+        ):
             primary = _RENDER_SECTION
-        elif behavior.can_enable_disable:
+        elif behavior.toggle_enabled is not None:
             primary = _RENDER_TIMELINE_SECTION
         elif behavior.is_header:
             primary = HelpSection(

@@ -56,9 +56,7 @@ from cleave.user_config import load_user_config
 from cleave.viz.controls import (
     NOTIFICATION_TIMELINE_DISABLED_TEXT,
     NOTIFICATION_TIMELINE_ENABLED_TEXT,
-    SEEK_LONG,
     SEEK_SHORT,
-    SEEK_TINY,
     TuningControls,
 )
 from cleave.viz.settings_controls import EDITOR_WINDOW_RESTART_TOAST
@@ -457,12 +455,12 @@ def test_header_toggles_enabled() -> None:
     controls.focus_descriptor = _desc(view, header_row)
     assert controls.session.layers["layer_1"].enabled is True
 
-    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_e))
     assert controls.session.layers["layer_1"].enabled is False
     assert enabled_events == [("layer_1", False)]
     assert controls.session.layers["layer_1"].opacity_pct == 50
 
-    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_e))
     assert controls.session.layers["layer_1"].enabled is True
     assert enabled_events == [("layer_1", False), ("layer_1", True)]
     assert controls.session.layers["layer_1"].opacity_pct == 50
@@ -529,7 +527,7 @@ def test_re_enable_without_expanding() -> None:
     assert controls.focus_descriptor == _desc(view, render_timeline_row)
 
     controls.focus_descriptor = _desc(view, header_row)
-    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_e))
     assert controls.session.layers["layer_1"].enabled is True
     assert controls.session.layers["layer_1"].expanded is False
 
@@ -569,7 +567,7 @@ def test_disable_auto_collapses_sub_rows() -> None:
     assert controls.focus_descriptor == _desc(view, stem_row)
 
     controls.focus_descriptor = _desc(view, header_row)
-    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_e))
     assert controls.session.layers["layer_1"].enabled is False
     assert controls.session.layers["layer_1"].expanded is False
     assert controls.focus_descriptor == _desc(view, header_row)
@@ -584,7 +582,7 @@ def test_disabled_track_can_expand_sub_rows() -> None:
     view = controls.build_view_state(paused=False)
     header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
     controls.focus_descriptor = _desc(view, header_row)
-    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_e))
     assert controls.session.layers["layer_1"].enabled is False
     assert controls.session.layers["layer_1"].expanded is False
 
@@ -606,7 +604,7 @@ def test_disabled_render_overlay_can_expand_sub_rows() -> None:
     view = controls.build_view_state(paused=False)
     header_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAYS_HEADER)
     controls.focus_descriptor = _desc(view, header_row)
-    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_e))
     assert controls.session.render_overlays.opening_card.enabled is False
     assert controls.session.render_overlays.closing_card.enabled is False
     assert controls.session.render_overlays.expanded is False
@@ -629,7 +627,7 @@ def test_disabled_render_post_fx_can_expand_sub_rows() -> None:
     view = controls.build_view_state(paused=False)
     header_row = view.layout.find_by_kind(RowKind.RENDER_POST_FX_HEADER)
     controls.focus_descriptor = _desc(view, header_row)
-    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_e))
     assert controls.session.render_post_fx.enabled is False
     assert controls.session.render_post_fx.expanded is False
 
@@ -651,7 +649,6 @@ def test_disabled_render_timeline_can_open_panel() -> None:
     view = controls.build_view_state(paused=False)
     header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
     controls.focus_descriptor = _desc(view, header_row)
-    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
     assert controls.session.timeline.enabled is False
     assert controls.session.timeline.panel_open is False
 
@@ -704,12 +701,12 @@ def test_opacity_ctrl_step_is_ten_percent() -> None:
     controls.session.layers["layer_1"].opacity_pct = 50
 
     controls.handle_keydown(
-        _keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL),
+        _keydown(pygame.K_PAGEDOWN),
     )
     assert controls.session.layers["layer_1"].opacity_pct == 60
 
     controls.handle_keydown(
-        _keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL),
+        _keydown(pygame.K_PAGEUP),
     )
     assert controls.session.layers["layer_1"].opacity_pct == 50
 
@@ -1273,7 +1270,7 @@ def test_render_overlay_background_margin_row() -> None:
     controls.focus_descriptor = _desc(view, margin_row)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.session.render_overlays.opening_card.background_margin == 41
-    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_PAGEUP))
     assert controls.session.render_overlays.opening_card.background_margin == 31
 
 
@@ -1291,7 +1288,7 @@ def test_render_overlay_background_padding_row() -> None:
     controls.focus_descriptor = _desc(view, padding_row)
     controls.handle_keydown(_keydown(pygame.K_LEFT))
     assert controls.session.render_overlays.opening_card.background_padding == 19
-    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_PAGEDOWN))
     assert controls.session.render_overlays.opening_card.background_padding == 29
 
 
@@ -3166,20 +3163,17 @@ def test_render_timeline_header_expand_arrow() -> None:
     assert _row_text(view, header_row).endswith(" ▼")
 
 
-def test_render_timeline_ctrl_right_toggles_enabled() -> None:
+def test_render_timeline_e_toggles_enabled() -> None:
     controls = _make_controls(timeline_enabled=True)
     view = controls.build_view_state(paused=False)
     header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
     controls.focus_descriptor = _desc(view, header_row)
     assert controls.session.timeline.enabled is True
 
-    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
-    assert controls.session.timeline.enabled is True
-
-    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_e))
     assert controls.session.timeline.enabled is False
 
-    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_e))
     assert controls.session.timeline.enabled is True
     assert controls.session.timeline.panel_open is True
     assert not isinstance(controls.focus_cursor, TimelineFocus)
@@ -3202,11 +3196,11 @@ def test_render_timeline_toggle_shows_notification() -> None:
         view = controls.build_view_state(paused=False)
         header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
         controls.focus_descriptor = _desc(view, header_row)
-        controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+        controls.handle_keydown(_keydown(pygame.K_e))
         view = controls.build_view_state(paused=False)
         assert view.notification_message == NOTIFICATION_TIMELINE_DISABLED_TEXT
 
-        controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+        controls.handle_keydown(_keydown(pygame.K_e))
         view = controls.build_view_state(paused=False)
         assert view.notification_message == NOTIFICATION_TIMELINE_ENABLED_TEXT
 
@@ -3357,7 +3351,7 @@ def test_render_timeline_enable_opens_panel() -> None:
     assert controls.session.timeline.enabled is False
     assert controls.session.timeline.panel_open is False
 
-    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_e))
     assert controls.session.timeline.enabled is True
     assert controls.session.timeline.panel_open is True
     assert not isinstance(controls.focus_cursor, TimelineFocus)
@@ -3755,7 +3749,7 @@ def test_render_timeline_disable_closes_panel() -> None:
     view = controls.build_view_state(paused=False)
     header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
     controls.focus_descriptor = _desc(view, header_row)
-    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_e))
     assert controls.session.timeline.enabled is False
     assert controls.session.timeline.panel_open is False
 
@@ -3861,13 +3855,10 @@ def test_render_timeline_enabled_change_callback() -> None:
     view = controls.build_view_state(paused=False)
     header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
     controls.focus_descriptor = _desc(view, header_row)
-    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
-    assert events == []
-
-    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_e))
     assert events == [False]
 
-    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_e))
     assert events == [False, True]
 
 
@@ -4326,12 +4317,12 @@ def test_directory_pack_hop_then_enter_ctrl_left_still_ascends() -> None:
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert playlist.current_dir.resolve() == other.resolve()
 
-    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
     assert playlist.current_dir.resolve() == child.resolve()
     view = controls.build_view_state(paused=False)
     assert "[..]" in view.tracks["layer_1"].preset_dir_label
 
-    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_BACKSPACE))
     assert playlist.current_dir.resolve() == other.resolve()
 
 
@@ -4344,12 +4335,12 @@ def test_directory_enter_then_ctrl_left_ascends_within_pack() -> None:
     playlist = controls.session.layers["layer_1"].playlist
     child = siblings[0] / "child"
 
-    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
     assert playlist.current_dir.resolve() == child.resolve()
     view = controls.build_view_state(paused=False)
     assert "[..]" in view.tracks["layer_1"].preset_dir_label
 
-    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_BACKSPACE))
     assert playlist.current_dir.resolve() == siblings[0].resolve()
 
 
@@ -4374,10 +4365,10 @@ def test_directory_ctrl_arrows_descend_and_ascend() -> None:
     playlist = controls.session.layers["layer_1"].playlist
     child = siblings[0] / "child"
 
-    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
     assert playlist.current_dir.resolve() == child.resolve()
 
-    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_BACKSPACE))
     assert playlist.current_dir.resolve() == siblings[0].resolve()
 
 
@@ -4400,14 +4391,14 @@ def test_directory_ctrl_arrows_follow_browse_while_auto_preset_elsewhere() -> No
     before = controls.build_view_state(paused=False).tracks["layer_1"].preset_dir_label
     assert "roles/" not in before
 
-    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
     assert layer.playlist.current_dir.resolve() == child.resolve()
     after_down = controls.build_view_state(paused=False).tracks["layer_1"]
     assert "roles/" not in after_down.preset_dir_label
     assert "[..]" in after_down.preset_dir_label
     assert after_down.preset_label.startswith("cast.milk")
 
-    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_BACKSPACE))
     assert layer.playlist.current_dir.resolve() == siblings[0].resolve()
     after_up = controls.build_view_state(paused=False).tracks["layer_1"].preset_dir_label
     assert after_up == before
@@ -4419,10 +4410,10 @@ def test_ctrl_left_at_browse_floor_is_noop() -> None:
     controls.focus_descriptor = _desc(controls.build_view_state(paused=False), _preset_dir_row(controls))
     playlist = controls.session.layers["layer_1"].playlist
 
-    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_BACKSPACE))
     assert playlist.current_dir.resolve() == siblings[0].resolve()
 
-    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_BACKSPACE))
     assert playlist.current_dir.resolve() == siblings[0].resolve()
 
 
@@ -4432,7 +4423,7 @@ def test_ctrl_left_at_preset_root_is_noop_when_floor_is_root() -> None:
     controls.focus_descriptor = _desc(controls.build_view_state(paused=False), _preset_dir_row(controls))
     playlist = controls.session.layers["layer_1"].playlist
 
-    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_BACKSPACE))
     assert playlist.current_dir.resolve() == root.resolve()
 
 
@@ -4443,10 +4434,10 @@ def test_directory_ctrl_arrows_do_not_repeat_parent_climb() -> None:
     playlist = controls.session.layers["layer_1"].playlist
     child = siblings[0] / "child"
 
-    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
     assert playlist.current_dir.resolve() == child.resolve()
 
-    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_BACKSPACE))
     assert playlist.current_dir.resolve() == siblings[0].resolve()
 
     for _ in range(20):
@@ -4501,7 +4492,7 @@ def test_preset_lr_noop_when_paths_empty() -> None:
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     controls.handle_keydown(_keydown(pygame.K_LEFT))
-    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_PAGEDOWN))
     assert changed == []
     assert playlist.index == 0
 
@@ -4527,11 +4518,11 @@ def test_ctrl_preset_steps_by_ten_wrapping() -> None:
     controls.focus_descriptor = _desc(view, preset_row)
     playlist = controls.session.layers["layer_1"].playlist
 
-    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_PAGEDOWN))
     assert playlist.index == 3
     assert changed == [("layer_1", 3)]
 
-    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_PAGEUP))
     assert playlist.index == 5
     assert changed[-1] == ("layer_1", 5)
 
@@ -4853,12 +4844,12 @@ def test_l_refused_on_timeline_header_while_recording() -> None:
     assert controls.session.timeline.locked is False
 
 
-def test_render_overlay_lock_blocks_ctrl_enable_disable() -> None:
+def test_render_overlay_lock_blocks_e_enable_disable() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.render_overlays.locked = True
     controls.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
     assert controls.session.render_overlays.opening_card.enabled is True
-    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_e))
     assert controls.session.render_overlays.opening_card.enabled is True
 
 
@@ -4866,7 +4857,7 @@ def test_render_overlay_lock_allows_solo() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.render_overlays.locked = True
     controls.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
-    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_SHIFT))
+    controls.handle_keydown(_keydown(pygame.K_s))
     assert controls.session.render_overlay_solo is True
 
 
@@ -4935,11 +4926,94 @@ def test_locked_blocks_enable_disable() -> None:
     controls.focus_descriptor = _desc(view, header_row)
     assert controls.session.layers["layer_1"].enabled is True
 
-    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_e))
     assert controls.session.layers["layer_1"].enabled is True
 
-    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_e))
     assert controls.session.layers["layer_1"].enabled is True
+
+
+def test_ctrl_arrow_on_value_row_does_not_change_value() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.layers["layer_1"].compositing_expanded = True
+    view = controls.build_view_state(paused=False)
+    opacity_row = _row(view, "layer_1", RowKind.TRACK_OPACITY)
+    controls.focus_descriptor = _desc(view, opacity_row)
+    before = controls.session.layers["layer_1"].opacity_pct
+    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_SHIFT))
+    assert controls.session.layers["layer_1"].opacity_pct == before
+
+
+def test_e_toggles_each_enable_header() -> None:
+    controls = _make_controls(("layer_1",))
+    view = controls.build_view_state(paused=False)
+
+    controls.focus_descriptor = _desc(
+        view, _row(view, "layer_1", RowKind.TRACK_HEADER)
+    )
+    assert controls.session.layers["layer_1"].enabled is True
+    controls.handle_keydown(_keydown(pygame.K_e))
+    assert controls.session.layers["layer_1"].enabled is False
+
+    controls.focus_descriptor = _desc(
+        view, view.layout.find_by_kind(RowKind.RENDER_OVERLAYS_HEADER)
+    )
+    assert controls.session.render_overlays.opening_card.enabled is True
+    controls.handle_keydown(_keydown(pygame.K_e))
+    assert controls.session.render_overlays.opening_card.enabled is False
+    assert controls.session.render_overlays.closing_card.enabled is False
+
+    controls.session.render_overlays.expanded = True
+    controls.session.render_overlays.opening_card.enabled = True
+    view = controls.build_view_state(paused=False)
+    card_row = view.layout.find_by_kind(
+        RowKind.RENDER_OVERLAY_CARD_HEADER, card="opening_card"
+    )
+    controls.focus_descriptor = _desc(view, card_row)
+    controls.handle_keydown(_keydown(pygame.K_e))
+    assert controls.session.render_overlays.opening_card.enabled is False
+
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_HEADER)
+    assert controls.session.render_post_fx.enabled is True
+    controls.handle_keydown(_keydown(pygame.K_e))
+    assert controls.session.render_post_fx.enabled is False
+
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_PATTERN_MASK_HEADER)
+    before_mask = controls.session.render_pattern_mask.enabled
+    controls.handle_keydown(_keydown(pygame.K_e))
+    assert controls.session.render_pattern_mask.enabled is not before_mask
+
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
+    assert controls.session.timeline.enabled is False
+    controls.handle_keydown(_keydown(pygame.K_e))
+    assert controls.session.timeline.enabled is True
+
+
+def test_s_toggles_overlays_always_on() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
+    controls.handle_keydown(_keydown(pygame.K_s))
+    assert controls.session.render_overlay_solo is True
+    controls.handle_keydown(_keydown(pygame.K_s))
+    assert controls.session.render_overlay_solo is False
+
+
+def test_locked_headers_block_e() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.render_post_fx.locked = True
+    controls.session.render_pattern_mask.locked = True
+    controls.session.timeline.locked = True
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_HEADER)
+    controls.handle_keydown(_keydown(pygame.K_e))
+    assert controls.session.render_post_fx.enabled is True
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_PATTERN_MASK_HEADER)
+    before_mask = controls.session.render_pattern_mask.enabled
+    controls.handle_keydown(_keydown(pygame.K_e))
+    assert controls.session.render_pattern_mask.enabled is before_mask
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
+    controls.handle_keydown(_keydown(pygame.K_e))
+    assert controls.session.timeline.enabled is False
 
 
 def test_locked_blocks_move_mode() -> None:
@@ -5073,18 +5147,14 @@ def test_transport_seek_constants() -> None:
     controls.focus_descriptor = _desc(view, transport_row)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     controls.handle_keydown(_keydown(pygame.K_LEFT))
-    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_SHIFT))
-    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_SHIFT))
-    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
-    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_PAGEDOWN))
+    controls.handle_keydown(_keydown(pygame.K_PAGEUP))
 
     assert seeks == [
         SEEK_SHORT,
         -SEEK_SHORT,
-        SEEK_TINY,
-        -SEEK_TINY,
-        SEEK_LONG,
-        -SEEK_LONG,
+        SEEK_SHORT,
+        -SEEK_SHORT,
     ]
 
 
@@ -5231,7 +5301,7 @@ def test_mod_shift_detects_shift_modifier() -> None:
     assert not mod_shift(pygame.KMOD_CTRL)
 
 
-def test_shift_right_enters_solo() -> None:
+def test_s_enters_solo() -> None:
     solo_calls: list[str | None] = []
     controls = _make_controls(("layer_1", "layer_2"))
     controls._layer_bindings = noop_layer_bindings(
@@ -5241,7 +5311,7 @@ def test_shift_right_enters_solo() -> None:
     view = controls.build_view_state(paused=False)
     header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
     controls.focus_descriptor = _desc(view, header_row)
-    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_SHIFT))
+    controls.handle_keydown(_keydown(pygame.K_s))
     assert controls.session.solo_slot == "layer_1"
     assert solo_calls == ["layer_1"]
     state = controls.build_view_state(paused=False)
@@ -5249,37 +5319,40 @@ def test_shift_right_enters_solo() -> None:
     assert state.solo_slot == "layer_1"
 
 
-def test_shift_right_switches_solo_target() -> None:
+def test_s_switches_solo_target() -> None:
     controls = _make_controls(("layer_1", "layer_2"))
     view = controls.build_view_state(paused=False)
     drums_header = _row(view, "layer_1", RowKind.TRACK_HEADER)
     bass_header = _row(view, "layer_2", RowKind.TRACK_HEADER)
 
     controls.focus_descriptor = _desc(view, drums_header)
-    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_SHIFT))
+    controls.handle_keydown(_keydown(pygame.K_s))
     assert controls.session.solo_slot == "layer_1"
 
     controls.focus_descriptor = _desc(view, bass_header)
-    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_SHIFT))
+    controls.handle_keydown(_keydown(pygame.K_s))
     assert controls.session.solo_slot == "layer_2"
 
 
-def test_shift_left_exits_solo_only_for_active_target() -> None:
+def test_s_exits_solo_only_for_active_target() -> None:
     controls = _make_controls(("layer_1", "layer_2"))
     view = controls.build_view_state(paused=False)
     drums_header = _row(view, "layer_1", RowKind.TRACK_HEADER)
     bass_header = _row(view, "layer_2", RowKind.TRACK_HEADER)
 
     controls.focus_descriptor = _desc(view, drums_header)
-    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_SHIFT))
+    controls.handle_keydown(_keydown(pygame.K_s))
     assert controls.session.solo_slot == "layer_1"
 
     controls.focus_descriptor = _desc(view, bass_header)
-    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_SHIFT))
-    assert controls.session.solo_slot == "layer_1"
+    controls.handle_keydown(_keydown(pygame.K_s))
+    assert controls.session.solo_slot == "layer_2"
 
     controls.focus_descriptor = _desc(view, drums_header)
-    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_SHIFT))
+    controls.handle_keydown(_keydown(pygame.K_s))
+    assert controls.session.solo_slot == "layer_1"
+
+    controls.handle_keydown(_keydown(pygame.K_s))
     assert controls.session.solo_slot is None
 
 
@@ -5290,7 +5363,7 @@ def test_save_blocked_while_solo_active() -> None:
     header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
     config_row = _config_header_row(view)
     controls.focus_descriptor = _desc(view, header_row)
-    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_SHIFT))
+    controls.handle_keydown(_keydown(pygame.K_s))
 
     controls.focus_descriptor = _desc(view, config_row)
     stderr = io.StringIO()
@@ -5599,27 +5672,27 @@ def test_settings_editor_window_adjusts_width_height_upscale() -> None:
     assert controls.cfg.editor.height == DEFAULT_EDITOR_HEIGHT
     assert controls.cfg.editor.upscale == DEFAULT_EDITOR_UPSCALE
 
-    controls.settings.adjust_editor_window_width(forward=True, ctrl=False)
+    controls.settings.adjust_editor_window_width(forward=True, large=False)
     assert controls.cfg.editor.width == DEFAULT_EDITOR_WIDTH + 10
-    controls.settings.adjust_editor_window_width(forward=False, ctrl=True)
+    controls.settings.adjust_editor_window_width(forward=False, large=True)
     assert controls.cfg.editor.width == DEFAULT_EDITOR_WIDTH - 90
 
-    controls.settings.adjust_editor_window_height(forward=True, ctrl=False)
+    controls.settings.adjust_editor_window_height(forward=True, large=False)
     assert controls.cfg.editor.height == DEFAULT_EDITOR_HEIGHT + 10
-    controls.settings.adjust_editor_window_height(forward=False, ctrl=True)
+    controls.settings.adjust_editor_window_height(forward=False, large=True)
     assert controls.cfg.editor.height == DEFAULT_EDITOR_HEIGHT - 90
 
-    controls.settings.adjust_editor_window_upscale(forward=True, ctrl=False)
+    controls.settings.adjust_editor_window_upscale(forward=True, large=False)
     assert controls.cfg.editor.upscale == pytest.approx(DEFAULT_EDITOR_UPSCALE + 0.1)
-    controls.settings.adjust_editor_window_upscale(forward=True, ctrl=True)
+    controls.settings.adjust_editor_window_upscale(forward=True, large=True)
     assert controls.cfg.editor.upscale == pytest.approx(DEFAULT_EDITOR_UPSCALE + 0.6)
 
     from dataclasses import replace as _replace
 
     controls.cfg.editor = _replace(controls.cfg.editor, width=330)
-    controls.settings.adjust_editor_window_width(forward=False, ctrl=False)
+    controls.settings.adjust_editor_window_width(forward=False, large=False)
     assert controls.cfg.editor.width == 320
-    controls.settings.adjust_editor_window_width(forward=False, ctrl=False)
+    controls.settings.adjust_editor_window_width(forward=False, large=False)
     assert controls.cfg.editor.width == 320
 
 
@@ -5633,9 +5706,9 @@ def test_settings_editor_window_display_size_tracks_width_height_upscale() -> No
     )
     assert _row_text(view, display_row) == f"  └─ display size: {display_w} x {display_h}"
 
-    controls.settings.adjust_editor_window_width(forward=True, ctrl=True)
-    controls.settings.adjust_editor_window_height(forward=True, ctrl=False)
-    controls.settings.adjust_editor_window_upscale(forward=True, ctrl=False)
+    controls.settings.adjust_editor_window_width(forward=True, large=True)
+    controls.settings.adjust_editor_window_height(forward=True, large=False)
+    controls.settings.adjust_editor_window_upscale(forward=True, large=False)
     view = controls.build_view_state(paused=False)
     display_w, display_h = editor_display_size(
         DEFAULT_EDITOR_WIDTH + 100,
@@ -5652,7 +5725,7 @@ def test_settings_editor_window_nudge_toasts_restart_and_persists(
     controls = _make_controls(("layer_1",))
     user_path = tmp_path / "config.yaml"
     controls.cfg.user_config_path = user_path
-    controls.settings.adjust_editor_window_width(forward=True, ctrl=True)
+    controls.settings.adjust_editor_window_width(forward=True, large=True)
     assert controls.cfg.editor.width == DEFAULT_EDITOR_WIDTH + 100
     assert not controls.config_dirty
     assert (
@@ -5670,7 +5743,7 @@ def test_settings_editor_window_nudge_at_clamp_does_not_toast() -> None:
 
     controls = _make_controls(("layer_1",))
     controls.cfg.editor = _replace(controls.cfg.editor, width=320)
-    controls.settings.adjust_editor_window_width(forward=False, ctrl=False)
+    controls.settings.adjust_editor_window_width(forward=False, large=False)
     assert controls.cfg.editor.width == 320
     assert controls.build_view_state(paused=False).notification_message is None
 
@@ -5779,7 +5852,7 @@ def test_settings_adjust_ui_fade() -> None:
     view = controls.build_view_state(paused=False)
     assert _row_text(view, ui_fade_row) == "  └─ auto-fade: 11s"
 
-    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_PAGEUP))
     assert controls.cfg.editor.ui_fade == 6.0
 
     for _ in range(6):
@@ -5834,13 +5907,13 @@ def test_settings_adjust_notification_display() -> None:
         == f"  └─ notification time: {DEFAULT_NOTIFICATION_DISPLAY_SEC + 1}s"
     )
 
-    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_PAGEUP))
     assert (
         controls.cfg.editor.notification_display_sec
         == DEFAULT_NOTIFICATION_DISPLAY_SEC + 1 - 5
     )
 
-    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_PAGEUP))
     assert controls.cfg.editor.notification_display_sec == 1
 
     controls.handle_keydown(_keydown(pygame.K_LEFT))
@@ -5912,7 +5985,7 @@ def test_settings_adjust_ui_width() -> None:
     view = controls.build_view_state(paused=False)
     assert _row_text(view, ui_width_row) == f"  └─ max width: {DEFAULT_UI_WIDTH + 1}"
 
-    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_PAGEUP))
     assert controls.cfg.editor.ui_width == DEFAULT_UI_WIDTH + 1 - 5
 
     for _ in range(86):
@@ -5935,7 +6008,7 @@ def test_settings_adjust_ui_min_width() -> None:
         f"  └─ min width: {DEFAULT_UI_MIN_WIDTH + 1}"
     )
 
-    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_PAGEUP))
     assert controls.cfg.editor.ui_min_width == DEFAULT_UI_MIN_WIDTH + 1 - 5
 
     while controls.cfg.editor.ui_min_width > 40:
@@ -5946,11 +6019,11 @@ def test_settings_adjust_ui_min_width() -> None:
 
     max_width = controls.cfg.editor.ui_width
     while controls.cfg.editor.ui_min_width < max_width:
-        controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+        controls.handle_keydown(_keydown(pygame.K_PAGEDOWN))
     assert controls.cfg.editor.ui_min_width == max_width
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.cfg.editor.ui_min_width == max_width
-    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_PAGEDOWN))
     assert controls.cfg.editor.ui_min_width == max_width
 
 
@@ -6114,7 +6187,7 @@ def test_preset_duration_ctrl_step_is_ten_seconds() -> None:
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.session.layers["layer_1"].preset_duration == 31.0
 
-    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_PAGEDOWN))
     assert controls.session.layers["layer_1"].preset_duration == 41.0
 
 
@@ -6169,7 +6242,7 @@ def test_easter_egg_steps_with_standard_and_large_increments() -> None:
     assert controls.session.layers["layer_1"].easter_egg == pytest.approx(1.01)
     assert switched == ["layer_1"]
 
-    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_PAGEDOWN))
     assert controls.session.layers["layer_1"].easter_egg == pytest.approx(1.11)
 
 
@@ -6209,7 +6282,7 @@ def test_hard_cut_sensitivity_steps_like_beat_sensitivity() -> None:
         1.51
     )
 
-    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_PAGEDOWN))
     assert controls.session.layers["layer_1"].hard_cut_sensitivity == pytest.approx(
         1.61
     )

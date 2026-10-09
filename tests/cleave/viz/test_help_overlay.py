@@ -107,15 +107,15 @@ def test_layer_section_includes_visibility_when_timeline_disabled() -> None:
     section = layer_section(timeline_enabled=False)
     entries = dict(section.entries)
     assert entries.get("L") == "lock/unlock layer"
-    assert entries.get("Shift + Left/Right") == "solo layer"
-    assert entries.get("Ctrl + Left/Right") == "enable/disable layer"
+    assert entries.get("S") == "solo layer"
+    assert entries.get("E") == "enable/disable layer"
     assert entries.get("Delete") == "delete layer"
 
 
 def test_layer_section_omits_visibility_when_timeline_enabled() -> None:
     section = layer_section(timeline_enabled=True)
     keys = [entry[0] for entry in section.entries]
-    assert "Ctrl + Left/Right" not in keys
+    assert "E" not in keys
 
 
 def test_curation_layer_section_only_expand_collapse() -> None:
@@ -149,8 +149,8 @@ def test_track_header_help_reflects_timeline_enabled() -> None:
         if isinstance(section, HelpSection)
         for key, _ in section.entries
     ]
-    assert "Ctrl + Left/Right" in disabled_keys
-    assert "Ctrl + Left/Right" not in enabled_keys
+    assert "E" in disabled_keys
+    assert "E" not in enabled_keys
 
 
 def test_preset_dir_help_titles() -> None:
@@ -165,8 +165,9 @@ def test_preset_dir_help_titles() -> None:
     )
     assert keyboard.title == KEYBOARD_CONTROLS_SECTION_TITLE
     entries = dict(keyboard.entries)
-    assert entries["Left/Right"] == "next/previous directory"
-    assert entries["Ctrl + Left/Right"] == "up/down directory tree"
+    assert entries["Left/Right"] == "next/previous"
+    assert entries["Enter"] == "open folder"
+    assert entries["Backspace"] == "parent"
     assert "Shift + +" not in entries
 
 
@@ -199,7 +200,7 @@ def test_preset_file_help_titles() -> None:
     }
     entries = dict(keyboard.entries)
     assert entries["Left/Right"] == "next/previous preset"
-    assert entries["Ctrl + Left/Right"] == "next/previous large step"
+    assert entries["PgUp/PgDn"] == "next/previous large step"
     assert entries["F"] == "favourite preset"
     assert entries["B"] == "blacklist preset"
     assert entries["C"] == "cast preset (bed/pulse/lead/accent)"
@@ -454,8 +455,8 @@ def test_cleave_effects_help() -> None:
     effect = _keyboard_section(sections_for(RowKind.TRACK_EFFECT))
     assert header.title == KEYBOARD_CONTROLS_SECTION_TITLE
     assert effect.title == KEYBOARD_CONTROLS_SECTION_TITLE
-    assert "Ctrl + Left/Right" not in [key for key, _ in header.entries]
-    assert dict(effect.entries)["Ctrl + Left/Right"] == "large step"
+    assert "PgUp/PgDn" not in [key for key, _ in header.entries]
+    assert dict(effect.entries)["PgUp/PgDn"] == "large step"
 
 
 def test_effect_row_help_uses_registry_description() -> None:
@@ -469,8 +470,9 @@ def test_effect_row_help_uses_registry_description() -> None:
 def test_render_timeline_help_has_no_solo() -> None:
     section = _keyboard_section(sections_for(RowKind.RENDER_TIMELINE_HEADER))
     keys = [key for key, _ in section.entries]
-    assert "Shift + Left/Right" not in keys
+    assert "S" not in keys
     assert dict(section.entries)["Left/Right"] == "expand/collapse"
+    assert dict(section.entries)["E"] == "enable/disable"
 
 
 def test_visual_limiter_header_help_expand_collapse() -> None:
@@ -521,7 +523,7 @@ def test_render_overlay_background_margin_and_padding_help() -> None:
         section = _keyboard_section(sections_for(kind))
         entries = dict(section.entries)
         assert entries["Left/Right"] == "adjust value"
-        assert entries["Ctrl + Left/Right"] == "large step"
+        assert entries["PgUp/PgDn"] == "large step"
 
 
 def test_render_overlay_body_text_help() -> None:
@@ -637,10 +639,15 @@ def test_curation_navigation_omits_disabled_global_hotkeys() -> None:
     assert "Ctrl + Enter" not in keys
     assert keys["Ctrl + Q"] == "quit"
     assert keys["Up/Down"] == "move row"
+    assert keys["Shift + Left/Right"] == "skip 2s"
+    assert keys["Ctrl + Left/Right"] == "skip 30s"
 
     visualizer_nav = sections_for(RowKind.TRACK_PRESET)[-1]
     assert isinstance(visualizer_nav, HelpSection)
-    assert "Ctrl + S" in dict(visualizer_nav.entries)
+    vis_keys = dict(visualizer_nav.entries)
+    assert "Ctrl + S" in vis_keys
+    assert vis_keys["Shift + Left/Right"] == "skip 2s"
+    assert vis_keys["Ctrl + Left/Right"] == "skip 30s"
 
 
 def test_timeline_strip_help_paused() -> None:
@@ -659,9 +666,12 @@ def test_timeline_strip_help_paused() -> None:
     assert entries["B"] == "cycle cue blend"
     assert entries["C"] == "cycle cue cut type"
     assert entries["O"] == "cycle cue role"
+    assert entries["Left/Right"] == "previous / next cue"
+    assert entries["Enter"] == "seek to cue"
+    assert entries[", / ."] == "nudge cue opacity -/+ 1%"
+    assert entries["Ctrl + , / ."] == "nudge cue opacity -/+ 10%"
     keys = [key for key, _ in section.entries]
     assert keys.index("Ctrl + Space / R") + 1 == keys.index("Space")
-    assert "Left/Right" in entries
 
 
 def test_timeline_strip_help_single_layer() -> None:
@@ -705,8 +715,8 @@ def test_timeline_strip_help_recording_while_playing() -> None:
     assert entries["Ctrl + 1-4"] == "drop cue (keep level)"
     assert "Shift + Enter" not in entries
     assert entries["Left/Right"] == "skip 10s, fills range"
-    assert entries["Shift + Left/Right"] == "skip 2s, fills range"
-    assert entries["Ctrl + Left/Right"] == "skip 30s, fills range"
+    assert "Shift + Left/Right" not in entries
+    assert "Ctrl + Left/Right" not in entries
     assert entries["R"] == "stop record"
     assert entries["Ctrl + Space / Space"] == "stop record and pause"
     assert "Space" not in entries

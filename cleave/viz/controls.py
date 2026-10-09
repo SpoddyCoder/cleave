@@ -45,7 +45,7 @@ from cleave.viz.focus_nav import (
     move_quick_focus,
     timeline_strip_in_ring,
 )
-from cleave.viz.row_kinds import RowDescriptor, RowKind
+from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
 from cleave.viz.row_spec import (
     PRESET_FILE_ROW_KINDS,
     REPEAT_ROW_KINDS,
@@ -53,6 +53,8 @@ from cleave.viz.row_spec import (
     RowPresentStyle,
     apply_field_action,
     apply_field_horizontal,
+    apply_field_toggle_enabled,
+    apply_field_toggle_solo,
     row_spec,
     row_triggers_layer_delete,
     section_lock_blocks_mutation,
@@ -450,18 +452,36 @@ class TuningControls:
             return True
 
         if event.key in (pygame.K_LEFT, pygame.K_RIGHT):
+            if mod_ctrl(event.mod) or mod_shift(event.mod):
+                return True
             kind = self.focus_descriptor.kind
-            self._apply_horizontal(event.key, event.mod, kind)
-            repeat = kind in REPEAT_ROW_KINDS
-            if repeat and kind == RowKind.TRACK_PRESET_DIR and mod_ctrl(event.mod):
-                repeat = False
-            if repeat:
+            self._apply_horizontal(event.key == pygame.K_RIGHT, False, kind)
+            if kind in REPEAT_ROW_KINDS:
                 self._key_repeat.on_keydown(
                     event.key,
                     event.mod,
-                    on_repeat=lambda key, mod: self._apply_horizontal(
-                        key,
-                        mod,
+                    on_repeat=lambda key, _mod: self._apply_horizontal(
+                        key == pygame.K_RIGHT,
+                        False,
+                        self.focus_descriptor.kind,
+                    ),
+                )
+            return True
+
+        if event.key in (pygame.K_PAGEUP, pygame.K_PAGEDOWN):
+            kind = self.focus_descriptor.kind
+            spec = ROW_SPECS.get(kind)
+            if spec is None or spec.affordance == RowAffordance.EXPAND:
+                return True
+            forward = event.key == pygame.K_PAGEDOWN
+            self._apply_horizontal(forward, True, kind)
+            if kind in REPEAT_ROW_KINDS:
+                self._key_repeat.on_keydown(
+                    event.key,
+                    event.mod,
+                    on_repeat=lambda key, _mod: self._apply_horizontal(
+                        key == pygame.K_PAGEDOWN,
+                        True,
                         self.focus_descriptor.kind,
                     ),
                 )
@@ -547,6 +567,14 @@ class TuningControls:
                 return True
             if kind == RowKind.RENDER_TIMELINE_HEADER:
                 self._toggle_render_timeline_locked()
+                return True
+
+        if event.key == pygame.K_e:
+            if apply_field_toggle_enabled(self, self.focus_descriptor):
+                return True
+
+        if event.key == pygame.K_s and not mod_ctrl(event.mod):
+            if apply_field_toggle_solo(self, self.focus_descriptor):
                 return True
 
         if add_current_preset_key_pressed(event.key, event.mod):
@@ -739,27 +767,44 @@ class TuningControls:
             return True
 
         if event.key in (pygame.K_LEFT, pygame.K_RIGHT):
+            if mod_ctrl(event.mod) or mod_shift(event.mod):
+                return True
             view = self.build_view_state(paused=self.playback.paused)
             desc = self.focus_descriptor
             if not view.layout.contains_descriptor(desc):
                 return True
             kind = desc.kind
-            # Layer header: expand/collapse only; no solo / enable-disable.
-            if kind == RowKind.TRACK_HEADER and (
-                mod_ctrl(event.mod) or mod_shift(event.mod)
-            ):
-                return True
-            self._apply_horizontal(event.key, event.mod, kind)
-            repeat = kind in REPEAT_ROW_KINDS
-            if repeat and kind == RowKind.TRACK_PRESET_DIR and mod_ctrl(event.mod):
-                repeat = False
-            if repeat:
+            self._apply_horizontal(event.key == pygame.K_RIGHT, False, kind)
+            if kind in REPEAT_ROW_KINDS:
                 self._key_repeat.on_keydown(
                     event.key,
                     event.mod,
-                    on_repeat=lambda key, mod: self._apply_horizontal(
-                        key,
-                        mod,
+                    on_repeat=lambda key, _mod: self._apply_horizontal(
+                        key == pygame.K_RIGHT,
+                        False,
+                        self.focus_descriptor.kind,
+                    ),
+                )
+            return True
+
+        if event.key in (pygame.K_PAGEUP, pygame.K_PAGEDOWN):
+            view = self.build_view_state(paused=self.playback.paused)
+            desc = self.focus_descriptor
+            if not view.layout.contains_descriptor(desc):
+                return True
+            kind = desc.kind
+            spec = ROW_SPECS.get(kind)
+            if spec is None or spec.affordance == RowAffordance.EXPAND:
+                return True
+            forward = event.key == pygame.K_PAGEDOWN
+            self._apply_horizontal(forward, True, kind)
+            if kind in REPEAT_ROW_KINDS:
+                self._key_repeat.on_keydown(
+                    event.key,
+                    event.mod,
+                    on_repeat=lambda key, _mod: self._apply_horizontal(
+                        key == pygame.K_PAGEDOWN,
+                        True,
                         self.focus_descriptor.kind,
                     ),
                 )
@@ -815,6 +860,16 @@ class TuningControls:
     def handle_keyup(self, event: pygame.event.Event) -> None:
         if event.type == pygame.KEYUP:
             self._key_repeat.on_keyup(event.key)
+
+    def arm_key_repeat(
+        self,
+        key: int,
+        mod: int,
+        *,
+        on_repeat: Callable[[int, int], None],
+        accel: bool = True,
+    ) -> None:
+        self._key_repeat.on_keydown(key, mod, on_repeat=on_repeat, accel=accel)
 
     @property
     def key_repeat_armed(self) -> bool:
@@ -996,11 +1051,7 @@ class TuningControls:
             MainFocus(RowDescriptor(RowKind.SONG_MARKERS_HEADER))
         )
 
-    def _apply_horizontal(self, key: int, mod: int, kind: RowKind) -> None:
-        ctrl = mod_ctrl(mod)
-        shift = mod_shift(mod)
-        forward = key == pygame.K_RIGHT
-
+    def _apply_horizontal(self, forward: bool, large: bool, kind: RowKind) -> None:
         field = ROW_SPECS.get(kind)
         if (
             field is not None
@@ -1008,7 +1059,7 @@ class TuningControls:
             and field.apply_horizontal is not None
         ):
             field.apply_horizontal(
-                self, self.focus_descriptor, forward, ctrl, shift
+                self, self.focus_descriptor, forward, large
             )
             return
 
@@ -1016,7 +1067,7 @@ class TuningControls:
             return
 
         apply_field_horizontal(
-            self, self.focus_descriptor, forward, ctrl, shift
+            self, self.focus_descriptor, forward, large
         )
 
     def _toggle_locked(self, slot: str) -> None:

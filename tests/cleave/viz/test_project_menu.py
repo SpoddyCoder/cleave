@@ -229,7 +229,8 @@ def test_compositor_hdr_toggle_resyncs_live_format() -> None:
 
 def test_compositor_header_is_expand_only() -> None:
     spec = row_spec(RowKind.PROJECT_COMPOSITOR_HEADER)
-    assert spec.can_enable_disable is False
+    assert spec.toggle_enabled is None
+    assert spec.toggle_solo is None
     assert spec.affordance == RowAffordance.EXPAND
 
 
@@ -244,7 +245,7 @@ def test_milkdrop_beat_sensitivity_keyboard_steps() -> None:
     assert controls.session.project.milkdrop_beat_sensitivity == pytest.approx(
         DEFAULT_BEAT_SENSITIVITY + 0.1
     )
-    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_PAGEDOWN))
     assert controls.session.project.milkdrop_beat_sensitivity == pytest.approx(
         DEFAULT_BEAT_SENSITIVITY + 0.6
     )
@@ -252,7 +253,7 @@ def test_milkdrop_beat_sensitivity_keyboard_steps() -> None:
     assert controls.session.project.milkdrop_beat_sensitivity == pytest.approx(
         DEFAULT_BEAT_SENSITIVITY + 0.5
     )
-    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_PAGEUP))
     assert controls.session.project.milkdrop_beat_sensitivity == pytest.approx(
         DEFAULT_BEAT_SENSITIVITY
     )
@@ -313,22 +314,22 @@ def test_adjust_start_and_end_steps_and_clamps() -> None:
     assert render.start_sec == 0
     assert render.end_sec is None
 
-    controls.project.adjust_start(forward=True, ctrl=False)
+    controls.project.adjust_start(forward=True, large=False)
     assert render.start_sec == 1
-    controls.project.adjust_start(forward=True, ctrl=True)
+    controls.project.adjust_start(forward=True, large=True)
     assert render.start_sec == 11
 
-    controls.project.adjust_end(forward=False, ctrl=False)
+    controls.project.adjust_end(forward=False, large=False)
     assert render.end_sec == 59
-    controls.project.adjust_end(forward=False, ctrl=True)
+    controls.project.adjust_end(forward=False, large=True)
     assert render.end_sec == 49
 
     render.start_sec = 48
-    controls.project.adjust_start(forward=True, ctrl=True)
+    controls.project.adjust_start(forward=True, large=True)
     assert render.start_sec == 48
-    controls.project.adjust_end(forward=True, ctrl=True)
+    controls.project.adjust_end(forward=True, large=True)
     assert render.end_sec == 59
-    controls.project.adjust_end(forward=True, ctrl=False)
+    controls.project.adjust_end(forward=True, large=False)
     assert render.end_sec is None
     assert not controls.config_dirty
 
@@ -459,13 +460,13 @@ def test_start_end_keyboard_steps() -> None:
     controls.focus_descriptor = _desc(view, start_row)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert render.start_sec == 1
-    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_PAGEDOWN))
     assert render.start_sec == 11
 
     controls.focus_descriptor = _desc(view, end_row)
     controls.handle_keydown(_keydown(pygame.K_LEFT))
     assert render.end_sec == 59
-    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_PAGEUP))
     assert render.end_sec == 49
 
 
@@ -481,19 +482,19 @@ def test_width_height_fps_keyboard_steps() -> None:
     controls.focus_descriptor = _desc(view, width_row)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert render.width == DEFAULT_RENDER_WIDTH + 10
-    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_PAGEDOWN))
     assert render.width == DEFAULT_RENDER_WIDTH + 110
 
     controls.focus_descriptor = _desc(view, height_row)
     controls.handle_keydown(_keydown(pygame.K_LEFT))
     assert render.height == DEFAULT_RENDER_HEIGHT - 10
-    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_PAGEUP))
     assert render.height == DEFAULT_RENDER_HEIGHT - 110
 
     controls.focus_descriptor = _desc(view, fps_row)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert render.fps == DEFAULT_RENDER_FPS + 1
-    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_PAGEDOWN))
     assert render.fps == DEFAULT_RENDER_FPS + 6
     controls.handle_keydown(_keydown(pygame.K_LEFT))
     assert render.fps == DEFAULT_RENDER_FPS + 5

@@ -15,8 +15,7 @@ def apply_expand_subheader(
     controls: TuningControls,
     desc: RowDescriptor,
     forward: bool,
-    _ctrl: bool,
-    _shift: bool,
+    _large: bool,
 ) -> None:
     apply_expand_toggle(
         controls, desc.kind, desc.slot, forward, card=desc.card
@@ -27,7 +26,6 @@ def noop_horizontal(
     _controls: TuningControls,
     _desc: RowDescriptor,
     _forward: bool,
-    _ctrl: bool,
-    _shift: bool,
+    _large: bool,
 ) -> None:
     return

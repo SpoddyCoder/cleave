@@ -51,22 +51,21 @@ def _format_render_pattern_mask_seed(
 ) -> str:
     return str(state.render_pattern_mask.seed)
 
+def _toggle_render_pattern_mask_enabled(
+    controls: TuningControls, _desc: RowDescriptor
+) -> None:
+    if controls.session.render_pattern_mask.locked:
+        return
+    enabled = controls.session.render_pattern_mask.enabled
+    controls.render_pattern_mask.set_enabled(not enabled)
+
+
 def _apply_render_pattern_mask_header(
     controls: TuningControls,
     desc: RowDescriptor,
     forward: bool,
-    ctrl: bool,
-    _shift: bool,
+    _large: bool,
 ) -> None:
-    from cleave.viz.row_spec import row_spec
-    if ctrl:
-        if (
-            controls.session.render_pattern_mask.locked
-            and row_spec(desc.kind).can_enable_disable
-        ):
-            return
-        controls.render_pattern_mask.set_enabled(forward)
-        return
     apply_expand_toggle(
         controls, desc.kind, desc.slot, forward, card=desc.card
     )
@@ -75,8 +74,7 @@ def _apply_render_pattern_mask_type(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
-    _ctrl: bool,
-    _shift: bool,
+    _large: bool,
 ) -> None:
     controls.render_pattern_mask.cycle_type(forward=forward)
 
@@ -84,11 +82,10 @@ def _apply_render_pattern_mask_feather(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
-    ctrl: bool,
-    _shift: bool,
+    large: bool,
 ) -> None:
     step = (
-        PATTERN_MASK_FEATHER_PCT_STEP_LARGE if ctrl else PATTERN_MASK_FEATHER_PCT_STEP
+        PATTERN_MASK_FEATHER_PCT_STEP_LARGE if large else PATTERN_MASK_FEATHER_PCT_STEP
     )
     delta = step if forward else -step
     controls.render_pattern_mask.set_feather_pct(
@@ -99,10 +96,9 @@ def _apply_render_pattern_mask_density(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
-    ctrl: bool,
-    _shift: bool,
+    large: bool,
 ) -> None:
-    step = PATTERN_MASK_DENSITY_STEP_LARGE if ctrl else PATTERN_MASK_DENSITY_STEP
+    step = PATTERN_MASK_DENSITY_STEP_LARGE if large else PATTERN_MASK_DENSITY_STEP
     delta = step if forward else -step
     controls.render_pattern_mask.set_density(
         controls.session.render_pattern_mask.density + delta
@@ -112,8 +108,7 @@ def _apply_render_pattern_mask_invert(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
-    _ctrl: bool,
-    _shift: bool,
+    _large: bool,
 ) -> None:
     controls.render_pattern_mask.cycle_invert(forward=forward)
 
@@ -121,11 +116,10 @@ def _apply_render_pattern_mask_transition(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
-    ctrl: bool,
-    _shift: bool,
+    large: bool,
 ) -> None:
     step = (
-        PATTERN_MASK_TRANSITION_STEP_LARGE if ctrl else PATTERN_MASK_TRANSITION_STEP
+        PATTERN_MASK_TRANSITION_STEP_LARGE if large else PATTERN_MASK_TRANSITION_STEP
     )
     delta = step if forward else -step
     controls.render_pattern_mask.set_transition(
@@ -136,8 +130,7 @@ def _apply_render_pattern_mask_seed(
     controls: TuningControls,
     _desc: RowDescriptor,
     _forward: bool,
-    _ctrl: bool,
-    _shift: bool,
+    _large: bool,
 ) -> None:
     controls.render_pattern_mask.respin_seed()
 
@@ -164,7 +157,7 @@ SPECS: dict[RowKind, RowSpec] = {
             "(blend mode, opacity) are greyed out and ignored.",
         ),
         quick_nav_target=True,
-        can_enable_disable=True,
+        toggle_enabled=_toggle_render_pattern_mask_enabled,
     ),
     RowKind.RENDER_PATTERN_MASK_TYPE: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
@@ -201,7 +194,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Feather",
         help_entries=(
             ("Left/Right", "+/- 1%"),
-            ("Ctrl+Left/Right", "+/- 10%"),
+            ("PgUp/PgDn", "+/- 10%"),
         ),
         help_description=(
             "0% hard territories (one layer per pixel).",

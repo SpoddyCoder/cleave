@@ -63,7 +63,7 @@ def _mutate_layer_z_order(controls: TuningControls) -> None:
 def _mutate_stem_enabled(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = view.layout.descriptor(_row(view, "layer_1", RowKind.TRACK_HEADER))
-    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_e))
 
 
 def _expand_compositing(controls: TuningControls) -> None:
@@ -131,7 +131,7 @@ def _mutate_preset_switching(controls: TuningControls) -> None:
 def _mutate_render_overlay_enabled(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
-    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_e))
 
 
 def _mutate_render_overlay_locked(controls: TuningControls) -> None:
@@ -279,7 +279,7 @@ def _mutate_render_overlay_display_time(controls: TuningControls) -> None:
 def _mutate_render_post_fx_enabled(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_HEADER)
-    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_e))
 
 
 def _expand_render_post_fx_fade(controls: TuningControls) -> None:
@@ -391,7 +391,7 @@ def _mutate_render_post_fx_chroma_boost_amount(controls: TuningControls) -> None
 def _mutate_timeline_enabled(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
-    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_e))
 
 
 def _expand_project_milkdrop(controls: TuningControls) -> None:
@@ -611,7 +611,7 @@ def _mutate_compositing_expanded(controls: TuningControls) -> None:
 def _mutate_solo_slot(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = view.layout.descriptor(_row(view, "layer_1", RowKind.TRACK_HEADER))
-    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_SHIFT))
+    controls.handle_keydown(_keydown(pygame.K_s))
 
 
 def _mutate_timeline_panel_open(controls: TuningControls) -> None:
@@ -628,7 +628,7 @@ def _mutate_render_overlay_expanded(controls: TuningControls) -> None:
 def _mutate_render_overlay_solo(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
-    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_SHIFT))
+    controls.handle_keydown(_keydown(pygame.K_s))
 
 
 def _mutate_render_post_fx_expanded(controls: TuningControls) -> None:

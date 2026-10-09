@@ -66,8 +66,8 @@ class SettingsControls:
             return
         settings.latency_compensation_expanded = expanded
 
-    def adjust_residual_latency_ms(self, *, forward: bool, ctrl: bool) -> None:
-        step = 50 if ctrl else 10
+    def adjust_residual_latency_ms(self, *, forward: bool, large: bool) -> None:
+        step = 50 if large else 10
         delta = step if forward else -step
         current = self.cfg.editor.residual_latency_ms
         new_value = clamp_residual_latency_ms(current + delta)
@@ -81,24 +81,24 @@ class SettingsControls:
         )
         persist_editor_settings(self.cfg)
 
-    def adjust_editor_window_width(self, *, forward: bool, ctrl: bool) -> None:
-        step = 100 if ctrl else 10
+    def adjust_editor_window_width(self, *, forward: bool, large: bool) -> None:
+        step = 100 if large else 10
         delta = step if forward else -step
         current = self.cfg.editor.width
         self._commit_editor_window(
             replace(self.cfg.editor, width=clamp_editor_width(current + delta))
         )
 
-    def adjust_editor_window_height(self, *, forward: bool, ctrl: bool) -> None:
-        step = 100 if ctrl else 10
+    def adjust_editor_window_height(self, *, forward: bool, large: bool) -> None:
+        step = 100 if large else 10
         delta = step if forward else -step
         current = self.cfg.editor.height
         self._commit_editor_window(
             replace(self.cfg.editor, height=clamp_editor_height(current + delta))
         )
 
-    def adjust_editor_window_upscale(self, *, forward: bool, ctrl: bool) -> None:
-        step = 0.5 if ctrl else 0.1
+    def adjust_editor_window_upscale(self, *, forward: bool, large: bool) -> None:
+        step = 0.5 if large else 0.1
         delta = step if forward else -step
         current = self.cfg.editor.upscale
         self._commit_editor_window(
@@ -144,16 +144,16 @@ class SettingsControls:
         self.cfg.editor = replace(self.cfg.editor, ui_width_mode=new_mode)
         persist_editor_settings(self.cfg)
 
-    def adjust_ui_fade(self, *, forward: bool, ctrl: bool) -> None:
-        step = 5.0 if ctrl else 1.0
+    def adjust_ui_fade(self, *, forward: bool, large: bool) -> None:
+        step = 5.0 if large else 1.0
         delta = step if forward else -step
         current = self.cfg.editor.ui_fade
         new_value = clamp_ui_fade(current + delta)
         self.cfg.editor = replace(self.cfg.editor, ui_fade=new_value)
         persist_editor_settings(self.cfg)
 
-    def adjust_notification_display_sec(self, *, forward: bool, ctrl: bool) -> None:
-        step = 5 if ctrl else 1
+    def adjust_notification_display_sec(self, *, forward: bool, large: bool) -> None:
+        step = 5 if large else 1
         delta = step if forward else -step
         current = self.cfg.editor.notification_display_sec
         new_value = clamp_notification_display_sec(current + delta)
@@ -166,16 +166,16 @@ class SettingsControls:
         if self._on_notification_display_changed is not None:
             self._on_notification_display_changed(new_value)
 
-    def adjust_ui_width(self, *, forward: bool, ctrl: bool) -> None:
-        step = 5 if ctrl else 1
+    def adjust_ui_width(self, *, forward: bool, large: bool) -> None:
+        step = 5 if large else 1
         delta = step if forward else -step
         current = self.cfg.editor.ui_width
         new_value = clamp_ui_width(current + delta)
         self.cfg.editor = replace(self.cfg.editor, ui_width=new_value)
         persist_editor_settings(self.cfg)
 
-    def adjust_ui_min_width(self, *, forward: bool, ctrl: bool) -> None:
-        step = 5 if ctrl else 1
+    def adjust_ui_min_width(self, *, forward: bool, large: bool) -> None:
+        step = 5 if large else 1
         delta = step if forward else -step
         current = self.cfg.editor.ui_min_width
         new_value = min(

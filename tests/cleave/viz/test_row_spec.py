@@ -31,6 +31,8 @@ from cleave.viz.row_spec import (
     TRACK_SUB_ROW_KINDS,
     RowPresentStyle,
     apply_field_horizontal,
+    apply_field_toggle_enabled,
+    apply_field_toggle_solo,
     composite_header_prefix_part,
     composite_header_suffix_part,
     expand_subheader_prefix,
@@ -1302,7 +1304,7 @@ def test_apply_field_horizontal_expand_subheader_when_layer_locked() -> None:
     desc = RowDescriptor(RowKind.TRACK_EFFECTS_HEADER, slot="layer_1")
     assert controls.session.layers["layer_1"].effects_expanded is False
 
-    assert apply_field_horizontal(controls, desc, True, False, False) is True
+    assert apply_field_horizontal(controls, desc, True, False) is True
     assert controls.session.layers["layer_1"].effects_expanded is True
 
 
@@ -1310,16 +1312,18 @@ def test_apply_field_horizontal_track_header_solo_and_expand() -> None:
     controls = _make_controls(("layer_1", "layer_2"))
     desc = RowDescriptor(RowKind.TRACK_HEADER, slot="layer_1")
 
-    assert apply_field_horizontal(controls, desc, True, False, True) is True
+    assert apply_field_toggle_solo(controls, desc) is True
     assert controls.session.solo_slot == "layer_1"
 
-    apply_field_horizontal(controls, desc, False, False, True)
+    apply_field_toggle_solo(controls, desc)
     assert controls.session.solo_slot is None
 
-    apply_field_horizontal(controls, desc, False, False, False)
+    apply_field_horizontal(controls, desc, False, False)
     assert controls.session.layers["layer_1"].expanded is False
-    apply_field_horizontal(controls, desc, True, False, False)
+    apply_field_horizontal(controls, desc, True, False)
     assert controls.session.layers["layer_1"].expanded is True
+    apply_field_toggle_enabled(controls, desc)
+    assert controls.session.layers["layer_1"].enabled is False
 
 
 def test_row_specs_total_over_row_kind() -> None:
@@ -1338,11 +1342,29 @@ def test_row_spec_apply_horizontal_signatures_match_field_mutator() -> None:
         if handler is None:
             continue
         param_count = len(inspect.signature(handler).parameters)
-        if param_count != 5:
+        if param_count != 4:
             mismatches.append(
-                f"{kind.name} ({handler.__name__}): {param_count} params, expected 5"
+                f"{kind.name} ({handler.__name__}): {param_count} params, expected 4"
             )
     assert not mismatches, "RowSpec apply_horizontal arity mismatches:\n" + "\n".join(mismatches)
+
+
+def test_row_spec_toggle_mutators_match_action_mutator() -> None:
+    mismatches: list[str] = []
+    for kind, field in ROW_SPECS.items():
+        for attr in ("toggle_enabled", "toggle_solo"):
+            handler = getattr(field, attr)
+            if handler is None:
+                continue
+            param_count = len(inspect.signature(handler).parameters)
+            if param_count != 2:
+                mismatches.append(
+                    f"{kind.name}.{attr} ({handler.__name__}): "
+                    f"{param_count} params, expected 2"
+                )
+    assert not mismatches, "RowSpec toggle mutator arity mismatches:\n" + "\n".join(
+        mismatches
+    )
 
 
 def test_format_row_value_path_icon() -> None:
@@ -1423,7 +1445,7 @@ def test_apply_field_horizontal_visual_limiter_header_expands() -> None:
 
 
 def test_apply_field_horizontal_transport_seeks() -> None:
-    from cleave.viz.controls import SEEK_LONG, SEEK_SHORT, SEEK_TINY
+    from cleave.viz.controls import SEEK_SHORT
 
     controls = _make_controls()
     controls.duration_sec = 120.0
@@ -1435,18 +1457,14 @@ def test_apply_field_horizontal_transport_seeks() -> None:
 
     apply_field_horizontal(controls, desc, True, False)
     apply_field_horizontal(controls, desc, False, False)
-    apply_field_horizontal(controls, desc, True, False, True)
-    apply_field_horizontal(controls, desc, False, False, True)
     apply_field_horizontal(controls, desc, True, True)
     apply_field_horizontal(controls, desc, False, True)
 
     assert seeks == [
         SEEK_SHORT,
         -SEEK_SHORT,
-        SEEK_TINY,
-        -SEEK_TINY,
-        SEEK_LONG,
-        -SEEK_LONG,
+        SEEK_SHORT,
+        -SEEK_SHORT,
     ]
 
 
@@ -1536,13 +1554,12 @@ def test_row_spec_callbacks_use_public_controls_api() -> None:
             marker_index=0,
             preset_index=0,
         )
-        for forward, ctrl, shift in (
-            (True, False, False),
-            (True, True, False),
-            (True, False, True),
+        for forward, large in (
+            (True, False),
+            (True, True),
         ):
             try:
-                field.apply_horizontal(controls, desc, forward, ctrl, shift)
+                field.apply_horizontal(controls, desc, forward, large)
             except Exception:
                 continue
     assert accessed == []

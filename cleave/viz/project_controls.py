@@ -20,7 +20,7 @@ from cleave.config_schema.project_render import (
 from cleave.viz.session import TuningSession
 
 _BEAT_SENSITIVITY_STEP = 0.1
-_BEAT_SENSITIVITY_CTRL_STEP = 0.5
+_BEAT_SENSITIVITY_LARGE_STEP = 0.5
 
 
 class ProjectControls:
@@ -61,8 +61,8 @@ class ProjectControls:
             return
         project.compositor_expanded = expanded
 
-    def adjust_milkdrop_beat_sensitivity(self, *, forward: bool, ctrl: bool) -> None:
-        step = _BEAT_SENSITIVITY_CTRL_STEP if ctrl else _BEAT_SENSITIVITY_STEP
+    def adjust_milkdrop_beat_sensitivity(self, *, forward: bool, large: bool) -> None:
+        step = _BEAT_SENSITIVITY_LARGE_STEP if large else _BEAT_SENSITIVITY_STEP
         delta = step if forward else -step
         project = self.session.project
         project.milkdrop_beat_sensitivity = clamp_beat_sensitivity(
@@ -87,15 +87,15 @@ class ProjectControls:
         else:
             render.quality = modes[(index - 1) % len(modes)]
 
-    def adjust_start(self, *, forward: bool, ctrl: bool) -> None:
-        step = 10 if ctrl else 1
+    def adjust_start(self, *, forward: bool, large: bool) -> None:
+        step = 10 if large else 1
         delta = step if forward else -step
         render = self.session.project.render
         end = resolved_project_render_end_sec(render.end_sec, self.duration_sec)
         render.start_sec = max(0, min(render.start_sec + delta, end - 1))
 
-    def adjust_end(self, *, forward: bool, ctrl: bool) -> None:
-        step = 10 if ctrl else 1
+    def adjust_end(self, *, forward: bool, large: bool) -> None:
+        step = 10 if large else 1
         delta = step if forward else -step
         render = self.session.project.render
         current = resolved_project_render_end_sec(render.end_sec, self.duration_sec)
@@ -103,20 +103,20 @@ class ProjectControls:
         new_end = max(render.start_sec + 1, min(current + delta, ceil))
         render.end_sec = None if new_end == ceil else new_end
 
-    def adjust_width(self, *, forward: bool, ctrl: bool) -> None:
-        step = RENDER_SIZE_STEP_LARGE if ctrl else RENDER_SIZE_STEP
+    def adjust_width(self, *, forward: bool, large: bool) -> None:
+        step = RENDER_SIZE_STEP_LARGE if large else RENDER_SIZE_STEP
         delta = step if forward else -step
         render = self.session.project.render
         render.width = clamp_render_width(render.width + delta)
 
-    def adjust_height(self, *, forward: bool, ctrl: bool) -> None:
-        step = RENDER_SIZE_STEP_LARGE if ctrl else RENDER_SIZE_STEP
+    def adjust_height(self, *, forward: bool, large: bool) -> None:
+        step = RENDER_SIZE_STEP_LARGE if large else RENDER_SIZE_STEP
         delta = step if forward else -step
         render = self.session.project.render
         render.height = clamp_render_height(render.height + delta)
 
-    def adjust_fps(self, *, forward: bool, ctrl: bool) -> None:
-        step = RENDER_FPS_STEP_LARGE if ctrl else RENDER_FPS_STEP
+    def adjust_fps(self, *, forward: bool, large: bool) -> None:
+        step = RENDER_FPS_STEP_LARGE if large else RENDER_FPS_STEP
         delta = step if forward else -step
         render = self.session.project.render
         render.fps = clamp_render_fps(render.fps + delta)

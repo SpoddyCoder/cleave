@@ -132,10 +132,10 @@ def test_curation_ignores_non_allowlisted_keys() -> None:
     controls.handle_keydown(keydown(pygame.K_DELETE))
     assert "layer_1" in controls.session.layers
 
-    controls.handle_keydown(keydown(pygame.K_RIGHT, mod=pygame.KMOD_SHIFT))
+    controls.handle_keydown(keydown(pygame.K_s))
     assert controls.session.solo_slot is None
 
-    controls.handle_keydown(keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(keydown(pygame.K_e))
     assert layer.enabled is was_enabled
 
     controls.handle_keydown(keydown(pygame.K_t))

@@ -6,10 +6,10 @@ from typing import TYPE_CHECKING
 
 import pygame
 
-from cleave.viz.controls import TuningControls
+from cleave.viz.controls import SEEK_LONG, SEEK_TINY, TuningControls
 from cleave.viz.editor_mode_controls import is_preset_curation_mode
 from cleave.viz.focus_nav import FocusCursor, TimelineFocus
-from cleave.viz.key_repeat import mod_ctrl
+from cleave.viz.key_repeat import mod_ctrl, mod_shift
 from cleave.viz.timeline_controls import TimelineControls
 
 if TYPE_CHECKING:
@@ -47,6 +47,44 @@ def key_handler_for_runtime(
     return runtime.controls
 
 
+def _global_seek(
+    runtime: LiveVisualizerRuntime, forward: bool, *, long: bool, tiny: bool
+) -> None:
+    timeline_controls = runtime.timeline_controls
+    if timeline_controls is not None:
+        timeline_controls.seek_step(forward, long=long, tiny=tiny)
+        return
+    delta_sec = SEEK_LONG if long else SEEK_TINY
+    if not forward:
+        delta_sec = -delta_sec
+    runtime.controls.do_seek(delta_sec)
+
+
+def _try_handle_global_seek(
+    event: pygame.event.Event, runtime: LiveVisualizerRuntime
+) -> bool:
+    if event.key not in (pygame.K_LEFT, pygame.K_RIGHT):
+        return False
+    long = mod_ctrl(event.mod)
+    tiny = mod_shift(event.mod)
+    if not long and not tiny:
+        return False
+    forward = event.key == pygame.K_RIGHT
+    _global_seek(runtime, forward, long=long, tiny=tiny)
+    key_handler = key_handler_for_runtime(runtime, event.key)
+    key_handler.arm_key_repeat(
+        event.key,
+        event.mod,
+        on_repeat=lambda key, mod: _global_seek(
+            runtime,
+            key == pygame.K_RIGHT,
+            long=mod_ctrl(mod),
+            tiny=mod_shift(mod),
+        ),
+    )
+    return True
+
+
 def _handle_global_keydown(
     event: pygame.event.Event, runtime: LiveVisualizerRuntime
 ) -> bool | None:
@@ -56,6 +94,8 @@ def _handle_global_keydown(
             return not runtime.controls.try_quit()
         if event.key == pygame.K_h:
             runtime.seed.session.help_visible = not runtime.seed.session.help_visible
+            return True
+        if _try_handle_global_seek(event, runtime):
             return True
         # Skip other globals (Ctrl+S, F3, ...); pass through to curation allowlist.
         return None
@@ -89,6 +129,9 @@ def _handle_global_keydown(
     if runtime.controls.tap_sync.active:
         if runtime.controls.tap_sync.handle_keydown(event):
             return True
+
+    if _try_handle_global_seek(event, runtime):
+        return True
 
     if tl.recording:
         if event.key == pygame.K_ESCAPE:

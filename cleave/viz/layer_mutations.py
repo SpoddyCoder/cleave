@@ -71,7 +71,7 @@ class LayerMutations:
         delta = 1 if forward else -1
         if playlist.step_sibling(delta, preset_root=self.preset_root):
             # Pack hop at preset_root: move the ascent floor with the playlist
-            # so Ctrl+Left still works after diving into the new pack.
+            # so Backspace still works after diving into the new pack.
             if is_top_level_browse_dir(playlist.current_dir, self.preset_root):
                 layer.browse_floor = playlist.current_dir.resolve()
             bindings = self._bindings()
@@ -96,12 +96,12 @@ class LayerMutations:
             if bindings is not None:
                 bindings.on_preset_change(slot, playlist)
 
-    def step_preset(self, slot: str, *, forward: bool, ctrl: bool) -> None:
+    def step_preset(self, slot: str, *, forward: bool, large: bool) -> None:
         layer = self.session.layers[slot]
         playlist = layer.playlist
         if not playlist.paths:
             return
-        if ctrl:
+        if large:
             playlist.step_by(10 if forward else -10)
         elif forward:
             playlist.next()
@@ -146,10 +146,10 @@ class LayerMutations:
             bindings.on_preset_switching_change(slot)
 
     def step_preset_duration(
-        self, slot: str, *, forward: bool, ctrl: bool = False
+        self, slot: str, *, forward: bool, large: bool = False
     ) -> None:
         layer = self.session.layers[slot]
-        step = 10.0 if ctrl else 1.0
+        step = 10.0 if large else 1.0
         delta = step if forward else -step
         layer.preset_duration = max(5.0, min(300.0, layer.preset_duration + delta))
         if (
@@ -174,19 +174,19 @@ class LayerMutations:
             bindings.on_preset_switching_change(slot)
 
     def step_soft_cut_duration(
-        self, slot: str, *, forward: bool, ctrl: bool = False
+        self, slot: str, *, forward: bool, large: bool = False
     ) -> None:
         layer = self.session.layers[slot]
-        step = 10.0 if ctrl else 1.0
+        step = 10.0 if large else 1.0
         delta = step if forward else -step
         layer.soft_cut_duration = max(0.0, min(60.0, layer.soft_cut_duration + delta))
         bindings = self._bindings()
         if bindings is not None:
             bindings.on_preset_switching_change(slot)
 
-    def step_easter_egg(self, slot: str, *, forward: bool, ctrl: bool = False) -> None:
+    def step_easter_egg(self, slot: str, *, forward: bool, large: bool = False) -> None:
         layer = self.session.layers[slot]
-        step = 0.1 if ctrl else 0.01
+        step = 0.1 if large else 0.01
         delta = step if forward else -step
         layer.easter_egg = clamp_easter_egg(layer.easter_egg + delta)
         bindings = self._bindings()
@@ -210,10 +210,10 @@ class LayerMutations:
             bindings.on_preset_switching_change(slot)
 
     def step_hard_cut_duration(
-        self, slot: str, *, forward: bool, ctrl: bool = False
+        self, slot: str, *, forward: bool, large: bool = False
     ) -> None:
         layer = self.session.layers[slot]
-        step = 10.0 if ctrl else 1.0
+        step = 10.0 if large else 1.0
         delta = step if forward else -step
         layer.hard_cut_duration = max(5.0, min(300.0, layer.hard_cut_duration + delta))
         bindings = self._bindings()

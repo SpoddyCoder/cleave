@@ -101,16 +101,15 @@ class TimelineControls:
             return True
 
         if self.session.timeline.locked:
-            # Locked: strip stays viewable/seekable and Space still toggles
-            # transport. Cue/record mutations stay blocked.
-            if event.key in (pygame.K_LEFT, pygame.K_RIGHT):
-                self._do_seek(
-                    event.key == pygame.K_RIGHT,
-                    long=mod_ctrl(event.mod),
-                    tiny=mod_shift(event.mod),
-                )
-                return True
-            if not (event.key == pygame.K_SPACE and not mod_ctrl(event.mod)):
+            # Locked: strip stays viewable; Left/Right select cues, Enter seeks
+            # to the selected cue, and Space still toggles transport. Cue/record
+            # mutations stay blocked.
+            locked_allowed = event.key in (pygame.K_LEFT, pygame.K_RIGHT)
+            if event.key == pygame.K_RETURN and not mod_shift(event.mod):
+                locked_allowed = True
+            if event.key == pygame.K_SPACE and not mod_ctrl(event.mod):
+                locked_allowed = True
+            if not locked_allowed:
                 return True
 
         if event.key == pygame.K_r:
@@ -145,11 +144,19 @@ class TimelineControls:
             return True
 
         if event.key in (pygame.K_LEFT, pygame.K_RIGHT):
-            self._do_seek(
-                event.key == pygame.K_RIGHT,
-                long=mod_ctrl(event.mod),
-                tiny=mod_shift(event.mod),
-            )
+            forward = event.key == pygame.K_RIGHT
+            if self.session.timeline.recording:
+                self.seek_step(forward)
+            else:
+                self._step_selected_cue(forward=forward)
+                self._key_repeat.on_keydown(
+                    event.key,
+                    event.mod,
+                    accel=False,
+                    on_repeat=lambda key, _mod: self._step_selected_cue(
+                        forward=key == pygame.K_RIGHT
+                    ),
+                )
             return True
 
         if event.key in _LAYER_KEY_INDEX:
@@ -189,42 +196,41 @@ class TimelineControls:
                 self._toggle_override_focused_row()
             return True
 
+        if event.key == pygame.K_RETURN:
+            if not self.session.timeline.recording:
+                self._seek_to_selected_cue()
+            return True
+
         if event.key == pygame.K_a:
             self._toggle_arm()
             return True
 
         if event.key == pygame.K_COMMA:
-            if mod_ctrl(event.mod) or mod_shift(event.mod):
-                self._nudge_selected_cue_level(
-                    forward=False, large=mod_ctrl(event.mod)
+            self._nudge_selected_cue_level(
+                forward=False, large=mod_ctrl(event.mod)
+            )
+            if self._cue_edits_allowed():
+                self._key_repeat.on_keydown(
+                    event.key,
+                    event.mod,
+                    on_repeat=lambda key, mod: self._nudge_selected_cue_level(
+                        forward=False, large=mod_ctrl(mod)
+                    ),
                 )
-                if self._cue_edits_allowed():
-                    self._key_repeat.on_keydown(
-                        event.key,
-                        event.mod,
-                        on_repeat=lambda key, mod: self._nudge_selected_cue_level(
-                            forward=False, large=mod_ctrl(mod)
-                        ),
-                    )
-            else:
-                self._step_selected_cue(forward=False)
             return True
 
         if event.key == pygame.K_PERIOD:
-            if mod_ctrl(event.mod) or mod_shift(event.mod):
-                self._nudge_selected_cue_level(
-                    forward=True, large=mod_ctrl(event.mod)
+            self._nudge_selected_cue_level(
+                forward=True, large=mod_ctrl(event.mod)
+            )
+            if self._cue_edits_allowed():
+                self._key_repeat.on_keydown(
+                    event.key,
+                    event.mod,
+                    on_repeat=lambda key, mod: self._nudge_selected_cue_level(
+                        forward=True, large=mod_ctrl(mod)
+                    ),
                 )
-                if self._cue_edits_allowed():
-                    self._key_repeat.on_keydown(
-                        event.key,
-                        event.mod,
-                        on_repeat=lambda key, mod: self._nudge_selected_cue_level(
-                            forward=True, large=mod_ctrl(mod)
-                        ),
-                    )
-            else:
-                self._step_selected_cue(forward=True)
             return True
 
         if event.key == pygame.K_b:
@@ -244,6 +250,16 @@ class TimelineControls:
     def handle_keyup(self, event: pygame.event.Event) -> None:
         if event.type == pygame.KEYUP:
             self._key_repeat.on_keyup(event.key)
+
+    def arm_key_repeat(
+        self,
+        key: int,
+        mod: int,
+        *,
+        on_repeat: Callable[[int, int], None],
+        accel: bool = True,
+    ) -> None:
+        self._key_repeat.on_keydown(key, mod, on_repeat=on_repeat, accel=accel)
 
     @property
     def key_repeat_armed(self) -> bool:
@@ -273,12 +289,15 @@ class TimelineControls:
     def _focused_slot(self) -> str:
         return self.session.layer_z_order[self.session.timeline.focus_row]
 
+    def _cue_selection_allowed(self) -> bool:
+        return not self.session.timeline.recording
+
     def _cue_edits_allowed(self) -> bool:
         tl = self.session.timeline
         return not tl.locked and not tl.recording
 
     def _step_selected_cue(self, *, forward: bool) -> None:
-        if not self._cue_edits_allowed():
+        if not self._cue_selection_allowed():
             return
         tl = self.session.timeline
         slot = self._focused_slot()
@@ -289,8 +308,11 @@ class TimelineControls:
         selected = tl.selected_cue_t.get(slot)
         if selected is None or selected not in times:
             playhead = current_sec(self.playback, self.duration_sec)
-            nearest = min(times, key=lambda t: (abs(t - playhead), t))
-            self._set_selected_cue(slot, nearest)
+            if forward:
+                pick = next((t for t in times if t >= playhead), times[-1])
+            else:
+                pick = next((t for t in reversed(times) if t <= playhead), times[0])
+            self._set_selected_cue(slot, pick)
             return
         index = times.index(selected)
         if forward:
@@ -298,6 +320,21 @@ class TimelineControls:
         else:
             index = max(index - 1, 0)
         self._set_selected_cue(slot, times[index])
+
+    def _seek_to_selected_cue(self) -> None:
+        if not self._cue_selection_allowed():
+            return
+        tl = self.session.timeline
+        slot = self._focused_slot()
+        target = tl.selected_cue_t.get(slot)
+        if target is None:
+            return
+        current = current_sec(self.playback, self.duration_sec)
+        delta = target - current
+        if self._on_seek is not None:
+            self._on_seek(delta)
+        else:
+            seek(self.playback, delta, self.duration_sec)
 
     def _set_selected_cue(self, slot: str, cue_t: float) -> None:
         tl = self.session.timeline
@@ -637,7 +674,7 @@ class TimelineControls:
                 if slot_start == prior_start:
                     tl.record_slot_start_sec[slot] = new_t
 
-    def _do_seek(self, forward: bool, *, long: bool = False, tiny: bool = False) -> None:
+    def seek_step(self, forward: bool, *, long: bool = False, tiny: bool = False) -> None:
         if long:
             delta_sec = SEEK_LONG
         elif tiny:

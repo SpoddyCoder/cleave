@@ -12,7 +12,8 @@ from tests.support.config import TEST_LAYER_STEMS
 from cleave.stems import STEM_NAMES
 from cleave.viz.app import LiveVisualizerRuntime, VisualizerSeed
 from cleave.viz.focus_nav import MainFocus, TimelineFocus
-from cleave.viz.controls import TuningControls
+from cleave.viz.controls import SEEK_LONG, SEEK_TINY, TuningControls
+from cleave.viz.layer_visibility import armed_recording_level
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.session import LayerRuntime, TuningSession
 from cleave.viz.input_dispatch import (
@@ -286,6 +287,146 @@ def test_submenu_routing_up_down_to_tuning_enter_to_timeline() -> None:
     assert key_handler_for_runtime(runtime, pygame.K_UP) is main
     assert key_handler_for_runtime(runtime, pygame.K_DOWN) is main
     assert key_handler_for_runtime(runtime, pygame.K_RETURN) is timeline
+
+
+def test_ctrl_arrows_seek_long_from_main_panel() -> None:
+    runtime = _make_runtime(submenu_focused=False)
+    player = runtime.playback.player
+    player.seek(40.0)
+    assert dispatch_keydown(
+        keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL), runtime
+    ) is True
+    assert player.file_position_sec() == 40.0 + SEEK_LONG
+    assert dispatch_keydown(
+        keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL), runtime
+    ) is True
+    assert player.file_position_sec() == 40.0
+
+
+def test_shift_arrows_seek_tiny_from_timeline_context() -> None:
+    runtime = _make_runtime()
+    player = runtime.playback.player
+    player.seek(10.0)
+    assert dispatch_keydown(
+        keydown(pygame.K_RIGHT, mod=pygame.KMOD_SHIFT), runtime
+    ) is True
+    assert player.file_position_sec() == 10.0 + SEEK_TINY
+    assert dispatch_keydown(
+        keydown(pygame.K_LEFT, mod=pygame.KMOD_SHIFT), runtime
+    ) is True
+    assert player.file_position_sec() == 10.0
+
+
+def test_curation_mode_still_seeks_with_modifiers() -> None:
+    runtime = _make_runtime(submenu_focused=False, panel_open=False)
+    runtime.seed.session.settings.editor_mode = "preset_curation"
+    player = runtime.playback.player
+    player.seek(10.0)
+    assert dispatch_keydown(
+        keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL), runtime
+    ) is True
+    assert player.file_position_sec() == 10.0 + SEEK_LONG
+
+
+def test_global_seek_arms_repeat_on_main_handler() -> None:
+    runtime = _make_runtime(submenu_focused=False)
+    dispatch_keydown(keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL), runtime)
+    assert runtime.controls.key_repeat_armed is True
+    dispatch_keyup(
+        pygame.event.Event(pygame.KEYUP, key=pygame.K_RIGHT),
+        runtime,
+    )
+    assert runtime.controls.key_repeat_armed is False
+
+
+def test_global_seek_arms_repeat_on_timeline_handler() -> None:
+    runtime = _make_runtime()
+    dispatch_keydown(keydown(pygame.K_RIGHT, mod=pygame.KMOD_SHIFT), runtime)
+    assert runtime.timeline_controls.key_repeat_armed is True
+    dispatch_keyup(
+        pygame.event.Event(pygame.KEYUP, key=pygame.K_RIGHT),
+        runtime,
+    )
+    assert runtime.timeline_controls.key_repeat_armed is False
+
+
+def test_ctrl_arrows_seek_from_value_row_without_changing_value() -> None:
+    runtime = _make_runtime(submenu_focused=False)
+    runtime.controls.session.layers["layer_1"].compositing_expanded = True
+    runtime.controls.focus_cursor = MainFocus(
+        RowDescriptor(RowKind.TRACK_OPACITY, slot="layer_1")
+    )
+    before = runtime.controls.session.layers["layer_1"].opacity_pct
+    player = runtime.playback.player
+    player.seek(40.0)
+    assert dispatch_keydown(
+        keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL), runtime
+    ) is True
+    assert player.file_position_sec() == 40.0 + SEEK_LONG
+    assert runtime.controls.session.layers["layer_1"].opacity_pct == before
+
+
+def test_shift_arrows_seek_from_track_header() -> None:
+    runtime = _make_runtime(submenu_focused=False)
+    runtime.controls.focus_cursor = MainFocus(
+        RowDescriptor(RowKind.TRACK_HEADER, slot="layer_1")
+    )
+    expanded = runtime.controls.session.layers["layer_1"].expanded
+    player = runtime.playback.player
+    player.seek(10.0)
+    assert dispatch_keydown(
+        keydown(pygame.K_RIGHT, mod=pygame.KMOD_SHIFT), runtime
+    ) is True
+    assert player.file_position_sec() == 10.0 + SEEK_TINY
+    assert runtime.controls.session.layers["layer_1"].expanded is expanded
+
+
+def test_global_seek_from_move_mode() -> None:
+    runtime = _make_runtime(submenu_focused=False)
+    runtime.controls.focus_cursor = MainFocus(
+        RowDescriptor(RowKind.TRACK_HEADER, slot="layer_1")
+    )
+    runtime.controls.handle_keydown(keydown(pygame.K_m))
+    assert runtime.controls.layer_lifecycle.move_mode_slot == "layer_1"
+    player = runtime.playback.player
+    player.seek(20.0)
+    assert dispatch_keydown(
+        keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL), runtime
+    ) is True
+    assert player.file_position_sec() == 20.0 + SEEK_LONG
+    assert runtime.controls.layer_lifecycle.move_mode_slot == "layer_1"
+
+
+def test_global_seek_ignored_while_modal_open() -> None:
+    runtime = _make_runtime(submenu_focused=False)
+    runtime.modal_host.prompt_text(
+        "Change text...",
+        "ab",
+        on_confirm=lambda _s: None,
+    )
+    player = runtime.playback.player
+    player.seek(10.0)
+    assert dispatch_keydown(
+        keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL), runtime
+    ) is True
+    assert player.file_position_sec() == 10.0
+
+
+def test_global_seek_while_recording_fills_range() -> None:
+    runtime = _make_runtime(submenu_focused=True)
+    session = runtime.seed.session
+    session.timeline.armed_slots = {"layer_1"}
+    session.layers["layer_1"].enabled = True
+    player = runtime.playback.player
+    player.seek(10.0)
+    runtime.timeline_controls.handle_keydown(keydown(pygame.K_r))
+    assert session.timeline.recording is True
+    active_at_start = armed_recording_level(session, "layer_1", 10.0)
+    assert dispatch_keydown(
+        keydown(pygame.K_RIGHT, mod=pygame.KMOD_SHIFT), runtime
+    ) is True
+    assert player.file_position_sec() == 10.0 + SEEK_TINY
+    assert armed_recording_level(session, "layer_1", 11.0) == active_at_start
 
 
 def test_notify_overlay_skipped_in_submenu() -> None:

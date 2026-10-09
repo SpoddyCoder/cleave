@@ -106,75 +106,66 @@ def _format_render_post_fx_chroma_boost_amount(
 ) -> str:
     return f"{state.render_post_fx.chroma_boost.amount_pct}%"
 
-def _fade_step(forward: bool, ctrl: bool) -> float:
-    step = 10.0 if ctrl else 1.0
+def _fade_step(forward: bool, large: bool) -> float:
+    step = 10.0 if large else 1.0
     return step if forward else -step
 
 def _apply_render_post_fx_fade_in_start(
-    controls: TuningControls, _desc: RowDescriptor, forward: bool, ctrl: bool,
-    _shift: bool,
+    controls: TuningControls, _desc: RowDescriptor, forward: bool, large: bool,
 ) -> None:
     fin = controls.session.render_post_fx.fade.fade_in
     controls.render_post_fx.set_fade_start(
-        "fade_in", fin.start + _fade_step(forward, ctrl)
+        "fade_in", fin.start + _fade_step(forward, large)
     )
 
 def _apply_render_post_fx_fade_in_end(
-    controls: TuningControls, _desc: RowDescriptor, forward: bool, ctrl: bool,
-    _shift: bool,
+    controls: TuningControls, _desc: RowDescriptor, forward: bool, large: bool,
 ) -> None:
     fin = controls.session.render_post_fx.fade.fade_in
     controls.render_post_fx.set_fade_end(
-        "fade_in", fin.end + _fade_step(forward, ctrl)
+        "fade_in", fin.end + _fade_step(forward, large)
     )
 
 def _apply_render_post_fx_fade_in_type(
-    controls: TuningControls, _desc: RowDescriptor, forward: bool, _ctrl: bool,
-    _shift: bool,
+    controls: TuningControls, _desc: RowDescriptor, forward: bool, _large: bool,
 ) -> None:
     controls.render_post_fx.cycle_fade_type("fade_in", forward=forward)
 
 def _apply_render_post_fx_fade_out_start(
-    controls: TuningControls, _desc: RowDescriptor, forward: bool, ctrl: bool,
-    _shift: bool,
+    controls: TuningControls, _desc: RowDescriptor, forward: bool, large: bool,
 ) -> None:
     fout = controls.session.render_post_fx.fade.fade_out
     controls.render_post_fx.set_fade_start(
-        "fade_out", fout.start + _fade_step(forward, ctrl)
+        "fade_out", fout.start + _fade_step(forward, large)
     )
 
 def _apply_render_post_fx_fade_out_end(
-    controls: TuningControls, _desc: RowDescriptor, forward: bool, ctrl: bool,
-    _shift: bool,
+    controls: TuningControls, _desc: RowDescriptor, forward: bool, large: bool,
 ) -> None:
     fout = controls.session.render_post_fx.fade.fade_out
     controls.render_post_fx.set_fade_end(
-        "fade_out", fout.end + _fade_step(forward, ctrl)
+        "fade_out", fout.end + _fade_step(forward, large)
     )
 
 def _apply_render_post_fx_fade_out_type(
-    controls: TuningControls, _desc: RowDescriptor, forward: bool, _ctrl: bool,
-    _shift: bool,
+    controls: TuningControls, _desc: RowDescriptor, forward: bool, _large: bool,
 ) -> None:
     controls.render_post_fx.cycle_fade_type("fade_out", forward=forward)
 
 def _apply_render_post_fx_highlight_rolloff_mode(
-    controls: TuningControls, _desc: RowDescriptor, forward: bool, _ctrl: bool,
-    _shift: bool,
+    controls: TuningControls, _desc: RowDescriptor, forward: bool, _large: bool,
 ) -> None:
     controls.render_post_fx.cycle_highlight_rolloff_mode(forward=forward)
 
 def _apply_render_post_fx_highlight_rolloff_curve(
-    controls: TuningControls, _desc: RowDescriptor, forward: bool, _ctrl: bool,
-    _shift: bool,
+    controls: TuningControls, _desc: RowDescriptor, forward: bool, _large: bool,
 ) -> None:
     controls.render_post_fx.cycle_highlight_rolloff_curve(forward=forward)
 
 def _apply_render_post_fx_highlight_rolloff_threshold(
-    controls: TuningControls, _desc: RowDescriptor, forward: bool, ctrl: bool,
-    _shift: bool,
+    controls: TuningControls, _desc: RowDescriptor, forward: bool, large: bool,
 ) -> None:
-    step = 10 if ctrl else 1
+    step = 10 if large else 1
     delta = step if forward else -step
     hr = controls.session.render_post_fx.highlight_rolloff
     controls.render_post_fx.set_highlight_rolloff_threshold_pct(
@@ -182,10 +173,9 @@ def _apply_render_post_fx_highlight_rolloff_threshold(
     )
 
 def _apply_render_post_fx_highlight_rolloff_ceiling(
-    controls: TuningControls, _desc: RowDescriptor, forward: bool, ctrl: bool,
-    _shift: bool,
+    controls: TuningControls, _desc: RowDescriptor, forward: bool, large: bool,
 ) -> None:
-    step = 10 if ctrl else 1
+    step = 10 if large else 1
     delta = step if forward else -step
     hr = controls.session.render_post_fx.highlight_rolloff
     controls.render_post_fx.set_highlight_rolloff_ceiling_pct(
@@ -193,10 +183,9 @@ def _apply_render_post_fx_highlight_rolloff_ceiling(
     )
 
 def _apply_render_post_fx_highlight_rolloff_strength(
-    controls: TuningControls, _desc: RowDescriptor, forward: bool, ctrl: bool,
-    _shift: bool,
+    controls: TuningControls, _desc: RowDescriptor, forward: bool, large: bool,
 ) -> None:
-    step = 10 if ctrl else 1
+    step = 10 if large else 1
     delta = step if forward else -step
     hr = controls.session.render_post_fx.highlight_rolloff
     controls.render_post_fx.set_highlight_rolloff_strength_pct(
@@ -204,10 +193,9 @@ def _apply_render_post_fx_highlight_rolloff_strength(
     )
 
 def _apply_render_post_fx_highlight_rolloff_softness(
-    controls: TuningControls, _desc: RowDescriptor, forward: bool, ctrl: bool,
-    _shift: bool,
+    controls: TuningControls, _desc: RowDescriptor, forward: bool, large: bool,
 ) -> None:
-    step = 10 if ctrl else 1
+    step = 10 if large else 1
     delta = step if forward else -step
     hr = controls.session.render_post_fx.highlight_rolloff
     controls.render_post_fx.set_highlight_rolloff_softness_pct(
@@ -215,10 +203,9 @@ def _apply_render_post_fx_highlight_rolloff_softness(
     )
 
 def _apply_render_post_fx_highlight_rolloff_desaturation(
-    controls: TuningControls, _desc: RowDescriptor, forward: bool, ctrl: bool,
-    _shift: bool,
+    controls: TuningControls, _desc: RowDescriptor, forward: bool, large: bool,
 ) -> None:
-    step = 10 if ctrl else 1
+    step = 10 if large else 1
     delta = step if forward else -step
     hr = controls.session.render_post_fx.highlight_rolloff
     controls.render_post_fx.set_highlight_rolloff_desaturation_pct(
@@ -226,22 +213,19 @@ def _apply_render_post_fx_highlight_rolloff_desaturation(
     )
 
 def _apply_render_post_fx_chroma_boost_mode(
-    controls: TuningControls, _desc: RowDescriptor, forward: bool, _ctrl: bool,
-    _shift: bool,
+    controls: TuningControls, _desc: RowDescriptor, forward: bool, _large: bool,
 ) -> None:
     controls.render_post_fx.cycle_chroma_boost_mode(forward=forward)
 
 def _apply_render_post_fx_chroma_boost_variant(
-    controls: TuningControls, _desc: RowDescriptor, forward: bool, _ctrl: bool,
-    _shift: bool,
+    controls: TuningControls, _desc: RowDescriptor, forward: bool, _large: bool,
 ) -> None:
     controls.render_post_fx.cycle_chroma_boost_variant(forward=forward)
 
 def _apply_render_post_fx_chroma_boost_amount(
-    controls: TuningControls, _desc: RowDescriptor, forward: bool, ctrl: bool,
-    _shift: bool,
+    controls: TuningControls, _desc: RowDescriptor, forward: bool, large: bool,
 ) -> None:
-    step = 10 if ctrl else 1
+    step = 10 if large else 1
     delta = step if forward else -step
     cb = controls.session.render_post_fx.chroma_boost
     controls.render_post_fx.set_chroma_boost_amount_pct(cb.amount_pct + delta)
@@ -255,8 +239,7 @@ def _apply_render_post_fx_limiter_enabled(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
-    _ctrl: bool,
-    _shift: bool,
+    _large: bool,
 ) -> None:
     controls.render_post_fx.set_limiter_enabled(forward)
 
@@ -269,10 +252,9 @@ def _apply_render_post_fx_limiter_threshold(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
-    _ctrl: bool,
-    _shift: bool,
+    _large: bool,
 ) -> None:
-    del _ctrl, _shift
+    del _large
     lim = controls.session.render_post_fx.limiter
     delta = VISUAL_LIMITER_THRESHOLD_STEP if forward else -VISUAL_LIMITER_THRESHOLD_STEP
     controls.render_post_fx.set_limiter_threshold(round(lim.threshold + delta, 2))
@@ -286,10 +268,9 @@ def _apply_render_post_fx_limiter_ratio(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
-    _ctrl: bool,
-    _shift: bool,
+    _large: bool,
 ) -> None:
-    del _ctrl, _shift
+    del _large
     lim = controls.session.render_post_fx.limiter
     delta = VISUAL_LIMITER_RATIO_STEP if forward else -VISUAL_LIMITER_RATIO_STEP
     controls.render_post_fx.set_limiter_ratio(round(lim.ratio + delta, 1))
@@ -303,30 +284,28 @@ def _apply_render_post_fx_limiter_release(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
-    _ctrl: bool,
-    _shift: bool,
+    _large: bool,
 ) -> None:
-    del _ctrl, _shift
+    del _large
     lim = controls.session.render_post_fx.limiter
     delta = VISUAL_LIMITER_RELEASE_STEP if forward else -VISUAL_LIMITER_RELEASE_STEP
     controls.render_post_fx.set_limiter_release(round(lim.release + delta, 1))
+
+def _toggle_render_post_fx_enabled(
+    controls: TuningControls, _desc: RowDescriptor
+) -> None:
+    if controls.session.render_post_fx.locked:
+        return
+    enabled = controls.session.render_post_fx.enabled
+    controls.render_post_fx.set_enabled(not enabled)
+
 
 def _apply_render_post_fx_header(
     controls: TuningControls,
     desc: RowDescriptor,
     forward: bool,
-    ctrl: bool,
-    _shift: bool,
+    _large: bool,
 ) -> None:
-    from cleave.viz.row_spec import row_spec
-    if ctrl:
-        if (
-            controls.session.render_post_fx.locked
-            and row_spec(desc.kind).can_enable_disable
-        ):
-            return
-        controls.render_post_fx.set_enabled(forward)
-        return
     apply_expand_toggle(
         controls, desc.kind, desc.slot, forward, card=desc.card
     )
@@ -352,7 +331,7 @@ SPECS: dict[RowKind, RowSpec] = {
             "Post-processing effects applied during final compositing.",
         ),
         quick_nav_target=True,
-        can_enable_disable=True,
+        toggle_enabled=_toggle_render_post_fx_enabled,
     ),
     RowKind.RENDER_POST_FX_FADE_HEADER: RowSpec(
         affordance=RowAffordance.EXPAND,

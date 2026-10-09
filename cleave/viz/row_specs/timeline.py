@@ -74,8 +74,7 @@ def _apply_timeline_bar_phase(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
-    _ctrl: bool,
-    _shift: bool,
+    _large: bool,
 ) -> None:
     controls.timeline_phase.nudge(forward=forward)
 
@@ -88,8 +87,7 @@ def _apply_timeline_bar_grid(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
-    _ctrl: bool,
-    _shift: bool,
+    _large: bool,
 ) -> None:
     controls.session.timeline.show_bar_grid = forward
 
@@ -102,8 +100,7 @@ def _apply_timeline_placement_snap(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
-    _ctrl: bool,
-    _shift: bool,
+    _large: bool,
 ) -> None:
     tl = controls.session.timeline
     tl.placement_snap = cycle_timeline_placement_snap(
@@ -120,8 +117,7 @@ def _apply_timeline_preset_character(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
-    _ctrl: bool,
-    _shift: bool,
+    _large: bool,
 ) -> None:
     tl = controls.session.timeline
     tl.timeline_preset_kind = cycle_timeline_preset_kind(
@@ -140,8 +136,7 @@ def _apply_timeline_preset_density(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
-    _ctrl: bool,
-    _shift: bool,
+    _large: bool,
 ) -> None:
     tl = controls.session.timeline
     tl.timeline_preset_density = cycle_timeline_preset_density(
@@ -160,8 +155,7 @@ def _apply_timeline_preset_cue_snap(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
-    _ctrl: bool,
-    _shift: bool,
+    _large: bool,
 ) -> None:
     tl = controls.session.timeline
     tl.timeline_preset_cue_snap = cycle_timeline_preset_cue_snap(
@@ -180,8 +174,7 @@ def _apply_timeline_preset_song_marker_snap(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
-    _ctrl: bool,
-    _shift: bool,
+    _large: bool,
 ) -> None:
     tl = controls.session.timeline
     tl.timeline_preset_song_marker_snap = cycle_timeline_preset_song_marker_snap(
@@ -200,8 +193,7 @@ def _apply_timeline_preset_timeline_cuts(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
-    _ctrl: bool,
-    _shift: bool,
+    _large: bool,
 ) -> None:
     tl = controls.session.timeline
     tl.timeline_preset_timeline_cuts = cycle_timeline_preset_timeline_cuts(
@@ -220,8 +212,7 @@ def _apply_timeline_preset_repopulate(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
-    _ctrl: bool,
-    _shift: bool,
+    _large: bool,
 ) -> None:
     tl = controls.session.timeline
     tl.timeline_preset_repopulate = cycle_timeline_preset_repopulate(
@@ -240,8 +231,7 @@ def _apply_timeline_preset_conductor(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
-    _ctrl: bool,
-    _shift: bool,
+    _large: bool,
 ) -> None:
     tl = controls.session.timeline
     tl.timeline_preset_conductor = cycle_timeline_preset_conductor(
@@ -258,8 +248,7 @@ def _apply_timeline_preset_mode(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
-    _ctrl: bool,
-    _shift: bool,
+    _large: bool,
 ) -> None:
     tl = controls.session.timeline
     tl.timeline_preset_mode = cycle_timeline_preset_mode(
@@ -276,8 +265,7 @@ def _apply_timeline_hard_cut_fades_enabled(
     controls: TuningControls,
     _desc: RowDescriptor,
     _forward: bool,
-    _ctrl: bool,
-    _shift: bool,
+    _large: bool,
 ) -> None:
     group = controls.session.timeline.hard_cut_fades
     group.enabled = not group.enabled
@@ -291,8 +279,7 @@ def _apply_timeline_hard_cut_fade_in(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
-    _ctrl: bool,
-    _shift: bool,
+    _large: bool,
 ) -> None:
     group = controls.session.timeline.hard_cut_fades
     delta = TIMELINE_FADE_DURATION_STEP if forward else -TIMELINE_FADE_DURATION_STEP
@@ -307,8 +294,7 @@ def _apply_timeline_hard_cut_fade_out(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
-    _ctrl: bool,
-    _shift: bool,
+    _large: bool,
 ) -> None:
     group = controls.session.timeline.hard_cut_fades
     delta = TIMELINE_FADE_DURATION_STEP if forward else -TIMELINE_FADE_DURATION_STEP
@@ -323,8 +309,7 @@ def _apply_timeline_soft_cut_fades_enabled(
     controls: TuningControls,
     _desc: RowDescriptor,
     _forward: bool,
-    _ctrl: bool,
-    _shift: bool,
+    _large: bool,
 ) -> None:
     group = controls.session.timeline.soft_cut_fades
     group.enabled = not group.enabled
@@ -338,8 +323,7 @@ def _apply_timeline_soft_cut_fade_in(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
-    _ctrl: bool,
-    _shift: bool,
+    _large: bool,
 ) -> None:
     group = controls.session.timeline.soft_cut_fades
     delta = TIMELINE_FADE_DURATION_STEP if forward else -TIMELINE_FADE_DURATION_STEP
@@ -354,8 +338,7 @@ def _apply_timeline_soft_cut_fade_out(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
-    _ctrl: bool,
-    _shift: bool,
+    _large: bool,
 ) -> None:
     group = controls.session.timeline.soft_cut_fades
     delta = TIMELINE_FADE_DURATION_STEP if forward else -TIMELINE_FADE_DURATION_STEP
@@ -370,8 +353,7 @@ def _apply_timeline_hard_cut_crossfade(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
-    _ctrl: bool,
-    _shift: bool,
+    _large: bool,
 ) -> None:
     group = controls.session.timeline.hard_cut_fades
     group.crossfade = cycle_timeline_crossfade(group.crossfade, forward=forward)
@@ -385,28 +367,26 @@ def _apply_timeline_soft_cut_crossfade(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
-    _ctrl: bool,
-    _shift: bool,
+    _large: bool,
 ) -> None:
     group = controls.session.timeline.soft_cut_fades
     group.crossfade = cycle_timeline_crossfade(group.crossfade, forward=forward)
+
+def _toggle_render_timeline_enabled(
+    controls: TuningControls, _desc: RowDescriptor
+) -> None:
+    if controls.session.timeline.locked:
+        return
+    enabled = controls.session.timeline.enabled
+    controls.set_render_timeline_enabled(not enabled)
+
 
 def _apply_render_timeline_header(
     controls: TuningControls,
     desc: RowDescriptor,
     forward: bool,
-    ctrl: bool,
-    _shift: bool,
+    _large: bool,
 ) -> None:
-    from cleave.viz.row_spec import row_spec
-    if ctrl:
-        if (
-            controls.session.timeline.locked
-            and row_spec(desc.kind).can_enable_disable
-        ):
-            return
-        controls.set_render_timeline_enabled(forward)
-        return
     apply_panel_anchor_toggle(controls, desc.kind, forward)
 
 def _format_song_markers_count(state: TuningViewState, _desc: RowDescriptor) -> str:
@@ -436,8 +416,7 @@ def _apply_song_marker_type(
     controls: TuningControls,
     desc: RowDescriptor,
     forward: bool,
-    _ctrl: bool,
-    _shift: bool,
+    _large: bool,
 ) -> None:
     assert desc.marker_index is not None
     markers = controls.session.song_markers
@@ -475,7 +454,7 @@ SPECS: dict[RowKind, RowSpec] = {
             "When enabled, standard layer visibility is disabled.",
         ),
         quick_nav_target=True,
-        can_enable_disable=True,
+        toggle_enabled=_toggle_render_timeline_enabled,
     ),
     RowKind.TIMELINE_PRESETS_HEADER: RowSpec(
         affordance=RowAffordance.EXPAND,

@@ -790,7 +790,7 @@ class TuningViewStateBuilder:
         for slot in layer_z_order:
             layer = self.session.layers[slot]
             display = self._display_playlist(layer)
-            # Directory row always reflects browse navigation (Ctrl+Left/Right).
+            # Directory row always reflects browse navigation (Left/Right, Enter, Backspace).
             # The file row alone follows auto_preset_path when switching plays
             # a cast/list preset outside the browse directory.
             tracks[slot] = TrackBlock(

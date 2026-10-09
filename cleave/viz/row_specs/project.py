@@ -93,8 +93,7 @@ def _apply_project_header(
     controls: TuningControls,
     desc: RowDescriptor,
     forward: bool,
-    _ctrl: bool,
-    _shift: bool,
+    _large: bool,
 ) -> None:
     apply_expand_toggle(
         controls, desc.kind, desc.slot, forward, card=desc.card
@@ -105,38 +104,34 @@ def _apply_project_render_width(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
-    ctrl: bool,
-    _shift: bool,
+    large: bool,
 ) -> None:
-    controls.project.adjust_width(forward=forward, ctrl=ctrl)
+    controls.project.adjust_width(forward=forward, large=large)
 
 
 def _apply_project_render_height(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
-    ctrl: bool,
-    _shift: bool,
+    large: bool,
 ) -> None:
-    controls.project.adjust_height(forward=forward, ctrl=ctrl)
+    controls.project.adjust_height(forward=forward, large=large)
 
 
 def _apply_project_render_fps(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
-    ctrl: bool,
-    _shift: bool,
+    large: bool,
 ) -> None:
-    controls.project.adjust_fps(forward=forward, ctrl=ctrl)
+    controls.project.adjust_fps(forward=forward, large=large)
 
 
 def _apply_project_render_quality(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
-    _ctrl: bool,
-    _shift: bool,
+    _large: bool,
 ) -> None:
     controls.project.cycle_quality(forward=forward)
 
@@ -145,38 +140,34 @@ def _apply_project_render_start(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
-    ctrl: bool,
-    _shift: bool,
+    large: bool,
 ) -> None:
-    controls.project.adjust_start(forward=forward, ctrl=ctrl)
+    controls.project.adjust_start(forward=forward, large=large)
 
 
 def _apply_project_render_end(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
-    ctrl: bool,
-    _shift: bool,
+    large: bool,
 ) -> None:
-    controls.project.adjust_end(forward=forward, ctrl=ctrl)
+    controls.project.adjust_end(forward=forward, large=large)
 
 
 def _apply_project_milkdrop_beat(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
-    ctrl: bool,
-    _shift: bool,
+    large: bool,
 ) -> None:
-    controls.project.adjust_milkdrop_beat_sensitivity(forward=forward, ctrl=ctrl)
+    controls.project.adjust_milkdrop_beat_sensitivity(forward=forward, large=large)
 
 
 def _apply_project_compositor_hdr(
     controls: TuningControls,
     _desc: RowDescriptor,
     _forward: bool,
-    _ctrl: bool,
-    _shift: bool,
+    _large: bool,
 ) -> None:
     controls.project.toggle_compositor_hdr()
 
@@ -237,7 +228,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Default beat sensitivity",
         help_entries=(
             ("Left/Right", "adjust (0.1)"),
-            ("Ctrl + Left/Right", "large step (0.5)"),
+            ("PgUp/PgDn", "large step (0.5)"),
         ),
         help_description=(
             "Fallback beat sensitivity for layers that do not set their own.",
@@ -319,7 +310,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Render width",
         help_entries=(
             ("Left/Right", f"adjust width ({RENDER_SIZE_STEP} px)"),
-            ("Ctrl + Left/Right", f"large step ({RENDER_SIZE_STEP_LARGE} px)"),
+            ("PgUp/PgDn", f"large step ({RENDER_SIZE_STEP_LARGE} px)"),
         ),
         help_description=("Offline render output width in pixels.",),
         is_pinned=True,
@@ -335,7 +326,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Render height",
         help_entries=(
             ("Left/Right", f"adjust height ({RENDER_SIZE_STEP} px)"),
-            ("Ctrl + Left/Right", f"large step ({RENDER_SIZE_STEP_LARGE} px)"),
+            ("PgUp/PgDn", f"large step ({RENDER_SIZE_STEP_LARGE} px)"),
         ),
         help_description=("Offline render output height in pixels.",),
         is_pinned=True,
@@ -351,7 +342,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Render fps",
         help_entries=(
             ("Left/Right", f"adjust fps ({RENDER_FPS_STEP})"),
-            ("Ctrl + Left/Right", f"large step ({RENDER_FPS_STEP_LARGE})"),
+            ("PgUp/PgDn", f"large step ({RENDER_FPS_STEP_LARGE})"),
         ),
         help_description=("Offline render output frame rate.",),
         is_pinned=True,
@@ -381,7 +372,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Render start",
         help_entries=(
             ("Left/Right", "adjust start (1s)"),
-            ("Ctrl + Left/Right", "large step (10s)"),
+            ("PgUp/PgDn", "large step (10s)"),
         ),
         help_description=("Segment start in whole seconds.",),
         is_pinned=True,
@@ -397,7 +388,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Render end",
         help_entries=(
             ("Left/Right", "adjust end (1s)"),
-            ("Ctrl + Left/Right", "large step (10s)"),
+            ("PgUp/PgDn", "large step (10s)"),
         ),
         help_description=("Segment end in whole seconds.",),
         is_pinned=True,

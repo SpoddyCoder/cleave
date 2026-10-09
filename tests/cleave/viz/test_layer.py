@@ -558,7 +558,7 @@ def test_header_toggle_blocked_when_timeline_enabled() -> None:
     controls.focus_descriptor = RowDescriptor(RowKind.TRACK_HEADER, slot="layer_1")
     assert controls.session.layers["layer_1"].enabled is True
 
-    controls.handle_keydown(keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(keydown(pygame.K_e))
 
     assert controls.session.layers["layer_1"].enabled is True
     view = controls.build_view_state(paused=False)

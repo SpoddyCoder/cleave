@@ -81,40 +81,36 @@ def _format_track_hard_cut_sensitivity(
     return f"{_track_block(state, desc).runtime.hard_cut_sensitivity:.2f}"
 
 def _apply_track_stem(
-    controls: TuningControls, desc: RowDescriptor, forward: bool, _ctrl: bool,
-    _shift: bool,
+    controls: TuningControls, desc: RowDescriptor, forward: bool, _large: bool,
 ) -> None:
     if desc.slot is None:
         return
     controls.layer_mutations.cycle_stem(desc.slot, forward=forward)
 
 def _apply_track_blend(
-    controls: TuningControls, desc: RowDescriptor, forward: bool, _ctrl: bool,
-    _shift: bool,
+    controls: TuningControls, desc: RowDescriptor, forward: bool, _large: bool,
 ) -> None:
     if desc.slot is None:
         return
     controls.layer_mutations.cycle_blend(desc.slot, forward=forward)
 
 def _apply_track_opacity(
-    controls: TuningControls, desc: RowDescriptor, forward: bool, ctrl: bool,
-    _shift: bool,
+    controls: TuningControls, desc: RowDescriptor, forward: bool, large: bool,
 ) -> None:
     if desc.slot is None:
         return
-    step = 10 if ctrl else 1
+    step = 10 if large else 1
     delta = step if forward else -step
     controls.layer_mutations.set_opacity(
         desc.slot, controls.session.layers[desc.slot].opacity_pct + delta
     )
 
 def _apply_track_beat(
-    controls: TuningControls, desc: RowDescriptor, forward: bool, ctrl: bool,
-    _shift: bool,
+    controls: TuningControls, desc: RowDescriptor, forward: bool, large: bool,
 ) -> None:
     if desc.slot is None:
         return
-    step = 0.1 if ctrl else 0.01
+    step = 0.1 if large else 0.01
     delta = step if forward else -step
     controls.layer_mutations.set_beat(
         desc.slot, controls.session.layers[desc.slot].beat_sensitivity + delta
@@ -124,97 +120,97 @@ def _apply_track_preset_switching_trigger(
     controls: TuningControls,
     desc: RowDescriptor,
     forward: bool,
-    _ctrl: bool,
-    _shift: bool,
+    _large: bool,
 ) -> None:
     if desc.slot is None:
         return
     controls.layer_mutations.cycle_preset_switching_trigger(desc.slot, forward=forward)
 
 def _apply_track_preset_duration(
-    controls: TuningControls, desc: RowDescriptor, forward: bool, ctrl: bool,
-    _shift: bool,
+    controls: TuningControls, desc: RowDescriptor, forward: bool, large: bool,
 ) -> None:
     if desc.slot is None:
         return
-    controls.layer_mutations.step_preset_duration(desc.slot, forward=forward, ctrl=ctrl)
+    controls.layer_mutations.step_preset_duration(desc.slot, forward=forward, large=large)
 
 def _apply_track_soft_cut_duration(
-    controls: TuningControls, desc: RowDescriptor, forward: bool, ctrl: bool,
-    _shift: bool,
+    controls: TuningControls, desc: RowDescriptor, forward: bool, large: bool,
 ) -> None:
     if desc.slot is None:
         return
-    controls.layer_mutations.step_soft_cut_duration(desc.slot, forward=forward, ctrl=ctrl)
+    controls.layer_mutations.step_soft_cut_duration(desc.slot, forward=forward, large=large)
 
 def _apply_track_easter_egg(
-    controls: TuningControls, desc: RowDescriptor, forward: bool, ctrl: bool,
-    _shift: bool,
+    controls: TuningControls, desc: RowDescriptor, forward: bool, large: bool,
 ) -> None:
     if desc.slot is None:
         return
-    controls.layer_mutations.step_easter_egg(desc.slot, forward=forward, ctrl=ctrl)
+    controls.layer_mutations.step_easter_egg(desc.slot, forward=forward, large=large)
 
 def _apply_track_preset_start_clean(
-    controls: TuningControls, desc: RowDescriptor, forward: bool, _ctrl: bool,
-    _shift: bool,
+    controls: TuningControls, desc: RowDescriptor, forward: bool, _large: bool,
 ) -> None:
     if desc.slot is None:
         return
     controls.layer_mutations.cycle_preset_start_clean(desc.slot, forward=forward)
 
 def _apply_track_hard_cut_enabled(
-    controls: TuningControls, desc: RowDescriptor, forward: bool, _ctrl: bool,
-    _shift: bool,
+    controls: TuningControls, desc: RowDescriptor, forward: bool, _large: bool,
 ) -> None:
     if desc.slot is None:
         return
     controls.layer_mutations.cycle_hard_cut_enabled(desc.slot, forward=forward)
 
 def _apply_track_hard_cut_duration(
-    controls: TuningControls, desc: RowDescriptor, forward: bool, ctrl: bool,
-    _shift: bool,
+    controls: TuningControls, desc: RowDescriptor, forward: bool, large: bool,
 ) -> None:
     if desc.slot is None:
         return
-    controls.layer_mutations.step_hard_cut_duration(desc.slot, forward=forward, ctrl=ctrl)
+    controls.layer_mutations.step_hard_cut_duration(desc.slot, forward=forward, large=large)
 
 def _apply_track_hard_cut_sensitivity(
-    controls: TuningControls, desc: RowDescriptor, forward: bool, ctrl: bool,
-    _shift: bool,
+    controls: TuningControls, desc: RowDescriptor, forward: bool, large: bool,
 ) -> None:
     if desc.slot is None:
         return
-    step = 0.1 if ctrl else 0.01
+    step = 0.1 if large else 0.01
     delta = step if forward else -step
     controls.layer_mutations.set_hard_cut_sensitivity(
         desc.slot, controls.session.layers[desc.slot].hard_cut_sensitivity + delta
     )
 
+def _toggle_track_enabled(
+    controls: TuningControls, desc: RowDescriptor
+) -> None:
+    slot = desc.slot
+    if slot is None:
+        return
+    layer = controls.session.layers[slot]
+    if layer.locked:
+        return
+    controls.layer_mutations.set_enabled(slot, not layer.enabled)
+
+
+def _toggle_track_solo(
+    controls: TuningControls, desc: RowDescriptor
+) -> None:
+    slot = desc.slot
+    if slot is None:
+        return
+    if controls.session.solo_slot == slot:
+        controls.layer_mutations.exit_solo(slot)
+    else:
+        controls.layer_mutations.enter_solo(slot)
+
+
 def _apply_track_header(
     controls: TuningControls,
     desc: RowDescriptor,
     forward: bool,
-    ctrl: bool,
-    shift: bool,
+    _large: bool,
 ) -> None:
-    from cleave.viz.row_spec import row_spec
     slot = desc.slot
     if slot is None:
-        return
-    if shift:
-        if forward:
-            controls.layer_mutations.enter_solo(slot)
-        else:
-            controls.layer_mutations.exit_solo(slot)
-        return
-    if ctrl:
-        if (
-            controls.session.layers[slot].locked
-            and row_spec(desc.kind).can_enable_disable
-        ):
-            return
-        controls.layer_mutations.set_enabled(slot, forward)
         return
     apply_expand_toggle(controls, desc.kind, slot, forward, card=desc.card)
 
@@ -247,17 +243,10 @@ def _apply_track_preset_dir(
     controls: TuningControls,
     desc: RowDescriptor,
     forward: bool,
-    ctrl: bool,
-    _shift: bool,
+    _large: bool,
 ) -> None:
     slot = desc.slot
     if slot is None:
-        return
-    if ctrl:
-        if forward:
-            controls.layer_mutations.enter_directory(slot)
-        else:
-            controls.layer_mutations.parent_directory(slot)
         return
     controls.layer_mutations.step_directory(slot, forward=forward)
 
@@ -265,20 +254,18 @@ def _apply_track_preset(
     controls: TuningControls,
     desc: RowDescriptor,
     forward: bool,
-    ctrl: bool,
-    _shift: bool,
+    large: bool,
 ) -> None:
     slot = desc.slot
     if slot is None:
         return
-    controls.layer_mutations.step_preset(slot, forward=forward, ctrl=ctrl)
+    controls.layer_mutations.step_preset(slot, forward=forward, large=large)
 
 def _apply_track_effect(
     controls: TuningControls,
     desc: RowDescriptor,
     forward: bool,
-    ctrl: bool,
-    _shift: bool,
+    large: bool,
 ) -> None:
     slot = desc.slot
     if slot is None:
@@ -287,7 +274,7 @@ def _apply_track_effect(
     driver_slug = desc.driver_slug
     if effect_id is None or driver_slug is None:
         return
-    step = 10 if ctrl else 1
+    step = 10 if large else 1
     delta = step if forward else -step
     current = controls.session.layers[slot].effects.get(effect_id, {}).get(
         driver_slug, 0
@@ -314,8 +301,8 @@ SPECS: dict[RowKind, RowSpec] = {
             "projectM visualiser layer.",
         ),
         quick_nav_target=True,
-        can_enable_disable=True,
-        can_solo=True,
+        toggle_enabled=_toggle_track_enabled,
+        toggle_solo=_toggle_track_solo,
         can_enter_move_mode=True,
     ),
     RowKind.TRACK_PRESET_DIR: RowSpec(
@@ -497,7 +484,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Easter egg",
         help_entries=(
             ("Left/Right", "step value"),
-            ("Ctrl + Left/Right", "large step"),
+            ("PgUp/PgDn", "large step"),
         ),
         help_description=(
             "How much projectM randomizes preset duration (Milkdrop legacy gaussian).",

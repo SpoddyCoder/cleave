@@ -49,7 +49,7 @@ class FitStrategy(Enum):
     NONE = auto()
 
 
-FieldMutator = Callable[["TuningControls", RowDescriptor, bool, bool, bool], None]
+FieldMutator = Callable[["TuningControls", RowDescriptor, bool, bool], None]
 ActionMutator = Callable[["TuningControls", RowDescriptor], None]
 VisibilityIconFn = Callable[[TuningViewState, RowDescriptor], tuple[bool, bool]]
 
@@ -80,8 +80,8 @@ class RowSpec:
     is_header: bool = False
     is_sub_header: bool = False
     is_pinned: bool = False
-    can_enable_disable: bool = False
-    can_solo: bool = False
+    toggle_enabled: ActionMutator | None = None
+    toggle_solo: ActionMutator | None = None
     can_enter_move_mode: bool = False
     repeatable: bool = False
     parent_group: str | None = None
@@ -482,13 +482,12 @@ def apply_field_horizontal(
     controls: TuningControls,
     desc: RowDescriptor,
     forward: bool,
-    ctrl: bool,
-    shift: bool = False,
+    large: bool,
 ) -> bool:
     spec = ROW_SPECS.get(desc.kind)
     if spec is None or spec.apply_horizontal is None:
         return False
-    spec.apply_horizontal(controls, desc, forward, ctrl, shift)
+    spec.apply_horizontal(controls, desc, forward, large)
     return True
 
 
@@ -500,4 +499,26 @@ def apply_field_action(
     if spec is None or spec.apply_action is None:
         return False
     spec.apply_action(controls, desc)
+    return True
+
+
+def apply_field_toggle_enabled(
+    controls: TuningControls,
+    desc: RowDescriptor,
+) -> bool:
+    spec = ROW_SPECS.get(desc.kind)
+    if spec is None or spec.toggle_enabled is None:
+        return False
+    spec.toggle_enabled(controls, desc)
+    return True
+
+
+def apply_field_toggle_solo(
+    controls: TuningControls,
+    desc: RowDescriptor,
+) -> bool:
+    spec = ROW_SPECS.get(desc.kind)
+    if spec is None or spec.toggle_solo is None:
+        return False
+    spec.toggle_solo(controls, desc)
     return True

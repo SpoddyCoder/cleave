@@ -33,19 +33,11 @@ def _apply_transport(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
-    ctrl: bool,
-    shift: bool,
+    _large: bool,
 ) -> None:
-    from cleave.viz.controls import SEEK_LONG, SEEK_SHORT, SEEK_TINY
+    from cleave.viz.controls import SEEK_SHORT
 
-    if ctrl:
-        delta_sec = SEEK_LONG
-    elif shift:
-        delta_sec = SEEK_TINY
-    else:
-        delta_sec = SEEK_SHORT
-    if not forward:
-        delta_sec = -delta_sec
+    delta_sec = SEEK_SHORT if forward else -SEEK_SHORT
     controls.do_seek(delta_sec)
 
 SPECS: dict[RowKind, RowSpec] = {

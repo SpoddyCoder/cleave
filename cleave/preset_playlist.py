@@ -133,7 +133,7 @@ def _can_go_parent(
     *,
     browse_floor: Path | None = None,
 ) -> bool:
-    """True when Ctrl+Left would ascend (same gate as ``go_parent``)."""
+    """True when Backspace would ascend (same gate as ``go_parent``)."""
     parent = current_dir.parent
     if parent == current_dir:
         return False

@@ -94,8 +94,7 @@ def _apply_settings_preview_quality(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
-    _ctrl: bool,
-    _shift: bool,
+    _large: bool,
 ) -> None:
     controls.settings.cycle_preview_quality(forward=forward)
     controls.layer_lifecycle.apply_preview_resolutions()
@@ -104,75 +103,65 @@ def _apply_settings_editor_window_width(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
-    ctrl: bool,
-    _shift: bool,
+    large: bool,
 ) -> None:
-    controls.settings.adjust_editor_window_width(forward=forward, ctrl=ctrl)
+    controls.settings.adjust_editor_window_width(forward=forward, large=large)
 
 def _apply_settings_editor_window_height(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
-    ctrl: bool,
-    _shift: bool,
+    large: bool,
 ) -> None:
-    controls.settings.adjust_editor_window_height(forward=forward, ctrl=ctrl)
+    controls.settings.adjust_editor_window_height(forward=forward, large=large)
 
 def _apply_settings_editor_window_upscale(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
-    ctrl: bool,
-    _shift: bool,
+    large: bool,
 ) -> None:
-    controls.settings.adjust_editor_window_upscale(forward=forward, ctrl=ctrl)
+    controls.settings.adjust_editor_window_upscale(forward=forward, large=large)
 
 def _apply_settings_ui_width_mode(
-    controls: TuningControls, _desc: RowDescriptor, forward: bool, _ctrl: bool,
-    _shift: bool,
+    controls: TuningControls, _desc: RowDescriptor, forward: bool, _large: bool,
 ) -> None:
     controls.settings.cycle_ui_width_mode(forward=forward)
 
 def _apply_settings_ui_width(
-    controls: TuningControls, _desc: RowDescriptor, forward: bool, ctrl: bool,
-    _shift: bool,
+    controls: TuningControls, _desc: RowDescriptor, forward: bool, large: bool,
 ) -> None:
-    controls.settings.adjust_ui_width(forward=forward, ctrl=ctrl)
+    controls.settings.adjust_ui_width(forward=forward, large=large)
 
 def _apply_settings_ui_min_width(
-    controls: TuningControls, _desc: RowDescriptor, forward: bool, ctrl: bool,
-    _shift: bool,
+    controls: TuningControls, _desc: RowDescriptor, forward: bool, large: bool,
 ) -> None:
-    controls.settings.adjust_ui_min_width(forward=forward, ctrl=ctrl)
+    controls.settings.adjust_ui_min_width(forward=forward, large=large)
 
 def _apply_settings_ui_fade(
-    controls: TuningControls, _desc: RowDescriptor, forward: bool, ctrl: bool,
-    _shift: bool,
+    controls: TuningControls, _desc: RowDescriptor, forward: bool, large: bool,
 ) -> None:
-    controls.settings.adjust_ui_fade(forward=forward, ctrl=ctrl)
+    controls.settings.adjust_ui_fade(forward=forward, large=large)
 
 def _apply_settings_ui_notification_display(
-    controls: TuningControls, _desc: RowDescriptor, forward: bool, ctrl: bool,
-    _shift: bool,
+    controls: TuningControls, _desc: RowDescriptor, forward: bool, large: bool,
 ) -> None:
-    controls.settings.adjust_notification_display_sec(forward=forward, ctrl=ctrl)
+    controls.settings.adjust_notification_display_sec(forward=forward, large=large)
 
 def _apply_settings_residual_latency_ms(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
-    ctrl: bool,
-    _shift: bool,
+    large: bool,
 ) -> None:
-    controls.settings.adjust_residual_latency_ms(forward=forward, ctrl=ctrl)
+    controls.settings.adjust_residual_latency_ms(forward=forward, large=large)
     controls.on_residual_latency_changed()
 
 def _apply_settings_header(
     controls: TuningControls,
     desc: RowDescriptor,
     forward: bool,
-    _ctrl: bool,
-    _shift: bool,
+    _large: bool,
 ) -> None:
     apply_expand_toggle(
         controls, desc.kind, desc.slot, forward, card=desc.card
@@ -249,7 +238,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Width",
         help_entries=(
             ("Left/Right", "adjust width (10 px)"),
-            ("Ctrl + Left/Right", "large step (100 px)"),
+            ("PgUp/PgDn", "large step (100 px)"),
         ),
         help_description=("Editor content width in pixels.",),
         is_pinned=True,
@@ -265,7 +254,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Height",
         help_entries=(
             ("Left/Right", "adjust height (10 px)"),
-            ("Ctrl + Left/Right", "large step (100 px)"),
+            ("PgUp/PgDn", "large step (100 px)"),
         ),
         help_description=("Editor content height in pixels.",),
         is_pinned=True,
@@ -281,7 +270,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Upscale",
         help_entries=(
             ("Left/Right", "adjust upscale (0.1)"),
-            ("Ctrl + Left/Right", "large step (0.5)"),
+            ("PgUp/PgDn", "large step (0.5)"),
         ),
         help_description=(
             "Multiplies content size to get the on-screen window size.",
@@ -327,7 +316,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Auto-fade",
         help_entries=(
             ("Left/Right", "adjust delay before UI fades"),
-            ("Ctrl + Left/Right", "large step"),
+            ("PgUp/PgDn", "large step"),
             ("0", "disabled; UI stays until Esc"),
         ),
         help_description=(
@@ -347,7 +336,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Notification time",
         help_entries=(
             ("Left/Right", "adjust how long toasts stay visible"),
-            ("Ctrl + Left/Right", "large step"),
+            ("PgUp/PgDn", "large step"),
             ("0", "until dismissed; Enter clears the toast"),
         ),
         help_description=(
@@ -384,7 +373,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Max width",
         help_entries=(
             ("Left/Right", "adjust max panel width"),
-            ("Ctrl + Left/Right", "large step"),
+            ("PgUp/PgDn", "large step"),
         ),
         help_description=(
             "Maximum width of the main tuning panel.",
@@ -402,7 +391,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Min width",
         help_entries=(
             ("Left/Right", "adjust minimum panel width"),
-            ("Ctrl + Left/Right", "large step"),
+            ("PgUp/PgDn", "large step"),
         ),
         help_description=(
             "Smallest the panel shrinks to in flexible mode.",
@@ -437,7 +426,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Residual latency",
         help_entries=(
             ("Left/Right", "adjust latency (10 ms)"),
-            ("Ctrl + Left/Right", "large step (50 ms)"),
+            ("PgUp/PgDn", "large step (50 ms)"),
         ),
         help_description=(
             "Compensates for unmeasurable input/output lag for live monitoring",

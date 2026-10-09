@@ -16,6 +16,8 @@ _REPEAT_KEYS = frozenset(
     {
         pygame.K_LEFT,
         pygame.K_RIGHT,
+        pygame.K_PAGEUP,
+        pygame.K_PAGEDOWN,
         pygame.K_UP,
         pygame.K_DOWN,
         pygame.K_COMMA,

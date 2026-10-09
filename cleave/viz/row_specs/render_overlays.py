@@ -172,8 +172,7 @@ def _apply_overlay_card_position(
     controls: TuningControls,
     desc: RowDescriptor,
     forward: bool,
-    _ctrl: bool,
-    _shift: bool,
+    _large: bool,
 ) -> None:
     _overlay_card_controls(controls, desc).cycle_position(forward=forward)
 
@@ -181,10 +180,9 @@ def _apply_overlay_card_title_font_size(
     controls: TuningControls,
     desc: RowDescriptor,
     forward: bool,
-    ctrl: bool,
-    _shift: bool,
+    large: bool,
 ) -> None:
-    step = 10 if ctrl else 1
+    step = 10 if large else 1
     delta = step if forward else -step
     card = _overlay_card_block_session(controls, desc)
     _overlay_card_controls(controls, desc).set_title_font_size(
@@ -195,8 +193,7 @@ def _apply_overlay_card_title_font(
     controls: TuningControls,
     desc: RowDescriptor,
     forward: bool,
-    _ctrl: bool,
-    _shift: bool,
+    _large: bool,
 ) -> None:
     _overlay_card_controls(controls, desc).cycle_title_font(forward=forward)
 
@@ -204,10 +201,9 @@ def _apply_overlay_card_title_margin_bottom(
     controls: TuningControls,
     desc: RowDescriptor,
     forward: bool,
-    ctrl: bool,
-    _shift: bool,
+    large: bool,
 ) -> None:
-    step = 10 if ctrl else 1
+    step = 10 if large else 1
     delta = step if forward else -step
     card = _overlay_card_block_session(controls, desc)
     _overlay_card_controls(controls, desc).set_title_margin_bottom(
@@ -285,10 +281,9 @@ def _apply_overlay_card_body_font_size(
     controls: TuningControls,
     desc: RowDescriptor,
     forward: bool,
-    ctrl: bool,
-    _shift: bool,
+    large: bool,
 ) -> None:
-    step = 10 if ctrl else 1
+    step = 10 if large else 1
     delta = step if forward else -step
     card = _overlay_card_block_session(controls, desc)
     _overlay_card_controls(controls, desc).set_body_font_size(
@@ -299,8 +294,7 @@ def _apply_overlay_card_body_font(
     controls: TuningControls,
     desc: RowDescriptor,
     forward: bool,
-    _ctrl: bool,
-    _shift: bool,
+    _large: bool,
 ) -> None:
     _overlay_card_controls(controls, desc).cycle_body_font(forward=forward)
 
@@ -338,10 +332,9 @@ def _apply_overlay_card_opacity(
     controls: TuningControls,
     desc: RowDescriptor,
     forward: bool,
-    ctrl: bool,
-    _shift: bool,
+    large: bool,
 ) -> None:
-    step = 10 if ctrl else 1
+    step = 10 if large else 1
     delta = step if forward else -step
     card = _overlay_card_block_session(controls, desc)
     _overlay_card_controls(controls, desc).set_opacity(card.opacity_pct + delta)
@@ -350,10 +343,9 @@ def _apply_overlay_card_border_width(
     controls: TuningControls,
     desc: RowDescriptor,
     forward: bool,
-    ctrl: bool,
-    _shift: bool,
+    large: bool,
 ) -> None:
-    step = 10 if ctrl else 1
+    step = 10 if large else 1
     delta = step if forward else -step
     card = _overlay_card_block_session(controls, desc)
     _overlay_card_controls(controls, desc).set_border_width(card.border_width + delta)
@@ -368,10 +360,9 @@ def _apply_overlay_card_background_margin(
     controls: TuningControls,
     desc: RowDescriptor,
     forward: bool,
-    ctrl: bool,
-    _shift: bool,
+    large: bool,
 ) -> None:
-    step = 10 if ctrl else 1
+    step = 10 if large else 1
     delta = step if forward else -step
     card = _overlay_card_block_session(controls, desc)
     _overlay_card_controls(controls, desc).set_background_margin(
@@ -382,10 +373,9 @@ def _apply_overlay_card_background_padding(
     controls: TuningControls,
     desc: RowDescriptor,
     forward: bool,
-    ctrl: bool,
-    _shift: bool,
+    large: bool,
 ) -> None:
-    step = 10 if ctrl else 1
+    step = 10 if large else 1
     delta = step if forward else -step
     card = _overlay_card_block_session(controls, desc)
     _overlay_card_controls(controls, desc).set_background_padding(
@@ -402,10 +392,9 @@ def _apply_overlay_card_time(
     controls: TuningControls,
     desc: RowDescriptor,
     forward: bool,
-    ctrl: bool,
-    _shift: bool,
+    large: bool,
 ) -> None:
-    step = 30.0 if ctrl else 1.0
+    step = 30.0 if large else 1.0
     delta = step if forward else -step
     card_controls = _overlay_card_controls(controls, desc)
     anim = _overlay_card_block_session(controls, desc).animation
@@ -418,10 +407,9 @@ def _apply_overlay_card_display_time(
     controls: TuningControls,
     desc: RowDescriptor,
     forward: bool,
-    ctrl: bool,
-    _shift: bool,
+    large: bool,
 ) -> None:
-    step = 30.0 if ctrl else 1.0
+    step = 30.0 if large else 1.0
     delta = step if forward else -step
     card = _overlay_card_block_session(controls, desc)
     _overlay_card_controls(controls, desc).set_display_time(
@@ -432,8 +420,7 @@ def _apply_overlay_card_animation_type(
     controls: TuningControls,
     desc: RowDescriptor,
     forward: bool,
-    _ctrl: bool,
-    _shift: bool,
+    _large: bool,
 ) -> None:
     _overlay_card_controls(controls, desc).cycle_animation_type(forward=forward)
 
@@ -441,53 +428,55 @@ def _apply_overlay_card_slide_direction(
     controls: TuningControls,
     desc: RowDescriptor,
     forward: bool,
-    _ctrl: bool,
-    _shift: bool,
+    _large: bool,
 ) -> None:
     _overlay_card_controls(controls, desc).cycle_slide_direction(forward=forward)
+
+def _toggle_render_overlays_enabled(
+    controls: TuningControls, _desc: RowDescriptor
+) -> None:
+    if controls.session.render_overlays.locked:
+        return
+    controls.render_overlays.set_enabled(
+        not controls.render_overlays.any_card_enabled()
+    )
+
+
+def _toggle_render_overlays_solo(
+    controls: TuningControls, _desc: RowDescriptor
+) -> None:
+    if controls.session.render_overlay_solo:
+        controls.render_overlays.exit_solo()
+    else:
+        controls.render_overlays.enter_solo()
+
 
 def _apply_render_overlays_header(
     controls: TuningControls,
     desc: RowDescriptor,
     forward: bool,
-    ctrl: bool,
-    shift: bool,
+    _large: bool,
 ) -> None:
-    from cleave.viz.row_spec import row_spec
-    if shift:
-        if forward:
-            controls.render_overlays.enter_solo()
-        else:
-            controls.render_overlays.exit_solo()
-        return
-    if ctrl:
-        if (
-            controls.session.render_overlays.locked
-            and row_spec(desc.kind).can_enable_disable
-        ):
-            return
-        controls.render_overlays.set_enabled(forward)
-        return
     apply_expand_toggle(
         controls, desc.kind, desc.slot, forward, card=desc.card
     )
+
+
+def _toggle_overlay_card_enabled(
+    controls: TuningControls, desc: RowDescriptor
+) -> None:
+    if controls.session.render_overlays.locked:
+        return
+    card = _overlay_card_block_session(controls, desc)
+    _overlay_card_controls(controls, desc).set_enabled(not card.enabled)
+
 
 def _apply_overlay_card_header(
     controls: TuningControls,
     desc: RowDescriptor,
     forward: bool,
-    ctrl: bool,
-    _shift: bool,
+    _large: bool,
 ) -> None:
-    from cleave.viz.row_spec import row_spec
-    if ctrl:
-        if (
-            controls.session.render_overlays.locked
-            and row_spec(desc.kind).can_enable_disable
-        ):
-            return
-        _overlay_card_controls(controls, desc).set_enabled(forward)
-        return
     apply_expand_toggle(
         controls, desc.kind, desc.slot, forward, card=desc.card
     )
@@ -517,8 +506,8 @@ SPECS: dict[RowKind, RowSpec] = {
         ),
         quick_nav_target=True,
         quick_nav_always=True,
-        can_enable_disable=True,
-        can_solo=True,
+        toggle_enabled=_toggle_render_overlays_enabled,
+        toggle_solo=_toggle_render_overlays_solo,
     ),
     RowKind.RENDER_OVERLAY_CARD_HEADER: RowSpec(
         affordance=RowAffordance.EXPAND,
@@ -527,11 +516,15 @@ SPECS: dict[RowKind, RowSpec] = {
         apply_horizontal=_apply_overlay_card_header,
         fit_strategy=FitStrategy.NONE,
         help_title="Credits card",
+        help_entries=(
+            ("Left/Right", "expand/collapse"),
+            ("E", "enable/disable"),
+        ),
         help_description=(
             "Opening card at the start of the song, or closing card near the end.",
         ),
         is_sub_header=True,
-        can_enable_disable=True,
+        toggle_enabled=_toggle_overlay_card_enabled,
         parent_group="render_overlay",
     ),
     RowKind.RENDER_OVERLAY_CARD_ANIMATION_HEADER: RowSpec(
