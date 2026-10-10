@@ -408,6 +408,7 @@ def load_manual_preset_clean(
     pm = layer.pm
     current = layer.playlist.current
     if current is None:
+        layer.auto_preset_path = None
         return
     pm.set_preset_start_clean(True)
     layer.playlist.load_into(pm, smooth=False)

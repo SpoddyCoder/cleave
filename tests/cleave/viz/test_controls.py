@@ -4373,7 +4373,7 @@ def test_directory_ctrl_arrows_descend_and_ascend() -> None:
 
 
 def test_directory_ctrl_arrows_follow_browse_while_auto_preset_elsewhere() -> None:
-    """Dir row must track browse nav even when switching plays a cast/list path."""
+    """Dir row tracks browse nav. Enter selects the child directory's first preset."""
     root, siblings = _make_sibling_dir_tree(2)
     roles_bed = root / "roles" / "bed"
     roles_bed.mkdir(parents=True)
@@ -4396,12 +4396,79 @@ def test_directory_ctrl_arrows_follow_browse_while_auto_preset_elsewhere() -> No
     after_down = controls.build_view_state(paused=False).tracks["layer_1"]
     assert "roles/" not in after_down.preset_dir_label
     assert "[..]" in after_down.preset_dir_label
-    assert after_down.preset_label.startswith("cast.milk")
+    assert after_down.preset_label.startswith("nested.milk")
 
     controls.handle_keydown(_keydown(pygame.K_BACKSPACE))
     assert layer.playlist.current_dir.resolve() == siblings[0].resolve()
     after_up = controls.build_view_state(paused=False).tracks["layer_1"].preset_dir_label
     assert after_up == before
+
+
+def test_directory_moves_select_first_preset_file() -> None:
+    """Parent and sibling moves land on the first file so Left/Right can step."""
+    root, siblings = _make_sibling_dir_tree(2)
+    parent = siblings[0]
+    other = siblings[1]
+    _write_milk(parent / "preset-1.milk")
+    _write_milk(other / "preset-1.milk")
+    child = parent / "child"
+    controls = _controls_with_playlist(root, child)
+    layer = controls.session.layers["layer_1"]
+    layer.auto_preset_path = (child / "nested.milk").resolve()
+    controls.focus_descriptor = _desc(
+        controls.build_view_state(paused=False), _preset_dir_row(controls)
+    )
+
+    controls.handle_keydown(_keydown(pygame.K_BACKSPACE))
+    assert layer.playlist.current == (parent / "preset-0.milk").resolve()
+    assert controls.build_view_state(paused=False).tracks[
+        "layer_1"
+    ].preset_label.startswith("preset-0.milk")
+
+    controls.focus_descriptor = _desc(
+        controls.build_view_state(paused=False), _preset_row(controls)
+    )
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert layer.playlist.current == (parent / "preset-1.milk").resolve()
+    assert controls.build_view_state(paused=False).tracks[
+        "layer_1"
+    ].preset_label.startswith("preset-1.milk")
+
+    controls.focus_descriptor = _desc(
+        controls.build_view_state(paused=False), _preset_dir_row(controls)
+    )
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert layer.playlist.current_dir.resolve() == other.resolve()
+    assert layer.playlist.current == (other / "preset-0.milk").resolve()
+    assert controls.build_view_state(paused=False).tracks[
+        "layer_1"
+    ].preset_label.startswith("preset-0.milk")
+
+
+def test_parent_directory_clears_preset_from_previous_directory() -> None:
+    root, siblings = _make_sibling_dir_tree(1)
+    parent = siblings[0]
+    for path in parent.glob("*.milk"):
+        path.unlink()
+    child = parent / "child"
+    controls = _controls_with_playlist(root, child)
+    layer = controls.session.layers["layer_1"]
+    layer.auto_preset_path = (child / "nested.milk").resolve()
+    controls.focus_descriptor = _desc(
+        controls.build_view_state(paused=False), _preset_dir_row(controls)
+    )
+
+    controls.handle_keydown(_keydown(pygame.K_BACKSPACE))
+    assert layer.playlist.current is None
+    assert layer.auto_preset_path is None
+    view = controls.build_view_state(paused=False)
+    assert view.tracks["layer_1"].preset_label == "NO PRESETS FOUND"
+
+    controls.focus_descriptor = _desc(view, _preset_row(controls))
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.build_view_state(paused=False).tracks[
+        "layer_1"
+    ].preset_label == "NO PRESETS FOUND"
 
 
 def test_ctrl_left_at_browse_floor_is_noop() -> None:

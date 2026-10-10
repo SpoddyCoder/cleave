@@ -65,6 +65,19 @@ class LayerMutations:
             return True
         return False
 
+    def _publish_browse_preset(self, slot: str) -> None:
+        """Point the file row at the browse playlist's current preset."""
+        layer = self.session.layers[slot]
+        playlist = layer.playlist
+        current = playlist.current
+        if current is None:
+            layer.auto_preset_path = None
+        elif current.exists():
+            layer.auto_preset_path = current.resolve()
+        bindings = self._bindings()
+        if bindings is not None:
+            bindings.on_preset_change(slot, playlist)
+
     def step_directory(self, slot: str, *, forward: bool) -> None:
         layer = self.session.layers[slot]
         playlist = layer.playlist
@@ -74,17 +87,13 @@ class LayerMutations:
             # so Backspace still works after diving into the new pack.
             if is_top_level_browse_dir(playlist.current_dir, self.preset_root):
                 layer.browse_floor = playlist.current_dir.resolve()
-            bindings = self._bindings()
-            if bindings is not None:
-                bindings.on_preset_change(slot, playlist)
+            self._publish_browse_preset(slot)
 
     def enter_directory(self, slot: str) -> None:
         layer = self.session.layers[slot]
         playlist = layer.playlist
         if playlist.enter_child(self.preset_root):
-            bindings = self._bindings()
-            if bindings is not None:
-                bindings.on_preset_change(slot, playlist)
+            self._publish_browse_preset(slot)
 
     def parent_directory(self, slot: str) -> None:
         layer = self.session.layers[slot]
@@ -92,9 +101,7 @@ class LayerMutations:
         if playlist.go_parent(
             self.preset_root, browse_floor=layer.browse_floor
         ):
-            bindings = self._bindings()
-            if bindings is not None:
-                bindings.on_preset_change(slot, playlist)
+            self._publish_browse_preset(slot)
 
     def step_preset(self, slot: str, *, forward: bool, large: bool) -> None:
         layer = self.session.layers[slot]
@@ -107,9 +114,7 @@ class LayerMutations:
             playlist.next()
         else:
             playlist.prev()
-        bindings = self._bindings()
-        if bindings is not None:
-            bindings.on_preset_change(slot, playlist)
+        self._publish_browse_preset(slot)
 
     def cycle_preset_switching_trigger(self, slot: str, *, forward: bool) -> None:
         layer = self.session.layers[slot]

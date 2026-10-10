@@ -104,6 +104,8 @@ class LiveLayerBindingsFactory:
         layer.playlist = playlist
         runtime = ctx.session.layers[slot]
         mode = self._effective_preset_switching(slot)
+        if playlist.current is None:
+            layer.auto_preset_path = None
         if mode != "on" and playlist.current is None:
             layer.switching_paused = False
             return

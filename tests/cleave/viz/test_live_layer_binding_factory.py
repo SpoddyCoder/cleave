@@ -245,6 +245,26 @@ def test_on_switching_resume_clears_pause_and_reapplies() -> None:
     assert seen == []
 
 
+def test_on_preset_change_clears_auto_when_directory_has_no_presets() -> None:
+    empty = PresetPlaylist(
+        current_dir=Path("/tmp/presets/empty"),
+        paths=(),
+        index=0,
+    )
+    ctx, factory, layer = _make_factory()
+    ctx.session.layers["layer_1"].preset_switching = "off"
+    layer.auto_preset_path = _MILK[1]
+    factory.on_preset_change("layer_1", empty)
+    assert layer.auto_preset_path is None
+    assert layer.switching_paused is False
+
+    ctx, factory, layer = _make_factory()
+    layer.auto_preset_path = _MILK[1]
+    factory.on_preset_change("layer_1", empty)
+    assert layer.auto_preset_path is None
+    assert layer.switching_paused is True
+
+
 def test_on_preset_change_mode_off_clears_pause() -> None:
     ctx, factory, layer = _make_factory()
     ctx.session.layers["layer_1"].preset_switching = "off"
