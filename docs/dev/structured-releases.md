@@ -8,7 +8,7 @@ Related: [README.md](../../README.md), [plans-completed/user-data-and-config-pla
 
 ## Current product
 
-[`v0.2.0`](https://github.com/SpoddyCoder/cleave/releases/tag/v0.2.0) attaches the Windows zip and setup exe (CPU `separate` plus play/render), plus source. [`v0.1.0`](https://github.com/SpoddyCoder/cleave/releases/tag/v0.1.0) is source-only.
+[`v0.3.0`](https://github.com/SpoddyCoder/cleave/releases/tag/v0.3.0) is the current Release: Windows zip and setup exe (CPU `separate` plus play/render), plus source. [`v0.2.0`](https://github.com/SpoddyCoder/cleave/releases/tag/v0.2.0) was the first tag that attached those binaries. [`v0.1.0`](https://github.com/SpoddyCoder/cleave/releases/tag/v0.1.0) is source-only.
 
 The Windows product is one `cleave.exe`: CPU stem split in the zip and installer, drop a music file (wav, mp3, flac, m4a, aac, ogg, aiff, or aif) into the editor, first-run weights in `Documents\Cleave\models`. The installer can download optional CUDA wheels (Phase 3.3.3); manual NVIDIA-box proof is still outstanding. Linux/macOS binaries are Phase 4. Linux/WSL checkout remains the source path in [README.md](../../README.md).
 
@@ -63,7 +63,7 @@ Decide these once, then reuse.
 - **GPU in CI.** GitHub-hosted runners cannot validate live compositing. Automate freeze and unit tests; keep a short manual GPU checklist per OS.
 - **CI cost (public repo).** Standard GitHub-hosted runners are free and unlimited on a public repository, including `windows-latest`, `ubuntu-latest`, and `macos-latest`. Do not use larger runners (extra CPU, RAM, GPU, or static IPs); those are billed even on public repos. Windows and macOS minute multipliers apply only when minutes are billed (private repos). Keep freeze jobs on the standard labels.
 - **Artifact storage.** Actions minutes for a freeze job are free; workflow artifact and cache storage are not unlimited. Ship the binary as a GitHub Release asset, not as a long-lived Actions artifact. Prefer attaching with `gh release upload` in the freeze job. If a workflow artifact is needed for a later job, give it a short retention and delete it once the Release upload succeeds. Do not upload intermediate freeze trees. Actions cache is a separate 10 GB per-repository allowance: cache pip/vcpkg keys, not FFmpeg zips, CUDA torch wheels, or onedir output. Do not host CUDA torch wheels as Release assets; the installer fetches pinned wheels from download.pytorch.org.
-- **Preset packs.** Milkdrop presets and textures are large and separately licensed. First-run download vs a huge installer is an open product choice, not a freeze detail. Do not put preset packs in workflow artifacts.
+- **Preset packs.** Milkdrop presets and textures are large and separately licensed. The editor offers to download starter packs on launch when the presets directory is empty. Do not put preset packs in the installer, the zip, or workflow artifacts.
 
 ---
 

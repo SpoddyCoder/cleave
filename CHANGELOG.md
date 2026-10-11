@@ -9,6 +9,14 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [0.3.0] - 2026-10-12
+
+### Added
+
 - Timeline hard and soft cuts include Remove from Cues. It uses the same cue scope choices as Apply to Cues and sets the chosen cues' cut type to none.
 - Open wav, mp3, flac, m4a, aac, ogg, aiff, and aif tracks from the file picker or by dropping them on cleave.exe. New projects store a PCM WAV mix and keep the original file path.
 - Settings > UI min width row (default 80). Smallest the flexible panel shrinks to.
@@ -126,6 +134,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Project backup and restore (`.cleave-tar.gz`).
 - XDG user-data and config directories (`~/.local/share/cleave/`, `~/.config/cleave/`), with `CLEAVE_DATA` override.
 
-[unreleased]: https://github.com/SpoddyCoder/cleave/compare/v0.2.0...HEAD
+[unreleased]: https://github.com/SpoddyCoder/cleave/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/SpoddyCoder/cleave/releases/tag/v0.3.0
 [0.2.0]: https://github.com/SpoddyCoder/cleave/releases/tag/v0.2.0
 [0.1.0]: https://github.com/SpoddyCoder/cleave/releases/tag/v0.1.0

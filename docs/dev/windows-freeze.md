@@ -302,7 +302,7 @@ Do not ask testers to unzip into an overlay folder. Do not ship a second setup e
 
 ## Seed presets and textures
 
-Still open: whether a seed preset/texture pack ships in the zip, or testers copy packs into `Documents\Cleave\presets` and `Documents\Cleave\textures` (same tree as Linux `~/.local/share/cleave/`). First-run download is Later. Play/render do not require a pack in the zip.
+The zip does not bundle preset or texture packs. On launch, when the presets directory is empty, the editor offers to download starter packs into `Documents\Cleave\presets` and `Documents\Cleave\textures` (same tree as Linux `~/.local/share/cleave/`). Play/render do not require a pack in the zip.
 
 ---
 
