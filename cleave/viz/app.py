@@ -40,7 +40,7 @@ from cleave.viz.loading import LoadingWindow, open_loading_window
 from cleave.viz.help_overlay import HelpOverlay
 from cleave.viz.tuning_panel_draw import TuningOverlay
 from cleave.viz.timeline_controls import TimelineControls
-from cleave.viz.timeline_overlay import TimelineOverlay
+from cleave.viz.timeline_overlay import TimelineOverlay, focused_cue_readout_visible
 from cleave.viz.playback import PlaybackState, current_sec, init_playback
 from cleave.viz.projectm_frame_clock import ProjectMFrameClock
 from cleave.viz.frame_finish import RenderOverlaysPanelCache, finish_content_frame
@@ -552,27 +552,7 @@ def _tick_frame_live_overlay(
                 fps=display_fps,
             )
 
-    if (
-        not tap_sync_progress
-        and _tuning_view_state_needed(
-            overlay_visibility=overlay_visibility,
-            modal_active=modal_active,
-        )
-    ):
-        timeline_panel_open = tl.panel_open and overlay_visibility > 0.01
-        with profiler.time_section("panel_draw"):
-            OverlayDrawer.draw_tuning(
-                runtime.compositor,
-                runtime.overlay,
-                runtime.overlay_surface,
-                view_state,
-                timeline_panel_open=timeline_panel_open,
-                overlay_visible=overlay_visibility > 0.01,
-                help_overlay=runtime.help_overlay,
-                modal_host=runtime.modal_host,
-                profiler=profiler,
-            )
-
+    timeline_state = None
     if timeline_strip_visible:
         signals = runtime.seed.signals
         timeline_state = build_timeline_view_state(
@@ -583,6 +563,35 @@ def _tick_frame_live_overlay(
             bar_times=signals.downbeat_times if signals is not None else (),
             beat_times=signals.beat_times if signals is not None else (),
         )
+
+    if (
+        not tap_sync_progress
+        and _tuning_view_state_needed(
+            overlay_visibility=overlay_visibility,
+            modal_active=modal_active,
+        )
+    ):
+        timeline_panel_open = tl.panel_open and overlay_visibility > 0.01
+        cue_readout_open = (
+            timeline_panel_open
+            and timeline_state is not None
+            and focused_cue_readout_visible(timeline_state)
+        )
+        with profiler.time_section("panel_draw"):
+            OverlayDrawer.draw_tuning(
+                runtime.compositor,
+                runtime.overlay,
+                runtime.overlay_surface,
+                view_state,
+                timeline_panel_open=timeline_panel_open,
+                cue_readout_open=cue_readout_open,
+                overlay_visible=overlay_visibility > 0.01,
+                help_overlay=runtime.help_overlay,
+                modal_host=runtime.modal_host,
+                profiler=profiler,
+            )
+
+    if timeline_state is not None:
         OverlayDrawer.draw_timeline(
             runtime.compositor,
             runtime.timeline_overlay,

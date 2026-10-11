@@ -85,6 +85,20 @@ def timeline_viewport_reserve_px(row_count: int, *, margin: int | None = None) -
     return panel_h + margin + metrics.panel_gap
 
 
+def cue_readout_panel_clearance_px(panel_margin_y: int) -> int:
+    """Extra tuning-panel shrink so the selected-cue badge stays clear.
+
+    The tuning panel already stops ``panel_gap + panel_margin_y`` above the
+    timeline strip. The cue badge occupies the top of that gap. Return the
+    additional pixels needed to leave ``rec_badge_gap`` between the panel and
+    the badge.
+    """
+    metrics = timeline_ui_metrics()
+    badge = timeline_badge_reserve_px(font_size=metrics.font_size)
+    gap_above_timeline = metrics.panel_gap + panel_margin_y
+    return max(0, badge + metrics.rec_badge_gap - gap_above_timeline)
+
+
 BAR_VERTICAL_INSET: int = _timeline_ui.bar_vertical_inset
 ARMED_BG_ALPHA: int = 220
 CUE_TICK_ALPHA: int = 120
@@ -440,6 +454,11 @@ def _selected_cue_for_focus(state: TimelineViewState) -> SlotCue | None:
         if cue.t == selected_t:
             return cue
     return None
+
+
+def focused_cue_readout_visible(state: TimelineViewState) -> bool:
+    """True when the focused row's selected cue draws the left-hand readout."""
+    return _selected_cue_for_focus(state) is not None
 
 
 def _lerp_rgb(

@@ -71,6 +71,7 @@ from cleave.viz.timeline_overlay import (
     row_prefix_width,
     selected_cue_flash_active,
     selected_cue_flash_bright,
+    focused_cue_readout_visible,
     selected_cue_readout_text,
     selected_cue_tick_color,
     stem_abbrev_label,
@@ -937,6 +938,35 @@ def test_bar_without_high_water_mark_behaves_as_before() -> None:
     )
     assert _bar_visible_at(state, slot, 22.0) is False
     assert _bar_visible_at(state, slot, 30.0) is True
+
+
+def test_focused_cue_readout_visible_follows_focused_row() -> None:
+    hidden = _view_state(layer_z_order=["layer_1"], focus_row=0)
+    assert focused_cue_readout_visible(hidden) is False
+    shown = _view_state(
+        layer_z_order=["layer_1"],
+        lanes={
+            "layer_1": TimelineLane(
+                baseline=0.0,
+                cues=[SlotCue(t=10.0, level=1.0)],
+            )
+        },
+        focus_row=0,
+        selected_cue_t={"layer_1": 10.0},
+    )
+    assert focused_cue_readout_visible(shown) is True
+    other_row = _view_state(
+        layer_z_order=["layer_1", "layer_2"],
+        lanes={
+            "layer_1": TimelineLane(
+                baseline=0.0,
+                cues=[SlotCue(t=10.0, level=1.0)],
+            )
+        },
+        focus_row=1,
+        selected_cue_t={"layer_1": 10.0},
+    )
+    assert focused_cue_readout_visible(other_row) is False
 
 
 def test_selected_cue_readout_text_format() -> None:

@@ -43,6 +43,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- A long tuning panel shortens while a timeline cue readout is showing, so it no longer covers the cue settings just above the timeline.
 - Moving between preset directories selects the first preset in the directory you land on, so Left/Right on the preset file changes files instead of staying on a preset from the previous directory.
 - Bar phase nudge keeps cues that start before the first detected beat near the song start. They move by one beat instead of jumping to that beat.
 - Project Settings focus highlight spans the full row. The shorter width reserved for the FPS readout stays on Cleave Settings.

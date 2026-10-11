@@ -265,6 +265,7 @@ def tuning_panel_max_dimensions(
     ui_width: int,
     *,
     timeline_panel_open: bool = False,
+    cue_readout_open: bool = False,
     margin_y: int,
     padding: int,
     panel_max_width: int | None = None,
@@ -280,9 +281,14 @@ def tuning_panel_max_dimensions(
     max_panel_w = max_w + padding * 2
     max_panel_h = viewport_h - margin_y * 2
     if timeline_panel_open and timeline_row_count > 0:
-        from cleave.viz.timeline_overlay import timeline_viewport_reserve_px
+        from cleave.viz.timeline_overlay import (
+            cue_readout_panel_clearance_px,
+            timeline_viewport_reserve_px,
+        )
 
         max_panel_h -= timeline_viewport_reserve_px(timeline_row_count)
+        if cue_readout_open:
+            max_panel_h -= cue_readout_panel_clearance_px(margin_y)
     return max_panel_w, max_panel_h
 
 
@@ -986,6 +992,7 @@ class TuningOverlay:
         viewport_width: int,
         viewport_height: int,
         timeline_panel_open: bool = False,
+        cue_readout_open: bool = False,
         counters: OverlayDrawCounters | None = None,
     ) -> ComposedPanel | None:
         self._panel_rect = None
@@ -1015,6 +1022,7 @@ class TuningOverlay:
             viewport_height,
             state.settings.ui_width,
             timeline_panel_open=timeline_panel_open,
+            cue_readout_open=cue_readout_open,
             margin_y=margin_y,
             padding=self._padding,
             panel_max_width=panel_max_width,
@@ -1445,6 +1453,7 @@ class TuningOverlay:
         state: TuningViewState,
         *,
         timeline_panel_open: bool = False,
+        cue_readout_open: bool = False,
         counters: OverlayDrawCounters | None = None,
     ) -> None:
         composed = self.compose_panel(
@@ -1452,6 +1461,7 @@ class TuningOverlay:
             viewport_width=surface.get_width(),
             viewport_height=surface.get_height(),
             timeline_panel_open=timeline_panel_open,
+            cue_readout_open=cue_readout_open,
             counters=counters,
         )
         if composed is None:

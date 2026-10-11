@@ -72,8 +72,14 @@ from cleave.viz.theme import (
     SCROLLBAR_WIDTH,
     SOLO_BG,
     VALUE,
+    timeline_panel_height_px,
+    timeline_ui_metrics,
 )
-from cleave.viz.timeline_overlay import timeline_viewport_reserve_px
+from cleave.viz.timeline_overlay import (
+    cue_readout_panel_clearance_px,
+    timeline_viewport_reserve_px,
+)
+from cleave.viz.timeline_panel_cache import timeline_badge_reserve_px
 
 
 def _effects_expanded_view_state() -> TuningViewState:
@@ -1840,6 +1846,40 @@ def test_panel_reserves_timeline_viewport_when_open() -> None:
     )
     assert open_metrics.max_panel_h < closed_metrics.max_panel_h
     assert open_metrics.max_panel_h == closed_metrics.max_panel_h - reserve
+
+
+def test_long_panel_clears_cue_readout() -> None:
+    pygame.init()
+    state = _effects_expanded_view_state()
+    surface_height = 720
+    surface = pygame.Surface((1280, surface_height), pygame.SRCALPHA)
+    _, margin_y = TuningOverlay()._margin
+    clearance = cue_readout_panel_clearance_px(margin_y)
+    assert clearance > 0
+
+    with_cue = TuningOverlay()
+    with_cue.notify_input()
+    with_cue.draw(
+        surface, state, timeline_panel_open=True, cue_readout_open=True
+    )
+    without_cue = TuningOverlay()
+    without_cue.notify_input()
+    without_cue.draw(surface, state, timeline_panel_open=True)
+
+    cue_panel = with_cue.panel_rect
+    plain_panel = without_cue.panel_rect
+    assert cue_panel is not None and plain_panel is not None
+    _, py, _, ph = cue_panel
+    assert ph == plain_panel[3] - clearance
+
+    metrics = timeline_ui_metrics()
+    timeline_top = (
+        surface_height
+        - timeline_panel_height_px(len(state.layer_z_order))
+        - metrics.margin
+    )
+    badge_top = timeline_top - timeline_badge_reserve_px()
+    assert py + ph <= badge_top - metrics.rec_badge_gap
 
 
 def test_panel_notification_in_pinned_header_block() -> None:

@@ -151,6 +151,7 @@ class OverlayDrawer:
         view_state: TuningViewState,
         *,
         timeline_panel_open: bool = False,
+        cue_readout_open: bool = False,
         overlay_visible: bool = True,
         help_overlay: HelpOverlay | None = None,
         modal_host: ModalHost | None = None,
@@ -186,6 +187,7 @@ class OverlayDrawer:
                 overlay_surface,
                 view_state,
                 timeline_panel_open=timeline_panel_open,
+                cue_readout_open=cue_readout_open,
                 counters=counters,
             )
             if help_overlay is not None and show_help:
@@ -211,6 +213,7 @@ class OverlayDrawer:
             viewport_width=viewport_w,
             viewport_height=viewport_h,
             timeline_panel_open=timeline_panel_open,
+            cue_readout_open=cue_readout_open,
             counters=counters,
         )
         if composed is not None:
