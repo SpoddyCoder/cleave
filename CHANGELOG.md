@@ -19,6 +19,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- Timeline cue readout leaves a wider gap between each label and value pair.
 - Shift + Left/Right skips 2s and Ctrl + Left/Right skips 30s from any row, the timeline strip, curation, and move mode. Recording fills the range. Modals keep their own arrows.
 - Layer and render headers use E to enable or disable and S to solo (layers) or always on (overlays). PgUp/PgDn is the large value step. Preset directories use Enter to open a folder and Backspace for the parent.
 - Timeline strip Left/Right steps cues (seek 10s while recording), Enter seeks to the selected cue, and , / . nudge cue opacity (Ctrl for 10%).

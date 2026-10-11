@@ -31,6 +31,7 @@ from cleave.viz.theme import (
     PLAYHEAD,
     PLAYHEAD_FLASH,
     SOLO_BG,
+    VALUE,
     SONG_MARKER,
     SONG_MARKER_SELECTED,
     timeline_ui_metrics,
@@ -71,7 +72,10 @@ from cleave.viz.timeline_overlay import (
     row_prefix_width,
     selected_cue_flash_active,
     selected_cue_flash_bright,
+    cue_readout_pair_gap_px,
     focused_cue_readout_visible,
+    render_selected_cue_readout,
+    selected_cue_readout_segments,
     selected_cue_readout_text,
     selected_cue_tick_color,
     stem_abbrev_label,
@@ -967,6 +971,23 @@ def test_focused_cue_readout_visible_follows_focused_row() -> None:
         selected_cue_t={"layer_1": 10.0},
     )
     assert focused_cue_readout_visible(other_row) is False
+
+
+def test_selected_cue_readout_pair_gap_is_one_extra_space() -> None:
+    pygame.init()
+    font = overlay_font(timeline_ui_metrics().font_size)
+    cue = SlotCue(t=65.0, level=1.0, blend="add", role="lead", cut="soft")
+    segments = selected_cue_readout_segments(cue, show_role=True)
+    surf = render_selected_cue_readout(font, cue, show_role=True)
+    text_w = sum(font.size(text)[0] for text, _ in segments)
+    separators = sum(
+        1
+        for index, (_, color) in enumerate(segments)
+        if color == VALUE and index + 1 < len(segments)
+    )
+    assert separators == 4
+    assert cue_readout_pair_gap_px(font) == font.size(" ")[0]
+    assert surf.get_width() == text_w + separators * cue_readout_pair_gap_px(font)
 
 
 def test_selected_cue_readout_text_format() -> None:

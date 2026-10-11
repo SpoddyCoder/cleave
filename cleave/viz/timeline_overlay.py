@@ -418,21 +418,30 @@ def selected_cue_readout_text(cue: SlotCue, *, show_role: bool = False) -> str:
     )
 
 
+def cue_readout_pair_gap_px(font: pygame.font.Font) -> int:
+    """Extra space between readout pairs, on top of the trailing space."""
+    return font.size(" ")[0]
+
+
 def render_selected_cue_readout(
     font: pygame.font.Font, cue: SlotCue, *, show_role: bool = False
 ) -> pygame.Surface:
     """Badge-strip surface: LABEL prefixes, VALUE for time and field values."""
-    surfs = [
-        font.render(text, True, color)
-        for text, color in selected_cue_readout_segments(cue, show_role=show_role)
+    segments = selected_cue_readout_segments(cue, show_role=show_role)
+    surfs = [font.render(text, True, color) for text, color in segments]
+    pair_gap = cue_readout_pair_gap_px(font)
+    # Value chunks already end with one space. Add another space before the next pair.
+    extras = [
+        pair_gap if color == VALUE and index + 1 < len(segments) else 0
+        for index, (_, color) in enumerate(segments)
     ]
-    width = sum(surf.get_width() for surf in surfs)
+    width = sum(surf.get_width() for surf in surfs) + sum(extras)
     height = max((surf.get_height() for surf in surfs), default=0)
-    out = pygame.Surface((width, height), pygame.SRCALPHA)
+    out = pygame.Surface((max(1, width), max(1, height)), pygame.SRCALPHA)
     x = 0
-    for surf in surfs:
+    for surf, extra in zip(surfs, extras):
         out.blit(surf, (x, 0))
-        x += surf.get_width()
+        x += surf.get_width() + extra
     return out
 
 
