@@ -17,6 +17,12 @@ Let agents create and refine visualisations from Cleave's existing data (signals
 
 Plan: [plans/ai-integration-proposal.md](plans/ai-integration-proposal.md).
 
+## Menu and panel overhaul
+
+Move from one expandable tuning tree to an in-window menu bar, object navigator, and property inspector; keep the timeline strip as a separate region. Keyboard navigation first, then mouse (hover, click, drag values, column split) on shared layout rects.
+
+Plan: [plans/menu-overhaul-and-mouse-support-proposal.md](plans/menu-overhaul-and-mouse-support-proposal.md).
+
 ## Timeline richer cue types
 
 Extend cues beyond visibility toggles so timeline events can control more layer and render parameters.
