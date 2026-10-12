@@ -11,6 +11,12 @@ Phase 2 Windows MVP ships PyInstaller ([structured-releases.md](structured-relea
 
 Session undo/redo for timeline and config edits.
 
+## AI-assisted visual authoring
+
+Let agents create and refine visualisations from Cleave's existing data (signals, markers, timeline generators, layer YAML) instead of hand-editing every cue. Headless tool layer first; MCP for IDE users; optional in-editor prompt later for frozen Windows (editor-first, same mutations as the panel).
+
+Plan: [plans/ai-integration-proposal.md](plans/ai-integration-proposal.md).
+
 ## Timeline richer cue types
 
 Extend cues beyond visibility toggles so timeline events can control more layer and render parameters.
