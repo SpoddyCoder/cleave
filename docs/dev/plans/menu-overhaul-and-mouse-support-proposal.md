@@ -6,6 +6,17 @@ Related: [editor-first.mdc](../../../.cursor/rules/editor-first.mdc), [live-tuni
 
 ---
 
+## Guiding principles
+
+These override more conservative constraints later in this proposal when they conflict.
+
+1. **Familiar creative-tool UX.** This is a major UI overhaul. Standardise Cleave on the conventions of other audio and video editors (menus, object navigator, property inspector, timeline) so a user feels comfortable immediately, without learning a Cleave-only tree.
+2. **Rules follow the UX.** Existing project rules may be broken when principle 1 requires it. Rewrite those rules in the same change so they describe the new shell.
+3. **Re-architect for a clean break.** Restructure modules when that keeps the new shell clear and maintainable. Leave as few references to the legacy tuning tree as possible in code, and none in the docs.
+4. **Frame rate is a hard constraint.** The editor is unusable if the frame rate drops too low. Layout, hit-testing, and drawing must stay cheap enough for live playback at display rate.
+
+---
+
 ## Problem
 
 The live tuning overlay is one long `RowLayout` list. Focus moves through every navigable row (`focus_nav.py` `build_focus_ring`), including deeply nested expand sections (overlay card title/body/animation, post-FX fade in/out, per-layer preset switching). That works for power users who learn the tree, but it is hard to scan, slow to reach distant sections, and unlike familiar creative tools (outliner + properties + menus).
