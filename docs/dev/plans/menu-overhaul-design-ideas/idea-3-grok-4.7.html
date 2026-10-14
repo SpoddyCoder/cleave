@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Cleave menu overhaul - conceptual diagrams</title>
+<style>
+  :root {
+    --page: #0c0e14;
+    --card: #121620;
+    --line: #262f42;
+    --muted: #9ba6bc;
+    --text: #e4e8f0;
+    --label: rgb(170, 210, 255);
+    --value: #fff;
+    --action: rgb(80, 190, 125);
+    --disabled: rgb(140, 140, 140);
+    --highlight: rgb(255, 235, 130);
+    --locked: rgb(235, 150, 150);
+    --lock: rgb(235, 90, 90);
+    --dirty: rgb(255, 255, 0);
+    --playhead: rgb(220, 170, 255);
+    --marker: rgb(220, 40, 40);
+    --marker-sel: rgb(255, 170, 40);
+    --panel: rgba(0, 0, 0, 0.82);
+    --edge: rgba(255, 255, 255, 0.88);
+    --hover: rgba(170, 210, 255, 0.16);
+    --mono: "Cascadia Mono", Consolas, "DejaVu Sans Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 28px 28px 72px;
+    background: var(--page);
+    color: var(--text);
+    font-family: system-ui, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.5;
+  }
+  a { color: var(--label); }
+  .wrap { max-width: 1280px; margin: 0 auto; display: flex; flex-direction: column; gap: 28px; }
+  h1 { margin: 0 0 6px; font-size: 24px; font-weight: 600; color: #fff; }
+  h2 { margin: 0; font-size: 17px; font-weight: 600; color: #fff; }
+  h2 .sub { margin-left: 10px; font-size: 12px; font-weight: 400; color: #8c98b0; }
+  p.lead, .note { margin: 0; color: var(--muted); font-size: 14px; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 20px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  kbd {
+    font-family: var(--mono);
+    font-size: 11px;
+    background: #202738;
+    border: 1px solid #384560;
+    border-bottom-width: 2px;
+    border-radius: 3px;
+    padding: 0 5px;
+    color: #d8e0ef;
+  }
+
+  /* ----- editor chrome ----- */
+  .win {
+    position: relative;
+    height: 460px;
+    border: 2px solid #3a4560;
+    border-radius: 4px;
+    overflow: hidden;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--value);
+    display: grid;
+    grid-template-rows: 26px 26px 1fr auto;
+    grid-template-columns: 210px 5px 1fr 5px 280px;
+    background: #05050c;
+  }
+  .win.compact { height: 420px; font-size: 11px; grid-template-columns: 168px 4px 1fr 4px 220px; }
+  .win.no-tl { grid-template-rows: 26px 26px 1fr 0; }
+  .viz {
+    position: absolute; inset: 0; z-index: 0;
+    background:
+      radial-gradient(circle at 28% 42%, rgba(255, 50, 150, 0.5), transparent 34%),
+      radial-gradient(circle at 72% 58%, rgba(30, 190, 255, 0.48), transparent 38%),
+      radial-gradient(circle at 52% 22%, rgba(255, 190, 40, 0.32), transparent 28%),
+      radial-gradient(circle at 46% 82%, rgba(110, 50, 255, 0.48), transparent 42%),
+      #07060e;
+  }
+  .region { position: relative; z-index: 1; background: var(--panel); min-width: 0; min-height: 0; }
+  .scope { box-shadow: inset 0 0 0 1px var(--highlight); }
+  .pin {
+    position: absolute; z-index: 6; top: 4px; right: 5px; left: auto;
+    width: 16px; height: 16px; border-radius: 50%;
+    background: var(--highlight); color: #111; font-size: 10px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    font-family: system-ui, sans-serif;
+  }
+  .view, .split { position: relative; }
+  .split { z-index: 3; }
+  .split .pin { right: auto; left: 50%; margin-left: -8px; top: 46%; }
+  .transport { padding-right: 40px; }
+
+  .menubar {
+    grid-column: 1 / -1;
+    display: flex; align-items: stretch;
+    border-bottom: 1px solid var(--edge);
+    z-index: 4;
+  }
+  .brand { color: var(--label); font-weight: 700; padding: 0 12px; display: flex; align-items: center; }
+  .m-top { padding: 0 10px; display: flex; align-items: center; position: relative; }
+  .m-top u { text-decoration: underline; text-underline-offset: 2px; }
+  .m-top.open { background: var(--highlight); color: #111; }
+  .drop {
+    position: absolute; top: 100%; left: 0; min-width: 210px; z-index: 8;
+    background: rgba(0, 0, 0, 0.96); border: 1px solid var(--edge); padding: 4px 0;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  }
+  .mi { display: flex; justify-content: space-between; gap: 18px; padding: 1px 10px 1px 8px; white-space: nowrap; }
+  .mi .sc { color: var(--muted); }
+  .mi.cmd { color: var(--action); }
+  .mi.dis { color: var(--disabled); }
+  .mi.cur { background: var(--highlight); color: #111; }
+  .mi.cur .sc { color: #111; }
+  .sep { border-top: 1px solid #444; margin: 4px 6px; }
+
+  .transport {
+    grid-column: 1 / -1;
+    display: flex; align-items: center; gap: 14px;
+    padding: 0 10px; border-bottom: 1px solid #3a3a3a; color: var(--muted);
+  }
+  .transport .play { color: var(--action); }
+  .transport .time { color: var(--value); }
+
+  .nav { grid-column: 1; overflow: hidden; border-right: 1px solid #333; padding: 4px 0 8px; }
+  .split { grid-row: 3; background: #1a1a1a; z-index: 2; }
+  .split.a { grid-column: 2; }
+  .split.b { grid-column: 4; }
+  .split .grip { position: absolute; top: 40%; left: 1px; width: 3px; height: 28px; background: #666; border-radius: 1px; }
+  .view { grid-column: 3; background: transparent; z-index: 0; }
+  .view .viz-label {
+    position: absolute; left: 50%; top: 46%; transform: translate(-50%, -50%);
+    color: rgba(255,255,255,0.38); letter-spacing: 1.5px; text-transform: uppercase;
+    font-size: 11px; text-align: center; line-height: 1.4;
+  }
+  .insp { grid-column: 5; overflow: hidden; border-left: 1px solid #333; padding: 4px 0 8px; }
+  .tl { grid-column: 1 / -1; border-top: 1px solid var(--edge); padding: 6px 8px 8px; min-height: 78px; }
+
+  .node, .field, .grp, .act {
+    display: flex; align-items: baseline; justify-content: space-between;
+    padding: 0 8px 0 6px; line-height: 1.45; white-space: nowrap;
+  }
+  .node { justify-content: flex-start; gap: 6px; }
+  .node .tw { width: 10px; color: var(--muted); flex: none; }
+  .node.sel { box-shadow: inset 3px 0 0 var(--label); }
+  .node.cur, .field.cur, .grp.cur, .act.cur { background: var(--highlight); color: #111; }
+  .node.cur .tw, .field.cur .l, .field.cur .v { color: #111; }
+  .node.lock { color: var(--locked); }
+  .l { color: var(--label); }
+  .field.cur .l { color: #111; }
+  .v { color: var(--value); }
+  .dirty { color: var(--dirty); }
+  .field.cur .dirty { color: #111; }
+  .grp { color: var(--value); justify-content: flex-start; gap: 6px; }
+  .grp .l { color: inherit; }
+  .act { color: var(--action); justify-content: flex-start; }
+  .act.cur { color: #111; }
+  .d1 { padding-left: 16px; }
+  .d2 { padding-left: 28px; }
+  .d3 { padding-left: 40px; }
+  .hd {
+    padding: 2px 8px 3px; color: var(--label); font-weight: 700;
+    border-bottom: 1px solid #333; margin-bottom: 2px;
+  }
+
+  .lane { position: relative; height: 12px; margin: 3px 0 3px 52px; background: rgba(255,255,255,0.04); }
+  .lane b {
+    position: absolute; left: 0; top: -1px; width: 48px; margin-left: -52px;
+    color: var(--label); font-weight: 400; font-size: 10px;
+  }
+  .cue { position: absolute; top: 1px; height: 10px; border-radius: 1px; opacity: 0.9; }
+  .ph {
+    position: absolute; top: 18px; bottom: 6px; width: 2px; background: var(--playhead); left: 42%;
+  }
+  .mk { position: absolute; top: 16px; bottom: 4px; width: 2px; background: var(--marker); }
+  .mk.sel { background: var(--marker-sel); width: 3px; }
+
+  .legend { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 22px; margin: 0; padding: 0; list-style: none; }
+  .legend li { display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; }
+  .legend .n {
+    flex: none; width: 18px; height: 18px; border-radius: 50%;
+    background: var(--highlight); color: #111; font-size: 11px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; margin-top: 1px;
+  }
+  .legend strong { color: #fff; font-weight: 600; }
+  .legend span { color: var(--muted); }
+
+  .frames { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .frame-cap { display: flex; flex-direction: column; gap: 6px; }
+  .frame-cap h3 { margin: 0; font-size: 14px; color: #fff; }
+  .frame-cap p { margin: 0; font-size: 12.5px; color: var(--muted); }
+
+  .keyrow { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 12.5px; color: var(--muted); }
+
+  /* menu wall */
+  .wall {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+    gap: 8px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+  }
+  .menu {
+    background: rgba(0, 0, 0, 0.55);
+    border: 1px solid var(--edge);
+    min-width: 0;
+  }
+  .menu h4 {
+    margin: 0; padding: 4px 8px; background: rgba(0,0,0,0.65);
+    border-bottom: 1px solid #444; color: #fff; font-size: 12px; font-weight: 600;
+  }
+  .menu h4 u { text-decoration: underline; text-underline-offset: 2px; }
+  .menu .mi { padding: 2px 8px; }
+  .menu .mi.jump { color: var(--value); }
+  .tag {
+    display: inline-block; margin-left: 6px; font-family: system-ui, sans-serif;
+    font-size: 9px; letter-spacing: 0.4px; text-transform: uppercase;
+    color: var(--muted); border: 1px solid #384560; border-radius: 3px; padding: 0 4px;
+  }
+
+  .cycle { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .box {
+    background: #181d2a; border: 1px solid #384560; border-radius: 6px;
+    padding: 8px 12px; min-width: 150px;
+  }
+  .box.on { border-color: var(--highlight); }
+  .box h4 { margin: 0 0 2px; font-size: 13px; color: #fff; }
+  .box p { margin: 0; font-size: 12px; color: var(--muted); }
+  .arr { color: var(--highlight); font-size: 18px; }
+
+  .mouse { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .mcell {
+    border: 1px solid #384560; border-radius: 6px; padding: 10px;
+    background: #10141d; display: flex; flex-direction: column; gap: 6px;
+    font-family: var(--mono); font-size: 11.5px;
+  }
+  .mcell h4 { margin: 0; font-family: system-ui, sans-serif; font-size: 13px; color: #fff; }
+  .mcell .phs { color: var(--muted); font-family: system-ui, sans-serif; font-size: 12px; }
+  .hov { background: var(--hover); }
+  .rect {
+    outline: 1px dashed rgba(255, 235, 130, 0.7);
+    outline-offset: -1px;
+  }
+
+  .roles { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .role {
+    border: 1px solid #384560; border-radius: 6px; padding: 12px 14px; background: #10141d;
+  }
+  .role h3 { margin: 0 0 6px; font-size: 14px; color: var(--highlight); }
+  .role ul { margin: 0; padding-left: 16px; color: var(--muted); font-size: 13px; }
+  .swatches { display: flex; flex-wrap: wrap; gap: 10px 16px; font-size: 12px; color: var(--muted); align-items: center; }
+  .sw { display: inline-block; width: 12px; height: 12px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+
+  @media (max-width: 980px) {
+    .frames, .legend, .mouse, .roles, .wall { grid-template-columns: 1fr 1fr; }
+    .wall { grid-template-columns: 1fr 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Menu overhaul: how the shell looks</h1>
+  <p class="lead">Conceptual frames for <a href="menu-overhaul-and-mouse-support-proposal.md">menu-overhaul-and-mouse-support-proposal.md</a>.
+  Chrome is drawn in the window over the visualiser. Labels follow the current panel; shortcuts and values are illustrative.
+  Yellow is keyboard focus. A blue bar is the navigator selection, which stays put when focus moves to the inspector.</p>
+</header>
+
+<section class="card">
+  <h2>Where things go <span class="sub">commands, objects, and fields split apart</span></h2>
+  <div class="roles">
+    <div class="role">
+      <h3>Menu bar</h3>
+      <ul>
+        <li>Actions and jumps, not every parameter.</li>
+        <li>File, Project, Layers, Render, Timeline, Settings, Help.</li>
+        <li>Items call the command registry. Shortcuts match the labels.</li>
+      </ul>
+    </div>
+    <div class="role">
+      <h3>Navigator</h3>
+      <ul>
+        <li>Shallow objects: Settings, Project, Render, Layers, Song markers.</li>
+        <li>Selecting a node sets the inspector root.</li>
+        <li>Value rows do not appear in this column.</li>
+      </ul>
+    </div>
+    <div class="role">
+      <h3>Inspector</h3>
+      <ul>
+        <li>Fields for the current selection only.</li>
+        <li>Collapsible groups stay inside this column.</li>
+        <li>Same row descriptors and mutations as today.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>1. Window anatomy <span class="sub">fixed regions, optional column split, timeline as its own strip</span></h2>
+  <div id="anatomy"></div>
+  <ol class="legend">
+    <li><span class="n">1</span><div><strong>Menu bar.</strong> <span>In-window OpenGL chrome. <kbd>F10</kbd> or <kbd>Alt</kbd> focuses it. <kbd>Alt</kbd>+letter opens a menu. Not a native Win32 menu.</span></div></li>
+    <li><span class="n">2</span><div><strong>Transport.</strong> <span>One slim bar under the menu. Not repeated in the inspector.</span></div></li>
+    <li><span class="n">3</span><div><strong>Navigator.</strong> <span>Up/Down moves. Left/Right collapses. Enter selects. Layer 3 is section-locked.</span></div></li>
+    <li><span class="n">4</span><div><strong>Visualiser.</strong> <span>projectM plus the compositor, always behind the panels.</span></div></li>
+    <li><span class="n">5</span><div><strong>Inspector.</strong> <span>Up/Down moves fields. Left/Right steps a value. Groups do not join a global focus ring.</span></div></li>
+    <li><span class="n">6</span><div><strong>Timeline strip.</strong> <span>Separate host. Existing timeline keys when that scope is active. Not folded into the row list.</span></div></li>
+    <li><span class="n">7</span><div><strong>Splitters.</strong> <span>Hit rects exist from the first layout pass. Drag to resize lands in the mouse phase.</span></div></li>
+  </ol>
+  <div class="swatches">
+    <span><i class="sw" style="background:var(--highlight)"></i>keyboard focus</span>
+    <span><i class="sw" style="background:var(--label)"></i>selection bar / labels</span>
+    <span><i class="sw" style="background:var(--action)"></i>command or contextual action</span>
+    <span><i class="sw" style="background:var(--dirty)"></i>dirty value</span>
+    <span><i class="sw" style="background:var(--locked)"></i>section lock</span>
+    <span><i class="sw" style="background:var(--disabled)"></i>disabled command</span>
+  </div>
+</section>
+
+<section class="card">
+  <h2>2. Same chrome, four selections <span class="sub">the inspector swaps; the navigator stays shallow</span></h2>
+  <p class="note">Each frame is the same window. Only the selected node, the inspector groups, and whether the timeline strip is open change.</p>
+  <div class="frames" id="frames"></div>
+</section>
+
+<section class="card">
+  <h2>3. Menu taxonomy <span class="sub">green runs a command, plain text jumps to a navigator root, grey is disabled</span></h2>
+  <div class="wall" id="wall"></div>
+  <p class="note">Render, separate, and backup started from a menu still use the in-window loading screen. Help lists commands grouped by these menus.</p>
+</section>
+
+<section class="card">
+  <h2>4. Focus scopes <span class="sub"><kbd>Tab</kbd> cycles regions; one scope owns the keys</span></h2>
+  <div class="cycle">
+    <div class="box on"><h4>Menu bar</h4><p>Arrows move. Enter activates. Esc closes.</p></div>
+    <div class="arr">&rarr;</div>
+    <div class="box on"><h4>Navigator</h4><p>Up/Down move. Left/Right expand. Enter selects.</p></div>
+    <div class="arr">&rarr;</div>
+    <div class="box on"><h4>Inspector</h4><p>Up/Down fields. Left/Right step. Enter runs a row action.</p></div>
+    <div class="arr">&rarr;</div>
+    <div class="box on"><h4>Timeline strip</h4><p>Existing keymap. Skipped when the strip is closed.</p></div>
+    <div class="arr">&#8635;</div>
+  </div>
+  <p class="note">Modal, file picker, and help stay above this cycle. Global keys (<kbd>Ctrl+Q</kbd>, <kbd>h</kbd>, recording) stay global. <kbd>Ctrl+Up</kbd> / <kbd>Ctrl+Down</kbd> quick-nav is retired or remapped to the previous and next top-level navigator node.</p>
+</section>
+
+<section class="card">
+  <h2>5. Mouse, later <span class="sub">same rectangles the keyboard layout already records</span></h2>
+  <div class="mouse">
+    <div class="mcell">
+      <h4>Hover</h4>
+      <div class="field"><span class="l">blend mode</span><span class="v">add</span></div>
+      <div class="field hov"><span class="l">opacity</span><span class="v">0.80</span></div>
+      <div class="field"><span class="l">beat sensitivity</span><span class="v">1.00</span></div>
+      <span class="phs">Highlight only. Focus does not move until click.</span>
+    </div>
+    <div class="mcell">
+      <h4>Click</h4>
+      <div class="node"><span class="tw">v</span>Layer 1  drums</div>
+      <div class="node sel cur"><span class="tw">&gt;</span>Layer 2  bass</div>
+      <div class="node lock"><span class="tw">&gt;</span>Layer 3  vocals</div>
+      <span class="phs">Sets the scope and the selection. Inspector follows.</span>
+    </div>
+    <div class="mcell">
+      <h4>Wheel and value drag</h4>
+      <div class="field rect"><span class="l">opacity</span><span class="v">0.80 &harr;</span></div>
+      <div class="field"><span class="l">duration</span><span class="v">16 bars</span></div>
+      <span class="phs">Wheel scrolls the column. Sideways drag steps a numeric field.</span>
+    </div>
+    <div class="mcell">
+      <h4>Splitter</h4>
+      <div style="display:flex;height:64px;border:1px solid #444">
+        <div style="width:38%;background:rgba(255,255,255,0.04);color:var(--label);padding:4px">nav</div>
+        <div style="width:6px;background:var(--highlight)"></div>
+        <div style="flex:1;color:var(--muted);padding:4px">view</div>
+        <div style="width:6px;background:#555"></div>
+        <div style="width:34%;background:rgba(255,255,255,0.04);color:var(--label);padding:4px">insp</div>
+      </div>
+      <span class="phs">Drag either gutter. Width can be persisted in the polish phase.</span>
+    </div>
+  </div>
+</section>
+
+</div>
+<script>
+const TREE = [
+  { id: "settings", label: "Settings" },
+  { id: "project", label: "Project", folder: true },
+  { id: "milk", label: "Milkdrop", parent: "project" },
+  { id: "comp", label: "Compositor", parent: "project" },
+  { id: "job", label: "Render job", parent: "project" },
+  { id: "render", label: "Render", folder: true },
+  { id: "overlays", label: "Overlays", parent: "render", folder: true },
+  { id: "opening", label: "Opening card", parent: "overlays" },
+  { id: "closing", label: "Closing card", parent: "overlays" },
+  { id: "postfx", label: "Post-FX", parent: "render" },
+  { id: "mask", label: "Pattern mask", parent: "render" },
+  { id: "timeline", label: "Timeline", parent: "render" },
+  { id: "layers", label: "Layers", folder: true },
+  { id: "layer1", label: "Layer 1   drums", parent: "layers" },
+  { id: "layer2", label: "Layer 2   bass", parent: "layers" },
+  { id: "layer3", label: "Layer 3   vocals", parent: "layers", locked: true },
+  { id: "layer4", label: "Layer 4   other", parent: "layers" },
+  { id: "markers", label: "Song markers" },
+];
+
+const OPEN = new Set(["project", "render", "overlays", "layers"]);
+
+function navHtml(selected, scope) {
+  const byParent = {};
+  TREE.forEach((n) => {
+    const k = n.parent || "";
+    (byParent[k] || (byParent[k] = [])).push(n);
+  });
+  const lines = [];
+  function walk(parent, depth) {
+    (byParent[parent] || []).forEach((n) => {
+      const open = OPEN.has(n.id);
+      const cls = ["node", "d" + depth];
+      if (n.id === selected) cls.push("sel");
+      if (n.id === selected && scope === "nav") cls.push("cur");
+      if (n.locked) cls.push("lock");
+      const tw = n.folder ? (open ? "v" : ">") : "";
+      lines.push(`<div class="${cls.join(" ")}"><span class="tw">${tw}</span>${n.label}</div>`);
+      if (n.folder && open) walk(n.id, depth + 1);
+    });
+  }
+  walk("", 0);
+  return lines.join("");
+}
+
+function rowHtml(r, scope) {
+  const cur = r.focus && scope === "insp" ? " cur" : "";
+  if (r.kind === "hd") return `<div class="hd">${r.label}</div>`;
+  if (r.kind === "grp") {
+    return `<div class="grp d${r.d || 0}${cur}"><span class="tw">${r.open ? "v" : ">"}</span><span class="l">${r.label}</span></div>`;
+  }
+  if (r.kind === "act") return `<div class="act d${r.d || 0}${cur}">${r.label}</div>`;
+  const dirty = r.dirty ? ` <span class="dirty">*</span>` : "";
+  return `<div class="field d${r.d || 0}${cur}"><span class="l">${r.label}</span><span class="v">${r.value}${dirty}</span></div>`;
+}
+
+function timelineHtml() {
+  const cue = (left, width, color) =>
+    `<i class="cue" style="left:${left}%;width:${width}%;background:${color}"></i>`;
+  return `
+    <div class="lane"><b>drums</b>${cue(4, 28, "rgba(170,210,255,.85)")}${cue(40, 22, "rgba(170,210,255,.55)")}${cue(70, 18, "rgba(170,210,255,.85)")}</div>
+    <div class="lane"><b>bass</b>${cue(8, 36, "rgba(80,190,125,.8)")}${cue(52, 30, "rgba(80,190,125,.55)")}</div>
+    <div class="lane"><b>vox</b>${cue(18, 20, "rgba(255,170,40,.8)")}${cue(48, 34, "rgba(255,170,40,.55)")}</div>
+    <div class="ph"></div>
+    <div class="mk" style="left:22%"></div>
+    <div class="mk sel" style="left:61%"></div>`;
+}
+
+function windowHtml(scene) {
+  const pins = scene.pins ? `<span class="pin">1</span>` : "";
+  const menuPin = scene.pins ? pins : "";
+  const open = scene.menu || null;
+  const menus = [
+    ["File", "F"], ["Project", "P"], ["Layers", "L"], ["Render", "R"],
+    ["Timeline", "T"], ["Settings", "S"], ["Help", "H"],
+  ];
+  const bar = menus.map(([name, letter]) => {
+    const cls = open === name ? "m-top open" : "m-top";
+    const drop = open === name ? scene.dropdown : "";
+    return `<div class="${cls}"><u>${letter}</u>${name.slice(1)}${drop}</div>`;
+  }).join("");
+  const tl = scene.timeline
+    ? `<div class="tl region ${scene.scope === "tl" ? "scope" : ""}">${scene.pins ? '<span class="pin">6</span>' : ""}${timelineHtml()}</div>`
+    : `<div class="tl" style="display:none"></div>`;
+  return `
+    <div class="win ${scene.compact ? "compact" : ""} ${scene.timeline ? "" : "no-tl"}">
+      <div class="viz"></div>
+      <div class="menubar region ${scene.scope === "menu" ? "scope" : ""}">
+        ${menuPin}<div class="brand">Cleave</div>${bar}
+      </div>
+      <div class="transport region">${scene.pins ? '<span class="pin">2</span>' : ""}
+        <span class="play">&#9654; playing</span>
+        <span class="time" style="margin-left:auto">01:23.4</span><span>/ 04:12.0</span>
+        <span>bar 34</span><span>124 bpm</span>
+      </div>
+      <div class="nav region ${scene.scope === "nav" ? "scope" : ""}">${scene.pins ? '<span class="pin">3</span>' : ""}${navHtml(scene.selected, scene.scope)}</div>
+      <div class="split a">${scene.pins ? '<span class="pin">7</span>' : ""}<div class="grip"></div></div>
+      <div class="view"><span class="viz-label">visualiser</span>${scene.pins ? '<span class="pin">4</span>' : ""}</div>
+      <div class="split b"><div class="grip"></div></div>
+      <div class="insp region ${scene.scope === "insp" ? "scope" : ""}">${scene.pins ? '<span class="pin">5</span>' : ""}${scene.rows.map((r) => rowHtml(r, scene.scope)).join("")}</div>
+      ${tl}
+    </div>`;
+}
+
+const layerRows = [
+  { kind: "hd", label: "Layer 2   bass" },
+  { kind: "field", label: "driving stem", value: "bass", d: 0 },
+  { kind: "field", label: "beat", value: "on" },
+  { kind: "field", label: "preset directory", value: "presets/bass" },
+  { kind: "field", label: "preset", value: "Geiss - Spiral", dirty: true },
+  { kind: "grp", label: "preset switching", open: true },
+  { kind: "field", label: "trigger", value: "beat", d: 1 },
+  { kind: "field", label: "duration", value: "16 bars", d: 1 },
+  { kind: "field", label: "start clean", value: "on", d: 1 },
+  { kind: "grp", label: "compositing", open: true },
+  { kind: "field", label: "blend mode", value: "add", d: 1 },
+  { kind: "field", label: "opacity", value: "0.80", d: 1, focus: true, dirty: true },
+  { kind: "grp", label: "effects", open: false },
+  { kind: "act", label: "Delete Layer" },
+];
+
+const cardRows = [
+  { kind: "hd", label: "Opening card" },
+  { kind: "grp", label: "animation", open: true },
+  { kind: "field", label: "type", value: "slide", d: 1 },
+  { kind: "field", label: "slide-direction", value: "up", d: 1 },
+  { kind: "field", label: "card time", value: "2.0 s", d: 1 },
+  { kind: "field", label: "display time", value: "4.0 s", d: 1 },
+  { kind: "field", label: "position", value: "center" },
+  { kind: "field", label: "background opacity", value: "0.70" },
+  { kind: "grp", label: "title", open: true },
+  { kind: "field", label: "title text", value: "CLEAVE", d: 1 },
+  { kind: "field", label: "title colour", value: "#ffffff", d: 1 },
+  { kind: "field", label: "font size", value: "48", d: 1, focus: true },
+  { kind: "grp", label: "body", open: false },
+];
+
+const fxRows = [
+  { kind: "hd", label: "Post-FX" },
+  { kind: "grp", label: "fade", open: true },
+  { kind: "grp", label: "fade in", open: true, d: 1 },
+  { kind: "field", label: "start", value: "0.0 s", d: 2 },
+  { kind: "field", label: "end", value: "1.5 s", d: 2, focus: true },
+  { kind: "field", label: "type", value: "linear", d: 2 },
+  { kind: "grp", label: "fade out", open: false, d: 1 },
+  { kind: "grp", label: "highlight rolloff", open: false },
+  { kind: "grp", label: "chroma boost", open: false },
+  { kind: "grp", label: "limiter", open: true },
+  { kind: "field", label: "enabled", value: "on", d: 1 },
+  { kind: "field", label: "threshold", value: "0.85", d: 1 },
+  { kind: "field", label: "ratio", value: "4.0", d: 1 },
+];
+
+const tlRows = [
+  { kind: "hd", label: "Timeline" },
+  { kind: "field", label: "beat / bar grid", value: "on" },
+  { kind: "field", label: "bar phase", value: "1" },
+  { kind: "field", label: "cue snap", value: "bar", focus: true },
+  { kind: "field", label: "song marker snap", value: "on" },
+  { kind: "grp", label: "timeline cuts", open: true },
+  { kind: "field", label: "hard cuts", value: "on", d: 1 },
+  { kind: "field", label: "soft cuts", value: "off", d: 1 },
+  { kind: "act", label: "Apply Timeline Preset" },
+  { kind: "act", label: "Reset Timeline" },
+];
+
+const anatomyDrop = `
+  <div class="drop">
+    <div class="mi cmd"><span>Add Layer</span></div>
+    <div class="mi cmd cur"><span>Delete Layer</span><span class="sc"></span></div>
+    <div class="sep"></div>
+    <div class="mi"><span>Layer 1   drums</span></div>
+    <div class="mi"><span>Layer 2   bass</span></div>
+    <div class="mi dis"><span>Layer 3   vocals</span></div>
+  </div>`;
+
+document.getElementById("anatomy").innerHTML = windowHtml({
+  pins: true,
+  scope: "menu",
+  selected: "layer2",
+  timeline: true,
+  menu: "Layers",
+  dropdown: anatomyDrop,
+  rows: layerRows,
+});
+
+const frames = [
+  {
+    title: "Layer 2, compositing",
+    note: "Navigator selects the layer. Inspector shows preset, switching, compositing, and Delete Layer. Opacity is focused and dirty. Effects stays collapsed in this column only.",
+    scene: { compact: true, scope: "insp", selected: "layer2", timeline: false, rows: layerRows },
+  },
+  {
+    title: "Opening card",
+    note: "Overlays are children of Render, and each card is its own node. Title and Body are inspector groups, not steps on a global tree. Slide-direction is visible because type is slide.",
+    scene: { compact: true, scope: "insp", selected: "opening", timeline: false, rows: cardRows },
+  },
+  {
+    title: "Post-FX",
+    note: "Fade, rolloff, chroma, and limiter are groups under one Post-FX node. Fade out is collapsed. Limiter fields show because enabled is on; they hide when the predicate is false.",
+    scene: { compact: true, scope: "insp", selected: "postfx", timeline: false, rows: fxRows },
+  },
+  {
+    title: "Timeline strip open",
+    note: "The Timeline node opens the strip. Beat grid, cuts, and preset actions sit in the inspector. Cue blocks, the playhead, and song markers stay in the strip.",
+    scene: { compact: true, scope: "tl", selected: "timeline", timeline: true, rows: tlRows },
+  },
+];
+
+document.getElementById("frames").innerHTML = frames.map((f) => `
+  <div class="frame-cap">
+    <h3>${f.title}</h3>
+    <p>${f.note}</p>
+    ${windowHtml(f.scene)}
+  </div>`).join("");
+
+const MENUS = [
+  ["File", "F", [
+    ["Open...", "", "cmd"],
+    ["Save", "Ctrl+S", "cmd"],
+    ["sep"],
+    ["Quit", "Ctrl+Q", "cmd"],
+  ]],
+  ["Project", "P", [
+    ["Render job", "", "jump"],
+    ["sep"],
+    ["Backup Project...", "", "cmd"],
+    ["Restore Project...", "", "cmd"],
+  ]],
+  ["Layers", "L", [
+    ["Add Layer", "", "cmd"],
+    ["Delete Layer", "", "cmd"],
+    ["sep"],
+    ["Layer 1   drums", "", "jump"],
+    ["Layer 2   bass", "", "jump"],
+    ["Layer 3   vocals", "", "dis"],
+  ]],
+  ["Render", "R", [
+    ["Overlays", "", "jump"],
+    ["Post-FX", "", "jump"],
+    ["Pattern Mask", "", "jump"],
+    ["sep"],
+    ["Start Render...", "", "cmd"],
+  ]],
+  ["Timeline", "T", [
+    ["Open Strip", "", "jump"],
+    ["sep"],
+    ["Apply Preset...", "", "cmd"],
+    ["Reset Timeline", "", "cmd"],
+    ["Snap Cues", "", "cmd"],
+  ]],
+  ["Settings", "S", [
+    ["Editor Window", "", "jump"],
+    ["UI", "", "jump"],
+    ["Latency", "", "jump"],
+  ]],
+  ["Help", "H", [
+    ["Help Overlay", "h", "cmd"],
+    ["Shortcut Reference", "", "cmd"],
+  ]],
+];
+
+document.getElementById("wall").innerHTML = MENUS.map(([name, letter, items]) => {
+  const body = items.map((it) => {
+    if (it[0] === "sep") return `<div class="sep"></div>`;
+    const [label, sc, kind] = it;
+    return `<div class="mi ${kind}"><span>${label}</span>${sc ? `<span class="sc">${sc}</span>` : ""}</div>`;
+  }).join("");
+  return `<div class="menu"><h4><u>${letter}</u>${name.slice(1)}</h4>${body}</div>`;
+}).join("");
+</script>
+</body>
+</html>
