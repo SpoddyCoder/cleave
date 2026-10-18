@@ -294,11 +294,15 @@
   <h1>Menu overhaul and mouse support: conceptual diagrams</h1>
   <p>Companion to <a href="menu-overhaul-and-mouse-support-proposal.md" style="color: var(--label)">menu-overhaul-and-mouse-support-proposal.md</a>.
   Everything is drawn in-window over the projectM output (OpenGL chrome, no native menu bar). Labels come from the current
-  <code>row_specs/*</code>; shortcuts and values are illustrative.</p>
+  <code>row_specs/*</code>; shortcuts and values are illustrative.
+  Named views for review: <code>#shell-split</code>, <code>#shell-docked</code>, <code>#menu-layers</code>,
+  <code>#inspector-locked</code>, <code>#inspector-card</code>, <code>#hit-rects</code>
+  (<code>cleaveDesign.apply(name)</code> in the console). See
+  <a href="menu-overhaul-design.md" style="color: var(--label)">menu-overhaul-design.md</a>.</p>
 </header>
 
 <!-- 1. Interactive shell -->
-<section class="card">
+<section class="card" id="shell">
   <h2>1. Target shell (interactive)<span class="sub">click inside the window, then use the keyboard; or use the mouse</span></h2>
   <div class="toolbar">
     <div class="grp"><span class="lbl">Layout</span>
@@ -345,7 +349,7 @@
 </section>
 
 <!-- 2. Menu taxonomy -->
-<section class="card">
+<section class="card" id="taxonomy">
   <h2>2. Menu taxonomy<span class="sub">commands and navigation jumps only, never every parameter</span></h2>
   <div class="menus-row" id="menusStatic"></div>
   <p class="note">Green items run a command from the registry; plain items jump the navigator and inspector to a root. Check marks mirror
@@ -353,7 +357,7 @@
 </section>
 
 <!-- 3. Before / after -->
-<section class="card">
+<section class="card" id="compare">
   <h2>3. Before and after<span class="sub">one focus ring over a long tree vs. selection-driven inspector</span></h2>
   <div class="compare">
     <div>
@@ -413,7 +417,7 @@
 </section>
 
 <!-- 4. Focus scopes -->
-<section class="card">
+<section class="card" id="scopes">
   <h2>4. Focus scopes and keyboard<span class="sub">replaces the single MainFocus ring</span></h2>
   <div class="cycle">
     <div class="fbox hl"><h4>Menu bar</h4><div class="k">F10 / Alt, Alt+letter<br/>Left/Right menus, Enter run</div></div>
@@ -451,7 +455,7 @@
 </section>
 
 <!-- 5. Command registry -->
-<section class="card">
+<section class="card" id="registry">
   <h2>5. Command registry<span class="sub">one run path for menus, shortcuts, clicks, and a later AI bridge</span></h2>
   <div class="flow">
     <div style="display:flex;flex-direction:column;gap:6px">
@@ -482,7 +486,7 @@ run(controls)   -&gt; None</pre>
 </section>
 
 <!-- 6. Mouse -->
-<section class="card">
+<section class="card" id="mouse">
   <h2>6. Mouse phases<span class="sub">all attach to LayoutItem rects recorded since phase 1</span></h2>
   <div class="mouse-grid">
     <div class="mcell">
@@ -1056,7 +1060,66 @@ LayoutItem(id="scroll:inspector",      rect=(1036, 52, 6, 520), role="scrollbar"
   const bRects = document.getElementById("btnRects");
   bRects.onclick = () => { const on = !win.classList.contains("rects"); win.classList.toggle("rects", on); bRects.setAttribute("aria-pressed", on); };
 
-  renderAll();
+  /* Named views. Hash or cleaveDesign.apply(name). Toolbar clicks do not change the hash. */
+  const VIEWS = {
+    "shell-split": function () {},
+    "shell-docked": function () {
+      win.classList.add("docked");
+      bSplit.setAttribute("aria-pressed", "false");
+      bDock.setAttribute("aria-pressed", "true");
+    },
+    "menu-layers": function () { openMenu(2); },
+    "inspector-locked": function () { select("layer3", true); },
+    "inspector-card": function () {
+      select("card1", true);
+      const items = inspItems();
+      const i = items.findIndex((it) => it.t === "r" && it.r.dirty);
+      if (i >= 0) st.inspCur = i;
+    },
+    "hit-rects": function () {
+      win.classList.add("rects");
+      bRects.setAttribute("aria-pressed", "true");
+    },
+  };
+
+  function resetView() {
+    win.classList.remove("docked", "rects");
+    bSplit.setAttribute("aria-pressed", "true");
+    bDock.setAttribute("aria-pressed", "false");
+    bRects.setAttribute("aria-pressed", "false");
+    st.scope = "nav";
+    st.expanded = new Set(["render", "overlays", "layers"]);
+    st.sel = "layer2";
+    st.inspCur = 0;
+    st.menuOpen = -1;
+    st.menuTop = 0;
+    st.menuItem = -1;
+    st.tlOpen = true;
+    st.playhead = 0.33;
+    win.classList.add("tl-open");
+    document.getElementById("btnTl").setAttribute("aria-pressed", "true");
+  }
+
+  function applyView(name) {
+    if (!VIEWS[name]) return false;
+    resetView();
+    VIEWS[name]();
+    renderAll();
+    if (location.hash !== "#" + name) history.replaceState(null, "", "#" + name);
+    const shell = document.getElementById("shell");
+    if (shell) shell.scrollIntoView({ block: "start" });
+    return true;
+  }
+
+  window.cleaveDesign = { apply: applyView, views: Object.keys(VIEWS) };
+  window.addEventListener("hashchange", function () {
+    const name = location.hash.replace(/^#/, "");
+    if (VIEWS[name]) applyView(name);
+  });
+
+  const initial = location.hash.replace(/^#/, "");
+  if (VIEWS[initial]) applyView(initial);
+  else renderAll();
 
   /* static: menu taxonomy */
   document.getElementById("menusStatic").innerHTML = MENUS.map((m) =>

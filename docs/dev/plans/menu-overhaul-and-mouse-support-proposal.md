@@ -6,6 +6,38 @@ Related: [editor-first.mdc](../../../.cursor/rules/editor-first.mdc), [live-tuni
 
 ---
 
+## Checking the work against the guide
+
+The shell is specified in three places. Use them in this order when implementing or reviewing a phase.
+
+1. This proposal: regions, focus scopes, command registry, phases, and what stays on `RowSpec`. The editor remains OpenGL chrome over projectM. Do not port the design page's DOM into the app.
+2. [menu-overhaul-design.html](menu-overhaul-design.html): appearance and interaction. Open it in a browser. Named views are the pictures to match. Keyboard behaviour on that page is the interaction spec for the mock.
+3. [menu-overhaul-design.md](menu-overhaul-design.md): which named view, still, or HTML section answers which question, and how the mock's colors map onto [theme.py](../../../cleave/viz/theme.py).
+
+Stills in [menu-overhaul-stills/](menu-overhaul-stills/) are captures of those named views. Prefer the live page. If a still and the page disagree, the page wins; recapture the still using the steps in the design index.
+
+### Inspect with the browser
+
+The Cursor browser does not open `file://` URLs. Serve the plans directory, then open the page over HTTP:
+
+```
+/home/fernpa/anaconda3/envs/cleave/bin/python -m http.server 8765 --bind 127.0.0.1 --directory docs/dev/plans
+```
+
+Then open `http://127.0.0.1:8765/menu-overhaul-design.html`.
+
+- A hash selects a view: `#shell-split`, `#shell-docked`, `#menu-layers`, `#inspector-locked`, `#inspector-card`, `#hit-rects`.
+- From the page, or from browser automation via `Runtime.evaluate`: `cleaveDesign.apply("menu-layers")`. `cleaveDesign.views` lists the names.
+- Click the mock window, then use the keys printed above it. The toolbar pills switch layout, timeline, and hit rects. Pill clicks do not change the hash; `cleaveDesign.apply` resets to the named view.
+- The shell is `#win`. Static diagrams are `#taxonomy`, `#compare`, `#scopes`, `#registry`, and `#mouse`.
+- An element screenshot of `#win` clips the inspector and the timeline. Capture the document rectangle instead: `getBoundingClientRect()` plus `scrollX` and `scrollY`, with `captureBeyondViewport`. The design index has the recapture steps.
+
+Before coding a region, open the matching view and read the still named in the design index. After the region draws, compare the editor to that view: region placement, type roles, focus ring, and the behaviour listed for that view. Match structure and theme roles. Do not pixel-match the mock.
+
+Illustrative shortcut strings, preset names, and field values in the mock are not product data. Menu shape (command vs jump, check mark, disabled) is. Long jobs started from a menu still use the in-window loading screen.
+
+---
+
 ## Guiding principles
 
 These override more conservative constraints later in this proposal when they conflict.
@@ -209,10 +241,10 @@ Proposal mapping:
 
 ### Phase 0 -- Design lock (docs + spike)
 
-- Approve region layout and menu taxonomy.
-- Optional: ImGui spike or a static screenshot mock in repo.
-- Update [live-tuning-ui.mdc](../../../.cursor/rules/live-tuning-ui.mdc) and [change-touchpoints.mdc](../../../.cursor/rules/change-touchpoints.mdc) outlines for new touchpoints.
-- Exit: agreed menu list and navigator roots.
+- Design guide is locked. Check work against it using [Checking the work against the guide](#checking-the-work-against-the-guide).
+- Optional: ImGui spike before committing to custom draw (see Layout engine and mouse readiness).
+- When the shell lands, update [live-tuning-ui.mdc](../../../.cursor/rules/live-tuning-ui.mdc) and [change-touchpoints.mdc](../../../.cursor/rules/change-touchpoints.mdc) so they describe the new regions.
+- Exit: an implementation pass can open each named view and point at the matching editor state.
 
 ### Phase 1 -- Menu bar shell (keyboard)
 
