@@ -6,6 +6,7 @@ One context, one font atlas, one frame per editor draw. Keyboard stays in
 
 from __future__ import annotations
 
+import math
 import os
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -34,7 +35,7 @@ from imgui_bundle.python_backends.opengl_backend import ProgrammablePipelineRend
 from cleave.gl_state import restore_gl_state, save_gl_state
 from cleave.viz.commands import Command, CommandContext, MenuSeparator, command_by_id
 from cleave.viz.focus_nav import TimelineFocus
-from cleave.viz.frame_rate import format_fps_display
+from cleave.viz.frame_rate import format_fps_value
 from cleave.viz.inspector import build_inspector_rows
 from cleave.viz.inspector_controls import inspector_command_enabled
 from cleave.viz.menu_bar import MenuBarState, menus_for_session
@@ -44,7 +45,6 @@ from cleave.viz.playback import format_mmss
 from cleave.viz.row_kinds import RowAffordance
 from cleave.viz.row_present_renderers import row_value_color_for
 from cleave.viz.row_sections import (
-    INSPECTOR_GROUP_COLLAPSED,
     INSPECTOR_GROUP_EXPANDED,
     inspector_group_glyph,
 )
@@ -59,10 +59,11 @@ from cleave.viz.theme import (
     FOCUS_ROW_BG_ALPHA,
     HIGHLIGHT,
     LABEL,
+    NAVIGATOR_BORDER,
+    TRANSPORT_RULE,
     VALUE,
     tuning_ui_metrics,
 )
-from cleave.viz.timeline_overlay import transport_time_text
 
 RENDERER_CLASS = ProgrammablePipelineRenderer
 
@@ -70,6 +71,15 @@ _HIDDEN = 0.01
 # Dear ImGui default Style.FramePadding.y. _apply_theme leaves it unchanged.
 _MENU_BAR_FRAME_PADDING_Y = 3.0
 _INSPECTOR_INDENT = 16.0
+_TRANSPORT_GAP = 16.0
+# Border pushed onto navigator and inspector windows.
+_PANEL_BORDER_PX = 1.0
+# ImDrawList::AddRect insets the stroke path by half a pixel.
+_BORDER_PATH_INSET_PX = 0.5
+# Anti-aliased lines add this fringe beyond half the stroke thickness.
+_AA_LINE_FRINGE_PX = 1.0
+_PLAY_GLYPH = "\u25b6"
+_PAUSE_GLYPH = "\u275a\u275a"
 
 
 @dataclass(frozen=True)
@@ -82,6 +92,28 @@ class TransportReadout:
     bar_text: str
     fps: float | None
     recording: bool
+
+
+def transport_parts(readout: TransportReadout) -> list[tuple[str, tuple[int, int, int]]]:
+    """Play state, clock, and meters for the transport bar.
+
+    Play and pause use the action role. The clock uses the value role.
+    Bar, frame rate, and record state use the label role.
+    """
+    icon = _PAUSE_GLYPH if readout.paused else _PLAY_GLYPH
+    word = "pause" if readout.paused else "playing"
+    fps = format_fps_value(readout.fps) if readout.fps is not None else "—"
+    recording = "rec on" if readout.recording else "rec off"
+    clock = (
+        f"{format_mmss(readout.position_sec)} / {format_mmss(readout.duration_sec)}"
+    )
+    return [
+        (f"{icon} {word}", ACTION),
+        (clock, VALUE),
+        (f"bar {readout.bar_text}", LABEL),
+        (f"{fps} fps", LABEL),
+        (recording, LABEL),
+    ]
 
 
 def menu_bar_height_px() -> int:
@@ -252,6 +284,7 @@ _SHELL_FLAGS = (
     | int(imgui.WindowFlags_.no_move)
     | int(imgui.WindowFlags_.no_saved_settings)
     | int(imgui.WindowFlags_.no_focus_on_appearing)
+    | int(imgui.WindowFlags_.no_bring_to_front_on_focus)
     | int(imgui.WindowFlags_.no_nav)
     | int(imgui.WindowFlags_.no_scrollbar)
     | int(imgui.WindowFlags_.no_scroll_with_mouse)
@@ -261,18 +294,20 @@ _SHELL_FLAGS = (
 def _shell_glyph_ranges() -> list[int]:
     """Default Latin plus the glyphs the shell draws outside that range.
 
-    Dear ImGui stops the default range at U+00FF. Disclosure triangles and the
-    menu check then rasterize as "?".
+    Dear ImGui stops the default range at U+00FF. Disclosure triangles, the
+    transport play and pause marks, and the menu check then rasterize as "?".
     """
     ranges = list(imgui.get_io().fonts.get_glyph_ranges_default())
     if ranges and ranges[-1] == 0:
         ranges = ranges[:-1]
     ranges.extend(
         (
-            ord(INSPECTOR_GROUP_COLLAPSED),
+            ord(_PLAY_GLYPH),
             ord(INSPECTOR_GROUP_EXPANDED),
             ord("✓"),
             ord("✓"),
+            ord(_PAUSE_GLYPH[0]),
+            ord(_PAUSE_GLYPH[0]),
             0,
         )
     )
@@ -322,6 +357,65 @@ def _value_parts(
         return [(value, color)]
     bracket = _rgba(DISABLED)
     return [("< ", bracket), (value, color), (" >", bracket)]
+
+
+def border_stroke_outset_px(border_size: float, *, anti_aliased_lines: bool) -> float:
+    """How far an ImGui window border extends outside the window rect.
+
+    ``AddRect`` centers the stroke on a path half a pixel inside the edge.
+    Anti-aliased lines add a one-pixel fringe beyond half the thickness.
+    Window padding is inside the rect and does not move this stroke.
+    """
+    if border_size <= 0.0:
+        return 0.0
+    half = float(border_size) * 0.5
+    if anti_aliased_lines:
+        return half + _AA_LINE_FRINGE_PX - _BORDER_PATH_INSET_PX
+    return max(0.0, half - _BORDER_PATH_INSET_PX)
+
+
+def side_panel_seat_px(border_size: float, *, anti_aliased_lines: bool) -> int:
+    """Pixels to drop a side panel so its border clears the transport rule."""
+    outset = border_stroke_outset_px(
+        border_size, anti_aliased_lines=anti_aliased_lines
+    )
+    if outset <= 0.0:
+        return 0
+    return math.ceil(outset - 1e-6)
+
+
+def transport_content_pad_y(window_height: float, line_height: float) -> float:
+    """Vertical padding that centers one text line inside the transport bar."""
+    return max(0.0, (float(window_height) - float(line_height)) * 0.5)
+
+
+def _seat_panel(
+    rect: tuple[int, int, int, int], inset: int
+) -> tuple[int, int, int, int]:
+    """Drop a side panel so its border stroke clears the transport rule."""
+    x, y, width, height = rect
+    if inset <= 0 or height <= inset:
+        return rect
+    return (x, y + inset, width, height - inset)
+
+
+def _stroke_h_rule(
+    x0: float, x1: float, y: float, rgb: tuple[int, int, int]
+) -> None:
+    """Opaque 1px rule on pixel row *y*, after every window.
+
+    A stroked line is anti-aliased, so the menu buttons' opaque fill shows
+    through it. A filled rectangle is not anti-aliased. The foreground list
+    is the last one Dear ImGui renders.
+    """
+    if x1 <= x0:
+        return
+    color = imgui.get_color_u32(_rgba(rgb))
+    draw = imgui.get_foreground_draw_list(imgui.get_main_viewport())
+    display = imgui.get_io().display_size
+    draw.push_clip_rect(imgui.ImVec2(0.0, 0.0), display, False)
+    draw.add_rect_filled(imgui.ImVec2(x0, y), imgui.ImVec2(x1, y + 1.0), color)
+    draw.pop_clip_rect()
 
 
 def _draw_rect_border(rect: tuple[int, int, int, int]) -> None:
@@ -554,9 +648,26 @@ class ShellHost:
             alpha = 1.0 if menu_state.dropdown_open else max(0.0, min(1.0, visibility))
             imgui.get_style().alpha = alpha
             self._menu_bar_height_px = max(1, int(round(imgui.get_frame_height())))
-            self._draw_bar(menu_state, command_ctx)
+            rule_y, anchors, menus = self._draw_bar(menu_state)
             if self._layout is not None:
                 self._draw_shell(menu_state, readout)
+            popup_hovered = False
+            if menu_state.dropdown_open and menus:
+                popup_hovered = self._draw_dropdown(
+                    menu_state, command_ctx, menus, anchors
+                )
+            if rule_y is not None:
+                _stroke_h_rule(
+                    0.0,
+                    imgui.get_io().display_size.x,
+                    rule_y,
+                    BORDER_COLOR,
+                )
+            if imgui.is_mouse_clicked(0) and not popup_hovered:
+                mouse = imgui.get_mouse_pos()
+                in_bar = 0.0 <= mouse.y < float(self._menu_bar_height_px)
+                if not in_bar:
+                    menu_state.blur()
         finally:
             imgui.render()
             self._render_draw_data()
@@ -607,24 +718,48 @@ class ShellHost:
             fps=readout.fps,
         )
         stop = self._cycle_stop(menu_state)
-        self._draw_fixed_window(
-            "##shell-transport",
-            layout.transport,
-            active=False,
-            body=lambda: self._draw_transport(readout, menu_state),
+        style = imgui.get_style()
+        # Default WindowMinSize is 32px, taller than this one-line bar, so the
+        # transport was painted through its own text and over the side panels.
+        saved_min_x = float(style.window_min_size.x)
+        saved_min_y = float(style.window_min_size.y)
+        style.window_min_size = imgui.ImVec2(1.0, 1.0)
+        seat = side_panel_seat_px(
+            _PANEL_BORDER_PX,
+            anti_aliased_lines=bool(style.anti_aliased_lines),
         )
-        self._draw_fixed_window(
-            "##shell-navigator",
-            layout.navigator,
-            active=stop is CycleStop.NAVIGATOR,
-            body=lambda: self._draw_navigator(),
-        )
-        self._draw_fixed_window(
-            "##shell-inspector",
-            layout.inspector,
-            active=stop is CycleStop.INSPECTOR,
-            body=lambda: self._draw_inspector(state),
-        )
+        try:
+            pad_y = transport_content_pad_y(
+                layout.transport[3], imgui.get_text_line_height()
+            )
+            imgui.push_style_var(
+                imgui.StyleVar_.window_padding,
+                imgui.ImVec2(style.window_padding.x, pad_y),
+            )
+            try:
+                self._draw_fixed_window(
+                    "##shell-transport",
+                    layout.transport,
+                    active=False,
+                    body=lambda: self._draw_transport(readout, menu_state),
+                )
+            finally:
+                imgui.pop_style_var()
+            self._draw_fixed_window(
+                "##shell-navigator",
+                _seat_panel(layout.navigator, seat),
+                active=stop is CycleStop.NAVIGATOR,
+                idle_border=NAVIGATOR_BORDER,
+                body=lambda: self._draw_navigator(),
+            )
+            self._draw_fixed_window(
+                "##shell-inspector",
+                _seat_panel(layout.inspector, seat),
+                active=stop is CycleStop.INSPECTOR,
+                body=lambda: self._draw_inspector(state),
+            )
+        finally:
+            style.window_min_size = imgui.ImVec2(saved_min_x, saved_min_y)
         if stop is CycleStop.TIMELINE:
             _draw_rect_border(layout.timeline)
 
@@ -635,19 +770,24 @@ class ShellHost:
         *,
         active: bool,
         body: Callable[[], None],
+        idle_border: tuple[int, int, int] | None = None,
     ) -> None:
         x, y, w, h = rect
         if w <= 0 or h <= 0:
             return
+        border = HIGHLIGHT if active else idle_border
         imgui.set_next_window_pos(
             imgui.ImVec2(float(x), float(y)), imgui.Cond_.always
         )
         imgui.set_next_window_size(
             imgui.ImVec2(float(w), float(h)), imgui.Cond_.always
         )
-        imgui.push_style_var(imgui.StyleVar_.window_border_size, 1.0 if active else 0.0)
-        if active:
-            imgui.push_style_color(imgui.Col_.border, _rgba(HIGHLIGHT))
+        imgui.push_style_var(
+            imgui.StyleVar_.window_border_size,
+            _PANEL_BORDER_PX if border is not None else 0.0,
+        )
+        if border is not None:
+            imgui.push_style_color(imgui.Col_.border, _rgba(border))
         try:
             _visible, _opened = imgui.begin(title, None, _SHELL_FLAGS)
             try:
@@ -655,44 +795,47 @@ class ShellHost:
             finally:
                 imgui.end()
         finally:
-            if active:
+            if border is not None:
                 imgui.pop_style_color()
             imgui.pop_style_var()
 
     def _draw_transport(
         self, readout: TransportReadout, menu_state: MenuBarState
     ) -> None:
-        word = "pause" if readout.paused else "play"
-        fps = (
-            format_fps_display(readout.fps)
-            if readout.fps is not None
-            else "FPS: —"
-        )
-        recording = "recording on" if readout.recording else "recording off"
-        left = (
-            f"{word}  {transport_time_text(readout.position_sec)} / "
-            f"{format_mmss(readout.duration_sec)}  {readout.bar_text}  {fps}  "
-            f"{recording}"
-        )
-        imgui.text(left)
+        for index, (text, color) in enumerate(transport_parts(readout)):
+            if index:
+                imgui.same_line(0.0, _TRANSPORT_GAP)
+            imgui.text_colored(_rgba(color), text)
         scope = f"scope: {self._scope_label(menu_state)}"
         width = imgui.calc_text_size(scope).x
         avail = imgui.get_window_width()
         pad = imgui.get_style().window_padding.x
         imgui.same_line(max(imgui.get_cursor_pos_x(), avail - width - pad))
         imgui.text(scope)
+        origin = imgui.get_window_pos()
+        size = imgui.get_window_size()
+        _stroke_h_rule(
+            origin.x,
+            origin.x + size.x,
+            origin.y + size.y - 1.0,
+            TRANSPORT_RULE,
+        )
 
     def _draw_navigator(self) -> None:
         focus = self._controls.shell_focus
-        for node in build_navigator(self._controls.session):
-            clicked, _selected = imgui.selectable(
-                f"{node.label}##nav-{node.id}",
-                node.id == focus.selected_id,
-            )
-            if node.badge:
-                _draw_item_suffix(node.badge, _rgba(LABEL))
-            if clicked:
-                self._controls.navigator.select(node.id)
+        imgui.push_style_color(imgui.Col_.text, _rgba(LABEL))
+        try:
+            for node in build_navigator(self._controls.session):
+                clicked, _selected = imgui.selectable(
+                    f"{node.label}##nav-{node.id}",
+                    node.id == focus.selected_id,
+                )
+                if node.badge:
+                    _draw_item_suffix(node.badge, _rgba(LABEL))
+                if clicked:
+                    self._controls.navigator.select(node.id)
+        finally:
+            imgui.pop_style_color()
 
     def _draw_inspector(self, state: Any) -> None:
         focus = self._controls.shell_focus
@@ -817,16 +960,23 @@ class ShellHost:
             self._wheel_x = 0.0
             self._wheel_y = 0.0
 
-    def _draw_bar(self, menu_state: MenuBarState, command_ctx: CommandContext) -> None:
+    def _draw_bar(
+        self, menu_state: MenuBarState
+    ) -> tuple[float | None, dict[int, tuple[float, float]], tuple[Any, ...]]:
         menus = menus_for_session(self._controls.session)
         anchors: dict[int, tuple[float, float]] = {}
         highlight = _rgba(HIGHLIGHT, FOCUS_ROW_BG_ALPHA / 255.0)
         imgui.push_style_color(imgui.Col_.text, _rgba(LABEL))
+        # The bar's own border is covered by opaque menu buttons except where
+        # the highlight is translucent. The white rule is drawn later, on top.
+        imgui.push_style_var(imgui.StyleVar_.window_border_size, 0.0)
         bar_open = imgui.begin_main_menu_bar()
+        rule_y: float | None = None
         try:
             if bar_open:
                 bar_bottom = imgui.get_window_pos().y + imgui.get_window_height()
                 self._menu_bar_height_px = max(1, int(round(bar_bottom)))
+                rule_y = bar_bottom - 1.0
                 for index, menu in enumerate(menus):
                     active = menu_state.focused and menu_state.menu_index == index
                     if active:
@@ -844,17 +994,9 @@ class ShellHost:
         finally:
             if bar_open:
                 imgui.end_main_menu_bar()
+            imgui.pop_style_var()
             imgui.pop_style_color()
-        popup_hovered = False
-        if menu_state.dropdown_open and menus:
-            popup_hovered = self._draw_dropdown(
-                menu_state, command_ctx, menus, anchors
-            )
-        if imgui.is_mouse_clicked(0) and not popup_hovered:
-            mouse = imgui.get_mouse_pos()
-            in_bar = 0.0 <= mouse.y < float(self._menu_bar_height_px)
-            if not in_bar:
-                menu_state.blur()
+        return rule_y, anchors, menus
 
     def _draw_dropdown(
         self,
@@ -874,6 +1016,9 @@ class ShellHost:
         imgui.set_next_window_pos(
             imgui.ImVec2(origin_x, origin_y), imgui.Cond_.always
         )
+        # Shell panels are begun earlier and must not cover this window.
+        # Focusing it moves it to the front of the display stack.
+        imgui.set_next_window_focus()
         visible, _open = imgui.begin("##cleave-menu", None, _POPUP_FLAGS)
         try:
             if not visible:

@@ -16,6 +16,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- The menu bar rule is a solid white line under the menu names, and open menus draw above the side panels. The transport shows a green play or pause mark, an unbracketed clock, and bar, fps, and rec in the label colour, with a dark rule under the bar. The navigator has a dark border when idle, sits below that rule, and draws its rows in the label colour.
 - Inspector groups show an expand or collapse arrow and highlight when focused, so they open and close. Field labels use the label colour, stepped values show side arrows, and the inspector column is half again as wide.
 - The live menu bar no longer crashes at startup when Wayland is set and the window is using an X11 OpenGL context.
 - A launch failure after the editor has quit pygame is no longer replaced by a video-system error in the file picker.

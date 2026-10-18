@@ -12,6 +12,10 @@ Accent colors for modes and icons (not label/value roles):
   PRESET_ICON, PRESET_FILE_ICON,
   TIMELINE_BAR_ON, BAR_GRID, PLAYHEAD, PLAYHEAD_FLASH, SONG_MARKER, SONG_MARKER_SELECTED
 
+Shell rules (not text roles):
+  TRANSPORT_RULE — dark rule under the transport bar
+  NAVIGATOR_BORDER — dark border around the navigator when it is not the active region
+
 Layout scales:
   UI_SCALE (1.2) — main tuning panel, help, modals, and Material Icons spacing
   TIMELINE_UI_SCALE (1.2) — bottom timeline strip typography and spacing
@@ -147,6 +151,8 @@ BACKGROUND: tuple[int, int, int] = (0, 0, 0)
 BACKGROUND_ALPHA: int = int(1.0 * 255)
 MODAL_SCRIM_ALPHA: int = int(0.55 * 255)
 BORDER_COLOR: tuple[int, int, int] = (255, 255, 255)
+TRANSPORT_RULE: tuple[int, int, int] = (68, 68, 68)
+NAVIGATOR_BORDER: tuple[int, int, int] = (85, 85, 85)
 
 LABEL: tuple[int, int, int] = (170, 210, 255)
 VALUE: tuple[int, int, int] = (255, 255, 255)
