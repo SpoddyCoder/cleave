@@ -19,9 +19,9 @@ Plan: [plans/ai-integration-proposal.md](plans/ai-integration-proposal.md).
 
 ## Menu and panel overhaul
 
-Move from one expandable tuning tree to an in-window menu bar, object navigator, and property inspector; keep the timeline strip as a separate region. Keyboard navigation first, then mouse (hover, click, drag values, column split) on shared layout rects.
+Move from one expandable tuning tree to an in-window Dear ImGui shell: menu bar, object navigator, and property inspector. Keep the timeline strip as its own region. Keyboard scopes first, then the mouse gestures in the design.
 
-Plan: [plans/menu-overhaul-and-mouse-support-proposal.md](plans/menu-overhaul-and-mouse-support-proposal.md).
+Plan: [plans/menu-overhaul-and-mouse-support-plan.md](plans/menu-overhaul-and-mouse-support-plan.md).
 
 ## Timeline richer cue types
 
