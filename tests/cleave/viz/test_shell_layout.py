@@ -29,7 +29,7 @@ def test_columns_use_navigator_and_inspector_widths() -> None:
         columns_h,
     )
     assert layout.navigator[2] == 230
-    assert layout.inspector[2] == 330
+    assert layout.inspector[2] == 495
     assert layout.timeline == (0, 720, 1280, 0)
 
 
@@ -57,8 +57,8 @@ def test_narrow_display_keeps_widths_non_negative() -> None:
     assert nav_w + viz_w + insp_w == 400
     assert nav_w < NAVIGATOR_WIDTH
     assert insp_w < INSPECTOR_WIDTH
-    assert nav_w == 163
-    assert insp_w == 236
+    assert nav_w == 126
+    assert insp_w == 273
     assert viz_w == 1
     assert layout.visualiser[3] == 300 - 20 - 20
     assert layout.timeline[2] == 400

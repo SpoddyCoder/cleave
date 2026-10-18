@@ -41,8 +41,13 @@ from cleave.viz.menu_bar import MenuBarState, menus_for_session
 from cleave.viz.navigator import build_navigator
 from cleave.viz.overlay_primitives import overlay_font_path
 from cleave.viz.playback import format_mmss
+from cleave.viz.row_kinds import RowAffordance
 from cleave.viz.row_present_renderers import row_value_color_for
-from cleave.viz.row_sections import expand_arrow_glyph
+from cleave.viz.row_sections import (
+    INSPECTOR_GROUP_COLLAPSED,
+    INSPECTOR_GROUP_EXPANDED,
+    inspector_group_glyph,
+)
 from cleave.viz.row_spec import format_row_value, row_panel_label, row_spec
 from cleave.viz.shell_focus import CycleStop, ShellRegion
 from cleave.viz.shell_layout import ShellLayout
@@ -253,6 +258,27 @@ _SHELL_FLAGS = (
 )
 
 
+def _shell_glyph_ranges() -> list[int]:
+    """Default Latin plus the glyphs the shell draws outside that range.
+
+    Dear ImGui stops the default range at U+00FF. Disclosure triangles and the
+    menu check then rasterize as "?".
+    """
+    ranges = list(imgui.get_io().fonts.get_glyph_ranges_default())
+    if ranges and ranges[-1] == 0:
+        ranges = ranges[:-1]
+    ranges.extend(
+        (
+            ord(INSPECTOR_GROUP_COLLAPSED),
+            ord(INSPECTOR_GROUP_EXPANDED),
+            ord("✓"),
+            ord("✓"),
+            0,
+        )
+    )
+    return ranges
+
+
 def _rgba(rgb: tuple[int, int, int], alpha: float = 1.0) -> imgui.ImVec4:
     return imgui.ImVec4(rgb[0] / 255.0, rgb[1] / 255.0, rgb[2] / 255.0, alpha)
 
@@ -263,15 +289,39 @@ def _rect_contains(rect: tuple[int, int, int, int], x: float, y: float) -> bool:
 
 
 def _draw_item_suffix(text: str, color: imgui.ImVec4) -> None:
+    _draw_aligned_parts([(text, color)])
+
+
+def _draw_aligned_parts(parts: list[tuple[str, imgui.ImVec4]]) -> None:
+    if not parts:
+        return
+    widths = [imgui.calc_text_size(text).x for text, _color in parts]
     rect_min = imgui.get_item_rect_min()
     rect_max = imgui.get_item_rect_max()
-    width = imgui.calc_text_size(text).x
     pad = imgui.get_style().frame_padding.x
-    imgui.get_window_draw_list().add_text(
-        imgui.ImVec2(rect_max.x - width - pad, rect_min.y),
-        imgui.get_color_u32(color),
-        text,
+    x = rect_max.x - sum(widths) - pad
+    y = rect_min.y
+    draw = imgui.get_window_draw_list()
+    for (text, color), width in zip(parts, widths):
+        draw.add_text(imgui.ImVec2(x, y), imgui.get_color_u32(color), text)
+        x += width
+
+
+def _inspector_row_selected(focus: Any, desc: Any) -> bool:
+    return (
+        focus.region is ShellRegion.INSPECTOR
+        and focus.inspector_command_id is None
+        and focus.inspector_cursor == desc
     )
+
+
+def _value_parts(
+    value: str, color: imgui.ImVec4, *, stepped: bool
+) -> list[tuple[str, imgui.ImVec4]]:
+    if not stepped:
+        return [(value, color)]
+    bracket = _rgba(DISABLED)
+    return [("< ", bracket), (value, color), (" >", bracket)]
 
 
 def _draw_rect_border(rect: tuple[int, int, int, int]) -> None:
@@ -403,7 +453,12 @@ class ShellHost:
             _keep_keyboard_nav_off()
             io.set_ini_filename(os.devnull)
             font_size = float(tuning_ui_metrics().font_size)
-            font = io.fonts.add_font_from_file_ttf(str(overlay_font_path()), font_size)
+            font = io.fonts.add_font_from_file_ttf(
+                str(overlay_font_path()),
+                font_size,
+                None,
+                _shell_glyph_ranges(),
+            )
             io.font_default = font
             _apply_theme()
             renderer = _select_renderer_class()()
@@ -667,33 +722,43 @@ class ShellHost:
             kind = desc.kind
             spec = row_spec(kind)
             label = row_panel_label(kind, desc)
+            selected = _inspector_row_selected(focus, desc)
             if row.is_group:
-                glyph = expand_arrow_glyph(kind not in focus.collapsed)
+                glyph = inspector_group_glyph(kind not in focus.collapsed)
                 clicked, _selected = imgui.selectable(
                     f"{glyph} {label}##grp-{kind.name}",
-                    False,
+                    selected,
                 )
                 if clicked:
-                    self._controls.inspector.toggle_group(kind)
+                    self._controls.inspector.focus_row(row)
+                    self._controls.inspector.activate(row)
                 return
-            selected = (
-                focus.region is ShellRegion.INSPECTOR
-                and focus.inspector_command_id is None
-                and focus.inspector_cursor == desc
+            label_color = (
+                ACTION if spec.affordance is RowAffordance.ACTION else LABEL
             )
-            clicked, _selected = imgui.selectable(
-                f"{label}##row-{kind.name}-{desc.slot}-{desc.preset_index}",
-                selected,
-            )
+            imgui.push_style_color(imgui.Col_.text, _rgba(label_color))
+            try:
+                clicked, _selected = imgui.selectable(
+                    f"{label}##row-{kind.name}-{desc.slot}-{desc.preset_index}",
+                    selected,
+                )
+            finally:
+                imgui.pop_style_color()
             value = format_row_value(state, desc) if spec.format_value else ""
+            stepped = spec.apply_horizontal is not None and value not in ("on", "off")
             if spec.shows_dirty_suffix and state.config_dirty:
                 value = f"{value}*" if value else "*"
             if value:
-                _draw_item_suffix(value, _rgba(row_value_color_for(state, desc)))
+                _draw_aligned_parts(
+                    _value_parts(
+                        value,
+                        _rgba(row_value_color_for(state, desc)),
+                        stepped=stepped,
+                    )
+                )
             if clicked:
                 self._controls.inspector.focus_row(row)
-                if spec.apply_action is not None:
-                    self._controls.inspector.activate(row)
+                self._controls.inspector.activate(row)
         finally:
             if indent:
                 imgui.unindent(indent)

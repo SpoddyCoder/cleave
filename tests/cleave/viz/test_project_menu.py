@@ -304,6 +304,21 @@ def test_output_path_uses_project_renders_dir_and_range_suffix(
     assert view.project.output_label.endswith("render_10-20s.mp4")
 
 
+def test_enter_on_headers_toggles_expand() -> None:
+    from cleave.viz.shell_focus import ShellRegion
+
+    controls = _make_controls(("layer_1",))
+    controls.shell_focus.region = ShellRegion.INSPECTOR
+    controls.shell_focus.selected_id = "project"
+    controls.shell_focus.inspector_cursor = RowDescriptor(
+        RowKind.PROJECT_MILKDROP_HEADER
+    )
+    controls.inspector.handle_keydown(_keydown(pygame.K_RETURN))
+    assert RowKind.PROJECT_MILKDROP_HEADER in controls.shell_focus.collapsed
+    controls.inspector.handle_keydown(_keydown(pygame.K_RETURN))
+    assert RowKind.PROJECT_MILKDROP_HEADER not in controls.shell_focus.collapsed
+
+
 def test_left_right_on_headers_toggles_expand() -> None:
     from cleave.viz.shell_focus import ShellRegion
 

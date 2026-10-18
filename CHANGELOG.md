@@ -16,6 +16,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- Inspector groups show an expand or collapse arrow and highlight when focused, so they open and close. Field labels use the label colour, stepped values show side arrows, and the inspector column is half again as wide.
 - The live menu bar no longer crashes at startup when Wayland is set and the window is using an X11 OpenGL context.
 - A launch failure after the editor has quit pygame is no longer replaced by a video-system error in the file picker.
 

@@ -18,6 +18,16 @@ def expand_arrow_glyph(expanded: bool) -> str:
     return "▼" if expanded else "▶"
 
 
+# Inspector disclosure marks from the shell design (U+25BE / U+25B8).
+# The ImGui atlas must include this range; the default Latin range draws them as "?".
+INSPECTOR_GROUP_EXPANDED = "▾"
+INSPECTOR_GROUP_COLLAPSED = "▸"
+
+
+def inspector_group_glyph(expanded: bool) -> str:
+    return INSPECTOR_GROUP_EXPANDED if expanded else INSPECTOR_GROUP_COLLAPSED
+
+
 ExpandToggleFn = Callable[["TuningControls", str | None, bool], None]
 AppendDynamicChildrenFn = Callable[[list[RowDescriptor], "TuningViewState", str | None], None]
 PanelAnchorToggleFn = Callable[["TuningControls", bool], None]

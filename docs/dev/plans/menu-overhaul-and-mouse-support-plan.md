@@ -80,7 +80,7 @@ Do not re-open these in a later phase.
 
 1. **One phase, one playable commit.** Sub-steps are the checklist inside that commit. Content moves in slices: menu bar while the current tree still works; then settings and project; then layers; then render blocks (overlays, post-FX, pattern mask); then timeline and song markers. The old list shrinks as each slice moves. The last content phase deletes the old tuning tree and the global focus ring. Do not keep two full navigation models.
 2. **Dear ImGui from phase 1.** Not a spike and not a later option. Dependency is `imgui-bundle` (pthom). Nothing in [requirements.txt](../../../requirements.txt) or [requirements-freeze.txt](../../../requirements-freeze.txt) provides ImGui today. ImGui is in-window OpenGL chrome, not a Win32 menu. The design's hit-rects view still says what is clickable; those roles are ImGui items, not a custom `LayoutItem` hit-test engine. Keyboard scopes from the design still apply. ImGui's default Tab-between-widgets must not replace the region cycle.
-3. **`shell-split` until polish.** `shell-docked` lands in phase 7. Default column widths are 230px (navigator) and 330px (inspector) until then.
+3. **`shell-split` until polish.** `shell-docked` lands in phase 7. Default column widths are 230px (navigator) and 495px (inspector) until then. The mock's inspector column is 330px; the editor uses one and a half times that width so labels and stepped values fit.
 4. **Quick-nav remap.** `Ctrl+Up` / `Ctrl+Down` become previous / next top-level navigator node (Settings, Project, Render, Layers, Song markers). Do this in phase 2, when the navigator appears, not before.
 5. **File menu.** Save (`Ctrl+S`) and Quit (`Ctrl+Q`) call the existing commands. Open (`Ctrl+O`) stays disabled. Do not pull file-picker phase 3 into this plan.
 6. **Same-phase removal.** When a command becomes reachable from the menu or the inspector, remove the matching old-tree row in that same phase. Menu and inspector may both call one command when the mock shows both (Add layer, Delete layer, timeline preset actions, Measure latency). Do not leave the tree row for a later parity pass.
@@ -115,7 +115,7 @@ Mutations stay on `RowSpec.apply_horizontal`, `apply_action`, and the controller
 |  transport (play, time, bar, bpm, fps, record)                    |
 +----------+------------------------------+------------------------+
 | Navigator|  visualiser                  | Inspector              |
-| 230px    |  projectM + compositor       | 330px                  |
+| 230px    |  projectM + compositor       | 495px                  |
 +----------+------------------------------+------------------------+
 |  Timeline strip (own focus scope; hidden when closed)            |
 +------------------------------------------------------------------+
@@ -308,7 +308,7 @@ Tests use `/home/fernpa/anaconda3/envs/cleave/bin/python tests/run_unit_tests.py
 
 **Sub-steps.**
 
-- Layout regions: menu, transport under the menu, navigator, visualiser, inspector, timeline strip anchor. Widths fixed at 230 and 330. Do not draw `shell-docked`. Splitters are not draggable yet.
+- Layout regions: menu, transport under the menu, navigator, visualiser, inspector, timeline strip anchor. Widths fixed at 230 and 495. Do not draw `shell-docked`. Splitters are not draggable yet.
 - Move the transport readout into the bar. Remove the transport row from `RowLayout`.
 - Navigator: five top-level nodes. Settings and Project inspectors built from `SETTINGS_SECTION` and `PROJECT_SECTION` (`SectionNode` children become inspector groups). Render, Layers, and Song markers select the matching leftover header via the [migration bridge](#migration-bridge).
 - Drop Settings and Project from the old list, including rows already removed in phase 1.
@@ -318,7 +318,7 @@ Tests use `/home/fernpa/anaconda3/envs/cleave/bin/python tests/run_unit_tests.py
 - Style ImGui from theme roles. No new color.
 - Help: document Tab and the new `Ctrl+Up` / `Ctrl+Down`. Do not yet describe layer or render navigation as the shell.
 
-**Exit.** Play: Tab around the four regions (three when the strip is closed). Edit a settings field and a project field in the inspector. `Ctrl+Up` / `Ctrl+Down` visit Settings, Project, Render, Layers, Song markers. Render and Layers still edit on the leftover panel. Save still works. Column edges sit at 230 and 330 and do not drag.
+**Exit.** Play: Tab around the four regions (three when the strip is closed). Edit a settings field and a project field in the inspector. `Ctrl+Up` / `Ctrl+Down` visit Settings, Project, Render, Layers, Song markers. Render and Layers still edit on the leftover panel. Save still works. Column edges sit at 230 and 495 and do not drag.
 
 **Tests.** `tests/run_unit_tests.py -k "structure_signature or navigator or shell_focus"`. Extend `tests/cleave/viz/test_view_state_structure.py` so settings and project field visibility follows the inspector, and those sections are absent from the leftover `RowLayout`. Selection-change test: Project node builds the project groups. Quick-nav test: the five top-level ids, in order.
 
@@ -394,7 +394,7 @@ Clicks on menu items, nodes, and fields already work once those widgets exist. T
 - Add one hover role in [theme.py](../../../cleave/viz/theme.py) and use it for the translucent label wash. No one-off color in the draw path.
 - Wheel scrolls the navigator and the inspector.
 - Sideways drag on a numeric value repeats the same step as Left/Right (`apply_horizontal` with delta). Locked rows do not change. This is not an ImGui slider widget with a different scale.
-- Drag the boundary between navigator and visualiser, and between visualiser and inspector. Widths stay session-only until phase 7. Defaults remain 230 and 330 when the user has not dragged.
+- Drag the boundary between navigator and visualiser, and between visualiser and inspector. Widths stay session-only until phase 7. Defaults remain 230 and 495 when the user has not dragged.
 - Hit targets match the roles on `hit-rects`: `menu`, `menu_item`, `tree_node`, `field`, `group`, `toggle`, `splitter`, `timeline_lane`, `transport`.
 
 **Exit.** Play: hover a row and see the new role. Scroll both columns with the wheel. Drag a numeric value sideways and match Left/Right. Drag both splitters. Keyboard scopes still work, including Tab. The layout is still `shell-split`.
@@ -410,13 +410,13 @@ Clicks on menu items, nodes, and fields already work once those widgets exist. T
 **Sub-steps.**
 
 - `shell-docked` layout mode: navigator and inspector on the left, visualiser in the remaining space. Same scopes and timeline. Switching mode does not move selection.
-- Persist navigator and inspector widths in user editor settings, next to `ui_width`, through [user_config.py](../../../cleave/user_config.py) and [editor.py](../../../cleave/config_schema/editor.py). Absent keys mean 230 and 330. Do not write them into the project file.
+- Persist navigator and inspector widths in user editor settings, next to `ui_width`, through [user_config.py](../../../cleave/user_config.py) and [editor.py](../../../cleave/config_schema/editor.py). Absent keys mean 230 and 495. Do not write them into the project file.
 - Mnemonics: underline the first letter. `Alt` plus that letter opens the menu (F, P, L, R, T, S, H), handled in `input_dispatch.py` with keyboard nav still off.
 - Focus ring contrast against the theme highlight so the active field is readable on the inspector wash and on the hover wash.
 
 **Exit.** Play: switch to docked and back. Resize both columns, quit, relaunch, and see the widths return. `Alt+F` opens File. The focus ring is visible on a hovered row. Project YAML does not gain a column-width field.
 
-**Tests.** `tests/run_unit_tests.py -k "user_config or editor_settings or shell_layout"`. Round-trip widths in user config. Missing keys use 230 and 330. Project persist payload has no column widths. Mnemonic letters match the seven menus.
+**Tests.** `tests/run_unit_tests.py -k "user_config or editor_settings or shell_layout"`. Round-trip widths in user config. Missing keys use 230 and 495. Project persist payload has no column widths. Mnemonic letters match the seven menus.
 
 **Compare.** `shell-split` and `shell-docked`. Underlined menu letters. Focus ring on `inspector-card` and `inspector-locked`.
 

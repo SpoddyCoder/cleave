@@ -10,7 +10,7 @@ Open the HTML and append the hash, or evaluate `cleaveDesign.apply(name)`. `clea
 
 | View | Still | What to match |
 | --- | --- | --- |
-| `shell-split` | [shell-split.png](menu-overhaul-stills/shell-split.png) | Default chrome. Menu, transport under the menu, navigator, visualiser, inspector, timeline strip. Navigator focused on Layer 2. Columns start at 230px and 330px. |
+| `shell-split` | [shell-split.png](menu-overhaul-stills/shell-split.png) | Default chrome. Menu, transport under the menu, navigator, visualiser, inspector, timeline strip. Navigator focused on Layer 2. Columns start at 230px and 495px. The mock still draws the inspector at 330px. |
 | `shell-docked` | [shell-docked.png](menu-overhaul-stills/shell-docked.png) | Navigator and inspector docked left; visualiser fills the rest. Same scopes and timeline. |
 | `menu-layers` | [menu-layers.png](menu-overhaul-stills/menu-layers.png) | Layers menu open. Green items are commands. Plain items jump to a navigator node. Check mark mirrors `checked(state)`. Grey text is disabled. Shortcut column on the right. |
 | `inspector-locked` | [inspector-locked.png](menu-overhaul-stills/inspector-locked.png) | Layer 3 selected, inspector focused. Locked rows and the lock control use the locked role. The navigator shows the lock mark. |
@@ -78,7 +78,7 @@ Open the views for the phase, then compare the editor to the live page.
 | Phase | Views and sections |
 | --- | --- |
 | 1 Menu bar | `menu-layers`, `#taxonomy`, `#registry` |
-| 2 Shell, settings, project | `shell-split` for chrome and the 230 / 330 widths, `#scopes`. The still's Layer 2 inspector is phase 3. Not `shell-docked`. |
+| 2 Shell, settings, project | `shell-split` for chrome and the 230 / 495 widths, `#scopes`. The still's Layer 2 inspector is phase 3. Not `shell-docked`. |
 | 3 Layers | `inspector-locked`, `menu-layers` |
 | 4 Render blocks | `inspector-card`, `#taxonomy` for the Render menu |
 | 5 Timeline and song markers | `shell-split` on the Timeline and Song markers pages, `#compare`, `#scopes` |

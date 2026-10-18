@@ -90,6 +90,9 @@ class InspectorControls:
         if row.command_id is not None:
             run_inspector_command(self._controls, row.command_id)
             return
+        if row.is_group and row.descriptor is not None:
+            self.toggle_group(row.descriptor.kind)
+            return
         if row.descriptor is not None:
             apply_field_action(self._controls, row.descriptor)
 

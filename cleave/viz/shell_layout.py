@@ -11,7 +11,8 @@ from dataclasses import dataclass
 Rect = tuple[int, int, int, int]
 
 NAVIGATOR_WIDTH = 230
-INSPECTOR_WIDTH = 330
+# Half again the design mock's 330px column, so labels and stepped values fit.
+INSPECTOR_WIDTH = 495
 
 
 def _column_widths(display_w: int) -> tuple[int, int, int]:
@@ -19,7 +20,7 @@ def _column_widths(display_w: int) -> tuple[int, int, int]:
 
     The visualiser stays at least 1px when the display is at least 1px wide.
     Side columns shrink in proportion to their nominal widths when the window
-    is too narrow for 230 + 330 plus that pixel.
+    is too narrow for both columns plus that pixel.
     """
     if display_w <= 0:
         return (0, 0, 0)
