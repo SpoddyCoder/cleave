@@ -117,8 +117,8 @@ def test_draw_effects_expanded_panel_rect_within_surface() -> None:
 
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
     overlay.notify_input()
-    top_inset = _menu_bar_inset()
-    overlay.draw(surface, state, top_inset=top_inset)
+    visualiser_rect = _visualiser_below(surface.get_width(), surface.get_height())
+    overlay.draw(surface, state, visualiser_rect=visualiser_rect)
 
     panel = overlay.panel_rect
     assert panel is not None
@@ -127,8 +127,8 @@ def test_draw_effects_expanded_panel_rect_within_surface() -> None:
     assert px >= 0 and py >= 0
     assert px + pw <= sw and py + ph <= sh
     _, margin_y = overlay._margin
-    assert py == margin_y + top_inset
-    assert ph <= sh - margin_y * 2 - top_inset
+    assert py == margin_y + visualiser_rect[1]
+    assert ph <= visualiser_rect[3] - margin_y * 2
     surface.subsurface(panel)
 
 
@@ -138,13 +138,21 @@ def _menu_bar_inset() -> int:
     return menu_bar_height_px()
 
 
+def _visualiser_below(
+    width: int, height: int, *, top: int | None = None
+) -> tuple[int, int, int, int]:
+    if top is None:
+        top = _menu_bar_inset()
+    return (0, top, width, height - top)
+
+
 def _panel_scroll_metrics(
     overlay: TuningOverlay,
     state: TuningViewState,
     *,
     surface_height: int = 720,
     timeline_panel_open: bool = False,
-    top_inset: int = 0,
+    visualiser_rect: tuple[int, int, int, int] | None = None,
 ) -> PanelScrollMetrics:
     font = overlay._font_get()
     line_h = font.get_linesize()
@@ -159,7 +167,8 @@ def _panel_scroll_metrics(
     )
     header_gap = line_h + overlay._line_gap
     _, margin_y = overlay._margin
-    max_panel_h = surface_height - margin_y * 2 - top_inset
+    viz_h = surface_height if visualiser_rect is None else visualiser_rect[3]
+    max_panel_h = viz_h - margin_y * 2
     if timeline_panel_open:
         max_panel_h -= timeline_viewport_reserve_px(len(state.layer_z_order))
 
@@ -910,6 +919,26 @@ def _minimal_view_state(**kwargs: object) -> TuningViewState:
     }
     defaults.update(kwargs)
     return TuningViewState(**defaults)  # type: ignore[arg-type]
+
+
+def test_tuning_panel_is_placed_inside_visualiser_rect() -> None:
+    pygame.init()
+    overlay = TuningOverlay()
+    overlay.notify_input()
+    state = _minimal_view_state()
+    rect = (230, 48, 500, 400)
+    composed = overlay.compose_panel(
+        state,
+        viewport_width=1280,
+        viewport_height=720,
+        visualiser_rect=rect,
+    )
+    assert composed is not None
+    x, y, w, h = composed.screen_rect
+    mx, my = overlay._margin
+    assert (x, y) == (rect[0] + mx, rect[1] + my)
+    assert x + w <= rect[0] + rect[2]
+    assert y + h <= rect[1] + rect[3]
 
 
 def test_track_header_uses_stem_display_not_slot_key() -> None:
@@ -1789,16 +1818,16 @@ def test_max_panel_h_unchanged_when_timeline_closed() -> None:
     overlay = TuningOverlay()
     state = _effects_expanded_view_state()
     surface_height = 720
-    top_inset = _menu_bar_inset()
+    visualiser_rect = _visualiser_below(1280, surface_height)
     closed = _panel_scroll_metrics(
         overlay,
         state,
         surface_height=surface_height,
         timeline_panel_open=False,
-        top_inset=top_inset,
+        visualiser_rect=visualiser_rect,
     )
     _, margin_y = overlay._margin
-    assert closed.max_panel_h == surface_height - margin_y * 2 - top_inset
+    assert closed.max_panel_h == visualiser_rect[3] - margin_y * 2
 
 
 def test_panel_reserves_timeline_viewport_when_open() -> None:
@@ -1808,15 +1837,15 @@ def test_panel_reserves_timeline_viewport_when_open() -> None:
     surface_height = 720
     surface = pygame.Surface((1280, surface_height), pygame.SRCALPHA)
     overlay.notify_input()
-    top_inset = _menu_bar_inset()
-    overlay.draw(surface, state, timeline_panel_open=True, top_inset=top_inset)
+    visualiser_rect = _visualiser_below(surface.get_width(), surface_height)
+    overlay.draw(surface, state, timeline_panel_open=True, visualiser_rect=visualiser_rect)
 
     panel = overlay.panel_rect
     assert panel is not None
     _, py, _, ph = panel
     _, margin_y = overlay._margin
     reserve = timeline_viewport_reserve_px(len(state.layer_z_order))
-    assert py == margin_y + top_inset
+    assert py == margin_y + visualiser_rect[1]
     assert py + ph + reserve <= surface_height - margin_y
 
     open_metrics = _panel_scroll_metrics(
@@ -1824,14 +1853,14 @@ def test_panel_reserves_timeline_viewport_when_open() -> None:
         state,
         surface_height=surface_height,
         timeline_panel_open=True,
-        top_inset=top_inset,
+        visualiser_rect=visualiser_rect,
     )
     closed_metrics = _panel_scroll_metrics(
         overlay,
         state,
         surface_height=surface_height,
         timeline_panel_open=False,
-        top_inset=top_inset,
+        visualiser_rect=visualiser_rect,
     )
     assert open_metrics.max_panel_h < closed_metrics.max_panel_h
     assert open_metrics.max_panel_h == closed_metrics.max_panel_h - reserve
@@ -1845,7 +1874,7 @@ def test_long_panel_clears_cue_readout() -> None:
     _, margin_y = TuningOverlay()._margin
     clearance = cue_readout_panel_clearance_px(margin_y)
     assert clearance > 0
-    top_inset = _menu_bar_inset()
+    visualiser_rect = _visualiser_below(surface.get_width(), surface_height)
 
     with_cue = TuningOverlay()
     with_cue.notify_input()
@@ -1854,17 +1883,19 @@ def test_long_panel_clears_cue_readout() -> None:
         state,
         timeline_panel_open=True,
         cue_readout_open=True,
-        top_inset=top_inset,
+        visualiser_rect=visualiser_rect,
     )
     without_cue = TuningOverlay()
     without_cue.notify_input()
-    without_cue.draw(surface, state, timeline_panel_open=True, top_inset=top_inset)
+    without_cue.draw(
+        surface, state, timeline_panel_open=True, visualiser_rect=visualiser_rect
+    )
 
     cue_panel = with_cue.panel_rect
     plain_panel = without_cue.panel_rect
     assert cue_panel is not None and plain_panel is not None
     _, py, _, ph = cue_panel
-    assert py == margin_y + top_inset
+    assert py == margin_y + visualiser_rect[1]
     assert ph == plain_panel[3] - clearance
 
     metrics = timeline_ui_metrics()

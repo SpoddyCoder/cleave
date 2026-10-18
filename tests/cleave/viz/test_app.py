@@ -35,6 +35,21 @@ from tests.support.compositor_mock import recording_compositor
 from tests.support.viz import make_test_cfg
 
 
+def _assert_warmup_tick(tick_call: object) -> None:
+    from cleave.viz.shell_layout import ShellLayout
+
+    kwargs = tick_call.kwargs  # type: ignore[attr-defined]
+    layout = kwargs["layout"]
+    assert isinstance(layout, ShellLayout)
+    assert tick_call == call(
+        0.0,
+        paused=False,
+        n_pcm=samples_per_frame(LIVE_PROJECTM_FPS),
+        dt_sec=0.0,
+        layout=layout,
+    )
+
+
 def _minimal_runtime(compositor: MagicMock, *, upscale: float = 2.0) -> LiveVisualizerRuntime:
     display_w = int(1280 * upscale)
     display_h = int(720 * upscale)
@@ -295,12 +310,7 @@ def test_run_boot_order_audio_starts_after_first_frame(
     mock_init_cheap.assert_called_once_with(seed, compositor=loading_compositor)
     mock_init_heavy.assert_called_once()
     mock_tick_frame.assert_called()
-    assert mock_tick_frame.call_args_list[0] == call(
-        0.0,
-        paused=False,
-        n_pcm=samples_per_frame(LIVE_PROJECTM_FPS),
-        dt_sec=0.0,
-    )
+    _assert_warmup_tick(mock_tick_frame.call_args_list[0])
     assert isinstance(app._runtime, LiveVisualizerRuntime)
     app._runtime.mix_player.start.assert_called_once()
     assert call_order.index("tick_frame") < call_order.index("mix_start")
@@ -650,12 +660,7 @@ def test_run_holds_content_and_overlay_while_project_render_busy(
         assert str(exc) == "still running"
 
     mock_tick_frame.assert_called_once()
-    assert mock_tick_frame.call_args == call(
-        0.0,
-        paused=False,
-        n_pcm=samples_per_frame(LIVE_PROJECTM_FPS),
-        dt_sec=0.0,
-    )
+    _assert_warmup_tick(mock_tick_frame.call_args)
     assert isinstance(app._runtime, LiveVisualizerRuntime)
     app._runtime.compositor.present_content.assert_called()
     mock_live_overlay.assert_called()
@@ -986,7 +991,12 @@ def test_tick_frame_draws_tuning_when_modal_active_and_panel_hidden(
 
     runtime.controls.build_view_state.assert_called_once()
     mock_draw_tuning.assert_called_once()
-    assert mock_draw_tuning.call_args.kwargs["top_inset"] == 0
+    from cleave.viz.shell_layout import ShellLayout
+
+    display_w, display_h = runtime.overlay_surface.get_size()
+    expected = ShellLayout.compute(display_w, display_h, 0, 0, 0)
+    assert mock_draw_tuning.call_args.kwargs["visualiser_rect"] == expected.visualiser
+    runtime.compositor.set_present_rect.assert_called_with(None)
 
 
 @patch("cleave.viz.app.OverlayDrawer.draw_tuning")
@@ -1012,11 +1022,22 @@ def test_tick_frame_insets_panels_by_full_menu_bar_height_when_faded(
     overlay.notify_input()
     overlay._idle_sec = overlay._hold_idle_sec + overlay._fade_duration_sec * 0.6
     app = VisualizerApp(runtime)
-    app._shell = SimpleNamespace(menu_bar_height_px=23)
+    shell = SimpleNamespace(menu_bar_height_px=23, set_layout=MagicMock())
+    app._shell = shell
     app.tick_frame(1.0, paused=True, draw_overlay=True, n_pcm=735)
 
+    from cleave.viz.shell_host import menu_bar_height_px
+    from cleave.viz.shell_layout import ShellLayout
+
+    display_w, display_h = runtime.overlay_surface.get_size()
+    expected = ShellLayout.compute(
+        display_w, display_h, 23, menu_bar_height_px(), 0
+    )
     mock_draw_tuning.assert_called_once()
-    assert mock_draw_tuning.call_args.kwargs["top_inset"] == 23
+    assert mock_draw_tuning.call_args.kwargs["visualiser_rect"] == expected.visualiser
+    runtime.compositor.set_present_rect.assert_called_with(expected.visualiser)
+    shell.set_layout.assert_called_once()
+    assert shell.set_layout.call_args.args[0].visualiser == expected.visualiser
 
 
 def test_live_overlay_ui_active_gating() -> None:

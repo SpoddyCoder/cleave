@@ -917,7 +917,8 @@ def test_tuning_panel_max_dimensions_reserves_timeline_strip() -> None:
 
     overlay = TuningOverlay()
     _, margin_y = overlay._margin
-    top_inset = menu_bar_height_px()
+    top = menu_bar_height_px()
+    visualiser_rect = (0, top, 1280, 720 - top)
     open_h = tuning_panel_max_dimensions(
         1280,
         720,
@@ -926,7 +927,7 @@ def test_tuning_panel_max_dimensions_reserves_timeline_strip() -> None:
         margin_y=margin_y,
         padding=overlay._padding,
         timeline_row_count=4,
-        top_inset=top_inset,
+        visualiser_rect=visualiser_rect,
     )[1]
     closed_h = tuning_panel_max_dimensions(
         1280,
@@ -935,9 +936,9 @@ def test_tuning_panel_max_dimensions_reserves_timeline_strip() -> None:
         timeline_panel_open=False,
         margin_y=margin_y,
         padding=overlay._padding,
-        top_inset=top_inset,
+        visualiser_rect=visualiser_rect,
     )[1]
-    assert closed_h == 720 - margin_y * 2 - top_inset
+    assert closed_h == visualiser_rect[3] - margin_y * 2
     assert open_h < closed_h
 
 

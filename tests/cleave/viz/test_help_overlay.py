@@ -538,16 +538,18 @@ def test_help_panel_starts_below_menu_bar() -> None:
     from cleave.viz.shell_host import menu_bar_height_px
 
     overlay = HelpOverlay()
-    top_inset = menu_bar_height_px()
+    top = menu_bar_height_px()
+    visualiser_rect = (0, top, 1280, 720 - top)
     composed = overlay.compose_panel(
         RowDescriptor(RowKind.TRANSPORT),
         viewport_width=1280,
         viewport_height=720,
-        top_inset=top_inset,
+        visualiser_rect=visualiser_rect,
     )
     assert composed is not None
     _, margin_y = overlay._margin
-    assert composed.screen_rect[1] == margin_y + top_inset
+    assert composed.screen_rect[1] == margin_y + visualiser_rect[1]
+    assert composed.screen_rect[0] + composed.screen_rect[2] <= visualiser_rect[0] + visualiser_rect[2]
 
 
 def test_layer_management_add_help() -> None:

@@ -34,6 +34,7 @@ from cleave.gl_state import restore_gl_state, save_gl_state
 from cleave.viz.commands import Command, CommandContext, MenuSeparator
 from cleave.viz.menu_bar import MenuBarState, menus_for_session
 from cleave.viz.overlay_primitives import overlay_font_path
+from cleave.viz.shell_layout import ShellLayout
 from cleave.viz.theme import (
     BACKGROUND,
     BORDER_COLOR,
@@ -318,6 +319,7 @@ class ShellHost:
         self._controls = controls
         self._display_size = display_size
         self._menu_bar_height_px = bar_height
+        self._layout: ShellLayout | None = None
         self._mouse_pos: tuple[float, float] | None = None
         self._buttons: list[tuple[int, bool]] = []
         self._held: set[int] = set()
@@ -359,6 +361,14 @@ class ShellHost:
     @property
     def menu_bar_height_px(self) -> int:
         return self._menu_bar_height_px
+
+    @property
+    def layout(self) -> ShellLayout | None:
+        return self._layout
+
+    def set_layout(self, layout: ShellLayout) -> None:
+        """Remember the frame's shell rects. Draw still paints only the menu bar."""
+        self._layout = layout
 
     def destroy(self) -> None:
         renderer = self._renderer

@@ -21,7 +21,8 @@ from cleave.viz.help_panel_cache import (
 )
 from cleave.viz.overlay_primitives import (
     ComposedPanel,
-    clip_rect_to_bounds,
+    bounds_rect,
+    clip_rect_to_rect,
     draw_panel_border,
     overlay_font,
     overlay_panel_surface,
@@ -209,9 +210,12 @@ class HelpOverlay:
         preset_switching: str | None = None,
         preset_curation: bool = False,
         layer_count: int = 4,
-        top_inset: int = 0,
+        visualiser_rect: tuple[int, int, int, int] | None = None,
     ) -> ComposedPanel | None:
         self._panel_rect = None
+        visualiser_rect = bounds_rect(
+            viewport_width, viewport_height, visualiser_rect
+        )
         font = self._font_get()
         content_sig = help_content_signature(
             focus,
@@ -263,11 +267,11 @@ class HelpOverlay:
             cache.panel_size = panel_size
 
         mx, my = self._margin
-        pos = (viewport_width - panel_w - mx, my + top_inset)
-        bounds = clip_rect_to_bounds(
+        vx, vy, vw, _vh = visualiser_rect
+        pos = (vx + vw - panel_w - mx, vy + my)
+        bounds = clip_rect_to_rect(
             (pos[0], pos[1], panel_w, panel_h),
-            viewport_width,
-            viewport_height,
+            visualiser_rect,
         )
         if bounds is None:
             return None
@@ -326,7 +330,7 @@ class HelpOverlay:
         preset_switching: str | None = None,
         preset_curation: bool = False,
         layer_count: int = 4,
-        top_inset: int = 0,
+        visualiser_rect: tuple[int, int, int, int] | None = None,
     ) -> None:
         composed = self.compose_panel(
             focus,
@@ -340,13 +344,16 @@ class HelpOverlay:
             preset_switching=preset_switching,
             preset_curation=preset_curation,
             layer_count=layer_count,
-            top_inset=top_inset,
+            visualiser_rect=visualiser_rect,
         )
         if composed is None:
             self._panel_rect = None
             return
         panel = self._cache.panel
         assert panel is not None
+        vx, vy, vw, _vh = bounds_rect(
+            surface.get_width(), surface.get_height(), visualiser_rect
+        )
         mx, my = self._margin
-        pos = (surface.get_width() - panel.get_width() - mx, my + top_inset)
+        pos = (vx + vw - panel.get_width() - mx, vy + my)
         surface.blit(panel, pos)

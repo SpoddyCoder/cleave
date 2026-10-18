@@ -67,7 +67,8 @@ from cleave.viz.theme import (
 )
 from cleave.viz.overlay_primitives import (
     ComposedPanel,
-    clip_rect_to_bounds,
+    bounds_rect,
+    clip_rect_to_rect,
     draw_panel_border,
     overlay_font,
 )
@@ -270,7 +271,7 @@ def tuning_panel_max_dimensions(
     padding: int,
     panel_max_width: int | None = None,
     timeline_row_count: int = 0,
-    top_inset: int = 0,
+    visualiser_rect: tuple[int, int, int, int] | None = None,
 ) -> tuple[int, int]:
     """Maximum panel width and height for stable GPU texture capacity."""
     del viewport_w  # horizontal placement uses margin_x elsewhere
@@ -280,7 +281,8 @@ def tuning_panel_max_dimensions(
         else panel_content_max_width_px(ui_width)
     )
     max_panel_w = max_w + padding * 2
-    max_panel_h = viewport_h - margin_y * 2 - top_inset
+    viz_h = viewport_h if visualiser_rect is None else visualiser_rect[3]
+    max_panel_h = viz_h - margin_y * 2
     if timeline_panel_open and timeline_row_count > 0:
         from cleave.viz.timeline_overlay import (
             cue_readout_panel_clearance_px,
@@ -995,11 +997,14 @@ class TuningOverlay:
         timeline_panel_open: bool = False,
         cue_readout_open: bool = False,
         counters: OverlayDrawCounters | None = None,
-        top_inset: int = 0,
+        visualiser_rect: tuple[int, int, int, int] | None = None,
     ) -> ComposedPanel | None:
         self._panel_rect = None
         if self._visibility <= 0.01 or len(state.layout) == 0:
             return None
+        visualiser_rect = bounds_rect(
+            viewport_width, viewport_height, visualiser_rect
+        )
 
         font = self._font_get()
         line_h = font.get_linesize()
@@ -1029,7 +1034,7 @@ class TuningOverlay:
             padding=self._padding,
             panel_max_width=panel_max_width,
             timeline_row_count=len(state.layer_z_order),
-            top_inset=top_inset,
+            visualiser_rect=visualiser_rect,
         )
         max_panel_h = capacity[1]
         metrics = scroll_metrics(
@@ -1070,7 +1075,7 @@ class TuningOverlay:
         margin_x, _ = self._margin
         viewport_content_max = max(
             panel_max_width,
-            viewport_width - margin_x * 2 - self._padding * 2,
+            visualiser_rect[2] - margin_x * 2 - self._padding * 2,
         )
         vis_tuple = tuple(visible_indices)
         # Stable order matching layout; viewport rows only for the static signature.
@@ -1172,9 +1177,7 @@ class TuningOverlay:
             placement = self._finish_compose_panel(
                 panel_w=panel_w,
                 panel_h=panel_h,
-                viewport_width=viewport_width,
-                viewport_height=viewport_height,
-                top_inset=top_inset,
+                visualiser_rect=visualiser_rect,
             )
             if placement is None:
                 return None
@@ -1320,9 +1323,7 @@ class TuningOverlay:
         placement = self._finish_compose_panel(
             panel_w=panel_w,
             panel_h=panel_h,
-            viewport_width=viewport_width,
-            viewport_height=viewport_height,
-            top_inset=top_inset,
+            visualiser_rect=visualiser_rect,
         )
         if placement is None:
             return None
@@ -1431,20 +1432,18 @@ class TuningOverlay:
         *,
         panel_w: int,
         panel_h: int,
-        viewport_width: int,
-        viewport_height: int,
-        top_inset: int = 0,
+        visualiser_rect: tuple[int, int, int, int],
     ) -> tuple[tuple[int, int, int, int], tuple[int, int]] | None:
+        vx, vy, vw, vh = visualiser_rect
         mx, my = self._margin
         if self._anchor == "topleft":
-            pos = (mx, my + top_inset)
+            pos = (vx + mx, vy + my)
         else:
-            pos = (mx, viewport_height - panel_h - my)
+            pos = (vx + mx, vy + vh - panel_h - my)
 
-        bounds = clip_rect_to_bounds(
+        bounds = clip_rect_to_rect(
             (pos[0], pos[1], panel_w, panel_h),
-            viewport_width,
-            viewport_height,
+            visualiser_rect,
         )
         if bounds is None:
             return None
@@ -1461,7 +1460,7 @@ class TuningOverlay:
         timeline_panel_open: bool = False,
         cue_readout_open: bool = False,
         counters: OverlayDrawCounters | None = None,
-        top_inset: int = 0,
+        visualiser_rect: tuple[int, int, int, int] | None = None,
     ) -> None:
         composed = self.compose_panel(
             state,
@@ -1470,16 +1469,19 @@ class TuningOverlay:
             timeline_panel_open=timeline_panel_open,
             cue_readout_open=cue_readout_open,
             counters=counters,
-            top_inset=top_inset,
+            visualiser_rect=visualiser_rect,
         )
         if composed is None:
             self._panel_rect = None
             return
         panel = self._panel_scratch
         assert panel is not None
+        vx, vy, _vw, vh = bounds_rect(
+            surface.get_width(), surface.get_height(), visualiser_rect
+        )
         mx, my = self._margin
         if self._anchor == "topleft":
-            blit_pos = (mx, my + top_inset)
+            blit_pos = (vx + mx, vy + my)
         else:
-            blit_pos = (mx, surface.get_height() - panel.get_height() - my)
+            blit_pos = (vx + mx, vy + vh - panel.get_height() - my)
         surface.blit(panel, blit_pos)

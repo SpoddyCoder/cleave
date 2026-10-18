@@ -21,6 +21,7 @@ from cleave.layer_blend import (
     opacity_in_alpha,
 )
 from cleave.layer_composite import LayerCompositeRequest
+from cleave.viz.theme import BACKGROUND
 from OpenGL.GL import (
     GL_BLEND,
     GL_BLEND_EQUATION_RGB,
@@ -192,6 +193,37 @@ class LayerFbo:
         self.unbind()
 
 
+def _present_dest_rect(
+    present_rect: tuple[int, int, int, int] | None,
+    display_width: int,
+    display_height: int,
+    content_width: int,
+    content_height: int,
+) -> tuple[float, float, float, float] | None:
+    """Full-display stretch, or the content aspect-fit inside *present_rect*."""
+    if present_rect is None:
+        if display_width <= 0 or display_height <= 0:
+            return None
+        return (0.0, 0.0, float(display_width), float(display_height))
+    rx, ry, rw, rh = present_rect
+    if rw <= 0 or rh <= 0 or content_width <= 0 or content_height <= 0:
+        return None
+    content_aspect = content_width / content_height
+    rect_aspect = rw / rh
+    if content_aspect >= rect_aspect:
+        fit_w = float(rw)
+        fit_h = fit_w / content_aspect
+    else:
+        fit_h = float(rh)
+        fit_w = fit_h * content_aspect
+    return (
+        rx + (rw - fit_w) / 2.0,
+        ry + (rh - fit_h) / 2.0,
+        fit_w,
+        fit_h,
+    )
+
+
 class GlCompositor:
     """Unmasked layer stack into a content FBO, then present to display.
 
@@ -233,6 +265,7 @@ class GlCompositor:
         self._content_fbo_id: int = 0
         self._content_texture_id: int = 0
         self._content_depth_rbo_id: int = 0
+        self._present_rect: tuple[int, int, int, int] | None = None
 
     def init(self) -> None:
         """Initialize GL state after a pygame OPENGL context exists."""
@@ -845,19 +878,42 @@ class GlCompositor:
             self._pop_blend_state(blend_enabled, blend_src, blend_dst, blend_equation)
             glColor4f(1.0, 1.0, 1.0, 1.0)
 
+    def set_present_rect(self, rect: tuple[int, int, int, int] | None) -> None:
+        """Confine the content blit to *rect*, or the full display when None.
+
+        Offline render leaves this unset so ``read_rgba_frame`` stays full-frame.
+        """
+        self._present_rect = rect
+
     def present_content(self) -> None:
-        """Blit content FBO to the default framebuffer at display size."""
+        """Clear to the shell background and blit the content texture.
+
+        With no present rect, stretch to the full display. With a rect,
+        aspect-fit the content inside that rect.
+        """
         self._ensure_init()
         self._bind_default_framebuffer()
         glDisable(GL_BLEND)
-        self._draw_textured_quad(
-            self._content_texture_id,
-            0.0,
-            0.0,
+        red, green, blue = BACKGROUND
+        glClearColor(red / 255.0, green / 255.0, blue / 255.0, 1.0)
+        glClear(GL_COLOR_BUFFER_BIT)
+        dest = _present_dest_rect(
+            self._present_rect,
             self.display_width,
             self.display_height,
-            (1.0, 1.0, 1.0, 1.0),
+            self.content_width,
+            self.content_height,
         )
+        if dest is not None:
+            x, y, width, height = dest
+            self._draw_textured_quad(
+                self._content_texture_id,
+                x,
+                y,
+                width,
+                height,
+                (1.0, 1.0, 1.0, 1.0),
+            )
         glEnable(GL_BLEND)
 
     def read_rgba_frame(self) -> bytes:

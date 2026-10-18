@@ -156,7 +156,7 @@ class OverlayDrawer:
         help_overlay: HelpOverlay | None = None,
         modal_host: ModalHost | None = None,
         profiler: OverlayProfiler | None = None,
-        top_inset: int = 0,
+        visualiser_rect: tuple[int, int, int, int] | None = None,
     ) -> None:
         viewport_w, viewport_h = overlay_surface.get_size()
         counters = profiler.counters() if profiler is not None else None
@@ -190,12 +190,12 @@ class OverlayDrawer:
                 timeline_panel_open=timeline_panel_open,
                 cue_readout_open=cue_readout_open,
                 counters=counters,
-                top_inset=top_inset,
+                visualiser_rect=visualiser_rect,
             )
             if help_overlay is not None and show_help:
                 help_overlay.draw(
                     overlay_surface,
-                    top_inset=top_inset,
+                    visualiser_rect=visualiser_rect,
                     **_help_compose_kwargs(view_state),
                 )
             modal_view = modal_host.view_state()
@@ -218,7 +218,7 @@ class OverlayDrawer:
             timeline_panel_open=timeline_panel_open,
             cue_readout_open=cue_readout_open,
             counters=counters,
-            top_inset=top_inset,
+            visualiser_rect=visualiser_rect,
         )
         if composed is not None:
             tex_id, tex_uv = _coordinator_upload(
@@ -244,7 +244,7 @@ class OverlayDrawer:
             help_composed = help_overlay.compose_panel(
                 viewport_width=viewport_w,
                 viewport_height=viewport_h,
-                top_inset=top_inset,
+                visualiser_rect=visualiser_rect,
                 **_help_compose_kwargs(view_state),
             )
             if help_composed is not None:
@@ -310,12 +310,14 @@ class OverlayDrawer:
         *,
         visibility: float = 1.0,
         profiler: OverlayProfiler | None = None,
+        timeline_rect: tuple[int, int, int, int] | None = None,
     ) -> None:
         composed = overlay.compose_panel(
             view_state,
             viewport_width=overlay_surface.get_width(),
             viewport_height=overlay_surface.get_height(),
             visibility=visibility,
+            timeline_rect=timeline_rect,
         )
         if composed is not None and visibility > 0.01:
             tex_id, tex_uv = _coordinator_upload(

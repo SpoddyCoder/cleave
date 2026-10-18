@@ -729,6 +729,38 @@ def test_draw_does_not_crash() -> None:
     surface.subsurface(panel)
 
 
+def test_compose_panel_occupies_timeline_band() -> None:
+    pygame.init()
+    from cleave.viz.theme import timeline_panel_height_px
+    from cleave.viz.timeline_overlay import timeline_band_height_px
+
+    overlay = TimelineOverlay()
+    state = _view_state()
+    row_count = len(state.layer_z_order)
+    viewport_w, viewport_h = 1280, 720
+    band_h = timeline_band_height_px(row_count)
+    band = (0, viewport_h - band_h, viewport_w, band_h)
+    composed = overlay.compose_panel(
+        state,
+        viewport_width=viewport_w,
+        viewport_height=viewport_h,
+        timeline_rect=band,
+    )
+    assert composed is not None
+    panel = overlay.panel_rect
+    assert panel is not None
+    px, py, pw, ph = panel
+    metrics = timeline_ui_metrics()
+    assert px == metrics.margin
+    assert pw == viewport_w - metrics.margin * 2
+    assert ph == timeline_panel_height_px(row_count)
+    assert py == viewport_h - ph - metrics.margin
+    badge = overlay.header_badge_rect
+    assert badge is not None
+    assert badge[1] >= band[1]
+    assert badge[1] + badge[3] <= py
+
+
 def test_song_markers_drawn_on_static_panel() -> None:
     pygame.init()
     overlay = TimelineOverlay()

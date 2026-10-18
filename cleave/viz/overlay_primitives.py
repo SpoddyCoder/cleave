@@ -65,6 +65,31 @@ def clip_rect_to_bounds(
     return (left, top, clip_w, clip_h)
 
 
+def clip_rect_to_rect(
+    rect: tuple[int, int, int, int],
+    bounds: tuple[int, int, int, int],
+) -> tuple[int, int, int, int] | None:
+    """Intersection of *rect* with *bounds* (both ``x, y, w, h``)."""
+    bx, by, bw, bh = bounds
+    x, y, w, h = rect
+    local = clip_rect_to_bounds((x - bx, y - by, w, h), bw, bh)
+    if local is None:
+        return None
+    lx, ly, lw, lh = local
+    return (bx + lx, by + ly, lw, lh)
+
+
+def bounds_rect(
+    fallback_w: int,
+    fallback_h: int,
+    rect: tuple[int, int, int, int] | None,
+) -> tuple[int, int, int, int]:
+    """Return *rect*, or the full fallback viewport when *rect* is omitted."""
+    if rect is None:
+        return (0, 0, fallback_w, fallback_h)
+    return rect
+
+
 def overlay_panel_surface(
     size: tuple[int, int],
     *,

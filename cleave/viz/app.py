@@ -41,7 +41,12 @@ from cleave.viz.loading import LoadingWindow, open_loading_window
 from cleave.viz.help_overlay import HelpOverlay
 from cleave.viz.tuning_panel_draw import TuningOverlay
 from cleave.viz.timeline_controls import TimelineControls
-from cleave.viz.timeline_overlay import TimelineOverlay, focused_cue_readout_visible
+from cleave.viz.shell_layout import ShellLayout
+from cleave.viz.timeline_overlay import (
+    TimelineOverlay,
+    focused_cue_readout_visible,
+    timeline_band_height_px,
+)
 from cleave.viz.playback import PlaybackState, current_sec, init_playback
 from cleave.viz.projectm_frame_clock import ProjectMFrameClock
 from cleave.viz.frame_finish import RenderOverlaysPanelCache, finish_content_frame
@@ -494,9 +499,8 @@ def _tick_frame_live_overlay(
     t_sec: float,
     *,
     paused: bool,
-    overlay_dt: float,
     display_fps: float | None = None,
-    top_inset: int = 0,
+    layout: ShellLayout,
 ) -> None:
     profiler = runtime.overlay_profiler
 
@@ -507,9 +511,6 @@ def _tick_frame_live_overlay(
         overlay_solo=runtime.seed.session.render_overlay_solo,
         panel_cache=runtime.render_overlays_panel_cache,
     )
-
-    runtime.overlay.set_hold_idle_sec(runtime.seed.cfg.editor.ui_fade)
-    runtime.overlay.update(overlay_dt)
 
     overlay_visibility = runtime.overlay.visibility
     modal_active = runtime.modal_host.active
@@ -576,7 +577,12 @@ def _tick_frame_live_overlay(
             modal_active=modal_active,
         )
     ):
-        timeline_panel_open = tl.panel_open and overlay_visibility > 0.01
+        # The shell band already sits under the columns, so the leftover
+        # panel must not reserve that strip a second time.
+        band_open = layout.timeline[3] > 0
+        timeline_panel_open = (
+            tl.panel_open and overlay_visibility > 0.01 and not band_open
+        )
         cue_readout_open = (
             timeline_panel_open
             and timeline_state is not None
@@ -594,7 +600,7 @@ def _tick_frame_live_overlay(
                 help_overlay=runtime.help_overlay,
                 modal_host=runtime.modal_host,
                 profiler=profiler,
-                top_inset=top_inset,
+                visualiser_rect=layout.visualiser,
             )
 
     if timeline_state is not None:
@@ -608,6 +614,7 @@ def _tick_frame_live_overlay(
                 overlay_visibility=overlay_visibility,
             ),
             profiler=profiler,
+            timeline_rect=layout.timeline,
         )
 
     profiler.finish_frame()
@@ -621,11 +628,43 @@ class VisualizerApp:
         self._pm_clock = ProjectMFrameClock()
         self._shell = None
 
-    def _panel_top_inset(self) -> int:
+    def _live_shell_layout(self, runtime: LiveVisualizerRuntime) -> ShellLayout:
+        from cleave.viz.shell_host import menu_bar_height_px
+
+        runtime.overlay.set_hold_idle_sec(runtime.seed.cfg.editor.ui_fade)
+        runtime.overlay.update(self._overlay_dt)
+        shell = self._shell
+        menu_h = int(shell.menu_bar_height_px) if shell is not None else 0
+        transport_h = menu_bar_height_px() if shell is not None else 0
+        timeline_h = 0
+        tl = runtime.seed.session.timeline
+        if not runtime.controls.tap_sync.showing_progress and _timeline_strip_visible(
+            tl,
+            overlay_visibility=runtime.overlay.visibility,
+            focus_cursor=runtime.controls.focus_cursor,
+        ):
+            timeline_h = timeline_band_height_px(
+                len(runtime.seed.session.layer_z_order)
+            )
+        display_w, display_h = runtime.overlay_surface.get_size()
+        return ShellLayout.compute(
+            display_w, display_h, menu_h, transport_h, timeline_h
+        )
+
+    def _publish_shell_layout(
+        self, runtime: LiveVisualizerRuntime, layout: ShellLayout
+    ) -> None:
         shell = self._shell
         if shell is None:
-            return 0
-        return int(shell.menu_bar_height_px)
+            runtime.compositor.set_present_rect(None)
+            return
+        shell.set_layout(layout)
+        runtime.compositor.set_present_rect(layout.visualiser)
+
+    def _begin_live_frame(self, runtime: LiveVisualizerRuntime) -> ShellLayout:
+        layout = self._live_shell_layout(runtime)
+        self._publish_shell_layout(runtime, layout)
+        return layout
 
     def tick_frame(
         self,
@@ -636,6 +675,7 @@ class VisualizerApp:
         dt_sec: float = 0.0,
         draw_overlay: bool = True,
         display_fps: float | None = None,
+        layout: ShellLayout | None = None,
     ) -> None:
         pm_time_sec = self._pm_clock.advance(dt_sec, paused=paused)
         blank_visualizers = (
@@ -656,13 +696,15 @@ class VisualizerApp:
                 raise TypeError(
                     "draw_overlay=True requires LiveVisualizerRuntime"
                 )
+            if layout is None:
+                layout = self._live_shell_layout(self._runtime)
+                self._publish_shell_layout(self._runtime, layout)
             _tick_frame_live_overlay(
                 self._runtime,
                 t_sec,
                 paused=paused,
-                overlay_dt=self._overlay_dt,
                 display_fps=display_fps,
-                top_inset=self._panel_top_inset(),
+                layout=layout,
             )
 
     def run(self, window: LoadingWindow | None = None) -> None:
@@ -728,6 +770,7 @@ class VisualizerApp:
                 paused=False,
                 n_pcm=samples_per_frame(LIVE_PROJECTM_FPS),
                 dt_sec=0.0,
+                layout=self._begin_live_frame(rt),
             )
             draw_menu_bar()
             pygame.display.flip()
@@ -777,15 +820,15 @@ class VisualizerApp:
                     rt.overlay.notify_input()
 
                 t_sec = current_sec(rt.playback, rt.seed.duration_sec)
+                layout = self._begin_live_frame(rt)
                 if rt.controls.project_render.busy:
                     rt.compositor.present_content()
                     _tick_frame_live_overlay(
                         rt,
                         t_sec,
                         paused=True,
-                        overlay_dt=self._overlay_dt,
                         display_fps=frame_rate.display_fps,
-                        top_inset=self._panel_top_inset(),
+                        layout=layout,
                     )
                 else:
                     pm_fps_governor.observe(measured_fps)
@@ -797,6 +840,7 @@ class VisualizerApp:
                         display_fps=frame_rate.display_fps,
                         n_pcm=samples_for_dt(self._overlay_dt),
                         dt_sec=self._overlay_dt,
+                        layout=layout,
                     )
 
                 draw_menu_bar()
@@ -804,6 +848,8 @@ class VisualizerApp:
                 measured_fps = frame_rate.end_frame()
 
         finally:
+            if rt is not None:
+                rt.compositor.set_present_rect(None)
             self._shell = None
             if shell is not None:
                 shell.destroy()

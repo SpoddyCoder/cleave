@@ -77,6 +77,18 @@ _ROLE_GLYPH: dict[CueRole, str] = {
 }
 
 
+def timeline_band_height_px(row_count: int) -> int:
+    """Shell band under the columns: strip, bottom margin, and the badge above it."""
+    if row_count <= 0:
+        return 0
+    metrics = timeline_ui_metrics()
+    return (
+        timeline_panel_height_px(row_count)
+        + metrics.margin
+        + timeline_badge_reserve_px(font_size=metrics.font_size)
+    )
+
+
 def timeline_viewport_reserve_px(row_count: int, *, margin: int | None = None) -> int:
     metrics = timeline_ui_metrics()
     if margin is None:
@@ -929,6 +941,7 @@ class TimelineOverlay:
         *,
         viewport_width: int,
         viewport_height: int,
+        timeline_rect: tuple[int, int, int, int] | None = None,
     ) -> _TimelineLayout | None:
         row_count = len(state.layer_z_order)
         if row_count == 0:
@@ -936,10 +949,20 @@ class TimelineOverlay:
 
         metrics = timeline_ui_metrics()
         row_h = metrics.row_height
-        panel_w = viewport_width - self._margin * 2
         panel_h = timeline_panel_height_px(row_count)
-        panel_x = self._margin
-        panel_y = viewport_height - panel_h - self._margin
+        if timeline_rect is None:
+            panel_w = viewport_width - self._margin * 2
+            panel_x = self._margin
+            panel_y = viewport_height - panel_h - self._margin
+        else:
+            band_x, band_y, band_w, band_h = timeline_rect
+            if band_w <= 0 or band_h <= 0:
+                return None
+            panel_w = band_w - self._margin * 2
+            if panel_w <= 0:
+                return None
+            panel_x = band_x + self._margin
+            panel_y = band_y + band_h - panel_h - self._margin
         badge_reserve = timeline_badge_reserve_px(font_size=self._font_size)
 
         font = self._font_get()
@@ -1581,6 +1604,7 @@ class TimelineOverlay:
         viewport_width: int,
         viewport_height: int,
         visibility: float = 1.0,
+        timeline_rect: tuple[int, int, int, int] | None = None,
     ) -> ComposedPanel | None:
         self._visibility = visibility
         self._panel_rect = None
@@ -1592,6 +1616,7 @@ class TimelineOverlay:
             state,
             viewport_width=viewport_width,
             viewport_height=viewport_height,
+            timeline_rect=timeline_rect,
         )
         if layout is None:
             return None
@@ -1754,11 +1779,14 @@ class TimelineOverlay:
         self,
         surface: pygame.Surface,
         state: TimelineViewState,
+        *,
+        timeline_rect: tuple[int, int, int, int] | None = None,
     ) -> None:
         composed = self.compose_panel(
             state,
             viewport_width=surface.get_width(),
             viewport_height=surface.get_height(),
+            timeline_rect=timeline_rect,
         )
         if composed is None:
             self._panel_rect = None
