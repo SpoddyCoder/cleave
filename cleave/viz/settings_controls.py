@@ -42,30 +42,6 @@ class SettingsControls:
         self._on_notification = on_notification
         self._on_notification_display_changed = on_notification_display_changed
 
-    def set_expanded(self, expanded: bool) -> None:
-        settings = self.session.settings
-        if settings.expanded == expanded:
-            return
-        settings.expanded = expanded
-
-    def set_editor_window_expanded(self, expanded: bool) -> None:
-        settings = self.session.settings
-        if settings.editor_window_expanded == expanded:
-            return
-        settings.editor_window_expanded = expanded
-
-    def set_ui_expanded(self, expanded: bool) -> None:
-        settings = self.session.settings
-        if settings.ui_expanded == expanded:
-            return
-        settings.ui_expanded = expanded
-
-    def set_latency_compensation_expanded(self, expanded: bool) -> None:
-        settings = self.session.settings
-        if settings.latency_compensation_expanded == expanded:
-            return
-        settings.latency_compensation_expanded = expanded
-
     def adjust_residual_latency_ms(self, *, forward: bool, large: bool) -> None:
         step = 50 if large else 10
         delta = step if forward else -step

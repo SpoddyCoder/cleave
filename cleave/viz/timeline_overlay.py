@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import bisect
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Literal
 
@@ -810,6 +812,14 @@ def stem_abbrev_label(stem: str) -> str:
 
 def transport_time_text(position_sec: float) -> str:
     return f"[{format_mmss(position_sec)}]"
+
+
+def playback_bar_text(position_sec: float, downbeat_times: Sequence[float]) -> str:
+    """1-based bar at the playhead. Empty grids show an em dash."""
+    if not downbeat_times:
+        return "—"
+    count = bisect.bisect_right(downbeat_times, position_sec)
+    return str(max(1, count))
 
 
 def stem_label_text(layer_num: int, stem: str) -> str:

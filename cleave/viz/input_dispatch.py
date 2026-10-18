@@ -12,6 +12,7 @@ from cleave.viz.editor_mode_controls import is_preset_curation_mode
 from cleave.viz.focus_nav import FocusCursor, TimelineFocus
 from cleave.viz.key_repeat import mod_ctrl, mod_shift
 from cleave.viz.menu_bar import menus_for_session
+from cleave.viz.shell_focus import CycleStop, ShellRegion, next_region
 from cleave.viz.timeline_controls import TimelineControls
 
 if TYPE_CHECKING:
@@ -120,6 +121,12 @@ def _handle_menu_bar_keydown(
         menu.note_alt_keydown()
         return True
     menu.cancel_alt_tap()
+    if (
+        menu.focused
+        and event.key in (pygame.K_UP, pygame.K_DOWN)
+        and mod_ctrl(event.mod)
+    ):
+        return True
     if event.key == pygame.K_F10:
         if menu.toggle_focus():
             runtime.overlay.notify_input()
@@ -181,6 +188,112 @@ def _handle_global_keydown(
     return None
 
 
+_REGION_KEYS = frozenset(
+    {
+        pygame.K_UP,
+        pygame.K_DOWN,
+        pygame.K_LEFT,
+        pygame.K_RIGHT,
+        pygame.K_RETURN,
+        pygame.K_KP_ENTER,
+        pygame.K_ESCAPE,
+        pygame.K_PAGEUP,
+        pygame.K_PAGEDOWN,
+    }
+)
+
+
+def _strip_open(runtime: LiveVisualizerRuntime) -> bool:
+    return bool(runtime.seed.session.timeline.panel_open)
+
+
+def _current_stop(runtime: LiveVisualizerRuntime) -> CycleStop:
+    if runtime.menu_bar.focused:
+        return CycleStop.MENU
+    if isinstance(runtime.controls.focus_cursor, TimelineFocus):
+        return CycleStop.TIMELINE
+    if runtime.controls.shell_focus.region is ShellRegion.INSPECTOR:
+        return CycleStop.INSPECTOR
+    return CycleStop.NAVIGATOR
+
+
+def _commit_cycle_stop(runtime: LiveVisualizerRuntime, stop: CycleStop) -> None:
+    menu = runtime.menu_bar
+    controls = runtime.controls
+    if stop is CycleStop.MENU:
+        menu.focus()
+        return
+    menu.blur()
+    if stop is CycleStop.TIMELINE:
+        if not isinstance(controls.focus_cursor, TimelineFocus):
+            controls.open_timeline_panel(enter_submenu=True)
+        return
+    if isinstance(controls.focus_cursor, TimelineFocus):
+        controls.exit_timeline_submenu()
+    controls.shell_focus.region = (
+        ShellRegion.INSPECTOR
+        if stop is CycleStop.INSPECTOR
+        else ShellRegion.NAVIGATOR
+    )
+
+
+def _handle_region_cycle(
+    event: pygame.event.Event, runtime: LiveVisualizerRuntime
+) -> bool:
+    """Tab / Shift+Tab. Runs before the menu bar so Tab blurs it."""
+    if event.key != pygame.K_TAB:
+        return False
+    delta = -1 if mod_shift(event.mod) else 1
+    stop = next_region(
+        _current_stop(runtime),
+        strip_open=_strip_open(runtime),
+        delta=delta,
+    )
+    _commit_cycle_stop(runtime, stop)
+    return True
+
+
+def _handle_ctrl_section_nav(
+    event: pygame.event.Event, runtime: LiveVisualizerRuntime
+) -> bool:
+    """Ctrl+Up/Down across visible top-level navigator ids."""
+    if event.key not in (pygame.K_UP, pygame.K_DOWN) or not mod_ctrl(event.mod):
+        return False
+    if runtime.menu_bar.focused:
+        return False
+    controls = runtime.controls
+    if isinstance(controls.focus_cursor, TimelineFocus):
+        controls.exit_timeline_submenu()
+    delta = -1 if event.key == pygame.K_UP else 1
+    controls.shell_focus.region = ShellRegion.NAVIGATOR
+    controls.navigator.quick_step(delta)
+    return True
+
+
+def _region_keydown(event: pygame.event.Event, runtime: LiveVisualizerRuntime) -> bool | None:
+    """Navigator and inspector own arrows, Enter, Esc, and PageUp/PageDown.
+
+    None means the key is unowned and should fall through. Timeline scope
+    stays on ``key_handler_for_runtime``.
+    """
+    if event.key not in _REGION_KEYS:
+        return None
+    if runtime.menu_bar.focused:
+        return None
+    if isinstance(runtime.controls.focus_cursor, TimelineFocus):
+        return None
+    region = runtime.controls.shell_focus.region
+    if region is ShellRegion.NAVIGATOR:
+        if runtime.controls.navigator.handle_keydown(event):
+            return True
+        return None
+    if region is ShellRegion.INSPECTOR:
+        if runtime.controls.inspector.handle_keydown(event):
+            return True
+        return None
+    return None
+
+
 def dispatch_keydown(event: pygame.event.Event, runtime: LiveVisualizerRuntime) -> bool:
     """Handle a key-down event. Return False when the app should quit."""
     if event.type != pygame.KEYDOWN:
@@ -190,6 +303,9 @@ def dispatch_keydown(event: pygame.event.Event, runtime: LiveVisualizerRuntime) 
         runtime.menu_bar.cancel_alt_tap()
         return runtime.controls.handle_modal_keydown(event)
 
+    if _handle_region_cycle(event, runtime):
+        return True
+
     menu_result = _handle_menu_bar_keydown(event, runtime)
     if menu_result is not None:
         return menu_result
@@ -198,9 +314,16 @@ def dispatch_keydown(event: pygame.event.Event, runtime: LiveVisualizerRuntime) 
     if shortcut_result is not None:
         return shortcut_result
 
+    if _handle_ctrl_section_nav(event, runtime):
+        return True
+
     global_result = _handle_global_keydown(event, runtime)
     if global_result is not None:
         return global_result
+
+    region_result = _region_keydown(event, runtime)
+    if region_result is not None:
+        return region_result
 
     key_handler = key_handler_for_runtime(runtime, event.key)
     return key_handler.handle_keydown(event)

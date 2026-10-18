@@ -8,9 +8,7 @@ from cleave.viz.focus_nav import (
     MainFocus,
     TimelineFocus,
     build_focus_ring,
-    build_quick_nav_ring,
     move_focus,
-    move_quick_focus,
     resolve_cursor,
     timeline_strip_in_ring,
 )
@@ -88,55 +86,22 @@ def test_build_focus_ring_includes_timeline_rows_when_strip_active() -> None:
     assert ring == main_part + timeline_part
 
 
-def test_build_quick_nav_ring_appends_timeline_strip_when_open() -> None:
-    state = _timeline_open_state(("layer_1", "layer_2"))
-    ring = build_quick_nav_ring(state)
-    main_part = [
-        MainFocus(state.layout.descriptor(index))
-        for index in state.layout.quick_nav_indices(state)
-    ]
-    assert ring == main_part + [TimelineFocus(0)]
-    assert isinstance(ring[-1], TimelineFocus)
-    assert MainFocus(RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)) in main_part
-    assert MainFocus(
-        RowDescriptor(RowKind.TRACK_HEADER, slot="layer_2")
-    ) not in main_part
-
-    closed = _minimal_view_state(
-        render_timeline=RenderTimelineBlock(enabled=True, expanded=False),
-    )
-    closed_ring = build_quick_nav_ring(closed)
-    assert all(isinstance(item, MainFocus) for item in closed_ring)
-    assert MainFocus(RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)) not in closed_ring
-
-
-def test_move_quick_focus_steps_onto_timeline_strip() -> None:
-    state = _timeline_open_state(("layer_1", "layer_2"))
-    header = MainFocus(RowDescriptor(RowKind.RENDER_TIMELINE_HEADER))
-    settings = MainFocus(RowDescriptor(RowKind.SETTINGS_HEADER))
-
-    assert move_quick_focus(header, 1, state) == TimelineFocus(0)
-    assert move_quick_focus(settings, -1, state) == TimelineFocus(0)
-    assert move_quick_focus(TimelineFocus(1), -1, state) == header
-    assert move_quick_focus(TimelineFocus(1), 1, state) == settings
-
-
-def test_move_focus_down_from_last_timeline_row_wraps_to_settings() -> None:
+def test_move_focus_down_from_last_timeline_row_wraps_to_first_leftover() -> None:
     slots = ("layer_1", "layer_2", "layer_3", "layer_4")
     state = _timeline_open_state(slots)
-    settings = RowDescriptor(RowKind.SETTINGS_HEADER)
+    first = state.layout.navigable_descriptors(state)[0]
     cursor = TimelineFocus(len(slots) - 1)
 
     result = move_focus(cursor, 1, state)
 
     assert isinstance(result, MainFocus)
-    assert result.descriptor == settings
+    assert result.descriptor == first
 
 
-def test_move_focus_up_from_settings_wraps_to_last_timeline_row() -> None:
+def test_move_focus_up_from_first_leftover_wraps_to_last_timeline_row() -> None:
     slots = ("layer_1", "layer_2", "layer_3", "layer_4")
     state = _timeline_open_state(slots)
-    cursor = MainFocus(RowDescriptor(RowKind.SETTINGS_HEADER))
+    cursor = MainFocus(state.layout.navigable_descriptors(state)[0])
 
     result = move_focus(cursor, -1, state)
 
@@ -151,7 +116,7 @@ def test_resolve_cursor_maps_stale_main_descriptor() -> None:
     resolved = resolve_cursor(stale, ring, state)
 
     assert isinstance(resolved, MainFocus)
-    assert resolved.descriptor == RowDescriptor(RowKind.SETTINGS_HEADER)
+    assert resolved.descriptor == state.layout.navigable_descriptors(state)[0]
     assert resolved in ring
 
 
@@ -176,20 +141,12 @@ def test_move_focus_steps_through_main_ring() -> None:
     assert move_focus(start, len(ring), state) == start
 
 
-def test_bug2_up_from_transport_reaches_settings_when_timeline_open() -> None:
+def test_up_from_first_leftover_wraps_to_last_timeline_row() -> None:
     slots = ("layer_1", "layer_2", "layer_3", "layer_4")
     controls = _make_controls(slots, timeline_enabled=True)
     controls.session.timeline.panel_open = True
     view = controls.build_view_state(paused=False)
-    transport_row = view.layout.find_by_kind(RowKind.TRANSPORT)
-    settings_row = view.layout.find_by_kind(RowKind.SETTINGS_HEADER)
-    controls.focus_descriptor = _desc(view, transport_row)
-
-    controls.handle_keydown(_keydown(pygame.K_UP))
-    assert not isinstance(controls.focus_cursor, TimelineFocus)
-
-    controls.handle_keydown(_keydown(pygame.K_UP))
-    assert controls.focus_descriptor == _desc(view, settings_row)
+    controls.focus_descriptor = view.layout.navigable_descriptors(view)[0]
 
     controls.handle_keydown(_keydown(pygame.K_UP))
     assert isinstance(controls.focus_cursor, TimelineFocus)

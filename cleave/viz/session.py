@@ -414,7 +414,6 @@ EditorMode = Literal["visualizer", "preset_curation"]
 
 @dataclass
 class ProjectRenderRuntime:
-    expanded: bool = False
     quality: ProjectRenderQuality = DEFAULT_PROJECT_RENDER_QUALITY
     start_sec: int = DEFAULT_PROJECT_RENDER_START_SEC
     end_sec: int | None = None
@@ -425,20 +424,13 @@ class ProjectRenderRuntime:
 
 @dataclass
 class ProjectRuntime:
-    expanded: bool = False
-    milkdrop_expanded: bool = False
     milkdrop_beat_sensitivity: float = DEFAULT_BEAT_SENSITIVITY
-    compositor_expanded: bool = False
     compositor_hdr: bool = DEFAULT_COMPOSITOR_HDR
     render: ProjectRenderRuntime = field(default_factory=ProjectRenderRuntime)
 
 
 @dataclass
 class SettingsRuntime:
-    expanded: bool = False
-    editor_window_expanded: bool = False
-    ui_expanded: bool = False
-    latency_compensation_expanded: bool = False
     editor_mode: EditorMode = "visualizer"
 
 

@@ -87,7 +87,6 @@ def _track_lock_state(locked: bool) -> SimpleNamespace:
 
 _EXPECTED_REPEAT_ROW_KINDS = frozenset(
     {
-        RowKind.TRANSPORT,
         RowKind.TRACK_PRESET_DIR,
         RowKind.TRACK_PRESET,
         RowKind.TRACK_PRESET_SWITCHING_TRIGGER,
@@ -180,13 +179,10 @@ def test_every_row_kind_has_spec() -> None:
 
 
 def test_header_row_kinds() -> None:
-    assert HEADER_ROW_KINDS == frozenset(
-        {
-            RowKind.TRANSPORT,
-            RowKind.PROJECT_HEADER,
-            RowKind.SETTINGS_HEADER,
-        }
-    )
+    names = {kind.name for kind in HEADER_ROW_KINDS}
+    assert "SETTINGS_HEADER" not in names
+    assert "PROJECT_HEADER" not in names
+    assert "TRANSPORT" not in names
 
 
 def test_action_row_kinds_match_affordance() -> None:
@@ -199,9 +195,7 @@ def test_action_row_kinds_match_affordance() -> None:
 
 
 def test_row_is_pinned() -> None:
-    assert row_is_pinned(RowKind.TRANSPORT) is True
-    assert row_is_pinned(RowKind.SETTINGS_HEADER) is True
-    assert row_is_pinned(RowKind.PROJECT_HEADER) is True
+    assert row_is_pinned(RowKind.PANEL_NOTIFICATION) is True
     assert row_is_pinned(RowKind.PROJECT_RENDER_HEADER) is True
     assert row_is_pinned(RowKind.PROJECT_COMPOSITOR_HEADER) is True
     assert row_is_pinned(RowKind.PROJECT_COMPOSITOR_HDR) is True
@@ -629,7 +623,7 @@ def test_row_triggers_layer_delete_for_track_rows_only() -> None:
     assert row_triggers_layer_delete(RowKind.TRACK_HEADER) is True
     assert row_triggers_layer_delete(RowKind.LAYER_MANAGEMENT_DELETE) is True
     assert row_triggers_layer_delete(RowKind.LAYER_MANAGEMENT_ADD) is False
-    assert row_triggers_layer_delete(RowKind.TRANSPORT) is False
+    assert row_triggers_layer_delete(RowKind.RENDER_OVERLAYS_HEADER) is False
 
 
 def test_tree_branch_prefix() -> None:
@@ -647,8 +641,6 @@ def test_tree_branch_leading_spaces() -> None:
 
 
 def test_row_panel_label_settings_header() -> None:
-    assert row_panel_label(RowKind.SETTINGS_HEADER) == "Cleave Settings"
-    assert row_panel_label(RowKind.PROJECT_HEADER) == "Project Settings"
     assert row_panel_label(RowKind.PROJECT_MILKDROP_HEADER) == "ProjectM"
     assert row_panel_label(RowKind.PROJECT_COMPOSITOR_HEADER) == "Compositor"
     assert row_panel_label(RowKind.PROJECT_RENDER_HEADER) == "Render Project"
@@ -670,15 +662,6 @@ def test_labeled_row_prefix_settings_children() -> None:
 
 
 def test_settings_ui_min_width_follows_max_width() -> None:
-    state = _minimal_view_state(
-        settings=SettingsBlock(expanded=True, ui_expanded=True),
-    )
-    visible = [
-        state.layout.kind(index)
-        for index in state.layout.visible_indices(state)
-    ]
-    max_index = visible.index(RowKind.SETTINGS_UI_WIDTH)
-    assert visible[max_index + 1] == RowKind.SETTINGS_UI_MIN_WIDTH
     assert labeled_row_prefix(RowKind.SETTINGS_UI_FADE) == "  └─ auto-fade: "
     assert labeled_row_prefix(RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY) == (
         "  └─ notification time: "
@@ -1050,12 +1033,6 @@ def test_apply_field_horizontal_adjusts_editor_window_size() -> None:
 
 def test_apply_field_horizontal_via_controls_keydown() -> None:
     controls = _make_controls()
-    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_HEADER)
-    controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    view = controls.build_view_state(paused=False)
-    ui_header = view.layout.find_by_kind(RowKind.SETTINGS_UI_HEADER)
-    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_HEADER)
-    controls.handle_keydown(_keydown(pygame.K_RIGHT))
     controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_WIDTH_MODE)
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
@@ -1438,30 +1415,6 @@ def test_apply_field_horizontal_visual_limiter_header_expands() -> None:
     apply_field_horizontal(controls, desc, False, False)
     assert controls.session.render_post_fx.limiter_expanded is False
     assert controls.session.render_post_fx.limiter.enabled is True
-
-
-def test_apply_field_horizontal_transport_seeks() -> None:
-    from cleave.viz.controls import SEEK_SHORT
-
-    controls = _make_controls()
-    controls.duration_sec = 120.0
-    seeks: list[float] = []
-    controls._layer_bindings = noop_layer_bindings(
-        on_seek=lambda delta: seeks.append(delta)
-    )
-    desc = RowDescriptor(RowKind.TRANSPORT)
-
-    apply_field_horizontal(controls, desc, True, False)
-    apply_field_horizontal(controls, desc, False, False)
-    apply_field_horizontal(controls, desc, True, True)
-    apply_field_horizontal(controls, desc, False, True)
-
-    assert seeks == [
-        SEEK_SHORT,
-        -SEEK_SHORT,
-        SEEK_SHORT,
-        -SEEK_SHORT,
-    ]
 
 
 class _RecordingControls:

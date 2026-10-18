@@ -248,14 +248,6 @@ def test_expand_section_respects_expanded_when_block_disabled() -> None:
 
 
 def test_sub_row_expand_visible_nested_sections() -> None:
-    collapsed_settings = _minimal_view_state(settings=SettingsBlock(expanded=False))
-    render_mode = RowDescriptor(RowKind.SETTINGS_PREVIEW_QUALITY)
-    assert sub_row_expand_visible(collapsed_settings, render_mode) is False
-
-    settings_only = _minimal_view_state(settings=SettingsBlock(expanded=True, ui_expanded=False))
-    ui_width = RowDescriptor(RowKind.SETTINGS_UI_WIDTH)
-    assert sub_row_expand_visible(settings_only, ui_width) is False
-
     collapsed_overlay = _minimal_view_state(
         render_overlays=RenderOverlaysBlock(expanded=False),
     )

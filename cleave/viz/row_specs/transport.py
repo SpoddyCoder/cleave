@@ -1,4 +1,4 @@
-"""Transport, notification, and spacer row specs."""
+"""Notification and spacer row specs."""
 
 from __future__ import annotations
 
@@ -10,9 +10,6 @@ from cleave.viz.tuning_view_state import TuningViewState
 
 if TYPE_CHECKING:
     from cleave.viz.controls import TuningControls
-
-def _format_transport(_state: TuningViewState, _desc: RowDescriptor) -> str:
-    return ""
 
 def _format_panel_notification(state: TuningViewState, desc: RowDescriptor) -> str:
     if desc.marker_index == 0:
@@ -27,33 +24,12 @@ def _apply_panel_notification_action(
         return
     controls.dismiss_notification()
     if controls.focus_descriptor == desc:
-        controls.focus_descriptor = RowDescriptor(RowKind.TRANSPORT)
+        from cleave.viz.row_layout import first_leftover_descriptor
 
-def _apply_transport(
-    controls: TuningControls,
-    _desc: RowDescriptor,
-    forward: bool,
-    _large: bool,
-) -> None:
-    from cleave.viz.controls import SEEK_SHORT
-
-    delta_sec = SEEK_SHORT if forward else -SEEK_SHORT
-    controls.do_seek(delta_sec)
+        view = controls.build_view_state(paused=controls.playback.paused)
+        controls.focus_descriptor = first_leftover_descriptor(view)
 
 SPECS: dict[RowKind, RowSpec] = {
-    RowKind.TRANSPORT: RowSpec(
-        affordance=RowAffordance.SEEK,
-        panel_label="",
-        present_style=RowPresentStyle.FULL_LINE,
-        format_value=_format_transport,
-        apply_horizontal=_apply_transport,
-        help_title="Transport",
-        help_description=("Scrubber and play/pause for the project audio.",),
-        quick_nav_target=True,
-        quick_nav_always=True,
-        is_header=True,
-        repeatable=True,
-    ),
     RowKind.PANEL_NOTIFICATION: RowSpec(
         affordance=RowAffordance.DISPLAY,
         panel_label="",

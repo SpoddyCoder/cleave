@@ -453,7 +453,6 @@ SPECS: dict[RowKind, RowSpec] = {
             "Layer visibility automation.",
             "When enabled, standard layer visibility is disabled.",
         ),
-        quick_nav_target=True,
         toggle_enabled=_toggle_render_timeline_enabled,
     ),
     RowKind.TIMELINE_PRESETS_HEADER: RowSpec(

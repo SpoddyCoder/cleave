@@ -94,8 +94,7 @@ class TuningPanelCache:
     row_cache_structure: tuple[int, ...] | None = None
     last_fps_rect: tuple[int, int, int, int] | None = None
     gpu: OverlayGpuState = field(default_factory=OverlayGpuState)
-    last_transport_rect: tuple[int, int, int, int] | None = None
-    last_live_signature: tuple[str, str | None] | None = None
+    last_live_signature: tuple[str | None] | None = None
 
     def clear_rows(self) -> None:
         self.row_surfaces.clear()
@@ -117,7 +116,6 @@ class TuningPanelCache:
         self.panel_size = None
         self.last_fps_rect = None
         self.gpu = OverlayGpuState()
-        self.last_transport_rect = None
         self.last_live_signature = None
 
     def clear_all(self) -> None:
@@ -210,8 +208,6 @@ def static_row_keys(
     """
     keys: list[tuple] = []
     for index in indices:
-        if state.layout.kind(index) == RowKind.TRANSPORT:
-            continue
         max_w = max_content_width_for_index(index)
         key = row_render_key(
             state,
@@ -294,21 +290,6 @@ def ensure_row_surface(
     counters: OverlayDrawCounters | None = None,
     used_keys: set[RowRenderKey] | None = None,
 ) -> RowRenderEntry:
-    kind = state.layout.kind(index)
-    if kind == RowKind.TRANSPORT:
-        if counters is not None:
-            counters.row_cache_misses += 1
-        surf, time_surf, width = build_row(
-            font,
-            state,
-            index,
-            max_content_width=max_content_width,
-            line_h=line_h,
-            counters=counters,
-            cache=cache,
-        )
-        return RowRenderEntry(primary=surf, secondary=time_surf, content_width=width)
-
     key = row_render_key(
         state,
         index,
@@ -341,12 +322,11 @@ def ensure_row_surface(
     return entry
 
 
-def live_upload_signature(state: TuningViewState) -> tuple[str, str | None]:
+def live_upload_signature(state: TuningViewState) -> tuple[str | None]:
     from cleave.viz.frame_rate import format_fps_display
-    from cleave.viz.playback import format_mmss
 
     fps = format_fps_display(state.fps) if state.fps is not None else None
-    return format_mmss(state.position_sec), fps
+    return (fps,)
 
 
 def static_upload_content_hash(panel_sig: PanelSignature) -> tuple:
@@ -367,7 +347,7 @@ def static_upload_content_hash(panel_sig: PanelSignature) -> tuple:
 def tuning_upload_signature(
     panel_sig: PanelSignature,
     screen_rect: tuple[int, int, int, int],
-    live_sig: tuple[str, str | None],
+    live_sig: tuple[str | None],
 ) -> UploadSignature:
     return UploadSignature(
         active_size=(screen_rect[2], screen_rect[3]),

@@ -1,4 +1,4 @@
-"""Command registry: taxonomy, phase-1 shortcuts, and wired controllers."""
+"""Command registry: taxonomy, resolved shortcuts, and wired controllers."""
 
 from __future__ import annotations
 
@@ -18,6 +18,7 @@ from cleave.viz.commands import (
     layer_focus_commands,
 )
 from cleave.viz.modal import ModalKind
+from cleave.viz.shell_focus import ShellRegion
 from cleave.viz.theme import ACTION, CONFIG_DIRTY
 from tests.cleave.viz.test_controls import _keydown, _make_controls, _mutate_dirty
 
@@ -60,11 +61,9 @@ _DISABLED_IDS = (
     "project.restore",
     "help.about",
     "timeline.undo_cut",
-    "project.settings",
     "render.edit_overlays",
     "render.edit_post_fx",
     "timeline.song_markers",
-    "settings.editor",
     "layers.add",
     "layers.delete",
     "render.overlays",
@@ -76,11 +75,13 @@ _DISABLED_IDS = (
     "timeline.snap_cues",
 )
 
-_JUMP_IDS = (
-    "project.settings",
+_DISABLED_JUMP_IDS = (
     "render.edit_overlays",
     "render.edit_post_fx",
     "timeline.song_markers",
+)
+_ENABLED_JUMP_IDS = (
+    "project.settings",
     "settings.editor",
 )
 
@@ -222,7 +223,7 @@ def test_later_shortcuts_stay_on_rows_but_do_not_resolve() -> None:
     assert command_for_shortcut(pygame.K_o, pygame.KMOD_CTRL) is None
     assert command_for_shortcut(pygame.K_l, pygame.KMOD_CTRL) is None
     assert command_for_shortcut(pygame.K_t, 0) is None
-    assert command_for_shortcut(pygame.K_COMMA, pygame.KMOD_CTRL) is None
+    assert command_for_shortcut(pygame.K_COMMA, pygame.KMOD_CTRL).id == "settings.editor"
     assert command_for_shortcut(pygame.K_1, 0) is None
     assert command_for_shortcut(pygame.K_s, pygame.KMOD_CTRL).id == "file.save"
     assert command_for_shortcut(pygame.K_q, pygame.KMOD_CTRL).id == "file.quit"
@@ -235,13 +236,37 @@ def test_disabled_items_and_jumps_stay_disabled() -> None:
     ctx = CommandContext()
     for command_id in _DISABLED_IDS:
         assert command_by_id(command_id, menus).enabled(ctx) is False
-    for command_id in _JUMP_IDS:
+    for command_id in _DISABLED_JUMP_IDS:
         command = command_by_id(command_id, menus)
         assert command.kind == "jump"
         assert command.enabled(ctx) is False
+    for command_id in _ENABLED_JUMP_IDS:
+        command = command_by_id(command_id, menus)
+        assert command.kind == "jump"
+        assert command.enabled(ctx) is True
     for command in iter_commands(menus):
         if command.id.startswith("layers.focus."):
             assert command.enabled(ctx) is False
+
+
+def test_project_and_editor_jumps_select_the_inspector() -> None:
+    menus = _menus()
+    controls = _make_controls(("layer_1",))
+    project = command_by_id("project.settings", menus)
+    editor = command_by_id("settings.editor", menus)
+    assert project.enabled(CommandContext()) is True
+    assert editor.enabled(CommandContext()) is True
+
+    project.run(controls)
+    assert controls.shell_focus.selected_id == "project"
+    assert controls.shell_focus.region is ShellRegion.INSPECTOR
+
+    editor.run(controls)
+    assert controls.shell_focus.selected_id == "settings"
+    assert controls.shell_focus.region is ShellRegion.INSPECTOR
+
+    assert command_for_shortcut(pygame.K_COMMA, pygame.KMOD_CTRL) is editor
+    assert command_for_shortcut(pygame.K_r, pygame.KMOD_CTRL).id == "project.render"
 
 
 def test_disabled_run_does_not_call_a_controller() -> None:

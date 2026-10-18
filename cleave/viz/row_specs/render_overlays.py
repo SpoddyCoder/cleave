@@ -504,8 +504,6 @@ SPECS: dict[RowKind, RowSpec] = {
         help_description=(
             "Opening and closing credits cards.",
         ),
-        quick_nav_target=True,
-        quick_nav_always=True,
         toggle_enabled=_toggle_render_overlays_enabled,
         toggle_solo=_toggle_render_overlays_solo,
     ),

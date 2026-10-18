@@ -132,7 +132,7 @@ def test_focus_change_changes_static_row_keys_for_affected_rows() -> None:
         ),
     )
     focused_transport = _minimal_view_state(
-        focus_cursor=MainFocus(RowDescriptor(RowKind.TRANSPORT)),
+        focus_cursor=MainFocus(RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)),
     )
 
     track_key_when_track_focused = next(
@@ -177,7 +177,7 @@ def test_active_preset_list_index_changes_row_render_color_state() -> None:
     state = _minimal_view_state(
         layer_z_order=("layer_1",),
         tracks=tracks,
-        focus_cursor=MainFocus(RowDescriptor(RowKind.TRANSPORT)),
+        focus_cursor=MainFocus(RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)),
     )
     active_index = state.layout.find_descriptor(
         RowDescriptor(
@@ -521,7 +521,7 @@ def test_row_cache_hits_on_full_recompose_with_warm_cache() -> None:
     )
 
     assert counters.row_cache_hits > 0
-    assert counters.row_cache_misses > 0
+    assert counters.row_cache_misses == 0
 
 
 def test_retain_row_surfaces_keeps_only_requested_keys() -> None:
@@ -534,7 +534,7 @@ def test_retain_row_surfaces_keeps_only_requested_keys() -> None:
     indices = [
         i
         for i in state.layout.visible_indices(state)
-        if state.layout.kind(i) != RowKind.TRANSPORT
+        if state.layout.kind(i) != RowKind.RENDER_OVERLAYS_HEADER
     ][:2]
     assert len(indices) == 2
     for index in indices:
@@ -697,7 +697,7 @@ def test_focus_change_exactly_two_row_cache_misses_on_full_recompose() -> None:
         viewport_height=720,
         counters=baseline,
     )
-    assert baseline.row_cache_misses == 1
+    assert baseline.row_cache_misses == 0
 
     counters = OverlayDrawCounters()
     overlay.compose_panel(
@@ -759,24 +759,7 @@ def test_incremental_compose_preserves_transport_row_border_pixels() -> None:
     panel_w = panel.get_width()
     font = overlay._font_get()
     line_h = font.get_linesize()
-    visible_indices = list(state.layout.visible_indices(state))
-    first_scrollable_visible = next(
-        (
-            index
-            for index in visible_indices
-            if not row_is_pinned(state.layout.kind(index))
-        ),
-        None,
-    )
-    metrics = _panel_scroll_metrics(overlay, state)
-    transport_index = state.layout.find_by_kind(RowKind.TRANSPORT)
-    transport_y = overlay._transport_row_y(
-        transport_index,
-        metrics=metrics,
-        visible_indices=visible_indices,
-        first_scrollable_visible=first_scrollable_visible,
-    )
-    sample_y = transport_y + line_h // 2
+    sample_y = overlay._padding + line_h // 2
 
     def border_pixels() -> tuple[tuple[int, ...], tuple[int, ...]]:
         left = panel.get_at((0, sample_y))
@@ -826,8 +809,8 @@ def test_live_upload_signature_transport_and_fps() -> None:
     state_with_fps = _minimal_view_state(fps=30.0, position_sec=65.0)
     state_no_fps = _minimal_view_state(fps=None, position_sec=12.0)
 
-    assert live_upload_signature(state_with_fps) == ("01:05", "FPS: 30")
-    assert live_upload_signature(state_no_fps) == ("00:12", None)
+    assert live_upload_signature(state_with_fps) == ("FPS: 30",)
+    assert live_upload_signature(state_no_fps) == (None,)
 
 
 def test_tuning_upload_signature_combines_static_and_live() -> None:
@@ -867,10 +850,9 @@ def test_incremental_compose_sets_transport_rect_and_partial_plan() -> None:
         viewport_height=720,
     )
     cache = overlay._panel_cache
-    assert cache.last_transport_rect is not None
-    tx, ty, tw, th = cache.last_transport_rect
-    assert tx == BORDER_WIDTH
-    assert th == overlay._font_get().get_linesize()
+    assert cache.last_fps_rect is not None
+    _fx, _fy, _fw, fh = cache.last_fps_rect
+    assert fh == overlay._font_get().get_linesize()
 
     moved = _minimal_view_state(fps=45.0, position_sec=15.0)
     composed = overlay.compose_panel(
@@ -880,7 +862,7 @@ def test_incremental_compose_sets_transport_rect_and_partial_plan() -> None:
     )
     assert composed is not None
     assert composed.upload_plan.mode == "partial"
-    assert cache.last_transport_rect in composed.upload_plan.dirty_rects
+    assert cache.last_fps_rect in composed.upload_plan.dirty_rects
 
 
 def test_incremental_compose_skip_plan_when_live_unchanged() -> None:

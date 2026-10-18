@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
 import pygame
@@ -31,11 +32,22 @@ from imgui_bundle import imgui
 from imgui_bundle.python_backends.opengl_backend import ProgrammablePipelineRenderer
 
 from cleave.gl_state import restore_gl_state, save_gl_state
-from cleave.viz.commands import Command, CommandContext, MenuSeparator
+from cleave.viz.commands import Command, CommandContext, MenuSeparator, command_by_id
+from cleave.viz.focus_nav import TimelineFocus
+from cleave.viz.frame_rate import format_fps_display
+from cleave.viz.inspector import build_inspector_rows
+from cleave.viz.inspector_controls import inspector_command_enabled
 from cleave.viz.menu_bar import MenuBarState, menus_for_session
+from cleave.viz.navigator import build_navigator
 from cleave.viz.overlay_primitives import overlay_font_path
+from cleave.viz.playback import format_mmss
+from cleave.viz.row_present_renderers import row_value_color_for
+from cleave.viz.row_sections import expand_arrow_glyph
+from cleave.viz.row_spec import format_row_value, row_panel_label, row_spec
+from cleave.viz.shell_focus import CycleStop, ShellRegion
 from cleave.viz.shell_layout import ShellLayout
 from cleave.viz.theme import (
+    ACTION,
     BACKGROUND,
     BORDER_COLOR,
     DISABLED,
@@ -45,12 +57,26 @@ from cleave.viz.theme import (
     VALUE,
     tuning_ui_metrics,
 )
+from cleave.viz.timeline_overlay import transport_time_text
 
 RENDERER_CLASS = ProgrammablePipelineRenderer
 
 _HIDDEN = 0.01
 # Dear ImGui default Style.FramePadding.y. _apply_theme leaves it unchanged.
 _MENU_BAR_FRAME_PADDING_Y = 3.0
+_INSPECTOR_INDENT = 16.0
+
+
+@dataclass(frozen=True)
+class TransportReadout:
+    """Transport bar numbers. The shell host does not read the app."""
+
+    paused: bool
+    position_sec: float
+    duration_sec: float
+    bar_text: str
+    fps: float | None
+    recording: bool
 
 
 def menu_bar_height_px() -> int:
@@ -215,10 +241,52 @@ _POPUP_FLAGS = (
     | int(imgui.WindowFlags_.no_focus_on_appearing)
     | int(imgui.WindowFlags_.no_nav)
 )
+_SHELL_FLAGS = (
+    int(imgui.WindowFlags_.no_title_bar)
+    | int(imgui.WindowFlags_.no_resize)
+    | int(imgui.WindowFlags_.no_move)
+    | int(imgui.WindowFlags_.no_saved_settings)
+    | int(imgui.WindowFlags_.no_focus_on_appearing)
+    | int(imgui.WindowFlags_.no_nav)
+    | int(imgui.WindowFlags_.no_scrollbar)
+    | int(imgui.WindowFlags_.no_scroll_with_mouse)
+)
 
 
 def _rgba(rgb: tuple[int, int, int], alpha: float = 1.0) -> imgui.ImVec4:
     return imgui.ImVec4(rgb[0] / 255.0, rgb[1] / 255.0, rgb[2] / 255.0, alpha)
+
+
+def _rect_contains(rect: tuple[int, int, int, int], x: float, y: float) -> bool:
+    rx, ry, rw, rh = rect
+    return rw > 0 and rh > 0 and rx <= x < rx + rw and ry <= y < ry + rh
+
+
+def _draw_item_suffix(text: str, color: imgui.ImVec4) -> None:
+    rect_min = imgui.get_item_rect_min()
+    rect_max = imgui.get_item_rect_max()
+    width = imgui.calc_text_size(text).x
+    pad = imgui.get_style().frame_padding.x
+    imgui.get_window_draw_list().add_text(
+        imgui.ImVec2(rect_max.x - width - pad, rect_min.y),
+        imgui.get_color_u32(color),
+        text,
+    )
+
+
+def _draw_rect_border(rect: tuple[int, int, int, int]) -> None:
+    x, y, w, h = rect
+    if w <= 0 or h <= 0:
+        return
+    color = imgui.get_color_u32(_rgba(HIGHLIGHT))
+    imgui.get_foreground_draw_list().add_rect(
+        imgui.ImVec2(float(x), float(y)),
+        imgui.ImVec2(float(x + w), float(y + h)),
+        color,
+        0.0,
+        0,
+        1.0,
+    )
 
 
 def _gl_int(param: int) -> int:
@@ -367,7 +435,7 @@ class ShellHost:
         return self._layout
 
     def set_layout(self, layout: ShellLayout) -> None:
-        """Remember the frame's shell rects. Draw still paints only the menu bar."""
+        """Remember the frame's shell rects for the transport, navigator, and inspector."""
         self._layout = layout
 
     def destroy(self) -> None:
@@ -384,7 +452,7 @@ class ShellHost:
         """Mouse motion, buttons, and wheel only. Keys stay out of ImGui."""
         if event.type == pygame.MOUSEMOTION:
             self._mouse_pos = (float(event.pos[0]), float(event.pos[1]))
-            if event.pos[1] < self._menu_bar_height_px:
+            if self._chrome_contains(event.pos[0], event.pos[1]):
                 self._overlay.notify_input()
             return
         if event.type in (pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP):
@@ -414,8 +482,9 @@ class ShellHost:
         command_ctx: CommandContext,
         visibility: float,
         dt: float,
+        readout: TransportReadout | None = None,
     ) -> None:
-        """One ImGui frame. Skip it when the bar is hidden and no menu is open."""
+        """One ImGui frame. Skip it when the shell is hidden and no menu is open."""
         if visibility <= _HIDDEN and not menu_state.dropdown_open:
             self._buttons.clear()
             self._held.clear()
@@ -431,9 +500,225 @@ class ShellHost:
             imgui.get_style().alpha = alpha
             self._menu_bar_height_px = max(1, int(round(imgui.get_frame_height())))
             self._draw_bar(menu_state, command_ctx)
+            if self._layout is not None:
+                self._draw_shell(menu_state, readout)
         finally:
             imgui.render()
             self._render_draw_data()
+
+    def _chrome_contains(self, x: float, y: float) -> bool:
+        if y < self._menu_bar_height_px:
+            return True
+        layout = self._layout
+        if layout is None:
+            return False
+        return any(
+            _rect_contains(rect, x, y)
+            for rect in (layout.transport, layout.navigator, layout.inspector)
+        )
+
+    def _cycle_stop(self, menu_state: MenuBarState) -> CycleStop:
+        if menu_state.focused:
+            return CycleStop.MENU
+        if isinstance(self._controls.focus_cursor, TimelineFocus):
+            return CycleStop.TIMELINE
+        if self._controls.shell_focus.region is ShellRegion.INSPECTOR:
+            return CycleStop.INSPECTOR
+        return CycleStop.NAVIGATOR
+
+    def _scope_label(self, menu_state: MenuBarState) -> str:
+        if menu_state.focused:
+            return "menu bar"
+        if isinstance(self._controls.focus_cursor, TimelineFocus):
+            return "timeline strip"
+        region = self._controls.shell_focus.region
+        if region is ShellRegion.INSPECTOR:
+            return "inspector"
+        if region is ShellRegion.PANEL:
+            return "panel"
+        return "navigator"
+
+    def _draw_shell(
+        self, menu_state: MenuBarState, readout: TransportReadout | None
+    ) -> None:
+        layout = self._layout
+        if layout is None:
+            return
+        if readout is None:
+            readout = TransportReadout(False, 0.0, 0.0, "—", None, False)
+        state = self._controls.build_view_state(
+            paused=readout.paused,
+            position_sec=readout.position_sec,
+            fps=readout.fps,
+        )
+        stop = self._cycle_stop(menu_state)
+        self._draw_fixed_window(
+            "##shell-transport",
+            layout.transport,
+            active=False,
+            body=lambda: self._draw_transport(readout, menu_state),
+        )
+        self._draw_fixed_window(
+            "##shell-navigator",
+            layout.navigator,
+            active=stop is CycleStop.NAVIGATOR,
+            body=lambda: self._draw_navigator(),
+        )
+        self._draw_fixed_window(
+            "##shell-inspector",
+            layout.inspector,
+            active=stop is CycleStop.INSPECTOR,
+            body=lambda: self._draw_inspector(state),
+        )
+        if stop is CycleStop.TIMELINE:
+            _draw_rect_border(layout.timeline)
+
+    def _draw_fixed_window(
+        self,
+        title: str,
+        rect: tuple[int, int, int, int],
+        *,
+        active: bool,
+        body: Callable[[], None],
+    ) -> None:
+        x, y, w, h = rect
+        if w <= 0 or h <= 0:
+            return
+        imgui.set_next_window_pos(
+            imgui.ImVec2(float(x), float(y)), imgui.Cond_.always
+        )
+        imgui.set_next_window_size(
+            imgui.ImVec2(float(w), float(h)), imgui.Cond_.always
+        )
+        imgui.push_style_var(imgui.StyleVar_.window_border_size, 1.0 if active else 0.0)
+        if active:
+            imgui.push_style_color(imgui.Col_.border, _rgba(HIGHLIGHT))
+        try:
+            _visible, _opened = imgui.begin(title, None, _SHELL_FLAGS)
+            try:
+                body()
+            finally:
+                imgui.end()
+        finally:
+            if active:
+                imgui.pop_style_color()
+            imgui.pop_style_var()
+
+    def _draw_transport(
+        self, readout: TransportReadout, menu_state: MenuBarState
+    ) -> None:
+        word = "pause" if readout.paused else "play"
+        fps = (
+            format_fps_display(readout.fps)
+            if readout.fps is not None
+            else "FPS: —"
+        )
+        recording = "recording on" if readout.recording else "recording off"
+        left = (
+            f"{word}  {transport_time_text(readout.position_sec)} / "
+            f"{format_mmss(readout.duration_sec)}  {readout.bar_text}  {fps}  "
+            f"{recording}"
+        )
+        imgui.text(left)
+        scope = f"scope: {self._scope_label(menu_state)}"
+        width = imgui.calc_text_size(scope).x
+        avail = imgui.get_window_width()
+        pad = imgui.get_style().window_padding.x
+        imgui.same_line(max(imgui.get_cursor_pos_x(), avail - width - pad))
+        imgui.text(scope)
+
+    def _draw_navigator(self) -> None:
+        focus = self._controls.shell_focus
+        for node in build_navigator(self._controls.session):
+            clicked, _selected = imgui.selectable(
+                f"{node.label}##nav-{node.id}",
+                node.id == focus.selected_id,
+            )
+            if node.badge:
+                _draw_item_suffix(node.badge, _rgba(LABEL))
+            if clicked:
+                self._controls.navigator.select(node.id)
+
+    def _draw_inspector(self, state: Any) -> None:
+        focus = self._controls.shell_focus
+        nodes = build_navigator(self._controls.session)
+        title = next(
+            (node.label for node in nodes if node.id == focus.selected_id),
+            focus.selected_id,
+        )
+        imgui.text(title)
+        rows = build_inspector_rows(state, focus.selected_id, focus.collapsed)
+        if not rows:
+            imgui.text_colored(_rgba(DISABLED), "Edited on the panel")
+            return
+        for row in rows:
+            self._draw_inspector_row(state, row)
+
+    def _draw_inspector_row(self, state: Any, row: Any) -> None:
+        focus = self._controls.shell_focus
+        indent = row.depth * _INSPECTOR_INDENT
+        if indent:
+            imgui.indent(indent)
+        try:
+            if row.command_id is not None:
+                self._draw_command_row(row)
+                return
+            desc = row.descriptor
+            kind = desc.kind
+            spec = row_spec(kind)
+            label = row_panel_label(kind, desc)
+            if row.is_group:
+                glyph = expand_arrow_glyph(kind not in focus.collapsed)
+                clicked, _selected = imgui.selectable(
+                    f"{glyph} {label}##grp-{kind.name}",
+                    False,
+                )
+                if clicked:
+                    self._controls.inspector.toggle_group(kind)
+                return
+            selected = (
+                focus.region is ShellRegion.INSPECTOR
+                and focus.inspector_command_id is None
+                and focus.inspector_cursor == desc
+            )
+            clicked, _selected = imgui.selectable(
+                f"{label}##row-{kind.name}-{desc.slot}-{desc.preset_index}",
+                selected,
+            )
+            value = format_row_value(state, desc) if spec.format_value else ""
+            if spec.shows_dirty_suffix and state.config_dirty:
+                value = f"{value}*" if value else "*"
+            if value:
+                _draw_item_suffix(value, _rgba(row_value_color_for(state, desc)))
+            if clicked:
+                self._controls.inspector.focus_row(row)
+                if spec.apply_action is not None:
+                    self._controls.inspector.activate(row)
+        finally:
+            if indent:
+                imgui.unindent(indent)
+
+    def _draw_command_row(self, row: Any) -> None:
+        command = command_by_id(row.command_id)
+        enabled = inspector_command_enabled(self._controls, row.command_id)
+        focus = self._controls.shell_focus
+        selected = (
+            focus.region is ShellRegion.INSPECTOR
+            and focus.inspector_command_id == row.command_id
+        )
+        color = ACTION if enabled else DISABLED
+        imgui.push_style_color(imgui.Col_.text, _rgba(color))
+        try:
+            clicked, _selected = imgui.selectable(
+                f"{command.label}##cmd-{row.command_id}",
+                selected,
+            )
+        finally:
+            imgui.pop_style_color()
+        if clicked:
+            self._controls.inspector.focus_row(row)
+            if enabled:
+                self._controls.inspector.activate(row)
 
     def _clicks_ignored(self) -> bool:
         return (

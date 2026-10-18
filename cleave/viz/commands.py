@@ -20,12 +20,13 @@ from cleave.viz.theme import ACTION, CONFIG_DIRTY
 CommandKind = Literal["command", "jump", "check"]
 LabelRole = tuple[int, int, int]
 
-_PHASE1_SHORTCUT_IDS = frozenset(
+_RESOLVED_SHORTCUT_IDS = frozenset(
     {
         "file.save",
         "file.quit",
         "project.render",
         "help.overlay",
+        "settings.editor",
     }
 )
 
@@ -160,6 +161,16 @@ def _run_measure_latency(controls: Any) -> None:
     controls.tap_sync.prompt_start()
 
 
+def _run_focus_node(node_id: str) -> Callable[[Any], None]:
+    """Select a navigator node and focus its inspector."""
+
+    def run(controls: Any) -> None:
+        controls.navigator.select(node_id)
+        controls.navigator.activate()
+
+    return run
+
+
 def _toggle_help(controls: Any) -> None:
     session = controls.session
     session.help_visible = not session.help_visible
@@ -184,7 +195,13 @@ _QUIT = Command(
     run=_run_quit,
 )
 
-_PROJECT_SETTINGS = _later("project.settings", "Project settings", "jump")
+_PROJECT_SETTINGS = Command(
+    id="project.settings",
+    label="Project settings",
+    kind="jump",
+    enabled=_enabled,
+    run=_run_focus_node("project"),
+)
 _SEPARATE = _later("project.separate", "Separate stems...", "command")
 _RENDER = Command(
     id="project.render",
@@ -221,7 +238,14 @@ _SNAP = _later("timeline.snap_cues", "Snap cues", "command")
 _UNDO_CUT = _later("timeline.undo_cut", "Undo last cut", "command")
 _SONG_MARKERS = _later("timeline.song_markers", "Song markers", "jump")
 
-_EDITOR = _later("settings.editor", "Editor settings", "jump", "Ctrl+,")
+_EDITOR = Command(
+    id="settings.editor",
+    label="Editor settings",
+    kind="jump",
+    shortcut="Ctrl+,",
+    enabled=_enabled,
+    run=_run_focus_node("settings"),
+)
 _MEASURE_LATENCY = Command(
     id="settings.measure_latency",
     label="Measure latency...",
@@ -396,14 +420,14 @@ def command_by_id(
 
 
 def command_for_shortcut(key: int, mod: int) -> Command | None:
-    """Phase-1 shortcut, or None.
+    """Resolved shortcut, or None.
 
-    Save, quit, render, and the help overlay resolve. Other shortcut text
-    stays on its row. Bare R does not resolve.
+    Save, quit, render, the help overlay, and editor settings resolve.
+    Other shortcut text stays on its row. Bare R does not resolve.
     """
     ctrl = mod_ctrl(mod)
     for command in _STATIC_COMMANDS:
-        if command.id not in _PHASE1_SHORTCUT_IDS or command.shortcut is None:
+        if command.id not in _RESOLVED_SHORTCUT_IDS or command.shortcut is None:
             continue
         mapped = _SHORTCUT_KEYS.get(command.shortcut)
         if mapped is None:

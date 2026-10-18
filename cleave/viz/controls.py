@@ -42,9 +42,12 @@ from cleave.viz.focus_nav import (
     TimelineFocus,
     cursor_main_descriptor,
     move_focus,
-    move_quick_focus,
     timeline_strip_in_ring,
 )
+from cleave.viz.inspector_controls import InspectorControls
+from cleave.viz.navigator_controls import NavigatorControls
+from cleave.viz.row_layout import first_leftover_descriptor
+from cleave.viz.shell_focus import ShellFocusState, ShellRegion
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
 from cleave.viz.row_spec import (
     PRESET_FILE_ROW_KINDS,
@@ -116,8 +119,9 @@ class TuningControls:
         self._masked_compositor = masked_compositor
         self._modal_host = modal_host if modal_host is not None else ModalHost()
 
+        self.shell_focus = ShellFocusState()
         self._focus_cursor: FocusCursor = MainFocus(
-            RowDescriptor(RowKind.TRANSPORT)
+            RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
         )
         self._notification_host = PanelNotificationHost()
         self._key_repeat = KeyRepeatController()
@@ -275,6 +279,11 @@ class TuningControls:
         )
         if session.timeline.enabled:
             self.show_notification(NOTIFICATION_TIMELINE_ENABLED_TEXT)
+        self.navigator = NavigatorControls(self)
+        self.inspector = InspectorControls(self)
+        self._apply_focus_cursor(
+            MainFocus(first_leftover_descriptor(self.build_view_state(paused=playback.paused)))
+        )
 
     @property
     def tap_sync(self) -> TapSyncControls:
@@ -445,18 +454,13 @@ class TuningControls:
 
         if event.key in (pygame.K_UP, pygame.K_DOWN):
             delta = -1 if event.key == pygame.K_UP else 1
-            if mod_ctrl(event.mod):
-                self._move_quick_focus(delta)
-            else:
-                self._move_focus(delta)
+            self._move_focus(delta)
             self._key_repeat.on_keydown(
                 event.key,
                 event.mod,
                 accel=False,
-                on_repeat=lambda key, mod: (
-                    self._move_quick_focus(-1 if key == pygame.K_UP else 1)
-                    if mod_ctrl(mod)
-                    else self._move_focus(-1 if key == pygame.K_UP else 1)
+                on_repeat=lambda key, _mod: self._move_focus(
+                    -1 if key == pygame.K_UP else 1
                 ),
             )
             return True
@@ -727,11 +731,6 @@ class TuningControls:
                         return True
                     self.layer_mutations.enter_directory(slot)
                 return True
-            if kind == RowKind.TRANSPORT:
-                if self._dismiss_timed_notification_if_present():
-                    return True
-                toggle_pause(self.playback, self.duration_sec)
-                return True
             if self._dismiss_timed_notification_if_present():
                 return True
 
@@ -748,18 +747,13 @@ class TuningControls:
 
         if event.key in (pygame.K_UP, pygame.K_DOWN):
             delta = -1 if event.key == pygame.K_UP else 1
-            if mod_ctrl(event.mod):
-                self._move_quick_focus(delta)
-            else:
-                self._move_focus(delta)
+            self._move_focus(delta)
             self._key_repeat.on_keydown(
                 event.key,
                 event.mod,
                 accel=False,
-                on_repeat=lambda key, mod: (
-                    self._move_quick_focus(-1 if key == pygame.K_UP else 1)
-                    if mod_ctrl(mod)
-                    else self._move_focus(-1 if key == pygame.K_UP else 1)
+                on_repeat=lambda key, _mod: self._move_focus(
+                    -1 if key == pygame.K_UP else 1
                 ),
             )
             return True
@@ -920,7 +914,9 @@ class TuningControls:
         self._view_state._structure = None
         view = self.build_view_state(paused=self.playback.paused)
         if isinstance(self.focus_cursor, TimelineFocus):
-            self._apply_focus_cursor(MainFocus(RowDescriptor(RowKind.TRANSPORT)))
+            self._apply_focus_cursor(
+                MainFocus(first_leftover_descriptor(view))
+            )
         else:
             focus_desc = cursor_main_descriptor(self.focus_cursor)
             if not view.layout.contains_descriptor(focus_desc):
@@ -945,12 +941,11 @@ class TuningControls:
         row_count = len(self.session.layer_z_order)
         if isinstance(self.focus_cursor, TimelineFocus):
             if not timeline_strip_in_ring(view):
-                fallback_kind = (
-                    RowKind.TRANSPORT
-                    if is_preset_curation_mode(self.session.settings.editor_mode)
-                    else RowKind.RENDER_TIMELINE_HEADER
-                )
-                self._apply_focus_cursor(MainFocus(RowDescriptor(fallback_kind)))
+                if is_preset_curation_mode(self.session.settings.editor_mode):
+                    fallback = first_leftover_descriptor(view)
+                else:
+                    fallback = RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
+                self._apply_focus_cursor(MainFocus(fallback))
                 return
             if row_count == 0:
                 self._apply_focus_cursor(
@@ -966,10 +961,6 @@ class TuningControls:
     def _move_focus(self, delta: int) -> None:
         view = self.build_view_state(paused=self.playback.paused)
         self._apply_focus_cursor(move_focus(self.focus_cursor, delta, view))
-
-    def _move_quick_focus(self, delta: int) -> None:
-        view = self.build_view_state(paused=self.playback.paused)
-        self._apply_focus_cursor(move_quick_focus(self.focus_cursor, delta, view))
 
     def _nudge_move_mode(self, direction: int) -> None:
         if self.preset_list.move_mode_preset is not None:
@@ -1183,7 +1174,8 @@ class TuningControls:
         )
         self.dismiss_notification()
         if focused_toast:
-            self.focus_descriptor = RowDescriptor(RowKind.TRANSPORT)
+            view = self.build_view_state(paused=self.playback.paused)
+            self.focus_descriptor = first_leftover_descriptor(view)
         return True
 
     def open_timeline_panel(self, *, enter_submenu: bool = False) -> None:
@@ -1196,10 +1188,15 @@ class TuningControls:
         tl = self.session.timeline
         if not tl.panel_open:
             return
+        was_timeline = isinstance(self.focus_cursor, TimelineFocus)
         tl.panel_open = False
-        self._apply_focus_cursor(
-            MainFocus(RowDescriptor(RowKind.RENDER_TIMELINE_HEADER))
-        )
+        view = self.build_view_state(paused=self.playback.paused)
+        header = RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
+        if not view.layout.contains_descriptor(header):
+            header = first_leftover_descriptor(view)
+        self._apply_focus_cursor(MainFocus(header))
+        if was_timeline:
+            self.shell_focus.region = ShellRegion.NAVIGATOR
 
     def exit_timeline_submenu(self) -> None:
         if not isinstance(self.focus_cursor, TimelineFocus):

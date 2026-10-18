@@ -37,30 +37,6 @@ class ProjectControls:
         self.duration_sec = duration_sec
         self._on_compositor_format_changed = on_compositor_format_changed
 
-    def set_expanded(self, expanded: bool) -> None:
-        project = self.session.project
-        if project.expanded == expanded:
-            return
-        project.expanded = expanded
-
-    def set_render_expanded(self, expanded: bool) -> None:
-        render = self.session.project.render
-        if render.expanded == expanded:
-            return
-        render.expanded = expanded
-
-    def set_milkdrop_expanded(self, expanded: bool) -> None:
-        project = self.session.project
-        if project.milkdrop_expanded == expanded:
-            return
-        project.milkdrop_expanded = expanded
-
-    def set_compositor_expanded(self, expanded: bool) -> None:
-        project = self.session.project
-        if project.compositor_expanded == expanded:
-            return
-        project.compositor_expanded = expanded
-
     def adjust_milkdrop_beat_sensitivity(self, *, forward: bool, large: bool) -> None:
         step = _BEAT_SENSITIVITY_LARGE_STEP if large else _BEAT_SENSITIVITY_STEP
         delta = step if forward else -step

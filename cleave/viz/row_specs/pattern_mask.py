@@ -156,7 +156,6 @@ SPECS: dict[RowKind, RowSpec] = {
             "Replaces layer compositing, so each layer's Compositing rows",
             "(blend mode, opacity) are greyed out and ignored.",
         ),
-        quick_nav_target=True,
         toggle_enabled=_toggle_render_pattern_mask_enabled,
     ),
     RowKind.RENDER_PATTERN_MASK_TYPE: RowSpec(

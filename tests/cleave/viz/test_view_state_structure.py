@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from cleave.viz.row_kinds import RowDescriptor, RowKind
@@ -943,66 +944,27 @@ def test_structure_signature_invalidates_on_visual_limiter_enabled() -> None:
     assert sig_before != sig_after
 
 
-def test_structure_signature_invalidates_on_editor_window_expanded() -> None:
+def test_leftover_layout_omits_settings_project_and_transport() -> None:
     controls = _make_controls(("layer_1",))
-    session = controls.session
-    config_save = controls._config_save
-    session.settings.editor_window_expanded = False
-    sig_before = view_state_structure_signature(
-        session, config_save, notification_active=False
+    view = controls.build_view_state(paused=False)
+    names = {row.kind.name for row in view.layout.rows}
+    assert "TRANSPORT" not in names
+    assert not any(name.startswith("SETTINGS_") or name.startswith("PROJECT_") for name in names)
+    sig = view_state_structure_signature(
+        controls.session, controls._config_save, notification_active=False
     )
-    session.settings.editor_window_expanded = True
-    sig_after = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
-    assert sig_before != sig_after
-
-
-def test_structure_signature_invalidates_on_milkdrop_expanded() -> None:
-    controls = _make_controls(("layer_1",))
-    session = controls.session
-    config_save = controls._config_save
-    session.project.expanded = True
-    session.project.milkdrop_expanded = False
-    sig_before = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
-    session.project.milkdrop_expanded = True
-    sig_after = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
-    assert sig_before != sig_after
-
-
-def test_structure_signature_invalidates_on_compositor_expanded() -> None:
-    controls = _make_controls(("layer_1",))
-    session = controls.session
-    config_save = controls._config_save
-    session.project.expanded = True
-    session.project.compositor_expanded = False
-    sig_before = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
-    session.project.compositor_expanded = True
-    sig_after = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
-    assert sig_before != sig_after
-
-
-def test_structure_signature_invalidates_on_latency_compensation_expanded() -> None:
-    controls = _make_controls(("layer_1",))
-    session = controls.session
-    config_save = controls._config_save
-    session.settings.latency_compensation_expanded = False
-    sig_before = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
-    session.settings.latency_compensation_expanded = True
-    sig_after = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
-    assert sig_before != sig_after
+    payload = json.loads(sig)
+    assert payload["settings"] == {"editor_mode": controls.session.settings.editor_mode}
+    assert payload["project"] == {}
+    for flag in (
+        "editor_window_expanded",
+        "ui_expanded",
+        "latency_compensation_expanded",
+        "milkdrop_expanded",
+        "compositor_expanded",
+        "render_expanded",
+    ):
+        assert flag not in sig
 
 
 def test_row_layout_includes_song_marker_items_when_expanded() -> None:

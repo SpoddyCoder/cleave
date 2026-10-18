@@ -42,35 +42,6 @@ from tests.cleave.viz.test_overlay import _minimal_view_state
 from tests.support.viz import make_track_block
 
 
-def test_structure_signature_invalidates_on_project_expand() -> None:
-    controls = _make_controls(("layer_1",))
-    session = controls.session
-    config_save = controls._config_save
-    sig_before = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
-    session.project.expanded = True
-    sig_after = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
-    assert sig_before != sig_after
-
-
-def test_structure_signature_invalidates_on_project_render_expand() -> None:
-    controls = _make_controls(("layer_1",))
-    session = controls.session
-    config_save = controls._config_save
-    session.project.expanded = True
-    sig_before = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
-    session.project.render.expanded = True
-    sig_after = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
-    assert sig_before != sig_after
-
-
 def test_structure_signature_stable_for_render_quality_and_range() -> None:
     controls = _make_controls(("layer_1",))
     session = controls.session
@@ -91,30 +62,33 @@ def test_structure_signature_stable_for_render_quality_and_range() -> None:
 
 
 def test_project_children_omitted_until_expanded() -> None:
+    from cleave.viz.inspector import build_inspector_rows
+
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
-    kinds = [row.kind for row in view.layout.rows]
-    assert RowKind.PROJECT_HEADER in kinds
-    assert RowKind.PROJECT_MILKDROP_HEADER not in kinds
-    assert RowKind.PROJECT_COMPOSITOR_HEADER not in kinds
-    assert RowKind.PROJECT_RENDER_HEADER not in kinds
-
-    _expand_project(controls)
-    view = controls.build_view_state(paused=False)
-    kinds = [row.kind for row in view.layout.rows]
+    names = {row.kind.name for row in view.layout.rows}
+    assert not any(name.startswith("PROJECT_") for name in names)
+    rows = build_inspector_rows(view, "project", frozenset())
+    kinds = [row.descriptor.kind for row in rows if row.descriptor is not None]
     assert RowKind.PROJECT_MILKDROP_HEADER in kinds
-    assert RowKind.PROJECT_MILKDROP_BEAT_SENSITIVITY not in kinds
     assert RowKind.PROJECT_COMPOSITOR_HEADER in kinds
-    assert RowKind.PROJECT_COMPOSITOR_HDR not in kinds
     assert RowKind.PROJECT_RENDER_HEADER in kinds
-    assert RowKind.PROJECT_RENDER_QUALITY not in kinds
+    collapsed = build_inspector_rows(
+        view, "project", frozenset({RowKind.PROJECT_MILKDROP_HEADER})
+    )
+    collapsed_kinds = [
+        row.descriptor.kind for row in collapsed if row.descriptor is not None
+    ]
+    assert RowKind.PROJECT_MILKDROP_BEAT_SENSITIVITY not in collapsed_kinds
 
 
 def test_project_render_children_omitted_until_expanded() -> None:
+    from cleave.viz.inspector import build_inspector_rows
+
     controls = _make_controls(("layer_1",))
-    _expand_project_render(controls)
     view = controls.build_view_state(paused=False)
-    kinds = [row.kind for row in view.layout.rows]
+    rows = build_inspector_rows(view, "project", frozenset())
+    kinds = [row.descriptor.kind for row in rows if row.descriptor is not None]
     assert RowKind.PROJECT_RENDER_OUTPUT in kinds
     assert RowKind.PROJECT_RENDER_WIDTH in kinds
     assert RowKind.PROJECT_RENDER_HEIGHT in kinds
@@ -125,36 +99,26 @@ def test_project_render_children_omitted_until_expanded() -> None:
 
 
 def test_project_milkdrop_children_omitted_until_expanded() -> None:
+    from cleave.viz.inspector import build_inspector_rows
+
     controls = _make_controls(("layer_1",))
-    _expand_project(controls)
     view = controls.build_view_state(paused=False)
-    kinds = [row.kind for row in view.layout.rows]
-    assert RowKind.PROJECT_MILKDROP_HEADER in kinds
-    assert RowKind.PROJECT_MILKDROP_BEAT_SENSITIVITY not in kinds
-
-    controls.session.project.milkdrop_expanded = True
-    view = controls.build_view_state(paused=False)
-    kinds = [row.kind for row in view.layout.rows]
-    assert RowKind.PROJECT_MILKDROP_BEAT_SENSITIVITY in kinds
-    beat_row = view.layout.find_by_kind(RowKind.PROJECT_MILKDROP_BEAT_SENSITIVITY)
-    assert format_row_value(view, view.layout.descriptor(beat_row)) == (
-        f"{DEFAULT_BEAT_SENSITIVITY:.2f}"
+    hidden = build_inspector_rows(
+        view, "project", frozenset({RowKind.PROJECT_MILKDROP_HEADER})
     )
-
-
-def test_structure_signature_invalidates_on_project_compositor_expand() -> None:
-    controls = _make_controls(("layer_1",))
-    session = controls.session
-    config_save = controls._config_save
-    session.project.expanded = True
-    sig_before = view_state_structure_signature(
-        session, config_save, notification_active=False
+    hidden_kinds = [
+        row.descriptor.kind for row in hidden if row.descriptor is not None
+    ]
+    assert RowKind.PROJECT_MILKDROP_HEADER in hidden_kinds
+    assert RowKind.PROJECT_MILKDROP_BEAT_SENSITIVITY not in hidden_kinds
+    shown = build_inspector_rows(view, "project", frozenset())
+    beat = next(
+        row.descriptor
+        for row in shown
+        if row.descriptor is not None
+        and row.descriptor.kind == RowKind.PROJECT_MILKDROP_BEAT_SENSITIVITY
     )
-    session.project.compositor_expanded = True
-    sig_after = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
-    assert sig_before != sig_after
+    assert format_row_value(view, beat) == f"{DEFAULT_BEAT_SENSITIVITY:.2f}"
 
 
 def test_structure_signature_stable_for_compositor_hdr() -> None:
@@ -172,28 +136,23 @@ def test_structure_signature_stable_for_compositor_hdr() -> None:
 
 
 def test_project_compositor_children_omitted_until_expanded() -> None:
-    controls = _make_controls(("layer_1",))
-    _expand_project(controls)
-    view = controls.build_view_state(paused=False)
-    kinds = [row.kind for row in view.layout.rows]
-    assert RowKind.PROJECT_COMPOSITOR_HEADER in kinds
-    assert RowKind.PROJECT_COMPOSITOR_HDR not in kinds
+    from cleave.viz.inspector import build_inspector_rows
 
-    controls.session.project.compositor_expanded = True
+    controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
-    kinds = [row.kind for row in view.layout.rows]
-    assert RowKind.PROJECT_COMPOSITOR_HDR in kinds
-    hdr_row = view.layout.find_by_kind(RowKind.PROJECT_COMPOSITOR_HDR)
-    assert format_row_value(view, view.layout.descriptor(hdr_row)) == "on"
+    shown = build_inspector_rows(view, "project", frozenset())
+    hdr = next(
+        row.descriptor
+        for row in shown
+        if row.descriptor is not None
+        and row.descriptor.kind == RowKind.PROJECT_COMPOSITOR_HDR
+    )
+    assert format_row_value(view, hdr) == "on"
 
 
 def test_compositor_hdr_keyboard_toggles() -> None:
     controls = _make_controls(("layer_1",))
-    _expand_project(controls)
-    controls.session.project.compositor_expanded = True
-    view = controls.build_view_state(paused=False)
-    hdr_row = view.layout.find_by_kind(RowKind.PROJECT_COMPOSITOR_HDR)
-    controls.focus_descriptor = view.layout.descriptor(hdr_row)
+    controls.focus_descriptor = RowDescriptor(RowKind.PROJECT_COMPOSITOR_HDR)
     assert controls.session.project.compositor_hdr is True
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.session.project.compositor_hdr is False
@@ -232,11 +191,7 @@ def test_compositor_header_is_expand_only() -> None:
 
 def test_milkdrop_beat_sensitivity_keyboard_steps() -> None:
     controls = _make_controls(("layer_1",))
-    _expand_project(controls)
-    controls.session.project.milkdrop_expanded = True
-    view = controls.build_view_state(paused=False)
-    beat_row = view.layout.find_by_kind(RowKind.PROJECT_MILKDROP_BEAT_SENSITIVITY)
-    controls.focus_descriptor = view.layout.descriptor(beat_row)
+    controls.focus_descriptor = RowDescriptor(RowKind.PROJECT_MILKDROP_BEAT_SENSITIVITY)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.session.project.milkdrop_beat_sensitivity == pytest.approx(
         DEFAULT_BEAT_SENSITIVITY + 0.1
@@ -266,28 +221,27 @@ def test_project_render_defaults() -> None:
     assert view.project.height == DEFAULT_RENDER_HEIGHT
     assert view.project.fps == DEFAULT_RENDER_FPS
     assert view.project.output_label.endswith("renders/render.mp4")
-    output_row = view.layout.find_by_kind(RowKind.PROJECT_RENDER_OUTPUT)
     assert format_row_value(
-        view, view.layout.descriptor(output_row)
+        view, RowDescriptor(RowKind.PROJECT_RENDER_OUTPUT)
     ) == view.project.output_label
-    quality_row = view.layout.find_by_kind(RowKind.PROJECT_RENDER_QUALITY)
-    assert format_row_value(view, view.layout.descriptor(quality_row)) == "normal"
-    width_row = view.layout.find_by_kind(RowKind.PROJECT_RENDER_WIDTH)
-    assert format_row_value(view, view.layout.descriptor(width_row)) == str(
-        DEFAULT_RENDER_WIDTH
-    )
-    height_row = view.layout.find_by_kind(RowKind.PROJECT_RENDER_HEIGHT)
-    assert format_row_value(view, view.layout.descriptor(height_row)) == str(
-        DEFAULT_RENDER_HEIGHT
-    )
-    fps_row = view.layout.find_by_kind(RowKind.PROJECT_RENDER_FPS)
-    assert format_row_value(view, view.layout.descriptor(fps_row)) == str(
-        DEFAULT_RENDER_FPS
-    )
-    start_row = view.layout.find_by_kind(RowKind.PROJECT_RENDER_START)
-    assert format_row_value(view, view.layout.descriptor(start_row)) == "0s"
-    end_row = view.layout.find_by_kind(RowKind.PROJECT_RENDER_END)
-    assert format_row_value(view, view.layout.descriptor(end_row)) == "120s"
+    assert format_row_value(
+        view, RowDescriptor(RowKind.PROJECT_RENDER_QUALITY)
+    ) == "normal"
+    assert format_row_value(
+        view, RowDescriptor(RowKind.PROJECT_RENDER_WIDTH)
+    ) == str(DEFAULT_RENDER_WIDTH)
+    assert format_row_value(
+        view, RowDescriptor(RowKind.PROJECT_RENDER_HEIGHT)
+    ) == str(DEFAULT_RENDER_HEIGHT)
+    assert format_row_value(
+        view, RowDescriptor(RowKind.PROJECT_RENDER_FPS)
+    ) == str(DEFAULT_RENDER_FPS)
+    assert format_row_value(
+        view, RowDescriptor(RowKind.PROJECT_RENDER_START)
+    ) == "0s"
+    assert format_row_value(
+        view, RowDescriptor(RowKind.PROJECT_RENDER_END)
+    ) == "120s"
 
 
 def test_cycle_quality_does_not_mark_dirty() -> None:
@@ -351,35 +305,23 @@ def test_output_path_uses_project_renders_dir_and_range_suffix(
 
 
 def test_left_right_on_headers_toggles_expand() -> None:
+    from cleave.viz.shell_focus import ShellRegion
+
     controls = _make_controls(("layer_1",))
-    controls.focus_descriptor = RowDescriptor(RowKind.PROJECT_HEADER)
-    controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert controls.session.project.expanded is True
-    controls.focus_descriptor = RowDescriptor(RowKind.PROJECT_MILKDROP_HEADER)
-    controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert controls.session.project.milkdrop_expanded is True
-    controls.handle_keydown(_keydown(pygame.K_LEFT))
-    assert controls.session.project.milkdrop_expanded is False
-    controls.focus_descriptor = RowDescriptor(RowKind.PROJECT_COMPOSITOR_HEADER)
-    controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert controls.session.project.compositor_expanded is True
-    controls.handle_keydown(_keydown(pygame.K_LEFT))
-    assert controls.session.project.compositor_expanded is False
-    controls.focus_descriptor = RowDescriptor(RowKind.PROJECT_RENDER_HEADER)
-    controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert controls.session.project.render.expanded is True
-    controls.handle_keydown(_keydown(pygame.K_LEFT))
-    assert controls.session.project.render.expanded is False
-    controls.focus_descriptor = RowDescriptor(RowKind.PROJECT_HEADER)
-    controls.handle_keydown(_keydown(pygame.K_LEFT))
-    assert controls.session.project.expanded is False
+    controls.shell_focus.region = ShellRegion.INSPECTOR
+    controls.shell_focus.selected_id = "project"
+    controls.shell_focus.inspector_cursor = RowDescriptor(
+        RowKind.PROJECT_MILKDROP_HEADER
+    )
+    controls.inspector.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert RowKind.PROJECT_MILKDROP_HEADER in controls.shell_focus.collapsed
+    controls.inspector.handle_keydown(_keydown(pygame.K_LEFT))
+    assert RowKind.PROJECT_MILKDROP_HEADER not in controls.shell_focus.collapsed
 
 
 def test_minimal_view_render_labels() -> None:
     state = _minimal_view_state(
         project=ProjectBlock(
-            expanded=True,
-            render_expanded=True,
             quality="high",
             start_sec=5,
             end_sec=40,
@@ -398,22 +340,12 @@ def test_minimal_view_render_labels() -> None:
         },
     )
     assert labeled_row_prefix(RowKind.PROJECT_RENDER_QUALITY) == "  └─ quality: "
-    quality = state.layout.find_by_kind(RowKind.PROJECT_RENDER_QUALITY)
-    assert format_row_value(state, state.layout.descriptor(quality)) == "high"
-    width = state.layout.find_by_kind(RowKind.PROJECT_RENDER_WIDTH)
-    assert format_row_value(state, state.layout.descriptor(width)) == str(
-        DEFAULT_RENDER_WIDTH
-    )
-    output = state.layout.find_by_kind(RowKind.PROJECT_RENDER_OUTPUT)
-    assert (
-        format_row_value(state, state.layout.descriptor(output))
-        == "renders/demo_5-40s.mp4"
-    )
-    project = state.layout.find_by_kind(RowKind.PROJECT_HEADER)
-    assert (
-        row_composite_header_display_text(state, state.layout.descriptor(project))
-        == "Project Settings ▼"
-    )
+    quality = RowDescriptor(RowKind.PROJECT_RENDER_QUALITY)
+    assert format_row_value(state, quality) == "high"
+    width = RowDescriptor(RowKind.PROJECT_RENDER_WIDTH)
+    assert format_row_value(state, width) == str(DEFAULT_RENDER_WIDTH)
+    output = RowDescriptor(RowKind.PROJECT_RENDER_OUTPUT)
+    assert format_row_value(state, output) == "renders/demo_5-40s.mp4"
 
 
 def test_render_output_row_is_read_only() -> None:
@@ -421,26 +353,21 @@ def test_render_output_row_is_read_only() -> None:
     assert spec.affordance == RowAffordance.DISPLAY
     assert spec.apply_horizontal is None
     assert spec.present_style == RowPresentStyle.PATH_ICON
-    project_spec = row_spec(RowKind.PROJECT_HEADER)
-    assert project_spec.header_glyph == FOLDER_GLYPH
-    assert project_spec.header_glyph_color == PRESET_ICON
+    project_spec = row_spec(RowKind.PROJECT_RENDER_HEADER)
+    assert project_spec.panel_label == "Render Project"
 
 
 def test_start_end_keyboard_steps() -> None:
     controls = _make_controls(("layer_1",), duration_sec=60.0)
-    _expand_project_render(controls)
-    view = controls.build_view_state(paused=False)
-    start_row = view.layout.find_by_kind(RowKind.PROJECT_RENDER_START)
-    end_row = view.layout.find_by_kind(RowKind.PROJECT_RENDER_END)
     render = controls.session.project.render
 
-    controls.focus_descriptor = _desc(view, start_row)
+    controls.focus_descriptor = RowDescriptor(RowKind.PROJECT_RENDER_START)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert render.start_sec == 1
     controls.handle_keydown(_keydown(pygame.K_PAGEDOWN))
     assert render.start_sec == 11
 
-    controls.focus_descriptor = _desc(view, end_row)
+    controls.focus_descriptor = RowDescriptor(RowKind.PROJECT_RENDER_END)
     controls.handle_keydown(_keydown(pygame.K_LEFT))
     assert render.end_sec == 59
     controls.handle_keydown(_keydown(pygame.K_PAGEUP))
@@ -449,26 +376,21 @@ def test_start_end_keyboard_steps() -> None:
 
 def test_width_height_fps_keyboard_steps() -> None:
     controls = _make_controls(("layer_1",))
-    _expand_project_render(controls)
-    view = controls.build_view_state(paused=False)
-    width_row = view.layout.find_by_kind(RowKind.PROJECT_RENDER_WIDTH)
-    height_row = view.layout.find_by_kind(RowKind.PROJECT_RENDER_HEIGHT)
-    fps_row = view.layout.find_by_kind(RowKind.PROJECT_RENDER_FPS)
     render = controls.session.project.render
 
-    controls.focus_descriptor = _desc(view, width_row)
+    controls.focus_descriptor = RowDescriptor(RowKind.PROJECT_RENDER_WIDTH)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert render.width == DEFAULT_RENDER_WIDTH + 10
     controls.handle_keydown(_keydown(pygame.K_PAGEDOWN))
     assert render.width == DEFAULT_RENDER_WIDTH + 110
 
-    controls.focus_descriptor = _desc(view, height_row)
+    controls.focus_descriptor = RowDescriptor(RowKind.PROJECT_RENDER_HEIGHT)
     controls.handle_keydown(_keydown(pygame.K_LEFT))
     assert render.height == DEFAULT_RENDER_HEIGHT - 10
     controls.handle_keydown(_keydown(pygame.K_PAGEUP))
     assert render.height == DEFAULT_RENDER_HEIGHT - 110
 
-    controls.focus_descriptor = _desc(view, fps_row)
+    controls.focus_descriptor = RowDescriptor(RowKind.PROJECT_RENDER_FPS)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert render.fps == DEFAULT_RENDER_FPS + 1
     controls.handle_keydown(_keydown(pygame.K_PAGEDOWN))

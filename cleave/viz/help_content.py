@@ -40,7 +40,8 @@ NAVIGATION_SECTION = HelpSection(
     "Navigation / Global",
     (
         ("Up/Down", "move row"),
-        ("Ctrl + Up/Down", "jump section"),
+        ("Tab / Shift+Tab", "cycle region"),
+        ("Ctrl + Up/Down", "previous / next section"),
         ("Shift + Left/Right", "skip 2s"),
         ("Ctrl + Left/Right", "skip 30s"),
         ("ESC", "hide UI"),
@@ -56,7 +57,8 @@ _CURATION_NAVIGATION_SECTION = HelpSection(
     "Navigation / Global",
     (
         ("Up/Down", "move row"),
-        ("Ctrl + Up/Down", "jump section"),
+        ("Tab / Shift+Tab", "cycle region"),
+        ("Ctrl + Up/Down", "previous / next section"),
         ("Shift + Left/Right", "skip 2s"),
         ("Ctrl + Left/Right", "skip 30s"),
         ("ESC", "hide UI"),
@@ -71,13 +73,6 @@ def navigation_section(*, preset_curation: bool = False) -> HelpSection:
         return _CURATION_NAVIGATION_SECTION
     return NAVIGATION_SECTION
 
-_TRANSPORT_SECTION = HelpSection(
-    "Transport Controls",
-    (
-        ("Enter", "play/pause"),
-        ("Left/Right", "skip 10s"),
-    ),
-)
 
 _LAYER_SECTION_BASE: tuple[tuple[str, str], ...] = (
     ("M", "move z-order"),
@@ -370,8 +365,6 @@ def sections_for(
         primary = _preset_section(
             switching_on=preset_switching == "on"
         )
-    elif behavior.affordance == RowAffordance.SEEK:
-        primary = _TRANSPORT_SECTION
     elif row_kind == RowKind.LAYER_MANAGEMENT_ADD:
         primary = HelpSection(
             behavior.help_title or "Add Layer",

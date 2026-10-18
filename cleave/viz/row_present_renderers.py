@@ -19,15 +19,13 @@ from cleave.viz.material_icons import (
     action_enter_icon_suffix_width,
     render_action_enter_icon,
     render_glyph,
-    render_transport_icons,
     row_icon_prefix_width,
     track_header_lock_suffix_width,
     visibility_icon_slot_width,
 )
 from cleave.viz.overlay_profiler import OverlayDrawCounters
 from cleave.viz.panel_notification import notification_attention
-from cleave.viz.playback import format_mmss
-from cleave.viz.row_kinds import RowAffordance, RowKind
+from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
 from cleave.viz.row_spec import (
     FitStrategy,
     ROW_SPECS,
@@ -582,11 +580,36 @@ def row_in_move_mode(state: TuningViewState, index: int) -> bool:
     )
 
 
-def row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]:
-    """Return the VALUE-role color for a row (before label/value split rendering)."""
-    kind = state.layout.kind(index)
+def _descriptor_has_tree_focus(state: TuningViewState, desc: RowDescriptor) -> bool:
+    if state.timeline_submenu_focused or not state.layout.rows:
+        return False
+    if not state.layout.contains_descriptor(desc):
+        return False
+    return state.layout.find_descriptor(desc) == state.focus_index
+
+
+def _descriptor_in_move_mode(state: TuningViewState, desc: RowDescriptor) -> bool:
+    if desc.slot is not None and state.move_mode_slot == desc.slot:
+        return True
+    move = state.move_mode_preset
+    if move is None:
+        return False
+    field = ROW_SPECS.get(desc.kind)
+    return (
+        field is not None
+        and field.present_style == RowPresentStyle.PATH_ICON
+        and desc.preset_index is not None
+        and desc.slot == move[0]
+        and desc.preset_index == move[1]
+    )
+
+
+def row_value_color_for(
+    state: TuningViewState, desc: RowDescriptor
+) -> tuple[int, int, int]:
+    """VALUE-role color for *desc*. Shared by the pygame painter and ImGui."""
+    kind = desc.kind
     field = ROW_SPECS.get(kind)
-    desc = state.layout.descriptor(index)
     if field is not None and field.present_style == RowPresentStyle.NOTIFICATION:
         accent = notification_accent(desc.marker_index)
         attention = notification_attention(
@@ -623,11 +646,11 @@ def row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]:
                 return DISABLED
         if locked_blocked:
             return LOCKED
-        if row_has_tree_focus(state, index):
+        if _descriptor_has_tree_focus(state, desc):
             return HIGHLIGHT
         return ACTION
 
-    stem = state.layout.slot(index)
+    stem = desc.slot
 
     if kind in RENDER_OVERLAY_SECTION_KINDS:
         overlays = state.render_overlays
@@ -667,10 +690,10 @@ def row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]:
     ):
         return DISABLED
 
-    if row_in_move_mode(state, index):
+    if _descriptor_in_move_mode(state, desc):
         return MOVE_MODE
 
-    if row_has_tree_focus(state, index):
+    if _descriptor_has_tree_focus(state, desc):
         return HIGHLIGHT
 
     if locked_blocked:
@@ -690,23 +713,17 @@ def row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]:
     return VALUE
 
 
+def row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]:
+    """Return the VALUE-role color for a layout row."""
+    return row_value_color_for(state, state.layout.descriptor(index))
+
+
 def row_bg_color(state: TuningViewState, index: int) -> tuple[int, int, int] | None:
     if row_in_move_mode(state, index):
         return MOVE_MODE
     if row_has_tree_focus(state, index):
         return HIGHLIGHT
     return None
-
-
-def is_transport_row(state: TuningViewState, index: int) -> bool:
-    field = field_for_index(state, index)
-    if field is None or field.present_style != RowPresentStyle.FULL_LINE:
-        return False
-    return row_spec(state.layout.kind(index)).affordance == RowAffordance.SEEK
-
-
-def is_settings_header_row(state: TuningViewState, index: int) -> bool:
-    return state.layout.kind(index) == RowKind.SETTINGS_HEADER
 
 
 def is_notification_row(state: TuningViewState, index: int) -> bool:
@@ -749,22 +766,6 @@ class RowPresentContext:
 RowPaint = Callable[
     [RowPresentContext], tuple[pygame.Surface, pygame.Surface | None, int]
 ]
-
-
-def _paint_transport(
-    ctx: RowPresentContext,
-) -> tuple[pygame.Surface, pygame.Surface | None, int]:
-    icons_surf = render_transport_icons(
-        color=ctx.color,
-        line_height=ctx.line_h,
-        paused=ctx.state.paused,
-    )
-    time_text = f" [{format_mmss(ctx.state.position_sec)}]"
-    time_surf = render_text(
-        ctx.font, time_text, True, ctx.color, counters=ctx.counters
-    )
-    width = ctx.indent + icons_surf.get_width() + time_surf.get_width()
-    return icons_surf, time_surf, width
 
 
 def _paint_track_header(
@@ -965,8 +966,6 @@ def _paint_labeled_value(
 def _paint_full_line(
     ctx: RowPresentContext,
 ) -> tuple[pygame.Surface, pygame.Surface | None, int]:
-    if is_transport_row(ctx.state, ctx.index):
-        return _paint_transport(ctx)
     label = row_text(ctx.state, ctx.index)
     surf = render_text(ctx.font, label, True, ctx.color, counters=ctx.counters)
     return surf, None, ctx.indent + surf.get_width()

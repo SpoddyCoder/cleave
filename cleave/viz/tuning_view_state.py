@@ -320,10 +320,6 @@ class RenderTimelineBlock:
 
 @dataclass
 class SettingsBlock:
-    expanded: bool = False
-    editor_window_expanded: bool = False
-    ui_expanded: bool = False
-    latency_compensation_expanded: bool = False
     editor_mode: str = "visualizer"
     preview_quality: str = DEFAULT_EDITOR_PREVIEW_QUALITY
     editor_window_width: int = DEFAULT_EDITOR_WIDTH
@@ -339,12 +335,8 @@ class SettingsBlock:
 
 @dataclass
 class ProjectBlock:
-    expanded: bool = False
-    milkdrop_expanded: bool = False
     milkdrop_beat_sensitivity: float = DEFAULT_BEAT_SENSITIVITY
-    compositor_expanded: bool = False
     compositor_hdr: bool = DEFAULT_COMPOSITOR_HDR
-    render_expanded: bool = False
     quality: str = DEFAULT_PROJECT_RENDER_QUALITY
     start_sec: int = DEFAULT_PROJECT_RENDER_START_SEC
     end_sec: int = DEFAULT_PROJECT_RENDER_START_SEC
@@ -444,16 +436,24 @@ class TuningViewState:
 
     @property
     def focus_index(self) -> int:
+        if not self.layout.rows:
+            return 0
         if self.layout_frame is not None:
             from cleave.viz.focus_nav import cursor_main_descriptor
             from cleave.viz.row_layout import resolve_navigable_descriptor
 
             focus_desc = cursor_main_descriptor(self.focus_cursor)
             resolved = resolve_navigable_descriptor(
-                focus_desc, self.layout_frame.navigable_descriptors
+                focus_desc,
+                self.layout_frame.navigable_descriptors,
+                fallback=self.layout.rows[0],
             )
+            if not self.layout.contains_descriptor(resolved):
+                resolved = self.layout.rows[0]
             return self.layout.find_descriptor(resolved)
         resolved = self.layout.resolve_navigable(self.focus_descriptor, self)
+        if not self.layout.contains_descriptor(resolved):
+            resolved = self.layout.rows[0]
         return self.layout.find_descriptor(resolved)
 
 
@@ -506,18 +506,9 @@ def view_state_structure_signature(
     payload = {
         "layer_z_order": list(session.layer_z_order),
         "settings": {
-            "expanded": session.settings.expanded,
-            "editor_window_expanded": session.settings.editor_window_expanded,
-            "ui_expanded": session.settings.ui_expanded,
-            "latency_compensation_expanded": session.settings.latency_compensation_expanded,
             "editor_mode": session.settings.editor_mode,
         },
-        "project": {
-            "expanded": session.project.expanded,
-            "milkdrop_expanded": session.project.milkdrop_expanded,
-            "compositor_expanded": session.project.compositor_expanded,
-            "render_expanded": session.project.render.expanded,
-        },
+        "project": {},
         "notification_active": notification_active,
         "persistent_notification_active": persistent_notification_active,
         "layers": layers,
@@ -603,12 +594,8 @@ def _project_block_from_session(
     end_sec = resolved_project_render_end_sec(render.end_sec, duration_sec)
     root = project_dir if project_dir is not None else Path(".")
     return ProjectBlock(
-        expanded=session.project.expanded,
-        milkdrop_expanded=session.project.milkdrop_expanded,
         milkdrop_beat_sensitivity=session.project.milkdrop_beat_sensitivity,
-        compositor_expanded=session.project.compositor_expanded,
         compositor_hdr=session.project.compositor_hdr,
-        render_expanded=render.expanded,
         quality=render.quality,
         start_sec=render.start_sec,
         end_sec=end_sec,
@@ -813,10 +800,6 @@ class TuningViewStateBuilder:
         pm = self.session.render_pattern_mask
         tl = self.session.timeline
         settings = SettingsBlock(
-            expanded=self.session.settings.expanded,
-            editor_window_expanded=self.session.settings.editor_window_expanded,
-            ui_expanded=self.session.settings.ui_expanded,
-            latency_compensation_expanded=self.session.settings.latency_compensation_expanded,
             editor_mode=self.session.settings.editor_mode,
         )
         project = _project_block_from_session(
@@ -910,7 +893,7 @@ class TuningViewStateBuilder:
             tracks=tracks,
             paused=False,
             position_sec=0.0,
-            focus_cursor=MainFocus(RowDescriptor(RowKind.TRANSPORT)),
+            focus_cursor=MainFocus(RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)),
             move_mode_slot=None,
             persistent_notification_message=(
                 "…" if persistent_notification_active else None
@@ -1113,10 +1096,6 @@ class TuningViewStateBuilder:
             ),
             settings=replace(
                 structure.settings,
-                expanded=self.session.settings.expanded,
-                editor_window_expanded=self.session.settings.editor_window_expanded,
-                ui_expanded=self.session.settings.ui_expanded,
-                latency_compensation_expanded=self.session.settings.latency_compensation_expanded,
                 editor_mode=self.session.settings.editor_mode,
                 preview_quality=self._config_save.cfg.editor.preview_quality,
                 editor_window_width=self._config_save.cfg.editor.width,

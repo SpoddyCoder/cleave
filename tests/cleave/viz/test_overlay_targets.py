@@ -85,7 +85,7 @@ def test_draw_tuning_overlay_uploads_help_panel() -> None:
     help_overlay = HelpOverlay()
     view_state = MagicMock()
     view_state.help_visible = True
-    view_state.focus_descriptor = RowDescriptor(RowKind.TRANSPORT)
+    view_state.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
     view_state.render_timeline.enabled = False
     view_state.timeline_submenu_focused = False
     view_state.paused = False
@@ -139,7 +139,7 @@ def test_draw_tuning_overlay_hides_help_when_overlay_hidden() -> None:
     help_overlay = HelpOverlay()
     view_state = MagicMock()
     view_state.help_visible = True
-    view_state.focus_descriptor = RowDescriptor(RowKind.TRANSPORT)
+    view_state.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
     overlay_surface = _overlay_surface_mock()
 
     OverlayDrawer.draw_tuning(

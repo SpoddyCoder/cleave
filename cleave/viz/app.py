@@ -45,6 +45,7 @@ from cleave.viz.shell_layout import ShellLayout
 from cleave.viz.timeline_overlay import (
     TimelineOverlay,
     focused_cue_readout_visible,
+    playback_bar_text,
     timeline_band_height_px,
 )
 from cleave.viz.playback import PlaybackState, current_sec, init_playback
@@ -751,18 +752,35 @@ class VisualizerApp:
             if window.quit_requested:
                 return
 
-            from cleave.viz.shell_host import ShellHost
+            from cleave.viz.shell_host import ShellHost, TransportReadout
 
             shell = ShellHost.create(rt.overlay, rt.menu_bar, rt.controls)
             self._shell = shell
 
+            display_fps: list[float | None] = [None]
+
             def draw_menu_bar() -> None:
                 assert shell is not None
+                position = current_sec(rt.playback, rt.seed.duration_sec)
+                readout = TransportReadout(
+                    paused=rt.playback.paused,
+                    position_sec=position,
+                    duration_sec=rt.seed.duration_sec,
+                    bar_text=playback_bar_text(
+                        position,
+                        ()
+                        if rt.seed.signals is None
+                        else rt.seed.signals.downbeat_times,
+                    ),
+                    fps=display_fps[0],
+                    recording=rt.controls.session.timeline.recording,
+                )
                 shell.draw(
                     rt.menu_bar,
                     command_context(rt.controls),
                     rt.overlay.visibility,
                     self._overlay_dt,
+                    readout,
                 )
 
             self.tick_frame(
@@ -843,6 +861,7 @@ class VisualizerApp:
                         layout=layout,
                     )
 
+                display_fps[0] = frame_rate.display_fps
                 draw_menu_bar()
                 pygame.display.flip()
                 measured_fps = frame_rate.end_frame()

@@ -300,7 +300,6 @@ SPECS: dict[RowKind, RowSpec] = {
         help_description=(
             "projectM visualiser layer.",
         ),
-        quick_nav_target=True,
         toggle_enabled=_toggle_track_enabled,
         toggle_solo=_toggle_track_solo,
         can_enter_move_mode=True,

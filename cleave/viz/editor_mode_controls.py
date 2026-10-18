@@ -86,8 +86,6 @@ def _merge_session_state(
     editor_mode: EditorMode | None = None,
     panel_open: bool | None = None,
 ) -> None:
-    preserve_expanded = target.settings.expanded
-    preserve_ui_expanded = target.settings.ui_expanded
     preserve_help = target.help_visible
     preserve_editor_mode = target.settings.editor_mode
     skip_tracker = target.preset_skip_notify_tracker
@@ -109,8 +107,6 @@ def _merge_session_state(
     target.project.render.height = fresh.project.render.height
     target.project.render.fps = fresh.project.render.fps
 
-    target.settings.expanded = preserve_expanded
-    target.settings.ui_expanded = preserve_ui_expanded
     mode = editor_mode if editor_mode is not None else preserve_editor_mode
     target.settings.editor_mode = mode
     target.help_visible = preserve_help

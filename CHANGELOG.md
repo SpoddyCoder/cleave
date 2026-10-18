@@ -11,6 +11,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- The editor shell now has a navigator, an inspector, and a transport bar. Settings and Project edit in the inspector. Tab cycles regions, and Ctrl+Up/Down move between the top-level sections.
 - The editor has a menu bar (File, Project, Layers, Render, Timeline, Settings, Help). Save, Render, Measure latency, and Preset curation moved from the panel to the menus. Ctrl+R starts a render.
 
 ### Fixed

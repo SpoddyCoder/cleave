@@ -41,7 +41,7 @@ def test_help_content_signature_stable_for_same_inputs() -> None:
 
 def test_help_content_signature_changes_on_focus_change() -> None:
     transport = help_content_signature(
-        RowDescriptor(RowKind.TRANSPORT),
+        RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER),
         timeline_enabled=False,
         timeline_submenu_focused=False,
         paused=False,
@@ -64,7 +64,7 @@ def test_help_content_signature_changes_on_focus_change() -> None:
 def test_compose_panel_cpu_cache_hit_reuses_panel_surface() -> None:
     pygame.init()
     overlay = HelpOverlay()
-    focus = RowDescriptor(RowKind.TRANSPORT)
+    focus = RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
     kwargs = dict(
         viewport_width=1280,
         viewport_height=720,
@@ -89,7 +89,7 @@ def test_upload_plan_full_on_first_frame() -> None:
     pygame.init()
     overlay = HelpOverlay()
     composed = overlay.compose_panel(
-        RowDescriptor(RowKind.TRANSPORT),
+        RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER),
         viewport_width=1280,
         viewport_height=720,
     )
@@ -100,7 +100,7 @@ def test_upload_plan_full_on_first_frame() -> None:
 def test_upload_plan_skip_when_signature_unchanged() -> None:
     pygame.init()
     overlay = HelpOverlay()
-    focus = RowDescriptor(RowKind.TRANSPORT)
+    focus = RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
     kwargs = dict(viewport_width=1280, viewport_height=720)
 
     first = overlay.compose_panel(focus, **kwargs)
@@ -121,7 +121,7 @@ def test_upload_plan_full_on_focus_change() -> None:
     overlay = HelpOverlay()
     kwargs = dict(viewport_width=1280, viewport_height=720)
 
-    first = overlay.compose_panel(RowDescriptor(RowKind.TRANSPORT), **kwargs)
+    first = overlay.compose_panel(RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER), **kwargs)
     assert first is not None
 
     cache = overlay._cache
@@ -139,7 +139,7 @@ def test_upload_plan_full_on_focus_change() -> None:
 
 def test_help_upload_signature_uses_screen_rect_active_size() -> None:
     content_sig = help_content_signature(
-        RowDescriptor(RowKind.TRANSPORT),
+        RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER),
         timeline_enabled=False,
         timeline_submenu_focused=False,
         paused=False,
@@ -164,7 +164,7 @@ def test_upload_plan_for_signature_skip_matches_help_path() -> None:
     pygame.init()
     overlay = HelpOverlay()
     composed = overlay.compose_panel(
-        RowDescriptor(RowKind.TRANSPORT),
+        RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER),
         viewport_width=1280,
         viewport_height=720,
     )

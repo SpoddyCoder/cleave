@@ -75,8 +75,6 @@ class RowSpec:
     help_description: tuple[str, ...] | None = None
     help_mode_entries: tuple[tuple[str, str], ...] | None = None
     navigable: bool = True
-    quick_nav_target: bool = False
-    quick_nav_always: bool = False
     is_header: bool = False
     is_sub_header: bool = False
     is_pinned: bool = False
@@ -398,8 +396,6 @@ def composite_header_prefix_part(
     if spec.present_style == RowPresentStyle.TRACK_HEADER:
         assert desc.slot is not None
         return _track_header_layer_prefix(state, desc.slot)
-    if desc.kind == RowKind.SETTINGS_HEADER:
-        return f"{spec.panel_label} "
     if spec.header_prefix is not None:
         return spec.header_prefix
     return f"{spec.panel_label} "
@@ -409,8 +405,6 @@ def composite_header_suffix_part(
     state: TuningViewState, desc: RowDescriptor
 ) -> str:
     spec = row_spec(desc.kind)
-    if desc.kind == RowKind.SETTINGS_HEADER:
-        return ""
     if spec.present_style == RowPresentStyle.TRACK_HEADER:
         assert desc.slot is not None
         return stem_overlay_header(state.tracks[desc.slot].runtime.stem)
@@ -457,8 +451,6 @@ def row_full_line_display_text(state: TuningViewState, desc: RowDescriptor) -> s
     if spec.present_style == RowPresentStyle.NOTIFICATION:
         assert spec.format_value is not None
         return spec.format_value(state, desc)
-    if desc.kind == RowKind.TRANSPORT:
-        return ""
     if spec.format_value is not None:
         return (
             tree_branch_prefix(_full_line_branch_depth(desc.kind))

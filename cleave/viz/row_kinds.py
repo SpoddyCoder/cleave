@@ -133,7 +133,6 @@ class RowKind(Enum):
     TIMELINE_REMOVE_HARD_CUTS = auto()
     SONG_MARKERS_HEADER = auto()
     SONG_MARKER_ITEM = auto()
-    PROJECT_HEADER = auto()
     PROJECT_MILKDROP_HEADER = auto()
     PROJECT_MILKDROP_BEAT_SENSITIVITY = auto()
     PROJECT_COMPOSITOR_HEADER = auto()
@@ -146,7 +145,6 @@ class RowKind(Enum):
     PROJECT_RENDER_QUALITY = auto()
     PROJECT_RENDER_START = auto()
     PROJECT_RENDER_END = auto()
-    SETTINGS_HEADER = auto()
     SETTINGS_PREVIEW_QUALITY = auto()
     SETTINGS_EDITOR_WINDOW_HEADER = auto()
     SETTINGS_EDITOR_WINDOW_WIDTH = auto()
@@ -161,7 +159,6 @@ class RowKind(Enum):
     SETTINGS_UI_NOTIFICATION_DISPLAY = auto()
     SETTINGS_LATENCY_COMPENSATION_HEADER = auto()
     SETTINGS_RESIDUAL_LATENCY_MS = auto()
-    TRANSPORT = auto()
 
 
 @dataclass(frozen=True)
@@ -180,6 +177,5 @@ class RowAffordance(Enum):
     VALUE_STEP = auto()
     PATH_DIR = auto()
     PATH_PRESET = auto()
-    SEEK = auto()
     ACTION = auto()
     DISPLAY = auto()

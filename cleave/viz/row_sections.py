@@ -23,46 +23,15 @@ AppendDynamicChildrenFn = Callable[[list[RowDescriptor], "TuningViewState", str 
 PanelAnchorToggleFn = Callable[["TuningControls", bool], None]
 
 
-def _toggle_settings(controls: TuningControls, _slot: str | None, forward: bool) -> None:
-    controls.settings.set_expanded(forward)
+def _inspector_group_expanded(_state: TuningViewState, _slot: str | None) -> bool:
+    """Settings and Project groups expand in the inspector, not the session."""
+    return True
 
 
-def _toggle_settings_editor_window(
-    controls: TuningControls, _slot: str | None, forward: bool
+def _inspector_group_toggle(
+    _controls: TuningControls, _slot: str | None, _forward: bool
 ) -> None:
-    controls.settings.set_editor_window_expanded(forward)
-
-
-def _toggle_settings_ui(controls: TuningControls, _slot: str | None, forward: bool) -> None:
-    controls.settings.set_ui_expanded(forward)
-
-
-def _toggle_settings_latency_compensation(
-    controls: TuningControls, _slot: str | None, forward: bool
-) -> None:
-    controls.settings.set_latency_compensation_expanded(forward)
-
-
-def _toggle_project(controls: TuningControls, _slot: str | None, forward: bool) -> None:
-    controls.project.set_expanded(forward)
-
-
-def _toggle_project_render(
-    controls: TuningControls, _slot: str | None, forward: bool
-) -> None:
-    controls.project.set_render_expanded(forward)
-
-
-def _toggle_project_milkdrop(
-    controls: TuningControls, _slot: str | None, forward: bool
-) -> None:
-    controls.project.set_milkdrop_expanded(forward)
-
-
-def _toggle_project_compositor(
-    controls: TuningControls, _slot: str | None, forward: bool
-) -> None:
-    controls.project.set_compositor_expanded(forward)
+    return None
 
 
 def _toggle_render_overlays(
@@ -278,7 +247,7 @@ class SectionNode:
 
 @dataclass(frozen=True)
 class ExpandSectionDef:
-    header_kind: RowKind
+    header_kind: RowKind | None
     context: Literal["global", "per_slot"]
     read_expanded: Callable[["TuningViewState", str | None], bool]
     toggle: ExpandToggleFn
@@ -304,42 +273,6 @@ PANEL_ANCHOR_TOGGLE_BY_HEADER: dict[RowKind, PanelAnchorToggleFn] = {
 }
 
 PANEL_ANCHOR_HEADER_KINDS = frozenset(PANEL_ANCHOR_BY_HEADER)
-
-
-def _settings_expanded(state: TuningViewState, _slot: str | None) -> bool:
-    return state.settings.expanded
-
-
-def _settings_editor_window_expanded(
-    state: TuningViewState, _slot: str | None
-) -> bool:
-    return state.settings.editor_window_expanded
-
-
-def _settings_ui_expanded(state: TuningViewState, _slot: str | None) -> bool:
-    return state.settings.ui_expanded
-
-
-def _settings_latency_compensation_expanded(
-    state: TuningViewState, _slot: str | None
-) -> bool:
-    return state.settings.latency_compensation_expanded
-
-
-def _project_expanded(state: TuningViewState, _slot: str | None) -> bool:
-    return state.project.expanded
-
-
-def _project_render_expanded(state: TuningViewState, _slot: str | None) -> bool:
-    return state.project.render_expanded
-
-
-def _project_milkdrop_expanded(state: TuningViewState, _slot: str | None) -> bool:
-    return state.project.milkdrop_expanded
-
-
-def _project_compositor_expanded(state: TuningViewState, _slot: str | None) -> bool:
-    return state.project.compositor_expanded
 
 
 def _render_overlays_expanded(state: TuningViewState, _slot: str | None) -> bool:
@@ -499,8 +432,8 @@ def _append_song_marker_rows(
 SETTINGS_EDITOR_WINDOW_SECTION = ExpandSectionDef(
     header_kind=RowKind.SETTINGS_EDITOR_WINDOW_HEADER,
     context="global",
-    read_expanded=_settings_editor_window_expanded,
-    toggle=_toggle_settings_editor_window,
+    read_expanded=_inspector_group_expanded,
+    toggle=_inspector_group_toggle,
     children=(
         SectionNode(leaf_kind=RowKind.SETTINGS_PREVIEW_QUALITY),
         SectionNode(leaf_kind=RowKind.SETTINGS_EDITOR_WINDOW_WIDTH),
@@ -513,8 +446,8 @@ SETTINGS_EDITOR_WINDOW_SECTION = ExpandSectionDef(
 SETTINGS_UI_SECTION = ExpandSectionDef(
     header_kind=RowKind.SETTINGS_UI_HEADER,
     context="global",
-    read_expanded=_settings_ui_expanded,
-    toggle=_toggle_settings_ui,
+    read_expanded=_inspector_group_expanded,
+    toggle=_inspector_group_toggle,
     children=(
         SectionNode(leaf_kind=RowKind.SETTINGS_UI_WIDTH_MODE),
         SectionNode(leaf_kind=RowKind.SETTINGS_UI_WIDTH),
@@ -527,18 +460,18 @@ SETTINGS_UI_SECTION = ExpandSectionDef(
 SETTINGS_LATENCY_COMPENSATION_SECTION = ExpandSectionDef(
     header_kind=RowKind.SETTINGS_LATENCY_COMPENSATION_HEADER,
     context="global",
-    read_expanded=_settings_latency_compensation_expanded,
-    toggle=_toggle_settings_latency_compensation,
+    read_expanded=_inspector_group_expanded,
+    toggle=_inspector_group_toggle,
     children=(
         SectionNode(leaf_kind=RowKind.SETTINGS_RESIDUAL_LATENCY_MS),
     ),
 )
 
 SETTINGS_SECTION = ExpandSectionDef(
-    header_kind=RowKind.SETTINGS_HEADER,
+    header_kind=None,
     context="global",
-    read_expanded=_settings_expanded,
-    toggle=_toggle_settings,
+    read_expanded=_inspector_group_expanded,
+    toggle=_inspector_group_toggle,
     children=(
         SectionNode(expand=SETTINGS_EDITOR_WINDOW_SECTION),
         SectionNode(expand=SETTINGS_UI_SECTION),
@@ -549,8 +482,8 @@ SETTINGS_SECTION = ExpandSectionDef(
 PROJECT_MILKDROP_SECTION = ExpandSectionDef(
     header_kind=RowKind.PROJECT_MILKDROP_HEADER,
     context="global",
-    read_expanded=_project_milkdrop_expanded,
-    toggle=_toggle_project_milkdrop,
+    read_expanded=_inspector_group_expanded,
+    toggle=_inspector_group_toggle,
     children=(
         SectionNode(leaf_kind=RowKind.PROJECT_MILKDROP_BEAT_SENSITIVITY),
     ),
@@ -559,8 +492,8 @@ PROJECT_MILKDROP_SECTION = ExpandSectionDef(
 PROJECT_COMPOSITOR_SECTION = ExpandSectionDef(
     header_kind=RowKind.PROJECT_COMPOSITOR_HEADER,
     context="global",
-    read_expanded=_project_compositor_expanded,
-    toggle=_toggle_project_compositor,
+    read_expanded=_inspector_group_expanded,
+    toggle=_inspector_group_toggle,
     children=(
         SectionNode(leaf_kind=RowKind.PROJECT_COMPOSITOR_HDR),
     ),
@@ -569,8 +502,8 @@ PROJECT_COMPOSITOR_SECTION = ExpandSectionDef(
 PROJECT_RENDER_SECTION = ExpandSectionDef(
     header_kind=RowKind.PROJECT_RENDER_HEADER,
     context="global",
-    read_expanded=_project_render_expanded,
-    toggle=_toggle_project_render,
+    read_expanded=_inspector_group_expanded,
+    toggle=_inspector_group_toggle,
     children=(
         SectionNode(leaf_kind=RowKind.PROJECT_RENDER_OUTPUT),
         SectionNode(leaf_kind=RowKind.PROJECT_RENDER_WIDTH),
@@ -583,10 +516,10 @@ PROJECT_RENDER_SECTION = ExpandSectionDef(
 )
 
 PROJECT_SECTION = ExpandSectionDef(
-    header_kind=RowKind.PROJECT_HEADER,
+    header_kind=None,
     context="global",
-    read_expanded=_project_expanded,
-    toggle=_toggle_project,
+    read_expanded=_inspector_group_expanded,
+    toggle=_inspector_group_toggle,
     children=(
         SectionNode(expand=PROJECT_MILKDROP_SECTION),
         SectionNode(expand=PROJECT_COMPOSITOR_SECTION),
@@ -1104,6 +1037,9 @@ def _collect_expand_sections(
     order: list[ExpandSectionDef] = []
 
     def walk_section(section: ExpandSectionDef) -> None:
+        if section.header_kind is None:
+            walk_nodes(section.children)
+            return
         if section.header_kind in seen:
             return
         seen[section.header_kind] = section
@@ -1135,11 +1071,15 @@ _ALL_EXPAND_SECTIONS = _collect_expand_sections(
 )
 
 EXPAND_SECTION_BY_HEADER: dict[RowKind, ExpandSectionDef] = {
-    section.header_kind: section for section in _ALL_EXPAND_SECTIONS
+    section.header_kind: section
+    for section in _ALL_EXPAND_SECTIONS
+    if section.header_kind is not None
 }
 
 EXPAND_TOGGLE_BY_HEADER: dict[RowKind, ExpandToggleFn] = {
-    section.header_kind: section.toggle for section in _ALL_EXPAND_SECTIONS
+    section.header_kind: section.toggle
+    for section in _ALL_EXPAND_SECTIONS
+    if section.header_kind is not None
 }
 
 EXPAND_HEADER_KINDS = frozenset(EXPAND_SECTION_BY_HEADER)
@@ -1214,7 +1154,9 @@ def _leaf_kinds_in_nodes(nodes: tuple[SectionNode, ...]) -> frozenset[RowKind]:
 
 
 def kinds_in_expand_section(section: ExpandSectionDef) -> frozenset[RowKind]:
-    kinds: set[RowKind] = {section.header_kind}
+    kinds: set[RowKind] = set()
+    if section.header_kind is not None:
+        kinds.add(section.header_kind)
     for child in section.children:
         if child.leaf_kind is not None:
             kinds.add(child.leaf_kind)
@@ -1301,7 +1243,8 @@ def _assign_expand_indent_depth(
     section: ExpandSectionDef,
     depth: int,
 ) -> None:
-    depths[section.header_kind] = depth
+    if section.header_kind is not None:
+        depths[section.header_kind] = depth
     _assign_indent_depth(depths, section.children, depth + 1)
 
 
@@ -1458,6 +1401,8 @@ def append_expand_section_rows(
     state: TuningViewState,
     slot: str | None = None,
 ) -> None:
+    if section.header_kind is None:
+        return
     section_slot = slot if section.context == "per_slot" else None
     section_card = section.card
     row_list.append(
@@ -1521,14 +1466,19 @@ _PER_CARD_SECTION_HEADERS = frozenset(
 
 def _register_section_header_parent(
     out: dict[RowKind, RowKind],
-    parent_header: RowKind,
+    parent_header: RowKind | None,
     nodes: tuple[SectionNode, ...],
 ) -> None:
     for child in nodes:
         if child.leaf_kind is not None:
-            out[child.leaf_kind] = parent_header
+            if parent_header is not None:
+                out[child.leaf_kind] = parent_header
         elif child.expand is not None:
-            out[child.expand.header_kind] = parent_header
+            if (
+                parent_header is not None
+                and child.expand.header_kind is not None
+            ):
+                out[child.expand.header_kind] = parent_header
             _walk_expand_section_for_headers(child.expand, out)
         elif child.conditional is not None:
             _register_section_header_parent(out, parent_header, child.conditional.children)
@@ -1538,8 +1488,7 @@ def _walk_expand_section_for_headers(
     section: ExpandSectionDef,
     out: dict[RowKind, RowKind],
 ) -> None:
-    header = section.header_kind
-    _register_section_header_parent(out, header, section.children)
+    _register_section_header_parent(out, section.header_kind, section.children)
 
 
 def _build_section_header_parent_map() -> dict[RowKind, RowKind]:

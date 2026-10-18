@@ -11,12 +11,8 @@ from cleave.config_schema.project_render import (
     RENDER_SIZE_STEP,
     RENDER_SIZE_STEP_LARGE,
 )
-from cleave.viz.material_icons import FOLDER_GLYPH
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
-from cleave.viz.row_sections import apply_expand_toggle
 from cleave.viz.row_spec import FitStrategy, RowPresentStyle, RowSpec
-from cleave.viz.row_specs.common import apply_expand_subheader
-from cleave.viz.theme import PRESET_ICON
 from cleave.viz.tuning_view_state import TuningViewState
 
 if TYPE_CHECKING:
@@ -75,17 +71,6 @@ def _format_project_compositor_hdr(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
     return "on" if state.project.compositor_hdr else "off"
-
-
-def _apply_project_header(
-    controls: TuningControls,
-    desc: RowDescriptor,
-    forward: bool,
-    _large: bool,
-) -> None:
-    apply_expand_toggle(
-        controls, desc.kind, desc.slot, forward, card=desc.card
-    )
 
 
 def _apply_project_render_width(
@@ -161,26 +146,10 @@ def _apply_project_compositor_hdr(
 
 
 SPECS: dict[RowKind, RowSpec] = {
-    RowKind.PROJECT_HEADER: RowSpec(
-        affordance=RowAffordance.EXPAND,
-        panel_label="Project Settings",
-        present_style=RowPresentStyle.COMPOSITE_HEADER,
-        apply_horizontal=_apply_project_header,
-        header_suffix="",
-        fit_strategy=FitStrategy.NONE,
-        help_title="Project Settings",
-        help_description=("Save the session and render this project to video.",),
-        header_glyph=FOLDER_GLYPH,
-        header_glyph_color=PRESET_ICON,
-        quick_nav_target=True,
-        quick_nav_always=True,
-        is_header=True,
-    ),
     RowKind.PROJECT_MILKDROP_HEADER: RowSpec(
         affordance=RowAffordance.EXPAND,
         panel_label="ProjectM",
         present_style=RowPresentStyle.EXPAND_SUBHEADER,
-        apply_horizontal=apply_expand_subheader,
         fit_strategy=FitStrategy.NONE,
         help_title="ProjectM",
         help_description=(
@@ -214,7 +183,6 @@ SPECS: dict[RowKind, RowSpec] = {
         affordance=RowAffordance.EXPAND,
         panel_label="Compositor",
         present_style=RowPresentStyle.EXPAND_SUBHEADER,
-        apply_horizontal=apply_expand_subheader,
         fit_strategy=FitStrategy.NONE,
         help_title="Compositor",
         help_description=(
@@ -247,7 +215,6 @@ SPECS: dict[RowKind, RowSpec] = {
         affordance=RowAffordance.EXPAND,
         panel_label="Render Project",
         present_style=RowPresentStyle.EXPAND_SUBHEADER,
-        apply_horizontal=apply_expand_subheader,
         fit_strategy=FitStrategy.NONE,
         help_title="Render Project",
         help_description=(

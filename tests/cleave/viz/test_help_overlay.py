@@ -63,6 +63,17 @@ def _timeline_keys(**kwargs: object) -> list[str]:
     return [key for key, _ in section.entries]
 
 
+def test_help_content_navigation_cycles_regions() -> None:
+    normal = dict(navigation_section().entries)
+    curation = dict(navigation_section(preset_curation=True).entries)
+    assert normal["Tab / Shift+Tab"] == "cycle region"
+    assert normal["Ctrl + Up/Down"] == "previous / next section"
+    assert curation["Tab / Shift+Tab"] == "cycle region"
+    assert curation["Ctrl + Up/Down"] == "previous / next section"
+    sections = sections_for(RowKind.TRACK_HEADER)
+    assert all(getattr(section, "title", "") != "Transport Controls" for section in sections)
+
+
 def test_help_entry_columns_align_to_widest_key() -> None:
     overlay = HelpOverlay()
     font = overlay._font_get()
@@ -541,7 +552,7 @@ def test_help_panel_starts_below_menu_bar() -> None:
     top = menu_bar_height_px()
     visualiser_rect = (0, top, 1280, 720 - top)
     composed = overlay.compose_panel(
-        RowDescriptor(RowKind.TRANSPORT),
+        RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER),
         viewport_width=1280,
         viewport_height=720,
         visualiser_rect=visualiser_rect,

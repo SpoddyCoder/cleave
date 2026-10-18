@@ -140,16 +140,16 @@ def test_navigable_descriptors_matches_indices() -> None:
 
 def test_resolve_navigable_returns_descriptor_when_navigable() -> None:
     state = _minimal_view_state()
-    transport = RowDescriptor(RowKind.TRANSPORT)
+    transport = RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
     assert state.layout.resolve_navigable(transport, state) == transport
 
 
-def test_resolve_navigable_settings_render_mode_collapsed() -> None:
-    state = _minimal_view_state(settings=SettingsBlock(expanded=False))
+def test_resolve_navigable_settings_field_falls_back_to_first_leftover() -> None:
+    state = _minimal_view_state()
     render_mode = RowDescriptor(RowKind.SETTINGS_PREVIEW_QUALITY)
     assert render_mode not in state.layout.navigable_descriptors(state)
-    assert state.layout.resolve_navigable(render_mode, state) == RowDescriptor(
-        RowKind.SETTINGS_HEADER
+    assert state.layout.resolve_navigable(render_mode, state) == (
+        state.layout.navigable_descriptors(state)[0]
     )
 
 

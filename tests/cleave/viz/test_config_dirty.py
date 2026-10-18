@@ -393,68 +393,28 @@ def _mutate_timeline_enabled(controls: TuningControls) -> None:
     controls.handle_keydown(_keydown(pygame.K_e))
 
 
-def _expand_project_milkdrop(controls: TuningControls) -> None:
-    _expand_project(controls)
-    controls.session.project.milkdrop_expanded = True
-
-
 def _mutate_milkdrop_beat_sensitivity(controls: TuningControls) -> None:
-    _expand_project_milkdrop(controls)
-    view = controls.build_view_state(paused=False)
-    beat_row = view.layout.find_by_kind(RowKind.PROJECT_MILKDROP_BEAT_SENSITIVITY)
-    controls.focus_descriptor = view.layout.descriptor(beat_row)
+    controls.focus_descriptor = RowDescriptor(RowKind.PROJECT_MILKDROP_BEAT_SENSITIVITY)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
-
-
-def _mutate_milkdrop_expanded(controls: TuningControls) -> None:
-    _expand_project(controls)
-    controls.project.set_milkdrop_expanded(True)
-
-
-def _expand_project_compositor(controls: TuningControls) -> None:
-    _expand_project(controls)
-    controls.session.project.compositor_expanded = True
 
 
 def _mutate_compositor_hdr(controls: TuningControls) -> None:
-    _expand_project_compositor(controls)
-    view = controls.build_view_state(paused=False)
-    hdr_row = view.layout.find_by_kind(RowKind.PROJECT_COMPOSITOR_HDR)
-    controls.focus_descriptor = view.layout.descriptor(hdr_row)
+    controls.focus_descriptor = RowDescriptor(RowKind.PROJECT_COMPOSITOR_HDR)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
-def _mutate_compositor_expanded(controls: TuningControls) -> None:
-    _expand_project(controls)
-    controls.project.set_compositor_expanded(True)
-
-
-def _expand_project_render(controls: TuningControls) -> None:
-    _expand_project(controls)
-    controls.session.project.render.expanded = True
-
-
 def _mutate_render_width(controls: TuningControls) -> None:
-    _expand_project_render(controls)
-    view = controls.build_view_state(paused=False)
-    width_row = view.layout.find_by_kind(RowKind.PROJECT_RENDER_WIDTH)
-    controls.focus_descriptor = view.layout.descriptor(width_row)
+    controls.focus_descriptor = RowDescriptor(RowKind.PROJECT_RENDER_WIDTH)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
 def _mutate_render_height(controls: TuningControls) -> None:
-    _expand_project_render(controls)
-    view = controls.build_view_state(paused=False)
-    height_row = view.layout.find_by_kind(RowKind.PROJECT_RENDER_HEIGHT)
-    controls.focus_descriptor = view.layout.descriptor(height_row)
+    controls.focus_descriptor = RowDescriptor(RowKind.PROJECT_RENDER_HEIGHT)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
 def _mutate_render_fps(controls: TuningControls) -> None:
-    _expand_project_render(controls)
-    view = controls.build_view_state(paused=False)
-    fps_row = view.layout.find_by_kind(RowKind.PROJECT_RENDER_FPS)
-    controls.focus_descriptor = view.layout.descriptor(fps_row)
+    controls.focus_descriptor = RowDescriptor(RowKind.PROJECT_RENDER_FPS)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
@@ -732,8 +692,6 @@ _SESSION_ONLY_MUTATIONS: list[tuple[str, Callable[[TuningControls], None], tuple
     ("timeline.armed", _mutate_timeline_arm, ("layer_1",)),
     ("timeline.recording", _mutate_timeline_recording_start, ("layer_1",)),
     ("timeline.preview", _mutate_timeline_preview_pause, ("layer_1",)),
-    ("project.milkdrop_expanded", _mutate_milkdrop_expanded, ("layer_1",)),
-    ("project.compositor_expanded", _mutate_compositor_expanded, ("layer_1",)),
 ]
 
 

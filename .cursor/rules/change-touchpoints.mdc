@@ -12,7 +12,7 @@ Open these files; do not search for a parallel serializer or a `RowKind` branch 
 1. Default + parse in the matching `cleave/config_schema/` submodule (not `__init__.py`).
 2. Session field in `cleave/viz/session.py`; import the default constant (no new literals).
 3. Persist only via `persisted_session_payload` in `config_schema/persist.py`.
-4. `RowKind` in `row_kinds.py`; `SPECS` in `row_specs/<domain>.py`; placement in `row_sections.py`.
+4. `RowKind` in `row_kinds.py`; `SPECS` in `row_specs/<domain>.py`. A new Settings or Project field is an inspector group child under `SETTINGS_SECTION` or `PROJECT_SECTION` in `row_sections.py`. Other fields are placed in `row_sections.py` on the leftover panel.
 5. Mutate via `LayerMutations` or public `*_controls`. Wire new controllers in `wiring.py`.
 6. If the field gates row presence, add it to `view_state_structure_signature()` in `tuning_view_state.py` and a `test_structure_signature_invalidates_on_*` test in `tests/cleave/viz/test_view_state_structure.py`.
 

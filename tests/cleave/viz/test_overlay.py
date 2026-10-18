@@ -39,7 +39,6 @@ from cleave.viz.tuning_panel_draw import (
     panel_help_hint_layout,
     preset_row_prefix_width,
     render_visibility_icon,
-    settings_header_highlight_width,
     TREE_INDENT,
     scroll_metrics,
 )
@@ -49,7 +48,6 @@ from cleave.viz.controls import (
 )
 from tests.support.viz import make_overlay_card_block, make_track_block
 from cleave.viz.tuning_view_state import (
-    ProjectBlock,
     RenderOverlaysBlock,
     RenderTimelineBlock,
     TimelineFadeGroupBlock,
@@ -102,7 +100,7 @@ def _effects_expanded_view_state() -> TuningViewState:
         tracks=tracks,
         paused=False,
         position_sec=0.0,
-        focus_cursor=MainFocus(RowDescriptor(RowKind.TRANSPORT)),
+        focus_cursor=MainFocus(RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)),
         move_mode_slot=None,
         notification_message=None,
         notification_remaining_sec=0.0,
@@ -474,7 +472,7 @@ def test_fps_color_ignores_transport_focus() -> None:
     overlay = TuningOverlay()
     state = _minimal_view_state(
         fps=30.0,
-        focus_cursor=MainFocus(RowDescriptor(RowKind.TRANSPORT)),
+        focus_cursor=MainFocus(RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)),
     )
 
     with_fps = _copy_panel_surface(overlay, state)
@@ -504,109 +502,6 @@ def test_fps_color_ignores_transport_focus() -> None:
     assert not _find_pixel_color(
         with_fps, layout.x, layout.y, color=HIGHLIGHT, max_dx=fps_w, max_dy=line_h
     )
-
-
-def test_settings_header_highlight_width_reserves_fps() -> None:
-    pygame.init()
-    font = overlay_font(14)
-    panel_w = 400
-    padding = 8
-    fps = 30.0
-    fps_w = fps_display_text_width(font, fps)
-    char_w = font.size("M")[0]
-    width = settings_header_highlight_width(
-        panel_w=panel_w,
-        padding=padding,
-        font=font,
-        fps=fps,
-        show_scrollbar=False,
-    )
-    assert width == panel_w - 2 * padding - fps_w - char_w
-    with_scroll = settings_header_highlight_width(
-        panel_w=panel_w,
-        padding=padding,
-        font=font,
-        fps=fps,
-        show_scrollbar=True,
-    )
-    assert with_scroll == (
-        panel_w
-        - 2 * padding
-        - SCROLLBAR_WIDTH
-        - SCROLLBAR_CONTENT_GAP
-        - fps_w
-        - char_w
-    )
-
-
-def test_settings_header_highlight_stops_before_fps() -> None:
-    pygame.init()
-    overlay = TuningOverlay()
-    state = _minimal_view_state(
-        fps=30.0,
-        focus_cursor=MainFocus(RowDescriptor(RowKind.SETTINGS_HEADER)),
-    )
-    panel = _copy_panel_surface(overlay, state)
-    font = overlay._font_get()
-    metrics = _panel_scroll_metrics(overlay, state)
-    fps_w = fps_display_text_width(font, 30.0)
-    layout = panel_fps_layout(
-        panel_w=panel.get_width(),
-        padding=overlay._padding,
-        text_width=fps_w,
-        show_scrollbar=metrics.show_scrollbar,
-    )
-    highlight_w = settings_header_highlight_width(
-        panel_w=panel.get_width(),
-        padding=overlay._padding,
-        font=font,
-        fps=30.0,
-        show_scrollbar=metrics.show_scrollbar,
-    )
-    expected_tint, _ = composite_row_background(
-        BACKGROUND, BACKGROUND_ALPHA, HIGHLIGHT, FOCUS_ROW_BG_ALPHA
-    )
-    mid_y = layout.y + font.get_linesize() // 2
-    # Sample near the left edge so label glyphs cannot obscure the tint.
-    tinted = panel.get_at((overlay._padding + 2, mid_y))[:3]
-    gap = panel.get_at((layout.x - max(1, font.size("M")[0]) // 2, mid_y))[:3]
-    under_fps = panel.get_at((layout.x + 2, mid_y))[:3]
-    assert highlight_w > 0
-    assert tinted == expected_tint
-    assert gap == BACKGROUND
-    assert under_fps != expected_tint
-
-
-def test_project_header_highlight_uses_full_row_width() -> None:
-    pygame.init()
-    overlay = TuningOverlay()
-    state = _minimal_view_state(
-        fps=30.0,
-        focus_cursor=MainFocus(RowDescriptor(RowKind.PROJECT_HEADER)),
-    )
-    panel = _copy_panel_surface(overlay, state)
-    font = overlay._font_get()
-    metrics = _panel_scroll_metrics(overlay, state)
-    project_idx = state.layout.find_by_kind(RowKind.PROJECT_HEADER)
-    assert project_idx in metrics.header_indices
-    row_index = metrics.header_indices.index(project_idx)
-    line_h = font.get_linesize()
-    mid_y = overlay._padding + row_index * metrics.row_stride + line_h // 2
-    shortened = settings_header_highlight_width(
-        panel_w=panel.get_width(),
-        padding=overlay._padding,
-        font=font,
-        fps=30.0,
-        show_scrollbar=metrics.show_scrollbar,
-    )
-    full_w = panel.get_width() - overlay._padding * 2
-    expected_tint, _ = composite_row_background(
-        BACKGROUND, BACKGROUND_ALPHA, HIGHLIGHT, FOCUS_ROW_BG_ALPHA
-    )
-    past_fps_reserve = overlay._padding + shortened + font.size("M")[0]
-    assert shortened < full_w
-    assert past_fps_reserve < overlay._padding + full_w - 2
-    assert panel.get_at((past_fps_reserve, mid_y))[:3] == expected_tint
 
 
 def test_bottom_row_highlight_stops_before_help_hint() -> None:
@@ -912,7 +807,7 @@ def _minimal_view_state(**kwargs: object) -> TuningViewState:
         },
         "paused": False,
         "position_sec": 0.0,
-        "focus_cursor": MainFocus(RowDescriptor(RowKind.TRANSPORT)),
+        "focus_cursor": MainFocus(RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)),
         "move_mode_slot": None,
         "notification_message": None,
         "notification_remaining_sec": 0.0,
@@ -1047,9 +942,8 @@ def test_panel_notification_pinned_under_transport() -> None:
     assert RowKind.PANEL_NOTIFICATION not in inactive_kinds
     assert RowKind.PANEL_NOTIFICATION in active_kinds
     notification_idx = active.layout.find_by_kind(RowKind.PANEL_NOTIFICATION)
-    transport_idx = active.layout.find_by_kind(RowKind.TRANSPORT)
     header_idx = active.layout.find("layer_1", RowKind.TRACK_HEADER)
-    assert transport_idx < notification_idx < header_idx
+    assert notification_idx < header_idx
     assert row_is_pinned(RowKind.PANEL_NOTIFICATION)
     assert notification_idx in active.layout.navigable_indices(active)
     assert _row_value_color(active, notification_idx) == HIGHLIGHT
@@ -1077,8 +971,7 @@ def test_persistent_and_timed_panel_notifications_stack() -> None:
     assert [row.marker_index for row in notification_rows] == [0, 1]
     persistent_idx = stacked.layout.find_descriptor(notification_rows[0])
     timed_idx = stacked.layout.find_descriptor(notification_rows[1])
-    transport_idx = stacked.layout.find_by_kind(RowKind.TRANSPORT)
-    assert transport_idx < persistent_idx < timed_idx
+    assert persistent_idx < timed_idx
     assert _row_value_color(stacked, persistent_idx) == ERROR_NOTIFICATION
     assert _row_value_color(stacked, timed_idx) == HIGHLIGHT
     assert _row_text(stacked, persistent_idx) == "No presets in bed roles folder"
@@ -1112,13 +1005,13 @@ def test_build_row_layout_includes_add_before_render_gap() -> None:
     assert add_idx < gap_idx < overlay_idx
 
 
-def test_build_row_layout_settings_project_transport_are_adjacent() -> None:
+def test_build_row_layout_omits_settings_project_and_transport() -> None:
     state = _minimal_view_state()
-    settings_idx = state.layout.find_by_kind(RowKind.SETTINGS_HEADER)
-    project_idx = state.layout.find_by_kind(RowKind.PROJECT_HEADER)
-    transport_idx = state.layout.find_by_kind(RowKind.TRANSPORT)
-    assert settings_idx + 1 == project_idx
-    assert project_idx + 1 == transport_idx
+    names = {row.kind.name for row in state.layout.rows}
+    assert "TRANSPORT" not in names
+    assert not any(
+        name.startswith("SETTINGS_") or name.startswith("PROJECT_") for name in names
+    )
 
 
 def test_build_row_layout_omits_add_at_max_layers() -> None:
@@ -1282,7 +1175,6 @@ def test_delete_layer_row_text_has_tree_prefix() -> None:
 
 def test_action_row_value_color() -> None:
     state = _minimal_view_state(
-        project=ProjectBlock(expanded=True),
         tracks={
             "layer_1": make_track_block(
                 stem="drums",
@@ -1366,16 +1258,11 @@ def test_apply_cuts_to_cues_rows_use_action_color() -> None:
 
 
 def test_display_size_row_uses_label_color() -> None:
-    from cleave.viz.tuning_view_state import SettingsBlock
+    from cleave.viz.row_present_renderers import row_value_color_for
 
-    state = _minimal_view_state(
-        settings=SettingsBlock(expanded=True, editor_window_expanded=True)
-    )
-    display_row = state.layout.find_by_kind(RowKind.SETTINGS_EDITOR_WINDOW_DISPLAY_SIZE)
-    assert display_row is not None
-    assert _row_text(state, display_row) == "  └─ display size: 1920 x 1080"
-    assert _row_value_color(state, display_row) == LABEL
-    assert display_row not in state.layout.navigable_indices(state)
+    state = _minimal_view_state()
+    desc = RowDescriptor(RowKind.SETTINGS_EDITOR_WINDOW_DISPLAY_SIZE)
+    assert row_value_color_for(state, desc) == LABEL
 
 
 def test_preset_list_populate_uses_full_line_action_colors() -> None:
@@ -1552,8 +1439,7 @@ def test_render_overlay_row_layout_includes_header_and_sub_rows_when_expanded() 
     assert RowKind.RENDER_OVERLAY_CARD_TITLE_FONT_SIZE not in kinds
     assert RowKind.RENDER_OVERLAY_CARD_BODY_FONT_SIZE not in kinds
     header_idx = state.layout.find_by_kind(RowKind.RENDER_OVERLAYS_HEADER)
-    project_idx = state.layout.find_by_kind(RowKind.PROJECT_HEADER)
-    assert project_idx < header_idx
+    assert header_idx >= 0
 
 
 def test_render_overlay_animation_rows_when_expanded() -> None:
@@ -1677,7 +1563,7 @@ def test_draw_track_header_with_solo_eye() -> None:
         },
         paused=False,
         position_sec=0.0,
-        focus_cursor=MainFocus(RowDescriptor(RowKind.TRANSPORT)),
+        focus_cursor=MainFocus(RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)),
         move_mode_slot=None,
         notification_message=None,
         notification_remaining_sec=0.0,
@@ -1723,7 +1609,7 @@ def test_main_tree_rows_not_highlighted_when_timeline_submenu_focused() -> None:
     state = _minimal_view_state(
         render_timeline=RenderTimelineBlock(enabled=True, expanded=True),
     )
-    for row_kind_target in (RowKind.TRANSPORT, RowKind.TRACK_HEADER):
+    for row_kind_target in (RowKind.RENDER_OVERLAYS_HEADER, RowKind.TRACK_HEADER):
         row = state.layout.find_by_kind(row_kind_target)
         state.focus_descriptor = state.layout.descriptor(row)
         state.timeline_submenu_focused = False
@@ -1923,7 +1809,4 @@ def test_panel_notification_in_pinned_header_block() -> None:
 
     metrics = _panel_scroll_metrics(overlay, state)
     notification_idx = state.layout.find_by_kind(RowKind.PANEL_NOTIFICATION)
-    assert notification_idx in metrics.header_indices
-    assert metrics.header_indices.index(notification_idx) > metrics.header_indices.index(
-        state.layout.find_by_kind(RowKind.TRANSPORT)
-    )
+    assert metrics.header_indices[0] == notification_idx

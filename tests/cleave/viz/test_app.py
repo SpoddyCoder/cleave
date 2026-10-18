@@ -830,7 +830,7 @@ def test_key_routing_main_when_strip_open_not_in_submenu() -> None:
     runtime.timeline_controls = timeline
     runtime.seed.session.timeline.enabled = True
     runtime.seed.session.timeline.panel_open = True
-    runtime.controls.focus_cursor = MainFocus(RowDescriptor(RowKind.TRANSPORT))
+    runtime.controls.focus_cursor = MainFocus(RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER))
 
     assert _key_handler_for_session(runtime) is main
 
@@ -904,7 +904,7 @@ def test_tick_frame_skips_timeline_when_overlay_hidden_and_not_in_submenu(
     pygame.init()
     compositor = recording_compositor()
     runtime = _timeline_open_runtime(compositor)
-    runtime.controls.focus_cursor = MainFocus(RowDescriptor(RowKind.TRANSPORT))
+    runtime.controls.focus_cursor = MainFocus(RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER))
 
     app = VisualizerApp(runtime)
     app.tick_frame(1.0, paused=True, draw_overlay=True, n_pcm=735)
@@ -1092,7 +1092,7 @@ def test_timeline_strip_visible_while_submenu_focused_despite_hidden_overlay() -
     assert _timeline_strip_visible(tl, overlay_visibility=1.0, focus_cursor=focus) is True
     assert _timeline_strip_fade(focus_cursor=focus, overlay_visibility=0.0) == 1.0
 
-    focus = MainFocus(RowDescriptor(RowKind.TRANSPORT))
+    focus = MainFocus(RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER))
     assert _timeline_strip_visible(tl, overlay_visibility=0.0, focus_cursor=focus) is False
     assert _timeline_strip_fade(focus_cursor=focus, overlay_visibility=0.5) == 0.5
 

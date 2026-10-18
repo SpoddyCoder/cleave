@@ -11,9 +11,7 @@ from cleave.config_schema.editor import (
     ui_fade_display,
 )
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
-from cleave.viz.row_sections import apply_expand_toggle
 from cleave.viz.row_spec import FitStrategy, RowPresentStyle, RowSpec
-from cleave.viz.row_specs.common import apply_expand_subheader
 from cleave.viz.tuning_view_state import TuningViewState
 
 if TYPE_CHECKING:
@@ -146,29 +144,7 @@ def _apply_settings_residual_latency_ms(
     controls.settings.adjust_residual_latency_ms(forward=forward, large=large)
     controls.on_residual_latency_changed()
 
-def _apply_settings_header(
-    controls: TuningControls,
-    desc: RowDescriptor,
-    forward: bool,
-    _large: bool,
-) -> None:
-    apply_expand_toggle(
-        controls, desc.kind, desc.slot, forward, card=desc.card
-    )
-
 SPECS: dict[RowKind, RowSpec] = {
-    RowKind.SETTINGS_HEADER: RowSpec(
-        affordance=RowAffordance.EXPAND,
-        panel_label="Cleave Settings",
-        present_style=RowPresentStyle.COMPOSITE_HEADER,
-        apply_horizontal=_apply_settings_header,
-        fit_strategy=FitStrategy.NONE,
-        help_title="Cleave Settings",
-        help_description=("Global editor settings (applies to all projects)",),
-        quick_nav_target=True,
-        quick_nav_always=True,
-        is_header=True,
-    ),
     RowKind.SETTINGS_PREVIEW_QUALITY: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
         panel_label="preview quality",
@@ -190,7 +166,6 @@ SPECS: dict[RowKind, RowSpec] = {
         affordance=RowAffordance.EXPAND,
         panel_label="Editor Window",
         present_style=RowPresentStyle.EXPAND_SUBHEADER,
-        apply_horizontal=apply_expand_subheader,
         fit_strategy=FitStrategy.NONE,
         help_title="Editor Window",
         help_description=(
@@ -270,7 +245,6 @@ SPECS: dict[RowKind, RowSpec] = {
         affordance=RowAffordance.EXPAND,
         panel_label="UI",
         present_style=RowPresentStyle.EXPAND_SUBHEADER,
-        apply_horizontal=apply_expand_subheader,
         fit_strategy=FitStrategy.NONE,
         help_title="UI",
         help_description=(
@@ -378,7 +352,6 @@ SPECS: dict[RowKind, RowSpec] = {
         affordance=RowAffordance.EXPAND,
         panel_label="Latency Compensation",
         present_style=RowPresentStyle.EXPAND_SUBHEADER,
-        apply_horizontal=apply_expand_subheader,
         fit_strategy=FitStrategy.NONE,
         help_title="Latency Compensation",
         help_description=(

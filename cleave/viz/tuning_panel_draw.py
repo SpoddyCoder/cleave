@@ -19,8 +19,6 @@ from cleave.viz.row_present_renderers import (
     compose_surface,
     fit_row_text,
     is_notification_row,
-    is_settings_header_row,
-    is_transport_row,
     notification_accent,
     notification_elapsed,
     preset_row_prefix_width,
@@ -238,26 +236,6 @@ def _render_fps_display(
         line_height=font.get_linesize(),
         counters=counters,
     )
-
-
-def settings_header_highlight_width(
-    *,
-    panel_w: int,
-    padding: int,
-    font: pygame.font.Font,
-    fps: float,
-    show_scrollbar: bool,
-) -> int:
-    """Settings-header focus tint: full row width minus FPS text and one character."""
-    fps_text_width = fps_display_text_width(font, fps)
-    char_w = max(1, font.size("M")[0])
-    fps_layout = panel_fps_layout(
-        panel_w=panel_w,
-        padding=padding,
-        text_width=fps_text_width,
-        show_scrollbar=show_scrollbar,
-    )
-    return max(0, fps_layout.x - padding - char_w)
 
 
 def tuning_panel_max_dimensions(
@@ -602,19 +580,6 @@ class TuningOverlay:
                 font=font,
                 show_scrollbar=show_scrollbar,
             )
-        elif (
-            bg is not None
-            and is_settings_header_row(state, index)
-            and state.fps is not None
-            and font is not None
-        ):
-            row_w = settings_header_highlight_width(
-                panel_w=panel_w,
-                padding=self._padding,
-                font=font,
-                fps=state.fps,
-                show_scrollbar=show_scrollbar,
-            )
         row_rect = (self._padding, y, row_w, line_h)
         tint_alpha = (
             int(FOCUS_ROW_BG_ALPHA * self._visibility) if bg is not None else 0
@@ -733,82 +698,19 @@ class TuningOverlay:
             cache.panel = _compose_surface((panel_w, panel_h), counters=counters)
         return cache.panel
 
-    def _transport_row_y(
-        self,
-        transport_index: int,
-        *,
-        metrics: PanelScrollMetrics,
-        visible_indices: list[int],
-        first_scrollable_visible: int | None,
-    ) -> int:
-        if metrics.needs_scroll:
-            try:
-                header_pos = metrics.header_indices.index(transport_index)
-            except ValueError:
-                return self._padding
-            return self._padding + header_pos * metrics.row_stride
-        row_y = self._padding
-        for index in visible_indices:
-            if index == first_scrollable_visible:
-                row_y += metrics.row_stride
-            if index == transport_index:
-                return row_y
-            row_y += metrics.row_stride
-        return self._padding
-
-    def _patch_live_panel_rows(
+    def _patch_live_fps(
         self,
         panel: pygame.Surface,
         state: TuningViewState,
         *,
         font: pygame.font.Font,
         metrics: PanelScrollMetrics,
-        visible_indices: list[int],
-        first_scrollable_visible: int | None,
-        transport_index: int,
-        transport_entry: RowRenderEntry,
         panel_w: int,
-        line_h: int,
         text_alpha: int,
         counters: OverlayDrawCounters | None = None,
     ) -> None:
         cache = self._panel_cache
         bg_alpha = int(BACKGROUND_ALPHA * self._visibility)
-        transport_y = self._transport_row_y(
-            transport_index,
-            metrics=metrics,
-            visible_indices=visible_indices,
-            first_scrollable_visible=first_scrollable_visible,
-        )
-        cache.last_transport_rect = (
-            BORDER_WIDTH,
-            transport_y,
-            panel_w - 2 * BORDER_WIDTH,
-            line_h,
-        )
-        if bg_alpha >= 2:
-            pygame.draw.rect(
-                panel,
-                (*BACKGROUND, bg_alpha),
-                (
-                    BORDER_WIDTH,
-                    transport_y,
-                    panel_w - 2 * BORDER_WIDTH,
-                    line_h,
-                ),
-            )
-        self._blit_row(
-            panel,
-            state=state,
-            index=transport_index,
-            surf=transport_entry.primary,
-            time_surf=transport_entry.secondary,
-            y=transport_y,
-            text_alpha=text_alpha,
-            panel_w=panel_w,
-            line_h=line_h,
-        )
-
         if state.fps is not None and text_alpha >= 2:
             if cache.last_fps_rect is not None and bg_alpha >= 2:
                 pygame.draw.rect(panel, (*BACKGROUND, bg_alpha), cache.last_fps_rect)
@@ -1134,42 +1036,17 @@ class TuningOverlay:
             and prev_size[1] == panel_h
         )
 
-        transport_index = next(
-            (
-                index
-                for index in visible_indices
-                if is_transport_row(state, index)
-            ),
-            None,
-        )
-
         if can_incremental:
             assert cache.panel is not None
-            assert transport_index is not None
             panel = cache.panel
             panel_w = prev_size[0]
             text_alpha = int(255 * self._visibility)
-            transport_entry = ensure_row_surface(
-                cache,
-                state,
-                transport_index,
-                font,
-                self._build_row_at_index,
-                max_content_width=max_content_width_for(transport_index),
-                line_h=line_h,
-                counters=counters,
-            )
-            self._patch_live_panel_rows(
+            self._patch_live_fps(
                 panel,
                 state,
                 font=font,
                 metrics=metrics,
-                visible_indices=visible_indices,
-                first_scrollable_visible=first_scrollable_visible,
-                transport_index=transport_index,
-                transport_entry=transport_entry,
                 panel_w=panel_w,
-                line_h=line_h,
                 text_alpha=text_alpha,
                 counters=counters,
             )
@@ -1310,14 +1187,6 @@ class TuningOverlay:
 
         cache.panel_signature = new_sig
         cache.panel_size = (panel_w, panel_h)
-        self._set_transport_rect_cache(
-            transport_index,
-            metrics=metrics,
-            visible_indices=visible_indices,
-            first_scrollable_visible=first_scrollable_visible,
-            panel_w=panel_w,
-            line_h=line_h,
-        )
         self._panel_scratch = panel
 
         placement = self._finish_compose_panel(
@@ -1335,32 +1204,6 @@ class TuningOverlay:
             state=state,
             capacity=capacity,
             incremental=False,
-        )
-
-    def _set_transport_rect_cache(
-        self,
-        transport_index: int | None,
-        *,
-        metrics: PanelScrollMetrics,
-        visible_indices: list[int],
-        first_scrollable_visible: int | None,
-        panel_w: int,
-        line_h: int,
-    ) -> None:
-        if transport_index is None:
-            self._panel_cache.last_transport_rect = None
-            return
-        transport_y = self._transport_row_y(
-            transport_index,
-            metrics=metrics,
-            visible_indices=visible_indices,
-            first_scrollable_visible=first_scrollable_visible,
-        )
-        self._panel_cache.last_transport_rect = (
-            BORDER_WIDTH,
-            transport_y,
-            panel_w - 2 * BORDER_WIDTH,
-            line_h,
         )
 
     def _build_composed_panel(
@@ -1389,8 +1232,6 @@ class TuningOverlay:
             )
         elif incremental:
             dirty_rects: list[tuple[int, int, int, int]] = []
-            if cache.last_transport_rect is not None:
-                dirty_rects.append(cache.last_transport_rect)
             if cache.last_fps_rect is not None and state.fps is not None:
                 dirty_rects.append(cache.last_fps_rect)
             upload_plan = upload_plan_for_signature(

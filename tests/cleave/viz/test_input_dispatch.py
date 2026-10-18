@@ -12,6 +12,8 @@ from tests.support.config import TEST_LAYER_STEMS
 from cleave.stems import STEM_NAMES
 from cleave.viz.app import LiveVisualizerRuntime, VisualizerSeed
 from cleave.viz.focus_nav import MainFocus, TimelineFocus
+from cleave.viz.navigator import visible_top_level_ids
+from cleave.viz.shell_focus import ShellRegion
 from cleave.viz.controls import SEEK_LONG, SEEK_TINY, TuningControls
 from cleave.viz.layer_visibility import armed_recording_level
 from cleave.viz.row_kinds import RowDescriptor, RowKind
@@ -175,14 +177,11 @@ def test_curation_dispatch_passes_navigation_keys() -> None:
     runtime = _make_runtime(submenu_focused=False, panel_open=False)
     session = runtime.seed.session
     session.settings.editor_mode = "preset_curation"
-    session.settings.expanded = True
-    runtime.controls.focus_cursor = MainFocus(
-        RowDescriptor(RowKind.SETTINGS_HEADER)
-    )
+    runtime.controls.shell_focus.region = ShellRegion.PANEL
+    start = RowDescriptor(RowKind.TRACK_HEADER, slot=session.layer_z_order[0])
+    runtime.controls.focus_cursor = MainFocus(start)
     assert dispatch_keydown(keydown(pygame.K_DOWN), runtime) is True
-    assert runtime.controls.focus_cursor == MainFocus(
-        RowDescriptor(RowKind.SETTINGS_EDITOR_WINDOW_HEADER)
-    )
+    assert runtime.controls.focus_descriptor != start
 
 
 def test_curation_dispatch_allows_help_toggle() -> None:
@@ -265,6 +264,7 @@ def test_second_esc_after_stop_closes_submenu_panel() -> None:
 
 def test_second_esc_after_stop_requests_overlay_hide_on_main() -> None:
     runtime = _make_runtime(submenu_focused=False, panel_open=True, recording=True)
+    runtime.controls.shell_focus.region = ShellRegion.PANEL
     dispatch_keydown(keydown(pygame.K_ESCAPE), runtime)
     assert runtime.seed.session.timeline.recording is False
 
@@ -496,7 +496,7 @@ def test_alt_then_another_key_does_not_focus_bar() -> None:
         pygame.event.Event(pygame.KEYDOWN, key=pygame.K_LALT),
         runtime,
     )
-    assert dispatch_keydown(keydown(pygame.K_TAB), runtime) is True
+    assert dispatch_keydown(keydown(pygame.K_a), runtime) is True
     dispatch_keyup(
         pygame.event.Event(pygame.KEYUP, key=pygame.K_LALT),
         runtime,
@@ -564,6 +564,84 @@ def test_menu_opens_in_curation_mode() -> None:
         dispatch_keydown(keydown(pygame.K_q, mod=pygame.KMOD_CTRL), runtime)
         is False
     )
+
+
+def test_tab_cycle_when_strip_open() -> None:
+    runtime = _make_runtime(submenu_focused=False, panel_open=True)
+    controls = runtime.controls
+    controls.shell_focus.region = ShellRegion.NAVIGATOR
+    assert dispatch_keydown(keydown(pygame.K_TAB), runtime) is True
+    assert controls.shell_focus.region is ShellRegion.INSPECTOR
+    assert runtime.menu_bar.focused is False
+    assert dispatch_keydown(keydown(pygame.K_TAB), runtime) is True
+    assert isinstance(controls.focus_cursor, TimelineFocus)
+    assert dispatch_keydown(keydown(pygame.K_TAB), runtime) is True
+    assert runtime.menu_bar.focused is True
+    assert dispatch_keydown(keydown(pygame.K_TAB), runtime) is True
+    assert runtime.menu_bar.focused is False
+    assert controls.shell_focus.region is ShellRegion.NAVIGATOR
+    assert not isinstance(controls.focus_cursor, TimelineFocus)
+
+
+def test_tab_from_panel_cycles_as_navigator() -> None:
+    runtime = _make_runtime(submenu_focused=False, panel_open=False)
+    controls = runtime.controls
+    controls.shell_focus.region = ShellRegion.PANEL
+    assert dispatch_keydown(keydown(pygame.K_TAB), runtime) is True
+    assert controls.shell_focus.region is ShellRegion.INSPECTOR
+    assert runtime.menu_bar.focused is False
+
+
+def test_tab_cycle_skips_timeline_when_strip_closed() -> None:
+    runtime = _make_runtime(submenu_focused=False, panel_open=False)
+    controls = runtime.controls
+    controls.shell_focus.region = ShellRegion.INSPECTOR
+    assert dispatch_keydown(keydown(pygame.K_TAB), runtime) is True
+    assert runtime.menu_bar.focused is True
+    assert not isinstance(controls.focus_cursor, TimelineFocus)
+    assert dispatch_keydown(keydown(pygame.K_TAB, mod=pygame.KMOD_SHIFT), runtime) is True
+    assert runtime.menu_bar.focused is False
+    assert controls.shell_focus.region is ShellRegion.INSPECTOR
+
+
+def test_ctrl_up_down_cycles_visible_top_level_ids() -> None:
+    runtime = _make_runtime(submenu_focused=False, panel_open=False)
+    controls = runtime.controls
+    ids = visible_top_level_ids(controls.session)
+    assert list(ids) == ["settings", "project", "render", "layers", "song_markers"]
+    seen = [controls.shell_focus.selected_id]
+    for _ in ids:
+        assert (
+            dispatch_keydown(keydown(pygame.K_DOWN, mod=pygame.KMOD_CTRL), runtime)
+            is True
+        )
+        seen.append(controls.shell_focus.selected_id)
+        assert controls.shell_focus.region is ShellRegion.NAVIGATOR
+        if controls.shell_focus.selected_id == "render":
+            assert controls.focus_descriptor.kind is RowKind.RENDER_OVERLAYS_HEADER
+    assert seen == [*ids, ids[0]]
+    assert dispatch_keydown(keydown(pygame.K_UP, mod=pygame.KMOD_CTRL), runtime) is True
+    assert controls.shell_focus.selected_id == ids[-1]
+
+
+def test_ctrl_up_down_do_nothing_while_menu_focused() -> None:
+    runtime = _make_runtime(submenu_focused=False, panel_open=False)
+    controls = runtime.controls
+    assert dispatch_keydown(keydown(pygame.K_F10), runtime) is True
+    assert runtime.menu_bar.focused is True
+    selected = controls.shell_focus.selected_id
+    region = controls.shell_focus.region
+    focus = controls.focus_cursor
+    assert dispatch_keydown(keydown(pygame.K_DOWN, mod=pygame.KMOD_CTRL), runtime) is True
+    assert runtime.menu_bar.focused is True
+    assert runtime.menu_bar.dropdown_open is False
+    assert runtime.menu_bar.menu_index == 0
+    assert controls.shell_focus.selected_id == selected
+    assert controls.shell_focus.region is region
+    assert controls.focus_cursor == focus
+    assert dispatch_keydown(keydown(pygame.K_UP, mod=pygame.KMOD_CTRL), runtime) is True
+    assert runtime.menu_bar.focused is True
+    assert controls.shell_focus.selected_id == selected
 
 
 def test_keyup_while_text_editing_disarms_modal_repeat() -> None:

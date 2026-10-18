@@ -330,7 +330,6 @@ SPECS: dict[RowKind, RowSpec] = {
         help_description=(
             "Post-processing effects applied during final compositing.",
         ),
-        quick_nav_target=True,
         toggle_enabled=_toggle_render_post_fx_enabled,
     ),
     RowKind.RENDER_POST_FX_FADE_HEADER: RowSpec(

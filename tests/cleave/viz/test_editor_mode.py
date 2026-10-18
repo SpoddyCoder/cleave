@@ -38,7 +38,7 @@ def _choose_editor_mode_option(controls, option_label: str) -> None:
 
 def _curation_view_state(**kwargs: object) -> TuningViewState:
     defaults: dict[str, object] = {
-        "settings": SettingsBlock(expanded=True, editor_mode="preset_curation"),
+        "settings": SettingsBlock(editor_mode="preset_curation"),
         "layer_z_order": ("layer_1", "layer_2"),
         "tracks": {
             "layer_1": make_track_block(
@@ -86,9 +86,10 @@ def test_curation_layout_allowlist() -> None:
     kinds = [row.kind for row in state.layout.rows]
     slots = [row.slot for row in state.layout.rows if row.slot is not None]
 
-    assert RowKind.SETTINGS_HEADER in kinds
-    assert RowKind.TRANSPORT in kinds
-    assert RowKind.PROJECT_HEADER not in kinds
+    names = {kind.name for kind in kinds}
+    assert "SETTINGS_HEADER" not in names
+    assert "PROJECT_HEADER" not in names
+    assert "TRANSPORT" not in names
     assert RowKind.RENDER_SECTION_GAP not in kinds
     assert RowKind.RENDER_OVERLAYS_HEADER not in kinds
     assert RowKind.RENDER_TIMELINE_HEADER not in kinds

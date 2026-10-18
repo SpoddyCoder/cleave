@@ -1,0 +1,79 @@
+"""Shell focus model: Tab cycle, quick nav, and escape."""
+
+from __future__ import annotations
+
+from cleave.viz.navigator import TOP_LEVEL_IDS
+from cleave.viz.shell_focus import (
+    CycleStop,
+    ShellFocusState,
+    ShellRegion,
+    escape_region,
+    next_region,
+    quick_nav_id,
+)
+
+_OPEN = (
+    CycleStop.MENU,
+    CycleStop.NAVIGATOR,
+    CycleStop.INSPECTOR,
+    CycleStop.TIMELINE,
+)
+_CLOSED = (
+    CycleStop.MENU,
+    CycleStop.NAVIGATOR,
+    CycleStop.INSPECTOR,
+)
+
+
+def test_tab_cycle_with_strip_open_has_four_stops() -> None:
+    assert len(_OPEN) == 4
+    for index, stop in enumerate(_OPEN):
+        assert next_region(stop, strip_open=True, delta=1) is _OPEN[(index + 1) % 4]
+        assert next_region(stop, strip_open=True, delta=-1) is _OPEN[(index - 1) % 4]
+        assert next_region(stop, strip_open=True, delta=0) is stop
+
+
+def test_tab_cycle_with_strip_closed_skips_timeline() -> None:
+    assert len(_CLOSED) == 3
+    for index, stop in enumerate(_CLOSED):
+        assert next_region(stop, strip_open=False, delta=1) is _CLOSED[(index + 1) % 3]
+        assert next_region(stop, strip_open=False, delta=-1) is _CLOSED[(index - 1) % 3]
+        assert next_region(stop, strip_open=False, delta=0) is stop
+    assert next_region(CycleStop.TIMELINE, strip_open=False, delta=1) is CycleStop.MENU
+    assert next_region(CycleStop.TIMELINE, strip_open=False, delta=-1) is CycleStop.NAVIGATOR
+    assert next_region(CycleStop.TIMELINE, strip_open=False, delta=0) is CycleStop.INSPECTOR
+
+
+def test_quick_nav_walks_top_level_ids_and_wraps() -> None:
+    ids = TOP_LEVEL_IDS
+    assert len(ids) == 5
+    selected = ids[0]
+    for expected in ids[1:]:
+        selected = quick_nav_id(ids, selected, 1)
+        assert selected == expected
+    assert quick_nav_id(ids, ids[-1], 1) == ids[0]
+    assert quick_nav_id(ids, ids[0], -1) == ids[-1]
+    selected = ids[-1]
+    for expected in reversed(ids[:-1]):
+        selected = quick_nav_id(ids, selected, -1)
+        assert selected == expected
+    assert quick_nav_id((), "settings", 1) == "settings"
+    assert quick_nav_id(ids, "missing", 1) == ids[0]
+    assert quick_nav_id(ids, "missing", -1) == ids[-1]
+
+
+def test_escape_region() -> None:
+    assert escape_region(ShellRegion.NAVIGATOR, leftover_rows=True) is ShellRegion.PANEL
+    assert escape_region(ShellRegion.NAVIGATOR, leftover_rows=False) is ShellRegion.NAVIGATOR
+    assert escape_region(ShellRegion.INSPECTOR, leftover_rows=True) is ShellRegion.NAVIGATOR
+    assert escape_region(ShellRegion.INSPECTOR, leftover_rows=False) is ShellRegion.NAVIGATOR
+    assert escape_region(ShellRegion.PANEL, leftover_rows=True) is ShellRegion.PANEL
+    assert escape_region(ShellRegion.PANEL, leftover_rows=False) is ShellRegion.PANEL
+
+
+def test_shell_focus_state_defaults() -> None:
+    state = ShellFocusState()
+    assert state.region is ShellRegion.NAVIGATOR
+    assert state.selected_id == "settings"
+    assert state.inspector_cursor is None
+    assert state.collapsed == frozenset()

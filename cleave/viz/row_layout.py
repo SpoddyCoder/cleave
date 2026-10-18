@@ -8,8 +8,6 @@ from typing import TYPE_CHECKING
 from cleave.config_schema.layers import MAX_LAYER_COUNT
 from cleave.viz.row_sections import (
     CURATION_LAYER_SECTION,
-    PROJECT_SECTION,
-    SETTINGS_SECTION,
     append_expand_section_rows,
     append_render_section_rows,
     append_track_section_rows,
@@ -53,44 +51,21 @@ def row_navigable(state: TuningViewState, desc: RowDescriptor) -> bool:
     return True
 
 
-def _quick_nav_section_open(state: TuningViewState, desc: RowDescriptor) -> bool:
-    """Whether a skippable quick-nav header is currently expanded/open."""
-    if desc.kind == RowKind.TRACK_HEADER:
-        if desc.slot is None:
-            return False
-        return state.tracks[desc.slot].runtime.expanded
-    if desc.kind == RowKind.RENDER_POST_FX_HEADER:
-        return state.render_post_fx.expanded
-    if desc.kind == RowKind.RENDER_PATTERN_MASK_HEADER:
-        return state.render_pattern_mask.expanded
-    if desc.kind == RowKind.RENDER_TIMELINE_HEADER:
-        return state.render_timeline.expanded
-    return True
-
-
-def quick_nav_stop_included(state: TuningViewState, desc: RowDescriptor) -> bool:
-    """Whether Ctrl+Up/Down should land on this main-panel descriptor.
-
-    Section tops (Cleave Settings, Transport, Layer 1, Render: OVERLAY) always stop.
-    Other quick-nav headers stop only when open.
-    """
-    spec = row_spec(desc.kind)
-    if not spec.quick_nav_target:
-        return False
-    if spec.quick_nav_always:
-        return True
-    if (
-        desc.kind == RowKind.TRACK_HEADER
-        and state.layer_z_order
-        and desc.slot == state.layer_z_order[0]
-    ):
-        return True
-    return _quick_nav_section_open(state, desc)
+def first_leftover_descriptor(state: TuningViewState) -> RowDescriptor:
+    """First navigable leftover row, or the first row when none are navigable."""
+    for desc in state.layout.rows:
+        if row_navigable(state, desc):
+            return desc
+    if state.layout.rows:
+        return state.layout.rows[0]
+    return RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
 
 
 def resolve_navigable_descriptor(
     desc: RowDescriptor,
     navigable_descriptors: tuple[RowDescriptor, ...] | list[RowDescriptor],
+    *,
+    fallback: RowDescriptor | None = None,
 ) -> RowDescriptor:
     if desc in navigable_descriptors:
         return desc
@@ -104,7 +79,11 @@ def resolve_navigable_descriptor(
         if header in navigable_descriptors:
             return header
         current = header
-    return RowDescriptor(RowKind.TRANSPORT)
+    if navigable_descriptors:
+        return navigable_descriptors[0]
+    if fallback is not None:
+        return fallback
+    return desc
 
 
 @dataclass(frozen=True)
@@ -133,8 +112,15 @@ def build_layout_frame(layout: RowLayout, state: TuningViewState) -> RowLayoutFr
         layout.descriptor(index) for index in navigable_indices
     )
     focus_desc = cursor_main_descriptor(state.focus_cursor)
-    resolved = resolve_navigable_descriptor(focus_desc, navigable_descriptors)
-    resolved_focus_index = layout.find_descriptor(resolved)
+    fallback = layout.rows[0] if layout.rows else None
+    resolved = resolve_navigable_descriptor(
+        focus_desc, navigable_descriptors, fallback=fallback
+    )
+    if layout.rows and not layout.contains_descriptor(resolved):
+        resolved = layout.rows[0]
+    resolved_focus_index = (
+        layout.find_descriptor(resolved) if layout.rows else 0
+    )
     return RowLayoutFrame(
         visible_indices=visible_indices,
         navigable_indices=navigable_indices,
@@ -153,10 +139,6 @@ class RowLayout:
     def build(cls, state: TuningViewState) -> RowLayout:
         row_list: list[RowDescriptor] = []
         curation = state.settings.editor_mode == "preset_curation"
-        append_expand_section_rows(row_list, SETTINGS_SECTION, state)
-        if not curation:
-            append_expand_section_rows(row_list, PROJECT_SECTION, state)
-        row_list.append(RowDescriptor(RowKind.TRANSPORT))
         # marker_index 0 = persistent error; 1 = timed toast (may stack).
         if state.persistent_notification_message:
             row_list.append(
@@ -303,18 +285,4 @@ class RowLayout:
             index
             for index in range(len(self))
             if row_navigable(state, self.descriptor(index))
-        ]
-
-    def quick_nav_indices(self, state: TuningViewState) -> list[int]:
-        """Main-panel row indices for Ctrl+Up/Down section jumps.
-
-        Always includes section tops (Settings, Transport, Layer 1,
-        Render: OVERLAY). Other quick-nav headers are included only when
-        open. The open timeline strip is appended separately in
-        ``focus_nav.build_quick_nav_ring``.
-        """
-        return [
-            index
-            for index in range(len(self))
-            if quick_nav_stop_included(state, self.descriptor(index))
         ]
