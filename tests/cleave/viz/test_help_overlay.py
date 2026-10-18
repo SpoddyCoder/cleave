@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pygame
+
 from cleave.blend_modes import BLEND_MODE_HELP_ENTRIES, BLEND_MODES
 from cleave.cue_roles import CUE_ROLE_MARKER_HELP_ENTRIES
 from cleave.config_schema.editor import EDITOR_PREVIEW_QUALITY_HELP_ENTRIES
@@ -28,7 +30,7 @@ from cleave.viz.help_content import (
 from cleave.viz.help_overlay import HelpOverlay
 from cleave.viz.help_panel_cache import entry_gap, entry_width, max_key_width
 from cleave.viz.theme import LABEL, VALUE
-from cleave.viz.row_kinds import RowKind
+from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.row_spec import ROW_SPECS
 
 
@@ -529,6 +531,23 @@ def test_render_overlay_background_margin_and_padding_help() -> None:
 def test_render_overlay_body_text_help() -> None:
     section = _keyboard_section(sections_for(RowKind.RENDER_OVERLAY_CARD_BODY_TEXT))
     assert dict(section.entries)["Enter"] == "edit body"
+
+
+def test_help_panel_starts_below_menu_bar() -> None:
+    pygame.init()
+    from cleave.viz.shell_host import menu_bar_height_px
+
+    overlay = HelpOverlay()
+    top_inset = menu_bar_height_px()
+    composed = overlay.compose_panel(
+        RowDescriptor(RowKind.TRANSPORT),
+        viewport_width=1280,
+        viewport_height=720,
+        top_inset=top_inset,
+    )
+    assert composed is not None
+    _, margin_y = overlay._margin
+    assert composed.screen_rect[1] == margin_y + top_inset
 
 
 def test_layer_management_add_help() -> None:

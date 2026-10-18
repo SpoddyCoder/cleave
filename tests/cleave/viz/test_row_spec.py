@@ -194,14 +194,12 @@ def test_action_row_kinds_match_affordance() -> None:
         k for k, b in ROW_SPECS.items() if b.affordance == RowAffordance.ACTION
     )
     assert RowKind.LAYER_MANAGEMENT_ADD in ACTION_ROW_KINDS
-    assert RowKind.CONFIG_HEADER in ACTION_ROW_KINDS
-    assert RowKind.SETTINGS_EDITOR_MODE in ACTION_ROW_KINDS
+    assert RowKind.PROJECT_RENDER_OUTPUT not in ACTION_ROW_KINDS
     assert RowKind.SETTINGS_EDITOR_WINDOW_DISPLAY_SIZE not in ACTION_ROW_KINDS
 
 
 def test_row_is_pinned() -> None:
     assert row_is_pinned(RowKind.TRANSPORT) is True
-    assert row_is_pinned(RowKind.CONFIG_HEADER) is True
     assert row_is_pinned(RowKind.SETTINGS_HEADER) is True
     assert row_is_pinned(RowKind.PROJECT_HEADER) is True
     assert row_is_pinned(RowKind.PROJECT_RENDER_HEADER) is True
@@ -209,7 +207,6 @@ def test_row_is_pinned() -> None:
     assert row_is_pinned(RowKind.PROJECT_COMPOSITOR_HDR) is True
     assert row_is_pinned(RowKind.PROJECT_RENDER_QUALITY) is True
     assert row_is_pinned(RowKind.SETTINGS_PREVIEW_QUALITY) is True
-    assert row_is_pinned(RowKind.SETTINGS_EDITOR_MODE) is True
     assert row_is_pinned(RowKind.SETTINGS_EDITOR_WINDOW_HEADER) is True
     assert row_is_pinned(RowKind.SETTINGS_EDITOR_WINDOW_WIDTH) is True
     assert row_is_pinned(RowKind.SETTINGS_UI_HEADER) is True
@@ -1382,8 +1379,8 @@ def test_format_row_value_path_icon() -> None:
         },
     )
     assert (
-        format_row_value(state, RowDescriptor(RowKind.CONFIG_HEADER))
-        == "Save"
+        format_row_value(state, RowDescriptor(RowKind.PROJECT_RENDER_OUTPUT))
+        == state.project.output_label
     )
     slot_desc = RowDescriptor(RowKind.TRACK_PRESET_DIR, slot="layer_1")
     assert format_row_value(state, slot_desc) == "presets/wave"
@@ -1414,7 +1411,6 @@ def test_track_effect_dynamic_label_and_prefix() -> None:
 
 def test_full_line_delete_layer_prefix() -> None:
     assert full_line_prefix(RowKind.LAYER_MANAGEMENT_DELETE) == "└─ Delete Layer"
-    assert full_line_prefix(RowKind.SETTINGS_EDITOR_MODE) == "└─ Switch to Preset Curation"
     assert row_panel_label(RowKind.LAYER_MANAGEMENT_ADD) == "Add Layer"
 
 

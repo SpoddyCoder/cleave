@@ -16,6 +16,7 @@ from cleave.config_schema.project_render import (
     DEFAULT_RENDER_WIDTH,
     default_project_render_path,
 )
+from cleave.viz.commands import command_by_id
 from cleave.viz.material_icons import FOLDER_GLYPH
 from cleave.viz.modal import ModalKind, ModalLabeledLine
 from cleave.viz.project_render_job import RenderJobStatus
@@ -25,11 +26,9 @@ from cleave.viz.row_spec import (
     format_row_value,
     labeled_row_prefix,
     row_composite_header_display_text,
-    row_full_line_display_text,
     row_spec,
 )
-from cleave.viz.theme import ACTION, HIGHLIGHT, PRESET_ICON
-from cleave.viz.tuning_panel_draw import _row_value_color
+from cleave.viz.theme import PRESET_ICON
 from cleave.viz.tuning_view_state import ProjectBlock, view_state_structure_signature
 from tests.cleave.viz.test_controls import (
     _choose_modal_option,
@@ -96,7 +95,6 @@ def test_project_children_omitted_until_expanded() -> None:
     view = controls.build_view_state(paused=False)
     kinds = [row.kind for row in view.layout.rows]
     assert RowKind.PROJECT_HEADER in kinds
-    assert RowKind.CONFIG_HEADER not in kinds
     assert RowKind.PROJECT_MILKDROP_HEADER not in kinds
     assert RowKind.PROJECT_COMPOSITOR_HEADER not in kinds
     assert RowKind.PROJECT_RENDER_HEADER not in kinds
@@ -104,7 +102,6 @@ def test_project_children_omitted_until_expanded() -> None:
     _expand_project(controls)
     view = controls.build_view_state(paused=False)
     kinds = [row.kind for row in view.layout.rows]
-    assert RowKind.CONFIG_HEADER in kinds
     assert RowKind.PROJECT_MILKDROP_HEADER in kinds
     assert RowKind.PROJECT_MILKDROP_BEAT_SENSITIVITY not in kinds
     assert RowKind.PROJECT_COMPOSITOR_HEADER in kinds
@@ -125,7 +122,6 @@ def test_project_render_children_omitted_until_expanded() -> None:
     assert RowKind.PROJECT_RENDER_QUALITY in kinds
     assert RowKind.PROJECT_RENDER_START in kinds
     assert RowKind.PROJECT_RENDER_END in kinds
-    assert RowKind.PROJECT_RENDER_ACTION in kinds
 
 
 def test_project_milkdrop_children_omitted_until_expanded() -> None:
@@ -354,20 +350,6 @@ def test_output_path_uses_project_renders_dir_and_range_suffix(
     assert view.project.output_label.endswith("render_10-20s.mp4")
 
 
-def test_render_action_is_green_button_with_enter_icon() -> None:
-    controls = _make_controls(("layer_1",))
-    _expand_project_render(controls)
-    view = controls.build_view_state(paused=False)
-    action_row = view.layout.find_by_kind(RowKind.PROJECT_RENDER_ACTION)
-    spec = row_spec(RowKind.PROJECT_RENDER_ACTION)
-    assert spec.shows_enter_icon is True
-    assert _row_value_color(view, action_row) == ACTION
-    view.focus_descriptor = view.layout.descriptor(action_row)
-    assert _row_value_color(view, action_row) == HIGHLIGHT
-    controls.focus_descriptor = _desc(view, action_row)
-    assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
-
-
 def test_left_right_on_headers_toggles_expand() -> None:
     controls = _make_controls(("layer_1",))
     controls.focus_descriptor = RowDescriptor(RowKind.PROJECT_HEADER)
@@ -426,11 +408,6 @@ def test_minimal_view_render_labels() -> None:
     assert (
         format_row_value(state, state.layout.descriptor(output))
         == "renders/demo_5-40s.mp4"
-    )
-    action = state.layout.find_by_kind(RowKind.PROJECT_RENDER_ACTION)
-    assert (
-        row_full_line_display_text(state, state.layout.descriptor(action))
-        == "  └─ Render the Project"
     )
     project = state.layout.find_by_kind(RowKind.PROJECT_HEADER)
     assert (
@@ -528,11 +505,8 @@ class _ScriptedRenderJob:
         self.finish(ok=False, error="aborted")
 
 
-def _focus_render_action(controls) -> None:
-    _expand_project_render(controls)
-    view = controls.build_view_state(paused=False)
-    action_row = view.layout.find_by_kind(RowKind.PROJECT_RENDER_ACTION)
-    controls.focus_descriptor = _desc(view, action_row)
+def _prompt_project_render(controls) -> None:
+    command_by_id("project.render").run(controls)
 
 
 def _wire_fake_job(controls, tmp_path: Path, job: _ScriptedRenderJob) -> Path:
@@ -553,8 +527,7 @@ def test_render_action_enter_opens_yes_cancel_modal() -> None:
     controls.session.project.render.quality = "high"
     controls.session.project.render.start_sec = 5
     controls.session.project.render.end_sec = 20
-    _focus_render_action(controls)
-    assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
+    _prompt_project_render(controls)
     modal_view = controls.modal_host.view_state()
     assert modal_view is not None
     assert modal_view.kind == ModalKind.YES_NO
@@ -575,8 +548,7 @@ def test_render_action_cancel_does_not_start_job(tmp_path: Path) -> None:
     controls = _make_controls(("layer_1",), project_dir=tmp_path)
     job = _ScriptedRenderJob()
     _wire_fake_job(controls, tmp_path, job)
-    _focus_render_action(controls)
-    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    _prompt_project_render(controls)
     _choose_modal_option(controls, "Cancel")
     assert controls.modal_host.view_state() is None
     assert job.spec is None
@@ -593,8 +565,7 @@ def test_render_confirm_shows_progress_then_success(
     )
     job = _ScriptedRenderJob()
     _wire_fake_job(controls, tmp_path, job)
-    _focus_render_action(controls)
-    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    _prompt_project_render(controls)
     assert not controls.playback.paused
     _choose_modal_option(controls, "Yes")
     assert controls.playback.paused is True
@@ -655,8 +626,7 @@ def test_render_confirm_failure_shows_error_modal(
     controls = _make_controls(("layer_1",), project_dir=tmp_path)
     job = _ScriptedRenderJob()
     _wire_fake_job(controls, tmp_path, job)
-    _focus_render_action(controls)
-    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    _prompt_project_render(controls)
     _choose_modal_option(controls, "Yes")
     job.finish(ok=False, error="ffmpeg exited with status 1")
     controls.tick(0.016)

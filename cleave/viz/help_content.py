@@ -47,6 +47,8 @@ NAVIGATION_SECTION = HelpSection(
         ("Ctrl + Q", "quit"),
         ("Ctrl + S", "save"),
         ("Ctrl + Enter", "place song marker"),
+        ("F10 / Alt", "menu bar"),
+        ("Ctrl + R", "render"),
     ),
 )
 
@@ -59,6 +61,7 @@ _CURATION_NAVIGATION_SECTION = HelpSection(
         ("Ctrl + Left/Right", "skip 30s"),
         ("ESC", "hide UI"),
         ("Ctrl + Q", "quit"),
+        ("F10 / Alt", "menu bar"),
     ),
 )
 
@@ -250,15 +253,6 @@ def timeline_strip_section(
     return HelpSection("Timeline", tuple(entries))
 
 
-_SAVE_SECTION = HelpSection(
-    "Save",
-    (
-        ("Enter", "save"),
-        ("Ctrl + S", "save"),
-    ),
-)
-
-
 def _value_step_section(row_kind: RowKind) -> HelpSection:
     behavior = row_spec(row_kind)
     if behavior.help_entries is not None:
@@ -389,13 +383,10 @@ def sections_for(
             (("Enter/Delete", "confirm delete"),),
         )
     elif behavior.affordance == RowAffordance.ACTION:
-        if behavior.help_entries is not None:
-            primary = HelpSection(
-                behavior.help_title or "Edit",
-                behavior.help_entries,
-            )
-        else:
-            primary = _SAVE_SECTION
+        primary = HelpSection(
+            behavior.help_title or "Edit",
+            behavior.help_entries or (),
+        )
     elif behavior.affordance == RowAffordance.DISPLAY:
         entries = behavior.help_entries
         if entries is None:

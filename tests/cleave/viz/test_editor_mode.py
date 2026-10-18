@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 import pygame
 
 from cleave.config_schema.persist import persisted_session_payload
+from cleave.viz.commands import command_by_id
 from cleave.viz.focus_nav import MainFocus
 from cleave.viz.modal import ModalKind
 from cleave.viz.row_kinds import RowDescriptor, RowKind
@@ -16,9 +17,13 @@ from tests.cleave.viz.test_overlay import _minimal_view_state
 from tests.support.viz import keydown, make_playlist, make_test_cfg, make_track_block
 
 
+def _prompt_editor_mode(controls) -> None:
+    command_by_id("layers.preset_curation").run(controls)
+
+
 def _choose_editor_mode_option(controls, option_label: str) -> None:
     if not controls.modal_host.active:
-        controls.handle_keydown(keydown(pygame.K_RETURN))
+        _prompt_editor_mode(controls)
     view = controls.modal_host.view_state()
     assert view is not None
     options = list(view.options)
@@ -82,10 +87,8 @@ def test_curation_layout_allowlist() -> None:
     slots = [row.slot for row in state.layout.rows if row.slot is not None]
 
     assert RowKind.SETTINGS_HEADER in kinds
-    assert RowKind.SETTINGS_EDITOR_MODE in kinds
     assert RowKind.TRANSPORT in kinds
     assert RowKind.PROJECT_HEADER not in kinds
-    assert RowKind.CONFIG_HEADER not in kinds
     assert RowKind.RENDER_SECTION_GAP not in kinds
     assert RowKind.RENDER_OVERLAYS_HEADER not in kinds
     assert RowKind.RENDER_TIMELINE_HEADER not in kinds
@@ -165,10 +168,7 @@ def test_curation_shows_only_focus_layer() -> None:
 def test_enter_curation_expands_layer_one() -> None:
     controls = _make_controls(("layer_1", "layer_2"))
     controls.session.layers["layer_1"].expanded = False
-    controls.session.settings.expanded = True
-    controls.focus_cursor = MainFocus(RowDescriptor(RowKind.SETTINGS_EDITOR_MODE))
-
-    controls.handle_keydown(keydown(pygame.K_RETURN))
+    _prompt_editor_mode(controls)
     view = controls.modal_host.view_state()
     assert view is not None
     assert view.kind == ModalKind.CHOICE
@@ -207,12 +207,10 @@ def test_editor_mode_change_syncs_compositor_format() -> None:
 def test_enter_curation_defaults_full_mix_and_disables_rotation() -> None:
     """Regression: session projectM rotation must not keep running in curation."""
     controls = _make_controls(("layer_1", "layer_2"))
-    controls.session.settings.expanded = True
     controls.session.solo_slot = "layer_2"
     controls.session.layers["layer_1"].stem = "drums"
     controls.session.layers["layer_1"].preset_switching = "on"
     controls._config_save.clear_config_dirty()
-    controls.focus_cursor = MainFocus(RowDescriptor(RowKind.SETTINGS_EDITOR_MODE))
     mock_bindings = MagicMock()
     controls.editor_mode._layer_bindings = mock_bindings
     controls._layer_bindings = mock_bindings
@@ -283,9 +281,6 @@ def test_curation_ignores_layer_lock() -> None:
 def test_dirty_enter_modal_cancel_stays_visualizer() -> None:
     controls = _make_controls(("layer_1",))
     _mutate_dirty(controls)
-    controls.session.settings.expanded = True
-    controls.focus_cursor = MainFocus(RowDescriptor(RowKind.SETTINGS_EDITOR_MODE))
-
     _choose_editor_mode_option(controls, "Ok")
     assert controls.modal_host.active
     view = controls.modal_host.view_state()
@@ -327,9 +322,7 @@ def test_exit_curation_reloads_and_clears_dirty() -> None:
             return_value=MagicMock(song_markers=[]),
         ),
     ):
-        controls.session.settings.expanded = True
-        controls.focus_cursor = MainFocus(RowDescriptor(RowKind.SETTINGS_EDITOR_MODE))
-        controls.handle_keydown(keydown(pygame.K_RETURN))
+        _prompt_editor_mode(controls)
         view = controls.modal_host.view_state()
         assert view is not None
         assert view.message == "Switch the editor to Visual Editor mode?"
@@ -343,10 +336,7 @@ def test_exit_curation_reloads_and_clears_dirty() -> None:
 
 def test_editor_mode_modal_cancel_keeps_visualizer() -> None:
     controls = _make_controls(("layer_1",))
-    controls.session.settings.expanded = True
-    controls.focus_cursor = MainFocus(RowDescriptor(RowKind.SETTINGS_EDITOR_MODE))
-
-    controls.handle_keydown(keydown(pygame.K_RETURN))
+    _prompt_editor_mode(controls)
     assert controls.modal_host.active
     _choose_editor_mode_option(controls, "Cancel")
     assert not controls.modal_host.active

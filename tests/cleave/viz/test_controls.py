@@ -68,7 +68,10 @@ from cleave.viz.session import (
     TuningSession,
 )
 from cleave.viz.row_spec import REPEAT_ROW_KINDS
+from cleave.viz.commands import command_by_id, command_context
 from cleave.viz.theme import (
+    ACTION,
+    CONFIG_DIRTY,
     DISABLED,
     HIGHLIGHT,
     LOCKED,
@@ -203,10 +206,6 @@ def _confirm_modal_yes(controls: TuningControls) -> None:
     controls.handle_keydown(_keydown(pygame.K_RETURN))
 
 
-def _config_header_row(view: TuningViewState) -> int:
-    return view.layout.find_by_kind(RowKind.CONFIG_HEADER)
-
-
 def _expand_project(controls: TuningControls) -> None:
     controls.session.project.expanded = True
 
@@ -217,7 +216,7 @@ def _expand_project_render(controls: TuningControls) -> None:
 
 
 def _save_now(controls: TuningControls) -> None:
-    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    command_by_id("file.save").run(controls)
     assert not controls.modal_host.active
 
 
@@ -763,10 +762,6 @@ def test_move_mode_backspace_cancels_without_applying() -> None:
 
 def test_save_triggers_notification_without_blocking_input() -> None:
     controls = _make_controls(("layer_1",))
-    _expand_project(controls)
-    view = controls.build_view_state(paused=False)
-    config_row = _config_header_row(view)
-    controls.focus_descriptor = _desc(view, config_row)
     stderr = io.StringIO()
     with patch.object(time, "monotonic", return_value=1000.0):
         with patch("sys.stderr", stderr):
@@ -788,43 +783,25 @@ def test_save_writes_immediately_no_modal() -> None:
     controls = _make_controls(("layer_1",), launch_config_path=launch_path)
     controls._config_save._on_save_config = lambda path: writes.append(path) or path.name
     _mutate_dirty(controls)
-    _expand_project(controls)
-    view = controls.build_view_state(paused=False)
-    controls.focus_descriptor = _desc(view, _config_header_row(view))
     _save_now(controls)
     assert writes == [launch_path]
     assert not controls.config_dirty
     assert not controls.modal_host.active
 
 
-def test_config_header_shows_save() -> None:
+def test_save_command_label() -> None:
     controls = _make_controls(("layer_1",))
-    _expand_project(controls)
-    view = controls.build_view_state(paused=False)
-    header_row = next(
-        i for i in range(len(view.layout)) if view.layout.kind(i) == RowKind.CONFIG_HEADER
-    )
-    assert _row_text(view, header_row) == "Save"
-    assert header_row in view.layout.navigable_indices(view)
-    font = overlay_font()
-    panel_w = baseline_tuning_ui_metrics().panel_content_max_width
-    label = fit_row_text(font, view, header_row, max_content_width=panel_w)
-    icon_budget = row_icon_prefix_width(font.get_linesize())
-    assert label == "Save"
-    assert font.size(label)[0] + icon_budget <= panel_w
+    command = command_by_id("file.save")
+    assert command.label == "Save"
+    assert command.enabled(command_context(controls)) is True
+    assert command.label_role(command_context(controls)) == ACTION
 
 
-def test_config_header_shows_asterisk_when_dirty() -> None:
+def test_save_command_label_role_when_dirty() -> None:
     controls = _make_controls(("layer_1",))
     _mutate_dirty(controls)
-    _expand_project(controls)
-    view = controls.build_view_state(paused=False)
-    header_row = next(
-        i for i in range(len(view.layout)) if view.layout.kind(i) == RowKind.CONFIG_HEADER
-    )
-    assert _row_text(view, header_row) == "Save"
-    assert view.config_dirty
-    assert header_row in view.layout.navigable_indices(view)
+    assert controls.config_dirty
+    assert command_by_id("file.save").label_role(command_context(controls)) == CONFIG_DIRTY
 
 
 def test_blend_and_opacity_change_sets_dirty_save_clears() -> None:
@@ -841,10 +818,6 @@ def test_blend_and_opacity_change_sets_dirty_save_clears() -> None:
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.config_dirty
 
-    _expand_project(controls)
-    view = controls.build_view_state(paused=False)
-    save_row = _config_header_row(view)
-    controls.focus_descriptor = _desc(view, save_row)
     _save_now(controls)
     assert not controls.config_dirty
 
@@ -895,7 +868,7 @@ def test_fit_row_text_config_and_preset_share_panel_width() -> None:
         "- Bitcore Tweak.milk (1/50)"
     )
     controls = _make_controls(("layer_1",))
-    _expand_project(controls)
+    _expand_project_render(controls)
     view = controls.build_view_state(paused=False)
     view.tracks["layer_1"] = make_track_block(
         stem="layer_1",
@@ -908,35 +881,32 @@ def test_fit_row_text_config_and_preset_share_panel_width() -> None:
         enabled=True,
         preset_empty=False,
     )
-    header_row = next(
-        i for i in range(len(view.layout)) if view.layout.kind(i) == RowKind.CONFIG_HEADER
-    )
+    output_row = view.layout.find_by_kind(RowKind.PROJECT_RENDER_OUTPUT)
     preset_row = _row(view, "layer_1", RowKind.TRACK_PRESET)
     font = overlay_font()
     panel_w = baseline_tuning_ui_metrics().panel_content_max_width
-    config_label = fit_row_text(font, view, header_row, max_content_width=panel_w)
+    output_label = fit_row_text(font, view, output_row, max_content_width=panel_w)
     preset_label = fit_row_text(font, view, preset_row, max_content_width=panel_w)
     icon_budget = row_icon_prefix_width(font.get_linesize())
     preset_prefix_w = preset_row_prefix_width(font, font.get_linesize())
-    assert font.size(config_label)[0] + icon_budget <= panel_w
+    assert font.size(output_label)[0] + icon_budget <= panel_w
     assert font.size(preset_label)[0] + TREE_INDENT + preset_prefix_w <= panel_w
 
 
-def test_navigable_project_save_row() -> None:
+def test_expanded_project_starts_at_milkdrop() -> None:
     controls = _make_controls(("layer_1",))
     _expand_project(controls)
     view = controls.build_view_state(paused=False)
-    assert len(view.layout) == 22
+    assert len(view.layout) == 21
     assert RowDescriptor(RowKind.TIMELINE_PRESETS) not in view.layout.rows
 
     kinds = {view.layout.kind(i) for i in range(len(view.layout))}
-    assert RowKind.CONFIG_HEADER in kinds
     assert RowKind.PROJECT_MILKDROP_HEADER in kinds
 
-    config_row = _config_header_row(view)
-    assert config_row in view.layout.navigable_indices(view)
+    project_row = view.layout.find_by_kind(RowKind.PROJECT_HEADER)
     milkdrop_row = view.layout.find_by_kind(RowKind.PROJECT_MILKDROP_HEADER)
-    controls.focus_descriptor = _desc(view, config_row)
+    assert milkdrop_row in view.layout.navigable_indices(view)
+    controls.focus_descriptor = _desc(view, project_row)
     controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert controls.focus_descriptor == _desc(view, milkdrop_row)
 
@@ -950,10 +920,6 @@ def test_save_writes_launch_path() -> None:
         writes.append(path) or path.name
     )
 
-    _expand_project(controls)
-    view = controls.build_view_state(paused=False)
-    save_row = _config_header_row(view)
-    controls.focus_descriptor = _desc(view, save_row)
     stderr = io.StringIO()
     with patch.object(time, "monotonic", return_value=2000.0):
         with patch("sys.stderr", stderr):
@@ -4103,19 +4069,19 @@ def test_ctrl_quick_nav_from_sub_row_jumps_forward() -> None:
     assert controls.focus_descriptor == _desc(view, quick[3])
 
 
-def test_ctrl_quick_nav_from_config_header_row() -> None:
+def test_ctrl_quick_nav_from_project_child() -> None:
     controls = _make_controls(("layer_1",))
     _expand_project(controls)
     view = controls.build_view_state(paused=False)
-    config_row = _config_header_row(view)
+    child_row = view.layout.find_by_kind(RowKind.PROJECT_MILKDROP_HEADER)
     project_row = view.layout.find_by_kind(RowKind.PROJECT_HEADER)
     transport_row = view.layout.find_by_kind(RowKind.TRANSPORT)
 
-    controls.focus_descriptor = _desc(view, config_row)
+    controls.focus_descriptor = _desc(view, child_row)
     controls.handle_keydown(_keydown(pygame.K_UP, mod=pygame.KMOD_CTRL))
     assert controls.focus_descriptor == _desc(view, project_row)
 
-    controls.focus_descriptor = _desc(view, config_row)
+    controls.focus_descriptor = _desc(view, child_row)
     controls.handle_keydown(_keydown(pygame.K_DOWN, mod=pygame.KMOD_CTRL))
     assert controls.focus_descriptor == _desc(view, transport_row)
 
@@ -5425,28 +5391,17 @@ def test_s_exits_solo_only_for_active_target() -> None:
 
 def test_save_blocked_while_solo_active() -> None:
     controls = _make_controls(("layer_1",))
-    _expand_project(controls)
     view = controls.build_view_state(paused=False)
     header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
-    config_row = _config_header_row(view)
     controls.focus_descriptor = _desc(view, header_row)
     controls.handle_keydown(_keydown(pygame.K_s))
 
-    controls.focus_descriptor = _desc(view, config_row)
     stderr = io.StringIO()
     with patch("sys.stderr", stderr):
-        controls.handle_keydown(_keydown(pygame.K_RETURN))
+        command_by_id("file.save").run(controls)
     assert stderr.getvalue() == ""
     assert controls.build_view_state(paused=False).solo_active is True
-
-
-def test_config_header_greyed_while_solo_active() -> None:
-    controls = _make_controls(("layer_1",))
-    controls.session.solo_slot = "layer_1"
-    _expand_project(controls)
-    view = controls.build_view_state(paused=False)
-    config_row = _config_header_row(view)
-    assert _row_value_color(view, config_row) == DISABLED
+    assert command_by_id("file.save").enabled(command_context(controls)) is False
 
 
 def test_solo_visibility_icon_same_width_as_normal() -> None:
@@ -5626,28 +5581,22 @@ def test_settings_expand_collapse_and_sub_row_visibility() -> None:
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.session.settings.expanded is True
     view = controls.build_view_state(paused=False)
-    assert [view.layout.kind(i) for i in range(5)] == [
+    assert [view.layout.kind(i) for i in range(4)] == [
         RowKind.SETTINGS_HEADER,
         RowKind.SETTINGS_EDITOR_WINDOW_HEADER,
         RowKind.SETTINGS_UI_HEADER,
         RowKind.SETTINGS_LATENCY_COMPENSATION_HEADER,
-        RowKind.SETTINGS_EDITOR_MODE,
     ]
     assert RowKind.SETTINGS_PREVIEW_QUALITY not in {
         view.layout.kind(i) for i in range(len(view.layout))
     }
-    editor_mode_row = view.layout.find_by_kind(RowKind.SETTINGS_EDITOR_MODE)
-    assert editor_mode_row == 4
-    assert editor_mode_row in view.layout.navigable_indices(view)
-    assert view.layout.header_row_count() == 7
+    assert view.layout.header_row_count() == 6
 
-    controls.focus_descriptor = _desc(view, editor_mode_row)
-    controls.handle_keydown(_keydown(pygame.K_LEFT))
     controls.focus_descriptor = _desc(view, settings_row)
     controls.handle_keydown(_keydown(pygame.K_LEFT))
     assert controls.session.settings.expanded is False
     view = controls.build_view_state(paused=False)
-    assert RowKind.SETTINGS_EDITOR_MODE not in {
+    assert RowKind.SETTINGS_UI_HEADER not in {
         view.layout.kind(i) for i in range(len(view.layout))
     }
     assert view.layout.header_row_count() == 3
@@ -5673,7 +5622,7 @@ def test_settings_ui_expand_collapse_and_sub_row_visibility() -> None:
     notify_row = view.layout.find_by_kind(RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY)
     assert ui_fade_row in view.layout.navigable_indices(view)
     assert notify_row in view.layout.navigable_indices(view)
-    assert view.layout.header_row_count() == 12
+    assert view.layout.header_row_count() == 11
 
     controls.focus_descriptor = _desc(view, ui_fade_row)
     controls.handle_keydown(_keydown(pygame.K_LEFT))
@@ -5687,7 +5636,7 @@ def test_settings_ui_expand_collapse_and_sub_row_visibility() -> None:
     assert RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY not in {
         view.layout.kind(i) for i in range(len(view.layout))
     }
-    assert view.layout.header_row_count() == 7
+    assert view.layout.header_row_count() == 6
 
 
 def test_settings_editor_window_expand_collapse_and_sub_row_visibility() -> None:
@@ -6796,9 +6745,6 @@ def test_marker_only_edit_marks_dirty_and_save_clears(tmp_path: Path) -> None:
     assert controls.config_dirty
     assert load_manifest(project).song_markers == ()
 
-    _expand_project(controls)
-    view = controls.build_view_state(paused=False)
-    controls.focus_descriptor = _desc(view, _config_header_row(view))
     _save_now(controls)
 
     assert not controls.config_dirty
@@ -6826,9 +6772,6 @@ def test_save_flushes_song_markers(tmp_path: Path) -> None:
     assert controls.config_dirty
     assert load_manifest(project).song_markers == _song_markers(8.0)
 
-    _expand_project(controls)
-    view = controls.build_view_state(paused=False)
-    controls.focus_descriptor = _desc(view, _config_header_row(view))
     _save_now(controls)
 
     assert writes == [launch]
@@ -6862,9 +6805,6 @@ def test_save_flushes_markers_to_project_yaml(tmp_path: Path) -> None:
 
     controls.playback.player.seek(3.0)
     controls.song_markers.drop()
-    _expand_project(controls)
-    view = controls.build_view_state(paused=False)
-    controls.focus_descriptor = _desc(view, _config_header_row(view))
     _save_now(controls)
 
     assert load_manifest(project).song_markers == _song_markers(3.0)

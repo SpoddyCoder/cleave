@@ -531,7 +531,6 @@ SETTINGS_LATENCY_COMPENSATION_SECTION = ExpandSectionDef(
     toggle=_toggle_settings_latency_compensation,
     children=(
         SectionNode(leaf_kind=RowKind.SETTINGS_RESIDUAL_LATENCY_MS),
-        SectionNode(leaf_kind=RowKind.SETTINGS_MEASURE_LATENCY),
     ),
 )
 
@@ -544,7 +543,6 @@ SETTINGS_SECTION = ExpandSectionDef(
         SectionNode(expand=SETTINGS_EDITOR_WINDOW_SECTION),
         SectionNode(expand=SETTINGS_UI_SECTION),
         SectionNode(expand=SETTINGS_LATENCY_COMPENSATION_SECTION),
-        SectionNode(leaf_kind=RowKind.SETTINGS_EDITOR_MODE),
     ),
 )
 
@@ -581,7 +579,6 @@ PROJECT_RENDER_SECTION = ExpandSectionDef(
         SectionNode(leaf_kind=RowKind.PROJECT_RENDER_QUALITY),
         SectionNode(leaf_kind=RowKind.PROJECT_RENDER_START),
         SectionNode(leaf_kind=RowKind.PROJECT_RENDER_END),
-        SectionNode(leaf_kind=RowKind.PROJECT_RENDER_ACTION),
     ),
 )
 
@@ -591,7 +588,6 @@ PROJECT_SECTION = ExpandSectionDef(
     read_expanded=_project_expanded,
     toggle=_toggle_project,
     children=(
-        SectionNode(leaf_kind=RowKind.CONFIG_HEADER),
         SectionNode(expand=PROJECT_MILKDROP_SECTION),
         SectionNode(expand=PROJECT_COMPOSITOR_SECTION),
         SectionNode(expand=PROJECT_RENDER_SECTION),

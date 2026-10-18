@@ -156,6 +156,7 @@ class OverlayDrawer:
         help_overlay: HelpOverlay | None = None,
         modal_host: ModalHost | None = None,
         profiler: OverlayProfiler | None = None,
+        top_inset: int = 0,
     ) -> None:
         viewport_w, viewport_h = overlay_surface.get_size()
         counters = profiler.counters() if profiler is not None else None
@@ -189,10 +190,12 @@ class OverlayDrawer:
                 timeline_panel_open=timeline_panel_open,
                 cue_readout_open=cue_readout_open,
                 counters=counters,
+                top_inset=top_inset,
             )
             if help_overlay is not None and show_help:
                 help_overlay.draw(
                     overlay_surface,
+                    top_inset=top_inset,
                     **_help_compose_kwargs(view_state),
                 )
             modal_view = modal_host.view_state()
@@ -215,6 +218,7 @@ class OverlayDrawer:
             timeline_panel_open=timeline_panel_open,
             cue_readout_open=cue_readout_open,
             counters=counters,
+            top_inset=top_inset,
         )
         if composed is not None:
             tex_id, tex_uv = _coordinator_upload(
@@ -240,6 +244,7 @@ class OverlayDrawer:
             help_composed = help_overlay.compose_panel(
                 viewport_width=viewport_w,
                 viewport_height=viewport_h,
+                top_inset=top_inset,
                 **_help_compose_kwargs(view_state),
             )
             if help_composed is not None:

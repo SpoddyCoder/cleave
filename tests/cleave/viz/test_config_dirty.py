@@ -15,7 +15,6 @@ from cleave.viz.timeline_controls import TimelineControls
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from tests.cleave.viz.test_controls import (
     _save_now,
-    _config_header_row,
     _desc,
     _expand_project,
     _expand_settings_editor_window,
@@ -581,9 +580,6 @@ def test_display_time_mutation_clears_dirty_after_save() -> None:
     _mutate_render_overlay_display_time(controls)
     assert controls.config_dirty
 
-    _expand_project(controls)
-    view = controls.build_view_state(paused=False)
-    controls.focus_descriptor = _desc(view, _config_header_row(view))
     _save_now(controls)
     assert not controls.config_dirty
 

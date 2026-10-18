@@ -6,10 +6,12 @@ from typing import TYPE_CHECKING
 
 import pygame
 
+from cleave.viz.commands import command_context, command_for_shortcut
 from cleave.viz.controls import SEEK_LONG, SEEK_TINY, TuningControls
 from cleave.viz.editor_mode_controls import is_preset_curation_mode
 from cleave.viz.focus_nav import FocusCursor, TimelineFocus
 from cleave.viz.key_repeat import mod_ctrl, mod_shift
+from cleave.viz.menu_bar import menus_for_session
 from cleave.viz.timeline_controls import TimelineControls
 
 if TYPE_CHECKING:
@@ -85,36 +87,72 @@ def _try_handle_global_seek(
     return True
 
 
+def _is_alt_key(key: int) -> bool:
+    return key in (pygame.K_LALT, pygame.K_RALT)
+
+
+def _run_command_shortcut(
+    event: pygame.event.Event, runtime: LiveVisualizerRuntime
+) -> bool | None:
+    """Ctrl+S, Ctrl+Q, Ctrl+R, and H. None when the key is not one of those.
+
+    Quit returns False only when ``request_quit`` says leave now. The loop
+    also reads ``consume_pending_exit`` for the menu Enter path.
+    """
+    command = command_for_shortcut(event.key, event.mod)
+    if command is None:
+        return None
+    command.run(runtime.controls)
+    if runtime.controls.pending_exit:
+        return False
+    return True
+
+
+def _handle_menu_bar_keydown(
+    event: pygame.event.Event, runtime: LiveVisualizerRuntime
+) -> bool | None:
+    """F10, Alt, and keys while the bar is focused.
+
+    True = consumed, False = quit now, None = pass through.
+    """
+    menu = runtime.menu_bar
+    if _is_alt_key(event.key):
+        menu.note_alt_keydown()
+        return True
+    menu.cancel_alt_tap()
+    if event.key == pygame.K_F10:
+        if menu.toggle_focus():
+            runtime.overlay.notify_input()
+        return True
+    if not menu.focused:
+        return None
+    consumed = menu.handle_keydown(
+        event.key,
+        menus_for_session(runtime.seed.session),
+        command_context(runtime.controls),
+        runtime.controls,
+    )
+    if runtime.controls.pending_exit:
+        return False
+    if consumed:
+        return True
+    return None
+
+
 def _handle_global_keydown(
     event: pygame.event.Event, runtime: LiveVisualizerRuntime
 ) -> bool | None:
     """Global shortcuts. True = handled, False = quit, None = pass through."""
     if is_preset_curation_mode(runtime.seed.session.settings.editor_mode):
-        if event.key == pygame.K_q and mod_ctrl(event.mod):
-            return not runtime.controls.try_quit()
-        if event.key == pygame.K_h:
-            runtime.seed.session.help_visible = not runtime.seed.session.help_visible
-            return True
         if _try_handle_global_seek(event, runtime):
             return True
-        # Skip other globals (Ctrl+S, F3, ...); pass through to curation allowlist.
+        # Skip other globals (F3, ...); pass through to curation allowlist.
         return None
-
-    if event.key == pygame.K_q and mod_ctrl(event.mod):
-        return not runtime.controls.try_quit()
-
-    if event.key == pygame.K_s and mod_ctrl(event.mod):
-        runtime.controls.prompt_save_config()
-        return True
 
     if event.key == pygame.K_RETURN and mod_ctrl(event.mod):
         if runtime.seed.session.timeline.recording:
             return True
         runtime.controls.song_markers.drop()
-        return True
-
-    if event.key == pygame.K_h:
-        runtime.seed.session.help_visible = not runtime.seed.session.help_visible
         return True
 
     if event.key == pygame.K_F3:
@@ -149,7 +187,16 @@ def dispatch_keydown(event: pygame.event.Event, runtime: LiveVisualizerRuntime) 
         return True
 
     if runtime.modal_host.active:
+        runtime.menu_bar.cancel_alt_tap()
         return runtime.controls.handle_modal_keydown(event)
+
+    menu_result = _handle_menu_bar_keydown(event, runtime)
+    if menu_result is not None:
+        return menu_result
+
+    shortcut_result = _run_command_shortcut(event, runtime)
+    if shortcut_result is not None:
+        return shortcut_result
 
     global_result = _handle_global_keydown(event, runtime)
     if global_result is not None:
@@ -162,10 +209,25 @@ def dispatch_keydown(event: pygame.event.Event, runtime: LiveVisualizerRuntime) 
 def dispatch_keyup(event: pygame.event.Event, runtime: LiveVisualizerRuntime) -> None:
     if event.type != pygame.KEYUP:
         return
+    if runtime.modal_host.active:
+        runtime.menu_bar.cancel_alt_tap()
+    elif _is_alt_key(event.key):
+        if runtime.menu_bar.complete_alt_tap():
+            runtime.overlay.notify_input()
+        return
     if runtime.modal_host.handle_keyup(event):
         return
     key_handler = key_handler_for_runtime(runtime, event.key)
     key_handler.handle_keyup(event)
+
+
+def dispatch_window_event(event: pygame.event.Event, runtime: LiveVisualizerRuntime) -> None:
+    """Clear a pending Alt tap when the window loses focus."""
+    if event.type == pygame.WINDOWFOCUSLOST:
+        runtime.menu_bar.cancel_alt_tap()
+        return
+    if event.type == pygame.ACTIVEEVENT and not getattr(event, "gain", True):
+        runtime.menu_bar.cancel_alt_tap()
 
 
 def dispatch_should_notify_overlay(

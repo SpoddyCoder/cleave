@@ -30,6 +30,7 @@ REPO = SPECDIR.parent
 # cleave.py (those imports live in function bodies).
 COLLECT_PACKAGES = (
     "pygame",
+    "imgui_bundle",
     "soxr",
     "torch",
     "torchaudio",

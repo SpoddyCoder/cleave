@@ -39,5 +39,5 @@ When enabled (project.yaml `compositor.hdr`, default on), compositor FBOs use `G
 ## New GPU pass
 
 - Draw via `_draw_quad` (`_ensure_moderngl_draw_state()`; compositor fixed-function state can block shader output).
-- Wrap in `_save_gl_state` / `_restore_gl_state`, then `_prepare_fixed_function_gl()`.
+- Wrap in `save_gl_state` / `restore_gl_state` from `cleave/gl_state.py`, then `_prepare_fixed_function_gl()`.
 - Confirm pixels change in a GPU probe or `*_gl_integration.py`; mocks miss silent no-ops.

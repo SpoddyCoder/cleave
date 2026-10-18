@@ -242,6 +242,7 @@ class LoadingWindow:
     display_height: int
     overlay_surface: pygame.Surface
     quit_requested: bool = field(default=False)
+    video_quit: bool = field(default=False)
 
     def update(
         self,

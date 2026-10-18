@@ -19,9 +19,8 @@ from OpenGL.GL import (
 from cleave.gl_post_process import (
     GlPostProcess,
     _prepare_fixed_function_gl,
-    _restore_gl_state,
-    _save_gl_state,
 )
+from cleave.gl_state import restore_gl_state, save_gl_state
 from cleave.gl_color_format import RGBA16F
 
 
@@ -47,9 +46,9 @@ def test_save_gl_state_queries_framebuffer_binding() -> None:
             return [9]
         return [0, 0, 800, 600]
 
-    with patch("cleave.gl_post_process.glGetIntegerv", side_effect=_record_getintegerv):
-        with patch("cleave.gl_post_process.glIsEnabled", return_value=False):
-            state = _save_gl_state()
+    with patch("cleave.gl_state.glGetIntegerv", side_effect=_record_getintegerv):
+        with patch("cleave.gl_state.glIsEnabled", return_value=False):
+            state = save_gl_state()
 
     assert GL_FRAMEBUFFER_BINDING in queried
     assert GL_FRAMEBUFFER not in queried
@@ -73,8 +72,8 @@ def test_apply_bloom_prepares_fixed_function_gl() -> None:
     post = GlPostProcess()
 
     with patch("cleave.gl_post_process.moderngl.create_context", return_value=ctx):
-        with patch("cleave.gl_post_process._save_gl_state", return_value=MagicMock()):
-            with patch("cleave.gl_post_process._restore_gl_state") as restore:
+        with patch("cleave.gl_post_process.save_gl_state", return_value=MagicMock()):
+            with patch("cleave.gl_post_process.restore_gl_state") as restore:
                 with patch(
                     "cleave.gl_post_process._prepare_fixed_function_gl"
                 ) as prepare:
@@ -89,8 +88,8 @@ def test_apply_highlight_rolloff_prepares_fixed_function_gl() -> None:
     post = GlPostProcess()
 
     with patch("cleave.gl_post_process.moderngl.create_context", return_value=ctx):
-        with patch("cleave.gl_post_process._save_gl_state", return_value=MagicMock()):
-            with patch("cleave.gl_post_process._restore_gl_state") as restore:
+        with patch("cleave.gl_post_process.save_gl_state", return_value=MagicMock()):
+            with patch("cleave.gl_post_process.restore_gl_state") as restore:
                 with patch(
                     "cleave.gl_post_process._prepare_fixed_function_gl"
                 ) as prepare:
@@ -116,8 +115,8 @@ def test_apply_highlight_rolloff_draws_via_gpu_shader() -> None:
     post = GlPostProcess()
 
     with patch("cleave.gl_post_process.moderngl.create_context", return_value=ctx):
-        with patch("cleave.gl_post_process._save_gl_state", return_value=MagicMock()):
-            with patch("cleave.gl_post_process._restore_gl_state"):
+        with patch("cleave.gl_post_process.save_gl_state", return_value=MagicMock()):
+            with patch("cleave.gl_post_process.restore_gl_state"):
                 with patch("cleave.gl_post_process._prepare_fixed_function_gl"):
                     with patch.object(post, "_draw_quad") as mock_draw:
                         result = post.apply_highlight_rolloff(
@@ -148,8 +147,8 @@ def test_apply_highlight_rolloff_sets_mode_uniform() -> None:
     post = GlPostProcess()
 
     with patch("cleave.gl_post_process.moderngl.create_context", return_value=ctx):
-        with patch("cleave.gl_post_process._save_gl_state", return_value=MagicMock()):
-            with patch("cleave.gl_post_process._restore_gl_state"):
+        with patch("cleave.gl_post_process.save_gl_state", return_value=MagicMock()):
+            with patch("cleave.gl_post_process.restore_gl_state"):
                 with patch("cleave.gl_post_process._prepare_fixed_function_gl"):
                     with patch.object(post, "_draw_quad") as mock_draw:
                         post.apply_highlight_rolloff(
@@ -178,8 +177,8 @@ def test_apply_chroma_boost_draws_via_gpu_shader() -> None:
     post = GlPostProcess()
 
     with patch("cleave.gl_post_process.moderngl.create_context", return_value=ctx):
-        with patch("cleave.gl_post_process._save_gl_state", return_value=MagicMock()):
-            with patch("cleave.gl_post_process._restore_gl_state"):
+        with patch("cleave.gl_post_process.save_gl_state", return_value=MagicMock()):
+            with patch("cleave.gl_post_process.restore_gl_state"):
                 with patch("cleave.gl_post_process._prepare_fixed_function_gl"):
                     with patch.object(post, "_draw_quad") as mock_draw:
                         result = post.apply_chroma_boost(
@@ -207,8 +206,8 @@ def test_apply_bloom_caches_dest_fbo_per_texture() -> None:
     )
 
     with patch("cleave.gl_post_process.moderngl.create_context", return_value=ctx):
-        with patch("cleave.gl_post_process._save_gl_state", return_value=MagicMock()):
-            with patch("cleave.gl_post_process._restore_gl_state"):
+        with patch("cleave.gl_post_process.save_gl_state", return_value=MagicMock()):
+            with patch("cleave.gl_post_process.restore_gl_state"):
                 with patch("cleave.gl_post_process._prepare_fixed_function_gl"):
                     with patch.object(
                         post, "_ensure_buffers", return_value=ping_buffers
@@ -309,8 +308,8 @@ def test_read_luma_grid_draws_once_and_reads_fbo() -> None:
     grid_buffers = SimpleNamespace(tex=grid_tex, fbo=grid_fbo)
 
     with patch("cleave.gl_post_process.moderngl.create_context", return_value=ctx):
-        with patch("cleave.gl_post_process._save_gl_state", return_value=MagicMock()):
-            with patch("cleave.gl_post_process._restore_gl_state") as restore:
+        with patch("cleave.gl_post_process.save_gl_state", return_value=MagicMock()):
+            with patch("cleave.gl_post_process.restore_gl_state") as restore:
                 with patch(
                     "cleave.gl_post_process._prepare_fixed_function_gl"
                 ) as prepare:
@@ -346,8 +345,8 @@ def test_read_luma_grid_sets_hdr_uniform_for_rgba16f() -> None:
     grid_buffers = SimpleNamespace(tex=MagicMock(), fbo=grid_fbo)
 
     with patch("cleave.gl_post_process.moderngl.create_context", return_value=ctx):
-        with patch("cleave.gl_post_process._save_gl_state", return_value=MagicMock()):
-            with patch("cleave.gl_post_process._restore_gl_state"):
+        with patch("cleave.gl_post_process.save_gl_state", return_value=MagicMock()):
+            with patch("cleave.gl_post_process.restore_gl_state"):
                 with patch("cleave.gl_post_process._prepare_fixed_function_gl"):
                     with patch.object(
                         post,
@@ -366,8 +365,8 @@ def test_apply_bloom_caches_vao_per_program() -> None:
     post = GlPostProcess()
 
     with patch("cleave.gl_post_process.moderngl.create_context", return_value=ctx):
-        with patch("cleave.gl_post_process._save_gl_state", return_value=MagicMock()):
-            with patch("cleave.gl_post_process._restore_gl_state"):
+        with patch("cleave.gl_post_process.save_gl_state", return_value=MagicMock()):
+            with patch("cleave.gl_post_process.restore_gl_state"):
                 with patch("cleave.gl_post_process._prepare_fixed_function_gl"):
                     result = post.apply_bloom(texture_id=7, width=64, height=64, strength=0.5)
 
@@ -399,22 +398,25 @@ def test_restore_gl_state_does_not_restore_shader_program() -> None:
         scissor_box=(0, 0, 1280, 720),
         color_writemask=(True, True, True, True),
         vertex_array_binding=0,
+        read_framebuffer=3,
+        read_buffer=0,
     )
 
-    with patch("cleave.gl_post_process.glUseProgram") as use_program:
-        with patch("cleave.gl_post_process.glBindFramebuffer"):
-            with patch("cleave.gl_post_process.glViewport"):
-                with patch("cleave.gl_post_process.glActiveTexture"):
-                    with patch("cleave.gl_post_process.glBindTexture"):
-                        with patch("cleave.gl_post_process.glEnable"):
-                            with patch("cleave.gl_post_process.glDisable"):
-                                with patch("cleave.gl_post_process.glBlendFunc"):
-                                    with patch("cleave.gl_post_process.glBlendEquation"):
-                                        with patch("cleave.gl_post_process.glScissor"):
-                                            with patch("cleave.gl_post_process.glColorMask"):
-                                                with patch(
-                                                    "cleave.gl_post_process.glBindVertexArray"
-                                                ):
-                                                    _restore_gl_state(saved)
+    with patch("cleave.gl_state.glUseProgram", create=True) as use_program:
+        with patch("cleave.gl_state.glBindFramebuffer"):
+            with patch("cleave.gl_state.glViewport"):
+                with patch("cleave.gl_state.glActiveTexture"):
+                    with patch("cleave.gl_state.glBindTexture"):
+                        with patch("cleave.gl_state.glEnable"):
+                            with patch("cleave.gl_state.glDisable"):
+                                with patch("cleave.gl_state.glBlendFunc"):
+                                    with patch("cleave.gl_state.glBlendEquation"):
+                                        with patch("cleave.gl_state.glScissor"):
+                                            with patch("cleave.gl_state.glColorMask"):
+                                                with patch("cleave.gl_state.glReadBuffer"):
+                                                    with patch(
+                                                        "cleave.gl_state.glBindVertexArray"
+                                                    ):
+                                                        restore_gl_state(saved)
 
     use_program.assert_not_called()

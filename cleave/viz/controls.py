@@ -380,6 +380,16 @@ class TuningControls:
             self.project_render.abort()
         return self._config_save.try_quit()
 
+    def request_quit(self) -> None:
+        """Quit from the menu.
+
+        A clean project sets pending exit so the loop can leave through
+        ``consume_pending_exit``. A dirty project only opens the unsaved
+        prompt; that dialog sets the flag after save or discard.
+        """
+        if self.try_quit():
+            self._config_save.mark_pending_exit()
+
     def prompt_save_config(self) -> None:
         if self.session.solo_slot is not None:
             return
@@ -628,12 +638,6 @@ class TuningControls:
                     return True
             if apply_field_action(self, self.focus_descriptor):
                 return True
-            if kind == RowKind.SETTINGS_EDITOR_MODE:
-                self.editor_mode.prompt_change_editor_mode()
-                return True
-            if kind == RowKind.SETTINGS_MEASURE_LATENCY:
-                self._tap_sync.prompt_start()
-                return True
             if kind == RowKind.SONG_MARKER_ITEM:
                 desc = self.focus_descriptor
                 if desc.marker_index is not None:
@@ -727,12 +731,6 @@ class TuningControls:
                 if self._dismiss_timed_notification_if_present():
                     return True
                 toggle_pause(self.playback, self.duration_sec)
-                return True
-            if kind == RowKind.CONFIG_HEADER:
-                self.prompt_save_config()
-                return True
-            if kind == RowKind.PROJECT_RENDER_ACTION:
-                self.project_render.prompt()
                 return True
             if self._dismiss_timed_notification_if_present():
                 return True
@@ -848,9 +846,6 @@ class TuningControls:
                 if spec is not None and spec.apply_action is not None:
                     return True
             if apply_field_action(self, self.focus_descriptor):
-                return True
-            if self.focus_descriptor.kind == RowKind.SETTINGS_EDITOR_MODE:
-                self.editor_mode.prompt_change_editor_mode()
                 return True
             if self._dismiss_timed_notification_if_present():
                 return True

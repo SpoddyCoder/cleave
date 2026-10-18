@@ -117,7 +117,8 @@ def test_draw_effects_expanded_panel_rect_within_surface() -> None:
 
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
     overlay.notify_input()
-    overlay.draw(surface, state)
+    top_inset = _menu_bar_inset()
+    overlay.draw(surface, state, top_inset=top_inset)
 
     panel = overlay.panel_rect
     assert panel is not None
@@ -126,8 +127,15 @@ def test_draw_effects_expanded_panel_rect_within_surface() -> None:
     assert px >= 0 and py >= 0
     assert px + pw <= sw and py + ph <= sh
     _, margin_y = overlay._margin
-    assert ph <= sh - margin_y * 2
+    assert py == margin_y + top_inset
+    assert ph <= sh - margin_y * 2 - top_inset
     surface.subsurface(panel)
+
+
+def _menu_bar_inset() -> int:
+    from cleave.viz.shell_host import menu_bar_height_px
+
+    return menu_bar_height_px()
 
 
 def _panel_scroll_metrics(
@@ -136,6 +144,7 @@ def _panel_scroll_metrics(
     *,
     surface_height: int = 720,
     timeline_panel_open: bool = False,
+    top_inset: int = 0,
 ) -> PanelScrollMetrics:
     font = overlay._font_get()
     line_h = font.get_linesize()
@@ -150,7 +159,7 @@ def _panel_scroll_metrics(
     )
     header_gap = line_h + overlay._line_gap
     _, margin_y = overlay._margin
-    max_panel_h = surface_height - margin_y * 2
+    max_panel_h = surface_height - margin_y * 2 - top_inset
     if timeline_panel_open:
         max_panel_h -= timeline_viewport_reserve_px(len(state.layer_z_order))
 
@@ -1269,29 +1278,14 @@ def test_action_row_value_color() -> None:
         },
         layer_z_order=["layer_1", "layer_2"],
     )
-    config_row = state.layout.find_by_kind( RowKind.CONFIG_HEADER)
     add_row = state.layout.find_by_kind( RowKind.LAYER_MANAGEMENT_ADD)
     delete_row = state.layout.find( "layer_1", RowKind.LAYER_MANAGEMENT_DELETE)
-    assert _row_value_color(state, config_row) == ACTION
     assert _row_value_color(state, add_row) == ACTION
     assert _row_value_color(state, delete_row) == ACTION
 
     state.focus_descriptor = state.layout.descriptor(add_row)
     assert _row_value_color(state, add_row) == HIGHLIGHT
     assert _row_value_color(state, delete_row) == ACTION
-
-
-def test_measure_latency_row_uses_action_color() -> None:
-    from cleave.viz.tuning_view_state import SettingsBlock
-
-    state = _minimal_view_state(
-        settings=SettingsBlock(expanded=True, latency_compensation_expanded=True),
-    )
-    sync_row = state.layout.find_by_kind(RowKind.SETTINGS_MEASURE_LATENCY)
-    assert sync_row is not None
-    assert _row_value_color(state, sync_row) == ACTION
-    state.focus_descriptor = state.layout.descriptor(sync_row)
-    assert _row_value_color(state, sync_row) == HIGHLIGHT
 
 
 def test_snap_to_song_markers_row_uses_action_color() -> None:
@@ -1353,26 +1347,6 @@ def test_display_size_row_uses_label_color() -> None:
     assert _row_text(state, display_row) == "  └─ display size: 1920 x 1080"
     assert _row_value_color(state, display_row) == LABEL
     assert display_row not in state.layout.navigable_indices(state)
-
-
-def test_change_editor_mode_row_uses_action_color() -> None:
-    from cleave.viz.tuning_view_state import SettingsBlock
-
-    state = _minimal_view_state(settings=SettingsBlock(expanded=True))
-    mode_row = state.layout.find_by_kind(RowKind.SETTINGS_EDITOR_MODE)
-    assert mode_row is not None
-    assert _row_text(state, mode_row) == "└─ Switch to Preset Curation"
-    curation = _minimal_view_state(
-        settings=SettingsBlock(expanded=True, editor_mode="preset_curation")
-    )
-    curation_row = curation.layout.find_by_kind(RowKind.SETTINGS_EDITOR_MODE)
-    assert curation_row is not None
-    assert _row_text(curation, curation_row) == "└─ Switch to Visual Editor"
-    assert _row_value_color(state, mode_row) == ACTION
-    assert _row_shows_action_enter_hint(state, mode_row) is False
-    state.focus_descriptor = state.layout.descriptor(mode_row)
-    assert _row_value_color(state, mode_row) == HIGHLIGHT
-    assert _row_shows_action_enter_hint(state, mode_row) is True
 
 
 def test_preset_list_populate_uses_full_line_action_colors() -> None:
@@ -1815,11 +1789,16 @@ def test_max_panel_h_unchanged_when_timeline_closed() -> None:
     overlay = TuningOverlay()
     state = _effects_expanded_view_state()
     surface_height = 720
+    top_inset = _menu_bar_inset()
     closed = _panel_scroll_metrics(
-        overlay, state, surface_height=surface_height, timeline_panel_open=False
+        overlay,
+        state,
+        surface_height=surface_height,
+        timeline_panel_open=False,
+        top_inset=top_inset,
     )
     _, margin_y = overlay._margin
-    assert closed.max_panel_h == surface_height - margin_y * 2
+    assert closed.max_panel_h == surface_height - margin_y * 2 - top_inset
 
 
 def test_panel_reserves_timeline_viewport_when_open() -> None:
@@ -1829,20 +1808,30 @@ def test_panel_reserves_timeline_viewport_when_open() -> None:
     surface_height = 720
     surface = pygame.Surface((1280, surface_height), pygame.SRCALPHA)
     overlay.notify_input()
-    overlay.draw(surface, state, timeline_panel_open=True)
+    top_inset = _menu_bar_inset()
+    overlay.draw(surface, state, timeline_panel_open=True, top_inset=top_inset)
 
     panel = overlay.panel_rect
     assert panel is not None
     _, py, _, ph = panel
     _, margin_y = overlay._margin
     reserve = timeline_viewport_reserve_px(len(state.layer_z_order))
+    assert py == margin_y + top_inset
     assert py + ph + reserve <= surface_height - margin_y
 
     open_metrics = _panel_scroll_metrics(
-        overlay, state, surface_height=surface_height, timeline_panel_open=True
+        overlay,
+        state,
+        surface_height=surface_height,
+        timeline_panel_open=True,
+        top_inset=top_inset,
     )
     closed_metrics = _panel_scroll_metrics(
-        overlay, state, surface_height=surface_height, timeline_panel_open=False
+        overlay,
+        state,
+        surface_height=surface_height,
+        timeline_panel_open=False,
+        top_inset=top_inset,
     )
     assert open_metrics.max_panel_h < closed_metrics.max_panel_h
     assert open_metrics.max_panel_h == closed_metrics.max_panel_h - reserve
@@ -1856,20 +1845,26 @@ def test_long_panel_clears_cue_readout() -> None:
     _, margin_y = TuningOverlay()._margin
     clearance = cue_readout_panel_clearance_px(margin_y)
     assert clearance > 0
+    top_inset = _menu_bar_inset()
 
     with_cue = TuningOverlay()
     with_cue.notify_input()
     with_cue.draw(
-        surface, state, timeline_panel_open=True, cue_readout_open=True
+        surface,
+        state,
+        timeline_panel_open=True,
+        cue_readout_open=True,
+        top_inset=top_inset,
     )
     without_cue = TuningOverlay()
     without_cue.notify_input()
-    without_cue.draw(surface, state, timeline_panel_open=True)
+    without_cue.draw(surface, state, timeline_panel_open=True, top_inset=top_inset)
 
     cue_panel = with_cue.panel_rect
     plain_panel = without_cue.panel_rect
     assert cue_panel is not None and plain_panel is not None
     _, py, _, ph = cue_panel
+    assert py == margin_y + top_inset
     assert ph == plain_panel[3] - clearance
 
     metrics = timeline_ui_metrics()

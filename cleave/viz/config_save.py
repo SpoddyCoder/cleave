@@ -154,6 +154,10 @@ class ConfigSaveController:
             return True
         return False
 
+    def mark_pending_exit(self) -> None:
+        """Ask the app loop to leave via ``consume_pending_exit``."""
+        self._pending_exit = True
+
     def try_quit(self) -> bool:
         """Handle a quit request. Return True when the app should exit now."""
         if self._pending_exit:

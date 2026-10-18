@@ -20,21 +20,12 @@ if TYPE_CHECKING:
 _ENTER_CURATION_DIRTY_MESSAGE = (
     "Save changes before entering preset curation mode?"
 )
-_SWITCH_TO_CURATION_LABEL = "Switch to Preset Curation"
-_SWITCH_TO_VISUAL_LABEL = "Switch to Visual Editor"
 _SWITCH_TO_CURATION_PROMPT = "Switch the editor to Preset Curation mode?"
 _SWITCH_TO_VISUAL_PROMPT = "Switch the editor to Visual Editor mode?"
 
 
 def is_preset_curation_mode(editor_mode: str) -> bool:
     return editor_mode == "preset_curation"
-
-
-def editor_mode_switch_label(editor_mode: str) -> str:
-    """Button label for leaving the current editor mode."""
-    if is_preset_curation_mode(editor_mode):
-        return _SWITCH_TO_VISUAL_LABEL
-    return _SWITCH_TO_CURATION_LABEL
 
 
 def editor_mode_switch_prompt(editor_mode: str) -> str:

@@ -12,7 +12,6 @@ from cleave.viz.row_spec import row_is_pinned
 from cleave.viz.theme import (
     BORDER_COLOR,
     BORDER_WIDTH,
-    CONFIG_DIRTY,
     LOCK_ICON,
     SCROLLBAR_CONTENT_GAP,
     SCROLLBAR_WIDTH,
@@ -30,7 +29,7 @@ from cleave.viz.tuning_panel_cache import (
     tuning_upload_signature,
 )
 from cleave.viz.tuning_panel_draw import TuningOverlay, tuning_panel_max_dimensions
-from cleave.viz.tuning_view_state import ProjectBlock, TuningViewState
+from cleave.viz.tuning_view_state import TuningViewState
 from tests.cleave.viz.test_overlay import (
     _effects_expanded_view_state,
     _minimal_view_state,
@@ -346,79 +345,6 @@ def _surface_has_color(surf: pygame.Surface, color: tuple[int, int, int]) -> boo
             if surf.get_at((x, y))[:3] == color:
                 return True
     return False
-
-
-def test_config_dirty_change_invalidates_config_header_row_key() -> None:
-    pygame.init()
-    overlay = TuningOverlay()
-    font = overlay._font_get()
-    cache = TuningPanelCache()
-    state = _minimal_view_state(
-        config_dirty=False, project=ProjectBlock(expanded=True)
-    )
-    index = state.layout.find_by_kind(RowKind.CONFIG_HEADER)
-    line_h = font.get_linesize()
-    max_w = 400
-
-    key_before = row_render_key(
-        state,
-        index,
-        font,
-        cache=cache,
-        max_content_width=max_w,
-        line_h=line_h,
-    )
-    state_dirty = replace(state, config_dirty=True)
-    key_after = row_render_key(
-        state_dirty,
-        index,
-        font,
-        cache=cache,
-        max_content_width=max_w,
-        line_h=line_h,
-    )
-    assert key_before != key_after
-    assert not key_before.config_dirty_suffix
-    assert key_after.config_dirty_suffix
-
-
-def test_config_dirty_change_misses_warm_row_cache_for_config_header() -> None:
-    pygame.init()
-    overlay = TuningOverlay()
-    font = overlay._font_get()
-    cache = TuningPanelCache()
-    state = _minimal_view_state(
-        config_dirty=False, project=ProjectBlock(expanded=True)
-    )
-    index = state.layout.find_by_kind(RowKind.CONFIG_HEADER)
-    line_h = font.get_linesize()
-    max_w = 400
-
-    ensure_row_surface(
-        cache,
-        state,
-        index,
-        font,
-        overlay._build_row_at_index,
-        max_content_width=max_w,
-        line_h=line_h,
-    )
-    state_dirty = replace(state, config_dirty=True)
-    counters = OverlayDrawCounters()
-    entry = ensure_row_surface(
-        cache,
-        state_dirty,
-        index,
-        font,
-        overlay._build_row_at_index,
-        max_content_width=max_w,
-        line_h=line_h,
-        counters=counters,
-    )
-    assert counters.row_cache_misses == 1
-    assert counters.row_cache_hits == 0
-    assert entry.secondary is not None
-    assert _surface_has_color(entry.secondary, CONFIG_DIRTY)
 
 
 def test_lock_change_invalidates_track_header_row_key() -> None:
@@ -987,8 +913,11 @@ def test_incremental_compose_skip_plan_when_live_unchanged() -> None:
 
 def test_tuning_panel_max_dimensions_reserves_timeline_strip() -> None:
     pygame.init()
+    from cleave.viz.shell_host import menu_bar_height_px
+
     overlay = TuningOverlay()
     _, margin_y = overlay._margin
+    top_inset = menu_bar_height_px()
     open_h = tuning_panel_max_dimensions(
         1280,
         720,
@@ -997,6 +926,7 @@ def test_tuning_panel_max_dimensions_reserves_timeline_strip() -> None:
         margin_y=margin_y,
         padding=overlay._padding,
         timeline_row_count=4,
+        top_inset=top_inset,
     )[1]
     closed_h = tuning_panel_max_dimensions(
         1280,
@@ -1005,7 +935,9 @@ def test_tuning_panel_max_dimensions_reserves_timeline_strip() -> None:
         timeline_panel_open=False,
         margin_y=margin_y,
         padding=overlay._padding,
+        top_inset=top_inset,
     )[1]
+    assert closed_h == 720 - margin_y * 2 - top_inset
     assert open_h < closed_h
 
 

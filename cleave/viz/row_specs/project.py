@@ -1,4 +1,4 @@
-"""Project header, Save, Compositor, and Render Project row specs."""
+"""Project header, ProjectM, compositor, and render row specs."""
 
 from __future__ import annotations
 
@@ -21,12 +21,6 @@ from cleave.viz.tuning_view_state import TuningViewState
 
 if TYPE_CHECKING:
     from cleave.viz.controls import TuningControls
-
-
-def _format_config_header(
-    _state: TuningViewState, _desc: RowDescriptor
-) -> str:
-    return "Save"
 
 
 def _format_project_render_output(
@@ -69,12 +63,6 @@ def _format_project_render_end(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
     return f"{state.project.end_sec}s"
-
-
-def _format_project_render_action(
-    _state: TuningViewState, _desc: RowDescriptor
-) -> str:
-    return "Render the Project"
 
 
 def _format_project_milkdrop_beat(
@@ -187,22 +175,6 @@ SPECS: dict[RowKind, RowSpec] = {
         quick_nav_target=True,
         quick_nav_always=True,
         is_header=True,
-    ),
-    RowKind.CONFIG_HEADER: RowSpec(
-        affordance=RowAffordance.ACTION,
-        panel_label="",
-        present_style=RowPresentStyle.PATH_ICON,
-        format_value=_format_config_header,
-        fit_strategy=FitStrategy.PATH,
-        shows_enter_icon=True,
-        shows_dirty_suffix=True,
-        help_title="Save",
-        help_description=(
-            "Save this project.",
-            "Enter or Ctrl+S writes immediately.",
-        ),
-        is_pinned=True,
-        parent_group="project",
     ),
     RowKind.PROJECT_MILKDROP_HEADER: RowSpec(
         affordance=RowAffordance.EXPAND,
@@ -393,18 +365,6 @@ SPECS: dict[RowKind, RowSpec] = {
         help_description=("Segment end in whole seconds.",),
         is_pinned=True,
         repeatable=True,
-        parent_group="project_render",
-    ),
-    RowKind.PROJECT_RENDER_ACTION: RowSpec(
-        affordance=RowAffordance.ACTION,
-        panel_label="Render the Project",
-        present_style=RowPresentStyle.FULL_LINE,
-        format_value=_format_project_render_action,
-        shows_enter_icon=True,
-        help_title="Render the Project",
-        help_entries=(("Enter", "confirm render"),),
-        help_description=("Write an MP4 using the path, size, fps, quality, and range above.",),
-        is_pinned=True,
         parent_group="project_render",
     ),
 }

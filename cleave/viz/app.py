@@ -27,6 +27,7 @@ from cleave.pcm_io import load_mix_pcm
 from cleave.stem_pcm import StemPcmBank, load_stem_pcm, LIVE_PROJECTM_FPS, samples_for_dt, samples_per_frame
 from cleave.project import load_manifest
 from cleave.viz.bootstrap import load_stem_signals
+from cleave.viz.commands import command_context
 from cleave.viz.controls import TuningControls
 from cleave.viz.session import TimelineRuntime, TuningSession, session_from_cfg
 from cleave.viz.mix_player import MixPlayer
@@ -51,7 +52,9 @@ from cleave.viz.input_dispatch import (
     dispatch_keydown,
     dispatch_keyup,
     dispatch_should_notify_overlay,
+    dispatch_window_event,
 )
+from cleave.viz.menu_bar import MenuBarState
 from cleave.milk_textures import project_texture_search_paths
 from cleave.viz.user_presets import cleanup_unreferenced_user_presets
 from cleave.viz.visual_limiter import VisualLimiterState, apply_visual_limiter_gains
@@ -112,6 +115,7 @@ class LiveVisualizerRuntime(VisualizerCore):
         default_factory=RenderOverlaysPanelCache
     )
     overlay_profiler: OverlayProfiler = field(default_factory=OverlayProfiler.from_env)
+    menu_bar: MenuBarState = field(default_factory=MenuBarState)
 
 
 @dataclass
@@ -492,6 +496,7 @@ def _tick_frame_live_overlay(
     paused: bool,
     overlay_dt: float,
     display_fps: float | None = None,
+    top_inset: int = 0,
 ) -> None:
     profiler = runtime.overlay_profiler
 
@@ -589,6 +594,7 @@ def _tick_frame_live_overlay(
                 help_overlay=runtime.help_overlay,
                 modal_host=runtime.modal_host,
                 profiler=profiler,
+                top_inset=top_inset,
             )
 
     if timeline_state is not None:
@@ -613,6 +619,13 @@ class VisualizerApp:
         self._overlay_dt = 0.0
         self._was_paused: bool | None = None
         self._pm_clock = ProjectMFrameClock()
+        self._shell = None
+
+    def _panel_top_inset(self) -> int:
+        shell = self._shell
+        if shell is None:
+            return 0
+        return int(shell.menu_bar_height_px)
 
     def tick_frame(
         self,
@@ -649,6 +662,7 @@ class VisualizerApp:
                 paused=paused,
                 overlay_dt=self._overlay_dt,
                 display_fps=display_fps,
+                top_inset=self._panel_top_inset(),
             )
 
     def run(self, window: LoadingWindow | None = None) -> None:
@@ -669,6 +683,7 @@ class VisualizerApp:
         clock = pygame.time.Clock()
 
         rt: LiveVisualizerRuntime | None = None
+        shell = None
         try:
             compositor, post_process, masked_compositor, overlay_surface = (
                 init_gl_resources_cheap(seed, compositor=window.compositor)
@@ -694,12 +709,27 @@ class VisualizerApp:
             if window.quit_requested:
                 return
 
+            from cleave.viz.shell_host import ShellHost
+
+            shell = ShellHost.create(rt.overlay, rt.menu_bar, rt.controls)
+            self._shell = shell
+
+            def draw_menu_bar() -> None:
+                assert shell is not None
+                shell.draw(
+                    rt.menu_bar,
+                    command_context(rt.controls),
+                    rt.overlay.visibility,
+                    self._overlay_dt,
+                )
+
             self.tick_frame(
                 0.0,
                 paused=False,
                 n_pcm=samples_per_frame(LIVE_PROJECTM_FPS),
                 dt_sec=0.0,
             )
+            draw_menu_bar()
             pygame.display.flip()
             rt.mix_player.start()
 
@@ -710,6 +740,8 @@ class VisualizerApp:
             while running:
                 frame_rate.begin_frame()
                 for event in pygame.event.get():
+                    dispatch_window_event(event, rt)
+                    shell.process_event(event)
                     if event.type == pygame.QUIT:
                         if rt.controls.try_quit():
                             running = False
@@ -753,6 +785,7 @@ class VisualizerApp:
                         paused=True,
                         overlay_dt=self._overlay_dt,
                         display_fps=frame_rate.display_fps,
+                        top_inset=self._panel_top_inset(),
                     )
                 else:
                     pm_fps_governor.observe(measured_fps)
@@ -766,10 +799,14 @@ class VisualizerApp:
                         dt_sec=self._overlay_dt,
                     )
 
+                draw_menu_bar()
                 pygame.display.flip()
                 measured_fps = frame_rate.end_frame()
 
         finally:
+            self._shell = None
+            if shell is not None:
+                shell.destroy()
             if rt is not None:
                 persist_editor_settings(rt.seed.cfg)
                 LayerFramePipeline.destroy(rt.layers)
@@ -778,4 +815,5 @@ class VisualizerApp:
                 rt.masked_compositor.release()
                 rt.mix_player.stop()
                 cleanup_unreferenced_user_presets(rt.seed.project_dir)
+            window.video_quit = True
             pygame.quit()

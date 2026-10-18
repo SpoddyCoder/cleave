@@ -11,7 +11,12 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- The editor has a menu bar (File, Project, Layers, Render, Timeline, Settings, Help). Save, Render, Measure latency, and Preset curation moved from the panel to the menus. Ctrl+R starts a render.
+
 ### Fixed
+
+- The live menu bar no longer crashes at startup when Wayland is set and the window is using an X11 OpenGL context.
+- A launch failure after the editor has quit pygame is no longer replaced by a video-system error in the file picker.
 
 ## [0.3.0] - 2026-10-12
 

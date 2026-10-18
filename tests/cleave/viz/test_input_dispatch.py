@@ -20,6 +20,7 @@ from cleave.viz.input_dispatch import (
     dispatch_keydown,
     dispatch_keyup,
     dispatch_should_notify_overlay,
+    dispatch_window_event,
     key_handler_for_runtime,
 )
 from cleave.viz.modal import ModalHost, ModalKind
@@ -462,6 +463,107 @@ def test_h_does_not_toggle_help_while_text_editing() -> None:
     assert view is not None
     assert view.draft == "abh"
     assert runtime.seed.session.help_visible is False
+
+
+def test_f10_toggles_bar_focus_and_wakes_overlay() -> None:
+    runtime = _make_runtime()
+    assert runtime.overlay.visibility == 0.0
+    assert dispatch_keydown(keydown(pygame.K_F10), runtime) is True
+    assert runtime.menu_bar.focused is True
+    assert runtime.overlay.visibility == 1.0
+    assert dispatch_keydown(keydown(pygame.K_F10), runtime) is True
+    assert runtime.menu_bar.focused is False
+
+
+def test_alt_tap_focuses_bar_and_wakes_overlay() -> None:
+    runtime = _make_runtime()
+    dispatch_keydown(
+        pygame.event.Event(pygame.KEYDOWN, key=pygame.K_LALT),
+        runtime,
+    )
+    assert runtime.menu_bar.focused is False
+    dispatch_keyup(
+        pygame.event.Event(pygame.KEYUP, key=pygame.K_LALT),
+        runtime,
+    )
+    assert runtime.menu_bar.focused is True
+    assert runtime.overlay.visibility == 1.0
+
+
+def test_alt_then_another_key_does_not_focus_bar() -> None:
+    runtime = _make_runtime()
+    dispatch_keydown(
+        pygame.event.Event(pygame.KEYDOWN, key=pygame.K_LALT),
+        runtime,
+    )
+    assert dispatch_keydown(keydown(pygame.K_TAB), runtime) is True
+    dispatch_keyup(
+        pygame.event.Event(pygame.KEYUP, key=pygame.K_LALT),
+        runtime,
+    )
+    assert runtime.menu_bar.focused is False
+
+
+def test_focus_loss_cancels_alt_tap() -> None:
+    runtime = _make_runtime()
+    dispatch_keydown(
+        pygame.event.Event(pygame.KEYDOWN, key=pygame.K_LALT),
+        runtime,
+    )
+    dispatch_window_event(
+        pygame.event.Event(pygame.WINDOWFOCUSLOST),
+        runtime,
+    )
+    dispatch_keyup(
+        pygame.event.Event(pygame.KEYUP, key=pygame.K_LALT),
+        runtime,
+    )
+    assert runtime.menu_bar.focused is False
+
+
+def test_ctrl_r_runs_render_bare_r_stays_on_timeline() -> None:
+    runtime = _make_runtime()
+    runtime.seed.session.timeline.armed_slots = {"layer_1"}
+    assert dispatch_keydown(
+        keydown(pygame.K_r, mod=pygame.KMOD_CTRL),
+        runtime,
+    ) is True
+    modal_view = runtime.modal_host.view_state()
+    assert modal_view is not None
+    assert modal_view.kind == ModalKind.YES_NO
+    assert runtime.seed.session.timeline.recording is False
+
+    runtime = _make_runtime()
+    runtime.seed.session.timeline.armed_slots = {"layer_1"}
+    assert dispatch_keydown(keydown(pygame.K_r), runtime) is True
+    assert runtime.seed.session.timeline.recording is True
+    assert runtime.modal_host.view_state() is None
+
+
+def test_other_key_while_bar_focused_passes_through() -> None:
+    runtime = _make_runtime()
+    runtime.seed.session.timeline.armed_slots = {"layer_1"}
+    assert dispatch_keydown(keydown(pygame.K_F10), runtime) is True
+    assert runtime.menu_bar.focused is True
+    assert dispatch_keydown(keydown(pygame.K_r), runtime) is True
+    assert runtime.menu_bar.focused is False
+    assert runtime.seed.session.timeline.recording is True
+
+
+def test_menu_opens_in_curation_mode() -> None:
+    runtime = _make_runtime(submenu_focused=False, panel_open=False)
+    runtime.seed.session.settings.editor_mode = "preset_curation"
+    runtime.controls.clear_config_dirty()
+    before = runtime.controls.focus_cursor
+    assert dispatch_keydown(keydown(pygame.K_F10), runtime) is True
+    assert dispatch_keydown(keydown(pygame.K_DOWN), runtime) is True
+    assert runtime.menu_bar.focused is True
+    assert runtime.menu_bar.dropdown_open is True
+    assert runtime.controls.focus_cursor == before
+    assert (
+        dispatch_keydown(keydown(pygame.K_q, mod=pygame.KMOD_CTRL), runtime)
+        is False
+    )
 
 
 def test_keyup_while_text_editing_disarms_modal_repeat() -> None:

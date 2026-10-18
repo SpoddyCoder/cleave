@@ -305,6 +305,8 @@ def _play_from_picker(args: argparse.Namespace, window: LoadingWindow) -> None:
                 return
             continue_launch(window, project_dir, config=args.config)
         except (FileNotFoundError, ValueError, RuntimeError) as e:
+            if getattr(window, "video_quit", False) is True:
+                raise
             if not show_picker_error(window, str(e)):
                 window.close()
                 return

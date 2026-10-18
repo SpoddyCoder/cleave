@@ -7,7 +7,7 @@ alwaysApply: true
 
 Windows users run the frozen editor (Start Menu, desktop, drop on `cleave.exe`) with no terminal. CLI remains for checkout, scripts, and CI.
 
-- Design the in-window path first (overlay, centered modal, or loading screen). No native menu bar.
+- Design the in-window path first (overlay, centered modal, or loading screen). No native menu bar means no Win32 menu. An ImGui menu bar in the OpenGL window is the intended chrome.
 - Share logic outside viz; the editor presents. CLI may print to stderr when a console exists.
 - Do not ship a feature whose only progress or error channel is stdout/stderr.
 - Long jobs (stem split, weight download, offline render, backup) show named status in the window, plus a progress bar when the work reports fraction. Failures use a modal or panel notification.

@@ -209,6 +209,7 @@ class HelpOverlay:
         preset_switching: str | None = None,
         preset_curation: bool = False,
         layer_count: int = 4,
+        top_inset: int = 0,
     ) -> ComposedPanel | None:
         self._panel_rect = None
         font = self._font_get()
@@ -262,7 +263,7 @@ class HelpOverlay:
             cache.panel_size = panel_size
 
         mx, my = self._margin
-        pos = (viewport_width - panel_w - mx, my)
+        pos = (viewport_width - panel_w - mx, my + top_inset)
         bounds = clip_rect_to_bounds(
             (pos[0], pos[1], panel_w, panel_h),
             viewport_width,
@@ -325,6 +326,7 @@ class HelpOverlay:
         preset_switching: str | None = None,
         preset_curation: bool = False,
         layer_count: int = 4,
+        top_inset: int = 0,
     ) -> None:
         composed = self.compose_panel(
             focus,
@@ -338,6 +340,7 @@ class HelpOverlay:
             preset_switching=preset_switching,
             preset_curation=preset_curation,
             layer_count=layer_count,
+            top_inset=top_inset,
         )
         if composed is None:
             self._panel_rect = None
@@ -345,5 +348,5 @@ class HelpOverlay:
         panel = self._cache.panel
         assert panel is not None
         mx, my = self._margin
-        pos = (surface.get_width() - panel.get_width() - mx, my)
+        pos = (surface.get_width() - panel.get_width() - mx, my + top_inset)
         surface.blit(panel, pos)

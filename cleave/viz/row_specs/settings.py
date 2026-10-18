@@ -10,7 +10,6 @@ from cleave.config_schema.editor import (
     notification_display_label,
     ui_fade_display,
 )
-from cleave.viz.editor_mode_controls import editor_mode_switch_label
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
 from cleave.viz.row_sections import apply_expand_toggle
 from cleave.viz.row_spec import FitStrategy, RowPresentStyle, RowSpec
@@ -50,11 +49,6 @@ def _format_settings_editor_window_display_size(
     )
     return f"{width} x {height}"
 
-def _format_settings_editor_mode(
-    state: TuningViewState, _desc: RowDescriptor
-) -> str:
-    return editor_mode_switch_label(state.settings.editor_mode)
-
 def _format_settings_ui_width_mode(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
@@ -84,11 +78,6 @@ def _format_settings_residual_latency_ms(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
     return f"{state.settings.residual_latency_ms} ms"
-
-def _format_settings_measure_latency(
-    _state: TuningViewState, _desc: RowDescriptor
-) -> str:
-    return "Measure Latency"
 
 def _apply_settings_preview_quality(
     controls: TuningControls,
@@ -179,22 +168,6 @@ SPECS: dict[RowKind, RowSpec] = {
         quick_nav_target=True,
         quick_nav_always=True,
         is_header=True,
-    ),
-    RowKind.SETTINGS_EDITOR_MODE: RowSpec(
-        affordance=RowAffordance.ACTION,
-        panel_label="Switch to Preset Curation",
-        present_style=RowPresentStyle.FULL_LINE,
-        format_value=_format_settings_editor_mode,
-        fit_strategy=FitStrategy.NONE,
-        shows_enter_icon=True,
-        help_title="Switch editor mode",
-        help_entries=(("Enter", "confirm the switch"),),
-        help_description=(
-            "Visual Editor exposes the full tuning panel.",
-            "Preset Curation limits the panel to preset favourites and blacklist.",
-        ),
-        is_pinned=True,
-        parent_group="settings",
     ),
     RowKind.SETTINGS_PREVIEW_QUALITY: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
@@ -434,25 +407,6 @@ SPECS: dict[RowKind, RowSpec] = {
         ),
         is_pinned=True,
         repeatable=True,
-        parent_group="settings_latency_compensation",
-    ),
-    RowKind.SETTINGS_MEASURE_LATENCY: RowSpec(
-        affordance=RowAffordance.ACTION,
-        panel_label="Measure Latency",
-        present_style=RowPresentStyle.FULL_LINE,
-        format_value=_format_settings_measure_latency,
-        fit_strategy=FitStrategy.NONE,
-        shows_enter_icon=True,
-        help_title="Measure Latency",
-        help_entries=(
-            ("Enter", "start calibration / tap the long low tone"),
-            ("Esc", "cancel"),
-        ),
-        help_description=(
-            "Plays a 140 BPM click track: one long low tone, then three short clicks.",
-            "Tap Enter on the long low tone. Four consistent taps confirm the measurement.",
-        ),
-        is_pinned=True,
         parent_group="settings_latency_compensation",
     ),
 }

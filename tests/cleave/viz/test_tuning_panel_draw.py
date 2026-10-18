@@ -17,7 +17,7 @@ from tests.support.viz import make_track_block, overlay_font
 def _present_style_view_state() -> TuningViewState:
     return _minimal_view_state(
         settings=SettingsBlock(expanded=True),
-        project=ProjectBlock(expanded=True),
+        project=ProjectBlock(expanded=True, render_expanded=True),
         tracks={
             "layer_1": make_track_block(
                 stem="drums",
@@ -50,8 +50,8 @@ def _row_for_style(
         index = layout.find_by_kind(RowKind.SETTINGS_HEADER)
         return index, "Cleave Settings ▼"
     if style == RowPresentStyle.PATH_ICON:
-        index = layout.find_by_kind(RowKind.CONFIG_HEADER)
-        return index, "Save"
+        index = layout.find_by_kind(RowKind.PROJECT_RENDER_OUTPUT)
+        return index, "renders/render.mp4"
     if style == RowPresentStyle.FULL_LINE:
         index = layout.find_by_kind(RowKind.LAYER_MANAGEMENT_ADD)
         return index, "Add Layer"

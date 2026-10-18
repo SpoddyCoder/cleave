@@ -215,6 +215,8 @@ def _heavy_init_side_effect(
     playback.paused = False
     mix_player = MagicMock()
     modal_host = ModalHost()
+    overlay = MagicMock()
+    overlay.visibility = 0.0  # TuningOverlay starts hidden; menu draw compares this
     return LiveVisualizerRuntime(
         seed=seed,
         layers=[],
@@ -227,7 +229,7 @@ def _heavy_init_side_effect(
         modal_host=modal_host,
         mix_player=mix_player,
         playback=playback,
-        overlay=MagicMock(),
+        overlay=overlay,
         help_overlay=MagicMock(),
         timeline_overlay=MagicMock(),
         overlay_surface=overlay_surface,
@@ -386,12 +388,17 @@ def test_run_ctrl_q_clean_exits(
         pygame.Surface((seed.display_width, seed.display_height), pygame.SRCALPHA),
     )
     controls = MagicMock()
-    controls.try_quit.return_value = True
+    controls.pending_exit = False
     controls.consume_pending_exit.return_value = False
     controls.tick = MagicMock()
     controls.key_repeat_armed = False
     controls.consume_hide_overlay.return_value = False
     controls.project_render.busy = False
+
+    def request_quit() -> None:
+        controls.pending_exit = True
+
+    controls.request_quit.side_effect = request_quit
 
     def heavy_with_controls(
         rt: VisualizerSeed,
@@ -420,7 +427,7 @@ def test_run_ctrl_q_clean_exits(
 
     VisualizerApp(seed).run(window)
 
-    assert controls.try_quit.call_count == 1
+    assert controls.request_quit.call_count == 1
 
 
 @patch("cleave.viz.app.current_sec", return_value=0.0)
@@ -979,6 +986,37 @@ def test_tick_frame_draws_tuning_when_modal_active_and_panel_hidden(
 
     runtime.controls.build_view_state.assert_called_once()
     mock_draw_tuning.assert_called_once()
+    assert mock_draw_tuning.call_args.kwargs["top_inset"] == 0
+
+
+@patch("cleave.viz.app.OverlayDrawer.draw_tuning")
+@patch("cleave.viz.frame_finish._composite_render_overlay")
+@patch("cleave.viz.frame_finish.live_frame_fade_alpha", return_value=1.0)
+@patch("cleave.viz.app.LayerFramePipeline.composite")
+@patch("cleave.viz.app.LayerFramePipeline.render_frame")
+@patch("cleave.viz.app.apply_layer_visibility")
+def test_tick_frame_insets_panels_by_full_menu_bar_height_when_faded(
+    _mock_visibility: MagicMock,
+    _mock_effects: MagicMock,
+    _mock_composite: MagicMock,
+    _mock_fade_alpha: MagicMock,
+    _mock_live_overlay: MagicMock,
+    mock_draw_tuning: MagicMock,
+) -> None:
+    pygame.init()
+    from types import SimpleNamespace
+
+    compositor = recording_compositor()
+    runtime = _minimal_runtime(compositor)
+    overlay = runtime.overlay
+    overlay.notify_input()
+    overlay._idle_sec = overlay._hold_idle_sec + overlay._fade_duration_sec * 0.6
+    app = VisualizerApp(runtime)
+    app._shell = SimpleNamespace(menu_bar_height_px=23)
+    app.tick_frame(1.0, paused=True, draw_overlay=True, n_pcm=735)
+
+    mock_draw_tuning.assert_called_once()
+    assert mock_draw_tuning.call_args.kwargs["top_inset"] == 23
 
 
 def test_live_overlay_ui_active_gating() -> None:
