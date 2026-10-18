@@ -1016,9 +1016,10 @@ class ShellHost:
         imgui.set_next_window_pos(
             imgui.ImVec2(origin_x, origin_y), imgui.Cond_.always
         )
-        # Shell panels are begun earlier and must not cover this window.
-        # Focusing it moves it to the front of the display stack.
-        imgui.set_next_window_focus()
+        # Begun after the shell panels, and those panels do not raise themselves,
+        # so this window stays at the front of the display stack. Do not focus
+        # it: FocusWindow clears the menu-bar button's ActiveId, and a later
+        # click on another top label never completes.
         visible, _open = imgui.begin("##cleave-menu", None, _POPUP_FLAGS)
         try:
             if not visible:

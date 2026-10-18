@@ -145,6 +145,65 @@ def test_click_uses_the_same_close_then_run_path() -> None:
     assert not state.focused
 
 
+def _at(pos: tuple[int, int], kind: int) -> pygame.event.Event:
+    if kind == pygame.MOUSEMOTION:
+        return pygame.event.Event(
+            pygame.MOUSEMOTION, pos=pos, rel=(0, 0), buttons=(0, 0, 0)
+        )
+    return pygame.event.Event(kind, pos=pos, button=1)
+
+
+def test_mouse_switches_and_closes_an_open_top_menu() -> None:
+    """A click on another label must complete while the dropdown is open."""
+    from unittest.mock import patch
+
+    from cleave.viz import shell_host
+
+    overlay = _Overlay()
+    overlay.visibility = 1.0
+    menu = MenuBarState()
+    with patch.object(shell_host, "_gl_context_current", return_value=False):
+        host = shell_host.ShellHost.create(overlay, menu, _shell_controls())
+    anchors: dict[int, tuple[float, float]] = {}
+    draw_bar = host._draw_bar
+
+    def remember(state: MenuBarState):
+        rule_y, found, menus = draw_bar(state)
+        anchors.clear()
+        anchors.update(found)
+        return rule_y, found, menus
+
+    host._draw_bar = remember
+    host._display_size = (1280, 720)
+
+    def draw() -> None:
+        host.draw(menu, CommandContext(), overlay.visibility, 1.0 / 60.0)
+
+    def click(index: int) -> None:
+        x, y = anchors[index]
+        pos = (int(x) + 8, int(y) - 8)
+        host.process_event(_at(pos, pygame.MOUSEMOTION))
+        draw()
+        host.process_event(_at(pos, pygame.MOUSEBUTTONDOWN))
+        draw()
+        host.process_event(_at(pos, pygame.MOUSEBUTTONUP))
+        draw()
+
+    try:
+        host.process_event(_at((20, 10), pygame.MOUSEMOTION))
+        draw()
+        click(0)
+        assert menu.dropdown_open
+        assert menu.menu_index == 0
+        click(1)
+        assert menu.dropdown_open
+        assert menu.menu_index == 1
+        click(1)
+        assert not menu.dropdown_open
+    finally:
+        host.destroy()
+
+
 def test_shell_host_imports_without_a_context() -> None:
     from imgui_bundle import imgui
 
