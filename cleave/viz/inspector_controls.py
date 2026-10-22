@@ -8,6 +8,7 @@ import pygame
 
 from cleave.viz.commands import command_by_id, command_context
 from cleave.viz.inspector import InspectorRow, build_inspector_rows
+from cleave.viz.row_hotkeys import handle_row_hotkey, layer_header_for_node
 from cleave.viz.row_spec import (
     REPEAT_ROW_KINDS,
     apply_field_action,
@@ -61,6 +62,18 @@ class InspectorControls:
             self._controls.shell_focus.region = ShellRegion.NAVIGATOR
             return True
         return False
+
+    def handle_hotkey(self, event: pygame.event.Event) -> bool:
+        """Letter, Delete, and Backspace for the focused inspector row."""
+        page_desc = layer_header_for_node(self._controls.shell_focus.selected_id)
+        row = self._current_row()
+        if row is None or row.descriptor is None:
+            if page_desc is None:
+                return False
+            return handle_row_hotkey(self._controls, page_desc, event)
+        return handle_row_hotkey(
+            self._controls, row.descriptor, event, page_desc=page_desc
+        )
 
     def move(self, delta: int) -> None:
         rows = self._navigable_rows()

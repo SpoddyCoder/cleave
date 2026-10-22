@@ -293,6 +293,77 @@ def _visibility_track(
     block = state.tracks[desc.slot]
     return (block.visible, state.solo_slot == desc.slot)
 
+
+def _section_lock_blocks(controls: TuningControls, desc: RowDescriptor) -> bool:
+    from cleave.viz.row_spec import section_lock_blocks_mutation
+
+    return section_lock_blocks_mutation(controls.session, desc)
+
+
+def _apply_preset_dir_action(controls: TuningControls, desc: RowDescriptor) -> None:
+    slot = desc.slot
+    if slot is None:
+        return
+    if _section_lock_blocks(controls, desc):
+        return
+    controls.layer_mutations.enter_directory(slot)
+
+
+def _apply_preset_list_add_action(
+    controls: TuningControls, desc: RowDescriptor
+) -> None:
+    slot = desc.slot
+    if slot is None:
+        return
+    if _section_lock_blocks(controls, desc):
+        return
+    controls.preset_list.add_current(slot)
+
+
+def _apply_preset_list_item_action(
+    controls: TuningControls, desc: RowDescriptor
+) -> None:
+    slot = desc.slot
+    index = desc.preset_index
+    if slot is None or index is None:
+        return
+    if _section_lock_blocks(controls, desc):
+        return
+    controls.preset_list.audition(slot, index)
+
+
+def _apply_preset_switching_resume_action(
+    controls: TuningControls, desc: RowDescriptor
+) -> None:
+    slot = desc.slot
+    if slot is None:
+        return
+    if _section_lock_blocks(controls, desc):
+        return
+    controls.preset_list.resume(slot)
+
+
+def _apply_preset_list_populate_action(
+    controls: TuningControls, desc: RowDescriptor
+) -> None:
+    slot = desc.slot
+    if slot is None:
+        return
+    if _section_lock_blocks(controls, desc):
+        return
+    controls.preset_list.prompt_populate(slot)
+
+
+def _apply_layer_add_action(controls: TuningControls, _desc: RowDescriptor) -> None:
+    controls.layer_lifecycle.prompt_add()
+
+
+def _apply_layer_delete_action(controls: TuningControls, desc: RowDescriptor) -> None:
+    slot = desc.slot
+    if slot is None:
+        return
+    controls.layer_lifecycle.prompt_delete(slot)
+
 SPECS: dict[RowKind, RowSpec] = {
     RowKind.TRACK_HEADER: RowSpec(
         affordance=RowAffordance.EXPAND,
@@ -315,6 +386,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.PATH_ICON,
         format_value=_format_track_preset_dir,
         apply_horizontal=_apply_track_preset_dir,
+        apply_action=_apply_preset_dir_action,
         fit_strategy=FitStrategy.COUNTER_LABEL,
         help_title="Preset Directory",
         help_description=(
@@ -360,6 +432,7 @@ SPECS: dict[RowKind, RowSpec] = {
         panel_label="Switching Paused - Enter To Resume",
         present_style=RowPresentStyle.FULL_LINE,
         apply_horizontal=noop_horizontal,
+        apply_action=_apply_preset_switching_resume_action,
         fit_strategy=FitStrategy.NONE,
         shows_enter_icon=True,
         help_title="Switching Paused - Enter To Resume",
@@ -407,6 +480,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.PATH_ICON,
         format_value=_format_track_preset_list_item,
         apply_horizontal=noop_horizontal,
+        apply_action=_apply_preset_list_item_action,
         fit_strategy=FitStrategy.COUNTER_LABEL,
         help_title="preset list entry",
         help_description=(
@@ -424,6 +498,7 @@ SPECS: dict[RowKind, RowSpec] = {
         panel_label="Add Current Preset",
         present_style=RowPresentStyle.FULL_LINE,
         apply_horizontal=noop_horizontal,
+        apply_action=_apply_preset_list_add_action,
         fit_strategy=FitStrategy.NONE,
         shows_enter_icon=True,
         help_title="Add Current Preset",
@@ -441,6 +516,7 @@ SPECS: dict[RowKind, RowSpec] = {
         panel_label="Populate Presets",
         present_style=RowPresentStyle.FULL_LINE,
         apply_horizontal=noop_horizontal,
+        apply_action=_apply_preset_list_populate_action,
         fit_strategy=FitStrategy.NONE,
         shows_enter_icon=True,
         help_title="Populate Presets",
@@ -666,6 +742,7 @@ SPECS: dict[RowKind, RowSpec] = {
         affordance=RowAffordance.ACTION,
         panel_label="Add Layer",
         present_style=RowPresentStyle.FULL_LINE,
+        apply_action=_apply_layer_add_action,
         fit_strategy=FitStrategy.NONE,
         shows_enter_icon=True,
         help_title="Add Layer",
@@ -678,6 +755,7 @@ SPECS: dict[RowKind, RowSpec] = {
         affordance=RowAffordance.ACTION,
         panel_label="Delete Layer",
         present_style=RowPresentStyle.FULL_LINE,
+        apply_action=_apply_layer_delete_action,
         fit_strategy=FitStrategy.NONE,
         shows_enter_icon=True,
         help_title="Delete layer",

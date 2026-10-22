@@ -294,6 +294,23 @@ def _region_keydown(event: pygame.event.Event, runtime: LiveVisualizerRuntime) -
     return None
 
 
+def _handle_shell_hotkey(
+    event: pygame.event.Event, runtime: LiveVisualizerRuntime
+) -> bool:
+    """Letter, Delete, and Backspace for the navigator or inspector."""
+    if runtime.menu_bar.focused:
+        return False
+    controls = runtime.controls
+    if isinstance(controls.focus_cursor, TimelineFocus):
+        return False
+    region = controls.shell_focus.region
+    if region is ShellRegion.INSPECTOR:
+        return controls.inspector.handle_hotkey(event)
+    if region is ShellRegion.NAVIGATOR:
+        return controls.navigator.handle_hotkey(event)
+    return False
+
+
 def dispatch_keydown(event: pygame.event.Event, runtime: LiveVisualizerRuntime) -> bool:
     """Handle a key-down event. Return False when the app should quit."""
     if event.type != pygame.KEYDOWN:
@@ -302,6 +319,9 @@ def dispatch_keydown(event: pygame.event.Event, runtime: LiveVisualizerRuntime) 
     if runtime.modal_host.active:
         runtime.menu_bar.cancel_alt_tap()
         return runtime.controls.handle_modal_keydown(event)
+
+    if runtime.controls.handle_move_mode_keydown(event):
+        return True
 
     if _handle_region_cycle(event, runtime):
         return True
@@ -324,6 +344,9 @@ def dispatch_keydown(event: pygame.event.Event, runtime: LiveVisualizerRuntime) 
     region_result = _region_keydown(event, runtime)
     if region_result is not None:
         return region_result
+
+    if _handle_shell_hotkey(event, runtime):
+        return True
 
     key_handler = key_handler_for_runtime(runtime, event.key)
     return key_handler.handle_keydown(event)

@@ -18,7 +18,7 @@ from cleave.viz.editor_mode_controls import EditorModeController, is_preset_cura
 from cleave.viz.post_fx import sync_live_compositor_format
 from cleave.viz.preset_curation_controls import PresetCurationController
 from cleave.viz.preset_list_controls import PresetListController
-from cleave.viz.key_repeat import KeyRepeatController, add_current_preset_key_pressed, delete_key_pressed, mod_ctrl, mod_shift
+from cleave.viz.key_repeat import KeyRepeatController, mod_ctrl, mod_shift
 from cleave.viz.modal import ModalHost
 from cleave.viz.panel_notification import PanelNotificationHost
 from cleave.viz.playback import PlaybackState, current_sec, seek, seek_to, toggle_pause
@@ -49,17 +49,13 @@ from cleave.viz.navigator_controls import NavigatorControls
 from cleave.viz.row_layout import first_leftover_descriptor
 from cleave.viz.shell_focus import ShellFocusState, ShellRegion
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
+from cleave.viz.row_hotkeys import handle_row_hotkey
 from cleave.viz.row_spec import (
-    PRESET_FILE_ROW_KINDS,
     REPEAT_ROW_KINDS,
     ROW_SPECS,
     RowPresentStyle,
     apply_field_action,
     apply_field_horizontal,
-    apply_field_toggle_enabled,
-    apply_field_toggle_solo,
-    row_spec,
-    row_triggers_layer_delete,
     section_lock_blocks_mutation,
 )
 from cleave.viz.session import TuningSession
@@ -295,6 +291,10 @@ class TuningControls:
     def tap_sync(self) -> TapSyncControls:
         return self._tap_sync
 
+    @property
+    def preset_curation(self) -> PresetCurationController:
+        return self._preset_curation
+
     def bind_tap_sync_overlay(
         self,
         *,
@@ -438,22 +438,6 @@ class TuningControls:
                 self.open_timeline_panel(enter_submenu=True)
             return True
 
-        if self._in_move_mode:
-            if event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
-                self._cancel_move_mode()
-                return True
-            if event.key == pygame.K_UP:
-                self._nudge_move_mode(-1)
-                return True
-            if event.key == pygame.K_DOWN:
-                self._nudge_move_mode(1)
-                return True
-            if event.key == pygame.K_m:
-                self._confirm_move_mode()
-                return True
-            if event.key in (pygame.K_RETURN, pygame.K_l):
-                return True
-
         if event.key == pygame.K_ESCAPE:
             self._hide_overlay_requested = True
             return True
@@ -507,138 +491,8 @@ class TuningControls:
                 )
             return True
 
-        if event.key == pygame.K_BACKSPACE:
-            kind = self.focus_descriptor.kind
-            if kind == RowKind.TRACK_PRESET_DIR:
-                slot = self.focus_descriptor.slot
-                if slot is not None:
-                    if section_lock_blocks_mutation(
-                        self.session, self.focus_descriptor
-                    ):
-                        return True
-                    self.layer_mutations.parent_directory(slot)
-                return True
-
-        if delete_key_pressed(event):
-            kind = self.focus_descriptor.kind
-            if kind == RowKind.SONG_MARKER_ITEM:
-                desc = self.focus_descriptor
-                if desc.marker_index is not None:
-                    if section_lock_blocks_mutation(
-                        self.session, self.focus_descriptor
-                    ):
-                        return True
-                    self.song_markers.prompt_delete(desc.marker_index)
-                return True
-            if kind == RowKind.TRACK_PRESET_LIST_ITEM:
-                slot = self.focus_descriptor.slot
-                desc = self.focus_descriptor
-                if slot is not None and desc.preset_index is not None:
-                    if section_lock_blocks_mutation(
-                        self.session, self.focus_descriptor
-                    ):
-                        return True
-                    self.preset_list.prompt_delete(slot, desc.preset_index)
-                return True
-            if row_triggers_layer_delete(kind):
-                slot = self.focus_descriptor.slot
-                if slot is not None:
-                    self.layer_lifecycle.prompt_delete(slot)
-                return True
-
-        if event.key == pygame.K_m:
-            kind = self.focus_descriptor.kind
-            if kind == RowKind.TRACK_HEADER:
-                slot = self.focus_descriptor.slot
-                if slot is not None:
-                    if (
-                        self.session.layers[slot].locked
-                        and row_spec(kind).can_enter_move_mode
-                    ):
-                        return True
-                    self.layer_lifecycle.enter_move_mode(slot)
-                return True
-            if kind == RowKind.TRACK_PRESET_LIST_ITEM:
-                slot = self.focus_descriptor.slot
-                index = self.focus_descriptor.preset_index
-                if slot is not None and index is not None:
-                    if section_lock_blocks_mutation(
-                        self.session, self.focus_descriptor
-                    ):
-                        return True
-                    self.preset_list.enter_move_mode(slot, index)
-                return True
-
-        if event.key == pygame.K_l:
-            kind = self.focus_descriptor.kind
-            if kind == RowKind.TRACK_HEADER:
-                slot = self.focus_descriptor.slot
-                if slot is not None:
-                    self._toggle_locked(slot)
-                return True
-            if kind == RowKind.RENDER_OVERLAYS_HEADER:
-                self._toggle_render_overlay_locked()
-                return True
-            if kind == RowKind.RENDER_POST_FX_HEADER:
-                self._toggle_render_post_fx_locked()
-                return True
-            if kind == RowKind.RENDER_PATTERN_MASK_HEADER:
-                self._toggle_render_pattern_mask_locked()
-                return True
-            if kind == RowKind.RENDER_TIMELINE_HEADER:
-                self._toggle_render_timeline_locked()
-                return True
-
-        if event.key == pygame.K_e:
-            if apply_field_toggle_enabled(self, self.focus_descriptor):
-                return True
-
-        if event.key == pygame.K_s and not mod_ctrl(event.mod):
-            if apply_field_toggle_solo(self, self.focus_descriptor):
-                return True
-
-        if add_current_preset_key_pressed(event.key, event.mod):
-            kind = self.focus_descriptor.kind
-            slot = self.focus_descriptor.slot
-            if (
-                slot is not None
-                and self.session.layers[slot].preset_switching == "on"
-                and row_spec(kind).parent_group == "track"
-            ):
-                if section_lock_blocks_mutation(
-                    self.session, self.focus_descriptor
-                ):
-                    return True
-                self.preset_list.add_current(slot)
-                return True
-
-        if event.key in (pygame.K_f, pygame.K_b, pygame.K_r, pygame.K_c):
-            kind = self.focus_descriptor.kind
-            slot = self.focus_descriptor.slot
-            if slot is not None and kind in PRESET_FILE_ROW_KINDS:
-                if section_lock_blocks_mutation(
-                    self.session, self.focus_descriptor
-                ):
-                    return True
-                src = self.preset_list.resolve_file_path(
-                    slot, kind, self.focus_descriptor
-                )
-                if src is None or not src.is_file():
-                    return True
-                if event.key == pygame.K_f:
-                    self._preset_curation.prompt_favourite(slot, src)
-                elif event.key == pygame.K_b:
-                    self._preset_curation.prompt_blacklist(
-                        slot,
-                        src,
-                        from_user_preset=(kind == RowKind.TRACK_PRESET_LIST_ITEM),
-                        user_preset_index=self.focus_descriptor.preset_index,
-                    )
-                elif event.key == pygame.K_c:
-                    self._preset_curation.prompt_cast(slot, src)
-                else:
-                    self._preset_curation.prompt_restore(slot, src)
-                return True
+        if handle_row_hotkey(self, self.focus_descriptor, event):
+            return True
 
         if event.key == pygame.K_RETURN:
             kind = self.focus_descriptor.kind
@@ -658,51 +512,6 @@ class TuningControls:
                     times = self.session.song_markers.times
                     if 0 <= desc.marker_index < len(times):
                         self.seek_to(times[desc.marker_index])
-                return True
-            if kind == RowKind.TRACK_PRESET_LIST_ADD:
-                slot = self.focus_descriptor.slot
-                if slot is not None:
-                    if section_lock_blocks_mutation(
-                        self.session, self.focus_descriptor
-                    ):
-                        return True
-                    self.preset_list.add_current(slot)
-                return True
-            if kind == RowKind.TRACK_PRESET_LIST_ITEM:
-                slot = self.focus_descriptor.slot
-                index = self.focus_descriptor.preset_index
-                if slot is not None and index is not None:
-                    if section_lock_blocks_mutation(
-                        self.session, self.focus_descriptor
-                    ):
-                        return True
-                    self.preset_list.audition(slot, index)
-                return True
-            if kind == RowKind.TRACK_PRESET_SWITCHING_RESUME:
-                slot = self.focus_descriptor.slot
-                if slot is not None:
-                    if section_lock_blocks_mutation(
-                        self.session, self.focus_descriptor
-                    ):
-                        return True
-                    self.preset_list.resume(slot)
-                return True
-            if kind == RowKind.TRACK_PRESET_LIST_POPULATE:
-                slot = self.focus_descriptor.slot
-                if slot is not None:
-                    if section_lock_blocks_mutation(
-                        self.session, self.focus_descriptor
-                    ):
-                        return True
-                    self.preset_list.prompt_populate(slot)
-                return True
-            if kind == RowKind.LAYER_MANAGEMENT_ADD:
-                self.layer_lifecycle.prompt_add()
-                return True
-            if kind == RowKind.LAYER_MANAGEMENT_DELETE:
-                slot = self.focus_descriptor.slot
-                if slot is not None:
-                    self.layer_lifecycle.prompt_delete(slot)
                 return True
             if kind == RowKind.TIMELINE_PRESETS:
                 self._timeline_presets.prompt(self.duration_sec)
@@ -727,15 +536,6 @@ class TuningControls:
                 RowKind.TIMELINE_REMOVE_HARD_CUTS,
             ):
                 self._timeline_cuts.prompt_remove()
-                return True
-            if kind == RowKind.TRACK_PRESET_DIR:
-                slot = self.focus_descriptor.slot
-                if slot is not None:
-                    if section_lock_blocks_mutation(
-                        self.session, self.focus_descriptor
-                    ):
-                        return True
-                    self.layer_mutations.enter_directory(slot)
                 return True
             if self._dismiss_timed_notification_if_present():
                 return True
@@ -804,36 +604,8 @@ class TuningControls:
                 )
             return True
 
-        if event.key in (pygame.K_f, pygame.K_b, pygame.K_r, pygame.K_c):
-            desc = self.focus_descriptor
-            kind = desc.kind
-            if kind not in _CURATION_ACTION_KINDS:
-                return True
-            slot = desc.slot
-            if slot is not None and kind in PRESET_FILE_ROW_KINDS:
-                if section_lock_blocks_mutation(
-                    self.session, self.focus_descriptor
-                ):
-                    return True
-                src = self.preset_list.resolve_file_path(
-                    slot, kind, self.focus_descriptor
-                )
-                if src is None or not src.is_file():
-                    return True
-                if event.key == pygame.K_f:
-                    self._preset_curation.prompt_favourite(slot, src)
-                elif event.key == pygame.K_b:
-                    self._preset_curation.prompt_blacklist(
-                        slot,
-                        src,
-                        from_user_preset=(kind == RowKind.TRACK_PRESET_LIST_ITEM),
-                        user_preset_index=self.focus_descriptor.preset_index,
-                    )
-                elif event.key == pygame.K_c:
-                    self._preset_curation.prompt_cast(slot, src)
-                else:
-                    self._preset_curation.prompt_restore(slot, src)
-                return True
+        if handle_row_hotkey(self, self.focus_descriptor, event):
+            return True
 
         if event.key == pygame.K_RETURN:
             if section_lock_blocks_mutation(self.session, self.focus_descriptor):
@@ -963,6 +735,26 @@ class TuningControls:
         view = self.build_view_state(paused=self.playback.paused)
         self._apply_focus_cursor(move_focus(self.focus_cursor, delta, view))
 
+    def handle_move_mode_keydown(self, event: pygame.event.Event) -> bool:
+        """Reorder keys while move mode is active. True when consumed."""
+        if not self._in_move_mode:
+            return False
+        if event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
+            self._cancel_move_mode()
+            return True
+        if event.key == pygame.K_UP:
+            self._nudge_move_mode(-1)
+            return True
+        if event.key == pygame.K_DOWN:
+            self._nudge_move_mode(1)
+            return True
+        if event.key == pygame.K_m:
+            self._confirm_move_mode()
+            return True
+        if event.key in (pygame.K_RETURN, pygame.K_l):
+            return True
+        return False
+
     def _nudge_move_mode(self, direction: int) -> None:
         if self.preset_list.move_mode_preset is not None:
             self.preset_list.swap_item(direction)
@@ -1048,21 +840,21 @@ class TuningControls:
             self, self.focus_descriptor, forward, large
         )
 
-    def _toggle_locked(self, slot: str) -> None:
+    def toggle_layer_locked(self, slot: str) -> None:
         layer = self.session.layers[slot]
         layer.locked = not layer.locked
 
-    def _toggle_render_overlay_locked(self) -> None:
+    def toggle_render_overlay_locked(self) -> None:
         self.render_overlays.toggle_locked()
 
-    def _toggle_render_post_fx_locked(self) -> None:
+    def toggle_render_post_fx_locked(self) -> None:
         post_fx = self.session.render_post_fx
         post_fx.locked = not post_fx.locked
 
-    def _toggle_render_pattern_mask_locked(self) -> None:
+    def toggle_render_pattern_mask_locked(self) -> None:
         self.render_pattern_mask.toggle_locked()
 
-    def _toggle_render_timeline_locked(self) -> None:
+    def toggle_render_timeline_locked(self) -> None:
         timeline = self.session.timeline
         if timeline.recording:
             return

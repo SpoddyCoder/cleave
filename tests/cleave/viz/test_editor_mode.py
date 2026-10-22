@@ -97,7 +97,7 @@ def test_curation_layout_allowlist() -> None:
     assert all(kind == RowKind.PANEL_NOTIFICATION for kind in kinds)
 
 
-def test_curation_ignores_non_allowlisted_keys() -> None:
+def test_curation_row_hotkeys_apply_and_other_keys_stay_ignored() -> None:
     controls = _make_controls(("layer_1", "layer_2"))
     controls.session.settings.editor_mode = "preset_curation"
     layer = controls.session.layers["layer_1"]
@@ -108,20 +108,22 @@ def test_curation_ignores_non_allowlisted_keys() -> None:
     before_opacity = layer.opacity_pct
     was_enabled = layer.enabled
 
-    controls.handle_keydown(keydown(pygame.K_l))
-    assert layer.locked is False
+    controls.handle_keydown(keydown(pygame.K_e))
+    assert layer.enabled is not was_enabled
+
+    controls.handle_keydown(keydown(pygame.K_s))
+    assert controls.session.solo_slot == "layer_1"
 
     controls.handle_keydown(keydown(pygame.K_m))
+    assert controls.layer_lifecycle.move_mode_slot == "layer_1"
+    controls.handle_move_mode_keydown(keydown(pygame.K_ESCAPE))
     assert controls.layer_lifecycle.move_mode_slot is None
+
+    controls.handle_keydown(keydown(pygame.K_l))
+    assert layer.locked is True
 
     controls.handle_keydown(keydown(pygame.K_DELETE))
     assert "layer_1" in controls.session.layers
-
-    controls.handle_keydown(keydown(pygame.K_s))
-    assert controls.session.solo_slot is None
-
-    controls.handle_keydown(keydown(pygame.K_e))
-    assert layer.enabled is was_enabled
 
     controls.handle_keydown(keydown(pygame.K_t))
     assert controls.session.timeline.panel_open is False

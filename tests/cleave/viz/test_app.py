@@ -404,6 +404,11 @@ def test_run_ctrl_q_clean_exits(
     controls.key_repeat_armed = False
     controls.consume_hide_overlay.return_value = False
     controls.project_render.busy = False
+    controls.handle_move_mode_keydown.return_value = False
+    controls.navigator.handle_keydown.return_value = False
+    controls.navigator.handle_hotkey.return_value = False
+    controls.inspector.handle_keydown.return_value = False
+    controls.inspector.handle_hotkey.return_value = False
 
     def request_quit() -> None:
         controls.pending_exit = True

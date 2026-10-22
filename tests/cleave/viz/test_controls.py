@@ -590,10 +590,10 @@ def test_move_mode_swaps_z_order() -> None:
     assert controls.handle_keydown(_keydown(_MOVE_MODE_KEY)) is True
     assert controls.layer_lifecycle.move_mode_slot == "layer_2"
 
-    assert controls.handle_keydown(_keydown(pygame.K_UP)) is True
+    assert controls.handle_move_mode_keydown(_keydown(pygame.K_UP)) is True
     assert controls.session.layer_z_order == ["layer_2", "layer_1", "layer_3"]
 
-    assert controls.handle_keydown(_keydown(_MOVE_MODE_KEY)) is True
+    assert controls.handle_move_mode_keydown(_keydown(_MOVE_MODE_KEY)) is True
     assert controls.layer_lifecycle.move_mode_slot is None
     assert controls.session.layer_z_order == ["layer_2", "layer_1", "layer_3"]
     assert controls.config_dirty
@@ -605,10 +605,10 @@ def test_move_mode_esc_cancels_without_applying() -> None:
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(RowKind.TRACK_HEADER, slot="layer_2")
     controls.handle_keydown(_keydown(_MOVE_MODE_KEY))
-    controls.handle_keydown(_keydown(pygame.K_UP))
+    controls.handle_move_mode_keydown(_keydown(pygame.K_UP))
     assert controls.session.layer_z_order == ["layer_2", "layer_1", "layer_3"]
 
-    assert controls.handle_keydown(_keydown(pygame.K_ESCAPE)) is True
+    assert controls.handle_move_mode_keydown(_keydown(pygame.K_ESCAPE)) is True
     assert controls.layer_lifecycle.move_mode_slot is None
     assert controls.session.layer_z_order == ["layer_1", "layer_2", "layer_3"]
     assert not controls.config_dirty
@@ -620,10 +620,10 @@ def test_move_mode_backspace_cancels_without_applying() -> None:
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(RowKind.TRACK_HEADER, slot="layer_2")
     controls.handle_keydown(_keydown(_MOVE_MODE_KEY))
-    controls.handle_keydown(_keydown(pygame.K_DOWN))
+    controls.handle_move_mode_keydown(_keydown(pygame.K_DOWN))
     assert controls.session.layer_z_order == ["layer_1", "layer_3", "layer_2"]
 
-    assert controls.handle_keydown(_keydown(pygame.K_BACKSPACE)) is True
+    assert controls.handle_move_mode_keydown(_keydown(pygame.K_BACKSPACE)) is True
     assert controls.layer_lifecycle.move_mode_slot is None
     assert controls.session.layer_z_order == ["layer_1", "layer_2", "layer_3"]
     assert not controls.config_dirty
@@ -812,7 +812,7 @@ def test_esc_in_move_mode_does_not_request_overlay_hide() -> None:
     controls.focus_descriptor = RowDescriptor(RowKind.TRACK_HEADER, slot="layer_1")
     controls.handle_keydown(_keydown(_MOVE_MODE_KEY))
     assert controls.layer_lifecycle.move_mode_slot == "layer_1"
-    assert controls.handle_keydown(_keydown(pygame.K_ESCAPE)) is True
+    assert controls.handle_move_mode_keydown(_keydown(pygame.K_ESCAPE)) is True
     assert controls.layer_lifecycle.move_mode_slot is None
     assert controls.consume_hide_overlay() is False
 
@@ -4693,7 +4693,7 @@ def test_locked_not_toggleable_during_move_mode() -> None:
     controls.handle_keydown(_keydown(_MOVE_MODE_KEY))
     assert controls.layer_lifecycle.move_mode_slot == "layer_2"
 
-    controls.handle_keydown(_keydown(pygame.K_l))
+    controls.handle_move_mode_keydown(_keydown(pygame.K_l))
     assert controls.session.layers["layer_2"].locked is False
 
 
@@ -4704,7 +4704,7 @@ def test_ctrl_quick_nav_blocked_during_move_mode() -> None:
     controls.handle_keydown(_keydown(_MOVE_MODE_KEY))
     assert controls.layer_lifecycle.move_mode_slot == "layer_2"
 
-    controls.handle_keydown(_keydown(pygame.K_UP, mod=pygame.KMOD_CTRL))
+    controls.handle_move_mode_keydown(_keydown(pygame.K_UP, mod=pygame.KMOD_CTRL))
     assert controls.session.layer_z_order == ["layer_2", "layer_1", "layer_3"]
     assert controls.focus_descriptor == RowDescriptor(
         RowKind.TRACK_HEADER, slot="layer_2"
@@ -5365,7 +5365,7 @@ def test_move_mode_swap_calls_apply_preview_resolutions() -> None:
     controls.handle_keydown(_keydown(_MOVE_MODE_KEY))
     layer_manager.apply_preview_resolutions.reset_mock()
 
-    controls.handle_keydown(_keydown(pygame.K_UP))
+    controls.handle_move_mode_keydown(_keydown(pygame.K_UP))
 
     layer_manager.apply_preview_resolutions.assert_called_once()
 
