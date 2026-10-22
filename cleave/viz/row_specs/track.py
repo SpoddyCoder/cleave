@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from cleave.blend_modes import BLEND_MODE_HELP_ENTRIES
 from cleave.config_schema.layers import (
+    MAX_LAYER_COUNT,
     PRESET_SWITCHING_TRIGGER_HELP_ENTRIES,
     hard_cut_enabled_display,
     preset_start_clean_display,
@@ -280,6 +281,10 @@ def _apply_track_effect(
         driver_slug, 0
     )
     controls.layer_mutations.set_effect(slot, effect_id, driver_slug, current + delta)
+
+def _format_layer_count(state: TuningViewState, _desc: RowDescriptor) -> str:
+    return f"{len(state.layer_z_order)} of {MAX_LAYER_COUNT} layers"
+
 
 def _visibility_track(
     state: TuningViewState, desc: RowDescriptor
@@ -649,6 +654,13 @@ SPECS: dict[RowKind, RowSpec] = {
         ),
         repeatable=True,
         parent_group="track",
+    ),
+    RowKind.LAYER_MANAGEMENT_COUNT: RowSpec(
+        affordance=RowAffordance.DISPLAY,
+        panel_label="",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_layer_count,
+        navigable=False,
     ),
     RowKind.LAYER_MANAGEMENT_ADD: RowSpec(
         affordance=RowAffordance.ACTION,

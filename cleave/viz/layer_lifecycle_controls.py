@@ -40,6 +40,7 @@ class LayerLifecycleController:
         self._on_restore_delete_focus = on_restore_delete_focus
         self.move_mode_slot: str | None = None
         self._move_mode_original_z_order: list[str] | None = None
+        self.removed_layer_index: int | None = None
 
     def apply_preview_resolutions(self) -> None:
         if self._layer_manager is not None:
@@ -119,6 +120,10 @@ class LayerLifecycleController:
             if self._on_capture_delete_nav is not None
             else 0
         )
+        try:
+            self.removed_layer_index = self.session.layer_z_order.index(slot)
+        except ValueError:
+            self.removed_layer_index = None
         self._layer_manager.remove_layer(slot)
         if self._on_rebuild_view is not None:
             self._on_rebuild_view()

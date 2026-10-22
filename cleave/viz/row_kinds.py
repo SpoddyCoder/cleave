@@ -35,6 +35,7 @@ class RowKind(Enum):
     TRACK_COMPOSITING_HEADER = auto()
     TRACK_EFFECTS_HEADER = auto()
     TRACK_EFFECT = auto()
+    LAYER_MANAGEMENT_COUNT = auto()
     LAYER_MANAGEMENT_ADD = auto()
     LAYER_MANAGEMENT_DELETE = auto()
     PANEL_NOTIFICATION = auto()

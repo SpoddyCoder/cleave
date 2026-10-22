@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal
 
 from cleave.effects.registry import effect_roster
+from cleave.viz.editor_mode_controls import is_preset_curation_mode
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 
 if TYPE_CHECKING:
@@ -534,6 +535,28 @@ PROJECT_SECTION = ExpandSectionDef(
         SectionNode(expand=PROJECT_MILKDROP_SECTION),
         SectionNode(expand=PROJECT_COMPOSITOR_SECTION),
         SectionNode(expand=PROJECT_RENDER_SECTION),
+    ),
+)
+
+
+def _layers_show_add(state: TuningViewState, _desc: RowDescriptor) -> bool:
+    return not is_preset_curation_mode(state.settings.editor_mode)
+
+
+LAYERS_SHOW_ADD = ConditionalRowsDef(
+    name="layers_show_add",
+    predicate=_layers_show_add,
+    children=(SectionNode(leaf_kind=RowKind.LAYER_MANAGEMENT_ADD),),
+)
+
+LAYERS_SECTION = ExpandSectionDef(
+    header_kind=None,
+    context="global",
+    read_expanded=_inspector_group_expanded,
+    toggle=_inspector_group_toggle,
+    children=(
+        SectionNode(leaf_kind=RowKind.LAYER_MANAGEMENT_COUNT),
+        SectionNode(conditional=LAYERS_SHOW_ADD),
     ),
 )
 

@@ -8,14 +8,18 @@ import pygame
 
 from cleave.viz.commands import command_by_id, command_context
 from cleave.viz.inspector import InspectorRow, build_inspector_rows
-from cleave.viz.row_kinds import RowKind
 from cleave.viz.row_spec import (
     REPEAT_ROW_KINDS,
     apply_field_action,
     apply_field_horizontal,
     section_lock_blocks_mutation,
 )
-from cleave.viz.shell_focus import ShellFocusState, ShellRegion
+from cleave.viz.shell_focus import (
+    InspectorGroupKey,
+    ShellFocusState,
+    ShellRegion,
+    toggle_inspector_group,
+)
 
 if TYPE_CHECKING:
     from cleave.viz.controls import TuningControls
@@ -79,19 +83,16 @@ class InspectorControls:
         focus.inspector_cursor = row.descriptor
         focus.inspector_command_id = None
 
-    def toggle_group(self, kind: RowKind) -> None:
-        collapsed = self._controls.shell_focus.collapsed
-        if kind in collapsed:
-            collapsed.discard(kind)
-        else:
-            collapsed.add(kind)
+    def toggle_group(self, key: InspectorGroupKey) -> None:
+        focus = self._controls.shell_focus
+        toggle_inspector_group(focus.collapsed, focus.opened, key)
 
     def activate(self, row: InspectorRow) -> None:
         if row.command_id is not None:
             run_inspector_command(self._controls, row.command_id)
             return
         if row.is_group and row.descriptor is not None:
-            self.toggle_group(row.descriptor.kind)
+            self.toggle_group(_group_key(row))
             return
         if row.descriptor is not None:
             apply_field_action(self._controls, row.descriptor)
@@ -108,7 +109,7 @@ class InspectorControls:
             return
         if row.is_group:
             if not large:
-                self.toggle_group(row.descriptor.kind)
+                self.toggle_group(_group_key(row))
             return
         desc = row.descriptor
         if section_lock_blocks_mutation(self._controls.session, desc):
@@ -136,13 +137,21 @@ class InspectorControls:
     def _navigable_rows(self) -> tuple[InspectorRow, ...]:
         view = self._view()
         focus = self._controls.shell_focus
-        rows = build_inspector_rows(view, focus.selected_id, focus.collapsed)
+        rows = build_inspector_rows(
+            view, focus.selected_id, focus.collapsed, focus.opened
+        )
         return tuple(row for row in rows if row.navigable)
 
     def _view(self) -> TuningViewState:
         return self._controls.build_view_state(
             paused=self._controls.playback.paused
         )
+
+
+def _group_key(row: InspectorRow) -> InspectorGroupKey:
+    desc = row.descriptor
+    assert desc is not None
+    return InspectorGroupKey(desc.kind, desc.slot, desc.card)
 
 
 def _cursor_index(rows: tuple[InspectorRow, ...], focus: ShellFocusState) -> int | None:

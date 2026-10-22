@@ -21,6 +21,7 @@ from cleave.viz.material_icons import FOLDER_GLYPH
 from cleave.viz.modal import ModalKind, ModalLabeledLine
 from cleave.viz.project_render_job import RenderJobStatus
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
+from cleave.viz.shell_focus import InspectorGroupKey
 from cleave.viz.row_spec import (
     RowPresentStyle,
     format_row_value,
@@ -74,7 +75,9 @@ def test_project_children_omitted_until_expanded() -> None:
     assert RowKind.PROJECT_COMPOSITOR_HEADER in kinds
     assert RowKind.PROJECT_RENDER_HEADER in kinds
     collapsed = build_inspector_rows(
-        view, "project", frozenset({RowKind.PROJECT_MILKDROP_HEADER})
+        view,
+        "project",
+        frozenset({InspectorGroupKey(RowKind.PROJECT_MILKDROP_HEADER)}),
     )
     collapsed_kinds = [
         row.descriptor.kind for row in collapsed if row.descriptor is not None
@@ -104,7 +107,9 @@ def test_project_milkdrop_children_omitted_until_expanded() -> None:
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
     hidden = build_inspector_rows(
-        view, "project", frozenset({RowKind.PROJECT_MILKDROP_HEADER})
+        view,
+        "project",
+        frozenset({InspectorGroupKey(RowKind.PROJECT_MILKDROP_HEADER)}),
     )
     hidden_kinds = [
         row.descriptor.kind for row in hidden if row.descriptor is not None
@@ -314,9 +319,10 @@ def test_enter_on_headers_toggles_expand() -> None:
         RowKind.PROJECT_MILKDROP_HEADER
     )
     controls.inspector.handle_keydown(_keydown(pygame.K_RETURN))
-    assert RowKind.PROJECT_MILKDROP_HEADER in controls.shell_focus.collapsed
+    milkdrop = InspectorGroupKey(RowKind.PROJECT_MILKDROP_HEADER)
+    assert milkdrop in controls.shell_focus.collapsed
     controls.inspector.handle_keydown(_keydown(pygame.K_RETURN))
-    assert RowKind.PROJECT_MILKDROP_HEADER not in controls.shell_focus.collapsed
+    assert milkdrop not in controls.shell_focus.collapsed
 
 
 def test_left_right_on_headers_toggles_expand() -> None:
@@ -329,9 +335,10 @@ def test_left_right_on_headers_toggles_expand() -> None:
         RowKind.PROJECT_MILKDROP_HEADER
     )
     controls.inspector.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert RowKind.PROJECT_MILKDROP_HEADER in controls.shell_focus.collapsed
+    milkdrop = InspectorGroupKey(RowKind.PROJECT_MILKDROP_HEADER)
+    assert milkdrop in controls.shell_focus.collapsed
     controls.inspector.handle_keydown(_keydown(pygame.K_LEFT))
-    assert RowKind.PROJECT_MILKDROP_HEADER not in controls.shell_focus.collapsed
+    assert milkdrop not in controls.shell_focus.collapsed
 
 
 def test_minimal_view_render_labels() -> None:

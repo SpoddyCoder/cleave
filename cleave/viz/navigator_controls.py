@@ -11,7 +11,13 @@ from cleave.viz.inspector import InspectorRow, build_inspector_rows
 from cleave.viz.navigator import NavNode, build_navigator, visible_top_level_ids
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.row_layout import first_leftover_descriptor, row_navigable
-from cleave.viz.shell_focus import ShellRegion, escape_region, quick_nav_id
+from cleave.viz.shell_focus import (
+    ShellRegion,
+    escape_region,
+    quick_nav_id,
+    reconcile_nav_id,
+    tree_nav_id,
+)
 
 if TYPE_CHECKING:
     from cleave.viz.controls import TuningControls
@@ -19,7 +25,7 @@ if TYPE_CHECKING:
 
 
 class NavigatorControls:
-    """Up/Down, Enter, and Esc while the navigator region is active."""
+    """Tree keys, Enter, and Esc while the navigator region is active."""
 
     def __init__(self, controls: TuningControls) -> None:
         self._controls = controls
@@ -28,29 +34,51 @@ class NavigatorControls:
         """Consume navigator keys. Unowned keys return False."""
         key = event.key
         if key in (pygame.K_UP, pygame.K_DOWN):
+            self.reconcile()
             delta = -1 if key == pygame.K_UP else 1
-            self.quick_step(delta)
+            self._tree_step(delta)
             self._controls.arm_key_repeat(
                 key,
                 event.mod,
                 accel=False,
-                on_repeat=lambda repeat_key, _mod: self.quick_step(
+                on_repeat=lambda repeat_key, _mod: self._tree_step(
                     -1 if repeat_key == pygame.K_UP else 1
                 ),
             )
             return True
-        if key in (pygame.K_LEFT, pygame.K_RIGHT, pygame.K_PAGEUP, pygame.K_PAGEDOWN):
+        if key in (pygame.K_LEFT, pygame.K_RIGHT):
+            self.reconcile()
+            self._horizontal(key)
+            return True
+        if key in (pygame.K_PAGEUP, pygame.K_PAGEDOWN):
+            self.reconcile()
             return True
         if key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+            self.reconcile()
             self.activate()
             return True
         if key == pygame.K_ESCAPE:
+            self.reconcile()
             self.escape()
             return True
         return False
 
+    def reconcile(self) -> None:
+        """Repair a selected id that is no longer a visible navigator row."""
+        focus = self._controls.shell_focus
+        lifecycle = self._controls.layer_lifecycle
+        prior = lifecycle.removed_layer_index
+        lifecycle.removed_layer_index = None
+        focus.selected_id = reconcile_nav_id(
+            self._visible_ids(),
+            focus.selected_id,
+            self._controls.session.layer_z_order,
+            prior_index=prior,
+        )
+
     def quick_step(self, delta: int) -> None:
         """Select the next visible top-level id and stay on the navigator."""
+        self.reconcile()
         focus = self._controls.shell_focus
         ids = visible_top_level_ids(self._controls.session)
         self.select(quick_nav_id(ids, focus.selected_id, delta))
@@ -58,6 +86,11 @@ class NavigatorControls:
     def select(self, node_id: str) -> None:
         """Select *node_id*, stay on the navigator, and scroll unmigrated sections."""
         focus = self._controls.shell_focus
+        node_id = reconcile_nav_id(
+            self._visible_ids(),
+            node_id,
+            self._controls.session.layer_z_order,
+        )
         focus.region = ShellRegion.NAVIGATOR
         focus.selected_id = node_id
         node = self._node(node_id)
@@ -95,7 +128,9 @@ class NavigatorControls:
     def _enter_inspector(self, node_id: str) -> None:
         focus = self._controls.shell_focus
         view = self._view()
-        rows = build_inspector_rows(view, node_id, focus.collapsed)
+        rows = build_inspector_rows(
+            view, node_id, focus.collapsed, focus.opened
+        )
         focus.region = ShellRegion.INSPECTOR
         first = next((row for row in rows if row.navigable), None)
         _set_inspector_cursor(focus, first)
@@ -113,10 +148,6 @@ class NavigatorControls:
         layout = view.layout
         if node_id == "render":
             desc = RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
-        elif node_id == "layers":
-            if not view.layer_z_order:
-                return None
-            desc = RowDescriptor(RowKind.TRACK_HEADER, slot=view.layer_z_order[0])
         elif node_id == "song_markers":
             desc = RowDescriptor(RowKind.SONG_MARKERS_HEADER)
             if not layout.contains_descriptor(desc):
@@ -127,8 +158,55 @@ class NavigatorControls:
             return desc
         return None
 
+    def _tree_step(self, delta: int) -> None:
+        focus = self._controls.shell_focus
+        self.select(tree_nav_id(self._visible_ids(), focus.selected_id, delta))
+
+    def _horizontal(self, key: int) -> None:
+        node = self._node(self._controls.shell_focus.selected_id)
+        if node is None:
+            return
+        if key == pygame.K_RIGHT:
+            self._expand_or_enter(node)
+            return
+        self._collapse_or_parent(node)
+
+    def _expand_or_enter(self, node: NavNode) -> None:
+        if not node.expandable:
+            return
+        focus = self._controls.shell_focus
+        if node.id not in focus.nav_expanded:
+            focus.nav_expanded.add(node.id)
+            return
+        child = self._first_child(node.id)
+        if child is not None:
+            self.select(child.id)
+
+    def _collapse_or_parent(self, node: NavNode) -> None:
+        focus = self._controls.shell_focus
+        if node.expandable and node.id in focus.nav_expanded:
+            focus.nav_expanded.discard(node.id)
+            return
+        if node.parent_id is not None:
+            self.select(node.parent_id)
+
+    def _first_child(self, parent_id: str) -> NavNode | None:
+        for node in self._nodes():
+            if node.parent_id == parent_id:
+                return node
+        return None
+
+    def _visible_ids(self) -> tuple[str, ...]:
+        return tuple(node.id for node in self._nodes())
+
+    def _nodes(self) -> tuple[NavNode, ...]:
+        return build_navigator(
+            self._controls.session,
+            self._controls.shell_focus.nav_expanded,
+        )
+
     def _node(self, node_id: str) -> NavNode | None:
-        for node in build_navigator(self._controls.session):
+        for node in self._nodes():
             if node.id == node_id:
                 return node
         return None

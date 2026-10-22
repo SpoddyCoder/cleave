@@ -49,7 +49,12 @@ from cleave.viz.row_sections import (
     inspector_group_glyph,
 )
 from cleave.viz.row_spec import format_row_value, row_panel_label, row_spec
-from cleave.viz.shell_focus import CycleStop, ShellRegion
+from cleave.viz.shell_focus import (
+    CycleStop,
+    InspectorGroupKey,
+    ShellRegion,
+    inspector_group_is_open,
+)
 from cleave.viz.shell_layout import ShellLayout
 from cleave.viz.theme import (
     ACTION,
@@ -340,6 +345,13 @@ def _draw_aligned_parts(parts: list[tuple[str, imgui.ImVec4]]) -> None:
     for (text, color), width in zip(parts, widths):
         draw.add_text(imgui.ImVec2(x, y), imgui.get_color_u32(color), text)
         x += width
+
+
+def _inspector_widget_id(desc: Any) -> str:
+    return (
+        f"{desc.slot}-{desc.card}-{desc.effect_id}-"
+        f"{desc.driver_slug}-{desc.preset_index}"
+    )
 
 
 def _inspector_row_selected(focus: Any, desc: Any) -> bool:
@@ -825,7 +837,10 @@ class ShellHost:
         focus = self._controls.shell_focus
         imgui.push_style_color(imgui.Col_.text, _rgba(LABEL))
         try:
-            for node in build_navigator(self._controls.session):
+            for node in build_navigator(
+                self._controls.session,
+                self._controls.shell_focus.nav_expanded,
+            ):
                 clicked, _selected = imgui.selectable(
                     f"{node.label}##nav-{node.id}",
                     node.id == focus.selected_id,
@@ -839,13 +854,18 @@ class ShellHost:
 
     def _draw_inspector(self, state: Any) -> None:
         focus = self._controls.shell_focus
-        nodes = build_navigator(self._controls.session)
+        nodes = build_navigator(
+            self._controls.session,
+            self._controls.shell_focus.nav_expanded,
+        )
         title = next(
             (node.label for node in nodes if node.id == focus.selected_id),
             focus.selected_id,
         )
         imgui.text(title)
-        rows = build_inspector_rows(state, focus.selected_id, focus.collapsed)
+        rows = build_inspector_rows(
+            state, focus.selected_id, focus.collapsed, focus.opened
+        )
         if not rows:
             imgui.text_colored(_rgba(DISABLED), "Edited on the panel")
             return
@@ -867,9 +887,12 @@ class ShellHost:
             label = row_panel_label(kind, desc)
             selected = _inspector_row_selected(focus, desc)
             if row.is_group:
-                glyph = inspector_group_glyph(kind not in focus.collapsed)
+                key = InspectorGroupKey(kind, desc.slot, desc.card)
+                glyph = inspector_group_glyph(
+                    inspector_group_is_open(key, focus.collapsed, focus.opened)
+                )
                 clicked, _selected = imgui.selectable(
-                    f"{glyph} {label}##grp-{kind.name}",
+                    f"{glyph} {label}##grp-{kind.name}-{_inspector_widget_id(desc)}",
                     selected,
                 )
                 if clicked:
@@ -882,7 +905,7 @@ class ShellHost:
             imgui.push_style_color(imgui.Col_.text, _rgba(label_color))
             try:
                 clicked, _selected = imgui.selectable(
-                    f"{label}##row-{kind.name}-{desc.slot}-{desc.preset_index}",
+                    f"{label}##row-{kind.name}-{_inspector_widget_id(desc)}",
                     selected,
                 )
             finally:

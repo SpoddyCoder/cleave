@@ -3,13 +3,17 @@
 from __future__ import annotations
 
 from cleave.viz.navigator import TOP_LEVEL_IDS
+from cleave.viz.row_kinds import RowKind
 from cleave.viz.shell_focus import (
     CycleStop,
+    InspectorGroupKey,
     ShellFocusState,
     ShellRegion,
     escape_region,
     next_region,
     quick_nav_id,
+    reconcile_nav_id,
+    tree_nav_id,
 )
 
 _OPEN = (
@@ -71,9 +75,49 @@ def test_escape_region() -> None:
     assert escape_region(ShellRegion.PANEL, leftover_rows=False) is ShellRegion.PANEL
 
 
+def test_tree_nav_stops_at_the_ends() -> None:
+    ids = ("a", "b", "c")
+    assert tree_nav_id(ids, "a", -1) == "a"
+    assert tree_nav_id(ids, "c", 1) == "c"
+    assert tree_nav_id(ids, "b", 1) == "c"
+    assert tree_nav_id(ids, "b", -1) == "a"
+    assert tree_nav_id(ids, "b", 0) == "b"
+    assert tree_nav_id(ids, "a", 5) == "c"
+    assert tree_nav_id(ids, "missing", 1) == "a"
+    assert tree_nav_id(ids, "missing", -1) == "c"
+    assert tree_nav_id(ids, "missing", 0) == "missing"
+    assert tree_nav_id((), "settings", -1) == "settings"
+
+
+def test_reconcile_nav_id_repairs_a_missing_layer() -> None:
+    visible = ("settings", "layers", "layer:a", "layer:c")
+    order = ("a", "b", "c")
+    assert reconcile_nav_id(visible, "settings", order) == "settings"
+    assert reconcile_nav_id(visible, "layer:b", order) == "layer:a"
+    assert (
+        reconcile_nav_id(visible, "layer:b", ("a", "c"), prior_index=1) == "layer:c"
+    )
+    assert (
+        reconcile_nav_id(("settings", "layers"), "layer:gone", (), prior_index=0)
+        == "layers"
+    )
+    assert reconcile_nav_id(("settings",), "project", ()) == "settings"
+    assert reconcile_nav_id(("settings", "layers"), "project", ()) == "layers"
+    assert reconcile_nav_id((), "layer:a", ("a",)) == "layer:a"
+
+
 def test_shell_focus_state_defaults() -> None:
     state = ShellFocusState()
     assert state.region is ShellRegion.NAVIGATOR
     assert state.selected_id == "settings"
     assert state.inspector_cursor is None
     assert state.collapsed == frozenset()
+    assert state.opened == frozenset()
+    assert state.nav_expanded == {"layers"}
+    other = ShellFocusState()
+    state.nav_expanded.add("render")
+    state.collapsed.add(InspectorGroupKey(RowKind.PROJECT_MILKDROP_HEADER))
+    state.opened.add(InspectorGroupKey(RowKind.TRACK_EFFECTS_HEADER, slot="layer_1"))
+    assert other.nav_expanded == {"layers"}
+    assert other.collapsed == frozenset()
+    assert other.opened == frozenset()

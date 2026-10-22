@@ -980,6 +980,7 @@ class TuningControls:
 
     def _rebuild_view(self) -> None:
         self._confirm_move_mode()
+        self.navigator.reconcile()
 
     def _focus_after_add_layer(self) -> None:
         view_after = self.build_view_state(paused=self.playback.paused)
