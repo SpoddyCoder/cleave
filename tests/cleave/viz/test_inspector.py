@@ -13,7 +13,9 @@ from cleave.viz.row_sections import (
     SETTINGS_SECTION,
     ExpandSectionDef,
 )
+from cleave.viz.row_present_renderers import inspector_field_colors
 from cleave.viz.row_spec import format_row_value, row_spec
+from cleave.viz.theme import ACTION, LOCKED
 from cleave.viz.shell_focus import InspectorGroupKey
 from cleave.viz.tuning_view_state import SettingsBlock, TuningViewState
 from tests.support.config import TEST_LAYER_STEMS
@@ -287,6 +289,26 @@ def test_cleave_effects_start_closed_and_toggle_sticks_per_slot() -> None:
     controls.inspector.toggle_group(key)
     assert effect_slots(layer_node_id("layer_1")) == []
     assert effect_slots(layer_node_id("layer_2")) == []
+
+
+def test_section_lock_inspector_field_colors() -> None:
+    state = _layer_view(("layer_1", "layer_2"))
+    state.tracks["layer_1"].runtime.locked = True
+    state.focus_cursor = MainFocus(
+        RowDescriptor(RowKind.TRACK_OPACITY, slot="layer_1")
+    )
+    opacity = RowDescriptor(RowKind.TRACK_OPACITY, slot="layer_1")
+    delete = RowDescriptor(RowKind.LAYER_MANAGEMENT_DELETE, slot="layer_1")
+    assert inspector_field_colors(state, opacity) == (LOCKED, LOCKED)
+    label, value = inspector_field_colors(state, delete)
+    assert label == ACTION
+    assert value != LOCKED
+    rows = build_inspector_rows(state, layer_node_id("layer_1"), frozenset())
+    assert any(
+        row.navigable
+        and row.descriptor == delete
+        for row in rows
+    )
 
 
 def test_layers_root_count_and_curation_omits_add() -> None:

@@ -10,7 +10,7 @@ from cleave.viz.commands import command_context, command_for_shortcut
 from cleave.viz.controls import SEEK_LONG, SEEK_TINY, TuningControls
 from cleave.viz.editor_mode_controls import is_preset_curation_mode
 from cleave.viz.focus_nav import FocusCursor, TimelineFocus
-from cleave.viz.key_repeat import mod_ctrl, mod_shift
+from cleave.viz.key_repeat import delete_key_pressed, mod_ctrl, mod_shift
 from cleave.viz.menu_bar import menus_for_session
 from cleave.viz.shell_focus import CycleStop, ShellRegion, next_region
 from cleave.viz.timeline_controls import TimelineControls
@@ -188,6 +188,18 @@ def _handle_global_keydown(
     return None
 
 
+_CURATION_SHELL_SUPPRESSED = frozenset(
+    {
+        pygame.K_l,
+        pygame.K_m,
+        pygame.K_s,
+        pygame.K_e,
+        pygame.K_p,
+        pygame.K_DELETE,
+    }
+)
+
+
 _REGION_KEYS = frozenset(
     {
         pygame.K_UP,
@@ -298,17 +310,37 @@ def _handle_shell_hotkey(
     event: pygame.event.Event, runtime: LiveVisualizerRuntime
 ) -> bool:
     """Letter, Delete, and Backspace for the navigator or inspector."""
-    if runtime.menu_bar.focused:
+    if not _shell_columns_focused(runtime):
         return False
+    if _curation_shell(runtime) and (
+        event.key in _CURATION_SHELL_SUPPRESSED or delete_key_pressed(event)
+    ):
+        return True
     controls = runtime.controls
-    if isinstance(controls.focus_cursor, TimelineFocus):
-        return False
     region = controls.shell_focus.region
     if region is ShellRegion.INSPECTOR:
         return controls.inspector.handle_hotkey(event)
     if region is ShellRegion.NAVIGATOR:
         return controls.navigator.handle_hotkey(event)
     return False
+
+
+def _shell_columns_focused(runtime: LiveVisualizerRuntime) -> bool:
+    """Navigator or inspector has the shell, not the menu, timeline, or panel."""
+    if runtime.menu_bar.focused:
+        return False
+    if isinstance(runtime.controls.focus_cursor, TimelineFocus):
+        return False
+    return runtime.controls.shell_focus.region in (
+        ShellRegion.NAVIGATOR,
+        ShellRegion.INSPECTOR,
+    )
+
+
+def _curation_shell(runtime: LiveVisualizerRuntime) -> bool:
+    return is_preset_curation_mode(
+        runtime.seed.session.settings.editor_mode
+    ) and _shell_columns_focused(runtime)
 
 
 def dispatch_keydown(event: pygame.event.Event, runtime: LiveVisualizerRuntime) -> bool:
@@ -320,7 +352,10 @@ def dispatch_keydown(event: pygame.event.Event, runtime: LiveVisualizerRuntime) 
         runtime.menu_bar.cancel_alt_tap()
         return runtime.controls.handle_modal_keydown(event)
 
-    if runtime.controls.handle_move_mode_keydown(event):
+    if (
+        not _curation_shell(runtime)
+        and runtime.controls.handle_move_mode_keydown(event)
+    ):
         return True
 
     if _handle_region_cycle(event, runtime):

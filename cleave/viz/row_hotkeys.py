@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 import pygame
 
+from cleave.viz.editor_mode_controls import is_preset_curation_mode
 from cleave.viz.key_repeat import (
     add_current_preset_key_pressed,
     delete_key_pressed,
@@ -81,6 +82,8 @@ def _hotkey_for_descriptor(
                 controls.preset_list.prompt_delete(slot, desc.preset_index)
             return True
         if row_triggers_layer_delete(kind):
+            if is_preset_curation_mode(controls.session.settings.editor_mode):
+                return True
             slot = desc.slot
             if slot is not None:
                 controls.layer_lifecycle.prompt_delete(slot)

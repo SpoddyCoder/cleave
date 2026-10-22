@@ -42,8 +42,7 @@ from cleave.viz.menu_bar import MenuBarState, menus_for_session
 from cleave.viz.navigator import build_navigator
 from cleave.viz.overlay_primitives import overlay_font_path
 from cleave.viz.playback import format_mmss
-from cleave.viz.row_kinds import RowAffordance
-from cleave.viz.row_present_renderers import row_value_color_for
+from cleave.viz.row_present_renderers import inspector_field_colors
 from cleave.viz.row_sections import (
     INSPECTOR_GROUP_EXPANDED,
     inspector_group_glyph,
@@ -899,9 +898,7 @@ class ShellHost:
                     self._controls.inspector.focus_row(row)
                     self._controls.inspector.activate(row)
                 return
-            label_color = (
-                ACTION if spec.affordance is RowAffordance.ACTION else LABEL
-            )
+            label_color, value_color = inspector_field_colors(state, desc)
             imgui.push_style_color(imgui.Col_.text, _rgba(label_color))
             try:
                 clicked, _selected = imgui.selectable(
@@ -918,7 +915,7 @@ class ShellHost:
                 _draw_aligned_parts(
                     _value_parts(
                         value,
-                        _rgba(row_value_color_for(state, desc)),
+                        _rgba(value_color),
                         stepped=stepped,
                     )
                 )

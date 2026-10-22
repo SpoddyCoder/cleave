@@ -214,9 +214,6 @@ def _apply_overlay_card_title_text_action(
     controls: TuningControls,
     desc: RowDescriptor,
 ) -> None:
-    from cleave.viz.row_spec import section_lock_blocks_mutation
-    if section_lock_blocks_mutation(controls.session, desc):
-        return
     card_controls = _overlay_card_controls(controls, desc)
     current_title = _overlay_card_block_session(controls, desc).title_content
     controls.modal_host.prompt_text(
@@ -236,9 +233,6 @@ def _apply_overlay_card_colour_action(
     field: str,
     optional: bool = False,
 ) -> None:
-    from cleave.viz.row_spec import section_lock_blocks_mutation
-    if section_lock_blocks_mutation(controls.session, desc):
-        return
     card_controls = _overlay_card_controls(controls, desc)
     current = getattr(_overlay_card_block_session(controls, desc), field)
     setter = getattr(card_controls, f"set_{field}")
@@ -302,9 +296,6 @@ def _apply_overlay_card_body_text_action(
     controls: TuningControls,
     desc: RowDescriptor,
 ) -> None:
-    from cleave.viz.row_spec import section_lock_blocks_mutation
-    if section_lock_blocks_mutation(controls.session, desc):
-        return
     card_controls = _overlay_card_controls(controls, desc)
     current_body = _overlay_card_block_session(controls, desc).body_content
     controls.modal_host.prompt_text(

@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 import pygame
 
+from cleave.viz.editor_mode_controls import is_preset_curation_mode
 from cleave.viz.focus_nav import MainFocus
 from cleave.viz.inspector import InspectorRow, build_inspector_rows
 from cleave.viz.navigator import NavNode, build_navigator, visible_top_level_ids
@@ -60,6 +61,9 @@ class NavigatorControls:
             return True
         if key == pygame.K_ESCAPE:
             self.reconcile()
+            if is_preset_curation_mode(self._controls.session.settings.editor_mode):
+                self._controls.request_hide_overlay()
+                return True
             self.escape()
             return True
         return False

@@ -46,6 +46,7 @@ from cleave.viz.row_spec import (
     row_full_line_display_text,
     row_labeled_display_text,
     row_spec,
+    section_lock_blocks_mutation,
     section_locked,
     tree_branch_leading_spaces,
 )
@@ -716,6 +717,20 @@ def row_value_color_for(
 def row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]:
     """Return the VALUE-role color for a layout row."""
     return row_value_color_for(state, state.layout.descriptor(index))
+
+
+def inspector_field_colors(
+    state: TuningViewState, desc: RowDescriptor
+) -> tuple[tuple[int, int, int], tuple[int, int, int]]:
+    """Label and value colors. Locked blocked rows use LOCKED for both."""
+    if section_lock_blocks_mutation(state, desc):
+        return LOCKED, LOCKED
+    label = (
+        ACTION
+        if row_spec(desc.kind).affordance is RowAffordance.ACTION
+        else LABEL
+    )
+    return label, row_value_color_for(state, desc)
 
 
 def row_bg_color(state: TuningViewState, index: int) -> tuple[int, int, int] | None:

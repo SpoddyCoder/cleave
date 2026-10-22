@@ -366,6 +366,9 @@ class TuningControls:
     def clear_config_dirty(self) -> None:
         self._config_save.clear_config_dirty()
 
+    def request_hide_overlay(self) -> None:
+        self._hide_overlay_requested = True
+
     def consume_hide_overlay(self) -> bool:
         requested = self._hide_overlay_requested
         self._hide_overlay_requested = False
@@ -439,7 +442,7 @@ class TuningControls:
             return True
 
         if event.key == pygame.K_ESCAPE:
-            self._hide_overlay_requested = True
+            self.request_hide_overlay()
             return True
 
         if event.key in (pygame.K_UP, pygame.K_DOWN):
@@ -496,10 +499,6 @@ class TuningControls:
 
         if event.key == pygame.K_RETURN:
             kind = self.focus_descriptor.kind
-            if section_lock_blocks_mutation(self.session, self.focus_descriptor):
-                spec = ROW_SPECS.get(kind)
-                if spec is not None and spec.apply_action is not None:
-                    return True
             if apply_field_action(self, self.focus_descriptor):
                 return True
             if kind == RowKind.SONG_MARKER_ITEM:
@@ -548,7 +547,7 @@ class TuningControls:
             return True
 
         if event.key == pygame.K_ESCAPE:
-            self._hide_overlay_requested = True
+            self.request_hide_overlay()
             return True
 
         if event.key in (pygame.K_UP, pygame.K_DOWN):
@@ -608,10 +607,6 @@ class TuningControls:
             return True
 
         if event.key == pygame.K_RETURN:
-            if section_lock_blocks_mutation(self.session, self.focus_descriptor):
-                spec = ROW_SPECS.get(self.focus_descriptor.kind)
-                if spec is not None and spec.apply_action is not None:
-                    return True
             if apply_field_action(self, self.focus_descriptor):
                 return True
             if self._dismiss_timed_notification_if_present():
@@ -831,9 +826,6 @@ class TuningControls:
             field.apply_horizontal(
                 self, self.focus_descriptor, forward, large
             )
-            return
-
-        if section_lock_blocks_mutation(self.session, self.focus_descriptor):
             return
 
         apply_field_horizontal(

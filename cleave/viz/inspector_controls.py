@@ -7,13 +7,13 @@ from typing import TYPE_CHECKING
 import pygame
 
 from cleave.viz.commands import command_by_id, command_context
+from cleave.viz.editor_mode_controls import is_preset_curation_mode
 from cleave.viz.inspector import InspectorRow, build_inspector_rows
 from cleave.viz.row_hotkeys import handle_row_hotkey, layer_header_for_node
 from cleave.viz.row_spec import (
     REPEAT_ROW_KINDS,
     apply_field_action,
     apply_field_horizontal,
-    section_lock_blocks_mutation,
 )
 from cleave.viz.shell_focus import (
     InspectorGroupKey,
@@ -59,6 +59,9 @@ class InspectorControls:
                 self.activate(row)
             return True
         if key == pygame.K_ESCAPE:
+            if is_preset_curation_mode(self._controls.session.settings.editor_mode):
+                self._controls.request_hide_overlay()
+                return True
             self._controls.shell_focus.region = ShellRegion.NAVIGATOR
             return True
         return False
@@ -125,16 +128,13 @@ class InspectorControls:
                 self.toggle_group(_group_key(row))
             return
         desc = row.descriptor
-        if section_lock_blocks_mutation(self._controls.session, desc):
+        if not apply_field_horizontal(self._controls, desc, forward, large):
             return
-        apply_field_horizontal(self._controls, desc, forward, large)
         if desc.kind not in REPEAT_ROW_KINDS:
             return
         page = event.key in (pygame.K_PAGEUP, pygame.K_PAGEDOWN)
 
         def on_repeat(key: int, _mod: int) -> None:
-            if section_lock_blocks_mutation(self._controls.session, desc):
-                return
             step_forward = key in (pygame.K_RIGHT, pygame.K_PAGEDOWN)
             apply_field_horizontal(self._controls, desc, step_forward, page)
 

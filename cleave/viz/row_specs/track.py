@@ -14,6 +14,7 @@ from cleave.config_schema.layers import (
 )
 from cleave.cue_roles import CUE_ROLE_MARKER_HELP_ENTRIES
 from cleave.stems import stem_control_label
+from cleave.viz.editor_mode_controls import is_preset_curation_mode
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
 from cleave.viz.row_sections import apply_expand_toggle
 from cleave.viz.row_spec import FitStrategy, RowPresentStyle, RowSpec
@@ -294,17 +295,9 @@ def _visibility_track(
     return (block.visible, state.solo_slot == desc.slot)
 
 
-def _section_lock_blocks(controls: TuningControls, desc: RowDescriptor) -> bool:
-    from cleave.viz.row_spec import section_lock_blocks_mutation
-
-    return section_lock_blocks_mutation(controls.session, desc)
-
-
 def _apply_preset_dir_action(controls: TuningControls, desc: RowDescriptor) -> None:
     slot = desc.slot
     if slot is None:
-        return
-    if _section_lock_blocks(controls, desc):
         return
     controls.layer_mutations.enter_directory(slot)
 
@@ -314,8 +307,6 @@ def _apply_preset_list_add_action(
 ) -> None:
     slot = desc.slot
     if slot is None:
-        return
-    if _section_lock_blocks(controls, desc):
         return
     controls.preset_list.add_current(slot)
 
@@ -327,8 +318,6 @@ def _apply_preset_list_item_action(
     index = desc.preset_index
     if slot is None or index is None:
         return
-    if _section_lock_blocks(controls, desc):
-        return
     controls.preset_list.audition(slot, index)
 
 
@@ -337,8 +326,6 @@ def _apply_preset_switching_resume_action(
 ) -> None:
     slot = desc.slot
     if slot is None:
-        return
-    if _section_lock_blocks(controls, desc):
         return
     controls.preset_list.resume(slot)
 
@@ -349,20 +336,23 @@ def _apply_preset_list_populate_action(
     slot = desc.slot
     if slot is None:
         return
-    if _section_lock_blocks(controls, desc):
-        return
     controls.preset_list.prompt_populate(slot)
 
 
 def _apply_layer_add_action(controls: TuningControls, _desc: RowDescriptor) -> None:
+    if is_preset_curation_mode(controls.session.settings.editor_mode):
+        return
     controls.layer_lifecycle.prompt_add()
 
 
 def _apply_layer_delete_action(controls: TuningControls, desc: RowDescriptor) -> None:
+    if is_preset_curation_mode(controls.session.settings.editor_mode):
+        return
     slot = desc.slot
     if slot is None:
         return
     controls.layer_lifecycle.prompt_delete(slot)
+
 
 SPECS: dict[RowKind, RowSpec] = {
     RowKind.TRACK_HEADER: RowSpec(

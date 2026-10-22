@@ -479,6 +479,8 @@ def apply_field_horizontal(
     spec = ROW_SPECS.get(desc.kind)
     if spec is None or spec.apply_horizontal is None:
         return False
+    if section_lock_blocks_mutation(controls.session, desc):
+        return False
     spec.apply_horizontal(controls, desc, forward, large)
     return True
 
@@ -490,6 +492,8 @@ def apply_field_action(
     spec = ROW_SPECS.get(desc.kind)
     if spec is None or spec.apply_action is None:
         return False
+    if section_lock_blocks_mutation(controls.session, desc):
+        return True
     spec.apply_action(controls, desc)
     return True
 
