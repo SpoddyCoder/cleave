@@ -15,7 +15,11 @@ from tests.support.viz import make_track_block, overlay_font
 
 
 def _present_style_view_state() -> TuningViewState:
-    return _minimal_view_state(
+    from cleave.viz.row_layout import RowLayout, build_layout_frame
+
+    from tests.cleave.viz.test_overlay import _mount_track_sections
+
+    state = _minimal_view_state(
         tracks={
             "layer_1": make_track_block(
                 stem="drums",
@@ -25,13 +29,20 @@ def _present_style_view_state() -> TuningViewState:
                 opacity_pct=50,
                 beat_sensitivity=1.0,
                 effects={"pulse": {"onset": 35}},
-                effects_expanded=True,
-                expanded=True,
             )
         },
         notification_message="timeline enabled",
         notification_remaining_sec=5.0,
     )
+    _mount_track_sections(state)
+    rows = list(state.layout.rows)
+    rows.append(RowDescriptor(RowKind.RENDER_SECTION_GAP))
+    state.layout = RowLayout(
+        rows=tuple(rows),
+        descriptor_index={desc: index for index, desc in enumerate(rows)},
+    )
+    state.layout_frame = build_layout_frame(state.layout, state)
+    return state
 
 
 def _row_for_style(
@@ -40,10 +51,10 @@ def _row_for_style(
     layout = state.layout
     if style == RowPresentStyle.LABELED_VALUE:
         index = layout.find("layer_1", RowKind.TRACK_STEM)
-        return index, "└─ driving stem: drums"
+        return index, "driving stem: drums"
     if style == RowPresentStyle.EXPAND_SUBHEADER:
         index = layout.find("layer_1", RowKind.TRACK_EFFECTS_HEADER)
-        return index, "└─ cleave effects ▼"
+        return index, "cleave effects ▼"
     if style == RowPresentStyle.COMPOSITE_HEADER:
         index = layout.find_by_kind(RowKind.RENDER_OVERLAYS_HEADER)
         return index, "Render: OVERLAYS ▶"
@@ -51,8 +62,8 @@ def _row_for_style(
         index = layout.find("layer_1", RowKind.TRACK_PRESET_DIR)
         return index, "dir"
     if style == RowPresentStyle.FULL_LINE:
-        index = layout.find_by_kind(RowKind.LAYER_MANAGEMENT_ADD)
-        return index, "Add Layer"
+        index = layout.find("layer_1", RowKind.LAYER_MANAGEMENT_DELETE)
+        return index, "└─ Delete Layer"
     if style == RowPresentStyle.DYNAMIC:
         index = layout.find(
             "layer_1",
@@ -60,7 +71,7 @@ def _row_for_style(
             effect_id="pulse",
             driver_slug="onset",
         )
-        return index, "  └─ pulse (onset): 35%"
+        return index, "pulse (onset): 35%"
     if style == RowPresentStyle.TRACK_HEADER:
         index = layout.find("layer_1", RowKind.TRACK_HEADER)
         return index, "Layer 1: DRUMS ▼"

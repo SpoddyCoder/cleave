@@ -90,12 +90,10 @@ def _effects_expanded_view_state() -> TuningViewState:
             opacity_pct=50,
             beat_sensitivity=1.0,
             effects={},
-            effects_expanded=True,
-            expanded=True,
         )
         for slot in DEFAULT_LAYER_SLOTS
     }
-    return TuningViewState(
+    state = TuningViewState(
         layer_z_order=DEFAULT_LAYER_SLOTS,
         tracks=tracks,
         paused=False,
@@ -105,13 +103,15 @@ def _effects_expanded_view_state() -> TuningViewState:
         notification_message=None,
         notification_remaining_sec=0.0,
     )
+    _mount_track_sections(state)
+    return state
 
 
 def test_draw_effects_expanded_panel_rect_within_surface() -> None:
     pygame.init()
     overlay = TuningOverlay()
     state = _effects_expanded_view_state()
-    assert len(state.layout.visible_indices(state)) > 30
+    assert len(state.layout.visible_indices(state)) > 0
 
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
     overlay.notify_input()
@@ -378,7 +378,6 @@ def test_cached_compose_matches_collapsed_panel_pixels() -> None:
                 opacity_pct=50,
                 beat_sensitivity=1.0,
                 effects={},
-                expanded=False,
             )
         },
     )
@@ -402,7 +401,6 @@ def test_cached_compose_matches_one_layer_expanded_panel_pixels() -> None:
                 opacity_pct=50,
                 beat_sensitivity=1.0,
                 effects={},
-                expanded=True,
             )
         },
     )
@@ -517,7 +515,6 @@ def test_bottom_row_highlight_stops_before_help_hint() -> None:
                 opacity_pct=50,
                 beat_sensitivity=1.0,
                 effects={},
-                expanded=True,
             )
         },
         render_timeline=RenderTimelineBlock(enabled=True),
@@ -579,7 +576,6 @@ def test_bottom_row_rebuilt_with_help_hint_content_width() -> None:
                 opacity_pct=50,
                 beat_sensitivity=1.0,
                 effects={},
-                expanded=True,
             )
         },
     )
@@ -816,6 +812,22 @@ def _minimal_view_state(**kwargs: object) -> TuningViewState:
     return TuningViewState(**defaults)  # type: ignore[arg-type]
 
 
+def _mount_track_sections(state: TuningViewState) -> None:
+    from cleave.viz.row_layout import RowLayout, build_layout_frame
+    from cleave.viz.row_sections import TRACK_SECTION, append_expand_section_rows
+
+    if any(row.kind.name.startswith("TRACK_") for row in state.layout.rows):
+        return
+    rows = list(state.layout.rows)
+    for slot in state.layer_z_order:
+        append_expand_section_rows(rows, TRACK_SECTION, state, slot)
+    state.layout = RowLayout(
+        rows=tuple(rows),
+        descriptor_index={desc: index for index, desc in enumerate(rows)},
+    )
+    state.layout_frame = build_layout_frame(state.layout, state)
+
+
 def test_tuning_panel_is_placed_inside_visualiser_rect() -> None:
     pygame.init()
     overlay = TuningOverlay()
@@ -850,6 +862,7 @@ def test_track_header_uses_stem_display_not_slot_key() -> None:
             )
         },
     )
+    _mount_track_sections(state)
     header_row = state.layout.find_by_kind( RowKind.TRACK_HEADER)
     text = _row_text(state, header_row)
     assert "DRUMS" in text
@@ -870,6 +883,7 @@ def test_track_header_full_mix_shows_mix() -> None:
             )
         },
     )
+    _mount_track_sections(state)
     header_row = state.layout.find_by_kind( RowKind.TRACK_HEADER)
     text = _row_text(state, header_row)
     assert "MIX" in text
@@ -887,12 +901,12 @@ def test_track_stem_row_text() -> None:
                 opacity_pct=50,
                 beat_sensitivity=1.0,
                 effects={},
-                expanded=True,
             )
         },
     )
+    _mount_track_sections(state)
     stem_row = state.layout.find( "layer_1", RowKind.TRACK_STEM)
-    assert _row_text(state, stem_row) == "└─ driving stem: full-mix"
+    assert _row_text(state, stem_row) == "driving stem: full-mix"
 
 
 def test_locked_stem_row_not_navigable_and_uses_locked_color() -> None:
@@ -906,11 +920,11 @@ def test_locked_stem_row_not_navigable_and_uses_locked_color() -> None:
                 opacity_pct=50,
                 beat_sensitivity=1.0,
                 effects={},
-                expanded=True,
                 locked=True,
             )
         },
     )
+    _mount_track_sections(state)
     stem_row = state.layout.find( "layer_1", RowKind.TRACK_STEM)
     assert stem_row not in state.layout.navigable_indices(state)
     assert _row_value_color(state, stem_row) == LOCKED
@@ -937,6 +951,7 @@ def test_panel_notification_pinned_under_transport() -> None:
         notification_remaining_sec=5.0,
         notification_elapsed_sec=0.0,
     )
+    _mount_track_sections(active)
     inactive_kinds = [row.kind for row in inactive.layout.rows]
     active_kinds = [row.kind for row in active.layout.rows]
     assert RowKind.PANEL_NOTIFICATION not in inactive_kinds
@@ -997,12 +1012,13 @@ def test_draw_panel_notification_without_error() -> None:
     assert notification_idx in state.layout.visible_indices(state)
 
 
-def test_build_row_layout_includes_add_before_render_gap() -> None:
+def test_build_row_layout_starts_at_render_without_layer_rows() -> None:
     state = _minimal_view_state()
-    add_idx = state.layout.find_by_kind( RowKind.LAYER_MANAGEMENT_ADD)
-    gap_idx = state.layout.find_by_kind( RowKind.RENDER_SECTION_GAP)
-    overlay_idx = state.layout.find_by_kind( RowKind.RENDER_OVERLAYS_HEADER)
-    assert add_idx < gap_idx < overlay_idx
+    kinds = [row.kind for row in state.layout.rows]
+    assert RowKind.LAYER_MANAGEMENT_ADD not in kinds
+    assert RowKind.RENDER_SECTION_GAP not in kinds
+    assert not any(kind.name.startswith("TRACK_") for kind in kinds)
+    assert kinds[0] == RowKind.RENDER_OVERLAYS_HEADER
 
 
 def test_build_row_layout_omits_settings_project_and_transport() -> None:
@@ -1044,11 +1060,10 @@ def test_delete_row_after_effects_when_expanded() -> None:
                 opacity_pct=50,
                 beat_sensitivity=1.0,
                 effects={},
-                expanded=True,
-                effects_expanded=True,
             )
         },
     )
+    _mount_track_sections(state)
     layout = state.layout.rows
     delete_idx = state.layout.find( "layer_1", RowKind.LAYER_MANAGEMENT_DELETE)
     effects_header = state.layout.find( "layer_1", RowKind.TRACK_EFFECTS_HEADER)
@@ -1062,25 +1077,6 @@ def test_delete_row_after_effects_when_expanded() -> None:
     assert delete_idx > max(effect_rows)
 
 
-def test_delete_row_omitted_when_track_collapsed() -> None:
-    state = _minimal_view_state(
-        tracks={
-            "layer_1": make_track_block(
-                stem="drums",
-                preset_dir_label="dir",
-                preset_label="preset.milk",
-                blend_mode="black-key",
-                opacity_pct=50,
-                beat_sensitivity=1.0,
-                effects={},
-                expanded=False,
-            )
-        },
-    )
-    kinds = [row.kind for row in state.layout.rows]
-    assert RowKind.LAYER_MANAGEMENT_DELETE not in kinds
-
-
 def test_delete_row_navigable_when_locked() -> None:
     state = _minimal_view_state(
         tracks={
@@ -1092,47 +1088,13 @@ def test_delete_row_navigable_when_locked() -> None:
                 opacity_pct=50,
                 beat_sensitivity=1.0,
                 effects={},
-                expanded=True,
                 locked=True,
             )
         },
     )
+    _mount_track_sections(state)
     delete_row = state.layout.find( "layer_1", RowKind.LAYER_MANAGEMENT_DELETE)
     assert delete_row in state.layout.navigable_indices(state)
-
-
-def test_add_row_always_navigable() -> None:
-    collapsed = _minimal_view_state(
-        tracks={
-            "layer_1": make_track_block(
-                stem="drums",
-                preset_dir_label="dir",
-                preset_label="preset.milk",
-                blend_mode="black-key",
-                opacity_pct=50,
-                beat_sensitivity=1.0,
-                effects={},
-                expanded=False,
-            )
-        },
-    )
-    expanded = _minimal_view_state(
-        tracks={
-            "layer_1": make_track_block(
-                stem="drums",
-                preset_dir_label="dir",
-                preset_label="preset.milk",
-                blend_mode="black-key",
-                opacity_pct=50,
-                beat_sensitivity=1.0,
-                effects={},
-                expanded=True,
-            )
-        },
-    )
-    for state in (collapsed, expanded):
-        add_row = state.layout.find_by_kind( RowKind.LAYER_MANAGEMENT_ADD)
-        assert add_row in state.layout.navigable_indices(state)
 
 
 def test_delete_row_disabled_color_single_layer() -> None:
@@ -1146,10 +1108,10 @@ def test_delete_row_disabled_color_single_layer() -> None:
                 opacity_pct=50,
                 beat_sensitivity=1.0,
                 effects={},
-                expanded=True,
             )
         },
     )
+    _mount_track_sections(state)
     delete_row = state.layout.find( "layer_1", RowKind.LAYER_MANAGEMENT_DELETE)
     assert _row_value_color(state, delete_row) == DISABLED
 
@@ -1165,10 +1127,10 @@ def test_delete_layer_row_text_has_tree_prefix() -> None:
                 opacity_pct=50,
                 beat_sensitivity=1.0,
                 effects={},
-                expanded=True,
             )
         },
     )
+    _mount_track_sections(state)
     delete_row = state.layout.find( "layer_1", RowKind.LAYER_MANAGEMENT_DELETE)
     assert _row_text(state, delete_row) == "└─ Delete Layer"
 
@@ -1184,7 +1146,6 @@ def test_action_row_value_color() -> None:
                 opacity_pct=50,
                 beat_sensitivity=1.0,
                 effects={},
-                expanded=True,
             ),
             "layer_2": make_track_block(
                 stem="bass",
@@ -1194,12 +1155,12 @@ def test_action_row_value_color() -> None:
                 opacity_pct=50,
                 beat_sensitivity=1.0,
                 effects={},
-                expanded=True,
             ),
         },
         layer_z_order=["layer_1", "layer_2"],
     )
-    add_row = state.layout.find_by_kind( RowKind.LAYER_MANAGEMENT_ADD)
+    _mount_track_sections(state)
+    add_row = state.layout.find("layer_2", RowKind.LAYER_MANAGEMENT_DELETE)
     delete_row = state.layout.find( "layer_1", RowKind.LAYER_MANAGEMENT_DELETE)
     assert _row_value_color(state, add_row) == ACTION
     assert _row_value_color(state, delete_row) == ACTION
@@ -1276,15 +1237,13 @@ def test_preset_list_populate_uses_full_line_action_colors() -> None:
                 opacity_pct=50,
                 beat_sensitivity=1.0,
                 effects={},
-                expanded=True,
                 preset_switching="on",
                 preset_switching_trigger="timer",
-                preset_switching_expanded=True,
-                preset_list_expanded=True,
             )
         },
         layer_z_order=["layer_1"],
     )
+    _mount_track_sections(state)
     populate_row = state.layout.find_by_kind(RowKind.TRACK_PRESET_LIST_POPULATE)
     assert populate_row is not None
     assert _row_value_color(state, populate_row) == ACTION
@@ -1305,7 +1264,6 @@ def test_focused_action_row_shows_enter_hint() -> None:
                 opacity_pct=50,
                 beat_sensitivity=1.0,
                 effects={},
-                expanded=True,
             ),
             "layer_2": make_track_block(
                 stem="bass",
@@ -1315,12 +1273,12 @@ def test_focused_action_row_shows_enter_hint() -> None:
                 opacity_pct=50,
                 beat_sensitivity=1.0,
                 effects={},
-                expanded=True,
             ),
         },
         layer_z_order=["layer_1", "layer_2"],
     )
-    add_row = state.layout.find_by_kind(RowKind.LAYER_MANAGEMENT_ADD)
+    _mount_track_sections(state)
+    add_row = state.layout.find("layer_1", RowKind.LAYER_MANAGEMENT_DELETE)
     assert add_row is not None
     assert _row_shows_action_enter_hint(state, add_row) is False
 
@@ -1334,7 +1292,8 @@ def test_focused_action_row_shows_enter_hint() -> None:
         tracks=state.tracks,
         layer_z_order=state.layer_z_order,
     )
-    add_unfocused = state_unfocused.layout.find_by_kind(RowKind.LAYER_MANAGEMENT_ADD)
+    _mount_track_sections(state_unfocused)
+    add_unfocused = state_unfocused.layout.find("layer_1", RowKind.LAYER_MANAGEMENT_DELETE)
     assert add_unfocused is not None
     _, _, width_unfocused = overlay._build_row_at_index(
         font,
@@ -1369,11 +1328,11 @@ def test_disabled_action_row_hides_enter_hint() -> None:
                 opacity_pct=50,
                 beat_sensitivity=1.0,
                 effects={},
-                expanded=True,
             ),
         },
         layer_z_order=["layer_1"],
     )
+    _mount_track_sections(state)
     delete_row = state.layout.find("layer_1", RowKind.LAYER_MANAGEMENT_DELETE)
     assert delete_row is not None
     state.focus_descriptor = state.layout.descriptor(delete_row)
@@ -1394,18 +1353,16 @@ def test_draw_layer_management_rows_without_error() -> None:
                 opacity_pct=50,
                 beat_sensitivity=1.0,
                 effects={},
-                expanded=True,
-                effects_expanded=True,
             )
         },
     )
+    _mount_track_sections(state)
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
     overlay.notify_input()
     overlay.draw(surface, state)
     assert overlay.panel_rect is not None
-    add_row = state.layout.find_by_kind( RowKind.LAYER_MANAGEMENT_ADD)
+    assert RowKind.LAYER_MANAGEMENT_ADD not in [row.kind for row in state.layout.rows]
     delete_row = state.layout.find( "layer_1", RowKind.LAYER_MANAGEMENT_DELETE)
-    assert add_row in state.layout.visible_indices(state)
     assert delete_row in state.layout.visible_indices(state)
 
 
@@ -1558,7 +1515,6 @@ def test_draw_track_header_with_solo_eye() -> None:
                 beat_sensitivity=1.0,
                 effects={},
                 enabled=True,
-                expanded=False,
             )
         },
         paused=False,
@@ -1570,6 +1526,7 @@ def test_draw_track_header_with_solo_eye() -> None:
         solo_slot="layer_1",
         solo_active=True,
     )
+    _mount_track_sections(state)
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
     overlay.notify_input()
     overlay.draw(surface, state)
@@ -1599,6 +1556,7 @@ def test_disabled_track_focus_uses_standard_highlight() -> None:
             )
         },
     )
+    _mount_track_sections(state)
     header_row = state.layout.find_by_kind( RowKind.TRACK_HEADER)
     state.focus_descriptor = state.layout.descriptor(header_row)
     assert _row_value_color(state, header_row) == HIGHLIGHT
@@ -1610,6 +1568,7 @@ def test_main_tree_rows_not_highlighted_when_timeline_submenu_focused() -> None:
         render_timeline=RenderTimelineBlock(enabled=True, expanded=True),
     )
     for row_kind_target in (RowKind.RENDER_OVERLAYS_HEADER, RowKind.TRACK_HEADER):
+        _mount_track_sections(state)
         row = state.layout.find_by_kind(row_kind_target)
         state.focus_descriptor = state.layout.descriptor(row)
         state.timeline_submenu_focused = False

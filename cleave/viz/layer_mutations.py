@@ -131,8 +131,6 @@ class LayerMutations:
         layer.preset_switching = preset_switching_mode_for_trigger(
             layer.preset_switching_trigger
         )
-        if layer.preset_switching == "on":
-            layer.preset_list_expanded = True
         if not self._warn_if_timeline_trigger_disabled(slot):
             if (
                 previous != "off"
@@ -282,8 +280,6 @@ class LayerMutations:
         if layer.enabled == enabled:
             return
         layer.enabled = enabled
-        if not enabled:
-            layer.expanded = False
         bindings = self._bindings()
         if bindings is not None:
             bindings.on_layer_enabled_change(slot, layer.enabled)

@@ -68,7 +68,6 @@ def test_layout_frame_matches_legacy_indices() -> None:
                 opacity_pct=50,
                 beat_sensitivity=1.0,
                 effects={},
-                expanded=True,
             )
         },
     )
@@ -99,15 +98,17 @@ def test_focus_index_uses_layout_frame_navigable() -> None:
     assert state.focus_index == frame.resolved_focus_index
     state.focus_descriptor = RowDescriptor(RowKind.TRACK_HEADER, slot="layer_1")
     assert state.focus_index == layout.find_descriptor(
-        RowDescriptor(RowKind.TRACK_HEADER, slot="layer_1")
+        layout.navigable_descriptors(state)[0]
     )
 
 
 def test_find_descriptor_and_contains_descriptor() -> None:
     state = _minimal_view_state()
-    desc = RowDescriptor(RowKind.TRACK_HEADER, slot="layer_1")
+    desc = RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
     assert state.layout.contains_descriptor(desc)
-    assert state.layout.find_descriptor(desc) == state.layout.find("layer_1", RowKind.TRACK_HEADER)
+    assert state.layout.find_descriptor(desc) == state.layout.find_by_kind(
+        RowKind.RENDER_OVERLAYS_HEADER
+    )
 
 
 def test_find_descriptor_raises_when_missing() -> None:
@@ -129,7 +130,6 @@ def test_navigable_descriptors_matches_indices() -> None:
                 opacity_pct=50,
                 beat_sensitivity=1.0,
                 effects={},
-                expanded=True,
             )
         },
     )
@@ -153,61 +153,19 @@ def test_resolve_navigable_settings_field_falls_back_to_first_leftover() -> None
     )
 
 
-def test_resolve_navigable_track_sub_row_collapsed_block() -> None:
+def test_resolve_navigable_track_row_falls_back_to_leftover() -> None:
     state = _minimal_view_state()
     stem = RowDescriptor(RowKind.TRACK_STEM, slot="layer_1")
-    assert stem not in state.layout.navigable_descriptors(state)
-    assert state.layout.resolve_navigable(stem, state) == RowDescriptor(
-        RowKind.TRACK_HEADER, slot="layer_1"
-    )
-
-
-def test_resolve_navigable_track_blend_collapsed_compositing() -> None:
-    state = _minimal_view_state(
-        tracks={
-            "layer_1": make_track_block(
-                stem="drums",
-                preset_dir_label="dir",
-                preset_label="preset.milk",
-                blend_mode="black-key",
-                opacity_pct=50,
-                beat_sensitivity=1.0,
-                effects={},
-                expanded=True,
-                compositing_expanded=False,
-            )
-        },
-    )
     blend = RowDescriptor(RowKind.TRACK_BLEND, slot="layer_1")
-    assert blend not in state.layout.rows
-    assert state.layout.resolve_navigable(blend, state) == RowDescriptor(
-        RowKind.TRACK_COMPOSITING_HEADER, slot="layer_1"
-    )
-
-
-def test_resolve_navigable_track_effect_collapsed_effects() -> None:
-    state = _minimal_view_state(
-        tracks={
-            "layer_1": make_track_block(
-                stem="drums",
-                preset_dir_label="dir",
-                preset_label="preset.milk",
-                blend_mode="black-key",
-                opacity_pct=50,
-                beat_sensitivity=1.0,
-                effects={},
-                expanded=True,
-                effects_expanded=False,
-            )
-        },
-    )
     effect = RowDescriptor(
         RowKind.TRACK_EFFECT, slot="layer_1", effect_id="pulse", driver_slug="onset"
     )
-    assert effect not in state.layout.rows
-    assert state.layout.resolve_navigable(effect, state) == RowDescriptor(
-        RowKind.TRACK_EFFECTS_HEADER, slot="layer_1"
-    )
+    first = state.layout.navigable_descriptors(state)[0]
+    assert stem not in state.layout.rows
+    assert state.layout.resolve_navigable(stem, state) == first
+    assert state.layout.resolve_navigable(blend, state) == first
+    assert state.layout.resolve_navigable(effect, state) == first
+    assert first.kind != RowKind.TRACK_HEADER
 
 
 def test_resolve_navigable_render_overlay_sub_row_collapsed() -> None:

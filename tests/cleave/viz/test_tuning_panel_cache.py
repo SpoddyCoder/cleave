@@ -33,9 +33,16 @@ from cleave.viz.tuning_view_state import TuningViewState
 from tests.cleave.viz.test_overlay import (
     _effects_expanded_view_state,
     _minimal_view_state,
+    _mount_track_sections,
     _panel_scroll_metrics,
 )
 from tests.support.viz import make_track_block
+
+
+def _layer_view_state(**kwargs: object) -> TuningViewState:
+    state = _minimal_view_state(**kwargs)
+    _mount_track_sections(state)
+    return state
 
 
 def _static_keys(
@@ -64,8 +71,8 @@ def test_row_render_key_stable_across_fps_and_position() -> None:
     overlay = TuningOverlay()
     font = overlay._font_get()
     cache = TuningPanelCache()
-    state_a = _minimal_view_state(fps=30.0, position_sec=12.5)
-    state_b = _minimal_view_state(fps=60.0, position_sec=99.0)
+    state_a = _layer_view_state(fps=30.0, position_sec=12.5)
+    state_b = _layer_view_state(fps=60.0, position_sec=99.0)
 
     track_index = state_a.layout.find_by_kind(RowKind.TRACK_HEADER)
     key_a = row_render_key(
@@ -92,7 +99,7 @@ def test_static_row_keys_only_includes_requested_indices() -> None:
     overlay = TuningOverlay()
     font = overlay._font_get()
     cache = TuningPanelCache()
-    state = _minimal_view_state()
+    state = _layer_view_state()
     visible = tuple(state.layout.visible_indices(state))
     assert len(visible) >= 2
     subset = visible[:2]
@@ -126,12 +133,12 @@ def test_focus_change_changes_static_row_keys_for_affected_rows() -> None:
     font = overlay._font_get()
     cache = TuningPanelCache()
 
-    focused_track = _minimal_view_state(
+    focused_track = _layer_view_state(
         focus_cursor=MainFocus(
             RowDescriptor(RowKind.TRACK_HEADER, slot="layer_1")
         ),
     )
-    focused_transport = _minimal_view_state(
+    focused_transport = _layer_view_state(
         focus_cursor=MainFocus(RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)),
     )
 
@@ -164,17 +171,14 @@ def test_active_preset_list_index_changes_row_render_color_state() -> None:
             opacity_pct=50,
             beat_sensitivity=1.0,
             effects={},
-            expanded=True,
             preset_switching="on",
             preset_switching_trigger="timer",
-            preset_switching_expanded=True,
             preset_list=["/tmp/a.milk", "/tmp/b.milk"],
             preset_list_labels=["a.milk", "b.milk"],
-            preset_list_expanded=True,
             active_preset_list_index=0,
         )
     }
-    state = _minimal_view_state(
+    state = _layer_view_state(
         layer_z_order=("layer_1",),
         tracks=tracks,
         focus_cursor=MainFocus(RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)),
@@ -398,7 +402,7 @@ def test_lock_change_invalidates_render_overlay_header_row_key() -> None:
     overlay = TuningOverlay()
     font = overlay._font_get()
     cache = TuningPanelCache()
-    state = _minimal_view_state()
+    state = _layer_view_state()
     index = state.layout.find_by_kind(RowKind.RENDER_OVERLAYS_HEADER)
     line_h = font.get_linesize()
     max_w = 400
@@ -472,7 +476,7 @@ def test_repeated_compose_panel_near_zero_font_renders_when_idle() -> None:
     pygame.init()
     overlay = TuningOverlay()
     overlay.notify_input()
-    state = _minimal_view_state(fps=30.0, position_sec=1.0)
+    state = _layer_view_state(fps=30.0, position_sec=1.0)
 
     overlay.compose_panel(
         state,
@@ -482,13 +486,13 @@ def test_repeated_compose_panel_near_zero_font_renders_when_idle() -> None:
 
     counters = OverlayDrawCounters()
     overlay.compose_panel(
-        _minimal_view_state(fps=31.0, position_sec=2.0),
+        _layer_view_state(fps=31.0, position_sec=2.0),
         viewport_width=1280,
         viewport_height=720,
         counters=counters,
     )
     overlay.compose_panel(
-        _minimal_view_state(fps=32.0, position_sec=3.0),
+        _layer_view_state(fps=32.0, position_sec=3.0),
         viewport_width=1280,
         viewport_height=720,
         counters=counters,
@@ -503,7 +507,7 @@ def test_row_cache_hits_on_full_recompose_with_warm_cache() -> None:
     pygame.init()
     overlay = TuningOverlay()
     overlay.notify_input()
-    state = _minimal_view_state(fps=30.0, position_sec=1.0)
+    state = _layer_view_state(fps=30.0, position_sec=1.0)
 
     overlay.compose_panel(
         state,
@@ -529,7 +533,7 @@ def test_retain_row_surfaces_keeps_only_requested_keys() -> None:
     overlay = TuningOverlay()
     font = overlay._font_get()
     cache = TuningPanelCache()
-    state = _minimal_view_state()
+    state = _layer_view_state()
     line_h = font.get_linesize()
     indices = [
         i
@@ -559,7 +563,7 @@ def test_expand_collapse_incrementally_evicts_row_cache() -> None:
     overlay.notify_input()
     cache = overlay._panel_cache
 
-    collapsed = _minimal_view_state(
+    collapsed = _layer_view_state(
         tracks={
             "layer_1": make_track_block(
                 stem="drums",
@@ -569,11 +573,10 @@ def test_expand_collapse_incrementally_evicts_row_cache() -> None:
                 opacity_pct=50,
                 beat_sensitivity=1.0,
                 effects={},
-                expanded=False,
             )
         },
     )
-    expanded = _minimal_view_state(
+    expanded = _layer_view_state(
         tracks={
             "layer_1": make_track_block(
                 stem="drums",
@@ -583,7 +586,6 @@ def test_expand_collapse_incrementally_evicts_row_cache() -> None:
                 opacity_pct=50,
                 beat_sensitivity=1.0,
                 effects={},
-                expanded=True,
             )
         },
     )
@@ -613,7 +615,7 @@ def test_ensure_row_surface_cache_hit_miss_counters() -> None:
     overlay = TuningOverlay()
     font = overlay._font_get()
     cache = TuningPanelCache()
-    state = _minimal_view_state()
+    state = _layer_view_state()
     counters = OverlayDrawCounters()
     index = state.layout.find_by_kind(RowKind.TRACK_HEADER)
 
@@ -648,7 +650,7 @@ def _two_layer_view_state(
     *,
     focus_slot: str,
 ) -> TuningViewState:
-    return _minimal_view_state(
+    return _layer_view_state(
         layer_z_order=("layer_1", "layer_2"),
         tracks={
             "layer_1": make_track_block(
@@ -659,7 +661,6 @@ def _two_layer_view_state(
                 opacity_pct=50,
                 beat_sensitivity=1.0,
                 effects={},
-                expanded=True,
             ),
             "layer_2": make_track_block(
                 stem="bass",
@@ -669,7 +670,6 @@ def _two_layer_view_state(
                 opacity_pct=50,
                 beat_sensitivity=1.0,
                 effects={},
-                expanded=True,
             ),
         },
         focus_cursor=MainFocus(
@@ -747,7 +747,7 @@ def test_incremental_compose_preserves_transport_row_border_pixels() -> None:
     pygame.init()
     overlay = TuningOverlay()
     overlay.notify_input()
-    state = _minimal_view_state(fps=30.0, position_sec=0.0)
+    state = _layer_view_state(fps=30.0, position_sec=0.0)
 
     overlay.compose_panel(
         state,
@@ -771,7 +771,7 @@ def test_incremental_compose_preserves_transport_row_border_pixels() -> None:
     assert right_before[:3] == BORDER_COLOR
 
     overlay.compose_panel(
-        _minimal_view_state(fps=45.0, position_sec=15.0),
+        _layer_view_state(fps=45.0, position_sec=15.0),
         viewport_width=1280,
         viewport_height=720,
     )
@@ -785,7 +785,7 @@ def test_incremental_compose_preserves_static_pixels() -> None:
     pygame.init()
     overlay = TuningOverlay()
     overlay.notify_input()
-    state = _minimal_view_state(fps=30.0, position_sec=0.0)
+    state = _layer_view_state(fps=30.0, position_sec=0.0)
 
     overlay.compose_panel(
         state,
@@ -797,7 +797,7 @@ def test_incremental_compose_preserves_static_pixels() -> None:
     before = pygame.image.tostring(panel, "RGBA")
 
     overlay.compose_panel(
-        _minimal_view_state(fps=45.0, position_sec=15.0),
+        _layer_view_state(fps=45.0, position_sec=15.0),
         viewport_width=1280,
         viewport_height=720,
     )
@@ -806,15 +806,15 @@ def test_incremental_compose_preserves_static_pixels() -> None:
 
 
 def test_live_upload_signature_transport_and_fps() -> None:
-    state_with_fps = _minimal_view_state(fps=30.0, position_sec=65.0)
-    state_no_fps = _minimal_view_state(fps=None, position_sec=12.0)
+    state_with_fps = _layer_view_state(fps=30.0, position_sec=65.0)
+    state_no_fps = _layer_view_state(fps=None, position_sec=12.0)
 
     assert live_upload_signature(state_with_fps) == ("FPS: 30",)
     assert live_upload_signature(state_no_fps) == (None,)
 
 
 def test_tuning_upload_signature_combines_static_and_live() -> None:
-    state = _minimal_view_state(fps=30.0, position_sec=1.0)
+    state = _layer_view_state(fps=30.0, position_sec=1.0)
     pygame.init()
     overlay = TuningOverlay()
     font = overlay._font_get()
@@ -842,7 +842,7 @@ def test_incremental_compose_sets_transport_rect_and_partial_plan() -> None:
     pygame.init()
     overlay = TuningOverlay()
     overlay.notify_input()
-    base = _minimal_view_state(fps=30.0, position_sec=0.0)
+    base = _layer_view_state(fps=30.0, position_sec=0.0)
 
     overlay.compose_panel(
         base,
@@ -854,7 +854,7 @@ def test_incremental_compose_sets_transport_rect_and_partial_plan() -> None:
     _fx, _fy, _fw, fh = cache.last_fps_rect
     assert fh == overlay._font_get().get_linesize()
 
-    moved = _minimal_view_state(fps=45.0, position_sec=15.0)
+    moved = _layer_view_state(fps=45.0, position_sec=15.0)
     composed = overlay.compose_panel(
         moved,
         viewport_width=1280,
@@ -869,7 +869,7 @@ def test_incremental_compose_skip_plan_when_live_unchanged() -> None:
     pygame.init()
     overlay = TuningOverlay()
     overlay.notify_input()
-    state = _minimal_view_state(fps=30.0, position_sec=5.0)
+    state = _layer_view_state(fps=30.0, position_sec=5.0)
 
     first = overlay.compose_panel(
         state,
@@ -1006,7 +1006,7 @@ def test_focused_row_opaque_after_incremental_compose() -> None:
     panel = overlay._panel_cache.panel
     assert panel is not None
 
-    moved = _minimal_view_state(
+    moved = _layer_view_state(
         layer_z_order=state.layer_z_order,
         tracks=state.tracks,
         focus_cursor=state.focus_cursor,
@@ -1032,7 +1032,7 @@ def test_timeline_open_full_upload_not_skip() -> None:
     overlay.notify_input()
     from cleave.viz.tuning_view_state import RenderTimelineBlock
 
-    state = _minimal_view_state(
+    state = _layer_view_state(
         render_timeline=RenderTimelineBlock(enabled=True, expanded=True),
     )
     kwargs = dict(viewport_width=1280, viewport_height=720)

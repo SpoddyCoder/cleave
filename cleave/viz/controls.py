@@ -79,6 +79,13 @@ NOTIFICATION_RESIDUAL_LATENCY_UNCHANGED_TEXT = (
 SEEK_TINY = 2
 SEEK_SHORT = 10
 SEEK_LONG = 30
+_CURATION_ACTION_KINDS = frozenset({
+    RowKind.TRACK_HEADER,
+    RowKind.TRACK_STEM,
+    RowKind.TRACK_BEAT,
+    RowKind.TRACK_PRESET_DIR,
+    RowKind.TRACK_PRESET,
+})
 
 
 class TuningControls:
@@ -137,7 +144,6 @@ class TuningControls:
             layer_bindings,
             on_rebuild_view=self._rebuild_view,
             on_notification=self.show_notification,
-            on_focus_after_add=self._focus_after_add_layer,
             on_capture_delete_nav=self._capture_delete_nav_pos,
             on_restore_delete_focus=self._restore_delete_focus,
         )
@@ -761,11 +767,9 @@ class TuningControls:
         if event.key in (pygame.K_LEFT, pygame.K_RIGHT):
             if mod_ctrl(event.mod) or mod_shift(event.mod):
                 return True
-            view = self.build_view_state(paused=self.playback.paused)
-            desc = self.focus_descriptor
-            if not view.layout.contains_descriptor(desc):
+            kind = self.focus_descriptor.kind
+            if kind not in _CURATION_ACTION_KINDS:
                 return True
-            kind = desc.kind
             self._apply_horizontal(event.key == pygame.K_RIGHT, False, kind)
             if kind in REPEAT_ROW_KINDS:
                 self._key_repeat.on_keydown(
@@ -780,11 +784,9 @@ class TuningControls:
             return True
 
         if event.key in (pygame.K_PAGEUP, pygame.K_PAGEDOWN):
-            view = self.build_view_state(paused=self.playback.paused)
-            desc = self.focus_descriptor
-            if not view.layout.contains_descriptor(desc):
+            kind = self.focus_descriptor.kind
+            if kind not in _CURATION_ACTION_KINDS:
                 return True
-            kind = desc.kind
             spec = ROW_SPECS.get(kind)
             if spec is None or spec.affordance == RowAffordance.EXPAND:
                 return True
@@ -803,11 +805,10 @@ class TuningControls:
             return True
 
         if event.key in (pygame.K_f, pygame.K_b, pygame.K_r, pygame.K_c):
-            view = self.build_view_state(paused=self.playback.paused)
             desc = self.focus_descriptor
-            if not view.layout.contains_descriptor(desc):
-                return True
             kind = desc.kind
+            if kind not in _CURATION_ACTION_KINDS:
+                return True
             slot = desc.slot
             if slot is not None and kind in PRESET_FILE_ROW_KINDS:
                 if section_lock_blocks_mutation(
@@ -982,16 +983,6 @@ class TuningControls:
         self._confirm_move_mode()
         self.navigator.reconcile()
 
-    def _focus_after_add_layer(self) -> None:
-        view_after = self.build_view_state(paused=self.playback.paused)
-        if (
-            self.focus_descriptor.kind == RowKind.LAYER_MANAGEMENT_ADD
-            and not view_after.layout.contains_descriptor(self.focus_descriptor)
-        ):
-            self._apply_focus_cursor(
-                MainFocus(RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER))
-            )
-
     def _capture_delete_nav_pos(self) -> int:
         view = self.build_view_state(paused=self.playback.paused)
         navigable = view.layout.navigable_descriptors(view)
@@ -1077,12 +1068,6 @@ class TuningControls:
             return
         timeline.locked = not timeline.locked
 
-    def set_expanded(self, slot: str, expanded: bool) -> None:
-        layer = self.session.layers[slot]
-        if layer.expanded == expanded:
-            return
-        layer.expanded = expanded
-
     def set_render_timeline_enabled(self, enabled: bool) -> None:
         tl = self.session.timeline
         if tl.enabled == enabled:
@@ -1099,30 +1084,6 @@ class TuningControls:
             if enabled
             else NOTIFICATION_TIMELINE_DISABLED_TEXT
         )
-
-    def set_preset_switching_expanded(self, slot: str, expanded: bool) -> None:
-        layer = self.session.layers[slot]
-        if layer.preset_switching_expanded == expanded:
-            return
-        layer.preset_switching_expanded = expanded
-
-    def set_effects_expanded(self, slot: str, expanded: bool) -> None:
-        layer = self.session.layers[slot]
-        if layer.effects_expanded == expanded:
-            return
-        layer.effects_expanded = expanded
-
-    def set_compositing_expanded(self, slot: str, expanded: bool) -> None:
-        layer = self.session.layers[slot]
-        if layer.compositing_expanded == expanded:
-            return
-        layer.compositing_expanded = expanded
-
-    def set_preset_list_expanded(self, slot: str, expanded: bool) -> None:
-        layer = self.session.layers[slot]
-        if layer.preset_list_expanded == expanded:
-            return
-        layer.preset_list_expanded = expanded
 
     def set_beat_bar_grid_expanded(self, expanded: bool) -> None:
         tl = self.session.timeline

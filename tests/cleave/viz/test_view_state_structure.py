@@ -32,18 +32,20 @@ def test_structure_signature_stable_for_fps_and_focus() -> None:
     assert view_a.layout is view_b.layout
 
 
-def test_structure_signature_invalidates_on_expand() -> None:
+def test_layer_expand_flags_absent_from_structure_signature() -> None:
     controls = _make_controls(("layer_1",))
-    session = controls.session
-    config_save = controls._config_save
-    sig_before = view_state_structure_signature(
-        session, config_save, notification_active=False
+    sig = view_state_structure_signature(
+        controls.session, controls._config_save, notification_active=False
     )
-    session.layers["layer_1"].expanded = False
-    sig_after = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
-    assert sig_before != sig_after
+    layer = json.loads(sig)["layers"]["layer_1"]
+    for flag in (
+        "expanded",
+        "effects_expanded",
+        "compositing_expanded",
+        "preset_list_expanded",
+        "preset_switching_expanded",
+    ):
+        assert flag not in layer
 
 
 def test_structure_signature_invalidates_on_layer_z_order() -> None:
@@ -89,23 +91,8 @@ def test_structure_signature_invalidates_on_notification() -> None:
     assert sig_inactive != sig_active
 
 
-def test_structure_signature_invalidates_on_compositing_expanded() -> None:
-    controls = _make_controls(("layer_1",))
-    session = controls.session
-    config_save = controls._config_save
-    sig_before = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
-    session.layers["layer_1"].compositing_expanded = True
-    sig_after = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
-    assert sig_before != sig_after
-
-
 def test_reused_structure_produces_identical_row_list_and_focus() -> None:
     controls = _make_controls(("layer_1",))
-    controls.session.layers["layer_1"].compositing_expanded = True
     controls.focus_descriptor = RowDescriptor(RowKind.TRACK_BLEND, slot="layer_1")
     view_a = controls.build_view_state(paused=False, fps=30.0)
     view_b = controls.build_view_state(paused=True, fps=60.0, position_sec=42.0)
@@ -524,7 +511,6 @@ def test_structure_signature_invalidates_on_preset_switching_trigger() -> None:
     config_save = controls._config_save
     session.layers["layer_1"].preset_switching = "on"
     session.layers["layer_1"].preset_switching_trigger = "timer"
-    session.layers["layer_1"].preset_switching_expanded = True
     sig_timer = view_state_structure_signature(
         session, config_save, notification_active=False
     )
@@ -546,19 +532,22 @@ def test_structure_signature_invalidates_on_preset_switching_trigger() -> None:
     assert sig_timeline != sig_off
 
 
-def test_structure_signature_invalidates_on_preset_switching_expanded() -> None:
+def test_structure_signature_invalidates_on_hard_cut_enabled() -> None:
     controls = _make_controls(("layer_1",))
     session = controls.session
     config_save = controls._config_save
-    session.layers["layer_1"].preset_switching_expanded = False
-    sig_collapsed = view_state_structure_signature(
+    layer = session.layers["layer_1"]
+    layer.preset_switching = "on"
+    layer.preset_switching_trigger = "projectm"
+    layer.hard_cut_enabled = True
+    sig_on = view_state_structure_signature(
         session, config_save, notification_active=False
     )
-    session.layers["layer_1"].preset_switching_expanded = True
-    sig_expanded = view_state_structure_signature(
+    layer.hard_cut_enabled = False
+    sig_off = view_state_structure_signature(
         session, config_save, notification_active=False
     )
-    assert sig_collapsed != sig_expanded
+    assert sig_on != sig_off
 
 
 def test_structure_signature_invalidates_on_switching_paused() -> None:
@@ -586,8 +575,6 @@ def test_builder_mirrors_switching_paused_into_layout() -> None:
     layer = session.layers["layer_1"]
     layer.preset_switching = "on"
     layer.preset_switching_trigger = "timer"
-    layer.preset_switching_expanded = True
-    layer.preset_list_expanded = False
     stem = MagicMock(spec=StemLayer)
     stem.switching_paused = False
     stem.auto_preset_path = None
@@ -596,17 +583,25 @@ def test_builder_mirrors_switching_paused_into_layout() -> None:
     stem.playlist = layer.playlist
     controls._view_state._layers_by_slot = {"layer_1": stem}
 
+    from cleave.viz.inspector import build_inspector_rows
+    from cleave.viz.navigator import layer_node_id
+
+    def inspector_kinds(view: object) -> set[RowKind]:
+        rows = build_inspector_rows(view, layer_node_id("layer_1"), frozenset())
+        return {
+            row.descriptor.kind
+            for row in rows
+            if row.descriptor is not None
+        }
+
     hidden = controls.build_view_state(paused=False)
-    hidden_kinds = {desc.kind for desc in hidden.layout.rows}
-    assert RowKind.TRACK_PRESET_SWITCHING_RESUME not in hidden_kinds
+    assert RowKind.TRACK_PRESET_SWITCHING_RESUME not in inspector_kinds(hidden)
     assert session.layers["layer_1"].switching_paused is False
 
     stem.switching_paused = True
     shown = controls.build_view_state(paused=False)
-    shown_kinds = {desc.kind for desc in shown.layout.rows}
     assert session.layers["layer_1"].switching_paused is True
-    assert RowKind.TRACK_PRESET_SWITCHING_RESUME in shown_kinds
-    assert RowKind.TRACK_PRESET_LIST_ADD not in shown_kinds
+    assert RowKind.TRACK_PRESET_SWITCHING_RESUME in inspector_kinds(shown)
 
 
 def test_structure_signature_invalidates_on_auto_preset_path() -> None:
@@ -690,11 +685,9 @@ def test_builder_syncs_playing_list_preset_from_projectm_position() -> None:
     layer = session.layers["layer_1"]
     layer.preset_switching = "on"
     layer.preset_switching_trigger = "projectm"
-    layer.preset_switching_expanded = True
     a = Path("/tmp/presets/list-a.milk").resolve()
     b = Path("/tmp/presets/list-b.milk").resolve()
     layer.preset_list = [str(a), str(b)]
-    layer.preset_list_expanded = True
     layer.auto_preset_path = a
 
     stem = MagicMock(spec=StemLayer)
@@ -737,13 +730,11 @@ def test_structure_signature_invalidates_on_persistent_notification() -> None:
 
 
 def test_timeline_mode_row_set_unchanged_when_timeline_enabled_toggles() -> None:
-    """Dimming when timeline is disabled does not add or remove preset-switching rows."""
+    """Dimming when timeline is disabled does not add or remove leftover rows."""
     controls = _make_controls(("layer_1",))
     session = controls.session
-    session.layers["layer_1"].expanded = True
     session.layers["layer_1"].preset_switching = "on"
     session.layers["layer_1"].preset_switching_trigger = "timer"
-    session.layers["layer_1"].preset_switching_expanded = True
     session.timeline.enabled = True
     builder = controls._view_state
     kinds_on = [desc.kind for desc in builder.build(paused=False).layout.rows]
@@ -967,6 +958,55 @@ def test_leftover_layout_omits_settings_project_and_transport() -> None:
         assert flag not in sig
 
 
+def test_leftover_layout_omits_track_rows() -> None:
+    controls = _make_controls(("layer_1", "layer_2"))
+    view = controls.build_view_state(paused=False)
+    kinds = {row.kind for row in view.layout.rows}
+    names = {kind.name for kind in kinds}
+    assert not any(name.startswith("TRACK_") for name in names)
+    assert RowKind.LAYER_MANAGEMENT_ADD not in kinds
+    assert RowKind.RENDER_SECTION_GAP not in kinds
+    assert RowKind.RENDER_OVERLAYS_HEADER in kinds
+    assert RowKind.RENDER_POST_FX_HEADER in kinds
+    assert RowKind.RENDER_PATTERN_MASK_HEADER in kinds
+    assert RowKind.RENDER_TIMELINE_HEADER in kinds
+
+    session = controls.session
+    session.timeline.panel_open = True
+    session.song_markers.expanded = True
+    session.song_markers.times = [1.0]
+    open_view = controls.build_view_state(paused=False)
+    open_kinds = {row.kind for row in open_view.layout.rows}
+    assert RowKind.SONG_MARKERS_HEADER in open_kinds
+    assert RowKind.SONG_MARKER_ITEM in open_kinds
+    assert RowKind.TIMELINE_BEAT_BAR_GRID_HEADER in open_kinds
+    assert not any(
+        row.kind.name.startswith("TRACK_") for row in open_view.layout.rows
+    )
+    assert RowKind.LAYER_MANAGEMENT_ADD not in open_kinds
+
+
+def test_curation_leftover_layout_is_notifications_only() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.settings.editor_mode = "preset_curation"
+    view = controls.build_view_state(paused=False)
+    assert all(row.kind == RowKind.PANEL_NOTIFICATION for row in view.layout.rows)
+
+    controls.show_notification("Saved")
+    toasted = controls.build_view_state(paused=False)
+    assert toasted.layout.rows
+    assert all(
+        row.kind == RowKind.PANEL_NOTIFICATION for row in toasted.layout.rows
+    )
+    assert not any(row.kind.name.startswith("TRACK_") for row in toasted.layout.rows)
+    assert RowKind.LAYER_MANAGEMENT_ADD not in {
+        row.kind for row in toasted.layout.rows
+    }
+    assert RowKind.RENDER_OVERLAYS_HEADER not in {
+        row.kind for row in toasted.layout.rows
+    }
+
+
 def test_row_layout_includes_song_marker_items_when_expanded() -> None:
     controls = _make_controls(("layer_1",))
     session = controls.session
@@ -1161,7 +1201,6 @@ def test_builder_caches_labels_across_idle_builds(monkeypatch) -> None:
     session = controls.session
     layer = session.layers["layer_1"]
     layer.preset_list = [f"/tmp/preset-{i}.milk" for i in range(40)]
-    layer.preset_list_expanded = False
 
     calls: list[int] = []
     original = __import__(
@@ -1180,22 +1219,6 @@ def test_builder_caches_labels_across_idle_builds(monkeypatch) -> None:
     controls.build_view_state(paused=False)
     controls.build_view_state(paused=False)
     assert calls == [1]
-
-
-def test_collapsed_preset_list_omits_item_rows() -> None:
-    controls = _make_controls(("layer_1",))
-    session = controls.session
-    layer = session.layers["layer_1"]
-    layer.preset_switching = "on"
-    layer.preset_switching_trigger = "timer"
-    layer.preset_switching_expanded = True
-    layer.preset_list = [f"/tmp/preset-{i}.milk" for i in range(5)]
-    layer.preset_list_expanded = False
-    view = controls.build_view_state(paused=False)
-    kinds = {desc.kind for desc in view.layout.rows}
-    assert RowKind.TRACK_PRESET_LIST in kinds
-    assert RowKind.TRACK_PRESET_LIST_ITEM not in kinds
-    assert RowKind.TRACK_PRESET_LIST_ADD not in kinds
 
 
 def test_session_mutation_visible_on_next_view_state() -> None:

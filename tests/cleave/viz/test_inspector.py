@@ -154,17 +154,12 @@ def _layer_view(
     editor_mode: str = "visualizer",
     trigger: str = "off",
     preset_list: list[str] | None = None,
-    preset_list_expanded: bool = True,
-    effects_expanded: bool = False,
 ) -> TuningViewState:
     tracks = {
         slot: make_track_block(
             stem=TEST_LAYER_STEMS.get(slot, "drums"),
             preset_switching_trigger=trigger,
             preset_list=list(preset_list or []),
-            preset_list_expanded=preset_list_expanded,
-            effects_expanded=effects_expanded,
-            compositing_expanded=False,
         )
         for slot in slots
     }
@@ -180,7 +175,7 @@ def _layer_view(
 
 
 def test_layer_slot_page_has_groups_without_track_header() -> None:
-    state = _layer_view(("layer_1",), effects_expanded=True)
+    state = _layer_view(("layer_1",))
     rows = build_inspector_rows(state, layer_node_id("layer_1"), frozenset())
     kinds = _kinds(rows)
     assert RowKind.TRACK_HEADER not in kinds
@@ -203,8 +198,6 @@ def test_dynamic_effect_and_preset_rows_keep_slot_identity() -> None:
         ("layer_1",),
         trigger="timer",
         preset_list=["/tmp/a.milk", "/tmp/b.milk"],
-        preset_list_expanded=False,
-        effects_expanded=True,
     )
     opened = frozenset(
         {InspectorGroupKey(RowKind.TRACK_EFFECTS_HEADER, slot="layer_1")}
@@ -269,8 +262,6 @@ def test_cleave_effects_start_closed_and_toggle_sticks_per_slot() -> None:
     from tests.cleave.viz.test_controls import _make_controls
 
     controls = _make_controls(("layer_1", "layer_2"))
-    controls.session.layers["layer_1"].effects_expanded = True
-    controls.session.layers["layer_2"].effects_expanded = True
     view = controls.build_view_state(paused=False)
     focus = controls.shell_focus
     key = InspectorGroupKey(RowKind.TRACK_EFFECTS_HEADER, slot="layer_1")
@@ -296,8 +287,6 @@ def test_cleave_effects_start_closed_and_toggle_sticks_per_slot() -> None:
     controls.inspector.toggle_group(key)
     assert effect_slots(layer_node_id("layer_1")) == []
     assert effect_slots(layer_node_id("layer_2")) == []
-    assert controls.session.layers["layer_1"].effects_expanded is True
-    assert controls.session.layers["layer_2"].effects_expanded is True
 
 
 def test_layers_root_count_and_curation_omits_add() -> None:

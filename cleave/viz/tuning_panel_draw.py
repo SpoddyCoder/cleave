@@ -106,10 +106,6 @@ _row_shows_action_enter_hint = row_shows_action_enter_hint
 _row_shows_enter_icon = row_shows_enter_icon
 
 
-def track_sub_rows_visible(state: TuningViewState, slot: str) -> bool:
-    return state.tracks[slot].runtime.expanded
-
-
 @dataclass(frozen=True)
 class PanelScrollMetrics:
     scrollable_indices: list[int]

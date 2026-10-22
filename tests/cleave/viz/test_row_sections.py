@@ -3,15 +3,14 @@
 from __future__ import annotations
 
 from cleave.effects.registry import effect_roster
-from cleave.viz.row_layout import row_draw_visible
 from cleave.viz.row_sections import (
     RENDER_OVERLAYS_SECTION,
     RENDER_OVERLAY_OPENING_CARD_SECTION,
     RENDER_OVERLAY_SECTION_KINDS,
     RENDER_POST_FX_SECTION,
-    append_track_section_rows,
+    TRACK_SECTION,
+    append_expand_section_rows,
     expand_section_expanded,
-    row_tree_indent_depth,
     section_header_from_section_tree,
     sub_row_expand_visible,
 )
@@ -39,10 +38,8 @@ def _track_block(**overrides: object) -> TrackBlock:
         opacity_pct=50,
         beat_sensitivity=1.0,
         effects={},
-        expanded=True,
         preset_switching="on",
         preset_switching_trigger="timer",
-        preset_switching_expanded=True,
         hard_cut_enabled=True,
     )
     base.update(overrides)
@@ -52,26 +49,14 @@ def _track_block(**overrides: object) -> TrackBlock:
 def _track_row_kinds(**overrides: object) -> list[RowKind]:
     state = _minimal_view_state(tracks={"layer_1": _track_block(**overrides)})
     rows: list[RowDescriptor] = []
-    append_track_section_rows(rows, state, "layer_1")
+    append_expand_section_rows(rows, TRACK_SECTION, state, "layer_1")
     return [row.kind for row in rows]
-
-
-def test_track_layout_collapsed_layer() -> None:
-    assert _track_row_kinds(expanded=False) == [RowKind.TRACK_HEADER]
-
-
-def test_track_layout_collapsed_preset_switching() -> None:
-    kinds = _track_row_kinds(preset_switching_expanded=False)
-    assert RowKind.TRACK_PRESET_SWITCHING in kinds
-    assert RowKind.TRACK_PRESET_SWITCHING_TRIGGER not in kinds
-    assert RowKind.TRACK_PRESET_DURATION not in kinds
 
 
 def test_track_layout_trigger_off_hides_switching_rows() -> None:
     kinds = _track_row_kinds(
         preset_switching="off",
         preset_switching_trigger="off",
-        preset_switching_expanded=True,
     )
     assert RowKind.TRACK_PRESET_SWITCHING in kinds
     assert RowKind.TRACK_PRESET_SWITCHING_TRIGGER in kinds
@@ -80,26 +65,10 @@ def test_track_layout_trigger_off_hides_switching_rows() -> None:
     assert RowKind.TRACK_PRESET_LIST not in kinds
 
 
-def test_track_layout_collapsed_effects() -> None:
-    kinds = _track_row_kinds(effects_expanded=False)
-    assert RowKind.TRACK_EFFECTS_HEADER in kinds
-    assert RowKind.TRACK_EFFECT not in kinds
-
-
-def test_track_layout_collapsed_compositing() -> None:
-    kinds = _track_row_kinds(compositing_expanded=False)
-    assert RowKind.TRACK_COMPOSITING_HEADER in kinds
-    assert RowKind.TRACK_BLEND not in kinds
-    assert RowKind.TRACK_OPACITY not in kinds
-
-
 def test_track_layout_conditional_rows_when_predicates_pass() -> None:
     timer_kinds = _track_row_kinds(
         preset_switching="on",
         preset_switching_trigger="timer",
-        preset_switching_expanded=True,
-        effects_expanded=False,
-        preset_list_expanded=True,
     )
     assert RowKind.TRACK_PRESET_DURATION in timer_kinds
     assert RowKind.TRACK_PRESET_SWITCHING_TRIGGER in timer_kinds
@@ -109,18 +78,11 @@ def test_track_layout_conditional_rows_when_predicates_pass() -> None:
     assert RowKind.TRACK_PRESET_LIST_POPULATE in timer_kinds
     assert RowKind.TRACK_SOFT_CUT_DURATION not in timer_kinds
     assert RowKind.TRACK_HARD_CUT_ENABLED not in timer_kinds
-    list_depth = row_tree_indent_depth(RowKind.TRACK_PRESET_LIST)
-    item_depth = list_depth + 1
-    assert list_depth == row_tree_indent_depth(RowKind.TRACK_PRESET_SWITCHING_TRIGGER)
-    assert row_tree_indent_depth(RowKind.TRACK_PRESET_LIST_ADD) == item_depth
-    assert row_tree_indent_depth(RowKind.TRACK_PRESET_LIST_ITEM) == item_depth
-    assert row_tree_indent_depth(RowKind.TRACK_PRESET_LIST_POPULATE) == item_depth
 
     projectm_kinds = _track_row_kinds(
         preset_switching="on",
         preset_switching_trigger="projectm",
         hard_cut_enabled=True,
-        effects_expanded=False,
     )
     assert RowKind.TRACK_PRESET_DURATION in projectm_kinds
     assert RowKind.TRACK_SOFT_CUT_DURATION in projectm_kinds
@@ -133,8 +95,6 @@ def test_track_layout_conditional_rows_when_predicates_pass() -> None:
     timeline_kinds = _track_row_kinds(
         preset_switching="on",
         preset_switching_trigger="timeline",
-        effects_expanded=False,
-        preset_list_expanded=False,
     )
     assert RowKind.TRACK_PRESET_SWITCHING_TRIGGER in timeline_kinds
     assert RowKind.TRACK_PRESET_DURATION not in timeline_kinds
@@ -143,37 +103,19 @@ def test_track_layout_conditional_rows_when_predicates_pass() -> None:
     assert RowKind.TRACK_HARD_CUT_ENABLED not in timeline_kinds
     assert RowKind.TRACK_PRESET_START_CLEAN in timeline_kinds
     assert RowKind.TRACK_PRESET_LIST in timeline_kinds
-    assert RowKind.TRACK_PRESET_LIST_POPULATE not in timeline_kinds
-    assert RowKind.TRACK_PRESET_LIST_ADD not in timeline_kinds
-
-    timeline_expanded_kinds = _track_row_kinds(
-        preset_switching="on",
-        preset_switching_trigger="timeline",
-        preset_list_expanded=True,
-        effects_expanded=False,
-    )
-    assert RowKind.TRACK_PRESET_LIST_POPULATE in timeline_expanded_kinds
-    assert RowKind.TRACK_PRESET_LIST_ADD in timeline_expanded_kinds
+    assert RowKind.TRACK_PRESET_LIST_POPULATE in timeline_kinds
+    assert RowKind.TRACK_PRESET_LIST_ADD in timeline_kinds
 
 
 def test_track_layout_omits_conditional_rows_when_predicates_fail() -> None:
     none_kinds = _track_row_kinds(
         preset_switching="off",
         preset_switching_trigger="off",
-        preset_switching_expanded=True,
     )
     assert RowKind.TRACK_PRESET_DURATION not in none_kinds
     assert RowKind.TRACK_PRESET_LIST not in none_kinds
     assert RowKind.TRACK_PRESET_SWITCHING_TRIGGER in none_kinds
     assert RowKind.TRACK_PRESET_LIST_POPULATE not in none_kinds
-
-    collapsed_list = _track_row_kinds(
-        preset_switching="on",
-        preset_list_expanded=False,
-    )
-    assert RowKind.TRACK_PRESET_LIST in collapsed_list
-    assert RowKind.TRACK_PRESET_LIST_ADD not in collapsed_list
-    assert RowKind.TRACK_PRESET_LIST_POPULATE not in collapsed_list
 
     hard_cut_off = _track_row_kinds(
         preset_switching="on",
@@ -185,18 +127,15 @@ def test_track_layout_omits_conditional_rows_when_predicates_fail() -> None:
 
 
 def test_track_layout_effect_roster_when_expanded() -> None:
-    kinds = _track_row_kinds(effects_expanded=True)
+    kinds = _track_row_kinds()
     effect_rows = [kind for kind in kinds if kind == RowKind.TRACK_EFFECT]
     assert len(effect_rows) == len(effect_roster("drums"))
 
 
 def test_track_layout_row_order_when_fully_expanded() -> None:
     kinds = _track_row_kinds(
-        effects_expanded=True,
-        compositing_expanded=True,
         preset_switching_trigger="projectm",
         hard_cut_enabled=True,
-        preset_list_expanded=True,
         preset_list=["a.milk", "b.milk"],
     )
     effects_header = kinds.index(RowKind.TRACK_EFFECTS_HEADER)
@@ -294,48 +233,30 @@ def test_sub_row_expand_visible_nested_sections() -> None:
     threshold = RowDescriptor(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD)
     assert sub_row_expand_visible(highlight_collapsed, threshold) is False
 
-    layer_collapsed = _minimal_view_state(
-        tracks={"layer_1": _track_block(expanded=False)},
+
+def test_section_omits_conditional_rows_when_predicate_fails() -> None:
+    none_kinds = _track_row_kinds(
+        preset_switching="off",
+        preset_switching_trigger="off",
     )
-    stem = RowDescriptor(RowKind.TRACK_STEM, slot="layer_1")
-    assert sub_row_expand_visible(layer_collapsed, stem) is False
+    assert RowKind.TRACK_PRESET_DURATION not in none_kinds
 
-
-def test_layout_omits_conditional_rows_when_predicate_fails() -> None:
-    none_mode = _minimal_view_state(
-        tracks={
-            "layer_1": _track_block(
-                preset_switching="off",
-                preset_switching_trigger="off",
-            )
-        },
+    hard_cut_off = _track_row_kinds(
+        preset_switching="on",
+        preset_switching_trigger="projectm",
+        hard_cut_enabled=False,
     )
-    duration = RowDescriptor(RowKind.TRACK_PRESET_DURATION, slot="layer_1")
-    assert duration not in none_mode.layout.rows
+    assert RowKind.TRACK_HARD_CUT_DURATION not in hard_cut_off
 
-    hard_cut_off = _minimal_view_state(
-        tracks={"layer_1": _track_block(hard_cut_enabled=False)},
+
+def test_section_includes_conditional_rows_when_predicates_pass() -> None:
+    projectm_kinds = _track_row_kinds(
+        preset_switching="on",
+        preset_switching_trigger="projectm",
+        hard_cut_enabled=True,
     )
-    hard_cut_min = RowDescriptor(RowKind.TRACK_HARD_CUT_DURATION, slot="layer_1")
-    assert hard_cut_min not in hard_cut_off.layout.rows
-
-
-def test_layout_includes_conditional_rows_when_predicates_pass() -> None:
-    projectm = _minimal_view_state(
-        tracks={
-            "layer_1": _track_block(
-                preset_switching="on",
-                preset_switching_trigger="projectm",
-                hard_cut_enabled=True,
-            )
-        }
-    )
-    duration = RowDescriptor(RowKind.TRACK_PRESET_DURATION, slot="layer_1")
-    hard_cut_min = RowDescriptor(RowKind.TRACK_HARD_CUT_DURATION, slot="layer_1")
-    assert duration in projectm.layout.rows
-    assert hard_cut_min in projectm.layout.rows
-    assert row_draw_visible(projectm, duration) is True
-    assert row_draw_visible(projectm, hard_cut_min) is True
+    assert RowKind.TRACK_PRESET_DURATION in projectm_kinds
+    assert RowKind.TRACK_HARD_CUT_DURATION in projectm_kinds
 
 
 def test_section_header_from_tree_preset_switching_submenu() -> None:

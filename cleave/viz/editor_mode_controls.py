@@ -203,12 +203,6 @@ class EditorModeController:
             return
         self._enter_curation_mode()
 
-    def _expand_layer_one(self) -> None:
-        if not self.session.layer_z_order:
-            return
-        slot = self.session.layer_z_order[0]
-        self.session.layers[slot].expanded = True
-
     def _enter_curation_mode(self) -> None:
         self.session.settings.editor_mode = "preset_curation"
         self._prepare_curation_runtime()
@@ -218,7 +212,6 @@ class EditorModeController:
         """Session-only curation defaults: full-mix focus layer, no solo/auto-switch."""
         self.session.solo_slot = None
         self.session.timeline.panel_open = False
-        self._expand_layer_one()
         focus = curation_focus_slot(self.session)
         if focus is not None:
             self.session.layers[focus].stem = "full_mix"

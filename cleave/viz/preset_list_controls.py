@@ -227,7 +227,6 @@ class PresetListController:
                     project_dir=self.project_dir,
                     preset_root=self.preset_root,
                 )
-            layer.preset_list_expanded = True
             if self._layer_bindings is not None:
                 self._layer_bindings.on_preset_switching_change(slot)
             count = len(layer.preset_list)

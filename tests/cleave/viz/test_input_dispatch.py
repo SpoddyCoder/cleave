@@ -353,7 +353,6 @@ def test_global_seek_arms_repeat_on_timeline_handler() -> None:
 
 def test_ctrl_arrows_seek_from_value_row_without_changing_value() -> None:
     runtime = _make_runtime(submenu_focused=False)
-    runtime.controls.session.layers["layer_1"].compositing_expanded = True
     runtime.controls.focus_cursor = MainFocus(
         RowDescriptor(RowKind.TRACK_OPACITY, slot="layer_1")
     )
@@ -372,14 +371,12 @@ def test_shift_arrows_seek_from_track_header() -> None:
     runtime.controls.focus_cursor = MainFocus(
         RowDescriptor(RowKind.TRACK_HEADER, slot="layer_1")
     )
-    expanded = runtime.controls.session.layers["layer_1"].expanded
     player = runtime.playback.player
     player.seek(10.0)
     assert dispatch_keydown(
         keydown(pygame.K_RIGHT, mod=pygame.KMOD_SHIFT), runtime
     ) is True
     assert player.file_position_sec() == 10.0 + SEEK_TINY
-    assert runtime.controls.session.layers["layer_1"].expanded is expanded
 
 
 def test_global_seek_from_move_mode() -> None:

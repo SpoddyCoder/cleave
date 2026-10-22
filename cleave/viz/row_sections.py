@@ -35,7 +35,7 @@ PanelAnchorToggleFn = Callable[["TuningControls", bool], None]
 
 
 def _inspector_group_expanded(_state: TuningViewState, _slot: str | None) -> bool:
-    """Settings and Project groups expand in the inspector, not the session."""
+    """Inspector groups open from shell focus, not a session flag."""
     return True
 
 
@@ -132,36 +132,6 @@ def _toggle_render_post_fx_limiter(
     controls: TuningControls, _slot: str | None, forward: bool
 ) -> None:
     controls.render_post_fx.set_limiter_expanded(forward)
-
-
-def _toggle_track_header(controls: TuningControls, slot: str | None, forward: bool) -> None:
-    if slot is None:
-        return
-    controls.set_expanded(slot, forward)
-
-
-def _toggle_preset_switching(controls: TuningControls, slot: str | None, forward: bool) -> None:
-    if slot is None:
-        return
-    controls.set_preset_switching_expanded(slot, forward)
-
-
-def _toggle_effects_header(controls: TuningControls, slot: str | None, forward: bool) -> None:
-    if slot is None:
-        return
-    controls.set_effects_expanded(slot, forward)
-
-
-def _toggle_compositing(controls: TuningControls, slot: str | None, forward: bool) -> None:
-    if slot is None:
-        return
-    controls.set_compositing_expanded(slot, forward)
-
-
-def _toggle_preset_list(controls: TuningControls, slot: str | None, forward: bool) -> None:
-    if slot is None:
-        return
-    controls.set_preset_list_expanded(slot, forward)
 
 
 def _toggle_song_markers(controls: TuningControls, _slot: str | None, forward: bool) -> None:
@@ -356,36 +326,6 @@ def _render_post_fx_limiter_expanded(
     return state.render_post_fx.limiter.expanded
 
 
-def _track_header_expanded(state: TuningViewState, slot: str | None) -> bool:
-    if slot is None:
-        return True
-    return state.tracks[slot].runtime.expanded
-
-
-def _track_preset_switching_expanded(state: TuningViewState, slot: str | None) -> bool:
-    if slot is None:
-        return True
-    return state.tracks[slot].runtime.preset_switching_expanded
-
-
-def _track_effects_expanded(state: TuningViewState, slot: str | None) -> bool:
-    if slot is None:
-        return True
-    return state.tracks[slot].runtime.effects_expanded
-
-
-def _track_compositing_expanded(state: TuningViewState, slot: str | None) -> bool:
-    if slot is None:
-        return True
-    return state.tracks[slot].runtime.compositing_expanded
-
-
-def _preset_list_expanded(state: TuningViewState, slot: str | None) -> bool:
-    if slot is None:
-        return True
-    return state.tracks[slot].runtime.preset_list_expanded
-
-
 def _song_markers_expanded(state: TuningViewState, _slot: str | None) -> bool:
     return state.render_timeline.song_markers_expanded
 
@@ -563,8 +503,8 @@ LAYERS_SECTION = ExpandSectionDef(
 CURATION_LAYER_SECTION = ExpandSectionDef(
     header_kind=RowKind.TRACK_HEADER,
     context="per_slot",
-    read_expanded=_track_header_expanded,
-    toggle=_toggle_track_header,
+    read_expanded=_inspector_group_expanded,
+    toggle=_inspector_group_toggle,
     children=(
         SectionNode(leaf_kind=RowKind.TRACK_STEM),
         SectionNode(leaf_kind=RowKind.TRACK_BEAT),
@@ -864,8 +804,8 @@ HARD_CUT_ENABLED = ConditionalRowsDef(
 PRESET_LIST_SECTION = ExpandSectionDef(
     header_kind=RowKind.TRACK_PRESET_LIST,
     context="per_slot",
-    read_expanded=_preset_list_expanded,
-    toggle=_toggle_preset_list,
+    read_expanded=_inspector_group_expanded,
+    toggle=_inspector_group_toggle,
     children=(),
     append_dynamic_children=_append_preset_list_rows,
 )
@@ -911,8 +851,8 @@ PRESET_SWITCHING_ACTIVE = ConditionalRowsDef(
 TRACK_PRESET_SWITCHING_SECTION = ExpandSectionDef(
     header_kind=RowKind.TRACK_PRESET_SWITCHING,
     context="per_slot",
-    read_expanded=_track_preset_switching_expanded,
-    toggle=_toggle_preset_switching,
+    read_expanded=_inspector_group_expanded,
+    toggle=_inspector_group_toggle,
     children=(
         SectionNode(leaf_kind=RowKind.TRACK_PRESET_SWITCHING_TRIGGER),
         SectionNode(conditional=PRESET_SWITCHING_ACTIVE),
@@ -922,8 +862,8 @@ TRACK_PRESET_SWITCHING_SECTION = ExpandSectionDef(
 TRACK_EFFECTS_SECTION = ExpandSectionDef(
     header_kind=RowKind.TRACK_EFFECTS_HEADER,
     context="per_slot",
-    read_expanded=_track_effects_expanded,
-    toggle=_toggle_effects_header,
+    read_expanded=_inspector_group_expanded,
+    toggle=_inspector_group_toggle,
     children=(),
     append_dynamic_children=_append_track_effect_rows,
 )
@@ -931,8 +871,8 @@ TRACK_EFFECTS_SECTION = ExpandSectionDef(
 TRACK_COMPOSITING_SECTION = ExpandSectionDef(
     header_kind=RowKind.TRACK_COMPOSITING_HEADER,
     context="per_slot",
-    read_expanded=_track_compositing_expanded,
-    toggle=_toggle_compositing,
+    read_expanded=_inspector_group_expanded,
+    toggle=_inspector_group_toggle,
     children=(
         SectionNode(leaf_kind=RowKind.TRACK_BLEND),
         SectionNode(leaf_kind=RowKind.TRACK_OPACITY),
@@ -942,8 +882,8 @@ TRACK_COMPOSITING_SECTION = ExpandSectionDef(
 TRACK_SECTION = ExpandSectionDef(
     header_kind=RowKind.TRACK_HEADER,
     context="per_slot",
-    read_expanded=_track_header_expanded,
-    toggle=_toggle_track_header,
+    read_expanded=_inspector_group_expanded,
+    toggle=_inspector_group_toggle,
     children=(
         SectionNode(leaf_kind=RowKind.TRACK_STEM),
         SectionNode(leaf_kind=RowKind.TRACK_BEAT),
@@ -1285,17 +1225,9 @@ def _build_row_tree_indent_depth() -> dict[RowKind, int]:
     depths: dict[RowKind, int] = {}
     _assign_expand_indent_depth(depths, SETTINGS_SECTION, 0)
     _assign_expand_indent_depth(depths, PROJECT_SECTION, 0)
-    _assign_expand_indent_depth(depths, TRACK_SECTION, 0)
     for node in RENDER_SECTION_NODES:
         if node.expand is not None:
             _assign_expand_indent_depth(depths, node.expand, 0)
-    depths[RowKind.TRACK_EFFECT] = 2
-    # Dynamic preset list rows nest under the preset list header.
-    preset_list_depth = depths[RowKind.TRACK_PRESET_LIST]
-    preset_list_item_depth = preset_list_depth + 1
-    depths[RowKind.TRACK_PRESET_LIST_ITEM] = preset_list_item_depth
-    depths[RowKind.TRACK_PRESET_LIST_ADD] = preset_list_item_depth
-    depths[RowKind.TRACK_PRESET_LIST_POPULATE] = preset_list_item_depth
     _assign_expand_indent_depth(depths, SONG_MARKERS_SECTION, 1)
     depths[RowKind.SONG_MARKER_ITEM] = 2
     depths[RowKind.TIMELINE_RESET] = 1
@@ -1387,10 +1319,6 @@ def sub_row_expand_visible(state: TuningViewState, desc: RowDescriptor) -> bool:
         visible = expand_section_sub_row_visible(state, desc, section)
         if visible is not None:
             return visible
-    if desc.slot is not None:
-        visible = expand_section_sub_row_visible(state, desc, TRACK_SECTION)
-        if visible is not None:
-            return visible
     return True
 
 
@@ -1469,14 +1397,6 @@ def append_render_section_rows(
                 append_expand_section_rows(row_list, TIMELINE_CUTS_SECTION, state)
                 append_expand_section_rows(row_list, TIMELINE_PRESETS_SECTION, state)
                 row_list.append(RowDescriptor(RowKind.TIMELINE_RESET))
-
-
-def append_track_section_rows(
-    row_list: list[RowDescriptor],
-    state: TuningViewState,
-    slot: str,
-) -> None:
-    append_expand_section_rows(row_list, TRACK_SECTION, state, slot)
 
 
 _PER_SLOT_SECTION_HEADERS = frozenset(

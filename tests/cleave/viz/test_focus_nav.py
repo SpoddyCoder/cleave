@@ -135,9 +135,9 @@ def test_resolve_cursor_clamps_timeline_row_when_layer_count_shrinks() -> None:
 def test_move_focus_steps_through_main_ring() -> None:
     state = _minimal_view_state()
     ring = build_focus_ring(state)
-    start = ring[3]
-    assert move_focus(start, 1, state) == ring[4]
-    assert move_focus(start, -1, state) == ring[2]
+    start = ring[1]
+    assert move_focus(start, 1, state) == ring[2]
+    assert move_focus(start, -1, state) == ring[0]
     assert move_focus(start, len(ring), state) == start
 
 

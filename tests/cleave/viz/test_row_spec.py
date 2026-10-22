@@ -676,8 +676,8 @@ def test_settings_ui_min_width_follows_max_width() -> None:
 
 
 def test_labeled_row_prefix_track_depths() -> None:
-    assert labeled_row_prefix(RowKind.TRACK_STEM) == "└─ driving stem: "
-    assert labeled_row_prefix(RowKind.TRACK_PRESET_SWITCHING_TRIGGER) == "  └─ trigger: "
+    assert labeled_row_prefix(RowKind.TRACK_STEM) == "driving stem: "
+    assert labeled_row_prefix(RowKind.TRACK_PRESET_SWITCHING_TRIGGER) == "trigger: "
 
 
 def test_format_row_value_settings() -> None:
@@ -1043,7 +1043,7 @@ def test_apply_field_horizontal_via_controls_keydown() -> None:
 def test_expand_subheader_prefix_preset_switching() -> None:
     assert (
         expand_subheader_prefix(RowKind.TRACK_PRESET_SWITCHING)
-        == "└─ preset switching "
+        == "preset switching "
     )
     assert expand_subheader_prefix(RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER) == (
         "  └─ title "
@@ -1079,13 +1079,12 @@ def test_row_expand_subheader_display_text() -> None:
             "layer_1": make_track_block(
                 preset_switching="on",
                 preset_switching_trigger="projectm",
-                preset_switching_expanded=False,
             )
         }
     )
     assert (
         row_expand_subheader_display_text(state, desc)
-        == "└─ preset switching ▶"
+        == "preset switching ▼"
     )
 
 
@@ -1186,7 +1185,11 @@ def test_preset_list_populate_is_full_line_action() -> None:
 
 
 def test_resume_switching_row_only_while_paused() -> None:
-    from cleave.viz.row_sections import append_track_section_rows, row_tree_indent_depth
+    from cleave.viz.row_sections import (
+        TRACK_SECTION,
+        append_expand_section_rows,
+        row_tree_indent_depth,
+    )
 
     spec = row_spec(RowKind.TRACK_PRESET_SWITCHING_RESUME)
     assert spec.affordance == RowAffordance.ACTION
@@ -1194,20 +1197,12 @@ def test_resume_switching_row_only_while_paused() -> None:
     assert spec.shows_enter_icon is True
     assert spec.blocked_by_section_lock is True
     assert spec.parent_group == "track"
-    assert row_tree_indent_depth(RowKind.TRACK_PRESET_SWITCHING_RESUME) == (
-        row_tree_indent_depth(RowKind.TRACK_PRESET)
-    )
+    assert row_tree_indent_depth(RowKind.TRACK_PRESET_SWITCHING_RESUME) == 0
     assert full_line_prefix(RowKind.TRACK_PRESET_SWITCHING_RESUME) == (
-        tree_branch_prefix(row_tree_indent_depth(RowKind.TRACK_PRESET))
-        + "Switching Paused - Enter To Resume"
+        "Switching Paused - Enter To Resume"
     )
 
-    def kinds(
-        *,
-        paused: bool,
-        list_expanded: bool,
-        switching_expanded: bool = True,
-    ) -> list[RowKind]:
+    def kinds(*, paused: bool) -> list[RowKind]:
         state = _minimal_view_state(
             tracks={
                 "layer_1": make_track_block(
@@ -1218,40 +1213,25 @@ def test_resume_switching_row_only_while_paused() -> None:
                     opacity_pct=50,
                     beat_sensitivity=1.0,
                     effects={},
-                    expanded=True,
                     preset_switching="on",
                     preset_switching_trigger="timer",
-                    preset_switching_expanded=switching_expanded,
                     preset_list=["/tmp/a.milk"],
-                    preset_list_expanded=list_expanded,
                     switching_paused=paused,
                 )
             }
         )
         rows: list[RowDescriptor] = []
-        append_track_section_rows(rows, state, "layer_1")
+        append_expand_section_rows(rows, TRACK_SECTION, state, "layer_1")
         return [row.kind for row in rows]
 
-    hidden = kinds(paused=False, list_expanded=True)
+    hidden = kinds(paused=False)
     assert RowKind.TRACK_PRESET_SWITCHING_RESUME not in hidden
-    menu_closed = kinds(paused=True, list_expanded=False, switching_expanded=False)
-    assert menu_closed.index(RowKind.TRACK_PRESET_SWITCHING_RESUME) == (
-        menu_closed.index(RowKind.TRACK_PRESET) + 1
+    shown = kinds(paused=True)
+    assert shown.index(RowKind.TRACK_PRESET_SWITCHING_RESUME) == (
+        shown.index(RowKind.TRACK_PRESET) + 1
     )
-    assert menu_closed.index(RowKind.TRACK_PRESET_SWITCHING) == (
-        menu_closed.index(RowKind.TRACK_PRESET_SWITCHING_RESUME) + 1
-    )
-    assert RowKind.TRACK_PRESET_SWITCHING_TRIGGER not in menu_closed
-    collapsed = kinds(paused=True, list_expanded=False)
-    assert RowKind.TRACK_PRESET_SWITCHING_RESUME in collapsed
-    assert RowKind.TRACK_PRESET_LIST_ADD not in collapsed
-    expanded = kinds(paused=True, list_expanded=True)
-    assert expanded.index(RowKind.TRACK_PRESET_SWITCHING_RESUME) == (
-        expanded.index(RowKind.TRACK_PRESET) + 1
-    )
-    assert expanded.index(RowKind.TRACK_PRESET_SWITCHING) == (
-        expanded.index(RowKind.TRACK_PRESET_SWITCHING_RESUME) + 1
-    )
+    assert RowKind.TRACK_PRESET_SWITCHING_TRIGGER in shown
+    assert RowKind.TRACK_PRESET_LIST_ADD in shown
 
 
 def test_preset_list_add_populate_share_list_item_tree_chrome() -> None:
@@ -1260,7 +1240,7 @@ def test_preset_list_add_populate_share_list_item_tree_chrome() -> None:
 
     item_depth = row_tree_indent_depth(RowKind.TRACK_PRESET_LIST_ITEM)
     branch = tree_branch_prefix(item_depth)
-    assert branch == "    └─ "
+    assert branch == ""
     assert full_line_prefix(RowKind.TRACK_PRESET_LIST_ADD) == (
         branch + "Add Current Preset"
     )
@@ -1270,16 +1250,6 @@ def test_preset_list_add_populate_share_list_item_tree_chrome() -> None:
         populate_branch + "Populate Presets"
     )
     assert labeled_row_prefix(RowKind.TRACK_PRESET_LIST_ITEM).startswith(branch)
-
-
-def test_apply_field_horizontal_expand_subheader_when_layer_locked() -> None:
-    controls = _make_controls(("layer_1",))
-    controls.session.layers["layer_1"].locked = True
-    desc = RowDescriptor(RowKind.TRACK_EFFECTS_HEADER, slot="layer_1")
-    assert controls.session.layers["layer_1"].effects_expanded is False
-
-    assert apply_field_horizontal(controls, desc, True, False) is True
-    assert controls.session.layers["layer_1"].effects_expanded is True
 
 
 def test_apply_field_horizontal_track_header_solo_and_expand() -> None:
@@ -1292,10 +1262,6 @@ def test_apply_field_horizontal_track_header_solo_and_expand() -> None:
     apply_field_toggle_solo(controls, desc)
     assert controls.session.solo_slot is None
 
-    apply_field_horizontal(controls, desc, False, False)
-    assert controls.session.layers["layer_1"].expanded is False
-    apply_field_horizontal(controls, desc, True, False)
-    assert controls.session.layers["layer_1"].expanded is True
     apply_field_toggle_enabled(controls, desc)
     assert controls.session.layers["layer_1"].enabled is False
 
@@ -1382,8 +1348,8 @@ def test_track_effect_dynamic_label_and_prefix() -> None:
     desc = RowDescriptor(
         RowKind.TRACK_EFFECT, slot="layer_1", effect_id="pulse", driver_slug="onset"
     )
-    assert row_dynamic_labeled_prefix(desc) == "  └─ pulse (onset): "
-    assert row_dynamic_labeled_display_text(state, desc) == "  └─ pulse (onset): 35%"
+    assert row_dynamic_labeled_prefix(desc) == "pulse (onset): "
+    assert row_dynamic_labeled_display_text(state, desc) == "pulse (onset): 35%"
 
 
 def test_full_line_delete_layer_prefix() -> None:

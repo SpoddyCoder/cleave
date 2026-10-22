@@ -5,12 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from cleave.config_schema.layers import MAX_LAYER_COUNT
 from cleave.viz.row_sections import (
-    CURATION_LAYER_SECTION,
-    append_expand_section_rows,
     append_render_section_rows,
-    append_track_section_rows,
     sub_row_expand_visible,
 )
 from cleave.viz.row_kinds import RowDescriptor, RowKind
@@ -148,20 +144,7 @@ class RowLayout:
             row_list.append(
                 RowDescriptor(RowKind.PANEL_NOTIFICATION, marker_index=1)
             )
-        if curation:
-            if state.layer_z_order:
-                append_expand_section_rows(
-                    row_list,
-                    CURATION_LAYER_SECTION,
-                    state,
-                    state.layer_z_order[0],
-                )
-        else:
-            for slot in state.layer_z_order:
-                append_track_section_rows(row_list, state, slot)
-            if len(state.layer_z_order) < MAX_LAYER_COUNT:
-                row_list.append(RowDescriptor(RowKind.LAYER_MANAGEMENT_ADD))
-            row_list.append(RowDescriptor(RowKind.RENDER_SECTION_GAP))
+        if not curation:
             append_render_section_rows(row_list, state)
         rows = tuple(row_list)
         return cls(
@@ -246,8 +229,18 @@ class RowLayout:
     ) -> RowDescriptor:
         frame = state.layout_frame
         if frame is not None:
-            return resolve_navigable_descriptor(desc, frame.navigable_descriptors)
-        return resolve_navigable_descriptor(desc, self.navigable_descriptors(state))
+            navigable = frame.navigable_descriptors
+        else:
+            navigable = tuple(self.navigable_descriptors(state))
+        fallback = self.rows[0] if self.rows else None
+        resolved = resolve_navigable_descriptor(
+            desc, navigable, fallback=fallback
+        )
+        if not self.rows:
+            return RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
+        if not self.contains_descriptor(resolved):
+            return self.rows[0]
+        return resolved
 
     def header_row_count(self) -> int:
         count = 0

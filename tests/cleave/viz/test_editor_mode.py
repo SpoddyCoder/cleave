@@ -49,7 +49,6 @@ def _curation_view_state(**kwargs: object) -> TuningViewState:
                 opacity_pct=50,
                 beat_sensitivity=1.0,
                 effects={},
-                expanded=True,
             ),
             "layer_2": make_track_block(
                 stem="bass",
@@ -59,7 +58,6 @@ def _curation_view_state(**kwargs: object) -> TuningViewState:
                 opacity_pct=50,
                 beat_sensitivity=1.0,
                 effects={},
-                expanded=True,
             ),
         },
     }
@@ -94,32 +92,15 @@ def test_curation_layout_allowlist() -> None:
     assert RowKind.RENDER_OVERLAYS_HEADER not in kinds
     assert RowKind.RENDER_TIMELINE_HEADER not in kinds
     assert RowKind.LAYER_MANAGEMENT_ADD not in kinds
-
-    track_headers = [
-        row for row in state.layout.rows if row.kind == RowKind.TRACK_HEADER
-    ]
-    assert len(track_headers) == 1
-    assert track_headers[0].slot == "layer_1"
-    assert "layer_2" not in slots
-
-    layer_1_kinds = {
-        row.kind
-        for row in state.layout.rows
-        if row.slot == "layer_1" and row.kind != RowKind.TRACK_HEADER
-    }
-    assert layer_1_kinds == {
-        RowKind.TRACK_PRESET_DIR,
-        RowKind.TRACK_PRESET,
-        RowKind.TRACK_STEM,
-        RowKind.TRACK_BEAT,
-    }
+    assert not any(name.startswith("TRACK_") for name in names)
+    assert slots == []
+    assert all(kind == RowKind.PANEL_NOTIFICATION for kind in kinds)
 
 
 def test_curation_ignores_non_allowlisted_keys() -> None:
     controls = _make_controls(("layer_1", "layer_2"))
     controls.session.settings.editor_mode = "preset_curation"
     layer = controls.session.layers["layer_1"]
-    layer.expanded = True
     controls.focus_cursor = MainFocus(
         RowDescriptor(RowKind.TRACK_HEADER, slot="layer_1")
     )
@@ -166,9 +147,8 @@ def test_curation_shows_only_focus_layer() -> None:
     assert effective_layer_enabled(session, "layer_2", 0.0) is False
 
 
-def test_enter_curation_expands_layer_one() -> None:
+def test_enter_curation_confirms_via_modal() -> None:
     controls = _make_controls(("layer_1", "layer_2"))
-    controls.session.layers["layer_1"].expanded = False
     _prompt_editor_mode(controls)
     view = controls.modal_host.view_state()
     assert view is not None
@@ -179,7 +159,6 @@ def test_enter_curation_expands_layer_one() -> None:
     _choose_editor_mode_option(controls, "Ok")
     assert not controls.modal_host.active
     assert controls.session.settings.editor_mode == "preset_curation"
-    assert controls.session.layers["layer_1"].expanded is True
 
 
 def test_editor_mode_change_syncs_compositor_format() -> None:
@@ -253,14 +232,11 @@ def test_curation_allowlisted_keys_still_work() -> None:
 def test_curation_ignores_layer_lock() -> None:
     from cleave.viz.row_layout import row_navigable
     from cleave.viz.row_spec import section_locked
-    from cleave.viz.theme import VALUE
-    from cleave.viz.tuning_panel_draw import _row_value_color
 
     controls = _make_controls(("layer_1",))
     controls.session.settings.editor_mode = "preset_curation"
     layer = controls.session.layers["layer_1"]
     layer.locked = True
-    layer.expanded = True
 
     view = controls.build_view_state(paused=True)
     header = RowDescriptor(RowKind.TRACK_HEADER, slot="layer_1")
@@ -269,8 +245,7 @@ def test_curation_ignores_layer_lock() -> None:
     assert section_locked(controls.session, preset) is False
     assert view.tracks["layer_1"].runtime.locked is True
     assert row_navigable(view, preset) is True
-    preset_index = view.layout.find_descriptor(preset)
-    assert _row_value_color(view, preset_index) == VALUE
+    assert preset not in view.layout.rows
 
     controls.focus_cursor = MainFocus(preset)
     mock_curation = MagicMock()
