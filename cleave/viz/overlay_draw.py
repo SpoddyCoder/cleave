@@ -6,8 +6,10 @@ import pygame
 
 from cleave.gl_compositor import GlCompositor, OverlayTextureSlot
 from cleave.viz import modal_overlay
+from cleave.viz.help_content import help_focus_descriptor
 from cleave.viz.help_overlay import HelpOverlay
 from cleave.viz.modal import ModalHost
+from cleave.viz.shell_focus import ShellFocusState
 from cleave.viz.tap_sync import CONSISTENCY_WINDOW
 from cleave.viz.tap_sync_controls import TapSyncProgressView
 from cleave.viz.tuning_panel_draw import TuningOverlay
@@ -93,15 +95,24 @@ def _present_overlay(
         present_overlay(compositor, tex_id, screen_rect, tex_uv, alpha=alpha)
 
 
-def _help_compose_kwargs(view_state: TuningViewState) -> dict[str, object]:
+def _help_compose_kwargs(
+    view_state: TuningViewState,
+    shell_focus: ShellFocusState | None = None,
+) -> dict[str, object]:
     focus = view_state.focus_descriptor
+    described = help_focus_descriptor(
+        focus,
+        shell_focus,
+        timeline_focused=view_state.timeline_submenu_focused,
+    )
     preset_switching = None
-    if focus.slot is not None:
-        track = view_state.tracks.get(focus.slot)
+    if described is not None and described.slot is not None:
+        track = view_state.tracks.get(described.slot)
         if track is not None:
             preset_switching = track.runtime.preset_switching
     return {
         "focus": focus,
+        "shell_focus": shell_focus,
         "timeline_enabled": view_state.render_timeline.enabled,
         "timeline_submenu_focused": view_state.timeline_submenu_focused,
         "paused": view_state.paused,
@@ -157,6 +168,7 @@ class OverlayDrawer:
         modal_host: ModalHost | None = None,
         profiler: OverlayProfiler | None = None,
         visualiser_rect: tuple[int, int, int, int] | None = None,
+        shell_focus: ShellFocusState | None = None,
     ) -> None:
         viewport_w, viewport_h = overlay_surface.get_size()
         counters = profiler.counters() if profiler is not None else None
@@ -196,7 +208,7 @@ class OverlayDrawer:
                 help_overlay.draw(
                     overlay_surface,
                     visualiser_rect=visualiser_rect,
-                    **_help_compose_kwargs(view_state),
+                    **_help_compose_kwargs(view_state, shell_focus),
                 )
             modal_view = modal_host.view_state()
             assert modal_view is not None
@@ -245,7 +257,7 @@ class OverlayDrawer:
                 viewport_width=viewport_w,
                 viewport_height=viewport_h,
                 visualiser_rect=visualiser_rect,
-                **_help_compose_kwargs(view_state),
+                **_help_compose_kwargs(view_state, shell_focus),
             )
             if help_composed is not None:
                 help_tex_id, help_tex_uv = _coordinator_upload(

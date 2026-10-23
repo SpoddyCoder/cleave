@@ -11,19 +11,22 @@ from cleave.effects.registry import EFFECT_IDS
 from cleave.viz.help_content import (
     DescriptionSection,
     HelpContent,
+    help_focus_descriptor,
+    help_shell_row,
     sections_for,
 )
 from cleave.viz.overlay_primitives import overlay_font
 from cleave.viz.overlay_upload import OverlayGpuState, UploadSignature
 from cleave.viz.row_kinds import RowDescriptor, RowKind
+from cleave.viz.shell_focus import ShellFocusState
 from cleave.viz.theme import HIGHLIGHT, LABEL, VALUE
 
 
 @dataclass(frozen=True)
 class HelpContentSignature:
-    """Hashable identity of help content — all inputs to sections_for()."""
+    """Hashable identity of help content, including the active shell row."""
 
-    kind: RowKind
+    kind: RowKind | None
     effect_id: str | None
     timeline_enabled: bool
     timeline_submenu_focused: bool
@@ -33,6 +36,7 @@ class HelpContentSignature:
     preset_switching: str | None
     preset_curation: bool = False
     layer_count: int = 4
+    shell_row: tuple[str | int | RowKind | None, ...] | None = None
 
 
 @dataclass
@@ -54,10 +58,22 @@ def help_content_signature(
     preset_switching: str | None,
     preset_curation: bool = False,
     layer_count: int = 4,
+    shell_focus: ShellFocusState | None = None,
 ) -> HelpContentSignature:
+    described = help_focus_descriptor(
+        focus,
+        shell_focus,
+        timeline_focused=timeline_submenu_focused,
+    )
+    if described is None:
+        kind = None
+        effect_id = None
+    else:
+        kind = described.kind
+        effect_id = described.effect_id
     return HelpContentSignature(
-        kind=focus.kind,
-        effect_id=focus.effect_id,
+        kind=kind,
+        effect_id=effect_id,
         timeline_enabled=timeline_enabled,
         timeline_submenu_focused=timeline_submenu_focused,
         paused=paused,
@@ -66,6 +82,10 @@ def help_content_signature(
         preset_switching=preset_switching,
         preset_curation=preset_curation,
         layer_count=layer_count,
+        shell_row=help_shell_row(
+            shell_focus,
+            timeline_focused=timeline_submenu_focused,
+        ),
     )
 
 

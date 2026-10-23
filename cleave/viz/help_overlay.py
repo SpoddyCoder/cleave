@@ -7,7 +7,7 @@ import pygame
 from cleave.viz.help_content import (
     DescriptionSection,
     HelpContent,
-    sections_for,
+    help_sections,
 )
 from cleave.viz.help_panel_cache import (
     HelpPanelCache,
@@ -29,6 +29,7 @@ from cleave.viz.overlay_primitives import (
 )
 from cleave.viz.overlay_upload import OverlayGpuState, upload_plan_for_signature
 from cleave.viz.row_kinds import RowDescriptor
+from cleave.viz.shell_focus import ShellFocusState
 from cleave.viz.theme import (
     DISABLED,
     HIGHLIGHT,
@@ -210,6 +211,7 @@ class HelpOverlay:
         preset_switching: str | None = None,
         preset_curation: bool = False,
         layer_count: int = 4,
+        shell_focus: ShellFocusState | None = None,
         visualiser_rect: tuple[int, int, int, int] | None = None,
     ) -> ComposedPanel | None:
         self._panel_rect = None
@@ -227,10 +229,11 @@ class HelpOverlay:
             preset_switching=preset_switching,
             preset_curation=preset_curation,
             layer_count=layer_count,
+            shell_focus=shell_focus,
         )
-        sections = sections_for(
-            focus.kind,
-            effect_id=focus.effect_id,
+        sections = help_sections(
+            focus,
+            shell_focus=shell_focus,
             timeline_enabled=timeline_enabled,
             timeline_submenu_focused=timeline_submenu_focused,
             paused=paused,
@@ -330,6 +333,7 @@ class HelpOverlay:
         preset_switching: str | None = None,
         preset_curation: bool = False,
         layer_count: int = 4,
+        shell_focus: ShellFocusState | None = None,
         visualiser_rect: tuple[int, int, int, int] | None = None,
     ) -> None:
         composed = self.compose_panel(
@@ -344,6 +348,7 @@ class HelpOverlay:
             preset_switching=preset_switching,
             preset_curation=preset_curation,
             layer_count=layer_count,
+            shell_focus=shell_focus,
             visualiser_rect=visualiser_rect,
         )
         if composed is None:

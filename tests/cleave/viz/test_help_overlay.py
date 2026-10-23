@@ -22,11 +22,13 @@ from cleave.viz.help_content import (
     HelpSection,
     KEYBOARD_CONTROLS_SECTION_TITLE,
     NAVIGATION_SECTION,
+    help_sections,
     layer_section,
     navigation_section,
     sections_for,
     timeline_strip_section,
 )
+from cleave.viz.shell_focus import ShellFocusState, ShellRegion
 from cleave.viz.help_overlay import HelpOverlay
 from cleave.viz.help_panel_cache import entry_gap, entry_width, max_key_width
 from cleave.viz.theme import LABEL, VALUE
@@ -131,13 +133,189 @@ def test_layer_section_omits_visibility_when_timeline_enabled() -> None:
     assert "E" not in keys
 
 
-def test_curation_layer_section_only_expand_collapse() -> None:
+def test_curation_layer_section_omits_add_delete_and_expand() -> None:
     section = layer_section(timeline_enabled=False, preset_curation=True)
-    assert dict(section.entries) == {"Left/Right": "expand/collapse"}
-    header = _keyboard_section(
-        sections_for(RowKind.TRACK_HEADER, preset_curation=True)
+    assert section.entries == ()
+    sections = sections_for(RowKind.TRACK_HEADER, preset_curation=True)
+    keys = [key for section in sections for key, _ in section.entries]
+    actions = [action for section in sections for _, action in section.entries]
+    assert "Ctrl + L" not in keys
+    assert "delete layer" not in actions
+    assert "expand/collapse" not in actions
+    assert "expand/collapse navigator" in actions
+    nav = dict(navigation_section(preset_curation=True).entries)
+    assert nav["Left/Right"] == "expand/collapse navigator"
+    assert "Ctrl + L" not in nav
+    preset = dict(
+        _keyboard_section(
+            sections_for(RowKind.TRACK_PRESET, preset_curation=True)
+        ).entries
     )
-    assert dict(header.entries) == {"Left/Right": "expand/collapse"}
+    assert preset["Left/Right"] == "next/previous preset"
+    assert preset["F"] == "favourite preset"
+
+
+def _help_text(sections: tuple[object, ...]) -> str:
+    parts: list[str] = []
+    for section in sections:
+        parts.append(getattr(section, "title", ""))
+        lines = getattr(section, "lines", ())
+        parts.extend(lines)
+        parts.extend(f"{key} {action}" for key, action in section.entries)
+    return "\n".join(parts)
+
+
+def test_layer_section_jump_and_add_layer() -> None:
+    section = layer_section(timeline_enabled=True, layer_count=4)
+    entries = dict(section.entries)
+    assert entries["M"] == "move z-order"
+    assert entries["L"] == "lock/unlock layer"
+    assert entries["S"] == "solo layer"
+    assert entries["Delete"] == "delete layer"
+    assert entries["1-4"] == "jump to layer"
+    assert entries["Ctrl + L"] == "add layer"
+    assert "Left/Right" not in entries
+    single = dict(layer_section(timeline_enabled=True, layer_count=1).entries)
+    assert single["1"] == "jump to layer"
+    wide = dict(layer_section(timeline_enabled=False, layer_count=8).entries)
+    assert wide["1-8"] == "jump to layer"
+    assert wide["E"] == "enable/disable layer"
+
+
+def test_layer_section_omits_jump_while_recording() -> None:
+    entries = dict(
+        _keyboard_section(
+            sections_for(
+                RowKind.TRACK_HEADER,
+                timeline_enabled=True,
+                timeline_recording=True,
+                layer_count=4,
+            )
+        ).entries
+    )
+    assert "1-4" not in entries
+    assert "jump to layer" not in entries.values()
+    assert entries["Ctrl + L"] == "add layer"
+    assert entries["L"] == "lock/unlock layer"
+
+
+def test_navigation_left_right_expands_navigator() -> None:
+    normal = dict(navigation_section().entries)
+    curation = dict(navigation_section(preset_curation=True).entries)
+    assert normal["Left/Right"] == "expand/collapse navigator"
+    assert curation["Left/Right"] == "expand/collapse navigator"
+    assert "Ctrl + L" not in normal
+    assert "1-4" not in normal
+    assert "jump to layer" not in normal.values()
+
+
+def test_help_follows_inspector_row_not_leftover() -> None:
+    leftover = RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
+    shell = ShellFocusState(
+        region=ShellRegion.INSPECTOR,
+        selected_id="layer:drums",
+        inspector_cursor=RowDescriptor(RowKind.TRACK_OPACITY, slot="drums"),
+    )
+    sections = help_sections(leftover, shell_focus=shell)
+    description = _description_section(sections)
+    assert description is not None
+    assert description.title == "Opacity"
+    keyboard = dict(_keyboard_section(sections).entries)
+    assert keyboard["Left/Right"] == "adjust value"
+    assert "jump to layer" not in keyboard.values()
+    assert "Credits overlays" not in _help_text(sections)
+    panel = help_sections(
+        leftover,
+        shell_focus=ShellFocusState(
+            region=ShellRegion.PANEL,
+            selected_id="layer:drums",
+            inspector_cursor=shell.inspector_cursor,
+        ),
+    )
+    panel_description = _description_section(panel)
+    assert panel_description is not None
+    assert panel_description.title == "Credits overlays"
+
+
+def test_help_follows_navigator_layer() -> None:
+    leftover = RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
+    sections = help_sections(
+        leftover,
+        shell_focus=ShellFocusState(
+            region=ShellRegion.NAVIGATOR,
+            selected_id="layer:drums",
+        ),
+        layer_count=6,
+    )
+    keyboard = dict(_keyboard_section(sections).entries)
+    assert keyboard["L"] == "lock/unlock layer"
+    assert keyboard["1-6"] == "jump to layer"
+    assert keyboard["Ctrl + L"] == "add layer"
+    assert keyboard["Delete"] == "delete layer"
+    assert "Left/Right" not in keyboard
+    nav = dict(sections[-1].entries)
+    assert nav["Left/Right"] == "expand/collapse navigator"
+    assert "Ctrl + L" not in nav
+    assert "1-6" not in nav
+    assert "Credits overlays" not in _help_text(sections)
+
+
+def test_navigator_other_nodes_keep_navigation_only() -> None:
+    leftover = RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
+    for selected_id in ("settings", "project", "layers", "render", "song_markers"):
+        sections = help_sections(
+            leftover,
+            shell_focus=ShellFocusState(
+                region=ShellRegion.NAVIGATOR,
+                selected_id=selected_id,
+            ),
+        )
+        assert sections == (navigation_section(),), selected_id
+
+
+def test_inspector_command_rows_use_layer_management_help() -> None:
+    leftover = RowDescriptor(RowKind.TRACK_OPACITY, slot="drums")
+    add = help_sections(
+        leftover,
+        shell_focus=ShellFocusState(
+            region=ShellRegion.INSPECTOR,
+            selected_id="layers",
+            inspector_command_id="layers.add",
+        ),
+    )
+    add_description = _description_section(add)
+    assert add_description is not None
+    assert add_description.title == "Add Layer"
+    assert dict(_keyboard_section(add).entries)["Enter"] == "confirm add"
+    delete = help_sections(
+        leftover,
+        shell_focus=ShellFocusState(
+            region=ShellRegion.INSPECTOR,
+            selected_id="layer:drums",
+            inspector_command_id="layers.delete",
+        ),
+    )
+    delete_description = _description_section(delete)
+    assert delete_description is not None
+    assert delete_description.title == "Delete layer"
+    assert "Opacity" not in _help_text(delete)
+
+
+def test_timeline_strip_help_keeps_lane_keys_when_layer_selected() -> None:
+    sections = help_sections(
+        RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER),
+        shell_focus=ShellFocusState(
+            region=ShellRegion.NAVIGATOR,
+            selected_id="layer:drums",
+        ),
+        timeline_submenu_focused=True,
+        paused=True,
+        layer_count=4,
+    )
+    entries = dict(_keyboard_section(sections).entries)
+    assert entries["1-4"] == "toggle layer visibility"
+    assert "jump to layer" not in entries.values()
+    assert "Ctrl + L" not in entries
 
 
 def test_track_header_help_includes_delete() -> None:

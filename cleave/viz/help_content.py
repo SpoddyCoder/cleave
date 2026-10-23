@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from cleave.viz.row_kinds import RowAffordance, RowKind
+from cleave.viz.navigator import LAYER_ID_PREFIX
+from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
 from cleave.viz.row_spec import row_spec
+from cleave.viz.shell_focus import ShellFocusState, ShellRegion
 
 HelpEntry = tuple[str, str]
 
@@ -36,10 +38,13 @@ HelpContent = HelpSection | DescriptionSection
 
 KEYBOARD_CONTROLS_SECTION_TITLE = "Keyboard Controls"
 
+_NAVIGATOR_EXPAND_ENTRY = ("Left/Right", "expand/collapse navigator")
+
 NAVIGATION_SECTION = HelpSection(
     "Navigation / Global",
     (
         ("Up/Down", "move row"),
+        _NAVIGATOR_EXPAND_ENTRY,
         ("Tab / Shift+Tab", "cycle region"),
         ("Ctrl + Up/Down", "previous / next section"),
         ("Shift + Left/Right", "skip 2s"),
@@ -57,6 +62,7 @@ _CURATION_NAVIGATION_SECTION = HelpSection(
     "Navigation / Global",
     (
         ("Up/Down", "move row"),
+        _NAVIGATOR_EXPAND_ENTRY,
         ("Tab / Shift+Tab", "cycle region"),
         ("Ctrl + Up/Down", "previous / next section"),
         ("Shift + Left/Right", "skip 2s"),
@@ -78,26 +84,36 @@ _LAYER_SECTION_BASE: tuple[tuple[str, str], ...] = (
     ("M", "move z-order"),
     ("L", "lock/unlock layer"),
     ("S", "solo layer"),
-    ("Left/Right", "expand/collapse"),
     ("Delete", "delete layer"),
 )
 
 _LAYER_VISIBILITY_ENTRY = ("E", "enable/disable layer")
+_LAYER_ADD_ENTRY = ("Ctrl + L", "add layer")
+_LAYER_JUMP_ACTION = "jump to layer"
 
-_CURATION_LAYER_SECTION = HelpSection(
-    "Layer",
-    (("Left/Right", "expand/collapse"),),
-)
+_CURATION_LAYER_SECTION = HelpSection("Layer", ())
+
+_INSPECTOR_COMMAND_KINDS = {
+    "layers.add": RowKind.LAYER_MANAGEMENT_ADD,
+    "layers.delete": RowKind.LAYER_MANAGEMENT_DELETE,
+}
 
 
 def layer_section(
-    *, timeline_enabled: bool, preset_curation: bool = False
+    *,
+    timeline_enabled: bool,
+    preset_curation: bool = False,
+    layer_count: int = 4,
+    layer_jumps: bool = True,
 ) -> HelpSection:
     if preset_curation:
         return _CURATION_LAYER_SECTION
     entries = list(_LAYER_SECTION_BASE)
     if not timeline_enabled:
         entries.append(_LAYER_VISIBILITY_ENTRY)
+    if layer_jumps:
+        entries.append((_layer_key_range_label(layer_count), _LAYER_JUMP_ACTION))
+    entries.append(_LAYER_ADD_ENTRY)
     return HelpSection("Layer", tuple(entries))
 
 
@@ -186,6 +202,65 @@ _RENDER_TIMELINE_SECTION = HelpSection(
         ("E", "enable/disable"),
     ),
 )
+
+
+def help_focus_descriptor(
+    focus: RowDescriptor,
+    shell_focus: ShellFocusState | None,
+    *,
+    timeline_focused: bool = False,
+) -> RowDescriptor | None:
+    """Row help should follow, or None when only the navigation section applies."""
+    if shell_focus is None or timeline_focused:
+        return focus
+    if shell_focus.region is ShellRegion.PANEL:
+        return focus
+    if shell_focus.region is ShellRegion.INSPECTOR:
+        command_id = shell_focus.inspector_command_id
+        if command_id is not None:
+            kind = _INSPECTOR_COMMAND_KINDS.get(command_id)
+            if kind is None:
+                return None
+            return RowDescriptor(kind)
+        return shell_focus.inspector_cursor
+    selected_id = shell_focus.selected_id
+    if selected_id.startswith(LAYER_ID_PREFIX):
+        return RowDescriptor(
+            RowKind.TRACK_HEADER,
+            slot=selected_id[len(LAYER_ID_PREFIX) :],
+        )
+    return None
+
+
+def help_shell_row(
+    shell_focus: ShellFocusState | None,
+    *,
+    timeline_focused: bool,
+) -> tuple[str | int | RowKind | None, ...] | None:
+    """Shell row identity for the help cache. None when help follows *focus*."""
+    if shell_focus is None or timeline_focused:
+        return None
+    if shell_focus.region is ShellRegion.PANEL:
+        return None
+    if shell_focus.region is ShellRegion.NAVIGATOR:
+        return ("navigator", shell_focus.selected_id)
+    command_id = shell_focus.inspector_command_id
+    if command_id is not None:
+        return ("inspector", "command", command_id)
+    cursor = shell_focus.inspector_cursor
+    if cursor is None:
+        return ("inspector", "empty")
+    return (
+        "inspector",
+        "cursor",
+        cursor.kind,
+        cursor.slot,
+        cursor.card,
+        cursor.effect_id,
+        cursor.driver_slug,
+        cursor.preset_index,
+        cursor.marker_index,
+    )
 
 
 def _layer_key_range_label(layer_count: int) -> str:
@@ -334,10 +409,18 @@ def sections_for(
                 entries if entries is not None else (("Left/Right", "expand/collapse"),),
             )
         elif behavior.can_enter_move_mode:
-            primary = layer_section(
+            section = layer_section(
                 timeline_enabled=timeline_enabled,
                 preset_curation=preset_curation,
+                layer_count=layer_count,
+                layer_jumps=not timeline_recording,
             )
+            if not section.entries:
+                description = _description_section(row_kind, effect_id=effect_id)
+                if description is not None:
+                    return (description, nav)
+                return (nav,)
+            primary = section
         elif (
             behavior.toggle_enabled is not None and behavior.toggle_solo is not None
         ):
@@ -399,3 +482,38 @@ def sections_for(
     if description is not None:
         return (description, _keyboard_section(primary), nav)
     return (primary, nav)
+
+
+def help_sections(
+    focus: RowDescriptor,
+    *,
+    shell_focus: ShellFocusState | None = None,
+    timeline_enabled: bool = False,
+    timeline_submenu_focused: bool = False,
+    paused: bool = False,
+    timeline_recording: bool = False,
+    timeline_override_active: bool = False,
+    preset_switching: str | None = None,
+    preset_curation: bool = False,
+    layer_count: int = 4,
+) -> tuple[HelpContent, ...]:
+    """Sections for the shell row, or for *focus* when the panel or timeline has scope."""
+    described = help_focus_descriptor(
+        focus,
+        shell_focus,
+        timeline_focused=timeline_submenu_focused,
+    )
+    if described is None:
+        return (navigation_section(preset_curation=preset_curation),)
+    return sections_for(
+        described.kind,
+        effect_id=described.effect_id,
+        timeline_enabled=timeline_enabled,
+        timeline_submenu_focused=timeline_submenu_focused,
+        paused=paused,
+        timeline_recording=timeline_recording,
+        timeline_override_active=timeline_override_active,
+        preset_switching=preset_switching,
+        preset_curation=preset_curation,
+        layer_count=layer_count,
+    )

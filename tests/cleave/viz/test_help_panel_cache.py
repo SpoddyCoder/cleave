@@ -14,6 +14,7 @@ from cleave.viz.help_panel_cache import (
 )
 from cleave.viz.overlay_upload import OverlayGpuState, upload_plan_for_signature
 from cleave.viz.row_kinds import RowDescriptor, RowKind
+from cleave.viz.shell_focus import ShellFocusState, ShellRegion
 
 
 def test_help_content_signature_stable_for_same_inputs() -> None:
@@ -37,6 +38,77 @@ def test_help_content_signature_stable_for_same_inputs() -> None:
         preset_switching=None,
     )
     assert sig_a == sig_b
+
+
+def _signature_kwargs() -> dict[str, object]:
+    return dict(
+        timeline_enabled=False,
+        timeline_submenu_focused=False,
+        paused=False,
+        timeline_recording=False,
+        timeline_override_active=False,
+        preset_switching=None,
+    )
+
+
+def test_help_content_signature_changes_when_shell_row_changes() -> None:
+    leftover = RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
+    kwargs = _signature_kwargs()
+    layer_a = ShellFocusState(region=ShellRegion.NAVIGATOR, selected_id="layer:a")
+    layer_b = ShellFocusState(region=ShellRegion.NAVIGATOR, selected_id="layer:b")
+    settings = ShellFocusState(region=ShellRegion.NAVIGATOR, selected_id="settings")
+    sig_a = help_content_signature(leftover, shell_focus=layer_a, **kwargs)
+    sig_b = help_content_signature(leftover, shell_focus=layer_b, **kwargs)
+    sig_settings = help_content_signature(leftover, shell_focus=settings, **kwargs)
+    assert sig_a != sig_b
+    assert sig_a != sig_settings
+    assert sig_a.kind == RowKind.TRACK_HEADER
+    assert sig_settings.kind is None
+    opacity = ShellFocusState(
+        region=ShellRegion.INSPECTOR,
+        inspector_cursor=RowDescriptor(RowKind.TRACK_OPACITY, slot="a"),
+    )
+    blend = ShellFocusState(
+        region=ShellRegion.INSPECTOR,
+        inspector_cursor=RowDescriptor(RowKind.TRACK_BLEND, slot="a"),
+    )
+    assert help_content_signature(
+        leftover, shell_focus=opacity, **kwargs
+    ) != help_content_signature(leftover, shell_focus=blend, **kwargs)
+    panel = ShellFocusState(region=ShellRegion.PANEL, selected_id="layer:a")
+    assert help_content_signature(
+        leftover, shell_focus=panel, **kwargs
+    ) == help_content_signature(leftover, **kwargs)
+
+
+def test_upload_plan_full_when_shell_row_changes() -> None:
+    pygame.init()
+    overlay = HelpOverlay()
+    kwargs = dict(viewport_width=1280, viewport_height=720)
+    leftover = RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
+    first = overlay.compose_panel(
+        leftover,
+        shell_focus=ShellFocusState(
+            region=ShellRegion.NAVIGATOR, selected_id="layer:a"
+        ),
+        **kwargs,
+    )
+    assert first is not None
+
+    cache = overlay._cache
+    cache.gpu.last_signature = first.upload_signature
+    cache.gpu.last_texture_id = 1
+    cache.gpu.capacity = first.capacity
+
+    second = overlay.compose_panel(
+        leftover,
+        shell_focus=ShellFocusState(
+            region=ShellRegion.NAVIGATOR, selected_id="layer:b"
+        ),
+        **kwargs,
+    )
+    assert second is not None
+    assert second.upload_plan.mode == "full"
 
 
 def test_help_content_signature_changes_on_focus_change() -> None:

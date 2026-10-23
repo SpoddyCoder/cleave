@@ -602,6 +602,7 @@ def _tick_frame_live_overlay(
                 modal_host=runtime.modal_host,
                 profiler=profiler,
                 visualiser_rect=layout.visualiser,
+                shell_focus=runtime.controls.shell_focus,
             )
 
     if timeline_state is not None:
