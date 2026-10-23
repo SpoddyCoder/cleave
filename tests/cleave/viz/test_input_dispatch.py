@@ -604,6 +604,7 @@ def test_ctrl_up_down_cycles_visible_top_level_ids() -> None:
     ids = visible_top_level_ids(controls.session)
     assert list(ids) == ["settings", "project", "render", "layers", "song_markers"]
     seen = [controls.shell_focus.selected_id]
+    leftover = controls.focus_cursor
     for _ in ids:
         assert (
             dispatch_keydown(keydown(pygame.K_DOWN, mod=pygame.KMOD_CTRL), runtime)
@@ -612,7 +613,8 @@ def test_ctrl_up_down_cycles_visible_top_level_ids() -> None:
         seen.append(controls.shell_focus.selected_id)
         assert controls.shell_focus.region is ShellRegion.NAVIGATOR
         if controls.shell_focus.selected_id == "render":
-            assert controls.focus_descriptor.kind is RowKind.RENDER_OVERLAYS_HEADER
+            assert controls.focus_cursor == leftover
+        leftover = controls.focus_cursor
     assert seen == [*ids, ids[0]]
     assert dispatch_keydown(keydown(pygame.K_UP, mod=pygame.KMOD_CTRL), runtime) is True
     assert controls.shell_focus.selected_id == ids[-1]

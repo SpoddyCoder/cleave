@@ -98,7 +98,11 @@ class NavigatorControls:
         self.select(quick_nav_id(ids, focus.selected_id, delta))
 
     def select(self, node_id: str) -> None:
-        """Select *node_id*, stay on the navigator, and scroll unmigrated sections."""
+        """Select *node_id* and stay on the navigator.
+
+        A node with no inspector that cannot expand scrolls the leftover
+        panel to its header.
+        """
         focus = self._controls.shell_focus
         node_id = reconcile_nav_id(
             self._visible_ids(),
@@ -108,11 +112,15 @@ class NavigatorControls:
         focus.region = ShellRegion.NAVIGATOR
         focus.selected_id = node_id
         node = self._node(node_id)
-        if node is not None and not node.has_inspector:
+        if node is not None and not node.has_inspector and not node.expandable:
             self._focus_leftover_header(node_id)
 
     def activate(self) -> None:
-        """Enter: inspector for migrated nodes, leftover header for the rest."""
+        """Open an inspector, or hand a leaf without one to the leftover panel.
+
+        An expandable node with no inspector expands and opens its first
+        child's inspector.
+        """
         focus = self._controls.shell_focus
         node = self._node(focus.selected_id)
         if node is None:
@@ -120,6 +128,13 @@ class NavigatorControls:
         if node.has_inspector:
             self._enter_inspector(node.id)
             return
+        if node.expandable:
+            focus.nav_expanded.add(node.id)
+            child = self._first_child(node.id)
+            if child is not None:
+                focus.selected_id = child.id
+                self._enter_inspector(child.id)
+                return
         focus.region = ShellRegion.PANEL
         self._focus_leftover_header(node.id)
 
@@ -159,15 +174,12 @@ class NavigatorControls:
     def _header_for(
         self, view: TuningViewState, node_id: str
     ) -> RowDescriptor | None:
-        layout = view.layout
-        if node_id == "render":
-            desc = RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
-        elif node_id == "song_markers":
-            desc = RowDescriptor(RowKind.SONG_MARKERS_HEADER)
-            if not layout.contains_descriptor(desc):
-                desc = RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
-        else:
+        if node_id != "song_markers":
             return None
+        layout = view.layout
+        desc = RowDescriptor(RowKind.SONG_MARKERS_HEADER)
+        if not layout.contains_descriptor(desc):
+            desc = RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
         if layout.contains_descriptor(desc):
             return desc
         return None

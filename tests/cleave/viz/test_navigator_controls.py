@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from cleave.viz.inspector import build_inspector_rows
 from cleave.viz.navigator import layer_node_id
-from cleave.viz.row_kinds import RowKind
+from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.shell_focus import ShellRegion
 from tests.cleave.viz.test_controls import _make_controls, _make_controls_with_manager
 
@@ -30,13 +30,52 @@ def test_enter_on_project_builds_inspector_groups() -> None:
     )
 
 
-def test_enter_on_render_moves_to_overlays_header() -> None:
+def test_enter_on_render_opens_overlays_inspector() -> None:
     controls = _make_controls(("layer_1",))
-    controls.shell_focus.selected_id = "render"
-    controls.shell_focus.region = ShellRegion.NAVIGATOR
+    focus = controls.shell_focus
+    focus.selected_id = "render"
+    focus.region = ShellRegion.NAVIGATOR
+    focus.nav_expanded.discard("render")
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
     controls.navigator.activate()
-    assert controls.shell_focus.region is ShellRegion.PANEL
-    assert controls.focus_descriptor.kind is RowKind.RENDER_OVERLAYS_HEADER
+    assert "render" in focus.nav_expanded
+    assert focus.selected_id == "render.overlays"
+    assert focus.region is ShellRegion.INSPECTOR
+    assert focus.inspector_cursor is None
+    assert controls.focus_descriptor.kind is RowKind.RENDER_TIMELINE_HEADER
+
+
+def test_enter_on_render_blocks_stays_off_the_panel() -> None:
+    controls = _make_controls(("layer_1",))
+    focus = controls.shell_focus
+    focus.nav_expanded.add("render")
+    for node_id in ("render.overlays", "render.post_fx", "render.pattern_mask"):
+        focus.selected_id = node_id
+        focus.region = ShellRegion.NAVIGATOR
+        controls.navigator.activate()
+        assert focus.region is ShellRegion.INSPECTOR
+        assert focus.selected_id == node_id
+        assert focus.inspector_cursor is None
+
+
+def test_enter_on_song_markers_hands_off_to_leftover_panel() -> None:
+    controls = _make_controls(("layer_1",))
+    focus = controls.shell_focus
+    focus.selected_id = "song_markers"
+    focus.region = ShellRegion.NAVIGATOR
+    controls.navigator.activate()
+    assert focus.region is ShellRegion.PANEL
+    assert focus.selected_id == "song_markers"
+    assert controls.focus_descriptor.kind is RowKind.RENDER_TIMELINE_HEADER
+
+
+def test_select_render_leaves_the_leftover_cursor() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
+    controls.navigator.select("render")
+    assert controls.shell_focus.region is ShellRegion.NAVIGATOR
+    assert controls.shell_focus.selected_id == "render"
+    assert controls.focus_descriptor.kind is RowKind.RENDER_TIMELINE_HEADER
 
 
 def test_enter_on_layers_opens_inspector() -> None:

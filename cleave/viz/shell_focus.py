@@ -102,7 +102,7 @@ class ShellFocusState:
     collapsed: set[InspectorGroupKey] = field(default_factory=set)
     opened: set[InspectorGroupKey] = field(default_factory=set)
     inspector_command_id: str | None = None
-    nav_expanded: set[str] = field(default_factory=lambda: {"layers"})
+    nav_expanded: set[str] = field(default_factory=lambda: {"layers", "render"})
 
 
 def next_region(current: CycleStop, *, strip_open: bool, delta: int) -> CycleStop:
