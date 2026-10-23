@@ -13,6 +13,14 @@ from cleave.config_schema.layers import DEFAULT_LAYER_SLOTS
 from tests.support.config import TEST_LAYER_STEMS
 from cleave.preset_playlist import PresetPlaylist
 from cleave.viz.controls import TuningControls
+from cleave.viz.editor_mode_controls import is_preset_curation_mode
+from cleave.viz.navigator import layer_node_id
+from cleave.viz.row_kinds import RowDescriptor, RowKind
+from cleave.viz.shell_focus import (
+    DEFAULT_CLOSED_INSPECTOR_GROUPS,
+    InspectorGroupKey,
+    ShellRegion,
+)
 from cleave.viz.live_layer_bindings import LiveLayerBindings
 from cleave.viz.session import (
     LayerRuntime,
@@ -219,3 +227,92 @@ def make_controls(
         duration_sec=120.0,
         launch_config_path=launch_config_path,
     )
+
+
+_LAYER_COMMANDS = {
+    RowKind.LAYER_MANAGEMENT_ADD: "layers.add",
+    RowKind.LAYER_MANAGEMENT_DELETE: "layers.delete",
+}
+
+# Groups that must be open for the child row to be the inspector cursor.
+_LAYER_GROUP_ANCESTORS: dict[RowKind, tuple[RowKind, ...]] = {
+    RowKind.TRACK_BLEND: (RowKind.TRACK_COMPOSITING_HEADER,),
+    RowKind.TRACK_OPACITY: (RowKind.TRACK_COMPOSITING_HEADER,),
+    RowKind.TRACK_EFFECT: (RowKind.TRACK_EFFECTS_HEADER,),
+    RowKind.TRACK_PRESET_SWITCHING_TRIGGER: (RowKind.TRACK_PRESET_SWITCHING,),
+    RowKind.TRACK_PRESET_DURATION: (RowKind.TRACK_PRESET_SWITCHING,),
+    RowKind.TRACK_EASTER_EGG: (RowKind.TRACK_PRESET_SWITCHING,),
+    RowKind.TRACK_SOFT_CUT_DURATION: (RowKind.TRACK_PRESET_SWITCHING,),
+    RowKind.TRACK_HARD_CUT_ENABLED: (RowKind.TRACK_PRESET_SWITCHING,),
+    RowKind.TRACK_HARD_CUT_DURATION: (RowKind.TRACK_PRESET_SWITCHING,),
+    RowKind.TRACK_HARD_CUT_SENSITIVITY: (RowKind.TRACK_PRESET_SWITCHING,),
+    RowKind.TRACK_PRESET_START_CLEAN: (RowKind.TRACK_PRESET_SWITCHING,),
+    RowKind.TRACK_PRESET_LIST: (RowKind.TRACK_PRESET_SWITCHING,),
+    RowKind.TRACK_PRESET_LIST_ITEM: (
+        RowKind.TRACK_PRESET_SWITCHING,
+        RowKind.TRACK_PRESET_LIST,
+    ),
+    RowKind.TRACK_PRESET_LIST_ADD: (
+        RowKind.TRACK_PRESET_SWITCHING,
+        RowKind.TRACK_PRESET_LIST,
+    ),
+    RowKind.TRACK_PRESET_LIST_POPULATE: (
+        RowKind.TRACK_PRESET_SWITCHING,
+        RowKind.TRACK_PRESET_LIST,
+    ),
+}
+
+
+def _open_layer_groups(controls: TuningControls, descriptor: RowDescriptor) -> None:
+    focus = controls.shell_focus
+    for kind in _LAYER_GROUP_ANCESTORS.get(descriptor.kind, ()):
+        key = InspectorGroupKey(kind, descriptor.slot)
+        if kind in DEFAULT_CLOSED_INSPECTOR_GROUPS:
+            focus.opened.add(key)
+        else:
+            focus.collapsed.discard(key)
+
+
+def press_layer_row(
+    controls: TuningControls,
+    descriptor: RowDescriptor,
+    event: pygame.event.Event,
+    runtime: object | None = None,
+) -> bool:
+    """Select the layer, focus this inspector row, and dispatch one key.
+
+    ``layer:<slot>`` is selected (Add Layer selects ``layers``). The shell
+    region is the inspector. A runtime goes through ``dispatch_keydown``.
+    Otherwise the inspector handles the key, then row hotkeys.
+    """
+    focus = controls.shell_focus
+    command_id = _LAYER_COMMANDS.get(descriptor.kind)
+    if descriptor.kind is RowKind.LAYER_MANAGEMENT_ADD:
+        focus.selected_id = "layers"
+        focus.inspector_cursor = None
+        focus.inspector_command_id = command_id
+    else:
+        if descriptor.slot is not None:
+            focus.selected_id = layer_node_id(descriptor.slot)
+        if command_id is not None:
+            focus.inspector_cursor = None
+            focus.inspector_command_id = command_id
+        else:
+            focus.inspector_cursor = descriptor
+            focus.inspector_command_id = None
+        _open_layer_groups(controls, descriptor)
+    focus.region = ShellRegion.INSPECTOR
+    if runtime is not None:
+        from cleave.viz.input_dispatch import dispatch_keydown
+
+        return dispatch_keydown(event, runtime)
+    if controls.modal_active:
+        return controls.handle_modal_keydown(event)
+    if (
+        not is_preset_curation_mode(controls.session.settings.editor_mode)
+        and controls.handle_move_mode_keydown(event)
+    ):
+        return True
+    if controls.inspector.handle_keydown(event):
+        return True
+    return controls.inspector.handle_hotkey(event)

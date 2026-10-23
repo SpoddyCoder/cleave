@@ -24,7 +24,7 @@ from tests.cleave.viz.test_controls import (
     _row,
 )
 from tests.cleave.viz.test_timeline_controls import _make_timeline_controls
-from tests.support.viz import keydown, stub_playback_state
+from tests.support.viz import press_layer_row, keydown, stub_playback_state
 
 
 def _expand_layer_1(controls: TuningControls) -> None:
@@ -50,7 +50,7 @@ def _expand_render_post_fx(controls: TuningControls) -> None:
 
 def _mutate_layer_z_order(controls: TuningControls) -> None:
     controls.focus_descriptor = RowDescriptor(RowKind.TRACK_HEADER, slot="layer_2")
-    controls.handle_keydown(_keydown(pygame.K_m))
+    press_layer_row(controls, RowDescriptor(RowKind.TRACK_HEADER, slot="layer_2"), _keydown(pygame.K_m))
     controls.handle_move_mode_keydown(_keydown(pygame.K_UP))
     controls.handle_move_mode_keydown(_keydown(pygame.K_m))
 
@@ -58,7 +58,7 @@ def _mutate_layer_z_order(controls: TuningControls) -> None:
 def _mutate_stem_enabled(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(RowKind.TRACK_HEADER, slot="layer_1")
-    controls.handle_keydown(_keydown(pygame.K_e))
+    press_layer_row(controls, RowDescriptor(RowKind.TRACK_HEADER, slot="layer_1"), _keydown(pygame.K_e))
 
 
 def _expand_compositing(controls: TuningControls) -> None:
@@ -70,7 +70,7 @@ def _mutate_stem_opacity(controls: TuningControls) -> None:
     _expand_compositing(controls)
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(RowKind.TRACK_OPACITY, slot="layer_1")
-    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    press_layer_row(controls, RowDescriptor(RowKind.TRACK_OPACITY, slot="layer_1"), _keydown(pygame.K_RIGHT))
 
 
 def _mutate_stem_blend_mode(controls: TuningControls) -> None:
@@ -78,37 +78,37 @@ def _mutate_stem_blend_mode(controls: TuningControls) -> None:
     _expand_compositing(controls)
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(RowKind.TRACK_BLEND, slot="layer_1")
-    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    press_layer_row(controls, RowDescriptor(RowKind.TRACK_BLEND, slot="layer_1"), _keydown(pygame.K_RIGHT))
 
 
 def _mutate_stem_locked(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(RowKind.TRACK_HEADER, slot="layer_1")
-    controls.handle_keydown(_keydown(pygame.K_l))
+    press_layer_row(controls, RowDescriptor(RowKind.TRACK_HEADER, slot="layer_1"), _keydown(pygame.K_l))
 
 
 def _mutate_stem_beat_sensitivity(controls: TuningControls) -> None:
     _expand_layer_1(controls)
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(RowKind.TRACK_BEAT, slot="layer_1")
-    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    press_layer_row(controls, RowDescriptor(RowKind.TRACK_BEAT, slot="layer_1"), _keydown(pygame.K_RIGHT))
 
 
 def _mutate_stem_effects(controls: TuningControls) -> None:
     _expand_layer_1(controls)
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(RowKind.TRACK_EFFECTS_HEADER, slot="layer_1")
-    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    press_layer_row(controls, RowDescriptor(RowKind.TRACK_EFFECTS_HEADER, slot="layer_1"), _keydown(pygame.K_RIGHT))
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(RowKind.TRACK_EFFECT, slot="layer_1", effect_id="pulse", driver_slug="onset")
-    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    press_layer_row(controls, RowDescriptor(RowKind.TRACK_EFFECT, slot="layer_1", effect_id="pulse", driver_slug="onset"), _keydown(pygame.K_RIGHT))
 
 
 def _mutate_preset_path(controls: TuningControls) -> None:
     _expand_layer_1(controls)
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(RowKind.TRACK_PRESET, slot="layer_1")
-    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    press_layer_row(controls, RowDescriptor(RowKind.TRACK_PRESET, slot="layer_1"), _keydown(pygame.K_RIGHT))
 
 
 def _mutate_preset_switching(controls: TuningControls) -> None:
@@ -116,7 +116,7 @@ def _mutate_preset_switching(controls: TuningControls) -> None:
     controls.focus_descriptor = RowDescriptor(
         RowKind.TRACK_PRESET_SWITCHING_TRIGGER, slot="layer_1"
     )
-    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    press_layer_row(controls, RowDescriptor( RowKind.TRACK_PRESET_SWITCHING_TRIGGER, slot="layer_1" ), _keydown(pygame.K_RIGHT))
 
 
 def _mutate_render_overlay_enabled(controls: TuningControls) -> None:
@@ -539,7 +539,7 @@ def test_display_time_mutation_clears_dirty_after_save() -> None:
 def _mutate_solo_slot(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(RowKind.TRACK_HEADER, slot="layer_1")
-    controls.handle_keydown(_keydown(pygame.K_s))
+    press_layer_row(controls, RowDescriptor(RowKind.TRACK_HEADER, slot="layer_1"), _keydown(pygame.K_s))
 
 
 def _mutate_timeline_panel_open(controls: TuningControls) -> None:
@@ -566,7 +566,7 @@ def _mutate_render_post_fx_expanded(controls: TuningControls) -> None:
 def _mutate_move_mode_without_confirm(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(RowKind.TRACK_HEADER, slot="layer_2")
-    controls.handle_keydown(_keydown(pygame.K_m))
+    press_layer_row(controls, RowDescriptor(RowKind.TRACK_HEADER, slot="layer_2"), _keydown(pygame.K_m))
     controls.handle_move_mode_keydown(_keydown(pygame.K_UP))
 
 

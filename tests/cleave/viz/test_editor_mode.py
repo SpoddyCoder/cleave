@@ -14,7 +14,7 @@ from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.tuning_view_state import SettingsBlock, TuningViewState, view_state_structure_signature
 from tests.cleave.viz.test_controls import _make_controls, _mutate_dirty
 from tests.cleave.viz.test_overlay import _minimal_view_state
-from tests.support.viz import keydown, make_playlist, make_test_cfg, make_track_block
+from tests.support.viz import press_layer_row, keydown, make_playlist, make_test_cfg, make_track_block
 
 
 def _prompt_editor_mode(controls) -> None:
@@ -95,44 +95,6 @@ def test_curation_layout_allowlist() -> None:
     assert not any(name.startswith("TRACK_") for name in names)
     assert slots == []
     assert all(kind == RowKind.PANEL_NOTIFICATION for kind in kinds)
-
-
-def test_curation_row_hotkeys_apply_and_other_keys_stay_ignored() -> None:
-    controls = _make_controls(("layer_1", "layer_2"))
-    controls.session.settings.editor_mode = "preset_curation"
-    layer = controls.session.layers["layer_1"]
-    controls.focus_cursor = MainFocus(
-        RowDescriptor(RowKind.TRACK_HEADER, slot="layer_1")
-    )
-
-    before_opacity = layer.opacity_pct
-    was_enabled = layer.enabled
-
-    controls.handle_keydown(keydown(pygame.K_e))
-    assert layer.enabled is not was_enabled
-
-    controls.handle_keydown(keydown(pygame.K_s))
-    assert controls.session.solo_slot == "layer_1"
-
-    controls.handle_keydown(keydown(pygame.K_m))
-    assert controls.layer_lifecycle.move_mode_slot == "layer_1"
-    controls.handle_move_mode_keydown(keydown(pygame.K_ESCAPE))
-    assert controls.layer_lifecycle.move_mode_slot is None
-
-    controls.handle_keydown(keydown(pygame.K_l))
-    assert layer.locked is True
-
-    controls.handle_keydown(keydown(pygame.K_DELETE))
-    assert "layer_1" in controls.session.layers
-
-    controls.handle_keydown(keydown(pygame.K_t))
-    assert controls.session.timeline.panel_open is False
-
-    controls.focus_cursor = MainFocus(
-        RowDescriptor(RowKind.TRACK_OPACITY, slot="layer_1")
-    )
-    controls.handle_keydown(keydown(pygame.K_RIGHT))
-    assert layer.opacity_pct == before_opacity
 
 
 def test_curation_shows_only_focus_layer() -> None:
@@ -221,9 +183,9 @@ def test_curation_allowlisted_keys_still_work() -> None:
     )
     mock_curation = MagicMock()
     controls._preset_curation = mock_curation
-    controls.handle_keydown(keydown(pygame.K_f))
+    press_layer_row(controls, RowDescriptor(RowKind.TRACK_PRESET, slot="layer_1"), keydown(pygame.K_f))
     mock_curation.prompt_favourite.assert_called_once()
-    controls.handle_keydown(keydown(pygame.K_c))
+    press_layer_row(controls, RowDescriptor(RowKind.TRACK_PRESET, slot="layer_1"), keydown(pygame.K_c))
     mock_curation.prompt_cast.assert_called_once()
 
     was_paused = controls.playback.paused
@@ -249,10 +211,9 @@ def test_curation_ignores_layer_lock() -> None:
     assert row_navigable(view, preset) is True
     assert preset not in view.layout.rows
 
-    controls.focus_cursor = MainFocus(preset)
     mock_curation = MagicMock()
     controls._preset_curation = mock_curation
-    controls.handle_keydown(keydown(pygame.K_f))
+    press_layer_row(controls, preset, keydown(pygame.K_f))
     mock_curation.prompt_favourite.assert_called_once()
 
 

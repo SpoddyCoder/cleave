@@ -33,7 +33,7 @@ from cleave.viz.timeline_overlay import (
     bar_tick_times_for_row,
     cue_times_for_stem,
 )
-from tests.support.viz import keydown, make_controls
+from tests.support.viz import press_layer_row, keydown, make_controls
 
 
 def _playlist(name: str) -> PresetPlaylist:
@@ -558,7 +558,7 @@ def test_header_toggle_blocked_when_timeline_enabled() -> None:
     controls.focus_descriptor = RowDescriptor(RowKind.TRACK_HEADER, slot="layer_1")
     assert controls.session.layers["layer_1"].enabled is True
 
-    controls.handle_keydown(keydown(pygame.K_e))
+    press_layer_row(controls, RowDescriptor(RowKind.TRACK_HEADER, slot="layer_1"), keydown(pygame.K_e))
 
     assert controls.session.layers["layer_1"].enabled is True
     view = controls.build_view_state(paused=False)

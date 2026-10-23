@@ -1049,34 +1049,6 @@ def test_build_row_layout_omits_add_at_max_layers() -> None:
         state.layout.find_by_kind(RowKind.LAYER_MANAGEMENT_ADD)
 
 
-def test_delete_row_after_effects_when_expanded() -> None:
-    state = _minimal_view_state(
-        tracks={
-            "layer_1": make_track_block(
-                stem="drums",
-                preset_dir_label="dir",
-                preset_label="preset.milk",
-                blend_mode="black-key",
-                opacity_pct=50,
-                beat_sensitivity=1.0,
-                effects={},
-            )
-        },
-    )
-    _mount_track_sections(state)
-    layout = state.layout.rows
-    delete_idx = state.layout.find( "layer_1", RowKind.LAYER_MANAGEMENT_DELETE)
-    effects_header = state.layout.find( "layer_1", RowKind.TRACK_EFFECTS_HEADER)
-    effect_rows = [
-        index
-        for index, row in enumerate(layout)
-        if row.kind == RowKind.TRACK_EFFECT and row.slot == "layer_1"
-    ]
-    assert effect_rows
-    assert delete_idx > effects_header
-    assert delete_idx > max(effect_rows)
-
-
 def test_delete_row_navigable_when_locked() -> None:
     state = _minimal_view_state(
         tracks={

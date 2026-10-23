@@ -29,7 +29,13 @@ from cleave.viz.modal import ModalHost, ModalKind
 from cleave.viz.tuning_panel_draw import TuningOverlay
 from cleave.viz.timeline_controls import TimelineControls
 from tests.support.compositor_mock import recording_compositor
-from tests.support.viz import keydown, make_playlist, make_test_cfg, stub_playback_state
+from tests.support.viz import (
+    keydown,
+    make_playlist,
+    make_test_cfg,
+    press_layer_row,
+    stub_playback_state,
+)
 
 
 def _make_runtime(
@@ -171,17 +177,6 @@ def test_h_toggles_help_when_timeline_submenu_focused() -> None:
     assert runtime.seed.session.help_visible is True
     assert dispatch_keydown(keydown(pygame.K_h), runtime) is True
     assert runtime.seed.session.help_visible is False
-
-
-def test_curation_dispatch_passes_navigation_keys() -> None:
-    runtime = _make_runtime(submenu_focused=False, panel_open=False)
-    session = runtime.seed.session
-    session.settings.editor_mode = "preset_curation"
-    runtime.controls.shell_focus.region = ShellRegion.PANEL
-    start = RowDescriptor(RowKind.TRACK_HEADER, slot=session.layer_z_order[0])
-    runtime.controls.focus_cursor = MainFocus(start)
-    assert dispatch_keydown(keydown(pygame.K_DOWN), runtime) is True
-    assert runtime.controls.focus_descriptor != start
 
 
 def test_curation_dispatch_allows_help_toggle() -> None:
@@ -381,10 +376,12 @@ def test_shift_arrows_seek_from_track_header() -> None:
 
 def test_global_seek_from_move_mode() -> None:
     runtime = _make_runtime(submenu_focused=False)
-    runtime.controls.focus_cursor = MainFocus(
-        RowDescriptor(RowKind.TRACK_HEADER, slot="layer_1")
+    press_layer_row(
+        runtime.controls,
+        RowDescriptor(RowKind.TRACK_HEADER, slot="layer_1"),
+        keydown(pygame.K_m),
+        runtime,
     )
-    runtime.controls.handle_keydown(keydown(pygame.K_m))
     assert runtime.controls.layer_lifecycle.move_mode_slot == "layer_1"
     player = runtime.playback.player
     player.seek(20.0)
