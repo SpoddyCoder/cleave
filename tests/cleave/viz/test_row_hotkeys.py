@@ -204,15 +204,14 @@ def test_section_lock_inspector_refuses_edits_and_delete_still_prompts() -> None
     assert dispatch_keydown(keydown(pygame.K_l), runtime) is True
     assert layer.locked is True
 
-    delete = RowDescriptor(RowKind.LAYER_MANAGEMENT_DELETE, slot="layer_1")
     _focus_inspector(controls, "layer_1", opacity)
-    visited = []
+    found_delete = False
     for _ in range(32):
         controls.inspector.move(1)
-        visited.append(controls.shell_focus.inspector_cursor)
-        if controls.shell_focus.inspector_cursor == delete:
+        if controls.shell_focus.inspector_command_id == "layers.delete":
+            found_delete = True
             break
-    assert delete in visited
+    assert found_delete
 
     assert dispatch_keydown(keydown(pygame.K_RETURN), runtime) is True
     modal = controls.modal_host.view_state()

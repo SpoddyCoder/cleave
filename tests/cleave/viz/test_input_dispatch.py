@@ -656,3 +656,22 @@ def test_keyup_while_text_editing_disarms_modal_repeat() -> None:
     )
     assert runtime.modal_host.text_key_repeat_armed is False
     assert runtime.controls.key_repeat_armed is False
+
+
+def test_ctrl_l_adds_during_timeline_scope_digits_do_not_jump() -> None:
+    runtime = _make_runtime(submenu_focused=True, panel_open=True)
+    controls = runtime.controls
+    controls.shell_focus.selected_id = "settings"
+    controls.layer_lifecycle.can_add = lambda: True
+    controls.layer_lifecycle.prompt_add = MagicMock()
+    assert dispatch_keydown(keydown(pygame.K_l, mod=pygame.KMOD_CTRL), runtime) is True
+    controls.layer_lifecycle.prompt_add.assert_called_once_with()
+    assert controls.shell_focus.selected_id == "settings"
+
+    assert dispatch_keydown(keydown(pygame.K_1), runtime) is True
+    assert controls.shell_focus.selected_id == "settings"
+
+    closed = _make_runtime(submenu_focused=False, panel_open=False, recording=True)
+    closed.controls.shell_focus.selected_id = "settings"
+    assert dispatch_keydown(keydown(pygame.K_1), closed) is True
+    assert closed.controls.shell_focus.selected_id == "settings"

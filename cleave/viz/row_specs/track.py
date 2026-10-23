@@ -14,6 +14,7 @@ from cleave.config_schema.layers import (
 )
 from cleave.cue_roles import CUE_ROLE_MARKER_HELP_ENTRIES
 from cleave.stems import stem_control_label
+from cleave.viz.commands import command_by_id
 from cleave.viz.editor_mode_controls import is_preset_curation_mode
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
 from cleave.viz.row_sections import apply_expand_toggle
@@ -342,16 +343,13 @@ def _apply_preset_list_populate_action(
 def _apply_layer_add_action(controls: TuningControls, _desc: RowDescriptor) -> None:
     if is_preset_curation_mode(controls.session.settings.editor_mode):
         return
-    controls.layer_lifecycle.prompt_add()
+    command_by_id("layers.add").run(controls)
 
 
-def _apply_layer_delete_action(controls: TuningControls, desc: RowDescriptor) -> None:
+def _apply_layer_delete_action(controls: TuningControls, _desc: RowDescriptor) -> None:
     if is_preset_curation_mode(controls.session.settings.editor_mode):
         return
-    slot = desc.slot
-    if slot is None:
-        return
-    controls.layer_lifecycle.prompt_delete(slot)
+    command_by_id("layers.delete").run(controls)
 
 
 SPECS: dict[RowKind, RowSpec] = {

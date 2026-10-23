@@ -14,7 +14,9 @@ import pygame
 
 from cleave.config_schema.layers import MAX_LAYER_COUNT
 from cleave.viz.editor_mode_controls import is_preset_curation_mode
+from cleave.viz.focus_nav import TimelineFocus
 from cleave.viz.key_repeat import mod_ctrl
+from cleave.viz.navigator import LAYER_ID_PREFIX, layer_node_id
 from cleave.viz.theme import ACTION, CONFIG_DIRTY
 
 CommandKind = Literal["command", "jump", "check"]
@@ -27,6 +29,7 @@ _RESOLVED_SHORTCUT_IDS = frozenset(
         "project.render",
         "help.overlay",
         "settings.editor",
+        "layers.add",
     }
 )
 
@@ -39,6 +42,10 @@ class CommandContext:
     solo_slot: str | None = None
     config_dirty: bool = False
     render_busy: bool = False
+    selected_slot: str | None = None
+    can_add_layer: bool = False
+    can_remove_layer: bool = False
+    timeline_scope: bool = False
 
 
 def _disabled(_ctx: CommandContext) -> bool:
@@ -82,11 +89,23 @@ class Menu:
 def command_context(controls: Any) -> CommandContext:
     """Read the fields menu predicates need from tuning controls."""
     session = controls.session
+    selected = controls.shell_focus.selected_id
+    selected_slot = None
+    if isinstance(selected, str) and selected.startswith(LAYER_ID_PREFIX):
+        selected_slot = selected[len(LAYER_ID_PREFIX) :]
+    lifecycle = controls.layer_lifecycle
+    timeline_scope = isinstance(controls.focus_cursor, TimelineFocus) or bool(
+        session.timeline.recording
+    )
     return CommandContext(
         editor_mode=session.settings.editor_mode,
         solo_slot=session.solo_slot,
         config_dirty=bool(controls.config_dirty),
         render_busy=bool(controls.project_render.busy),
+        selected_slot=selected_slot,
+        can_add_layer=lifecycle.can_add(),
+        can_remove_layer=lifecycle.can_remove(),
+        timeline_scope=timeline_scope,
     )
 
 
@@ -161,6 +180,29 @@ def _run_measure_latency(controls: Any) -> None:
     controls.tap_sync.prompt_start()
 
 
+def _add_enabled(ctx: CommandContext) -> bool:
+    return ctx.can_add_layer and not is_preset_curation_mode(ctx.editor_mode)
+
+
+def _delete_enabled(ctx: CommandContext) -> bool:
+    return (
+        ctx.selected_slot is not None
+        and ctx.can_remove_layer
+        and not is_preset_curation_mode(ctx.editor_mode)
+    )
+
+
+def _run_add(controls: Any) -> None:
+    controls.layer_lifecycle.prompt_add()
+
+
+def _run_delete(controls: Any) -> None:
+    slot = command_context(controls).selected_slot
+    if slot is None:
+        return
+    controls.layer_lifecycle.prompt_delete(slot)
+
+
 def _run_focus_node(node_id: str) -> Callable[[Any], None]:
     """Select a navigator node and focus its inspector."""
 
@@ -214,8 +256,21 @@ _RENDER = Command(
 _BACKUP = _later("project.backup", "Backup...", "command")
 _RESTORE = _later("project.restore", "Restore...", "command")
 
-_ADD = _later("layers.add", "Add layer", "command", "Ctrl+L")
-_DELETE = _later("layers.delete", "Delete layer", "command")
+_ADD = Command(
+    id="layers.add",
+    label="Add layer",
+    kind="command",
+    shortcut="Ctrl+L",
+    enabled=_add_enabled,
+    run=_when_enabled(_add_enabled, _run_add),
+)
+_DELETE = Command(
+    id="layers.delete",
+    label="Delete layer",
+    kind="command",
+    enabled=_delete_enabled,
+    run=_when_enabled(_delete_enabled, _run_delete),
+)
 _CURATION = Command(
     id="layers.preset_curation",
     label="Preset curation mode",
@@ -271,36 +326,6 @@ _HELP_SHORTCUTS = Command(
 )
 _ABOUT = _later("help.about", "About Cleave", "command")
 
-_STATIC_COMMANDS: tuple[Command, ...] = (
-    _OPEN,
-    _SAVE,
-    _QUIT,
-    _PROJECT_SETTINGS,
-    _SEPARATE,
-    _RENDER,
-    _BACKUP,
-    _RESTORE,
-    _ADD,
-    _DELETE,
-    _CURATION,
-    _OVERLAYS,
-    _POST_FX,
-    _PATTERN_MASK,
-    _EDIT_OVERLAYS,
-    _EDIT_POST_FX,
-    _SHOW_STRIP,
-    _APPLY_PRESET,
-    _RESET,
-    _SNAP,
-    _UNDO_CUT,
-    _SONG_MARKERS,
-    _EDITOR,
-    _MEASURE_LATENCY,
-    _HELP_OVERLAY,
-    _HELP_SHORTCUTS,
-    _ABOUT,
-)
-
 _SHORTCUT_KEYS: dict[str, tuple[int, bool]] = {
     "Ctrl+O": (pygame.K_o, True),
     "Ctrl+S": (pygame.K_s, True),
@@ -324,10 +349,11 @@ _SHORTCUT_KEYS: dict[str, tuple[int, bool]] = {
 def layer_focus_commands(
     slots: Sequence[tuple[str, str]],
 ) -> tuple[Command, ...]:
-    """Disabled Layers jumps in z-order.
+    """Layer jumps in z-order.
 
     ``slots`` is ``(slot, stem_label)``. ``stem_label`` is shown as given.
     Shortcuts are ``1`` through ``8``; later rows keep no shortcut.
+    ``run`` selects ``layer:<slot>`` and focuses its inspector.
     """
     commands: list[Command] = []
     for index, (slot, stem_label) in enumerate(slots):
@@ -339,8 +365,8 @@ def layer_focus_commands(
                 label=f"Layer {number}  {stem_label}",
                 kind="jump",
                 shortcut=shortcut,
-                enabled=_disabled,
-                run=_noop,
+                enabled=_enabled,
+                run=_run_focus_node(layer_node_id(slot)),
             )
         )
     return tuple(commands)
@@ -419,15 +445,33 @@ def command_by_id(
     raise KeyError(command_id)
 
 
-def command_for_shortcut(key: int, mod: int) -> Command | None:
-    """Resolved shortcut, or None.
+def _shortcut_resolves(command: Command, *, timeline_scope: bool) -> bool:
+    if command.id in _RESOLVED_SHORTCUT_IDS:
+        return True
+    if command.id.startswith("layers.focus."):
+        return not timeline_scope
+    return False
 
-    Save, quit, render, the help overlay, and editor settings resolve.
-    Other shortcut text stays on its row. Bare R does not resolve.
+
+def command_for_shortcut(
+    key: int,
+    mod: int,
+    menus: Sequence[Menu] | None = None,
+    *,
+    timeline_scope: bool = False,
+) -> Command | None:
+    """Resolved shortcut from *menus*, or None.
+
+    Save, quit, render, the help overlay, editor settings, and add-layer
+    resolve. Layer jumps resolve unless *timeline_scope* is set. Other
+    shortcut text stays on its row. Bare R does not resolve.
     """
+    source = MENUS if menus is None else menus
     ctrl = mod_ctrl(mod)
-    for command in _STATIC_COMMANDS:
-        if command.id not in _RESOLVED_SHORTCUT_IDS or command.shortcut is None:
+    for command in iter_commands(source):
+        if not _shortcut_resolves(command, timeline_scope=timeline_scope):
+            continue
+        if command.shortcut is None:
             continue
         mapped = _SHORTCUT_KEYS.get(command.shortcut)
         if mapped is None:

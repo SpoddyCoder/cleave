@@ -42,6 +42,7 @@ from cleave.timeline import SlotCue, TimelineLane, canonicalize, lane_level_at
 from cleave.project import load_manifest, write_manifest
 from cleave.song_markers import SongMarker
 from cleave.viz.focus_nav import MainFocus, TimelineFocus
+from cleave.viz.navigator import layer_node_id
 from cleave.viz.key_repeat import mod_shift
 from cleave.viz.playback import format_mmss
 from tests.support.viz import (
@@ -238,10 +239,10 @@ def test_add_layer_row_omitted_at_max() -> None:
 
 def test_delete_layer_at_min_shows_toast() -> None:
     controls, manager = _make_controls_with_manager(("layer_1",), can_remove=False)
-    view = controls.build_view_state(paused=False)
-    controls.focus_descriptor = RowDescriptor(RowKind.LAYER_MANAGEMENT_DELETE, slot="layer_1")
+    controls.shell_focus.selected_id = layer_node_id("layer_1")
+    controls.focus_descriptor = RowDescriptor(RowKind.TRACK_HEADER, slot="layer_1")
 
-    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    controls.handle_keydown(_keydown(pygame.K_DELETE))
 
     manager.remove_layer.assert_not_called()
     assert controls.modal_host.view_state() is None
@@ -281,7 +282,7 @@ def test_delete_layer_confirm_calls_manager(confirm_key: int) -> None:
         del controls.session.layers[slot]
 
     manager.remove_layer.side_effect = remove_layer
-    view = controls.build_view_state(paused=False)
+    controls.shell_focus.selected_id = layer_node_id("layer_2")
     controls.focus_descriptor = RowDescriptor(RowKind.LAYER_MANAGEMENT_DELETE, slot="layer_2")
 
     controls.handle_keydown(_keydown(confirm_key))

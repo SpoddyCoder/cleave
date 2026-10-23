@@ -45,9 +45,10 @@ from cleave.viz.focus_nav import (
     timeline_strip_in_ring,
 )
 from cleave.viz.inspector_controls import InspectorControls
+from cleave.viz.navigator import build_navigator, layer_node_id
 from cleave.viz.navigator_controls import NavigatorControls
 from cleave.viz.row_layout import first_leftover_descriptor
-from cleave.viz.shell_focus import ShellFocusState, ShellRegion
+from cleave.viz.shell_focus import ShellFocusState, ShellRegion, reconcile_nav_id
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
 from cleave.viz.row_hotkeys import handle_row_hotkey
 from cleave.viz.row_spec import (
@@ -140,8 +141,8 @@ class TuningControls:
             layer_bindings,
             on_rebuild_view=self._rebuild_view,
             on_notification=self.show_notification,
-            on_capture_delete_nav=self._capture_delete_nav_pos,
-            on_restore_delete_focus=self._restore_delete_focus,
+            on_focus_after_add=self._focus_added_layer,
+            on_focus_after_delete=self._focus_deleted_layer,
         )
         self.song_markers = SongMarkerController(
             session,
@@ -770,25 +771,49 @@ class TuningControls:
         self._confirm_move_mode()
         self.navigator.reconcile()
 
-    def _capture_delete_nav_pos(self) -> int:
-        view = self.build_view_state(paused=self.playback.paused)
-        navigable = view.layout.navigable_descriptors(view)
-        current = view.layout.resolve_navigable(self.focus_descriptor, view)
-        try:
-            return navigable.index(current)
-        except ValueError:
-            return 0
+    def _focus_layer_inspector(self, node_id: str) -> None:
+        self.shell_focus.nav_expanded.add("layers")
+        self.navigator.select(node_id)
+        self.navigator.activate()
 
-    def _restore_delete_focus(self, nav_pos: int) -> None:
-        view_after = self.build_view_state(paused=self.playback.paused)
-        navigable_after = view_after.layout.navigable_descriptors(view_after)
-        if navigable_after:
-            self._apply_focus_cursor(
-                MainFocus(
-                    navigable_after[min(nav_pos, len(navigable_after) - 1)]
-                )
+    def _focus_added_layer(self) -> None:
+        order = self.session.layer_z_order
+        if not order:
+            return
+        self._focus_layer_inspector(layer_node_id(order[-1]))
+
+    def _focus_deleted_layer(self, slot: str, prior_index: int | None) -> None:
+        self.shell_focus.nav_expanded.add("layers")
+        visible = tuple(
+            node.id
+            for node in build_navigator(
+                self.session, self.shell_focus.nav_expanded
             )
-        self._normalize_focus_cursor()
+        )
+        target = reconcile_nav_id(
+            visible,
+            layer_node_id(slot),
+            self.session.layer_z_order,
+            prior_index=prior_index,
+        )
+        self.navigator.select(target)
+        self.navigator.activate()
+        self._clamp_timeline_focus_row()
+
+    def _clamp_timeline_focus_row(self) -> None:
+        row_count = len(self.session.layer_z_order)
+        if isinstance(self.focus_cursor, TimelineFocus):
+            if row_count <= 0:
+                self._apply_focus_cursor(TimelineFocus(0))
+                return
+            if self.focus_cursor.row >= row_count:
+                self._apply_focus_cursor(TimelineFocus(row_count - 1))
+            return
+        timeline = self.session.timeline
+        if row_count <= 0:
+            timeline.focus_row = 0
+        elif timeline.focus_row >= row_count:
+            timeline.focus_row = row_count - 1
 
     def _focus_preset_list_item(self, slot: str, index: int) -> None:
         self._apply_focus_cursor(

@@ -54,13 +54,9 @@ def test_enter_on_layers_opens_inspector() -> None:
     )
     assert [row.descriptor.kind for row in rows if row.descriptor is not None] == [
         RowKind.LAYER_MANAGEMENT_COUNT,
-        RowKind.LAYER_MANAGEMENT_ADD,
     ]
-    assert focus.inspector_cursor == next(
-        row.descriptor
-        for row in rows
-        if row.navigable and row.descriptor is not None
-    )
+    assert focus.inspector_command_id == "layers.add"
+    assert focus.inspector_cursor is None
 
     controls.shell_focus.region = ShellRegion.NAVIGATOR
     controls.shell_focus.selected_id = layer_node_id("layer_1")

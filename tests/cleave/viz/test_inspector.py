@@ -187,9 +187,10 @@ def test_layer_slot_page_has_groups_without_track_header() -> None:
         RowKind.TRACK_PRESET_SWITCHING,
         RowKind.TRACK_COMPOSITING_HEADER,
         RowKind.TRACK_EFFECTS_HEADER,
-        RowKind.LAYER_MANAGEMENT_DELETE,
     ):
         assert kind in kinds
+    assert any(row.command_id == "layers.delete" and row.navigable for row in rows)
+    assert RowKind.LAYER_MANAGEMENT_DELETE not in kinds
     assert RowKind.TRACK_BLEND in kinds
     assert RowKind.TRACK_OPACITY in kinds
     assert RowKind.TRACK_EFFECT not in kinds
@@ -304,20 +305,16 @@ def test_section_lock_inspector_field_colors() -> None:
     assert label == ACTION
     assert value != LOCKED
     rows = build_inspector_rows(state, layer_node_id("layer_1"), frozenset())
-    assert any(
-        row.navigable
-        and row.descriptor == delete
-        for row in rows
-    )
+    assert any(row.navigable and row.command_id == "layers.delete" for row in rows)
 
 
 def test_layers_root_count_and_curation_omits_add() -> None:
     state = _layer_view(("layer_1", "layer_2"))
     rows = build_inspector_rows(state, "layers", frozenset())
-    assert _kinds(rows) == [
-        RowKind.LAYER_MANAGEMENT_COUNT,
-        RowKind.LAYER_MANAGEMENT_ADD,
-    ]
+    assert _kinds(rows) == [RowKind.LAYER_MANAGEMENT_COUNT]
+    assert rows[1].command_id == "layers.add"
+    assert rows[1].navigable is True
+    assert rows[1].descriptor is None
     count = rows[0]
     assert count.descriptor is not None
     assert count.navigable is False
@@ -325,9 +322,9 @@ def test_layers_root_count_and_curation_omits_add() -> None:
     assert format_row_value(state, count.descriptor) == "2 of 8 layers"
 
     state.settings.editor_mode = "preset_curation"
-    assert _kinds(build_inspector_rows(state, "layers", frozenset())) == [
-        RowKind.LAYER_MANAGEMENT_COUNT,
-    ]
+    curation_rows = build_inspector_rows(state, "layers", frozenset())
+    assert _kinds(curation_rows) == [RowKind.LAYER_MANAGEMENT_COUNT]
+    assert all(row.command_id != "layers.add" for row in curation_rows)
     assert _kinds(build_inspector_rows(state, layer_node_id("layer_1"), frozenset())) == [
         RowKind.TRACK_STEM,
         RowKind.TRACK_BEAT,

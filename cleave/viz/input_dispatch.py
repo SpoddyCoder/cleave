@@ -95,12 +95,19 @@ def _is_alt_key(key: int) -> bool:
 def _run_command_shortcut(
     event: pygame.event.Event, runtime: LiveVisualizerRuntime
 ) -> bool | None:
-    """Ctrl+S, Ctrl+Q, Ctrl+R, and H. None when the key is not one of those.
+    """Resolved menu shortcuts. None when the key is not one of those.
 
     Quit returns False only when ``request_quit`` says leave now. The loop
-    also reads ``consume_pending_exit`` for the menu Enter path.
+    also reads ``consume_pending_exit`` for the menu Enter path. Digit jumps
+    stay unresolved while the timeline strip has scope.
     """
-    command = command_for_shortcut(event.key, event.mod)
+    ctx = command_context(runtime.controls)
+    command = command_for_shortcut(
+        event.key,
+        event.mod,
+        menus_for_session(runtime.seed.session),
+        timeline_scope=ctx.timeline_scope,
+    )
     if command is None:
         return None
     command.run(runtime.controls)

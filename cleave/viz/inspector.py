@@ -44,6 +44,11 @@ _GROUP_COMMANDS: dict[RowKind, str] = {
     RowKind.PROJECT_RENDER_HEADER: "project.render",
 }
 
+_LEAF_COMMANDS: dict[RowKind, str] = {
+    RowKind.LAYER_MANAGEMENT_ADD: "layers.add",
+    RowKind.LAYER_MANAGEMENT_DELETE: "layers.delete",
+}
+
 
 def build_inspector_rows(
     state: TuningViewState,
@@ -215,6 +220,10 @@ def _append_nodes(
 ) -> None:
     for child in nodes:
         if child.leaf_kind is not None:
+            command_id = _LEAF_COMMANDS.get(child.leaf_kind)
+            if command_id is not None:
+                rows.append(_command_row(command_id, depth))
+                continue
             rows.append(
                 _inspector_row(
                     child.leaf_kind,

@@ -22,8 +22,7 @@ def _make_controller(
     on_rebuild_view=None,
     on_notification=None,
     on_focus_after_add=None,
-    on_capture_delete_nav=None,
-    on_restore_delete_focus=None,
+    on_focus_after_delete=None,
 ) -> tuple[LayerLifecycleController, TuningSession, ModalHost, MagicMock]:
     session = TuningSession(
         layer_z_order=list(slots),
@@ -53,8 +52,7 @@ def _make_controller(
         on_rebuild_view=on_rebuild_view,
         on_notification=on_notification,
         on_focus_after_add=on_focus_after_add,
-        on_capture_delete_nav=on_capture_delete_nav,
-        on_restore_delete_focus=on_restore_delete_focus,
+        on_focus_after_delete=on_focus_after_delete,
     )
     return controller, session, modal, manager
 
@@ -96,19 +94,18 @@ def test_prompt_delete_toasts_at_min() -> None:
     assert notes == ["Must have at least 1 layer"]
 
 
-def test_confirm_delete_rebuilds_and_restores_focus() -> None:
-    restored: list[int] = []
+def test_confirm_delete_rebuilds_and_focuses() -> None:
+    focused: list[tuple[str, int | None]] = []
     rebuilt: list[str] = []
     controller, _session, modal, manager = _make_controller(
         on_rebuild_view=lambda: rebuilt.append("rebuild"),
-        on_capture_delete_nav=lambda: 3,
-        on_restore_delete_focus=lambda pos: restored.append(pos),
+        on_focus_after_delete=lambda slot, index: focused.append((slot, index)),
     )
     controller.prompt_delete("layer_2")
     modal.handle_keydown(keydown(pygame.K_RETURN))
     manager.remove_layer.assert_called_once_with("layer_2")
     assert rebuilt == ["rebuild"]
-    assert restored == [3]
+    assert focused == [("layer_2", 1)]
 
 
 def test_enter_and_swap_move_mode() -> None:
@@ -170,3 +167,5 @@ def test_apply_preview_resolutions_noops_without_manager() -> None:
         session, None, ModalHost(), None
     )
     controller.apply_preview_resolutions()
+    assert controller.can_add() is False
+    assert controller.can_remove() is False
