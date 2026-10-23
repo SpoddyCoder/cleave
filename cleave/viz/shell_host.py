@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import math
 import os
-from collections.abc import Callable
+from collections.abc import Callable, Collection, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -34,14 +34,16 @@ from imgui_bundle.python_backends.opengl_backend import ProgrammablePipelineRend
 
 from cleave.gl_state import restore_gl_state, save_gl_state
 from cleave.viz.commands import Command, CommandContext, MenuSeparator, command_by_id
+from cleave.viz.editor_mode_controls import is_preset_curation_mode
 from cleave.viz.focus_nav import TimelineFocus
 from cleave.viz.frame_rate import format_fps_value
 from cleave.viz.inspector import build_inspector_rows
 from cleave.viz.inspector_controls import inspector_command_enabled
 from cleave.viz.menu_bar import MenuBarState, menus_for_session
-from cleave.viz.navigator import build_navigator
+from cleave.viz.navigator import NavNode, build_navigator
 from cleave.viz.overlay_primitives import overlay_font_path
 from cleave.viz.playback import format_mmss
+from cleave.viz.row_kinds import RowDescriptor
 from cleave.viz.row_present_renderers import inspector_field_colors
 from cleave.viz.row_sections import (
     INSPECTOR_GROUP_EXPANDED,
@@ -63,6 +65,7 @@ from cleave.viz.theme import (
     FOCUS_ROW_BG_ALPHA,
     HIGHLIGHT,
     LABEL,
+    LOCK_ICON,
     NAVIGATOR_BORDER,
     TRANSPORT_RULE,
     VALUE,
@@ -75,6 +78,7 @@ _HIDDEN = 0.01
 # Dear ImGui default Style.FramePadding.y. _apply_theme leaves it unchanged.
 _MENU_BAR_FRAME_PADDING_Y = 3.0
 _INSPECTOR_INDENT = 16.0
+_NAV_LOCK_MARK = "[lock]"
 _TRANSPORT_GAP = 16.0
 # Border pushed onto navigator and inspector windows.
 _PANEL_BORDER_PX = 1.0
@@ -98,6 +102,15 @@ class TransportReadout:
     recording: bool
 
 
+@dataclass(frozen=True)
+class InspectorHeader:
+    """Inspector title line and the optional layer lock toggle."""
+
+    title: str
+    lock_label: str | None = None
+    slot: str | None = None
+
+
 def transport_parts(readout: TransportReadout) -> list[tuple[str, tuple[int, int, int]]]:
     """Play state, clock, and meters for the transport bar.
 
@@ -118,6 +131,71 @@ def transport_parts(readout: TransportReadout) -> list[tuple[str, tuple[int, int
         (f"{fps} fps", LABEL),
         (recording, LABEL),
     ]
+
+
+def navigator_twisty(node: NavNode, expanded: Collection[str]) -> str | None:
+    """Disclosure glyph for an expandable navigator node."""
+    if not node.expandable:
+        return None
+    return inspector_group_glyph(node.id in expanded)
+
+
+def navigator_lock_mark(node: NavNode) -> str | None:
+    """Lock mark for a locked navigator node."""
+    if not node.locked:
+        return None
+    return _NAV_LOCK_MARK
+
+
+def selection_after_nav_toggle(
+    visible_ids: Sequence[str],
+    selected_id: str,
+    toggled_id: str,
+    *,
+    expanded: bool,
+) -> str:
+    """Selection after a twisty click.
+
+    Expanding keeps *selected_id*. Collapsing selects *toggled_id* when
+    *selected_id* is not in *visible_ids*.
+    """
+    if expanded or selected_id in visible_ids:
+        return selected_id
+    return toggled_id
+
+
+def inspector_header(
+    nodes: Sequence[NavNode],
+    selected_id: str,
+    *,
+    curation: bool,
+) -> InspectorHeader:
+    """Title for *selected_id*. A layer slot breadcrumbs to its parent."""
+    node = next((item for item in nodes if item.id == selected_id), None)
+    if node is None:
+        return InspectorHeader(selected_id)
+    title = node.label
+    if node.parent_id == "layers":
+        parent = next((item for item in nodes if item.id == node.parent_id), None)
+        if parent is not None:
+            title = f"{parent.label} > {node.label}"
+    if node.slot is None or curation:
+        return InspectorHeader(title)
+    lock_label = "locked" if node.locked else "lock"
+    return InspectorHeader(title, lock_label, node.slot)
+
+
+def inspector_selectable_id(desc: RowDescriptor, *, group: bool) -> str:
+    """ImGui id for an inspector group or row.
+
+    Slot, card, effect, and preset index stay in the id so repeated effect
+    rows and preset-list items do not collide. Group ids include the slot.
+    """
+    tag = "grp" if group else "row"
+    return (
+        f"##{tag}-{desc.kind.name}-{desc.slot}-{desc.card}-"
+        f"{desc.effect_id}-{desc.driver_slug}-{desc.preset_index}"
+    )
 
 
 def menu_bar_height_px() -> int:
@@ -331,6 +409,19 @@ def _draw_item_suffix(text: str, color: imgui.ImVec4) -> None:
     _draw_aligned_parts([(text, color)])
 
 
+def _draw_nav_lock_mark(text_pos: imgui.ImVec2, label: str, mark: str) -> None:
+    gap = imgui.get_style().item_spacing.x
+    origin = imgui.ImVec2(
+        text_pos.x + imgui.calc_text_size(label).x + gap,
+        text_pos.y,
+    )
+    imgui.get_window_draw_list().add_text(
+        origin,
+        imgui.get_color_u32(_rgba(LOCK_ICON)),
+        mark,
+    )
+
+
 def _draw_aligned_parts(parts: list[tuple[str, imgui.ImVec4]]) -> None:
     if not parts:
         return
@@ -344,13 +435,6 @@ def _draw_aligned_parts(parts: list[tuple[str, imgui.ImVec4]]) -> None:
     for (text, color), width in zip(parts, widths):
         draw.add_text(imgui.ImVec2(x, y), imgui.get_color_u32(color), text)
         x += width
-
-
-def _inspector_widget_id(desc: Any) -> str:
-    return (
-        f"{desc.slot}-{desc.card}-{desc.effect_id}-"
-        f"{desc.driver_slug}-{desc.preset_index}"
-    )
 
 
 def _inspector_row_selected(focus: Any, desc: Any) -> bool:
@@ -838,30 +922,86 @@ class ShellHost:
         try:
             for node in build_navigator(
                 self._controls.session,
-                self._controls.shell_focus.nav_expanded,
+                focus.nav_expanded,
             ):
-                clicked, _selected = imgui.selectable(
-                    f"{node.label}##nav-{node.id}",
-                    node.id == focus.selected_id,
-                )
-                if node.badge:
-                    _draw_item_suffix(node.badge, _rgba(LABEL))
-                if clicked:
-                    self._controls.navigator.select(node.id)
+                self._draw_nav_node(node)
         finally:
             imgui.pop_style_color()
+
+    def _draw_nav_node(self, node: NavNode) -> None:
+        focus = self._controls.shell_focus
+        indent = node.depth * _INSPECTOR_INDENT
+        if indent:
+            imgui.indent(indent)
+        try:
+            selected = node.id == focus.selected_id
+            twisty_clicked = False
+            twisty = navigator_twisty(node, focus.nav_expanded)
+            if twisty is not None:
+                width = imgui.calc_text_size(twisty).x
+                twisty_clicked, _selected = imgui.selectable(
+                    f"{twisty}##nav-twisty-{node.id}",
+                    selected,
+                    0,
+                    imgui.ImVec2(width, 0.0),
+                )
+                imgui.same_line()
+            text_pos = imgui.get_cursor_screen_pos()
+            clicked, _selected = imgui.selectable(
+                f"{node.label}##nav-{node.id}",
+                selected,
+            )
+            mark = navigator_lock_mark(node)
+            if mark is not None:
+                _draw_nav_lock_mark(text_pos, node.label, mark)
+            if node.badge:
+                _draw_item_suffix(node.badge, _rgba(LABEL))
+            if twisty_clicked:
+                self._toggle_nav_expanded(node.id)
+            elif clicked:
+                self._controls.navigator.select(node.id)
+        finally:
+            if indent:
+                imgui.unindent(indent)
+
+    def _toggle_nav_expanded(self, node_id: str) -> None:
+        focus = self._controls.shell_focus
+        expanded = node_id not in focus.nav_expanded
+        if expanded:
+            focus.nav_expanded.add(node_id)
+        else:
+            focus.nav_expanded.discard(node_id)
+        visible = tuple(
+            node.id
+            for node in build_navigator(
+                self._controls.session, focus.nav_expanded
+            )
+        )
+        focus.selected_id = selection_after_nav_toggle(
+            visible,
+            focus.selected_id,
+            node_id,
+            expanded=expanded,
+        )
 
     def _draw_inspector(self, state: Any) -> None:
         focus = self._controls.shell_focus
         nodes = build_navigator(
             self._controls.session,
-            self._controls.shell_focus.nav_expanded,
+            focus.nav_expanded,
         )
-        title = next(
-            (node.label for node in nodes if node.id == focus.selected_id),
+        header = inspector_header(
+            nodes,
             focus.selected_id,
+            curation=is_preset_curation_mode(
+                self._controls.session.settings.editor_mode
+            ),
         )
-        imgui.text(title)
+        if header.lock_label is not None:
+            imgui.align_text_to_frame_padding()
+        imgui.text(header.title)
+        if header.lock_label is not None and header.slot is not None:
+            self._draw_inspector_lock(header.lock_label, header.slot)
         rows = build_inspector_rows(
             state, focus.selected_id, focus.collapsed, focus.opened
         )
@@ -891,7 +1031,7 @@ class ShellHost:
                     inspector_group_is_open(key, focus.collapsed, focus.opened)
                 )
                 clicked, _selected = imgui.selectable(
-                    f"{glyph} {label}##grp-{kind.name}-{_inspector_widget_id(desc)}",
+                    f"{glyph} {label}{inspector_selectable_id(desc, group=True)}",
                     selected,
                 )
                 if clicked:
@@ -902,7 +1042,7 @@ class ShellHost:
             imgui.push_style_color(imgui.Col_.text, _rgba(label_color))
             try:
                 clicked, _selected = imgui.selectable(
-                    f"{label}##row-{kind.name}-{_inspector_widget_id(desc)}",
+                    f"{label}{inspector_selectable_id(desc, group=False)}",
                     selected,
                 )
             finally:
@@ -947,6 +1087,30 @@ class ShellHost:
             self._controls.inspector.focus_row(row)
             if enabled:
                 self._controls.inspector.activate(row)
+
+    def _draw_inspector_lock(self, label: str, slot: str) -> None:
+        style = imgui.get_style()
+        text_w = imgui.calc_text_size(label).x
+        item_w = text_w + style.frame_padding.x * 2.0
+        avail = imgui.get_window_width()
+        imgui.same_line(
+            max(
+                imgui.get_cursor_pos_x(),
+                avail - item_w - style.window_padding.x,
+            )
+        )
+        imgui.push_style_color(imgui.Col_.text, _rgba(LOCK_ICON))
+        try:
+            clicked, _selected = imgui.selectable(
+                f"{label}##insp-lock-{slot}",
+                False,
+                0,
+                imgui.ImVec2(item_w, 0.0),
+            )
+        finally:
+            imgui.pop_style_color()
+        if clicked:
+            self._controls.toggle_layer_locked(slot)
 
     def _clicks_ignored(self) -> bool:
         return (
