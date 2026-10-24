@@ -250,6 +250,8 @@ def _header_enabled(session: TuningSession, desc: RowDescriptor) -> bool:
         return bool(session.render_post_fx.enabled)
     if kind == RowKind.RENDER_PATTERN_MASK_HEADER:
         return bool(session.render_pattern_mask.enabled)
+    if kind == RowKind.RENDER_TIMELINE_HEADER:
+        return bool(session.timeline.enabled)
     return False
 
 

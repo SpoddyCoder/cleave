@@ -8,9 +8,11 @@ from cleave.viz.row_sections import (
     RENDER_OVERLAY_OPENING_CARD_SECTION,
     RENDER_OVERLAY_SECTION_KINDS,
     RENDER_POST_FX_SECTION,
+    TIMELINE_PRESETS_SECTION,
     TRACK_SECTION,
     append_expand_section_rows,
     expand_section_expanded,
+    row_tree_indent_depth,
     section_header_from_section_tree,
     sub_row_expand_visible,
 )
@@ -345,3 +347,22 @@ def test_render_overlay_body_text_is_first_body_child() -> None:
         and node.expand.header_kind == RowKind.RENDER_OVERLAY_CARD_BODY_HEADER
     )
     assert body_section.children[0].leaf_kind == RowKind.RENDER_OVERLAY_CARD_BODY_TEXT
+
+
+def test_timeline_reset_follows_presets_section() -> None:
+    leaves = tuple(
+        child.leaf_kind
+        for child in TIMELINE_PRESETS_SECTION.children
+        if child.leaf_kind is not None
+    )
+    assert leaves[-2:] == (RowKind.TIMELINE_PRESETS, RowKind.TIMELINE_RESET)
+    assert row_tree_indent_depth(RowKind.TIMELINE_PRESETS_HEADER) == 1
+    assert row_tree_indent_depth(RowKind.TIMELINE_RESET) == (
+        row_tree_indent_depth(RowKind.TIMELINE_PRESETS)
+    )
+    assert section_header_from_section_tree(
+        RowDescriptor(RowKind.TIMELINE_RESET)
+    ) == RowDescriptor(RowKind.TIMELINE_PRESETS_HEADER)
+    assert section_header_descriptor(
+        RowDescriptor(RowKind.TIMELINE_RESET)
+    ) == RowDescriptor(RowKind.TIMELINE_PRESETS_HEADER)

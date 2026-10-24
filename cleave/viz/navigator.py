@@ -43,7 +43,7 @@ _TOP_LEVEL: tuple[NavNode, ...] = (
     NavNode("project", "Project", 0, True, None),
     NavNode("render", "Render", 0, False, None, expandable=True),
     NavNode("layers", "Layers", 0, True, None, expandable=True),
-    NavNode("song_markers", "Song markers", 0, False, None),
+    NavNode("song_markers", "Song markers", 0, True, None),
 )
 
 TOP_LEVEL_IDS: tuple[str, ...] = tuple(node.id for node in _TOP_LEVEL)
@@ -75,11 +75,12 @@ def build_navigator(
     """Visible navigator rows for *session*.
 
     *expanded* defaults to ``{"layers", "render"}`` so layer children and
-    render children are included. Render children are Overlays, Post-FX, and
-    Pattern mask. Overlay card children appear when ``render.overlays`` is
-    expanded. Preset curation omits Project, Render, and Song markers, and
-    keeps one layer child for the curation focus slot. Song markers carries
-    the marker count as its badge, including ``"0"``.
+    render children are included. Render children are Overlays, Post-FX,
+    Pattern mask, and Timeline. Overlay card children appear when
+    ``render.overlays`` is expanded. Preset curation omits Project, Render,
+    and Song markers, and keeps one layer child for the curation focus slot.
+    Song markers has an inspector and carries the marker count as its badge,
+    including ``"0"``.
     """
     if expanded is None:
         expanded = _DEFAULT_EXPANDED
@@ -143,6 +144,7 @@ def _render_children(
         nodes.extend(_overlay_card_nodes(session))
     nodes.append(_post_fx_node(session))
     nodes.append(_pattern_mask_node(session))
+    nodes.append(_timeline_node(session))
     return tuple(nodes)
 
 
@@ -183,6 +185,18 @@ def _pattern_mask_node(session: TuningSession) -> NavNode:
         badge=None if pattern_mask.enabled else OFF_BADGE,
         parent_id="render",
         locked=pattern_mask.locked,
+    )
+
+
+def _timeline_node(session: TuningSession) -> NavNode:
+    return NavNode(
+        id="render.timeline",
+        label="Timeline",
+        depth=1,
+        has_inspector=True,
+        badge=None,
+        parent_id="render",
+        locked=session.timeline.locked,
     )
 
 

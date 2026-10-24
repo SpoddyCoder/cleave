@@ -839,6 +839,19 @@ TIMELINE_PRESETS_SECTION = ExpandSectionDef(
         SectionNode(leaf_kind=RowKind.TIMELINE_PRESET_CONDUCTOR),
         SectionNode(leaf_kind=RowKind.TIMELINE_PRESET_MODE),
         SectionNode(leaf_kind=RowKind.TIMELINE_PRESETS),
+        SectionNode(leaf_kind=RowKind.TIMELINE_RESET),
+    ),
+)
+
+RENDER_TIMELINE_INSPECTOR_SECTION = ExpandSectionDef(
+    header_kind=None,
+    context="global",
+    read_expanded=_inspector_group_expanded,
+    toggle=_inspector_group_toggle,
+    children=(
+        SectionNode(expand=TIMELINE_PRESETS_SECTION),
+        SectionNode(expand=BEAT_BAR_GRID_SECTION),
+        SectionNode(expand=TIMELINE_CUTS_SECTION),
     ),
 )
 
@@ -1071,7 +1084,6 @@ def _build_row_tree_indent_depth() -> dict[RowKind, int]:
             _assign_expand_indent_depth(depths, node.expand, 0)
     _assign_expand_indent_depth(depths, SONG_MARKERS_SECTION, 1)
     depths[RowKind.SONG_MARKER_ITEM] = 2
-    depths[RowKind.TIMELINE_RESET] = 1
     _assign_expand_indent_depth(depths, BEAT_BAR_GRID_SECTION, 1)
     _assign_expand_indent_depth(depths, TIMELINE_CUTS_SECTION, 1)
     _assign_expand_indent_depth(depths, TIMELINE_PRESETS_SECTION, 1)
@@ -1232,7 +1244,6 @@ def append_leftover_timeline_rows(
     append_expand_section_rows(row_list, SONG_MARKERS_SECTION, state)
     append_expand_section_rows(row_list, TIMELINE_CUTS_SECTION, state)
     append_expand_section_rows(row_list, TIMELINE_PRESETS_SECTION, state)
-    row_list.append(RowDescriptor(RowKind.TIMELINE_RESET))
 
 
 _PER_SLOT_SECTION_HEADERS = frozenset(

@@ -55,7 +55,7 @@ def test_top_level_ids_in_order() -> None:
         True,
         False,
         True,
-        False,
+        True,
     )
     assert tuple(node.expandable for node in top) == (
         False,
@@ -76,12 +76,16 @@ def test_top_level_ids_in_order() -> None:
 
 def test_song_markers_badge_is_marker_count() -> None:
     empty = _session()
-    assert build_navigator(empty)[-1].badge == "0"
+    markers = build_navigator(empty)[-1]
+    assert markers.id == "song_markers"
+    assert markers.has_inspector is True
+    assert markers.badge == "0"
 
     session = _session()
     session.song_markers.times = [1.0, 4.5, 9.0]
     nodes = build_navigator(session)
     assert nodes[-1].id == "song_markers"
+    assert nodes[-1].has_inspector is True
     assert nodes[-1].badge == "3"
 
 
@@ -134,6 +138,7 @@ def test_layer_children_follow_z_order() -> None:
         "render.overlays",
         "render.post_fx",
         "render.pattern_mask",
+        "render.timeline",
         "layers",
         layer_node_id("layer_2"),
         layer_node_id("layer_1"),
@@ -194,6 +199,7 @@ def test_render_children_follow_overlays_post_fx_and_pattern_mask() -> None:
         "render.overlays",
         "render.post_fx",
         "render.pattern_mask",
+        "render.timeline",
         "layers",
         "song_markers",
     )
@@ -201,11 +207,13 @@ def test_render_children_follow_overlays_post_fx_and_pattern_mask() -> None:
         "render.overlays",
         "render.post_fx",
         "render.pattern_mask",
+        "render.timeline",
     )
     assert tuple(node.label for node in children) == (
         "Overlays",
         "Post-FX",
         "Pattern mask",
+        "Timeline",
     )
     assert all(node.depth == 1 for node in children)
     assert all(node.has_inspector for node in children)
@@ -213,7 +221,39 @@ def test_render_children_follow_overlays_post_fx_and_pattern_mask() -> None:
     assert children[0].expandable is True
     assert children[1].expandable is False
     assert children[2].expandable is False
+    assert children[3].expandable is False
+    timeline = children[3]
+    assert timeline.has_inspector is True
+    assert timeline.badge is None
+    assert timeline.locked is False
     assert not any(node.parent_id == "render.overlays" for node in nodes)
+
+
+def test_render_timeline_lock_follows_session_and_has_no_badge() -> None:
+    session = _session()
+    session.timeline.enabled = False
+    session.timeline.locked = True
+    children = tuple(
+        node for node in build_navigator(session) if node.parent_id == "render"
+    )
+    timeline = children[-1]
+
+    assert timeline.id == "render.timeline"
+    assert timeline.label == "Timeline"
+    assert timeline.depth == 1
+    assert timeline.parent_id == "render"
+    assert timeline.has_inspector is True
+    assert timeline.badge is None
+    assert timeline.locked is True
+    assert timeline.expandable is False
+
+    session.timeline.locked = False
+    session.timeline.enabled = True
+    unlocked = next(
+        node for node in build_navigator(session) if node.id == "render.timeline"
+    )
+    assert unlocked.locked is False
+    assert unlocked.badge is None
 
 
 def test_overlay_cards_follow_opening_then_closing() -> None:

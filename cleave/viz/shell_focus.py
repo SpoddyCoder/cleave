@@ -62,7 +62,13 @@ class InspectorGroupKey:
     card: str | None = None
 
 
-DEFAULT_CLOSED_INSPECTOR_GROUPS = frozenset({RowKind.TRACK_EFFECTS_HEADER})
+DEFAULT_CLOSED_INSPECTOR_GROUPS = frozenset(
+    {
+        RowKind.TRACK_EFFECTS_HEADER,
+        RowKind.TIMELINE_BEAT_BAR_GRID_HEADER,
+        RowKind.TIMELINE_CUTS_HEADER,
+    }
+)
 
 
 def inspector_group_is_open(

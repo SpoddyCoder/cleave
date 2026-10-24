@@ -2162,6 +2162,7 @@ def test_timeline_presets_skips_crescendo_without_typed_marker() -> None:
 
 def _focus_timeline_reset(controls: TuningControls) -> None:
     controls.session.timeline.panel_open = True
+    controls.session.timeline.timeline_presets_expanded = True
     view = controls.build_view_state(paused=False)
     reset_row = view.layout.find_by_kind(RowKind.TIMELINE_RESET)
     controls.focus_descriptor = _desc(view, reset_row)
@@ -3117,7 +3118,6 @@ def test_render_timeline_down_enters_submenu() -> None:
     snap_markers_row = view.layout.find_by_kind(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS)
     cuts_row = view.layout.find_by_kind(RowKind.TIMELINE_CUTS_HEADER)
     presets_header_row = view.layout.find_by_kind(RowKind.TIMELINE_PRESETS_HEADER)
-    reset_row = view.layout.find_by_kind(RowKind.TIMELINE_RESET)
     controls.focus_descriptor = _desc(view, header_row)
     controls.session.timeline.focus_row = 2
 
@@ -3156,10 +3156,7 @@ def test_render_timeline_down_enters_submenu() -> None:
     controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert controls.focus_descriptor == _desc(view, presets_header_row)
     assert not isinstance(controls.focus_cursor, TimelineFocus)
-
-    controls.handle_keydown(_keydown(pygame.K_DOWN))
-    assert controls.focus_descriptor == _desc(view, reset_row)
-    assert not isinstance(controls.focus_cursor, TimelineFocus)
+    assert RowKind.TIMELINE_RESET not in {row.kind for row in view.layout.rows}
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert isinstance(controls.focus_cursor, TimelineFocus)
@@ -3233,7 +3230,7 @@ def test_render_timeline_down_enters_submenu_and_routes_keys() -> None:
     controls.focus_descriptor = _desc(view, header_row)
     controls.session.timeline.focus_row = 2
 
-    for _ in range(10):
+    for _ in range(9):
         controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert isinstance(controls.focus_cursor, TimelineFocus)
     assert controls.session.timeline.focus_row == 0
@@ -3363,7 +3360,7 @@ def test_render_timeline_submenu_up_returns_to_header() -> None:
 
     assert not isinstance(controls.focus_cursor, TimelineFocus)
     view = controls.build_view_state(paused=False)
-    assert controls.focus_descriptor == RowDescriptor(RowKind.TIMELINE_RESET)
+    assert controls.focus_descriptor == RowDescriptor(RowKind.TIMELINE_PRESETS_HEADER)
 
 
 def test_render_timeline_submenu_entry_stops_repeat_on_keyup() -> None:
@@ -3372,6 +3369,7 @@ def test_render_timeline_submenu_entry_stops_repeat_on_keyup() -> None:
     controls = _make_controls(timeline_enabled=True)
     controls.session.timeline.panel_open = True
     controls.session.timeline.beat_bar_grid_expanded = True
+    controls.session.timeline.timeline_presets_expanded = True
     view = controls.build_view_state(paused=False)
     reset_row = view.layout.find_by_kind(RowKind.TIMELINE_RESET)
     controls.focus_descriptor = _desc(view, reset_row)

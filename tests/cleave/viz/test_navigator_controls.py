@@ -58,7 +58,12 @@ def test_enter_on_render_blocks_stays_off_the_panel() -> None:
     focus = controls.shell_focus
     focus.nav_expanded.add("render")
     view = controls.build_view_state(paused=controls.playback.paused)
-    for node_id in ("render.overlays", "render.post_fx", "render.pattern_mask"):
+    for node_id in (
+        "render.overlays",
+        "render.post_fx",
+        "render.pattern_mask",
+        "render.timeline",
+    ):
         focus.selected_id = node_id
         focus.region = ShellRegion.NAVIGATOR
         controls.navigator.activate()
@@ -74,15 +79,20 @@ def test_enter_on_render_blocks_stays_off_the_panel() -> None:
         )
 
 
-def test_enter_on_song_markers_hands_off_to_leftover_panel() -> None:
+def test_enter_on_song_markers_opens_inspector() -> None:
     controls = _make_controls(("layer_1",))
     focus = controls.shell_focus
     focus.selected_id = "song_markers"
     focus.region = ShellRegion.NAVIGATOR
     controls.navigator.activate()
-    assert focus.region is ShellRegion.PANEL
+    assert focus.region is ShellRegion.INSPECTOR
     assert focus.selected_id == "song_markers"
-    assert controls.focus_descriptor.kind is RowKind.RENDER_TIMELINE_HEADER
+    view = controls.build_view_state(paused=controls.playback.paused)
+    rows = build_inspector_rows(view, "song_markers", focus.collapsed, focus.opened)
+    assert RowKind.SONG_MARKERS_HEADER not in {
+        row.descriptor.kind for row in rows if row.descriptor is not None
+    }
+    assert focus.inspector_cursor == RowDescriptor(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS)
 
 
 def test_select_render_leaves_the_leftover_cursor() -> None:

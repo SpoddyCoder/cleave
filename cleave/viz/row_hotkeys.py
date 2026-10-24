@@ -42,6 +42,8 @@ def node_header_descriptor(node_id: str) -> RowDescriptor | None:
         return RowDescriptor(RowKind.RENDER_POST_FX_HEADER)
     if node_id == "render.pattern_mask":
         return RowDescriptor(RowKind.RENDER_PATTERN_MASK_HEADER)
+    if node_id == "render.timeline":
+        return RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
     if node_id.startswith(OVERLAY_CARD_ID_PREFIX):
         card = node_id[len(OVERLAY_CARD_ID_PREFIX) :]
         if card not in _OVERLAY_CARDS:

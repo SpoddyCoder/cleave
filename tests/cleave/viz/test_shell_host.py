@@ -173,6 +173,45 @@ def test_card_node_has_enabled_chip_and_overlays_lock_chip() -> None:
     assert locked["lock"].active is True
 
 
+def test_timeline_inspector_header_chips_follow_enabled_and_lock() -> None:
+    session = _session()
+    nodes = build_navigator(session)
+    header = inspector_header(nodes, "render.timeline", session, curation=False)
+    chips = _chips(header)
+    assert header.title == "Timeline"
+    assert tuple(chips) == ("enabled", "lock")
+    assert chips["enabled"].label == "on"
+    assert chips["enabled"].active is True
+    assert chips["lock"].label == "lock"
+    assert chips["lock"].active is False
+
+    session.timeline.enabled = False
+    session.timeline.locked = True
+    off = _chips(
+        inspector_header(nodes, "render.timeline", session, curation=False)
+    )
+    assert off["enabled"].label == "off"
+    assert off["enabled"].active is False
+    assert off["lock"].label == "locked"
+    assert off["lock"].active is True
+
+    markers = inspector_header(nodes, "song_markers", session, curation=False)
+    assert markers.title == "Song markers"
+    assert markers.chips == ()
+
+    controls = _make_controls(("layer_1",), timeline_enabled=True)
+    assert controls.session.timeline.panel_open is False
+    desc = RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
+    activate_inspector_chip(controls, "enabled", desc)
+    assert controls.session.timeline.enabled is False
+    assert controls.session.timeline.panel_open is False
+    activate_inspector_chip(controls, "enabled", desc)
+    assert controls.session.timeline.enabled is True
+    assert controls.session.timeline.panel_open is True
+    activate_inspector_chip(controls, "lock", desc)
+    assert controls.session.timeline.locked is True
+
+
 def test_preset_curation_omits_header_chips() -> None:
     session = _session()
     nodes = build_navigator(session)

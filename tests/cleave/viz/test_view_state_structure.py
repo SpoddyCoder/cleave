@@ -206,7 +206,7 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert preset_conductor not in view_open.layout.rows
     assert preset_mode not in view_open.layout.rows
     assert presets_apply not in view_open.layout.rows
-    assert reset in view_open.layout.rows
+    assert reset not in view_open.layout.rows
     assert beat_bar_header in view_open.layout.rows
     assert bar_phase not in view_open.layout.rows
     assert bar_grid not in view_open.layout.rows
@@ -220,11 +220,9 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     beat_bar_idx = view_open.layout.rows.index(beat_bar_header)
     cuts_idx = view_open.layout.rows.index(cuts_header)
     presets_header_idx = view_open.layout.rows.index(presets_header)
-    reset_idx = view_open.layout.rows.index(reset)
     assert markers_idx == beat_bar_idx + 1
     assert cuts_idx == markers_idx + 1
     assert presets_header_idx == cuts_idx + 1
-    assert reset_idx == presets_header_idx + 1
 
     session.song_markers.expanded = True
     view_markers_expanded = builder.build(paused=False)
@@ -256,7 +254,7 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert hard_cut_fades not in view_beat_expanded.layout.rows
     assert soft_cut_fades not in view_beat_expanded.layout.rows
     assert view_beat_expanded.layout.rows.index(presets_header) == cuts_idx + 1
-    assert view_beat_expanded.layout.rows.index(reset) == cuts_idx + 2
+    assert reset not in view_beat_expanded.layout.rows
 
     session.timeline.cuts_expanded = True
     view_cuts_expanded = builder.build(paused=False)
@@ -336,6 +334,7 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert preset_conductor not in view_presets_collapsed.layout.rows
     assert preset_mode not in view_presets_collapsed.layout.rows
     assert presets_apply not in view_presets_collapsed.layout.rows
+    assert reset not in view_presets_collapsed.layout.rows
     assert presets_header in view_presets_collapsed.layout.rows
 
     session.timeline.panel_open = False

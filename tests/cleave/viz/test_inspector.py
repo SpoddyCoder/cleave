@@ -20,7 +20,7 @@ from cleave.viz.row_sections import (
 from cleave.viz.row_present_renderers import inspector_field_colors
 from cleave.viz.row_spec import format_row_value, row_spec
 from cleave.viz.theme import ACTION, LOCKED
-from cleave.viz.shell_focus import InspectorGroupKey
+from cleave.viz.shell_focus import InspectorGroupKey, inspector_group_is_open
 from cleave.viz.tuning_view_state import SettingsBlock, TuningViewState
 from tests.support.config import TEST_LAYER_STEMS
 from tests.support.viz import make_track_block
@@ -152,11 +152,115 @@ def test_unmigrated_nodes_return_no_rows() -> None:
     state = _view_state()
     for node_id in (
         "render",
-        "song_markers",
         "unknown",
         "render.overlays.card:other",
     ):
         assert build_inspector_rows(state, node_id, frozenset()) == ()
+
+
+def test_render_timeline_page_is_three_groups() -> None:
+    state = _view_state()
+    state.render_timeline.timeline_presets_expanded = False
+    state.render_timeline.beat_bar_grid_expanded = True
+    state.render_timeline.cuts_expanded = True
+    preset_key = InspectorGroupKey(RowKind.TIMELINE_PRESETS_HEADER)
+    beat_key = InspectorGroupKey(RowKind.TIMELINE_BEAT_BAR_GRID_HEADER)
+    cuts_key = InspectorGroupKey(RowKind.TIMELINE_CUTS_HEADER)
+    assert inspector_group_is_open(preset_key, frozenset(), frozenset()) is True
+    assert inspector_group_is_open(beat_key, frozenset(), frozenset()) is False
+    assert inspector_group_is_open(cuts_key, frozenset(), frozenset()) is False
+
+    rows = build_inspector_rows(state, "render.timeline", frozenset())
+    kinds = _kinds(rows)
+    groups = tuple(row for row in rows if row.is_group)
+    assert tuple(row.descriptor.kind for row in groups) == (
+        RowKind.TIMELINE_PRESETS_HEADER,
+        RowKind.TIMELINE_BEAT_BAR_GRID_HEADER,
+        RowKind.TIMELINE_CUTS_HEADER,
+    )
+    assert all(row.depth == 0 for row in groups)
+    assert RowKind.RENDER_TIMELINE_HEADER not in kinds
+    assert all(row.command_id is None for row in rows)
+    preset_leaves = _group_leaves(rows, RowKind.TIMELINE_PRESETS_HEADER)
+    assert tuple(row.descriptor.kind for row in preset_leaves)[-2:] == (
+        RowKind.TIMELINE_PRESETS,
+        RowKind.TIMELINE_RESET,
+    )
+    assert all(row.depth == 1 and not row.is_group for row in preset_leaves)
+    assert RowKind.TIMELINE_PLACEMENT_SNAP not in kinds
+    assert RowKind.TIMELINE_BAR_GRID not in kinds
+    assert RowKind.TIMELINE_HARD_CUTS not in kinds
+    assert RowKind.TIMELINE_SOFT_CUTS not in kinds
+    assert RowKind.TIMELINE_HARD_CUT_FADE_IN not in kinds
+
+    opened = frozenset({beat_key, cuts_key})
+    open_rows = build_inspector_rows(state, "render.timeline", frozenset(), opened)
+    open_kinds = _kinds(open_rows)
+    beat_leaves = _group_leaves(open_rows, RowKind.TIMELINE_BEAT_BAR_GRID_HEADER)
+    assert tuple(row.descriptor.kind for row in beat_leaves) == (
+        RowKind.TIMELINE_PLACEMENT_SNAP,
+        RowKind.TIMELINE_BAR_GRID,
+        RowKind.TIMELINE_BAR_PHASE,
+        RowKind.TIMELINE_SNAP_CUES,
+    )
+    assert RowKind.TIMELINE_HARD_CUTS in open_kinds
+    assert RowKind.TIMELINE_SOFT_CUTS in open_kinds
+    assert RowKind.TIMELINE_HARD_CUT_FADE_IN not in open_kinds
+    assert RowKind.TIMELINE_SOFT_CUT_FADE_IN not in open_kinds
+    assert RowKind.TIMELINE_APPLY_HARD_CUTS not in open_kinds
+    assert RowKind.TIMELINE_APPLY_SOFT_CUTS not in open_kinds
+
+    state.render_timeline.hard_cut_fades.enabled = True
+    state.render_timeline.soft_cut_fades.enabled = True
+    fade_kinds = _kinds(
+        build_inspector_rows(state, "render.timeline", frozenset(), opened)
+    )
+    hard_idx = fade_kinds.index(RowKind.TIMELINE_HARD_CUTS)
+    assert fade_kinds[hard_idx : hard_idx + 6] == [
+        RowKind.TIMELINE_HARD_CUTS,
+        RowKind.TIMELINE_HARD_CUT_FADE_IN,
+        RowKind.TIMELINE_HARD_CUT_FADE_OUT,
+        RowKind.TIMELINE_HARD_CUT_CROSSFADE,
+        RowKind.TIMELINE_APPLY_HARD_CUTS,
+        RowKind.TIMELINE_REMOVE_HARD_CUTS,
+    ]
+    soft_idx = fade_kinds.index(RowKind.TIMELINE_SOFT_CUTS)
+    assert fade_kinds[soft_idx : soft_idx + 6] == [
+        RowKind.TIMELINE_SOFT_CUTS,
+        RowKind.TIMELINE_SOFT_CUT_FADE_IN,
+        RowKind.TIMELINE_SOFT_CUT_FADE_OUT,
+        RowKind.TIMELINE_SOFT_CUT_CROSSFADE,
+        RowKind.TIMELINE_APPLY_SOFT_CUTS,
+        RowKind.TIMELINE_REMOVE_SOFT_CUTS,
+    ]
+
+    collapsed = frozenset({preset_key})
+    hidden = _kinds(build_inspector_rows(state, "render.timeline", collapsed, opened))
+    assert RowKind.TIMELINE_PRESETS_HEADER in hidden
+    assert RowKind.TIMELINE_PRESETS not in hidden
+    assert RowKind.TIMELINE_RESET not in hidden
+    assert RowKind.TIMELINE_HARD_CUT_FADE_IN in hidden
+
+
+def test_song_markers_page_is_snap_and_marker_rows() -> None:
+    state = _view_state()
+    state.render_timeline.song_markers_expanded = False
+    state.render_timeline.song_marker_times = (1.0, 4.0, 9.0)
+    rows = build_inspector_rows(state, "song_markers", frozenset())
+    kinds = _kinds(rows)
+
+    assert RowKind.SONG_MARKERS_HEADER not in kinds
+    assert all(not row.is_group for row in rows)
+    assert all(row.command_id is None for row in rows)
+    assert kinds[0] == RowKind.TIMELINE_SNAP_TO_SONG_MARKERS
+    markers = [
+        row.descriptor
+        for row in rows
+        if row.descriptor is not None
+        and row.descriptor.kind is RowKind.SONG_MARKER_ITEM
+    ]
+    assert [desc.marker_index for desc in markers] == [0, 1, 2]
+    assert all(row.depth == 0 for row in rows)
 
 
 def test_render_overlays_page_is_the_two_card_groups() -> None:

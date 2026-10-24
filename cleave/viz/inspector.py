@@ -1,4 +1,4 @@
-"""Inspector row model for Settings, Project, Layers, and render blocks.
+"""Inspector row model for Settings, Project, Layers, render blocks, and timeline.
 
 Rows are a pure function of view state, node id, and the group sets.
 Session expand flags are not read. This module does not draw.
@@ -22,10 +22,11 @@ from cleave.viz.row_sections import (
     RENDER_OVERLAYS_SECTION,
     RENDER_PATTERN_MASK_SECTION,
     RENDER_POST_FX_SECTION,
+    RENDER_TIMELINE_INSPECTOR_SECTION,
     SETTINGS_SECTION,
+    SONG_MARKERS_SECTION,
     TRACK_SECTION,
     ExpandSectionDef,
-    SectionNode,
 )
 from cleave.viz.row_spec import row_spec
 from cleave.viz.shell_focus import InspectorGroupKey, inspector_group_is_open
@@ -74,7 +75,10 @@ def build_inspector_rows(
     curation, without the section header. ``render.overlays``,
     ``render.post_fx``, and ``render.pattern_mask`` walk those sections.
     ``render.overlays.card:<card>`` walks the opening or closing card section.
-    An unknown card suffix, the render root, and song markers are empty.
+    ``render.timeline`` walks the headerless timeline page: timeline preset,
+    beat / bar grid, and cue fades. ``song_markers`` walks song markers and
+    omits that section header. An unknown id, including the render root, is
+    empty.
     """
     if node_id == "settings":
         section = SETTINGS_SECTION
@@ -100,6 +104,12 @@ def build_inspector_rows(
         slot = None
     elif node_id == "render.pattern_mask":
         section = RENDER_PATTERN_MASK_SECTION
+        slot = None
+    elif node_id == "render.timeline":
+        section = RENDER_TIMELINE_INSPECTOR_SECTION
+        slot = None
+    elif node_id == "song_markers":
+        section = SONG_MARKERS_SECTION
         slot = None
     elif node_id.startswith(OVERLAY_CARD_ID_PREFIX):
         section = _OVERLAY_CARD_SECTIONS.get(node_id[len(OVERLAY_CARD_ID_PREFIX) :])
