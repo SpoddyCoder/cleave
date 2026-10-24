@@ -95,7 +95,7 @@ class TimelineControls:
         )
 
     def handle_keydown(self, event: pygame.event.Event) -> bool:
-        if event.key in (pygame.K_ESCAPE, pygame.K_t):
+        if event.key == pygame.K_ESCAPE:
             if not self.session.timeline.recording:
                 self._close_panel()
             return True

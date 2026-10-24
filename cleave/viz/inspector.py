@@ -53,6 +53,9 @@ _GROUP_COMMANDS: dict[RowKind, str] = {
 _LEAF_COMMANDS: dict[RowKind, str] = {
     RowKind.LAYER_MANAGEMENT_ADD: "layers.add",
     RowKind.LAYER_MANAGEMENT_DELETE: "layers.delete",
+    RowKind.TIMELINE_PRESETS: "timeline.apply_preset",
+    RowKind.TIMELINE_RESET: "timeline.reset",
+    RowKind.TIMELINE_SNAP_CUES: "timeline.snap_cues",
 }
 
 _OVERLAY_CARD_SECTIONS = {

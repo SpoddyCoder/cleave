@@ -185,12 +185,9 @@ def _handle_global_keydown(
     if _try_handle_global_seek(event, runtime):
         return True
 
-    if tl.recording:
-        if event.key == pygame.K_ESCAPE:
-            runtime.timeline_controls.stop_recording()
-            return True
-        if event.key == pygame.K_t:
-            return True
+    if tl.recording and event.key == pygame.K_ESCAPE:
+        runtime.timeline_controls.stop_recording()
+        return True
 
     return None
 

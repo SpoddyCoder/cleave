@@ -3558,7 +3558,7 @@ def test_t_opens_timeline_panel_when_enabled() -> None:
     controls.session.timeline.focus_row = 2
     assert controls.session.timeline.panel_open is False
 
-    controls.handle_keydown(_keydown(pygame.K_t))
+    command_by_id("timeline.show_strip").run(controls)
     assert controls.session.timeline.panel_open is True
     assert isinstance(controls.focus_cursor, TimelineFocus)
     assert controls.session.timeline.focus_row == 0
@@ -3572,7 +3572,7 @@ def test_t_closes_timeline_panel_and_focuses_header_when_open() -> None:
     
     controls.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
 
-    controls.handle_keydown(_keydown(pygame.K_t))
+    command_by_id("timeline.show_strip").run(controls)
     assert controls.session.timeline.panel_open is False
     assert not isinstance(controls.focus_cursor, TimelineFocus)
     assert controls.focus_descriptor == _desc(view, header_row)
@@ -3586,15 +3586,7 @@ def test_t_from_submenu_closes_and_focuses_render_timeline_header() -> None:
     controls.session.timeline.panel_open = True
     controls.focus_cursor = TimelineFocus(0)
 
-    from cleave.viz.timeline_controls import TimelineControls
-
-    timeline_controls = TimelineControls(
-        controls.session,
-        controls.playback,
-        controls.duration_sec,
-        on_close=controls.close_timeline_panel,
-    )
-    timeline_controls.handle_keydown(_keydown(pygame.K_t))
+    command_by_id("timeline.show_strip").run(controls)
 
     assert controls.session.timeline.panel_open is False
     assert not isinstance(controls.focus_cursor, TimelineFocus)
@@ -3607,7 +3599,7 @@ def test_t_opens_timeline_panel_when_disabled() -> None:
     controls.session.timeline.focus_row = 2
     assert controls.session.timeline.panel_open is False
 
-    controls.handle_keydown(_keydown(pygame.K_t))
+    command_by_id("timeline.show_strip").run(controls)
     assert controls.session.timeline.enabled is False
     assert controls.session.timeline.panel_open is True
     assert isinstance(controls.focus_cursor, TimelineFocus)

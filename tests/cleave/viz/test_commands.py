@@ -20,12 +20,14 @@ from cleave.viz.commands import (
     layer_focus_commands,
 )
 from cleave.viz.focus_nav import MainFocus, TimelineFocus
+from cleave.viz.help_content import help_focus_descriptor
 from cleave.viz.inspector import build_inspector_rows
 from cleave.viz.modal import ModalKind
 from cleave.viz.navigator import layer_node_id
 from cleave.viz.row_kinds import RowDescriptor, RowKind
+from cleave.viz.row_spec import apply_field_action, row_spec
 from cleave.viz.session import LayerRuntime
-from cleave.viz.shell_focus import ShellRegion
+from cleave.viz.shell_focus import InspectorGroupKey, ShellRegion
 from cleave.viz.theme import ACTION, CONFIG_DIRTY
 from tests.cleave.viz.test_controls import (
     _keydown,
@@ -74,21 +76,16 @@ _DISABLED_IDS = (
     "project.restore",
     "help.about",
     "timeline.undo_cut",
-    "timeline.song_markers",
     "layers.add",
     "layers.delete",
-    "timeline.show_strip",
-    "timeline.apply_preset",
-    "timeline.reset",
-    "timeline.snap_cues",
 )
 
-_DISABLED_JUMP_IDS = ("timeline.song_markers",)
 _ENABLED_JUMP_IDS = (
     "project.settings",
     "settings.editor",
     "render.edit_overlays",
     "render.edit_post_fx",
+    "timeline.song_markers",
 )
 
 
@@ -119,7 +116,11 @@ def _fake_controls(
             settings=SimpleNamespace(editor_mode=editor_mode),
             solo_slot=solo_slot,
             help_visible=help_visible,
-            timeline=SimpleNamespace(recording=recording),
+            timeline=SimpleNamespace(
+                recording=recording,
+                panel_open=False,
+                locked=False,
+            ),
             render_overlays=SimpleNamespace(
                 opening_card=SimpleNamespace(enabled=False),
                 closing_card=SimpleNamespace(enabled=False),
@@ -248,7 +249,11 @@ def test_later_shortcuts_stay_on_rows_but_do_not_resolve() -> None:
     assert command_by_id("settings.editor", menus).shortcut == "Ctrl+,"
     assert command_by_id("layers.focus.slot_a", menus).shortcut == "1"
     assert command_for_shortcut(pygame.K_o, pygame.KMOD_CTRL) is None
-    assert command_for_shortcut(pygame.K_t, 0) is None
+    assert command_for_shortcut(pygame.K_t, 0).id == "timeline.show_strip"
+    assert (
+        command_for_shortcut(pygame.K_t, 0, timeline_scope=True).id
+        == "timeline.show_strip"
+    )
     assert command_for_shortcut(pygame.K_COMMA, pygame.KMOD_CTRL).id == "settings.editor"
     assert command_for_shortcut(pygame.K_1, 0) is None
     assert command_for_shortcut(pygame.K_s, pygame.KMOD_CTRL).id == "file.save"
@@ -262,10 +267,6 @@ def test_disabled_items_and_jumps_stay_disabled() -> None:
     ctx = CommandContext()
     for command_id in _DISABLED_IDS:
         assert command_by_id(command_id, menus).enabled(ctx) is False
-    for command_id in _DISABLED_JUMP_IDS:
-        command = command_by_id(command_id, menus)
-        assert command.kind == "jump"
-        assert command.enabled(ctx) is False
     for command_id in _ENABLED_JUMP_IDS:
         command = command_by_id(command_id, menus)
         assert command.kind == "jump"
@@ -707,3 +708,212 @@ def test_add_selects_new_layer_and_delete_selects_neighbour() -> None:
     controls.layer_lifecycle.confirm_delete("layer_1")
     assert controls.shell_focus.selected_id == "layers"
     assert controls.shell_focus.region is ShellRegion.INSPECTOR
+
+
+def test_show_strip_toggles_panel_and_is_disabled_while_recording_or_curating() -> None:
+    show = command_by_id("timeline.show_strip")
+    assert show.kind == "check"
+    assert show.label == "Show timeline strip"
+    assert show.shortcut == "T"
+    assert command_for_shortcut(pygame.K_t, 0) is show
+    assert command_for_shortcut(pygame.K_t, 0, timeline_scope=True) is show
+    assert command_for_shortcut(pygame.K_r, 0) is None
+    assert command_for_shortcut(pygame.K_r, pygame.KMOD_CTRL).id == "project.render"
+    assert [command.id for command in iter_commands(MENUS) if command.shortcut == "T"] == [
+        "timeline.show_strip"
+    ]
+
+    assert show.checked(CommandContext(timeline_panel_open=False)) is False
+    assert show.checked(CommandContext(timeline_panel_open=True)) is True
+    assert show.enabled(CommandContext()) is True
+    assert show.enabled(CommandContext(timeline_recording=True)) is False
+    assert show.enabled(CommandContext(editor_mode="preset_curation")) is False
+
+    closed = _make_controls(("layer_1",))
+    assert command_context(closed).timeline_panel_open is False
+    assert show.checked(command_context(closed)) is False
+    show.run(closed)
+    assert closed.session.timeline.panel_open is True
+    assert isinstance(closed.focus_cursor, TimelineFocus)
+    assert command_context(closed).timeline_panel_open is True
+    assert show.checked(command_context(closed)) is True
+    show.run(closed)
+    assert closed.session.timeline.panel_open is False
+    assert not isinstance(closed.focus_cursor, TimelineFocus)
+    assert closed.shell_focus.region is ShellRegion.NAVIGATOR
+
+    recording = _make_controls(("layer_1",))
+    recording.session.timeline.recording = True
+    recording.session.timeline.panel_open = True
+    assert command_context(recording).timeline_recording is True
+    assert show.enabled(command_context(recording)) is False
+    show.run(recording)
+    assert recording.session.timeline.panel_open is True
+    assert not isinstance(recording.focus_cursor, TimelineFocus)
+
+    curated = _make_controls(("layer_1",))
+    curated.session.settings.editor_mode = "preset_curation"
+    show.run(curated)
+    assert curated.session.timeline.panel_open is False
+
+
+def test_undo_cut_stays_disabled_and_run_is_a_noop() -> None:
+    undo = command_by_id("timeline.undo_cut")
+    assert undo.enabled(CommandContext()) is False
+    sentinel = MagicMock()
+    undo.run(sentinel)
+    assert sentinel.mock_calls == []
+
+
+def test_timeline_actions_share_run_with_the_inspector() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.prompt_apply_timeline_preset = MagicMock()
+    controls.prompt_reset_timeline = MagicMock()
+    controls.prompt_snap_cues = MagicMock()
+    actions = (
+        ("timeline.apply_preset", RowKind.TIMELINE_PRESETS, controls.prompt_apply_timeline_preset),
+        ("timeline.reset", RowKind.TIMELINE_RESET, controls.prompt_reset_timeline),
+        ("timeline.snap_cues", RowKind.TIMELINE_SNAP_CUES, controls.prompt_snap_cues),
+    )
+    visualizer = CommandContext()
+    locked = CommandContext(timeline_locked=True)
+    recording = CommandContext(timeline_recording=True)
+    curated = CommandContext(editor_mode="preset_curation")
+    for command_id, _kind, _prompt in actions:
+        command = command_by_id(command_id)
+        assert command.enabled(visualizer) is True
+        assert command.enabled(recording) is True
+        assert command.enabled(locked) is False
+        assert command.enabled(curated) is False
+
+    view = controls.build_view_state(paused=False)
+    opened = frozenset({InspectorGroupKey(RowKind.TIMELINE_BEAT_BAR_GRID_HEADER)})
+    rows = build_inspector_rows(view, "render.timeline", frozenset(), opened)
+    by_id = {row.command_id: row for row in rows if row.command_id}
+    assert set(by_id) == {"timeline.apply_preset", "timeline.reset", "timeline.snap_cues"}
+    assert all(row.descriptor is None for row in by_id.values())
+    descriptor_kinds = {
+        row.descriptor.kind for row in rows if row.descriptor is not None
+    }
+    assert RowKind.TIMELINE_PRESETS not in descriptor_kinds
+    assert RowKind.TIMELINE_RESET not in descriptor_kinds
+    assert RowKind.TIMELINE_SNAP_CUES not in descriptor_kinds
+
+    controls.shell_focus.region = ShellRegion.INSPECTOR
+    controls.shell_focus.selected_id = "render.timeline"
+    for command_id, kind, prompt in actions:
+        prompt.reset_mock()
+        command_by_id(command_id).run(controls)
+        prompt.assert_called_once_with()
+        prompt.reset_mock()
+        controls.inspector.activate(by_id[command_id])
+        prompt.assert_called_once_with()
+        prompt.reset_mock()
+        assert apply_field_action(controls, RowDescriptor(kind)) is True
+        prompt.assert_called_once_with()
+        controls.shell_focus.inspector_command_id = command_id
+        followed = help_focus_descriptor(
+            RowDescriptor(RowKind.RENDER_TIMELINE_HEADER),
+            controls.shell_focus,
+        )
+        assert followed == RowDescriptor(kind)
+
+    controls.session.timeline.locked = True
+    assert command_context(controls).timeline_locked is True
+    for command_id, kind, prompt in actions:
+        prompt.reset_mock()
+        command_by_id(command_id).run(controls)
+        controls.inspector.activate(by_id[command_id])
+        apply_field_action(controls, RowDescriptor(kind))
+        prompt.assert_not_called()
+
+    controls.session.timeline.locked = False
+    controls.session.settings.editor_mode = "preset_curation"
+    for command_id, kind, prompt in actions:
+        prompt.reset_mock()
+        command_by_id(command_id).run(controls)
+        controls.inspector.activate(by_id[command_id])
+        apply_field_action(controls, RowDescriptor(kind))
+        prompt.assert_not_called()
+
+
+def test_song_markers_jump_opens_the_inspector() -> None:
+    jump = command_by_id("timeline.song_markers")
+    assert jump.kind == "jump"
+    assert jump.label == "Song markers"
+    assert jump.enabled(CommandContext()) is True
+    assert jump.enabled(CommandContext(timeline_locked=True)) is True
+    assert jump.enabled(CommandContext(editor_mode="preset_curation")) is False
+
+    controls = _make_controls(("layer_1",))
+    jump.run(controls)
+    assert controls.shell_focus.selected_id == "song_markers"
+    assert controls.shell_focus.region is ShellRegion.INSPECTOR
+
+    curated = _make_controls(("layer_1",))
+    curated.session.settings.editor_mode = "preset_curation"
+    before_id = curated.shell_focus.selected_id
+    before_region = curated.shell_focus.region
+    jump.run(curated)
+    assert curated.shell_focus.selected_id == before_id
+    assert curated.shell_focus.region is before_region
+
+
+def test_inspector_only_timeline_actions_are_not_menu_commands() -> None:
+    labels = [command.label for command in iter_commands(MENUS)]
+    assert "Apply to Cues" not in labels
+    assert "Remove from Cues" not in labels
+    assert labels.count("Snap cues") == 1
+
+    controls = _make_controls(("layer_1",))
+    controls.session.song_markers.times = [10.0, 40.0]
+    prompts = (
+        (RowKind.TIMELINE_APPLY_SOFT_CUTS, "prompt_apply_soft_cuts"),
+        (RowKind.TIMELINE_APPLY_HARD_CUTS, "prompt_apply_hard_cuts"),
+        (RowKind.TIMELINE_REMOVE_SOFT_CUTS, "prompt_remove_timeline_cuts"),
+        (RowKind.TIMELINE_REMOVE_HARD_CUTS, "prompt_remove_timeline_cuts"),
+        (RowKind.TIMELINE_SNAP_TO_SONG_MARKERS, "prompt_snap_cues_to_song_markers"),
+    )
+    for kind, method_name in prompts:
+        method = MagicMock()
+        setattr(controls, method_name, method)
+        desc = RowDescriptor(kind)
+        row_spec(kind).apply_action(controls, desc)
+        method.assert_called_once_with()
+        controls.session.timeline.locked = True
+        method.reset_mock()
+        row_spec(kind).apply_action(controls, desc)
+        method.assert_not_called()
+        controls.session.timeline.locked = False
+
+    view = controls.build_view_state(paused=False)
+    marker_rows = build_inspector_rows(view, "song_markers", frozenset())
+    snap = next(
+        row
+        for row in marker_rows
+        if row.descriptor is not None
+        and row.descriptor.kind is RowKind.TIMELINE_SNAP_TO_SONG_MARKERS
+    )
+    assert snap.command_id is None
+    marker = next(
+        row
+        for row in marker_rows
+        if row.descriptor is not None
+        and row.descriptor.kind is RowKind.SONG_MARKER_ITEM
+    )
+    assert marker.command_id is None
+
+    controls.seek_to = MagicMock()
+    marker_desc = RowDescriptor(RowKind.SONG_MARKER_ITEM, marker_index=1)
+    row_spec(RowKind.SONG_MARKER_ITEM).apply_action(controls, marker_desc)
+    controls.seek_to.assert_called_once_with(40.0)
+    controls.session.timeline.locked = True
+    controls.seek_to.reset_mock()
+    row_spec(RowKind.SONG_MARKER_ITEM).apply_action(controls, marker_desc)
+    controls.seek_to.assert_not_called()
+    controls.session.timeline.locked = False
+    controls.seek_to.reset_mock()
+    row_spec(RowKind.SONG_MARKER_ITEM).apply_action(
+        controls, RowDescriptor(RowKind.SONG_MARKER_ITEM)
+    )
+    controls.seek_to.assert_not_called()

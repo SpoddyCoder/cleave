@@ -96,6 +96,9 @@ _CURATION_LAYER_SECTION = HelpSection("Layer", ())
 _INSPECTOR_COMMAND_KINDS = {
     "layers.add": RowKind.LAYER_MANAGEMENT_ADD,
     "layers.delete": RowKind.LAYER_MANAGEMENT_DELETE,
+    "timeline.apply_preset": RowKind.TIMELINE_PRESETS,
+    "timeline.reset": RowKind.TIMELINE_RESET,
+    "timeline.snap_cues": RowKind.TIMELINE_SNAP_CUES,
 }
 
 

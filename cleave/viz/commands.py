@@ -30,6 +30,7 @@ _RESOLVED_SHORTCUT_IDS = frozenset(
         "help.overlay",
         "settings.editor",
         "layers.add",
+        "timeline.show_strip",
     }
 )
 
@@ -46,6 +47,9 @@ class CommandContext:
     can_add_layer: bool = False
     can_remove_layer: bool = False
     timeline_scope: bool = False
+    timeline_panel_open: bool = False
+    timeline_recording: bool = False
+    timeline_locked: bool = False
     overlays_enabled: bool = False
     post_fx_enabled: bool = False
     pattern_mask_enabled: bool = False
@@ -100,8 +104,9 @@ def command_context(controls: Any) -> CommandContext:
     if isinstance(selected, str) and selected.startswith(LAYER_ID_PREFIX):
         selected_slot = selected[len(LAYER_ID_PREFIX) :]
     lifecycle = controls.layer_lifecycle
+    timeline = session.timeline
     timeline_scope = isinstance(controls.focus_cursor, TimelineFocus) or bool(
-        session.timeline.recording
+        timeline.recording
     )
     overlays = session.render_overlays
     post_fx = session.render_post_fx
@@ -115,6 +120,9 @@ def command_context(controls: Any) -> CommandContext:
         can_add_layer=lifecycle.can_add(),
         can_remove_layer=lifecycle.can_remove(),
         timeline_scope=timeline_scope,
+        timeline_panel_open=bool(timeline.panel_open),
+        timeline_recording=bool(timeline.recording),
+        timeline_locked=bool(timeline.locked),
         overlays_enabled=bool(
             overlays.opening_card.enabled or overlays.closing_card.enabled
         ),
@@ -265,6 +273,45 @@ def _run_toggle_enabled(node_id: str) -> Callable[[Any], None]:
     return run
 
 
+def _show_strip_enabled(ctx: CommandContext) -> bool:
+    return (
+        not is_preset_curation_mode(ctx.editor_mode) and not ctx.timeline_recording
+    )
+
+
+def _show_strip_checked(ctx: CommandContext) -> bool:
+    return ctx.timeline_panel_open
+
+
+def _timeline_actions_enabled(ctx: CommandContext) -> bool:
+    return (
+        not is_preset_curation_mode(ctx.editor_mode) and not ctx.timeline_locked
+    )
+
+
+def _song_markers_enabled(ctx: CommandContext) -> bool:
+    return not is_preset_curation_mode(ctx.editor_mode)
+
+
+def _run_show_strip(controls: Any) -> None:
+    if controls.session.timeline.panel_open:
+        controls.close_timeline_panel()
+    else:
+        controls.open_timeline_panel(enter_submenu=True)
+
+
+def _run_apply_preset(controls: Any) -> None:
+    controls.prompt_apply_timeline_preset()
+
+
+def _run_reset_timeline(controls: Any) -> None:
+    controls.prompt_reset_timeline()
+
+
+def _run_snap_cues(controls: Any) -> None:
+    controls.prompt_snap_cues()
+
+
 def _run_focus_node(node_id: str) -> Callable[[Any], None]:
     """Select a navigator node and focus its inspector."""
 
@@ -383,12 +430,44 @@ _EDIT_POST_FX = Command(
     run=_when_enabled(_render_jump_enabled, _run_focus_node("render.post_fx")),
 )
 
-_SHOW_STRIP = _later("timeline.show_strip", "Show timeline strip", "check", "T")
-_APPLY_PRESET = _later("timeline.apply_preset", "Apply timeline preset", "command")
-_RESET = _later("timeline.reset", "Reset timeline", "command")
-_SNAP = _later("timeline.snap_cues", "Snap cues", "command")
+_SHOW_STRIP = Command(
+    id="timeline.show_strip",
+    label="Show timeline strip",
+    kind="check",
+    shortcut="T",
+    enabled=_show_strip_enabled,
+    run=_when_enabled(_show_strip_enabled, _run_show_strip),
+    checked=_show_strip_checked,
+)
+_APPLY_PRESET = Command(
+    id="timeline.apply_preset",
+    label="Apply timeline preset",
+    kind="command",
+    enabled=_timeline_actions_enabled,
+    run=_when_enabled(_timeline_actions_enabled, _run_apply_preset),
+)
+_RESET = Command(
+    id="timeline.reset",
+    label="Reset timeline",
+    kind="command",
+    enabled=_timeline_actions_enabled,
+    run=_when_enabled(_timeline_actions_enabled, _run_reset_timeline),
+)
+_SNAP = Command(
+    id="timeline.snap_cues",
+    label="Snap cues",
+    kind="command",
+    enabled=_timeline_actions_enabled,
+    run=_when_enabled(_timeline_actions_enabled, _run_snap_cues),
+)
 _UNDO_CUT = _later("timeline.undo_cut", "Undo last cut", "command")
-_SONG_MARKERS = _later("timeline.song_markers", "Song markers", "jump")
+_SONG_MARKERS = Command(
+    id="timeline.song_markers",
+    label="Song markers",
+    kind="jump",
+    enabled=_song_markers_enabled,
+    run=_when_enabled(_song_markers_enabled, _run_focus_node("song_markers")),
+)
 
 _EDITOR = Command(
     id="settings.editor",
@@ -559,9 +638,9 @@ def command_for_shortcut(
 ) -> Command | None:
     """Resolved shortcut from *menus*, or None.
 
-    Save, quit, render, the help overlay, editor settings, and add-layer
-    resolve. Layer jumps resolve unless *timeline_scope* is set. Other
-    shortcut text stays on its row. Bare R does not resolve.
+    Save, quit, render, the help overlay, editor settings, add-layer, and
+    show-timeline-strip resolve. Layer jumps resolve unless *timeline_scope*
+    is set. Other shortcut text stays on its row. Bare R does not resolve.
     """
     source = MENUS if menus is None else menus
     ctrl = mod_ctrl(mod)

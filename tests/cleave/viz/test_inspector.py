@@ -180,12 +180,17 @@ def test_render_timeline_page_is_three_groups() -> None:
     )
     assert all(row.depth == 0 for row in groups)
     assert RowKind.RENDER_TIMELINE_HEADER not in kinds
-    assert all(row.command_id is None for row in rows)
+    assert [row.command_id for row in rows if row.command_id] == [
+        "timeline.apply_preset",
+        "timeline.reset",
+    ]
     preset_leaves = _group_leaves(rows, RowKind.TIMELINE_PRESETS_HEADER)
-    assert tuple(row.descriptor.kind for row in preset_leaves)[-2:] == (
-        RowKind.TIMELINE_PRESETS,
-        RowKind.TIMELINE_RESET,
-    )
+    assert [row.command_id for row in preset_leaves[-2:]] == [
+        "timeline.apply_preset",
+        "timeline.reset",
+    ]
+    assert all(row.descriptor is None for row in preset_leaves[-2:])
+    assert all(row.command_id is None for row in preset_leaves[:-2])
     assert all(row.depth == 1 and not row.is_group for row in preset_leaves)
     assert RowKind.TIMELINE_PLACEMENT_SNAP not in kinds
     assert RowKind.TIMELINE_BAR_GRID not in kinds
@@ -197,12 +202,17 @@ def test_render_timeline_page_is_three_groups() -> None:
     open_rows = build_inspector_rows(state, "render.timeline", frozenset(), opened)
     open_kinds = _kinds(open_rows)
     beat_leaves = _group_leaves(open_rows, RowKind.TIMELINE_BEAT_BAR_GRID_HEADER)
-    assert tuple(row.descriptor.kind for row in beat_leaves) == (
+    assert tuple(
+        row.descriptor.kind if row.descriptor is not None else None
+        for row in beat_leaves
+    ) == (
         RowKind.TIMELINE_PLACEMENT_SNAP,
         RowKind.TIMELINE_BAR_GRID,
         RowKind.TIMELINE_BAR_PHASE,
-        RowKind.TIMELINE_SNAP_CUES,
+        None,
     )
+    assert beat_leaves[-1].command_id == "timeline.snap_cues"
+    assert beat_leaves[-1].descriptor is None
     assert RowKind.TIMELINE_HARD_CUTS in open_kinds
     assert RowKind.TIMELINE_SOFT_CUTS in open_kinds
     assert RowKind.TIMELINE_HARD_CUT_FADE_IN not in open_kinds
@@ -235,10 +245,15 @@ def test_render_timeline_page_is_three_groups() -> None:
     ]
 
     collapsed = frozenset({preset_key})
-    hidden = _kinds(build_inspector_rows(state, "render.timeline", collapsed, opened))
+    hidden_rows = build_inspector_rows(
+        state, "render.timeline", collapsed, opened
+    )
+    hidden = _kinds(hidden_rows)
+    hidden_commands = [row.command_id for row in hidden_rows if row.command_id]
     assert RowKind.TIMELINE_PRESETS_HEADER in hidden
-    assert RowKind.TIMELINE_PRESETS not in hidden
-    assert RowKind.TIMELINE_RESET not in hidden
+    assert "timeline.apply_preset" not in hidden_commands
+    assert "timeline.reset" not in hidden_commands
+    assert hidden_commands == ["timeline.snap_cues"]
     assert RowKind.TIMELINE_HARD_CUT_FADE_IN in hidden
 
 

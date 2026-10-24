@@ -432,16 +432,6 @@ class TuningControls:
             toggle_pause(self.playback, self.duration_sec)
             return True
 
-        if event.key == pygame.K_t:
-            if self._in_move_mode:
-                return True
-            tl = self.session.timeline
-            if tl.panel_open:
-                self.close_timeline_panel()
-            else:
-                self.open_timeline_panel(enter_submenu=True)
-            return True
-
         if event.key == pygame.K_ESCAPE:
             self.request_hide_overlay()
             return True
@@ -499,43 +489,7 @@ class TuningControls:
             return True
 
         if event.key == pygame.K_RETURN:
-            kind = self.focus_descriptor.kind
             if apply_field_action(self, self.focus_descriptor):
-                return True
-            if kind == RowKind.SONG_MARKER_ITEM:
-                desc = self.focus_descriptor
-                if desc.marker_index is not None:
-                    if section_lock_blocks_mutation(
-                        self.session, self.focus_descriptor
-                    ):
-                        return True
-                    times = self.session.song_markers.times
-                    if 0 <= desc.marker_index < len(times):
-                        self.seek_to(times[desc.marker_index])
-                return True
-            if kind == RowKind.TIMELINE_PRESETS:
-                self._timeline_presets.prompt(self.duration_sec)
-                return True
-            if kind == RowKind.TIMELINE_RESET:
-                self._timeline_presets.prompt_reset()
-                return True
-            if kind == RowKind.TIMELINE_SNAP_CUES:
-                self._timeline_snap.prompt_cues()
-                return True
-            if kind == RowKind.TIMELINE_SNAP_TO_SONG_MARKERS:
-                self._timeline_snap.prompt_song_markers()
-                return True
-            if kind == RowKind.TIMELINE_APPLY_SOFT_CUTS:
-                self._timeline_cuts.prompt_soft()
-                return True
-            if kind == RowKind.TIMELINE_APPLY_HARD_CUTS:
-                self._timeline_cuts.prompt_hard()
-                return True
-            if kind in (
-                RowKind.TIMELINE_REMOVE_SOFT_CUTS,
-                RowKind.TIMELINE_REMOVE_HARD_CUTS,
-            ):
-                self._timeline_cuts.prompt_remove()
                 return True
             if self._dismiss_timed_notification_if_present():
                 return True
@@ -948,6 +902,36 @@ class TuningControls:
             view = self.build_view_state(paused=self.playback.paused)
             self.focus_descriptor = first_leftover_descriptor(view)
         return True
+
+    def prompt_apply_timeline_preset(self) -> None:
+        self._timeline_presets.prompt(self.duration_sec)
+
+    def prompt_reset_timeline(self) -> None:
+        self._timeline_presets.prompt_reset()
+
+    def prompt_snap_cues(self) -> None:
+        self._timeline_snap.prompt_cues()
+
+    def prompt_snap_cues_to_song_markers(self) -> None:
+        self._timeline_snap.prompt_song_markers()
+
+    def prompt_apply_soft_cuts(self) -> None:
+        self._timeline_cuts.prompt_soft()
+
+    def prompt_apply_hard_cuts(self) -> None:
+        self._timeline_cuts.prompt_hard()
+
+    def prompt_remove_timeline_cuts(self) -> None:
+        self._timeline_cuts.prompt_remove()
+
+    def seek_song_marker(self, desc: RowDescriptor) -> None:
+        if desc.marker_index is None:
+            return
+        if section_lock_blocks_mutation(self.session, desc):
+            return
+        times = self.session.song_markers.times
+        if 0 <= desc.marker_index < len(times):
+            self.seek_to(times[desc.marker_index])
 
     def open_timeline_panel(self, *, enter_submenu: bool = False) -> None:
         tl = self.session.timeline

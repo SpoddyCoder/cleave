@@ -155,7 +155,7 @@ def test_left_right_step_cues_when_not_recording() -> None:
     assert session.timeline.selected_cue_t["layer_1"] == 10.0
 
 
-def test_esc_and_t_close_panel_when_not_recording() -> None:
+def test_esc_closes_panel_and_strip_t_does_not() -> None:
     controls, session, _, close_calls, _, _ = _make_timeline_controls()
 
     controls.handle_keydown(keydown(pygame.K_ESCAPE))
@@ -164,8 +164,8 @@ def test_esc_and_t_close_panel_when_not_recording() -> None:
 
     session.timeline.panel_open = True
     controls.handle_keydown(keydown(pygame.K_t))
-    assert len(close_calls) == 2
-    assert session.timeline.panel_open is False
+    assert close_calls == [True]
+    assert session.timeline.panel_open is True
 
 
 def test_esc_and_t_while_recording_do_not_close_panel() -> None:

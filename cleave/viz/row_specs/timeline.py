@@ -56,6 +56,7 @@ from cleave.timeline_presets.timeline_cuts import (
     cycle_timeline_preset_timeline_cuts,
     timeline_preset_timeline_cuts_display,
 )
+from cleave.viz.commands import command_by_id
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
 from cleave.viz.row_sections import apply_expand_toggle, apply_panel_anchor_toggle
 from cleave.viz.row_spec import FitStrategy, RowPresentStyle, RowSpec
@@ -438,6 +439,57 @@ def _visibility_timeline(
 ) -> tuple[bool, bool]:
     return (state.render_timeline.enabled, False)
 
+
+def _section_lock_blocks(controls: TuningControls, desc: RowDescriptor) -> bool:
+    from cleave.viz.row_spec import section_lock_blocks_mutation
+
+    return section_lock_blocks_mutation(controls.session, desc)
+
+
+def _apply_timeline_presets(controls: TuningControls, _desc: RowDescriptor) -> None:
+    command_by_id("timeline.apply_preset").run(controls)
+
+
+def _apply_timeline_reset(controls: TuningControls, _desc: RowDescriptor) -> None:
+    command_by_id("timeline.reset").run(controls)
+
+
+def _apply_timeline_snap_cues(controls: TuningControls, _desc: RowDescriptor) -> None:
+    command_by_id("timeline.snap_cues").run(controls)
+
+
+def _apply_timeline_soft_cuts(controls: TuningControls, desc: RowDescriptor) -> None:
+    if _section_lock_blocks(controls, desc):
+        return
+    controls.prompt_apply_soft_cuts()
+
+
+def _apply_timeline_hard_cuts(controls: TuningControls, desc: RowDescriptor) -> None:
+    if _section_lock_blocks(controls, desc):
+        return
+    controls.prompt_apply_hard_cuts()
+
+
+def _apply_timeline_remove_cuts(controls: TuningControls, desc: RowDescriptor) -> None:
+    if _section_lock_blocks(controls, desc):
+        return
+    controls.prompt_remove_timeline_cuts()
+
+
+def _apply_timeline_snap_to_song_markers(
+    controls: TuningControls, desc: RowDescriptor
+) -> None:
+    if _section_lock_blocks(controls, desc):
+        return
+    controls.prompt_snap_cues_to_song_markers()
+
+
+def _apply_song_marker_item(controls: TuningControls, desc: RowDescriptor) -> None:
+    if _section_lock_blocks(controls, desc):
+        return
+    controls.seek_song_marker(desc)
+
+
 SPECS: dict[RowKind, RowSpec] = {
     RowKind.RENDER_TIMELINE_HEADER: RowSpec(
         affordance=RowAffordance.EXPAND,
@@ -586,6 +638,7 @@ SPECS: dict[RowKind, RowSpec] = {
         affordance=RowAffordance.ACTION,
         panel_label="Apply Timeline Preset",
         present_style=RowPresentStyle.FULL_LINE,
+        apply_action=_apply_timeline_presets,
         fit_strategy=FitStrategy.NONE,
         shows_enter_icon=True,
         help_title="Apply Timeline Preset",
@@ -601,6 +654,7 @@ SPECS: dict[RowKind, RowSpec] = {
         affordance=RowAffordance.ACTION,
         panel_label="Reset Timeline",
         present_style=RowPresentStyle.FULL_LINE,
+        apply_action=_apply_timeline_reset,
         fit_strategy=FitStrategy.NONE,
         shows_enter_icon=True,
         help_title="Reset Timeline",
@@ -678,6 +732,7 @@ SPECS: dict[RowKind, RowSpec] = {
         affordance=RowAffordance.ACTION,
         panel_label="Snap Cues",
         present_style=RowPresentStyle.FULL_LINE,
+        apply_action=_apply_timeline_snap_cues,
         fit_strategy=FitStrategy.NONE,
         shows_enter_icon=True,
         help_title="Snap Cues",
@@ -691,6 +746,7 @@ SPECS: dict[RowKind, RowSpec] = {
         affordance=RowAffordance.ACTION,
         panel_label="Snap Cues",
         present_style=RowPresentStyle.FULL_LINE,
+        apply_action=_apply_timeline_snap_to_song_markers,
         fit_strategy=FitStrategy.NONE,
         shows_enter_icon=True,
         help_title="Snap Cues",
@@ -842,6 +898,7 @@ SPECS: dict[RowKind, RowSpec] = {
         affordance=RowAffordance.ACTION,
         panel_label="Apply to Cues",
         present_style=RowPresentStyle.FULL_LINE,
+        apply_action=_apply_timeline_soft_cuts,
         fit_strategy=FitStrategy.NONE,
         shows_enter_icon=True,
         help_title="Apply to Cues",
@@ -855,6 +912,7 @@ SPECS: dict[RowKind, RowSpec] = {
         affordance=RowAffordance.ACTION,
         panel_label="Apply to Cues",
         present_style=RowPresentStyle.FULL_LINE,
+        apply_action=_apply_timeline_hard_cuts,
         fit_strategy=FitStrategy.NONE,
         shows_enter_icon=True,
         help_title="Apply to Cues",
@@ -868,6 +926,7 @@ SPECS: dict[RowKind, RowSpec] = {
         affordance=RowAffordance.ACTION,
         panel_label="Remove from Cues",
         present_style=RowPresentStyle.FULL_LINE,
+        apply_action=_apply_timeline_remove_cuts,
         fit_strategy=FitStrategy.NONE,
         shows_enter_icon=True,
         help_title="Remove from Cues",
@@ -881,6 +940,7 @@ SPECS: dict[RowKind, RowSpec] = {
         affordance=RowAffordance.ACTION,
         panel_label="Remove from Cues",
         present_style=RowPresentStyle.FULL_LINE,
+        apply_action=_apply_timeline_remove_cuts,
         fit_strategy=FitStrategy.NONE,
         shows_enter_icon=True,
         help_title="Remove from Cues",
@@ -910,6 +970,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.FULL_LINE,
         format_value=_format_song_marker_item,
         apply_horizontal=_apply_song_marker_type,
+        apply_action=_apply_song_marker_item,
         fit_strategy=FitStrategy.NONE,
         shows_enter_icon=True,
         help_title="Song marker",
