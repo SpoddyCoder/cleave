@@ -5,11 +5,15 @@ from __future__ import annotations
 from cleave.effects.registry import effect_roster
 from cleave.viz.focus_nav import MainFocus
 from cleave.viz.inspector import build_inspector_rows, rows_for_section
-from cleave.viz.navigator import layer_node_id
+from cleave.viz.navigator import layer_node_id, overlay_card_node_id
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.row_sections import (
     PROJECT_SECTION,
+    RENDER_OVERLAY_CLOSING_CARD_SECTION,
+    RENDER_OVERLAY_OPENING_CARD_SECTION,
+    RENDER_OVERLAYS_SECTION,
     RENDER_PATTERN_MASK_SECTION,
+    RENDER_POST_FX_SECTION,
     SETTINGS_SECTION,
     ExpandSectionDef,
 )
@@ -146,8 +150,153 @@ def test_settings_and_project_omit_top_headers() -> None:
 
 def test_unmigrated_nodes_return_no_rows() -> None:
     state = _view_state()
-    for node_id in ("render", "song_markers", "unknown"):
+    for node_id in (
+        "render",
+        "song_markers",
+        "unknown",
+        "render.overlays.card:other",
+    ):
         assert build_inspector_rows(state, node_id, frozenset()) == ()
+
+
+def test_render_overlays_page_is_the_two_card_groups() -> None:
+    state = _view_state()
+    rows = build_inspector_rows(state, "render.overlays", frozenset())
+    assert rows == rows_for_section(state, RENDER_OVERLAYS_SECTION, frozenset())
+    assert all(row.command_id is None for row in rows)
+    groups = tuple(row for row in rows if row.is_group and row.depth == 0)
+    assert tuple(
+        (row.descriptor.kind, row.descriptor.card) for row in groups
+    ) == (
+        (RowKind.RENDER_OVERLAY_CARD_HEADER, "opening_card"),
+        (RowKind.RENDER_OVERLAY_CARD_HEADER, "closing_card"),
+    )
+    assert RowKind.RENDER_OVERLAYS_HEADER not in _kinds(rows)
+    for card in ("opening_card", "closing_card"):
+        assert any(
+            row.descriptor is not None
+            and row.descriptor.card == card
+            and row.descriptor.kind is RowKind.RENDER_OVERLAY_CARD_POSITION
+            for row in rows
+        )
+
+    collapsed = frozenset(
+        {InspectorGroupKey(RowKind.RENDER_OVERLAY_CARD_HEADER, card="opening_card")}
+    )
+    hidden = build_inspector_rows(state, "render.overlays", collapsed)
+    opening = tuple(
+        row.descriptor.kind
+        for row in hidden
+        if row.descriptor is not None and row.descriptor.card == "opening_card"
+    )
+    assert opening == (RowKind.RENDER_OVERLAY_CARD_HEADER,)
+    assert any(
+        row.descriptor is not None
+        and row.descriptor.card == "closing_card"
+        and row.descriptor.kind is RowKind.RENDER_OVERLAY_CARD_POSITION
+        for row in hidden
+    )
+
+
+def test_opening_card_page_omits_its_header() -> None:
+    state = _view_state()
+    node_id = overlay_card_node_id("opening_card")
+    rows = build_inspector_rows(state, node_id, frozenset())
+    assert rows == rows_for_section(
+        state, RENDER_OVERLAY_OPENING_CARD_SECTION, frozenset()
+    )
+    kinds = _kinds(rows)
+    assert RowKind.RENDER_OVERLAY_CARD_HEADER not in kinds
+    for kind in (
+        RowKind.RENDER_OVERLAY_CARD_ANIMATION_HEADER,
+        RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER,
+        RowKind.RENDER_OVERLAY_CARD_BODY_HEADER,
+        RowKind.RENDER_OVERLAY_CARD_POSITION,
+        RowKind.RENDER_OVERLAY_CARD_OPACITY,
+        RowKind.RENDER_OVERLAY_CARD_BACKGROUND_COLOUR,
+        RowKind.RENDER_OVERLAY_CARD_BACKGROUND_MARGIN,
+        RowKind.RENDER_OVERLAY_CARD_BACKGROUND_PADDING,
+        RowKind.RENDER_OVERLAY_CARD_BORDER_WIDTH,
+        RowKind.RENDER_OVERLAY_CARD_BORDER_COLOUR,
+    ):
+        assert kind in kinds
+    assert all(
+        row.descriptor is not None and row.descriptor.card == "opening_card"
+        for row in rows
+    )
+
+    closing = build_inspector_rows(
+        state, overlay_card_node_id("closing_card"), frozenset()
+    )
+    assert closing == rows_for_section(
+        state, RENDER_OVERLAY_CLOSING_CARD_SECTION, frozenset()
+    )
+    assert RowKind.RENDER_OVERLAY_CARD_HEADER not in _kinds(closing)
+    assert all(
+        row.descriptor is not None and row.descriptor.card == "closing_card"
+        for row in closing
+    )
+
+
+def test_render_predicates_omit_rows() -> None:
+    state = _view_state()
+    mask = build_inspector_rows(state, "render.pattern_mask", frozenset())
+    assert mask == rows_for_section(state, RENDER_PATTERN_MASK_SECTION, frozenset())
+    assert state.render_pattern_mask.type != "plasma"
+    assert RowKind.RENDER_PATTERN_MASK_TYPE in _kinds(mask)
+    assert RowKind.RENDER_PATTERN_MASK_SEED not in _kinds(mask)
+    assert RowKind.RENDER_PATTERN_MASK_HEADER not in _kinds(mask)
+
+    card = build_inspector_rows(
+        state, overlay_card_node_id("opening_card"), frozenset()
+    )
+    assert state.render_overlays.opening_card.runtime.animation.type == "fade"
+    assert RowKind.RENDER_OVERLAY_CARD_ANIMATION_TYPE in _kinds(card)
+    assert RowKind.RENDER_OVERLAY_CARD_ANIMATION_SLIDE_DIRECTION not in _kinds(card)
+
+    post = build_inspector_rows(state, "render.post_fx", frozenset())
+    assert post == rows_for_section(state, RENDER_POST_FX_SECTION, frozenset())
+    assert state.render_post_fx.chroma_boost.mode == "off"
+    post_kinds = _kinds(post)
+    assert RowKind.RENDER_POST_FX_CHROMA_BOOST_MODE in post_kinds
+    assert RowKind.RENDER_POST_FX_CHROMA_BOOST_VARIANT not in post_kinds
+    assert RowKind.RENDER_POST_FX_CHROMA_BOOST_AMOUNT not in post_kinds
+    assert RowKind.RENDER_POST_FX_HEADER not in post_kinds
+
+
+def test_locked_render_blocks_still_build() -> None:
+    state = _view_state()
+    state.render_overlays.locked = True
+    state.render_post_fx.locked = True
+    state.render_pattern_mask.locked = True
+
+    overlays = build_inspector_rows(state, "render.overlays", frozenset())
+    position = next(
+        row.descriptor
+        for row in overlays
+        if row.descriptor is not None
+        and row.descriptor.kind is RowKind.RENDER_OVERLAY_CARD_POSITION
+        and row.descriptor.card == "opening_card"
+    )
+    assert inspector_field_colors(state, position) == (LOCKED, LOCKED)
+
+    post = build_inspector_rows(state, "render.post_fx", frozenset())
+    fade_start = next(
+        row.descriptor
+        for row in post
+        if row.descriptor is not None
+        and row.descriptor.kind is RowKind.RENDER_POST_FX_FADE_IN_START
+    )
+    assert inspector_field_colors(state, fade_start) == (LOCKED, LOCKED)
+
+    mask = build_inspector_rows(state, "render.pattern_mask", frozenset())
+    density = next(
+        row.descriptor
+        for row in mask
+        if row.descriptor is not None
+        and row.descriptor.kind is RowKind.RENDER_PATTERN_MASK_DENSITY
+    )
+    assert inspector_field_colors(state, density) == (LOCKED, LOCKED)
 
 
 def _layer_view(

@@ -1,4 +1,4 @@
-"""Inspector row model for Settings, Project, and Layers.
+"""Inspector row model for Settings, Project, Layers, and render blocks.
 
 Rows are a pure function of view state, node id, and the group sets.
 Session expand flags are not read. This module does not draw.
@@ -11,12 +11,17 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from cleave.viz.editor_mode_controls import is_preset_curation_mode
-from cleave.viz.navigator import LAYER_ID_PREFIX
+from cleave.viz.navigator import LAYER_ID_PREFIX, OVERLAY_CARD_ID_PREFIX
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.row_sections import (
     CURATION_LAYER_SECTION,
     LAYERS_SECTION,
     PROJECT_SECTION,
+    RENDER_OVERLAY_CLOSING_CARD_SECTION,
+    RENDER_OVERLAY_OPENING_CARD_SECTION,
+    RENDER_OVERLAYS_SECTION,
+    RENDER_PATTERN_MASK_SECTION,
+    RENDER_POST_FX_SECTION,
     SETTINGS_SECTION,
     TRACK_SECTION,
     ExpandSectionDef,
@@ -49,6 +54,11 @@ _LEAF_COMMANDS: dict[RowKind, str] = {
     RowKind.LAYER_MANAGEMENT_DELETE: "layers.delete",
 }
 
+_OVERLAY_CARD_SECTIONS = {
+    "opening_card": RENDER_OVERLAY_OPENING_CARD_SECTION,
+    "closing_card": RENDER_OVERLAY_CLOSING_CARD_SECTION,
+}
+
 
 def build_inspector_rows(
     state: TuningViewState,
@@ -61,8 +71,10 @@ def build_inspector_rows(
     ``settings`` and ``project`` walk those sections. ``layers`` is the count
     row and Add Layer (Add Layer is omitted in preset curation). ``layer:<slot>``
     walks that slot's track section, or the curation layer section in preset
-    curation, without the section header. Every other id, including render and
-    song markers, is empty.
+    curation, without the section header. ``render.overlays``,
+    ``render.post_fx``, and ``render.pattern_mask`` walk those sections.
+    ``render.overlays.card:<card>`` walks the opening or closing card section.
+    An unknown card suffix, the render root, and song markers are empty.
     """
     if node_id == "settings":
         section = SETTINGS_SECTION
@@ -80,6 +92,20 @@ def build_inspector_rows(
             else TRACK_SECTION
         )
         slot = node_id[len(LAYER_ID_PREFIX) :]
+    elif node_id == "render.overlays":
+        section = RENDER_OVERLAYS_SECTION
+        slot = None
+    elif node_id == "render.post_fx":
+        section = RENDER_POST_FX_SECTION
+        slot = None
+    elif node_id == "render.pattern_mask":
+        section = RENDER_PATTERN_MASK_SECTION
+        slot = None
+    elif node_id.startswith(OVERLAY_CARD_ID_PREFIX):
+        section = _OVERLAY_CARD_SECTIONS.get(node_id[len(OVERLAY_CARD_ID_PREFIX) :])
+        if section is None:
+            return ()
+        slot = None
     else:
         return ()
     return rows_for_section(state, section, collapsed, opened, slot)

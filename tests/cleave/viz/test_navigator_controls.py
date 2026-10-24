@@ -41,7 +41,15 @@ def test_enter_on_render_opens_overlays_inspector() -> None:
     assert "render" in focus.nav_expanded
     assert focus.selected_id == "render.overlays"
     assert focus.region is ShellRegion.INSPECTOR
-    assert focus.inspector_cursor is None
+    view = controls.build_view_state(paused=controls.playback.paused)
+    rows = build_inspector_rows(
+        view, "render.overlays", focus.collapsed, focus.opened
+    )
+    assert focus.inspector_cursor == next(
+        row.descriptor
+        for row in rows
+        if row.navigable and row.descriptor is not None
+    )
     assert controls.focus_descriptor.kind is RowKind.RENDER_TIMELINE_HEADER
 
 
@@ -49,13 +57,21 @@ def test_enter_on_render_blocks_stays_off_the_panel() -> None:
     controls = _make_controls(("layer_1",))
     focus = controls.shell_focus
     focus.nav_expanded.add("render")
+    view = controls.build_view_state(paused=controls.playback.paused)
     for node_id in ("render.overlays", "render.post_fx", "render.pattern_mask"):
         focus.selected_id = node_id
         focus.region = ShellRegion.NAVIGATOR
         controls.navigator.activate()
         assert focus.region is ShellRegion.INSPECTOR
         assert focus.selected_id == node_id
-        assert focus.inspector_cursor is None
+        rows = build_inspector_rows(
+            view, node_id, focus.collapsed, focus.opened
+        )
+        assert focus.inspector_cursor == next(
+            row.descriptor
+            for row in rows
+            if row.navigable and row.descriptor is not None
+        )
 
 
 def test_enter_on_song_markers_hands_off_to_leftover_panel() -> None:
