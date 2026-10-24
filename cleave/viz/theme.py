@@ -15,6 +15,7 @@ Accent colors for modes and icons (not label/value roles):
 Shell rules (not text roles):
   TRANSPORT_RULE — dark rule under the transport bar
   NAVIGATOR_BORDER — dark border around the navigator when it is not the active region
+  HOVER - translucent label wash for pointer hover
 
 Layout scales:
   UI_SCALE (1.2) — main tuning panel, help, modals, and Material Icons spacing
@@ -155,6 +156,7 @@ TRANSPORT_RULE: tuple[int, int, int] = (68, 68, 68)
 NAVIGATOR_BORDER: tuple[int, int, int] = (85, 85, 85)
 
 LABEL: tuple[int, int, int] = (170, 210, 255)
+HOVER: tuple[int, int, int] = (170, 210, 255)
 VALUE: tuple[int, int, int] = (255, 255, 255)
 ACTION: tuple[int, int, int] = (80, 190, 125)
 DISABLED: tuple[int, int, int] = (140, 140, 140)
@@ -174,6 +176,7 @@ ARMED_BG: tuple[int, int, int] = SOLO_BG
 OVERRIDE_GLYPH: tuple[int, int, int] = (0, 0, 0)
 OVERRIDE_GLYPH_OFF: tuple[int, int, int] = DISABLED
 FOCUS_ROW_BG_ALPHA: int = 130
+HOVER_BG_ALPHA: int = 28
 REC_BG: tuple[int, int, int] = (220, 0, 0)
 TIMELINE_BAR_ON: tuple[int, int, int] = (200, 225, 255)
 BAR_GRID: tuple[int, int, int] = (70, 95, 130)

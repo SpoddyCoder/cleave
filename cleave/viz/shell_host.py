@@ -67,6 +67,8 @@ from cleave.viz.theme import (
     DISABLED,
     FOCUS_ROW_BG_ALPHA,
     HIGHLIGHT,
+    HOVER,
+    HOVER_BG_ALPHA,
     LABEL,
     LOCK_ICON,
     NAVIGATOR_BORDER,
@@ -615,13 +617,14 @@ def _gl_int(param: int) -> int:
 
 
 def _apply_theme() -> None:
-    """Map existing overlay roles onto ImGui. No new colors."""
+    """Map overlay roles onto ImGui, including the hover wash."""
     style = imgui.get_style()
     style.window_rounding = 0.0
     style.frame_rounding = 0.0
     style.popup_rounding = 0.0
     style.scrollbar_rounding = 0.0
     highlight = _rgba(HIGHLIGHT, FOCUS_ROW_BG_ALPHA / 255.0)
+    hover = _rgba(HOVER, HOVER_BG_ALPHA / 255.0)
     background = _rgba(BACKGROUND)
     text = _rgba(VALUE)
     disabled = _rgba(DISABLED)
@@ -634,8 +637,8 @@ def _apply_theme() -> None:
         imgui.Col_.menu_bar_bg: background,
         imgui.Col_.border: _rgba(BORDER_COLOR),
         imgui.Col_.header: highlight,
-        imgui.Col_.header_hovered: highlight,
-        imgui.Col_.header_active: highlight,
+        imgui.Col_.header_hovered: hover,
+        imgui.Col_.header_active: hover,
         imgui.Col_.button: background,
         imgui.Col_.button_hovered: highlight,
         imgui.Col_.button_active: highlight,
