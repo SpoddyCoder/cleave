@@ -258,6 +258,16 @@ def test_clicks_outside_a_splitter_still_reach_imgui() -> None:
     assert host.nav_width is None
 
 
+def test_theme_exports_hover_role() -> None:
+    from cleave.viz.theme import HOVER, HOVER_BG_ALPHA
+
+    assert isinstance(HOVER, tuple)
+    assert len(HOVER) == 3
+    assert all(type(channel) is int for channel in HOVER)
+    assert type(HOVER_BG_ALPHA) is int
+    assert 0 < HOVER_BG_ALPHA <= 255
+
+
 def test_splitter_hit_zone_is_six_pixels() -> None:
     assert SPLITTER_HIT_PX == 6
     layout = ShellLayout.compute(1280, 720, 23, 23, 0)
