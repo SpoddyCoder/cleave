@@ -65,7 +65,11 @@ from cleave.viz.shell_focus import (
     ShellRegion,
     inspector_group_is_open,
 )
-from cleave.viz.shell_layout import ShellLayout
+from cleave.viz.shell_layout import (
+    ShellLayout,
+    splitter_hit,
+    splitter_request_width,
+)
 from cleave.viz.theme import (
     ACTION,
     BACKGROUND,
@@ -772,6 +776,12 @@ class ShellHost:
         self._wheel_y = 0.0
         self._value_drag_accum = 0.0
         self._value_drag_crossed = False
+        # Pointer requests. Layout clamps these; they are not written to config.
+        self._nav_width: int | None = None
+        self._insp_width: int | None = None
+        self._splitter: str | None = None
+        self._splitter_down_x = 0.0
+        self._resize_cursor = False
 
     @classmethod
     def create(cls, overlay: Any, menu_state: MenuBarState, controls: Any) -> ShellHost:
@@ -822,6 +832,16 @@ class ShellHost:
         """Remember the frame's shell rects for the transport, navigator, and inspector."""
         self._layout = layout
 
+    @property
+    def nav_width(self) -> int | None:
+        """Requested navigator width. None until a splitter drag."""
+        return self._nav_width
+
+    @property
+    def insp_width(self) -> int | None:
+        """Requested inspector width. None until a splitter drag."""
+        return self._insp_width
+
     def destroy(self) -> None:
         renderer = self._renderer
         self._renderer = None
@@ -835,8 +855,15 @@ class ShellHost:
     def process_event(self, event: pygame.event.Event) -> None:
         """Mouse motion, buttons, and wheel only. Keys stay out of ImGui."""
         if event.type == pygame.MOUSEMOTION:
-            self._mouse_pos = (float(event.pos[0]), float(event.pos[1]))
-            if self._chrome_contains(event.pos[0], event.pos[1]):
+            x = float(event.pos[0])
+            y = float(event.pos[1])
+            self._mouse_pos = (x, y)
+            self._track_splitter_motion(x, y)
+            if (
+                self._chrome_contains(x, y)
+                or self._splitter is not None
+                or self._resize_cursor
+            ):
                 self._overlay.notify_input()
             return
         if event.type in (pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP):
@@ -846,8 +873,19 @@ class ShellHost:
             down = event.type == pygame.MOUSEBUTTONDOWN
             if down:
                 if self._clicks_ignored():
+                    self._cancel_splitter_drag()
+                    return
+                # Swallow the left button so ImGui does not activate a row
+                # or start a value drag.
+                if button == 0 and self._begin_splitter_drag(event.pos):
                     return
                 self._held.add(button)
+            elif button == 0 and self._splitter is not None:
+                if self._clicks_ignored():
+                    self._cancel_splitter_drag()
+                else:
+                    self._end_splitter_drag(event.pos)
+                return
             elif button not in self._held:
                 return
             else:
@@ -859,6 +897,66 @@ class ShellHost:
                 return
             self._wheel_x += float(event.x)
             self._wheel_y += float(event.y)
+
+    def _splitter_at(self, x: float, y: float) -> str | None:
+        layout = self._layout
+        if layout is None:
+            return None
+        return splitter_hit(layout, x, y)
+
+    def _assign_splitter_width(self, which: str, pointer_x: float) -> None:
+        layout = self._layout
+        if layout is None:
+            return
+        width = splitter_request_width(layout, which, pointer_x)
+        if which == "nav":
+            self._nav_width = width
+        else:
+            self._insp_width = width
+
+    def _begin_splitter_drag(self, pos: tuple[float, float]) -> bool:
+        which = self._splitter_at(float(pos[0]), float(pos[1]))
+        if which is None:
+            return False
+        self._splitter = which
+        self._splitter_down_x = float(pos[0])
+        self._set_resize_cursor(True)
+        return True
+
+    def _end_splitter_drag(self, pos: tuple[float, float]) -> None:
+        which = self._splitter
+        x = float(pos[0])
+        if which is not None and abs(x - self._splitter_down_x) >= 1.0:
+            self._assign_splitter_width(which, x)
+        self._splitter = None
+        # Layout catches up after this event. Keep the resize cursor until
+        # the next motion, which tests the updated boundaries.
+        self._set_resize_cursor(True)
+
+    def _cancel_splitter_drag(self) -> None:
+        self._splitter = None
+        self._set_resize_cursor(False)
+
+    def _track_splitter_motion(self, x: float, y: float) -> None:
+        if self._clicks_ignored():
+            self._cancel_splitter_drag()
+            return
+        if self._splitter is not None:
+            self._assign_splitter_width(self._splitter, x)
+            self._set_resize_cursor(True)
+            return
+        self._set_resize_cursor(self._splitter_at(x, y) is not None)
+
+    def _set_resize_cursor(self, resize: bool) -> None:
+        if resize == self._resize_cursor:
+            return
+        cursor = (
+            pygame.SYSTEM_CURSOR_SIZEWE
+            if resize
+            else pygame.SYSTEM_CURSOR_ARROW
+        )
+        pygame.mouse.set_cursor(cursor)
+        self._resize_cursor = resize
 
     def draw(
         self,
@@ -875,6 +973,7 @@ class ShellHost:
             self._wheel_x = 0.0
             self._wheel_y = 0.0
             self._clear_value_drag()
+            self._cancel_splitter_drag()
             return
         self._submit_input(dt)
         _keep_keyboard_nav_off()

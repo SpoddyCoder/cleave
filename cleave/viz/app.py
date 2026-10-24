@@ -649,8 +649,19 @@ class VisualizerApp:
                 len(runtime.seed.session.layer_z_order)
             )
         display_w, display_h = runtime.overlay_surface.get_size()
+        nav_width = None
+        insp_width = None
+        if shell is not None:
+            nav_width = getattr(shell, "nav_width", None)
+            insp_width = getattr(shell, "insp_width", None)
         return ShellLayout.compute(
-            display_w, display_h, menu_h, transport_h, timeline_h
+            display_w,
+            display_h,
+            menu_h,
+            transport_h,
+            timeline_h,
+            nav_width=nav_width,
+            insp_width=insp_width,
         )
 
     def _publish_shell_layout(

@@ -1,13 +1,27 @@
-"""Sideways drag on stepped inspector values. No ImGui window."""
+"""Sideways drag on stepped inspector values, and column splitters. No GL window."""
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+from unittest.mock import patch
+
+import pygame
+
+from cleave.viz.menu_bar import MenuBarState
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.row_spec import apply_field_horizontal
 from cleave.viz.shell_host import (
     _VALUE_DRAG_THRESHOLD_PX,
+    ShellHost,
     apply_value_drag,
     value_drag_steps,
+)
+from cleave.viz.shell_layout import (
+    MIN_COLUMN_WIDTH,
+    SPLITTER_HIT_PX,
+    ShellLayout,
+    clamp_column_widths,
+    splitter_hit,
 )
 from tests.cleave.viz.test_controls import _make_controls
 
@@ -84,3 +98,172 @@ def test_locked_drag_does_not_change_the_value() -> None:
     assert crossed_again is False
     assert again == 5.0
     assert _opacity(controls) == before
+
+
+def test_extreme_drags_keep_visualiser_and_column_minimums() -> None:
+    minimum = MIN_COLUMN_WIDTH
+    wide = 1280
+    assert clamp_column_widths(wide, 0, 0, min_column=minimum) == (
+        minimum,
+        wide - minimum * 2,
+        minimum,
+    )
+    for nav, insp in ((1, 1), (50_000, 40), (40, 50_000), (50_000, 50_000)):
+        got_nav, viz, got_insp = clamp_column_widths(
+            wide, nav, insp, min_column=minimum
+        )
+        assert viz >= 1
+        assert got_nav >= minimum
+        assert got_insp >= minimum
+        assert got_nav + viz + got_insp == wide
+
+    # Too narrow for both minimums: proportional, non-negative, visualiser lives.
+    narrow = 80
+    assert narrow < minimum * 2 + 1
+    assert clamp_column_widths(
+        narrow, 100_000, 100_000, min_column=minimum
+    ) == (39, 1, 40)
+
+
+def test_clamped_request_fits_again_when_the_display_grows() -> None:
+    request_nav, request_insp = 400, 500
+    nav, viz, insp = clamp_column_widths(
+        400, request_nav, request_insp, min_column=MIN_COLUMN_WIDTH
+    )
+    assert viz >= 1
+    assert nav >= MIN_COLUMN_WIDTH
+    assert insp >= MIN_COLUMN_WIDTH
+    assert (nav, insp) != (request_nav, request_insp)
+
+    assert clamp_column_widths(
+        1280, request_nav, request_insp, min_column=MIN_COLUMN_WIDTH
+    ) == (request_nav, 1280 - request_nav - request_insp, request_insp)
+
+
+class _Overlay:
+    def __init__(self, visibility: float = 1.0) -> None:
+        self.visibility = visibility
+
+    def notify_input(self) -> None:
+        return None
+
+
+def _host(visibility: float = 1.0) -> ShellHost:
+    overlay = _Overlay(visibility)
+    host = ShellHost(
+        None,
+        None,
+        overlay,
+        MenuBarState(),
+        SimpleNamespace(),
+        (1280, 720),
+        23,
+    )
+    host.set_layout(ShellLayout.compute(1280, 720, 23, 23, 0))
+    return host
+
+
+def _motion(pos: tuple[int, int]) -> pygame.event.Event:
+    return pygame.event.Event(
+        pygame.MOUSEMOTION, pos=pos, rel=(0, 0), buttons=(0, 0, 0)
+    )
+
+
+def _button(kind: int, pos: tuple[int, int], button: int = 1) -> pygame.event.Event:
+    return pygame.event.Event(kind, pos=pos, button=button)
+
+
+def test_splitter_drag_updates_session_widths_without_imgui_buttons() -> None:
+    host = _host()
+    left = (230, 100)
+    right_edge = 1280 - 495
+    with patch("cleave.viz.shell_host.pygame.mouse.set_cursor") as set_cursor:
+        host.process_event(_motion(left))
+        set_cursor.assert_called_with(pygame.SYSTEM_CURSOR_SIZEWE)
+        host.process_event(_button(pygame.MOUSEBUTTONDOWN, left))
+        host.process_event(_button(pygame.MOUSEBUTTONUP, left))
+        assert host.nav_width is None
+        assert host._splitter is None
+        host.process_event(_button(pygame.MOUSEBUTTONDOWN, left))
+        assert host._buttons == []
+        assert 0 not in host._held
+        assert host.nav_width is None
+        assert host.insp_width is None
+        assert host._value_drag_accum == 0.0
+        assert host._value_drag_crossed is False
+
+        host.process_event(_motion((400, 100)))
+        assert host.nav_width == 400
+        assert host._buttons == []
+        host.process_event(_button(pygame.MOUSEBUTTONUP, (400, 120)))
+        assert host.nav_width == 400
+        assert host._splitter is None
+        assert host._buttons == []
+
+        host.process_event(_motion((right_edge, 100)))
+        host.process_event(_button(pygame.MOUSEBUTTONDOWN, (right_edge, 100)))
+        host.process_event(_motion((700, 100)))
+        host.process_event(_button(pygame.MOUSEBUTTONUP, (700, 100)))
+        assert host.insp_width == 1280 - 700
+        assert host.nav_width == 400
+        assert host._buttons == []
+
+        narrow = ShellLayout.compute(
+            320,
+            200,
+            23,
+            23,
+            0,
+            nav_width=host.nav_width,
+            insp_width=host.insp_width,
+        )
+        assert host.nav_width == 400
+        assert host.insp_width == 1280 - 700
+        assert narrow.visualiser[2] >= 1
+        assert narrow.navigator[2] >= MIN_COLUMN_WIDTH
+        assert narrow.inspector[2] >= MIN_COLUMN_WIDTH
+        assert narrow.navigator[2] < 400
+
+        restored = ShellLayout.compute(
+            1280,
+            720,
+            23,
+            23,
+            0,
+            nav_width=host.nav_width,
+            insp_width=host.insp_width,
+        )
+        assert restored.navigator[2] == 400
+        assert restored.inspector[2] == 1280 - 700
+
+        host.process_event(_motion((640, 400)))
+        set_cursor.assert_called_with(pygame.SYSTEM_CURSOR_ARROW)
+
+
+def test_splitter_drag_is_ignored_when_the_shell_is_hidden() -> None:
+    host = _host(visibility=0.0)
+    with patch("cleave.viz.shell_host.pygame.mouse.set_cursor"):
+        host.process_event(_button(pygame.MOUSEBUTTONDOWN, (230, 100)))
+    assert host.nav_width is None
+    assert host.insp_width is None
+    assert host._buttons == []
+    assert host._splitter is None
+
+
+def test_clicks_outside_a_splitter_still_reach_imgui() -> None:
+    host = _host()
+    with patch("cleave.viz.shell_host.pygame.mouse.set_cursor"):
+        host.process_event(_button(pygame.MOUSEBUTTONDOWN, (100, 100)))
+    assert host._buttons == [(0, True)]
+    assert host.nav_width is None
+
+
+def test_splitter_hit_zone_is_six_pixels() -> None:
+    assert SPLITTER_HIT_PX == 6
+    layout = ShellLayout.compute(1280, 720, 23, 23, 0)
+    edge = layout.navigator[2]
+    assert splitter_hit(layout, edge - 3, 100) == "nav"
+    assert splitter_hit(layout, edge + 2, 100) == "nav"
+    assert splitter_hit(layout, edge - 4, 100) is None
+    assert splitter_hit(layout, edge + 3, 100) is None
+    assert splitter_hit(layout, edge, 10) is None

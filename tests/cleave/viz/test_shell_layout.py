@@ -3,7 +3,12 @@
 from __future__ import annotations
 
 from cleave.gl_compositor import _present_dest_rect
-from cleave.viz.shell_layout import INSPECTOR_WIDTH, NAVIGATOR_WIDTH, ShellLayout
+from cleave.viz.shell_layout import (
+    INSPECTOR_WIDTH,
+    MIN_COLUMN_WIDTH,
+    NAVIGATOR_WIDTH,
+    ShellLayout,
+)
 
 
 def test_columns_use_navigator_and_inspector_widths() -> None:
@@ -73,6 +78,69 @@ def test_side_columns_shrink_when_they_would_leave_no_visualiser() -> None:
     )
     assert layout.navigator[2] >= 0
     assert layout.inspector[2] >= 0
+
+
+def test_omitted_width_overrides_use_nominal_columns() -> None:
+    layout = ShellLayout.compute(
+        1280, 720, 0, 0, 0, nav_width=None, insp_width=None
+    )
+    assert layout.navigator[2] == NAVIGATOR_WIDTH == 230
+    assert layout.inspector[2] == INSPECTOR_WIDTH == 495
+    assert layout.visualiser[2] == 1280 - 230 - 495
+
+
+def test_width_overrides_set_column_rects() -> None:
+    menu_h = 23
+    transport_h = 23
+    nav_w = 300
+    insp_w = 180
+    layout = ShellLayout.compute(
+        1280,
+        720,
+        menu_h,
+        transport_h,
+        0,
+        nav_width=nav_w,
+        insp_width=insp_w,
+    )
+    columns_y = menu_h + transport_h
+    columns_h = 720 - columns_y
+    assert layout.navigator == (0, columns_y, nav_w, columns_h)
+    assert layout.visualiser == (
+        nav_w,
+        columns_y,
+        1280 - nav_w - insp_w,
+        columns_h,
+    )
+    assert layout.inspector == (
+        1280 - insp_w,
+        columns_y,
+        insp_w,
+        columns_h,
+    )
+    assert layout.menu == (0, 0, 1280, menu_h)
+    assert layout.timeline == (0, 720, 1280, 0)
+
+
+def test_one_width_override_leaves_the_other_nominal() -> None:
+    layout = ShellLayout.compute(1280, 720, 0, 0, 0, nav_width=300)
+    assert layout.navigator[2] == 300
+    assert layout.inspector[2] == INSPECTOR_WIDTH
+    assert layout.visualiser == (300, 0, 1280 - 300 - INSPECTOR_WIDTH, 720)
+
+
+def test_narrow_override_lifts_to_the_column_minimum() -> None:
+    layout = ShellLayout.compute(
+        1280, 720, 0, 0, 0, nav_width=10, insp_width=INSPECTOR_WIDTH
+    )
+    assert layout.navigator == (0, 0, MIN_COLUMN_WIDTH, 720)
+    assert layout.inspector[2] == INSPECTOR_WIDTH
+    assert layout.visualiser == (
+        MIN_COLUMN_WIDTH,
+        0,
+        1280 - MIN_COLUMN_WIDTH - INSPECTOR_WIDTH,
+        720,
+    )
 
 
 def test_present_rect_none_stretches_to_the_display() -> None:
