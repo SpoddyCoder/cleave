@@ -46,13 +46,19 @@ from cleave.viz.playback import format_mmss
 from cleave.viz.row_hotkeys import activate_inspector_chip, node_header_descriptor
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.row_present_renderers import inspector_field_colors
-from cleave.viz.row_spec import row_lock_section, row_spec, section_locked
-from cleave.viz.session import TuningSession
 from cleave.viz.row_sections import (
     INSPECTOR_GROUP_EXPANDED,
     inspector_group_glyph,
 )
-from cleave.viz.row_spec import format_row_value, row_panel_label, row_spec
+from cleave.viz.row_spec import (
+    apply_field_horizontal,
+    format_row_value,
+    row_lock_section,
+    row_panel_label,
+    row_spec,
+    section_locked,
+)
+from cleave.viz.session import TuningSession
 from cleave.viz.shell_focus import (
     CycleStop,
     InspectorGroupKey,
@@ -93,6 +99,8 @@ _BORDER_PATH_INSET_PX = 0.5
 _AA_LINE_FRINGE_PX = 1.0
 _PLAY_GLYPH = "\u25b6"
 _PAUSE_GLYPH = "\u275a\u275a"
+# One Left/Right step per this many pixels of sideways drag.
+_VALUE_DRAG_THRESHOLD_PX = 10.0
 
 
 @dataclass(frozen=True)
@@ -163,6 +171,43 @@ def navigator_lock_mark(node: NavNode) -> str | None:
     if not node.locked:
         return None
     return _NAV_LOCK_MARK
+
+
+def value_drag_steps(accum: float, threshold: float) -> tuple[int, float]:
+    """Split a signed pixel accumulator into steps and a sub-threshold remainder.
+
+    Positive *accum* steps forward. ``25`` at ``10`` is ``(2, 5.0)``;
+    ``-25`` is ``(-2, -5.0)``; ``9`` is ``(0, 9.0)``.
+    """
+    steps = math.trunc(accum / threshold)
+    if steps == 0:
+        return 0, accum
+    return steps, accum - steps * threshold
+
+
+def apply_value_drag(
+    controls: Any,
+    desc: RowDescriptor,
+    delta_x: float,
+    accum: float,
+    *,
+    threshold: float = _VALUE_DRAG_THRESHOLD_PX,
+) -> tuple[float, bool]:
+    """Apply one Left/Right step per *threshold* pixels of horizontal motion.
+
+    *delta_x* is this frame's mouse delta, added to *accum*. Rightward motion
+    is ``forward=True``. ``large`` stays false. A refused mutation still
+    consumes its steps so those pixels are not retried later.
+
+    Returns the leftover accumulator and whether this call consumed a step.
+    """
+    steps, remaining = value_drag_steps(accum + delta_x, threshold)
+    if steps == 0:
+        return remaining, False
+    forward = steps > 0
+    for _ in range(abs(steps)):
+        apply_field_horizontal(controls, desc, forward, False)
+    return remaining, True
 
 
 def selection_after_nav_toggle(
@@ -725,6 +770,8 @@ class ShellHost:
         self._held: set[int] = set()
         self._wheel_x = 0.0
         self._wheel_y = 0.0
+        self._value_drag_accum = 0.0
+        self._value_drag_crossed = False
 
     @classmethod
     def create(cls, overlay: Any, menu_state: MenuBarState, controls: Any) -> ShellHost:
@@ -827,6 +874,7 @@ class ShellHost:
             self._held.clear()
             self._wheel_x = 0.0
             self._wheel_y = 0.0
+            self._clear_value_drag()
             return
         self._submit_input(dt)
         _keep_keyboard_nav_off()
@@ -856,6 +904,7 @@ class ShellHost:
                 in_bar = 0.0 <= mouse.y < float(self._menu_bar_height_px)
                 if not in_bar:
                     menu_state.blur()
+            self._release_value_drag()
         finally:
             imgui.render()
             self._render_draw_data()
@@ -1150,6 +1199,12 @@ class ShellHost:
                     f"{label}{inspector_selectable_id(desc, group=False)}",
                     selected,
                 )
+                # Item flags are only valid while this selectable is current.
+                # Release clears the active id inside the widget, so the
+                # frame the button comes up is deactivated, not active.
+                activated = imgui.is_item_activated()
+                active = imgui.is_item_active()
+                released = imgui.is_item_deactivated()
             finally:
                 imgui.pop_style_color()
             value = format_row_value(state, desc) if spec.format_value else ""
@@ -1164,12 +1219,56 @@ class ShellHost:
                         stepped=stepped,
                     )
                 )
-            if clicked:
+            if stepped:
+                self._track_value_drag(
+                    row,
+                    desc,
+                    activated=activated,
+                    active=active or released,
+                )
+            # A release still over the row reports clicked. A gesture that
+            # already stepped is a drag, so it must not run the row action.
+            if clicked and not self._value_drag_crossed:
                 self._controls.inspector.focus_row(row)
                 self._controls.inspector.activate(row)
         finally:
             if indent:
                 imgui.unindent(indent)
+
+    def _track_value_drag(
+        self,
+        row: Any,
+        desc: RowDescriptor,
+        *,
+        activated: bool,
+        active: bool,
+    ) -> None:
+        """Step a held inspector value from this frame's horizontal mouse delta."""
+        if not active:
+            return
+        if activated:
+            self._value_drag_accum = 0.0
+            self._value_drag_crossed = False
+        delta_x = float(imgui.get_io().mouse_delta.x)
+        remaining, crossed = apply_value_drag(
+            self._controls,
+            desc,
+            delta_x,
+            self._value_drag_accum,
+        )
+        self._value_drag_accum = remaining
+        if not crossed:
+            return
+        self._value_drag_crossed = True
+        self._controls.inspector.focus_row(row)
+
+    def _clear_value_drag(self) -> None:
+        self._value_drag_accum = 0.0
+        self._value_drag_crossed = False
+
+    def _release_value_drag(self) -> None:
+        if not imgui.is_mouse_down(0):
+            self._clear_value_drag()
 
     def _draw_command_row(self, row: Any) -> None:
         command = command_by_id(row.command_id)
