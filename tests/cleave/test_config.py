@@ -57,7 +57,10 @@ from cleave.config_schema.editor import (
     DEFAULT_EDITOR_HEIGHT,
     DEFAULT_EDITOR_UPSCALE,
     DEFAULT_EDITOR_WIDTH,
+    DEFAULT_INSPECTOR_WIDTH,
+    DEFAULT_NAVIGATOR_WIDTH,
     DEFAULT_NOTIFICATION_DISPLAY_SEC,
+    DEFAULT_SHELL_LAYOUT_MODE,
     DEFAULT_UI_FADE_SEC,
     DEFAULT_UI_MIN_WIDTH,
     DEFAULT_UI_WIDTH,
@@ -235,6 +238,9 @@ def test_editor_config_from_settings_defaults() -> None:
     assert cfg.ui_min_width == DEFAULT_UI_MIN_WIDTH
     assert cfg.ui_min_width == 80
     assert cfg.notification_display_sec == DEFAULT_NOTIFICATION_DISPLAY_SEC
+    assert cfg.navigator_width == DEFAULT_NAVIGATOR_WIDTH == 230
+    assert cfg.inspector_width == DEFAULT_INSPECTOR_WIDTH == 495
+    assert cfg.shell_layout_mode == DEFAULT_SHELL_LAYOUT_MODE == "split"
 
 
 def test_editor_config_from_settings_uses_user_editor() -> None:
@@ -249,6 +255,9 @@ def test_editor_config_from_settings_uses_user_editor() -> None:
         ui_fade=25.0,
         notification_display_sec=5,
         residual_latency_ms=0,
+        navigator_width=280,
+        inspector_width=640,
+        shell_layout_mode="docked",
     )
     cfg = editor_config_from_settings(editor)
     assert cfg.width == 1920
@@ -260,6 +269,9 @@ def test_editor_config_from_settings_uses_user_editor() -> None:
     assert cfg.ui_min_width == 96
     assert cfg.ui_fade == 25.0
     assert cfg.notification_display_sec == 5
+    assert cfg.navigator_width == 280
+    assert cfg.inspector_width == 640
+    assert cfg.shell_layout_mode == "docked"
 
 
 def test_ui_min_width_clamps_and_round_trips() -> None:

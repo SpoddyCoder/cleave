@@ -63,6 +63,18 @@ UiWidthMode = Literal["flexible", "fixed"]
 UI_WIDTH_MODES: tuple[UiWidthMode, ...] = ("flexible", "fixed")
 DEFAULT_UI_WIDTH_MODE: UiWidthMode = "flexible"
 
+DEFAULT_NAVIGATOR_WIDTH = 230
+# Half again the design mock's 330px column, so labels and stepped values fit.
+DEFAULT_INSPECTOR_WIDTH = 495
+# Side columns stay at least this wide once the display can hold both of them
+# and a 1px visualiser. A narrower window skips the floor.
+MIN_COLUMN_WIDTH = 60
+
+ShellLayoutMode = Literal["split", "docked"]
+
+SHELL_LAYOUT_MODES: tuple[ShellLayoutMode, ...] = ("split", "docked")
+DEFAULT_SHELL_LAYOUT_MODE: ShellLayoutMode = "split"
+
 
 def editor_display_size(
     width: int = DEFAULT_EDITOR_WIDTH,
@@ -119,6 +131,10 @@ def clamp_ui_width(value: int | float) -> int:
     return max(UI_WIDTH_MIN, min(UI_WIDTH_MAX, int(round(value))))
 
 
+def clamp_shell_column_width(value: int | float) -> int:
+    return max(MIN_COLUMN_WIDTH, int(round(value)))
+
+
 def clamp_ui_min_width(value: int | float) -> int:
     return max(UI_MIN_WIDTH_MIN, min(UI_WIDTH_MAX, int(round(value))))
 
@@ -155,6 +171,17 @@ def _parse_ui_width_mode(
         raise ValueError(f"{label} must be a string")
     if value not in UI_WIDTH_MODES:
         allowed = ", ".join(f"'{mode}'" for mode in UI_WIDTH_MODES)
+        raise ValueError(f"{label} must be one of: {allowed}")
+    return value
+
+
+def _parse_shell_layout_mode(
+    value: Any, ctx: ParseCtx, label: str = "editor.shell_layout_mode"
+) -> ShellLayoutMode:
+    if not isinstance(value, str):
+        raise ValueError(f"{label} must be a string")
+    if value not in SHELL_LAYOUT_MODES:
+        allowed = ", ".join(f"'{mode}'" for mode in SHELL_LAYOUT_MODES)
         raise ValueError(f"{label} must be one of: {allowed}")
     return value
 
@@ -234,6 +261,28 @@ EDITOR_FIELDS: tuple[FieldDescriptor, ...] = (
         ),
         lambda value, _ctx: clamp_residual_latency_ms(value),
     ),
+    FieldDescriptor(
+        "navigator_width",
+        DEFAULT_NAVIGATOR_WIDTH,
+        lambda raw, ctx, label: clamp_shell_column_width(
+            int(require_non_negative_number(raw, label, as_int=True))
+        ),
+        lambda value, _ctx: clamp_shell_column_width(value),
+    ),
+    FieldDescriptor(
+        "inspector_width",
+        DEFAULT_INSPECTOR_WIDTH,
+        lambda raw, ctx, label: clamp_shell_column_width(
+            int(require_non_negative_number(raw, label, as_int=True))
+        ),
+        lambda value, _ctx: clamp_shell_column_width(value),
+    ),
+    FieldDescriptor(
+        "shell_layout_mode",
+        DEFAULT_SHELL_LAYOUT_MODE,
+        _parse_shell_layout_mode,
+        dump_scalar,
+    ),
 )
 
 
@@ -256,6 +305,9 @@ def parse_editor_section(data: dict[str, Any]) -> Any:
         ui_fade=parsed["ui_fade"],
         notification_display_sec=parsed["notification_display_sec"],
         residual_latency_ms=parsed["residual_latency_ms"],
+        navigator_width=parsed["navigator_width"],
+        inspector_width=parsed["inspector_width"],
+        shell_layout_mode=parsed["shell_layout_mode"],
     )
 
 
@@ -271,6 +323,9 @@ def dump_editor_section(editor: Any) -> dict[str, Any]:
         "ui_fade": editor.ui_fade,
         "notification_display_sec": editor.notification_display_sec,
         "residual_latency_ms": editor.residual_latency_ms,
+        "navigator_width": editor.navigator_width,
+        "inspector_width": editor.inspector_width,
+        "shell_layout_mode": editor.shell_layout_mode,
     }
     ctx = PersistCtx(cfg=None, session=None)
     return dump_fields(EDITOR_FIELDS, values, ctx)
@@ -294,4 +349,7 @@ def editor_config_from_settings(editor: Any | None = None) -> Any:
         ui_fade=editor.ui_fade,
         notification_display_sec=editor.notification_display_sec,
         residual_latency_ms=editor.residual_latency_ms,
+        navigator_width=editor.navigator_width,
+        inspector_width=editor.inspector_width,
+        shell_layout_mode=editor.shell_layout_mode,
     )

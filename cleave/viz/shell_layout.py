@@ -8,14 +8,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from cleave.config_schema.editor import (
+    DEFAULT_INSPECTOR_WIDTH,
+    DEFAULT_NAVIGATOR_WIDTH,
+    MIN_COLUMN_WIDTH,
+)
+
 Rect = tuple[int, int, int, int]
 
-NAVIGATOR_WIDTH = 230
-# Half again the design mock's 330px column, so labels and stepped values fit.
-INSPECTOR_WIDTH = 495
-# Side columns stay at least this wide once the display can hold both of them
-# and a 1px visualiser. A narrower window skips the floor.
-MIN_COLUMN_WIDTH = 60
+NAVIGATOR_WIDTH = DEFAULT_NAVIGATOR_WIDTH
+INSPECTOR_WIDTH = DEFAULT_INSPECTOR_WIDTH
 # Hit-rects ``splitter`` role. Centered on each column boundary.
 SPLITTER_HIT_PX = 6
 
@@ -91,8 +93,8 @@ def _column_widths(
     that omit overrides keep the proportional narrow-window split.
     """
     overridden = nav is not None or insp is not None
-    nav_w = NAVIGATOR_WIDTH if nav is None else nav
-    insp_w = INSPECTOR_WIDTH if insp is None else insp
+    nav_w = DEFAULT_NAVIGATOR_WIDTH if nav is None else nav
+    insp_w = DEFAULT_INSPECTOR_WIDTH if insp is None else insp
     floor = MIN_COLUMN_WIDTH if overridden else 0
     return clamp_column_widths(
         display_w,

@@ -16,6 +16,9 @@ from cleave.config_schema.editor import (
     DEFAULT_EDITOR_HEIGHT,
     DEFAULT_EDITOR_WIDTH,
     DEFAULT_EDITOR_UPSCALE,
+    DEFAULT_INSPECTOR_WIDTH,
+    DEFAULT_NAVIGATOR_WIDTH,
+    DEFAULT_SHELL_LAYOUT_MODE,
     DEFAULT_UI_FADE_SEC,
     DEFAULT_UI_MIN_WIDTH,
     DEFAULT_UI_WIDTH,
@@ -23,6 +26,7 @@ from cleave.config_schema.editor import (
     DEFAULT_EDITOR_PREVIEW_QUALITY,
     DEFAULT_NOTIFICATION_DISPLAY_SEC,
     DEFAULT_RESIDUAL_LATENCY_MS,
+    ShellLayoutMode,
     UiWidthMode,
     EditorPreviewQuality,
     dump_editor_section,
@@ -63,6 +67,9 @@ class EditorSettings:
     notification_display_sec: int
     residual_latency_ms: int
     ui_min_width: int = DEFAULT_UI_MIN_WIDTH
+    navigator_width: int = DEFAULT_NAVIGATOR_WIDTH
+    inspector_width: int = DEFAULT_INSPECTOR_WIDTH
+    shell_layout_mode: ShellLayoutMode = DEFAULT_SHELL_LAYOUT_MODE
 
 
 @dataclass(frozen=True)
@@ -85,6 +92,9 @@ def default_editor_settings() -> EditorSettings:
         ui_fade=DEFAULT_UI_FADE_SEC,
         notification_display_sec=DEFAULT_NOTIFICATION_DISPLAY_SEC,
         residual_latency_ms=DEFAULT_RESIDUAL_LATENCY_MS,
+        navigator_width=DEFAULT_NAVIGATOR_WIDTH,
+        inspector_width=DEFAULT_INSPECTOR_WIDTH,
+        shell_layout_mode=DEFAULT_SHELL_LAYOUT_MODE,
     )
 
 
@@ -153,6 +163,9 @@ def editor_settings_from_config(cfg: EditorConfig) -> EditorSettings:
         ui_fade=cfg.ui_fade,
         notification_display_sec=cfg.notification_display_sec,
         residual_latency_ms=cfg.residual_latency_ms,
+        navigator_width=cfg.navigator_width,
+        inspector_width=cfg.inspector_width,
+        shell_layout_mode=cfg.shell_layout_mode,
     )
 
 

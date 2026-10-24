@@ -12,6 +12,9 @@ from cleave.config_schema.editor import (
     DEFAULT_EDITOR_HEIGHT,
     DEFAULT_EDITOR_UPSCALE,
     DEFAULT_EDITOR_WIDTH,
+    DEFAULT_INSPECTOR_WIDTH,
+    DEFAULT_NAVIGATOR_WIDTH,
+    DEFAULT_SHELL_LAYOUT_MODE,
     DEFAULT_UI_FADE_SEC,
     DEFAULT_UI_MIN_WIDTH,
     DEFAULT_UI_WIDTH,
@@ -19,6 +22,7 @@ from cleave.config_schema.editor import (
     DEFAULT_EDITOR_PREVIEW_QUALITY,
     DEFAULT_NOTIFICATION_DISPLAY_SEC,
     DEFAULT_RESIDUAL_LATENCY_MS,
+    MIN_COLUMN_WIDTH,
 )
 from dataclasses import replace
 
@@ -53,6 +57,9 @@ def test_load_user_config_missing_file_returns_defaults(tmp_path: Path) -> None:
     assert cfg.editor.ui_fade == DEFAULT_UI_FADE_SEC
     assert cfg.editor.notification_display_sec == DEFAULT_NOTIFICATION_DISPLAY_SEC
     assert cfg.editor.residual_latency_ms == DEFAULT_RESIDUAL_LATENCY_MS
+    assert cfg.editor.navigator_width == DEFAULT_NAVIGATOR_WIDTH == 230
+    assert cfg.editor.inspector_width == DEFAULT_INSPECTOR_WIDTH == 495
+    assert cfg.editor.shell_layout_mode == DEFAULT_SHELL_LAYOUT_MODE == "split"
 
 
 def test_default_editor_settings_matches_schema_defaults() -> None:
@@ -67,6 +74,9 @@ def test_default_editor_settings_matches_schema_defaults() -> None:
     assert editor.ui_fade == DEFAULT_UI_FADE_SEC
     assert editor.notification_display_sec == DEFAULT_NOTIFICATION_DISPLAY_SEC
     assert editor.residual_latency_ms == DEFAULT_RESIDUAL_LATENCY_MS
+    assert editor.navigator_width == DEFAULT_NAVIGATOR_WIDTH == 230
+    assert editor.inspector_width == DEFAULT_INSPECTOR_WIDTH == 495
+    assert editor.shell_layout_mode == DEFAULT_SHELL_LAYOUT_MODE == "split"
 
 
 def test_load_user_config_empty_file_returns_defaults(tmp_path: Path) -> None:
@@ -191,6 +201,9 @@ def test_editor_settings_from_config() -> None:
         ui_fade=22.5,
         notification_display_sec=8,
         residual_latency_ms=150,
+        navigator_width=280,
+        inspector_width=640,
+        shell_layout_mode="docked",
     )
     editor = editor_settings_from_config(vis)
     assert editor == EditorSettings(
@@ -204,6 +217,9 @@ def test_editor_settings_from_config() -> None:
         ui_fade=22.5,
         notification_display_sec=8,
         residual_latency_ms=150,
+        navigator_width=280,
+        inspector_width=640,
+        shell_layout_mode="docked",
     )
 
 
@@ -225,6 +241,9 @@ def test_persist_editor_settings_writes_visualizer_editor_fields(
             ui_fade=17.5,
             notification_display_sec=3,
             residual_latency_ms=200,
+            navigator_width=280,
+            inspector_width=640,
+            shell_layout_mode="docked",
         ),
     )
 
@@ -241,6 +260,86 @@ def test_persist_editor_settings_writes_visualizer_editor_fields(
     assert loaded.editor.ui_fade == 17.5
     assert loaded.editor.notification_display_sec == 3
     assert loaded.editor.residual_latency_ms == 200
+    assert loaded.editor.navigator_width == 280
+    assert loaded.editor.inspector_width == 640
+    assert loaded.editor.shell_layout_mode == "docked"
+
+
+def test_shell_column_settings_round_trip(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.yaml"
+    editor = replace(
+        default_editor_settings(),
+        navigator_width=280,
+        inspector_width=640,
+        shell_layout_mode="docked",
+    )
+    write_user_config(editor, config_path)
+
+    loaded = load_user_config(config_path)
+    assert loaded.editor.navigator_width == 280
+    assert loaded.editor.inspector_width == 640
+    assert loaded.editor.shell_layout_mode == "docked"
+
+
+def test_shell_column_settings_absent_keys_use_defaults(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        yaml.safe_dump({"editor": {"ui_width": 100}}, sort_keys=False),
+        encoding="utf-8",
+    )
+
+    cfg = load_user_config(config_path)
+    assert cfg.editor.ui_width == 100
+    assert cfg.editor.navigator_width == DEFAULT_NAVIGATOR_WIDTH == 230
+    assert cfg.editor.inspector_width == DEFAULT_INSPECTOR_WIDTH == 495
+    assert cfg.editor.shell_layout_mode == DEFAULT_SHELL_LAYOUT_MODE == "split"
+
+
+def test_shell_column_widths_clamp_and_reject_bad_values(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {"editor": {"navigator_width": 10, "inspector_width": 0}},
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    cfg = load_user_config(config_path)
+    assert cfg.editor.navigator_width == MIN_COLUMN_WIDTH
+    assert cfg.editor.inspector_width == MIN_COLUMN_WIDTH
+
+    config_path.write_text(
+        yaml.safe_dump({"editor": {"navigator_width": 4000}}, sort_keys=False),
+        encoding="utf-8",
+    )
+    assert load_user_config(config_path).editor.navigator_width == 4000
+
+    config_path.write_text(
+        yaml.safe_dump({"editor": {"navigator_width": "wide"}}, sort_keys=False),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="editor.navigator_width must be a number"):
+        load_user_config(config_path)
+
+    config_path.write_text(
+        yaml.safe_dump({"editor": {"inspector_width": -1}}, sort_keys=False),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="editor.inspector_width must be non-negative"):
+        load_user_config(config_path)
+
+
+def test_shell_layout_mode_rejects_unknown_value(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {"editor": {"shell_layout_mode": "floating"}},
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="editor.shell_layout_mode must be one of"):
+        load_user_config(config_path)
 
 
 def test_user_config_path_respects_xdg_config_home(
