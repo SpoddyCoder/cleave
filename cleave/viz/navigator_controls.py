@@ -10,7 +10,7 @@ from cleave.viz.editor_mode_controls import is_preset_curation_mode
 from cleave.viz.focus_nav import MainFocus
 from cleave.viz.inspector import InspectorRow, build_inspector_rows
 from cleave.viz.navigator import NavNode, build_navigator, visible_top_level_ids
-from cleave.viz.row_hotkeys import handle_row_hotkey, layer_header_for_node
+from cleave.viz.row_hotkeys import handle_row_hotkey, node_header_descriptor
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.row_layout import first_leftover_descriptor, row_navigable
 from cleave.viz.shell_focus import (
@@ -69,8 +69,8 @@ class NavigatorControls:
         return False
 
     def handle_hotkey(self, event: pygame.event.Event) -> bool:
-        """Letter, Delete, and Backspace for a selected layer node."""
-        header = layer_header_for_node(self._controls.shell_focus.selected_id)
+        """Letter, Delete, and Backspace for a selected layer or render node."""
+        header = node_header_descriptor(self._controls.shell_focus.selected_id)
         if header is None:
             return False
         return handle_row_hotkey(

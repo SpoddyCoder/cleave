@@ -12,7 +12,7 @@ from cleave.viz.key_repeat import (
     delete_key_pressed,
     mod_ctrl,
 )
-from cleave.viz.navigator import LAYER_ID_PREFIX
+from cleave.viz.navigator import LAYER_ID_PREFIX, OVERLAY_CARD_ID_PREFIX
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.row_spec import (
     PRESET_FILE_ROW_KINDS,
@@ -27,13 +27,64 @@ if TYPE_CHECKING:
     from cleave.viz.controls import TuningControls
 
 
-def layer_header_for_node(node_id: str) -> RowDescriptor | None:
-    """Track header for a ``layer:<slot>`` navigator id, else None."""
-    if not node_id.startswith(LAYER_ID_PREFIX):
-        return None
-    return RowDescriptor(
-        RowKind.TRACK_HEADER, slot=node_id[len(LAYER_ID_PREFIX) :]
-    )
+_OVERLAY_CARDS = frozenset({"opening_card", "closing_card"})
+
+
+def node_header_descriptor(node_id: str) -> RowDescriptor | None:
+    """Header row for a navigator id, or None when that node has no header."""
+    if node_id.startswith(LAYER_ID_PREFIX):
+        return RowDescriptor(
+            RowKind.TRACK_HEADER, slot=node_id[len(LAYER_ID_PREFIX) :]
+        )
+    if node_id == "render.overlays":
+        return RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
+    if node_id == "render.post_fx":
+        return RowDescriptor(RowKind.RENDER_POST_FX_HEADER)
+    if node_id == "render.pattern_mask":
+        return RowDescriptor(RowKind.RENDER_PATTERN_MASK_HEADER)
+    if node_id.startswith(OVERLAY_CARD_ID_PREFIX):
+        card = node_id[len(OVERLAY_CARD_ID_PREFIX) :]
+        if card not in _OVERLAY_CARDS:
+            return None
+        return RowDescriptor(RowKind.RENDER_OVERLAY_CARD_HEADER, card=card)
+    return None
+
+
+def toggle_header_locked(controls: TuningControls, desc: RowDescriptor) -> bool:
+    """Toggle the section lock for a header row. False when *desc* has none."""
+    kind = desc.kind
+    if kind == RowKind.TRACK_HEADER:
+        slot = desc.slot
+        if slot is not None:
+            controls.toggle_layer_locked(slot)
+        return True
+    if kind in (RowKind.RENDER_OVERLAYS_HEADER, RowKind.RENDER_OVERLAY_CARD_HEADER):
+        controls.toggle_render_overlay_locked()
+        return True
+    if kind == RowKind.RENDER_POST_FX_HEADER:
+        controls.toggle_render_post_fx_locked()
+        return True
+    if kind == RowKind.RENDER_PATTERN_MASK_HEADER:
+        controls.toggle_render_pattern_mask_locked()
+        return True
+    if kind == RowKind.RENDER_TIMELINE_HEADER:
+        controls.toggle_render_timeline_locked()
+        return True
+    return False
+
+
+def activate_inspector_chip(
+    controls: TuningControls, chip_id: str, desc: RowDescriptor
+) -> None:
+    """Run the header mutation for an inspector chip click."""
+    if chip_id == "enabled":
+        apply_field_toggle_enabled(controls, desc)
+        return
+    if chip_id == "solo":
+        apply_field_toggle_solo(controls, desc)
+        return
+    if chip_id == "lock":
+        toggle_header_locked(controls, desc)
 
 
 def handle_row_hotkey(
@@ -112,24 +163,7 @@ def _hotkey_for_descriptor(
         return False
 
     if event.key == pygame.K_l:
-        if kind == RowKind.TRACK_HEADER:
-            slot = desc.slot
-            if slot is not None:
-                controls.toggle_layer_locked(slot)
-            return True
-        if kind == RowKind.RENDER_OVERLAYS_HEADER:
-            controls.toggle_render_overlay_locked()
-            return True
-        if kind == RowKind.RENDER_POST_FX_HEADER:
-            controls.toggle_render_post_fx_locked()
-            return True
-        if kind == RowKind.RENDER_PATTERN_MASK_HEADER:
-            controls.toggle_render_pattern_mask_locked()
-            return True
-        if kind == RowKind.RENDER_TIMELINE_HEADER:
-            controls.toggle_render_timeline_locked()
-            return True
-        return False
+        return toggle_header_locked(controls, desc)
 
     if event.key == pygame.K_e:
         return apply_field_toggle_enabled(controls, desc)

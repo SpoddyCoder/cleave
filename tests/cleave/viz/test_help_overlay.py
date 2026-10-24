@@ -260,6 +260,39 @@ def test_help_follows_navigator_layer() -> None:
     assert "Credits overlays" not in _help_text(sections)
 
 
+def test_help_follows_navigator_render_node() -> None:
+    leftover = RowDescriptor(RowKind.TRACK_OPACITY, slot="drums")
+    overlays = help_sections(
+        leftover,
+        shell_focus=ShellFocusState(
+            region=ShellRegion.NAVIGATOR,
+            selected_id="render.overlays",
+        ),
+    )
+    description = _description_section(overlays)
+    assert description is not None
+    assert description.title == "Credits overlays"
+    keyboard = dict(_keyboard_section(overlays).entries)
+    assert keyboard["E"] == "enable/disable"
+    assert keyboard["S"] == "always on"
+    assert overlays != (navigation_section(),)
+
+    post = help_sections(
+        leftover,
+        shell_focus=ShellFocusState(
+            region=ShellRegion.NAVIGATOR,
+            selected_id="render.post_fx",
+        ),
+    )
+    post_description = _description_section(post)
+    assert post_description is not None
+    assert post_description.title == "Post FX"
+    post_keys = dict(_keyboard_section(post).entries)
+    assert post_keys["E"] == "enable/disable"
+    assert "S" not in post_keys
+    assert "Post-processing effects" in _help_text(post)
+
+
 def test_navigator_other_nodes_keep_navigation_only() -> None:
     leftover = RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
     for selected_id in ("settings", "project", "layers", "render", "song_markers"):

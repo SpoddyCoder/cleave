@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from cleave.viz.navigator import LAYER_ID_PREFIX
+from cleave.viz.row_hotkeys import node_header_descriptor
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
 from cleave.viz.row_spec import row_spec
 from cleave.viz.shell_focus import ShellFocusState, ShellRegion
@@ -223,12 +223,8 @@ def help_focus_descriptor(
                 return None
             return RowDescriptor(kind)
         return shell_focus.inspector_cursor
-    selected_id = shell_focus.selected_id
-    if selected_id.startswith(LAYER_ID_PREFIX):
-        return RowDescriptor(
-            RowKind.TRACK_HEADER,
-            slot=selected_id[len(LAYER_ID_PREFIX) :],
-        )
+    if shell_focus.region is ShellRegion.NAVIGATOR:
+        return node_header_descriptor(shell_focus.selected_id)
     return None
 
 

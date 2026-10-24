@@ -241,7 +241,7 @@ def _state_timeline_locked(state: object) -> bool:
     return bool(state.timeline.locked)
 
 
-def _row_lock_section(kind: RowKind) -> str | None:
+def row_lock_section(kind: RowKind) -> str | None:
     if kind in TRACK_LOCK_KINDS:
         return "track"
     if kind in RENDER_OVERLAY_SECTION_KINDS:
@@ -269,7 +269,7 @@ def section_locked(state: object, desc: RowDescriptor) -> bool:
         "preset_curation"
     ):
         return False
-    section = _row_lock_section(desc.kind)
+    section = row_lock_section(desc.kind)
     if section is None:
         return False
     if section == "track":

@@ -11,7 +11,8 @@ from cleave.viz.focus_nav import MainFocus
 from cleave.viz.input_dispatch import dispatch_keydown
 from cleave.viz.inspector import InspectorRow, build_inspector_rows
 from cleave.viz.menu_bar import MenuBarState
-from cleave.viz.navigator import layer_node_id
+from cleave.viz.navigator import layer_node_id, overlay_card_node_id
+import cleave.viz.row_hotkeys as row_hotkeys
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.shell_focus import ShellRegion
 from tests.cleave.viz.test_controls import (
@@ -41,6 +42,32 @@ def _select_layer(controls, slot: str, *, region: ShellRegion) -> None:
     focus.region = region
     focus.selected_id = layer_node_id(slot)
     focus.inspector_command_id = None
+
+
+def test_node_header_descriptor_maps_render_and_layer_ids() -> None:
+    assert not hasattr(row_hotkeys, "layer_header_for_node")
+    assert row_hotkeys.node_header_descriptor(layer_node_id("layer_2")) == RowDescriptor(
+        RowKind.TRACK_HEADER, slot="layer_2"
+    )
+    header = row_hotkeys.node_header_descriptor
+    assert header("render.overlays") == RowDescriptor(
+        RowKind.RENDER_OVERLAYS_HEADER
+    )
+    assert header("render.post_fx") == RowDescriptor(
+        RowKind.RENDER_POST_FX_HEADER
+    )
+    assert header("render.pattern_mask") == RowDescriptor(
+        RowKind.RENDER_PATTERN_MASK_HEADER
+    )
+    assert header(overlay_card_node_id("opening_card")) == (
+        RowDescriptor(RowKind.RENDER_OVERLAY_CARD_HEADER, card="opening_card")
+    )
+    assert header(overlay_card_node_id("closing_card")) == (
+        RowDescriptor(RowKind.RENDER_OVERLAY_CARD_HEADER, card="closing_card")
+    )
+    assert header("render.overlays.card:other") is None
+    assert header("render") is None
+    assert header("song_markers") is None
 
 
 def test_navigator_layer_lock_and_delete_follow_selected_node() -> None:

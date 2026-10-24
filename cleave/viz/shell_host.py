@@ -43,8 +43,11 @@ from cleave.viz.menu_bar import MenuBarState, menus_for_session
 from cleave.viz.navigator import NavNode, build_navigator
 from cleave.viz.overlay_primitives import overlay_font_path
 from cleave.viz.playback import format_mmss
-from cleave.viz.row_kinds import RowDescriptor
+from cleave.viz.row_hotkeys import activate_inspector_chip, node_header_descriptor
+from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.row_present_renderers import inspector_field_colors
+from cleave.viz.row_spec import row_lock_section, row_spec, section_locked
+from cleave.viz.session import TuningSession
 from cleave.viz.row_sections import (
     INSPECTOR_GROUP_EXPANDED,
     inspector_group_glyph,
@@ -103,12 +106,25 @@ class TransportReadout:
 
 
 @dataclass(frozen=True)
+class InspectorChip:
+    """One inspector header toggle.
+
+    ``id`` is ``enabled``, ``solo``, or ``lock``. ``active`` is on, soloed,
+    or locked. The lock label is ``locked`` or ``lock``; solo stays ``solo``.
+    """
+
+    id: str
+    label: str
+    active: bool
+
+
+@dataclass(frozen=True)
 class InspectorHeader:
-    """Inspector title line and the optional layer lock toggle."""
+    """Inspector title line and the header chips for the selected node."""
 
     title: str
-    lock_label: str | None = None
-    slot: str | None = None
+    chips: tuple[InspectorChip, ...] = ()
+    descriptor: RowDescriptor | None = None
 
 
 def transport_parts(readout: TransportReadout) -> list[tuple[str, tuple[int, int, int]]]:
@@ -167,10 +183,15 @@ def selection_after_nav_toggle(
 def inspector_header(
     nodes: Sequence[NavNode],
     selected_id: str,
+    session: TuningSession,
     *,
     curation: bool,
 ) -> InspectorHeader:
-    """Title for *selected_id*. A layer slot breadcrumbs to its parent."""
+    """Title for *selected_id*. A layer slot breadcrumbs to its parent.
+
+    Chips follow the node's header ``RowSpec`` and are omitted in preset
+    curation. Enabled, solo, then lock.
+    """
     node = next((item for item in nodes if item.id == selected_id), None)
     if node is None:
         return InspectorHeader(selected_id)
@@ -179,10 +200,65 @@ def inspector_header(
         parent = next((item for item in nodes if item.id == node.parent_id), None)
         if parent is not None:
             title = f"{parent.label} > {node.label}"
-    if node.slot is None or curation:
+    if curation:
         return InspectorHeader(title)
-    lock_label = "locked" if node.locked else "lock"
-    return InspectorHeader(title, lock_label, node.slot)
+    descriptor = node_header_descriptor(selected_id)
+    if descriptor is None:
+        return InspectorHeader(title)
+    return InspectorHeader(
+        title, _header_chips(session, descriptor), descriptor
+    )
+
+
+def _header_chips(
+    session: TuningSession, desc: RowDescriptor
+) -> tuple[InspectorChip, ...]:
+    spec = row_spec(desc.kind)
+    chips: list[InspectorChip] = []
+    if spec.toggle_enabled is not None:
+        enabled = _header_enabled(session, desc)
+        chips.append(
+            InspectorChip("enabled", "on" if enabled else "off", enabled)
+        )
+    if spec.toggle_solo is not None:
+        chips.append(InspectorChip("solo", "solo", _header_solo_active(session, desc)))
+    if row_lock_section(desc.kind) is not None:
+        locked = section_locked(session, desc)
+        chips.append(InspectorChip("lock", "locked" if locked else "lock", locked))
+    return tuple(chips)
+
+
+def _header_enabled(session: TuningSession, desc: RowDescriptor) -> bool:
+    kind = desc.kind
+    if kind == RowKind.TRACK_HEADER:
+        slot = desc.slot
+        if slot is None:
+            return False
+        return bool(session.layers[slot].enabled)
+    if kind == RowKind.RENDER_OVERLAYS_HEADER:
+        overlays = session.render_overlays
+        return bool(
+            overlays.opening_card.enabled or overlays.closing_card.enabled
+        )
+    if kind == RowKind.RENDER_OVERLAY_CARD_HEADER:
+        if desc.card == "opening_card":
+            return bool(session.render_overlays.opening_card.enabled)
+        if desc.card == "closing_card":
+            return bool(session.render_overlays.closing_card.enabled)
+        return False
+    if kind == RowKind.RENDER_POST_FX_HEADER:
+        return bool(session.render_post_fx.enabled)
+    if kind == RowKind.RENDER_PATTERN_MASK_HEADER:
+        return bool(session.render_pattern_mask.enabled)
+    return False
+
+
+def _header_solo_active(session: TuningSession, desc: RowDescriptor) -> bool:
+    if desc.kind == RowKind.TRACK_HEADER:
+        return session.solo_slot == desc.slot
+    if desc.kind == RowKind.RENDER_OVERLAYS_HEADER:
+        return bool(session.render_overlay_solo)
+    return False
 
 
 def inspector_selectable_id(desc: RowDescriptor, *, group: bool) -> str:
@@ -993,15 +1069,16 @@ class ShellHost:
         header = inspector_header(
             nodes,
             focus.selected_id,
+            self._controls.session,
             curation=is_preset_curation_mode(
                 self._controls.session.settings.editor_mode
             ),
         )
-        if header.lock_label is not None:
+        if header.chips:
             imgui.align_text_to_frame_padding()
         imgui.text(header.title)
-        if header.lock_label is not None and header.slot is not None:
-            self._draw_inspector_lock(header.lock_label, header.slot)
+        if header.chips:
+            self._draw_inspector_chips(header)
         rows = build_inspector_rows(
             state, focus.selected_id, focus.collapsed, focus.opened
         )
@@ -1088,29 +1165,43 @@ class ShellHost:
             if enabled:
                 self._controls.inspector.activate(row)
 
-    def _draw_inspector_lock(self, label: str, slot: str) -> None:
+    def _draw_inspector_chips(self, header: InspectorHeader) -> None:
+        chips = header.chips
+        descriptor = header.descriptor
+        if descriptor is None or not chips:
+            return
         style = imgui.get_style()
-        text_w = imgui.calc_text_size(label).x
-        item_w = text_w + style.frame_padding.x * 2.0
+        gap = style.item_spacing.x
+        pad = style.frame_padding.x
+        widths = [
+            imgui.calc_text_size(chip.label).x + pad * 2.0 for chip in chips
+        ]
+        total = sum(widths) + gap * (len(chips) - 1)
         avail = imgui.get_window_width()
         imgui.same_line(
             max(
                 imgui.get_cursor_pos_x(),
-                avail - item_w - style.window_padding.x,
+                avail - total - style.window_padding.x,
             )
         )
-        imgui.push_style_color(imgui.Col_.text, _rgba(LOCK_ICON))
-        try:
-            clicked, _selected = imgui.selectable(
-                f"{label}##insp-lock-{slot}",
-                False,
-                0,
-                imgui.ImVec2(item_w, 0.0),
+        for index, chip in enumerate(chips):
+            if index:
+                imgui.same_line(0.0, gap)
+            color = LOCK_ICON if chip.id == "lock" else (
+                ACTION if chip.active else LABEL
             )
-        finally:
-            imgui.pop_style_color()
-        if clicked:
-            self._controls.toggle_layer_locked(slot)
+            imgui.push_style_color(imgui.Col_.text, _rgba(color))
+            try:
+                clicked, _selected = imgui.selectable(
+                    f"{chip.label}##insp-chip-{chip.id}",
+                    False,
+                    0,
+                    imgui.ImVec2(widths[index], 0.0),
+                )
+            finally:
+                imgui.pop_style_color()
+            if clicked:
+                activate_inspector_chip(self._controls, chip.id, descriptor)
 
     def _clicks_ignored(self) -> bool:
         return (
