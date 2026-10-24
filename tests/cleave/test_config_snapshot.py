@@ -850,7 +850,7 @@ def _snapshot_fixture(tmp_path: Path) -> tuple[CleaveConfig, TuningSession, Path
             display_time=40.0,
         ),
     )
-    post_fx_runtime = default_render_post_fx_runtime(enabled=True, expanded=False)
+    post_fx_runtime = default_render_post_fx_runtime(enabled=True)
     session = TuningSession(
         layer_z_order=list(DEFAULT_LAYER_SLOTS),
         render_post_fx=replace(
@@ -862,10 +862,8 @@ def _snapshot_fixture(tmp_path: Path) -> tuple[CleaveConfig, TuningSession, Path
             ),
         ),
         render_overlays=RenderOverlaysRuntime(
-            expanded=False,
             opening_card=opening,
-            closing_card=default_render_overlay_card_runtime(closing=True),
-        ),
+            closing_card=default_render_overlay_card_runtime(closing=True)),
         layers={
             slot: LayerRuntime(
                 playlist=playlist_at_dir(preset_root / slot, index=0),
@@ -944,9 +942,6 @@ def test_write_session_snapshot_strips_legacy_overlay_font(tmp_path: Path) -> No
 
 def test_write_session_snapshot_persists_render_post_fx(tmp_path: Path) -> None:
     cfg, session, out_path = _snapshot_fixture(tmp_path)
-    session.render_post_fx.fade.expanded = True
-    session.render_post_fx.fade.fade_in.expanded = True
-    session.render_post_fx.fade.fade_out.expanded = True
     write_session_snapshot(out_path, cfg=cfg, session=session)
 
     data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
@@ -1610,8 +1605,6 @@ def test_session_snapshot_full_round_trip(tmp_path: Path) -> None:
     session.render_overlays.opening_card.animation.appear_at = 8.0
     session.render_overlays.opening_card.position = "top-right"
     session.render_overlays.opening_card.opacity_pct = 80
-    session.render_post_fx.fade.expanded = True
-    session.render_post_fx.fade.fade_in.expanded = True
     session.render_post_fx.fade.fade_in.end = 18.0
     session.render_post_fx.fade.fade_out.start = 2.0
     session.timeline.lanes = {

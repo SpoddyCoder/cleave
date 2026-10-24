@@ -11,6 +11,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- Overlays, Post-FX, and Pattern mask edit in the inspector. The Render menu toggles them, and those sections are gone from the leftover panel.
 - Each layer is a navigator node and edits in the inspector. Add layer (Ctrl+L) and Delete layer are on the Layers menu and the inspector. Keys 1-8 jump to layers when the timeline strip is not focused.
 - The editor shell now has a navigator, an inspector, and a transport bar. Settings and Project edit in the inspector. Tab cycles regions, and Ctrl+Up/Down move between the top-level sections.
 - The editor has a menu bar (File, Project, Layers, Render, Timeline, Settings, Help). Save, Render, Measure latency, and Preset curation moved from the panel to the menus. Ctrl+R starts a render.

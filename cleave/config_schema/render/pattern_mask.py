@@ -183,7 +183,6 @@ def pattern_mask_persist_values(ctx: PersistCtx) -> dict[str, Any]:
 def default_render_pattern_mask_runtime_values() -> dict[str, Any]:
     return {
         "enabled": DEFAULT_RENDER_PATTERN_MASK_ENABLED,
-        "expanded": False,
         "type": DEFAULT_RENDER_PATTERN_MASK_TYPE,
         "density": DEFAULT_RENDER_PATTERN_MASK_DENSITY,
         "feather_pct": DEFAULT_RENDER_PATTERN_MASK_FEATHER_PCT,

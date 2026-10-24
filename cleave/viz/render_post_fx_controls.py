@@ -37,12 +37,6 @@ class RenderPostFxControls:
         self.session = session
         self._bindings = bindings
 
-    def set_expanded(self, expanded: bool) -> None:
-        pp = self.session.render_post_fx
-        if pp.expanded == expanded:
-            return
-        pp.expanded = expanded
-
     def set_enabled(self, enabled: bool) -> None:
         pp = self.session.render_post_fx
         if pp.enabled == enabled:
@@ -50,7 +44,6 @@ class RenderPostFxControls:
         pp.enabled = enabled
         if not enabled:
             self.session.render_post_fx_solo = False
-            pp.expanded = False
 
     def enter_solo(self) -> None:
         if self.session.render_post_fx_solo:
@@ -61,18 +54,6 @@ class RenderPostFxControls:
         if not self.session.render_post_fx_solo:
             return
         self.session.render_post_fx_solo = False
-
-    def set_fade_expanded(self, expanded: bool) -> None:
-        fade = self.session.render_post_fx.fade
-        if fade.expanded == expanded:
-            return
-        fade.expanded = expanded
-
-    def set_fade_side_expanded(self, side: str, expanded: bool) -> None:
-        window = self._fade_side(side)
-        if window.expanded == expanded:
-            return
-        window.expanded = expanded
 
     def set_fade_start(self, side: str, value: float) -> None:
         window = self._fade_side(side)
@@ -111,12 +92,6 @@ class RenderPostFxControls:
         raise ValueError(
             f"fade side must be 'fade_in' or 'fade_out', got {side!r}"
         )
-
-    def set_highlight_rolloff_expanded(self, expanded: bool) -> None:
-        pp = self.session.render_post_fx
-        if pp.highlight_rolloff_expanded == expanded:
-            return
-        pp.highlight_rolloff_expanded = expanded
 
     def _enforce_ceiling_vs_threshold(self) -> None:
         hr = self.session.render_post_fx.highlight_rolloff
@@ -185,12 +160,6 @@ class RenderPostFxControls:
         else:
             hr.curve = curves[(index - 1) % len(curves)]
 
-    def set_chroma_boost_expanded(self, expanded: bool) -> None:
-        pp = self.session.render_post_fx
-        if pp.chroma_boost_expanded == expanded:
-            return
-        pp.chroma_boost_expanded = expanded
-
     def set_chroma_boost_amount_pct(self, amount_pct: int) -> None:
         self.session.render_post_fx.chroma_boost.amount_pct = (
             clamp_chroma_boost_amount_pct(amount_pct)
@@ -228,12 +197,6 @@ class RenderPostFxControls:
             cb.variant = variants[(index + 1) % len(variants)]
         else:
             cb.variant = variants[(index - 1) % len(variants)]
-
-    def set_limiter_expanded(self, expanded: bool) -> None:
-        pp = self.session.render_post_fx
-        if pp.limiter_expanded == expanded:
-            return
-        pp.limiter_expanded = expanded
 
     def set_limiter_enabled(self, enabled: bool) -> None:
         lim = self.session.render_post_fx.limiter

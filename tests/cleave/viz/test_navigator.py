@@ -320,7 +320,7 @@ def test_tree_up_down_does_not_wrap() -> None:
     focus = controls.shell_focus
     nav = controls.navigator
     nav.select("render")
-    assert controls.focus_descriptor.kind is RowKind.RENDER_OVERLAYS_HEADER
+    assert controls.focus_descriptor.kind is RowKind.RENDER_TIMELINE_HEADER
     focus.selected_id = "settings"
     focus.region = ShellRegion.NAVIGATOR
 
@@ -336,7 +336,7 @@ def test_tree_up_down_does_not_wrap() -> None:
         seen.append(focus.selected_id)
         assert focus.region is ShellRegion.NAVIGATOR
         if focus.selected_id == "layers" or focus.selected_id.startswith("layer:"):
-            assert controls.focus_descriptor.kind is RowKind.RENDER_OVERLAYS_HEADER
+            assert controls.focus_descriptor.kind is RowKind.RENDER_TIMELINE_HEADER
 
     nodes = build_navigator(controls.session, focus.nav_expanded)
     assert seen == [node.id for node in nodes]

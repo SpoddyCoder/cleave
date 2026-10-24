@@ -29,19 +29,12 @@ class RenderOverlayCardControls:
     def _card(self) -> RenderOverlayCardRuntime:
         return getattr(self.session.render_overlays, self._card_name)
 
-    def set_expanded(self, expanded: bool) -> None:
-        card = self._card()
-        if card.expanded == expanded:
-            return
-        card.expanded = expanded
-
     def set_enabled(self, enabled: bool) -> None:
         card = self._card()
         if card.enabled == enabled:
             return
         card.enabled = enabled
         if not enabled:
-            card.expanded = False
             overlays = self.session.render_overlays
             if (
                 not overlays.opening_card.enabled
@@ -60,24 +53,6 @@ class RenderOverlayCardControls:
             card.position = positions[(index + 1) % len(positions)]
         else:
             card.position = positions[(index - 1) % len(positions)]
-
-    def set_title_expanded(self, expanded: bool) -> None:
-        card = self._card()
-        if card.title_expanded == expanded:
-            return
-        card.title_expanded = expanded
-
-    def set_body_expanded(self, expanded: bool) -> None:
-        card = self._card()
-        if card.body_expanded == expanded:
-            return
-        card.body_expanded = expanded
-
-    def set_animation_expanded(self, expanded: bool) -> None:
-        card = self._card()
-        if card.animation_expanded == expanded:
-            return
-        card.animation_expanded = expanded
 
     def cycle_animation_type(self, *, forward: bool) -> None:
         anim = self._card().animation
@@ -191,18 +166,11 @@ class RenderOverlaysControls:
             return self.closing_card
         raise ValueError(f"unknown overlay card {name!r}")
 
-    def set_expanded(self, expanded: bool) -> None:
-        overlays = self.session.render_overlays
-        if overlays.expanded == expanded:
-            return
-        overlays.expanded = expanded
-
     def set_enabled(self, enabled: bool) -> None:
         """Bulk-enable or disable both cards."""
         self.opening_card.set_enabled(enabled)
         self.closing_card.set_enabled(enabled)
         if not enabled:
-            self.session.render_overlays.expanded = False
             self.session.render_overlay_solo = False
 
     def set_locked(self, locked: bool) -> None:

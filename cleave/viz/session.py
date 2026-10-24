@@ -142,10 +142,7 @@ def default_render_overlay_closing_animation_runtime() -> (
 @dataclass
 class RenderOverlayCardRuntime:
     enabled: bool
-    expanded: bool
     position: RenderOverlayPosition
-    title_expanded: bool
-    body_expanded: bool
     title_font_size: int
     title_font: str
     title_margin_bottom: int
@@ -164,12 +161,10 @@ class RenderOverlayCardRuntime:
     background_padding: int
     border_colour: tuple[int, int, int]
     animation: RenderOverlayAnimationRuntime | RenderOverlayClosingAnimationRuntime
-    animation_expanded: bool = False
 
 
 @dataclass
 class RenderOverlaysRuntime:
-    expanded: bool
     opening_card: RenderOverlayCardRuntime
     closing_card: RenderOverlayCardRuntime
     locked: bool = DEFAULT_RENDER_OVERLAYS_LOCKED
@@ -198,7 +193,6 @@ def default_render_overlay_card_runtime(
 def default_render_overlays_runtime() -> RenderOverlaysRuntime:
     values = default_render_overlays_runtime_values()
     return RenderOverlaysRuntime(
-        expanded=values["expanded"],
         opening_card=_card_runtime_from_values(dict(values["opening_card"])),
         closing_card=_card_runtime_from_values(dict(values["closing_card"])),
         locked=values["locked"],
@@ -236,14 +230,12 @@ class FadeSideRuntime:
     start: float
     end: float
     type: FadeCurve
-    expanded: bool = False
 
 
 @dataclass
 class FadeRuntime:
     fade_in: FadeSideRuntime
     fade_out: FadeSideRuntime
-    expanded: bool = False
 
 
 @dataclass
@@ -261,14 +253,10 @@ def default_visual_limiter_runtime() -> VisualLimiterRuntime:
 @dataclass
 class RenderPostFxRuntime:
     enabled: bool
-    expanded: bool
     fade: FadeRuntime
     highlight_rolloff: HighlightRolloffRuntime
-    highlight_rolloff_expanded: bool = False
     chroma_boost: ChromaBoostRuntime = field(default_factory=default_chroma_boost_runtime)
-    chroma_boost_expanded: bool = False
     limiter: VisualLimiterRuntime = field(default_factory=default_visual_limiter_runtime)
-    limiter_expanded: bool = False
     locked: bool = DEFAULT_RENDER_POST_FX_LOCKED
 
 
@@ -276,7 +264,6 @@ def _fade_runtime_from_values(values: dict[str, Any]) -> FadeRuntime:
     return FadeRuntime(
         fade_in=FadeSideRuntime(**values["fade_in"]),
         fade_out=FadeSideRuntime(**values["fade_out"]),
-        expanded=values["expanded"],
     )
 
 
@@ -298,7 +285,6 @@ def default_render_post_fx_runtime() -> RenderPostFxRuntime:
 @dataclass
 class RenderPatternMaskRuntime:
     enabled: bool
-    expanded: bool
     type: PatternMaskType
     density: float
     feather_pct: int

@@ -5,15 +5,14 @@ from __future__ import annotations
 import pytest
 
 from cleave.viz.tuning_view_state import (
-    FadeBlock,
-    FadeSideBlock,
     HighlightRolloffBlock,
     RenderOverlaysBlock,
     RenderPostFxBlock,
     SettingsBlock,
     TuningViewState,
 )
-from tests.support.viz import make_overlay_card_block, make_track_block
+from tests.support.viz import make_track_block
+from cleave.viz.inspector import build_inspector_rows
 from cleave.viz.row_layout import (
     build_layout_frame,
     row_draw_visible,
@@ -104,10 +103,10 @@ def test_focus_index_uses_layout_frame_navigable() -> None:
 
 def test_find_descriptor_and_contains_descriptor() -> None:
     state = _minimal_view_state()
-    desc = RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
+    desc = RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
     assert state.layout.contains_descriptor(desc)
     assert state.layout.find_descriptor(desc) == state.layout.find_by_kind(
-        RowKind.RENDER_OVERLAYS_HEADER
+        RowKind.RENDER_TIMELINE_HEADER
     )
 
 
@@ -140,7 +139,7 @@ def test_navigable_descriptors_matches_indices() -> None:
 
 def test_resolve_navigable_returns_descriptor_when_navigable() -> None:
     state = _minimal_view_state()
-    transport = RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
+    transport = RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
     assert state.layout.resolve_navigable(transport, state) == transport
 
 
@@ -168,97 +167,91 @@ def test_resolve_navigable_track_row_falls_back_to_leftover() -> None:
     assert first.kind != RowKind.TRACK_HEADER
 
 
+def _inspector_kinds(state: TuningViewState, node_id: str) -> list[RowKind]:
+    rows = build_inspector_rows(state, node_id, frozenset())
+    return [row.descriptor.kind for row in rows if row.descriptor is not None]
+
+
 def test_resolve_navigable_render_overlay_sub_row_collapsed() -> None:
-    state = _minimal_view_state(render_overlays=RenderOverlaysBlock(expanded=False))
+    state = _minimal_view_state(render_overlays=RenderOverlaysBlock())
     opacity = RowDescriptor(
         RowKind.RENDER_OVERLAY_CARD_OPACITY, card="opening_card"
     )
+    timeline = RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
     assert opacity not in state.layout.rows
-    assert state.layout.resolve_navigable(opacity, state) == RowDescriptor(
-        RowKind.RENDER_OVERLAYS_HEADER
+    assert state.layout.resolve_navigable(opacity, state) == timeline
+    assert RowKind.RENDER_OVERLAY_CARD_OPACITY in _inspector_kinds(
+        state, "render.overlays.card:opening_card"
     )
 
 
 def test_resolve_navigable_render_overlay_title_nested_collapsed() -> None:
-    state = _minimal_view_state(
-        render_overlays=RenderOverlaysBlock(
-            expanded=True,
-            opening_card=make_overlay_card_block(
-                expanded=True, title_expanded=False
-            ),
-        ),
-    )
+    state = _minimal_view_state()
     font = RowDescriptor(
         RowKind.RENDER_OVERLAY_CARD_TITLE_FONT, card="opening_card"
     )
     assert font not in state.layout.rows
-    title_header = RowDescriptor(
-        RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER, card="opening_card"
+    assert state.layout.resolve_navigable(font, state) == RowDescriptor(
+        RowKind.RENDER_TIMELINE_HEADER
     )
-    assert state.layout.resolve_navigable(font, state) == title_header
+    assert RowKind.RENDER_OVERLAY_CARD_TITLE_FONT in _inspector_kinds(
+        state, "render.overlays.card:opening_card"
+    )
 
 
 def test_resolve_navigable_render_post_fx_sub_row_collapsed() -> None:
-    state = _minimal_view_state(render_post_fx=RenderPostFxBlock(expanded=False))
+    state = _minimal_view_state(render_post_fx=RenderPostFxBlock())
     fade = RowDescriptor(RowKind.RENDER_POST_FX_FADE_HEADER)
     assert fade not in state.layout.rows
     assert state.layout.resolve_navigable(fade, state) == RowDescriptor(
-        RowKind.RENDER_POST_FX_HEADER
+        RowKind.RENDER_TIMELINE_HEADER
+    )
+    assert RowKind.RENDER_POST_FX_FADE_IN_START in _inspector_kinds(
+        state, "render.post_fx"
     )
 
 
 def test_resolve_navigable_render_post_fx_highlight_rolloff_mode_off_hides_params() -> None:
     state = _minimal_view_state(
         render_post_fx=RenderPostFxBlock(
-            expanded=True,
-            highlight_rolloff=HighlightRolloffBlock(expanded=True, mode="off"),
+            highlight_rolloff=HighlightRolloffBlock(mode="off")
         ),
     )
     threshold = RowDescriptor(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD)
+    page = _inspector_kinds(state, "render.post_fx")
     assert threshold not in state.layout.rows
-    mode = RowDescriptor(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_MODE)
-    assert mode in state.layout.rows
+    assert RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_MODE in page
+    assert RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD not in page
+    assert state.layout.resolve_navigable(threshold, state) == RowDescriptor(
+        RowKind.RENDER_TIMELINE_HEADER
+    )
 
 
 def test_resolve_navigable_render_post_fx_fade_nested_collapsed() -> None:
-    collapsed_fade = _minimal_view_state(
-        render_post_fx=RenderPostFxBlock(
-            expanded=True,
-            fade=FadeBlock(expanded=False),
-        ),
-    )
+    state = _minimal_view_state(render_post_fx=RenderPostFxBlock())
     start = RowDescriptor(RowKind.RENDER_POST_FX_FADE_IN_START)
-    assert start not in collapsed_fade.layout.rows
-    assert collapsed_fade.layout.resolve_navigable(start, collapsed_fade) == (
-        RowDescriptor(RowKind.RENDER_POST_FX_FADE_HEADER)
+    assert start not in state.layout.rows
+    assert state.layout.resolve_navigable(start, state) == RowDescriptor(
+        RowKind.RENDER_TIMELINE_HEADER
     )
-
-    collapsed_side = _minimal_view_state(
-        render_post_fx=RenderPostFxBlock(
-            expanded=True,
-            fade=FadeBlock(
-                expanded=True,
-                fade_in=FadeSideBlock(expanded=False),
-            ),
-        ),
-    )
-    assert start not in collapsed_side.layout.rows
-    assert collapsed_side.layout.resolve_navigable(start, collapsed_side) == (
-        RowDescriptor(RowKind.RENDER_POST_FX_FADE_IN_HEADER)
+    assert RowKind.RENDER_POST_FX_FADE_IN_START in _inspector_kinds(
+        state, "render.post_fx"
     )
 
 
 def test_resolve_navigable_render_post_fx_highlight_rolloff_nested_collapsed() -> None:
     state = _minimal_view_state(
         render_post_fx=RenderPostFxBlock(
-            expanded=True,
-            highlight_rolloff=HighlightRolloffBlock(expanded=False),
+            highlight_rolloff=HighlightRolloffBlock(mode="composite")
         ),
     )
     threshold = RowDescriptor(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD)
+    page = _inspector_kinds(state, "render.post_fx")
     assert threshold not in state.layout.rows
-    header = RowDescriptor(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_HEADER)
-    assert state.layout.resolve_navigable(threshold, state) == header
+    assert RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD in page
+    assert state.layout.resolve_navigable(threshold, state) == RowDescriptor(
+        RowKind.RENDER_TIMELINE_HEADER
+    )
 
 
 def test_section_header_descriptor_mappings() -> None:

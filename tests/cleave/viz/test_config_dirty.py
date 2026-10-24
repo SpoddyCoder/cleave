@@ -151,7 +151,6 @@ def _mutate_render_overlay_position(controls: TuningControls) -> None:
 
 def _mutate_render_overlay_title_font_size(controls: TuningControls) -> None:
     _expand_render_overlay(controls)
-    controls.session.render_overlays.opening_card.title_expanded = True
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(
         RowKind.RENDER_OVERLAY_CARD_TITLE_FONT_SIZE, card="opening_card"
@@ -161,7 +160,6 @@ def _mutate_render_overlay_title_font_size(controls: TuningControls) -> None:
 
 def _mutate_render_overlay_title_font(controls: TuningControls) -> None:
     _expand_render_overlay(controls)
-    controls.session.render_overlays.opening_card.title_expanded = True
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(
         RowKind.RENDER_OVERLAY_CARD_TITLE_FONT, card="opening_card"
@@ -171,7 +169,6 @@ def _mutate_render_overlay_title_font(controls: TuningControls) -> None:
 
 def _mutate_render_overlay_title_margin_bottom(controls: TuningControls) -> None:
     _expand_render_overlay(controls)
-    controls.session.render_overlays.opening_card.title_expanded = True
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(
         RowKind.RENDER_OVERLAY_CARD_TITLE_MARGIN_BOTTOM, card="opening_card"
@@ -193,7 +190,6 @@ def _mutate_render_overlay_body_content(controls: TuningControls) -> None:
 
 def _mutate_render_overlay_body_font_size(controls: TuningControls) -> None:
     _expand_render_overlay(controls)
-    controls.session.render_overlays.opening_card.body_expanded = True
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(
         RowKind.RENDER_OVERLAY_CARD_BODY_FONT_SIZE, card="opening_card"
@@ -203,7 +199,6 @@ def _mutate_render_overlay_body_font_size(controls: TuningControls) -> None:
 
 def _mutate_render_overlay_body_font(controls: TuningControls) -> None:
     _expand_render_overlay(controls)
-    controls.session.render_overlays.opening_card.body_expanded = True
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(
         RowKind.RENDER_OVERLAY_CARD_BODY_FONT, card="opening_card"
@@ -249,7 +244,6 @@ def _mutate_render_overlay_background_padding(controls: TuningControls) -> None:
 
 def _mutate_render_overlay_start_delay(controls: TuningControls) -> None:
     _expand_render_overlay(controls)
-    controls.session.render_overlays.opening_card.animation_expanded = True
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(
         RowKind.RENDER_OVERLAY_CARD_TIME, card="opening_card"
@@ -259,7 +253,6 @@ def _mutate_render_overlay_start_delay(controls: TuningControls) -> None:
 
 def _mutate_render_overlay_display_time(controls: TuningControls) -> None:
     _expand_render_overlay(controls)
-    controls.session.render_overlays.opening_card.animation_expanded = True
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(
         RowKind.RENDER_OVERLAY_CARD_DISPLAY_TIME, card="opening_card"

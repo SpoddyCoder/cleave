@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from cleave.viz.row_sections import (
-    append_render_section_rows,
+    append_leftover_timeline_rows,
     sub_row_expand_visible,
 )
 from cleave.viz.row_kinds import RowDescriptor, RowKind
@@ -54,7 +54,7 @@ def first_leftover_descriptor(state: TuningViewState) -> RowDescriptor:
             return desc
     if state.layout.rows:
         return state.layout.rows[0]
-    return RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
+    return RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
 
 
 def resolve_navigable_descriptor(
@@ -145,7 +145,7 @@ class RowLayout:
                 RowDescriptor(RowKind.PANEL_NOTIFICATION, marker_index=1)
             )
         if not curation:
-            append_render_section_rows(row_list, state)
+            append_leftover_timeline_rows(row_list, state)
         rows = tuple(row_list)
         return cls(
             rows=rows,
@@ -237,7 +237,7 @@ class RowLayout:
             desc, navigable, fallback=fallback
         )
         if not self.rows:
-            return RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
+            return RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
         if not self.contains_descriptor(resolved):
             return self.rows[0]
         return resolved

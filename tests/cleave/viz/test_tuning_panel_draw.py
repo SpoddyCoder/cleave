@@ -56,8 +56,8 @@ def _row_for_style(
         index = layout.find("layer_1", RowKind.TRACK_EFFECTS_HEADER)
         return index, "cleave effects ▼"
     if style == RowPresentStyle.COMPOSITE_HEADER:
-        index = layout.find_by_kind(RowKind.RENDER_OVERLAYS_HEADER)
-        return index, "Render: OVERLAYS ▶"
+        index = layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
+        return index, "Render: TIMELINE ▶"
     if style == RowPresentStyle.PATH_ICON:
         index = layout.find("layer_1", RowKind.TRACK_PRESET_DIR)
         return index, "dir"

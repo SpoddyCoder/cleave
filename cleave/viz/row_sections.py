@@ -45,95 +45,6 @@ def _inspector_group_toggle(
     return None
 
 
-def _toggle_render_overlays(
-    controls: TuningControls, _slot: str | None, forward: bool
-) -> None:
-    controls.render_overlays.set_expanded(forward)
-
-
-def _overlay_card_runtime(state: TuningViewState, card: str | None):
-    assert card is not None
-    return getattr(state.render_overlays, card)
-
-
-def _toggle_overlay_card(
-    controls: TuningControls, card: str | None, forward: bool
-) -> None:
-    if card is None:
-        return
-    controls.render_overlays.card(card).set_expanded(forward)
-
-
-def _toggle_overlay_card_title(
-    controls: TuningControls, card: str | None, forward: bool
-) -> None:
-    if card is None:
-        return
-    controls.render_overlays.card(card).set_title_expanded(forward)
-
-
-def _toggle_overlay_card_body(
-    controls: TuningControls, card: str | None, forward: bool
-) -> None:
-    if card is None:
-        return
-    controls.render_overlays.card(card).set_body_expanded(forward)
-
-
-def _toggle_overlay_card_animation(
-    controls: TuningControls, card: str | None, forward: bool
-) -> None:
-    if card is None:
-        return
-    controls.render_overlays.card(card).set_animation_expanded(forward)
-
-
-def _toggle_render_post_fx(controls: TuningControls, _slot: str | None, forward: bool) -> None:
-    controls.render_post_fx.set_expanded(forward)
-
-
-def _toggle_render_pattern_mask(
-    controls: TuningControls, _slot: str | None, forward: bool
-) -> None:
-    controls.render_pattern_mask.set_expanded(forward)
-
-
-def _toggle_render_post_fx_fade(
-    controls: TuningControls, _slot: str | None, forward: bool
-) -> None:
-    controls.render_post_fx.set_fade_expanded(forward)
-
-
-def _toggle_render_post_fx_fade_in(
-    controls: TuningControls, _slot: str | None, forward: bool
-) -> None:
-    controls.render_post_fx.set_fade_side_expanded("fade_in", forward)
-
-
-def _toggle_render_post_fx_fade_out(
-    controls: TuningControls, _slot: str | None, forward: bool
-) -> None:
-    controls.render_post_fx.set_fade_side_expanded("fade_out", forward)
-
-
-def _toggle_render_post_fx_highlight_rolloff(
-    controls: TuningControls, _slot: str | None, forward: bool
-) -> None:
-    controls.render_post_fx.set_highlight_rolloff_expanded(forward)
-
-
-def _toggle_render_post_fx_chroma_boost(
-    controls: TuningControls, _slot: str | None, forward: bool
-) -> None:
-    controls.render_post_fx.set_chroma_boost_expanded(forward)
-
-
-def _toggle_render_post_fx_limiter(
-    controls: TuningControls, _slot: str | None, forward: bool
-) -> None:
-    controls.render_post_fx.set_limiter_expanded(forward)
-
-
 def _toggle_song_markers(controls: TuningControls, _slot: str | None, forward: bool) -> None:
     controls.song_markers.set_expanded(forward)
 
@@ -254,76 +165,6 @@ PANEL_ANCHOR_TOGGLE_BY_HEADER: dict[RowKind, PanelAnchorToggleFn] = {
 }
 
 PANEL_ANCHOR_HEADER_KINDS = frozenset(PANEL_ANCHOR_BY_HEADER)
-
-
-def _render_overlays_expanded(state: TuningViewState, _slot: str | None) -> bool:
-    return state.render_overlays.expanded
-
-
-def _read_overlay_card_expanded(state: TuningViewState, card: str | None) -> bool:
-    return _overlay_card_runtime(state, card).runtime.expanded
-
-
-def _read_overlay_card_title_expanded(
-    state: TuningViewState, card: str | None
-) -> bool:
-    return _overlay_card_runtime(state, card).runtime.title_expanded
-
-
-def _read_overlay_card_body_expanded(
-    state: TuningViewState, card: str | None
-) -> bool:
-    return _overlay_card_runtime(state, card).runtime.body_expanded
-
-
-def _read_overlay_card_animation_expanded(
-    state: TuningViewState, card: str | None
-) -> bool:
-    return _overlay_card_runtime(state, card).runtime.animation_expanded
-
-
-def _render_post_fx_expanded(state: TuningViewState, _slot: str | None) -> bool:
-    return state.render_post_fx.expanded
-
-
-def _render_pattern_mask_expanded(state: TuningViewState, _slot: str | None) -> bool:
-    return state.render_pattern_mask.expanded
-
-
-def _render_post_fx_fade_expanded(
-    state: TuningViewState, _slot: str | None
-) -> bool:
-    return state.render_post_fx.fade.expanded
-
-
-def _render_post_fx_fade_in_expanded(
-    state: TuningViewState, _slot: str | None
-) -> bool:
-    return state.render_post_fx.fade.fade_in.expanded
-
-
-def _render_post_fx_fade_out_expanded(
-    state: TuningViewState, _slot: str | None
-) -> bool:
-    return state.render_post_fx.fade.fade_out.expanded
-
-
-def _render_post_fx_highlight_rolloff_expanded(
-    state: TuningViewState, _slot: str | None
-) -> bool:
-    return state.render_post_fx.highlight_rolloff.expanded
-
-
-def _render_post_fx_chroma_boost_expanded(
-    state: TuningViewState, _slot: str | None
-) -> bool:
-    return state.render_post_fx.chroma_boost.expanded
-
-
-def _render_post_fx_limiter_expanded(
-    state: TuningViewState, _slot: str | None
-) -> bool:
-    return state.render_post_fx.limiter.expanded
 
 
 def _song_markers_expanded(state: TuningViewState, _slot: str | None) -> bool:
@@ -518,8 +359,8 @@ def _build_render_overlay_card_section(card: str) -> ExpandSectionDef:
         header_kind=RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER,
         context="global",
         card=card,
-        read_expanded=_read_overlay_card_title_expanded,
-        toggle=_toggle_overlay_card_title,
+        read_expanded=_inspector_group_expanded,
+        toggle=_inspector_group_toggle,
         children=(
             SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_TITLE_TEXT),
             SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_TITLE_COLOUR),
@@ -533,8 +374,8 @@ def _build_render_overlay_card_section(card: str) -> ExpandSectionDef:
         header_kind=RowKind.RENDER_OVERLAY_CARD_BODY_HEADER,
         context="global",
         card=card,
-        read_expanded=_read_overlay_card_body_expanded,
-        toggle=_toggle_overlay_card_body,
+        read_expanded=_inspector_group_expanded,
+        toggle=_inspector_group_toggle,
         children=(
             SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_BODY_TEXT),
             SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_BODY_COLOUR),
@@ -561,8 +402,8 @@ def _build_render_overlay_card_section(card: str) -> ExpandSectionDef:
         header_kind=RowKind.RENDER_OVERLAY_CARD_ANIMATION_HEADER,
         context="global",
         card=card,
-        read_expanded=_read_overlay_card_animation_expanded,
-        toggle=_toggle_overlay_card_animation,
+        read_expanded=_inspector_group_expanded,
+        toggle=_inspector_group_toggle,
         children=(
             SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_ANIMATION_TYPE),
             SectionNode(conditional=slide_conditional),
@@ -574,8 +415,8 @@ def _build_render_overlay_card_section(card: str) -> ExpandSectionDef:
         header_kind=RowKind.RENDER_OVERLAY_CARD_HEADER,
         context="global",
         card=card,
-        read_expanded=_read_overlay_card_expanded,
-        toggle=_toggle_overlay_card,
+        read_expanded=_inspector_group_expanded,
+        toggle=_inspector_group_toggle,
         children=(
             SectionNode(expand=animation_section),
             SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_POSITION),
@@ -601,8 +442,8 @@ RENDER_OVERLAY_CLOSING_CARD_SECTION = _build_render_overlay_card_section(
 RENDER_OVERLAYS_SECTION = ExpandSectionDef(
     header_kind=RowKind.RENDER_OVERLAYS_HEADER,
     context="global",
-    read_expanded=_render_overlays_expanded,
-    toggle=_toggle_render_overlays,
+    read_expanded=_inspector_group_expanded,
+    toggle=_inspector_group_toggle,
     children=(
         SectionNode(expand=RENDER_OVERLAY_OPENING_CARD_SECTION),
         SectionNode(expand=RENDER_OVERLAY_CLOSING_CARD_SECTION),
@@ -625,8 +466,8 @@ RENDER_POST_FX_HIGHLIGHT_ROLLOFF_ACTIVE = ConditionalRowsDef(
 RENDER_POST_FX_HIGHLIGHT_ROLLOFF_SECTION = ExpandSectionDef(
     header_kind=RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_HEADER,
     context="global",
-    read_expanded=_render_post_fx_highlight_rolloff_expanded,
-    toggle=_toggle_render_post_fx_highlight_rolloff,
+    read_expanded=_inspector_group_expanded,
+    toggle=_inspector_group_toggle,
     children=(
         SectionNode(leaf_kind=RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_MODE),
         SectionNode(conditional=RENDER_POST_FX_HIGHLIGHT_ROLLOFF_ACTIVE),
@@ -661,8 +502,8 @@ RENDER_POST_FX_LIMITER_ACTIVE = ConditionalRowsDef(
 RENDER_POST_FX_LIMITER_SECTION = ExpandSectionDef(
     header_kind=RowKind.RENDER_POST_FX_LIMITER_HEADER,
     context="global",
-    read_expanded=_render_post_fx_limiter_expanded,
-    toggle=_toggle_render_post_fx_limiter,
+    read_expanded=_inspector_group_expanded,
+    toggle=_inspector_group_toggle,
     children=(
         SectionNode(leaf_kind=RowKind.RENDER_POST_FX_LIMITER_ENABLED),
         SectionNode(conditional=RENDER_POST_FX_LIMITER_ACTIVE),
@@ -672,8 +513,8 @@ RENDER_POST_FX_LIMITER_SECTION = ExpandSectionDef(
 RENDER_POST_FX_CHROMA_BOOST_SECTION = ExpandSectionDef(
     header_kind=RowKind.RENDER_POST_FX_CHROMA_BOOST_HEADER,
     context="global",
-    read_expanded=_render_post_fx_chroma_boost_expanded,
-    toggle=_toggle_render_post_fx_chroma_boost,
+    read_expanded=_inspector_group_expanded,
+    toggle=_inspector_group_toggle,
     children=(
         SectionNode(leaf_kind=RowKind.RENDER_POST_FX_CHROMA_BOOST_MODE),
         SectionNode(conditional=RENDER_POST_FX_CHROMA_BOOST_ACTIVE),
@@ -683,8 +524,8 @@ RENDER_POST_FX_CHROMA_BOOST_SECTION = ExpandSectionDef(
 RENDER_POST_FX_FADE_IN_SECTION = ExpandSectionDef(
     header_kind=RowKind.RENDER_POST_FX_FADE_IN_HEADER,
     context="global",
-    read_expanded=_render_post_fx_fade_in_expanded,
-    toggle=_toggle_render_post_fx_fade_in,
+    read_expanded=_inspector_group_expanded,
+    toggle=_inspector_group_toggle,
     children=(
         SectionNode(leaf_kind=RowKind.RENDER_POST_FX_FADE_IN_START),
         SectionNode(leaf_kind=RowKind.RENDER_POST_FX_FADE_IN_END),
@@ -695,8 +536,8 @@ RENDER_POST_FX_FADE_IN_SECTION = ExpandSectionDef(
 RENDER_POST_FX_FADE_OUT_SECTION = ExpandSectionDef(
     header_kind=RowKind.RENDER_POST_FX_FADE_OUT_HEADER,
     context="global",
-    read_expanded=_render_post_fx_fade_out_expanded,
-    toggle=_toggle_render_post_fx_fade_out,
+    read_expanded=_inspector_group_expanded,
+    toggle=_inspector_group_toggle,
     children=(
         SectionNode(leaf_kind=RowKind.RENDER_POST_FX_FADE_OUT_START),
         SectionNode(leaf_kind=RowKind.RENDER_POST_FX_FADE_OUT_END),
@@ -707,8 +548,8 @@ RENDER_POST_FX_FADE_OUT_SECTION = ExpandSectionDef(
 RENDER_POST_FX_FADE_SECTION = ExpandSectionDef(
     header_kind=RowKind.RENDER_POST_FX_FADE_HEADER,
     context="global",
-    read_expanded=_render_post_fx_fade_expanded,
-    toggle=_toggle_render_post_fx_fade,
+    read_expanded=_inspector_group_expanded,
+    toggle=_inspector_group_toggle,
     children=(
         SectionNode(expand=RENDER_POST_FX_FADE_IN_SECTION),
         SectionNode(expand=RENDER_POST_FX_FADE_OUT_SECTION),
@@ -718,8 +559,8 @@ RENDER_POST_FX_FADE_SECTION = ExpandSectionDef(
 RENDER_POST_FX_SECTION = ExpandSectionDef(
     header_kind=RowKind.RENDER_POST_FX_HEADER,
     context="global",
-    read_expanded=_render_post_fx_expanded,
-    toggle=_toggle_render_post_fx,
+    read_expanded=_inspector_group_expanded,
+    toggle=_inspector_group_toggle,
     children=(
         SectionNode(expand=RENDER_POST_FX_FADE_SECTION),
         SectionNode(expand=RENDER_POST_FX_HIGHLIGHT_ROLLOFF_SECTION),
@@ -739,8 +580,8 @@ RENDER_PATTERN_MASK_PLASMA_SEED = ConditionalRowsDef(
 RENDER_PATTERN_MASK_SECTION = ExpandSectionDef(
     header_kind=RowKind.RENDER_PATTERN_MASK_HEADER,
     context="global",
-    read_expanded=_render_pattern_mask_expanded,
-    toggle=_toggle_render_pattern_mask,
+    read_expanded=_inspector_group_expanded,
+    toggle=_inspector_group_toggle,
     children=(
         SectionNode(leaf_kind=RowKind.RENDER_PATTERN_MASK_TYPE),
         SectionNode(leaf_kind=RowKind.RENDER_PATTERN_MASK_DENSITY),
@@ -1379,24 +1220,19 @@ def append_expand_section_rows(
         section.append_dynamic_children(row_list, state, slot)
 
 
-def append_render_section_rows(
+def append_leftover_timeline_rows(
     row_list: list[RowDescriptor],
     state: TuningViewState,
 ) -> None:
-    for node in RENDER_SECTION_NODES:
-        if node.expand is not None:
-            append_expand_section_rows(row_list, node.expand, state)
-        elif node.panel_anchor is not None:
-            row_list.append(RowDescriptor(node.panel_anchor.header_kind))
-            if (
-                node.panel_anchor.header_kind == RowKind.RENDER_TIMELINE_HEADER
-                and state.render_timeline.expanded
-            ):
-                append_expand_section_rows(row_list, BEAT_BAR_GRID_SECTION, state)
-                append_expand_section_rows(row_list, SONG_MARKERS_SECTION, state)
-                append_expand_section_rows(row_list, TIMELINE_CUTS_SECTION, state)
-                append_expand_section_rows(row_list, TIMELINE_PRESETS_SECTION, state)
-                row_list.append(RowDescriptor(RowKind.TIMELINE_RESET))
+    """Timeline anchor and its subsections. Overlays, post-FX, and pattern mask stay in the inspector."""
+    row_list.append(RowDescriptor(RowKind.RENDER_TIMELINE_HEADER))
+    if not state.render_timeline.expanded:
+        return
+    append_expand_section_rows(row_list, BEAT_BAR_GRID_SECTION, state)
+    append_expand_section_rows(row_list, SONG_MARKERS_SECTION, state)
+    append_expand_section_rows(row_list, TIMELINE_CUTS_SECTION, state)
+    append_expand_section_rows(row_list, TIMELINE_PRESETS_SECTION, state)
+    row_list.append(RowDescriptor(RowKind.TIMELINE_RESET))
 
 
 _PER_SLOT_SECTION_HEADERS = frozenset(

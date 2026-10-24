@@ -125,7 +125,7 @@ class TuningControls:
 
         self.shell_focus = ShellFocusState()
         self._focus_cursor: FocusCursor = MainFocus(
-            RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
+            RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
         )
         self._notification_host = PanelNotificationHost()
         self._key_repeat = KeyRepeatController()

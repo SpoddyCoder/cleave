@@ -703,7 +703,6 @@ def test_render_pattern_mask_runtime_from_cfg_defaults() -> None:
     assert runtime.feather_pct == 0
     assert runtime.density == DEFAULT_RENDER_PATTERN_MASK_DENSITY
     assert runtime.seed == 0
-    assert runtime.expanded is False
 
 
 def _overlap_pixel_count(weights: np.ndarray) -> int:

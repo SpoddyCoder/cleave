@@ -398,27 +398,19 @@ def test_lock_change_invalidates_track_header_row_key() -> None:
 
 
 def test_lock_change_invalidates_render_overlay_header_row_key() -> None:
-    pygame.init()
-    overlay = TuningOverlay()
-    font = overlay._font_get()
-    cache = TuningPanelCache()
-    state = _layer_view_state()
-    index = state.layout.find_by_kind(RowKind.RENDER_OVERLAYS_HEADER)
-    line_h = font.get_linesize()
-    max_w = 400
+    from cleave.viz.row_spec import section_locked
 
-    key_before = row_render_key(
-        state, index, font, cache=cache, max_content_width=max_w, line_h=line_h
-    )
+    state = _layer_view_state()
+    desc = RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
+    assert desc not in state.layout.rows
+    assert section_locked(state, desc) is False
     state_locked = replace(
         state, render_overlays=replace(state.render_overlays, locked=True)
     )
-    key_after = row_render_key(
-        state_locked, index, font, cache=cache, max_content_width=max_w, line_h=line_h
-    )
-    assert key_before != key_after
-    assert not key_before.header_locked
-    assert key_after.header_locked
+    assert section_locked(state_locked, desc) is True
+    assert [row.kind for row in state_locked.layout.rows] == [
+        row.kind for row in state.layout.rows
+    ]
 
 
 def test_lock_change_misses_warm_row_cache_for_track_header() -> None:
@@ -716,7 +708,7 @@ def test_scroll_without_content_change_row_misses_bounded_by_viewport() -> None:
     overlay = TuningOverlay()
     overlay.notify_input()
     state = _effects_expanded_view_state()
-    scroll_focus = state.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER) - 1
+    scroll_focus = state.layout.visible_indices(state)[-1]
     state.focus_descriptor = state.layout.descriptor(scroll_focus)
 
     overlay.compose_panel(

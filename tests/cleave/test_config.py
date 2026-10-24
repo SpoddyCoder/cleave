@@ -1118,15 +1118,12 @@ def test_render_post_fx_runtime_from_cfg_copies_fade() -> None:
     )
     cfg = SimpleNamespace(render=SimpleNamespace(post_fx=post_fx))
     runtime = render_post_fx_runtime_from_cfg(cfg)
-    assert runtime.fade.expanded is False
     assert runtime.fade.fade_in.start == 1.0
     assert runtime.fade.fade_in.end == 8.0
     assert runtime.fade.fade_in.type == "linear"
-    assert runtime.fade.fade_in.expanded is False
     assert runtime.fade.fade_out.start == 6.0
     assert runtime.fade.fade_out.end == 2.0
     assert runtime.fade.fade_out.type == "ease_out_expo"
-    assert runtime.fade.fade_out.expanded is False
 
 
 def test_parse_render_post_fx_highlight_rolloff_defaults() -> None:
@@ -2098,11 +2095,6 @@ _LITERAL_DEFAULT_TYPES = (bool, int, float, str)
 # on TuningSession runtimes and view blocks must import config_schema constants.
 _UI_ONLY_LITERAL_DEFAULTS = frozenset(
     {
-        ("RenderOverlayCardRuntime", "animation_expanded"),
-        ("RenderPostFxRuntime", "highlight_rolloff_expanded"),
-        ("RenderPostFxRuntime", "chroma_boost_expanded"),
-        ("FadeSideRuntime", "expanded"),
-        ("FadeRuntime", "expanded"),
         ("TimelineRuntime", "panel_open"),
         ("TimelineRuntime", "focus_row"),
         ("TimelineRuntime", "recording"),
@@ -2112,7 +2104,6 @@ _UI_ONLY_LITERAL_DEFAULTS = frozenset(
         ("TimelineRuntime", "beat_bar_grid_expanded"),
         ("TimelineRuntime", "cuts_expanded"),
         ("TimelineRuntime", "timeline_presets_expanded"),
-        ("RenderPostFxRuntime", "limiter_expanded"),
         ("SongMarkerRuntime", "expanded"),
         ("SettingsRuntime", "editor_mode"),
         ("LayerRuntime", "switching_paused"),
@@ -2122,10 +2113,6 @@ _UI_ONLY_LITERAL_DEFAULTS = frozenset(
         ("TrackBlock", "preset_empty"),
         ("TrackBlock", "visible"),
         ("RenderOverlaysBlock", "solo"),
-        ("HighlightRolloffBlock", "expanded"),
-        ("ChromaBoostBlock", "expanded"),
-        ("FadeSideBlock", "expanded"),
-        ("FadeBlock", "expanded"),
         ("RenderPostFxBlock", "solo"),
         ("RenderTimelineBlock", "expanded"),
         ("RenderTimelineBlock", "bar_phase_offset"),
@@ -2133,7 +2120,6 @@ _UI_ONLY_LITERAL_DEFAULTS = frozenset(
         ("RenderTimelineBlock", "beat_bar_grid_expanded"),
         ("RenderTimelineBlock", "cuts_expanded"),
         ("RenderTimelineBlock", "timeline_presets_expanded"),
-        ("VisualLimiterBlock", "expanded"),
         ("RenderTimelineBlock", "song_markers_expanded"),
         ("SettingsBlock", "editor_mode"),
         ("TuningViewState", "persistent_notification_elapsed_sec"),

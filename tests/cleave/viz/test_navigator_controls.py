@@ -138,12 +138,12 @@ def test_enter_on_layers_opens_inspector() -> None:
 def test_selecting_layers_does_not_focus_track_header() -> None:
     controls = _make_controls(("layer_1",))
     controls.navigator.select("render")
-    assert controls.focus_descriptor.kind is RowKind.RENDER_OVERLAYS_HEADER
+    assert controls.focus_descriptor.kind is RowKind.RENDER_TIMELINE_HEADER
     controls.navigator.select("layers")
     assert controls.shell_focus.region is ShellRegion.NAVIGATOR
-    assert controls.focus_descriptor.kind is RowKind.RENDER_OVERLAYS_HEADER
+    assert controls.focus_descriptor.kind is RowKind.RENDER_TIMELINE_HEADER
     controls.navigator.select(layer_node_id("layer_1"))
-    assert controls.focus_descriptor.kind is RowKind.RENDER_OVERLAYS_HEADER
+    assert controls.focus_descriptor.kind is RowKind.RENDER_TIMELINE_HEADER
 
 
 def test_quick_step_stays_on_top_level_ids() -> None:

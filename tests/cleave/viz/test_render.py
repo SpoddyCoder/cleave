@@ -63,7 +63,7 @@ def _render_post_fx_runtime(
     fade_in_end: float,
     fade_out_start: float,
 ) -> RenderPostFxRuntime:
-    base = default_render_post_fx_runtime(enabled=enabled, expanded=False)
+    base = default_render_post_fx_runtime(enabled=enabled)
     return replace(
         base,
         fade=replace(

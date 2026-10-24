@@ -676,13 +676,11 @@ def default_fade_side_runtime_values(start: float, end: float) -> dict[str, Any]
         "start": start,
         "end": end,
         "type": DEFAULT_FADE_CURVE,
-        "expanded": False,
     }
 
 
 def default_fade_runtime_values() -> dict[str, Any]:
     return {
-        "expanded": False,
         "fade_in": default_fade_side_runtime_values(
             DEFAULT_FADE_IN_START, DEFAULT_FADE_IN_END
         ),
@@ -695,18 +693,14 @@ def default_fade_runtime_values() -> dict[str, Any]:
 def default_render_post_fx_runtime_values() -> dict[str, Any]:
     return {
         "enabled": DEFAULT_RENDER_POST_FX_ENABLED,
-        "expanded": False,
         "fade": default_fade_runtime_values(),
         "highlight_rolloff": default_highlight_rolloff_runtime_values(),
-        "highlight_rolloff_expanded": False,
         "chroma_boost": default_chroma_boost_runtime_values(),
-        "chroma_boost_expanded": False,
         "limiter": {
             "enabled": DEFAULT_VISUAL_LIMITER_ENABLED,
             "threshold": DEFAULT_VISUAL_LIMITER_THRESHOLD,
             "ratio": DEFAULT_VISUAL_LIMITER_RATIO,
             "release": DEFAULT_VISUAL_LIMITER_RELEASE,
         },
-        "limiter_expanded": False,
         "locked": DEFAULT_RENDER_POST_FX_LOCKED,
     }

@@ -74,28 +74,21 @@ _DISABLED_IDS = (
     "project.restore",
     "help.about",
     "timeline.undo_cut",
-    "render.edit_overlays",
-    "render.edit_post_fx",
     "timeline.song_markers",
     "layers.add",
     "layers.delete",
-    "render.overlays",
-    "render.post_fx",
-    "render.pattern_mask",
     "timeline.show_strip",
     "timeline.apply_preset",
     "timeline.reset",
     "timeline.snap_cues",
 )
 
-_DISABLED_JUMP_IDS = (
-    "render.edit_overlays",
-    "render.edit_post_fx",
-    "timeline.song_markers",
-)
+_DISABLED_JUMP_IDS = ("timeline.song_markers",)
 _ENABLED_JUMP_IDS = (
     "project.settings",
     "settings.editor",
+    "render.edit_overlays",
+    "render.edit_post_fx",
 )
 
 
@@ -127,6 +120,13 @@ def _fake_controls(
             solo_slot=solo_slot,
             help_visible=help_visible,
             timeline=SimpleNamespace(recording=recording),
+            render_overlays=SimpleNamespace(
+                opening_card=SimpleNamespace(enabled=False),
+                closing_card=SimpleNamespace(enabled=False),
+                locked=False,
+            ),
+            render_post_fx=SimpleNamespace(enabled=False, locked=False),
+            render_pattern_mask=SimpleNamespace(enabled=False, locked=False),
         ),
         config_dirty=config_dirty,
         project_render=SimpleNamespace(busy=render_busy, prompt=MagicMock()),
@@ -532,6 +532,103 @@ def test_menu_and_inspector_share_layer_add_and_delete() -> None:
     controls.inspector.activate(delete_row)
     controls.layer_lifecycle.prompt_delete.assert_called_once_with("layer_1")
     controls.layer_lifecycle.prompt_add.assert_not_called()
+
+
+def test_render_menu_checks_mirror_flags_and_jumps_open_inspectors() -> None:
+    menus = _menus()
+    overlays = command_by_id("render.overlays", menus)
+    post_fx = command_by_id("render.post_fx", menus)
+    pattern = command_by_id("render.pattern_mask", menus)
+    edit_overlays = command_by_id("render.edit_overlays", menus)
+    edit_post_fx = command_by_id("render.edit_post_fx", menus)
+    checks = (overlays, post_fx, pattern)
+    jumps = (edit_overlays, edit_post_fx)
+
+    assert all(command.kind == "check" and command.shortcut is None for command in checks)
+    assert all(command.kind == "jump" and command.shortcut is None for command in jumps)
+    assert overlays.checked(CommandContext(overlays_enabled=True)) is True
+    assert overlays.checked(CommandContext()) is False
+    assert post_fx.checked(CommandContext(post_fx_enabled=True)) is True
+    assert post_fx.checked(CommandContext()) is False
+    assert pattern.checked(CommandContext(pattern_mask_enabled=True)) is True
+    assert pattern.checked(CommandContext()) is False
+
+    visualizer = CommandContext()
+    curation = CommandContext(editor_mode="preset_curation")
+    for command in (*checks, *jumps):
+        assert command.enabled(visualizer) is True
+        assert command.enabled(curation) is False
+    assert overlays.enabled(CommandContext(overlays_locked=True)) is False
+    assert post_fx.enabled(CommandContext(post_fx_locked=True)) is False
+    assert pattern.enabled(CommandContext(pattern_mask_locked=True)) is False
+    assert edit_overlays.enabled(CommandContext(overlays_locked=True)) is True
+    assert edit_post_fx.enabled(CommandContext(post_fx_locked=True)) is True
+
+    live = _make_controls(("layer_1",))
+    ctx = command_context(live)
+    assert ctx.overlays_enabled is True
+    assert ctx.post_fx_enabled is True
+    assert ctx.pattern_mask_enabled is False
+    assert ctx.overlays_locked is False
+    assert ctx.post_fx_locked is False
+    assert ctx.pattern_mask_locked is False
+    assert overlays.checked(ctx) is True
+    assert post_fx.checked(ctx) is True
+    assert pattern.checked(ctx) is False
+    live.session.render_overlays.opening_card.enabled = False
+    assert overlays.checked(command_context(live)) is True
+    live.session.render_overlays.closing_card.enabled = False
+    assert overlays.checked(command_context(live)) is False
+    live.session.render_post_fx.enabled = False
+    live.session.render_pattern_mask.enabled = True
+    assert post_fx.checked(command_context(live)) is False
+    assert pattern.checked(command_context(live)) is True
+
+    toggled = _make_controls(("layer_1",))
+    overlays.run(toggled)
+    assert toggled.session.render_overlays.opening_card.enabled is False
+    assert toggled.session.render_overlays.closing_card.enabled is False
+    post_fx.run(toggled)
+    assert toggled.session.render_post_fx.enabled is False
+    pattern.run(toggled)
+    assert toggled.session.render_pattern_mask.enabled is True
+
+    locked = _make_controls(("layer_1",))
+    locked.session.render_overlays.locked = True
+    locked.session.render_post_fx.locked = True
+    locked.session.render_pattern_mask.locked = True
+    locked_ctx = command_context(locked)
+    assert locked_ctx.overlays_locked is True
+    assert overlays.enabled(locked_ctx) is False
+    assert post_fx.enabled(locked_ctx) is False
+    assert pattern.enabled(locked_ctx) is False
+    assert edit_overlays.enabled(locked_ctx) is True
+    overlays.run(locked)
+    post_fx.run(locked)
+    pattern.run(locked)
+    assert locked.session.render_overlays.opening_card.enabled is True
+    assert locked.session.render_post_fx.enabled is True
+    assert locked.session.render_pattern_mask.enabled is False
+
+    curated = _make_controls(("layer_1",))
+    curated.session.settings.editor_mode = "preset_curation"
+    curated.shell_focus.selected_id = "project"
+    curated.shell_focus.region = ShellRegion.NAVIGATOR
+    assert command_context(curated).editor_mode == "preset_curation"
+    overlays.run(curated)
+    edit_overlays.run(curated)
+    edit_post_fx.run(curated)
+    assert curated.session.render_overlays.opening_card.enabled is True
+    assert curated.shell_focus.selected_id == "project"
+    assert curated.shell_focus.region is ShellRegion.NAVIGATOR
+
+    focused = _make_controls(("layer_1",))
+    edit_overlays.run(focused)
+    assert focused.shell_focus.selected_id == "render.overlays"
+    assert focused.shell_focus.region is ShellRegion.INSPECTOR
+    edit_post_fx.run(focused)
+    assert focused.shell_focus.selected_id == "render.post_fx"
+    assert focused.shell_focus.region is ShellRegion.INSPECTOR
 
 
 def test_layer_jumps_select_the_layer_inspector() -> None:

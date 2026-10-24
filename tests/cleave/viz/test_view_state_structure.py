@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from cleave.viz.inspector import build_inspector_rows
+from cleave.viz.navigator import overlay_card_node_id
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.tuning_view_state import view_state_structure_signature
 from tests.cleave.viz.test_controls import _make_controls
@@ -381,37 +383,31 @@ def test_structure_signature_invalidates_on_animation_type() -> None:
     assert sig_before != sig_after
 
 
+def _inspector_kinds(state, node_id: str) -> list[RowKind]:
+    rows = build_inspector_rows(state, node_id, frozenset())
+    return [row.descriptor.kind for row in rows if row.descriptor is not None]
+
+
 def test_builder_rebuilds_layout_when_animation_type_changes() -> None:
     controls = _make_controls(("layer_1",))
     session = controls.session
-    session.render_overlays.expanded = True
-    session.render_overlays.opening_card.expanded = True
-    session.render_overlays.opening_card.animation_expanded = True
     session.render_overlays.opening_card.animation.type = "fade"
     view_fade = controls.build_view_state(paused=False)
-    kinds_fade = [row.kind for row in view_fade.layout.rows]
-    assert RowKind.RENDER_OVERLAY_CARD_ANIMATION_SLIDE_DIRECTION not in kinds_fade
+    node = overlay_card_node_id("opening_card")
+    fade_page = _inspector_kinds(view_fade, node)
+    assert RowKind.RENDER_OVERLAY_CARD_ANIMATION_SLIDE_DIRECTION not in fade_page
+    assert RowKind.RENDER_OVERLAY_CARD_ANIMATION_SLIDE_DIRECTION not in {
+        row.kind for row in view_fade.layout.rows
+    }
 
     session.render_overlays.opening_card.animation.type = "slide"
     view_slide = controls.build_view_state(paused=False)
-    kinds_slide = [row.kind for row in view_slide.layout.rows]
-    assert RowKind.RENDER_OVERLAY_CARD_ANIMATION_SLIDE_DIRECTION in kinds_slide
-
-
-def test_structure_signature_invalidates_on_opening_card_expanded() -> None:
-    controls = _make_controls(("layer_1",))
-    session = controls.session
-    config_save = controls._config_save
-    session.render_overlays.expanded = True
-    session.render_overlays.opening_card.expanded = False
-    sig_before = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
-    session.render_overlays.opening_card.expanded = True
-    sig_after = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
-    assert sig_before != sig_after
+    slide_page = _inspector_kinds(view_slide, node)
+    assert RowKind.RENDER_OVERLAY_CARD_ANIMATION_SLIDE_DIRECTION in slide_page
+    assert RowKind.RENDER_OVERLAY_CARD_ANIMATION_SLIDE_DIRECTION not in {
+        row.kind for row in view_slide.layout.rows
+    }
+    assert view_slide.layout is not view_fade.layout
 
 
 def test_structure_signature_invalidates_on_closing_card_animation_type() -> None:
@@ -444,64 +440,25 @@ def test_structure_signature_invalidates_on_chroma_boost_mode() -> None:
     assert sig_before != sig_after
 
 
-def test_structure_signature_invalidates_on_render_post_fx_fade_expanded() -> None:
-    controls = _make_controls(("layer_1",))
-    session = controls.session
-    config_save = controls._config_save
-    sig_before = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
-    session.render_post_fx.fade.expanded = True
-    sig_after = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
-    assert sig_before != sig_after
-
-
-def test_structure_signature_invalidates_on_render_post_fx_fade_in_expanded() -> None:
-    controls = _make_controls(("layer_1",))
-    session = controls.session
-    config_save = controls._config_save
-    sig_before = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
-    session.render_post_fx.fade.fade_in.expanded = True
-    sig_after = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
-    assert sig_before != sig_after
-
-
-def test_structure_signature_invalidates_on_render_post_fx_fade_out_expanded() -> None:
-    controls = _make_controls(("layer_1",))
-    session = controls.session
-    config_save = controls._config_save
-    sig_before = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
-    session.render_post_fx.fade.fade_out.expanded = True
-    sig_after = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
-    assert sig_before != sig_after
-
-
 def test_builder_rebuilds_layout_when_highlight_rolloff_mode_changes() -> None:
     controls = _make_controls(("layer_1",))
     session = controls.session
-    session.render_post_fx.expanded = True
-    session.render_post_fx.highlight_rolloff_expanded = True
     session.render_post_fx.highlight_rolloff.mode = "composite"
     builder = controls._view_state
 
     view_on = builder.build(paused=False)
-    threshold = RowDescriptor(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD)
-    assert threshold in view_on.layout.rows
+    on_page = _inspector_kinds(view_on, "render.post_fx")
+    assert RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD in on_page
+    assert RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD not in {
+        row.kind for row in view_on.layout.rows
+    }
 
     session.render_post_fx.highlight_rolloff.mode = "off"
     view_off = builder.build(paused=False)
     assert view_off.layout is not view_on.layout
-    assert threshold not in view_off.layout.rows
+    assert RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD not in _inspector_kinds(
+        view_off, "render.post_fx"
+    )
 
 
 
@@ -825,21 +782,6 @@ def test_structure_signature_invalidates_on_timeline_presets_expanded() -> None:
     assert sig_before != sig_after
 
 
-def test_structure_signature_invalidates_on_pattern_mask_expanded() -> None:
-    controls = _make_controls(("layer_1",))
-    session = controls.session
-    config_save = controls._config_save
-    session.render_pattern_mask.expanded = False
-    sig_before = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
-    session.render_pattern_mask.expanded = True
-    sig_after = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
-    assert sig_before != sig_after
-
-
 def test_structure_signature_invalidates_on_pattern_mask_type() -> None:
     controls = _make_controls(("layer_1",))
     session = controls.session
@@ -858,21 +800,26 @@ def test_structure_signature_invalidates_on_pattern_mask_type() -> None:
 def test_pattern_mask_seed_row_only_for_plasma() -> None:
     controls = _make_controls(("layer_1",))
     session = controls.session
-    session.render_pattern_mask.expanded = True
     builder = controls._view_state
-    seed = RowDescriptor(RowKind.RENDER_PATTERN_MASK_SEED)
-    feather = RowDescriptor(RowKind.RENDER_PATTERN_MASK_FEATHER)
 
     for mask_type in ("strips", "bars", "radial", "checker"):
         session.render_pattern_mask.type = mask_type
         view = builder.build(paused=False)
-        assert feather in view.layout.rows
-        assert seed not in view.layout.rows
+        page = _inspector_kinds(view, "render.pattern_mask")
+        assert RowKind.RENDER_PATTERN_MASK_FEATHER in page
+        assert RowKind.RENDER_PATTERN_MASK_SEED not in page
+        assert RowKind.RENDER_PATTERN_MASK_SEED not in {
+            row.kind for row in view.layout.rows
+        }
 
     session.render_pattern_mask.type = "plasma"
     view_plasma = builder.build(paused=False)
-    assert seed in view_plasma.layout.rows
-    assert feather in view_plasma.layout.rows
+    plasma = _inspector_kinds(view_plasma, "render.pattern_mask")
+    assert RowKind.RENDER_PATTERN_MASK_SEED in plasma
+    assert RowKind.RENDER_PATTERN_MASK_FEATHER in plasma
+    assert RowKind.RENDER_PATTERN_MASK_SEED not in {
+        row.kind for row in view_plasma.layout.rows
+    }
 
 
 def test_structure_signature_invalidates_on_hard_cut_fades_enabled() -> None:
@@ -899,21 +846,6 @@ def test_structure_signature_invalidates_on_soft_cut_fades_enabled() -> None:
         session, config_save, notification_active=False
     )
     session.timeline.soft_cut_fades.enabled = True
-    sig_after = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
-    assert sig_before != sig_after
-
-
-def test_structure_signature_invalidates_on_visual_limiter_expanded() -> None:
-    controls = _make_controls(("layer_1",))
-    session = controls.session
-    config_save = controls._config_save
-    session.render_post_fx.limiter_expanded = False
-    sig_before = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
-    session.render_post_fx.limiter_expanded = True
     sig_after = view_state_structure_signature(
         session, config_save, notification_active=False
     )
@@ -954,6 +886,12 @@ def test_leftover_layout_omits_settings_project_and_transport() -> None:
         "milkdrop_expanded",
         "compositor_expanded",
         "render_expanded",
+        "title_expanded",
+        "body_expanded",
+        "animation_expanded",
+        "highlight_rolloff_expanded",
+        "chroma_boost_expanded",
+        "limiter_expanded",
     ):
         assert flag not in sig
 
@@ -966,9 +904,9 @@ def test_leftover_layout_omits_track_rows() -> None:
     assert not any(name.startswith("TRACK_") for name in names)
     assert RowKind.LAYER_MANAGEMENT_ADD not in kinds
     assert RowKind.RENDER_SECTION_GAP not in kinds
-    assert RowKind.RENDER_OVERLAYS_HEADER in kinds
-    assert RowKind.RENDER_POST_FX_HEADER in kinds
-    assert RowKind.RENDER_PATTERN_MASK_HEADER in kinds
+    assert RowKind.RENDER_OVERLAYS_HEADER not in kinds
+    assert RowKind.RENDER_POST_FX_HEADER not in kinds
+    assert RowKind.RENDER_PATTERN_MASK_HEADER not in kinds
     assert RowKind.RENDER_TIMELINE_HEADER in kinds
 
     session = controls.session

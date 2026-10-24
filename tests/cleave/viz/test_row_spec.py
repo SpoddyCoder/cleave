@@ -754,12 +754,9 @@ def test_format_row_value_track_and_render() -> None:
                 background_colour=(1, 2, 3),
                 border_colour=(4, 5, 6),
                 background_margin=40,
-                background_padding=20,
-            ),
-        ),
+                background_padding=20)),
         render_post_fx=RenderPostFxBlock(
-            fade=FadeBlock(fade_in=FadeSideBlock(start=2.5)),
-        ),
+            fade=FadeBlock(fade_in=FadeSideBlock(start=2.5))),
     )
     slot_desc = RowDescriptor(RowKind.TRACK_BLEND, slot="layer_1")
     assert format_row_value(state, slot_desc) == "add"
@@ -951,27 +948,31 @@ def test_apply_field_horizontal_render_overlay_background_padding() -> None:
 
 
 def test_overlay_cards_share_kinds_and_isolate_runtime() -> None:
+    from cleave.viz.inspector import build_inspector_rows
+
     controls = _make_controls()
-    controls.session.render_overlays.expanded = True
-    controls.session.render_overlays.opening_card.expanded = True
-    controls.session.render_overlays.closing_card.expanded = True
     view = controls.build_view_state(paused=False)
-    opening_pos = view.layout.find_by_kind(
+    opening_desc = RowDescriptor(
         RowKind.RENDER_OVERLAY_CARD_POSITION, card="opening_card"
     )
-    closing_pos = view.layout.find_by_kind(
+    closing_desc = RowDescriptor(
         RowKind.RENDER_OVERLAY_CARD_POSITION, card="closing_card"
     )
-    opening_desc = view.layout.descriptor(opening_pos)
-    closing_desc = view.layout.descriptor(closing_pos)
     assert opening_desc.kind == RowKind.RENDER_OVERLAY_CARD_POSITION
     assert closing_desc.kind == RowKind.RENDER_OVERLAY_CARD_POSITION
     assert opening_desc.card == "opening_card"
     assert closing_desc.card == "closing_card"
-    assert opening_pos != closing_pos
-    navigable = view.layout.navigable_indices(view)
-    assert opening_pos in navigable
-    assert closing_pos in navigable
+    assert opening_desc != closing_desc
+    overlays = build_inspector_rows(view, "render.overlays", frozenset())
+    cards = {
+        row.descriptor.card
+        for row in overlays
+        if row.descriptor is not None
+        and row.descriptor.kind is RowKind.RENDER_OVERLAY_CARD_POSITION
+    }
+    assert cards == {"opening_card", "closing_card"}
+    assert opening_desc not in view.layout.rows
+    assert closing_desc not in view.layout.rows
 
     opening_before = controls.session.render_overlays.opening_card.position
     closing_before = controls.session.render_overlays.closing_card.position
@@ -1092,35 +1093,33 @@ def test_expand_subheader_omits_child_status_value() -> None:
     state = _minimal_view_state(
         render_overlays=RenderOverlaysBlock(
             opening_card=make_overlay_card_block(animation_type="slide"),
-            closing_card=make_overlay_card_block(animation_type="slide-fade"),
-        ),
+            closing_card=make_overlay_card_block(animation_type="slide-fade")),
         render_post_fx=RenderPostFxBlock(
             highlight_rolloff=HighlightRolloffBlock(mode="per_layer"),
             chroma_boost=ChromaBoostBlock(mode="composite"),
-            limiter=VisualLimiterBlock(enabled=False),
-        ),
+            limiter=VisualLimiterBlock(enabled=False)),
     )
     assert row_expand_subheader_display_text(
         state, RowDescriptor(RowKind.RENDER_POST_FX_LIMITER_HEADER)
-    ) == "└─ visual limiter ▶"
+    ) == "└─ visual limiter ▼"
     assert row_expand_subheader_display_text(
         state,
         RowDescriptor(
             RowKind.RENDER_OVERLAY_CARD_ANIMATION_HEADER, card="opening_card"
         ),
-    ) == "  └─ animation ▶"
+    ) == "  └─ animation ▼"
     assert row_expand_subheader_display_text(
         state,
         RowDescriptor(
             RowKind.RENDER_OVERLAY_CARD_ANIMATION_HEADER, card="closing_card"
         ),
-    ) == "  └─ animation ▶"
+    ) == "  └─ animation ▼"
     assert row_expand_subheader_display_text(
         state, RowDescriptor(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_HEADER)
-    ) == "└─ highlight rolloff ▶"
+    ) == "└─ highlight rolloff ▼"
     assert row_expand_subheader_display_text(
         state, RowDescriptor(RowKind.RENDER_POST_FX_CHROMA_BOOST_HEADER)
-    ) == "└─ chroma boost ▶"
+    ) == "└─ chroma boost ▼"
 
 
 def test_format_row_value_timeline_cuts() -> None:
@@ -1172,7 +1171,7 @@ def test_composite_header_render_overlay_metadata() -> None:
     desc = RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
     assert composite_header_prefix_part(state, desc) == "Render: "
     assert composite_header_suffix_part(state, desc) == "OVERLAYS"
-    assert row_composite_header_display_text(state, desc) == "Render: OVERLAYS ▶"
+    assert row_composite_header_display_text(state, desc) == "Render: OVERLAYS ▼"
 
 
 def test_preset_list_populate_is_full_line_action() -> None:
@@ -1371,15 +1370,12 @@ def test_apply_field_horizontal_visual_limiter_enabled() -> None:
 
 def test_apply_field_horizontal_visual_limiter_header_expands() -> None:
     controls = _make_controls()
-    controls.session.render_post_fx.limiter_expanded = False
     desc = RowDescriptor(RowKind.RENDER_POST_FX_LIMITER_HEADER)
 
     apply_field_horizontal(controls, desc, True, False)
-    assert controls.session.render_post_fx.limiter_expanded is True
     assert controls.session.render_post_fx.limiter.enabled is True
 
     apply_field_horizontal(controls, desc, False, False)
-    assert controls.session.render_post_fx.limiter_expanded is False
     assert controls.session.render_post_fx.limiter.enabled is True
 
 

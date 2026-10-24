@@ -21,19 +21,11 @@ class RenderPatternMaskControls:
     def __init__(self, session: TuningSession) -> None:
         self.session = session
 
-    def set_expanded(self, expanded: bool) -> None:
-        pm = self.session.render_pattern_mask
-        if pm.expanded == expanded:
-            return
-        pm.expanded = expanded
-
     def set_enabled(self, enabled: bool) -> None:
         pm = self.session.render_pattern_mask
         if pm.enabled == enabled:
             return
         pm.enabled = enabled
-        if not enabled:
-            pm.expanded = False
 
     def set_density(self, density: float) -> None:
         self.session.render_pattern_mask.density = clamp_pattern_mask_density(density)

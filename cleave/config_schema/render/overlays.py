@@ -635,10 +635,7 @@ def default_render_overlay_card_runtime_values(
     )
     return {
         "enabled": DEFAULT_RENDER_OVERLAY_CARD_ENABLED,
-        "expanded": False,
         "position": DEFAULT_RENDER_OVERLAY_POSITION,
-        "title_expanded": False,
-        "body_expanded": False,
         "title_font_size": DEFAULT_RENDER_OVERLAY_TITLE_FONT_SIZE,
         "title_font": DEFAULT_RENDER_OVERLAY_FONT,
         "title_margin_bottom": DEFAULT_RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
@@ -657,13 +654,11 @@ def default_render_overlay_card_runtime_values(
         "background_padding": DEFAULT_RENDER_OVERLAY_BACKGROUND_PADDING,
         "border_colour": DEFAULT_RENDER_OVERLAY_BORDER_COLOUR,
         "animation": animation,
-        "animation_expanded": False,
     }
 
 
 def default_render_overlays_runtime_values() -> dict[str, Any]:
     return {
-        "expanded": False,
         "opening_card": default_render_overlay_card_runtime_values(closing=False),
         "closing_card": default_render_overlay_card_runtime_values(closing=True),
         "locked": DEFAULT_RENDER_OVERLAYS_LOCKED,

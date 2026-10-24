@@ -143,11 +143,8 @@ def make_overlay_card_block(*, closing: bool = False, **kwargs) -> RenderOverlay
     """Build an overlay card view block wrapping a session runtime."""
     runtime = default_render_overlay_card_runtime(closing=closing)
     animation_type = kwargs.pop("animation_type", None)
-    animation_expanded = kwargs.pop("animation_expanded", None)
     if animation_type is not None:
         runtime.animation.type = animation_type
-    if animation_expanded is not None:
-        runtime.animation_expanded = animation_expanded
     for key, value in kwargs.items():
         setattr(runtime, key, value)
     return RenderOverlayCardBlock(runtime=runtime)

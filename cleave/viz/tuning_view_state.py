@@ -148,7 +148,6 @@ class RenderOverlayCardBlock:
 
 @dataclass
 class RenderOverlaysBlock:
-    expanded: bool = _RO_OVERLAYS_DEFAULTS["expanded"]
     opening_card: RenderOverlayCardBlock = field(
         default_factory=RenderOverlayCardBlock
     )
@@ -163,7 +162,6 @@ class RenderOverlaysBlock:
 
 @dataclass
 class FadeSideBlock:
-    expanded: bool = False
     start: float = DEFAULT_FADE_IN_START
     end: float = DEFAULT_FADE_IN_END
     type: str = DEFAULT_FADE_CURVE
@@ -179,7 +177,6 @@ def _default_fade_out_side() -> FadeSideBlock:
 
 @dataclass
 class FadeBlock:
-    expanded: bool = False
     fade_in: FadeSideBlock = field(default_factory=FadeSideBlock)
     fade_out: FadeSideBlock = field(default_factory=_default_fade_out_side)
 
@@ -188,15 +185,12 @@ def _fade_block_from_runtime(fade: FadeRuntime) -> FadeBlock:
     fade_in = fade.fade_in
     fade_out = fade.fade_out
     return FadeBlock(
-        expanded=fade.expanded,
         fade_in=FadeSideBlock(
-            expanded=fade_in.expanded,
             start=fade_in.start,
             end=fade_in.end,
             type=fade_in.type,
         ),
         fade_out=FadeSideBlock(
-            expanded=fade_out.expanded,
             start=fade_out.start,
             end=fade_out.end,
             type=fade_out.type,
@@ -206,7 +200,6 @@ def _fade_block_from_runtime(fade: FadeRuntime) -> FadeBlock:
 
 @dataclass
 class HighlightRolloffBlock:
-    expanded: bool = False
     mode: str = DEFAULT_HIGHLIGHT_ROLLOFF_APPLY_MODE
     curve: str = DEFAULT_HIGHLIGHT_ROLLOFF_CURVE
     threshold_pct: int = DEFAULT_HIGHLIGHT_ROLLOFF_THRESHOLD_PCT
@@ -218,7 +211,6 @@ class HighlightRolloffBlock:
 
 @dataclass
 class ChromaBoostBlock:
-    expanded: bool = False
     mode: str = DEFAULT_CHROMA_BOOST_APPLY_MODE
     variant: str = DEFAULT_CHROMA_BOOST_VARIANT
     amount_pct: int = DEFAULT_CHROMA_BOOST_AMOUNT_PCT
@@ -230,13 +222,11 @@ class VisualLimiterBlock:
     threshold: float = DEFAULT_VISUAL_LIMITER_THRESHOLD
     ratio: float = DEFAULT_VISUAL_LIMITER_RATIO
     release: float = DEFAULT_VISUAL_LIMITER_RELEASE
-    expanded: bool = False
 
 
 @dataclass
 class RenderPostFxBlock:
     enabled: bool = _RO_POST_FX_DEFAULTS["enabled"]
-    expanded: bool = _RO_POST_FX_DEFAULTS["expanded"]
     fade: FadeBlock = field(default_factory=FadeBlock)
     highlight_rolloff: HighlightRolloffBlock = field(
         default_factory=HighlightRolloffBlock
@@ -250,7 +240,6 @@ class RenderPostFxBlock:
 @dataclass
 class RenderPatternMaskBlock:
     enabled: bool = _RO_PATTERN_MASK_DEFAULTS["enabled"]
-    expanded: bool = _RO_PATTERN_MASK_DEFAULTS["expanded"]
     type: PatternMaskType = _RO_PATTERN_MASK_DEFAULTS["type"]
     density: float = _RO_PATTERN_MASK_DEFAULTS["density"]
     feather_pct: int = _RO_PATTERN_MASK_DEFAULTS["feather_pct"]
@@ -508,40 +497,23 @@ def view_state_structure_signature(
         "persistent_notification_active": persistent_notification_active,
         "layers": layers,
         "render_overlays": {
-            "expanded": ro.expanded,
             "opening_card": {
                 "enabled": ro.opening_card.enabled,
-                "expanded": ro.opening_card.expanded,
-                "title_expanded": ro.opening_card.title_expanded,
-                "body_expanded": ro.opening_card.body_expanded,
-                "animation_expanded": ro.opening_card.animation_expanded,
                 "animation_type": ro.opening_card.animation.type,
             },
             "closing_card": {
                 "enabled": ro.closing_card.enabled,
-                "expanded": ro.closing_card.expanded,
-                "title_expanded": ro.closing_card.title_expanded,
-                "body_expanded": ro.closing_card.body_expanded,
-                "animation_expanded": ro.closing_card.animation_expanded,
                 "animation_type": ro.closing_card.animation.type,
             },
         },
         "render_post_fx": {
             "enabled": pp.enabled,
-            "expanded": pp.expanded,
-            "fade_expanded": pp.fade.expanded,
-            "fade_in_expanded": pp.fade.fade_in.expanded,
-            "fade_out_expanded": pp.fade.fade_out.expanded,
-            "highlight_rolloff_expanded": pp.highlight_rolloff_expanded,
             "highlight_rolloff_mode": pp.highlight_rolloff.mode,
-            "chroma_boost_expanded": pp.chroma_boost_expanded,
             "chroma_boost_mode": pp.chroma_boost.mode,
-            "limiter_expanded": pp.limiter_expanded,
             "limiter_enabled": pp.limiter.enabled,
         },
         "render_pattern_mask": {
-            "expanded": pm.expanded,
-            # type gates the plasma-only seed row in the panel layout.
+            # type gates the plasma-only seed row in the inspector.
             "type": pm.type,
         },
         "render_timeline": {
@@ -804,17 +776,14 @@ class TuningViewStateBuilder:
             project_slug=self._config_save.cfg.project_slug,
         )
         render_overlays = RenderOverlaysBlock(
-            expanded=ro.expanded,
             opening_card=_card_block_from_runtime(ro.opening_card),
             closing_card=_card_block_from_runtime(ro.closing_card),
             locked=ro.locked,
         )
         render_post_fx = RenderPostFxBlock(
             enabled=pp.enabled,
-            expanded=pp.expanded,
             fade=_fade_block_from_runtime(pp.fade),
             highlight_rolloff=HighlightRolloffBlock(
-                expanded=pp.highlight_rolloff_expanded,
                 mode=pp.highlight_rolloff.mode,
                 curve=pp.highlight_rolloff.curve,
                 threshold_pct=pp.highlight_rolloff.threshold_pct,
@@ -824,13 +793,11 @@ class TuningViewStateBuilder:
                 desaturation_pct=pp.highlight_rolloff.desaturation_pct,
             ),
             chroma_boost=ChromaBoostBlock(
-                expanded=pp.chroma_boost_expanded,
                 mode=pp.chroma_boost.mode,
                 variant=pp.chroma_boost.variant,
                 amount_pct=pp.chroma_boost.amount_pct,
             ),
             limiter=VisualLimiterBlock(
-                expanded=pp.limiter_expanded,
                 enabled=pp.limiter.enabled,
                 threshold=pp.limiter.threshold,
                 ratio=pp.limiter.ratio,
@@ -839,7 +806,6 @@ class TuningViewStateBuilder:
         )
         render_pattern_mask = RenderPatternMaskBlock(
             enabled=pm.enabled,
-            expanded=pm.expanded,
             type=pm.type,
             feather_pct=pm.feather_pct,
             density=pm.density,
@@ -888,7 +854,7 @@ class TuningViewStateBuilder:
             tracks=tracks,
             paused=False,
             position_sec=0.0,
-            focus_cursor=MainFocus(RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)),
+            focus_cursor=MainFocus(RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)),
             move_mode_slot=None,
             persistent_notification_message=(
                 "…" if persistent_notification_active else None
@@ -1006,7 +972,6 @@ class TuningViewStateBuilder:
             solo_active=self.session.solo_slot is not None,
             render_overlays=replace(
                 structure.render_overlays,
-                expanded=ro.expanded,
                 solo=self.session.render_overlay_solo,
                 locked=ro.locked,
             ),
@@ -1015,7 +980,6 @@ class TuningViewStateBuilder:
                 fade=_fade_block_from_runtime(pp.fade),
                 highlight_rolloff=replace(
                     structure.render_post_fx.highlight_rolloff,
-                    expanded=pp.highlight_rolloff_expanded,
                     mode=pp.highlight_rolloff.mode,
                     curve=pp.highlight_rolloff.curve,
                     threshold_pct=pp.highlight_rolloff.threshold_pct,
@@ -1026,13 +990,11 @@ class TuningViewStateBuilder:
                 ),
                 chroma_boost=replace(
                     structure.render_post_fx.chroma_boost,
-                    expanded=pp.chroma_boost_expanded,
                     mode=pp.chroma_boost.mode,
                     variant=pp.chroma_boost.variant,
                     amount_pct=pp.chroma_boost.amount_pct,
                 ),
                 limiter=VisualLimiterBlock(
-                    expanded=pp.limiter_expanded,
                     enabled=pp.limiter.enabled,
                     threshold=pp.limiter.threshold,
                     ratio=pp.limiter.ratio,
@@ -1044,7 +1006,6 @@ class TuningViewStateBuilder:
             render_pattern_mask=replace(
                 structure.render_pattern_mask,
                 enabled=pm.enabled,
-                expanded=pm.expanded,
                 type=pm.type,
                 feather_pct=pm.feather_pct,
                 density=pm.density,

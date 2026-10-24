@@ -13,6 +13,8 @@ from tests.support.config import TEST_LAYER_STEMS
 from cleave.stems import STEM_NAMES
 from cleave.viz.frame_rate import FPS_DISPLAY_LABEL
 from cleave.viz.focus_nav import MainFocus
+from cleave.viz.inspector import build_inspector_rows
+from cleave.viz.navigator import overlay_card_node_id
 from cleave.viz.overlay_primitives import overlay_font
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.row_spec import row_is_pinned
@@ -186,7 +188,7 @@ def test_scrolled_panel_keeps_focus_row_in_viewport() -> None:
     overlay = TuningOverlay()
     state = _effects_expanded_view_state()
     state.focus_descriptor = state.layout.descriptor(
-        state.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER) - 1
+        state.layout.visible_indices(state)[-1]
     )
 
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
@@ -231,7 +233,7 @@ def _find_pixel_color(
 def test_header_rows_pinned_when_scrolled() -> None:
     pygame.init()
     state_top = _effects_expanded_view_state()
-    scroll_focus = state_top.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER) - 1
+    scroll_focus = state_top.layout.visible_indices(state_top)[-1]
     state_top.focus_descriptor = state_top.layout.descriptor(scroll_focus)
     state_bottom = _effects_expanded_view_state()
     state_bottom.focus_descriptor = state_bottom.layout.descriptor(scroll_focus)
@@ -415,7 +417,7 @@ def test_cached_compose_matches_one_layer_expanded_panel_pixels() -> None:
 def test_cached_compose_matches_scrolled_focus_panel_pixels() -> None:
     pygame.init()
     state = _effects_expanded_view_state()
-    scroll_focus = state.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER) - 1
+    scroll_focus = state.layout.visible_indices(state)[-1]
     state.focus_descriptor = state.layout.descriptor(scroll_focus)
 
     cold_overlay = TuningOverlay()
@@ -1018,7 +1020,10 @@ def test_build_row_layout_starts_at_render_without_layer_rows() -> None:
     assert RowKind.LAYER_MANAGEMENT_ADD not in kinds
     assert RowKind.RENDER_SECTION_GAP not in kinds
     assert not any(kind.name.startswith("TRACK_") for kind in kinds)
-    assert kinds[0] == RowKind.RENDER_OVERLAYS_HEADER
+    assert kinds[0] == RowKind.RENDER_TIMELINE_HEADER
+    assert RowKind.RENDER_OVERLAYS_HEADER not in kinds
+    assert RowKind.RENDER_POST_FX_HEADER not in kinds
+    assert RowKind.RENDER_PATTERN_MASK_HEADER not in kinds
 
 
 def test_build_row_layout_omits_settings_project_and_transport() -> None:
@@ -1338,53 +1343,48 @@ def test_draw_layer_management_rows_without_error() -> None:
     assert delete_row in state.layout.visible_indices(state)
 
 
+def _inspector_kinds(state, node_id: str) -> list[RowKind]:
+    rows = build_inspector_rows(state, node_id, frozenset())
+    return [row.descriptor.kind for row in rows if row.descriptor is not None]
+
+
 def test_render_overlay_row_layout_includes_header_and_sub_rows_when_expanded() -> None:
-    state = _minimal_view_state(
-        render_overlays=RenderOverlaysBlock(
-            expanded=True,
-            opening_card=make_overlay_card_block(expanded=True),
-        ),
-    )
-    kinds = [row.kind for row in state.layout.rows]
-    cards = [
-        row.card
-        for row in state.layout.rows
-        if row.kind == RowKind.RENDER_OVERLAY_CARD_HEADER
-    ]
-    assert RowKind.RENDER_OVERLAYS_HEADER in kinds
-    assert set(cards) == {"opening_card", "closing_card"}
-    assert RowKind.RENDER_OVERLAY_CARD_ANIMATION_HEADER in kinds
-    assert RowKind.RENDER_OVERLAY_CARD_POSITION in kinds
-    assert RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER in kinds
-    assert RowKind.RENDER_OVERLAY_CARD_BODY_HEADER in kinds
-    assert RowKind.RENDER_OVERLAY_CARD_OPACITY in kinds
-    assert RowKind.RENDER_OVERLAY_CARD_BACKGROUND_COLOUR in kinds
-    assert RowKind.RENDER_OVERLAY_CARD_BACKGROUND_MARGIN in kinds
-    assert RowKind.RENDER_OVERLAY_CARD_BACKGROUND_PADDING in kinds
-    assert RowKind.RENDER_OVERLAY_CARD_BORDER_WIDTH in kinds
-    assert RowKind.RENDER_OVERLAY_CARD_BORDER_COLOUR in kinds
-    assert RowKind.RENDER_OVERLAY_CARD_TIME not in kinds
-    assert RowKind.RENDER_OVERLAY_CARD_DISPLAY_TIME not in kinds
-    assert RowKind.RENDER_OVERLAY_CARD_TITLE_FONT_SIZE not in kinds
-    assert RowKind.RENDER_OVERLAY_CARD_BODY_FONT_SIZE not in kinds
-    header_idx = state.layout.find_by_kind(RowKind.RENDER_OVERLAYS_HEADER)
-    assert header_idx >= 0
+    state = _minimal_view_state()
+    leftover = [row.kind for row in state.layout.rows]
+    assert leftover[0] == RowKind.RENDER_TIMELINE_HEADER
+    assert RowKind.RENDER_OVERLAYS_HEADER not in leftover
+    assert RowKind.RENDER_OVERLAY_CARD_HEADER not in leftover
+    opening = _inspector_kinds(state, overlay_card_node_id("opening_card"))
+    for kind in (
+        RowKind.RENDER_OVERLAY_CARD_ANIMATION_HEADER,
+        RowKind.RENDER_OVERLAY_CARD_POSITION,
+        RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER,
+        RowKind.RENDER_OVERLAY_CARD_BODY_HEADER,
+        RowKind.RENDER_OVERLAY_CARD_OPACITY,
+        RowKind.RENDER_OVERLAY_CARD_BACKGROUND_COLOUR,
+        RowKind.RENDER_OVERLAY_CARD_BACKGROUND_MARGIN,
+        RowKind.RENDER_OVERLAY_CARD_BACKGROUND_PADDING,
+        RowKind.RENDER_OVERLAY_CARD_BORDER_WIDTH,
+        RowKind.RENDER_OVERLAY_CARD_BORDER_COLOUR,
+        RowKind.RENDER_OVERLAY_CARD_TITLE_FONT_SIZE,
+        RowKind.RENDER_OVERLAY_CARD_BODY_FONT_SIZE,
+    ):
+        assert kind in opening
+    assert RowKind.RENDER_OVERLAY_CARD_TIME in opening
+    assert RowKind.RENDER_OVERLAY_CARD_DISPLAY_TIME in opening
 
 
 def test_render_overlay_animation_rows_when_expanded() -> None:
     state = _minimal_view_state(
         render_overlays=RenderOverlaysBlock(
-            expanded=True,
-            opening_card=make_overlay_card_block(
-                expanded=True,
-                animation_expanded=True,
-                animation_type="slide",
-            ),
+            opening_card=make_overlay_card_block(animation_type="slide")
         ),
     )
-    kinds = [row.kind for row in state.layout.rows]
+    kinds = _inspector_kinds(state, overlay_card_node_id("opening_card"))
+    leftover = [row.kind for row in state.layout.rows]
     assert RowKind.RENDER_OVERLAY_CARD_ANIMATION_TYPE in kinds
     assert RowKind.RENDER_OVERLAY_CARD_ANIMATION_SLIDE_DIRECTION in kinds
+    assert RowKind.RENDER_OVERLAY_CARD_ANIMATION_SLIDE_DIRECTION not in leftover
     assert RowKind.RENDER_OVERLAY_CARD_TIME in kinds
     assert RowKind.RENDER_OVERLAY_CARD_DISPLAY_TIME in kinds
 
@@ -1392,84 +1392,64 @@ def test_render_overlay_animation_rows_when_expanded() -> None:
 def test_render_overlay_animation_hides_slide_direction_for_fade() -> None:
     state = _minimal_view_state(
         render_overlays=RenderOverlaysBlock(
-            expanded=True,
-            opening_card=make_overlay_card_block(
-                expanded=True,
-                animation_expanded=True,
-                animation_type="fade",
-            ),
+            opening_card=make_overlay_card_block(animation_type="fade")
         ),
     )
-    kinds = [row.kind for row in state.layout.rows]
+    kinds = _inspector_kinds(state, overlay_card_node_id("opening_card"))
     assert RowKind.RENDER_OVERLAY_CARD_ANIMATION_TYPE in kinds
     assert RowKind.RENDER_OVERLAY_CARD_ANIMATION_SLIDE_DIRECTION not in kinds
-    assert RowKind.RENDER_OVERLAY_CARD_TIME in kinds
-    assert RowKind.RENDER_OVERLAY_CARD_DISPLAY_TIME in kinds
 
 
 def test_render_overlay_title_and_body_font_rows_when_expanded() -> None:
-    state = _minimal_view_state(
-        render_overlays=RenderOverlaysBlock(
-            expanded=True,
-            opening_card=make_overlay_card_block(
-                expanded=True,
-                title_expanded=True,
-                body_expanded=True,
-            ),
-        ),
-    )
-    kinds = [row.kind for row in state.layout.rows]
-    assert RowKind.RENDER_OVERLAY_CARD_TITLE_FONT_SIZE in kinds
-    assert RowKind.RENDER_OVERLAY_CARD_TITLE_FONT in kinds
-    assert RowKind.RENDER_OVERLAY_CARD_TITLE_TEXT in kinds
-    assert RowKind.RENDER_OVERLAY_CARD_TITLE_COLOUR in kinds
-    assert RowKind.RENDER_OVERLAY_CARD_TITLE_BACKGROUND_COLOUR in kinds
-    assert RowKind.RENDER_OVERLAY_CARD_TITLE_MARGIN_BOTTOM in kinds
-    assert RowKind.RENDER_OVERLAY_CARD_BODY_FONT_SIZE in kinds
-    assert RowKind.RENDER_OVERLAY_CARD_BODY_FONT in kinds
-    assert RowKind.RENDER_OVERLAY_CARD_BODY_TEXT in kinds
-    assert RowKind.RENDER_OVERLAY_CARD_BODY_COLOUR in kinds
-    assert RowKind.RENDER_OVERLAY_CARD_BODY_BACKGROUND_COLOUR in kinds
+    state = _minimal_view_state()
+    kinds = _inspector_kinds(state, overlay_card_node_id("opening_card"))
+    for kind in (
+        RowKind.RENDER_OVERLAY_CARD_TITLE_FONT_SIZE,
+        RowKind.RENDER_OVERLAY_CARD_TITLE_FONT,
+        RowKind.RENDER_OVERLAY_CARD_TITLE_TEXT,
+        RowKind.RENDER_OVERLAY_CARD_TITLE_COLOUR,
+        RowKind.RENDER_OVERLAY_CARD_TITLE_BACKGROUND_COLOUR,
+        RowKind.RENDER_OVERLAY_CARD_TITLE_MARGIN_BOTTOM,
+        RowKind.RENDER_OVERLAY_CARD_BODY_FONT_SIZE,
+        RowKind.RENDER_OVERLAY_CARD_BODY_FONT,
+        RowKind.RENDER_OVERLAY_CARD_BODY_TEXT,
+        RowKind.RENDER_OVERLAY_CARD_BODY_COLOUR,
+        RowKind.RENDER_OVERLAY_CARD_BODY_BACKGROUND_COLOUR,
+    ):
+        assert kind in kinds
+    leftover = {row.kind for row in state.layout.rows}
+    assert RowKind.RENDER_OVERLAY_CARD_TITLE_FONT not in leftover
 
 
 def test_render_overlay_collapsed_hides_sub_rows() -> None:
-    collapsed = _minimal_view_state(
-        render_overlays=RenderOverlaysBlock(expanded=False),
-    )
-    expanded = _minimal_view_state(
-        render_overlays=RenderOverlaysBlock(expanded=True),
-    )
-    collapsed_kinds = {row.kind for row in collapsed.layout.rows}
-    expanded_kinds = {row.kind for row in expanded.layout.rows}
-    assert RowKind.RENDER_OVERLAYS_HEADER in collapsed_kinds
-    assert RowKind.RENDER_OVERLAY_CARD_HEADER not in collapsed_kinds
-    assert RowKind.RENDER_OVERLAY_CARD_HEADER in expanded_kinds
-    assert {
-        row.card
-        for row in expanded.layout.rows
-        if row.kind == RowKind.RENDER_OVERLAY_CARD_HEADER
-    } == {"opening_card", "closing_card"}
-    assert RowKind.RENDER_OVERLAY_CARD_POSITION not in collapsed_kinds
-    assert len(collapsed.layout.visible_indices(collapsed)) + 2 == len(
-        expanded.layout.visible_indices(expanded)
-    )
+    state = _minimal_view_state()
+    leftover = {row.kind for row in state.layout.rows}
+    assert RowKind.RENDER_OVERLAYS_HEADER not in leftover
+    assert RowKind.RENDER_OVERLAY_CARD_HEADER not in leftover
+    assert RowKind.RENDER_OVERLAY_CARD_POSITION not in leftover
+    opening = _inspector_kinds(state, overlay_card_node_id("opening_card"))
+    closing = _inspector_kinds(state, overlay_card_node_id("closing_card"))
+    assert RowKind.RENDER_OVERLAY_CARD_POSITION in opening
+    assert RowKind.RENDER_OVERLAY_CARD_POSITION in closing
+    overlays = _inspector_kinds(state, "render.overlays")
+    assert overlays.count(RowKind.RENDER_OVERLAY_CARD_HEADER) == 2
 
 
 def test_draw_render_overlay_header_without_error() -> None:
     pygame.init()
     overlay = TuningOverlay()
     state = _minimal_view_state(
-        render_overlays=RenderOverlaysBlock(
-            expanded=False,
-            solo=True,
-        ),
+        render_overlays=RenderOverlaysBlock(solo=True),
     )
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
     overlay.notify_input()
     overlay.draw(surface, state)
     assert overlay.panel_rect is not None
-    header_row = state.layout.find_by_kind(RowKind.RENDER_OVERLAYS_HEADER)
+    header_row = state.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
     assert header_row in state.layout.visible_indices(state)
+    assert RowKind.RENDER_OVERLAYS_HEADER not in {
+        row.kind for row in state.layout.rows
+    }
 
 
 def test_draw_track_header_with_solo_eye() -> None:
@@ -1539,7 +1519,10 @@ def test_main_tree_rows_not_highlighted_when_timeline_submenu_focused() -> None:
     state = _minimal_view_state(
         render_timeline=RenderTimelineBlock(enabled=True, expanded=True),
     )
-    for row_kind_target in (RowKind.RENDER_OVERLAYS_HEADER, RowKind.TRACK_HEADER):
+    for row_kind_target in (
+        RowKind.TIMELINE_BEAT_BAR_GRID_HEADER,
+        RowKind.TRACK_HEADER,
+    ):
         _mount_track_sections(state)
         row = state.layout.find_by_kind(row_kind_target)
         state.focus_descriptor = state.layout.descriptor(row)

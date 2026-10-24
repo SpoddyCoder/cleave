@@ -17,9 +17,6 @@ from cleave.viz.row_sections import (
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.row_spec import section_header_descriptor
 from cleave.viz.tuning_view_state import (
-    FadeBlock,
-    FadeSideBlock,
-    HighlightRolloffBlock,
     RenderOverlaysBlock,
     RenderPostFxBlock,
     SettingsBlock,
@@ -172,66 +169,32 @@ def test_track_layout_row_order_when_fully_expanded() -> None:
 def test_expand_section_respects_expanded_when_block_disabled() -> None:
     disabled_overlay = _minimal_view_state(
         render_overlays=RenderOverlaysBlock(
-            expanded=True,
-            opening_card=make_overlay_card_block(enabled=False, expanded=True),
-        ),
+            opening_card=make_overlay_card_block(enabled=False)),
     )
     assert expand_section_expanded(disabled_overlay, RENDER_OVERLAYS_SECTION, None) is True
     opacity = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_OPACITY)
     assert sub_row_expand_visible(disabled_overlay, opacity) is True
 
     disabled_post_fx = _minimal_view_state(
-        render_post_fx=RenderPostFxBlock(enabled=False, expanded=True),
+        render_post_fx=RenderPostFxBlock(enabled=False),
     )
     assert expand_section_expanded(disabled_post_fx, RENDER_POST_FX_SECTION, None) is True
 
 
 def test_sub_row_expand_visible_nested_sections() -> None:
-    collapsed_overlay = _minimal_view_state(
-        render_overlays=RenderOverlaysBlock(expanded=False),
+    state = _minimal_view_state()
+    opacity = RowDescriptor(
+        RowKind.RENDER_OVERLAY_CARD_OPACITY, card="opening_card"
     )
-    opacity = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_OPACITY)
-    assert sub_row_expand_visible(collapsed_overlay, opacity) is False
-
-    title_collapsed = _minimal_view_state(
-        render_overlays=RenderOverlaysBlock(
-            expanded=True,
-            opening_card=make_overlay_card_block(
-                expanded=True, title_expanded=False
-            ),
-        ),
+    assert sub_row_expand_visible(state, opacity) is True
+    title_font = RowDescriptor(
+        RowKind.RENDER_OVERLAY_CARD_TITLE_FONT, card="opening_card"
     )
-    title_font = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_FONT)
-    assert sub_row_expand_visible(title_collapsed, title_font) is False
-
-    fade_collapsed = _minimal_view_state(
-        render_post_fx=RenderPostFxBlock(
-            expanded=True,
-            fade=FadeBlock(expanded=False),
-        ),
-    )
+    assert sub_row_expand_visible(state, title_font) is True
     fade_start = RowDescriptor(RowKind.RENDER_POST_FX_FADE_IN_START)
-    assert sub_row_expand_visible(fade_collapsed, fade_start) is False
-
-    fade_in_collapsed = _minimal_view_state(
-        render_post_fx=RenderPostFxBlock(
-            expanded=True,
-            fade=FadeBlock(
-                expanded=True,
-                fade_in=FadeSideBlock(expanded=False),
-            ),
-        ),
-    )
-    assert sub_row_expand_visible(fade_in_collapsed, fade_start) is False
-
-    highlight_collapsed = _minimal_view_state(
-        render_post_fx=RenderPostFxBlock(
-            expanded=True,
-            highlight_rolloff=HighlightRolloffBlock(expanded=False),
-        ),
-    )
+    assert sub_row_expand_visible(state, fade_start) is True
     threshold = RowDescriptor(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD)
-    assert sub_row_expand_visible(highlight_collapsed, threshold) is False
+    assert sub_row_expand_visible(state, threshold) is True
 
 
 def test_section_omits_conditional_rows_when_predicate_fails() -> None:

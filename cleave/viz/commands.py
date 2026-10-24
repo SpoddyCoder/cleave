@@ -46,6 +46,12 @@ class CommandContext:
     can_add_layer: bool = False
     can_remove_layer: bool = False
     timeline_scope: bool = False
+    overlays_enabled: bool = False
+    post_fx_enabled: bool = False
+    pattern_mask_enabled: bool = False
+    overlays_locked: bool = False
+    post_fx_locked: bool = False
+    pattern_mask_locked: bool = False
 
 
 def _disabled(_ctx: CommandContext) -> bool:
@@ -97,6 +103,9 @@ def command_context(controls: Any) -> CommandContext:
     timeline_scope = isinstance(controls.focus_cursor, TimelineFocus) or bool(
         session.timeline.recording
     )
+    overlays = session.render_overlays
+    post_fx = session.render_post_fx
+    pattern_mask = session.render_pattern_mask
     return CommandContext(
         editor_mode=session.settings.editor_mode,
         solo_slot=session.solo_slot,
@@ -106,6 +115,14 @@ def command_context(controls: Any) -> CommandContext:
         can_add_layer=lifecycle.can_add(),
         can_remove_layer=lifecycle.can_remove(),
         timeline_scope=timeline_scope,
+        overlays_enabled=bool(
+            overlays.opening_card.enabled or overlays.closing_card.enabled
+        ),
+        post_fx_enabled=bool(post_fx.enabled),
+        pattern_mask_enabled=bool(pattern_mask.enabled),
+        overlays_locked=bool(overlays.locked),
+        post_fx_locked=bool(post_fx.locked),
+        pattern_mask_locked=bool(pattern_mask.locked),
     )
 
 
@@ -203,6 +220,51 @@ def _run_delete(controls: Any) -> None:
     controls.layer_lifecycle.prompt_delete(slot)
 
 
+def _render_block_menu_enabled(locked: bool, editor_mode: str) -> bool:
+    return not locked and not is_preset_curation_mode(editor_mode)
+
+
+def _overlays_menu_enabled(ctx: CommandContext) -> bool:
+    return _render_block_menu_enabled(ctx.overlays_locked, ctx.editor_mode)
+
+
+def _post_fx_menu_enabled(ctx: CommandContext) -> bool:
+    return _render_block_menu_enabled(ctx.post_fx_locked, ctx.editor_mode)
+
+
+def _pattern_mask_menu_enabled(ctx: CommandContext) -> bool:
+    return _render_block_menu_enabled(ctx.pattern_mask_locked, ctx.editor_mode)
+
+
+def _render_jump_enabled(ctx: CommandContext) -> bool:
+    return not is_preset_curation_mode(ctx.editor_mode)
+
+
+def _overlays_checked(ctx: CommandContext) -> bool:
+    return ctx.overlays_enabled
+
+
+def _post_fx_checked(ctx: CommandContext) -> bool:
+    return ctx.post_fx_enabled
+
+
+def _pattern_mask_checked(ctx: CommandContext) -> bool:
+    return ctx.pattern_mask_enabled
+
+
+def _run_toggle_enabled(node_id: str) -> Callable[[Any], None]:
+    def run(controls: Any) -> None:
+        from cleave.viz.row_hotkeys import node_header_descriptor
+        from cleave.viz.row_spec import apply_field_toggle_enabled
+
+        descriptor = node_header_descriptor(node_id)
+        if descriptor is None:
+            return
+        apply_field_toggle_enabled(controls, descriptor)
+
+    return run
+
+
 def _run_focus_node(node_id: str) -> Callable[[Any], None]:
     """Select a navigator node and focus its inspector."""
 
@@ -280,11 +342,46 @@ _CURATION = Command(
     checked=_curation_checked,
 )
 
-_OVERLAYS = _later("render.overlays", "Overlays", "check")
-_POST_FX = _later("render.post_fx", "Post-FX", "check")
-_PATTERN_MASK = _later("render.pattern_mask", "Pattern mask", "check")
-_EDIT_OVERLAYS = _later("render.edit_overlays", "Edit overlays", "jump")
-_EDIT_POST_FX = _later("render.edit_post_fx", "Edit post-FX", "jump")
+_OVERLAYS = Command(
+    id="render.overlays",
+    label="Overlays",
+    kind="check",
+    enabled=_overlays_menu_enabled,
+    run=_when_enabled(_overlays_menu_enabled, _run_toggle_enabled("render.overlays")),
+    checked=_overlays_checked,
+)
+_POST_FX = Command(
+    id="render.post_fx",
+    label="Post-FX",
+    kind="check",
+    enabled=_post_fx_menu_enabled,
+    run=_when_enabled(_post_fx_menu_enabled, _run_toggle_enabled("render.post_fx")),
+    checked=_post_fx_checked,
+)
+_PATTERN_MASK = Command(
+    id="render.pattern_mask",
+    label="Pattern mask",
+    kind="check",
+    enabled=_pattern_mask_menu_enabled,
+    run=_when_enabled(
+        _pattern_mask_menu_enabled, _run_toggle_enabled("render.pattern_mask")
+    ),
+    checked=_pattern_mask_checked,
+)
+_EDIT_OVERLAYS = Command(
+    id="render.edit_overlays",
+    label="Edit overlays",
+    kind="jump",
+    enabled=_render_jump_enabled,
+    run=_when_enabled(_render_jump_enabled, _run_focus_node("render.overlays")),
+)
+_EDIT_POST_FX = Command(
+    id="render.edit_post_fx",
+    label="Edit post-FX",
+    kind="jump",
+    enabled=_render_jump_enabled,
+    run=_when_enabled(_render_jump_enabled, _run_focus_node("render.post_fx")),
+)
 
 _SHOW_STRIP = _later("timeline.show_strip", "Show timeline strip", "check", "T")
 _APPLY_PRESET = _later("timeline.apply_preset", "Apply timeline preset", "command")
