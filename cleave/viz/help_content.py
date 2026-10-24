@@ -38,22 +38,40 @@ HelpContent = HelpSection | DescriptionSection
 
 KEYBOARD_CONTROLS_SECTION_TITLE = "Keyboard Controls"
 
-_NAVIGATOR_EXPAND_ENTRY = ("Left/Right", "expand/collapse navigator")
+_REGION_MOVE_ENTRY = (
+    "Up/Down",
+    "in the active region: navigator nodes, inspector fields and group headers, or timeline lanes",
+)
+_NAVIGATOR_EXPAND_ENTRY = (
+    "Left/Right",
+    "expand/collapse navigator, or step an inspector value",
+)
+_REGION_CYCLE_ENTRY = (
+    "Tab / Shift+Tab",
+    "cycle Menu, Navigator, Inspector, and Timeline; skip Timeline when the strip is closed",
+)
+_TOP_LEVEL_NAV_ENTRY = (
+    "Ctrl + Up/Down",
+    "previous / next top-level navigator node",
+)
+_SEEK_AND_QUIT_ENTRIES: tuple[HelpEntry, ...] = (
+    ("Shift + Left/Right", "skip 2s"),
+    ("Ctrl + Left/Right", "skip 30s"),
+    ("ESC", "hide UI"),
+    ("Ctrl + Q", "quit"),
+)
 
 NAVIGATION_SECTION = HelpSection(
     "Navigation / Global",
     (
-        ("Up/Down", "move row"),
+        _REGION_MOVE_ENTRY,
         _NAVIGATOR_EXPAND_ENTRY,
-        ("Tab / Shift+Tab", "cycle region"),
-        ("Ctrl + Up/Down", "previous / next section"),
-        ("Shift + Left/Right", "skip 2s"),
-        ("Ctrl + Left/Right", "skip 30s"),
-        ("ESC", "hide UI"),
-        ("Ctrl + Q", "quit"),
+        _REGION_CYCLE_ENTRY,
+        _TOP_LEVEL_NAV_ENTRY,
+        *_SEEK_AND_QUIT_ENTRIES,
         ("Ctrl + S", "save"),
         ("Ctrl + Enter", "place song marker"),
-        ("F10 / Alt", "menu bar"),
+        ("F10 / Alt", "focus menu bar"),
         ("Ctrl + R", "render"),
     ),
 )
@@ -61,15 +79,12 @@ NAVIGATION_SECTION = HelpSection(
 _CURATION_NAVIGATION_SECTION = HelpSection(
     "Navigation / Global",
     (
-        ("Up/Down", "move row"),
+        _REGION_MOVE_ENTRY,
         _NAVIGATOR_EXPAND_ENTRY,
-        ("Tab / Shift+Tab", "cycle region"),
-        ("Ctrl + Up/Down", "previous / next section"),
-        ("Shift + Left/Right", "skip 2s"),
-        ("Ctrl + Left/Right", "skip 30s"),
-        ("ESC", "hide UI"),
-        ("Ctrl + Q", "quit"),
-        ("F10 / Alt", "menu bar"),
+        _REGION_CYCLE_ENTRY,
+        _TOP_LEVEL_NAV_ENTRY,
+        *_SEEK_AND_QUIT_ENTRIES,
+        ("F10 / Alt", "focus menu bar"),
     ),
 )
 

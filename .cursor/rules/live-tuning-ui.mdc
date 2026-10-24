@@ -8,37 +8,45 @@ alwaysApply: false
 
 # Live tuning overlay
 
-Focus-driven tree panel: session -> view state -> `RowLayout` -> draw. Overlay Latin text uses bundled DejaVu Sans Mono; icons use Material Icons in `assets/fonts/`.
+The shell is a menu bar, a navigator, an inspector, and a timeline strip. Session state becomes view state; inspector pages come from section defs in `row_sections.py`. `RowLayout` draws notification toasts only. Overlay Latin text uses bundled DejaVu Sans Mono; icons use Material Icons in `assets/fonts/`.
 
-## Collapsible UI lexicon
+## Where new fields go
 
-- **Expandable section:** header with expand arrow; Left/Right toggles a session-only `expanded` flag; children live in `RowLayout` and are omitted when collapsed.
-- **Inspector group:** Settings, Project, and layer fields. Layer fields are groups under `TRACK_SECTION` (curation uses `CURATION_LAYER_SECTION`). Overlays, Post-FX, and Pattern mask are inspector groups (`RENDER_OVERLAYS_SECTION`, `RENDER_POST_FX_SECTION`, `RENDER_PATTERN_MASK_SECTION`). The header is the sub-group row kind. Open and closed state is the shell collapsed set (`InspectorGroupKey`), not a session `expanded` flag. Cleave effects starts closed. A collapsed group hides its children.
-- **Conditional rows:** sibling rows shown or hidden by a value predicate; no arrow or expanded flag.
-- **Panel anchor:** header looks like an expandable section but content lives in a separate host (timeline strip). Do not fold the timeline strip into `RowLayout`.
+A new field is an inspector group child or a command. Groups are built from `row_sections.py`:
 
-`RowLayout` rebuilds only when `view_state_structure_signature()` changes. Conditional rows are included or omitted at build time. A field that gates row presence must be in that signature; omit value-only fields. Add a `test_structure_signature_invalidates_on_*` test in `tests/cleave/viz/test_view_state_structure.py`.
+- Settings: `SETTINGS_SECTION`
+- Project: `PROJECT_SECTION`
+- Layers: `TRACK_SECTION` (preset curation uses `CURATION_LAYER_SECTION`)
+- Overlays, Post-FX, and pattern mask: `RENDER_OVERLAYS_SECTION`, `RENDER_POST_FX_SECTION`, `RENDER_PATTERN_MASK_SECTION`
+- Timeline preset, beat / bar grid, and cue fades: `TIMELINE_PRESETS_SECTION`, `BEAT_BAR_GRID_SECTION`, `TIMELINE_CUTS_SECTION`
+- Song markers: `SONG_MARKERS_SECTION`
 
-New rows: `RowKind` + `RowSpec` + `SectionNode`. No per-`RowKind` label or mutation branches in `tuning_panel_draw.py` or `controls.py`. Overlay chrome lives in `overlay_primitives`; timeline, help, and modal must not import `tuning_panel_draw`. `render_visibility_icon` stays in `row_present_renderers.py`.
+Open and closed state is an `InspectorGroupKey` on the shell (`collapsed` and `opened`). There is no session `expanded` flag for a group. Cleave effects, beat / bar grid, and cue fades start closed. A closed group hides its children.
+
+Conditional rows are siblings shown or hidden by a value predicate. They have no arrow and no open/closed key. The view-state structure includes or omits them at build time and rebuilds only when `view_state_structure_signature()` changes. A field that gates row presence belongs in that signature; leave value-only fields out. Add a `test_structure_signature_invalidates_on_*` test in `tests/cleave/viz/test_view_state_structure.py`.
+
+New rows use `RowKind`, `RowSpec`, and `SectionNode`. Do not add a per-`RowKind` label or mutation branch in `tuning_panel_draw.py` or `controls.py`. Overlay chrome lives in `overlay_primitives`. Timeline, help, and modal must not import `tuning_panel_draw`. `render_visibility_icon` stays in `row_present_renderers.py`.
+
+The timeline strip stays its own host in `timeline_overlay.py`. Cue blocks are edited on the strip, not in the inspector. Do not fold the strip into `RowLayout`.
 
 ## Parameterized actions
 
-When an action needs parameters, keep the panel row as a plain `ACTION` line. On Enter, chain one modal per parameter, then apply.
+When an action needs parameters, keep the inspector row as a plain `ACTION` line. On Enter, chain one modal per parameter, then apply.
 
-Exception: timeline preset parameters live as child value rows under an expandable section; apply confirms with Yes/Cancel and lists staged choices as `labeled_lines`.
+Exception: timeline preset parameters live as child value rows in the timeline preset group. Apply confirms with Yes/Cancel and lists staged choices as `labeled_lines`.
 
-## Render `enabled`
+## Render enabled
 
-`enabled=False` on a render header must skip that block in the frame path, not only dim panel rows. Overlay cards gate per card. Post-FX children must check `session.render_post_fx.enabled`. New post-FX subsections need an `enabled=False` test.
+`enabled=False` on a render header must skip that block in the frame path, not only dim the inspector row. Overlay cards gate per card. Post-FX children must check `session.render_post_fx.enabled`. New post-FX subsections need an `enabled=False` test.
 
 ## Typography
 
 Colors live in `cleave/viz/theme.py`. Use existing roles (`LABEL`, `VALUE`, `ACTION`, `DISABLED`, `LOCKED`) plus the accent constants already there. Do not invent a new color without adding a theme constant.
 
-Label+value rows: prefix in `LABEL`, value in the row value color. Expand arrows use the value role. Exceptions (single-color action rows, settings/config headers, transport, notifications, modals) are deliberate; match nearby rows.
+Label+value rows: prefix in `LABEL`, value in the row value color. Expand arrows use the value role. Exceptions (single-color action rows, settings and project headers, transport, notifications, modals) are deliberate; match nearby rows.
 
 ## Keyboard dispatch
 
-Layered in `input_dispatch.py`. Modal keys first. Then Tab / Shift+Tab cycles Menu, Navigator, Inspector, and Timeline (Timeline is skipped when the strip is closed; the leftover panel is never a Tab stop). Then the menu bar, command shortcuts, and Ctrl+Up / Ctrl+Down (previous / next top-level navigator node; no effect while the menu bar is focused). Then other globals, then the active region. The navigator and inspector own arrows, Enter, Esc, and PageUp/PageDown. Other keys fall through to the leftover panel. Timeline keys stay on the strip when that region is active. `h` stays global even when the timeline strip has focus.
+Layered in `input_dispatch.py`. Modal keys first. Then Tab / Shift+Tab cycles Menu, Navigator, Inspector, and Timeline. Timeline is skipped when the strip is closed. Then the menu bar, command shortcuts, and Ctrl+Up / Ctrl+Down (previous / next top-level navigator node; no effect while the menu bar is focused). Navigator and inspector own their arrows, Enter, Esc, and PageUp/PageDown. Timeline keys stay on the strip when that region is active. `h` stays global even when the strip has focus. There is no panel region and no main-list focus ring.
 
-Settings and Project fields are inspector groups (`SETTINGS_SECTION`, `PROJECT_SECTION`). Layer fields are inspector groups under `TRACK_SECTION` (curation uses `CURATION_LAYER_SECTION`). Overlays, Post-FX, and Pattern mask are inspector groups (`RENDER_OVERLAYS_SECTION`, `RENDER_POST_FX_SECTION`, `RENDER_PATTERN_MASK_SECTION`). `row_hotkeys.handle_row_hotkey` is the per-descriptor path for letter, Delete, and Backspace keys, used by the navigator, the inspector, and the leftover panel. Timeline and song-marker rows stay on the leftover panel.
+`row_hotkeys.handle_row_hotkey` is the per-descriptor path for letter, Delete, and Backspace keys, used by the navigator and the inspector.

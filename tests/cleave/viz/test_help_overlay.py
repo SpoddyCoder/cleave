@@ -65,13 +65,30 @@ def _timeline_keys(**kwargs: object) -> list[str]:
     return [key for key, _ in section.entries]
 
 
+def _assert_shell_navigation(entries: dict[str, str]) -> None:
+    cycle = entries["Tab / Shift+Tab"]
+    for name in ("Menu", "Navigator", "Inspector", "Timeline"):
+        assert name in cycle
+    assert "skip Timeline when the strip is closed" in cycle
+    move = entries["Up/Down"]
+    assert "navigator nodes" in move
+    assert "inspector fields and group headers" in move
+    assert "timeline lanes" in move
+    joined = " ".join(entries.values()).lower()
+    assert "move row" not in joined
+    assert "one tree" not in joined
+    assert "walk" not in joined
+    assert "expand/collapse navigator" in entries["Left/Right"]
+    assert "step an inspector value" in entries["Left/Right"]
+    assert entries["Ctrl + Up/Down"] == "previous / next top-level navigator node"
+    assert entries["F10 / Alt"] == "focus menu bar"
+
+
 def test_help_content_navigation_cycles_regions() -> None:
     normal = dict(navigation_section().entries)
     curation = dict(navigation_section(preset_curation=True).entries)
-    assert normal["Tab / Shift+Tab"] == "cycle region"
-    assert normal["Ctrl + Up/Down"] == "previous / next section"
-    assert curation["Tab / Shift+Tab"] == "cycle region"
-    assert curation["Ctrl + Up/Down"] == "previous / next section"
+    _assert_shell_navigation(normal)
+    _assert_shell_navigation(curation)
     sections = sections_for(RowKind.TRACK_HEADER)
     assert all(getattr(section, "title", "") != "Transport Controls" for section in sections)
 
@@ -142,9 +159,9 @@ def test_curation_layer_section_omits_add_delete_and_expand() -> None:
     assert "Ctrl + L" not in keys
     assert "delete layer" not in actions
     assert "expand/collapse" not in actions
-    assert "expand/collapse navigator" in actions
     nav = dict(navigation_section(preset_curation=True).entries)
-    assert nav["Left/Right"] == "expand/collapse navigator"
+    assert "expand/collapse navigator" in nav["Left/Right"]
+    assert "step an inspector value" in nav["Left/Right"]
     assert "Ctrl + L" not in nav
     preset = dict(
         _keyboard_section(
@@ -202,8 +219,9 @@ def test_layer_section_omits_jump_while_recording() -> None:
 def test_navigation_left_right_expands_navigator() -> None:
     normal = dict(navigation_section().entries)
     curation = dict(navigation_section(preset_curation=True).entries)
-    assert normal["Left/Right"] == "expand/collapse navigator"
-    assert curation["Left/Right"] == "expand/collapse navigator"
+    assert normal["Left/Right"] == curation["Left/Right"]
+    assert "expand/collapse navigator" in normal["Left/Right"]
+    assert "step an inspector value" in normal["Left/Right"]
     assert "Ctrl + L" not in normal
     assert "1-4" not in normal
     assert "jump to layer" not in normal.values()
@@ -243,7 +261,8 @@ def test_help_follows_navigator_layer() -> None:
     assert keyboard["Delete"] == "delete layer"
     assert "Left/Right" not in keyboard
     nav = dict(sections[-1].entries)
-    assert nav["Left/Right"] == "expand/collapse navigator"
+    assert "expand/collapse navigator" in nav["Left/Right"]
+    assert "step an inspector value" in nav["Left/Right"]
     assert "Ctrl + L" not in nav
     assert "1-6" not in nav
     assert "Credits overlays" not in _help_text(sections)
@@ -869,8 +888,10 @@ def test_curation_navigation_omits_disabled_global_hotkeys() -> None:
     keys = dict(nav.entries)
     assert "Ctrl + S" not in keys
     assert "Ctrl + Enter" not in keys
+    assert "Ctrl + R" not in keys
     assert keys["Ctrl + Q"] == "quit"
-    assert keys["Up/Down"] == "move row"
+    assert "move row" not in keys["Up/Down"]
+    assert "one tree" not in " ".join(keys.values()).lower()
     assert keys["Shift + Left/Right"] == "skip 2s"
     assert keys["Ctrl + Left/Right"] == "skip 30s"
 
@@ -878,6 +899,8 @@ def test_curation_navigation_omits_disabled_global_hotkeys() -> None:
     assert isinstance(visualizer_nav, HelpSection)
     vis_keys = dict(visualizer_nav.entries)
     assert "Ctrl + S" in vis_keys
+    assert vis_keys["Ctrl + Enter"] == "place song marker"
+    assert vis_keys["Ctrl + R"] == "render"
     assert vis_keys["Shift + Left/Right"] == "skip 2s"
     assert vis_keys["Ctrl + Left/Right"] == "skip 30s"
 
