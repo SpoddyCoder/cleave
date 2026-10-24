@@ -308,6 +308,39 @@ def test_inspector_selectable_id_changes_with_effect_and_preset() -> None:
     )
 
 
+def test_scrollable_shell_flags_drop_only_the_scroll_bits() -> None:
+    from imgui_bundle import imgui
+
+    from cleave.viz.shell_host import _POPUP_FLAGS, _SHELL_FLAGS, shell_window_flags
+
+    no_scrollbar = int(imgui.WindowFlags_.no_scrollbar)
+    no_scroll_with_mouse = int(imgui.WindowFlags_.no_scroll_with_mouse)
+    scroll_off = no_scrollbar | no_scroll_with_mouse
+    kept = (
+        int(imgui.WindowFlags_.no_title_bar)
+        | int(imgui.WindowFlags_.no_resize)
+        | int(imgui.WindowFlags_.no_move)
+        | int(imgui.WindowFlags_.no_saved_settings)
+        | int(imgui.WindowFlags_.no_focus_on_appearing)
+        | int(imgui.WindowFlags_.no_bring_to_front_on_focus)
+        | int(imgui.WindowFlags_.no_nav)
+    )
+
+    fixed = shell_window_flags(_SHELL_FLAGS, scrollable=False)
+    scrolling = shell_window_flags(_SHELL_FLAGS, scrollable=True)
+
+    assert fixed == _SHELL_FLAGS
+    assert fixed & scroll_off == scroll_off
+    assert fixed & kept == kept
+    assert scrolling & scroll_off == 0
+    assert scrolling & kept == kept
+    assert scrolling == _SHELL_FLAGS & ~scroll_off
+    assert _POPUP_FLAGS & no_scrollbar == no_scrollbar
+    assert _POPUP_FLAGS & int(imgui.WindowFlags_.no_nav) == int(
+        imgui.WindowFlags_.no_nav
+    )
+
+
 def test_collapsing_layers_moves_selection_off_a_hidden_child() -> None:
     session = _session()
     child_id = layer_node_id("layer_1")

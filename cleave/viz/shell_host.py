@@ -453,6 +453,18 @@ _SHELL_FLAGS = (
 )
 
 
+def shell_window_flags(base: int, *, scrollable: bool) -> int:
+    """Shell window flags. Scrollable panels keep the wheel and the scrollbar."""
+    flags = int(base)
+    if not scrollable:
+        return flags
+    hidden = (
+        int(imgui.WindowFlags_.no_scrollbar)
+        | int(imgui.WindowFlags_.no_scroll_with_mouse)
+    )
+    return flags & ~hidden
+
+
 def _shell_glyph_ranges() -> list[int]:
     """Default Latin plus the glyphs the shell draws outside that range.
 
@@ -931,12 +943,14 @@ class ShellHost:
                 active=stop is CycleStop.NAVIGATOR,
                 idle_border=NAVIGATOR_BORDER,
                 body=lambda: self._draw_navigator(),
+                scrollable=True,
             )
             self._draw_fixed_window(
                 "##shell-inspector",
                 _seat_panel(layout.inspector, seat),
                 active=stop is CycleStop.INSPECTOR,
                 body=lambda: self._draw_inspector(state),
+                scrollable=True,
             )
         finally:
             style.window_min_size = imgui.ImVec2(saved_min_x, saved_min_y)
@@ -951,6 +965,7 @@ class ShellHost:
         active: bool,
         body: Callable[[], None],
         idle_border: tuple[int, int, int] | None = None,
+        scrollable: bool = False,
     ) -> None:
         x, y, w, h = rect
         if w <= 0 or h <= 0:
@@ -969,7 +984,11 @@ class ShellHost:
         if border is not None:
             imgui.push_style_color(imgui.Col_.border, _rgba(border))
         try:
-            _visible, _opened = imgui.begin(title, None, _SHELL_FLAGS)
+            _visible, _opened = imgui.begin(
+                title,
+                None,
+                shell_window_flags(_SHELL_FLAGS, scrollable=scrollable),
+            )
             try:
                 body()
             finally:
