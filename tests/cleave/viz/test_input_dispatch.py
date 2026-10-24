@@ -591,6 +591,16 @@ def test_navigator_esc_hides_overlay() -> None:
     assert controls.shell_focus.region is ShellRegion.NAVIGATOR
 
 
+def test_navigator_esc_hides_overlay_in_preset_curation() -> None:
+    runtime = _make_runtime(submenu_focused=False, panel_open=False)
+    runtime.seed.session.settings.editor_mode = "preset_curation"
+    controls = runtime.controls
+    controls.shell_focus.region = ShellRegion.NAVIGATOR
+    assert dispatch_keydown(keydown(pygame.K_ESCAPE), runtime) is True
+    assert controls.consume_hide_overlay() is True
+    assert controls.shell_focus.region is ShellRegion.NAVIGATOR
+
+
 def test_inspector_esc_returns_to_navigator() -> None:
     runtime = _make_runtime(submenu_focused=False, panel_open=False)
     controls = runtime.controls

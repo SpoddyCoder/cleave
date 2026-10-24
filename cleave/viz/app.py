@@ -578,8 +578,8 @@ def _tick_frame_live_overlay(
             modal_active=modal_active,
         )
     ):
-        # The shell band already sits under the columns, so the leftover
-        # panel must not reserve that strip a second time.
+        # The shell band already shows the strip, so the toast panel must
+        # not reserve that strip a second time.
         band_open = layout.timeline[3] > 0
         timeline_panel_open = (
             tl.panel_open and overlay_visibility > 0.01 and not band_open

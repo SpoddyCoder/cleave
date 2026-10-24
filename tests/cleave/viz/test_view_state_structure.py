@@ -141,6 +141,15 @@ def test_structure_signature_ignores_timeline_panel_open() -> None:
         session, config_save, notification_active=False
     )
     assert sig_before == sig_after
+    timeline = json.loads(sig_after)["render_timeline"]
+    for flag in (
+        "panel_open",
+        "beat_bar_grid_expanded",
+        "cuts_expanded",
+        "timeline_presets_expanded",
+        "expanded",
+    ):
+        assert flag not in timeline
 
 
 

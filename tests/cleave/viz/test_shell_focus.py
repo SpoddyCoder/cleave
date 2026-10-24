@@ -67,6 +67,7 @@ def test_quick_nav_walks_top_level_ids_and_wraps() -> None:
 
 
 def test_escape_region() -> None:
+    assert not hasattr(ShellRegion, "PANEL")
     assert escape_region(ShellRegion.NAVIGATOR) is ShellRegion.NAVIGATOR
     assert escape_region(ShellRegion.INSPECTOR) is ShellRegion.NAVIGATOR
     assert not hasattr(ShellRegion, "PANEL")
