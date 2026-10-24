@@ -274,13 +274,9 @@ def default_soft_timeline_fade_group_block() -> TimelineFadeGroupBlock:
 @dataclass
 class RenderTimelineBlock:
     enabled: bool = DEFAULT_TIMELINE_ENABLED
-    expanded: bool = False
     bar_phase_offset: int = 0
     show_bar_grid: bool = False
-    beat_bar_grid_expanded: bool = False
     placement_snap: str = DEFAULT_TIMELINE_PLACEMENT_SNAP
-    cuts_expanded: bool = False
-    timeline_presets_expanded: bool = False
     timeline_preset_kind: str = DEFAULT_TIMELINE_PRESET_KIND
     timeline_preset_density: TimelinePresetDensity = DEFAULT_TIMELINE_PRESET_DENSITY
     timeline_preset_cue_snap: TimelinePresetCueSnap = DEFAULT_TIMELINE_PRESET_CUE_SNAP
@@ -302,7 +298,6 @@ class RenderTimelineBlock:
         default_factory=default_soft_timeline_fade_group_block
     )
     locked: bool = DEFAULT_TIMELINE_LOCKED
-    song_markers_expanded: bool = False
     song_marker_times: tuple[float, ...] = ()
     song_marker_types: tuple[str, ...] = ()
 
@@ -427,22 +422,21 @@ class TuningViewState:
     def focus_index(self) -> int:
         if not self.layout.rows:
             return 0
-        if self.layout_frame is not None:
-            from cleave.viz.focus_nav import cursor_main_descriptor
-            from cleave.viz.row_layout import resolve_navigable_descriptor
+        from cleave.viz.focus_nav import cursor_main_descriptor
+        from cleave.viz.row_layout import resolve_navigable_descriptor
 
-            focus_desc = cursor_main_descriptor(self.focus_cursor)
-            resolved = resolve_navigable_descriptor(
-                focus_desc,
-                self.layout_frame.navigable_descriptors,
-                fallback=self.layout.rows[0],
-            )
-            if not self.layout.contains_descriptor(resolved):
-                resolved = self.layout.rows[0]
-            return self.layout.find_descriptor(resolved)
-        resolved = self.layout.resolve_navigable(self.focus_descriptor, self)
+        navigable = (
+            self.layout_frame.navigable_descriptors
+            if self.layout_frame is not None
+            else tuple(self.layout.navigable_descriptors(self))
+        )
+        if not navigable:
+            return 0
+        resolved = resolve_navigable_descriptor(
+            cursor_main_descriptor(self.focus_cursor), navigable
+        )
         if not self.layout.contains_descriptor(resolved):
-            resolved = self.layout.rows[0]
+            resolved = navigable[0]
         return self.layout.find_descriptor(resolved)
 
 
@@ -518,12 +512,7 @@ def view_state_structure_signature(
         },
         "render_timeline": {
             "enabled": tl.enabled,
-            "panel_open": tl.panel_open,
-            "song_markers_expanded": session.song_markers.expanded,
             "song_marker_count": len(session.song_markers.times),
-            "beat_bar_grid_expanded": tl.beat_bar_grid_expanded,
-            "cuts_expanded": tl.cuts_expanded,
-            "timeline_presets_expanded": tl.timeline_presets_expanded,
             "hard_cut_fades_enabled": tl.hard_cut_fades.enabled,
             "soft_cut_fades_enabled": tl.soft_cut_fades.enabled,
         },
@@ -816,13 +805,9 @@ class TuningViewStateBuilder:
         )
         render_timeline = RenderTimelineBlock(
             enabled=tl.enabled,
-            expanded=tl.panel_open,
             bar_phase_offset=tl.bar_phase_offset,
             show_bar_grid=tl.show_bar_grid,
-            beat_bar_grid_expanded=tl.beat_bar_grid_expanded,
             placement_snap=tl.placement_snap,
-            cuts_expanded=tl.cuts_expanded,
-            timeline_presets_expanded=tl.timeline_presets_expanded,
             timeline_preset_kind=tl.timeline_preset_kind,
             timeline_preset_density=tl.timeline_preset_density,
             timeline_preset_cue_snap=tl.timeline_preset_cue_snap,
@@ -843,7 +828,6 @@ class TuningViewStateBuilder:
                 fade_out=tl.soft_cut_fades.fade_out,
                 crossfade=tl.soft_cut_fades.crossfade,
             ),
-            song_markers_expanded=self.session.song_markers.expanded,
             song_marker_times=tuple(self.session.song_markers.times),
             song_marker_types=tuple(
                 m.marker_type for m in self.session.song_markers.markers
@@ -1016,13 +1000,9 @@ class TuningViewStateBuilder:
             ),
             render_timeline=replace(
                 structure.render_timeline,
-                expanded=tl.panel_open,
                 bar_phase_offset=tl.bar_phase_offset,
                 show_bar_grid=tl.show_bar_grid,
-                beat_bar_grid_expanded=tl.beat_bar_grid_expanded,
                 placement_snap=tl.placement_snap,
-                cuts_expanded=tl.cuts_expanded,
-                timeline_presets_expanded=tl.timeline_presets_expanded,
                 timeline_preset_kind=tl.timeline_preset_kind,
                 timeline_preset_density=tl.timeline_preset_density,
                 timeline_preset_cue_snap=tl.timeline_preset_cue_snap,
@@ -1044,7 +1024,6 @@ class TuningViewStateBuilder:
                     crossfade=tl.soft_cut_fades.crossfade,
                 ),
                 locked=tl.locked,
-                song_markers_expanded=self.session.song_markers.expanded,
                 song_marker_times=tuple(self.session.song_markers.times),
                 song_marker_types=tuple(
                     m.marker_type for m in self.session.song_markers.markers

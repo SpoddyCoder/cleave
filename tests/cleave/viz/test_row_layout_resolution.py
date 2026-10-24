@@ -49,6 +49,8 @@ def _legacy_focus_index(state: TuningViewState) -> int:
     object.__setattr__(state, "layout_frame", None)
     try:
         resolved = layout.resolve_navigable(state.focus_descriptor, state)
+        if not layout.contains_descriptor(resolved):
+            return 0
         return layout.find_descriptor(resolved)
     finally:
         object.__setattr__(
@@ -96,17 +98,21 @@ def test_focus_index_uses_layout_frame_navigable() -> None:
     object.__setattr__(state, "layout_frame", frame)
     assert state.focus_index == frame.resolved_focus_index
     state.focus_descriptor = RowDescriptor(RowKind.TRACK_HEADER, slot="layer_1")
-    assert state.focus_index == layout.find_descriptor(
-        layout.navigable_descriptors(state)[0]
-    )
+    assert state.focus_index == 0
 
 
 def test_find_descriptor_and_contains_descriptor() -> None:
-    state = _minimal_view_state()
-    desc = RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
+    state = _minimal_view_state(
+        notification_message="Saved",
+        notification_remaining_sec=1.0,
+    )
+    desc = RowDescriptor(RowKind.PANEL_NOTIFICATION, marker_index=1)
     assert state.layout.contains_descriptor(desc)
     assert state.layout.find_descriptor(desc) == state.layout.find_by_kind(
-        RowKind.RENDER_TIMELINE_HEADER
+        RowKind.PANEL_NOTIFICATION
+    )
+    assert not state.layout.contains_descriptor(
+        RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
     )
 
 
@@ -137,19 +143,18 @@ def test_navigable_descriptors_matches_indices() -> None:
     assert descriptors == [state.layout.descriptor(index) for index in indices]
 
 
-def test_resolve_navigable_returns_descriptor_when_navigable() -> None:
+def test_resolve_navigable_returns_descriptor_when_nothing_is_navigable() -> None:
     state = _minimal_view_state()
     transport = RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
+    assert state.layout.navigable_descriptors(state) == []
     assert state.layout.resolve_navigable(transport, state) == transport
 
 
-def test_resolve_navigable_settings_field_falls_back_to_first_leftover() -> None:
+def test_resolve_navigable_settings_field_stays_on_the_descriptor() -> None:
     state = _minimal_view_state()
     render_mode = RowDescriptor(RowKind.SETTINGS_PREVIEW_QUALITY)
     assert render_mode not in state.layout.navigable_descriptors(state)
-    assert state.layout.resolve_navigable(render_mode, state) == (
-        state.layout.navigable_descriptors(state)[0]
-    )
+    assert state.layout.resolve_navigable(render_mode, state) == render_mode
 
 
 def test_resolve_navigable_track_row_falls_back_to_leftover() -> None:
@@ -159,12 +164,10 @@ def test_resolve_navigable_track_row_falls_back_to_leftover() -> None:
     effect = RowDescriptor(
         RowKind.TRACK_EFFECT, slot="layer_1", effect_id="pulse", driver_slug="onset"
     )
-    first = state.layout.navigable_descriptors(state)[0]
     assert stem not in state.layout.rows
-    assert state.layout.resolve_navigable(stem, state) == first
-    assert state.layout.resolve_navigable(blend, state) == first
-    assert state.layout.resolve_navigable(effect, state) == first
-    assert first.kind != RowKind.TRACK_HEADER
+    assert state.layout.resolve_navigable(stem, state) == stem
+    assert state.layout.resolve_navigable(blend, state) == blend
+    assert state.layout.resolve_navigable(effect, state) == effect
 
 
 def _inspector_kinds(state: TuningViewState, node_id: str) -> list[RowKind]:
@@ -177,9 +180,8 @@ def test_resolve_navigable_render_overlay_sub_row_collapsed() -> None:
     opacity = RowDescriptor(
         RowKind.RENDER_OVERLAY_CARD_OPACITY, card="opening_card"
     )
-    timeline = RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
     assert opacity not in state.layout.rows
-    assert state.layout.resolve_navigable(opacity, state) == timeline
+    assert state.layout.resolve_navigable(opacity, state) == opacity
     assert RowKind.RENDER_OVERLAY_CARD_OPACITY in _inspector_kinds(
         state, "render.overlays.card:opening_card"
     )
@@ -191,9 +193,7 @@ def test_resolve_navigable_render_overlay_title_nested_collapsed() -> None:
         RowKind.RENDER_OVERLAY_CARD_TITLE_FONT, card="opening_card"
     )
     assert font not in state.layout.rows
-    assert state.layout.resolve_navigable(font, state) == RowDescriptor(
-        RowKind.RENDER_TIMELINE_HEADER
-    )
+    assert state.layout.resolve_navigable(font, state) == font
     assert RowKind.RENDER_OVERLAY_CARD_TITLE_FONT in _inspector_kinds(
         state, "render.overlays.card:opening_card"
     )
@@ -203,9 +203,7 @@ def test_resolve_navigable_render_post_fx_sub_row_collapsed() -> None:
     state = _minimal_view_state(render_post_fx=RenderPostFxBlock())
     fade = RowDescriptor(RowKind.RENDER_POST_FX_FADE_HEADER)
     assert fade not in state.layout.rows
-    assert state.layout.resolve_navigable(fade, state) == RowDescriptor(
-        RowKind.RENDER_TIMELINE_HEADER
-    )
+    assert state.layout.resolve_navigable(fade, state) == fade
     assert RowKind.RENDER_POST_FX_FADE_IN_START in _inspector_kinds(
         state, "render.post_fx"
     )
@@ -222,18 +220,14 @@ def test_resolve_navigable_render_post_fx_highlight_rolloff_mode_off_hides_param
     assert threshold not in state.layout.rows
     assert RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_MODE in page
     assert RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD not in page
-    assert state.layout.resolve_navigable(threshold, state) == RowDescriptor(
-        RowKind.RENDER_TIMELINE_HEADER
-    )
+    assert state.layout.resolve_navigable(threshold, state) == threshold
 
 
 def test_resolve_navigable_render_post_fx_fade_nested_collapsed() -> None:
     state = _minimal_view_state(render_post_fx=RenderPostFxBlock())
     start = RowDescriptor(RowKind.RENDER_POST_FX_FADE_IN_START)
     assert start not in state.layout.rows
-    assert state.layout.resolve_navigable(start, state) == RowDescriptor(
-        RowKind.RENDER_TIMELINE_HEADER
-    )
+    assert state.layout.resolve_navigable(start, state) == start
     assert RowKind.RENDER_POST_FX_FADE_IN_START in _inspector_kinds(
         state, "render.post_fx"
     )
@@ -249,9 +243,7 @@ def test_resolve_navigable_render_post_fx_highlight_rolloff_nested_collapsed() -
     page = _inspector_kinds(state, "render.post_fx")
     assert threshold not in state.layout.rows
     assert RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD in page
-    assert state.layout.resolve_navigable(threshold, state) == RowDescriptor(
-        RowKind.RENDER_TIMELINE_HEADER
-    )
+    assert state.layout.resolve_navigable(threshold, state) == threshold
 
 
 def test_section_header_descriptor_mappings() -> None:

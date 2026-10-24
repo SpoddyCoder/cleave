@@ -122,6 +122,7 @@ def _make_runtime(
         120.0,
         on_close=runtime.controls.close_timeline_panel,
         on_exit_submenu=runtime.controls.exit_timeline_submenu,
+        on_focus_row=runtime.controls.set_timeline_focus_row,
     )
     return runtime
 
@@ -146,7 +147,6 @@ def test_ctrl_enter_drops_song_marker_from_timeline_context() -> None:
     markers = runtime.seed.session.song_markers
     assert markers.times == [12.5]
     assert markers.selected_index is None
-    assert markers.expanded is True
     assert runtime.seed.session.timeline.panel_open is True
     assert runtime.controls.focus_cursor == prior_focus
 
@@ -254,12 +254,13 @@ def test_second_esc_after_stop_closes_submenu_panel() -> None:
 
     assert dispatch_keydown(keydown(pygame.K_ESCAPE), runtime) is True
     assert runtime.seed.session.timeline.panel_open is False
-    assert not isinstance(runtime.controls.focus_cursor, TimelineFocus)
+    assert isinstance(runtime.controls.focus_cursor, TimelineFocus)
+    assert runtime.controls.shell_focus.region is ShellRegion.NAVIGATOR
 
 
 def test_second_esc_after_stop_requests_overlay_hide_on_main() -> None:
     runtime = _make_runtime(submenu_focused=False, panel_open=True, recording=True)
-    runtime.controls.shell_focus.region = ShellRegion.PANEL
+    runtime.controls.shell_focus.region = ShellRegion.NAVIGATOR
     dispatch_keydown(keydown(pygame.K_ESCAPE), runtime)
     assert runtime.seed.session.timeline.recording is False
 
@@ -280,9 +281,13 @@ def test_submenu_routing_up_down_to_tuning_enter_to_timeline() -> None:
     main = runtime.controls
     timeline = runtime.timeline_controls
 
-    assert key_handler_for_runtime(runtime, pygame.K_UP) is main
-    assert key_handler_for_runtime(runtime, pygame.K_DOWN) is main
+    assert key_handler_for_runtime(runtime, pygame.K_UP) is timeline
+    assert key_handler_for_runtime(runtime, pygame.K_DOWN) is timeline
     assert key_handler_for_runtime(runtime, pygame.K_RETURN) is timeline
+    assert main.focus_cursor == TimelineFocus(0)
+    assert dispatch_keydown(keydown(pygame.K_DOWN), runtime) is True
+    assert isinstance(main.focus_cursor, TimelineFocus)
+    assert main.focus_cursor.row == 1
 
 
 def test_ctrl_arrows_seek_long_from_main_panel() -> None:
@@ -577,13 +582,22 @@ def test_tab_cycle_when_strip_open() -> None:
     assert not isinstance(controls.focus_cursor, TimelineFocus)
 
 
-def test_tab_from_panel_cycles_as_navigator() -> None:
+def test_navigator_esc_hides_overlay() -> None:
     runtime = _make_runtime(submenu_focused=False, panel_open=False)
     controls = runtime.controls
-    controls.shell_focus.region = ShellRegion.PANEL
-    assert dispatch_keydown(keydown(pygame.K_TAB), runtime) is True
-    assert controls.shell_focus.region is ShellRegion.INSPECTOR
-    assert runtime.menu_bar.focused is False
+    controls.shell_focus.region = ShellRegion.NAVIGATOR
+    assert dispatch_keydown(keydown(pygame.K_ESCAPE), runtime) is True
+    assert controls.consume_hide_overlay() is True
+    assert controls.shell_focus.region is ShellRegion.NAVIGATOR
+
+
+def test_inspector_esc_returns_to_navigator() -> None:
+    runtime = _make_runtime(submenu_focused=False, panel_open=False)
+    controls = runtime.controls
+    controls.shell_focus.region = ShellRegion.INSPECTOR
+    assert dispatch_keydown(keydown(pygame.K_ESCAPE), runtime) is True
+    assert controls.shell_focus.region is ShellRegion.NAVIGATOR
+    assert controls.consume_hide_overlay() is False
 
 
 def test_tab_cycle_skips_timeline_when_strip_closed() -> None:

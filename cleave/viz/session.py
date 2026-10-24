@@ -343,10 +343,7 @@ class TimelineRuntime:
     selected_cue_flash_start_ms: int | None = None
     bar_phase_offset: int = 0
     show_bar_grid: bool = False
-    beat_bar_grid_expanded: bool = False
     placement_snap: TimelinePlacementSnap = DEFAULT_TIMELINE_PLACEMENT_SNAP
-    cuts_expanded: bool = False
-    timeline_presets_expanded: bool = False
     timeline_preset_kind: str = DEFAULT_TIMELINE_PRESET_KIND
     timeline_preset_density: TimelinePresetDensity = DEFAULT_TIMELINE_PRESET_DENSITY
     timeline_preset_cue_snap: TimelinePresetCueSnap = DEFAULT_TIMELINE_PRESET_CUE_SNAP
@@ -379,7 +376,6 @@ class SongMarkerRuntime:
 
     markers: list[SongMarker] = field(default_factory=list)
     selected_index: int | None = None
-    expanded: bool = False
 
     @property
     def times(self) -> list[float]:

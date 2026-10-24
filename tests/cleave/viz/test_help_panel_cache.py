@@ -75,10 +75,6 @@ def test_help_content_signature_changes_when_shell_row_changes() -> None:
     assert help_content_signature(
         leftover, shell_focus=opacity, **kwargs
     ) != help_content_signature(leftover, shell_focus=blend, **kwargs)
-    panel = ShellFocusState(region=ShellRegion.PANEL, selected_id="layer:a")
-    assert help_content_signature(
-        leftover, shell_focus=panel, **kwargs
-    ) == help_content_signature(leftover, **kwargs)
 
 
 def test_upload_plan_full_when_shell_row_changes() -> None:

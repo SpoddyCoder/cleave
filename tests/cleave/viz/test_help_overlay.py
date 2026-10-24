@@ -224,17 +224,6 @@ def test_help_follows_inspector_row_not_leftover() -> None:
     assert keyboard["Left/Right"] == "adjust value"
     assert "jump to layer" not in keyboard.values()
     assert "Credits overlays" not in _help_text(sections)
-    panel = help_sections(
-        leftover,
-        shell_focus=ShellFocusState(
-            region=ShellRegion.PANEL,
-            selected_id="layer:drums",
-            inspector_cursor=shell.inspector_cursor,
-        ),
-    )
-    panel_description = _description_section(panel)
-    assert panel_description is not None
-    assert panel_description.title == "Credits overlays"
 
 
 def test_help_follows_navigator_layer() -> None:

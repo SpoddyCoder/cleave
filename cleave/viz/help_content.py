@@ -216,8 +216,6 @@ def help_focus_descriptor(
     """Row help should follow, or None when only the navigation section applies."""
     if shell_focus is None or timeline_focused:
         return focus
-    if shell_focus.region is ShellRegion.PANEL:
-        return focus
     if shell_focus.region is ShellRegion.INSPECTOR:
         command_id = shell_focus.inspector_command_id
         if command_id is not None:
@@ -238,8 +236,6 @@ def help_shell_row(
 ) -> tuple[str | int | RowKind | None, ...] | None:
     """Shell row identity for the help cache. None when help follows *focus*."""
     if shell_focus is None or timeline_focused:
-        return None
-    if shell_focus.region is ShellRegion.PANEL:
         return None
     if shell_focus.region is ShellRegion.NAVIGATOR:
         return ("navigator", shell_focus.selected_id)

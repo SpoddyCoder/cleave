@@ -14,8 +14,11 @@ from tests.support.config import TEST_LAYER_STEMS
 from cleave.preset_playlist import PresetPlaylist
 from cleave.viz.controls import TuningControls
 from cleave.viz.editor_mode_controls import is_preset_curation_mode
+from cleave.viz.focus_nav import MainFocus
 from cleave.viz.navigator import layer_node_id
+from cleave.viz.row_hotkeys import handle_row_hotkey
 from cleave.viz.row_kinds import RowDescriptor, RowKind
+from cleave.viz.row_spec import apply_field_action, apply_field_horizontal
 from cleave.viz.shell_focus import (
     DEFAULT_CLOSED_INSPECTOR_GROUPS,
     InspectorGroupKey,
@@ -313,3 +316,34 @@ def press_layer_row(
     if controls.inspector.handle_keydown(event):
         return True
     return controls.inspector.handle_hotkey(event)
+
+
+def press_main_row(controls: TuningControls, event: pygame.event.Event) -> bool:
+    """Apply the main cursor's row action.
+
+    Field tests name a descriptor and press a key. The tuning tree no longer
+    walks that list, so the helper applies the descriptor directly.
+    """
+    if controls.modal_host.active:
+        return controls.handle_keydown(event)
+    cursor = controls.focus_cursor
+    if isinstance(cursor, MainFocus):
+        desc = cursor.descriptor
+        key = event.key
+        if key in (
+            pygame.K_LEFT,
+            pygame.K_RIGHT,
+            pygame.K_PAGEUP,
+            pygame.K_PAGEDOWN,
+        ):
+            forward = key in (pygame.K_RIGHT, pygame.K_PAGEDOWN)
+            large = key in (pygame.K_PAGEUP, pygame.K_PAGEDOWN)
+            if apply_field_horizontal(controls, desc, forward, large):
+                return True
+        if key in (pygame.K_RETURN, pygame.K_KP_ENTER) and apply_field_action(
+            controls, desc
+        ):
+            return True
+        if handle_row_hotkey(controls, desc, event):
+            return True
+    return controls.handle_keydown(event)

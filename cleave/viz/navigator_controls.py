@@ -6,16 +6,11 @@ from typing import TYPE_CHECKING
 
 import pygame
 
-from cleave.viz.editor_mode_controls import is_preset_curation_mode
-from cleave.viz.focus_nav import MainFocus
 from cleave.viz.inspector import InspectorRow, build_inspector_rows
 from cleave.viz.navigator import NavNode, build_navigator, visible_top_level_ids
 from cleave.viz.row_hotkeys import handle_row_hotkey, node_header_descriptor
-from cleave.viz.row_kinds import RowDescriptor, RowKind
-from cleave.viz.row_layout import first_leftover_descriptor, row_navigable
 from cleave.viz.shell_focus import (
     ShellRegion,
-    escape_region,
     quick_nav_id,
     reconcile_nav_id,
     tree_nav_id,
@@ -61,10 +56,7 @@ class NavigatorControls:
             return True
         if key == pygame.K_ESCAPE:
             self.reconcile()
-            if is_preset_curation_mode(self._controls.session.settings.editor_mode):
-                self._controls.request_hide_overlay()
-                return True
-            self.escape()
+            self._controls.request_hide_overlay()
             return True
         return False
 
@@ -98,11 +90,7 @@ class NavigatorControls:
         self.select(quick_nav_id(ids, focus.selected_id, delta))
 
     def select(self, node_id: str) -> None:
-        """Select *node_id* and stay on the navigator.
-
-        A node with no inspector that cannot expand scrolls the leftover
-        panel to its header.
-        """
+        """Select *node_id* and stay on the navigator."""
         focus = self._controls.shell_focus
         node_id = reconcile_nav_id(
             self._visible_ids(),
@@ -111,12 +99,9 @@ class NavigatorControls:
         )
         focus.region = ShellRegion.NAVIGATOR
         focus.selected_id = node_id
-        node = self._node(node_id)
-        if node is not None and not node.has_inspector and not node.expandable:
-            self._focus_leftover_header(node_id)
 
     def activate(self) -> None:
-        """Open an inspector, or hand a leaf without one to the leftover panel.
+        """Open an inspector.
 
         An expandable node with no inspector expands and opens its first
         child's inspector.
@@ -128,31 +113,14 @@ class NavigatorControls:
         if node.has_inspector:
             self._enter_inspector(node.id)
             return
-        if node.expandable:
-            focus.nav_expanded.add(node.id)
-            child = self._first_child(node.id)
-            if child is not None:
-                focus.selected_id = child.id
-                self._enter_inspector(child.id)
-                return
-        focus.region = ShellRegion.PANEL
-        self._focus_leftover_header(node.id)
-
-    def escape(self) -> None:
-        """Leave the navigator for the panel when leftover rows are navigable."""
-        focus = self._controls.shell_focus
-        view = self._view()
-        target = escape_region(
-            focus.region,
-            leftover_rows=self._has_navigable_leftover(view),
-        )
-        if target is not ShellRegion.PANEL:
+        if not node.expandable:
             return
-        focus.region = ShellRegion.PANEL
-        header = self._header_for(view, focus.selected_id)
-        if header is None:
-            header = first_leftover_descriptor(view)
-        self._controls.focus_cursor = MainFocus(header)
+        focus.nav_expanded.add(node.id)
+        child = self._first_child(node.id)
+        if child is None:
+            return
+        focus.selected_id = child.id
+        self._enter_inspector(child.id)
 
     def _enter_inspector(self, node_id: str) -> None:
         focus = self._controls.shell_focus
@@ -163,26 +131,6 @@ class NavigatorControls:
         focus.region = ShellRegion.INSPECTOR
         first = next((row for row in rows if row.navigable), None)
         _set_inspector_cursor(focus, first)
-
-    def _focus_leftover_header(self, node_id: str) -> None:
-        view = self._view()
-        header = self._header_for(view, node_id)
-        if header is None:
-            header = first_leftover_descriptor(view)
-        self._controls.focus_cursor = MainFocus(header)
-
-    def _header_for(
-        self, view: TuningViewState, node_id: str
-    ) -> RowDescriptor | None:
-        if node_id != "song_markers":
-            return None
-        layout = view.layout
-        desc = RowDescriptor(RowKind.SONG_MARKERS_HEADER)
-        if not layout.contains_descriptor(desc):
-            desc = RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
-        if layout.contains_descriptor(desc):
-            return desc
-        return None
 
     def _tree_step(self, delta: int) -> None:
         focus = self._controls.shell_focus
@@ -240,10 +188,6 @@ class NavigatorControls:
     def _view(self) -> TuningViewState:
         playback = self._controls.playback
         return self._controls.build_view_state(paused=playback.paused)
-
-    @staticmethod
-    def _has_navigable_leftover(view: TuningViewState) -> bool:
-        return any(row_navigable(view, desc) for desc in view.layout.rows)
 
 
 def _set_inspector_cursor(focus, row: InspectorRow | None) -> None:

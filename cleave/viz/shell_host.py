@@ -856,10 +856,16 @@ class ShellHost:
             for rect in (layout.transport, layout.navigator, layout.inspector)
         )
 
+    def _strip_has_scope(self) -> bool:
+        return (
+            isinstance(self._controls.focus_cursor, TimelineFocus)
+            and self._controls.session.timeline.panel_open
+        )
+
     def _cycle_stop(self, menu_state: MenuBarState) -> CycleStop:
         if menu_state.focused:
             return CycleStop.MENU
-        if isinstance(self._controls.focus_cursor, TimelineFocus):
+        if self._strip_has_scope():
             return CycleStop.TIMELINE
         if self._controls.shell_focus.region is ShellRegion.INSPECTOR:
             return CycleStop.INSPECTOR
@@ -868,13 +874,11 @@ class ShellHost:
     def _scope_label(self, menu_state: MenuBarState) -> str:
         if menu_state.focused:
             return "menu bar"
-        if isinstance(self._controls.focus_cursor, TimelineFocus):
+        if self._strip_has_scope():
             return "timeline strip"
         region = self._controls.shell_focus.region
         if region is ShellRegion.INSPECTOR:
             return "inspector"
-        if region is ShellRegion.PANEL:
-            return "panel"
         return "navigator"
 
     def _draw_shell(

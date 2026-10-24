@@ -5,10 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from cleave.viz.row_sections import (
-    append_leftover_timeline_rows,
-    sub_row_expand_visible,
-)
+from cleave.viz.row_sections import sub_row_expand_visible
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.row_spec import (
     row_is_pinned,
@@ -37,7 +34,7 @@ def row_draw_visible(state: TuningViewState, desc: RowDescriptor) -> bool:
 
 def row_navigable(state: TuningViewState, desc: RowDescriptor) -> bool:
     if desc.kind == RowKind.PANEL_NOTIFICATION:
-        return desc.marker_index == 1
+        return False
     if not row_spec(desc.kind).navigable:
         return False
     if not _sub_row_expanded(state, desc):
@@ -45,16 +42,6 @@ def row_navigable(state: TuningViewState, desc: RowDescriptor) -> bool:
     if section_locked(state, desc) and not row_navigable_when_section_locked(desc.kind):
         return False
     return True
-
-
-def first_leftover_descriptor(state: TuningViewState) -> RowDescriptor:
-    """First navigable leftover row, or the first row when none are navigable."""
-    for desc in state.layout.rows:
-        if row_navigable(state, desc):
-            return desc
-    if state.layout.rows:
-        return state.layout.rows[0]
-    return RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
 
 
 def resolve_navigable_descriptor(
@@ -108,15 +95,13 @@ def build_layout_frame(layout: RowLayout, state: TuningViewState) -> RowLayoutFr
         layout.descriptor(index) for index in navigable_indices
     )
     focus_desc = cursor_main_descriptor(state.focus_cursor)
-    fallback = layout.rows[0] if layout.rows else None
-    resolved = resolve_navigable_descriptor(
-        focus_desc, navigable_descriptors, fallback=fallback
-    )
-    if layout.rows and not layout.contains_descriptor(resolved):
-        resolved = layout.rows[0]
-    resolved_focus_index = (
-        layout.find_descriptor(resolved) if layout.rows else 0
-    )
+    resolved_focus_index = 0
+    if navigable_descriptors:
+        resolved = resolve_navigable_descriptor(
+            focus_desc, navigable_descriptors
+        )
+        if layout.contains_descriptor(resolved):
+            resolved_focus_index = layout.find_descriptor(resolved)
     return RowLayoutFrame(
         visible_indices=visible_indices,
         navigable_indices=navigable_indices,
@@ -134,7 +119,6 @@ class RowLayout:
     @classmethod
     def build(cls, state: TuningViewState) -> RowLayout:
         row_list: list[RowDescriptor] = []
-        curation = state.settings.editor_mode == "preset_curation"
         # marker_index 0 = persistent error; 1 = timed toast (may stack).
         if state.persistent_notification_message:
             row_list.append(
@@ -144,8 +128,6 @@ class RowLayout:
             row_list.append(
                 RowDescriptor(RowKind.PANEL_NOTIFICATION, marker_index=1)
             )
-        if not curation:
-            append_leftover_timeline_rows(row_list, state)
         rows = tuple(row_list)
         return cls(
             rows=rows,
@@ -232,15 +214,12 @@ class RowLayout:
             navigable = frame.navigable_descriptors
         else:
             navigable = tuple(self.navigable_descriptors(state))
-        fallback = self.rows[0] if self.rows else None
-        resolved = resolve_navigable_descriptor(
-            desc, navigable, fallback=fallback
-        )
-        if not self.rows:
-            return RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
-        if not self.contains_descriptor(resolved):
-            return self.rows[0]
-        return resolved
+        if not navigable:
+            return desc
+        resolved = resolve_navigable_descriptor(desc, navigable)
+        if self.contains_descriptor(resolved):
+            return resolved
+        return navigable[0]
 
     def header_row_count(self) -> int:
         count = 0

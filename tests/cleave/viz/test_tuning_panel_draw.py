@@ -36,6 +36,7 @@ def _present_style_view_state() -> TuningViewState:
     )
     _mount_track_sections(state)
     rows = list(state.layout.rows)
+    rows.append(RowDescriptor(RowKind.RENDER_TIMELINE_HEADER))
     rows.append(RowDescriptor(RowKind.RENDER_SECTION_GAP))
     state.layout = RowLayout(
         rows=tuple(rows),
@@ -165,6 +166,8 @@ def test_flexible_panel_floor_and_toast_width() -> None:
             ui_width=200,
             ui_min_width=160,
         ),
+        notification_message="ok",
+        notification_remaining_sec=5.0,
     )
     assert _composed_content_width(short) >= floor
 

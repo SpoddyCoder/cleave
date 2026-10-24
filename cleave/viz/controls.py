@@ -18,7 +18,7 @@ from cleave.viz.editor_mode_controls import EditorModeController, is_preset_cura
 from cleave.viz.post_fx import sync_live_compositor_format
 from cleave.viz.preset_curation_controls import PresetCurationController
 from cleave.viz.preset_list_controls import PresetListController
-from cleave.viz.key_repeat import KeyRepeatController, mod_ctrl, mod_shift
+from cleave.viz.key_repeat import KeyRepeatController
 from cleave.viz.modal import ModalHost
 from cleave.viz.panel_notification import PanelNotificationHost
 from cleave.viz.playback import PlaybackState, current_sec, seek, seek_to, toggle_pause
@@ -41,24 +41,13 @@ from cleave.viz.focus_nav import (
     MainFocus,
     TimelineFocus,
     cursor_main_descriptor,
-    move_focus,
-    timeline_strip_in_ring,
 )
 from cleave.viz.inspector_controls import InspectorControls
 from cleave.viz.navigator import build_navigator, layer_node_id
 from cleave.viz.navigator_controls import NavigatorControls
-from cleave.viz.row_layout import first_leftover_descriptor
 from cleave.viz.shell_focus import ShellFocusState, ShellRegion, reconcile_nav_id
-from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
-from cleave.viz.row_hotkeys import handle_row_hotkey
-from cleave.viz.row_spec import (
-    REPEAT_ROW_KINDS,
-    ROW_SPECS,
-    RowPresentStyle,
-    apply_field_action,
-    apply_field_horizontal,
-    section_lock_blocks_mutation,
-)
+from cleave.viz.row_kinds import RowDescriptor, RowKind
+from cleave.viz.row_spec import section_lock_blocks_mutation
 from cleave.viz.session import TuningSession
 from cleave.viz.tuning_view_state import TuningViewState, TuningViewStateBuilder
 
@@ -76,13 +65,6 @@ NOTIFICATION_RESIDUAL_LATENCY_UNCHANGED_TEXT = (
 SEEK_TINY = 2
 SEEK_SHORT = 10
 SEEK_LONG = 30
-_CURATION_ACTION_KINDS = frozenset({
-    RowKind.TRACK_HEADER,
-    RowKind.TRACK_STEM,
-    RowKind.TRACK_BEAT,
-    RowKind.TRACK_PRESET_DIR,
-    RowKind.TRACK_PRESET,
-})
 
 
 class TuningControls:
@@ -284,9 +266,6 @@ class TuningControls:
             self.show_notification(NOTIFICATION_TIMELINE_ENABLED_TEXT)
         self.navigator = NavigatorControls(self)
         self.inspector = InspectorControls(self)
-        self._apply_focus_cursor(
-            MainFocus(first_leftover_descriptor(self.build_view_state(paused=playback.paused)))
-        )
 
     @property
     def tap_sync(self) -> TapSyncControls:
@@ -322,9 +301,7 @@ class TuningControls:
         if self.session.timeline.panel_open:
             self.session.timeline.panel_open = False
         if isinstance(self.focus_cursor, TimelineFocus):
-            self._apply_focus_cursor(
-                MainFocus(RowDescriptor(RowKind.RENDER_TIMELINE_HEADER))
-            )
+            self.exit_timeline_submenu()
         if self._overlay_hide is not None:
             self._overlay_hide()
         return snapshot
@@ -415,17 +392,21 @@ class TuningControls:
         self._config_save.save()
 
     def handle_keydown(self, event: pygame.event.Event) -> bool:
-        """Handle a key down event for the main tuning tree."""
+        """Keys that no shell region claimed.
+
+        Space pauses. Esc hides the UI. Modals and tap-sync own their keys.
+        Navigator, inspector, and the timeline strip handle their own arrows.
+        """
         if event.type != pygame.KEYDOWN:
             return True
 
         if self.handle_modal_keydown(event):
             return True
 
-        if is_preset_curation_mode(self.session.settings.editor_mode):
-            return self._handle_curation_keydown(event)
-
-        if self._tap_sync.active:
+        if (
+            not is_preset_curation_mode(self.session.settings.editor_mode)
+            and self._tap_sync.active
+        ):
             return self._tap_sync.handle_keydown(event) or True
 
         if event.key == pygame.K_SPACE:
@@ -435,137 +416,6 @@ class TuningControls:
         if event.key == pygame.K_ESCAPE:
             self.request_hide_overlay()
             return True
-
-        if event.key in (pygame.K_UP, pygame.K_DOWN):
-            delta = -1 if event.key == pygame.K_UP else 1
-            self._move_focus(delta)
-            self._key_repeat.on_keydown(
-                event.key,
-                event.mod,
-                accel=False,
-                on_repeat=lambda key, _mod: self._move_focus(
-                    -1 if key == pygame.K_UP else 1
-                ),
-            )
-            return True
-
-        if event.key in (pygame.K_LEFT, pygame.K_RIGHT):
-            if mod_ctrl(event.mod) or mod_shift(event.mod):
-                return True
-            kind = self.focus_descriptor.kind
-            self._apply_horizontal(event.key == pygame.K_RIGHT, False, kind)
-            if kind in REPEAT_ROW_KINDS:
-                self._key_repeat.on_keydown(
-                    event.key,
-                    event.mod,
-                    on_repeat=lambda key, _mod: self._apply_horizontal(
-                        key == pygame.K_RIGHT,
-                        False,
-                        self.focus_descriptor.kind,
-                    ),
-                )
-            return True
-
-        if event.key in (pygame.K_PAGEUP, pygame.K_PAGEDOWN):
-            kind = self.focus_descriptor.kind
-            spec = ROW_SPECS.get(kind)
-            if spec is None or spec.affordance == RowAffordance.EXPAND:
-                return True
-            forward = event.key == pygame.K_PAGEDOWN
-            self._apply_horizontal(forward, True, kind)
-            if kind in REPEAT_ROW_KINDS:
-                self._key_repeat.on_keydown(
-                    event.key,
-                    event.mod,
-                    on_repeat=lambda key, _mod: self._apply_horizontal(
-                        key == pygame.K_PAGEDOWN,
-                        True,
-                        self.focus_descriptor.kind,
-                    ),
-                )
-            return True
-
-        if handle_row_hotkey(self, self.focus_descriptor, event):
-            return True
-
-        if event.key == pygame.K_RETURN:
-            if apply_field_action(self, self.focus_descriptor):
-                return True
-            if self._dismiss_timed_notification_if_present():
-                return True
-
-        return True
-
-    def _handle_curation_keydown(self, event: pygame.event.Event) -> bool:
-        if event.key == pygame.K_SPACE:
-            toggle_pause(self.playback, self.duration_sec)
-            return True
-
-        if event.key == pygame.K_ESCAPE:
-            self.request_hide_overlay()
-            return True
-
-        if event.key in (pygame.K_UP, pygame.K_DOWN):
-            delta = -1 if event.key == pygame.K_UP else 1
-            self._move_focus(delta)
-            self._key_repeat.on_keydown(
-                event.key,
-                event.mod,
-                accel=False,
-                on_repeat=lambda key, _mod: self._move_focus(
-                    -1 if key == pygame.K_UP else 1
-                ),
-            )
-            return True
-
-        if event.key in (pygame.K_LEFT, pygame.K_RIGHT):
-            if mod_ctrl(event.mod) or mod_shift(event.mod):
-                return True
-            kind = self.focus_descriptor.kind
-            if kind not in _CURATION_ACTION_KINDS:
-                return True
-            self._apply_horizontal(event.key == pygame.K_RIGHT, False, kind)
-            if kind in REPEAT_ROW_KINDS:
-                self._key_repeat.on_keydown(
-                    event.key,
-                    event.mod,
-                    on_repeat=lambda key, _mod: self._apply_horizontal(
-                        key == pygame.K_RIGHT,
-                        False,
-                        self.focus_descriptor.kind,
-                    ),
-                )
-            return True
-
-        if event.key in (pygame.K_PAGEUP, pygame.K_PAGEDOWN):
-            kind = self.focus_descriptor.kind
-            if kind not in _CURATION_ACTION_KINDS:
-                return True
-            spec = ROW_SPECS.get(kind)
-            if spec is None or spec.affordance == RowAffordance.EXPAND:
-                return True
-            forward = event.key == pygame.K_PAGEDOWN
-            self._apply_horizontal(forward, True, kind)
-            if kind in REPEAT_ROW_KINDS:
-                self._key_repeat.on_keydown(
-                    event.key,
-                    event.mod,
-                    on_repeat=lambda key, _mod: self._apply_horizontal(
-                        key == pygame.K_PAGEDOWN,
-                        True,
-                        self.focus_descriptor.kind,
-                    ),
-                )
-            return True
-
-        if handle_row_hotkey(self, self.focus_descriptor, event):
-            return True
-
-        if event.key == pygame.K_RETURN:
-            if apply_field_action(self, self.focus_descriptor):
-                return True
-            if self._dismiss_timed_notification_if_present():
-                return True
 
         return True
 
@@ -635,16 +485,8 @@ class TuningControls:
     def _on_editor_mode_changed(self) -> None:
         self._sync_live_compositor_format()
         self._view_state._structure = None
-        view = self.build_view_state(paused=self.playback.paused)
         if isinstance(self.focus_cursor, TimelineFocus):
-            self._apply_focus_cursor(
-                MainFocus(first_leftover_descriptor(view))
-            )
-        else:
-            focus_desc = cursor_main_descriptor(self.focus_cursor)
-            if not view.layout.contains_descriptor(focus_desc):
-                resolved = view.layout.resolve_navigable(focus_desc, view)
-                self._apply_focus_cursor(MainFocus(resolved))
+            self.exit_timeline_submenu()
         self._normalize_focus_cursor()
 
     def _sync_live_compositor_format(self) -> None:
@@ -659,31 +501,18 @@ class TuningControls:
         )
 
     def _normalize_focus_cursor(self) -> None:
-        view = self.build_view_state(paused=self.playback.paused)
-        tl = self.session.timeline
         row_count = len(self.session.layer_z_order)
         if isinstance(self.focus_cursor, TimelineFocus):
-            if not timeline_strip_in_ring(view):
-                if is_preset_curation_mode(self.session.settings.editor_mode):
-                    fallback = first_leftover_descriptor(view)
-                else:
-                    fallback = RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
-                self._apply_focus_cursor(MainFocus(fallback))
-                return
             if row_count == 0:
-                self._apply_focus_cursor(
-                    MainFocus(RowDescriptor(RowKind.RENDER_TIMELINE_HEADER))
-                )
+                self._apply_focus_cursor(TimelineFocus(0))
             elif self.focus_cursor.row >= row_count:
                 self._apply_focus_cursor(TimelineFocus(row_count - 1))
             return
         tl = self.session.timeline
-        if tl.focus_row >= row_count:
+        if row_count <= 0:
+            tl.focus_row = 0
+        elif tl.focus_row >= row_count:
             tl.focus_row = row_count - 1
-
-    def _move_focus(self, delta: int) -> None:
-        view = self.build_view_state(paused=self.playback.paused)
-        self._apply_focus_cursor(move_focus(self.focus_cursor, delta, view))
 
     def handle_move_mode_keydown(self, event: pygame.event.Event) -> bool:
         """Reorder keys while move mode is active. True when consumed."""
@@ -781,35 +610,18 @@ class TuningControls:
         )
 
     def _focus_song_marker(self, marker_index: int | None) -> None:
-        if marker_index is not None:
-            self._apply_focus_cursor(
-                MainFocus(
-                    RowDescriptor(
-                        RowKind.SONG_MARKER_ITEM,
-                        marker_index=marker_index,
-                    )
-                )
-            )
+        focus = self.shell_focus
+        if focus.selected_id != "song_markers":
             return
-        self._apply_focus_cursor(
-            MainFocus(RowDescriptor(RowKind.SONG_MARKERS_HEADER))
-        )
-
-    def _apply_horizontal(self, forward: bool, large: bool, kind: RowKind) -> None:
-        field = ROW_SPECS.get(kind)
-        if (
-            field is not None
-            and field.present_style == RowPresentStyle.EXPAND_SUBHEADER
-            and field.apply_horizontal is not None
-        ):
-            field.apply_horizontal(
-                self, self.focus_descriptor, forward, large
+        if marker_index is None:
+            focus.inspector_cursor = RowDescriptor(RowKind.SONG_MARKERS_HEADER)
+        else:
+            focus.inspector_cursor = RowDescriptor(
+                RowKind.SONG_MARKER_ITEM,
+                marker_index=marker_index,
             )
-            return
-
-        apply_field_horizontal(
-            self, self.focus_descriptor, forward, large
-        )
+        focus.inspector_command_id = None
+        focus.region = ShellRegion.INSPECTOR
 
     def toggle_layer_locked(self, slot: str) -> None:
         layer = self.session.layers[slot]
@@ -848,24 +660,6 @@ class TuningControls:
             else NOTIFICATION_TIMELINE_DISABLED_TEXT
         )
 
-    def set_beat_bar_grid_expanded(self, expanded: bool) -> None:
-        tl = self.session.timeline
-        if tl.beat_bar_grid_expanded == expanded:
-            return
-        tl.beat_bar_grid_expanded = expanded
-
-    def set_timeline_cuts_expanded(self, expanded: bool) -> None:
-        tl = self.session.timeline
-        if tl.cuts_expanded == expanded:
-            return
-        tl.cuts_expanded = expanded
-
-    def set_timeline_presets_expanded(self, expanded: bool) -> None:
-        tl = self.session.timeline
-        if tl.timeline_presets_expanded == expanded:
-            return
-        tl.timeline_presets_expanded = expanded
-
     def do_seek(self, delta_sec: float) -> None:
         if self._layer_bindings is not None:
             self._layer_bindings.on_seek(delta_sec)
@@ -889,19 +683,6 @@ class TuningControls:
 
     def dismiss_notification(self) -> None:
         self._notification_host.dismiss_timed()
-
-    def _dismiss_timed_notification_if_present(self) -> bool:
-        if self._notification_host.active().message is None:
-            return False
-        focused_toast = (
-            self.focus_descriptor.kind == RowKind.PANEL_NOTIFICATION
-            and self.focus_descriptor.marker_index == 1
-        )
-        self.dismiss_notification()
-        if focused_toast:
-            view = self.build_view_state(paused=self.playback.paused)
-            self.focus_descriptor = first_leftover_descriptor(view)
-        return True
 
     def prompt_apply_timeline_preset(self) -> None:
         self._timeline_presets.prompt(self.duration_sec)
@@ -933,6 +714,10 @@ class TuningControls:
         if 0 <= desc.marker_index < len(times):
             self.seek_to(times[desc.marker_index])
 
+    def set_timeline_focus_row(self, row: int) -> None:
+        """Move the strip cursor to *row* in ``layer_z_order``."""
+        self._apply_focus_cursor(TimelineFocus(row))
+
     def open_timeline_panel(self, *, enter_submenu: bool = False) -> None:
         tl = self.session.timeline
         tl.panel_open = True
@@ -945,11 +730,6 @@ class TuningControls:
             return
         was_timeline = isinstance(self.focus_cursor, TimelineFocus)
         tl.panel_open = False
-        view = self.build_view_state(paused=self.playback.paused)
-        header = RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
-        if not view.layout.contains_descriptor(header):
-            header = first_leftover_descriptor(view)
-        self._apply_focus_cursor(MainFocus(header))
         if was_timeline:
             self.shell_focus.region = ShellRegion.NAVIGATOR
 

@@ -62,7 +62,6 @@ def test_drop_inserts_without_selecting() -> None:
     markers = session.song_markers
     assert markers.times == [15.0]
     assert markers.selected_index is None
-    assert markers.expanded is True
     assert session.timeline.panel_open is True
     assert notes == ["Song marker 00:15.00"]
 
@@ -73,15 +72,6 @@ def test_drop_refused_while_recording() -> None:
     controller._playback.player.seek(15.0)
     controller.drop()
     assert session.song_markers.times == []
-
-
-def test_set_expanded() -> None:
-    controller, session, _modal = _make_controller()
-    assert session.song_markers.expanded is False
-    controller.set_expanded(True)
-    assert session.song_markers.expanded is True
-    controller.set_expanded(True)
-    assert session.song_markers.expanded is True
 
 
 def test_sync_focus_selects_marker_item() -> None:

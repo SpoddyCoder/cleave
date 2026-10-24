@@ -139,7 +139,9 @@ def test_focus_change_changes_static_row_keys_for_affected_rows() -> None:
         ),
     )
     focused_transport = _layer_view_state(
-        focus_cursor=MainFocus(RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)),
+        focus_cursor=MainFocus(
+            RowDescriptor(RowKind.TRACK_STEM, slot="layer_1")
+        ),
     )
 
     track_key_when_track_focused = next(
@@ -1025,7 +1027,7 @@ def test_timeline_open_full_upload_not_skip() -> None:
     from cleave.viz.tuning_view_state import RenderTimelineBlock
 
     state = _layer_view_state(
-        render_timeline=RenderTimelineBlock(enabled=True, expanded=True),
+        render_timeline=RenderTimelineBlock(enabled=True),
     )
     kwargs = dict(viewport_width=1280, viewport_height=720)
 

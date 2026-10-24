@@ -1,4 +1,4 @@
-"""Song-marker drop, delete, and expand for live tuning."""
+"""Song-marker drop and delete for live tuning."""
 
 from __future__ import annotations
 
@@ -36,12 +36,6 @@ class SongMarkerController:
         self._on_notification = on_notification
         self._on_focus_marker = on_focus_marker
 
-    def set_expanded(self, expanded: bool) -> None:
-        markers = self.session.song_markers
-        if markers.expanded == expanded:
-            return
-        markers.expanded = expanded
-
     def sync_focus(self, descriptor: RowDescriptor) -> None:
         if (
             descriptor.kind == RowKind.SONG_MARKER_ITEM
@@ -70,7 +64,6 @@ class SongMarkerController:
             markers.markers, t
         )
         markers.markers = list(new_markers)
-        markers.expanded = True
         self.session.timeline.panel_open = True
         # Never activate the newly placed marker; keep prior selection by time.
         if prior_selected_time is None:

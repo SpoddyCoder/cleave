@@ -67,12 +67,9 @@ def test_quick_nav_walks_top_level_ids_and_wraps() -> None:
 
 
 def test_escape_region() -> None:
-    assert escape_region(ShellRegion.NAVIGATOR, leftover_rows=True) is ShellRegion.PANEL
-    assert escape_region(ShellRegion.NAVIGATOR, leftover_rows=False) is ShellRegion.NAVIGATOR
-    assert escape_region(ShellRegion.INSPECTOR, leftover_rows=True) is ShellRegion.NAVIGATOR
-    assert escape_region(ShellRegion.INSPECTOR, leftover_rows=False) is ShellRegion.NAVIGATOR
-    assert escape_region(ShellRegion.PANEL, leftover_rows=True) is ShellRegion.PANEL
-    assert escape_region(ShellRegion.PANEL, leftover_rows=False) is ShellRegion.PANEL
+    assert escape_region(ShellRegion.NAVIGATOR) is ShellRegion.NAVIGATOR
+    assert escape_region(ShellRegion.INSPECTOR) is ShellRegion.NAVIGATOR
+    assert not hasattr(ShellRegion, "PANEL")
 
 
 def test_tree_nav_stops_at_the_ends() -> None:

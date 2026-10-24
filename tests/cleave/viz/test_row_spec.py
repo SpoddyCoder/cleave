@@ -1033,10 +1033,12 @@ def test_apply_field_horizontal_adjusts_editor_window_size() -> None:
 
 
 def test_apply_field_horizontal_via_controls_keydown() -> None:
+    from tests.support.viz import press_main_row
+
     controls = _make_controls()
     controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_WIDTH_MODE)
 
-    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    press_main_row(controls, _keydown(pygame.K_RIGHT))
     assert controls.cfg.editor.ui_width_mode != DEFAULT_UI_WIDTH_MODE
     assert controls.cfg.editor.ui_width_mode == "fixed"
 
@@ -1152,13 +1154,11 @@ def test_format_row_value_timeline_cuts() -> None:
 def test_song_markers_expand_subheader_includes_count() -> None:
     state = _minimal_view_state(
         render_timeline=RenderTimelineBlock(
-            expanded=True,
-            song_markers_expanded=False,
             song_marker_times=(1.0, 2.0, 3.0, 4.0),
         )
     )
     desc = RowDescriptor(RowKind.SONG_MARKERS_HEADER)
-    assert row_expand_subheader_display_text(state, desc) == "└─ song markers (4) ▶"
+    assert row_expand_subheader_display_text(state, desc) == "└─ song markers (4) ▼"
 
 
 def test_composite_header_render_overlay_metadata() -> None:

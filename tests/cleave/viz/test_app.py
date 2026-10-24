@@ -854,8 +854,8 @@ def test_key_routing_timeline_when_submenu_focused() -> None:
     runtime.controls.focus_cursor = TimelineFocus(0)
 
     assert _key_handler_for_session(runtime, pygame.K_RETURN) is timeline
-    assert _key_handler_for_session(runtime, pygame.K_UP) is main
-    assert _key_handler_for_session(runtime, pygame.K_DOWN) is main
+    assert _key_handler_for_session(runtime, pygame.K_UP) is timeline
+    assert _key_handler_for_session(runtime, pygame.K_DOWN) is timeline
 
 
 def test_key_routing_timeline_when_overlay_hidden_and_submenu_focused() -> None:
@@ -871,7 +871,7 @@ def test_key_routing_timeline_when_overlay_hidden_and_submenu_focused() -> None:
     runtime.controls.focus_cursor = TimelineFocus(0)
 
     assert _key_handler_for_session(runtime, pygame.K_RETURN) is timeline
-    assert _key_handler_for_session(runtime, pygame.K_UP) is main
+    assert _key_handler_for_session(runtime, pygame.K_UP) is timeline
 
 
 def test_keyup_routing_main_for_vertical_nav_when_submenu_focused() -> None:
@@ -885,8 +885,8 @@ def test_keyup_routing_main_for_vertical_nav_when_submenu_focused() -> None:
     runtime.seed.session.timeline.panel_open = True
     runtime.controls.focus_cursor = TimelineFocus(0)
 
-    assert _keyup_handler_for_session(runtime, pygame.K_UP) is main
-    assert _keyup_handler_for_session(runtime, pygame.K_DOWN) is main
+    assert _keyup_handler_for_session(runtime, pygame.K_UP) is timeline
+    assert _keyup_handler_for_session(runtime, pygame.K_DOWN) is timeline
     assert _keyup_handler_for_session(runtime, pygame.K_RETURN) is timeline
 
 

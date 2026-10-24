@@ -130,6 +130,12 @@ def field_for_index(state: TuningViewState, index: int) -> RowSpec | None:
 def row_has_tree_focus(state: TuningViewState, index: int) -> bool:
     if state.timeline_submenu_focused:
         return False
+    if index < 0 or index >= len(state.layout):
+        return False
+    from cleave.viz.row_layout import row_navigable
+
+    if not row_navigable(state, state.layout.descriptor(index)):
+        return False
     return index == state.focus_index
 
 

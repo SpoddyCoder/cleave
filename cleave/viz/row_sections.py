@@ -45,34 +45,6 @@ def _inspector_group_toggle(
     return None
 
 
-def _toggle_song_markers(controls: TuningControls, _slot: str | None, forward: bool) -> None:
-    controls.song_markers.set_expanded(forward)
-
-
-def _toggle_beat_bar_grid(controls: TuningControls, _slot: str | None, forward: bool) -> None:
-    controls.set_beat_bar_grid_expanded(forward)
-
-
-def _beat_bar_grid_expanded(state: TuningViewState, _slot: str | None) -> bool:
-    return state.render_timeline.beat_bar_grid_expanded
-
-
-def _toggle_timeline_cuts(controls: TuningControls, _slot: str | None, forward: bool) -> None:
-    controls.set_timeline_cuts_expanded(forward)
-
-
-def _timeline_cuts_expanded(state: TuningViewState, _slot: str | None) -> bool:
-    return state.render_timeline.cuts_expanded
-
-
-def _toggle_timeline_presets(controls: TuningControls, _slot: str | None, forward: bool) -> None:
-    controls.set_timeline_presets_expanded(forward)
-
-
-def _timeline_presets_expanded(state: TuningViewState, _slot: str | None) -> bool:
-    return state.render_timeline.timeline_presets_expanded
-
-
 def _open_timeline_panel(controls: TuningControls, forward: bool) -> None:
     if forward:
         controls.open_timeline_panel()
@@ -165,10 +137,6 @@ PANEL_ANCHOR_TOGGLE_BY_HEADER: dict[RowKind, PanelAnchorToggleFn] = {
 }
 
 PANEL_ANCHOR_HEADER_KINDS = frozenset(PANEL_ANCHOR_BY_HEADER)
-
-
-def _song_markers_expanded(state: TuningViewState, _slot: str | None) -> bool:
-    return state.render_timeline.song_markers_expanded
 
 
 def _append_track_effect_rows(
@@ -753,8 +721,8 @@ RENDER_SECTION_NODES: tuple[SectionNode, ...] = (
 SONG_MARKERS_SECTION = ExpandSectionDef(
     header_kind=RowKind.SONG_MARKERS_HEADER,
     context="global",
-    read_expanded=_song_markers_expanded,
-    toggle=_toggle_song_markers,
+    read_expanded=_inspector_group_expanded,
+    toggle=_inspector_group_toggle,
     children=(
         SectionNode(leaf_kind=RowKind.TIMELINE_SNAP_TO_SONG_MARKERS),
     ),
@@ -764,8 +732,8 @@ SONG_MARKERS_SECTION = ExpandSectionDef(
 BEAT_BAR_GRID_SECTION = ExpandSectionDef(
     header_kind=RowKind.TIMELINE_BEAT_BAR_GRID_HEADER,
     context="global",
-    read_expanded=_beat_bar_grid_expanded,
-    toggle=_toggle_beat_bar_grid,
+    read_expanded=_inspector_group_expanded,
+    toggle=_inspector_group_toggle,
     children=(
         SectionNode(leaf_kind=RowKind.TIMELINE_PLACEMENT_SNAP),
         SectionNode(leaf_kind=RowKind.TIMELINE_BAR_GRID),
@@ -814,8 +782,8 @@ TIMELINE_SOFT_CUTS_ACTIVE = ConditionalRowsDef(
 TIMELINE_CUTS_SECTION = ExpandSectionDef(
     header_kind=RowKind.TIMELINE_CUTS_HEADER,
     context="global",
-    read_expanded=_timeline_cuts_expanded,
-    toggle=_toggle_timeline_cuts,
+    read_expanded=_inspector_group_expanded,
+    toggle=_inspector_group_toggle,
     children=(
         SectionNode(leaf_kind=RowKind.TIMELINE_HARD_CUTS),
         SectionNode(conditional=TIMELINE_HARD_CUTS_ACTIVE),
@@ -827,8 +795,8 @@ TIMELINE_CUTS_SECTION = ExpandSectionDef(
 TIMELINE_PRESETS_SECTION = ExpandSectionDef(
     header_kind=RowKind.TIMELINE_PRESETS_HEADER,
     context="global",
-    read_expanded=_timeline_presets_expanded,
-    toggle=_toggle_timeline_presets,
+    read_expanded=_inspector_group_expanded,
+    toggle=_inspector_group_toggle,
     children=(
         SectionNode(leaf_kind=RowKind.TIMELINE_PRESET_CHARACTER),
         SectionNode(leaf_kind=RowKind.TIMELINE_PRESET_DENSITY),
@@ -1230,20 +1198,6 @@ def append_expand_section_rows(
     )
     if section.append_dynamic_children is not None:
         section.append_dynamic_children(row_list, state, slot)
-
-
-def append_leftover_timeline_rows(
-    row_list: list[RowDescriptor],
-    state: TuningViewState,
-) -> None:
-    """Timeline anchor and its subsections. Overlays, post-FX, and pattern mask stay in the inspector."""
-    row_list.append(RowDescriptor(RowKind.RENDER_TIMELINE_HEADER))
-    if not state.render_timeline.expanded:
-        return
-    append_expand_section_rows(row_list, BEAT_BAR_GRID_SECTION, state)
-    append_expand_section_rows(row_list, SONG_MARKERS_SECTION, state)
-    append_expand_section_rows(row_list, TIMELINE_CUTS_SECTION, state)
-    append_expand_section_rows(row_list, TIMELINE_PRESETS_SECTION, state)
 
 
 _PER_SLOT_SECTION_HEADERS = frozenset(

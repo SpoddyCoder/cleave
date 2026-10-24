@@ -172,10 +172,10 @@ def test_move_mode_up_reorders_layers_before_navigator_cursor() -> None:
     assert controls.shell_focus.selected_id == selected
 
 
-def test_panel_render_header_l_still_toggles_overlay_lock() -> None:
+def test_navigator_render_overlays_l_toggles_overlay_lock() -> None:
     controls = _make_controls(("layer_1",))
-    controls.focus_cursor = MainFocus(RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER))
-    _select_layer(controls, "layer_1", region=ShellRegion.PANEL)
+    controls.shell_focus.region = ShellRegion.NAVIGATOR
+    controls.shell_focus.selected_id = "render.overlays"
     runtime = _runtime(controls)
 
     assert dispatch_keydown(keydown(pygame.K_l), runtime) is True
@@ -309,8 +309,8 @@ def test_curation_shell_allowlist() -> None:
     controls.layer_lifecycle.prompt_add.assert_not_called()
 
     assert dispatch_keydown(keydown(pygame.K_ESCAPE), runtime) is True
-    assert controls.consume_hide_overlay() is True
-    assert controls.shell_focus.region is ShellRegion.INSPECTOR
+    assert controls.consume_hide_overlay() is False
+    assert controls.shell_focus.region is ShellRegion.NAVIGATOR
 
     _select_layer(controls, "layer_1", region=ShellRegion.NAVIGATOR)
     assert dispatch_keydown(keydown(pygame.K_ESCAPE), runtime) is True

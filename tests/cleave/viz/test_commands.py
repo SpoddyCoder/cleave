@@ -739,7 +739,7 @@ def test_show_strip_toggles_panel_and_is_disabled_while_recording_or_curating() 
     assert show.checked(command_context(closed)) is True
     show.run(closed)
     assert closed.session.timeline.panel_open is False
-    assert not isinstance(closed.focus_cursor, TimelineFocus)
+    assert isinstance(closed.focus_cursor, TimelineFocus)
     assert closed.shell_focus.region is ShellRegion.NAVIGATOR
 
     recording = _make_controls(("layer_1",))

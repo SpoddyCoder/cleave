@@ -160,9 +160,6 @@ def test_unmigrated_nodes_return_no_rows() -> None:
 
 def test_render_timeline_page_is_three_groups() -> None:
     state = _view_state()
-    state.render_timeline.timeline_presets_expanded = False
-    state.render_timeline.beat_bar_grid_expanded = True
-    state.render_timeline.cuts_expanded = True
     preset_key = InspectorGroupKey(RowKind.TIMELINE_PRESETS_HEADER)
     beat_key = InspectorGroupKey(RowKind.TIMELINE_BEAT_BAR_GRID_HEADER)
     cuts_key = InspectorGroupKey(RowKind.TIMELINE_CUTS_HEADER)
@@ -259,7 +256,6 @@ def test_render_timeline_page_is_three_groups() -> None:
 
 def test_song_markers_page_is_snap_and_marker_rows() -> None:
     state = _view_state()
-    state.render_timeline.song_markers_expanded = False
     state.render_timeline.song_marker_times = (1.0, 4.0, 9.0)
     rows = build_inspector_rows(state, "song_markers", frozenset())
     kinds = _kinds(rows)

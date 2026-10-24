@@ -128,7 +128,7 @@ def test_builder_patches_highlight_rolloff_curve_without_structure_rebuild() -> 
     assert view_b.render_post_fx.highlight_rolloff.curve == "smoothstep"
 
 
-def test_structure_signature_invalidates_on_timeline_panel_open() -> None:
+def test_structure_signature_ignores_timeline_panel_open() -> None:
     controls = _make_controls(("layer_1",))
     session = controls.session
     config_save = controls._config_save
@@ -140,217 +140,36 @@ def test_structure_signature_invalidates_on_timeline_panel_open() -> None:
     sig_after = view_state_structure_signature(
         session, config_save, notification_active=False
     )
-    assert sig_before != sig_after
+    assert sig_before == sig_after
 
 
-def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
+
+def test_layout_rows_omit_timeline_and_song_markers() -> None:
     controls = _make_controls(("layer_1",))
     session = controls.session
-    session.timeline.panel_open = False
-    builder = controls._view_state
-
-    view_closed = builder.build(paused=False)
-    presets_header = RowDescriptor(RowKind.TIMELINE_PRESETS_HEADER)
-    preset_character = RowDescriptor(RowKind.TIMELINE_PRESET_CHARACTER)
-    preset_density = RowDescriptor(RowKind.TIMELINE_PRESET_DENSITY)
-    preset_cue_snap = RowDescriptor(RowKind.TIMELINE_PRESET_CUE_SNAP)
-    preset_song_marker_snap = RowDescriptor(RowKind.TIMELINE_PRESET_SONG_MARKER_SNAP)
-    preset_timeline_cuts = RowDescriptor(RowKind.TIMELINE_PRESET_TIMELINE_CUTS)
-    preset_repopulate = RowDescriptor(RowKind.TIMELINE_PRESET_REPOPULATE)
-    preset_conductor = RowDescriptor(RowKind.TIMELINE_PRESET_CONDUCTOR)
-    preset_mode = RowDescriptor(RowKind.TIMELINE_PRESET_MODE)
-    presets_apply = RowDescriptor(RowKind.TIMELINE_PRESETS)
-    reset = RowDescriptor(RowKind.TIMELINE_RESET)
-    beat_bar_header = RowDescriptor(RowKind.TIMELINE_BEAT_BAR_GRID_HEADER)
-    bar_phase = RowDescriptor(RowKind.TIMELINE_BAR_PHASE)
-    bar_grid = RowDescriptor(RowKind.TIMELINE_BAR_GRID)
-    placement_snap = RowDescriptor(RowKind.TIMELINE_PLACEMENT_SNAP)
-    snap_cues = RowDescriptor(RowKind.TIMELINE_SNAP_CUES)
-    snap_markers = RowDescriptor(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS)
-    cuts_header = RowDescriptor(RowKind.TIMELINE_CUTS_HEADER)
-    hard_cut_fades = RowDescriptor(RowKind.TIMELINE_HARD_CUTS)
-    hard_cut_fade_in = RowDescriptor(RowKind.TIMELINE_HARD_CUT_FADE_IN)
-    hard_cut_fade_out = RowDescriptor(RowKind.TIMELINE_HARD_CUT_FADE_OUT)
-    hard_cut_crossfade = RowDescriptor(RowKind.TIMELINE_HARD_CUT_CROSSFADE)
-    soft_cut_fades = RowDescriptor(RowKind.TIMELINE_SOFT_CUTS)
-    soft_cut_fade_in = RowDescriptor(RowKind.TIMELINE_SOFT_CUT_FADE_IN)
-    soft_cut_fade_out = RowDescriptor(RowKind.TIMELINE_SOFT_CUT_FADE_OUT)
-    soft_cut_crossfade = RowDescriptor(RowKind.TIMELINE_SOFT_CUT_CROSSFADE)
-    apply_soft_cuts = RowDescriptor(RowKind.TIMELINE_APPLY_SOFT_CUTS)
-    apply_hard_cuts = RowDescriptor(RowKind.TIMELINE_APPLY_HARD_CUTS)
-    remove_soft_cuts = RowDescriptor(RowKind.TIMELINE_REMOVE_SOFT_CUTS)
-    remove_hard_cuts = RowDescriptor(RowKind.TIMELINE_REMOVE_HARD_CUTS)
-    markers_header = RowDescriptor(RowKind.SONG_MARKERS_HEADER)
-    assert presets_header not in view_closed.layout.rows
-    assert presets_apply not in view_closed.layout.rows
-    assert reset not in view_closed.layout.rows
-    assert beat_bar_header not in view_closed.layout.rows
-    assert bar_phase not in view_closed.layout.rows
-    assert bar_grid not in view_closed.layout.rows
-    assert placement_snap not in view_closed.layout.rows
-    assert snap_cues not in view_closed.layout.rows
-    assert snap_markers not in view_closed.layout.rows
-    assert cuts_header not in view_closed.layout.rows
-    assert markers_header not in view_closed.layout.rows
-
     session.timeline.panel_open = True
-    view_open = builder.build(paused=False)
-    assert view_open.layout is not view_closed.layout
-    assert presets_header in view_open.layout.rows
-    assert preset_character not in view_open.layout.rows
-    assert preset_density not in view_open.layout.rows
-    assert preset_cue_snap not in view_open.layout.rows
-    assert preset_song_marker_snap not in view_open.layout.rows
-    assert preset_timeline_cuts not in view_open.layout.rows
-    assert preset_repopulate not in view_open.layout.rows
-    assert preset_conductor not in view_open.layout.rows
-    assert preset_mode not in view_open.layout.rows
-    assert presets_apply not in view_open.layout.rows
-    assert reset not in view_open.layout.rows
-    assert beat_bar_header in view_open.layout.rows
-    assert bar_phase not in view_open.layout.rows
-    assert bar_grid not in view_open.layout.rows
-    assert placement_snap not in view_open.layout.rows
-    assert snap_cues not in view_open.layout.rows
-    assert snap_markers not in view_open.layout.rows
-    assert cuts_header in view_open.layout.rows
-    assert hard_cut_fades not in view_open.layout.rows
-    assert markers_header in view_open.layout.rows
-    markers_idx = view_open.layout.rows.index(markers_header)
-    beat_bar_idx = view_open.layout.rows.index(beat_bar_header)
-    cuts_idx = view_open.layout.rows.index(cuts_header)
-    presets_header_idx = view_open.layout.rows.index(presets_header)
-    assert markers_idx == beat_bar_idx + 1
-    assert cuts_idx == markers_idx + 1
-    assert presets_header_idx == cuts_idx + 1
-
-    session.song_markers.expanded = True
-    view_markers_expanded = builder.build(paused=False)
-    assert snap_cues not in view_markers_expanded.layout.rows
-    assert snap_markers in view_markers_expanded.layout.rows
-    markers_idx = view_markers_expanded.layout.rows.index(markers_header)
-    beat_bar_idx = view_markers_expanded.layout.rows.index(beat_bar_header)
-    assert markers_idx == beat_bar_idx + 1
-    assert view_markers_expanded.layout.rows.index(snap_markers) == markers_idx + 1
-
-    session.timeline.beat_bar_grid_expanded = True
-    view_beat_expanded = builder.build(paused=False)
-    assert view_beat_expanded.layout is not view_open.layout
-    beat_bar_idx = view_beat_expanded.layout.rows.index(beat_bar_header)
-    bar_phase_idx = view_beat_expanded.layout.rows.index(bar_phase)
-    bar_grid_idx = view_beat_expanded.layout.rows.index(bar_grid)
-    placement_snap_idx = view_beat_expanded.layout.rows.index(placement_snap)
-    snap_cues_idx = view_beat_expanded.layout.rows.index(snap_cues)
-    snap_markers_idx = view_beat_expanded.layout.rows.index(snap_markers)
-    markers_idx = view_beat_expanded.layout.rows.index(markers_header)
-    cuts_idx = view_beat_expanded.layout.rows.index(cuts_header)
-    assert placement_snap_idx == beat_bar_idx + 1
-    assert bar_grid_idx == placement_snap_idx + 1
-    assert bar_phase_idx == bar_grid_idx + 1
-    assert snap_cues_idx == bar_phase_idx + 1
-    assert markers_idx == snap_cues_idx + 1
-    assert snap_markers_idx == markers_idx + 1
-    assert cuts_idx == snap_markers_idx + 1
-    assert hard_cut_fades not in view_beat_expanded.layout.rows
-    assert soft_cut_fades not in view_beat_expanded.layout.rows
-    assert view_beat_expanded.layout.rows.index(presets_header) == cuts_idx + 1
-    assert reset not in view_beat_expanded.layout.rows
-
-    session.timeline.cuts_expanded = True
-    view_cuts_expanded = builder.build(paused=False)
-    assert view_cuts_expanded.layout is not view_beat_expanded.layout
-    cuts_idx = view_cuts_expanded.layout.rows.index(cuts_header)
-    assert view_cuts_expanded.layout.rows.index(hard_cut_fades) == cuts_idx + 1
-    assert view_cuts_expanded.layout.rows.index(soft_cut_fades) == cuts_idx + 2
-    assert apply_soft_cuts not in view_cuts_expanded.layout.rows
-    assert apply_hard_cuts not in view_cuts_expanded.layout.rows
-    assert remove_soft_cuts not in view_cuts_expanded.layout.rows
-    assert remove_hard_cuts not in view_cuts_expanded.layout.rows
-    assert hard_cut_fade_in not in view_cuts_expanded.layout.rows
-    assert soft_cut_fade_in not in view_cuts_expanded.layout.rows
-    assert view_cuts_expanded.layout.rows.index(presets_header) == cuts_idx + 3
-
+    session.song_markers.times = [1.0, 8.0]
     session.timeline.hard_cut_fades.enabled = True
     session.timeline.soft_cut_fades.enabled = True
-    view_cuts_enabled = builder.build(paused=False)
-    assert view_cuts_enabled.layout is not view_cuts_expanded.layout
-    cuts_idx = view_cuts_enabled.layout.rows.index(cuts_header)
-    assert view_cuts_enabled.layout.rows.index(hard_cut_fades) == cuts_idx + 1
-    assert view_cuts_enabled.layout.rows.index(hard_cut_fade_in) == cuts_idx + 2
-    assert view_cuts_enabled.layout.rows.index(hard_cut_fade_out) == cuts_idx + 3
-    assert view_cuts_enabled.layout.rows.index(hard_cut_crossfade) == cuts_idx + 4
-    assert view_cuts_enabled.layout.rows.index(apply_hard_cuts) == cuts_idx + 5
-    assert view_cuts_enabled.layout.rows.index(remove_hard_cuts) == cuts_idx + 6
-    assert view_cuts_enabled.layout.rows.index(soft_cut_fades) == cuts_idx + 7
-    assert view_cuts_enabled.layout.rows.index(soft_cut_fade_in) == cuts_idx + 8
-    assert view_cuts_enabled.layout.rows.index(soft_cut_fade_out) == cuts_idx + 9
-    assert view_cuts_enabled.layout.rows.index(soft_cut_crossfade) == cuts_idx + 10
-    assert view_cuts_enabled.layout.rows.index(apply_soft_cuts) == cuts_idx + 11
-    assert view_cuts_enabled.layout.rows.index(remove_soft_cuts) == cuts_idx + 12
-    assert view_cuts_enabled.layout.rows.index(presets_header) == cuts_idx + 13
-
-    session.timeline.timeline_presets_expanded = True
-    view_presets_expanded = builder.build(paused=False)
-    assert view_presets_expanded.layout is not view_cuts_enabled.layout
-    presets_header_idx = view_presets_expanded.layout.rows.index(presets_header)
-    assert view_presets_expanded.layout.rows.index(preset_character) == (
-        presets_header_idx + 1
-    )
-    assert view_presets_expanded.layout.rows.index(preset_density) == (
-        presets_header_idx + 2
-    )
-    assert view_presets_expanded.layout.rows.index(preset_cue_snap) == (
-        presets_header_idx + 3
-    )
-    assert view_presets_expanded.layout.rows.index(preset_song_marker_snap) == (
-        presets_header_idx + 4
-    )
-    assert view_presets_expanded.layout.rows.index(preset_timeline_cuts) == (
-        presets_header_idx + 5
-    )
-    assert view_presets_expanded.layout.rows.index(preset_repopulate) == (
-        presets_header_idx + 6
-    )
-    assert view_presets_expanded.layout.rows.index(preset_conductor) == (
-        presets_header_idx + 7
-    )
-    assert view_presets_expanded.layout.rows.index(preset_mode) == (
-        presets_header_idx + 8
-    )
-    assert view_presets_expanded.layout.rows.index(presets_apply) == (
-        presets_header_idx + 9
-    )
-    assert view_presets_expanded.layout.rows.index(reset) == presets_header_idx + 10
-
-    session.timeline.timeline_presets_expanded = False
-    view_presets_collapsed = builder.build(paused=False)
-    assert view_presets_collapsed.layout is not view_presets_expanded.layout
-    assert preset_character not in view_presets_collapsed.layout.rows
-    assert preset_density not in view_presets_collapsed.layout.rows
-    assert preset_cue_snap not in view_presets_collapsed.layout.rows
-    assert preset_song_marker_snap not in view_presets_collapsed.layout.rows
-    assert preset_timeline_cuts not in view_presets_collapsed.layout.rows
-    assert preset_repopulate not in view_presets_collapsed.layout.rows
-    assert preset_conductor not in view_presets_collapsed.layout.rows
-    assert preset_mode not in view_presets_collapsed.layout.rows
-    assert presets_apply not in view_presets_collapsed.layout.rows
-    assert reset not in view_presets_collapsed.layout.rows
-    assert presets_header in view_presets_collapsed.layout.rows
+    view = controls.build_view_state(paused=False)
+    kinds = {row.kind for row in view.layout.rows}
+    forbidden = {
+        RowKind.RENDER_TIMELINE_HEADER,
+        RowKind.SONG_MARKERS_HEADER,
+        RowKind.SONG_MARKER_ITEM,
+        RowKind.TIMELINE_PRESETS_HEADER,
+        RowKind.TIMELINE_BEAT_BAR_GRID_HEADER,
+        RowKind.TIMELINE_CUTS_HEADER,
+        RowKind.TIMELINE_SNAP_TO_SONG_MARKERS,
+        RowKind.TIMELINE_PRESET_CHARACTER,
+        RowKind.TIMELINE_HARD_CUTS,
+    }
+    assert kinds.isdisjoint(forbidden)
+    assert kinds <= {RowKind.PANEL_NOTIFICATION}
 
     session.timeline.panel_open = False
-    view_closed_again = builder.build(paused=False)
-    assert view_closed_again.layout is not view_open.layout
-    assert presets_header not in view_closed_again.layout.rows
-    assert presets_apply not in view_closed_again.layout.rows
-    assert reset not in view_closed_again.layout.rows
-    assert cuts_header not in view_closed_again.layout.rows
-    assert bar_phase not in view_closed_again.layout.rows
-    assert bar_grid not in view_closed_again.layout.rows
-    assert placement_snap not in view_closed_again.layout.rows
-    assert snap_cues not in view_closed_again.layout.rows
-    assert snap_markers not in view_closed_again.layout.rows
-    assert markers_header not in view_closed_again.layout.rows
-
+    closed = controls.build_view_state(paused=False)
+    assert {row.kind for row in closed.layout.rows} == kinds
 
 def test_structure_signature_invalidates_on_highlight_rolloff_mode() -> None:
     controls = _make_controls(("layer_1",))
@@ -704,7 +523,7 @@ def test_minimal_view_state_still_builds_layout() -> None:
     state = _minimal_view_state()
     assert state.layout is not None
     assert state.layout_frame is not None
-    assert len(state.layout.rows) > 0
+    assert state.layout.rows == ()
 
 
 def test_structure_signature_invalidates_on_song_marker_count() -> None:
@@ -721,64 +540,6 @@ def test_structure_signature_invalidates_on_song_marker_count() -> None:
     assert sig_before != sig_after
 
 
-def test_structure_signature_invalidates_on_song_markers_expanded() -> None:
-    controls = _make_controls(("layer_1",))
-    session = controls.session
-    config_save = controls._config_save
-    session.song_markers.expanded = False
-    sig_before = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
-    session.song_markers.expanded = True
-    sig_after = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
-    assert sig_before != sig_after
-
-
-def test_structure_signature_invalidates_on_beat_bar_grid_expanded() -> None:
-    controls = _make_controls(("layer_1",))
-    session = controls.session
-    config_save = controls._config_save
-    session.timeline.beat_bar_grid_expanded = False
-    sig_before = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
-    session.timeline.beat_bar_grid_expanded = True
-    sig_after = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
-    assert sig_before != sig_after
-
-
-def test_structure_signature_invalidates_on_timeline_levels_expanded() -> None:
-    controls = _make_controls(("layer_1",))
-    session = controls.session
-    config_save = controls._config_save
-    session.timeline.cuts_expanded = False
-    sig_before = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
-    session.timeline.cuts_expanded = True
-    sig_after = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
-    assert sig_before != sig_after
-
-
-def test_structure_signature_invalidates_on_timeline_presets_expanded() -> None:
-    controls = _make_controls(("layer_1",))
-    session = controls.session
-    config_save = controls._config_save
-    session.timeline.timeline_presets_expanded = False
-    sig_before = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
-    session.timeline.timeline_presets_expanded = True
-    sig_after = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
-    assert sig_before != sig_after
 
 
 def test_structure_signature_invalidates_on_pattern_mask_type() -> None:
@@ -895,7 +656,7 @@ def test_leftover_layout_omits_settings_project_and_transport() -> None:
         assert flag not in sig
 
 
-def test_leftover_layout_omits_track_rows() -> None:
+def test_layout_omits_track_timeline_and_song_marker_rows() -> None:
     controls = _make_controls(("layer_1", "layer_2"))
     view = controls.build_view_state(paused=False)
     kinds = {row.kind for row in view.layout.rows}
@@ -906,22 +667,22 @@ def test_leftover_layout_omits_track_rows() -> None:
     assert RowKind.RENDER_OVERLAYS_HEADER not in kinds
     assert RowKind.RENDER_POST_FX_HEADER not in kinds
     assert RowKind.RENDER_PATTERN_MASK_HEADER not in kinds
-    assert RowKind.RENDER_TIMELINE_HEADER in kinds
+    assert RowKind.RENDER_TIMELINE_HEADER not in kinds
+    assert RowKind.SONG_MARKERS_HEADER not in kinds
+    assert RowKind.SONG_MARKER_ITEM not in kinds
 
     session = controls.session
     session.timeline.panel_open = True
-    session.song_markers.expanded = True
     session.song_markers.times = [1.0]
     open_view = controls.build_view_state(paused=False)
     open_kinds = {row.kind for row in open_view.layout.rows}
-    assert RowKind.SONG_MARKERS_HEADER in open_kinds
-    assert RowKind.SONG_MARKER_ITEM in open_kinds
-    assert RowKind.TIMELINE_BEAT_BAR_GRID_HEADER in open_kinds
+    assert RowKind.SONG_MARKERS_HEADER not in open_kinds
+    assert RowKind.SONG_MARKER_ITEM not in open_kinds
+    assert RowKind.TIMELINE_BEAT_BAR_GRID_HEADER not in open_kinds
+    assert RowKind.RENDER_TIMELINE_HEADER not in open_kinds
     assert not any(
         row.kind.name.startswith("TRACK_") for row in open_view.layout.rows
     )
-    assert RowKind.LAYER_MANAGEMENT_ADD not in open_kinds
-
 
 def test_curation_leftover_layout_is_notifications_only() -> None:
     controls = _make_controls(("layer_1",))
@@ -944,41 +705,25 @@ def test_curation_leftover_layout_is_notifications_only() -> None:
     }
 
 
-def test_row_layout_includes_song_marker_items_when_expanded() -> None:
+def test_song_marker_items_stay_on_the_inspector() -> None:
+    from cleave.viz.inspector import build_inspector_rows
+
     controls = _make_controls(("layer_1",))
     session = controls.session
     session.timeline.panel_open = True
     session.song_markers.times = [8.0, 32.5, 64.0]
-    session.song_markers.expanded = True
-    builder = controls._view_state
-
-    view = builder.build(paused=False)
-    header = RowDescriptor(RowKind.SONG_MARKERS_HEADER)
-    assert header in view.layout.rows
+    view = controls.build_view_state(paused=False)
+    layout_kinds = {row.kind for row in view.layout.rows}
+    assert RowKind.SONG_MARKERS_HEADER not in layout_kinds
+    assert RowKind.SONG_MARKER_ITEM not in layout_kinds
+    rows = build_inspector_rows(view, "song_markers", frozenset(), frozenset())
     items = [
-        desc
-        for desc in view.layout.rows
-        if desc.kind == RowKind.SONG_MARKER_ITEM
+        row.descriptor
+        for row in rows
+        if row.descriptor is not None
+        and row.descriptor.kind == RowKind.SONG_MARKER_ITEM
     ]
-    assert len(items) == 3
     assert [desc.marker_index for desc in items] == [0, 1, 2]
-    header_idx = view.layout.rows.index(header)
-    snap = RowDescriptor(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS)
-    assert view.layout.rows.index(snap) == header_idx + 1
-    assert view.layout.rows.index(items[0]) == header_idx + 2
-    beat_bar = RowDescriptor(RowKind.TIMELINE_BEAT_BAR_GRID_HEADER)
-    assert view.layout.rows.index(beat_bar) == header_idx - 1
-    cuts = RowDescriptor(RowKind.TIMELINE_CUTS_HEADER)
-    assert view.layout.rows.index(cuts) == header_idx + len(items) + 2
-
-    session.song_markers.expanded = False
-    view_collapsed = builder.build(paused=False)
-    assert header in view_collapsed.layout.rows
-    assert snap not in view_collapsed.layout.rows
-    assert not any(
-        desc.kind == RowKind.SONG_MARKER_ITEM for desc in view_collapsed.layout.rows
-    )
-
 
 def test_builder_appends_curation_markers_without_structure_change() -> None:
     controls = _make_controls(("layer_1",))

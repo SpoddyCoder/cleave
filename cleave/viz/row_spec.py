@@ -416,7 +416,7 @@ def format_composite_header_expand_value(
     state: TuningViewState, desc: RowDescriptor
 ) -> str:
     if desc.kind == RowKind.RENDER_TIMELINE_HEADER:
-        return expand_arrow_glyph(state.render_timeline.expanded)
+        return expand_arrow_glyph(False)
     return expand_arrow_for_header(state, desc.kind, desc.slot, card=desc.card)
 
 

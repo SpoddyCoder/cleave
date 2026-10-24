@@ -1,8 +1,8 @@
 """Shell focus model: region, Tab cycle, and escape.
 
-``ShellRegion`` is where focus sits, including the leftover panel.
-``CycleStop`` is the Tab ring. Menu and timeline cursors stay in their
-existing owners; this module only names the stops.
+``ShellRegion`` is where focus sits. ``CycleStop`` is the Tab ring. Menu and
+timeline cursors stay in their existing owners; this module only names the
+stops.
 """
 
 from __future__ import annotations
@@ -16,11 +16,10 @@ from cleave.viz.row_kinds import RowDescriptor, RowKind
 
 
 class ShellRegion(Enum):
-    """Focus region inside the shell. PANEL is never a Tab stop."""
+    """Focus region inside the shell. The timeline strip is not a region."""
 
     NAVIGATOR = auto()
     INSPECTOR = auto()
-    PANEL = auto()
 
 
 class CycleStop(Enum):
@@ -236,14 +235,12 @@ def _nearest_layer_id(
     return best
 
 
-def escape_region(region: ShellRegion, *, leftover_rows: bool) -> ShellRegion:
+def escape_region(region: ShellRegion) -> ShellRegion:
     """Escape target for *region*.
 
-    Inspector always returns to the navigator. The navigator returns to the
-    panel only while leftover rows exist. The panel stays on the panel.
+    Inspector returns to the navigator. The navigator stays on the navigator;
+    the navigator hides the UI itself.
     """
     if region is ShellRegion.INSPECTOR:
         return ShellRegion.NAVIGATOR
-    if region is ShellRegion.NAVIGATOR and leftover_rows:
-        return ShellRegion.PANEL
     return region

@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING
 import pygame
 
 from cleave.viz.commands import command_by_id, command_context
-from cleave.viz.editor_mode_controls import is_preset_curation_mode
 from cleave.viz.inspector import InspectorRow, build_inspector_rows
 from cleave.viz.row_hotkeys import handle_row_hotkey, node_header_descriptor
 from cleave.viz.row_spec import (
@@ -59,9 +58,6 @@ class InspectorControls:
                 self.activate(row)
             return True
         if key == pygame.K_ESCAPE:
-            if is_preset_curation_mode(self._controls.session.settings.editor_mode):
-                self._controls.request_hide_overlay()
-                return True
             self._controls.shell_focus.region = ShellRegion.NAVIGATOR
             return True
         return False
@@ -98,6 +94,8 @@ class InspectorControls:
             return
         focus.inspector_cursor = row.descriptor
         focus.inspector_command_id = None
+        if row.descriptor is not None:
+            self._controls.song_markers.sync_focus(row.descriptor)
 
     def toggle_group(self, key: InspectorGroupKey) -> None:
         focus = self._controls.shell_focus

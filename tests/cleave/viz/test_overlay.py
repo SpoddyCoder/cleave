@@ -204,7 +204,20 @@ def test_scrolled_panel_keeps_focus_row_in_viewport() -> None:
     assert row_y + line_h <= overlay._scroll_y + metrics.scroll_viewport_h
 
 
+def _ensure_drawable_panel(state: TuningViewState) -> None:
+    """Give an empty layout one toast so compose has a panel to measure."""
+    if state.layout.rows:
+        return
+    from cleave.viz.row_layout import RowLayout, build_layout_frame
+
+    object.__setattr__(state, "notification_message", "Saved")
+    object.__setattr__(state, "notification_remaining_sec", 5.0)
+    state.layout = RowLayout.build(state)
+    state.layout_frame = build_layout_frame(state.layout, state)
+
+
 def _copy_panel_surface(overlay: TuningOverlay, state: TuningViewState) -> pygame.Surface:
+    _ensure_drawable_panel(state)
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
     overlay.notify_input()
     overlay.draw(surface, state)
@@ -521,6 +534,7 @@ def test_bottom_row_highlight_stops_before_help_hint() -> None:
         },
         render_timeline=RenderTimelineBlock(enabled=True),
     )
+    _mount_track_sections(state)
     visible = state.layout.visible_indices(state)
     state.focus_descriptor = state.layout.descriptor(visible[-1])
     panel = _copy_panel_surface(overlay, state)
@@ -581,6 +595,7 @@ def test_bottom_row_rebuilt_with_help_hint_content_width() -> None:
             )
         },
     )
+    _mount_track_sections(state)
     visible = state.layout.visible_indices(state)
     state.focus_descriptor = state.layout.descriptor(visible[-1])
     overlay.notify_input()
@@ -676,6 +691,7 @@ def test_no_scrollbar_when_content_fits() -> None:
     pygame.init()
     overlay = TuningOverlay()
     state = _minimal_view_state()
+    _ensure_drawable_panel(state)
     metrics = _panel_scroll_metrics(overlay, state)
     assert not metrics.needs_scroll
     assert not metrics.show_scrollbar
@@ -835,6 +851,7 @@ def test_tuning_panel_is_placed_inside_visualiser_rect() -> None:
     overlay = TuningOverlay()
     overlay.notify_input()
     state = _minimal_view_state()
+    _ensure_drawable_panel(state)
     rect = (230, 48, 500, 400)
     composed = overlay.compose_panel(
         state,
@@ -962,7 +979,7 @@ def test_panel_notification_pinned_under_transport() -> None:
     header_idx = active.layout.find("layer_1", RowKind.TRACK_HEADER)
     assert notification_idx < header_idx
     assert row_is_pinned(RowKind.PANEL_NOTIFICATION)
-    assert notification_idx in active.layout.navigable_indices(active)
+    assert notification_idx not in active.layout.navigable_indices(active)
     assert _row_value_color(active, notification_idx) == HIGHLIGHT
     attention_idx = attention.layout.find_by_kind(RowKind.PANEL_NOTIFICATION)
     assert _row_value_color(attention, attention_idx) == NOTIFICATION_ON_FILL
@@ -995,7 +1012,7 @@ def test_persistent_and_timed_panel_notifications_stack() -> None:
     assert _row_text(stacked, timed_idx) == "Saved"
     navigable = stacked.layout.navigable_indices(stacked)
     assert persistent_idx not in navigable
-    assert timed_idx in navigable
+    assert timed_idx not in navigable
 
 
 def test_draw_panel_notification_without_error() -> None:
@@ -1020,7 +1037,8 @@ def test_build_row_layout_starts_at_render_without_layer_rows() -> None:
     assert RowKind.LAYER_MANAGEMENT_ADD not in kinds
     assert RowKind.RENDER_SECTION_GAP not in kinds
     assert not any(kind.name.startswith("TRACK_") for kind in kinds)
-    assert kinds[0] == RowKind.RENDER_TIMELINE_HEADER
+    assert RowKind.RENDER_TIMELINE_HEADER not in kinds
+    assert RowKind.SONG_MARKERS_HEADER not in kinds
     assert RowKind.RENDER_OVERLAYS_HEADER not in kinds
     assert RowKind.RENDER_POST_FX_HEADER not in kinds
     assert RowKind.RENDER_PATTERN_MASK_HEADER not in kinds
@@ -1148,18 +1166,24 @@ def test_action_row_value_color() -> None:
 
 
 def test_snap_to_song_markers_row_uses_action_color() -> None:
+    from cleave.viz.row_layout import build_layout_frame
+
     state = _minimal_view_state(
-        render_timeline=RenderTimelineBlock(
-            enabled=True,
-            expanded=True,
-            song_markers_expanded=True,
-        ),
+        render_timeline=RenderTimelineBlock(enabled=True),
     )
-    snap_row = state.layout.find_by_kind(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS)
+    anchor = RowDescriptor(RowKind.TRACK_HEADER, slot="layer_1")
+    desc = RowDescriptor(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS)
+    rows = (anchor, desc)
+    state.layout = state.layout.__class__(
+        rows=rows,
+        descriptor_index={row: index for index, row in enumerate(rows)},
+    )
+    object.__setattr__(state, "layout_frame", build_layout_frame(state.layout, state))
+    snap_row = 1
     assert _row_value_color(state, snap_row) == ACTION
     assert "▶" not in _row_text(state, snap_row)
     assert "▼" not in _row_text(state, snap_row)
-    state.focus_descriptor = state.layout.descriptor(snap_row)
+    state.focus_descriptor = desc
     assert _row_value_color(state, snap_row) == HIGHLIGHT
 
 
@@ -1167,16 +1191,28 @@ def test_apply_cuts_to_cues_rows_use_action_color() -> None:
     state = _minimal_view_state(
         render_timeline=RenderTimelineBlock(
             enabled=True,
-            expanded=True,
-            cuts_expanded=True,
             hard_cut_fades=TimelineFadeGroupBlock(enabled=True),
             soft_cut_fades=TimelineFadeGroupBlock(enabled=True),
         ),
     )
-    soft_row = state.layout.find_by_kind(RowKind.TIMELINE_APPLY_SOFT_CUTS)
-    hard_row = state.layout.find_by_kind(RowKind.TIMELINE_APPLY_HARD_CUTS)
-    remove_soft_row = state.layout.find_by_kind(RowKind.TIMELINE_REMOVE_SOFT_CUTS)
-    remove_hard_row = state.layout.find_by_kind(RowKind.TIMELINE_REMOVE_HARD_CUTS)
+    from cleave.viz.row_layout import build_layout_frame
+
+    rows = (
+        RowDescriptor(RowKind.TRACK_HEADER, slot="layer_1"),
+        RowDescriptor(RowKind.TIMELINE_APPLY_SOFT_CUTS),
+        RowDescriptor(RowKind.TIMELINE_APPLY_HARD_CUTS),
+        RowDescriptor(RowKind.TIMELINE_REMOVE_SOFT_CUTS),
+        RowDescriptor(RowKind.TIMELINE_REMOVE_HARD_CUTS),
+    )
+    state.layout = state.layout.__class__(
+        rows=rows,
+        descriptor_index={desc: index for index, desc in enumerate(rows)},
+    )
+    object.__setattr__(state, "layout_frame", build_layout_frame(state.layout, state))
+    soft_row = 1
+    hard_row = 2
+    remove_soft_row = 3
+    remove_hard_row = 4
     assert _row_value_color(state, soft_row) == ACTION
     assert _row_value_color(state, hard_row) == ACTION
     assert _row_value_color(state, remove_soft_row) == ACTION
@@ -1351,7 +1387,8 @@ def _inspector_kinds(state, node_id: str) -> list[RowKind]:
 def test_render_overlay_row_layout_includes_header_and_sub_rows_when_expanded() -> None:
     state = _minimal_view_state()
     leftover = [row.kind for row in state.layout.rows]
-    assert leftover[0] == RowKind.RENDER_TIMELINE_HEADER
+    assert RowKind.RENDER_TIMELINE_HEADER not in leftover
+    assert RowKind.SONG_MARKERS_HEADER not in leftover
     assert RowKind.RENDER_OVERLAYS_HEADER not in leftover
     assert RowKind.RENDER_OVERLAY_CARD_HEADER not in leftover
     opening = _inspector_kinds(state, overlay_card_node_id("opening_card"))
@@ -1444,12 +1481,9 @@ def test_draw_render_overlay_header_without_error() -> None:
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
     overlay.notify_input()
     overlay.draw(surface, state)
-    assert overlay.panel_rect is not None
-    header_row = state.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
-    assert header_row in state.layout.visible_indices(state)
-    assert RowKind.RENDER_OVERLAYS_HEADER not in {
-        row.kind for row in state.layout.rows
-    }
+    kinds = {row.kind for row in state.layout.rows}
+    assert RowKind.RENDER_TIMELINE_HEADER not in kinds
+    assert RowKind.RENDER_OVERLAYS_HEADER not in kinds
 
 
 def test_draw_track_header_with_solo_eye() -> None:
@@ -1517,49 +1551,32 @@ def test_disabled_track_focus_uses_standard_highlight() -> None:
 
 def test_main_tree_rows_not_highlighted_when_timeline_submenu_focused() -> None:
     state = _minimal_view_state(
-        render_timeline=RenderTimelineBlock(enabled=True, expanded=True),
+        render_timeline=RenderTimelineBlock(enabled=True),
     )
-    for row_kind_target in (
-        RowKind.TIMELINE_BEAT_BAR_GRID_HEADER,
-        RowKind.TRACK_HEADER,
-    ):
-        _mount_track_sections(state)
-        row = state.layout.find_by_kind(row_kind_target)
-        state.focus_descriptor = state.layout.descriptor(row)
-        state.timeline_submenu_focused = False
-        assert _row_value_color(state, row) == HIGHLIGHT
-        assert _row_bg_color(state, row) == HIGHLIGHT
-
-        state.timeline_submenu_focused = True
-        assert _row_value_color(state, row) != HIGHLIGHT
-        assert _row_bg_color(state, row) is None
-
-    timeline_row = state.layout.find_by_kind( RowKind.RENDER_TIMELINE_HEADER)
-    state.focus_descriptor = state.layout.descriptor(timeline_row)
+    _mount_track_sections(state)
+    row = state.layout.find_by_kind(RowKind.TRACK_HEADER)
+    state.focus_descriptor = state.layout.descriptor(row)
     state.timeline_submenu_focused = False
-    assert _row_value_color(state, timeline_row) == HIGHLIGHT
-    assert _row_bg_color(state, timeline_row) == HIGHLIGHT
+    assert _row_value_color(state, row) == HIGHLIGHT
+    assert _row_bg_color(state, row) == HIGHLIGHT
 
     state.timeline_submenu_focused = True
-    assert _row_value_color(state, timeline_row) == VALUE
-    assert _row_bg_color(state, timeline_row) is None
+    assert _row_value_color(state, row) != HIGHLIGHT
+    assert _row_bg_color(state, row) is None
 
 
 def test_draw_render_timeline_header_without_error() -> None:
     pygame.init()
     overlay = TuningOverlay()
     state = _minimal_view_state(
-        render_timeline=RenderTimelineBlock(
-            enabled=True,
-            expanded=False,
-        ),
+        render_timeline=RenderTimelineBlock(enabled=True),
     )
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
     overlay.notify_input()
     overlay.draw(surface, state)
-    assert overlay.panel_rect is not None
-    header_row = state.layout.find_by_kind( RowKind.RENDER_TIMELINE_HEADER)
-    assert header_row in state.layout.visible_indices(state)
+    assert RowKind.RENDER_TIMELINE_HEADER not in {
+        row.kind for row in state.layout.rows
+    }
 
 
 def test_overlay_starts_hidden() -> None:

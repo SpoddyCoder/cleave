@@ -23,15 +23,13 @@ def timeline_submenu_routes_to_timeline(
     tl,
     *,
     timeline_controls: TimelineControls | None,
-    key: int,
     focus_cursor: FocusCursor,
 ) -> bool:
-    """True when the key should route to timeline controls (submenu focused)."""
+    """True when keys should route to timeline controls (strip has scope)."""
     return (
         tl.panel_open
         and isinstance(focus_cursor, TimelineFocus)
         and timeline_controls is not None
-        and key not in (pygame.K_UP, pygame.K_DOWN)
     )
 
 
@@ -43,7 +41,6 @@ def key_handler_for_runtime(
     if timeline_submenu_routes_to_timeline(
         tl,
         timeline_controls=runtime.timeline_controls,
-        key=key,
         focus_cursor=runtime.controls.focus_cursor,
     ):
         return runtime.timeline_controls
@@ -226,11 +223,17 @@ def _strip_open(runtime: LiveVisualizerRuntime) -> bool:
 def _current_stop(runtime: LiveVisualizerRuntime) -> CycleStop:
     if runtime.menu_bar.focused:
         return CycleStop.MENU
-    if isinstance(runtime.controls.focus_cursor, TimelineFocus):
+    if _strip_has_scope(runtime):
         return CycleStop.TIMELINE
     if runtime.controls.shell_focus.region is ShellRegion.INSPECTOR:
         return CycleStop.INSPECTOR
     return CycleStop.NAVIGATOR
+
+
+def _strip_has_scope(runtime: LiveVisualizerRuntime) -> bool:
+    return _strip_open(runtime) and isinstance(
+        runtime.controls.focus_cursor, TimelineFocus
+    )
 
 
 def _commit_cycle_stop(runtime: LiveVisualizerRuntime, stop: CycleStop) -> None:
@@ -296,7 +299,7 @@ def _region_keydown(event: pygame.event.Event, runtime: LiveVisualizerRuntime) -
         return None
     if runtime.menu_bar.focused:
         return None
-    if isinstance(runtime.controls.focus_cursor, TimelineFocus):
+    if _strip_has_scope(runtime):
         return None
     region = runtime.controls.shell_focus.region
     if region is ShellRegion.NAVIGATOR:
@@ -330,10 +333,10 @@ def _handle_shell_hotkey(
 
 
 def _shell_columns_focused(runtime: LiveVisualizerRuntime) -> bool:
-    """Navigator or inspector has the shell, not the menu, timeline, or panel."""
+    """Navigator or inspector has the shell, not the menu or the timeline strip."""
     if runtime.menu_bar.focused:
         return False
-    if isinstance(runtime.controls.focus_cursor, TimelineFocus):
+    if _strip_has_scope(runtime):
         return False
     return runtime.controls.shell_focus.region in (
         ShellRegion.NAVIGATOR,

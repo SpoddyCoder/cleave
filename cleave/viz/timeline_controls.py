@@ -68,6 +68,7 @@ class TimelineControls:
         on_visibility_change: Callable[[], None] | None = None,
         on_close: Callable[[], None] | None = None,
         on_exit_submenu: Callable[[], None] | None = None,
+        on_focus_row: Callable[[int], None] | None = None,
         on_seek: Callable[[float], None] | None = None,
         on_notification: Callable[[str], None] | None = None,
         beat_times: Sequence[float] = (),
@@ -81,6 +82,7 @@ class TimelineControls:
         self._on_visibility_change = on_visibility_change
         self._on_close = on_close
         self._on_exit_submenu = on_exit_submenu
+        self._on_focus_row = on_focus_row
         self._on_seek = on_seek
         self._on_notification = on_notification
         self._last_toggle_t: dict[str, float] = {}
@@ -98,6 +100,19 @@ class TimelineControls:
         if event.key == pygame.K_ESCAPE:
             if not self.session.timeline.recording:
                 self._close_panel()
+            return True
+
+        if event.key in (pygame.K_UP, pygame.K_DOWN):
+            delta = -1 if event.key == pygame.K_UP else 1
+            self._step_focus_row(delta)
+            self._key_repeat.on_keydown(
+                event.key,
+                event.mod,
+                accel=False,
+                on_repeat=lambda key, _mod: self._step_focus_row(
+                    -1 if key == pygame.K_UP else 1
+                ),
+            )
             return True
 
         if self.session.timeline.locked:
@@ -275,6 +290,28 @@ class TimelineControls:
     def _close_panel(self) -> None:
         if self._on_close is not None:
             self._on_close()
+
+    def _step_focus_row(self, delta: int) -> None:
+        """Move the strip lane within ``layer_z_order``. Does not wrap."""
+        count = len(self.session.layer_z_order)
+        if count <= 0:
+            return
+        row = self.session.timeline.focus_row
+        if row < 0:
+            row = 0
+        elif row >= count:
+            row = count - 1
+        nxt = row + delta
+        if nxt < 0:
+            nxt = 0
+        elif nxt >= count:
+            nxt = count - 1
+        if nxt == self.session.timeline.focus_row:
+            return
+        if self._on_focus_row is not None:
+            self._on_focus_row(nxt)
+            return
+        self.session.timeline.focus_row = nxt
 
     def _notify(self, message: str) -> None:
         if self._on_notification is not None:
