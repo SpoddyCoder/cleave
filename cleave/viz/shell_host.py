@@ -57,6 +57,7 @@ from cleave.viz.row_spec import (
     row_lock_section,
     row_panel_label,
     row_spec,
+    section_lock_blocks_mutation,
     section_locked,
 )
 from cleave.viz.session import TuningSession
@@ -619,6 +620,18 @@ def _inspector_row_selected(focus: Any, desc: Any) -> bool:
         focus.region is ShellRegion.INSPECTOR
         and focus.inspector_command_id is None
         and focus.inspector_cursor == desc
+    )
+
+
+def inspector_row_stepped(state: object, desc: RowDescriptor) -> bool:
+    """Whether this inspector row paints side arrows and accepts sideways drag.
+
+    Arrows stay paint-only. Drag uses the row selectable. The section-lock
+    rule matches Left/Right.
+    """
+    return (
+        row_spec(desc.kind).apply_horizontal is not None
+        and not section_lock_blocks_mutation(state, desc)
     )
 
 
@@ -1438,7 +1451,7 @@ class ShellHost:
             finally:
                 imgui.pop_style_color()
             value = format_row_value(state, desc) if spec.format_value else ""
-            stepped = spec.apply_horizontal is not None and value not in ("on", "off")
+            stepped = inspector_row_stepped(state, desc)
             if spec.shows_dirty_suffix and state.config_dirty:
                 value = f"{value}*" if value else "*"
             if value:

@@ -21,6 +21,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- Inspector stepped values keep side arrows and sideways drag when the value is off, including placement snap.
 - An open menu draws over the focused row highlight.
 - Menu and transport rows have more vertical padding. An open menu draws over the transport rule, and menu items use a lighter hover.
 - With a menu already open, a click on another top label switches to that menu. A second click on the open label closes it.

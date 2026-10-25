@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import inspect
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pygame
+import pytest
+from imgui_bundle import imgui
 
 from cleave.config_schema.editor import (
     DEFAULT_INSPECTOR_WIDTH,
@@ -13,11 +16,13 @@ from cleave.config_schema.editor import (
 )
 from cleave.viz.menu_bar import MenuBarState
 from cleave.viz.row_kinds import RowDescriptor, RowKind
-from cleave.viz.row_spec import apply_field_horizontal
+from cleave.viz.row_spec import apply_field_horizontal, row_spec
 from cleave.viz.shell_host import (
     _VALUE_DRAG_THRESHOLD_PX,
     ShellHost,
+    _value_parts,
     apply_value_drag,
+    inspector_row_stepped,
     value_drag_steps,
 )
 from cleave.viz.shell_layout import (
@@ -102,6 +107,184 @@ def test_locked_drag_does_not_change_the_value() -> None:
     assert crossed_again is False
     assert again == 5.0
     assert _opacity(controls) == before
+
+
+def test_off_value_keeps_side_arrows_and_stepped_ignores_the_text() -> None:
+    parts = _value_parts("off", imgui.ImVec4(1.0, 1.0, 1.0, 1.0), stepped=True)
+    assert [text for text, _color in parts] == ["< ", "off", " >"]
+
+    assert tuple(inspect.signature(inspector_row_stepped).parameters) == (
+        "state",
+        "desc",
+    )
+
+    unlocked = _make_controls(("layer_1",))
+    snap = RowDescriptor(RowKind.TIMELINE_PLACEMENT_SNAP)
+    unlocked.session.timeline.placement_snap = "off"
+    assert unlocked.session.timeline.locked is False
+    assert inspector_row_stepped(unlocked.session, snap) is True
+
+    unlocked.session.timeline.locked = True
+    assert inspector_row_stepped(unlocked.session, snap) is False
+
+    display = RowDescriptor(RowKind.SETTINGS_EDITOR_WINDOW_DISPLAY_SIZE)
+    assert row_spec(display.kind).apply_horizontal is None
+    assert inspector_row_stepped(unlocked.session, display) is False
+
+    limiter = RowDescriptor(RowKind.RENDER_POST_FX_LIMITER_ENABLED)
+    assert row_spec(limiter.kind).blocked_by_section_lock is False
+    unlocked.session.render_post_fx.locked = True
+    assert inspector_row_stepped(unlocked.session, limiter) is True
+
+
+def _seed_placement_snap_off(controls) -> None:
+    controls.session.timeline.placement_snap = "off"
+
+
+def _seed_conductor_off(controls) -> None:
+    controls.session.timeline.timeline_preset_conductor = False
+
+
+def _seed_hard_crossfade_off(controls) -> None:
+    controls.session.timeline.hard_cut_fades.crossfade = False
+
+
+def _seed_soft_crossfade_off(controls) -> None:
+    controls.session.timeline.soft_cut_fades.crossfade = False
+
+
+def _seed_compositor_hdr_off(controls) -> None:
+    controls.session.project.compositor_hdr = False
+
+
+def _seed_limiter_off(controls) -> None:
+    controls.session.render_post_fx.limiter.enabled = False
+
+
+def _seed_rolloff_mode_off(controls) -> None:
+    controls.session.render_post_fx.highlight_rolloff.mode = "off"
+
+
+def _seed_chroma_mode_off(controls) -> None:
+    controls.session.render_post_fx.chroma_boost.mode = "off"
+
+
+def _seed_invert_off(controls) -> None:
+    controls.session.render_pattern_mask.invert = False
+
+
+def _seed_trigger_off(controls) -> None:
+    controls.session.layers["layer_1"].preset_switching_trigger = "off"
+
+
+def _preset_switching_trigger(controls) -> str:
+    return controls.session.layers["layer_1"].preset_switching_trigger
+
+
+@pytest.mark.parametrize(
+    ("desc", "seed", "read"),
+    [
+        pytest.param(
+            RowDescriptor(RowKind.TIMELINE_PLACEMENT_SNAP),
+            _seed_placement_snap_off,
+            lambda controls: controls.session.timeline.placement_snap,
+            id="placement_snap",
+        ),
+        pytest.param(
+            RowDescriptor(RowKind.TIMELINE_PRESET_CONDUCTOR),
+            _seed_conductor_off,
+            lambda controls: controls.session.timeline.timeline_preset_conductor,
+            id="conductor",
+        ),
+        pytest.param(
+            RowDescriptor(RowKind.TIMELINE_HARD_CUT_CROSSFADE),
+            _seed_hard_crossfade_off,
+            lambda controls: controls.session.timeline.hard_cut_fades.crossfade,
+            id="hard_cut_crossfade",
+        ),
+        pytest.param(
+            RowDescriptor(RowKind.TIMELINE_SOFT_CUT_CROSSFADE),
+            _seed_soft_crossfade_off,
+            lambda controls: controls.session.timeline.soft_cut_fades.crossfade,
+            id="soft_cut_crossfade",
+        ),
+        pytest.param(
+            RowDescriptor(RowKind.PROJECT_COMPOSITOR_HDR),
+            _seed_compositor_hdr_off,
+            lambda controls: controls.session.project.compositor_hdr,
+            id="compositor_hdr",
+        ),
+        pytest.param(
+            RowDescriptor(RowKind.RENDER_POST_FX_LIMITER_ENABLED),
+            _seed_limiter_off,
+            lambda controls: controls.session.render_post_fx.limiter.enabled,
+            id="limiter_enabled",
+        ),
+        pytest.param(
+            RowDescriptor(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_MODE),
+            _seed_rolloff_mode_off,
+            lambda controls: controls.session.render_post_fx.highlight_rolloff.mode,
+            id="highlight_rolloff_mode",
+        ),
+        pytest.param(
+            RowDescriptor(RowKind.RENDER_POST_FX_CHROMA_BOOST_MODE),
+            _seed_chroma_mode_off,
+            lambda controls: controls.session.render_post_fx.chroma_boost.mode,
+            id="chroma_boost_mode",
+        ),
+        pytest.param(
+            RowDescriptor(RowKind.RENDER_PATTERN_MASK_INVERT),
+            _seed_invert_off,
+            lambda controls: controls.session.render_pattern_mask.invert,
+            id="pattern_mask_invert",
+        ),
+        pytest.param(
+            RowDescriptor(RowKind.TRACK_PRESET_SWITCHING_TRIGGER, slot="layer_1"),
+            _seed_trigger_off,
+            _preset_switching_trigger,
+            id="preset_switching_trigger",
+        ),
+    ],
+)
+def test_off_value_drag_matches_one_horizontal_step(desc, seed, read) -> None:
+    threshold = _VALUE_DRAG_THRESHOLD_PX
+    dragged = _make_controls(("layer_1",))
+    keyed = _make_controls(("layer_1",))
+    seed(dragged)
+    seed(keyed)
+    before = read(dragged)
+
+    remaining, crossed = apply_value_drag(dragged, desc, threshold, 0.0)
+    apply_field_horizontal(keyed, desc, True, False)
+    assert crossed is True
+    assert remaining == 0.0
+    assert read(dragged) == read(keyed)
+    assert read(dragged) != before
+
+    remaining, crossed = apply_value_drag(dragged, desc, -threshold, 0.0)
+    apply_field_horizontal(keyed, desc, False, False)
+    assert crossed is True
+    assert remaining == 0.0
+    assert read(dragged) == read(keyed)
+
+
+def test_locked_placement_snap_drag_consumes_steps() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.timeline.locked = True
+    controls.session.timeline.placement_snap = "off"
+    desc = RowDescriptor(RowKind.TIMELINE_PLACEMENT_SNAP)
+
+    remaining, crossed = apply_value_drag(
+        controls, desc, _VALUE_DRAG_THRESHOLD_PX * 2 + 5.0, 0.0
+    )
+
+    assert crossed is True
+    assert remaining == 5.0
+    assert controls.session.timeline.placement_snap == "off"
+    again, crossed_again = apply_value_drag(controls, desc, 0.0, remaining)
+    assert crossed_again is False
+    assert again == 5.0
+    assert controls.session.timeline.placement_snap == "off"
 
 
 def test_extreme_drags_keep_visualiser_and_column_minimums() -> None:
