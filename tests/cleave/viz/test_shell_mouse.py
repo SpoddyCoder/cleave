@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pygame
 
+from cleave.config_schema.editor import (
+    DEFAULT_INSPECTOR_WIDTH,
+    DEFAULT_NAVIGATOR_WIDTH,
+)
 from cleave.viz.menu_bar import MenuBarState
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.row_spec import apply_field_horizontal
@@ -150,12 +154,20 @@ class _Overlay:
 
 def _host(visibility: float = 1.0) -> ShellHost:
     overlay = _Overlay(visibility)
+    editor = SimpleNamespace(
+        navigator_width=DEFAULT_NAVIGATOR_WIDTH,
+        inspector_width=DEFAULT_INSPECTOR_WIDTH,
+    )
+    controls = SimpleNamespace(
+        cfg=SimpleNamespace(editor=editor),
+        settings=SimpleNamespace(set_shell_column_widths=MagicMock()),
+    )
     host = ShellHost(
         None,
         None,
         overlay,
         MenuBarState(),
-        SimpleNamespace(),
+        controls,
         (1280, 720),
         23,
     )
@@ -195,17 +207,21 @@ def test_splitter_drag_updates_session_widths_without_imgui_buttons() -> None:
         host.process_event(_motion((400, 100)))
         assert host.nav_width == 400
         assert host._buttons == []
+        nav_request = host.nav_width
         host.process_event(_button(pygame.MOUSEBUTTONUP, (400, 120)))
-        assert host.nav_width == 400
+        assert host.nav_width is None
+        assert host.insp_width is None
         assert host._splitter is None
         assert host._buttons == []
 
         host.process_event(_motion((right_edge, 100)))
         host.process_event(_button(pygame.MOUSEBUTTONDOWN, (right_edge, 100)))
         host.process_event(_motion((700, 100)))
-        host.process_event(_button(pygame.MOUSEBUTTONUP, (700, 100)))
         assert host.insp_width == 1280 - 700
-        assert host.nav_width == 400
+        insp_request = host.insp_width
+        host.process_event(_button(pygame.MOUSEBUTTONUP, (700, 100)))
+        assert host.insp_width is None
+        assert host.nav_width is None
         assert host._buttons == []
 
         narrow = ShellLayout.compute(
@@ -214,11 +230,11 @@ def test_splitter_drag_updates_session_widths_without_imgui_buttons() -> None:
             23,
             23,
             0,
-            nav_width=host.nav_width,
-            insp_width=host.insp_width,
+            nav_width=nav_request,
+            insp_width=insp_request,
         )
-        assert host.nav_width == 400
-        assert host.insp_width == 1280 - 700
+        assert nav_request == 400
+        assert insp_request == 1280 - 700
         assert narrow.visualiser[2] >= 1
         assert narrow.navigator[2] >= MIN_COLUMN_WIDTH
         assert narrow.inspector[2] >= MIN_COLUMN_WIDTH
@@ -230,8 +246,8 @@ def test_splitter_drag_updates_session_widths_without_imgui_buttons() -> None:
             23,
             23,
             0,
-            nav_width=host.nav_width,
-            insp_width=host.insp_width,
+            nav_width=nav_request,
+            insp_width=insp_request,
         )
         assert restored.navigator[2] == 400
         assert restored.inspector[2] == 1280 - 700
@@ -247,6 +263,74 @@ def test_splitter_drag_is_ignored_when_the_shell_is_hidden() -> None:
     assert host.nav_width is None
     assert host.insp_width is None
     assert host._buttons == []
+    assert host._splitter is None
+    host._controls.settings.set_shell_column_widths.assert_not_called()
+
+
+def test_splitter_drag_release_persists_requested_widths() -> None:
+    host = _host()
+    left = (DEFAULT_NAVIGATOR_WIDTH, 100)
+    pointer_x = 2000
+    with patch("cleave.viz.shell_host.pygame.mouse.set_cursor"):
+        host.process_event(_button(pygame.MOUSEBUTTONDOWN, left))
+        host.process_event(_motion((pointer_x, 100)))
+        assert host.nav_width == pointer_x
+        host.process_event(_button(pygame.MOUSEBUTTONUP, (pointer_x, 120)))
+    fitted = ShellLayout.compute(
+        1280,
+        720,
+        23,
+        23,
+        0,
+        nav_width=pointer_x,
+        insp_width=DEFAULT_INSPECTOR_WIDTH,
+    )
+    assert fitted.navigator[2] != pointer_x
+    host._controls.settings.set_shell_column_widths.assert_called_once_with(
+        pointer_x,
+        DEFAULT_INSPECTOR_WIDTH,
+    )
+    assert host.nav_width is None
+    assert host.insp_width is None
+
+
+def test_splitter_drag_release_persists_the_other_columns_live_width() -> None:
+    host = _host()
+    host._insp_width = 510
+    left = (DEFAULT_NAVIGATOR_WIDTH, 100)
+    with patch("cleave.viz.shell_host.pygame.mouse.set_cursor"):
+        host.process_event(_button(pygame.MOUSEBUTTONDOWN, left))
+        host.process_event(_motion((400, 100)))
+        host.process_event(_button(pygame.MOUSEBUTTONUP, (400, 100)))
+    host._controls.settings.set_shell_column_widths.assert_called_once_with(400, 510)
+    assert host.nav_width is None
+    assert host.insp_width is None
+
+
+def test_cancelled_splitter_drag_does_not_persist() -> None:
+    host = _host()
+    left = (DEFAULT_NAVIGATOR_WIDTH, 100)
+    with patch("cleave.viz.shell_host.pygame.mouse.set_cursor"):
+        host.process_event(_button(pygame.MOUSEBUTTONDOWN, left))
+        host.process_event(_motion((400, 100)))
+        assert host.nav_width == 400
+        host._overlay.visibility = 0.0
+        host.process_event(_button(pygame.MOUSEBUTTONUP, (400, 100)))
+    host._controls.settings.set_shell_column_widths.assert_not_called()
+    assert host._splitter is None
+    assert host.nav_width == 400
+
+
+def test_splitter_mouseup_under_one_pixel_does_not_persist() -> None:
+    host = _host()
+    host._insp_width = 510
+    left = (DEFAULT_NAVIGATOR_WIDTH, 100)
+    with patch("cleave.viz.shell_host.pygame.mouse.set_cursor"):
+        host.process_event(_button(pygame.MOUSEBUTTONDOWN, left))
+        host.process_event(_button(pygame.MOUSEBUTTONUP, (left[0], left[1] + 40)))
+    host._controls.settings.set_shell_column_widths.assert_not_called()
+    assert host.nav_width is None
+    assert host.insp_width == 510
     assert host._splitter is None
 
 

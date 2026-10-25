@@ -13,6 +13,7 @@ from cleave.config_schema.editor import (
     clamp_editor_height,
     clamp_editor_width,
     clamp_residual_latency_ms,
+    clamp_shell_column_width,
     clamp_ui_fade,
     clamp_ui_min_width,
     clamp_ui_width,
@@ -139,6 +140,14 @@ class SettingsControls:
         current = self.cfg.editor.shell_layout_mode
         new_mode = "split" if current == "docked" else "docked"
         self.cfg.editor = replace(self.cfg.editor, shell_layout_mode=new_mode)
+        persist_editor_settings(self.cfg)
+
+    def set_shell_column_widths(self, nav: int, insp: int) -> None:
+        self.cfg.editor = replace(
+            self.cfg.editor,
+            navigator_width=clamp_shell_column_width(nav),
+            inspector_width=clamp_shell_column_width(insp),
+        )
         persist_editor_settings(self.cfg)
 
     def adjust_ui_fade(self, *, forward: bool, large: bool) -> None:

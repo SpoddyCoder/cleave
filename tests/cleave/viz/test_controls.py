@@ -24,6 +24,7 @@ from cleave.config_schema.editor import (
     DEFAULT_UI_MIN_WIDTH,
     DEFAULT_UI_WIDTH,
     DEFAULT_UI_WIDTH_MODE,
+    MIN_COLUMN_WIDTH,
     editor_display_size,
 )
 from cleave.config_schema.layers import (
@@ -4876,6 +4877,38 @@ def test_settings_cycle_and_toggle_shell_layout_mode(tmp_path: Path) -> None:
     assert controls.shell_focus.selected_id == selected_id
     assert controls.shell_focus.inspector_cursor == inspector_cursor
     assert controls.focus_cursor is focus_cursor
+
+
+def test_settings_set_shell_column_widths_clamps_and_persists(tmp_path: Path) -> None:
+    controls = _make_controls(("layer_1",))
+    user_path = tmp_path / "user.yaml"
+    controls.cfg.user_config_path = user_path
+    selected_id = controls.shell_focus.selected_id
+    inspector_cursor = controls.shell_focus.inspector_cursor
+    focus_cursor = controls.focus_cursor
+    mode = controls.cfg.editor.shell_layout_mode
+    assert not controls.config_dirty
+
+    controls.settings.set_shell_column_widths(12, 40)
+    assert controls.cfg.editor.navigator_width == MIN_COLUMN_WIDTH
+    assert controls.cfg.editor.inspector_width == MIN_COLUMN_WIDTH
+    assert controls.cfg.editor.shell_layout_mode == mode
+    assert controls.shell_focus.selected_id == selected_id
+    assert controls.shell_focus.inspector_cursor == inspector_cursor
+    assert controls.focus_cursor is focus_cursor
+    assert not controls.config_dirty
+    loaded = load_user_config(user_path)
+    assert loaded.editor.navigator_width == MIN_COLUMN_WIDTH
+    assert loaded.editor.inspector_width == MIN_COLUMN_WIDTH
+
+    controls.settings.set_shell_column_widths(280, 510)
+    assert controls.cfg.editor.navigator_width == 280
+    assert controls.cfg.editor.inspector_width == 510
+    assert controls.cfg.editor.shell_layout_mode == mode
+    loaded = load_user_config(user_path)
+    assert loaded.editor.navigator_width == 280
+    assert loaded.editor.inspector_width == 510
+    assert not controls.config_dirty
 
 
 def test_settings_ui_width_mode_change_does_not_mark_project_config_dirty() -> None:

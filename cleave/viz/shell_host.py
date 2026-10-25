@@ -776,7 +776,7 @@ class ShellHost:
         self._wheel_y = 0.0
         self._value_drag_accum = 0.0
         self._value_drag_crossed = False
-        # Pointer requests. Layout clamps these; they are not written to config.
+        # Live drag requests. A completed drag persists both columns, then clears these.
         self._nav_width: int | None = None
         self._insp_width: int | None = None
         self._splitter: str | None = None
@@ -834,12 +834,12 @@ class ShellHost:
 
     @property
     def nav_width(self) -> int | None:
-        """Requested navigator width. None until a splitter drag."""
+        """Navigator width requested by an in-progress splitter drag."""
         return self._nav_width
 
     @property
     def insp_width(self) -> int | None:
-        """Requested inspector width. None until a splitter drag."""
+        """Inspector width requested by an in-progress splitter drag."""
         return self._insp_width
 
     def destroy(self) -> None:
@@ -928,6 +928,20 @@ class ShellHost:
         x = float(pos[0])
         if which is not None and abs(x - self._splitter_down_x) >= 1.0:
             self._assign_splitter_width(which, x)
+            editor = self._controls.cfg.editor
+            nav = (
+                self._nav_width
+                if self._nav_width is not None
+                else editor.navigator_width
+            )
+            insp = (
+                self._insp_width
+                if self._insp_width is not None
+                else editor.inspector_width
+            )
+            self._controls.settings.set_shell_column_widths(nav, insp)
+            self._nav_width = None
+            self._insp_width = None
         self._splitter = None
         # Layout catches up after this event. Keep the resize cursor until
         # the next motion, which tests the updated boundaries.
