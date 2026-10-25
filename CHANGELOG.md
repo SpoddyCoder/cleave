@@ -21,6 +21,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- The tap-sync detection box draws above the editor panels.
 - With the strip open, navigator and inspector keep their keys until the user Tabs to Timeline or clicks the strip.
 - Inspector stepped values keep side arrows and sideways drag when the value is off, including placement snap.
 - An open menu draws over the focused row highlight.

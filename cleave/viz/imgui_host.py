@@ -31,19 +31,10 @@ from imgui_bundle import imgui
 from imgui_bundle.python_backends.opengl_backend import ProgrammablePipelineRenderer
 
 from cleave.gl_state import restore_gl_state, save_gl_state
+from cleave.viz.imgui_theme import apply_imgui_theme
 from cleave.viz.overlay_primitives import overlay_font_path
 from cleave.viz.row_sections import INSPECTOR_GROUP_EXPANDED
-from cleave.viz.theme import (
-    BACKGROUND,
-    BORDER_COLOR,
-    DISABLED,
-    FOCUS_ROW_BG_ALPHA,
-    HIGHLIGHT,
-    HOVER,
-    HOVER_BG_ALPHA,
-    VALUE,
-    tuning_ui_metrics,
-)
+from cleave.viz.theme import tuning_ui_metrics
 
 RENDERER_CLASS = ProgrammablePipelineRenderer
 
@@ -68,10 +59,6 @@ class _HeadlessRenderer:
 def mouse_button(event: pygame.event.Event) -> int | None:
     """ImGui button index for a pygame mouse button event, or None."""
     return _IMGUI_BUTTON.get(getattr(event, "button", 0))
-
-
-def rgba(rgb: tuple[int, int, int], alpha: float = 1.0) -> imgui.ImVec4:
-    return imgui.ImVec4(rgb[0] / 255.0, rgb[1] / 255.0, rgb[2] / 255.0, alpha)
 
 
 def _context_pointer(getter: _ContextGetter) -> int:
@@ -232,45 +219,6 @@ def _keep_keyboard_nav_off() -> None:
     io.config_flags = int(io.config_flags) & ~nav
 
 
-def _apply_theme() -> None:
-    """Map overlay roles onto ImGui, including the hover wash."""
-    style = imgui.get_style()
-    style.window_rounding = 0.0
-    style.frame_rounding = 0.0
-    style.popup_rounding = 0.0
-    style.scrollbar_rounding = 0.0
-    highlight = rgba(HIGHLIGHT, FOCUS_ROW_BG_ALPHA / 255.0)
-    hover = rgba(HOVER, HOVER_BG_ALPHA / 255.0)
-    background = rgba(BACKGROUND)
-    text = rgba(VALUE)
-    disabled = rgba(DISABLED)
-    assignments = {
-        imgui.Col_.text: text,
-        imgui.Col_.text_disabled: disabled,
-        imgui.Col_.window_bg: background,
-        imgui.Col_.child_bg: background,
-        imgui.Col_.popup_bg: background,
-        imgui.Col_.menu_bar_bg: background,
-        imgui.Col_.border: rgba(BORDER_COLOR),
-        imgui.Col_.header: highlight,
-        imgui.Col_.header_hovered: hover,
-        imgui.Col_.header_active: hover,
-        imgui.Col_.button: background,
-        imgui.Col_.button_hovered: highlight,
-        imgui.Col_.button_active: highlight,
-        imgui.Col_.frame_bg: background,
-        imgui.Col_.title_bg: background,
-        imgui.Col_.title_bg_active: background,
-        imgui.Col_.title_bg_collapsed: background,
-        imgui.Col_.check_mark: text,
-        imgui.Col_.separator: disabled,
-        imgui.Col_.text_selected_bg: highlight,
-        imgui.Col_.nav_highlight: rgba(HIGHLIGHT),
-    }
-    for column, color in assignments.items():
-        style.set_color_(int(column), color)
-
-
 def _gl_int(param: int) -> int:
     value = glGetIntegerv(param)
     try:
@@ -339,7 +287,7 @@ class ImGuiHost:
                 _shell_glyph_ranges(),
             )
             io.font_default = font
-            _apply_theme()
+            apply_imgui_theme()
             renderer = _select_renderer_class()()
         except Exception:
             imgui.destroy_context(context)
@@ -389,7 +337,7 @@ class ImGuiHost:
         self._submit_input(dt)
         _keep_keyboard_nav_off()
         _ensure_font_atlas()
-        _apply_theme()
+        apply_imgui_theme()
         imgui.new_frame()
 
     def end_frame(self) -> None:

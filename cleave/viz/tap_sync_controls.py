@@ -9,10 +9,12 @@ from cleave.config import CleaveConfig
 from cleave.config_schema.editor import clamp_residual_latency_ms
 from cleave.user_config import persist_editor_settings
 from cleave.viz.focus_nav import FocusCursor
+from cleave.viz.info_panel import InfoPanelViewState
 from cleave.viz.modal import ModalHost
 from cleave.viz.shell_focus import ShellRegion
 from cleave.viz.playback import PlaybackState, toggle_pause
 from cleave.viz.tap_sync import (
+    CONSISTENCY_WINDOW,
     accept_tap_for_accent,
     append_streak_delta,
     build_metronome_schedule,
@@ -44,6 +46,26 @@ class TapSyncProgressView:
     streak: int
     spread_ms: int | None
     estimate_ms: int | None
+
+
+def tap_sync_info_panel(progress: TapSyncProgressView) -> InfoPanelViewState:
+    """Copy for the detection box shown while calibration is listening."""
+    spread_text = "--" if progress.spread_ms is None else f"{progress.spread_ms} ms"
+    estimate_text = (
+        "--" if progress.estimate_ms is None else f"{progress.estimate_ms} ms"
+    )
+    return InfoPanelViewState(
+        title_lines=(
+            "Detection in progress",
+            "Tap Enter on the long low tone",
+        ),
+        body_lines=(
+            f"Streak: {progress.streak}/{CONSISTENCY_WINDOW}",
+            f"Spread: {spread_text}",
+            f"Estimate: {estimate_text}",
+        ),
+        footer_line="Esc to cancel",
+    )
 
 
 class TapSyncControls:

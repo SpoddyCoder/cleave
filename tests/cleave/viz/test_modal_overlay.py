@@ -7,6 +7,7 @@ from dataclasses import replace
 import pygame
 
 from cleave.viz import modal_overlay
+from cleave.viz.info_panel import InfoPanelViewState
 from cleave.viz.modal import (
     ModalHost,
     ModalKind,
@@ -422,7 +423,7 @@ def test_info_panel_sections_include_blank_line_gaps() -> None:
     font = _font()
     line_gap = 3
     line_h = font.get_linesize()
-    state = modal_overlay.InfoPanelViewState(
+    state = InfoPanelViewState(
         title_lines=("Detection in progress", "Tap Enter on each bar beat"),
         body_lines=(
             "Streak: 2/4",

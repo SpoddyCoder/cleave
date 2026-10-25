@@ -392,13 +392,11 @@ def _live_overlay_ui_active(
     overlay_visibility: float,
     modal_active: bool,
     timeline_strip_visible: bool,
-    tap_sync_progress: bool,
 ) -> bool:
     return (
         overlay_visibility > 0.01
         or modal_active
         or timeline_strip_visible
-        or tap_sync_progress
     )
 
 
@@ -530,27 +528,18 @@ def _tick_frame_live_overlay(
         overlay_visibility=overlay_visibility,
         modal_active=modal_active,
         timeline_strip_visible=timeline_strip_visible,
-        tap_sync_progress=tap_sync_progress,
     ):
         profiler.note_skipped_frame()
         profiler.finish_frame()
         return
 
     view_state = None
-    if tap_sync_progress:
-        progress = runtime.controls.tap_sync.progress_view()
-        if progress is not None:
-            with profiler.time_section("panel_draw"):
-                OverlayDrawer.draw_tap_sync_progress(
-                    runtime.compositor,
-                    runtime.overlay,
-                    runtime.overlay_surface,
-                    progress,
-                    profiler=profiler,
-                )
-    elif _tuning_view_state_needed(
-        overlay_visibility=overlay_visibility,
-        modal_active=modal_active,
+    if (
+        not tap_sync_progress
+        and _tuning_view_state_needed(
+            overlay_visibility=overlay_visibility,
+            modal_active=modal_active,
+        )
     ):
         with profiler.time_section("view_state_build"):
             view_state = runtime.controls.build_view_state(
@@ -778,8 +767,11 @@ class VisualizerApp:
             from cleave.viz.shell_host import (
                 ShellHost,
                 TransportReadout,
+                draw_shell_frame,
                 menu_bar_height_px,
             )
+            from cleave.viz.tap_sync_controls import tap_sync_info_panel
+            from cleave.viz.top_layer import InfoPanelSurface
 
             assert window.imgui is not None
             shell = ShellHost(
@@ -793,8 +785,14 @@ class VisualizerApp:
 
             display_fps: list[float | None] = [None]
 
-            def draw_menu_bar() -> None:
+            def draw_ui() -> None:
                 assert shell is not None
+                if rt.controls.tap_sync.showing_progress:
+                    progress = rt.controls.tap_sync.progress_view()
+                    if progress is not None:
+                        shell.top_layer.push(
+                            InfoPanelSurface(tap_sync_info_panel(progress))
+                        )
                 position = current_sec(rt.playback, rt.seed.duration_sec)
                 readout = TransportReadout(
                     paused=rt.playback.paused,
@@ -809,7 +807,8 @@ class VisualizerApp:
                     fps=display_fps[0],
                     recording=rt.controls.session.timeline.recording,
                 )
-                shell.draw(
+                draw_shell_frame(
+                    shell,
                     rt.menu_bar,
                     command_context(rt.controls),
                     rt.overlay.visibility,
@@ -824,7 +823,7 @@ class VisualizerApp:
                 dt_sec=0.0,
                 layout=self._begin_live_frame(rt),
             )
-            draw_menu_bar()
+            draw_ui()
             pygame.display.flip()
             rt.mix_player.start()
 
@@ -896,7 +895,7 @@ class VisualizerApp:
                     )
 
                 display_fps[0] = frame_rate.display_fps
-                draw_menu_bar()
+                draw_ui()
                 pygame.display.flip()
                 measured_fps = frame_rate.end_frame()
 

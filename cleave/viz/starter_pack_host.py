@@ -22,7 +22,8 @@ from cleave.starter_packs import (
     download_starter_packs,
 )
 from cleave.viz.loading import LoadingWindow
-from cleave.viz.modal_overlay import InfoPanelViewState, draw_info
+from cleave.viz.info_panel import InfoPanelViewState
+from cleave.viz.modal_overlay import draw_info
 from cleave.viz.overlay_primitives import overlay_font
 from cleave.viz.theme import BACKGROUND
 

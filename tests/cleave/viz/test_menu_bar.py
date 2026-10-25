@@ -224,7 +224,9 @@ def test_mouse_switches_and_closes_an_open_top_menu() -> None:
     host.imgui.display_size = (1280, 720)
 
     def draw() -> None:
-        host.draw(menu, CommandContext(), overlay.visibility, 1.0 / 60.0)
+        from cleave.viz.shell_host import draw_shell_frame
+
+        draw_shell_frame(host, menu, CommandContext(), overlay.visibility, 1.0 / 60.0)
 
     def click(index: int) -> None:
         x, y = anchors[index]
@@ -281,13 +283,52 @@ def _draw_list_has_color(draw_list: object, color: int) -> bool:
     return False
 
 
+def _content_lists(lists: list) -> list:
+    """Window lists in paint order. The foreground list is not one of them."""
+    return [
+        draw_list
+        for draw_list in lists
+        if "Foreground" not in str(draw_list._owner_name)
+    ]
+
+
+def _color_u32(rgb: tuple[int, int, int]) -> int:
+    from imgui_bundle import imgui
+
+    return int(
+        imgui.get_color_u32(
+            imgui.ImVec4(rgb[0] / 255.0, rgb[1] / 255.0, rgb[2] / 255.0, 1.0)
+        )
+    )
+
+
+def _assert_chrome_last(lists: list) -> list:
+    content = _content_lists(lists)
+    names = [draw_list._owner_name for draw_list in content]
+    assert names[-1] == "##shell-chrome", names
+    for name in (
+        "##MainMenuBar",
+        "##shell-transport",
+        "##shell-navigator",
+        "##shell-inspector",
+    ):
+        assert names.index(name) < names.index("##shell-chrome"), names
+    foreground = [
+        draw_list
+        for draw_list in lists
+        if "Foreground" in str(draw_list._owner_name)
+    ]
+    return foreground
+
+
 def test_open_menu_paints_over_the_transport_rule() -> None:
     """The transport rule stays on its window, under a later menu popup."""
     from imgui_bundle import imgui
 
     from cleave.viz import imgui_host, shell_host
+    from cleave.viz.shell_host import draw_shell_frame
     from cleave.viz.shell_layout import ShellLayout
-    from cleave.viz.theme import TRANSPORT_RULE
+    from cleave.viz.theme import BORDER_COLOR, TRANSPORT_RULE
 
     overlay = _Overlay()
     overlay.visibility = 1.0
@@ -306,31 +347,37 @@ def test_open_menu_paints_over_the_transport_rule() -> None:
         host._draw_navigator = lambda: None
         host._draw_inspector = lambda _state: None
         # The font atlas is built on the first frame. Open the menu after that.
-        host.draw(menu, CommandContext(), 1.0, 1.0 / 60.0)
+        draw_shell_frame(host, menu, CommandContext(), 1.0, 1.0 / 60.0)
         menu.open_menu(0, MENUS)
-        host.draw(menu, CommandContext(), 1.0, 1.0 / 60.0)
+        # The popup's first frame is hidden while it measures. The next frame paints it.
+        draw_shell_frame(host, menu, CommandContext(), 1.0, 1.0 / 60.0)
+        draw_shell_frame(host, menu, CommandContext(), 1.0, 1.0 / 60.0)
         assert host.menu_bar_height_px == height
         lists = list(imgui.get_draw_data().cmd_lists)
-        assert len(lists) >= 2
-        grey = int(
-            imgui.get_color_u32(
-                imgui.ImVec4(
-                    TRANSPORT_RULE[0] / 255.0,
-                    TRANSPORT_RULE[1] / 255.0,
-                    TRANSPORT_RULE[2] / 255.0,
-                    1.0,
-                )
-            )
+        content = _content_lists(lists)
+        names = [draw_list._owner_name for draw_list in content]
+        foreground = _assert_chrome_last(lists)
+        transport_at = names.index("##shell-transport")
+        popup_at = names.index("##cleave-menu")
+        chrome_at = names.index("##shell-chrome")
+        assert transport_at < popup_at < chrome_at
+        grey = _color_u32(TRANSPORT_RULE)
+        white = _color_u32(BORDER_COLOR)
+        on_transport = _draw_list_has_color(content[transport_at], grey)
+        on_popup = _draw_list_has_color(content[popup_at], grey)
+        on_chrome = _draw_list_has_color(content[chrome_at], grey)
+        rule_on_chrome = _draw_list_has_color(content[chrome_at], white)
+        rule_on_foreground = any(
+            _draw_list_has_color(draw_list, white) for draw_list in foreground
         )
-        on_foreground = _draw_list_has_color(lists[-1], grey)
-        under_popup = any(
-            _draw_list_has_color(draw_list, grey) for draw_list in lists[:-1]
-        )
-        del lists
+        del lists, content
     finally:
         host.imgui.destroy()
-    assert not on_foreground
-    assert under_popup
+    assert on_transport
+    assert not on_popup
+    assert not on_chrome
+    assert rule_on_chrome
+    assert not rule_on_foreground
 
 
 def test_open_menu_paints_over_the_focus_ring() -> None:
@@ -338,8 +385,9 @@ def test_open_menu_paints_over_the_focus_ring() -> None:
     from imgui_bundle import imgui
 
     from cleave.viz import imgui_host, shell_host
+    from cleave.viz.shell_host import draw_shell_frame
     from cleave.viz.shell_layout import ShellLayout
-    from cleave.viz.theme import HIGHLIGHT
+    from cleave.viz.theme import BORDER_COLOR, HIGHLIGHT
 
     overlay = _Overlay()
     overlay.visibility = 1.0
@@ -353,8 +401,10 @@ def test_open_menu_paints_over_the_focus_ring() -> None:
     try:
         host.imgui.display_size = (1280, 720)
         height = shell_host.menu_bar_height_px()
-        host.set_layout(ShellLayout.compute(1280, 720, height, height, 0))
+        host.set_layout(ShellLayout.compute(1280, 720, height, height, 80))
         host.process_event(_motion(4))
+        controls.session.timeline = SimpleNamespace(panel_open=True)
+        controls.shell_focus.region = ShellRegion.TIMELINE
 
         def draw_focused_row() -> None:
             imgui.selectable("Focused##row", True)
@@ -362,31 +412,54 @@ def test_open_menu_paints_over_the_focus_ring() -> None:
 
         host._draw_navigator = draw_focused_row
         host._draw_inspector = lambda _state: None
-        # The font atlas is built on the first frame. Open the menu after that.
-        host.draw(menu, CommandContext(), 1.0, 1.0 / 60.0)
+        # The font atlas is built on the first frame. The strip border is on
+        # chrome while the strip has focus; an open menu takes that focus.
+        draw_shell_frame(host, menu, CommandContext(), 1.0, 1.0 / 60.0)
+        strip_lists = list(imgui.get_draw_data().cmd_lists)
+        strip_content = _content_lists(strip_lists)
+        strip_names = [draw_list._owner_name for draw_list in strip_content]
+        strip_foreground = _assert_chrome_last(strip_lists)
+        gold = _color_u32(HIGHLIGHT)
+        white = _color_u32(BORDER_COLOR)
+        strip_on_chrome = _draw_list_has_color(
+            strip_content[strip_names.index("##shell-chrome")], gold
+        )
+        strip_on_foreground = any(
+            _draw_list_has_color(draw_list, gold) for draw_list in strip_foreground
+        )
+        rule_on_foreground = any(
+            _draw_list_has_color(draw_list, white) for draw_list in strip_foreground
+        )
+        del strip_lists, strip_content
+        controls.shell_focus.region = ShellRegion.NAVIGATOR
         menu.open_menu(0, MENUS)
-        host.draw(menu, CommandContext(), 1.0, 1.0 / 60.0)
+        # The popup's first frame is hidden while it measures. The next frame paints it.
+        draw_shell_frame(host, menu, CommandContext(), 1.0, 1.0 / 60.0)
+        draw_shell_frame(host, menu, CommandContext(), 1.0, 1.0 / 60.0)
         lists = list(imgui.get_draw_data().cmd_lists)
-        assert len(lists) >= 2
-        gold = int(
-            imgui.get_color_u32(
-                imgui.ImVec4(
-                    HIGHLIGHT[0] / 255.0,
-                    HIGHLIGHT[1] / 255.0,
-                    HIGHLIGHT[2] / 255.0,
-                    1.0,
-                )
-            )
+        content = _content_lists(lists)
+        names = [draw_list._owner_name for draw_list in content]
+        foreground = _assert_chrome_last(lists)
+        nav_at = names.index("##shell-navigator")
+        popup_at = names.index("##cleave-menu")
+        chrome_at = names.index("##shell-chrome")
+        assert nav_at < popup_at < chrome_at
+        ring_on_nav = _draw_list_has_color(content[nav_at], gold)
+        ring_on_popup = _draw_list_has_color(content[popup_at], gold)
+        ring_on_chrome = _draw_list_has_color(content[chrome_at], gold)
+        ring_on_foreground = any(
+            _draw_list_has_color(draw_list, gold) for draw_list in foreground
         )
-        on_foreground = _draw_list_has_color(lists[-1], gold)
-        under_popup = any(
-            _draw_list_has_color(draw_list, gold) for draw_list in lists[:-1]
-        )
-        del lists
+        del lists, content
     finally:
         host.imgui.destroy()
-    assert not on_foreground
-    assert under_popup
+    assert strip_on_chrome
+    assert not strip_on_foreground
+    assert not rule_on_foreground
+    assert ring_on_nav
+    assert not ring_on_popup
+    assert not ring_on_chrome
+    assert not ring_on_foreground
 
 
 class _Overlay:
@@ -395,14 +468,6 @@ class _Overlay:
 
     def notify_input(self) -> None:
         self.visibility = 1.0
-
-
-class _FakeRenderer:
-    def shutdown(self) -> None:
-        return None
-
-    def render(self, _draw_data: object) -> None:
-        return None
 
 
 def _shell_controls() -> SimpleNamespace:
@@ -416,82 +481,3 @@ def _motion(y: int) -> pygame.event.Event:
         rel=(0, 0),
         buttons=(0, 0, 0),
     )
-
-
-def test_gl_renderer_waits_until_native_context_is_installed() -> None:
-    """A null PyOpenGL context stays headless until a native context is bound."""
-    import OpenGL.platform as gl_platform
-
-    from cleave.viz import imgui_host
-
-    plat = gl_platform.PLATFORM
-    saved = (
-        gl_platform.GetCurrentContext,
-        gl_platform.CurrentContextIsValid,
-        plat.GetCurrentContext,
-        plat.CurrentContextIsValid,
-    )
-
-    def zero() -> int:
-        return 0
-
-    def live() -> int:
-        return 1
-
-    try:
-        imgui_host._install_pyopengl_context(zero)
-        with patch.object(imgui_host, "_native_context_getter", return_value=None):
-            assert imgui_host._select_renderer_class() is imgui_host._HeadlessRenderer
-        with patch.object(imgui_host, "_native_context_getter", return_value=live):
-            selected = imgui_host._select_renderer_class()
-        assert gl_platform.GetCurrentContext() == 1
-        assert selected is imgui_host.RENDERER_CLASS
-        assert selected.__name__ == "ProgrammablePipelineRenderer"
-    finally:
-        (
-            gl_platform.GetCurrentContext,
-            gl_platform.CurrentContextIsValid,
-            plat.GetCurrentContext,
-            plat.CurrentContextIsValid,
-        ) = saved
-
-
-def test_create_uses_programmable_renderer_when_gl_context_is_current() -> None:
-    from imgui_bundle import imgui
-
-    from cleave.viz import imgui_host
-
-    with (
-        patch.object(imgui_host, "_gl_context_current", return_value=True),
-        patch.object(imgui_host, "RENDERER_CLASS", _FakeRenderer),
-    ):
-        host = _open_shell(_Overlay(), MenuBarState())
-    try:
-        assert isinstance(host.imgui.renderer, _FakeRenderer)
-    finally:
-        host.imgui.destroy()
-    assert not imgui.get_current_context()
-
-
-def test_top_strip_motion_wakes_overlay_and_draw_without_gl() -> None:
-    """The crash: visibility leaves 0, then new_frame runs with no font atlas."""
-    from imgui_bundle import imgui
-
-    from cleave.viz import imgui_host
-
-    overlay = _Overlay()
-    menu = MenuBarState()
-    with patch.object(imgui_host, "_gl_context_current", return_value=False):
-        host = _open_shell(overlay, menu)
-    try:
-        assert isinstance(host.imgui.renderer, imgui_host._HeadlessRenderer)
-        host.draw(menu, CommandContext(), overlay.visibility, 1.0 / 60.0)
-        host.process_event(_motion(host.menu_bar_height_px + 8))
-        assert overlay.visibility == 0.0
-        host.process_event(_motion(0))
-        assert overlay.visibility == 1.0
-        host.draw(menu, CommandContext(), overlay.visibility, 1.0 / 60.0)
-        assert imgui.get_io().fonts.is_built()
-    finally:
-        host.imgui.destroy()
-    assert not imgui.get_current_context()

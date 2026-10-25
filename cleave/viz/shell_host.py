@@ -18,7 +18,8 @@ from imgui_bundle import imgui
 from cleave.viz.commands import Command, CommandContext, MenuSeparator, command_by_id
 from cleave.viz.editor_mode_controls import is_preset_curation_mode
 from cleave.viz.frame_rate import format_fps_value
-from cleave.viz.imgui_host import ImGuiHost, PAUSE_GLYPH, PLAY_GLYPH, mouse_button, rgba
+from cleave.viz.imgui_host import ImGuiHost, PAUSE_GLYPH, PLAY_GLYPH, mouse_button
+from cleave.viz.imgui_theme import rgba
 from cleave.viz.inspector import build_inspector_rows
 from cleave.viz.inspector_controls import inspector_command_enabled
 from cleave.viz.menu_bar import MenuBarState, menus_for_session
@@ -65,6 +66,7 @@ from cleave.viz.theme import (
     VALUE,
     tuning_ui_metrics,
 )
+from cleave.viz.top_layer import TopLayer
 
 _HIDDEN = 0.01
 # Vertical padding for the menu bar and the transport bar, which shares its height.
@@ -349,6 +351,18 @@ _SHELL_FLAGS = (
     | int(imgui.WindowFlags_.no_scrollbar)
     | int(imgui.WindowFlags_.no_scroll_with_mouse)
 )
+_CHROME_WINDOW = "##shell-chrome"
+_CHROME_FLAGS = (
+    int(imgui.WindowFlags_.no_background)
+    | int(imgui.WindowFlags_.no_inputs)
+    | int(imgui.WindowFlags_.no_title_bar)
+    | int(imgui.WindowFlags_.no_resize)
+    | int(imgui.WindowFlags_.no_move)
+    | int(imgui.WindowFlags_.no_saved_settings)
+    | int(imgui.WindowFlags_.no_focus_on_appearing)
+    | int(imgui.WindowFlags_.no_bring_to_front_on_focus)
+    | int(imgui.WindowFlags_.no_nav)
+)
 
 
 def shell_window_flags(base: int, *, scrollable: bool) -> int:
@@ -492,43 +506,36 @@ def _stroke_h_rule(
     x1: float,
     y: float,
     rgb: tuple[int, int, int],
-    *,
-    foreground: bool = True,
 ) -> None:
-    """Opaque 1px rule on pixel row *y*.
+    """Opaque 1px rule on pixel row *y* of the current window.
 
     A stroked line is anti-aliased, so an opaque fill shows through it. A
-    filled rectangle is not. The foreground list paints after every window,
-    which keeps the menu-bar rule on top of the menu buttons. The transport
-    rule stays on its own window so a later menu popup covers it.
+    filled rectangle is not. The menu rule is drawn on the chrome window,
+    above the menu buttons. The transport rule stays on the transport window
+    so a later menu popup covers it.
     """
     if x1 <= x0:
         return
     color = imgui.get_color_u32(rgba(rgb))
-    rect_min = imgui.ImVec2(x0, y)
-    rect_max = imgui.ImVec2(x1, y + 1.0)
-    if not foreground:
-        imgui.get_window_draw_list().add_rect_filled(rect_min, rect_max, color)
-        return
-    draw = imgui.get_foreground_draw_list(imgui.get_main_viewport())
-    display = imgui.get_io().display_size
-    draw.push_clip_rect(imgui.ImVec2(0.0, 0.0), display, False)
-    draw.add_rect_filled(rect_min, rect_max, color)
-    draw.pop_clip_rect()
+    imgui.get_window_draw_list().add_rect_filled(
+        imgui.ImVec2(x0, y),
+        imgui.ImVec2(x1, y + 1.0),
+        color,
+    )
 
 
 def _draw_rect_border(rect: tuple[int, int, int, int]) -> None:
-    """1px highlight around the timeline strip.
+    """1px highlight around the timeline strip on the current window.
 
-    Drawn only while the strip has focus. An open menu takes that focus, so
-    this outline and the popup are never in the same frame. The foreground
-    list keeps the stroke above the side panels that meet the strip.
+    Drawn on the chrome window while the strip has focus. An open menu takes
+    that focus, so this outline and the popup are never in the same frame.
+    Chrome sits above the side panels that meet the strip.
     """
     x, y, w, h = rect
     if w <= 0 or h <= 0:
         return
     color = imgui.get_color_u32(rgba(HIGHLIGHT))
-    imgui.get_foreground_draw_list().add_rect(
+    imgui.get_window_draw_list().add_rect(
         imgui.ImVec2(float(x), float(y)),
         imgui.ImVec2(float(x + w), float(y + h)),
         color,
@@ -614,6 +621,7 @@ class ShellHost:
         self._splitter: str | None = None
         self._splitter_down_x = 0.0
         self._resize_cursor = False
+        self.top_layer = TopLayer()
 
     @property
     def menu_bar_height_px(self) -> int:
@@ -639,6 +647,9 @@ class ShellHost:
 
     def process_event(self, event: pygame.event.Event) -> None:
         """Mouse motion, buttons, and wheel only. Keys stay out of ImGui."""
+        if self.top_layer.modal_active:
+            self._process_modal_event(event)
+            return
         imgui_host = self.imgui
         if event.type == pygame.MOUSEMOTION:
             imgui_host.process_mouse_event(event)
@@ -661,14 +672,19 @@ class ShellHost:
                 if self._clicks_ignored():
                     self._cancel_splitter_drag()
                     return
+                x = float(event.pos[0])
+                y = float(event.pos[1])
+                captured = self.top_layer.captures_pointer(x, y)
                 # Swallow the left button so ImGui does not activate a row
-                # or start a value drag.
-                if button == 0 and self._begin_splitter_drag(event.pos):
+                # or start a value drag. A top-layer hit keeps the click.
+                if (
+                    button == 0
+                    and not captured
+                    and self._begin_splitter_drag(event.pos)
+                ):
                     return
-                if button == 0:
-                    self._assign_shell_region(
-                        float(event.pos[0]), float(event.pos[1])
-                    )
+                if button == 0 and not captured:
+                    self._assign_shell_region(x, y)
                 imgui_host.press_button(button)
             elif button == 0 and self._splitter is not None:
                 if self._clicks_ignored():
@@ -685,6 +701,30 @@ class ShellHost:
         if event.type == pygame.MOUSEWHEEL:
             if self._clicks_ignored():
                 return
+            imgui_host.process_mouse_event(event)
+
+    def _process_modal_event(self, event: pygame.event.Event) -> None:
+        """Forward the pointer to ImGui. The shell takes no region or splitter."""
+        self._cancel_splitter_drag()
+        imgui_host = self.imgui
+        if event.type == pygame.MOUSEMOTION:
+            imgui_host.process_mouse_event(event)
+            x = float(event.pos[0])
+            y = float(event.pos[1])
+            if self._chrome_contains(x, y):
+                self._overlay.notify_input()
+            return
+        if event.type in (pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP):
+            button = mouse_button(event)
+            if button is None:
+                return
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                imgui_host.press_button(button)
+            else:
+                imgui_host.release_button(button)
+            imgui_host.process_mouse_event(event)
+            return
+        if event.type == pygame.MOUSEWHEEL:
             imgui_host.process_mouse_event(event)
 
     def _assign_shell_region(self, x: float, y: float) -> None:
@@ -779,53 +819,77 @@ class ShellHost:
         pygame.mouse.set_cursor(cursor)
         self._resize_cursor = resize
 
-    def draw(
+    def draw_windows(
         self,
         menu_state: MenuBarState,
         command_ctx: CommandContext,
-        visibility: float,
-        dt: float,
         readout: TransportReadout | None = None,
-    ) -> None:
-        """One ImGui frame. Skip it when the shell is hidden and no menu is open."""
-        if visibility <= _HIDDEN and not menu_state.dropdown_open:
-            self.imgui.discard_input()
-            self._clear_value_drag()
-            self._cancel_splitter_drag()
-            return
-        self.imgui.begin_frame(dt)
+    ) -> float | None:
+        """Menu bar, transport, navigator, inspector, and the open dropdown.
+
+        The caller owns the ImGui frame and the fade. Returns the menu-rule
+        row, or None when the bar did not open.
+        """
+        with _menu_bar_frame_padding():
+            self._menu_bar_height_px = max(
+                1, int(round(imgui.get_frame_height()))
+            )
+            rule_y, anchors, menus = self._draw_bar(menu_state)
+        if self._layout is not None:
+            self._draw_shell(menu_state, readout)
+        popup_hovered = False
+        if menu_state.dropdown_open and menus:
+            popup_hovered = self._draw_dropdown(
+                menu_state, command_ctx, menus, anchors
+            )
+        if imgui.is_mouse_clicked(0) and not popup_hovered:
+            mouse = imgui.get_mouse_pos()
+            in_bar = 0.0 <= mouse.y < float(self._menu_bar_height_px)
+            if not in_bar:
+                menu_state.blur()
+        self._release_value_drag()
+        return rule_y
+
+    def draw_chrome(self, menu_state: MenuBarState, rule_y: float | None) -> None:
+        """Menu rule and timeline focus border, above the shell windows.
+
+        Full-display, no background, and no inputs. Raised after Begin so the
+        order stays shell windows, dropdown, then this window.
+        """
+        display = imgui.get_io().display_size
+        imgui.set_next_window_pos(imgui.ImVec2(0.0, 0.0), imgui.Cond_.always)
+        imgui.set_next_window_size(
+            imgui.ImVec2(display.x, display.y), imgui.Cond_.always
+        )
+        # A non-zero border insets the window clip and would eat the edge rule.
+        imgui.push_style_var(imgui.StyleVar_.window_border_size, 0.0)
         try:
-            alpha = 1.0 if menu_state.dropdown_open else max(0.0, min(1.0, visibility))
-            imgui.get_style().alpha = alpha
-            with _menu_bar_frame_padding():
-                self._menu_bar_height_px = max(
-                    1, int(round(imgui.get_frame_height()))
+            _visible, _opened = imgui.begin(_CHROME_WINDOW, None, _CHROME_FLAGS)
+            try:
+                imgui.internal.bring_window_to_display_front(
+                    imgui.internal.find_window_by_name(_CHROME_WINDOW)
                 )
-                rule_y, anchors, menus = self._draw_bar(menu_state)
-            if self._layout is not None:
-                self._draw_shell(menu_state, readout)
-            popup_hovered = False
-            if menu_state.dropdown_open and menus:
-                popup_hovered = self._draw_dropdown(
-                    menu_state, command_ctx, menus, anchors
-                )
-            if rule_y is not None:
-                _stroke_h_rule(
-                    0.0,
-                    imgui.get_io().display_size.x,
-                    rule_y,
-                    BORDER_COLOR,
-                )
-            if imgui.is_mouse_clicked(0) and not popup_hovered:
-                mouse = imgui.get_mouse_pos()
-                in_bar = 0.0 <= mouse.y < float(self._menu_bar_height_px)
-                if not in_bar:
-                    menu_state.blur()
-            self._release_value_drag()
+                draw = imgui.get_window_draw_list()
+                draw.push_clip_rect(imgui.ImVec2(0.0, 0.0), display, False)
+                try:
+                    if rule_y is not None:
+                        _stroke_h_rule(0.0, display.x, rule_y, BORDER_COLOR)
+                    layout = self._layout
+                    if (
+                        layout is not None
+                        and self._cycle_stop(menu_state) is CycleStop.TIMELINE
+                    ):
+                        _draw_rect_border(layout.timeline)
+                finally:
+                    draw.pop_clip_rect()
+            finally:
+                imgui.end()
         finally:
-            self.imgui.end_frame()
+            imgui.pop_style_var()
 
     def _chrome_contains(self, x: float, y: float) -> bool:
+        if self.top_layer.captures_pointer(x, y):
+            return True
         if y < self._menu_bar_height_px:
             return True
         layout = self._layout
@@ -919,8 +983,6 @@ class ShellHost:
             )
         finally:
             style.window_min_size = imgui.ImVec2(saved_min_x, saved_min_y)
-        if stop is CycleStop.TIMELINE:
-            _draw_rect_border(layout.timeline)
 
     def _draw_fixed_window(
         self,
@@ -983,7 +1045,6 @@ class ShellHost:
             origin.x + size.x,
             origin.y + size.y - 1.0,
             TRANSPORT_RULE,
-            foreground=False,
         )
 
     def _draw_navigator(self) -> None:
@@ -1323,9 +1384,9 @@ class ShellHost:
             imgui.ImVec2(origin_x, origin_y), imgui.Cond_.always
         )
         # Begun after the shell panels, and those panels do not raise themselves,
-        # so this window stays at the front of the display stack. Do not focus
-        # it: FocusWindow clears the menu-bar button's ActiveId, and a later
-        # click on another top label never completes.
+        # so the popup covers them. Chrome is raised after this window. Do not
+        # focus it: FocusWindow clears the menu-bar button's ActiveId, and a
+        # later click on another top label never completes.
         visible, _open = imgui.begin("##cleave-menu", None, _POPUP_FLAGS)
         try:
             if not visible:
@@ -1411,6 +1472,43 @@ class ShellHost:
         finally:
             imgui.pop_style_color(2)
         return hit
+
+
+def draw_shell_frame(
+    shell: ShellHost,
+    menu_state: MenuBarState,
+    command_ctx: CommandContext,
+    visibility: float,
+    dt: float,
+    readout: TransportReadout | None = None,
+) -> None:
+    """One ImGui frame: shell windows, chrome, then the top layer.
+
+    Skips ``new_frame`` when the shell is hidden, no menu is open, and the
+    top layer is empty. The fade covers the shell and chrome only.
+    """
+    if (
+        visibility <= _HIDDEN
+        and not menu_state.dropdown_open
+        and shell.top_layer.empty
+    ):
+        shell.imgui.discard_input()
+        shell._clear_value_drag()
+        shell._cancel_splitter_drag()
+        shell.top_layer.draw()
+        return
+    shell.imgui.begin_frame(dt)
+    try:
+        alpha = 1.0 if menu_state.dropdown_open else max(0.0, min(1.0, visibility))
+        imgui.push_style_var(imgui.StyleVar_.alpha, alpha)
+        try:
+            rule_y = shell.draw_windows(menu_state, command_ctx, readout)
+            shell.draw_chrome(menu_state, rule_y)
+        finally:
+            imgui.pop_style_var()
+        shell.top_layer.draw()
+    finally:
+        shell.imgui.end_frame()
 
 
 def _mouse_in_current_window() -> bool:

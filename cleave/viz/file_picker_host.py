@@ -22,7 +22,8 @@ from cleave.viz import file_picker_overlay
 from cleave.viz.file_picker import FilePicker, PickerAction
 from cleave.viz.key_repeat import KeyRepeatController, mod_ctrl
 from cleave.viz.loading import LoadingWindow
-from cleave.viz.modal_overlay import InfoPanelViewState, draw_info
+from cleave.viz.info_panel import InfoPanelViewState
+from cleave.viz.modal_overlay import draw_info
 from cleave.viz.overlay_primitives import overlay_font
 from cleave.viz.theme import BACKGROUND
 

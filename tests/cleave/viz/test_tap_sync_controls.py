@@ -17,6 +17,7 @@ from cleave.viz.tap_sync_controls import (
     TapSyncControls,
     TapSyncProgressView,
     TapSyncUiSnapshot,
+    tap_sync_info_panel,
     _TAP_SYNC_CONFIRM_MESSAGE,
 )
 from tests.support.viz import make_test_cfg
@@ -450,3 +451,30 @@ def test_enter_records_tap_space_does_not() -> None:
     assert controls.handle_keydown(keydown(pygame.K_RETURN)) is True
     assert controls.progress_view().streak == 1
     assert "Enter" in _TAP_SYNC_CONFIRM_MESSAGE
+
+
+def test_tap_sync_info_panel_uses_dashes_when_estimate_and_spread_are_missing() -> None:
+    panel = tap_sync_info_panel(
+        TapSyncProgressView(streak=0, spread_ms=None, estimate_ms=None)
+    )
+    assert panel.title_lines == (
+        "Detection in progress",
+        "Tap Enter on the long low tone",
+    )
+    assert panel.body_lines == (
+        f"Streak: 0/{CONSISTENCY_WINDOW}",
+        "Spread: --",
+        "Estimate: --",
+    )
+    assert panel.footer_line == "Esc to cancel"
+
+
+def test_tap_sync_info_panel_formats_populated_estimate_and_spread() -> None:
+    panel = tap_sync_info_panel(
+        TapSyncProgressView(streak=3, spread_ms=12, estimate_ms=205)
+    )
+    assert panel.body_lines == (
+        f"Streak: 3/{CONSISTENCY_WINDOW}",
+        "Spread: 12 ms",
+        "Estimate: 205 ms",
+    )

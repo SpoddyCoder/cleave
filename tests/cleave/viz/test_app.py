@@ -42,6 +42,12 @@ from tests.support.compositor_mock import recording_compositor
 from tests.support.viz import make_test_cfg
 
 
+def _silence_tap_sync(controls: MagicMock) -> None:
+    controls.tap_sync.active = False
+    controls.tap_sync.showing_progress = False
+    controls.tap_sync.progress_view.return_value = None
+
+
 def _assert_warmup_tick(tick_call: object) -> None:
     from cleave.viz.shell_layout import ShellLayout
 
@@ -72,9 +78,7 @@ def _minimal_runtime(compositor: MagicMock, *, upscale: float = 2.0) -> LiveVisu
     )
     controls = MagicMock()
     controls.build_view_state.return_value = MagicMock()
-    controls.tap_sync.active = False
-    controls.tap_sync.showing_progress = False
-    controls.tap_sync.progress_view.return_value = None
+    _silence_tap_sync(controls)
     controls.project_render.busy = False
     overlay = TuningOverlay()
     modal_host = ModalHost()
@@ -228,6 +232,7 @@ def _heavy_init_side_effect(
         on_progress("Building layers...")
     controls = MagicMock()
     controls.build_view_state.return_value = MagicMock()
+    _silence_tap_sync(controls)
     controls.tick = MagicMock()
     controls.consume_hide_overlay.return_value = False
     controls.key_repeat_armed = False
@@ -347,6 +352,7 @@ def test_run_pygame_quit_clean_exits_via_try_quit(
         pygame.Surface((seed.display_width, seed.display_height), pygame.SRCALPHA),
     )
     controls = MagicMock()
+    _silence_tap_sync(controls)
     controls.try_quit.return_value = True
     controls.consume_pending_exit.return_value = False
     controls.tick = MagicMock()
@@ -406,6 +412,7 @@ def test_run_ctrl_q_clean_exits(
         pygame.Surface((seed.display_width, seed.display_height), pygame.SRCALPHA),
     )
     controls = MagicMock()
+    _silence_tap_sync(controls)
     controls.pending_exit = False
     controls.consume_pending_exit.return_value = False
     controls.tick = MagicMock()
@@ -475,6 +482,7 @@ def test_run_pygame_quit_dirty_stays_open(
         pygame.Surface((seed.display_width, seed.display_height), pygame.SRCALPHA),
     )
     controls = MagicMock()
+    _silence_tap_sync(controls)
     controls.try_quit.return_value = False
     controls.consume_pending_exit.return_value = False
     controls.tick = MagicMock()
@@ -538,6 +546,7 @@ def test_run_main_loop_stays_open_without_quit_event(
         pygame.Surface((seed.display_width, seed.display_height), pygame.SRCALPHA),
     )
     controls = MagicMock()
+    _silence_tap_sync(controls)
     controls.try_quit.return_value = True
     controls.consume_pending_exit.return_value = False
     controls.tick = MagicMock()
@@ -640,6 +649,7 @@ def test_run_holds_content_and_overlay_while_project_render_busy(
         pygame.Surface((seed.display_width, seed.display_height), pygame.SRCALPHA),
     )
     controls = MagicMock()
+    _silence_tap_sync(controls)
     controls.try_quit.return_value = True
     controls.consume_pending_exit.return_value = False
     controls.tick = MagicMock()
@@ -1089,31 +1099,21 @@ def test_live_overlay_ui_active_gating() -> None:
         overlay_visibility=0.0,
         modal_active=False,
         timeline_strip_visible=False,
-        tap_sync_progress=False,
     )
     assert _live_overlay_ui_active(
         overlay_visibility=0.5,
         modal_active=False,
         timeline_strip_visible=False,
-        tap_sync_progress=False,
     )
     assert _live_overlay_ui_active(
         overlay_visibility=0.0,
         modal_active=True,
         timeline_strip_visible=False,
-        tap_sync_progress=False,
     )
     assert _live_overlay_ui_active(
         overlay_visibility=0.0,
         modal_active=False,
         timeline_strip_visible=True,
-        tap_sync_progress=False,
-    )
-    assert _live_overlay_ui_active(
-        overlay_visibility=0.0,
-        modal_active=False,
-        timeline_strip_visible=False,
-        tap_sync_progress=True,
     )
 
 

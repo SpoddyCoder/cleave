@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 import pygame
 
+from cleave.viz.info_panel import InfoPanelViewState
 from cleave.viz.modal import (
     ModalHost,
     ModalKind,
@@ -187,13 +186,6 @@ def draw(
     draw_panel_border(panel, alpha=int(255 * text_alpha / 255))
 
     surface.blit(panel, (panel_x, panel_y))
-
-
-@dataclass(frozen=True)
-class InfoPanelViewState:
-    title_lines: tuple[str, ...]
-    body_lines: tuple[str, ...]
-    footer_line: str | None = None
 
 
 def _measure_info_panel(
