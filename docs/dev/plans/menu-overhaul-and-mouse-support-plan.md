@@ -2,7 +2,7 @@
 
 Replace the single scrollable tuning tree with an in-window shell: menu bar, transport, object navigator, property inspector, and the existing timeline strip. Draw the new shell with Dear ImGui in the current OpenGL window. Move content across several playable commits. The last content commit deletes the old tree.
 
-Related: [editor-first.mdc](../../../.cursor/rules/editor-first.mdc), [live-tuning-ui.mdc](../../../.cursor/rules/live-tuning-ui.mdc), [change-touchpoints.mdc](../../../.cursor/rules/change-touchpoints.mdc), [roadmap.md](../roadmap.md).
+Related: [editor-first.mdc](../../../.cursor/rules/editor-first.mdc), [live-tuning-ui.mdc](../../../.cursor/rules/live-tuning-ui.mdc), [change-touchpoints.mdc](../../../.cursor/rules/change-touchpoints.mdc), [roadmap.md](../roadmap.md). Follow-up gaps and deferred items: [menu-overhaul-omissions-and-fixes.md](menu-overhaul-omissions-and-fixes.md).
 
 ---
 
