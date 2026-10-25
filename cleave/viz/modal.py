@@ -530,6 +530,77 @@ class ModalHost:
             )
         )
 
+    def hover_option(self, index: int) -> None:
+        """Focus option ``index``, clamped into the option list."""
+        count = self._option_count()
+        if count <= 0:
+            return
+        self._focus_index = max(0, min(index, count - 1))
+
+    def activate_option(self, index: int) -> None:
+        """Activate option ``index``. Same path as Enter on that option."""
+        if self._option_count() <= 0:
+            return
+        self.hover_option(index)
+        self._activate_focused()
+
+    def cancel(self) -> None:
+        """Same as Esc. PROGRESS ignores it."""
+        request = self._request
+        if request is None or request.kind == ModalKind.PROGRESS:
+            return
+        if request.kind == ModalKind.TEXT:
+            state = self._text_state
+            if state is None:
+                return
+            if state.editing:
+                state.draft = state.initial
+                state.caret_index = len(state.initial)
+                state.error = None
+                self._leave_text_edit(state)
+                return
+            self._dismiss_text(invoke_cancel=True)
+            return
+        self._dismiss()
+
+    def focus_text_field(self, caret_index: int) -> None:
+        """TEXT only. Enter edit mode and place the caret. Does not clear an error."""
+        state = self._text_state_or_none()
+        if state is None:
+            return
+        self._begin_field_edit(state, caret_index)
+
+    def activate_text_button(self, index: int) -> None:
+        """TEXT only. ``0`` confirms (with validation); ``1`` cancels."""
+        state = self._text_state_or_none()
+        if state is None:
+            return
+        if index == 0:
+            self._confirm_text(state)
+        elif index == 1:
+            self._dismiss_text(invoke_cancel=True)
+
+    def hover_text_button(self, index: int) -> None:
+        """TEXT only. Leave edit mode and focus button ``index`` (clamped to 0 or 1)."""
+        state = self._text_state_or_none()
+        if state is None:
+            return
+        if state.editing:
+            self._stop_text_input()
+            state.editing = False
+        state.focus_region = TextFocusRegion.BUTTONS
+        state.button_index = max(0, min(index, 1))
+
+    def hover_text_field(self) -> None:
+        """TEXT only. Focus the field without entering edit mode.
+
+        Already editing stays editing.
+        """
+        state = self._text_state_or_none()
+        if state is None or state.editing:
+            return
+        state.focus_region = TextFocusRegion.FIELD
+
     def handle_keydown(self, event: pygame.event.Event) -> bool:
         """Return True when the event is consumed (including while blocking)."""
         if not self.active or event.type != pygame.KEYDOWN:
@@ -543,7 +614,7 @@ class ModalHost:
             return self._handle_text_keydown(event)
 
         if event.key == pygame.K_ESCAPE:
-            self._dismiss()
+            self.cancel()
             return True
 
         option_count = len(request.options)
@@ -558,14 +629,14 @@ class ModalHost:
 
         if option_count == 2:
             if event.key == pygame.K_y:
-                self._focus_index = 0
+                self.hover_option(0)
                 return True
             if event.key == pygame.K_n:
-                self._focus_index = 1
+                self.hover_option(1)
                 return True
 
         if event.key == pygame.K_RETURN:
-            self._activate_focused()
+            self.activate_option(self._focus_index)
             return True
 
         return True
@@ -613,10 +684,7 @@ class ModalHost:
         state: TextModalState,
     ) -> bool:
         if event.key == pygame.K_ESCAPE:
-            state.draft = state.initial
-            state.caret_index = len(state.initial)
-            state.error = None
-            self._leave_text_edit(state)
+            self.cancel()
             return True
         if event.key == pygame.K_RETURN:
             if mod_shift(event.mod):
@@ -651,14 +719,13 @@ class ModalHost:
         state: TextModalState,
     ) -> bool:
         if event.key == pygame.K_ESCAPE:
-            self._dismiss_text(invoke_cancel=True)
+            self.cancel()
             return True
         if event.key in (pygame.K_UP, pygame.K_DOWN):
             if state.focus_region == TextFocusRegion.FIELD:
-                state.focus_region = TextFocusRegion.BUTTONS
-                state.button_index = 0
+                self.hover_text_button(0)
             else:
-                state.focus_region = TextFocusRegion.FIELD
+                self.hover_text_field()
             return True
         if event.key in (pygame.K_LEFT, pygame.K_RIGHT):
             if state.focus_region == TextFocusRegion.BUTTONS:
@@ -667,14 +734,9 @@ class ModalHost:
             return True
         if event.key == pygame.K_RETURN:
             if state.focus_region == TextFocusRegion.FIELD:
-                state.editing = True
-                _reset_caret_blink(state)
-                self._start_text_input()
+                self.focus_text_field(state.caret_index)
                 return True
-            if state.button_index == 0:
-                self._confirm_text(state)
-            else:
-                self._dismiss_text(invoke_cancel=True)
+            self.activate_text_button(state.button_index)
             return True
         return True
 
@@ -693,12 +755,29 @@ class ModalHost:
         if error is None:
             return False
         state.error = error
-        state.focus_region = TextFocusRegion.FIELD
-        if not state.editing:
-            state.editing = True
-            self._start_text_input()
-        _reset_caret_blink(state)
+        self._begin_field_edit(state)
         return True
+
+    def _option_count(self) -> int:
+        request = self._request
+        if request is None or request.kind in (ModalKind.PROGRESS, ModalKind.TEXT):
+            return 0
+        return len(request.options)
+
+    def _text_state_or_none(self) -> TextModalState | None:
+        if self._request is None or self._request.kind != ModalKind.TEXT:
+            return None
+        return self._text_state
+
+    def _begin_field_edit(
+        self, state: TextModalState, caret_index: int | None = None
+    ) -> None:
+        state.editing = True
+        state.focus_region = TextFocusRegion.FIELD
+        if caret_index is not None:
+            state.caret_index = max(0, min(caret_index, len(state.draft)))
+        _reset_caret_blink(state)
+        self._start_text_input()
 
     def _leave_text_edit(
         self,

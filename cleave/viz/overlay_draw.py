@@ -5,10 +5,8 @@ from __future__ import annotations
 import pygame
 
 from cleave.gl_compositor import GlCompositor, OverlayTextureSlot
-from cleave.viz import modal_overlay
 from cleave.viz.help_content import help_focus_descriptor
 from cleave.viz.help_overlay import HelpOverlay
-from cleave.viz.modal import ModalHost
 from cleave.viz.shell_focus import ShellFocusState, ShellRegion
 from cleave.viz.tuning_panel_draw import TuningOverlay
 from cleave.viz.tuning_view_state import TuningViewState
@@ -147,63 +145,13 @@ class OverlayDrawer:
         cue_readout_open: bool = False,
         overlay_visible: bool = True,
         help_overlay: HelpOverlay | None = None,
-        modal_host: ModalHost | None = None,
         profiler: OverlayProfiler | None = None,
         visualiser_rect: tuple[int, int, int, int] | None = None,
         shell_focus: ShellFocusState | None = None,
     ) -> None:
         viewport_w, viewport_h = overlay_surface.get_size()
         counters = profiler.counters() if profiler is not None else None
-        modal_active = modal_host is not None and modal_host.active
         show_help = view_state.help_visible and overlay_visible
-
-        def _upload(surface: pygame.Surface) -> int:
-            if profiler is not None:
-                with profiler.time_section("upload"):
-                    return compositor.upload_overlay_texture(surface)
-            return compositor.upload_overlay_texture(surface)
-
-        def _present(
-            tex_id: int,
-            x: int,
-            y: int,
-            w: int,
-            h: int,
-        ) -> None:
-            if profiler is not None:
-                with profiler.time_section("overlay_present"):
-                    compositor.draw_overlay(tex_id, x, y, w, h)
-            else:
-                compositor.draw_overlay(tex_id, x, y, w, h)
-
-        if modal_active:
-            overlay_surface.fill((0, 0, 0, 0))
-            overlay.draw(
-                overlay_surface,
-                view_state,
-                timeline_panel_open=timeline_panel_open,
-                cue_readout_open=cue_readout_open,
-                counters=counters,
-                visualiser_rect=visualiser_rect,
-            )
-            if help_overlay is not None and show_help:
-                help_overlay.draw(
-                    overlay_surface,
-                    visualiser_rect=visualiser_rect,
-                    **_help_compose_kwargs(view_state, shell_focus),
-                )
-            modal_view = modal_host.view_state()
-            assert modal_view is not None
-            modal_overlay.draw(
-                overlay_surface,
-                modal_view,
-                font=overlay._font_get(),
-                line_gap=overlay._line_gap,
-                modal_host=modal_host,
-            )
-            tex_id = _upload(overlay_surface)
-            _present(tex_id, 0, 0, viewport_w, viewport_h)
-            return
 
         composed = overlay.compose_panel(
             view_state,

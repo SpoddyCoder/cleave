@@ -647,7 +647,11 @@ class ShellHost:
 
     def process_event(self, event: pygame.event.Event) -> None:
         """Mouse motion, buttons, and wheel only. Keys stay out of ImGui."""
-        if self.top_layer.modal_active:
+        # Host active covers the click before the top layer has drawn the modal.
+        modal_host = getattr(self._controls, "modal_host", None)
+        if self.top_layer.modal_active or (
+            modal_host is not None and modal_host.active
+        ):
             self._process_modal_event(event)
             return
         imgui_host = self.imgui

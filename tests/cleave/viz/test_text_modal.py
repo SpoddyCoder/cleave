@@ -7,7 +7,14 @@ from collections.abc import Callable
 import pygame
 
 from cleave.viz.key_repeat import INITIAL_DELAY_SEC
-from cleave.viz.modal import ModalHost, TextFocusRegion
+from cleave.viz.modal import (
+    ModalHost,
+    ModalKind,
+    ModalLabeledLine,
+    ModalOption,
+    TextFocusRegion,
+    capital_case_modal_option,
+)
 
 
 def _keydown(key: int, mod: int = 0) -> pygame.event.Event:
@@ -909,3 +916,375 @@ def test_reenter_edit_resets_caret_blink() -> None:
     assert view is not None
     assert view.editing is True
     assert view.caret_visible is True
+
+
+def _choice(modal: ModalHost, picked: list[int]) -> None:
+    modal.prompt_choice(
+        "Pick",
+        [
+            ModalOption("A", lambda: picked.append(0)),
+            ModalOption("B", lambda: picked.append(1)),
+            ModalOption("C", lambda: picked.append(2)),
+        ],
+    )
+
+
+def test_hover_option_matches_arrow_focus() -> None:
+    keyed = ModalHost()
+    pointed = ModalHost()
+    _choice(keyed, [])
+    _choice(pointed, [])
+    keyed.handle_keydown(_keydown(pygame.K_DOWN))
+    keyed.handle_keydown(_keydown(pygame.K_DOWN))
+    pointed.hover_option(2)
+    assert keyed.view_state() == pointed.view_state()
+    assert pointed.view_state() is not None
+    assert pointed.view_state().focus_index == 2
+
+    yes_key = ModalHost()
+    yes_pointer = ModalHost()
+    yes_key.prompt_yes_no("Overwrite?", on_confirm=lambda: None)
+    yes_pointer.prompt_yes_no("Overwrite?", on_confirm=lambda: None)
+    yes_key.handle_keydown(_keydown(pygame.K_UP))
+    yes_pointer.hover_option(1)
+    assert yes_key.view_state() == yes_pointer.view_state()
+
+    pointed.hover_option(-3)
+    assert pointed.view_state() is not None
+    assert pointed.view_state().focus_index == 0
+    pointed.hover_option(99)
+    assert pointed.view_state().focus_index == 2
+
+
+def test_activate_option_matches_enter() -> None:
+    keyed_picks: list[int] = []
+    pointer_picks: list[int] = []
+    keyed = ModalHost()
+    pointed = ModalHost()
+    _choice(keyed, keyed_picks)
+    _choice(pointed, pointer_picks)
+    keyed.handle_keydown(_keydown(pygame.K_DOWN))
+    keyed.handle_keydown(_keydown(pygame.K_DOWN))
+    keyed.handle_keydown(_keydown(pygame.K_RETURN))
+    pointed.activate_option(2)
+    assert not keyed.active
+    assert not pointed.active
+    assert keyed_picks == pointer_picks == [2]
+
+
+def test_cancel_matches_escape_for_yes_no_and_text() -> None:
+    key_dismissed: list[str] = []
+    pointer_dismissed: list[str] = []
+    keyed = ModalHost()
+    pointed = ModalHost()
+    keyed.prompt_yes_no(
+        "Overwrite?",
+        on_confirm=lambda: None,
+        on_cancel=lambda: key_dismissed.append("dismiss"),
+    )
+    pointed.prompt_yes_no(
+        "Overwrite?",
+        on_confirm=lambda: None,
+        on_cancel=lambda: pointer_dismissed.append("dismiss"),
+    )
+    assert keyed.handle_keydown(_keydown(pygame.K_ESCAPE)) is True
+    pointed.cancel()
+    assert key_dismissed == pointer_dismissed == ["dismiss"]
+    assert not keyed.active
+    assert not pointed.active
+
+    edit_key = ModalHost()
+    edit_pointer = ModalHost()
+    _open_text(edit_key, initial="hello")
+    _open_text(edit_pointer, initial="hello")
+    edit_key.handle_text_input("!")
+    edit_pointer.handle_text_input("!")
+    edit_key.handle_keydown(_keydown(pygame.K_ESCAPE))
+    edit_pointer.cancel()
+    assert edit_key.view_state() == edit_pointer.view_state()
+    view = edit_pointer.view_state()
+    assert view is not None
+    assert view.draft == "hello"
+    assert view.editing is False
+    assert view.error is None
+    assert edit_pointer.active
+
+    nav_key = ModalHost()
+    nav_pointer = ModalHost()
+    _key_confirmed, key_cancelled = _open_text(nav_key, initial="hello")
+    _pointer_confirmed, pointer_cancelled = _open_text(nav_pointer, initial="hello")
+    nav_key.handle_keydown(_keydown(pygame.K_ESCAPE))
+    nav_pointer.handle_keydown(_keydown(pygame.K_ESCAPE))
+    nav_key.handle_keydown(_keydown(pygame.K_ESCAPE))
+    nav_pointer.cancel()
+    assert not nav_key.active
+    assert not nav_pointer.active
+    assert key_cancelled == pointer_cancelled == ["cancel"]
+
+    progress = ModalHost()
+    progress.prompt_progress("Rendering...", fraction=0.4)
+    before = progress.view_state()
+    assert progress.handle_keydown(_keydown(pygame.K_ESCAPE)) is True
+    progress.cancel()
+    assert progress.active
+    assert progress.view_state() == before
+    assert progress.view_state() is not None
+    assert progress.view_state().kind == ModalKind.PROGRESS
+
+
+def test_focus_text_field_enters_editing_at_caret() -> None:
+    def opened() -> tuple[ModalHost, list[str], list[str]]:
+        modal, starts, stops = _host_with_text_callbacks()
+        _open_text(modal, initial="hello")
+        modal.handle_keydown(_keydown(pygame.K_ESCAPE))
+        return modal, starts, stops
+
+    keyed, key_starts, key_stops = opened()
+    pointed, pointer_starts, pointer_stops = opened()
+    keyed.handle_keydown(_keydown(pygame.K_RETURN))
+    pointed.focus_text_field(len("hello"))
+    assert keyed.view_state() == pointed.view_state()
+    view = pointed.view_state()
+    assert view is not None
+    assert view.editing is True
+    assert view.caret_index == len("hello")
+    assert view.focus_region == TextFocusRegion.FIELD
+    assert key_starts == pointer_starts == ["start", "start"]
+    assert key_stops == pointer_stops == ["stop"]
+
+    pointed.focus_text_field(2)
+    view = pointed.view_state()
+    assert view is not None
+    assert view.editing is True
+    assert view.caret_index == 2
+
+    errored = ModalHost()
+    _open_text(errored, initial="bad", validate=lambda _draft: "nope")
+    errored.handle_keydown(_keydown(pygame.K_RETURN))
+    errored.focus_text_field(1)
+    view = errored.view_state()
+    assert view is not None
+    assert view.error == "nope"
+    assert view.caret_index == 1
+    assert view.editing is True
+
+
+def test_activate_text_button_confirm_matches_enter() -> None:
+    def failing(draft: str) -> str | None:
+        if draft == "bad":
+            return "invalid hex colour"
+        return None
+
+    keyed = ModalHost()
+    pointed = ModalHost()
+    key_confirmed, key_cancelled = _open_text(keyed, initial="bad", validate=failing)
+    pointer_confirmed, pointer_cancelled = _open_text(
+        pointed, initial="bad", validate=failing
+    )
+    for modal in (keyed, pointed):
+        modal.handle_keydown(_keydown(pygame.K_ESCAPE))
+        modal.handle_keydown(_keydown(pygame.K_DOWN))
+    keyed.handle_keydown(_keydown(pygame.K_RETURN))
+    pointed.activate_text_button(0)
+    assert keyed.active and pointed.active
+    assert keyed.view_state() == pointed.view_state()
+    view = pointed.view_state()
+    assert view is not None
+    assert view.error == "invalid hex colour"
+    assert view.editing is True
+    assert view.focus_region == TextFocusRegion.FIELD
+    assert key_confirmed == pointer_confirmed == []
+    assert key_cancelled == pointer_cancelled == []
+
+    keyed = ModalHost()
+    pointed = ModalHost()
+    key_confirmed, _key_cancelled = _open_text(
+        keyed, initial="ok", validate=lambda _draft: None
+    )
+    pointer_confirmed, _pointer_cancelled = _open_text(
+        pointed, initial="ok", validate=lambda _draft: None
+    )
+    for modal in (keyed, pointed):
+        modal.handle_text_input("!")
+        modal.handle_keydown(_keydown(pygame.K_RETURN))
+    keyed.handle_keydown(_keydown(pygame.K_RETURN))
+    pointed.activate_text_button(0)
+    assert not keyed.active
+    assert not pointed.active
+    assert key_confirmed == pointer_confirmed == ["ok!"]
+
+
+def test_hover_text_button_focuses_button_and_leaves_edit() -> None:
+    modal, starts, stops = _host_with_text_callbacks()
+    _open_text(modal, initial="hello")
+    modal.handle_text_input("!")
+    modal.hover_text_button(1)
+    view = modal.view_state()
+    assert view is not None
+    assert view.draft == "hello!"
+    assert view.editing is False
+    assert view.focus_region == TextFocusRegion.BUTTONS
+    assert view.button_index == 1
+    assert starts == ["start"]
+    assert stops == ["stop"]
+
+    keyed = ModalHost()
+    pointed = ModalHost()
+    _open_text(keyed, initial="hello")
+    _open_text(pointed, initial="hello")
+    keyed.handle_keydown(_keydown(pygame.K_ESCAPE))
+    pointed.handle_keydown(_keydown(pygame.K_ESCAPE))
+    keyed.handle_keydown(_keydown(pygame.K_DOWN))
+    keyed.handle_keydown(_keydown(pygame.K_RIGHT))
+    pointed.hover_text_button(1)
+    assert keyed.view_state() == pointed.view_state()
+
+    pointed.hover_text_field()
+    view = pointed.view_state()
+    assert view is not None
+    assert view.focus_region == TextFocusRegion.FIELD
+    assert view.editing is False
+    keyed.handle_keydown(_keydown(pygame.K_UP))
+    assert keyed.view_state() == pointed.view_state()
+
+
+def test_hover_text_field_while_editing_stays_editing() -> None:
+    modal = ModalHost()
+    _open_text(modal, initial="hello")
+    modal.handle_keydown(_keydown(pygame.K_LEFT))
+    before = modal.view_state()
+    modal.hover_text_field()
+    assert modal.view_state() == before
+    assert before is not None
+    assert before.editing is True
+
+
+def test_text_pointer_methods_noop_on_yes_no() -> None:
+    modal = ModalHost()
+    modal.prompt_yes_no("Overwrite?", on_confirm=lambda: None)
+    before = modal.view_state()
+    modal.focus_text_field(0)
+    modal.activate_text_button(0)
+    modal.hover_text_button(1)
+    modal.hover_text_field()
+    assert modal.active
+    assert modal.view_state() == before
+
+
+def test_capital_case_modal_option() -> None:
+    assert capital_case_modal_option("YES") == "Yes"
+    assert capital_case_modal_option("save as new") == "Save As New"
+    assert capital_case_modal_option("DON'T SAVE") == "Don't Save"
+    assert capital_case_modal_option("(root)") == "(Root)"
+    assert capital_case_modal_option("keepers") == "Keepers"
+    assert capital_case_modal_option("5.0s") == "5.0s"
+    assert capital_case_modal_option("a-tier") == "A-tier"
+
+
+def test_prompt_choice_renders_n_options() -> None:
+    modal = ModalHost()
+    modal.prompt_choice(
+        "Favourite preset: demo.milk?",
+        [
+            ModalOption("(root)", lambda: None),
+            ModalOption("keepers", lambda: None),
+            ModalOption("wip", lambda: None),
+            ModalOption("Cancel", lambda: None),
+        ],
+    )
+    view = modal.view_state()
+    assert view is not None
+    assert view.kind == ModalKind.CHOICE
+    assert view.options == ("(Root)", "Keepers", "Wip", "Cancel")
+
+
+def test_prompt_choice_up_down_and_left_right_cycle_options() -> None:
+    modal = ModalHost()
+    modal.prompt_choice(
+        "Blacklist preset: demo.milk?",
+        [
+            ModalOption("(root)", lambda: None),
+            ModalOption("review", lambda: None),
+            ModalOption("Cancel", lambda: None),
+        ],
+    )
+    view = modal.view_state()
+    assert view is not None
+    assert view.focus_index == 0
+
+    modal.handle_keydown(_keydown(pygame.K_DOWN))
+    assert modal.view_state() is not None
+    assert modal.view_state().focus_index == 1
+
+    modal.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert modal.view_state().focus_index == 2
+
+    modal.handle_keydown(_keydown(pygame.K_DOWN))
+    assert modal.view_state().focus_index == 0
+
+    modal.handle_keydown(_keydown(pygame.K_UP))
+    assert modal.view_state().focus_index == 2
+
+    modal.handle_keydown(_keydown(pygame.K_LEFT))
+    assert modal.view_state().focus_index == 1
+
+
+def test_prompt_yes_no_passes_labeled_lines() -> None:
+    modal = ModalHost()
+    labeled = (
+        ModalLabeledLine("character", "arc"),
+        ModalLabeledLine("conductor", "on"),
+    )
+    modal.prompt_yes_no(
+        "Apply timeline preset?",
+        on_confirm=lambda: None,
+        cancel_label="Cancel",
+        labeled_lines=labeled,
+    )
+    view = modal.view_state()
+    assert view is not None
+    assert view.message == "Apply timeline preset?"
+    assert view.labeled_lines == labeled
+    assert view.options == ("Yes", "Cancel")
+
+
+def test_prompt_progress_has_bar_and_ignores_keys() -> None:
+    modal = ModalHost()
+    labeled = (
+        ModalLabeledLine("output", "renders/song.mp4"),
+        ModalLabeledLine("quality", "high"),
+    )
+    modal.prompt_progress(
+        "Rendering project...",
+        labeled_lines=labeled,
+        fraction=0.25,
+    )
+    view = modal.view_state()
+    assert view is not None
+    assert view.kind == ModalKind.PROGRESS
+    assert view.message == "Rendering project..."
+    assert view.options == ()
+    assert view.progress_fraction == 0.25
+    assert view.labeled_lines == labeled
+    assert modal.handle_keydown(_keydown(pygame.K_ESCAPE)) is True
+    assert modal.active is True
+    assert modal.handle_keydown(_keydown(pygame.K_RETURN)) is True
+    assert modal.active is True
+    modal.update_progress(0.8)
+    assert modal.view_state() is not None
+    assert modal.view_state().progress_fraction == 0.8
+
+
+def test_prompt_choice_passes_labeled_lines() -> None:
+    modal = ModalHost()
+    labeled = (ModalLabeledLine("output", "renders/song.mp4"),)
+    modal.prompt_choice(
+        "Render complete",
+        [ModalOption("OK", lambda: None)],
+        labeled_lines=labeled,
+    )
+    view = modal.view_state()
+    assert view is not None
+    assert view.message == "Render complete"
+    assert view.labeled_lines == labeled
+    assert view.options == ("Ok",)

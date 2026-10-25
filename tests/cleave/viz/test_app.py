@@ -1004,7 +1004,7 @@ def test_tick_frame_skips_view_state_and_draw_tuning_when_overlay_hidden(
 @patch("cleave.viz.app.LayerFramePipeline.composite")
 @patch("cleave.viz.app.LayerFramePipeline.render_frame")
 @patch("cleave.viz.app.apply_layer_visibility")
-def test_tick_frame_draws_tuning_when_modal_active_and_panel_hidden(
+def test_tick_frame_skips_tuning_when_only_a_modal_is_active(
     _mock_visibility: MagicMock,
     _mock_effects: MagicMock,
     _mock_composite: MagicMock,
@@ -1021,26 +1021,8 @@ def test_tick_frame_draws_tuning_when_modal_active_and_panel_hidden(
     app = VisualizerApp(runtime)
     app.tick_frame(1.0, paused=True, draw_overlay=True, n_pcm=735)
 
-    runtime.controls.build_view_state.assert_called_once()
-    mock_draw_tuning.assert_called_once()
-    from cleave.viz.shell_layout import ShellLayout
-
-    display_w, display_h = runtime.overlay_surface.get_size()
-    editor = runtime.seed.cfg.editor
-    expected = ShellLayout.compute(
-        display_w,
-        display_h,
-        0,
-        0,
-        0,
-        nav_width=editor.navigator_width,
-        insp_width=editor.inspector_width,
-        docked=editor.shell_layout_mode == "docked",
-    )
-    assert editor.navigator_width == DEFAULT_NAVIGATOR_WIDTH
-    assert editor.inspector_width == DEFAULT_INSPECTOR_WIDTH
-    assert mock_draw_tuning.call_args.kwargs["visualiser_rect"] == expected.visualiser
-    runtime.compositor.set_present_rect.assert_called_with(None)
+    runtime.controls.build_view_state.assert_not_called()
+    mock_draw_tuning.assert_not_called()
 
 
 @patch("cleave.viz.app.OverlayDrawer.draw_tuning")
@@ -1097,33 +1079,21 @@ def test_tick_frame_insets_panels_by_full_menu_bar_height_when_faded(
 def test_live_overlay_ui_active_gating() -> None:
     assert not _live_overlay_ui_active(
         overlay_visibility=0.0,
-        modal_active=False,
         timeline_strip_visible=False,
     )
     assert _live_overlay_ui_active(
         overlay_visibility=0.5,
-        modal_active=False,
         timeline_strip_visible=False,
     )
     assert _live_overlay_ui_active(
         overlay_visibility=0.0,
-        modal_active=True,
-        timeline_strip_visible=False,
-    )
-    assert _live_overlay_ui_active(
-        overlay_visibility=0.0,
-        modal_active=False,
         timeline_strip_visible=True,
     )
 
 
 def test_tuning_view_state_needed_gating() -> None:
-    assert not _tuning_view_state_needed(overlay_visibility=0.0, modal_active=False)
-    assert _tuning_view_state_needed(overlay_visibility=0.5, modal_active=False)
-    assert _tuning_view_state_needed(overlay_visibility=0.0, modal_active=True)
-    assert not _tuning_view_state_needed(
-        overlay_visibility=0.0, modal_active=False
-    )
+    assert not _tuning_view_state_needed(overlay_visibility=0.0)
+    assert _tuning_view_state_needed(overlay_visibility=0.5)
 
 
 def test_timeline_strip_visible_while_timeline_region_despite_hidden_overlay() -> None:

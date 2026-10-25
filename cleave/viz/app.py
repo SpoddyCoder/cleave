@@ -390,22 +390,16 @@ def init_gl_resources_render(
 def _live_overlay_ui_active(
     *,
     overlay_visibility: float,
-    modal_active: bool,
     timeline_strip_visible: bool,
 ) -> bool:
-    return (
-        overlay_visibility > 0.01
-        or modal_active
-        or timeline_strip_visible
-    )
+    return overlay_visibility > 0.01 or timeline_strip_visible
 
 
 def _tuning_view_state_needed(
     *,
     overlay_visibility: float,
-    modal_active: bool,
 ) -> bool:
-    return overlay_visibility > 0.01 or modal_active
+    return overlay_visibility > 0.01
 
 
 def _timeline_strip_visible(
@@ -512,7 +506,6 @@ def _tick_frame_live_overlay(
     )
 
     overlay_visibility = runtime.overlay.visibility
-    modal_active = runtime.modal_host.active
     tap_sync_progress = runtime.controls.tap_sync.showing_progress
     tl = runtime.seed.session.timeline
     timeline_strip_visible = (
@@ -526,7 +519,6 @@ def _tick_frame_live_overlay(
 
     if not _live_overlay_ui_active(
         overlay_visibility=overlay_visibility,
-        modal_active=modal_active,
         timeline_strip_visible=timeline_strip_visible,
     ):
         profiler.note_skipped_frame()
@@ -538,7 +530,6 @@ def _tick_frame_live_overlay(
         not tap_sync_progress
         and _tuning_view_state_needed(
             overlay_visibility=overlay_visibility,
-            modal_active=modal_active,
         )
     ):
         with profiler.time_section("view_state_build"):
@@ -568,7 +559,6 @@ def _tick_frame_live_overlay(
         not tap_sync_progress
         and _tuning_view_state_needed(
             overlay_visibility=overlay_visibility,
-            modal_active=modal_active,
         )
     ):
         # The shell band already shows the strip, so the toast panel must
@@ -592,7 +582,6 @@ def _tick_frame_live_overlay(
                 cue_readout_open=cue_readout_open,
                 overlay_visible=overlay_visibility > 0.01,
                 help_overlay=runtime.help_overlay,
-                modal_host=runtime.modal_host,
                 profiler=profiler,
                 visualiser_rect=layout.visualiser,
                 shell_focus=runtime.controls.shell_focus,
@@ -764,6 +753,15 @@ class VisualizerApp:
             if window.quit_requested:
                 return
 
+            from imgui_bundle import imgui
+
+            from cleave.viz.modal import ModalKind
+            from cleave.viz.modal_surface import (
+                ImGuiTextMeasure,
+                ModalSurface,
+                apply_modal_pointer,
+                text_field_wrap,
+            )
             from cleave.viz.shell_host import (
                 ShellHost,
                 TransportReadout,
@@ -793,6 +791,14 @@ class VisualizerApp:
                         shell.top_layer.push(
                             InfoPanelSurface(tap_sync_info_panel(progress))
                         )
+                modal_surface: ModalSurface | None = None
+                if rt.modal_host.active:
+                    modal_view = rt.modal_host.view_state()
+                    if modal_view is not None:
+                        modal_surface = ModalSurface(
+                            modal_view, ImGuiTextMeasure()
+                        )
+                        shell.top_layer.push(modal_surface)
                 position = current_sec(rt.playback, rt.seed.duration_sec)
                 readout = TransportReadout(
                     paused=rt.playback.paused,
@@ -815,6 +821,15 @@ class VisualizerApp:
                     self._overlay_dt,
                     readout,
                 )
+                if modal_surface is not None and modal_surface.intent is not None:
+                    apply_modal_pointer(rt.modal_host, modal_surface.intent)
+                    rt.overlay.notify_input()
+                shown = rt.modal_host.view_state()
+                if shown is not None and shown.kind == ModalKind.TEXT:
+                    display_w = max(1, int(imgui.get_io().display_size.x))
+                    rt.modal_host.set_text_field_wrap(text_field_wrap(display_w))
+                else:
+                    rt.modal_host.set_text_field_wrap(None)
 
             self.tick_frame(
                 0.0,

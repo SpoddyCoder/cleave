@@ -3,8 +3,15 @@
 from __future__ import annotations
 
 import re
+from typing import Protocol
 
 import pygame
+
+
+class TextSizer(Protocol):
+    """Something that can measure a string. A pygame font satisfies this."""
+
+    def size(self, text: str) -> tuple[int, int]: ...
 
 # Must-include parent-directory prefix: "[..]".
 _TREE_MARKER_PREFIX = re.compile(r"^(\[\.\.\])")
@@ -29,11 +36,11 @@ _META_SUFFIX = re.compile(
 _SENTENCE_END = frozenset(".?!")
 
 
-def _text_width(font: pygame.font.Font, text: str) -> int:
+def _text_width(font: TextSizer, text: str) -> int:
     return font.size(text)[0]
 
 
-def _max_prefix_len(font: pygame.font.Font, text: str, max_px: int) -> int:
+def _max_prefix_len(font: TextSizer, text: str, max_px: int) -> int:
     lo, hi = 0, len(text)
     while lo < hi:
         mid = (lo + hi + 1) // 2
@@ -58,7 +65,7 @@ def _preferred_wrap_break(chunk: str) -> int:
 
 
 def _wrap_paragraph_to_width(
-    font: pygame.font.Font, text: str, max_px: int
+    font: TextSizer, text: str, max_px: int
 ) -> list[str]:
     """Wrap a single paragraph (no newlines) to max_px."""
     if not text:
@@ -90,9 +97,7 @@ def _wrap_paragraph_to_width(
     return lines
 
 
-def wrap_text_to_width(
-    font: pygame.font.Font, text: str, max_px: int
-) -> list[str]:
+def wrap_text_to_width(font: TextSizer, text: str, max_px: int) -> list[str]:
     """Wrap text to max_px; prefer breaks after sentence endings, then spaces.
 
     Explicit newlines are preserved as hard line breaks.

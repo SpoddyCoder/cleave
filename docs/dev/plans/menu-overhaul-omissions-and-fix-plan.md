@@ -68,8 +68,10 @@ No user-visible feature on its own except the pilot; this is what Phases 4 throu
 
 ## Phase 4: Modals in ImGui (item 2)
 
+Done.
+
 - Keep `ModalHost`, `ModalRequest`, `ModalViewState`, and `TextModalState` as the model; every caller in `*_controls.py` is unchanged. Only presentation and input move.
-- ImGui centred modal on the top layer: title, body, `labeled_lines`, option buttons (click or keyboard), and the text field (caret, selection, multi-line) driven from `TextModalState` rather than ImGui's own input widget, so existing key semantics and tests survive.
+- ImGui centred modal on the top layer: title, body, `labeled_lines`, option buttons (click or keyboard), and the text field (caret, multi-line) driven from `TextModalState` rather than ImGui's own input widget, so existing key semantics and tests survive.
 - Mouse: click an option to choose it, click outside or Esc to cancel where the modal allows cancel, hover moves the focused option.
 - Remove the `modal_active` branch of `OverlayDrawer.draw_tuning` and the pygame chrome in `modal_overlay.py`. Starter-pack's `draw_info` use moves in Phase 8; keep `draw_info` until then or move it now if simpler.
 

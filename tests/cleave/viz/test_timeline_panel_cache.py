@@ -316,8 +316,11 @@ def test_live_signature_changes_on_selected_cue_flash_phase(monkeypatch) -> None
     assert bright != alt
 
 
-def test_upload_plan_skip_when_paused_and_unchanged() -> None:
+def test_upload_plan_skip_when_paused_and_unchanged(monkeypatch) -> None:
     pygame.init()
+    # Playhead blink is in the live signature. Pin the clock so two composes
+    # of an unchanged paused view stay on one flash phase and skip the upload.
+    monkeypatch.setattr(pygame.time, "get_ticks", lambda: 1_000)
     overlay = TimelineOverlay()
     state = _view_state(position_sec=30.0)
     first = overlay.compose_panel(state, viewport_width=1280, viewport_height=720)
