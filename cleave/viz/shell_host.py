@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import math
 import os
-from collections.abc import Callable, Collection, Sequence
+from collections.abc import Callable, Collection, Iterator, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any
 
@@ -687,6 +688,52 @@ def _draw_rect_border(rect: tuple[int, int, int, int]) -> None:
     )
 
 
+def _draw_item_focus_ring() -> None:
+    """1px highlight outline of the current item on the foreground list."""
+    rect_min = imgui.get_item_rect_min()
+    rect_max = imgui.get_item_rect_max()
+    if rect_max.x <= rect_min.x or rect_max.y <= rect_min.y:
+        return
+    color = imgui.get_color_u32(_rgba(HIGHLIGHT))
+    imgui.get_foreground_draw_list().add_rect(
+        rect_min,
+        rect_max,
+        color,
+        0.0,
+        0,
+        1.0,
+    )
+
+
+def selectable_wash(selected: bool) -> tuple[imgui.ImVec4, imgui.ImVec4]:
+    """Hovered and active header colors for one shell selectable.
+
+    A selected row keeps the highlight wash. An unselected row uses the hover
+    wash ``_apply_theme`` assigns to ``header_hovered`` and ``header_active``.
+    """
+    if selected:
+        rgb: tuple[int, int, int] = HIGHLIGHT
+        alpha = FOCUS_ROW_BG_ALPHA / 255.0
+    else:
+        rgb = HOVER
+        alpha = HOVER_BG_ALPHA / 255.0
+    return _rgba(rgb, alpha), _rgba(rgb, alpha)
+
+
+@contextmanager
+def _selected_header_wash(selected: bool) -> Iterator[None]:
+    """Push the highlight header wash for a selected selectable, then pop."""
+    if selected:
+        hovered, active = selectable_wash(True)
+        imgui.push_style_color(imgui.Col_.header_hovered, hovered)
+        imgui.push_style_color(imgui.Col_.header_active, active)
+    try:
+        yield
+    finally:
+        if selected:
+            imgui.pop_style_color(2)
+
+
 def _gl_int(param: int) -> int:
     value = glGetIntegerv(param)
     try:
@@ -1220,21 +1267,24 @@ class ShellHost:
         try:
             selected = node.id == focus.selected_id
             twisty_clicked = False
-            twisty = navigator_twisty(node, focus.nav_expanded)
-            if twisty is not None:
-                width = imgui.calc_text_size(twisty).x
-                twisty_clicked, _selected = imgui.selectable(
-                    f"{twisty}##nav-twisty-{node.id}",
+            with _selected_header_wash(selected):
+                twisty = navigator_twisty(node, focus.nav_expanded)
+                if twisty is not None:
+                    width = imgui.calc_text_size(twisty).x
+                    twisty_clicked, _selected = imgui.selectable(
+                        f"{twisty}##nav-twisty-{node.id}",
+                        selected,
+                        0,
+                        imgui.ImVec2(width, 0.0),
+                    )
+                    imgui.same_line()
+                text_pos = imgui.get_cursor_screen_pos()
+                clicked, _selected = imgui.selectable(
+                    f"{node.label}##nav-{node.id}",
                     selected,
-                    0,
-                    imgui.ImVec2(width, 0.0),
                 )
-                imgui.same_line()
-            text_pos = imgui.get_cursor_screen_pos()
-            clicked, _selected = imgui.selectable(
-                f"{node.label}##nav-{node.id}",
-                selected,
-            )
+                if selected:
+                    _draw_item_focus_ring()
             mark = navigator_lock_mark(node)
             if mark is not None:
                 _draw_nav_lock_mark(text_pos, node.label, mark)
@@ -1315,10 +1365,13 @@ class ShellHost:
                 glyph = inspector_group_glyph(
                     inspector_group_is_open(key, focus.collapsed, focus.opened)
                 )
-                clicked, _selected = imgui.selectable(
-                    f"{glyph} {label}{inspector_selectable_id(desc, group=True)}",
-                    selected,
-                )
+                with _selected_header_wash(selected):
+                    clicked, _selected = imgui.selectable(
+                        f"{glyph} {label}{inspector_selectable_id(desc, group=True)}",
+                        selected,
+                    )
+                    if selected:
+                        _draw_item_focus_ring()
                 if clicked:
                     self._controls.inspector.focus_row(row)
                     self._controls.inspector.activate(row)
@@ -1326,16 +1379,19 @@ class ShellHost:
             label_color, value_color = inspector_field_colors(state, desc)
             imgui.push_style_color(imgui.Col_.text, _rgba(label_color))
             try:
-                clicked, _selected = imgui.selectable(
-                    f"{label}{inspector_selectable_id(desc, group=False)}",
-                    selected,
-                )
-                # Item flags are only valid while this selectable is current.
-                # Release clears the active id inside the widget, so the
-                # frame the button comes up is deactivated, not active.
-                activated = imgui.is_item_activated()
-                active = imgui.is_item_active()
-                released = imgui.is_item_deactivated()
+                with _selected_header_wash(selected):
+                    clicked, _selected = imgui.selectable(
+                        f"{label}{inspector_selectable_id(desc, group=False)}",
+                        selected,
+                    )
+                    # Item flags are only valid while this selectable is current.
+                    # Release clears the active id inside the widget, so the
+                    # frame the button comes up is deactivated, not active.
+                    activated = imgui.is_item_activated()
+                    active = imgui.is_item_active()
+                    released = imgui.is_item_deactivated()
+                    if selected:
+                        _draw_item_focus_ring()
             finally:
                 imgui.pop_style_color()
             value = format_row_value(state, desc) if spec.format_value else ""
@@ -1412,10 +1468,13 @@ class ShellHost:
         color = ACTION if enabled else DISABLED
         imgui.push_style_color(imgui.Col_.text, _rgba(color))
         try:
-            clicked, _selected = imgui.selectable(
-                f"{command.label}##cmd-{row.command_id}",
-                selected,
-            )
+            with _selected_header_wash(selected):
+                clicked, _selected = imgui.selectable(
+                    f"{command.label}##cmd-{row.command_id}",
+                    selected,
+                )
+                if selected:
+                    _draw_item_focus_ring()
         finally:
             imgui.pop_style_color()
         if clicked:

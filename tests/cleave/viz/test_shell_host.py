@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import replace
 from pathlib import Path
 
+import pytest
+
 from cleave.preset_playlist import PresetPlaylist
 from cleave.stems import StemSource
 from cleave.viz.navigator import (
@@ -27,8 +29,10 @@ from cleave.viz.shell_host import (
     inspector_selectable_id,
     navigator_lock_mark,
     navigator_twisty,
+    selectable_wash,
     selection_after_nav_toggle,
 )
+from cleave.viz.theme import FOCUS_ROW_BG_ALPHA, HIGHLIGHT, HOVER, HOVER_BG_ALPHA
 from tests.cleave.viz.test_controls import _make_controls
 
 
@@ -63,6 +67,33 @@ def _session() -> TuningSession:
 
 def _chips(header) -> dict[str, object]:
     return {chip.id: chip for chip in header.chips}
+
+
+def _wash_channels(color) -> tuple[float, float, float, float]:
+    return (color.x, color.y, color.z, color.w)
+
+
+def test_selected_row_keeps_highlight_wash_when_hovered() -> None:
+    highlight = (
+        HIGHLIGHT[0] / 255.0,
+        HIGHLIGHT[1] / 255.0,
+        HIGHLIGHT[2] / 255.0,
+        FOCUS_ROW_BG_ALPHA / 255.0,
+    )
+    hover = (
+        HOVER[0] / 255.0,
+        HOVER[1] / 255.0,
+        HOVER[2] / 255.0,
+        HOVER_BG_ALPHA / 255.0,
+    )
+
+    hovered, active = selectable_wash(True)
+    assert _wash_channels(hovered) == pytest.approx(highlight)
+    assert _wash_channels(active) == pytest.approx(highlight)
+
+    hovered, active = selectable_wash(False)
+    assert _wash_channels(hovered) == pytest.approx(hover)
+    assert _wash_channels(active) == pytest.approx(hover)
 
 
 def test_layer_breadcrumb_uses_navigator_label() -> None:
