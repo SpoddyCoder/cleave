@@ -9,7 +9,7 @@ from cleave.viz import modal_overlay
 from cleave.viz.help_content import help_focus_descriptor
 from cleave.viz.help_overlay import HelpOverlay
 from cleave.viz.modal import ModalHost
-from cleave.viz.shell_focus import ShellFocusState
+from cleave.viz.shell_focus import ShellFocusState, ShellRegion
 from cleave.viz.tap_sync import CONSISTENCY_WINDOW
 from cleave.viz.tap_sync_controls import TapSyncProgressView
 from cleave.viz.tuning_panel_draw import TuningOverlay
@@ -95,15 +95,26 @@ def _present_overlay(
         present_overlay(compositor, tex_id, screen_rect, tex_uv, alpha=alpha)
 
 
+def _timeline_strip_keyboard_scope(
+    view_state: TuningViewState,
+    shell_focus: ShellFocusState | None,
+) -> bool:
+    """Strip keyboard scope is the Timeline region when the shell is known."""
+    if shell_focus is not None:
+        return shell_focus.region is ShellRegion.TIMELINE
+    return view_state.timeline_submenu_focused
+
+
 def _help_compose_kwargs(
     view_state: TuningViewState,
     shell_focus: ShellFocusState | None = None,
 ) -> dict[str, object]:
     focus = view_state.focus_descriptor
+    timeline_focused = _timeline_strip_keyboard_scope(view_state, shell_focus)
     described = help_focus_descriptor(
         focus,
         shell_focus,
-        timeline_focused=view_state.timeline_submenu_focused,
+        timeline_focused=timeline_focused,
     )
     preset_switching = None
     if described is not None and described.slot is not None:
@@ -114,7 +125,7 @@ def _help_compose_kwargs(
         "focus": focus,
         "shell_focus": shell_focus,
         "timeline_enabled": view_state.render_timeline.enabled,
-        "timeline_submenu_focused": view_state.timeline_submenu_focused,
+        "timeline_submenu_focused": timeline_focused,
         "paused": view_state.paused,
         "timeline_recording": view_state.timeline_recording,
         "timeline_override_active": view_state.timeline_override_active,

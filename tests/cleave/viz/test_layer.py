@@ -13,6 +13,7 @@ from tests.support.config import TEST_LAYER_STEMS
 from cleave.preset_playlist import PresetPlaylist
 from cleave.timeline import SlotCue, TimelineLane, canonicalize
 from cleave.viz.session import LayerRuntime, TimelineRuntime, TuningSession
+from cleave.viz.focus_nav import MainFocus, TimelineFocus
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.layer import StemLayer
 from cleave.viz.layer_visibility import (
@@ -965,9 +966,34 @@ def test_build_timeline_view_state_includes_song_markers() -> None:
     assert state_focused.selected_song_marker_index == 1
 
 
-def test_build_timeline_view_state_song_marker_highlight_requires_marker_focus() -> None:
-    from cleave.viz.focus_nav import MainFocus, TimelineFocus
+def test_timeline_strip_lane_highlight_follows_region_not_cursor() -> None:
+    session = _session(
+        layer_enabled={"layer_1": True, "layer_2": True, "layer_3": True, "layer_4": True},
+        timeline_enabled=True,
+    )
+    session.timeline.focus_row = 1
+    stale = build_timeline_view_state(
+        session,
+        position_sec=0.0,
+        duration_sec=60.0,
+        focus_cursor=TimelineFocus(1),
+        strip_focused=False,
+    )
+    assert stale.submenu_focused is False
+    assert stale.focus_row == 1
 
+    focused = build_timeline_view_state(
+        session,
+        position_sec=0.0,
+        duration_sec=60.0,
+        focus_cursor=MainFocus(RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)),
+        strip_focused=True,
+    )
+    assert focused.submenu_focused is True
+    assert focused.focus_row == 1
+
+
+def test_build_timeline_view_state_song_marker_highlight_requires_marker_focus() -> None:
     session = _session(
         layer_enabled={"layer_1": True, "layer_2": True, "layer_3": True, "layer_4": True},
         timeline_enabled=True,

@@ -36,7 +36,6 @@ from imgui_bundle.python_backends.opengl_backend import ProgrammablePipelineRend
 from cleave.gl_state import restore_gl_state, save_gl_state
 from cleave.viz.commands import Command, CommandContext, MenuSeparator, command_by_id
 from cleave.viz.editor_mode_controls import is_preset_curation_mode
-from cleave.viz.focus_nav import TimelineFocus
 from cleave.viz.frame_rate import format_fps_value
 from cleave.viz.inspector import build_inspector_rows
 from cleave.viz.inspector_controls import inspector_command_enabled
@@ -996,6 +995,10 @@ class ShellHost:
                 # or start a value drag.
                 if button == 0 and self._begin_splitter_drag(event.pos):
                     return
+                if button == 0:
+                    self._assign_shell_region(
+                        float(event.pos[0]), float(event.pos[1])
+                    )
                 self._held.add(button)
             elif button == 0 and self._splitter is not None:
                 if self._clicks_ignored():
@@ -1014,6 +1017,24 @@ class ShellHost:
                 return
             self._wheel_x += float(event.x)
             self._wheel_y += float(event.y)
+
+    def _assign_shell_region(self, x: float, y: float) -> None:
+        """Left click chooses navigator, inspector, or the open strip.
+
+        Menu, transport, and the visualiser leave the region alone. A miss
+        when no layout is stored does nothing. The strip stays open.
+        """
+        layout = self._layout
+        if layout is None:
+            return
+        if _rect_contains(layout.navigator, x, y):
+            self._controls.set_shell_region(ShellRegion.NAVIGATOR)
+            return
+        if _rect_contains(layout.inspector, x, y):
+            self._controls.set_shell_region(ShellRegion.INSPECTOR)
+            return
+        if layout.timeline[3] > 0 and _rect_contains(layout.timeline, x, y):
+            self._controls.set_shell_region(ShellRegion.TIMELINE)
 
     def _splitter_at(self, x: float, y: float) -> str | None:
         layout = self._layout
@@ -1155,7 +1176,7 @@ class ShellHost:
 
     def _strip_has_scope(self) -> bool:
         return (
-            isinstance(self._controls.focus_cursor, TimelineFocus)
+            self._controls.shell_focus.region is ShellRegion.TIMELINE
             and self._controls.session.timeline.panel_open
         )
 

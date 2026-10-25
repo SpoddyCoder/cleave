@@ -15,9 +15,9 @@ import pygame
 from cleave.config_schema.editor import DEFAULT_SHELL_LAYOUT_MODE
 from cleave.config_schema.layers import MAX_LAYER_COUNT
 from cleave.viz.editor_mode_controls import is_preset_curation_mode
-from cleave.viz.focus_nav import TimelineFocus
 from cleave.viz.key_repeat import mod_ctrl
 from cleave.viz.navigator import LAYER_ID_PREFIX, layer_node_id
+from cleave.viz.shell_focus import ShellRegion
 from cleave.viz.theme import ACTION, CONFIG_DIRTY
 
 CommandKind = Literal["command", "jump", "check"]
@@ -107,8 +107,9 @@ def command_context(controls: Any) -> CommandContext:
         selected_slot = selected[len(LAYER_ID_PREFIX) :]
     lifecycle = controls.layer_lifecycle
     timeline = session.timeline
-    timeline_scope = isinstance(controls.focus_cursor, TimelineFocus) or bool(
-        timeline.recording
+    timeline_scope = (
+        controls.shell_focus.region is ShellRegion.TIMELINE
+        or bool(timeline.recording)
     )
     overlays = session.render_overlays
     post_fx = session.render_post_fx

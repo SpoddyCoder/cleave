@@ -53,7 +53,7 @@ from cleave.viz.projectm_frame_clock import ProjectMFrameClock
 from cleave.viz.frame_finish import RenderOverlaysPanelCache, finish_content_frame
 from cleave.viz.overlay_profiler import OverlayProfiler
 from cleave.viz.frame_rate import FrameRateMeter, ProjectMFpsGovernor
-from cleave.viz.focus_nav import FocusCursor, TimelineFocus
+from cleave.viz.shell_focus import ShellRegion
 from cleave.viz.input_dispatch import (
     dispatch_keydown,
     dispatch_keyup,
@@ -414,20 +414,20 @@ def _timeline_strip_visible(
     tl: TimelineRuntime,
     *,
     overlay_visibility: float,
-    focus_cursor: FocusCursor,
+    region: ShellRegion,
 ) -> bool:
-    """Show the bottom timeline strip while the main panel is visible or a row is focused."""
+    """Show the strip while it is open and the shell is up, or Timeline has scope."""
     return tl.panel_open and (
-        isinstance(focus_cursor, TimelineFocus) or overlay_visibility > 0.01
+        region is ShellRegion.TIMELINE or overlay_visibility > 0.01
     )
 
 
 def _timeline_strip_fade(
     *,
-    focus_cursor: FocusCursor,
+    region: ShellRegion,
     overlay_visibility: float,
 ) -> float:
-    if isinstance(focus_cursor, TimelineFocus):
+    if region is ShellRegion.TIMELINE:
         return 1.0
     return overlay_visibility
 
@@ -522,7 +522,7 @@ def _tick_frame_live_overlay(
         and _timeline_strip_visible(
             tl,
             overlay_visibility=overlay_visibility,
-            focus_cursor=runtime.controls.focus_cursor,
+            region=runtime.controls.shell_focus.region,
         )
     )
 
@@ -567,6 +567,10 @@ def _tick_frame_live_overlay(
             t_sec,
             runtime.seed.duration_sec,
             focus_cursor=runtime.controls.focus_cursor,
+            strip_focused=(
+                runtime.controls.shell_focus.region is ShellRegion.TIMELINE
+                and tl.panel_open
+            ),
             bar_times=signals.downbeat_times if signals is not None else (),
             beat_times=signals.beat_times if signals is not None else (),
         )
@@ -612,7 +616,7 @@ def _tick_frame_live_overlay(
             runtime.overlay_surface,
             timeline_state,
             visibility=_timeline_strip_fade(
-                focus_cursor=runtime.controls.focus_cursor,
+                region=runtime.controls.shell_focus.region,
                 overlay_visibility=overlay_visibility,
             ),
             profiler=profiler,
@@ -643,7 +647,7 @@ class VisualizerApp:
         if not runtime.controls.tap_sync.showing_progress and _timeline_strip_visible(
             tl,
             overlay_visibility=runtime.overlay.visibility,
-            focus_cursor=runtime.controls.focus_cursor,
+            region=runtime.controls.shell_focus.region,
         ):
             timeline_h = timeline_band_height_px(
                 len(runtime.seed.session.layer_z_order)

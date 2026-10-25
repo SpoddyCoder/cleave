@@ -11,8 +11,10 @@ from cleave.config_schema.layers import DEFAULT_LAYER_SLOTS
 from tests.support.config import TEST_LAYER_STEMS
 from cleave.stems import STEM_NAMES
 from cleave.viz.app import LiveVisualizerRuntime, VisualizerSeed
+from cleave.timeline import SlotCue, TimelineLane
 from cleave.viz.focus_nav import MainFocus, TimelineFocus
-from cleave.viz.navigator import visible_top_level_ids
+from cleave.viz.inspector import InspectorRow
+from cleave.viz.navigator import layer_node_id, visible_top_level_ids
 from cleave.viz.shell_focus import ShellRegion
 from cleave.viz.controls import SEEK_LONG, SEEK_TINY, TuningControls
 from cleave.viz.layer_visibility import armed_recording_level
@@ -112,9 +114,11 @@ def _make_runtime(
         duration_sec=120.0,
     )
     if submenu_focused:
-        runtime.controls.focus_cursor = TimelineFocus(0)
+        runtime.controls.set_shell_region(ShellRegion.TIMELINE)
     else:
-        runtime.controls.focus_cursor = MainFocus(RowDescriptor(RowKind.RENDER_TIMELINE_HEADER))
+        runtime.controls.focus_cursor = MainFocus(
+            RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
+        )
     runtime.modal_host = runtime.controls.modal_host
     runtime.timeline_controls = TimelineControls(
         session,
@@ -254,8 +258,12 @@ def test_second_esc_after_stop_closes_submenu_panel() -> None:
 
     assert dispatch_keydown(keydown(pygame.K_ESCAPE), runtime) is True
     assert runtime.seed.session.timeline.panel_open is False
-    assert isinstance(runtime.controls.focus_cursor, TimelineFocus)
     assert runtime.controls.shell_focus.region is ShellRegion.NAVIGATOR
+    assert isinstance(runtime.controls.focus_cursor, MainFocus)
+    assert (
+        runtime.controls.focus_cursor.descriptor.kind
+        is RowKind.RENDER_TIMELINE_HEADER
+    )
 
 
 def test_second_esc_after_stop_requests_overlay_hide_on_main() -> None:
@@ -316,6 +324,11 @@ def test_shift_arrows_seek_tiny_from_timeline_context() -> None:
         keydown(pygame.K_LEFT, mod=pygame.KMOD_SHIFT), runtime
     ) is True
     assert player.file_position_sec() == 10.0
+    assert dispatch_keydown(
+        keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL), runtime
+    ) is True
+    assert player.file_position_sec() == 10.0 + SEEK_LONG
+    assert runtime.controls.shell_focus.region is ShellRegion.TIMELINE
 
 
 def test_curation_mode_still_seeks_with_modifiers() -> None:
@@ -438,6 +451,9 @@ def test_notify_overlay_when_main_context() -> None:
     runtime = _make_runtime(submenu_focused=False)
     assert dispatch_should_notify_overlay(keydown(pygame.K_LEFT), runtime) is True
     assert dispatch_should_notify_overlay(keydown(pygame.K_t), runtime) is False
+    runtime.controls.focus_cursor = TimelineFocus(0)
+    assert runtime.controls.shell_focus.region is ShellRegion.NAVIGATOR
+    assert dispatch_should_notify_overlay(keydown(pygame.K_LEFT), runtime) is True
 
 
 def test_h_does_not_toggle_help_while_text_editing() -> None:
@@ -730,3 +746,67 @@ def test_ctrl_l_adds_during_timeline_scope_digits_do_not_jump() -> None:
     closed.controls.shell_focus.selected_id = "settings"
     assert dispatch_keydown(keydown(pygame.K_1), closed) is True
     assert closed.controls.shell_focus.selected_id == "settings"
+
+
+def test_inspector_arrows_step_value_while_strip_is_open() -> None:
+    runtime = _make_runtime(submenu_focused=True, panel_open=True)
+    session = runtime.seed.session
+    session.timeline.lanes["layer_1"] = TimelineLane(
+        baseline=None,
+        cues=[SlotCue(4.0, 1.0), SlotCue(10.0, 0.0)],
+    )
+    session.timeline.selected_cue_t["layer_1"] = 4.0
+    session.layers["layer_1"].opacity_pct = 50
+    controls = runtime.controls
+    controls.shell_focus.selected_id = layer_node_id("layer_1")
+    controls.inspector.focus_row(
+        InspectorRow(
+            descriptor=RowDescriptor(RowKind.TRACK_OPACITY, slot="layer_1"),
+            is_group=False,
+            depth=1,
+            navigable=True,
+        )
+    )
+    assert controls.shell_focus.region is ShellRegion.INSPECTOR
+    assert isinstance(controls.focus_cursor, MainFocus)
+    assert session.timeline.panel_open is True
+    assert session.timeline.focus_row == 0
+    cues = dict(session.timeline.selected_cue_t)
+    assert dispatch_keydown(keydown(pygame.K_RIGHT), runtime) is True
+    assert session.layers["layer_1"].opacity_pct == 51
+    assert session.timeline.selected_cue_t == cues
+
+    assert dispatch_keydown(keydown(pygame.K_TAB), runtime) is True
+    assert controls.shell_focus.region is ShellRegion.TIMELINE
+    assert controls.focus_cursor == TimelineFocus(0)
+    assert dispatch_keydown(keydown(pygame.K_RIGHT), runtime) is True
+    assert session.timeline.selected_cue_t["layer_1"] == 10.0
+    assert session.layers["layer_1"].opacity_pct == 51
+
+
+def test_layer_digits_jump_from_inspector_while_strip_is_open() -> None:
+    runtime = _make_runtime(submenu_focused=True, panel_open=True)
+    controls = runtime.controls
+    controls.set_shell_region(ShellRegion.INSPECTOR)
+    controls.shell_focus.selected_id = "settings"
+    assert runtime.seed.session.timeline.panel_open is True
+    assert dispatch_keydown(keydown(pygame.K_2), runtime) is True
+    assert controls.shell_focus.selected_id == layer_node_id("layer_2")
+    assert controls.shell_focus.region is ShellRegion.INSPECTOR
+
+    controls.set_shell_region(ShellRegion.TIMELINE)
+    assert dispatch_keydown(keydown(pygame.K_1), runtime) is True
+    assert controls.shell_focus.selected_id == layer_node_id("layer_2")
+    assert controls.shell_focus.region is ShellRegion.TIMELINE
+
+
+def test_ctrl_down_from_timeline_moves_to_navigator() -> None:
+    runtime = _make_runtime(submenu_focused=True, panel_open=True)
+    controls = runtime.controls
+    controls.shell_focus.selected_id = "settings"
+    assert dispatch_keydown(keydown(pygame.K_DOWN, mod=pygame.KMOD_CTRL), runtime) is True
+    assert controls.shell_focus.region is ShellRegion.NAVIGATOR
+    assert isinstance(controls.focus_cursor, MainFocus)
+    assert controls.shell_focus.selected_id == "project"
+    assert runtime.seed.session.timeline.panel_open is True
+    assert runtime.seed.session.timeline.focus_row == 0

@@ -67,10 +67,15 @@ def test_quick_nav_walks_top_level_ids_and_wraps() -> None:
 
 
 def test_escape_region() -> None:
+    assert [region.name for region in ShellRegion] == [
+        "NAVIGATOR",
+        "INSPECTOR",
+        "TIMELINE",
+    ]
     assert not hasattr(ShellRegion, "PANEL")
     assert escape_region(ShellRegion.NAVIGATOR) is ShellRegion.NAVIGATOR
     assert escape_region(ShellRegion.INSPECTOR) is ShellRegion.NAVIGATOR
-    assert not hasattr(ShellRegion, "PANEL")
+    assert escape_region(ShellRegion.TIMELINE) is ShellRegion.TIMELINE
 
 
 def test_tree_nav_stops_at_the_ends() -> None:

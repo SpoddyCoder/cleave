@@ -296,11 +296,15 @@ class TuningControls:
                 if self._overlay_get_visible is not None
                 else True
             ),
+            shell_region=self.shell_focus.region,
         )
         self.session.help_visible = False
         if self.session.timeline.panel_open:
             self.session.timeline.panel_open = False
-        if isinstance(self.focus_cursor, TimelineFocus):
+        if (
+            self.shell_focus.region is ShellRegion.TIMELINE
+            or isinstance(self.focus_cursor, TimelineFocus)
+        ):
             self.exit_timeline_submenu()
         if self._overlay_hide is not None:
             self._overlay_hide()
@@ -309,7 +313,17 @@ class TuningControls:
     def _restore_tap_sync_calibration_ui(self, snapshot: TapSyncUiSnapshot) -> None:
         self.session.help_visible = snapshot.help_visible
         self.session.timeline.panel_open = snapshot.timeline_panel_open
-        self._apply_focus_cursor(snapshot.focus_cursor)
+        if (
+            snapshot.shell_region is ShellRegion.TIMELINE
+            and snapshot.timeline_panel_open
+        ):
+            if isinstance(snapshot.focus_cursor, TimelineFocus):
+                self.session.timeline.focus_row = snapshot.focus_cursor.row
+            self.set_shell_region(ShellRegion.TIMELINE)
+        else:
+            self._apply_focus_cursor(snapshot.focus_cursor)
+            # Exact snapshot: a saved strip cursor outside Timeline stays put.
+            self.shell_focus.region = snapshot.shell_region
         if snapshot.overlay_visible and self._overlay_show is not None:
             self._overlay_show()
 
@@ -621,7 +635,7 @@ class TuningControls:
                 marker_index=marker_index,
             )
         focus.inspector_command_id = None
-        focus.region = ShellRegion.INSPECTOR
+        self.set_shell_region(ShellRegion.INSPECTOR)
 
     def toggle_layer_locked(self, slot: str) -> None:
         layer = self.session.layers[slot]
@@ -714,26 +728,59 @@ class TuningControls:
         if 0 <= desc.marker_index < len(times):
             self.seek_to(times[desc.marker_index])
 
+    def set_shell_region(self, region: ShellRegion) -> None:
+        """Give *region* keyboard scope and keep the strip cursor in sync.
+
+        Entering Timeline selects the stored lane, clamped to the layer count.
+        Leaving Timeline replaces a ``TimelineFocus`` cursor with the timeline
+        header stand-in and leaves the stored lane in place.
+        """
+        if region is ShellRegion.TIMELINE:
+            self.shell_focus.region = ShellRegion.TIMELINE
+            self._apply_focus_cursor(
+                TimelineFocus(self._clamped_timeline_focus_row())
+            )
+            return
+        if isinstance(self.focus_cursor, TimelineFocus):
+            self._apply_focus_cursor(
+                MainFocus(RowDescriptor(RowKind.RENDER_TIMELINE_HEADER))
+            )
+        self.shell_focus.region = region
+
+    def _clamped_timeline_focus_row(self) -> int:
+        row_count = len(self.session.layer_z_order)
+        row = self.session.timeline.focus_row
+        if row_count <= 0 or row < 0:
+            return 0
+        if row >= row_count:
+            return row_count - 1
+        return row
+
     def set_timeline_focus_row(self, row: int) -> None:
-        """Move the strip cursor to *row* in ``layer_z_order``."""
-        self._apply_focus_cursor(TimelineFocus(row))
+        """Move the strip lane to *row* without granting keyboard scope."""
+        if self.shell_focus.region is ShellRegion.TIMELINE:
+            self._apply_focus_cursor(TimelineFocus(row))
+            return
+        self.session.timeline.focus_row = row
 
     def open_timeline_panel(self, *, enter_submenu: bool = False) -> None:
         tl = self.session.timeline
         tl.panel_open = True
         if enter_submenu:
-            self._apply_focus_cursor(TimelineFocus(0))
+            self.set_shell_region(ShellRegion.TIMELINE)
 
     def close_timeline_panel(self) -> None:
         tl = self.session.timeline
         if not tl.panel_open:
             return
-        was_timeline = isinstance(self.focus_cursor, TimelineFocus)
         tl.panel_open = False
-        if was_timeline:
-            self.shell_focus.region = ShellRegion.NAVIGATOR
+        if self.shell_focus.region is ShellRegion.TIMELINE:
+            self.set_shell_region(ShellRegion.NAVIGATOR)
 
     def exit_timeline_submenu(self) -> None:
+        if self.shell_focus.region is ShellRegion.TIMELINE:
+            self.set_shell_region(ShellRegion.NAVIGATOR)
+            return
         if not isinstance(self.focus_cursor, TimelineFocus):
             return
         self._apply_focus_cursor(

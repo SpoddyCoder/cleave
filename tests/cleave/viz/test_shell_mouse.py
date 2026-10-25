@@ -14,7 +14,9 @@ from cleave.config_schema.editor import (
     DEFAULT_INSPECTOR_WIDTH,
     DEFAULT_NAVIGATOR_WIDTH,
 )
+from cleave.viz.focus_nav import TimelineFocus
 from cleave.viz.menu_bar import MenuBarState
+from cleave.viz.shell_focus import ShellRegion
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.row_spec import apply_field_horizontal, row_spec
 from cleave.viz.shell_host import (
@@ -344,6 +346,7 @@ def _host(visibility: float = 1.0) -> ShellHost:
     controls = SimpleNamespace(
         cfg=SimpleNamespace(editor=editor),
         settings=SimpleNamespace(set_shell_column_widths=MagicMock()),
+        set_shell_region=MagicMock(),
     )
     host = ShellHost(
         None,
@@ -533,6 +536,85 @@ def test_theme_exports_hover_role() -> None:
     assert all(type(channel) is int for channel in HOVER)
     assert type(HOVER_BG_ALPHA) is int
     assert 0 < HOVER_BG_ALPHA <= 255
+
+
+def _rect_center(rect: tuple[int, int, int, int]) -> tuple[int, int]:
+    x, y, w, h = rect
+    return (x + w // 2, y + max(h, 1) // 2)
+
+
+def _open_strip_layout() -> ShellLayout:
+    return ShellLayout.compute(1280, 720, 23, 23, 80)
+
+
+def _click(host: ShellHost, pos: tuple[int, int]) -> None:
+    host.process_event(_button(pygame.MOUSEBUTTONDOWN, pos))
+
+
+def test_click_in_timeline_rect_sets_timeline_region() -> None:
+    controls = _make_controls(("layer_1", "layer_2"))
+    controls.session.timeline.panel_open = True
+    controls.session.timeline.focus_row = 1
+    host = _host()
+    host._controls = controls
+    layout = _open_strip_layout()
+    host.set_layout(layout)
+
+    _click(host, _rect_center(layout.timeline))
+
+    assert controls.shell_focus.region is ShellRegion.TIMELINE
+    assert controls.session.timeline.panel_open is True
+    assert controls.focus_cursor == TimelineFocus(1)
+    assert host._buttons == [(0, True)]
+
+
+def test_click_in_navigator_sets_navigator_and_keeps_strip_open() -> None:
+    controls = _make_controls(("layer_1", "layer_2"))
+    controls.open_timeline_panel(enter_submenu=True)
+    host = _host()
+    host._controls = controls
+    layout = _open_strip_layout()
+    host.set_layout(layout)
+
+    _click(host, _rect_center(layout.navigator))
+
+    assert controls.shell_focus.region is ShellRegion.NAVIGATOR
+    assert controls.session.timeline.panel_open is True
+
+
+def test_click_in_inspector_sets_inspector_and_keeps_strip_open() -> None:
+    controls = _make_controls(("layer_1", "layer_2"))
+    controls.open_timeline_panel(enter_submenu=True)
+    host = _host()
+    host._controls = controls
+    layout = _open_strip_layout()
+    host.set_layout(layout)
+
+    _click(host, _rect_center(layout.inspector))
+
+    assert controls.shell_focus.region is ShellRegion.INSPECTOR
+    assert controls.session.timeline.panel_open is True
+
+
+def test_click_in_visualiser_or_menu_does_not_change_region() -> None:
+    controls = _make_controls(("layer_1", "layer_2"))
+    controls.open_timeline_panel(enter_submenu=True)
+    host = _host()
+    host._controls = controls
+    layout = _open_strip_layout()
+    host.set_layout(layout)
+
+    _click(host, _rect_center(layout.visualiser))
+    assert controls.shell_focus.region is ShellRegion.TIMELINE
+    assert controls.session.timeline.panel_open is True
+
+    _click(host, _rect_center(layout.menu))
+    assert controls.shell_focus.region is ShellRegion.TIMELINE
+    assert controls.session.timeline.panel_open is True
+
+    _click(host, _rect_center(layout.transport))
+    assert controls.shell_focus.region is ShellRegion.TIMELINE
+    assert controls.session.timeline.panel_open is True
 
 
 def test_splitter_hit_zone_is_six_pixels() -> None:

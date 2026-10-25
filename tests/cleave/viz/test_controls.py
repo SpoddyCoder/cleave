@@ -646,6 +646,7 @@ def test_disabled_render_timeline_can_open_panel() -> None:
     command_by_id("timeline.show_strip").run(controls)
     assert controls.session.timeline.enabled is False
     assert controls.session.timeline.panel_open is True
+    assert controls.shell_focus.region is ShellRegion.TIMELINE
     assert isinstance(controls.focus_cursor, TimelineFocus)
     view = controls.build_view_state(paused=False)
     kinds = {row.kind for row in view.layout.rows}
@@ -894,7 +895,7 @@ def test_esc_hide_preserves_focus_when_not_in_timeline_submenu() -> None:
 
 
 def test_exit_timeline_submenu_only_when_submenu_focused() -> None:
-    controls = _make_controls()
+    controls = _make_controls(("layer_1", "layer_2"))
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(RowKind.TRACK_PRESET, slot="layer_1")
     controls.exit_timeline_submenu()
@@ -903,6 +904,18 @@ def test_exit_timeline_submenu_only_when_submenu_focused() -> None:
     controls.focus_cursor = TimelineFocus(0)
     controls.exit_timeline_submenu()
     assert controls.focus_descriptor.kind == RowKind.RENDER_TIMELINE_HEADER
+    assert controls.shell_focus.region is ShellRegion.NAVIGATOR
+
+    controls.session.timeline.focus_row = 1
+    controls.session.timeline.panel_open = True
+    controls.set_shell_region(ShellRegion.TIMELINE)
+    assert controls.focus_cursor == TimelineFocus(1)
+    controls.exit_timeline_submenu()
+    assert controls.shell_focus.region is ShellRegion.NAVIGATOR
+    assert isinstance(controls.focus_cursor, MainFocus)
+    assert controls.focus_descriptor.kind == RowKind.RENDER_TIMELINE_HEADER
+    assert controls.session.timeline.focus_row == 1
+    assert controls.session.timeline.panel_open is True
 
 
 def test_esc_in_move_mode_does_not_request_overlay_hide() -> None:
@@ -2876,6 +2889,7 @@ def test_render_timeline_e_toggles_enabled() -> None:
     assert _press_timeline_hotkey(controls, pygame.K_e) is True
     assert controls.session.timeline.enabled is True
     assert controls.session.timeline.panel_open is True
+    assert controls.shell_focus.region is ShellRegion.NAVIGATOR
     assert not isinstance(controls.focus_cursor, TimelineFocus)
 
 
@@ -3040,7 +3054,8 @@ def test_render_timeline_enable_opens_panel() -> None:
     assert _press_timeline_hotkey(controls, pygame.K_e) is True
     assert controls.session.timeline.enabled is True
     assert controls.session.timeline.panel_open is True
-    assert not isinstance(controls.focus_cursor, TimelineFocus)
+    assert controls.shell_focus.region is ShellRegion.NAVIGATOR
+    assert isinstance(controls.focus_cursor, MainFocus)
 
 
 def test_render_timeline_right_does_not_open_the_strip() -> None:
@@ -3173,15 +3188,16 @@ def test_render_timeline_enabled_change_callback() -> None:
 
 
 def test_t_opens_timeline_panel_when_enabled() -> None:
-    controls = _make_controls()
+    controls = _make_controls(("layer_1", "layer_2", "layer_3", "layer_4"))
     controls.session.timeline.enabled = True
     controls.session.timeline.focus_row = 2
     assert controls.session.timeline.panel_open is False
 
     command_by_id("timeline.show_strip").run(controls)
     assert controls.session.timeline.panel_open is True
-    assert isinstance(controls.focus_cursor, TimelineFocus)
-    assert controls.session.timeline.focus_row == 0
+    assert controls.shell_focus.region is ShellRegion.TIMELINE
+    assert controls.focus_cursor == TimelineFocus(2)
+    assert controls.session.timeline.focus_row == 2
 
 
 def test_t_closes_timeline_panel_without_moving_a_main_cursor() -> None:
@@ -3194,18 +3210,22 @@ def test_t_closes_timeline_panel_without_moving_a_main_cursor() -> None:
     assert controls.focus_descriptor.kind == RowKind.RENDER_OVERLAYS_HEADER
 
 
-def test_t_from_submenu_closes_and_leaves_the_strip_cursor() -> None:
+def test_t_from_timeline_region_closes_onto_navigator() -> None:
     controls = _make_controls(timeline_enabled=True)
-    controls.session.timeline.panel_open = True
-    controls.focus_cursor = TimelineFocus(0)
+    controls.session.timeline.focus_row = 1
+    command_by_id("timeline.show_strip").run(controls)
+    assert controls.shell_focus.region is ShellRegion.TIMELINE
+    assert controls.focus_cursor == TimelineFocus(1)
     command_by_id("timeline.show_strip").run(controls)
     assert controls.session.timeline.panel_open is False
-    assert isinstance(controls.focus_cursor, TimelineFocus)
     assert controls.shell_focus.region is ShellRegion.NAVIGATOR
+    assert isinstance(controls.focus_cursor, MainFocus)
+    assert controls.focus_descriptor.kind == RowKind.RENDER_TIMELINE_HEADER
+    assert controls.session.timeline.focus_row == 1
 
 
 def test_t_opens_timeline_panel_when_disabled() -> None:
-    controls = _make_controls()
+    controls = _make_controls(("layer_1", "layer_2", "layer_3", "layer_4"))
     controls.session.timeline.enabled = False
     controls.session.timeline.focus_row = 2
     assert controls.session.timeline.panel_open is False
@@ -3213,8 +3233,9 @@ def test_t_opens_timeline_panel_when_disabled() -> None:
     command_by_id("timeline.show_strip").run(controls)
     assert controls.session.timeline.enabled is False
     assert controls.session.timeline.panel_open is True
-    assert isinstance(controls.focus_cursor, TimelineFocus)
-    assert controls.session.timeline.focus_row == 0
+    assert controls.shell_focus.region is ShellRegion.TIMELINE
+    assert controls.focus_cursor == TimelineFocus(2)
+    assert controls.session.timeline.focus_row == 2
 
 
 def test_t_ignored_during_move_mode() -> None:

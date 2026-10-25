@@ -7,6 +7,7 @@ import pygame
 import pytest
 
 from cleave.viz.focus_nav import MainFocus, TimelineFocus
+from cleave.viz.shell_focus import ShellRegion
 from cleave.viz.modal import ModalHost
 from cleave.viz.mix_player import FREQUENCY_HZ, NUM_CHANNELS, MixPlayer
 from cleave.viz.playback import PlaybackState
@@ -44,6 +45,7 @@ def _make_controls(
             timeline_panel_open=True,
             focus_cursor=TimelineFocus(1),
             overlay_visible=True,
+            shell_region=ShellRegion.NAVIGATOR,
         )
         snapshot_store.append(snapshot)
         return snapshot

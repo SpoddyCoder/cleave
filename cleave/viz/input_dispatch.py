@@ -9,7 +9,6 @@ import pygame
 from cleave.viz.commands import command_context, command_for_shortcut
 from cleave.viz.controls import SEEK_LONG, SEEK_TINY, TuningControls
 from cleave.viz.editor_mode_controls import is_preset_curation_mode
-from cleave.viz.focus_nav import FocusCursor, TimelineFocus
 from cleave.viz.key_repeat import delete_key_pressed, mod_alt, mod_ctrl, mod_shift
 from cleave.viz.menu_bar import menu_index_for_mnemonic, menus_for_session
 from cleave.viz.shell_focus import CycleStop, ShellRegion, next_region
@@ -23,12 +22,12 @@ def timeline_submenu_routes_to_timeline(
     tl,
     *,
     timeline_controls: TimelineControls | None,
-    focus_cursor: FocusCursor,
+    region: ShellRegion,
 ) -> bool:
-    """True when keys should route to timeline controls (strip has scope)."""
+    """True when the open strip's Timeline region owns keyboard scope."""
     return (
         tl.panel_open
-        and isinstance(focus_cursor, TimelineFocus)
+        and region is ShellRegion.TIMELINE
         and timeline_controls is not None
     )
 
@@ -41,7 +40,7 @@ def key_handler_for_runtime(
     if timeline_submenu_routes_to_timeline(
         tl,
         timeline_controls=runtime.timeline_controls,
-        focus_cursor=runtime.controls.focus_cursor,
+        region=runtime.controls.shell_focus.region,
     ):
         return runtime.timeline_controls
     return runtime.controls
@@ -239,8 +238,8 @@ def _current_stop(runtime: LiveVisualizerRuntime) -> CycleStop:
 
 
 def _strip_has_scope(runtime: LiveVisualizerRuntime) -> bool:
-    return _strip_open(runtime) and isinstance(
-        runtime.controls.focus_cursor, TimelineFocus
+    return _strip_open(runtime) and (
+        runtime.controls.shell_focus.region is ShellRegion.TIMELINE
     )
 
 
@@ -252,12 +251,10 @@ def _commit_cycle_stop(runtime: LiveVisualizerRuntime, stop: CycleStop) -> None:
         return
     menu.blur()
     if stop is CycleStop.TIMELINE:
-        if not isinstance(controls.focus_cursor, TimelineFocus):
-            controls.open_timeline_panel(enter_submenu=True)
+        if _strip_open(runtime):
+            controls.set_shell_region(ShellRegion.TIMELINE)
         return
-    if isinstance(controls.focus_cursor, TimelineFocus):
-        controls.exit_timeline_submenu()
-    controls.shell_focus.region = (
+    controls.set_shell_region(
         ShellRegion.INSPECTOR
         if stop is CycleStop.INSPECTOR
         else ShellRegion.NAVIGATOR
@@ -289,19 +286,17 @@ def _handle_ctrl_section_nav(
     if runtime.menu_bar.focused:
         return False
     controls = runtime.controls
-    if isinstance(controls.focus_cursor, TimelineFocus):
-        controls.exit_timeline_submenu()
     delta = -1 if event.key == pygame.K_UP else 1
-    controls.shell_focus.region = ShellRegion.NAVIGATOR
+    controls.set_shell_region(ShellRegion.NAVIGATOR)
     controls.navigator.quick_step(delta)
     return True
 
 
 def _region_keydown(event: pygame.event.Event, runtime: LiveVisualizerRuntime) -> bool | None:
-    """Navigator and inspector own arrows, Enter, Esc, and PageUp/PageDown.
+    """Navigator, inspector, and timeline own arrows, Enter, Esc, and PageUp/PageDown.
 
-    None means the key is unowned and should fall through. Timeline scope
-    stays on ``key_handler_for_runtime``.
+    Timeline returns None so ``key_handler_for_runtime`` runs timeline controls.
+    None means the key is unowned and should fall through.
     """
     if event.key not in _REGION_KEYS:
         return None
@@ -432,10 +427,9 @@ def dispatch_should_notify_overlay(
     """Mirror VisualizerApp.run overlay fade-in on input."""
     if event.type != pygame.KEYDOWN:
         return False
-    tl = runtime.seed.session.timeline
     key_handler = key_handler_for_runtime(runtime, event.key)
     if key_handler is not runtime.controls:
         return False
-    return event.key != pygame.K_t and not isinstance(
-        runtime.controls.focus_cursor, TimelineFocus
-    )
+    if runtime.controls.shell_focus.region is ShellRegion.TIMELINE:
+        return False
+    return event.key != pygame.K_t

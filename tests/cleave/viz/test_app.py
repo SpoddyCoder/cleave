@@ -30,6 +30,7 @@ from cleave.viz.app import (
     init_gl_resources_render,
 )
 from cleave.viz.focus_nav import MainFocus, TimelineFocus
+from cleave.viz.shell_focus import ShellRegion
 from cleave.viz.input_dispatch import key_handler_for_runtime
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from tests.support.config import default_render_post_fx_runtime
@@ -859,6 +860,7 @@ def test_key_routing_timeline_when_submenu_focused() -> None:
     runtime.seed.session.timeline.enabled = True
     runtime.seed.session.timeline.panel_open = True
     runtime.controls.focus_cursor = TimelineFocus(0)
+    runtime.controls.shell_focus.region = ShellRegion.TIMELINE
 
     assert _key_handler_for_session(runtime, pygame.K_RETURN) is timeline
     assert _key_handler_for_session(runtime, pygame.K_UP) is timeline
@@ -876,6 +878,7 @@ def test_key_routing_timeline_when_overlay_hidden_and_submenu_focused() -> None:
     runtime.seed.session.timeline.enabled = True
     runtime.seed.session.timeline.panel_open = True
     runtime.controls.focus_cursor = TimelineFocus(0)
+    runtime.controls.shell_focus.region = ShellRegion.TIMELINE
 
     assert _key_handler_for_session(runtime, pygame.K_RETURN) is timeline
     assert _key_handler_for_session(runtime, pygame.K_UP) is timeline
@@ -891,6 +894,7 @@ def test_keyup_routing_main_for_vertical_nav_when_submenu_focused() -> None:
     runtime.seed.session.timeline.enabled = True
     runtime.seed.session.timeline.panel_open = True
     runtime.controls.focus_cursor = TimelineFocus(0)
+    runtime.controls.shell_focus.region = ShellRegion.TIMELINE
 
     assert _keyup_handler_for_session(runtime, pygame.K_UP) is timeline
     assert _keyup_handler_for_session(runtime, pygame.K_DOWN) is timeline
@@ -916,7 +920,8 @@ def test_tick_frame_skips_timeline_when_overlay_hidden_and_not_in_submenu(
     pygame.init()
     compositor = recording_compositor()
     runtime = _timeline_open_runtime(compositor)
-    runtime.controls.focus_cursor = MainFocus(RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER))
+    runtime.controls.focus_cursor = TimelineFocus(0)
+    runtime.controls.shell_focus.region = ShellRegion.NAVIGATOR
 
     app = VisualizerApp(runtime)
     app.tick_frame(1.0, paused=True, draw_overlay=True, n_pcm=735)
@@ -942,11 +947,16 @@ def test_tick_frame_draws_timeline_when_overlay_hidden_but_submenu_focused(
     pygame.init()
     compositor = recording_compositor()
     runtime = _timeline_open_runtime(compositor)
-    runtime.controls.focus_cursor = TimelineFocus(0)
+    runtime.controls.focus_cursor = MainFocus(
+        RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
+    )
+    runtime.controls.shell_focus.region = ShellRegion.TIMELINE
 
     app = VisualizerApp(runtime)
     app.tick_frame(1.0, paused=True, draw_overlay=True, n_pcm=735)
     mock_draw_timeline.assert_called_once()
+    assert mock_draw_timeline.call_args.kwargs["visibility"] == 1.0
+    assert mock_draw_timeline.call_args.args[3].submenu_focused is True
     _mock_draw_tuning.assert_not_called()
 
 
@@ -1116,19 +1126,39 @@ def test_tuning_view_state_needed_gating() -> None:
     )
 
 
-def test_timeline_strip_visible_while_submenu_focused_despite_hidden_overlay() -> None:
+def test_timeline_strip_visible_while_timeline_region_despite_hidden_overlay() -> None:
     tl = TuningSession(layer_z_order=[], layers={}).timeline
     tl.enabled = True
     tl.panel_open = True
-    focus = TimelineFocus(0)
 
-    assert _timeline_strip_visible(tl, overlay_visibility=0.0, focus_cursor=focus) is True
-    assert _timeline_strip_visible(tl, overlay_visibility=1.0, focus_cursor=focus) is True
-    assert _timeline_strip_fade(focus_cursor=focus, overlay_visibility=0.0) == 1.0
+    assert (
+        _timeline_strip_visible(
+            tl, overlay_visibility=0.0, region=ShellRegion.TIMELINE
+        )
+        is True
+    )
+    assert (
+        _timeline_strip_visible(
+            tl, overlay_visibility=1.0, region=ShellRegion.TIMELINE
+        )
+        is True
+    )
+    assert _timeline_strip_fade(region=ShellRegion.TIMELINE, overlay_visibility=0.0) == 1.0
 
-    focus = MainFocus(RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER))
-    assert _timeline_strip_visible(tl, overlay_visibility=0.0, focus_cursor=focus) is False
-    assert _timeline_strip_fade(focus_cursor=focus, overlay_visibility=0.5) == 0.5
+    assert (
+        _timeline_strip_visible(
+            tl, overlay_visibility=0.0, region=ShellRegion.NAVIGATOR
+        )
+        is False
+    )
+    assert (
+        _timeline_strip_visible(
+            tl, overlay_visibility=0.5, region=ShellRegion.INSPECTOR
+        )
+        is True
+    )
+    assert _timeline_strip_fade(region=ShellRegion.NAVIGATOR, overlay_visibility=0.5) == 0.5
+    assert _timeline_strip_fade(region=ShellRegion.INSPECTOR, overlay_visibility=0.5) == 0.5
 
 
 @patch("cleave.viz.app.OverlayDrawer.draw_timeline")
@@ -1150,11 +1180,15 @@ def test_tick_frame_draws_timeline_when_overlay_visible_and_panel_open(
     pygame.init()
     compositor = recording_compositor()
     runtime = _timeline_open_runtime(compositor)
+    runtime.controls.focus_cursor = TimelineFocus(0)
+    runtime.controls.shell_focus.region = ShellRegion.NAVIGATOR
     runtime.overlay.notify_input()
 
     app = VisualizerApp(runtime)
     app.tick_frame(1.0, paused=True, draw_overlay=True, n_pcm=735)
     mock_draw_timeline.assert_called_once()
+    assert mock_draw_timeline.call_args.kwargs["visibility"] == 1.0
+    assert mock_draw_timeline.call_args.args[3].submenu_focused is False
 
 
 def test_esc_hide_clears_submenu_focus_preserves_panel_open() -> None:

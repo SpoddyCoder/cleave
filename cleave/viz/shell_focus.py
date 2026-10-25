@@ -1,8 +1,9 @@
 """Shell focus model: region, Tab cycle, and escape.
 
-``ShellRegion`` is where focus sits. ``CycleStop`` is the Tab ring. Menu and
-timeline cursors stay in their existing owners; this module only names the
-stops.
+``ShellRegion`` is where keyboard scope sits: navigator, inspector, or the
+timeline strip. ``CycleStop`` is the Tab ring. The menu bar stays
+``menu_bar.focused`` and is not a region. ``next_region`` skips Timeline
+when the strip is closed.
 """
 
 from __future__ import annotations
@@ -16,14 +17,15 @@ from cleave.viz.row_kinds import RowDescriptor, RowKind
 
 
 class ShellRegion(Enum):
-    """Focus region inside the shell. The timeline strip is not a region."""
+    """Focus region that owns keyboard scope."""
 
     NAVIGATOR = auto()
     INSPECTOR = auto()
+    TIMELINE = auto()
 
 
 class CycleStop(Enum):
-    """Tab-cycle stop. Menu and timeline are still their existing cursors."""
+    """Tab-cycle stop. Menu is the menu bar, not a ``ShellRegion``."""
 
     MENU = auto()
     NAVIGATOR = auto()
@@ -239,7 +241,8 @@ def escape_region(region: ShellRegion) -> ShellRegion:
     """Escape target for *region*.
 
     Inspector returns to the navigator. The navigator stays on the navigator;
-    the navigator hides the UI itself.
+    the navigator hides the UI itself. Timeline stays on Timeline; the strip
+    closes through timeline controls.
     """
     if region is ShellRegion.INSPECTOR:
         return ShellRegion.NAVIGATOR

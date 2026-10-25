@@ -97,7 +97,7 @@ class NavigatorControls:
             node_id,
             self._controls.session.layer_z_order,
         )
-        focus.region = ShellRegion.NAVIGATOR
+        self._controls.set_shell_region(ShellRegion.NAVIGATOR)
         focus.selected_id = node_id
 
     def activate(self) -> None:
@@ -128,7 +128,7 @@ class NavigatorControls:
         rows = build_inspector_rows(
             view, node_id, focus.collapsed, focus.opened
         )
-        focus.region = ShellRegion.INSPECTOR
+        self._controls.set_shell_region(ShellRegion.INSPECTOR)
         first = next((row for row in rows if row.navigable), None)
         _set_inspector_cursor(focus, first)
 

@@ -58,7 +58,7 @@ class InspectorControls:
                 self.activate(row)
             return True
         if key == pygame.K_ESCAPE:
-            self._controls.shell_focus.region = ShellRegion.NAVIGATOR
+            self._controls.set_shell_region(ShellRegion.NAVIGATOR)
             return True
         return False
 
@@ -87,7 +87,7 @@ class InspectorControls:
 
     def focus_row(self, row: InspectorRow) -> None:
         focus = self._controls.shell_focus
-        focus.region = ShellRegion.INSPECTOR
+        self._controls.set_shell_region(ShellRegion.INSPECTOR)
         if row.command_id is not None:
             focus.inspector_cursor = None
             focus.inspector_command_id = row.command_id

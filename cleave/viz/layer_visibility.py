@@ -26,12 +26,7 @@ from cleave.viz.editor_mode_controls import (
     is_preset_curation_mode,
     layer_compositing_active,
 )
-from cleave.viz.focus_nav import (
-    FocusCursor,
-    MainFocus,
-    cursor_timeline_row,
-    cursor_timeline_submenu_focused,
-)
+from cleave.viz.focus_nav import FocusCursor, MainFocus, TimelineFocus
 from cleave.viz.row_kinds import RowKind
 from cleave.viz.session import TimelineFadeGroupRuntime, TuningSession
 from cleave.viz.timeline_overlay import (
@@ -313,6 +308,7 @@ def build_timeline_view_state(
     duration_sec: float,
     *,
     focus_cursor: FocusCursor | None = None,
+    strip_focused: bool = False,
     bar_times: Sequence[float] = (),
     beat_times: Sequence[float] = (),
 ) -> TimelineViewState:
@@ -321,14 +317,10 @@ def build_timeline_view_state(
     tl.selected_cue_flash_start_ms = prune_expired_selected_cue_flash(
         tl.selected_cue_flash_start_ms
     )
-    submenu_focused = (
-        focus_cursor is not None and cursor_timeline_submenu_focused(focus_cursor)
-    )
-    focus_row = (
-        cursor_timeline_row(focus_cursor)
-        if submenu_focused
-        else tl.focus_row
-    )
+    submenu_focused = strip_focused
+    focus_row = tl.focus_row
+    if strip_focused and isinstance(focus_cursor, TimelineFocus):
+        focus_row = focus_cursor.row
     monitor_visible = {
         slot: effective_layer_enabled(session, slot, position_sec)
         for slot in session.layer_z_order

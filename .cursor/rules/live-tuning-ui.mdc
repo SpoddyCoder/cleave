@@ -47,6 +47,6 @@ Label+value rows: prefix in `LABEL`, value in the row value color. Expand arrows
 
 ## Keyboard dispatch
 
-Layered in `input_dispatch.py`. Modal keys first. Then Tab / Shift+Tab cycles Menu, Navigator, Inspector, and Timeline. Timeline is skipped when the strip is closed. Then the menu bar, command shortcuts, and Ctrl+Up / Ctrl+Down (previous / next top-level navigator node; no effect while the menu bar is focused). Navigator and inspector own their arrows, Enter, Esc, and PageUp/PageDown. Timeline keys stay on the strip when that region is active. `h` stays global even when the strip has focus. There is no panel region and no main-list focus ring.
+Layered in `input_dispatch.py`. Modal keys first. Then Tab / Shift+Tab cycles Menu, Navigator, Inspector, and Timeline. Timeline is skipped when the strip is closed. Then the menu bar, command shortcuts, and Ctrl+Up / Ctrl+Down (previous / next top-level navigator node; no effect while the menu bar is focused). Navigator and inspector own their arrows, Enter, Esc, and PageUp/PageDown. An open strip does not take keys. Timeline takes arrows, Enter, Esc, and cue keys only while that region is active. `h` stays global even when the strip has focus. There is no panel region and no main-list focus ring.
 
 `row_hotkeys.handle_row_hotkey` is the per-descriptor path for letter, Delete, and Backspace keys, used by the navigator and the inspector.

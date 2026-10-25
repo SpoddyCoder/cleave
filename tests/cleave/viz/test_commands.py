@@ -138,7 +138,10 @@ def _fake_controls(
         request_quit=MagicMock(),
         editor_mode=SimpleNamespace(prompt_change_editor_mode=MagicMock()),
         tap_sync=SimpleNamespace(prompt_start=MagicMock()),
-        shell_focus=SimpleNamespace(selected_id=selected_id),
+        shell_focus=SimpleNamespace(
+            selected_id=selected_id,
+            region=ShellRegion.NAVIGATOR,
+        ),
         focus_cursor=object(),
         layer_lifecycle=SimpleNamespace(
             can_add=lambda: can_add,
@@ -518,7 +521,10 @@ def test_command_context_reads_live_layer_flags() -> None:
     assert command_context(controls).selected_slot == "layer_2"
 
     controls.focus_cursor = TimelineFocus(1)
+    assert command_context(controls).timeline_scope is False
+    controls.set_shell_region(ShellRegion.TIMELINE)
     assert command_context(controls).timeline_scope is True
+    controls.set_shell_region(ShellRegion.NAVIGATOR)
     controls.focus_cursor = MainFocus(
         RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
     )
@@ -782,13 +788,16 @@ def test_show_strip_toggles_panel_and_is_disabled_while_recording_or_curating() 
     assert show.checked(command_context(closed)) is False
     show.run(closed)
     assert closed.session.timeline.panel_open is True
+    assert closed.shell_focus.region is ShellRegion.TIMELINE
     assert isinstance(closed.focus_cursor, TimelineFocus)
+    assert command_context(closed).timeline_scope is True
     assert command_context(closed).timeline_panel_open is True
     assert show.checked(command_context(closed)) is True
     show.run(closed)
     assert closed.session.timeline.panel_open is False
-    assert isinstance(closed.focus_cursor, TimelineFocus)
     assert closed.shell_focus.region is ShellRegion.NAVIGATOR
+    assert isinstance(closed.focus_cursor, MainFocus)
+    assert command_context(closed).timeline_scope is False
 
     recording = _make_controls(("layer_1",))
     recording.session.timeline.recording = True

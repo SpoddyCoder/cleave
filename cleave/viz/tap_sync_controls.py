@@ -10,6 +10,7 @@ from cleave.config_schema.editor import clamp_residual_latency_ms
 from cleave.user_config import persist_editor_settings
 from cleave.viz.focus_nav import FocusCursor
 from cleave.viz.modal import ModalHost
+from cleave.viz.shell_focus import ShellRegion
 from cleave.viz.playback import PlaybackState, toggle_pause
 from cleave.viz.tap_sync import (
     accept_tap_for_accent,
@@ -35,6 +36,7 @@ class TapSyncUiSnapshot:
     timeline_panel_open: bool
     focus_cursor: FocusCursor
     overlay_visible: bool
+    shell_region: ShellRegion
 
 
 @dataclass(frozen=True)

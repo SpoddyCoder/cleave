@@ -350,7 +350,7 @@ def test_timeline_strip_help_keeps_lane_keys_when_layer_selected() -> None:
     sections = help_sections(
         RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER),
         shell_focus=ShellFocusState(
-            region=ShellRegion.NAVIGATOR,
+            region=ShellRegion.TIMELINE,
             selected_id="layer:drums",
         ),
         timeline_submenu_focused=True,
