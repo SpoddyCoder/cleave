@@ -11,6 +11,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- Settings switches to a docked layout with the navigator and inspector on the left and the visualiser filling the rest, remembers navigator and inspector widths in user editor settings (not the project file), opens a menu with Alt plus its underlined letter, and keeps a visible focus ring on the focused shell row when hovered.
 - Mouse gestures: hover highlights, wheel scroll on the navigator and inspector, sideways drag on numeric values, and draggable column splitters.
 - Timeline and song markers edit in the inspector, and the old tuning list is gone. The Timeline menu opens the strip, applies and resets the timeline, snaps cues, and jumps to song markers.
 - Overlays, Post-FX, and Pattern mask edit in the inspector. The Render menu toggles them, and those sections are gone from the leftover panel.
