@@ -32,6 +32,25 @@ _NAV_KEYS = frozenset(
 )
 
 
+def menu_mnemonic(label: str) -> str:
+    """Lowercased first character of a top-menu label."""
+    if not label:
+        return ""
+    return label[0].lower()
+
+
+def menu_index_for_mnemonic(
+    menus: tuple[Menu, ...] | list[Menu],
+    letter: str,
+) -> int | None:
+    """Index of the menu whose mnemonic matches ``letter``, or None."""
+    needle = letter.lower()
+    for index, menu in enumerate(menus):
+        if menu_mnemonic(menu.label) == needle:
+            return index
+    return None
+
+
 def menus_for_session(session: Any) -> tuple[Menu, ...]:
     """Menus for the live session, including layer jumps in z-order."""
     slots = tuple(
@@ -150,6 +169,19 @@ class MenuBarState:
             else:
                 self.blur()
         return True
+
+    def open_menu(self, index: int, menus: tuple[Menu, ...] | list[Menu]) -> None:
+        """Focus the bar and open this menu on its first command.
+
+        A second call leaves the dropdown open. Cancels a pending Alt tap so
+        Alt keyup does not treat the chord as a bare Alt tap.
+        """
+        self.cancel_alt_tap()
+        if not menus:
+            return
+        self.focused = True
+        self.menu_index = index % len(menus)
+        self._open_dropdown(menus, last=False)
 
     def click_top(self, index: int, menus: tuple[Menu, ...] | list[Menu]) -> None:
         """Toggle the dropdown under a top label."""

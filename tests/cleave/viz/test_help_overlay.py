@@ -82,6 +82,10 @@ def _assert_shell_navigation(entries: dict[str, str]) -> None:
     assert "step an inspector value" in entries["Left/Right"]
     assert entries["Ctrl + Up/Down"] == "previous / next top-level navigator node"
     assert entries["F10 / Alt"] == "focus menu bar"
+    assert (
+        entries["Alt + underlined letter"]
+        == "open that menu (F, P, L, R, T, S, H)"
+    )
 
 
 def test_help_content_navigation_cycles_regions() -> None:

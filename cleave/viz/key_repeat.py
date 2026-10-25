@@ -35,6 +35,10 @@ def mod_shift(mod: int) -> bool:
     return bool(mod & (pygame.KMOD_SHIFT | pygame.KMOD_LSHIFT | pygame.KMOD_RSHIFT))
 
 
+def mod_alt(mod: int) -> bool:
+    return bool(mod & (pygame.KMOD_ALT | pygame.KMOD_LALT | pygame.KMOD_RALT))
+
+
 def delete_key_pressed(event: pygame.event.Event) -> bool:
     """True for forward-delete keys (keysym or scancode; not Backspace)."""
     if event.key == pygame.K_DELETE:

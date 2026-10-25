@@ -34,6 +34,7 @@ from cleave.viz.overlay_primitives import (
 )
 from cleave.viz.overlay_upload import (
     clip_dirty_rects,
+    dirty_rects_for_clip_rect,
     upload_plan_for_signature,
 )
 from cleave.viz.row_present_renderers import render_visibility_icon
@@ -1759,19 +1760,13 @@ class TimelineOverlay:
             clip_rect = (
                 (src_x, src_y, sw, sh)
                 if src_x != 0 or src_y != 0 or (sw, sh) != (upload_w, upload_h)
-                else ()
+                else None
             )
-            if clip_rect:
-                upload_plan = upload_plan_for_signature(
-                    upload_signature,
-                    cache.gpu.last_signature,
-                    dirty_rects=clip_dirty_rects(clip_rect, upload_w, upload_h),
-                )
-            else:
-                upload_plan = upload_plan_for_signature(
-                    upload_signature,
-                    cache.gpu.last_signature,
-                )
+            upload_plan = upload_plan_for_signature(
+                upload_signature,
+                cache.gpu.last_signature,
+                dirty_rects=dirty_rects_for_clip_rect(clip_rect, upload_w, upload_h),
+            )
 
         cache.last_live_signature = live_sig
         self._blit_src = (src_x, src_y)

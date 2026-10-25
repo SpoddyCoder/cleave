@@ -14,6 +14,7 @@ from cleave.viz.overlay_upload import (
     UploadPlan,
     UploadSignature,
     clip_dirty_rects,
+    dirty_rects_for_clip_rect,
     present_overlay,
     tex_uv_for_active,
     upload_plan_for_signature,
@@ -72,6 +73,17 @@ def test_tex_uv_for_active_subregion() -> None:
 
 def test_tex_uv_for_active_full_capacity() -> None:
     assert tex_uv_for_active((100, 50), (100, 50)) == (0.0, 0.0, 1.0, 1.0)
+
+
+def test_dirty_rects_for_clip_rect_wraps_one_window() -> None:
+    assert dirty_rects_for_clip_rect(None, 100, 50) == ()
+    assert dirty_rects_for_clip_rect((0, 0, 80, 40), 100, 50) == ()
+    assert dirty_rects_for_clip_rect((10, 4, 30, 12), 100, 50) == (
+        (10, 4, 30, 12),
+    )
+    assert dirty_rects_for_clip_rect((-5, 0, 20, 10), 100, 50) == (
+        (0, 0, 15, 10),
+    )
 
 
 def test_clip_dirty_rects_clips_to_bounds() -> None:

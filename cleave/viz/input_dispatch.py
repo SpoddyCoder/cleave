@@ -10,8 +10,8 @@ from cleave.viz.commands import command_context, command_for_shortcut
 from cleave.viz.controls import SEEK_LONG, SEEK_TINY, TuningControls
 from cleave.viz.editor_mode_controls import is_preset_curation_mode
 from cleave.viz.focus_nav import FocusCursor, TimelineFocus
-from cleave.viz.key_repeat import delete_key_pressed, mod_ctrl, mod_shift
-from cleave.viz.menu_bar import menus_for_session
+from cleave.viz.key_repeat import delete_key_pressed, mod_alt, mod_ctrl, mod_shift
+from cleave.viz.menu_bar import menu_index_for_mnemonic, menus_for_session
 from cleave.viz.shell_focus import CycleStop, ShellRegion, next_region
 from cleave.viz.timeline_controls import TimelineControls
 
@@ -116,7 +116,7 @@ def _run_command_shortcut(
 def _handle_menu_bar_keydown(
     event: pygame.event.Event, runtime: LiveVisualizerRuntime
 ) -> bool | None:
-    """F10, Alt, and keys while the bar is focused.
+    """F10, Alt, Alt+letter mnemonics, and keys while the bar is focused.
 
     True = consumed, False = quit now, None = pass through.
     """
@@ -125,6 +125,14 @@ def _handle_menu_bar_keydown(
         menu.note_alt_keydown()
         return True
     menu.cancel_alt_tap()
+    if mod_alt(event.mod) and pygame.K_a <= event.key <= pygame.K_z:
+        menus = menus_for_session(runtime.seed.session)
+        letter = chr(ord("a") + (event.key - pygame.K_a))
+        index = menu_index_for_mnemonic(menus, letter)
+        if index is not None:
+            menu.open_menu(index, menus)
+            runtime.overlay.notify_input()
+            return True
     if (
         menu.focused
         and event.key in (pygame.K_UP, pygame.K_DOWN)

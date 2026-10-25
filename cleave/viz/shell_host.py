@@ -550,6 +550,24 @@ def _draw_item_suffix(text: str, color: imgui.ImVec4) -> None:
     _draw_aligned_parts([(text, color)])
 
 
+def _draw_mnemonic_underline(label: str) -> None:
+    """1px underline under the first letter of a top-menu button."""
+    letter = label[:1]
+    if not letter:
+        return
+    rect_min = imgui.get_item_rect_min()
+    pad = imgui.get_style().frame_padding
+    letter_size = imgui.calc_text_size(letter)
+    x0 = rect_min.x + pad.x
+    y = rect_min.y + pad.y + letter_size.y
+    color = imgui.get_color_u32(_rgba(LABEL))
+    imgui.get_window_draw_list().add_rect_filled(
+        imgui.ImVec2(x0, y),
+        imgui.ImVec2(x0 + letter_size.x, y + 1.0),
+        color,
+    )
+
+
 def _draw_nav_lock_mark(text_pos: imgui.ImVec2, label: str, mark: str) -> None:
     gap = imgui.get_style().item_spacing.x
     origin = imgui.ImVec2(
@@ -1501,6 +1519,7 @@ class ShellHost:
                     clicked = imgui.button(menu.label)
                     if active:
                         imgui.pop_style_color(3)
+                    _draw_mnemonic_underline(menu.label)
                     rect_min = imgui.get_item_rect_min()
                     rect_max = imgui.get_item_rect_max()
                     anchors[index] = (rect_min.x, rect_max.y)

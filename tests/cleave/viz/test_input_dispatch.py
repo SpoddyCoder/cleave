@@ -474,6 +474,38 @@ def test_f10_toggles_bar_focus_and_wakes_overlay() -> None:
     assert runtime.menu_bar.focused is False
 
 
+def test_alt_f_opens_file_menu_plain_f_does_not() -> None:
+    runtime = _make_runtime()
+    assert runtime.overlay.visibility == 0.0
+    dispatch_keydown(
+        pygame.event.Event(pygame.KEYDOWN, key=pygame.K_LALT),
+        runtime,
+    )
+    assert dispatch_keydown(
+        keydown(pygame.K_f, mod=pygame.KMOD_ALT),
+        runtime,
+    ) is True
+    dispatch_keyup(
+        pygame.event.Event(pygame.KEYUP, key=pygame.K_LALT),
+        runtime,
+    )
+    assert runtime.menu_bar.focused is True
+    assert runtime.menu_bar.dropdown_open is True
+    assert runtime.menu_bar.menu_index == 0
+    assert runtime.overlay.visibility == 1.0
+    assert dispatch_keydown(
+        keydown(pygame.K_f, mod=pygame.KMOD_ALT),
+        runtime,
+    ) is True
+    assert runtime.menu_bar.focused is True
+    assert runtime.menu_bar.dropdown_open is True
+
+    runtime = _make_runtime()
+    assert dispatch_keydown(keydown(pygame.K_f), runtime) is True
+    assert runtime.menu_bar.focused is False
+    assert runtime.menu_bar.dropdown_open is False
+
+
 def test_alt_tap_focuses_bar_and_wakes_overlay() -> None:
     runtime = _make_runtime()
     dispatch_keydown(

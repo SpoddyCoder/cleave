@@ -72,6 +72,7 @@ NAVIGATION_SECTION = HelpSection(
         ("Ctrl + S", "save"),
         ("Ctrl + Enter", "place song marker"),
         ("F10 / Alt", "focus menu bar"),
+        ("Alt + underlined letter", "open that menu (F, P, L, R, T, S, H)"),
         ("Ctrl + R", "render"),
     ),
 )
@@ -85,6 +86,7 @@ _CURATION_NAVIGATION_SECTION = HelpSection(
         _TOP_LEVEL_NAV_ENTRY,
         *_SEEK_AND_QUIT_ENTRIES,
         ("F10 / Alt", "focus menu bar"),
+        ("Alt + underlined letter", "open that menu (F, P, L, R, T, S, H)"),
     ),
 )
 

@@ -7,8 +7,8 @@ from unittest.mock import patch
 
 import pygame
 
-from cleave.viz.commands import SEPARATOR, Command, CommandContext, Menu
-from cleave.viz.menu_bar import MenuBarState
+from cleave.viz.commands import MENUS, SEPARATOR, Command, CommandContext, Menu
+from cleave.viz.menu_bar import MenuBarState, menu_index_for_mnemonic, menu_mnemonic
 
 _LABELS = ("File", "Project", "Layers", "Render", "Timeline", "Settings", "Help")
 
@@ -127,6 +127,37 @@ def test_disabled_enter_does_not_run() -> None:
     assert runs == []
     assert state.dropdown_open
     assert state.focused
+    assert state.highlighted_command(menus).id == "disabled"
+
+
+def test_menu_mnemonics_are_the_unique_first_letters() -> None:
+    letters = tuple(menu_mnemonic(menu.label).upper() for menu in MENUS)
+    assert letters == ("F", "P", "L", "R", "T", "S", "H")
+    assert len(set(letters)) == len(letters)
+    assert MENUS[0].label == "File"
+    assert menu_index_for_mnemonic(MENUS, "F") == 0
+    assert menu_index_for_mnemonic(MENUS, "f") == 0
+    assert menu_index_for_mnemonic(MENUS, "q") is None
+    assert menu_mnemonic("") == ""
+
+
+def test_open_menu_focuses_dropdown_and_stays_open() -> None:
+    runs: list[tuple[str, bool]] = []
+    menus = _menus(runs)
+    state = MenuBarState()
+    state.note_alt_keydown()
+    state.open_menu(0, menus)
+    assert state.focused
+    assert state.menu_index == 0
+    assert state.dropdown_open
+    assert state.highlighted_command(menus).id == "disabled"
+    assert state.complete_alt_tap() is False
+    assert state.focused
+    assert state.dropdown_open
+    state.open_menu(0, menus)
+    assert state.focused
+    assert state.dropdown_open
+    assert state.menu_index == 0
     assert state.highlighted_command(menus).id == "disabled"
 
 

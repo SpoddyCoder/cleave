@@ -27,7 +27,11 @@ from cleave.viz.overlay_primitives import (
     overlay_font,
     overlay_panel_surface,
 )
-from cleave.viz.overlay_upload import OverlayGpuState, upload_plan_for_signature
+from cleave.viz.overlay_upload import (
+    OverlayGpuState,
+    dirty_rects_for_clip_rect,
+    upload_plan_for_signature,
+)
 from cleave.viz.row_kinds import RowDescriptor
 from cleave.viz.shell_focus import ShellFocusState
 from cleave.viz.theme import (
@@ -295,21 +299,13 @@ class HelpOverlay:
         clip_rect = (
             (src_x, src_y, active_w, active_h)
             if src_x != 0 or src_y != 0 or (active_w, active_h) != panel_size
-            else ()
+            else None
         )
-        if clip_rect:
-            from cleave.viz.overlay_upload import clip_dirty_rects
-
-            upload_plan = upload_plan_for_signature(
-                upload_signature,
-                cache.gpu.last_signature,
-                dirty_rects=clip_dirty_rects(clip_rect, panel_w, panel_h),
-            )
-        else:
-            upload_plan = upload_plan_for_signature(
-                upload_signature,
-                cache.gpu.last_signature,
-            )
+        upload_plan = upload_plan_for_signature(
+            upload_signature,
+            cache.gpu.last_signature,
+            dirty_rects=dirty_rects_for_clip_rect(clip_rect, panel_w, panel_h),
+        )
 
         return ComposedPanel(
             upload_surface=panel,

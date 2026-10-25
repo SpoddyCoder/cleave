@@ -100,6 +100,24 @@ def clip_dirty_rects(
     return tuple(clipped)
 
 
+def dirty_rects_for_clip_rect(
+    clip_rect: tuple[int, int, int, int] | None,
+    panel_w: int,
+    panel_h: int,
+) -> tuple[tuple[int, int, int, int], ...]:
+    """One viewport window as dirty rects.
+
+    ``None`` means the panel already matches the upload. An origin-aligned
+    window is omitted so the plan stays a full upload of the active size.
+    """
+    if clip_rect is None:
+        return ()
+    clipped = clip_dirty_rects((clip_rect,), panel_w, panel_h)
+    if clipped == ((0, 0, clip_rect[2], clip_rect[3]),):
+        return ()
+    return clipped
+
+
 def _tex_uv_for_draw(
     capacity: tuple[int, int],
     active_size: tuple[int, int],

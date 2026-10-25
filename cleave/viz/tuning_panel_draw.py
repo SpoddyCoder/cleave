@@ -74,6 +74,7 @@ from cleave.viz.overlay_profiler import OverlayDrawCounters
 from cleave.viz.overlay_upload import (
     OverlayGpuState,
     clip_dirty_rects,
+    dirty_rects_for_clip_rect,
     upload_plan_for_signature,
 )
 from cleave.viz.tuning_panel_cache import (
@@ -1240,19 +1241,13 @@ class TuningOverlay:
             clip_rect = (
                 (src_x, src_y, active_w, active_h)
                 if src_x != 0 or src_y != 0 or (active_w, active_h) != (panel_w, panel_h)
-                else ()
+                else None
             )
-            if clip_rect:
-                upload_plan = upload_plan_for_signature(
-                    upload_signature,
-                    cache.gpu.last_signature,
-                    dirty_rects=clip_dirty_rects(clip_rect, panel_w, panel_h),
-                )
-            else:
-                upload_plan = upload_plan_for_signature(
-                    upload_signature,
-                    cache.gpu.last_signature,
-                )
+            upload_plan = upload_plan_for_signature(
+                upload_signature,
+                cache.gpu.last_signature,
+                dirty_rects=dirty_rects_for_clip_rect(clip_rect, panel_w, panel_h),
+            )
 
         cache.last_live_signature = live_sig
         return ComposedPanel(
