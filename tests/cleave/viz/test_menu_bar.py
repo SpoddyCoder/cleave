@@ -9,6 +9,7 @@ import pygame
 
 from cleave.viz.commands import MENUS, SEPARATOR, Command, CommandContext, Menu
 from cleave.viz.menu_bar import MenuBarState, menu_index_for_mnemonic, menu_mnemonic
+from cleave.viz.shell_focus import ShellRegion
 
 _LABELS = ("File", "Project", "Layers", "Render", "Timeline", "Settings", "Help")
 
@@ -252,8 +253,123 @@ def test_menu_bar_height_px_needs_no_gl_context() -> None:
 
     assert imgui.get_current_context() is None
     height = menu_bar_height_px()
-    assert height == max(1, round(float(tuning_ui_metrics().font_size) + 6.0))
+    assert height == max(1, round(float(tuning_ui_metrics().font_size) + 16.0))
     assert imgui.get_current_context() is None
+
+
+def _draw_list_has_color(draw_list: object, color: int) -> bool:
+    for vtx in draw_list.vtx_buffer:
+        if int(vtx.col) == color:
+            return True
+    return False
+
+
+def test_open_menu_paints_over_the_transport_rule() -> None:
+    """The transport rule stays on its window, under a later menu popup."""
+    from imgui_bundle import imgui
+
+    from cleave.viz import shell_host
+    from cleave.viz.shell_layout import ShellLayout
+    from cleave.viz.theme import TRANSPORT_RULE
+
+    overlay = _Overlay()
+    overlay.visibility = 1.0
+    menu = MenuBarState()
+    controls = _shell_controls()
+    controls.build_view_state = lambda **_kwargs: None
+    controls.focus_cursor = None
+    controls.shell_focus = SimpleNamespace(region=ShellRegion.NAVIGATOR)
+    with patch.object(shell_host, "_gl_context_current", return_value=False):
+        host = shell_host.ShellHost.create(overlay, menu, controls)
+    try:
+        host._display_size = (1280, 720)
+        height = shell_host.menu_bar_height_px()
+        host.set_layout(ShellLayout.compute(1280, 720, height, height, 0))
+        host.process_event(_motion(4))
+        host._draw_navigator = lambda: None
+        host._draw_inspector = lambda _state: None
+        # The font atlas is built on the first frame. Open the menu after that.
+        host.draw(menu, CommandContext(), 1.0, 1.0 / 60.0)
+        menu.open_menu(0, MENUS)
+        host.draw(menu, CommandContext(), 1.0, 1.0 / 60.0)
+        assert host.menu_bar_height_px == height
+        lists = list(imgui.get_draw_data().cmd_lists)
+        assert len(lists) >= 2
+        grey = int(
+            imgui.get_color_u32(
+                imgui.ImVec4(
+                    TRANSPORT_RULE[0] / 255.0,
+                    TRANSPORT_RULE[1] / 255.0,
+                    TRANSPORT_RULE[2] / 255.0,
+                    1.0,
+                )
+            )
+        )
+        on_foreground = _draw_list_has_color(lists[-1], grey)
+        under_popup = any(
+            _draw_list_has_color(draw_list, grey) for draw_list in lists[:-1]
+        )
+        del lists
+    finally:
+        host.destroy()
+    assert not on_foreground
+    assert under_popup
+
+
+def test_open_menu_paints_over_the_focus_ring() -> None:
+    """The row highlight stays on its panel, under a later menu popup."""
+    from imgui_bundle import imgui
+
+    from cleave.viz import shell_host
+    from cleave.viz.shell_layout import ShellLayout
+    from cleave.viz.theme import HIGHLIGHT
+
+    overlay = _Overlay()
+    overlay.visibility = 1.0
+    menu = MenuBarState()
+    controls = _shell_controls()
+    controls.build_view_state = lambda **_kwargs: None
+    controls.focus_cursor = None
+    controls.shell_focus = SimpleNamespace(region=ShellRegion.NAVIGATOR)
+    with patch.object(shell_host, "_gl_context_current", return_value=False):
+        host = shell_host.ShellHost.create(overlay, menu, controls)
+    try:
+        host._display_size = (1280, 720)
+        height = shell_host.menu_bar_height_px()
+        host.set_layout(ShellLayout.compute(1280, 720, height, height, 0))
+        host.process_event(_motion(4))
+
+        def draw_focused_row() -> None:
+            imgui.selectable("Focused##row", True)
+            shell_host._draw_item_focus_ring()
+
+        host._draw_navigator = draw_focused_row
+        host._draw_inspector = lambda _state: None
+        # The font atlas is built on the first frame. Open the menu after that.
+        host.draw(menu, CommandContext(), 1.0, 1.0 / 60.0)
+        menu.open_menu(0, MENUS)
+        host.draw(menu, CommandContext(), 1.0, 1.0 / 60.0)
+        lists = list(imgui.get_draw_data().cmd_lists)
+        assert len(lists) >= 2
+        gold = int(
+            imgui.get_color_u32(
+                imgui.ImVec4(
+                    HIGHLIGHT[0] / 255.0,
+                    HIGHLIGHT[1] / 255.0,
+                    HIGHLIGHT[2] / 255.0,
+                    1.0,
+                )
+            )
+        )
+        on_foreground = _draw_list_has_color(lists[-1], gold)
+        under_popup = any(
+            _draw_list_has_color(draw_list, gold) for draw_list in lists[:-1]
+        )
+        del lists
+    finally:
+        host.destroy()
+    assert not on_foreground
+    assert under_popup
 
 
 class _Overlay:

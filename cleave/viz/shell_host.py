@@ -81,6 +81,7 @@ from cleave.viz.theme import (
     HOVER,
     HOVER_BG_ALPHA,
     LABEL,
+    MENU_ITEM_HOVER_BG_ALPHA,
     LOCK_ICON,
     NAVIGATOR_BORDER,
     TRANSPORT_RULE,
@@ -91,8 +92,9 @@ from cleave.viz.theme import (
 RENDERER_CLASS = ProgrammablePipelineRenderer
 
 _HIDDEN = 0.01
-# Dear ImGui default Style.FramePadding.y. _apply_theme leaves it unchanged.
-_MENU_BAR_FRAME_PADDING_Y = 3.0
+# Vertical padding for the menu bar and the transport bar, which shares its height.
+# Dear ImGui's default FramePadding.y is 3, which leaves both rows cramped.
+_MENU_BAR_FRAME_PADDING_Y = 8.0
 _INSPECTOR_INDENT = 16.0
 _NAV_LOCK_MARK = "[lock]"
 _TRANSPORT_GAP = 16.0
@@ -332,10 +334,25 @@ def menu_bar_height_px() -> int:
     """Pixels reserved for the menu bar before the first ImGui layout.
 
     Safe without a GL context or an ImGui context. ``ShellHost`` replaces
-    this with the laid-out bar height after the first frame.
+    this with the laid-out bar height after the first frame. The transport
+    bar uses the same height.
     """
     font_size = float(tuning_ui_metrics().font_size)
     return max(1, int(round(font_size + _MENU_BAR_FRAME_PADDING_Y * 2.0)))
+
+
+@contextmanager
+def _menu_bar_frame_padding() -> Iterator[None]:
+    """Extra vertical padding for the menu bar. Other rows keep the default."""
+    style = imgui.get_style()
+    imgui.push_style_var(
+        imgui.StyleVar_.frame_padding,
+        imgui.ImVec2(style.frame_padding.x, _MENU_BAR_FRAME_PADDING_Y),
+    )
+    try:
+        yield
+    finally:
+        imgui.pop_style_var()
 
 
 class _HeadlessRenderer:
@@ -655,25 +672,42 @@ def _seat_panel(
 
 
 def _stroke_h_rule(
-    x0: float, x1: float, y: float, rgb: tuple[int, int, int]
+    x0: float,
+    x1: float,
+    y: float,
+    rgb: tuple[int, int, int],
+    *,
+    foreground: bool = True,
 ) -> None:
-    """Opaque 1px rule on pixel row *y*, after every window.
+    """Opaque 1px rule on pixel row *y*.
 
-    A stroked line is anti-aliased, so the menu buttons' opaque fill shows
-    through it. A filled rectangle is not anti-aliased. The foreground list
-    is the last one Dear ImGui renders.
+    A stroked line is anti-aliased, so an opaque fill shows through it. A
+    filled rectangle is not. The foreground list paints after every window,
+    which keeps the menu-bar rule on top of the menu buttons. The transport
+    rule stays on its own window so a later menu popup covers it.
     """
     if x1 <= x0:
         return
     color = imgui.get_color_u32(_rgba(rgb))
+    rect_min = imgui.ImVec2(x0, y)
+    rect_max = imgui.ImVec2(x1, y + 1.0)
+    if not foreground:
+        imgui.get_window_draw_list().add_rect_filled(rect_min, rect_max, color)
+        return
     draw = imgui.get_foreground_draw_list(imgui.get_main_viewport())
     display = imgui.get_io().display_size
     draw.push_clip_rect(imgui.ImVec2(0.0, 0.0), display, False)
-    draw.add_rect_filled(imgui.ImVec2(x0, y), imgui.ImVec2(x1, y + 1.0), color)
+    draw.add_rect_filled(rect_min, rect_max, color)
     draw.pop_clip_rect()
 
 
 def _draw_rect_border(rect: tuple[int, int, int, int]) -> None:
+    """1px highlight around the timeline strip.
+
+    Drawn only while the strip has focus. An open menu takes that focus, so
+    this outline and the popup are never in the same frame. The foreground
+    list keeps the stroke above the side panels that meet the strip.
+    """
     x, y, w, h = rect
     if w <= 0 or h <= 0:
         return
@@ -689,13 +723,18 @@ def _draw_rect_border(rect: tuple[int, int, int, int]) -> None:
 
 
 def _draw_item_focus_ring() -> None:
-    """1px highlight outline of the current item on the foreground list."""
+    """1px highlight outline of the current item on its window.
+
+    The window list is painted with that panel, so a later menu popup covers
+    the outline where they overlap. The foreground list would sit above the
+    popup.
+    """
     rect_min = imgui.get_item_rect_min()
     rect_max = imgui.get_item_rect_max()
     if rect_max.x <= rect_min.x or rect_max.y <= rect_min.y:
         return
     color = imgui.get_color_u32(_rgba(HIGHLIGHT))
-    imgui.get_foreground_draw_list().add_rect(
+    imgui.get_window_draw_list().add_rect(
         rect_min,
         rect_max,
         color,
@@ -1061,8 +1100,11 @@ class ShellHost:
         try:
             alpha = 1.0 if menu_state.dropdown_open else max(0.0, min(1.0, visibility))
             imgui.get_style().alpha = alpha
-            self._menu_bar_height_px = max(1, int(round(imgui.get_frame_height())))
-            rule_y, anchors, menus = self._draw_bar(menu_state)
+            with _menu_bar_frame_padding():
+                self._menu_bar_height_px = max(
+                    1, int(round(imgui.get_frame_height()))
+                )
+                rule_y, anchors, menus = self._draw_bar(menu_state)
             if self._layout is not None:
                 self._draw_shell(menu_state, readout)
             popup_hovered = False
@@ -1245,6 +1287,7 @@ class ShellHost:
             origin.x + size.x,
             origin.y + size.y - 1.0,
             TRANSPORT_RULE,
+            foreground=False,
         )
 
     def _draw_navigator(self) -> None:
@@ -1646,50 +1689,57 @@ class ShellHost:
                 shortcut_w = max(shortcut_w, imgui.calc_text_size(item.shortcut).x)
         row_w = pad_x * 2.0 + check_w + gap + label_w + gap + shortcut_w + pad_x
         draw_list = imgui.get_window_draw_list()
-        for item_index, item in enumerate(menu.items):
-            if isinstance(item, MenuSeparator):
-                imgui.separator()
-                continue
-            enabled = bool(item.enabled(command_ctx))
-            highlighted = menu_state.item_index == item_index
-            pos = imgui.get_cursor_screen_pos()
-            clicked, _selected = imgui.selectable(
-                f"##{item.id}",
-                highlighted,
-                0,
-                imgui.ImVec2(row_w, 0.0),
-            )
-            color = _row_color(item, command_ctx, enabled)
-            packed = imgui.get_color_u32(color)
-            text_y = pos.y + pad_y
-            text_x = pos.x + pad_x
-            if (
-                item.kind == "check"
-                and item.checked is not None
-                and item.checked(command_ctx)
-            ):
-                draw_list.add_text(imgui.ImVec2(text_x, text_y), packed, "✓")
-            draw_list.add_text(
-                imgui.ImVec2(text_x + check_w + gap, text_y),
-                packed,
-                item.label,
-            )
-            if item.shortcut:
-                shortcut_width = imgui.calc_text_size(item.shortcut).x
+        hover = _rgba(HOVER, MENU_ITEM_HOVER_BG_ALPHA / 255.0)
+        imgui.push_style_color(imgui.Col_.header_hovered, hover)
+        imgui.push_style_color(imgui.Col_.header_active, hover)
+        try:
+            for item_index, item in enumerate(menu.items):
+                if isinstance(item, MenuSeparator):
+                    imgui.separator()
+                    continue
+                enabled = bool(item.enabled(command_ctx))
+                highlighted = menu_state.item_index == item_index
+                pos = imgui.get_cursor_screen_pos()
+                with _selected_header_wash(highlighted):
+                    clicked, _selected = imgui.selectable(
+                        f"##{item.id}",
+                        highlighted,
+                        0,
+                        imgui.ImVec2(row_w, 0.0),
+                    )
+                color = _row_color(item, command_ctx, enabled)
+                packed = imgui.get_color_u32(color)
+                text_y = pos.y + pad_y
+                text_x = pos.x + pad_x
+                if (
+                    item.kind == "check"
+                    and item.checked is not None
+                    and item.checked(command_ctx)
+                ):
+                    draw_list.add_text(imgui.ImVec2(text_x, text_y), packed, "✓")
                 draw_list.add_text(
-                    imgui.ImVec2(pos.x + row_w - pad_x - shortcut_width, text_y),
+                    imgui.ImVec2(text_x + check_w + gap, text_y),
                     packed,
-                    item.shortcut,
+                    item.label,
                 )
-            if clicked:
-                hit = True
-                menu_state.click_item(
-                    menu_index,
-                    item_index,
-                    menus,
-                    command_ctx,
-                    self._controls,
-                )
+                if item.shortcut:
+                    shortcut_width = imgui.calc_text_size(item.shortcut).x
+                    draw_list.add_text(
+                        imgui.ImVec2(pos.x + row_w - pad_x - shortcut_width, text_y),
+                        packed,
+                        item.shortcut,
+                    )
+                if clicked:
+                    hit = True
+                    menu_state.click_item(
+                        menu_index,
+                        item_index,
+                        menus,
+                        command_ctx,
+                        self._controls,
+                    )
+        finally:
+            imgui.pop_style_color(2)
         return hit
 
     def _render_draw_data(self) -> None:

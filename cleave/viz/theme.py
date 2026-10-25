@@ -177,6 +177,8 @@ OVERRIDE_GLYPH: tuple[int, int, int] = (0, 0, 0)
 OVERRIDE_GLYPH_OFF: tuple[int, int, int] = DISABLED
 FOCUS_ROW_BG_ALPHA: int = 130
 HOVER_BG_ALPHA: int = 28
+# Menu rows sit on a black popup. The shell hover wash is too faint there.
+MENU_ITEM_HOVER_BG_ALPHA: int = 140
 REC_BG: tuple[int, int, int] = (220, 0, 0)
 TIMELINE_BAR_ON: tuple[int, int, int] = (200, 225, 255)
 BAR_GRID: tuple[int, int, int] = (70, 95, 130)

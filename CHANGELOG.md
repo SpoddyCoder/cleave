@@ -21,6 +21,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- An open menu draws over the focused row highlight.
+- Menu and transport rows have more vertical padding. An open menu draws over the transport rule, and menu items use a lighter hover.
 - With a menu already open, a click on another top label switches to that menu. A second click on the open label closes it.
 - The menu bar rule is a solid white line under the menu names, and open menus draw above the side panels. The transport shows a green play or pause mark, an unbracketed clock, and bar, fps, and rec in the label colour, with a dark rule under the bar. The navigator has a dark border when idle, sits below that rule, and draws its rows in the label colour.
 - Inspector groups show an expand or collapse arrow and highlight when focused, so they open and close. Field labels use the label colour, stepped values show side arrows, and the inspector column is half again as wide.
