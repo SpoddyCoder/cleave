@@ -200,6 +200,7 @@ SETTINGS_EDITOR_WINDOW_SECTION = ExpandSectionDef(
         SectionNode(leaf_kind=RowKind.SETTINGS_EDITOR_WINDOW_HEIGHT),
         SectionNode(leaf_kind=RowKind.SETTINGS_EDITOR_WINDOW_UPSCALE),
         SectionNode(leaf_kind=RowKind.SETTINGS_EDITOR_WINDOW_DISPLAY_SIZE),
+        SectionNode(leaf_kind=RowKind.SETTINGS_SHELL_LAYOUT_MODE),
     ),
 )
 

@@ -121,7 +121,10 @@ def splitter_hit(
         return None
     half = hit_px / 2.0
     left = float(layout.navigator[0] + layout.navigator[2])
-    right = float(layout.inspector[0])
+    if layout.docked:
+        right = float(layout.inspector[0] + layout.inspector[2])
+    else:
+        right = float(layout.inspector[0])
     in_left = (left - half) <= x < (left + half)
     in_right = (right - half) <= x < (right + half)
     if in_left and in_right:
@@ -138,10 +141,13 @@ def splitter_hit(
 def splitter_request_width(layout: ShellLayout, which: str, pointer_x: float) -> int:
     """Unclamped column width *pointer_x* is asking for.
 
-    ``nav`` grows as the pointer moves right. ``insp`` grows as it moves left.
+    ``nav`` grows as the pointer moves right. In split mode ``insp`` grows as
+    the pointer moves left; in docked mode ``insp`` grows rightward too.
     """
     if which == "nav":
         width = pointer_x - float(layout.navigator[0])
+    elif layout.docked:
+        width = pointer_x - float(layout.inspector[0])
     else:
         right = layout.inspector[0] + layout.inspector[2]
         width = float(right) - pointer_x
@@ -156,6 +162,7 @@ class ShellLayout:
     visualiser: Rect
     inspector: Rect
     timeline: Rect
+    docked: bool = False
 
     @staticmethod
     def compute(
@@ -166,6 +173,8 @@ class ShellLayout:
         timeline_h: int,
         nav_width: int | None = None,
         insp_width: int | None = None,
+        *,
+        docked: bool = False,
     ) -> ShellLayout:
         """Column rects for one frame.
 
@@ -190,11 +199,21 @@ class ShellLayout:
         else:
             timeline = (0, display_h, display_w, 0)
 
+        if docked:
+            navigator = (0, columns_y, nav_w, columns_h)
+            inspector = (nav_w, columns_y, insp_w, columns_h)
+            visualiser = (nav_w + insp_w, columns_y, viz_w, columns_h)
+        else:
+            navigator = (0, columns_y, nav_w, columns_h)
+            visualiser = (nav_w, columns_y, viz_w, columns_h)
+            inspector = (nav_w + viz_w, columns_y, insp_w, columns_h)
+
         return ShellLayout(
             menu=(0, 0, display_w, menu_h),
             transport=(0, menu_h, display_w, transport_h),
-            navigator=(0, columns_y, nav_w, columns_h),
-            visualiser=(nav_w, columns_y, viz_w, columns_h),
-            inspector=(nav_w + viz_w, columns_y, insp_w, columns_h),
+            navigator=navigator,
+            visualiser=visualiser,
+            inspector=inspector,
             timeline=timeline,
+            docked=docked,
         )

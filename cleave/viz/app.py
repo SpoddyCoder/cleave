@@ -649,11 +649,17 @@ class VisualizerApp:
                 len(runtime.seed.session.layer_z_order)
             )
         display_w, display_h = runtime.overlay_surface.get_size()
-        nav_width = None
-        insp_width = None
+        editor = runtime.seed.cfg.editor
+        nav_width = editor.navigator_width
+        insp_width = editor.inspector_width
         if shell is not None:
-            nav_width = getattr(shell, "nav_width", None)
-            insp_width = getattr(shell, "insp_width", None)
+            live_nav = getattr(shell, "nav_width", None)
+            live_insp = getattr(shell, "insp_width", None)
+            if live_nav is not None:
+                nav_width = live_nav
+            if live_insp is not None:
+                insp_width = live_insp
+        docked = editor.shell_layout_mode == "docked"
         return ShellLayout.compute(
             display_w,
             display_h,
@@ -662,6 +668,7 @@ class VisualizerApp:
             timeline_h,
             nav_width=nav_width,
             insp_width=insp_width,
+            docked=docked,
         )
 
     def _publish_shell_layout(

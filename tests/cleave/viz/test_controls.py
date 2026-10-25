@@ -20,6 +20,7 @@ from cleave.config_schema.editor import (
     DEFAULT_EDITOR_UPSCALE,
     DEFAULT_EDITOR_WIDTH,
     DEFAULT_NOTIFICATION_DISPLAY_SEC,
+    DEFAULT_SHELL_LAYOUT_MODE,
     DEFAULT_UI_MIN_WIDTH,
     DEFAULT_UI_WIDTH,
     DEFAULT_UI_WIDTH_MODE,
@@ -4845,6 +4846,36 @@ def test_settings_cycle_ui_width_mode() -> None:
 
     _press_focused(controls, _keydown(pygame.K_LEFT))
     assert controls.cfg.editor.ui_width_mode == "flexible"
+
+
+def test_settings_cycle_and_toggle_shell_layout_mode(tmp_path: Path) -> None:
+    controls = _make_controls(("layer_1",))
+    user_path = tmp_path / "user.yaml"
+    controls.cfg.user_config_path = user_path
+    selected_id = controls.shell_focus.selected_id
+    inspector_cursor = controls.shell_focus.inspector_cursor
+    focus_cursor = controls.focus_cursor
+    assert controls.cfg.editor.shell_layout_mode == DEFAULT_SHELL_LAYOUT_MODE
+    assert not controls.config_dirty
+
+    controls.settings.cycle_shell_layout_mode(forward=True)
+    assert controls.cfg.editor.shell_layout_mode == "docked"
+    controls.settings.cycle_shell_layout_mode(forward=True)
+    assert controls.cfg.editor.shell_layout_mode == DEFAULT_SHELL_LAYOUT_MODE
+    controls.settings.cycle_shell_layout_mode(forward=False)
+    assert controls.cfg.editor.shell_layout_mode == "docked"
+    controls.settings.toggle_shell_layout_mode()
+    assert controls.cfg.editor.shell_layout_mode == DEFAULT_SHELL_LAYOUT_MODE
+    controls.settings.toggle_shell_layout_mode()
+    assert controls.cfg.editor.shell_layout_mode == "docked"
+    assert (
+        controls.build_view_state(paused=False).settings.shell_layout_mode == "docked"
+    )
+    assert load_user_config(user_path).editor.shell_layout_mode == "docked"
+    assert not controls.config_dirty
+    assert controls.shell_focus.selected_id == selected_id
+    assert controls.shell_focus.inspector_cursor == inspector_cursor
+    assert controls.focus_cursor is focus_cursor
 
 
 def test_settings_ui_width_mode_change_does_not_mark_project_config_dirty() -> None:

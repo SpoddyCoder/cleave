@@ -7,7 +7,13 @@ from unittest.mock import MagicMock, call, patch
 
 import pygame
 
-from cleave.config_schema.editor import DEFAULT_EDITOR_HEIGHT, DEFAULT_EDITOR_WIDTH
+from cleave.config import EditorConfig
+from cleave.config_schema.editor import (
+    DEFAULT_EDITOR_HEIGHT,
+    DEFAULT_EDITOR_WIDTH,
+    DEFAULT_INSPECTOR_WIDTH,
+    DEFAULT_NAVIGATOR_WIDTH,
+)
 from cleave.config_schema.layers import DEFAULT_LAYER_SLOTS
 from tests.support.config import TEST_LAYER_STEMS
 from cleave.stems import STEM_NAMES
@@ -89,6 +95,7 @@ def _minimal_runtime(compositor: MagicMock, *, upscale: float = 2.0) -> LiveVisu
         preset_root=MagicMock(),
         playlists={},
     )
+    seed.cfg.editor = EditorConfig()
     runtime = LiveVisualizerRuntime(
         seed=seed,
         layers=[],
@@ -999,7 +1006,19 @@ def test_tick_frame_draws_tuning_when_modal_active_and_panel_hidden(
     from cleave.viz.shell_layout import ShellLayout
 
     display_w, display_h = runtime.overlay_surface.get_size()
-    expected = ShellLayout.compute(display_w, display_h, 0, 0, 0)
+    editor = runtime.seed.cfg.editor
+    expected = ShellLayout.compute(
+        display_w,
+        display_h,
+        0,
+        0,
+        0,
+        nav_width=editor.navigator_width,
+        insp_width=editor.inspector_width,
+        docked=editor.shell_layout_mode == "docked",
+    )
+    assert editor.navigator_width == DEFAULT_NAVIGATOR_WIDTH
+    assert editor.inspector_width == DEFAULT_INSPECTOR_WIDTH
     assert mock_draw_tuning.call_args.kwargs["visualiser_rect"] == expected.visualiser
     runtime.compositor.set_present_rect.assert_called_with(None)
 
@@ -1035,9 +1054,19 @@ def test_tick_frame_insets_panels_by_full_menu_bar_height_when_faded(
     from cleave.viz.shell_layout import ShellLayout
 
     display_w, display_h = runtime.overlay_surface.get_size()
+    editor = runtime.seed.cfg.editor
     expected = ShellLayout.compute(
-        display_w, display_h, 23, menu_bar_height_px(), 0
+        display_w,
+        display_h,
+        23,
+        menu_bar_height_px(),
+        0,
+        nav_width=editor.navigator_width,
+        insp_width=editor.inspector_width,
+        docked=editor.shell_layout_mode == "docked",
     )
+    assert editor.navigator_width == DEFAULT_NAVIGATOR_WIDTH
+    assert editor.inspector_width == DEFAULT_INSPECTOR_WIDTH
     mock_draw_tuning.assert_called_once()
     assert mock_draw_tuning.call_args.kwargs["visualiser_rect"] == expected.visualiser
     runtime.compositor.set_present_rect.assert_called_with(expected.visualiser)

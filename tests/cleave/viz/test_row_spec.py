@@ -14,6 +14,7 @@ from cleave.config_schema.editor import (
     DEFAULT_EDITOR_UPSCALE,
     DEFAULT_EDITOR_WIDTH,
     DEFAULT_NOTIFICATION_DISPLAY_SEC,
+    DEFAULT_SHELL_LAYOUT_MODE,
     DEFAULT_UI_WIDTH_MODE,
     editor_display_size,
     notification_display_label,
@@ -142,6 +143,7 @@ _EXPECTED_REPEAT_ROW_KINDS = frozenset(
         RowKind.SETTINGS_EDITOR_WINDOW_WIDTH,
         RowKind.SETTINGS_EDITOR_WINDOW_HEIGHT,
         RowKind.SETTINGS_EDITOR_WINDOW_UPSCALE,
+        RowKind.SETTINGS_SHELL_LAYOUT_MODE,
         RowKind.SETTINGS_UI_WIDTH_MODE,
         RowKind.SETTINGS_UI_WIDTH,
         RowKind.SETTINGS_UI_MIN_WIDTH,
@@ -203,6 +205,7 @@ def test_row_is_pinned() -> None:
     assert row_is_pinned(RowKind.SETTINGS_PREVIEW_QUALITY) is True
     assert row_is_pinned(RowKind.SETTINGS_EDITOR_WINDOW_HEADER) is True
     assert row_is_pinned(RowKind.SETTINGS_EDITOR_WINDOW_WIDTH) is True
+    assert row_is_pinned(RowKind.SETTINGS_SHELL_LAYOUT_MODE) is True
     assert row_is_pinned(RowKind.SETTINGS_UI_HEADER) is True
     assert row_is_pinned(RowKind.SETTINGS_UI_FADE) is True
     assert row_is_pinned(RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY) is True
@@ -382,6 +385,9 @@ def test_parent_group_on_row_specs() -> None:
     )
     assert row_spec(RowKind.SETTINGS_EDITOR_WINDOW_HEADER).parent_group == "settings"
     assert row_spec(RowKind.SETTINGS_EDITOR_WINDOW_WIDTH).parent_group == (
+        "settings_editor_window"
+    )
+    assert row_spec(RowKind.SETTINGS_SHELL_LAYOUT_MODE).parent_group == (
         "settings_editor_window"
     )
     assert row_spec(RowKind.SETTINGS_EDITOR_WINDOW_DISPLAY_SIZE).navigable is False
@@ -656,6 +662,7 @@ def test_labeled_row_prefix_settings_children() -> None:
     assert labeled_row_prefix(RowKind.SETTINGS_EDITOR_WINDOW_DISPLAY_SIZE) == (
         "  └─ display size: "
     )
+    assert labeled_row_prefix(RowKind.SETTINGS_SHELL_LAYOUT_MODE) == "  └─ layout: "
     assert labeled_row_prefix(RowKind.SETTINGS_UI_WIDTH_MODE) == "  └─ width mode: "
     assert labeled_row_prefix(RowKind.SETTINGS_UI_WIDTH) == "  └─ max width: "
     assert labeled_row_prefix(RowKind.SETTINGS_UI_MIN_WIDTH) == "  └─ min width: "
@@ -688,6 +695,7 @@ def test_format_row_value_settings() -> None:
             editor_window_height=1080,
             editor_window_upscale=1.5,
             ui_width_mode="fixed",
+            shell_layout_mode="docked",
             ui_width=320,
             ui_fade=0.0,
             notification_display_sec=0,
@@ -713,6 +721,10 @@ def test_format_row_value_settings() -> None:
     assert (
         format_row_value(state, RowDescriptor(RowKind.SETTINGS_UI_WIDTH_MODE))
         == "fixed"
+    )
+    assert (
+        format_row_value(state, RowDescriptor(RowKind.SETTINGS_SHELL_LAYOUT_MODE))
+        == "docked"
     )
     assert format_row_value(state, RowDescriptor(RowKind.SETTINGS_UI_WIDTH)) == "320"
     assert format_row_value(
@@ -873,6 +885,18 @@ def test_apply_field_horizontal_unknown_kind_returns_false() -> None:
         )
         is False
     )
+
+
+def test_apply_field_horizontal_cycles_shell_layout_mode() -> None:
+    controls = _make_controls()
+    desc = RowDescriptor(RowKind.SETTINGS_SHELL_LAYOUT_MODE)
+    assert controls.cfg.editor.shell_layout_mode == DEFAULT_SHELL_LAYOUT_MODE
+
+    assert apply_field_horizontal(controls, desc, True, False) is True
+    assert controls.cfg.editor.shell_layout_mode == "docked"
+
+    apply_field_horizontal(controls, desc, False, False)
+    assert controls.cfg.editor.shell_layout_mode == DEFAULT_SHELL_LAYOUT_MODE
 
 
 def test_apply_field_horizontal_cycles_preview_quality() -> None:

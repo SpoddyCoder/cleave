@@ -8,6 +8,7 @@ from dataclasses import replace
 from cleave.config import CleaveConfig, EditorConfig
 from cleave.config_schema.editor import (
     UI_WIDTH_MODES,
+    SHELL_LAYOUT_MODES,
     EDITOR_PREVIEW_QUALITIES,
     clamp_editor_height,
     clamp_editor_width,
@@ -118,6 +119,26 @@ class SettingsControls:
         else:
             new_mode = modes[(index - 1) % len(modes)]
         self.cfg.editor = replace(self.cfg.editor, ui_width_mode=new_mode)
+        persist_editor_settings(self.cfg)
+
+    def cycle_shell_layout_mode(self, *, forward: bool) -> None:
+        modes = SHELL_LAYOUT_MODES
+        current = self.cfg.editor.shell_layout_mode
+        try:
+            index = modes.index(current)
+        except ValueError:
+            index = 0
+        if forward:
+            new_mode = modes[(index + 1) % len(modes)]
+        else:
+            new_mode = modes[(index - 1) % len(modes)]
+        self.cfg.editor = replace(self.cfg.editor, shell_layout_mode=new_mode)
+        persist_editor_settings(self.cfg)
+
+    def toggle_shell_layout_mode(self) -> None:
+        current = self.cfg.editor.shell_layout_mode
+        new_mode = "split" if current == "docked" else "docked"
+        self.cfg.editor = replace(self.cfg.editor, shell_layout_mode=new_mode)
         persist_editor_settings(self.cfg)
 
     def adjust_ui_fade(self, *, forward: bool, large: bool) -> None:

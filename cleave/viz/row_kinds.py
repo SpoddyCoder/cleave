@@ -154,6 +154,7 @@ class RowKind(Enum):
     SETTINGS_EDITOR_WINDOW_DISPLAY_SIZE = auto()
     SETTINGS_UI_HEADER = auto()
     SETTINGS_UI_WIDTH_MODE = auto()
+    SETTINGS_SHELL_LAYOUT_MODE = auto()
     SETTINGS_UI_WIDTH = auto()
     SETTINGS_UI_MIN_WIDTH = auto()
     SETTINGS_UI_FADE = auto()

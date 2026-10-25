@@ -8,6 +8,8 @@ from cleave.viz.shell_layout import (
     MIN_COLUMN_WIDTH,
     NAVIGATOR_WIDTH,
     ShellLayout,
+    splitter_hit,
+    splitter_request_width,
 )
 
 
@@ -149,6 +151,67 @@ def test_present_rect_none_stretches_to_the_display() -> None:
         0.0,
         1920.0,
         1080.0,
+    )
+
+
+def test_docked_places_navigator_inspector_then_visualiser() -> None:
+    menu_h = 23
+    transport_h = 23
+    layout = ShellLayout.compute(
+        1280, 720, menu_h, transport_h, 0, docked=True
+    )
+    columns_y = menu_h + transport_h
+    columns_h = 720 - columns_y
+    nav_w = NAVIGATOR_WIDTH
+    insp_w = INSPECTOR_WIDTH
+    viz_w = 1280 - nav_w - insp_w
+
+    assert layout.docked is True
+    assert layout.navigator == (0, columns_y, nav_w, columns_h)
+    assert layout.inspector == (nav_w, columns_y, insp_w, columns_h)
+    assert layout.visualiser == (nav_w + insp_w, columns_y, viz_w, columns_h)
+    assert nav_w + insp_w + viz_w == 1280
+
+
+def test_docked_width_overrides_set_column_rects() -> None:
+    nav_w = 300
+    insp_w = 180
+    layout = ShellLayout.compute(
+        1280, 720, 0, 0, 0, nav_width=nav_w, insp_width=insp_w, docked=True
+    )
+    assert layout.navigator == (0, 0, nav_w, 720)
+    assert layout.inspector == (nav_w, 0, insp_w, 720)
+    assert layout.visualiser == (
+        nav_w + insp_w,
+        0,
+        1280 - nav_w - insp_w,
+        720,
+    )
+
+
+def test_splitter_hit_and_request_width_split_vs_docked() -> None:
+    menu_h = 23
+    transport_h = 23
+    split = ShellLayout.compute(1280, 720, menu_h, transport_h, 0, docked=False)
+    docked = ShellLayout.compute(1280, 720, menu_h, transport_h, 0, docked=True)
+
+    nav_edge = split.navigator[0] + split.navigator[2]
+    split_insp_edge = split.inspector[0]
+    docked_insp_edge = docked.inspector[0] + docked.inspector[2]
+
+    y = menu_h + transport_h + 10
+    assert splitter_hit(split, nav_edge, y) == "nav"
+    assert splitter_hit(split, split_insp_edge, y) == "insp"
+    assert splitter_hit(docked, nav_edge, y) == "nav"
+    assert splitter_hit(docked, docked_insp_edge, y) == "insp"
+
+    assert splitter_request_width(split, "nav", 400.0) == 400
+    assert splitter_request_width(docked, "nav", 400.0) == 400
+
+    # Split inspector grows leftward; docked grows rightward from its left edge.
+    assert splitter_request_width(split, "insp", 700.0) == 1280 - 700
+    assert splitter_request_width(docked, "insp", 500.0) == (
+        500 - NAVIGATOR_WIDTH
     )
 
 
