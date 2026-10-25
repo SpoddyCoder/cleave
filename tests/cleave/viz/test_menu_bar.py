@@ -185,17 +185,32 @@ def _at(pos: tuple[int, int], kind: int) -> pygame.event.Event:
     return pygame.event.Event(kind, pos=pos, button=1)
 
 
+def _open_shell(overlay: _Overlay, menu: MenuBarState, controls: object | None = None):
+    from cleave.viz.imgui_host import ImGuiHost
+    from cleave.viz.shell_host import ShellHost, menu_bar_height_px
+
+    if controls is None:
+        controls = _shell_controls()
+    return ShellHost(
+        ImGuiHost.create(),
+        overlay,
+        menu,
+        controls,
+        menu_bar_height_px(),
+    )
+
+
 def test_mouse_switches_and_closes_an_open_top_menu() -> None:
     """A click on another label must complete while the dropdown is open."""
     from unittest.mock import patch
 
-    from cleave.viz import imgui_host, shell_host
+    from cleave.viz import imgui_host
 
     overlay = _Overlay()
     overlay.visibility = 1.0
     menu = MenuBarState()
     with patch.object(imgui_host, "_gl_context_current", return_value=False):
-        host = shell_host.ShellHost.create(overlay, menu, _shell_controls())
+        host = _open_shell(overlay, menu)
     anchors: dict[int, tuple[float, float]] = {}
     draw_bar = host._draw_bar
 
@@ -233,7 +248,7 @@ def test_mouse_switches_and_closes_an_open_top_menu() -> None:
         click(1)
         assert not menu.dropdown_open
     finally:
-        host.destroy()
+        host.imgui.destroy()
 
 
 def test_shell_host_imports_without_a_context() -> None:
@@ -282,7 +297,7 @@ def test_open_menu_paints_over_the_transport_rule() -> None:
     controls.focus_cursor = None
     controls.shell_focus = SimpleNamespace(region=ShellRegion.NAVIGATOR)
     with patch.object(imgui_host, "_gl_context_current", return_value=False):
-        host = shell_host.ShellHost.create(overlay, menu, controls)
+        host = _open_shell(overlay, menu, controls)
     try:
         host.imgui.display_size = (1280, 720)
         height = shell_host.menu_bar_height_px()
@@ -313,7 +328,7 @@ def test_open_menu_paints_over_the_transport_rule() -> None:
         )
         del lists
     finally:
-        host.destroy()
+        host.imgui.destroy()
     assert not on_foreground
     assert under_popup
 
@@ -334,7 +349,7 @@ def test_open_menu_paints_over_the_focus_ring() -> None:
     controls.focus_cursor = None
     controls.shell_focus = SimpleNamespace(region=ShellRegion.NAVIGATOR)
     with patch.object(imgui_host, "_gl_context_current", return_value=False):
-        host = shell_host.ShellHost.create(overlay, menu, controls)
+        host = _open_shell(overlay, menu, controls)
     try:
         host.imgui.display_size = (1280, 720)
         height = shell_host.menu_bar_height_px()
@@ -369,7 +384,7 @@ def test_open_menu_paints_over_the_focus_ring() -> None:
         )
         del lists
     finally:
-        host.destroy()
+        host.imgui.destroy()
     assert not on_foreground
     assert under_popup
 
@@ -444,19 +459,17 @@ def test_gl_renderer_waits_until_native_context_is_installed() -> None:
 def test_create_uses_programmable_renderer_when_gl_context_is_current() -> None:
     from imgui_bundle import imgui
 
-    from cleave.viz import imgui_host, shell_host
+    from cleave.viz import imgui_host
 
     with (
         patch.object(imgui_host, "_gl_context_current", return_value=True),
         patch.object(imgui_host, "RENDERER_CLASS", _FakeRenderer),
     ):
-        host = shell_host.ShellHost.create(
-            _Overlay(), MenuBarState(), _shell_controls()
-        )
+        host = _open_shell(_Overlay(), MenuBarState())
     try:
         assert isinstance(host.imgui.renderer, _FakeRenderer)
     finally:
-        host.destroy()
+        host.imgui.destroy()
     assert not imgui.get_current_context()
 
 
@@ -464,12 +477,12 @@ def test_top_strip_motion_wakes_overlay_and_draw_without_gl() -> None:
     """The crash: visibility leaves 0, then new_frame runs with no font atlas."""
     from imgui_bundle import imgui
 
-    from cleave.viz import imgui_host, shell_host
+    from cleave.viz import imgui_host
 
     overlay = _Overlay()
     menu = MenuBarState()
     with patch.object(imgui_host, "_gl_context_current", return_value=False):
-        host = shell_host.ShellHost.create(overlay, menu, _shell_controls())
+        host = _open_shell(overlay, menu)
     try:
         assert isinstance(host.imgui.renderer, imgui_host._HeadlessRenderer)
         host.draw(menu, CommandContext(), overlay.visibility, 1.0 / 60.0)
@@ -480,5 +493,5 @@ def test_top_strip_motion_wakes_overlay_and_draw_without_gl() -> None:
         host.draw(menu, CommandContext(), overlay.visibility, 1.0 / 60.0)
         assert imgui.get_io().fonts.is_built()
     finally:
-        host.destroy()
+        host.imgui.destroy()
     assert not imgui.get_current_context()

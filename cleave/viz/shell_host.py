@@ -615,17 +615,6 @@ class ShellHost:
         self._splitter_down_x = 0.0
         self._resize_cursor = False
 
-    @classmethod
-    def create(cls, overlay: Any, menu_state: MenuBarState, controls: Any) -> ShellHost:
-        """Build the ImGui host once. Call after the live GL window exists."""
-        return cls(
-            ImGuiHost.create(),
-            overlay,
-            menu_state,
-            controls,
-            menu_bar_height_px(),
-        )
-
     @property
     def menu_bar_height_px(self) -> int:
         return self._menu_bar_height_px
@@ -647,9 +636,6 @@ class ShellHost:
     def insp_width(self) -> int | None:
         """Inspector width requested by an in-progress splitter drag."""
         return self._insp_width
-
-    def destroy(self) -> None:
-        self.imgui.destroy()
 
     def process_event(self, event: pygame.event.Event) -> None:
         """Mouse motion, buttons, and wheel only. Keys stay out of ImGui."""

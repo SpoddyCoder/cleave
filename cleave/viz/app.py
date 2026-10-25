@@ -775,9 +775,20 @@ class VisualizerApp:
             if window.quit_requested:
                 return
 
-            from cleave.viz.shell_host import ShellHost, TransportReadout
+            from cleave.viz.shell_host import (
+                ShellHost,
+                TransportReadout,
+                menu_bar_height_px,
+            )
 
-            shell = ShellHost.create(rt.overlay, rt.menu_bar, rt.controls)
+            assert window.imgui is not None
+            shell = ShellHost(
+                window.imgui,
+                rt.overlay,
+                rt.menu_bar,
+                rt.controls,
+                menu_bar_height_px(),
+            )
             self._shell = shell
 
             display_fps: list[float | None] = [None]
@@ -893,8 +904,7 @@ class VisualizerApp:
             if rt is not None:
                 rt.compositor.set_present_rect(None)
             self._shell = None
-            if shell is not None:
-                shell.destroy()
+            window.release_imgui()
             if rt is not None:
                 persist_editor_settings(rt.seed.cfg)
                 LayerFramePipeline.destroy(rt.layers)

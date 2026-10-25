@@ -365,7 +365,7 @@ def _host(visibility: float = 1.0) -> Iterator[ShellHost]:
     try:
         yield host
     finally:
-        host.destroy()
+        host.imgui.destroy()
 
 
 def _motion(pos: tuple[int, int]) -> pygame.event.Event:

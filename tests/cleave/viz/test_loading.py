@@ -220,6 +220,7 @@ def test_compose_draws_bar_fill_and_empty_track() -> None:
     assert border_sample[:3] == VALUE
 
 
+@patch("cleave.viz.imgui_host.ImGuiHost.create")
 @patch("cleave.viz.loading.draw_loading_screen")
 @patch("cleave.viz.loading.GlCompositor")
 @patch("cleave.viz.loading.pygame.display.set_caption")
@@ -229,12 +230,15 @@ def test_open_loading_window_uses_editor_defaults(
     mock_set_caption: MagicMock,
     mock_gl: MagicMock,
     mock_draw: MagicMock,
+    mock_imgui_create: MagicMock,
 ) -> None:
     from cleave.config_schema.editor import editor_display_size
     from cleave.gl_color_format import RGBA8
 
     compositor = MagicMock()
     mock_gl.return_value = compositor
+    host = MagicMock()
+    mock_imgui_create.return_value = host
     pygame.init()
     window = open_loading_window()
     width, height = editor_display_size()
@@ -250,11 +254,24 @@ def test_open_loading_window_uses_editor_defaults(
         color_format=RGBA8,
     )
     compositor.init.assert_called_once()
+    mock_imgui_create.assert_called_once()
+    assert window.imgui is host
     mock_draw.assert_called_once()
     assert mock_draw.call_args.args[1] == "Loading..."
     assert window.display_width == width
     assert window.display_height == height
     assert window.quit_requested is False
+
+    order: list[str] = []
+    host.destroy.side_effect = lambda: order.append("destroy")
+    with patch("cleave.viz.loading.pygame.quit", side_effect=lambda: order.append("quit")):
+        window.close()
+        assert order == ["destroy", "quit"]
+        assert window.imgui is None
+        window.release_imgui()
+        window.close()
+    host.destroy.assert_called_once()
+    assert order == ["destroy", "quit", "quit"]
 
 
 @patch("cleave.viz.loading.draw_loading_screen")

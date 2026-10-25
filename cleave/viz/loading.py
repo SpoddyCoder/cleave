@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 import pygame
 from OpenGL.GL import (
@@ -39,6 +40,9 @@ from cleave.viz.theme import (
     VALUE,
     scale_px,
 )
+
+if TYPE_CHECKING:
+    from cleave.viz.imgui_host import ImGuiHost
 
 _FONT_SIZE = 28
 _DETAIL_FONT_SIZE = 18
@@ -243,6 +247,7 @@ class LoadingWindow:
     overlay_surface: pygame.Surface
     quit_requested: bool = field(default=False)
     video_quit: bool = field(default=False)
+    imgui: ImGuiHost | None = None
 
     def update(
         self,
@@ -276,7 +281,16 @@ class LoadingWindow:
         self.display_height = height
         self.overlay_surface = pygame.Surface((width, height), pygame.SRCALPHA)
 
+    def release_imgui(self) -> None:
+        """Destroy the ImGui host. A second call is a no-op."""
+        host = self.imgui
+        if host is None:
+            return
+        host.destroy()
+        self.imgui = None
+
     def close(self) -> None:
+        self.release_imgui()
         self.compositor.destroy()
         pygame.quit()
 
@@ -300,12 +314,16 @@ def open_loading_window(
         color_format=RGBA8,
     )
     compositor.init()
+    from cleave.viz.imgui_host import ImGuiHost
+
+    imgui_host = ImGuiHost.create()
     overlay_surface = pygame.Surface((width, height), pygame.SRCALPHA)
     window = LoadingWindow(
         compositor=compositor,
         display_width=width,
         display_height=height,
         overlay_surface=overlay_surface,
+        imgui=imgui_host,
     )
     window.update("Loading...")
     return window
