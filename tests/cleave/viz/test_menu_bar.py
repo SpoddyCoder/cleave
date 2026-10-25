@@ -189,12 +189,12 @@ def test_mouse_switches_and_closes_an_open_top_menu() -> None:
     """A click on another label must complete while the dropdown is open."""
     from unittest.mock import patch
 
-    from cleave.viz import shell_host
+    from cleave.viz import imgui_host, shell_host
 
     overlay = _Overlay()
     overlay.visibility = 1.0
     menu = MenuBarState()
-    with patch.object(shell_host, "_gl_context_current", return_value=False):
+    with patch.object(imgui_host, "_gl_context_current", return_value=False):
         host = shell_host.ShellHost.create(overlay, menu, _shell_controls())
     anchors: dict[int, tuple[float, float]] = {}
     draw_bar = host._draw_bar
@@ -206,7 +206,7 @@ def test_mouse_switches_and_closes_an_open_top_menu() -> None:
         return rule_y, found, menus
 
     host._draw_bar = remember
-    host._display_size = (1280, 720)
+    host.imgui.display_size = (1280, 720)
 
     def draw() -> None:
         host.draw(menu, CommandContext(), overlay.visibility, 1.0 / 60.0)
@@ -239,8 +239,10 @@ def test_mouse_switches_and_closes_an_open_top_menu() -> None:
 def test_shell_host_imports_without_a_context() -> None:
     from imgui_bundle import imgui
 
-    from cleave.viz.shell_host import RENDERER_CLASS
+    from cleave.viz import shell_host
+    from cleave.viz.imgui_host import RENDERER_CLASS
 
+    assert shell_host.ShellHost.__name__ == "ShellHost"
     assert RENDERER_CLASS.__name__ == "ProgrammablePipelineRenderer"
     assert not imgui.get_current_context()
 
@@ -268,7 +270,7 @@ def test_open_menu_paints_over_the_transport_rule() -> None:
     """The transport rule stays on its window, under a later menu popup."""
     from imgui_bundle import imgui
 
-    from cleave.viz import shell_host
+    from cleave.viz import imgui_host, shell_host
     from cleave.viz.shell_layout import ShellLayout
     from cleave.viz.theme import TRANSPORT_RULE
 
@@ -279,10 +281,10 @@ def test_open_menu_paints_over_the_transport_rule() -> None:
     controls.build_view_state = lambda **_kwargs: None
     controls.focus_cursor = None
     controls.shell_focus = SimpleNamespace(region=ShellRegion.NAVIGATOR)
-    with patch.object(shell_host, "_gl_context_current", return_value=False):
+    with patch.object(imgui_host, "_gl_context_current", return_value=False):
         host = shell_host.ShellHost.create(overlay, menu, controls)
     try:
-        host._display_size = (1280, 720)
+        host.imgui.display_size = (1280, 720)
         height = shell_host.menu_bar_height_px()
         host.set_layout(ShellLayout.compute(1280, 720, height, height, 0))
         host.process_event(_motion(4))
@@ -320,7 +322,7 @@ def test_open_menu_paints_over_the_focus_ring() -> None:
     """The row highlight stays on its panel, under a later menu popup."""
     from imgui_bundle import imgui
 
-    from cleave.viz import shell_host
+    from cleave.viz import imgui_host, shell_host
     from cleave.viz.shell_layout import ShellLayout
     from cleave.viz.theme import HIGHLIGHT
 
@@ -331,10 +333,10 @@ def test_open_menu_paints_over_the_focus_ring() -> None:
     controls.build_view_state = lambda **_kwargs: None
     controls.focus_cursor = None
     controls.shell_focus = SimpleNamespace(region=ShellRegion.NAVIGATOR)
-    with patch.object(shell_host, "_gl_context_current", return_value=False):
+    with patch.object(imgui_host, "_gl_context_current", return_value=False):
         host = shell_host.ShellHost.create(overlay, menu, controls)
     try:
-        host._display_size = (1280, 720)
+        host.imgui.display_size = (1280, 720)
         height = shell_host.menu_bar_height_px()
         host.set_layout(ShellLayout.compute(1280, 720, height, height, 0))
         host.process_event(_motion(4))
@@ -405,7 +407,7 @@ def test_gl_renderer_waits_until_native_context_is_installed() -> None:
     """A null PyOpenGL context stays headless until a native context is bound."""
     import OpenGL.platform as gl_platform
 
-    from cleave.viz import shell_host
+    from cleave.viz import imgui_host
 
     plat = gl_platform.PLATFORM
     saved = (
@@ -422,13 +424,13 @@ def test_gl_renderer_waits_until_native_context_is_installed() -> None:
         return 1
 
     try:
-        shell_host._install_pyopengl_context(zero)
-        with patch.object(shell_host, "_native_context_getter", return_value=None):
-            assert shell_host._select_renderer_class() is shell_host._HeadlessRenderer
-        with patch.object(shell_host, "_native_context_getter", return_value=live):
-            selected = shell_host._select_renderer_class()
+        imgui_host._install_pyopengl_context(zero)
+        with patch.object(imgui_host, "_native_context_getter", return_value=None):
+            assert imgui_host._select_renderer_class() is imgui_host._HeadlessRenderer
+        with patch.object(imgui_host, "_native_context_getter", return_value=live):
+            selected = imgui_host._select_renderer_class()
         assert gl_platform.GetCurrentContext() == 1
-        assert selected is shell_host.RENDERER_CLASS
+        assert selected is imgui_host.RENDERER_CLASS
         assert selected.__name__ == "ProgrammablePipelineRenderer"
     finally:
         (
@@ -442,17 +444,17 @@ def test_gl_renderer_waits_until_native_context_is_installed() -> None:
 def test_create_uses_programmable_renderer_when_gl_context_is_current() -> None:
     from imgui_bundle import imgui
 
-    from cleave.viz import shell_host
+    from cleave.viz import imgui_host, shell_host
 
     with (
-        patch.object(shell_host, "_gl_context_current", return_value=True),
-        patch.object(shell_host, "RENDERER_CLASS", _FakeRenderer),
+        patch.object(imgui_host, "_gl_context_current", return_value=True),
+        patch.object(imgui_host, "RENDERER_CLASS", _FakeRenderer),
     ):
         host = shell_host.ShellHost.create(
             _Overlay(), MenuBarState(), _shell_controls()
         )
     try:
-        assert isinstance(host._renderer, _FakeRenderer)
+        assert isinstance(host.imgui.renderer, _FakeRenderer)
     finally:
         host.destroy()
     assert not imgui.get_current_context()
@@ -462,14 +464,14 @@ def test_top_strip_motion_wakes_overlay_and_draw_without_gl() -> None:
     """The crash: visibility leaves 0, then new_frame runs with no font atlas."""
     from imgui_bundle import imgui
 
-    from cleave.viz import shell_host
+    from cleave.viz import imgui_host, shell_host
 
     overlay = _Overlay()
     menu = MenuBarState()
-    with patch.object(shell_host, "_gl_context_current", return_value=False):
+    with patch.object(imgui_host, "_gl_context_current", return_value=False):
         host = shell_host.ShellHost.create(overlay, menu, _shell_controls())
     try:
-        assert isinstance(host._renderer, shell_host._HeadlessRenderer)
+        assert isinstance(host.imgui.renderer, imgui_host._HeadlessRenderer)
         host.draw(menu, CommandContext(), overlay.visibility, 1.0 / 60.0)
         host.process_event(_motion(host.menu_bar_height_px + 8))
         assert overlay.visibility == 0.0
