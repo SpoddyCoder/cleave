@@ -37,6 +37,7 @@ from tests.support.config import default_render_post_fx_runtime
 from cleave.viz.session import LayerRuntime, TuningSession
 from tests.support.config import default_render_post_fx_runtime
 from cleave.viz.modal import ModalHost
+from cleave.viz.panel_notification import PanelNotificationActive
 from cleave.viz.tuning_panel_draw import TuningOverlay
 from tests.support.compositor_mock import recording_compositor
 from tests.support.viz import make_test_cfg
@@ -46,6 +47,15 @@ def _silence_tap_sync(controls: MagicMock) -> None:
     controls.tap_sync.active = False
     controls.tap_sync.showing_progress = False
     controls.tap_sync.progress_view.return_value = None
+    # A MagicMock message is not None, so draw_ui would push a toast and call
+    # ImGui. These run() doubles have no ImGui context.
+    controls.notification_active.return_value = PanelNotificationActive(
+        persistent_message=None,
+        persistent_elapsed_sec=0.0,
+        message=None,
+        remaining_sec=0.0,
+        elapsed_sec=0.0,
+    )
 
 
 def _assert_warmup_tick(tick_call: object) -> None:

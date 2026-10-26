@@ -7,9 +7,8 @@ import pygame
 from cleave.paths import repo_root
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.row_spec import ROW_SPECS, RowPresentStyle
-from cleave.viz.theme import panel_content_max_width_px
 from cleave.viz.tuning_panel_draw import TuningOverlay, _row_text, fit_row_text
-from cleave.viz.tuning_view_state import ProjectBlock, SettingsBlock, TuningViewState
+from cleave.viz.tuning_view_state import SettingsBlock, TuningViewState
 from tests.cleave.viz.test_overlay import _minimal_view_state
 from tests.support.viz import make_track_block, overlay_font
 
@@ -31,8 +30,6 @@ def _present_style_view_state() -> TuningViewState:
                 effects={"pulse": {"onset": 35}},
             )
         },
-        notification_message="timeline enabled",
-        notification_remaining_sec=5.0,
     )
     _mount_track_sections(state)
     rows = list(state.layout.rows)
@@ -76,11 +73,6 @@ def _row_for_style(
     if style == RowPresentStyle.TRACK_HEADER:
         index = layout.find("layer_1", RowKind.TRACK_HEADER)
         return index, "Layer 1: DRUMS ▼"
-    if style == RowPresentStyle.NOTIFICATION:
-        index = layout.find_descriptor(
-            RowDescriptor(RowKind.PANEL_NOTIFICATION, marker_index=1)
-        )
-        return index, "timeline enabled"
     if style == RowPresentStyle.SPACER:
         index = layout.find_by_kind(RowKind.RENDER_SECTION_GAP)
         return index, ""
@@ -117,59 +109,23 @@ _OVERLAY_MODULES_WITHOUT_TUNING_DRAW = (
 )
 
 
-def _composed_content_width(
-    state: TuningViewState,
-    *,
-    viewport_width: int = 1600,
-    viewport_height: int = 900,
-) -> int:
+def test_notification_does_not_compose_tuning_panel() -> None:
     pygame.init()
     overlay = TuningOverlay()
     overlay.notify_input()
+    state = _minimal_view_state(
+        settings=SettingsBlock(ui_width_mode="flexible", ui_width=80, ui_min_width=40),
+        notification_message="warning " * 40,
+        notification_remaining_sec=5.0,
+        persistent_notification_message="No presets in bed roles folder",
+    )
     composed = overlay.compose_panel(
         state,
-        viewport_width=viewport_width,
-        viewport_height=viewport_height,
+        viewport_width=1600,
+        viewport_height=900,
     )
-    assert composed is not None
-    return composed.panel_size[0] - overlay._padding * 2
-
-
-def test_flexible_panel_floor_and_toast_width() -> None:
-    long_toast = "warning " * 40
-    max_px = panel_content_max_width_px(80)
-    flexible = _minimal_view_state(
-        settings=SettingsBlock(
-            ui_width_mode="flexible",
-            ui_width=80,
-            ui_min_width=40,
-        ),
-        notification_message=long_toast,
-        notification_remaining_sec=5.0,
-    )
-    fixed = _minimal_view_state(
-        settings=SettingsBlock(
-            ui_width_mode="fixed",
-            ui_width=80,
-            ui_min_width=40,
-        ),
-        notification_message=long_toast,
-        notification_remaining_sec=5.0,
-    )
-    assert _composed_content_width(flexible) > max_px
-    assert _composed_content_width(fixed) == max_px
-
-    floor = panel_content_max_width_px(min(160, 200))
-    short = _minimal_view_state(
-        settings=SettingsBlock(
-            ui_width_mode="flexible",
-            ui_width=200,
-            ui_min_width=160,
-        ),
-        notification_message="ok",
-        notification_remaining_sec=5.0,
-    )
-    assert _composed_content_width(short) >= floor
+    assert state.layout.rows == ()
+    assert composed is None
 
 
 def test_peer_overlays_do_not_import_tuning_panel_draw() -> None:

@@ -7,6 +7,7 @@ import sys
 import tempfile
 import time
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pygame
@@ -44,6 +45,8 @@ from cleave.timeline import SlotCue, TimelineLane, canonicalize, lane_level_at
 from cleave.project import load_manifest, write_manifest
 from cleave.song_markers import SongMarker
 from cleave.viz.focus_nav import MainFocus, TimelineFocus
+from cleave.viz.input_dispatch import dispatch_keydown
+from cleave.viz.menu_bar import MenuBarState
 from cleave.viz.inspector import build_inspector_rows
 from cleave.viz.shell_focus import InspectorGroupKey, ShellRegion
 from cleave.viz.navigator import layer_node_id, overlay_card_node_id
@@ -67,7 +70,7 @@ from cleave.viz.controls import (
 )
 from cleave.viz.settings_controls import EDITOR_WINDOW_RESTART_TOAST
 from cleave.viz.modal import ModalKind, ModalLabeledLine
-from cleave.viz.theme import ERROR_NOTIFICATION, HIGHLIGHT
+from cleave.viz.theme import HIGHLIGHT
 from cleave.viz.session import (
     LayerRuntime,
     TimelineRuntime,
@@ -2901,7 +2904,7 @@ def test_timeline_enabled_startup_shows_notification() -> None:
     assert view.notification_remaining_sec == pytest.approx(
         DEFAULT_NOTIFICATION_DISPLAY_SEC, abs=0.01
     )
-    assert RowKind.PANEL_NOTIFICATION in [row.kind for row in view.layout.rows]
+    assert view.layout.rows == ()
 
 
 def test_render_timeline_toggle_shows_notification() -> None:
@@ -2932,6 +2935,19 @@ def test_panel_notification_expires_after_duration() -> None:
         assert view.notification_remaining_sec == 0.0
 
 
+def _notification_runtime(controls: TuningControls):
+    return SimpleNamespace(
+        controls=controls,
+        seed=SimpleNamespace(session=controls.session),
+        modal_host=controls.modal_host,
+        menu_bar=MenuBarState(),
+        timeline_controls=None,
+        overlay=MagicMock(),
+        overlay_profiler=MagicMock(),
+        playback=controls.playback,
+    )
+
+
 def test_panel_notification_until_dismissed_stays_until_enter() -> None:
     controls = _make_controls(("layer_1",))
     for _ in range(DEFAULT_NOTIFICATION_DISPLAY_SEC):
@@ -2947,12 +2963,17 @@ def test_panel_notification_until_dismissed_stays_until_enter() -> None:
         controls.tick(0.0)
         view = controls.build_view_state(paused=False)
         assert view.notification_message == "Saved"
-        toast = RowDescriptor(RowKind.PANEL_NOTIFICATION, marker_index=1)
-        assert toast in view.layout.rows
-        assert toast not in view.layout.navigable_descriptors(view)
-        assert _press_focused(controls, _keydown(pygame.K_RETURN)) is True
+        assert view.layout.rows == ()
+        before = controls.focus_cursor
+        assert controls.playback.paused is False
+        assert (
+            dispatch_keydown(_keydown(pygame.K_RETURN), _notification_runtime(controls))
+            is True
+        )
         view = controls.build_view_state(paused=False)
-        assert view.notification_message == "Saved"
+        assert view.notification_message is None
+        assert controls.focus_cursor == before
+        assert controls.playback.paused is False
 
 
 def test_panel_notification_expires_after_adjusted_duration(tmp_path: Path) -> None:
@@ -3012,12 +3033,33 @@ def test_panel_notification_enter_dismisses_before_timeout() -> None:
         controls = _make_controls(("layer_1",))
         controls.show_notification("Saved")
         view = controls.build_view_state(paused=False)
-        toast = RowDescriptor(RowKind.PANEL_NOTIFICATION, marker_index=1)
-        assert toast in view.layout.rows
-        assert toast not in view.layout.navigable_descriptors(view)
-        assert _press_focused(controls, _keydown(pygame.K_RETURN)) is True
-        view = controls.build_view_state(paused=False)
         assert view.notification_message == "Saved"
+        assert view.layout.rows == ()
+        runtime = _notification_runtime(controls)
+        before = controls.focus_cursor
+        assert controls.playback.paused is False
+        assert (
+            dispatch_keydown(
+                _keydown(pygame.K_RETURN, mod=pygame.KMOD_CTRL), runtime
+            )
+            is True
+        )
+        view = controls.build_view_state(paused=False)
+        assert view.notification_message == "Song marker 00:00.00"
+        assert controls.focus_cursor == before
+        confirmed: list[bool] = []
+        controls.modal_host.prompt_yes_no(
+            "Leave?", lambda: confirmed.append(True)
+        )
+        assert dispatch_keydown(_keydown(pygame.K_RETURN), runtime) is True
+        assert confirmed == [True]
+        view = controls.build_view_state(paused=False)
+        assert view.notification_message == "Song marker 00:00.00"
+        assert dispatch_keydown(_keydown(pygame.K_KP_ENTER), runtime) is True
+        view = controls.build_view_state(paused=False)
+        assert view.notification_message is None
+        assert controls.focus_cursor == before
+        assert controls.playback.paused is False
 
 
 def test_panel_notification_enter_dismisses_without_focusing_toast() -> None:
@@ -3027,9 +3069,12 @@ def test_panel_notification_enter_dismisses_without_focusing_toast() -> None:
         controls.show_notification("Saved")
         assert controls.playback.paused is False
         before = controls.focus_cursor
-        assert _press_focused(controls, _keydown(pygame.K_RETURN)) is True
+        assert (
+            dispatch_keydown(_keydown(pygame.K_RETURN), _notification_runtime(controls))
+            is True
+        )
         view = controls.build_view_state(paused=False)
-        assert view.notification_message == "Saved"
+        assert view.notification_message is None
         assert controls.playback.paused is False
         assert controls.focus_cursor == before
 
@@ -3041,10 +3086,17 @@ def test_panel_notification_enter_dismisses_without_focusing_toast() -> None:
         )
         controls.show_notification("Saved")
         before = controls.focus_cursor
-        assert _press_focused(controls, _keydown(pygame.K_RETURN)) is True
+        display_sec = controls.cfg.editor.notification_display_sec
+        assert (
+            dispatch_keydown(
+                _keydown(pygame.K_KP_ENTER), _notification_runtime(controls)
+            )
+            is True
+        )
         view = controls.build_view_state(paused=False)
-        assert view.notification_message == "Saved"
+        assert view.notification_message is None
         assert controls.focus_cursor == before
+        assert controls.cfg.editor.notification_display_sec == display_sec
 
 
 def test_render_timeline_enable_opens_panel() -> None:
@@ -5009,18 +5061,7 @@ def test_persistent_and_timed_notifications_stack() -> None:
 
     assert view.persistent_notification_message == EMPTY_PRESET_LIST_NOTIFICATION
     assert view.notification_message == "Saved"
-    notification_rows = [
-        row
-        for row in view.layout.rows
-        if row.kind == RowKind.PANEL_NOTIFICATION
-    ]
-    assert [row.marker_index for row in notification_rows] == [0, 1]
-    persistent_idx = view.layout.find_descriptor(notification_rows[0])
-    timed_idx = view.layout.find_descriptor(notification_rows[1])
-    assert _row_value_color(view, persistent_idx) == ERROR_NOTIFICATION
-    assert _row_value_color(view, timed_idx) == HIGHLIGHT
-    assert _row_text(view, persistent_idx) == EMPTY_PRESET_LIST_NOTIFICATION
-    assert _row_text(view, timed_idx) == "Saved"
+    assert view.layout.rows == ()
 
 
 

@@ -445,9 +445,6 @@ class TuningViewState:
 def view_state_structure_signature(
     session: TuningSession,
     config_save: ConfigSaveController,
-    *,
-    notification_active: bool,
-    persistent_notification_active: bool = False,
 ) -> str:
     layers: dict[str, object] = {}
     for slot in session.layer_z_order:
@@ -489,8 +486,6 @@ def view_state_structure_signature(
             "editor_mode": session.settings.editor_mode,
         },
         "project": {},
-        "notification_active": notification_active,
-        "persistent_notification_active": persistent_notification_active,
         "layers": layers,
         "render_overlays": {
             "opening_card": {
@@ -724,8 +719,6 @@ class TuningViewStateBuilder:
         self,
         *,
         signature: str,
-        notification_active: bool,
-        persistent_notification_active: bool,
         user_names: set[str],
     ) -> _ViewStateStructure:
         from cleave.viz.focus_nav import MainFocus
@@ -842,11 +835,6 @@ class TuningViewStateBuilder:
             position_sec=0.0,
             focus_cursor=MainFocus(RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)),
             move_mode_slot=None,
-            persistent_notification_message=(
-                "…" if persistent_notification_active else None
-            ),
-            notification_message="…" if notification_active else None,
-            notification_remaining_sec=1.0 if notification_active else 0.0,
             render_overlays=render_overlays,
             render_post_fx=render_post_fx,
             render_pattern_mask=render_pattern_mask,
@@ -912,22 +900,14 @@ class TuningViewStateBuilder:
         notification_elapsed_sec = notification.elapsed_sec
         persistent_notification_message = notification.persistent_message
         persistent_notification_elapsed_sec = notification.persistent_elapsed_sec
-        notification_active = bool(
-            notification_message and notification_remaining_sec > 0
-        )
-        persistent_notification_active = bool(persistent_notification_message)
         user_names = self._user_preset_basenames()
         signature = view_state_structure_signature(
             self.session,
             self._config_save,
-            notification_active=notification_active,
-            persistent_notification_active=persistent_notification_active,
         )
         if self._structure is None or self._structure.signature != signature:
             self._structure = self._build_structure(
                 signature=signature,
-                notification_active=notification_active,
-                persistent_notification_active=persistent_notification_active,
                 user_names=user_names,
             )
         structure = self._structure

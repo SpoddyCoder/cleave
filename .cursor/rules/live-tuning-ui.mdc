@@ -8,7 +8,7 @@ alwaysApply: false
 
 # Live tuning overlay
 
-The shell is a menu bar, a navigator, an inspector, and a timeline strip. Session state becomes view state; inspector pages come from section defs in `row_sections.py`. `RowLayout` draws notification toasts only. Overlay Latin text uses bundled DejaVu Sans Mono; icons use Material Icons in `assets/fonts/`.
+The shell is a menu bar, a navigator, an inspector, and a timeline strip. Session state becomes view state; inspector pages come from section defs in `row_sections.py`. Toasts are an ImGui top-layer window in the visualiser corner. `RowLayout` no longer draws them. Overlay Latin text uses bundled DejaVu Sans Mono; icons use Material Icons in `assets/fonts/`.
 
 ## Where new fields go
 

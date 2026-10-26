@@ -24,17 +24,12 @@ def _sub_row_expanded(state: TuningViewState, desc: RowDescriptor) -> bool:
 
 
 def row_draw_visible(state: TuningViewState, desc: RowDescriptor) -> bool:
-    if desc.kind in {
-        RowKind.PANEL_NOTIFICATION,
-        RowKind.RENDER_SECTION_GAP,
-    }:
+    if desc.kind == RowKind.RENDER_SECTION_GAP:
         return True
     return _sub_row_expanded(state, desc)
 
 
 def row_navigable(state: TuningViewState, desc: RowDescriptor) -> bool:
-    if desc.kind == RowKind.PANEL_NOTIFICATION:
-        return False
     if not row_spec(desc.kind).navigable:
         return False
     if not _sub_row_expanded(state, desc):
@@ -117,22 +112,8 @@ class RowLayout:
     descriptor_index: dict[RowDescriptor, int] = field(default_factory=dict)
 
     @classmethod
-    def build(cls, state: TuningViewState) -> RowLayout:
-        row_list: list[RowDescriptor] = []
-        # marker_index 0 = persistent error; 1 = timed toast (may stack).
-        if state.persistent_notification_message:
-            row_list.append(
-                RowDescriptor(RowKind.PANEL_NOTIFICATION, marker_index=0)
-            )
-        if state.notification_message and state.notification_remaining_sec > 0:
-            row_list.append(
-                RowDescriptor(RowKind.PANEL_NOTIFICATION, marker_index=1)
-            )
-        rows = tuple(row_list)
-        return cls(
-            rows=rows,
-            descriptor_index={desc: index for index, desc in enumerate(rows)},
-        )
+    def build(cls, _state: TuningViewState) -> RowLayout:
+        return cls(rows=(), descriptor_index={})
 
     def __len__(self) -> int:
         return len(self.rows)

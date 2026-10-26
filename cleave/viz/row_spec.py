@@ -38,7 +38,6 @@ class RowPresentStyle(Enum):
     FULL_LINE = auto()
     DYNAMIC = auto()
     TRACK_HEADER = auto()
-    NOTIFICATION = auto()
     SPACER = auto()
 
 
@@ -448,9 +447,6 @@ def full_line_prefix(kind: RowKind) -> str:
 
 def row_full_line_display_text(state: TuningViewState, desc: RowDescriptor) -> str:
     spec = row_spec(desc.kind)
-    if spec.present_style == RowPresentStyle.NOTIFICATION:
-        assert spec.format_value is not None
-        return spec.format_value(state, desc)
     if spec.format_value is not None:
         return (
             tree_branch_prefix(_full_line_branch_depth(desc.kind))

@@ -45,9 +45,6 @@ from cleave.viz.tuning_panel_draw import (
     scroll_metrics,
 )
 from cleave.viz.ui_tint import composite_row_background
-from cleave.viz.controls import (
-    NOTIFICATION_TIMELINE_ENABLED_TEXT,
-)
 from tests.support.viz import make_overlay_card_block, make_track_block
 from cleave.viz.tuning_view_state import (
     RenderOverlaysBlock,
@@ -205,14 +202,13 @@ def test_scrolled_panel_keeps_focus_row_in_viewport() -> None:
 
 
 def _ensure_drawable_panel(state: TuningViewState) -> None:
-    """Give an empty layout one toast so compose has a panel to measure."""
+    """Give an empty layout one row so compose has a panel to measure."""
     if state.layout.rows:
         return
     from cleave.viz.row_layout import RowLayout, build_layout_frame
 
-    object.__setattr__(state, "notification_message", "Saved")
-    object.__setattr__(state, "notification_remaining_sec", 5.0)
-    state.layout = RowLayout.build(state)
+    desc = RowDescriptor(RowKind.RENDER_SECTION_GAP)
+    state.layout = RowLayout(rows=(desc,), descriptor_index={desc: 0})
     state.layout_frame = build_layout_frame(state.layout, state)
 
 
@@ -949,10 +945,7 @@ def test_locked_stem_row_not_navigable_and_uses_locked_color() -> None:
     assert _row_value_color(state, stem_row) == LOCKED
 
 
-def test_panel_notification_pinned_under_transport() -> None:
-    from cleave.viz.panel_notification import NOTIFICATION_ATTENTION_DURATION_SEC
-    from cleave.viz.theme import NOTIFICATION_ON_FILL
-
+def test_panel_notification_does_not_insert_layout_rows() -> None:
     inactive = _minimal_view_state(
         render_timeline=RenderTimelineBlock(enabled=True),
         notification_message=None,
@@ -960,59 +953,14 @@ def test_panel_notification_pinned_under_transport() -> None:
     )
     active = _minimal_view_state(
         render_timeline=RenderTimelineBlock(enabled=True),
-        notification_message=NOTIFICATION_TIMELINE_ENABLED_TEXT,
-        notification_remaining_sec=5.0,
-        notification_elapsed_sec=NOTIFICATION_ATTENTION_DURATION_SEC + 0.1,
-    )
-    attention = _minimal_view_state(
-        render_timeline=RenderTimelineBlock(enabled=True),
-        notification_message=NOTIFICATION_TIMELINE_ENABLED_TEXT,
-        notification_remaining_sec=5.0,
-        notification_elapsed_sec=0.0,
-    )
-    _mount_track_sections(active)
-    inactive_kinds = [row.kind for row in inactive.layout.rows]
-    active_kinds = [row.kind for row in active.layout.rows]
-    assert RowKind.PANEL_NOTIFICATION not in inactive_kinds
-    assert RowKind.PANEL_NOTIFICATION in active_kinds
-    notification_idx = active.layout.find_by_kind(RowKind.PANEL_NOTIFICATION)
-    header_idx = active.layout.find("layer_1", RowKind.TRACK_HEADER)
-    assert notification_idx < header_idx
-    assert row_is_pinned(RowKind.PANEL_NOTIFICATION)
-    assert notification_idx not in active.layout.navigable_indices(active)
-    assert _row_value_color(active, notification_idx) == HIGHLIGHT
-    attention_idx = attention.layout.find_by_kind(RowKind.PANEL_NOTIFICATION)
-    assert _row_value_color(attention, attention_idx) == NOTIFICATION_ON_FILL
-    assert _row_text(active, notification_idx) == NOTIFICATION_TIMELINE_ENABLED_TEXT
-
-
-def test_persistent_and_timed_panel_notifications_stack() -> None:
-    from cleave.viz.panel_notification import NOTIFICATION_ATTENTION_DURATION_SEC
-    from cleave.viz.theme import ERROR_NOTIFICATION
-
-    stacked = _minimal_view_state(
-        persistent_notification_message="No presets in bed roles folder",
-        persistent_notification_elapsed_sec=NOTIFICATION_ATTENTION_DURATION_SEC + 0.1,
         notification_message="Saved",
         notification_remaining_sec=5.0,
-        notification_elapsed_sec=NOTIFICATION_ATTENTION_DURATION_SEC + 0.1,
+        persistent_notification_message="No presets in bed roles folder",
     )
-    notification_rows = [
-        row
-        for row in stacked.layout.rows
-        if row.kind == RowKind.PANEL_NOTIFICATION
-    ]
-    assert [row.marker_index for row in notification_rows] == [0, 1]
-    persistent_idx = stacked.layout.find_descriptor(notification_rows[0])
-    timed_idx = stacked.layout.find_descriptor(notification_rows[1])
-    assert persistent_idx < timed_idx
-    assert _row_value_color(stacked, persistent_idx) == ERROR_NOTIFICATION
-    assert _row_value_color(stacked, timed_idx) == HIGHLIGHT
-    assert _row_text(stacked, persistent_idx) == "No presets in bed roles folder"
-    assert _row_text(stacked, timed_idx) == "Saved"
-    navigable = stacked.layout.navigable_indices(stacked)
-    assert persistent_idx not in navigable
-    assert timed_idx not in navigable
+    assert inactive.layout.rows == ()
+    assert active.layout.rows == ()
+    assert active.notification_message == "Saved"
+    assert active.persistent_notification_message == "No presets in bed roles folder"
 
 
 def test_draw_panel_notification_without_error() -> None:
@@ -1020,15 +968,14 @@ def test_draw_panel_notification_without_error() -> None:
     overlay = TuningOverlay()
     state = _minimal_view_state(
         render_timeline=RenderTimelineBlock(enabled=True),
-        notification_message=NOTIFICATION_TIMELINE_ENABLED_TEXT,
+        notification_message="Saved",
         notification_remaining_sec=5.0,
     )
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
     overlay.notify_input()
     overlay.draw(surface, state)
-    assert overlay.panel_rect is not None
-    notification_idx = state.layout.find_by_kind(RowKind.PANEL_NOTIFICATION)
-    assert notification_idx in state.layout.visible_indices(state)
+    assert state.layout.rows == ()
+    assert overlay.panel_rect is None
 
 
 def test_build_row_layout_starts_at_render_without_layer_rows() -> None:
@@ -1735,9 +1682,5 @@ def test_panel_notification_in_pinned_header_block() -> None:
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
     overlay.notify_input()
     overlay.draw(surface, state)
-    panel = overlay.panel_rect
-    assert panel is not None
-
-    metrics = _panel_scroll_metrics(overlay, state)
-    notification_idx = state.layout.find_by_kind(RowKind.PANEL_NOTIFICATION)
-    assert metrics.header_indices[0] == notification_idx
+    assert overlay.panel_rect is None
+    assert state.layout.visible_indices(state) == []

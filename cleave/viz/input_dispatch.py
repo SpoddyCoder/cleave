@@ -353,6 +353,20 @@ def _curation_shell(runtime: LiveVisualizerRuntime) -> bool:
     ) and _shell_columns_focused(runtime)
 
 
+def _dismiss_timed_notification(
+    event: pygame.event.Event, runtime: LiveVisualizerRuntime
+) -> bool:
+    """Plain Enter and keypad Enter clear the timed toast."""
+    if event.key not in (pygame.K_RETURN, pygame.K_KP_ENTER):
+        return False
+    if mod_ctrl(event.mod) or mod_shift(event.mod) or mod_alt(event.mod):
+        return False
+    if runtime.controls.notification_active().message is None:
+        return False
+    runtime.controls.dismiss_notification()
+    return True
+
+
 def dispatch_keydown(event: pygame.event.Event, runtime: LiveVisualizerRuntime) -> bool:
     """Handle a key-down event. Return False when the app should quit."""
     if event.type != pygame.KEYDOWN:
@@ -385,6 +399,9 @@ def dispatch_keydown(event: pygame.event.Event, runtime: LiveVisualizerRuntime) 
     global_result = _handle_global_keydown(event, runtime)
     if global_result is not None:
         return global_result
+
+    if _dismiss_timed_notification(event, runtime):
+        return True
 
     region_result = _region_keydown(event, runtime)
     if region_result is not None:

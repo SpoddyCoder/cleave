@@ -20,7 +20,10 @@ from cleave.viz.preset_curation_controls import PresetCurationController
 from cleave.viz.preset_list_controls import PresetListController
 from cleave.viz.key_repeat import KeyRepeatController
 from cleave.viz.modal import ModalHost
-from cleave.viz.panel_notification import PanelNotificationHost
+from cleave.viz.panel_notification import (
+    PanelNotificationActive,
+    PanelNotificationHost,
+)
 from cleave.viz.playback import PlaybackState, current_sec, seek, seek_to, toggle_pause
 from cleave.viz.live_layer_bindings import LiveLayerBindings
 from cleave.viz.render_overlay_controls import RenderOverlaysControls
@@ -697,6 +700,9 @@ class TuningControls:
 
     def dismiss_notification(self) -> None:
         self._notification_host.dismiss_timed()
+
+    def notification_active(self) -> PanelNotificationActive:
+        return self._notification_host.active()
 
     def prompt_apply_timeline_preset(self) -> None:
         self._timeline_presets.prompt(self.duration_sec)

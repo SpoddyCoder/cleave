@@ -102,16 +102,20 @@ def test_focus_index_uses_layout_frame_navigable() -> None:
 
 
 def test_find_descriptor_and_contains_descriptor() -> None:
+    from cleave.viz.row_layout import RowLayout
+
     state = _minimal_view_state(
         notification_message="Saved",
         notification_remaining_sec=1.0,
     )
-    desc = RowDescriptor(RowKind.PANEL_NOTIFICATION, marker_index=1)
-    assert state.layout.contains_descriptor(desc)
-    assert state.layout.find_descriptor(desc) == state.layout.find_by_kind(
-        RowKind.PANEL_NOTIFICATION
+    assert state.layout.rows == ()
+    desc = RowDescriptor(RowKind.RENDER_SECTION_GAP)
+    layout = RowLayout(rows=(desc,), descriptor_index={desc: 0})
+    assert layout.contains_descriptor(desc)
+    assert layout.find_descriptor(desc) == layout.find_by_kind(
+        RowKind.RENDER_SECTION_GAP
     )
-    assert not state.layout.contains_descriptor(
+    assert not layout.contains_descriptor(
         RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
     )
 

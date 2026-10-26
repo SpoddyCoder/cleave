@@ -762,6 +762,7 @@ class VisualizerApp:
                 apply_modal_pointer,
                 text_field_wrap,
             )
+            from cleave.viz.toast_surface import ToastSurface, apply_toast_pointer
             from cleave.viz.shell_host import (
                 ShellHost,
                 TransportReadout,
@@ -785,6 +786,15 @@ class VisualizerApp:
 
             def draw_ui() -> None:
                 assert shell is not None
+                toast_surface: ToastSurface | None = None
+                notice = rt.controls.notification_active()
+                if shell.layout is not None and (
+                    notice.persistent_message is not None or notice.message is not None
+                ):
+                    toast_surface = ToastSurface(
+                        notice, shell.layout, ImGuiTextMeasure()
+                    )
+                    shell.top_layer.push(toast_surface)
                 if rt.controls.tap_sync.showing_progress:
                     progress = rt.controls.tap_sync.progress_view()
                     if progress is not None:
@@ -821,6 +831,12 @@ class VisualizerApp:
                     self._overlay_dt,
                     readout,
                 )
+                if (
+                    toast_surface is not None
+                    and toast_surface.intent is not None
+                    and not shell.top_layer.modal_active
+                ):
+                    apply_toast_pointer(rt.controls, toast_surface.intent)
                 if modal_surface is not None and modal_surface.intent is not None:
                     apply_modal_pointer(rt.modal_host, modal_surface.intent)
                     rt.overlay.notify_input()

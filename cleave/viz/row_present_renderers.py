@@ -24,7 +24,6 @@ from cleave.viz.material_icons import (
     visibility_icon_slot_width,
 )
 from cleave.viz.overlay_profiler import OverlayDrawCounters
-from cleave.viz.panel_notification import notification_attention
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
 from cleave.viz.row_spec import (
     FitStrategy,
@@ -73,13 +72,11 @@ from cleave.viz.theme import (
     ACTION,
     CONFIG_DIRTY,
     DISABLED,
-    ERROR_NOTIFICATION,
     HIGHLIGHT,
     LABEL,
     LOCKED,
     LOCK_ICON,
     MOVE_MODE,
-    NOTIFICATION_ON_FILL,
     OVERRIDE_BG,
     OVERRIDE_GLYPH,
     OVERRIDE_GLYPH_OFF,
@@ -211,8 +208,6 @@ def row_text(state: TuningViewState, index: int) -> str:
     style = field.present_style
     if style == RowPresentStyle.SPACER:
         return ""
-    if style == RowPresentStyle.NOTIFICATION:
-        return format_row_value(state, desc)
     if style == RowPresentStyle.LABELED_VALUE:
         return row_labeled_display_text(state, desc)
     if style == RowPresentStyle.EXPAND_SUBHEADER:
@@ -557,18 +552,6 @@ def fit_row_text(
     )
 
 
-def notification_elapsed(state: TuningViewState, marker_index: int | None) -> float:
-    if marker_index == 0:
-        return state.persistent_notification_elapsed_sec
-    return state.notification_elapsed_sec
-
-
-def notification_accent(marker_index: int | None) -> tuple[int, int, int]:
-    if marker_index == 0:
-        return ERROR_NOTIFICATION
-    return HIGHLIGHT
-
-
 def row_in_move_mode(state: TuningViewState, index: int) -> bool:
     stem = state.layout.slot(index)
     if stem is not None and state.move_mode_slot == stem:
@@ -617,15 +600,6 @@ def row_value_color_for(
     """VALUE-role color for *desc*. Shared by the pygame painter and ImGui."""
     kind = desc.kind
     field = ROW_SPECS.get(kind)
-    if field is not None and field.present_style == RowPresentStyle.NOTIFICATION:
-        accent = notification_accent(desc.marker_index)
-        attention = notification_attention(
-            notification_elapsed(state, desc.marker_index)
-        )
-        if attention.text_on_fill:
-            return NOTIFICATION_ON_FILL
-        return accent
-
     locked_blocked = section_locked(state, desc) and row_blocked_by_section_lock(kind)
     affordance = row_spec(kind).affordance
 
@@ -745,11 +719,6 @@ def row_bg_color(state: TuningViewState, index: int) -> tuple[int, int, int] | N
     if row_has_tree_focus(state, index):
         return HIGHLIGHT
     return None
-
-
-def is_notification_row(state: TuningViewState, index: int) -> bool:
-    field = field_for_index(state, index)
-    return field is not None and field.present_style == RowPresentStyle.NOTIFICATION
 
 
 @dataclass(frozen=True)
@@ -992,20 +961,6 @@ def _paint_full_line(
     return surf, None, ctx.indent + surf.get_width()
 
 
-def _paint_notification(
-    ctx: RowPresentContext,
-) -> tuple[pygame.Surface, pygame.Surface | None, int]:
-    text = fit_row_text(
-        ctx.font,
-        ctx.state,
-        ctx.index,
-        max_content_width=ctx.max_content_width,
-        cache=ctx.cache,
-    )
-    surf = render_text(ctx.font, text, True, ctx.color, counters=ctx.counters)
-    return surf, None, ctx.indent + surf.get_width()
-
-
 ROW_PRESENT_RENDERERS: dict[RowPresentStyle, RowPaint] = {
     RowPresentStyle.LABELED_VALUE: _paint_labeled_value,
     RowPresentStyle.DYNAMIC: _paint_labeled_value,
@@ -1014,7 +969,6 @@ ROW_PRESENT_RENDERERS: dict[RowPresentStyle, RowPaint] = {
     RowPresentStyle.PATH_ICON: _paint_path_icon,
     RowPresentStyle.FULL_LINE: _paint_full_line,
     RowPresentStyle.TRACK_HEADER: _paint_track_header,
-    RowPresentStyle.NOTIFICATION: _paint_notification,
     RowPresentStyle.SPACER: _paint_spacer,
 }
 

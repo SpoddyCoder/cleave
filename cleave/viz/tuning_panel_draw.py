@@ -18,9 +18,6 @@ from cleave.viz.row_present_renderers import (
     RowPresentContext,
     compose_surface,
     fit_row_text,
-    is_notification_row,
-    notification_accent,
-    notification_elapsed,
     preset_row_prefix_width,
     render_label_value_row,
     render_present_row,
@@ -44,7 +41,6 @@ from cleave.viz.frame_rate import (
 from cleave.viz.material_icons import (
     material_font,
 )
-from cleave.viz.panel_notification import notification_attention
 from cleave.viz.ui_tint import draw_opaque_row_background
 from cleave.viz.theme import (
     BACKGROUND,
@@ -101,8 +97,6 @@ _row_bg_color = row_bg_color
 _render_text = render_text
 _compose_surface = compose_surface
 _render_label_value_row = render_label_value_row
-_notification_elapsed = notification_elapsed
-_notification_accent = notification_accent
 _row_shows_action_enter_hint = row_shows_action_enter_hint
 _row_shows_enter_icon = row_shows_enter_icon
 
@@ -518,39 +512,6 @@ class TuningOverlay:
             )
         return self._panel_scratch
 
-    def _draw_notification_attention_fill(
-        self,
-        panel: pygame.Surface,
-        *,
-        state: TuningViewState,
-        index: int,
-        row_rect: tuple[int, int, int, int],
-    ) -> None:
-        desc = state.layout.descriptor(index)
-        attention = notification_attention(
-            notification_elapsed(state, desc.marker_index)
-        )
-        if attention.fill_progress <= 0.001:
-            return
-        x, y, row_w, line_h = row_rect
-        if attention.fill_progress >= 0.999:
-            fill_w = row_w
-        else:
-            fill_w = max(1, int(round(row_w * attention.fill_progress)))
-        if attention.fill_from_left:
-            fill_x = x
-        else:
-            fill_x = x + max(0, row_w - fill_w)
-        accent = notification_accent(desc.marker_index)
-        fill_alpha = int(255 * self._visibility)
-        if fill_alpha < 2:
-            return
-        pygame.draw.rect(
-            panel,
-            (*accent, fill_alpha),
-            (fill_x, y, fill_w, line_h),
-        )
-
     def _blit_row(
         self,
         panel: pygame.Surface,
@@ -589,13 +550,6 @@ class TuningOverlay:
             bg,
             tint_alpha=tint_alpha,
         )
-        if is_notification_row(state, index):
-            self._draw_notification_attention_fill(
-                panel,
-                state=state,
-                index=index,
-                row_rect=row_rect,
-            )
 
         indent = self._padding + _row_indent(state, index)
         if text_alpha >= 2:
@@ -987,11 +941,6 @@ class TuningOverlay:
             cache.row_cache_structure = vis_tuple
 
         def max_content_width_for(index: int) -> int:
-            if (
-                state.settings.ui_width_mode == "flexible"
-                and is_notification_row(state, index)
-            ):
-                return viewport_content_max
             return self._max_content_width(
                 index,
                 scrollable_indices=scrollable_indices,

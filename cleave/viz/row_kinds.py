@@ -38,7 +38,6 @@ class RowKind(Enum):
     LAYER_MANAGEMENT_COUNT = auto()
     LAYER_MANAGEMENT_ADD = auto()
     LAYER_MANAGEMENT_DELETE = auto()
-    PANEL_NOTIFICATION = auto()
     RENDER_SECTION_GAP = auto()
     RENDER_OVERLAYS_HEADER = auto()
     RENDER_OVERLAY_CARD_HEADER = auto()

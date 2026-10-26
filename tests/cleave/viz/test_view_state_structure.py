@@ -18,27 +18,23 @@ def test_structure_signature_stable_for_fps_and_focus() -> None:
     session = controls.session
     config_save = controls._config_save
     sig_a = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
+        session, config_save)
     controls.focus_descriptor = RowDescriptor(RowKind.TRACK_HEADER, slot="layer_1")
     sig_b = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
+        session, config_save)
     assert sig_a == sig_b
 
     view_a = controls.build_view_state(paused=False, fps=30.0)
     view_b = controls.build_view_state(paused=False, fps=60.0)
     assert view_state_structure_signature(
-        session, config_save, notification_active=False
-    ) == sig_a
+        session, config_save) == sig_a
     assert view_a.layout is view_b.layout
 
 
 def test_layer_expand_flags_absent_from_structure_signature() -> None:
     controls = _make_controls(("layer_1",))
     sig = view_state_structure_signature(
-        controls.session, controls._config_save, notification_active=False
-    )
+        controls.session, controls._config_save)
     layer = json.loads(sig)["layers"]["layer_1"]
     for flag in (
         "expanded",
@@ -55,13 +51,11 @@ def test_structure_signature_invalidates_on_layer_z_order() -> None:
     session = controls.session
     config_save = controls._config_save
     sig_before = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
+        session, config_save)
     session.layer_z_order = ["layer_1"]
     del session.layers["layer_2"]
     sig_after = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
+        session, config_save)
     assert sig_before != sig_after
 
 
@@ -71,26 +65,31 @@ def test_structure_signature_invalidates_on_preset_navigation() -> None:
     layer = session.layers["layer_1"]
     config_save = controls._config_save
     sig_before = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
+        session, config_save)
     layer.playlist.next()
     sig_after = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
+        session, config_save)
     assert sig_before != sig_after
 
 
-def test_structure_signature_invalidates_on_notification() -> None:
+def test_structure_signature_unchanged_when_notification_shows() -> None:
     controls = _make_controls(("layer_1",))
     session = controls.session
     config_save = controls._config_save
-    sig_inactive = view_state_structure_signature(
-        session, config_save, notification_active=False
+    view_before = controls.build_view_state(paused=False)
+    sig_before = view_state_structure_signature(session, config_save)
+    controls.show_notification("Saved")
+    controls._notification_host.set_persistent("No presets in bed roles folder")
+    sig_after = view_state_structure_signature(session, config_save)
+    view_after = controls.build_view_state(paused=False)
+    assert sig_before == sig_after
+    assert view_after.layout is view_before.layout
+    assert view_after.notification_message == "Saved"
+    assert (
+        view_after.persistent_notification_message
+        == "No presets in bed roles folder"
     )
-    sig_active = view_state_structure_signature(
-        session, config_save, notification_active=True
-    )
-    assert sig_inactive != sig_active
+    assert view_after.layout.rows == ()
 
 
 def test_reused_structure_produces_identical_row_list_and_focus() -> None:
@@ -134,12 +133,10 @@ def test_structure_signature_ignores_timeline_panel_open() -> None:
     config_save = controls._config_save
     session.timeline.panel_open = False
     sig_before = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
+        session, config_save)
     session.timeline.panel_open = True
     sig_after = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
+        session, config_save)
     assert sig_before == sig_after
     timeline = json.loads(sig_after)["render_timeline"]
     for flag in (
@@ -174,7 +171,7 @@ def test_layout_rows_omit_timeline_and_song_markers() -> None:
         RowKind.TIMELINE_HARD_CUTS,
     }
     assert kinds.isdisjoint(forbidden)
-    assert kinds <= {RowKind.PANEL_NOTIFICATION}
+    assert kinds == set()
 
     session.timeline.panel_open = False
     closed = controls.build_view_state(paused=False)
@@ -186,12 +183,10 @@ def test_structure_signature_invalidates_on_highlight_rolloff_mode() -> None:
     config_save = controls._config_save
     session.render_post_fx.highlight_rolloff.mode = "composite"
     sig_before = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
+        session, config_save)
     session.render_post_fx.highlight_rolloff.mode = "off"
     sig_after = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
+        session, config_save)
     assert sig_before != sig_after
 
 
@@ -201,12 +196,10 @@ def test_structure_signature_invalidates_on_animation_type() -> None:
     config_save = controls._config_save
     session.render_overlays.opening_card.animation.type = "fade"
     sig_before = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
+        session, config_save)
     session.render_overlays.opening_card.animation.type = "slide"
     sig_after = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
+        session, config_save)
     assert sig_before != sig_after
 
 
@@ -243,12 +236,10 @@ def test_structure_signature_invalidates_on_closing_card_animation_type() -> Non
     config_save = controls._config_save
     session.render_overlays.closing_card.animation.type = "fade"
     sig_before = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
+        session, config_save)
     session.render_overlays.closing_card.animation.type = "slide"
     sig_after = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
+        session, config_save)
     assert sig_before != sig_after
 
 
@@ -258,12 +249,10 @@ def test_structure_signature_invalidates_on_chroma_boost_mode() -> None:
     config_save = controls._config_save
     session.render_post_fx.chroma_boost.mode = "composite"
     sig_before = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
+        session, config_save)
     session.render_post_fx.chroma_boost.mode = "off"
     sig_after = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
+        session, config_save)
     assert sig_before != sig_after
 
 
@@ -296,23 +285,19 @@ def test_structure_signature_invalidates_on_preset_switching_trigger() -> None:
     session.layers["layer_1"].preset_switching = "on"
     session.layers["layer_1"].preset_switching_trigger = "timer"
     sig_timer = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
+        session, config_save)
     session.layers["layer_1"].preset_switching_trigger = "projectm"
     sig_projectm = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
+        session, config_save)
     assert sig_timer != sig_projectm
     session.layers["layer_1"].preset_switching_trigger = "timeline"
     sig_timeline = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
+        session, config_save)
     assert sig_projectm != sig_timeline
     session.layers["layer_1"].preset_switching = "off"
     session.layers["layer_1"].preset_switching_trigger = "off"
     sig_off = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
+        session, config_save)
     assert sig_timeline != sig_off
 
 
@@ -325,12 +310,10 @@ def test_structure_signature_invalidates_on_hard_cut_enabled() -> None:
     layer.preset_switching_trigger = "projectm"
     layer.hard_cut_enabled = True
     sig_on = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
+        session, config_save)
     layer.hard_cut_enabled = False
     sig_off = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
+        session, config_save)
     assert sig_on != sig_off
 
 
@@ -340,12 +323,10 @@ def test_structure_signature_invalidates_on_switching_paused() -> None:
     config_save = controls._config_save
     layer = session.layers["layer_1"]
     sig_before = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
+        session, config_save)
     layer.switching_paused = True
     sig_after = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
+        session, config_save)
     assert sig_before != sig_after
 
 
@@ -394,12 +375,10 @@ def test_structure_signature_invalidates_on_auto_preset_path() -> None:
     config_save = controls._config_save
     layer = session.layers["layer_1"]
     sig_before = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
+        session, config_save)
     layer.auto_preset_path = layer.playlist.paths[1].resolve()
     sig_after = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
+        session, config_save)
     assert sig_before != sig_after
 
 
@@ -489,27 +468,6 @@ def test_builder_syncs_playing_list_preset_from_projectm_position() -> None:
     assert view.tracks["layer_1"].active_preset_list_index == 1
 
 
-def test_structure_signature_invalidates_on_persistent_notification() -> None:
-    controls = _make_controls(("layer_1",))
-    session = controls.session
-    config_save = controls._config_save
-    sig_inactive = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
-    sig_persistent = view_state_structure_signature(
-        session,
-        config_save,
-        notification_active=False,
-        persistent_notification_active=True,
-    )
-    assert sig_inactive != sig_persistent
-    sig_both = view_state_structure_signature(
-        session,
-        config_save,
-        notification_active=True,
-        persistent_notification_active=True,
-    )
-    assert sig_persistent != sig_both
 
 
 
@@ -540,12 +498,10 @@ def test_structure_signature_invalidates_on_song_marker_count() -> None:
     session = controls.session
     config_save = controls._config_save
     sig_before = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
+        session, config_save)
     session.song_markers.times = [10.0, 20.0]
     sig_after = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
+        session, config_save)
     assert sig_before != sig_after
 
 
@@ -557,12 +513,10 @@ def test_structure_signature_invalidates_on_pattern_mask_type() -> None:
     config_save = controls._config_save
     session.render_pattern_mask.type = "strips"
     sig_before = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
+        session, config_save)
     session.render_pattern_mask.type = "plasma"
     sig_after = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
+        session, config_save)
     assert sig_before != sig_after
 
 
@@ -597,12 +551,10 @@ def test_structure_signature_invalidates_on_hard_cut_fades_enabled() -> None:
     config_save = controls._config_save
     session.timeline.hard_cut_fades.enabled = False
     sig_before = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
+        session, config_save)
     session.timeline.hard_cut_fades.enabled = True
     sig_after = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
+        session, config_save)
     assert sig_before != sig_after
 
 
@@ -612,12 +564,10 @@ def test_structure_signature_invalidates_on_soft_cut_fades_enabled() -> None:
     config_save = controls._config_save
     session.timeline.soft_cut_fades.enabled = False
     sig_before = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
+        session, config_save)
     session.timeline.soft_cut_fades.enabled = True
     sig_after = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
+        session, config_save)
     assert sig_before != sig_after
 
 
@@ -627,12 +577,10 @@ def test_structure_signature_invalidates_on_visual_limiter_enabled() -> None:
     config_save = controls._config_save
     session.render_post_fx.limiter.enabled = True
     sig_before = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
+        session, config_save)
     session.render_post_fx.limiter.enabled = False
     sig_after = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
+        session, config_save)
     assert sig_before != sig_after
 
 
@@ -643,8 +591,7 @@ def test_leftover_layout_omits_settings_project_and_transport() -> None:
     assert "TRANSPORT" not in names
     assert not any(name.startswith("SETTINGS_") or name.startswith("PROJECT_") for name in names)
     sig = view_state_structure_signature(
-        controls.session, controls._config_save, notification_active=False
-    )
+        controls.session, controls._config_save)
     payload = json.loads(sig)
     assert payload["settings"] == {"editor_mode": controls.session.settings.editor_mode}
     assert payload["project"] == {}
@@ -693,25 +640,17 @@ def test_layout_omits_track_timeline_and_song_marker_rows() -> None:
         row.kind.name.startswith("TRACK_") for row in open_view.layout.rows
     )
 
-def test_curation_leftover_layout_is_notifications_only() -> None:
+def test_curation_leftover_layout_is_empty() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.settings.editor_mode = "preset_curation"
     view = controls.build_view_state(paused=False)
-    assert all(row.kind == RowKind.PANEL_NOTIFICATION for row in view.layout.rows)
+    assert view.layout.rows == ()
 
     controls.show_notification("Saved")
     toasted = controls.build_view_state(paused=False)
-    assert toasted.layout.rows
-    assert all(
-        row.kind == RowKind.PANEL_NOTIFICATION for row in toasted.layout.rows
-    )
-    assert not any(row.kind.name.startswith("TRACK_") for row in toasted.layout.rows)
-    assert RowKind.LAYER_MANAGEMENT_ADD not in {
-        row.kind for row in toasted.layout.rows
-    }
-    assert RowKind.RENDER_OVERLAYS_HEADER not in {
-        row.kind for row in toasted.layout.rows
-    }
+    assert toasted.notification_message == "Saved"
+    assert toasted.layout.rows == ()
+    assert toasted.layout is view.layout
 
 
 def test_song_marker_items_stay_on_the_inspector() -> None:
@@ -746,8 +685,7 @@ def test_builder_appends_curation_markers_without_structure_change() -> None:
     layer.preset_list = [str(user_path)]
 
     sig_before = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
+        session, config_save)
     view_before = controls.build_view_state(paused=False)
     block_before = view_before.tracks["layer_1"]
     assert block_before.preset_label == "preset-0.milk (1/3)"
@@ -760,8 +698,7 @@ def test_builder_appends_curation_markers_without_structure_change() -> None:
     index.mark_blacklisted(user_path.name)
 
     sig_after = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
+        session, config_save)
     assert sig_before == sig_after
 
     view_after = controls.build_view_state(paused=False)
@@ -790,16 +727,14 @@ def test_builder_appends_user_defined_marker_on_track_preset() -> None:
     layer_2.preset_list = [str(other_path)]
 
     sig_before = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
+        session, config_save)
     view_u = controls.build_view_state(paused=False)
     assert view_u.tracks["layer_1"].preset_label == f"{current_name} (1/3) [U]"
     assert view_u.tracks["layer_2"].preset_list_labels == [current_name]
 
     index.mark_favourite(current_name)
     sig_after = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
+        session, config_save)
     assert sig_before == sig_after
 
     view_fu = controls.build_view_state(paused=False)
@@ -849,12 +784,10 @@ def test_structure_signature_invalidates_on_preset_list_change() -> None:
     config_save = controls._config_save
     layer = session.layers["layer_1"]
     sig_before = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
+        session, config_save)
     layer.preset_list = ["/tmp/a.milk"]
     sig_after = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
+        session, config_save)
     assert sig_before != sig_after
 
 
@@ -865,8 +798,7 @@ def test_structure_signature_uses_digest_not_full_paths() -> None:
     long_path = "/tmp/projects/my-track/very-long-directory-name/preset.milk"
     layer.preset_list = [long_path]
     sig = view_state_structure_signature(
-        session, controls._config_save, notification_active=False
-    )
+        session, controls._config_save)
     assert long_path not in sig
     assert '"digest"' in sig
     assert '"len":1' in sig.replace(" ", "")
@@ -879,11 +811,9 @@ def test_structure_signature_stable_for_long_preset_list() -> None:
     layer = session.layers["layer_1"]
     layer.preset_list = [f"/tmp/preset-{i}.milk" for i in range(40)]
     sig_a = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
+        session, config_save)
     sig_b = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
+        session, config_save)
     assert sig_a == sig_b
 
 

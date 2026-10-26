@@ -197,7 +197,6 @@ def test_action_row_kinds_match_affordance() -> None:
 
 
 def test_row_is_pinned() -> None:
-    assert row_is_pinned(RowKind.PANEL_NOTIFICATION) is True
     assert row_is_pinned(RowKind.PROJECT_RENDER_HEADER) is True
     assert row_is_pinned(RowKind.PROJECT_COMPOSITOR_HEADER) is True
     assert row_is_pinned(RowKind.PROJECT_COMPOSITOR_HDR) is True

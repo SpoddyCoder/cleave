@@ -81,7 +81,6 @@ class PanelSignature:
     timeline_panel_open: bool
     config_dirty: bool
     static_row_keys: tuple[tuple, ...]
-    notification_attention: tuple = ()
 
 
 @dataclass
@@ -234,21 +233,6 @@ def static_row_keys(
     return tuple(keys)
 
 
-def _notification_attention_signature(state: TuningViewState) -> tuple:
-    from cleave.viz.panel_notification import notification_attention_bucket
-
-    parts: list[tuple] = []
-    if state.persistent_notification_message:
-        parts.append(
-            (0, *notification_attention_bucket(state.persistent_notification_elapsed_sec))
-        )
-    if state.notification_message and state.notification_remaining_sec > 0:
-        parts.append(
-            (1, *notification_attention_bucket(state.notification_elapsed_sec))
-        )
-    return tuple(parts)
-
-
 def panel_signature(
     state: TuningViewState,
     *,
@@ -274,7 +258,6 @@ def panel_signature(
         timeline_panel_open=timeline_panel_open,
         config_dirty=state.config_dirty,
         static_row_keys=static_row_keys,
-        notification_attention=_notification_attention_signature(state),
     )
 
 
@@ -340,7 +323,6 @@ def static_upload_content_hash(panel_sig: PanelSignature) -> tuple:
         panel_sig.timeline_panel_open,
         panel_sig.config_dirty,
         panel_sig.static_row_keys,
-        panel_sig.notification_attention,
     )
 
 

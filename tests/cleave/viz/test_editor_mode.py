@@ -70,12 +70,10 @@ def test_structure_signature_invalidates_on_editor_mode() -> None:
     session = controls.session
     config_save = controls._config_save
     sig_before = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
+        session, config_save)
     session.settings.editor_mode = "preset_curation"
     sig_after = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
+        session, config_save)
     assert sig_before != sig_after
 
 
@@ -94,7 +92,7 @@ def test_curation_layout_allowlist() -> None:
     assert RowKind.LAYER_MANAGEMENT_ADD not in kinds
     assert not any(name.startswith("TRACK_") for name in names)
     assert slots == []
-    assert all(kind == RowKind.PANEL_NOTIFICATION for kind in kinds)
+    assert kinds == []
 
 
 def test_curation_shows_only_focus_layer() -> None:

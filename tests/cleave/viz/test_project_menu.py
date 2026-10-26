@@ -48,8 +48,7 @@ def test_structure_signature_stable_for_render_quality_and_range() -> None:
     session = controls.session
     config_save = controls._config_save
     sig_before = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
+        session, config_save)
     session.project.render.quality = "high"
     session.project.render.start_sec = 10
     session.project.render.end_sec = 20
@@ -57,8 +56,7 @@ def test_structure_signature_stable_for_render_quality_and_range() -> None:
     session.project.render.height = 720
     session.project.render.fps = 24
     sig_after = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
+        session, config_save)
     assert sig_before == sig_after
 
 
@@ -131,12 +129,10 @@ def test_structure_signature_stable_for_compositor_hdr() -> None:
     session = controls.session
     config_save = controls._config_save
     sig_before = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
+        session, config_save)
     session.project.compositor_hdr = False
     sig_after = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
+        session, config_save)
     assert sig_before == sig_after
 
 
