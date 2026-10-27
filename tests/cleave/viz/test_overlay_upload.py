@@ -178,7 +178,7 @@ def test_coordinator_full_uploads_at_origin() -> None:
 
     texture_id, tex_uv = coordinator.upload(
         compositor,
-        OverlayTextureSlot.HELP,
+        OverlayTextureSlot.TUNING,
         surface,
         plan,
         capacity=(200, 100),
@@ -189,10 +189,10 @@ def test_coordinator_full_uploads_at_origin() -> None:
     assert texture_id == 7
     assert tex_uv == (0.0, 0.0, 0.5, 0.5)
     compositor.ensure_overlay_texture.assert_called_once_with(
-        OverlayTextureSlot.HELP, 200, 100
+        OverlayTextureSlot.TUNING, 200, 100
     )
     compositor.upload_overlay_region.assert_called_once_with(
-        OverlayTextureSlot.HELP,
+        OverlayTextureSlot.TUNING,
         surface,
         dest_x=0,
         dest_y=0,

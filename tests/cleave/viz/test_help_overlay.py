@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-import pygame
-
 from cleave.blend_modes import BLEND_MODE_HELP_ENTRIES, BLEND_MODES
 from cleave.cue_roles import CUE_ROLE_MARKER_HELP_ENTRIES
 from cleave.config_schema.editor import EDITOR_PREVIEW_QUALITY_HELP_ENTRIES
@@ -33,9 +31,6 @@ from cleave.viz.help_content import (
     timeline_strip_section,
 )
 from cleave.viz.shell_focus import CycleStop, ShellFocusState, ShellRegion
-from cleave.viz.help_overlay import HelpOverlay
-from cleave.viz.help_panel_cache import entry_gap, entry_width, max_key_width
-from cleave.viz.theme import LABEL, VALUE
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.row_spec import ROW_SPECS
 
@@ -105,48 +100,6 @@ def test_help_content_navigation_cycles_regions() -> None:
     _assert_shell_navigation(curation)
     sections = sections_for(RowKind.TRACK_HEADER)
     assert all(getattr(section, "title", "") != "Transport Controls" for section in sections)
-
-
-def test_help_entry_columns_align_to_widest_key() -> None:
-    overlay = HelpOverlay()
-    font = overlay._font_get()
-    mode_description = DescriptionSection(
-        "Blend mode",
-        lines=("How this layer is composited onto the layers below it.",),
-        entries=BLEND_MODE_HELP_ENTRIES,
-    )
-    sections = (NAVIGATION_SECTION, layer_section(timeline_enabled=False), mode_description)
-    key_column_width = max_key_width(font, sections)
-    gap = entry_gap(font)
-
-    all_keys = [
-        key
-        for section in sections
-        for key, _ in (
-            section.entries
-            if isinstance(section, (HelpSection, DescriptionSection))
-            else ()
-        )
-    ]
-    widest_key = max(
-        all_keys,
-        key=lambda key: font.render(key, True, LABEL).get_width(),
-    )
-    assert key_column_width == font.render(widest_key, True, LABEL).get_width()
-
-    for section in sections:
-        if not isinstance(section, (HelpSection, DescriptionSection)):
-            continue
-        for key, description in section.entries:
-            assert entry_width(
-                font,
-                key,
-                description,
-                key_column_width=key_column_width,
-                entry_gap=gap,
-            ) == key_column_width + gap + font.render(
-                description, True, VALUE
-            ).get_width()
 
 
 def test_layer_section_includes_visibility_when_timeline_disabled() -> None:
@@ -788,25 +741,6 @@ def test_render_overlay_background_margin_and_padding_help() -> None:
 def test_render_overlay_body_text_help() -> None:
     section = _keyboard_section(sections_for(RowKind.RENDER_OVERLAY_CARD_BODY_TEXT))
     assert dict(section.entries)["Enter"] == "edit body"
-
-
-def test_help_panel_starts_below_menu_bar() -> None:
-    pygame.init()
-    from cleave.viz.shell_host import menu_bar_height_px
-
-    overlay = HelpOverlay()
-    top = menu_bar_height_px()
-    visualiser_rect = (0, top, 1280, 720 - top)
-    composed = overlay.compose_panel(
-        RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER),
-        viewport_width=1280,
-        viewport_height=720,
-        visualiser_rect=visualiser_rect,
-    )
-    assert composed is not None
-    _, margin_y = overlay._margin
-    assert composed.screen_rect[1] == margin_y + visualiser_rect[1]
-    assert composed.screen_rect[0] + composed.screen_rect[2] <= visualiser_rect[0] + visualiser_rect[2]
 
 
 def test_layer_management_add_help() -> None:

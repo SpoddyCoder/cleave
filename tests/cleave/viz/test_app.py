@@ -124,7 +124,6 @@ def _minimal_runtime(compositor: MagicMock, *, upscale: float = 2.0) -> LiveVisu
         mix_player=MagicMock(),
         playback=MagicMock(),
         overlay=overlay,
-        help_overlay=MagicMock(),
         timeline_overlay=MagicMock(),
         overlay_surface=pygame.Surface((display_w, display_h), pygame.SRCALPHA),
     )
@@ -268,7 +267,6 @@ def _heavy_init_side_effect(
         mix_player=mix_player,
         playback=playback,
         overlay=overlay,
-        help_overlay=MagicMock(),
         timeline_overlay=MagicMock(),
         overlay_surface=overlay_surface,
     )

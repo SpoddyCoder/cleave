@@ -2,17 +2,15 @@
 
 from __future__ import annotations
 
-from unittest.mock import ANY, MagicMock
+from unittest.mock import MagicMock
 
 import pygame
 
 from cleave.gl_compositor import OverlayTextureSlot
-from cleave.viz.help_overlay import HelpOverlay
 from cleave.viz.overlay_draw import OverlayDrawer
 from cleave.viz.overlay_primitives import ComposedPanel
 from cleave.viz.overlay_profiler import OverlayProfiler
 from cleave.viz.overlay_upload import OverlayGpuState, UploadPlan, UploadSignature
-from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.timeline_overlay import TimelineViewState
 from tests.support.compositor_mock import recording_compositor
 
@@ -72,89 +70,6 @@ def test_draw_tuning_overlay_uses_display_target() -> None:
     compositor.upload_overlay_texture.assert_not_called()
     compositor.draw_overlay.assert_called_once_with(11, 10, 20, 100, 50, 1.0, None)
     compositor.draw_content_overlay.assert_not_called()
-
-
-def test_draw_tuning_overlay_uploads_help_panel() -> None:
-    pygame.init()
-    compositor = recording_compositor()
-    compositor.ensure_overlay_texture.side_effect = [11, 22]
-    compositor.upload_overlay_region.return_value = 22
-
-    overlay = MagicMock()
-    _mock_tuning_compose(overlay)
-    help_overlay = HelpOverlay()
-    view_state = MagicMock()
-    view_state.help_visible = True
-    view_state.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
-    view_state.render_timeline.enabled = False
-    view_state.timeline_submenu_focused = False
-    view_state.paused = False
-    view_state.timeline_recording = False
-    view_state.timeline_override_active = False
-    view_state.tracks = {}
-    overlay_surface = _overlay_surface_mock()
-    help_warm = help_overlay.compose_panel(
-        view_state.focus_descriptor,
-        viewport_width=1280,
-        viewport_height=720,
-    )
-    assert help_warm is not None
-    help_capacity = help_warm.capacity
-
-    OverlayDrawer.draw_tuning(
-        compositor,
-        overlay,
-        overlay_surface,
-        view_state,
-        help_overlay=help_overlay,
-    )
-
-    overlay_surface.fill.assert_not_called()
-    assert compositor.draw_overlay.call_count == 2
-    compositor.draw_overlay.assert_any_call(11, 10, 20, 100, 50, 1.0, None)
-    help_panel = help_overlay.panel_rect
-    assert help_panel is not None
-    compositor.draw_overlay.assert_any_call(22, *help_panel, 1.0, ANY)
-    assert compositor.ensure_overlay_texture.call_count == 2
-    compositor.ensure_overlay_texture.assert_any_call(
-        OverlayTextureSlot.TUNING, 100, 50
-    )
-    compositor.ensure_overlay_texture.assert_any_call(
-        OverlayTextureSlot.HELP,
-        help_capacity[0],
-        help_capacity[1],
-    )
-    compositor.upload_overlay_texture.assert_not_called()
-    assert compositor.upload_overlay_region.call_count == 2
-
-
-def test_draw_tuning_overlay_hides_help_when_overlay_hidden() -> None:
-    pygame.init()
-    compositor = recording_compositor()
-    compositor.ensure_overlay_texture.return_value = 11
-    compositor.upload_overlay_region.return_value = 11
-
-    overlay = MagicMock()
-    _mock_tuning_compose(overlay)
-    help_overlay = HelpOverlay()
-    view_state = MagicMock()
-    view_state.help_visible = True
-    view_state.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
-    overlay_surface = _overlay_surface_mock()
-
-    OverlayDrawer.draw_tuning(
-        compositor,
-        overlay,
-        overlay_surface,
-        view_state,
-        overlay_visible=False,
-        help_overlay=help_overlay,
-    )
-
-    overlay_surface.fill.assert_not_called()
-    compositor.draw_overlay.assert_called_once_with(11, 10, 20, 100, 50, 1.0, None)
-    compositor.upload_overlay_texture.assert_not_called()
-    assert help_overlay.panel_rect is None
 
 
 def _mock_timeline_compose(

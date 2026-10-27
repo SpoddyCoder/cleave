@@ -38,7 +38,6 @@ from cleave.viz.preset_switching import advance_timeline_preset_switching
 from cleave.viz.modal import ModalHost
 from cleave.viz.overlay_draw import OverlayDrawer
 from cleave.viz.loading import LoadingWindow, open_loading_window
-from cleave.viz.help_overlay import HelpOverlay
 from cleave.viz.tuning_panel_draw import TuningOverlay
 from cleave.viz.timeline_controls import TimelineControls
 from cleave.viz.shell_layout import ShellLayout
@@ -114,7 +113,6 @@ class LiveVisualizerRuntime(VisualizerCore):
     mix_player: MixPlayer
     playback: PlaybackState
     overlay: TuningOverlay
-    help_overlay: HelpOverlay
     timeline_overlay: TimelineOverlay
     overlay_surface: pygame.Surface
     render_overlays_panel_cache: RenderOverlaysPanelCache = field(
@@ -327,7 +325,6 @@ def init_gl_resources_heavy(
         mix_player=mix_player,
         playback=playback,
         overlay=TuningOverlay(hold_idle_sec=seed.cfg.editor.ui_fade),
-        help_overlay=HelpOverlay(),
         timeline_overlay=TimelineOverlay(),
         overlay_surface=overlay_surface,
     )
@@ -582,11 +579,8 @@ def _tick_frame_live_overlay(
                 view_state,
                 timeline_panel_open=timeline_panel_open,
                 cue_readout_open=cue_readout_open,
-                overlay_visible=overlay_visibility > 0.01,
-                help_overlay=runtime.help_overlay,
                 profiler=profiler,
                 visualiser_rect=layout.visualiser,
-                shell_focus=runtime.controls.shell_focus,
             )
 
     if timeline_state is not None:

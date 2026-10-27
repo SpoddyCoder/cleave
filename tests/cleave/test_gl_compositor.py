@@ -422,17 +422,17 @@ def test_overlay_slots_are_independent(gl_texture_mocks) -> None:
     tuning_id = compositor.upload_overlay_region(
         OverlayTextureSlot.TUNING, _make_surface(100, 50)
     )
-    help_id = compositor.upload_overlay_region(
-        OverlayTextureSlot.HELP, _make_surface(80, 40)
+    timeline_id = compositor.upload_overlay_region(
+        OverlayTextureSlot.TIMELINE, _make_surface(80, 40)
     )
 
     assert tuning_id == 100
-    assert help_id == 101
+    assert timeline_id == 101
     assert gl_texture_mocks["gen"].call_count == 2
     tuning_state = compositor._overlay_slots[OverlayTextureSlot.TUNING]
-    help_state = compositor._overlay_slots[OverlayTextureSlot.HELP]
+    timeline_state = compositor._overlay_slots[OverlayTextureSlot.TIMELINE]
     assert tuning_state.texture_id == 100
-    assert help_state.texture_id == 101
+    assert timeline_state.texture_id == 101
 
 
 def test_upload_overlay_texture_same_size_uses_subimage(gl_texture_mocks) -> None:
@@ -499,7 +499,7 @@ def test_destroy_deletes_all_slot_textures(gl_texture_mocks) -> None:
         OverlayTextureSlot.TUNING, _make_surface(50, 50)
     )
     compositor.upload_overlay_region(
-        OverlayTextureSlot.HELP, _make_surface(40, 40)
+        OverlayTextureSlot.TIMELINE, _make_surface(40, 40)
     )
     compositor._destroy_content_fbo = MagicMock()
 

@@ -261,35 +261,6 @@ def help_focus_descriptor(
     return None
 
 
-def help_shell_row(
-    shell_focus: ShellFocusState | None,
-    *,
-    timeline_focused: bool,
-) -> tuple[str | int | RowKind | None, ...] | None:
-    """Shell row identity for the help cache. None when help follows *focus*."""
-    if shell_focus is None or timeline_focused:
-        return None
-    if shell_focus.region is ShellRegion.NAVIGATOR:
-        return ("navigator", shell_focus.selected_id)
-    command_id = shell_focus.inspector_command_id
-    if command_id is not None:
-        return ("inspector", "command", command_id)
-    cursor = shell_focus.inspector_cursor
-    if cursor is None:
-        return ("inspector", "empty")
-    return (
-        "inspector",
-        "cursor",
-        cursor.kind,
-        cursor.slot,
-        cursor.card,
-        cursor.effect_id,
-        cursor.driver_slug,
-        cursor.preset_index,
-        cursor.marker_index,
-    )
-
-
 def _layer_key_range_label(layer_count: int) -> str:
     if layer_count <= 1:
         return "1"
@@ -617,7 +588,7 @@ def help_section_kwargs(
     *,
     stop: CycleStop,
 ) -> dict[str, Any]:
-    """Facts shared by the help column and the pygame help overlay."""
+    """Facts the help column passes into section dispatch."""
     focus = view_state.focus_descriptor
     described = _described_row(stop, focus, shell_focus)
     preset_switching = None

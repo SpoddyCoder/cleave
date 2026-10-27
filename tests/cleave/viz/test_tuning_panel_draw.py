@@ -104,7 +104,7 @@ def test_tuning_panel_draw_has_no_rowkind_comparisons() -> None:
 
 _OVERLAY_MODULES_WITHOUT_TUNING_DRAW = (
     "timeline_overlay.py",
-    "help_overlay.py",
+    "help_column.py",
     "modal_overlay.py",
 )
 

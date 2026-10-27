@@ -106,7 +106,6 @@ class OverlayTextureSlot(Enum):
     """Stable GL overlay texture bucket (one texture per slot)."""
 
     TUNING = "tuning"
-    HELP = "help"
     TIMELINE = "timeline"
     FULL_VIEWPORT = "full_viewport"
 

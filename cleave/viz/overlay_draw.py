@@ -5,9 +5,6 @@ from __future__ import annotations
 import pygame
 
 from cleave.gl_compositor import GlCompositor, OverlayTextureSlot
-from cleave.viz.help_content import help_section_kwargs, help_stop_for_shell
-from cleave.viz.help_overlay import HelpOverlay
-from cleave.viz.shell_focus import ShellFocusState, ShellRegion
 from cleave.viz.tuning_panel_draw import TuningOverlay
 from cleave.viz.tuning_view_state import TuningViewState
 from cleave.viz.overlay_profiler import OverlayProfiler
@@ -23,7 +20,6 @@ from cleave.viz.timeline_overlay import TimelineOverlay, TimelineViewState
 _TIMELINE_UPLOAD_COORDINATOR = OverlayUploadCoordinator()
 
 _TUNING_UPLOAD_COORDINATOR = OverlayUploadCoordinator()
-_HELP_UPLOAD_COORDINATOR = OverlayUploadCoordinator()
 
 
 def _note_upload(
@@ -91,27 +87,6 @@ def _present_overlay(
         present_overlay(compositor, tex_id, screen_rect, tex_uv, alpha=alpha)
 
 
-def _timeline_strip_keyboard_scope(
-    view_state: TuningViewState,
-    shell_focus: ShellFocusState | None,
-) -> bool:
-    """Strip keyboard scope is the Timeline region when the shell is known."""
-    if shell_focus is not None:
-        return shell_focus.region is ShellRegion.TIMELINE
-    return view_state.timeline_submenu_focused
-
-
-def _help_compose_kwargs(
-    view_state: TuningViewState,
-    shell_focus: ShellFocusState | None = None,
-) -> dict[str, object]:
-    timeline_focused = _timeline_strip_keyboard_scope(view_state, shell_focus)
-    stop = help_stop_for_shell(shell_focus, timeline_focused=timeline_focused)
-    kwargs = help_section_kwargs(view_state, shell_focus, stop=stop)
-    kwargs["timeline_submenu_focused"] = timeline_focused
-    return kwargs
-
-
 class OverlayDrawer:
     """Upload pygame overlay surfaces to the display framebuffer."""
 
@@ -124,15 +99,11 @@ class OverlayDrawer:
         *,
         timeline_panel_open: bool = False,
         cue_readout_open: bool = False,
-        overlay_visible: bool = True,
-        help_overlay: HelpOverlay | None = None,
         profiler: OverlayProfiler | None = None,
         visualiser_rect: tuple[int, int, int, int] | None = None,
-        shell_focus: ShellFocusState | None = None,
     ) -> None:
         viewport_w, viewport_h = overlay_surface.get_size()
         counters = profiler.counters() if profiler is not None else None
-        show_help = view_state.help_visible and overlay_visible
 
         composed = overlay.compose_panel(
             view_state,
@@ -162,33 +133,6 @@ class OverlayDrawer:
                 composed.screen_rect,
                 tex_uv,
             )
-
-        if help_overlay is not None and show_help:
-            help_composed = help_overlay.compose_panel(
-                viewport_width=viewport_w,
-                viewport_height=viewport_h,
-                visualiser_rect=visualiser_rect,
-                **_help_compose_kwargs(view_state, shell_focus),
-            )
-            if help_composed is not None:
-                help_tex_id, help_tex_uv = _coordinator_upload(
-                    profiler,
-                    compositor,
-                    _HELP_UPLOAD_COORDINATOR,
-                    OverlayTextureSlot.HELP,
-                    help_composed.upload_surface,
-                    help_composed.upload_plan,
-                    help_composed.capacity,
-                    help_overlay.gpu_state,
-                    help_composed.upload_signature,
-                )
-                _present_overlay(
-                    profiler,
-                    compositor,
-                    help_tex_id,
-                    help_composed.screen_rect,
-                    help_tex_uv,
-                )
 
     @staticmethod
     def draw_timeline(

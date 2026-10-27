@@ -100,7 +100,6 @@ def _make_runtime(
         post_process=MagicMock(),
         masked_compositor=MagicMock(),
         overlay=TuningOverlay(),
-        help_overlay=MagicMock(),
         timeline_overlay=MagicMock(),
         overlay_surface=pygame.Surface((2560, 1440), pygame.SRCALPHA),
         controls=MagicMock(),
