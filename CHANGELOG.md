@@ -11,6 +11,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- Help is a resizable column beside the inspector. It follows the focused region and no longer covers the visualiser.
 - Toasts sit in the visualiser corner and clear with Enter or a click. The tuning panel no longer draws them.
 - Dialogs draw above the navigator and inspector and respond to the mouse: click an option, click outside or press Esc to cancel, click the text field to place the caret.
 - Settings switches to a docked layout with the navigator and inspector on the left and the visualiser filling the rest, remembers navigator and inspector widths in user editor settings (not the project file), opens a menu with Alt plus its underlined letter, and keeps a visible focus ring on the focused shell row when hovered.

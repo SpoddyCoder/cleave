@@ -50,7 +50,7 @@ These are lower risk than the shipped P0-P4 flaws. Keep the boundaries.
 
 Clip, font, panel chrome, `ComposedPanel`, and `visibility_bucket` live in [overlay_primitives.py](../../cleave/viz/overlay_primitives.py). Timeline, help, and modal do not import [tuning_panel_draw.py](../../cleave/viz/tuning_panel_draw.py). `render_visibility_icon` is imported from [row_present_renderers.py](../../cleave/viz/row_present_renderers.py). GL upload and dirty rects live in [overlay_upload.py](../../cleave/viz/overlay_upload.py) and [overlay_draw.py](../../cleave/viz/overlay_draw.py).
 
-The strip still owns its own compose, cache, and live-patch domain (bars, cues, glyphs). Help ([help_overlay.py](../../cleave/viz/help_overlay.py)) and modals ([modal_overlay.py](../../cleave/viz/modal_overlay.py)) are further stacks but smaller.
+The strip still owns its own compose, cache, and live-patch domain (bars, cues, glyphs). Help ([help_column.py](../../cleave/viz/help_column.py) in [shell_layout.py](../../cleave/viz/shell_layout.py)) and modals ([modal_overlay.py](../../cleave/viz/modal_overlay.py)) are further stacks but smaller.
 
 Do not fold the timeline strip into `RowLayout` (it is a panel anchor by design).
 

@@ -58,6 +58,7 @@ class CommandContext:
     post_fx_locked: bool = False
     pattern_mask_locked: bool = False
     shell_layout_mode: str = DEFAULT_SHELL_LAYOUT_MODE
+    help_visible: bool = False
 
 
 def _disabled(_ctx: CommandContext) -> bool:
@@ -135,6 +136,7 @@ def command_context(controls: Any) -> CommandContext:
         post_fx_locked=bool(post_fx.locked),
         pattern_mask_locked=bool(pattern_mask.locked),
         shell_layout_mode=controls.cfg.editor.shell_layout_mode,
+        help_visible=bool(session.help_visible),
     )
 
 
@@ -211,6 +213,10 @@ def _run_measure_latency(controls: Any) -> None:
 
 def _docked_layout_checked(ctx: CommandContext) -> bool:
     return ctx.shell_layout_mode == "docked"
+
+
+def _help_checked(ctx: CommandContext) -> bool:
+    return ctx.help_visible
 
 
 def _run_toggle_shell_layout(controls: Any) -> None:
@@ -515,18 +521,20 @@ _MEASURE_LATENCY = Command(
 
 _HELP_OVERLAY = Command(
     id="help.overlay",
-    label="Help overlay",
-    kind="command",
+    label="Help",
+    kind="check",
     shortcut="H",
     enabled=_enabled,
     run=_toggle_help,
+    checked=_help_checked,
 )
 _HELP_SHORTCUTS = Command(
     id="help.shortcuts",
     label="Keyboard shortcuts",
-    kind="command",
+    kind="check",
     enabled=_enabled,
     run=_toggle_help,
+    checked=_help_checked,
 )
 _ABOUT = _later("help.about", "About Cleave", "command")
 

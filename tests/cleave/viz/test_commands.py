@@ -415,10 +415,27 @@ def test_wired_run_calls_controllers() -> None:
     assert curation.checked(CommandContext()) is False
     assert curation.checked(CommandContext(editor_mode="preset_curation")) is True
 
-    command_by_id("help.overlay", menus).run(controls)
+    help_item = command_by_id("help.overlay", menus)
+    shortcuts = command_by_id("help.shortcuts", menus)
+    assert help_item.label == "Help"
+    assert help_item.kind == "check"
+    assert help_item.shortcut == "H"
+    assert shortcuts.label == "Keyboard shortcuts"
+    assert shortcuts.kind == "check"
+    assert shortcuts.shortcut is None
+    assert help_item.checked is not None
+    assert shortcuts.checked is help_item.checked
+    assert help_item.checked(CommandContext()) is False
+    assert help_item.checked(CommandContext(help_visible=True)) is True
+    assert command_context(controls).help_visible is False
+
+    help_item.run(controls)
     assert controls.session.help_visible is True
-    command_by_id("help.shortcuts", menus).run(controls)
+    assert help_item.checked(command_context(controls)) is True
+    assert shortcuts.checked(command_context(controls)) is True
+    shortcuts.run(controls)
     assert controls.session.help_visible is False
+    assert help_item.checked(command_context(controls)) is False
 
 
 def test_request_quit_clean_sets_pending_exit() -> None:

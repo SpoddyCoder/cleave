@@ -8,7 +8,7 @@ alwaysApply: false
 
 # Live tuning overlay
 
-The shell is a menu bar, a navigator, an inspector, and a timeline strip. Session state becomes view state; inspector pages come from section defs in `row_sections.py`. Toasts are an ImGui top-layer window in the visualiser corner. `RowLayout` no longer draws them. Overlay Latin text uses bundled DejaVu Sans Mono; icons use Material Icons in `assets/fonts/`.
+The shell is a menu bar, a navigator, an inspector, an optional help column, and a timeline strip. Help is an ImGui column beside the inspector. It does not cover the visualiser. Width is an editor preference. Session state becomes view state; inspector pages come from section defs in `row_sections.py`. Toasts are an ImGui top-layer window in the visualiser corner. `RowLayout` no longer draws them. Overlay Latin text uses bundled DejaVu Sans Mono; icons use Material Icons in `assets/fonts/`.
 
 ## Where new fields go
 
@@ -47,6 +47,6 @@ Label+value rows: prefix in `LABEL`, value in the row value color. Expand arrows
 
 ## Keyboard dispatch
 
-Layered in `input_dispatch.py`. Modal keys first. Then Tab / Shift+Tab cycles Menu, Navigator, Inspector, and Timeline. Timeline is skipped when the strip is closed. Then the menu bar, command shortcuts, and Ctrl+Up / Ctrl+Down (previous / next top-level navigator node; no effect while the menu bar is focused). Navigator and inspector own their arrows, Enter, Esc, and PageUp/PageDown. An open strip does not take keys. Timeline takes arrows, Enter, Esc, and cue keys only while that region is active. `h` stays global even when the strip has focus. There is no panel region and no main-list focus ring.
+Layered in `input_dispatch.py`. Modal keys first. Then Tab / Shift+Tab cycles Menu, Navigator, Inspector, Help, and Timeline. Help is skipped when the column is closed. Timeline is skipped when the strip is closed. Then the menu bar, command shortcuts, and Ctrl+Up / Ctrl+Down (previous / next top-level navigator node; no effect while the menu bar is focused). Navigator and inspector own their arrows, Enter, Esc, and PageUp/PageDown. An open strip does not take keys. Timeline takes arrows, Enter, Esc, and cue keys only while that region is active. `h` toggles the help column and stays global. Opening help does not move focus. Esc while Help is focused closes the column and restores the previous stop. It does not hide the UI. There is no panel region and no main-list focus ring.
 
 `row_hotkeys.handle_row_hotkey` is the per-descriptor path for letter, Delete, and Backspace keys, used by the navigator and the inspector.
