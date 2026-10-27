@@ -5,8 +5,6 @@ from __future__ import annotations
 import re
 from typing import Protocol
 
-import pygame
-
 
 class TextSizer(Protocol):
     """Something that can measure a string. A pygame font satisfies this."""
@@ -130,7 +128,7 @@ def _split_meta_parts(label: str) -> tuple[str, str, str]:
     return prefix, head, suffix
 
 
-def fit_text_to_width(font: pygame.font.Font, text: str, max_px: int) -> str:
+def fit_text_to_width(font: TextSizer, text: str, max_px: int) -> str:
     """Shorten text with a trailing ellipsis until it fits max_px."""
     if not text or max_px <= 0:
         return ""
@@ -149,7 +147,7 @@ def fit_text_to_width(font: pygame.font.Font, text: str, max_px: int) -> str:
     return text[:lo] + ellipsis if lo < len(text) else text
 
 
-def fit_path_label_to_width(font: pygame.font.Font, label: str, max_px: int) -> str:
+def fit_path_label_to_width(font: TextSizer, label: str, max_px: int) -> str:
     """Shorten a path for overlay width; keep the tail (subdir + filename)."""
     if not label or max_px <= 0:
         return ""
@@ -177,14 +175,14 @@ def fit_path_label_to_width(font: pygame.font.Font, label: str, max_px: int) -> 
     return best
 
 
-def _fit_label_head(font: pygame.font.Font, head: str, max_px: int) -> str:
+def _fit_label_head(font: TextSizer, head: str, max_px: int) -> str:
     """Fit the non-meta head: path-style when it contains ``/``, else keep the start."""
     if "/" in head:
         return fit_path_label_to_width(font, head, max_px)
     return fit_text_to_width(font, head, max_px)
 
 
-def fit_counter_label_to_width(font: pygame.font.Font, label: str, max_px: int) -> str:
+def fit_counter_label_to_width(font: TextSizer, label: str, max_px: int) -> str:
     """Shorten a path or filename to max_px; preserve counter and must-include markers."""
     prefix, head, suffix = _split_meta_parts(label)
     if not prefix and not suffix:

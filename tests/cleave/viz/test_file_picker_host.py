@@ -72,7 +72,7 @@ def _run_with_events(
     with (
         patch("pygame.event.get", side_effect=next_batch),
         patch("pygame.display.flip"),
-        patch("cleave.viz.file_picker_host._present"),
+        patch("cleave.viz.file_picker_host.present_frame"),
         patch("cleave.viz.file_picker.projects_dir", return_value=start),
     ):
         return run_file_picker(window)
@@ -136,15 +136,45 @@ def test_window_close_stops_the_loop(tmp_path: Path) -> None:
     assert window.quit_requested
 
 
+def test_mouse_without_imgui_is_ignored(tmp_path: Path) -> None:
+    window = _mock_window()
+    window.imgui = None
+    motion = pygame.event.Event(
+        pygame.MOUSEMOTION, pos=(4, 5), rel=(0, 0), buttons=(0, 0, 0)
+    )
+
+    assert (
+        _run_with_events(window, [[motion, _keydown(pygame.K_ESCAPE)]], tmp_path)
+        is None
+    )
+
+
+def test_mouse_events_reach_imgui(tmp_path: Path) -> None:
+    window = _mock_window()
+    window.imgui = MagicMock()
+    motion = pygame.event.Event(
+        pygame.MOUSEMOTION, pos=(4, 5), rel=(0, 0), buttons=(0, 0, 0)
+    )
+    wheel = pygame.event.Event(pygame.MOUSEWHEEL, x=0, y=-1)
+
+    _run_with_events(
+        window, [[motion, wheel, _keydown(pygame.K_ESCAPE)]], tmp_path
+    )
+
+    assert window.imgui.process_mouse_event.call_count == 2
+
+
 def test_show_picker_error_any_key_returns_true(tmp_path: Path) -> None:
     window = _mock_window()
     batches = [[], [_keydown(pygame.K_SPACE)]]
 
     with (
         patch("pygame.event.get", side_effect=lambda: batches.pop(0)),
-        patch("cleave.viz.file_picker_host._present"),
+        patch("cleave.viz.file_picker_host.present_frame") as present,
     ):
         assert show_picker_error(window, "demucs blew up") is True
+    present.assert_called()
+    assert present.call_args.kwargs["scrim"] is True
     assert not window.quit_requested
 
 
@@ -154,7 +184,7 @@ def test_show_picker_error_quit_returns_false() -> None:
 
     with (
         patch("pygame.event.get", side_effect=lambda: batches.pop(0)),
-        patch("cleave.viz.file_picker_host._present"),
+        patch("cleave.viz.file_picker_host.present_frame"),
     ):
         assert show_picker_error(window, "boom") is False
     assert window.quit_requested

@@ -7,27 +7,15 @@ Prompt and error copy use the info panel. Download progress goes through
 from __future__ import annotations
 
 import pygame
-from OpenGL.GL import (
-    GL_COLOR_BUFFER_BIT,
-    GL_FRAMEBUFFER,
-    glBindFramebuffer,
-    glClear,
-    glClearColor,
-    glViewport,
-)
 
 from cleave.starter_packs import (
     StarterPackCancelled,
     StarterPackError,
     download_starter_packs,
 )
-from cleave.viz.loading import LoadingWindow
 from cleave.viz.info_panel import InfoPanelViewState
-from cleave.viz.modal_overlay import draw_info
-from cleave.viz.overlay_primitives import overlay_font
-from cleave.viz.theme import BACKGROUND
+from cleave.viz.loading import LoadingWindow, present_frame
 
-_FONT_SIZE = 20
 _TICK_FPS = 60
 _ERROR_FOOTER = "Press any key to continue"
 
@@ -41,24 +29,14 @@ _PROMPT_STATE = InfoPanelViewState(
 )
 
 
-def _present(window: LoadingWindow, surface: pygame.Surface) -> None:
-    texture_id = window.compositor.upload_overlay_texture(surface)
-    glBindFramebuffer(GL_FRAMEBUFFER, 0)
-    glViewport(0, 0, window.display_width, window.display_height)
-    red, green, blue = BACKGROUND
-    glClearColor(red / 255.0, green / 255.0, blue / 255.0, 1.0)
-    glClear(GL_COLOR_BUFFER_BIT)
-    window.compositor.draw_overlay(
-        texture_id, 0, 0, window.display_width, window.display_height
-    )
-    pygame.display.flip()
+def _present_info(window: LoadingWindow, state: InfoPanelViewState, dt: float) -> None:
+    """Draw one info panel inside the loading frame. The scrim is already there."""
+    from cleave.viz.top_layer import InfoPanelSurface
 
+    def draw() -> None:
+        InfoPanelSurface(state).draw()
 
-def _draw_info(window: LoadingWindow, state: InfoPanelViewState) -> None:
-    font = overlay_font(_FONT_SIZE)
-    window.overlay_surface.fill((0, 0, 0, 0))
-    draw_info(window.overlay_surface, state, font=font)
-    _present(window, window.overlay_surface)
+    present_frame(window, draw, scrim=True, dt=dt)
 
 
 def _show_error(window: LoadingWindow, message: str) -> bool:
@@ -76,8 +54,8 @@ def _show_error(window: LoadingWindow, message: str) -> bool:
                 return False
             if event.type == pygame.KEYDOWN:
                 return True
-        clock.tick(_TICK_FPS)
-        _draw_info(window, state)
+        dt_sec = clock.tick(_TICK_FPS) / 1000.0
+        _present_info(window, state, dt_sec)
 
 
 def run_starter_pack_prompt(window: LoadingWindow) -> bool | None:
@@ -98,8 +76,8 @@ def run_starter_pack_prompt(window: LoadingWindow) -> bool | None:
                 return _run_download(window)
             if event.key in (pygame.K_n, pygame.K_ESCAPE):
                 return False
-        clock.tick(_TICK_FPS)
-        _draw_info(window, _PROMPT_STATE)
+        dt_sec = clock.tick(_TICK_FPS) / 1000.0
+        _present_info(window, _PROMPT_STATE, dt_sec)
     return None
 
 

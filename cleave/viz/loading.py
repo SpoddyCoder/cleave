@@ -4,11 +4,13 @@ Optional detail line and determinate progress bar when a job reports a
 fraction. Indeterminate waits stay message-only.
 
 ``LoadingWindow`` is the pre-project pygame/GL handle: open the window,
-draw phase messages, then hand the same display to ``continue_launch``.
+draw phase messages with ImGui, then hand the same display to
+``continue_launch``.
 """
 
 from __future__ import annotations
 
+import functools
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
@@ -26,14 +28,10 @@ from OpenGL.GL import (
 from cleave.config_schema.editor import editor_display_size
 from cleave.gl_color_format import RGBA8
 from cleave.gl_compositor import GlCompositor
-from cleave.viz.overlay_primitives import (
-    draw_panel_border,
-    overlay_font,
-    overlay_panel_surface,
-)
-from cleave.viz.text_fit import fit_text_to_width
+from cleave.viz.text_fit import TextSizer, fit_text_to_width
 from cleave.viz.theme import (
     BACKGROUND,
+    BORDER_COLOR,
     BORDER_WIDTH,
     LABEL,
     UI_SCALE,
@@ -42,17 +40,64 @@ from cleave.viz.theme import (
 )
 
 if TYPE_CHECKING:
+    from imgui_bundle import imgui
+
     from cleave.viz.imgui_host import ImGuiHost
 
-_FONT_SIZE = 28
-_DETAIL_FONT_SIZE = 18
+
+@functools.cache
+def _imgui():
+    from imgui_bundle import imgui as imgui_mod
+
+    return imgui_mod
+
+
+def _rgba(rgb: tuple[int, int, int], alpha: float = 1.0) -> imgui.ImVec4:
+    return _imgui().ImVec4(
+        rgb[0] / 255.0, rgb[1] / 255.0, rgb[2] / 255.0, alpha
+    )
+
+
+@functools.cache
+def _loading_flags() -> int:
+    imgui = _imgui()
+    return (
+        int(imgui.WindowFlags_.no_title_bar)
+        | int(imgui.WindowFlags_.no_resize)
+        | int(imgui.WindowFlags_.no_move)
+        | int(imgui.WindowFlags_.no_saved_settings)
+        | int(imgui.WindowFlags_.no_focus_on_appearing)
+        | int(imgui.WindowFlags_.no_nav)
+        | int(imgui.WindowFlags_.no_bring_to_front_on_focus)
+        | int(imgui.WindowFlags_.no_scrollbar)
+        | int(imgui.WindowFlags_.no_scroll_with_mouse)
+        | int(imgui.WindowFlags_.no_background)
+    )
+
+
+@functools.cache
+def _scrim_flags() -> int:
+    imgui = _imgui()
+    return (
+        int(imgui.WindowFlags_.no_title_bar)
+        | int(imgui.WindowFlags_.no_resize)
+        | int(imgui.WindowFlags_.no_move)
+        | int(imgui.WindowFlags_.no_saved_settings)
+        | int(imgui.WindowFlags_.no_focus_on_appearing)
+        | int(imgui.WindowFlags_.no_nav)
+        | int(imgui.WindowFlags_.no_bring_to_front_on_focus)
+        | int(imgui.WindowFlags_.no_scrollbar)
+        | int(imgui.WindowFlags_.no_scroll_with_mouse)
+    )
+
+
 _BAR_WIDTH_FRACTION = 0.4
 _TEXT_MAX_WIDTH_FRACTION = 0.8
 _BAR_HEIGHT = scale_px(10, scale=UI_SCALE)
 _LINE_GAP = scale_px(8, scale=UI_SCALE)
 _BAR_GAP = scale_px(16, scale=UI_SCALE)
-
-_loading_font: pygame.font.Font | None = None
+_LOADING_WINDOW = "##loading"
+_SCRIM_WINDOW = "##loading-scrim"
 
 # Future separate/download hook: (message, fraction). fraction None = named wait, no bar.
 LoadingProgress = Callable[[str, float | None], None]
@@ -135,68 +180,104 @@ def loading_content_layout(
     )
 
 
-def _loading_font_get() -> pygame.font.Font:
-    global _loading_font
-    if _loading_font is None:
-        _loading_font = overlay_font(_FONT_SIZE)
-    return _loading_font
+class _ImGuiTextSize:
+    """``TextSizer`` for the current ImGui font. Valid only inside a frame."""
+
+    def size(self, text: str) -> tuple[int, int]:
+        imgui = _imgui()
+        measured = imgui.calc_text_size(text)
+        return (int(measured.x), int(measured.y))
 
 
-def _detail_font_get() -> pygame.font.Font:
-    return overlay_font(_DETAIL_FONT_SIZE)
+def _packed(role: tuple[int, int, int]) -> int:
+    imgui = _imgui()
+    return int(imgui.get_color_u32(_rgba(role)))
+
+
+def _style_color(slot: imgui.Col_) -> imgui.ImVec4:
+    imgui = _imgui()
+    color = imgui.get_style().color_(slot)
+    return imgui.ImVec4(color.x, color.y, color.z, color.w)
+
+
+def _raise_window(name: str) -> None:
+    imgui = _imgui()
+    imgui.internal.bring_window_to_display_front(
+        imgui.internal.find_window_by_name(name)
+    )
+
+
+def _text(
+    draw: imgui.ImDrawList,
+    x: int,
+    y: int,
+    text: str,
+    role: tuple[int, int, int],
+) -> None:
+    if not text:
+        return
+    imgui = _imgui()
+    draw.add_text(imgui.ImVec2(float(x), float(y)), _packed(role), text)
 
 
 def _draw_loading_bar(
-    surface: pygame.Surface,
+    draw: imgui.ImDrawList,
     bar_rect: tuple[int, int, int, int],
     fill_rect: tuple[int, int, int, int] | None,
 ) -> None:
-    x, y, w, h = bar_rect
-    bar = overlay_panel_surface((w, h), fill_alpha=255)
+    imgui = _imgui()
+    x, y, width, height = bar_rect
+    draw.add_rect_filled(
+        imgui.ImVec2(float(x), float(y)),
+        imgui.ImVec2(float(x + width), float(y + height)),
+        _packed(BACKGROUND),
+    )
     if fill_rect is not None:
-        fx, fy, fw, fh = fill_rect
-        pygame.draw.rect(bar, VALUE, (fx - x, fy - y, fw, fh))
-    draw_panel_border(bar)
-    surface.blit(bar, (x, y))
-
-
-def compose_loading_surface(
-    message: str,
-    display_width: int,
-    display_height: int,
-    *,
-    fraction: float | None = None,
-    detail: str | None = None,
-) -> pygame.Surface:
-    """Blit message, optional detail, and optional bar onto an overlay surface."""
-    message_surface = _loading_font_get().render(message, True, VALUE)
-
-    detail_surface: pygame.Surface | None = None
-    if detail:
-        max_w = max(1, int(display_width * _TEXT_MAX_WIDTH_FRACTION))
-        fitted = fit_text_to_width(_detail_font_get(), detail, max_w)
-        if fitted:
-            detail_surface = _detail_font_get().render(fitted, True, LABEL)
-
-    layout = loading_content_layout(
-        display_width,
-        display_height,
-        message_surface.get_size(),
-        detail_size=None if detail_surface is None else detail_surface.get_size(),
-        fraction=fraction,
+        fill_x, fill_y, fill_w, fill_h = fill_rect
+        draw.add_rect_filled(
+            imgui.ImVec2(float(fill_x), float(fill_y)),
+            imgui.ImVec2(float(fill_x + fill_w), float(fill_y + fill_h)),
+            _packed(VALUE),
+        )
+    draw.add_rect(
+        imgui.ImVec2(float(x), float(y)),
+        imgui.ImVec2(float(x + width), float(y + height)),
+        _packed(BORDER_COLOR),
+        0.0,
+        0,
+        float(BORDER_WIDTH),
     )
 
-    surface = pygame.Surface((display_width, display_height), pygame.SRCALPHA)
-    surface.blit(message_surface, layout.message_xy)
-    if detail_surface is not None and layout.detail_xy is not None:
-        surface.blit(detail_surface, layout.detail_xy)
-    if layout.bar_rect is not None:
-        _draw_loading_bar(surface, layout.bar_rect, layout.fill_rect)
-    return surface
+
+def _draw_scrim() -> None:
+    imgui = _imgui()
+    display = imgui.get_io().display_size
+    imgui.set_next_window_pos(imgui.ImVec2(0.0, 0.0), imgui.Cond_.always)
+    imgui.set_next_window_size(
+        imgui.ImVec2(display.x, display.y), imgui.Cond_.always
+    )
+    imgui.push_style_color(
+        imgui.Col_.window_bg,
+        _style_color(imgui.Col_.modal_window_dim_bg),
+    )
+    imgui.push_style_var(imgui.StyleVar_.window_border_size, 0.0)
+    try:
+        imgui.begin(_SCRIM_WINDOW, None, _scrim_flags())
+        try:
+            _raise_window(_SCRIM_WINDOW)
+        finally:
+            imgui.end()
+    finally:
+        imgui.pop_style_var()
+        imgui.pop_style_color()
 
 
-def draw_loading_screen(
-    compositor: GlCompositor,
+def _fitted_detail(detail: str, display_width: int, measure: TextSizer) -> str:
+    max_w = max(1, int(display_width * _TEXT_MAX_WIDTH_FRACTION))
+    return fit_text_to_width(measure, detail, max_w)
+
+
+def draw_loading_content(
     message: str,
     display_width: int,
     display_height: int,
@@ -204,23 +285,102 @@ def draw_loading_screen(
     fraction: float | None = None,
     detail: str | None = None,
 ) -> None:
-    surface = compose_loading_surface(
-        message,
+    """Draw the centred loading block into the current ImGui frame."""
+    imgui = _imgui()
+    measure = _ImGuiTextSize()
+    message_size = measure.size(message) if message else (0, 0)
+    fitted = ""
+    detail_size: tuple[int, int] | None = None
+    if detail:
+        fitted = _fitted_detail(detail, display_width, measure)
+        if fitted:
+            detail_size = measure.size(fitted)
+    layout = loading_content_layout(
         display_width,
         display_height,
+        message_size,
+        detail_size=detail_size,
         fraction=fraction,
-        detail=detail,
     )
-    texture_id = compositor.upload_overlay_texture(surface)
 
+    imgui.set_next_window_pos(imgui.ImVec2(0.0, 0.0), imgui.Cond_.always)
+    imgui.set_next_window_size(
+        imgui.ImVec2(float(display_width), float(display_height)),
+        imgui.Cond_.always,
+    )
+    pushed = 0
+    begun = False
+    try:
+        imgui.push_style_var(imgui.StyleVar_.window_padding, imgui.ImVec2(0.0, 0.0))
+        pushed += 1
+        imgui.push_style_var(imgui.StyleVar_.window_border_size, 0.0)
+        pushed += 1
+        imgui.begin(_LOADING_WINDOW, None, _loading_flags())
+        begun = True
+        _raise_window(_LOADING_WINDOW)
+        draw = imgui.get_window_draw_list()
+        _text(draw, layout.message_xy[0], layout.message_xy[1], message, VALUE)
+        if fitted and layout.detail_xy is not None:
+            _text(draw, layout.detail_xy[0], layout.detail_xy[1], fitted, LABEL)
+        if layout.bar_rect is not None:
+            _draw_loading_bar(draw, layout.bar_rect, layout.fill_rect)
+    finally:
+        if begun:
+            imgui.end()
+        if pushed:
+            imgui.pop_style_var(pushed)
+
+
+def _clear_display(width: int, height: int) -> None:
     glBindFramebuffer(GL_FRAMEBUFFER, 0)
-    glViewport(0, 0, display_width, display_height)
-    r, g, b = BACKGROUND
-    glClearColor(r / 255.0, g / 255.0, b / 255.0, 1.0)
+    glViewport(0, 0, width, height)
+    red, green, blue = BACKGROUND
+    glClearColor(red / 255.0, green / 255.0, blue / 255.0, 1.0)
     glClear(GL_COLOR_BUFFER_BIT)
 
-    compositor.draw_overlay(texture_id, 0, 0, display_width, display_height)
+
+def present_frame(
+    window: LoadingWindow,
+    draw: Callable[[], None],
+    *,
+    scrim: bool = False,
+    dt: float = 1.0 / 60.0,
+) -> None:
+    """Clear the framebuffer, run one ImGui frame, and flip.
+
+    ``draw`` runs inside the frame, after the scrim when ``scrim`` is set.
+    No ImGui host skips the clear, the frame, and the callback.
+    """
+    host = window.imgui
+    if host is None:
+        return
+    _clear_display(window.display_width, window.display_height)
+    host.begin_frame(dt)
+    try:
+        if scrim:
+            _draw_scrim()
+        draw()
+    finally:
+        host.end_frame()
     pygame.display.flip()
+
+
+@dataclass
+class _LoadingDraw:
+    message: str
+    display_width: int
+    display_height: int
+    fraction: float | None = None
+    detail: str | None = None
+
+    def __call__(self) -> None:
+        draw_loading_content(
+            self.message,
+            self.display_width,
+            self.display_height,
+            fraction=self.fraction,
+            detail=self.detail,
+        )
 
 
 _GL_DISPLAY_FLAGS = pygame.OPENGL | pygame.DOUBLEBUF
@@ -239,7 +399,7 @@ def _set_gl_mode(width: int, height: int) -> None:
 
 @dataclass
 class LoadingWindow:
-    """OpenGL display plus overlay compositor for boot and stem-split progress."""
+    """OpenGL display and ImGui host for boot and stem-split progress."""
 
     compositor: GlCompositor
     display_width: int
@@ -262,13 +422,16 @@ class LoadingWindow:
                 return False
         if self.quit_requested:
             return False
-        draw_loading_screen(
-            self.compositor,
-            message,
-            self.display_width,
-            self.display_height,
-            fraction=fraction,
-            detail=detail,
+        present_frame(
+            self,
+            _LoadingDraw(
+                message,
+                self.display_width,
+                self.display_height,
+                fraction,
+                detail,
+            ),
+            scrim=False,
         )
         return True
 

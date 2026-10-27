@@ -345,3 +345,79 @@ def test_active_shortcut_clears_when_not_on_a_shortcut(
 ) -> None:
     picker = FilePicker(current=tmp_path)
     assert picker.view_state().active_shortcut is None
+
+
+def test_select_row_focuses_without_opening(tmp_path: Path) -> None:
+    song = _wav(tmp_path, "song.wav")
+    picker = FilePicker(current=tmp_path)
+    picker.status = "nope"
+    picker.focus = PickerFocus.SHORTCUTS
+    picker.select_row(1)
+
+    assert picker.focus is PickerFocus.LIST
+    assert picker.selected_index == 1
+    assert picker.status == ""
+    assert picker.current == tmp_path
+    assert picker.selected_row is not None
+    assert picker.selected_row.target == song
+
+    picker.select_row(99)
+    assert picker.selected_index == 1
+    assert picker.current == tmp_path
+
+
+def test_open_row_audio_returns_target(tmp_path: Path) -> None:
+    song = _wav(tmp_path, "song.wav")
+    picker = FilePicker(current=tmp_path)
+    picker.select_row(1)
+
+    target = picker.open_row()
+
+    assert target is not None
+    assert target.kind is OpenTargetKind.AUDIO
+    assert target.path == song
+
+
+def test_open_row_directory_navigates(tmp_path: Path) -> None:
+    folder = tmp_path / "music"
+    folder.mkdir()
+    picker = FilePicker(current=tmp_path)
+    assert picker.rows[1].kind is PickerRowKind.DIRECTORY
+    picker.select_row(1)
+
+    assert picker.open_row() is None
+    assert picker.current == folder
+
+
+def test_open_row_note_does_nothing(tmp_path: Path) -> None:
+    for index in range(MAX_ROWS + 1):
+        (tmp_path / f"dir{index:04d}").mkdir()
+    picker = FilePicker(current=tmp_path)
+    note = len(picker.rows) - 1
+    assert picker.rows[note].kind is PickerRowKind.NOTE
+    picker.select_row(note)
+
+    assert picker.open_row() is None
+    assert picker.current == tmp_path
+    assert picker.selected_index == note
+
+
+def test_scroll_rows_matches_up_and_down(tmp_path: Path) -> None:
+    _wav(tmp_path, "a.wav")
+    _wav(tmp_path, "b.wav")
+    picker = FilePicker(current=tmp_path)
+    picker.select_row(1)
+    picker.status = "stale"
+
+    picker.scroll_rows(1)
+    assert picker.selected_index == 2
+    assert picker.focus is PickerFocus.LIST
+    assert picker.status == ""
+
+    picker.scroll_rows(-1)
+    assert picker.selected_index == 1
+
+    picker.select_row(0)
+    picker.scroll_rows(-1)
+    assert picker.focus is PickerFocus.SHORTCUTS
+    assert picker.selected_index == 0

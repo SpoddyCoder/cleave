@@ -11,6 +11,9 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- The starter-pack prompt and the launch error panels draw in the editor UI.
+- The launch file picker draws in the editor UI and takes the mouse: click a row, double-click to open, click a shortcut, and wheel to scroll.
+- Loading progress draws in the editor UI instead of a pygame overlay.
 - Help is a resizable column beside the inspector. It follows the focused region and no longer covers the visualiser.
 - Toasts sit in the visualiser corner and clear with Enter or a click. The tuning panel no longer draws them.
 - Dialogs draw above the navigator and inspector and respond to the mouse: click an option, click outside or press Esc to cancel, click the text field to place the caret.

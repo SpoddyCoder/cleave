@@ -49,7 +49,7 @@ These are lower risk than the shipped P0-P4 flaws. Keep the boundaries.
 
 Clip, font, panel chrome, `ComposedPanel`, and `visibility_bucket` live in [overlay_primitives.py](../../cleave/viz/overlay_primitives.py). `render_visibility_icon` is imported from [row_present_renderers.py](../../cleave/viz/row_present_renderers.py). GL upload and dirty rects live in [overlay_upload.py](../../cleave/viz/overlay_upload.py) and [overlay_draw.py](../../cleave/viz/overlay_draw.py).
 
-The strip still owns its own compose, cache, and live-patch domain (bars, cues, glyphs). Help ([help_column.py](../../cleave/viz/help_column.py) in [shell_layout.py](../../cleave/viz/shell_layout.py)) and modals ([modal_overlay.py](../../cleave/viz/modal_overlay.py)) are further stacks but smaller. The strip stays its own host.
+The strip still owns its own compose, cache, and live-patch domain (bars, cues, glyphs). Help ([help_column.py](../../cleave/viz/help_column.py) in [shell_layout.py](../../cleave/viz/shell_layout.py)) and modals ([modal_surface.py](../../cleave/viz/modal_surface.py)) are further stacks but smaller. The strip stays its own host.
 
 ### Generative timeline is a second domain (~4,300 lines)
 

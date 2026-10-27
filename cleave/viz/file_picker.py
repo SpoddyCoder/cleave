@@ -1,8 +1,8 @@
-"""Keyboard file browser state for opening an audio file or a Cleave project.
+"""File browser state for opening an audio file or a Cleave project.
 
 Pure state and view state: no pygame import, not even key constants. The host
-maps real key events onto :class:`PickerAction` and the payload-carrying
-methods, then draws :meth:`FilePicker.view_state`.
+maps keys onto :class:`PickerAction` and pointer hits onto the row, shortcut,
+and scroll methods, then draws :meth:`FilePicker.view_state`.
 """
 
 from __future__ import annotations
@@ -388,6 +388,31 @@ class FilePicker:
             self.show_drives()
         elif shortcut.target is not None:
             self.navigate_to(shortcut.target)
+
+    def select_row(self, index: int) -> None:
+        """Highlight a listing row. Does not open it."""
+        self.focus = PickerFocus.LIST
+        self.status = ""
+        if 0 <= index < len(self._rows):
+            self.selected_index = index
+
+    def open_row(self) -> OpenTarget | None:
+        """Accept the highlighted listing row.
+
+        Audio and projects return a target. Directories, the parent row, and
+        drives navigate. A note does nothing.
+        """
+        self.focus = PickerFocus.LIST
+        self.status = ""
+        return self._accept()
+
+    def scroll_rows(self, delta: int) -> None:
+        """Step the listing by *delta* rows, the same move as Up and Down."""
+        if delta == 0:
+            return
+        if self.focus is not PickerFocus.LIST:
+            self.focus = PickerFocus.LIST
+        self._move(delta)
 
     def _enter(self) -> None:
         if self.focus is PickerFocus.SHORTCUTS:

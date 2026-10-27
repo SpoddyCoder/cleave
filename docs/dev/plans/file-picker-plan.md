@@ -24,7 +24,7 @@ Reuse [cleave/open_target.py](../../../cleave/open_target.py) and the Phase 1 pi
 - Persist last browse directory in global user config.
 - Freeze-only native dialog as a shortcut into the same path object.
 - Optional installer task for a "Play with Cleave" shell verb.
-- Mouse in the picker and live overlay.
+- Mouse in the live overlay.
 - File associations (deferred in [structured-releases.md](../structured-releases.md)).
 
 ---
