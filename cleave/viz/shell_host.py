@@ -41,6 +41,7 @@ from cleave.viz.row_spec import (
     section_locked,
 )
 from cleave.viz.session import TuningSession
+from cleave.viz.ui_fade import UiFade
 from cleave.viz.shell_focus import (
     CycleStop,
     InspectorGroupKey,
@@ -605,13 +606,13 @@ class ShellHost:
     def __init__(
         self,
         imgui_host: ImGuiHost,
-        overlay: Any,
+        ui_fade: UiFade,
         menu_state: MenuBarState,
         controls: Any,
         bar_height: int,
     ) -> None:
         self.imgui = imgui_host
-        self._overlay = overlay
+        self._ui_fade = ui_fade
         self._menu_state = menu_state
         self._controls = controls
         self._menu_bar_height_px = bar_height
@@ -685,7 +686,7 @@ class ShellHost:
                 or self._splitter is not None
                 or self._resize_cursor
             ):
-                self._overlay.notify_input()
+                self._ui_fade.notify_input()
             return
         if event.type in (pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP):
             button = mouse_button(event)
@@ -736,7 +737,7 @@ class ShellHost:
             x = float(event.pos[0])
             y = float(event.pos[1])
             if self._chrome_contains(x, y):
-                self._overlay.notify_input()
+                self._ui_fade.notify_input()
             return
         if event.type in (pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP):
             button = mouse_button(event)
@@ -1419,7 +1420,7 @@ class ShellHost:
 
     def _clicks_ignored(self) -> bool:
         return (
-            self._overlay.visibility <= _HIDDEN
+            self._ui_fade.visibility <= _HIDDEN
             and not self._menu_state.dropdown_open
         )
 

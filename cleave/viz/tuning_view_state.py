@@ -120,7 +120,6 @@ from cleave.viz.user_presets import (
 if TYPE_CHECKING:
     from cleave.viz.focus_nav import FocusCursor
     from cleave.viz.layer import StemLayer
-    from cleave.viz.row_layout import RowLayout, RowLayoutFrame
 
 _RO_OVERLAYS_DEFAULTS = default_render_overlays_runtime_values()
 _RO_POST_FX_DEFAULTS = default_render_post_fx_runtime_values()
@@ -365,26 +364,12 @@ class TuningViewState:
     timeline_override_active: bool = False
     help_visible: bool = False
     fps: float | None = None
-    layout: RowLayout | None = field(default=None, repr=False)
-    layout_frame: RowLayoutFrame | None = field(default=None, repr=False)
-
-    def __post_init__(self) -> None:
-        from cleave.viz.row_layout import RowLayout, build_layout_frame
-
-        if self.layout is None:
-            object.__setattr__(self, "layout", RowLayout.build(self))
-        if self.layout_frame is None:
-            object.__setattr__(
-                self, "layout_frame", build_layout_frame(self.layout, self)
-            )
 
     @property
     def focus_descriptor(self) -> RowDescriptor:
         from cleave.viz.focus_nav import cursor_main_descriptor
 
-        return self.layout.resolve_navigable(
-            cursor_main_descriptor(self.focus_cursor), self
-        )
+        return cursor_main_descriptor(self.focus_cursor)
 
     @focus_descriptor.setter
     def focus_descriptor(self, descriptor: RowDescriptor) -> None:
@@ -419,27 +404,6 @@ class TuningViewState:
                 "focus_cursor",
                 MainFocus(RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)),
             )
-
-    @property
-    def focus_index(self) -> int:
-        if not self.layout.rows:
-            return 0
-        from cleave.viz.focus_nav import cursor_main_descriptor
-        from cleave.viz.row_layout import resolve_navigable_descriptor
-
-        navigable = (
-            self.layout_frame.navigable_descriptors
-            if self.layout_frame is not None
-            else tuple(self.layout.navigable_descriptors(self))
-        )
-        if not navigable:
-            return 0
-        resolved = resolve_navigable_descriptor(
-            cursor_main_descriptor(self.focus_cursor), navigable
-        )
-        if not self.layout.contains_descriptor(resolved):
-            resolved = navigable[0]
-        return self.layout.find_descriptor(resolved)
 
 
 def view_state_structure_signature(
@@ -529,7 +493,6 @@ class _ViewStateStructure:
     render_post_fx: RenderPostFxBlock
     render_pattern_mask: RenderPatternMaskBlock
     render_timeline: RenderTimelineBlock
-    layout: RowLayout
 
 
 def _card_block_from_runtime(card: RenderOverlayCardRuntime) -> RenderOverlayCardBlock:
@@ -721,8 +684,6 @@ class TuningViewStateBuilder:
         signature: str,
         user_names: set[str],
     ) -> _ViewStateStructure:
-        from cleave.viz.focus_nav import MainFocus
-
         layer_z_order = tuple(self.session.layer_z_order)
         tracks: dict[str, TrackBlock] = {}
         for slot in layer_z_order:
@@ -828,22 +789,6 @@ class TuningViewStateBuilder:
                 m.marker_type for m in self.session.song_markers.markers
             ),
         )
-        layout_state = TuningViewState(
-            layer_z_order=layer_z_order,
-            tracks=tracks,
-            paused=False,
-            position_sec=0.0,
-            focus_cursor=MainFocus(RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)),
-            move_mode_slot=None,
-            render_overlays=render_overlays,
-            render_post_fx=render_post_fx,
-            render_pattern_mask=render_pattern_mask,
-            render_timeline=render_timeline,
-            settings=settings,
-            project=project,
-        )
-        layout = layout_state.layout
-        assert layout is not None
         return _ViewStateStructure(
             signature=signature,
             layer_z_order=layer_z_order,
@@ -854,7 +799,6 @@ class TuningViewStateBuilder:
             render_post_fx=render_post_fx,
             render_pattern_mask=render_pattern_mask,
             render_timeline=render_timeline,
-            layout=layout,
         )
 
     def _patch_tracks(
@@ -1038,6 +982,5 @@ class TuningViewStateBuilder:
             timeline_override_active=bool(tl.override_slots),
             help_visible=self.session.help_visible,
             fps=fps,
-            layout=structure.layout,
         )
         return state

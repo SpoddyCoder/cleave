@@ -124,7 +124,7 @@ def test_coordinator_skip_does_not_call_compositor_upload() -> None:
 
     texture_id, tex_uv = coordinator.upload(
         compositor,
-        OverlayTextureSlot.TUNING,
+        OverlayTextureSlot.TIMELINE,
         surface,
         plan,
         capacity=(200, 100),
@@ -155,7 +155,7 @@ def test_coordinator_skip_requires_prior_texture() -> None:
     with pytest.raises(ValueError, match="previously uploaded texture"):
         coordinator.upload(
             compositor,
-            OverlayTextureSlot.TUNING,
+            OverlayTextureSlot.TIMELINE,
             surface,
             plan,
             capacity=(200, 100),
@@ -178,7 +178,7 @@ def test_coordinator_full_uploads_at_origin() -> None:
 
     texture_id, tex_uv = coordinator.upload(
         compositor,
-        OverlayTextureSlot.TUNING,
+        OverlayTextureSlot.TIMELINE,
         surface,
         plan,
         capacity=(200, 100),
@@ -189,10 +189,10 @@ def test_coordinator_full_uploads_at_origin() -> None:
     assert texture_id == 7
     assert tex_uv == (0.0, 0.0, 0.5, 0.5)
     compositor.ensure_overlay_texture.assert_called_once_with(
-        OverlayTextureSlot.TUNING, 200, 100
+        OverlayTextureSlot.TIMELINE, 200, 100
     )
     compositor.upload_overlay_region.assert_called_once_with(
-        OverlayTextureSlot.TUNING,
+        OverlayTextureSlot.TIMELINE,
         surface,
         dest_x=0,
         dest_y=0,
@@ -251,7 +251,7 @@ def test_coordinator_updates_gpu_state_after_upload() -> None:
 
     coordinator.upload(
         compositor,
-        OverlayTextureSlot.TUNING,
+        OverlayTextureSlot.TIMELINE,
         surface,
         plan,
         capacity=(150, 75),
@@ -279,7 +279,7 @@ def test_coordinator_tex_uv_uses_gl_capacity_not_logical() -> None:
 
     _, tex_uv = coordinator.upload(
         compositor,
-        OverlayTextureSlot.TUNING,
+        OverlayTextureSlot.TIMELINE,
         surface,
         plan,
         capacity=(400, 450),
@@ -298,7 +298,7 @@ def test_coordinator_tex_uv_uses_gl_capacity_not_logical() -> None:
     )
     _, skip_uv = coordinator.upload(
         compositor,
-        OverlayTextureSlot.TUNING,
+        OverlayTextureSlot.TIMELINE,
         surface,
         skip_plan,
         capacity=(400, 450),

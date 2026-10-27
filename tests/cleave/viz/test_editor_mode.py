@@ -11,10 +11,9 @@ from cleave.viz.commands import command_by_id
 from cleave.viz.focus_nav import MainFocus
 from cleave.viz.modal import ModalKind
 from cleave.viz.row_kinds import RowDescriptor, RowKind
-from cleave.viz.tuning_view_state import SettingsBlock, TuningViewState, view_state_structure_signature
+from cleave.viz.tuning_view_state import view_state_structure_signature
 from tests.cleave.viz.test_controls import _make_controls, _mutate_dirty
-from tests.cleave.viz.test_overlay import _minimal_view_state
-from tests.support.viz import press_layer_row, keydown, make_playlist, make_test_cfg, make_track_block
+from tests.support.viz import press_layer_row, keydown, make_playlist, make_test_cfg
 
 
 def _prompt_editor_mode(controls) -> None:
@@ -36,35 +35,6 @@ def _choose_editor_mode_option(controls, option_label: str) -> None:
     controls.handle_keydown(keydown(pygame.K_RETURN))
 
 
-def _curation_view_state(**kwargs: object) -> TuningViewState:
-    defaults: dict[str, object] = {
-        "settings": SettingsBlock(editor_mode="preset_curation"),
-        "layer_z_order": ("layer_1", "layer_2"),
-        "tracks": {
-            "layer_1": make_track_block(
-                stem="drums",
-                preset_dir_label="dir",
-                preset_label="preset.milk",
-                blend_mode="black-key",
-                opacity_pct=50,
-                beat_sensitivity=1.0,
-                effects={},
-            ),
-            "layer_2": make_track_block(
-                stem="bass",
-                preset_dir_label="dir2",
-                preset_label="preset2.milk",
-                blend_mode="black-key",
-                opacity_pct=50,
-                beat_sensitivity=1.0,
-                effects={},
-            ),
-        },
-    }
-    defaults.update(kwargs)
-    return _minimal_view_state(**defaults)
-
-
 def test_structure_signature_invalidates_on_editor_mode() -> None:
     controls = _make_controls(("layer_1",))
     session = controls.session
@@ -75,24 +45,6 @@ def test_structure_signature_invalidates_on_editor_mode() -> None:
     sig_after = view_state_structure_signature(
         session, config_save)
     assert sig_before != sig_after
-
-
-def test_curation_layout_allowlist() -> None:
-    state = _curation_view_state()
-    kinds = [row.kind for row in state.layout.rows]
-    slots = [row.slot for row in state.layout.rows if row.slot is not None]
-
-    names = {kind.name for kind in kinds}
-    assert "SETTINGS_HEADER" not in names
-    assert "PROJECT_HEADER" not in names
-    assert "TRANSPORT" not in names
-    assert RowKind.RENDER_SECTION_GAP not in kinds
-    assert RowKind.RENDER_OVERLAYS_HEADER not in kinds
-    assert RowKind.RENDER_TIMELINE_HEADER not in kinds
-    assert RowKind.LAYER_MANAGEMENT_ADD not in kinds
-    assert not any(name.startswith("TRACK_") for name in names)
-    assert slots == []
-    assert kinds == []
 
 
 def test_curation_shows_only_focus_layer() -> None:
@@ -192,7 +144,6 @@ def test_curation_allowlisted_keys_still_work() -> None:
 
 
 def test_curation_ignores_layer_lock() -> None:
-    from cleave.viz.row_layout import row_navigable
     from cleave.viz.row_spec import section_locked
 
     controls = _make_controls(("layer_1",))
@@ -206,8 +157,6 @@ def test_curation_ignores_layer_lock() -> None:
     assert section_locked(view, header) is False
     assert section_locked(controls.session, preset) is False
     assert view.tracks["layer_1"].runtime.locked is True
-    assert row_navigable(view, preset) is True
-    assert preset not in view.layout.rows
 
     mock_curation = MagicMock()
     controls._preset_curation = mock_curation

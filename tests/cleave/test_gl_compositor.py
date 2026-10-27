@@ -336,15 +336,15 @@ def gl_texture_mocks():
 def test_ensure_overlay_texture_allocates_once_per_slot(gl_texture_mocks) -> None:
     compositor = _make_overlay_compositor()
 
-    tex_id = compositor.ensure_overlay_texture(OverlayTextureSlot.TUNING, 200, 100)
+    tex_id = compositor.ensure_overlay_texture(OverlayTextureSlot.TIMELINE, 200, 100)
 
     assert tex_id == 100
-    assert compositor.overlay_texture_capacity(OverlayTextureSlot.TUNING) == (200, 100)
+    assert compositor.overlay_texture_capacity(OverlayTextureSlot.TIMELINE) == (200, 100)
     gl_texture_mocks["gen"].assert_called_once()
     gl_texture_mocks["tex_image"].assert_called_once()
     gl_texture_mocks["delete"].assert_not_called()
 
-    tex_id_again = compositor.ensure_overlay_texture(OverlayTextureSlot.TUNING, 200, 100)
+    tex_id_again = compositor.ensure_overlay_texture(OverlayTextureSlot.TIMELINE, 200, 100)
     assert tex_id_again == 100
     gl_texture_mocks["gen"].assert_called_once()
     gl_texture_mocks["tex_image"].assert_called_once()
@@ -352,14 +352,14 @@ def test_ensure_overlay_texture_allocates_once_per_slot(gl_texture_mocks) -> Non
 
 def test_upload_overlay_region_subimage_within_capacity(gl_texture_mocks) -> None:
     compositor = _make_overlay_compositor()
-    compositor.ensure_overlay_texture(OverlayTextureSlot.TUNING, 400, 300)
+    compositor.ensure_overlay_texture(OverlayTextureSlot.TIMELINE, 400, 300)
     gl_texture_mocks["tex_image"].reset_mock()
     gl_texture_mocks["gen"].reset_mock()
     gl_texture_mocks["delete"].reset_mock()
 
     surface = _make_surface(200, 150)
     tex_id = compositor.upload_overlay_region(
-        OverlayTextureSlot.TUNING, surface, dest_x=10, dest_y=20
+        OverlayTextureSlot.TIMELINE, surface, dest_x=10, dest_y=20
     )
 
     assert tex_id == 100
@@ -376,12 +376,12 @@ def test_upload_overlay_region_subimage_within_capacity(gl_texture_mocks) -> Non
 
 def test_upload_overlay_region_active_size_clips_surface(gl_texture_mocks) -> None:
     compositor = _make_overlay_compositor()
-    compositor.ensure_overlay_texture(OverlayTextureSlot.TUNING, 400, 300)
+    compositor.ensure_overlay_texture(OverlayTextureSlot.TIMELINE, 400, 300)
     gl_texture_mocks["rgba_bytes"].reset_mock()
 
     surface = _make_surface(400, 300)
     compositor.upload_overlay_region(
-        OverlayTextureSlot.TUNING,
+        OverlayTextureSlot.TIMELINE,
         surface,
         dest_x=0,
         dest_y=0,
@@ -398,12 +398,12 @@ def test_upload_overlay_region_active_size_clips_surface(gl_texture_mocks) -> No
 
 def test_upload_overlay_region_realloc_when_capacity_grows(gl_texture_mocks) -> None:
     compositor = _make_overlay_compositor()
-    compositor.ensure_overlay_texture(OverlayTextureSlot.TUNING, 200, 100)
+    compositor.ensure_overlay_texture(OverlayTextureSlot.TIMELINE, 200, 100)
     gl_texture_mocks["tex_image"].reset_mock()
     gl_texture_mocks["gen"].reset_mock()
 
     surface = _make_surface(300, 200)
-    tex_id = compositor.upload_overlay_region(OverlayTextureSlot.TUNING, surface)
+    tex_id = compositor.upload_overlay_region(OverlayTextureSlot.TIMELINE, surface)
 
     assert tex_id == 101
     gl_texture_mocks["delete"].assert_called_once_with(1, [100])
@@ -419,20 +419,20 @@ def test_upload_overlay_region_realloc_when_capacity_grows(gl_texture_mocks) -> 
 def test_overlay_slots_are_independent(gl_texture_mocks) -> None:
     compositor = _make_overlay_compositor()
 
-    tuning_id = compositor.upload_overlay_region(
-        OverlayTextureSlot.TUNING, _make_surface(100, 50)
-    )
     timeline_id = compositor.upload_overlay_region(
-        OverlayTextureSlot.TIMELINE, _make_surface(80, 40)
+        OverlayTextureSlot.TIMELINE, _make_surface(100, 50)
+    )
+    full_viewport_id = compositor.upload_overlay_region(
+        OverlayTextureSlot.FULL_VIEWPORT, _make_surface(80, 40)
     )
 
-    assert tuning_id == 100
-    assert timeline_id == 101
+    assert timeline_id == 100
+    assert full_viewport_id == 101
     assert gl_texture_mocks["gen"].call_count == 2
-    tuning_state = compositor._overlay_slots[OverlayTextureSlot.TUNING]
     timeline_state = compositor._overlay_slots[OverlayTextureSlot.TIMELINE]
-    assert tuning_state.texture_id == 100
-    assert timeline_state.texture_id == 101
+    full_viewport_state = compositor._overlay_slots[OverlayTextureSlot.FULL_VIEWPORT]
+    assert timeline_state.texture_id == 100
+    assert full_viewport_state.texture_id == 101
 
 
 def test_upload_overlay_texture_same_size_uses_subimage(gl_texture_mocks) -> None:
@@ -496,10 +496,10 @@ def test_draw_overlay_custom_tex_uv(gl_texture_mocks) -> None:
 def test_destroy_deletes_all_slot_textures(gl_texture_mocks) -> None:
     compositor = _make_overlay_compositor()
     compositor.upload_overlay_region(
-        OverlayTextureSlot.TUNING, _make_surface(50, 50)
+        OverlayTextureSlot.TIMELINE, _make_surface(50, 50)
     )
     compositor.upload_overlay_region(
-        OverlayTextureSlot.TIMELINE, _make_surface(40, 40)
+        OverlayTextureSlot.FULL_VIEWPORT, _make_surface(40, 40)
     )
     compositor._destroy_content_fbo = MagicMock()
 

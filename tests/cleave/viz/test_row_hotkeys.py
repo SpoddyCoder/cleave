@@ -31,7 +31,7 @@ def _runtime(controls):
         modal_host=controls.modal_host,
         menu_bar=MenuBarState(),
         timeline_controls=None,
-        overlay=MagicMock(),
+        ui_fade=MagicMock(),
         overlay_profiler=MagicMock(),
         playback=controls.playback,
     )

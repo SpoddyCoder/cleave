@@ -105,7 +105,6 @@ def _gl_name(gen_fn, count: int = 1) -> int:
 class OverlayTextureSlot(Enum):
     """Stable GL overlay texture bucket (one texture per slot)."""
 
-    TUNING = "tuning"
     TIMELINE = "timeline"
     FULL_VIEWPORT = "full_viewport"
 

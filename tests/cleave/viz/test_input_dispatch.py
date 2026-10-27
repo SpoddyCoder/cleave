@@ -31,7 +31,7 @@ from cleave.viz.layer_visibility import armed_recording_level
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.session import LayerRuntime, TuningSession
 from cleave.viz.modal import ModalHost, ModalKind
-from cleave.viz.tuning_panel_draw import TuningOverlay
+from cleave.viz.ui_fade import UiFade
 from cleave.viz.timeline_controls import TimelineControls
 from tests.support.compositor_mock import recording_compositor
 from tests.support.viz import (
@@ -99,7 +99,7 @@ def _make_runtime(
         compositor=compositor,
         post_process=MagicMock(),
         masked_compositor=MagicMock(),
-        overlay=TuningOverlay(),
+        ui_fade=UiFade(),
         timeline_overlay=MagicMock(),
         overlay_surface=pygame.Surface((2560, 1440), pygame.SRCALPHA),
         controls=MagicMock(),
@@ -485,17 +485,17 @@ def test_h_does_not_toggle_help_while_text_editing() -> None:
 
 def test_f10_toggles_bar_focus_and_wakes_overlay() -> None:
     runtime = _make_runtime()
-    assert runtime.overlay.visibility == 0.0
+    assert runtime.ui_fade.visibility == 0.0
     assert dispatch_keydown(keydown(pygame.K_F10), runtime) is True
     assert runtime.menu_bar.focused is True
-    assert runtime.overlay.visibility == 1.0
+    assert runtime.ui_fade.visibility == 1.0
     assert dispatch_keydown(keydown(pygame.K_F10), runtime) is True
     assert runtime.menu_bar.focused is False
 
 
 def test_alt_f_opens_file_menu_plain_f_does_not() -> None:
     runtime = _make_runtime()
-    assert runtime.overlay.visibility == 0.0
+    assert runtime.ui_fade.visibility == 0.0
     dispatch_keydown(
         pygame.event.Event(pygame.KEYDOWN, key=pygame.K_LALT),
         runtime,
@@ -511,7 +511,7 @@ def test_alt_f_opens_file_menu_plain_f_does_not() -> None:
     assert runtime.menu_bar.focused is True
     assert runtime.menu_bar.dropdown_open is True
     assert runtime.menu_bar.menu_index == 0
-    assert runtime.overlay.visibility == 1.0
+    assert runtime.ui_fade.visibility == 1.0
     assert dispatch_keydown(
         keydown(pygame.K_f, mod=pygame.KMOD_ALT),
         runtime,
@@ -537,7 +537,7 @@ def test_alt_tap_focuses_bar_and_wakes_overlay() -> None:
         runtime,
     )
     assert runtime.menu_bar.focused is True
-    assert runtime.overlay.visibility == 1.0
+    assert runtime.ui_fade.visibility == 1.0
 
 
 def test_alt_then_another_key_does_not_focus_bar() -> None:

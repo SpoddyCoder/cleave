@@ -1,12 +1,8 @@
-"""Per-frame overlay draw profiling for the live tuning UI.
+"""Per-frame overlay draw profiling for the live editor.
 
 Enable at runtime with **F3** (toggle) or start enabled via
 ``CLEAVE_OVERLAY_PROFILE=1``. Results print to the terminal stdout every
-``CLEAVE_OVERLAY_PROFILE_INTERVAL`` frames (default 30). When the tuning panel
-is visible, the latest sample also appears on the panel bottom-left.
-
-Phase 1 baselines: record stdout for hidden, collapsed, and one-layer-expanded
-panel states.
+``CLEAVE_OVERLAY_PROFILE_INTERVAL`` frames (default 30).
 """
 
 from __future__ import annotations
@@ -21,9 +17,7 @@ from cleave.viz.overlay_upload import UploadPlan
 
 _DEFAULT_EMIT_INTERVAL = 30
 
-_SECTION_NAMES = frozenset(
-    {"view_state_build", "panel_draw", "upload", "overlay_present"}
-)
+_SECTION_NAMES = frozenset({"upload", "overlay_present"})
 
 
 @dataclass
@@ -41,8 +35,6 @@ class OverlayDrawCounters:
 
 @dataclass
 class OverlayFrameSample:
-    view_state_build_ms: float
-    panel_draw_ms: float
     upload_ms: float
     overlay_present_ms: float
     surface_builds: int
@@ -87,9 +79,7 @@ def _format_sample_line(sample: OverlayFrameSample) -> str:
     if sample.skipped:
         return "overlay: skip"
     line = (
-        f"overlay: vs={sample.view_state_build_ms:.1f}ms"
-        f" draw={sample.panel_draw_ms:.1f}ms"
-        f" surf={sample.surface_builds}"
+        f"overlay: surf={sample.surface_builds}"
         f" font={sample.font_renders}"
         f" rcache={sample.row_cache_hits}/{sample.row_cache_misses}"
         f" up={sample.upload_ms:.1f}ms"
@@ -126,7 +116,7 @@ class OverlayProfiler:
             profiler._emit_next_frame = True
             print(
                 f"overlay profiler: on (logging to terminal every "
-                f"{interval} frames; latest on panel when open)",
+                f"{interval} frames)",
                 flush=True,
             )
         return profiler
@@ -171,8 +161,6 @@ class OverlayProfiler:
             return None
 
         sample = OverlayFrameSample(
-            view_state_build_ms=self._section_ms.get("view_state_build", 0.0),
-            panel_draw_ms=self._section_ms.get("panel_draw", 0.0),
             upload_ms=self._section_ms.get("upload", 0.0),
             overlay_present_ms=self._section_ms.get("overlay_present", 0.0),
             surface_builds=self._counters.surface_builds,
@@ -211,7 +199,7 @@ class OverlayProfiler:
             self.last_line = "overlay: …"
             print(
                 f"overlay profiler: on (logging to terminal every "
-                f"{self.emit_interval_frames} frames; latest on panel when open)",
+                f"{self.emit_interval_frames} frames)",
                 flush=True,
             )
         else:

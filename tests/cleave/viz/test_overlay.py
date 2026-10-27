@@ -1,782 +1,32 @@
-"""Tests for live tuning overlay drawing."""
+"""Tests for inspector row colors and the visibility icon."""
 
 from __future__ import annotations
 
 import pygame
-import pytest
 
-from cleave.config_schema.layers import (
-    DEFAULT_LAYER_SLOTS,
-    MAX_LAYER_COUNT,
-)
-from tests.support.config import TEST_LAYER_STEMS
-from cleave.stems import STEM_NAMES
-from cleave.viz.frame_rate import FPS_DISPLAY_LABEL
 from cleave.viz.focus_nav import MainFocus
 from cleave.viz.inspector import build_inspector_rows
 from cleave.viz.navigator import overlay_card_node_id
-from cleave.viz.overlay_primitives import overlay_font
 from cleave.viz.row_kinds import RowDescriptor, RowKind
-from cleave.viz.row_spec import row_is_pinned
-from cleave.viz.material_icons import (
-    RETURN_ARROW_GLYPH,
-    action_enter_icon_suffix_width,
-    render_action_enter_icon,
-    render_glyph,
-)
-from cleave.viz.tuning_panel_draw import (
-    HELP_HINT_LABEL,
-    PanelScrollMetrics,
-    TuningOverlay,
-    _row_bg_color,
-    _row_shows_action_enter_hint,
-    _row_text,
-    _row_value_color,
-    bottom_row_highlight_width,
-    fit_row_text,
-    fps_display_text_width,
-    panel_bottom_row_index,
-    panel_content_max_width,
-    panel_fps_layout,
-    panel_help_hint_layout,
-    preset_row_prefix_width,
+from cleave.viz.row_present_renderers import (
     render_visibility_icon,
-    TREE_INDENT,
-    scroll_metrics,
+    row_value_color_for,
 )
-from cleave.viz.ui_tint import composite_row_background
-from tests.support.viz import make_overlay_card_block, make_track_block
+from cleave.viz.row_spec import row_full_line_display_text
+from cleave.viz.theme import (
+    ACTION,
+    DISABLED,
+    LABEL,
+    LOCKED,
+    SOLO_BG,
+)
 from cleave.viz.tuning_view_state import (
     RenderOverlaysBlock,
     RenderTimelineBlock,
     TimelineFadeGroupBlock,
     TuningViewState,
 )
-from cleave.config_schema.editor import DEFAULT_UI_FADE_SEC
-from cleave.viz.theme import (
-    ACTION,
-    BACKGROUND,
-    BACKGROUND_ALPHA,
-    BORDER_WIDTH,
-    DISABLED,
-    FOCUS_ROW_BG_ALPHA,
-    HIGHLIGHT,
-    LABEL,
-    LOCKED,
-    PANEL_CONTENT_MAX_WIDTH,
-    SCROLLBAR_CONTENT_GAP,
-    SCROLLBAR_TRACK,
-    SCROLLBAR_WIDTH,
-    SOLO_BG,
-    VALUE,
-    timeline_panel_height_px,
-    timeline_ui_metrics,
-)
-from cleave.viz.timeline_overlay import (
-    cue_readout_panel_clearance_px,
-    timeline_viewport_reserve_px,
-)
-from cleave.viz.timeline_panel_cache import timeline_badge_reserve_px
-
-
-def _effects_expanded_view_state() -> TuningViewState:
-    tracks = {
-        slot: make_track_block(
-            stem=TEST_LAYER_STEMS[slot],
-            preset_dir_label=f"{slot}/dir",
-            preset_label=f"{slot}/preset.milk",
-            blend_mode="add",
-            opacity_pct=50,
-            beat_sensitivity=1.0,
-            effects={},
-        )
-        for slot in DEFAULT_LAYER_SLOTS
-    }
-    state = TuningViewState(
-        layer_z_order=DEFAULT_LAYER_SLOTS,
-        tracks=tracks,
-        paused=False,
-        position_sec=0.0,
-        focus_cursor=MainFocus(RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)),
-        move_mode_slot=None,
-        notification_message=None,
-        notification_remaining_sec=0.0,
-    )
-    _mount_track_sections(state)
-    return state
-
-
-def test_draw_effects_expanded_panel_rect_within_surface() -> None:
-    pygame.init()
-    overlay = TuningOverlay()
-    state = _effects_expanded_view_state()
-    assert len(state.layout.visible_indices(state)) > 0
-
-    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
-    overlay.notify_input()
-    visualiser_rect = _visualiser_below(surface.get_width(), surface.get_height())
-    overlay.draw(surface, state, visualiser_rect=visualiser_rect)
-
-    panel = overlay.panel_rect
-    assert panel is not None
-    px, py, pw, ph = panel
-    sw, sh = surface.get_size()
-    assert px >= 0 and py >= 0
-    assert px + pw <= sw and py + ph <= sh
-    _, margin_y = overlay._margin
-    assert py == margin_y + visualiser_rect[1]
-    assert ph <= visualiser_rect[3] - margin_y * 2
-    surface.subsurface(panel)
-
-
-def _menu_bar_inset() -> int:
-    from cleave.viz.shell_host import menu_bar_height_px
-
-    return menu_bar_height_px()
-
-
-def _visualiser_below(
-    width: int, height: int, *, top: int | None = None
-) -> tuple[int, int, int, int]:
-    if top is None:
-        top = _menu_bar_inset()
-    return (0, top, width, height - top)
-
-
-def _panel_scroll_metrics(
-    overlay: TuningOverlay,
-    state: TuningViewState,
-    *,
-    surface_height: int = 720,
-    timeline_panel_open: bool = False,
-    visualiser_rect: tuple[int, int, int, int] | None = None,
-) -> PanelScrollMetrics:
-    font = overlay._font_get()
-    line_h = font.get_linesize()
-    visible_indices = state.layout.visible_indices(state)
-    first_scrollable_visible = next(
-        (
-            index
-            for index in visible_indices
-            if not row_is_pinned(state.layout.kind(index))
-        ),
-        None,
-    )
-    header_gap = line_h + overlay._line_gap
-    _, margin_y = overlay._margin
-    viz_h = surface_height if visualiser_rect is None else visualiser_rect[3]
-    max_panel_h = viz_h - margin_y * 2
-    if timeline_panel_open:
-        max_panel_h -= timeline_viewport_reserve_px(len(state.layer_z_order))
-
-    return scroll_metrics(
-        visible_indices=visible_indices,
-        first_scrollable_visible=first_scrollable_visible,
-        line_h=line_h,
-        line_gap=overlay._line_gap,
-        padding=overlay._padding,
-        header_gap=header_gap,
-        max_panel_h=max_panel_h,
-    )
-
-
-def test_scrolled_panel_keeps_focus_row_in_viewport() -> None:
-    pygame.init()
-    overlay = TuningOverlay()
-    state = _effects_expanded_view_state()
-    state.focus_descriptor = state.layout.descriptor(
-        state.layout.visible_indices(state)[-1]
-    )
-
-    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
-    overlay.notify_input()
-    overlay.draw(surface, state)
-
-    metrics = _panel_scroll_metrics(overlay, state)
-    assert metrics.needs_scroll
-    row_pos = metrics.scrollable_indices.index(state.focus_index)
-    row_y = row_pos * metrics.row_stride
-    line_h = overlay._font_get().get_linesize()
-    assert overlay._scroll_y <= row_y
-    assert row_y + line_h <= overlay._scroll_y + metrics.scroll_viewport_h
-
-
-def _ensure_drawable_panel(state: TuningViewState) -> None:
-    """Give an empty layout one row so compose has a panel to measure."""
-    if state.layout.rows:
-        return
-    from cleave.viz.row_layout import RowLayout, build_layout_frame
-
-    desc = RowDescriptor(RowKind.RENDER_SECTION_GAP)
-    state.layout = RowLayout(rows=(desc,), descriptor_index={desc: 0})
-    state.layout_frame = build_layout_frame(state.layout, state)
-
-
-def _copy_panel_surface(overlay: TuningOverlay, state: TuningViewState) -> pygame.Surface:
-    _ensure_drawable_panel(state)
-    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
-    overlay.notify_input()
-    overlay.draw(surface, state)
-    panel = overlay.panel_rect
-    assert panel is not None
-    return surface.subsurface(panel).copy()
-
-
-def _find_pixel_color(
-    surface: pygame.Surface,
-    start_x: int,
-    start_y: int,
-    *,
-    color: tuple[int, int, int],
-    max_dx: int,
-    max_dy: int = 1,
-) -> bool:
-    """True if ``color`` appears in the given rectangle."""
-    for dy in range(max(1, max_dy)):
-        for dx in range(max(1, max_dx)):
-            if surface.get_at((start_x + dx, start_y + dy))[:3] == color:
-                return True
-    return False
-
-
-def test_header_rows_pinned_when_scrolled() -> None:
-    pygame.init()
-    state_top = _effects_expanded_view_state()
-    scroll_focus = state_top.layout.visible_indices(state_top)[-1]
-    state_top.focus_descriptor = state_top.layout.descriptor(scroll_focus)
-    state_bottom = _effects_expanded_view_state()
-    state_bottom.focus_descriptor = state_bottom.layout.descriptor(scroll_focus)
-
-    panel_top = _copy_panel_surface(TuningOverlay(), state_top)
-    panel_bottom = _copy_panel_surface(TuningOverlay(), state_bottom)
-
-    overlay = TuningOverlay()
-    metrics = _panel_scroll_metrics(overlay, state_bottom)
-    assert metrics.needs_scroll
-    transport_y = overlay._padding
-    header_h = metrics.header_block_h
-    top_strip = panel_top.subsurface((0, transport_y, panel_top.get_width(), header_h))
-    bottom_strip = panel_bottom.subsurface(
-        (0, transport_y, panel_bottom.get_width(), header_h)
-    )
-    assert pygame.image.tostring(top_strip, "RGBA") == pygame.image.tostring(
-        bottom_strip, "RGBA"
-    )
-
-
-def test_help_hint_layout_avoids_scrollbar_column() -> None:
-    pygame.init()
-    overlay = TuningOverlay()
-    font = overlay._font_get()
-    hint_w = font.render(HELP_HINT_LABEL, True, LABEL).get_width()
-    panel_w = 320
-    panel_h = 200
-    without_bar = panel_help_hint_layout(
-        panel_w=panel_w,
-        panel_h=panel_h,
-        padding=overlay._padding,
-        line_h=font.get_linesize(),
-        hint_width=hint_w,
-        show_scrollbar=False,
-    )
-    with_bar = panel_help_hint_layout(
-        panel_w=panel_w,
-        panel_h=panel_h,
-        padding=overlay._padding,
-        line_h=font.get_linesize(),
-        hint_width=hint_w,
-        show_scrollbar=True,
-    )
-    assert with_bar.y == without_bar.y
-    assert with_bar.x == without_bar.x - SCROLLBAR_WIDTH - SCROLLBAR_CONTENT_GAP
-
-
-def test_bottom_row_highlight_width_reserves_help_hint() -> None:
-    pygame.init()
-    font = overlay_font(14)
-    panel_w = 400
-    padding = 8
-    hint_w = font.size(HELP_HINT_LABEL)[0]
-    char_w = font.size("M")[0]
-    width = bottom_row_highlight_width(
-        panel_w=panel_w,
-        padding=padding,
-        font=font,
-        show_scrollbar=False,
-    )
-    assert width == panel_w - 2 * padding - hint_w - char_w
-    with_scroll = bottom_row_highlight_width(
-        panel_w=panel_w,
-        padding=padding,
-        font=font,
-        show_scrollbar=True,
-    )
-    assert with_scroll == (
-        panel_w
-        - 2 * padding
-        - SCROLLBAR_WIDTH
-        - SCROLLBAR_CONTENT_GAP
-        - hint_w
-        - char_w
-    )
-
-
-def test_fps_layout_top_right_on_transport_row() -> None:
-    pygame.init()
-    overlay = TuningOverlay()
-    font = overlay._font_get()
-    fps_w = fps_display_text_width(font, 30.0)
-    panel_w = 320
-    without_bar = panel_fps_layout(
-        panel_w=panel_w,
-        padding=overlay._padding,
-        text_width=fps_w,
-        show_scrollbar=False,
-    )
-    with_bar = panel_fps_layout(
-        panel_w=panel_w,
-        padding=overlay._padding,
-        text_width=fps_w,
-        show_scrollbar=True,
-    )
-    assert without_bar.y == overlay._padding
-    assert with_bar.y == overlay._padding
-    assert with_bar.x == without_bar.x - SCROLLBAR_WIDTH - SCROLLBAR_CONTENT_GAP
-
-
-def _cached_compose_panel(
-    overlay: TuningOverlay,
-    state: TuningViewState,
-) -> pygame.Surface:
-    overlay.notify_input()
-    overlay.compose_panel(
-        state,
-        viewport_width=1280,
-        viewport_height=720,
-    )
-    overlay._panel_cache.panel_signature = None
-    overlay._panel_cache.panel = None
-    overlay.compose_panel(
-        state,
-        viewport_width=1280,
-        viewport_height=720,
-    )
-    cached = overlay._panel_cache.panel
-    assert cached is not None
-    return cached
-
-
-def test_cached_compose_matches_full_compose_pixels() -> None:
-    pygame.init()
-    state = _minimal_view_state(fps=30.0, position_sec=12.0)
-    cold_panel = _copy_panel_surface(TuningOverlay(), state)
-    cached = _cached_compose_panel(TuningOverlay(), state)
-
-    assert pygame.image.tostring(cold_panel, "RGBA") == pygame.image.tostring(
-        cached, "RGBA"
-    )
-
-
-def test_cached_compose_matches_collapsed_panel_pixels() -> None:
-    pygame.init()
-    state = _minimal_view_state(
-        tracks={
-            "layer_1": make_track_block(
-                stem="drums",
-                preset_dir_label="dir",
-                preset_label="preset.milk",
-                blend_mode="black-key",
-                opacity_pct=50,
-                beat_sensitivity=1.0,
-                effects={},
-            )
-        },
-    )
-    cold_panel = _copy_panel_surface(TuningOverlay(), state)
-    cached = _cached_compose_panel(TuningOverlay(), state)
-
-    assert pygame.image.tostring(cold_panel, "RGBA") == pygame.image.tostring(
-        cached, "RGBA"
-    )
-
-
-def test_cached_compose_matches_one_layer_expanded_panel_pixels() -> None:
-    pygame.init()
-    state = _minimal_view_state(
-        tracks={
-            "layer_1": make_track_block(
-                stem="drums",
-                preset_dir_label="dir",
-                preset_label="preset.milk",
-                blend_mode="black-key",
-                opacity_pct=50,
-                beat_sensitivity=1.0,
-                effects={},
-            )
-        },
-    )
-    cold_panel = _copy_panel_surface(TuningOverlay(), state)
-    cached = _cached_compose_panel(TuningOverlay(), state)
-
-    assert pygame.image.tostring(cold_panel, "RGBA") == pygame.image.tostring(
-        cached, "RGBA"
-    )
-
-
-def test_cached_compose_matches_scrolled_focus_panel_pixels() -> None:
-    pygame.init()
-    state = _effects_expanded_view_state()
-    scroll_focus = state.layout.visible_indices(state)[-1]
-    state.focus_descriptor = state.layout.descriptor(scroll_focus)
-
-    cold_overlay = TuningOverlay()
-    cold_panel = _copy_panel_surface(cold_overlay, state)
-    warm_overlay = TuningOverlay()
-    warm_overlay._scroll_y = cold_overlay._scroll_y
-    cached = _cached_compose_panel(warm_overlay, state)
-
-    assert pygame.image.tostring(cold_panel, "RGBA") == pygame.image.tostring(
-        cached, "RGBA"
-    )
-
-
-def test_draw_fps_counter_when_present() -> None:
-    pygame.init()
-    overlay = TuningOverlay()
-    state = _minimal_view_state(fps=28.4)
-
-    without_fps = _copy_panel_surface(overlay, _minimal_view_state())
-    with_fps = _copy_panel_surface(overlay, state)
-    assert pygame.image.tostring(without_fps, "RGBA") != pygame.image.tostring(
-        with_fps, "RGBA"
-    )
-
-    font = overlay._font_get()
-    line_h = font.get_linesize()
-    fps_w = fps_display_text_width(font, 28.4)
-    label_w = font.render(FPS_DISPLAY_LABEL, True, LABEL).get_width()
-    value_w = fps_w - label_w
-    metrics = _panel_scroll_metrics(overlay, state)
-    layout = panel_fps_layout(
-        panel_w=with_fps.get_width(),
-        padding=overlay._padding,
-        text_width=fps_w,
-        show_scrollbar=metrics.show_scrollbar,
-    )
-    assert _find_pixel_color(
-        with_fps, layout.x, layout.y, color=LABEL, max_dx=label_w, max_dy=line_h
-    )
-    assert _find_pixel_color(
-        with_fps,
-        layout.x + label_w,
-        layout.y,
-        color=VALUE,
-        max_dx=value_w,
-        max_dy=line_h,
-    )
-
-
-def test_fps_color_ignores_transport_focus() -> None:
-    pygame.init()
-    overlay = TuningOverlay()
-    state = _minimal_view_state(
-        fps=30.0,
-        focus_cursor=MainFocus(RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)),
-    )
-
-    with_fps = _copy_panel_surface(overlay, state)
-    font = overlay._font_get()
-    line_h = font.get_linesize()
-    fps_w = fps_display_text_width(font, 30.0)
-    label_w = font.render(FPS_DISPLAY_LABEL, True, LABEL).get_width()
-    value_w = fps_w - label_w
-    metrics = _panel_scroll_metrics(overlay, state)
-    layout = panel_fps_layout(
-        panel_w=with_fps.get_width(),
-        padding=overlay._padding,
-        text_width=fps_w,
-        show_scrollbar=metrics.show_scrollbar,
-    )
-    assert _find_pixel_color(
-        with_fps, layout.x, layout.y, color=LABEL, max_dx=label_w, max_dy=line_h
-    )
-    assert _find_pixel_color(
-        with_fps,
-        layout.x + label_w,
-        layout.y,
-        color=VALUE,
-        max_dx=value_w,
-        max_dy=line_h,
-    )
-    assert not _find_pixel_color(
-        with_fps, layout.x, layout.y, color=HIGHLIGHT, max_dx=fps_w, max_dy=line_h
-    )
-
-
-def test_bottom_row_highlight_stops_before_help_hint() -> None:
-    pygame.init()
-    overlay = TuningOverlay()
-    state = _minimal_view_state(
-        tracks={
-            "layer_1": make_track_block(
-                stem="drums",
-                preset_dir_label="dir",
-                preset_label="preset.milk",
-                blend_mode="black-key",
-                opacity_pct=50,
-                beat_sensitivity=1.0,
-                effects={},
-            )
-        },
-        render_timeline=RenderTimelineBlock(enabled=True),
-    )
-    _mount_track_sections(state)
-    visible = state.layout.visible_indices(state)
-    state.focus_descriptor = state.layout.descriptor(visible[-1])
-    panel = _copy_panel_surface(overlay, state)
-    font = overlay._font_get()
-    metrics = _panel_scroll_metrics(overlay, state)
-    line_h = font.get_linesize()
-    bottom_index = panel_bottom_row_index(
-        visible_indices=visible,
-        metrics=metrics,
-        scroll_y=overlay._scroll_y,
-        padding=overlay._padding,
-        line_h=line_h,
-        panel_h=panel.get_height(),
-    )
-    assert bottom_index == visible[-1]
-
-    hint_w = font.size(HELP_HINT_LABEL)[0]
-    hint_layout = panel_help_hint_layout(
-        panel_w=panel.get_width(),
-        panel_h=panel.get_height(),
-        padding=overlay._padding,
-        line_h=line_h,
-        hint_width=hint_w,
-        show_scrollbar=metrics.show_scrollbar,
-    )
-    highlight_w = bottom_row_highlight_width(
-        panel_w=panel.get_width(),
-        padding=overlay._padding,
-        font=font,
-        show_scrollbar=metrics.show_scrollbar,
-    )
-    expected_tint, _ = composite_row_background(
-        BACKGROUND, BACKGROUND_ALPHA, HIGHLIGHT, FOCUS_ROW_BG_ALPHA
-    )
-    mid_y = hint_layout.y + line_h // 2
-    # Sample near the left edge so label glyphs cannot obscure the tint.
-    tinted = panel.get_at((overlay._padding + 2, mid_y))[:3]
-    under_help = panel.get_at((hint_layout.x + 2, mid_y))[:3]
-    assert tinted == expected_tint
-    # Help CTA must not sit on the focus tint (glyph AA may occupy the 1ch gap).
-    assert under_help != expected_tint
-    assert highlight_w < hint_layout.x - overlay._padding
-
-
-def test_bottom_row_rebuilt_with_help_hint_content_width() -> None:
-    pygame.init()
-    overlay = TuningOverlay()
-    state = _minimal_view_state(
-        tracks={
-            "layer_1": make_track_block(
-                stem="drums",
-                preset_dir_label="dir",
-                preset_label="preset.milk",
-                blend_mode="black-key",
-                opacity_pct=50,
-                beat_sensitivity=1.0,
-                effects={},
-            )
-        },
-    )
-    _mount_track_sections(state)
-    visible = state.layout.visible_indices(state)
-    state.focus_descriptor = state.layout.descriptor(visible[-1])
-    overlay.notify_input()
-    composed = overlay.compose_panel(
-        state,
-        viewport_width=1280,
-        viewport_height=720,
-    )
-    assert composed is not None
-    panel = overlay._panel_cache.panel
-    assert panel is not None
-    font = overlay._font_get()
-    metrics = _panel_scroll_metrics(overlay, state)
-    line_h = font.get_linesize()
-    bottom_index = panel_bottom_row_index(
-        visible_indices=visible,
-        metrics=metrics,
-        scroll_y=overlay._scroll_y,
-        padding=overlay._padding,
-        line_h=line_h,
-        panel_h=panel.get_height(),
-    )
-    assert bottom_index == visible[-1]
-    bottom_max = bottom_row_highlight_width(
-        panel_w=panel.get_width(),
-        padding=overlay._padding,
-        font=font,
-        show_scrollbar=metrics.show_scrollbar,
-    )
-    unconstrained = panel_content_max_width(
-        index=bottom_index,
-        scrollable_indices=frozenset(metrics.scrollable_indices),
-        show_scrollbar=metrics.show_scrollbar,
-    )
-    assert bottom_max < unconstrained
-    assert any(
-        key.max_width == bottom_max
-        and key.kind == state.layout.kind(bottom_index)
-        for key in overlay._panel_cache.row_surfaces
-    )
-
-
-def test_long_preset_fits_within_bottom_row_budget() -> None:
-    pygame.init()
-    overlay = TuningOverlay()
-    long_preset = (
-        "presets/very/long/filename/for/testing-bottom-row-text-clash-"
-        "with-the-help-label.milk"
-    )
-    state = _effects_expanded_view_state()
-    state.tracks["layer_1"].preset_label = long_preset
-    preset_idx = state.layout.find_by_kind(RowKind.TRACK_PRESET)
-    font = overlay._font_get()
-    metrics = _panel_scroll_metrics(overlay, state)
-    panel_w = PANEL_CONTENT_MAX_WIDTH + overlay._padding * 2
-    bottom_max = bottom_row_highlight_width(
-        panel_w=panel_w,
-        padding=overlay._padding,
-        font=font,
-        show_scrollbar=metrics.show_scrollbar,
-    )
-    unconstrained = panel_content_max_width(
-        index=preset_idx,
-        scrollable_indices=frozenset(metrics.scrollable_indices),
-        show_scrollbar=metrics.show_scrollbar,
-    )
-    label = fit_row_text(
-        font, state, preset_idx, max_content_width=bottom_max
-    )
-    wide_label = fit_row_text(
-        font, state, preset_idx, max_content_width=unconstrained
-    )
-    prefix_w = preset_row_prefix_width(font, font.get_linesize())
-    budget = bottom_max - TREE_INDENT - prefix_w
-    assert font.size(label)[0] <= budget
-    assert font.size(label)[0] < font.size(wide_label)[0]
-
-
-def test_panel_content_max_width_reserves_scrollbar() -> None:
-    scrollable = frozenset({1, 2, 3})
-    assert panel_content_max_width(
-        index=1, scrollable_indices=scrollable, show_scrollbar=True
-    ) == PANEL_CONTENT_MAX_WIDTH - SCROLLBAR_WIDTH
-    assert panel_content_max_width(
-        index=9, scrollable_indices=scrollable, show_scrollbar=True
-    ) == PANEL_CONTENT_MAX_WIDTH
-    assert panel_content_max_width(
-        index=1, scrollable_indices=scrollable, show_scrollbar=False
-    ) == PANEL_CONTENT_MAX_WIDTH
-
-
-def test_no_scrollbar_when_content_fits() -> None:
-    pygame.init()
-    overlay = TuningOverlay()
-    state = _minimal_view_state()
-    _ensure_drawable_panel(state)
-    metrics = _panel_scroll_metrics(overlay, state)
-    assert not metrics.needs_scroll
-    assert not metrics.show_scrollbar
-
-    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
-    overlay.notify_input()
-    overlay.draw(surface, state)
-    panel = overlay.panel_rect
-    assert panel is not None
-    panel_surf = surface.subsurface(panel)
-    track_x = panel_surf.get_width() - SCROLLBAR_WIDTH - BORDER_WIDTH - 1
-    track_y = overlay._padding + 2
-    assert panel_surf.get_at((track_x, track_y))[:3] != SCROLLBAR_TRACK
-
-
-def test_scrollbar_track_is_vertical_channel_only() -> None:
-    pygame.init()
-    overlay = TuningOverlay()
-    panel_w = 120
-    scroll_viewport_h = 80
-    panel = pygame.Surface(
-        (panel_w, scroll_viewport_h + overlay._padding * 2), pygame.SRCALPHA
-    )
-    overlay._draw_scrollbar(
-        panel,
-        panel_w=panel_w,
-        scroll_top=overlay._padding,
-        scroll_viewport_h=scroll_viewport_h,
-        scroll_content_h=scroll_viewport_h * 10,
-        border_alpha=255,
-    )
-
-    track_x = panel_w - SCROLLBAR_WIDTH
-    track_y = overlay._padding
-    track_bottom = track_y + scroll_viewport_h - 1
-    channel_mid_x = track_x + SCROLLBAR_WIDTH // 2
-    edge_y = track_y + 20
-
-    assert panel.get_at((track_x, edge_y))[:3] == SCROLLBAR_TRACK
-    assert panel.get_at((track_x + SCROLLBAR_WIDTH - 1, edge_y))[:3] == SCROLLBAR_TRACK
-    assert panel.get_at((channel_mid_x, track_y))[:3] != SCROLLBAR_TRACK
-    assert panel.get_at((channel_mid_x, track_bottom))[:3] != SCROLLBAR_TRACK
-
-
-def test_preset_rows_fit_within_scrollbar_content_width() -> None:
-    pygame.init()
-    overlay = TuningOverlay()
-    state = _effects_expanded_view_state()
-    long_dir = "presets/very/long/directory/path/for/testing (12/99)"
-    long_preset = "presets/very/long/filename/for/testing-preset.milk (34/99)"
-    state.tracks["layer_1"].preset_dir_label = long_dir
-    state.tracks["layer_1"].preset_label = long_preset
-
-    metrics = _panel_scroll_metrics(overlay, state)
-    assert metrics.show_scrollbar
-    scrollable = frozenset(metrics.scrollable_indices)
-    font = overlay._font_get()
-
-    drums_dir_idx = state.layout.find_by_kind( RowKind.TRACK_PRESET_DIR)
-    drums_preset_idx = state.layout.find_by_kind( RowKind.TRACK_PRESET)
-    for index, expected_counter in (
-        (drums_dir_idx, "(12/99)"),
-        (drums_preset_idx, "(34/99)"),
-    ):
-        max_w = panel_content_max_width(
-            index=index,
-            scrollable_indices=scrollable,
-            show_scrollbar=True,
-        )
-        label = fit_row_text(font, state, index, max_content_width=max_w)
-        assert expected_counter in label
-        prefix_w = preset_row_prefix_width(font, font.get_linesize())
-        budget = max_w - TREE_INDENT - prefix_w
-        assert font.size(label)[0] <= budget
-
-
-def test_draw_effects_expanded_subsurface_panel_rect() -> None:
-    """Regression: overlay subsurfaces panel_rect after draw."""
-    pygame.init()
-    overlay = TuningOverlay()
-    state = _effects_expanded_view_state()
-    width, height = 1280, 720
-    overlay_surface = pygame.Surface((width, height), pygame.SRCALPHA)
-    overlay_surface.fill((0, 0, 0, 0))
-    overlay.notify_input()
-    overlay.draw(overlay_surface, state)
-    panel = overlay.panel_rect
-    assert panel is not None
-    overlay_surface.subsurface(panel)
+from tests.support.viz import make_overlay_card_block, make_track_block
 
 
 def test_solo_visibility_icon_uses_red_background() -> None:
@@ -826,312 +76,55 @@ def _minimal_view_state(**kwargs: object) -> TuningViewState:
     return TuningViewState(**defaults)  # type: ignore[arg-type]
 
 
-def _mount_track_sections(state: TuningViewState) -> None:
-    from cleave.viz.row_layout import RowLayout, build_layout_frame
-    from cleave.viz.row_sections import TRACK_SECTION, append_expand_section_rows
-
-    if any(row.kind.name.startswith("TRACK_") for row in state.layout.rows):
-        return
-    rows = list(state.layout.rows)
-    for slot in state.layer_z_order:
-        append_expand_section_rows(rows, TRACK_SECTION, state, slot)
-    state.layout = RowLayout(
-        rows=tuple(rows),
-        descriptor_index={desc: index for index, desc in enumerate(rows)},
-    )
-    state.layout_frame = build_layout_frame(state.layout, state)
-
-
-def test_tuning_panel_is_placed_inside_visualiser_rect() -> None:
-    pygame.init()
-    overlay = TuningOverlay()
-    overlay.notify_input()
-    state = _minimal_view_state()
-    _ensure_drawable_panel(state)
-    rect = (230, 48, 500, 400)
-    composed = overlay.compose_panel(
-        state,
-        viewport_width=1280,
-        viewport_height=720,
-        visualiser_rect=rect,
-    )
-    assert composed is not None
-    x, y, w, h = composed.screen_rect
-    mx, my = overlay._margin
-    assert (x, y) == (rect[0] + mx, rect[1] + my)
-    assert x + w <= rect[0] + rect[2]
-    assert y + h <= rect[1] + rect[3]
-
-
-def test_track_header_uses_stem_display_not_slot_key() -> None:
-    state = _minimal_view_state(
-        tracks={
-            "layer_1": make_track_block(
-                stem="drums",
-                preset_dir_label="dir",
-                preset_label="preset.milk",
-                blend_mode="black-key",
-                opacity_pct=50,
-                beat_sensitivity=1.0,
-                effects={},
-            )
-        },
-    )
-    _mount_track_sections(state)
-    header_row = state.layout.find_by_kind( RowKind.TRACK_HEADER)
-    text = _row_text(state, header_row)
-    assert "DRUMS" in text
-    assert "LAYER_1" not in text.upper()
-
-
-def test_track_header_full_mix_shows_mix() -> None:
-    state = _minimal_view_state(
-        tracks={
-            "layer_1": make_track_block(
-                stem="full_mix",
-                preset_dir_label="dir",
-                preset_label="preset.milk",
-                blend_mode="black-key",
-                opacity_pct=50,
-                beat_sensitivity=1.0,
-                effects={},
-            )
-        },
-    )
-    _mount_track_sections(state)
-    header_row = state.layout.find_by_kind( RowKind.TRACK_HEADER)
-    text = _row_text(state, header_row)
-    assert "MIX" in text
-    assert "FULL_MIX" not in text.upper()
-
-
-def test_track_stem_row_text() -> None:
-    state = _minimal_view_state(
-        tracks={
-            "layer_1": make_track_block(
-                stem="full_mix",
-                preset_dir_label="dir",
-                preset_label="preset.milk",
-                blend_mode="black-key",
-                opacity_pct=50,
-                beat_sensitivity=1.0,
-                effects={},
-            )
-        },
-    )
-    _mount_track_sections(state)
-    stem_row = state.layout.find( "layer_1", RowKind.TRACK_STEM)
-    assert _row_text(state, stem_row) == "driving stem: full-mix"
-
-
-def test_locked_stem_row_not_navigable_and_uses_locked_color() -> None:
-    state = _minimal_view_state(
-        tracks={
-            "layer_1": make_track_block(
-                stem="drums",
-                preset_dir_label="dir",
-                preset_label="preset.milk",
-                blend_mode="black-key",
-                opacity_pct=50,
-                beat_sensitivity=1.0,
-                effects={},
-                locked=True,
-            )
-        },
-    )
-    _mount_track_sections(state)
-    stem_row = state.layout.find( "layer_1", RowKind.TRACK_STEM)
-    assert stem_row not in state.layout.navigable_indices(state)
-    assert _row_value_color(state, stem_row) == LOCKED
-
-
-def test_panel_notification_does_not_insert_layout_rows() -> None:
-    inactive = _minimal_view_state(
-        render_timeline=RenderTimelineBlock(enabled=True),
-        notification_message=None,
-        notification_remaining_sec=0.0,
-    )
-    active = _minimal_view_state(
-        render_timeline=RenderTimelineBlock(enabled=True),
-        notification_message="Saved",
-        notification_remaining_sec=5.0,
-        persistent_notification_message="No presets in bed roles folder",
-    )
-    assert inactive.layout.rows == ()
-    assert active.layout.rows == ()
-    assert active.notification_message == "Saved"
-    assert active.persistent_notification_message == "No presets in bed roles folder"
-
-
-def test_draw_panel_notification_without_error() -> None:
-    pygame.init()
-    overlay = TuningOverlay()
-    state = _minimal_view_state(
-        render_timeline=RenderTimelineBlock(enabled=True),
-        notification_message="Saved",
-        notification_remaining_sec=5.0,
-    )
-    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
-    overlay.notify_input()
-    overlay.draw(surface, state)
-    assert state.layout.rows == ()
-    assert overlay.panel_rect is None
-
-
-def test_build_row_layout_starts_at_render_without_layer_rows() -> None:
-    state = _minimal_view_state()
-    kinds = [row.kind for row in state.layout.rows]
-    assert RowKind.LAYER_MANAGEMENT_ADD not in kinds
-    assert RowKind.RENDER_SECTION_GAP not in kinds
-    assert not any(kind.name.startswith("TRACK_") for kind in kinds)
-    assert RowKind.RENDER_TIMELINE_HEADER not in kinds
-    assert RowKind.SONG_MARKERS_HEADER not in kinds
-    assert RowKind.RENDER_OVERLAYS_HEADER not in kinds
-    assert RowKind.RENDER_POST_FX_HEADER not in kinds
-    assert RowKind.RENDER_PATTERN_MASK_HEADER not in kinds
-
-
-def test_build_row_layout_omits_settings_project_and_transport() -> None:
-    state = _minimal_view_state()
-    names = {row.kind.name for row in state.layout.rows}
-    assert "TRANSPORT" not in names
-    assert not any(
-        name.startswith("SETTINGS_") or name.startswith("PROJECT_") for name in names
-    )
-
-
-def test_build_row_layout_omits_add_at_max_layers() -> None:
-    slots = tuple(f"layer_{i}" for i in range(1, MAX_LAYER_COUNT + 1))
-    tracks = {
-        slot: make_track_block(
-            stem="drums",
-            preset_dir_label="dir",
-            preset_label="preset.milk",
-            blend_mode="black-key",
-            opacity_pct=50,
-            beat_sensitivity=1.0,
-            effects={},
-        )
-        for slot in slots
+def _track(**kwargs: object):
+    defaults: dict[str, object] = {
+        "stem": "drums",
+        "preset_dir_label": "dir",
+        "preset_label": "preset.milk",
+        "blend_mode": "black-key",
+        "opacity_pct": 50,
+        "beat_sensitivity": 1.0,
+        "effects": {},
     }
-    state = _minimal_view_state(layer_z_order=slots, tracks=tracks)
-    with pytest.raises(ValueError, match="no row for kind"):
-        state.layout.find_by_kind(RowKind.LAYER_MANAGEMENT_ADD)
+    defaults.update(kwargs)
+    return make_track_block(**defaults)  # type: ignore[arg-type]
 
 
-def test_delete_row_navigable_when_locked() -> None:
-    state = _minimal_view_state(
-        tracks={
-            "layer_1": make_track_block(
-                stem="drums",
-                preset_dir_label="dir",
-                preset_label="preset.milk",
-                blend_mode="black-key",
-                opacity_pct=50,
-                beat_sensitivity=1.0,
-                effects={},
-                locked=True,
-            )
-        },
-    )
-    _mount_track_sections(state)
-    delete_row = state.layout.find( "layer_1", RowKind.LAYER_MANAGEMENT_DELETE)
-    assert delete_row in state.layout.navigable_indices(state)
+def test_locked_stem_row_uses_locked_color() -> None:
+    state = _minimal_view_state(tracks={"layer_1": _track(locked=True)})
+    stem = RowDescriptor(RowKind.TRACK_STEM, slot="layer_1")
+    assert row_value_color_for(state, stem) == LOCKED
 
 
 def test_delete_row_disabled_color_single_layer() -> None:
-    state = _minimal_view_state(
-        tracks={
-            "layer_1": make_track_block(
-                stem="drums",
-                preset_dir_label="dir",
-                preset_label="preset.milk",
-                blend_mode="black-key",
-                opacity_pct=50,
-                beat_sensitivity=1.0,
-                effects={},
-            )
-        },
-    )
-    _mount_track_sections(state)
-    delete_row = state.layout.find( "layer_1", RowKind.LAYER_MANAGEMENT_DELETE)
-    assert _row_value_color(state, delete_row) == DISABLED
-
-
-def test_delete_layer_row_text_has_tree_prefix() -> None:
-    state = _minimal_view_state(
-        tracks={
-            "layer_1": make_track_block(
-                stem="drums",
-                preset_dir_label="dir",
-                preset_label="preset.milk",
-                blend_mode="black-key",
-                opacity_pct=50,
-                beat_sensitivity=1.0,
-                effects={},
-            )
-        },
-    )
-    _mount_track_sections(state)
-    delete_row = state.layout.find( "layer_1", RowKind.LAYER_MANAGEMENT_DELETE)
-    assert _row_text(state, delete_row) == "└─ Delete Layer"
+    state = _minimal_view_state()
+    delete_row = RowDescriptor(RowKind.LAYER_MANAGEMENT_DELETE, slot="layer_1")
+    assert row_value_color_for(state, delete_row) == DISABLED
 
 
 def test_action_row_value_color() -> None:
     state = _minimal_view_state(
         tracks={
-            "layer_1": make_track_block(
-                stem="drums",
-                preset_dir_label="dir",
-                preset_label="preset.milk",
-                blend_mode="black-key",
-                opacity_pct=50,
-                beat_sensitivity=1.0,
-                effects={},
-            ),
-            "layer_2": make_track_block(
-                stem="bass",
-                preset_dir_label="dir",
-                preset_label="preset.milk",
-                blend_mode="black-key",
-                opacity_pct=50,
-                beat_sensitivity=1.0,
-                effects={},
-            ),
+            "layer_1": _track(),
+            "layer_2": _track(stem="bass"),
         },
-        layer_z_order=["layer_1", "layer_2"],
+        layer_z_order=("layer_1", "layer_2"),
     )
-    _mount_track_sections(state)
-    add_row = state.layout.find("layer_2", RowKind.LAYER_MANAGEMENT_DELETE)
-    delete_row = state.layout.find( "layer_1", RowKind.LAYER_MANAGEMENT_DELETE)
-    assert _row_value_color(state, add_row) == ACTION
-    assert _row_value_color(state, delete_row) == ACTION
-
-    state.focus_descriptor = state.layout.descriptor(add_row)
-    assert _row_value_color(state, add_row) == HIGHLIGHT
-    assert _row_value_color(state, delete_row) == ACTION
+    add_row = RowDescriptor(RowKind.LAYER_MANAGEMENT_DELETE, slot="layer_2")
+    delete_row = RowDescriptor(RowKind.LAYER_MANAGEMENT_DELETE, slot="layer_1")
+    assert row_value_color_for(state, add_row) == ACTION
+    assert row_value_color_for(state, delete_row) == ACTION
 
 
 def test_snap_to_song_markers_row_uses_action_color() -> None:
-    from cleave.viz.row_layout import build_layout_frame
-
     state = _minimal_view_state(
         render_timeline=RenderTimelineBlock(enabled=True),
     )
-    anchor = RowDescriptor(RowKind.TRACK_HEADER, slot="layer_1")
     desc = RowDescriptor(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS)
-    rows = (anchor, desc)
-    state.layout = state.layout.__class__(
-        rows=rows,
-        descriptor_index={row: index for index, row in enumerate(rows)},
-    )
-    object.__setattr__(state, "layout_frame", build_layout_frame(state.layout, state))
-    snap_row = 1
-    assert _row_value_color(state, snap_row) == ACTION
-    assert "▶" not in _row_text(state, snap_row)
-    assert "▼" not in _row_text(state, snap_row)
-    state.focus_descriptor = desc
-    assert _row_value_color(state, snap_row) == HIGHLIGHT
+    assert row_value_color_for(state, desc) == ACTION
+    text = row_full_line_display_text(state, desc)
+    assert "▶" not in text
+    assert "▼" not in text
 
 
 def test_apply_cuts_to_cues_rows_use_action_color() -> None:
@@ -1142,188 +135,46 @@ def test_apply_cuts_to_cues_rows_use_action_color() -> None:
             soft_cut_fades=TimelineFadeGroupBlock(enabled=True),
         ),
     )
-    from cleave.viz.row_layout import build_layout_frame
-
-    rows = (
-        RowDescriptor(RowKind.TRACK_HEADER, slot="layer_1"),
-        RowDescriptor(RowKind.TIMELINE_APPLY_SOFT_CUTS),
-        RowDescriptor(RowKind.TIMELINE_APPLY_HARD_CUTS),
-        RowDescriptor(RowKind.TIMELINE_REMOVE_SOFT_CUTS),
-        RowDescriptor(RowKind.TIMELINE_REMOVE_HARD_CUTS),
-    )
-    state.layout = state.layout.__class__(
-        rows=rows,
-        descriptor_index={desc: index for index, desc in enumerate(rows)},
-    )
-    object.__setattr__(state, "layout_frame", build_layout_frame(state.layout, state))
-    soft_row = 1
-    hard_row = 2
-    remove_soft_row = 3
-    remove_hard_row = 4
-    assert _row_value_color(state, soft_row) == ACTION
-    assert _row_value_color(state, hard_row) == ACTION
-    assert _row_value_color(state, remove_soft_row) == ACTION
-    assert _row_value_color(state, remove_hard_row) == ACTION
-    assert "Remove from Cues" in _row_text(state, remove_soft_row)
-    assert "Remove from Cues" in _row_text(state, remove_hard_row)
-    assert "▶" not in _row_text(state, soft_row)
-    assert "▼" not in _row_text(state, soft_row)
-    assert "▶" not in _row_text(state, hard_row)
-    assert "▼" not in _row_text(state, hard_row)
-    state.focus_descriptor = state.layout.descriptor(soft_row)
-    assert _row_value_color(state, soft_row) == HIGHLIGHT
-    assert _row_value_color(state, hard_row) == ACTION
-    state.focus_descriptor = state.layout.descriptor(hard_row)
-    assert _row_value_color(state, hard_row) == HIGHLIGHT
-    assert _row_value_color(state, soft_row) == ACTION
+    soft_row = RowDescriptor(RowKind.TIMELINE_APPLY_SOFT_CUTS)
+    hard_row = RowDescriptor(RowKind.TIMELINE_APPLY_HARD_CUTS)
+    remove_soft_row = RowDescriptor(RowKind.TIMELINE_REMOVE_SOFT_CUTS)
+    remove_hard_row = RowDescriptor(RowKind.TIMELINE_REMOVE_HARD_CUTS)
+    assert row_value_color_for(state, soft_row) == ACTION
+    assert row_value_color_for(state, hard_row) == ACTION
+    assert row_value_color_for(state, remove_soft_row) == ACTION
+    assert row_value_color_for(state, remove_hard_row) == ACTION
+    assert "Remove from Cues" in row_full_line_display_text(state, remove_soft_row)
+    assert "Remove from Cues" in row_full_line_display_text(state, remove_hard_row)
+    for desc in (soft_row, hard_row):
+        text = row_full_line_display_text(state, desc)
+        assert "▶" not in text
+        assert "▼" not in text
 
 
 def test_display_size_row_uses_label_color() -> None:
-    from cleave.viz.row_present_renderers import row_value_color_for
-
     state = _minimal_view_state()
     desc = RowDescriptor(RowKind.SETTINGS_EDITOR_WINDOW_DISPLAY_SIZE)
     assert row_value_color_for(state, desc) == LABEL
 
 
-def test_preset_list_populate_uses_full_line_action_colors() -> None:
+def test_preset_list_populate_uses_action_color() -> None:
     state = _minimal_view_state(
         tracks={
-            "layer_1": make_track_block(
-                stem="drums",
-                preset_dir_label="dir",
-                preset_label="preset.milk",
-                blend_mode="black-key",
-                opacity_pct=50,
-                beat_sensitivity=1.0,
-                effects={},
+            "layer_1": _track(
                 preset_switching="on",
                 preset_switching_trigger="timer",
             )
         },
-        layer_z_order=["layer_1"],
     )
-    _mount_track_sections(state)
-    populate_row = state.layout.find_by_kind(RowKind.TRACK_PRESET_LIST_POPULATE)
-    assert populate_row is not None
-    assert _row_value_color(state, populate_row) == ACTION
-    state.focus_descriptor = state.layout.descriptor(populate_row)
-    assert _row_value_color(state, populate_row) == HIGHLIGHT
-    assert _row_shows_action_enter_hint(state, populate_row) is True
+    populate_row = RowDescriptor(RowKind.TRACK_PRESET_LIST_POPULATE, slot="layer_1")
+    assert row_value_color_for(state, populate_row) == ACTION
 
 
-def test_focused_action_row_shows_enter_hint() -> None:
-    pygame.init()
-    state = _minimal_view_state(
-        tracks={
-            "layer_1": make_track_block(
-                stem="drums",
-                preset_dir_label="dir",
-                preset_label="preset.milk",
-                blend_mode="black-key",
-                opacity_pct=50,
-                beat_sensitivity=1.0,
-                effects={},
-            ),
-            "layer_2": make_track_block(
-                stem="bass",
-                preset_dir_label="dir",
-                preset_label="preset.milk",
-                blend_mode="black-key",
-                opacity_pct=50,
-                beat_sensitivity=1.0,
-                effects={},
-            ),
-        },
-        layer_z_order=["layer_1", "layer_2"],
-    )
-    _mount_track_sections(state)
-    add_row = state.layout.find("layer_1", RowKind.LAYER_MANAGEMENT_DELETE)
-    assert add_row is not None
-    assert _row_shows_action_enter_hint(state, add_row) is False
-
-    state.focus_descriptor = state.layout.descriptor(add_row)
-    assert _row_shows_action_enter_hint(state, add_row) is True
-
-    overlay = TuningOverlay()
-    font = pygame.font.Font(None, 24)
-    line_h = font.get_linesize()
-    state_unfocused = _minimal_view_state(
-        tracks=state.tracks,
-        layer_z_order=state.layer_z_order,
-    )
-    _mount_track_sections(state_unfocused)
-    add_unfocused = state_unfocused.layout.find("layer_1", RowKind.LAYER_MANAGEMENT_DELETE)
-    assert add_unfocused is not None
-    _, _, width_unfocused = overlay._build_row_at_index(
-        font,
-        state_unfocused,
-        add_unfocused,
-        max_content_width=PANEL_CONTENT_MAX_WIDTH,
-        line_h=line_h,
-    )
-    _, _, width_focused = overlay._build_row_at_index(
-        font,
-        state,
-        add_row,
-        max_content_width=PANEL_CONTENT_MAX_WIDTH,
-        line_h=line_h,
-    )
-    assert width_focused == width_unfocused + action_enter_icon_suffix_width(line_h)
-
-    enter = render_action_enter_icon(color=HIGHLIGHT, line_height=line_h)
-    plain = render_glyph(RETURN_ARROW_GLYPH, color=HIGHLIGHT, line_height=line_h)
-    assert pygame.mask.from_surface(enter).count() > pygame.mask.from_surface(plain).count()
-    assert enter.get_width() == plain.get_width() + 1
-
-
-def test_disabled_action_row_hides_enter_hint() -> None:
-    state = _minimal_view_state(
-        tracks={
-            "layer_1": make_track_block(
-                stem="drums",
-                preset_dir_label="dir",
-                preset_label="preset.milk",
-                blend_mode="black-key",
-                opacity_pct=50,
-                beat_sensitivity=1.0,
-                effects={},
-            ),
-        },
-        layer_z_order=["layer_1"],
-    )
-    _mount_track_sections(state)
-    delete_row = state.layout.find("layer_1", RowKind.LAYER_MANAGEMENT_DELETE)
-    assert delete_row is not None
-    state.focus_descriptor = state.layout.descriptor(delete_row)
-    assert _row_value_color(state, delete_row) == DISABLED
-    assert _row_shows_action_enter_hint(state, delete_row) is False
-
-
-def test_draw_layer_management_rows_without_error() -> None:
-    pygame.init()
-    overlay = TuningOverlay()
-    state = _minimal_view_state(
-        tracks={
-            "layer_1": make_track_block(
-                stem="drums",
-                preset_dir_label="dir",
-                preset_label="preset.milk",
-                blend_mode="black-key",
-                opacity_pct=50,
-                beat_sensitivity=1.0,
-                effects={},
-            )
-        },
-    )
-    _mount_track_sections(state)
-    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
-    overlay.notify_input()
-    overlay.draw(surface, state)
-    assert overlay.panel_rect is not None
-    assert RowKind.LAYER_MANAGEMENT_ADD not in [row.kind for row in state.layout.rows]
-    delete_row = state.layout.find( "layer_1", RowKind.LAYER_MANAGEMENT_DELETE)
-    assert delete_row in state.layout.visible_indices(state)
+def test_disabled_action_row_stays_disabled() -> None:
+    state = _minimal_view_state()
+    delete_row = RowDescriptor(RowKind.LAYER_MANAGEMENT_DELETE, slot="layer_1")
+    state.focus_descriptor = delete_row
+    assert row_value_color_for(state, delete_row) == DISABLED
 
 
 def _inspector_kinds(state, node_id: str) -> list[RowKind]:
@@ -1331,13 +182,8 @@ def _inspector_kinds(state, node_id: str) -> list[RowKind]:
     return [row.descriptor.kind for row in rows if row.descriptor is not None]
 
 
-def test_render_overlay_row_layout_includes_header_and_sub_rows_when_expanded() -> None:
+def test_render_overlay_inspector_includes_header_and_sub_rows_when_expanded() -> None:
     state = _minimal_view_state()
-    leftover = [row.kind for row in state.layout.rows]
-    assert RowKind.RENDER_TIMELINE_HEADER not in leftover
-    assert RowKind.SONG_MARKERS_HEADER not in leftover
-    assert RowKind.RENDER_OVERLAYS_HEADER not in leftover
-    assert RowKind.RENDER_OVERLAY_CARD_HEADER not in leftover
     opening = _inspector_kinds(state, overlay_card_node_id("opening_card"))
     for kind in (
         RowKind.RENDER_OVERLAY_CARD_ANIMATION_HEADER,
@@ -1365,10 +211,8 @@ def test_render_overlay_animation_rows_when_expanded() -> None:
         ),
     )
     kinds = _inspector_kinds(state, overlay_card_node_id("opening_card"))
-    leftover = [row.kind for row in state.layout.rows]
     assert RowKind.RENDER_OVERLAY_CARD_ANIMATION_TYPE in kinds
     assert RowKind.RENDER_OVERLAY_CARD_ANIMATION_SLIDE_DIRECTION in kinds
-    assert RowKind.RENDER_OVERLAY_CARD_ANIMATION_SLIDE_DIRECTION not in leftover
     assert RowKind.RENDER_OVERLAY_CARD_TIME in kinds
     assert RowKind.RENDER_OVERLAY_CARD_DISPLAY_TIME in kinds
 
@@ -1401,286 +245,13 @@ def test_render_overlay_title_and_body_font_rows_when_expanded() -> None:
         RowKind.RENDER_OVERLAY_CARD_BODY_BACKGROUND_COLOUR,
     ):
         assert kind in kinds
-    leftover = {row.kind for row in state.layout.rows}
-    assert RowKind.RENDER_OVERLAY_CARD_TITLE_FONT not in leftover
 
 
 def test_render_overlay_collapsed_hides_sub_rows() -> None:
     state = _minimal_view_state()
-    leftover = {row.kind for row in state.layout.rows}
-    assert RowKind.RENDER_OVERLAYS_HEADER not in leftover
-    assert RowKind.RENDER_OVERLAY_CARD_HEADER not in leftover
-    assert RowKind.RENDER_OVERLAY_CARD_POSITION not in leftover
     opening = _inspector_kinds(state, overlay_card_node_id("opening_card"))
     closing = _inspector_kinds(state, overlay_card_node_id("closing_card"))
     assert RowKind.RENDER_OVERLAY_CARD_POSITION in opening
     assert RowKind.RENDER_OVERLAY_CARD_POSITION in closing
     overlays = _inspector_kinds(state, "render.overlays")
     assert overlays.count(RowKind.RENDER_OVERLAY_CARD_HEADER) == 2
-
-
-def test_draw_render_overlay_header_without_error() -> None:
-    pygame.init()
-    overlay = TuningOverlay()
-    state = _minimal_view_state(
-        render_overlays=RenderOverlaysBlock(solo=True),
-    )
-    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
-    overlay.notify_input()
-    overlay.draw(surface, state)
-    kinds = {row.kind for row in state.layout.rows}
-    assert RowKind.RENDER_TIMELINE_HEADER not in kinds
-    assert RowKind.RENDER_OVERLAYS_HEADER not in kinds
-
-
-def test_draw_track_header_with_solo_eye() -> None:
-    pygame.init()
-    overlay = TuningOverlay()
-    state = TuningViewState(
-        layer_z_order=("layer_1",),
-        tracks={
-            "layer_1": make_track_block(
-                stem="drums",
-                preset_dir_label="dir",
-                preset_label="preset.milk",
-                blend_mode="black-key",
-                opacity_pct=50,
-                beat_sensitivity=1.0,
-                effects={},
-                enabled=True,
-            )
-        },
-        paused=False,
-        position_sec=0.0,
-        focus_cursor=MainFocus(RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)),
-        move_mode_slot=None,
-        notification_message=None,
-        notification_remaining_sec=0.0,
-        solo_slot="layer_1",
-        solo_active=True,
-    )
-    _mount_track_sections(state)
-    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
-    overlay.notify_input()
-    overlay.draw(surface, state)
-    assert overlay.panel_rect is not None
-
-    header_row = next(
-        i
-        for i in state.layout.visible_indices(state)
-        if state.layout.kind( i) == RowKind.TRACK_HEADER and state.layout.slot( i) == "layer_1"
-    )
-    assert state.solo_slot == "layer_1"
-    assert header_row == state.layout.find_by_kind( RowKind.TRACK_HEADER)
-
-
-def test_disabled_track_focus_uses_standard_highlight() -> None:
-    state = _minimal_view_state(
-        tracks={
-            "layer_1": make_track_block(
-                stem="drums",
-                preset_dir_label="dir",
-                preset_label="preset.milk",
-                blend_mode="black-key",
-                opacity_pct=50,
-                beat_sensitivity=1.0,
-                effects={},
-                visible=False,
-            )
-        },
-    )
-    _mount_track_sections(state)
-    header_row = state.layout.find_by_kind( RowKind.TRACK_HEADER)
-    state.focus_descriptor = state.layout.descriptor(header_row)
-    assert _row_value_color(state, header_row) == HIGHLIGHT
-    assert _row_bg_color(state, header_row) == HIGHLIGHT
-
-
-def test_main_tree_rows_not_highlighted_when_timeline_submenu_focused() -> None:
-    state = _minimal_view_state(
-        render_timeline=RenderTimelineBlock(enabled=True),
-    )
-    _mount_track_sections(state)
-    row = state.layout.find_by_kind(RowKind.TRACK_HEADER)
-    state.focus_descriptor = state.layout.descriptor(row)
-    state.timeline_submenu_focused = False
-    assert _row_value_color(state, row) == HIGHLIGHT
-    assert _row_bg_color(state, row) == HIGHLIGHT
-
-    state.timeline_submenu_focused = True
-    assert _row_value_color(state, row) != HIGHLIGHT
-    assert _row_bg_color(state, row) is None
-
-
-def test_draw_render_timeline_header_without_error() -> None:
-    pygame.init()
-    overlay = TuningOverlay()
-    state = _minimal_view_state(
-        render_timeline=RenderTimelineBlock(enabled=True),
-    )
-    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
-    overlay.notify_input()
-    overlay.draw(surface, state)
-    assert RowKind.RENDER_TIMELINE_HEADER not in {
-        row.kind for row in state.layout.rows
-    }
-
-
-def test_overlay_starts_hidden() -> None:
-    pygame.init()
-    overlay = TuningOverlay()
-    state = _effects_expanded_view_state()
-    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
-    overlay.draw(surface, state)
-    assert overlay.panel_rect is None
-
-
-def test_hide_immediately_hides_overlay() -> None:
-    pygame.init()
-    overlay = TuningOverlay()
-    state = _effects_expanded_view_state()
-    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
-    overlay.notify_input()
-    overlay.draw(surface, state)
-    assert overlay.panel_rect is not None
-    overlay.hide_immediately()
-    assert overlay.is_visible() is False
-    overlay.draw(surface, state)
-    assert overlay.panel_rect is None
-
-
-def test_is_visible_tracks_visibility() -> None:
-    overlay = TuningOverlay()
-    assert overlay.is_visible() is False
-    overlay.notify_input()
-    assert overlay.is_visible() is True
-    overlay.hide_immediately()
-    assert overlay.is_visible() is False
-
-
-def test_overlay_normal_hold_idle_without_timeline_panel() -> None:
-    overlay = TuningOverlay()
-    overlay.notify_input()
-    overlay.update(DEFAULT_UI_FADE_SEC - 0.1)
-    assert overlay._visibility == 1.0
-    overlay.update(0.2)
-    assert overlay._visibility < 1.0
-
-
-def test_overlay_ui_fade_disabled_stays_visible_until_hide() -> None:
-    overlay = TuningOverlay(hold_idle_sec=0.0)
-    overlay.notify_input()
-    for _ in range(200):
-        overlay.update(1.0)
-    assert overlay.is_visible() is True
-    overlay.hide_immediately()
-    assert overlay.is_visible() is False
-
-
-def test_max_panel_h_unchanged_when_timeline_closed() -> None:
-    pygame.init()
-    overlay = TuningOverlay()
-    state = _effects_expanded_view_state()
-    surface_height = 720
-    visualiser_rect = _visualiser_below(1280, surface_height)
-    closed = _panel_scroll_metrics(
-        overlay,
-        state,
-        surface_height=surface_height,
-        timeline_panel_open=False,
-        visualiser_rect=visualiser_rect,
-    )
-    _, margin_y = overlay._margin
-    assert closed.max_panel_h == visualiser_rect[3] - margin_y * 2
-
-
-def test_panel_reserves_timeline_viewport_when_open() -> None:
-    pygame.init()
-    overlay = TuningOverlay()
-    state = _effects_expanded_view_state()
-    surface_height = 720
-    surface = pygame.Surface((1280, surface_height), pygame.SRCALPHA)
-    overlay.notify_input()
-    visualiser_rect = _visualiser_below(surface.get_width(), surface_height)
-    overlay.draw(surface, state, timeline_panel_open=True, visualiser_rect=visualiser_rect)
-
-    panel = overlay.panel_rect
-    assert panel is not None
-    _, py, _, ph = panel
-    _, margin_y = overlay._margin
-    reserve = timeline_viewport_reserve_px(len(state.layer_z_order))
-    assert py == margin_y + visualiser_rect[1]
-    assert py + ph + reserve <= surface_height - margin_y
-
-    open_metrics = _panel_scroll_metrics(
-        overlay,
-        state,
-        surface_height=surface_height,
-        timeline_panel_open=True,
-        visualiser_rect=visualiser_rect,
-    )
-    closed_metrics = _panel_scroll_metrics(
-        overlay,
-        state,
-        surface_height=surface_height,
-        timeline_panel_open=False,
-        visualiser_rect=visualiser_rect,
-    )
-    assert open_metrics.max_panel_h < closed_metrics.max_panel_h
-    assert open_metrics.max_panel_h == closed_metrics.max_panel_h - reserve
-
-
-def test_long_panel_clears_cue_readout() -> None:
-    pygame.init()
-    state = _effects_expanded_view_state()
-    surface_height = 720
-    surface = pygame.Surface((1280, surface_height), pygame.SRCALPHA)
-    _, margin_y = TuningOverlay()._margin
-    clearance = cue_readout_panel_clearance_px(margin_y)
-    assert clearance > 0
-    visualiser_rect = _visualiser_below(surface.get_width(), surface_height)
-
-    with_cue = TuningOverlay()
-    with_cue.notify_input()
-    with_cue.draw(
-        surface,
-        state,
-        timeline_panel_open=True,
-        cue_readout_open=True,
-        visualiser_rect=visualiser_rect,
-    )
-    without_cue = TuningOverlay()
-    without_cue.notify_input()
-    without_cue.draw(
-        surface, state, timeline_panel_open=True, visualiser_rect=visualiser_rect
-    )
-
-    cue_panel = with_cue.panel_rect
-    plain_panel = without_cue.panel_rect
-    assert cue_panel is not None and plain_panel is not None
-    _, py, _, ph = cue_panel
-    assert py == margin_y + visualiser_rect[1]
-    assert ph == plain_panel[3] - clearance
-
-    metrics = timeline_ui_metrics()
-    timeline_top = (
-        surface_height
-        - timeline_panel_height_px(len(state.layer_z_order))
-        - metrics.margin
-    )
-    badge_top = timeline_top - timeline_badge_reserve_px()
-    assert py + ph <= badge_top - metrics.rec_badge_gap
-
-
-def test_panel_notification_in_pinned_header_block() -> None:
-    pygame.init()
-    overlay = TuningOverlay()
-    state = _minimal_view_state(
-        notification_message="Saved",
-        notification_remaining_sec=2.0,
-    )
-    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
-    overlay.notify_input()
-    overlay.draw(surface, state)
-    assert overlay.panel_rect is None
-    assert state.layout.visible_indices(state) == []

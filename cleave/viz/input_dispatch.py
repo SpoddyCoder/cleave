@@ -135,7 +135,7 @@ def _handle_menu_bar_keydown(
         index = menu_index_for_mnemonic(menus, letter)
         if index is not None:
             menu.open_menu(index, menus)
-            runtime.overlay.notify_input()
+            runtime.ui_fade.notify_input()
             return True
     if (
         menu.focused
@@ -145,7 +145,7 @@ def _handle_menu_bar_keydown(
         return True
     if event.key == pygame.K_F10:
         if menu.toggle_focus():
-            runtime.overlay.notify_input()
+            runtime.ui_fade.notify_input()
         return True
     if not menu.focused:
         return None
@@ -473,7 +473,7 @@ def dispatch_keyup(event: pygame.event.Event, runtime: LiveVisualizerRuntime) ->
         runtime.menu_bar.cancel_alt_tap()
     elif _is_alt_key(event.key):
         if runtime.menu_bar.complete_alt_tap():
-            runtime.overlay.notify_input()
+            runtime.ui_fade.notify_input()
         return
     if runtime.modal_host.handle_keyup(event):
         return

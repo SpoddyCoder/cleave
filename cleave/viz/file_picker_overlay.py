@@ -1,7 +1,7 @@
 """Draw the file picker view state as a centered overlay panel.
 
 Same chrome rules as the modal: `overlay_primitives` plus theme roles, and no
-import of `tuning_panel_draw` or the live help content.
+live help content.
 """
 
 from __future__ import annotations

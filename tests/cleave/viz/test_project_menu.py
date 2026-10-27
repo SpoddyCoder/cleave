@@ -65,8 +65,6 @@ def test_project_children_omitted_until_expanded() -> None:
 
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
-    names = {row.kind.name for row in view.layout.rows}
-    assert not any(name.startswith("PROJECT_") for name in names)
     rows = build_inspector_rows(view, "project", frozenset())
     kinds = [row.descriptor.kind for row in rows if row.descriptor is not None]
     assert RowKind.PROJECT_MILKDROP_HEADER in kinds

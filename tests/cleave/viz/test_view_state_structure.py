@@ -10,7 +10,6 @@ from cleave.viz.navigator import overlay_card_node_id
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.tuning_view_state import view_state_structure_signature
 from tests.cleave.viz.test_controls import _make_controls
-from tests.cleave.viz.test_overlay import _minimal_view_state
 
 
 def test_structure_signature_stable_for_fps_and_focus() -> None:
@@ -24,11 +23,8 @@ def test_structure_signature_stable_for_fps_and_focus() -> None:
         session, config_save)
     assert sig_a == sig_b
 
-    view_a = controls.build_view_state(paused=False, fps=30.0)
-    view_b = controls.build_view_state(paused=False, fps=60.0)
     assert view_state_structure_signature(
         session, config_save) == sig_a
-    assert view_a.layout is view_b.layout
 
 
 def test_layer_expand_flags_absent_from_structure_signature() -> None:
@@ -76,39 +72,26 @@ def test_structure_signature_unchanged_when_notification_shows() -> None:
     controls = _make_controls(("layer_1",))
     session = controls.session
     config_save = controls._config_save
-    view_before = controls.build_view_state(paused=False)
     sig_before = view_state_structure_signature(session, config_save)
     controls.show_notification("Saved")
     controls._notification_host.set_persistent("No presets in bed roles folder")
     sig_after = view_state_structure_signature(session, config_save)
     view_after = controls.build_view_state(paused=False)
     assert sig_before == sig_after
-    assert view_after.layout is view_before.layout
     assert view_after.notification_message == "Saved"
     assert (
         view_after.persistent_notification_message
         == "No presets in bed roles folder"
     )
-    assert view_after.layout.rows == ()
 
 
-def test_reused_structure_produces_identical_row_list_and_focus() -> None:
+def test_reused_structure_keeps_focus() -> None:
     controls = _make_controls(("layer_1",))
     controls.focus_descriptor = RowDescriptor(RowKind.TRACK_BLEND, slot="layer_1")
     view_a = controls.build_view_state(paused=False, fps=30.0)
     view_b = controls.build_view_state(paused=True, fps=60.0, position_sec=42.0)
-    assert view_a.layout is view_b.layout
-    assert view_a.layout.rows == view_b.layout.rows
-    assert view_a.focus_index == view_b.focus_index
-
-
-def test_builder_skips_layout_rebuild_when_structure_unchanged() -> None:
-    controls = _make_controls(("layer_1",))
-    builder = controls._view_state
-    view_a = builder.build(paused=False)
-    layout_a = view_a.layout
-    view_b = builder.build(paused=True, position_sec=10.0, fps=55.0)
-    assert view_b.layout is layout_a
+    assert view_a.focus_descriptor == view_b.focus_descriptor
+    assert view_a.focus_descriptor == RowDescriptor(RowKind.TRACK_BLEND, slot="layer_1")
 
 
 def test_builder_patches_highlight_rolloff_curve_without_structure_rebuild() -> None:
@@ -118,12 +101,12 @@ def test_builder_patches_highlight_rolloff_curve_without_structure_rebuild() -> 
     session.render_post_fx.highlight_rolloff.curve = "rolloff"
 
     view_a = builder.build(paused=False)
-    layout_a = view_a.layout
+    structure = builder._structure
     assert view_a.render_post_fx.highlight_rolloff.curve == "rolloff"
 
     session.render_post_fx.highlight_rolloff.curve = "smoothstep"
     view_b = builder.build(paused=False)
-    assert view_b.layout is layout_a
+    assert builder._structure is structure
     assert view_b.render_post_fx.highlight_rolloff.curve == "smoothstep"
 
 
@@ -149,33 +132,6 @@ def test_structure_signature_ignores_timeline_panel_open() -> None:
         assert flag not in timeline
 
 
-
-def test_layout_rows_omit_timeline_and_song_markers() -> None:
-    controls = _make_controls(("layer_1",))
-    session = controls.session
-    session.timeline.panel_open = True
-    session.song_markers.times = [1.0, 8.0]
-    session.timeline.hard_cut_fades.enabled = True
-    session.timeline.soft_cut_fades.enabled = True
-    view = controls.build_view_state(paused=False)
-    kinds = {row.kind for row in view.layout.rows}
-    forbidden = {
-        RowKind.RENDER_TIMELINE_HEADER,
-        RowKind.SONG_MARKERS_HEADER,
-        RowKind.SONG_MARKER_ITEM,
-        RowKind.TIMELINE_PRESETS_HEADER,
-        RowKind.TIMELINE_BEAT_BAR_GRID_HEADER,
-        RowKind.TIMELINE_CUTS_HEADER,
-        RowKind.TIMELINE_SNAP_TO_SONG_MARKERS,
-        RowKind.TIMELINE_PRESET_CHARACTER,
-        RowKind.TIMELINE_HARD_CUTS,
-    }
-    assert kinds.isdisjoint(forbidden)
-    assert kinds == set()
-
-    session.timeline.panel_open = False
-    closed = controls.build_view_state(paused=False)
-    assert {row.kind for row in closed.layout.rows} == kinds
 
 def test_structure_signature_invalidates_on_highlight_rolloff_mode() -> None:
     controls = _make_controls(("layer_1",))
@@ -216,18 +172,13 @@ def test_builder_rebuilds_layout_when_animation_type_changes() -> None:
     node = overlay_card_node_id("opening_card")
     fade_page = _inspector_kinds(view_fade, node)
     assert RowKind.RENDER_OVERLAY_CARD_ANIMATION_SLIDE_DIRECTION not in fade_page
-    assert RowKind.RENDER_OVERLAY_CARD_ANIMATION_SLIDE_DIRECTION not in {
-        row.kind for row in view_fade.layout.rows
-    }
+    fade_structure = controls._view_state._structure
 
     session.render_overlays.opening_card.animation.type = "slide"
     view_slide = controls.build_view_state(paused=False)
     slide_page = _inspector_kinds(view_slide, node)
     assert RowKind.RENDER_OVERLAY_CARD_ANIMATION_SLIDE_DIRECTION in slide_page
-    assert RowKind.RENDER_OVERLAY_CARD_ANIMATION_SLIDE_DIRECTION not in {
-        row.kind for row in view_slide.layout.rows
-    }
-    assert view_slide.layout is not view_fade.layout
+    assert controls._view_state._structure is not fade_structure
 
 
 def test_structure_signature_invalidates_on_closing_card_animation_type() -> None:
@@ -265,13 +216,11 @@ def test_builder_rebuilds_layout_when_highlight_rolloff_mode_changes() -> None:
     view_on = builder.build(paused=False)
     on_page = _inspector_kinds(view_on, "render.post_fx")
     assert RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD in on_page
-    assert RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD not in {
-        row.kind for row in view_on.layout.rows
-    }
+    on_structure = builder._structure
 
     session.render_post_fx.highlight_rolloff.mode = "off"
     view_off = builder.build(paused=False)
-    assert view_off.layout is not view_on.layout
+    assert builder._structure is not on_structure
     assert RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD not in _inspector_kinds(
         view_off, "render.post_fx"
     )
@@ -330,7 +279,7 @@ def test_structure_signature_invalidates_on_switching_paused() -> None:
     assert sig_before != sig_after
 
 
-def test_builder_mirrors_switching_paused_into_layout() -> None:
+def test_builder_mirrors_switching_paused_into_inspector() -> None:
     from unittest.mock import MagicMock
 
     from cleave.viz.layer import StemLayer
@@ -471,28 +420,6 @@ def test_builder_syncs_playing_list_preset_from_projectm_position() -> None:
 
 
 
-def test_timeline_mode_row_set_unchanged_when_timeline_enabled_toggles() -> None:
-    """Dimming when timeline is disabled does not add or remove leftover rows."""
-    controls = _make_controls(("layer_1",))
-    session = controls.session
-    session.layers["layer_1"].preset_switching = "on"
-    session.layers["layer_1"].preset_switching_trigger = "timer"
-    session.timeline.enabled = True
-    builder = controls._view_state
-    kinds_on = [desc.kind for desc in builder.build(paused=False).layout.rows]
-    session.timeline.enabled = False
-    kinds_off = [desc.kind for desc in builder.build(paused=False).layout.rows]
-    assert kinds_on == kinds_off
-
-
-
-def test_minimal_view_state_still_builds_layout() -> None:
-    state = _minimal_view_state()
-    assert state.layout is not None
-    assert state.layout_frame is not None
-    assert state.layout.rows == ()
-
-
 def test_structure_signature_invalidates_on_song_marker_count() -> None:
     controls = _make_controls(("layer_1",))
     session = controls.session
@@ -531,18 +458,12 @@ def test_pattern_mask_seed_row_only_for_plasma() -> None:
         page = _inspector_kinds(view, "render.pattern_mask")
         assert RowKind.RENDER_PATTERN_MASK_FEATHER in page
         assert RowKind.RENDER_PATTERN_MASK_SEED not in page
-        assert RowKind.RENDER_PATTERN_MASK_SEED not in {
-            row.kind for row in view.layout.rows
-        }
 
     session.render_pattern_mask.type = "plasma"
     view_plasma = builder.build(paused=False)
     plasma = _inspector_kinds(view_plasma, "render.pattern_mask")
     assert RowKind.RENDER_PATTERN_MASK_SEED in plasma
     assert RowKind.RENDER_PATTERN_MASK_FEATHER in plasma
-    assert RowKind.RENDER_PATTERN_MASK_SEED not in {
-        row.kind for row in view_plasma.layout.rows
-    }
 
 
 def test_structure_signature_invalidates_on_hard_cut_fades_enabled() -> None:
@@ -584,12 +505,8 @@ def test_structure_signature_invalidates_on_visual_limiter_enabled() -> None:
     assert sig_before != sig_after
 
 
-def test_leftover_layout_omits_settings_project_and_transport() -> None:
+def test_structure_signature_omits_expand_flags() -> None:
     controls = _make_controls(("layer_1",))
-    view = controls.build_view_state(paused=False)
-    names = {row.kind.name for row in view.layout.rows}
-    assert "TRANSPORT" not in names
-    assert not any(name.startswith("SETTINGS_") or name.startswith("PROJECT_") for name in names)
     sig = view_state_structure_signature(
         controls.session, controls._config_save)
     payload = json.loads(sig)
@@ -612,47 +529,6 @@ def test_leftover_layout_omits_settings_project_and_transport() -> None:
         assert flag not in sig
 
 
-def test_layout_omits_track_timeline_and_song_marker_rows() -> None:
-    controls = _make_controls(("layer_1", "layer_2"))
-    view = controls.build_view_state(paused=False)
-    kinds = {row.kind for row in view.layout.rows}
-    names = {kind.name for kind in kinds}
-    assert not any(name.startswith("TRACK_") for name in names)
-    assert RowKind.LAYER_MANAGEMENT_ADD not in kinds
-    assert RowKind.RENDER_SECTION_GAP not in kinds
-    assert RowKind.RENDER_OVERLAYS_HEADER not in kinds
-    assert RowKind.RENDER_POST_FX_HEADER not in kinds
-    assert RowKind.RENDER_PATTERN_MASK_HEADER not in kinds
-    assert RowKind.RENDER_TIMELINE_HEADER not in kinds
-    assert RowKind.SONG_MARKERS_HEADER not in kinds
-    assert RowKind.SONG_MARKER_ITEM not in kinds
-
-    session = controls.session
-    session.timeline.panel_open = True
-    session.song_markers.times = [1.0]
-    open_view = controls.build_view_state(paused=False)
-    open_kinds = {row.kind for row in open_view.layout.rows}
-    assert RowKind.SONG_MARKERS_HEADER not in open_kinds
-    assert RowKind.SONG_MARKER_ITEM not in open_kinds
-    assert RowKind.TIMELINE_BEAT_BAR_GRID_HEADER not in open_kinds
-    assert RowKind.RENDER_TIMELINE_HEADER not in open_kinds
-    assert not any(
-        row.kind.name.startswith("TRACK_") for row in open_view.layout.rows
-    )
-
-def test_curation_leftover_layout_is_empty() -> None:
-    controls = _make_controls(("layer_1",))
-    controls.session.settings.editor_mode = "preset_curation"
-    view = controls.build_view_state(paused=False)
-    assert view.layout.rows == ()
-
-    controls.show_notification("Saved")
-    toasted = controls.build_view_state(paused=False)
-    assert toasted.notification_message == "Saved"
-    assert toasted.layout.rows == ()
-    assert toasted.layout is view.layout
-
-
 def test_song_marker_items_stay_on_the_inspector() -> None:
     from cleave.viz.inspector import build_inspector_rows
 
@@ -661,9 +537,6 @@ def test_song_marker_items_stay_on_the_inspector() -> None:
     session.timeline.panel_open = True
     session.song_markers.times = [8.0, 32.5, 64.0]
     view = controls.build_view_state(paused=False)
-    layout_kinds = {row.kind for row in view.layout.rows}
-    assert RowKind.SONG_MARKERS_HEADER not in layout_kinds
-    assert RowKind.SONG_MARKER_ITEM not in layout_kinds
     rows = build_inspector_rows(view, "song_markers", frozenset(), frozenset())
     items = [
         row.descriptor

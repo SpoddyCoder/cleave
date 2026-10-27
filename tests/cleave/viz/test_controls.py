@@ -54,11 +54,9 @@ from cleave.viz.key_repeat import mod_shift
 from cleave.viz.playback import format_mmss
 from tests.support.viz import (
     press_layer_row,
-    baseline_tuning_ui_metrics,
     make_test_cfg,
     make_track_block,
     noop_layer_bindings,
-    overlay_font,
     stub_playback_state,
 )
 from cleave.user_config import load_user_config
@@ -70,7 +68,6 @@ from cleave.viz.controls import (
 )
 from cleave.viz.settings_controls import EDITOR_WINDOW_RESTART_TOAST
 from cleave.viz.modal import ModalKind, ModalLabeledLine
-from cleave.viz.theme import HIGHLIGHT
 from cleave.viz.session import (
     LayerRuntime,
     TimelineRuntime,
@@ -79,8 +76,15 @@ from cleave.viz.session import (
 from cleave.viz.row_hotkeys import handle_row_hotkey
 from cleave.viz.row_spec import (
     REPEAT_ROW_KINDS,
+    RowPresentStyle,
     apply_field_action,
     apply_field_horizontal,
+    row_composite_header_display_text,
+    row_dynamic_labeled_display_text,
+    row_expand_subheader_display_text,
+    row_full_line_display_text,
+    row_labeled_display_text,
+    row_spec,
 )
 from cleave.viz.commands import command_by_id, command_context
 from cleave.viz.theme import (
@@ -101,30 +105,13 @@ from cleave.viz.material_icons import (
     VISIBILITY_OFF_GLYPH,
     render_glyph,
     render_transport_icons,
-    row_icon_prefix_width,
     track_header_lock_suffix_width,
     visibility_icon_prefix_width,
 )
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.row_present_renderers import (
-    row_composite_header_display_text,
-    row_expand_subheader_display_text,
-    row_full_line_display_text,
-    row_indent as _layout_row_indent,
-    row_labeled_display_text,
-    row_text as _layout_row_text,
-    row_value_color as _layout_row_value_color,
-    row_value_color_for,
-)
-from cleave.viz.row_sections import row_tree_indent_depth
-from cleave.viz.row_spec import RowPresentStyle, row_spec
-from cleave.viz.tuning_panel_draw import (
-    TREE_INDENT,
-    _row_bg_color,
-    fit_row_text,
-    preset_row_prefix_width,
     render_visibility_icon,
-    track_header_prefix_width,
+    row_value_color_for,
 )
 from cleave.viz.tuning_view_state import TuningViewState
 
@@ -243,9 +230,6 @@ def test_build_view_state_passes_fps() -> None:
 
 def test_add_layer_row_omitted_at_max() -> None:
     controls, manager = _make_controls_with_manager(("layer_1",), can_add=False)
-    view = controls.build_view_state(paused=False)
-    with pytest.raises(ValueError, match="no row for kind"):
-        view.layout.find_by_kind(RowKind.LAYER_MANAGEMENT_ADD)
     controls.focus_descriptor = RowDescriptor(RowKind.LAYER_MANAGEMENT_ADD)
 
     press_layer_row(controls, RowDescriptor(RowKind.LAYER_MANAGEMENT_ADD), _keydown(pygame.K_RETURN))
@@ -369,22 +353,6 @@ def test_delete_layer_exits_move_mode() -> None:
     manager.remove_layer.assert_called_once_with("layer_2")
 
 
-def _mount_track_sections(view: TuningViewState) -> None:
-    from cleave.viz.row_layout import RowLayout, build_layout_frame
-    from cleave.viz.row_sections import TRACK_SECTION, append_expand_section_rows
-
-    if any(row.kind.name.startswith("TRACK_") for row in view.layout.rows):
-        return
-    rows = list(view.layout.rows)
-    for slot in view.layer_z_order:
-        append_expand_section_rows(rows, TRACK_SECTION, view, slot)
-    view.layout = RowLayout(
-        rows=tuple(rows),
-        descriptor_index={desc: index for index, desc in enumerate(rows)},
-    )
-    view.layout_frame = build_layout_frame(view.layout, view)
-
-
 def _inspector_kinds(controls: TuningControls, slot: str) -> list[RowKind]:
     from cleave.viz.inspector import build_inspector_rows
 
@@ -407,31 +375,18 @@ def _row(
     *,
     effect_id: str | None = None,
     driver_slug: str | None = None,
-) -> int:
-    try:
-        return view.layout.find(stem, kind, effect_id=effect_id, driver_slug=driver_slug)
-    except ValueError:
-        if not kind.name.startswith("TRACK_") and not kind.name.startswith("LAYER_MANAGEMENT"):
-            raise
-        before = len(view.layout)
-        _mount_track_sections(view)
-        if len(view.layout) == before:
-            raise
-        return view.layout.find(stem, kind, effect_id=effect_id, driver_slug=driver_slug)
-
-
-def _row_indent(state: TuningViewState, index: int | RowDescriptor) -> int:
-    if isinstance(index, RowDescriptor):
-        return TREE_INDENT * row_tree_indent_depth(index.kind)
-    return _layout_row_indent(state, index)
+) -> RowDescriptor:
+    del view
+    return RowDescriptor(
+        kind, slot=stem, effect_id=effect_id, driver_slug=driver_slug
+    )
 
 
 def _row_value_color(
     state: TuningViewState, index: int | RowDescriptor
 ) -> tuple[int, int, int]:
-    if isinstance(index, RowDescriptor):
-        return row_value_color_for(state, index)
-    return _layout_row_value_color(state, index)
+    assert isinstance(index, RowDescriptor)
+    return row_value_color_for(state, index)
 
 
 def _page_kinds(state: TuningViewState, node_id: str) -> list[RowKind]:
@@ -459,19 +414,20 @@ def _text_for_descriptor(state: TuningViewState, desc: RowDescriptor) -> str:
         return row_composite_header_display_text(state, desc)
     if style == RowPresentStyle.FULL_LINE:
         return row_full_line_display_text(state, desc)
+    if style == RowPresentStyle.DYNAMIC:
+        return row_dynamic_labeled_display_text(state, desc)
     return ""
 
 
 def _row_text(state: TuningViewState, index: int | RowDescriptor) -> str:
-    if isinstance(index, RowDescriptor):
-        return _text_for_descriptor(state, index)
-    return _layout_row_text(state, index)
+    assert isinstance(index, RowDescriptor)
+    return _text_for_descriptor(state, index)
 
 
 def _desc(view: TuningViewState, index: int | RowDescriptor) -> RowDescriptor:
-    if isinstance(index, RowDescriptor):
-        return index
-    return view.layout.descriptor(index)
+    del view
+    assert isinstance(index, RowDescriptor)
+    return index
 
 
 def _expand_settings(controls: TuningControls) -> None:
@@ -488,12 +444,6 @@ def _expand_settings_editor_window(controls: TuningControls) -> None:
 
 def _expand_settings_latency(controls: TuningControls) -> None:
     return None
-
-
-def _focus_index(controls: TuningControls, *, paused: bool = False) -> int:
-    view = controls.build_view_state(paused=paused)
-    return view.layout.find_descriptor(controls.focus_descriptor)
-
 
 
 _INSPECTOR_COMMANDS = {
@@ -616,9 +566,6 @@ def test_disabled_render_overlay_can_expand_sub_rows() -> None:
     assert controls.session.render_overlays.opening_card.enabled is False
 
     view = controls.build_view_state(paused=False)
-    leftover = {row.kind for row in view.layout.rows}
-    assert RowKind.RENDER_OVERLAYS_HEADER not in leftover
-    assert RowKind.RENDER_OVERLAY_CARD_HEADER not in leftover
     page = _page_kinds(view, overlay_card_node_id("opening_card"))
     assert RowKind.RENDER_OVERLAY_CARD_POSITION in page
 
@@ -635,9 +582,6 @@ def test_disabled_render_post_fx_can_expand_sub_rows() -> None:
     assert controls.session.render_post_fx.enabled is False
 
     view = controls.build_view_state(paused=False)
-    leftover = {row.kind for row in view.layout.rows}
-    assert RowKind.RENDER_POST_FX_HEADER not in leftover
-    assert RowKind.RENDER_POST_FX_FADE_HEADER not in leftover
     page = _page_kinds(view, "render.post_fx")
     assert RowKind.RENDER_POST_FX_FADE_IN_START in page
 
@@ -651,12 +595,6 @@ def test_disabled_render_timeline_can_open_panel() -> None:
     assert controls.session.timeline.panel_open is True
     assert controls.shell_focus.region is ShellRegion.TIMELINE
     assert isinstance(controls.focus_cursor, TimelineFocus)
-    view = controls.build_view_state(paused=False)
-    kinds = {row.kind for row in view.layout.rows}
-    assert RowKind.RENDER_TIMELINE_HEADER not in kinds
-    assert RowKind.TIMELINE_BEAT_BAR_GRID_HEADER not in kinds
-    assert RowKind.SONG_MARKERS_HEADER not in kinds
-    assert RowKind.TIMELINE_PRESETS_HEADER not in kinds
 
 def test_beat_sensitivity_clamps() -> None:
     controls = _make_controls(("layer_1",))
@@ -791,72 +729,6 @@ def test_blend_and_opacity_change_sets_dirty_save_clears() -> None:
 
     _save_now(controls)
     assert not controls.config_dirty
-
-
-def test_preset_row_truncates_long_filenames() -> None:
-    long_name = (
-        "Phat_Zylot_Eo.S. rainbow bubble_mid3-starpoints_spirals_VE "
-        "- Bitcore Tweak.milk (1/50)"
-    )
-    view = TuningViewState(
-        layer_z_order=("layer_1",),
-        tracks={
-            "layer_1": make_track_block(
-                stem="drums",
-                preset_dir_label="short (1/1)",
-                preset_label=long_name,
-                blend_mode="black-key",
-                opacity_pct=50,
-                beat_sensitivity=1.0,
-                effects={},
-                enabled=True,
-                preset_empty=False,
-            )
-        },
-        paused=False,
-        position_sec=0.0,
-        focus_cursor=MainFocus(RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)),
-        move_mode_slot=None,
-        notification_message=None,
-        notification_remaining_sec=0.0,
-    )
-    preset_row = _row(view, "layer_1", RowKind.TRACK_PRESET)
-    font = overlay_font()
-    panel_w = baseline_tuning_ui_metrics().panel_content_max_width
-    label = fit_row_text(font, view, preset_row, max_content_width=panel_w)
-    prefix_w = preset_row_prefix_width(font, font.get_linesize())
-    assert font.size(label)[0] <= panel_w - prefix_w
-    assert label.endswith("(1/50)")
-    assert label.startswith("Phat_Zylot")
-    assert "…" in label
-    assert "…/" not in label
-
-
-def test_fit_row_text_config_and_preset_share_panel_width() -> None:
-    long_name = (
-        "Phat_Zylot_Eo.S. rainbow bubble_mid3-starpoints_spirals_VE "
-        "- Bitcore Tweak.milk (1/50)"
-    )
-    controls = _make_controls(("layer_1",))
-    view = controls.build_view_state(paused=False)
-    view.tracks["layer_1"] = make_track_block(
-        stem="drums",
-        preset_dir_label="short (1/1)",
-        preset_label=long_name,
-        blend_mode="black-key",
-        opacity_pct=50,
-        beat_sensitivity=1.0,
-        effects={},
-        enabled=True,
-        preset_empty=False,
-    )
-    preset_row = _row(view, "layer_1", RowKind.TRACK_PRESET)
-    font = overlay_font()
-    panel_w = baseline_tuning_ui_metrics().panel_content_max_width
-    preset_label = fit_row_text(font, view, preset_row, max_content_width=panel_w)
-    preset_prefix_w = preset_row_prefix_width(font, font.get_linesize())
-    assert font.size(preset_label)[0] + preset_prefix_w <= panel_w
-
 
 
 def test_save_writes_launch_path() -> None:
@@ -1074,39 +946,6 @@ def test_render_overlay_body_font_size_row() -> None:
     assert controls.session.render_overlays.opening_card.body_font_size == 17
 
 
-def test_render_overlay_font_rows_nested_indent() -> None:
-    controls = _make_controls()
-    view = controls.build_view_state(paused=False)
-    title_header = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER, card="opening_card")
-    title_text = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_TEXT, card="opening_card")
-    title_colour = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_COLOUR, card="opening_card")
-    title_background = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_BACKGROUND_COLOUR, card="opening_card")
-    title_font_size = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_FONT_SIZE, card="opening_card")
-    title_font = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_FONT, card="opening_card")
-    body_header = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_BODY_HEADER, card="opening_card")
-    body_text = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_BODY_TEXT, card="opening_card")
-    body_colour = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_BODY_COLOUR, card="opening_card")
-    body_background = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_BODY_BACKGROUND_COLOUR, card="opening_card")
-    body_font_size = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_BODY_FONT_SIZE, card="opening_card")
-    body_font = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_BODY_FONT, card="opening_card")
-    background_colour = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_BACKGROUND_COLOUR, card="opening_card")
-    border_colour = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_BORDER_COLOUR, card="opening_card")
-    assert _row_indent(view, title_header) == TREE_INDENT * 2
-    assert _row_indent(view, title_text) == TREE_INDENT * 3
-    assert _row_indent(view, title_colour) == TREE_INDENT * 3
-    assert _row_indent(view, title_background) == TREE_INDENT * 3
-    assert _row_indent(view, title_font_size) == TREE_INDENT * 3
-    assert _row_indent(view, title_font) == TREE_INDENT * 3
-    assert _row_indent(view, body_header) == TREE_INDENT * 2
-    assert _row_indent(view, body_text) == TREE_INDENT * 3
-    assert _row_indent(view, body_colour) == TREE_INDENT * 3
-    assert _row_indent(view, body_background) == TREE_INDENT * 3
-    assert _row_indent(view, body_font_size) == TREE_INDENT * 3
-    assert _row_indent(view, body_font) == TREE_INDENT * 3
-    assert _row_indent(view, background_colour) == TREE_INDENT * 2
-    assert _row_indent(view, border_colour) == TREE_INDENT * 2
-
-
 def test_render_overlay_background_margin_and_padding_placement() -> None:
     controls = _make_controls()
     view = controls.build_view_state(paused=False)
@@ -1122,8 +961,6 @@ def test_render_overlay_background_margin_and_padding_placement() -> None:
         padding.kind,
         border_width.kind,
     )
-    assert _row_indent(view, margin) == TREE_INDENT * 2
-    assert _row_indent(view, padding) == TREE_INDENT * 2
 
 
 def test_render_overlay_background_margin_row() -> None:
@@ -1712,16 +1549,15 @@ def test_render_overlay_collapse_refocuses_from_title_font_row() -> None:
     controls.focus_descriptor = font_desc
     assert controls.focus_descriptor == font_desc
     view = controls.build_view_state(paused=False)
-    assert view.layout.resolve_navigable(controls.focus_descriptor, view) == font_desc
+    assert view.focus_descriptor == font_desc
 
 
 def test_render_overlay_title_collapse_refocuses_from_font_row() -> None:
     controls = _make_controls()
-    view = controls.build_view_state(paused=False)
     font_row = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_FONT_SIZE, card="opening_card")
     controls.focus_descriptor = font_row
     view = controls.build_view_state(paused=False)
-    assert view.layout.resolve_navigable(controls.focus_descriptor, view) == font_row
+    assert view.focus_descriptor == font_row
 
 
 def test_track_header_visibility_icon_color() -> None:
@@ -1838,16 +1674,6 @@ def test_render_post_fx_highlight_rolloff_mode_off_keeps_section_expanded() -> N
     controls.render_post_fx.cycle_highlight_rolloff_mode(forward=True)
 
     assert controls.session.render_post_fx.highlight_rolloff.mode == "off"
-
-
-def test_render_timeline_header_after_post_fx() -> None:
-    controls = _make_controls()
-    view = controls.build_view_state(paused=False)
-    kinds = {row.kind for row in view.layout.rows}
-    assert RowKind.RENDER_TIMELINE_HEADER not in kinds
-    assert RowKind.RENDER_OVERLAYS_HEADER not in kinds
-    assert RowKind.RENDER_POST_FX_HEADER not in kinds
-    assert RowKind.RENDER_PATTERN_MASK_HEADER not in kinds
 
 
 def _focus_timeline_presets(controls: TuningControls) -> None:
@@ -2705,8 +2531,6 @@ def test_timeline_snap_song_markers_is_plain_action_row() -> None:
     assert "▼" not in text
     _focus_inspector_kind(controls, RowKind.TIMELINE_SNAP_TO_SONG_MARKERS)
     assert _press_focused(controls, _keydown(pygame.K_RIGHT)) is True
-    view_after = controls.build_view_state(paused=False)
-    assert view_after.layout.rows == view.layout.rows
 
 
 def test_timeline_snap_song_markers_uses_proximity() -> None:
@@ -2875,15 +2699,6 @@ def test_timeline_remove_soft_cuts_all_clears_on_and_off() -> None:
     assert view.notification_message == "Removed cuts from 2 cues"
 
 
-def test_render_timeline_header_is_not_a_layout_row() -> None:
-    controls = _make_controls()
-    view = controls.build_view_state(paused=False)
-    assert RowKind.RENDER_TIMELINE_HEADER not in {row.kind for row in view.layout.rows}
-    controls.session.timeline.panel_open = True
-    view = controls.build_view_state(paused=False)
-    assert RowKind.RENDER_TIMELINE_HEADER not in {row.kind for row in view.layout.rows}
-
-
 def test_render_timeline_e_toggles_enabled() -> None:
     controls = _make_controls(timeline_enabled=True)
     assert controls.session.timeline.enabled is True
@@ -2904,7 +2719,6 @@ def test_timeline_enabled_startup_shows_notification() -> None:
     assert view.notification_remaining_sec == pytest.approx(
         DEFAULT_NOTIFICATION_DISPLAY_SEC, abs=0.01
     )
-    assert view.layout.rows == ()
 
 
 def test_render_timeline_toggle_shows_notification() -> None:
@@ -2942,7 +2756,7 @@ def _notification_runtime(controls: TuningControls):
         modal_host=controls.modal_host,
         menu_bar=MenuBarState(),
         timeline_controls=None,
-        overlay=MagicMock(),
+        ui_fade=MagicMock(),
         overlay_profiler=MagicMock(),
         playback=controls.playback,
     )
@@ -2963,7 +2777,6 @@ def test_panel_notification_until_dismissed_stays_until_enter() -> None:
         controls.tick(0.0)
         view = controls.build_view_state(paused=False)
         assert view.notification_message == "Saved"
-        assert view.layout.rows == ()
         before = controls.focus_cursor
         assert controls.playback.paused is False
         assert (
@@ -3034,7 +2847,6 @@ def test_panel_notification_enter_dismisses_before_timeout() -> None:
         controls.show_notification("Saved")
         view = controls.build_view_state(paused=False)
         assert view.notification_message == "Saved"
-        assert view.layout.rows == ()
         runtime = _notification_runtime(controls)
         before = controls.focus_cursor
         assert controls.playback.paused is False
@@ -3402,16 +3214,6 @@ def _controls_with_playlist(
     )
 
 
-def _preset_dir_row(controls: TuningControls) -> int:
-    view = controls.build_view_state(paused=False)
-    return _row(view, "layer_1", RowKind.TRACK_PRESET_DIR)
-
-
-def _preset_row(controls: TuningControls) -> int:
-    view = controls.build_view_state(paused=False)
-    return _row(view, "layer_1", RowKind.TRACK_PRESET)
-
-
 def test_directory_row_lr_changes_current_dir() -> None:
     root, siblings = _make_sibling_dir_tree(3)
     controls = _controls_with_playlist(root, siblings[0])
@@ -3725,13 +3527,10 @@ def test_move_mode_colors_focused_track_header() -> None:
     assert press_layer_row(controls, header, _keydown(_MOVE_MODE_KEY)) is True
 
     view = controls.build_view_state(paused=False)
-    _mount_track_sections(view)
-    header_row = _row(view, "layer_2", RowKind.TRACK_HEADER)
-    child_row = header_row + 1
+    header_row = RowDescriptor(RowKind.TRACK_HEADER, slot="layer_2")
+    child_row = RowDescriptor(RowKind.TRACK_PRESET, slot="layer_2")
     assert _row_value_color(view, header_row) == MOVE_MODE
-    assert _row_bg_color(view, header_row) == MOVE_MODE
     assert _row_value_color(view, child_row) == MOVE_MODE
-    assert _row_bg_color(view, child_row) == MOVE_MODE
 
 
 def test_move_mode_colors_preset_list_item() -> None:
@@ -3741,49 +3540,19 @@ def test_move_mode_colors_preset_list_item() -> None:
     layer.preset_switching_trigger = "timer"
     layer.preset_list = ["/tmp/presets/a.milk", "/tmp/presets/b.milk"]
 
-    view = controls.build_view_state(paused=False)
-    _mount_track_sections(view)
-    item_row = view.layout.find_descriptor(
-        RowDescriptor(
-            RowKind.TRACK_PRESET_LIST_ITEM,
-            slot="layer_1",
-            preset_index=0,
-        )
-    )
-    sibling_row = view.layout.find_descriptor(
-        RowDescriptor(
-            RowKind.TRACK_PRESET_LIST_ITEM,
-            slot="layer_1",
-            preset_index=1,
-        )
-    )
     item = RowDescriptor(
         RowKind.TRACK_PRESET_LIST_ITEM, slot="layer_1", preset_index=0
+    )
+    sibling = RowDescriptor(
+        RowKind.TRACK_PRESET_LIST_ITEM, slot="layer_1", preset_index=1
     )
     controls.focus_descriptor = item
     assert press_layer_row(controls, item, _keydown(_MOVE_MODE_KEY)) is True
     assert controls.preset_list.move_mode_preset == ("layer_1", 0)
 
     view = controls.build_view_state(paused=False)
-    _mount_track_sections(view)
-    item_row = view.layout.find_descriptor(
-        RowDescriptor(
-            RowKind.TRACK_PRESET_LIST_ITEM,
-            slot="layer_1",
-            preset_index=0,
-        )
-    )
-    sibling_row = view.layout.find_descriptor(
-        RowDescriptor(
-            RowKind.TRACK_PRESET_LIST_ITEM,
-            slot="layer_1",
-            preset_index=1,
-        )
-    )
-    assert _row_value_color(view, item_row) == MOVE_MODE
-    assert _row_bg_color(view, item_row) == MOVE_MODE
-    assert _row_value_color(view, sibling_row) != MOVE_MODE
-    assert _row_bg_color(view, sibling_row) != MOVE_MODE
+    assert _row_value_color(view, item) == MOVE_MODE
+    assert _row_value_color(view, sibling) != MOVE_MODE
 
 
 def test_preset_list_enter_auditions_item_and_resumes() -> None:
@@ -3841,43 +3610,18 @@ def test_active_preset_list_item_uses_highlight_color() -> None:
 
     controls.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
     view = controls.build_view_state(paused=False)
-    _mount_track_sections(view)
     assert view.tracks["layer_1"].active_preset_list_index == 1
-    active_row = view.layout.find_descriptor(
-        RowDescriptor(
-            RowKind.TRACK_PRESET_LIST_ITEM,
-            slot="layer_1",
-            preset_index=1,
-        )
+    active_row = RowDescriptor(
+        RowKind.TRACK_PRESET_LIST_ITEM, slot="layer_1", preset_index=1
     )
-    idle_row = view.layout.find_descriptor(
-        RowDescriptor(
-            RowKind.TRACK_PRESET_LIST_ITEM,
-            slot="layer_1",
-            preset_index=0,
-        )
+    idle_row = RowDescriptor(
+        RowKind.TRACK_PRESET_LIST_ITEM, slot="layer_1", preset_index=0
     )
     assert _row_value_color(view, active_row) == HIGHLIGHT
     assert _row_value_color(view, idle_row) == VALUE
-    assert _row_bg_color(view, active_row) is None
 
     layer.auto_preset_path = a
     view = controls.build_view_state(paused=False)
-    _mount_track_sections(view)
-    active_row = view.layout.find_descriptor(
-        RowDescriptor(
-            RowKind.TRACK_PRESET_LIST_ITEM,
-            slot="layer_1",
-            preset_index=1,
-        )
-    )
-    idle_row = view.layout.find_descriptor(
-        RowDescriptor(
-            RowKind.TRACK_PRESET_LIST_ITEM,
-            slot="layer_1",
-            preset_index=0,
-        )
-    )
     assert view.tracks["layer_1"].active_preset_list_index == 0
     assert _row_value_color(view, active_row) == VALUE
     assert _row_value_color(view, idle_row) == HIGHLIGHT
@@ -3893,14 +3637,9 @@ def test_first_preset_list_item_highlighted_when_auto_unset() -> None:
     layer.auto_preset_path = None
     controls.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
     view = controls.build_view_state(paused=False)
-    _mount_track_sections(view)
     assert view.tracks["layer_1"].active_preset_list_index == 0
-    item_row = view.layout.find_descriptor(
-        RowDescriptor(
-            RowKind.TRACK_PRESET_LIST_ITEM,
-            slot="layer_1",
-            preset_index=0,
-        )
+    item_row = RowDescriptor(
+        RowKind.TRACK_PRESET_LIST_ITEM, slot="layer_1", preset_index=0
     )
     assert _row_value_color(view, item_row) == HIGHLIGHT
 
@@ -3922,25 +3661,15 @@ def test_row_value_color_dim_for_focused_empty_preset() -> None:
         },
         paused=False,
         position_sec=0.0,
-        focus_cursor=MainFocus(RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)),
+        focus_cursor=MainFocus(
+            RowDescriptor(RowKind.TRACK_PRESET, slot="layer_1")
+        ),
         move_mode_slot=None,
         notification_message=None,
         notification_remaining_sec=0.0,
     )
-    preset_row = _row(state, "layer_1", RowKind.TRACK_PRESET)
-    state = TuningViewState(
-        layer_z_order=state.layer_z_order,
-        tracks=state.tracks,
-        paused=state.paused,
-        position_sec=state.position_sec,
-        focus_cursor=MainFocus(state.layout.descriptor(preset_row)),
-        move_mode_slot=state.move_mode_slot,
-        notification_message=state.notification_message,
-        notification_remaining_sec=state.notification_remaining_sec,
-        layout=state.layout,
-    )
+    preset_row = RowDescriptor(RowKind.TRACK_PRESET, slot="layer_1")
     assert _row_value_color(state, preset_row) == DISABLED
-    assert _row_bg_color(state, preset_row) == HIGHLIGHT
 
 
 def test_preset_overlay_shows_directory_and_position() -> None:
@@ -3971,39 +3700,6 @@ def test_scan_file_anchor_builds_parent_directory_playlist() -> None:
         assert playlist.index == 1
         assert preset_filename_display(playlist) == "beta.milk (2/2)"
         assert directory_display(playlist, root) == "[..]pack/Aurora/ (1/1)"
-
-
-def _header_row(
-    controls: TuningControls,
-    stem: str,
-    *,
-    paused: bool = False,
-) -> int:
-    view = controls.build_view_state(paused=paused)
-    return next(
-        i
-        for i in range(len(view.layout))
-        if view.layout.kind(i) == RowKind.TRACK_HEADER and view.layout.slot( i) == stem
-    )
-
-
-def _sub_rows_for_stem(view: TuningViewState, stem: str) -> list[int]:
-    sub_kinds = (
-        RowKind.TRACK_PRESET_DIR,
-        RowKind.TRACK_PRESET,
-        RowKind.TRACK_STEM,
-        RowKind.TRACK_BEAT,
-        RowKind.TRACK_COMPOSITING_HEADER,
-        RowKind.TRACK_BLEND,
-        RowKind.TRACK_OPACITY,
-        RowKind.TRACK_EFFECTS_HEADER,
-        RowKind.TRACK_EFFECT,
-    )
-    return [
-        i
-        for i in range(len(view.layout))
-        if view.layout.slot( i) == stem and view.layout.kind(i) in sub_kinds
-    ]
 
 
 def test_l_toggles_lock() -> None:
@@ -4072,9 +3768,6 @@ def test_render_overlay_locked_skips_children_in_nav() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.render_overlays.locked = True
     view = controls.build_view_state(paused=False)
-    leftover = {row.kind for row in view.layout.rows}
-    assert RowKind.RENDER_OVERLAYS_HEADER not in leftover
-    assert RowKind.RENDER_OVERLAY_CARD_POSITION not in leftover
     position_row = RowDescriptor(
         RowKind.RENDER_OVERLAY_CARD_POSITION, card="opening_card"
     )
@@ -4089,9 +3782,6 @@ def test_render_timeline_locked_dims_inspector_children() -> None:
     controls.session.timeline.enabled = True
     controls.session.timeline.locked = True
     view = controls.build_view_state(paused=False)
-    assert RowKind.TIMELINE_PRESETS_HEADER not in {
-        row.kind for row in view.layout.rows
-    }
     assert _row_value_color(
         view, RowDescriptor(RowKind.TIMELINE_PRESET_CHARACTER)
     ) == LOCKED
@@ -4208,33 +3898,8 @@ def test_locked_sub_rows_use_locked_color() -> None:
     view = controls.build_view_state(paused=False)
     header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
     preset_dir_row = _row(view, "layer_1", RowKind.TRACK_PRESET_DIR)
-    unfocused = TuningViewState(
-        layer_z_order=view.layer_z_order,
-        tracks=view.tracks,
-        paused=view.paused,
-        position_sec=view.position_sec,
-        focus_cursor=MainFocus(view.layout.descriptor(len(view.layout) - 1)),
-        move_mode_slot=view.move_mode_slot,
-        notification_message=view.notification_message,
-        notification_remaining_sec=view.notification_remaining_sec,
-        layout=view.layout,
-    )
-    assert _row_value_color(unfocused, header_row) == VALUE
-    assert _row_value_color(unfocused, preset_dir_row) == LOCKED
-
-    focused_header = TuningViewState(
-        layer_z_order=view.layer_z_order,
-        tracks=view.tracks,
-        paused=view.paused,
-        position_sec=view.position_sec,
-        focus_cursor=MainFocus(view.layout.descriptor(header_row)),
-        move_mode_slot=view.move_mode_slot,
-        notification_message=view.notification_message,
-        notification_remaining_sec=view.notification_remaining_sec,
-        layout=view.layout,
-    )
-    assert _row_value_color(focused_header, header_row) == HIGHLIGHT
-    assert _row_value_color(focused_header, preset_dir_row) == LOCKED
+    assert _row_value_color(view, header_row) == VALUE
+    assert _row_value_color(view, preset_dir_row) == LOCKED
 
 
 def test_locked_disabled_layer_sub_rows_prefer_locked_color() -> None:
@@ -4244,19 +3909,8 @@ def test_locked_disabled_layer_sub_rows_prefer_locked_color() -> None:
     view = controls.build_view_state(paused=False)
     header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
     preset_dir_row = _row(view, "layer_1", RowKind.TRACK_PRESET_DIR)
-    unfocused = TuningViewState(
-        layer_z_order=view.layer_z_order,
-        tracks=view.tracks,
-        paused=view.paused,
-        position_sec=view.position_sec,
-        focus_cursor=MainFocus(view.layout.descriptor(len(view.layout) - 1)),
-        move_mode_slot=view.move_mode_slot,
-        notification_message=view.notification_message,
-        notification_remaining_sec=view.notification_remaining_sec,
-        layout=view.layout,
-    )
-    assert _row_value_color(unfocused, header_row) == DISABLED
-    assert _row_value_color(unfocused, preset_dir_row) == LOCKED
+    assert _row_value_color(view, header_row) == DISABLED
+    assert _row_value_color(view, preset_dir_row) == LOCKED
 
 
 def test_locked_not_toggleable_during_move_mode() -> None:
@@ -4339,14 +3993,6 @@ def test_compositing_rows_dim_only_in_pattern_mask_mode() -> None:
     view = controls.build_view_state(paused=False)
     for kind in kinds:
         assert _row_value_color(view, _row(view, "layer_1", kind)) == DISABLED
-
-    controls.session.settings.editor_mode = "preset_curation"
-    controls.session.render_pattern_mask.enabled = True
-    view = controls.build_view_state(paused=False)
-    assert all(
-        view.layout.kind(i) != RowKind.TRACK_COMPOSITING_HEADER
-        for i in range(len(view.layout))
-    )
 
 
 
@@ -4442,15 +4088,6 @@ def test_solo_visibility_icon_same_width_as_normal() -> None:
     normal = render_visibility_icon(enabled=True, solo=False, line_height=line_h)
     assert soloed.get_width() == normal.get_width()
     assert soloed.get_at((1, line_h // 2))[:3] == SOLO_BG
-
-
-def test_track_header_prefix_width_matches_visibility_icon() -> None:
-    font = overlay_font()
-    line_h = font.get_linesize()
-    assert track_header_prefix_width(font) == visibility_icon_prefix_width(line_h)
-    soloed = render_visibility_icon(enabled=True, solo=True, line_height=line_h)
-    normal = render_visibility_icon(enabled=True, solo=False, line_height=line_h)
-    assert soloed.get_width() == normal.get_width()
 
 
 def test_try_quit_clean_session_returns_true_immediately() -> None:
@@ -5009,11 +4646,9 @@ def test_move_mode_swap_calls_apply_preview_resolutions() -> None:
     layer_manager.apply_preview_resolutions.assert_called_once()
 
 
-def test_default_focus_is_not_a_layout_row() -> None:
+def test_default_focus_is_timeline_header() -> None:
     controls = _make_controls(("layer_1",))
-    view = controls.build_view_state(paused=False)
     assert controls.focus_descriptor == RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
-    assert controls.focus_descriptor not in view.layout.rows
 
 
 
@@ -5065,7 +4700,6 @@ def test_persistent_and_timed_notifications_stack() -> None:
 
     assert view.persistent_notification_message == EMPTY_PRESET_LIST_NOTIFICATION
     assert view.notification_message == "Saved"
-    assert view.layout.rows == ()
 
 
 
@@ -5336,8 +4970,6 @@ def test_drop_song_marker_does_not_select_or_steal_focus() -> None:
     assert markers.selected_index is None
     assert controls.session.timeline.panel_open is True
     assert controls.focus_descriptor == prior_focus
-    view = controls.build_view_state(paused=False)
-    assert RowDescriptor(RowKind.SONG_MARKER_ITEM, marker_index=0) not in view.layout.rows
 
 
 def test_song_marker_left_right_cycles_type() -> None:

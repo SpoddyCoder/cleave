@@ -994,8 +994,6 @@ def test_overlay_cards_share_kinds_and_isolate_runtime() -> None:
         and row.descriptor.kind is RowKind.RENDER_OVERLAY_CARD_POSITION
     }
     assert cards == {"opening_card", "closing_card"}
-    assert opening_desc not in view.layout.rows
-    assert closing_desc not in view.layout.rows
 
     opening_before = controls.session.render_overlays.opening_card.position
     closing_before = controls.session.render_overlays.closing_card.position

@@ -40,8 +40,6 @@ def test_from_env_custom_interval(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def _sample(**overrides: object) -> OverlayFrameSample:
     defaults = {
-        "view_state_build_ms": 0.0,
-        "panel_draw_ms": 0.0,
         "upload_ms": 0.0,
         "overlay_present_ms": 0.0,
         "surface_builds": 0,
@@ -61,8 +59,6 @@ def _sample(**overrides: object) -> OverlayFrameSample:
 
 def test_format_sample_line_full() -> None:
     sample = _sample(
-        view_state_build_ms=0.4,
-        panel_draw_ms=2.1,
         upload_ms=0.3,
         overlay_present_ms=0.05,
         surface_builds=18,
@@ -72,7 +68,7 @@ def test_format_sample_line_full() -> None:
     )
     assert (
         _format_sample_line(sample)
-        == "overlay: vs=0.4ms draw=2.1ms surf=18 font=42 rcache=10/2 up=0.3ms"
+        == "overlay: surf=18 font=42 rcache=10/2 up=0.3ms"
     )
 
 
@@ -83,8 +79,6 @@ def test_format_sample_line_skip() -> None:
 
 def test_format_sample_line_upload_skip_suffix() -> None:
     sample = _sample(
-        view_state_build_ms=1.3,
-        panel_draw_ms=1.0,
         upload_ms=0.0,
         surface_builds=0,
         font_renders=2,
@@ -94,21 +88,19 @@ def test_format_sample_line_upload_skip_suffix() -> None:
     )
     assert (
         _format_sample_line(sample)
-        == "overlay: vs=1.3ms draw=1.0ms surf=0 font=2 rcache=0/1 up=0.0ms uskip=1"
+        == "overlay: surf=0 font=2 rcache=0/1 up=0.0ms uskip=1"
     )
 
 
 def test_format_sample_line_upload_partial_suffix() -> None:
     sample = _sample(
-        view_state_build_ms=1.3,
-        panel_draw_ms=1.0,
         upload_ms=0.1,
         upload_partial=1,
         upload_partial_rects=2,
     )
     assert (
         _format_sample_line(sample)
-        == "overlay: vs=1.3ms draw=1.0ms surf=0 font=0 rcache=0/0 up=0.1ms upart=1/2"
+        == "overlay: surf=0 font=0 rcache=0/0 up=0.1ms upart=1/2"
     )
 
 
@@ -150,8 +142,6 @@ def test_note_upload_plan_increments_skip_partial_full() -> None:
 
 def test_finish_frame_includes_upload_fields(capsys: pytest.CaptureFixture[str]) -> None:
     profiler = OverlayProfiler(enabled=True, emit_interval_frames=1)
-    profiler._section_ms["view_state_build"] = 1.3
-    profiler._section_ms["panel_draw"] = 1.0
     profiler._section_ms["upload"] = 0.0
     profiler._counters.font_renders = 2
     profiler._counters.row_cache_misses = 1
@@ -169,28 +159,26 @@ def test_finish_frame_includes_upload_fields(capsys: pytest.CaptureFixture[str])
     assert sample is not None
     assert sample.upload_skipped == 1
     assert capsys.readouterr().out.strip() == (
-        "overlay: vs=1.3ms draw=1.0ms surf=0 font=2 rcache=0/1 up=0.0ms uskip=1"
+        "overlay: surf=0 font=2 rcache=0/1 up=0.0ms uskip=1"
     )
 
 
 def test_finish_frame_prints_compact_line(capsys: pytest.CaptureFixture[str]) -> None:
     profiler = OverlayProfiler(enabled=True, emit_interval_frames=1)
-    profiler._section_ms["view_state_build"] = 0.4
-    profiler._section_ms["panel_draw"] = 2.1
     profiler._section_ms["upload"] = 0.3
+    profiler._section_ms["overlay_present"] = 0.05
     profiler._counters.surface_builds = 18
     profiler._counters.font_renders = 42
 
     sample = profiler.finish_frame()
 
     assert sample is not None
-    assert sample.view_state_build_ms == pytest.approx(0.4)
-    assert sample.panel_draw_ms == pytest.approx(2.1)
     assert sample.upload_ms == pytest.approx(0.3)
+    assert sample.overlay_present_ms == pytest.approx(0.05)
     assert sample.surface_builds == 18
     assert sample.font_renders == 42
     assert capsys.readouterr().out.strip() == (
-        "overlay: vs=0.4ms draw=2.1ms surf=18 font=42 rcache=0/0 up=0.3ms"
+        "overlay: surf=18 font=42 rcache=0/0 up=0.3ms"
     )
 
 
@@ -218,15 +206,15 @@ def test_time_section_accumulates() -> None:
         "cleave.viz.overlay_profiler.time.perf_counter",
         side_effect=[0.0, 0.001, 0.001, 0.003],
     ):
-        with profiler.time_section("view_state_build"):
+        with profiler.time_section("upload"):
             pass
-        with profiler.time_section("view_state_build"):
+        with profiler.time_section("upload"):
             pass
 
     sample = profiler.finish_frame()
 
     assert sample is not None
-    assert sample.view_state_build_ms == pytest.approx(3.0)
+    assert sample.upload_ms == pytest.approx(3.0)
 
 
 def test_time_section_unknown_name_raises() -> None:

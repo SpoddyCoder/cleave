@@ -8,7 +8,7 @@ alwaysApply: false
 
 # Live tuning overlay
 
-The shell is a menu bar, a navigator, an inspector, an optional help column, and a timeline strip. Help is an ImGui column beside the inspector. It does not cover the visualiser. Width is an editor preference. Session state becomes view state; inspector pages come from section defs in `row_sections.py`. Toasts are an ImGui top-layer window in the visualiser corner. `RowLayout` no longer draws them. Overlay Latin text uses bundled DejaVu Sans Mono; icons use Material Icons in `assets/fonts/`.
+The shell is a menu bar, a navigator, an inspector, an optional help column, and a timeline strip. Help is an ImGui column beside the inspector. It does not cover the visualiser. Width is an editor preference. Session state becomes view state; inspector pages come from section defs in `row_sections.py`. Toasts are an ImGui top-layer window in the visualiser corner. Overlay Latin text uses bundled DejaVu Sans Mono; icons use Material Icons in `assets/fonts/`.
 
 ## Where new fields go
 
@@ -25,9 +25,9 @@ Open and closed state is an `InspectorGroupKey` on the shell (`collapsed` and `o
 
 Conditional rows are siblings shown or hidden by a value predicate. They have no arrow and no open/closed key. The view-state structure includes or omits them at build time and rebuilds only when `view_state_structure_signature()` changes. A field that gates row presence belongs in that signature; leave value-only fields out. Add a `test_structure_signature_invalidates_on_*` test in `tests/cleave/viz/test_view_state_structure.py`.
 
-New rows use `RowKind`, `RowSpec`, and `SectionNode`. Do not add a per-`RowKind` label or mutation branch in `tuning_panel_draw.py` or `controls.py`. Overlay chrome lives in `overlay_primitives`. Timeline, help, and modal must not import `tuning_panel_draw`. `render_visibility_icon` stays in `row_present_renderers.py`.
+New rows use `RowKind`, `RowSpec`, and `SectionNode`. Do not add a per-`RowKind` label or mutation branch in `controls.py`. Overlay chrome lives in `overlay_primitives`. `render_visibility_icon` stays in `row_present_renderers.py`.
 
-The timeline strip stays its own host in `timeline_overlay.py`. Cue blocks are edited on the strip, not in the inspector. Do not fold the strip into `RowLayout`.
+The timeline strip stays its own host in `timeline_overlay.py`. Cue blocks are edited on the strip, not in the inspector.
 
 ## Parameterized actions
 

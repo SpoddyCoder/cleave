@@ -515,7 +515,7 @@ def test_cancelled_splitter_drag_does_not_persist() -> None:
             host.process_event(_button(pygame.MOUSEBUTTONDOWN, left))
             host.process_event(_motion((400, 100)))
             assert host.nav_width == 400
-            host._overlay.visibility = 0.0
+            host._ui_fade.visibility = 0.0
             host.process_event(_button(pygame.MOUSEBUTTONUP, (400, 100)))
         host._controls.settings.set_shell_column_widths.assert_not_called()
         assert host._splitter is None

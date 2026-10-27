@@ -1,12 +1,10 @@
-"""GL upload path for live tuning and timeline overlays."""
+"""GL upload path for the timeline overlay."""
 
 from __future__ import annotations
 
 import pygame
 
 from cleave.gl_compositor import GlCompositor, OverlayTextureSlot
-from cleave.viz.tuning_panel_draw import TuningOverlay
-from cleave.viz.tuning_view_state import TuningViewState
 from cleave.viz.overlay_profiler import OverlayProfiler
 from cleave.viz.overlay_upload import (
     OverlayGpuState,
@@ -18,8 +16,6 @@ from cleave.viz.overlay_upload import (
 from cleave.viz.timeline_overlay import TimelineOverlay, TimelineViewState
 
 _TIMELINE_UPLOAD_COORDINATOR = OverlayUploadCoordinator()
-
-_TUNING_UPLOAD_COORDINATOR = OverlayUploadCoordinator()
 
 
 def _note_upload(
@@ -89,50 +85,6 @@ def _present_overlay(
 
 class OverlayDrawer:
     """Upload pygame overlay surfaces to the display framebuffer."""
-
-    @staticmethod
-    def draw_tuning(
-        compositor: GlCompositor,
-        overlay: TuningOverlay,
-        overlay_surface: pygame.Surface,
-        view_state: TuningViewState,
-        *,
-        timeline_panel_open: bool = False,
-        cue_readout_open: bool = False,
-        profiler: OverlayProfiler | None = None,
-        visualiser_rect: tuple[int, int, int, int] | None = None,
-    ) -> None:
-        viewport_w, viewport_h = overlay_surface.get_size()
-        counters = profiler.counters() if profiler is not None else None
-
-        composed = overlay.compose_panel(
-            view_state,
-            viewport_width=viewport_w,
-            viewport_height=viewport_h,
-            timeline_panel_open=timeline_panel_open,
-            cue_readout_open=cue_readout_open,
-            counters=counters,
-            visualiser_rect=visualiser_rect,
-        )
-        if composed is not None:
-            tex_id, tex_uv = _coordinator_upload(
-                profiler,
-                compositor,
-                _TUNING_UPLOAD_COORDINATOR,
-                OverlayTextureSlot.TUNING,
-                composed.upload_surface,
-                composed.upload_plan,
-                composed.capacity,
-                overlay.gpu_state,
-                composed.upload_signature,
-            )
-            _present_overlay(
-                profiler,
-                compositor,
-                tex_id,
-                composed.screen_rect,
-                tex_uv,
-            )
 
     @staticmethod
     def draw_timeline(

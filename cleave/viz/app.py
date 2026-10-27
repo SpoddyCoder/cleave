@@ -38,12 +38,11 @@ from cleave.viz.preset_switching import advance_timeline_preset_switching
 from cleave.viz.modal import ModalHost
 from cleave.viz.overlay_draw import OverlayDrawer
 from cleave.viz.loading import LoadingWindow, open_loading_window
-from cleave.viz.tuning_panel_draw import TuningOverlay
+from cleave.viz.ui_fade import UiFade
 from cleave.viz.timeline_controls import TimelineControls
 from cleave.viz.shell_layout import ShellLayout
 from cleave.viz.timeline_overlay import (
     TimelineOverlay,
-    focused_cue_readout_visible,
     playback_bar_text,
     timeline_band_height_px,
 )
@@ -112,7 +111,7 @@ class LiveVisualizerRuntime(VisualizerCore):
     modal_host: ModalHost
     mix_player: MixPlayer
     playback: PlaybackState
-    overlay: TuningOverlay
+    ui_fade: UiFade
     timeline_overlay: TimelineOverlay
     overlay_surface: pygame.Surface
     render_overlays_panel_cache: RenderOverlaysPanelCache = field(
@@ -324,7 +323,7 @@ def init_gl_resources_heavy(
         modal_host=modal_host,
         mix_player=mix_player,
         playback=playback,
-        overlay=TuningOverlay(hold_idle_sec=seed.cfg.editor.ui_fade),
+        ui_fade=UiFade(hold_idle_sec=seed.cfg.editor.ui_fade),
         timeline_overlay=TimelineOverlay(),
         overlay_surface=overlay_surface,
     )
@@ -335,9 +334,9 @@ def init_gl_resources_heavy(
 def bind_live_runtime_overlay_hooks(runtime: LiveVisualizerRuntime) -> None:
     runtime.controls.bind_menu_bar(runtime.menu_bar)
     runtime.controls.bind_tap_sync_overlay(
-        get_visible=runtime.overlay.is_visible,
-        hide=runtime.overlay.hide_immediately,
-        show=runtime.overlay.notify_input,
+        get_visible=runtime.ui_fade.is_visible,
+        hide=runtime.ui_fade.hide_immediately,
+        show=runtime.ui_fade.notify_input,
     )
 
 
@@ -392,13 +391,6 @@ def _live_overlay_ui_active(
     timeline_strip_visible: bool,
 ) -> bool:
     return overlay_visibility > 0.01 or timeline_strip_visible
-
-
-def _tuning_view_state_needed(
-    *,
-    overlay_visibility: float,
-) -> bool:
-    return overlay_visibility > 0.01
 
 
 def _timeline_strip_visible(
@@ -490,8 +482,6 @@ def _tick_frame_live_overlay(
     runtime: LiveVisualizerRuntime,
     t_sec: float,
     *,
-    paused: bool,
-    display_fps: float | None = None,
     layout: ShellLayout,
 ) -> None:
     profiler = runtime.overlay_profiler
@@ -504,7 +494,7 @@ def _tick_frame_live_overlay(
         panel_cache=runtime.render_overlays_panel_cache,
     )
 
-    overlay_visibility = runtime.overlay.visibility
+    overlay_visibility = runtime.ui_fade.visibility
     tap_sync_progress = runtime.controls.tap_sync.showing_progress
     tl = runtime.seed.session.timeline
     timeline_strip_visible = (
@@ -524,20 +514,6 @@ def _tick_frame_live_overlay(
         profiler.finish_frame()
         return
 
-    view_state = None
-    if (
-        not tap_sync_progress
-        and _tuning_view_state_needed(
-            overlay_visibility=overlay_visibility,
-        )
-    ):
-        with profiler.time_section("view_state_build"):
-            view_state = runtime.controls.build_view_state(
-                paused=paused,
-                position_sec=t_sec,
-                fps=display_fps,
-            )
-
     timeline_state = None
     if timeline_strip_visible:
         signals = runtime.seed.signals
@@ -553,35 +529,6 @@ def _tick_frame_live_overlay(
             bar_times=signals.downbeat_times if signals is not None else (),
             beat_times=signals.beat_times if signals is not None else (),
         )
-
-    if (
-        not tap_sync_progress
-        and _tuning_view_state_needed(
-            overlay_visibility=overlay_visibility,
-        )
-    ):
-        # The shell band already shows the strip, so the toast panel must
-        # not reserve that strip a second time.
-        band_open = layout.timeline[3] > 0
-        timeline_panel_open = (
-            tl.panel_open and overlay_visibility > 0.01 and not band_open
-        )
-        cue_readout_open = (
-            timeline_panel_open
-            and timeline_state is not None
-            and focused_cue_readout_visible(timeline_state)
-        )
-        with profiler.time_section("panel_draw"):
-            OverlayDrawer.draw_tuning(
-                runtime.compositor,
-                runtime.overlay,
-                runtime.overlay_surface,
-                view_state,
-                timeline_panel_open=timeline_panel_open,
-                cue_readout_open=cue_readout_open,
-                profiler=profiler,
-                visualiser_rect=layout.visualiser,
-            )
 
     if timeline_state is not None:
         OverlayDrawer.draw_timeline(
@@ -611,8 +558,8 @@ class VisualizerApp:
     def _live_shell_layout(self, runtime: LiveVisualizerRuntime) -> ShellLayout:
         from cleave.viz.shell_host import menu_bar_height_px
 
-        runtime.overlay.set_hold_idle_sec(runtime.seed.cfg.editor.ui_fade)
-        runtime.overlay.update(self._overlay_dt)
+        runtime.ui_fade.set_hold_idle_sec(runtime.seed.cfg.editor.ui_fade)
+        runtime.ui_fade.update(self._overlay_dt)
         shell = self._shell
         menu_h = int(shell.menu_bar_height_px) if shell is not None else 0
         transport_h = menu_bar_height_px() if shell is not None else 0
@@ -620,7 +567,7 @@ class VisualizerApp:
         tl = runtime.seed.session.timeline
         if not runtime.controls.tap_sync.showing_progress and _timeline_strip_visible(
             tl,
-            overlay_visibility=runtime.overlay.visibility,
+            overlay_visibility=runtime.ui_fade.visibility,
             region=runtime.controls.shell_focus.region,
         ):
             timeline_h = timeline_band_height_px(
@@ -680,7 +627,6 @@ class VisualizerApp:
         n_pcm: int,
         dt_sec: float = 0.0,
         draw_overlay: bool = True,
-        display_fps: float | None = None,
         layout: ShellLayout | None = None,
     ) -> None:
         pm_time_sec = self._pm_clock.advance(dt_sec, paused=paused)
@@ -708,8 +654,6 @@ class VisualizerApp:
             _tick_frame_live_overlay(
                 self._runtime,
                 t_sec,
-                paused=paused,
-                display_fps=display_fps,
                 layout=layout,
             )
 
@@ -779,7 +723,7 @@ class VisualizerApp:
             assert window.imgui is not None
             shell = ShellHost(
                 window.imgui,
-                rt.overlay,
+                rt.ui_fade,
                 rt.menu_bar,
                 rt.controls,
                 menu_bar_height_px(),
@@ -832,7 +776,7 @@ class VisualizerApp:
                     shell,
                     rt.menu_bar,
                     command_context(rt.controls),
-                    rt.overlay.visibility,
+                    rt.ui_fade.visibility,
                     self._overlay_dt,
                     readout,
                 )
@@ -844,7 +788,7 @@ class VisualizerApp:
                     apply_toast_pointer(rt.controls, toast_surface.intent)
                 if modal_surface is not None and modal_surface.intent is not None:
                     apply_modal_pointer(rt.modal_host, modal_surface.intent)
-                    rt.overlay.notify_input()
+                    rt.ui_fade.notify_input()
                 shown = rt.modal_host.view_state()
                 if shown is not None and shown.kind == ModalKind.TEXT:
                     display_w = max(1, int(imgui.get_io().display_size.x))
@@ -876,21 +820,21 @@ class VisualizerApp:
                         if rt.controls.try_quit():
                             running = False
                         else:
-                            rt.overlay.notify_input()
+                            rt.ui_fade.notify_input()
                     elif event.type == pygame.KEYDOWN:
                         if dispatch_keydown(event, rt) is False:
                             running = False
                         else:
                             if rt.controls.consume_hide_overlay():
-                                rt.overlay.hide_immediately()
+                                rt.ui_fade.hide_immediately()
                                 rt.controls.exit_timeline_submenu()
                             elif dispatch_should_notify_overlay(event, rt):
-                                rt.overlay.notify_input()
+                                rt.ui_fade.notify_input()
                     elif event.type == pygame.KEYUP:
                         dispatch_keyup(event, rt)
                     elif event.type == pygame.TEXTINPUT:
                         if rt.modal_host.handle_text_input(event.text):
-                            rt.overlay.notify_input()
+                            rt.ui_fade.notify_input()
 
                 if rt.controls.consume_pending_exit():
                     running = False
@@ -904,7 +848,7 @@ class VisualizerApp:
                     or rt.timeline_controls.key_repeat_armed
                     or rt.modal_host.text_key_repeat_armed
                 ):
-                    rt.overlay.notify_input()
+                    rt.ui_fade.notify_input()
 
                 t_sec = current_sec(rt.playback, rt.seed.duration_sec)
                 layout = self._begin_live_frame(rt)
@@ -913,8 +857,6 @@ class VisualizerApp:
                     _tick_frame_live_overlay(
                         rt,
                         t_sec,
-                        paused=True,
-                        display_fps=frame_rate.display_fps,
                         layout=layout,
                     )
                 else:
@@ -924,7 +866,6 @@ class VisualizerApp:
                     self.tick_frame(
                         t_sec,
                         paused=rt.playback.paused,
-                        display_fps=frame_rate.display_fps,
                         n_pcm=samples_for_dt(self._overlay_dt),
                         dt_sec=self._overlay_dt,
                         layout=layout,
