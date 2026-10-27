@@ -66,8 +66,9 @@ DEFAULT_UI_WIDTH_MODE: UiWidthMode = "flexible"
 DEFAULT_NAVIGATOR_WIDTH = 230
 # Half again the design mock's 330px column, so labels and stepped values fit.
 DEFAULT_INSPECTOR_WIDTH = 495
-# Side columns stay at least this wide once the display can hold both of them
-# and a 1px visualiser. A narrower window skips the floor.
+DEFAULT_HELP_WIDTH = 320
+# Side columns stay at least this wide once the display can hold every open
+# side column and a 1px visualiser. A narrower window skips the floor.
 MIN_COLUMN_WIDTH = 60
 
 ShellLayoutMode = Literal["split", "docked"]
@@ -278,6 +279,14 @@ EDITOR_FIELDS: tuple[FieldDescriptor, ...] = (
         lambda value, _ctx: clamp_shell_column_width(value),
     ),
     FieldDescriptor(
+        "help_width",
+        DEFAULT_HELP_WIDTH,
+        lambda raw, ctx, label: clamp_shell_column_width(
+            int(require_non_negative_number(raw, label, as_int=True))
+        ),
+        lambda value, _ctx: clamp_shell_column_width(value),
+    ),
+    FieldDescriptor(
         "shell_layout_mode",
         DEFAULT_SHELL_LAYOUT_MODE,
         _parse_shell_layout_mode,
@@ -307,6 +316,7 @@ def parse_editor_section(data: dict[str, Any]) -> Any:
         residual_latency_ms=parsed["residual_latency_ms"],
         navigator_width=parsed["navigator_width"],
         inspector_width=parsed["inspector_width"],
+        help_width=parsed["help_width"],
         shell_layout_mode=parsed["shell_layout_mode"],
     )
 
@@ -325,6 +335,7 @@ def dump_editor_section(editor: Any) -> dict[str, Any]:
         "residual_latency_ms": editor.residual_latency_ms,
         "navigator_width": editor.navigator_width,
         "inspector_width": editor.inspector_width,
+        "help_width": editor.help_width,
         "shell_layout_mode": editor.shell_layout_mode,
     }
     ctx = PersistCtx(cfg=None, session=None)
@@ -351,5 +362,6 @@ def editor_config_from_settings(editor: Any | None = None) -> Any:
         residual_latency_ms=editor.residual_latency_ms,
         navigator_width=editor.navigator_width,
         inspector_width=editor.inspector_width,
+        help_width=editor.help_width,
         shell_layout_mode=editor.shell_layout_mode,
     )

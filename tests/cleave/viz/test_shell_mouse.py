@@ -13,13 +13,14 @@ import pytest
 from imgui_bundle import imgui
 
 from cleave.config_schema.editor import (
+    DEFAULT_HELP_WIDTH,
     DEFAULT_INSPECTOR_WIDTH,
     DEFAULT_NAVIGATOR_WIDTH,
 )
 from cleave.viz.focus_nav import TimelineFocus
 from cleave.viz.imgui_host import ImGuiHost
 from cleave.viz.menu_bar import MenuBarState
-from cleave.viz.shell_focus import ShellRegion
+from cleave.viz.shell_focus import CycleStop, ShellRegion
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.row_spec import apply_field_horizontal, row_spec
 from cleave.viz.shell_host import (
@@ -299,37 +300,40 @@ def test_extreme_drags_keep_visualiser_and_column_minimums() -> None:
         minimum,
         wide - minimum * 2,
         minimum,
+        0,
     )
     for nav, insp in ((1, 1), (50_000, 40), (40, 50_000), (50_000, 50_000)):
-        got_nav, viz, got_insp = clamp_column_widths(
+        got_nav, viz, got_insp, got_help = clamp_column_widths(
             wide, nav, insp, min_column=minimum
         )
         assert viz >= 1
         assert got_nav >= minimum
         assert got_insp >= minimum
-        assert got_nav + viz + got_insp == wide
+        assert got_help == 0
+        assert got_nav + viz + got_insp + got_help == wide
 
     # Too narrow for both minimums: proportional, non-negative, visualiser lives.
     narrow = 80
     assert narrow < minimum * 2 + 1
     assert clamp_column_widths(
         narrow, 100_000, 100_000, min_column=minimum
-    ) == (39, 1, 40)
+    ) == (39, 1, 40, 0)
 
 
 def test_clamped_request_fits_again_when_the_display_grows() -> None:
     request_nav, request_insp = 400, 500
-    nav, viz, insp = clamp_column_widths(
+    nav, viz, insp, help_w = clamp_column_widths(
         400, request_nav, request_insp, min_column=MIN_COLUMN_WIDTH
     )
     assert viz >= 1
     assert nav >= MIN_COLUMN_WIDTH
     assert insp >= MIN_COLUMN_WIDTH
+    assert help_w == 0
     assert (nav, insp) != (request_nav, request_insp)
 
     assert clamp_column_widths(
         1280, request_nav, request_insp, min_column=MIN_COLUMN_WIDTH
-    ) == (request_nav, 1280 - request_nav - request_insp, request_insp)
+    ) == (request_nav, 1280 - request_nav - request_insp, request_insp, 0)
 
 
 class _Overlay:
@@ -346,6 +350,7 @@ def _host(visibility: float = 1.0) -> Iterator[ShellHost]:
     editor = SimpleNamespace(
         navigator_width=DEFAULT_NAVIGATOR_WIDTH,
         inspector_width=DEFAULT_INSPECTOR_WIDTH,
+        help_width=DEFAULT_HELP_WIDTH,
     )
     controls = SimpleNamespace(
         cfg=SimpleNamespace(editor=editor),
@@ -482,6 +487,7 @@ def test_splitter_drag_release_persists_requested_widths() -> None:
         host._controls.settings.set_shell_column_widths.assert_called_once_with(
             pointer_x,
             DEFAULT_INSPECTOR_WIDTH,
+            DEFAULT_HELP_WIDTH,
         )
         assert host.nav_width is None
         assert host.insp_width is None
@@ -495,7 +501,9 @@ def test_splitter_drag_release_persists_the_other_columns_live_width() -> None:
             host.process_event(_button(pygame.MOUSEBUTTONDOWN, left))
             host.process_event(_motion((400, 100)))
             host.process_event(_button(pygame.MOUSEBUTTONUP, (400, 100)))
-        host._controls.settings.set_shell_column_widths.assert_called_once_with(400, 510)
+        host._controls.settings.set_shell_column_widths.assert_called_once_with(
+            400, 510, DEFAULT_HELP_WIDTH
+        )
         assert host.nav_width is None
         assert host.insp_width is None
 
@@ -525,6 +533,111 @@ def test_splitter_mouseup_under_one_pixel_does_not_persist() -> None:
         assert host.nav_width is None
         assert host.insp_width == 510
         assert host._splitter is None
+
+
+def test_help_splitter_drag_persists_requested_width() -> None:
+    with _host() as host:
+        layout = ShellLayout.compute(
+            1280, 720, 23, 23, 0, help_width=DEFAULT_HELP_WIDTH
+        )
+        host.set_layout(layout)
+        edge = layout.help[0]
+        with patch("cleave.viz.shell_host.pygame.mouse.set_cursor"):
+            host.process_event(_button(pygame.MOUSEBUTTONDOWN, (edge, 100)))
+            host.process_event(_motion((edge - 40, 100)))
+            assert host.help_width == DEFAULT_HELP_WIDTH + 40
+            assert host.nav_width is None
+            assert host.insp_width is None
+            host.process_event(_button(pygame.MOUSEBUTTONUP, (edge - 40, 100)))
+        host._controls.settings.set_shell_column_widths.assert_called_once_with(
+            DEFAULT_NAVIGATOR_WIDTH,
+            DEFAULT_INSPECTOR_WIDTH,
+            DEFAULT_HELP_WIDTH + 40,
+        )
+        assert host.help_width is None
+        assert host.nav_width is None
+        assert host.insp_width is None
+        assert host._splitter is None
+
+
+def test_help_splitter_under_one_pixel_does_not_persist() -> None:
+    with _host() as host:
+        layout = ShellLayout.compute(
+            1280, 720, 23, 23, 0, help_width=DEFAULT_HELP_WIDTH
+        )
+        host.set_layout(layout)
+        edge = layout.help[0]
+        with patch("cleave.viz.shell_host.pygame.mouse.set_cursor"):
+            host.process_event(_button(pygame.MOUSEBUTTONDOWN, (edge, 100)))
+            host.process_event(_button(pygame.MOUSEBUTTONUP, (edge, 140)))
+        host._controls.settings.set_shell_column_widths.assert_not_called()
+        assert host.help_width is None
+        assert host._splitter is None
+
+
+def test_cycle_stop_reports_help_only_while_the_column_is_open() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.help_visible = True
+    controls.session.timeline.panel_open = True
+    controls.set_shell_region(ShellRegion.TIMELINE)
+    controls.set_shell_region(ShellRegion.HELP)
+    with _host() as host:
+        host._controls = controls
+        menu = MenuBarState()
+        assert host._cycle_stop(menu) is CycleStop.HELP
+        assert host._scope_label(menu) == "help"
+        controls.session.help_visible = False
+        assert host._cycle_stop(menu) is CycleStop.INSPECTOR
+        assert host._cycle_stop(menu) is not CycleStop.TIMELINE
+
+
+def test_help_window_applies_pending_scroll_and_drops_it_when_closed() -> None:
+    from cleave.viz.commands import command_context
+    from cleave.viz.shell_host import draw_shell_frame
+
+    controls = _make_controls(("layer_1",))
+    controls.session.help_visible = True
+    controls.set_shell_region(ShellRegion.HELP)
+    with _host() as host:
+        host._controls = controls
+        host.imgui.display_size = (1280, 720)
+        layout = ShellLayout.compute(
+            1280, 720, 23, 23, 0, help_width=DEFAULT_HELP_WIDTH
+        )
+        host.set_layout(layout)
+        host.scroll_help(40.0)
+        host.scroll_help(-15.0)
+        assert host.help_scroll_px == 25.0
+        with patch("cleave.viz.shell_host.imgui.set_scroll_y") as set_scroll_y:
+            draw_shell_frame(
+                host, MenuBarState(), command_context(controls), 1.0, 1 / 60
+            )
+        assert host.help_scroll_px == 0.0
+        set_scroll_y.assert_called_once()
+        assert set_scroll_y.call_args.args[0] == pytest.approx(25.0)
+
+        host.scroll_help(40.0)
+        host.set_layout(ShellLayout.compute(1280, 720, 23, 23, 0, help_width=0))
+        with patch("cleave.viz.shell_host.imgui.set_scroll_y") as set_scroll_y:
+            draw_shell_frame(
+                host, MenuBarState(), command_context(controls), 1.0, 1 / 60
+            )
+        assert host.help_scroll_px == 0.0
+        set_scroll_y.assert_not_called()
+
+
+def test_chrome_contains_open_help_column() -> None:
+    with _host() as host:
+        layout = ShellLayout.compute(
+            1280, 720, 23, 23, 0, help_width=DEFAULT_HELP_WIDTH
+        )
+        host.set_layout(layout)
+        x, y, w, h = layout.help
+        assert host._chrome_contains(x + w / 2, y + h / 2)
+        closed = ShellLayout.compute(1280, 720, 23, 23, 0, help_width=0)
+        host.set_layout(closed)
+        vx, vy, vw, vh = closed.visualiser
+        assert not host._chrome_contains(vx + vw / 2, vy + vh / 2)
 
 
 def test_clicks_outside_a_splitter_still_reach_imgui() -> None:
@@ -601,6 +714,28 @@ def test_click_in_inspector_sets_inspector_and_keeps_strip_open() -> None:
 
         assert controls.shell_focus.region is ShellRegion.INSPECTOR
         assert controls.session.timeline.panel_open is True
+
+
+def test_click_in_help_sets_help_region() -> None:
+    controls = _make_controls(("layer_1", "layer_2"))
+    controls.open_timeline_panel(enter_submenu=True)
+    controls.session.timeline.focus_row = 1
+    controls.session.help_visible = True
+    with _host() as host:
+        host._controls = controls
+        layout = ShellLayout.compute(
+            1280, 720, 23, 23, 80, help_width=DEFAULT_HELP_WIDTH
+        )
+        host.set_layout(layout)
+
+        _click(host, _rect_center(layout.help))
+
+        assert controls.shell_focus.region is ShellRegion.HELP
+        assert controls.shell_focus.help_subject is CycleStop.TIMELINE
+        assert controls.session.timeline.panel_open is True
+        assert controls.session.timeline.focus_row == 1
+        assert not isinstance(controls.focus_cursor, TimelineFocus)
+        assert host.imgui.queued_buttons == [(0, True)]
 
 
 def test_click_in_visualiser_or_menu_does_not_change_region() -> None:

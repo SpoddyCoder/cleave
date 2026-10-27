@@ -12,6 +12,7 @@ from cleave.config_schema.editor import (
     DEFAULT_EDITOR_HEIGHT,
     DEFAULT_EDITOR_UPSCALE,
     DEFAULT_EDITOR_WIDTH,
+    DEFAULT_HELP_WIDTH,
     DEFAULT_INSPECTOR_WIDTH,
     DEFAULT_NAVIGATOR_WIDTH,
     DEFAULT_SHELL_LAYOUT_MODE,
@@ -59,6 +60,7 @@ def test_load_user_config_missing_file_returns_defaults(tmp_path: Path) -> None:
     assert cfg.editor.residual_latency_ms == DEFAULT_RESIDUAL_LATENCY_MS
     assert cfg.editor.navigator_width == DEFAULT_NAVIGATOR_WIDTH == 230
     assert cfg.editor.inspector_width == DEFAULT_INSPECTOR_WIDTH == 495
+    assert cfg.editor.help_width == DEFAULT_HELP_WIDTH == 320
     assert cfg.editor.shell_layout_mode == DEFAULT_SHELL_LAYOUT_MODE == "split"
 
 
@@ -76,6 +78,7 @@ def test_default_editor_settings_matches_schema_defaults() -> None:
     assert editor.residual_latency_ms == DEFAULT_RESIDUAL_LATENCY_MS
     assert editor.navigator_width == DEFAULT_NAVIGATOR_WIDTH == 230
     assert editor.inspector_width == DEFAULT_INSPECTOR_WIDTH == 495
+    assert editor.help_width == DEFAULT_HELP_WIDTH == 320
     assert editor.shell_layout_mode == DEFAULT_SHELL_LAYOUT_MODE == "split"
 
 
@@ -203,6 +206,7 @@ def test_editor_settings_from_config() -> None:
         residual_latency_ms=150,
         navigator_width=280,
         inspector_width=640,
+        help_width=360,
         shell_layout_mode="docked",
     )
     editor = editor_settings_from_config(vis)
@@ -219,6 +223,7 @@ def test_editor_settings_from_config() -> None:
         residual_latency_ms=150,
         navigator_width=280,
         inspector_width=640,
+        help_width=360,
         shell_layout_mode="docked",
     )
 
@@ -243,6 +248,7 @@ def test_persist_editor_settings_writes_visualizer_editor_fields(
             residual_latency_ms=200,
             navigator_width=280,
             inspector_width=640,
+            help_width=360,
             shell_layout_mode="docked",
         ),
     )
@@ -262,6 +268,7 @@ def test_persist_editor_settings_writes_visualizer_editor_fields(
     assert loaded.editor.residual_latency_ms == 200
     assert loaded.editor.navigator_width == 280
     assert loaded.editor.inspector_width == 640
+    assert loaded.editor.help_width == 360
     assert loaded.editor.shell_layout_mode == "docked"
 
 
@@ -271,6 +278,7 @@ def test_shell_column_settings_round_trip(tmp_path: Path) -> None:
         default_editor_settings(),
         navigator_width=280,
         inspector_width=640,
+        help_width=360,
         shell_layout_mode="docked",
     )
     write_user_config(editor, config_path)
@@ -278,6 +286,7 @@ def test_shell_column_settings_round_trip(tmp_path: Path) -> None:
     loaded = load_user_config(config_path)
     assert loaded.editor.navigator_width == 280
     assert loaded.editor.inspector_width == 640
+    assert loaded.editor.help_width == 360
     assert loaded.editor.shell_layout_mode == "docked"
 
 
@@ -292,6 +301,7 @@ def test_shell_column_settings_absent_keys_use_defaults(tmp_path: Path) -> None:
     assert cfg.editor.ui_width == 100
     assert cfg.editor.navigator_width == DEFAULT_NAVIGATOR_WIDTH == 230
     assert cfg.editor.inspector_width == DEFAULT_INSPECTOR_WIDTH == 495
+    assert cfg.editor.help_width == DEFAULT_HELP_WIDTH == 320
     assert cfg.editor.shell_layout_mode == DEFAULT_SHELL_LAYOUT_MODE == "split"
 
 
@@ -299,7 +309,7 @@ def test_shell_column_widths_clamp_and_reject_bad_values(tmp_path: Path) -> None
     config_path = tmp_path / "config.yaml"
     config_path.write_text(
         yaml.safe_dump(
-            {"editor": {"navigator_width": 10, "inspector_width": 0}},
+            {"editor": {"navigator_width": 10, "inspector_width": 0, "help_width": 5}},
             sort_keys=False,
         ),
         encoding="utf-8",
@@ -307,12 +317,19 @@ def test_shell_column_widths_clamp_and_reject_bad_values(tmp_path: Path) -> None
     cfg = load_user_config(config_path)
     assert cfg.editor.navigator_width == MIN_COLUMN_WIDTH
     assert cfg.editor.inspector_width == MIN_COLUMN_WIDTH
+    assert cfg.editor.help_width == MIN_COLUMN_WIDTH
 
     config_path.write_text(
         yaml.safe_dump({"editor": {"navigator_width": 4000}}, sort_keys=False),
         encoding="utf-8",
     )
     assert load_user_config(config_path).editor.navigator_width == 4000
+
+    config_path.write_text(
+        yaml.safe_dump({"editor": {"help_width": 4000}}, sort_keys=False),
+        encoding="utf-8",
+    )
+    assert load_user_config(config_path).editor.help_width == 4000
 
     config_path.write_text(
         yaml.safe_dump({"editor": {"navigator_width": "wide"}}, sort_keys=False),

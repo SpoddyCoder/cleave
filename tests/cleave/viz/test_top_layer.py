@@ -80,7 +80,11 @@ def _host() -> Iterator[object]:
     from cleave.viz.shell_host import ShellHost, menu_bar_height_px
 
     controls = SimpleNamespace(
-        session=SimpleNamespace(layer_z_order=()),
+        session=SimpleNamespace(
+            layer_z_order=(),
+            help_visible=False,
+            timeline=SimpleNamespace(panel_open=False),
+        ),
         shell_focus=SimpleNamespace(region=ShellRegion.NAVIGATOR),
         build_view_state=lambda **_kwargs: None,
         set_shell_region=MagicMock(),

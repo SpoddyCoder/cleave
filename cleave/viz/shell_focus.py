@@ -1,9 +1,9 @@
 """Shell focus model: region, Tab cycle, and escape.
 
-``ShellRegion`` is where keyboard scope sits: navigator, inspector, or the
-timeline strip. ``CycleStop`` is the Tab ring. The menu bar stays
-``menu_bar.focused`` and is not a region. ``next_region`` skips Timeline
-when the strip is closed.
+``ShellRegion`` is where keyboard scope sits: navigator, inspector, help,
+or the timeline strip. ``CycleStop`` is the Tab ring. The menu bar stays
+``menu_bar.focused`` and is not a region. ``next_region`` skips Help when
+the column is closed and Timeline when the strip is closed.
 """
 
 from __future__ import annotations
@@ -22,6 +22,7 @@ class ShellRegion(Enum):
     NAVIGATOR = auto()
     INSPECTOR = auto()
     TIMELINE = auto()
+    HELP = auto()
 
 
 class CycleStop(Enum):
@@ -30,20 +31,8 @@ class CycleStop(Enum):
     MENU = auto()
     NAVIGATOR = auto()
     INSPECTOR = auto()
+    HELP = auto()
     TIMELINE = auto()
-
-
-_CYCLE_OPEN: tuple[CycleStop, ...] = (
-    CycleStop.MENU,
-    CycleStop.NAVIGATOR,
-    CycleStop.INSPECTOR,
-    CycleStop.TIMELINE,
-)
-_CYCLE_CLOSED: tuple[CycleStop, ...] = (
-    CycleStop.MENU,
-    CycleStop.NAVIGATOR,
-    CycleStop.INSPECTOR,
-)
 
 
 @dataclass(frozen=True)
@@ -100,10 +89,12 @@ class ShellFocusState:
 
     ``collapsed`` and ``opened`` hold ``InspectorGroupKey`` values.
     ``nav_expanded`` is the set of expanded navigator ids. Pure helpers in
-    this module do not mutate these sets.
+    this module do not mutate these sets. ``help_subject`` is the Menu,
+    Navigator, Inspector, or Timeline stop restored when leaving Help.
     """
 
     region: ShellRegion = ShellRegion.NAVIGATOR
+    help_subject: CycleStop = CycleStop.NAVIGATOR
     selected_id: str = "settings"
     inspector_cursor: RowDescriptor | None = None
     collapsed: set[InspectorGroupKey] = field(default_factory=set)
@@ -112,20 +103,63 @@ class ShellFocusState:
     nav_expanded: set[str] = field(default_factory=lambda: {"layers", "render"})
 
 
-def next_region(current: CycleStop, *, strip_open: bool, delta: int) -> CycleStop:
+def cycle_stops(*, help_open: bool, strip_open: bool) -> tuple[CycleStop, ...]:
+    """Tab order with Help and Timeline included only while each is open."""
+    stops = [CycleStop.MENU, CycleStop.NAVIGATOR, CycleStop.INSPECTOR]
+    if help_open:
+        stops.append(CycleStop.HELP)
+    if strip_open:
+        stops.append(CycleStop.TIMELINE)
+    return tuple(stops)
+
+
+def next_region(
+    current: CycleStop,
+    *,
+    strip_open: bool,
+    help_open: bool,
+    delta: int,
+) -> CycleStop:
     """Move *delta* steps around the Tab cycle.
 
-    Order is Menu, Navigator, Inspector, Timeline. Timeline is skipped when
-    *strip_open* is false. A closed strip treats a Timeline current stop as
-    Inspector before *delta* is applied. *delta* of 0 returns that stop.
+    Order is Menu, Navigator, Inspector, Help, Timeline. Help is skipped
+    when *help_open* is false. Timeline is skipped when *strip_open* is
+    false. A closed column treats a Help current stop as Inspector before
+    *delta* is applied, the same way a closed strip treats Timeline as
+    Inspector. *delta* of 0 returns that stop.
     """
+    if not help_open and current is CycleStop.HELP:
+        current = CycleStop.INSPECTOR
     if not strip_open and current is CycleStop.TIMELINE:
         current = CycleStop.INSPECTOR
     if delta == 0:
         return current
-    stops = _CYCLE_OPEN if strip_open else _CYCLE_CLOSED
+    stops = cycle_stops(help_open=help_open, strip_open=strip_open)
     index = stops.index(current)
     return stops[(index + delta) % len(stops)]
+
+
+def cycle_stop_for_focus(
+    *,
+    menu_focused: bool,
+    region: ShellRegion,
+    help_open: bool,
+    strip_open: bool,
+) -> CycleStop:
+    """Active Tab stop from menu focus, the shell region, and which columns are open.
+
+    A Help region with the column closed is Inspector, so the stop does not
+    stay on Help. A closed strip does not report Timeline.
+    """
+    if menu_focused:
+        return CycleStop.MENU
+    if region is ShellRegion.HELP and help_open:
+        return CycleStop.HELP
+    if region is ShellRegion.TIMELINE and strip_open:
+        return CycleStop.TIMELINE
+    if region is ShellRegion.INSPECTOR or region is ShellRegion.HELP:
+        return CycleStop.INSPECTOR
+    return CycleStop.NAVIGATOR
 
 
 def quick_nav_id(visible_ids: Sequence[str], selected_id: str, delta: int) -> str:
@@ -242,7 +276,8 @@ def escape_region(region: ShellRegion) -> ShellRegion:
 
     Inspector returns to the navigator. The navigator stays on the navigator;
     the navigator hides the UI itself. Timeline stays on Timeline; the strip
-    closes through timeline controls.
+    closes through timeline controls. Help is not redirected here; Esc closes
+    the column and restores the subject stop.
     """
     if region is ShellRegion.INSPECTOR:
         return ShellRegion.NAVIGATOR

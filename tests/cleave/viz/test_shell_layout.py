@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from cleave.config_schema.editor import DEFAULT_HELP_WIDTH
 from cleave.gl_compositor import _present_dest_rect
 from cleave.viz.shell_layout import (
     INSPECTOR_WIDTH,
@@ -213,6 +214,165 @@ def test_splitter_hit_and_request_width_split_vs_docked() -> None:
     assert splitter_request_width(docked, "insp", 500.0) == (
         500 - NAVIGATOR_WIDTH
     )
+
+
+def test_open_help_column_sits_beside_the_inspector() -> None:
+    menu_h = 23
+    transport_h = 23
+    help_w = DEFAULT_HELP_WIDTH
+    display_w = 1280
+    columns_y = menu_h + transport_h
+    columns_h = 720 - columns_y
+    nav_w = NAVIGATOR_WIDTH
+    insp_w = INSPECTOR_WIDTH
+    viz_w = display_w - nav_w - insp_w - help_w
+
+    split = ShellLayout.compute(
+        display_w,
+        720,
+        menu_h,
+        transport_h,
+        0,
+        help_width=help_w,
+        docked=False,
+    )
+    assert split.navigator == (0, columns_y, nav_w, columns_h)
+    assert split.visualiser == (nav_w, columns_y, viz_w, columns_h)
+    assert split.inspector == (nav_w + viz_w, columns_y, insp_w, columns_h)
+    assert split.help == (nav_w + viz_w + insp_w, columns_y, help_w, columns_h)
+    assert nav_w + viz_w + insp_w + help_w == display_w
+
+    docked = ShellLayout.compute(
+        display_w,
+        720,
+        menu_h,
+        transport_h,
+        0,
+        help_width=help_w,
+        docked=True,
+    )
+    assert docked.navigator == (0, columns_y, nav_w, columns_h)
+    assert docked.inspector == (nav_w, columns_y, insp_w, columns_h)
+    assert docked.help == (nav_w + insp_w, columns_y, help_w, columns_h)
+    assert docked.visualiser == (
+        nav_w + insp_w + help_w,
+        columns_y,
+        viz_w,
+        columns_h,
+    )
+    assert nav_w + insp_w + help_w + viz_w == display_w
+
+
+def test_narrow_display_keeps_open_help_in_the_column_row() -> None:
+    display_w = 100
+    split = ShellLayout.compute(
+        display_w, 200, 0, 0, 0, help_width=DEFAULT_HELP_WIDTH, docked=False
+    )
+    docked = ShellLayout.compute(
+        display_w, 200, 0, 0, 0, help_width=DEFAULT_HELP_WIDTH, docked=True
+    )
+    for layout in (split, docked):
+        nav_w = layout.navigator[2]
+        viz_w = layout.visualiser[2]
+        insp_w = layout.inspector[2]
+        help_w = layout.help[2]
+        assert nav_w >= 0 and viz_w >= 0 and insp_w >= 0 and help_w >= 0
+        assert nav_w + viz_w + insp_w + help_w == display_w
+        assert viz_w == display_w - nav_w - insp_w - help_w
+
+    assert split.navigator[2] == 21
+    assert split.visualiser == (21, 0, 1, 200)
+    assert split.inspector == (22, 0, 46, 200)
+    assert split.help == (68, 0, 32, 200)
+
+    assert docked.navigator == (0, 0, 21, 200)
+    assert docked.inspector == (21, 0, 46, 200)
+    assert docked.help == (67, 0, 32, 200)
+    assert docked.visualiser == (99, 0, 1, 200)
+
+
+def test_closed_help_matches_split_and_docked_geometry() -> None:
+    for docked in (False, True):
+        current = ShellLayout.compute(1280, 720, 23, 23, 0, docked=docked)
+        for help_width in (None, 0):
+            closed = ShellLayout.compute(
+                1280, 720, 23, 23, 0, help_width=help_width, docked=docked
+            )
+            assert closed.help[2] == 0
+            assert closed.help[3] == current.navigator[3]
+            assert closed.navigator == current.navigator
+            assert closed.visualiser == current.visualiser
+            assert closed.inspector == current.inspector
+            assert (
+                closed.navigator[2]
+                + closed.visualiser[2]
+                + closed.inspector[2]
+                + closed.help[2]
+                == 1280
+            )
+
+
+def test_closed_help_does_not_take_a_minimum_slot() -> None:
+    closed = ShellLayout.compute(
+        121, 100, 0, 0, 0, nav_width=60, insp_width=60, help_width=0
+    )
+    assert (closed.navigator[2], closed.visualiser[2], closed.inspector[2]) == (
+        60,
+        1,
+        60,
+    )
+    assert closed.help[2] == 0
+
+    opened = ShellLayout.compute(
+        121, 100, 0, 0, 0, nav_width=60, insp_width=60, help_width=1
+    )
+    assert opened.help[2] > 0
+    assert opened.visualiser[2] >= 0
+    assert (
+        opened.navigator[2]
+        + opened.visualiser[2]
+        + opened.inspector[2]
+        + opened.help[2]
+        == 121
+    )
+
+
+def test_help_splitter_hit_and_request_width() -> None:
+    menu_h = 23
+    transport_h = 23
+    y = menu_h + transport_h + 10
+    help_w = DEFAULT_HELP_WIDTH
+    split = ShellLayout.compute(
+        1280, 720, menu_h, transport_h, 0, help_width=help_w, docked=False
+    )
+    docked = ShellLayout.compute(
+        1280, 720, menu_h, transport_h, 0, help_width=help_w, docked=True
+    )
+    closed = ShellLayout.compute(
+        1280, 720, menu_h, transport_h, 0, help_width=0, docked=False
+    )
+    closed_docked = ShellLayout.compute(
+        1280, 720, menu_h, transport_h, 0, help_width=None, docked=True
+    )
+
+    split_edge = split.help[0]
+    docked_edge = docked.help[0] + docked.help[2]
+    assert splitter_hit(split, split_edge, y) == "help"
+    assert splitter_hit(docked, docked_edge, y) == "help"
+    assert splitter_hit(split, split.navigator[2], y) == "nav"
+    assert splitter_hit(split, split.inspector[0], y) == "insp"
+    assert splitter_hit(closed, split_edge, y) != "help"
+    assert splitter_hit(closed, closed.help[0], y) != "help"
+    assert splitter_hit(
+        closed_docked,
+        closed_docked.inspector[0] + closed_docked.inspector[2],
+        y,
+    ) == "insp"
+
+    assert splitter_request_width(split, "help", split_edge - 40) == help_w + 40
+    assert splitter_request_width(
+        docked, "help", docked.help[0] + help_w + 40
+    ) == (help_w + 40)
 
 
 def test_present_rect_aspect_fits_inside_the_rect() -> None:

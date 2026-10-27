@@ -12,13 +12,14 @@ from cleave.viz.help_content import (
     DescriptionSection,
     HelpContent,
     help_focus_descriptor,
+    help_sections_for_stop,
     help_shell_row,
     sections_for,
 )
 from cleave.viz.overlay_primitives import overlay_font
 from cleave.viz.overlay_upload import OverlayGpuState, UploadSignature
 from cleave.viz.row_kinds import RowDescriptor, RowKind
-from cleave.viz.shell_focus import ShellFocusState
+from cleave.viz.shell_focus import CycleStop, ShellFocusState, ShellRegion
 from cleave.viz.theme import HIGHLIGHT, LABEL, VALUE
 
 
@@ -206,6 +207,9 @@ def compute_help_panel_size(
     )
     line_h = font.get_linesize()
     row_stride = line_h + line_gap
+    if not sections:
+        side = padding * 2
+        return side, side
     line_count = sum(_section_line_count(section) for section in sections)
     line_count += max(0, len(sections) - 1)
     content_h = line_count * row_stride - line_gap
@@ -216,10 +220,7 @@ def _help_flag_variants() -> tuple[dict[str, bool], ...]:
     """Boolean flag combinations that change sections_for() output."""
     keys = (
         "timeline_enabled",
-        "timeline_submenu_focused",
-        "paused",
         "timeline_recording",
-        "timeline_override_active",
     )
     variants: list[dict[str, bool]] = []
     for values in product((False, True), repeat=len(keys)):
@@ -241,11 +242,10 @@ def help_panel_max_dimensions(
 ) -> tuple[int, int]:
     """Worst-case help panel size for stable GPU texture capacity.
 
-  Iterates every RowKind (and effect id for TRACK_EFFECT) through
-  sections_for() with all boolean flag combinations and both preset
-  switching modes. Viewport size is accepted for API symmetry with the
-  tuning panel helper; measured content drives capacity so textures are
-  never undersized.
+    Measures row sections, the menu block, navigator movement plus each
+    row, and timeline strip variants. Viewport size is accepted for API
+    symmetry with the tuning panel helper; measured content drives
+    capacity so textures are never undersized.
     """
     cache_key = (
         viewport_w,
@@ -261,6 +261,42 @@ def help_panel_max_dimensions(
     font = overlay_font(font_size)
     max_w = 0
     max_h = 0
+    focus = RowDescriptor(RowKind.TRACK_HEADER)
+    navigator = ShellFocusState(
+        region=ShellRegion.NAVIGATOR, selected_id="settings"
+    )
+
+    def measure(sections: tuple[HelpContent, ...]) -> None:
+        nonlocal max_w, max_h
+        panel_w, panel_h = compute_help_panel_size(
+            font,
+            sections,
+            padding=padding,
+            line_gap=line_gap,
+        )
+        max_w = max(max_w, panel_w)
+        max_h = max(max_h, panel_h)
+
+    for preset_curation in (False, True):
+        measure(
+            help_sections_for_stop(
+                CycleStop.MENU,
+                focus,
+                preset_curation=preset_curation,
+                layer_count=8,
+            )
+        )
+    for paused, recording, override in product((False, True), repeat=3):
+        measure(
+            help_sections_for_stop(
+                CycleStop.TIMELINE,
+                focus,
+                paused=paused,
+                timeline_recording=recording,
+                timeline_override_active=override,
+                layer_count=8,
+            )
+        )
     for row_kind in RowKind:
         effect_ids: tuple[str | None, ...] = (
             tuple(EFFECT_IDS) if row_kind == RowKind.TRACK_EFFECT else (None,)
@@ -275,14 +311,16 @@ def help_panel_max_dimensions(
                         layer_count=8,
                         **flags,
                     )
-                    panel_w, panel_h = compute_help_panel_size(
-                        font,
-                        sections,
-                        padding=padding,
-                        line_gap=line_gap,
+                    movement = help_sections_for_stop(
+                        CycleStop.NAVIGATOR,
+                        RowDescriptor(row_kind, effect_id=effect_id),
+                        shell_focus=navigator,
+                        preset_switching=preset_switching,
+                        layer_count=8,
+                        **flags,
                     )
-                    max_w = max(max_w, panel_w)
-                    max_h = max(max_h, panel_h)
+                    measure(sections)
+                    measure(movement + sections)
     margin_x, margin_y = margin
     usable_w = max(1, viewport_w - margin_x * 2)
     usable_h = max(1, viewport_h - margin_y * 2)

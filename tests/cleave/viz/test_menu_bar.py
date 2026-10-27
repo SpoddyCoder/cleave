@@ -471,7 +471,13 @@ class _Overlay:
 
 
 def _shell_controls() -> SimpleNamespace:
-    return SimpleNamespace(session=SimpleNamespace(layer_z_order=()))
+    return SimpleNamespace(
+        session=SimpleNamespace(
+            layer_z_order=(),
+            help_visible=False,
+            timeline=SimpleNamespace(panel_open=False),
+        )
+    )
 
 
 def _motion(y: int) -> pygame.event.Event:

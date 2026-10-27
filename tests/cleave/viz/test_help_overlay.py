@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pygame
 
 from cleave.blend_modes import BLEND_MODE_HELP_ENTRIES, BLEND_MODES
@@ -17,23 +19,28 @@ from cleave.config_schema.render import (
     HIGHLIGHT_ROLLOFF_CURVES,
 )
 from cleave.timeline_presets import TIMELINE_PRESET_HELP_ENTRIES
+from cleave.viz.help_column import help_column_text
 from cleave.viz.help_content import (
     DescriptionSection,
     HelpSection,
     KEYBOARD_CONTROLS_SECTION_TITLE,
     NAVIGATION_SECTION,
     help_sections,
+    help_sections_for_stop,
     layer_section,
     navigation_section,
     sections_for,
     timeline_strip_section,
 )
-from cleave.viz.shell_focus import ShellFocusState, ShellRegion
+from cleave.viz.shell_focus import CycleStop, ShellFocusState, ShellRegion
 from cleave.viz.help_overlay import HelpOverlay
 from cleave.viz.help_panel_cache import entry_gap, entry_width, max_key_width
 from cleave.viz.theme import LABEL, VALUE
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.row_spec import ROW_SPECS
+
+
+_ROW_SECTION_SKIP_TITLES = {NAVIGATION_SECTION.title, "Navigator"}
 
 
 def _is_navigation_section(section: object) -> bool:
@@ -42,7 +49,10 @@ def _is_navigation_section(section: object) -> bool:
 
 def _keyboard_section(sections: tuple[object, ...]) -> HelpSection:
     for section in sections:
-        if isinstance(section, HelpSection) and not _is_navigation_section(section):
+        if (
+            isinstance(section, HelpSection)
+            and section.title not in _ROW_SECTION_SKIP_TITLES
+        ):
             return section
     raise AssertionError("no keyboard help section found")
 
@@ -55,21 +65,21 @@ def _description_section(sections: tuple[object, ...]) -> DescriptionSection | N
 
 
 def _timeline_keys(**kwargs: object) -> list[str]:
-    section = _keyboard_section(
-        sections_for(
-            RowKind.RENDER_TIMELINE_HEADER,
-            timeline_submenu_focused=True,
-            **kwargs,
-        )
+    section = timeline_strip_section(
+        paused=bool(kwargs.get("paused", False)),
+        recording=bool(kwargs.get("timeline_recording", False)),
+        override_active=bool(kwargs.get("timeline_override_active", False)),
+        layer_count=int(kwargs.get("layer_count", 4)),
     )
     return [key for key, _ in section.entries]
 
 
 def _assert_shell_navigation(entries: dict[str, str]) -> None:
     cycle = entries["Tab / Shift+Tab"]
-    for name in ("Menu", "Navigator", "Inspector", "Timeline"):
+    for name in ("Menu", "Navigator", "Inspector", "Help", "Timeline"):
         assert name in cycle
-    assert "skip Timeline when the strip is closed" in cycle
+    assert "Help only while the column is open" in cycle
+    assert "Timeline only while the strip is open" in cycle
     move = entries["Up/Down"]
     assert "navigator nodes" in move
     assert "inspector fields and group headers" in move
@@ -246,6 +256,8 @@ def test_help_follows_inspector_row_not_leftover() -> None:
     assert keyboard["Left/Right"] == "adjust value"
     assert "jump to layer" not in keyboard.values()
     assert "Credits overlays" not in _help_text(sections)
+    assert "Ctrl + Q" not in _help_text(sections)
+    assert NAVIGATION_SECTION.title not in _help_text(sections)
 
 
 def test_help_follows_navigator_layer() -> None:
@@ -264,10 +276,18 @@ def test_help_follows_navigator_layer() -> None:
     assert keyboard["Ctrl + L"] == "add layer"
     assert keyboard["Delete"] == "delete layer"
     assert "Left/Right" not in keyboard
-    nav = dict(sections[-1].entries)
-    assert "expand/collapse navigator" in nav["Left/Right"]
-    assert "step an inspector value" in nav["Left/Right"]
+    nav = dict(
+        next(
+            section.entries
+            for section in sections
+            if isinstance(section, HelpSection) and section.title == "Navigator"
+        )
+    )
+    assert nav["Up/Down"] == "move across nodes"
+    assert nav["Left/Right"] == "expand/collapse"
+    assert nav["Ctrl + Up/Down"] == "previous / next top-level navigator node"
     assert "Ctrl + L" not in nav
+    assert "Ctrl + S" not in nav
     assert "1-6" not in nav
     assert "Credits overlays" not in _help_text(sections)
 
@@ -315,7 +335,10 @@ def test_navigator_other_nodes_keep_navigation_only() -> None:
                 selected_id=selected_id,
             ),
         )
-        assert sections == (navigation_section(),), selected_id
+        assert len(sections) == 1, selected_id
+        assert isinstance(sections[0], HelpSection)
+        assert sections[0].title == "Navigator"
+        assert "Ctrl + S" not in dict(sections[0].entries)
 
 
 def test_inspector_command_rows_use_layer_management_help() -> None:
@@ -841,10 +864,10 @@ def test_navigable_row_kinds_with_description_have_three_sections() -> None:
         if behavior.help_description is None and behavior.help_mode_entries is None:
             continue
         sections = sections_for(row_kind)
-        assert len(sections) == 3, f"{row_kind} expected 3 sections, got {len(sections)}"
+        assert len(sections) == 2, f"{row_kind} expected 2 sections, got {len(sections)}"
         assert isinstance(sections[0], DescriptionSection)
         assert isinstance(sections[1], HelpSection)
-        assert sections[2] is navigation_section()
+        assert sections[1].title == KEYBOARD_CONTROLS_SECTION_TITLE
 
 
 def test_description_sections_use_control_name_not_about() -> None:
@@ -870,23 +893,85 @@ def test_settings_preview_quality_description_separated_from_keyboard() -> None:
     assert "live view only" in " ".join(description.lines)
 
 
-def test_timeline_submenu_help_has_three_sections() -> None:
-    sections = sections_for(
-        RowKind.RENDER_TIMELINE_HEADER,
-        timeline_submenu_focused=True,
+def test_timeline_stop_help_is_the_strip_only() -> None:
+    sections = help_sections_for_stop(
+        CycleStop.TIMELINE,
+        RowDescriptor(RowKind.RENDER_TIMELINE_HEADER),
         paused=True,
+        layer_count=4,
     )
-    assert len(sections) == 3
-    assert isinstance(sections[0], DescriptionSection)
-    assert sections[0].title == "Timeline"
-    assert isinstance(sections[1], HelpSection)
-    assert sections[1].title == KEYBOARD_CONTROLS_SECTION_TITLE
-    assert sections[2] is navigation_section()
+    assert sections == (
+        timeline_strip_section(
+            paused=True, recording=False, override_active=False, layer_count=4
+        ),
+    )
+
+
+def test_each_stop_has_its_own_shortcut_section() -> None:
+    focus = RowDescriptor(RowKind.TRACK_OPACITY, slot="drums")
+    shell = ShellFocusState(
+        region=ShellRegion.INSPECTOR,
+        selected_id="layer:drums",
+        inspector_cursor=focus,
+    )
+    menu = help_sections_for_stop(CycleStop.MENU, focus, shell_focus=shell)
+    navigator = help_sections_for_stop(
+        CycleStop.NAVIGATOR,
+        focus,
+        shell_focus=replace(shell, region=ShellRegion.NAVIGATOR),
+        layer_count=4,
+    )
+    inspector = help_sections_for_stop(
+        CycleStop.INSPECTOR, focus, shell_focus=shell
+    )
+    timeline = help_sections_for_stop(
+        CycleStop.TIMELINE,
+        focus,
+        shell_focus=replace(shell, region=ShellRegion.TIMELINE),
+        paused=True,
+        layer_count=4,
+    )
+    assert menu[0].title == "Navigation / Global"
+    assert "Ctrl + S" in dict(menu[0].entries)
+    assert navigator[0].title == "Navigator"
+    assert "Ctrl + S" not in _help_text(navigator)
+    assert any(
+        isinstance(section, HelpSection)
+        and dict(section.entries).get("L") == "lock/unlock layer"
+        for section in navigator
+    )
+    assert _description_section(inspector) is not None
+    assert _description_section(inspector).title == "Opacity"
+    assert "Ctrl + Q" not in _help_text(inspector)
+    assert timeline[0].title == "Timeline"
+    assert "Ctrl + Q" not in _help_text(timeline)
+    assert {menu[0].title, navigator[0].title, inspector[0].title, timeline[0].title} == {
+        "Navigation / Global",
+        "Navigator",
+        "Opacity",
+        "Timeline",
+    }
+
+
+def test_help_subject_is_used_when_the_column_is_focused() -> None:
+    focus = RowDescriptor(RowKind.TRACK_HEADER)
+    shell = ShellFocusState(
+        region=ShellRegion.HELP,
+        help_subject=CycleStop.MENU,
+        selected_id="settings",
+    )
+    sections = help_sections(focus, shell_focus=shell)
+    assert sections == (navigation_section(),)
+    direct = help_sections_for_stop(shell.help_subject, focus, shell_focus=shell)
+    assert direct == sections
 
 
 def test_curation_navigation_omits_disabled_global_hotkeys() -> None:
-    sections = sections_for(RowKind.TRACK_PRESET, preset_curation=True)
-    nav = sections[-1]
+    focus = RowDescriptor(RowKind.TRACK_PRESET)
+    sections = help_sections_for_stop(
+        CycleStop.MENU, focus, preset_curation=True
+    )
+    nav = sections[0]
     assert isinstance(nav, HelpSection)
     assert nav is navigation_section(preset_curation=True)
     keys = dict(nav.entries)
@@ -899,7 +984,7 @@ def test_curation_navigation_omits_disabled_global_hotkeys() -> None:
     assert keys["Shift + Left/Right"] == "skip 2s"
     assert keys["Ctrl + Left/Right"] == "skip 30s"
 
-    visualizer_nav = sections_for(RowKind.TRACK_PRESET)[-1]
+    visualizer_nav = help_sections_for_stop(CycleStop.MENU, focus)[0]
     assert isinstance(visualizer_nav, HelpSection)
     vis_keys = dict(visualizer_nav.entries)
     assert "Ctrl + S" in vis_keys
@@ -979,3 +1064,88 @@ def test_timeline_strip_help_recording_while_playing() -> None:
     assert entries["R"] == "stop record"
     assert entries["Ctrl + Space / Space"] == "stop record and pause"
     assert "Space" not in entries
+
+
+def test_help_column_text_includes_the_key_label() -> None:
+    sections = help_sections_for_stop(
+        CycleStop.MENU, RowDescriptor(RowKind.TRACK_HEADER)
+    )
+    assert "Ctrl + Q" in help_column_text(sections)
+
+
+def test_help_column_draws_the_subject_stop() -> None:
+    from types import SimpleNamespace
+    from unittest.mock import patch
+
+    from imgui_bundle import imgui
+
+    from cleave.viz import imgui_host
+    from cleave.viz.commands import CommandContext
+    from cleave.viz.menu_bar import MenuBarState
+    from cleave.viz.shell_host import draw_shell_frame, menu_bar_height_px
+    from cleave.viz.shell_layout import ShellLayout
+    from cleave.viz.theme import HIGHLIGHT, LABEL
+
+    overlay = SimpleNamespace(visibility=1.0, notify_input=lambda: None)
+    menu = MenuBarState()
+    menu.focused = True
+    controls = SimpleNamespace(
+        session=SimpleNamespace(
+            layer_z_order=(),
+            help_visible=True,
+            timeline=SimpleNamespace(panel_open=False),
+        ),
+        shell_focus=ShellFocusState(region=ShellRegion.NAVIGATOR),
+        focus_cursor=None,
+        build_view_state=lambda **_kwargs: SimpleNamespace(
+            focus_descriptor=RowDescriptor(RowKind.TRACK_HEADER),
+            render_timeline=SimpleNamespace(enabled=False),
+            paused=False,
+            timeline_recording=False,
+            timeline_override_active=False,
+            settings=SimpleNamespace(editor_mode="visualizer"),
+            layer_z_order=("drums",),
+            tracks={},
+        ),
+    )
+    with patch.object(imgui_host, "_gl_context_current", return_value=False):
+        from cleave.viz.imgui_host import ImGuiHost
+        from cleave.viz.shell_host import ShellHost
+
+        host = ShellHost(
+            ImGuiHost.create(),
+            overlay,
+            menu,
+            controls,
+            menu_bar_height_px(),
+        )
+    try:
+        host.imgui.display_size = (1280, 720)
+        height = menu_bar_height_px()
+        host.set_layout(
+            ShellLayout.compute(1280, 720, height, height, 0, help_width=320)
+        )
+        host._draw_navigator = lambda: None
+        host._draw_inspector = lambda _state: None
+        draw_shell_frame(host, menu, CommandContext(), 1.0, 1.0 / 60.0)
+        draw_shell_frame(host, menu, CommandContext(), 1.0, 1.0 / 60.0)
+        lists = list(imgui.get_draw_data().cmd_lists)
+        help_list = next(
+            draw_list
+            for draw_list in lists
+            if str(draw_list._owner_name) == "##shell-help"
+        )
+        colors = {int(vtx.col) for vtx in help_list.vtx_buffer}
+
+        def color_u32(rgb: tuple[int, int, int]) -> int:
+            return int(
+                imgui.get_color_u32(
+                    imgui.ImVec4(rgb[0] / 255.0, rgb[1] / 255.0, rgb[2] / 255.0, 1.0)
+                )
+            )
+
+        assert color_u32(HIGHLIGHT) in colors
+        assert color_u32(LABEL) in colors
+        del lists, help_list, colors
+    finally:
+        host.imgui.destroy()

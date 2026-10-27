@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from typing import TYPE_CHECKING, Any
 
 from cleave.viz.row_hotkeys import node_header_descriptor
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
 from cleave.viz.row_spec import row_spec
-from cleave.viz.shell_focus import ShellFocusState, ShellRegion
+from cleave.viz.shell_focus import CycleStop, ShellFocusState, ShellRegion
+
+if TYPE_CHECKING:
+    from cleave.viz.tuning_view_state import TuningViewState
 
 HelpEntry = tuple[str, str]
 
@@ -48,7 +52,8 @@ _NAVIGATOR_EXPAND_ENTRY = (
 )
 _REGION_CYCLE_ENTRY = (
     "Tab / Shift+Tab",
-    "cycle Menu, Navigator, Inspector, and Timeline; skip Timeline when the strip is closed",
+    "cycle Menu, Navigator, Inspector, Help, and Timeline; "
+    "Help only while the column is open, Timeline only while the strip is open",
 )
 _TOP_LEVEL_NAV_ENTRY = (
     "Ctrl + Up/Down",
@@ -95,6 +100,16 @@ def navigation_section(*, preset_curation: bool = False) -> HelpSection:
     if preset_curation:
         return _CURATION_NAVIGATION_SECTION
     return NAVIGATION_SECTION
+
+
+_NAVIGATOR_SECTION = HelpSection(
+    "Navigator",
+    (
+        ("Up/Down", "move across nodes"),
+        ("Left/Right", "expand/collapse"),
+        ("Ctrl + Up/Down", "previous / next top-level navigator node"),
+    ),
+)
 
 
 _LAYER_SECTION_BASE: tuple[tuple[str, str], ...] = (
@@ -230,7 +245,7 @@ def help_focus_descriptor(
     *,
     timeline_focused: bool = False,
 ) -> RowDescriptor | None:
-    """Row help should follow, or None when only the navigation section applies."""
+    """Navigator or inspector row help should follow, or None when that stop has no row."""
     if shell_focus is None or timeline_focused:
         return focus
     if shell_focus.region is ShellRegion.INSPECTOR:
@@ -380,36 +395,21 @@ def sections_for(
     *,
     effect_id: str | None = None,
     timeline_enabled: bool = False,
-    timeline_submenu_focused: bool = False,
-    paused: bool = False,
     timeline_recording: bool = False,
-    timeline_override_active: bool = False,
     preset_switching: str | None = None,
     preset_curation: bool = False,
     layer_count: int = 4,
 ) -> tuple[HelpContent, ...]:
-    nav = navigation_section(preset_curation=preset_curation)
-    if timeline_submenu_focused:
-        strip = timeline_strip_section(
-            paused=paused,
-            recording=timeline_recording,
-            override_active=timeline_override_active,
-            layer_count=layer_count,
-        )
-        description = _description_section(RowKind.RENDER_TIMELINE_HEADER)
-        if description is not None:
-            return (description, _keyboard_section(strip), nav)
-        return (strip, nav)
-
+    """Description and keyboard sections for one row. No global navigation."""
     behavior = row_spec(row_kind)
 
     if not behavior.navigable:
-        return (nav,)
+        return ()
     if (
         behavior.affordance == RowAffordance.DISPLAY
         and behavior.help_description is None
     ):
-        return (nav,)
+        return ()
 
     primary: HelpSection | None = None
 
@@ -430,8 +430,8 @@ def sections_for(
             if not section.entries:
                 description = _description_section(row_kind, effect_id=effect_id)
                 if description is not None:
-                    return (description, nav)
-                return (nav,)
+                    return (description,)
+                return ()
             primary = section
         elif (
             behavior.toggle_enabled is not None and behavior.toggle_solo is not None
@@ -480,20 +480,162 @@ def sections_for(
         if entries is None:
             description = _description_section(row_kind, effect_id=effect_id)
             if description is not None:
-                return (description, nav)
-            return (nav,)
+                return (description,)
+            return ()
         primary = HelpSection(
             behavior.help_title or "Edit",
             entries,
         )
 
     if primary is None:
-        return (nav,)
+        return ()
 
     description = _description_section(row_kind, effect_id=effect_id)
     if description is not None:
-        return (description, _keyboard_section(primary), nav)
-    return (primary, nav)
+        return (description, _keyboard_section(primary))
+    return (primary,)
+
+
+def help_stop_for_shell(
+    shell_focus: ShellFocusState | None,
+    *,
+    timeline_focused: bool,
+) -> CycleStop:
+    """Content stop from the shell region. Menu focus is not a region."""
+    if timeline_focused or (
+        shell_focus is not None and shell_focus.region is ShellRegion.TIMELINE
+    ):
+        return CycleStop.TIMELINE
+    if shell_focus is None:
+        return CycleStop.INSPECTOR
+    if shell_focus.region is ShellRegion.HELP:
+        return _subject_stop(shell_focus)
+    if shell_focus.region is ShellRegion.INSPECTOR:
+        return CycleStop.INSPECTOR
+    return CycleStop.NAVIGATOR
+
+
+def _subject_stop(shell_focus: ShellFocusState) -> CycleStop:
+    subject = shell_focus.help_subject
+    if subject is CycleStop.HELP:
+        return CycleStop.NAVIGATOR
+    return subject
+
+
+def _described_row(
+    stop: CycleStop,
+    focus: RowDescriptor,
+    shell_focus: ShellFocusState | None,
+) -> RowDescriptor | None:
+    if stop is CycleStop.NAVIGATOR:
+        if shell_focus is None:
+            return None
+        return help_focus_descriptor(
+            focus,
+            replace(shell_focus, region=ShellRegion.NAVIGATOR),
+            timeline_focused=False,
+        )
+    if stop is CycleStop.INSPECTOR:
+        if shell_focus is None:
+            return focus
+        return help_focus_descriptor(
+            focus,
+            replace(shell_focus, region=ShellRegion.INSPECTOR),
+            timeline_focused=False,
+        )
+    return None
+
+
+def _sections_for_row(
+    described: RowDescriptor | None,
+    *,
+    timeline_enabled: bool,
+    timeline_recording: bool,
+    preset_switching: str | None,
+    preset_curation: bool,
+    layer_count: int,
+) -> tuple[HelpContent, ...]:
+    if described is None:
+        return ()
+    return sections_for(
+        described.kind,
+        effect_id=described.effect_id,
+        timeline_enabled=timeline_enabled,
+        timeline_recording=timeline_recording,
+        preset_switching=preset_switching,
+        preset_curation=preset_curation,
+        layer_count=layer_count,
+    )
+
+
+def help_sections_for_stop(
+    stop: CycleStop,
+    focus: RowDescriptor,
+    *,
+    shell_focus: ShellFocusState | None = None,
+    timeline_enabled: bool = False,
+    paused: bool = False,
+    timeline_recording: bool = False,
+    timeline_override_active: bool = False,
+    preset_switching: str | None = None,
+    preset_curation: bool = False,
+    layer_count: int = 4,
+) -> tuple[HelpContent, ...]:
+    """Help for one Tab stop. ``CycleStop.HELP`` uses ``shell_focus.help_subject``."""
+    if stop is CycleStop.HELP:
+        if shell_focus is None:
+            stop = CycleStop.NAVIGATOR
+        else:
+            stop = _subject_stop(shell_focus)
+    if stop is CycleStop.MENU:
+        return (navigation_section(preset_curation=preset_curation),)
+    if stop is CycleStop.TIMELINE:
+        return (
+            timeline_strip_section(
+                paused=paused,
+                recording=timeline_recording,
+                override_active=timeline_override_active,
+                layer_count=layer_count,
+            ),
+        )
+    row_sections = _sections_for_row(
+        _described_row(stop, focus, shell_focus),
+        timeline_enabled=timeline_enabled,
+        timeline_recording=timeline_recording,
+        preset_switching=preset_switching,
+        preset_curation=preset_curation,
+        layer_count=layer_count,
+    )
+    if stop is CycleStop.NAVIGATOR:
+        return (_NAVIGATOR_SECTION, *row_sections)
+    return row_sections
+
+
+def help_section_kwargs(
+    view_state: TuningViewState,
+    shell_focus: ShellFocusState | None,
+    *,
+    stop: CycleStop,
+) -> dict[str, Any]:
+    """Facts shared by the help column and the pygame help overlay."""
+    focus = view_state.focus_descriptor
+    described = _described_row(stop, focus, shell_focus)
+    preset_switching = None
+    if described is not None and described.slot is not None:
+        track = view_state.tracks.get(described.slot)
+        if track is not None:
+            preset_switching = track.runtime.preset_switching
+    return {
+        "focus": focus,
+        "shell_focus": shell_focus,
+        "timeline_enabled": view_state.render_timeline.enabled,
+        "paused": view_state.paused,
+        "timeline_recording": view_state.timeline_recording,
+        "timeline_override_active": view_state.timeline_override_active,
+        "preset_switching": preset_switching,
+        "preset_curation": view_state.settings.editor_mode == "preset_curation",
+        "layer_count": len(view_state.layer_z_order),
+    }
 
 
 def help_sections(
@@ -509,19 +651,15 @@ def help_sections(
     preset_curation: bool = False,
     layer_count: int = 4,
 ) -> tuple[HelpContent, ...]:
-    """Sections for the shell row, or for *focus* when the panel or timeline has scope."""
-    described = help_focus_descriptor(
-        focus,
-        shell_focus,
-        timeline_focused=timeline_submenu_focused,
+    """Sections for the shell row's stop. The column passes Menu itself."""
+    stop = help_stop_for_shell(
+        shell_focus, timeline_focused=timeline_submenu_focused
     )
-    if described is None:
-        return (navigation_section(preset_curation=preset_curation),)
-    return sections_for(
-        described.kind,
-        effect_id=described.effect_id,
+    return help_sections_for_stop(
+        stop,
+        focus,
+        shell_focus=shell_focus,
         timeline_enabled=timeline_enabled,
-        timeline_submenu_focused=timeline_submenu_focused,
         paused=paused,
         timeline_recording=timeline_recording,
         timeline_override_active=timeline_override_active,

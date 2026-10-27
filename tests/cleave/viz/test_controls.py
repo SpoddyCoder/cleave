@@ -4962,9 +4962,10 @@ def test_settings_set_shell_column_widths_clamps_and_persists(tmp_path: Path) ->
     mode = controls.cfg.editor.shell_layout_mode
     assert not controls.config_dirty
 
-    controls.settings.set_shell_column_widths(12, 40)
+    controls.settings.set_shell_column_widths(12, 40, 8)
     assert controls.cfg.editor.navigator_width == MIN_COLUMN_WIDTH
     assert controls.cfg.editor.inspector_width == MIN_COLUMN_WIDTH
+    assert controls.cfg.editor.help_width == MIN_COLUMN_WIDTH
     assert controls.cfg.editor.shell_layout_mode == mode
     assert controls.shell_focus.selected_id == selected_id
     assert controls.shell_focus.inspector_cursor == inspector_cursor
@@ -4973,14 +4974,17 @@ def test_settings_set_shell_column_widths_clamps_and_persists(tmp_path: Path) ->
     loaded = load_user_config(user_path)
     assert loaded.editor.navigator_width == MIN_COLUMN_WIDTH
     assert loaded.editor.inspector_width == MIN_COLUMN_WIDTH
+    assert loaded.editor.help_width == MIN_COLUMN_WIDTH
 
-    controls.settings.set_shell_column_widths(280, 510)
+    controls.settings.set_shell_column_widths(280, 510, 360)
     assert controls.cfg.editor.navigator_width == 280
     assert controls.cfg.editor.inspector_width == 510
+    assert controls.cfg.editor.help_width == 360
     assert controls.cfg.editor.shell_layout_mode == mode
     loaded = load_user_config(user_path)
     assert loaded.editor.navigator_width == 280
     assert loaded.editor.inspector_width == 510
+    assert loaded.editor.help_width == 360
     assert not controls.config_dirty
 
 

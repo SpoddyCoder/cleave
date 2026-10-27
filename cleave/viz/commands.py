@@ -336,7 +336,15 @@ def _run_focus_node(node_id: str) -> Callable[[Any], None]:
 
 def _toggle_help(controls: Any) -> None:
     session = controls.session
-    session.help_visible = not session.help_visible
+    if not session.help_visible:
+        session.help_visible = True
+        return
+    # TuningControls.close_help restores the subject when Help is focused.
+    # Command fakes that only flip the flag have no close_help method.
+    if getattr(type(controls), "close_help", None) is None:
+        session.help_visible = False
+        return
+    controls.close_help()
 
 
 _OPEN = _later("file.open", "Open project...", "command", "Ctrl+O")

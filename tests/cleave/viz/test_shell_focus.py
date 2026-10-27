@@ -16,36 +16,102 @@ from cleave.viz.shell_focus import (
     tree_nav_id,
 )
 
-_OPEN = (
+_BOTH = (
+    CycleStop.MENU,
+    CycleStop.NAVIGATOR,
+    CycleStop.INSPECTOR,
+    CycleStop.HELP,
+    CycleStop.TIMELINE,
+)
+_HELP_ONLY = (
+    CycleStop.MENU,
+    CycleStop.NAVIGATOR,
+    CycleStop.INSPECTOR,
+    CycleStop.HELP,
+)
+_STRIP_ONLY = (
     CycleStop.MENU,
     CycleStop.NAVIGATOR,
     CycleStop.INSPECTOR,
     CycleStop.TIMELINE,
 )
-_CLOSED = (
+_NEITHER = (
     CycleStop.MENU,
     CycleStop.NAVIGATOR,
     CycleStop.INSPECTOR,
 )
 
 
-def test_tab_cycle_with_strip_open_has_four_stops() -> None:
-    assert len(_OPEN) == 4
-    for index, stop in enumerate(_OPEN):
-        assert next_region(stop, strip_open=True, delta=1) is _OPEN[(index + 1) % 4]
-        assert next_region(stop, strip_open=True, delta=-1) is _OPEN[(index - 1) % 4]
-        assert next_region(stop, strip_open=True, delta=0) is stop
+def _assert_cycle(
+    stops: tuple[CycleStop, ...], *, strip_open: bool, help_open: bool
+) -> None:
+    count = len(stops)
+    for index, stop in enumerate(stops):
+        assert next_region(
+            stop, strip_open=strip_open, help_open=help_open, delta=1
+        ) is stops[(index + 1) % count]
+        assert next_region(
+            stop, strip_open=strip_open, help_open=help_open, delta=-1
+        ) is stops[(index - 1) % count]
+        assert next_region(
+            stop, strip_open=strip_open, help_open=help_open, delta=0
+        ) is stop
+
+
+def test_tab_cycle_with_help_and_strip_open() -> None:
+    assert len(_BOTH) == 5
+    _assert_cycle(_BOTH, strip_open=True, help_open=True)
+
+
+def test_tab_cycle_with_strip_open_skips_closed_help() -> None:
+    assert len(_STRIP_ONLY) == 4
+    _assert_cycle(_STRIP_ONLY, strip_open=True, help_open=False)
+    assert next_region(
+        CycleStop.HELP, strip_open=True, help_open=False, delta=1
+    ) is CycleStop.TIMELINE
+    assert next_region(
+        CycleStop.HELP, strip_open=True, help_open=False, delta=-1
+    ) is CycleStop.NAVIGATOR
+    assert next_region(
+        CycleStop.HELP, strip_open=True, help_open=False, delta=0
+    ) is CycleStop.INSPECTOR
+
+
+def test_tab_cycle_with_help_open_skips_closed_strip() -> None:
+    assert len(_HELP_ONLY) == 4
+    _assert_cycle(_HELP_ONLY, strip_open=False, help_open=True)
+    assert next_region(
+        CycleStop.TIMELINE, strip_open=False, help_open=True, delta=1
+    ) is CycleStop.HELP
+    assert next_region(
+        CycleStop.TIMELINE, strip_open=False, help_open=True, delta=-1
+    ) is CycleStop.NAVIGATOR
+    assert next_region(
+        CycleStop.TIMELINE, strip_open=False, help_open=True, delta=0
+    ) is CycleStop.INSPECTOR
 
 
 def test_tab_cycle_with_strip_closed_skips_timeline() -> None:
-    assert len(_CLOSED) == 3
-    for index, stop in enumerate(_CLOSED):
-        assert next_region(stop, strip_open=False, delta=1) is _CLOSED[(index + 1) % 3]
-        assert next_region(stop, strip_open=False, delta=-1) is _CLOSED[(index - 1) % 3]
-        assert next_region(stop, strip_open=False, delta=0) is stop
-    assert next_region(CycleStop.TIMELINE, strip_open=False, delta=1) is CycleStop.MENU
-    assert next_region(CycleStop.TIMELINE, strip_open=False, delta=-1) is CycleStop.NAVIGATOR
-    assert next_region(CycleStop.TIMELINE, strip_open=False, delta=0) is CycleStop.INSPECTOR
+    assert len(_NEITHER) == 3
+    _assert_cycle(_NEITHER, strip_open=False, help_open=False)
+    assert next_region(
+        CycleStop.TIMELINE, strip_open=False, help_open=False, delta=1
+    ) is CycleStop.MENU
+    assert next_region(
+        CycleStop.TIMELINE, strip_open=False, help_open=False, delta=-1
+    ) is CycleStop.NAVIGATOR
+    assert next_region(
+        CycleStop.TIMELINE, strip_open=False, help_open=False, delta=0
+    ) is CycleStop.INSPECTOR
+    assert next_region(
+        CycleStop.HELP, strip_open=False, help_open=False, delta=1
+    ) is CycleStop.MENU
+    assert next_region(
+        CycleStop.HELP, strip_open=False, help_open=False, delta=-1
+    ) is CycleStop.NAVIGATOR
+    assert next_region(
+        CycleStop.HELP, strip_open=False, help_open=False, delta=0
+    ) is CycleStop.INSPECTOR
 
 
 def test_quick_nav_walks_top_level_ids_and_wraps() -> None:
@@ -71,11 +137,13 @@ def test_escape_region() -> None:
         "NAVIGATOR",
         "INSPECTOR",
         "TIMELINE",
+        "HELP",
     ]
     assert not hasattr(ShellRegion, "PANEL")
     assert escape_region(ShellRegion.NAVIGATOR) is ShellRegion.NAVIGATOR
     assert escape_region(ShellRegion.INSPECTOR) is ShellRegion.NAVIGATOR
     assert escape_region(ShellRegion.TIMELINE) is ShellRegion.TIMELINE
+    assert escape_region(ShellRegion.HELP) is ShellRegion.HELP
 
 
 def test_tree_nav_stops_at_the_ends() -> None:
@@ -112,6 +180,7 @@ def test_reconcile_nav_id_repairs_a_missing_layer() -> None:
 def test_shell_focus_state_defaults() -> None:
     state = ShellFocusState()
     assert state.region is ShellRegion.NAVIGATOR
+    assert state.help_subject is CycleStop.NAVIGATOR
     assert state.selected_id == "settings"
     assert state.inspector_cursor is None
     assert state.collapsed == frozenset()

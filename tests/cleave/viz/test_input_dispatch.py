@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pygame
@@ -15,18 +16,20 @@ from cleave.timeline import SlotCue, TimelineLane
 from cleave.viz.focus_nav import MainFocus, TimelineFocus
 from cleave.viz.inspector import InspectorRow
 from cleave.viz.navigator import layer_node_id, visible_top_level_ids
-from cleave.viz.shell_focus import ShellRegion
-from cleave.viz.controls import SEEK_LONG, SEEK_TINY, TuningControls
-from cleave.viz.layer_visibility import armed_recording_level
-from cleave.viz.row_kinds import RowDescriptor, RowKind
-from cleave.viz.session import LayerRuntime, TuningSession
 from cleave.viz.input_dispatch import (
+    HELP_SCROLL_LINE_PX,
+    HELP_SCROLL_PAGE_PX,
     dispatch_keydown,
     dispatch_keyup,
     dispatch_should_notify_overlay,
     dispatch_window_event,
     key_handler_for_runtime,
 )
+from cleave.viz.shell_focus import CycleStop, ShellRegion
+from cleave.viz.controls import SEEK_LONG, SEEK_TINY, TuningControls
+from cleave.viz.layer_visibility import armed_recording_level
+from cleave.viz.row_kinds import RowDescriptor, RowKind
+from cleave.viz.session import LayerRuntime, TuningSession
 from cleave.viz.modal import ModalHost, ModalKind
 from cleave.viz.tuning_panel_draw import TuningOverlay
 from cleave.viz.timeline_controls import TimelineControls
@@ -113,6 +116,7 @@ def _make_runtime(
         playback=playback,
         duration_sec=120.0,
     )
+    runtime.controls.bind_menu_bar(runtime.menu_bar)
     if submenu_focused:
         runtime.controls.set_shell_region(ShellRegion.TIMELINE)
     else:
@@ -798,6 +802,143 @@ def test_layer_digits_jump_from_inspector_while_strip_is_open() -> None:
     assert dispatch_keydown(keydown(pygame.K_1), runtime) is True
     assert controls.shell_focus.selected_id == layer_node_id("layer_2")
     assert controls.shell_focus.region is ShellRegion.TIMELINE
+
+
+def test_tab_cycle_includes_help_when_open() -> None:
+    runtime = _make_runtime(submenu_focused=False, panel_open=True, help_visible=True)
+    controls = runtime.controls
+    controls.shell_focus.region = ShellRegion.NAVIGATOR
+    assert dispatch_keydown(keydown(pygame.K_TAB), runtime) is True
+    assert controls.shell_focus.region is ShellRegion.INSPECTOR
+    assert dispatch_keydown(keydown(pygame.K_TAB), runtime) is True
+    assert controls.shell_focus.region is ShellRegion.HELP
+    assert controls.shell_focus.help_subject is CycleStop.INSPECTOR
+    assert not isinstance(controls.focus_cursor, TimelineFocus)
+    assert runtime.menu_bar.focused is False
+    assert dispatch_keydown(keydown(pygame.K_TAB), runtime) is True
+    assert controls.shell_focus.region is ShellRegion.TIMELINE
+    assert isinstance(controls.focus_cursor, TimelineFocus)
+    assert dispatch_keydown(keydown(pygame.K_TAB), runtime) is True
+    assert runtime.menu_bar.focused is True
+    assert dispatch_keydown(keydown(pygame.K_TAB), runtime) is True
+    assert runtime.menu_bar.focused is False
+    assert controls.shell_focus.region is ShellRegion.NAVIGATOR
+
+
+def test_tab_cycle_help_open_skips_closed_strip() -> None:
+    runtime = _make_runtime(submenu_focused=False, panel_open=False, help_visible=True)
+    controls = runtime.controls
+    controls.shell_focus.region = ShellRegion.INSPECTOR
+    assert dispatch_keydown(keydown(pygame.K_TAB), runtime) is True
+    assert controls.shell_focus.region is ShellRegion.HELP
+    assert not isinstance(controls.focus_cursor, TimelineFocus)
+    assert dispatch_keydown(keydown(pygame.K_TAB), runtime) is True
+    assert runtime.menu_bar.focused is True
+    assert dispatch_keydown(keydown(pygame.K_TAB, mod=pygame.KMOD_SHIFT), runtime) is True
+    assert controls.shell_focus.region is ShellRegion.HELP
+    assert runtime.menu_bar.focused is False
+
+
+def test_help_keys_do_not_edit_inspector_or_timeline() -> None:
+    runtime = _make_runtime(submenu_focused=True, panel_open=True, help_visible=True)
+    session = runtime.seed.session
+    session.timeline.lanes["layer_1"] = TimelineLane(
+        baseline=None,
+        cues=[SlotCue(4.0, 1.0), SlotCue(10.0, 0.0)],
+    )
+    session.timeline.selected_cue_t["layer_1"] = 4.0
+    session.layers["layer_1"].opacity_pct = 50
+    session.layers["layer_1"].enabled = True
+    controls = runtime.controls
+    controls.shell_focus.selected_id = layer_node_id("layer_1")
+    controls.inspector.focus_row(
+        InspectorRow(
+            descriptor=RowDescriptor(RowKind.TRACK_OPACITY, slot="layer_1"),
+            is_group=False,
+            depth=1,
+            navigable=True,
+        )
+    )
+    controls.set_shell_region(ShellRegion.HELP)
+    assert controls.shell_focus.help_subject is CycleStop.INSPECTOR
+    assert controls.shell_focus.region is ShellRegion.HELP
+    focus_row = session.timeline.focus_row
+    cursor = controls.shell_focus.inspector_cursor
+    runtime.shell_host = SimpleNamespace(scroll_help=MagicMock())
+    assert dispatch_keydown(keydown(pygame.K_RIGHT), runtime) is True
+    assert dispatch_keydown(keydown(pygame.K_LEFT), runtime) is True
+    assert session.layers["layer_1"].opacity_pct == 50
+    assert session.timeline.selected_cue_t["layer_1"] == 4.0
+    assert dispatch_keydown(keydown(pygame.K_DOWN), runtime) is True
+    assert dispatch_keydown(keydown(pygame.K_UP), runtime) is True
+    assert controls.shell_focus.inspector_cursor == cursor
+    assert session.timeline.focus_row == focus_row
+    assert controls.shell_focus.region is ShellRegion.HELP
+    runtime.shell_host.scroll_help.assert_any_call(HELP_SCROLL_LINE_PX)
+    runtime.shell_host.scroll_help.assert_any_call(-HELP_SCROLL_LINE_PX)
+    assert dispatch_keydown(keydown(pygame.K_PAGEDOWN), runtime) is True
+    runtime.shell_host.scroll_help.assert_any_call(HELP_SCROLL_PAGE_PX)
+    assert dispatch_keydown(keydown(pygame.K_e), runtime) is True
+    assert dispatch_keydown(keydown(pygame.K_DELETE), runtime) is True
+    assert session.layers["layer_1"].enabled is True
+    assert "layer_1" in session.layers
+    assert dispatch_keydown(keydown(pygame.K_ESCAPE), runtime) is True
+    assert session.help_visible is False
+    assert controls.shell_focus.region is ShellRegion.INSPECTOR
+    assert controls.consume_hide_overlay() is False
+
+
+def test_h_toggle_does_not_move_region_until_help_is_focused() -> None:
+    runtime = _make_runtime(submenu_focused=False, panel_open=False, help_visible=False)
+    controls = runtime.controls
+    controls.set_shell_region(ShellRegion.INSPECTOR)
+    assert dispatch_keydown(keydown(pygame.K_h), runtime) is True
+    assert runtime.seed.session.help_visible is True
+    assert controls.shell_focus.region is ShellRegion.INSPECTOR
+    assert dispatch_keydown(keydown(pygame.K_h), runtime) is True
+    assert runtime.seed.session.help_visible is False
+    assert controls.shell_focus.region is ShellRegion.INSPECTOR
+
+
+def test_h_while_help_focused_restores_subject() -> None:
+    runtime = _make_runtime(submenu_focused=False, panel_open=True, help_visible=True)
+    controls = runtime.controls
+    controls.set_shell_region(ShellRegion.TIMELINE)
+    stored = controls.session.timeline.focus_row
+    controls.set_shell_region(ShellRegion.HELP)
+    assert controls.shell_focus.help_subject is CycleStop.TIMELINE
+    assert not isinstance(controls.focus_cursor, TimelineFocus)
+    assert dispatch_keydown(keydown(pygame.K_h), runtime) is True
+    assert runtime.seed.session.help_visible is False
+    assert controls.shell_focus.region is ShellRegion.TIMELINE
+    assert controls.focus_cursor == TimelineFocus(stored)
+
+
+def test_esc_from_help_falls_back_when_timeline_subject_strip_is_closed() -> None:
+    runtime = _make_runtime(submenu_focused=False, panel_open=True, help_visible=True)
+    controls = runtime.controls
+    controls.set_shell_region(ShellRegion.TIMELINE)
+    controls.set_shell_region(ShellRegion.HELP)
+    controls.session.timeline.panel_open = False
+    assert dispatch_keydown(keydown(pygame.K_ESCAPE), runtime) is True
+    assert runtime.seed.session.help_visible is False
+    assert controls.shell_focus.region is ShellRegion.INSPECTOR
+    assert not isinstance(controls.focus_cursor, TimelineFocus)
+
+
+def test_esc_from_help_restores_menu_subject() -> None:
+    runtime = _make_runtime(submenu_focused=False, panel_open=False, help_visible=True)
+    controls = runtime.controls
+    controls.set_shell_region(ShellRegion.INSPECTOR)
+    runtime.menu_bar.focus()
+    controls.set_shell_region(ShellRegion.HELP, menu_focused=True)
+    assert controls.shell_focus.help_subject is CycleStop.MENU
+    runtime.menu_bar.blur()
+    assert dispatch_keydown(keydown(pygame.K_ESCAPE), runtime) is True
+    assert runtime.seed.session.help_visible is False
+    assert runtime.menu_bar.focused is True
+    assert controls.shell_focus.region is ShellRegion.NAVIGATOR
+    assert controls.consume_hide_overlay() is False
 
 
 def test_ctrl_down_from_timeline_moves_to_navigator() -> None:

@@ -57,6 +57,7 @@ from cleave.config_schema.editor import (
     DEFAULT_EDITOR_HEIGHT,
     DEFAULT_EDITOR_UPSCALE,
     DEFAULT_EDITOR_WIDTH,
+    DEFAULT_HELP_WIDTH,
     DEFAULT_INSPECTOR_WIDTH,
     DEFAULT_NAVIGATOR_WIDTH,
     DEFAULT_NOTIFICATION_DISPLAY_SEC,
@@ -240,6 +241,7 @@ def test_editor_config_from_settings_defaults() -> None:
     assert cfg.notification_display_sec == DEFAULT_NOTIFICATION_DISPLAY_SEC
     assert cfg.navigator_width == DEFAULT_NAVIGATOR_WIDTH == 230
     assert cfg.inspector_width == DEFAULT_INSPECTOR_WIDTH == 495
+    assert cfg.help_width == DEFAULT_HELP_WIDTH == 320
     assert cfg.shell_layout_mode == DEFAULT_SHELL_LAYOUT_MODE == "split"
 
 
@@ -257,6 +259,7 @@ def test_editor_config_from_settings_uses_user_editor() -> None:
         residual_latency_ms=0,
         navigator_width=280,
         inspector_width=640,
+        help_width=360,
         shell_layout_mode="docked",
     )
     cfg = editor_config_from_settings(editor)
@@ -271,6 +274,7 @@ def test_editor_config_from_settings_uses_user_editor() -> None:
     assert cfg.notification_display_sec == 5
     assert cfg.navigator_width == 280
     assert cfg.inspector_width == 640
+    assert cfg.help_width == 360
     assert cfg.shell_layout_mode == "docked"
 
 

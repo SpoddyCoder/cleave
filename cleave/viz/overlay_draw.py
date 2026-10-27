@@ -5,7 +5,7 @@ from __future__ import annotations
 import pygame
 
 from cleave.gl_compositor import GlCompositor, OverlayTextureSlot
-from cleave.viz.help_content import help_focus_descriptor
+from cleave.viz.help_content import help_section_kwargs, help_stop_for_shell
 from cleave.viz.help_overlay import HelpOverlay
 from cleave.viz.shell_focus import ShellFocusState, ShellRegion
 from cleave.viz.tuning_panel_draw import TuningOverlay
@@ -105,30 +105,11 @@ def _help_compose_kwargs(
     view_state: TuningViewState,
     shell_focus: ShellFocusState | None = None,
 ) -> dict[str, object]:
-    focus = view_state.focus_descriptor
     timeline_focused = _timeline_strip_keyboard_scope(view_state, shell_focus)
-    described = help_focus_descriptor(
-        focus,
-        shell_focus,
-        timeline_focused=timeline_focused,
-    )
-    preset_switching = None
-    if described is not None and described.slot is not None:
-        track = view_state.tracks.get(described.slot)
-        if track is not None:
-            preset_switching = track.runtime.preset_switching
-    return {
-        "focus": focus,
-        "shell_focus": shell_focus,
-        "timeline_enabled": view_state.render_timeline.enabled,
-        "timeline_submenu_focused": timeline_focused,
-        "paused": view_state.paused,
-        "timeline_recording": view_state.timeline_recording,
-        "timeline_override_active": view_state.timeline_override_active,
-        "preset_switching": preset_switching,
-        "preset_curation": view_state.settings.editor_mode == "preset_curation",
-        "layer_count": len(view_state.layer_z_order),
-    }
+    stop = help_stop_for_shell(shell_focus, timeline_focused=timeline_focused)
+    kwargs = help_section_kwargs(view_state, shell_focus, stop=stop)
+    kwargs["timeline_submenu_focused"] = timeline_focused
+    return kwargs
 
 
 class OverlayDrawer:

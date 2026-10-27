@@ -11,7 +11,12 @@ from cleave.viz.controls import SEEK_LONG, SEEK_TINY, TuningControls
 from cleave.viz.editor_mode_controls import is_preset_curation_mode
 from cleave.viz.key_repeat import delete_key_pressed, mod_alt, mod_ctrl, mod_shift
 from cleave.viz.menu_bar import menu_index_for_mnemonic, menus_for_session
-from cleave.viz.shell_focus import CycleStop, ShellRegion, next_region
+from cleave.viz.shell_focus import (
+    CycleStop,
+    ShellRegion,
+    cycle_stop_for_focus,
+    next_region,
+)
 from cleave.viz.timeline_controls import TimelineControls
 
 if TYPE_CHECKING:
@@ -227,19 +232,33 @@ def _strip_open(runtime: LiveVisualizerRuntime) -> bool:
     return bool(runtime.seed.session.timeline.panel_open)
 
 
+# Help column keyboard scroll. The body is empty until the content pass.
+HELP_SCROLL_LINE_PX = 24.0
+HELP_SCROLL_PAGE_PX = 240.0
+
+
 def _current_stop(runtime: LiveVisualizerRuntime) -> CycleStop:
-    if runtime.menu_bar.focused:
-        return CycleStop.MENU
-    if _strip_has_scope(runtime):
-        return CycleStop.TIMELINE
-    if runtime.controls.shell_focus.region is ShellRegion.INSPECTOR:
-        return CycleStop.INSPECTOR
-    return CycleStop.NAVIGATOR
+    return cycle_stop_for_focus(
+        menu_focused=runtime.menu_bar.focused,
+        region=runtime.controls.shell_focus.region,
+        help_open=_help_open(runtime),
+        strip_open=_strip_open(runtime),
+    )
 
 
 def _strip_has_scope(runtime: LiveVisualizerRuntime) -> bool:
     return _strip_open(runtime) and (
         runtime.controls.shell_focus.region is ShellRegion.TIMELINE
+    )
+
+
+def _help_open(runtime: LiveVisualizerRuntime) -> bool:
+    return bool(runtime.seed.session.help_visible)
+
+
+def _help_has_scope(runtime: LiveVisualizerRuntime) -> bool:
+    return _help_open(runtime) and (
+        runtime.controls.shell_focus.region is ShellRegion.HELP
     )
 
 
@@ -249,7 +268,11 @@ def _commit_cycle_stop(runtime: LiveVisualizerRuntime, stop: CycleStop) -> None:
     if stop is CycleStop.MENU:
         menu.focus()
         return
+    menu_focused = menu.focused
     menu.blur()
+    if stop is CycleStop.HELP:
+        controls.set_shell_region(ShellRegion.HELP, menu_focused=menu_focused)
+        return
     if stop is CycleStop.TIMELINE:
         if _strip_open(runtime):
             controls.set_shell_region(ShellRegion.TIMELINE)
@@ -271,6 +294,7 @@ def _handle_region_cycle(
     stop = next_region(
         _current_stop(runtime),
         strip_open=_strip_open(runtime),
+        help_open=_help_open(runtime),
         delta=delta,
     )
     _commit_cycle_stop(runtime, stop)
@@ -292,16 +316,44 @@ def _handle_ctrl_section_nav(
     return True
 
 
+def _help_scroll_delta(key: int) -> float:
+    if key == pygame.K_UP:
+        return -HELP_SCROLL_LINE_PX
+    if key == pygame.K_DOWN:
+        return HELP_SCROLL_LINE_PX
+    if key == pygame.K_PAGEUP:
+        return -HELP_SCROLL_PAGE_PX
+    return HELP_SCROLL_PAGE_PX
+
+
+def _handle_help_region_key(
+    event: pygame.event.Event, runtime: LiveVisualizerRuntime
+) -> bool:
+    """Keys for the help column. They do not fall through to other regions."""
+    key = event.key
+    if key in (pygame.K_UP, pygame.K_DOWN, pygame.K_PAGEUP, pygame.K_PAGEDOWN):
+        host = getattr(runtime, "shell_host", None)
+        if host is not None:
+            host.scroll_help(_help_scroll_delta(key))
+        return True
+    if key == pygame.K_ESCAPE:
+        runtime.controls.close_help()
+        return True
+    return True
+
+
 def _region_keydown(event: pygame.event.Event, runtime: LiveVisualizerRuntime) -> bool | None:
-    """Navigator, inspector, and timeline own arrows, Enter, Esc, and PageUp/PageDown.
+    """Navigator, inspector, help, and timeline own arrows, Enter, Esc, and PageUp/PageDown.
 
     Timeline returns None so ``key_handler_for_runtime`` runs timeline controls.
-    None means the key is unowned and should fall through.
+    Help consumes its keys here. None means the key is unowned and should fall through.
     """
     if event.key not in _REGION_KEYS:
         return None
     if runtime.menu_bar.focused:
         return None
+    if _help_has_scope(runtime):
+        return _handle_help_region_key(event, runtime)
     if _strip_has_scope(runtime):
         return None
     region = runtime.controls.shell_focus.region
@@ -336,7 +388,7 @@ def _handle_shell_hotkey(
 
 
 def _shell_columns_focused(runtime: LiveVisualizerRuntime) -> bool:
-    """Navigator or inspector has the shell, not the menu or the timeline strip."""
+    """Navigator or inspector has the shell, not the menu, help, or the strip."""
     if runtime.menu_bar.focused:
         return False
     if _strip_has_scope(runtime):

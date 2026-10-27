@@ -122,6 +122,7 @@ class LiveVisualizerRuntime(VisualizerCore):
     )
     overlay_profiler: OverlayProfiler = field(default_factory=OverlayProfiler.from_env)
     menu_bar: MenuBarState = field(default_factory=MenuBarState)
+    shell_host: object | None = None
 
 
 @dataclass
@@ -335,6 +336,7 @@ def init_gl_resources_heavy(
 
 
 def bind_live_runtime_overlay_hooks(runtime: LiveVisualizerRuntime) -> None:
+    runtime.controls.bind_menu_bar(runtime.menu_bar)
     runtime.controls.bind_tap_sync_overlay(
         get_visible=runtime.overlay.is_visible,
         hide=runtime.overlay.hide_immediately,
@@ -634,6 +636,9 @@ class VisualizerApp:
         editor = runtime.seed.cfg.editor
         nav_width = editor.navigator_width
         insp_width = editor.inspector_width
+        help_width: int | None = None
+        if runtime.seed.session.help_visible:
+            help_width = editor.help_width
         if shell is not None:
             live_nav = getattr(shell, "nav_width", None)
             live_insp = getattr(shell, "insp_width", None)
@@ -641,6 +646,10 @@ class VisualizerApp:
                 nav_width = live_nav
             if live_insp is not None:
                 insp_width = live_insp
+            if help_width is not None:
+                live_help = getattr(shell, "help_width", None)
+                if live_help is not None:
+                    help_width = live_help
         docked = editor.shell_layout_mode == "docked"
         return ShellLayout.compute(
             display_w,
@@ -650,6 +659,7 @@ class VisualizerApp:
             timeline_h,
             nav_width=nav_width,
             insp_width=insp_width,
+            help_width=help_width,
             docked=docked,
         )
 
@@ -781,6 +791,7 @@ class VisualizerApp:
                 menu_bar_height_px(),
             )
             self._shell = shell
+            rt.shell_host = shell
 
             display_fps: list[float | None] = [None]
 
