@@ -184,7 +184,12 @@ class MenuBarState:
         self._open_dropdown(menus, last=False)
 
     def click_top(self, index: int, menus: tuple[Menu, ...] | list[Menu]) -> None:
-        """Toggle the dropdown under a top label."""
+        """Toggle the dropdown under a top label.
+
+        A mouse open focuses the bar and leaves no keyboard row. Arrow keys
+        seed the highlight afterwards. A second click on the open label closes
+        the dropdown.
+        """
         if not menus:
             return
         index = index % len(menus)
@@ -193,7 +198,8 @@ class MenuBarState:
             self.dropdown_open = False
             return
         self.menu_index = index
-        self._open_dropdown(menus, last=False)
+        self.dropdown_open = True
+        self.item_index = -1
 
     def click_item(
         self,
@@ -233,7 +239,7 @@ class MenuBarState:
             self._open_dropdown(menus, last=delta < 0)
             return
         if self.item_index not in indices:
-            self.item_index = indices[0]
+            self.item_index = indices[-1] if delta < 0 else indices[0]
             return
         position = indices.index(self.item_index)
         self.item_index = indices[(position + delta) % len(indices)]

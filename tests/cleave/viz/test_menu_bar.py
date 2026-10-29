@@ -8,7 +8,14 @@ from unittest.mock import patch
 import pygame
 import pytest
 
-from cleave.viz.commands import MENUS, SEPARATOR, Command, CommandContext, Menu
+from cleave.viz.commands import (
+    MENUS,
+    SEPARATOR,
+    Command,
+    CommandContext,
+    Menu,
+    MenuSeparator,
+)
 from cleave.viz.menu_bar import MenuBarState, menu_index_for_mnemonic, menu_mnemonic
 from cleave.viz.shell_focus import ShellRegion
 
@@ -161,6 +168,36 @@ def test_open_menu_focuses_dropdown_and_stays_open() -> None:
     assert state.dropdown_open
     assert state.menu_index == 0
     assert state.highlighted_command(menus).id == "disabled"
+
+
+def test_click_top_opens_without_a_keyboard_row() -> None:
+    runs: list[tuple[str, bool]] = []
+    menus = _menus(runs)
+    state = MenuBarState()
+    state.click_top(0, menus)
+    assert state.focused
+    assert state.dropdown_open
+    assert state.menu_index == 0
+    assert state.highlighted_command(menus) is None
+    assert state.item_index not in range(len(menus[0].items))
+    state.click_top(0, menus)
+    assert not state.dropdown_open
+    assert state.focused
+
+
+def test_arrow_after_click_top_selects_an_end_command() -> None:
+    runs: list[tuple[str, bool]] = []
+    menus = _menus(runs)
+    down = MenuBarState()
+    down.click_top(0, menus)
+    assert down.highlighted_command(menus) is None
+    assert _press(down, pygame.K_DOWN, menus, runs)
+    assert down.highlighted_command(menus).id == "disabled"
+
+    up = MenuBarState()
+    up.click_top(0, menus)
+    assert _press(up, pygame.K_UP, menus, runs)
+    assert up.highlighted_command(menus).id == "enabled"
 
 
 def test_click_uses_the_same_close_then_run_path() -> None:
@@ -544,6 +581,101 @@ def test_open_menu_paints_over_the_focus_ring() -> None:
     assert popup_above_ring
     assert not ring_on_chrome
     assert not ring_on_foreground
+
+
+def test_menu_underline_and_popup_row_are_snug() -> None:
+    """The mnemonic sits one pixel under the letter, and the row fill is centered."""
+    from imgui_bundle import imgui
+
+    from cleave.viz import imgui_host
+    from cleave.viz.shell_host import draw_shell_frame
+    from cleave.viz.theme import BACKGROUND, HIGHLIGHT
+
+    overlay = _Overlay()
+    overlay.visibility = 1.0
+    menu = MenuBarState()
+    with patch.object(imgui_host, "_gl_context_current", return_value=False):
+        host = _open_shell(overlay, menu)
+    host.imgui.display_size = (1280, 720)
+    host.process_event(_motion(4))
+    menu.open_menu(0, MENUS)
+    try:
+        draw_shell_frame(host, menu, CommandContext(), 1.0, 1.0 / 60.0)
+        draw_shell_frame(host, menu, CommandContext(), 1.0, 1.0 / 60.0)
+        lists = list(imgui.get_draw_data().cmd_lists)
+        by_name = {draw_list._owner_name: draw_list for draw_list in lists}
+        bar = by_name["##MainMenuBar"]
+        popup = by_name["##cleave-menu"]
+        ink = _color_u32(BACKGROUND)
+        fill = _color_u32(HIGHLIGHT)
+        underline_gap = _underline_gap(bar, ink)
+        row_gap_above, row_gap_below = _popup_row_ink_gaps(popup, ink, fill)
+    finally:
+        host.imgui.destroy()
+    assert underline_gap == pytest.approx(1.0, abs=0.51)
+    assert row_gap_above == pytest.approx(row_gap_below, abs=0.51)
+
+
+def _underline_gap(draw_list: object, ink: int) -> float:
+    """Pixels between the open title's ink and the mnemonic underline."""
+    bands: dict[float, list[float]] = {}
+    for vtx in draw_list.vtx_buffer:
+        if int(vtx.col) != ink:
+            continue
+        x = float(vtx.pos.x)
+        if not 4.0 <= x <= 70.0:
+            continue
+        y = round(float(vtx.pos.y), 1)
+        bands.setdefault(y, []).append(x)
+    word_span = 0.0
+    word_bottom = 0.0
+    underline_top: float | None = None
+    for y, xs in bands.items():
+        span = max(xs) - min(xs)
+        if span > word_span:
+            word_span = span
+            word_bottom = y
+    for y, xs in bands.items():
+        span = max(xs) - min(xs)
+        if y <= word_bottom or span > word_span * 0.5:
+            continue
+        underline_top = y if underline_top is None else min(underline_top, y)
+    assert underline_top is not None
+    return underline_top - word_bottom
+
+
+def _popup_row_ink_gaps(
+    draw_list: object, ink: int, fill: int
+) -> tuple[float, float]:
+    """Padding from the highlighted row fill to the label's font box.
+
+    Descenders sit inside the same box, so the gaps use the line height
+    rather than the lowest ink pixel.
+    """
+    from imgui_bundle import imgui
+
+    box = _color_bounds(draw_list, fill)
+    assert box is not None
+    x0, y0, _x1, y1 = box
+    tops = [
+        float(vtx.pos.y)
+        for vtx in draw_list.vtx_buffer
+        if int(vtx.col) == ink and x0 < float(vtx.pos.x) < _x1
+    ]
+    assert tops
+    font = imgui.get_font()
+    label = next(
+        item.label
+        for item in MENUS[0].items
+        if not isinstance(item, MenuSeparator)
+    )
+    min_y0 = min(
+        font.find_glyph(ord(char)).y0
+        for char in label
+        if not char.isspace()
+    )
+    text_top = min(tops) - min_y0
+    return (text_top - y0), (y1 - (text_top + font.font_size))
 
 
 def _color_u32_alpha(rgb: tuple[int, int, int], alpha: float) -> int:

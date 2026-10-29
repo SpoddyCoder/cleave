@@ -390,20 +390,34 @@ def _draw_item_suffix(text: str, color: imgui.ImVec4) -> None:
     _draw_aligned_parts([(text, color)])
 
 
+def _selectable_label_origin() -> tuple[float, float]:
+    """Top-left of the current selectable's label.
+
+    The item rect is the highlight, which Selectable grows by half of
+    ItemSpacing. The label itself is drawn at the unpadded cursor.
+    """
+    rect_min = imgui.get_item_rect_min()
+    spacing = imgui.get_style().item_spacing
+    return (
+        rect_min.x + float(math.trunc(spacing.x * 0.5)),
+        rect_min.y + float(math.trunc(spacing.y * 0.5)),
+    )
+
+
 def _draw_mnemonic_underline(label: str, color: tuple[int, int, int]) -> None:
-    """1px underline under the first letter of a top-menu button."""
+    """1px underline just under the ink of a top menu's first letter."""
     letter = label[:1]
     if not letter:
         return
-    rect_min = imgui.get_item_rect_min()
-    pad = imgui.get_style().frame_padding
-    letter_size = imgui.calc_text_size(letter)
-    x0 = rect_min.x + pad.x
-    y = rect_min.y + pad.y + letter_size.y
+    origin_x, origin_y = _selectable_label_origin()
+    glyph = imgui.get_font().find_glyph(ord(letter))
+    letter_width = imgui.calc_text_size(letter).x
+    # One pixel under the glyph. The line box still has descent below that.
+    y = origin_y + glyph.y1 + 1.0
     packed = imgui.get_color_u32(rgba(color))
     imgui.get_window_draw_list().add_rect_filled(
-        imgui.ImVec2(x0, y),
-        imgui.ImVec2(x0 + letter_size.x, y + 1.0),
+        imgui.ImVec2(origin_x, y),
+        imgui.ImVec2(origin_x + letter_width, y + 1.0),
         packed,
     )
 
@@ -1547,7 +1561,6 @@ class ShellHost:
         hit = False
         style = imgui.get_style()
         pad_x = style.frame_padding.x
-        pad_y = style.frame_padding.y
         check_w = imgui.calc_text_size("✓").x
         gap = max(imgui.calc_text_size("  ").x, 16.0)
         label_w = 0.0
@@ -1588,7 +1601,10 @@ class ShellHost:
                 label_color = _row_color(item, command_ctx, enabled)
                 check_color = rgba(ACTION)
                 shortcut_color = rgba(MUTED)
-            text_y = pos.y + pad_y
+            # Selectable anchors the label at the cursor and pads the highlight
+            # with half of ItemSpacing on each side. Frame padding would push
+            # the label down so the fill sits high, flush with the next row.
+            text_y = pos.y
             text_x = pos.x + pad_x
             if (
                 item.kind == "check"

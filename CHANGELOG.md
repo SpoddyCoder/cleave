@@ -28,6 +28,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- Menu underlines sit just under the first letter, and popup row highlights are centered on the label with the same padding above and below as the navigator.
+- Clicking a menu title opens the dropdown without highlighting a command. Arrow keys start the opaque row highlight.
 - The tap-sync detection box draws above the editor panels.
 - With the strip open, navigator and inspector keep their keys until the user Tabs to Timeline or clicks the strip.
 - Inspector stepped values keep side arrows and sideways drag when the value is off, including placement snap.
