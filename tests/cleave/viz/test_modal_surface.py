@@ -45,7 +45,7 @@ from cleave.viz.shell_focus import ShellRegion
 from cleave.viz.shell_layout import ShellLayout
 from cleave.viz.theme import (
     DISABLED,
-    FOCUS_ROW_BG_ALPHA,
+    FOCUS_WASH_ALPHA,
     HIGHLIGHT,
     LABEL,
     VALUE,
@@ -322,7 +322,7 @@ def test_kind_renders_with_idle_mouse(view: ModalViewState) -> None:
         assert abs(surface.panel_rect[0] - (screen_w - expected[0]) // 2) <= 1
         assert abs(surface.panel_rect[1] - (screen_h - expected[1]) // 2) <= 1
         colors = _color_counts()
-        wash = _pack(HIGHLIGHT, FOCUS_ROW_BG_ALPHA / 255.0)
+        wash = _pack(HIGHLIGHT, FOCUS_WASH_ALPHA / 255.0)
         assert colors.get(_pack(LABEL), 0) > 0
         if view.kind == ModalKind.TEXT:
             assert colors.get(_pack(DISABLED), 0) == 4 * (
@@ -802,7 +802,7 @@ def test_text_button_colours_follow_focus() -> None:
         surface = ModalSurface(navigating, ImGuiTextMeasure())
         _idle(host, surface)
         colors = _color_counts()
-        wash = _pack(HIGHLIGHT, FOCUS_ROW_BG_ALPHA / 255.0)
+        wash = _pack(HIGHLIGHT, FOCUS_WASH_ALPHA / 255.0)
         assert colors.get(_pack(DISABLED), 0) == 4 * sum(
             _glyphs(label) for label in TEXT_BUTTON_LABELS
         )

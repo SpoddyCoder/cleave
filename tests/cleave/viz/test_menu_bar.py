@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import pygame
+import pytest
 
 from cleave.viz.commands import MENUS, SEPARATOR, Command, CommandContext, Menu
 from cleave.viz.menu_bar import MenuBarState, menu_index_for_mnemonic, menu_mnemonic
@@ -283,6 +284,18 @@ def _draw_list_has_color(draw_list: object, color: int) -> bool:
     return False
 
 
+def _color_span_x(draw_list: object, color: int) -> float:
+    """Width covered by vertices of *color*. Zero when the colour is absent."""
+    xs = [
+        float(vtx.pos.x)
+        for vtx in draw_list.vtx_buffer
+        if int(vtx.col) == color
+    ]
+    if len(xs) < 2:
+        return 0.0
+    return max(xs) - min(xs)
+
+
 def _content_lists(lists: list) -> list:
     """Window lists in paint order. The foreground list is not one of them."""
     return [
@@ -290,6 +303,64 @@ def _content_lists(lists: list) -> list:
         for draw_list in lists
         if "Foreground" not in str(draw_list._owner_name)
     ]
+
+
+def _color_bounds(
+    draw_list: object, color: int
+) -> tuple[float, float, float, float] | None:
+    xs: list[float] = []
+    ys: list[float] = []
+    for vtx in draw_list.vtx_buffer:
+        if int(vtx.col) != color:
+            continue
+        xs.append(float(vtx.pos.x))
+        ys.append(float(vtx.pos.y))
+    if not xs:
+        return None
+    return min(xs), min(ys), max(xs), max(ys)
+
+
+def _ink_runs_on_fill(draw_list: object, ink: int, fill: int) -> int:
+    """X-separated runs of *ink* strictly inside the *fill* bounds.
+
+    Glyphs in one label sit closer together than the menu's check, label,
+    and shortcut columns, so those three parts are three runs.
+    """
+    box = _color_bounds(draw_list, fill)
+    if box is None:
+        return 0
+    x0, y0, x1, y1 = box
+    xs = sorted(
+        float(vtx.pos.x)
+        for vtx in draw_list.vtx_buffer
+        if int(vtx.col) == ink
+        and x0 < float(vtx.pos.x) < x1
+        and y0 < float(vtx.pos.y) < y1
+    )
+    if not xs:
+        return 0
+    runs = 1
+    for previous, current in zip(xs, xs[1:]):
+        if current - previous > 14.0:
+            runs += 1
+    return runs
+
+
+def _ink_on_fill(draw_list: object, ink: int, fill: int) -> int:
+    """Vertices of *ink* strictly inside the *fill* bounds."""
+    box = _color_bounds(draw_list, fill)
+    if box is None:
+        return 0
+    x0, y0, x1, y1 = box
+    count = 0
+    for vtx in draw_list.vtx_buffer:
+        if int(vtx.col) != ink:
+            continue
+        x = float(vtx.pos.x)
+        y = float(vtx.pos.y)
+        if x0 < x < x1 and y0 < y < y1:
+            count += 1
+    return count
 
 
 def _color_u32(rgb: tuple[int, int, int]) -> int:
@@ -322,7 +393,11 @@ def _assert_chrome_last(lists: list) -> list:
 
 
 def test_open_menu_paints_over_the_transport_rule() -> None:
-    """The transport rule stays on its window, under a later menu popup."""
+    """The transport rule stays on its window, under a later menu popup.
+
+    Menu separators use the same colour, so the popup may contain it. The
+    rule is the span as wide as the transport window; a separator is not.
+    """
     from imgui_bundle import imgui
 
     from cleave.viz import imgui_host, shell_host
@@ -364,7 +439,8 @@ def test_open_menu_paints_over_the_transport_rule() -> None:
         grey = _color_u32(TRANSPORT_RULE)
         white = _color_u32(BORDER_COLOR)
         on_transport = _draw_list_has_color(content[transport_at], grey)
-        on_popup = _draw_list_has_color(content[popup_at], grey)
+        transport_span = _color_span_x(content[transport_at], grey)
+        popup_span = _color_span_x(content[popup_at], grey)
         on_chrome = _draw_list_has_color(content[chrome_at], grey)
         rule_on_chrome = _draw_list_has_color(content[chrome_at], white)
         rule_on_foreground = any(
@@ -374,7 +450,7 @@ def test_open_menu_paints_over_the_transport_rule() -> None:
     finally:
         host.imgui.destroy()
     assert on_transport
-    assert not on_popup
+    assert transport_span > popup_span
     assert not on_chrome
     assert rule_on_chrome
     assert not rule_on_foreground
@@ -445,7 +521,15 @@ def test_open_menu_paints_over_the_focus_ring() -> None:
         chrome_at = names.index("##shell-chrome")
         assert nav_at < popup_at < chrome_at
         ring_on_nav = _draw_list_has_color(content[nav_at], gold)
-        ring_on_popup = _draw_list_has_color(content[popup_at], gold)
+        # The current menu row is opaque highlight near the menu bar. The
+        # navigator ring is lower, on its own list, not copied onto the popup.
+        popup_gold = _color_bounds(content[popup_at], gold)
+        nav_gold = _color_bounds(content[nav_at], gold)
+        popup_above_ring = (
+            popup_gold is not None
+            and nav_gold is not None
+            and popup_gold[3] < nav_gold[1]
+        )
         ring_on_chrome = _draw_list_has_color(content[chrome_at], gold)
         ring_on_foreground = any(
             _draw_list_has_color(draw_list, gold) for draw_list in foreground
@@ -457,9 +541,323 @@ def test_open_menu_paints_over_the_focus_ring() -> None:
     assert not strip_on_foreground
     assert not rule_on_foreground
     assert ring_on_nav
-    assert not ring_on_popup
+    assert popup_above_ring
     assert not ring_on_chrome
     assert not ring_on_foreground
+
+
+def _color_u32_alpha(rgb: tuple[int, int, int], alpha: float) -> int:
+    from imgui_bundle import imgui
+
+    return int(
+        imgui.get_color_u32(
+            imgui.ImVec4(
+                rgb[0] / 255.0,
+                rgb[1] / 255.0,
+                rgb[2] / 255.0,
+                alpha,
+            )
+        )
+    )
+
+
+def _paint_shell(host, menu, ctx, *, frames: int = 2) -> list:
+    from imgui_bundle import imgui
+
+    from cleave.viz.shell_host import draw_shell_frame
+
+    lists = []
+    for _ in range(frames):
+        draw_shell_frame(host, menu, ctx, 1.0, 1.0 / 60.0)
+        lists = list(imgui.get_draw_data().cmd_lists)
+    return lists
+
+
+def test_open_menu_ink_matches_the_mock() -> None:
+    """Open title and the current row use background ink on opaque highlight.
+
+    An unfocused check is action, its shortcut is muted, and the scope
+    readout is highlight. The Help row's label, check, and shortcut are
+    background ink while that row is current.
+    """
+    from cleave.viz import imgui_host
+    from cleave.viz.shell_layout import ShellLayout
+    from cleave.viz.theme import (
+        ACTION,
+        BACKGROUND,
+        DISABLED,
+        HIGHLIGHT,
+        LABEL,
+        MUTED,
+        VALUE,
+    )
+
+    overlay = _Overlay()
+    overlay.visibility = 1.0
+    menu = MenuBarState()
+    controls = _shell_controls()
+    controls.build_view_state = lambda **_kwargs: None
+    controls.focus_cursor = None
+    controls.shell_focus = SimpleNamespace(region=ShellRegion.NAVIGATOR)
+    help_index = next(index for index, item in enumerate(MENUS) if item.label == "Help")
+    with patch.object(imgui_host, "_gl_context_current", return_value=False):
+        host = _open_shell(overlay, menu, controls)
+    try:
+        from cleave.viz import shell_host
+
+        host.imgui.display_size = (1280, 720)
+        height = shell_host.menu_bar_height_px()
+        host.set_layout(ShellLayout.compute(1280, 720, height, height, 0))
+        host.process_event(_motion(4))
+        host._draw_navigator = lambda: None
+        host._draw_inspector = lambda _state: None
+        ctx = CommandContext(help_visible=True)
+        _paint_shell(host, menu, ctx, frames=1)
+        menu.open_menu(help_index, MENUS)
+        menu.item_index = 1
+        lists = _paint_shell(host, menu, ctx)
+        content = _content_lists(lists)
+        names = [draw_list._owner_name for draw_list in content]
+        bar = content[names.index("##MainMenuBar")]
+        popup = content[names.index("##cleave-menu")]
+        transport = content[names.index("##shell-transport")]
+        gold = _color_u32(HIGHLIGHT)
+        ink = _color_u32(BACKGROUND)
+        title_ink = _ink_on_fill(bar, ink, gold)
+        row_ink = _ink_on_fill(popup, ink, gold)
+        scope = _draw_list_has_color(transport, gold)
+        unfocused_check = _draw_list_has_color(popup, _color_u32(ACTION))
+        unfocused_shortcut = _draw_list_has_color(popup, _color_u32(MUTED))
+        unfocused_label = _draw_list_has_color(popup, _color_u32(VALUE))
+        disabled = _draw_list_has_color(popup, _color_u32(DISABLED))
+        idle_title = _draw_list_has_color(bar, _color_u32(LABEL))
+        check_on_current = _ink_on_fill(popup, _color_u32(ACTION), gold)
+        shortcut_on_current = _ink_on_fill(popup, _color_u32(MUTED), gold)
+        menu.item_index = 0
+        lists = _paint_shell(host, menu, ctx)
+        content = _content_lists(lists)
+        names = [draw_list._owner_name for draw_list in content]
+        popup = content[names.index("##cleave-menu")]
+        current_parts = _ink_runs_on_fill(popup, ink, gold)
+        del lists, content
+    finally:
+        host.imgui.destroy()
+    assert title_ink > 4
+    assert row_ink > 4
+    assert scope
+    assert unfocused_check
+    assert unfocused_shortcut
+    assert unfocused_label
+    assert disabled
+    assert idle_title
+    assert check_on_current == 0
+    assert shortcut_on_current == 0
+    assert current_parts == 3
+
+
+def test_navigator_focus_ring_only_while_that_region_is_active() -> None:
+    from cleave.viz import imgui_host, shell_host
+    from cleave.viz.navigator import NavNode
+    from cleave.viz.shell_focus import ShellFocusState
+    from cleave.viz.shell_layout import ShellLayout
+    from cleave.viz.theme import (
+        FOCUS_ROW_BG_ALPHA,
+        HIGHLIGHT,
+        LABEL,
+        LOCK_ICON,
+        SELECTED_WASH_ALPHA,
+        VALUE,
+    )
+
+    overlay = _Overlay()
+    overlay.visibility = 1.0
+    menu = MenuBarState()
+    nodes = (
+        NavNode("settings", "Settings", 0, True, None, locked=True),
+        NavNode("project", "Project", 0, True, None),
+    )
+    focus = ShellFocusState(region=ShellRegion.NAVIGATOR, selected_id="settings")
+    controls = _shell_controls()
+    controls.build_view_state = lambda **_kwargs: None
+    controls.focus_cursor = None
+    controls.shell_focus = focus
+    controls.navigator = SimpleNamespace(select=lambda *_args, **_kwargs: None)
+    rings: list[bool] = []
+    real_ring = shell_host._draw_item_focus_ring
+
+    def spy_ring() -> None:
+        rings.append(True)
+        real_ring()
+
+    with patch.object(imgui_host, "_gl_context_current", return_value=False):
+        host = _open_shell(overlay, menu, controls)
+    try:
+        host.imgui.display_size = (1280, 720)
+        height = shell_host.menu_bar_height_px()
+        host.set_layout(ShellLayout.compute(1280, 720, height, height, 0))
+        host.process_event(_motion(4))
+        host._draw_inspector = lambda _state: None
+        with (
+            patch.object(shell_host, "_draw_item_focus_ring", spy_ring),
+            patch.object(shell_host, "build_navigator", return_value=nodes),
+        ):
+            _paint_shell(host, menu, CommandContext(), frames=1)
+            rings.clear()
+            lists = _paint_shell(host, menu, CommandContext(), frames=1)
+            active_rings = len(rings)
+            content = _content_lists(lists)
+            names = [draw_list._owner_name for draw_list in content]
+            nav = content[names.index("##shell-navigator")]
+            colors = {int(vtx.col) for vtx in nav.vtx_buffer}
+            wash = _color_u32_alpha(HIGHLIGHT, SELECTED_WASH_ALPHA / 255.0)
+            old_wash = _color_u32_alpha(HIGHLIGHT, FOCUS_ROW_BG_ALPHA / 255.0)
+            has_wash = wash in colors
+            has_old = old_wash in colors
+            has_value = _color_u32(VALUE) in colors
+            has_label = _color_u32(LABEL) in colors
+            has_lock = _color_u32(LOCK_ICON) in colors
+            del lists, content, colors
+            focus.region = ShellRegion.INSPECTOR
+            rings.clear()
+            _paint_shell(host, menu, CommandContext(), frames=1)
+            inspector_rings = len(rings)
+            menu.focused = True
+            focus.region = ShellRegion.NAVIGATOR
+            rings.clear()
+            _paint_shell(host, menu, CommandContext(), frames=1)
+            menu_rings = len(rings)
+    finally:
+        host.imgui.destroy()
+    assert active_rings == 1
+    assert inspector_rings == 0
+    assert menu_rings == 0
+    assert has_wash
+    assert not has_old
+    assert has_value
+    assert has_label
+    assert has_lock
+
+
+def test_focused_inspector_label_is_highlight() -> None:
+    from imgui_bundle import imgui
+
+    from cleave.viz import imgui_host, shell_host
+    from cleave.viz.focus_nav import MainFocus
+    from cleave.viz.inspector import build_inspector_rows
+    from cleave.viz.row_kinds import RowDescriptor, RowKind
+    from cleave.viz.shell_focus import ShellFocusState
+    from cleave.viz.shell_layout import ShellLayout
+    from cleave.viz.theme import (
+        FOCUS_ROW_BG_ALPHA,
+        FOCUS_WASH_ALPHA,
+        HIGHLIGHT,
+        LABEL,
+        SELECTED_WASH_ALPHA,
+        VALUE,
+    )
+    from cleave.viz.tuning_view_state import TuningViewState
+
+    view = TuningViewState(
+        layer_z_order=(),
+        tracks={},
+        paused=False,
+        position_sec=0.0,
+        focus_cursor=MainFocus(RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)),
+        move_mode_slot=None,
+    )
+    rows = build_inspector_rows(view, "project", frozenset())
+    group = next(row for row in rows if row.is_group)
+    field = next(row for row in rows if not row.is_group and row.command_id is None)
+    focus = ShellFocusState(
+        region=ShellRegion.INSPECTOR,
+        selected_id="project",
+        inspector_cursor=field.descriptor,
+    )
+    overlay = _Overlay()
+    overlay.visibility = 1.0
+    menu = MenuBarState()
+    controls = _shell_controls()
+    controls.build_view_state = lambda **_kwargs: None
+    controls.focus_cursor = None
+    controls.shell_focus = focus
+    controls.inspector = SimpleNamespace(
+        focus_row=lambda *_args, **_kwargs: None,
+        activate=lambda *_args, **_kwargs: None,
+    )
+    text_pushes: list[tuple[float, float, float, float]] = []
+    real_push = shell_host.imgui.push_style_color
+
+    def spy_push(idx, color):
+        if int(idx) == int(imgui.Col_.text):
+            text_pushes.append((color.x, color.y, color.z, color.w))
+        return real_push(idx, color)
+
+    with patch.object(imgui_host, "_gl_context_current", return_value=False):
+        host = _open_shell(overlay, menu, controls)
+    try:
+        host.imgui.display_size = (1280, 720)
+        height = shell_host.menu_bar_height_px()
+        host.set_layout(ShellLayout.compute(1280, 720, height, height, 280))
+        host.process_event(_motion(4))
+        host._draw_navigator = lambda: None
+        seen: dict[str, list] = {}
+
+        def draw_inspector(_state) -> None:
+            start = len(text_pushes)
+            host._draw_inspector_row(view, group)
+            seen["group"] = list(text_pushes[start:])
+            start = len(text_pushes)
+            host._draw_inspector_row(view, field)
+            seen["field"] = list(text_pushes[start:])
+
+        host._draw_inspector = draw_inspector
+        with patch.object(shell_host.imgui, "push_style_color", spy_push):
+            _paint_shell(host, menu, CommandContext(), frames=1)
+            lists = _paint_shell(host, menu, CommandContext(), frames=1)
+        content = _content_lists(lists)
+        names = [draw_list._owner_name for draw_list in content]
+        inspector = content[names.index("##shell-inspector")]
+        colors = {int(vtx.col) for vtx in inspector.vtx_buffer}
+        focus_wash = _color_u32_alpha(HIGHLIGHT, FOCUS_WASH_ALPHA / 255.0)
+        selected_wash = _color_u32_alpha(HIGHLIGHT, SELECTED_WASH_ALPHA / 255.0)
+        old_wash = _color_u32_alpha(HIGHLIGHT, FOCUS_ROW_BG_ALPHA / 255.0)
+        has_focus_wash = focus_wash in colors
+        has_selected_wash = selected_wash in colors
+        has_old_wash = old_wash in colors
+        has_value = _color_u32(VALUE) in colors
+        highlight = (
+            HIGHLIGHT[0] / 255.0,
+            HIGHLIGHT[1] / 255.0,
+            HIGHLIGHT[2] / 255.0,
+            1.0,
+        )
+        label = (
+            LABEL[0] / 255.0,
+            LABEL[1] / 255.0,
+            LABEL[2] / 255.0,
+            1.0,
+        )
+        field_push = list(seen["field"])
+        group_push = list(seen["group"])
+        focus.inspector_cursor = group.descriptor
+        text_pushes.clear()
+        with patch.object(shell_host.imgui, "push_style_color", spy_push):
+            _paint_shell(host, menu, CommandContext(), frames=1)
+        focused_group_push = list(seen["group"])
+        unfocused_field = list(seen["field"])
+        del lists, content, colors
+    finally:
+        host.imgui.destroy()
+    assert group_push == []
+    assert len(field_push) == 1
+    assert field_push[0] == pytest.approx(highlight)
+    assert has_focus_wash
+    assert not has_selected_wash
+    assert not has_old_wash
+    assert has_value
+    assert focused_group_push == []
+    assert len(unfocused_field) == 1
+    assert unfocused_field[0] == pytest.approx(label)
 
 
 class _Overlay:

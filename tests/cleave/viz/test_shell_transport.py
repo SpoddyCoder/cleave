@@ -9,7 +9,7 @@ from cleave.viz.shell_host import (
     transport_content_pad_y,
     transport_parts,
 )
-from cleave.viz.theme import ACTION, LABEL, VALUE
+from cleave.viz.theme import ACTION, MUTED, VALUE
 
 
 def test_transport_parts_while_playing() -> None:
@@ -24,9 +24,9 @@ def test_transport_parts_while_playing() -> None:
     assert transport_parts(readout) == [
         ("\u25b6 playing", ACTION),
         ("01:23 / 04:12", VALUE),
-        ("bar 34", LABEL),
-        ("60 fps", LABEL),
-        ("rec off", LABEL),
+        ("bar 34", MUTED),
+        ("60 fps", MUTED),
+        ("rec off", MUTED),
     ]
 
 
@@ -42,9 +42,9 @@ def test_transport_parts_while_paused_and_recording() -> None:
     assert transport_parts(readout) == [
         ("\u275a\u275a pause", ACTION),
         ("00:00 / 00:00", VALUE),
-        ("bar —", LABEL),
-        ("— fps", LABEL),
-        ("rec on", LABEL),
+        ("bar —", MUTED),
+        ("— fps", MUTED),
+        ("rec on", MUTED),
     ]
 
 

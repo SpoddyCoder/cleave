@@ -31,7 +31,7 @@ from cleave.viz.theme import (
     BORDER_WIDTH,
     DISABLED,
     ERROR_NOTIFICATION,
-    FOCUS_ROW_BG_ALPHA,
+    FOCUS_WASH_ALPHA,
     HIGHLIGHT,
     LABEL,
     PRESET_ICON,
@@ -51,7 +51,7 @@ _PROJECT_SUFFIX = "  [project]"
 _DIRECTORY_SUFFIX = "/"
 _SHORTCUT_SEPARATOR = "   "
 _SHORTCUT_HIGHLIGHT_PAD = 4
-_WASH_ALPHA = FOCUS_ROW_BG_ALPHA / 255.0
+_WASH_ALPHA = FOCUS_WASH_ALPHA / 255.0
 
 
 class PickerPointerKind(Enum):

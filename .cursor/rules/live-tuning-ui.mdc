@@ -41,7 +41,7 @@ Exception: timeline preset parameters live as child value rows in the timeline p
 
 ## Typography
 
-Colors live in `cleave/viz/theme.py`. Use existing roles (`LABEL`, `VALUE`, `ACTION`, `DISABLED`, `LOCKED`) plus the accent constants already there. Do not invent a new color without adding a theme constant.
+Colors live in `cleave/viz/theme.py`. Use existing roles (`LABEL`, `VALUE`, `ACTION`, `DISABLED`, `MUTED`, `LOCKED`) plus the accent constants already there. Do not invent a new color without adding a theme constant.
 
 Label+value rows: prefix in `LABEL`, value in the row value color. Expand arrows use the value role. Exceptions (single-color action rows, settings and project headers, transport, notifications, modals) are deliberate; match nearby rows.
 

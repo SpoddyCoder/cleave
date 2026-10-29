@@ -56,16 +56,16 @@ from cleave.viz.shell_layout import (
 )
 from cleave.viz.theme import (
     ACTION,
+    BACKGROUND,
     BORDER_COLOR,
     DISABLED,
-    FOCUS_ROW_BG_ALPHA,
+    FOCUS_WASH_ALPHA,
     HIGHLIGHT,
-    HOVER,
-    HOVER_BG_ALPHA,
     LABEL,
-    MENU_ITEM_HOVER_BG_ALPHA,
     LOCK_ICON,
+    MUTED,
     NAVIGATOR_BORDER,
+    SELECTED_WASH_ALPHA,
     TRANSPORT_RULE,
     VALUE,
     tuning_ui_metrics,
@@ -127,7 +127,7 @@ def transport_parts(readout: TransportReadout) -> list[tuple[str, tuple[int, int
     """Play state, clock, and meters for the transport bar.
 
     Play and pause use the action role. The clock uses the value role.
-    Bar, frame rate, and record state use the label role.
+    Bar, frame rate, and record state use the muted role.
     """
     icon = PAUSE_GLYPH if readout.paused else PLAY_GLYPH
     word = "pause" if readout.paused else "playing"
@@ -139,9 +139,9 @@ def transport_parts(readout: TransportReadout) -> list[tuple[str, tuple[int, int
     return [
         (f"{icon} {word}", ACTION),
         (clock, VALUE),
-        (f"bar {readout.bar_text}", LABEL),
-        (f"{fps} fps", LABEL),
-        (recording, LABEL),
+        (f"bar {readout.bar_text}", MUTED),
+        (f"{fps} fps", MUTED),
+        (recording, MUTED),
     ]
 
 
@@ -390,7 +390,7 @@ def _draw_item_suffix(text: str, color: imgui.ImVec4) -> None:
     _draw_aligned_parts([(text, color)])
 
 
-def _draw_mnemonic_underline(label: str) -> None:
+def _draw_mnemonic_underline(label: str, color: tuple[int, int, int]) -> None:
     """1px underline under the first letter of a top-menu button."""
     letter = label[:1]
     if not letter:
@@ -400,11 +400,11 @@ def _draw_mnemonic_underline(label: str) -> None:
     letter_size = imgui.calc_text_size(letter)
     x0 = rect_min.x + pad.x
     y = rect_min.y + pad.y + letter_size.y
-    color = imgui.get_color_u32(rgba(LABEL))
+    packed = imgui.get_color_u32(rgba(color))
     imgui.get_window_draw_list().add_rect_filled(
         imgui.ImVec2(x0, y),
         imgui.ImVec2(x0 + letter_size.x, y + 1.0),
-        color,
+        packed,
     )
 
 
@@ -571,33 +571,49 @@ def _draw_item_focus_ring() -> None:
     )
 
 
-def selectable_wash(selected: bool) -> tuple[imgui.ImVec4, imgui.ImVec4]:
-    """Hovered and active header colors for one shell selectable.
+def selectable_wash(*, inspector: bool) -> tuple[imgui.ImVec4, imgui.ImVec4]:
+    """Header fill for a selected navigator row or a focused inspector row.
 
-    A selected row keeps the highlight wash. An unselected row uses the hover
-    wash the ImGui theme assigns to ``header_hovered`` and ``header_active``.
+    Both values are that fill, pushed on the header slots so the row keeps it
+    under the pointer. Unselected hover stays the theme table.
     """
-    if selected:
-        rgb: tuple[int, int, int] = HIGHLIGHT
-        alpha = FOCUS_ROW_BG_ALPHA / 255.0
-    else:
-        rgb = HOVER
-        alpha = HOVER_BG_ALPHA / 255.0
-    return rgba(rgb, alpha), rgba(rgb, alpha)
+    alpha = (FOCUS_WASH_ALPHA if inspector else SELECTED_WASH_ALPHA) / 255.0
+    fill = rgba(HIGHLIGHT, alpha)
+    return fill, fill
 
 
 @contextmanager
-def _selected_header_wash(selected: bool) -> Iterator[None]:
-    """Push the highlight header wash for a selected selectable, then pop."""
+def _selected_header_wash(selected: bool, *, inspector: bool = False) -> Iterator[None]:
+    """Push a selected-row header fill, then pop.
+
+    Navigator selection uses the selected wash. Inspector focus uses the focus
+    wash. Hover on an unselected row is the theme table, not a second push.
+    """
     if selected:
-        hovered, active = selectable_wash(True)
+        hovered, active = selectable_wash(inspector=inspector)
+        imgui.push_style_color(imgui.Col_.header, hovered)
         imgui.push_style_color(imgui.Col_.header_hovered, hovered)
         imgui.push_style_color(imgui.Col_.header_active, active)
     try:
         yield
     finally:
         if selected:
-            imgui.pop_style_color(2)
+            imgui.pop_style_color(3)
+
+
+@contextmanager
+def _opaque_highlight_fill(active: bool) -> Iterator[None]:
+    """Push an opaque highlight header fill for an open menu title or row."""
+    if active:
+        fill = rgba(HIGHLIGHT, 1.0)
+        imgui.push_style_color(imgui.Col_.header, fill)
+        imgui.push_style_color(imgui.Col_.header_hovered, fill)
+        imgui.push_style_color(imgui.Col_.header_active, fill)
+    try:
+        yield
+    finally:
+        if active:
+            imgui.pop_style_color(3)
 
 
 class ShellHost:
@@ -1023,6 +1039,7 @@ class ShellHost:
                 "##shell-inspector",
                 _seat_panel(layout.inspector, seat),
                 active=stop is CycleStop.INSPECTOR,
+                idle_border=NAVIGATOR_BORDER,
                 body=lambda: self._draw_inspector(state),
                 scrollable=True,
             )
@@ -1110,6 +1127,7 @@ class ShellHost:
             "##shell-help",
             _seat_panel(rect, seat),
             active=active,
+            idle_border=NAVIGATOR_BORDER,
             body=body,
             scrollable=True,
         )
@@ -1135,7 +1153,7 @@ class ShellHost:
         avail = imgui.get_window_width()
         pad = imgui.get_style().window_padding.x
         imgui.same_line(max(imgui.get_cursor_pos_x(), avail - width - pad))
-        imgui.text(scope)
+        imgui.text_colored(rgba(HIGHLIGHT), scope)
         origin = imgui.get_window_pos()
         size = imgui.get_window_size()
         _stroke_h_rule(
@@ -1164,6 +1182,11 @@ class ShellHost:
             imgui.indent(indent)
         try:
             selected = node.id == focus.selected_id
+            ring = (
+                selected
+                and focus.region is ShellRegion.NAVIGATOR
+                and not self._menu_state.focused
+            )
             twisty_clicked = False
             with _selected_header_wash(selected):
                 twisty = navigator_twisty(node, focus.nav_expanded)
@@ -1176,13 +1199,19 @@ class ShellHost:
                         imgui.ImVec2(width, 0.0),
                     )
                     imgui.same_line()
-                text_pos = imgui.get_cursor_screen_pos()
-                clicked, _selected = imgui.selectable(
-                    f"{node.label}##nav-{node.id}",
-                    selected,
-                )
                 if selected:
-                    _draw_item_focus_ring()
+                    imgui.push_style_color(imgui.Col_.text, rgba(VALUE))
+                try:
+                    text_pos = imgui.get_cursor_screen_pos()
+                    clicked, _selected = imgui.selectable(
+                        f"{node.label}##nav-{node.id}",
+                        selected,
+                    )
+                    if ring:
+                        _draw_item_focus_ring()
+                finally:
+                    if selected:
+                        imgui.pop_style_color()
             mark = navigator_lock_mark(node)
             if mark is not None:
                 _draw_nav_lock_mark(text_pos, node.label, mark)
@@ -1263,7 +1292,7 @@ class ShellHost:
                 glyph = inspector_group_glyph(
                     inspector_group_is_open(key, focus.collapsed, focus.opened)
                 )
-                with _selected_header_wash(selected):
+                with _selected_header_wash(selected, inspector=True):
                     clicked, _selected = imgui.selectable(
                         f"{glyph} {label}{inspector_selectable_id(desc, group=True)}",
                         selected,
@@ -1275,9 +1304,11 @@ class ShellHost:
                     self._controls.inspector.activate(row)
                 return
             label_color, value_color = inspector_field_colors(state, desc)
+            if selected and label_color == LABEL:
+                label_color = HIGHLIGHT
             imgui.push_style_color(imgui.Col_.text, rgba(label_color))
             try:
-                with _selected_header_wash(selected):
+                with _selected_header_wash(selected, inspector=True):
                     clicked, _selected = imgui.selectable(
                         f"{label}{inspector_selectable_id(desc, group=False)}",
                         selected,
@@ -1366,7 +1397,7 @@ class ShellHost:
         color = ACTION if enabled else DISABLED
         imgui.push_style_color(imgui.Col_.text, rgba(color))
         try:
-            with _selected_header_wash(selected):
+            with _selected_header_wash(selected, inspector=True):
                 clicked, _selected = imgui.selectable(
                     f"{command.label}##cmd-{row.command_id}",
                     selected,
@@ -1429,10 +1460,9 @@ class ShellHost:
     ) -> tuple[float | None, dict[int, tuple[float, float]], tuple[Any, ...]]:
         menus = menus_for_session(self._controls.session)
         anchors: dict[int, tuple[float, float]] = {}
-        highlight = rgba(HIGHLIGHT, FOCUS_ROW_BG_ALPHA / 255.0)
         imgui.push_style_color(imgui.Col_.text, rgba(LABEL))
-        # The bar's own border is covered by opaque menu buttons except where
-        # the highlight is translucent. The white rule is drawn later, on top.
+        # The bar's own border is covered by the menu titles. The white rule
+        # is drawn later, on top.
         imgui.push_style_var(imgui.StyleVar_.window_border_size, 0.0)
         bar_open = imgui.begin_main_menu_bar()
         rule_y: float | None = None
@@ -1441,16 +1471,28 @@ class ShellHost:
                 bar_bottom = imgui.get_window_pos().y + imgui.get_window_height()
                 self._menu_bar_height_px = max(1, int(round(bar_bottom)))
                 rule_y = bar_bottom - 1.0
+                pad_x = imgui.get_style().frame_padding.x
                 for index, menu in enumerate(menus):
                     active = menu_state.focused and menu_state.menu_index == index
-                    if active:
-                        imgui.push_style_color(imgui.Col_.button, highlight)
-                        imgui.push_style_color(imgui.Col_.button_hovered, highlight)
-                        imgui.push_style_color(imgui.Col_.button_active, highlight)
-                    clicked = imgui.button(menu.label)
-                    if active:
-                        imgui.pop_style_color(3)
-                    _draw_mnemonic_underline(menu.label)
+                    width = imgui.calc_text_size(menu.label).x + pad_x * 2.0
+                    # Open title stays opaque highlight, including under the
+                    # pointer. Idle hover is the theme header wash.
+                    with _opaque_highlight_fill(active):
+                        if active:
+                            imgui.push_style_color(
+                                imgui.Col_.text, rgba(BACKGROUND)
+                            )
+                        clicked, _selected = imgui.selectable(
+                            menu.label,
+                            active,
+                            0,
+                            imgui.ImVec2(width, 0.0),
+                        )
+                        if active:
+                            imgui.pop_style_color()
+                    _draw_mnemonic_underline(
+                        menu.label, BACKGROUND if active else LABEL
+                    )
                     rect_min = imgui.get_item_rect_min()
                     rect_max = imgui.get_item_rect_max()
                     anchors[index] = (rect_min.x, rect_max.y)
@@ -1518,57 +1560,67 @@ class ShellHost:
                 shortcut_w = max(shortcut_w, imgui.calc_text_size(item.shortcut).x)
         row_w = pad_x * 2.0 + check_w + gap + label_w + gap + shortcut_w + pad_x
         draw_list = imgui.get_window_draw_list()
-        hover = rgba(HOVER, MENU_ITEM_HOVER_BG_ALPHA / 255.0)
-        imgui.push_style_color(imgui.Col_.header_hovered, hover)
-        imgui.push_style_color(imgui.Col_.header_active, hover)
-        try:
-            for item_index, item in enumerate(menu.items):
-                if isinstance(item, MenuSeparator):
-                    imgui.separator()
-                    continue
-                enabled = bool(item.enabled(command_ctx))
-                highlighted = menu_state.item_index == item_index
-                pos = imgui.get_cursor_screen_pos()
-                with _selected_header_wash(highlighted):
-                    clicked, _selected = imgui.selectable(
-                        f"##{item.id}",
-                        highlighted,
-                        0,
-                        imgui.ImVec2(row_w, 0.0),
-                    )
-                color = _row_color(item, command_ctx, enabled)
-                packed = imgui.get_color_u32(color)
-                text_y = pos.y + pad_y
-                text_x = pos.x + pad_x
-                if (
-                    item.kind == "check"
-                    and item.checked is not None
-                    and item.checked(command_ctx)
-                ):
-                    draw_list.add_text(imgui.ImVec2(text_x, text_y), packed, "✓")
-                draw_list.add_text(
-                    imgui.ImVec2(text_x + check_w + gap, text_y),
-                    packed,
-                    item.label,
+        for item_index, item in enumerate(menu.items):
+            if isinstance(item, MenuSeparator):
+                imgui.separator()
+                continue
+            enabled = bool(item.enabled(command_ctx))
+            highlighted = menu_state.item_index == item_index
+            pos = imgui.get_cursor_screen_pos()
+            # Disabled skips the hover wash. The keyboard row stays selectable
+            # so its opaque fill still paints.
+            flags = int(
+                imgui.SelectableFlags_.disabled
+                if not enabled and not highlighted
+                else imgui.SelectableFlags_.none
+            )
+            with _opaque_highlight_fill(highlighted):
+                clicked, _selected = imgui.selectable(
+                    f"##{item.id}",
+                    highlighted,
+                    flags,
+                    imgui.ImVec2(row_w, 0.0),
                 )
-                if item.shortcut:
-                    shortcut_width = imgui.calc_text_size(item.shortcut).x
-                    draw_list.add_text(
-                        imgui.ImVec2(pos.x + row_w - pad_x - shortcut_width, text_y),
-                        packed,
-                        item.shortcut,
-                    )
-                if clicked:
-                    hit = True
-                    menu_state.click_item(
-                        menu_index,
-                        item_index,
-                        menus,
-                        command_ctx,
-                        self._controls,
-                    )
-        finally:
-            imgui.pop_style_color(2)
+            if highlighted:
+                ink = rgba(BACKGROUND)
+                label_color = check_color = shortcut_color = ink
+            else:
+                label_color = _row_color(item, command_ctx, enabled)
+                check_color = rgba(ACTION)
+                shortcut_color = rgba(MUTED)
+            text_y = pos.y + pad_y
+            text_x = pos.x + pad_x
+            if (
+                item.kind == "check"
+                and item.checked is not None
+                and item.checked(command_ctx)
+            ):
+                draw_list.add_text(
+                    imgui.ImVec2(text_x, text_y),
+                    imgui.get_color_u32(check_color),
+                    "✓",
+                )
+            draw_list.add_text(
+                imgui.ImVec2(text_x + check_w + gap, text_y),
+                imgui.get_color_u32(label_color),
+                item.label,
+            )
+            if item.shortcut:
+                shortcut_width = imgui.calc_text_size(item.shortcut).x
+                draw_list.add_text(
+                    imgui.ImVec2(pos.x + row_w - pad_x - shortcut_width, text_y),
+                    imgui.get_color_u32(shortcut_color),
+                    item.shortcut,
+                )
+            if clicked:
+                hit = True
+                menu_state.click_item(
+                    menu_index,
+                    item_index,
+                    menus,
+                    command_ctx,
+                    self._controls,
+                )
         return hit
 
 

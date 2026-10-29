@@ -52,12 +52,6 @@ def _imgui():
     return imgui_mod
 
 
-def _rgba(rgb: tuple[int, int, int], alpha: float = 1.0) -> imgui.ImVec4:
-    return _imgui().ImVec4(
-        rgb[0] / 255.0, rgb[1] / 255.0, rgb[2] / 255.0, alpha
-    )
-
-
 @functools.cache
 def _loading_flags() -> int:
     imgui = _imgui()
@@ -190,8 +184,12 @@ class _ImGuiTextSize:
 
 
 def _packed(role: tuple[int, int, int]) -> int:
+    # imgui_theme imports imgui_bundle, whose package init loads matplotlib
+    # when that package is installed. Keep it off the play-path import graph.
+    from cleave.viz.imgui_theme import rgba
+
     imgui = _imgui()
-    return int(imgui.get_color_u32(_rgba(role)))
+    return int(imgui.get_color_u32(rgba(role)))
 
 
 def _style_color(slot: imgui.Col_) -> imgui.ImVec4:

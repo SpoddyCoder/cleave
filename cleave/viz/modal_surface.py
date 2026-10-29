@@ -47,7 +47,7 @@ from cleave.viz.theme import (
     BORDER_COLOR,
     BORDER_WIDTH,
     DISABLED,
-    FOCUS_ROW_BG_ALPHA,
+    FOCUS_WASH_ALPHA,
     HIGHLIGHT,
     LABEL,
     VALUE,
@@ -68,7 +68,7 @@ _MODAL_FLAGS = (
     | int(imgui.WindowFlags_.no_bring_to_front_on_focus)
     | int(imgui.WindowFlags_.no_scrollbar)
 )
-_WASH_ALPHA = FOCUS_ROW_BG_ALPHA / 255.0
+_WASH_ALPHA = FOCUS_WASH_ALPHA / 255.0
 
 
 class ModalPointerKind(Enum):

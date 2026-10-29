@@ -16,7 +16,6 @@ from cleave.viz.panel_notification import (
 )
 from cleave.viz.shell_layout import ShellLayout
 from cleave.viz.theme import (
-    BACKGROUND,
     ERROR_NOTIFICATION,
     HIGHLIGHT,
     NOTIFICATION_ON_FILL,
@@ -168,11 +167,8 @@ class ToastSurface:
             imgui.ImVec2(float(width), float(height)), imgui.Cond_.always
         )
         pushed_vars = 0
-        pushed_colors = 0
         begun = False
         try:
-            imgui.push_style_color(imgui.Col_.window_bg, rgba(BACKGROUND))
-            pushed_colors += 1
             imgui.push_style_var(
                 imgui.StyleVar_.window_padding, imgui.ImVec2(0.0, 0.0)
             )
@@ -194,8 +190,6 @@ class ToastSurface:
             finally:
                 if pushed_vars:
                     imgui.pop_style_var(pushed_vars)
-                if pushed_colors:
-                    imgui.pop_style_color(pushed_colors)
 
     def _place(self, geometry: ToastGeometry) -> None:
         pos = imgui.get_window_pos()

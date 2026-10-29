@@ -1,8 +1,4 @@
-"""Theme roles applied to ImGui once per frame.
-
-Shell widgets still push a few colours at draw time. Those stay until the
-colour audit replaces them with this table.
-"""
+"""Theme roles applied to ImGui once per frame."""
 
 from __future__ import annotations
 
@@ -17,10 +13,13 @@ from cleave.viz.theme import (
     HOVER,
     HOVER_BG_ALPHA,
     MODAL_SCRIM_ALPHA,
+    SELECTED_WASH_ALPHA,
+    TRANSPORT_RULE,
     VALUE,
 )
 
 _HIGHLIGHT_WASH = FOCUS_ROW_BG_ALPHA / 255.0
+_SELECTED_WASH = SELECTED_WASH_ALPHA / 255.0
 _HOVER_WASH = HOVER_BG_ALPHA / 255.0
 # Same black scrim as the pygame modal underlay.
 _SCRIM = MODAL_SCRIM_ALPHA / 255.0
@@ -33,7 +32,7 @@ IMGUI_COLOR_ROLES: dict[imgui.Col_, tuple[tuple[int, int, int], float]] = {
     imgui.Col_.popup_bg: (BACKGROUND, 1.0),
     imgui.Col_.menu_bar_bg: (BACKGROUND, 1.0),
     imgui.Col_.border: (BORDER_COLOR, 1.0),
-    imgui.Col_.header: (HIGHLIGHT, _HIGHLIGHT_WASH),
+    imgui.Col_.header: (HIGHLIGHT, _SELECTED_WASH),
     imgui.Col_.header_hovered: (HOVER, _HOVER_WASH),
     imgui.Col_.header_active: (HOVER, _HOVER_WASH),
     imgui.Col_.button: (BACKGROUND, 1.0),
@@ -44,7 +43,7 @@ IMGUI_COLOR_ROLES: dict[imgui.Col_, tuple[tuple[int, int, int], float]] = {
     imgui.Col_.title_bg_active: (BACKGROUND, 1.0),
     imgui.Col_.title_bg_collapsed: (BACKGROUND, 1.0),
     imgui.Col_.check_mark: (VALUE, 1.0),
-    imgui.Col_.separator: (DISABLED, 1.0),
+    imgui.Col_.separator: (TRANSPORT_RULE, 1.0),
     imgui.Col_.text_selected_bg: (HIGHLIGHT, _HIGHLIGHT_WASH),
     imgui.Col_.nav_highlight: (HIGHLIGHT, 1.0),
     imgui.Col_.modal_window_dim_bg: (BACKGROUND, _SCRIM),

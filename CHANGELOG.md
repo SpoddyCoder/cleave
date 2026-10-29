@@ -11,6 +11,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- Menu highlight, navigator and inspector focus, and transport readouts follow the same colour roles, with muted secondary transport text and black text on the open menu highlight.
 - The starter-pack prompt and the launch error panels draw in the editor UI.
 - The launch file picker draws in the editor UI and takes the mouse: click a row, double-click to open, click a shortcut, and wheel to scroll.
 - Loading progress draws in the editor UI instead of a pygame overlay.

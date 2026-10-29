@@ -5,6 +5,7 @@ Typography roles for the live tuning overlay:
   VALUE    — white text for values and state indicators (default)
   ACTION   — dark mint text for action rows and staged action-parameter labels
   DISABLED — dimmed text when a row or control is inactive
+  MUTED    — muted blue-grey text (#9ba6bc)
   LOCKED   — tinted text for locked sub-rows that cannot be edited
 
 Accent colors for modes and icons (not label/value roles):
@@ -160,6 +161,7 @@ HOVER: tuple[int, int, int] = (170, 210, 255)
 VALUE: tuple[int, int, int] = (255, 255, 255)
 ACTION: tuple[int, int, int] = (80, 190, 125)
 DISABLED: tuple[int, int, int] = (140, 140, 140)
+MUTED: tuple[int, int, int] = (155, 166, 188)
 HIGHLIGHT: tuple[int, int, int] = (255, 235, 130)
 ERROR_NOTIFICATION: tuple[int, int, int] = (255, 140, 140)
 NOTIFICATION_ON_FILL: tuple[int, int, int] = (0, 0, 0)
@@ -176,9 +178,11 @@ ARMED_BG: tuple[int, int, int] = SOLO_BG
 OVERRIDE_GLYPH: tuple[int, int, int] = (0, 0, 0)
 OVERRIDE_GLYPH_OFF: tuple[int, int, int] = DISABLED
 FOCUS_ROW_BG_ALPHA: int = 130
-HOVER_BG_ALPHA: int = 28
-# Menu rows sit on a black popup. The shell hover wash is too faint there.
-MENU_ITEM_HOVER_BG_ALPHA: int = 140
+HOVER_BG_ALPHA: int = 36
+# Selected-navigator highlight wash (highlight at 0.16).
+SELECTED_WASH_ALPHA: int = 41
+# Focused-inspector-row highlight wash (highlight at 0.10).
+FOCUS_WASH_ALPHA: int = 26
 REC_BG: tuple[int, int, int] = (220, 0, 0)
 TIMELINE_BAR_ON: tuple[int, int, int] = (200, 225, 255)
 BAR_GRID: tuple[int, int, int] = (70, 95, 130)

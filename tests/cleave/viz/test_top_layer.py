@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import ast
 from collections.abc import Iterator
 from contextlib import contextmanager
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -192,7 +194,13 @@ def test_apply_imgui_theme_uses_the_role_table() -> None:
     with _host():
         apply_imgui_theme()
         style = imgui.get_style()
-        for slot in (imgui.Col_.text, imgui.Col_.header, imgui.Col_.modal_window_dim_bg):
+        for slot in (
+            imgui.Col_.text,
+            imgui.Col_.header,
+            imgui.Col_.header_hovered,
+            imgui.Col_.separator,
+            imgui.Col_.modal_window_dim_bg,
+        ):
             role, alpha = IMGUI_COLOR_ROLES[slot]
             got = style.color_(slot)
             expect = rgba(role, alpha)
@@ -200,3 +208,41 @@ def test_apply_imgui_theme_uses_the_role_table() -> None:
             assert got.y == pytest.approx(expect.y)
             assert got.z == pytest.approx(expect.z)
             assert got.w == pytest.approx(expect.w)
+
+
+_IMGUI_DRAW_MODULES = (
+    "shell_host.py",
+    "modal_surface.py",
+    "toast_surface.py",
+    "help_column.py",
+    "file_picker_surface.py",
+    "loading.py",
+    "top_layer.py",
+    "imgui_theme.py",
+)
+
+
+def _raw_rgb_tuples(source: str) -> list[str]:
+    """Three-int tuple literals. Comments and hex prose are not tuples."""
+    found: list[str] = []
+    tree = ast.parse(source)
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Tuple) or len(node.elts) != 3:
+            continue
+        if not all(
+            isinstance(elt, ast.Constant) and type(elt.value) is int
+            for elt in node.elts
+        ):
+            continue
+        text = ast.get_source_segment(source, node) or ""
+        found.append(f"{node.lineno}: {text}")
+    return found
+
+
+def test_imgui_theme_draw_modules_have_no_raw_rgb_tuples() -> None:
+    viz = Path(__file__).resolve().parents[3] / "cleave" / "viz"
+    offenders: list[str] = []
+    for name in _IMGUI_DRAW_MODULES:
+        source = (viz / name).read_text(encoding="utf-8")
+        offenders.extend(f"{name}:{hit}" for hit in _raw_rgb_tuples(source))
+    assert offenders == []

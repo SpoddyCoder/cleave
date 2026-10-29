@@ -32,7 +32,7 @@ from cleave.viz.shell_host import (
     selectable_wash,
     selection_after_nav_toggle,
 )
-from cleave.viz.theme import FOCUS_ROW_BG_ALPHA, HIGHLIGHT, HOVER, HOVER_BG_ALPHA
+from cleave.viz.theme import FOCUS_WASH_ALPHA, HIGHLIGHT, SELECTED_WASH_ALPHA
 from tests.cleave.viz.test_controls import _make_controls
 
 
@@ -73,27 +73,27 @@ def _wash_channels(color) -> tuple[float, float, float, float]:
     return (color.x, color.y, color.z, color.w)
 
 
-def test_selected_row_keeps_highlight_wash_when_hovered() -> None:
-    highlight = (
+def test_selectable_wash_splits_navigator_and_inspector() -> None:
+    navigator = (
         HIGHLIGHT[0] / 255.0,
         HIGHLIGHT[1] / 255.0,
         HIGHLIGHT[2] / 255.0,
-        FOCUS_ROW_BG_ALPHA / 255.0,
+        SELECTED_WASH_ALPHA / 255.0,
     )
-    hover = (
-        HOVER[0] / 255.0,
-        HOVER[1] / 255.0,
-        HOVER[2] / 255.0,
-        HOVER_BG_ALPHA / 255.0,
+    inspector = (
+        HIGHLIGHT[0] / 255.0,
+        HIGHLIGHT[1] / 255.0,
+        HIGHLIGHT[2] / 255.0,
+        FOCUS_WASH_ALPHA / 255.0,
     )
 
-    hovered, active = selectable_wash(True)
-    assert _wash_channels(hovered) == pytest.approx(highlight)
-    assert _wash_channels(active) == pytest.approx(highlight)
+    hovered, active = selectable_wash(inspector=False)
+    assert _wash_channels(hovered) == pytest.approx(navigator)
+    assert _wash_channels(active) == pytest.approx(navigator)
 
-    hovered, active = selectable_wash(False)
-    assert _wash_channels(hovered) == pytest.approx(hover)
-    assert _wash_channels(active) == pytest.approx(hover)
+    hovered, active = selectable_wash(inspector=True)
+    assert _wash_channels(hovered) == pytest.approx(inspector)
+    assert _wash_channels(active) == pytest.approx(inspector)
 
 
 def test_layer_breadcrumb_uses_navigator_label() -> None:
