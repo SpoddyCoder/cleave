@@ -584,7 +584,7 @@ def test_open_menu_paints_over_the_focus_ring() -> None:
 
 
 def test_menu_underline_and_popup_row_are_snug() -> None:
-    """The mnemonic sits one pixel under the letter, and the row fill is centered."""
+    """The mnemonic sits two pixels under the letter, and the row fill is centered."""
     from imgui_bundle import imgui
 
     from cleave.viz import imgui_host
@@ -612,8 +612,114 @@ def test_menu_underline_and_popup_row_are_snug() -> None:
         row_gap_above, row_gap_below = _popup_row_ink_gaps(popup, ink, fill)
     finally:
         host.imgui.destroy()
-    assert underline_gap == pytest.approx(1.0, abs=0.51)
+    assert underline_gap == pytest.approx(2.0, abs=0.51)
     assert row_gap_above == pytest.approx(row_gap_below, abs=0.51)
+
+
+def _row_fill(draw_list: object, y: float) -> int | None:
+    """Packed colour of the row-sized translucent quad covering *y*."""
+    buf = draw_list.vtx_buffer
+    idx = draw_list.idx_buffer
+    found: int | None = None
+    for i in range(0, len(idx), 6):
+        ids = [int(idx[i + k]) for k in range(4)]
+        color = int(buf[ids[0]].col)
+        alpha = (color >> 24) & 255
+        if alpha == 0 or alpha == 255:
+            continue
+        xs = [float(buf[j].pos.x) for j in ids]
+        ys = [float(buf[j].pos.y) for j in ids]
+        if max(xs) - min(xs) < 20 or not 8 <= max(ys) - min(ys) <= 40:
+            continue
+        if min(ys) <= y <= max(ys):
+            found = color
+    return found
+
+
+def test_popup_hover_matches_inspector_and_navigator() -> None:
+    """Popup mouse-hover packs the same wash as an unselected panel row.
+
+    That wash is the theme header hover. The gold selection wash is only for
+    a selected navigator row, and the opaque highlight is only the keyboard row.
+    """
+    from cleave.viz import imgui_host, shell_host
+    from cleave.viz.shell_focus import ShellFocusState
+    from cleave.viz.shell_layout import ShellLayout
+    from cleave.viz.theme import HIGHLIGHT, HOVER, HOVER_BG_ALPHA, SELECTED_WASH_ALPHA
+
+    overlay = _Overlay()
+    overlay.visibility = 1.0
+    menu = MenuBarState()
+    controls = _shell_controls()
+    controls.build_view_state = lambda **_kwargs: None
+    controls.focus_cursor = None
+    controls.shell_focus = ShellFocusState(
+        region=ShellRegion.NAVIGATOR, selected_id="missing"
+    )
+    controls.navigator = SimpleNamespace(select=lambda *_args, **_kwargs: None)
+    controls.settings = SimpleNamespace(
+        set_shell_column_widths=lambda *_args, **_kwargs: None
+    )
+
+    def draw_nav() -> None:
+        from imgui_bundle import imgui
+
+        imgui.selectable("Nav row", False)
+
+    def draw_inspector(_state: object) -> None:
+        from imgui_bundle import imgui
+
+        imgui.selectable("Inspector row", False)
+
+    with patch.object(imgui_host, "_gl_context_current", return_value=False):
+        host = _open_shell(overlay, menu, controls)
+    host.imgui.display_size = (1280, 720)
+    host._draw_navigator = draw_nav
+    host._draw_inspector = draw_inspector
+    try:
+        height = shell_host.menu_bar_height_px()
+        host.set_layout(ShellLayout.compute(1280, 720, height, height, 280))
+        host.process_event(_motion(8))
+        _paint_shell(host, menu, CommandContext(), frames=1)
+        layout = host.layout
+        assert layout is not None
+        nx, ny, _nw, _nh = layout.navigator
+        nav_y = ny + 12
+        host.process_event(_at((nx + 40, nav_y), pygame.MOUSEMOTION))
+        lists = _paint_shell(host, menu, CommandContext(), frames=2)
+        nav = next(item for item in lists if item._owner_name == "##shell-navigator")
+        nav_fill = _row_fill(nav, nav_y)
+        ix, iy, _iw, _ih = layout.inspector
+        insp_y = iy + 12
+        host.process_event(_at((ix + 40, insp_y), pygame.MOUSEMOTION))
+        lists = _paint_shell(host, menu, CommandContext(), frames=2)
+        inspector = next(
+            item for item in lists if item._owner_name == "##shell-inspector"
+        )
+        inspector_fill = _row_fill(inspector, insp_y)
+        menu.click_top(0, MENUS)
+        _paint_shell(host, menu, CommandContext(), frames=2)
+        from imgui_bundle import imgui
+
+        lists = list(imgui.get_draw_data().cmd_lists)
+        popup = next(item for item in lists if item._owner_name == "##cleave-menu")
+        xs = [float(vtx.pos.x) for vtx in popup.vtx_buffer]
+        ys = [float(vtx.pos.y) for vtx in popup.vtx_buffer]
+        popup_y = int(min(ys) + 40)
+        host.process_event(
+            _at((int((min(xs) + max(xs)) / 2), popup_y), pygame.MOUSEMOTION)
+        )
+        lists = _paint_shell(host, menu, CommandContext(), frames=2)
+        popup = next(item for item in lists if item._owner_name == "##cleave-menu")
+        popup_fill = _row_fill(popup, popup_y)
+        theme_hover = _color_u32_alpha(HOVER, HOVER_BG_ALPHA / 255.0)
+        selection = _color_u32_alpha(HIGHLIGHT, SELECTED_WASH_ALPHA / 255.0)
+    finally:
+        host.imgui.destroy()
+    assert nav_fill == theme_hover
+    assert inspector_fill == theme_hover
+    assert popup_fill == nav_fill == inspector_fill
+    assert popup_fill != selection
 
 
 def _underline_gap(draw_list: object, ink: int) -> float:

@@ -405,15 +405,15 @@ def _selectable_label_origin() -> tuple[float, float]:
 
 
 def _draw_mnemonic_underline(label: str, color: tuple[int, int, int]) -> None:
-    """1px underline just under the ink of a top menu's first letter."""
+    """1px underline two pixels under the ink of a top menu's first letter."""
     letter = label[:1]
     if not letter:
         return
     origin_x, origin_y = _selectable_label_origin()
     glyph = imgui.get_font().find_glyph(ord(letter))
     letter_width = imgui.calc_text_size(letter).x
-    # One pixel under the glyph. The line box still has descent below that.
-    y = origin_y + glyph.y1 + 1.0
+    # Two pixels under the glyph. The line box still has descent below that.
+    y = origin_y + glyph.y1 + 2.0
     packed = imgui.get_color_u32(rgba(color))
     imgui.get_window_draw_list().add_rect_filled(
         imgui.ImVec2(origin_x, y),
