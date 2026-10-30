@@ -100,8 +100,7 @@ def test_toast_geometry_clamps_inside_a_narrow_visualiser(docked: bool) -> None:
         18,
         18,
         0,
-        nav_width=120,
-        insp_width=120,
+        insp_width=200,
         docked=docked,
     )
     measure = _FixedMeasure()

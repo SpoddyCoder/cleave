@@ -1,7 +1,9 @@
 """Menu command registry for the live editor.
 
-Static rows match the menu taxonomy. Layer jumps are built from a z-order
-of ``(slot, stem_label)`` pairs so stem names stay with the project.
+Static rows match the menu taxonomy. Layer-focus and editor-settings
+commands are shortcut-only: they are not menu rows. Layer focus is built
+from a z-order of ``(slot, stem_label)`` pairs so stem names stay with the
+project.
 """
 
 from __future__ import annotations
@@ -262,10 +264,6 @@ def _pattern_mask_menu_enabled(ctx: CommandContext) -> bool:
     return _render_block_menu_enabled(ctx.pattern_mask_locked, ctx.editor_mode)
 
 
-def _render_jump_enabled(ctx: CommandContext) -> bool:
-    return not is_preset_curation_mode(ctx.editor_mode)
-
-
 def _overlays_checked(ctx: CommandContext) -> bool:
     return ctx.overlays_enabled
 
@@ -305,10 +303,6 @@ def _timeline_actions_enabled(ctx: CommandContext) -> bool:
     return (
         not is_preset_curation_mode(ctx.editor_mode) and not ctx.timeline_locked
     )
-
-
-def _song_markers_enabled(ctx: CommandContext) -> bool:
-    return not is_preset_curation_mode(ctx.editor_mode)
 
 
 def _run_show_strip(controls: Any) -> None:
@@ -372,13 +366,6 @@ _QUIT = Command(
     run=_run_quit,
 )
 
-_PROJECT_SETTINGS = Command(
-    id="project.settings",
-    label="Project settings",
-    kind="jump",
-    enabled=_enabled,
-    run=_run_focus_node("project"),
-)
 _SEPARATE = _later("project.separate", "Separate stems...", "command")
 _RENDER = Command(
     id="project.render",
@@ -441,21 +428,6 @@ _PATTERN_MASK = Command(
     ),
     checked=_pattern_mask_checked,
 )
-_EDIT_OVERLAYS = Command(
-    id="render.edit_overlays",
-    label="Edit overlays",
-    kind="jump",
-    enabled=_render_jump_enabled,
-    run=_when_enabled(_render_jump_enabled, _run_focus_node("render.overlays")),
-)
-_EDIT_POST_FX = Command(
-    id="render.edit_post_fx",
-    label="Edit post-FX",
-    kind="jump",
-    enabled=_render_jump_enabled,
-    run=_when_enabled(_render_jump_enabled, _run_focus_node("render.post_fx")),
-)
-
 _SHOW_STRIP = Command(
     id="timeline.show_strip",
     label="Show timeline strip",
@@ -487,13 +459,6 @@ _SNAP = Command(
     run=_when_enabled(_timeline_actions_enabled, _run_snap_cues),
 )
 _UNDO_CUT = _later("timeline.undo_cut", "Undo last cut", "command")
-_SONG_MARKERS = Command(
-    id="timeline.song_markers",
-    label="Song markers",
-    kind="jump",
-    enabled=_song_markers_enabled,
-    run=_when_enabled(_song_markers_enabled, _run_focus_node("song_markers")),
-)
 
 _EDITOR = Command(
     id="settings.editor",
@@ -558,10 +523,28 @@ _SHORTCUT_KEYS: dict[str, tuple[int, bool]] = {
 }
 
 
+class MenuSet(tuple[Menu, ...]):
+    """Menus plus the layer z-order used by number-key shortcuts.
+
+    Layer-focus commands are not items of any menu.
+    """
+
+    layer_slots: tuple[tuple[str, str], ...]
+
+    def __new__(
+        cls,
+        menus: tuple[Menu, ...],
+        layer_slots: tuple[tuple[str, str], ...] = (),
+    ) -> MenuSet:
+        obj = super().__new__(cls, menus)
+        obj.layer_slots = layer_slots
+        return obj
+
+
 def layer_focus_commands(
     slots: Sequence[tuple[str, str]],
 ) -> tuple[Command, ...]:
-    """Layer jumps in z-order.
+    """Layer jumps in z-order. Not inserted into a menu.
 
     ``slots`` is ``(slot, stem_label)``. ``stem_label`` is shown as given.
     Shortcuts are ``1`` through ``8``; later rows keep no shortcut.
@@ -586,53 +569,35 @@ def layer_focus_commands(
 
 def build_menus(
     layer_slots: Sequence[tuple[str, str]] = (),
-) -> tuple[Menu, ...]:
-    """Full menu bar. Layer jumps occupy the slot between the two Layers separators."""
-    jumps = layer_focus_commands(layer_slots)
-    return (
-        Menu("File", (_OPEN, _SAVE, SEPARATOR, _QUIT)),
-        Menu(
-            "Project",
-            (
-                _PROJECT_SETTINGS,
-                SEPARATOR,
-                _SEPARATE,
-                _RENDER,
-                SEPARATOR,
-                _BACKUP,
-                _RESTORE,
+) -> MenuSet:
+    """Full menu bar. Commands and checks only; no navigator jumps.
+
+    ``layer_slots`` is stored for number-key shortcuts and is not shown.
+    """
+    return MenuSet(
+        (
+            Menu("File", (_OPEN, _SAVE, SEPARATOR, _QUIT)),
+            Menu(
+                "Project",
+                (_SEPARATE, _RENDER, SEPARATOR, _BACKUP, _RESTORE),
             ),
-        ),
-        Menu(
-            "Layers",
-            (_ADD, _DELETE, SEPARATOR, *jumps, SEPARATOR, _CURATION),
-        ),
-        Menu(
-            "Render",
-            (
-                _OVERLAYS,
-                _POST_FX,
-                _PATTERN_MASK,
-                SEPARATOR,
-                _EDIT_OVERLAYS,
-                _EDIT_POST_FX,
+            Menu("Layers", (_ADD, _DELETE, SEPARATOR, _CURATION)),
+            Menu("Render", (_OVERLAYS, _POST_FX, _PATTERN_MASK)),
+            Menu(
+                "Timeline",
+                (
+                    _SHOW_STRIP,
+                    SEPARATOR,
+                    _APPLY_PRESET,
+                    _RESET,
+                    _SNAP,
+                    _UNDO_CUT,
+                ),
             ),
+            Menu("Settings", (_DOCKED_LAYOUT, _MEASURE_LATENCY)),
+            Menu("Help", (_HELP_OVERLAY, _HELP_SHORTCUTS, SEPARATOR, _ABOUT)),
         ),
-        Menu(
-            "Timeline",
-            (
-                _SHOW_STRIP,
-                SEPARATOR,
-                _APPLY_PRESET,
-                _RESET,
-                _SNAP,
-                _UNDO_CUT,
-                SEPARATOR,
-                _SONG_MARKERS,
-            ),
-        ),
-        Menu("Settings", (_EDITOR, _DOCKED_LAYOUT, _MEASURE_LATENCY)),
-        Menu("Help", (_HELP_OVERLAY, _HELP_SHORTCUTS, SEPARATOR, _ABOUT)),
+        tuple(layer_slots),
     )
 
 
@@ -665,6 +630,14 @@ def _shortcut_resolves(command: Command, *, timeline_scope: bool) -> bool:
     return False
 
 
+def _shortcut_commands(menus: Sequence[Menu]) -> Iterator[Command]:
+    """Menu rows, then shortcut-only layer focus and editor settings."""
+    yield from iter_commands(menus)
+    slots = getattr(menus, "layer_slots", ())
+    yield from layer_focus_commands(slots)
+    yield _EDITOR
+
+
 def command_for_shortcut(
     key: int,
     mod: int,
@@ -672,15 +645,17 @@ def command_for_shortcut(
     *,
     timeline_scope: bool = False,
 ) -> Command | None:
-    """Resolved shortcut from *menus*, or None.
+    """Resolved shortcut, or None.
 
-    Save, quit, render, the help overlay, editor settings, add-layer, and
-    show-timeline-strip resolve. Layer jumps resolve unless *timeline_scope*
-    is set. Other shortcut text stays on its row. Bare R does not resolve.
+    Save, quit, render, the help overlay, add-layer, and show-timeline-strip
+    resolve from menu rows. Editor settings (Ctrl+,) and layer jumps
+    (``1``–``8``) resolve from commands that are not menu rows. Layer jumps
+    stay unresolved while *timeline_scope* is set. Other shortcut text stays
+    on its row. Bare R does not resolve.
     """
     source = MENUS if menus is None else menus
     ctrl = mod_ctrl(mod)
-    for command in iter_commands(source):
+    for command in _shortcut_commands(source):
         if not _shortcut_resolves(command, timeline_scope=timeline_scope):
             continue
         if command.shortcut is None:

@@ -12,7 +12,6 @@ from cleave.config_schema.editor import (
     DEFAULT_EDITOR_HEIGHT,
     DEFAULT_EDITOR_WIDTH,
     DEFAULT_INSPECTOR_WIDTH,
-    DEFAULT_NAVIGATOR_WIDTH,
 )
 from cleave.config_schema.layers import DEFAULT_LAYER_SLOTS
 from tests.support.config import TEST_LAYER_STEMS
@@ -1063,11 +1062,9 @@ def test_tick_frame_insets_panels_by_full_menu_bar_height_when_faded(
         23,
         menu_bar_height_px(),
         0,
-        nav_width=editor.navigator_width,
         insp_width=editor.inspector_width,
         docked=editor.shell_layout_mode == "docked",
     )
-    assert editor.navigator_width == DEFAULT_NAVIGATOR_WIDTH
     assert editor.inspector_width == DEFAULT_INSPECTOR_WIDTH
     runtime.compositor.set_present_rect.assert_called_with(expected.visualiser)
     shell.set_layout.assert_called_once()

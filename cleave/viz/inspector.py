@@ -78,7 +78,7 @@ def build_inspector_rows(
     curation, without the section header. ``render.overlays``,
     ``render.post_fx``, and ``render.pattern_mask`` walk those sections.
     ``render.overlays.card:<card>`` walks the opening or closing card section.
-    ``render.timeline`` walks the headerless timeline page: timeline preset,
+    ``timeline`` walks the headerless timeline page: timeline preset,
     beat / bar grid, and cue fades. ``song_markers`` walks song markers and
     omits that section header. An unknown id, including the render root, is
     empty.
@@ -108,7 +108,7 @@ def build_inspector_rows(
     elif node_id == "render.pattern_mask":
         section = RENDER_PATTERN_MASK_SECTION
         slot = None
-    elif node_id == "render.timeline":
+    elif node_id == "timeline":
         section = RENDER_TIMELINE_INSPECTOR_SECTION
         slot = None
     elif node_id == "song_markers":

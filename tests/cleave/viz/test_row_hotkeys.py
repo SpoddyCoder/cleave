@@ -59,7 +59,7 @@ def test_node_header_descriptor_maps_render_and_layer_ids() -> None:
     assert header("render.pattern_mask") == RowDescriptor(
         RowKind.RENDER_PATTERN_MASK_HEADER
     )
-    assert header("render.timeline") == RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
+    assert header("timeline") == RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
     assert header(overlay_card_node_id("opening_card")) == (
         RowDescriptor(RowKind.RENDER_OVERLAY_CARD_HEADER, card="opening_card")
     )

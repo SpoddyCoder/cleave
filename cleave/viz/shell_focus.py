@@ -100,7 +100,7 @@ class ShellFocusState:
     collapsed: set[InspectorGroupKey] = field(default_factory=set)
     opened: set[InspectorGroupKey] = field(default_factory=set)
     inspector_command_id: str | None = None
-    nav_expanded: set[str] = field(default_factory=lambda: {"layers", "render"})
+    nav_expanded: set[str] = field(default_factory=lambda: {"layers", "render", "timeline"})
 
 
 def cycle_stops(*, help_open: bool, strip_open: bool) -> tuple[CycleStop, ...]:

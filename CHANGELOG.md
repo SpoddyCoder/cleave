@@ -11,16 +11,20 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- The navigator lists a single Overlays row. Opening and closing cards stay in the inspector.
+- The navigator sits on top of the inspector in one column, and the visualiser uses the freed width.
+- Timeline is a top-level navigator row, and Song markers sits under it.
+- The menu bar lists commands and checks, and no longer repeats navigator destinations. Layer number keys and Ctrl+, still open the matching navigator page.
 - Menu highlight, navigator and inspector focus, and transport readouts follow the same colour roles, with muted secondary transport text and black text on the open menu highlight.
 - The starter-pack prompt and the launch error panels draw in the editor UI.
 - The launch file picker draws in the editor UI and takes the mouse: click a row, double-click to open, click a shortcut, and wheel to scroll.
 - Loading progress draws in the editor UI instead of a pygame overlay.
-- Help is a resizable column beside the inspector. It follows the focused region and no longer covers the visualiser.
+- Help is a resizable column beside the side column. It follows the focused region and no longer covers the visualiser.
 - Toasts sit in the visualiser corner and clear with Enter or a click. The tuning panel no longer draws them.
 - Dialogs draw above the navigator and inspector and respond to the mouse: click an option, click outside or press Esc to cancel, click the text field to place the caret.
-- Settings switches to a docked layout with the navigator and inspector on the left and the visualiser filling the rest, remembers navigator and inspector widths in user editor settings (not the project file), opens a menu with Alt plus its underlined letter, and keeps a visible focus ring on the focused shell row when hovered.
+- Settings switches to a docked layout (side column on the left), remembers the inspector and help widths in user editor settings (not the project file), opens a menu with Alt plus its underlined letter, and keeps a visible focus ring on the focused shell row when hovered.
 - Mouse gestures: hover highlights, wheel scroll on the navigator and inspector, sideways drag on numeric values, and draggable column splitters.
-- Timeline and song markers edit in the inspector, and the old tuning list is gone. The Timeline menu opens the strip, applies and resets the timeline, snaps cues, and jumps to song markers.
+- Timeline and song markers edit in the inspector, and the old tuning list is gone. The Timeline menu opens the strip, applies and resets the timeline, and snaps cues.
 - Overlays, Post-FX, and Pattern mask edit in the inspector. The Render menu toggles them, and those sections are gone from the leftover panel.
 - Each layer is a navigator node and edits in the inspector. Add layer (Ctrl+L) and Delete layer are on the Layers menu and the inspector. Keys 1-8 jump to layers when the timeline strip is not focused.
 - The editor shell now has a navigator, an inspector, and a transport bar. Settings and Project edit in the inspector. Tab cycles regions, and Ctrl+Up/Down move between the top-level sections.

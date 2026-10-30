@@ -62,7 +62,6 @@ def test_enter_on_render_blocks_stays_off_the_panel() -> None:
         "render.overlays",
         "render.post_fx",
         "render.pattern_mask",
-        "render.timeline",
     ):
         focus.selected_id = node_id
         focus.region = ShellRegion.NAVIGATOR
@@ -160,7 +159,7 @@ def test_quick_step_stays_on_top_level_ids() -> None:
     controls = _make_controls(("layer_1", "layer_2"))
     controls.shell_focus.selected_id = "layers"
     controls.navigator.quick_step(1)
-    assert controls.shell_focus.selected_id == "song_markers"
+    assert controls.shell_focus.selected_id == "timeline"
     controls.navigator.quick_step(1)
     assert controls.shell_focus.selected_id == "settings"
     controls.shell_focus.selected_id = layer_node_id("layer_2")
@@ -168,7 +167,7 @@ def test_quick_step_stays_on_top_level_ids() -> None:
     assert controls.shell_focus.selected_id == "settings"
     controls.shell_focus.selected_id = layer_node_id("layer_2")
     controls.navigator.quick_step(-1)
-    assert controls.shell_focus.selected_id == "song_markers"
+    assert controls.shell_focus.selected_id == "timeline"
 
 
 def test_delete_reconciles_to_nearest_layer_sibling() -> None:

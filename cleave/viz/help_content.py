@@ -79,6 +79,7 @@ NAVIGATION_SECTION = HelpSection(
         ("F10 / Alt", "focus menu bar"),
         ("Alt + underlined letter", "open that menu (F, P, L, R, T, S, H)"),
         ("Ctrl + R", "render"),
+        ("Ctrl + ,", "open Settings"),
     ),
 )
 

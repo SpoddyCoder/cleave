@@ -309,6 +309,28 @@ def inspector_selectable_id(desc: RowDescriptor, *, group: bool) -> str:
     )
 
 
+def _navigator_content_height_px() -> int:
+    """Outer height of the navigator list just drawn in the current window.
+
+    The cursor sits one item-spacing past the last row. Adding the bottom
+    padding and border matches the window size that fits the rows. Scroll is
+    already included in the cursor, so a clipped list still reports its full
+    height for the next frame.
+    """
+    style = imgui.get_style()
+    cursor_y = float(imgui.get_cursor_pos().y)
+    spacing_y = float(style.item_spacing.y)
+    content_bottom = cursor_y - spacing_y
+    if content_bottom < 0.0:
+        content_bottom = cursor_y
+    outer = (
+        content_bottom
+        + float(style.window_padding.y)
+        + float(style.window_border_size)
+    )
+    return max(1, int(round(outer)))
+
+
 def menu_bar_height_px() -> int:
     """Pixels reserved for the menu bar before the first ImGui layout.
 
@@ -646,12 +668,13 @@ class ShellHost:
         self._menu_state = menu_state
         self._controls = controls
         self._menu_bar_height_px = bar_height
+        # Drawn navigator list height, applied on the next frame. 0 until measured.
+        self._nav_content_height_px = 0
         self._layout: ShellLayout | None = None
         self._value_drag_accum = 0.0
         self._value_drag_crossed = False
-        # Live drag requests. A drag that moves at least 1px persists navigator,
-        # inspector, and help, then clears these.
-        self._nav_width: int | None = None
+        # Live drag requests. A drag that moves at least 1px persists the stack
+        # and help, then clears these.
         self._insp_width: int | None = None
         self._help_width: int | None = None
         self._help_scroll_px = 0.0
@@ -665,17 +688,17 @@ class ShellHost:
         return self._menu_bar_height_px
 
     @property
+    def nav_content_height_px(self) -> int:
+        """Navigator list height measured last frame. 0 until the list is drawn."""
+        return self._nav_content_height_px
+
+    @property
     def layout(self) -> ShellLayout | None:
         return self._layout
 
     def set_layout(self, layout: ShellLayout) -> None:
         """Remember the frame's shell rects for the transport, navigator, and inspector."""
         self._layout = layout
-
-    @property
-    def nav_width(self) -> int | None:
-        """Navigator width requested by an in-progress splitter drag."""
-        return self._nav_width
 
     @property
     def insp_width(self) -> int | None:
@@ -821,11 +844,9 @@ class ShellHost:
         if layout is None:
             return
         width = splitter_request_width(layout, which, pointer_x)
-        if which == "nav":
-            self._nav_width = width
-        elif which == "help":
+        if which == "help":
             self._help_width = width
-        else:
+        elif which == "insp":
             self._insp_width = width
 
     def _begin_splitter_drag(self, pos: tuple[float, float]) -> bool:
@@ -843,11 +864,6 @@ class ShellHost:
         if which is not None and abs(x - self._splitter_down_x) >= 1.0:
             self._assign_splitter_width(which, x)
             editor = self._controls.cfg.editor
-            nav = (
-                self._nav_width
-                if self._nav_width is not None
-                else editor.navigator_width
-            )
             insp = (
                 self._insp_width
                 if self._insp_width is not None
@@ -858,8 +874,7 @@ class ShellHost:
                 if self._help_width is not None
                 else editor.help_width
             )
-            self._controls.settings.set_shell_column_widths(nav, insp, help_w)
-            self._nav_width = None
+            self._controls.settings.set_shell_column_widths(insp, help_w)
             self._insp_width = None
             self._help_width = None
         self._splitter = None
@@ -1188,6 +1203,7 @@ class ShellHost:
                 self._draw_nav_node(node)
         finally:
             imgui.pop_style_color()
+        self._nav_content_height_px = _navigator_content_height_px()
 
     def _draw_nav_node(self, node: NavNode) -> None:
         focus = self._controls.shell_focus

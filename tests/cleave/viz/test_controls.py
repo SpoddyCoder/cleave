@@ -487,7 +487,7 @@ def _focus_inspector_kind(
     focus = controls.shell_focus
     focus.region = ShellRegion.INSPECTOR
     focus.selected_id = (
-        "song_markers" if kind in _SONG_INSPECTOR_KINDS else "render.timeline"
+        "song_markers" if kind in _SONG_INSPECTOR_KINDS else "timeline"
     )
     if kind in _BEAT_INSPECTOR_KINDS:
         focus.opened.add(InspectorGroupKey(RowKind.TIMELINE_BEAT_BAR_GRID_HEADER))
@@ -539,7 +539,7 @@ def _press_focused(controls: TuningControls, event: pygame.event.Event) -> bool:
 
 def _press_timeline_hotkey(controls: TuningControls, key: int) -> bool:
     controls.shell_focus.region = ShellRegion.NAVIGATOR
-    controls.shell_focus.selected_id = "render.timeline"
+    controls.shell_focus.selected_id = "timeline"
     return controls.navigator.handle_hotkey(_keydown(key))
 
 
@@ -2924,7 +2924,7 @@ def test_render_timeline_enable_opens_panel() -> None:
 
 def test_render_timeline_right_does_not_open_the_strip() -> None:
     controls = _make_controls(timeline_enabled=True)
-    controls.shell_focus.selected_id = "render.timeline"
+    controls.shell_focus.selected_id = "timeline"
     controls.session.timeline.focus_row = 2
     controls.navigator.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.session.timeline.panel_open is False
@@ -3785,7 +3785,7 @@ def test_render_timeline_locked_dims_inspector_children() -> None:
     assert _row_value_color(
         view, RowDescriptor(RowKind.TIMELINE_PRESET_CHARACTER)
     ) == LOCKED
-    assert RowKind.TIMELINE_PRESET_CHARACTER in _page_kinds(view, "render.timeline")
+    assert RowKind.TIMELINE_PRESET_CHARACTER in _page_kinds(view, "timeline")
 
 
 def test_locked_blocks_enable_disable() -> None:
@@ -4599,8 +4599,7 @@ def test_settings_set_shell_column_widths_clamps_and_persists(tmp_path: Path) ->
     mode = controls.cfg.editor.shell_layout_mode
     assert not controls.config_dirty
 
-    controls.settings.set_shell_column_widths(12, 40, 8)
-    assert controls.cfg.editor.navigator_width == MIN_COLUMN_WIDTH
+    controls.settings.set_shell_column_widths(40, 8)
     assert controls.cfg.editor.inspector_width == MIN_COLUMN_WIDTH
     assert controls.cfg.editor.help_width == MIN_COLUMN_WIDTH
     assert controls.cfg.editor.shell_layout_mode == mode
@@ -4609,19 +4608,17 @@ def test_settings_set_shell_column_widths_clamps_and_persists(tmp_path: Path) ->
     assert controls.focus_cursor is focus_cursor
     assert not controls.config_dirty
     loaded = load_user_config(user_path)
-    assert loaded.editor.navigator_width == MIN_COLUMN_WIDTH
     assert loaded.editor.inspector_width == MIN_COLUMN_WIDTH
     assert loaded.editor.help_width == MIN_COLUMN_WIDTH
 
-    controls.settings.set_shell_column_widths(280, 510, 360)
-    assert controls.cfg.editor.navigator_width == 280
+    controls.settings.set_shell_column_widths(510, 360)
     assert controls.cfg.editor.inspector_width == 510
     assert controls.cfg.editor.help_width == 360
     assert controls.cfg.editor.shell_layout_mode == mode
     loaded = load_user_config(user_path)
-    assert loaded.editor.navigator_width == 280
     assert loaded.editor.inspector_width == 510
     assert loaded.editor.help_width == 360
+    assert "navigator_width" not in user_path.read_text(encoding="utf-8")
     assert not controls.config_dirty
 
 

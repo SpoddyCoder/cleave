@@ -167,7 +167,7 @@ def test_render_timeline_page_is_three_groups() -> None:
     assert inspector_group_is_open(beat_key, frozenset(), frozenset()) is False
     assert inspector_group_is_open(cuts_key, frozenset(), frozenset()) is False
 
-    rows = build_inspector_rows(state, "render.timeline", frozenset())
+    rows = build_inspector_rows(state, "timeline", frozenset())
     kinds = _kinds(rows)
     groups = tuple(row for row in rows if row.is_group)
     assert tuple(row.descriptor.kind for row in groups) == (
@@ -196,7 +196,7 @@ def test_render_timeline_page_is_three_groups() -> None:
     assert RowKind.TIMELINE_HARD_CUT_FADE_IN not in kinds
 
     opened = frozenset({beat_key, cuts_key})
-    open_rows = build_inspector_rows(state, "render.timeline", frozenset(), opened)
+    open_rows = build_inspector_rows(state, "timeline", frozenset(), opened)
     open_kinds = _kinds(open_rows)
     beat_leaves = _group_leaves(open_rows, RowKind.TIMELINE_BEAT_BAR_GRID_HEADER)
     assert tuple(
@@ -220,7 +220,7 @@ def test_render_timeline_page_is_three_groups() -> None:
     state.render_timeline.hard_cut_fades.enabled = True
     state.render_timeline.soft_cut_fades.enabled = True
     fade_kinds = _kinds(
-        build_inspector_rows(state, "render.timeline", frozenset(), opened)
+        build_inspector_rows(state, "timeline", frozenset(), opened)
     )
     hard_idx = fade_kinds.index(RowKind.TIMELINE_HARD_CUTS)
     assert fade_kinds[hard_idx : hard_idx + 6] == [
@@ -243,7 +243,7 @@ def test_render_timeline_page_is_three_groups() -> None:
 
     collapsed = frozenset({preset_key})
     hidden_rows = build_inspector_rows(
-        state, "render.timeline", collapsed, opened
+        state, "timeline", collapsed, opened
     )
     hidden = _kinds(hidden_rows)
     hidden_commands = [row.command_id for row in hidden_rows if row.command_id]

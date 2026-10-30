@@ -142,10 +142,9 @@ class SettingsControls:
         self.cfg.editor = replace(self.cfg.editor, shell_layout_mode=new_mode)
         persist_editor_settings(self.cfg)
 
-    def set_shell_column_widths(self, nav: int, insp: int, help_width: int) -> None:
+    def set_shell_column_widths(self, insp: int, help_width: int) -> None:
         self.cfg.editor = replace(
             self.cfg.editor,
-            navigator_width=clamp_shell_column_width(nav),
             inspector_width=clamp_shell_column_width(insp),
             help_width=clamp_shell_column_width(help_width),
         )

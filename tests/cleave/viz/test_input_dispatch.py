@@ -677,7 +677,7 @@ def test_ctrl_up_down_cycles_visible_top_level_ids() -> None:
     runtime = _make_runtime(submenu_focused=False, panel_open=False)
     controls = runtime.controls
     ids = visible_top_level_ids(controls.session)
-    assert list(ids) == ["settings", "project", "render", "layers", "song_markers"]
+    assert list(ids) == ["settings", "project", "render", "layers", "timeline"]
     seen = [controls.shell_focus.selected_id]
     leftover = controls.focus_cursor
     for _ in ids:

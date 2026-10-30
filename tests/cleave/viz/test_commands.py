@@ -45,7 +45,6 @@ _STATIC_IDS = (
     "file.open",
     "file.save",
     "file.quit",
-    "project.settings",
     "project.separate",
     "project.render",
     "project.backup",
@@ -56,20 +55,24 @@ _STATIC_IDS = (
     "render.overlays",
     "render.post_fx",
     "render.pattern_mask",
-    "render.edit_overlays",
-    "render.edit_post_fx",
     "timeline.show_strip",
     "timeline.apply_preset",
     "timeline.reset",
     "timeline.snap_cues",
     "timeline.undo_cut",
-    "timeline.song_markers",
-    "settings.editor",
     "settings.docked_layout",
     "settings.measure_latency",
     "help.overlay",
     "help.shortcuts",
     "help.about",
+)
+
+_OFF_MENU_IDS = (
+    "project.settings",
+    "render.edit_overlays",
+    "render.edit_post_fx",
+    "timeline.song_markers",
+    "settings.editor",
 )
 
 _DISABLED_IDS = (
@@ -83,13 +86,6 @@ _DISABLED_IDS = (
     "layers.delete",
 )
 
-_ENABLED_JUMP_IDS = (
-    "project.settings",
-    "settings.editor",
-    "render.edit_overlays",
-    "render.edit_post_fx",
-    "timeline.song_markers",
-)
 
 
 def _menus():
@@ -169,8 +165,6 @@ def test_menus_list_taxonomy_ids_once() -> None:
     ]
     assert _row_ids(menus[0]) == ["file.open", "file.save", None, "file.quit"]
     assert _row_ids(menus[1]) == [
-        "project.settings",
-        None,
         "project.separate",
         "project.render",
         None,
@@ -181,18 +175,12 @@ def test_menus_list_taxonomy_ids_once() -> None:
         "layers.add",
         "layers.delete",
         None,
-        "layers.focus.slot_a",
-        "layers.focus.slot_b",
-        None,
         "layers.preset_curation",
     ]
     assert _row_ids(menus[3]) == [
         "render.overlays",
         "render.post_fx",
         "render.pattern_mask",
-        None,
-        "render.edit_overlays",
-        "render.edit_post_fx",
     ]
     assert _row_ids(menus[4]) == [
         "timeline.show_strip",
@@ -201,11 +189,8 @@ def test_menus_list_taxonomy_ids_once() -> None:
         "timeline.reset",
         "timeline.snap_cues",
         "timeline.undo_cut",
-        None,
-        "timeline.song_markers",
     ]
     assert _row_ids(menus[5]) == [
-        "settings.editor",
         "settings.docked_layout",
         "settings.measure_latency",
     ]
@@ -217,15 +202,23 @@ def test_menus_list_taxonomy_ids_once() -> None:
     ]
     ids = [command.id for command in iter_commands(menus)]
     assert len(ids) == len(set(ids))
-    assert set(ids) == set(_STATIC_IDS) | {
-        "layers.focus.slot_a",
-        "layers.focus.slot_b",
-    }
+    assert set(ids) == set(_STATIC_IDS)
+    assert not any(command_id in ids for command_id in _OFF_MENU_IDS)
+    assert not any(command_id.startswith("layers.focus.") for command_id in ids)
     assert "Start render..." not in [command.label for command in iter_commands(menus)]
+    assert "Edit timeline" not in [command.label for command in iter_commands(menus)]
     assert [menu.label for menu in MENUS] == [menu.label for menu in menus]
     assert not any(
         command.id.startswith("layers.focus.") for command in iter_commands(MENUS)
     )
+    for menu in menus:
+        row_ids = _row_ids(menu)
+        assert row_ids[0] is not None
+        assert row_ids[-1] is not None
+        assert not any(
+            left is None and right is None
+            for left, right in zip(row_ids, row_ids[1:])
+        )
 
 
 def test_layer_jumps_use_given_labels() -> None:
@@ -259,8 +252,16 @@ def test_later_shortcuts_stay_on_rows_but_do_not_resolve() -> None:
     assert command_by_id("file.open", menus).shortcut == "Ctrl+O"
     assert command_by_id("layers.add", menus).shortcut == "Ctrl+L"
     assert command_by_id("timeline.show_strip", menus).shortcut == "T"
-    assert command_by_id("settings.editor", menus).shortcut == "Ctrl+,"
-    assert command_by_id("layers.focus.slot_a", menus).shortcut == "1"
+    editor = command_for_shortcut(pygame.K_COMMA, pygame.KMOD_CTRL)
+    assert editor is not None
+    assert editor.id == "settings.editor"
+    assert editor.shortcut == "Ctrl+,"
+    assert editor not in tuple(iter_commands(menus))
+    layer = command_for_shortcut(pygame.K_1, 0, menus)
+    assert layer is not None
+    assert layer.id == "layers.focus.slot_a"
+    assert layer.shortcut == "1"
+    assert layer not in tuple(iter_commands(menus))
     assert command_for_shortcut(pygame.K_o, pygame.KMOD_CTRL) is None
     assert command_for_shortcut(pygame.K_t, 0).id == "timeline.show_strip"
     assert (
@@ -275,32 +276,28 @@ def test_later_shortcuts_stay_on_rows_but_do_not_resolve() -> None:
     assert command_for_shortcut(pygame.K_h, pygame.KMOD_CTRL) is None
 
 
-def test_disabled_items_and_jumps_stay_disabled() -> None:
+def test_disabled_items_stay_disabled() -> None:
     menus = _menus()
     ctx = CommandContext()
     for command_id in _DISABLED_IDS:
         assert command_by_id(command_id, menus).enabled(ctx) is False
-    for command_id in _ENABLED_JUMP_IDS:
-        command = command_by_id(command_id, menus)
-        assert command.kind == "jump"
+    assert not any(command.kind == "jump" for command in iter_commands(menus))
+    for command in layer_focus_commands(_SLOTS):
         assert command.enabled(ctx) is True
-    for command in iter_commands(menus):
-        if command.id.startswith("layers.focus."):
-            assert command.enabled(ctx) is True
-            assert command.kind == "jump"
+        assert command.kind == "jump"
 
 
-def test_project_and_editor_jumps_select_the_inspector() -> None:
+def test_editor_shortcut_selects_the_settings_inspector() -> None:
     menus = _menus()
     controls = _make_controls(("layer_1",))
-    project = command_by_id("project.settings", menus)
-    editor = command_by_id("settings.editor", menus)
-    assert project.enabled(CommandContext()) is True
+    editor = command_for_shortcut(pygame.K_COMMA, pygame.KMOD_CTRL, menus)
+    assert editor is not None
+    assert editor.id == "settings.editor"
+    assert editor.kind == "jump"
     assert editor.enabled(CommandContext()) is True
-
-    project.run(controls)
-    assert controls.shell_focus.selected_id == "project"
-    assert controls.shell_focus.region is ShellRegion.INSPECTOR
+    assert "settings.editor" not in {
+        command.id for command in iter_commands(menus)
+    }
 
     editor.run(controls)
     assert controls.shell_focus.selected_id == "settings"
@@ -606,18 +603,17 @@ def test_menu_and_inspector_share_layer_add_and_delete() -> None:
     controls.layer_lifecycle.prompt_add.assert_not_called()
 
 
-def test_render_menu_checks_mirror_flags_and_jumps_open_inspectors() -> None:
+def test_render_menu_checks_mirror_flags() -> None:
     menus = _menus()
     overlays = command_by_id("render.overlays", menus)
     post_fx = command_by_id("render.post_fx", menus)
     pattern = command_by_id("render.pattern_mask", menus)
-    edit_overlays = command_by_id("render.edit_overlays", menus)
-    edit_post_fx = command_by_id("render.edit_post_fx", menus)
     checks = (overlays, post_fx, pattern)
-    jumps = (edit_overlays, edit_post_fx)
+    menu_ids = {command.id for command in iter_commands(menus)}
+    assert "render.edit_overlays" not in menu_ids
+    assert "render.edit_post_fx" not in menu_ids
 
     assert all(command.kind == "check" and command.shortcut is None for command in checks)
-    assert all(command.kind == "jump" and command.shortcut is None for command in jumps)
     assert overlays.checked(CommandContext(overlays_enabled=True)) is True
     assert overlays.checked(CommandContext()) is False
     assert post_fx.checked(CommandContext(post_fx_enabled=True)) is True
@@ -627,14 +623,12 @@ def test_render_menu_checks_mirror_flags_and_jumps_open_inspectors() -> None:
 
     visualizer = CommandContext()
     curation = CommandContext(editor_mode="preset_curation")
-    for command in (*checks, *jumps):
+    for command in checks:
         assert command.enabled(visualizer) is True
         assert command.enabled(curation) is False
     assert overlays.enabled(CommandContext(overlays_locked=True)) is False
     assert post_fx.enabled(CommandContext(post_fx_locked=True)) is False
     assert pattern.enabled(CommandContext(pattern_mask_locked=True)) is False
-    assert edit_overlays.enabled(CommandContext(overlays_locked=True)) is True
-    assert edit_post_fx.enabled(CommandContext(post_fx_locked=True)) is True
 
     live = _make_controls(("layer_1",))
     ctx = command_context(live)
@@ -674,7 +668,6 @@ def test_render_menu_checks_mirror_flags_and_jumps_open_inspectors() -> None:
     assert overlays.enabled(locked_ctx) is False
     assert post_fx.enabled(locked_ctx) is False
     assert pattern.enabled(locked_ctx) is False
-    assert edit_overlays.enabled(locked_ctx) is True
     overlays.run(locked)
     post_fx.run(locked)
     pattern.run(locked)
@@ -688,19 +681,9 @@ def test_render_menu_checks_mirror_flags_and_jumps_open_inspectors() -> None:
     curated.shell_focus.region = ShellRegion.NAVIGATOR
     assert command_context(curated).editor_mode == "preset_curation"
     overlays.run(curated)
-    edit_overlays.run(curated)
-    edit_post_fx.run(curated)
     assert curated.session.render_overlays.opening_card.enabled is True
     assert curated.shell_focus.selected_id == "project"
     assert curated.shell_focus.region is ShellRegion.NAVIGATOR
-
-    focused = _make_controls(("layer_1",))
-    edit_overlays.run(focused)
-    assert focused.shell_focus.selected_id == "render.overlays"
-    assert focused.shell_focus.region is ShellRegion.INSPECTOR
-    edit_post_fx.run(focused)
-    assert focused.shell_focus.selected_id == "render.post_fx"
-    assert focused.shell_focus.region is ShellRegion.INSPECTOR
 
 
 def test_layer_jumps_select_the_layer_inspector() -> None:
@@ -730,7 +713,18 @@ def test_ctrl_l_and_layer_digits_follow_timeline_scope() -> None:
         command = command_for_shortcut(key, 0, menus)
         assert command is not None
         assert command.id == f"layers.focus.layer_{number}"
+        assert command.id not in {item.id for item in iter_commands(menus)}
         assert command_for_shortcut(key, 0, menus, timeline_scope=True) is None
+    controls = _make_controls(("layer_1", "layer_2"))
+    focused = command_for_shortcut(
+        pygame.K_2,
+        0,
+        build_menus((("layer_1", "a"), ("layer_2", "b"))),
+    )
+    assert focused is not None
+    focused.run(controls)
+    assert controls.shell_focus.selected_id == layer_node_id("layer_2")
+    assert controls.shell_focus.region is ShellRegion.INSPECTOR
     assert command_for_shortcut(pygame.K_1, 0) is None
     assert command_for_shortcut(pygame.K_r, 0, menus) is None
     assert command_for_shortcut(pygame.K_r, pygame.KMOD_CTRL, menus).id == "project.render"
@@ -862,7 +856,7 @@ def test_timeline_actions_share_run_with_the_inspector() -> None:
 
     view = controls.build_view_state(paused=False)
     opened = frozenset({InspectorGroupKey(RowKind.TIMELINE_BEAT_BAR_GRID_HEADER)})
-    rows = build_inspector_rows(view, "render.timeline", frozenset(), opened)
+    rows = build_inspector_rows(view, "timeline", frozenset(), opened)
     by_id = {row.command_id: row for row in rows if row.command_id}
     assert set(by_id) == {"timeline.apply_preset", "timeline.reset", "timeline.snap_cues"}
     assert all(row.descriptor is None for row in by_id.values())
@@ -874,7 +868,7 @@ def test_timeline_actions_share_run_with_the_inspector() -> None:
     assert RowKind.TIMELINE_SNAP_CUES not in descriptor_kinds
 
     controls.shell_focus.region = ShellRegion.INSPECTOR
-    controls.shell_focus.selected_id = "render.timeline"
+    controls.shell_focus.selected_id = "timeline"
     for command_id, kind, prompt in actions:
         prompt.reset_mock()
         command_by_id(command_id).run(controls)
@@ -911,26 +905,10 @@ def test_timeline_actions_share_run_with_the_inspector() -> None:
         prompt.assert_not_called()
 
 
-def test_song_markers_jump_opens_the_inspector() -> None:
-    jump = command_by_id("timeline.song_markers")
-    assert jump.kind == "jump"
-    assert jump.label == "Song markers"
-    assert jump.enabled(CommandContext()) is True
-    assert jump.enabled(CommandContext(timeline_locked=True)) is True
-    assert jump.enabled(CommandContext(editor_mode="preset_curation")) is False
-
-    controls = _make_controls(("layer_1",))
-    jump.run(controls)
-    assert controls.shell_focus.selected_id == "song_markers"
-    assert controls.shell_focus.region is ShellRegion.INSPECTOR
-
-    curated = _make_controls(("layer_1",))
-    curated.session.settings.editor_mode = "preset_curation"
-    before_id = curated.shell_focus.selected_id
-    before_region = curated.shell_focus.region
-    jump.run(curated)
-    assert curated.shell_focus.selected_id == before_id
-    assert curated.shell_focus.region is before_region
+def test_song_markers_is_not_a_menu_row() -> None:
+    ids = [command.id for command in iter_commands(MENUS)]
+    assert "timeline.song_markers" not in ids
+    assert "Song markers" not in [command.label for command in iter_commands(MENUS)]
 
 
 def test_inspector_only_timeline_actions_are_not_menu_commands() -> None:

@@ -11,7 +11,6 @@ from typing import TYPE_CHECKING
 
 from cleave.stems import stem_overlay_header
 from cleave.viz.editor_mode_controls import curation_focus_slot, is_preset_curation_mode
-from cleave.viz.row_kinds import RowKind
 
 if TYPE_CHECKING:
     from cleave.viz.session import TuningSession
@@ -22,7 +21,7 @@ OVERLAY_CARD_ID_PREFIX = "render.overlays.card:"
 SOLO_BADGE = "solo"
 HIDDEN_BADGE = "hidden"
 OFF_BADGE = "off"
-_DEFAULT_EXPANDED = frozenset({"layers", "render"})
+_DEFAULT_EXPANDED = frozenset({"layers", "render", "timeline"})
 
 
 @dataclass(frozen=True)
@@ -43,12 +42,12 @@ _TOP_LEVEL: tuple[NavNode, ...] = (
     NavNode("project", "Project", 0, True, None),
     NavNode("render", "Render", 0, False, None, expandable=True),
     NavNode("layers", "Layers", 0, True, None, expandable=True),
-    NavNode("song_markers", "Song markers", 0, True, None),
+    NavNode("timeline", "Timeline", 0, True, None, expandable=True),
 )
 
 TOP_LEVEL_IDS: tuple[str, ...] = tuple(node.id for node in _TOP_LEVEL)
 
-_HIDDEN_IN_CURATION = frozenset({"project", "render", "song_markers"})
+_HIDDEN_IN_CURATION = frozenset({"project", "render", "timeline"})
 
 
 def layer_node_id(slot: str) -> str:
@@ -57,7 +56,7 @@ def layer_node_id(slot: str) -> str:
 
 
 def overlay_card_node_id(card: str) -> str:
-    """Navigator id for an opening or closing overlay card."""
+    """Inspector page id for an opening or closing overlay card."""
     return f"{OVERLAY_CARD_ID_PREFIX}{card}"
 
 
@@ -74,29 +73,30 @@ def build_navigator(
 ) -> tuple[NavNode, ...]:
     """Visible navigator rows for *session*.
 
-    *expanded* defaults to ``{"layers", "render"}`` so layer children and
-    render children are included. Render children are Overlays, Post-FX,
-    Pattern mask, and Timeline. Overlay card children appear when
-    ``render.overlays`` is expanded. Preset curation omits Project, Render,
-    and Song markers, and keeps one layer child for the curation focus slot.
-    Song markers has an inspector and carries the marker count as its badge,
-    including ``"0"``.
+    *expanded* defaults to ``{"layers", "render", "timeline"}`` so layer
+    children, render children, and Song markers are included. Render children
+    are Overlays, Post-FX, and Pattern mask. Timeline's only child is Song
+    markers.
+    Preset curation omits Project, Render, and Timeline, and keeps one layer
+    child for the curation focus slot. Song markers has an inspector and
+    carries the marker count as its badge, including ``"0"``.
     """
     if expanded is None:
         expanded = _DEFAULT_EXPANDED
     visible = frozenset(visible_top_level_ids(session))
-    marker_badge = str(len(session.song_markers.times))
     nodes: list[NavNode] = []
     for node in _TOP_LEVEL:
         if node.id not in visible:
             continue
-        if node.id == "song_markers":
-            node = replace(node, badge=marker_badge)
+        if node.id == "timeline":
+            node = replace(node, locked=session.timeline.locked)
         nodes.append(node)
         if node.id == "render" and "render" in expanded:
-            nodes.extend(_render_children(session, expanded))
+            nodes.extend(_render_children(session))
         if node.id == "layers" and "layers" in expanded:
             nodes.extend(_layer_children(session))
+        if node.id == "timeline" and "timeline" in expanded:
+            nodes.append(_song_markers_node(session))
     return tuple(nodes)
 
 
@@ -136,16 +136,12 @@ def _layer_badge(session: TuningSession, slot: str) -> str | None:
     return None
 
 
-def _render_children(
-    session: TuningSession, expanded: Collection[str]
-) -> tuple[NavNode, ...]:
-    nodes: list[NavNode] = [_overlays_node(session)]
-    if "render.overlays" in expanded:
-        nodes.extend(_overlay_card_nodes(session))
-    nodes.append(_post_fx_node(session))
-    nodes.append(_pattern_mask_node(session))
-    nodes.append(_timeline_node(session))
-    return tuple(nodes)
+def _render_children(session: TuningSession) -> tuple[NavNode, ...]:
+    return (
+        _overlays_node(session),
+        _post_fx_node(session),
+        _pattern_mask_node(session),
+    )
 
 
 def _overlays_node(session: TuningSession) -> NavNode:
@@ -157,7 +153,6 @@ def _overlays_node(session: TuningSession) -> NavNode:
         has_inspector=True,
         badge=_overlays_badge(session),
         parent_id="render",
-        expandable=True,
         locked=overlays.locked,
     )
 
@@ -188,43 +183,15 @@ def _pattern_mask_node(session: TuningSession) -> NavNode:
     )
 
 
-def _timeline_node(session: TuningSession) -> NavNode:
+def _song_markers_node(session: TuningSession) -> NavNode:
     return NavNode(
-        id="render.timeline",
-        label="Timeline",
+        id="song_markers",
+        label="Song markers",
         depth=1,
         has_inspector=True,
-        badge=None,
-        parent_id="render",
-        locked=session.timeline.locked,
+        badge=str(len(session.song_markers.times)),
+        parent_id="timeline",
     )
-
-
-def _overlay_card_nodes(session: TuningSession) -> tuple[NavNode, ...]:
-    overlays = session.render_overlays
-    cards = (
-        ("opening_card", overlays.opening_card),
-        ("closing_card", overlays.closing_card),
-    )
-    return tuple(
-        NavNode(
-            id=overlay_card_node_id(name),
-            label=_overlay_card_label(name),
-            depth=2,
-            has_inspector=True,
-            badge=None if card.enabled else OFF_BADGE,
-            parent_id="render.overlays",
-        )
-        for name, card in cards
-    )
-
-
-def _overlay_card_label(card: str) -> str:
-    from cleave.viz.row_specs.render_overlays import overlay_card_panel_label
-
-    label = overlay_card_panel_label(RowKind.RENDER_OVERLAY_CARD_HEADER, card)
-    assert label is not None
-    return label
 
 
 def _overlays_badge(session: TuningSession) -> str | None:

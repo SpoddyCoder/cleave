@@ -924,6 +924,8 @@ def test_curation_navigation_omits_disabled_global_hotkeys() -> None:
     assert "Ctrl + S" in vis_keys
     assert vis_keys["Ctrl + Enter"] == "place song marker"
     assert vis_keys["Ctrl + R"] == "render"
+    assert vis_keys["Ctrl + ,"] == "open Settings"
+    assert "Ctrl + ," not in keys
     assert vis_keys["Shift + Left/Right"] == "skip 2s"
     assert vis_keys["Ctrl + Left/Right"] == "skip 30s"
 

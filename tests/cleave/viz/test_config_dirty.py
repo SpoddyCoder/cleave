@@ -141,7 +141,7 @@ def _mutate_render_post_fx_locked(controls: TuningControls) -> None:
 
 
 def _mutate_timeline_locked(controls: TuningControls) -> None:
-    controls.shell_focus.selected_id = "render.timeline"
+    controls.shell_focus.selected_id = "timeline"
     controls.navigator.handle_hotkey(_keydown(pygame.K_l))
 
 
@@ -378,7 +378,7 @@ def _mutate_render_post_fx_chroma_boost_amount(controls: TuningControls) -> None
 
 
 def _mutate_timeline_enabled(controls: TuningControls) -> None:
-    controls.shell_focus.selected_id = "render.timeline"
+    controls.shell_focus.selected_id = "timeline"
     controls.navigator.handle_hotkey(_keydown(pygame.K_e))
 
 

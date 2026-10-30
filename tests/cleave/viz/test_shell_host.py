@@ -14,11 +14,9 @@ from cleave.viz.navigator import (
     SOLO_BADGE,
     build_navigator,
     layer_node_id,
-    overlay_card_node_id,
 )
 from cleave.viz.row_hotkeys import activate_inspector_chip
 from cleave.viz.row_kinds import RowDescriptor, RowKind
-from cleave.viz.row_spec import row_lock_section
 from cleave.viz.row_sections import (
     INSPECTOR_GROUP_COLLAPSED,
     INSPECTOR_GROUP_EXPANDED,
@@ -182,32 +180,10 @@ def test_render_block_headers_have_enabled_solo_and_lock_chips() -> None:
     assert "solo" not in mask
 
 
-def test_card_node_has_enabled_chip_and_overlays_lock_chip() -> None:
-    session = _session()
-    nodes = build_navigator(
-        session, expanded={"render", "render.overlays", "layers"}
-    )
-    opening_id = overlay_card_node_id("opening_card")
-    assert row_lock_section(RowKind.RENDER_OVERLAY_CARD_HEADER) == "render_overlay"
-    header = inspector_header(nodes, opening_id, session, curation=False)
-    chips = _chips(header)
-    assert tuple(chips) == ("enabled", "lock")
-    assert chips["enabled"].label == "on"
-    assert chips["lock"].label == "lock"
-    assert "solo" not in chips
-
-    session.render_overlays.opening_card.enabled = False
-    session.render_overlays.locked = True
-    locked = _chips(inspector_header(nodes, opening_id, session, curation=False))
-    assert locked["enabled"].label == "off"
-    assert locked["lock"].label == "locked"
-    assert locked["lock"].active is True
-
-
 def test_timeline_inspector_header_chips_follow_enabled_and_lock() -> None:
     session = _session()
     nodes = build_navigator(session)
-    header = inspector_header(nodes, "render.timeline", session, curation=False)
+    header = inspector_header(nodes, "timeline", session, curation=False)
     chips = _chips(header)
     assert header.title == "Timeline"
     assert tuple(chips) == ("enabled", "lock")
@@ -219,7 +195,7 @@ def test_timeline_inspector_header_chips_follow_enabled_and_lock() -> None:
     session.timeline.enabled = False
     session.timeline.locked = True
     off = _chips(
-        inspector_header(nodes, "render.timeline", session, curation=False)
+        inspector_header(nodes, "timeline", session, curation=False)
     )
     assert off["enabled"].label == "off"
     assert off["enabled"].active is False

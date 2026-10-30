@@ -63,8 +63,8 @@ UiWidthMode = Literal["flexible", "fixed"]
 UI_WIDTH_MODES: tuple[UiWidthMode, ...] = ("flexible", "fixed")
 DEFAULT_UI_WIDTH_MODE: UiWidthMode = "flexible"
 
-DEFAULT_NAVIGATOR_WIDTH = 230
 # Half again the design mock's 330px column, so labels and stepped values fit.
+# The navigator and the inspector share this stack width.
 DEFAULT_INSPECTOR_WIDTH = 495
 DEFAULT_HELP_WIDTH = 320
 # Side columns stay at least this wide once the display can hold every open
@@ -263,14 +263,6 @@ EDITOR_FIELDS: tuple[FieldDescriptor, ...] = (
         lambda value, _ctx: clamp_residual_latency_ms(value),
     ),
     FieldDescriptor(
-        "navigator_width",
-        DEFAULT_NAVIGATOR_WIDTH,
-        lambda raw, ctx, label: clamp_shell_column_width(
-            int(require_non_negative_number(raw, label, as_int=True))
-        ),
-        lambda value, _ctx: clamp_shell_column_width(value),
-    ),
-    FieldDescriptor(
         "inspector_width",
         DEFAULT_INSPECTOR_WIDTH,
         lambda raw, ctx, label: clamp_shell_column_width(
@@ -314,7 +306,6 @@ def parse_editor_section(data: dict[str, Any]) -> Any:
         ui_fade=parsed["ui_fade"],
         notification_display_sec=parsed["notification_display_sec"],
         residual_latency_ms=parsed["residual_latency_ms"],
-        navigator_width=parsed["navigator_width"],
         inspector_width=parsed["inspector_width"],
         help_width=parsed["help_width"],
         shell_layout_mode=parsed["shell_layout_mode"],
@@ -333,7 +324,6 @@ def dump_editor_section(editor: Any) -> dict[str, Any]:
         "ui_fade": editor.ui_fade,
         "notification_display_sec": editor.notification_display_sec,
         "residual_latency_ms": editor.residual_latency_ms,
-        "navigator_width": editor.navigator_width,
         "inspector_width": editor.inspector_width,
         "help_width": editor.help_width,
         "shell_layout_mode": editor.shell_layout_mode,
@@ -360,7 +350,6 @@ def editor_config_from_settings(editor: Any | None = None) -> Any:
         ui_fade=editor.ui_fade,
         notification_display_sec=editor.notification_display_sec,
         residual_latency_ms=editor.residual_latency_ms,
-        navigator_width=editor.navigator_width,
         inspector_width=editor.inspector_width,
         help_width=editor.help_width,
         shell_layout_mode=editor.shell_layout_mode,

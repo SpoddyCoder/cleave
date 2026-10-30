@@ -52,7 +52,11 @@ def menu_index_for_mnemonic(
 
 
 def menus_for_session(session: Any) -> tuple[Menu, ...]:
-    """Menus for the live session, including layer jumps in z-order."""
+    """Menus for the live session.
+
+    Layer number shortcuts use this session's z-order. Those commands are
+    not menu rows.
+    """
     slots = tuple(
         (slot, stem_overlay_header(session.layers[slot].stem))
         for slot in session.layer_z_order

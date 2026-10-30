@@ -185,11 +185,11 @@ def test_shell_focus_state_defaults() -> None:
     assert state.inspector_cursor is None
     assert state.collapsed == frozenset()
     assert state.opened == frozenset()
-    assert state.nav_expanded == {"layers", "render"}
+    assert state.nav_expanded == {"layers", "render", "timeline"}
     other = ShellFocusState()
     state.nav_expanded.add("render.overlays")
     state.collapsed.add(InspectorGroupKey(RowKind.PROJECT_MILKDROP_HEADER))
     state.opened.add(InspectorGroupKey(RowKind.TRACK_EFFECTS_HEADER, slot="layer_1"))
-    assert other.nav_expanded == {"layers", "render"}
+    assert other.nav_expanded == {"layers", "render", "timeline"}
     assert other.collapsed == frozenset()
     assert other.opened == frozenset()
