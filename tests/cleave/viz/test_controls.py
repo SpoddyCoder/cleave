@@ -525,7 +525,7 @@ def _press_focused(controls: TuningControls, event: pygame.event.Event) -> bool:
             pygame.K_PAGEUP,
             pygame.K_PAGEDOWN,
         ):
-            forward = key in (pygame.K_RIGHT, pygame.K_PAGEDOWN)
+            forward = key in (pygame.K_RIGHT, pygame.K_PAGEUP)
             large = key in (pygame.K_PAGEUP, pygame.K_PAGEDOWN)
             if apply_field_horizontal(controls, desc, forward, large):
                 return True
@@ -615,10 +615,10 @@ def test_opacity_ctrl_step_is_ten_percent() -> None:
     controls.focus_descriptor = RowDescriptor(RowKind.TRACK_OPACITY, slot="layer_1")
     controls.session.layers["layer_1"].opacity_pct = 50
 
-    press_layer_row(controls, RowDescriptor(RowKind.TRACK_OPACITY, slot="layer_1"), _keydown(pygame.K_PAGEDOWN),)
+    press_layer_row(controls, RowDescriptor(RowKind.TRACK_OPACITY, slot="layer_1"), _keydown(pygame.K_PAGEUP),)
     assert controls.session.layers["layer_1"].opacity_pct == 60
 
-    press_layer_row(controls, RowDescriptor(RowKind.TRACK_OPACITY, slot="layer_1"), _keydown(pygame.K_PAGEUP),)
+    press_layer_row(controls, RowDescriptor(RowKind.TRACK_OPACITY, slot="layer_1"), _keydown(pygame.K_PAGEDOWN),)
     assert controls.session.layers["layer_1"].opacity_pct == 50
 
 
@@ -973,7 +973,7 @@ def test_render_overlay_background_margin_row() -> None:
     controls.focus_descriptor = _desc(view, margin_row)
     _press_focused(controls, _keydown(pygame.K_RIGHT))
     assert controls.session.render_overlays.opening_card.background_margin == 41
-    _press_focused(controls, _keydown(pygame.K_PAGEUP))
+    _press_focused(controls, _keydown(pygame.K_PAGEDOWN))
     assert controls.session.render_overlays.opening_card.background_margin == 31
 
 
@@ -987,7 +987,7 @@ def test_render_overlay_background_padding_row() -> None:
     controls.focus_descriptor = _desc(view, padding_row)
     _press_focused(controls, _keydown(pygame.K_LEFT))
     assert controls.session.render_overlays.opening_card.background_padding == 19
-    _press_focused(controls, _keydown(pygame.K_PAGEDOWN))
+    _press_focused(controls, _keydown(pygame.K_PAGEUP))
     assert controls.session.render_overlays.opening_card.background_padding == 29
 
 
@@ -3498,11 +3498,11 @@ def test_ctrl_preset_steps_by_ten_wrapping() -> None:
     controls.focus_descriptor = RowDescriptor(RowKind.TRACK_PRESET, slot="layer_1")
     playlist = controls.session.layers["layer_1"].playlist
 
-    press_layer_row(controls, RowDescriptor(RowKind.TRACK_PRESET, slot="layer_1"), _keydown(pygame.K_PAGEDOWN))
+    press_layer_row(controls, RowDescriptor(RowKind.TRACK_PRESET, slot="layer_1"), _keydown(pygame.K_PAGEUP))
     assert playlist.index == 3
     assert changed == [("layer_1", 3)]
 
-    press_layer_row(controls, RowDescriptor(RowKind.TRACK_PRESET, slot="layer_1"), _keydown(pygame.K_PAGEUP))
+    press_layer_row(controls, RowDescriptor(RowKind.TRACK_PRESET, slot="layer_1"), _keydown(pygame.K_PAGEDOWN))
     assert playlist.index == 5
     assert changed[-1] == ("layer_1", 5)
 
@@ -4381,7 +4381,7 @@ def test_settings_adjust_ui_fade() -> None:
     _press_focused(controls, _keydown(pygame.K_RIGHT))
     assert controls.cfg.editor.ui_fade == 11.0
 
-    _press_focused(controls, _keydown(pygame.K_PAGEUP))
+    _press_focused(controls, _keydown(pygame.K_PAGEDOWN))
     assert controls.cfg.editor.ui_fade == 6.0
 
     for _ in range(6):
@@ -4425,13 +4425,13 @@ def test_settings_adjust_notification_display() -> None:
         controls.cfg.editor.notification_display_sec
         == DEFAULT_NOTIFICATION_DISPLAY_SEC + 1
     )
-    _press_focused(controls, _keydown(pygame.K_PAGEUP))
+    _press_focused(controls, _keydown(pygame.K_PAGEDOWN))
     assert (
         controls.cfg.editor.notification_display_sec
         == DEFAULT_NOTIFICATION_DISPLAY_SEC + 1 - 5
     )
 
-    _press_focused(controls, _keydown(pygame.K_PAGEUP))
+    _press_focused(controls, _keydown(pygame.K_PAGEDOWN))
     assert controls.cfg.editor.notification_display_sec == 1
 
     _press_focused(controls, _keydown(pygame.K_LEFT))
@@ -4494,7 +4494,7 @@ def test_settings_adjust_ui_width() -> None:
     _press_focused(controls, _keydown(pygame.K_RIGHT))
     assert controls.cfg.editor.ui_width == DEFAULT_UI_WIDTH + 1
 
-    _press_focused(controls, _keydown(pygame.K_PAGEUP))
+    _press_focused(controls, _keydown(pygame.K_PAGEDOWN))
     assert controls.cfg.editor.ui_width == DEFAULT_UI_WIDTH + 1 - 5
 
     for _ in range(86):
@@ -4510,7 +4510,7 @@ def test_settings_adjust_ui_min_width() -> None:
     _press_focused(controls, _keydown(pygame.K_RIGHT))
     assert controls.cfg.editor.ui_min_width == DEFAULT_UI_MIN_WIDTH + 1
 
-    _press_focused(controls, _keydown(pygame.K_PAGEUP))
+    _press_focused(controls, _keydown(pygame.K_PAGEDOWN))
     assert controls.cfg.editor.ui_min_width == DEFAULT_UI_MIN_WIDTH + 1 - 5
 
     while controls.cfg.editor.ui_min_width > 40:
@@ -4521,11 +4521,11 @@ def test_settings_adjust_ui_min_width() -> None:
 
     max_width = controls.cfg.editor.ui_width
     while controls.cfg.editor.ui_min_width < max_width:
-        _press_focused(controls, _keydown(pygame.K_PAGEDOWN))
+        _press_focused(controls, _keydown(pygame.K_PAGEUP))
     assert controls.cfg.editor.ui_min_width == max_width
     _press_focused(controls, _keydown(pygame.K_RIGHT))
     assert controls.cfg.editor.ui_min_width == max_width
-    _press_focused(controls, _keydown(pygame.K_PAGEDOWN))
+    _press_focused(controls, _keydown(pygame.K_PAGEUP))
     assert controls.cfg.editor.ui_min_width == max_width
 
 
@@ -4711,7 +4711,7 @@ def test_preset_duration_ctrl_step_is_ten_seconds() -> None:
     press_layer_row(controls, duration, _keydown(pygame.K_RIGHT))
     assert controls.session.layers["layer_1"].preset_duration == 31.0
 
-    press_layer_row(controls, duration, _keydown(pygame.K_PAGEDOWN))
+    press_layer_row(controls, duration, _keydown(pygame.K_PAGEUP))
     assert controls.session.layers["layer_1"].preset_duration == 41.0
 
 
@@ -4753,7 +4753,7 @@ def test_easter_egg_steps_with_standard_and_large_increments() -> None:
     assert controls.session.layers["layer_1"].easter_egg == pytest.approx(1.01)
     assert switched == ["layer_1"]
 
-    press_layer_row(controls, egg, _keydown(pygame.K_PAGEDOWN))
+    press_layer_row(controls, egg, _keydown(pygame.K_PAGEUP))
     assert controls.session.layers["layer_1"].easter_egg == pytest.approx(1.11)
 
 
@@ -4785,7 +4785,7 @@ def test_hard_cut_sensitivity_steps_like_beat_sensitivity() -> None:
         1.51
     )
 
-    press_layer_row(controls, sensitivity, _keydown(pygame.K_PAGEDOWN))
+    press_layer_row(controls, sensitivity, _keydown(pygame.K_PAGEUP))
     assert controls.session.layers["layer_1"].hard_cut_sensitivity == pytest.approx(
         1.61
     )

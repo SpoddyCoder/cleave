@@ -32,6 +32,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- Page Up raises stepped values and Page Down lowers them.
 - Menu underlines sit two pixels under the first letter, and popup row highlights are centered on the label with the same padding above and below as the navigator. Popup mouse-hover uses the same hover wash as the navigator and inspector.
 - Clicking a menu title opens the dropdown without highlighting a command. Arrow keys start the opaque row highlight.
 - The tap-sync detection box draws above the editor panels.

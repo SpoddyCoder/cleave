@@ -50,7 +50,7 @@ class InspectorControls:
             self._horizontal(forward=key == pygame.K_RIGHT, large=False, event=event)
             return True
         if key in (pygame.K_PAGEUP, pygame.K_PAGEDOWN):
-            self._horizontal(forward=key == pygame.K_PAGEDOWN, large=True, event=event)
+            self._horizontal(forward=key == pygame.K_PAGEUP, large=True, event=event)
             return True
         if key in (pygame.K_RETURN, pygame.K_KP_ENTER):
             row = self._current_row()
@@ -133,7 +133,7 @@ class InspectorControls:
         page = event.key in (pygame.K_PAGEUP, pygame.K_PAGEDOWN)
 
         def on_repeat(key: int, _mod: int) -> None:
-            step_forward = key in (pygame.K_RIGHT, pygame.K_PAGEDOWN)
+            step_forward = key in (pygame.K_RIGHT, pygame.K_PAGEUP)
             apply_field_horizontal(self._controls, desc, step_forward, page)
 
         self._controls.arm_key_repeat(event.key, event.mod, on_repeat=on_repeat)

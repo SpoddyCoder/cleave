@@ -195,7 +195,7 @@ def test_milkdrop_beat_sensitivity_keyboard_steps() -> None:
     assert controls.session.project.milkdrop_beat_sensitivity == pytest.approx(
         DEFAULT_BEAT_SENSITIVITY + 0.1
     )
-    press_main_row(controls, _keydown(pygame.K_PAGEDOWN))
+    press_main_row(controls, _keydown(pygame.K_PAGEUP))
     assert controls.session.project.milkdrop_beat_sensitivity == pytest.approx(
         DEFAULT_BEAT_SENSITIVITY + 0.6
     )
@@ -203,7 +203,7 @@ def test_milkdrop_beat_sensitivity_keyboard_steps() -> None:
     assert controls.session.project.milkdrop_beat_sensitivity == pytest.approx(
         DEFAULT_BEAT_SENSITIVITY + 0.5
     )
-    press_main_row(controls, _keydown(pygame.K_PAGEUP))
+    press_main_row(controls, _keydown(pygame.K_PAGEDOWN))
     assert controls.session.project.milkdrop_beat_sensitivity == pytest.approx(
         DEFAULT_BEAT_SENSITIVITY
     )
@@ -380,13 +380,13 @@ def test_start_end_keyboard_steps() -> None:
     controls.focus_descriptor = RowDescriptor(RowKind.PROJECT_RENDER_START)
     press_main_row(controls, _keydown(pygame.K_RIGHT))
     assert render.start_sec == 1
-    press_main_row(controls, _keydown(pygame.K_PAGEDOWN))
+    press_main_row(controls, _keydown(pygame.K_PAGEUP))
     assert render.start_sec == 11
 
     controls.focus_descriptor = RowDescriptor(RowKind.PROJECT_RENDER_END)
     press_main_row(controls, _keydown(pygame.K_LEFT))
     assert render.end_sec == 59
-    press_main_row(controls, _keydown(pygame.K_PAGEUP))
+    press_main_row(controls, _keydown(pygame.K_PAGEDOWN))
     assert render.end_sec == 49
 
 
@@ -397,19 +397,19 @@ def test_width_height_fps_keyboard_steps() -> None:
     controls.focus_descriptor = RowDescriptor(RowKind.PROJECT_RENDER_WIDTH)
     press_main_row(controls, _keydown(pygame.K_RIGHT))
     assert render.width == DEFAULT_RENDER_WIDTH + 10
-    press_main_row(controls, _keydown(pygame.K_PAGEDOWN))
+    press_main_row(controls, _keydown(pygame.K_PAGEUP))
     assert render.width == DEFAULT_RENDER_WIDTH + 110
 
     controls.focus_descriptor = RowDescriptor(RowKind.PROJECT_RENDER_HEIGHT)
     press_main_row(controls, _keydown(pygame.K_LEFT))
     assert render.height == DEFAULT_RENDER_HEIGHT - 10
-    press_main_row(controls, _keydown(pygame.K_PAGEUP))
+    press_main_row(controls, _keydown(pygame.K_PAGEDOWN))
     assert render.height == DEFAULT_RENDER_HEIGHT - 110
 
     controls.focus_descriptor = RowDescriptor(RowKind.PROJECT_RENDER_FPS)
     press_main_row(controls, _keydown(pygame.K_RIGHT))
     assert render.fps == DEFAULT_RENDER_FPS + 1
-    press_main_row(controls, _keydown(pygame.K_PAGEDOWN))
+    press_main_row(controls, _keydown(pygame.K_PAGEUP))
     assert render.fps == DEFAULT_RENDER_FPS + 6
     press_main_row(controls, _keydown(pygame.K_LEFT))
     assert render.fps == DEFAULT_RENDER_FPS + 5

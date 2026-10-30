@@ -336,7 +336,7 @@ def press_main_row(controls: TuningControls, event: pygame.event.Event) -> bool:
             pygame.K_PAGEUP,
             pygame.K_PAGEDOWN,
         ):
-            forward = key in (pygame.K_RIGHT, pygame.K_PAGEDOWN)
+            forward = key in (pygame.K_RIGHT, pygame.K_PAGEUP)
             large = key in (pygame.K_PAGEUP, pygame.K_PAGEDOWN)
             if apply_field_horizontal(controls, desc, forward, large):
                 return True
