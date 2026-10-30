@@ -571,7 +571,6 @@ def test_cycle_stop_reports_help_only_while_the_column_is_open() -> None:
         host._controls = controls
         menu = MenuBarState()
         assert host._cycle_stop(menu) is CycleStop.HELP
-        assert host._scope_label(menu) == "help"
         controls.session.help_visible = False
         assert host._cycle_stop(menu) is CycleStop.INSPECTOR
         assert host._cycle_stop(menu) is not CycleStop.TIMELINE

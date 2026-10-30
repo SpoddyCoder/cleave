@@ -26,6 +26,10 @@ from cleave.viz.inspector import build_inspector_rows
 from cleave.viz.inspector_controls import inspector_command_enabled
 from cleave.viz.menu_bar import MenuBarState, menus_for_session
 from cleave.viz.navigator import NavNode, build_navigator
+from cleave.viz.panel_notification import (
+    PanelNotificationActive,
+    notification_attention,
+)
 from cleave.viz.playback import format_mmss
 from cleave.viz.row_hotkeys import activate_inspector_chip, node_header_descriptor
 from cleave.viz.row_kinds import RowDescriptor, RowKind
@@ -59,12 +63,14 @@ from cleave.viz.theme import (
     BACKGROUND,
     BORDER_COLOR,
     DISABLED,
+    ERROR_NOTIFICATION,
     FOCUS_WASH_ALPHA,
     HIGHLIGHT,
     LABEL,
     LOCK_ICON,
     MUTED,
     NAVIGATOR_BORDER,
+    NOTIFICATION_ON_FILL,
     SELECTED_WASH_ALPHA,
     TRANSPORT_RULE,
     VALUE,
@@ -98,7 +104,6 @@ class TransportReadout:
     duration_sec: float
     bar_text: str
     fps: float | None
-    recording: bool
 
 
 @dataclass(frozen=True)
@@ -124,15 +129,14 @@ class InspectorHeader:
 
 
 def transport_parts(readout: TransportReadout) -> list[tuple[str, tuple[int, int, int]]]:
-    """Play state, clock, and meters for the transport bar.
+    """Play state, clock, and bar for the transport bar.
 
     Play and pause use the action role. The clock uses the value role.
-    Bar, frame rate, and record state use the muted role.
+    The bar uses the muted role. Frame rate is ``transport_fps_text`` so the
+    bar can pin it to the right.
     """
     icon = PAUSE_GLYPH if readout.paused else PLAY_GLYPH
     word = "pause" if readout.paused else "playing"
-    fps = format_fps_value(readout.fps) if readout.fps is not None else "—"
-    recording = "rec on" if readout.recording else "rec off"
     clock = (
         f"{format_mmss(readout.position_sec)} / {format_mmss(readout.duration_sec)}"
     )
@@ -140,9 +144,45 @@ def transport_parts(readout: TransportReadout) -> list[tuple[str, tuple[int, int
         (f"{icon} {word}", ACTION),
         (clock, VALUE),
         (f"bar {readout.bar_text}", MUTED),
-        (f"{fps} fps", MUTED),
-        (recording, MUTED),
     ]
+
+
+def transport_fps_text(readout: TransportReadout) -> str:
+    """Muted frame-rate label pinned to the right of the transport bar."""
+    fps = format_fps_value(readout.fps) if readout.fps is not None else "—"
+    return f"{fps} fps"
+
+
+@dataclass(frozen=True)
+class TransportNotice:
+    """One warning or error line drawn across the transport bar.
+
+    A timed warning uses ``HIGHLIGHT``. A persistent error uses
+    ``ERROR_NOTIFICATION``. ``timed`` is true when a click should dismiss it.
+    """
+
+    text: str
+    accent: tuple[int, int, int]
+    elapsed_sec: float
+    timed: bool
+
+
+def transport_notice(active: PanelNotificationActive) -> TransportNotice | None:
+    """The line the transport bar shows, or None when nothing is up.
+
+    A timed warning wins when both lines are active, so a new toast is not
+    hidden behind a pinned error. The error returns once the warning clears.
+    """
+    if active.message is not None:
+        return TransportNotice(active.message, HIGHLIGHT, active.elapsed_sec, True)
+    if active.persistent_message is not None:
+        return TransportNotice(
+            active.persistent_message,
+            ERROR_NOTIFICATION,
+            active.persistent_elapsed_sec,
+            False,
+        )
+    return None
 
 
 def navigator_twisty(node: NavNode, expanded: Collection[str]) -> str | None:
@@ -541,6 +581,92 @@ def _seat_panel(
     return (x, y + inset, width, height - inset)
 
 
+def _packed(role: tuple[int, int, int]) -> int:
+    return int(imgui.get_color_u32(rgba(role)))
+
+
+def _notice_fill(
+    width: float, attention_progress: float, *, from_left: bool
+) -> tuple[float, float] | None:
+    """Fill origin and width for a swipe across a bar of *width* pixels.
+
+    The origin is relative to the bar's left edge. ``None`` when the accent
+    bar is gone.
+    """
+    if attention_progress <= 0.001 or width <= 0:
+        return None
+    if attention_progress >= 0.999:
+        fill_w = width
+    else:
+        fill_w = float(max(1, int(round(width * attention_progress))))
+    fill_x = 0.0 if from_left else max(0.0, width - fill_w)
+    return fill_x, fill_w
+
+
+def _draw_transport_notice(
+    notice: TransportNotice,
+) -> tuple[float, float, float, float] | None:
+    """Centered accent chip, as wide as the message plus one space each side.
+
+    The play, clock, bar, and frame-rate labels stay in place. Black text is
+    used only while the accent bar covers the message. Before the swipe
+    reaches it, and after the bar slides off, the text stays in the accent
+    colour. Returns the chip rect, or None when there is no message.
+    """
+    if not notice.text:
+        return None
+    origin = imgui.get_window_pos()
+    size = imgui.get_window_size()
+    text_size = imgui.calc_text_size(notice.text)
+    space = imgui.calc_text_size(" ").x
+    chip_w = min(size.x, text_size.x + space * 2.0)
+    chip_x = origin.x + (size.x - chip_w) * 0.5
+    chip = (chip_x, origin.y, chip_w, size.y)
+    draw = imgui.get_window_draw_list()
+    draw.push_clip_rect(
+        imgui.ImVec2(origin.x, origin.y),
+        imgui.ImVec2(origin.x + size.x, origin.y + size.y),
+        False,
+    )
+    try:
+        attention = notification_attention(notice.elapsed_sec)
+        fill = _notice_fill(
+            chip_w,
+            attention.fill_progress,
+            from_left=attention.fill_from_left,
+        )
+        if fill is not None:
+            fill_x, fill_w = fill
+            draw.add_rect_filled(
+                imgui.ImVec2(chip_x + fill_x, origin.y),
+                imgui.ImVec2(chip_x + fill_x + fill_w, origin.y + size.y),
+                _packed(notice.accent),
+            )
+        text_x = origin.x + (size.x - text_size.x) * 0.5
+        text_y = origin.y + (size.y - text_size.y) * 0.5
+        role = notice.accent
+        if attention.text_on_fill and fill is not None:
+            fill_x, fill_w = fill
+            mid = text_x + text_size.x * 0.5
+            if chip_x + fill_x <= mid < chip_x + fill_x + fill_w:
+                role = NOTIFICATION_ON_FILL
+        draw.add_text(imgui.ImVec2(text_x, text_y), _packed(role), notice.text)
+    finally:
+        draw.pop_clip_rect()
+    return chip
+
+
+def _transport_notice_clicked(chip: tuple[float, float, float, float]) -> bool:
+    """True when this frame's left click landed on the toast chip."""
+    if not bool(imgui.get_io().mouse_clicked[0]):
+        return False
+    if not bool(imgui.is_window_hovered()):
+        return False
+    x, y, width, height = chip
+    pos = imgui.get_io().mouse_pos
+    return x <= pos.x < x + width and y <= pos.y < y + height
+
+
 def _stroke_h_rule(
     x0: float,
     x1: float,
@@ -681,6 +807,7 @@ class ShellHost:
         self._splitter: str | None = None
         self._splitter_down_x = 0.0
         self._resize_cursor = False
+        self.transport_notice_clicked = False
         self.top_layer = TopLayer()
 
     @property
@@ -912,6 +1039,7 @@ class ShellHost:
         menu_state: MenuBarState,
         command_ctx: CommandContext,
         readout: TransportReadout | None = None,
+        notice: PanelNotificationActive | None = None,
     ) -> float | None:
         """Menu bar, transport, navigator, inspector, and the open dropdown.
 
@@ -924,7 +1052,7 @@ class ShellHost:
             )
             rule_y, anchors, menus = self._draw_bar(menu_state)
         if self._layout is not None:
-            self._draw_shell(menu_state, readout)
+            self._draw_shell(menu_state, readout, notice)
         popup_hovered = False
         if menu_state.dropdown_open and menus:
             popup_hovered = self._draw_dropdown(
@@ -1003,26 +1131,17 @@ class ShellHost:
             strip_open=bool(session.timeline.panel_open),
         )
 
-    def _scope_label(self, menu_state: MenuBarState) -> str:
-        stop = self._cycle_stop(menu_state)
-        if stop is CycleStop.MENU:
-            return "menu bar"
-        if stop is CycleStop.TIMELINE:
-            return "timeline strip"
-        if stop is CycleStop.HELP:
-            return "help"
-        if stop is CycleStop.INSPECTOR:
-            return "inspector"
-        return "navigator"
-
     def _draw_shell(
-        self, menu_state: MenuBarState, readout: TransportReadout | None
+        self,
+        menu_state: MenuBarState,
+        readout: TransportReadout | None,
+        notice: PanelNotificationActive | None,
     ) -> None:
         layout = self._layout
         if layout is None:
             return
         if readout is None:
-            readout = TransportReadout(False, 0.0, 0.0, "—", None, False)
+            readout = TransportReadout(False, 0.0, 0.0, "—", None)
         state = self._controls.build_view_state(
             paused=readout.paused,
             position_sec=readout.position_sec,
@@ -1052,7 +1171,7 @@ class ShellHost:
                     "##shell-transport",
                     layout.transport,
                     active=False,
-                    body=lambda: self._draw_transport(readout, menu_state),
+                    body=lambda: self._draw_transport(readout, notice),
                 )
             finally:
                 imgui.pop_style_var()
@@ -1171,18 +1290,25 @@ class ShellHost:
         return subject
 
     def _draw_transport(
-        self, readout: TransportReadout, menu_state: MenuBarState
+        self,
+        readout: TransportReadout,
+        notice: PanelNotificationActive | None,
     ) -> None:
         for index, (text, color) in enumerate(transport_parts(readout)):
             if index:
                 imgui.same_line(0.0, _TRANSPORT_GAP)
             imgui.text_colored(rgba(color), text)
-        scope = f"scope: {self._scope_label(menu_state)}"
-        width = imgui.calc_text_size(scope).x
+        fps = transport_fps_text(readout)
+        width = imgui.calc_text_size(fps).x
         avail = imgui.get_window_width()
         pad = imgui.get_style().window_padding.x
         imgui.same_line(max(imgui.get_cursor_pos_x(), avail - width - pad))
-        imgui.text_colored(rgba(HIGHLIGHT), scope)
+        imgui.text_colored(rgba(MUTED), fps)
+        line = None if notice is None else transport_notice(notice)
+        if line is not None:
+            chip = _draw_transport_notice(line)
+            if line.timed and chip is not None and _transport_notice_clicked(chip):
+                self.transport_notice_clicked = True
         origin = imgui.get_window_pos()
         size = imgui.get_window_size()
         _stroke_h_rule(
@@ -1663,12 +1789,14 @@ def draw_shell_frame(
     visibility: float,
     dt: float,
     readout: TransportReadout | None = None,
+    notice: PanelNotificationActive | None = None,
 ) -> None:
     """One ImGui frame: shell windows, chrome, then the top layer.
 
     Skips ``new_frame`` when the shell is hidden, no menu is open, and the
     top layer is empty. The fade covers the shell and chrome only.
     """
+    shell.transport_notice_clicked = False
     if (
         visibility <= _HIDDEN
         and not menu_state.dropdown_open
@@ -1684,7 +1812,9 @@ def draw_shell_frame(
         alpha = 1.0 if menu_state.dropdown_open else max(0.0, min(1.0, visibility))
         imgui.push_style_var(imgui.StyleVar_.alpha, alpha)
         try:
-            rule_y = shell.draw_windows(menu_state, command_ctx, readout)
+            rule_y = shell.draw_windows(
+                menu_state, command_ctx, readout, notice
+            )
             shell.draw_chrome(menu_state, rule_y)
         finally:
             imgui.pop_style_var()

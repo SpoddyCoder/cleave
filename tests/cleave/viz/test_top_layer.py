@@ -213,7 +213,6 @@ def test_apply_imgui_theme_uses_the_role_table() -> None:
 _IMGUI_DRAW_MODULES = (
     "shell_host.py",
     "modal_surface.py",
-    "toast_surface.py",
     "help_column.py",
     "file_picker_surface.py",
     "loading.py",

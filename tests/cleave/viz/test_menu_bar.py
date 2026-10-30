@@ -814,9 +814,9 @@ def _paint_shell(host, menu, ctx, *, frames: int = 2) -> list:
 def test_open_menu_ink_matches_the_mock() -> None:
     """Open title and the current row use background ink on opaque highlight.
 
-    An unfocused check is action, its shortcut is muted, and the scope
-    readout is highlight. The Help row's label, check, and shortcut are
-    background ink while that row is current.
+    An unfocused check is action and its shortcut is muted. The transport
+    bar has no highlight readout. The Help row's label, check, and shortcut
+    are background ink while that row is current.
     """
     from cleave.viz import imgui_host
     from cleave.viz.shell_layout import ShellLayout
@@ -882,7 +882,7 @@ def test_open_menu_ink_matches_the_mock() -> None:
         host.imgui.destroy()
     assert title_ink > 4
     assert row_ink > 4
-    assert scope
+    assert not scope
     assert unfocused_check
     assert unfocused_shortcut
     assert unfocused_label
