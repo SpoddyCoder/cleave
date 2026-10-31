@@ -6,6 +6,7 @@ hold repeats with the same clock as Left/Right.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
@@ -38,6 +39,30 @@ def value_parts(
         (value, color),
         (NUDGE_FORWARD_GLYPH, bracket),
     ]
+
+
+def selectable_text_y(
+    item_min_y: float,
+    item_spacing_y: float,
+    *,
+    selectable_text_align_y: float = 0.0,
+    text_box_height: float = 0.0,
+    text_height: float = 0.0,
+) -> float:
+    """Screen y of a Selectable label, given the item-rect top.
+
+    Selectable grows the highlight by ``trunc(ItemSpacing / 2)`` above the
+    cursor and draws the label at that cursor. Inspector rows submit
+    Selectable with the default size, so the text box is the line height.
+    ``SelectableTextAlign`` only drops the line when that box is taller than
+    the text. Frame padding is not added to this box, so it is not an input.
+    """
+    y = float(item_min_y) + float(math.trunc(float(item_spacing_y) * 0.5))
+    if selectable_text_align_y > 0.0:
+        slack = float(text_box_height) - float(text_height)
+        if slack > 0.0:
+            y += slack * float(selectable_text_align_y)
+    return y
 
 
 def nudge_cluster_origin_x(

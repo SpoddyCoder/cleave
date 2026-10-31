@@ -22,6 +22,7 @@ from cleave.viz.value_nudge import (
     nudge_hit_at,
     nudge_hover_fill_rect,
     nudge_press_skips_row,
+    selectable_text_y,
 )
 from tests.cleave.viz.test_controls import _make_controls
 
@@ -97,6 +98,46 @@ def test_hover_fill_centers_on_the_arrow_character() -> None:
         (back.max_x + forward.min_x) / 2, 28.0, back, forward
     )
     assert body is None
+
+
+def test_selectable_text_y_matches_the_label_line() -> None:
+    # Dear ImGui defaults: ItemSpacing.y is 4, SelectableTextAlign.y is 0,
+    # FramePadding.y is 3. Inspector Selectable uses the default size, so the
+    # text box is the line and frame padding is not part of the offset.
+    line = 13.0
+    assert (
+        selectable_text_y(
+            20.0,
+            4.0,
+            selectable_text_align_y=0.0,
+            text_box_height=line,
+            text_height=line,
+        )
+        == 22.0
+    )
+    assert selectable_text_y(10.0, 3.0) == 11.0
+    assert selectable_text_y(10.0, 1.0) == 10.0
+    # Align drops the line only when the box is taller than the text.
+    assert (
+        selectable_text_y(
+            10.0,
+            4.0,
+            selectable_text_align_y=0.5,
+            text_box_height=18.0,
+            text_height=14.0,
+        )
+        == 14.0
+    )
+    assert (
+        selectable_text_y(
+            10.0,
+            4.0,
+            selectable_text_align_y=1.0,
+            text_box_height=line,
+            text_height=line,
+        )
+        == 12.0
+    )
 
 
 def test_arrow_press_steps_and_skips_drag_and_activate() -> None:

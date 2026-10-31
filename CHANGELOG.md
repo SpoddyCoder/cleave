@@ -36,6 +36,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- Inspector values and their side arrows sit on the same line as the row label.
 - Hovering a side arrow on an inspector value centers the highlight on the arrow character.
 - Page Up raises stepped values and Page Down lowers them.
 - Menu underlines sit two pixels under the first letter, and popup row highlights are centered on the label with the same padding above and below as the navigator. Popup mouse-hover uses the same hover wash as the navigator and inspector.

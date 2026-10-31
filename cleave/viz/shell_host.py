@@ -86,6 +86,7 @@ from cleave.viz.value_nudge import (
     nudge_hit_at,
     nudge_hover_fill_rect,
     nudge_press_skips_row,
+    selectable_text_y,
     value_parts,
 )
 from cleave.viz.top_layer import TopLayer
@@ -464,6 +465,26 @@ def _draw_item_suffix(text: str, color: imgui.ImVec4) -> None:
     _draw_aligned_parts([(text, color)])
 
 
+def _selectable_text_y(item_min_y: float) -> float:
+    """Y of a shell selectable's label, given that item's rect top.
+
+    Rows call Selectable with no explicit size. The theme leaves
+    SelectableTextAlign at (0, 0) and FramePadding at Dear ImGui's default
+    (y = 3), which this widget does not add. The text box is one line, so
+    the align term is zero and the label sits trunc(ItemSpacing.y / 2)
+    below the item rect.
+    """
+    style = imgui.get_style()
+    line = imgui.get_text_line_height()
+    return selectable_text_y(
+        item_min_y,
+        style.item_spacing.y,
+        selectable_text_align_y=style.selectable_text_align.y,
+        text_box_height=line,
+        text_height=line,
+    )
+
+
 def _selectable_label_origin() -> tuple[float, float]:
     """Top-left of the current selectable's label.
 
@@ -471,10 +492,10 @@ def _selectable_label_origin() -> tuple[float, float]:
     ItemSpacing. The label itself is drawn at the unpadded cursor.
     """
     rect_min = imgui.get_item_rect_min()
-    spacing = imgui.get_style().item_spacing
+    spacing_x = imgui.get_style().item_spacing.x
     return (
-        rect_min.x + float(math.trunc(spacing.x * 0.5)),
-        rect_min.y + float(math.trunc(spacing.y * 0.5)),
+        rect_min.x + float(math.trunc(spacing_x * 0.5)),
+        _selectable_text_y(rect_min.y),
     )
 
 
@@ -517,7 +538,8 @@ def _draw_aligned_parts(parts: list[tuple[str, imgui.ImVec4]]) -> None:
     rect_max = imgui.get_item_rect_max()
     pad = imgui.get_style().frame_padding.x
     x = nudge_cluster_origin_x(rect_max.x, widths, pad)
-    y = rect_min.y
+    # Same line as the selectable label. Navigator badges use this too.
+    y = _selectable_text_y(rect_min.y)
     draw = imgui.get_window_draw_list()
     for (text, color), width in zip(parts, widths):
         draw.add_text(imgui.ImVec2(x, y), imgui.get_color_u32(color), text)
@@ -1572,7 +1594,7 @@ class ShellHost:
             fill,
         )
         draw.add_text(
-            imgui.ImVec2(rect.min_x, rect.min_y),
+            imgui.ImVec2(rect.min_x, _selectable_text_y(rect.min_y)),
             imgui.get_color_u32(rgba(NUDGE_HOVER_FG)),
             glyph,
         )
