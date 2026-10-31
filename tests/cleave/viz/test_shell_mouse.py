@@ -25,11 +25,11 @@ from cleave.viz.row_spec import apply_field_horizontal, row_spec
 from cleave.viz.shell_host import (
     _VALUE_DRAG_THRESHOLD_PX,
     ShellHost,
-    _value_parts,
     apply_value_drag,
     inspector_row_stepped,
     value_drag_steps,
 )
+from cleave.viz.value_nudge import value_parts
 from cleave.viz.shell_layout import (
     MIN_COLUMN_WIDTH,
     SPLITTER_HIT_PX,
@@ -115,7 +115,7 @@ def test_locked_drag_does_not_change_the_value() -> None:
 
 
 def test_off_value_keeps_side_arrows_and_stepped_ignores_the_text() -> None:
-    parts = _value_parts("off", imgui.ImVec4(1.0, 1.0, 1.0, 1.0), stepped=True)
+    parts = value_parts("off", imgui.ImVec4(1.0, 1.0, 1.0, 1.0), stepped=True)
     assert [text for text, _color in parts] == ["< ", "off", " >"]
 
     assert tuple(inspect.signature(inspector_row_stepped).parameters) == (
@@ -353,6 +353,7 @@ def _host(visibility: float = 1.0) -> Iterator[ShellHost]:
         cfg=SimpleNamespace(editor=editor),
         settings=SimpleNamespace(set_shell_column_widths=MagicMock()),
         set_shell_region=MagicMock(),
+        disarm_value_nudge=MagicMock(),
     )
     with patch("cleave.viz.imgui_host._gl_context_current", return_value=False):
         imgui_host = ImGuiHost.create()

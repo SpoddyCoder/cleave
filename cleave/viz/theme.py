@@ -17,6 +17,9 @@ Shell rules (not text roles):
   TRANSPORT_RULE — dark rule under the transport bar
   NAVIGATOR_BORDER — dark border around the navigator when it is not the active region
   HOVER - translucent label wash for pointer hover
+  NUDGE_HOVER_FG - foreground for the side arrows on an adjustable inspector value
+  NUDGE_HOVER_BG - background for the side arrows on an adjustable inspector value
+  NUDGE_HOVER_BG_ALPHA - wash alpha for those arrows (stronger than HOVER_BG_ALPHA)
 
 Layout scales:
   UI_SCALE (1.2) — main tuning panel, help, modals, and Material Icons spacing
@@ -179,6 +182,9 @@ OVERRIDE_GLYPH: tuple[int, int, int] = (0, 0, 0)
 OVERRIDE_GLYPH_OFF: tuple[int, int, int] = DISABLED
 FOCUS_ROW_BG_ALPHA: int = 130
 HOVER_BG_ALPHA: int = 36
+NUDGE_HOVER_FG: tuple[int, int, int] = HIGHLIGHT
+NUDGE_HOVER_BG: tuple[int, int, int] = HOVER
+NUDGE_HOVER_BG_ALPHA: int = 72
 # Selected-navigator highlight wash (highlight at 0.16).
 SELECTED_WASH_ALPHA: int = 41
 # Focused-inspector-row highlight wash (highlight at 0.10).

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pygame
 
@@ -31,7 +31,10 @@ def _open_shell(overlay: _Overlay, menu: MenuBarState):
     from cleave.viz.imgui_host import ImGuiHost
     from cleave.viz.shell_host import ShellHost, menu_bar_height_px
 
-    controls = SimpleNamespace(session=SimpleNamespace(layer_z_order=()))
+    controls = SimpleNamespace(
+        session=SimpleNamespace(layer_z_order=()),
+        disarm_value_nudge=MagicMock(),
+    )
     return ShellHost(
         ImGuiHost.create(),
         overlay,

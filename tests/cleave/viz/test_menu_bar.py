@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pygame
 import pytest
@@ -1111,7 +1111,10 @@ def _shell_controls() -> SimpleNamespace:
             layer_z_order=(),
             help_visible=False,
             timeline=SimpleNamespace(panel_open=False),
-        )
+        ),
+        value_nudge=SimpleNamespace(armed=False, desc=None, forward=False),
+        disarm_value_nudge=MagicMock(),
+        begin_value_nudge=MagicMock(),
     )
 
 

@@ -834,6 +834,7 @@ class VisualizerApp:
                 rt.modal_host.tick(self._overlay_dt)
                 if (
                     rt.controls.key_repeat_armed
+                    or rt.controls.value_nudge_armed
                     or rt.timeline_controls.key_repeat_armed
                     or rt.modal_host.text_key_repeat_armed
                 ):

@@ -244,6 +244,7 @@ def _heavy_init_side_effect(
     controls.tick = MagicMock()
     controls.consume_hide_overlay.return_value = False
     controls.key_repeat_armed = False
+    controls.value_nudge_armed = False
     controls.project_render.busy = False
     timeline_controls = MagicMock()
     timeline_controls.key_repeat_armed = False
@@ -364,6 +365,7 @@ def test_run_pygame_quit_clean_exits_via_try_quit(
     controls.consume_pending_exit.return_value = False
     controls.tick = MagicMock()
     controls.key_repeat_armed = False
+    controls.value_nudge_armed = False
     controls.consume_hide_overlay.return_value = False
     controls.project_render.busy = False
 
@@ -424,6 +426,7 @@ def test_run_ctrl_q_clean_exits(
     controls.consume_pending_exit.return_value = False
     controls.tick = MagicMock()
     controls.key_repeat_armed = False
+    controls.value_nudge_armed = False
     controls.consume_hide_overlay.return_value = False
     controls.project_render.busy = False
     controls.handle_move_mode_keydown.return_value = False
@@ -494,6 +497,7 @@ def test_run_pygame_quit_dirty_stays_open(
     controls.consume_pending_exit.return_value = False
     controls.tick = MagicMock()
     controls.key_repeat_armed = False
+    controls.value_nudge_armed = False
     controls.consume_hide_overlay.return_value = False
     controls.project_render.busy = False
 
@@ -558,6 +562,7 @@ def test_run_main_loop_stays_open_without_quit_event(
     controls.consume_pending_exit.return_value = False
     controls.tick = MagicMock()
     controls.key_repeat_armed = False
+    controls.value_nudge_armed = False
     controls.consume_hide_overlay.return_value = False
     controls.project_render.busy = False
 
@@ -661,6 +666,7 @@ def test_run_holds_content_and_overlay_while_project_render_busy(
     controls.consume_pending_exit.return_value = False
     controls.tick = MagicMock()
     controls.key_repeat_armed = False
+    controls.value_nudge_armed = False
     controls.consume_hide_overlay.return_value = False
     controls.project_render.busy = True
 

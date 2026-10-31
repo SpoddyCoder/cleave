@@ -90,6 +90,7 @@ def _host() -> Iterator[object]:
         shell_focus=SimpleNamespace(region=ShellRegion.NAVIGATOR),
         build_view_state=lambda **_kwargs: None,
         set_shell_region=MagicMock(),
+        disarm_value_nudge=MagicMock(),
     )
     overlay = _Overlay()
     menu = MenuBarState()

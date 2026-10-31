@@ -19,6 +19,7 @@ from cleave.viz.post_fx import sync_live_compositor_format
 from cleave.viz.preset_curation_controls import PresetCurationController
 from cleave.viz.preset_list_controls import PresetListController
 from cleave.viz.key_repeat import KeyRepeatController
+from cleave.viz.value_nudge import ValueNudgeHold
 from cleave.viz.modal import ModalHost
 from cleave.viz.panel_notification import (
     PanelNotificationActive,
@@ -118,6 +119,7 @@ class TuningControls:
         )
         self._notification_host = PanelNotificationHost()
         self._key_repeat = KeyRepeatController()
+        self.value_nudge = ValueNudgeHold(self)
         self._hide_overlay_requested = False
         self._overlay_get_visible: Callable[[], bool] | None = None
         self._overlay_hide: Callable[[], None] | None = None
@@ -452,14 +454,32 @@ class TuningControls:
         on_repeat: Callable[[int, int], None],
         accel: bool = True,
     ) -> None:
+        self.value_nudge.release()
         self._key_repeat.on_keydown(key, mod, on_repeat=on_repeat, accel=accel)
+
+    def begin_value_nudge(
+        self, desc: RowDescriptor, forward: bool, repeatable: bool
+    ) -> None:
+        """Capture a side-arrow hold and stop any key repeat."""
+        self._key_repeat.disarm()
+        self.value_nudge.press(desc, forward, repeatable)
+
+    def disarm_value_nudge(self) -> None:
+        self.value_nudge.release()
 
     @property
     def key_repeat_armed(self) -> bool:
         return self._key_repeat.is_armed
 
+    @property
+    def value_nudge_armed(self) -> bool:
+        return self.value_nudge.armed
+
     def tick(self, dt_sec: float) -> None:
+        if not pygame.mouse.get_pressed()[0] or self._modal_host.active:
+            self.value_nudge.release()
         self._key_repeat.tick(dt_sec)
+        self.value_nudge.tick(dt_sec)
         self._notification_host.clear_expired()
         self.project_render.tick()
 

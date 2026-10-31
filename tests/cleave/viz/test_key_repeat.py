@@ -10,6 +10,7 @@ from cleave.viz.key_repeat import (
     INITIAL_DELAY_SEC,
     SLOW_INTERVAL_SEC,
     KeyRepeatController,
+    RepeatClock,
     add_current_preset_key_pressed,
     delete_key_pressed,
 )
@@ -21,6 +22,31 @@ def _arm(controller: KeyRepeatController, repeats: list[tuple[int, int]]) -> Non
         0,
         on_repeat=lambda key, mod: repeats.append((key, mod)),
     )
+
+
+def test_repeat_clock_delay_then_slow_then_fast() -> None:
+    early = RepeatClock()
+    assert early.tick(INITIAL_DELAY_SEC - 0.01) == 0
+
+    boundary = RepeatClock()
+    assert boundary.tick(INITIAL_DELAY_SEC) == 1
+
+    slow = RepeatClock()
+    assert slow.tick(INITIAL_DELAY_SEC) == 1
+    assert slow.tick(SLOW_INTERVAL_SEC) == 1
+    assert slow.tick(SLOW_INTERVAL_SEC * 0.99) == 0
+    assert slow.tick(SLOW_INTERVAL_SEC * 0.01) == 1
+
+    fast = RepeatClock()
+    assert fast.tick(INITIAL_DELAY_SEC) == 1
+    held = INITIAL_DELAY_SEC
+    n_slow = int((ACCEL_AFTER_SEC - INITIAL_DELAY_SEC) / SLOW_INTERVAL_SEC)
+    for _ in range(n_slow):
+        fast.tick(SLOW_INTERVAL_SEC)
+        held += SLOW_INTERVAL_SEC
+    fast.tick(ACCEL_AFTER_SEC - held + 0.001)
+    assert fast.tick(FAST_INTERVAL_SEC * 0.5) == 0
+    assert fast.tick(FAST_INTERVAL_SEC * 0.5) == 1
 
 
 def test_no_repeat_before_initial_delay() -> None:

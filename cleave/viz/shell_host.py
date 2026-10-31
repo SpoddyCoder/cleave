@@ -71,10 +71,22 @@ from cleave.viz.theme import (
     MUTED,
     NAVIGATOR_BORDER,
     NOTIFICATION_ON_FILL,
+    NUDGE_HOVER_BG,
+    NUDGE_HOVER_BG_ALPHA,
+    NUDGE_HOVER_FG,
     SELECTED_WASH_ALPHA,
     TRANSPORT_RULE,
     VALUE,
     tuning_ui_metrics,
+)
+from cleave.viz.value_nudge import (
+    NudgeRect,
+    nudge_arrow_rects,
+    nudge_cluster_origin_x,
+    nudge_hit_at,
+    nudge_hover_fill_rect,
+    nudge_press_skips_row,
+    value_parts,
 )
 from cleave.viz.top_layer import TopLayer
 
@@ -504,7 +516,7 @@ def _draw_aligned_parts(parts: list[tuple[str, imgui.ImVec4]]) -> None:
     rect_min = imgui.get_item_rect_min()
     rect_max = imgui.get_item_rect_max()
     pad = imgui.get_style().frame_padding.x
-    x = rect_max.x - sum(widths) - pad
+    x = nudge_cluster_origin_x(rect_max.x, widths, pad)
     y = rect_min.y
     draw = imgui.get_window_draw_list()
     for (text, color), width in zip(parts, widths):
@@ -521,24 +533,14 @@ def _inspector_row_selected(focus: Any, desc: Any) -> bool:
 
 
 def inspector_row_stepped(state: object, desc: RowDescriptor) -> bool:
-    """Whether this inspector row paints side arrows and accepts sideways drag.
+    """Whether this inspector row paints side arrows and accepts a sideways drag.
 
-    Arrows stay paint-only. Drag uses the row selectable. The section-lock
-    rule matches Left/Right.
+    The section-lock rule matches Left/Right.
     """
     return (
         row_spec(desc.kind).apply_horizontal is not None
         and not section_lock_blocks_mutation(state, desc)
     )
-
-
-def _value_parts(
-    value: str, color: imgui.ImVec4, *, stepped: bool
-) -> list[tuple[str, imgui.ImVec4]]:
-    if not stepped:
-        return [(value, color)]
-    bracket = rgba(DISABLED)
-    return [("< ", bracket), (value, color), (" >", bracket)]
 
 
 def border_stroke_outset_px(border_size: float, *, anti_aliased_lines: bool) -> float:
@@ -799,6 +801,7 @@ class ShellHost:
         self._layout: ShellLayout | None = None
         self._value_drag_accum = 0.0
         self._value_drag_crossed = False
+        self._nudge_swallow = False
         # Live drag requests. A drag that moves at least 1px persists the stack
         # and help, then clears these.
         self._insp_width: int | None = None
@@ -839,10 +842,7 @@ class ShellHost:
     def process_event(self, event: pygame.event.Event) -> None:
         """Mouse motion, buttons, and wheel only. Keys stay out of ImGui."""
         # Host active covers the click before the top layer has drawn the modal.
-        modal_host = getattr(self._controls, "modal_host", None)
-        if self.top_layer.modal_active or (
-            modal_host is not None and modal_host.active
-        ):
+        if self._modal_has_pointer():
             self._process_modal_event(event)
             return
         imgui_host = self.imgui
@@ -866,6 +866,7 @@ class ShellHost:
             if down:
                 if self._clicks_ignored():
                     self._cancel_splitter_drag()
+                    self._controls.disarm_value_nudge()
                     return
                 x = float(event.pos[0])
                 y = float(event.pos[1])
@@ -895,12 +896,14 @@ class ShellHost:
             return
         if event.type == pygame.MOUSEWHEEL:
             if self._clicks_ignored():
+                self._controls.disarm_value_nudge()
                 return
             imgui_host.process_mouse_event(event)
 
     def _process_modal_event(self, event: pygame.event.Event) -> None:
         """Forward the pointer to ImGui. The shell takes no region or splitter."""
         self._cancel_splitter_drag()
+        self._controls.disarm_value_nudge()
         imgui_host = self.imgui
         if event.type == pygame.MOUSEMOTION:
             imgui_host.process_mouse_event(event)
@@ -996,6 +999,7 @@ class ShellHost:
     def _track_splitter_motion(self, x: float, y: float) -> None:
         if self._clicks_ignored():
             self._cancel_splitter_drag()
+            self._controls.disarm_value_nudge()
             return
         if self._splitter is not None:
             self._assign_splitter_width(self._splitter, x)
@@ -1026,6 +1030,8 @@ class ShellHost:
         The caller owns the ImGui frame and the fade. Returns the menu-rule
         row, or None when the bar did not open.
         """
+        if self._nudge_input_blocked():
+            self._controls.disarm_value_nudge()
         with _menu_bar_frame_padding():
             self._menu_bar_height_px = max(
                 1, int(round(imgui.get_frame_height()))
@@ -1044,6 +1050,7 @@ class ShellHost:
             if not in_bar:
                 menu_state.blur()
         self._release_value_drag()
+        self._release_nudge_swallow()
         return rule_y
 
     def draw_chrome(self, menu_state: MenuBarState, rule_y: float | None) -> None:
@@ -1447,14 +1454,21 @@ class ShellHost:
             if spec.shows_dirty_suffix and state.config_dirty:
                 value = f"{value}*" if value else "*"
             if value:
-                _draw_aligned_parts(
-                    _value_parts(
-                        value,
-                        rgba(value_color),
-                        stepped=stepped,
-                    )
+                parts = value_parts(
+                    value,
+                    rgba(value_color),
+                    stepped=stepped,
                 )
-            if stepped:
+                _draw_aligned_parts(parts)
+                if stepped:
+                    self._handle_value_nudge(
+                        row,
+                        desc,
+                        parts,
+                        repeatable=spec.repeatable,
+                        activated=activated,
+                    )
+            if stepped and not self._nudge_swallow:
                 self._track_value_drag(
                     row,
                     desc,
@@ -1463,12 +1477,118 @@ class ShellHost:
                 )
             # A release still over the row reports clicked. A gesture that
             # already stepped is a drag, so it must not run the row action.
-            if clicked and not self._value_drag_crossed:
+            # An arrow press is neither a drag nor an activate.
+            if (
+                clicked
+                and not self._value_drag_crossed
+                and not self._nudge_swallow
+            ):
                 self._controls.inspector.focus_row(row)
                 self._controls.inspector.activate(row)
         finally:
             if indent:
                 imgui.unindent(indent)
+
+    def _handle_value_nudge(
+        self,
+        row: Any,
+        desc: RowDescriptor,
+        parts: list[tuple[str, imgui.ImVec4]],
+        *,
+        repeatable: bool,
+        activated: bool,
+    ) -> None:
+        """Hover and press the painted side arrows. The value string is not a hit."""
+        if len(parts) != 3:
+            return
+        rect_min = imgui.get_item_rect_min()
+        rect_max = imgui.get_item_rect_max()
+        widths = [imgui.calc_text_size(text).x for text, _color in parts]
+        pad = imgui.get_style().frame_padding.x
+        back_rect, forward_rect = nudge_arrow_rects(
+            rect_min.x,
+            rect_min.y,
+            rect_max.x,
+            rect_max.y,
+            widths,
+            frame_pad_x=pad,
+        )
+        blocked = self._nudge_input_blocked()
+        mouse = imgui.get_mouse_pos()
+        hit = (
+            None
+            if blocked
+            else nudge_hit_at(mouse.x, mouse.y, back_rect, forward_rect)
+        )
+        hold = self._controls.value_nudge
+        held_here = hold.armed and hold.desc == desc
+        hover_forward: bool | None = None
+        if held_here:
+            hover_forward = hold.forward
+        elif hit is not None and not hold.armed:
+            hover_forward = hit.forward
+        if hover_forward is not None:
+            self._paint_nudge_hover(
+                forward_rect if hover_forward else back_rect,
+                parts,
+                hover_forward,
+            )
+        if (
+            not activated
+            or blocked
+            or not nudge_press_skips_row(hit)
+            or hit is None
+        ):
+            return
+        self._controls.inspector.focus_row(row)
+        apply_field_horizontal(self._controls, desc, hit.forward, False)
+        self._controls.begin_value_nudge(desc, hit.forward, repeatable)
+        self._clear_value_drag()
+        self._nudge_swallow = True
+
+    def _paint_nudge_hover(
+        self,
+        rect: NudgeRect,
+        parts: list[tuple[str, imgui.ImVec4]],
+        forward: bool,
+    ) -> None:
+        glyph = parts[2][0] if forward else parts[0][0]
+        arrow = ">" if forward else "<"
+        arrow_width = imgui.calc_text_size(arrow).x
+        space_width = imgui.calc_text_size(" ").x
+        fill_rect = nudge_hover_fill_rect(
+            rect,
+            forward=forward,
+            arrow_width=arrow_width,
+            space_width=space_width,
+        )
+        draw = imgui.get_window_draw_list()
+        fill = imgui.get_color_u32(
+            rgba(NUDGE_HOVER_BG, NUDGE_HOVER_BG_ALPHA / 255.0)
+        )
+        draw.add_rect_filled(
+            imgui.ImVec2(fill_rect.min_x, fill_rect.min_y),
+            imgui.ImVec2(fill_rect.max_x, fill_rect.max_y),
+            fill,
+        )
+        draw.add_text(
+            imgui.ImVec2(rect.min_x, rect.min_y),
+            imgui.get_color_u32(rgba(NUDGE_HOVER_FG)),
+            glyph,
+        )
+
+    def _nudge_input_blocked(self) -> bool:
+        return self._clicks_ignored() or self._modal_has_pointer()
+
+    def _modal_has_pointer(self) -> bool:
+        modal_host = getattr(self._controls, "modal_host", None)
+        return bool(self.top_layer.modal_active) or (
+            modal_host is not None and bool(modal_host.active)
+        )
+
+    def _release_nudge_swallow(self) -> None:
+        if not imgui.is_mouse_down(0):
+            self._nudge_swallow = False
 
     def _track_value_drag(
         self,

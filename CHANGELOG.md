@@ -11,6 +11,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- Side arrows on adjustable inspector values highlight on hover, step once on click, and repeat while held like Left and Right.
 - Help is a check on the Settings menu, and About Cleave is on the File menu. The Help menu and its Keyboard shortcuts item are gone.
 - Help is not a Tab stop, and clicking the column does not move focus.
 - Settings chooses the navigator column and the help column side separately. They start with the navigator and inspector on the left and help on the right. The Docked layout command is gone.
@@ -35,6 +36,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- Hovering a side arrow on an inspector value centers the highlight on the arrow character.
 - Page Up raises stepped values and Page Down lowers them.
 - Menu underlines sit two pixels under the first letter, and popup row highlights are centered on the label with the same padding above and below as the navigator. Popup mouse-hover uses the same hover wash as the navigator and inspector.
 - Clicking a menu title opens the dropdown without highlighting a command. Arrow keys start the opaque row highlight.

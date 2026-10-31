@@ -90,6 +90,7 @@ def _host() -> Iterator[object]:
         build_view_state=lambda **_kwargs: None,
         set_shell_region=MagicMock(),
         modal_host=ModalHost(),
+        disarm_value_nudge=MagicMock(),
     )
     with patch.object(imgui_host, "_gl_context_current", return_value=False):
         host = ShellHost(

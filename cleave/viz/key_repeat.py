@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import pygame
 
@@ -54,15 +54,48 @@ def add_current_preset_key_pressed(key: int, mod: int) -> bool:
     return key == pygame.K_p
 
 
+class RepeatClock:
+    """Delay, then repeating fires. Reports how many times to fire each tick."""
+
+    def __init__(self) -> None:
+        self.held_sec = 0.0
+        self.since_last_repeat_sec = 0.0
+        self.fired_once = False
+
+    def tick(self, dt_sec: float, *, accel: bool = True) -> int:
+        self.held_sec += dt_sec
+        if self.held_sec < INITIAL_DELAY_SEC:
+            return 0
+
+        if not self.fired_once:
+            self.fired_once = True
+            self.since_last_repeat_sec = 0.0
+            return 1
+
+        interval = (
+            SLOW_INTERVAL_SEC
+            if not accel
+            else (
+                FAST_INTERVAL_SEC
+                if self.held_sec >= ACCEL_AFTER_SEC
+                else SLOW_INTERVAL_SEC
+            )
+        )
+        self.since_last_repeat_sec += dt_sec
+        fires = 0
+        while self.since_last_repeat_sec >= interval:
+            fires += 1
+            self.since_last_repeat_sec -= interval
+        return fires
+
+
 @dataclass
 class _ActiveRepeat:
     key: int
     mod: int
     on_repeat: Callable[[int, int], None]
     accel: bool = True
-    held_sec: float = 0.0
-    since_last_repeat_sec: float = 0.0
-    fired_once: bool = False
+    clock: RepeatClock = field(default_factory=RepeatClock)
 
 
 class KeyRepeatController:
@@ -101,27 +134,5 @@ class KeyRepeatController:
         active = self._active
         if active is None:
             return
-
-        active.held_sec += dt_sec
-        if active.held_sec < INITIAL_DELAY_SEC:
-            return
-
-        if not active.fired_once:
+        for _ in range(active.clock.tick(dt_sec, accel=active.accel)):
             active.on_repeat(active.key, active.mod)
-            active.fired_once = True
-            active.since_last_repeat_sec = 0.0
-            return
-
-        interval = (
-            SLOW_INTERVAL_SEC
-            if not active.accel
-            else (
-                FAST_INTERVAL_SEC
-                if active.held_sec >= ACCEL_AFTER_SEC
-                else SLOW_INTERVAL_SEC
-            )
-        )
-        active.since_last_repeat_sec += dt_sec
-        while active.since_last_repeat_sec >= interval:
-            active.on_repeat(active.key, active.mod)
-            active.since_last_repeat_sec -= interval
