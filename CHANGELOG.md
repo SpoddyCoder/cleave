@@ -11,6 +11,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- Help is not a Tab stop, and clicking the column does not move focus.
 - Settings chooses the navigator column and the help column side separately. They start with the navigator and inspector on the left and help on the right. The Docked layout command is gone.
 - The navigator lists a single Overlays row. Opening and closing cards stay in the inspector.
 - The navigator sits on top of the inspector in one column, and the visualiser uses the freed width.

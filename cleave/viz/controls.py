@@ -48,9 +48,7 @@ from cleave.viz.focus_nav import (
 from cleave.viz.inspector_controls import InspectorControls
 from cleave.viz.navigator import build_navigator, layer_node_id
 from cleave.viz.navigator_controls import NavigatorControls
-from cleave.viz.menu_bar import MenuBarState
 from cleave.viz.shell_focus import (
-    CycleStop,
     ShellFocusState,
     ShellRegion,
     reconcile_nav_id,
@@ -124,7 +122,6 @@ class TuningControls:
         self._overlay_get_visible: Callable[[], bool] | None = None
         self._overlay_hide: Callable[[], None] | None = None
         self._overlay_show: Callable[[], None] | None = None
-        self._menu_bar: MenuBarState | None = None
 
         self.layer_lifecycle = LayerLifecycleController(
             session,
@@ -334,11 +331,6 @@ class TuningControls:
             self._apply_focus_cursor(snapshot.focus_cursor)
             # Exact snapshot: a saved strip cursor outside Timeline stays put.
             self.shell_focus.region = snapshot.shell_region
-        if (
-            not self.session.help_visible
-            and self.shell_focus.region is ShellRegion.HELP
-        ):
-            self.restore_help_subject()
         if snapshot.overlay_visible and self._overlay_show is not None:
             self._overlay_show()
 
@@ -746,52 +738,17 @@ class TuningControls:
         if 0 <= desc.marker_index < len(times):
             self.seek_to(times[desc.marker_index])
 
-    def bind_menu_bar(self, menu: MenuBarState) -> None:
-        """Menu bar restored when closing Help returns to a Menu subject."""
-        self._menu_bar = menu
-
     def close_help(self) -> None:
-        """Hide the help column and restore the subject when Help has scope."""
+        """Hide the help column. Focus stays where it is."""
         self.session.help_visible = False
-        if self.shell_focus.region is ShellRegion.HELP:
-            self.restore_help_subject()
 
-    def restore_help_subject(self) -> None:
-        """Leave Help for the stop recorded on entry.
-
-        Menu focuses the bound menu bar and parks the shell on the navigator.
-        Timeline falls back to the inspector when the strip is closed.
-        """
-        subject = self.shell_focus.help_subject
-        strip_open = bool(self.session.timeline.panel_open)
-        if subject is CycleStop.MENU and self._menu_bar is not None:
-            self._menu_bar.focus()
-            self.set_shell_region(ShellRegion.NAVIGATOR)
-            return
-        if subject is CycleStop.TIMELINE and strip_open:
-            self.set_shell_region(ShellRegion.TIMELINE)
-            return
-        if subject is CycleStop.INSPECTOR or subject is CycleStop.TIMELINE:
-            self.set_shell_region(ShellRegion.INSPECTOR)
-            return
-        self.set_shell_region(ShellRegion.NAVIGATOR)
-
-    def set_shell_region(
-        self, region: ShellRegion, *, menu_focused: bool = False
-    ) -> None:
+    def set_shell_region(self, region: ShellRegion) -> None:
         """Give *region* keyboard scope and keep the strip cursor in sync.
 
         Entering Timeline selects the stored lane, clamped to the layer count.
-        Leaving Timeline, including for Help, replaces a ``TimelineFocus``
-        cursor with the timeline header stand-in and leaves the stored lane
-        in place. Entering Help records the current stop when it is not
-        already Help. A focused menu bar records Menu.
+        Leaving Timeline replaces a ``TimelineFocus`` cursor with the timeline
+        header stand-in and leaves the stored lane in place.
         """
-        if (
-            region is ShellRegion.HELP
-            and self.shell_focus.region is not ShellRegion.HELP
-        ):
-            self._remember_help_subject(menu_focused=menu_focused)
         if region is ShellRegion.TIMELINE:
             self.shell_focus.region = ShellRegion.TIMELINE
             self._apply_focus_cursor(
@@ -803,18 +760,6 @@ class TuningControls:
                 MainFocus(RowDescriptor(RowKind.RENDER_TIMELINE_HEADER))
             )
         self.shell_focus.region = region
-
-    def _remember_help_subject(self, *, menu_focused: bool) -> None:
-        if menu_focused:
-            self.shell_focus.help_subject = CycleStop.MENU
-            return
-        region = self.shell_focus.region
-        if region is ShellRegion.INSPECTOR:
-            self.shell_focus.help_subject = CycleStop.INSPECTOR
-        elif region is ShellRegion.TIMELINE:
-            self.shell_focus.help_subject = CycleStop.TIMELINE
-        else:
-            self.shell_focus.help_subject = CycleStop.NAVIGATOR
 
     def _clamped_timeline_focus_row(self) -> int:
         row_count = len(self.session.layer_z_order)

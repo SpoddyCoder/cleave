@@ -71,9 +71,9 @@ def _timeline_keys(**kwargs: object) -> list[str]:
 
 def _assert_shell_navigation(entries: dict[str, str]) -> None:
     cycle = entries["Tab / Shift+Tab"]
-    for name in ("Menu", "Navigator", "Inspector", "Help", "Timeline"):
+    for name in ("Menu", "Navigator", "Inspector", "Timeline"):
         assert name in cycle
-    assert "Help only while the column is open" in cycle
+    assert "Help" not in cycle
     assert "Timeline only while the strip is open" in cycle
     move = entries["Up/Down"]
     assert "navigator nodes" in move
@@ -885,19 +885,6 @@ def test_each_stop_has_its_own_shortcut_section() -> None:
         "Opacity",
         "Timeline",
     }
-
-
-def test_help_subject_is_used_when_the_column_is_focused() -> None:
-    focus = RowDescriptor(RowKind.TRACK_HEADER)
-    shell = ShellFocusState(
-        region=ShellRegion.HELP,
-        help_subject=CycleStop.MENU,
-        selected_id="settings",
-    )
-    sections = help_sections(focus, shell_focus=shell)
-    assert sections == (navigation_section(),)
-    direct = help_sections_for_stop(shell.help_subject, focus, shell_focus=shell)
-    assert direct == sections
 
 
 def test_curation_navigation_omits_disabled_global_hotkeys() -> None:

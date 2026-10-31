@@ -332,7 +332,6 @@ def init_gl_resources_heavy(
 
 
 def bind_live_runtime_overlay_hooks(runtime: LiveVisualizerRuntime) -> None:
-    runtime.controls.bind_menu_bar(runtime.menu_bar)
     runtime.controls.bind_tap_sync_overlay(
         get_visible=runtime.ui_fade.is_visible,
         hide=runtime.ui_fade.hide_immediately,

@@ -563,54 +563,15 @@ def test_help_splitter_under_one_pixel_does_not_persist() -> None:
         assert host._splitter is None
 
 
-def test_cycle_stop_reports_help_only_while_the_column_is_open() -> None:
+def test_cycle_stop_stays_on_timeline_while_help_is_open() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.help_visible = True
     controls.session.timeline.panel_open = True
     controls.set_shell_region(ShellRegion.TIMELINE)
-    controls.set_shell_region(ShellRegion.HELP)
     with _host() as host:
         host._controls = controls
         menu = MenuBarState()
-        assert host._cycle_stop(menu) is CycleStop.HELP
-        controls.session.help_visible = False
-        assert host._cycle_stop(menu) is CycleStop.INSPECTOR
-        assert host._cycle_stop(menu) is not CycleStop.TIMELINE
-
-
-def test_help_window_applies_pending_scroll_and_drops_it_when_closed() -> None:
-    from cleave.viz.commands import command_context
-    from cleave.viz.shell_host import draw_shell_frame
-
-    controls = _make_controls(("layer_1",))
-    controls.session.help_visible = True
-    controls.set_shell_region(ShellRegion.HELP)
-    with _host() as host:
-        host._controls = controls
-        host.imgui.display_size = (1280, 720)
-        layout = ShellLayout.compute(
-            1280, 720, 23, 23, 0, help_width=DEFAULT_HELP_WIDTH
-        )
-        host.set_layout(layout)
-        host.scroll_help(40.0)
-        host.scroll_help(-15.0)
-        assert host.help_scroll_px == 25.0
-        with patch("cleave.viz.shell_host.imgui.set_scroll_y") as set_scroll_y:
-            draw_shell_frame(
-                host, MenuBarState(), command_context(controls), 1.0, 1 / 60
-            )
-        assert host.help_scroll_px == 0.0
-        set_scroll_y.assert_called_once()
-        assert set_scroll_y.call_args.args[0] == pytest.approx(25.0)
-
-        host.scroll_help(40.0)
-        host.set_layout(ShellLayout.compute(1280, 720, 23, 23, 0, help_width=0))
-        with patch("cleave.viz.shell_host.imgui.set_scroll_y") as set_scroll_y:
-            draw_shell_frame(
-                host, MenuBarState(), command_context(controls), 1.0, 1 / 60
-            )
-        assert host.help_scroll_px == 0.0
-        set_scroll_y.assert_not_called()
+        assert host._cycle_stop(menu) is CycleStop.TIMELINE
 
 
 def test_navigator_content_height_is_measured_for_the_next_frame() -> None:
@@ -724,10 +685,10 @@ def test_click_in_inspector_sets_inspector_and_keeps_strip_open() -> None:
         assert controls.session.timeline.panel_open is True
 
 
-def test_click_in_help_sets_help_region() -> None:
+def test_click_in_help_leaves_the_region() -> None:
     controls = _make_controls(("layer_1", "layer_2"))
     controls.open_timeline_panel(enter_submenu=True)
-    controls.session.timeline.focus_row = 1
+    controls.set_timeline_focus_row(1)
     controls.session.help_visible = True
     with _host() as host:
         host._controls = controls
@@ -738,11 +699,10 @@ def test_click_in_help_sets_help_region() -> None:
 
         _click(host, _rect_center(layout.help))
 
-        assert controls.shell_focus.region is ShellRegion.HELP
-        assert controls.shell_focus.help_subject is CycleStop.TIMELINE
+        assert controls.shell_focus.region is ShellRegion.TIMELINE
+        assert controls.focus_cursor == TimelineFocus(1)
         assert controls.session.timeline.panel_open is True
-        assert controls.session.timeline.focus_row == 1
-        assert not isinstance(controls.focus_cursor, TimelineFocus)
+        assert controls.session.help_visible is True
         assert host.imgui.queued_buttons == [(0, True)]
 
 

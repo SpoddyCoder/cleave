@@ -803,7 +803,6 @@ class ShellHost:
         # and help, then clears these.
         self._insp_width: int | None = None
         self._help_width: int | None = None
-        self._help_scroll_px = 0.0
         self._splitter: str | None = None
         self._splitter_down_x = 0.0
         self._resize_cursor = False
@@ -836,15 +835,6 @@ class ShellHost:
     def help_width(self) -> int | None:
         """Help width requested by an in-progress splitter drag."""
         return self._help_width
-
-    @property
-    def help_scroll_px(self) -> float:
-        """Pending help-column scroll, applied the next time the window draws."""
-        return self._help_scroll_px
-
-    def scroll_help(self, delta_px: float) -> None:
-        """Queue a vertical scroll for the help column."""
-        self._help_scroll_px += float(delta_px)
 
     def process_event(self, event: pygame.event.Event) -> None:
         """Mouse motion, buttons, and wheel only. Keys stay out of ImGui."""
@@ -933,10 +923,10 @@ class ShellHost:
             imgui_host.process_mouse_event(event)
 
     def _assign_shell_region(self, x: float, y: float) -> None:
-        """Left click chooses navigator, inspector, help, or the open strip.
+        """Left click chooses navigator, inspector, or the open strip.
 
-        Menu, transport, and the visualiser leave the region alone. A miss
-        when no layout is stored does nothing. The strip stays open.
+        Menu, transport, help, and the visualiser leave the region alone. A
+        miss when no layout is stored does nothing. The strip stays open.
         """
         layout = self._layout
         if layout is None:
@@ -949,16 +939,6 @@ class ShellHost:
             return
         if layout.timeline[3] > 0 and _rect_contains(layout.timeline, x, y):
             self._controls.set_shell_region(ShellRegion.TIMELINE)
-            return
-        if (
-            layout.help[2] > 0
-            and layout.help[3] > 0
-            and _rect_contains(layout.help, x, y)
-        ):
-            self._controls.set_shell_region(
-                ShellRegion.HELP,
-                menu_focused=self._menu_state.focused,
-            )
 
     def _splitter_at(self, x: float, y: float) -> str | None:
         layout = self._layout
@@ -1127,7 +1107,6 @@ class ShellHost:
         return cycle_stop_for_focus(
             menu_focused=menu_state.focused,
             region=self._controls.shell_focus.region,
-            help_open=bool(session.help_visible),
             strip_open=bool(session.timeline.panel_open),
         )
 
@@ -1194,7 +1173,6 @@ class ShellHost:
             self._draw_help(
                 layout.help,
                 seat,
-                active=stop is CycleStop.HELP,
                 state=state,
                 menu_state=menu_state,
             )
@@ -1247,22 +1225,16 @@ class ShellHost:
         rect: tuple[int, int, int, int],
         seat: int,
         *,
-        active: bool,
         state: object | None,
         menu_state: MenuBarState,
     ) -> None:
         if rect[2] <= 0 or rect[3] <= 0:
-            self._help_scroll_px = 0.0
             return
 
         def body() -> None:
-            pending = self._help_scroll_px
-            self._help_scroll_px = 0.0
-            if pending != 0.0:
-                imgui.set_scroll_y(imgui.get_scroll_y() + pending)
             if state is None:
                 return
-            stop = self._help_content_stop(menu_state)
+            stop = self._cycle_stop(menu_state)
             shell_focus = self._controls.shell_focus
             draw_help_column(
                 help_sections_for_stop(
@@ -1274,20 +1246,11 @@ class ShellHost:
         self._draw_fixed_window(
             "##shell-help",
             _seat_panel(rect, seat),
-            active=active,
+            active=False,
             idle_border=NAVIGATOR_BORDER,
             body=body,
             scrollable=True,
         )
-
-    def _help_content_stop(self, menu_state: MenuBarState) -> CycleStop:
-        stop = self._cycle_stop(menu_state)
-        if stop is not CycleStop.HELP:
-            return stop
-        subject = self._controls.shell_focus.help_subject
-        if subject is CycleStop.HELP:
-            return CycleStop.NAVIGATOR
-        return subject
 
     def _draw_transport(
         self,

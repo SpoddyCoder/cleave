@@ -52,8 +52,8 @@ _NAVIGATOR_EXPAND_ENTRY = (
 )
 _REGION_CYCLE_ENTRY = (
     "Tab / Shift+Tab",
-    "cycle Menu, Navigator, Inspector, Help, and Timeline; "
-    "Help only while the column is open, Timeline only while the strip is open",
+    "cycle Menu, Navigator, Inspector, and Timeline; "
+    "Timeline only while the strip is open",
 )
 _TOP_LEVEL_NAV_ENTRY = (
     "Ctrl + Up/Down",
@@ -480,18 +480,9 @@ def help_stop_for_shell(
         return CycleStop.TIMELINE
     if shell_focus is None:
         return CycleStop.INSPECTOR
-    if shell_focus.region is ShellRegion.HELP:
-        return _subject_stop(shell_focus)
     if shell_focus.region is ShellRegion.INSPECTOR:
         return CycleStop.INSPECTOR
     return CycleStop.NAVIGATOR
-
-
-def _subject_stop(shell_focus: ShellFocusState) -> CycleStop:
-    subject = shell_focus.help_subject
-    if subject is CycleStop.HELP:
-        return CycleStop.NAVIGATOR
-    return subject
 
 
 def _described_row(
@@ -553,12 +544,7 @@ def help_sections_for_stop(
     preset_curation: bool = False,
     layer_count: int = 4,
 ) -> tuple[HelpContent, ...]:
-    """Help for one Tab stop. ``CycleStop.HELP`` uses ``shell_focus.help_subject``."""
-    if stop is CycleStop.HELP:
-        if shell_focus is None:
-            stop = CycleStop.NAVIGATOR
-        else:
-            stop = _subject_stop(shell_focus)
+    """Help for one Tab stop."""
     if stop is CycleStop.MENU:
         return (navigation_section(preset_curation=preset_curation),)
     if stop is CycleStop.TIMELINE:
