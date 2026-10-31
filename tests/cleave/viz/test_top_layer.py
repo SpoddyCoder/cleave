@@ -22,7 +22,7 @@ from cleave.viz.shell_layout import ShellLayout
 from cleave.viz.top_layer import InfoPanelSurface
 
 _MODAL_RECT = (480, 260, 200, 120)
-_PANEL_RECT = (400, 200, 120, 80)
+_PANEL_RECT = (640, 200, 120, 80)
 
 
 class _Overlay:
@@ -186,8 +186,8 @@ def test_chrome_contains_recorded_top_layer_rect() -> None:
     with _host() as host:
         host.top_layer.push(_FixedSurface("##top-panel", _PANEL_RECT, modal=False))
         _draw(host)
-        assert host._chrome_contains(450, 230)
-        assert not host._chrome_contains(300, 400)
+        assert host._chrome_contains(690, 230)
+        assert not host._chrome_contains(900, 400)
 
 
 def test_apply_imgui_theme_uses_the_role_table() -> None:

@@ -3,9 +3,11 @@
 Rects are ``(x, y, w, h)`` in top-left origin pixels. One layout is computed
 per frame and shared by the shell host, overlay placement, and the compositor.
 
-The navigator and the inspector share one side stack. The navigator is the
-top of that stack, only as tall as its rows. The inspector is the remainder.
-Help is a full-height column beside the stack.
+The navigator and the inspector share one side column. The navigator is the
+top of that column, only as tall as its rows. The inspector is the remainder.
+Help is its own full-height column. Each column chooses left or right. When
+they share a side, help sits at the window edge and the navigator column
+stays against the visualiser.
 """
 
 from __future__ import annotations
@@ -13,8 +15,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from cleave.config_schema.editor import (
+    DEFAULT_HELP_SIDE,
     DEFAULT_INSPECTOR_WIDTH,
+    DEFAULT_NAVIGATOR_SIDE,
     MIN_COLUMN_WIDTH,
+    ColumnSide,
 )
 from cleave.viz.theme import tuning_ui_metrics
 
@@ -124,7 +129,7 @@ def _column_widths(
 
     A missing inspector request uses the nominal stack width and no column
     floor, so callers that omit overrides keep the proportional narrow-window
-    split. Help stays closed unless a positive width is requested.
+    widths. Help stays closed unless a positive width is requested.
     """
     help_request = 0 if help_width is None else help_width
     overridden = insp is not None or help_request > 0
@@ -184,16 +189,11 @@ def splitter_hit(
     zones: list[tuple[str, float]] = []
     stack_w = layout.navigator[2]
     if stack_w > 0:
-        if layout.docked:
-            zones.append(("insp", float(layout.navigator[0] + stack_w)))
-        else:
-            zones.append(("insp", float(layout.navigator[0])))
+        zones.append(
+            ("insp", _inner_edge(layout.navigator, layout.navigator_side))
+        )
     if layout.help[2] > 0:
-        if layout.docked:
-            help_edge = float(layout.help[0] + layout.help[2])
-        else:
-            help_edge = float(layout.help[0])
-        zones.append(("help", help_edge))
+        zones.append(("help", _inner_edge(layout.help, layout.help_side)))
     best: str | None = None
     best_dist: float | None = None
     for name, edge in zones:
@@ -205,27 +205,33 @@ def splitter_hit(
     return best
 
 
+def _inner_edge(rect: Rect, side: ColumnSide) -> float:
+    """Edge of *rect* that faces the visualiser."""
+    if side == "left":
+        return float(rect[0] + rect[2])
+    return float(rect[0])
+
+
 def splitter_request_width(layout: ShellLayout, which: str, pointer_x: float) -> int:
     """Unclamped column width *pointer_x* is asking for.
 
-    In split mode ``insp`` and ``help`` grow as the pointer moves left; in
-    docked mode both grow rightward. ``insp`` is the shared stack.
+    A column on the left grows as the pointer moves right. A column on the
+    right grows as the pointer moves left. ``insp`` is the navigator column.
     ``help`` changes only the help column.
     """
     if which == "help":
-        if layout.docked:
-            width = pointer_x - float(layout.help[0])
-        else:
-            right = layout.help[0] + layout.help[2]
-            width = float(right) - pointer_x
+        rect = layout.help
+        side = layout.help_side
     elif which == "insp":
-        if layout.docked:
-            width = pointer_x - float(layout.inspector[0])
-        else:
-            right = layout.inspector[0] + layout.inspector[2]
-            width = float(right) - pointer_x
+        rect = layout.inspector
+        side = layout.navigator_side
     else:
         return 0
+    if side == "left":
+        width = pointer_x - float(rect[0])
+    else:
+        right = rect[0] + rect[2]
+        width = float(right) - pointer_x
     return max(0, int(round(width)))
 
 
@@ -238,7 +244,8 @@ class ShellLayout:
     inspector: Rect
     help: Rect
     timeline: Rect
-    docked: bool = False
+    navigator_side: ColumnSide = DEFAULT_NAVIGATOR_SIDE
+    help_side: ColumnSide = DEFAULT_HELP_SIDE
 
     @staticmethod
     def compute(
@@ -251,19 +258,21 @@ class ShellLayout:
         help_width: int | None = None,
         nav_content_h: int | None = None,
         *,
-        docked: bool = False,
+        navigator_side: ColumnSide = DEFAULT_NAVIGATOR_SIDE,
+        help_side: ColumnSide = DEFAULT_HELP_SIDE,
     ) -> ShellLayout:
         """Column rects for one frame.
 
-        The stack is *insp_width* wide (nominal 495 when omitted). The
-        navigator is the top of that stack, *nav_content_h* tall after the
-        half-band clamp. None or a non-positive height is one row. The
-        inspector is the rest of the stack. *help_width* None or 0 leaves
+        The navigator column is *insp_width* wide (nominal 495 when omitted).
+        The navigator is the top of that column, *nav_content_h* tall after
+        the half-band clamp. None or a non-positive height is one row. The
+        inspector is the rest of the column. *help_width* None or 0 leaves
         the help column closed. Requests are clamped into this layout and
         are not written back.
 
-        Split places the visualiser, then the stack, then help. Docked
-        places the stack, then help, then the visualiser.
+        *navigator_side* and *help_side* place those columns. The default
+        puts the navigator column on the left and help on the right. When
+        they share a side, help is at the window edge.
         """
         display_w = max(0, int(display_w))
         display_h = max(0, int(display_h))
@@ -285,17 +294,29 @@ class ShellLayout:
         else:
             timeline = (0, display_h, display_w, 0)
 
-        if docked:
-            navigator = (0, columns_y, stack_w, nav_h)
-            inspector = (0, columns_y + nav_h, stack_w, insp_h)
-            help_rect = (stack_w, columns_y, help_w, columns_h)
-            visualiser = (stack_w + help_w, columns_y, viz_w, columns_h)
+        left: list[tuple[str, int]] = []
+        right: list[tuple[str, int]] = []
+        if help_side == "left":
+            left.append(("help", help_w))
+        if navigator_side == "left":
+            left.append(("stack", stack_w))
         else:
-            visualiser = (0, columns_y, viz_w, columns_h)
-            stack_x = viz_w
-            navigator = (stack_x, columns_y, stack_w, nav_h)
-            inspector = (stack_x, columns_y + nav_h, stack_w, insp_h)
-            help_rect = (stack_x + stack_w, columns_y, help_w, columns_h)
+            right.append(("stack", stack_w))
+        if help_side == "right":
+            right.append(("help", help_w))
+
+        placed: dict[str, tuple[int, int]] = {}
+        x = 0
+        for name, width in (*left, ("viz", viz_w), *right):
+            placed[name] = (x, width)
+            x += width
+        stack_x, _stack_placed = placed["stack"]
+        viz_x, _viz_placed = placed["viz"]
+        help_x, _help_placed = placed["help"]
+        navigator = (stack_x, columns_y, stack_w, nav_h)
+        inspector = (stack_x, columns_y + nav_h, stack_w, insp_h)
+        visualiser = (viz_x, columns_y, viz_w, columns_h)
+        help_rect = (help_x, columns_y, help_w, columns_h)
 
         return ShellLayout(
             menu=(0, 0, display_w, menu_h),
@@ -305,5 +326,6 @@ class ShellLayout:
             inspector=inspector,
             help=help_rect,
             timeline=timeline,
-            docked=docked,
+            navigator_side=navigator_side,
+            help_side=help_side,
         )

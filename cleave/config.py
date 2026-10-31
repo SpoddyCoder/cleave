@@ -40,7 +40,8 @@ from cleave.config_schema.editor import (
     DEFAULT_RESIDUAL_LATENCY_MS,
     DEFAULT_HELP_WIDTH,
     DEFAULT_INSPECTOR_WIDTH,
-    DEFAULT_SHELL_LAYOUT_MODE,
+    DEFAULT_HELP_SIDE,
+    DEFAULT_NAVIGATOR_SIDE,
     DEFAULT_UI_MIN_WIDTH,
     DEFAULT_UI_WIDTH,
     DEFAULT_UI_WIDTH_MODE,
@@ -49,7 +50,7 @@ from cleave.config_schema.editor import (
     DEFAULT_EDITOR_WIDTH,
     UPSCALE_MIN,
     EDITOR_PREVIEW_QUALITIES,
-    ShellLayoutMode,
+    ColumnSide,
     UiWidthMode,
     EditorPreviewQuality,
     clamp_beat_sensitivity,
@@ -223,7 +224,8 @@ class EditorConfig:
     residual_latency_ms: int = DEFAULT_RESIDUAL_LATENCY_MS
     inspector_width: int = DEFAULT_INSPECTOR_WIDTH
     help_width: int = DEFAULT_HELP_WIDTH
-    shell_layout_mode: ShellLayoutMode = DEFAULT_SHELL_LAYOUT_MODE
+    navigator_side: ColumnSide = DEFAULT_NAVIGATOR_SIDE
+    help_side: ColumnSide = DEFAULT_HELP_SIDE
 
     @property
     def display_width(self) -> int:

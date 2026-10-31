@@ -8,8 +8,6 @@ from unittest.mock import MagicMock
 
 import pygame
 
-from cleave.config_schema.editor import DEFAULT_SHELL_LAYOUT_MODE
-from cleave.user_config import load_user_config
 from cleave.viz.commands import (
     MENUS,
     CommandContext,
@@ -60,7 +58,6 @@ _STATIC_IDS = (
     "timeline.reset",
     "timeline.snap_cues",
     "timeline.undo_cut",
-    "settings.docked_layout",
     "settings.measure_latency",
     "help.overlay",
     "help.shortcuts",
@@ -147,7 +144,7 @@ def _fake_controls(
         ),
         navigator=SimpleNamespace(select=MagicMock(), activate=MagicMock()),
         cfg=SimpleNamespace(
-            editor=SimpleNamespace(shell_layout_mode=DEFAULT_SHELL_LAYOUT_MODE),
+            editor=SimpleNamespace(),
         ),
     )
 
@@ -190,10 +187,7 @@ def test_menus_list_taxonomy_ids_once() -> None:
         "timeline.snap_cues",
         "timeline.undo_cut",
     ]
-    assert _row_ids(menus[5]) == [
-        "settings.docked_layout",
-        "settings.measure_latency",
-    ]
+    assert _row_ids(menus[5]) == ["settings.measure_latency"]
     assert _row_ids(menus[6]) == [
         "help.overlay",
         "help.shortcuts",
@@ -305,44 +299,6 @@ def test_editor_shortcut_selects_the_settings_inspector() -> None:
 
     assert command_for_shortcut(pygame.K_COMMA, pygame.KMOD_CTRL) is editor
     assert command_for_shortcut(pygame.K_r, pygame.KMOD_CTRL).id == "project.render"
-
-
-def test_docked_layout_check_follows_editor_setting_and_toggles(tmp_path: Path) -> None:
-    menus = _menus()
-    command = command_by_id("settings.docked_layout", menus)
-    assert command.kind == "check"
-    assert command.label == "Docked layout"
-    assert command.shortcut is None
-    assert command.enabled(CommandContext()) is True
-    assert command.checked(CommandContext()) is False
-    assert command.checked(CommandContext(shell_layout_mode="docked")) is True
-
-    controls = _make_controls(("layer_1",))
-    user_path = tmp_path / "user.yaml"
-    controls.cfg.user_config_path = user_path
-    selected_id = controls.shell_focus.selected_id
-    inspector_cursor = controls.shell_focus.inspector_cursor
-    focus_cursor = controls.focus_cursor
-    assert controls.cfg.editor.shell_layout_mode == DEFAULT_SHELL_LAYOUT_MODE
-    assert command.checked(command_context(controls)) is False
-
-    command.run(controls)
-    assert controls.cfg.editor.shell_layout_mode == "docked"
-    assert command.checked(command_context(controls)) is True
-    assert load_user_config(user_path).editor.shell_layout_mode == "docked"
-    assert controls.shell_focus.selected_id == selected_id
-    assert controls.shell_focus.inspector_cursor == inspector_cursor
-    assert controls.focus_cursor is focus_cursor
-
-    command.run(controls)
-    assert controls.cfg.editor.shell_layout_mode == DEFAULT_SHELL_LAYOUT_MODE
-    assert command.checked(command_context(controls)) is False
-    assert load_user_config(user_path).editor.shell_layout_mode == (
-        DEFAULT_SHELL_LAYOUT_MODE
-    )
-    assert controls.shell_focus.selected_id == selected_id
-    assert controls.shell_focus.inspector_cursor == inspector_cursor
-    assert controls.focus_cursor is focus_cursor
 
 
 def test_disabled_run_does_not_call_a_controller() -> None:

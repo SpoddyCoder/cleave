@@ -71,10 +71,11 @@ DEFAULT_HELP_WIDTH = 320
 # side column and a 1px visualiser. A narrower window skips the floor.
 MIN_COLUMN_WIDTH = 60
 
-ShellLayoutMode = Literal["split", "docked"]
+ColumnSide = Literal["left", "right"]
 
-SHELL_LAYOUT_MODES: tuple[ShellLayoutMode, ...] = ("split", "docked")
-DEFAULT_SHELL_LAYOUT_MODE: ShellLayoutMode = "split"
+COLUMN_SIDES: tuple[ColumnSide, ...] = ("left", "right")
+DEFAULT_NAVIGATOR_SIDE: ColumnSide = "left"
+DEFAULT_HELP_SIDE: ColumnSide = "right"
 
 
 def editor_display_size(
@@ -176,13 +177,13 @@ def _parse_ui_width_mode(
     return value
 
 
-def _parse_shell_layout_mode(
-    value: Any, ctx: ParseCtx, label: str = "editor.shell_layout_mode"
-) -> ShellLayoutMode:
+def _parse_column_side(
+    value: Any, ctx: ParseCtx, label: str
+) -> ColumnSide:
     if not isinstance(value, str):
         raise ValueError(f"{label} must be a string")
-    if value not in SHELL_LAYOUT_MODES:
-        allowed = ", ".join(f"'{mode}'" for mode in SHELL_LAYOUT_MODES)
+    if value not in COLUMN_SIDES:
+        allowed = ", ".join(f"'{side}'" for side in COLUMN_SIDES)
         raise ValueError(f"{label} must be one of: {allowed}")
     return value
 
@@ -279,9 +280,15 @@ EDITOR_FIELDS: tuple[FieldDescriptor, ...] = (
         lambda value, _ctx: clamp_shell_column_width(value),
     ),
     FieldDescriptor(
-        "shell_layout_mode",
-        DEFAULT_SHELL_LAYOUT_MODE,
-        _parse_shell_layout_mode,
+        "navigator_side",
+        DEFAULT_NAVIGATOR_SIDE,
+        lambda raw, ctx, label: _parse_column_side(raw, ctx, label),
+        dump_scalar,
+    ),
+    FieldDescriptor(
+        "help_side",
+        DEFAULT_HELP_SIDE,
+        lambda raw, ctx, label: _parse_column_side(raw, ctx, label),
         dump_scalar,
     ),
 )
@@ -308,7 +315,8 @@ def parse_editor_section(data: dict[str, Any]) -> Any:
         residual_latency_ms=parsed["residual_latency_ms"],
         inspector_width=parsed["inspector_width"],
         help_width=parsed["help_width"],
-        shell_layout_mode=parsed["shell_layout_mode"],
+        navigator_side=parsed["navigator_side"],
+        help_side=parsed["help_side"],
     )
 
 
@@ -326,7 +334,8 @@ def dump_editor_section(editor: Any) -> dict[str, Any]:
         "residual_latency_ms": editor.residual_latency_ms,
         "inspector_width": editor.inspector_width,
         "help_width": editor.help_width,
-        "shell_layout_mode": editor.shell_layout_mode,
+        "navigator_side": editor.navigator_side,
+        "help_side": editor.help_side,
     }
     ctx = PersistCtx(cfg=None, session=None)
     return dump_fields(EDITOR_FIELDS, values, ctx)
@@ -352,5 +361,6 @@ def editor_config_from_settings(editor: Any | None = None) -> Any:
         residual_latency_ms=editor.residual_latency_ms,
         inspector_width=editor.inspector_width,
         help_width=editor.help_width,
-        shell_layout_mode=editor.shell_layout_mode,
+        navigator_side=editor.navigator_side,
+        help_side=editor.help_side,
     )

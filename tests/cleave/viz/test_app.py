@@ -1063,7 +1063,8 @@ def test_tick_frame_insets_panels_by_full_menu_bar_height_when_faded(
         menu_bar_height_px(),
         0,
         insp_width=editor.inspector_width,
-        docked=editor.shell_layout_mode == "docked",
+        navigator_side=editor.navigator_side,
+        help_side=editor.help_side,
     )
     assert editor.inspector_width == DEFAULT_INSPECTOR_WIDTH
     runtime.compositor.set_present_rect.assert_called_with(expected.visualiser)

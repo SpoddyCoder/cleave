@@ -60,7 +60,8 @@ from cleave.config_schema.editor import (
     DEFAULT_HELP_WIDTH,
     DEFAULT_INSPECTOR_WIDTH,
     DEFAULT_NOTIFICATION_DISPLAY_SEC,
-    DEFAULT_SHELL_LAYOUT_MODE,
+    DEFAULT_HELP_SIDE,
+    DEFAULT_NAVIGATOR_SIDE,
     DEFAULT_UI_FADE_SEC,
     DEFAULT_UI_MIN_WIDTH,
     DEFAULT_UI_WIDTH,
@@ -240,7 +241,8 @@ def test_editor_config_from_settings_defaults() -> None:
     assert cfg.notification_display_sec == DEFAULT_NOTIFICATION_DISPLAY_SEC
     assert cfg.inspector_width == DEFAULT_INSPECTOR_WIDTH == 495
     assert cfg.help_width == DEFAULT_HELP_WIDTH == 320
-    assert cfg.shell_layout_mode == DEFAULT_SHELL_LAYOUT_MODE == "split"
+    assert cfg.navigator_side == DEFAULT_NAVIGATOR_SIDE == "left"
+    assert cfg.help_side == DEFAULT_HELP_SIDE == "right"
 
 
 def test_editor_config_from_settings_uses_user_editor() -> None:
@@ -257,7 +259,8 @@ def test_editor_config_from_settings_uses_user_editor() -> None:
         residual_latency_ms=0,
         inspector_width=640,
         help_width=360,
-        shell_layout_mode="docked",
+        navigator_side="right",
+        help_side="left",
     )
     cfg = editor_config_from_settings(editor)
     assert cfg.width == 1920
@@ -271,7 +274,8 @@ def test_editor_config_from_settings_uses_user_editor() -> None:
     assert cfg.notification_display_sec == 5
     assert cfg.inspector_width == 640
     assert cfg.help_width == 360
-    assert cfg.shell_layout_mode == "docked"
+    assert cfg.navigator_side == "right"
+    assert cfg.help_side == "left"
 
 
 def test_ui_min_width_clamps_and_round_trips() -> None:

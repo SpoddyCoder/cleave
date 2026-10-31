@@ -7,8 +7,8 @@ from dataclasses import replace
 
 from cleave.config import CleaveConfig, EditorConfig
 from cleave.config_schema.editor import (
+    COLUMN_SIDES,
     UI_WIDTH_MODES,
-    SHELL_LAYOUT_MODES,
     EDITOR_PREVIEW_QUALITIES,
     clamp_editor_height,
     clamp_editor_width,
@@ -122,24 +122,22 @@ class SettingsControls:
         self.cfg.editor = replace(self.cfg.editor, ui_width_mode=new_mode)
         persist_editor_settings(self.cfg)
 
-    def cycle_shell_layout_mode(self, *, forward: bool) -> None:
-        modes = SHELL_LAYOUT_MODES
-        current = self.cfg.editor.shell_layout_mode
+    def cycle_navigator_side(self, *, forward: bool) -> None:
+        self._cycle_column_side("navigator_side", forward=forward)
+
+    def cycle_help_side(self, *, forward: bool) -> None:
+        self._cycle_column_side("help_side", forward=forward)
+
+    def _cycle_column_side(self, field: str, *, forward: bool) -> None:
+        sides = COLUMN_SIDES
+        current = getattr(self.cfg.editor, field)
         try:
-            index = modes.index(current)
+            index = sides.index(current)
         except ValueError:
             index = 0
-        if forward:
-            new_mode = modes[(index + 1) % len(modes)]
-        else:
-            new_mode = modes[(index - 1) % len(modes)]
-        self.cfg.editor = replace(self.cfg.editor, shell_layout_mode=new_mode)
-        persist_editor_settings(self.cfg)
-
-    def toggle_shell_layout_mode(self) -> None:
-        current = self.cfg.editor.shell_layout_mode
-        new_mode = "split" if current == "docked" else "docked"
-        self.cfg.editor = replace(self.cfg.editor, shell_layout_mode=new_mode)
+        step = 1 if forward else -1
+        new_side = sides[(index + step) % len(sides)]
+        self.cfg.editor = replace(self.cfg.editor, **{field: new_side})
         persist_editor_settings(self.cfg)
 
     def set_shell_column_widths(self, insp: int, help_width: int) -> None:

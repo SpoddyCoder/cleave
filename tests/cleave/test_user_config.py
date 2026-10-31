@@ -14,7 +14,8 @@ from cleave.config_schema.editor import (
     DEFAULT_EDITOR_WIDTH,
     DEFAULT_HELP_WIDTH,
     DEFAULT_INSPECTOR_WIDTH,
-    DEFAULT_SHELL_LAYOUT_MODE,
+    DEFAULT_HELP_SIDE,
+    DEFAULT_NAVIGATOR_SIDE,
     DEFAULT_UI_FADE_SEC,
     DEFAULT_UI_MIN_WIDTH,
     DEFAULT_UI_WIDTH,
@@ -59,7 +60,8 @@ def test_load_user_config_missing_file_returns_defaults(tmp_path: Path) -> None:
     assert cfg.editor.residual_latency_ms == DEFAULT_RESIDUAL_LATENCY_MS
     assert cfg.editor.inspector_width == DEFAULT_INSPECTOR_WIDTH == 495
     assert cfg.editor.help_width == DEFAULT_HELP_WIDTH == 320
-    assert cfg.editor.shell_layout_mode == DEFAULT_SHELL_LAYOUT_MODE == "split"
+    assert cfg.editor.navigator_side == DEFAULT_NAVIGATOR_SIDE == "left"
+    assert cfg.editor.help_side == DEFAULT_HELP_SIDE == "right"
 
 
 def test_default_editor_settings_matches_schema_defaults() -> None:
@@ -76,7 +78,8 @@ def test_default_editor_settings_matches_schema_defaults() -> None:
     assert editor.residual_latency_ms == DEFAULT_RESIDUAL_LATENCY_MS
     assert editor.inspector_width == DEFAULT_INSPECTOR_WIDTH == 495
     assert editor.help_width == DEFAULT_HELP_WIDTH == 320
-    assert editor.shell_layout_mode == DEFAULT_SHELL_LAYOUT_MODE == "split"
+    assert editor.navigator_side == DEFAULT_NAVIGATOR_SIDE == "left"
+    assert editor.help_side == DEFAULT_HELP_SIDE == "right"
 
 
 def test_load_user_config_empty_file_returns_defaults(tmp_path: Path) -> None:
@@ -203,7 +206,8 @@ def test_editor_settings_from_config() -> None:
         residual_latency_ms=150,
         inspector_width=640,
         help_width=360,
-        shell_layout_mode="docked",
+        navigator_side="right",
+        help_side="left",
     )
     editor = editor_settings_from_config(vis)
     assert editor == EditorSettings(
@@ -219,7 +223,8 @@ def test_editor_settings_from_config() -> None:
         residual_latency_ms=150,
         inspector_width=640,
         help_width=360,
-        shell_layout_mode="docked",
+        navigator_side="right",
+        help_side="left",
     )
 
 
@@ -243,7 +248,8 @@ def test_persist_editor_settings_writes_visualizer_editor_fields(
             residual_latency_ms=200,
             inspector_width=640,
             help_width=360,
-            shell_layout_mode="docked",
+            navigator_side="right",
+            help_side="left",
         ),
     )
 
@@ -262,7 +268,8 @@ def test_persist_editor_settings_writes_visualizer_editor_fields(
     assert loaded.editor.residual_latency_ms == 200
     assert loaded.editor.inspector_width == 640
     assert loaded.editor.help_width == 360
-    assert loaded.editor.shell_layout_mode == "docked"
+    assert loaded.editor.navigator_side == "right"
+    assert loaded.editor.help_side == "left"
 
 
 def test_shell_column_settings_round_trip(tmp_path: Path) -> None:
@@ -271,14 +278,16 @@ def test_shell_column_settings_round_trip(tmp_path: Path) -> None:
         default_editor_settings(),
         inspector_width=640,
         help_width=360,
-        shell_layout_mode="docked",
+        navigator_side="right",
+        help_side="left",
     )
     write_user_config(editor, config_path)
 
     loaded = load_user_config(config_path)
     assert loaded.editor.inspector_width == 640
     assert loaded.editor.help_width == 360
-    assert loaded.editor.shell_layout_mode == "docked"
+    assert loaded.editor.navigator_side == "right"
+    assert loaded.editor.help_side == "left"
     saved = yaml.safe_load(config_path.read_text(encoding="utf-8"))
     assert "navigator_width" not in saved["editor"]
 
@@ -294,7 +303,8 @@ def test_shell_column_settings_absent_keys_use_defaults(tmp_path: Path) -> None:
     assert cfg.editor.ui_width == 100
     assert cfg.editor.inspector_width == DEFAULT_INSPECTOR_WIDTH == 495
     assert cfg.editor.help_width == DEFAULT_HELP_WIDTH == 320
-    assert cfg.editor.shell_layout_mode == DEFAULT_SHELL_LAYOUT_MODE == "split"
+    assert cfg.editor.navigator_side == DEFAULT_NAVIGATOR_SIDE == "left"
+    assert cfg.editor.help_side == DEFAULT_HELP_SIDE == "right"
 
 
 def test_shell_column_widths_clamp_and_reject_bad_values(tmp_path: Path) -> None:
@@ -343,16 +353,26 @@ def test_shell_column_widths_clamp_and_reject_bad_values(tmp_path: Path) -> None
         load_user_config(config_path)
 
 
-def test_shell_layout_mode_rejects_unknown_value(tmp_path: Path) -> None:
+def test_column_side_rejects_unknown_value(tmp_path: Path) -> None:
     config_path = tmp_path / "config.yaml"
     config_path.write_text(
         yaml.safe_dump(
-            {"editor": {"shell_layout_mode": "floating"}},
+            {"editor": {"navigator_side": "floating"}},
             sort_keys=False,
         ),
         encoding="utf-8",
     )
-    with pytest.raises(ValueError, match="editor.shell_layout_mode must be one of"):
+    with pytest.raises(ValueError, match="editor.navigator_side must be one of"):
+        load_user_config(config_path)
+
+    config_path.write_text(
+        yaml.safe_dump(
+            {"editor": {"help_side": "floating"}},
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="editor.help_side must be one of"):
         load_user_config(config_path)
 
 

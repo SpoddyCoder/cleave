@@ -52,10 +52,15 @@ def _format_settings_ui_width_mode(
 ) -> str:
     return state.settings.ui_width_mode
 
-def _format_settings_shell_layout_mode(
+def _format_settings_navigator_side(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return state.settings.shell_layout_mode
+    return state.settings.navigator_side
+
+def _format_settings_help_side(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return state.settings.help_side
 
 def _format_settings_ui_width(
     state: TuningViewState, _desc: RowDescriptor
@@ -120,10 +125,15 @@ def _apply_settings_ui_width_mode(
 ) -> None:
     controls.settings.cycle_ui_width_mode(forward=forward)
 
-def _apply_settings_shell_layout_mode(
+def _apply_settings_navigator_side(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, _large: bool,
 ) -> None:
-    controls.settings.cycle_shell_layout_mode(forward=forward)
+    controls.settings.cycle_navigator_side(forward=forward)
+
+def _apply_settings_help_side(
+    controls: TuningControls, _desc: RowDescriptor, forward: bool, _large: bool,
+) -> None:
+    controls.settings.cycle_help_side(forward=forward)
 
 def _apply_settings_ui_width(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, large: bool,
@@ -251,17 +261,33 @@ SPECS: dict[RowKind, RowSpec] = {
         is_pinned=True,
         parent_group="settings_editor_window",
     ),
-    RowKind.SETTINGS_SHELL_LAYOUT_MODE: RowSpec(
+    RowKind.SETTINGS_NAVIGATOR_SIDE: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
-        panel_label="layout",
+        panel_label="navigator",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_settings_shell_layout_mode,
-        apply_horizontal=_apply_settings_shell_layout_mode,
-        help_title="Layout",
-        help_entries=(("Left/Right", "cycle mode"),),
+        format_value=_format_settings_navigator_side,
+        apply_horizontal=_apply_settings_navigator_side,
+        help_title="Navigator",
+        help_entries=(("Left/Right", "choose side"),),
         help_description=(
-            "Split keeps the navigator and inspector on opposite sides of the visualiser.",
-            "Docked places the navigator and inspector on the left.",
+            "Side of the window for the navigator and inspector.",
+            "They stay one column.",
+        ),
+        is_pinned=True,
+        repeatable=True,
+        parent_group="settings_editor_window",
+    ),
+    RowKind.SETTINGS_HELP_SIDE: RowSpec(
+        affordance=RowAffordance.VALUE_STEP,
+        panel_label="help",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_settings_help_side,
+        apply_horizontal=_apply_settings_help_side,
+        help_title="Help",
+        help_entries=(("Left/Right", "choose side"),),
+        help_description=(
+            "Side of the window for the help column.",
+            "When it shares a side with the navigator, it sits at the window edge.",
         ),
         is_pinned=True,
         repeatable=True,

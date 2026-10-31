@@ -21,7 +21,8 @@ from cleave.config_schema.editor import (
     DEFAULT_EDITOR_UPSCALE,
     DEFAULT_EDITOR_WIDTH,
     DEFAULT_NOTIFICATION_DISPLAY_SEC,
-    DEFAULT_SHELL_LAYOUT_MODE,
+    DEFAULT_HELP_SIDE,
+    DEFAULT_NAVIGATOR_SIDE,
     DEFAULT_UI_MIN_WIDTH,
     DEFAULT_UI_WIDTH,
     DEFAULT_UI_WIDTH_MODE,
@@ -4559,30 +4560,31 @@ def test_settings_cycle_ui_width_mode() -> None:
     assert controls.cfg.editor.ui_width_mode == "flexible"
 
 
-def test_settings_cycle_and_toggle_shell_layout_mode(tmp_path: Path) -> None:
+def test_settings_cycle_column_sides(tmp_path: Path) -> None:
     controls = _make_controls(("layer_1",))
     user_path = tmp_path / "user.yaml"
     controls.cfg.user_config_path = user_path
     selected_id = controls.shell_focus.selected_id
     inspector_cursor = controls.shell_focus.inspector_cursor
     focus_cursor = controls.focus_cursor
-    assert controls.cfg.editor.shell_layout_mode == DEFAULT_SHELL_LAYOUT_MODE
+    assert controls.cfg.editor.navigator_side == DEFAULT_NAVIGATOR_SIDE == "left"
+    assert controls.cfg.editor.help_side == DEFAULT_HELP_SIDE == "right"
     assert not controls.config_dirty
 
-    controls.settings.cycle_shell_layout_mode(forward=True)
-    assert controls.cfg.editor.shell_layout_mode == "docked"
-    controls.settings.cycle_shell_layout_mode(forward=True)
-    assert controls.cfg.editor.shell_layout_mode == DEFAULT_SHELL_LAYOUT_MODE
-    controls.settings.cycle_shell_layout_mode(forward=False)
-    assert controls.cfg.editor.shell_layout_mode == "docked"
-    controls.settings.toggle_shell_layout_mode()
-    assert controls.cfg.editor.shell_layout_mode == DEFAULT_SHELL_LAYOUT_MODE
-    controls.settings.toggle_shell_layout_mode()
-    assert controls.cfg.editor.shell_layout_mode == "docked"
-    assert (
-        controls.build_view_state(paused=False).settings.shell_layout_mode == "docked"
-    )
-    assert load_user_config(user_path).editor.shell_layout_mode == "docked"
+    controls.settings.cycle_navigator_side(forward=True)
+    assert controls.cfg.editor.navigator_side == "right"
+    controls.settings.cycle_navigator_side(forward=True)
+    assert controls.cfg.editor.navigator_side == "left"
+    controls.settings.cycle_navigator_side(forward=False)
+    assert controls.cfg.editor.navigator_side == "right"
+    controls.settings.cycle_help_side(forward=False)
+    assert controls.cfg.editor.help_side == "left"
+    view = controls.build_view_state(paused=False).settings
+    assert view.navigator_side == "right"
+    assert view.help_side == "left"
+    loaded = load_user_config(user_path).editor
+    assert loaded.navigator_side == "right"
+    assert loaded.help_side == "left"
     assert not controls.config_dirty
     assert controls.shell_focus.selected_id == selected_id
     assert controls.shell_focus.inspector_cursor == inspector_cursor
@@ -4596,13 +4598,15 @@ def test_settings_set_shell_column_widths_clamps_and_persists(tmp_path: Path) ->
     selected_id = controls.shell_focus.selected_id
     inspector_cursor = controls.shell_focus.inspector_cursor
     focus_cursor = controls.focus_cursor
-    mode = controls.cfg.editor.shell_layout_mode
+    navigator_side = controls.cfg.editor.navigator_side
+    help_side = controls.cfg.editor.help_side
     assert not controls.config_dirty
 
     controls.settings.set_shell_column_widths(40, 8)
     assert controls.cfg.editor.inspector_width == MIN_COLUMN_WIDTH
     assert controls.cfg.editor.help_width == MIN_COLUMN_WIDTH
-    assert controls.cfg.editor.shell_layout_mode == mode
+    assert controls.cfg.editor.navigator_side == navigator_side
+    assert controls.cfg.editor.help_side == help_side
     assert controls.shell_focus.selected_id == selected_id
     assert controls.shell_focus.inspector_cursor == inspector_cursor
     assert controls.focus_cursor is focus_cursor
@@ -4614,7 +4618,8 @@ def test_settings_set_shell_column_widths_clamps_and_persists(tmp_path: Path) ->
     controls.settings.set_shell_column_widths(510, 360)
     assert controls.cfg.editor.inspector_width == 510
     assert controls.cfg.editor.help_width == 360
-    assert controls.cfg.editor.shell_layout_mode == mode
+    assert controls.cfg.editor.navigator_side == navigator_side
+    assert controls.cfg.editor.help_side == help_side
     loaded = load_user_config(user_path)
     assert loaded.editor.inspector_width == 510
     assert loaded.editor.help_width == 360

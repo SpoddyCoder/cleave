@@ -14,7 +14,6 @@ from typing import Any, Literal
 
 import pygame
 
-from cleave.config_schema.editor import DEFAULT_SHELL_LAYOUT_MODE
 from cleave.config_schema.layers import MAX_LAYER_COUNT
 from cleave.viz.editor_mode_controls import is_preset_curation_mode
 from cleave.viz.key_repeat import mod_ctrl
@@ -59,7 +58,6 @@ class CommandContext:
     overlays_locked: bool = False
     post_fx_locked: bool = False
     pattern_mask_locked: bool = False
-    shell_layout_mode: str = DEFAULT_SHELL_LAYOUT_MODE
     help_visible: bool = False
 
 
@@ -137,7 +135,6 @@ def command_context(controls: Any) -> CommandContext:
         overlays_locked=bool(overlays.locked),
         post_fx_locked=bool(post_fx.locked),
         pattern_mask_locked=bool(pattern_mask.locked),
-        shell_layout_mode=controls.cfg.editor.shell_layout_mode,
         help_visible=bool(session.help_visible),
     )
 
@@ -213,16 +210,8 @@ def _run_measure_latency(controls: Any) -> None:
     controls.tap_sync.prompt_start()
 
 
-def _docked_layout_checked(ctx: CommandContext) -> bool:
-    return ctx.shell_layout_mode == "docked"
-
-
 def _help_checked(ctx: CommandContext) -> bool:
     return ctx.help_visible
-
-
-def _run_toggle_shell_layout(controls: Any) -> None:
-    controls.settings.toggle_shell_layout_mode()
 
 
 def _add_enabled(ctx: CommandContext) -> bool:
@@ -468,14 +457,6 @@ _EDITOR = Command(
     enabled=_enabled,
     run=_run_focus_node("settings"),
 )
-_DOCKED_LAYOUT = Command(
-    id="settings.docked_layout",
-    label="Docked layout",
-    kind="check",
-    enabled=_enabled,
-    run=_run_toggle_shell_layout,
-    checked=_docked_layout_checked,
-)
 _MEASURE_LATENCY = Command(
     id="settings.measure_latency",
     label="Measure latency...",
@@ -594,7 +575,7 @@ def build_menus(
                     _UNDO_CUT,
                 ),
             ),
-            Menu("Settings", (_DOCKED_LAYOUT, _MEASURE_LATENCY)),
+            Menu("Settings", (_MEASURE_LATENCY,)),
             Menu("Help", (_HELP_OVERLAY, _HELP_SHORTCUTS, SEPARATOR, _ABOUT)),
         ),
         tuple(layer_slots),

@@ -591,7 +591,6 @@ class VisualizerApp:
             measured = int(getattr(shell, "nav_content_height_px", 0) or 0)
             if measured > 0:
                 nav_content_h = measured
-        docked = editor.shell_layout_mode == "docked"
         return ShellLayout.compute(
             display_w,
             display_h,
@@ -601,7 +600,8 @@ class VisualizerApp:
             insp_width=insp_width,
             help_width=help_width,
             nav_content_h=nav_content_h,
-            docked=docked,
+            navigator_side=editor.navigator_side,
+            help_side=editor.help_side,
         )
 
     def _publish_shell_layout(

@@ -383,6 +383,8 @@ def _button(kind: int, pos: tuple[int, int], button: int = 1) -> pygame.event.Ev
 def _stack_edge(host: ShellHost) -> int:
     layout = host.layout
     assert layout is not None
+    if layout.navigator_side == "left":
+        return layout.navigator[0] + layout.navigator[2]
     return layout.navigator[0]
 
 
@@ -405,7 +407,7 @@ def test_splitter_drag_updates_session_widths_without_imgui_buttons() -> None:
             assert host._value_drag_crossed is False
 
             host.process_event(_motion((700, 100)))
-            assert host.insp_width == 1280 - 700
+            assert host.insp_width == 700
             assert host.imgui.queued_buttons == []
             insp_request = host.insp_width
             host.process_event(_button(pygame.MOUSEBUTTONUP, (700, 120)))
@@ -422,7 +424,7 @@ def test_splitter_drag_updates_session_widths_without_imgui_buttons() -> None:
                 0,
                 insp_width=insp_request,
             )
-            assert insp_request == 1280 - 700
+            assert insp_request == 700
             assert narrow.visualiser[2] >= 1
             assert narrow.navigator[2] >= MIN_COLUMN_WIDTH
             assert narrow.inspector[2] == narrow.navigator[2]
@@ -458,11 +460,11 @@ def test_splitter_drag_is_ignored_when_the_shell_is_hidden() -> None:
 def test_splitter_drag_release_persists_requested_widths() -> None:
     with _host() as host:
         edge = _stack_edge(host)
-        pointer_x = -200
+        pointer_x = 2000
         with patch("cleave.viz.shell_host.pygame.mouse.set_cursor"):
             host.process_event(_button(pygame.MOUSEBUTTONDOWN, (edge, 100)))
             host.process_event(_motion((pointer_x, 100)))
-            assert host.insp_width == 1280 - pointer_x
+            assert host.insp_width == pointer_x
             request = host.insp_width
             host.process_event(_button(pygame.MOUSEBUTTONUP, (pointer_x, 120)))
         fitted = ShellLayout.compute(
@@ -491,7 +493,7 @@ def test_splitter_drag_release_persists_the_other_columns_live_width() -> None:
             host.process_event(_motion((700, 100)))
             host.process_event(_button(pygame.MOUSEBUTTONUP, (700, 100)))
         host._controls.settings.set_shell_column_widths.assert_called_once_with(
-            1280 - 700, 360
+            700, 360
         )
         assert host.insp_width is None
         assert host.help_width is None
@@ -503,12 +505,12 @@ def test_cancelled_splitter_drag_does_not_persist() -> None:
         with patch("cleave.viz.shell_host.pygame.mouse.set_cursor"):
             host.process_event(_button(pygame.MOUSEBUTTONDOWN, (edge, 100)))
             host.process_event(_motion((700, 100)))
-            assert host.insp_width == 1280 - 700
+            assert host.insp_width == 700
             host._ui_fade.visibility = 0.0
             host.process_event(_button(pygame.MOUSEBUTTONUP, (700, 100)))
         host._controls.settings.set_shell_column_widths.assert_not_called()
         assert host._splitter is None
-        assert host.insp_width == 1280 - 700
+        assert host.insp_width == 700
 
 
 def test_splitter_mouseup_under_one_pixel_does_not_persist() -> None:
@@ -768,7 +770,7 @@ def test_click_in_visualiser_or_menu_does_not_change_region() -> None:
 def test_splitter_hit_zone_is_six_pixels() -> None:
     assert SPLITTER_HIT_PX == 6
     layout = ShellLayout.compute(1280, 720, 23, 23, 0)
-    edge = layout.navigator[0]
+    edge = layout.navigator[0] + layout.navigator[2]
     assert splitter_hit(layout, edge - 3, 100) == "insp"
     assert splitter_hit(layout, edge + 2, 100) == "insp"
     assert splitter_hit(layout, edge - 4, 100) is None
