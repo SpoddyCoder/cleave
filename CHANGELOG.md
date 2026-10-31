@@ -11,6 +11,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- Help is a check on the Settings menu, and About Cleave is on the File menu. The Help menu and its Keyboard shortcuts item are gone.
 - Help is not a Tab stop, and clicking the column does not move focus.
 - Settings chooses the navigator column and the help column side separately. They start with the navigator and inspector on the left and help on the right. The Docked layout command is gone.
 - The navigator lists a single Overlays row. Opening and closing cards stay in the inspector.

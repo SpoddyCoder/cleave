@@ -60,8 +60,7 @@ _STATIC_IDS = (
     "timeline.undo_cut",
     "settings.measure_latency",
     "help.overlay",
-    "help.shortcuts",
-    "help.about",
+    "file.about",
 )
 
 _OFF_MENU_IDS = (
@@ -77,7 +76,7 @@ _DISABLED_IDS = (
     "project.separate",
     "project.backup",
     "project.restore",
-    "help.about",
+    "file.about",
     "timeline.undo_cut",
     "layers.add",
     "layers.delete",
@@ -158,9 +157,15 @@ def test_menus_list_taxonomy_ids_once() -> None:
         "Render",
         "Timeline",
         "Settings",
-        "Help",
     ]
-    assert _row_ids(menus[0]) == ["file.open", "file.save", None, "file.quit"]
+    assert _row_ids(menus[0]) == [
+        "file.open",
+        "file.save",
+        None,
+        "file.quit",
+        None,
+        "file.about",
+    ]
     assert _row_ids(menus[1]) == [
         "project.separate",
         "project.render",
@@ -187,13 +192,7 @@ def test_menus_list_taxonomy_ids_once() -> None:
         "timeline.snap_cues",
         "timeline.undo_cut",
     ]
-    assert _row_ids(menus[5]) == ["settings.measure_latency"]
-    assert _row_ids(menus[6]) == [
-        "help.overlay",
-        "help.shortcuts",
-        None,
-        "help.about",
-    ]
+    assert _row_ids(menus[5]) == ["settings.measure_latency", "help.overlay"]
     ids = [command.id for command in iter_commands(menus)]
     assert len(ids) == len(set(ids))
     assert set(ids) == set(_STATIC_IDS)
@@ -369,15 +368,10 @@ def test_wired_run_calls_controllers() -> None:
     assert curation.checked(CommandContext(editor_mode="preset_curation")) is True
 
     help_item = command_by_id("help.overlay", menus)
-    shortcuts = command_by_id("help.shortcuts", menus)
     assert help_item.label == "Help"
     assert help_item.kind == "check"
     assert help_item.shortcut == "H"
-    assert shortcuts.label == "Keyboard shortcuts"
-    assert shortcuts.kind == "check"
-    assert shortcuts.shortcut is None
     assert help_item.checked is not None
-    assert shortcuts.checked is help_item.checked
     assert help_item.checked(CommandContext()) is False
     assert help_item.checked(CommandContext(help_visible=True)) is True
     assert command_context(controls).help_visible is False
@@ -385,8 +379,7 @@ def test_wired_run_calls_controllers() -> None:
     help_item.run(controls)
     assert controls.session.help_visible is True
     assert help_item.checked(command_context(controls)) is True
-    assert shortcuts.checked(command_context(controls)) is True
-    shortcuts.run(controls)
+    help_item.run(controls)
     assert controls.session.help_visible is False
     assert help_item.checked(command_context(controls)) is False
 

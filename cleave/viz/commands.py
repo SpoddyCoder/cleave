@@ -354,6 +354,7 @@ _QUIT = Command(
     enabled=_enabled,
     run=_run_quit,
 )
+_ABOUT = _later("file.about", "About Cleave", "command")
 
 _SEPARATE = _later("project.separate", "Separate stems...", "command")
 _RENDER = Command(
@@ -474,15 +475,6 @@ _HELP_OVERLAY = Command(
     run=_toggle_help,
     checked=_help_checked,
 )
-_HELP_SHORTCUTS = Command(
-    id="help.shortcuts",
-    label="Keyboard shortcuts",
-    kind="check",
-    enabled=_enabled,
-    run=_toggle_help,
-    checked=_help_checked,
-)
-_ABOUT = _later("help.about", "About Cleave", "command")
 
 _SHORTCUT_KEYS: dict[str, tuple[int, bool]] = {
     "Ctrl+O": (pygame.K_o, True),
@@ -557,7 +549,7 @@ def build_menus(
     """
     return MenuSet(
         (
-            Menu("File", (_OPEN, _SAVE, SEPARATOR, _QUIT)),
+            Menu("File", (_OPEN, _SAVE, SEPARATOR, _QUIT, SEPARATOR, _ABOUT)),
             Menu(
                 "Project",
                 (_SEPARATE, _RENDER, SEPARATOR, _BACKUP, _RESTORE),
@@ -575,8 +567,7 @@ def build_menus(
                     _UNDO_CUT,
                 ),
             ),
-            Menu("Settings", (_MEASURE_LATENCY,)),
-            Menu("Help", (_HELP_OVERLAY, _HELP_SHORTCUTS, SEPARATOR, _ABOUT)),
+            Menu("Settings", (_MEASURE_LATENCY, _HELP_OVERLAY)),
         ),
         tuple(layer_slots),
     )

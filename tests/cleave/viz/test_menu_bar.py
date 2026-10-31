@@ -141,7 +141,7 @@ def test_disabled_enter_does_not_run() -> None:
 
 def test_menu_mnemonics_are_the_unique_first_letters() -> None:
     letters = tuple(menu_mnemonic(menu.label).upper() for menu in MENUS)
-    assert letters == ("F", "P", "L", "R", "T", "S", "H")
+    assert letters == ("F", "P", "L", "R", "T", "S")
     assert len(set(letters)) == len(letters)
     assert MENUS[0].label == "File"
     assert menu_index_for_mnemonic(MENUS, "F") == 0
@@ -815,15 +815,14 @@ def test_open_menu_ink_matches_the_mock() -> None:
     """Open title and the current row use background ink on opaque highlight.
 
     An unfocused check is action and its shortcut is muted. The transport
-    bar has no highlight readout. The Help row's label, check, and shortcut
-    are background ink while that row is current.
+    bar has no highlight readout. The Settings menu Help row's label, check,
+    and shortcut are background ink while that row is current.
     """
     from cleave.viz import imgui_host
     from cleave.viz.shell_layout import ShellLayout
     from cleave.viz.theme import (
         ACTION,
         BACKGROUND,
-        DISABLED,
         HIGHLIGHT,
         LABEL,
         MUTED,
@@ -837,7 +836,9 @@ def test_open_menu_ink_matches_the_mock() -> None:
     controls.build_view_state = lambda **_kwargs: None
     controls.focus_cursor = None
     controls.shell_focus = SimpleNamespace(region=ShellRegion.NAVIGATOR)
-    help_index = next(index for index, item in enumerate(MENUS) if item.label == "Help")
+    settings_index = next(
+        index for index, item in enumerate(MENUS) if item.label == "Settings"
+    )
     with patch.object(imgui_host, "_gl_context_current", return_value=False):
         host = _open_shell(overlay, menu, controls)
     try:
@@ -851,8 +852,8 @@ def test_open_menu_ink_matches_the_mock() -> None:
         host._draw_inspector = lambda _state: None
         ctx = CommandContext(help_visible=True)
         _paint_shell(host, menu, ctx, frames=1)
-        menu.open_menu(help_index, MENUS)
-        menu.item_index = 1
+        menu.open_menu(settings_index, MENUS)
+        menu.item_index = 0
         lists = _paint_shell(host, menu, ctx)
         content = _content_lists(lists)
         names = [draw_list._owner_name for draw_list in content]
@@ -867,11 +868,10 @@ def test_open_menu_ink_matches_the_mock() -> None:
         unfocused_check = _draw_list_has_color(popup, _color_u32(ACTION))
         unfocused_shortcut = _draw_list_has_color(popup, _color_u32(MUTED))
         unfocused_label = _draw_list_has_color(popup, _color_u32(VALUE))
-        disabled = _draw_list_has_color(popup, _color_u32(DISABLED))
         idle_title = _draw_list_has_color(bar, _color_u32(LABEL))
         check_on_current = _ink_on_fill(popup, _color_u32(ACTION), gold)
         shortcut_on_current = _ink_on_fill(popup, _color_u32(MUTED), gold)
-        menu.item_index = 0
+        menu.item_index = 1
         lists = _paint_shell(host, menu, ctx)
         content = _content_lists(lists)
         names = [draw_list._owner_name for draw_list in content]
@@ -886,7 +886,6 @@ def test_open_menu_ink_matches_the_mock() -> None:
     assert unfocused_check
     assert unfocused_shortcut
     assert unfocused_label
-    assert disabled
     assert idle_title
     assert check_on_current == 0
     assert shortcut_on_current == 0
