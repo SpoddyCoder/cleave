@@ -102,10 +102,6 @@ _NAV_LOCK_MARK = "[lock]"
 _TRANSPORT_GAP = 16.0
 # Border pushed onto navigator and inspector windows.
 _PANEL_BORDER_PX = 1.0
-# ImDrawList::AddRect insets the stroke path by half a pixel.
-_BORDER_PATH_INSET_PX = 0.5
-# Anti-aliased lines add this fringe beyond half the stroke thickness.
-_AA_LINE_FRINGE_PX = 1.0
 # One Left/Right step per this many pixels of sideways drag.
 _VALUE_DRAG_THRESHOLD_PX = 10.0
 
@@ -567,29 +563,17 @@ def inspector_row_stepped(state: object, desc: RowDescriptor) -> bool:
     )
 
 
-def border_stroke_outset_px(border_size: float, *, anti_aliased_lines: bool) -> float:
-    """How far an ImGui window border extends outside the window rect.
+def panel_border_overlap_px(border_size: float) -> int:
+    """Pixels to pull a panel up so its top border shares the rule above.
 
-    ``AddRect`` centers the stroke on a path half a pixel inside the edge.
-    Anti-aliased lines add a one-pixel fringe beyond half the thickness.
-    Window padding is inside the rect and does not move this stroke.
+    ``AddRect`` centers a window border half a pixel inside the rect. The
+    transport rule fills the bar's last pixel, and a panel stacked below
+    starts on that shared edge, so the two strokes sit one pixel apart.
+    One pixel of overlap puts them on the same row.
     """
     if border_size <= 0.0:
-        return 0.0
-    half = float(border_size) * 0.5
-    if anti_aliased_lines:
-        return half + _AA_LINE_FRINGE_PX - _BORDER_PATH_INSET_PX
-    return max(0.0, half - _BORDER_PATH_INSET_PX)
-
-
-def side_panel_seat_px(border_size: float, *, anti_aliased_lines: bool) -> int:
-    """Pixels to drop a side panel so its border clears the transport rule."""
-    outset = border_stroke_outset_px(
-        border_size, anti_aliased_lines=anti_aliased_lines
-    )
-    if outset <= 0.0:
         return 0
-    return math.ceil(outset - 1e-6)
+    return 1
 
 
 def transport_content_pad_y(window_height: float, line_height: float) -> float:
@@ -597,14 +581,18 @@ def transport_content_pad_y(window_height: float, line_height: float) -> float:
     return max(0.0, (float(window_height) - float(line_height)) * 0.5)
 
 
-def _seat_panel(
-    rect: tuple[int, int, int, int], inset: int
+def _overlap_panel(
+    rect: tuple[int, int, int, int], overlap: int
 ) -> tuple[int, int, int, int]:
-    """Drop a side panel so its border stroke clears the transport rule."""
+    """Pull a panel up so its top border sits on the rule above it.
+
+    The bottom edge stays put. The extra pixel covers the line already drawn
+    by the window above, so the two strokes share one row.
+    """
     x, y, width, height = rect
-    if inset <= 0 or height <= inset:
+    if overlap <= 0 or height <= 0 or y < overlap:
         return rect
-    return (x, y + inset, width, height - inset)
+    return (x, y - overlap, width, height + overlap)
 
 
 def _packed(role: tuple[int, int, int]) -> int:
@@ -717,12 +705,7 @@ def _stroke_h_rule(
 
 
 def _draw_rect_border(rect: tuple[int, int, int, int]) -> None:
-    """1px highlight around the timeline strip on the current window.
-
-    Drawn on the chrome window while the strip has focus. An open menu takes
-    that focus, so this outline and the popup are never in the same frame.
-    Chrome sits above the side panels that meet the strip.
-    """
+    """1px highlight around *rect* on the current window."""
     x, y, w, h = rect
     if w <= 0 or h <= 0:
         return
@@ -735,6 +718,58 @@ def _draw_rect_border(rect: tuple[int, int, int, int]) -> None:
         0,
         1.0,
     )
+
+
+def _fill_rect_border(rect: tuple[int, int, int, int]) -> None:
+    """Opaque 1px highlight around *rect* on the current window.
+
+    A stroked border is anti-aliased, so the solid rule underneath shows
+    through it. Filled edges cover that rule.
+    """
+    x, y, w, h = rect
+    if w <= 1 or h <= 1:
+        return
+    color = imgui.get_color_u32(rgba(HIGHLIGHT))
+    draw = imgui.get_window_draw_list()
+    x0, y0 = float(x), float(y)
+    x1, y1 = x0 + float(w), y0 + float(h)
+    draw.add_rect_filled(imgui.ImVec2(x0, y0), imgui.ImVec2(x1, y0 + 1.0), color)
+    draw.add_rect_filled(imgui.ImVec2(x0, y1 - 1.0), imgui.ImVec2(x1, y1), color)
+    draw.add_rect_filled(imgui.ImVec2(x0, y0), imgui.ImVec2(x0 + 1.0, y1), color)
+    draw.add_rect_filled(imgui.ImVec2(x1 - 1.0, y0), imgui.ImVec2(x1, y1), color)
+
+
+def _draw_panel_focus_border(rect: tuple[int, int, int, int]) -> None:
+    """Highlight outline above the shell windows that share its edges.
+
+    Shell windows stay in an earlier display slot, so a border drawn with
+    its panel sits under the rule it overlaps. This window is moved in front
+    of those panels and left behind the menu popup, which begins afterwards.
+    """
+    display = imgui.get_io().display_size
+    imgui.set_next_window_pos(imgui.ImVec2(0.0, 0.0), imgui.Cond_.always)
+    imgui.set_next_window_size(
+        imgui.ImVec2(display.x, display.y), imgui.Cond_.always
+    )
+    imgui.push_style_var(imgui.StyleVar_.window_border_size, 0.0)
+    try:
+        _visible, _opened = imgui.begin(
+            "##shell-focus-border", None, _CHROME_FLAGS
+        )
+        try:
+            imgui.internal.bring_window_to_display_front(
+                imgui.internal.find_window_by_name("##shell-focus-border")
+            )
+            draw = imgui.get_window_draw_list()
+            draw.push_clip_rect(imgui.ImVec2(0.0, 0.0), display, False)
+            try:
+                _fill_rect_border(rect)
+            finally:
+                draw.pop_clip_rect()
+        finally:
+            imgui.end()
+    finally:
+        imgui.pop_style_var()
 
 
 def _draw_item_focus_ring() -> None:
@@ -1164,10 +1199,7 @@ class ShellHost:
         saved_min_x = float(style.window_min_size.x)
         saved_min_y = float(style.window_min_size.y)
         style.window_min_size = imgui.ImVec2(1.0, 1.0)
-        seat = side_panel_seat_px(
-            _PANEL_BORDER_PX,
-            anti_aliased_lines=bool(style.anti_aliased_lines),
-        )
+        overlap = panel_border_overlap_px(_PANEL_BORDER_PX)
         try:
             pad_y = transport_content_pad_y(
                 layout.transport[3], imgui.get_text_line_height()
@@ -1185,9 +1217,11 @@ class ShellHost:
                 )
             finally:
                 imgui.pop_style_var()
+            navigator = _overlap_panel(layout.navigator, overlap)
+            inspector = _overlap_panel(layout.inspector, overlap)
             self._draw_fixed_window(
                 "##shell-navigator",
-                _seat_panel(layout.navigator, seat),
+                navigator,
                 active=stop is CycleStop.NAVIGATOR,
                 idle_border=NAVIGATOR_BORDER,
                 body=lambda: self._draw_navigator(),
@@ -1195,7 +1229,7 @@ class ShellHost:
             )
             self._draw_fixed_window(
                 "##shell-inspector",
-                _seat_panel(layout.inspector, seat),
+                inspector,
                 active=stop is CycleStop.INSPECTOR,
                 idle_border=NAVIGATOR_BORDER,
                 body=lambda: self._draw_inspector(state),
@@ -1203,10 +1237,14 @@ class ShellHost:
             )
             self._draw_help(
                 layout.help,
-                seat,
+                overlap,
                 state=state,
                 menu_state=menu_state,
             )
+            if stop is CycleStop.NAVIGATOR:
+                _draw_panel_focus_border(navigator)
+            elif stop is CycleStop.INSPECTOR:
+                _draw_panel_focus_border(inspector)
         finally:
             style.window_min_size = imgui.ImVec2(saved_min_x, saved_min_y)
 
@@ -1254,7 +1292,7 @@ class ShellHost:
     def _draw_help(
         self,
         rect: tuple[int, int, int, int],
-        seat: int,
+        overlap: int,
         *,
         state: object | None,
         menu_state: MenuBarState,
@@ -1276,7 +1314,7 @@ class ShellHost:
 
         self._draw_fixed_window(
             "##shell-help",
-            _seat_panel(rect, seat),
+            _overlap_panel(rect, overlap),
             active=False,
             idle_border=NAVIGATOR_BORDER,
             body=body,

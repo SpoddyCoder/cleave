@@ -5,8 +5,7 @@ from __future__ import annotations
 from cleave.viz.panel_notification import PanelNotificationActive
 from cleave.viz.shell_host import (
     TransportReadout,
-    border_stroke_outset_px,
-    side_panel_seat_px,
+    panel_border_overlap_px,
     transport_content_pad_y,
     transport_fps_text,
     transport_notice,
@@ -91,20 +90,10 @@ def test_transport_notice_uses_the_persistent_error_when_no_warning() -> None:
     assert transport_notice(_active()) is None
 
 
-def test_border_stroke_outset_matches_imgui_rect() -> None:
-    # AddRect path is inset 0.5px. AA adds a 1px fringe past half the thickness.
-    assert border_stroke_outset_px(1.0, anti_aliased_lines=True) == 1.0
-    assert border_stroke_outset_px(2.0, anti_aliased_lines=True) == 1.5
-    assert border_stroke_outset_px(1.0, anti_aliased_lines=False) == 0.0
-    assert border_stroke_outset_px(2.0, anti_aliased_lines=False) == 0.5
-    assert border_stroke_outset_px(0.0, anti_aliased_lines=True) == 0.0
-
-
-def test_side_panel_seat_clears_the_stroke() -> None:
-    assert side_panel_seat_px(1.0, anti_aliased_lines=True) == 1
-    assert side_panel_seat_px(2.0, anti_aliased_lines=True) == 2
-    assert side_panel_seat_px(1.0, anti_aliased_lines=False) == 0
-    assert side_panel_seat_px(2.0, anti_aliased_lines=False) == 1
+def test_panel_border_overlap_shares_one_row() -> None:
+    assert panel_border_overlap_px(1.0) == 1
+    assert panel_border_overlap_px(2.0) == 1
+    assert panel_border_overlap_px(0.0) == 0
 
 
 def test_transport_content_pad_centers_one_line() -> None:
