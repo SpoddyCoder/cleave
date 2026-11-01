@@ -1114,6 +1114,27 @@ def test_activate_text_button_confirm_matches_enter() -> None:
     assert key_confirmed == pointer_confirmed == ["ok!"]
 
 
+def test_activate_text_button_while_editing_commits_or_cancels() -> None:
+    modal = ModalHost()
+    confirmed, cancelled = _open_text(modal, initial="hello")
+    modal.handle_text_input("!")
+    modal.activate_text_button(0)
+    assert not modal.active
+    assert confirmed == ["hello!"]
+    assert cancelled == []
+
+    modal = ModalHost()
+    confirmed, cancelled = _open_text(modal, initial="hello")
+    modal.handle_text_input("!")
+    view = modal.view_state()
+    assert view is not None
+    assert view.editing is True
+    modal.activate_text_button(1)
+    assert not modal.active
+    assert confirmed == []
+    assert cancelled == ["cancel"]
+
+
 def test_hover_text_button_focuses_button_and_leaves_edit() -> None:
     modal, starts, stops = _host_with_text_callbacks()
     _open_text(modal, initial="hello")

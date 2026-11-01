@@ -47,6 +47,7 @@ from cleave.viz.theme import (
     BORDER_COLOR,
     BORDER_WIDTH,
     DISABLED,
+    FOCUS_BORDER_ALPHA,
     FOCUS_WASH_ALPHA,
     HIGHLIGHT,
     LABEL,
@@ -69,6 +70,8 @@ _MODAL_FLAGS = (
     | int(imgui.WindowFlags_.no_scrollbar)
 )
 _WASH_ALPHA = FOCUS_WASH_ALPHA / 255.0
+_FOCUS_BORDER_ALPHA = FOCUS_BORDER_ALPHA / 255.0
+_FOCUS_BORDER_THICKNESS = 1.0
 
 
 class ModalPointerKind(Enum):
@@ -187,6 +190,31 @@ def _wash(draw: imgui.ImDrawList, rect: Rect) -> None:
     )
 
 
+def _focus_border(draw: imgui.ImDrawList, rect: Rect) -> None:
+    """1px highlight outline, matching a focused navigator or inspector row."""
+    x, y, width, height = rect
+    if width <= 0 or height <= 0:
+        return
+    draw.add_rect(
+        imgui.ImVec2(float(x), float(y)),
+        imgui.ImVec2(float(x + width), float(y + height)),
+        _packed(HIGHLIGHT, _FOCUS_BORDER_ALPHA),
+        0.0,
+        0,
+        _FOCUS_BORDER_THICKNESS,
+    )
+
+
+def _highlight_option(draw: imgui.ImDrawList, rect: Rect) -> None:
+    _wash(draw, rect)
+    _focus_border(draw, rect)
+
+
+def _pointer_inside(rect: Rect) -> bool:
+    pos = imgui.get_io().mouse_pos
+    return _contains(rect, float(pos.x), float(pos.y))
+
+
 @contextmanager
 def _clipped(draw: imgui.ImDrawList, rect: Rect) -> Iterator[None]:
     x, y, width, height = rect
@@ -289,7 +317,7 @@ def _draw_options(
         )
         rect = (ox + hx, oy + hy, hw, hh)
         if focused:
-            _wash(draw, rect)
+            _highlight_option(draw, rect)
         text = option_text(label)
         text_w = measure.size(text)[0]
         text_x = option_x + max(0, (options_w - text_w) // 2)
@@ -320,8 +348,11 @@ def _draw_text_buttons(
         width = (confirm_w, cancel_w)[index]
         rect = (bx, y, width, line_h)
         focused = buttons_focused and view.button_index == index
-        if focused:
-            _wash(draw, rect)
+        # The caret stays put while editing. The button under the pointer
+        # still takes the hover highlight; only a click leaves the field.
+        pointer_hover = view.editing and _pointer_inside(rect)
+        if focused or pointer_hover:
+            _highlight_option(draw, rect)
             role: _Role = HIGHLIGHT
         elif field_focused:
             role = DISABLED
@@ -632,7 +663,9 @@ class ModalSurface:
         if in_field:
             self.intent = ModalPointerIntent(ModalPointerKind.HOVER_TEXT_FIELD)
             return
-        if button is not None:
+        # Hover must not steal the caret. A click on the button is
+        # ACTIVATE_TEXT_BUTTON, which commits or discards and runs it.
+        if button is not None and not self.view.editing:
             self.intent = ModalPointerIntent(
                 ModalPointerKind.HOVER_TEXT_BUTTON, index=button
             )

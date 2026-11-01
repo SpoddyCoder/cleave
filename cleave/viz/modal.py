@@ -571,7 +571,11 @@ class ModalHost:
         self._begin_field_edit(state, caret_index)
 
     def activate_text_button(self, index: int) -> None:
-        """TEXT only. ``0`` confirms (with validation); ``1`` cancels."""
+        """TEXT only. ``0`` confirms (with validation); ``1`` cancels.
+
+        A click while the field is editing does both in that one call:
+        confirm commits the draft, cancel discards it.
+        """
         state = self._text_state_or_none()
         if state is None:
             return

@@ -45,6 +45,7 @@ from cleave.viz.shell_focus import ShellRegion
 from cleave.viz.shell_layout import ShellLayout
 from cleave.viz.theme import (
     DISABLED,
+    FOCUS_BORDER_ALPHA,
     FOCUS_WASH_ALPHA,
     HIGHLIGHT,
     LABEL,
@@ -324,6 +325,7 @@ def test_kind_renders_with_idle_mouse(view: ModalViewState) -> None:
         assert abs(surface.panel_rect[1] - (screen_h - expected[1]) // 2) <= 1
         colors = _color_counts()
         wash = _pack(HIGHLIGHT, FOCUS_WASH_ALPHA / 255.0)
+        border = _pack(HIGHLIGHT, FOCUS_BORDER_ALPHA / 255.0)
         assert colors.get(_pack(LABEL), 0) > 0
         if view.kind == ModalKind.TEXT:
             assert colors.get(_pack(DISABLED), 0) == 4 * (
@@ -331,6 +333,7 @@ def test_kind_renders_with_idle_mouse(view: ModalViewState) -> None:
             )
             assert colors.get(_pack(HIGHLIGHT), 0) == 4
             assert wash not in colors
+            assert border not in colors
         elif view.kind == ModalKind.PROGRESS:
             assert colors.get(_pack(LABEL), 0) == 4 * (
                 _glyphs(view.message or "")
@@ -338,10 +341,12 @@ def test_kind_renders_with_idle_mouse(view: ModalViewState) -> None:
             )
             assert _pack(HIGHLIGHT) not in colors
             assert wash not in colors
+            assert border not in colors
         else:
             focused = view.options[view.focus_index]
             assert colors.get(_pack(HIGHLIGHT), 0) == 4 * _glyphs(focused)
             assert colors.get(wash, 0) == 4
+            assert colors.get(border, 0) > 0
             assert colors.get(_pack(VALUE), 0) > 0
         if view.kind == ModalKind.TEXT:
             assert surface.text_field_rect is not None
@@ -804,10 +809,12 @@ def test_text_button_colours_follow_focus() -> None:
         _idle(host, surface)
         colors = _color_counts()
         wash = _pack(HIGHLIGHT, FOCUS_WASH_ALPHA / 255.0)
+        border = _pack(HIGHLIGHT, FOCUS_BORDER_ALPHA / 255.0)
         assert colors.get(_pack(DISABLED), 0) == 4 * sum(
             _glyphs(label) for label in TEXT_BUTTON_LABELS
         )
         assert colors.get(wash, 0) == 4
+        assert border not in colors
         assert _pack(HIGHLIGHT) not in colors
         _pointer(host, surface, _center(surface.text_field_rect), click=False)
         assert surface.intent == ModalPointerIntent(ModalPointerKind.HOVER_TEXT_FIELD)
@@ -818,6 +825,7 @@ def test_text_button_colours_follow_focus() -> None:
         assert _pack(DISABLED) not in colors
         assert colors.get(_pack(HIGHLIGHT), 0) == 4 * _glyphs(TEXT_BUTTON_LABELS[0])
         assert colors.get(wash, 0) == 4
+        assert colors.get(border, 0) > 0
         _pointer(host, surface, _center(surface.text_button_rects[1]), click=False)
         assert surface.intent == ModalPointerIntent(
             ModalPointerKind.HOVER_TEXT_BUTTON, index=1
@@ -825,4 +833,27 @@ def test_text_button_colours_follow_focus() -> None:
         _pointer(host, surface, _center(surface.text_button_rects[1]), click=True)
         assert surface.intent == ModalPointerIntent(
             ModalPointerKind.ACTIVATE_TEXT_BUTTON, index=1
+        )
+
+
+def test_hover_text_button_while_editing_keeps_the_caret() -> None:
+    with _host() as host:
+        surface = ModalSurface(_text(), ImGuiTextMeasure())
+        _idle(host, surface)
+        _pointer(host, surface, _center(surface.text_button_rects[0]), click=False)
+        assert surface.intent is None
+        colors = _color_counts()
+        wash = _pack(HIGHLIGHT, FOCUS_WASH_ALPHA / 255.0)
+        border = _pack(HIGHLIGHT, FOCUS_BORDER_ALPHA / 255.0)
+        assert colors.get(wash, 0) == 4
+        assert colors.get(border, 0) > 0
+        assert colors.get(_pack(HIGHLIGHT), 0) == 4 * (
+            _glyphs(TEXT_BUTTON_LABELS[0]) + 1
+        )
+        assert colors.get(_pack(DISABLED), 0) == 4 * (
+            _glyphs(EDITING_HINT) + _glyphs(TEXT_BUTTON_LABELS[1])
+        )
+        _pointer(host, surface, _center(surface.text_button_rects[0]), click=True)
+        assert surface.intent == ModalPointerIntent(
+            ModalPointerKind.ACTIVATE_TEXT_BUTTON, index=0
         )

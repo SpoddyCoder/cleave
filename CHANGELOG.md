@@ -11,6 +11,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- Dialog options use the same outline as a highlighted navigator or inspector row.
+- A text dialog keeps the caret until a click. Clicking Confirm or Cancel applies or discards the text and runs that action.
 - The focus outline on the current row and the active panel uses the same colour at a lower intensity.
 - Side arrows on adjustable inspector values highlight on hover, step once on click, and repeat while held like Left and Right.
 - Help is a check on the Settings menu, and About Cleave is on the File menu. The Help menu and its Keyboard shortcuts item are gone.
