@@ -11,6 +11,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- The file picker highlights the row or shortcut under the pointer, with the same outline as a dialog option.
 - Dialog options use the same outline as a highlighted navigator or inspector row.
 - A text dialog keeps the caret until a click. Clicking Confirm or Cancel applies or discards the text and runs that action.
 - The focus outline on the current row and the active panel uses the same colour at a lower intensity.

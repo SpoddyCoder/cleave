@@ -32,7 +32,9 @@ from cleave.viz.file_picker_surface import (
     shortcut_is_selected,
     visible_slice,
 )
+from cleave.viz.imgui_theme import rgba
 from cleave.viz.material_icons import FOLDER_GLYPH
+from cleave.viz.theme import FOCUS_BORDER_ALPHA, FOCUS_WASH_ALPHA, HIGHLIGHT
 
 Rect = tuple[int, int, int, int]
 _DISPLAY = (1280, 720)
@@ -208,6 +210,65 @@ def test_panel_row_and_chip_rects(tmp_path: Path) -> None:
         for rect in surface.row_rects:
             assert panel[0] <= rect[0]
             assert rect[0] + rect[2] <= panel[0] + panel[2]
+
+
+def _pack(role: tuple[int, int, int], alpha: float = 1.0) -> int:
+    return int(imgui.get_color_u32(rgba(role, alpha)))
+
+
+def _color_counts() -> dict[int, int]:
+    found: dict[int, int] = {}
+    for draw_list in imgui.get_draw_data().cmd_lists:
+        if str(draw_list._owner_name) != FILE_PICKER_WINDOW:
+            continue
+        for index in range(draw_list.vtx_buffer.size()):
+            color = int(draw_list.vtx_buffer[index].col)
+            found[color] = found.get(color, 0) + 1
+    return found
+
+
+def test_pointer_over_a_row_draws_the_hover_outline(tmp_path: Path) -> None:
+    (tmp_path / "song.wav").write_bytes(b"RIFF")
+    picker = FilePicker(current=tmp_path)
+    surface = FilePickerSurface(picker.view_state())
+
+    with _host() as host:
+        _frame(host, surface)
+        pos = _center(surface.row_rects[1])
+        _frame(host, surface, (_motion(pos),))
+        assert surface.intent is None
+        colors = _color_counts()
+        wash = _pack(HIGHLIGHT, FOCUS_WASH_ALPHA / 255.0)
+        border = _pack(HIGHLIGHT, FOCUS_BORDER_ALPHA / 255.0)
+
+    assert picker.selected_index == 0
+    assert colors.get(wash, 0) == 8
+    assert colors.get(border, 0) > 0
+
+
+def test_pointer_over_a_shortcut_draws_the_hover_outline(tmp_path: Path) -> None:
+    picker = FilePicker(current=tmp_path)
+    surface = FilePickerSurface(picker.view_state())
+
+    with _host() as host:
+        _frame(host, surface)
+        home = surface.chip_indices.index(
+            next(
+                index
+                for index, shortcut in enumerate(picker.shortcuts)
+                if shortcut.label == "Home"
+            )
+        )
+        pos = _center(surface.chip_rects[home])
+        _frame(host, surface, (_motion(pos),))
+        assert surface.intent is None
+        colors = _color_counts()
+        wash = _pack(HIGHLIGHT, FOCUS_WASH_ALPHA / 255.0)
+        border = _pack(HIGHLIGHT, FOCUS_BORDER_ALPHA / 255.0)
+
+    assert picker.current == tmp_path
+    assert colors.get(wash, 0) == 8
+    assert colors.get(border, 0) > 0
 
 
 def test_click_selects_a_row(tmp_path: Path) -> None:

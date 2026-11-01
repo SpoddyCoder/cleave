@@ -31,6 +31,7 @@ from cleave.viz.theme import (
     BORDER_WIDTH,
     DISABLED,
     ERROR_NOTIFICATION,
+    FOCUS_BORDER_ALPHA,
     FOCUS_WASH_ALPHA,
     HIGHLIGHT,
     LABEL,
@@ -52,6 +53,8 @@ _DIRECTORY_SUFFIX = "/"
 _SHORTCUT_SEPARATOR = "   "
 _SHORTCUT_HIGHLIGHT_PAD = 4
 _WASH_ALPHA = FOCUS_WASH_ALPHA / 255.0
+_FOCUS_BORDER_ALPHA = FOCUS_BORDER_ALPHA / 255.0
+_FOCUS_BORDER_THICKNESS = 1.0
 
 
 class PickerPointerKind(Enum):
@@ -270,6 +273,27 @@ def _wash(draw: Any, rect: Rect) -> None:
     )
 
 
+def _focus_border(draw: Any, rect: Rect) -> None:
+    """1px highlight outline, matching a focused navigator or inspector row."""
+    x, y, width, height = rect
+    if width <= 0 or height <= 0:
+        return
+    imgui = _imgui()
+    draw.add_rect(
+        imgui.ImVec2(float(x), float(y)),
+        imgui.ImVec2(float(x + width), float(y + height)),
+        _packed(HIGHLIGHT, _FOCUS_BORDER_ALPHA),
+        0.0,
+        0,
+        _FOCUS_BORDER_THICKNESS,
+    )
+
+
+def _pointer_inside(rect: Rect) -> bool:
+    pos = _imgui().get_io().mouse_pos
+    return _contains(rect, float(pos.x), float(pos.y))
+
+
 def _raise_window() -> None:
     imgui = _imgui()
     imgui.internal.bring_window_to_display_front(
@@ -452,9 +476,12 @@ class FilePickerSurface:
                 width + _SHORTCUT_HIGHLIGHT_PAD * 2,
                 line_h,
             )
-            if selected:
+            hovered = _pointer_inside(hit)
+            if selected or hovered:
                 _wash(draw, hit)
-            color = HIGHLIGHT if selected or current else ACTION
+            if hovered:
+                _focus_border(draw, hit)
+            color = HIGHLIGHT if selected or current or hovered else ACTION
             _text(draw, screen_x, y, text, color)
             rects.append(hit)
             indices.append(index)
@@ -499,9 +526,12 @@ class FilePickerSurface:
             selected = (
                 index == view.selected_index and view.focus is PickerFocus.LIST
             )
-            if selected:
+            hovered = _pointer_inside(rect)
+            if selected or hovered:
                 _wash(draw, rect)
-            color = HIGHLIGHT if selected else _row_color(row)
+            if hovered:
+                _focus_border(draw, rect)
+            color = HIGHLIGHT if selected or hovered else _row_color(row)
             _text(
                 draw,
                 content_x,
