@@ -610,10 +610,19 @@ def test_menu_underline_and_popup_row_are_snug() -> None:
         fill = _color_u32(HIGHLIGHT)
         underline_gap = _underline_gap(bar, ink)
         row_gap_above, row_gap_below = _popup_row_ink_gaps(popup, ink, fill)
+        top_gap = _popup_first_row_gap(popup, fill)
+        style = imgui.get_style()
+        expected_top = (
+            float(style.window_border_size)
+            + float(style.window_padding.y)
+            - float(int(style.item_spacing.y * 0.5))
+            + 4.0
+        )
     finally:
         host.imgui.destroy()
     assert underline_gap == pytest.approx(2.0, abs=0.51)
     assert row_gap_above == pytest.approx(row_gap_below, abs=0.51)
+    assert top_gap == pytest.approx(expected_top, abs=1.0)
 
 
 def _row_fill(draw_list: object, y: float) -> int | None:
@@ -748,6 +757,16 @@ def _underline_gap(draw_list: object, ink: int) -> float:
         underline_top = y if underline_top is None else min(underline_top, y)
     assert underline_top is not None
     return underline_top - word_bottom
+
+
+def _popup_first_row_gap(draw_list: object, fill: int) -> float:
+    """Pixels from the popup background top to the first row's highlight."""
+    from cleave.viz.theme import BACKGROUND
+
+    background = _color_bounds(draw_list, _color_u32(BACKGROUND))
+    box = _color_bounds(draw_list, fill)
+    assert background is not None and box is not None
+    return box[1] - background[1]
 
 
 def _popup_row_ink_gaps(

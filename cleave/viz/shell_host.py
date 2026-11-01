@@ -95,6 +95,8 @@ _HIDDEN = 0.01
 # Vertical padding for the menu bar and the transport bar, which shares its height.
 # Dear ImGui's default FramePadding.y is 3, which leaves both rows cramped.
 _MENU_BAR_FRAME_PADDING_Y = 8.0
+# Extra space between the menu-bar rule and the first popup row.
+_MENU_POPUP_TOP_PAD_PX = 4.0
 _INSPECTOR_INDENT = 16.0
 _NAV_LOCK_MARK = "[lock]"
 _TRANSPORT_GAP = 16.0
@@ -1820,6 +1822,7 @@ class ShellHost:
                 shortcut_w = max(shortcut_w, imgui.calc_text_size(item.shortcut).x)
         row_w = pad_x * 2.0 + check_w + gap + label_w + gap + shortcut_w + pad_x
         draw_list = imgui.get_window_draw_list()
+        imgui.set_cursor_pos_y(imgui.get_cursor_pos_y() + _MENU_POPUP_TOP_PAD_PX)
         for item_index, item in enumerate(menu.items):
             if isinstance(item, MenuSeparator):
                 imgui.separator()
