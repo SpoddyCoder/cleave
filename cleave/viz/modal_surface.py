@@ -72,6 +72,7 @@ _MODAL_FLAGS = (
 _WASH_ALPHA = FOCUS_WASH_ALPHA / 255.0
 _FOCUS_BORDER_ALPHA = FOCUS_BORDER_ALPHA / 255.0
 _FOCUS_BORDER_THICKNESS = 1.0
+_HIGHLIGHT_PAD = 2
 
 
 class ModalPointerKind(Enum):
@@ -205,6 +206,12 @@ def _focus_border(draw: imgui.ImDrawList, rect: Rect) -> None:
     )
 
 
+def _outset(rect: Rect, pad: int = _HIGHLIGHT_PAD) -> Rect:
+    """Grow *rect* by *pad* on every side."""
+    x, y, width, height = rect
+    return (x - pad, y - pad, width + 2 * pad, height + 2 * pad)
+
+
 def _highlight_option(draw: imgui.ImDrawList, rect: Rect) -> None:
     _wash(draw, rect)
     _focus_border(draw, rect)
@@ -315,7 +322,7 @@ def _draw_options(
         hx, hy, hw, hh = focus_highlight_rect(
             measure, panel_width=panel_w, y=y - oy, line_h=line_h
         )
-        rect = (ox + hx, oy + hy, hw, hh)
+        rect = _outset((ox + hx, oy + hy, hw, hh))
         if focused:
             _highlight_option(draw, rect)
         text = option_text(label)
@@ -346,7 +353,7 @@ def _draw_text_buttons(
     rects: list[Rect] = []
     for index, label in enumerate(TEXT_BUTTON_LABELS):
         width = (confirm_w, cancel_w)[index]
-        rect = (bx, y, width, line_h)
+        rect = _outset((bx, y, width, line_h))
         focused = buttons_focused and view.button_index == index
         # The caret stays put while editing. The button under the pointer
         # still takes the hover highlight; only a click leaves the field.

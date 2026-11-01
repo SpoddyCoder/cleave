@@ -55,6 +55,7 @@ _SHORTCUT_HIGHLIGHT_PAD = 4
 _WASH_ALPHA = FOCUS_WASH_ALPHA / 255.0
 _FOCUS_BORDER_ALPHA = FOCUS_BORDER_ALPHA / 255.0
 _FOCUS_BORDER_THICKNESS = 1.0
+_HIGHLIGHT_PAD = 2
 
 
 class PickerPointerKind(Enum):
@@ -289,6 +290,12 @@ def _focus_border(draw: Any, rect: Rect) -> None:
     )
 
 
+def _outset(rect: Rect, pad: int = _HIGHLIGHT_PAD) -> Rect:
+    """Grow *rect* by *pad* on every side."""
+    x, y, width, height = rect
+    return (x - pad, y - pad, width + 2 * pad, height + 2 * pad)
+
+
 def _pointer_inside(rect: Rect) -> bool:
     pos = _imgui().get_io().mouse_pos
     return _contains(rect, float(pos.x), float(pos.y))
@@ -470,11 +477,13 @@ class FilePickerSurface:
             screen_x = content_x + chip_x
             selected = shortcut_is_selected(view, index)
             current = shortcut_is_current(view, index)
-            hit = (
-                screen_x - _SHORTCUT_HIGHLIGHT_PAD,
-                y,
-                width + _SHORTCUT_HIGHLIGHT_PAD * 2,
-                line_h,
+            hit = _outset(
+                (
+                    screen_x - _SHORTCUT_HIGHLIGHT_PAD,
+                    y,
+                    width + _SHORTCUT_HIGHLIGHT_PAD * 2,
+                    line_h,
+                )
             )
             hovered = _pointer_inside(hit)
             if selected or hovered:
@@ -522,7 +531,7 @@ class FilePickerSurface:
         y = list_top
         for index in range(start, end):
             row = view.rows[index]
-            rect = (content_x, y, content_w, line_h)
+            rect = _outset((content_x, y, content_w, line_h))
             selected = (
                 index == view.selected_index and view.focus is PickerFocus.LIST
             )
