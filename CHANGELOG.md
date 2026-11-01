@@ -11,6 +11,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- The focus outline on the current row and the active panel uses the same colour at a lower intensity.
 - Side arrows on adjustable inspector values highlight on hover, step once on click, and repeat while held like Left and Right.
 - Help is a check on the Settings menu, and About Cleave is on the File menu. The Help menu and its Keyboard shortcuts item are gone.
 - Help is not a Tab stop, and clicking the column does not move focus.

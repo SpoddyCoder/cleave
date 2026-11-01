@@ -500,7 +500,7 @@ def test_open_menu_paints_over_the_focus_ring() -> None:
     from cleave.viz import imgui_host, shell_host
     from cleave.viz.shell_host import draw_shell_frame
     from cleave.viz.shell_layout import ShellLayout
-    from cleave.viz.theme import BORDER_COLOR, HIGHLIGHT
+    from cleave.viz.theme import BORDER_COLOR, FOCUS_BORDER_ALPHA, HIGHLIGHT
 
     overlay = _Overlay()
     overlay.visibility = 1.0
@@ -533,9 +533,10 @@ def test_open_menu_paints_over_the_focus_ring() -> None:
         strip_names = [draw_list._owner_name for draw_list in strip_content]
         strip_foreground = _assert_chrome_last(strip_lists)
         gold = _color_u32(HIGHLIGHT)
+        ring = _color_u32_alpha(HIGHLIGHT, FOCUS_BORDER_ALPHA / 255.0)
         white = _color_u32(BORDER_COLOR)
         strip_on_chrome = _draw_list_has_color(
-            strip_content[strip_names.index("##shell-chrome")], gold
+            strip_content[strip_names.index("##shell-chrome")], ring
         )
         strip_on_foreground = any(
             _draw_list_has_color(draw_list, gold) for draw_list in strip_foreground
@@ -557,11 +558,11 @@ def test_open_menu_paints_over_the_focus_ring() -> None:
         popup_at = names.index("##cleave-menu")
         chrome_at = names.index("##shell-chrome")
         assert nav_at < popup_at < chrome_at
-        ring_on_nav = _draw_list_has_color(content[nav_at], gold)
+        ring_on_nav = _draw_list_has_color(content[nav_at], ring)
         # The current menu row is opaque highlight near the menu bar. The
         # navigator ring is lower, on its own list, not copied onto the popup.
         popup_gold = _color_bounds(content[popup_at], gold)
-        nav_gold = _color_bounds(content[nav_at], gold)
+        nav_gold = _color_bounds(content[nav_at], ring)
         popup_above_ring = (
             popup_gold is not None
             and nav_gold is not None

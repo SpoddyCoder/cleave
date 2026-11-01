@@ -189,6 +189,8 @@ NUDGE_HOVER_BG_ALPHA: int = 72
 SELECTED_WASH_ALPHA: int = 41
 # Focused-inspector-row highlight wash (highlight at 0.10).
 FOCUS_WASH_ALPHA: int = 26
+# Outline of the current row and the active panel (highlight at 0.55).
+FOCUS_BORDER_ALPHA: int = 140
 REC_BG: tuple[int, int, int] = (220, 0, 0)
 TIMELINE_BAR_ON: tuple[int, int, int] = (200, 225, 255)
 BAR_GRID: tuple[int, int, int] = (70, 95, 130)

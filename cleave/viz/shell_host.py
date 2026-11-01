@@ -64,6 +64,7 @@ from cleave.viz.theme import (
     BORDER_COLOR,
     DISABLED,
     ERROR_NOTIFICATION,
+    FOCUS_BORDER_ALPHA,
     FOCUS_WASH_ALPHA,
     HIGHLIGHT,
     LABEL,
@@ -704,12 +705,17 @@ def _stroke_h_rule(
     )
 
 
+def _focus_border_rgba() -> imgui.ImVec4:
+    """Highlight colour at the quieter focus-outline alpha."""
+    return rgba(HIGHLIGHT, FOCUS_BORDER_ALPHA / 255.0)
+
+
 def _draw_rect_border(rect: tuple[int, int, int, int]) -> None:
     """1px highlight around *rect* on the current window."""
     x, y, w, h = rect
     if w <= 0 or h <= 0:
         return
-    color = imgui.get_color_u32(rgba(HIGHLIGHT))
+    color = imgui.get_color_u32(_focus_border_rgba())
     imgui.get_window_draw_list().add_rect(
         imgui.ImVec2(float(x), float(y)),
         imgui.ImVec2(float(x + w), float(y + h)),
@@ -721,15 +727,16 @@ def _draw_rect_border(rect: tuple[int, int, int, int]) -> None:
 
 
 def _fill_rect_border(rect: tuple[int, int, int, int]) -> None:
-    """Opaque 1px highlight around *rect* on the current window.
+    """1px highlight around *rect* on the current window.
 
     A stroked border is anti-aliased, so the solid rule underneath shows
-    through it. Filled edges cover that rule.
+    through it. Filled edges cover that rule. The fill uses the quieter
+    focus-outline alpha, so the rule tints the shared edge.
     """
     x, y, w, h = rect
     if w <= 1 or h <= 1:
         return
-    color = imgui.get_color_u32(rgba(HIGHLIGHT))
+    color = imgui.get_color_u32(_focus_border_rgba())
     draw = imgui.get_window_draw_list()
     x0, y0 = float(x), float(y)
     x1, y1 = x0 + float(w), y0 + float(h)
@@ -783,7 +790,7 @@ def _draw_item_focus_ring() -> None:
     rect_max = imgui.get_item_rect_max()
     if rect_max.x <= rect_min.x or rect_max.y <= rect_min.y:
         return
-    color = imgui.get_color_u32(rgba(HIGHLIGHT))
+    color = imgui.get_color_u32(_focus_border_rgba())
     imgui.get_window_draw_list().add_rect(
         rect_min,
         rect_max,
@@ -1273,7 +1280,8 @@ class ShellHost:
             _PANEL_BORDER_PX if border is not None else 0.0,
         )
         if border is not None:
-            imgui.push_style_color(imgui.Col_.border, rgba(border))
+            alpha = FOCUS_BORDER_ALPHA / 255.0 if active else 1.0
+            imgui.push_style_color(imgui.Col_.border, rgba(border, alpha))
         try:
             _visible, _opened = imgui.begin(
                 title,
