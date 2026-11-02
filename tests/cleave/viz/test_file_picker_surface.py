@@ -29,6 +29,7 @@ from cleave.viz.file_picker_surface import (
     clamp_scroll,
     legend_rows,
     location_text,
+    location_text_lift,
     row_text,
     scroll_to_reveal,
     shortcut_chip_layout,
@@ -39,7 +40,13 @@ from cleave.viz.file_picker_surface import (
 )
 from cleave.viz.imgui_theme import rgba
 from cleave.viz.material_icons import FOLDER_GLYPH
-from cleave.viz.theme import FOCUS_BORDER_ALPHA, FOCUS_WASH_ALPHA, HIGHLIGHT
+from cleave.viz.theme import (
+    FOCUS_BORDER_ALPHA,
+    FOCUS_WASH_ALPHA,
+    HIGHLIGHT,
+    PRESET_ICON,
+    VALUE,
+)
 
 Rect = tuple[int, int, int, int]
 _DISPLAY = (1280, 720)
@@ -161,6 +168,16 @@ def test_row_text_marks_directories_and_projects() -> None:
     assert row_text(audio) == "song.wav"
 
 
+def _vertex_ys(color: int) -> list[float]:
+    found: list[float] = []
+    for draw_list in _picker_draw_lists():
+        for index in range(draw_list.vtx_buffer.size()):
+            vertex = draw_list.vtx_buffer[index]
+            if int(vertex.col) == color:
+                found.append(float(vertex.pos.y))
+    return found
+
+
 def test_location_text_keeps_the_path_tail() -> None:
     path = "/home/user/very/long/nested/directory/structure/projects/song"
     fitted = location_text(path, 24, len)
@@ -168,6 +185,30 @@ def test_location_text_keeps_the_path_tail() -> None:
     assert fitted.endswith("song")
     assert len(fitted) <= 24
     assert not fitted.endswith("…")
+
+
+def test_location_text_lines_up_with_the_folder_icon(tmp_path: Path) -> None:
+    picker = FilePicker(current=tmp_path)
+    surface = FilePickerSurface(picker.view_state())
+
+    with _host() as host:
+        _frame(host, surface)
+        font = imgui.get_io().font_default
+        icon = font.find_glyph(ord(FOLDER_GLYPH))
+        cap = font.find_glyph(ord("A"))
+        lift = location_text_lift()
+        icon_ys = _vertex_ys(_pack(PRESET_ICON))
+        icon_top, icon_bottom = min(icon_ys), max(icon_ys)
+        path_ys = [
+            y
+            for y in _vertex_ys(_pack(VALUE))
+            if icon_top - 8.0 <= y <= icon_bottom + 8.0
+        ]
+
+    assert lift == int(round((icon.y0 + icon.y1) / 2 - (cap.y0 + cap.y1) / 2))
+    assert lift < 0
+    assert icon_ys and path_ys
+    assert abs((min(path_ys) - min(icon_ys)) - (lift + cap.y0 - icon.y0)) <= 1.0
 
 
 def test_shortcut_chip_layout_and_selection(tmp_path: Path) -> None:
@@ -303,6 +344,34 @@ def _off_item_positions(
     )
 
 
+def _assert_outline_inside_clip(
+    color: int, *, x: float | None = None, y: float | None = None, slack: float = 1.5
+) -> None:
+    """Border vertices on one edge of a highlight must sit inside their clip."""
+    found = 0
+    for draw_list in _picker_draw_lists():
+        vertices = draw_list.vtx_buffer
+        indices = draw_list.idx_buffer
+        for cmd_index in range(draw_list.cmd_buffer.size()):
+            cmd = draw_list.cmd_buffer[cmd_index]
+            clip = cmd.clip_rect
+            base = int(cmd.vtx_offset)
+            start = int(cmd.idx_offset)
+            for offset in range(int(cmd.elem_count)):
+                vertex = vertices[base + int(indices[start + offset])]
+                if int(vertex.col) != color:
+                    continue
+                px, py = float(vertex.pos.x), float(vertex.pos.y)
+                if x is not None and abs(px - x) > slack:
+                    continue
+                if y is not None and abs(py - y) > slack:
+                    continue
+                found += 1
+                assert clip.x <= px <= clip.z
+                assert clip.y <= py <= clip.w
+    assert found > 0
+
+
 def _assert_highlight_hidden() -> None:
     wash, border = _wash_and_border()
     colors = _color_counts()
@@ -324,6 +393,27 @@ def _shortcut_slot(surface: FilePickerSurface, picker: FilePicker, label: str) -
         if shortcut.label == label
     )
     return surface.chip_indices.index(model)
+
+
+def test_row_highlight_outline_is_not_clipped(tmp_path: Path) -> None:
+    (tmp_path / "song.wav").write_bytes(b"RIFF")
+    picker = FilePicker(current=tmp_path)
+    surface = FilePickerSurface(picker.view_state())
+
+    with _host() as host:
+        _frame(host, surface)
+        _wash, border = _wash_and_border()
+        top = surface.row_rects[0]
+        _assert_outline_inside_clip(border, x=float(top[0]))
+        _assert_outline_inside_clip(border, y=float(top[1]))
+        _assert_outline_inside_clip(border, x=float(top[0] + top[2]))
+        _assert_outline_inside_clip(border, y=float(top[1] + top[3]))
+
+        pos = _center(surface.row_rects[1])
+        _frame(host, surface, (_motion(pos),))
+        lower = surface.row_rects[1]
+        _assert_outline_inside_clip(border, x=float(lower[0]))
+        _assert_outline_inside_clip(border, y=float(lower[1]))
 
 
 def test_pointer_over_a_row_draws_the_hover_outline(tmp_path: Path) -> None:

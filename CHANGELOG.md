@@ -41,6 +41,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- The file picker directory name lines up with the folder icon.
+- The file picker row highlight keeps its left border, and its top border on the first row.
 - The open file picker shows a scrollbar when the directory list is long, and the mouse wheel scrolls that list.
 - The transport bar, navigator, and inspector share one horizontal rule where they meet. The focused outline draws above that shared rule.
 - The first command in a menu popup sits 4px below the rule under the menu bar.

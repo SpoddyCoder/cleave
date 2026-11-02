@@ -232,6 +232,16 @@ def location_text(location: str, content_w: int, text_width: TextWidth) -> str:
     return fit_path_label_to_width(_CallableSizer(text_width), location, content_w)
 
 
+def location_text_lift() -> int:
+    """Pixels to raise the path so its caps center on the folder mark."""
+    font = _imgui().get_io().font_default
+    icon = font.find_glyph(ord(FOLDER_GLYPH))
+    cap = font.find_glyph(ord("A"))
+    icon_mid = (icon.y0 + icon.y1) * 0.5
+    cap_mid = (cap.y0 + cap.y1) * 0.5
+    return int(round(icon_mid - cap_mid))
+
+
 def apply_picker_pointer(
     picker: FilePicker, intent: PickerPointerIntent | None
 ) -> OpenTarget | None:
@@ -362,6 +372,26 @@ def _highlight(draw: Any, rect: Rect) -> None:
     """Wash plus the 1px focus border, for keyboard selection and pointer hover."""
     _wash(draw, rect)
     _focus_border(draw, rect)
+
+
+def _push_list_highlight_clip(draw: Any) -> None:
+    """Let the row outline draw into the padding around the list.
+
+    The directory list is a child window whose clip starts on the text. The
+    highlight sits ``_HIGHLIGHT_PAD`` outside that text, and the outline's
+    anti-aliased fringe needs two more pixels so the scissor does not cut it.
+    Without this, the left edge is clipped on every row, and the top edge is
+    clipped on the first row.
+    """
+    imgui = _imgui()
+    clip_min = draw.get_clip_rect_min()
+    clip_max = draw.get_clip_rect_max()
+    slack = float(_HIGHLIGHT_PAD + 2)
+    draw.push_clip_rect(
+        imgui.ImVec2(float(clip_min.x) - slack, float(clip_min.y) - slack),
+        imgui.ImVec2(float(clip_max.x) + slack, float(clip_max.y) + slack),
+        False,
+    )
 
 
 def _highlight_visible(
@@ -662,7 +692,7 @@ class FilePickerSurface:
         prefix_w = measure.size(FOLDER_GLYPH)[0] + icon_gap
         text_w = max(1, content_w - prefix_w)
         fitted = location_text(location, text_w, lambda text: measure.size(text)[0])
-        _text(draw, x + prefix_w, y, fitted, VALUE)
+        _text(draw, x + prefix_w, y + location_text_lift(), fitted, VALUE)
 
     def _paint_list(
         self,
@@ -808,7 +838,11 @@ class FilePickerSurface:
                 selected, hovered, pointer_over_item, view.keyboard_highlight
             )
             if lit:
-                _highlight(draw, rect)
+                _push_list_highlight_clip(draw)
+                try:
+                    _highlight(draw, rect)
+                finally:
+                    draw.pop_clip_rect()
             color = HIGHLIGHT if lit else _row_color(row)
             _text(
                 draw,
