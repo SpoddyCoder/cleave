@@ -228,8 +228,7 @@ def test_pointer_actions_leave_the_keyboard_highlight_hidden(tmp_path: Path) -> 
     picker = FilePicker(current=tmp_path)
     picker.suppress_keyboard_highlight()
     picker.select_row(1)
-    picker.scroll_rows(-1)
-    assert picker.selected_index == 0
+    assert picker.selected_index == 1
     assert picker.keyboard_highlight is False
     picker.open_row()
     assert picker.keyboard_highlight is False
@@ -439,24 +438,3 @@ def test_open_row_note_does_nothing(tmp_path: Path) -> None:
     assert picker.open_row() is None
     assert picker.current == tmp_path
     assert picker.selected_index == note
-
-
-def test_scroll_rows_matches_up_and_down(tmp_path: Path) -> None:
-    _wav(tmp_path, "a.wav")
-    _wav(tmp_path, "b.wav")
-    picker = FilePicker(current=tmp_path)
-    picker.select_row(1)
-    picker.status = "stale"
-
-    picker.scroll_rows(1)
-    assert picker.selected_index == 2
-    assert picker.focus is PickerFocus.LIST
-    assert picker.status == ""
-
-    picker.scroll_rows(-1)
-    assert picker.selected_index == 1
-
-    picker.select_row(0)
-    picker.scroll_rows(-1)
-    assert picker.focus is PickerFocus.SHORTCUTS
-    assert picker.selected_index == 0

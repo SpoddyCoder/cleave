@@ -1,7 +1,9 @@
 """ImGui file picker. Draw records hit rects and one pointer intent.
 
 Does not mutate :class:`FilePicker`. The host applies :func:`apply_picker_pointer`
-after the frame. ImGui and the theme bridge load on draw, not at import.
+after the frame. The directory list is a child window: a scrollbar appears when
+the rows do not fit, and the wheel scrolls that window. ImGui and the theme
+bridge load on draw, not at import.
 """
 
 from __future__ import annotations
@@ -36,6 +38,8 @@ from cleave.viz.theme import (
     HIGHLIGHT,
     LABEL,
     PRESET_ICON,
+    SCROLLBAR_THUMB,
+    SCROLLBAR_TRACK,
     VALUE,
     tuning_ui_metrics,
 )
@@ -45,6 +49,8 @@ _Role = tuple[int, int, int]
 TextWidth = Callable[[str], int]
 
 FILE_PICKER_WINDOW = "##file-picker"
+FILE_PICKER_LIST = "##file-picker-list"
+_WHEEL_ROWS = 3
 
 _PANEL_WIDTH_FRACTION = 0.6
 _PANEL_HEIGHT_FRACTION = 0.7
@@ -64,21 +70,20 @@ class PickerPointerKind(Enum):
     SELECT_ROW = "select-row"
     OPEN_ROW = "open-row"
     GOTO_SHORTCUT = "goto-shortcut"
-    SCROLL_ROWS = "scroll-rows"
     SUPPRESS_KEYBOARD_HIGHLIGHT = "suppress-keyboard-highlight"
 
 
 @dataclass(frozen=True)
 class PickerPointerIntent:
-    """``index`` is a listing row or a shortcut. ``delta`` is a list step.
+    """``index`` is a listing row or a shortcut.
 
-    ``pointer_over_item`` hides the keyboard highlight. Hover with no click
-    or wheel uses :attr:`PickerPointerKind.SUPPRESS_KEYBOARD_HIGHLIGHT`.
+    ``pointer_over_item`` hides the keyboard highlight. Hover with no click,
+    and a wheel over the scrolling list, use
+    :attr:`PickerPointerKind.SUPPRESS_KEYBOARD_HIGHLIGHT`.
     """
 
     kind: PickerPointerKind
     index: int | None = None
-    delta: int = 0
     pointer_over_item: bool = False
 
 
@@ -92,14 +97,65 @@ class _CallableSizer:
         return (self._text_width(text), 0)
 
 
-def visible_slice(total: int, selected: int, capacity: int) -> tuple[int, int]:
-    """Return the [start, end) row window that keeps *selected* on screen."""
-    if capacity <= 0 or total <= 0:
+def clamp_scroll(
+    scroll_y: float,
+    *,
+    row_stride: int,
+    view_height: float,
+    row_count: int,
+) -> float:
+    """Clamp a list scroll offset so the last row can sit at the bottom."""
+    if row_stride <= 0 or view_height <= 0 or row_count <= 0:
+        return 0.0
+    limit = max(0.0, row_count * row_stride - view_height)
+    return min(max(0.0, scroll_y), limit)
+
+
+def scroll_to_reveal(
+    scroll_y: float,
+    row: int,
+    *,
+    row_stride: int,
+    view_height: float,
+    row_count: int,
+) -> float:
+    """Move *scroll_y* the least amount that puts *row* fully in the view."""
+    if row_stride <= 0 or view_height <= 0 or row_count <= 0:
+        return 0.0
+    row = min(max(0, row), row_count - 1)
+    top = float(row * row_stride)
+    bottom = top + float(row_stride)
+    if top < scroll_y:
+        scroll_y = top
+    elif bottom > scroll_y + view_height:
+        scroll_y = bottom - view_height
+    return clamp_scroll(
+        scroll_y,
+        row_stride=row_stride,
+        view_height=view_height,
+        row_count=row_count,
+    )
+
+
+def visible_row_range(
+    scroll_y: float,
+    view_height: float,
+    row_stride: int,
+    row_count: int,
+) -> tuple[int, int]:
+    """Return the [start, end) rows that intersect the scrolled view."""
+    if row_count <= 0 or row_stride <= 0 or view_height <= 0:
         return 0, 0
-    if total <= capacity:
-        return 0, total
-    start = min(max(0, selected - capacity // 2), total - capacity)
-    return start, start + capacity
+    start = min(row_count, max(0, int(scroll_y // row_stride)))
+    end = min(row_count, int((scroll_y + view_height - 1e-3) // row_stride) + 1)
+    return start, max(start, end)
+
+
+def wheel_scroll_px(wheel: float, row_stride: int) -> float:
+    """Pixels to add to the scroll offset. A positive *wheel* moves the list up."""
+    if wheel == 0.0 or row_stride <= 0:
+        return 0.0
+    return -wheel * float(row_stride * _WHEEL_ROWS)
 
 
 def row_text(row: PickerRow) -> str:
@@ -206,8 +262,6 @@ def apply_picker_pointer(
         if intent.index is not None:
             picker.goto_shortcut(intent.index)
         return None
-    if kind is PickerPointerKind.SCROLL_ROWS:
-        picker.scroll_rows(intent.delta)
     return None
 
 
@@ -400,12 +454,25 @@ def _raise_window() -> None:
     )
 
 
-def _wheel_delta(wheel: float) -> int:
-    """Map ImGui wheel (positive scrolls up) onto a list step (negative is up)."""
-    delta = -int(round(wheel))
-    if delta == 0:
-        return -1 if wheel > 0.0 else 1
-    return delta
+def _list_flags() -> int:
+    imgui = _imgui()
+    # The wheel is applied by this overlay. NoScrollWithMouse keeps ImGui from
+    # scrolling the child again, and leaves the scrollbar in place.
+    return (
+        int(imgui.WindowFlags_.no_saved_settings)
+        | int(imgui.WindowFlags_.no_nav)
+        | int(imgui.WindowFlags_.no_focus_on_appearing)
+        | int(imgui.WindowFlags_.no_scroll_with_mouse)
+    )
+
+
+def _push_scrollbar_colors() -> int:
+    imgui = _imgui()
+    imgui.push_style_color(imgui.Col_.scrollbar_bg, _packed(SCROLLBAR_TRACK))
+    imgui.push_style_color(imgui.Col_.scrollbar_grab, _packed(SCROLLBAR_THUMB))
+    imgui.push_style_color(imgui.Col_.scrollbar_grab_hovered, _packed(HIGHLIGHT))
+    imgui.push_style_color(imgui.Col_.scrollbar_grab_active, _packed(HIGHLIGHT))
+    return 4
 
 
 class FilePickerSurface:
@@ -423,7 +490,7 @@ class FilePickerSurface:
         self.row_indices: tuple[int, ...] = ()
         self.chip_rects: tuple[Rect, ...] = ()
         self.chip_indices: tuple[int, ...] = ()
-        self._list_rect: Rect | None = None
+        self._wheeled = False
 
     def draw(self) -> Rect:
         self.intent = None
@@ -432,7 +499,7 @@ class FilePickerSurface:
         self.row_indices = ()
         self.chip_rects = ()
         self.chip_indices = ()
-        self._list_rect = None
+        self._wheeled = False
 
         imgui = _imgui()
         display = imgui.get_io().display_size
@@ -511,16 +578,10 @@ class FilePickerSurface:
         footer = legend_rows(view.legend, content_w, text_width)
         footer_lines = len(footer) + (1 if view.status else 0)
         list_bottom = oy + panel_h - pad_y - (footer_lines + 1) * step
-        capacity = max(1, (list_bottom - list_top) // step)
-        start, end = visible_slice(len(view.rows), view.selected_index, capacity)
+        list_h = max(1, list_bottom - list_top)
         chips = _chip_hits(
             view, content_x, chip_y, content_w, line_h, text_width
         )
-        rows = _row_hits(
-            content_x, list_top, content_w, line_h, step, start, end
-        )
-        hover_chip, hover_row = _pointer_hover(chips, rows)
-        self._paint_chips(draw, view, chip_y, chips, hover_chip, hover_row)
         self._paint_location(
             draw,
             view.location,
@@ -530,17 +591,19 @@ class FilePickerSurface:
             content_w,
             metrics.icon_label_gap,
         )
-        self._paint_rows(
-            draw,
+        hover_chip, hover_row = self._paint_list(
             view,
             measure,
             content_x,
             list_top,
             content_w,
-            rows,
-            hover_chip,
-            hover_row,
+            list_h,
+            line_h,
+            step,
+            metrics.scrollbar_width,
+            chips,
         )
+        self._paint_chips(draw, view, chip_y, chips, hover_chip, hover_row)
 
         footer_y = oy + panel_h - pad_y - footer_lines * step
         for row in footer:
@@ -601,13 +664,132 @@ class FilePickerSurface:
         fitted = location_text(location, text_w, lambda text: measure.size(text)[0])
         _text(draw, x + prefix_w, y, fitted, VALUE)
 
+    def _paint_list(
+        self,
+        view: PickerViewState,
+        measure,
+        content_x: int,
+        list_top: int,
+        content_w: int,
+        list_h: int,
+        line_h: int,
+        step: int,
+        scrollbar_width: int,
+        chips: tuple[tuple[int, str, int, Rect], ...],
+    ) -> tuple[int | None, int | None]:
+        """Scrollable directory list. Returns the shortcut and row under the pointer."""
+        imgui = _imgui()
+        total = len(view.rows)
+        imgui.set_cursor_screen_pos(imgui.ImVec2(float(content_x), float(list_top)))
+        imgui.set_next_window_content_size(imgui.ImVec2(0.0, float(total * step)))
+        colors = _push_scrollbar_colors()
+        imgui.push_style_var(imgui.StyleVar_.window_padding, imgui.ImVec2(0.0, 0.0))
+        imgui.push_style_var(imgui.StyleVar_.item_spacing, imgui.ImVec2(0.0, 0.0))
+        imgui.push_style_var(imgui.StyleVar_.scrollbar_size, float(scrollbar_width))
+        flags = _list_flags()
+        if total * step > list_h:
+            flags |= int(imgui.WindowFlags_.always_vertical_scrollbar)
+        begun = False
+        hover_chip: int | None = None
+        hover_row: int | None = None
+        try:
+            imgui.begin_child(
+                FILE_PICKER_LIST,
+                imgui.ImVec2(float(content_w), float(list_h)),
+                0,
+                flags,
+            )
+            begun = True
+            origin = imgui.get_window_pos()
+            scroll_y = self._sync_list_scroll(view, step, float(list_h))
+            row_w = max(1, int(imgui.get_content_region_avail().x) - _HIGHLIGHT_PAD)
+            if total:
+                imgui.dummy(imgui.ImVec2(1.0, float(total * step)))
+            start, end = visible_row_range(scroll_y, float(list_h), step, total)
+            left = int(origin.x)
+            rows_list: list[tuple[int, int, Rect]] = []
+            for index in range(start, end):
+                y = int(round(float(origin.y) + index * step - scroll_y))
+                rows_list.append((index, y, _outset((left, y, row_w, line_h))))
+            rows = tuple(rows_list)
+            hover_chip, hover_row = _pointer_hover(chips, rows)
+            self._paint_rows(
+                imgui.get_window_draw_list(),
+                view,
+                measure,
+                left,
+                row_w,
+                rows,
+                hover_chip,
+                hover_row,
+            )
+        finally:
+            if begun:
+                imgui.end_child()
+            imgui.pop_style_var(3)
+            if colors:
+                imgui.pop_style_color(colors)
+        return hover_chip, hover_row
+
+    def _sync_list_scroll(
+        self, view: PickerViewState, step: int, view_h: float
+    ) -> float:
+        """Keep the keyboard selection on screen, and apply the wheel."""
+        imgui = _imgui()
+        storage = imgui.get_state_storage()
+        loc_id = imgui.get_id("##scroll-loc")
+        sel_id = imgui.get_id("##scroll-sel")
+        key_id = imgui.get_id("##scroll-key")
+        loc_key = int(imgui.get_id(view.location)) & 0x7FFFFFFF
+        prev_loc = storage.get_int(loc_id, -1)
+        prev_sel = storage.get_int(sel_id, -1)
+        prev_keys = storage.get_bool(key_id, False)
+        keys = view.keyboard_highlight and view.focus is PickerFocus.LIST
+        scroll_y = float(imgui.get_scroll_y())
+        max_scroll = max(0.0, len(view.rows) * step - view_h)
+        wheel = float(imgui.get_io().mouse_wheel)
+        wheeled = (
+            bool(imgui.is_window_hovered()) and wheel != 0.0 and max_scroll > 0.0
+        )
+        moved = prev_loc != loc_key
+        if moved:
+            scroll_y = 0.0
+        if wheeled:
+            scroll_y = clamp_scroll(
+                scroll_y + wheel_scroll_px(wheel, step),
+                row_stride=step,
+                view_height=view_h,
+                row_count=len(view.rows),
+            )
+        elif moved or (
+            view.focus is PickerFocus.LIST
+            and (prev_sel != view.selected_index or (keys and not prev_keys))
+        ):
+            scroll_y = scroll_to_reveal(
+                scroll_y,
+                view.selected_index,
+                row_stride=step,
+                view_height=view_h,
+                row_count=len(view.rows),
+            )
+        if abs(scroll_y - float(imgui.get_scroll_y())) > 0.01:
+            imgui.set_scroll_y(float(scroll_y))
+            # SetScrollY lands next frame. Write the window scroll now so the
+            # thumb matches the rows drawn this frame.
+            window = imgui.internal.get_current_window()
+            window.scroll = imgui.ImVec2(float(window.scroll.x), float(scroll_y))
+        storage.set_int(loc_id, loc_key)
+        storage.set_int(sel_id, view.selected_index)
+        storage.set_bool(key_id, keys)
+        self._wheeled = wheeled
+        return scroll_y
+
     def _paint_rows(
         self,
         draw: Any,
         view: PickerViewState,
         measure,
         content_x: int,
-        list_top: int,
         content_w: int,
         rows: tuple[tuple[int, int, Rect], ...],
         hover_chip: int | None,
@@ -639,9 +821,6 @@ class FilePickerSurface:
             indices.append(index)
         self.row_rects = tuple(rects)
         self.row_indices = tuple(indices)
-        if rects:
-            bottom = rects[-1][1] + rects[-1][3]
-            self._list_rect = (content_x, list_top, content_w, bottom - list_top)
 
     def _paint_legend_row(
         self,
@@ -694,12 +873,9 @@ class FilePickerSurface:
                 pointer_over_item=True,
             )
             return
-        wheel = float(io.mouse_wheel)
-        list_rect = self._list_rect
-        if wheel != 0.0 and list_rect is not None and _contains(list_rect, x, y):
+        if self._wheeled:
             self.intent = PickerPointerIntent(
-                PickerPointerKind.SCROLL_ROWS,
-                delta=_wheel_delta(wheel),
+                PickerPointerKind.SUPPRESS_KEYBOARD_HIGHLIGHT,
                 pointer_over_item=on_item,
             )
             return

@@ -1,8 +1,9 @@
 """File browser state for opening an audio file or a Cleave project.
 
 Pure state and view state: no pygame import, not even key constants. The host
-maps keys onto :class:`PickerAction` and pointer hits onto the row, shortcut,
-and scroll methods, then draws :meth:`FilePicker.view_state`.
+maps keys onto :class:`PickerAction` and pointer hits onto the row and
+shortcut methods, then draws :meth:`FilePicker.view_state`. The list scrollbar
+and the wheel live on the overlay.
 """
 
 from __future__ import annotations
@@ -415,14 +416,6 @@ class FilePicker:
         self.focus = PickerFocus.LIST
         self.status = ""
         return self._accept()
-
-    def scroll_rows(self, delta: int) -> None:
-        """Step the listing by *delta* rows, the same move as Up and Down."""
-        if delta == 0:
-            return
-        if self.focus is not PickerFocus.LIST:
-            self.focus = PickerFocus.LIST
-        self._move(delta)
 
     def _enter(self) -> None:
         if self.focus is PickerFocus.SHORTCUTS:

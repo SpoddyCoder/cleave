@@ -21,17 +21,21 @@ from cleave.viz.file_picker import (
     PickerRowKind,
 )
 from cleave.viz.file_picker_surface import (
+    FILE_PICKER_LIST,
     FILE_PICKER_WINDOW,
     FilePickerSurface,
     PickerPointerKind,
     apply_picker_pointer,
+    clamp_scroll,
     legend_rows,
     location_text,
     row_text,
+    scroll_to_reveal,
     shortcut_chip_layout,
     shortcut_is_current,
     shortcut_is_selected,
-    visible_slice,
+    visible_row_range,
+    wheel_scroll_px,
 )
 from cleave.viz.imgui_theme import rgba
 from cleave.viz.material_icons import FOLDER_GLYPH
@@ -104,22 +108,41 @@ def _draw_names() -> list[str]:
     return [str(draw_list._owner_name) for draw_list in imgui.get_draw_data().cmd_lists]
 
 
-def test_visible_slice_shows_everything_when_it_fits() -> None:
-    assert visible_slice(5, 0, 12) == (0, 5)
+def test_clamp_scroll_fits_the_list_when_it_is_short() -> None:
+    assert clamp_scroll(40, row_stride=10, view_height=50, row_count=3) == 0
 
 
-def test_visible_slice_keeps_selection_on_screen() -> None:
-    start, end = visible_slice(100, 90, 10)
-    assert start <= 90 < end
-    assert end - start == 10
+def test_scroll_to_reveal_keeps_a_visible_row() -> None:
+    assert (
+        scroll_to_reveal(0, 1, row_stride=10, view_height=50, row_count=20) == 0
+    )
 
 
-def test_visible_slice_clamps_at_the_end() -> None:
-    assert visible_slice(100, 99, 10) == (90, 100)
+def test_scroll_to_reveal_brings_a_row_below_into_view() -> None:
+    assert (
+        scroll_to_reveal(0, 9, row_stride=10, view_height=50, row_count=20) == 50
+    )
 
 
-def test_visible_slice_empty_listing() -> None:
-    assert visible_slice(0, 0, 10) == (0, 0)
+def test_scroll_to_reveal_brings_a_row_above_into_view() -> None:
+    assert (
+        scroll_to_reveal(50, 1, row_stride=10, view_height=50, row_count=20) == 10
+    )
+
+
+def test_visible_row_range_covers_rows_that_intersect_the_view() -> None:
+    assert visible_row_range(0, 50, 10, 20) == (0, 5)
+    assert visible_row_range(15, 50, 10, 20) == (1, 7)
+
+
+def test_visible_row_range_empty_listing() -> None:
+    assert visible_row_range(0, 50, 10, 0) == (0, 0)
+
+
+def test_wheel_scroll_px_moves_three_rows_per_notch() -> None:
+    assert wheel_scroll_px(1.0, 10) == -30
+    assert wheel_scroll_px(-1.0, 10) == 30
+    assert wheel_scroll_px(0.0, 10) == 0
 
 
 def test_row_text_marks_directories_and_projects() -> None:
@@ -217,11 +240,18 @@ def _pack(role: tuple[int, int, int], alpha: float = 1.0) -> int:
     return int(imgui.get_color_u32(rgba(role, alpha)))
 
 
+def _picker_draw_lists():
+    prefix = FILE_PICKER_WINDOW
+    return [
+        draw_list
+        for draw_list in imgui.get_draw_data().cmd_lists
+        if str(draw_list._owner_name).startswith(prefix)
+    ]
+
+
 def _color_counts() -> dict[int, int]:
     found: dict[int, int] = {}
-    for draw_list in imgui.get_draw_data().cmd_lists:
-        if str(draw_list._owner_name) != FILE_PICKER_WINDOW:
-            continue
+    for draw_list in _picker_draw_lists():
         for index in range(draw_list.vtx_buffer.size()):
             color = int(draw_list.vtx_buffer[index].col)
             found[color] = found.get(color, 0) + 1
@@ -233,9 +263,7 @@ def _vertices_near(
 ) -> int:
     """Count vertices of *color* sitting on one edge of a highlight rect."""
     found = 0
-    for draw_list in imgui.get_draw_data().cmd_lists:
-        if str(draw_list._owner_name) != FILE_PICKER_WINDOW:
-            continue
+    for draw_list in _picker_draw_lists():
         for index in range(draw_list.vtx_buffer.size()):
             vtx = draw_list.vtx_buffer[index]
             if int(vtx.col) != color:
@@ -601,26 +629,105 @@ def test_double_click_opens_audio(tmp_path: Path) -> None:
     assert target.path == song
 
 
-def test_wheel_over_the_list_steps_the_selection(tmp_path: Path) -> None:
-    (tmp_path / "song.wav").write_bytes(b"RIFF")
+def _list_window():
+    ctx = imgui.get_current_context()
+    prefix = f"{FILE_PICKER_WINDOW}/{FILE_PICKER_LIST}"
+    for window in ctx.windows:
+        if str(window.name).startswith(prefix):
+            return window
+    return None
+
+
+def test_long_list_shows_a_scrollbar(tmp_path: Path) -> None:
+    for index in range(40):
+        (tmp_path / f"dir{index:02d}").mkdir()
+    surface = FilePickerSurface(FilePicker(current=tmp_path).view_state())
+
+    with _host() as host:
+        _frame(host, surface)
+        window = _list_window()
+
+    assert window is not None
+    assert window.scrollbar_y is True
+
+
+def test_wheel_over_a_long_list_scrolls(tmp_path: Path) -> None:
+    for index in range(40):
+        (tmp_path / f"dir{index:02d}").mkdir()
     picker = FilePicker(current=tmp_path)
     surface = FilePickerSurface(picker.view_state())
 
     with _host() as host:
         _frame(host, surface)
         pos = _center(surface.row_rects[0])
-        # ImGui applies a wheel event on the next frame when a mouse-position
-        # event is queued ahead of it.
         _frame(host, surface, (_motion(pos), _wheel(-1)))
         _frame(host, surface)
 
+    assert surface.row_indices[0] > 0
     assert surface.intent is not None
-    assert surface.intent.kind is PickerPointerKind.SCROLL_ROWS
-    assert surface.intent.pointer_over_item is True
+    assert surface.intent.kind is PickerPointerKind.SUPPRESS_KEYBOARD_HIGHLIGHT
     apply_picker_pointer(picker, surface.intent)
     assert picker.keyboard_highlight is False
-    assert picker.selected_index == 1
+    assert picker.selected_index == 0
     assert picker.focus is PickerFocus.LIST
+
+
+def test_short_list_has_no_scrollbar(tmp_path: Path) -> None:
+    picker = FilePicker(current=tmp_path)
+    surface = FilePickerSurface(picker.view_state())
+
+    with _host() as host:
+        _frame(host, surface)
+        window = _list_window()
+
+    assert window is not None
+    assert window.scrollbar_y is False
+
+
+def test_scrollbar_track_click_scrolls(tmp_path: Path) -> None:
+    for index in range(40):
+        (tmp_path / f"dir{index:02d}").mkdir()
+    picker = FilePicker(current=tmp_path)
+    surface = FilePickerSurface(picker.view_state())
+
+    with _host() as host:
+        _frame(host, surface)
+        window = _list_window()
+        assert window is not None
+        rect = imgui.internal.get_window_scrollbar_rect(
+            window, imgui.internal.Axis.y
+        )
+        click = (
+            int((rect.min.x + rect.max.x) / 2),
+            int(rect.max.y - 8),
+        )
+        _frame(host, surface, (_motion(click), _down(click)))
+        _frame(host, surface, (_up(click),))
+        _frame(host, surface)
+
+    assert surface.row_indices[0] > 0
+    assert picker.selected_index == 0
+
+
+def test_a_new_directory_opens_at_the_top(tmp_path: Path) -> None:
+    for index in range(40):
+        (tmp_path / f"dir{index:02d}").mkdir()
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    picker = FilePicker(current=tmp_path)
+    surface = FilePickerSurface(picker.view_state())
+
+    with _host() as host:
+        _frame(host, surface)
+        pos = _center(surface.row_rects[0])
+        _frame(host, surface, (_motion(pos), _wheel(-1)))
+        _frame(host, surface)
+        assert surface.row_indices[0] > 0
+        picker.navigate_to(elsewhere)
+        opened = FilePickerSurface(picker.view_state())
+        _frame(host, opened)
+
+    assert opened.row_indices[0] == 0
 
 
 def test_wheel_outside_the_list_records_nothing(tmp_path: Path) -> None:
