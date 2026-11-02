@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from cleave.open_target import OpenTarget
     from cleave.viz.loading import LoadingWindow
 
 __all__ = [
@@ -60,11 +61,12 @@ def continue_launch(
     project_dir: Path,
     *,
     config: Path | None = None,
-) -> None:
+) -> OpenTarget | None:
     """Finish editor boot into an already-open loading window.
 
-    Raises :class:`LaunchError` when boot fails, so a CLI target can exit while
-    a picker-driven attempt returns to the picker on the same window.
+    Returns a switch request, or None when the session quit. Raises
+    :class:`LaunchError` when boot fails, so a CLI target can exit while a
+    picker-driven attempt returns to the picker on the same window.
     """
     from cleave.config import load_config
     from cleave.paths import resource_dir
@@ -82,7 +84,7 @@ def continue_launch(
         cfg = load_config(config_path, resource_dir())
         playlists = scan_all_layers(cfg)
         runtime = build_runtime_base(cfg, project_dir, audio_path, playlists)
-        VisualizerApp(runtime).run(window)
+        return VisualizerApp(runtime).run(window)
     except (ProjectMLibraryError, FileNotFoundError, ValueError) as exc:
         window.update(f"error: {exc}")
         raise LaunchError(str(exc)) from exc
@@ -94,5 +96,12 @@ def launch(
     config: Path | None = None,
 ) -> None:
     """Entry for `python -m cleave play` and programmatic launch."""
+    from cleave.open_target import OpenTarget, OpenTargetKind
+    from cleave.viz.session_loop import run_editor_sessions
+
     window = open_loading_window()
-    continue_launch(window, project_dir, config=config)
+    run_editor_sessions(
+        window,
+        OpenTarget(path=project_dir, kind=OpenTargetKind.PROJECT),
+        config=config,
+    )

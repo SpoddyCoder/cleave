@@ -9,7 +9,7 @@ from __future__ import annotations
 import pygame
 
 from cleave.open_target import OpenTarget
-from cleave.viz.file_picker import FilePicker, PickerAction
+from cleave.viz.file_picker import FilePicker, PickerAction, PickerMode
 from cleave.viz.info_panel import InfoPanelViewState
 from cleave.viz.key_repeat import KeyRepeatController, mod_ctrl
 from cleave.viz.loading import LoadingWindow, present_frame
@@ -67,7 +67,10 @@ def _present_info(window: LoadingWindow, state: InfoPanelViewState, dt: float) -
     present_frame(window, draw, scrim=True, dt=dt)
 
 
-def run_file_picker(window: LoadingWindow) -> OpenTarget | None:
+def run_file_picker(
+    window: LoadingWindow,
+    mode: PickerMode = PickerMode.COLD_START,
+) -> OpenTarget | None:
     """Browse until the user picks something.
 
     Returns the accepted target, or None when the user cancelled or closed the
@@ -80,7 +83,7 @@ def run_file_picker(window: LoadingWindow) -> OpenTarget | None:
         apply_picker_pointer,
     )
 
-    picker = FilePicker()
+    picker = FilePicker(mode=mode)
     repeat = KeyRepeatController()
     clock = pygame.time.Clock()
     accepted: OpenTarget | None = None

@@ -508,6 +508,8 @@ def test_cmd_play_opens_window_before_separate(
 ) -> None:
     monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
     project = _complete_project(tmp_path)
+    audio = tmp_path / "song.flac"
+    audio.write_bytes(b"audio")
     window = _mock_loading_window()
     order: list[str] = []
 
@@ -527,7 +529,7 @@ def test_cmd_play_opens_window_before_separate(
         patch("cleave.separate.run_separate", side_effect=separate) as run_separate,
         patch("cleave.viz.continue_launch", side_effect=cont) as continue_launch,
     ):
-        cmd_play(build_parser().parse_args(["play", "my-track"]))
+        cmd_play(build_parser().parse_args(["play", str(audio)]))
 
     assert order == ["window", "separate", "continue"]
     continue_launch.assert_called_once_with(window, project.resolve(), config=None)
@@ -632,7 +634,7 @@ if "torch" in sys.modules:
 
 
 def test_cmd_play_missing_torch_on_raw_audio(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
     monkeypatch.setattr("cleave.separate.stem_split_available", lambda: False)
@@ -644,16 +646,14 @@ def test_cmd_play_missing_torch_on_raw_audio(
     with (
         patch("cleave.viz.open_loading_window", return_value=window),
         patch("cleave.viz.continue_launch") as continue_launch,
-        pytest.raises(SystemExit) as exc,
+        patch(
+            "cleave.viz.file_picker_host.show_picker_error", return_value=False
+        ) as show_error,
     ):
         cmd_play(build_parser().parse_args(["play", str(audio)]))
-    assert exc.value.code == 1
-    err = capsys.readouterr().err
-    assert "not in this Windows build" in err
-    window.update.assert_called()
-    error_messages = [str(call.args[0]) for call in window.update.call_args_list if call.args]
-    assert any("not in this Windows build" in msg for msg in error_messages)
+    assert "not in this Windows build" in show_error.call_args.args[1]
     continue_launch.assert_not_called()
+    window.close.assert_called_once()
 
 
 def test_cmd_separate_high_quality_completion_message(
@@ -930,7 +930,7 @@ def test_cmd_render_errors_when_project_incomplete(
     assert "signals.json" in capsys.readouterr().err
 
 
-def test_cmd_play_calls_run_separate_when_incomplete(
+def test_cmd_play_existing_project_skips_separate(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
@@ -946,21 +946,18 @@ def test_cmd_play_calls_run_separate_when_incomplete(
         original_path=tmp_path / "my-track.flac",
         demucs_model="htdemucs",
     )
+    window = _mock_loading_window()
 
     with (
-        patch("cleave.separate.run_separate", return_value=project.resolve()) as run_separate,
-        patch("cleave.viz.open_loading_window", return_value=_mock_loading_window()) as open_win,
-        patch("cleave.viz.continue_launch"),
+        patch("cleave.separate.run_separate") as run_separate,
+        patch("cleave.viz.open_loading_window", return_value=window) as open_win,
+        patch("cleave.viz.continue_launch") as continue_launch,
     ):
         cmd_play(build_parser().parse_args(["play", "my-track"]))
 
     open_win.assert_called_once_with()
-    run_separate.assert_called_once_with(
-        Path("my-track"),
-        high_quality=False,
-        beat_detection_stem=None,
-        on_progress=open_win.return_value.update,
-    )
+    run_separate.assert_not_called()
+    continue_launch.assert_called_once_with(window, project.resolve(), config=None)
 
 
 def test_cmd_play_forwards_high_quality_to_run_separate(
@@ -968,6 +965,8 @@ def test_cmd_play_forwards_high_quality_to_run_separate(
 ) -> None:
     monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
     project = _complete_project(tmp_path)
+    audio = tmp_path / "song.flac"
+    audio.write_bytes(b"audio")
     window = _mock_loading_window()
 
     with (
@@ -975,10 +974,10 @@ def test_cmd_play_forwards_high_quality_to_run_separate(
         patch("cleave.viz.open_loading_window", return_value=window),
         patch("cleave.viz.continue_launch"),
     ):
-        cmd_play(build_parser().parse_args(["play", "my-track", "--high-quality"]))
+        cmd_play(build_parser().parse_args(["play", str(audio), "--high-quality"]))
 
     run_separate.assert_called_once_with(
-        Path("my-track"),
+        audio,
         high_quality=True,
         beat_detection_stem=None,
         on_progress=window.update,
@@ -990,6 +989,8 @@ def test_cmd_play_forwards_beat_detection_stem(
 ) -> None:
     monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
     project = _complete_project(tmp_path)
+    audio = tmp_path / "song.flac"
+    audio.write_bytes(b"audio")
     window = _mock_loading_window()
 
     with (
@@ -998,11 +999,11 @@ def test_cmd_play_forwards_beat_detection_stem(
         patch("cleave.viz.continue_launch"),
     ):
         cmd_play(
-            build_parser().parse_args(["play", "my-track", "-bds", "vocals"])
+            build_parser().parse_args(["play", str(audio), "-bds", "vocals"])
         )
 
     run_separate.assert_called_once_with(
-        Path("my-track"),
+        audio,
         high_quality=False,
         beat_detection_stem="vocals",
         on_progress=window.update,
@@ -1014,6 +1015,8 @@ def test_cmd_play_quit_during_separate_skips_continue(
 ) -> None:
     monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
     project = _complete_project(tmp_path)
+    audio = tmp_path / "song.flac"
+    audio.write_bytes(b"audio")
     window = _mock_loading_window()
 
     def separate(*_args: object, **_kwargs: object) -> Path:
@@ -1025,7 +1028,7 @@ def test_cmd_play_quit_during_separate_skips_continue(
         patch("cleave.separate.run_separate", side_effect=separate),
         patch("cleave.viz.continue_launch") as continue_launch,
     ):
-        cmd_play(build_parser().parse_args(["play", "my-track"]))
+        cmd_play(build_parser().parse_args(["play", str(audio)]))
 
     continue_launch.assert_not_called()
     window.close.assert_called_once()
@@ -1265,7 +1268,9 @@ def test_cmd_play_without_target_uses_picker(
     ):
         cmd_play(build_parser().parse_args(["play"]))
 
-    picker.assert_called_once_with(window)
+    from cleave.viz.file_picker import PickerMode
+
+    picker.assert_called_once_with(window, mode=PickerMode.COLD_START)
     continue_launch.assert_called_once()
     assert continue_launch.call_args.args[1] == project.resolve()
 
@@ -1317,10 +1322,14 @@ def test_cmd_play_picker_separate_failure_returns_to_picker(
     ):
         cmd_play(build_parser().parse_args(["play"]))
 
+    from cleave.viz.file_picker import PickerMode
+
     assert picker.call_count == 2
+    assert picker.call_args_list[0].kwargs["mode"] is PickerMode.COLD_START
+    assert picker.call_args_list[1].kwargs["mode"] is PickerMode.NEW_PROJECT
     assert "demucs blew up" in error.call_args.args[1]
     continue_launch.assert_called_once()
-    window.close.assert_not_called()
+    window.close.assert_called_once()
 
 
 def test_cmd_play_picker_error_dismissed_by_quit_closes_window(
@@ -1374,29 +1383,41 @@ def test_cmd_play_picker_launch_failure_returns_to_picker(
     ):
         cmd_play(build_parser().parse_args(["play"]))
 
+    from cleave.viz.file_picker import PickerMode
+
     assert picker.call_count == 2
+    assert picker.call_args_list[0].kwargs["mode"] is PickerMode.COLD_START
+    assert picker.call_args_list[1].kwargs["mode"] is PickerMode.NEW_PROJECT
     assert "no projectM" in error.call_args.args[1]
 
 
-def test_cmd_play_argv_target_launch_failure_still_exits(
+def test_cmd_play_argv_project_launch_failure_returns_to_open_picker(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     from cleave.viz import LaunchError
+    from cleave.viz.file_picker import PickerMode
 
     monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
-    project = _complete_project(tmp_path)
+    _complete_project(tmp_path)
     window = _mock_loading_window()
 
     with (
         patch("cleave.viz.open_loading_window", return_value=window),
-        patch("cleave.separate.run_separate", return_value=project.resolve()),
+        patch("cleave.separate.run_separate") as separate,
         patch(
             "cleave.viz.continue_launch", side_effect=LaunchError("no projectM")
         ),
+        patch(
+            "cleave.viz.file_picker_host.show_picker_error", return_value=True
+        ) as error,
+        patch("cleave.viz.file_picker_host.run_file_picker", return_value=None) as picker,
     ):
-        with pytest.raises(SystemExit) as exc:
-            cmd_play(build_parser().parse_args(["play", "my-track"]))
-    assert exc.value.code == 1
+        cmd_play(build_parser().parse_args(["play", "my-track"]))
+
+    separate.assert_not_called()
+    assert "no projectM" in error.call_args.args[1]
+    picker.assert_called_once_with(window, mode=PickerMode.OPEN_PROJECT)
+    window.close.assert_called_once()
 
 
 def test_cmd_play_open_gl_failure_exits() -> None:

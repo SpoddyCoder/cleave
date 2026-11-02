@@ -25,6 +25,7 @@ from cleave.preset_playlist import PresetPlaylist
 from cleave.signals import Signals
 from cleave.pcm_io import load_mix_pcm
 from cleave.stem_pcm import StemPcmBank, load_stem_pcm, LIVE_PROJECTM_FPS, samples_for_dt, samples_per_frame
+from cleave.open_target import OpenTarget
 from cleave.project import load_manifest
 from cleave.viz.bootstrap import load_stem_signals
 from cleave.viz.commands import command_context
@@ -656,7 +657,12 @@ class VisualizerApp:
                 layout=layout,
             )
 
-    def run(self, window: LoadingWindow | None = None) -> None:
+    def run(self, window: LoadingWindow | None = None) -> OpenTarget | None:
+        """Run one live session on an already-open loading window.
+
+        Returns the accepted project switch, or None when the session quit.
+        The loading compositor and the pygame display stay up for the next session.
+        """
         if not isinstance(self._runtime, VisualizerSeed):
             raise TypeError("run() requires a VisualizerSeed from build_runtime_base()")
 
@@ -675,6 +681,7 @@ class VisualizerApp:
 
         rt: LiveVisualizerRuntime | None = None
         shell = None
+        switch_target: OpenTarget | None = None
         try:
             compositor, post_process, masked_compositor, overlay_surface = (
                 init_gl_resources_cheap(seed, compositor=window.compositor)
@@ -698,10 +705,11 @@ class VisualizerApp:
             )
             self._runtime = rt
             if window.quit_requested:
-                return
+                return None
 
             from imgui_bundle import imgui
 
+            from cleave.viz.file_picker_surface import FilePickerSurface
             from cleave.viz.modal import ModalKind
             from cleave.viz.modal_surface import (
                 ImGuiTextMeasure,
@@ -741,6 +749,7 @@ class VisualizerApp:
                             InfoPanelSurface(tap_sync_info_panel(progress))
                         )
                 modal_surface: ModalSurface | None = None
+                picker_surface: FilePickerSurface | None = None
                 if rt.modal_host.active:
                     modal_view = rt.modal_host.view_state()
                     if modal_view is not None:
@@ -748,6 +757,11 @@ class VisualizerApp:
                             modal_view, ImGuiTextMeasure()
                         )
                         shell.top_layer.push(modal_surface)
+                elif rt.controls.project_switch.active:
+                    picker_view = rt.controls.project_switch.view_state()
+                    if picker_view is not None:
+                        picker_surface = FilePickerSurface(picker_view)
+                        shell.top_layer.push(picker_surface)
                 position = current_sec(rt.playback, rt.seed.duration_sec)
                 readout = TransportReadout(
                     paused=rt.playback.paused,
@@ -778,6 +792,8 @@ class VisualizerApp:
                 if modal_surface is not None and modal_surface.intent is not None:
                     apply_modal_pointer(rt.modal_host, modal_surface.intent)
                     rt.ui_fade.notify_input()
+                if picker_surface is not None and picker_surface.intent is not None:
+                    rt.controls.project_switch.apply_pointer(picker_surface.intent)
                 shown = rt.modal_host.view_state()
                 if shown is not None and shown.kind == ModalKind.TEXT:
                     display_w = max(1, int(imgui.get_io().display_size.x))
@@ -827,6 +843,9 @@ class VisualizerApp:
 
                 if rt.controls.consume_pending_exit():
                     running = False
+                elif rt.controls.consume_pending_switch():
+                    switch_target = rt.controls.project_switch.take_accepted()
+                    running = False
 
                 self._overlay_dt = clock.tick() / 1000.0
                 rt.controls.tick(self._overlay_dt)
@@ -834,6 +853,7 @@ class VisualizerApp:
                 rt.modal_host.tick(self._overlay_dt)
                 if (
                     rt.controls.key_repeat_armed
+                    or rt.controls.project_switch.key_repeat_armed
                     or rt.controls.value_nudge_armed
                     or rt.timeline_controls.key_repeat_armed
                     or rt.modal_host.text_key_repeat_armed
@@ -865,6 +885,7 @@ class VisualizerApp:
                 draw_ui()
                 pygame.display.flip()
                 measured_fps = frame_rate.end_frame()
+            return switch_target
 
         finally:
             if rt is not None:
@@ -874,10 +895,7 @@ class VisualizerApp:
             if rt is not None:
                 persist_editor_settings(rt.seed.cfg)
                 LayerFramePipeline.destroy(rt.layers)
-                rt.compositor.destroy()
                 rt.post_process.destroy()
                 rt.masked_compositor.release()
                 rt.mix_player.stop()
                 cleanup_unreferenced_user_presets(rt.seed.project_dir)
-            window.video_quit = True
-            pygame.quit()

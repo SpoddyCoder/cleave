@@ -4125,13 +4125,15 @@ def test_try_quit_cancel_and_escape_stay() -> None:
     controls.handle_modal_keydown(_keydown(pygame.K_RIGHT))
     controls.handle_modal_keydown(_keydown(pygame.K_RIGHT))
     controls.handle_modal_keydown(_keydown(pygame.K_RETURN))
-    assert controls._config_save._pending_exit is False
+    assert controls.pending_exit is False
+    assert controls.consume_pending_switch() is False
     assert controls.config_dirty
     assert not controls.modal_host.active
 
     controls.try_quit()
     controls.handle_modal_keydown(_keydown(pygame.K_ESCAPE))
-    assert controls._config_save._pending_exit is False
+    assert controls.pending_exit is False
+    assert controls.consume_pending_switch() is False
     assert controls.config_dirty
     assert not controls.modal_host.active
 

@@ -19,6 +19,7 @@ from cleave.gl_post_process import GlPostProcess
 from cleave.preset_playlist import PresetPlaylist, scan_single_layer
 from cleave.signals import Signals
 from cleave.viz.controls import TuningControls
+from cleave.viz.project_switch import ProjectSwitchController
 from cleave.viz.layer_preview_resolution import preview_layer_size
 from cleave.viz.live_layer_binding_factory import (
     LiveLayerBindingContext,
@@ -205,6 +206,10 @@ def make_tuning_controls(
         kwargs["modal_host"] = modal_host
 
     controls = TuningControls(**kwargs)
+    controls.project_switch = ProjectSwitchController(
+        controls.config_save,
+        controls.modal_host,
+    )
     ctx.notification_sink = controls.show_notification
     if pcm_bank is not None and mix_player is not None:
         mix_player.set_stem_pcm(

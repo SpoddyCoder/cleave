@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import sys
 from collections.abc import Callable
+from enum import Enum
 from pathlib import Path
 
 from cleave.config import CleaveConfig
@@ -19,8 +20,16 @@ from cleave.viz.modal import ModalHost, ModalKind
 from cleave.viz.session import TuningSession
 
 
+class PendingAction(Enum):
+    """Why the live session should leave, once the app loop consumes it."""
+
+    NONE = "none"
+    EXIT = "exit"
+    SWITCH = "switch"
+
+
 class ConfigSaveController:
-    """Dirty tracking, immediate Save, and deferred quit.
+    """Dirty tracking, immediate Save, and one deferred leave (quit or switch).
 
     Viz YAML fields use ``persisted_session_payload``. Song markers,
     milkdrop beat sensitivity, compositor hdr, and render width/height/fps
@@ -56,7 +65,7 @@ class ConfigSaveController:
         self._saved_render_width = session.project.render.width
         self._saved_render_height = session.project.render.height
         self._saved_render_fps = session.project.render.fps
-        self._pending_exit = False
+        self._pending = PendingAction.NONE
         self._on_commit_save: list[Callable[[], None]] = []
 
     def add_on_commit_save(self, callback: Callable[[], None]) -> None:
@@ -145,32 +154,72 @@ class ConfigSaveController:
 
     @property
     def pending_exit(self) -> bool:
-        return self._pending_exit
+        return self._pending is PendingAction.EXIT
 
     def consume_pending_exit(self) -> bool:
         """Return True once when quit was deferred (e.g. Don't save from unsaved dialog)."""
-        if self._pending_exit:
-            self._pending_exit = False
+        if self._pending is PendingAction.EXIT:
+            self._pending = PendingAction.NONE
+            return True
+        return False
+
+    def consume_pending_switch(self) -> bool:
+        """Return True once when a project switch was deferred."""
+        if self._pending is PendingAction.SWITCH:
+            self._pending = PendingAction.NONE
             return True
         return False
 
     def mark_pending_exit(self) -> None:
         """Ask the app loop to leave via ``consume_pending_exit``."""
-        self._pending_exit = True
+        self._pending = PendingAction.EXIT
+
+    def clear_pending_switch(self) -> None:
+        """Drop a switch the session loop has not consumed."""
+        if self._pending is PendingAction.SWITCH:
+            self._pending = PendingAction.NONE
+
+    def _unsaved_prompt_active(self) -> bool:
+        view_state = self._modal.view_state()
+        return view_state is not None and view_state.kind == ModalKind.UNSAVED_QUIT
 
     def try_quit(self) -> bool:
         """Handle a quit request. Return True when the app should exit now."""
-        if self._pending_exit:
+        if self._pending is PendingAction.EXIT:
             return True
         if not self.config_dirty:
             return True
-        view_state = self._modal.view_state()
-        if view_state is None or view_state.kind != ModalKind.UNSAVED_QUIT:
+        if not self._unsaved_prompt_active():
             self._modal.prompt_unsaved_quit(
                 on_save=self._quit_save,
                 on_discard=self._quit_discard,
             )
         return False
+
+    def commit_switch(self, *, on_cancel: Callable[[], None] | None = None) -> bool:
+        """Ask the app loop to switch projects.
+
+        The open target stays with the caller. A clean project marks
+        ``SWITCH`` now. A dirty project reuses the unsaved prompt; save and
+        discard mark ``SWITCH``, and cancel leaves the pending action none.
+        Returns False when a quit is already pending or the unsaved prompt is
+        already up, so the caller can drop a target that was not committed.
+        """
+        if self._pending is PendingAction.EXIT:
+            return False
+        if self._unsaved_prompt_active():
+            return False
+        if self._pending is PendingAction.SWITCH:
+            return True
+        if not self.config_dirty:
+            self._pending = PendingAction.SWITCH
+            return True
+        self._modal.prompt_unsaved_quit(
+            on_save=self._switch_save,
+            on_discard=self._switch_discard,
+            on_cancel=on_cancel,
+        )
+        return True
 
     def save(self) -> None:
         """Write the active creative YAML and flush project.yaml session fields."""
@@ -182,10 +231,17 @@ class ConfigSaveController:
 
     def _quit_save(self) -> None:
         self.save()
-        self._pending_exit = True
+        self._pending = PendingAction.EXIT
 
     def _quit_discard(self) -> None:
-        self._pending_exit = True
+        self._pending = PendingAction.EXIT
+
+    def _switch_save(self) -> None:
+        self.save()
+        self._pending = PendingAction.SWITCH
+
+    def _switch_discard(self) -> None:
+        self._pending = PendingAction.SWITCH
 
     def _show_save_notification(self, message: str) -> None:
         print(message, file=sys.stderr)

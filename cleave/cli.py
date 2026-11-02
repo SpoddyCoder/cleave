@@ -16,8 +16,8 @@ from cleave.render_progress import (
 from cleave.win_console import attach_parent_console
 
 if TYPE_CHECKING:
+    from cleave.open_target import OpenTarget
     from cleave.stems import StemSource
-    from cleave.viz.loading import LoadingWindow
     from cleave.viz.render import RenderSegment
 
 # Parser/help constants (must match defining modules; avoid importing them for -h).
@@ -225,7 +225,7 @@ def cmd_separate(args: argparse.Namespace) -> None:
 
 def cmd_play(args: argparse.Namespace) -> None:
     os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
-    from cleave.viz import LaunchError, continue_launch, open_loading_window
+    from cleave.viz import LaunchError, open_loading_window
 
     try:
         window = open_loading_window()
@@ -249,69 +249,46 @@ def cmd_play(args: argparse.Namespace) -> None:
             window.close()
             return
 
+    play_target: OpenTarget | None
     if args.target is None:
-        _play_from_picker(args, window)
-        return
-
-    try:
-        project_dir = _separate_for_play(args, window, Path(args.target))
-    except (FileNotFoundError, ValueError, RuntimeError) as e:
-        window.update(f"error: {e}")
-        _exit_error(f"error: {e}")
-
-    if project_dir is None:
-        window.close()
-        return
-
-    try:
-        continue_launch(window, project_dir, config=args.config)
-    except LaunchError as e:
-        _exit_error(f"error: {e}")
-
-
-def _separate_for_play(
-    args: argparse.Namespace,
-    window: LoadingWindow,
-    target: Path,
-) -> Path | None:
-    """Run stem split with progress. None when the user closed the window."""
-    from cleave.separate import run_separate
-
-    project_dir = run_separate(
-        target,
-        high_quality=args.high_quality,
-        beat_detection_stem=_optional_beat_detection_stem(args),
-        on_progress=window.update,
-    )
-    if window.quit_requested:
-        return None
-    return project_dir
-
-
-def _play_from_picker(args: argparse.Namespace, window: LoadingWindow) -> None:
-    """Browse, separate, and play, returning to the picker on failure."""
-    from cleave.viz import continue_launch
-    from cleave.viz.file_picker_host import run_file_picker, show_picker_error
-
-    while True:
-        target = run_file_picker(window)
-        if target is None:
-            window.close()
-            return
+        play_target = None
+    else:
         try:
-            project_dir = _separate_for_play(args, window, target.path)
-            if project_dir is None:
-                window.close()
-                return
-            continue_launch(window, project_dir, config=args.config)
+            play_target = _play_open_target(str(args.target))
         except (FileNotFoundError, ValueError, RuntimeError) as e:
-            if getattr(window, "video_quit", False) is True:
-                raise
-            if not show_picker_error(window, str(e)):
-                window.close()
-                return
-            continue
-        return
+            window.update(f"error: {e}")
+            _exit_error(f"error: {e}")
+            return
+
+    from cleave.viz.session_loop import run_editor_sessions
+
+    run_editor_sessions(
+        window,
+        play_target,
+        config=args.config,
+        high_quality=bool(args.high_quality),
+        beat_detection_stem=_optional_beat_detection_stem(args),
+    )
+
+
+def _play_open_target(target: str) -> OpenTarget:
+    """Classify an explicit ``play`` path. Raises the same errors as separate."""
+    from cleave.open_target import (
+        OpenTarget,
+        OpenTargetKind,
+        classify_open_target,
+        is_project_target,
+    )
+    from cleave.separate import resolve_separate_target
+
+    path = Path(target)
+    found = classify_open_target(path)
+    if found is not None:
+        return found
+    project_dir, _audio = resolve_separate_target(path)
+    if not is_project_target(project_dir):
+        raise ValueError(f"not a Cleave project or audio file: {path}")
+    return OpenTarget(path=project_dir, kind=OpenTargetKind.PROJECT)
 
 
 def cmd_render(args: argparse.Namespace) -> None:

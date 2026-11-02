@@ -16,6 +16,7 @@ from pathlib import Path
 from cleave.open_target import (
     AUDIO_SUFFIXES,
     OpenTarget,
+    OpenTargetKind,
     classify_open_target,
     is_project_target,
     open_target_rejection,
@@ -39,6 +40,59 @@ DRIVES_LABEL = "Drives"
 PARENT_LABEL = ".."
 MAX_ROWS = 512
 PAGE_SIZE = 12
+
+
+class PickerMode(Enum):
+    """Which open flow the picker is serving."""
+
+    COLD_START = "cold-start"
+    OPEN_PROJECT = "open-project"
+    NEW_PROJECT = "new-project"
+
+
+class PickerStart(Enum):
+    """Where a mode lists first."""
+
+    PROJECTS = "projects"
+    HOME = "home"
+
+
+@dataclass(frozen=True)
+class PickerModeSpec:
+    """Title, start directory, and accepted targets for one picker mode."""
+
+    title: str
+    start: PickerStart
+    kinds: frozenset[OpenTargetKind]
+
+
+PICKER_MODE_SPECS: dict[PickerMode, PickerModeSpec] = {
+    PickerMode.COLD_START: PickerModeSpec(
+        title=TITLE,
+        start=PickerStart.PROJECTS,
+        kinds=frozenset({OpenTargetKind.AUDIO, OpenTargetKind.PROJECT}),
+    ),
+    PickerMode.OPEN_PROJECT: PickerModeSpec(
+        title="Open a Cleave project...",
+        start=PickerStart.PROJECTS,
+        kinds=frozenset({OpenTargetKind.PROJECT}),
+    ),
+    PickerMode.NEW_PROJECT: PickerModeSpec(
+        title="Select an audio file to create a new project...",
+        start=PickerStart.HOME,
+        kinds=frozenset({OpenTargetKind.AUDIO}),
+    ),
+}
+
+
+def picker_mode_rejection(mode: PickerMode, path: Path) -> str:
+    """Return why *path* cannot be accepted in *mode*."""
+    kinds = PICKER_MODE_SPECS[mode].kinds
+    if kinds == frozenset({OpenTargetKind.PROJECT}):
+        return f"select a Cleave project, not {path.name}"
+    if kinds == frozenset({OpenTargetKind.AUDIO}):
+        return f"select an audio file, not {path.name}"
+    return f"cannot open {path.name}"
 
 
 class PickerAction(Enum):
@@ -144,7 +198,10 @@ def _sort_key(path: Path) -> str:
     return path.name.casefold()
 
 
-def _list_directory(path: Path) -> tuple[tuple[PickerRow, ...], bool]:
+def _list_directory(
+    path: Path,
+    accepted: frozenset[OpenTargetKind],
+) -> tuple[tuple[PickerRow, ...], bool]:
     """Return rows for *path*, and whether the listing was truncated."""
     try:
         entries = list(path.iterdir())
@@ -159,7 +216,11 @@ def _list_directory(path: Path) -> tuple[tuple[PickerRow, ...], bool]:
         try:
             if entry.is_dir():
                 directories.append(entry)
-            elif entry.suffix.lower() in AUDIO_SUFFIXES and entry.is_file():
+            elif (
+                OpenTargetKind.AUDIO in accepted
+                and entry.suffix.lower() in AUDIO_SUFFIXES
+                and entry.is_file()
+            ):
                 audio.append(entry)
         except OSError:
             continue
@@ -168,7 +229,7 @@ def _list_directory(path: Path) -> tuple[tuple[PickerRow, ...], bool]:
     for entry in sorted(directories, key=_sort_key):
         kind = (
             PickerRowKind.PROJECT
-            if is_project_target(entry)
+            if OpenTargetKind.PROJECT in accepted and is_project_target(entry)
             else PickerRowKind.DIRECTORY
         )
         rows.append(PickerRow(label=entry.name, kind=kind, target=entry))
@@ -197,6 +258,7 @@ class FilePicker:
     the pointer is over a row or shortcut.
     """
 
+    mode: PickerMode = PickerMode.COLD_START
     current: Path | None = None
     shortcuts: tuple[PickerShortcut, ...] = field(default_factory=picker_shortcuts)
     selected_index: int = 0
@@ -209,15 +271,12 @@ class FilePicker:
     _truncated: bool = field(default=False, repr=False)
 
     def __post_init__(self) -> None:
-        # A None at construction means "start where the user data lives"; a
+        # A None at construction means "start in this mode's directory"; a
         # None later means the drives listing.
         if self.current is None:
-            start = projects_dir()
-            try:
-                start.mkdir(parents=True, exist_ok=True)
-            except OSError:
-                start = Path.home()
+            start = _start_directory(self.mode)
             self.current = start
+            self.selected_shortcut = _shortcut_index(self.shortcuts, start)
         self._refresh()
 
     # -- listing -----------------------------------------------------------
@@ -227,7 +286,9 @@ class FilePicker:
             rows = _drive_rows()
             truncated = False
         else:
-            listing, truncated = _list_directory(self.current)
+            listing, truncated = _list_directory(
+                self.current, PICKER_MODE_SPECS[self.mode].kinds
+            )
             # Always offer "..": at a volume root it leads to the drives
             # listing rather than nowhere.
             rows = (
@@ -275,7 +336,7 @@ class FilePicker:
     def view_state(self) -> PickerViewState:
         """Return the immutable snapshot the overlay draws."""
         return PickerViewState(
-            title=TITLE,
+            title=PICKER_MODE_SPECS[self.mode].title,
             location=DRIVES_LABEL if self.current is None else str(self.current),
             rows=self._rows,
             selected_index=self.selected_index,
@@ -449,4 +510,34 @@ class FilePicker:
                 return None
             self.status = open_target_rejection(row.target)
             return None
+        if target.kind not in PICKER_MODE_SPECS[self.mode].kinds:
+            try:
+                is_dir = row.target.is_dir()
+            except OSError:
+                is_dir = False
+            if is_dir:
+                self.navigate_to(row.target)
+                return None
+            self.status = picker_mode_rejection(self.mode, row.target)
+            return None
         return target
+
+
+def _start_directory(mode: PickerMode) -> Path:
+    """Return the directory a new picker lists for *mode*."""
+    if PICKER_MODE_SPECS[mode].start is PickerStart.HOME:
+        return Path.home()
+    start = projects_dir()
+    try:
+        start.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        return Path.home()
+    return start
+
+
+def _shortcut_index(shortcuts: tuple[PickerShortcut, ...], target: Path) -> int:
+    """Return the shortcut whose target is *target*, or 0 when none matches."""
+    for index, shortcut in enumerate(shortcuts):
+        if shortcut.target == target:
+            return index
+    return 0

@@ -11,10 +11,13 @@ from cleave.paths import drive_roots, install_dir
 from cleave.project import PROJECT_FILENAME
 from cleave.viz.file_picker import (
     MAX_ROWS,
+    TITLE,
     FilePicker,
     PickerAction,
     PickerFocus,
+    PickerMode,
     PickerRowKind,
+    picker_mode_rejection,
     picker_shortcuts,
 )
 
@@ -43,6 +46,14 @@ def _labels(picker: FilePicker) -> list[str]:
     return [row.label for row in picker.rows]
 
 
+def _shortcut_index(picker: FilePicker, label: str) -> int:
+    return next(
+        index
+        for index, shortcut in enumerate(picker.shortcuts)
+        if shortcut.label == label
+    )
+
+
 def test_starts_in_projects_dir_and_creates_it(data_root: Path) -> None:
     from cleave.paths import projects_dir
 
@@ -51,6 +62,129 @@ def test_starts_in_projects_dir_and_creates_it(data_root: Path) -> None:
     assert projects_dir().is_dir()
     assert picker.view_state().active_shortcut == 0
     assert picker.shortcuts[0].label == "Projects"
+    assert picker.selected_shortcut == _shortcut_index(picker, "Projects")
+    assert picker.view_state().title == TITLE
+
+
+def test_open_project_starts_in_projects_dir(data_root: Path) -> None:
+    from cleave.paths import projects_dir
+
+    picker = FilePicker(mode=PickerMode.OPEN_PROJECT)
+    assert picker.current == projects_dir()
+    assert projects_dir().is_dir()
+    assert picker.selected_shortcut == _shortcut_index(picker, "Projects")
+    assert picker.view_state().title == "Open a Cleave project..."
+
+
+def test_new_project_starts_at_home_without_creating_projects(
+    data_root: Path,
+) -> None:
+    from cleave.paths import projects_dir
+
+    picker = FilePicker(mode=PickerMode.NEW_PROJECT)
+    assert picker.current == Path.home()
+    assert picker.selected_shortcut == _shortcut_index(picker, "Home")
+    assert picker.view_state().title == (
+        "Select an audio file to create a new project..."
+    )
+    assert not projects_dir().exists()
+
+
+def test_open_project_listing_omits_audio_and_marks_projects(tmp_path: Path) -> None:
+    _project(tmp_path, "song")
+    (tmp_path / "plain").mkdir()
+    _wav(tmp_path, "tune.wav")
+
+    picker = FilePicker(current=tmp_path, mode=PickerMode.OPEN_PROJECT)
+    kinds = {row.label: row.kind for row in picker.rows}
+    assert "tune.wav" not in kinds
+    assert kinds["song"] is PickerRowKind.PROJECT
+    assert kinds["plain"] is PickerRowKind.DIRECTORY
+
+
+def test_new_project_lists_audio_and_project_dirs_as_directories(
+    tmp_path: Path,
+) -> None:
+    _project(tmp_path, "song")
+    _wav(tmp_path, "tune.wav")
+
+    picker = FilePicker(current=tmp_path, mode=PickerMode.NEW_PROJECT)
+    kinds = {row.label: row.kind for row in picker.rows}
+    assert kinds["tune.wav"] is PickerRowKind.AUDIO
+    assert kinds["song"] is PickerRowKind.DIRECTORY
+
+
+def test_new_project_accepts_audio_and_enters_a_project_dir(tmp_path: Path) -> None:
+    song = _wav(tmp_path, "song.wav")
+    project = _project(tmp_path, "album")
+
+    picker = FilePicker(current=tmp_path, mode=PickerMode.NEW_PROJECT)
+    audio = next(index for index, row in enumerate(picker.rows) if row.target == song)
+    picker.select_row(audio)
+    target = picker.open_row()
+    assert target is not None
+    assert target.kind is OpenTargetKind.AUDIO
+    assert target.path == song
+
+    picker = FilePicker(current=tmp_path, mode=PickerMode.NEW_PROJECT)
+    album = next(
+        index for index, row in enumerate(picker.rows) if row.target == project
+    )
+    assert picker.rows[album].kind is PickerRowKind.DIRECTORY
+    picker.select_row(album)
+    assert picker.open_row() is None
+    assert picker.current == project
+    assert picker.status == ""
+
+
+def test_open_project_rejects_an_audio_file(tmp_path: Path) -> None:
+    song = _wav(tmp_path, "song.wav")
+    picker = FilePicker(current=tmp_path)
+    audio = next(index for index, row in enumerate(picker.rows) if row.target == song)
+    picker.select_row(audio)
+    picker.mode = PickerMode.OPEN_PROJECT
+
+    assert picker.open_row() is None
+    assert picker.current == tmp_path
+    assert picker.status == picker_mode_rejection(PickerMode.OPEN_PROJECT, song)
+    assert picker.status == f"select a Cleave project, not {song.name}"
+
+
+def test_cold_start_accepts_audio_and_project(tmp_path: Path) -> None:
+    song = _wav(tmp_path, "song.wav")
+    project = _project(tmp_path, "album")
+
+    picker = FilePicker(current=tmp_path, mode=PickerMode.COLD_START)
+    audio = next(index for index, row in enumerate(picker.rows) if row.target == song)
+    picker.select_row(audio)
+    target = picker.open_row()
+    assert target is not None
+    assert target.kind is OpenTargetKind.AUDIO
+    assert target.path == song
+
+    picker = FilePicker(current=tmp_path)
+    album = next(
+        index for index, row in enumerate(picker.rows) if row.target == project
+    )
+    assert picker.rows[album].kind is PickerRowKind.PROJECT
+    picker.select_row(album)
+    target = picker.open_row()
+    assert target is not None
+    assert target.kind is OpenTargetKind.PROJECT
+    assert target.path == project
+
+
+def test_open_project_accepts_a_project_directory(tmp_path: Path) -> None:
+    project = _project(tmp_path, "album")
+    picker = FilePicker(current=tmp_path, mode=PickerMode.OPEN_PROJECT)
+    album = next(
+        index for index, row in enumerate(picker.rows) if row.target == project
+    )
+    picker.select_row(album)
+    target = picker.open_row()
+    assert target is not None
+    assert target.kind is OpenTargetKind.PROJECT
+    assert target.path == project
 
 
 def test_listing_order_directories_then_audio(tmp_path: Path) -> None:

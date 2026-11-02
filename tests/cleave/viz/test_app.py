@@ -54,6 +54,10 @@ def _silence_tap_sync(controls: MagicMock) -> None:
         remaining_sec=0.0,
         elapsed_sec=0.0,
     )
+    controls.project_switch.active = False
+    controls.project_switch.key_repeat_armed = False
+    controls.project_switch.take_accepted.return_value = None
+    controls.consume_pending_switch.return_value = False
 
 
 def _assert_warmup_tick(tick_call: object) -> None:
@@ -323,9 +327,10 @@ def test_run_boot_order_audio_starts_after_first_frame(
     mock_pygame.time.Clock.return_value.tick.return_value = 33
 
     app = VisualizerApp(seed)
-    app.run(window)
+    assert app.run(window) is None
 
-    loading_compositor.destroy.assert_called_once()
+    loading_compositor.destroy.assert_not_called()
+    mock_pygame.quit.assert_not_called()
     window.adopt_display_size.assert_not_called()
     mock_pygame.display.set_mode.assert_not_called()
     mock_init_cheap.assert_called_once_with(seed, compositor=loading_compositor)
@@ -397,6 +402,66 @@ def test_run_pygame_quit_clean_exits_via_try_quit(
     controls.consume_pending_exit.assert_called()
     assert isinstance(app._runtime, LiveVisualizerRuntime)
     app._runtime.ui_fade.notify_input.assert_not_called()
+
+
+@patch("cleave.viz.app.current_sec", return_value=0.0)
+@patch("cleave.viz.app.pygame")
+@patch("cleave.viz.app.init_gl_resources_heavy")
+@patch("cleave.viz.app.init_gl_resources_cheap")
+@patch.object(VisualizerApp, "tick_frame")
+def test_run_pending_switch_returns_target_and_keeps_compositor(
+    mock_tick_frame: MagicMock,
+    mock_init_cheap: MagicMock,
+    mock_init_heavy: MagicMock,
+    mock_pygame: MagicMock,
+    _mock_current_sec: MagicMock,
+) -> None:
+    from cleave.open_target import OpenTarget, OpenTargetKind
+
+    seed = _run_seed()
+    compositor = MagicMock()
+    window = _boot_window(seed, compositor)
+    target = OpenTarget(path=seed.project_dir, kind=OpenTargetKind.PROJECT)
+
+    mock_init_cheap.side_effect = lambda rt, compositor=None: (
+        compositor,
+        MagicMock(),
+        MagicMock(),
+        pygame.Surface((seed.display_width, seed.display_height), pygame.SRCALPHA),
+    )
+    controls = MagicMock()
+    _silence_tap_sync(controls)
+    controls.consume_pending_exit.return_value = False
+    controls.consume_pending_switch.return_value = True
+    controls.project_switch.take_accepted.return_value = target
+    controls.tick = MagicMock()
+    controls.key_repeat_armed = False
+    controls.value_nudge_armed = False
+    controls.consume_hide_overlay.return_value = False
+    controls.project_render.busy = False
+
+    def heavy_with_controls(
+        rt: VisualizerSeed,
+        comp: MagicMock,
+        post: MagicMock,
+        masked: MagicMock,
+        surface: pygame.Surface,
+        on_progress=None,
+    ) -> LiveVisualizerRuntime:
+        live = _heavy_init_side_effect(rt, comp, post, masked, surface, on_progress)
+        live.controls = controls
+        return live
+
+    mock_init_heavy.side_effect = heavy_with_controls
+    mock_tick_frame.side_effect = lambda *_a, **_k: None
+    mock_pygame.event.get.return_value = []
+    mock_pygame.QUIT = pygame.QUIT
+    mock_pygame.time.Clock.return_value.tick.return_value = 33
+
+    assert VisualizerApp(seed).run(window) is target
+    compositor.destroy.assert_not_called()
+    mock_pygame.quit.assert_not_called()
+    assert window.video_quit is not True
 
 
 @patch("cleave.viz.app.current_sec", return_value=0.0)
@@ -632,7 +697,7 @@ def test_run_resizes_when_loading_window_size_differs(
     window.adopt_display_size.assert_called_once_with(
         seed.display_width, seed.display_height
     )
-    loading.destroy.assert_called_once()
+    loading.destroy.assert_not_called()
     mock_pygame.display.set_mode.assert_not_called()
     mock_init_cheap.assert_called_once_with(seed, compositor=loading)
 

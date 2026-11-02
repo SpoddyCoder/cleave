@@ -34,6 +34,7 @@ from cleave.viz.render_post_fx_controls import RenderPostFxControls
 from cleave.viz.settings_controls import SettingsControls
 from cleave.viz.project_controls import ProjectControls
 from cleave.viz.project_render_controls import ProjectRenderController
+from cleave.viz.project_switch import ProjectSwitchController
 from cleave.viz.song_marker_controls import SongMarkerController
 from cleave.viz.tap_sync_controls import TapSyncControls, TapSyncUiSnapshot
 from cleave.viz.timeline_phase_controls import TimelinePhaseController
@@ -154,6 +155,10 @@ class TuningControls:
             on_save_config=on_save_config,
             on_notification=self.show_notification,
             move_mode_signature=self.layer_lifecycle.signature_payload,
+        )
+        self.project_switch = ProjectSwitchController(
+            self._config_save,
+            self._modal_host,
         )
         layers_by_slot = (
             layer_manager.layers_by_slot if layer_manager is not None else {}
@@ -394,6 +399,13 @@ class TuningControls:
     def consume_pending_exit(self) -> bool:
         return self._config_save.consume_pending_exit()
 
+    def consume_pending_switch(self) -> bool:
+        return self._config_save.consume_pending_switch()
+
+    @property
+    def config_save(self) -> ConfigSaveController:
+        return self._config_save
+
     def try_quit(self) -> bool:
         if self.project_render.busy:
             self.project_render.abort()
@@ -479,6 +491,7 @@ class TuningControls:
         if not pygame.mouse.get_pressed()[0] or self._modal_host.active:
             self.value_nudge.release()
         self._key_repeat.tick(dt_sec)
+        self.project_switch.tick(dt_sec)
         self.value_nudge.tick(dt_sec)
         self._notification_host.clear_expired()
         self.project_render.tick()

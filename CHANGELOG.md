@@ -9,6 +9,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 
+- File > New project (Ctrl+N) asks for an audio file, and File > Open project (Ctrl+O) asks for a project. Both switch the live session without quitting. A project with unsaved changes asks before leaving.
+
 ### Changed
 
 - The timeline strip opens when a session starts with the timeline enabled. Closing the strip or turning the timeline off hides it.

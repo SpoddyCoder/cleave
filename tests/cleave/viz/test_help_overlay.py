@@ -896,6 +896,8 @@ def test_curation_navigation_omits_disabled_global_hotkeys() -> None:
     assert isinstance(nav, HelpSection)
     assert nav is navigation_section(preset_curation=True)
     keys = dict(nav.entries)
+    assert "Ctrl + N" not in keys
+    assert "Ctrl + O" not in keys
     assert "Ctrl + S" not in keys
     assert "Ctrl + Enter" not in keys
     assert "Ctrl + R" not in keys
@@ -908,6 +910,8 @@ def test_curation_navigation_omits_disabled_global_hotkeys() -> None:
     visualizer_nav = help_sections_for_stop(CycleStop.MENU, focus)[0]
     assert isinstance(visualizer_nav, HelpSection)
     vis_keys = dict(visualizer_nav.entries)
+    assert vis_keys["Ctrl + N"] == "new project"
+    assert vis_keys["Ctrl + O"] == "open project"
     assert "Ctrl + S" in vis_keys
     assert vis_keys["Ctrl + Enter"] == "place song marker"
     assert vis_keys["Ctrl + R"] == "render"

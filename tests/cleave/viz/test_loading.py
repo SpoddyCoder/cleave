@@ -431,10 +431,33 @@ def test_open_loading_window_uses_editor_defaults(
         window.close()
         assert order == ["destroy", "quit"]
         assert window.imgui is None
+        assert window.video_quit is True
         window.release_imgui()
         window.close()
     host.destroy.assert_called_once()
     assert order == ["destroy", "quit", "quit"]
+
+
+def test_ensure_imgui_recreates_host_after_release() -> None:
+    pygame.init()
+    host = MagicMock()
+    window = LoadingWindow(
+        compositor=MagicMock(),
+        display_width=640,
+        display_height=360,
+        overlay_surface=pygame.Surface((640, 360), pygame.SRCALPHA),
+        imgui=host,
+    )
+    window.ensure_imgui()
+    assert window.imgui is host
+    window.release_imgui()
+    assert window.imgui is None
+    replacement = MagicMock()
+    with patch("cleave.viz.imgui_host.ImGuiHost.create", return_value=replacement):
+        window.ensure_imgui()
+    assert window.imgui is replacement
+    window.ensure_imgui()
+    assert window.imgui is replacement
 
 
 @patch("cleave.viz.loading.present_frame")

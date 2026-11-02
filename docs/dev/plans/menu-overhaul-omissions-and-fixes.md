@@ -23,11 +23,12 @@ These are not bugs; they were non-goals, disabled menu items, or deferred to oth
 
 | Menu path | Reason |
 | --- | --- |
-| File > Open project... (`Ctrl+O`) | Mid-session open stays [file-picker-plan.md](file-picker-plan.md) phase 3. |
 | Project > Separate stems... | CLI `cleave separate` only. |
 | Project > Backup... / Restore... | CLI `cleave backup` / `cleave restore` only. |
 | Timeline > Undo last cut | No cut-undo command exists yet. |
 | Help > About Cleave | No about command exists yet. |
+
+File > New project (Ctrl+N) and File > Open project (Ctrl+O) switch the live session. They are not deferred. See [file-picker-plan.md](file-picker-plan.md).
 
 ### Other deferred product items
 

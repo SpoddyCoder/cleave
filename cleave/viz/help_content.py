@@ -74,6 +74,8 @@ NAVIGATION_SECTION = HelpSection(
         _REGION_CYCLE_ENTRY,
         _TOP_LEVEL_NAV_ENTRY,
         *_SEEK_AND_QUIT_ENTRIES,
+        ("Ctrl + N", "new project"),
+        ("Ctrl + O", "open project"),
         ("Ctrl + S", "save"),
         ("Ctrl + Enter", "place song marker"),
         ("F10 / Alt", "focus menu bar"),

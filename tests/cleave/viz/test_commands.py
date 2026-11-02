@@ -40,6 +40,7 @@ from tests.cleave.viz.test_controls import (
 _SLOTS = (("slot_a", "snare"), ("slot_b", "pad"))
 
 _STATIC_IDS = (
+    "file.new",
     "file.open",
     "file.save",
     "file.quit",
@@ -72,7 +73,6 @@ _OFF_MENU_IDS = (
 )
 
 _DISABLED_IDS = (
-    "file.open",
     "project.separate",
     "project.backup",
     "project.restore",
@@ -159,6 +159,7 @@ def test_menus_list_taxonomy_ids_once() -> None:
         "Settings",
     ]
     assert _row_ids(menus[0]) == [
+        "file.new",
         "file.open",
         "file.save",
         None,
@@ -242,6 +243,7 @@ def test_only_project_render_owns_ctrl_r() -> None:
 
 def test_later_shortcuts_stay_on_rows_but_do_not_resolve() -> None:
     menus = _menus()
+    assert command_by_id("file.new", menus).shortcut == "Ctrl+N"
     assert command_by_id("file.open", menus).shortcut == "Ctrl+O"
     assert command_by_id("layers.add", menus).shortcut == "Ctrl+L"
     assert command_by_id("timeline.show_strip", menus).shortcut == "T"
@@ -255,7 +257,8 @@ def test_later_shortcuts_stay_on_rows_but_do_not_resolve() -> None:
     assert layer.id == "layers.focus.slot_a"
     assert layer.shortcut == "1"
     assert layer not in tuple(iter_commands(menus))
-    assert command_for_shortcut(pygame.K_o, pygame.KMOD_CTRL) is None
+    assert command_for_shortcut(pygame.K_n, pygame.KMOD_CTRL).id == "file.new"
+    assert command_for_shortcut(pygame.K_o, pygame.KMOD_CTRL).id == "file.open"
     assert command_for_shortcut(pygame.K_t, 0).id == "timeline.show_strip"
     assert (
         command_for_shortcut(pygame.K_t, 0, timeline_scope=True).id
@@ -298,6 +301,43 @@ def test_editor_shortcut_selects_the_settings_inspector() -> None:
 
     assert command_for_shortcut(pygame.K_COMMA, pygame.KMOD_CTRL) is editor
     assert command_for_shortcut(pygame.K_r, pygame.KMOD_CTRL).id == "project.render"
+
+
+def test_new_and_open_are_enabled_outside_blocked_sessions() -> None:
+    menus = _menus()
+    new = command_by_id("file.new", menus)
+    open_project = command_by_id("file.open", menus)
+    assert new.label == "New project..."
+    assert open_project.label == "Open project..."
+    assert new.enabled(CommandContext()) is True
+    assert open_project.enabled(CommandContext()) is True
+    for blocked in (
+        CommandContext(editor_mode="preset_curation"),
+        CommandContext(render_busy=True),
+        CommandContext(timeline_recording=True),
+    ):
+        assert new.enabled(blocked) is False
+        assert open_project.enabled(blocked) is False
+
+    controls = _fake_controls()
+    controls.project_switch = SimpleNamespace(
+        prompt_new=MagicMock(),
+        prompt_open=MagicMock(),
+    )
+    new.run(controls)
+    open_project.run(controls)
+    controls.project_switch.prompt_new.assert_called_once_with()
+    controls.project_switch.prompt_open.assert_called_once_with()
+
+    blocked = _fake_controls(render_busy=True)
+    blocked.project_switch = SimpleNamespace(
+        prompt_new=MagicMock(),
+        prompt_open=MagicMock(),
+    )
+    new.run(blocked)
+    open_project.run(blocked)
+    blocked.project_switch.prompt_new.assert_not_called()
+    blocked.project_switch.prompt_open.assert_not_called()
 
 
 def test_disabled_run_does_not_call_a_controller() -> None:

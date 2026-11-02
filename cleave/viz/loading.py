@@ -450,9 +450,21 @@ class LoadingWindow:
         host.destroy()
         self.imgui = None
 
+    def ensure_imgui(self) -> None:
+        """Recreate the ImGui host after :meth:`release_imgui`.
+
+        No-op when a host is already attached.
+        """
+        if self.imgui is not None:
+            return
+        from cleave.viz.imgui_host import ImGuiHost
+
+        self.imgui = ImGuiHost.create()
+
     def close(self) -> None:
         self.release_imgui()
         self.compositor.destroy()
+        self.video_quit = True
         pygame.quit()
 
 

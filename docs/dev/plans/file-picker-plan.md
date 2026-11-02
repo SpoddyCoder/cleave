@@ -1,6 +1,6 @@
 # File picker plan
 
-Phase 1 is shipped (loading-screen picker, optional `play` target, frozen no-args): [file-picker-phase-1.md](../plans-completed/file-picker-phase-1.md). Remaining: Phase 2 (`DROPFILE`) and Phase 3 (mid-session open / Ctrl+O).
+Phase 1 is shipped (loading-screen picker, optional `play` target, frozen no-args): [file-picker-phase-1.md](../plans-completed/file-picker-phase-1.md). Phase 3 is shipped (File > New project and File > Open project on one window). Remaining: Phase 2 (`DROPFILE`).
 
 Related: [editor-first.mdc](../../../.cursor/rules/editor-first.mdc), [architecture-principles.mdc](../../../.cursor/rules/architecture-principles.mdc), [structured-releases.md](../structured-releases.md), [windows-freeze.md](../windows-freeze.md).
 
@@ -10,12 +10,11 @@ Related: [editor-first.mdc](../../../.cursor/rules/editor-first.mdc), [architect
 
 Cold start already opens in-window. `cleave play` with no target, frozen no-args (Start Menu, double-click), and checkout `cleave play` with no target browse for an audio file or a project directory, then separate and launch. Supported audio is wav, mp3, flac, m4a, aac, ogg, aiff, and aif. A new project stores a PCM WAV mix; stem split, playback, and render use that WAV. Drop onto the exe still works via `normalise_argv`.
 
-Two gaps remain:
+One gap remains:
 
 - No pygame `DROPFILE` handler on the GL window (loading-screen picker or live session).
-- No way to switch song mid-session without quitting. Ctrl+O is not wired. [VisualizerApp.run](../../../cleave/viz/app.py) always `pygame.quit()` in `finally`.
 
-Reuse [cleave/open_target.py](../../../cleave/open_target.py) and the Phase 1 picker. A chosen path still goes through `run_separate` then `continue_launch` (cold start) or the same pair after a live teardown (mid-session).
+File > New project (Ctrl+N) and File > Open project (Ctrl+O) switch the live session on the same window. Accept, then tear down: Esc cancels and leaves the session up. A dirty project reuses the unsaved-changes prompt. Audio goes through `run_separate` on the loading window; a project directory launches directly. [VisualizerApp.run](../../../cleave/viz/app.py) returns the switch request and does not call `pygame.quit()`; the session loop closes the window on quit.
 
 ---
 
@@ -33,7 +32,7 @@ Reuse [cleave/open_target.py](../../../cleave/open_target.py) and the Phase 1 pi
 
 pygame 2 / SDL2 `DROPFILE` onto the GL window. Worth doing on the freeze; best-effort on WSL.
 
-- Pump `DROPFILE` in the loading-screen picker loop and, in Phase 3, in the live event loop.
+- Pump `DROPFILE` in the loading-screen picker loop and in the live event loop.
 - `event.file` is a string path. Run the same accept helper. On accept, behave as if the user confirmed that row (cold start: leave picker and `run_separate`; mid-session: unsaved prompt then reload).
 - WSL: if the string looks like `C:\...` and the Linux path does not exist, show an in-window message suggesting `/mnt/c/...` or the picker shortcuts. Do not shell out to `wslpath` as a hard dependency.
 - Windows freeze: this is the in-window counterpart of drop-on-exe. Drop-on-exe remains argv normalisation and does not need the window open.
@@ -44,24 +43,11 @@ Do not use `DROPFILE` as the only open path.
 
 ## Mid-session reload (Phase 3)
 
-Goal: Ctrl+O (and drop onto the live window) switches song without process exit.
+Shipped. File > New project (Ctrl+N) asks for an audio file. File > Open project (Ctrl+O) asks for a project. Both run in the live window.
 
-[VisualizerApp.run](../../../cleave/viz/app.py) today: load GL, loop until quit, `finally` persist settings, destroy layers/compositor/post/mask, stop mix player, cleanup user presets, `pygame.quit()`.
+Accept, then tear down. Esc cancels and keeps the session. A dirty project uses the unsaved-changes prompt; save or discard marks the switch and keeps the target, and cancel drops it. The session loop keeps the display and the loading compositor, stem-splits audio with loading progress, and launches the project. Failure shows an error on the window and returns to the picker in that request's mode. Quit closes the window once.
 
-Reload needs a loop around "live session" that does **not** call `pygame.quit()` until real quit:
-
-1. User requests open (`Ctrl+O` in [input_dispatch.py](../../../cleave/viz/input_dispatch.py), or `DROPFILE`).
-2. If dirty, reuse the unsaved-changes modal pattern in [ConfigSaveController](../../../cleave/viz/config_save.py) (`try_quit` / `UNSAVED_QUIT`). Generalise "pending action after save" rather than adding a second dirty flag. Cancel stays on the current project.
-3. Stop mix player, destroy layer pipeline and GL objects that are per-project. Keep the display and the loading compositor (same adopt path used at boot: [_adopt_loading_compositor](../../../cleave/viz/app.py)). Projects can differ in editor display size; go through `adopt_display_size`.
-4. Show picker (or use the dropped path). Esc returns to the **current** project only if teardown has not started; once teardown starts, picker cancel should quit or re-open the same project. Prefer: prompt and teardown only after a path is accepted, so Esc is cheap.
-5. `run_separate` with loading-screen progress (an audio file may need stem split). Failure: error message, any key, back to the picker, window still up.
-6. `build_runtime_base` + heavy GL init + live loop as today.
-
-Help: add Open (`Ctrl+O`) to [help_content.py](../../../cleave/viz/help_content.py) navigation section.
-
-Order inside Phase 3: accept-then-teardown so cancel is cheap. Do not destroy the live session until the picker returns a path.
-
-Do not bolt file browsing onto [TuningControls](../../../cleave/viz/controls.py). Do not add a `RowKind` or fold the picker into `RowLayout`. Draw via [overlay_primitives](../../../cleave/viz/overlay_primitives.py); do not import `tuning_panel_draw`.
+`DROPFILE` onto the live window is still Phase 2.
 
 ---
 
@@ -80,7 +66,7 @@ Do not bolt file browsing onto [TuningControls](../../../cleave/viz/controls.py)
 
 - Stem split, Demucs, analyse, `project.yaml` shape, persist, overlay row registry, Inno onedir layout, sidecar FFmpeg/libprojectM.
 - Drop-on-exe argv normalisation.
-- `continue_launch` contract: still takes an already-open `LoadingWindow` and a resolved `project_dir`.
+- `continue_launch` still takes an already-open `LoadingWindow` and a resolved `project_dir`. It returns a switch request, or None for quit. `LaunchError` is unchanged.
 - Live overlay stays keyboard-only. This work does not add mouse hit-testing.
 - Phase 1 picker, CLI optional target, and frozen no-args behaviour.
 
@@ -92,4 +78,4 @@ No editor / OpenGL window in unit tests ([agent-environment.mdc](../../../.curso
 
 Phase 2: `DROPFILE` path string accepted or rejected; Windows-style path on POSIX does not raise.
 
-Phase 3: unsaved prompt before switch; cancel keeps session; accept issues teardown then rebuild (mocks). Dirty tracking stays computed.
+Phase 3: unsaved prompt before switch; cancel keeps the session; accept switches on the same window (mocks). Dirty tracking stays computed.

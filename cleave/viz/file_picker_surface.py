@@ -506,11 +506,15 @@ def _push_scrollbar_colors() -> int:
 
 
 class FilePickerSurface:
-    """Centred picker window. ``intent`` is the pointer result of the last draw.
+    """Centred picker window. ``modal`` keeps the top-layer scrim up.
+
+    ``intent`` is the pointer result of the last draw.
 
     ``panel_rect``, ``row_rects``, and ``chip_rects`` are that frame's hit
     targets, in screen pixels. ``row_indices`` and ``chip_indices`` match them.
     """
+
+    modal = True
 
     def __init__(self, view: PickerViewState) -> None:
         self.view = view

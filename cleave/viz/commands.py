@@ -26,6 +26,8 @@ LabelRole = tuple[int, int, int]
 
 _RESOLVED_SHORTCUT_IDS = frozenset(
     {
+        "file.new",
+        "file.open",
         "file.save",
         "file.quit",
         "project.render",
@@ -170,6 +172,22 @@ def _when_enabled(
         action(controls)
 
     return run
+
+
+def _project_switch_enabled(ctx: CommandContext) -> bool:
+    return (
+        not is_preset_curation_mode(ctx.editor_mode)
+        and not ctx.render_busy
+        and not ctx.timeline_recording
+    )
+
+
+def _run_new(controls: Any) -> None:
+    controls.project_switch.prompt_new()
+
+
+def _run_open(controls: Any) -> None:
+    controls.project_switch.prompt_open()
 
 
 def _save_enabled(ctx: CommandContext) -> bool:
@@ -336,7 +354,22 @@ def _toggle_help(controls: Any) -> None:
     controls.close_help()
 
 
-_OPEN = _later("file.open", "Open project...", "command", "Ctrl+O")
+_NEW = Command(
+    id="file.new",
+    label="New project...",
+    kind="command",
+    shortcut="Ctrl+N",
+    enabled=_project_switch_enabled,
+    run=_when_enabled(_project_switch_enabled, _run_new),
+)
+_OPEN = Command(
+    id="file.open",
+    label="Open project...",
+    kind="command",
+    shortcut="Ctrl+O",
+    enabled=_project_switch_enabled,
+    run=_when_enabled(_project_switch_enabled, _run_open),
+)
 _SAVE = Command(
     id="file.save",
     label="Save",
@@ -477,6 +510,7 @@ _HELP_OVERLAY = Command(
 )
 
 _SHORTCUT_KEYS: dict[str, tuple[int, bool]] = {
+    "Ctrl+N": (pygame.K_n, True),
     "Ctrl+O": (pygame.K_o, True),
     "Ctrl+S": (pygame.K_s, True),
     "Ctrl+Q": (pygame.K_q, True),
@@ -549,7 +583,10 @@ def build_menus(
     """
     return MenuSet(
         (
-            Menu("File", (_OPEN, _SAVE, SEPARATOR, _QUIT, SEPARATOR, _ABOUT)),
+            Menu(
+                "File",
+                (_NEW, _OPEN, _SAVE, SEPARATOR, _QUIT, SEPARATOR, _ABOUT),
+            ),
             Menu(
                 "Project",
                 (_SEPARATE, _RENDER, SEPARATOR, _BACKUP, _RESTORE),
@@ -619,9 +656,10 @@ def command_for_shortcut(
 ) -> Command | None:
     """Resolved shortcut, or None.
 
-    Save, quit, render, the help overlay, add-layer, and show-timeline-strip
-    resolve from menu rows. Editor settings (Ctrl+,) and layer jumps
-    (``1``–``8``) resolve from commands that are not menu rows. Layer jumps
+    New, open, save, quit, render, the help overlay, add-layer, and
+    show-timeline-strip resolve from menu rows. Editor settings (Ctrl+,) and
+    layer jumps (``1``–``8``) resolve from commands that are not menu rows.
+    Layer jumps
     stay unresolved while *timeline_scope* is set. Other shortcut text stays
     on its row. Bare R does not resolve.
     """
