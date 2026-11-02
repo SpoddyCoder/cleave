@@ -12,7 +12,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 ### Changed
 
 - Dialog and file-picker highlights sit two pixels out from the text on every side.
-- The file picker highlights the row or shortcut under the pointer, with the same outline as a dialog option.
+- The file picker draws the dialog outline on the keyboard selection and on the row or shortcut under the pointer. Hovering a row or shortcut highlights only that item. Moving the pointer off it clears the highlight until the next hover or key move.
 - Dialog options use the same outline as a highlighted navigator or inspector row.
 - A text dialog keeps the caret until a click. Clicking Confirm or Cancel applies or discards the text and runs that action.
 - The focus outline on the current row and the active panel uses the same colour at a lower intensity.

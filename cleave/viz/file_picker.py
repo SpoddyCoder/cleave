@@ -66,7 +66,7 @@ class PickerRowKind(Enum):
 
 
 class PickerFocus(Enum):
-    """Which list the highlight is in."""
+    """Which list the keyboard highlight is in."""
 
     LIST = "list"
     SHORTCUTS = "shortcuts"
@@ -103,6 +103,7 @@ class PickerViewState:
     selected_shortcut: int
     active_shortcut: int | None
     focus: PickerFocus
+    keyboard_highlight: bool
     status: str
     legend: tuple[tuple[str, str], ...]
     truncated: bool
@@ -191,7 +192,8 @@ class FilePicker:
     """Browse the filesystem and return an audio file or project path.
 
     ``current`` is the directory being listed, or None while showing the
-    drives listing.
+    drives listing. ``keyboard_highlight`` draws the keyboard selection until
+    the pointer is over a row or shortcut.
     """
 
     current: Path | None = None
@@ -199,6 +201,7 @@ class FilePicker:
     selected_index: int = 0
     selected_shortcut: int = 0
     focus: PickerFocus = PickerFocus.LIST
+    keyboard_highlight: bool = True
     status: str = ""
     cancelled: bool = False
     _rows: tuple[PickerRow, ...] = field(default_factory=tuple, repr=False)
@@ -279,6 +282,7 @@ class FilePicker:
             selected_shortcut=self.selected_shortcut,
             active_shortcut=self._active_shortcut_index(),
             focus=self.focus,
+            keyboard_highlight=self.keyboard_highlight,
             status=self.status,
             legend=LEGEND,
             truncated=self._truncated,
@@ -286,8 +290,14 @@ class FilePicker:
 
     # -- actions -----------------------------------------------------------
 
+    def suppress_keyboard_highlight(self) -> None:
+        """Hide the keyboard selection until the next key that moves it."""
+        self.keyboard_highlight = False
+
     def handle(self, action: PickerAction) -> OpenTarget | None:
         """Apply *action*. Returns a target only when the user accepted one."""
+        if action is not PickerAction.CANCEL:
+            self.keyboard_highlight = True
         if action is PickerAction.MOVE_UP:
             self._move(-1)
         elif action is PickerAction.MOVE_DOWN:
