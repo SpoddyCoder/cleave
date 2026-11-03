@@ -61,9 +61,11 @@ def _center(rect: Rect) -> tuple[int, int]:
     return (x + width // 2, y + height // 2)
 
 
-def _motion(pos: tuple[int, int]) -> pygame.event.Event:
+def _motion(
+    pos: tuple[int, int], rel: tuple[int, int] = (0, 0)
+) -> pygame.event.Event:
     return pygame.event.Event(
-        pygame.MOUSEMOTION, pos=pos, rel=(0, 0), buttons=(0, 0, 0)
+        pygame.MOUSEMOTION, pos=pos, rel=rel, buttons=(0, 0, 0)
     )
 
 
@@ -101,14 +103,29 @@ def _host() -> Iterator[object]:
             host.destroy()
 
 
-def _frame(host: object, surface: FilePickerSurface, events=(), dt: float = 1.0 / 60.0) -> None:
+def _frame(
+    host: object,
+    surface: FilePickerSurface,
+    events=(),
+    dt: float = 1.0 / 60.0,
+    *,
+    picker: FilePicker | None = None,
+) -> None:
     for event in events:
+        if picker is not None:
+            picker.note_pointer_motion(event)
         host.process_mouse_event(event)
+    if picker is not None:
+        surface.view = picker.view_state()
     host.begin_frame(dt)
     try:
         surface.draw()
     finally:
         host.end_frame()
+
+
+def _assert_pointer_hover(surface: FilePickerSurface) -> None:
+    assert surface.intent is None
 
 
 def _draw_names() -> list[str]:
@@ -380,10 +397,7 @@ def _assert_highlight_hidden() -> None:
 
 
 def _assert_hover_suppresses(surface: FilePickerSurface) -> None:
-    assert surface.intent is not None
-    assert surface.intent.kind is PickerPointerKind.SUPPRESS_KEYBOARD_HIGHLIGHT
-    assert surface.intent.pointer_over_item is True
-    assert surface.intent.index is None
+    _assert_pointer_hover(surface)
 
 
 def _shortcut_slot(surface: FilePickerSurface, picker: FilePicker, label: str) -> int:
@@ -422,9 +436,9 @@ def test_pointer_over_a_row_draws_the_hover_outline(tmp_path: Path) -> None:
     surface = FilePickerSurface(picker.view_state())
 
     with _host() as host:
-        _frame(host, surface)
+        _frame(host, surface, picker=picker)
         pos = _center(surface.row_rects[1])
-        _frame(host, surface, (_motion(pos),))
+        _frame(host, surface, (_motion(pos, rel=(1, 0)),), picker=picker)
         _assert_hover_suppresses(surface)
         colors = _color_counts()
         wash, border = _wash_and_border()
@@ -437,8 +451,6 @@ def test_pointer_over_a_row_draws_the_hover_outline(tmp_path: Path) -> None:
 
     apply_picker_pointer(picker, surface.intent)
     assert picker.keyboard_highlight is False
-    assert picker.selected_index == 0
-    # Hover replaces the keyboard wash, so only the row under the pointer is filled.
     assert colors.get(wash, 0) == 4
     assert hovered_wash == 2
     assert hovered_border > 0
@@ -451,7 +463,7 @@ def test_pointer_over_a_shortcut_draws_the_hover_outline(tmp_path: Path) -> None
     surface = FilePickerSurface(picker.view_state())
 
     with _host() as host:
-        _frame(host, surface)
+        _frame(host, surface, picker=picker)
         home = surface.chip_indices.index(
             next(
                 index
@@ -460,7 +472,7 @@ def test_pointer_over_a_shortcut_draws_the_hover_outline(tmp_path: Path) -> None
             )
         )
         pos = _center(surface.chip_rects[home])
-        _frame(host, surface, (_motion(pos),))
+        _frame(host, surface, (_motion(pos, rel=(1, 0)),), picker=picker)
         _assert_hover_suppresses(surface)
         colors = _color_counts()
         wash, border = _wash_and_border()
@@ -513,36 +525,35 @@ def test_pointer_on_another_row_drops_the_keyboard_highlight(tmp_path: Path) -> 
     surface = FilePickerSurface(picker.view_state())
 
     with _host() as host:
-        _frame(host, surface)
+        _frame(host, surface, picker=picker)
         panel = surface.panel_rect
         assert panel is not None
         selected = surface.row_rects[0]
         hovered = surface.row_rects[1]
-        _frame(host, surface, (_motion(_above(panel)),))
+        _frame(host, surface, (_motion(_above(panel)),), picker=picker)
         wash, border = _wash_and_border()
         assert _vertices_near(wash, y=float(selected[1])) == 2
         assert _vertices_near(border, y=float(selected[1])) > 0
 
-        _frame(host, surface, (_motion(_center(hovered)),))
+        _frame(host, surface, (_motion(_center(hovered), rel=(1, 0)),), picker=picker)
         _assert_hover_suppresses(surface)
         colors = _color_counts()
         selected_wash = _vertices_near(wash, y=float(selected[1]))
         selected_border = _vertices_near(border, y=float(selected[1]))
         hovered_wash = _vertices_near(wash, y=float(hovered[1]))
         hovered_border = _vertices_near(border, y=float(hovered[1]))
-        apply_picker_pointer(picker, surface.intent)
         assert picker.keyboard_highlight is False
         assert picker.selected_index == 0
         for pos in _off_item_positions(surface, panel):
             left = FilePickerSurface(picker.view_state())
-            _frame(host, left, (_motion(pos),))
+            _frame(host, left, (_motion(pos),), picker=picker)
             assert left.intent is None
             _assert_highlight_hidden()
 
         picker.handle(PickerAction.MOVE_DOWN)
         assert picker.keyboard_highlight is True
         restored = FilePickerSurface(picker.view_state())
-        _frame(host, restored, (_motion(_above(panel)),))
+        _frame(host, restored, (_motion(_above(panel)),), picker=picker)
         assert restored.intent is None
         moved = restored.row_rects[1]
         assert _color_counts().get(wash, 0) == 4
@@ -594,28 +605,27 @@ def test_pointer_on_another_shortcut_drops_the_keyboard_highlight(
     surface = FilePickerSurface(picker.view_state())
 
     with _host() as host:
-        _frame(host, surface)
+        _frame(host, surface, picker=picker)
         panel = surface.panel_rect
         assert panel is not None
         selected = surface.chip_rects[_shortcut_slot(surface, picker, "Projects")]
-        _frame(host, surface, (_motion(_above(panel)),))
+        _frame(host, surface, (_motion(_above(panel)),), picker=picker)
         wash, border = _wash_and_border()
         assert _vertices_near(wash, x=float(selected[0])) == 2
         assert _vertices_near(border, x=float(selected[0])) > 0
 
         home = surface.chip_rects[_shortcut_slot(surface, picker, "Home")]
-        _frame(host, surface, (_motion(_center(home)),))
+        _frame(host, surface, (_motion(_center(home), rel=(1, 0)),), picker=picker)
         _assert_hover_suppresses(surface)
         colors = _color_counts()
         selected_wash = _vertices_near(wash, x=float(selected[0]))
         selected_border = _vertices_near(border, x=float(selected[0]))
         home_wash = _vertices_near(wash, x=float(home[0]))
         home_border = _vertices_near(border, x=float(home[0]))
-        apply_picker_pointer(picker, surface.intent)
         assert picker.keyboard_highlight is False
         for pos in _off_item_positions(surface, panel):
             left = FilePickerSurface(picker.view_state())
-            _frame(host, left, (_motion(pos),))
+            _frame(host, left, (_motion(pos),), picker=picker)
             assert left.intent is None
             _assert_highlight_hidden()
 
@@ -637,27 +647,26 @@ def test_pointer_on_a_row_drops_the_keyboard_shortcut_highlight(tmp_path: Path) 
     surface = FilePickerSurface(picker.view_state())
 
     with _host() as host:
-        _frame(host, surface)
+        _frame(host, surface, picker=picker)
         panel = surface.panel_rect
         assert panel is not None
         chip = surface.chip_rects[_shortcut_slot(surface, picker, "Projects")]
         row = surface.row_rects[0]
-        _frame(host, surface, (_motion(_above(panel)),))
+        _frame(host, surface, (_motion(_above(panel)),), picker=picker)
         wash, border = _wash_and_border()
         assert _vertices_near(wash, x=float(chip[0])) == 2
 
-        _frame(host, surface, (_motion(_center(row)),))
+        _frame(host, surface, (_motion(_center(row), rel=(1, 0)),), picker=picker)
         _assert_hover_suppresses(surface)
         colors = _color_counts()
         chip_wash = _vertices_near(wash, x=float(chip[0]))
         chip_border = _vertices_near(border, x=float(chip[0]))
         row_wash = _vertices_near(wash, y=float(row[1]))
         row_border = _vertices_near(border, y=float(row[1]))
-        apply_picker_pointer(picker, surface.intent)
         assert picker.keyboard_highlight is False
         for pos in _off_item_positions(surface, panel):
             left = FilePickerSurface(picker.view_state())
-            _frame(host, left, (_motion(pos),))
+            _frame(host, left, (_motion(pos),), picker=picker)
             assert left.intent is None
             _assert_highlight_hidden()
 
@@ -886,3 +895,28 @@ def test_folder_glyph_is_in_the_font() -> None:
     assert glyph is not None
     assert glyph.x1 > glyph.x0
     assert missing is None
+
+
+def test_arrow_keys_keep_the_highlight_while_the_pointer_stays_put(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "a.wav").write_bytes(b"RIFF")
+    (tmp_path / "b.wav").write_bytes(b"RIFF")
+    picker = FilePicker(current=tmp_path)
+    surface = FilePickerSurface(picker.view_state())
+
+    with _host() as host:
+        _frame(host, surface, picker=picker)
+        under_mouse = surface.row_rects[2]
+        pos = _center(under_mouse)
+        _frame(host, surface, (_motion(pos, rel=(1, 0)),), picker=picker)
+        assert picker.keyboard_highlight is False
+        picker.handle(PickerAction.MOVE_DOWN)
+        assert picker.selected_index == 1
+        assert picker.keyboard_highlight is True
+        stuck = FilePickerSurface(picker.view_state())
+        _frame(host, stuck, picker=picker)
+        wash, border = _wash_and_border()
+        selected = stuck.row_rects[1]
+        assert _vertices_near(wash, y=float(selected[1])) == 2
+        assert _vertices_near(border, y=float(selected[1])) > 0

@@ -45,6 +45,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- Arrow keys move the highlight in dialogs and the file picker even when the pointer stays on another row. Moving the mouse switches back to pointer highlighting.
 - The file picker directory name lines up with the folder icon.
 - The file picker row highlight keeps its left border, and its top border on the first row.
 - The open file picker shows a scrollbar when the directory list is long, and the mouse wheel scrolls that list.

@@ -956,6 +956,28 @@ def test_hover_option_matches_arrow_focus() -> None:
     assert pointed.view_state().focus_index == 2
 
 
+def test_choice_arrows_ignore_stationary_pointer_hover() -> None:
+    modal = ModalHost()
+    modal.prompt_choice(
+        "Pick",
+        [
+            ModalOption("A", lambda: None),
+            ModalOption("B", lambda: None),
+            ModalOption("C", lambda: None),
+        ],
+    )
+    modal.hover_option(1)
+    assert modal.view_state() is not None
+    assert modal.view_state().focus_index == 1
+    modal.handle_keydown(_keydown(pygame.K_UP))
+    modal.hover_option(1)
+    assert modal.view_state() is not None
+    assert modal.view_state().focus_index == 0
+    modal.handle_keydown(_keydown(pygame.K_DOWN))
+    assert modal.view_state() is not None
+    assert modal.view_state().focus_index == 1
+
+
 def test_activate_option_matches_enter() -> None:
     keyed_picks: list[int] = []
     pointer_picks: list[int] = []

@@ -8,6 +8,7 @@ from enum import Enum
 
 import pygame
 
+from cleave.viz.input_modality import InputModality, PointerMotionTracker
 from cleave.viz.key_repeat import KeyRepeatController, mod_shift
 
 
@@ -347,6 +348,8 @@ class ModalHost:
         self._text_input_started = False
         self._text_key_repeat = KeyRepeatController()
         self._text_field_wrap: Callable[[str], list[str]] | None = None
+        self._input_modality = InputModality.POINTER
+        self._pointer_motion = PointerMotionTracker()
 
     def set_text_field_wrap(
         self, wrap: Callable[[str], list[str]] | None
@@ -398,10 +401,22 @@ class ModalHost:
         self._stop_text_input()
         self._request = request
         self._text_state = None
+        self._input_modality = InputModality.POINTER
+        self._pointer_motion.reset()
         self._focus_index = clamp_modal_focus_index(
             request.initial_focus_index,
             len(request.options),
         )
+
+    def enter_keyboard_modality(self) -> None:
+        self._input_modality = InputModality.KEYBOARD
+
+    def enter_pointer_modality(self) -> None:
+        self._input_modality = InputModality.POINTER
+
+    def note_pointer_motion(self, event: pygame.event.Event) -> None:
+        if self._pointer_motion.moved(event):
+            self.enter_pointer_modality()
 
     def prompt_yes_no(
         self,
@@ -532,6 +547,11 @@ class ModalHost:
 
     def hover_option(self, index: int) -> None:
         """Focus option ``index``, clamped into the option list."""
+        if self._input_modality is InputModality.KEYBOARD:
+            return
+        self._focus_option(index)
+
+    def _focus_option(self, index: int) -> None:
         count = self._option_count()
         if count <= 0:
             return
@@ -541,7 +561,7 @@ class ModalHost:
         """Activate option ``index``. Same path as Enter on that option."""
         if self._option_count() <= 0:
             return
-        self.hover_option(index)
+        self._focus_option(index)
         self._activate_focused()
 
     def cancel(self) -> None:
@@ -586,6 +606,8 @@ class ModalHost:
 
     def hover_text_button(self, index: int) -> None:
         """TEXT only. Leave edit mode and focus button ``index`` (clamped to 0 or 1)."""
+        if self._input_modality is InputModality.KEYBOARD:
+            return
         state = self._text_state_or_none()
         if state is None:
             return
@@ -600,6 +622,8 @@ class ModalHost:
 
         Already editing stays editing.
         """
+        if self._input_modality is InputModality.KEYBOARD:
+            return
         state = self._text_state_or_none()
         if state is None or state.editing:
             return
@@ -625,18 +649,22 @@ class ModalHost:
         if option_count == 0:
             return True
         if event.key in (pygame.K_UP, pygame.K_LEFT):
+            self.enter_keyboard_modality()
             self._focus_index = (self._focus_index - 1) % option_count
             return True
         if event.key in (pygame.K_DOWN, pygame.K_RIGHT):
+            self.enter_keyboard_modality()
             self._focus_index = (self._focus_index + 1) % option_count
             return True
 
         if option_count == 2:
             if event.key == pygame.K_y:
-                self.hover_option(0)
+                self.enter_keyboard_modality()
+                self._focus_option(0)
                 return True
             if event.key == pygame.K_n:
-                self.hover_option(1)
+                self.enter_keyboard_modality()
+                self._focus_option(1)
                 return True
 
         if event.key == pygame.K_RETURN:
@@ -726,12 +754,17 @@ class ModalHost:
             self.cancel()
             return True
         if event.key in (pygame.K_UP, pygame.K_DOWN):
+            self.enter_keyboard_modality()
             if state.focus_region == TextFocusRegion.FIELD:
-                self.hover_text_button(0)
+                self._stop_text_input()
+                state.editing = False
+                state.focus_region = TextFocusRegion.BUTTONS
+                state.button_index = 0
             else:
-                self.hover_text_field()
+                state.focus_region = TextFocusRegion.FIELD
             return True
         if event.key in (pygame.K_LEFT, pygame.K_RIGHT):
+            self.enter_keyboard_modality()
             if state.focus_region == TextFocusRegion.BUTTONS:
                 delta = -1 if event.key == pygame.K_LEFT else 1
                 state.button_index = (state.button_index + delta) % 2

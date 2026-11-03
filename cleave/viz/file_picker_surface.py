@@ -253,12 +253,8 @@ def apply_picker_pointer(
     if intent is None:
         return None
     kind = intent.kind
-    if (
-        kind is PickerPointerKind.SUPPRESS_KEYBOARD_HIGHLIGHT
-        or intent.pointer_over_item
-    ):
-        picker.suppress_keyboard_highlight()
     if kind is PickerPointerKind.SUPPRESS_KEYBOARD_HIGHLIGHT:
+        picker.enter_pointer_modality()
         return None
     if kind is PickerPointerKind.SELECT_ROW:
         if intent.index is not None:
@@ -269,6 +265,7 @@ def apply_picker_pointer(
             picker.select_row(intent.index)
         return picker.open_row()
     if kind is PickerPointerKind.GOTO_SHORTCUT:
+        picker.enter_pointer_modality()
         if intent.index is not None:
             picker.goto_shortcut(intent.index)
         return None
@@ -400,12 +397,9 @@ def _highlight_visible(
     pointer_over_item: bool,
     keyboard_highlight: bool,
 ) -> bool:
-    """The row or chip under the pointer, or the keyboard selection.
-
-    A pointer over a row or chip shows that item alone. The keyboard
-    selection stays visible until that happens, then stays hidden until
-    the next key move.
-    """
+    """The row or chip under the pointer, or the keyboard selection."""
+    if keyboard_highlight:
+        return keyboard
     return hovered or (
         keyboard and keyboard_highlight and not pointer_over_item
     )
@@ -664,6 +658,10 @@ class FilePickerSurface:
         hover_row: int | None,
     ) -> None:
         pointer_over_item = hover_chip is not None or hover_row is not None
+        if view.keyboard_highlight:
+            hover_chip = None
+            hover_row = None
+            pointer_over_item = False
         rects: list[Rect] = []
         indices: list[int] = []
         for index, text, screen_x, hit in chips:
@@ -830,6 +828,10 @@ class FilePickerSurface:
         hover_row: int | None,
     ) -> None:
         pointer_over_item = hover_chip is not None or hover_row is not None
+        if view.keyboard_highlight:
+            hover_chip = None
+            hover_row = None
+            pointer_over_item = False
         rects: list[Rect] = []
         indices: list[int] = []
         for index, y, rect in rows:
@@ -918,7 +920,4 @@ class FilePickerSurface:
             )
             return
         if on_item:
-            self.intent = PickerPointerIntent(
-                PickerPointerKind.SUPPRESS_KEYBOARD_HIGHLIGHT,
-                pointer_over_item=True,
-            )
+            return

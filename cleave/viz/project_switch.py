@@ -103,6 +103,10 @@ class ProjectSwitchController:
         if accepted is not None:
             self._finish_accept(accepted)
 
+    def note_pointer_motion(self, event: pygame.event.Event) -> None:
+        if self._picker is not None:
+            self._picker.note_pointer_motion(event)
+
     def take_accepted(self) -> OpenTarget | None:
         """Return the accepted target once. The pending switch is separate."""
         target = self._accepted

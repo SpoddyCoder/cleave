@@ -102,6 +102,8 @@ def run_file_picker(
                 break
             if event.type in _MOUSE_EVENTS:
                 _feed_mouse(window, event)
+                if event.type == pygame.MOUSEMOTION:
+                    picker.note_pointer_motion(event)
                 continue
             if event.type == pygame.KEYUP:
                 repeat.on_keyup(event.key)

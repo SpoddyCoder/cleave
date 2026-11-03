@@ -12,6 +12,7 @@ import sys
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
+from typing import Any
 
 from cleave.open_target import (
     AUDIO_SUFFIXES,
@@ -27,6 +28,7 @@ from cleave.paths import (
     projects_dir,
     windows_documents_dir,
 )
+from cleave.viz.input_modality import InputModality, PointerMotionTracker
 
 TITLE = "Open a Cleave project, or select an audio file to create a new project..."
 LEGEND: tuple[tuple[str, str], ...] = (
@@ -254,8 +256,8 @@ class FilePicker:
     """Browse the filesystem and return an audio file or project path.
 
     ``current`` is the directory being listed, or None while showing the
-    drives listing. ``keyboard_highlight`` draws the keyboard selection until
-    the pointer is over a row or shortcut.
+    drives listing. Arrow keys use keyboard highlighting until the pointer
+    moves; pointer hover highlights the row or shortcut under the cursor.
     """
 
     mode: PickerMode = PickerMode.COLD_START
@@ -267,6 +269,10 @@ class FilePicker:
     keyboard_highlight: bool = True
     status: str = ""
     cancelled: bool = False
+    _input_modality: InputModality = InputModality.KEYBOARD
+    _pointer_motion: PointerMotionTracker = field(
+        default_factory=PointerMotionTracker, repr=False
+    )
     _rows: tuple[PickerRow, ...] = field(default_factory=tuple, repr=False)
     _truncated: bool = field(default=False, repr=False)
 
@@ -344,7 +350,7 @@ class FilePicker:
             selected_shortcut=self.selected_shortcut,
             active_shortcut=self._active_shortcut_index(),
             focus=self.focus,
-            keyboard_highlight=self.keyboard_highlight,
+            keyboard_highlight=self._input_modality is InputModality.KEYBOARD,
             status=self.status,
             legend=LEGEND,
             truncated=self._truncated,
@@ -352,14 +358,26 @@ class FilePicker:
 
     # -- actions -----------------------------------------------------------
 
+    def enter_keyboard_modality(self) -> None:
+        self._input_modality = InputModality.KEYBOARD
+        self.keyboard_highlight = True
+
+    def enter_pointer_modality(self) -> None:
+        self._input_modality = InputModality.POINTER
+        self.keyboard_highlight = False
+
+    def note_pointer_motion(self, event: Any) -> None:
+        if self._pointer_motion.moved(event):
+            self.enter_pointer_modality()
+
     def suppress_keyboard_highlight(self) -> None:
         """Hide the keyboard selection until the next key that moves it."""
-        self.keyboard_highlight = False
+        self.enter_pointer_modality()
 
     def handle(self, action: PickerAction) -> OpenTarget | None:
         """Apply *action*. Returns a target only when the user accepted one."""
         if action is not PickerAction.CANCEL:
-            self.keyboard_highlight = True
+            self.enter_keyboard_modality()
         if action is PickerAction.MOVE_UP:
             self._move(-1)
         elif action is PickerAction.MOVE_DOWN:
@@ -463,6 +481,7 @@ class FilePicker:
 
     def select_row(self, index: int) -> None:
         """Highlight a listing row. Does not open it."""
+        self.enter_pointer_modality()
         self.focus = PickerFocus.LIST
         self.status = ""
         if 0 <= index < len(self._rows):
