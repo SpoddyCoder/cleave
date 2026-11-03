@@ -11,7 +11,7 @@ description: >-
 
 # Cut a release
 
-Prepare the tree for the next `vX.Y.Z` tag. Product SOP (tag, CI, freeze): [docs/dev/structured-releases.md](../../../docs/dev/structured-releases.md). Stance: [versioned-releases.mdc](../../rules/versioned-releases.mdc).
+Prepare the tree for the next `vX.Y.Z` tag. Product SOP (tag, CI, freeze): [docs/dev/structured-releases.md](../../../docs/dev/structured-releases.md). Stance: [AGENTS.md](../../../AGENTS.md).
 
 Copy this checklist and tick it as you go:
 
@@ -82,7 +82,7 @@ Prefer `main`. If HEAD is not `main`, say so and continue only if the user alrea
 
 ## 3. Documentation
 
-Style: [documentation-style.mdc](../../rules/documentation-style.mdc). Living references stay in `docs/dev/`. Do not rewrite [docs/dev/structured-releases.md](../../../docs/dev/structured-releases.md) history; only fix sentences that the new tag makes false.
+Style: [documentation-style](../../rules/documentation-style.md). Living references stay in `docs/dev/`. Do not rewrite [docs/dev/structured-releases.md](../../../docs/dev/structured-releases.md) history; only fix sentences that the new tag makes false.
 
 Tree:
 
@@ -110,7 +110,7 @@ Live design plans sit in `docs/dev/plans/`. Living references never move out of 
 
 Move a plan to `docs/dev/plans-completed/` only when remaining work is shipped **or** explicitly parked in `todos.md` / `roadmap.md`. Mixed plans: extract shipped slices to `plans-completed/`; leave outstanding slices in `plans/`.
 
-`docs/dev/plans-completed/` is in `.cursorignore`. List it and `git mv` via Shell with `required_permissions: ["all"]`:
+`docs/dev/plans-completed/` is ignored by Cursor (`.cursorignore`) and read-denied in `.claude/settings.json`. Do not read it; `git mv` into it with Bash:
 
 ```bash
 git mv docs/dev/plans/<plan>.md docs/dev/plans-completed/<plan>.md
@@ -126,7 +126,7 @@ Then:
 
 - Changelog bullets that describe current product behaviour should match README (picker, Windows zip/installer, CUDA extra, data dirs). Fix README if it lags; do not invent features.
 - Do not add a changelog bullet for this cut (docs/refactors/tests stay out per project-context).
-- Do not bump anything in `.cursor/rules/` except inbound plan links you broke by `git mv`.
+- Do not bump anything in `.claude/rules/` except inbound plan links you broke by `git mv`.
 
 ## 4. Health checks
 

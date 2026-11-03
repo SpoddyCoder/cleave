@@ -2,7 +2,7 @@
 
 Let external agents (Cursor, Claude Desktop, custom scripts) create and refine Cleave visualisations using the same data the editor already relies on: stems, `signals.json`, song markers, timeline presets, layer YAML, and optional preview renders.
 
-Related: [editor-first.mdc](../../../.cursor/rules/editor-first.mdc), [architecture-principles.mdc](../../../.cursor/rules/architecture-principles.mdc), [roadmap.md](../roadmap.md) (AI-assisted visual authoring).
+Related: [editor-first](../../../AGENTS.md), [architecture-principles](../../../.claude/rules/architecture-principles.md), [roadmap.md](../roadmap.md) (AI-assisted visual authoring).
 
 ---
 
@@ -162,7 +162,7 @@ Transport: MCP over stdio for dev; document frozen-Windows constraints ([win_con
 
 ## Tests
 
-Per [agent-environment.mdc](../../../.cursor/rules/agent-environment.mdc): unit tests for summarisation, patch validation, and compose wrappers. No routine editor smoke. Preview render tests may be skipped on hosts without GL if already the pattern for render tests.
+Per [agent-environment](../../../AGENTS.md): unit tests for summarisation, patch validation, and compose wrappers. No routine editor smoke. Preview render tests may be skipped on hosts without GL if already the pattern for render tests.
 
 ---
 

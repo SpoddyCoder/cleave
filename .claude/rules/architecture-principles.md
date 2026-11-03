@@ -1,0 +1,28 @@
+---
+description: Persist, session authority, effects registry, frame path, and config-schema invariants
+paths:
+  - "cleave/**/*.py"
+  - "tests/cleave/**/*.py"
+globs:
+  - "cleave/**/*.py"
+  - "tests/cleave/**/*.py"
+alwaysApply: false
+---
+
+# Architecture
+
+Prefer a cohesive abstraction over bolting onto an existing class when a change spans packages. Read [docs/dev/architecture-review.md](docs/dev/architecture-review.md) only for that case. Overlay draw/rows: [live-tuning-ui](live-tuning-ui.md).
+
+- **Persist once.** New persisted fields go through `persisted_session_payload` in `cleave/config_schema/persist.py`.
+- **Session owns live creative state.** After `session_from_cfg`, `TuningSession` owns layer creative fields. `CleaveConfig` is YAML bootstrap, immutable paths, and editor prefs. Overlay card copy, colours, margin, and padding are session-owned. Do not read leftover `cfg.layers` creative fields on the frame path or persist.
+- **Dirty tracking is computed.** Mutate session; never reintroduce `mark_config_dirty()`.
+- **Thin feature controllers.** `TuningControls` coordinates focus and input; feature work lives in `*_controls`. `make_tuning_controls` in `wiring.py` only assembles.
+- **Readiness in types.** Prefer `VisualizerSeed` / `VisualizerCore` / live and render runtimes over optional fields plus `assert`.
+- **Typed DI.** Pass small typed contexts (`FocusContext`), not dicts of lambdas or `setattr` by string.
+- **Public APIs across modules.** No cross-module underscore imports.
+- **One default per setting.** Defaults live in `cleave/config_schema/` submodules. Session and view-state dataclasses import those constants. `tests/cleave/test_config.py` source-scans for this.
+- **Descriptor-driven config.** `editor`, `render.post_fx`, and `render.overlays` use descriptors. `layers` and `timeline` use bespoke parse. Importers use submodule paths; `config_schema/__init__.py` has no re-exports.
+- **Registry-driven effects.** New effect = registry entry + handler module. No per-effect branches in `cleave/effects/runtime.py`. `cleave/effects/` does not import viz; it consumes `LayerEffectState`.
+- **Shared frame path.** Live and offline call `frame_finish`. Layer composite goes through `LayerFramePipeline.composite`. Wipes are an explicit `MaskTransition`.
+- **projectM time is monotonic.** `ProjectMFrameClock` via `set_frame_time`. Song playhead is for PCM, timeline, and effects only.
+- **`enabled` gates the frame path.** `render.post_fx` children respect the parent `enabled`. Overlay cards each have their own `enabled`.

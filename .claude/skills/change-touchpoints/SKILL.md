@@ -1,6 +1,6 @@
 ---
+name: change-touchpoints
 description: Adding or changing a persisted YAML/session field, panel row, overlay card, effect, post-FX pass, or config default. Exact files to edit; do not grep for a serializer or draw branch.
-alwaysApply: false
 ---
 
 # Change touchpoints

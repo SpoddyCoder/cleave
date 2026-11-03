@@ -68,7 +68,7 @@ Ordered roughly by dependency: retire legacy pygame panel surfaces first, then f
 
 **Goal.** Rethink help as **ImGui**. Prefer a **resizable third column** beside the inspector (help panel in the region cycle when open), not a centered tree-style sheet over projectM. Context-sensitive shortcut lines should follow the active shell region (menu, navigator, inspector, timeline) without duplicating the pre-shell navigation story.
 
-**Touchpoints.** Help menu commands in [commands.py](../../../cleave/viz/commands.py), [shell_focus.py](../../../cleave/viz/shell_focus.py) (optional Help region), [live-tuning-ui.mdc](../../../.cursor/rules/live-tuning-ui.mdc) after the model is chosen.
+**Touchpoints.** Help menu commands in [commands.py](../../../cleave/viz/commands.py), [shell_focus.py](../../../cleave/viz/shell_focus.py) (optional Help region), [live-tuning-ui](../../../.claude/rules/live-tuning-ui.md) after the model is chosen.
 
 ### 4. Launch / open-project UI
 

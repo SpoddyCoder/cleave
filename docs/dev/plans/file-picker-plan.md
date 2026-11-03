@@ -2,7 +2,7 @@
 
 Phase 1 is shipped (loading-screen picker, optional `play` target, frozen no-args): [file-picker-phase-1.md](../plans-completed/file-picker-phase-1.md). Phase 3 is shipped (File > New project and File > Open project on one window). Remaining: Phase 2 (`DROPFILE`).
 
-Related: [editor-first.mdc](../../../.cursor/rules/editor-first.mdc), [architecture-principles.mdc](../../../.cursor/rules/architecture-principles.mdc), [structured-releases.md](../structured-releases.md), [windows-freeze.md](../windows-freeze.md).
+Related: [editor-first](../../../AGENTS.md), [architecture-principles](../../../.claude/rules/architecture-principles.md), [structured-releases.md](../structured-releases.md), [windows-freeze.md](../windows-freeze.md).
 
 ---
 
@@ -74,7 +74,7 @@ Accept, then tear down. Esc cancels and keeps the session. A dirty project uses 
 
 ## Tests
 
-No editor / OpenGL window in unit tests ([agent-environment.mdc](../../../.cursor/rules/agent-environment.mdc)).
+No editor / OpenGL window in unit tests ([agent-environment](../../../AGENTS.md)).
 
 Phase 2: `DROPFILE` path string accepted or rejected; Windows-style path on POSIX does not raise.
 

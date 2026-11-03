@@ -31,7 +31,7 @@ times row count plus padding and gaps via timeline_panel_height_px().
 Use tuning_ui_metrics(), timeline_ui_metrics(), and timeline_panel_height_px() for
 scaled layout; BORDER_WIDTH is not scaled.
 
-See [.cursor/rules/live-tuning-ui.mdc](../.cursor/rules/live-tuning-ui.mdc) for how
+See [live-tuning-ui](../.claude/rules/live-tuning-ui.md) for how
 rows apply these roles, including intentional exceptions.
 """
 

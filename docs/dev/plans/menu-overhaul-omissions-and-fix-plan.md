@@ -50,7 +50,7 @@ Make `ShellFocusState.region` the single source of truth for which region owns k
 
 **Tests.** Dispatch tests in `tests/cleave/viz/`: with the strip open, Tab to Inspector then Left/Right steps the inspector value and leaves cues untouched; Tab to Timeline then Left/Right edits the cue. Mouse click region switch tests in `test_shell_mouse.py`.
 
-**Done when.** The region cycle Menu, Navigator, Inspector, Timeline behaves the same whether or not the strip is open, apart from Timeline being skipped when closed. Update the keyboard dispatch section of [live-tuning-ui.mdc](../../../.cursor/rules/live-tuning-ui.mdc) if wording changes.
+**Done when.** The region cycle Menu, Navigator, Inspector, Timeline behaves the same whether or not the strip is open, apart from Timeline being skipped when closed. Update the keyboard dispatch section of [live-tuning-ui](../../../.claude/rules/live-tuning-ui.md) if wording changes.
 
 ## Phase 3: ImGui overlay layer foundation
 
@@ -82,7 +82,7 @@ Done.
 ## Phase 5: Notifications as ImGui toasts (item 1, part one)
 
 - Keep `panel_notification.py` as the model (accent, elapsed, attention). Replace the `RowKind.PANEL_NOTIFICATION` row with a toast region on the top layer, anchored to the visualiser rect corner under the transport so it never covers navigator or inspector.
-- Warning and error toasts stay until dismissed or timed out per existing rules; long-job failures still escalate to a modal (Phase 4) per [editor-first.mdc](../../../.cursor/rules/editor-first.mdc).
+- Warning and error toasts stay until dismissed or timed out per existing rules; long-job failures still escalate to a modal (Phase 4) per [editor-first](../../../AGENTS.md).
 - Remove the `PANEL_NOTIFICATION` spec from `row_specs/transport.py`, the row kind if unused, and the notification draw branch in `tuning_panel_draw.py`.
 
 **Tests.** Toast lifecycle tests against the model; layout test that the toast rect stays inside the visualiser rect for `shell-split` and `shell-docked`.
@@ -100,7 +100,7 @@ Depends on Phase 2 (region model) and Phase 3 (theme bridge).
 
 **Tests.** Layout clamp tests with three columns at narrow and wide display sizes; persisted width round trip; region cycle with help open; content tests that each region yields its own shortcut section.
 
-**Done when.** Help is ImGui, resizable, region-aware, and the visualiser is never covered by it. Update the help line in [live-tuning-ui.mdc](../../../.cursor/rules/live-tuning-ui.mdc).
+**Done when.** Help is ImGui, resizable, region-aware, and the visualiser is never covered by it. Update the help line in [live-tuning-ui](../../../.claude/rules/live-tuning-ui.md).
 
 ## Phase 7: Retire the legacy panel stack (item 1, part two)
 
@@ -108,7 +108,7 @@ Only possible after Phases 4, 5, and 6.
 
 - Extract the UI fade timer (`visibility`, `notify_input`, `hide_immediately`, `set_hold_idle_sec`) from `TuningOverlay` into a small standalone class used by `app.py`, `input_dispatch.py`, and `ShellHost`.
 - Delete `OverlayDrawer.draw_tuning`, `tuning_panel_draw.py`, and `tuning_panel_cache.py`. Move anything `row_present_renderers.py` still needs from `TuningPanelCache` into the renderer module or `overlay_primitives.py`.
-- Decide `RowLayout`: if the inspector still needs the flattened navigable-descriptor list, keep that part under an honest name (it is a navigation model, not a layout) and drop the draw-only parts; otherwise remove it. Either way, remove "RowLayout draws notification toasts only" from [live-tuning-ui.mdc](../../../.cursor/rules/live-tuning-ui.mdc).
+- Decide `RowLayout`: if the inspector still needs the flattened navigable-descriptor list, keep that part under an honest name (it is a navigation model, not a layout) and drop the draw-only parts; otherwise remove it. Either way, remove "RowLayout draws notification toasts only" from [live-tuning-ui](../../../.claude/rules/live-tuning-ui.md).
 - Remove the now-unused `OverlayTextureSlot` entries and upload coordinators for tuning and help.
 
 **Tests.** Full unit suite (cross-cutting). A source-scan test that nothing under `cleave/viz/` imports the deleted modules.

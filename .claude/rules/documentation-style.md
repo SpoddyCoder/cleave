@@ -1,0 +1,16 @@
+---
+description: Markdown style for repo docs
+paths:
+  - "**/*.md"
+globs:
+  - "**/*.md"
+alwaysApply: false
+---
+
+# Documentation style
+
+- Write for humans. Technical terms only when they aid precision.
+- One emphasis style per span (no stacked bold + backticks).
+- Links: `[path/to/file](path/to/file)` with no backticks on link text.
+- Literals (paths, commands, env vars): backticks when not linked; bold for plain emphasis only.
+- ASCII only: no emojis, em-dashes, or other non-ASCII punctuation.

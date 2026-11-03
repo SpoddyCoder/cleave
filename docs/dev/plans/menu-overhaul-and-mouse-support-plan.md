@@ -2,7 +2,7 @@
 
 Replace the single scrollable tuning tree with an in-window shell: menu bar, transport, object navigator, property inspector, and the existing timeline strip. Draw the new shell with Dear ImGui in the current OpenGL window. Move content across several playable commits. The last content commit deletes the old tree.
 
-Related: [editor-first.mdc](../../../.cursor/rules/editor-first.mdc), [live-tuning-ui.mdc](../../../.cursor/rules/live-tuning-ui.mdc), [change-touchpoints.mdc](../../../.cursor/rules/change-touchpoints.mdc), [roadmap.md](../roadmap.md). Follow-up gaps and deferred items: [menu-overhaul-omissions-and-fixes.md](menu-overhaul-omissions-and-fixes.md).
+Related: [editor-first](../../../AGENTS.md), [live-tuning-ui](../../../.claude/rules/live-tuning-ui.md), [change-touchpoints](../../../.claude/rules/change-touchpoints.md), [roadmap.md](../roadmap.md). Follow-up gaps and deferred items: [menu-overhaul-omissions-and-fixes.md](menu-overhaul-omissions-and-fixes.md).
 
 ---
 
@@ -279,7 +279,7 @@ Phases 2 to 4 keep a shrinking tuning panel so unmigrated sections stay editable
 
 Each phase is one commit a person can play. User-visible phases add one `### Changed` bullet under `## [Unreleased]` in [CHANGELOG.md](../../../CHANGELOG.md). Do not bump `cleave.__version__`.
 
-Tests use `/home/fernpa/anaconda3/envs/cleave/bin/python tests/run_unit_tests.py`. Prefer `-k`. No routine editor launch ([agent-environment.mdc](../../../.cursor/rules/agent-environment.mdc)).
+Tests use `/home/fernpa/anaconda3/envs/cleave/bin/python tests/run_unit_tests.py`. Prefer `-k`. No routine editor launch ([agent-environment](../../../AGENTS.md)).
 
 ### Phase 1: Menu bar
 
@@ -293,7 +293,7 @@ Tests use `/home/fernpa/anaconda3/envs/cleave/bin/python tests/run_unit_tests.py
 - Remove the matching tree rows in this commit: the project save row (`CONFIG_HEADER`), `PROJECT_RENDER_ACTION`, `SETTINGS_MEASURE_LATENCY`, and `SETTINGS_EDITOR_MODE`. Leave every other row.
 - Leave Open, Separate, Backup, Restore, About, Undo last cut, and every jump disabled.
 - Keyboard nav flag off, as in [Focus scopes](#focus-scopes). `F10` / `Alt` and arrows operate the bar. Alt+letter waits for phase 7.
-- Update [editor-first.mdc](../../../.cursor/rules/editor-first.mdc): "No native menu bar" means no Win32 menu. An ImGui menu bar in the OpenGL window is the intended chrome.
+- Update [editor-first](../../../AGENTS.md): "No native menu bar" means no Win32 menu. An ImGui menu bar in the OpenGL window is the intended chrome.
 - Help: add `F10` / `Alt` and `Ctrl+R` only. Leave the tree navigation lines until the keys they describe have changed.
 
 **Exit.** Play: open each menu, Save, Quit (including the unsaved prompt), Help, start the render confirm modal, measure latency, toggle preset curation. Edit a layer preset from the old tree. The visualiser still advances at display rate after the menu has drawn.
@@ -374,7 +374,7 @@ Tests use `/home/fernpa/anaconda3/envs/cleave/bin/python tests/run_unit_tests.py
 - Enable the Timeline menu commands except Undo last cut.
 - Delete the leftover tuning panel, `build_focus_ring` for the main list, expand-in-list Left/Right, and session `expanded` flags that only served that list. Inspector group open/closed state is view state, not those flags.
 - Remove the migration bridge (`Esc` to the leftover panel, unmigrated-node handoff).
-- Rewrite [live-tuning-ui.mdc](../../../.cursor/rules/live-tuning-ui.mdc) and [change-touchpoints.mdc](../../../.cursor/rules/change-touchpoints.mdc) so new fields go to an inspector group or a command, conditional rows and the structure signature stay, and the timeline strip stays a panel anchor.
+- Rewrite [live-tuning-ui](../../../.claude/rules/live-tuning-ui.md) and [change-touchpoints](../../../.claude/rules/change-touchpoints.md) so new fields go to an inspector group or a command, conditional rows and the structure signature stay, and the timeline strip stays a panel anchor.
 - Rewrite the help navigation section for the shell: region cycle, navigator, inspector, menu, timeline scope.
 
 **Exit.** Play: edit a timeline preset field, apply it, toggle the strip, edit a song marker, and scrub cues on the strip with the timeline keys. There is no second list anywhere. `Tab` never lands on a tree. Help text matches the keys.
@@ -424,7 +424,7 @@ Clicks on menu items, nodes, and fields already work once those widgets exist. T
 
 ## Risks
 
-- **Structure signature.** Inspector visibility has to invalidate `view_state_structure_signature()` the same way expand-in-list did ([live-tuning-ui.mdc](../../../.cursor/rules/live-tuning-ui.mdc)). A predicate that adds or removes fields belongs in that signature.
+- **Structure signature.** Inspector visibility has to invalidate `view_state_structure_signature()` the same way expand-in-list did ([live-tuning-ui](../../../.claude/rules/live-tuning-ui.md)). A predicate that adds or removes fields belongs in that signature.
 - **Editor-first progress.** Render already uses `ProjectRenderController` (confirm modal, then in-window progress, window stays up). Keep that path. Separate, Backup, and Restore stay disabled here. If a later change enables them from the menu, they need the loading screen and a modal on failure, not stdout.
 - **Windows freeze, phase 1 only.** After the menu bar works on checkout, try keyboard menu use once on the PyInstaller build ([windows-freeze.md](../windows-freeze.md)). That check is not a gate on phases 2 to 7.
 - **GL state.** ImGui and moderngl share one context. Phase 1 is where a leaked viewport or shader will show up as a blank visualiser. Fix it there.

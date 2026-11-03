@@ -1,10 +1,10 @@
 # Architecture review
 
-Start implementation from [.cursor/rules/project-context.mdc](../../.cursor/rules/project-context.mdc). Read this review only when adding a cross-module abstraction.
+Start implementation from [project-context](../../AGENTS.md). Read this review only when adding a cross-module abstraction.
 
 Living note of current invariants. P0 through P4 are shipped; the write-ups live in [plans-completed/architecture-review-p0-p4.md](plans-completed/architecture-review-p0-p4.md). Remaining section 2 items are domain isolation kept on purpose, not a next P.
 
-Related: [architecture-principles.mdc](../../.cursor/rules/architecture-principles.mdc), [todos.md](todos.md), [plans-completed/architecture-refactor.md](plans-completed/architecture-refactor.md), [plans-completed/architecture-improvements.md](plans-completed/architecture-improvements.md).
+Related: [architecture-principles](../../.claude/rules/architecture-principles.md), [todos.md](todos.md), [plans-completed/architecture-refactor.md](plans-completed/architecture-refactor.md), [plans-completed/architecture-improvements.md](plans-completed/architecture-improvements.md).
 
 ---
 
