@@ -35,7 +35,6 @@ from cleave.config_schema.editor import (
     BEAT_SENSITIVITY_MIN,
     DEFAULT_BEAT_SENSITIVITY,
     DEFAULT_EDITOR_HEIGHT,
-    DEFAULT_UI_FADE_SEC,
     DEFAULT_NOTIFICATION_DISPLAY_SEC,
     DEFAULT_RESIDUAL_LATENCY_MS,
     DEFAULT_HELP_WIDTH,
@@ -219,7 +218,6 @@ class EditorConfig:
     ui_width_mode: UiWidthMode = DEFAULT_UI_WIDTH_MODE
     ui_width: int = DEFAULT_UI_WIDTH
     ui_min_width: int = DEFAULT_UI_MIN_WIDTH
-    ui_fade: float = DEFAULT_UI_FADE_SEC
     notification_display_sec: int = DEFAULT_NOTIFICATION_DISPLAY_SEC
     residual_latency_ms: int = DEFAULT_RESIDUAL_LATENCY_MS
     inspector_width: int = DEFAULT_INSPECTOR_WIDTH

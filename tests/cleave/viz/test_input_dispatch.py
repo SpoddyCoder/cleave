@@ -18,7 +18,6 @@ from cleave.viz.navigator import layer_node_id, visible_top_level_ids
 from cleave.viz.input_dispatch import (
     dispatch_keydown,
     dispatch_keyup,
-    dispatch_should_notify_overlay,
     dispatch_window_event,
     key_handler_for_runtime,
 )
@@ -28,7 +27,6 @@ from cleave.viz.layer_visibility import armed_recording_level
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.session import LayerRuntime, TuningSession
 from cleave.viz.modal import ModalHost, ModalKind
-from cleave.viz.ui_fade import UiFade
 from cleave.viz.timeline_controls import TimelineControls
 from tests.support.compositor_mock import recording_compositor
 from tests.support.viz import (
@@ -96,7 +94,6 @@ def _make_runtime(
         compositor=compositor,
         post_process=MagicMock(),
         masked_compositor=MagicMock(),
-        ui_fade=UiFade(),
         timeline_overlay=MagicMock(),
         overlay_surface=pygame.Surface((2560, 1440), pygame.SRCALPHA),
         controls=MagicMock(),
@@ -272,7 +269,6 @@ def test_second_esc_after_stop_requests_overlay_hide_on_main() -> None:
     assert runtime.seed.session.timeline.recording is False
 
     assert dispatch_keydown(keydown(pygame.K_ESCAPE), runtime) is True
-    assert runtime.controls.consume_hide_overlay() is True
     assert runtime.seed.session.timeline.panel_open is True
 
 
@@ -441,20 +437,6 @@ def test_global_seek_while_recording_fills_range() -> None:
     assert armed_recording_level(session, "layer_1", 11.0) == active_at_start
 
 
-def test_notify_overlay_skipped_in_submenu() -> None:
-    runtime = _make_runtime()
-    assert dispatch_should_notify_overlay(keydown(pygame.K_LEFT), runtime) is False
-
-
-def test_notify_overlay_when_main_context() -> None:
-    runtime = _make_runtime(submenu_focused=False)
-    assert dispatch_should_notify_overlay(keydown(pygame.K_LEFT), runtime) is True
-    assert dispatch_should_notify_overlay(keydown(pygame.K_t), runtime) is False
-    runtime.controls.focus_cursor = TimelineFocus(0)
-    assert runtime.controls.shell_focus.region is ShellRegion.NAVIGATOR
-    assert dispatch_should_notify_overlay(keydown(pygame.K_LEFT), runtime) is True
-
-
 def test_h_does_not_toggle_help_while_text_editing() -> None:
     runtime = _make_runtime(
         submenu_focused=False, panel_open=False, help_visible=False
@@ -479,19 +461,16 @@ def test_h_does_not_toggle_help_while_text_editing() -> None:
     assert runtime.seed.session.help_visible is False
 
 
-def test_f10_toggles_bar_focus_and_wakes_overlay() -> None:
+def test_f10_toggles_bar_focus() -> None:
     runtime = _make_runtime()
-    assert runtime.ui_fade.visibility == 0.0
     assert dispatch_keydown(keydown(pygame.K_F10), runtime) is True
     assert runtime.menu_bar.focused is True
-    assert runtime.ui_fade.visibility == 1.0
     assert dispatch_keydown(keydown(pygame.K_F10), runtime) is True
     assert runtime.menu_bar.focused is False
 
 
 def test_alt_f_opens_file_menu_plain_f_does_not() -> None:
     runtime = _make_runtime()
-    assert runtime.ui_fade.visibility == 0.0
     dispatch_keydown(
         pygame.event.Event(pygame.KEYDOWN, key=pygame.K_LALT),
         runtime,
@@ -507,7 +486,6 @@ def test_alt_f_opens_file_menu_plain_f_does_not() -> None:
     assert runtime.menu_bar.focused is True
     assert runtime.menu_bar.dropdown_open is True
     assert runtime.menu_bar.menu_index == 0
-    assert runtime.ui_fade.visibility == 1.0
     assert dispatch_keydown(
         keydown(pygame.K_f, mod=pygame.KMOD_ALT),
         runtime,
@@ -521,7 +499,7 @@ def test_alt_f_opens_file_menu_plain_f_does_not() -> None:
     assert runtime.menu_bar.dropdown_open is False
 
 
-def test_alt_tap_focuses_bar_and_wakes_overlay() -> None:
+def test_alt_tap_focuses_bar() -> None:
     runtime = _make_runtime()
     dispatch_keydown(
         pygame.event.Event(pygame.KEYDOWN, key=pygame.K_LALT),
@@ -533,7 +511,6 @@ def test_alt_tap_focuses_bar_and_wakes_overlay() -> None:
         runtime,
     )
     assert runtime.menu_bar.focused is True
-    assert runtime.ui_fade.visibility == 1.0
 
 
 def test_alt_then_another_key_does_not_focus_bar() -> None:
@@ -629,22 +606,20 @@ def test_tab_cycle_when_strip_open() -> None:
     assert not isinstance(controls.focus_cursor, TimelineFocus)
 
 
-def test_navigator_esc_hides_overlay() -> None:
+def test_navigator_esc_leaves_the_shell_visible() -> None:
     runtime = _make_runtime(submenu_focused=False, panel_open=False)
     controls = runtime.controls
     controls.shell_focus.region = ShellRegion.NAVIGATOR
     assert dispatch_keydown(keydown(pygame.K_ESCAPE), runtime) is True
-    assert controls.consume_hide_overlay() is True
     assert controls.shell_focus.region is ShellRegion.NAVIGATOR
 
 
-def test_navigator_esc_hides_overlay_in_preset_curation() -> None:
+def test_navigator_esc_leaves_the_shell_visible_in_preset_curation() -> None:
     runtime = _make_runtime(submenu_focused=False, panel_open=False)
     runtime.seed.session.settings.editor_mode = "preset_curation"
     controls = runtime.controls
     controls.shell_focus.region = ShellRegion.NAVIGATOR
     assert dispatch_keydown(keydown(pygame.K_ESCAPE), runtime) is True
-    assert controls.consume_hide_overlay() is True
     assert controls.shell_focus.region is ShellRegion.NAVIGATOR
 
 
@@ -654,7 +629,6 @@ def test_inspector_esc_returns_to_navigator() -> None:
     controls.shell_focus.region = ShellRegion.INSPECTOR
     assert dispatch_keydown(keydown(pygame.K_ESCAPE), runtime) is True
     assert controls.shell_focus.region is ShellRegion.NAVIGATOR
-    assert controls.consume_hide_overlay() is False
 
 
 def test_tab_cycle_skips_timeline_when_strip_closed() -> None:

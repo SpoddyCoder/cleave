@@ -45,7 +45,6 @@ from cleave.viz.row_spec import (
     section_locked,
 )
 from cleave.viz.session import TuningSession
-from cleave.viz.ui_fade import UiFade
 from cleave.viz.shell_focus import (
     CycleStop,
     InspectorGroupKey,
@@ -92,7 +91,6 @@ from cleave.viz.value_nudge import (
 )
 from cleave.viz.top_layer import TopLayer
 
-_HIDDEN = 0.01
 # Vertical padding for the menu bar and the transport bar, which shares its height.
 # Dear ImGui's default FramePadding.y is 3, which leaves both rows cramped.
 _MENU_BAR_FRAME_PADDING_Y = 8.0
@@ -852,13 +850,11 @@ class ShellHost:
     def __init__(
         self,
         imgui_host: ImGuiHost,
-        ui_fade: UiFade,
         menu_state: MenuBarState,
         controls: Any,
         bar_height: int,
     ) -> None:
         self.imgui = imgui_host
-        self._ui_fade = ui_fade
         self._menu_state = menu_state
         self._controls = controls
         self._menu_bar_height_px = bar_height
@@ -917,12 +913,6 @@ class ShellHost:
             x = float(event.pos[0])
             y = float(event.pos[1])
             self._track_splitter_motion(x, y)
-            if (
-                self._chrome_contains(x, y)
-                or self._splitter is not None
-                or self._resize_cursor
-            ):
-                self._ui_fade.notify_input()
             return
         if event.type in (pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP):
             button = mouse_button(event)
@@ -930,10 +920,6 @@ class ShellHost:
                 return
             down = event.type == pygame.MOUSEBUTTONDOWN
             if down:
-                if self._clicks_ignored():
-                    self._cancel_splitter_drag()
-                    self._controls.disarm_value_nudge()
-                    return
                 x = float(event.pos[0])
                 y = float(event.pos[1])
                 captured = self.top_layer.captures_pointer(x, y)
@@ -949,10 +935,7 @@ class ShellHost:
                     self._assign_shell_region(x, y)
                 imgui_host.press_button(button)
             elif button == 0 and self._splitter is not None:
-                if self._clicks_ignored():
-                    self._cancel_splitter_drag()
-                else:
-                    self._end_splitter_drag(event.pos)
+                self._end_splitter_drag(event.pos)
                 return
             elif not imgui_host.button_held(button):
                 return
@@ -961,9 +944,6 @@ class ShellHost:
             imgui_host.process_mouse_event(event)
             return
         if event.type == pygame.MOUSEWHEEL:
-            if self._clicks_ignored():
-                self._controls.disarm_value_nudge()
-                return
             imgui_host.process_mouse_event(event)
 
     def _process_modal_event(self, event: pygame.event.Event) -> None:
@@ -973,10 +953,6 @@ class ShellHost:
         imgui_host = self.imgui
         if event.type == pygame.MOUSEMOTION:
             imgui_host.process_mouse_event(event)
-            x = float(event.pos[0])
-            y = float(event.pos[1])
-            if self._chrome_contains(x, y):
-                self._ui_fade.notify_input()
             return
         if event.type in (pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP):
             button = mouse_button(event)
@@ -1063,10 +1039,6 @@ class ShellHost:
         self._set_resize_cursor(False)
 
     def _track_splitter_motion(self, x: float, y: float) -> None:
-        if self._clicks_ignored():
-            self._cancel_splitter_drag()
-            self._controls.disarm_value_nudge()
-            return
         if self._splitter is not None:
             self._assign_splitter_width(self._splitter, x)
             self._set_resize_cursor(True)
@@ -1648,7 +1620,7 @@ class ShellHost:
         )
 
     def _nudge_input_blocked(self) -> bool:
-        return self._clicks_ignored() or self._modal_has_pointer()
+        return self._modal_has_pointer()
 
     def _modal_has_pointer(self) -> bool:
         modal_host = getattr(self._controls, "modal_host", None)
@@ -1757,12 +1729,6 @@ class ShellHost:
                 imgui.pop_style_color()
             if clicked:
                 activate_inspector_chip(self._controls, chip.id, descriptor)
-
-    def _clicks_ignored(self) -> bool:
-        return (
-            self._ui_fade.visibility <= _HIDDEN
-            and not self._menu_state.dropdown_open
-        )
 
     def _draw_bar(
         self, menu_state: MenuBarState
@@ -1940,38 +1906,21 @@ def draw_shell_frame(
     shell: ShellHost,
     menu_state: MenuBarState,
     command_ctx: CommandContext,
-    visibility: float,
     dt: float,
     readout: TransportReadout | None = None,
     notice: PanelNotificationActive | None = None,
 ) -> None:
     """One ImGui frame: shell windows, chrome, then the top layer.
 
-    Skips ``new_frame`` when the shell is hidden, no menu is open, and the
-    top layer is empty. The fade covers the shell and chrome only.
+    The menu, navigator, and inspector stay visible.
     """
     shell.transport_notice_clicked = False
-    if (
-        visibility <= _HIDDEN
-        and not menu_state.dropdown_open
-        and shell.top_layer.empty
-    ):
-        shell.imgui.discard_input()
-        shell._clear_value_drag()
-        shell._cancel_splitter_drag()
-        shell.top_layer.draw()
-        return
     shell.imgui.begin_frame(dt)
     try:
-        alpha = 1.0 if menu_state.dropdown_open else max(0.0, min(1.0, visibility))
-        imgui.push_style_var(imgui.StyleVar_.alpha, alpha)
-        try:
-            rule_y = shell.draw_windows(
-                menu_state, command_ctx, readout, notice
-            )
-            shell.draw_chrome(menu_state, rule_y)
-        finally:
-            imgui.pop_style_var()
+        rule_y = shell.draw_windows(
+            menu_state, command_ctx, readout, notice
+        )
+        shell.draw_chrome(menu_state, rule_y)
         shell.top_layer.draw()
     finally:
         shell.imgui.end_frame()

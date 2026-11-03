@@ -8,7 +8,6 @@ from cleave.config_schema.editor import (
     EDITOR_PREVIEW_QUALITY_HELP_ENTRIES,
     editor_display_size,
     notification_display_label,
-    ui_fade_display,
 )
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
 from cleave.viz.row_spec import FitStrategy, RowPresentStyle, RowSpec
@@ -71,11 +70,6 @@ def _format_settings_ui_min_width(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
     return str(state.settings.ui_min_width)
-
-def _format_settings_ui_fade(
-    state: TuningViewState, _desc: RowDescriptor
-) -> str:
-    return ui_fade_display(state.settings.ui_fade)
 
 def _format_settings_ui_notification_display(
     state: TuningViewState, _desc: RowDescriptor
@@ -144,11 +138,6 @@ def _apply_settings_ui_min_width(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, large: bool,
 ) -> None:
     controls.settings.adjust_ui_min_width(forward=forward, large=large)
-
-def _apply_settings_ui_fade(
-    controls: TuningControls, _desc: RowDescriptor, forward: bool, large: bool,
-) -> None:
-    controls.settings.adjust_ui_fade(forward=forward, large=large)
 
 def _apply_settings_ui_notification_display(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, large: bool,
@@ -300,31 +289,11 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="UI",
         help_description=(
-            "Panel width, auto-fade, and notification time for the main tuning overlay.",
+            "Panel width and notification time for the main tuning overlay.",
         ),
         is_sub_header=True,
         is_pinned=True,
         parent_group="settings",
-    ),
-    RowKind.SETTINGS_UI_FADE: RowSpec(
-        affordance=RowAffordance.VALUE_STEP,
-        panel_label="auto-fade",
-        present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_settings_ui_fade,
-        apply_horizontal=_apply_settings_ui_fade,
-        help_title="Auto-fade",
-        help_entries=(
-            ("Left/Right", "adjust delay before UI fades"),
-            ("PgUp/PgDn", "large step"),
-            ("0", "disabled; UI stays until Esc"),
-        ),
-        help_description=(
-            "Delay before the overlay panel fades out.",
-            "0 keeps it always visible.",
-        ),
-        is_pinned=True,
-        repeatable=True,
-        parent_group="settings_ui",
     ),
     RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY: RowSpec(
         affordance=RowAffordance.VALUE_STEP,

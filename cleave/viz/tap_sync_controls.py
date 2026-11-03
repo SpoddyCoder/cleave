@@ -37,7 +37,6 @@ class TapSyncUiSnapshot:
     help_visible: bool
     timeline_panel_open: bool
     focus_cursor: FocusCursor
-    overlay_visible: bool
     shell_region: ShellRegion
 
 

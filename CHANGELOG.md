@@ -13,6 +13,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- The menu, navigator, and inspector stay visible. The auto-fade setting is gone.
 - The timeline strip opens when a session starts with the timeline enabled. Closing the strip or turning the timeline off hides it.
 - Dialog and file-picker highlights sit two pixels out from the text on every side.
 - The file picker draws the dialog outline on the keyboard selection and on the row or shortcut under the pointer. Hovering a row or shortcut highlights only that item. Moving the pointer off it clears the highlight until the next hover or key move.

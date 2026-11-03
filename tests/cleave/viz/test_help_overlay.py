@@ -1041,7 +1041,6 @@ def test_help_column_draws_the_subject_stop() -> None:
 
         host = ShellHost(
             ImGuiHost.create(),
-            overlay,
             menu,
             controls,
             menu_bar_height_px(),
@@ -1054,8 +1053,8 @@ def test_help_column_draws_the_subject_stop() -> None:
         )
         host._draw_navigator = lambda: None
         host._draw_inspector = lambda _state: None
-        draw_shell_frame(host, menu, CommandContext(), 1.0, 1.0 / 60.0)
-        draw_shell_frame(host, menu, CommandContext(), 1.0, 1.0 / 60.0)
+        draw_shell_frame(host, menu, CommandContext(), 1.0 / 60.0)
+        draw_shell_frame(host, menu, CommandContext(), 1.0 / 60.0)
         lists = list(imgui.get_draw_data().cmd_lists)
         help_list = next(
             draw_list

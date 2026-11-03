@@ -135,7 +135,6 @@ def _handle_menu_bar_keydown(
         index = menu_index_for_mnemonic(menus, letter)
         if index is not None:
             menu.open_menu(index, menus)
-            runtime.ui_fade.notify_input()
             return True
     if (
         menu.focused
@@ -144,8 +143,7 @@ def _handle_menu_bar_keydown(
     ):
         return True
     if event.key == pygame.K_F10:
-        if menu.toggle_focus():
-            runtime.ui_fade.notify_input()
+        menu.toggle_focus()
         return True
     if not menu.focused:
         return None
@@ -431,8 +429,7 @@ def dispatch_keyup(event: pygame.event.Event, runtime: LiveVisualizerRuntime) ->
         runtime.controls.project_switch.handle_keyup(event)
         return
     elif _is_alt_key(event.key):
-        if runtime.menu_bar.complete_alt_tap():
-            runtime.ui_fade.notify_input()
+        runtime.menu_bar.complete_alt_tap()
         return
     if runtime.modal_host.handle_keyup(event):
         return
@@ -447,17 +444,3 @@ def dispatch_window_event(event: pygame.event.Event, runtime: LiveVisualizerRunt
         return
     if event.type == pygame.ACTIVEEVENT and not getattr(event, "gain", True):
         runtime.menu_bar.cancel_alt_tap()
-
-
-def dispatch_should_notify_overlay(
-    event: pygame.event.Event, runtime: LiveVisualizerRuntime
-) -> bool:
-    """Mirror VisualizerApp.run overlay fade-in on input."""
-    if event.type != pygame.KEYDOWN:
-        return False
-    key_handler = key_handler_for_runtime(runtime, event.key)
-    if key_handler is not runtime.controls:
-        return False
-    if runtime.controls.shell_focus.region is ShellRegion.TIMELINE:
-        return False
-    return event.key != pygame.K_t

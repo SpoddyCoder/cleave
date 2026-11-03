@@ -14,7 +14,6 @@ from cleave.config_schema.editor import (
     clamp_editor_width,
     clamp_residual_latency_ms,
     clamp_shell_column_width,
-    clamp_ui_fade,
     clamp_ui_min_width,
     clamp_ui_width,
     clamp_notification_display_sec,
@@ -146,14 +145,6 @@ class SettingsControls:
             inspector_width=clamp_shell_column_width(insp),
             help_width=clamp_shell_column_width(help_width),
         )
-        persist_editor_settings(self.cfg)
-
-    def adjust_ui_fade(self, *, forward: bool, large: bool) -> None:
-        step = 5.0 if large else 1.0
-        delta = step if forward else -step
-        current = self.cfg.editor.ui_fade
-        new_value = clamp_ui_fade(current + delta)
-        self.cfg.editor = replace(self.cfg.editor, ui_fade=new_value)
         persist_editor_settings(self.cfg)
 
     def adjust_notification_display_sec(self, *, forward: bool, large: bool) -> None:

@@ -753,19 +753,11 @@ def test_save_writes_launch_path() -> None:
         assert "Saved" in stderr.getvalue()
 
 
-def test_esc_requests_overlay_hide() -> None:
-    controls = _make_controls()
-    assert _press_focused(controls, _keydown(pygame.K_ESCAPE)) is True
-    assert controls.consume_hide_overlay() is True
-    assert controls.consume_hide_overlay() is False
-
-
-def test_esc_hide_preserves_focus_when_not_in_timeline_submenu() -> None:
+def test_esc_leaves_focus_when_not_in_timeline_submenu() -> None:
     controls = _make_controls()
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(RowKind.TRACK_PRESET, slot="layer_1")
     assert _press_focused(controls, _keydown(pygame.K_ESCAPE)) is True
-    assert controls.consume_hide_overlay() is True
     controls.exit_timeline_submenu()
     assert controls.focus_descriptor.kind == RowKind.TRACK_PRESET
 
@@ -802,7 +794,6 @@ def test_esc_in_move_mode_does_not_request_overlay_hide() -> None:
     assert controls.layer_lifecycle.move_mode_slot == "layer_1"
     assert controls.handle_move_mode_keydown(_keydown(pygame.K_ESCAPE)) is True
     assert controls.layer_lifecycle.move_mode_slot is None
-    assert controls.consume_hide_overlay() is False
 
 
 def test_ctrl_q_not_handled_by_main_controls() -> None:
@@ -2757,7 +2748,6 @@ def _notification_runtime(controls: TuningControls):
         modal_host=controls.modal_host,
         menu_bar=MenuBarState(),
         timeline_controls=None,
-        ui_fade=MagicMock(),
         overlay_profiler=MagicMock(),
         playback=controls.playback,
     )
@@ -4374,45 +4364,6 @@ def test_cycle_preview_quality_calls_apply_preview_resolutions() -> None:
     _press_focused(controls, _keydown(pygame.K_RIGHT))
 
     layer_manager.apply_preview_resolutions.assert_called_once()
-
-
-def test_settings_adjust_ui_fade() -> None:
-    controls = _make_controls(("layer_1",))
-    assert controls.cfg.editor.ui_fade == 10.0
-    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_FADE)
-
-    _press_focused(controls, _keydown(pygame.K_RIGHT))
-    assert controls.cfg.editor.ui_fade == 11.0
-
-    _press_focused(controls, _keydown(pygame.K_PAGEDOWN))
-    assert controls.cfg.editor.ui_fade == 6.0
-
-    for _ in range(6):
-        _press_focused(controls, _keydown(pygame.K_LEFT))
-    assert controls.cfg.editor.ui_fade == 0.0
-
-
-def test_settings_ui_fade_change_does_not_mark_project_config_dirty() -> None:
-    controls = _make_controls(("layer_1",))
-    assert not controls.config_dirty
-    _expand_settings_ui(controls)
-    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_FADE)
-    _press_focused(controls, _keydown(pygame.K_RIGHT))
-    assert not controls.config_dirty
-
-
-def test_settings_ui_fade_writes_user_config_without_dirty(tmp_path: Path) -> None:
-    user_path = tmp_path / "config.yaml"
-    controls = _make_controls(("layer_1",))
-    controls.cfg.user_config_path = user_path
-    assert not controls.config_dirty
-    _expand_settings_ui(controls)
-    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_FADE)
-    _press_focused(controls, _keydown(pygame.K_RIGHT))
-    assert not controls.config_dirty
-    assert user_path.is_file()
-    loaded = load_user_config(user_path)
-    assert loaded.editor.ui_fade == controls.cfg.editor.ui_fade
 
 
 def test_settings_adjust_notification_display() -> None:

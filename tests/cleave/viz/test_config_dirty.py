@@ -577,12 +577,6 @@ def _mutate_settings_preview_quality(controls: TuningControls) -> None:
     press_main_row(controls, _keydown(pygame.K_RIGHT))
 
 
-def _mutate_settings_ui_fade(controls: TuningControls) -> None:
-    _expand_settings_ui(controls)
-    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_FADE)
-    press_main_row(controls, _keydown(pygame.K_RIGHT))
-
-
 def _mutate_settings_ui_width(controls: TuningControls) -> None:
     _expand_settings_ui(controls)
     controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_WIDTH)
@@ -649,7 +643,6 @@ _SESSION_ONLY_MUTATIONS: list[tuple[str, Callable[[TuningControls], None], tuple
     ("move_mode.swap", _mutate_move_mode_without_confirm, ("layer_1", "layer_2")),
     ("help_visible", _mutate_help_visible, ("layer_1",)),
     ("settings.preview_quality", _mutate_settings_preview_quality, ("layer_1",)),
-    ("settings.ui_fade", _mutate_settings_ui_fade, ("layer_1",)),
     ("settings.ui_width", _mutate_settings_ui_width, ("layer_1",)),
     ("settings.ui_min_width", _mutate_settings_ui_min_width, ("layer_1",)),
     ("settings.ui_width_mode", _mutate_settings_ui_width_mode, ("layer_1",)),

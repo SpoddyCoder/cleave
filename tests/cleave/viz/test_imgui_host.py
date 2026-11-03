@@ -11,14 +11,6 @@ from cleave.viz.commands import CommandContext
 from cleave.viz.menu_bar import MenuBarState
 
 
-class _Overlay:
-    def __init__(self) -> None:
-        self.visibility = 0.0
-
-    def notify_input(self) -> None:
-        self.visibility = 1.0
-
-
 class _FakeRenderer:
     def shutdown(self) -> None:
         return None
@@ -27,7 +19,7 @@ class _FakeRenderer:
         return None
 
 
-def _open_shell(overlay: _Overlay, menu: MenuBarState):
+def _open_shell(menu: MenuBarState):
     from cleave.viz.imgui_host import ImGuiHost
     from cleave.viz.shell_host import ShellHost, menu_bar_height_px
 
@@ -37,7 +29,6 @@ def _open_shell(overlay: _Overlay, menu: MenuBarState):
     )
     return ShellHost(
         ImGuiHost.create(),
-        overlay,
         menu,
         controls,
         menu_bar_height_px(),
@@ -100,7 +91,7 @@ def test_create_uses_programmable_renderer_when_gl_context_is_current() -> None:
         patch.object(imgui_host, "_gl_context_current", return_value=True),
         patch.object(imgui_host, "RENDERER_CLASS", _FakeRenderer),
     ):
-        host = _open_shell(_Overlay(), MenuBarState())
+        host = _open_shell(MenuBarState())
     try:
         assert isinstance(host.imgui.renderer, _FakeRenderer)
     finally:
@@ -108,57 +99,28 @@ def test_create_uses_programmable_renderer_when_gl_context_is_current() -> None:
     assert not imgui.get_current_context()
 
 
-def test_top_strip_motion_wakes_overlay_and_draw_without_gl() -> None:
-    """The crash: visibility leaves 0, then new_frame runs with no font atlas."""
+def test_shell_frames_build_the_font_atlas_without_gl() -> None:
+    """Headless frames must build the font atlas before the context is destroyed."""
     from imgui_bundle import imgui
 
     from cleave.viz import imgui_host
     from cleave.viz.shell_host import draw_shell_frame
 
-    overlay = _Overlay()
     menu = MenuBarState()
     with patch.object(imgui_host, "_gl_context_current", return_value=False):
-        host = _open_shell(overlay, menu)
+        host = _open_shell(menu)
     try:
         assert isinstance(host.imgui.renderer, imgui_host._HeadlessRenderer)
-        draw_shell_frame(
-            host, menu, CommandContext(), overlay.visibility, 1.0 / 60.0
-        )
+        draw_shell_frame(host, menu, CommandContext(), 1.0 / 60.0)
         host.process_event(_motion(host.menu_bar_height_px + 8))
-        assert overlay.visibility == 0.0
         host.process_event(_motion(0))
-        assert overlay.visibility == 1.0
-        draw_shell_frame(
-            host, menu, CommandContext(), overlay.visibility, 1.0 / 60.0
-        )
         # One menu-bar frame, then destroy, makes the next context assert on
         # the menu buttons. A second frame leaves Dear ImGui settled.
-        draw_shell_frame(
-            host, menu, CommandContext(), overlay.visibility, 1.0 / 60.0
-        )
+        draw_shell_frame(host, menu, CommandContext(), 1.0 / 60.0)
+        draw_shell_frame(host, menu, CommandContext(), 1.0 / 60.0)
         assert imgui.get_io().fonts.is_built()
     finally:
         host.imgui.destroy()
     assert not imgui.get_current_context()
 
 
-def test_skipped_frame_discards_queued_buttons() -> None:
-    from cleave.viz import imgui_host
-    from cleave.viz.shell_host import draw_shell_frame
-
-    overlay = _Overlay()
-    menu = MenuBarState()
-    with patch.object(imgui_host, "_gl_context_current", return_value=False):
-        host = _open_shell(overlay, menu)
-    try:
-        host.imgui.process_mouse_event(
-            pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=(4, 4), button=1)
-        )
-        assert host.imgui.queued_buttons
-        with patch.object(
-            host.imgui, "begin_frame", side_effect=AssertionError("frame started")
-        ):
-            draw_shell_frame(host, menu, CommandContext(), 0.0, 1.0 / 60.0)
-        assert host.imgui.queued_buttons == []
-    finally:
-        host.imgui.destroy()

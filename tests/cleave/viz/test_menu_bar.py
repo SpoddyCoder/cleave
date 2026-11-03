@@ -231,7 +231,6 @@ def _open_shell(overlay: _Overlay, menu: MenuBarState, controls: object | None =
         controls = _shell_controls()
     return ShellHost(
         ImGuiHost.create(),
-        overlay,
         menu,
         controls,
         menu_bar_height_px(),
@@ -264,7 +263,7 @@ def test_mouse_switches_and_closes_an_open_top_menu() -> None:
     def draw() -> None:
         from cleave.viz.shell_host import draw_shell_frame
 
-        draw_shell_frame(host, menu, CommandContext(), overlay.visibility, 1.0 / 60.0)
+        draw_shell_frame(host, menu, CommandContext(), 1.0 / 60.0)
 
     def click(index: int) -> None:
         x, y = anchors[index]
@@ -459,11 +458,11 @@ def test_open_menu_paints_over_the_transport_rule() -> None:
         host._draw_navigator = lambda: None
         host._draw_inspector = lambda _state: None
         # The font atlas is built on the first frame. Open the menu after that.
-        draw_shell_frame(host, menu, CommandContext(), 1.0, 1.0 / 60.0)
+        draw_shell_frame(host, menu, CommandContext(), 1.0 / 60.0)
         menu.open_menu(0, MENUS)
         # The popup's first frame is hidden while it measures. The next frame paints it.
-        draw_shell_frame(host, menu, CommandContext(), 1.0, 1.0 / 60.0)
-        draw_shell_frame(host, menu, CommandContext(), 1.0, 1.0 / 60.0)
+        draw_shell_frame(host, menu, CommandContext(), 1.0 / 60.0)
+        draw_shell_frame(host, menu, CommandContext(), 1.0 / 60.0)
         assert host.menu_bar_height_px == height
         lists = list(imgui.get_draw_data().cmd_lists)
         content = _content_lists(lists)
@@ -527,7 +526,7 @@ def test_open_menu_paints_over_the_focus_ring() -> None:
         host._draw_inspector = lambda _state: None
         # The font atlas is built on the first frame. The strip border is on
         # chrome while the strip has focus; an open menu takes that focus.
-        draw_shell_frame(host, menu, CommandContext(), 1.0, 1.0 / 60.0)
+        draw_shell_frame(host, menu, CommandContext(), 1.0 / 60.0)
         strip_lists = list(imgui.get_draw_data().cmd_lists)
         strip_content = _content_lists(strip_lists)
         strip_names = [draw_list._owner_name for draw_list in strip_content]
@@ -548,8 +547,8 @@ def test_open_menu_paints_over_the_focus_ring() -> None:
         controls.shell_focus.region = ShellRegion.NAVIGATOR
         menu.open_menu(0, MENUS)
         # The popup's first frame is hidden while it measures. The next frame paints it.
-        draw_shell_frame(host, menu, CommandContext(), 1.0, 1.0 / 60.0)
-        draw_shell_frame(host, menu, CommandContext(), 1.0, 1.0 / 60.0)
+        draw_shell_frame(host, menu, CommandContext(), 1.0 / 60.0)
+        draw_shell_frame(host, menu, CommandContext(), 1.0 / 60.0)
         lists = list(imgui.get_draw_data().cmd_lists)
         content = _content_lists(lists)
         names = [draw_list._owner_name for draw_list in content]
@@ -601,8 +600,8 @@ def test_menu_underline_and_popup_row_are_snug() -> None:
     host.process_event(_motion(4))
     menu.open_menu(0, MENUS)
     try:
-        draw_shell_frame(host, menu, CommandContext(), 1.0, 1.0 / 60.0)
-        draw_shell_frame(host, menu, CommandContext(), 1.0, 1.0 / 60.0)
+        draw_shell_frame(host, menu, CommandContext(), 1.0 / 60.0)
+        draw_shell_frame(host, menu, CommandContext(), 1.0 / 60.0)
         lists = list(imgui.get_draw_data().cmd_lists)
         by_name = {draw_list._owner_name: draw_list for draw_list in lists}
         bar = by_name["##MainMenuBar"]
@@ -826,7 +825,7 @@ def _paint_shell(host, menu, ctx, *, frames: int = 2) -> list:
 
     lists = []
     for _ in range(frames):
-        draw_shell_frame(host, menu, ctx, 1.0, 1.0 / 60.0)
+        draw_shell_frame(host, menu, ctx, 1.0 / 60.0)
         lists = list(imgui.get_draw_data().cmd_lists)
     return lists
 

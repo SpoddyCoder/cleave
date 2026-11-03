@@ -6,6 +6,7 @@ from dataclasses import replace
 from unittest.mock import MagicMock, call, patch
 
 import pygame
+import pytest
 
 from cleave.config import EditorConfig
 from cleave.config_schema.editor import (
@@ -22,7 +23,6 @@ from cleave.viz.app import (
     VisualizerApp,
     VisualizerSeed,
     _live_overlay_ui_active,
-    _timeline_strip_fade,
     _timeline_strip_visible,
     init_gl_resources_cheap,
     init_gl_resources_render,
@@ -36,9 +36,17 @@ from cleave.viz.session import LayerRuntime, TuningSession
 from tests.support.config import default_render_post_fx_runtime
 from cleave.viz.modal import ModalHost
 from cleave.viz.panel_notification import PanelNotificationActive
-from cleave.viz.ui_fade import UiFade
 from tests.support.compositor_mock import recording_compositor
 from tests.support.viz import make_test_cfg
+
+
+@pytest.fixture(autouse=True)
+def _stub_shell_draw(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Loop tests have no ImGui context. The shell stays drawn in the app."""
+    monkeypatch.setattr(
+        "cleave.viz.shell_host.draw_shell_frame",
+        lambda *_args, **_kwargs: None,
+    )
 
 
 def _silence_tap_sync(controls: MagicMock) -> None:
@@ -92,7 +100,6 @@ def _minimal_runtime(compositor: MagicMock, *, upscale: float = 2.0) -> LiveVisu
     controls.build_view_state.return_value = MagicMock()
     _silence_tap_sync(controls)
     controls.project_render.busy = False
-    ui_fade = UiFade()
     modal_host = ModalHost()
     seed = VisualizerSeed(
         project_dir=MagicMock(),
@@ -125,7 +132,6 @@ def _minimal_runtime(compositor: MagicMock, *, upscale: float = 2.0) -> LiveVisu
         modal_host=modal_host,
         mix_player=MagicMock(),
         playback=MagicMock(),
-        ui_fade=ui_fade,
         timeline_overlay=MagicMock(),
         overlay_surface=pygame.Surface((display_w, display_h), pygame.SRCALPHA),
     )
@@ -177,7 +183,6 @@ def _boot_window(seed: VisualizerSeed, compositor: MagicMock) -> MagicMock:
 
 def _timeline_open_runtime(compositor: MagicMock) -> LiveVisualizerRuntime:
     runtime = _minimal_runtime(compositor)
-    runtime.ui_fade = UiFade()
     runtime.seed.session.layer_z_order = list(DEFAULT_LAYER_SLOTS)
     runtime.seed.session.layers = {
         slot: LayerRuntime(
@@ -210,7 +215,6 @@ def test_tick_frame_overlay_order_fade_content_present_then_ui(
     compositor = recording_compositor()
     runtime = _minimal_runtime(compositor)
     runtime.seed.session.timeline.panel_open = True
-    runtime.ui_fade.notify_input()
     call_order: list[str] = []
 
     compositor.apply_frame_fade.side_effect = lambda *_a, **_k: call_order.append(
@@ -246,7 +250,6 @@ def _heavy_init_side_effect(
     controls.build_view_state.return_value = MagicMock()
     _silence_tap_sync(controls)
     controls.tick = MagicMock()
-    controls.consume_hide_overlay.return_value = False
     controls.key_repeat_armed = False
     controls.value_nudge_armed = False
     controls.project_render.busy = False
@@ -256,8 +259,6 @@ def _heavy_init_side_effect(
     playback.paused = False
     mix_player = MagicMock()
     modal_host = ModalHost()
-    ui_fade = MagicMock()
-    ui_fade.visibility = 0.0  # UiFade starts hidden; menu draw compares this
     return LiveVisualizerRuntime(
         seed=seed,
         layers=[],
@@ -270,7 +271,6 @@ def _heavy_init_side_effect(
         modal_host=modal_host,
         mix_player=mix_player,
         playback=playback,
-        ui_fade=ui_fade,
         timeline_overlay=MagicMock(),
         overlay_surface=overlay_surface,
     )
@@ -371,7 +371,6 @@ def test_run_pygame_quit_clean_exits_via_try_quit(
     controls.tick = MagicMock()
     controls.key_repeat_armed = False
     controls.value_nudge_armed = False
-    controls.consume_hide_overlay.return_value = False
     controls.project_render.busy = False
 
     def heavy_with_controls(
@@ -401,7 +400,6 @@ def test_run_pygame_quit_clean_exits_via_try_quit(
     assert controls.try_quit.call_count == 1
     controls.consume_pending_exit.assert_called()
     assert isinstance(app._runtime, LiveVisualizerRuntime)
-    app._runtime.ui_fade.notify_input.assert_not_called()
 
 
 @patch("cleave.viz.app.current_sec", return_value=0.0)
@@ -437,7 +435,6 @@ def test_run_pending_switch_returns_target_and_keeps_compositor(
     controls.tick = MagicMock()
     controls.key_repeat_armed = False
     controls.value_nudge_armed = False
-    controls.consume_hide_overlay.return_value = False
     controls.project_render.busy = False
 
     def heavy_with_controls(
@@ -492,7 +489,6 @@ def test_run_ctrl_q_clean_exits(
     controls.tick = MagicMock()
     controls.key_repeat_armed = False
     controls.value_nudge_armed = False
-    controls.consume_hide_overlay.return_value = False
     controls.project_render.busy = False
     controls.handle_move_mode_keydown.return_value = False
     controls.navigator.handle_keydown.return_value = False
@@ -563,7 +559,6 @@ def test_run_pygame_quit_dirty_stays_open(
     controls.tick = MagicMock()
     controls.key_repeat_armed = False
     controls.value_nudge_armed = False
-    controls.consume_hide_overlay.return_value = False
     controls.project_render.busy = False
 
     def heavy_with_controls(
@@ -597,7 +592,6 @@ def test_run_pygame_quit_dirty_stays_open(
     assert controls.try_quit.call_count == 1
     controls.consume_pending_exit.assert_called()
     assert isinstance(app._runtime, LiveVisualizerRuntime)
-    app._runtime.ui_fade.notify_input.assert_called_once()
 
 
 @patch("cleave.viz.app.current_sec", return_value=0.0)
@@ -628,7 +622,6 @@ def test_run_main_loop_stays_open_without_quit_event(
     controls.tick = MagicMock()
     controls.key_repeat_armed = False
     controls.value_nudge_armed = False
-    controls.consume_hide_overlay.return_value = False
     controls.project_render.busy = False
 
     def heavy_with_controls(
@@ -732,7 +725,6 @@ def test_run_holds_content_and_overlay_while_project_render_busy(
     controls.tick = MagicMock()
     controls.key_repeat_armed = False
     controls.value_nudge_armed = False
-    controls.consume_hide_overlay.return_value = False
     controls.project_render.busy = True
 
     def heavy_with_controls(
@@ -890,7 +882,6 @@ def test_tick_frame_overlay_order_at_upscale_one(
     compositor = recording_compositor()
     runtime = _minimal_runtime(compositor, upscale=1.0)
     runtime.seed.session.timeline.panel_open = True
-    runtime.ui_fade.notify_input()
     call_order: list[str] = []
 
     compositor.apply_frame_fade.side_effect = lambda *_a, **_k: call_order.append(
@@ -944,8 +935,6 @@ def test_key_routing_timeline_when_submenu_focused() -> None:
     timeline = MagicMock()
     runtime.controls = main
     runtime.timeline_controls = timeline
-    runtime.ui_fade = UiFade()
-    runtime.ui_fade.notify_input()
     runtime.seed.session.timeline.enabled = True
     runtime.seed.session.timeline.panel_open = True
     runtime.controls.focus_cursor = TimelineFocus(0)
@@ -956,14 +945,13 @@ def test_key_routing_timeline_when_submenu_focused() -> None:
     assert _key_handler_for_session(runtime, pygame.K_DOWN) is timeline
 
 
-def test_key_routing_timeline_when_overlay_hidden_and_submenu_focused() -> None:
+def test_key_routing_timeline_when_strip_focused() -> None:
     compositor = recording_compositor()
     runtime = _minimal_runtime(compositor)
     main = MagicMock()
     timeline = MagicMock()
     runtime.controls = main
     runtime.timeline_controls = timeline
-    runtime.ui_fade = UiFade()
     runtime.seed.session.timeline.enabled = True
     runtime.seed.session.timeline.panel_open = True
     runtime.controls.focus_cursor = TimelineFocus(0)
@@ -996,7 +984,7 @@ def test_keyup_routing_main_for_vertical_nav_when_submenu_focused() -> None:
 @patch("cleave.viz.app.LayerFramePipeline.composite")
 @patch("cleave.viz.app.LayerFramePipeline.render_frame")
 @patch("cleave.viz.app.apply_layer_visibility")
-def test_tick_frame_skips_timeline_when_overlay_hidden_and_not_in_submenu(
+def test_tick_frame_skips_timeline_when_panel_closed(
     _mock_visibility: MagicMock,
     _mock_effects: MagicMock,
     _mock_composite: MagicMock,
@@ -1007,6 +995,7 @@ def test_tick_frame_skips_timeline_when_overlay_hidden_and_not_in_submenu(
     pygame.init()
     compositor = recording_compositor()
     runtime = _timeline_open_runtime(compositor)
+    runtime.seed.session.timeline.panel_open = False
     runtime.controls.focus_cursor = TimelineFocus(0)
     runtime.controls.shell_focus.region = ShellRegion.NAVIGATOR
 
@@ -1021,7 +1010,7 @@ def test_tick_frame_skips_timeline_when_overlay_hidden_and_not_in_submenu(
 @patch("cleave.viz.app.LayerFramePipeline.composite")
 @patch("cleave.viz.app.LayerFramePipeline.render_frame")
 @patch("cleave.viz.app.apply_layer_visibility")
-def test_tick_frame_draws_timeline_when_overlay_hidden_but_submenu_focused(
+def test_tick_frame_draws_timeline_when_strip_focused(
     _mock_visibility: MagicMock,
     _mock_effects: MagicMock,
     _mock_composite: MagicMock,
@@ -1050,7 +1039,7 @@ def test_tick_frame_draws_timeline_when_overlay_hidden_but_submenu_focused(
 @patch("cleave.viz.app.LayerFramePipeline.composite")
 @patch("cleave.viz.app.LayerFramePipeline.render_frame")
 @patch("cleave.viz.app.apply_layer_visibility")
-def test_tick_frame_skips_view_state_and_timeline_when_overlay_hidden(
+def test_tick_frame_skips_timeline_when_strip_closed(
     _mock_visibility: MagicMock,
     _mock_effects: MagicMock,
     _mock_composite: MagicMock,
@@ -1102,7 +1091,7 @@ def test_tick_frame_skips_tuning_when_only_a_modal_is_active(
 @patch("cleave.viz.app.LayerFramePipeline.composite")
 @patch("cleave.viz.app.LayerFramePipeline.render_frame")
 @patch("cleave.viz.app.apply_layer_visibility")
-def test_tick_frame_insets_panels_by_full_menu_bar_height_when_faded(
+def test_tick_frame_insets_panels_by_full_menu_bar_height(
     _mock_visibility: MagicMock,
     _mock_effects: MagicMock,
     _mock_composite: MagicMock,
@@ -1114,9 +1103,6 @@ def test_tick_frame_insets_panels_by_full_menu_bar_height_when_faded(
 
     compositor = recording_compositor()
     runtime = _minimal_runtime(compositor)
-    fade = runtime.ui_fade
-    fade.notify_input()
-    fade._idle_sec = fade._hold_idle_sec + fade._fade_duration_sec * 0.6
     app = VisualizerApp(runtime)
     shell = SimpleNamespace(menu_bar_height_px=23, set_layout=MagicMock())
     app._shell = shell
@@ -1143,54 +1129,18 @@ def test_tick_frame_insets_panels_by_full_menu_bar_height_when_faded(
     assert shell.set_layout.call_args.args[0].visualiser == expected.visualiser
 
 
-def test_live_overlay_ui_active_gating() -> None:
-    assert not _live_overlay_ui_active(
-        overlay_visibility=0.0,
-        timeline_strip_visible=False,
-    )
-    assert _live_overlay_ui_active(
-        overlay_visibility=0.5,
-        timeline_strip_visible=False,
-    )
-    assert _live_overlay_ui_active(
-        overlay_visibility=0.0,
-        timeline_strip_visible=True,
-    )
+def test_live_overlay_ui_active_follows_the_open_strip() -> None:
+    assert not _live_overlay_ui_active(timeline_strip_visible=False)
+    assert _live_overlay_ui_active(timeline_strip_visible=True)
 
 
-def test_timeline_strip_visible_while_timeline_region_despite_hidden_overlay() -> None:
+def test_timeline_strip_visible_while_panel_open() -> None:
     tl = TuningSession(layer_z_order=[], layers={}).timeline
     tl.enabled = True
     tl.panel_open = True
-
-    assert (
-        _timeline_strip_visible(
-            tl, overlay_visibility=0.0, region=ShellRegion.TIMELINE
-        )
-        is True
-    )
-    assert (
-        _timeline_strip_visible(
-            tl, overlay_visibility=1.0, region=ShellRegion.TIMELINE
-        )
-        is True
-    )
-    assert _timeline_strip_fade(region=ShellRegion.TIMELINE, overlay_visibility=0.0) == 1.0
-
-    assert (
-        _timeline_strip_visible(
-            tl, overlay_visibility=0.0, region=ShellRegion.NAVIGATOR
-        )
-        is False
-    )
-    assert (
-        _timeline_strip_visible(
-            tl, overlay_visibility=0.5, region=ShellRegion.INSPECTOR
-        )
-        is True
-    )
-    assert _timeline_strip_fade(region=ShellRegion.NAVIGATOR, overlay_visibility=0.5) == 0.5
-    assert _timeline_strip_fade(region=ShellRegion.INSPECTOR, overlay_visibility=0.5) == 0.5
+    assert _timeline_strip_visible(tl) is True
+    tl.panel_open = False
+    assert _timeline_strip_visible(tl) is False
 
 
 @patch("cleave.viz.app.OverlayDrawer.draw_timeline")
@@ -1212,7 +1162,6 @@ def test_tick_frame_draws_timeline_when_overlay_visible_and_panel_open(
     runtime = _timeline_open_runtime(compositor)
     runtime.controls.focus_cursor = TimelineFocus(0)
     runtime.controls.shell_focus.region = ShellRegion.NAVIGATOR
-    runtime.ui_fade.notify_input()
 
     app = VisualizerApp(runtime)
     app.tick_frame(1.0, paused=True, draw_overlay=True, n_pcm=735)
@@ -1221,39 +1170,13 @@ def test_tick_frame_draws_timeline_when_overlay_visible_and_panel_open(
     assert mock_draw_timeline.call_args.args[3].submenu_focused is False
 
 
-def test_esc_hide_clears_submenu_focus_preserves_panel_open() -> None:
-    compositor = recording_compositor()
-    runtime = _minimal_runtime(compositor)
-    fade = UiFade()
-    fade.notify_input()
-    runtime.ui_fade = fade
-    runtime.seed.session.timeline.enabled = True
-    runtime.seed.session.timeline.panel_open = True
-    runtime.controls.focus_cursor = TimelineFocus(0)
-
-    def _exit_submenu() -> None:
-        runtime.controls.focus_cursor = MainFocus(
-            RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
-        )
-
-    runtime.controls.consume_hide_overlay.return_value = True
-    runtime.controls.exit_timeline_submenu = _exit_submenu
-    if runtime.controls.consume_hide_overlay():
-        fade.hide_immediately()
-        runtime.controls.exit_timeline_submenu()
-
-    assert runtime.seed.session.timeline.panel_open is True
-    assert not isinstance(runtime.controls.focus_cursor, TimelineFocus)
-    assert fade.is_visible() is False
-
-
 @patch("cleave.viz.app.OverlayDrawer.draw_timeline")
 @patch("cleave.viz.frame_finish._composite_render_overlay")
 @patch("cleave.viz.frame_finish.live_frame_fade_alpha", return_value=1.0)
 @patch("cleave.viz.app.LayerFramePipeline.composite")
 @patch("cleave.viz.app.LayerFramePipeline.render_frame")
 @patch("cleave.viz.app.apply_layer_visibility")
-def test_tick_frame_restores_timeline_after_overlay_shown_again(
+def test_tick_frame_draws_open_timeline_immediately(
     _mock_visibility: MagicMock,
     _mock_effects: MagicMock,
     _mock_composite: MagicMock,
@@ -1264,13 +1187,9 @@ def test_tick_frame_restores_timeline_after_overlay_shown_again(
     pygame.init()
     compositor = recording_compositor()
     runtime = _timeline_open_runtime(compositor)
-    fade = runtime.ui_fade
 
     app = VisualizerApp(runtime)
     app.tick_frame(1.0, paused=True, draw_overlay=True, n_pcm=735)
-    mock_draw_timeline.assert_not_called()
-
-    fade.notify_input()
-    app.tick_frame(1.0, paused=True, draw_overlay=True, n_pcm=735)
     mock_draw_timeline.assert_called_once()
+    assert mock_draw_timeline.call_args.kwargs["visibility"] == 1.0
     assert runtime.seed.session.timeline.panel_open is True

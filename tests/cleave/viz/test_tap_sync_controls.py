@@ -45,7 +45,6 @@ def _make_controls(
             help_visible=True,
             timeline_panel_open=True,
             focus_cursor=TimelineFocus(1),
-            overlay_visible=True,
             shell_region=ShellRegion.NAVIGATOR,
         )
         snapshot_store.append(snapshot)
@@ -401,11 +400,6 @@ def test_tuning_controls_begin_and_restore_ui_snapshot() -> None:
     from tests.support.viz import make_controls
 
     controls = make_controls()
-    controls.bind_tap_sync_overlay(
-        get_visible=lambda: True,
-        hide=lambda: None,
-        show=lambda: None,
-    )
     session = controls.session
     session.help_visible = True
     session.timeline.panel_open = True

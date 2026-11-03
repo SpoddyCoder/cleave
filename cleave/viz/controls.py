@@ -121,11 +121,6 @@ class TuningControls:
         self._notification_host = PanelNotificationHost()
         self._key_repeat = KeyRepeatController()
         self.value_nudge = ValueNudgeHold(self)
-        self._hide_overlay_requested = False
-        self._overlay_get_visible: Callable[[], bool] | None = None
-        self._overlay_hide: Callable[[], None] | None = None
-        self._overlay_show: Callable[[], None] | None = None
-
         self.layer_lifecycle = LayerLifecycleController(
             session,
             layer_manager,
@@ -289,27 +284,11 @@ class TuningControls:
     def preset_curation(self) -> PresetCurationController:
         return self._preset_curation
 
-    def bind_tap_sync_overlay(
-        self,
-        *,
-        get_visible: Callable[[], bool],
-        hide: Callable[[], None],
-        show: Callable[[], None],
-    ) -> None:
-        self._overlay_get_visible = get_visible
-        self._overlay_hide = hide
-        self._overlay_show = show
-
     def _begin_tap_sync_calibration_ui(self) -> TapSyncUiSnapshot:
         snapshot = TapSyncUiSnapshot(
             help_visible=self.session.help_visible,
             timeline_panel_open=self.session.timeline.panel_open,
             focus_cursor=self.focus_cursor,
-            overlay_visible=(
-                self._overlay_get_visible()
-                if self._overlay_get_visible is not None
-                else True
-            ),
             shell_region=self.shell_focus.region,
         )
         self.close_help()
@@ -320,8 +299,6 @@ class TuningControls:
             or isinstance(self.focus_cursor, TimelineFocus)
         ):
             self.exit_timeline_submenu()
-        if self._overlay_hide is not None:
-            self._overlay_hide()
         return snapshot
 
     def _restore_tap_sync_calibration_ui(self, snapshot: TapSyncUiSnapshot) -> None:
@@ -338,8 +315,6 @@ class TuningControls:
             self._apply_focus_cursor(snapshot.focus_cursor)
             # Exact snapshot: a saved strip cursor outside Timeline stays put.
             self.shell_focus.region = snapshot.shell_region
-        if snapshot.overlay_visible and self._overlay_show is not None:
-            self._overlay_show()
 
     def _apply_residual_latency(self) -> None:
         latency_sec = self.cfg.editor.residual_latency_ms / 1000.0
@@ -371,14 +346,6 @@ class TuningControls:
 
     def clear_config_dirty(self) -> None:
         self._config_save.clear_config_dirty()
-
-    def request_hide_overlay(self) -> None:
-        self._hide_overlay_requested = True
-
-    def consume_hide_overlay(self) -> bool:
-        requested = self._hide_overlay_requested
-        self._hide_overlay_requested = False
-        return requested
 
     @property
     def modal_host(self) -> ModalHost:
@@ -429,7 +396,7 @@ class TuningControls:
     def handle_keydown(self, event: pygame.event.Event) -> bool:
         """Keys that no shell region claimed.
 
-        Space pauses. Esc hides the UI. Modals and tap-sync own their keys.
+        Space pauses. Modals and tap-sync own their keys.
         Navigator, inspector, and the timeline strip handle their own arrows.
         """
         if event.type != pygame.KEYDOWN:
@@ -446,10 +413,6 @@ class TuningControls:
 
         if event.key == pygame.K_SPACE:
             toggle_pause(self.playback, self.duration_sec)
-            return True
-
-        if event.key == pygame.K_ESCAPE:
-            self.request_hide_overlay()
             return True
 
         return True

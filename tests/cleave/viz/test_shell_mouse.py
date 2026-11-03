@@ -334,17 +334,8 @@ def test_clamped_request_fits_again_when_the_display_grows() -> None:
     ) == (request_stack, 1280 - request_stack, 0)
 
 
-class _Overlay:
-    def __init__(self, visibility: float = 1.0) -> None:
-        self.visibility = visibility
-
-    def notify_input(self) -> None:
-        return None
-
-
 @contextmanager
-def _host(visibility: float = 1.0) -> Iterator[ShellHost]:
-    overlay = _Overlay(visibility)
+def _host() -> Iterator[ShellHost]:
     editor = SimpleNamespace(
         inspector_width=DEFAULT_INSPECTOR_WIDTH,
         help_width=DEFAULT_HELP_WIDTH,
@@ -359,7 +350,6 @@ def _host(visibility: float = 1.0) -> Iterator[ShellHost]:
         imgui_host = ImGuiHost.create()
     host = ShellHost(
         imgui_host,
-        overlay,
         MenuBarState(),
         controls,
         23,
@@ -446,18 +436,6 @@ def test_splitter_drag_updates_session_widths_without_imgui_buttons() -> None:
             set_cursor.assert_called_with(pygame.SYSTEM_CURSOR_ARROW)
 
 
-def test_splitter_drag_is_ignored_when_the_shell_is_hidden() -> None:
-    with _host(visibility=0.0) as host:
-        edge = _stack_edge(host)
-        with patch("cleave.viz.shell_host.pygame.mouse.set_cursor"):
-            host.process_event(_button(pygame.MOUSEBUTTONDOWN, (edge, 100)))
-        assert host.insp_width is None
-        assert host.help_width is None
-        assert host.imgui.queued_buttons == []
-        assert host._splitter is None
-        host._controls.settings.set_shell_column_widths.assert_not_called()
-
-
 def test_splitter_drag_release_persists_requested_widths() -> None:
     with _host() as host:
         edge = _stack_edge(host)
@@ -498,20 +476,6 @@ def test_splitter_drag_release_persists_the_other_columns_live_width() -> None:
         )
         assert host.insp_width is None
         assert host.help_width is None
-
-
-def test_cancelled_splitter_drag_does_not_persist() -> None:
-    with _host() as host:
-        edge = _stack_edge(host)
-        with patch("cleave.viz.shell_host.pygame.mouse.set_cursor"):
-            host.process_event(_button(pygame.MOUSEBUTTONDOWN, (edge, 100)))
-            host.process_event(_motion((700, 100)))
-            assert host.insp_width == 700
-            host._ui_fade.visibility = 0.0
-            host.process_event(_button(pygame.MOUSEBUTTONUP, (700, 100)))
-        host._controls.settings.set_shell_column_widths.assert_not_called()
-        assert host._splitter is None
-        assert host.insp_width == 700
 
 
 def test_splitter_mouseup_under_one_pixel_does_not_persist() -> None:
@@ -586,12 +550,12 @@ def test_navigator_content_height_is_measured_for_the_next_frame() -> None:
         host.imgui.display_size = (1280, 720)
         assert host.nav_content_height_px == 0
         draw_shell_frame(
-            host, MenuBarState(), command_context(controls), 1.0, 1 / 60
+            host, MenuBarState(), command_context(controls), 1 / 60
         )
         measured = host.nav_content_height_px
         assert measured > navigator_row_px()
         draw_shell_frame(
-            host, MenuBarState(), command_context(controls), 1.0, 1 / 60
+            host, MenuBarState(), command_context(controls), 1 / 60
         )
         assert host.nav_content_height_px == measured
 

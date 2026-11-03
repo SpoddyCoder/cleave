@@ -137,7 +137,6 @@ def test_esc_and_cancel_keep_the_session(tmp_path: Path, monkeypatch) -> None:
     assert controls.consume_pending_switch() is False
     assert controls.consume_pending_exit() is False
     assert controls.session is session
-    assert not controls.consume_hide_overlay()
 
     switch.prompt_open()
     assert (
@@ -308,7 +307,6 @@ def test_dispatch_sends_picker_keys_and_lets_the_modal_win(
 
     assert dispatch_keydown(keydown(pygame.K_ESCAPE), runtime) is True
     assert not switch.active
-    assert not controls.consume_hide_overlay()
     assert controls.consume_pending_switch() is False
 
     _project(projects_dir(), "album")

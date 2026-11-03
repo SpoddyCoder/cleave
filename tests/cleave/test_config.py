@@ -62,7 +62,6 @@ from cleave.config_schema.editor import (
     DEFAULT_NOTIFICATION_DISPLAY_SEC,
     DEFAULT_HELP_SIDE,
     DEFAULT_NAVIGATOR_SIDE,
-    DEFAULT_UI_FADE_SEC,
     DEFAULT_UI_MIN_WIDTH,
     DEFAULT_UI_WIDTH,
     DEFAULT_UI_WIDTH_MODE,
@@ -233,7 +232,6 @@ def test_editor_config_from_settings_defaults() -> None:
     assert cfg.width == DEFAULT_EDITOR_WIDTH
     assert cfg.height == DEFAULT_EDITOR_HEIGHT
     assert cfg.preview_quality == DEFAULT_EDITOR_PREVIEW_QUALITY
-    assert cfg.ui_fade == DEFAULT_UI_FADE_SEC
     assert cfg.ui_width == DEFAULT_UI_WIDTH
     assert cfg.ui_width_mode == DEFAULT_UI_WIDTH_MODE
     assert cfg.ui_min_width == DEFAULT_UI_MIN_WIDTH
@@ -254,7 +252,6 @@ def test_editor_config_from_settings_uses_user_editor() -> None:
         ui_width_mode="fixed",
         ui_width=80,
         ui_min_width=96,
-        ui_fade=25.0,
         notification_display_sec=5,
         residual_latency_ms=0,
         inspector_width=640,
@@ -270,7 +267,6 @@ def test_editor_config_from_settings_uses_user_editor() -> None:
     assert cfg.ui_width_mode == "fixed"
     assert cfg.ui_width == 80
     assert cfg.ui_min_width == 96
-    assert cfg.ui_fade == 25.0
     assert cfg.notification_display_sec == 5
     assert cfg.inspector_width == 640
     assert cfg.help_width == 360
@@ -337,7 +333,6 @@ def test_persisted_session_payload_omits_editor() -> None:
             preview_quality="performance",
             ui_width_mode="fixed",
             ui_width=80,
-            ui_fade=25.0,
         ),
         config_path=Path("/tmp/cleave-viz.yaml"),
         user_config_path=Path("/tmp/user-config.yaml"),
@@ -577,7 +572,6 @@ def test_load_config_editor_settings_from_user_config(tmp_path: Path) -> None:
         ui_width_mode="fixed",
         ui_width=80,
         ui_min_width=96,
-        ui_fade=25.0,
         notification_display_sec=5,
         residual_latency_ms=0,
     )
@@ -596,7 +590,6 @@ def test_load_config_editor_settings_from_user_config(tmp_path: Path) -> None:
     assert cfg.editor.ui_width_mode == "fixed"
     assert cfg.editor.ui_width == 80
     assert cfg.editor.ui_min_width == 96
-    assert cfg.editor.ui_fade == 25.0
     assert cfg.editor.notification_display_sec == 5
     assert cfg.user_config_path == user_cfg_path.resolve()
 
@@ -610,7 +603,6 @@ def test_load_config_ignores_editor_fields_in_project_yaml(tmp_path: Path) -> No
         ui_width_mode="fixed",
         ui_width=80,
         ui_min_width=96,
-        ui_fade=25.0,
         notification_display_sec=5,
         residual_latency_ms=0,
     )
@@ -629,7 +621,6 @@ def test_load_config_ignores_editor_fields_in_project_yaml(tmp_path: Path) -> No
             "ui_width_mode": "flexible",
             "ui_width": 200,
             "ui_min_width": 40,
-            "ui_fade": 99,
             "width": 640,
             "height": 360,
             "upscale": 3.0,
@@ -644,7 +635,6 @@ def test_load_config_ignores_editor_fields_in_project_yaml(tmp_path: Path) -> No
     assert cfg.editor.ui_width_mode == "fixed"
     assert cfg.editor.ui_width == 80
     assert cfg.editor.ui_min_width == 96
-    assert cfg.editor.ui_fade == 25.0
     assert cfg.milkdrop_beat_sensitivity == DEFAULT_BEAT_SENSITIVITY
 
 

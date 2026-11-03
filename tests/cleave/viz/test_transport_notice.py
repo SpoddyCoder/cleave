@@ -56,7 +56,6 @@ def _host() -> Iterator[object]:
     with patch.object(imgui_host, "_gl_context_current", return_value=False):
         host = ShellHost(
             ImGuiHost.create(),
-            _Overlay(),
             menu,
             controls,
             menu_bar_height_px(),
@@ -93,7 +92,6 @@ def _draw(host: object, notice: PanelNotificationActive) -> None:
         host,
         host._menu_state,
         CommandContext(),
-        1.0,
         1.0 / 60.0,
         notice=notice,
     )

@@ -31,7 +31,6 @@ def _runtime(controls):
         modal_host=controls.modal_host,
         menu_bar=MenuBarState(),
         timeline_controls=None,
-        ui_fade=MagicMock(),
         overlay_profiler=MagicMock(),
         playback=controls.playback,
     )
@@ -162,7 +161,6 @@ def test_move_mode_up_reorders_layers_before_navigator_cursor() -> None:
     assert controls.layer_lifecycle.move_mode_slot is None
     assert controls.session.layer_z_order == ["layer_1", "layer_2", "layer_3"]
     assert controls.shell_focus.selected_id == selected
-    assert controls.consume_hide_overlay() is False
 
     assert dispatch_keydown(keydown(pygame.K_m), runtime) is True
     assert dispatch_keydown(keydown(pygame.K_UP), runtime) is True
@@ -309,12 +307,10 @@ def test_curation_shell_allowlist() -> None:
     controls.layer_lifecycle.prompt_add.assert_not_called()
 
     assert dispatch_keydown(keydown(pygame.K_ESCAPE), runtime) is True
-    assert controls.consume_hide_overlay() is False
     assert controls.shell_focus.region is ShellRegion.NAVIGATOR
 
     _select_layer(controls, "layer_1", region=ShellRegion.NAVIGATOR)
     assert dispatch_keydown(keydown(pygame.K_ESCAPE), runtime) is True
-    assert controls.consume_hide_overlay() is True
     assert controls.shell_focus.region is ShellRegion.NAVIGATOR
 
     order = list(controls.session.layer_z_order)

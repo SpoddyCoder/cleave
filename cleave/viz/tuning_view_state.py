@@ -16,7 +16,6 @@ from cleave.config_schema.editor import (
     DEFAULT_EDITOR_UPSCALE,
     DEFAULT_EDITOR_WIDTH,
     DEFAULT_RESIDUAL_LATENCY_MS,
-    DEFAULT_UI_FADE_SEC,
     DEFAULT_UI_MIN_WIDTH,
     DEFAULT_HELP_SIDE,
     DEFAULT_NAVIGATOR_SIDE,
@@ -315,7 +314,6 @@ class SettingsBlock:
     help_side: str = DEFAULT_HELP_SIDE
     ui_width: int = DEFAULT_UI_WIDTH
     ui_min_width: int = DEFAULT_UI_MIN_WIDTH
-    ui_fade: float = DEFAULT_UI_FADE_SEC
     notification_display_sec: int = DEFAULT_NOTIFICATION_DISPLAY_SEC
     residual_latency_ms: int = DEFAULT_RESIDUAL_LATENCY_MS
 
@@ -969,7 +967,6 @@ class TuningViewStateBuilder:
                 help_side=self._config_save.cfg.editor.help_side,
                 ui_width=self._config_save.cfg.editor.ui_width,
                 ui_min_width=self._config_save.cfg.editor.ui_min_width,
-                ui_fade=self._config_save.cfg.editor.ui_fade,
                 notification_display_sec=(
                     self._config_save.cfg.editor.notification_display_sec
                 ),

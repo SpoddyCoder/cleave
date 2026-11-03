@@ -54,10 +54,6 @@ class NavigatorControls:
             self.reconcile()
             self.activate()
             return True
-        if key == pygame.K_ESCAPE:
-            self.reconcile()
-            self._controls.request_hide_overlay()
-            return True
         return False
 
     def handle_hotkey(self, event: pygame.event.Event) -> bool:

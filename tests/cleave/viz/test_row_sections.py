@@ -266,9 +266,6 @@ def test_section_header_descriptor_uses_tree_and_effect_fallback() -> None:
         RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_BACKGROUND_COLOUR)
     ) == RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER)
     assert section_header_descriptor(
-        RowDescriptor(RowKind.SETTINGS_UI_FADE)
-    ) == RowDescriptor(RowKind.SETTINGS_UI_HEADER)
-    assert section_header_descriptor(
         RowDescriptor(RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY)
     ) == RowDescriptor(RowKind.SETTINGS_UI_HEADER)
     assert section_header_descriptor(
