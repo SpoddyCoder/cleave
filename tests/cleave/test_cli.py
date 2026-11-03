@@ -1156,11 +1156,14 @@ def test_shortcut_flags() -> None:
 
 
 def test_module_help_lists_subcommands() -> None:
+    # argparse wraps help to the terminal width; pin it so output is stable.
+    env = {**os.environ, "COLUMNS": "200"}
     root = subprocess.run(
         [sys.executable, "-m", "cleave", "--help"],
         capture_output=True,
         text=True,
         check=True,
+        env=env,
     )
     out = root.stdout
     assert "separate" in out
@@ -1179,6 +1182,7 @@ def test_module_help_lists_subcommands() -> None:
         capture_output=True,
         text=True,
         check=True,
+        env=env,
     )
     assert play.stdout.startswith(
         "usage: cleave play [-h] [-hq] [-bds {drums,full-mix,bass,vocals,other}]"
@@ -1189,6 +1193,7 @@ def test_module_help_lists_subcommands() -> None:
         capture_output=True,
         text=True,
         check=True,
+        env=env,
     )
     render_usage = render.stdout.split("positional arguments:")[0]
     assert "usage: cleave render [-h] [-c CONFIG] [-o OUTPUT]" in render_usage
