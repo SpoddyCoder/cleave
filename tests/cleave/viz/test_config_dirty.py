@@ -577,24 +577,6 @@ def _mutate_settings_preview_quality(controls: TuningControls) -> None:
     press_main_row(controls, _keydown(pygame.K_RIGHT))
 
 
-def _mutate_settings_ui_width(controls: TuningControls) -> None:
-    _expand_settings_ui(controls)
-    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_WIDTH)
-    press_main_row(controls, _keydown(pygame.K_RIGHT))
-
-
-def _mutate_settings_ui_min_width(controls: TuningControls) -> None:
-    _expand_settings_ui(controls)
-    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_MIN_WIDTH)
-    press_main_row(controls, _keydown(pygame.K_RIGHT))
-
-
-def _mutate_settings_ui_width_mode(controls: TuningControls) -> None:
-    _expand_settings_ui(controls)
-    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_WIDTH_MODE)
-    press_main_row(controls, _keydown(pygame.K_RIGHT))
-
-
 def _mutate_settings_notification_display(controls: TuningControls) -> None:
     _expand_settings_ui(controls)
     controls.focus_descriptor = RowDescriptor(
@@ -643,9 +625,6 @@ _SESSION_ONLY_MUTATIONS: list[tuple[str, Callable[[TuningControls], None], tuple
     ("move_mode.swap", _mutate_move_mode_without_confirm, ("layer_1", "layer_2")),
     ("help_visible", _mutate_help_visible, ("layer_1",)),
     ("settings.preview_quality", _mutate_settings_preview_quality, ("layer_1",)),
-    ("settings.ui_width", _mutate_settings_ui_width, ("layer_1",)),
-    ("settings.ui_min_width", _mutate_settings_ui_min_width, ("layer_1",)),
-    ("settings.ui_width_mode", _mutate_settings_ui_width_mode, ("layer_1",)),
     ("settings.notification_display_sec", _mutate_settings_notification_display, ("layer_1",)),
     ("focus_navigation", _mutate_focus_navigation, ("layer_1",)),
     ("timeline.armed", _mutate_timeline_arm, ("layer_1",)),

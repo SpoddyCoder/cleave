@@ -48,18 +48,8 @@ EDITOR_PREVIEW_QUALITY_HELP_ENTRIES: tuple[
 DEFAULT_EDITOR_PREVIEW_QUALITY: EditorPreviewQuality = "full-quality"
 DEFAULT_RESIDUAL_LATENCY_MS = 0
 MAX_RESIDUAL_LATENCY_MS = 2000
-DEFAULT_UI_WIDTH = 160
-UI_WIDTH_MIN = 80
-UI_WIDTH_MAX = 200
-DEFAULT_UI_MIN_WIDTH = 80
-UI_MIN_WIDTH_MIN = 40
 DEFAULT_NOTIFICATION_DISPLAY_SEC = 10
 NOTIFICATION_DISPLAY_MAX_SEC = 20
-
-UiWidthMode = Literal["flexible", "fixed"]
-
-UI_WIDTH_MODES: tuple[UiWidthMode, ...] = ("flexible", "fixed")
-DEFAULT_UI_WIDTH_MODE: UiWidthMode = "flexible"
 
 # Half again the design mock's 330px column, so labels and stepped values fit.
 # The navigator and the inspector share this stack width.
@@ -115,16 +105,8 @@ def _parse_upscale(raw: Any, ctx: ParseCtx, label: str) -> float:
     return clamp_upscale(upscale)
 
 
-def clamp_ui_width(value: int | float) -> int:
-    return max(UI_WIDTH_MIN, min(UI_WIDTH_MAX, int(round(value))))
-
-
 def clamp_shell_column_width(value: int | float) -> int:
     return max(MIN_COLUMN_WIDTH, int(round(value)))
-
-
-def clamp_ui_min_width(value: int | float) -> int:
-    return max(UI_MIN_WIDTH_MIN, min(UI_WIDTH_MAX, int(round(value))))
 
 
 def clamp_notification_display_sec(value: int | float) -> int:
@@ -148,17 +130,6 @@ def _parse_editor_preview_quality(
         raise ValueError(f"{label} must be a string")
     if value not in EDITOR_PREVIEW_QUALITIES:
         allowed = ", ".join(f"'{mode}'" for mode in EDITOR_PREVIEW_QUALITIES)
-        raise ValueError(f"{label} must be one of: {allowed}")
-    return value
-
-
-def _parse_ui_width_mode(
-    value: Any, ctx: ParseCtx, label: str = "editor.ui_width_mode"
-) -> UiWidthMode:
-    if not isinstance(value, str):
-        raise ValueError(f"{label} must be a string")
-    if value not in UI_WIDTH_MODES:
-        allowed = ", ".join(f"'{mode}'" for mode in UI_WIDTH_MODES)
         raise ValueError(f"{label} must be one of: {allowed}")
     return value
 
@@ -202,28 +173,6 @@ EDITOR_FIELDS: tuple[FieldDescriptor, ...] = (
         DEFAULT_EDITOR_PREVIEW_QUALITY,
         _parse_editor_preview_quality,
         dump_scalar,
-    ),
-    FieldDescriptor(
-        "ui_width_mode",
-        DEFAULT_UI_WIDTH_MODE,
-        _parse_ui_width_mode,
-        dump_scalar,
-    ),
-    FieldDescriptor(
-        "ui_width",
-        DEFAULT_UI_WIDTH,
-        lambda raw, ctx, label: clamp_ui_width(
-            int(require_non_negative_number(raw, label, as_int=True))
-        ),
-        lambda value, _ctx: clamp_ui_width(value),
-    ),
-    FieldDescriptor(
-        "ui_min_width",
-        DEFAULT_UI_MIN_WIDTH,
-        lambda raw, ctx, label: clamp_ui_min_width(
-            int(require_non_negative_number(raw, label, as_int=True))
-        ),
-        lambda value, _ctx: clamp_ui_min_width(value),
     ),
     FieldDescriptor(
         "notification_display_sec",
@@ -285,9 +234,6 @@ def parse_editor_section(data: dict[str, Any]) -> Any:
         height=parsed["height"],
         upscale=parsed["upscale"],
         preview_quality=parsed["preview_quality"],
-        ui_width_mode=parsed["ui_width_mode"],
-        ui_width=parsed["ui_width"],
-        ui_min_width=parsed["ui_min_width"],
         notification_display_sec=parsed["notification_display_sec"],
         residual_latency_ms=parsed["residual_latency_ms"],
         inspector_width=parsed["inspector_width"],
@@ -303,9 +249,6 @@ def dump_editor_section(editor: Any) -> dict[str, Any]:
         "height": editor.height,
         "upscale": editor.upscale,
         "preview_quality": editor.preview_quality,
-        "ui_width_mode": editor.ui_width_mode,
-        "ui_width": editor.ui_width,
-        "ui_min_width": editor.ui_min_width,
         "notification_display_sec": editor.notification_display_sec,
         "residual_latency_ms": editor.residual_latency_ms,
         "inspector_width": editor.inspector_width,
@@ -329,9 +272,6 @@ def editor_config_from_settings(editor: Any | None = None) -> Any:
         height=editor.height,
         upscale=editor.upscale,
         preview_quality=editor.preview_quality,
-        ui_width_mode=editor.ui_width_mode,
-        ui_width=editor.ui_width,
-        ui_min_width=editor.ui_min_width,
         notification_display_sec=editor.notification_display_sec,
         residual_latency_ms=editor.residual_latency_ms,
         inspector_width=editor.inspector_width,

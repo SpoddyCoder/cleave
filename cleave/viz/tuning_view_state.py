@@ -16,11 +16,8 @@ from cleave.config_schema.editor import (
     DEFAULT_EDITOR_UPSCALE,
     DEFAULT_EDITOR_WIDTH,
     DEFAULT_RESIDUAL_LATENCY_MS,
-    DEFAULT_UI_MIN_WIDTH,
     DEFAULT_HELP_SIDE,
     DEFAULT_NAVIGATOR_SIDE,
-    DEFAULT_UI_WIDTH,
-    DEFAULT_UI_WIDTH_MODE,
     DEFAULT_NOTIFICATION_DISPLAY_SEC,
 )
 from cleave.config_schema.project_render import (
@@ -309,11 +306,8 @@ class SettingsBlock:
     editor_window_width: int = DEFAULT_EDITOR_WIDTH
     editor_window_height: int = DEFAULT_EDITOR_HEIGHT
     editor_window_upscale: float = DEFAULT_EDITOR_UPSCALE
-    ui_width_mode: str = DEFAULT_UI_WIDTH_MODE
     navigator_side: str = DEFAULT_NAVIGATOR_SIDE
     help_side: str = DEFAULT_HELP_SIDE
-    ui_width: int = DEFAULT_UI_WIDTH
-    ui_min_width: int = DEFAULT_UI_MIN_WIDTH
     notification_display_sec: int = DEFAULT_NOTIFICATION_DISPLAY_SEC
     residual_latency_ms: int = DEFAULT_RESIDUAL_LATENCY_MS
 
@@ -962,11 +956,8 @@ class TuningViewStateBuilder:
                 editor_window_width=self._config_save.cfg.editor.width,
                 editor_window_height=self._config_save.cfg.editor.height,
                 editor_window_upscale=self._config_save.cfg.editor.upscale,
-                ui_width_mode=self._config_save.cfg.editor.ui_width_mode,
                 navigator_side=self._config_save.cfg.editor.navigator_side,
                 help_side=self._config_save.cfg.editor.help_side,
-                ui_width=self._config_save.cfg.editor.ui_width,
-                ui_min_width=self._config_save.cfg.editor.ui_min_width,
                 notification_display_sec=(
                     self._config_save.cfg.editor.notification_display_sec
                 ),

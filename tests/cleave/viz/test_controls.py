@@ -23,9 +23,6 @@ from cleave.config_schema.editor import (
     DEFAULT_NOTIFICATION_DISPLAY_SEC,
     DEFAULT_HELP_SIDE,
     DEFAULT_NAVIGATOR_SIDE,
-    DEFAULT_UI_MIN_WIDTH,
-    DEFAULT_UI_WIDTH,
-    DEFAULT_UI_WIDTH_MODE,
     MIN_COLUMN_WIDTH,
     editor_display_size,
 )
@@ -4440,79 +4437,6 @@ def test_settings_residual_latency_writes_user_config_without_dirty(
     assert loaded.editor.residual_latency_ms == controls.cfg.editor.residual_latency_ms
 
 
-def test_settings_adjust_ui_width() -> None:
-    controls = _make_controls(("layer_1",))
-    assert controls.cfg.editor.ui_width == DEFAULT_UI_WIDTH
-    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_WIDTH)
-
-    _press_focused(controls, _keydown(pygame.K_RIGHT))
-    assert controls.cfg.editor.ui_width == DEFAULT_UI_WIDTH + 1
-
-    _press_focused(controls, _keydown(pygame.K_PAGEDOWN))
-    assert controls.cfg.editor.ui_width == DEFAULT_UI_WIDTH + 1 - 5
-
-    for _ in range(86):
-        _press_focused(controls, _keydown(pygame.K_LEFT))
-    assert controls.cfg.editor.ui_width == 80
-
-
-def test_settings_adjust_ui_min_width() -> None:
-    controls = _make_controls(("layer_1",))
-    assert controls.cfg.editor.ui_min_width == DEFAULT_UI_MIN_WIDTH
-    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_MIN_WIDTH)
-
-    _press_focused(controls, _keydown(pygame.K_RIGHT))
-    assert controls.cfg.editor.ui_min_width == DEFAULT_UI_MIN_WIDTH + 1
-
-    _press_focused(controls, _keydown(pygame.K_PAGEDOWN))
-    assert controls.cfg.editor.ui_min_width == DEFAULT_UI_MIN_WIDTH + 1 - 5
-
-    while controls.cfg.editor.ui_min_width > 40:
-        _press_focused(controls, _keydown(pygame.K_LEFT))
-    assert controls.cfg.editor.ui_min_width == 40
-    _press_focused(controls, _keydown(pygame.K_LEFT))
-    assert controls.cfg.editor.ui_min_width == 40
-
-    max_width = controls.cfg.editor.ui_width
-    while controls.cfg.editor.ui_min_width < max_width:
-        _press_focused(controls, _keydown(pygame.K_PAGEUP))
-    assert controls.cfg.editor.ui_min_width == max_width
-    _press_focused(controls, _keydown(pygame.K_RIGHT))
-    assert controls.cfg.editor.ui_min_width == max_width
-    _press_focused(controls, _keydown(pygame.K_PAGEUP))
-    assert controls.cfg.editor.ui_min_width == max_width
-
-
-def test_settings_ui_min_width_change_does_not_mark_project_config_dirty() -> None:
-    controls = _make_controls(("layer_1",))
-    assert not controls.config_dirty
-    _expand_settings_ui(controls)
-    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_MIN_WIDTH)
-    _press_focused(controls, _keydown(pygame.K_RIGHT))
-    assert not controls.config_dirty
-
-
-def test_settings_ui_width_change_does_not_mark_project_config_dirty() -> None:
-    controls = _make_controls(("layer_1",))
-    assert not controls.config_dirty
-    _expand_settings_ui(controls)
-    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_WIDTH)
-    _press_focused(controls, _keydown(pygame.K_RIGHT))
-    assert not controls.config_dirty
-
-
-def test_settings_cycle_ui_width_mode() -> None:
-    controls = _make_controls(("layer_1",))
-    assert controls.cfg.editor.ui_width_mode == DEFAULT_UI_WIDTH_MODE
-    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_WIDTH_MODE)
-
-    _press_focused(controls, _keydown(pygame.K_RIGHT))
-    assert controls.cfg.editor.ui_width_mode == "fixed"
-
-    _press_focused(controls, _keydown(pygame.K_LEFT))
-    assert controls.cfg.editor.ui_width_mode == "flexible"
-
-
 def test_settings_cycle_column_sides(tmp_path: Path) -> None:
     controls = _make_controls(("layer_1",))
     user_path = tmp_path / "user.yaml"
@@ -4577,15 +4501,6 @@ def test_settings_set_shell_column_widths_clamps_and_persists(tmp_path: Path) ->
     assert loaded.editor.inspector_width == 510
     assert loaded.editor.help_width == 360
     assert "navigator_width" not in user_path.read_text(encoding="utf-8")
-    assert not controls.config_dirty
-
-
-def test_settings_ui_width_mode_change_does_not_mark_project_config_dirty() -> None:
-    controls = _make_controls(("layer_1",))
-    assert not controls.config_dirty
-    _expand_settings_ui(controls)
-    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_WIDTH_MODE)
-    _press_focused(controls, _keydown(pygame.K_RIGHT))
     assert not controls.config_dirty
 
 

@@ -16,9 +16,6 @@ from cleave.config_schema.editor import (
     DEFAULT_INSPECTOR_WIDTH,
     DEFAULT_HELP_SIDE,
     DEFAULT_NAVIGATOR_SIDE,
-    DEFAULT_UI_MIN_WIDTH,
-    DEFAULT_UI_WIDTH,
-    DEFAULT_UI_WIDTH_MODE,
     DEFAULT_EDITOR_PREVIEW_QUALITY,
     DEFAULT_NOTIFICATION_DISPLAY_SEC,
     DEFAULT_RESIDUAL_LATENCY_MS,
@@ -50,10 +47,6 @@ def test_load_user_config_missing_file_returns_defaults(tmp_path: Path) -> None:
     assert cfg.editor.height == DEFAULT_EDITOR_HEIGHT
     assert cfg.editor.upscale == DEFAULT_EDITOR_UPSCALE
     assert cfg.editor.preview_quality == DEFAULT_EDITOR_PREVIEW_QUALITY
-    assert cfg.editor.ui_width_mode == DEFAULT_UI_WIDTH_MODE
-    assert cfg.editor.ui_width == DEFAULT_UI_WIDTH
-    assert cfg.editor.ui_min_width == DEFAULT_UI_MIN_WIDTH
-    assert cfg.editor.ui_min_width == 80
     assert cfg.editor.notification_display_sec == DEFAULT_NOTIFICATION_DISPLAY_SEC
     assert cfg.editor.residual_latency_ms == DEFAULT_RESIDUAL_LATENCY_MS
     assert cfg.editor.inspector_width == DEFAULT_INSPECTOR_WIDTH == 495
@@ -68,9 +61,6 @@ def test_default_editor_settings_matches_schema_defaults() -> None:
     assert editor.height == DEFAULT_EDITOR_HEIGHT
     assert editor.upscale == DEFAULT_EDITOR_UPSCALE
     assert editor.preview_quality == DEFAULT_EDITOR_PREVIEW_QUALITY
-    assert editor.ui_width_mode == DEFAULT_UI_WIDTH_MODE
-    assert editor.ui_width == DEFAULT_UI_WIDTH
-    assert editor.ui_min_width == DEFAULT_UI_MIN_WIDTH
     assert editor.notification_display_sec == DEFAULT_NOTIFICATION_DISPLAY_SEC
     assert editor.residual_latency_ms == DEFAULT_RESIDUAL_LATENCY_MS
     assert editor.inspector_width == DEFAULT_INSPECTOR_WIDTH == 495
@@ -109,8 +99,6 @@ def test_load_user_config_parses_editor_and_paths(tmp_path: Path) -> None:
             {
                 "editor": {
                     "preview_quality": "performance",
-                    "ui_width_mode": "fixed",
-                    "ui_width": 80,
                 },
                 "paths": {
                     "preset_root": str(preset_root),
@@ -125,8 +113,6 @@ def test_load_user_config_parses_editor_and_paths(tmp_path: Path) -> None:
     cfg = load_user_config(config_path)
 
     assert cfg.editor.preview_quality == "performance"
-    assert cfg.editor.ui_width_mode == "fixed"
-    assert cfg.editor.ui_width == 80
     assert cfg.editor.notification_display_sec == DEFAULT_NOTIFICATION_DISPLAY_SEC
     assert cfg.preset_root == preset_root.resolve()
     assert cfg.texture_paths == (texture_a.resolve(), texture_b.resolve())
@@ -140,8 +126,6 @@ def test_write_user_config_preserves_paths_and_rewrites_editor(tmp_path: Path) -
             {
                 "editor": {
                     "preview_quality": "balanced",
-                    "ui_width_mode": "flexible",
-                    "ui_width": 110,
                 },
                 "paths": {
                     "preset_root": str(preset_root),
@@ -159,9 +143,6 @@ def test_write_user_config_preserves_paths_and_rewrites_editor(tmp_path: Path) -
         height=1080,
         upscale=1.5,
         preview_quality="ultra-performance",
-        ui_width_mode="fixed",
-        ui_width=90,
-        ui_min_width=96,
         notification_display_sec=12,
         residual_latency_ms=210,
     )
@@ -174,9 +155,6 @@ def test_write_user_config_preserves_paths_and_rewrites_editor(tmp_path: Path) -
     assert data["editor"]["height"] == 1080
     assert data["editor"]["upscale"] == 1.5
     assert data["editor"]["preview_quality"] == "ultra-performance"
-    assert data["editor"]["ui_width_mode"] == "fixed"
-    assert data["editor"]["ui_width"] == 90
-    assert data["editor"]["ui_min_width"] == 96
     assert "ui_fade" not in data["editor"]
     assert data["editor"]["notification_display_sec"] == 12
     assert data["editor"]["residual_latency_ms"] == 210
@@ -191,9 +169,6 @@ def test_editor_settings_from_config() -> None:
         height=1080,
         upscale=1.5,
         preview_quality="performance",
-        ui_width_mode="fixed",
-        ui_width=75,
-        ui_min_width=96,
         notification_display_sec=8,
         residual_latency_ms=150,
         inspector_width=640,
@@ -207,9 +182,6 @@ def test_editor_settings_from_config() -> None:
         height=1080,
         upscale=1.5,
         preview_quality="performance",
-        ui_width_mode="fixed",
-        ui_width=75,
-        ui_min_width=96,
         notification_display_sec=8,
         residual_latency_ms=150,
         inspector_width=640,
@@ -231,9 +203,6 @@ def test_persist_editor_settings_writes_visualizer_editor_fields(
             height=1080,
             upscale=1.5,
             preview_quality="ultra-performance",
-            ui_width_mode="fixed",
-            ui_width=88,
-            ui_min_width=96,
             notification_display_sec=3,
             residual_latency_ms=200,
             inspector_width=640,
@@ -250,9 +219,6 @@ def test_persist_editor_settings_writes_visualizer_editor_fields(
     assert loaded.editor.height == 1080
     assert loaded.editor.upscale == 1.5
     assert loaded.editor.preview_quality == "ultra-performance"
-    assert loaded.editor.ui_width_mode == "fixed"
-    assert loaded.editor.ui_width == 88
-    assert loaded.editor.ui_min_width == 96
     assert loaded.editor.notification_display_sec == 3
     assert loaded.editor.residual_latency_ms == 200
     assert loaded.editor.inspector_width == 640
@@ -284,12 +250,11 @@ def test_shell_column_settings_round_trip(tmp_path: Path) -> None:
 def test_shell_column_settings_absent_keys_use_defaults(tmp_path: Path) -> None:
     config_path = tmp_path / "config.yaml"
     config_path.write_text(
-        yaml.safe_dump({"editor": {"ui_width": 100}}, sort_keys=False),
+        yaml.safe_dump({"editor": {"upscale": 1.5}}, sort_keys=False),
         encoding="utf-8",
     )
 
     cfg = load_user_config(config_path)
-    assert cfg.editor.ui_width == 100
     assert cfg.editor.inspector_width == DEFAULT_INSPECTOR_WIDTH == 495
     assert cfg.editor.help_width == DEFAULT_HELP_WIDTH == 320
     assert cfg.editor.navigator_side == DEFAULT_NAVIGATOR_SIDE == "left"

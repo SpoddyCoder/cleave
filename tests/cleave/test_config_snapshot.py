@@ -154,8 +154,6 @@ def test_write_session_snapshot_omits_editor_section(
         layers=cfg.layers,
         editor=EditorConfig(
             preview_quality="performance",
-            ui_width_mode="fixed",
-            ui_width=80,
         ),
         config_path=cfg.config_path,
         user_config_path=cfg.user_config_path,

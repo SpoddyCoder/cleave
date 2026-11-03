@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-from cleave.config_schema.editor import DEFAULT_UI_WIDTH
 from cleave.viz.theme import (
-    UI_WIDTH_PX_FACTOR,
-    panel_content_max_width_px,
     scale_px,
     timeline_panel_height_px,
     timeline_ui_metrics,
@@ -19,9 +16,6 @@ def test_tuning_ui_metrics_default_scale() -> None:
     assert metrics.padding == 12
     assert metrics.line_gap == 4
     assert metrics.tree_indent == 12
-    assert metrics.panel_content_max_width == panel_content_max_width_px(
-        DEFAULT_UI_WIDTH, scale=1.5
-    )
 
 
 def test_timeline_ui_metrics_default_scale() -> None:
@@ -55,15 +49,3 @@ def test_baseline_tuning_ui_metrics() -> None:
     assert metrics.font_size == 14
     assert metrics.padding == 8
     assert metrics.tree_indent == 8
-    assert metrics.panel_content_max_width == panel_content_max_width_px(
-        DEFAULT_UI_WIDTH, scale=1.0
-    )
-
-
-def test_panel_content_max_width_px_follows_ui_width_and_scale() -> None:
-    assert panel_content_max_width_px(scale=1.2) == scale_px(
-        DEFAULT_UI_WIDTH * UI_WIDTH_PX_FACTOR, scale=1.2
-    )
-    assert panel_content_max_width_px(scale=1.0) == scale_px(
-        DEFAULT_UI_WIDTH * UI_WIDTH_PX_FACTOR, scale=1.0
-    )

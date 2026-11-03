@@ -8,14 +8,11 @@ from dataclasses import replace
 from cleave.config import CleaveConfig, EditorConfig
 from cleave.config_schema.editor import (
     COLUMN_SIDES,
-    UI_WIDTH_MODES,
     EDITOR_PREVIEW_QUALITIES,
     clamp_editor_height,
     clamp_editor_width,
     clamp_residual_latency_ms,
     clamp_shell_column_width,
-    clamp_ui_min_width,
-    clamp_ui_width,
     clamp_notification_display_sec,
     clamp_upscale,
 )
@@ -107,20 +104,6 @@ class SettingsControls:
         self.cfg.editor = replace(self.cfg.editor, preview_quality=new_mode)
         persist_editor_settings(self.cfg)
 
-    def cycle_ui_width_mode(self, *, forward: bool) -> None:
-        modes = UI_WIDTH_MODES
-        current = self.cfg.editor.ui_width_mode
-        try:
-            index = modes.index(current)
-        except ValueError:
-            index = 0
-        if forward:
-            new_mode = modes[(index + 1) % len(modes)]
-        else:
-            new_mode = modes[(index - 1) % len(modes)]
-        self.cfg.editor = replace(self.cfg.editor, ui_width_mode=new_mode)
-        persist_editor_settings(self.cfg)
-
     def cycle_navigator_side(self, *, forward: bool) -> None:
         self._cycle_column_side("navigator_side", forward=forward)
 
@@ -161,21 +144,3 @@ class SettingsControls:
         if self._on_notification_display_changed is not None:
             self._on_notification_display_changed(new_value)
 
-    def adjust_ui_width(self, *, forward: bool, large: bool) -> None:
-        step = 5 if large else 1
-        delta = step if forward else -step
-        current = self.cfg.editor.ui_width
-        new_value = clamp_ui_width(current + delta)
-        self.cfg.editor = replace(self.cfg.editor, ui_width=new_value)
-        persist_editor_settings(self.cfg)
-
-    def adjust_ui_min_width(self, *, forward: bool, large: bool) -> None:
-        step = 5 if large else 1
-        delta = step if forward else -step
-        current = self.cfg.editor.ui_min_width
-        new_value = min(
-            clamp_ui_min_width(current + delta),
-            self.cfg.editor.ui_width,
-        )
-        self.cfg.editor = replace(self.cfg.editor, ui_min_width=new_value)
-        persist_editor_settings(self.cfg)

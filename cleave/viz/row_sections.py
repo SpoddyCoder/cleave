@@ -211,9 +211,6 @@ SETTINGS_UI_SECTION = ExpandSectionDef(
     read_expanded=_inspector_group_expanded,
     toggle=_inspector_group_toggle,
     children=(
-        SectionNode(leaf_kind=RowKind.SETTINGS_UI_WIDTH_MODE),
-        SectionNode(leaf_kind=RowKind.SETTINGS_UI_WIDTH),
-        SectionNode(leaf_kind=RowKind.SETTINGS_UI_MIN_WIDTH),
         SectionNode(leaf_kind=RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY),
     ),
 )

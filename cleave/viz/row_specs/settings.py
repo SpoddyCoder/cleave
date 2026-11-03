@@ -46,11 +46,6 @@ def _format_settings_editor_window_display_size(
     )
     return f"{width} x {height}"
 
-def _format_settings_ui_width_mode(
-    state: TuningViewState, _desc: RowDescriptor
-) -> str:
-    return state.settings.ui_width_mode
-
 def _format_settings_navigator_side(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
@@ -60,16 +55,6 @@ def _format_settings_help_side(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
     return state.settings.help_side
-
-def _format_settings_ui_width(
-    state: TuningViewState, _desc: RowDescriptor
-) -> str:
-    return str(state.settings.ui_width)
-
-def _format_settings_ui_min_width(
-    state: TuningViewState, _desc: RowDescriptor
-) -> str:
-    return str(state.settings.ui_min_width)
 
 def _format_settings_ui_notification_display(
     state: TuningViewState, _desc: RowDescriptor
@@ -114,11 +99,6 @@ def _apply_settings_editor_window_upscale(
 ) -> None:
     controls.settings.adjust_editor_window_upscale(forward=forward, large=large)
 
-def _apply_settings_ui_width_mode(
-    controls: TuningControls, _desc: RowDescriptor, forward: bool, _large: bool,
-) -> None:
-    controls.settings.cycle_ui_width_mode(forward=forward)
-
 def _apply_settings_navigator_side(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, _large: bool,
 ) -> None:
@@ -128,16 +108,6 @@ def _apply_settings_help_side(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, _large: bool,
 ) -> None:
     controls.settings.cycle_help_side(forward=forward)
-
-def _apply_settings_ui_width(
-    controls: TuningControls, _desc: RowDescriptor, forward: bool, large: bool,
-) -> None:
-    controls.settings.adjust_ui_width(forward=forward, large=large)
-
-def _apply_settings_ui_min_width(
-    controls: TuningControls, _desc: RowDescriptor, forward: bool, large: bool,
-) -> None:
-    controls.settings.adjust_ui_min_width(forward=forward, large=large)
 
 def _apply_settings_ui_notification_display(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, large: bool,
@@ -311,59 +281,6 @@ SPECS: dict[RowKind, RowSpec] = {
             "How long panel toasts stay visible before they disappear.",
             "Until dismissed keeps them until you press Enter.",
             "Enter dismisses the current toast at any remaining time.",
-        ),
-        is_pinned=True,
-        repeatable=True,
-        parent_group="settings_ui",
-    ),
-    RowKind.SETTINGS_UI_WIDTH_MODE: RowSpec(
-        affordance=RowAffordance.VALUE_STEP,
-        panel_label="width mode",
-        present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_settings_ui_width_mode,
-        apply_horizontal=_apply_settings_ui_width_mode,
-        help_title="Width mode",
-        help_entries=(("Left/Right", "cycle mode"),),
-        help_description=(
-            "Flexible shrinks the panel to fit content up to the max width.",
-            "Fixed keeps the panel at the max width always.",
-        ),
-        is_pinned=True,
-        repeatable=True,
-        parent_group="settings_ui",
-    ),
-    RowKind.SETTINGS_UI_WIDTH: RowSpec(
-        affordance=RowAffordance.VALUE_STEP,
-        panel_label="max width",
-        present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_settings_ui_width,
-        apply_horizontal=_apply_settings_ui_width,
-        help_title="Max width",
-        help_entries=(
-            ("Left/Right", "adjust max panel width"),
-            ("PgUp/PgDn", "large step"),
-        ),
-        help_description=(
-            "Maximum width of the main tuning panel.",
-        ),
-        is_pinned=True,
-        repeatable=True,
-        parent_group="settings_ui",
-    ),
-    RowKind.SETTINGS_UI_MIN_WIDTH: RowSpec(
-        affordance=RowAffordance.VALUE_STEP,
-        panel_label="min width",
-        present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_settings_ui_min_width,
-        apply_horizontal=_apply_settings_ui_min_width,
-        help_title="Min width",
-        help_entries=(
-            ("Left/Right", "adjust minimum panel width"),
-            ("PgUp/PgDn", "large step"),
-        ),
-        help_description=(
-            "Smallest the panel shrinks to in flexible mode.",
-            "Fixed mode stays at the max width.",
         ),
         is_pinned=True,
         repeatable=True,

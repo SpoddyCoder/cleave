@@ -16,7 +16,6 @@ from cleave.config_schema.editor import (
     DEFAULT_NOTIFICATION_DISPLAY_SEC,
     DEFAULT_HELP_SIDE,
     DEFAULT_NAVIGATOR_SIDE,
-    DEFAULT_UI_WIDTH_MODE,
     editor_display_size,
     notification_display_label,
 )
@@ -145,9 +144,6 @@ _EXPECTED_REPEAT_ROW_KINDS = frozenset(
         RowKind.SETTINGS_EDITOR_WINDOW_UPSCALE,
         RowKind.SETTINGS_NAVIGATOR_SIDE,
         RowKind.SETTINGS_HELP_SIDE,
-        RowKind.SETTINGS_UI_WIDTH_MODE,
-        RowKind.SETTINGS_UI_WIDTH,
-        RowKind.SETTINGS_UI_MIN_WIDTH,
         RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY,
         RowKind.SETTINGS_RESIDUAL_LATENCY_MS,
         RowKind.PROJECT_RENDER_QUALITY,
@@ -208,9 +204,6 @@ def test_row_is_pinned() -> None:
     assert row_is_pinned(RowKind.SETTINGS_HELP_SIDE) is True
     assert row_is_pinned(RowKind.SETTINGS_UI_HEADER) is True
     assert row_is_pinned(RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY) is True
-    assert row_is_pinned(RowKind.SETTINGS_UI_WIDTH_MODE) is True
-    assert row_is_pinned(RowKind.SETTINGS_UI_WIDTH) is True
-    assert row_is_pinned(RowKind.SETTINGS_UI_MIN_WIDTH) is True
     assert row_is_pinned(RowKind.TRACK_HEADER) is False
     assert row_is_pinned(RowKind.RENDER_OVERLAYS_HEADER) is False
 
@@ -396,8 +389,6 @@ def test_parent_group_on_row_specs() -> None:
     assert row_spec(RowKind.SETTINGS_EDITOR_WINDOW_DISPLAY_SIZE).affordance == (
         RowAffordance.DISPLAY
     )
-    assert row_spec(RowKind.SETTINGS_UI_WIDTH_MODE).parent_group == "settings_ui"
-    assert row_spec(RowKind.SETTINGS_UI_MIN_WIDTH).parent_group == "settings_ui"
 
 
 def test_track_sub_row_kinds() -> None:
@@ -666,12 +657,9 @@ def test_labeled_row_prefix_settings_children() -> None:
     )
     assert labeled_row_prefix(RowKind.SETTINGS_NAVIGATOR_SIDE) == "  └─ navigator: "
     assert labeled_row_prefix(RowKind.SETTINGS_HELP_SIDE) == "  └─ help: "
-    assert labeled_row_prefix(RowKind.SETTINGS_UI_WIDTH_MODE) == "  └─ width mode: "
-    assert labeled_row_prefix(RowKind.SETTINGS_UI_WIDTH) == "  └─ max width: "
-    assert labeled_row_prefix(RowKind.SETTINGS_UI_MIN_WIDTH) == "  └─ min width: "
 
 
-def test_settings_ui_min_width_follows_max_width() -> None:
+def test_settings_ui_notification_display_prefix() -> None:
     assert labeled_row_prefix(RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY) == (
         "  └─ notification time: "
     )
@@ -696,10 +684,8 @@ def test_format_row_value_settings() -> None:
             editor_window_width=1920,
             editor_window_height=1080,
             editor_window_upscale=1.5,
-            ui_width_mode="fixed",
             navigator_side="right",
             help_side="left",
-            ui_width=320,
             notification_display_sec=0,
         ),
     )
@@ -721,10 +707,6 @@ def test_format_row_value_settings() -> None:
         state, RowDescriptor(RowKind.SETTINGS_EDITOR_WINDOW_DISPLAY_SIZE)
     ) == f"{display_w} x {display_h}"
     assert (
-        format_row_value(state, RowDescriptor(RowKind.SETTINGS_UI_WIDTH_MODE))
-        == "fixed"
-    )
-    assert (
         format_row_value(state, RowDescriptor(RowKind.SETTINGS_NAVIGATOR_SIDE))
         == "right"
     )
@@ -732,10 +714,6 @@ def test_format_row_value_settings() -> None:
         format_row_value(state, RowDescriptor(RowKind.SETTINGS_HELP_SIDE))
         == "left"
     )
-    assert format_row_value(state, RowDescriptor(RowKind.SETTINGS_UI_WIDTH)) == "320"
-    assert format_row_value(
-        state, RowDescriptor(RowKind.SETTINGS_UI_MIN_WIDTH)
-    ) == "80"
     assert (
         format_row_value(state, RowDescriptor(RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY))
         == notification_display_label(0)
@@ -1053,11 +1031,11 @@ def test_apply_field_horizontal_via_controls_keydown() -> None:
     from tests.support.viz import press_main_row
 
     controls = _make_controls()
-    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_WIDTH_MODE)
+    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_NAVIGATOR_SIDE)
+    before = controls.cfg.editor.navigator_side
 
     press_main_row(controls, _keydown(pygame.K_RIGHT))
-    assert controls.cfg.editor.ui_width_mode != DEFAULT_UI_WIDTH_MODE
-    assert controls.cfg.editor.ui_width_mode == "fixed"
+    assert controls.cfg.editor.navigator_side != before
 
 
 def test_expand_subheader_prefix_preset_switching() -> None:

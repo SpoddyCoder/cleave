@@ -41,16 +41,12 @@ from cleave.config_schema.editor import (
     DEFAULT_INSPECTOR_WIDTH,
     DEFAULT_HELP_SIDE,
     DEFAULT_NAVIGATOR_SIDE,
-    DEFAULT_UI_MIN_WIDTH,
-    DEFAULT_UI_WIDTH,
-    DEFAULT_UI_WIDTH_MODE,
     DEFAULT_EDITOR_PREVIEW_QUALITY,
     DEFAULT_EDITOR_UPSCALE,
     DEFAULT_EDITOR_WIDTH,
     UPSCALE_MIN,
     EDITOR_PREVIEW_QUALITIES,
     ColumnSide,
-    UiWidthMode,
     EditorPreviewQuality,
     clamp_beat_sensitivity,
     clamp_upscale,
@@ -215,9 +211,6 @@ class EditorConfig:
     height: int = DEFAULT_EDITOR_HEIGHT
     upscale: float = DEFAULT_EDITOR_UPSCALE
     preview_quality: EditorPreviewQuality = DEFAULT_EDITOR_PREVIEW_QUALITY
-    ui_width_mode: UiWidthMode = DEFAULT_UI_WIDTH_MODE
-    ui_width: int = DEFAULT_UI_WIDTH
-    ui_min_width: int = DEFAULT_UI_MIN_WIDTH
     notification_display_sec: int = DEFAULT_NOTIFICATION_DISPLAY_SEC
     residual_latency_ms: int = DEFAULT_RESIDUAL_LATENCY_MS
     inspector_width: int = DEFAULT_INSPECTOR_WIDTH

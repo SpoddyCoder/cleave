@@ -20,14 +20,10 @@ from cleave.config_schema.editor import (
     DEFAULT_INSPECTOR_WIDTH,
     DEFAULT_HELP_SIDE,
     DEFAULT_NAVIGATOR_SIDE,
-    DEFAULT_UI_MIN_WIDTH,
-    DEFAULT_UI_WIDTH,
-    DEFAULT_UI_WIDTH_MODE,
     DEFAULT_EDITOR_PREVIEW_QUALITY,
     DEFAULT_NOTIFICATION_DISPLAY_SEC,
     DEFAULT_RESIDUAL_LATENCY_MS,
     ColumnSide,
-    UiWidthMode,
     EditorPreviewQuality,
     dump_editor_section,
     parse_editor_section,
@@ -61,11 +57,8 @@ class EditorSettings:
     height: int
     upscale: float
     preview_quality: EditorPreviewQuality
-    ui_width_mode: UiWidthMode
-    ui_width: int
     notification_display_sec: int
     residual_latency_ms: int
-    ui_min_width: int = DEFAULT_UI_MIN_WIDTH
     inspector_width: int = DEFAULT_INSPECTOR_WIDTH
     help_width: int = DEFAULT_HELP_WIDTH
     navigator_side: ColumnSide = DEFAULT_NAVIGATOR_SIDE
@@ -86,9 +79,6 @@ def default_editor_settings() -> EditorSettings:
         height=DEFAULT_EDITOR_HEIGHT,
         upscale=DEFAULT_EDITOR_UPSCALE,
         preview_quality=DEFAULT_EDITOR_PREVIEW_QUALITY,
-        ui_width_mode=DEFAULT_UI_WIDTH_MODE,
-        ui_width=DEFAULT_UI_WIDTH,
-        ui_min_width=DEFAULT_UI_MIN_WIDTH,
         notification_display_sec=DEFAULT_NOTIFICATION_DISPLAY_SEC,
         residual_latency_ms=DEFAULT_RESIDUAL_LATENCY_MS,
         inspector_width=DEFAULT_INSPECTOR_WIDTH,
@@ -157,9 +147,6 @@ def editor_settings_from_config(cfg: EditorConfig) -> EditorSettings:
         height=cfg.height,
         upscale=cfg.upscale,
         preview_quality=cfg.preview_quality,
-        ui_width_mode=cfg.ui_width_mode,
-        ui_width=cfg.ui_width,
-        ui_min_width=cfg.ui_min_width,
         notification_display_sec=cfg.notification_display_sec,
         residual_latency_ms=cfg.residual_latency_ms,
         inspector_width=cfg.inspector_width,
