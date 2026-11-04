@@ -583,6 +583,24 @@ def test_navigator_content_height_is_measured_for_the_next_frame() -> None:
         assert host.nav_content_height_px == measured
 
 
+def test_navigator_height_follows_rows_opened_before_the_next_draw() -> None:
+    from cleave.viz.commands import command_context
+    from cleave.viz.shell_host import draw_shell_frame
+
+    controls = _make_controls(("layer_1",))
+    with _host() as host:
+        host._controls = controls
+        host.imgui.display_size = (1280, 720)
+        controls.shell_focus.nav_expanded.clear()
+        draw_shell_frame(host, MenuBarState(), command_context(controls), 1 / 60)
+        closed = host.nav_content_height_px
+        controls.shell_focus.nav_expanded.add("settings")
+        predicted = host.nav_content_height_px
+        assert predicted > closed
+        draw_shell_frame(host, MenuBarState(), command_context(controls), 1 / 60)
+        assert predicted - host.nav_content_height_px in (0, 1)
+
+
 def test_chrome_contains_open_help_column() -> None:
     with _host() as host:
         layout = ShellLayout.compute(

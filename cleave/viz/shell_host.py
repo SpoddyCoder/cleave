@@ -212,11 +212,6 @@ def navigator_twisty(node: NavNode, expanded: Collection[str]) -> str | None:
     return TWISTY_EXPANDED if node.id in expanded else TWISTY_COLLAPSED
 
 
-def navigator_label_toggles(node: NavNode) -> bool:
-    """Whether a click on *node*'s label also opens or closes it."""
-    return node.expandable and node.depth == 0
-
-
 def navigator_lock_mark(node: NavNode) -> str | None:
     """Lock mark for a locked navigator node."""
     if not node.locked:
@@ -392,6 +387,27 @@ def _navigator_content_height_px() -> int:
         + float(style.window_border_size)
     )
     return max(1, int(round(outer)))
+
+
+def navigator_height_for_rows(
+    measured_px: int,
+    measured_rows: int,
+    rows: int,
+    *,
+    chrome_px: float,
+    spacing_px: float,
+) -> int:
+    """Navigator outer height for *rows* given one measured frame.
+
+    The window is sized a frame after the rows change, so the tree is
+    resized from the last measurement to avoid one frame of overflow, which
+    draws a scrollbar. *chrome_px* is the window padding top and bottom plus border and
+    *spacing_px* the gap between rows. Rows are uniform.
+    """
+    if measured_px <= 0 or measured_rows <= 0 or rows == measured_rows:
+        return measured_px
+    step = (measured_px - chrome_px + spacing_px) / measured_rows
+    return max(1, int(math.ceil(measured_px + (rows - measured_rows) * step)))
 
 
 def menu_bar_height_px() -> int:
@@ -947,6 +963,7 @@ class ShellHost:
         self._menu_bar_height_px = bar_height
         # Drawn navigator list height, applied on the next frame. 0 until measured.
         self._nav_content_height_px = 0
+        self._nav_measured_rows = 0
         self._nav_scrolled_id: str | None = None
         self._layout: ShellLayout | None = None
         self._value_drag_accum = 0.0
@@ -968,8 +985,27 @@ class ShellHost:
 
     @property
     def nav_content_height_px(self) -> int:
-        """Navigator list height measured last frame. 0 until the list is drawn."""
-        return self._nav_content_height_px
+        """Navigator list height for the rows now visible. 0 until measured.
+
+        Rows opened or closed since the last draw are included, so the window
+        never lags the tree by a frame.
+        """
+        if self._nav_content_height_px <= 0:
+            return 0
+        style = imgui.get_style()
+        return navigator_height_for_rows(
+            self._nav_content_height_px,
+            self._nav_measured_rows,
+            len(self._visible_nav_nodes()),
+            chrome_px=2.0 * float(style.window_padding.y)
+            + float(style.window_border_size),
+            spacing_px=float(style.item_spacing.y),
+        )
+
+    def _visible_nav_nodes(self) -> tuple[NavNode, ...]:
+        return build_navigator(
+            self._controls.session, self._controls.shell_focus.nav_expanded
+        )
 
     @property
     def layout(self) -> ShellLayout | None:
@@ -1425,16 +1461,14 @@ class ShellHost:
         )
 
     def _draw_navigator(self) -> None:
-        focus = self._controls.shell_focus
         imgui.push_style_color(imgui.Col_.text, rgba(LABEL))
         try:
-            for node in build_navigator(
-                self._controls.session,
-                focus.nav_expanded,
-            ):
+            nodes = self._visible_nav_nodes()
+            for node in nodes:
                 self._draw_nav_node(node)
         finally:
             imgui.pop_style_color()
+        self._nav_measured_rows = len(nodes)
         self._nav_content_height_px = _navigator_content_height_px()
 
     def _draw_nav_node(self, node: NavNode) -> None:
@@ -1486,7 +1520,7 @@ class ShellHost:
                 self._toggle_nav_expanded(node.id)
             elif clicked:
                 self._controls.navigator.select(node.id)
-                if navigator_label_toggles(node):
+                if node.expandable:
                     self._toggle_nav_expanded(node.id)
         finally:
             if indent:

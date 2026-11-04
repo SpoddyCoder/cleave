@@ -25,7 +25,7 @@ from cleave.viz.session import LayerRuntime, TuningSession
 from cleave.viz.shell_host import (
     inspector_header,
     inspector_selectable_id,
-    navigator_label_toggles,
+    navigator_height_for_rows,
     navigator_lock_mark,
     navigator_twisty,
     selectable_wash,
@@ -316,19 +316,20 @@ def test_only_expandable_nodes_show_a_twisty() -> None:
         assert navigator_twisty(node, {"layers", node.id}) is None
 
 
-def test_label_click_toggles_expandable_roots_only() -> None:
-    nodes = build_navigator(_session(), {"layers"})
+def test_navigator_height_scales_with_row_count() -> None:
+    chrome = 8.0
+    spacing = 4.0
+    two_rows = int(2 * 20 + spacing + chrome)
 
-    toggling = {node.id for node in nodes if navigator_label_toggles(node)}
+    grown = navigator_height_for_rows(
+        two_rows, 2, 3, chrome_px=chrome, spacing_px=spacing
+    )
 
-    assert toggling == {
-        "settings",
-        "project",
-        "overlay",
-        "post_fx",
-        "timeline",
-        "layers",
-    }
+    assert grown == two_rows + 20 + int(spacing)
+    assert (
+        navigator_height_for_rows(0, 0, 3, chrome_px=chrome, spacing_px=spacing)
+        == 0
+    )
 
 
 def test_inspector_selectable_id_changes_with_effect_and_preset() -> None:
