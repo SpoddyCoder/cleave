@@ -9,8 +9,8 @@ import pygame
 from cleave.viz.inspector import InspectorRow, build_inspector_rows
 from cleave.viz.navigator import (
     NavNode,
+    ancestor_ids,
     build_navigator,
-    expansion_path,
     root_id,
     visible_top_level_ids,
 )
@@ -84,7 +84,7 @@ class NavigatorControls:
             prior_index=prior,
         )
         if repaired != focus.selected_id:
-            focus.nav_expanded = expansion_path(repaired)
+            focus.nav_expanded |= ancestor_ids(repaired)
             focus.selected_id = repaired
 
     def quick_step(self, delta: int) -> None:
@@ -95,15 +95,15 @@ class NavigatorControls:
         self.select(quick_nav_id(ids, root_id(focus.selected_id), delta))
 
     def select(self, node_id: str) -> None:
-        """Select *node_id*, close other branches, and stay on the navigator."""
+        """Select *node_id*, open its ancestors, and stay on the navigator."""
         focus = self._controls.shell_focus
-        focus.nav_expanded = expansion_path(node_id)
+        focus.nav_expanded |= ancestor_ids(node_id)
         node_id = reconcile_nav_id(
             self._visible_ids(),
             node_id,
             self._controls.session.layer_z_order,
         )
-        focus.nav_expanded = expansion_path(node_id)
+        focus.nav_expanded |= ancestor_ids(node_id)
         self._controls.set_shell_region(ShellRegion.NAVIGATOR)
         focus.selected_id = node_id
 

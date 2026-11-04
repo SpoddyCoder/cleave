@@ -15,7 +15,7 @@ from cleave.viz.navigator import (
     TWISTY_COLLAPSED,
     TWISTY_EXPANDED,
     build_navigator,
-    expansion_path,
+    ancestor_ids,
     layer_node_id,
     layer_page_node_id,
 )
@@ -130,7 +130,7 @@ def test_settings_project_and_layers_have_no_chips() -> None:
 def test_child_pages_breadcrumb_and_show_owner_chips() -> None:
     session = _session()
     page = layer_page_node_id("layer_3", "compositing")
-    nodes = build_navigator(session, expansion_path(page))
+    nodes = build_navigator(session, ancestor_ids(page))
     layer = next(node for node in nodes if node.id == layer_node_id("layer_3"))
 
     header = inspector_header(nodes, page, session, curation=False)

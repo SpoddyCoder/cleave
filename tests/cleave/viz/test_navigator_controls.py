@@ -16,7 +16,7 @@ def test_enter_on_project_opens_first_child() -> None:
     controls.navigator.activate()
     assert focus.selected_id == "project.projectm"
     assert focus.region is ShellRegion.INSPECTOR
-    assert focus.nav_expanded == {"project", "project.projectm"}
+    assert "project" in focus.nav_expanded
     assert focus.inspector_cursor == RowDescriptor(
         RowKind.PROJECT_MILKDROP_BEAT_SENSITIVITY
     )
@@ -172,4 +172,4 @@ def test_reconcile_opens_the_branch_it_lands_on() -> None:
     controls.session.settings.editor_mode = "preset_curation"
     controls.navigator.reconcile()
     assert focus.selected_id == "layers"
-    assert focus.nav_expanded == {"layers"}
+    assert "layers" in focus.nav_expanded

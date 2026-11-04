@@ -1,4 +1,4 @@
-"""Navigator model: roots, child pages, accordion, and tree keys."""
+"""Navigator model: roots, child pages, expansion, and tree keys."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from cleave.viz.navigator import (
     SOLO_BADGE,
     TOP_LEVEL_IDS,
     build_navigator,
-    expansion_path,
+    ancestor_ids,
     layer_node_id,
     layer_page_node_id,
     layer_page_of,
@@ -148,19 +148,12 @@ def test_full_tree_order_and_labels() -> None:
     assert "render" not in {node.id for node in nodes}
 
 
-def test_default_tree_opens_only_settings() -> None:
+def test_default_tree_opens_only_layers() -> None:
     nodes = build_navigator(_two_layers())
     assert tuple(node.id for node in nodes) == (
-        "settings",
-        "settings.editor_window",
-        "settings.ui",
-        "settings.latency",
-        "project",
-        "overlay",
-        "post_fx",
-        "pattern_mask",
-        "timeline",
-        "layers",
+        *TOP_LEVEL_IDS,
+        layer_node_id("layer_2"),
+        layer_node_id("layer_1"),
     )
 
 
@@ -179,7 +172,8 @@ def test_node_id_helpers() -> None:
     assert root_id(page) == "layers"
     assert root_id("timeline.grid") == "timeline"
     assert root_id("pattern_mask") == "pattern_mask"
-    assert expansion_path(page) == {page, layer_node_id("layer_1"), "layers"}
+    assert ancestor_ids(page) == {layer_node_id("layer_1"), "layers"}
+    assert ancestor_ids("settings") == set()
 
 
 def test_song_markers_badge_is_marker_count() -> None:
@@ -323,24 +317,35 @@ def test_layer_lock_and_visibility_badges() -> None:
     assert nodes[layer_node_id("layer_3")].badge == SOLO_BADGE
 
 
-def test_select_closes_other_branches() -> None:
+def test_select_opens_ancestors_and_closes_nothing() -> None:
     controls = _make_controls(("layer_1", "layer_2"))
     focus = controls.shell_focus
     nav = controls.navigator
+    focus.nav_expanded = {"timeline"}
 
     nav.select("post_fx.fade")
-    assert focus.nav_expanded == {"post_fx", "post_fx.fade"}
+    assert focus.nav_expanded == {"timeline", "post_fx"}
 
-    nav.select(layer_page_node_id("layer_2", "compositing"))
-    assert focus.selected_id == layer_page_node_id("layer_2", "compositing")
+    page = layer_page_node_id("layer_2", "compositing")
+    nav.select(page)
+    assert focus.selected_id == page
     assert focus.nav_expanded == {
+        "timeline",
+        "post_fx",
         "layers",
         layer_node_id("layer_2"),
-        layer_page_node_id("layer_2", "compositing"),
     }
-    ids = {node.id for node in build_navigator(controls.session, focus.nav_expanded)}
-    assert "post_fx.fade" not in ids
-    assert layer_page_node_id("layer_1", "compositing") not in ids
+
+
+def test_select_does_not_open_the_selected_node() -> None:
+    controls = _make_controls(("layer_1",))
+    focus = controls.shell_focus
+    focus.nav_expanded = set()
+
+    controls.navigator.select("overlay")
+    assert focus.nav_expanded == set()
+    controls.navigator.select(layer_node_id("layer_1"))
+    assert focus.nav_expanded == {"layers"}
 
 
 def test_tree_up_down_does_not_wrap() -> None:
@@ -360,14 +365,8 @@ def test_tree_up_down_does_not_wrap() -> None:
         seen.append(focus.selected_id)
         assert focus.region is ShellRegion.NAVIGATOR
 
-    assert seen[:5] == [
-        "settings",
-        "settings.editor_window",
-        "settings.ui",
-        "settings.latency",
-        "project",
-    ]
-    last = layer_page_node_id("layer_2", "effects")
+    assert seen == [node.id for node in build_navigator(controls.session, focus.nav_expanded)]
+    last = layer_node_id("layer_2")
     assert seen[-1] == last
     nav.handle_keydown(_keydown(pygame.K_DOWN))
     assert focus.selected_id == last
@@ -383,6 +382,10 @@ def test_left_right_expand_move_collapse_and_parent() -> None:
 
     nav.handle_keydown(_keydown(pygame.K_RIGHT))
     assert focus.selected_id == "layers"
+    assert focus.nav_expanded == {"layers"}
+
+    nav.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert focus.selected_id == layer_node_id("layer_1")
     assert focus.nav_expanded == {"layers"}
 
     nav.handle_keydown(_keydown(pygame.K_RIGHT))

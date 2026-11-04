@@ -1481,6 +1481,8 @@ class ShellHost:
                 self._toggle_nav_expanded(node.id)
             elif clicked:
                 self._controls.navigator.select(node.id)
+                if node.expandable and not node.has_inspector:
+                    self._toggle_nav_expanded(node.id)
         finally:
             if indent:
                 imgui.unindent(indent)
@@ -1488,7 +1490,7 @@ class ShellHost:
     def _toggle_nav_expanded(self, node_id: str) -> None:
         focus = self._controls.shell_focus
         if node_id not in focus.nav_expanded:
-            self._controls.navigator.select(node_id)
+            focus.nav_expanded.add(node_id)
             return
         focus.nav_expanded.discard(node_id)
         visible = tuple(

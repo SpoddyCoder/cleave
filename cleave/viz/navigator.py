@@ -21,6 +21,7 @@ SOLO_BADGE = "solo"
 HIDDEN_BADGE = "hidden"
 OFF_BADGE = "off"
 DEFAULT_SELECTED_ID = "settings"
+DEFAULT_EXPANDED_IDS = frozenset({"layers"})
 # The ImGui atlas must include these; the default Latin range draws them as "?".
 TWISTY_EXPANDED = "▾"
 TWISTY_COLLAPSED = "▸"
@@ -137,14 +138,14 @@ def root_id(node_id: str) -> str:
     return node_id
 
 
-def expansion_path(node_id: str) -> set[str]:
-    """Ids left open when *node_id* is selected: it and its ancestors."""
-    path = {node_id}
+def ancestor_ids(node_id: str) -> set[str]:
+    """Ids that must be open for *node_id* to be visible."""
+    ancestors: set[str] = set()
     parent = parent_id_of(node_id)
     while parent is not None:
-        path.add(parent)
+        ancestors.add(parent)
         parent = parent_id_of(parent)
-    return path
+    return ancestors
 
 
 def visible_top_level_ids(session: TuningSession) -> tuple[str, ...]:
@@ -160,14 +161,14 @@ def build_navigator(
 ) -> tuple[NavNode, ...]:
     """Visible navigator rows for *session*.
 
-    *expanded* defaults to the path of the default selection. A node's children
-    are included only while its id is in *expanded*. Preset curation omits every
+    *expanded* defaults to ``DEFAULT_EXPANDED_IDS``. A node's children are
+    included only while its id is in *expanded*. Preset curation omits every
     root except Settings and Layers, and keeps one childless layer for the
     curation focus slot. Song Markers carries the marker count as its badge,
     including ``"0"``.
     """
     if expanded is None:
-        expanded = expansion_path(DEFAULT_SELECTED_ID)
+        expanded = DEFAULT_EXPANDED_IDS
     visible = frozenset(visible_top_level_ids(session))
     nodes: list[NavNode] = []
     for node in _TOP_LEVEL:

@@ -124,7 +124,7 @@ def test_shell_focus_state_defaults() -> None:
     assert state.region is ShellRegion.NAVIGATOR
     assert state.selected_id == "settings"
     assert state.inspector_cursor is None
-    assert state.nav_expanded == {"settings"}
+    assert state.nav_expanded == {"layers"}
     other = ShellFocusState()
     state.nav_expanded.add("overlay")
-    assert other.nav_expanded == {"settings"}
+    assert other.nav_expanded == {"layers"}

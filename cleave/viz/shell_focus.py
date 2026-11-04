@@ -13,9 +13,9 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 
 from cleave.viz.navigator import (
+    DEFAULT_EXPANDED_IDS,
     DEFAULT_SELECTED_ID,
     LAYER_ID_PREFIX,
-    expansion_path,
     layer_node_id,
     layer_page_of,
     layer_slot_of,
@@ -44,17 +44,16 @@ class CycleStop(Enum):
 class ShellFocusState:
     """Mutable focus owned by ``TuningControls``.
 
-    ``nav_expanded`` is the set of expanded navigator ids. Selecting a node
-    resets it to that node's path. Pure helpers in this module do not mutate it.
+    ``nav_expanded`` is the set of expanded navigator ids. The user opens and
+    closes nodes; selecting a node only opens its ancestors. Pure helpers in
+    this module do not mutate it.
     """
 
     region: ShellRegion = ShellRegion.NAVIGATOR
     selected_id: str = DEFAULT_SELECTED_ID
     inspector_cursor: RowDescriptor | None = None
     inspector_command_id: str | None = None
-    nav_expanded: set[str] = field(
-        default_factory=lambda: expansion_path(DEFAULT_SELECTED_ID)
-    )
+    nav_expanded: set[str] = field(default_factory=lambda: set(DEFAULT_EXPANDED_IDS))
 
 
 def cycle_stops(*, strip_open: bool) -> tuple[CycleStop, ...]:
