@@ -39,7 +39,11 @@ from cleave.viz.file_picker_surface import (
     wheel_scroll_px,
 )
 from cleave.viz.imgui_theme import rgba
-from cleave.viz.material_icons import FOLDER_GLYPH
+from cleave.viz.material_icons import (
+    ARROW_DOWNWARD_GLYPH,
+    ARROW_UPWARD_GLYPH,
+    FOLDER_GLYPH,
+)
 from cleave.viz.theme import (
     FOCUS_BORDER_ALPHA,
     FOCUS_WASH_ALPHA,
@@ -895,6 +899,18 @@ def test_folder_glyph_is_in_the_font() -> None:
     assert glyph is not None
     assert glyph.x1 > glyph.x0
     assert missing is None
+
+
+def test_directory_arrow_glyphs_are_in_the_font() -> None:
+    with _host() as host:
+        host.begin_frame(1.0 / 60.0)
+        host.end_frame()
+        font = imgui.get_io().font_default
+        up = font.find_glyph_no_fallback(ord(ARROW_UPWARD_GLYPH))
+        down = font.find_glyph_no_fallback(ord(ARROW_DOWNWARD_GLYPH))
+
+    assert up is not None and up.x1 > up.x0
+    assert down is not None and down.x1 > down.x0
 
 
 def test_arrow_keys_keep_the_highlight_while_the_pointer_stays_put(

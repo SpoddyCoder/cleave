@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import inspect
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pygame
 import pytest
@@ -37,6 +38,7 @@ from cleave.viz.row_spec import (
     composite_header_suffix_part,
     expand_subheader_prefix,
     expandable_row_kinds,
+    apply_field_nav_button,
     format_row_markers,
     format_row_position,
     format_row_value,
@@ -1482,6 +1484,36 @@ def test_two_line_rows_are_the_preset_path_rows() -> None:
     }
 
 
+def test_preset_dir_buttons_follow_the_available_moves() -> None:
+    desc = RowDescriptor(RowKind.TRACK_PRESET_DIR, slot="layer_1")
+    block = SimpleNamespace(preset_dir_can_go_up=True, preset_dir_can_go_down=False)
+    state = SimpleNamespace(tracks={"layer_1": block})
+    up, down = row_spec(RowKind.TRACK_PRESET_DIR).nav_buttons
+    assert up.available(state, desc) is True
+    assert down.available(state, desc) is False
+
+
+def test_nav_buttons_move_up_and_down_the_tree() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.layer_mutations = MagicMock()
+    desc = RowDescriptor(RowKind.TRACK_PRESET_DIR, slot="layer_1")
+
+    assert apply_field_nav_button(controls, desc, 0) is True
+    controls.layer_mutations.parent_directory.assert_called_once_with("layer_1")
+    assert apply_field_nav_button(controls, desc, 1) is True
+    controls.layer_mutations.enter_directory.assert_called_once_with("layer_1")
+
+
+def test_section_lock_blocks_nav_buttons() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.layer_mutations = MagicMock()
+    controls.session.layers["layer_1"].locked = True
+    desc = RowDescriptor(RowKind.TRACK_PRESET_DIR, slot="layer_1")
+
+    assert apply_field_nav_button(controls, desc, 0) is False
+    controls.layer_mutations.parent_directory.assert_not_called()
+
+
 def test_preset_list_item_has_no_side_arrows() -> None:
     assert row_spec(RowKind.TRACK_PRESET_LIST_ITEM).apply_horizontal is None
 
@@ -1490,7 +1522,6 @@ def test_two_line_row_splits_value_position_and_markers() -> None:
     block = SimpleNamespace(
         preset_dir_label="packs/wave/",
         preset_dir_position="2/5",
-        preset_dir_markers="[..] >",
         preset_label="foo.milk",
         preset_position="3/9",
         preset_markers="[F] [R:B]",
@@ -1502,7 +1533,7 @@ def test_two_line_row_splits_value_position_and_markers() -> None:
     directory = RowDescriptor(RowKind.TRACK_PRESET_DIR, slot="layer_1")
     assert format_row_value(state, directory) == "packs/wave/"
     assert format_row_position(state, directory) == "2/5"
-    assert format_row_markers(state, directory) == "[..] >"
+    assert format_row_markers(state, directory) == ""
 
     preset = RowDescriptor(RowKind.TRACK_PRESET, slot="layer_1")
     assert format_row_value(state, preset) == "foo.milk"

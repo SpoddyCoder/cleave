@@ -197,10 +197,10 @@ def test_step_sibling_hops_top_level_packs() -> None:
         _write_milk(pack_b / "b.milk")
 
         playlist = playlist_at_dir(pack_a)
-        assert playlist.directory_display(root, browse_floor=pack_a) == DirectoryDisplay("pack-a/", "1/2", "")
+        assert playlist.directory_display(root, browse_floor=pack_a) == DirectoryDisplay("pack-a/", "1/2", False, False)
         assert playlist.step_sibling(1, preset_root=root) is True
         assert playlist.current_dir.resolve() == pack_b.resolve()
-        assert playlist.directory_display(root, browse_floor=pack_b) == DirectoryDisplay("pack-b/", "2/2", "")
+        assert playlist.directory_display(root, browse_floor=pack_b) == DirectoryDisplay("pack-b/", "2/2", False, False)
 
 
 def test_go_parent_recovers_when_outside_browse_floor() -> None:
@@ -217,7 +217,7 @@ def test_go_parent_recovers_when_outside_browse_floor() -> None:
         _write_milk(child / "c.milk")
 
         playlist = playlist_at_dir(child)
-        assert playlist.directory_display(root, browse_floor=pack_a) == DirectoryDisplay("pack-b/child/", "1/1", "[..]")
+        assert playlist.directory_display(root, browse_floor=pack_a) == DirectoryDisplay("pack-b/child/", "1/1", True, False)
         assert playlist.go_parent(root, browse_floor=pack_a) is True
         assert playlist.current_dir.resolve() == pack_b.resolve()
         assert playlist.go_parent(root, browse_floor=pack_a) is False
@@ -255,7 +255,7 @@ def test_directory_display_clamps_sibling_parent_at_preset_root() -> None:
 
         playlist = scan_preset_playlist(root)
         label = playlist.directory_display(root)
-        assert label == DirectoryDisplay("./", "1/2", ">")
+        assert label == DirectoryDisplay("./", "1/2", False, True)
 
 
 def test_directory_display_outside_preset_root() -> None:
@@ -287,7 +287,7 @@ def test_directory_display_caches_on_repeated_calls() -> None:
         ) as mock_list:
             first = playlist.directory_display(root)
             second = playlist.directory_display(root)
-            assert first == second == DirectoryDisplay("./", "1/2", ">")
+            assert first == second == DirectoryDisplay("./", "1/2", False, True)
             # Sibling listing plus child listing for the tree marker.
             assert mock_list.call_count == 2
 
@@ -365,7 +365,7 @@ def test_directory_display_invalidated_after_step_sibling() -> None:
             playlist.step_sibling(1, preset_root=root)
             label = playlist.directory_display(root)
             assert mock_list.call_count >= 1
-            assert label == DirectoryDisplay("beta/", "2/3", "[..]")
+            assert label == DirectoryDisplay("beta/", "2/3", True, False)
 
 
 def test_directory_display_invalidated_after_enter_child() -> None:
@@ -385,7 +385,7 @@ def test_directory_display_invalidated_after_enter_child() -> None:
             playlist.enter_child(root)
             label = playlist.directory_display(root)
             assert mock_list.call_count >= 1
-            assert label == DirectoryDisplay("parent/child-a/", "1/1", "[..]")
+            assert label == DirectoryDisplay("parent/child-a/", "1/1", True, False)
 
 
 def test_directory_display_invalidated_after_go_parent() -> None:
@@ -405,7 +405,7 @@ def test_directory_display_invalidated_after_go_parent() -> None:
             playlist.go_parent(root)
             label = playlist.directory_display(root)
             assert mock_list.call_count >= 1
-            assert label == DirectoryDisplay("pack-a/", "1/1", "[..] >")
+            assert label == DirectoryDisplay("pack-a/", "1/1", True, True)
 
 
 def test_directory_display_tree_markers() -> None:
@@ -419,19 +419,19 @@ def test_directory_display_tree_markers() -> None:
         _write_milk(child / "child.milk")
 
         at_root = scan_preset_playlist(root)
-        assert at_root.directory_display(root, browse_floor=root) == DirectoryDisplay("./", "1/1", ">")
+        assert at_root.directory_display(root, browse_floor=root) == DirectoryDisplay("./", "1/1", False, True)
 
         at_pack = playlist_at_dir(pack)
         assert at_pack.directory_display(root, browse_floor=root) == (
-            DirectoryDisplay("pack/", "1/1", "[..] >")
+            DirectoryDisplay("pack/", "1/1", True, True)
         )
         assert at_pack.directory_display(root, browse_floor=pack) == (
-            DirectoryDisplay("pack/", "1/1", ">")
+            DirectoryDisplay("pack/", "1/1", False, True)
         )
 
         at_child = playlist_at_dir(child)
         assert at_child.directory_display(root, browse_floor=pack) == (
-            DirectoryDisplay("pack/child/", "1/1", "[..]")
+            DirectoryDisplay("pack/child/", "1/1", True, False)
         )
 
 

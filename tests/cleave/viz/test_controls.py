@@ -3235,7 +3235,7 @@ def test_directory_pack_hop_then_enter_ctrl_left_still_ascends() -> None:
     press_layer_row(controls, RowDescriptor(RowKind.TRACK_PRESET_DIR, slot="layer_1"), _keydown(pygame.K_RETURN))
     assert playlist.current_dir.resolve() == child.resolve()
     view = controls.build_view_state(paused=False)
-    assert "[..]" in view.tracks["layer_1"].preset_dir_markers
+    assert view.tracks["layer_1"].preset_dir_can_go_up
 
     press_layer_row(controls, RowDescriptor(RowKind.TRACK_PRESET_DIR, slot="layer_1"), _keydown(pygame.K_BACKSPACE))
     assert playlist.current_dir.resolve() == other.resolve()
@@ -3251,7 +3251,7 @@ def test_directory_enter_then_ctrl_left_ascends_within_pack() -> None:
     press_layer_row(controls, RowDescriptor(RowKind.TRACK_PRESET_DIR, slot="layer_1"), _keydown(pygame.K_RETURN))
     assert playlist.current_dir.resolve() == child.resolve()
     view = controls.build_view_state(paused=False)
-    assert "[..]" in view.tracks["layer_1"].preset_dir_markers
+    assert view.tracks["layer_1"].preset_dir_can_go_up
 
     press_layer_row(controls, RowDescriptor(RowKind.TRACK_PRESET_DIR, slot="layer_1"), _keydown(pygame.K_BACKSPACE))
     assert playlist.current_dir.resolve() == siblings[0].resolve()
@@ -3306,7 +3306,7 @@ def test_directory_ctrl_arrows_follow_browse_while_auto_preset_elsewhere() -> No
     assert layer.playlist.current_dir.resolve() == child.resolve()
     after_down = controls.build_view_state(paused=False).tracks["layer_1"]
     assert "roles/" not in after_down.preset_dir_label
-    assert "[..]" in after_down.preset_dir_markers
+    assert after_down.preset_dir_can_go_up
     assert after_down.preset_label.startswith("nested.milk")
 
     press_layer_row(controls, RowDescriptor(RowKind.TRACK_PRESET_DIR, slot="layer_1"), _keydown(pygame.K_BACKSPACE))
@@ -3692,7 +3692,7 @@ def test_scan_file_anchor_builds_parent_directory_playlist() -> None:
         assert preset_filename_display(playlist) == "beta.milk"
         assert preset_position_display(playlist) == "2/2"
         assert playlist.directory_display(root) == DirectoryDisplay(
-            "pack/Aurora/", "1/1", "[..]"
+            "pack/Aurora/", "1/1", True, False
         )
 
 

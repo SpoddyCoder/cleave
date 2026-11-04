@@ -18,6 +18,8 @@ from cleave.viz.row_spec import apply_field_horizontal, row_spec
 from cleave.viz.value_nudge import (
     NudgeRect,
     ValueNudgeHold,
+    nav_button_hit_at,
+    nav_button_rects,
     nudge_arrow_rects,
     nudge_hit_at,
     nudge_hover_fill_rect,
@@ -65,6 +67,20 @@ def test_arrow_rects_cover_glyphs_and_not_the_value() -> None:
     assert nudge_hit_at(196.0, 28.0, back, forward) is None
     assert nudge_hit_at(145.0, 19.9, back, forward) is None
     assert nudge_hit_at(145.0, 36.0, back, forward) is None
+
+
+def test_nav_button_rects_touch_and_center_each_glyph() -> None:
+    up, down = nav_button_rects(100.0, 20.0, 36.0, (12.0, 14.0), gap=6.0)
+    assert up == NudgeRect(100.0, 20.0, 118.0, 36.0)
+    assert down == NudgeRect(118.0, 20.0, 138.0, 36.0)
+
+
+def test_nav_button_hit_at_finds_the_button_under_the_pointer() -> None:
+    rects = nav_button_rects(100.0, 20.0, 36.0, (12.0, 14.0), gap=6.0)
+    assert nav_button_hit_at(105.0, 28.0, rects) == 0
+    assert nav_button_hit_at(118.0, 28.0, rects) == 1
+    assert nav_button_hit_at(138.0, 28.0, rects) is None
+    assert nav_button_hit_at(105.0, 36.0, rects) is None
 
 
 def test_hover_fill_centers_on_the_arrow_character() -> None:

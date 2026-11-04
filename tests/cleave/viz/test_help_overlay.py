@@ -373,7 +373,9 @@ def test_preset_dir_help_titles() -> None:
     assert description.title == "Preset Directory"
     assert description.lines == (
         "Directory from which presets are browsed for this layer.",
-        "[..] when a parent is available; > when a child directory is available.",
+        "Up and down arrows open the parent or first child directory.",
+        "They dim when there is no directory to move to.",
+        "Double-click also opens the first child directory.",
     )
     assert keyboard.title == KEYBOARD_CONTROLS_SECTION_TITLE
     entries = dict(keyboard.entries)

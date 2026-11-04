@@ -176,15 +176,22 @@ def _select_renderer_class() -> type[ProgrammablePipelineRenderer] | type[_Headl
     return _HeadlessRenderer
 
 
-def _merge_folder_glyph(fonts: Any, size_pixels: float) -> tuple[Any, list[int]]:
-    """Merge the folder mark into the font just added. Not the whole icon font."""
-    from cleave.viz.material_icons import FOLDER_GLYPH, font_path
+def _merge_icon_glyphs(fonts: Any, size_pixels: float) -> tuple[Any, list[int]]:
+    """Merge the shell's icons into the font just added. Not the whole icon font."""
+    from cleave.viz.material_icons import (
+        ARROW_DOWNWARD_GLYPH,
+        ARROW_UPWARD_GLYPH,
+        FOLDER_GLYPH,
+        font_path,
+    )
 
     config = imgui.ImFontConfig()
     config.merge_mode = True
     config.pixel_snap_h = True
-    codepoint = ord(FOLDER_GLYPH)
-    ranges = [codepoint, codepoint, 0]
+    ranges: list[int] = []
+    for glyph in (FOLDER_GLYPH, ARROW_UPWARD_GLYPH, ARROW_DOWNWARD_GLYPH):
+        ranges.extend((ord(glyph), ord(glyph)))
+    ranges.append(0)
     fonts.add_font_from_file_ttf(
         str(font_path()),
         size_pixels,
@@ -307,7 +314,7 @@ class ImGuiHost:
                 _shell_glyph_ranges(),
             )
             io.font_default = font
-            icon_font = _merge_folder_glyph(io.fonts, font_size)
+            icon_font = _merge_icon_glyphs(io.fonts, font_size)
             apply_imgui_theme()
             renderer = _select_renderer_class()()
         except Exception:
@@ -320,7 +327,7 @@ class ImGuiHost:
             display_size = surface.get_size()
         host = cls(context, renderer, display_size)
         # ImFontConfig is copied, but the glyph-range buffer must outlive Build.
-        host._folder_icon_font = icon_font
+        host._icon_font = icon_font
         return host
 
     @property

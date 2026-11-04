@@ -36,7 +36,9 @@ from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.row_present_renderers import inspector_field_colors
 from cleave.viz.row_sections import inspector_group_glyph
 from cleave.viz.row_spec import (
+    RowNavButton,
     apply_field_horizontal,
+    apply_field_nav_button,
     format_row_markers,
     format_row_position,
     format_row_value,
@@ -85,6 +87,8 @@ from cleave.viz.theme import (
 )
 from cleave.viz.value_nudge import (
     NudgeRect,
+    nav_button_hit_at,
+    nav_button_rects,
     nudge_arrow_rects,
     nudge_cluster_origin_x,
     nudge_hit_at,
@@ -555,6 +559,14 @@ class _ImguiTextSizer:
         return math.ceil(measured.x), math.ceil(measured.y)
 
 
+def _icon_drop_to_text(glyph: str) -> float:
+    """Pixels to lower a merged icon so it centers on the capitals beside it."""
+    font = imgui.get_font()
+    icon = font.find_glyph(ord(glyph))
+    cap = font.find_glyph(ord("A"))
+    return float(round(((cap.y0 + cap.y1) - (icon.y0 + icon.y1)) * 0.5))
+
+
 def _draw_two_line_row_text(
     label: str,
     markers: str,
@@ -593,6 +605,24 @@ def _draw_two_line_row_text(
         imgui.get_color_u32(value_color),
         fit_path_or_name_to_width(sizer, value, int(right_x - pad - origin_x)),
     )
+
+
+def inspector_row_click_outcome(
+    *,
+    double_click_row: bool,
+    clicked: bool,
+    activated: bool,
+    double_clicked: bool,
+) -> tuple[bool, bool]:
+    """Whether a row gesture focuses the row, and whether it runs the row action.
+
+    Selectable reports a click on release, but ImGui only flags a double-click
+    on the second press. A double-click row therefore activates on that press.
+    """
+    if not double_click_row:
+        return clicked, clicked
+    activate = activated and double_clicked
+    return clicked or activate, activate
 
 
 def _inspector_row_selected(focus: Any, desc: Any) -> bool:
@@ -1574,6 +1604,17 @@ class ShellHost:
                         rgba(label_color),
                         rgba(value_color),
                     )
+                if spec.nav_buttons:
+                    self._handle_nav_buttons(
+                        state,
+                        row,
+                        desc,
+                        label,
+                        spec.nav_buttons,
+                        rgba(value_color),
+                        stepped=stepped,
+                        activated=activated,
+                    )
                 if stepped:
                     self._handle_value_nudge(
                         row,
@@ -1593,16 +1634,81 @@ class ShellHost:
             # A release still over the row reports clicked. A gesture that
             # already stepped is a drag, so it must not run the row action.
             # An arrow press is neither a drag nor an activate.
-            if (
-                clicked
-                and not self._value_drag_crossed
-                and not self._nudge_swallow
-            ):
-                self._controls.inspector.focus_row(row)
-                self._controls.inspector.activate(row)
+            if not self._value_drag_crossed and not self._nudge_swallow:
+                focus, activate = inspector_row_click_outcome(
+                    double_click_row=spec.activate_on_double_click,
+                    clicked=clicked,
+                    activated=activated,
+                    double_clicked=imgui.is_mouse_double_clicked(0),
+                )
+                if focus:
+                    self._controls.inspector.focus_row(row)
+                if activate:
+                    self._controls.inspector.activate(row)
         finally:
             if indent:
                 imgui.unindent(indent)
+
+    def _handle_nav_buttons(
+        self,
+        state: Any,
+        row: Any,
+        desc: RowDescriptor,
+        label: str,
+        buttons: tuple[RowNavButton, ...],
+        value_color: imgui.ImVec4,
+        *,
+        stepped: bool,
+        activated: bool,
+    ) -> None:
+        """Paint the icon buttons after the label, and take hover and press.
+
+        A press on a dimmed button is swallowed. Otherwise a double-click on
+        it would reach the row and open a child directory.
+        """
+        origin_x, text_y = _selectable_label_origin()
+        rect_min = imgui.get_item_rect_min()
+        line = imgui.get_text_line_height()
+        space = imgui.calc_text_size(" ").x
+        rects = nav_button_rects(
+            origin_x + imgui.calc_text_size(f"{label} ").x,
+            rect_min.y,
+            imgui.get_item_rect_max().y - line,
+            [imgui.calc_text_size(button.glyph).x for button in buttons],
+            gap=space,
+        )
+        blocked = not stepped or self._nudge_input_blocked()
+        mouse = imgui.get_mouse_pos()
+        hit = None if blocked else nav_button_hit_at(mouse.x, mouse.y, rects)
+        hold_armed = self._controls.value_nudge.armed
+        available = [button.available(state, desc) for button in buttons]
+        draw = imgui.get_window_draw_list()
+        for index, (button, rect) in enumerate(zip(buttons, rects)):
+            color = value_color if available[index] else rgba(DISABLED)
+            if index == hit and available[index] and not hold_armed:
+                draw.add_rect_filled(
+                    imgui.ImVec2(rect.min_x, rect.min_y),
+                    imgui.ImVec2(rect.max_x, rect.max_y),
+                    imgui.get_color_u32(
+                        rgba(NUDGE_HOVER_BG, NUDGE_HOVER_BG_ALPHA / 255.0)
+                    ),
+                )
+                color = rgba(NUDGE_HOVER_FG)
+            draw.add_text(
+                imgui.ImVec2(
+                    rect.min_x + space * 0.5,
+                    text_y + _icon_drop_to_text(button.glyph),
+                ),
+                imgui.get_color_u32(color),
+                button.glyph,
+            )
+        if not activated or hit is None:
+            return
+        self._controls.inspector.focus_row(row)
+        if available[hit]:
+            apply_field_nav_button(self._controls, desc, hit)
+        self._clear_value_drag()
+        self._nudge_swallow = True
 
     def _handle_value_nudge(
         self,

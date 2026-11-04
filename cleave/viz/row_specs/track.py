@@ -15,10 +15,11 @@ from cleave.config_schema.layers import (
 from cleave.cue_roles import CUE_ROLE_MARKER_HELP_ENTRIES
 from cleave.stems import stem_control_label
 from cleave.viz.commands import command_by_id
+from cleave.viz.material_icons import ARROW_DOWNWARD_GLYPH, ARROW_UPWARD_GLYPH
 from cleave.viz.editor_mode_controls import is_preset_curation_mode
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
 from cleave.viz.row_sections import apply_expand_toggle
-from cleave.viz.row_spec import FitStrategy, RowPresentStyle, RowSpec
+from cleave.viz.row_spec import FitStrategy, RowNavButton, RowPresentStyle, RowSpec
 from cleave.viz.row_specs.common import apply_expand_subheader, noop_horizontal
 from cleave.viz.tuning_view_state import TrackBlock, TuningViewState
 
@@ -228,10 +229,11 @@ def _format_track_preset_dir_position(
 ) -> str:
     return _track_block(state, desc).preset_dir_position
 
-def _format_track_preset_dir_markers(
-    state: TuningViewState, desc: RowDescriptor
-) -> str:
-    return _track_block(state, desc).preset_dir_markers
+def _preset_dir_can_go_up(state: TuningViewState, desc: RowDescriptor) -> bool:
+    return _track_block(state, desc).preset_dir_can_go_up
+
+def _preset_dir_can_go_down(state: TuningViewState, desc: RowDescriptor) -> bool:
+    return _track_block(state, desc).preset_dir_can_go_down
 
 def _format_track_preset_position(
     state: TuningViewState, desc: RowDescriptor
@@ -336,6 +338,15 @@ def _apply_preset_dir_action(controls: TuningControls, desc: RowDescriptor) -> N
     controls.layer_mutations.enter_directory(slot)
 
 
+def _apply_preset_dir_parent_action(
+    controls: TuningControls, desc: RowDescriptor
+) -> None:
+    slot = desc.slot
+    if slot is None:
+        return
+    controls.layer_mutations.parent_directory(slot)
+
+
 def _apply_preset_list_add_action(
     controls: TuningControls, desc: RowDescriptor
 ) -> None:
@@ -407,14 +418,28 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.PATH_ICON,
         format_value=_format_track_preset_dir,
         format_position=_format_track_preset_dir_position,
-        format_markers=_format_track_preset_dir_markers,
+        nav_buttons=(
+            RowNavButton(
+                ARROW_UPWARD_GLYPH,
+                _preset_dir_can_go_up,
+                _apply_preset_dir_parent_action,
+            ),
+            RowNavButton(
+                ARROW_DOWNWARD_GLYPH,
+                _preset_dir_can_go_down,
+                _apply_preset_dir_action,
+            ),
+        ),
         apply_horizontal=_apply_track_preset_dir,
         apply_action=_apply_preset_dir_action,
+        activate_on_double_click=True,
         fit_strategy=FitStrategy.NONE,
         help_title="Preset Directory",
         help_description=(
             "Directory from which presets are browsed for this layer.",
-            "[..] when a parent is available; > when a child directory is available.",
+            "Up and down arrows open the parent or first child directory.",
+            "They dim when there is no directory to move to.",
+            "Double-click also opens the first child directory.",
         ),
         repeatable=True,
         parent_group="track",

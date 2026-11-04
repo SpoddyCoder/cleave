@@ -136,6 +136,37 @@ def nudge_hover_fill_rect(
     return NudgeRect(min_x, hit.min_y, min_x + width, hit.max_y)
 
 
+def nav_button_rects(
+    start_x: float,
+    min_y: float,
+    max_y: float,
+    glyph_widths: Sequence[float],
+    *,
+    gap: float,
+) -> tuple[NudgeRect, ...]:
+    """Icon button hit rects, left to right from *start_x*.
+
+    Each rect is its glyph plus half of *gap* on either side, so neighbours
+    touch and the glyph sits in the middle.
+    """
+    rects: list[NudgeRect] = []
+    x = start_x
+    for width in glyph_widths:
+        rects.append(NudgeRect(x, min_y, x + width + gap, max_y))
+        x += width + gap
+    return tuple(rects)
+
+
+def nav_button_hit_at(
+    x: float, y: float, rects: Sequence[NudgeRect]
+) -> int | None:
+    """Index of the icon button under the pointer."""
+    for index, rect in enumerate(rects):
+        if rect.contains(x, y):
+            return index
+    return None
+
+
 @dataclass(frozen=True)
 class NudgeHit:
     """Pointer is on a side arrow. ``forward`` is the right glyph."""

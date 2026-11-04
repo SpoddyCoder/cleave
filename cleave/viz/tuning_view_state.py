@@ -130,7 +130,8 @@ class TrackBlock:
     preset_dir_label: str
     preset_label: str
     preset_dir_position: str = ""
-    preset_dir_markers: str = ""
+    preset_dir_can_go_up: bool = False
+    preset_dir_can_go_down: bool = False
     preset_position: str = ""
     preset_markers: str = ""
     preset_list_labels: list[str] = field(default_factory=list)
@@ -701,7 +702,8 @@ class TuningViewStateBuilder:
                 runtime=layer,
                 preset_dir_label=directory.path,
                 preset_dir_position=directory.position,
-                preset_dir_markers=directory.markers,
+                preset_dir_can_go_up=directory.can_go_up,
+                preset_dir_can_go_down=directory.can_go_down,
                 preset_label=preset_filename_display(display),
                 preset_position=preset_position_display(display),
                 preset_markers=self._preset_markers(

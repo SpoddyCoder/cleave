@@ -26,6 +26,7 @@ from cleave.viz.shell_host import (
     _VALUE_DRAG_THRESHOLD_PX,
     ShellHost,
     apply_value_drag,
+    inspector_row_click_outcome,
     inspector_row_stepped,
     value_drag_steps,
 )
@@ -112,6 +113,28 @@ def test_locked_drag_does_not_change_the_value() -> None:
     assert crossed_again is False
     assert again == 5.0
     assert _opacity(controls) == before
+
+
+def test_plain_row_click_focuses_and_activates() -> None:
+    assert inspector_row_click_outcome(
+        double_click_row=False, clicked=True, activated=False, double_clicked=False
+    ) == (True, True)
+
+
+def test_double_click_row_only_focuses_on_a_single_click() -> None:
+    assert inspector_row_click_outcome(
+        double_click_row=True, clicked=True, activated=False, double_clicked=False
+    ) == (True, False)
+
+
+def test_double_click_row_activates_on_the_second_press() -> None:
+    assert inspector_row_click_outcome(
+        double_click_row=True, clicked=False, activated=True, double_clicked=True
+    ) == (True, True)
+    # The release after that press focuses only, so the action runs once.
+    assert inspector_row_click_outcome(
+        double_click_row=True, clicked=True, activated=False, double_clicked=False
+    ) == (True, False)
 
 
 def test_off_value_keeps_side_arrows_and_stepped_ignores_the_text() -> None:

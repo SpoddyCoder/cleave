@@ -53,6 +53,15 @@ VisibilityIconFn = Callable[[TuningViewState, RowDescriptor], tuple[bool, bool]]
 
 
 @dataclass(frozen=True)
+class RowNavButton:
+    """Icon button after a row label. Dims when *available* is false."""
+
+    glyph: str
+    available: Callable[[TuningViewState, RowDescriptor], bool]
+    action: ActionMutator
+
+
+@dataclass(frozen=True)
 class RowSpec:
     affordance: RowAffordance
     panel_label: str
@@ -62,8 +71,11 @@ class RowSpec:
     # the markers after the label. format_value is the second line.
     format_position: Callable[[TuningViewState, RowDescriptor], str] | None = None
     format_markers: Callable[[TuningViewState, RowDescriptor], str] | None = None
+    nav_buttons: tuple[RowNavButton, ...] = ()
     apply_horizontal: FieldMutator | None = None
     apply_action: ActionMutator | None = None
+    # A mouse click only focuses the row. Double-click runs apply_action.
+    activate_on_double_click: bool = False
     header_prefix: str | None = None
     header_suffix: str | None = None
     fit_strategy: FitStrategy = FitStrategy.PLAIN
@@ -511,6 +523,19 @@ def apply_field_action(
     if section_lock_blocks_mutation(controls.session, desc):
         return True
     spec.apply_action(controls, desc)
+    return True
+
+
+def apply_field_nav_button(
+    controls: TuningControls,
+    desc: RowDescriptor,
+    index: int,
+) -> bool:
+    """Run the icon button at *index*. False when the section lock blocks it."""
+    if section_lock_blocks_mutation(controls.session, desc):
+        return False
+    button = row_spec(desc.kind).nav_buttons[index]
+    button.action(controls, desc)
     return True
 
 

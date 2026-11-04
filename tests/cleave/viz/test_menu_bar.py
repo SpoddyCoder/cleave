@@ -1193,6 +1193,90 @@ def test_preset_row_draws_two_lines_and_fits_the_filename() -> None:
     assert bounds[2] <= heights["right"]
 
 
+@pytest.mark.parametrize(
+    ("can_go_up", "index", "expected_parent_calls", "expected_child_calls"),
+    (
+        (True, 0, 1, 0),
+        (False, 0, 0, 0),
+        (True, 1, 0, 1),
+    ),
+)
+def test_directory_nav_button_press_skips_the_row_action(
+    can_go_up: bool,
+    index: int,
+    expected_parent_calls: int,
+    expected_child_calls: int,
+) -> None:
+    from cleave.viz import imgui_host, shell_host
+    from cleave.viz.inspector import InspectorRow
+    from cleave.viz.row_kinds import RowDescriptor, RowKind
+    from cleave.viz.shell_focus import ShellFocusState
+    from cleave.viz.shell_layout import ShellLayout
+    from tests.cleave.viz.test_overlay import _minimal_view_state
+
+    view = _minimal_view_state()
+    slot = next(iter(view.tracks))
+    block = view.tracks[slot]
+    block.preset_dir_label = "packs/wave/"
+    block.preset_dir_position = "2/5"
+    block.preset_dir_can_go_up = can_go_up
+    block.preset_dir_can_go_down = True
+    row = InspectorRow(
+        RowDescriptor(RowKind.TRACK_PRESET_DIR, slot=slot), False, 0, True
+    )
+    controls = _shell_controls()
+    controls.build_view_state = lambda **_kwargs: None
+    controls.focus_cursor = None
+    controls.shell_focus = ShellFocusState(
+        region=ShellRegion.NAVIGATOR, selected_id="project"
+    )
+    controls.inspector = MagicMock()
+    controls.layer_mutations = MagicMock()
+    controls.value_nudge = SimpleNamespace(armed=False, desc=None, forward=False)
+    controls.session.layers = {slot: SimpleNamespace(locked=False, stem="drums")}
+    controls.session.layer_z_order = (slot,)
+    overlay = _Overlay()
+    overlay.visibility = 1.0
+    menu = MenuBarState()
+    rects: list = []
+    real_rects = shell_host.nav_button_rects
+
+    def spy_rects(*args, **kwargs):
+        rects[:] = real_rects(*args, **kwargs)
+        return tuple(rects)
+
+    with patch.object(imgui_host, "_gl_context_current", return_value=False):
+        host = _open_shell(overlay, menu, controls)
+    try:
+        host.imgui.display_size = (1280, 720)
+        height = shell_host.menu_bar_height_px()
+        host.set_layout(ShellLayout.compute(1280, 720, height, height, 280))
+        host.process_event(_motion(4))
+        host._draw_navigator = lambda: None
+        host._draw_inspector = lambda _state: host._draw_inspector_row(view, row)
+        with patch.object(shell_host, "nav_button_rects", spy_rects):
+            _paint_shell(host, menu, CommandContext(), frames=1)
+            target = rects[index]
+            pointer = shell_host.imgui.ImVec2(
+                (target.min_x + target.max_x) * 0.5,
+                (target.min_y + target.max_y) * 0.5,
+            )
+            with (
+                patch.object(shell_host.imgui, "get_mouse_pos", return_value=pointer),
+                patch.object(shell_host.imgui, "is_item_activated", return_value=True),
+                patch.object(
+                    shell_host.imgui, "is_mouse_double_clicked", return_value=True
+                ),
+            ):
+                _paint_shell(host, menu, CommandContext(), frames=1)
+    finally:
+        host.imgui.destroy()
+    mutations = controls.layer_mutations
+    assert mutations.parent_directory.call_count == expected_parent_calls
+    assert mutations.enter_directory.call_count == expected_child_calls
+    controls.inspector.activate.assert_not_called()
+
+
 class _Overlay:
     def __init__(self) -> None:
         self.visibility = 0.0

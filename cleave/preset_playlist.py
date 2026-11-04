@@ -145,36 +145,28 @@ def _can_go_parent(
     return _path_at_or_below(parent, floor)
 
 
-def directory_tree_markers(
+def directory_tree_moves(
     current_dir: Path,
     preset_root: Path,
     *,
     browse_floor: Path | None = None,
-) -> str:
-    """Tree markers for the directory row.
-
-    ``[..]`` when a parent directory is available, ``>`` when a child
-    directory is available. Empty when neither is.
-    """
+) -> tuple[bool, bool]:
+    """Whether the directory row can move to a parent, and to a child."""
     can_up = _can_go_parent(
         current_dir, preset_root, browse_floor=browse_floor
     )
     can_down = bool(list_navigable_dirs(current_dir))
-    markers = []
-    if can_up:
-        markers.append("[..]")
-    if can_down:
-        markers.append(">")
-    return " ".join(markers)
+    return can_up, can_down
 
 
 @dataclass(frozen=True)
 class DirectoryDisplay:
-    """Directory row text: path, sibling position, and tree markers."""
+    """Directory row content: path, sibling position, and available tree moves."""
 
     path: str
     position: str
-    markers: str
+    can_go_up: bool
+    can_go_down: bool
 
 
 @dataclass
@@ -205,11 +197,11 @@ class PresetPlaylist:
     ) -> DirectoryDisplay:
         rel = to_config_relative(self.current_dir, preset_root).rstrip("/") + "/"
         siblings = list_browse_siblings(self.current_dir, preset_root)
-        markers = directory_tree_markers(
+        can_go_up, can_go_down = directory_tree_moves(
             self.current_dir, preset_root, browse_floor=browse_floor
         )
         if not siblings:
-            return DirectoryDisplay(rel, "1/1", markers)
+            return DirectoryDisplay(rel, "1/1", can_go_up, can_go_down)
         resolved_current = self.current_dir.resolve()
         try:
             position = (
@@ -222,7 +214,9 @@ class PresetPlaylist:
             )
         except StopIteration:
             position = 1
-        return DirectoryDisplay(rel, f"{position}/{len(siblings)}", markers)
+        return DirectoryDisplay(
+            rel, f"{position}/{len(siblings)}", can_go_up, can_go_down
+        )
 
     def directory_display(
         self,
