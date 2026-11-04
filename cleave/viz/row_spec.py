@@ -43,7 +43,6 @@ class RowPresentStyle(Enum):
 
 class FitStrategy(Enum):
     PLAIN = auto()
-    COUNTER_LABEL = auto()
     PATH = auto()
     NONE = auto()
 
@@ -59,6 +58,10 @@ class RowSpec:
     panel_label: str
     present_style: RowPresentStyle
     format_value: Callable[[TuningViewState, RowDescriptor], str] | None = None
+    # Set on two-line rows: position sits in the arrows on the label line, with
+    # the markers after the label. format_value is the second line.
+    format_position: Callable[[TuningViewState, RowDescriptor], str] | None = None
+    format_markers: Callable[[TuningViewState, RowDescriptor], str] | None = None
     apply_horizontal: FieldMutator | None = None
     apply_action: ActionMutator | None = None
     header_prefix: str | None = None
@@ -339,6 +342,23 @@ def format_row_value(state: TuningViewState, desc: RowDescriptor) -> str:
     spec = row_spec(desc.kind)
     assert spec.format_value is not None, f"no format_value for {desc.kind!r}"
     return spec.format_value(state, desc)
+
+
+def row_is_two_line(kind: RowKind) -> bool:
+    return row_spec(kind).format_position is not None
+
+
+def format_row_position(state: TuningViewState, desc: RowDescriptor) -> str:
+    spec = row_spec(desc.kind)
+    assert spec.format_position is not None, f"no format_position for {desc.kind!r}"
+    return spec.format_position(state, desc)
+
+
+def format_row_markers(state: TuningViewState, desc: RowDescriptor) -> str:
+    spec = row_spec(desc.kind)
+    if spec.format_markers is None:
+        return ""
+    return spec.format_markers(state, desc)
 
 
 def labeled_row_prefix(kind: RowKind, desc: RowDescriptor | None = None) -> str:

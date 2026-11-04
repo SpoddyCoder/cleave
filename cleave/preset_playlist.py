@@ -145,24 +145,36 @@ def _can_go_parent(
     return _path_at_or_below(parent, floor)
 
 
-def directory_tree_marker(
+def directory_tree_markers(
     current_dir: Path,
     preset_root: Path,
     *,
     browse_floor: Path | None = None,
-) -> tuple[str, str]:
-    """Parent prefix and child suffix for the directory row.
+) -> str:
+    """Tree markers for the directory row.
 
-    Prefix is ``[..]`` when a parent directory is available, else empty.
-    Suffix is `` >`` when a child directory is available, else empty.
+    ``[..]`` when a parent directory is available, ``>`` when a child
+    directory is available. Empty when neither is.
     """
     can_up = _can_go_parent(
         current_dir, preset_root, browse_floor=browse_floor
     )
     can_down = bool(list_navigable_dirs(current_dir))
-    prefix = "[..]" if can_up else ""
-    child = " >" if can_down else ""
-    return prefix, child
+    markers = []
+    if can_up:
+        markers.append("[..]")
+    if can_down:
+        markers.append(">")
+    return " ".join(markers)
+
+
+@dataclass(frozen=True)
+class DirectoryDisplay:
+    """Directory row text: path, sibling position, and tree markers."""
+
+    path: str
+    position: str
+    markers: str
 
 
 @dataclass
@@ -172,7 +184,7 @@ class PresetPlaylist:
     index: int = 0
     _dir_display_root: Path | None = field(default=None, repr=False)
     _dir_display_floor: Path | None = field(default=None, repr=False)
-    _dir_display_label: str | None = field(default=None, repr=False)
+    _dir_display: DirectoryDisplay | None = field(default=None, repr=False)
 
     @property
     def current(self) -> Path | None:
@@ -183,21 +195,21 @@ class PresetPlaylist:
     def _invalidate_dir_display(self) -> None:
         self._dir_display_root = None
         self._dir_display_floor = None
-        self._dir_display_label = None
+        self._dir_display = None
 
-    def _compute_dir_display_label(
+    def _compute_dir_display(
         self,
         preset_root: Path,
         *,
         browse_floor: Path | None = None,
-    ) -> str:
+    ) -> DirectoryDisplay:
         rel = to_config_relative(self.current_dir, preset_root).rstrip("/") + "/"
         siblings = list_browse_siblings(self.current_dir, preset_root)
-        prefix, child = directory_tree_marker(
+        markers = directory_tree_markers(
             self.current_dir, preset_root, browse_floor=browse_floor
         )
         if not siblings:
-            return f"{prefix}{rel}{child} (1/1)"
+            return DirectoryDisplay(rel, "1/1", markers)
         resolved_current = self.current_dir.resolve()
         try:
             position = (
@@ -210,14 +222,14 @@ class PresetPlaylist:
             )
         except StopIteration:
             position = 1
-        return f"{prefix}{rel}{child} ({position}/{len(siblings)})"
+        return DirectoryDisplay(rel, f"{position}/{len(siblings)}", markers)
 
-    def directory_display_label(
+    def directory_display(
         self,
         preset_root: Path,
         *,
         browse_floor: Path | None = None,
-    ) -> str:
+    ) -> DirectoryDisplay:
         resolved_root = preset_root.resolve()
         resolved_floor = (
             browse_floor if browse_floor is not None else preset_root
@@ -225,16 +237,16 @@ class PresetPlaylist:
         if (
             self._dir_display_root == resolved_root
             and self._dir_display_floor == resolved_floor
-            and self._dir_display_label is not None
+            and self._dir_display is not None
         ):
-            return self._dir_display_label
-        label = self._compute_dir_display_label(
+            return self._dir_display
+        display = self._compute_dir_display(
             preset_root, browse_floor=browse_floor
         )
         self._dir_display_root = resolved_root
         self._dir_display_floor = resolved_floor
-        self._dir_display_label = label
-        return label
+        self._dir_display = display
+        return display
 
     def _apply(self, other: PresetPlaylist) -> None:
         self.current_dir = other.current_dir
@@ -383,25 +395,18 @@ def scan_preset_playlist(anchor: Path) -> PresetPlaylist:
     raise ValueError(f"preset anchor is not a file or directory: {resolved}")
 
 
-def directory_display(
-    playlist: PresetPlaylist,
-    preset_root: Path,
-    *,
-    browse_floor: Path | None = None,
-) -> str:
-    """Directory path for overlay with sibling position among navigable dirs."""
-    return playlist.directory_display_label(
-        preset_root, browse_floor=browse_floor
-    )
-
-
 def preset_filename_display(playlist: PresetPlaylist) -> str:
-    """Current preset filename with position, or empty-state label."""
+    """Current preset filename, or empty-state label."""
     if playlist.current is None:
         return "NO PRESETS FOUND"
-    total = len(playlist.paths)
-    position = playlist.index + 1
-    return f"{playlist.current.name} ({position}/{total})"
+    return playlist.current.name
+
+
+def preset_position_display(playlist: PresetPlaylist) -> str:
+    """Position of the current preset in its directory, as ``N/TOTAL``."""
+    if playlist.current is None:
+        return "0/0"
+    return f"{playlist.index + 1}/{len(playlist.paths)}"
 
 
 def to_config_relative(path: Path, preset_root: Path) -> str:

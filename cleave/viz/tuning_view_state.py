@@ -71,6 +71,7 @@ from cleave.viz.session import FadeRuntime
 from cleave.preset_playlist import (
     PresetPlaylist,
     preset_filename_display,
+    preset_position_display,
     scan_preset_playlist,
 )
 from cleave.timeline_presets.characters import DEFAULT_TIMELINE_PRESET_KIND
@@ -128,7 +129,12 @@ class TrackBlock:
     runtime: LayerRuntime
     preset_dir_label: str
     preset_label: str
+    preset_dir_position: str = ""
+    preset_dir_markers: str = ""
+    preset_position: str = ""
+    preset_markers: str = ""
     preset_list_labels: list[str] = field(default_factory=list)
+    preset_list_markers: list[str] = field(default_factory=list)
     preset_empty: bool = False
     visible: bool = True
     # Index into runtime.preset_list of the currently playing preset, when present.
@@ -554,8 +560,8 @@ class TuningViewStateBuilder:
         self._layers_by_slot = layers_by_slot
         self._project_dir = project_dir
         self._auto_display_cache: dict[Path, PresetPlaylist] = {}
-        self._base_preset_list_label_cache: dict[tuple[str, ...], list[str]] = {}
-        self._annotated_preset_list_label_cache: dict[
+        self._preset_list_label_cache: dict[tuple[str, ...], list[str]] = {}
+        self._preset_list_marker_cache: dict[
             tuple[tuple[str, ...], str], list[str]
         ] = {}
         self._user_basenames_cache: dict[tuple[tuple[str, ...], ...], set[str]] = {}
@@ -610,31 +616,32 @@ class TuningViewStateBuilder:
         self._auto_display_cache[auto] = playlist
         return playlist
 
-    def _preset_label(
+    def _preset_markers(
         self, playlist: PresetPlaylist, *, user_names: set[str]
     ) -> str:
-        label = preset_filename_display(playlist)
-        if playlist.current is not None:
-            name = playlist.current.name
-            label += self._curation_index.marker(name, user=name in user_names)
-        return label
+        if playlist.current is None:
+            return ""
+        name = playlist.current.name
+        return self._curation_index.marker(name, user=name in user_names).strip()
 
     def _preset_list_labels(self, paths: list[str]) -> list[str]:
         paths_key = tuple(paths)
-        annotated_key = (paths_key, self._curation_index.curation_stamp)
-        cached = self._annotated_preset_list_label_cache.get(annotated_key)
-        if cached is not None:
-            return cached
-        base = self._base_preset_list_label_cache.get(paths_key)
-        if base is None:
-            base = preset_list_display_names(paths)
-            self._base_preset_list_label_cache[paths_key] = base
-        labels = [
-            base[i] + self._curation_index.marker(Path(paths[i]).name)
-            for i in range(len(paths))
-        ]
-        self._annotated_preset_list_label_cache[annotated_key] = labels
+        labels = self._preset_list_label_cache.get(paths_key)
+        if labels is None:
+            labels = preset_list_display_names(paths)
+            self._preset_list_label_cache[paths_key] = labels
         return labels
+
+    def _preset_list_markers(self, paths: list[str]) -> list[str]:
+        key = (tuple(paths), self._curation_index.curation_stamp)
+        markers = self._preset_list_marker_cache.get(key)
+        if markers is None:
+            markers = [
+                self._curation_index.marker(Path(path).name).strip()
+                for path in paths
+            ]
+            self._preset_list_marker_cache[key] = markers
+        return markers
 
     @staticmethod
     def _active_preset_list_index(layer: LayerRuntime) -> int | None:
@@ -686,18 +693,24 @@ class TuningViewStateBuilder:
             # Directory row always reflects browse navigation (Left/Right, Enter, Backspace).
             # The file row alone follows auto_preset_path when switching plays
             # a cast/list preset outside the browse directory.
+            directory = layer.playlist.directory_display(
+                self.preset_root,
+                browse_floor=layer.browse_floor,
+            )
             tracks[slot] = TrackBlock(
                 runtime=layer,
-                preset_dir_label=layer.playlist.directory_display_label(
-                    self.preset_root,
-                    browse_floor=layer.browse_floor,
-                ),
-                preset_label=self._preset_label(
+                preset_dir_label=directory.path,
+                preset_dir_position=directory.position,
+                preset_dir_markers=directory.markers,
+                preset_label=preset_filename_display(display),
+                preset_position=preset_position_display(display),
+                preset_markers=self._preset_markers(
                     display, user_names=user_names
                 ),
                 preset_empty=not display.paths,
                 visible=layer.enabled,
                 preset_list_labels=self._preset_list_labels(list(layer.preset_list)),
+                preset_list_markers=self._preset_list_markers(list(layer.preset_list)),
                 active_preset_list_index=self._active_preset_list_index(layer),
             )
 
@@ -813,10 +826,13 @@ class TuningViewStateBuilder:
             tracks[slot] = replace(
                 base,
                 visible=visible,
-                preset_label=self._preset_label(
+                preset_label=preset_filename_display(display),
+                preset_position=preset_position_display(display),
+                preset_markers=self._preset_markers(
                     display, user_names=user_names
                 ),
                 preset_list_labels=self._preset_list_labels(list(layer.preset_list)),
+                preset_list_markers=self._preset_list_markers(list(layer.preset_list)),
             )
         return tracks
 

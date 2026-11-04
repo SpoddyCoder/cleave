@@ -354,12 +354,14 @@ def test_builder_shows_auto_preset_in_file_row_only() -> None:
     layer.auto_preset_path = bed_b.resolve()
     view_bed = controls.build_view_state(paused=False)
     assert view_bed.tracks["layer_1"].preset_dir_label == browse_dir_label
-    assert view_bed.tracks["layer_1"].preset_label.startswith("bed-b.milk (2/2)")
+    assert view_bed.tracks["layer_1"].preset_label == "bed-b.milk"
+    assert view_bed.tracks["layer_1"].preset_position == "2/2"
 
     layer.auto_preset_path = pulse_a.resolve()
     view_pulse = controls.build_view_state(paused=False)
     assert view_pulse.tracks["layer_1"].preset_dir_label == browse_dir_label
-    assert view_pulse.tracks["layer_1"].preset_label.startswith("pulse-a.milk (1/1)")
+    assert view_pulse.tracks["layer_1"].preset_label == "pulse-a.milk"
+    assert view_pulse.tracks["layer_1"].preset_position == "1/1"
     # Browse playlist unchanged (config stays clean).
     assert layer.playlist.index == 0
 
@@ -561,7 +563,9 @@ def test_builder_appends_curation_markers_without_structure_change() -> None:
         session, config_save)
     view_before = controls.build_view_state(paused=False)
     block_before = view_before.tracks["layer_1"]
-    assert block_before.preset_label == "preset-0.milk (1/3)"
+    assert block_before.preset_label == "preset-0.milk"
+    assert block_before.preset_position == "1/3"
+    assert block_before.preset_markers == ""
     assert block_before.preset_list_labels == ["user.milk"]
 
     current_name = layer.playlist.current.name
@@ -576,9 +580,11 @@ def test_builder_appends_curation_markers_without_structure_change() -> None:
 
     view_after = controls.build_view_state(paused=False)
     block_after = view_after.tracks["layer_1"]
-    assert block_after.preset_label == "preset-0.milk (1/3) [F]"
+    assert block_after.preset_label == "preset-0.milk"
+    assert block_after.preset_markers == "[F]"
     # User-preset rows never append U; F/B only in single-bracket form.
-    assert block_after.preset_list_labels == ["user.milk [FB]"]
+    assert block_after.preset_list_labels == ["user.milk"]
+    assert block_after.preset_list_markers == ["[FB]"]
 
 
 def test_builder_appends_user_defined_marker_on_track_preset() -> None:
@@ -602,7 +608,8 @@ def test_builder_appends_user_defined_marker_on_track_preset() -> None:
     sig_before = view_state_structure_signature(
         session, config_save)
     view_u = controls.build_view_state(paused=False)
-    assert view_u.tracks["layer_1"].preset_label == f"{current_name} (1/3) [U]"
+    assert view_u.tracks["layer_1"].preset_label == current_name
+    assert view_u.tracks["layer_1"].preset_markers == "[U]"
     assert view_u.tracks["layer_2"].preset_list_labels == [current_name]
 
     index.mark_favourite(current_name)
@@ -611,8 +618,10 @@ def test_builder_appends_user_defined_marker_on_track_preset() -> None:
     assert sig_before == sig_after
 
     view_fu = controls.build_view_state(paused=False)
-    assert view_fu.tracks["layer_1"].preset_label == f"{current_name} (1/3) [FU]"
-    assert view_fu.tracks["layer_2"].preset_list_labels == [f"{current_name} [F]"]
+    assert view_fu.tracks["layer_1"].preset_label == current_name
+    assert view_fu.tracks["layer_1"].preset_markers == "[FU]"
+    assert view_fu.tracks["layer_2"].preset_list_labels == [current_name]
+    assert view_fu.tracks["layer_2"].preset_list_markers == ["[F]"]
 
 
 def test_builder_caches_preset_list_base_labels(monkeypatch) -> None:
@@ -647,7 +656,8 @@ def test_builder_caches_preset_list_base_labels(monkeypatch) -> None:
     index = controls._view_state._curation_index
     index.mark_favourite(user_path.name)
     view_marked = controls.build_view_state(paused=False)
-    assert view_marked.tracks["layer_1"].preset_list_labels == ["user.milk [F]"]
+    assert view_marked.tracks["layer_1"].preset_list_labels == ["user.milk"]
+    assert view_marked.tracks["layer_1"].preset_list_markers == ["[F]"]
     assert calls == [1]
 
 

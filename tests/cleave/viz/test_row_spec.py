@@ -37,6 +37,8 @@ from cleave.viz.row_spec import (
     composite_header_suffix_part,
     expand_subheader_prefix,
     expandable_row_kinds,
+    format_row_markers,
+    format_row_position,
     format_row_value,
     full_line_prefix,
     labeled_row_prefix,
@@ -46,6 +48,7 @@ from cleave.viz.row_spec import (
     row_dynamic_labeled_prefix,
     row_expand_subheader_display_text,
     row_is_pinned,
+    row_is_two_line,
     row_labeled_display_text,
     row_navigable_when_section_locked,
     row_panel_label,
@@ -1469,3 +1472,46 @@ def test_row_spec_callbacks_use_public_controls_api() -> None:
             except Exception:
                 continue
     assert accessed == []
+
+
+def test_two_line_rows_are_the_preset_path_rows() -> None:
+    assert {kind for kind in RowKind if row_is_two_line(kind)} == {
+        RowKind.TRACK_PRESET_DIR,
+        RowKind.TRACK_PRESET,
+        RowKind.TRACK_PRESET_LIST_ITEM,
+    }
+
+
+def test_preset_list_item_has_no_side_arrows() -> None:
+    assert row_spec(RowKind.TRACK_PRESET_LIST_ITEM).apply_horizontal is None
+
+
+def test_two_line_row_splits_value_position_and_markers() -> None:
+    block = SimpleNamespace(
+        preset_dir_label="packs/wave/",
+        preset_dir_position="2/5",
+        preset_dir_markers="[..] >",
+        preset_label="foo.milk",
+        preset_position="3/9",
+        preset_markers="[F] [R:B]",
+        preset_list_labels=["a.milk", "b.milk"],
+        preset_list_markers=["", "[B]"],
+    )
+    state = SimpleNamespace(tracks={"layer_1": block})
+
+    directory = RowDescriptor(RowKind.TRACK_PRESET_DIR, slot="layer_1")
+    assert format_row_value(state, directory) == "packs/wave/"
+    assert format_row_position(state, directory) == "2/5"
+    assert format_row_markers(state, directory) == "[..] >"
+
+    preset = RowDescriptor(RowKind.TRACK_PRESET, slot="layer_1")
+    assert format_row_value(state, preset) == "foo.milk"
+    assert format_row_position(state, preset) == "3/9"
+    assert format_row_markers(state, preset) == "[F] [R:B]"
+
+    item = RowDescriptor(
+        RowKind.TRACK_PRESET_LIST_ITEM, slot="layer_1", preset_index=1
+    )
+    assert format_row_value(state, item) == "b.milk"
+    assert format_row_position(state, item) == "2/2"
+    assert format_row_markers(state, item) == "[B]"

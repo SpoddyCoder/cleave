@@ -223,6 +223,26 @@ def _format_track_preset_dir(state: TuningViewState, desc: RowDescriptor) -> str
 def _format_track_preset(state: TuningViewState, desc: RowDescriptor) -> str:
     return _track_block(state, desc).preset_label
 
+def _format_track_preset_dir_position(
+    state: TuningViewState, desc: RowDescriptor
+) -> str:
+    return _track_block(state, desc).preset_dir_position
+
+def _format_track_preset_dir_markers(
+    state: TuningViewState, desc: RowDescriptor
+) -> str:
+    return _track_block(state, desc).preset_dir_markers
+
+def _format_track_preset_position(
+    state: TuningViewState, desc: RowDescriptor
+) -> str:
+    return _track_block(state, desc).preset_position
+
+def _format_track_preset_markers(
+    state: TuningViewState, desc: RowDescriptor
+) -> str:
+    return _track_block(state, desc).preset_markers
+
 def _format_track_preset_list_count(
     state: TuningViewState, desc: RowDescriptor
 ) -> str:
@@ -234,6 +254,19 @@ def _format_track_preset_list_item(
     assert desc.preset_index is not None
     block = _track_block(state, desc)
     return block.preset_list_labels[desc.preset_index]
+
+def _format_track_preset_list_item_position(
+    state: TuningViewState, desc: RowDescriptor
+) -> str:
+    assert desc.preset_index is not None
+    total = len(_track_block(state, desc).preset_list_labels)
+    return f"{desc.preset_index + 1}/{total}"
+
+def _format_track_preset_list_item_markers(
+    state: TuningViewState, desc: RowDescriptor
+) -> str:
+    assert desc.preset_index is not None
+    return _track_block(state, desc).preset_list_markers[desc.preset_index]
 
 def _format_track_effect(state: TuningViewState, desc: RowDescriptor) -> str:
     assert desc.effect_id is not None and desc.driver_slug is not None
@@ -373,9 +406,11 @@ SPECS: dict[RowKind, RowSpec] = {
         panel_label="preset directory",
         present_style=RowPresentStyle.PATH_ICON,
         format_value=_format_track_preset_dir,
+        format_position=_format_track_preset_dir_position,
+        format_markers=_format_track_preset_dir_markers,
         apply_horizontal=_apply_track_preset_dir,
         apply_action=_apply_preset_dir_action,
-        fit_strategy=FitStrategy.COUNTER_LABEL,
+        fit_strategy=FitStrategy.NONE,
         help_title="Preset Directory",
         help_description=(
             "Directory from which presets are browsed for this layer.",
@@ -389,8 +424,10 @@ SPECS: dict[RowKind, RowSpec] = {
         panel_label="preset",
         present_style=RowPresentStyle.PATH_ICON,
         format_value=_format_track_preset,
+        format_position=_format_track_preset_position,
+        format_markers=_format_track_preset_markers,
         apply_horizontal=_apply_track_preset,
-        fit_strategy=FitStrategy.COUNTER_LABEL,
+        fit_strategy=FitStrategy.NONE,
         help_title="Milkdrop Preset File",
         help_description=(
             "Currently active Milkdrop preset for this layer.",
@@ -467,9 +504,10 @@ SPECS: dict[RowKind, RowSpec] = {
         panel_label="preset",
         present_style=RowPresentStyle.PATH_ICON,
         format_value=_format_track_preset_list_item,
-        apply_horizontal=noop_horizontal,
+        format_position=_format_track_preset_list_item_position,
+        format_markers=_format_track_preset_list_item_markers,
         apply_action=_apply_preset_list_item_action,
-        fit_strategy=FitStrategy.COUNTER_LABEL,
+        fit_strategy=FitStrategy.NONE,
         help_title="preset list entry",
         help_description=(
             "Preset in this layer's switching list.",

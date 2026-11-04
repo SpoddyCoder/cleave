@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 from typing import Protocol
 
 
@@ -10,25 +9,6 @@ class TextSizer(Protocol):
     """Something that can measure a string. A pygame font satisfies this."""
 
     def size(self, text: str) -> tuple[int, int]: ...
-
-# Must-include parent-directory prefix: "[..]".
-_TREE_MARKER_PREFIX = re.compile(r"^(\[\.\.\])")
-
-# Playlist counter and/or must-include curation markers after a filename or path.
-# Counter: " (N/TOTAL)".
-# Child directory: " >" immediately before the counter, or a bare trailing " >".
-# Markers: FBU bracket (e.g. " [FBU]") and/or role cast brackets (e.g. " [R:B]").
-# Combined suffixes: " [FBU]", " [FBU] [R:B]", " [R:B] [R:L]", " (2/5) [F] [R:B]",
-# " > (2/5)", " > (2/5) [F] [R:B]".
-_META_SUFFIX = re.compile(
-    r"(?: >)?(?: \((\d+)/(\d+)\))(?: \[[FBU]+\])?(?: \[R:[BPLA]\])*$"
-    r"|"
-    r" >$"
-    r"|"
-    r"(?: \[[FBU]+\])(?: \[R:[BPLA]\])*$"
-    r"|"
-    r"(?: \[R:[BPLA]\])+$"
-)
 
 
 _SENTENCE_END = frozenset(".?!")
@@ -108,26 +88,6 @@ def wrap_text_to_width(font: TextSizer, text: str, max_px: int) -> list[str]:
     return lines
 
 
-def _split_meta_suffix(label: str) -> tuple[str, str]:
-    """Split ``head`` from trailing counter and/or must-include markers."""
-    match = _META_SUFFIX.search(label)
-    if match is None:
-        return label, ""
-    return label[: match.start()], match.group(0)
-
-
-def _split_meta_parts(label: str) -> tuple[str, str, str]:
-    """Split into (tree prefix, head, counter/curation suffix)."""
-    prefix = ""
-    rest = label
-    match = _TREE_MARKER_PREFIX.match(label)
-    if match is not None:
-        prefix = match.group(0)
-        rest = label[match.end() :]
-    head, suffix = _split_meta_suffix(rest)
-    return prefix, head, suffix
-
-
 def fit_text_to_width(font: TextSizer, text: str, max_px: int) -> str:
     """Shorten text with a trailing ellipsis until it fits max_px."""
     if not text or max_px <= 0:
@@ -175,21 +135,8 @@ def fit_path_label_to_width(font: TextSizer, label: str, max_px: int) -> str:
     return best
 
 
-def _fit_label_head(font: TextSizer, head: str, max_px: int) -> str:
-    """Fit the non-meta head: path-style when it contains ``/``, else keep the start."""
-    if "/" in head:
-        return fit_path_label_to_width(font, head, max_px)
-    return fit_text_to_width(font, head, max_px)
-
-
-def fit_counter_label_to_width(font: TextSizer, label: str, max_px: int) -> str:
-    """Shorten a path or filename to max_px; preserve counter and must-include markers."""
-    prefix, head, suffix = _split_meta_parts(label)
-    if not prefix and not suffix:
-        return _fit_label_head(font, label, max_px)
-    reserved = prefix + suffix
-    reserved_w = _text_width(font, reserved)
-    head_budget = max_px - reserved_w
-    if head_budget <= 0:
-        return reserved
-    return prefix + _fit_label_head(font, head, head_budget) + suffix
+def fit_path_or_name_to_width(font: TextSizer, text: str, max_px: int) -> str:
+    """Fit a path by its tail when it contains ``/``, else keep the start."""
+    if "/" in text:
+        return fit_path_label_to_width(font, text, max_px)
+    return fit_text_to_width(font, text, max_px)

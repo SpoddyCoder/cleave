@@ -9,7 +9,7 @@ from unittest.mock import patch
 from cleave.config import load_config
 from cleave.config_schema.layers import DEFAULT_LAYER_SLOTS
 from cleave.preset_playlist import (
-    directory_display,
+    DirectoryDisplay,
     list_navigable_dirs,
     path_under_preset_root,
     playlist_at_dir,
@@ -197,14 +197,10 @@ def test_step_sibling_hops_top_level_packs() -> None:
         _write_milk(pack_b / "b.milk")
 
         playlist = playlist_at_dir(pack_a)
-        assert directory_display(
-            playlist, root, browse_floor=pack_a
-        ) == "pack-a/ (1/2)"
+        assert playlist.directory_display(root, browse_floor=pack_a) == DirectoryDisplay("pack-a/", "1/2", "")
         assert playlist.step_sibling(1, preset_root=root) is True
         assert playlist.current_dir.resolve() == pack_b.resolve()
-        assert directory_display(
-            playlist, root, browse_floor=pack_b
-        ) == "pack-b/ (2/2)"
+        assert playlist.directory_display(root, browse_floor=pack_b) == DirectoryDisplay("pack-b/", "2/2", "")
 
 
 def test_go_parent_recovers_when_outside_browse_floor() -> None:
@@ -221,9 +217,7 @@ def test_go_parent_recovers_when_outside_browse_floor() -> None:
         _write_milk(child / "c.milk")
 
         playlist = playlist_at_dir(child)
-        assert directory_display(
-            playlist, root, browse_floor=pack_a
-        ) == "[..]pack-b/child/ (1/1)"
+        assert playlist.directory_display(root, browse_floor=pack_a) == DirectoryDisplay("pack-b/child/", "1/1", "[..]")
         assert playlist.go_parent(root, browse_floor=pack_a) is True
         assert playlist.current_dir.resolve() == pack_b.resolve()
         assert playlist.go_parent(root, browse_floor=pack_a) is False
@@ -260,11 +254,11 @@ def test_directory_display_clamps_sibling_parent_at_preset_root() -> None:
         _write_milk(pack_b / "b.milk")
 
         playlist = scan_preset_playlist(root)
-        label = directory_display(playlist, root)
-        assert label == "./ > (1/2)"
+        label = playlist.directory_display(root)
+        assert label == DirectoryDisplay("./", "1/2", ">")
 
 
-def test_directory_display_label_outside_preset_root() -> None:
+def test_directory_display_outside_preset_root() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp) / "presets"
         outside = Path(tmp) / "project-presets"
@@ -272,12 +266,12 @@ def test_directory_display_label_outside_preset_root() -> None:
         outside.mkdir()
         _write_milk(outside / "a.milk")
         playlist = playlist_at_dir(outside)
-        label = playlist.directory_display_label(root)
-        assert outside.resolve().as_posix() in label
+        label = playlist.directory_display(root)
+        assert outside.resolve().as_posix() in label.path
         assert not path_under_preset_root(outside, root)
 
 
-def test_directory_display_label_caches_on_repeated_calls() -> None:
+def test_directory_display_caches_on_repeated_calls() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         pack_a = root / "pack-a"
@@ -291,9 +285,9 @@ def test_directory_display_label_caches_on_repeated_calls() -> None:
         with patch(
             "cleave.preset_playlist.list_navigable_dirs", wraps=list_navigable_dirs
         ) as mock_list:
-            first = playlist.directory_display_label(root)
-            second = playlist.directory_display_label(root)
-            assert first == second == "./ > (1/2)"
+            first = playlist.directory_display(root)
+            second = playlist.directory_display(root)
+            assert first == second == DirectoryDisplay("./", "1/2", ">")
             # Sibling listing plus child listing for the tree marker.
             assert mock_list.call_count == 2
 
@@ -309,7 +303,7 @@ def _playlist_with_siblings(root: Path) -> tuple:
     return playlist, siblings
 
 
-def test_directory_display_label_invalidated_after_next() -> None:
+def test_directory_display_invalidated_after_next() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         preset_dir = root / "pack"
@@ -317,16 +311,16 @@ def test_directory_display_label_invalidated_after_next() -> None:
         _write_milk(preset_dir / "a.milk")
         _write_milk(preset_dir / "b.milk")
         playlist = playlist_at_dir(preset_dir)
-        playlist.directory_display_label(root)
+        playlist.directory_display(root)
         with patch(
             "cleave.preset_playlist.list_navigable_dirs", wraps=list_navigable_dirs
         ) as mock_list:
             playlist.next()
-            playlist.directory_display_label(root)
+            playlist.directory_display(root)
             assert mock_list.call_count == 2
 
 
-def test_directory_display_label_invalidated_after_prev() -> None:
+def test_directory_display_invalidated_after_prev() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         preset_dir = root / "pack"
@@ -334,16 +328,16 @@ def test_directory_display_label_invalidated_after_prev() -> None:
         _write_milk(preset_dir / "a.milk")
         _write_milk(preset_dir / "b.milk")
         playlist = playlist_at_dir(preset_dir)
-        playlist.directory_display_label(root)
+        playlist.directory_display(root)
         with patch(
             "cleave.preset_playlist.list_navigable_dirs", wraps=list_navigable_dirs
         ) as mock_list:
             playlist.prev()
-            playlist.directory_display_label(root)
+            playlist.directory_display(root)
             assert mock_list.call_count == 2
 
 
-def test_directory_display_label_invalidated_after_step_by() -> None:
+def test_directory_display_invalidated_after_step_by() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         preset_dir = root / "pack"
@@ -351,30 +345,30 @@ def test_directory_display_label_invalidated_after_step_by() -> None:
         _write_milk(preset_dir / "a.milk")
         _write_milk(preset_dir / "b.milk")
         playlist = playlist_at_dir(preset_dir)
-        playlist.directory_display_label(root)
+        playlist.directory_display(root)
         with patch(
             "cleave.preset_playlist.list_navigable_dirs", wraps=list_navigable_dirs
         ) as mock_list:
             playlist.step_by(1)
-            playlist.directory_display_label(root)
+            playlist.directory_display(root)
             assert mock_list.call_count == 2
 
 
-def test_directory_display_label_invalidated_after_step_sibling() -> None:
+def test_directory_display_invalidated_after_step_sibling() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         playlist, siblings = _playlist_with_siblings(root)
-        playlist.directory_display_label(root)
+        playlist.directory_display(root)
         with patch(
             "cleave.preset_playlist.list_navigable_dirs", wraps=list_navigable_dirs
         ) as mock_list:
             playlist.step_sibling(1, preset_root=root)
-            label = playlist.directory_display_label(root)
+            label = playlist.directory_display(root)
             assert mock_list.call_count >= 1
-            assert label == "[..]beta/ (2/3)"
+            assert label == DirectoryDisplay("beta/", "2/3", "[..]")
 
 
-def test_directory_display_label_invalidated_after_enter_child() -> None:
+def test_directory_display_invalidated_after_enter_child() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         parent = root / "parent"
@@ -384,17 +378,17 @@ def test_directory_display_label_invalidated_after_enter_child() -> None:
         child_a.mkdir()
         _write_milk(child_a / "a.milk")
         playlist = playlist_at_dir(parent)
-        playlist.directory_display_label(root)
+        playlist.directory_display(root)
         with patch(
             "cleave.preset_playlist.list_navigable_dirs", wraps=list_navigable_dirs
         ) as mock_list:
             playlist.enter_child(root)
-            label = playlist.directory_display_label(root)
+            label = playlist.directory_display(root)
             assert mock_list.call_count >= 1
-            assert label == "[..]parent/child-a/ (1/1)"
+            assert label == DirectoryDisplay("parent/child-a/", "1/1", "[..]")
 
 
-def test_directory_display_label_invalidated_after_go_parent() -> None:
+def test_directory_display_invalidated_after_go_parent() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         pack = root / "pack-a"
@@ -404,17 +398,17 @@ def test_directory_display_label_invalidated_after_go_parent() -> None:
         child.mkdir()
         _write_milk(child / "child.milk")
         playlist = playlist_at_dir(child)
-        playlist.directory_display_label(root)
+        playlist.directory_display(root)
         with patch(
             "cleave.preset_playlist.list_navigable_dirs", wraps=list_navigable_dirs
         ) as mock_list:
             playlist.go_parent(root)
-            label = playlist.directory_display_label(root)
+            label = playlist.directory_display(root)
             assert mock_list.call_count >= 1
-            assert label == "[..]pack-a/ > (1/1)"
+            assert label == DirectoryDisplay("pack-a/", "1/1", "[..] >")
 
 
-def test_directory_display_label_tree_markers() -> None:
+def test_directory_display_tree_markers() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         pack = root / "pack"
@@ -425,19 +419,19 @@ def test_directory_display_label_tree_markers() -> None:
         _write_milk(child / "child.milk")
 
         at_root = scan_preset_playlist(root)
-        assert directory_display(at_root, root, browse_floor=root) == "./ > (1/1)"
+        assert at_root.directory_display(root, browse_floor=root) == DirectoryDisplay("./", "1/1", ">")
 
         at_pack = playlist_at_dir(pack)
-        assert directory_display(at_pack, root, browse_floor=root) == (
-            "[..]pack/ > (1/1)"
+        assert at_pack.directory_display(root, browse_floor=root) == (
+            DirectoryDisplay("pack/", "1/1", "[..] >")
         )
-        assert directory_display(at_pack, root, browse_floor=pack) == (
-            "pack/ > (1/1)"
+        assert at_pack.directory_display(root, browse_floor=pack) == (
+            DirectoryDisplay("pack/", "1/1", ">")
         )
 
         at_child = playlist_at_dir(child)
-        assert directory_display(at_child, root, browse_floor=pack) == (
-            "[..]pack/child/ (1/1)"
+        assert at_child.directory_display(root, browse_floor=pack) == (
+            DirectoryDisplay("pack/child/", "1/1", "[..]")
         )
 
 
@@ -459,8 +453,8 @@ def test_config_preset_path_outside_preset_root_is_absolute() -> None:
         assert empty_playlist.config_preset_path(root) == (
             empty.resolve().as_posix() + "/"
         )
-        label = empty_playlist.directory_display_label(root)
-        assert empty.resolve().as_posix() in label
+        label = empty_playlist.directory_display(root)
+        assert empty.resolve().as_posix() in label.path
 
 
 def test_empty_directory_display_and_config_path() -> None:
@@ -641,11 +635,11 @@ def test_remove_preset_invalidates_dir_display_cache() -> None:
         _write_milk(pack_b / "b.milk")
 
         playlist = playlist_at_dir(pack_a, index=0)
-        playlist.directory_display_label(root)
+        playlist.directory_display(root)
         with patch(
             "cleave.preset_playlist.list_navigable_dirs", wraps=list_navigable_dirs
         ) as mock_list:
             playlist.remove_preset(alpha)
-            playlist.directory_display_label(root)
+            playlist.directory_display(root)
             # Sibling listing plus child listing for the tree marker.
             assert mock_list.call_count == 2

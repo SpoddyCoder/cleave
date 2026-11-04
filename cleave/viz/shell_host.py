@@ -37,7 +37,10 @@ from cleave.viz.row_present_renderers import inspector_field_colors
 from cleave.viz.row_sections import inspector_group_glyph
 from cleave.viz.row_spec import (
     apply_field_horizontal,
+    format_row_markers,
+    format_row_position,
     format_row_value,
+    row_is_two_line,
     row_lock_section,
     row_panel_label,
     row_spec,
@@ -57,6 +60,7 @@ from cleave.viz.shell_layout import (
     splitter_hit,
     splitter_request_width,
 )
+from cleave.viz.text_fit import fit_path_or_name_to_width, fit_text_to_width
 from cleave.viz.theme import (
     ACTION,
     BACKGROUND,
@@ -541,6 +545,54 @@ def _draw_aligned_parts(parts: list[tuple[str, imgui.ImVec4]]) -> None:
     for (text, color), width in zip(parts, widths):
         draw.add_text(imgui.ImVec2(x, y), imgui.get_color_u32(color), text)
         x += width
+
+
+class _ImguiTextSizer:
+    """Measure text with the current ImGui font for the text fitters."""
+
+    def size(self, text: str) -> tuple[int, int]:
+        measured = imgui.calc_text_size(text)
+        return math.ceil(measured.x), math.ceil(measured.y)
+
+
+def _draw_two_line_row_text(
+    label: str,
+    markers: str,
+    value: str,
+    parts: list[tuple[str, imgui.ImVec4]],
+    label_color: imgui.ImVec4,
+    value_color: imgui.ImVec4,
+) -> None:
+    """Markers after the label, stopping short of the arrows, and the value below.
+
+    Markers are painted, not part of the selectable label: ImGui hashes the
+    visible label into the id, and a press must survive the markers changing.
+    """
+    origin_x, origin_y = _selectable_label_origin()
+    right_x = imgui.get_item_rect_max().x
+    pad = imgui.get_style().frame_padding.x
+    sizer = _ImguiTextSizer()
+    draw = imgui.get_window_draw_list()
+    if markers:
+        marker_x = origin_x + imgui.calc_text_size(f"{label} ").x
+        cluster_x = nudge_cluster_origin_x(
+            right_x,
+            [imgui.calc_text_size(text).x for text, _color in parts],
+            pad,
+        )
+        fitted = fit_text_to_width(
+            sizer, markers, int(cluster_x - marker_x - imgui.calc_text_size(" ").x)
+        )
+        draw.add_text(
+            imgui.ImVec2(marker_x, origin_y),
+            imgui.get_color_u32(label_color),
+            fitted,
+        )
+    draw.add_text(
+        imgui.ImVec2(origin_x, origin_y + imgui.get_text_line_height()),
+        imgui.get_color_u32(value_color),
+        fit_path_or_name_to_width(sizer, value, int(right_x - pad - origin_x)),
+    )
 
 
 def _inspector_row_selected(focus: Any, desc: Any) -> bool:
@@ -1480,12 +1532,16 @@ class ShellHost:
             label_color, value_color = inspector_field_colors(state, desc)
             if selected and label_color == LABEL:
                 label_color = HIGHLIGHT
+            two_line = row_is_two_line(kind)
+            row_height = 2.0 * imgui.get_text_line_height() if two_line else 0.0
             imgui.push_style_color(imgui.Col_.text, rgba(label_color))
             try:
                 with _selected_header_wash(selected, inspector=True):
                     clicked, _selected = imgui.selectable(
                         f"{label}{inspector_selectable_id(desc, group=False)}",
                         selected,
+                        0,
+                        imgui.ImVec2(0.0, row_height),
                     )
                     # Item flags are only valid while this selectable is current.
                     # Release clears the active id inside the widget, so the
@@ -1501,13 +1557,23 @@ class ShellHost:
             stepped = inspector_row_stepped(state, desc)
             if spec.shows_dirty_suffix and state.config_dirty:
                 value = f"{value}*" if value else "*"
-            if value:
+            cluster = format_row_position(state, desc) if two_line else value
+            if cluster:
                 parts = value_parts(
-                    value,
+                    cluster,
                     rgba(value_color),
                     stepped=stepped,
                 )
                 _draw_aligned_parts(parts)
+                if two_line:
+                    _draw_two_line_row_text(
+                        label,
+                        format_row_markers(state, desc),
+                        value,
+                        parts,
+                        rgba(label_color),
+                        rgba(value_color),
+                    )
                 if stepped:
                     self._handle_value_nudge(
                         row,
@@ -1515,6 +1581,7 @@ class ShellHost:
                         parts,
                         repeatable=spec.repeatable,
                         activated=activated,
+                        two_line=two_line,
                     )
             if stepped and not self._nudge_swallow:
                 self._track_value_drag(
@@ -1545,19 +1612,26 @@ class ShellHost:
         *,
         repeatable: bool,
         activated: bool,
+        two_line: bool,
     ) -> None:
-        """Hover and press the painted side arrows. The value string is not a hit."""
+        """Hover and press the painted side arrows. The value string is not a hit.
+
+        On a two-line row the arrows cover the first line only.
+        """
         if len(parts) != 3:
             return
         rect_min = imgui.get_item_rect_min()
         rect_max = imgui.get_item_rect_max()
         widths = [imgui.calc_text_size(text).x for text, _color in parts]
         pad = imgui.get_style().frame_padding.x
+        arrows_max_y = rect_max.y
+        if two_line:
+            arrows_max_y -= imgui.get_text_line_height()
         back_rect, forward_rect = nudge_arrow_rects(
             rect_min.x,
             rect_min.y,
             rect_max.x,
-            rect_max.y,
+            arrows_max_y,
             widths,
             frame_pad_x=pad,
         )

@@ -191,8 +191,13 @@ def test_view_state_reflects_session_mutation_without_block_writes() -> None:
     assert {field.name for field in fields(TrackBlock)} == {
         "runtime",
         "preset_dir_label",
+        "preset_dir_position",
+        "preset_dir_markers",
         "preset_label",
+        "preset_position",
+        "preset_markers",
         "preset_list_labels",
+        "preset_list_markers",
         "preset_empty",
         "visible",
         "active_preset_list_index",

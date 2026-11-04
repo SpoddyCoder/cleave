@@ -1116,6 +1116,83 @@ def test_focused_inspector_label_is_highlight() -> None:
     assert unfocused_field[0] == pytest.approx(label)
 
 
+def test_preset_row_draws_two_lines_and_fits_the_filename() -> None:
+    from cleave.viz import imgui_host, shell_host
+    from cleave.viz.inspector import InspectorRow
+    from cleave.viz.row_kinds import RowDescriptor, RowKind
+    from cleave.viz.shell_focus import ShellFocusState
+    from cleave.viz.shell_layout import ShellLayout
+    from cleave.viz.theme import VALUE
+    from tests.cleave.viz.test_overlay import _minimal_view_state
+
+    view = _minimal_view_state()
+    slot = next(iter(view.tracks))
+    block = view.tracks[slot]
+    block.preset_label = "very long milkdrop preset filename " * 8 + ".milk"
+    block.preset_position = "3/9"
+    block.preset_markers = "[F] [R:B]"
+    block.preset_list_labels = ["listed.milk"]
+    block.preset_list_markers = ["[B]"]
+    preset = InspectorRow(
+        RowDescriptor(RowKind.TRACK_PRESET, slot=slot), False, 0, True
+    )
+    stem = InspectorRow(RowDescriptor(RowKind.TRACK_STEM, slot=slot), False, 0, True)
+    item = InspectorRow(
+        RowDescriptor(RowKind.TRACK_PRESET_LIST_ITEM, slot=slot, preset_index=0),
+        False,
+        0,
+        True,
+    )
+    controls = _shell_controls()
+    controls.build_view_state = lambda **_kwargs: None
+    controls.focus_cursor = None
+    controls.shell_focus = ShellFocusState(
+        region=ShellRegion.NAVIGATOR, selected_id="project"
+    )
+    overlay = _Overlay()
+    overlay.visibility = 1.0
+    menu = MenuBarState()
+    heights: dict[str, float] = {}
+
+    with patch.object(imgui_host, "_gl_context_current", return_value=False):
+        host = _open_shell(overlay, menu, controls)
+    try:
+        host.imgui.display_size = (1280, 720)
+        height = shell_host.menu_bar_height_px()
+        host.set_layout(ShellLayout.compute(1280, 720, height, height, 280))
+        host.process_event(_motion(4))
+        host._draw_navigator = lambda: None
+
+        def draw_inspector(_state) -> None:
+            imgui = shell_host.imgui
+            top = imgui.get_cursor_pos().y
+            host._draw_inspector_row(view, preset)
+            middle = imgui.get_cursor_pos().y
+            host._draw_inspector_row(view, stem)
+            heights["preset"] = middle - top
+            heights["stem"] = imgui.get_cursor_pos().y - middle
+            before_item = imgui.get_cursor_pos().y
+            host._draw_inspector_row(view, item)
+            heights["item"] = imgui.get_cursor_pos().y - before_item
+            heights["line"] = imgui.get_text_line_height()
+            heights["right"] = imgui.get_item_rect_max().x
+
+        host._draw_inspector = draw_inspector
+        _paint_shell(host, menu, CommandContext(), frames=1)
+        lists = _paint_shell(host, menu, CommandContext(), frames=1)
+        content = _content_lists(lists)
+        names = [draw_list._owner_name for draw_list in content]
+        inspector = content[names.index("##shell-inspector")]
+        bounds = _color_bounds(inspector, _color_u32(VALUE))
+        del lists, content
+    finally:
+        host.imgui.destroy()
+    assert heights["preset"] == pytest.approx(heights["stem"] + heights["line"])
+    assert heights["item"] == pytest.approx(heights["preset"])
+    assert bounds is not None
+    assert bounds[2] <= heights["right"]
+
+
 class _Overlay:
     def __init__(self) -> None:
         self.visibility = 0.0

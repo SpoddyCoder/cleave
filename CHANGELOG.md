@@ -13,6 +13,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- Preset directory, preset, and preset list rows use two lines, so long names no longer overlap the label. The label line holds the markers and the position, and the path or filename sits alone on the line below. Preset list rows show the position without side arrows, since Left and Right do nothing there.
 - The menu, navigator, and inspector stay visible. The auto-fade setting is gone.
 - The timeline strip opens when a session starts with the timeline enabled. Closing the strip or turning the timeline off hides it.
 - Dialog and file-picker highlights sit two pixels out from the text on every side.

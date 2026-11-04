@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from cleave.viz.text_fit import (
-    fit_counter_label_to_width,
     fit_path_label_to_width,
+    fit_path_or_name_to_width,
     fit_text_to_width,
     wrap_text_to_width,
 )
@@ -45,190 +45,18 @@ def test_fit_path_label_preserves_tail() -> None:
     assert font.size(fitted)[0] <= width
 
 
-def test_fit_counter_label_preserves_suffix() -> None:
+def test_fit_path_or_name_keeps_path_tail() -> None:
     font = overlay_font()
-    label = "presets/vocals/long/path/to/preset.milk (3/12)"
-    suffix = " (3/12)"
-    suffix_w = font.size(suffix)[0]
-    width = suffix_w + font.size("…tail.milk")[0]
-    fitted = fit_counter_label_to_width(font, label, width)
-    assert fitted.endswith(suffix)
-    assert font.size(fitted)[0] <= width
+    label = "packs/drums/subdir/"
+    width = font.size("…subdir/")[0]
+    assert fit_path_or_name_to_width(font, label, width) == "…subdir/"
 
 
-def test_fit_counter_label_preserves_curation_marker() -> None:
+def test_fit_path_or_name_keeps_filename_start() -> None:
     font = overlay_font()
-    label = (
-        "Slow transition to black - gas effect + zoom in + orange filter "
-        "=== Tripgnosis - FlameOrb --- Isosceles edit.milk (2/5) [B]"
-    )
-    suffix = " (2/5) [B]"
-    # Narrow enough that a naive path fitter would latch onto the "/" in (2/5).
-    width = font.size(suffix)[0] + font.size("Slow transition to black…")[0]
-    fitted = fit_counter_label_to_width(font, label, width)
-    assert fitted.endswith(suffix)
-    assert fitted.startswith("Slow")
-    assert "…/" not in fitted
-    assert font.size(fitted)[0] <= width
-
-
-def test_fit_counter_label_preserves_favourite_and_blacklist_markers() -> None:
-    font = overlay_font()
-    label = "long-name-without-much-room-left.milk (1/9) [FB]"
-    suffix = " (1/9) [FB]"
-    width = font.size(suffix)[0] + font.size("long-name…")[0]
-    fitted = fit_counter_label_to_width(font, label, width)
-    assert fitted.endswith(suffix)
-    assert font.size(fitted)[0] <= width
-
-
-def test_fit_counter_label_preserves_user_defined_marker() -> None:
-    font = overlay_font()
-    label = "long-name-without-much-room-left.milk (1/9) [FU]"
-    suffix = " (1/9) [FU]"
-    width = font.size(suffix)[0] + font.size("long-name…")[0]
-    fitted = fit_counter_label_to_width(font, label, width)
-    assert fitted.endswith(suffix)
-    assert font.size(fitted)[0] <= width
-
-
-def test_fit_counter_label_preserves_full_fbu_marker() -> None:
-    font = overlay_font()
-    label = "long-name-without-much-room-left.milk (2/8) [FBU]"
-    suffix = " (2/8) [FBU]"
-    width = font.size(suffix)[0] + font.size("long-name…")[0]
-    fitted = fit_counter_label_to_width(font, label, width)
-    assert fitted.endswith(suffix)
-    assert font.size(fitted)[0] <= width
-
-
-def test_fit_counter_label_preserves_role_marker() -> None:
-    font = overlay_font()
-    label = "very-long-cast-preset-filename-that-needs-truncation.milk [R:B]"
-    suffix = " [R:B]"
-    width = font.size(suffix)[0] + font.size("very-long-cast…")[0]
-    fitted = fit_counter_label_to_width(font, label, width)
-    assert fitted.endswith(suffix)
-    assert fitted.startswith("very")
-    assert font.size(fitted)[0] <= width
-
-
-def test_fit_counter_label_preserves_favourite_and_role_markers() -> None:
-    font = overlay_font()
-    label = "long-name-without-much-room-left.milk [F] [R:L]"
-    suffix = " [F] [R:L]"
-    width = font.size(suffix)[0] + font.size("long-name…")[0]
-    fitted = fit_counter_label_to_width(font, label, width)
-    assert fitted.endswith(suffix)
-    assert font.size(fitted)[0] <= width
-
-
-def test_fit_counter_label_preserves_counter_fav_and_role_markers() -> None:
-    font = overlay_font()
-    label = "long-name-without-much-room-left.milk (2/5) [FB] [R:B] [R:A]"
-    suffix = " (2/5) [FB] [R:B] [R:A]"
-    width = font.size(suffix)[0] + font.size("long-name…")[0]
-    fitted = fit_counter_label_to_width(font, label, width)
-    assert fitted.endswith(suffix)
-    assert font.size(fitted)[0] <= width
-
-
-def test_fit_counter_label_preserves_multiple_role_markers_only() -> None:
-    font = overlay_font()
-    label = "very-long-cast-preset-filename-that-needs-truncation.milk [R:B] [R:L]"
-    suffix = " [R:B] [R:L]"
-    width = font.size(suffix)[0] + font.size("very-long-cast…")[0]
-    fitted = fit_counter_label_to_width(font, label, width)
-    assert fitted.endswith(suffix)
-    assert font.size(fitted)[0] <= width
-
-
-def test_fit_counter_label_marker_only_user_preset() -> None:
-    font = overlay_font()
-    label = "very-long-user-preset-filename-that-needs-truncation.milk [B]"
-    suffix = " [B]"
-    width = font.size(suffix)[0] + font.size("very-long-user…")[0]
-    fitted = fit_counter_label_to_width(font, label, width)
-    assert fitted.endswith(suffix)
-    assert fitted.startswith("very")
-    assert font.size(fitted)[0] <= width
-
-
-def test_fit_counter_label_filename_keeps_start_not_shared_tail() -> None:
-    font = overlay_font()
-    a = (
-        "Slow transition to black - gas effect + zoom in === "
-        "Tripgnosis - FlameOrb --- Isosceles edit.milk (3/5) [B]"
-    )
-    b = (
-        "Slow transition to black - gas effect + zoom out === "
-        "amandio c - magnetosphere --- Isosceles edit.milk (4/5) [B]"
-    )
-    width = font.size(" (3/5) [B]")[0] + font.size(
-        "Slow transition to black - gas effect + zoom i…"
-    )[0]
-    fitted_a = fit_counter_label_to_width(font, a, width)
-    fitted_b = fit_counter_label_to_width(font, b, width)
-    assert fitted_a.endswith(" (3/5) [B]")
-    assert fitted_b.endswith(" (4/5) [B]")
-    assert fitted_a.startswith("Slow")
-    assert fitted_b.startswith("Slow")
-    # Path-style tail keep would collapse both to "…Isosceles edit.milk".
-    assert "Isosceles" not in fitted_a
-    assert "Isosceles" not in fitted_b
-    assert "zoom i" in fitted_a
-    assert "zoom o" in fitted_b
-    assert fitted_a != fitted_b
-
-
-def test_fit_counter_label_suffix_only_when_budget_tiny() -> None:
-    font = overlay_font()
-    label = "anything.milk (1/2) [B]"
-    suffix = " (1/2) [B]"
-    fitted = fit_counter_label_to_width(font, label, font.size(suffix)[0] - 1)
-    assert fitted == suffix
-
-
-def test_fit_counter_label_preserves_directory_tree_marker() -> None:
-    font = overlay_font()
-    head = "presets/very/long/directory/path/for/testing/"
-    cases = (
-        ("[..]", " (12/99)"),
-        ("", " > (12/99)"),
-        ("[..]", " > (12/99)"),
-        ("", " >"),
-    )
-    for prefix, suffix in cases:
-        label = f"{prefix}{head}{suffix}"
-        reserved = f"{prefix}{suffix}"
-        width = font.size(reserved)[0] + font.size("…testing/")[0]
-        fitted = fit_counter_label_to_width(font, label, width)
-        if prefix:
-            assert fitted.startswith(prefix)
-        assert fitted.endswith(suffix)
-        assert fitted[: -len(suffix)].endswith("/")
-        assert font.size(fitted)[0] <= width
-        tiny = fit_counter_label_to_width(font, label, max(font.size(reserved)[0] - 1, 0))
-        assert tiny == reserved
-
-
-def test_fit_counter_label_both_tree_markers_reserve_full_width() -> None:
-    """Parent prefix and child '>' are reserved with the counter."""
-    font = overlay_font()
-    label = "[..]presets/very/long/directory/path/for/testing/ > (3/9)"
-    reserved = "[..] > (3/9)"
-    counter_only = "[..] (3/9)"
-    # Budget fits prefix, child marker, counter, and a short head. If '>' stayed
-    # in the path head, a tiny budget would drop it.
-    width = font.size(reserved)[0] + font.size("…testing/")[0]
-    fitted = fit_counter_label_to_width(font, label, width)
-    assert fitted.startswith("[..]")
-    assert fitted.endswith(" > (3/9)")
-    assert fitted[: -len(" > (3/9)")].endswith("/")
-    assert font.size(fitted)[0] <= width
-    tiny = fit_counter_label_to_width(font, label, font.size(reserved)[0] - 1)
-    assert tiny == reserved
-    assert tiny != counter_only
+    name = "Geiss - Reaction Diffusion 2 - shared tail.milk"
+    width = font.size("Geiss - Reaction…")[0]
+    assert fit_path_or_name_to_width(font, name, width) == "Geiss - Reaction…"
 
 
 def test_wrap_text_to_width_keeps_short_line() -> None:

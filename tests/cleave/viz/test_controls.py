@@ -33,10 +33,11 @@ from cleave.config_schema.layers import (
 from tests.support.config import TEST_LAYER_STEMS
 from cleave.preset_playlist import (
     PresetPlaylist,
-    directory_display,
+    DirectoryDisplay,
     playlist_at_dir,
     preset_browse_floor,
     preset_filename_display,
+    preset_position_display,
     scan_preset_playlist,
 )
 from cleave.timeline import SlotCue, TimelineLane, canonicalize, lane_level_at
@@ -3234,7 +3235,7 @@ def test_directory_pack_hop_then_enter_ctrl_left_still_ascends() -> None:
     press_layer_row(controls, RowDescriptor(RowKind.TRACK_PRESET_DIR, slot="layer_1"), _keydown(pygame.K_RETURN))
     assert playlist.current_dir.resolve() == child.resolve()
     view = controls.build_view_state(paused=False)
-    assert "[..]" in view.tracks["layer_1"].preset_dir_label
+    assert "[..]" in view.tracks["layer_1"].preset_dir_markers
 
     press_layer_row(controls, RowDescriptor(RowKind.TRACK_PRESET_DIR, slot="layer_1"), _keydown(pygame.K_BACKSPACE))
     assert playlist.current_dir.resolve() == other.resolve()
@@ -3250,7 +3251,7 @@ def test_directory_enter_then_ctrl_left_ascends_within_pack() -> None:
     press_layer_row(controls, RowDescriptor(RowKind.TRACK_PRESET_DIR, slot="layer_1"), _keydown(pygame.K_RETURN))
     assert playlist.current_dir.resolve() == child.resolve()
     view = controls.build_view_state(paused=False)
-    assert "[..]" in view.tracks["layer_1"].preset_dir_label
+    assert "[..]" in view.tracks["layer_1"].preset_dir_markers
 
     press_layer_row(controls, RowDescriptor(RowKind.TRACK_PRESET_DIR, slot="layer_1"), _keydown(pygame.K_BACKSPACE))
     assert playlist.current_dir.resolve() == siblings[0].resolve()
@@ -3305,7 +3306,7 @@ def test_directory_ctrl_arrows_follow_browse_while_auto_preset_elsewhere() -> No
     assert layer.playlist.current_dir.resolve() == child.resolve()
     after_down = controls.build_view_state(paused=False).tracks["layer_1"]
     assert "roles/" not in after_down.preset_dir_label
-    assert "[..]" in after_down.preset_dir_label
+    assert "[..]" in after_down.preset_dir_markers
     assert after_down.preset_label.startswith("nested.milk")
 
     press_layer_row(controls, RowDescriptor(RowKind.TRACK_PRESET_DIR, slot="layer_1"), _keydown(pygame.K_BACKSPACE))
@@ -3638,7 +3639,7 @@ def test_row_value_color_dim_for_focused_empty_preset() -> None:
         tracks={
             "layer_1": make_track_block(
                 stem="drums",
-                preset_dir_label="empty (1/1)",
+                preset_dir_label="empty/",
                 preset_label="NO PRESETS FOUND",
                 blend_mode="black-key",
                 opacity_pct=50,
@@ -3664,12 +3665,14 @@ def test_preset_overlay_shows_directory_and_position() -> None:
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
     block = view.tracks["layer_1"]
-    assert block.preset_dir_label.startswith("layer_1/ (")
-    assert block.preset_label == "preset-0.milk (1/3)"
+    assert block.preset_dir_label == "layer_1/"
+    assert block.preset_label == "preset-0.milk"
+    assert block.preset_position == "1/3"
 
     controls.session.layers["layer_1"].playlist.index = 1
     view = controls.build_view_state(paused=False)
-    assert view.tracks["layer_1"].preset_label == "preset-1.milk (2/3)"
+    assert view.tracks["layer_1"].preset_label == "preset-1.milk"
+    assert view.tracks["layer_1"].preset_position == "2/3"
 
 
 def test_scan_file_anchor_builds_parent_directory_playlist() -> None:
@@ -3686,8 +3689,11 @@ def test_scan_file_anchor_builds_parent_directory_playlist() -> None:
         assert playlist.current_dir == preset_dir.resolve()
         assert playlist.paths == (first.resolve(), second.resolve())
         assert playlist.index == 1
-        assert preset_filename_display(playlist) == "beta.milk (2/2)"
-        assert directory_display(playlist, root) == "[..]pack/Aurora/ (1/1)"
+        assert preset_filename_display(playlist) == "beta.milk"
+        assert preset_position_display(playlist) == "2/2"
+        assert playlist.directory_display(root) == DirectoryDisplay(
+            "pack/Aurora/", "1/1", "[..]"
+        )
 
 
 def test_l_toggles_lock() -> None:
