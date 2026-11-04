@@ -212,6 +212,11 @@ def navigator_twisty(node: NavNode, expanded: Collection[str]) -> str | None:
     return TWISTY_EXPANDED if node.id in expanded else TWISTY_COLLAPSED
 
 
+def navigator_label_toggles(node: NavNode) -> bool:
+    """Whether a click on *node*'s label also opens or closes it."""
+    return node.expandable and node.depth == 0
+
+
 def navigator_lock_mark(node: NavNode) -> str | None:
     """Lock mark for a locked navigator node."""
     if not node.locked:
@@ -1481,7 +1486,7 @@ class ShellHost:
                 self._toggle_nav_expanded(node.id)
             elif clicked:
                 self._controls.navigator.select(node.id)
-                if node.expandable and not node.has_inspector:
+                if navigator_label_toggles(node):
                     self._toggle_nav_expanded(node.id)
         finally:
             if indent:

@@ -25,6 +25,7 @@ from cleave.viz.session import LayerRuntime, TuningSession
 from cleave.viz.shell_host import (
     inspector_header,
     inspector_selectable_id,
+    navigator_label_toggles,
     navigator_lock_mark,
     navigator_twisty,
     selectable_wash,
@@ -313,6 +314,21 @@ def test_only_expandable_nodes_show_a_twisty() -> None:
         if node.expandable:
             continue
         assert navigator_twisty(node, {"layers", node.id}) is None
+
+
+def test_label_click_toggles_expandable_roots_only() -> None:
+    nodes = build_navigator(_session(), {"layers"})
+
+    toggling = {node.id for node in nodes if navigator_label_toggles(node)}
+
+    assert toggling == {
+        "settings",
+        "project",
+        "overlay",
+        "post_fx",
+        "timeline",
+        "layers",
+    }
 
 
 def test_inspector_selectable_id_changes_with_effect_and_preset() -> None:
