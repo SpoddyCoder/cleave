@@ -930,6 +930,7 @@ def test_navigator_focus_ring_only_while_that_region_is_active() -> None:
     menu = MenuBarState()
     nodes = (
         NavNode("settings", "Settings", 0, True, None, locked=True),
+        NavNode("settings.ui", "UI", 1, True, None, parent_id="settings"),
         NavNode("project", "Project", 0, True, None),
     )
     focus = ShellFocusState(region=ShellRegion.NAVIGATOR, selected_id="settings")

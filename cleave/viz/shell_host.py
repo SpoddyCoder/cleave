@@ -1495,7 +1495,8 @@ class ShellHost:
                         imgui.ImVec2(width, 0.0),
                     )
                     imgui.same_line()
-                if selected:
+                bright = selected or node.depth == 0
+                if bright:
                     imgui.push_style_color(imgui.Col_.text, rgba(VALUE))
                 try:
                     text_pos = imgui.get_cursor_screen_pos()
@@ -1509,7 +1510,7 @@ class ShellHost:
                         imgui.set_scroll_here_y()
                         self._nav_scrolled_id = node.id
                 finally:
-                    if selected:
+                    if bright:
                         imgui.pop_style_color()
             mark = navigator_lock_mark(node)
             if mark is not None:
