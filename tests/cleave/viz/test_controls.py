@@ -552,40 +552,40 @@ def test_focus_navigation_does_not_walk_a_main_list() -> None:
     assert _press_focused(controls, _keydown(pygame.K_LEFT)) is True
     assert controls.focus_cursor == before
 
-def test_disabled_render_overlay_can_expand_sub_rows() -> None:
+def test_disabled_overlay_can_expand_sub_rows() -> None:
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
-    header_row = RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
+    header_row = RowDescriptor(RowKind.OVERLAYS_HEADER)
     controls.focus_descriptor = header_row
     _press_focused(controls, _keydown(pygame.K_e))
-    assert controls.session.render_overlays.opening_card.enabled is False
-    assert controls.session.render_overlays.closing_card.enabled is False
+    assert controls.session.overlays.opening_card.enabled is False
+    assert controls.session.overlays.closing_card.enabled is False
 
     _press_focused(controls, _keydown(pygame.K_RIGHT))
-    assert controls.session.render_overlays.opening_card.enabled is False
+    assert controls.session.overlays.opening_card.enabled is False
 
     view = controls.build_view_state(paused=False)
     page = _page_kinds(view, "overlay.opening_card")
-    assert RowKind.RENDER_OVERLAY_CARD_POSITION in page
+    assert RowKind.OVERLAY_CARD_POSITION in page
 
 
-def test_disabled_render_post_fx_can_expand_sub_rows() -> None:
+def test_disabled_post_fx_can_expand_sub_rows() -> None:
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
-    header_row = RowDescriptor(RowKind.RENDER_POST_FX_HEADER)
+    header_row = RowDescriptor(RowKind.POST_FX_HEADER)
     controls.focus_descriptor = header_row
     _press_focused(controls, _keydown(pygame.K_e))
-    assert controls.session.render_post_fx.enabled is False
+    assert controls.session.post_fx.enabled is False
 
     _press_focused(controls, _keydown(pygame.K_RIGHT))
-    assert controls.session.render_post_fx.enabled is False
+    assert controls.session.post_fx.enabled is False
 
     view = controls.build_view_state(paused=False)
     page = _page_kinds(view, "post_fx.fade")
-    assert RowKind.RENDER_POST_FX_FADE_IN_START in page
+    assert RowKind.POST_FX_FADE_IN_START in page
 
 
-def test_disabled_render_timeline_can_open_panel() -> None:
+def test_disabled_timeline_can_open_panel() -> None:
     controls = _make_controls(("layer_1",))
     assert controls.session.timeline.enabled is False
     assert controls.session.timeline.panel_open is False
@@ -769,7 +769,7 @@ def test_exit_timeline_submenu_only_when_submenu_focused() -> None:
 
     controls.focus_cursor = TimelineFocus(0)
     controls.exit_timeline_submenu()
-    assert controls.focus_descriptor.kind == RowKind.RENDER_TIMELINE_HEADER
+    assert controls.focus_descriptor.kind == RowKind.TIMELINE_HEADER
     assert controls.shell_focus.region is ShellRegion.NAVIGATOR
 
     controls.session.timeline.focus_row = 1
@@ -779,7 +779,7 @@ def test_exit_timeline_submenu_only_when_submenu_focused() -> None:
     controls.exit_timeline_submenu()
     assert controls.shell_focus.region is ShellRegion.NAVIGATOR
     assert isinstance(controls.focus_cursor, MainFocus)
-    assert controls.focus_descriptor.kind == RowKind.RENDER_TIMELINE_HEADER
+    assert controls.focus_descriptor.kind == RowKind.TIMELINE_HEADER
     assert controls.session.timeline.focus_row == 1
     assert controls.session.timeline.panel_open is True
 
@@ -840,80 +840,80 @@ _OVERLAY_TEST_FONTS = ("alpha", "bravo", "charlie")
 
 
 @patch(
-    "cleave.viz.fonts.render_overlay_system_fonts",
+    "cleave.viz.fonts.overlay_system_fonts",
     return_value=_OVERLAY_TEST_FONTS,
 )
-def test_render_overlay_title_font_row(_mock_fonts) -> None:
+def test_overlay_title_font_row(_mock_fonts) -> None:
     controls = _make_controls()
-    controls.session.render_overlays.opening_card.title_font = "alpha"
+    controls.session.overlays.opening_card.title_font = "alpha"
     view = controls.build_view_state(paused=False)
-    font_row = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_FONT, card="opening_card")
+    font_row = RowDescriptor(RowKind.OVERLAY_CARD_TITLE_FONT, card="opening_card")
     assert _row_text(view, font_row) == "font: alpha (1/3)"
 
     controls.focus_descriptor = _desc(view, font_row)
     _press_focused(controls, _keydown(pygame.K_RIGHT))
-    assert controls.session.render_overlays.opening_card.title_font == "bravo"
+    assert controls.session.overlays.opening_card.title_font == "bravo"
 
 
 @patch(
-    "cleave.viz.fonts.render_overlay_system_fonts",
+    "cleave.viz.fonts.overlay_system_fonts",
     return_value=_OVERLAY_TEST_FONTS,
 )
-def test_render_overlay_body_font_row(_mock_fonts) -> None:
+def test_overlay_body_font_row(_mock_fonts) -> None:
     controls = _make_controls()
-    controls.session.render_overlays.opening_card.body_font = "bravo"
+    controls.session.overlays.opening_card.body_font = "bravo"
     view = controls.build_view_state(paused=False)
-    font_row = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_BODY_FONT, card="opening_card")
+    font_row = RowDescriptor(RowKind.OVERLAY_CARD_BODY_FONT, card="opening_card")
     assert _row_text(view, font_row) == "font: bravo (2/3)"
 
     controls.focus_descriptor = _desc(view, font_row)
     _press_focused(controls, _keydown(pygame.K_LEFT))
-    assert controls.session.render_overlays.opening_card.body_font == "alpha"
+    assert controls.session.overlays.opening_card.body_font == "alpha"
 
 
-def test_render_overlay_title_font_size_row() -> None:
+def test_overlay_title_font_size_row() -> None:
     controls = _make_controls()
-    controls.session.render_overlays.opening_card.title_font_size = 12
+    controls.session.overlays.opening_card.title_font_size = 12
     view = controls.build_view_state(paused=False)
-    font_row = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_FONT_SIZE, card="opening_card")
+    font_row = RowDescriptor(RowKind.OVERLAY_CARD_TITLE_FONT_SIZE, card="opening_card")
     assert _row_text(view, font_row) == "font size: 12px"
 
     controls.focus_descriptor = _desc(view, font_row)
     _press_focused(controls, _keydown(pygame.K_RIGHT))
-    assert controls.session.render_overlays.opening_card.title_font_size == 13
+    assert controls.session.overlays.opening_card.title_font_size == 13
 
 
-def test_render_overlay_title_margin_bottom_row() -> None:
+def test_overlay_title_margin_bottom_row() -> None:
     controls = _make_controls()
-    controls.session.render_overlays.opening_card.title_margin_bottom = 10
+    controls.session.overlays.opening_card.title_margin_bottom = 10
     view = controls.build_view_state(paused=False)
-    margin_row = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_MARGIN_BOTTOM, card="opening_card")
+    margin_row = RowDescriptor(RowKind.OVERLAY_CARD_TITLE_MARGIN_BOTTOM, card="opening_card")
     assert _row_text(view, margin_row) == "margin bottom: 10px"
 
     controls.focus_descriptor = _desc(view, margin_row)
     _press_focused(controls, _keydown(pygame.K_RIGHT))
-    assert controls.session.render_overlays.opening_card.title_margin_bottom == 11
+    assert controls.session.overlays.opening_card.title_margin_bottom == 11
 
 
-def test_render_overlay_body_font_size_row() -> None:
+def test_overlay_body_font_size_row() -> None:
     controls = _make_controls()
-    controls.session.render_overlays.opening_card.body_font_size = 18
+    controls.session.overlays.opening_card.body_font_size = 18
     view = controls.build_view_state(paused=False)
-    font_row = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_BODY_FONT_SIZE, card="opening_card")
+    font_row = RowDescriptor(RowKind.OVERLAY_CARD_BODY_FONT_SIZE, card="opening_card")
     assert _row_text(view, font_row) == "font size: 18px"
 
     controls.focus_descriptor = _desc(view, font_row)
     _press_focused(controls, _keydown(pygame.K_LEFT))
-    assert controls.session.render_overlays.opening_card.body_font_size == 17
+    assert controls.session.overlays.opening_card.body_font_size == 17
 
 
-def test_render_overlay_background_margin_and_padding_placement() -> None:
+def test_overlay_background_margin_and_padding_placement() -> None:
     controls = _make_controls()
     view = controls.build_view_state(paused=False)
-    colour = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_BACKGROUND_COLOUR, card="opening_card")
-    margin = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_BACKGROUND_MARGIN, card="opening_card")
-    padding = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_BACKGROUND_PADDING, card="opening_card")
-    border_width = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_BORDER_WIDTH, card="opening_card")
+    colour = RowDescriptor(RowKind.OVERLAY_CARD_BACKGROUND_COLOUR, card="opening_card")
+    margin = RowDescriptor(RowKind.OVERLAY_CARD_BACKGROUND_MARGIN, card="opening_card")
+    padding = RowDescriptor(RowKind.OVERLAY_CARD_BACKGROUND_PADDING, card="opening_card")
+    border_width = RowDescriptor(RowKind.OVERLAY_CARD_BORDER_WIDTH, card="opening_card")
     _assert_card_order(
         view,
         "opening_card",
@@ -924,68 +924,68 @@ def test_render_overlay_background_margin_and_padding_placement() -> None:
     )
 
 
-def test_render_overlay_background_margin_row() -> None:
+def test_overlay_background_margin_row() -> None:
     controls = _make_controls()
-    controls.session.render_overlays.opening_card.background_margin = 40
+    controls.session.overlays.opening_card.background_margin = 40
     view = controls.build_view_state(paused=False)
-    margin_row = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_BACKGROUND_MARGIN, card="opening_card")
+    margin_row = RowDescriptor(RowKind.OVERLAY_CARD_BACKGROUND_MARGIN, card="opening_card")
     assert _row_text(view, margin_row) == "background margin: 40px"
 
     controls.focus_descriptor = _desc(view, margin_row)
     _press_focused(controls, _keydown(pygame.K_RIGHT))
-    assert controls.session.render_overlays.opening_card.background_margin == 41
+    assert controls.session.overlays.opening_card.background_margin == 41
     _press_focused(controls, _keydown(pygame.K_PAGEDOWN))
-    assert controls.session.render_overlays.opening_card.background_margin == 31
+    assert controls.session.overlays.opening_card.background_margin == 31
 
 
-def test_render_overlay_background_padding_row() -> None:
+def test_overlay_background_padding_row() -> None:
     controls = _make_controls()
-    controls.session.render_overlays.opening_card.background_padding = 20
+    controls.session.overlays.opening_card.background_padding = 20
     view = controls.build_view_state(paused=False)
-    padding_row = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_BACKGROUND_PADDING, card="opening_card")
+    padding_row = RowDescriptor(RowKind.OVERLAY_CARD_BACKGROUND_PADDING, card="opening_card")
     assert _row_text(view, padding_row) == "background padding: 20px"
 
     controls.focus_descriptor = _desc(view, padding_row)
     _press_focused(controls, _keydown(pygame.K_LEFT))
-    assert controls.session.render_overlays.opening_card.background_padding == 19
+    assert controls.session.overlays.opening_card.background_padding == 19
     _press_focused(controls, _keydown(pygame.K_PAGEUP))
-    assert controls.session.render_overlays.opening_card.background_padding == 29
+    assert controls.session.overlays.opening_card.background_padding == 29
 
 
 def _expand_overlay_card_title(controls: TuningControls, card: str) -> None:
-    overlays = controls.session.render_overlays
+    overlays = controls.session.overlays
 
 
-def test_render_overlay_title_text_row_present_for_both_cards() -> None:
+def test_overlay_title_text_row_present_for_both_cards() -> None:
     controls = _make_controls()
     _expand_overlay_card_title(controls, "opening_card")
     _expand_overlay_card_title(controls, "closing_card")
     view = controls.build_view_state(paused=False)
-    opening = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_TEXT, card="opening_card")
-    closing = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_TEXT, card="closing_card")
-    opening_font = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_FONT, card="opening_card")
-    closing_font = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_FONT, card="closing_card")
+    opening = RowDescriptor(RowKind.OVERLAY_CARD_TITLE_TEXT, card="opening_card")
+    closing = RowDescriptor(RowKind.OVERLAY_CARD_TITLE_TEXT, card="closing_card")
+    opening_font = RowDescriptor(RowKind.OVERLAY_CARD_TITLE_FONT, card="opening_card")
+    closing_font = RowDescriptor(RowKind.OVERLAY_CARD_TITLE_FONT, card="closing_card")
     assert opening.card == "opening_card"
     assert closing.card == "closing_card"
     _assert_card_order(view, "opening_card", opening.kind, opening_font.kind)
     _assert_card_order(view, "closing_card", closing.kind, closing_font.kind)
 
 
-def test_render_overlay_title_text_formats_newlines_as_spaces() -> None:
+def test_overlay_title_text_formats_newlines_as_spaces() -> None:
     controls = _make_controls()
     _expand_overlay_card_title(controls, "opening_card")
-    controls.session.render_overlays.opening_card.title_content = "Line one\nLine two"
+    controls.session.overlays.opening_card.title_content = "Line one\nLine two"
     view = controls.build_view_state(paused=False)
-    row = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_TEXT, card="opening_card")
+    row = RowDescriptor(RowKind.OVERLAY_CARD_TITLE_TEXT, card="opening_card")
     assert _row_text(view, row) == "title text: Line one Line two"
 
 
-def test_render_overlay_title_text_enter_opens_single_line_modal() -> None:
+def test_overlay_title_text_enter_opens_single_line_modal() -> None:
     controls = _make_controls()
     _expand_overlay_card_title(controls, "opening_card")
-    controls.session.render_overlays.opening_card.title_content = "Opening title"
+    controls.session.overlays.opening_card.title_content = "Opening title"
     view = controls.build_view_state(paused=False)
-    row = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_TEXT, card="opening_card")
+    row = RowDescriptor(RowKind.OVERLAY_CARD_TITLE_TEXT, card="opening_card")
     controls.focus_descriptor = _desc(view, row)
     _press_focused(controls, _keydown(pygame.K_RETURN))
     modal = controls.modal_host.view_state()
@@ -997,12 +997,12 @@ def test_render_overlay_title_text_enter_opens_single_line_modal() -> None:
     assert modal.editing is True
 
 
-def test_render_overlay_title_text_confirm_updates_session() -> None:
+def test_overlay_title_text_confirm_updates_session() -> None:
     controls = _make_controls()
     _expand_overlay_card_title(controls, "opening_card")
-    controls.session.render_overlays.opening_card.title_content = "Opening title"
+    controls.session.overlays.opening_card.title_content = "Opening title"
     view = controls.build_view_state(paused=False)
-    row = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_TEXT, card="opening_card")
+    row = RowDescriptor(RowKind.OVERLAY_CARD_TITLE_TEXT, card="opening_card")
     controls.focus_descriptor = _desc(view, row)
     _press_focused(controls, _keydown(pygame.K_RETURN))
     controls.modal_host.handle_text_input(" edited")
@@ -1010,35 +1010,35 @@ def test_render_overlay_title_text_confirm_updates_session() -> None:
     _press_focused(controls, _keydown(pygame.K_RETURN))
     assert controls.modal_host.view_state() is None
     assert (
-        controls.session.render_overlays.opening_card.title_content
+        controls.session.overlays.opening_card.title_content
         == "Opening title edited"
     )
 
 
-def test_render_overlay_title_text_cancel_keeps_session() -> None:
+def test_overlay_title_text_cancel_keeps_session() -> None:
     controls = _make_controls()
     _expand_overlay_card_title(controls, "closing_card")
-    controls.session.render_overlays.closing_card.title_content = "Closing title"
+    controls.session.overlays.closing_card.title_content = "Closing title"
     view = controls.build_view_state(paused=False)
-    row = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_TEXT, card="closing_card")
+    row = RowDescriptor(RowKind.OVERLAY_CARD_TITLE_TEXT, card="closing_card")
     controls.focus_descriptor = _desc(view, row)
     _press_focused(controls, _keydown(pygame.K_RETURN))
     controls.modal_host.handle_text_input(" edited")
     _press_focused(controls, _keydown(pygame.K_ESCAPE))
     _press_focused(controls, _keydown(pygame.K_ESCAPE))
     assert controls.modal_host.view_state() is None
-    assert controls.session.render_overlays.closing_card.title_content == (
+    assert controls.session.overlays.closing_card.title_content == (
         "Closing title"
     )
 
 
-def test_render_overlay_title_text_lock_blocks_enter() -> None:
+def test_overlay_title_text_lock_blocks_enter() -> None:
     controls = _make_controls()
     _expand_overlay_card_title(controls, "opening_card")
     view = controls.build_view_state(paused=False)
-    row = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_TEXT, card="opening_card")
+    row = RowDescriptor(RowKind.OVERLAY_CARD_TITLE_TEXT, card="opening_card")
     controls.focus_descriptor = _desc(view, row)
-    controls.session.render_overlays.locked = True
+    controls.session.overlays.locked = True
     _press_focused(controls, _keydown(pygame.K_RETURN))
     assert controls.modal_host.view_state() is None
 
@@ -1057,17 +1057,17 @@ def _confirm_text_modal(controls: TuningControls) -> None:
     _press_focused(controls, _keydown(pygame.K_RETURN))
 
 
-def test_render_overlay_title_colour_row_present_for_both_cards() -> None:
+def test_overlay_title_colour_row_present_for_both_cards() -> None:
     controls = _make_controls()
     _expand_overlay_card_title(controls, "opening_card")
     _expand_overlay_card_title(controls, "closing_card")
     view = controls.build_view_state(paused=False)
-    opening_text = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_TEXT, card="opening_card")
-    opening_colour = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_COLOUR, card="opening_card")
-    opening_font = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_FONT, card="opening_card")
-    closing_text = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_TEXT, card="closing_card")
-    closing_colour = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_COLOUR, card="closing_card")
-    closing_font = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_FONT, card="closing_card")
+    opening_text = RowDescriptor(RowKind.OVERLAY_CARD_TITLE_TEXT, card="opening_card")
+    opening_colour = RowDescriptor(RowKind.OVERLAY_CARD_TITLE_COLOUR, card="opening_card")
+    opening_font = RowDescriptor(RowKind.OVERLAY_CARD_TITLE_FONT, card="opening_card")
+    closing_text = RowDescriptor(RowKind.OVERLAY_CARD_TITLE_TEXT, card="closing_card")
+    closing_colour = RowDescriptor(RowKind.OVERLAY_CARD_TITLE_COLOUR, card="closing_card")
+    closing_font = RowDescriptor(RowKind.OVERLAY_CARD_TITLE_FONT, card="closing_card")
     assert opening_colour.card == "opening_card"
     assert closing_colour.card == "closing_card"
     _assert_card_order(
@@ -1078,21 +1078,21 @@ def test_render_overlay_title_colour_row_present_for_both_cards() -> None:
     )
 
 
-def test_render_overlay_title_colour_formats_hex() -> None:
+def test_overlay_title_colour_formats_hex() -> None:
     controls = _make_controls()
     _expand_overlay_card_title(controls, "opening_card")
-    controls.session.render_overlays.opening_card.title_colour = (255, 0, 0)
+    controls.session.overlays.opening_card.title_colour = (255, 0, 0)
     view = controls.build_view_state(paused=False)
-    row = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_COLOUR, card="opening_card")
+    row = RowDescriptor(RowKind.OVERLAY_CARD_TITLE_COLOUR, card="opening_card")
     assert _row_text(view, row) == "title colour: #ff0000"
 
 
-def test_render_overlay_title_colour_enter_opens_single_line_modal() -> None:
+def test_overlay_title_colour_enter_opens_single_line_modal() -> None:
     controls = _make_controls()
     _expand_overlay_card_title(controls, "opening_card")
-    controls.session.render_overlays.opening_card.title_colour = (255, 255, 255)
+    controls.session.overlays.opening_card.title_colour = (255, 255, 255)
     view = controls.build_view_state(paused=False)
-    row = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_COLOUR, card="opening_card")
+    row = RowDescriptor(RowKind.OVERLAY_CARD_TITLE_COLOUR, card="opening_card")
     controls.focus_descriptor = _desc(view, row)
     _press_focused(controls, _keydown(pygame.K_RETURN))
     modal = controls.modal_host.view_state()
@@ -1104,26 +1104,26 @@ def test_render_overlay_title_colour_enter_opens_single_line_modal() -> None:
     assert modal.editing is True
 
 
-def test_render_overlay_title_colour_confirm_updates_session() -> None:
+def test_overlay_title_colour_confirm_updates_session() -> None:
     controls = _make_controls()
     _expand_overlay_card_title(controls, "opening_card")
-    controls.session.render_overlays.opening_card.title_colour = (255, 255, 255)
+    controls.session.overlays.opening_card.title_colour = (255, 255, 255)
     view = controls.build_view_state(paused=False)
-    row = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_COLOUR, card="opening_card")
+    row = RowDescriptor(RowKind.OVERLAY_CARD_TITLE_COLOUR, card="opening_card")
     controls.focus_descriptor = _desc(view, row)
     _press_focused(controls, _keydown(pygame.K_RETURN))
     _replace_text_modal_draft(controls, "#ff0000")
     _confirm_text_modal(controls)
     assert controls.modal_host.view_state() is None
-    assert controls.session.render_overlays.opening_card.title_colour == (255, 0, 0)
+    assert controls.session.overlays.opening_card.title_colour == (255, 0, 0)
 
 
-def test_render_overlay_title_colour_confirm_invalid_stays_open() -> None:
+def test_overlay_title_colour_confirm_invalid_stays_open() -> None:
     controls = _make_controls()
     _expand_overlay_card_title(controls, "opening_card")
-    controls.session.render_overlays.opening_card.title_colour = (255, 255, 255)
+    controls.session.overlays.opening_card.title_colour = (255, 255, 255)
     view = controls.build_view_state(paused=False)
-    row = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_COLOUR, card="opening_card")
+    row = RowDescriptor(RowKind.OVERLAY_CARD_TITLE_COLOUR, card="opening_card")
     controls.focus_descriptor = _desc(view, row)
     _press_focused(controls, _keydown(pygame.K_RETURN))
     _replace_text_modal_draft(controls, "bad")
@@ -1132,77 +1132,77 @@ def test_render_overlay_title_colour_confirm_invalid_stays_open() -> None:
     assert modal is not None
     assert modal.kind == ModalKind.TEXT
     assert modal.error == "invalid hex colour (use #rgb or #rrggbb)"
-    assert controls.session.render_overlays.opening_card.title_colour == (
+    assert controls.session.overlays.opening_card.title_colour == (
         255,
         255,
         255,
     )
 
 
-def test_render_overlay_title_colour_cancel_keeps_session() -> None:
+def test_overlay_title_colour_cancel_keeps_session() -> None:
     controls = _make_controls()
     _expand_overlay_card_title(controls, "closing_card")
-    controls.session.render_overlays.closing_card.title_colour = (255, 255, 255)
+    controls.session.overlays.closing_card.title_colour = (255, 255, 255)
     view = controls.build_view_state(paused=False)
-    row = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_COLOUR, card="closing_card")
+    row = RowDescriptor(RowKind.OVERLAY_CARD_TITLE_COLOUR, card="closing_card")
     controls.focus_descriptor = _desc(view, row)
     _press_focused(controls, _keydown(pygame.K_RETURN))
     _replace_text_modal_draft(controls, "#ff0000")
     _press_focused(controls, _keydown(pygame.K_ESCAPE))
     _press_focused(controls, _keydown(pygame.K_ESCAPE))
     assert controls.modal_host.view_state() is None
-    assert controls.session.render_overlays.closing_card.title_colour == (
+    assert controls.session.overlays.closing_card.title_colour == (
         255,
         255,
         255,
     )
 
 
-def test_render_overlay_title_colour_lock_blocks_enter() -> None:
+def test_overlay_title_colour_lock_blocks_enter() -> None:
     controls = _make_controls()
     _expand_overlay_card_title(controls, "opening_card")
     view = controls.build_view_state(paused=False)
-    row = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_COLOUR, card="opening_card")
+    row = RowDescriptor(RowKind.OVERLAY_CARD_TITLE_COLOUR, card="opening_card")
     controls.focus_descriptor = _desc(view, row)
-    controls.session.render_overlays.locked = True
+    controls.session.overlays.locked = True
     _press_focused(controls, _keydown(pygame.K_RETURN))
     assert controls.modal_host.view_state() is None
 
 
 def _expand_overlay_card_body(controls: TuningControls, card: str) -> None:
-    overlays = controls.session.render_overlays
+    overlays = controls.session.overlays
 
 
-def test_render_overlay_body_text_row_present_for_both_cards() -> None:
+def test_overlay_body_text_row_present_for_both_cards() -> None:
     controls = _make_controls()
     _expand_overlay_card_body(controls, "opening_card")
     _expand_overlay_card_body(controls, "closing_card")
     view = controls.build_view_state(paused=False)
-    opening = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_BODY_TEXT, card="opening_card")
-    closing = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_BODY_TEXT, card="closing_card")
-    opening_font = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_BODY_FONT, card="opening_card")
-    closing_font = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_BODY_FONT, card="closing_card")
+    opening = RowDescriptor(RowKind.OVERLAY_CARD_BODY_TEXT, card="opening_card")
+    closing = RowDescriptor(RowKind.OVERLAY_CARD_BODY_TEXT, card="closing_card")
+    opening_font = RowDescriptor(RowKind.OVERLAY_CARD_BODY_FONT, card="opening_card")
+    closing_font = RowDescriptor(RowKind.OVERLAY_CARD_BODY_FONT, card="closing_card")
     assert opening.card == "opening_card"
     assert closing.card == "closing_card"
     _assert_card_order(view, "opening_card", opening.kind, opening_font.kind)
     _assert_card_order(view, "closing_card", closing.kind, closing_font.kind)
 
 
-def test_render_overlay_body_text_formats_newlines_as_spaces() -> None:
+def test_overlay_body_text_formats_newlines_as_spaces() -> None:
     controls = _make_controls()
     _expand_overlay_card_body(controls, "opening_card")
-    controls.session.render_overlays.opening_card.body_content = "Line one\nLine two"
+    controls.session.overlays.opening_card.body_content = "Line one\nLine two"
     view = controls.build_view_state(paused=False)
-    row = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_BODY_TEXT, card="opening_card")
+    row = RowDescriptor(RowKind.OVERLAY_CARD_BODY_TEXT, card="opening_card")
     assert _row_text(view, row) == "body text: Line one Line two"
 
 
-def test_render_overlay_body_text_enter_opens_multiline_modal() -> None:
+def test_overlay_body_text_enter_opens_multiline_modal() -> None:
     controls = _make_controls()
     _expand_overlay_card_body(controls, "opening_card")
-    controls.session.render_overlays.opening_card.body_content = "Opening body"
+    controls.session.overlays.opening_card.body_content = "Opening body"
     view = controls.build_view_state(paused=False)
-    row = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_BODY_TEXT, card="opening_card")
+    row = RowDescriptor(RowKind.OVERLAY_CARD_BODY_TEXT, card="opening_card")
     controls.focus_descriptor = _desc(view, row)
     _press_focused(controls, _keydown(pygame.K_RETURN))
     modal = controls.modal_host.view_state()
@@ -1214,12 +1214,12 @@ def test_render_overlay_body_text_enter_opens_multiline_modal() -> None:
     assert modal.editing is True
 
 
-def test_render_overlay_body_text_confirm_updates_session() -> None:
+def test_overlay_body_text_confirm_updates_session() -> None:
     controls = _make_controls()
     _expand_overlay_card_body(controls, "opening_card")
-    controls.session.render_overlays.opening_card.body_content = "Opening body"
+    controls.session.overlays.opening_card.body_content = "Opening body"
     view = controls.build_view_state(paused=False)
-    row = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_BODY_TEXT, card="opening_card")
+    row = RowDescriptor(RowKind.OVERLAY_CARD_BODY_TEXT, card="opening_card")
     controls.focus_descriptor = _desc(view, row)
     _press_focused(controls, _keydown(pygame.K_RETURN))
     controls.modal_host.handle_text_input(" edited")
@@ -1227,41 +1227,41 @@ def test_render_overlay_body_text_confirm_updates_session() -> None:
     _press_focused(controls, _keydown(pygame.K_RETURN))
     assert controls.modal_host.view_state() is None
     assert (
-        controls.session.render_overlays.opening_card.body_content
+        controls.session.overlays.opening_card.body_content
         == "Opening body edited"
     )
 
 
-def test_render_overlay_body_text_cancel_keeps_session() -> None:
+def test_overlay_body_text_cancel_keeps_session() -> None:
     controls = _make_controls()
     _expand_overlay_card_body(controls, "closing_card")
-    controls.session.render_overlays.closing_card.body_content = "Closing body"
+    controls.session.overlays.closing_card.body_content = "Closing body"
     view = controls.build_view_state(paused=False)
-    row = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_BODY_TEXT, card="closing_card")
+    row = RowDescriptor(RowKind.OVERLAY_CARD_BODY_TEXT, card="closing_card")
     controls.focus_descriptor = _desc(view, row)
     _press_focused(controls, _keydown(pygame.K_RETURN))
     controls.modal_host.handle_text_input(" edited")
     _press_focused(controls, _keydown(pygame.K_ESCAPE))
     _press_focused(controls, _keydown(pygame.K_ESCAPE))
     assert controls.modal_host.view_state() is None
-    assert controls.session.render_overlays.closing_card.body_content == (
+    assert controls.session.overlays.closing_card.body_content == (
         "Closing body"
     )
 
 
-def test_render_overlay_body_text_lock_blocks_enter() -> None:
+def test_overlay_body_text_lock_blocks_enter() -> None:
     controls = _make_controls()
     _expand_overlay_card_body(controls, "opening_card")
     view = controls.build_view_state(paused=False)
-    row = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_BODY_TEXT, card="opening_card")
+    row = RowDescriptor(RowKind.OVERLAY_CARD_BODY_TEXT, card="opening_card")
     controls.focus_descriptor = _desc(view, row)
-    controls.session.render_overlays.locked = True
+    controls.session.overlays.locked = True
     _press_focused(controls, _keydown(pygame.K_RETURN))
     assert controls.modal_host.view_state() is None
 
 
 def _expand_overlay_card(controls: TuningControls, card: str) -> None:
-    overlays = controls.session.render_overlays
+    overlays = controls.session.overlays
 
 
 def _focus_overlay_colour_row(
@@ -1293,8 +1293,8 @@ def _assert_overlay_colour_row_present_confirm_cancel(
     else:
         _expand_overlay_card(controls, "opening_card")
         _expand_overlay_card(controls, "closing_card")
-    opening_card = controls.session.render_overlays.opening_card
-    closing_card = controls.session.render_overlays.closing_card
+    opening_card = controls.session.overlays.opening_card
+    closing_card = controls.session.overlays.closing_card
     setattr(opening_card, field, (255, 255, 255))
     setattr(closing_card, field, (255, 255, 255))
     view = controls.build_view_state(paused=False)
@@ -1330,75 +1330,75 @@ def _assert_overlay_colour_row_present_confirm_cancel(
     assert getattr(closing_card, field) == (255, 255, 255)
 
 
-def test_render_overlay_title_background_colour_row_present_and_confirm_cancel() -> None:
+def test_overlay_title_background_colour_row_present_and_confirm_cancel() -> None:
     _assert_overlay_colour_row_present_confirm_cancel(
-        kind=RowKind.RENDER_OVERLAY_CARD_TITLE_BACKGROUND_COLOUR,
+        kind=RowKind.OVERLAY_CARD_TITLE_BACKGROUND_COLOUR,
         field="title_background_colour",
         expand="title",
-        after_kind=RowKind.RENDER_OVERLAY_CARD_TITLE_COLOUR,
-        before_kind=RowKind.RENDER_OVERLAY_CARD_TITLE_FONT,
+        after_kind=RowKind.OVERLAY_CARD_TITLE_COLOUR,
+        before_kind=RowKind.OVERLAY_CARD_TITLE_FONT,
         label="title background",
         nested=True,
     )
 
 
-def test_render_overlay_body_colour_row_present_and_confirm_cancel() -> None:
+def test_overlay_body_colour_row_present_and_confirm_cancel() -> None:
     _assert_overlay_colour_row_present_confirm_cancel(
-        kind=RowKind.RENDER_OVERLAY_CARD_BODY_COLOUR,
+        kind=RowKind.OVERLAY_CARD_BODY_COLOUR,
         field="body_colour",
         expand="body",
-        after_kind=RowKind.RENDER_OVERLAY_CARD_BODY_TEXT,
-        before_kind=RowKind.RENDER_OVERLAY_CARD_BODY_BACKGROUND_COLOUR,
+        after_kind=RowKind.OVERLAY_CARD_BODY_TEXT,
+        before_kind=RowKind.OVERLAY_CARD_BODY_BACKGROUND_COLOUR,
         label="body colour",
         nested=True,
     )
 
 
-def test_render_overlay_body_background_colour_row_present_and_confirm_cancel() -> None:
+def test_overlay_body_background_colour_row_present_and_confirm_cancel() -> None:
     _assert_overlay_colour_row_present_confirm_cancel(
-        kind=RowKind.RENDER_OVERLAY_CARD_BODY_BACKGROUND_COLOUR,
+        kind=RowKind.OVERLAY_CARD_BODY_BACKGROUND_COLOUR,
         field="body_background_colour",
         expand="body",
-        after_kind=RowKind.RENDER_OVERLAY_CARD_BODY_COLOUR,
-        before_kind=RowKind.RENDER_OVERLAY_CARD_BODY_FONT,
+        after_kind=RowKind.OVERLAY_CARD_BODY_COLOUR,
+        before_kind=RowKind.OVERLAY_CARD_BODY_FONT,
         label="body background",
         nested=True,
     )
 
 
-def test_render_overlay_background_colour_row_present_and_confirm_cancel() -> None:
+def test_overlay_background_colour_row_present_and_confirm_cancel() -> None:
     _assert_overlay_colour_row_present_confirm_cancel(
-        kind=RowKind.RENDER_OVERLAY_CARD_BACKGROUND_COLOUR,
+        kind=RowKind.OVERLAY_CARD_BACKGROUND_COLOUR,
         field="background_colour",
         expand="card",
-        after_kind=RowKind.RENDER_OVERLAY_CARD_OPACITY,
-        before_kind=RowKind.RENDER_OVERLAY_CARD_BACKGROUND_MARGIN,
+        after_kind=RowKind.OVERLAY_CARD_OPACITY,
+        before_kind=RowKind.OVERLAY_CARD_BACKGROUND_MARGIN,
         label="background colour",
         nested=False,
     )
 
 
-def test_render_overlay_border_colour_row_present_and_confirm_cancel() -> None:
+def test_overlay_border_colour_row_present_and_confirm_cancel() -> None:
     _assert_overlay_colour_row_present_confirm_cancel(
-        kind=RowKind.RENDER_OVERLAY_CARD_BORDER_COLOUR,
+        kind=RowKind.OVERLAY_CARD_BORDER_COLOUR,
         field="border_colour",
         expand="card",
-        after_kind=RowKind.RENDER_OVERLAY_CARD_BORDER_WIDTH,
-        before_kind=RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER,
+        after_kind=RowKind.OVERLAY_CARD_BORDER_WIDTH,
+        before_kind=RowKind.OVERLAY_CARD_TITLE_HEADER,
         label="border colour",
         nested=False,
     )
 
 
-def test_render_overlay_optional_colour_formats_none() -> None:
+def test_overlay_optional_colour_formats_none() -> None:
     controls = _make_controls()
     _expand_overlay_card_title(controls, "opening_card")
     _expand_overlay_card_body(controls, "opening_card")
-    controls.session.render_overlays.opening_card.title_background_colour = None
-    controls.session.render_overlays.opening_card.body_background_colour = None
+    controls.session.overlays.opening_card.title_background_colour = None
+    controls.session.overlays.opening_card.body_background_colour = None
     view = controls.build_view_state(paused=False)
-    title_bg = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_BACKGROUND_COLOUR, card="opening_card")
-    body_bg = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_BODY_BACKGROUND_COLOUR, card="opening_card")
+    title_bg = RowDescriptor(RowKind.OVERLAY_CARD_TITLE_BACKGROUND_COLOUR, card="opening_card")
+    body_bg = RowDescriptor(RowKind.OVERLAY_CARD_BODY_BACKGROUND_COLOUR, card="opening_card")
     assert _row_text(view, title_bg) == "title background: none"
     assert _row_text(view, body_bg) == "body background: none"
     controls.focus_descriptor = _desc(view, title_bg)
@@ -1408,20 +1408,20 @@ def test_render_overlay_optional_colour_formats_none() -> None:
     assert modal.draft == ""
 
 
-def test_render_overlay_optional_colour_empty_confirm_clears() -> None:
+def test_overlay_optional_colour_empty_confirm_clears() -> None:
     controls = _make_controls()
     _expand_overlay_card_title(controls, "opening_card")
     _expand_overlay_card_body(controls, "opening_card")
-    opening = controls.session.render_overlays.opening_card
+    opening = controls.session.overlays.opening_card
     opening.title_background_colour = (10, 20, 30)
     opening.body_background_colour = (40, 50, 60)
     for kind, field in (
         (
-            RowKind.RENDER_OVERLAY_CARD_TITLE_BACKGROUND_COLOUR,
+            RowKind.OVERLAY_CARD_TITLE_BACKGROUND_COLOUR,
             "title_background_colour",
         ),
         (
-            RowKind.RENDER_OVERLAY_CARD_BODY_BACKGROUND_COLOUR,
+            RowKind.OVERLAY_CARD_BODY_BACKGROUND_COLOUR,
             "body_background_colour",
         ),
     ):
@@ -1436,11 +1436,11 @@ def test_render_overlay_optional_colour_empty_confirm_clears() -> None:
         assert getattr(opening, field) is None
 
 
-def test_render_overlay_remaining_colour_rows_invalid_hex_stays_open() -> None:
+def test_overlay_remaining_colour_rows_invalid_hex_stays_open() -> None:
     controls = _make_controls()
     _expand_overlay_card_title(controls, "opening_card")
     _expand_overlay_card_body(controls, "opening_card")
-    opening = controls.session.render_overlays.opening_card
+    opening = controls.session.overlays.opening_card
     opening.title_background_colour = (255, 255, 255)
     opening.body_colour = (255, 255, 255)
     opening.body_background_colour = (255, 255, 255)
@@ -1448,16 +1448,16 @@ def test_render_overlay_remaining_colour_rows_invalid_hex_stays_open() -> None:
     opening.border_colour = (255, 255, 255)
     for kind, field in (
         (
-            RowKind.RENDER_OVERLAY_CARD_TITLE_BACKGROUND_COLOUR,
+            RowKind.OVERLAY_CARD_TITLE_BACKGROUND_COLOUR,
             "title_background_colour",
         ),
-        (RowKind.RENDER_OVERLAY_CARD_BODY_COLOUR, "body_colour"),
+        (RowKind.OVERLAY_CARD_BODY_COLOUR, "body_colour"),
         (
-            RowKind.RENDER_OVERLAY_CARD_BODY_BACKGROUND_COLOUR,
+            RowKind.OVERLAY_CARD_BODY_BACKGROUND_COLOUR,
             "body_background_colour",
         ),
-        (RowKind.RENDER_OVERLAY_CARD_BACKGROUND_COLOUR, "background_colour"),
-        (RowKind.RENDER_OVERLAY_CARD_BORDER_COLOUR, "border_colour"),
+        (RowKind.OVERLAY_CARD_BACKGROUND_COLOUR, "background_colour"),
+        (RowKind.OVERLAY_CARD_BORDER_COLOUR, "border_colour"),
     ):
         _focus_overlay_colour_row(controls, kind, "opening_card")
         _press_focused(controls, _keydown(pygame.K_RETURN))
@@ -1473,38 +1473,38 @@ def test_render_overlay_remaining_colour_rows_invalid_hex_stays_open() -> None:
         assert controls.modal_host.view_state() is None
 
 
-def test_render_overlay_remaining_colour_rows_lock_blocks_enter() -> None:
+def test_overlay_remaining_colour_rows_lock_blocks_enter() -> None:
     controls = _make_controls()
     _expand_overlay_card_title(controls, "opening_card")
     _expand_overlay_card_body(controls, "opening_card")
     for kind in (
-        RowKind.RENDER_OVERLAY_CARD_TITLE_BACKGROUND_COLOUR,
-        RowKind.RENDER_OVERLAY_CARD_BODY_COLOUR,
-        RowKind.RENDER_OVERLAY_CARD_BODY_BACKGROUND_COLOUR,
-        RowKind.RENDER_OVERLAY_CARD_BACKGROUND_COLOUR,
-        RowKind.RENDER_OVERLAY_CARD_BORDER_COLOUR,
+        RowKind.OVERLAY_CARD_TITLE_BACKGROUND_COLOUR,
+        RowKind.OVERLAY_CARD_BODY_COLOUR,
+        RowKind.OVERLAY_CARD_BODY_BACKGROUND_COLOUR,
+        RowKind.OVERLAY_CARD_BACKGROUND_COLOUR,
+        RowKind.OVERLAY_CARD_BORDER_COLOUR,
     ):
         _focus_overlay_colour_row(controls, kind, "opening_card")
-        controls.session.render_overlays.locked = True
+        controls.session.overlays.locked = True
         _press_focused(controls, _keydown(pygame.K_RETURN))
         assert controls.modal_host.view_state() is None
-        controls.session.render_overlays.locked = False
+        controls.session.overlays.locked = False
 
 
-def test_render_overlay_title_header_toggles_expansion() -> None:
+def test_overlay_title_header_toggles_expansion() -> None:
     controls = _make_controls()
     view = controls.build_view_state(paused=False)
-    title_header = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER, card="opening_card")
+    title_header = RowDescriptor(RowKind.OVERLAY_CARD_TITLE_HEADER, card="opening_card")
     controls.focus_descriptor = _desc(view, title_header)
     _press_focused(controls, _keydown(pygame.K_RIGHT))
 
     _press_focused(controls, _keydown(pygame.K_LEFT))
 
 
-def test_render_overlay_collapse_refocuses_from_title_font_row() -> None:
+def test_overlay_collapse_refocuses_from_title_font_row() -> None:
     controls = _make_controls()
     view = controls.build_view_state(paused=False)
-    font_row = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_FONT_SIZE, card="opening_card")
+    font_row = RowDescriptor(RowKind.OVERLAY_CARD_TITLE_FONT_SIZE, card="opening_card")
     font_desc = _desc(view, font_row)
     controls.focus_descriptor = font_desc
     assert controls.focus_descriptor == font_desc
@@ -1512,9 +1512,9 @@ def test_render_overlay_collapse_refocuses_from_title_font_row() -> None:
     assert view.focus_descriptor == font_desc
 
 
-def test_render_overlay_title_collapse_refocuses_from_font_row() -> None:
+def test_overlay_title_collapse_refocuses_from_font_row() -> None:
     controls = _make_controls()
-    font_row = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_FONT_SIZE, card="opening_card")
+    font_row = RowDescriptor(RowKind.OVERLAY_CARD_TITLE_FONT_SIZE, card="opening_card")
     controls.focus_descriptor = font_row
     view = controls.build_view_state(paused=False)
     assert view.focus_descriptor == font_row
@@ -1570,70 +1570,70 @@ def test_transport_icons_play_vs_pause() -> None:
     assert overlap_px < play_mask.count() or overlap_px < pause_mask.count()
 
 
-def test_render_post_fx_fade_rows_step_window_edges() -> None:
+def test_post_fx_fade_rows_step_window_edges() -> None:
     controls = _make_controls(("layer_1",))
-    pp = controls.session.render_post_fx
+    pp = controls.session.post_fx
     view = controls.build_view_state(paused=False)
 
-    fade_in_start = RowDescriptor(RowKind.RENDER_POST_FX_FADE_IN_START)
+    fade_in_start = RowDescriptor(RowKind.POST_FX_FADE_IN_START)
     controls.focus_descriptor = _desc(view, fade_in_start)
     fin = pp.fade.fade_in
     start = fin.start
     _press_focused(controls, _keydown(pygame.K_RIGHT))
     assert fin.start == start + 1.0
     view = controls.build_view_state(paused=False)
-    assert view.render_post_fx.fade.fade_in.start == fin.start
+    assert view.post_fx.fade.fade_in.start == fin.start
 
-    fade_in_end = RowDescriptor(RowKind.RENDER_POST_FX_FADE_IN_END)
+    fade_in_end = RowDescriptor(RowKind.POST_FX_FADE_IN_END)
     controls.focus_descriptor = _desc(view, fade_in_end)
     end = fin.end
     _press_focused(controls, _keydown(pygame.K_RIGHT))
     assert fin.end == end + 1.0
     view = controls.build_view_state(paused=False)
-    assert view.render_post_fx.fade.fade_in.end == fin.end
+    assert view.post_fx.fade.fade_in.end == fin.end
 
-    fade_out_start = RowDescriptor(RowKind.RENDER_POST_FX_FADE_OUT_START)
+    fade_out_start = RowDescriptor(RowKind.POST_FX_FADE_OUT_START)
     controls.focus_descriptor = _desc(view, fade_out_start)
     fout = pp.fade.fade_out
     fout_start = fout.start
     _press_focused(controls, _keydown(pygame.K_RIGHT))
     assert fout.start == fout_start + 1.0
     view = controls.build_view_state(paused=False)
-    assert view.render_post_fx.fade.fade_out.start == fout.start
+    assert view.post_fx.fade.fade_out.start == fout.start
 
 
-def test_render_post_fx_fade_setters_clamp_and_cycle() -> None:
+def test_post_fx_fade_setters_clamp_and_cycle() -> None:
     controls = _make_controls(("layer_1",))
-    fade = controls.session.render_post_fx.fade
-    controls.render_post_fx.set_fade_end("fade_in", 12.0)
+    fade = controls.session.post_fx.fade
+    controls.post_fx.set_fade_end("fade_in", 12.0)
     assert fade.fade_in.end == 12.0
-    controls.render_post_fx.set_fade_start("fade_in", 20.0)
+    controls.post_fx.set_fade_start("fade_in", 20.0)
     assert fade.fade_in.start == 20.0
     assert fade.fade_in.end == 20.0
-    controls.render_post_fx.set_fade_start("fade_in", -3.0)
+    controls.post_fx.set_fade_start("fade_in", -3.0)
     assert fade.fade_in.start == 0.0
     assert fade.fade_in.end == 20.0
 
-    controls.render_post_fx.set_fade_end("fade_out", 5.0)
+    controls.post_fx.set_fade_end("fade_out", 5.0)
     assert fade.fade_out.end == 5.0
     assert fade.fade_out.start == 5.0
-    controls.render_post_fx.set_fade_start("fade_out", 1.0)
+    controls.post_fx.set_fade_start("fade_out", 1.0)
     assert fade.fade_out.start == 5.0
 
     assert fade.fade_in.type == "smoothstep"
-    controls.render_post_fx.cycle_fade_type("fade_in", forward=True)
+    controls.post_fx.cycle_fade_type("fade_in", forward=True)
     assert fade.fade_in.type == "ease_out_cubic"
-    controls.render_post_fx.cycle_fade_type("fade_in", forward=False)
+    controls.post_fx.cycle_fade_type("fade_in", forward=False)
     assert fade.fade_in.type == "smoothstep"
 
 
-def test_render_post_fx_highlight_rolloff_mode_off_keeps_section_expanded() -> None:
+def test_post_fx_highlight_rolloff_mode_off_keeps_section_expanded() -> None:
     controls = _make_controls()
-    controls.session.render_post_fx.highlight_rolloff.mode = "composite"
+    controls.session.post_fx.highlight_rolloff.mode = "composite"
 
-    controls.render_post_fx.cycle_highlight_rolloff_mode(forward=True)
+    controls.post_fx.cycle_highlight_rolloff_mode(forward=True)
 
-    assert controls.session.render_post_fx.highlight_rolloff.mode == "off"
+    assert controls.session.post_fx.highlight_rolloff.mode == "off"
 
 
 def _focus_timeline_presets(controls: TuningControls) -> None:
@@ -2659,7 +2659,7 @@ def test_timeline_remove_soft_cuts_all_clears_on_and_off() -> None:
     assert view.notification_message == "Removed cuts from 2 cues"
 
 
-def test_render_timeline_e_toggles_enabled() -> None:
+def test_timeline_e_toggles_enabled() -> None:
     controls = _make_controls(timeline_enabled=True)
     assert controls.session.timeline.enabled is True
     assert _press_timeline_hotkey(controls, pygame.K_e) is True
@@ -2681,7 +2681,7 @@ def test_timeline_enabled_startup_shows_notification() -> None:
     )
 
 
-def test_render_timeline_toggle_shows_notification() -> None:
+def test_timeline_toggle_shows_notification() -> None:
     with patch.object(time, "monotonic", return_value=1000.0):
         controls = _make_controls(timeline_enabled=True)
         assert _press_timeline_hotkey(controls, pygame.K_e) is True
@@ -2836,7 +2836,7 @@ def test_panel_notification_enter_dismisses_before_timeout() -> None:
 def test_panel_notification_enter_dismisses_without_focusing_toast() -> None:
     with patch.object(time, "monotonic", return_value=9000.0):
         controls = _make_controls(("layer_1",))
-        controls.focus_descriptor = RowDescriptor(RowKind.RENDER_SECTION_GAP)
+        controls.focus_descriptor = RowDescriptor(RowKind.TRACK_HEADER, slot="layer_1")
         controls.show_notification("Saved")
         assert controls.playback.paused is False
         before = controls.focus_cursor
@@ -2870,7 +2870,7 @@ def test_panel_notification_enter_dismisses_without_focusing_toast() -> None:
         assert controls.cfg.editor.notification_display_sec == display_sec
 
 
-def test_render_timeline_enable_opens_panel() -> None:
+def test_timeline_enable_opens_panel() -> None:
     controls = _make_controls()
     assert controls.session.timeline.enabled is False
     assert controls.session.timeline.panel_open is False
@@ -2881,7 +2881,7 @@ def test_render_timeline_enable_opens_panel() -> None:
     assert isinstance(controls.focus_cursor, MainFocus)
 
 
-def test_render_timeline_right_does_not_open_the_strip() -> None:
+def test_timeline_right_does_not_open_the_strip() -> None:
     controls = _make_controls(timeline_enabled=True)
     controls.shell_focus.selected_id = "timeline"
     controls.session.timeline.focus_row = 2
@@ -2890,7 +2890,7 @@ def test_render_timeline_right_does_not_open_the_strip() -> None:
     assert controls.session.timeline.focus_row == 2
 
 
-def test_render_timeline_disable_closes_panel() -> None:
+def test_timeline_disable_closes_panel() -> None:
     controls = _make_controls()
     controls.session.timeline.enabled = True
     controls.session.timeline.panel_open = True
@@ -2899,17 +2899,17 @@ def test_render_timeline_disable_closes_panel() -> None:
     assert controls.session.timeline.panel_open is False
 
 
-def test_render_timeline_header_eye_color_when_disabled() -> None:
+def test_timeline_header_eye_color_when_disabled() -> None:
     controls = _make_controls(timeline_enabled=True)
     view = controls.build_view_state(paused=False)
-    header = RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
+    header = RowDescriptor(RowKind.TIMELINE_HEADER)
     assert _row_value_color(view, header) == VALUE
     controls.session.timeline.enabled = False
     view = controls.build_view_state(paused=False)
     assert _row_value_color(view, header) == DISABLED
 
 
-def test_render_timeline_sub_rows_dim_when_disabled() -> None:
+def test_timeline_sub_rows_dim_when_disabled() -> None:
     controls = _make_controls(timeline_enabled=True)
     controls.session.timeline.panel_open = True
     controls.session.timeline.hard_cut_fades.enabled = True
@@ -2917,7 +2917,7 @@ def test_render_timeline_sub_rows_dim_when_disabled() -> None:
     controls.session.timeline.enabled = False
     view = controls.build_view_state(paused=False)
     for kind in (
-        RowKind.RENDER_TIMELINE_HEADER,
+        RowKind.TIMELINE_HEADER,
         RowKind.SONG_MARKERS_HEADER,
         RowKind.TIMELINE_BEAT_BAR_GRID_HEADER,
         RowKind.TIMELINE_BAR_PHASE,
@@ -2953,7 +2953,7 @@ def test_render_timeline_sub_rows_dim_when_disabled() -> None:
         assert _row_value_color(view, RowDescriptor(kind)) == DISABLED, kind
 
 
-def test_render_timeline_enabled_change_callback() -> None:
+def test_timeline_enabled_change_callback() -> None:
     controls = _make_controls(timeline_enabled=True)
     events: list[bool] = []
     controls._layer_bindings = noop_layer_bindings(
@@ -2996,7 +2996,7 @@ def test_solo_marks_non_solo_tracks_not_visible_when_timeline_off() -> None:
     assert view.tracks["layer_2"].visible is False
 
 
-def test_render_timeline_enabled_change_callback() -> None:
+def test_timeline_enabled_change_callback() -> None:
     controls = _make_controls(timeline_enabled=True)
     events: list[bool] = []
     controls._layer_bindings = noop_layer_bindings(
@@ -3026,11 +3026,11 @@ def test_t_opens_timeline_panel_when_enabled() -> None:
 def test_t_closes_timeline_panel_without_moving_a_main_cursor() -> None:
     controls = _make_controls(timeline_enabled=True)
     controls.session.timeline.panel_open = True
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
+    controls.focus_descriptor = RowDescriptor(RowKind.OVERLAYS_HEADER)
     command_by_id("timeline.show_strip").run(controls)
     assert controls.session.timeline.panel_open is False
     assert not isinstance(controls.focus_cursor, TimelineFocus)
-    assert controls.focus_descriptor.kind == RowKind.RENDER_OVERLAYS_HEADER
+    assert controls.focus_descriptor.kind == RowKind.OVERLAYS_HEADER
 
 
 def test_t_from_timeline_region_closes_onto_navigator() -> None:
@@ -3043,7 +3043,7 @@ def test_t_from_timeline_region_closes_onto_navigator() -> None:
     assert controls.session.timeline.panel_open is False
     assert controls.shell_focus.region is ShellRegion.NAVIGATOR
     assert isinstance(controls.focus_cursor, MainFocus)
-    assert controls.focus_descriptor.kind == RowKind.RENDER_TIMELINE_HEADER
+    assert controls.focus_descriptor.kind == RowKind.TIMELINE_HEADER
     assert controls.session.timeline.focus_row == 1
 
 
@@ -3076,7 +3076,7 @@ def test_t_ignored_during_move_mode() -> None:
 def test_space_toggles_pause_from_any_focus() -> None:
     controls = _make_controls(("layer_1",))
     assert controls.playback.paused is False
-    assert controls.focus_descriptor == RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
+    assert controls.focus_descriptor == RowDescriptor(RowKind.TIMELINE_HEADER)
 
     _press_focused(controls, _keydown(pygame.K_SPACE))
     assert controls.playback.paused is True
@@ -3567,7 +3567,7 @@ def test_active_preset_list_item_uses_highlight_color() -> None:
     layer.preset_list = [str(a), str(b)]
     layer.auto_preset_path = b
 
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
+    controls.focus_descriptor = RowDescriptor(RowKind.OVERLAYS_HEADER)
     view = controls.build_view_state(paused=False)
     assert view.tracks["layer_1"].active_preset_list_index == 1
     active_row = RowDescriptor(
@@ -3594,7 +3594,7 @@ def test_first_preset_list_item_highlighted_when_auto_unset() -> None:
     listed = Path("/tmp/user/presets/copy-a.milk").resolve()
     layer.preset_list = [str(listed)]
     layer.auto_preset_path = None
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
+    controls.focus_descriptor = RowDescriptor(RowKind.OVERLAYS_HEADER)
     view = controls.build_view_state(paused=False)
     assert view.tracks["layer_1"].active_preset_list_index == 0
     item_row = RowDescriptor(
@@ -3679,25 +3679,25 @@ def test_l_toggles_lock() -> None:
     assert controls.session.layers["layer_1"].locked is False
 
 
-def test_l_toggles_render_overlay_lock() -> None:
+def test_l_toggles_overlay_lock() -> None:
     controls = _make_controls(("layer_1",))
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
-    assert controls.session.render_overlays.locked is False
+    controls.focus_descriptor = RowDescriptor(RowKind.OVERLAYS_HEADER)
+    assert controls.session.overlays.locked is False
     _press_focused(controls, _keydown(pygame.K_l))
-    assert controls.session.render_overlays.locked is True
+    assert controls.session.overlays.locked is True
     _press_focused(controls, _keydown(pygame.K_l))
-    assert controls.session.render_overlays.locked is False
+    assert controls.session.overlays.locked is False
 
 
-def test_l_toggles_render_post_fx_lock() -> None:
+def test_l_toggles_post_fx_lock() -> None:
     controls = _make_controls(("layer_1",))
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_HEADER)
-    assert controls.session.render_post_fx.locked is False
+    controls.focus_descriptor = RowDescriptor(RowKind.POST_FX_HEADER)
+    assert controls.session.post_fx.locked is False
     _press_focused(controls, _keydown(pygame.K_l))
-    assert controls.session.render_post_fx.locked is True
+    assert controls.session.post_fx.locked is True
 
 
-def test_l_toggles_render_timeline_lock() -> None:
+def test_l_toggles_timeline_lock() -> None:
     controls = _make_controls(("layer_1",))
     assert controls.session.timeline.locked is False
     assert _press_timeline_hotkey(controls, pygame.K_l) is True
@@ -3711,37 +3711,37 @@ def test_l_refused_on_timeline_header_while_recording() -> None:
     assert controls.session.timeline.locked is False
 
 
-def test_render_overlay_lock_blocks_e_enable_disable() -> None:
+def test_overlay_lock_blocks_e_enable_disable() -> None:
     controls = _make_controls(("layer_1",))
-    controls.session.render_overlays.locked = True
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
-    assert controls.session.render_overlays.opening_card.enabled is True
+    controls.session.overlays.locked = True
+    controls.focus_descriptor = RowDescriptor(RowKind.OVERLAYS_HEADER)
+    assert controls.session.overlays.opening_card.enabled is True
     _press_focused(controls, _keydown(pygame.K_e))
-    assert controls.session.render_overlays.opening_card.enabled is True
+    assert controls.session.overlays.opening_card.enabled is True
 
 
-def test_render_overlay_lock_allows_solo() -> None:
+def test_overlay_lock_allows_solo() -> None:
     controls = _make_controls(("layer_1",))
-    controls.session.render_overlays.locked = True
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
+    controls.session.overlays.locked = True
+    controls.focus_descriptor = RowDescriptor(RowKind.OVERLAYS_HEADER)
     _press_focused(controls, _keydown(pygame.K_s))
-    assert controls.session.render_overlay_solo is True
+    assert controls.session.overlay_solo is True
 
 
-def test_render_overlay_locked_skips_children_in_nav() -> None:
+def test_overlay_locked_skips_children_in_nav() -> None:
     controls = _make_controls(("layer_1",))
-    controls.session.render_overlays.locked = True
+    controls.session.overlays.locked = True
     view = controls.build_view_state(paused=False)
     position_row = RowDescriptor(
-        RowKind.RENDER_OVERLAY_CARD_POSITION, card="opening_card"
+        RowKind.OVERLAY_CARD_POSITION, card="opening_card"
     )
     assert _row_value_color(view, position_row) == LOCKED
-    assert RowKind.RENDER_OVERLAY_CARD_POSITION in _page_kinds(
+    assert RowKind.OVERLAY_CARD_POSITION in _page_kinds(
         view, "overlay.opening_card"
     )
 
 
-def test_render_timeline_locked_dims_inspector_children() -> None:
+def test_timeline_locked_dims_inspector_children() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.timeline.enabled = True
     controls.session.timeline.locked = True
@@ -3789,31 +3789,31 @@ def test_e_toggles_each_enable_header() -> None:
     assert controls.session.layers["layer_1"].enabled is False
 
     controls.focus_descriptor = _desc(
-        view, RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
+        view, RowDescriptor(RowKind.OVERLAYS_HEADER)
     )
-    assert controls.session.render_overlays.opening_card.enabled is True
+    assert controls.session.overlays.opening_card.enabled is True
     _press_focused(controls, _keydown(pygame.K_e))
-    assert controls.session.render_overlays.opening_card.enabled is False
-    assert controls.session.render_overlays.closing_card.enabled is False
+    assert controls.session.overlays.opening_card.enabled is False
+    assert controls.session.overlays.closing_card.enabled is False
 
-    controls.session.render_overlays.opening_card.enabled = True
+    controls.session.overlays.opening_card.enabled = True
     view = controls.build_view_state(paused=False)
-    card_row = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_HEADER, card="opening_card")
+    card_row = RowDescriptor(RowKind.OVERLAY_CARD_HEADER, card="opening_card")
     controls.focus_descriptor = _desc(view, card_row)
     _press_focused(controls, _keydown(pygame.K_e))
-    assert controls.session.render_overlays.opening_card.enabled is False
+    assert controls.session.overlays.opening_card.enabled is False
 
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_HEADER)
-    assert controls.session.render_post_fx.enabled is True
+    controls.focus_descriptor = RowDescriptor(RowKind.POST_FX_HEADER)
+    assert controls.session.post_fx.enabled is True
     _press_focused(controls, _keydown(pygame.K_e))
-    assert controls.session.render_post_fx.enabled is False
+    assert controls.session.post_fx.enabled is False
 
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_PATTERN_MASK_HEADER)
-    before_mask = controls.session.render_pattern_mask.enabled
+    controls.focus_descriptor = RowDescriptor(RowKind.PATTERN_MASK_HEADER)
+    before_mask = controls.session.pattern_mask.enabled
     _press_focused(controls, _keydown(pygame.K_e))
-    assert controls.session.render_pattern_mask.enabled is not before_mask
+    assert controls.session.pattern_mask.enabled is not before_mask
 
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
+    controls.focus_descriptor = RowDescriptor(RowKind.TIMELINE_HEADER)
     assert controls.session.timeline.enabled is False
     _press_focused(controls, _keydown(pygame.K_e))
     assert controls.session.timeline.enabled is True
@@ -3821,26 +3821,26 @@ def test_e_toggles_each_enable_header() -> None:
 
 def test_s_toggles_overlays_always_on() -> None:
     controls = _make_controls(("layer_1",))
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
+    controls.focus_descriptor = RowDescriptor(RowKind.OVERLAYS_HEADER)
     _press_focused(controls, _keydown(pygame.K_s))
-    assert controls.session.render_overlay_solo is True
+    assert controls.session.overlay_solo is True
     _press_focused(controls, _keydown(pygame.K_s))
-    assert controls.session.render_overlay_solo is False
+    assert controls.session.overlay_solo is False
 
 
 def test_locked_headers_block_e() -> None:
     controls = _make_controls(("layer_1",))
-    controls.session.render_post_fx.locked = True
-    controls.session.render_pattern_mask.locked = True
+    controls.session.post_fx.locked = True
+    controls.session.pattern_mask.locked = True
     controls.session.timeline.locked = True
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_HEADER)
+    controls.focus_descriptor = RowDescriptor(RowKind.POST_FX_HEADER)
     _press_focused(controls, _keydown(pygame.K_e))
-    assert controls.session.render_post_fx.enabled is True
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_PATTERN_MASK_HEADER)
-    before_mask = controls.session.render_pattern_mask.enabled
+    assert controls.session.post_fx.enabled is True
+    controls.focus_descriptor = RowDescriptor(RowKind.PATTERN_MASK_HEADER)
+    before_mask = controls.session.pattern_mask.enabled
     _press_focused(controls, _keydown(pygame.K_e))
-    assert controls.session.render_pattern_mask.enabled is before_mask
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
+    assert controls.session.pattern_mask.enabled is before_mask
+    controls.focus_descriptor = RowDescriptor(RowKind.TIMELINE_HEADER)
     _press_focused(controls, _keydown(pygame.K_e))
     assert controls.session.timeline.enabled is False
 
@@ -3951,7 +3951,7 @@ def test_compositing_rows_dim_only_in_pattern_mask_mode() -> None:
     for kind in kinds:
         assert _row_value_color(view, _row(view, "layer_1", kind)) != DISABLED
 
-    controls.session.render_pattern_mask.enabled = True
+    controls.session.pattern_mask.enabled = True
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(RowKind.TRACK_BLEND, slot="layer_1")
     view = controls.build_view_state(paused=False)
@@ -4494,7 +4494,7 @@ def test_move_mode_swap_calls_apply_preview_resolutions() -> None:
 
 def test_default_focus_is_timeline_header() -> None:
     controls = _make_controls(("layer_1",))
-    assert controls.focus_descriptor == RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
+    assert controls.focus_descriptor == RowDescriptor(RowKind.TIMELINE_HEADER)
 
 
 
@@ -4794,7 +4794,7 @@ def test_c_on_preset_file_in_curation_mode_prompts_cast() -> None:
 
 def test_f_b_ignored_on_non_preset_rows() -> None:
     controls = _make_controls(("layer_1",))
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
+    controls.focus_descriptor = RowDescriptor(RowKind.OVERLAYS_HEADER)
     mock_curation = MagicMock()
     controls._preset_curation = mock_curation
 

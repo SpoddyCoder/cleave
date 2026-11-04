@@ -327,22 +327,22 @@ def _header_enabled(session: TuningSession, desc: RowDescriptor) -> bool:
         if slot is None:
             return False
         return bool(session.layers[slot].enabled)
-    if kind == RowKind.RENDER_OVERLAYS_HEADER:
-        overlays = session.render_overlays
+    if kind == RowKind.OVERLAYS_HEADER:
+        overlays = session.overlays
         return bool(
             overlays.opening_card.enabled or overlays.closing_card.enabled
         )
-    if kind == RowKind.RENDER_OVERLAY_CARD_HEADER:
+    if kind == RowKind.OVERLAY_CARD_HEADER:
         if desc.card == "opening_card":
-            return bool(session.render_overlays.opening_card.enabled)
+            return bool(session.overlays.opening_card.enabled)
         if desc.card == "closing_card":
-            return bool(session.render_overlays.closing_card.enabled)
+            return bool(session.overlays.closing_card.enabled)
         return False
-    if kind == RowKind.RENDER_POST_FX_HEADER:
-        return bool(session.render_post_fx.enabled)
-    if kind == RowKind.RENDER_PATTERN_MASK_HEADER:
-        return bool(session.render_pattern_mask.enabled)
-    if kind == RowKind.RENDER_TIMELINE_HEADER:
+    if kind == RowKind.POST_FX_HEADER:
+        return bool(session.post_fx.enabled)
+    if kind == RowKind.PATTERN_MASK_HEADER:
+        return bool(session.pattern_mask.enabled)
+    if kind == RowKind.TIMELINE_HEADER:
         return bool(session.timeline.enabled)
     return False
 
@@ -350,8 +350,8 @@ def _header_enabled(session: TuningSession, desc: RowDescriptor) -> bool:
 def _header_solo_active(session: TuningSession, desc: RowDescriptor) -> bool:
     if desc.kind == RowKind.TRACK_HEADER:
         return session.solo_slot == desc.slot
-    if desc.kind == RowKind.RENDER_OVERLAYS_HEADER:
-        return bool(session.render_overlay_solo)
+    if desc.kind == RowKind.OVERLAYS_HEADER:
+        return bool(session.overlay_solo)
     return False
 
 

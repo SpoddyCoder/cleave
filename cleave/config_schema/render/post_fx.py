@@ -612,7 +612,7 @@ def parse_render_post_fx_section(post_fx_map: dict[str, Any]) -> Any:
 
 
 def post_fx_persist_values(ctx: PersistCtx) -> dict[str, Any]:
-    runtime = ctx.session.render_post_fx
+    runtime = ctx.session.post_fx
     return {
         "enabled": runtime.enabled,
         "locked": runtime.locked,

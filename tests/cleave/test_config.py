@@ -45,7 +45,7 @@ from cleave.config import (
     render_output_size,
     _parse_layers,
 )
-from tests.support.config import default_highlight_rolloff_config, default_render_post_fx_config
+from tests.support.config import default_highlight_rolloff_config, default_post_fx_config
 from cleave.config_schema.compositor import DEFAULT_COMPOSITOR_HDR
 from cleave.config_schema.descriptors import (
     ParseCtx,
@@ -87,7 +87,7 @@ from cleave.config_schema.render import (
 )
 from cleave.config_schema.timeline import parse_timeline_section, persist_timeline
 from cleave.user_config import EditorSettings
-from cleave.viz.session import TuningSession, render_post_fx_runtime_from_cfg
+from cleave.viz.session import TuningSession, post_fx_runtime_from_cfg
 from cleave.paths import default_preset_root, default_texture_paths, repo_root
 from cleave.stems import STEM_NAMES
 from cleave.timeline import SlotCue, TimelineLane
@@ -832,7 +832,7 @@ def _expected_opening_card() -> RenderOverlayCardConfig:
     )
 
 
-def test_parse_render_overlay_full_template() -> None:
+def test_parse_overlay_full_template() -> None:
     data = yaml.safe_load(_OVERLAY_YAML)
     render = parse_render_section(data)
     assert render is not None
@@ -859,7 +859,7 @@ def testparse_hex_colour(value: str, expected: tuple[int, int, int]) -> None:
     assert parse_hex_colour(value, "test.colour") == expected
 
 
-def test_parse_render_overlay_empty_background_colour() -> None:
+def test_parse_overlay_empty_background_colour() -> None:
     data = yaml.safe_load(_OVERLAY_YAML)
     data["render"]["overlays"]["opening-card"]["body"]["background-colour"] = ""
     render = parse_render_section(data)
@@ -869,7 +869,7 @@ def test_parse_render_overlay_empty_background_colour() -> None:
     assert render.overlays.opening_card.title.background_colour == (51, 51, 255)
 
 
-def test_parse_render_overlay_missing_background_colour() -> None:
+def test_parse_overlay_missing_background_colour() -> None:
     data = yaml.safe_load(_OVERLAY_YAML)
     del data["render"]["overlays"]["opening-card"]["title"]["background-colour"]
     render = parse_render_section(data)
@@ -878,21 +878,21 @@ def test_parse_render_overlay_missing_background_colour() -> None:
     assert render.overlays.opening_card.title.background_colour is None
 
 
-def test_parse_render_overlay_rejects_invalid_position() -> None:
+def test_parse_overlay_rejects_invalid_position() -> None:
     data = yaml.safe_load(_OVERLAY_YAML)
     data["render"]["overlays"]["opening-card"]["position"] = "middle"
     with pytest.raises(ValueError, match="render.overlays.opening-card.position must be one of"):
         parse_render_section(data)
 
 
-def test_parse_render_overlay_locked_defaults_false() -> None:
+def test_parse_overlay_locked_defaults_false() -> None:
     data = yaml.safe_load(_OVERLAY_YAML)
     render = parse_render_section(data)
     assert render is not None and render.overlays is not None
     assert render.overlays.locked is False
 
 
-def test_parse_render_overlay_locked_true() -> None:
+def test_parse_overlay_locked_true() -> None:
     data = yaml.safe_load(_OVERLAY_YAML)
     data["render"]["overlays"]["locked"] = True
     render = parse_render_section(data)
@@ -900,7 +900,7 @@ def test_parse_render_overlay_locked_true() -> None:
     assert render.overlays.locked is True
 
 
-def test_parse_render_post_fx_locked_true() -> None:
+def test_parse_post_fx_locked_true() -> None:
     render = parse_render_section({"render": {"post_fx": {"locked": True}}})
     assert render is not None and render.post_fx is not None
     assert render.post_fx.locked is True
@@ -982,7 +982,7 @@ def test_load_config_render_size_from_project_yaml(tmp_path: Path) -> None:
     assert render_fps(cfg) == 24
 
 
-def test_parse_render_post_fx_defaults() -> None:
+def test_parse_post_fx_defaults() -> None:
     data = yaml.safe_load(
         """\
 render:
@@ -999,7 +999,7 @@ render:
     render = parse_render_section(data)
     assert render == RenderConfig(
         overlays=None,
-        post_fx=default_render_post_fx_config(
+        post_fx=default_post_fx_config(
             enabled=True,
             fade=FadeConfig(
                 fade_in=FadeSideConfig(start=0.0, end=12.0, type="smoothstep"),
@@ -1009,7 +1009,7 @@ render:
     )
 
 
-def test_parse_render_post_fx_fade_enforces_window() -> None:
+def test_parse_post_fx_fade_enforces_window() -> None:
     data = yaml.safe_load(
         """\
 render:
@@ -1034,7 +1034,7 @@ render:
 
 
 @pytest.mark.parametrize("curve", FADE_CURVES)
-def test_parse_render_post_fx_fade_valid_curves(curve: str) -> None:
+def test_parse_post_fx_fade_valid_curves(curve: str) -> None:
     data = yaml.safe_load(
         f"""\
 render:
@@ -1050,7 +1050,7 @@ render:
     assert render.post_fx.fade.fade_in.type == curve
 
 
-def test_parse_render_post_fx_fade_rejects_invalid_curve() -> None:
+def test_parse_post_fx_fade_rejects_invalid_curve() -> None:
     data = yaml.safe_load(
         """\
 render:
@@ -1064,17 +1064,17 @@ render:
         parse_render_section(data)
 
 
-def test_render_post_fx_runtime_from_cfg_copies_fade() -> None:
+def test_post_fx_runtime_from_cfg_copies_fade() -> None:
     from types import SimpleNamespace
 
-    post_fx = default_render_post_fx_config(
+    post_fx = default_post_fx_config(
         fade=FadeConfig(
             fade_in=FadeSideConfig(start=1.0, end=8.0, type="linear"),
             fade_out=FadeSideConfig(start=6.0, end=2.0, type="ease_out_expo"),
         ),
     )
     cfg = SimpleNamespace(render=SimpleNamespace(post_fx=post_fx))
-    runtime = render_post_fx_runtime_from_cfg(cfg)
+    runtime = post_fx_runtime_from_cfg(cfg)
     assert runtime.fade.fade_in.start == 1.0
     assert runtime.fade.fade_in.end == 8.0
     assert runtime.fade.fade_in.type == "linear"
@@ -1083,7 +1083,7 @@ def test_render_post_fx_runtime_from_cfg_copies_fade() -> None:
     assert runtime.fade.fade_out.type == "ease_out_expo"
 
 
-def test_parse_render_post_fx_highlight_rolloff_defaults() -> None:
+def test_parse_post_fx_highlight_rolloff_defaults() -> None:
     data = yaml.safe_load(
         """\
 render:
@@ -1105,7 +1105,7 @@ render:
     assert hr.desaturation_pct == 30
 
 
-def test_parse_render_post_fx_chroma_boost_defaults() -> None:
+def test_parse_post_fx_chroma_boost_defaults() -> None:
     data = yaml.safe_load(
         """\
 render:
@@ -1124,7 +1124,7 @@ render:
 
 
 @pytest.mark.parametrize("variant", ("saturation", "vibrance"))
-def test_parse_render_post_fx_chroma_boost_valid_variants(variant: str) -> None:
+def test_parse_post_fx_chroma_boost_valid_variants(variant: str) -> None:
     data = yaml.safe_load(
         f"""\
 render:
@@ -1140,7 +1140,7 @@ render:
 
 
 @pytest.mark.parametrize("mode", ("off", "per_layer", "composite"))
-def test_parse_render_post_fx_chroma_boost_valid_modes(mode: str) -> None:
+def test_parse_post_fx_chroma_boost_valid_modes(mode: str) -> None:
     data = yaml.safe_load(
         f"""\
 render:
@@ -1156,7 +1156,7 @@ render:
 
 
 @pytest.mark.parametrize("curve", ("rolloff", "smoothstep", "aces_fit"))
-def test_parse_render_post_fx_highlight_rolloff_valid_curves(curve: str) -> None:
+def test_parse_post_fx_highlight_rolloff_valid_curves(curve: str) -> None:
     data = yaml.safe_load(
         f"""\
 render:
@@ -1172,7 +1172,7 @@ render:
 
 
 @pytest.mark.parametrize("mode", ("off", "per_layer", "composite"))
-def test_parse_render_post_fx_highlight_rolloff_valid_modes(mode: str) -> None:
+def test_parse_post_fx_highlight_rolloff_valid_modes(mode: str) -> None:
     data = yaml.safe_load(
         f"""\
 render:
@@ -1187,7 +1187,7 @@ render:
     assert render.post_fx.highlight_rolloff.mode == mode
 
 
-def test_parse_render_post_fx_highlight_rolloff_rejects_invalid_curve() -> None:
+def test_parse_post_fx_highlight_rolloff_rejects_invalid_curve() -> None:
     data = yaml.safe_load(
         """\
 render:
@@ -1200,7 +1200,7 @@ render:
         parse_render_section(data)
 
 
-def test_parse_render_post_fx_highlight_rolloff_rejects_invalid_mode() -> None:
+def test_parse_post_fx_highlight_rolloff_rejects_invalid_mode() -> None:
     data = yaml.safe_load(
         """\
 render:
@@ -1213,7 +1213,7 @@ render:
         parse_render_section(data)
 
 
-def test_parse_render_post_fx_highlight_rolloff_clamps() -> None:
+def test_parse_post_fx_highlight_rolloff_clamps() -> None:
     data = yaml.safe_load(
         """\
 render:
@@ -1428,7 +1428,7 @@ def test_persist_post_fx_limiter_round_trip() -> None:
     session = TuningSession(
         layer_z_order=list(DEFAULT_LAYER_SLOTS),
     )
-    session.render_post_fx.limiter = VisualLimiterRuntime(
+    session.post_fx.limiter = VisualLimiterRuntime(
         enabled=False,
         threshold=0.72,
         ratio=4.0,
@@ -2060,8 +2060,8 @@ _UI_ONLY_LITERAL_DEFAULTS = frozenset(
         ("TimelineRuntime", "show_bar_grid"),
         ("SettingsRuntime", "editor_mode"),
         ("LayerRuntime", "switching_paused"),
-        ("TuningSession", "render_overlay_solo"),
-        ("TuningSession", "render_post_fx_solo"),
+        ("TuningSession", "overlay_solo"),
+        ("TuningSession", "post_fx_solo"),
         ("TuningSession", "help_visible"),
         ("TrackBlock", "preset_dir_position"),
         ("TrackBlock", "preset_dir_can_go_up"),
@@ -2070,10 +2070,10 @@ _UI_ONLY_LITERAL_DEFAULTS = frozenset(
         ("TrackBlock", "preset_markers"),
         ("TrackBlock", "preset_empty"),
         ("TrackBlock", "visible"),
-        ("RenderOverlaysBlock", "solo"),
-        ("RenderPostFxBlock", "solo"),
-        ("RenderTimelineBlock", "bar_phase_offset"),
-        ("RenderTimelineBlock", "show_bar_grid"),
+        ("OverlaysBlock", "solo"),
+        ("PostFxBlock", "solo"),
+        ("TimelineBlock", "bar_phase_offset"),
+        ("TimelineBlock", "show_bar_grid"),
         ("SettingsBlock", "editor_mode"),
         ("TuningViewState", "persistent_notification_elapsed_sec"),
         ("TuningViewState", "notification_remaining_sec"),

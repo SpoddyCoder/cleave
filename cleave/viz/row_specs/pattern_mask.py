@@ -20,54 +20,54 @@ from cleave.viz.tuning_view_state import TuningViewState
 if TYPE_CHECKING:
     from cleave.viz.controls import TuningControls
 
-def _format_render_pattern_mask_type(
+def _format_pattern_mask_type(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return state.render_pattern_mask.type
+    return state.pattern_mask.type
 
-def _format_render_pattern_mask_feather(
+def _format_pattern_mask_feather(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return f"{state.render_pattern_mask.feather_pct}%"
+    return f"{state.pattern_mask.feather_pct}%"
 
-def _format_render_pattern_mask_density(
+def _format_pattern_mask_density(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return f"{state.render_pattern_mask.density:.1f}x"
+    return f"{state.pattern_mask.density:.1f}x"
 
-def _format_render_pattern_mask_invert(
+def _format_pattern_mask_invert(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return pattern_mask_invert_display(state.render_pattern_mask.invert)
+    return pattern_mask_invert_display(state.pattern_mask.invert)
 
-def _format_render_pattern_mask_transition(
+def _format_pattern_mask_transition(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return f"{state.render_pattern_mask.transition:.1f}s"
+    return f"{state.pattern_mask.transition:.1f}s"
 
-def _format_render_pattern_mask_seed(
+def _format_pattern_mask_seed(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return str(state.render_pattern_mask.seed)
+    return str(state.pattern_mask.seed)
 
-def _toggle_render_pattern_mask_enabled(
+def _toggle_pattern_mask_enabled(
     controls: TuningControls, _desc: RowDescriptor
 ) -> None:
-    if controls.session.render_pattern_mask.locked:
+    if controls.session.pattern_mask.locked:
         return
-    enabled = controls.session.render_pattern_mask.enabled
-    controls.render_pattern_mask.set_enabled(not enabled)
+    enabled = controls.session.pattern_mask.enabled
+    controls.pattern_mask.set_enabled(not enabled)
 
 
-def _apply_render_pattern_mask_type(
+def _apply_pattern_mask_type(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
     _large: bool,
 ) -> None:
-    controls.render_pattern_mask.cycle_type(forward=forward)
+    controls.pattern_mask.cycle_type(forward=forward)
 
-def _apply_render_pattern_mask_feather(
+def _apply_pattern_mask_feather(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
@@ -77,11 +77,11 @@ def _apply_render_pattern_mask_feather(
         PATTERN_MASK_FEATHER_PCT_STEP_LARGE if large else PATTERN_MASK_FEATHER_PCT_STEP
     )
     delta = step if forward else -step
-    controls.render_pattern_mask.set_feather_pct(
-        controls.session.render_pattern_mask.feather_pct + delta
+    controls.pattern_mask.set_feather_pct(
+        controls.session.pattern_mask.feather_pct + delta
     )
 
-def _apply_render_pattern_mask_density(
+def _apply_pattern_mask_density(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
@@ -89,19 +89,19 @@ def _apply_render_pattern_mask_density(
 ) -> None:
     step = PATTERN_MASK_DENSITY_STEP_LARGE if large else PATTERN_MASK_DENSITY_STEP
     delta = step if forward else -step
-    controls.render_pattern_mask.set_density(
-        controls.session.render_pattern_mask.density + delta
+    controls.pattern_mask.set_density(
+        controls.session.pattern_mask.density + delta
     )
 
-def _apply_render_pattern_mask_invert(
+def _apply_pattern_mask_invert(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
     _large: bool,
 ) -> None:
-    controls.render_pattern_mask.cycle_invert(forward=forward)
+    controls.pattern_mask.cycle_invert(forward=forward)
 
-def _apply_render_pattern_mask_transition(
+def _apply_pattern_mask_transition(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
@@ -111,27 +111,27 @@ def _apply_render_pattern_mask_transition(
         PATTERN_MASK_TRANSITION_STEP_LARGE if large else PATTERN_MASK_TRANSITION_STEP
     )
     delta = step if forward else -step
-    controls.render_pattern_mask.set_transition(
-        controls.session.render_pattern_mask.transition + delta
+    controls.pattern_mask.set_transition(
+        controls.session.pattern_mask.transition + delta
     )
 
-def _apply_render_pattern_mask_seed(
+def _apply_pattern_mask_seed(
     controls: TuningControls,
     _desc: RowDescriptor,
     _forward: bool,
     _large: bool,
 ) -> None:
-    controls.render_pattern_mask.respin_seed()
+    controls.pattern_mask.respin_seed()
 
 def _visibility_pattern_mask(
     state: TuningViewState, _desc: RowDescriptor
 ) -> tuple[bool, bool]:
-    return (state.render_pattern_mask.enabled, False)
+    return (state.pattern_mask.enabled, False)
 
 SPECS: dict[RowKind, RowSpec] = {
-    RowKind.RENDER_PATTERN_MASK_HEADER: RowSpec(
+    RowKind.PATTERN_MASK_HEADER: RowSpec(
         affordance=RowAffordance.HEADING,
-        panel_label="PATTERN MASK",
+        panel_label="Pattern Mask",
         present_style=RowPresentStyle.HEADING,
         fit_strategy=FitStrategy.NONE,
         visibility_icon=_visibility_pattern_mask,
@@ -142,40 +142,40 @@ SPECS: dict[RowKind, RowSpec] = {
             "Replaces layer compositing, so each layer's Compositing rows",
             "(blend mode, opacity) are greyed out and ignored.",
         ),
-        toggle_enabled=_toggle_render_pattern_mask_enabled,
+        toggle_enabled=_toggle_pattern_mask_enabled,
     ),
-    RowKind.RENDER_PATTERN_MASK_TYPE: RowSpec(
+    RowKind.PATTERN_MASK_TYPE: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
         panel_label="type",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_render_pattern_mask_type,
-        apply_horizontal=_apply_render_pattern_mask_type,
+        format_value=_format_pattern_mask_type,
+        apply_horizontal=_apply_pattern_mask_type,
         help_title="Type",
         help_entries=(("Left/Right", "cycle pattern type"),),
         help_description=("Pattern geometry used to partition the frame.",),
         repeatable=True,
-        parent_group="render_pattern_mask",
+        parent_group="pattern_mask",
     ),
-    RowKind.RENDER_PATTERN_MASK_DENSITY: RowSpec(
+    RowKind.PATTERN_MASK_DENSITY: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
         panel_label="density",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_render_pattern_mask_density,
-        apply_horizontal=_apply_render_pattern_mask_density,
+        format_value=_format_pattern_mask_density,
+        apply_horizontal=_apply_pattern_mask_density,
         help_title="Density",
         help_description=(
             "Segments per active layer (1.0x = one strip/bar/wedge/tile per layer).",
             "Higher multiplies how many segments cycle through visible layers.",
         ),
         repeatable=True,
-        parent_group="render_pattern_mask",
+        parent_group="pattern_mask",
     ),
-    RowKind.RENDER_PATTERN_MASK_FEATHER: RowSpec(
+    RowKind.PATTERN_MASK_FEATHER: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
         panel_label="feather",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_render_pattern_mask_feather,
-        apply_horizontal=_apply_render_pattern_mask_feather,
+        format_value=_format_pattern_mask_feather,
+        apply_horizontal=_apply_pattern_mask_feather,
         help_title="Feather",
         help_entries=(
             ("Left/Right", "+/- 1%"),
@@ -186,40 +186,40 @@ SPECS: dict[RowKind, RowSpec] = {
             "100% maximum segment overlap.",
         ),
         repeatable=True,
-        parent_group="render_pattern_mask",
+        parent_group="pattern_mask",
     ),
-    RowKind.RENDER_PATTERN_MASK_INVERT: RowSpec(
+    RowKind.PATTERN_MASK_INVERT: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
         panel_label="invert",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_render_pattern_mask_invert,
-        apply_horizontal=_apply_render_pattern_mask_invert,
+        format_value=_format_pattern_mask_invert,
+        apply_horizontal=_apply_pattern_mask_invert,
         help_title="Invert",
         help_entries=(("Left/Right", "toggle invert on/off"),),
         help_description=("Reverse layer assignment order across the pattern.",),
         repeatable=True,
-        parent_group="render_pattern_mask",
+        parent_group="pattern_mask",
     ),
-    RowKind.RENDER_PATTERN_MASK_TRANSITION: RowSpec(
+    RowKind.PATTERN_MASK_TRANSITION: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
         panel_label="transition",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_render_pattern_mask_transition,
-        apply_horizontal=_apply_render_pattern_mask_transition,
+        format_value=_format_pattern_mask_transition,
+        apply_horizontal=_apply_pattern_mask_transition,
         help_title="Transition",
         help_description=(
             "Seconds to morph mask territories when layers toggle.",
             "0.0s applies the new partition instantly.",
         ),
         repeatable=True,
-        parent_group="render_pattern_mask",
+        parent_group="pattern_mask",
     ),
-    RowKind.RENDER_PATTERN_MASK_SEED: RowSpec(
+    RowKind.PATTERN_MASK_SEED: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
         panel_label="seed",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_render_pattern_mask_seed,
-        apply_horizontal=_apply_render_pattern_mask_seed,
+        format_value=_format_pattern_mask_seed,
+        apply_horizontal=_apply_pattern_mask_seed,
         help_title="Seed",
         help_entries=(("Left/Right", "respin seed"),),
         help_description=(
@@ -227,6 +227,6 @@ SPECS: dict[RowKind, RowSpec] = {
             "Left/Right picks a new random seed for a different field.",
         ),
         repeatable=True,
-        parent_group="render_pattern_mask",
+        parent_group="pattern_mask",
     ),
 }

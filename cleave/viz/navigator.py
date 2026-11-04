@@ -188,17 +188,17 @@ def _root_node(session: TuningSession, node: NavNode) -> NavNode:
         return replace(
             node,
             badge=_overlay_badge(session),
-            locked=session.render_overlays.locked,
+            locked=session.overlays.locked,
         )
     if node.id == "post_fx":
-        post_fx = session.render_post_fx
+        post_fx = session.post_fx
         return replace(
             node,
             badge=None if post_fx.enabled else OFF_BADGE,
             locked=post_fx.locked,
         )
     if node.id == "pattern_mask":
-        pattern_mask = session.render_pattern_mask
+        pattern_mask = session.pattern_mask
         return replace(
             node,
             badge=None if pattern_mask.enabled else OFF_BADGE,
@@ -227,9 +227,9 @@ def _static_child_badge(session: TuningSession, node_id: str) -> str | None:
     if node_id == "timeline.song_markers":
         return str(len(session.song_markers.times))
     if node_id == "overlay.opening_card":
-        return None if session.render_overlays.opening_card.enabled else OFF_BADGE
+        return None if session.overlays.opening_card.enabled else OFF_BADGE
     if node_id == "overlay.closing_card":
-        return None if session.render_overlays.closing_card.enabled else OFF_BADGE
+        return None if session.overlays.closing_card.enabled else OFF_BADGE
     return None
 
 
@@ -295,9 +295,9 @@ def _layer_badge(session: TuningSession, slot: str) -> str | None:
 
 
 def _overlay_badge(session: TuningSession) -> str | None:
-    if session.render_overlay_solo:
+    if session.overlay_solo:
         return SOLO_BADGE
-    overlays = session.render_overlays
+    overlays = session.overlays
     if not overlays.opening_card.enabled and not overlays.closing_card.enabled:
         return OFF_BADGE
     return None

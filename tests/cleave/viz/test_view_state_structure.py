@@ -97,16 +97,16 @@ def test_builder_patches_highlight_rolloff_curve_without_structure_rebuild() -> 
     controls = _make_controls(("layer_1",))
     builder = controls._view_state
     session = controls.session
-    session.render_post_fx.highlight_rolloff.curve = "rolloff"
+    session.post_fx.highlight_rolloff.curve = "rolloff"
 
     view_a = builder.build(paused=False)
     structure = builder._structure
-    assert view_a.render_post_fx.highlight_rolloff.curve == "rolloff"
+    assert view_a.post_fx.highlight_rolloff.curve == "rolloff"
 
-    session.render_post_fx.highlight_rolloff.curve = "smoothstep"
+    session.post_fx.highlight_rolloff.curve = "smoothstep"
     view_b = builder.build(paused=False)
     assert builder._structure is structure
-    assert view_b.render_post_fx.highlight_rolloff.curve == "smoothstep"
+    assert view_b.post_fx.highlight_rolloff.curve == "smoothstep"
 
 
 def test_structure_signature_ignores_timeline_panel_open() -> None:
@@ -120,7 +120,7 @@ def test_structure_signature_ignores_timeline_panel_open() -> None:
     sig_after = view_state_structure_signature(
         session, config_save)
     assert sig_before == sig_after
-    timeline = json.loads(sig_after)["render_timeline"]
+    timeline = json.loads(sig_after)["timeline"]
     for flag in (
         "panel_open",
         "beat_bar_grid_expanded",
@@ -136,10 +136,10 @@ def test_structure_signature_invalidates_on_highlight_rolloff_mode() -> None:
     controls = _make_controls(("layer_1",))
     session = controls.session
     config_save = controls._config_save
-    session.render_post_fx.highlight_rolloff.mode = "composite"
+    session.post_fx.highlight_rolloff.mode = "composite"
     sig_before = view_state_structure_signature(
         session, config_save)
-    session.render_post_fx.highlight_rolloff.mode = "off"
+    session.post_fx.highlight_rolloff.mode = "off"
     sig_after = view_state_structure_signature(
         session, config_save)
     assert sig_before != sig_after
@@ -149,10 +149,10 @@ def test_structure_signature_invalidates_on_animation_type() -> None:
     controls = _make_controls(("layer_1",))
     session = controls.session
     config_save = controls._config_save
-    session.render_overlays.opening_card.animation.type = "fade"
+    session.overlays.opening_card.animation.type = "fade"
     sig_before = view_state_structure_signature(
         session, config_save)
-    session.render_overlays.opening_card.animation.type = "slide"
+    session.overlays.opening_card.animation.type = "slide"
     sig_after = view_state_structure_signature(
         session, config_save)
     assert sig_before != sig_after
@@ -166,17 +166,17 @@ def _inspector_kinds(state, node_id: str) -> list[RowKind]:
 def test_builder_rebuilds_layout_when_animation_type_changes() -> None:
     controls = _make_controls(("layer_1",))
     session = controls.session
-    session.render_overlays.opening_card.animation.type = "fade"
+    session.overlays.opening_card.animation.type = "fade"
     view_fade = controls.build_view_state(paused=False)
     node = "overlay.opening_card"
     fade_page = _inspector_kinds(view_fade, node)
-    assert RowKind.RENDER_OVERLAY_CARD_ANIMATION_SLIDE_DIRECTION not in fade_page
+    assert RowKind.OVERLAY_CARD_ANIMATION_SLIDE_DIRECTION not in fade_page
     fade_structure = controls._view_state._structure
 
-    session.render_overlays.opening_card.animation.type = "slide"
+    session.overlays.opening_card.animation.type = "slide"
     view_slide = controls.build_view_state(paused=False)
     slide_page = _inspector_kinds(view_slide, node)
-    assert RowKind.RENDER_OVERLAY_CARD_ANIMATION_SLIDE_DIRECTION in slide_page
+    assert RowKind.OVERLAY_CARD_ANIMATION_SLIDE_DIRECTION in slide_page
     assert controls._view_state._structure is not fade_structure
 
 
@@ -184,10 +184,10 @@ def test_structure_signature_invalidates_on_closing_card_animation_type() -> Non
     controls = _make_controls(("layer_1",))
     session = controls.session
     config_save = controls._config_save
-    session.render_overlays.closing_card.animation.type = "fade"
+    session.overlays.closing_card.animation.type = "fade"
     sig_before = view_state_structure_signature(
         session, config_save)
-    session.render_overlays.closing_card.animation.type = "slide"
+    session.overlays.closing_card.animation.type = "slide"
     sig_after = view_state_structure_signature(
         session, config_save)
     assert sig_before != sig_after
@@ -197,10 +197,10 @@ def test_structure_signature_invalidates_on_chroma_boost_mode() -> None:
     controls = _make_controls(("layer_1",))
     session = controls.session
     config_save = controls._config_save
-    session.render_post_fx.chroma_boost.mode = "composite"
+    session.post_fx.chroma_boost.mode = "composite"
     sig_before = view_state_structure_signature(
         session, config_save)
-    session.render_post_fx.chroma_boost.mode = "off"
+    session.post_fx.chroma_boost.mode = "off"
     sig_after = view_state_structure_signature(
         session, config_save)
     assert sig_before != sig_after
@@ -209,18 +209,18 @@ def test_structure_signature_invalidates_on_chroma_boost_mode() -> None:
 def test_builder_rebuilds_layout_when_highlight_rolloff_mode_changes() -> None:
     controls = _make_controls(("layer_1",))
     session = controls.session
-    session.render_post_fx.highlight_rolloff.mode = "composite"
+    session.post_fx.highlight_rolloff.mode = "composite"
     builder = controls._view_state
 
     view_on = builder.build(paused=False)
     on_page = _inspector_kinds(view_on, "post_fx.highlight_rolloff")
-    assert RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD in on_page
+    assert RowKind.POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD in on_page
     on_structure = builder._structure
 
-    session.render_post_fx.highlight_rolloff.mode = "off"
+    session.post_fx.highlight_rolloff.mode = "off"
     view_off = builder.build(paused=False)
     assert builder._structure is not on_structure
-    assert RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD not in _inspector_kinds(
+    assert RowKind.POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD not in _inspector_kinds(
         view_off, "post_fx"
     )
 
@@ -439,10 +439,10 @@ def test_structure_signature_invalidates_on_pattern_mask_type() -> None:
     controls = _make_controls(("layer_1",))
     session = controls.session
     config_save = controls._config_save
-    session.render_pattern_mask.type = "strips"
+    session.pattern_mask.type = "strips"
     sig_before = view_state_structure_signature(
         session, config_save)
-    session.render_pattern_mask.type = "plasma"
+    session.pattern_mask.type = "plasma"
     sig_after = view_state_structure_signature(
         session, config_save)
     assert sig_before != sig_after
@@ -454,17 +454,17 @@ def test_pattern_mask_seed_row_only_for_plasma() -> None:
     builder = controls._view_state
 
     for mask_type in ("strips", "bars", "radial", "checker"):
-        session.render_pattern_mask.type = mask_type
+        session.pattern_mask.type = mask_type
         view = builder.build(paused=False)
         page = _inspector_kinds(view, "pattern_mask")
-        assert RowKind.RENDER_PATTERN_MASK_FEATHER in page
-        assert RowKind.RENDER_PATTERN_MASK_SEED not in page
+        assert RowKind.PATTERN_MASK_FEATHER in page
+        assert RowKind.PATTERN_MASK_SEED not in page
 
-    session.render_pattern_mask.type = "plasma"
+    session.pattern_mask.type = "plasma"
     view_plasma = builder.build(paused=False)
     plasma = _inspector_kinds(view_plasma, "pattern_mask")
-    assert RowKind.RENDER_PATTERN_MASK_SEED in plasma
-    assert RowKind.RENDER_PATTERN_MASK_FEATHER in plasma
+    assert RowKind.PATTERN_MASK_SEED in plasma
+    assert RowKind.PATTERN_MASK_FEATHER in plasma
 
 
 def test_structure_signature_invalidates_on_hard_cut_fades_enabled() -> None:
@@ -497,10 +497,10 @@ def test_structure_signature_invalidates_on_visual_limiter_enabled() -> None:
     controls = _make_controls(("layer_1",))
     session = controls.session
     config_save = controls._config_save
-    session.render_post_fx.limiter.enabled = True
+    session.post_fx.limiter.enabled = True
     sig_before = view_state_structure_signature(
         session, config_save)
-    session.render_post_fx.limiter.enabled = False
+    session.post_fx.limiter.enabled = False
     sig_after = view_state_structure_signature(
         session, config_save)
     assert sig_before != sig_after

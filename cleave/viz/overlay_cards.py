@@ -16,7 +16,7 @@ from cleave.easing import (
     fade_alpha,
 )
 from cleave.gl_compositor import GlCompositor
-from cleave.viz.session import RenderOverlayCardRuntime
+from cleave.viz.session import OverlayCardRuntime
 from cleave.viz.theme import FADE_DURATION_SEC
 
 LINE_GAP = 3
@@ -76,7 +76,7 @@ class LayerAnimState:
 
 @dataclass(frozen=True)
 class OverlayAnimationState:
-    """Per-frame animation evaluation for the render overlay."""
+    """Per-frame animation evaluation for an overlay card."""
 
     visible: bool
     settled: bool
@@ -113,7 +113,7 @@ def panel_surface_key(cfg: RenderOverlayCardConfig) -> tuple:
 
 
 def build_live_overlay_config(
-    runtime: RenderOverlayCardRuntime,
+    runtime: OverlayCardRuntime,
 ) -> RenderOverlayCardConfig:
     """Build overlay card config from live-tuned session runtime."""
     from cleave.config import (
@@ -122,10 +122,10 @@ def build_live_overlay_config(
         RenderOverlayBorderConfig,
         RenderOverlayClosingAnimationConfig,
     )
-    from cleave.viz.session import RenderOverlayClosingAnimationRuntime
+    from cleave.viz.session import OverlayClosingAnimationRuntime
 
     anim = runtime.animation
-    if isinstance(anim, RenderOverlayClosingAnimationRuntime):
+    if isinstance(anim, OverlayClosingAnimationRuntime):
         animation: (
             RenderOverlayAnimationConfig | RenderOverlayClosingAnimationConfig
         ) = RenderOverlayClosingAnimationConfig(
@@ -668,7 +668,7 @@ def _clip_rect_to_bounds(
     return (left, top, clip_w, clip_h)
 
 
-def composite_render_overlay_with_alpha(
+def composite_overlay_with_alpha(
     compositor: GlCompositor,
     cfg: RenderOverlayCardConfig,
     alpha: float,
@@ -681,7 +681,7 @@ def composite_render_overlay_with_alpha(
     solo: bool = False,
     song_duration: float | None = None,
 ) -> None:
-    """Upload and draw the render overlay at *alpha* visibility."""
+    """Upload and draw the overlay card at *alpha* visibility."""
     if alpha <= _ALPHA_EPSILON:
         return
 
@@ -781,7 +781,7 @@ def _upload_and_draw(
     )
 
 
-def composite_render_overlay(
+def composite_overlay(
     compositor: GlCompositor,
     cfg: RenderOverlayCardConfig,
     t_sec: float,
@@ -791,8 +791,8 @@ def composite_render_overlay(
     panel: pygame.Surface | None = None,
     layers: OverlayLayerSet | None = None,
 ) -> None:
-    """Upload and draw the render overlay when visible at *t_sec*."""
-    composite_render_overlay_with_alpha(
+    """Upload and draw the overlay card when visible at *t_sec*."""
+    composite_overlay_with_alpha(
         compositor,
         cfg,
         overlay_visible_alpha(t_sec, cfg),

@@ -117,7 +117,7 @@ def _make_runtime(
         runtime.controls.set_shell_region(ShellRegion.TIMELINE)
     else:
         runtime.controls.focus_cursor = MainFocus(
-            RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
+            RowDescriptor(RowKind.TIMELINE_HEADER)
         )
     runtime.modal_host = runtime.controls.modal_host
     runtime.timeline_controls = TimelineControls(
@@ -262,7 +262,7 @@ def test_second_esc_after_stop_closes_submenu_panel() -> None:
     assert isinstance(runtime.controls.focus_cursor, MainFocus)
     assert (
         runtime.controls.focus_cursor.descriptor.kind
-        is RowKind.RENDER_TIMELINE_HEADER
+        is RowKind.TIMELINE_HEADER
     )
 
 

@@ -74,7 +74,7 @@ class LimiterFrameState:
     def from_session(cls, session: TuningSession) -> LimiterFrameState:
         return cls(
             timeline=session.timeline,
-            limiter=session.render_post_fx.limiter,
+            limiter=session.post_fx.limiter,
             solo_slot=session.solo_slot,
             editor_mode=session.settings.editor_mode,
             layer_z_order=session.layer_z_order,

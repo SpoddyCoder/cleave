@@ -67,7 +67,7 @@ if TYPE_CHECKING:
 def _format_timeline_bar_phase(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return f"+{state.render_timeline.bar_phase_offset}"
+    return f"+{state.timeline.bar_phase_offset}"
 
 def _apply_timeline_bar_phase(
     controls: TuningControls,
@@ -80,7 +80,7 @@ def _apply_timeline_bar_phase(
 def _format_timeline_bar_grid(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return "show" if state.render_timeline.show_bar_grid else "hide"
+    return "show" if state.timeline.show_bar_grid else "hide"
 
 def _apply_timeline_bar_grid(
     controls: TuningControls,
@@ -93,7 +93,7 @@ def _apply_timeline_bar_grid(
 def _format_timeline_placement_snap(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return state.render_timeline.placement_snap
+    return state.timeline.placement_snap
 
 def _apply_timeline_placement_snap(
     controls: TuningControls,
@@ -110,7 +110,7 @@ def _apply_timeline_placement_snap(
 def _format_timeline_preset_character(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return timeline_preset_kind_display(state.render_timeline.timeline_preset_kind)
+    return timeline_preset_kind_display(state.timeline.timeline_preset_kind)
 
 def _apply_timeline_preset_character(
     controls: TuningControls,
@@ -128,7 +128,7 @@ def _format_timeline_preset_density(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
     return timeline_preset_density_display(
-        state.render_timeline.timeline_preset_density
+        state.timeline.timeline_preset_density
     )
 
 def _apply_timeline_preset_density(
@@ -147,7 +147,7 @@ def _format_timeline_preset_cue_snap(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
     return timeline_preset_cue_snap_display(
-        state.render_timeline.timeline_preset_cue_snap
+        state.timeline.timeline_preset_cue_snap
     )
 
 def _apply_timeline_preset_cue_snap(
@@ -166,7 +166,7 @@ def _format_timeline_preset_song_marker_snap(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
     return timeline_preset_song_marker_snap_display(
-        state.render_timeline.timeline_preset_song_marker_snap
+        state.timeline.timeline_preset_song_marker_snap
     )
 
 def _apply_timeline_preset_song_marker_snap(
@@ -185,7 +185,7 @@ def _format_timeline_preset_timeline_cuts(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
     return timeline_preset_timeline_cuts_display(
-        state.render_timeline.timeline_preset_timeline_cuts
+        state.timeline.timeline_preset_timeline_cuts
     )
 
 def _apply_timeline_preset_timeline_cuts(
@@ -204,7 +204,7 @@ def _format_timeline_preset_repopulate(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
     return timeline_preset_repopulate_display(
-        state.render_timeline.timeline_preset_repopulate
+        state.timeline.timeline_preset_repopulate
     )
 
 def _apply_timeline_preset_repopulate(
@@ -223,7 +223,7 @@ def _format_timeline_preset_conductor(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
     return timeline_preset_conductor_display(
-        state.render_timeline.timeline_preset_conductor
+        state.timeline.timeline_preset_conductor
     )
 
 def _apply_timeline_preset_conductor(
@@ -241,7 +241,7 @@ def _apply_timeline_preset_conductor(
 def _format_timeline_preset_mode(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return timeline_preset_mode_display(state.render_timeline.timeline_preset_mode)
+    return timeline_preset_mode_display(state.timeline.timeline_preset_mode)
 
 def _apply_timeline_preset_mode(
     controls: TuningControls,
@@ -258,7 +258,7 @@ def _apply_timeline_preset_mode(
 def _format_timeline_hard_cut_fades_enabled(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return hard_cut_enabled_display(state.render_timeline.hard_cut_fades.enabled)
+    return hard_cut_enabled_display(state.timeline.hard_cut_fades.enabled)
 
 def _apply_timeline_hard_cut_fades_enabled(
     controls: TuningControls,
@@ -272,7 +272,7 @@ def _apply_timeline_hard_cut_fades_enabled(
 def _format_timeline_hard_cut_fade_in(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return f"{state.render_timeline.hard_cut_fades.fade_in:.1f}s"
+    return f"{state.timeline.hard_cut_fades.fade_in:.1f}s"
 
 def _apply_timeline_hard_cut_fade_in(
     controls: TuningControls,
@@ -287,7 +287,7 @@ def _apply_timeline_hard_cut_fade_in(
 def _format_timeline_hard_cut_fade_out(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return f"{state.render_timeline.hard_cut_fades.fade_out:.1f}s"
+    return f"{state.timeline.hard_cut_fades.fade_out:.1f}s"
 
 def _apply_timeline_hard_cut_fade_out(
     controls: TuningControls,
@@ -302,7 +302,7 @@ def _apply_timeline_hard_cut_fade_out(
 def _format_timeline_soft_cut_fades_enabled(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return hard_cut_enabled_display(state.render_timeline.soft_cut_fades.enabled)
+    return hard_cut_enabled_display(state.timeline.soft_cut_fades.enabled)
 
 def _apply_timeline_soft_cut_fades_enabled(
     controls: TuningControls,
@@ -316,7 +316,7 @@ def _apply_timeline_soft_cut_fades_enabled(
 def _format_timeline_soft_cut_fade_in(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return f"{state.render_timeline.soft_cut_fades.fade_in:.1f}s"
+    return f"{state.timeline.soft_cut_fades.fade_in:.1f}s"
 
 def _apply_timeline_soft_cut_fade_in(
     controls: TuningControls,
@@ -331,7 +331,7 @@ def _apply_timeline_soft_cut_fade_in(
 def _format_timeline_soft_cut_fade_out(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return f"{state.render_timeline.soft_cut_fades.fade_out:.1f}s"
+    return f"{state.timeline.soft_cut_fades.fade_out:.1f}s"
 
 def _apply_timeline_soft_cut_fade_out(
     controls: TuningControls,
@@ -346,7 +346,7 @@ def _apply_timeline_soft_cut_fade_out(
 def _format_timeline_hard_cut_crossfade(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return timeline_crossfade_display(state.render_timeline.hard_cut_fades.crossfade)
+    return timeline_crossfade_display(state.timeline.hard_cut_fades.crossfade)
 
 def _apply_timeline_hard_cut_crossfade(
     controls: TuningControls,
@@ -360,7 +360,7 @@ def _apply_timeline_hard_cut_crossfade(
 def _format_timeline_soft_cut_crossfade(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return timeline_crossfade_display(state.render_timeline.soft_cut_fades.crossfade)
+    return timeline_crossfade_display(state.timeline.soft_cut_fades.crossfade)
 
 def _apply_timeline_soft_cut_crossfade(
     controls: TuningControls,
@@ -371,17 +371,17 @@ def _apply_timeline_soft_cut_crossfade(
     group = controls.session.timeline.soft_cut_fades
     group.crossfade = cycle_timeline_crossfade(group.crossfade, forward=forward)
 
-def _toggle_render_timeline_enabled(
+def _toggle_timeline_enabled(
     controls: TuningControls, _desc: RowDescriptor
 ) -> None:
     if controls.session.timeline.locked:
         return
     enabled = controls.session.timeline.enabled
-    controls.set_render_timeline_enabled(not enabled)
+    controls.set_timeline_enabled(not enabled)
 
 
 def _format_song_markers_count(state: TuningViewState, _desc: RowDescriptor) -> str:
-    return f"({len(state.render_timeline.song_marker_times)})"
+    return f"({len(state.timeline.song_marker_times)})"
 
 def _song_marker_type_display(marker_type: str) -> str:
     if marker_type == DEFAULT_SONG_MARKER_TYPE:
@@ -391,8 +391,8 @@ def _song_marker_type_display(marker_type: str) -> str:
 def _format_song_marker_item(state: TuningViewState, desc: RowDescriptor) -> str:
     assert desc.marker_index is not None
     index = desc.marker_index
-    times = state.render_timeline.song_marker_times
-    types = state.render_timeline.song_marker_types
+    times = state.timeline.song_marker_times
+    types = state.timeline.song_marker_types
     marker_type = (
         types[index]
         if 0 <= index < len(types)
@@ -427,7 +427,7 @@ def _apply_song_marker_type(
 def _visibility_timeline(
     state: TuningViewState, _desc: RowDescriptor
 ) -> tuple[bool, bool]:
-    return (state.render_timeline.enabled, False)
+    return (state.timeline.enabled, False)
 
 
 def _section_lock_blocks(controls: TuningControls, desc: RowDescriptor) -> bool:
@@ -481,9 +481,9 @@ def _apply_song_marker_item(controls: TuningControls, desc: RowDescriptor) -> No
 
 
 SPECS: dict[RowKind, RowSpec] = {
-    RowKind.RENDER_TIMELINE_HEADER: RowSpec(
+    RowKind.TIMELINE_HEADER: RowSpec(
         affordance=RowAffordance.HEADING,
-        panel_label="TIMELINE",
+        panel_label="Timeline",
         present_style=RowPresentStyle.HEADING,
         fit_strategy=FitStrategy.NONE,
         visibility_icon=_visibility_timeline,
@@ -492,7 +492,7 @@ SPECS: dict[RowKind, RowSpec] = {
             "Layer visibility automation.",
             "When enabled, standard layer visibility is disabled.",
         ),
-        toggle_enabled=_toggle_render_timeline_enabled,
+        toggle_enabled=_toggle_timeline_enabled,
     ),
     RowKind.TIMELINE_PRESETS_HEADER: RowSpec(
         affordance=RowAffordance.HEADING,

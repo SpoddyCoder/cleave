@@ -26,11 +26,11 @@ from cleave.viz.editor_mode_controls import (
     render_sections_active,
 )
 from cleave.viz.row_sections import (
-    RENDER_OVERLAY_SECTION_KINDS,
-    RENDER_PATTERN_MASK_SECTION_KINDS,
-    RENDER_POST_FX_LIMITER_KINDS,
-    RENDER_POST_FX_SECTION_KINDS,
-    RENDER_TIMELINE_SECTION_KINDS,
+    OVERLAY_SECTION_KINDS,
+    PATTERN_MASK_SECTION_KINDS,
+    POST_FX_LIMITER_KINDS,
+    POST_FX_SECTION_KINDS,
+    TIMELINE_SECTION_KINDS,
     TRACK_COMPOSITING_SECTION_KINDS,
 )
 from cleave.viz.theme import (
@@ -85,8 +85,8 @@ def row_value_color_for(
     ):
         return LABEL
 
-    if kind in RENDER_TIMELINE_SECTION_KINDS:
-        if not state.render_timeline.enabled:
+    if kind in TIMELINE_SECTION_KINDS:
+        if not state.timeline.enabled:
             return DISABLED
 
     if affordance == RowAffordance.ACTION:
@@ -106,8 +106,8 @@ def row_value_color_for(
 
     stem = desc.slot
 
-    if kind in RENDER_OVERLAY_SECTION_KINDS:
-        overlays = state.render_overlays
+    if kind in OVERLAY_SECTION_KINDS:
+        overlays = state.overlays
         if not (
             overlays.opening_card.runtime.enabled
             or overlays.closing_card.runtime.enabled
@@ -115,14 +115,14 @@ def row_value_color_for(
             return DISABLED
 
     if (
-        kind in RENDER_POST_FX_SECTION_KINDS
-        and kind not in RENDER_POST_FX_LIMITER_KINDS
+        kind in POST_FX_SECTION_KINDS
+        and kind not in POST_FX_LIMITER_KINDS
     ):
-        if not state.render_post_fx.enabled:
+        if not state.post_fx.enabled:
             return DISABLED
 
-    if kind in RENDER_PATTERN_MASK_SECTION_KINDS:
-        if not state.render_pattern_mask.enabled:
+    if kind in PATTERN_MASK_SECTION_KINDS:
+        if not state.pattern_mask.enabled:
             return DISABLED
 
     if kind in TRACK_COMPOSITING_SECTION_KINDS:
@@ -131,7 +131,7 @@ def row_value_color_for(
             render_sections_active(editor_mode)
             and not layer_compositing_active(
                 editor_mode,
-                state.render_pattern_mask.enabled,
+                state.pattern_mask.enabled,
             )
         ):
             return DISABLED

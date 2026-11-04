@@ -12,13 +12,12 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import TYPE_CHECKING
 
-from cleave.stems import stem_overlay_header
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
 from cleave.viz.row_sections import (
-    RENDER_OVERLAY_SECTION_KINDS,
-    RENDER_PATTERN_MASK_SECTION_KINDS,
-    RENDER_POST_FX_SECTION_KINDS,
-    RENDER_TIMELINE_SECTION_KINDS,
+    OVERLAY_SECTION_KINDS,
+    PATTERN_MASK_SECTION_KINDS,
+    POST_FX_SECTION_KINDS,
+    TIMELINE_SECTION_KINDS,
 )
 from cleave.viz.tuning_view_state import TuningViewState
 
@@ -32,7 +31,6 @@ class RowPresentStyle(Enum):
     PATH_ICON = auto()
     FULL_LINE = auto()
     DYNAMIC = auto()
-    SPACER = auto()
 
 
 class FitStrategy(Enum):
@@ -95,36 +93,33 @@ class RowSpec:
 # Domain modules import RowSpec from this module, so assembly happens after the
 # dataclass is defined.
 from cleave.viz.row_specs.pattern_mask import SPECS as _PATTERN_MASK_SPECS
-from cleave.viz.row_specs.render_overlays import (
-    SPECS as _RENDER_OVERLAY_SPECS,
+from cleave.viz.row_specs.overlays import (
+    SPECS as _OVERLAY_SPECS,
     overlay_card_panel_label,
 )
-from cleave.viz.row_specs.render_post_fx import SPECS as _RENDER_POST_FX_SPECS
+from cleave.viz.row_specs.post_fx import SPECS as _POST_FX_SPECS
 from cleave.viz.row_specs.project import SPECS as _PROJECT_SPECS
 from cleave.viz.row_specs.settings import SPECS as _SETTINGS_SPECS
 from cleave.viz.row_specs.timeline import SPECS as _TIMELINE_SPECS
 from cleave.viz.row_specs.track import SPECS as _TRACK_SPECS
-from cleave.viz.row_specs.transport import SPECS as _TRANSPORT_SPECS
 
 ROW_SPECS: dict[RowKind, RowSpec] = {
-    **_TRANSPORT_SPECS,
     **_SETTINGS_SPECS,
     **_PROJECT_SPECS,
     **_TRACK_SPECS,
-    **_RENDER_OVERLAY_SPECS,
-    **_RENDER_POST_FX_SPECS,
+    **_OVERLAY_SPECS,
+    **_POST_FX_SPECS,
     **_PATTERN_MASK_SPECS,
     **_TIMELINE_SPECS,
 }
 
 _missing = set(RowKind) - set(ROW_SPECS)
 _duplicate_overlap = (
-    len(_TRANSPORT_SPECS)
-    + len(_SETTINGS_SPECS)
+    len(_SETTINGS_SPECS)
     + len(_PROJECT_SPECS)
     + len(_TRACK_SPECS)
-    + len(_RENDER_OVERLAY_SPECS)
-    + len(_RENDER_POST_FX_SPECS)
+    + len(_OVERLAY_SPECS)
+    + len(_POST_FX_SPECS)
     + len(_PATTERN_MASK_SPECS)
     + len(_TIMELINE_SPECS)
 ) - len(ROW_SPECS)
@@ -165,9 +160,9 @@ def _in_lockable_group(parent_group: str | None) -> bool:
         return False
     return (
         parent_group == "track"
-        or parent_group.startswith("render_overlay")
-        or parent_group.startswith("render_post_fx")
-        or parent_group.startswith("render_pattern_mask")
+        or parent_group.startswith("overlay")
+        or parent_group.startswith("post_fx")
+        or parent_group.startswith("pattern_mask")
     )
 
 
@@ -210,23 +205,16 @@ def _state_track_locked(state: object, slot: str) -> bool:
     return bool(state.layers[slot].locked)
 
 
-def _state_timeline_locked(state: object) -> bool:
-    render_timeline = getattr(state, "render_timeline", None)
-    if render_timeline is not None:
-        return bool(render_timeline.locked)
-    return bool(state.timeline.locked)
-
-
 def row_lock_section(kind: RowKind) -> str | None:
     if kind in TRACK_LOCK_KINDS:
         return "track"
-    if kind in RENDER_OVERLAY_SECTION_KINDS:
-        return "render_overlay"
-    if kind in RENDER_POST_FX_SECTION_KINDS:
-        return "render_post_fx"
-    if kind in RENDER_PATTERN_MASK_SECTION_KINDS:
-        return "render_pattern_mask"
-    if kind in RENDER_TIMELINE_SECTION_KINDS:
+    if kind in OVERLAY_SECTION_KINDS:
+        return "overlay"
+    if kind in POST_FX_SECTION_KINDS:
+        return "post_fx"
+    if kind in PATTERN_MASK_SECTION_KINDS:
+        return "pattern_mask"
+    if kind in TIMELINE_SECTION_KINDS:
         return "timeline"
     return None
 
@@ -234,8 +222,7 @@ def row_lock_section(kind: RowKind) -> str | None:
 def section_locked(state: object, desc: RowDescriptor) -> bool:
     """Whether the section owning *desc* is locked.
 
-    Accepts either a ``TuningViewState`` (tracks/render_timeline attributes)
-    or a ``TuningSession`` (layers/timeline attributes).
+    Accepts either a ``TuningViewState`` or a ``TuningSession``.
 
     Section locks are ignored in preset curation mode so layer browse and
     favourite / blacklist / restore stay available.
@@ -253,14 +240,14 @@ def section_locked(state: object, desc: RowDescriptor) -> bool:
         if slot is None:
             return False
         return _state_track_locked(state, slot)
-    if section == "render_overlay":
-        return bool(state.render_overlays.locked)
-    if section == "render_post_fx":
-        return bool(state.render_post_fx.locked)
-    if section == "render_pattern_mask":
-        return bool(state.render_pattern_mask.locked)
+    if section == "overlay":
+        return bool(state.overlays.locked)
+    if section == "post_fx":
+        return bool(state.post_fx.locked)
+    if section == "pattern_mask":
+        return bool(state.pattern_mask.locked)
     if section == "timeline":
-        return _state_timeline_locked(state)
+        return bool(state.timeline.locked)
     return False
 
 

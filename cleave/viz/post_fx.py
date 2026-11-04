@@ -14,7 +14,7 @@ from cleave.easing import fade_ramp_alpha
 from cleave.gl_color_format import resolve_live_compositor_format
 from cleave.layer_composite import apply_color_format
 from cleave.viz.editor_mode_controls import is_preset_curation_mode
-from cleave.viz.session import FadeRuntime, RenderPostFxRuntime
+from cleave.viz.session import FadeRuntime, PostFxRuntime
 
 if TYPE_CHECKING:
     from cleave.gl_compositor import GlCompositor
@@ -273,7 +273,7 @@ def apply_hdr_display_shoulder(
     )
 
 
-def highlight_rolloff_active(pp: RenderPostFxRuntime, *, solo: bool) -> bool:
+def highlight_rolloff_active(pp: PostFxRuntime, *, solo: bool) -> bool:
     return pp.enabled and pp.highlight_rolloff.mode != "off" and not solo
 
 
@@ -323,7 +323,7 @@ def apply_chroma_boost_rgba(
     return out.tobytes()
 
 
-def chroma_boost_active(pp: RenderPostFxRuntime, *, solo: bool) -> bool:
+def chroma_boost_active(pp: PostFxRuntime, *, solo: bool) -> bool:
     return (
         pp.enabled
         and pp.chroma_boost.mode != "off"

@@ -590,10 +590,10 @@ def test_apply_pattern_mask_calls_builder_and_enables_mask() -> None:
     mock_cresc.assert_not_called()
     mock_accent.assert_not_called()
     mock_breath.assert_not_called()
-    assert session.render_pattern_mask.enabled is True
-    assert session.render_pattern_mask.type == "strips"
-    assert session.render_pattern_mask.feather_pct == 0
-    assert session.render_pattern_mask.transition == 1.0
+    assert session.pattern_mask.enabled is True
+    assert session.pattern_mask.type == "strips"
+    assert session.pattern_mask.feather_pct == 0
+    assert session.pattern_mask.transition == 1.0
     assert notes == ["Applied pattern mask timeline"]
 
 
@@ -622,8 +622,8 @@ def test_apply_pattern_mask_passes_conductor_kwargs() -> None:
 def test_apply_layers_mode_uses_character_builder() -> None:
     slots = ("layer_1", "layer_2", "layer_3", "layer_4")
     session = _session(slots, mode="layers")
-    session.render_pattern_mask.enabled = False
-    session.render_pattern_mask.transition = 0.0
+    session.pattern_mask.enabled = False
+    session.pattern_mask.transition = 0.0
     controller, notes = _controller(session)
     captured: dict = {}
 
@@ -648,6 +648,6 @@ def test_apply_layers_mode_uses_character_builder() -> None:
     mock_pm.assert_not_called()
     mock_cresc.assert_called_once()
     assert "bar_times" in captured["kwargs"]
-    assert session.render_pattern_mask.enabled is False
-    assert session.render_pattern_mask.transition == 0.0
+    assert session.pattern_mask.enabled is False
+    assert session.pattern_mask.transition == 0.0
     assert notes == ["Applied Breathing timeline preset"]

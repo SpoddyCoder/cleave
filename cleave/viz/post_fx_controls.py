@@ -21,39 +21,39 @@ from cleave.config_schema.render import (
     clamp_visual_limiter_release,
     clamp_visual_limiter_threshold,
 )
-from cleave.viz.render_post_fx_bindings import RenderPostFxBindings
+from cleave.viz.post_fx_bindings import PostFxBindings
 from cleave.viz.session import FadeSideRuntime, TuningSession
 
 
-class RenderPostFxControls:
+class PostFxControls:
     """Mutations for render post-FX rows."""
 
     def __init__(
         self,
         session: TuningSession,
         *,
-        bindings: RenderPostFxBindings | None = None,
+        bindings: PostFxBindings | None = None,
     ) -> None:
         self.session = session
         self._bindings = bindings
 
     def set_enabled(self, enabled: bool) -> None:
-        pp = self.session.render_post_fx
+        pp = self.session.post_fx
         if pp.enabled == enabled:
             return
         pp.enabled = enabled
         if not enabled:
-            self.session.render_post_fx_solo = False
+            self.session.post_fx_solo = False
 
     def enter_solo(self) -> None:
-        if self.session.render_post_fx_solo:
+        if self.session.post_fx_solo:
             return
-        self.session.render_post_fx_solo = True
+        self.session.post_fx_solo = True
 
     def exit_solo(self) -> None:
-        if not self.session.render_post_fx_solo:
+        if not self.session.post_fx_solo:
             return
-        self.session.render_post_fx_solo = False
+        self.session.post_fx_solo = False
 
     def set_fade_start(self, side: str, value: float) -> None:
         window = self._fade_side(side)
@@ -84,7 +84,7 @@ class RenderPostFxControls:
             window.type = curves[(index - 1) % len(curves)]
 
     def _fade_side(self, side: str) -> FadeSideRuntime:
-        fade = self.session.render_post_fx.fade
+        fade = self.session.post_fx.fade
         if side == "fade_in":
             return fade.fade_in
         if side == "fade_out":
@@ -94,40 +94,40 @@ class RenderPostFxControls:
         )
 
     def _enforce_ceiling_vs_threshold(self) -> None:
-        hr = self.session.render_post_fx.highlight_rolloff
+        hr = self.session.post_fx.highlight_rolloff
         hr.ceiling_pct = clamp_highlight_rolloff_ceiling_pct(
             hr.ceiling_pct, threshold_pct=hr.threshold_pct
         )
 
     def set_highlight_rolloff_threshold_pct(self, threshold_pct: int) -> None:
-        hr = self.session.render_post_fx.highlight_rolloff
+        hr = self.session.post_fx.highlight_rolloff
         hr.threshold_pct = clamp_highlight_rolloff_threshold_pct(threshold_pct)
         self._enforce_ceiling_vs_threshold()
 
     def set_highlight_rolloff_ceiling_pct(self, ceiling_pct: int) -> None:
-        hr = self.session.render_post_fx.highlight_rolloff
+        hr = self.session.post_fx.highlight_rolloff
         hr.ceiling_pct = clamp_highlight_rolloff_ceiling_pct(
             ceiling_pct, threshold_pct=hr.threshold_pct
         )
 
     def set_highlight_rolloff_strength_pct(self, strength_pct: int) -> None:
-        self.session.render_post_fx.highlight_rolloff.strength_pct = (
+        self.session.post_fx.highlight_rolloff.strength_pct = (
             clamp_highlight_rolloff_strength_pct(strength_pct)
         )
 
     def set_highlight_rolloff_softness_pct(self, softness_pct: int) -> None:
-        self.session.render_post_fx.highlight_rolloff.softness_pct = (
+        self.session.post_fx.highlight_rolloff.softness_pct = (
             clamp_highlight_rolloff_softness_pct(softness_pct)
         )
 
     def set_highlight_rolloff_desaturation_pct(self, desaturation_pct: int) -> None:
-        self.session.render_post_fx.highlight_rolloff.desaturation_pct = (
+        self.session.post_fx.highlight_rolloff.desaturation_pct = (
             clamp_highlight_rolloff_desaturation_pct(desaturation_pct)
         )
 
     def cycle_highlight_rolloff_mode(self, *, forward: bool) -> None:
         modes = HIGHLIGHT_ROLLOFF_APPLY_MODES
-        hr = self.session.render_post_fx.highlight_rolloff
+        hr = self.session.post_fx.highlight_rolloff
         old_mode = hr.mode
         try:
             index = modes.index(hr.mode)
@@ -150,7 +150,7 @@ class RenderPostFxControls:
 
     def cycle_highlight_rolloff_curve(self, *, forward: bool) -> None:
         curves = HIGHLIGHT_ROLLOFF_CURVES
-        hr = self.session.render_post_fx.highlight_rolloff
+        hr = self.session.post_fx.highlight_rolloff
         try:
             index = curves.index(hr.curve)
         except ValueError:
@@ -161,13 +161,13 @@ class RenderPostFxControls:
             hr.curve = curves[(index - 1) % len(curves)]
 
     def set_chroma_boost_amount_pct(self, amount_pct: int) -> None:
-        self.session.render_post_fx.chroma_boost.amount_pct = (
+        self.session.post_fx.chroma_boost.amount_pct = (
             clamp_chroma_boost_amount_pct(amount_pct)
         )
 
     def cycle_chroma_boost_mode(self, *, forward: bool) -> None:
         modes = CHROMA_BOOST_APPLY_MODES
-        cb = self.session.render_post_fx.chroma_boost
+        cb = self.session.post_fx.chroma_boost
         old_mode = cb.mode
         try:
             index = modes.index(cb.mode)
@@ -188,7 +188,7 @@ class RenderPostFxControls:
 
     def cycle_chroma_boost_variant(self, *, forward: bool) -> None:
         variants = CHROMA_BOOST_VARIANTS
-        cb = self.session.render_post_fx.chroma_boost
+        cb = self.session.post_fx.chroma_boost
         try:
             index = variants.index(cb.variant)
         except ValueError:
@@ -199,19 +199,19 @@ class RenderPostFxControls:
             cb.variant = variants[(index - 1) % len(variants)]
 
     def set_limiter_enabled(self, enabled: bool) -> None:
-        lim = self.session.render_post_fx.limiter
+        lim = self.session.post_fx.limiter
         if lim.enabled == enabled:
             return
         lim.enabled = enabled
 
     def set_limiter_threshold(self, value: float) -> None:
-        lim = self.session.render_post_fx.limiter
+        lim = self.session.post_fx.limiter
         lim.threshold = clamp_visual_limiter_threshold(value)
 
     def set_limiter_ratio(self, value: float) -> None:
-        lim = self.session.render_post_fx.limiter
+        lim = self.session.post_fx.limiter
         lim.ratio = clamp_visual_limiter_ratio(value)
 
     def set_limiter_release(self, value: float) -> None:
-        lim = self.session.render_post_fx.limiter
+        lim = self.session.post_fx.limiter
         lim.release = clamp_visual_limiter_release(value)

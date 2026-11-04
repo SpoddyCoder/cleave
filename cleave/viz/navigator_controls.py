@@ -63,7 +63,7 @@ class NavigatorControls:
         return False
 
     def handle_hotkey(self, event: pygame.event.Event) -> bool:
-        """Letter, Delete, and Backspace for a selected layer or render node."""
+        """Letter, Delete, and Backspace for the selected navigator page."""
         header = node_control_descriptor(self._controls.shell_focus.selected_id)
         if header is None:
             return False

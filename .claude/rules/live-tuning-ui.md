@@ -11,22 +11,25 @@ alwaysApply: false
 
 # Live tuning overlay
 
-The shell is a menu bar, a navigator stacked on an inspector in one side column, an optional help column, and a timeline strip. The menu lists commands and checks. Navigator destinations live only in the navigator. Roots are Settings, Project, Render, Layers, and Timeline. Song markers is under Timeline. Render children are Overlays, Post-FX, and Pattern mask. Settings chooses a side for the navigator column and a side for help. The default puts the navigator column on the left and help on the right. When they share a side, help sits at the window edge and the navigator column stays against the visualiser. The navigator is only as tall as its rows. The inspector fills the rest of the column and keeps at least half the band. Help is an ImGui column. It does not cover the visualiser. Column sides, stack width, and help width are editor preferences. Layer number keys and Ctrl+, select the matching navigator row. Session state becomes view state; inspector pages come from section defs in `row_sections.py`. Warning and error toasts draw centered on the transport bar, only as wide as the message plus a space on each side. Enter, or a click on the toast, clears a timed toast. A pinned error has no click. Overlay Latin text uses bundled DejaVu Sans Mono; icons use Material Icons in `assets/fonts/`.
+The shell is a menu bar, a navigator stacked on an inspector in one side column, an optional help column, and a timeline strip. The menu lists commands and checks. All navigation lives in the navigator, and the inspector holds only the settings rows of the selected page. Roots are Settings, Project, Overlay, Post-FX, Pattern Mask, Timeline, and Layers. Each layer has Preset Switching, Compositing, and Cleave Effects pages. The navigator is an accordion: selecting a node resets `nav_expanded` to that node's path. Settings and Project have no page of their own, so Enter opens their first child. Overlay, Post-FX, and Timeline are chips-only pages. A child page shows the chips of the parent that owns it, and its E, S, and L keys act on that parent (`node_control_descriptor`). Settings chooses a side for the navigator column and a side for help. The default puts the navigator column on the left and help on the right. When they share a side, help sits at the window edge and the navigator column stays against the visualiser. The navigator is only as tall as its rows. The inspector fills the rest of the column and keeps at least half the band. Help is an ImGui column. It does not cover the visualiser. Column sides, stack width, and help width are editor preferences. Layer number keys and Ctrl+, select the matching navigator row. Session state becomes view state; inspector pages come from section defs in `row_sections.py`. Warning and error toasts draw centered on the transport bar, only as wide as the message plus a space on each side. Enter, or a click on the toast, clears a timed toast. A pinned error has no click. Overlay Latin text uses bundled DejaVu Sans Mono; icons use Material Icons in `assets/fonts/`.
 
 ## Where new fields go
 
-A new field is an inspector group child or a command. Groups are built from `row_sections.py`:
+A new field is a page child or a command. Pages are `SectionDef`s in `row_sections.py`, mapped to navigator ids in `inspector.py` (`_PAGE_SECTIONS`, `_LAYER_PAGE_SECTIONS`):
 
-- Settings: `SETTINGS_SECTION`
-- Project: `PROJECT_SECTION`
-- Layers: `TRACK_SECTION` (preset curation uses `CURATION_LAYER_SECTION`)
-- Overlays, Post-FX, and pattern mask: `RENDER_OVERLAYS_SECTION`, `RENDER_POST_FX_SECTION`, `RENDER_PATTERN_MASK_SECTION`
-- Timeline preset, beat / bar grid, and cue fades: `TIMELINE_PRESETS_SECTION`, `BEAT_BAR_GRID_SECTION`, `TIMELINE_CUTS_SECTION`
-- Song markers: `SONG_MARKERS_SECTION`
+- Settings: `SETTINGS_EDITOR_WINDOW_SECTION`, `SETTINGS_UI_SECTION`, `SETTINGS_LATENCY_COMPENSATION_SECTION`
+- Project: `PROJECT_MILKDROP_SECTION`, `PROJECT_COMPOSITOR_SECTION`, `PROJECT_RENDER_SECTION`
+- Overlay: `OVERLAY_OPENING_CARD_SECTION`, `OVERLAY_CLOSING_CARD_SECTION`
+- Post-FX: `POST_FX_FADE_SECTION`, `POST_FX_HIGHLIGHT_ROLLOFF_SECTION`, `POST_FX_CHROMA_BOOST_SECTION`, `POST_FX_LIMITER_SECTION`
+- Pattern Mask: `PATTERN_MASK_SECTION`
+- Timeline: `BEAT_BAR_GRID_SECTION`, `TIMELINE_CUTS_SECTION`, `SONG_MARKERS_SECTION`, `TIMELINE_PRESETS_SECTION`
+- Layers: `LAYERS_SECTION`, and per layer `TRACK_SECTION` (preset curation uses `CURATION_LAYER_SECTION`), `TRACK_PRESET_SWITCHING_SECTION`, `TRACK_COMPOSITING_SECTION`, `TRACK_EFFECTS_SECTION`
 
-Open and closed state is an `InspectorGroupKey` on the shell (`collapsed` and `opened`). There is no session `expanded` flag for a group. Cleave effects, beat / bar grid, and cue fades start closed. A closed group hides its children.
+A new page needs a navigator entry in `navigator.py`, a section mapping in `inspector.py`, and a header mapping in `row_hotkeys.py`.
 
-Conditional rows are siblings shown or hidden by a value predicate. They have no arrow and no open/closed key. The view-state structure includes or omits them at build time and rebuilds only when `view_state_structure_signature()` changes. A field that gates row presence belongs in that signature; leave value-only fields out. Add a `test_structure_signature_invalidates_on_*` test in `tests/cleave/viz/test_view_state_structure.py`.
+The inspector has no open or closed state. A block nested in a page through `SectionNode.subsection` draws a static, non-navigable heading with its rows indented under it.
+
+Conditional rows are siblings shown or hidden by a value predicate. The view-state structure includes or omits them at build time and rebuilds only when `view_state_structure_signature()` changes. A field that gates row presence belongs in that signature; leave value-only fields out. Add a `test_structure_signature_invalidates_on_*` test in `tests/cleave/viz/test_view_state_structure.py`.
 
 New rows use `RowKind`, `RowSpec`, and `SectionNode`. Do not add a per-`RowKind` label or mutation branch in `controls.py`. Overlay chrome lives in `overlay_primitives`. `render_visibility_icon` stays in `row_present_renderers.py`.
 
@@ -36,17 +39,17 @@ The timeline strip stays its own host in `timeline_overlay.py`. Cue blocks are e
 
 When an action needs parameters, keep the inspector row as a plain `ACTION` line. On Enter, chain one modal per parameter, then apply.
 
-Exception: timeline preset parameters live as child value rows in the timeline preset group. Apply confirms with Yes/Cancel and lists staged choices as `labeled_lines`.
+Exception: timeline preset parameters live as value rows on the Timeline Preset page. Apply confirms with Yes/Cancel and lists staged choices as `labeled_lines`.
 
-## Render enabled
+## Enabled gates the frame path
 
-`enabled=False` on a render header must skip that block in the frame path, not only dim the inspector row. Overlay cards gate per card. Post-FX children must check `session.render_post_fx.enabled`. New post-FX subsections need an `enabled=False` test.
+`enabled=False` on an Overlay, Post-FX, or Pattern Mask header must skip that block in the frame path, not only dim the inspector row. Overlay cards gate per card. Post-FX children must check `session.post_fx.enabled`. New post-FX subsections need an `enabled=False` test.
 
 ## Typography
 
 Colors live in `cleave/viz/theme.py`. Use existing roles (`LABEL`, `VALUE`, `ACTION`, `DISABLED`, `MUTED`, `LOCKED`) plus the accent constants already there. Do not invent a new color without adding a theme constant.
 
-Label+value rows: prefix in `LABEL`, value in the row value color. Expand arrows use the value role. Exceptions (single-color action rows, settings and project headers, transport, notifications, modals) are deliberate; match nearby rows.
+Label+value rows: prefix in `LABEL`, value in the row value color. Exceptions (single-color action rows, settings and project headers, transport, notifications, modals) are deliberate; match nearby rows.
 
 ## Keyboard dispatch
 

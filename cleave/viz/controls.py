@@ -27,10 +27,10 @@ from cleave.viz.panel_notification import (
 )
 from cleave.viz.playback import PlaybackState, current_sec, seek, seek_to, toggle_pause
 from cleave.viz.live_layer_bindings import LiveLayerBindings
-from cleave.viz.render_overlay_controls import RenderOverlaysControls
-from cleave.viz.render_pattern_mask_controls import RenderPatternMaskControls
-from cleave.viz.render_post_fx_bindings import RenderPostFxBindings
-from cleave.viz.render_post_fx_controls import RenderPostFxControls
+from cleave.viz.overlay_controls import OverlaysControls
+from cleave.viz.pattern_mask_controls import PatternMaskControls
+from cleave.viz.post_fx_bindings import PostFxBindings
+from cleave.viz.post_fx_controls import PostFxControls
 from cleave.viz.settings_controls import SettingsControls
 from cleave.viz.project_controls import ProjectControls
 from cleave.viz.project_render_controls import ProjectRenderController
@@ -89,7 +89,7 @@ class TuningControls:
         *,
         project_dir: Path | None = None,
         layer_bindings: LiveLayerBindings | None = None,
-        render_post_fx_bindings: RenderPostFxBindings | None = None,
+        post_fx_bindings: PostFxBindings | None = None,
         on_save_config: Callable[[Path], str | None] | None = None,
         launch_config_path: Path | None = None,
         modal_host: ModalHost | None = None,
@@ -108,7 +108,7 @@ class TuningControls:
         self.playback = playback
         self.duration_sec = duration_sec
         self._layer_bindings = layer_bindings
-        self._render_post_fx_bindings = render_post_fx_bindings
+        self._post_fx_bindings = post_fx_bindings
         self._compositor = compositor
         self._post_process = post_process
         self._masked_compositor = masked_compositor
@@ -116,7 +116,7 @@ class TuningControls:
 
         self.shell_focus = ShellFocusState()
         self._focus_cursor: FocusCursor = MainFocus(
-            RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
+            RowDescriptor(RowKind.TIMELINE_HEADER)
         )
         self._notification_host = PanelNotificationHost()
         self._key_repeat = KeyRepeatController()
@@ -218,11 +218,11 @@ class TuningControls:
             layers_by_slot=layers_by_slot,
             project_dir=project_dir,
         )
-        self.render_overlays = RenderOverlaysControls(session)
-        self.render_post_fx = RenderPostFxControls(
-            session, bindings=render_post_fx_bindings
+        self.overlays = OverlaysControls(session)
+        self.post_fx = PostFxControls(
+            session, bindings=post_fx_bindings
         )
-        self.render_pattern_mask = RenderPatternMaskControls(session)
+        self.pattern_mask = PatternMaskControls(session)
         self.settings = SettingsControls(
             session,
             cfg,
@@ -645,23 +645,23 @@ class TuningControls:
         layer = self.session.layers[slot]
         layer.locked = not layer.locked
 
-    def toggle_render_overlay_locked(self) -> None:
-        self.render_overlays.toggle_locked()
+    def toggle_overlay_locked(self) -> None:
+        self.overlays.toggle_locked()
 
-    def toggle_render_post_fx_locked(self) -> None:
-        post_fx = self.session.render_post_fx
+    def toggle_post_fx_locked(self) -> None:
+        post_fx = self.session.post_fx
         post_fx.locked = not post_fx.locked
 
-    def toggle_render_pattern_mask_locked(self) -> None:
-        self.render_pattern_mask.toggle_locked()
+    def toggle_pattern_mask_locked(self) -> None:
+        self.pattern_mask.toggle_locked()
 
-    def toggle_render_timeline_locked(self) -> None:
+    def toggle_timeline_locked(self) -> None:
         timeline = self.session.timeline
         if timeline.recording:
             return
         timeline.locked = not timeline.locked
 
-    def set_render_timeline_enabled(self, enabled: bool) -> None:
+    def set_timeline_enabled(self, enabled: bool) -> None:
         tl = self.session.timeline
         if tl.enabled == enabled:
             return
@@ -754,7 +754,7 @@ class TuningControls:
             return
         if isinstance(self.focus_cursor, TimelineFocus):
             self._apply_focus_cursor(
-                MainFocus(RowDescriptor(RowKind.RENDER_TIMELINE_HEADER))
+                MainFocus(RowDescriptor(RowKind.TIMELINE_HEADER))
             )
         self.shell_focus.region = region
 
@@ -795,5 +795,5 @@ class TuningControls:
         if not isinstance(self.focus_cursor, TimelineFocus):
             return
         self._apply_focus_cursor(
-            MainFocus(RowDescriptor(RowKind.RENDER_TIMELINE_HEADER))
+            MainFocus(RowDescriptor(RowKind.TIMELINE_HEADER))
         )

@@ -159,9 +159,9 @@ def test_off_value_keeps_side_arrows_and_stepped_ignores_the_text() -> None:
     assert row_spec(display.kind).apply_horizontal is None
     assert inspector_row_stepped(unlocked.session, display) is False
 
-    limiter = RowDescriptor(RowKind.RENDER_POST_FX_LIMITER_ENABLED)
+    limiter = RowDescriptor(RowKind.POST_FX_LIMITER_ENABLED)
     assert row_spec(limiter.kind).blocked_by_section_lock is False
-    unlocked.session.render_post_fx.locked = True
+    unlocked.session.post_fx.locked = True
     assert inspector_row_stepped(unlocked.session, limiter) is True
 
 
@@ -186,19 +186,19 @@ def _seed_compositor_hdr_off(controls) -> None:
 
 
 def _seed_limiter_off(controls) -> None:
-    controls.session.render_post_fx.limiter.enabled = False
+    controls.session.post_fx.limiter.enabled = False
 
 
 def _seed_rolloff_mode_off(controls) -> None:
-    controls.session.render_post_fx.highlight_rolloff.mode = "off"
+    controls.session.post_fx.highlight_rolloff.mode = "off"
 
 
 def _seed_chroma_mode_off(controls) -> None:
-    controls.session.render_post_fx.chroma_boost.mode = "off"
+    controls.session.post_fx.chroma_boost.mode = "off"
 
 
 def _seed_invert_off(controls) -> None:
-    controls.session.render_pattern_mask.invert = False
+    controls.session.pattern_mask.invert = False
 
 
 def _seed_trigger_off(controls) -> None:
@@ -243,27 +243,27 @@ def _preset_switching_trigger(controls) -> str:
             id="compositor_hdr",
         ),
         pytest.param(
-            RowDescriptor(RowKind.RENDER_POST_FX_LIMITER_ENABLED),
+            RowDescriptor(RowKind.POST_FX_LIMITER_ENABLED),
             _seed_limiter_off,
-            lambda controls: controls.session.render_post_fx.limiter.enabled,
+            lambda controls: controls.session.post_fx.limiter.enabled,
             id="limiter_enabled",
         ),
         pytest.param(
-            RowDescriptor(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_MODE),
+            RowDescriptor(RowKind.POST_FX_HIGHLIGHT_ROLLOFF_MODE),
             _seed_rolloff_mode_off,
-            lambda controls: controls.session.render_post_fx.highlight_rolloff.mode,
+            lambda controls: controls.session.post_fx.highlight_rolloff.mode,
             id="highlight_rolloff_mode",
         ),
         pytest.param(
-            RowDescriptor(RowKind.RENDER_POST_FX_CHROMA_BOOST_MODE),
+            RowDescriptor(RowKind.POST_FX_CHROMA_BOOST_MODE),
             _seed_chroma_mode_off,
-            lambda controls: controls.session.render_post_fx.chroma_boost.mode,
+            lambda controls: controls.session.post_fx.chroma_boost.mode,
             id="chroma_boost_mode",
         ),
         pytest.param(
-            RowDescriptor(RowKind.RENDER_PATTERN_MASK_INVERT),
+            RowDescriptor(RowKind.PATTERN_MASK_INVERT),
             _seed_invert_off,
-            lambda controls: controls.session.render_pattern_mask.invert,
+            lambda controls: controls.session.pattern_mask.invert,
             id="pattern_mask_invert",
         ),
         pytest.param(

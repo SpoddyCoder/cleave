@@ -52,8 +52,8 @@ from cleave.pattern_mask import (
 )
 from cleave.viz.session import (
     TuningSession,
-    default_render_pattern_mask_runtime,
-    render_pattern_mask_runtime_from_cfg,
+    default_pattern_mask_runtime,
+    pattern_mask_runtime_from_cfg,
 )
 
 
@@ -523,7 +523,7 @@ def test_generate_soft_weights_rejects_unknown_type() -> None:
         generate_soft_weights("spiral", 16, 16, 2)
 
 
-def test_parse_render_pattern_mask_defaults() -> None:
+def test_parse_pattern_mask_defaults() -> None:
     render = parse_render_section({"render": {"pattern_mask": {}}})
     assert render is not None
     assert render.pattern_mask is not None
@@ -537,7 +537,7 @@ def test_parse_render_pattern_mask_defaults() -> None:
     assert render.pattern_mask.locked is False
 
 
-def test_parse_render_pattern_mask_explicit() -> None:
+def test_parse_pattern_mask_explicit() -> None:
     render = parse_render_section(
         {
             "render": {
@@ -566,7 +566,7 @@ def test_parse_render_pattern_mask_explicit() -> None:
     assert render.pattern_mask.locked is True
 
 
-def test_parse_render_pattern_mask_clamps_density() -> None:
+def test_parse_pattern_mask_clamps_density() -> None:
     high = parse_render_section(
         {"render": {"pattern_mask": {"density": 12.0}}}
     )
@@ -581,7 +581,7 @@ def test_parse_render_pattern_mask_clamps_density() -> None:
     assert low.pattern_mask.density == 1.0
 
 
-def test_parse_render_pattern_mask_clamps_transition() -> None:
+def test_parse_pattern_mask_clamps_transition() -> None:
     high = parse_render_section(
         {"render": {"pattern_mask": {"transition": 9.0}}}
     )
@@ -594,7 +594,7 @@ def test_parse_render_pattern_mask_clamps_transition() -> None:
         )
 
 
-def test_parse_render_pattern_mask_accepts_all_types() -> None:
+def test_parse_pattern_mask_accepts_all_types() -> None:
     for mask_type in PATTERN_MASK_TYPES:
         render = parse_render_section(
             {"render": {"pattern_mask": {"type": mask_type}}}
@@ -604,12 +604,12 @@ def test_parse_render_pattern_mask_accepts_all_types() -> None:
         assert render.pattern_mask.type == mask_type
 
 
-def test_parse_render_pattern_mask_rejects_unknown_type() -> None:
+def test_parse_pattern_mask_rejects_unknown_type() -> None:
     with pytest.raises(ValueError, match="pattern_mask.type"):
         parse_render_section({"render": {"pattern_mask": {"type": "spiral"}}})
 
 
-def test_parse_render_pattern_mask_ignores_leftover_mode() -> None:
+def test_parse_pattern_mask_ignores_leftover_mode() -> None:
     render = parse_render_section(
         {"render": {"pattern_mask": {"mode": "soft", "feather_pct": 40}}}
     )
@@ -618,7 +618,7 @@ def test_parse_render_pattern_mask_ignores_leftover_mode() -> None:
     assert render.pattern_mask.feather_pct == 40
 
 
-def test_parse_render_pattern_mask_clamps_feather() -> None:
+def test_parse_pattern_mask_clamps_feather() -> None:
     high = parse_render_section(
         {"render": {"pattern_mask": {"feather_pct": 140}}}
     )
@@ -633,7 +633,7 @@ def test_parse_render_pattern_mask_clamps_feather() -> None:
     assert low.pattern_mask.feather_pct == 0
 
 
-def test_persist_render_pattern_mask_round_trip() -> None:
+def test_persist_pattern_mask_round_trip() -> None:
     render = parse_render_section(
         {
             "render": {
@@ -661,7 +661,7 @@ def test_persist_render_pattern_mask_round_trip() -> None:
         render=render,
     )
     session = TuningSession(layer_z_order=[])
-    session.render_pattern_mask = render_pattern_mask_runtime_from_cfg(cfg)
+    session.pattern_mask = pattern_mask_runtime_from_cfg(cfg)
     payload = persist_render(PersistCtx(cfg=cfg, session=session, cfg_dir=None))
     assert payload["pattern_mask"] == {
         "enabled": True,
@@ -687,7 +687,7 @@ def test_persist_render_pattern_mask_round_trip() -> None:
     )
 
 
-def test_render_pattern_mask_runtime_from_cfg_defaults() -> None:
+def test_pattern_mask_runtime_from_cfg_defaults() -> None:
     cfg = CleaveConfig(
         paths=PathsConfig(preset_root=Path("/tmp"), texture_paths=()),
         layers={},
@@ -696,8 +696,8 @@ def test_render_pattern_mask_runtime_from_cfg_defaults() -> None:
         user_config_path=Path("/tmp/user-config.yaml"),
         render=RenderConfig(),
     )
-    runtime = render_pattern_mask_runtime_from_cfg(cfg)
-    assert runtime == default_render_pattern_mask_runtime()
+    runtime = pattern_mask_runtime_from_cfg(cfg)
+    assert runtime == default_pattern_mask_runtime()
     assert runtime.enabled is False
     assert runtime.type == "strips"
     assert runtime.feather_pct == 0

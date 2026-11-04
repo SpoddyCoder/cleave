@@ -20,7 +20,7 @@ from cleave.viz.live_layer_binding_factory import (
     sync_mix_player_solo,
 )
 from cleave.viz.live_layer_bindings import LiveLayerBindings
-from cleave.viz.render_post_fx_bindings import RenderPostFxBindings
+from cleave.viz.post_fx_bindings import PostFxBindings
 from cleave.viz.session import LayerRuntime, TuningSession
 from tests.support.viz import make_test_cfg, stub_playback_state
 
@@ -102,9 +102,9 @@ def _invoke_on_empty(*_args, on_empty=None, **_kwargs) -> None:
 def test_layer_bindings_and_post_fx_shapes() -> None:
     _ctx, factory, _layer = _make_factory()
     layer_bindings = factory.layer_bindings()
-    post_fx = factory.render_post_fx_bindings()
+    post_fx = factory.post_fx_bindings()
     assert isinstance(layer_bindings, LiveLayerBindings)
-    assert isinstance(post_fx, RenderPostFxBindings)
+    assert isinstance(post_fx, PostFxBindings)
     assert layer_bindings.on_preset_change == factory.on_preset_change
     assert layer_bindings.on_switching_resume == factory.on_switching_resume
     assert layer_bindings.on_seek == factory.on_seek
@@ -138,7 +138,7 @@ def test_empty_list_notify_skips_in_curation_mode() -> None:
 
 def test_is_paused_reads_playback() -> None:
     ctx, factory, _layer = _make_factory()
-    is_paused = factory.render_post_fx_bindings().is_paused
+    is_paused = factory.post_fx_bindings().is_paused
     assert is_paused is not None
     assert is_paused() is False
     ctx.playback.paused = True

@@ -9,25 +9,25 @@ from cleave.config import (
     RENDER_OVERLAY_POSITIONS,
     RENDER_OVERLAY_SLIDE_DIRECTIONS,
 )
-from cleave.viz.fonts import cycle_render_overlay_font
+from cleave.viz.fonts import cycle_overlay_font
 from cleave.viz.session import (
-    RenderOverlayCardRuntime,
-    RenderOverlayClosingAnimationRuntime,
+    OverlayCardRuntime,
+    OverlayClosingAnimationRuntime,
     TuningSession,
 )
 
 CardName = Literal["opening_card", "closing_card"]
 
 
-class RenderOverlayCardControls:
+class OverlayCardControls:
     """Mutations for one overlay card's rows."""
 
     def __init__(self, session: TuningSession, card: CardName) -> None:
         self.session = session
         self._card_name = card
 
-    def _card(self) -> RenderOverlayCardRuntime:
-        return getattr(self.session.render_overlays, self._card_name)
+    def _card(self) -> OverlayCardRuntime:
+        return getattr(self.session.overlays, self._card_name)
 
     def set_enabled(self, enabled: bool) -> None:
         card = self._card()
@@ -35,12 +35,12 @@ class RenderOverlayCardControls:
             return
         card.enabled = enabled
         if not enabled:
-            overlays = self.session.render_overlays
+            overlays = self.session.overlays
             if (
                 not overlays.opening_card.enabled
                 and not overlays.closing_card.enabled
             ):
-                self.session.render_overlay_solo = False
+                self.session.overlay_solo = False
 
     def cycle_position(self, *, forward: bool) -> None:
         card = self._card()
@@ -83,7 +83,7 @@ class RenderOverlayCardControls:
 
     def cycle_title_font(self, *, forward: bool) -> None:
         card = self._card()
-        card.title_font = cycle_render_overlay_font(card.title_font, forward=forward)
+        card.title_font = cycle_overlay_font(card.title_font, forward=forward)
 
     def set_title_margin_bottom(self, margin: int) -> None:
         self._card().title_margin_bottom = max(0, margin)
@@ -127,7 +127,7 @@ class RenderOverlayCardControls:
 
     def cycle_body_font(self, *, forward: bool) -> None:
         card = self._card()
-        card.body_font = cycle_render_overlay_font(card.body_font, forward=forward)
+        card.body_font = cycle_overlay_font(card.body_font, forward=forward)
 
     def set_opacity(self, pct: int) -> None:
         self._card().opacity_pct = max(0, min(100, pct))
@@ -137,13 +137,13 @@ class RenderOverlayCardControls:
 
     def set_appear_at(self, appear_at: float) -> None:
         anim = self._card().animation
-        if isinstance(anim, RenderOverlayClosingAnimationRuntime):
+        if isinstance(anim, OverlayClosingAnimationRuntime):
             return
         anim.appear_at = max(0.0, appear_at)
 
     def set_disappear_at(self, disappear_at: float) -> None:
         anim = self._card().animation
-        if not isinstance(anim, RenderOverlayClosingAnimationRuntime):
+        if not isinstance(anim, OverlayClosingAnimationRuntime):
             return
         anim.disappear_at = max(0.0, disappear_at)
 
@@ -151,15 +151,15 @@ class RenderOverlayCardControls:
         self._card().animation.display_time = max(0.0, display_time)
 
 
-class RenderOverlaysControls:
+class OverlaysControls:
     """Parent overlays section mutations plus per-card controllers."""
 
     def __init__(self, session: TuningSession) -> None:
         self.session = session
-        self.opening_card = RenderOverlayCardControls(session, "opening_card")
-        self.closing_card = RenderOverlayCardControls(session, "closing_card")
+        self.opening_card = OverlayCardControls(session, "opening_card")
+        self.closing_card = OverlayCardControls(session, "closing_card")
 
-    def card(self, name: str) -> RenderOverlayCardControls:
+    def card(self, name: str) -> OverlayCardControls:
         if name == "opening_card":
             return self.opening_card
         if name == "closing_card":
@@ -171,28 +171,28 @@ class RenderOverlaysControls:
         self.opening_card.set_enabled(enabled)
         self.closing_card.set_enabled(enabled)
         if not enabled:
-            self.session.render_overlay_solo = False
+            self.session.overlay_solo = False
 
     def set_locked(self, locked: bool) -> None:
-        overlays = self.session.render_overlays
+        overlays = self.session.overlays
         if overlays.locked == locked:
             return
         overlays.locked = locked
 
     def toggle_locked(self) -> None:
-        overlays = self.session.render_overlays
+        overlays = self.session.overlays
         overlays.locked = not overlays.locked
 
     def any_card_enabled(self) -> bool:
-        overlays = self.session.render_overlays
+        overlays = self.session.overlays
         return overlays.opening_card.enabled or overlays.closing_card.enabled
 
     def enter_solo(self) -> None:
-        if self.session.render_overlay_solo:
+        if self.session.overlay_solo:
             return
-        self.session.render_overlay_solo = True
+        self.session.overlay_solo = True
 
     def exit_solo(self) -> None:
-        if not self.session.render_overlay_solo:
+        if not self.session.overlay_solo:
             return
-        self.session.render_overlay_solo = False
+        self.session.overlay_solo = False

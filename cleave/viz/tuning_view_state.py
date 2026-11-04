@@ -106,9 +106,9 @@ from cleave.viz.playback import PlaybackState, current_sec
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.session import (
     LayerRuntime,
-    RenderOverlayCardRuntime,
+    OverlayCardRuntime,
     TuningSession,
-    default_render_overlay_card_runtime,
+    default_overlay_card_runtime,
 )
 from cleave.viz.user_presets import (
     path_list_identity,
@@ -144,20 +144,20 @@ class TrackBlock:
 
 
 @dataclass
-class RenderOverlayCardBlock:
-    runtime: RenderOverlayCardRuntime = field(
-        default_factory=default_render_overlay_card_runtime
+class OverlayCardBlock:
+    runtime: OverlayCardRuntime = field(
+        default_factory=default_overlay_card_runtime
     )
 
 
 @dataclass
-class RenderOverlaysBlock:
-    opening_card: RenderOverlayCardBlock = field(
-        default_factory=RenderOverlayCardBlock
+class OverlaysBlock:
+    opening_card: OverlayCardBlock = field(
+        default_factory=OverlayCardBlock
     )
-    closing_card: RenderOverlayCardBlock = field(
-        default_factory=lambda: RenderOverlayCardBlock(
-            runtime=default_render_overlay_card_runtime(closing=True)
+    closing_card: OverlayCardBlock = field(
+        default_factory=lambda: OverlayCardBlock(
+            runtime=default_overlay_card_runtime(closing=True)
         )
     )
     solo: bool = False
@@ -229,7 +229,7 @@ class VisualLimiterBlock:
 
 
 @dataclass
-class RenderPostFxBlock:
+class PostFxBlock:
     enabled: bool = _RO_POST_FX_DEFAULTS["enabled"]
     fade: FadeBlock = field(default_factory=FadeBlock)
     highlight_rolloff: HighlightRolloffBlock = field(
@@ -242,7 +242,7 @@ class RenderPostFxBlock:
 
 
 @dataclass
-class RenderPatternMaskBlock:
+class PatternMaskBlock:
     enabled: bool = _RO_PATTERN_MASK_DEFAULTS["enabled"]
     type: PatternMaskType = _RO_PATTERN_MASK_DEFAULTS["type"]
     density: float = _RO_PATTERN_MASK_DEFAULTS["density"]
@@ -276,7 +276,7 @@ def default_soft_timeline_fade_group_block() -> TimelineFadeGroupBlock:
 
 
 @dataclass
-class RenderTimelineBlock:
+class TimelineBlock:
     enabled: bool = DEFAULT_TIMELINE_ENABLED
     bar_phase_offset: int = 0
     show_bar_grid: bool = False
@@ -349,15 +349,15 @@ class TuningViewState:
     config_dirty: bool = False
     solo_slot: str | None = None
     solo_active: bool = False
-    render_overlays: RenderOverlaysBlock = field(default_factory=RenderOverlaysBlock)
-    render_post_fx: RenderPostFxBlock = field(
-        default_factory=RenderPostFxBlock
+    overlays: OverlaysBlock = field(default_factory=OverlaysBlock)
+    post_fx: PostFxBlock = field(
+        default_factory=PostFxBlock
     )
-    render_pattern_mask: RenderPatternMaskBlock = field(
-        default_factory=RenderPatternMaskBlock
+    pattern_mask: PatternMaskBlock = field(
+        default_factory=PatternMaskBlock
     )
-    render_timeline: RenderTimelineBlock = field(
-        default_factory=RenderTimelineBlock
+    timeline: TimelineBlock = field(
+        default_factory=TimelineBlock
     )
     settings: SettingsBlock = field(default_factory=SettingsBlock)
     project: ProjectBlock = field(default_factory=ProjectBlock)
@@ -403,7 +403,7 @@ class TuningViewState:
             object.__setattr__(
                 self,
                 "focus_cursor",
-                MainFocus(RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)),
+                MainFocus(RowDescriptor(RowKind.TIMELINE_HEADER)),
             )
 
 
@@ -441,9 +441,9 @@ def view_state_structure_signature(
             ),
             "switching_paused": layer.switching_paused,
         }
-    ro = session.render_overlays
-    pp = session.render_post_fx
-    pm = session.render_pattern_mask
+    ro = session.overlays
+    pp = session.post_fx
+    pm = session.pattern_mask
     tl = session.timeline
     payload = {
         "layer_z_order": list(session.layer_z_order),
@@ -452,7 +452,7 @@ def view_state_structure_signature(
         },
         "project": {},
         "layers": layers,
-        "render_overlays": {
+        "overlays": {
             "opening_card": {
                 "enabled": ro.opening_card.enabled,
                 "animation_type": ro.opening_card.animation.type,
@@ -462,23 +462,22 @@ def view_state_structure_signature(
                 "animation_type": ro.closing_card.animation.type,
             },
         },
-        "render_post_fx": {
+        "post_fx": {
             "enabled": pp.enabled,
             "highlight_rolloff_mode": pp.highlight_rolloff.mode,
             "chroma_boost_mode": pp.chroma_boost.mode,
             "limiter_enabled": pp.limiter.enabled,
         },
-        "render_pattern_mask": {
+        "pattern_mask": {
             # type gates the plasma-only seed row in the inspector.
             "type": pm.type,
         },
-        "render_timeline": {
+        "timeline": {
             "enabled": tl.enabled,
             "song_marker_count": len(session.song_markers.times),
             "hard_cut_fades_enabled": tl.hard_cut_fades.enabled,
             "soft_cut_fades_enabled": tl.soft_cut_fades.enabled,
         },
-        "timeline": {"enabled": tl.enabled},
     }
     return json.dumps(payload, sort_keys=True, separators=(",", ":"))
 
@@ -490,14 +489,14 @@ class _ViewStateStructure:
     tracks: dict[str, TrackBlock]
     settings: SettingsBlock
     project: ProjectBlock
-    render_overlays: RenderOverlaysBlock
-    render_post_fx: RenderPostFxBlock
-    render_pattern_mask: RenderPatternMaskBlock
-    render_timeline: RenderTimelineBlock
+    overlays: OverlaysBlock
+    post_fx: PostFxBlock
+    pattern_mask: PatternMaskBlock
+    timeline: TimelineBlock
 
 
-def _card_block_from_runtime(card: RenderOverlayCardRuntime) -> RenderOverlayCardBlock:
-    return RenderOverlayCardBlock(runtime=card)
+def _card_block_from_runtime(card: OverlayCardRuntime) -> OverlayCardBlock:
+    return OverlayCardBlock(runtime=card)
 
 
 def _project_block_from_session(
@@ -716,9 +715,9 @@ class TuningViewStateBuilder:
                 active_preset_list_index=self._active_preset_list_index(layer),
             )
 
-        ro = self.session.render_overlays
-        pp = self.session.render_post_fx
-        pm = self.session.render_pattern_mask
+        ro = self.session.overlays
+        pp = self.session.post_fx
+        pm = self.session.pattern_mask
         tl = self.session.timeline
         settings = SettingsBlock(
             editor_mode=self.session.settings.editor_mode,
@@ -729,12 +728,12 @@ class TuningViewStateBuilder:
             project_dir=self._project_dir,
             project_slug=self._config_save.cfg.project_slug,
         )
-        render_overlays = RenderOverlaysBlock(
+        overlays = OverlaysBlock(
             opening_card=_card_block_from_runtime(ro.opening_card),
             closing_card=_card_block_from_runtime(ro.closing_card),
             locked=ro.locked,
         )
-        render_post_fx = RenderPostFxBlock(
+        post_fx = PostFxBlock(
             enabled=pp.enabled,
             fade=_fade_block_from_runtime(pp.fade),
             highlight_rolloff=HighlightRolloffBlock(
@@ -758,7 +757,7 @@ class TuningViewStateBuilder:
                 release=pp.limiter.release,
             ),
         )
-        render_pattern_mask = RenderPatternMaskBlock(
+        pattern_mask = PatternMaskBlock(
             enabled=pm.enabled,
             type=pm.type,
             feather_pct=pm.feather_pct,
@@ -768,7 +767,7 @@ class TuningViewStateBuilder:
             seed=pm.seed,
             locked=pm.locked,
         )
-        render_timeline = RenderTimelineBlock(
+        timeline = TimelineBlock(
             enabled=tl.enabled,
             bar_phase_offset=tl.bar_phase_offset,
             show_bar_grid=tl.show_bar_grid,
@@ -804,10 +803,10 @@ class TuningViewStateBuilder:
             tracks=tracks,
             settings=settings,
             project=project,
-            render_overlays=render_overlays,
-            render_post_fx=render_post_fx,
-            render_pattern_mask=render_pattern_mask,
-            render_timeline=render_timeline,
+            overlays=overlays,
+            post_fx=post_fx,
+            pattern_mask=pattern_mask,
+            timeline=timeline,
         )
 
     def _patch_tracks(
@@ -872,9 +871,9 @@ class TuningViewStateBuilder:
             structure, position_sec=position_sec, user_names=user_names
         )
 
-        ro = self.session.render_overlays
-        pp = self.session.render_post_fx
-        pm = self.session.render_pattern_mask
+        ro = self.session.overlays
+        pp = self.session.post_fx
+        pm = self.session.pattern_mask
         tl = self.session.timeline
         state = TuningViewState(
             layer_z_order=structure.layer_z_order,
@@ -892,16 +891,16 @@ class TuningViewStateBuilder:
             config_dirty=self._config_save.config_dirty,
             solo_slot=self.session.solo_slot,
             solo_active=self.session.solo_slot is not None,
-            render_overlays=replace(
-                structure.render_overlays,
-                solo=self.session.render_overlay_solo,
+            overlays=replace(
+                structure.overlays,
+                solo=self.session.overlay_solo,
                 locked=ro.locked,
             ),
-            render_post_fx=replace(
-                structure.render_post_fx,
+            post_fx=replace(
+                structure.post_fx,
                 fade=_fade_block_from_runtime(pp.fade),
                 highlight_rolloff=replace(
-                    structure.render_post_fx.highlight_rolloff,
+                    structure.post_fx.highlight_rolloff,
                     mode=pp.highlight_rolloff.mode,
                     curve=pp.highlight_rolloff.curve,
                     threshold_pct=pp.highlight_rolloff.threshold_pct,
@@ -911,7 +910,7 @@ class TuningViewStateBuilder:
                     desaturation_pct=pp.highlight_rolloff.desaturation_pct,
                 ),
                 chroma_boost=replace(
-                    structure.render_post_fx.chroma_boost,
+                    structure.post_fx.chroma_boost,
                     mode=pp.chroma_boost.mode,
                     variant=pp.chroma_boost.variant,
                     amount_pct=pp.chroma_boost.amount_pct,
@@ -922,11 +921,11 @@ class TuningViewStateBuilder:
                     ratio=pp.limiter.ratio,
                     release=pp.limiter.release,
                 ),
-                solo=self.session.render_post_fx_solo,
+                solo=self.session.post_fx_solo,
                 locked=pp.locked,
             ),
-            render_pattern_mask=replace(
-                structure.render_pattern_mask,
+            pattern_mask=replace(
+                structure.pattern_mask,
                 enabled=pm.enabled,
                 type=pm.type,
                 feather_pct=pm.feather_pct,
@@ -936,8 +935,8 @@ class TuningViewStateBuilder:
                 seed=pm.seed,
                 locked=pm.locked,
             ),
-            render_timeline=replace(
-                structure.render_timeline,
+            timeline=replace(
+                structure.timeline,
                 bar_phase_offset=tl.bar_phase_offset,
                 show_bar_grid=tl.show_bar_grid,
                 placement_snap=tl.placement_snap,

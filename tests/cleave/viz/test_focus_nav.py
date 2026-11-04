@@ -78,4 +78,4 @@ def test_strip_up_down_without_callback_updates_session_row() -> None:
     assert session.timeline.focus_row == 1
     timeline.handle_keydown(keydown(pygame.K_DOWN))
     assert session.timeline.focus_row == 1
-    assert not isinstance(MainFocus(RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)), TimelineFocus)
+    assert not isinstance(MainFocus(RowDescriptor(RowKind.TIMELINE_HEADER)), TimelineFocus)

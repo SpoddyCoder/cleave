@@ -567,7 +567,7 @@ def help_section_kwargs(
     return {
         "focus": focus,
         "shell_focus": shell_focus,
-        "timeline_enabled": view_state.render_timeline.enabled,
+        "timeline_enabled": view_state.timeline.enabled,
         "paused": view_state.paused,
         "timeline_recording": view_state.timeline_recording,
         "timeline_override_active": view_state.timeline_override_active,

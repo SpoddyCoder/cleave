@@ -20,8 +20,8 @@ from cleave.viz.theme import (
     SOLO_BG,
 )
 from cleave.viz.tuning_view_state import (
-    RenderOverlaysBlock,
-    RenderTimelineBlock,
+    OverlaysBlock,
+    TimelineBlock,
     TimelineFadeGroupBlock,
     TuningViewState,
 )
@@ -66,7 +66,7 @@ def _minimal_view_state(**kwargs: object) -> TuningViewState:
         },
         "paused": False,
         "position_sec": 0.0,
-        "focus_cursor": MainFocus(RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)),
+        "focus_cursor": MainFocus(RowDescriptor(RowKind.OVERLAYS_HEADER)),
         "move_mode_slot": None,
         "notification_message": None,
         "notification_remaining_sec": 0.0,
@@ -117,7 +117,7 @@ def test_action_row_value_color() -> None:
 
 def test_snap_to_song_markers_row_uses_action_color() -> None:
     state = _minimal_view_state(
-        render_timeline=RenderTimelineBlock(enabled=True),
+        timeline=TimelineBlock(enabled=True),
     )
     desc = RowDescriptor(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS)
     assert row_value_color_for(state, desc) == ACTION
@@ -128,7 +128,7 @@ def test_snap_to_song_markers_row_uses_action_color() -> None:
 
 def test_apply_cuts_to_cues_rows_use_action_color() -> None:
     state = _minimal_view_state(
-        render_timeline=RenderTimelineBlock(
+        timeline=TimelineBlock(
             enabled=True,
             hard_cut_fades=TimelineFadeGroupBlock(enabled=True),
             soft_cut_fades=TimelineFadeGroupBlock(enabled=True),
@@ -181,67 +181,67 @@ def _inspector_kinds(state, node_id: str) -> list[RowKind]:
     return [row.descriptor.kind for row in rows if row.descriptor is not None]
 
 
-def test_render_overlay_inspector_includes_header_and_sub_rows_when_expanded() -> None:
+def test_overlay_inspector_includes_header_and_sub_rows_when_expanded() -> None:
     state = _minimal_view_state()
     opening = _inspector_kinds(state, "overlay.opening_card")
     for kind in (
-        RowKind.RENDER_OVERLAY_CARD_ANIMATION_HEADER,
-        RowKind.RENDER_OVERLAY_CARD_POSITION,
-        RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER,
-        RowKind.RENDER_OVERLAY_CARD_BODY_HEADER,
-        RowKind.RENDER_OVERLAY_CARD_OPACITY,
-        RowKind.RENDER_OVERLAY_CARD_BACKGROUND_COLOUR,
-        RowKind.RENDER_OVERLAY_CARD_BACKGROUND_MARGIN,
-        RowKind.RENDER_OVERLAY_CARD_BACKGROUND_PADDING,
-        RowKind.RENDER_OVERLAY_CARD_BORDER_WIDTH,
-        RowKind.RENDER_OVERLAY_CARD_BORDER_COLOUR,
-        RowKind.RENDER_OVERLAY_CARD_TITLE_FONT_SIZE,
-        RowKind.RENDER_OVERLAY_CARD_BODY_FONT_SIZE,
+        RowKind.OVERLAY_CARD_ANIMATION_HEADER,
+        RowKind.OVERLAY_CARD_POSITION,
+        RowKind.OVERLAY_CARD_TITLE_HEADER,
+        RowKind.OVERLAY_CARD_BODY_HEADER,
+        RowKind.OVERLAY_CARD_OPACITY,
+        RowKind.OVERLAY_CARD_BACKGROUND_COLOUR,
+        RowKind.OVERLAY_CARD_BACKGROUND_MARGIN,
+        RowKind.OVERLAY_CARD_BACKGROUND_PADDING,
+        RowKind.OVERLAY_CARD_BORDER_WIDTH,
+        RowKind.OVERLAY_CARD_BORDER_COLOUR,
+        RowKind.OVERLAY_CARD_TITLE_FONT_SIZE,
+        RowKind.OVERLAY_CARD_BODY_FONT_SIZE,
     ):
         assert kind in opening
-    assert RowKind.RENDER_OVERLAY_CARD_TIME in opening
-    assert RowKind.RENDER_OVERLAY_CARD_DISPLAY_TIME in opening
+    assert RowKind.OVERLAY_CARD_TIME in opening
+    assert RowKind.OVERLAY_CARD_DISPLAY_TIME in opening
 
 
-def test_render_overlay_animation_rows_when_expanded() -> None:
+def test_overlay_animation_rows_when_expanded() -> None:
     state = _minimal_view_state(
-        render_overlays=RenderOverlaysBlock(
+        overlays=OverlaysBlock(
             opening_card=make_overlay_card_block(animation_type="slide")
         ),
     )
     kinds = _inspector_kinds(state, "overlay.opening_card")
-    assert RowKind.RENDER_OVERLAY_CARD_ANIMATION_TYPE in kinds
-    assert RowKind.RENDER_OVERLAY_CARD_ANIMATION_SLIDE_DIRECTION in kinds
-    assert RowKind.RENDER_OVERLAY_CARD_TIME in kinds
-    assert RowKind.RENDER_OVERLAY_CARD_DISPLAY_TIME in kinds
+    assert RowKind.OVERLAY_CARD_ANIMATION_TYPE in kinds
+    assert RowKind.OVERLAY_CARD_ANIMATION_SLIDE_DIRECTION in kinds
+    assert RowKind.OVERLAY_CARD_TIME in kinds
+    assert RowKind.OVERLAY_CARD_DISPLAY_TIME in kinds
 
 
-def test_render_overlay_animation_hides_slide_direction_for_fade() -> None:
+def test_overlay_animation_hides_slide_direction_for_fade() -> None:
     state = _minimal_view_state(
-        render_overlays=RenderOverlaysBlock(
+        overlays=OverlaysBlock(
             opening_card=make_overlay_card_block(animation_type="fade")
         ),
     )
     kinds = _inspector_kinds(state, "overlay.opening_card")
-    assert RowKind.RENDER_OVERLAY_CARD_ANIMATION_TYPE in kinds
-    assert RowKind.RENDER_OVERLAY_CARD_ANIMATION_SLIDE_DIRECTION not in kinds
+    assert RowKind.OVERLAY_CARD_ANIMATION_TYPE in kinds
+    assert RowKind.OVERLAY_CARD_ANIMATION_SLIDE_DIRECTION not in kinds
 
 
-def test_render_overlay_title_and_body_font_rows_when_expanded() -> None:
+def test_overlay_title_and_body_font_rows_when_expanded() -> None:
     state = _minimal_view_state()
     kinds = _inspector_kinds(state, "overlay.opening_card")
     for kind in (
-        RowKind.RENDER_OVERLAY_CARD_TITLE_FONT_SIZE,
-        RowKind.RENDER_OVERLAY_CARD_TITLE_FONT,
-        RowKind.RENDER_OVERLAY_CARD_TITLE_TEXT,
-        RowKind.RENDER_OVERLAY_CARD_TITLE_COLOUR,
-        RowKind.RENDER_OVERLAY_CARD_TITLE_BACKGROUND_COLOUR,
-        RowKind.RENDER_OVERLAY_CARD_TITLE_MARGIN_BOTTOM,
-        RowKind.RENDER_OVERLAY_CARD_BODY_FONT_SIZE,
-        RowKind.RENDER_OVERLAY_CARD_BODY_FONT,
-        RowKind.RENDER_OVERLAY_CARD_BODY_TEXT,
-        RowKind.RENDER_OVERLAY_CARD_BODY_COLOUR,
-        RowKind.RENDER_OVERLAY_CARD_BODY_BACKGROUND_COLOUR,
+        RowKind.OVERLAY_CARD_TITLE_FONT_SIZE,
+        RowKind.OVERLAY_CARD_TITLE_FONT,
+        RowKind.OVERLAY_CARD_TITLE_TEXT,
+        RowKind.OVERLAY_CARD_TITLE_COLOUR,
+        RowKind.OVERLAY_CARD_TITLE_BACKGROUND_COLOUR,
+        RowKind.OVERLAY_CARD_TITLE_MARGIN_BOTTOM,
+        RowKind.OVERLAY_CARD_BODY_FONT_SIZE,
+        RowKind.OVERLAY_CARD_BODY_FONT,
+        RowKind.OVERLAY_CARD_BODY_TEXT,
+        RowKind.OVERLAY_CARD_BODY_COLOUR,
+        RowKind.OVERLAY_CARD_BODY_BACKGROUND_COLOUR,
     ):
         assert kind in kinds
 
@@ -250,6 +250,6 @@ def test_overlay_root_has_no_rows_and_cards_do() -> None:
     state = _minimal_view_state()
     opening = _inspector_kinds(state, "overlay.opening_card")
     closing = _inspector_kinds(state, "overlay.closing_card")
-    assert RowKind.RENDER_OVERLAY_CARD_POSITION in opening
-    assert RowKind.RENDER_OVERLAY_CARD_POSITION in closing
+    assert RowKind.OVERLAY_CARD_POSITION in opening
+    assert RowKind.OVERLAY_CARD_POSITION in closing
     assert _inspector_kinds(state, "overlay") == []

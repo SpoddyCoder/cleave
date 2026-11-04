@@ -23,7 +23,7 @@ def _view_state() -> TuningViewState:
         tracks={},
         paused=False,
         position_sec=0.0,
-        focus_cursor=MainFocus(RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)),
+        focus_cursor=MainFocus(RowDescriptor(RowKind.OVERLAYS_HEADER)),
         move_mode_slot=None,
     )
 
@@ -105,10 +105,10 @@ def test_page_header_is_never_a_row() -> None:
     state = _layer_view(("layer_1",))
     for node_id, header in (
         ("settings.ui", RowKind.SETTINGS_UI_HEADER),
-        ("post_fx.fade", RowKind.RENDER_POST_FX_FADE_HEADER),
-        ("pattern_mask", RowKind.RENDER_PATTERN_MASK_HEADER),
+        ("post_fx.fade", RowKind.POST_FX_FADE_HEADER),
+        ("pattern_mask", RowKind.PATTERN_MASK_HEADER),
         ("timeline.preset", RowKind.TIMELINE_PRESETS_HEADER),
-        ("overlay.opening_card", RowKind.RENDER_OVERLAY_CARD_HEADER),
+        ("overlay.opening_card", RowKind.OVERLAY_CARD_HEADER),
         (layer_node_id("layer_1"), RowKind.TRACK_HEADER),
     ):
         assert header not in _kinds(build_inspector_rows(state, node_id))
@@ -119,14 +119,14 @@ def test_headings_are_static_and_show_their_rows() -> None:
     rows = build_inspector_rows(state, "post_fx.fade")
 
     assert _headings(rows) == [
-        RowKind.RENDER_POST_FX_FADE_IN_HEADER,
-        RowKind.RENDER_POST_FX_FADE_OUT_HEADER,
+        RowKind.POST_FX_FADE_IN_HEADER,
+        RowKind.POST_FX_FADE_OUT_HEADER,
     ]
     assert all(not row.navigable for row in rows if row.is_heading)
     assert all(row.depth == 0 for row in rows if row.is_heading)
     assert all(row.depth == 1 for row in rows if not row.is_heading)
-    assert RowKind.RENDER_POST_FX_FADE_IN_START in _kinds(rows)
-    assert RowKind.RENDER_POST_FX_FADE_OUT_TYPE in _kinds(rows)
+    assert RowKind.POST_FX_FADE_IN_START in _kinds(rows)
+    assert RowKind.POST_FX_FADE_OUT_TYPE in _kinds(rows)
 
 
 def test_card_page_has_headings_and_card_identity() -> None:
@@ -134,16 +134,16 @@ def test_card_page_has_headings_and_card_identity() -> None:
     rows = build_inspector_rows(state, "overlay.opening_card")
 
     assert _headings(rows) == [
-        RowKind.RENDER_OVERLAY_CARD_ANIMATION_HEADER,
-        RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER,
-        RowKind.RENDER_OVERLAY_CARD_BODY_HEADER,
+        RowKind.OVERLAY_CARD_ANIMATION_HEADER,
+        RowKind.OVERLAY_CARD_TITLE_HEADER,
+        RowKind.OVERLAY_CARD_BODY_HEADER,
     ]
     for kind in (
-        RowKind.RENDER_OVERLAY_CARD_POSITION,
-        RowKind.RENDER_OVERLAY_CARD_OPACITY,
-        RowKind.RENDER_OVERLAY_CARD_BORDER_COLOUR,
-        RowKind.RENDER_OVERLAY_CARD_TITLE_FONT,
-        RowKind.RENDER_OVERLAY_CARD_BODY_TEXT,
+        RowKind.OVERLAY_CARD_POSITION,
+        RowKind.OVERLAY_CARD_OPACITY,
+        RowKind.OVERLAY_CARD_BORDER_COLOUR,
+        RowKind.OVERLAY_CARD_TITLE_FONT,
+        RowKind.OVERLAY_CARD_BODY_TEXT,
     ):
         assert kind in _kinds(rows)
     assert all(row.descriptor.card == "opening_card" for row in rows)
@@ -153,23 +153,23 @@ def test_card_page_has_headings_and_card_identity() -> None:
 
 def test_conditional_rows_follow_predicates() -> None:
     state = _view_state()
-    assert state.render_pattern_mask.type != "plasma"
-    assert RowKind.RENDER_PATTERN_MASK_SEED not in _kinds(
+    assert state.pattern_mask.type != "plasma"
+    assert RowKind.PATTERN_MASK_SEED not in _kinds(
         build_inspector_rows(state, "pattern_mask")
     )
-    state.render_pattern_mask.type = "plasma"
-    assert RowKind.RENDER_PATTERN_MASK_SEED in _kinds(
+    state.pattern_mask.type = "plasma"
+    assert RowKind.PATTERN_MASK_SEED in _kinds(
         build_inspector_rows(state, "pattern_mask")
     )
 
     card = _kinds(build_inspector_rows(state, "overlay.opening_card"))
-    assert state.render_overlays.opening_card.runtime.animation.type == "fade"
-    assert RowKind.RENDER_OVERLAY_CARD_ANIMATION_TYPE in card
-    assert RowKind.RENDER_OVERLAY_CARD_ANIMATION_SLIDE_DIRECTION not in card
+    assert state.overlays.opening_card.runtime.animation.type == "fade"
+    assert RowKind.OVERLAY_CARD_ANIMATION_TYPE in card
+    assert RowKind.OVERLAY_CARD_ANIMATION_SLIDE_DIRECTION not in card
 
-    assert state.render_post_fx.chroma_boost.mode == "off"
+    assert state.post_fx.chroma_boost.mode == "off"
     assert _kinds(build_inspector_rows(state, "post_fx.chroma_boost")) == [
-        RowKind.RENDER_POST_FX_CHROMA_BOOST_MODE
+        RowKind.POST_FX_CHROMA_BOOST_MODE
     ]
 
 
@@ -198,8 +198,8 @@ def test_cue_fades_page_follows_enabled_flags() -> None:
         RowKind.TIMELINE_HARD_CUTS,
         RowKind.TIMELINE_SOFT_CUTS,
     ]
-    state.render_timeline.hard_cut_fades.enabled = True
-    state.render_timeline.soft_cut_fades.enabled = True
+    state.timeline.hard_cut_fades.enabled = True
+    state.timeline.soft_cut_fades.enabled = True
     kinds = _kinds(build_inspector_rows(state, "timeline.cue_fades"))
     hard_idx = kinds.index(RowKind.TIMELINE_HARD_CUTS)
     assert kinds[hard_idx : hard_idx + 6] == [
@@ -223,7 +223,7 @@ def test_cue_fades_page_follows_enabled_flags() -> None:
 
 def test_song_markers_page_is_snap_and_marker_rows() -> None:
     state = _view_state()
-    state.render_timeline.song_marker_times = (1.0, 4.0, 9.0)
+    state.timeline.song_marker_times = (1.0, 4.0, 9.0)
     rows = build_inspector_rows(state, "timeline.song_markers")
     kinds = _kinds(rows)
 
@@ -240,28 +240,28 @@ def test_song_markers_page_is_snap_and_marker_rows() -> None:
 
 def test_locked_blocks_still_build() -> None:
     state = _view_state()
-    state.render_overlays.locked = True
-    state.render_post_fx.locked = True
-    state.render_pattern_mask.locked = True
+    state.overlays.locked = True
+    state.post_fx.locked = True
+    state.pattern_mask.locked = True
 
     position = next(
         row.descriptor
         for row in build_inspector_rows(state, "overlay.opening_card")
-        if row.descriptor.kind is RowKind.RENDER_OVERLAY_CARD_POSITION
+        if row.descriptor.kind is RowKind.OVERLAY_CARD_POSITION
     )
     assert inspector_field_colors(state, position) == (LOCKED, LOCKED)
 
     fade_start = next(
         row.descriptor
         for row in build_inspector_rows(state, "post_fx.fade")
-        if row.descriptor.kind is RowKind.RENDER_POST_FX_FADE_IN_START
+        if row.descriptor.kind is RowKind.POST_FX_FADE_IN_START
     )
     assert inspector_field_colors(state, fade_start) == (LOCKED, LOCKED)
 
     density = next(
         row.descriptor
         for row in build_inspector_rows(state, "pattern_mask")
-        if row.descriptor.kind is RowKind.RENDER_PATTERN_MASK_DENSITY
+        if row.descriptor.kind is RowKind.PATTERN_MASK_DENSITY
     )
     assert inspector_field_colors(state, density) == (LOCKED, LOCKED)
 

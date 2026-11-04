@@ -37,7 +37,7 @@ from cleave.viz.app import (
     init_gl_resources_render,
 )
 from cleave.stem_pcm import samples_per_frame
-from cleave.viz.frame_finish import RenderOverlaysPanelCache, finish_content_frame
+from cleave.viz.frame_finish import OverlaysPanelCache, finish_content_frame
 from cleave.viz.layer_pipeline import LayerFramePipeline
 
 _PREPARE_HINT = "run `cleave separate` or `cleave play` first"
@@ -307,7 +307,7 @@ def render(
             ]
         )
 
-        panel_cache = RenderOverlaysPanelCache()
+        panel_cache = OverlaysPanelCache()
 
         encode_message = (
             f"Encoding {frame_count} frames ({width}x{height} @ {fps} fps) "

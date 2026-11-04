@@ -110,7 +110,7 @@ from cleave.timeline_presets.timeline_cuts import (
 
 
 @dataclass
-class RenderOverlayAnimationRuntime:
+class OverlayAnimationRuntime:
     type: RenderOverlayAnimationType
     slide_direction: RenderOverlaySlideDirection
     appear_at: float
@@ -118,29 +118,29 @@ class RenderOverlayAnimationRuntime:
 
 
 @dataclass
-class RenderOverlayClosingAnimationRuntime:
+class OverlayClosingAnimationRuntime:
     type: RenderOverlayAnimationType
     slide_direction: RenderOverlaySlideDirection
     disappear_at: float
     display_time: float
 
 
-def default_render_overlay_animation_runtime() -> RenderOverlayAnimationRuntime:
-    return RenderOverlayAnimationRuntime(
+def default_overlay_animation_runtime() -> OverlayAnimationRuntime:
+    return OverlayAnimationRuntime(
         **default_render_overlay_animation_runtime_values()
     )
 
 
-def default_render_overlay_closing_animation_runtime() -> (
-    RenderOverlayClosingAnimationRuntime
+def default_overlay_closing_animation_runtime() -> (
+    OverlayClosingAnimationRuntime
 ):
-    return RenderOverlayClosingAnimationRuntime(
+    return OverlayClosingAnimationRuntime(
         **default_render_overlay_closing_animation_runtime_values()
     )
 
 
 @dataclass
-class RenderOverlayCardRuntime:
+class OverlayCardRuntime:
     enabled: bool
     position: RenderOverlayPosition
     title_font_size: int
@@ -160,39 +160,39 @@ class RenderOverlayCardRuntime:
     background_margin: int
     background_padding: int
     border_colour: tuple[int, int, int]
-    animation: RenderOverlayAnimationRuntime | RenderOverlayClosingAnimationRuntime
+    animation: OverlayAnimationRuntime | OverlayClosingAnimationRuntime
 
 
 @dataclass
-class RenderOverlaysRuntime:
-    opening_card: RenderOverlayCardRuntime
-    closing_card: RenderOverlayCardRuntime
+class OverlaysRuntime:
+    opening_card: OverlayCardRuntime
+    closing_card: OverlayCardRuntime
     locked: bool = DEFAULT_RENDER_OVERLAYS_LOCKED
 
 
-def _card_runtime_from_values(values: dict[str, Any]) -> RenderOverlayCardRuntime:
+def _card_runtime_from_values(values: dict[str, Any]) -> OverlayCardRuntime:
     values = dict(values)
     animation_values = dict(values.pop("animation"))
     if "appear_at" in animation_values:
-        animation: RenderOverlayAnimationRuntime | RenderOverlayClosingAnimationRuntime = (
-            RenderOverlayAnimationRuntime(**animation_values)
+        animation: OverlayAnimationRuntime | OverlayClosingAnimationRuntime = (
+            OverlayAnimationRuntime(**animation_values)
         )
     else:
-        animation = RenderOverlayClosingAnimationRuntime(**animation_values)
-    return RenderOverlayCardRuntime(animation=animation, **values)
+        animation = OverlayClosingAnimationRuntime(**animation_values)
+    return OverlayCardRuntime(animation=animation, **values)
 
 
-def default_render_overlay_card_runtime(
+def default_overlay_card_runtime(
     *, closing: bool = False
-) -> RenderOverlayCardRuntime:
+) -> OverlayCardRuntime:
     return _card_runtime_from_values(
         default_render_overlay_card_runtime_values(closing=closing)
     )
 
 
-def default_render_overlays_runtime() -> RenderOverlaysRuntime:
+def default_overlays_runtime() -> OverlaysRuntime:
     values = default_render_overlays_runtime_values()
-    return RenderOverlaysRuntime(
+    return OverlaysRuntime(
         opening_card=_card_runtime_from_values(dict(values["opening_card"])),
         closing_card=_card_runtime_from_values(dict(values["closing_card"])),
         locked=values["locked"],
@@ -251,7 +251,7 @@ def default_visual_limiter_runtime() -> VisualLimiterRuntime:
 
 
 @dataclass
-class RenderPostFxRuntime:
+class PostFxRuntime:
     enabled: bool
     fade: FadeRuntime
     highlight_rolloff: HighlightRolloffRuntime
@@ -267,13 +267,13 @@ def _fade_runtime_from_values(values: dict[str, Any]) -> FadeRuntime:
     )
 
 
-def default_render_post_fx_runtime() -> RenderPostFxRuntime:
+def default_post_fx_runtime() -> PostFxRuntime:
     values = default_render_post_fx_runtime_values()
     highlight_rolloff = HighlightRolloffRuntime(**values.pop("highlight_rolloff"))
     chroma_boost = ChromaBoostRuntime(**values.pop("chroma_boost"))
     fade = _fade_runtime_from_values(values.pop("fade"))
     limiter = VisualLimiterRuntime(**values.pop("limiter"))
-    return RenderPostFxRuntime(
+    return PostFxRuntime(
         highlight_rolloff=highlight_rolloff,
         chroma_boost=chroma_boost,
         fade=fade,
@@ -283,7 +283,7 @@ def default_render_post_fx_runtime() -> RenderPostFxRuntime:
 
 
 @dataclass
-class RenderPatternMaskRuntime:
+class PatternMaskRuntime:
     enabled: bool
     type: PatternMaskType
     density: float
@@ -294,8 +294,8 @@ class RenderPatternMaskRuntime:
     locked: bool = DEFAULT_RENDER_PATTERN_MASK_LOCKED
 
 
-def default_render_pattern_mask_runtime() -> RenderPatternMaskRuntime:
-    return RenderPatternMaskRuntime(**default_render_pattern_mask_runtime_values())
+def default_pattern_mask_runtime() -> PatternMaskRuntime:
+    return PatternMaskRuntime(**default_render_pattern_mask_runtime_values())
 
 
 @dataclass
@@ -450,16 +450,16 @@ class TuningSession:
     layer_z_order: list[str]
     layers: dict[str, LayerRuntime] = field(default_factory=dict)
     solo_slot: str | None = None
-    render_overlays: RenderOverlaysRuntime = field(
-        default_factory=default_render_overlays_runtime
+    overlays: OverlaysRuntime = field(
+        default_factory=default_overlays_runtime
     )
-    render_overlay_solo: bool = False
-    render_post_fx: RenderPostFxRuntime = field(
-        default_factory=default_render_post_fx_runtime
+    overlay_solo: bool = False
+    post_fx: PostFxRuntime = field(
+        default_factory=default_post_fx_runtime
     )
-    render_post_fx_solo: bool = False
-    render_pattern_mask: RenderPatternMaskRuntime = field(
-        default_factory=default_render_pattern_mask_runtime
+    post_fx_solo: bool = False
+    pattern_mask: PatternMaskRuntime = field(
+        default_factory=default_pattern_mask_runtime
     )
     timeline: TimelineRuntime = field(default_factory=default_timeline_runtime)
     song_markers: SongMarkerRuntime = field(default_factory=default_song_marker_runtime)
@@ -474,12 +474,12 @@ class TuningSession:
     )
 
 
-def _card_runtime_from_cfg(card: Any) -> RenderOverlayCardRuntime:
+def _card_runtime_from_cfg(card: Any) -> OverlayCardRuntime:
     anim = card.animation
     if hasattr(anim, "appear_at"):
-        animation: RenderOverlayAnimationRuntime | RenderOverlayClosingAnimationRuntime = (
+        animation: OverlayAnimationRuntime | OverlayClosingAnimationRuntime = (
             replace(
-                default_render_overlay_animation_runtime(),
+                default_overlay_animation_runtime(),
                 type=anim.type,
                 slide_direction=anim.slide_direction,
                 appear_at=anim.appear_at,
@@ -489,7 +489,7 @@ def _card_runtime_from_cfg(card: Any) -> RenderOverlayCardRuntime:
         closing = False
     else:
         animation = replace(
-            default_render_overlay_closing_animation_runtime(),
+            default_overlay_closing_animation_runtime(),
             type=anim.type,
             slide_direction=anim.slide_direction,
             disappear_at=anim.disappear_at,
@@ -497,7 +497,7 @@ def _card_runtime_from_cfg(card: Any) -> RenderOverlayCardRuntime:
         )
         closing = True
     return replace(
-        default_render_overlay_card_runtime(closing=closing),
+        default_overlay_card_runtime(closing=closing),
         enabled=card.enabled,
         position=card.position,
         title_font_size=card.title.font_size,
@@ -521,27 +521,27 @@ def _card_runtime_from_cfg(card: Any) -> RenderOverlayCardRuntime:
     )
 
 
-def render_overlays_runtime_from_cfg(cfg: CleaveConfig) -> RenderOverlaysRuntime:
+def overlays_runtime_from_cfg(cfg: CleaveConfig) -> OverlaysRuntime:
     overlays = cfg.render.overlays if cfg.render is not None else None
     if overlays is not None:
         return replace(
-            default_render_overlays_runtime(),
+            default_overlays_runtime(),
             opening_card=_card_runtime_from_cfg(overlays.opening_card),
             closing_card=_card_runtime_from_cfg(overlays.closing_card),
             locked=overlays.locked,
         )
-    return default_render_overlays_runtime()
+    return default_overlays_runtime()
 
 
-def render_post_fx_runtime_from_cfg(
+def post_fx_runtime_from_cfg(
     cfg: CleaveConfig,
-) -> RenderPostFxRuntime:
+) -> PostFxRuntime:
     post_fx = cfg.render.post_fx if cfg.render is not None else None
     if post_fx is not None:
         hr = post_fx.highlight_rolloff
         cb = post_fx.chroma_boost
         lim = post_fx.limiter
-        base = default_render_post_fx_runtime()
+        base = default_post_fx_runtime()
         fin = post_fx.fade.fade_in
         fout = post_fx.fade.fade_out
         return replace(
@@ -587,16 +587,16 @@ def render_post_fx_runtime_from_cfg(
                 release=lim.release,
             ),
         )
-    return default_render_post_fx_runtime()
+    return default_post_fx_runtime()
 
 
-def render_pattern_mask_runtime_from_cfg(
+def pattern_mask_runtime_from_cfg(
     cfg: CleaveConfig,
-) -> RenderPatternMaskRuntime:
+) -> PatternMaskRuntime:
     pattern_mask = cfg.render.pattern_mask if cfg.render is not None else None
     if pattern_mask is not None:
         return replace(
-            default_render_pattern_mask_runtime(),
+            default_pattern_mask_runtime(),
             enabled=pattern_mask.enabled,
             locked=pattern_mask.locked,
             type=pattern_mask.type,
@@ -606,7 +606,7 @@ def render_pattern_mask_runtime_from_cfg(
             transition=pattern_mask.transition,
             seed=pattern_mask.seed,
         )
-    return default_render_pattern_mask_runtime()
+    return default_pattern_mask_runtime()
 
 
 def _fade_group_runtime_from_cfg(
@@ -717,9 +717,9 @@ def session_from_cfg(
     preset_root = cfg.paths.preset_root
     return TuningSession(
         layer_z_order=list(cfg.layer_z_order),
-        render_overlays=render_overlays_runtime_from_cfg(cfg),
-        render_post_fx=render_post_fx_runtime_from_cfg(cfg),
-        render_pattern_mask=render_pattern_mask_runtime_from_cfg(cfg),
+        overlays=overlays_runtime_from_cfg(cfg),
+        post_fx=post_fx_runtime_from_cfg(cfg),
+        pattern_mask=pattern_mask_runtime_from_cfg(cfg),
         timeline=timeline_runtime_from_cfg(cfg),
         project=ProjectRuntime(
             milkdrop_beat_sensitivity=cfg.milkdrop_beat_sensitivity,

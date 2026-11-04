@@ -30,12 +30,12 @@ from cleave.viz.live_layer_bindings import LiveLayerBindings
 from cleave.viz.session import (
     LayerRuntime,
     TuningSession,
-    default_render_overlay_card_runtime,
+    default_overlay_card_runtime,
 )
 from cleave.viz.playback import PlaybackState
 from cleave.viz.overlay_primitives import overlay_font as production_overlay_font
 from cleave.viz.theme import TuningUiMetrics, tuning_ui_metrics
-from cleave.viz.tuning_view_state import RenderOverlayCardBlock, TrackBlock
+from cleave.viz.tuning_view_state import OverlayCardBlock, TrackBlock
 
 
 def baseline_tuning_ui_metrics() -> TuningUiMetrics:
@@ -144,15 +144,15 @@ def make_track_block(**kwargs) -> TrackBlock:
     )
 
 
-def make_overlay_card_block(*, closing: bool = False, **kwargs) -> RenderOverlayCardBlock:
+def make_overlay_card_block(*, closing: bool = False, **kwargs) -> OverlayCardBlock:
     """Build an overlay card view block wrapping a session runtime."""
-    runtime = default_render_overlay_card_runtime(closing=closing)
+    runtime = default_overlay_card_runtime(closing=closing)
     animation_type = kwargs.pop("animation_type", None)
     if animation_type is not None:
         runtime.animation.type = animation_type
     for key, value in kwargs.items():
         setattr(runtime, key, value)
-    return RenderOverlayCardBlock(runtime=runtime)
+    return OverlayCardBlock(runtime=runtime)
 
 
 def stub_playback_state() -> PlaybackState:

@@ -109,7 +109,7 @@ def _append_song_marker_rows(
     state: TuningViewState,
     _slot: str | None,
 ) -> None:
-    for index in range(len(state.render_timeline.song_marker_times)):
+    for index in range(len(state.timeline.song_marker_times)):
         row_list.append(
             RowDescriptor(RowKind.SONG_MARKER_ITEM, marker_index=index)
         )
@@ -206,215 +206,215 @@ CURATION_LAYER_SECTION = SectionDef(
     ),
 )
 
-def _build_render_overlay_card_section(card: str) -> SectionDef:
+def _build_overlay_card_section(card: str) -> SectionDef:
     title_section = SectionDef(
-        header_kind=RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER,
+        header_kind=RowKind.OVERLAY_CARD_TITLE_HEADER,
         context="global",
         card=card,
         children=(
-            SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_TITLE_TEXT),
-            SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_TITLE_COLOUR),
-            SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_TITLE_BACKGROUND_COLOUR),
-            SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_TITLE_FONT),
-            SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_TITLE_FONT_SIZE),
-            SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_TITLE_MARGIN_BOTTOM),
+            SectionNode(leaf_kind=RowKind.OVERLAY_CARD_TITLE_TEXT),
+            SectionNode(leaf_kind=RowKind.OVERLAY_CARD_TITLE_COLOUR),
+            SectionNode(leaf_kind=RowKind.OVERLAY_CARD_TITLE_BACKGROUND_COLOUR),
+            SectionNode(leaf_kind=RowKind.OVERLAY_CARD_TITLE_FONT),
+            SectionNode(leaf_kind=RowKind.OVERLAY_CARD_TITLE_FONT_SIZE),
+            SectionNode(leaf_kind=RowKind.OVERLAY_CARD_TITLE_MARGIN_BOTTOM),
         ),
     )
     body_section = SectionDef(
-        header_kind=RowKind.RENDER_OVERLAY_CARD_BODY_HEADER,
+        header_kind=RowKind.OVERLAY_CARD_BODY_HEADER,
         context="global",
         card=card,
         children=(
-            SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_BODY_TEXT),
-            SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_BODY_COLOUR),
-            SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_BODY_BACKGROUND_COLOUR),
-            SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_BODY_FONT),
-            SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_BODY_FONT_SIZE),
+            SectionNode(leaf_kind=RowKind.OVERLAY_CARD_BODY_TEXT),
+            SectionNode(leaf_kind=RowKind.OVERLAY_CARD_BODY_COLOUR),
+            SectionNode(leaf_kind=RowKind.OVERLAY_CARD_BODY_BACKGROUND_COLOUR),
+            SectionNode(leaf_kind=RowKind.OVERLAY_CARD_BODY_FONT),
+            SectionNode(leaf_kind=RowKind.OVERLAY_CARD_BODY_FONT_SIZE),
         ),
     )
     slide_conditional = ConditionalRowsDef(
         name=f"overlay_{card}_animation_slide_direction",
         predicate=(
             lambda state, _desc, card=card: getattr(
-                state.render_overlays, card
+                state.overlays, card
             ).runtime.animation.type
             != "fade"
         ),
         children=(
             SectionNode(
-                leaf_kind=RowKind.RENDER_OVERLAY_CARD_ANIMATION_SLIDE_DIRECTION
+                leaf_kind=RowKind.OVERLAY_CARD_ANIMATION_SLIDE_DIRECTION
             ),
         ),
     )
     animation_section = SectionDef(
-        header_kind=RowKind.RENDER_OVERLAY_CARD_ANIMATION_HEADER,
+        header_kind=RowKind.OVERLAY_CARD_ANIMATION_HEADER,
         context="global",
         card=card,
         children=(
-            SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_ANIMATION_TYPE),
+            SectionNode(leaf_kind=RowKind.OVERLAY_CARD_ANIMATION_TYPE),
             SectionNode(conditional=slide_conditional),
-            SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_TIME),
-            SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_DISPLAY_TIME),
+            SectionNode(leaf_kind=RowKind.OVERLAY_CARD_TIME),
+            SectionNode(leaf_kind=RowKind.OVERLAY_CARD_DISPLAY_TIME),
         ),
     )
     return SectionDef(
-        header_kind=RowKind.RENDER_OVERLAY_CARD_HEADER,
+        header_kind=RowKind.OVERLAY_CARD_HEADER,
         context="global",
         card=card,
         children=(
             SectionNode(subsection=animation_section),
-            SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_POSITION),
-            SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_OPACITY),
-            SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_BACKGROUND_COLOUR),
-            SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_BACKGROUND_MARGIN),
-            SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_BACKGROUND_PADDING),
-            SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_BORDER_WIDTH),
-            SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_BORDER_COLOUR),
+            SectionNode(leaf_kind=RowKind.OVERLAY_CARD_POSITION),
+            SectionNode(leaf_kind=RowKind.OVERLAY_CARD_OPACITY),
+            SectionNode(leaf_kind=RowKind.OVERLAY_CARD_BACKGROUND_COLOUR),
+            SectionNode(leaf_kind=RowKind.OVERLAY_CARD_BACKGROUND_MARGIN),
+            SectionNode(leaf_kind=RowKind.OVERLAY_CARD_BACKGROUND_PADDING),
+            SectionNode(leaf_kind=RowKind.OVERLAY_CARD_BORDER_WIDTH),
+            SectionNode(leaf_kind=RowKind.OVERLAY_CARD_BORDER_COLOUR),
             SectionNode(subsection=title_section),
             SectionNode(subsection=body_section),
         ),
     )
 
 
-RENDER_OVERLAY_OPENING_CARD_SECTION = _build_render_overlay_card_section(
+OVERLAY_OPENING_CARD_SECTION = _build_overlay_card_section(
     "opening_card"
 )
-RENDER_OVERLAY_CLOSING_CARD_SECTION = _build_render_overlay_card_section(
+OVERLAY_CLOSING_CARD_SECTION = _build_overlay_card_section(
     "closing_card"
 )
 
-RENDER_OVERLAYS_SECTION = SectionDef(
-    header_kind=RowKind.RENDER_OVERLAYS_HEADER,
+OVERLAYS_SECTION = SectionDef(
+    header_kind=RowKind.OVERLAYS_HEADER,
     context="global",
     children=(
-        SectionNode(subsection=RENDER_OVERLAY_OPENING_CARD_SECTION),
-        SectionNode(subsection=RENDER_OVERLAY_CLOSING_CARD_SECTION),
+        SectionNode(subsection=OVERLAY_OPENING_CARD_SECTION),
+        SectionNode(subsection=OVERLAY_CLOSING_CARD_SECTION),
     ),
 )
 
-RENDER_POST_FX_HIGHLIGHT_ROLLOFF_ACTIVE = ConditionalRowsDef(
+POST_FX_HIGHLIGHT_ROLLOFF_ACTIVE = ConditionalRowsDef(
     name="highlight_rolloff_active",
-    predicate=lambda state, _desc: state.render_post_fx.highlight_rolloff.mode != "off",
+    predicate=lambda state, _desc: state.post_fx.highlight_rolloff.mode != "off",
     children=(
-        SectionNode(leaf_kind=RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_CURVE),
-        SectionNode(leaf_kind=RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD),
-        SectionNode(leaf_kind=RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_CEILING),
-        SectionNode(leaf_kind=RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_STRENGTH),
-        SectionNode(leaf_kind=RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_SOFTNESS),
-        SectionNode(leaf_kind=RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_DESATURATION),
+        SectionNode(leaf_kind=RowKind.POST_FX_HIGHLIGHT_ROLLOFF_CURVE),
+        SectionNode(leaf_kind=RowKind.POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD),
+        SectionNode(leaf_kind=RowKind.POST_FX_HIGHLIGHT_ROLLOFF_CEILING),
+        SectionNode(leaf_kind=RowKind.POST_FX_HIGHLIGHT_ROLLOFF_STRENGTH),
+        SectionNode(leaf_kind=RowKind.POST_FX_HIGHLIGHT_ROLLOFF_SOFTNESS),
+        SectionNode(leaf_kind=RowKind.POST_FX_HIGHLIGHT_ROLLOFF_DESATURATION),
     ),
 )
 
-RENDER_POST_FX_HIGHLIGHT_ROLLOFF_SECTION = SectionDef(
-    header_kind=RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_HEADER,
+POST_FX_HIGHLIGHT_ROLLOFF_SECTION = SectionDef(
+    header_kind=RowKind.POST_FX_HIGHLIGHT_ROLLOFF_HEADER,
     context="global",
     children=(
-        SectionNode(leaf_kind=RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_MODE),
-        SectionNode(conditional=RENDER_POST_FX_HIGHLIGHT_ROLLOFF_ACTIVE),
+        SectionNode(leaf_kind=RowKind.POST_FX_HIGHLIGHT_ROLLOFF_MODE),
+        SectionNode(conditional=POST_FX_HIGHLIGHT_ROLLOFF_ACTIVE),
     ),
 )
 
-RENDER_POST_FX_CHROMA_BOOST_ACTIVE = ConditionalRowsDef(
+POST_FX_CHROMA_BOOST_ACTIVE = ConditionalRowsDef(
     name="chroma_boost_active",
-    predicate=lambda state, _desc: state.render_post_fx.chroma_boost.mode != "off",
+    predicate=lambda state, _desc: state.post_fx.chroma_boost.mode != "off",
     children=(
-        SectionNode(leaf_kind=RowKind.RENDER_POST_FX_CHROMA_BOOST_VARIANT),
-        SectionNode(leaf_kind=RowKind.RENDER_POST_FX_CHROMA_BOOST_AMOUNT),
+        SectionNode(leaf_kind=RowKind.POST_FX_CHROMA_BOOST_VARIANT),
+        SectionNode(leaf_kind=RowKind.POST_FX_CHROMA_BOOST_AMOUNT),
     ),
 )
 
-def _render_post_fx_limiter_enabled(
+def _post_fx_limiter_enabled(
     state: TuningViewState, _desc: RowDescriptor
 ) -> bool:
-    return state.render_post_fx.limiter.enabled
+    return state.post_fx.limiter.enabled
 
 
-RENDER_POST_FX_LIMITER_ACTIVE = ConditionalRowsDef(
+POST_FX_LIMITER_ACTIVE = ConditionalRowsDef(
     name="visual_limiter_enabled",
-    predicate=_render_post_fx_limiter_enabled,
+    predicate=_post_fx_limiter_enabled,
     children=(
-        SectionNode(leaf_kind=RowKind.RENDER_POST_FX_LIMITER_THRESHOLD),
-        SectionNode(leaf_kind=RowKind.RENDER_POST_FX_LIMITER_RATIO),
-        SectionNode(leaf_kind=RowKind.RENDER_POST_FX_LIMITER_RELEASE),
+        SectionNode(leaf_kind=RowKind.POST_FX_LIMITER_THRESHOLD),
+        SectionNode(leaf_kind=RowKind.POST_FX_LIMITER_RATIO),
+        SectionNode(leaf_kind=RowKind.POST_FX_LIMITER_RELEASE),
     ),
 )
 
-RENDER_POST_FX_LIMITER_SECTION = SectionDef(
-    header_kind=RowKind.RENDER_POST_FX_LIMITER_HEADER,
+POST_FX_LIMITER_SECTION = SectionDef(
+    header_kind=RowKind.POST_FX_LIMITER_HEADER,
     context="global",
     children=(
-        SectionNode(leaf_kind=RowKind.RENDER_POST_FX_LIMITER_ENABLED),
-        SectionNode(conditional=RENDER_POST_FX_LIMITER_ACTIVE),
+        SectionNode(leaf_kind=RowKind.POST_FX_LIMITER_ENABLED),
+        SectionNode(conditional=POST_FX_LIMITER_ACTIVE),
     ),
 )
 
-RENDER_POST_FX_CHROMA_BOOST_SECTION = SectionDef(
-    header_kind=RowKind.RENDER_POST_FX_CHROMA_BOOST_HEADER,
+POST_FX_CHROMA_BOOST_SECTION = SectionDef(
+    header_kind=RowKind.POST_FX_CHROMA_BOOST_HEADER,
     context="global",
     children=(
-        SectionNode(leaf_kind=RowKind.RENDER_POST_FX_CHROMA_BOOST_MODE),
-        SectionNode(conditional=RENDER_POST_FX_CHROMA_BOOST_ACTIVE),
+        SectionNode(leaf_kind=RowKind.POST_FX_CHROMA_BOOST_MODE),
+        SectionNode(conditional=POST_FX_CHROMA_BOOST_ACTIVE),
     ),
 )
 
-RENDER_POST_FX_FADE_IN_SECTION = SectionDef(
-    header_kind=RowKind.RENDER_POST_FX_FADE_IN_HEADER,
+POST_FX_FADE_IN_SECTION = SectionDef(
+    header_kind=RowKind.POST_FX_FADE_IN_HEADER,
     context="global",
     children=(
-        SectionNode(leaf_kind=RowKind.RENDER_POST_FX_FADE_IN_START),
-        SectionNode(leaf_kind=RowKind.RENDER_POST_FX_FADE_IN_END),
-        SectionNode(leaf_kind=RowKind.RENDER_POST_FX_FADE_IN_TYPE),
+        SectionNode(leaf_kind=RowKind.POST_FX_FADE_IN_START),
+        SectionNode(leaf_kind=RowKind.POST_FX_FADE_IN_END),
+        SectionNode(leaf_kind=RowKind.POST_FX_FADE_IN_TYPE),
     ),
 )
 
-RENDER_POST_FX_FADE_OUT_SECTION = SectionDef(
-    header_kind=RowKind.RENDER_POST_FX_FADE_OUT_HEADER,
+POST_FX_FADE_OUT_SECTION = SectionDef(
+    header_kind=RowKind.POST_FX_FADE_OUT_HEADER,
     context="global",
     children=(
-        SectionNode(leaf_kind=RowKind.RENDER_POST_FX_FADE_OUT_START),
-        SectionNode(leaf_kind=RowKind.RENDER_POST_FX_FADE_OUT_END),
-        SectionNode(leaf_kind=RowKind.RENDER_POST_FX_FADE_OUT_TYPE),
+        SectionNode(leaf_kind=RowKind.POST_FX_FADE_OUT_START),
+        SectionNode(leaf_kind=RowKind.POST_FX_FADE_OUT_END),
+        SectionNode(leaf_kind=RowKind.POST_FX_FADE_OUT_TYPE),
     ),
 )
 
-RENDER_POST_FX_FADE_SECTION = SectionDef(
-    header_kind=RowKind.RENDER_POST_FX_FADE_HEADER,
+POST_FX_FADE_SECTION = SectionDef(
+    header_kind=RowKind.POST_FX_FADE_HEADER,
     context="global",
     children=(
-        SectionNode(subsection=RENDER_POST_FX_FADE_IN_SECTION),
-        SectionNode(subsection=RENDER_POST_FX_FADE_OUT_SECTION),
+        SectionNode(subsection=POST_FX_FADE_IN_SECTION),
+        SectionNode(subsection=POST_FX_FADE_OUT_SECTION),
     ),
 )
 
-RENDER_POST_FX_SECTION = SectionDef(
-    header_kind=RowKind.RENDER_POST_FX_HEADER,
+POST_FX_SECTION = SectionDef(
+    header_kind=RowKind.POST_FX_HEADER,
     context="global",
     children=(
-        SectionNode(subsection=RENDER_POST_FX_FADE_SECTION),
-        SectionNode(subsection=RENDER_POST_FX_HIGHLIGHT_ROLLOFF_SECTION),
-        SectionNode(subsection=RENDER_POST_FX_CHROMA_BOOST_SECTION),
-        SectionNode(subsection=RENDER_POST_FX_LIMITER_SECTION),
+        SectionNode(subsection=POST_FX_FADE_SECTION),
+        SectionNode(subsection=POST_FX_HIGHLIGHT_ROLLOFF_SECTION),
+        SectionNode(subsection=POST_FX_CHROMA_BOOST_SECTION),
+        SectionNode(subsection=POST_FX_LIMITER_SECTION),
     ),
 )
 
-RENDER_PATTERN_MASK_PLASMA_SEED = ConditionalRowsDef(
+PATTERN_MASK_PLASMA_SEED = ConditionalRowsDef(
     name="pattern_mask_plasma_seed",
-    predicate=lambda state, _desc: state.render_pattern_mask.type == "plasma",
+    predicate=lambda state, _desc: state.pattern_mask.type == "plasma",
     children=(
-        SectionNode(leaf_kind=RowKind.RENDER_PATTERN_MASK_SEED),
+        SectionNode(leaf_kind=RowKind.PATTERN_MASK_SEED),
     ),
 )
 
-RENDER_PATTERN_MASK_SECTION = SectionDef(
-    header_kind=RowKind.RENDER_PATTERN_MASK_HEADER,
+PATTERN_MASK_SECTION = SectionDef(
+    header_kind=RowKind.PATTERN_MASK_HEADER,
     context="global",
     children=(
-        SectionNode(leaf_kind=RowKind.RENDER_PATTERN_MASK_TYPE),
-        SectionNode(leaf_kind=RowKind.RENDER_PATTERN_MASK_DENSITY),
-        SectionNode(leaf_kind=RowKind.RENDER_PATTERN_MASK_FEATHER),
-        SectionNode(leaf_kind=RowKind.RENDER_PATTERN_MASK_INVERT),
-        SectionNode(leaf_kind=RowKind.RENDER_PATTERN_MASK_TRANSITION),
-        SectionNode(conditional=RENDER_PATTERN_MASK_PLASMA_SEED),
+        SectionNode(leaf_kind=RowKind.PATTERN_MASK_TYPE),
+        SectionNode(leaf_kind=RowKind.PATTERN_MASK_DENSITY),
+        SectionNode(leaf_kind=RowKind.PATTERN_MASK_FEATHER),
+        SectionNode(leaf_kind=RowKind.PATTERN_MASK_INVERT),
+        SectionNode(leaf_kind=RowKind.PATTERN_MASK_TRANSITION),
+        SectionNode(conditional=PATTERN_MASK_PLASMA_SEED),
     ),
 )
 
@@ -575,13 +575,13 @@ BEAT_BAR_GRID_SECTION = SectionDef(
 def _timeline_hard_cut_fades_enabled(
     state: TuningViewState, _desc: RowDescriptor
 ) -> bool:
-    return state.render_timeline.hard_cut_fades.enabled
+    return state.timeline.hard_cut_fades.enabled
 
 
 def _timeline_soft_cut_fades_enabled(
     state: TuningViewState, _desc: RowDescriptor
 ) -> bool:
-    return state.render_timeline.soft_cut_fades.enabled
+    return state.timeline.soft_cut_fades.enabled
 
 
 TIMELINE_HARD_CUTS_ACTIVE = ConditionalRowsDef(
@@ -674,14 +674,14 @@ def kinds_in_section(section: SectionDef) -> frozenset[RowKind]:
     return frozenset(kinds)
 
 
-RENDER_OVERLAY_SECTION_KINDS = kinds_in_section(RENDER_OVERLAYS_SECTION)
-RENDER_POST_FX_SECTION_KINDS = kinds_in_section(RENDER_POST_FX_SECTION)
-RENDER_POST_FX_LIMITER_KINDS = kinds_in_section(RENDER_POST_FX_LIMITER_SECTION)
-RENDER_PATTERN_MASK_SECTION_KINDS = kinds_in_section(RENDER_PATTERN_MASK_SECTION)
+OVERLAY_SECTION_KINDS = kinds_in_section(OVERLAYS_SECTION)
+POST_FX_SECTION_KINDS = kinds_in_section(POST_FX_SECTION)
+POST_FX_LIMITER_KINDS = kinds_in_section(POST_FX_LIMITER_SECTION)
+PATTERN_MASK_SECTION_KINDS = kinds_in_section(PATTERN_MASK_SECTION)
 TRACK_COMPOSITING_SECTION_KINDS = kinds_in_section(TRACK_COMPOSITING_SECTION)
-RENDER_TIMELINE_SECTION_KINDS = frozenset(
+TIMELINE_SECTION_KINDS = frozenset(
     {
-        RowKind.RENDER_TIMELINE_HEADER,
+        RowKind.TIMELINE_HEADER,
         RowKind.SONG_MARKERS_HEADER,
         RowKind.SONG_MARKER_ITEM,
         RowKind.TIMELINE_PRESETS_HEADER,

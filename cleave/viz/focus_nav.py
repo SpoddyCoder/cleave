@@ -27,7 +27,7 @@ FocusCursor = MainFocus | TimelineFocus
 def cursor_main_descriptor(cursor: FocusCursor) -> RowDescriptor:
     if isinstance(cursor, MainFocus):
         return cursor.descriptor
-    return RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
+    return RowDescriptor(RowKind.TIMELINE_HEADER)
 
 
 def cursor_timeline_submenu_focused(cursor: FocusCursor) -> bool:

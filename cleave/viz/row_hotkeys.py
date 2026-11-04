@@ -41,14 +41,14 @@ _NODE_HEADER_KINDS: dict[str, RowKind] = {
     "project.projectm": RowKind.PROJECT_MILKDROP_HEADER,
     "project.compositor": RowKind.PROJECT_COMPOSITOR_HEADER,
     "project.render": RowKind.PROJECT_RENDER_HEADER,
-    "overlay": RowKind.RENDER_OVERLAYS_HEADER,
-    "post_fx": RowKind.RENDER_POST_FX_HEADER,
-    "post_fx.fade": RowKind.RENDER_POST_FX_FADE_HEADER,
-    "post_fx.highlight_rolloff": RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_HEADER,
-    "post_fx.chroma_boost": RowKind.RENDER_POST_FX_CHROMA_BOOST_HEADER,
-    "post_fx.limiter": RowKind.RENDER_POST_FX_LIMITER_HEADER,
-    "pattern_mask": RowKind.RENDER_PATTERN_MASK_HEADER,
-    "timeline": RowKind.RENDER_TIMELINE_HEADER,
+    "overlay": RowKind.OVERLAYS_HEADER,
+    "post_fx": RowKind.POST_FX_HEADER,
+    "post_fx.fade": RowKind.POST_FX_FADE_HEADER,
+    "post_fx.highlight_rolloff": RowKind.POST_FX_HIGHLIGHT_ROLLOFF_HEADER,
+    "post_fx.chroma_boost": RowKind.POST_FX_CHROMA_BOOST_HEADER,
+    "post_fx.limiter": RowKind.POST_FX_LIMITER_HEADER,
+    "pattern_mask": RowKind.PATTERN_MASK_HEADER,
+    "timeline": RowKind.TIMELINE_HEADER,
     "timeline.grid": RowKind.TIMELINE_BEAT_BAR_GRID_HEADER,
     "timeline.cue_fades": RowKind.TIMELINE_CUTS_HEADER,
     "timeline.song_markers": RowKind.SONG_MARKERS_HEADER,
@@ -76,7 +76,7 @@ def node_header_descriptor(node_id: str) -> RowDescriptor | None:
         return RowDescriptor(kind, slot=slot)
     card = _NODE_CARDS.get(node_id)
     if card is not None:
-        return RowDescriptor(RowKind.RENDER_OVERLAY_CARD_HEADER, card=card)
+        return RowDescriptor(RowKind.OVERLAY_CARD_HEADER, card=card)
     kind = _NODE_HEADER_KINDS.get(node_id)
     return None if kind is None else RowDescriptor(kind)
 
@@ -103,17 +103,17 @@ def toggle_header_locked(controls: TuningControls, desc: RowDescriptor) -> bool:
         if slot is not None:
             controls.toggle_layer_locked(slot)
         return True
-    if kind in (RowKind.RENDER_OVERLAYS_HEADER, RowKind.RENDER_OVERLAY_CARD_HEADER):
-        controls.toggle_render_overlay_locked()
+    if kind in (RowKind.OVERLAYS_HEADER, RowKind.OVERLAY_CARD_HEADER):
+        controls.toggle_overlay_locked()
         return True
-    if kind == RowKind.RENDER_POST_FX_HEADER:
-        controls.toggle_render_post_fx_locked()
+    if kind == RowKind.POST_FX_HEADER:
+        controls.toggle_post_fx_locked()
         return True
-    if kind == RowKind.RENDER_PATTERN_MASK_HEADER:
-        controls.toggle_render_pattern_mask_locked()
+    if kind == RowKind.PATTERN_MASK_HEADER:
+        controls.toggle_pattern_mask_locked()
         return True
-    if kind == RowKind.RENDER_TIMELINE_HEADER:
-        controls.toggle_render_timeline_locked()
+    if kind == RowKind.TIMELINE_HEADER:
+        controls.toggle_timeline_locked()
         return True
     return False
 

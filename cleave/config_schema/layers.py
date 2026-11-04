@@ -42,7 +42,7 @@ PRESET_SWITCHING_TRIGGER_HELP_ENTRIES: tuple[
     ),
     (
         "timeline",
-        "advance on each timeline on-transition (requires Render: TIMELINE).",
+        "advance on each timeline on-transition (requires the timeline).",
     ),
 )
 DEFAULT_PRESET_SWITCHING: PresetSwitchingMode = "off"

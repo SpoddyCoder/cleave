@@ -195,7 +195,7 @@ def test_navigation_left_right_expands_navigator() -> None:
 
 
 def test_help_follows_inspector_row_not_leftover() -> None:
-    leftover = RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
+    leftover = RowDescriptor(RowKind.OVERLAYS_HEADER)
     shell = ShellFocusState(
         region=ShellRegion.INSPECTOR,
         selected_id="layer:drums",
@@ -214,7 +214,7 @@ def test_help_follows_inspector_row_not_leftover() -> None:
 
 
 def test_help_follows_navigator_layer() -> None:
-    leftover = RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
+    leftover = RowDescriptor(RowKind.OVERLAYS_HEADER)
     sections = help_sections(
         leftover,
         shell_focus=ShellFocusState(
@@ -279,7 +279,7 @@ def test_help_follows_navigator_render_node() -> None:
 
 
 def test_navigator_other_nodes_keep_navigation_only() -> None:
-    leftover = RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
+    leftover = RowDescriptor(RowKind.OVERLAYS_HEADER)
     for selected_id in ("settings", "project", "layers"):
         sections = help_sections(
             leftover,
@@ -324,7 +324,7 @@ def test_inspector_command_rows_use_layer_management_help() -> None:
 
 def test_timeline_strip_help_keeps_lane_keys_when_layer_selected() -> None:
     sections = help_sections(
-        RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER),
+        RowDescriptor(RowKind.OVERLAYS_HEADER),
         shell_focus=ShellFocusState(
             region=ShellRegion.TIMELINE,
             selected_id="layer:drums",
@@ -437,7 +437,7 @@ def test_blend_mode_help_lists_modes() -> None:
     assert description.title == "Blend mode"
     assert description.lines == (
         "How this layer is composited onto the layers below it.",
-        "Ignored while PATTERN MASK is enabled.",
+        "Ignored while Pattern Mask is enabled.",
     )
     assert description.entries == BLEND_MODE_HELP_ENTRIES
     assert [mode for mode, _ in description.entries] == list(BLEND_MODES)
@@ -585,7 +585,7 @@ def test_preset_list_populate_help() -> None:
 
 def test_highlight_rolloff_mode_help_lists_modes() -> None:
     description = _description_section(
-        sections_for(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_MODE)
+        sections_for(RowKind.POST_FX_HIGHLIGHT_ROLLOFF_MODE)
     )
     assert description is not None
     assert description.title == "Mode"
@@ -598,7 +598,7 @@ def test_highlight_rolloff_mode_help_lists_modes() -> None:
 
 def test_highlight_rolloff_curve_help_lists_curves() -> None:
     description = _description_section(
-        sections_for(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_CURVE)
+        sections_for(RowKind.POST_FX_HIGHLIGHT_ROLLOFF_CURVE)
     )
     assert description is not None
     assert description.title == "Curve"
@@ -609,7 +609,7 @@ def test_highlight_rolloff_curve_help_lists_curves() -> None:
 
 def test_highlight_rolloff_header_help() -> None:
     description = _description_section(
-        sections_for(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_HEADER)
+        sections_for(RowKind.POST_FX_HIGHLIGHT_ROLLOFF_HEADER)
     )
     assert description is not None
     assert description.lines[0] == (
@@ -617,14 +617,14 @@ def test_highlight_rolloff_header_help() -> None:
     )
 
 
-def test_render_post_fx_header_help() -> None:
-    description = _description_section(sections_for(RowKind.RENDER_POST_FX_HEADER))
+def test_post_fx_header_help() -> None:
+    description = _description_section(sections_for(RowKind.POST_FX_HEADER))
     assert description is not None
     assert "applied during final compositing" in description.lines[0]
 
 
 def test_timeline_help_mentions_visibility_handoff() -> None:
-    description = _description_section(sections_for(RowKind.RENDER_TIMELINE_HEADER))
+    description = _description_section(sections_for(RowKind.TIMELINE_HEADER))
     assert description is not None
     assert any("standard layer visibility is disabled" in line for line in description.lines)
 
@@ -643,17 +643,17 @@ def test_stem_row_help() -> None:
 def test_compositing_header_and_opacity_help() -> None:
     header = _description_section(sections_for(RowKind.TRACK_COMPOSITING_HEADER))
     opacity = _description_section(sections_for(RowKind.TRACK_OPACITY))
-    mask = _description_section(sections_for(RowKind.RENDER_PATTERN_MASK_HEADER))
+    mask = _description_section(sections_for(RowKind.PATTERN_MASK_HEADER))
     assert header is not None
     assert header.title == "Compositing"
     assert header.lines == (
         "Blend mode and opacity for this layer.",
-        "Greyed out and ignored while PATTERN MASK is enabled.",
+        "Greyed out and ignored while Pattern Mask is enabled.",
     )
     assert opacity is not None
     assert opacity.lines == (
         "Opacity of this layer.",
-        "Ignored while PATTERN MASK is enabled.",
+        "Ignored while Pattern Mask is enabled.",
     )
     assert mask is not None
     assert "Replaces layer compositing, so each layer's Compositing rows" in mask.lines
@@ -674,39 +674,39 @@ def test_effect_row_help_uses_registry_description() -> None:
     assert "Opacity follows the audio driver signal." in description.lines
 
 
-def test_render_timeline_help_has_no_solo() -> None:
-    section = _keyboard_section(sections_for(RowKind.RENDER_TIMELINE_HEADER))
+def test_timeline_help_has_no_solo() -> None:
+    section = _keyboard_section(sections_for(RowKind.TIMELINE_HEADER))
     keys = [key for key, _ in section.entries]
     assert "S" not in keys
     assert dict(section.entries)["E"] == "enable/disable"
 
 
-def test_render_overlay_title_text_help() -> None:
-    section = _keyboard_section(sections_for(RowKind.RENDER_OVERLAY_CARD_TITLE_TEXT))
+def test_overlay_title_text_help() -> None:
+    section = _keyboard_section(sections_for(RowKind.OVERLAY_CARD_TITLE_TEXT))
     assert dict(section.entries)["Enter"] == "edit title"
 
 
-def test_render_overlay_title_colour_help() -> None:
-    section = _keyboard_section(sections_for(RowKind.RENDER_OVERLAY_CARD_TITLE_COLOUR))
+def test_overlay_title_colour_help() -> None:
+    section = _keyboard_section(sections_for(RowKind.OVERLAY_CARD_TITLE_COLOUR))
     assert dict(section.entries)["Enter"] == "edit colour"
 
 
-def test_render_overlay_remaining_colour_rows_help() -> None:
+def test_overlay_remaining_colour_rows_help() -> None:
     for kind in (
-        RowKind.RENDER_OVERLAY_CARD_TITLE_BACKGROUND_COLOUR,
-        RowKind.RENDER_OVERLAY_CARD_BODY_COLOUR,
-        RowKind.RENDER_OVERLAY_CARD_BODY_BACKGROUND_COLOUR,
-        RowKind.RENDER_OVERLAY_CARD_BACKGROUND_COLOUR,
-        RowKind.RENDER_OVERLAY_CARD_BORDER_COLOUR,
+        RowKind.OVERLAY_CARD_TITLE_BACKGROUND_COLOUR,
+        RowKind.OVERLAY_CARD_BODY_COLOUR,
+        RowKind.OVERLAY_CARD_BODY_BACKGROUND_COLOUR,
+        RowKind.OVERLAY_CARD_BACKGROUND_COLOUR,
+        RowKind.OVERLAY_CARD_BORDER_COLOUR,
     ):
         section = _keyboard_section(sections_for(kind))
         assert dict(section.entries)["Enter"] == "edit colour"
 
 
-def test_render_overlay_background_margin_and_padding_help() -> None:
+def test_overlay_background_margin_and_padding_help() -> None:
     for kind in (
-        RowKind.RENDER_OVERLAY_CARD_BACKGROUND_MARGIN,
-        RowKind.RENDER_OVERLAY_CARD_BACKGROUND_PADDING,
+        RowKind.OVERLAY_CARD_BACKGROUND_MARGIN,
+        RowKind.OVERLAY_CARD_BACKGROUND_PADDING,
     ):
         section = _keyboard_section(sections_for(kind))
         entries = dict(section.entries)
@@ -714,8 +714,8 @@ def test_render_overlay_background_margin_and_padding_help() -> None:
         assert entries["PgUp/PgDn"] == "large step"
 
 
-def test_render_overlay_body_text_help() -> None:
-    section = _keyboard_section(sections_for(RowKind.RENDER_OVERLAY_CARD_BODY_TEXT))
+def test_overlay_body_text_help() -> None:
+    section = _keyboard_section(sections_for(RowKind.OVERLAY_CARD_BODY_TEXT))
     assert dict(section.entries)["Enter"] == "edit body"
 
 
@@ -818,7 +818,7 @@ def test_settings_preview_quality_description_separated_from_keyboard() -> None:
 def test_timeline_stop_help_is_the_strip_only() -> None:
     sections = help_sections_for_stop(
         CycleStop.TIMELINE,
-        RowDescriptor(RowKind.RENDER_TIMELINE_HEADER),
+        RowDescriptor(RowKind.TIMELINE_HEADER),
         paused=True,
         layer_count=4,
     )
@@ -1014,7 +1014,7 @@ def test_help_column_draws_the_subject_stop() -> None:
         focus_cursor=None,
         build_view_state=lambda **_kwargs: SimpleNamespace(
             focus_descriptor=RowDescriptor(RowKind.TRACK_HEADER),
-            render_timeline=SimpleNamespace(enabled=False),
+            timeline=SimpleNamespace(enabled=False),
             paused=False,
             timeline_recording=False,
             timeline_override_active=False,

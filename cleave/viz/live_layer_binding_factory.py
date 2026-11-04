@@ -31,7 +31,7 @@ from cleave.viz.preset_switching import (
     reapply_projectm_preset_switching,
     resync_timeline_preset_switching,
 )
-from cleave.viz.render_post_fx_bindings import RenderPostFxBindings
+from cleave.viz.post_fx_bindings import PostFxBindings
 from cleave.viz.session import TuningSession
 from cleave.viz.user_presets import USER_PRESETS_DIRNAME
 
@@ -65,7 +65,7 @@ def sync_mix_player_solo(session: TuningSession, mix_player: MixPlayer) -> None:
 
 
 class LiveLayerBindingsFactory:
-    """Handlers for LiveLayerBindings, RenderPostFxBindings, and config save."""
+    """Handlers for LiveLayerBindings, PostFxBindings, and config save."""
 
     def __init__(self, ctx: LiveLayerBindingContext) -> None:
         self.ctx = ctx
@@ -86,8 +86,8 @@ class LiveLayerBindingsFactory:
             on_seek=self.on_seek,
         )
 
-    def render_post_fx_bindings(self) -> RenderPostFxBindings:
-        return RenderPostFxBindings(
+    def post_fx_bindings(self) -> PostFxBindings:
+        return PostFxBindings(
             on_highlight_rolloff_apply_mode_change=(
                 self.on_highlight_rolloff_apply_mode_change
             ),
@@ -207,9 +207,9 @@ class LiveLayerBindingsFactory:
         ctx = self.ctx
         if ctx.compositor is None or ctx.post_process is None:
             return
-        if ctx.session.render_post_fx_solo:
+        if ctx.session.post_fx_solo:
             return
-        hr = ctx.session.render_post_fx.highlight_rolloff
+        hr = ctx.session.post_fx.highlight_rolloff
         for layer in ctx.layers:
             if not layer.fbo.enabled:
                 continue
@@ -240,9 +240,9 @@ class LiveLayerBindingsFactory:
         ctx = self.ctx
         if ctx.compositor is None or ctx.post_process is None:
             return
-        if ctx.session.render_post_fx_solo:
+        if ctx.session.post_fx_solo:
             return
-        cb = ctx.session.render_post_fx.chroma_boost
+        cb = ctx.session.post_fx.chroma_boost
         for layer in ctx.layers:
             if not layer.fbo.enabled:
                 continue

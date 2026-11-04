@@ -20,7 +20,7 @@ from cleave.viz.preset_switching import layer_notification
 from cleave.viz.session import TuningSession
 
 NOTIFICATION_TIMELINE_TRIGGER_DISABLED_TEXT = (
-    "Timeline is disabled; enable Render: TIMELINE to switch presets"
+    "Timeline is disabled; enable it to switch presets"
 )
 
 

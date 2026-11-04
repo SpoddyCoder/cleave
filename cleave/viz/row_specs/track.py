@@ -487,7 +487,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_description=(
             "How the ordered preset list advances.",
             "Off disables switching and hides the other rows.",
-            "Timeline trigger needs Render: TIMELINE enabled.",
+            "Timeline trigger needs the timeline enabled.",
         ),
         help_mode_entries=PRESET_SWITCHING_TRIGGER_HELP_ENTRIES,
         repeatable=True,
@@ -689,7 +689,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Blend mode",
         help_description=(
             "How this layer is composited onto the layers below it.",
-            "Ignored while PATTERN MASK is enabled.",
+            "Ignored while Pattern Mask is enabled.",
         ),
         help_mode_entries=BLEND_MODE_HELP_ENTRIES,
         repeatable=True,
@@ -704,7 +704,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Opacity",
         help_description=(
             "Opacity of this layer.",
-            "Ignored while PATTERN MASK is enabled.",
+            "Ignored while Pattern Mask is enabled.",
         ),
         repeatable=True,
         parent_group="track",
@@ -731,7 +731,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Compositing",
         help_description=(
             "Blend mode and opacity for this layer.",
-            "Greyed out and ignored while PATTERN MASK is enabled.",
+            "Greyed out and ignored while Pattern Mask is enabled.",
         ),
         parent_group="track",
     ),

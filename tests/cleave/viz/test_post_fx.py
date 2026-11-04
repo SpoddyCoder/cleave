@@ -14,13 +14,13 @@ from cleave.viz.post_fx import (
     highlight_rolloff_active,
     live_frame_fade_alpha,
 )
-from tests.support.config import default_render_post_fx_runtime
+from tests.support.config import default_post_fx_runtime
 
 HIGHLIGHT_ROLLOFF_CURVES = ("rolloff", "smoothstep", "aces_fit")
 
 
 def test_live_frame_fade_alpha_enabled() -> None:
-    fade = default_render_post_fx_runtime().fade
+    fade = default_post_fx_runtime().fade
     alpha = live_frame_fade_alpha(15.0, 100.0, fade, enabled=True, solo=False)
     assert alpha == fade_alpha(15.0, 100.0, 30.0, 4.0)
     alpha_out = live_frame_fade_alpha(98.0, 100.0, fade, enabled=True, solo=False)
@@ -28,7 +28,7 @@ def test_live_frame_fade_alpha_enabled() -> None:
 
 
 def test_live_frame_fade_alpha_disabled() -> None:
-    fade = default_render_post_fx_runtime().fade
+    fade = default_post_fx_runtime().fade
     assert (
         live_frame_fade_alpha(0.0, 100.0, fade, enabled=False, solo=False)
         == 1.0
@@ -36,12 +36,12 @@ def test_live_frame_fade_alpha_disabled() -> None:
 
 
 def test_live_frame_fade_alpha_solo() -> None:
-    fade = default_render_post_fx_runtime().fade
+    fade = default_post_fx_runtime().fade
     assert live_frame_fade_alpha(0.0, 100.0, fade, enabled=True, solo=True) == 1.0
 
 
 def test_highlight_rolloff_active() -> None:
-    pp = default_render_post_fx_runtime(enabled=True)
+    pp = default_post_fx_runtime(enabled=True)
     pp.highlight_rolloff.mode = "composite"
     assert highlight_rolloff_active(pp, solo=False) is True
     assert highlight_rolloff_active(pp, solo=True) is False
@@ -208,7 +208,7 @@ def test_apply_highlight_rolloff_rgb_matches_scalar_reference() -> None:
 
 
 def test_chroma_boost_active() -> None:
-    pp = default_render_post_fx_runtime(enabled=True)
+    pp = default_post_fx_runtime(enabled=True)
     pp.chroma_boost.mode = "composite"
     pp.chroma_boost.amount_pct = 25
     assert chroma_boost_active(pp, solo=False) is True

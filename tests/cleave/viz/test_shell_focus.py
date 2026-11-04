@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from cleave.viz.navigator import TOP_LEVEL_IDS
-from cleave.viz.row_kinds import RowKind
 from cleave.viz.shell_focus import (
     CycleStop,
     ShellFocusState,

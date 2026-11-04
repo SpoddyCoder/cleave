@@ -12,7 +12,7 @@ from cleave.viz.layer import StemLayer
 from cleave.viz.layer_pipeline import LayerFramePipeline
 from cleave.viz.projectm_frame_clock import ProjectMFrameClock
 from cleave.viz.session import LayerRuntime, TuningSession
-from tests.support.config import TEST_LAYER_STEMS, default_render_post_fx_runtime
+from tests.support.config import TEST_LAYER_STEMS, default_post_fx_runtime
 
 
 def _stem_layer(slot: str) -> StemLayer:
@@ -91,7 +91,7 @@ def test_clock_does_not_start_while_paused() -> None:
 def test_render_frame_feeds_pm_time_not_song_time() -> None:
     layer = _stem_layer("layer_1")
     session = _session(("layer_1",))
-    session.render_post_fx = default_render_post_fx_runtime(enabled=False)
+    session.post_fx = default_post_fx_runtime(enabled=False)
     pcm_bank = MagicMock()
     pcm_bank.slice_pcm.return_value = b""
     pcm_bank.channels.return_value = 2

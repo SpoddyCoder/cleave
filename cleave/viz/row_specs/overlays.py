@@ -14,7 +14,7 @@ from cleave.viz.colour_parse import (
     validate_hex_colour,
     validate_optional_hex_colour,
 )
-from cleave.viz.fonts import render_overlay_font_display
+from cleave.viz.fonts import overlay_font_display
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
 from cleave.viz.row_spec import FitStrategy, RowPresentStyle, RowSpec
 from cleave.viz.tuning_view_state import TuningViewState
@@ -24,22 +24,22 @@ if TYPE_CHECKING:
 
 def _overlay_card_block(state: TuningViewState, desc: RowDescriptor):
     assert desc.card is not None
-    return getattr(state.render_overlays, desc.card)
+    return getattr(state.overlays, desc.card)
 
 def _overlay_card_controls(controls: TuningControls, desc: RowDescriptor):
     assert desc.card is not None
-    return controls.render_overlays.card(desc.card)
+    return controls.overlays.card(desc.card)
 
 def _overlay_card_block_session(controls: TuningControls, desc: RowDescriptor):
     assert desc.card is not None
-    return getattr(controls.session.render_overlays, desc.card)
+    return getattr(controls.session.overlays, desc.card)
 
 def overlay_card_panel_label(kind: RowKind, card: str | None) -> str | None:
     if card is None:
         return None
-    if kind == RowKind.RENDER_OVERLAY_CARD_HEADER:
+    if kind == RowKind.OVERLAY_CARD_HEADER:
         return "opening card" if card == "opening_card" else "closing card"
-    if kind == RowKind.RENDER_OVERLAY_CARD_TIME:
+    if kind == RowKind.OVERLAY_CARD_TIME:
         return "appear at" if card == "opening_card" else "disappear at"
     return None
 
@@ -56,7 +56,7 @@ def _format_overlay_card_title_font_size(
 def _format_overlay_card_title_font(
     state: TuningViewState, desc: RowDescriptor
 ) -> str:
-    return render_overlay_font_display(_overlay_card_block(state, desc).runtime.title_font)
+    return overlay_font_display(_overlay_card_block(state, desc).runtime.title_font)
 
 def _format_overlay_card_title_margin_bottom(
     state: TuningViewState, desc: RowDescriptor
@@ -95,7 +95,7 @@ def _format_overlay_card_body_font_size(
 def _format_overlay_card_body_font(
     state: TuningViewState, desc: RowDescriptor
 ) -> str:
-    return render_overlay_font_display(_overlay_card_block(state, desc).runtime.body_font)
+    return overlay_font_display(_overlay_card_block(state, desc).runtime.body_font)
 
 def _format_overlay_card_body_content(
     state: TuningViewState, desc: RowDescriptor
@@ -421,29 +421,29 @@ def _apply_overlay_card_slide_direction(
 ) -> None:
     _overlay_card_controls(controls, desc).cycle_slide_direction(forward=forward)
 
-def _toggle_render_overlays_enabled(
+def _toggle_overlays_enabled(
     controls: TuningControls, _desc: RowDescriptor
 ) -> None:
-    if controls.session.render_overlays.locked:
+    if controls.session.overlays.locked:
         return
-    controls.render_overlays.set_enabled(
-        not controls.render_overlays.any_card_enabled()
+    controls.overlays.set_enabled(
+        not controls.overlays.any_card_enabled()
     )
 
 
-def _toggle_render_overlays_solo(
+def _toggle_overlays_solo(
     controls: TuningControls, _desc: RowDescriptor
 ) -> None:
-    if controls.session.render_overlay_solo:
-        controls.render_overlays.exit_solo()
+    if controls.session.overlay_solo:
+        controls.overlays.exit_solo()
     else:
-        controls.render_overlays.enter_solo()
+        controls.overlays.enter_solo()
 
 
 def _toggle_overlay_card_enabled(
     controls: TuningControls, desc: RowDescriptor
 ) -> None:
-    if controls.session.render_overlays.locked:
+    if controls.session.overlays.locked:
         return
     card = _overlay_card_block_session(controls, desc)
     _overlay_card_controls(controls, desc).set_enabled(not card.enabled)
@@ -452,16 +452,16 @@ def _toggle_overlay_card_enabled(
 def _visibility_overlays(
     state: TuningViewState, _desc: RowDescriptor
 ) -> tuple[bool, bool]:
-    block = state.render_overlays
+    block = state.overlays
     any_enabled = (
         block.opening_card.runtime.enabled or block.closing_card.runtime.enabled
     )
     return (any_enabled, block.solo)
 
 SPECS: dict[RowKind, RowSpec] = {
-    RowKind.RENDER_OVERLAYS_HEADER: RowSpec(
+    RowKind.OVERLAYS_HEADER: RowSpec(
         affordance=RowAffordance.HEADING,
-        panel_label="OVERLAYS",
+        panel_label="Overlay",
         present_style=RowPresentStyle.HEADING,
         fit_strategy=FitStrategy.NONE,
         visibility_icon=_visibility_overlays,
@@ -469,10 +469,10 @@ SPECS: dict[RowKind, RowSpec] = {
         help_description=(
             "Opening and closing credits cards.",
         ),
-        toggle_enabled=_toggle_render_overlays_enabled,
-        toggle_solo=_toggle_render_overlays_solo,
+        toggle_enabled=_toggle_overlays_enabled,
+        toggle_solo=_toggle_overlays_solo,
     ),
-    RowKind.RENDER_OVERLAY_CARD_HEADER: RowSpec(
+    RowKind.OVERLAY_CARD_HEADER: RowSpec(
         affordance=RowAffordance.HEADING,
         panel_label="card",
         present_style=RowPresentStyle.HEADING,
@@ -485,9 +485,9 @@ SPECS: dict[RowKind, RowSpec] = {
             "Opening card at the start of the song, or closing card near the end.",
         ),
         toggle_enabled=_toggle_overlay_card_enabled,
-        parent_group="render_overlay",
+        parent_group="overlay",
     ),
-    RowKind.RENDER_OVERLAY_CARD_ANIMATION_HEADER: RowSpec(
+    RowKind.OVERLAY_CARD_ANIMATION_HEADER: RowSpec(
         affordance=RowAffordance.HEADING,
         panel_label="animation",
         present_style=RowPresentStyle.HEADING,
@@ -496,9 +496,9 @@ SPECS: dict[RowKind, RowSpec] = {
         help_description=(
             "Entrance and exit motion for this credits card.",
         ),
-        parent_group="render_overlay",
+        parent_group="overlay",
     ),
-    RowKind.RENDER_OVERLAY_CARD_ANIMATION_TYPE: RowSpec(
+    RowKind.OVERLAY_CARD_ANIMATION_TYPE: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
         panel_label="type",
         present_style=RowPresentStyle.LABELED_VALUE,
@@ -509,9 +509,9 @@ SPECS: dict[RowKind, RowSpec] = {
         help_description=("How this credits card enters and leaves the screen.",),
         help_mode_entries=RENDER_OVERLAY_ANIMATION_TYPE_HELP_ENTRIES,
         repeatable=True,
-        parent_group="render_overlay_animation",
+        parent_group="overlay_animation",
     ),
-    RowKind.RENDER_OVERLAY_CARD_ANIMATION_SLIDE_DIRECTION: RowSpec(
+    RowKind.OVERLAY_CARD_ANIMATION_SLIDE_DIRECTION: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
         panel_label="slide-direction",
         present_style=RowPresentStyle.LABELED_VALUE,
@@ -524,9 +524,9 @@ SPECS: dict[RowKind, RowSpec] = {
         ),
         help_mode_entries=RENDER_OVERLAY_SLIDE_DIRECTION_HELP_ENTRIES,
         repeatable=True,
-        parent_group="render_overlay_animation",
+        parent_group="overlay_animation",
     ),
-    RowKind.RENDER_OVERLAY_CARD_POSITION: RowSpec(
+    RowKind.OVERLAY_CARD_POSITION: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
         panel_label="position",
         present_style=RowPresentStyle.LABELED_VALUE,
@@ -537,18 +537,18 @@ SPECS: dict[RowKind, RowSpec] = {
             "Screen corner where this credits card appears.",
         ),
         repeatable=True,
-        parent_group="render_overlay",
+        parent_group="overlay",
     ),
-    RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER: RowSpec(
+    RowKind.OVERLAY_CARD_TITLE_HEADER: RowSpec(
         affordance=RowAffordance.HEADING,
         panel_label="title",
         present_style=RowPresentStyle.HEADING,
         fit_strategy=FitStrategy.NONE,
         help_title="Card title",
         help_description=("Title line of this credits card.",),
-        parent_group="render_overlay",
+        parent_group="overlay",
     ),
-    RowKind.RENDER_OVERLAY_CARD_TITLE_FONT_SIZE: RowSpec(
+    RowKind.OVERLAY_CARD_TITLE_FONT_SIZE: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
         panel_label="font size",
         present_style=RowPresentStyle.LABELED_VALUE,
@@ -557,9 +557,9 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Title font size",
         help_description=("Font size of this credits card title.",),
         repeatable=True,
-        parent_group="render_overlay_title",
+        parent_group="overlay_title",
     ),
-    RowKind.RENDER_OVERLAY_CARD_TITLE_FONT: RowSpec(
+    RowKind.OVERLAY_CARD_TITLE_FONT: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
         panel_label="font",
         present_style=RowPresentStyle.LABELED_VALUE,
@@ -569,9 +569,9 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Title font",
         help_description=("Font used for this credits card title.",),
         repeatable=True,
-        parent_group="render_overlay_title",
+        parent_group="overlay_title",
     ),
-    RowKind.RENDER_OVERLAY_CARD_TITLE_MARGIN_BOTTOM: RowSpec(
+    RowKind.OVERLAY_CARD_TITLE_MARGIN_BOTTOM: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
         panel_label="margin bottom",
         present_style=RowPresentStyle.LABELED_VALUE,
@@ -582,9 +582,9 @@ SPECS: dict[RowKind, RowSpec] = {
             "Gap between the title and body in this credits card box.",
         ),
         repeatable=True,
-        parent_group="render_overlay_title",
+        parent_group="overlay_title",
     ),
-    RowKind.RENDER_OVERLAY_CARD_TITLE_TEXT: RowSpec(
+    RowKind.OVERLAY_CARD_TITLE_TEXT: RowSpec(
         affordance=RowAffordance.ACTION,
         panel_label="title text",
         present_style=RowPresentStyle.LABELED_VALUE,
@@ -594,10 +594,10 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Title text",
         help_entries=(("Enter", "edit title"),),
         help_description=("Open a dialog to change this card's title.",),
-        parent_group="render_overlay_title",
+        parent_group="overlay_title",
         blocked_by_section_lock=True,
     ),
-    RowKind.RENDER_OVERLAY_CARD_TITLE_COLOUR: RowSpec(
+    RowKind.OVERLAY_CARD_TITLE_COLOUR: RowSpec(
         affordance=RowAffordance.ACTION,
         panel_label="title colour",
         present_style=RowPresentStyle.LABELED_VALUE,
@@ -607,10 +607,10 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Title colour",
         help_entries=(("Enter", "edit colour"),),
         help_description=("Hex colour of this credits card title.",),
-        parent_group="render_overlay_title",
+        parent_group="overlay_title",
         blocked_by_section_lock=True,
     ),
-    RowKind.RENDER_OVERLAY_CARD_TITLE_BACKGROUND_COLOUR: RowSpec(
+    RowKind.OVERLAY_CARD_TITLE_BACKGROUND_COLOUR: RowSpec(
         affordance=RowAffordance.ACTION,
         panel_label="title background",
         present_style=RowPresentStyle.LABELED_VALUE,
@@ -622,19 +622,19 @@ SPECS: dict[RowKind, RowSpec] = {
         help_description=(
             "Optional hex background colour of this credits card title.",
         ),
-        parent_group="render_overlay_title",
+        parent_group="overlay_title",
         blocked_by_section_lock=True,
     ),
-    RowKind.RENDER_OVERLAY_CARD_BODY_HEADER: RowSpec(
+    RowKind.OVERLAY_CARD_BODY_HEADER: RowSpec(
         affordance=RowAffordance.HEADING,
         panel_label="body",
         present_style=RowPresentStyle.HEADING,
         fit_strategy=FitStrategy.NONE,
         help_title="Card body",
         help_description=("Body block of this credits card.",),
-        parent_group="render_overlay",
+        parent_group="overlay",
     ),
-    RowKind.RENDER_OVERLAY_CARD_BODY_FONT_SIZE: RowSpec(
+    RowKind.OVERLAY_CARD_BODY_FONT_SIZE: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
         panel_label="font size",
         present_style=RowPresentStyle.LABELED_VALUE,
@@ -643,9 +643,9 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Body font size",
         help_description=("Font size of this credits card body.",),
         repeatable=True,
-        parent_group="render_overlay_body",
+        parent_group="overlay_body",
     ),
-    RowKind.RENDER_OVERLAY_CARD_BODY_FONT: RowSpec(
+    RowKind.OVERLAY_CARD_BODY_FONT: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
         panel_label="font",
         present_style=RowPresentStyle.LABELED_VALUE,
@@ -655,9 +655,9 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Body font",
         help_description=("Font used for this credits card body.",),
         repeatable=True,
-        parent_group="render_overlay_body",
+        parent_group="overlay_body",
     ),
-    RowKind.RENDER_OVERLAY_CARD_BODY_TEXT: RowSpec(
+    RowKind.OVERLAY_CARD_BODY_TEXT: RowSpec(
         affordance=RowAffordance.ACTION,
         panel_label="body text",
         present_style=RowPresentStyle.LABELED_VALUE,
@@ -667,10 +667,10 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Body text",
         help_entries=(("Enter", "edit body"),),
         help_description=("Open a dialog to change this card's body.",),
-        parent_group="render_overlay_body",
+        parent_group="overlay_body",
         blocked_by_section_lock=True,
     ),
-    RowKind.RENDER_OVERLAY_CARD_BODY_COLOUR: RowSpec(
+    RowKind.OVERLAY_CARD_BODY_COLOUR: RowSpec(
         affordance=RowAffordance.ACTION,
         panel_label="body colour",
         present_style=RowPresentStyle.LABELED_VALUE,
@@ -680,10 +680,10 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Body colour",
         help_entries=(("Enter", "edit colour"),),
         help_description=("Hex colour of this credits card body.",),
-        parent_group="render_overlay_body",
+        parent_group="overlay_body",
         blocked_by_section_lock=True,
     ),
-    RowKind.RENDER_OVERLAY_CARD_BODY_BACKGROUND_COLOUR: RowSpec(
+    RowKind.OVERLAY_CARD_BODY_BACKGROUND_COLOUR: RowSpec(
         affordance=RowAffordance.ACTION,
         panel_label="body background",
         present_style=RowPresentStyle.LABELED_VALUE,
@@ -695,10 +695,10 @@ SPECS: dict[RowKind, RowSpec] = {
         help_description=(
             "Optional hex background colour of this credits card body.",
         ),
-        parent_group="render_overlay_body",
+        parent_group="overlay_body",
         blocked_by_section_lock=True,
     ),
-    RowKind.RENDER_OVERLAY_CARD_OPACITY: RowSpec(
+    RowKind.OVERLAY_CARD_OPACITY: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
         panel_label="background opacity",
         present_style=RowPresentStyle.LABELED_VALUE,
@@ -707,9 +707,9 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Background opacity",
         help_description=("Background opacity of this credits card box.",),
         repeatable=True,
-        parent_group="render_overlay",
+        parent_group="overlay",
     ),
-    RowKind.RENDER_OVERLAY_CARD_BACKGROUND_COLOUR: RowSpec(
+    RowKind.OVERLAY_CARD_BACKGROUND_COLOUR: RowSpec(
         affordance=RowAffordance.ACTION,
         panel_label="background colour",
         present_style=RowPresentStyle.LABELED_VALUE,
@@ -719,10 +719,10 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Background colour",
         help_entries=(("Enter", "edit colour"),),
         help_description=("Hex colour of this credits card box.",),
-        parent_group="render_overlay",
+        parent_group="overlay",
         blocked_by_section_lock=True,
     ),
-    RowKind.RENDER_OVERLAY_CARD_BACKGROUND_MARGIN: RowSpec(
+    RowKind.OVERLAY_CARD_BACKGROUND_MARGIN: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
         panel_label="background margin",
         present_style=RowPresentStyle.LABELED_VALUE,
@@ -733,9 +733,9 @@ SPECS: dict[RowKind, RowSpec] = {
             "Gap between this credits card box and the screen edge.",
         ),
         repeatable=True,
-        parent_group="render_overlay",
+        parent_group="overlay",
     ),
-    RowKind.RENDER_OVERLAY_CARD_BACKGROUND_PADDING: RowSpec(
+    RowKind.OVERLAY_CARD_BACKGROUND_PADDING: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
         panel_label="background padding",
         present_style=RowPresentStyle.LABELED_VALUE,
@@ -746,9 +746,9 @@ SPECS: dict[RowKind, RowSpec] = {
             "Inner space between this credits card border and its text.",
         ),
         repeatable=True,
-        parent_group="render_overlay",
+        parent_group="overlay",
     ),
-    RowKind.RENDER_OVERLAY_CARD_BORDER_WIDTH: RowSpec(
+    RowKind.OVERLAY_CARD_BORDER_WIDTH: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
         panel_label="border width",
         present_style=RowPresentStyle.LABELED_VALUE,
@@ -759,9 +759,9 @@ SPECS: dict[RowKind, RowSpec] = {
             "Width of the border drawn around this credits card box.",
         ),
         repeatable=True,
-        parent_group="render_overlay",
+        parent_group="overlay",
     ),
-    RowKind.RENDER_OVERLAY_CARD_BORDER_COLOUR: RowSpec(
+    RowKind.OVERLAY_CARD_BORDER_COLOUR: RowSpec(
         affordance=RowAffordance.ACTION,
         panel_label="border colour",
         present_style=RowPresentStyle.LABELED_VALUE,
@@ -773,10 +773,10 @@ SPECS: dict[RowKind, RowSpec] = {
         help_description=(
             "Hex colour of the border around this credits card box.",
         ),
-        parent_group="render_overlay",
+        parent_group="overlay",
         blocked_by_section_lock=True,
     ),
-    RowKind.RENDER_OVERLAY_CARD_TIME: RowSpec(
+    RowKind.OVERLAY_CARD_TIME: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
         panel_label="card time",
         present_style=RowPresentStyle.LABELED_VALUE,
@@ -788,9 +788,9 @@ SPECS: dict[RowKind, RowSpec] = {
             "Closing card: seconds before the song ends (disappear at).",
         ),
         repeatable=True,
-        parent_group="render_overlay_animation",
+        parent_group="overlay_animation",
     ),
-    RowKind.RENDER_OVERLAY_CARD_DISPLAY_TIME: RowSpec(
+    RowKind.OVERLAY_CARD_DISPLAY_TIME: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
         panel_label="display time",
         present_style=RowPresentStyle.LABELED_VALUE,
@@ -802,6 +802,6 @@ SPECS: dict[RowKind, RowSpec] = {
             "0 = stays on.",
         ),
         repeatable=True,
-        parent_group="render_overlay_animation",
+        parent_group="overlay_animation",
     ),
 }

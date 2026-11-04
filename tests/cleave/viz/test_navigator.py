@@ -280,10 +280,10 @@ def test_timeline_lock_follows_session_and_has_no_badge() -> None:
 
 def test_off_solo_and_lock_marks() -> None:
     session = _session()
-    session.render_overlays.opening_card.enabled = False
-    session.render_overlays.closing_card.enabled = False
-    session.render_post_fx.enabled = False
-    session.render_pattern_mask.enabled = False
+    session.overlays.opening_card.enabled = False
+    session.overlays.closing_card.enabled = False
+    session.post_fx.enabled = False
+    session.pattern_mask.enabled = False
     nodes = {node.id: node for node in build_navigator(session, {"overlay"})}
 
     assert nodes["overlay"].badge == OFF_BADGE
@@ -292,13 +292,13 @@ def test_off_solo_and_lock_marks() -> None:
     assert nodes["post_fx"].badge == OFF_BADGE
     assert nodes["pattern_mask"].badge == OFF_BADGE
 
-    session.render_overlay_solo = True
+    session.overlay_solo = True
     solo = {node.id: node for node in build_navigator(session)}
     assert solo["overlay"].badge == SOLO_BADGE
 
-    session.render_overlays.locked = True
-    session.render_post_fx.locked = True
-    session.render_pattern_mask.locked = True
+    session.overlays.locked = True
+    session.post_fx.locked = True
+    session.pattern_mask.locked = True
     locked = {node.id: node for node in build_navigator(session)}
     assert locked["overlay"].locked is True
     assert locked["post_fx"].locked is True

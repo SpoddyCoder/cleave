@@ -82,7 +82,7 @@ def apply_effect_modifiers(
         effect_runtime.update(session.layers, signals, t_sec)
     ignore_base_opacity = not layer_compositing_active(
         session.settings.editor_mode,
-        session.render_pattern_mask.enabled,
+        session.pattern_mask.enabled,
     )
     modifiers = effect_runtime.modifiers(
         session.layers,
@@ -111,7 +111,7 @@ def _pattern_mask_live_slots(
         return None
     if not render_sections_active(session.settings.editor_mode):
         return None
-    pm = session.render_pattern_mask
+    pm = session.pattern_mask
     if not pm.enabled:
         return None
     slot_names = list(session.layer_z_order)
@@ -469,7 +469,7 @@ class LayerFramePipeline:
             t_sec,
         )
 
-        pp = session.render_post_fx
+        pp = session.post_fx
         sections_on = render_sections_active(session.settings.editor_mode)
         hr = pp.highlight_rolloff
         cb = pp.chroma_boost
@@ -543,7 +543,7 @@ class LayerFramePipeline:
         active_slots = tuple(
             bool(layer.fbo.enabled and layer.fbo.opacity > 0.0) for layer in ordered
         )
-        pm = session.render_pattern_mask
+        pm = session.pattern_mask
         use_mask = (
             render_sections_active(session.settings.editor_mode)
             and pm.enabled

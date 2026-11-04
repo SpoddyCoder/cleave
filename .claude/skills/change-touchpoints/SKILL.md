@@ -12,10 +12,10 @@ Open these files; do not search for a parallel serializer or a `RowKind` branch 
 1. Default + parse in the matching `cleave/config_schema/` submodule (not `__init__.py`).
 2. Session field in `cleave/viz/session.py`; import the default constant (no new literals).
 3. Persist only via `persisted_session_payload` in `config_schema/persist.py`.
-4. `RowKind` in `row_kinds.py`; `SPECS` in `row_specs/<domain>.py`. A new Settings or Project field is an inspector group child under `SETTINGS_SECTION` or `PROJECT_SECTION`. A new layer field is a `RowKind` + `RowSpec` in `row_specs/track.py` and a `TRACK_SECTION` child, shown in the inspector. Render, timeline, and song-marker fields are inspector groups via `row_sections.py` (timeline preset / beat-bar / cue fades, `SONG_MARKERS_SECTION`, and the existing render sections).
+4. `RowKind` in `row_kinds.py`; `SPECS` in `row_specs/<domain>.py`. A new field is a `SectionNode` child of its page's `SectionDef` in `row_sections.py` (the page list is in `.claude/rules/live-tuning-ui.md`). A new layer field is a `RowKind` + `RowSpec` in `row_specs/track.py` and a child of `TRACK_SECTION` or one of the layer page sections. A new page also needs a navigator entry in `navigator.py`, a section mapping in `inspector.py`, and a header mapping in `row_hotkeys.py`.
 5. Mutate via `LayerMutations` or public `*_controls`. Wire new controllers in `wiring.py`.
 6. If the field gates row presence, add it to `view_state_structure_signature()` in `tuning_view_state.py` and a `test_structure_signature_invalidates_on_*` test in `tests/cleave/viz/test_view_state_structure.py`.
 
 **Effect:** `effects/registry.py` + handler module + `handlers.py`. No branch in `effects/runtime.py`. Consume `LayerEffectState`; do not import viz.
 
-**Post-FX / overlay `enabled`:** skip the block on the frame path (`frame_finish.py` / `post_fx.py`), not only dim the panel. Post-FX children check `session.render_post_fx.enabled`. Overlay cards gate per card.
+**Post-FX / overlay `enabled`:** skip the block on the frame path (`frame_finish.py` / `post_fx.py`), not only dim the panel. Post-FX children check `session.post_fx.enabled`. Overlay cards gate per card.

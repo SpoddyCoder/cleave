@@ -5,7 +5,7 @@ paths:
   - "cleave/viz/post_fx.py"
   - "cleave/viz/frame_finish.py"
   - "cleave/viz/layer_pipeline.py"
-  - "cleave/viz/render_post_fx_controls.py"
+  - "cleave/viz/post_fx_controls.py"
   - "tests/cleave/test_gl_*.py"
   - "tests/cleave/test_*rolloff*.py"
   - "tests/cleave/test_hdr_*.py"
@@ -18,7 +18,7 @@ globs:
   - "cleave/viz/post_fx.py"
   - "cleave/viz/frame_finish.py"
   - "cleave/viz/layer_pipeline.py"
-  - "cleave/viz/render_post_fx_controls.py"
+  - "cleave/viz/post_fx_controls.py"
   - "tests/cleave/test_gl_*.py"
   - "tests/cleave/test_*rolloff*.py"
   - "tests/cleave/test_hdr_*.py"
@@ -35,7 +35,7 @@ Shader passes in `cleave/gl_post_process.py` share the pygame GL context with th
 
 ## Runtime gating
 
-`*_active()` helpers in `post_fx.py` must check `render.post_fx.enabled`, child mode/strength, and `render_post_fx_solo`. Panel dimming is not enough. Test `enabled=False` on the frame path.
+`*_active()` helpers in `post_fx.py` must check `render.post_fx.enabled`, child mode/strength, and `post_fx_solo`. Panel dimming is not enough. Test `enabled=False` on the frame path.
 
 ## HDR (`compositor.hdr`)
 

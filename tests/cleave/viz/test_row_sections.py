@@ -7,8 +7,8 @@ from cleave.viz.inspector import build_inspector_rows
 from cleave.viz.navigator import layer_node_id, layer_page_node_id
 from cleave.viz.row_kinds import RowKind
 from cleave.viz.row_sections import (
-    RENDER_OVERLAY_OPENING_CARD_SECTION,
-    RENDER_OVERLAY_SECTION_KINDS,
+    OVERLAY_OPENING_CARD_SECTION,
+    OVERLAY_SECTION_KINDS,
     TIMELINE_PRESETS_SECTION,
 )
 from cleave.viz.tuning_view_state import TrackBlock
@@ -124,77 +124,77 @@ def test_compositing_and_effect_pages() -> None:
     ] * len(effect_roster("drums"))
 
 
-def test_render_overlay_section_kinds_from_tree() -> None:
-    assert RowKind.RENDER_OVERLAYS_HEADER in RENDER_OVERLAY_SECTION_KINDS
-    assert RowKind.RENDER_OVERLAY_CARD_TITLE_FONT in RENDER_OVERLAY_SECTION_KINDS
-    assert RowKind.RENDER_OVERLAY_CARD_TITLE_TEXT in RENDER_OVERLAY_SECTION_KINDS
-    assert RowKind.RENDER_OVERLAY_CARD_TITLE_COLOUR in RENDER_OVERLAY_SECTION_KINDS
-    assert RowKind.RENDER_OVERLAY_CARD_TITLE_BACKGROUND_COLOUR in (
-        RENDER_OVERLAY_SECTION_KINDS
+def test_overlay_section_kinds_from_tree() -> None:
+    assert RowKind.OVERLAYS_HEADER in OVERLAY_SECTION_KINDS
+    assert RowKind.OVERLAY_CARD_TITLE_FONT in OVERLAY_SECTION_KINDS
+    assert RowKind.OVERLAY_CARD_TITLE_TEXT in OVERLAY_SECTION_KINDS
+    assert RowKind.OVERLAY_CARD_TITLE_COLOUR in OVERLAY_SECTION_KINDS
+    assert RowKind.OVERLAY_CARD_TITLE_BACKGROUND_COLOUR in (
+        OVERLAY_SECTION_KINDS
     )
-    assert RowKind.RENDER_OVERLAY_CARD_BODY_FONT in RENDER_OVERLAY_SECTION_KINDS
-    assert RowKind.RENDER_OVERLAY_CARD_BODY_TEXT in RENDER_OVERLAY_SECTION_KINDS
-    assert RowKind.RENDER_OVERLAY_CARD_BODY_COLOUR in RENDER_OVERLAY_SECTION_KINDS
-    assert RowKind.RENDER_OVERLAY_CARD_BODY_BACKGROUND_COLOUR in (
-        RENDER_OVERLAY_SECTION_KINDS
+    assert RowKind.OVERLAY_CARD_BODY_FONT in OVERLAY_SECTION_KINDS
+    assert RowKind.OVERLAY_CARD_BODY_TEXT in OVERLAY_SECTION_KINDS
+    assert RowKind.OVERLAY_CARD_BODY_COLOUR in OVERLAY_SECTION_KINDS
+    assert RowKind.OVERLAY_CARD_BODY_BACKGROUND_COLOUR in (
+        OVERLAY_SECTION_KINDS
     )
-    assert RowKind.RENDER_OVERLAY_CARD_BACKGROUND_COLOUR in RENDER_OVERLAY_SECTION_KINDS
-    assert RowKind.RENDER_OVERLAY_CARD_BACKGROUND_MARGIN in RENDER_OVERLAY_SECTION_KINDS
-    assert RowKind.RENDER_OVERLAY_CARD_BACKGROUND_PADDING in RENDER_OVERLAY_SECTION_KINDS
-    assert RowKind.RENDER_OVERLAY_CARD_BORDER_COLOUR in RENDER_OVERLAY_SECTION_KINDS
+    assert RowKind.OVERLAY_CARD_BACKGROUND_COLOUR in OVERLAY_SECTION_KINDS
+    assert RowKind.OVERLAY_CARD_BACKGROUND_MARGIN in OVERLAY_SECTION_KINDS
+    assert RowKind.OVERLAY_CARD_BACKGROUND_PADDING in OVERLAY_SECTION_KINDS
+    assert RowKind.OVERLAY_CARD_BORDER_COLOUR in OVERLAY_SECTION_KINDS
 
 
-def test_render_overlay_title_colour_follows_title_text() -> None:
+def test_overlay_title_colour_follows_title_text() -> None:
     title_section = next(
         node.subsection
-        for node in RENDER_OVERLAY_OPENING_CARD_SECTION.children
+        for node in OVERLAY_OPENING_CARD_SECTION.children
         if node.subsection is not None
-        and node.subsection.header_kind == RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER
+        and node.subsection.header_kind == RowKind.OVERLAY_CARD_TITLE_HEADER
     )
-    assert title_section.children[0].leaf_kind == RowKind.RENDER_OVERLAY_CARD_TITLE_TEXT
+    assert title_section.children[0].leaf_kind == RowKind.OVERLAY_CARD_TITLE_TEXT
     assert title_section.children[1].leaf_kind == (
-        RowKind.RENDER_OVERLAY_CARD_TITLE_COLOUR
+        RowKind.OVERLAY_CARD_TITLE_COLOUR
     )
     assert title_section.children[2].leaf_kind == (
-        RowKind.RENDER_OVERLAY_CARD_TITLE_BACKGROUND_COLOUR
+        RowKind.OVERLAY_CARD_TITLE_BACKGROUND_COLOUR
     )
 
 
-def test_render_overlay_body_colour_follows_body_text() -> None:
+def test_overlay_body_colour_follows_body_text() -> None:
     body_section = next(
         node.subsection
-        for node in RENDER_OVERLAY_OPENING_CARD_SECTION.children
+        for node in OVERLAY_OPENING_CARD_SECTION.children
         if node.subsection is not None
-        and node.subsection.header_kind == RowKind.RENDER_OVERLAY_CARD_BODY_HEADER
+        and node.subsection.header_kind == RowKind.OVERLAY_CARD_BODY_HEADER
     )
-    assert body_section.children[0].leaf_kind == RowKind.RENDER_OVERLAY_CARD_BODY_TEXT
-    assert body_section.children[1].leaf_kind == RowKind.RENDER_OVERLAY_CARD_BODY_COLOUR
+    assert body_section.children[0].leaf_kind == RowKind.OVERLAY_CARD_BODY_TEXT
+    assert body_section.children[1].leaf_kind == RowKind.OVERLAY_CARD_BODY_COLOUR
     assert body_section.children[2].leaf_kind == (
-        RowKind.RENDER_OVERLAY_CARD_BODY_BACKGROUND_COLOUR
+        RowKind.OVERLAY_CARD_BODY_BACKGROUND_COLOUR
     )
 
 
-def test_render_overlay_card_colours_follow_opacity_and_border() -> None:
+def test_overlay_card_colours_follow_opacity_and_border() -> None:
     leaf_kinds = [
-        child.leaf_kind for child in RENDER_OVERLAY_OPENING_CARD_SECTION.children
+        child.leaf_kind for child in OVERLAY_OPENING_CARD_SECTION.children
     ]
-    opacity = leaf_kinds.index(RowKind.RENDER_OVERLAY_CARD_OPACITY)
-    background = leaf_kinds.index(RowKind.RENDER_OVERLAY_CARD_BACKGROUND_COLOUR)
-    margin = leaf_kinds.index(RowKind.RENDER_OVERLAY_CARD_BACKGROUND_MARGIN)
-    padding = leaf_kinds.index(RowKind.RENDER_OVERLAY_CARD_BACKGROUND_PADDING)
-    border_width = leaf_kinds.index(RowKind.RENDER_OVERLAY_CARD_BORDER_WIDTH)
-    border_colour = leaf_kinds.index(RowKind.RENDER_OVERLAY_CARD_BORDER_COLOUR)
+    opacity = leaf_kinds.index(RowKind.OVERLAY_CARD_OPACITY)
+    background = leaf_kinds.index(RowKind.OVERLAY_CARD_BACKGROUND_COLOUR)
+    margin = leaf_kinds.index(RowKind.OVERLAY_CARD_BACKGROUND_MARGIN)
+    padding = leaf_kinds.index(RowKind.OVERLAY_CARD_BACKGROUND_PADDING)
+    border_width = leaf_kinds.index(RowKind.OVERLAY_CARD_BORDER_WIDTH)
+    border_colour = leaf_kinds.index(RowKind.OVERLAY_CARD_BORDER_COLOUR)
     assert opacity < background < margin < padding < border_width < border_colour
 
 
-def test_render_overlay_body_text_is_first_body_child() -> None:
+def test_overlay_body_text_is_first_body_child() -> None:
     body_section = next(
         node.subsection
-        for node in RENDER_OVERLAY_OPENING_CARD_SECTION.children
+        for node in OVERLAY_OPENING_CARD_SECTION.children
         if node.subsection is not None
-        and node.subsection.header_kind == RowKind.RENDER_OVERLAY_CARD_BODY_HEADER
+        and node.subsection.header_kind == RowKind.OVERLAY_CARD_BODY_HEADER
     )
-    assert body_section.children[0].leaf_kind == RowKind.RENDER_OVERLAY_CARD_BODY_TEXT
+    assert body_section.children[0].leaf_kind == RowKind.OVERLAY_CARD_BODY_TEXT
 
 
 def test_timeline_reset_follows_presets_section() -> None:

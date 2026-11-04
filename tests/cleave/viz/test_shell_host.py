@@ -145,7 +145,7 @@ def test_child_pages_breadcrumb_and_show_owner_chips() -> None:
         curation=False,
     )
     assert fade.title == "Post-FX > Fade"
-    assert fade.descriptor == RowDescriptor(RowKind.RENDER_POST_FX_HEADER)
+    assert fade.descriptor == RowDescriptor(RowKind.POST_FX_HEADER)
 
     ui = inspector_header(
         build_navigator(session, {"settings"}),
@@ -186,10 +186,10 @@ def test_render_block_headers_have_enabled_solo_and_lock_chips() -> None:
     assert overlays["solo"].active is False
     assert overlays["lock"].label == "lock"
 
-    session.render_overlays.opening_card.enabled = False
-    session.render_overlays.closing_card.enabled = False
-    session.render_overlay_solo = True
-    session.render_overlays.locked = True
+    session.overlays.opening_card.enabled = False
+    session.overlays.closing_card.enabled = False
+    session.overlay_solo = True
+    session.overlays.locked = True
     solo_off = _chips(
         inspector_header(nodes, "overlay", session, curation=False)
     )
@@ -243,7 +243,7 @@ def test_timeline_inspector_header_chips_follow_enabled_and_lock() -> None:
 
     controls = _make_controls(("layer_1",), timeline_enabled=True)
     assert controls.session.timeline.panel_open is False
-    desc = RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
+    desc = RowDescriptor(RowKind.TIMELINE_HEADER)
     activate_inspector_chip(controls, "enabled", desc)
     assert controls.session.timeline.enabled is False
     assert controls.session.timeline.panel_open is False
@@ -268,19 +268,19 @@ def test_preset_curation_omits_header_chips() -> None:
 
 def test_inspector_chip_click_toggles_the_header_flag() -> None:
     controls = _make_controls(("layer_1",))
-    post = RowDescriptor(RowKind.RENDER_POST_FX_HEADER)
-    assert controls.session.render_post_fx.enabled is True
+    post = RowDescriptor(RowKind.POST_FX_HEADER)
+    assert controls.session.post_fx.enabled is True
     activate_inspector_chip(controls, "enabled", post)
-    assert controls.session.render_post_fx.enabled is False
+    assert controls.session.post_fx.enabled is False
     activate_inspector_chip(controls, "lock", post)
-    assert controls.session.render_post_fx.locked is True
+    assert controls.session.post_fx.locked is True
 
-    overlays = RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
+    overlays = RowDescriptor(RowKind.OVERLAYS_HEADER)
     activate_inspector_chip(controls, "solo", overlays)
-    assert controls.session.render_overlay_solo is True
+    assert controls.session.overlay_solo is True
     activate_inspector_chip(controls, "enabled", overlays)
-    assert controls.session.render_overlays.opening_card.enabled is False
-    assert controls.session.render_overlays.closing_card.enabled is False
+    assert controls.session.overlays.opening_card.enabled is False
+    assert controls.session.overlays.closing_card.enabled is False
 
 
 def test_lock_mark_is_separate_from_badges() -> None:
@@ -332,7 +332,7 @@ def test_inspector_selectable_id_changes_with_effect_and_preset() -> None:
     group = RowDescriptor(RowKind.TRACK_EFFECTS_HEADER, slot="layer_1")
     other_group = replace(group, slot="layer_2")
     card = RowDescriptor(
-        RowKind.RENDER_OVERLAY_CARD_HEADER,
+        RowKind.OVERLAY_CARD_HEADER,
         card="opening_card",
     )
     other_card = replace(card, card="closing_card")

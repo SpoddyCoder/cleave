@@ -36,20 +36,20 @@ def _expand_layer_1(controls: TuningControls) -> None:
     del controls
 
 
-def _expand_render_overlay(controls: TuningControls) -> None:
+def _expand_overlay(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
+    controls.focus_descriptor = RowDescriptor(RowKind.OVERLAYS_HEADER)
     press_main_row(controls, _keydown(pygame.K_RIGHT))
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(
-        RowKind.RENDER_OVERLAY_CARD_HEADER, card="opening_card"
+        RowKind.OVERLAY_CARD_HEADER, card="opening_card"
     )
     press_main_row(controls, _keydown(pygame.K_RIGHT))
 
 
-def _expand_render_post_fx(controls: TuningControls) -> None:
+def _expand_post_fx(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_HEADER)
+    controls.focus_descriptor = RowDescriptor(RowKind.POST_FX_HEADER)
     press_main_row(controls, _keydown(pygame.K_RIGHT))
 
 
@@ -124,19 +124,19 @@ def _mutate_preset_switching(controls: TuningControls) -> None:
     press_layer_row(controls, RowDescriptor( RowKind.TRACK_PRESET_SWITCHING_TRIGGER, slot="layer_1" ), _keydown(pygame.K_RIGHT))
 
 
-def _mutate_render_overlay_enabled(controls: TuningControls) -> None:
+def _mutate_overlay_enabled(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
+    controls.focus_descriptor = RowDescriptor(RowKind.OVERLAYS_HEADER)
     press_main_row(controls, _keydown(pygame.K_e))
 
 
-def _mutate_render_overlay_locked(controls: TuningControls) -> None:
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
+def _mutate_overlay_locked(controls: TuningControls) -> None:
+    controls.focus_descriptor = RowDescriptor(RowKind.OVERLAYS_HEADER)
     press_main_row(controls, _keydown(pygame.K_l))
 
 
-def _mutate_render_post_fx_locked(controls: TuningControls) -> None:
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_HEADER)
+def _mutate_post_fx_locked(controls: TuningControls) -> None:
+    controls.focus_descriptor = RowDescriptor(RowKind.POST_FX_HEADER)
     press_main_row(controls, _keydown(pygame.K_l))
 
 
@@ -145,235 +145,235 @@ def _mutate_timeline_locked(controls: TuningControls) -> None:
     controls.navigator.handle_hotkey(_keydown(pygame.K_l))
 
 
-def _mutate_render_overlay_position(controls: TuningControls) -> None:
-    _expand_render_overlay(controls)
+def _mutate_overlay_position(controls: TuningControls) -> None:
+    _expand_overlay(controls)
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(
-        RowKind.RENDER_OVERLAY_CARD_POSITION, card="opening_card"
+        RowKind.OVERLAY_CARD_POSITION, card="opening_card"
     )
     press_main_row(controls, _keydown(pygame.K_RIGHT))
 
 
-def _mutate_render_overlay_title_font_size(controls: TuningControls) -> None:
-    _expand_render_overlay(controls)
+def _mutate_overlay_title_font_size(controls: TuningControls) -> None:
+    _expand_overlay(controls)
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(
-        RowKind.RENDER_OVERLAY_CARD_TITLE_FONT_SIZE, card="opening_card"
+        RowKind.OVERLAY_CARD_TITLE_FONT_SIZE, card="opening_card"
     )
     press_main_row(controls, _keydown(pygame.K_RIGHT))
 
 
-def _mutate_render_overlay_title_font(controls: TuningControls) -> None:
-    _expand_render_overlay(controls)
+def _mutate_overlay_title_font(controls: TuningControls) -> None:
+    _expand_overlay(controls)
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(
-        RowKind.RENDER_OVERLAY_CARD_TITLE_FONT, card="opening_card"
+        RowKind.OVERLAY_CARD_TITLE_FONT, card="opening_card"
     )
     press_main_row(controls, _keydown(pygame.K_RIGHT))
 
 
-def _mutate_render_overlay_title_margin_bottom(controls: TuningControls) -> None:
-    _expand_render_overlay(controls)
+def _mutate_overlay_title_margin_bottom(controls: TuningControls) -> None:
+    _expand_overlay(controls)
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(
-        RowKind.RENDER_OVERLAY_CARD_TITLE_MARGIN_BOTTOM, card="opening_card"
+        RowKind.OVERLAY_CARD_TITLE_MARGIN_BOTTOM, card="opening_card"
     )
     press_main_row(controls, _keydown(pygame.K_RIGHT))
 
 
-def _mutate_render_overlay_title_content(controls: TuningControls) -> None:
-    controls.render_overlays.opening_card.set_title_content("Custom overlay title")
+def _mutate_overlay_title_content(controls: TuningControls) -> None:
+    controls.overlays.opening_card.set_title_content("Custom overlay title")
 
 
-def _mutate_render_overlay_title_colour(controls: TuningControls) -> None:
-    controls.render_overlays.opening_card.set_title_colour((255, 0, 0))
+def _mutate_overlay_title_colour(controls: TuningControls) -> None:
+    controls.overlays.opening_card.set_title_colour((255, 0, 0))
 
 
-def _mutate_render_overlay_body_content(controls: TuningControls) -> None:
-    controls.render_overlays.opening_card.set_body_content("Custom overlay body")
+def _mutate_overlay_body_content(controls: TuningControls) -> None:
+    controls.overlays.opening_card.set_body_content("Custom overlay body")
 
 
-def _mutate_render_overlay_body_font_size(controls: TuningControls) -> None:
-    _expand_render_overlay(controls)
+def _mutate_overlay_body_font_size(controls: TuningControls) -> None:
+    _expand_overlay(controls)
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(
-        RowKind.RENDER_OVERLAY_CARD_BODY_FONT_SIZE, card="opening_card"
+        RowKind.OVERLAY_CARD_BODY_FONT_SIZE, card="opening_card"
     )
     press_main_row(controls, _keydown(pygame.K_RIGHT))
 
 
-def _mutate_render_overlay_body_font(controls: TuningControls) -> None:
-    _expand_render_overlay(controls)
+def _mutate_overlay_body_font(controls: TuningControls) -> None:
+    _expand_overlay(controls)
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(
-        RowKind.RENDER_OVERLAY_CARD_BODY_FONT, card="opening_card"
+        RowKind.OVERLAY_CARD_BODY_FONT, card="opening_card"
     )
     press_main_row(controls, _keydown(pygame.K_RIGHT))
 
 
-def _mutate_render_overlay_opacity(controls: TuningControls) -> None:
-    _expand_render_overlay(controls)
+def _mutate_overlay_opacity(controls: TuningControls) -> None:
+    _expand_overlay(controls)
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(
-        RowKind.RENDER_OVERLAY_CARD_OPACITY, card="opening_card"
+        RowKind.OVERLAY_CARD_OPACITY, card="opening_card"
     )
     press_main_row(controls, _keydown(pygame.K_RIGHT))
 
 
-def _mutate_render_overlay_border_width(controls: TuningControls) -> None:
-    _expand_render_overlay(controls)
+def _mutate_overlay_border_width(controls: TuningControls) -> None:
+    _expand_overlay(controls)
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(
-        RowKind.RENDER_OVERLAY_CARD_BORDER_WIDTH, card="opening_card"
+        RowKind.OVERLAY_CARD_BORDER_WIDTH, card="opening_card"
     )
     press_main_row(controls, _keydown(pygame.K_RIGHT))
 
 
-def _mutate_render_overlay_background_margin(controls: TuningControls) -> None:
-    _expand_render_overlay(controls)
+def _mutate_overlay_background_margin(controls: TuningControls) -> None:
+    _expand_overlay(controls)
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(
-        RowKind.RENDER_OVERLAY_CARD_BACKGROUND_MARGIN, card="opening_card"
+        RowKind.OVERLAY_CARD_BACKGROUND_MARGIN, card="opening_card"
     )
     press_main_row(controls, _keydown(pygame.K_RIGHT))
 
 
-def _mutate_render_overlay_background_padding(controls: TuningControls) -> None:
-    _expand_render_overlay(controls)
+def _mutate_overlay_background_padding(controls: TuningControls) -> None:
+    _expand_overlay(controls)
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(
-        RowKind.RENDER_OVERLAY_CARD_BACKGROUND_PADDING, card="opening_card"
+        RowKind.OVERLAY_CARD_BACKGROUND_PADDING, card="opening_card"
     )
     press_main_row(controls, _keydown(pygame.K_RIGHT))
 
 
-def _mutate_render_overlay_start_delay(controls: TuningControls) -> None:
-    _expand_render_overlay(controls)
+def _mutate_overlay_start_delay(controls: TuningControls) -> None:
+    _expand_overlay(controls)
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(
-        RowKind.RENDER_OVERLAY_CARD_TIME, card="opening_card"
+        RowKind.OVERLAY_CARD_TIME, card="opening_card"
     )
     press_main_row(controls, _keydown(pygame.K_RIGHT))
 
 
-def _mutate_render_overlay_display_time(controls: TuningControls) -> None:
-    _expand_render_overlay(controls)
+def _mutate_overlay_display_time(controls: TuningControls) -> None:
+    _expand_overlay(controls)
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(
-        RowKind.RENDER_OVERLAY_CARD_DISPLAY_TIME, card="opening_card"
+        RowKind.OVERLAY_CARD_DISPLAY_TIME, card="opening_card"
     )
     press_main_row(controls, _keydown(pygame.K_RIGHT))
 
 
-def _mutate_render_post_fx_enabled(controls: TuningControls) -> None:
+def _mutate_post_fx_enabled(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_HEADER)
+    controls.focus_descriptor = RowDescriptor(RowKind.POST_FX_HEADER)
     press_main_row(controls, _keydown(pygame.K_e))
 
 
-def _expand_render_post_fx_fade(controls: TuningControls) -> None:
-    _expand_render_post_fx(controls)
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_FADE_HEADER)
+def _expand_post_fx_fade(controls: TuningControls) -> None:
+    _expand_post_fx(controls)
+    controls.focus_descriptor = RowDescriptor(RowKind.POST_FX_FADE_HEADER)
     press_main_row(controls, _keydown(pygame.K_RIGHT))
 
 
-def _mutate_render_post_fx_fade_in(controls: TuningControls) -> None:
-    _expand_render_post_fx_fade(controls)
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_FADE_IN_HEADER)
+def _mutate_post_fx_fade_in(controls: TuningControls) -> None:
+    _expand_post_fx_fade(controls)
+    controls.focus_descriptor = RowDescriptor(RowKind.POST_FX_FADE_IN_HEADER)
     press_main_row(controls, _keydown(pygame.K_RIGHT))
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_FADE_IN_END)
-    press_main_row(controls, _keydown(pygame.K_RIGHT))
-
-
-def _mutate_render_post_fx_fade_out(controls: TuningControls) -> None:
-    _expand_render_post_fx_fade(controls)
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_FADE_OUT_HEADER)
-    press_main_row(controls, _keydown(pygame.K_RIGHT))
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_FADE_OUT_START)
+    controls.focus_descriptor = RowDescriptor(RowKind.POST_FX_FADE_IN_END)
     press_main_row(controls, _keydown(pygame.K_RIGHT))
 
 
-def _expand_render_post_fx_highlight_rolloff(controls: TuningControls) -> None:
-    _expand_render_post_fx(controls)
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_HEADER)
+def _mutate_post_fx_fade_out(controls: TuningControls) -> None:
+    _expand_post_fx_fade(controls)
+    controls.focus_descriptor = RowDescriptor(RowKind.POST_FX_FADE_OUT_HEADER)
+    press_main_row(controls, _keydown(pygame.K_RIGHT))
+    controls.focus_descriptor = RowDescriptor(RowKind.POST_FX_FADE_OUT_START)
     press_main_row(controls, _keydown(pygame.K_RIGHT))
 
 
-def _mutate_render_post_fx_highlight_rolloff_mode(controls: TuningControls) -> None:
-    _expand_render_post_fx_highlight_rolloff(controls)
+def _expand_post_fx_highlight_rolloff(controls: TuningControls) -> None:
+    _expand_post_fx(controls)
+    controls.focus_descriptor = RowDescriptor(RowKind.POST_FX_HIGHLIGHT_ROLLOFF_HEADER)
+    press_main_row(controls, _keydown(pygame.K_RIGHT))
+
+
+def _mutate_post_fx_highlight_rolloff_mode(controls: TuningControls) -> None:
+    _expand_post_fx_highlight_rolloff(controls)
     view = controls.build_view_state(paused=False)
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_MODE)
+    controls.focus_descriptor = RowDescriptor(RowKind.POST_FX_HIGHLIGHT_ROLLOFF_MODE)
     press_main_row(controls, _keydown(pygame.K_RIGHT))
 
 
-def _mutate_render_post_fx_highlight_rolloff_curve(controls: TuningControls) -> None:
-    _expand_render_post_fx_highlight_rolloff(controls)
+def _mutate_post_fx_highlight_rolloff_curve(controls: TuningControls) -> None:
+    _expand_post_fx_highlight_rolloff(controls)
     view = controls.build_view_state(paused=False)
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_CURVE)
+    controls.focus_descriptor = RowDescriptor(RowKind.POST_FX_HIGHLIGHT_ROLLOFF_CURVE)
     press_main_row(controls, _keydown(pygame.K_RIGHT))
 
 
-def _mutate_render_post_fx_highlight_rolloff_threshold(controls: TuningControls) -> None:
-    _expand_render_post_fx_highlight_rolloff(controls)
+def _mutate_post_fx_highlight_rolloff_threshold(controls: TuningControls) -> None:
+    _expand_post_fx_highlight_rolloff(controls)
     view = controls.build_view_state(paused=False)
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD)
+    controls.focus_descriptor = RowDescriptor(RowKind.POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD)
     press_main_row(controls, _keydown(pygame.K_RIGHT))
 
 
-def _mutate_render_post_fx_highlight_rolloff_ceiling(controls: TuningControls) -> None:
-    _expand_render_post_fx_highlight_rolloff(controls)
+def _mutate_post_fx_highlight_rolloff_ceiling(controls: TuningControls) -> None:
+    _expand_post_fx_highlight_rolloff(controls)
     view = controls.build_view_state(paused=False)
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_CEILING)
+    controls.focus_descriptor = RowDescriptor(RowKind.POST_FX_HIGHLIGHT_ROLLOFF_CEILING)
     press_main_row(controls, _keydown(pygame.K_RIGHT))
 
 
-def _mutate_render_post_fx_highlight_rolloff_strength(controls: TuningControls) -> None:
-    _expand_render_post_fx_highlight_rolloff(controls)
+def _mutate_post_fx_highlight_rolloff_strength(controls: TuningControls) -> None:
+    _expand_post_fx_highlight_rolloff(controls)
     view = controls.build_view_state(paused=False)
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_STRENGTH)
+    controls.focus_descriptor = RowDescriptor(RowKind.POST_FX_HIGHLIGHT_ROLLOFF_STRENGTH)
     press_main_row(controls, _keydown(pygame.K_RIGHT))
 
 
-def _mutate_render_post_fx_highlight_rolloff_softness(controls: TuningControls) -> None:
-    _expand_render_post_fx_highlight_rolloff(controls)
+def _mutate_post_fx_highlight_rolloff_softness(controls: TuningControls) -> None:
+    _expand_post_fx_highlight_rolloff(controls)
     view = controls.build_view_state(paused=False)
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_SOFTNESS)
+    controls.focus_descriptor = RowDescriptor(RowKind.POST_FX_HIGHLIGHT_ROLLOFF_SOFTNESS)
     press_main_row(controls, _keydown(pygame.K_RIGHT))
 
 
-def _mutate_render_post_fx_highlight_rolloff_desaturation(controls: TuningControls) -> None:
-    _expand_render_post_fx_highlight_rolloff(controls)
+def _mutate_post_fx_highlight_rolloff_desaturation(controls: TuningControls) -> None:
+    _expand_post_fx_highlight_rolloff(controls)
     view = controls.build_view_state(paused=False)
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_DESATURATION)
+    controls.focus_descriptor = RowDescriptor(RowKind.POST_FX_HIGHLIGHT_ROLLOFF_DESATURATION)
     press_main_row(controls, _keydown(pygame.K_RIGHT))
 
 
-def _expand_render_post_fx_chroma_boost(controls: TuningControls) -> None:
-    _expand_render_post_fx(controls)
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_CHROMA_BOOST_HEADER)
+def _expand_post_fx_chroma_boost(controls: TuningControls) -> None:
+    _expand_post_fx(controls)
+    controls.focus_descriptor = RowDescriptor(RowKind.POST_FX_CHROMA_BOOST_HEADER)
     press_main_row(controls, _keydown(pygame.K_RIGHT))
 
 
-def _mutate_render_post_fx_chroma_boost_mode(controls: TuningControls) -> None:
-    _expand_render_post_fx_chroma_boost(controls)
+def _mutate_post_fx_chroma_boost_mode(controls: TuningControls) -> None:
+    _expand_post_fx_chroma_boost(controls)
     controls.build_view_state(paused=False)
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_CHROMA_BOOST_MODE)
+    controls.focus_descriptor = RowDescriptor(RowKind.POST_FX_CHROMA_BOOST_MODE)
     press_main_row(controls, _keydown(pygame.K_RIGHT))
 
 
-def _mutate_render_post_fx_chroma_boost_variant(controls: TuningControls) -> None:
-    _expand_render_post_fx_chroma_boost(controls)
-    controls.session.render_post_fx.chroma_boost.mode = "composite"
+def _mutate_post_fx_chroma_boost_variant(controls: TuningControls) -> None:
+    _expand_post_fx_chroma_boost(controls)
+    controls.session.post_fx.chroma_boost.mode = "composite"
     controls.build_view_state(paused=False)
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_CHROMA_BOOST_VARIANT)
+    controls.focus_descriptor = RowDescriptor(RowKind.POST_FX_CHROMA_BOOST_VARIANT)
     press_main_row(controls, _keydown(pygame.K_RIGHT))
 
 
-def _mutate_render_post_fx_chroma_boost_amount(controls: TuningControls) -> None:
-    _expand_render_post_fx_chroma_boost(controls)
-    controls.session.render_post_fx.chroma_boost.mode = "composite"
+def _mutate_post_fx_chroma_boost_amount(controls: TuningControls) -> None:
+    _expand_post_fx_chroma_boost(controls)
+    controls.session.post_fx.chroma_boost.mode = "composite"
     controls.build_view_state(paused=False)
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_CHROMA_BOOST_AMOUNT)
+    controls.focus_descriptor = RowDescriptor(RowKind.POST_FX_CHROMA_BOOST_AMOUNT)
     press_main_row(controls, _keydown(pygame.K_RIGHT))
 
 
@@ -439,35 +439,35 @@ _PERSISTED_MUTATIONS: list[
     ("stem.effects", _mutate_stem_effects, ("layer_1",), {}),
     ("stem.preset", _mutate_preset_path, ("layer_1",), {}),
     ("stem.preset_switching", _mutate_preset_switching, ("layer_1",), {}),
-    ("render_overlay.enabled", _mutate_render_overlay_enabled, ("layer_1",), {}),
-    ("render_overlay.locked", _mutate_render_overlay_locked, ("layer_1",), {}),
-    ("render_overlay.position", _mutate_render_overlay_position, ("layer_1",), {}),
-    ("render_overlay.title_font_size", _mutate_render_overlay_title_font_size, ("layer_1",), {}),
-    ("render_overlay.title_content", _mutate_render_overlay_title_content, ("layer_1",), {}),
-    ("render_overlay.title_colour", _mutate_render_overlay_title_colour, ("layer_1",), {}),
-    ("render_overlay.body_content", _mutate_render_overlay_body_content, ("layer_1",), {}),
-    ("render_overlay.title_margin_bottom", _mutate_render_overlay_title_margin_bottom, ("layer_1",), {}),
-    ("render_overlay.body_font_size", _mutate_render_overlay_body_font_size, ("layer_1",), {}),
-    ("render_overlay.opacity_pct", _mutate_render_overlay_opacity, ("layer_1",), {}),
-    ("render_overlay.border_width", _mutate_render_overlay_border_width, ("layer_1",), {}),
-    ("render_overlay.background_margin", _mutate_render_overlay_background_margin, ("layer_1",), {}),
-    ("render_overlay.background_padding", _mutate_render_overlay_background_padding, ("layer_1",), {}),
-    ("render_overlay.animation.appear_at", _mutate_render_overlay_start_delay, ("layer_1",), {}),
-    ("render_overlay.animation.display_time", _mutate_render_overlay_display_time, ("layer_1",), {}),
-    ("render_post_fx.enabled", _mutate_render_post_fx_enabled, ("layer_1",), {}),
-    ("render_post_fx.locked", _mutate_render_post_fx_locked, ("layer_1",), {}),
-    ("render_post_fx.fade.fade_in.end", _mutate_render_post_fx_fade_in, ("layer_1",), {}),
-    ("render_post_fx.fade.fade_out.start", _mutate_render_post_fx_fade_out, ("layer_1",), {}),
-    ("render_post_fx.highlight_rolloff.mode", _mutate_render_post_fx_highlight_rolloff_mode, ("layer_1",), {}),
-    ("render_post_fx.highlight_rolloff.curve", _mutate_render_post_fx_highlight_rolloff_curve, ("layer_1",), {}),
-    ("render_post_fx.highlight_rolloff.threshold_pct", _mutate_render_post_fx_highlight_rolloff_threshold, ("layer_1",), {}),
-    ("render_post_fx.highlight_rolloff.ceiling_pct", _mutate_render_post_fx_highlight_rolloff_ceiling, ("layer_1",), {}),
-    ("render_post_fx.highlight_rolloff.strength_pct", _mutate_render_post_fx_highlight_rolloff_strength, ("layer_1",), {}),
-    ("render_post_fx.highlight_rolloff.softness_pct", _mutate_render_post_fx_highlight_rolloff_softness, ("layer_1",), {}),
-    ("render_post_fx.highlight_rolloff.desaturation_pct", _mutate_render_post_fx_highlight_rolloff_desaturation, ("layer_1",), {}),
-    ("render_post_fx.chroma_boost.mode", _mutate_render_post_fx_chroma_boost_mode, ("layer_1",), {}),
-    ("render_post_fx.chroma_boost.variant", _mutate_render_post_fx_chroma_boost_variant, ("layer_1",), {}),
-    ("render_post_fx.chroma_boost.amount_pct", _mutate_render_post_fx_chroma_boost_amount, ("layer_1",), {}),
+    ("overlay.enabled", _mutate_overlay_enabled, ("layer_1",), {}),
+    ("overlay.locked", _mutate_overlay_locked, ("layer_1",), {}),
+    ("overlay.position", _mutate_overlay_position, ("layer_1",), {}),
+    ("overlay.title_font_size", _mutate_overlay_title_font_size, ("layer_1",), {}),
+    ("overlay.title_content", _mutate_overlay_title_content, ("layer_1",), {}),
+    ("overlay.title_colour", _mutate_overlay_title_colour, ("layer_1",), {}),
+    ("overlay.body_content", _mutate_overlay_body_content, ("layer_1",), {}),
+    ("overlay.title_margin_bottom", _mutate_overlay_title_margin_bottom, ("layer_1",), {}),
+    ("overlay.body_font_size", _mutate_overlay_body_font_size, ("layer_1",), {}),
+    ("overlay.opacity_pct", _mutate_overlay_opacity, ("layer_1",), {}),
+    ("overlay.border_width", _mutate_overlay_border_width, ("layer_1",), {}),
+    ("overlay.background_margin", _mutate_overlay_background_margin, ("layer_1",), {}),
+    ("overlay.background_padding", _mutate_overlay_background_padding, ("layer_1",), {}),
+    ("overlay.animation.appear_at", _mutate_overlay_start_delay, ("layer_1",), {}),
+    ("overlay.animation.display_time", _mutate_overlay_display_time, ("layer_1",), {}),
+    ("post_fx.enabled", _mutate_post_fx_enabled, ("layer_1",), {}),
+    ("post_fx.locked", _mutate_post_fx_locked, ("layer_1",), {}),
+    ("post_fx.fade.fade_in.end", _mutate_post_fx_fade_in, ("layer_1",), {}),
+    ("post_fx.fade.fade_out.start", _mutate_post_fx_fade_out, ("layer_1",), {}),
+    ("post_fx.highlight_rolloff.mode", _mutate_post_fx_highlight_rolloff_mode, ("layer_1",), {}),
+    ("post_fx.highlight_rolloff.curve", _mutate_post_fx_highlight_rolloff_curve, ("layer_1",), {}),
+    ("post_fx.highlight_rolloff.threshold_pct", _mutate_post_fx_highlight_rolloff_threshold, ("layer_1",), {}),
+    ("post_fx.highlight_rolloff.ceiling_pct", _mutate_post_fx_highlight_rolloff_ceiling, ("layer_1",), {}),
+    ("post_fx.highlight_rolloff.strength_pct", _mutate_post_fx_highlight_rolloff_strength, ("layer_1",), {}),
+    ("post_fx.highlight_rolloff.softness_pct", _mutate_post_fx_highlight_rolloff_softness, ("layer_1",), {}),
+    ("post_fx.highlight_rolloff.desaturation_pct", _mutate_post_fx_highlight_rolloff_desaturation, ("layer_1",), {}),
+    ("post_fx.chroma_boost.mode", _mutate_post_fx_chroma_boost_mode, ("layer_1",), {}),
+    ("post_fx.chroma_boost.variant", _mutate_post_fx_chroma_boost_variant, ("layer_1",), {}),
+    ("post_fx.chroma_boost.amount_pct", _mutate_post_fx_chroma_boost_amount, ("layer_1",), {}),
     ("timeline.enabled", _mutate_timeline_enabled, ("layer_1",), {"timeline_enabled": True}),
     ("timeline.locked", _mutate_timeline_locked, ("layer_1",), {}),
     ("project.milkdrop_beat_sensitivity", _mutate_milkdrop_beat_sensitivity, ("layer_1",), {}),
@@ -496,11 +496,11 @@ def test_persisted_mutation_marks_config_dirty(
     assert controls.config_dirty
 
 
-@patch("cleave.viz.fonts.render_overlay_system_fonts", return_value=["alpha", "bravo"])
+@patch("cleave.viz.fonts.overlay_system_fonts", return_value=["alpha", "bravo"])
 @pytest.mark.parametrize(
     "mutate",
-    [_mutate_render_overlay_title_font, _mutate_render_overlay_body_font],
-    ids=["render_overlay.title_font", "render_overlay.body_font"],
+    [_mutate_overlay_title_font, _mutate_overlay_body_font],
+    ids=["overlay.title_font", "overlay.body_font"],
 )
 def test_persisted_font_mutation_marks_config_dirty(
     _mock_fonts: object,
@@ -516,17 +516,17 @@ def test_persisted_timeline_cue_record_marks_config_dirty() -> None:
     _mutate_timeline_cues_via_record()
 
 
-def test_render_overlay_display_time_keyboard_regression() -> None:
+def test_overlay_display_time_keyboard_regression() -> None:
     controls = _make_controls(("layer_1",))
     assert not controls.config_dirty
-    _mutate_render_overlay_display_time(controls)
+    _mutate_overlay_display_time(controls)
     assert controls.config_dirty
-    assert controls.session.render_overlays.opening_card.animation.display_time > 0.0
+    assert controls.session.overlays.opening_card.animation.display_time > 0.0
 
 
 def test_display_time_mutation_clears_dirty_after_save() -> None:
     controls = _make_controls(("layer_1",))
-    _mutate_render_overlay_display_time(controls)
+    _mutate_overlay_display_time(controls)
     assert controls.config_dirty
 
     _save_now(controls)
@@ -542,22 +542,22 @@ def _mutate_solo_slot(controls: TuningControls) -> None:
 def _mutate_timeline_panel_open(controls: TuningControls) -> None:
     controls.session.timeline.enabled = True
     view = controls.build_view_state(paused=False)
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
+    controls.focus_descriptor = RowDescriptor(RowKind.TIMELINE_HEADER)
     press_main_row(controls, _keydown(pygame.K_RIGHT))
 
 
-def _mutate_render_overlay_expanded(controls: TuningControls) -> None:
-    _expand_render_overlay(controls)
+def _mutate_overlay_expanded(controls: TuningControls) -> None:
+    _expand_overlay(controls)
 
 
-def _mutate_render_overlay_solo(controls: TuningControls) -> None:
+def _mutate_overlay_solo(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
+    controls.focus_descriptor = RowDescriptor(RowKind.OVERLAYS_HEADER)
     press_main_row(controls, _keydown(pygame.K_s))
 
 
-def _mutate_render_post_fx_expanded(controls: TuningControls) -> None:
-    _expand_render_post_fx(controls)
+def _mutate_post_fx_expanded(controls: TuningControls) -> None:
+    _expand_post_fx(controls)
 
 
 def _mutate_move_mode_without_confirm(controls: TuningControls) -> None:
@@ -619,9 +619,9 @@ def _mutate_timeline_preview_pause(controls: TuningControls) -> None:
 _SESSION_ONLY_MUTATIONS: list[tuple[str, Callable[[TuningControls], None], tuple[str, ...]]] = [
     ("solo_slot", _mutate_solo_slot, ("layer_1",)),
     ("timeline.panel_open", _mutate_timeline_panel_open, ("layer_1",)),
-    ("render_overlay.expanded", _mutate_render_overlay_expanded, ("layer_1",)),
-    ("render_overlay.solo", _mutate_render_overlay_solo, ("layer_1",)),
-    ("render_post_fx.expanded", _mutate_render_post_fx_expanded, ("layer_1",)),
+    ("overlay.expanded", _mutate_overlay_expanded, ("layer_1",)),
+    ("overlay.solo", _mutate_overlay_solo, ("layer_1",)),
+    ("post_fx.expanded", _mutate_post_fx_expanded, ("layer_1",)),
     ("move_mode.swap", _mutate_move_mode_without_confirm, ("layer_1", "layer_2")),
     ("help_visible", _mutate_help_visible, ("layer_1",)),
     ("settings.preview_quality", _mutate_settings_preview_quality, ("layer_1",)),

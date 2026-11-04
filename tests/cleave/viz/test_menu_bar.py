@@ -1018,7 +1018,7 @@ def test_focused_inspector_label_is_highlight() -> None:
         tracks={},
         paused=False,
         position_sec=0.0,
-        focus_cursor=MainFocus(RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)),
+        focus_cursor=MainFocus(RowDescriptor(RowKind.OVERLAYS_HEADER)),
         move_mode_slot=None,
     )
     rows = build_inspector_rows(view, "post_fx.fade")

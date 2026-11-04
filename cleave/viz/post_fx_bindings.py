@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
-class RenderPostFxBindings:
+class PostFxBindings:
     on_highlight_rolloff_apply_mode_change: Callable[[str, str], None] | None = None
     on_chroma_boost_apply_mode_change: Callable[[str, str], None] | None = None
     is_paused: Callable[[], bool] | None = None

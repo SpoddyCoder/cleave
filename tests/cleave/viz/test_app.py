@@ -31,9 +31,9 @@ from cleave.viz.focus_nav import MainFocus, TimelineFocus
 from cleave.viz.shell_focus import ShellRegion
 from cleave.viz.input_dispatch import key_handler_for_runtime
 from cleave.viz.row_kinds import RowDescriptor, RowKind
-from tests.support.config import default_render_post_fx_runtime
+from tests.support.config import default_post_fx_runtime
 from cleave.viz.session import LayerRuntime, TuningSession
-from tests.support.config import default_render_post_fx_runtime
+from tests.support.config import default_post_fx_runtime
 from cleave.viz.modal import ModalHost
 from cleave.viz.panel_notification import PanelNotificationActive
 from tests.support.compositor_mock import recording_compositor
@@ -87,8 +87,8 @@ def _minimal_runtime(compositor: MagicMock, *, upscale: float = 2.0) -> LiveVisu
     display_w = int(1280 * upscale)
     display_h = int(720 * upscale)
     session = TuningSession(layer_z_order=[], layers={})
-    post_fx = default_render_post_fx_runtime(enabled=False)
-    session.render_post_fx = replace(
+    post_fx = default_post_fx_runtime(enabled=False)
+    session.post_fx = replace(
         post_fx,
         fade=replace(
             post_fx.fade,
@@ -198,7 +198,7 @@ def _timeline_open_runtime(compositor: MagicMock) -> LiveVisualizerRuntime:
 
 
 @patch("cleave.viz.app.OverlayDrawer.draw_timeline")
-@patch("cleave.viz.frame_finish._composite_render_overlay")
+@patch("cleave.viz.frame_finish._composite_overlay")
 @patch("cleave.viz.frame_finish.live_frame_fade_alpha", return_value=1.0)
 @patch("cleave.viz.app.LayerFramePipeline.composite")
 @patch("cleave.viz.app.LayerFramePipeline.render_frame")
@@ -865,7 +865,7 @@ def test_init_gl_resources_cheap_uses_editor_canvas_not_render_output(
 
 
 @patch("cleave.viz.app.OverlayDrawer.draw_timeline")
-@patch("cleave.viz.frame_finish._composite_render_overlay")
+@patch("cleave.viz.frame_finish._composite_overlay")
 @patch("cleave.viz.frame_finish.live_frame_fade_alpha", return_value=1.0)
 @patch("cleave.viz.app.LayerFramePipeline.composite")
 @patch("cleave.viz.app.LayerFramePipeline.render_frame")
@@ -923,7 +923,7 @@ def test_key_routing_main_when_strip_open_not_in_submenu() -> None:
     runtime.timeline_controls = timeline
     runtime.seed.session.timeline.enabled = True
     runtime.seed.session.timeline.panel_open = True
-    runtime.controls.focus_cursor = MainFocus(RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER))
+    runtime.controls.focus_cursor = MainFocus(RowDescriptor(RowKind.OVERLAYS_HEADER))
 
     assert _key_handler_for_session(runtime) is main
 
@@ -979,7 +979,7 @@ def test_keyup_routing_main_for_vertical_nav_when_submenu_focused() -> None:
 
 
 @patch("cleave.viz.app.OverlayDrawer.draw_timeline")
-@patch("cleave.viz.frame_finish._composite_render_overlay")
+@patch("cleave.viz.frame_finish._composite_overlay")
 @patch("cleave.viz.frame_finish.live_frame_fade_alpha", return_value=1.0)
 @patch("cleave.viz.app.LayerFramePipeline.composite")
 @patch("cleave.viz.app.LayerFramePipeline.render_frame")
@@ -1005,7 +1005,7 @@ def test_tick_frame_skips_timeline_when_panel_closed(
 
 
 @patch("cleave.viz.app.OverlayDrawer.draw_timeline")
-@patch("cleave.viz.frame_finish._composite_render_overlay")
+@patch("cleave.viz.frame_finish._composite_overlay")
 @patch("cleave.viz.frame_finish.live_frame_fade_alpha", return_value=1.0)
 @patch("cleave.viz.app.LayerFramePipeline.composite")
 @patch("cleave.viz.app.LayerFramePipeline.render_frame")
@@ -1022,7 +1022,7 @@ def test_tick_frame_draws_timeline_when_strip_focused(
     compositor = recording_compositor()
     runtime = _timeline_open_runtime(compositor)
     runtime.controls.focus_cursor = MainFocus(
-        RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
+        RowDescriptor(RowKind.TIMELINE_HEADER)
     )
     runtime.controls.shell_focus.region = ShellRegion.TIMELINE
 
@@ -1034,7 +1034,7 @@ def test_tick_frame_draws_timeline_when_strip_focused(
 
 
 @patch("cleave.viz.app.OverlayDrawer.draw_timeline")
-@patch("cleave.viz.frame_finish._composite_render_overlay")
+@patch("cleave.viz.frame_finish._composite_overlay")
 @patch("cleave.viz.frame_finish.live_frame_fade_alpha", return_value=1.0)
 @patch("cleave.viz.app.LayerFramePipeline.composite")
 @patch("cleave.viz.app.LayerFramePipeline.render_frame")
@@ -1060,7 +1060,7 @@ def test_tick_frame_skips_timeline_when_strip_closed(
 
 
 @patch("cleave.viz.app.OverlayDrawer.draw_timeline")
-@patch("cleave.viz.frame_finish._composite_render_overlay")
+@patch("cleave.viz.frame_finish._composite_overlay")
 @patch("cleave.viz.frame_finish.live_frame_fade_alpha", return_value=1.0)
 @patch("cleave.viz.app.LayerFramePipeline.composite")
 @patch("cleave.viz.app.LayerFramePipeline.render_frame")
@@ -1086,7 +1086,7 @@ def test_tick_frame_skips_tuning_when_only_a_modal_is_active(
     mock_draw_timeline.assert_not_called()
 
 
-@patch("cleave.viz.frame_finish._composite_render_overlay")
+@patch("cleave.viz.frame_finish._composite_overlay")
 @patch("cleave.viz.frame_finish.live_frame_fade_alpha", return_value=1.0)
 @patch("cleave.viz.app.LayerFramePipeline.composite")
 @patch("cleave.viz.app.LayerFramePipeline.render_frame")
@@ -1144,7 +1144,7 @@ def test_timeline_strip_visible_while_panel_open() -> None:
 
 
 @patch("cleave.viz.app.OverlayDrawer.draw_timeline")
-@patch("cleave.viz.frame_finish._composite_render_overlay")
+@patch("cleave.viz.frame_finish._composite_overlay")
 @patch("cleave.viz.frame_finish.live_frame_fade_alpha", return_value=1.0)
 @patch("cleave.viz.app.LayerFramePipeline.composite")
 @patch("cleave.viz.app.LayerFramePipeline.render_frame")
@@ -1171,7 +1171,7 @@ def test_tick_frame_draws_timeline_when_overlay_visible_and_panel_open(
 
 
 @patch("cleave.viz.app.OverlayDrawer.draw_timeline")
-@patch("cleave.viz.frame_finish._composite_render_overlay")
+@patch("cleave.viz.frame_finish._composite_overlay")
 @patch("cleave.viz.frame_finish.live_frame_fade_alpha", return_value=1.0)
 @patch("cleave.viz.app.LayerFramePipeline.composite")
 @patch("cleave.viz.app.LayerFramePipeline.render_frame")

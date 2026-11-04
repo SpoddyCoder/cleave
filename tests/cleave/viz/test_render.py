@@ -17,13 +17,13 @@ from cleave.timeline import SlotCue, TimelineLane, canonicalize
 from cleave.viz.layer_visibility import effective_layer_enabled
 from cleave.viz.session import (
     LayerRuntime,
-    RenderPostFxRuntime,
+    PostFxRuntime,
     TimelineRuntime,
     TuningSession,
-    default_render_overlays_runtime,
+    default_overlays_runtime,
     session_from_cfg,
 )
-from tests.support.config import TEST_LAYER_STEMS, default_render_post_fx_runtime
+from tests.support.config import TEST_LAYER_STEMS, default_post_fx_runtime
 from cleave.paths import repo_root
 from cleave.config_schema.layers import DEFAULT_LAYER_SLOTS
 from cleave.config_schema.project_render import (
@@ -43,7 +43,7 @@ from cleave.viz.render import (  # noqa: E402
     _resolve_segment,
     validate_render_project,
 )
-from tests.cleave.viz.test_render_overlay import (
+from tests.cleave.viz.test_overlay_cards import (
     _closing_overlay_cfg,
     _overlay_cfg,
     _overlays_cfg,
@@ -57,13 +57,13 @@ def _render_frame_bytes(
     return b"\xff" * (width * height * 4)
 
 
-def _render_post_fx_runtime(
+def _post_fx_runtime(
     *,
     enabled: bool,
     fade_in_end: float,
     fade_out_start: float,
-) -> RenderPostFxRuntime:
-    base = default_render_post_fx_runtime(enabled=enabled)
+) -> PostFxRuntime:
+    base = default_post_fx_runtime(enabled=enabled)
     return replace(
         base,
         fade=replace(
@@ -74,14 +74,14 @@ def _render_post_fx_runtime(
     )
 
 
-def _attach_render_post_fx_session(
+def _attach_post_fx_session(
     runtime: MagicMock,
     *,
     enabled: bool = False,
     fade_in_end: float = 0.0,
     fade_out_start: float = 0.0,
 ) -> None:
-    runtime.seed.session.render_post_fx = _render_post_fx_runtime(
+    runtime.seed.session.post_fx = _post_fx_runtime(
         enabled=enabled,
         fade_in_end=fade_in_end,
         fade_out_start=fade_out_start,
@@ -154,16 +154,16 @@ def _mock_render_runtime(
     seed.cfg.render = RenderConfig()
     seed.session = TuningSession(
         layer_z_order=list(DEFAULT_LAYER_SLOTS),
-        render_overlays=replace(
-            default_render_overlays_runtime(),
+        overlays=replace(
+            default_overlays_runtime(),
             opening_card=replace(
-                default_render_overlays_runtime().opening_card, enabled=False
+                default_overlays_runtime().opening_card, enabled=False
             ),
             closing_card=replace(
-                default_render_overlays_runtime().closing_card, enabled=False
+                default_overlays_runtime().closing_card, enabled=False
             ),
         ),
-        render_post_fx=_render_post_fx_runtime(
+        post_fx=_post_fx_runtime(
             enabled=False, fade_in_end=0.0, fade_out_start=0.0
         ),
     )
@@ -419,7 +419,7 @@ def test_render_default_passes_viz_quality_false_to_init_gl(
     proc.wait.return_value = 0
     mock_subprocess.Popen.return_value = proc
 
-    _attach_render_post_fx_session(runtime)
+    _attach_post_fx_session(runtime)
 
     render_mod.render(project)
 
@@ -478,7 +478,7 @@ def test_render_load_config_uses_project_dir_for_snapshot(
     proc.wait.return_value = 0
     mock_subprocess.Popen.return_value = proc
 
-    _attach_render_post_fx_session(runtime)
+    _attach_post_fx_session(runtime)
 
     render_mod.render(project, config=snapshot)
 
@@ -527,7 +527,7 @@ def test_render_reports_on_progress_fraction(
     proc.stdin = MagicMock()
     proc.wait.return_value = 0
     mock_subprocess.Popen.return_value = proc
-    _attach_render_post_fx_session(runtime)
+    _attach_post_fx_session(runtime)
 
     fractions: list[float] = []
 
@@ -585,7 +585,7 @@ def test_render_viz_quality_passes_flag_to_init_gl(
     proc.wait.return_value = 0
     mock_subprocess.Popen.return_value = proc
 
-    _attach_render_post_fx_session(runtime)
+    _attach_post_fx_session(runtime)
 
     render_mod.render(project, viz_quality=True)
 
@@ -634,7 +634,7 @@ def test_render_frame_count_and_ffmpeg_args(
     proc.wait.return_value = 0
     mock_subprocess.Popen.return_value = proc
 
-    _attach_render_post_fx_session(runtime)
+    _attach_post_fx_session(runtime)
 
     output = render_mod.render(project)
 
@@ -696,7 +696,7 @@ def test_render_segment_frame_count_tick_times_and_ffmpeg_trim(
     proc.wait.return_value = 0
     mock_subprocess.Popen.return_value = proc
 
-    _attach_render_post_fx_session(runtime)
+    _attach_post_fx_session(runtime)
 
     output = render_mod.render(project, start_sec=start_sec, end_sec=end_sec)
 
@@ -775,7 +775,7 @@ def test_render_cue_at_beat_aligns_with_file_timeline_and_mux(
     proc.wait.return_value = 0
     mock_subprocess.Popen.return_value = proc
 
-    _attach_render_post_fx_session(runtime)
+    _attach_post_fx_session(runtime)
 
     render_kwargs: dict = {}
     if start_sec is not None:
@@ -857,7 +857,7 @@ def test_render_segment_fade_alpha_uses_full_duration(
     proc.wait.return_value = 0
     mock_subprocess.Popen.return_value = proc
 
-    _attach_render_post_fx_session(
+    _attach_post_fx_session(
         runtime, enabled=True, fade_in_end=5.0, fade_out_start=5.0
     )
 
@@ -904,7 +904,7 @@ def test_render_ffmpeg_preset_veryslow_when_high_quality(
     proc.wait.return_value = 0
     mock_subprocess.Popen.return_value = proc
 
-    _attach_render_post_fx_session(runtime)
+    _attach_post_fx_session(runtime)
 
     render_mod.render(project, high_quality=True)
 
@@ -953,7 +953,7 @@ def test_render_applies_fade_via_compositor(
     proc.wait.return_value = 0
     mock_subprocess.Popen.return_value = proc
 
-    _attach_render_post_fx_session(
+    _attach_post_fx_session(
         runtime, enabled=True, fade_in_end=1.0, fade_out_start=1.0
     )
 
@@ -975,7 +975,7 @@ def test_render_output_must_be_mp4(tmp_path: Path) -> None:
     side_effect=lambda *a, enabled=True, solo=False, **k: (1.0 if enabled else 0.0),
 )
 @patch("cleave.viz.frame_finish.build_overlay_layers")
-@patch("cleave.viz.frame_finish.composite_render_overlay_with_alpha")
+@patch("cleave.viz.frame_finish.composite_overlay_with_alpha")
 @patch.object(render_mod, "pygame")
 @patch.object(render_mod, "ffmpeg_executable", return_value="/usr/bin/ffmpeg")
 @patch.object(render_mod, "subprocess")
@@ -1059,7 +1059,7 @@ def test_render_calls_overlay_compositing_when_enabled(
 
 
 @patch("cleave.viz.frame_finish.build_overlay_layers")
-@patch("cleave.viz.frame_finish.composite_render_overlay_with_alpha")
+@patch("cleave.viz.frame_finish.composite_overlay_with_alpha")
 @patch.object(render_mod, "pygame")
 @patch.object(render_mod, "ffmpeg_executable", return_value="/usr/bin/ffmpeg")
 @patch.object(render_mod, "subprocess")
@@ -1126,7 +1126,7 @@ def test_render_skips_overlay_when_disabled(
     "cleave.viz.frame_finish.live_overlay_alpha",
     side_effect=lambda *a, enabled=True, solo=False, **k: (1.0 if enabled else 0.0),
 )
-@patch("cleave.viz.frame_finish.composite_render_overlay_with_alpha")
+@patch("cleave.viz.frame_finish.composite_overlay_with_alpha")
 @patch.object(render_mod, "pygame")
 @patch.object(render_mod, "ffmpeg_executable", return_value="/usr/bin/ffmpeg")
 @patch.object(render_mod, "subprocess")
@@ -1241,7 +1241,7 @@ def test_render_ffmpeg_ignores_upscale_uses_render_resolution(
     proc.wait.return_value = 0
     mock_subprocess.Popen.return_value = proc
 
-    _attach_render_post_fx_session(runtime)
+    _attach_post_fx_session(runtime)
 
     render_mod.render(project)
 
@@ -1298,7 +1298,7 @@ def test_render_ffmpeg_uses_explicit_render_resolution(
     proc.wait.return_value = 0
     mock_subprocess.Popen.return_value = proc
 
-    _attach_render_post_fx_session(runtime)
+    _attach_post_fx_session(runtime)
 
     render_mod.render(project)
 
@@ -1354,7 +1354,7 @@ def test_render_present_content_every_frame_at_upscale_one(
     proc.wait.return_value = 0
     mock_subprocess.Popen.return_value = proc
 
-    _attach_render_post_fx_session(runtime)
+    _attach_post_fx_session(runtime)
 
     render_mod.render(project)
 
@@ -1457,9 +1457,9 @@ def test_render_upscale_overlay_frame_order_uses_content_dims(
     _attach_session_from_cfg(runtime, mock_load_config.return_value)
 
     with patch(
-        "cleave.viz.frame_finish.composite_render_overlay_with_alpha",
+        "cleave.viz.frame_finish.composite_overlay_with_alpha",
         side_effect=lambda *args, **kwargs: call_order.append(
-            "composite_render_overlay"
+            "composite_overlay"
         ),
     ) as mock_composite:
         render_mod.render(project)
@@ -1473,7 +1473,7 @@ def test_render_upscale_overlay_frame_order_uses_content_dims(
 
     expected_per_frame = [
         "apply_frame_fade",
-        "composite_render_overlay",
+        "composite_overlay",
         "present_content",
         "read_rgba_frame",
     ]

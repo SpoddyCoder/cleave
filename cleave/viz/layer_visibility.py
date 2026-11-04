@@ -278,7 +278,7 @@ def apply_layer_visibility(
     frame = LimiterFrameState.from_session(session)
     compositing = layer_compositing_active(
         session.settings.editor_mode,
-        session.render_pattern_mask.enabled,
+        session.pattern_mask.enabled,
     )
     for slot, layer in layers_by_slot.items():
         if timeline_levels_apply(frame, slot):

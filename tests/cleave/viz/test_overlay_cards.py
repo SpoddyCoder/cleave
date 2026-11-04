@@ -20,7 +20,7 @@ from cleave.config import (
     RenderOverlayTextBlockConfig,
 )
 from cleave.easing import ease_out_expo, smoothstep
-from cleave.viz.render_overlay import (
+from cleave.viz.overlay_cards import (
     OVERLAY_MOTION_DURATION_SEC,
     OVERLAY_MOTION_STAGGER_SEC,
     _background_pixel_alpha,
@@ -28,8 +28,8 @@ from cleave.viz.render_overlay import (
     build_panel_surface,
     closing_card_start_time,
     closing_overlay_visible_alpha,
-    composite_render_overlay,
-    composite_render_overlay_with_alpha,
+    composite_overlay,
+    composite_overlay_with_alpha,
     live_overlay_alpha,
     overlay_animation_state,
     overlay_visible_alpha,
@@ -38,9 +38,9 @@ from cleave.viz.render_overlay import (
 )
 from cleave.config_schema.render.overlays import _overlay_card_persist_values
 from cleave.viz.session import (
-    RenderOverlayAnimationRuntime,
+    OverlayAnimationRuntime,
     _card_runtime_from_cfg,
-    default_render_overlay_card_runtime,
+    default_overlay_card_runtime,
 )
 from cleave.viz.theme import FADE_DURATION_SEC
 
@@ -218,7 +218,7 @@ def test_build_live_overlay_config_overrides_runtime_fields() -> None:
         border_width=1,
     )
     runtime = replace(
-        default_render_overlay_card_runtime(),
+        default_overlay_card_runtime(),
         enabled=True,
         position="bottom-right",
         title_font_size=14,
@@ -232,7 +232,7 @@ def test_build_live_overlay_config_overrides_runtime_fields() -> None:
         body_content="Live body override",
         background_margin=12,
         background_padding=8,
-        animation=RenderOverlayAnimationRuntime(
+        animation=OverlayAnimationRuntime(
             type="slide",
             slide_direction="right",
             appear_at=20.0,
@@ -366,7 +366,7 @@ def test_overlay_card_persist_values_uses_runtime_colours() -> None:
 def test_build_live_overlay_config_uses_runtime_colours() -> None:
     base = _overlay_cfg()
     runtime = replace(
-        default_render_overlay_card_runtime(),
+        default_overlay_card_runtime(),
         title_colour=(9, 8, 7),
         title_background_colour=(6, 5, 4),
         body_colour=(3, 2, 1),
@@ -401,7 +401,7 @@ def test_overlay_card_persist_values_uses_runtime_margin_and_padding() -> None:
 
 def test_build_live_overlay_config_uses_runtime_margin_and_padding() -> None:
     runtime = replace(
-        default_render_overlay_card_runtime(),
+        default_overlay_card_runtime(),
         background_margin=18,
         background_padding=5,
     )
@@ -432,7 +432,7 @@ def test_panel_position_centre_ignores_margin() -> None:
 def test_title_font_size_and_bold() -> None:
     pygame.init()
     cfg = _overlay_cfg(title_font_size=12, body_font_size=10)
-    with patch("cleave.viz.render_overlay.pygame.font.SysFont") as sys_font:
+    with patch("cleave.viz.overlay_cards.pygame.font.SysFont") as sys_font:
         body_font = MagicMock()
         title_font = MagicMock()
         body_font.get_linesize.return_value = 12
@@ -581,10 +581,10 @@ def test_border_grows_outward_not_inward() -> None:
     assert h1 == h0 + 8
 
 
-def test_composite_render_overlay_noop_before_start() -> None:
+def test_composite_overlay_noop_before_start() -> None:
     compositor = recording_compositor()
     cfg = _overlay_cfg(appear_at=10.0)
-    composite_render_overlay(
+    composite_overlay(
         compositor, cfg, 5.0, 1280, 720, panel=MagicMock()
     )
     compositor.upload_overlay_texture.assert_not_called()
@@ -592,14 +592,14 @@ def test_composite_render_overlay_noop_before_start() -> None:
     compositor.draw_overlay.assert_not_called()
 
 
-def test_composite_render_overlay_draws_when_visible() -> None:
+def test_composite_overlay_draws_when_visible() -> None:
     pygame.init()
     compositor = recording_compositor()
     compositor.upload_overlay_texture.return_value = 99
     cfg = _overlay_cfg(appear_at=0.0, display_time=30.0)
     panel = build_panel_surface(cfg)
 
-    composite_render_overlay(compositor, cfg, 15.0, 1280, 720, panel=panel)
+    composite_overlay(compositor, cfg, 15.0, 1280, 720, panel=panel)
 
     compositor.upload_overlay_texture.assert_called_once()
     compositor.draw_content_overlay.assert_called_once_with(
@@ -613,14 +613,14 @@ def test_composite_render_overlay_draws_when_visible() -> None:
     compositor.draw_overlay.assert_not_called()
 
 
-def test_composite_render_overlay_with_alpha_uses_precomputed_alpha() -> None:
+def test_composite_overlay_with_alpha_uses_precomputed_alpha() -> None:
     pygame.init()
     compositor = recording_compositor()
     compositor.upload_overlay_texture.return_value = 42
     cfg = _overlay_cfg(appear_at=10.0, display_time=30.0)
     panel = build_panel_surface(cfg)
 
-    composite_render_overlay_with_alpha(
+    composite_overlay_with_alpha(
         compositor, cfg, 0.5, 1280, 720, panel=panel
     )
 
@@ -629,7 +629,7 @@ def test_composite_render_overlay_with_alpha_uses_precomputed_alpha() -> None:
     compositor.draw_overlay.assert_not_called()
 
 
-def test_composite_render_overlay_uses_content_not_display_target() -> None:
+def test_composite_overlay_uses_content_not_display_target() -> None:
     pygame.init()
     compositor = recording_compositor()
     compositor.upload_overlay_texture.return_value = 7
@@ -637,7 +637,7 @@ def test_composite_render_overlay_uses_content_not_display_target() -> None:
     panel = build_panel_surface(cfg)
     content_w, content_h = 1280, 720
 
-    composite_render_overlay_with_alpha(
+    composite_overlay_with_alpha(
         compositor, cfg, 1.0, content_w, content_h, panel=panel
     )
 

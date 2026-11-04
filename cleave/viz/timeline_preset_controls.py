@@ -190,7 +190,7 @@ class TimelinePresetController:
                 rng,
                 song_markers=markers,
                 beat_times=self._beat_times,
-                transition_duration=self.session.render_pattern_mask.transition,
+                transition_duration=self.session.pattern_mask.transition,
                 **builder_kwargs,
             )
             message = "Applied pattern mask timeline"
@@ -248,7 +248,7 @@ class TimelinePresetController:
             self._notify(message)
 
     def _enable_pattern_mask(self) -> None:
-        pm = self.session.render_pattern_mask
+        pm = self.session.pattern_mask
         pm.enabled = True
         pm.type = "strips"
         pm.feather_pct = 0

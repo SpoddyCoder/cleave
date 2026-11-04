@@ -111,9 +111,9 @@ def command_context(controls: Any) -> CommandContext:
         controls.shell_focus.region is ShellRegion.TIMELINE
         or bool(timeline.recording)
     )
-    overlays = session.render_overlays
-    post_fx = session.render_post_fx
-    pattern_mask = session.render_pattern_mask
+    overlays = session.overlays
+    post_fx = session.post_fx
+    pattern_mask = session.pattern_mask
     return CommandContext(
         editor_mode=session.settings.editor_mode,
         solo_slot=session.solo_slot,

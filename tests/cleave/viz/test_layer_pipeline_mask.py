@@ -10,7 +10,7 @@ from cleave.preset_playlist import PresetPlaylist
 from cleave.viz.layer import StemLayer
 from cleave.viz.layer_pipeline import LayerFramePipeline
 from cleave.viz.session import LayerRuntime, TuningSession
-from tests.support.config import TEST_LAYER_STEMS, default_render_post_fx_runtime
+from tests.support.config import TEST_LAYER_STEMS, default_post_fx_runtime
 
 
 def _stem_layer(slot: str, *, enabled: bool = True, opacity: float = 1.0) -> StemLayer:
@@ -56,12 +56,12 @@ def _session(slots: tuple[str, ...]) -> TuningSession:
 
 def test_composite_uses_masked_path_when_enabled() -> None:
     session = _session(("layer_1", "layer_2"))
-    session.render_pattern_mask.enabled = True
-    session.render_pattern_mask.feather_pct = 0
-    session.render_pattern_mask.type = "radial"
-    session.render_pattern_mask.density = 2.5
-    session.render_pattern_mask.invert = True
-    session.render_pattern_mask.seed = 11
+    session.pattern_mask.enabled = True
+    session.pattern_mask.feather_pct = 0
+    session.pattern_mask.type = "radial"
+    session.pattern_mask.density = 2.5
+    session.pattern_mask.invert = True
+    session.pattern_mask.seed = 11
     layers_by_slot = {
         "layer_1": _stem_layer("layer_1"),
         "layer_2": _stem_layer("layer_2"),
@@ -101,8 +101,8 @@ def test_composite_uses_masked_path_when_enabled() -> None:
 
 def test_composite_passes_transition_and_inactive_slots() -> None:
     session = _session(("layer_1", "layer_2", "layer_3"))
-    session.render_pattern_mask.enabled = True
-    session.render_pattern_mask.transition = 1.2
+    session.pattern_mask.enabled = True
+    session.pattern_mask.transition = 1.2
     layers_by_slot = {
         "layer_1": _stem_layer("layer_1"),
         "layer_2": _stem_layer("layer_2", enabled=False),
@@ -137,12 +137,12 @@ def test_composite_passes_transition_and_inactive_slots() -> None:
 
 def test_composite_uses_soft_path_when_feather_above_zero() -> None:
     session = _session(("layer_1", "layer_2"))
-    session.render_pattern_mask.enabled = True
-    session.render_pattern_mask.feather_pct = 100
-    session.render_pattern_mask.type = "plasma"
-    session.render_pattern_mask.density = 2.0
-    session.render_pattern_mask.invert = False
-    session.render_pattern_mask.seed = 42
+    session.pattern_mask.enabled = True
+    session.pattern_mask.feather_pct = 100
+    session.pattern_mask.type = "plasma"
+    session.pattern_mask.density = 2.0
+    session.pattern_mask.invert = False
+    session.pattern_mask.seed = 42
     layers_by_slot = {
         "layer_1": _stem_layer("layer_1"),
         "layer_2": _stem_layer("layer_2"),
@@ -174,7 +174,7 @@ def test_composite_uses_soft_path_when_feather_above_zero() -> None:
 
 def test_composite_uses_fixed_path_when_disabled() -> None:
     session = _session(("layer_1",))
-    session.render_pattern_mask.enabled = False
+    session.pattern_mask.enabled = False
     layers_by_slot = {"layer_1": _stem_layer("layer_1")}
     compositor = MagicMock()
     compositor.content_width = 1280
@@ -196,8 +196,8 @@ def test_composite_uses_fixed_path_when_disabled() -> None:
 
 def test_composite_enabled_false_skips_mask_even_with_compositor() -> None:
     session = _session(("layer_1", "layer_2"))
-    session.render_pattern_mask.enabled = False
-    session.render_pattern_mask.density = 1.0
+    session.pattern_mask.enabled = False
+    session.pattern_mask.density = 1.0
     layers_by_slot = {
         "layer_1": _stem_layer("layer_1"),
         "layer_2": _stem_layer("layer_2"),
@@ -218,7 +218,7 @@ def test_composite_enabled_false_skips_mask_even_with_compositor() -> None:
 
 def test_composite_skips_mask_in_preset_curation_mode() -> None:
     session = _session(("layer_1",))
-    session.render_pattern_mask.enabled = True
+    session.pattern_mask.enabled = True
     session.settings.editor_mode = "preset_curation"
     layers_by_slot = {"layer_1": _stem_layer("layer_1")}
     compositor = MagicMock()
@@ -254,9 +254,9 @@ def _effect_runtime_for(slots: tuple[str, ...]) -> MagicMock:
 
 def test_render_frame_feeds_pcm_for_live_disabled_slot() -> None:
     session = _session(("layer_1", "layer_2"))
-    session.render_pattern_mask.enabled = True
-    session.render_pattern_mask.transition = 1.0
-    session.render_post_fx = default_render_post_fx_runtime(enabled=False)
+    session.pattern_mask.enabled = True
+    session.pattern_mask.transition = 1.0
+    session.post_fx = default_post_fx_runtime(enabled=False)
     live = _stem_layer("layer_1")
     departing = _stem_layer("layer_2", enabled=False)
     pcm_bank = MagicMock()
@@ -291,7 +291,7 @@ def test_render_frame_feeds_pcm_for_live_disabled_slot() -> None:
         (True, False),
         song_time_sec=2.5,
         duration=1.0,
-        mask_type=session.render_pattern_mask.type,
+        mask_type=session.pattern_mask.type,
     )
     masked.live_slots.assert_called_once_with(
         (True, False), 2.5, masked.transitions.peek.return_value
@@ -303,9 +303,9 @@ def test_render_frame_feeds_pcm_for_live_disabled_slot() -> None:
 
 def test_render_frame_skips_disabled_slot_that_is_not_live() -> None:
     session = _session(("layer_1", "layer_2"))
-    session.render_pattern_mask.enabled = True
-    session.render_pattern_mask.transition = 1.0
-    session.render_post_fx = default_render_post_fx_runtime(enabled=False)
+    session.pattern_mask.enabled = True
+    session.pattern_mask.transition = 1.0
+    session.post_fx = default_post_fx_runtime(enabled=False)
     live = _stem_layer("layer_1")
     idle = _stem_layer("layer_2", enabled=False)
     pcm_bank = MagicMock()

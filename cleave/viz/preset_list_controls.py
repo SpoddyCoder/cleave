@@ -237,7 +237,7 @@ class PresetListController:
                             self.session.layer_z_order,
                             slot,
                             f"Populated {count} presets; "
-                            "enable Render: TIMELINE to switch",
+                            "enable Timeline to switch",
                         )
                     )
                 else:

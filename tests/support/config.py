@@ -35,8 +35,8 @@ from cleave.stems import STEM_NAMES, StemSource
 from cleave.preset_playlist import playlist_at_dir
 from cleave.viz.session import (
     LayerRuntime,
-    RenderPostFxRuntime,
-    default_render_post_fx_runtime as _session_default_render_post_fx_runtime,
+    PostFxRuntime,
+    default_post_fx_runtime as _session_default_post_fx_runtime,
 )
 
 TEST_LAYER_STEMS: dict[str, StemSource] = {
@@ -70,7 +70,7 @@ def default_fade_config() -> FadeConfig:
     )
 
 
-def default_render_post_fx_config(**overrides: object) -> RenderPostFxConfig:
+def default_post_fx_config(**overrides: object) -> RenderPostFxConfig:
     values: dict[str, object] = {
         "enabled": True,
         "fade": default_fade_config(),
@@ -81,8 +81,8 @@ def default_render_post_fx_config(**overrides: object) -> RenderPostFxConfig:
     return RenderPostFxConfig(**values)  # type: ignore[arg-type]
 
 
-def default_render_post_fx_runtime(**overrides: object) -> RenderPostFxRuntime:
-    runtime = _session_default_render_post_fx_runtime()
+def default_post_fx_runtime(**overrides: object) -> PostFxRuntime:
+    runtime = _session_default_post_fx_runtime()
     if not overrides:
         return runtime
     return replace(runtime, **overrides)  # type: ignore[arg-type]

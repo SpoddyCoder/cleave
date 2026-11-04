@@ -116,13 +116,13 @@ def _fake_controls(
                 panel_open=False,
                 locked=False,
             ),
-            render_overlays=SimpleNamespace(
+            overlays=SimpleNamespace(
                 opening_card=SimpleNamespace(enabled=False),
                 closing_card=SimpleNamespace(enabled=False),
                 locked=False,
             ),
-            render_post_fx=SimpleNamespace(enabled=False, locked=False),
-            render_pattern_mask=SimpleNamespace(enabled=False, locked=False),
+            post_fx=SimpleNamespace(enabled=False, locked=False),
+            pattern_mask=SimpleNamespace(enabled=False, locked=False),
         ),
         config_dirty=config_dirty,
         project_render=SimpleNamespace(busy=render_busy, prompt=MagicMock()),
@@ -529,7 +529,7 @@ def test_command_context_reads_live_layer_flags() -> None:
     assert command_context(controls).timeline_scope is True
     controls.set_shell_region(ShellRegion.NAVIGATOR)
     controls.focus_cursor = MainFocus(
-        RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
+        RowDescriptor(RowKind.OVERLAYS_HEADER)
     )
     controls.session.timeline.recording = True
     assert command_context(controls).timeline_scope is True
@@ -630,28 +630,28 @@ def test_render_menu_checks_mirror_flags() -> None:
     assert overlays.checked(ctx) is True
     assert post_fx.checked(ctx) is True
     assert pattern.checked(ctx) is False
-    live.session.render_overlays.opening_card.enabled = False
+    live.session.overlays.opening_card.enabled = False
     assert overlays.checked(command_context(live)) is True
-    live.session.render_overlays.closing_card.enabled = False
+    live.session.overlays.closing_card.enabled = False
     assert overlays.checked(command_context(live)) is False
-    live.session.render_post_fx.enabled = False
-    live.session.render_pattern_mask.enabled = True
+    live.session.post_fx.enabled = False
+    live.session.pattern_mask.enabled = True
     assert post_fx.checked(command_context(live)) is False
     assert pattern.checked(command_context(live)) is True
 
     toggled = _make_controls(("layer_1",))
     overlays.run(toggled)
-    assert toggled.session.render_overlays.opening_card.enabled is False
-    assert toggled.session.render_overlays.closing_card.enabled is False
+    assert toggled.session.overlays.opening_card.enabled is False
+    assert toggled.session.overlays.closing_card.enabled is False
     post_fx.run(toggled)
-    assert toggled.session.render_post_fx.enabled is False
+    assert toggled.session.post_fx.enabled is False
     pattern.run(toggled)
-    assert toggled.session.render_pattern_mask.enabled is True
+    assert toggled.session.pattern_mask.enabled is True
 
     locked = _make_controls(("layer_1",))
-    locked.session.render_overlays.locked = True
-    locked.session.render_post_fx.locked = True
-    locked.session.render_pattern_mask.locked = True
+    locked.session.overlays.locked = True
+    locked.session.post_fx.locked = True
+    locked.session.pattern_mask.locked = True
     locked_ctx = command_context(locked)
     assert locked_ctx.overlays_locked is True
     assert overlays.enabled(locked_ctx) is False
@@ -660,9 +660,9 @@ def test_render_menu_checks_mirror_flags() -> None:
     overlays.run(locked)
     post_fx.run(locked)
     pattern.run(locked)
-    assert locked.session.render_overlays.opening_card.enabled is True
-    assert locked.session.render_post_fx.enabled is True
-    assert locked.session.render_pattern_mask.enabled is False
+    assert locked.session.overlays.opening_card.enabled is True
+    assert locked.session.post_fx.enabled is True
+    assert locked.session.pattern_mask.enabled is False
 
     curated = _make_controls(("layer_1",))
     curated.session.settings.editor_mode = "preset_curation"
@@ -670,7 +670,7 @@ def test_render_menu_checks_mirror_flags() -> None:
     curated.shell_focus.region = ShellRegion.NAVIGATOR
     assert command_context(curated).editor_mode == "preset_curation"
     overlays.run(curated)
-    assert curated.session.render_overlays.opening_card.enabled is True
+    assert curated.session.overlays.opening_card.enabled is True
     assert curated.shell_focus.selected_id == "project"
     assert curated.shell_focus.region is ShellRegion.NAVIGATOR
 
@@ -872,7 +872,7 @@ def test_timeline_actions_share_run_with_the_inspector() -> None:
         prompt.assert_called_once_with()
         controls.shell_focus.inspector_command_id = command_id
         followed = help_focus_descriptor(
-            RowDescriptor(RowKind.RENDER_TIMELINE_HEADER),
+            RowDescriptor(RowKind.TIMELINE_HEADER),
             controls.shell_focus,
         )
         assert followed == RowDescriptor(kind)

@@ -413,7 +413,7 @@ def test_tuning_controls_begin_and_restore_ui_snapshot() -> None:
     assert session.help_visible is False
     assert session.timeline.panel_open is False
     assert isinstance(controls.focus_cursor, MainFocus)
-    assert controls.focus_cursor.descriptor.kind == RowKind.RENDER_TIMELINE_HEADER
+    assert controls.focus_cursor.descriptor.kind == RowKind.TIMELINE_HEADER
 
     controls._restore_tap_sync_calibration_ui(snapshot)
 

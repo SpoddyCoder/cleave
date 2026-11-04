@@ -17,7 +17,7 @@ Live Milkdrop/libprojectM editor. Windows app is the product; CLI is for checkou
 
 Do not glob `**/*.py`, grep the repo root, spawn an explore subagent, or read `docs/dev/architecture-review.md` to find a home. `docs/dev/plans-completed/` is ignored (`.cursorignore`, and denied in `.claude/settings.json`). Open the files below, then grep only that directory. Tests: `tests/cleave/` mirrors `cleave/`; overlay tests are `tests/cleave/viz/`.
 
-- Panel row: `cleave/viz/row_kinds.py`, `row_specs/<domain>.py` (transport, settings, project, track, render_overlays, render_post_fx, pattern_mask, timeline), `row_sections.py`
+- Panel row: `cleave/viz/row_kinds.py`, `row_specs/<domain>.py` (settings, project, track, overlays, post_fx, pattern_mask, timeline), `row_sections.py`
 - Mutation / input: `cleave/viz/layer_mutations.py`, matching `*_controls.py`, `wiring.py`
 - Draw / type: `row_present_renderers.py`, `overlay_primitives.py`, `theme.py` (not `tuning_panel_draw.py` first)
 - Live state / YAML: `cleave/viz/session.py`, `cleave/config.py`, `config_schema/<section>.py`, `config_schema/persist.py`

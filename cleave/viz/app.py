@@ -48,7 +48,7 @@ from cleave.viz.timeline_overlay import (
 )
 from cleave.viz.playback import PlaybackState, current_sec, init_playback
 from cleave.viz.projectm_frame_clock import ProjectMFrameClock
-from cleave.viz.frame_finish import RenderOverlaysPanelCache, finish_content_frame
+from cleave.viz.frame_finish import OverlaysPanelCache, finish_content_frame
 from cleave.viz.overlay_profiler import OverlayProfiler
 from cleave.viz.frame_rate import FrameRateMeter, ProjectMFpsGovernor
 from cleave.viz.shell_focus import ShellRegion
@@ -112,8 +112,8 @@ class LiveVisualizerRuntime(VisualizerCore):
     playback: PlaybackState
     timeline_overlay: TimelineOverlay
     overlay_surface: pygame.Surface
-    render_overlays_panel_cache: RenderOverlaysPanelCache = field(
-        default_factory=RenderOverlaysPanelCache
+    overlays_panel_cache: OverlaysPanelCache = field(
+        default_factory=OverlaysPanelCache
     )
     overlay_profiler: OverlayProfiler = field(default_factory=OverlayProfiler.from_env)
     menu_bar: MenuBarState = field(default_factory=MenuBarState)
@@ -455,9 +455,9 @@ def _tick_frame_live_overlay(
     finish_content_frame(
         runtime,
         t_sec,
-        post_fx_solo=runtime.seed.session.render_post_fx_solo,
-        overlay_solo=runtime.seed.session.render_overlay_solo,
-        panel_cache=runtime.render_overlays_panel_cache,
+        post_fx_solo=runtime.seed.session.post_fx_solo,
+        overlay_solo=runtime.seed.session.overlay_solo,
+        panel_cache=runtime.overlays_panel_cache,
     )
 
     tap_sync_progress = runtime.controls.tap_sync.showing_progress

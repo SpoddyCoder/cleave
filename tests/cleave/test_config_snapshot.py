@@ -42,8 +42,8 @@ from cleave.paths import resource_dir
 from cleave.project import CompositorSettings, MilkdropSettings, write_manifest
 from tests.support.config import (
     TEST_LAYER_STEMS,
-    default_render_post_fx_config,
-    default_render_post_fx_runtime,
+    default_post_fx_config,
+    default_post_fx_runtime,
     layer_configs,
     layer_runtimes,
     make_preset_dirs,
@@ -60,11 +60,11 @@ from cleave.preset_playlist import playlist_at_dir
 from cleave.timeline import SlotCue, TimelineLane
 from cleave.viz.session import (
     LayerRuntime,
-    RenderOverlayAnimationRuntime,
-    RenderOverlayClosingAnimationRuntime,
-    RenderOverlaysRuntime,
+    OverlayAnimationRuntime,
+    OverlayClosingAnimationRuntime,
+    OverlaysRuntime,
     TuningSession,
-    default_render_overlay_card_runtime,
+    default_overlay_card_runtime,
     session_from_cfg,
 )
 
@@ -646,7 +646,7 @@ def test_write_session_snapshot_omits_all_zero_effects() -> None:
         assert "effects" not in data["layers"]["layer_3"]
 
 
-def _render_overlay_card_cfg(
+def _overlay_card_cfg(
     *,
     closing: bool = False,
     content_title: str = "My Title",
@@ -697,10 +697,10 @@ def _render_overlay_card_cfg(
     )
 
 
-def _render_overlays_cfg() -> RenderOverlaysConfig:
+def _overlays_cfg() -> RenderOverlaysConfig:
     return RenderOverlaysConfig(
-        opening_card=_render_overlay_card_cfg(),
-        closing_card=_render_overlay_card_cfg(
+        opening_card=_overlay_card_cfg(),
+        closing_card=_overlay_card_cfg(
             closing=True, content_title="Closing", content_body="End"
         ),
     )
@@ -821,12 +821,12 @@ def _snapshot_fixture(tmp_path: Path) -> tuple[CleaveConfig, TuningSession, Path
         config_path=config_path,
         user_config_path=root / "user-config.yaml",
         render=RenderConfig(
-            overlays=_render_overlays_cfg(),
-            post_fx=default_render_post_fx_config(enabled=True),
+            overlays=_overlays_cfg(),
+            post_fx=default_post_fx_config(enabled=True),
         ),
     )
     opening = replace(
-        default_render_overlay_card_runtime(),
+        default_overlay_card_runtime(),
         enabled=True,
         position="top-right",
         title_font_size=14,
@@ -840,17 +840,17 @@ def _snapshot_fixture(tmp_path: Path) -> tuple[CleaveConfig, TuningSession, Path
         background_padding=9,
         title_content="My Title",
         body_content="Line one\nLine two",
-        animation=RenderOverlayAnimationRuntime(
+        animation=OverlayAnimationRuntime(
             type="fade",
             slide_direction="left",
             appear_at=20.0,
             display_time=40.0,
         ),
     )
-    post_fx_runtime = default_render_post_fx_runtime(enabled=True)
+    post_fx_runtime = default_post_fx_runtime(enabled=True)
     session = TuningSession(
         layer_z_order=list(DEFAULT_LAYER_SLOTS),
-        render_post_fx=replace(
+        post_fx=replace(
             post_fx_runtime,
             fade=replace(
                 post_fx_runtime.fade,
@@ -858,9 +858,9 @@ def _snapshot_fixture(tmp_path: Path) -> tuple[CleaveConfig, TuningSession, Path
                 fade_out=replace(post_fx_runtime.fade.fade_out, start=3.0),
             ),
         ),
-        render_overlays=RenderOverlaysRuntime(
+        overlays=OverlaysRuntime(
             opening_card=opening,
-            closing_card=default_render_overlay_card_runtime(closing=True)),
+            closing_card=default_overlay_card_runtime(closing=True)),
         layers={
             slot: LayerRuntime(
                 playlist=playlist_at_dir(preset_root / slot, index=0),
@@ -873,7 +873,7 @@ def _snapshot_fixture(tmp_path: Path) -> tuple[CleaveConfig, TuningSession, Path
     return cfg, session, root / "snapshot.yaml"
 
 
-def test_write_session_snapshot_persists_render_overlay(tmp_path: Path) -> None:
+def test_write_session_snapshot_persists_overlay(tmp_path: Path) -> None:
     cfg, session, out_path = _snapshot_fixture(tmp_path)
     write_session_snapshot(out_path, cfg=cfg, session=session)
 
@@ -937,7 +937,7 @@ def test_write_session_snapshot_strips_legacy_overlay_font(tmp_path: Path) -> No
     assert "overlay" not in snapshot["render"]
 
 
-def test_write_session_snapshot_persists_render_post_fx(tmp_path: Path) -> None:
+def test_write_session_snapshot_persists_post_fx(tmp_path: Path) -> None:
     cfg, session, out_path = _snapshot_fixture(tmp_path)
     write_session_snapshot(out_path, cfg=cfg, session=session)
 
@@ -972,7 +972,7 @@ def test_write_session_snapshot_persists_render_post_fx(tmp_path: Path) -> None:
 
 def test_write_session_snapshot_persists_highlight_rolloff_curve(tmp_path: Path) -> None:
     cfg, session, out_path = _snapshot_fixture(tmp_path)
-    session.render_post_fx.highlight_rolloff.curve = "aces_fit"
+    session.post_fx.highlight_rolloff.curve = "aces_fit"
     write_session_snapshot(out_path, cfg=cfg, session=session)
 
     data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
@@ -985,9 +985,9 @@ def test_write_session_snapshot_persists_highlight_rolloff_curve(tmp_path: Path)
     assert round_trip.post_fx.highlight_rolloff.curve == "aces_fit"
 
 
-def test_write_session_snapshot_persists_render_pattern_mask(tmp_path: Path) -> None:
+def test_write_session_snapshot_persists_pattern_mask(tmp_path: Path) -> None:
     cfg, session, out_path = _snapshot_fixture(tmp_path)
-    pm = session.render_pattern_mask
+    pm = session.pattern_mask
     pm.enabled = True
     pm.locked = True
     pm.type = "plasma"
@@ -1026,8 +1026,8 @@ def test_write_session_snapshot_persists_render_pattern_mask(tmp_path: Path) -> 
 
 def test_write_session_snapshot_persists_pattern_mask_disabled(tmp_path: Path) -> None:
     cfg, session, out_path = _snapshot_fixture(tmp_path)
-    session.render_pattern_mask.enabled = False
-    session.render_pattern_mask.density = 4.0
+    session.pattern_mask.enabled = False
+    session.pattern_mask.density = 4.0
     write_session_snapshot(out_path, cfg=cfg, session=session)
 
     data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
@@ -1052,14 +1052,14 @@ def test_write_session_snapshot_overwrites_stale_pattern_mask(tmp_path: Path) ->
     }
     config_path.write_text(yaml.safe_dump(data), encoding="utf-8")
 
-    session.render_pattern_mask.enabled = False
-    session.render_pattern_mask.type = "strips"
-    session.render_pattern_mask.density = 1.5
-    session.render_pattern_mask.feather_pct = 0
-    session.render_pattern_mask.invert = False
-    session.render_pattern_mask.transition = 0.0
-    session.render_pattern_mask.seed = 0
-    session.render_pattern_mask.locked = False
+    session.pattern_mask.enabled = False
+    session.pattern_mask.type = "strips"
+    session.pattern_mask.density = 1.5
+    session.pattern_mask.feather_pct = 0
+    session.pattern_mask.invert = False
+    session.pattern_mask.transition = 0.0
+    session.pattern_mask.seed = 0
+    session.pattern_mask.locked = False
     write_session_snapshot(out_path, cfg=cfg, session=session)
 
     snapshot = yaml.safe_load(out_path.read_text(encoding="utf-8"))
@@ -1077,10 +1077,10 @@ def test_write_session_snapshot_overwrites_stale_pattern_mask(tmp_path: Path) ->
 
 def test_write_session_snapshot_persists_full_render_payload(tmp_path: Path) -> None:
     cfg, session, out_path = _snapshot_fixture(tmp_path)
-    session.render_overlays.locked = True
-    session.render_post_fx.locked = True
-    session.render_post_fx.highlight_rolloff.ceiling_pct = 40
-    session.render_post_fx.highlight_rolloff.desaturation_pct = 55
+    session.overlays.locked = True
+    session.post_fx.locked = True
+    session.post_fx.highlight_rolloff.ceiling_pct = 40
+    session.post_fx.highlight_rolloff.desaturation_pct = 55
     write_session_snapshot(out_path, cfg=cfg, session=session)
 
     data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
@@ -1112,33 +1112,33 @@ def test_write_session_snapshot_preserves_unknown_render_keys(tmp_path: Path) ->
     assert snapshot["render"]["experimental_flag"] is True
 
 
-def test_write_session_snapshot_render_post_fx_solo_does_not_affect_enabled(
+def test_write_session_snapshot_post_fx_solo_does_not_affect_enabled(
     tmp_path: Path,
 ) -> None:
     cfg, session, out_path = _snapshot_fixture(tmp_path)
-    session.render_post_fx.enabled = False
-    session.render_post_fx_solo = True
+    session.post_fx.enabled = False
+    session.post_fx_solo = True
     write_session_snapshot(out_path, cfg=cfg, session=session)
 
     data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
     assert data["render"]["post_fx"]["enabled"] is False
-    assert "render_post_fx_solo" not in yaml.safe_dump(data)
+    assert "post_fx_solo" not in yaml.safe_dump(data)
 
 
-def test_write_session_snapshot_render_overlay_solo_does_not_affect_enabled(
+def test_write_session_snapshot_overlay_solo_does_not_affect_enabled(
     tmp_path: Path,
 ) -> None:
     cfg, session, out_path = _snapshot_fixture(tmp_path)
-    session.render_overlays.opening_card.enabled = False
-    session.render_overlay_solo = True
+    session.overlays.opening_card.enabled = False
+    session.overlay_solo = True
     write_session_snapshot(out_path, cfg=cfg, session=session)
 
     data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
     assert data["render"]["overlays"]["opening-card"]["enabled"] is False
-    assert "render_overlay_solo" not in yaml.safe_dump(data)
+    assert "overlay_solo" not in yaml.safe_dump(data)
 
 
-def test_write_session_snapshot_render_overlay_without_cfg_render(tmp_path: Path) -> None:
+def test_write_session_snapshot_overlay_without_cfg_render(tmp_path: Path) -> None:
     cfg, session, out_path = _snapshot_fixture(tmp_path)
     cfg = CleaveConfig(
         paths=cfg.paths,
@@ -1598,12 +1598,12 @@ def test_session_snapshot_full_round_trip(tmp_path: Path) -> None:
     session.layers["layer_2"].beat_sensitivity = 2.5
     session.layers["layer_3"].enabled = True
     session.layers["layer_3"].effects = {"flash": {"rms": 15}}
-    session.render_overlays.opening_card.animation.display_time = 55.0
-    session.render_overlays.opening_card.animation.appear_at = 8.0
-    session.render_overlays.opening_card.position = "top-right"
-    session.render_overlays.opening_card.opacity_pct = 80
-    session.render_post_fx.fade.fade_in.end = 18.0
-    session.render_post_fx.fade.fade_out.start = 2.0
+    session.overlays.opening_card.animation.display_time = 55.0
+    session.overlays.opening_card.animation.appear_at = 8.0
+    session.overlays.opening_card.position = "top-right"
+    session.overlays.opening_card.opacity_pct = 80
+    session.post_fx.fade.fade_in.end = 18.0
+    session.post_fx.fade.fade_out.start = 2.0
     session.timeline.lanes = {
         "layer_1": TimelineLane(
             baseline=0.0,

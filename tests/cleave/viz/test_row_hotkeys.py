@@ -50,20 +50,20 @@ def test_node_header_descriptor_maps_render_and_layer_ids() -> None:
     )
     header = row_hotkeys.node_header_descriptor
     assert header("overlay") == RowDescriptor(
-        RowKind.RENDER_OVERLAYS_HEADER
+        RowKind.OVERLAYS_HEADER
     )
     assert header("post_fx") == RowDescriptor(
-        RowKind.RENDER_POST_FX_HEADER
+        RowKind.POST_FX_HEADER
     )
     assert header("pattern_mask") == RowDescriptor(
-        RowKind.RENDER_PATTERN_MASK_HEADER
+        RowKind.PATTERN_MASK_HEADER
     )
-    assert header("timeline") == RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
+    assert header("timeline") == RowDescriptor(RowKind.TIMELINE_HEADER)
     assert header("overlay.opening_card") == (
-        RowDescriptor(RowKind.RENDER_OVERLAY_CARD_HEADER, card="opening_card")
+        RowDescriptor(RowKind.OVERLAY_CARD_HEADER, card="opening_card")
     )
     assert header("overlay.closing_card") == (
-        RowDescriptor(RowKind.RENDER_OVERLAY_CARD_HEADER, card="closing_card")
+        RowDescriptor(RowKind.OVERLAY_CARD_HEADER, card="closing_card")
     )
     assert header("overlay.other") is None
     assert header("render") is None
@@ -71,7 +71,7 @@ def test_node_header_descriptor_maps_render_and_layer_ids() -> None:
     assert header("timeline.song_markers") == RowDescriptor(
         RowKind.SONG_MARKERS_HEADER
     )
-    assert header("post_fx.fade") == RowDescriptor(RowKind.RENDER_POST_FX_FADE_HEADER)
+    assert header("post_fx.fade") == RowDescriptor(RowKind.POST_FX_FADE_HEADER)
     assert header(layer_page_node_id("layer_1", "compositing")) == RowDescriptor(
         RowKind.TRACK_COMPOSITING_HEADER, slot="layer_1"
     )
@@ -79,13 +79,13 @@ def test_node_header_descriptor_maps_render_and_layer_ids() -> None:
 
 def test_node_control_descriptor_resolves_to_the_owner() -> None:
     assert row_hotkeys.node_control_descriptor("post_fx.fade") == RowDescriptor(
-        RowKind.RENDER_POST_FX_HEADER
+        RowKind.POST_FX_HEADER
     )
     assert row_hotkeys.node_control_descriptor("timeline.grid") == RowDescriptor(
-        RowKind.RENDER_TIMELINE_HEADER
+        RowKind.TIMELINE_HEADER
     )
     assert row_hotkeys.node_control_descriptor("overlay.closing_card") == RowDescriptor(
-        RowKind.RENDER_OVERLAY_CARD_HEADER, card="closing_card"
+        RowKind.OVERLAY_CARD_HEADER, card="closing_card"
     )
     assert row_hotkeys.node_control_descriptor(
         layer_page_node_id("layer_1", "effects")
@@ -102,7 +102,7 @@ def test_hotkeys_on_a_child_page_reach_the_owner() -> None:
 
     controls.navigator.select("post_fx.fade")
     assert controls.navigator.handle_hotkey(keydown(pygame.K_e)) is True
-    assert controls.session.render_post_fx.enabled is False
+    assert controls.session.post_fx.enabled is False
 
 
 def test_navigator_layer_lock_and_delete_follow_selected_node() -> None:
@@ -113,14 +113,14 @@ def test_navigator_layer_lock_and_delete_follow_selected_node() -> None:
         del controls.session.layers[slot]
 
     manager.remove_layer.side_effect = remove_layer
-    controls.focus_cursor = MainFocus(RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER))
+    controls.focus_cursor = MainFocus(RowDescriptor(RowKind.OVERLAYS_HEADER))
     _select_layer(controls, "layer_2", region=ShellRegion.NAVIGATOR)
     runtime = _runtime(controls)
 
     assert dispatch_keydown(keydown(pygame.K_l), runtime) is True
     assert controls.session.layers["layer_2"].locked is True
     assert controls.session.layers["layer_1"].locked is False
-    assert controls.session.render_overlays.locked is False
+    assert controls.session.overlays.locked is False
 
     assert dispatch_keydown(keydown(pygame.K_DELETE), runtime) is True
     modal = controls.modal_host.view_state()
@@ -169,7 +169,7 @@ def test_inspector_preset_item_delete_and_move_stay_on_the_item() -> None:
 def test_inspector_value_row_l_locks_the_page_layer() -> None:
     controls = _make_controls(("layer_1", "layer_2"))
     opacity = RowDescriptor(RowKind.TRACK_OPACITY, slot="layer_1")
-    controls.focus_cursor = MainFocus(RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER))
+    controls.focus_cursor = MainFocus(RowDescriptor(RowKind.OVERLAYS_HEADER))
     _select_layer(controls, "layer_1", region=ShellRegion.INSPECTOR)
     controls.shell_focus.inspector_cursor = opacity
     runtime = _runtime(controls)
@@ -177,7 +177,7 @@ def test_inspector_value_row_l_locks_the_page_layer() -> None:
     assert dispatch_keydown(keydown(pygame.K_l), runtime) is True
     assert controls.session.layers["layer_1"].locked is True
     assert controls.session.layers["layer_2"].locked is False
-    assert controls.session.render_overlays.locked is False
+    assert controls.session.overlays.locked is False
 
 
 def test_move_mode_up_reorders_layers_before_navigator_cursor() -> None:
@@ -205,14 +205,14 @@ def test_move_mode_up_reorders_layers_before_navigator_cursor() -> None:
     assert controls.shell_focus.selected_id == selected
 
 
-def test_navigator_render_overlays_l_toggles_overlay_lock() -> None:
+def test_navigator_overlays_l_toggles_overlay_lock() -> None:
     controls = _make_controls(("layer_1",))
     controls.shell_focus.region = ShellRegion.NAVIGATOR
     controls.shell_focus.selected_id = "overlay"
     runtime = _runtime(controls)
 
     assert dispatch_keydown(keydown(pygame.K_l), runtime) is True
-    assert controls.session.render_overlays.locked is True
+    assert controls.session.overlays.locked is True
     assert controls.session.layers["layer_1"].locked is False
 
 

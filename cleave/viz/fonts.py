@@ -1,4 +1,4 @@
-"""System font discovery for render overlay tuning."""
+"""System font discovery for overlay cards."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ def _has_latin_glyphs(name: str) -> bool:
     return a != i
 
 
-def render_overlay_system_fonts() -> tuple[str, ...]:
+def overlay_system_fonts() -> tuple[str, ...]:
     """Sorted Latin-capable pygame/SDL font names on this machine."""
     global _font_names_cache
     if _font_names_cache is None:
@@ -37,9 +37,9 @@ def render_overlay_system_fonts() -> tuple[str, ...]:
     return _font_names_cache
 
 
-def render_overlay_font_display(name: str) -> str:
+def overlay_font_display(name: str) -> str:
     """Font name with ``(position/total)`` when *name* is in the Latin font list."""
-    fonts = render_overlay_system_fonts()
+    fonts = overlay_system_fonts()
     if not fonts:
         return name
     try:
@@ -49,8 +49,8 @@ def render_overlay_font_display(name: str) -> str:
     return f"{name} ({position}/{len(fonts)})"
 
 
-def cycle_render_overlay_font(current: str, *, forward: bool) -> str:
-    fonts = render_overlay_system_fonts()
+def cycle_overlay_font(current: str, *, forward: bool) -> str:
+    fonts = overlay_system_fonts()
     if not fonts:
         return current
     try:

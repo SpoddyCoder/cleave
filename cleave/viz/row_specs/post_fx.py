@@ -24,290 +24,290 @@ if TYPE_CHECKING:
 def _format_fade_seconds(value: float) -> str:
     return f"{value:.1f}s"
 
-def _format_render_post_fx_fade_in_start(
+def _format_post_fx_fade_in_start(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return _format_fade_seconds(state.render_post_fx.fade.fade_in.start)
+    return _format_fade_seconds(state.post_fx.fade.fade_in.start)
 
-def _format_render_post_fx_fade_in_end(
+def _format_post_fx_fade_in_end(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return _format_fade_seconds(state.render_post_fx.fade.fade_in.end)
+    return _format_fade_seconds(state.post_fx.fade.fade_in.end)
 
-def _format_render_post_fx_fade_in_type(
+def _format_post_fx_fade_in_type(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return state.render_post_fx.fade.fade_in.type
+    return state.post_fx.fade.fade_in.type
 
-def _format_render_post_fx_fade_out_start(
+def _format_post_fx_fade_out_start(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return _format_fade_seconds(state.render_post_fx.fade.fade_out.start)
+    return _format_fade_seconds(state.post_fx.fade.fade_out.start)
 
-def _format_render_post_fx_fade_out_end(
+def _format_post_fx_fade_out_end(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return _format_fade_seconds(state.render_post_fx.fade.fade_out.end)
+    return _format_fade_seconds(state.post_fx.fade.fade_out.end)
 
-def _format_render_post_fx_fade_out_type(
+def _format_post_fx_fade_out_type(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return state.render_post_fx.fade.fade_out.type
+    return state.post_fx.fade.fade_out.type
 
-def _format_render_post_fx_highlight_rolloff_mode(
+def _format_post_fx_highlight_rolloff_mode(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return state.render_post_fx.highlight_rolloff.mode
+    return state.post_fx.highlight_rolloff.mode
 
-def _format_render_post_fx_highlight_rolloff_curve(
+def _format_post_fx_highlight_rolloff_curve(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return state.render_post_fx.highlight_rolloff.curve
+    return state.post_fx.highlight_rolloff.curve
 
-def _format_render_post_fx_highlight_rolloff_threshold(
+def _format_post_fx_highlight_rolloff_threshold(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return f"{state.render_post_fx.highlight_rolloff.threshold_pct}%"
+    return f"{state.post_fx.highlight_rolloff.threshold_pct}%"
 
-def _format_render_post_fx_highlight_rolloff_ceiling(
+def _format_post_fx_highlight_rolloff_ceiling(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return f"{state.render_post_fx.highlight_rolloff.ceiling_pct}%"
+    return f"{state.post_fx.highlight_rolloff.ceiling_pct}%"
 
-def _format_render_post_fx_highlight_rolloff_strength(
+def _format_post_fx_highlight_rolloff_strength(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return f"{state.render_post_fx.highlight_rolloff.strength_pct}%"
+    return f"{state.post_fx.highlight_rolloff.strength_pct}%"
 
-def _format_render_post_fx_highlight_rolloff_softness(
+def _format_post_fx_highlight_rolloff_softness(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return f"{state.render_post_fx.highlight_rolloff.softness_pct}%"
+    return f"{state.post_fx.highlight_rolloff.softness_pct}%"
 
-def _format_render_post_fx_highlight_rolloff_desaturation(
+def _format_post_fx_highlight_rolloff_desaturation(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return f"{state.render_post_fx.highlight_rolloff.desaturation_pct}%"
+    return f"{state.post_fx.highlight_rolloff.desaturation_pct}%"
 
-def _format_render_post_fx_chroma_boost_mode(
+def _format_post_fx_chroma_boost_mode(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return state.render_post_fx.chroma_boost.mode
+    return state.post_fx.chroma_boost.mode
 
-def _format_render_post_fx_chroma_boost_variant(
+def _format_post_fx_chroma_boost_variant(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return state.render_post_fx.chroma_boost.variant
+    return state.post_fx.chroma_boost.variant
 
-def _format_render_post_fx_chroma_boost_amount(
+def _format_post_fx_chroma_boost_amount(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return f"{state.render_post_fx.chroma_boost.amount_pct}%"
+    return f"{state.post_fx.chroma_boost.amount_pct}%"
 
 def _fade_step(forward: bool, large: bool) -> float:
     step = 10.0 if large else 1.0
     return step if forward else -step
 
-def _apply_render_post_fx_fade_in_start(
+def _apply_post_fx_fade_in_start(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, large: bool,
 ) -> None:
-    fin = controls.session.render_post_fx.fade.fade_in
-    controls.render_post_fx.set_fade_start(
+    fin = controls.session.post_fx.fade.fade_in
+    controls.post_fx.set_fade_start(
         "fade_in", fin.start + _fade_step(forward, large)
     )
 
-def _apply_render_post_fx_fade_in_end(
+def _apply_post_fx_fade_in_end(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, large: bool,
 ) -> None:
-    fin = controls.session.render_post_fx.fade.fade_in
-    controls.render_post_fx.set_fade_end(
+    fin = controls.session.post_fx.fade.fade_in
+    controls.post_fx.set_fade_end(
         "fade_in", fin.end + _fade_step(forward, large)
     )
 
-def _apply_render_post_fx_fade_in_type(
+def _apply_post_fx_fade_in_type(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, _large: bool,
 ) -> None:
-    controls.render_post_fx.cycle_fade_type("fade_in", forward=forward)
+    controls.post_fx.cycle_fade_type("fade_in", forward=forward)
 
-def _apply_render_post_fx_fade_out_start(
+def _apply_post_fx_fade_out_start(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, large: bool,
 ) -> None:
-    fout = controls.session.render_post_fx.fade.fade_out
-    controls.render_post_fx.set_fade_start(
+    fout = controls.session.post_fx.fade.fade_out
+    controls.post_fx.set_fade_start(
         "fade_out", fout.start + _fade_step(forward, large)
     )
 
-def _apply_render_post_fx_fade_out_end(
+def _apply_post_fx_fade_out_end(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, large: bool,
 ) -> None:
-    fout = controls.session.render_post_fx.fade.fade_out
-    controls.render_post_fx.set_fade_end(
+    fout = controls.session.post_fx.fade.fade_out
+    controls.post_fx.set_fade_end(
         "fade_out", fout.end + _fade_step(forward, large)
     )
 
-def _apply_render_post_fx_fade_out_type(
+def _apply_post_fx_fade_out_type(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, _large: bool,
 ) -> None:
-    controls.render_post_fx.cycle_fade_type("fade_out", forward=forward)
+    controls.post_fx.cycle_fade_type("fade_out", forward=forward)
 
-def _apply_render_post_fx_highlight_rolloff_mode(
+def _apply_post_fx_highlight_rolloff_mode(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, _large: bool,
 ) -> None:
-    controls.render_post_fx.cycle_highlight_rolloff_mode(forward=forward)
+    controls.post_fx.cycle_highlight_rolloff_mode(forward=forward)
 
-def _apply_render_post_fx_highlight_rolloff_curve(
+def _apply_post_fx_highlight_rolloff_curve(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, _large: bool,
 ) -> None:
-    controls.render_post_fx.cycle_highlight_rolloff_curve(forward=forward)
+    controls.post_fx.cycle_highlight_rolloff_curve(forward=forward)
 
-def _apply_render_post_fx_highlight_rolloff_threshold(
+def _apply_post_fx_highlight_rolloff_threshold(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, large: bool,
 ) -> None:
     step = 10 if large else 1
     delta = step if forward else -step
-    hr = controls.session.render_post_fx.highlight_rolloff
-    controls.render_post_fx.set_highlight_rolloff_threshold_pct(
+    hr = controls.session.post_fx.highlight_rolloff
+    controls.post_fx.set_highlight_rolloff_threshold_pct(
         hr.threshold_pct + delta
     )
 
-def _apply_render_post_fx_highlight_rolloff_ceiling(
+def _apply_post_fx_highlight_rolloff_ceiling(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, large: bool,
 ) -> None:
     step = 10 if large else 1
     delta = step if forward else -step
-    hr = controls.session.render_post_fx.highlight_rolloff
-    controls.render_post_fx.set_highlight_rolloff_ceiling_pct(
+    hr = controls.session.post_fx.highlight_rolloff
+    controls.post_fx.set_highlight_rolloff_ceiling_pct(
         hr.ceiling_pct + delta
     )
 
-def _apply_render_post_fx_highlight_rolloff_strength(
+def _apply_post_fx_highlight_rolloff_strength(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, large: bool,
 ) -> None:
     step = 10 if large else 1
     delta = step if forward else -step
-    hr = controls.session.render_post_fx.highlight_rolloff
-    controls.render_post_fx.set_highlight_rolloff_strength_pct(
+    hr = controls.session.post_fx.highlight_rolloff
+    controls.post_fx.set_highlight_rolloff_strength_pct(
         hr.strength_pct + delta
     )
 
-def _apply_render_post_fx_highlight_rolloff_softness(
+def _apply_post_fx_highlight_rolloff_softness(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, large: bool,
 ) -> None:
     step = 10 if large else 1
     delta = step if forward else -step
-    hr = controls.session.render_post_fx.highlight_rolloff
-    controls.render_post_fx.set_highlight_rolloff_softness_pct(
+    hr = controls.session.post_fx.highlight_rolloff
+    controls.post_fx.set_highlight_rolloff_softness_pct(
         hr.softness_pct + delta
     )
 
-def _apply_render_post_fx_highlight_rolloff_desaturation(
+def _apply_post_fx_highlight_rolloff_desaturation(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, large: bool,
 ) -> None:
     step = 10 if large else 1
     delta = step if forward else -step
-    hr = controls.session.render_post_fx.highlight_rolloff
-    controls.render_post_fx.set_highlight_rolloff_desaturation_pct(
+    hr = controls.session.post_fx.highlight_rolloff
+    controls.post_fx.set_highlight_rolloff_desaturation_pct(
         hr.desaturation_pct + delta
     )
 
-def _apply_render_post_fx_chroma_boost_mode(
+def _apply_post_fx_chroma_boost_mode(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, _large: bool,
 ) -> None:
-    controls.render_post_fx.cycle_chroma_boost_mode(forward=forward)
+    controls.post_fx.cycle_chroma_boost_mode(forward=forward)
 
-def _apply_render_post_fx_chroma_boost_variant(
+def _apply_post_fx_chroma_boost_variant(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, _large: bool,
 ) -> None:
-    controls.render_post_fx.cycle_chroma_boost_variant(forward=forward)
+    controls.post_fx.cycle_chroma_boost_variant(forward=forward)
 
-def _apply_render_post_fx_chroma_boost_amount(
+def _apply_post_fx_chroma_boost_amount(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, large: bool,
 ) -> None:
     step = 10 if large else 1
     delta = step if forward else -step
-    cb = controls.session.render_post_fx.chroma_boost
-    controls.render_post_fx.set_chroma_boost_amount_pct(cb.amount_pct + delta)
+    cb = controls.session.post_fx.chroma_boost
+    controls.post_fx.set_chroma_boost_amount_pct(cb.amount_pct + delta)
 
-def _format_render_post_fx_limiter_enabled(
+def _format_post_fx_limiter_enabled(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return "on" if state.render_post_fx.limiter.enabled else "off"
+    return "on" if state.post_fx.limiter.enabled else "off"
 
-def _apply_render_post_fx_limiter_enabled(
+def _apply_post_fx_limiter_enabled(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
     _large: bool,
 ) -> None:
-    controls.render_post_fx.set_limiter_enabled(forward)
+    controls.post_fx.set_limiter_enabled(forward)
 
-def _format_render_post_fx_limiter_threshold(
+def _format_post_fx_limiter_threshold(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return f"{int(round(state.render_post_fx.limiter.threshold * 100))}%"
+    return f"{int(round(state.post_fx.limiter.threshold * 100))}%"
 
-def _apply_render_post_fx_limiter_threshold(
+def _apply_post_fx_limiter_threshold(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
     _large: bool,
 ) -> None:
     del _large
-    lim = controls.session.render_post_fx.limiter
+    lim = controls.session.post_fx.limiter
     delta = VISUAL_LIMITER_THRESHOLD_STEP if forward else -VISUAL_LIMITER_THRESHOLD_STEP
-    controls.render_post_fx.set_limiter_threshold(round(lim.threshold + delta, 2))
+    controls.post_fx.set_limiter_threshold(round(lim.threshold + delta, 2))
 
-def _format_render_post_fx_limiter_ratio(
+def _format_post_fx_limiter_ratio(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return f"{state.render_post_fx.limiter.ratio:.1f}:1"
+    return f"{state.post_fx.limiter.ratio:.1f}:1"
 
-def _apply_render_post_fx_limiter_ratio(
+def _apply_post_fx_limiter_ratio(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
     _large: bool,
 ) -> None:
     del _large
-    lim = controls.session.render_post_fx.limiter
+    lim = controls.session.post_fx.limiter
     delta = VISUAL_LIMITER_RATIO_STEP if forward else -VISUAL_LIMITER_RATIO_STEP
-    controls.render_post_fx.set_limiter_ratio(round(lim.ratio + delta, 1))
+    controls.post_fx.set_limiter_ratio(round(lim.ratio + delta, 1))
 
-def _format_render_post_fx_limiter_release(
+def _format_post_fx_limiter_release(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return f"{state.render_post_fx.limiter.release:.1f}s"
+    return f"{state.post_fx.limiter.release:.1f}s"
 
-def _apply_render_post_fx_limiter_release(
+def _apply_post_fx_limiter_release(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
     _large: bool,
 ) -> None:
     del _large
-    lim = controls.session.render_post_fx.limiter
+    lim = controls.session.post_fx.limiter
     delta = VISUAL_LIMITER_RELEASE_STEP if forward else -VISUAL_LIMITER_RELEASE_STEP
-    controls.render_post_fx.set_limiter_release(round(lim.release + delta, 1))
+    controls.post_fx.set_limiter_release(round(lim.release + delta, 1))
 
-def _toggle_render_post_fx_enabled(
+def _toggle_post_fx_enabled(
     controls: TuningControls, _desc: RowDescriptor
 ) -> None:
-    if controls.session.render_post_fx.locked:
+    if controls.session.post_fx.locked:
         return
-    enabled = controls.session.render_post_fx.enabled
-    controls.render_post_fx.set_enabled(not enabled)
+    enabled = controls.session.post_fx.enabled
+    controls.post_fx.set_enabled(not enabled)
 
 
 def _visibility_post_fx(
     state: TuningViewState, _desc: RowDescriptor
 ) -> tuple[bool, bool]:
-    block = state.render_post_fx
+    block = state.post_fx
     return (block.enabled, block.solo)
 
 SPECS: dict[RowKind, RowSpec] = {
-    RowKind.RENDER_POST_FX_HEADER: RowSpec(
+    RowKind.POST_FX_HEADER: RowSpec(
         affordance=RowAffordance.HEADING,
-        panel_label="POST FX",
+        panel_label="Post-FX",
         present_style=RowPresentStyle.HEADING,
         fit_strategy=FitStrategy.NONE,
         visibility_icon=_visibility_post_fx,
@@ -315,9 +315,9 @@ SPECS: dict[RowKind, RowSpec] = {
         help_description=(
             "Post-processing effects applied during final compositing.",
         ),
-        toggle_enabled=_toggle_render_post_fx_enabled,
+        toggle_enabled=_toggle_post_fx_enabled,
     ),
-    RowKind.RENDER_POST_FX_FADE_HEADER: RowSpec(
+    RowKind.POST_FX_FADE_HEADER: RowSpec(
         affordance=RowAffordance.HEADING,
         panel_label="fade",
         present_style=RowPresentStyle.HEADING,
@@ -326,9 +326,9 @@ SPECS: dict[RowKind, RowSpec] = {
         help_description=(
             "Fades the picture in from the song start and out toward the song end.",
         ),
-        parent_group="render_post_fx",
+        parent_group="post_fx",
     ),
-    RowKind.RENDER_POST_FX_FADE_IN_HEADER: RowSpec(
+    RowKind.POST_FX_FADE_IN_HEADER: RowSpec(
         affordance=RowAffordance.HEADING,
         panel_label="fade in",
         present_style=RowPresentStyle.HEADING,
@@ -338,49 +338,49 @@ SPECS: dict[RowKind, RowSpec] = {
             "Offsets from the start of the song.",
             "The picture rises from start to end.",
         ),
-        parent_group="render_post_fx_fade",
+        parent_group="post_fx_fade",
     ),
-    RowKind.RENDER_POST_FX_FADE_IN_START: RowSpec(
+    RowKind.POST_FX_FADE_IN_START: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
         panel_label="start",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_render_post_fx_fade_in_start,
-        apply_horizontal=_apply_render_post_fx_fade_in_start,
+        format_value=_format_post_fx_fade_in_start,
+        apply_horizontal=_apply_post_fx_fade_in_start,
         help_title="Start",
         help_description=(
             "Seconds from the start of the song where the fade-in begins.",
         ),
         repeatable=True,
-        parent_group="render_post_fx_fade_in",
+        parent_group="post_fx_fade_in",
     ),
-    RowKind.RENDER_POST_FX_FADE_IN_END: RowSpec(
+    RowKind.POST_FX_FADE_IN_END: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
         panel_label="end",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_render_post_fx_fade_in_end,
-        apply_horizontal=_apply_render_post_fx_fade_in_end,
+        format_value=_format_post_fx_fade_in_end,
+        apply_horizontal=_apply_post_fx_fade_in_end,
         help_title="End",
         help_description=(
             "Seconds from the start of the song where the fade-in finishes.",
             "Must be at or after start.",
         ),
         repeatable=True,
-        parent_group="render_post_fx_fade_in",
+        parent_group="post_fx_fade_in",
     ),
-    RowKind.RENDER_POST_FX_FADE_IN_TYPE: RowSpec(
+    RowKind.POST_FX_FADE_IN_TYPE: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
         panel_label="type",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_render_post_fx_fade_in_type,
-        apply_horizontal=_apply_render_post_fx_fade_in_type,
+        format_value=_format_post_fx_fade_in_type,
+        apply_horizontal=_apply_post_fx_fade_in_type,
         help_title="Type",
         help_entries=(("Left/Right", "cycle type"),),
         help_description=("Curve used while the picture rises.",),
         help_mode_entries=FADE_CURVE_HELP_ENTRIES,
         repeatable=True,
-        parent_group="render_post_fx_fade_in",
+        parent_group="post_fx_fade_in",
     ),
-    RowKind.RENDER_POST_FX_FADE_OUT_HEADER: RowSpec(
+    RowKind.POST_FX_FADE_OUT_HEADER: RowSpec(
         affordance=RowAffordance.HEADING,
         panel_label="fade out",
         present_style=RowPresentStyle.HEADING,
@@ -391,41 +391,41 @@ SPECS: dict[RowKind, RowSpec] = {
             "The picture falls from start to end.",
             "Start is farther from the end than end.",
         ),
-        parent_group="render_post_fx_fade",
+        parent_group="post_fx_fade",
     ),
-    RowKind.RENDER_POST_FX_FADE_OUT_START: RowSpec(
+    RowKind.POST_FX_FADE_OUT_START: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
         panel_label="start",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_render_post_fx_fade_out_start,
-        apply_horizontal=_apply_render_post_fx_fade_out_start,
+        format_value=_format_post_fx_fade_out_start,
+        apply_horizontal=_apply_post_fx_fade_out_start,
         help_title="Start",
         help_description=(
             "Seconds counted backward from the song end where the fade-out begins.",
             "Start is farther from the end than end.",
         ),
         repeatable=True,
-        parent_group="render_post_fx_fade_out",
+        parent_group="post_fx_fade_out",
     ),
-    RowKind.RENDER_POST_FX_FADE_OUT_END: RowSpec(
+    RowKind.POST_FX_FADE_OUT_END: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
         panel_label="end",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_render_post_fx_fade_out_end,
-        apply_horizontal=_apply_render_post_fx_fade_out_end,
+        format_value=_format_post_fx_fade_out_end,
+        apply_horizontal=_apply_post_fx_fade_out_end,
         help_title="End",
         help_description=(
             "Seconds counted backward from the song end where the fade-out finishes.",
         ),
         repeatable=True,
-        parent_group="render_post_fx_fade_out",
+        parent_group="post_fx_fade_out",
     ),
-    RowKind.RENDER_POST_FX_FADE_OUT_TYPE: RowSpec(
+    RowKind.POST_FX_FADE_OUT_TYPE: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
         panel_label="type",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_render_post_fx_fade_out_type,
-        apply_horizontal=_apply_render_post_fx_fade_out_type,
+        format_value=_format_post_fx_fade_out_type,
+        apply_horizontal=_apply_post_fx_fade_out_type,
         help_title="Type",
         help_entries=(("Left/Right", "cycle type"),),
         help_description=(
@@ -434,9 +434,9 @@ SPECS: dict[RowKind, RowSpec] = {
         ),
         help_mode_entries=FADE_CURVE_HELP_ENTRIES,
         repeatable=True,
-        parent_group="render_post_fx_fade_out",
+        parent_group="post_fx_fade_out",
     ),
-    RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_HEADER: RowSpec(
+    RowKind.POST_FX_HIGHLIGHT_ROLLOFF_HEADER: RowSpec(
         affordance=RowAffordance.HEADING,
         panel_label="highlight rolloff",
         present_style=RowPresentStyle.HEADING,
@@ -450,40 +450,40 @@ SPECS: dict[RowKind, RowSpec] = {
             "runs automatically; composite rolloff here is extra control.",
             "Per-layer rolloff is optional and can stay light.",
         ),
-        parent_group="render_post_fx",
+        parent_group="post_fx",
     ),
-    RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_MODE: RowSpec(
+    RowKind.POST_FX_HIGHLIGHT_ROLLOFF_MODE: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
         panel_label="mode",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_render_post_fx_highlight_rolloff_mode,
-        apply_horizontal=_apply_render_post_fx_highlight_rolloff_mode,
+        format_value=_format_post_fx_highlight_rolloff_mode,
+        apply_horizontal=_apply_post_fx_highlight_rolloff_mode,
         help_title="Mode",
         help_entries=(("Left/Right", "cycle mode"),),
         help_description=("Where highlight rolloff is applied.",),
         help_mode_entries=HIGHLIGHT_ROLLOFF_APPLY_MODE_HELP_ENTRIES,
         repeatable=True,
-        parent_group="render_post_fx_highlight_rolloff",
+        parent_group="post_fx_highlight_rolloff",
     ),
-    RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_CURVE: RowSpec(
+    RowKind.POST_FX_HIGHLIGHT_ROLLOFF_CURVE: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
         panel_label="curve",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_render_post_fx_highlight_rolloff_curve,
-        apply_horizontal=_apply_render_post_fx_highlight_rolloff_curve,
+        format_value=_format_post_fx_highlight_rolloff_curve,
+        apply_horizontal=_apply_post_fx_highlight_rolloff_curve,
         help_title="Curve",
         help_entries=(("Left/Right", "cycle curve"),),
         help_description=("Shoulder curve used above the soft knee.",),
         help_mode_entries=HIGHLIGHT_ROLLOFF_CURVE_HELP_ENTRIES,
         repeatable=True,
-        parent_group="render_post_fx_highlight_rolloff",
+        parent_group="post_fx_highlight_rolloff",
     ),
-    RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD: RowSpec(
+    RowKind.POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
         panel_label="threshold",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_render_post_fx_highlight_rolloff_threshold,
-        apply_horizontal=_apply_render_post_fx_highlight_rolloff_threshold,
+        format_value=_format_post_fx_highlight_rolloff_threshold,
+        apply_horizontal=_apply_post_fx_highlight_rolloff_threshold,
         help_title="Threshold",
         help_description=(
             "Rec.709 luminance level where compression begins.",
@@ -491,14 +491,14 @@ SPECS: dict[RowKind, RowSpec] = {
             "Higher = only the brightest peaks are compressed.",
         ),
         repeatable=True,
-        parent_group="render_post_fx_highlight_rolloff",
+        parent_group="post_fx_highlight_rolloff",
     ),
-    RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_CEILING: RowSpec(
+    RowKind.POST_FX_HIGHLIGHT_ROLLOFF_CEILING: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
         panel_label="ceiling",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_render_post_fx_highlight_rolloff_ceiling,
-        apply_horizontal=_apply_render_post_fx_highlight_rolloff_ceiling,
+        format_value=_format_post_fx_highlight_rolloff_ceiling,
+        apply_horizontal=_apply_post_fx_highlight_rolloff_ceiling,
         help_title="Ceiling",
         help_description=(
             "Luminance target for fully compressed highlights.",
@@ -506,14 +506,14 @@ SPECS: dict[RowKind, RowSpec] = {
             "Must be at or below threshold (e.g. threshold 78%, ceiling 65%).",
         ),
         repeatable=True,
-        parent_group="render_post_fx_highlight_rolloff",
+        parent_group="post_fx_highlight_rolloff",
     ),
-    RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_STRENGTH: RowSpec(
+    RowKind.POST_FX_HIGHLIGHT_ROLLOFF_STRENGTH: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
         panel_label="strength",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_render_post_fx_highlight_rolloff_strength,
-        apply_horizontal=_apply_render_post_fx_highlight_rolloff_strength,
+        format_value=_format_post_fx_highlight_rolloff_strength,
+        apply_horizontal=_apply_post_fx_highlight_rolloff_strength,
         help_title="Strength",
         help_description=(
             "How strongly highlights above the threshold are compressed.",
@@ -522,14 +522,14 @@ SPECS: dict[RowKind, RowSpec] = {
             "Lower = gentler rolloff with more retained brightness.",
         ),
         repeatable=True,
-        parent_group="render_post_fx_highlight_rolloff",
+        parent_group="post_fx_highlight_rolloff",
     ),
-    RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_SOFTNESS: RowSpec(
+    RowKind.POST_FX_HIGHLIGHT_ROLLOFF_SOFTNESS: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
         panel_label="softness",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_render_post_fx_highlight_rolloff_softness,
-        apply_horizontal=_apply_render_post_fx_highlight_rolloff_softness,
+        format_value=_format_post_fx_highlight_rolloff_softness,
+        apply_horizontal=_apply_post_fx_highlight_rolloff_softness,
         help_title="Softness",
         help_description=(
             "Width of the soft knee above the threshold.",
@@ -537,14 +537,14 @@ SPECS: dict[RowKind, RowSpec] = {
             "Lower = tighter transition right at the threshold.",
         ),
         repeatable=True,
-        parent_group="render_post_fx_highlight_rolloff",
+        parent_group="post_fx_highlight_rolloff",
     ),
-    RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_DESATURATION: RowSpec(
+    RowKind.POST_FX_HIGHLIGHT_ROLLOFF_DESATURATION: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
         panel_label="desaturation",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_render_post_fx_highlight_rolloff_desaturation,
-        apply_horizontal=_apply_render_post_fx_highlight_rolloff_desaturation,
+        format_value=_format_post_fx_highlight_rolloff_desaturation,
+        apply_horizontal=_apply_post_fx_highlight_rolloff_desaturation,
         help_title="Desaturation",
         help_description=(
             "How much compressed highlights lose color purity.",
@@ -552,9 +552,9 @@ SPECS: dict[RowKind, RowSpec] = {
             "Hue is preserved during luminance scaling, then pulled toward gray.",
         ),
         repeatable=True,
-        parent_group="render_post_fx_highlight_rolloff",
+        parent_group="post_fx_highlight_rolloff",
     ),
-    RowKind.RENDER_POST_FX_CHROMA_BOOST_HEADER: RowSpec(
+    RowKind.POST_FX_CHROMA_BOOST_HEADER: RowSpec(
         affordance=RowAffordance.HEADING,
         panel_label="chroma boost",
         present_style=RowPresentStyle.HEADING,
@@ -565,49 +565,49 @@ SPECS: dict[RowKind, RowSpec] = {
             "Useful after highlight compression to restore perceived color.",
             "Vibrance spares already-saturated pixels to avoid clipping primaries.",
         ),
-        parent_group="render_post_fx",
+        parent_group="post_fx",
     ),
-    RowKind.RENDER_POST_FX_CHROMA_BOOST_MODE: RowSpec(
+    RowKind.POST_FX_CHROMA_BOOST_MODE: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
         panel_label="mode",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_render_post_fx_chroma_boost_mode,
-        apply_horizontal=_apply_render_post_fx_chroma_boost_mode,
+        format_value=_format_post_fx_chroma_boost_mode,
+        apply_horizontal=_apply_post_fx_chroma_boost_mode,
         help_title="Mode",
         help_entries=(("Left/Right", "cycle mode"),),
         help_description=("Where chroma boost is applied.",),
         help_mode_entries=CHROMA_BOOST_APPLY_MODE_HELP_ENTRIES,
         repeatable=True,
-        parent_group="render_post_fx_chroma_boost",
+        parent_group="post_fx_chroma_boost",
     ),
-    RowKind.RENDER_POST_FX_CHROMA_BOOST_VARIANT: RowSpec(
+    RowKind.POST_FX_CHROMA_BOOST_VARIANT: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
         panel_label="variant",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_render_post_fx_chroma_boost_variant,
-        apply_horizontal=_apply_render_post_fx_chroma_boost_variant,
+        format_value=_format_post_fx_chroma_boost_variant,
+        apply_horizontal=_apply_post_fx_chroma_boost_variant,
         help_title="Variant",
         help_entries=(("Left/Right", "cycle variant"),),
         help_description=("Saturation vs vibrance weighting.",),
         help_mode_entries=CHROMA_BOOST_VARIANT_HELP_ENTRIES,
         repeatable=True,
-        parent_group="render_post_fx_chroma_boost",
+        parent_group="post_fx_chroma_boost",
     ),
-    RowKind.RENDER_POST_FX_CHROMA_BOOST_AMOUNT: RowSpec(
+    RowKind.POST_FX_CHROMA_BOOST_AMOUNT: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
         panel_label="amount",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_render_post_fx_chroma_boost_amount,
-        apply_horizontal=_apply_render_post_fx_chroma_boost_amount,
+        format_value=_format_post_fx_chroma_boost_amount,
+        apply_horizontal=_apply_post_fx_chroma_boost_amount,
         help_title="Amount",
         help_description=(
             "Chroma boost strength as a percentage.",
             "0% disables the pass even when mode is not off.",
         ),
         repeatable=True,
-        parent_group="render_post_fx_chroma_boost",
+        parent_group="post_fx_chroma_boost",
     ),
-    RowKind.RENDER_POST_FX_LIMITER_HEADER: RowSpec(
+    RowKind.POST_FX_LIMITER_HEADER: RowSpec(
         affordance=RowAffordance.HEADING,
         panel_label="visual limiter",
         present_style=RowPresentStyle.HEADING,
@@ -618,30 +618,30 @@ SPECS: dict[RowKind, RowSpec] = {
             "Works with the timeline off. Cue roles weight the cut when the timeline is on.",
             "Independent of the Post FX master switch and Post FX solo.",
         ),
-        parent_group="render_post_fx",
+        parent_group="post_fx",
         blocked_by_section_lock=False,
     ),
-    RowKind.RENDER_POST_FX_LIMITER_ENABLED: RowSpec(
+    RowKind.POST_FX_LIMITER_ENABLED: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
         panel_label="enabled",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_render_post_fx_limiter_enabled,
-        apply_horizontal=_apply_render_post_fx_limiter_enabled,
+        format_value=_format_post_fx_limiter_enabled,
+        apply_horizontal=_apply_post_fx_limiter_enabled,
         help_title="Visual limiter enabled",
         help_entries=(("Left/Right", "off / on"),),
         help_description=(
             "When off, the limiter is idle and remaining knobs hide.",
             "The Post FX master switch does not turn this off.",
         ),
-        parent_group="render_post_fx_limiter",
+        parent_group="post_fx_limiter",
         blocked_by_section_lock=False,
     ),
-    RowKind.RENDER_POST_FX_LIMITER_THRESHOLD: RowSpec(
+    RowKind.POST_FX_LIMITER_THRESHOLD: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
         panel_label="threshold",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_render_post_fx_limiter_threshold,
-        apply_horizontal=_apply_render_post_fx_limiter_threshold,
+        format_value=_format_post_fx_limiter_threshold,
+        apply_horizontal=_apply_post_fx_limiter_threshold,
         help_title="Visual limiter threshold",
         help_entries=(
             ("Left", "decrease threshold"),
@@ -651,15 +651,15 @@ SPECS: dict[RowKind, RowSpec] = {
             "Busyness level above which compression engages.",
         ),
         repeatable=True,
-        parent_group="render_post_fx_limiter",
+        parent_group="post_fx_limiter",
         blocked_by_section_lock=False,
     ),
-    RowKind.RENDER_POST_FX_LIMITER_RATIO: RowSpec(
+    RowKind.POST_FX_LIMITER_RATIO: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
         panel_label="ratio",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_render_post_fx_limiter_ratio,
-        apply_horizontal=_apply_render_post_fx_limiter_ratio,
+        format_value=_format_post_fx_limiter_ratio,
+        apply_horizontal=_apply_post_fx_limiter_ratio,
         help_title="Visual limiter ratio",
         help_entries=(
             ("Left", "decrease ratio"),
@@ -670,15 +670,15 @@ SPECS: dict[RowKind, RowSpec] = {
             "Higher ratios duck hot layers more.",
         ),
         repeatable=True,
-        parent_group="render_post_fx_limiter",
+        parent_group="post_fx_limiter",
         blocked_by_section_lock=False,
     ),
-    RowKind.RENDER_POST_FX_LIMITER_RELEASE: RowSpec(
+    RowKind.POST_FX_LIMITER_RELEASE: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
         panel_label="release",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_render_post_fx_limiter_release,
-        apply_horizontal=_apply_render_post_fx_limiter_release,
+        format_value=_format_post_fx_limiter_release,
+        apply_horizontal=_apply_post_fx_limiter_release,
         help_title="Visual limiter release",
         help_entries=(
             ("Left", "decrease release"),
@@ -689,7 +689,7 @@ SPECS: dict[RowKind, RowSpec] = {
             "Controls how quickly ducking eases off.",
         ),
         repeatable=True,
-        parent_group="render_post_fx_limiter",
+        parent_group="post_fx_limiter",
         blocked_by_section_lock=False,
     ),
 }

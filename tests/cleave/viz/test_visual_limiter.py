@@ -329,7 +329,7 @@ def test_apply_effect_modifiers_includes_limiter_gain() -> None:
 def test_visual_limiter_inactive_when_disabled() -> None:
     session = _session(timeline_enabled=False)
     assert visual_limiter_active(LimiterFrameState.from_session(session)) is True
-    session.render_post_fx.limiter.enabled = False
+    session.post_fx.limiter.enabled = False
     assert visual_limiter_active(LimiterFrameState.from_session(session)) is False
 
 
@@ -398,8 +398,8 @@ def test_visual_limiter_idle_for_exclusions(mutate) -> None:
 
 def test_visual_limiter_ignores_post_fx_master_and_solo() -> None:
     session = _session(timeline_enabled=False)
-    session.render_post_fx.enabled = False
-    session.render_post_fx_solo = True
+    session.post_fx.enabled = False
+    session.post_fx_solo = True
     assert visual_limiter_active(LimiterFrameState.from_session(session)) is True
     session.timeline.enabled = True
     assert visual_limiter_active(LimiterFrameState.from_session(session)) is True
@@ -407,7 +407,7 @@ def test_visual_limiter_ignores_post_fx_master_and_solo() -> None:
 
 def test_apply_visual_limiter_gains_resets_when_disabled() -> None:
     session = _session(timeline_enabled=False)
-    session.render_post_fx.limiter.enabled = False
+    session.post_fx.limiter.enabled = False
     state = VisualLimiterState()
     state.gains["layer_1"] = _SAMPLE_GAIN
     layer = _stem("layer_1", timeline_level=1.0)

@@ -12,7 +12,7 @@ from cleave.viz.layer import StemLayer
 from cleave.viz.layer_pipeline import LayerFramePipeline
 from cleave.viz.layer_preview_resolution import preview_layer_size
 from cleave.viz.session import LayerRuntime, TuningSession
-from tests.support.config import TEST_LAYER_STEMS, default_render_post_fx_runtime
+from tests.support.config import TEST_LAYER_STEMS, default_post_fx_runtime
 from tests.support.viz import make_test_cfg
 
 
@@ -254,8 +254,8 @@ def test_render_frame_applies_per_layer_highlight_rolloff_when_playing() -> None
     layer.fbo.enabled = True
     layer.fbo.texture_id = 11
     session = _session(("layer_1",))
-    session.render_post_fx = default_render_post_fx_runtime(enabled=True)
-    hr = session.render_post_fx.highlight_rolloff
+    session.post_fx = default_post_fx_runtime(enabled=True)
+    hr = session.post_fx.highlight_rolloff
     hr.mode = "per_layer"
     compositor = MagicMock()
     compositor.rolloff_source_texture_id.return_value = 22
@@ -301,8 +301,8 @@ def test_render_frame_skips_per_layer_highlight_rolloff_when_post_fx_disabled() 
     layer.fbo.enabled = True
     layer.fbo.texture_id = 11
     session = _session(("layer_1",))
-    session.render_post_fx = default_render_post_fx_runtime(enabled=False)
-    session.render_post_fx.highlight_rolloff.mode = "per_layer"
+    session.post_fx = default_post_fx_runtime(enabled=False)
+    session.post_fx.highlight_rolloff.mode = "per_layer"
     compositor = MagicMock()
     post_process = MagicMock()
     effect_runtime = MagicMock()
@@ -342,8 +342,8 @@ def test_render_frame_paused_per_layer_uses_frozen_rolloff_source() -> None:
     layer.fbo.enabled = True
     layer.fbo.texture_id = 11
     session = _session(("layer_1",))
-    session.render_post_fx = default_render_post_fx_runtime(enabled=True)
-    hr = session.render_post_fx.highlight_rolloff
+    session.post_fx = default_post_fx_runtime(enabled=True)
+    hr = session.post_fx.highlight_rolloff
     hr.mode = "per_layer"
     compositor = MagicMock()
     compositor.rolloff_source_texture_id.return_value = 22
@@ -381,8 +381,8 @@ def test_render_frame_applies_per_layer_chroma_boost_when_playing() -> None:
     layer.fbo.enabled = True
     layer.fbo.texture_id = 11
     session = _session(("layer_1",))
-    session.render_post_fx = default_render_post_fx_runtime(enabled=True)
-    cb = session.render_post_fx.chroma_boost
+    session.post_fx = default_post_fx_runtime(enabled=True)
+    cb = session.post_fx.chroma_boost
     cb.mode = "per_layer"
     cb.amount_pct = 30
     compositor = MagicMock()
@@ -425,8 +425,8 @@ def test_render_frame_skips_per_layer_chroma_boost_when_amount_zero() -> None:
     layer = _stem_layer("layer_1")
     layer.fbo.enabled = True
     session = _session(("layer_1",))
-    session.render_post_fx = default_render_post_fx_runtime(enabled=True)
-    cb = session.render_post_fx.chroma_boost
+    session.post_fx = default_post_fx_runtime(enabled=True)
+    cb = session.post_fx.chroma_boost
     cb.mode = "per_layer"
     cb.amount_pct = 0
     compositor = MagicMock()

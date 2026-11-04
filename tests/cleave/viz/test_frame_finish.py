@@ -5,7 +5,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 from cleave.viz.frame_finish import _composite_one_overlay_card, finish_content_frame
-from tests.support.config import default_render_post_fx_runtime
+from tests.support.config import default_post_fx_runtime
 
 
 def _make_core(*, hdr: bool = False) -> MagicMock:
@@ -31,7 +31,7 @@ def test_overlay_card_layout_uses_compositor_content_size() -> None:
 
     with (
         patch("cleave.viz.frame_finish.live_overlay_alpha", return_value=1.0),
-        patch("cleave.viz.frame_finish.composite_render_overlay_with_alpha") as composite,
+        patch("cleave.viz.frame_finish.composite_overlay_with_alpha") as composite,
     ):
         _composite_one_overlay_card(
             core,
@@ -49,8 +49,8 @@ def test_overlay_card_layout_uses_compositor_content_size() -> None:
 
 def test_finish_content_frame_applies_highlight_rolloff_when_active() -> None:
     core = _make_core(hdr=False)
-    core.seed.session.render_post_fx = default_render_post_fx_runtime(enabled=True)
-    hr = core.seed.session.render_post_fx.highlight_rolloff
+    core.seed.session.post_fx = default_post_fx_runtime(enabled=True)
+    hr = core.seed.session.post_fx.highlight_rolloff
     hr.mode = "composite"
     hr.curve = "rolloff"
     hr.threshold_pct = 80
@@ -61,7 +61,7 @@ def test_finish_content_frame_applies_highlight_rolloff_when_active() -> None:
 
     with (
         patch("cleave.viz.frame_finish.apply_hdr_display_shoulder") as shoulder,
-        patch("cleave.viz.frame_finish._composite_render_overlay"),
+        patch("cleave.viz.frame_finish._composite_overlay"),
     ):
         finish_content_frame(core, 1.0)
 
@@ -81,14 +81,14 @@ def test_finish_content_frame_applies_highlight_rolloff_when_active() -> None:
 
 def test_finish_content_frame_passes_highlight_rolloff_curve_index() -> None:
     core = _make_core(hdr=False)
-    core.seed.session.render_post_fx = default_render_post_fx_runtime(enabled=True)
-    hr = core.seed.session.render_post_fx.highlight_rolloff
+    core.seed.session.post_fx = default_post_fx_runtime(enabled=True)
+    hr = core.seed.session.post_fx.highlight_rolloff
     hr.mode = "composite"
     hr.curve = "aces_fit"
 
     with (
         patch("cleave.viz.frame_finish.apply_hdr_display_shoulder"),
-        patch("cleave.viz.frame_finish._composite_render_overlay"),
+        patch("cleave.viz.frame_finish._composite_overlay"),
     ):
         finish_content_frame(core, 1.0)
 
@@ -98,12 +98,12 @@ def test_finish_content_frame_passes_highlight_rolloff_curve_index() -> None:
 
 def test_finish_content_frame_skips_highlight_rolloff_when_solo() -> None:
     core = _make_core(hdr=False)
-    core.seed.session.render_post_fx = default_render_post_fx_runtime(enabled=True)
-    core.seed.session.render_post_fx.highlight_rolloff.mode = "composite"
+    core.seed.session.post_fx = default_post_fx_runtime(enabled=True)
+    core.seed.session.post_fx.highlight_rolloff.mode = "composite"
 
     with (
         patch("cleave.viz.frame_finish.apply_hdr_display_shoulder"),
-        patch("cleave.viz.frame_finish._composite_render_overlay"),
+        patch("cleave.viz.frame_finish._composite_overlay"),
     ):
         finish_content_frame(core, 1.0, post_fx_solo=True)
 
@@ -112,12 +112,12 @@ def test_finish_content_frame_skips_highlight_rolloff_when_solo() -> None:
 
 def test_finish_content_frame_skips_highlight_rolloff_when_post_fx_disabled() -> None:
     core = _make_core(hdr=False)
-    core.seed.session.render_post_fx = default_render_post_fx_runtime(enabled=False)
-    core.seed.session.render_post_fx.highlight_rolloff.mode = "composite"
+    core.seed.session.post_fx = default_post_fx_runtime(enabled=False)
+    core.seed.session.post_fx.highlight_rolloff.mode = "composite"
 
     with (
         patch("cleave.viz.frame_finish.apply_hdr_display_shoulder"),
-        patch("cleave.viz.frame_finish._composite_render_overlay"),
+        patch("cleave.viz.frame_finish._composite_overlay"),
     ):
         finish_content_frame(core, 1.0)
 
@@ -126,8 +126,8 @@ def test_finish_content_frame_skips_highlight_rolloff_when_post_fx_disabled() ->
 
 def test_finish_content_frame_call_order_rolloff_fade_overlay_present() -> None:
     core = _make_core(hdr=False)
-    core.seed.session.render_post_fx = default_render_post_fx_runtime(enabled=True)
-    core.seed.session.render_post_fx.highlight_rolloff.mode = "composite"
+    core.seed.session.post_fx = default_post_fx_runtime(enabled=True)
+    core.seed.session.post_fx.highlight_rolloff.mode = "composite"
     call_order: list[str] = []
 
     core.post_process.apply_highlight_rolloff.side_effect = (
@@ -143,7 +143,7 @@ def test_finish_content_frame_call_order_rolloff_fade_overlay_present() -> None:
     with (
         patch("cleave.viz.frame_finish.apply_hdr_display_shoulder"),
         patch(
-            "cleave.viz.frame_finish._composite_render_overlay",
+            "cleave.viz.frame_finish._composite_overlay",
             side_effect=lambda *_a, **_k: call_order.append("overlay"),
         ),
     ):
@@ -159,15 +159,15 @@ def test_finish_content_frame_call_order_rolloff_fade_overlay_present() -> None:
 
 def test_finish_content_frame_applies_chroma_boost_when_active() -> None:
     core = _make_core(hdr=False)
-    core.seed.session.render_post_fx = default_render_post_fx_runtime(enabled=True)
-    cb = core.seed.session.render_post_fx.chroma_boost
+    core.seed.session.post_fx = default_post_fx_runtime(enabled=True)
+    cb = core.seed.session.post_fx.chroma_boost
     cb.mode = "composite"
     cb.variant = "vibrance"
     cb.amount_pct = 40
 
     with (
         patch("cleave.viz.frame_finish.apply_hdr_display_shoulder"),
-        patch("cleave.viz.frame_finish._composite_render_overlay"),
+        patch("cleave.viz.frame_finish._composite_overlay"),
     ):
         finish_content_frame(core, 1.0)
 
@@ -182,13 +182,13 @@ def test_finish_content_frame_applies_chroma_boost_when_active() -> None:
 
 def test_finish_content_frame_skips_chroma_boost_when_post_fx_disabled() -> None:
     core = _make_core(hdr=False)
-    core.seed.session.render_post_fx = default_render_post_fx_runtime(enabled=False)
-    core.seed.session.render_post_fx.chroma_boost.mode = "composite"
-    core.seed.session.render_post_fx.chroma_boost.amount_pct = 25
+    core.seed.session.post_fx = default_post_fx_runtime(enabled=False)
+    core.seed.session.post_fx.chroma_boost.mode = "composite"
+    core.seed.session.post_fx.chroma_boost.amount_pct = 25
 
     with (
         patch("cleave.viz.frame_finish.apply_hdr_display_shoulder"),
-        patch("cleave.viz.frame_finish._composite_render_overlay"),
+        patch("cleave.viz.frame_finish._composite_overlay"),
     ):
         finish_content_frame(core, 1.0)
 
@@ -197,10 +197,10 @@ def test_finish_content_frame_skips_chroma_boost_when_post_fx_disabled() -> None
 
 def test_finish_content_frame_call_order_rolloff_chroma_fade_overlay_present() -> None:
     core = _make_core(hdr=False)
-    core.seed.session.render_post_fx = default_render_post_fx_runtime(enabled=True)
-    core.seed.session.render_post_fx.highlight_rolloff.mode = "composite"
-    core.seed.session.render_post_fx.chroma_boost.mode = "composite"
-    core.seed.session.render_post_fx.chroma_boost.amount_pct = 25
+    core.seed.session.post_fx = default_post_fx_runtime(enabled=True)
+    core.seed.session.post_fx.highlight_rolloff.mode = "composite"
+    core.seed.session.post_fx.chroma_boost.mode = "composite"
+    core.seed.session.post_fx.chroma_boost.amount_pct = 25
     call_order: list[str] = []
 
     core.post_process.apply_highlight_rolloff.side_effect = (
@@ -219,7 +219,7 @@ def test_finish_content_frame_call_order_rolloff_chroma_fade_overlay_present() -
     with (
         patch("cleave.viz.frame_finish.apply_hdr_display_shoulder"),
         patch(
-            "cleave.viz.frame_finish._composite_render_overlay",
+            "cleave.viz.frame_finish._composite_overlay",
             side_effect=lambda *_a, **_k: call_order.append("overlay"),
         ),
     ):
@@ -236,13 +236,13 @@ def test_finish_content_frame_call_order_rolloff_chroma_fade_overlay_present() -
 
 def test_finish_content_frame_skips_composite_rolloff_when_per_layer() -> None:
     core = _make_core(hdr=False)
-    core.seed.session.render_post_fx = default_render_post_fx_runtime(enabled=True)
-    hr = core.seed.session.render_post_fx.highlight_rolloff
+    core.seed.session.post_fx = default_post_fx_runtime(enabled=True)
+    hr = core.seed.session.post_fx.highlight_rolloff
     hr.mode = "per_layer"
 
     with (
         patch("cleave.viz.frame_finish.apply_hdr_display_shoulder"),
-        patch("cleave.viz.frame_finish._composite_render_overlay"),
+        patch("cleave.viz.frame_finish._composite_overlay"),
     ):
         finish_content_frame(core, 1.0)
 
@@ -251,12 +251,12 @@ def test_finish_content_frame_skips_composite_rolloff_when_per_layer() -> None:
 
 def test_finish_content_frame_hdr_on_rolloff_off_applies_display_shoulder_only() -> None:
     core = _make_core(hdr=True)
-    core.seed.session.render_post_fx = default_render_post_fx_runtime(enabled=True)
-    core.seed.session.render_post_fx.highlight_rolloff.mode = "off"
+    core.seed.session.post_fx = default_post_fx_runtime(enabled=True)
+    core.seed.session.post_fx.highlight_rolloff.mode = "off"
 
     with (
         patch("cleave.viz.frame_finish.apply_hdr_display_shoulder") as shoulder,
-        patch("cleave.viz.frame_finish._composite_render_overlay"),
+        patch("cleave.viz.frame_finish._composite_overlay"),
     ):
         finish_content_frame(core, 1.0)
 
@@ -266,8 +266,8 @@ def test_finish_content_frame_hdr_on_rolloff_off_applies_display_shoulder_only()
 
 def test_finish_content_frame_hdr_on_rolloff_on_call_order() -> None:
     core = _make_core(hdr=True)
-    core.seed.session.render_post_fx = default_render_post_fx_runtime(enabled=True)
-    core.seed.session.render_post_fx.highlight_rolloff.mode = "composite"
+    core.seed.session.post_fx = default_post_fx_runtime(enabled=True)
+    core.seed.session.post_fx.highlight_rolloff.mode = "composite"
     call_order: list[str] = []
 
     with (
@@ -276,7 +276,7 @@ def test_finish_content_frame_hdr_on_rolloff_on_call_order() -> None:
             side_effect=lambda *_a, **_k: call_order.append("display_shoulder"),
         ),
         patch(
-            "cleave.viz.frame_finish._composite_render_overlay",
+            "cleave.viz.frame_finish._composite_overlay",
             side_effect=lambda *_a, **_k: call_order.append("overlay"),
         ),
     ):
@@ -302,12 +302,12 @@ def test_finish_content_frame_hdr_on_rolloff_on_call_order() -> None:
 
 def test_finish_content_frame_hdr_off_skips_display_shoulder() -> None:
     core = _make_core(hdr=False)
-    core.seed.session.render_post_fx = default_render_post_fx_runtime(enabled=True)
-    core.seed.session.render_post_fx.highlight_rolloff.mode = "off"
+    core.seed.session.post_fx = default_post_fx_runtime(enabled=True)
+    core.seed.session.post_fx.highlight_rolloff.mode = "off"
 
     with (
         patch("cleave.viz.frame_finish.apply_hdr_display_shoulder") as shoulder,
-        patch("cleave.viz.frame_finish._composite_render_overlay"),
+        patch("cleave.viz.frame_finish._composite_overlay"),
     ):
         finish_content_frame(core, 1.0)
 
@@ -316,12 +316,12 @@ def test_finish_content_frame_hdr_off_skips_display_shoulder() -> None:
 
 def test_finish_content_frame_hdr_on_post_fx_disabled_still_applies_display_shoulder() -> None:
     core = _make_core(hdr=True)
-    core.seed.session.render_post_fx = default_render_post_fx_runtime(enabled=False)
-    core.seed.session.render_post_fx.highlight_rolloff.mode = "composite"
+    core.seed.session.post_fx = default_post_fx_runtime(enabled=False)
+    core.seed.session.post_fx.highlight_rolloff.mode = "composite"
 
     with (
         patch("cleave.viz.frame_finish.apply_hdr_display_shoulder") as shoulder,
-        patch("cleave.viz.frame_finish._composite_render_overlay"),
+        patch("cleave.viz.frame_finish._composite_overlay"),
     ):
         finish_content_frame(core, 1.0)
 
@@ -331,12 +331,12 @@ def test_finish_content_frame_hdr_on_post_fx_disabled_still_applies_display_shou
 
 def test_finish_content_frame_hdr_on_post_fx_solo_still_applies_display_shoulder() -> None:
     core = _make_core(hdr=True)
-    core.seed.session.render_post_fx = default_render_post_fx_runtime(enabled=True)
-    core.seed.session.render_post_fx.highlight_rolloff.mode = "composite"
+    core.seed.session.post_fx = default_post_fx_runtime(enabled=True)
+    core.seed.session.post_fx.highlight_rolloff.mode = "composite"
 
     with (
         patch("cleave.viz.frame_finish.apply_hdr_display_shoulder") as shoulder,
-        patch("cleave.viz.frame_finish._composite_render_overlay"),
+        patch("cleave.viz.frame_finish._composite_overlay"),
     ):
         finish_content_frame(core, 1.0, post_fx_solo=True)
 
@@ -345,21 +345,21 @@ def test_finish_content_frame_hdr_on_post_fx_solo_still_applies_display_shoulder
 
 
 def test_finish_content_frame_skips_render_sections_in_curation() -> None:
-    from cleave.viz.frame_finish import _composite_render_overlay
+    from cleave.viz.frame_finish import _composite_overlay
 
     core = _make_core(hdr=True)
     core.seed.session.settings.editor_mode = "preset_curation"
-    core.seed.session.render_overlays.opening_card.enabled = True
-    core.seed.session.render_post_fx = default_render_post_fx_runtime(enabled=True)
-    core.seed.session.render_post_fx.highlight_rolloff.mode = "composite"
-    core.seed.session.render_post_fx.chroma_boost.mode = "composite"
-    core.seed.session.render_post_fx.chroma_boost.amount_pct = 40
-    core.seed.session.render_post_fx.fade.fade_in.end = 2.0
-    core.seed.session.render_post_fx.fade.fade_out.start = 2.0
+    core.seed.session.overlays.opening_card.enabled = True
+    core.seed.session.post_fx = default_post_fx_runtime(enabled=True)
+    core.seed.session.post_fx.highlight_rolloff.mode = "composite"
+    core.seed.session.post_fx.chroma_boost.mode = "composite"
+    core.seed.session.post_fx.chroma_boost.amount_pct = 40
+    core.seed.session.post_fx.fade.fade_in.end = 2.0
+    core.seed.session.post_fx.fade.fade_out.start = 2.0
 
     with (
         patch("cleave.viz.frame_finish.apply_hdr_display_shoulder") as shoulder,
-        patch("cleave.viz.frame_finish._composite_render_overlay"),
+        patch("cleave.viz.frame_finish._composite_overlay"),
     ):
         finish_content_frame(core, 1.0)
 
@@ -377,9 +377,9 @@ def test_finish_content_frame_skips_render_sections_in_curation() -> None:
             "cleave.viz.frame_finish.live_overlay_alpha",
             return_value=0.0,
         ) as alpha,
-        patch("cleave.viz.frame_finish.composite_render_overlay_with_alpha"),
+        patch("cleave.viz.frame_finish.composite_overlay_with_alpha"),
     ):
-        _composite_render_overlay(
+        _composite_overlay(
             core,
             1.0,
             core.seed.session,

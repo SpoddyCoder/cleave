@@ -178,7 +178,7 @@ def apply_preset_switching(
 
     if trigger in ("timer", "timeline"):
         # Timer and timeline index the list (timer by duration; timeline by
-        # on-transitions when Render: TIMELINE is enabled).
+        # on-transitions when the timeline is enabled).
         if trigger == "timeline" and layer.preset_rotation is not None:
             rebuild_list_rotation_preserving_index(
                 layer,

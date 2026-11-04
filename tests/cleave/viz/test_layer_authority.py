@@ -174,12 +174,12 @@ def test_view_state_reflects_session_mutation_without_block_writes() -> None:
 
     from cleave.viz.row_kinds import RowDescriptor, RowKind
     from cleave.viz.row_spec import format_row_value
-    from cleave.viz.tuning_view_state import RenderOverlayCardBlock, TrackBlock
+    from cleave.viz.tuning_view_state import OverlayCardBlock, TrackBlock
     from tests.support.viz import make_controls
 
     controls = make_controls(("layer_1",))
     runtime = controls.session.layers["layer_1"]
-    card = controls.session.render_overlays.opening_card
+    card = controls.session.overlays.opening_card
     runtime.opacity_pct = 41
     runtime.blend_mode = "add"
     card.position = "top-right"
@@ -187,7 +187,7 @@ def test_view_state_reflects_session_mutation_without_block_writes() -> None:
     view = controls.build_view_state(paused=False)
     block = view.tracks["layer_1"]
     assert block.runtime is runtime
-    assert view.render_overlays.opening_card.runtime is card
+    assert view.overlays.opening_card.runtime is card
     assert {field.name for field in fields(TrackBlock)} == {
         "runtime",
         "preset_dir_label",
@@ -203,7 +203,7 @@ def test_view_state_reflects_session_mutation_without_block_writes() -> None:
         "visible",
         "active_preset_list_index",
     }
-    assert {field.name for field in fields(RenderOverlayCardBlock)} == {"runtime"}
+    assert {field.name for field in fields(OverlayCardBlock)} == {"runtime"}
     assert format_row_value(
         view, RowDescriptor(RowKind.TRACK_OPACITY, slot="layer_1")
     ) == "41%"
@@ -212,5 +212,5 @@ def test_view_state_reflects_session_mutation_without_block_writes() -> None:
     ) == "add"
     assert format_row_value(
         view,
-        RowDescriptor(RowKind.RENDER_OVERLAY_CARD_POSITION, card="opening_card"),
+        RowDescriptor(RowKind.OVERLAY_CARD_POSITION, card="opening_card"),
     ) == "top-right"

@@ -191,7 +191,7 @@ def make_tuning_controls(
         "playback": playback,
         "duration_sec": duration_sec,
         "layer_bindings": factory.layer_bindings(),
-        "render_post_fx_bindings": factory.render_post_fx_bindings(),
+        "post_fx_bindings": factory.post_fx_bindings(),
         "layer_manager": layer_manager,
         "compositor": compositor,
         "post_process": post_process,

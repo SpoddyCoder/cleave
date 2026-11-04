@@ -598,7 +598,7 @@ def _overlay_card_persist_values(runtime: Any) -> dict[str, Any]:
 
 
 def overlays_persist_values(ctx: PersistCtx) -> dict[str, Any]:
-    runtime = ctx.session.render_overlays
+    runtime = ctx.session.overlays
     return {
         "locked": runtime.locked,
         "opening_card": _overlay_card_persist_values(runtime.opening_card),

@@ -167,7 +167,7 @@ def parse_render_pattern_mask_section(pattern_mask_map: dict[str, Any]) -> Any:
 
 
 def pattern_mask_persist_values(ctx: PersistCtx) -> dict[str, Any]:
-    runtime = ctx.session.render_pattern_mask
+    runtime = ctx.session.pattern_mask
     return {
         "enabled": runtime.enabled,
         "locked": runtime.locked,

@@ -350,7 +350,7 @@ def test_pattern_mask_forces_black_key_and_full_base_opacity() -> None:
             ),
         },
     )
-    session.render_pattern_mask.enabled = True
+    session.pattern_mask.enabled = True
     session.layers["layer_1"].blend_mode = "screen"
     session.layers["layer_1"].opacity_pct = 0
     layers_by_slot = {slot: _stem_layer(slot) for slot in DEFAULT_LAYER_SLOTS}
@@ -372,7 +372,7 @@ def test_pattern_mask_forces_black_key_and_full_base_opacity() -> None:
     )
     assert layer.fbo.opacity == pytest.approx(0.5 * 0.8)
 
-    session.render_pattern_mask.enabled = False
+    session.pattern_mask.enabled = False
     session.layers["layer_1"].opacity_pct = 40
     apply_layer_visibility(session, layers_by_slot, 1.0)
     assert layer.fbo.blend_mode == "add"
@@ -986,7 +986,7 @@ def test_timeline_strip_lane_highlight_follows_region_not_cursor() -> None:
         session,
         position_sec=0.0,
         duration_sec=60.0,
-        focus_cursor=MainFocus(RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)),
+        focus_cursor=MainFocus(RowDescriptor(RowKind.TIMELINE_HEADER)),
         strip_focused=True,
     )
     assert focused.submenu_focused is True
