@@ -8,12 +8,19 @@ timeline strip. ``CycleStop`` is the Tab ring. The menu bar stays
 
 from __future__ import annotations
 
-from collections.abc import Sequence, Set as AbstractSet
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from enum import Enum, auto
 
-from cleave.viz.navigator import LAYER_ID_PREFIX
-from cleave.viz.row_kinds import RowDescriptor, RowKind
+from cleave.viz.navigator import (
+    DEFAULT_SELECTED_ID,
+    LAYER_ID_PREFIX,
+    expansion_path,
+    layer_node_id,
+    layer_page_of,
+    layer_slot_of,
+)
+from cleave.viz.row_kinds import RowDescriptor
 
 
 class ShellRegion(Enum):
@@ -33,70 +40,21 @@ class CycleStop(Enum):
     TIMELINE = auto()
 
 
-@dataclass(frozen=True)
-class InspectorGroupKey:
-    """Identity of one inspector group.
-
-    A group is open unless this key is in ``ShellFocusState.collapsed``.
-    Kinds in ``DEFAULT_CLOSED_INSPECTOR_GROUPS`` start closed and are open
-    only while this key is in ``ShellFocusState.opened``. Toggles write those
-    sets; building a page does not re-seed them, so an opened cleave-effects
-    group stays open for that slot until it is closed. Settings and Project
-    use ``slot=None`` and ``card=None``. Later card pages reuse ``card``.
-    """
-
-    kind: RowKind
-    slot: str | None = None
-    card: str | None = None
-
-
-DEFAULT_CLOSED_INSPECTOR_GROUPS = frozenset(
-    {
-        RowKind.TRACK_EFFECTS_HEADER,
-        RowKind.TIMELINE_BEAT_BAR_GRID_HEADER,
-        RowKind.TIMELINE_CUTS_HEADER,
-    }
-)
-
-
-def inspector_group_is_open(
-    key: InspectorGroupKey,
-    collapsed: AbstractSet[InspectorGroupKey],
-    opened: AbstractSet[InspectorGroupKey],
-) -> bool:
-    if key.kind in DEFAULT_CLOSED_INSPECTOR_GROUPS:
-        return key in opened
-    return key not in collapsed
-
-
-def toggle_inspector_group(
-    collapsed: set[InspectorGroupKey],
-    opened: set[InspectorGroupKey],
-    key: InspectorGroupKey,
-) -> None:
-    target = opened if key.kind in DEFAULT_CLOSED_INSPECTOR_GROUPS else collapsed
-    if key in target:
-        target.discard(key)
-    else:
-        target.add(key)
-
-
 @dataclass
 class ShellFocusState:
     """Mutable focus owned by ``TuningControls``.
 
-    ``collapsed`` and ``opened`` hold ``InspectorGroupKey`` values.
-    ``nav_expanded`` is the set of expanded navigator ids. Pure helpers in
-    this module do not mutate these sets.
+    ``nav_expanded`` is the set of expanded navigator ids. Selecting a node
+    resets it to that node's path. Pure helpers in this module do not mutate it.
     """
 
     region: ShellRegion = ShellRegion.NAVIGATOR
-    selected_id: str = "settings"
+    selected_id: str = DEFAULT_SELECTED_ID
     inspector_cursor: RowDescriptor | None = None
-    collapsed: set[InspectorGroupKey] = field(default_factory=set)
-    opened: set[InspectorGroupKey] = field(default_factory=set)
     inspector_command_id: str | None = None
-    nav_expanded: set[str] = field(default_factory=lambda: {"layers", "render", "timeline"})
+    nav_expanded: set[str] = field(
+        default_factory=lambda: expansion_path(DEFAULT_SELECTED_ID)
+    )
 
 
 def cycle_stops(*, strip_open: bool) -> tuple[CycleStop, ...]:
@@ -207,17 +165,21 @@ def reconcile_nav_id(
 ) -> str:
     """Return *selected_id* when it is visible, otherwise a nearby stand-in.
 
-    A missing ``layer:<slot>`` lands on the nearest remaining layer sibling
-    by z-order index, then ``layers`` when that id is visible, then the first
-    visible id. An empty *visible_ids* returns *selected_id*.
+    A missing page under a visible layer lands on that layer. A missing
+    ``layer:<slot>`` or a page under a removed layer lands on the nearest
+    remaining layer sibling by z-order index, then ``layers`` when that id is
+    visible, then the first visible id. An empty *visible_ids* returns
+    *selected_id*.
     """
     if not visible_ids:
         return selected_id
     ids = tuple(visible_ids)
     if selected_id in ids:
         return selected_id
-    if selected_id.startswith(LAYER_ID_PREFIX):
-        slot = selected_id[len(LAYER_ID_PREFIX) :]
+    slot = layer_slot_of(selected_id)
+    if slot is not None:
+        if layer_page_of(selected_id) is not None and layer_node_id(slot) in ids:
+            return layer_node_id(slot)
         sibling = _nearest_layer_id(ids, layer_z_order, slot, prior_index)
         if sibling is not None:
             return sibling
@@ -243,9 +205,9 @@ def _nearest_layer_id(
     best: str | None = None
     best_key: tuple[int, int] | None = None
     for node_id in visible_ids:
-        if not node_id.startswith(LAYER_ID_PREFIX):
+        if not node_id.startswith(LAYER_ID_PREFIX) or layer_page_of(node_id):
             continue
-        child = node_id[len(LAYER_ID_PREFIX) :]
+        child = layer_slot_of(node_id)
         if child == slot or child not in index_of:
             continue
         index = index_of[child]

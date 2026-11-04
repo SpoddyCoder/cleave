@@ -15,15 +15,17 @@ from cleave.preset_playlist import PresetPlaylist
 from cleave.viz.controls import TuningControls
 from cleave.viz.editor_mode_controls import is_preset_curation_mode
 from cleave.viz.focus_nav import MainFocus
-from cleave.viz.navigator import layer_node_id
+from cleave.viz.navigator import (
+    LAYER_PAGE_COMPOSITING,
+    LAYER_PAGE_EFFECTS,
+    LAYER_PAGE_PRESET_SWITCHING,
+    layer_node_id,
+    layer_page_node_id,
+)
 from cleave.viz.row_hotkeys import handle_row_hotkey
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.row_spec import apply_field_action, apply_field_horizontal
-from cleave.viz.shell_focus import (
-    DEFAULT_CLOSED_INSPECTOR_GROUPS,
-    InspectorGroupKey,
-    ShellRegion,
-)
+from cleave.viz.shell_focus import ShellRegion
 from cleave.viz.live_layer_bindings import LiveLayerBindings
 from cleave.viz.session import (
     LayerRuntime,
@@ -234,43 +236,34 @@ _LAYER_COMMANDS = {
     RowKind.LAYER_MANAGEMENT_DELETE: "layers.delete",
 }
 
-# Groups that must be open for the child row to be the inspector cursor.
-_LAYER_GROUP_ANCESTORS: dict[RowKind, tuple[RowKind, ...]] = {
-    RowKind.TRACK_BLEND: (RowKind.TRACK_COMPOSITING_HEADER,),
-    RowKind.TRACK_OPACITY: (RowKind.TRACK_COMPOSITING_HEADER,),
-    RowKind.TRACK_EFFECT: (RowKind.TRACK_EFFECTS_HEADER,),
-    RowKind.TRACK_PRESET_SWITCHING_TRIGGER: (RowKind.TRACK_PRESET_SWITCHING,),
-    RowKind.TRACK_PRESET_DURATION: (RowKind.TRACK_PRESET_SWITCHING,),
-    RowKind.TRACK_EASTER_EGG: (RowKind.TRACK_PRESET_SWITCHING,),
-    RowKind.TRACK_SOFT_CUT_DURATION: (RowKind.TRACK_PRESET_SWITCHING,),
-    RowKind.TRACK_HARD_CUT_ENABLED: (RowKind.TRACK_PRESET_SWITCHING,),
-    RowKind.TRACK_HARD_CUT_DURATION: (RowKind.TRACK_PRESET_SWITCHING,),
-    RowKind.TRACK_HARD_CUT_SENSITIVITY: (RowKind.TRACK_PRESET_SWITCHING,),
-    RowKind.TRACK_PRESET_START_CLEAN: (RowKind.TRACK_PRESET_SWITCHING,),
-    RowKind.TRACK_PRESET_LIST: (RowKind.TRACK_PRESET_SWITCHING,),
-    RowKind.TRACK_PRESET_LIST_ITEM: (
-        RowKind.TRACK_PRESET_SWITCHING,
+_PRESET_SWITCHING_PAGE_KINDS = frozenset(
+    {
+        RowKind.TRACK_PRESET_SWITCHING_TRIGGER,
+        RowKind.TRACK_PRESET_DURATION,
+        RowKind.TRACK_EASTER_EGG,
+        RowKind.TRACK_SOFT_CUT_DURATION,
+        RowKind.TRACK_HARD_CUT_ENABLED,
+        RowKind.TRACK_HARD_CUT_DURATION,
+        RowKind.TRACK_HARD_CUT_SENSITIVITY,
+        RowKind.TRACK_PRESET_START_CLEAN,
         RowKind.TRACK_PRESET_LIST,
-    ),
-    RowKind.TRACK_PRESET_LIST_ADD: (
-        RowKind.TRACK_PRESET_SWITCHING,
-        RowKind.TRACK_PRESET_LIST,
-    ),
-    RowKind.TRACK_PRESET_LIST_POPULATE: (
-        RowKind.TRACK_PRESET_SWITCHING,
-        RowKind.TRACK_PRESET_LIST,
-    ),
-}
+        RowKind.TRACK_PRESET_LIST_ITEM,
+        RowKind.TRACK_PRESET_LIST_ADD,
+        RowKind.TRACK_PRESET_LIST_POPULATE,
+    }
+)
+_COMPOSITING_PAGE_KINDS = frozenset({RowKind.TRACK_BLEND, RowKind.TRACK_OPACITY})
 
 
-def _open_layer_groups(controls: TuningControls, descriptor: RowDescriptor) -> None:
-    focus = controls.shell_focus
-    for kind in _LAYER_GROUP_ANCESTORS.get(descriptor.kind, ()):
-        key = InspectorGroupKey(kind, descriptor.slot)
-        if kind in DEFAULT_CLOSED_INSPECTOR_GROUPS:
-            focus.opened.add(key)
-        else:
-            focus.collapsed.discard(key)
+def layer_page_id_for_row(slot: str, kind: RowKind) -> str:
+    """Navigator id of the page that shows *kind* for *slot*."""
+    if kind in _PRESET_SWITCHING_PAGE_KINDS:
+        return layer_page_node_id(slot, LAYER_PAGE_PRESET_SWITCHING)
+    if kind in _COMPOSITING_PAGE_KINDS:
+        return layer_page_node_id(slot, LAYER_PAGE_COMPOSITING)
+    if kind is RowKind.TRACK_EFFECT:
+        return layer_page_node_id(slot, LAYER_PAGE_EFFECTS)
+    return layer_node_id(slot)
 
 
 def press_layer_row(
@@ -281,7 +274,7 @@ def press_layer_row(
 ) -> bool:
     """Select the layer, focus this inspector row, and dispatch one key.
 
-    ``layer:<slot>`` is selected (Add Layer selects ``layers``). The shell
+    The layer page showing the row is selected (Add Layer selects ``layers``). The shell
     region is the inspector. A runtime goes through ``dispatch_keydown``.
     Otherwise the inspector handles the key, then row hotkeys.
     """
@@ -293,14 +286,13 @@ def press_layer_row(
         focus.inspector_command_id = command_id
     else:
         if descriptor.slot is not None:
-            focus.selected_id = layer_node_id(descriptor.slot)
+            focus.selected_id = layer_page_id_for_row(descriptor.slot, descriptor.kind)
         if command_id is not None:
             focus.inspector_cursor = None
             focus.inspector_command_id = command_id
         else:
             focus.inspector_cursor = descriptor
             focus.inspector_command_id = None
-        _open_layer_groups(controls, descriptor)
     focus.region = ShellRegion.INSPECTOR
     if runtime is not None:
         from cleave.viz.input_dispatch import dispatch_keydown

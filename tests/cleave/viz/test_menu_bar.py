@@ -1021,12 +1021,12 @@ def test_focused_inspector_label_is_highlight() -> None:
         focus_cursor=MainFocus(RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)),
         move_mode_slot=None,
     )
-    rows = build_inspector_rows(view, "project", frozenset())
-    group = next(row for row in rows if row.is_group)
-    field = next(row for row in rows if not row.is_group and row.command_id is None)
+    rows = build_inspector_rows(view, "post_fx.fade")
+    group = next(row for row in rows if row.is_heading)
+    field = next(row for row in rows if not row.is_heading and row.command_id is None)
     focus = ShellFocusState(
         region=ShellRegion.INSPECTOR,
-        selected_id="project",
+        selected_id="post_fx.fade",
         inspector_cursor=field.descriptor,
     )
     overlay = _Overlay()

@@ -12,15 +12,15 @@ from cleave.stems import StemSource
 from cleave.viz.navigator import (
     HIDDEN_BADGE,
     SOLO_BADGE,
+    TWISTY_COLLAPSED,
+    TWISTY_EXPANDED,
     build_navigator,
+    expansion_path,
     layer_node_id,
+    layer_page_node_id,
 )
 from cleave.viz.row_hotkeys import activate_inspector_chip
 from cleave.viz.row_kinds import RowDescriptor, RowKind
-from cleave.viz.row_sections import (
-    INSPECTOR_GROUP_COLLAPSED,
-    INSPECTOR_GROUP_EXPANDED,
-)
 from cleave.viz.session import LayerRuntime, TuningSession
 from cleave.viz.shell_host import (
     inspector_header,
@@ -28,7 +28,7 @@ from cleave.viz.shell_host import (
     navigator_lock_mark,
     navigator_twisty,
     selectable_wash,
-    selection_after_nav_toggle,
+    selection_after_nav_collapse,
 )
 from cleave.viz.theme import FOCUS_WASH_ALPHA, HIGHLIGHT, SELECTED_WASH_ALPHA
 from tests.cleave.viz.test_controls import _make_controls
@@ -96,7 +96,7 @@ def test_selectable_wash_splits_navigator_and_inspector() -> None:
 
 def test_layer_breadcrumb_uses_navigator_label() -> None:
     session = _session()
-    nodes = build_navigator(session)
+    nodes = build_navigator(session, {"layers", "timeline"})
     child = next(node for node in nodes if node.slot == "layer_2")
 
     header = inspector_header(nodes, child.id, session, curation=False)
@@ -127,9 +127,39 @@ def test_settings_project_and_layers_have_no_chips() -> None:
     assert project.chips == ()
 
 
+def test_child_pages_breadcrumb_and_show_owner_chips() -> None:
+    session = _session()
+    page = layer_page_node_id("layer_3", "compositing")
+    nodes = build_navigator(session, expansion_path(page))
+    layer = next(node for node in nodes if node.id == layer_node_id("layer_3"))
+
+    header = inspector_header(nodes, page, session, curation=False)
+    assert header.title == f"Layers > {layer.label} > Compositing"
+    assert tuple(_chips(header)) == ("enabled", "solo", "lock")
+    assert header.descriptor == RowDescriptor(RowKind.TRACK_HEADER, slot="layer_3")
+
+    fade = inspector_header(
+        build_navigator(session, {"post_fx"}),
+        "post_fx.fade",
+        session,
+        curation=False,
+    )
+    assert fade.title == "Post-FX > Fade"
+    assert fade.descriptor == RowDescriptor(RowKind.RENDER_POST_FX_HEADER)
+
+    ui = inspector_header(
+        build_navigator(session, {"settings"}),
+        "settings.ui",
+        session,
+        curation=False,
+    )
+    assert ui.title == "Settings > UI"
+    assert ui.chips == ()
+
+
 def test_layer_header_has_enabled_solo_and_lock_chips() -> None:
     session = _session()
-    nodes = build_navigator(session)
+    nodes = build_navigator(session, {"layers", "timeline"})
     solo = inspector_header(
         nodes, layer_node_id("layer_3"), session, curation=False
     )
@@ -147,7 +177,7 @@ def test_render_block_headers_have_enabled_solo_and_lock_chips() -> None:
     session = _session()
     nodes = build_navigator(session)
     overlays = _chips(
-        inspector_header(nodes, "render.overlays", session, curation=False)
+        inspector_header(nodes, "overlay", session, curation=False)
     )
     assert tuple(overlays) == ("enabled", "solo", "lock")
     assert overlays["enabled"].label == "on"
@@ -161,16 +191,16 @@ def test_render_block_headers_have_enabled_solo_and_lock_chips() -> None:
     session.render_overlay_solo = True
     session.render_overlays.locked = True
     solo_off = _chips(
-        inspector_header(nodes, "render.overlays", session, curation=False)
+        inspector_header(nodes, "overlay", session, curation=False)
     )
     assert solo_off["enabled"].label == "off"
     assert solo_off["enabled"].active is False
     assert solo_off["solo"].active is True
     assert solo_off["lock"].label == "locked"
 
-    post = _chips(inspector_header(nodes, "render.post_fx", session, curation=False))
+    post = _chips(inspector_header(nodes, "post_fx", session, curation=False))
     mask = _chips(
-        inspector_header(nodes, "render.pattern_mask", session, curation=False)
+        inspector_header(nodes, "pattern_mask", session, curation=False)
     )
     assert tuple(post) == ("enabled", "lock")
     assert tuple(mask) == ("enabled", "lock")
@@ -202,9 +232,14 @@ def test_timeline_inspector_header_chips_follow_enabled_and_lock() -> None:
     assert off["lock"].label == "locked"
     assert off["lock"].active is True
 
-    markers = inspector_header(nodes, "song_markers", session, curation=False)
-    assert markers.title == "Song markers"
-    assert markers.chips == ()
+    markers = inspector_header(
+        build_navigator(session, {"timeline"}),
+        "timeline.song_markers",
+        session,
+        curation=False,
+    )
+    assert markers.title == "Timeline > Song Markers"
+    assert tuple(_chips(markers)) == ("enabled", "lock")
 
     controls = _make_controls(("layer_1",), timeline_enabled=True)
     assert controls.session.timeline.panel_open is False
@@ -221,11 +256,11 @@ def test_timeline_inspector_header_chips_follow_enabled_and_lock() -> None:
 
 def test_preset_curation_omits_header_chips() -> None:
     session = _session()
-    nodes = build_navigator(session)
+    nodes = build_navigator(session, {"layers", "timeline"})
     layer = inspector_header(
         nodes, layer_node_id("layer_1"), session, curation=True
     )
-    overlays = inspector_header(nodes, "render.overlays", session, curation=True)
+    overlays = inspector_header(nodes, "overlay", session, curation=True)
     assert layer.title.startswith("Layers > ")
     assert layer.chips == ()
     assert overlays.chips == ()
@@ -249,11 +284,14 @@ def test_inspector_chip_click_toggles_the_header_flag() -> None:
 
 
 def test_lock_mark_is_separate_from_badges() -> None:
-    nodes = {node.id: node for node in build_navigator(_session())}
+    session = _session()
+    nodes = {
+        node.id: node for node in build_navigator(session, {"layers", "timeline"})
+    }
     locked = nodes[layer_node_id("layer_1")]
     hidden = nodes[layer_node_id("layer_2")]
     solo = nodes[layer_node_id("layer_3")]
-    markers = nodes["song_markers"]
+    markers = nodes["timeline.song_markers"]
 
     assert navigator_lock_mark(locked) == "[lock]"
     assert locked.badge is None
@@ -269,8 +307,8 @@ def test_only_expandable_nodes_show_a_twisty() -> None:
     nodes = build_navigator(_session(), {"layers"})
     layers = next(node for node in nodes if node.id == "layers")
 
-    assert navigator_twisty(layers, {"layers"}) == INSPECTOR_GROUP_EXPANDED
-    assert navigator_twisty(layers, set()) == INSPECTOR_GROUP_COLLAPSED
+    assert navigator_twisty(layers, {"layers"}) == TWISTY_EXPANDED
+    assert navigator_twisty(layers, set()) == TWISTY_COLLAPSED
     for node in nodes:
         if node.expandable:
             continue
@@ -299,20 +337,18 @@ def test_inspector_selectable_id_changes_with_effect_and_preset() -> None:
     )
     other_card = replace(card, card="closing_card")
 
-    effect_id = inspector_selectable_id(effect, group=False)
-    preset_id = inspector_selectable_id(preset, group=False)
-    group_id = inspector_selectable_id(group, group=True)
-    assert effect_id != inspector_selectable_id(other_effect, group=False)
+    effect_id = inspector_selectable_id(effect)
+    preset_id = inspector_selectable_id(preset)
+    group_id = inspector_selectable_id(group)
+    assert effect_id != inspector_selectable_id(other_effect)
     assert "kaleido" in effect_id
     assert effect_id != f"##row-{RowKind.TRACK_EFFECT.name}"
-    assert preset_id != inspector_selectable_id(other_preset, group=False)
+    assert preset_id != inspector_selectable_id(other_preset)
     assert "0" in preset_id
-    assert group_id != inspector_selectable_id(other_group, group=True)
-    assert group_id.startswith("##grp-")
+    assert group_id != inspector_selectable_id(other_group)
+    assert group_id.startswith("##row-")
     assert "layer_1" in group_id
-    assert inspector_selectable_id(card, group=True) != inspector_selectable_id(
-        other_card, group=True
-    )
+    assert inspector_selectable_id(card) != inspector_selectable_id(other_card)
 
 
 def test_scrollable_shell_flags_drop_only_the_scroll_bits() -> None:
@@ -358,19 +394,5 @@ def test_collapsing_layers_moves_selection_off_a_hidden_child() -> None:
 
     assert child_id not in collapsed
     assert child_id in opened
-    assert (
-        selection_after_nav_toggle(
-            collapsed, child_id, "layers", expanded=False
-        )
-        == "layers"
-    )
-    assert (
-        selection_after_nav_toggle(opened, child_id, "layers", expanded=True)
-        == child_id
-    )
-    assert (
-        selection_after_nav_toggle(
-            collapsed, "settings", "layers", expanded=False
-        )
-        == "settings"
-    )
+    assert selection_after_nav_collapse(collapsed, child_id, "layers") == "layers"
+    assert selection_after_nav_collapse(collapsed, "settings", "layers") == "settings"

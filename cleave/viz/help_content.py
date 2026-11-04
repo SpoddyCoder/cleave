@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 from cleave.viz.row_hotkeys import node_header_descriptor
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
-from cleave.viz.row_spec import row_spec
+from cleave.viz.row_spec import RowSpec, row_spec
 from cleave.viz.shell_focus import CycleStop, ShellFocusState, ShellRegion
 
 if TYPE_CHECKING:
@@ -224,22 +224,16 @@ def _preset_section(*, switching_on: bool = False) -> HelpSection:
         entries.append(_USER_PRESET_ADD_SHORTCUT)
     return HelpSection(_PRESET_SECTION.title, tuple(entries))
 
-_RENDER_SECTION = HelpSection(
-    "Render",
-    (
-        ("Left/Right", "expand/collapse"),
-        ("E", "enable/disable"),
-        ("S", "always on"),
-    ),
-)
-
-_RENDER_TIMELINE_SECTION = HelpSection(
-    "Render",
-    (
-        ("Left/Right", "expand/collapse"),
-        ("E", "enable/disable"),
-    ),
-)
+def _heading_section(behavior: RowSpec) -> HelpSection | None:
+    """Keys for a navigator page, or None when it has only a description."""
+    entries: list[tuple[str, str]] = []
+    if behavior.toggle_enabled is not None:
+        entries.append(("E", "enable/disable"))
+    if behavior.toggle_solo is not None:
+        entries.append(("S", "always on"))
+    if not entries:
+        return None
+    return HelpSection(behavior.help_title, tuple(entries))
 
 
 def help_focus_descriptor(
@@ -387,14 +381,8 @@ def sections_for(
 
     primary: HelpSection | None = None
 
-    if behavior.affordance == RowAffordance.EXPAND:
-        if behavior.is_sub_header:
-            entries = behavior.help_entries
-            primary = HelpSection(
-                behavior.help_title or "Edit",
-                entries if entries is not None else (("Left/Right", "expand/collapse"),),
-            )
-        elif behavior.can_enter_move_mode:
+    if behavior.affordance == RowAffordance.HEADING:
+        if behavior.can_enter_move_mode:
             section = layer_section(
                 timeline_enabled=timeline_enabled,
                 preset_curation=preset_curation,
@@ -407,17 +395,8 @@ def sections_for(
                     return (description,)
                 return ()
             primary = section
-        elif (
-            behavior.toggle_enabled is not None and behavior.toggle_solo is not None
-        ):
-            primary = _RENDER_SECTION
-        elif behavior.toggle_enabled is not None:
-            primary = _RENDER_TIMELINE_SECTION
-        elif behavior.is_header:
-            primary = HelpSection(
-                behavior.help_title or "Settings",
-                (("Left/Right", "expand/collapse"),),
-            )
+        else:
+            primary = _heading_section(behavior)
     elif behavior.affordance == RowAffordance.VALUE_STEP:
         primary = _value_step_section(row_kind)
     elif row_kind == RowKind.TRACK_PRESET_LIST_ITEM:
@@ -461,10 +440,10 @@ def sections_for(
             entries,
         )
 
-    if primary is None:
-        return ()
-
     description = _description_section(row_kind, effect_id=effect_id)
+    if primary is None:
+        return () if description is None else (description,)
+
     if description is not None:
         return (description, _keyboard_section(primary))
     return (primary,)

@@ -18,9 +18,8 @@ from cleave.viz.commands import command_by_id
 from cleave.viz.material_icons import ARROW_DOWNWARD_GLYPH, ARROW_UPWARD_GLYPH
 from cleave.viz.editor_mode_controls import is_preset_curation_mode
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
-from cleave.viz.row_sections import apply_expand_toggle
 from cleave.viz.row_spec import FitStrategy, RowNavButton, RowPresentStyle, RowSpec
-from cleave.viz.row_specs.common import apply_expand_subheader, noop_horizontal
+from cleave.viz.row_specs.common import noop_horizontal
 from cleave.viz.tuning_view_state import TrackBlock, TuningViewState
 
 if TYPE_CHECKING:
@@ -207,17 +206,6 @@ def _toggle_track_solo(
         controls.layer_mutations.enter_solo(slot)
 
 
-def _apply_track_header(
-    controls: TuningControls,
-    desc: RowDescriptor,
-    forward: bool,
-    _large: bool,
-) -> None:
-    slot = desc.slot
-    if slot is None:
-        return
-    apply_expand_toggle(controls, desc.kind, slot, forward, card=desc.card)
-
 def _format_track_preset_dir(state: TuningViewState, desc: RowDescriptor) -> str:
     return _track_block(state, desc).preset_dir_label
 
@@ -398,10 +386,9 @@ def _apply_layer_delete_action(controls: TuningControls, _desc: RowDescriptor) -
 
 SPECS: dict[RowKind, RowSpec] = {
     RowKind.TRACK_HEADER: RowSpec(
-        affordance=RowAffordance.EXPAND,
+        affordance=RowAffordance.HEADING,
         panel_label="Layer",
-        present_style=RowPresentStyle.TRACK_HEADER,
-        apply_horizontal=_apply_track_header,
+        present_style=RowPresentStyle.HEADING,
         fit_strategy=FitStrategy.NONE,
         visibility_icon=_visibility_track,
         help_title="Layer",
@@ -464,17 +451,14 @@ SPECS: dict[RowKind, RowSpec] = {
         parent_group="track",
     ),
     RowKind.TRACK_PRESET_SWITCHING: RowSpec(
-        affordance=RowAffordance.EXPAND,
+        affordance=RowAffordance.HEADING,
         panel_label="preset switching",
-        present_style=RowPresentStyle.EXPAND_SUBHEADER,
-        apply_horizontal=apply_expand_subheader,
+        present_style=RowPresentStyle.HEADING,
         fit_strategy=FitStrategy.NONE,
         help_title="Preset switching",
         help_description=(
             "Automatic preset list advances for this layer.",
-            "Left/Right expands or collapses.",
         ),
-        is_sub_header=True,
         parent_group="track",
     ),
     RowKind.TRACK_PRESET_SWITCHING_RESUME: RowSpec(
@@ -510,18 +494,16 @@ SPECS: dict[RowKind, RowSpec] = {
         parent_group="track",
     ),
     RowKind.TRACK_PRESET_LIST: RowSpec(
-        affordance=RowAffordance.EXPAND,
+        affordance=RowAffordance.HEADING,
         panel_label="preset list",
-        present_style=RowPresentStyle.EXPAND_SUBHEADER,
+        present_style=RowPresentStyle.HEADING,
         format_value=_format_track_preset_list_count,
-        apply_horizontal=apply_expand_subheader,
         fit_strategy=FitStrategy.NONE,
         help_title="preset list",
         help_description=(
             "Ordered presets used for automatic switching on this layer.",
-            "Expand to reorder, delete, or add the currently playing preset.",
+            "Reorder, delete, or add the currently playing preset.",
         ),
-        is_sub_header=True,
         parent_group="track",
     ),
     RowKind.TRACK_PRESET_LIST_ITEM: RowSpec(
@@ -742,30 +724,26 @@ SPECS: dict[RowKind, RowSpec] = {
         parent_group="track",
     ),
     RowKind.TRACK_COMPOSITING_HEADER: RowSpec(
-        affordance=RowAffordance.EXPAND,
+        affordance=RowAffordance.HEADING,
         panel_label="compositing",
-        present_style=RowPresentStyle.EXPAND_SUBHEADER,
-        apply_horizontal=apply_expand_subheader,
+        present_style=RowPresentStyle.HEADING,
         fit_strategy=FitStrategy.NONE,
         help_title="Compositing",
         help_description=(
             "Blend mode and opacity for this layer.",
             "Greyed out and ignored while PATTERN MASK is enabled.",
         ),
-        is_sub_header=True,
         parent_group="track",
     ),
     RowKind.TRACK_EFFECTS_HEADER: RowSpec(
-        affordance=RowAffordance.EXPAND,
+        affordance=RowAffordance.HEADING,
         panel_label="cleave effects",
-        present_style=RowPresentStyle.EXPAND_SUBHEADER,
-        apply_horizontal=apply_expand_subheader,
+        present_style=RowPresentStyle.HEADING,
         fit_strategy=FitStrategy.NONE,
         help_title="Cleave Effects",
         help_description=(
             "Cleave audio-driven effects applied to this layer's output.",
         ),
-        is_sub_header=True,
         parent_group="track",
     ),
     RowKind.TRACK_EFFECT: RowSpec(

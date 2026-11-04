@@ -17,7 +17,7 @@ import pygame
 from cleave.config_schema.layers import MAX_LAYER_COUNT
 from cleave.viz.editor_mode_controls import is_preset_curation_mode
 from cleave.viz.key_repeat import mod_ctrl
-from cleave.viz.navigator import LAYER_ID_PREFIX, layer_node_id
+from cleave.viz.navigator import layer_node_id, layer_slot_of
 from cleave.viz.shell_focus import ShellRegion
 from cleave.viz.theme import ACTION, CONFIG_DIRTY
 
@@ -104,10 +104,7 @@ class Menu:
 def command_context(controls: Any) -> CommandContext:
     """Read the fields menu predicates need from tuning controls."""
     session = controls.session
-    selected = controls.shell_focus.selected_id
-    selected_slot = None
-    if isinstance(selected, str) and selected.startswith(LAYER_ID_PREFIX):
-        selected_slot = selected[len(LAYER_ID_PREFIX) :]
+    selected_slot = layer_slot_of(controls.shell_focus.selected_id)
     lifecycle = controls.layer_lifecycle
     timeline = session.timeline
     timeline_scope = (
@@ -426,28 +423,28 @@ _CURATION = Command(
 )
 
 _OVERLAYS = Command(
-    id="render.overlays",
+    id="overlay",
     label="Overlays",
     kind="check",
     enabled=_overlays_menu_enabled,
-    run=_when_enabled(_overlays_menu_enabled, _run_toggle_enabled("render.overlays")),
+    run=_when_enabled(_overlays_menu_enabled, _run_toggle_enabled("overlay")),
     checked=_overlays_checked,
 )
 _POST_FX = Command(
-    id="render.post_fx",
+    id="post_fx",
     label="Post-FX",
     kind="check",
     enabled=_post_fx_menu_enabled,
-    run=_when_enabled(_post_fx_menu_enabled, _run_toggle_enabled("render.post_fx")),
+    run=_when_enabled(_post_fx_menu_enabled, _run_toggle_enabled("post_fx")),
     checked=_post_fx_checked,
 )
 _PATTERN_MASK = Command(
-    id="render.pattern_mask",
+    id="pattern_mask",
     label="Pattern mask",
     kind="check",
     enabled=_pattern_mask_menu_enabled,
     run=_when_enabled(
-        _pattern_mask_menu_enabled, _run_toggle_enabled("render.pattern_mask")
+        _pattern_mask_menu_enabled, _run_toggle_enabled("pattern_mask")
     ),
     checked=_pattern_mask_checked,
 )

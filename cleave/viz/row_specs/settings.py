@@ -142,9 +142,9 @@ SPECS: dict[RowKind, RowSpec] = {
         parent_group="settings_editor_window",
     ),
     RowKind.SETTINGS_EDITOR_WINDOW_HEADER: RowSpec(
-        affordance=RowAffordance.EXPAND,
+        affordance=RowAffordance.HEADING,
         panel_label="Editor Window",
-        present_style=RowPresentStyle.EXPAND_SUBHEADER,
+        present_style=RowPresentStyle.HEADING,
         fit_strategy=FitStrategy.NONE,
         help_title="Editor Window",
         help_description=(
@@ -152,7 +152,6 @@ SPECS: dict[RowKind, RowSpec] = {
             "Width, height, and upscale write user config immediately.",
             "Restart the application for the new window size to take effect.",
         ),
-        is_sub_header=True,
         is_pinned=True,
         parent_group="settings",
     ),
@@ -253,15 +252,14 @@ SPECS: dict[RowKind, RowSpec] = {
         parent_group="settings_editor_window",
     ),
     RowKind.SETTINGS_UI_HEADER: RowSpec(
-        affordance=RowAffordance.EXPAND,
+        affordance=RowAffordance.HEADING,
         panel_label="UI",
-        present_style=RowPresentStyle.EXPAND_SUBHEADER,
+        present_style=RowPresentStyle.HEADING,
         fit_strategy=FitStrategy.NONE,
         help_title="UI",
         help_description=(
             "Panel width and notification time for the main tuning overlay.",
         ),
-        is_sub_header=True,
         is_pinned=True,
         parent_group="settings",
     ),
@@ -287,9 +285,9 @@ SPECS: dict[RowKind, RowSpec] = {
         parent_group="settings_ui",
     ),
     RowKind.SETTINGS_LATENCY_COMPENSATION_HEADER: RowSpec(
-        affordance=RowAffordance.EXPAND,
+        affordance=RowAffordance.HEADING,
         panel_label="Latency Compensation",
-        present_style=RowPresentStyle.EXPAND_SUBHEADER,
+        present_style=RowPresentStyle.HEADING,
         fit_strategy=FitStrategy.NONE,
         help_title="Latency Compensation",
         help_description=(
@@ -297,7 +295,6 @@ SPECS: dict[RowKind, RowSpec] = {
             "Affects new timeline cue & song marker placements only.",
             "Already saved markers and cues do not move when you change this."
         ),
-        is_sub_header=True,
         is_pinned=True,
         parent_group="settings",
     ),

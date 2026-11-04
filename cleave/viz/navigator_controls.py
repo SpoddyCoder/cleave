@@ -7,8 +7,14 @@ from typing import TYPE_CHECKING
 import pygame
 
 from cleave.viz.inspector import InspectorRow, build_inspector_rows
-from cleave.viz.navigator import NavNode, build_navigator, visible_top_level_ids
-from cleave.viz.row_hotkeys import handle_row_hotkey, node_header_descriptor
+from cleave.viz.navigator import (
+    NavNode,
+    build_navigator,
+    expansion_path,
+    root_id,
+    visible_top_level_ids,
+)
+from cleave.viz.row_hotkeys import handle_row_hotkey, node_control_descriptor
 from cleave.viz.shell_focus import (
     ShellRegion,
     quick_nav_id,
@@ -58,7 +64,7 @@ class NavigatorControls:
 
     def handle_hotkey(self, event: pygame.event.Event) -> bool:
         """Letter, Delete, and Backspace for a selected layer or render node."""
-        header = node_header_descriptor(self._controls.shell_focus.selected_id)
+        header = node_control_descriptor(self._controls.shell_focus.selected_id)
         if header is None:
             return False
         return handle_row_hotkey(
@@ -71,28 +77,33 @@ class NavigatorControls:
         lifecycle = self._controls.layer_lifecycle
         prior = lifecycle.removed_layer_index
         lifecycle.removed_layer_index = None
-        focus.selected_id = reconcile_nav_id(
+        repaired = reconcile_nav_id(
             self._visible_ids(),
             focus.selected_id,
             self._controls.session.layer_z_order,
             prior_index=prior,
         )
+        if repaired != focus.selected_id:
+            focus.nav_expanded = expansion_path(repaired)
+            focus.selected_id = repaired
 
     def quick_step(self, delta: int) -> None:
         """Select the next visible top-level id and stay on the navigator."""
         self.reconcile()
         focus = self._controls.shell_focus
         ids = visible_top_level_ids(self._controls.session)
-        self.select(quick_nav_id(ids, focus.selected_id, delta))
+        self.select(quick_nav_id(ids, root_id(focus.selected_id), delta))
 
     def select(self, node_id: str) -> None:
-        """Select *node_id* and stay on the navigator."""
+        """Select *node_id*, close other branches, and stay on the navigator."""
         focus = self._controls.shell_focus
+        focus.nav_expanded = expansion_path(node_id)
         node_id = reconcile_nav_id(
             self._visible_ids(),
             node_id,
             self._controls.session.layer_z_order,
         )
+        focus.nav_expanded = expansion_path(node_id)
         self._controls.set_shell_region(ShellRegion.NAVIGATOR)
         focus.selected_id = node_id
 
@@ -100,7 +111,7 @@ class NavigatorControls:
         """Open an inspector.
 
         An expandable node with no inspector expands and opens its first
-        child's inspector.
+        child's inspector. A page with no rows keeps focus on the navigator.
         """
         focus = self._controls.shell_focus
         node = self._node(focus.selected_id)
@@ -115,17 +126,17 @@ class NavigatorControls:
         child = self._first_child(node.id)
         if child is None:
             return
-        focus.selected_id = child.id
+        self.select(child.id)
         self._enter_inspector(child.id)
 
     def _enter_inspector(self, node_id: str) -> None:
         focus = self._controls.shell_focus
         view = self._view()
-        rows = build_inspector_rows(
-            view, node_id, focus.collapsed, focus.opened
-        )
-        self._controls.set_shell_region(ShellRegion.INSPECTOR)
+        rows = build_inspector_rows(view, node_id)
         first = next((row for row in rows if row.navigable), None)
+        if first is None:
+            return
+        self._controls.set_shell_region(ShellRegion.INSPECTOR)
         _set_inspector_cursor(focus, first)
 
     def _tree_step(self, delta: int) -> None:
@@ -186,11 +197,7 @@ class NavigatorControls:
         return self._controls.build_view_state(paused=playback.paused)
 
 
-def _set_inspector_cursor(focus, row: InspectorRow | None) -> None:
-    if row is None:
-        focus.inspector_cursor = None
-        focus.inspector_command_id = None
-        return
+def _set_inspector_cursor(focus, row: InspectorRow) -> None:
     if row.command_id is not None:
         focus.inspector_cursor = None
         focus.inspector_command_id = row.command_id

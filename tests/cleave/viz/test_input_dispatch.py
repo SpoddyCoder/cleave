@@ -14,7 +14,11 @@ from cleave.viz.app import LiveVisualizerRuntime, VisualizerSeed
 from cleave.timeline import SlotCue, TimelineLane
 from cleave.viz.focus_nav import MainFocus, TimelineFocus
 from cleave.viz.inspector import InspectorRow
-from cleave.viz.navigator import layer_node_id, visible_top_level_ids
+from cleave.viz.navigator import (
+    layer_node_id,
+    layer_page_node_id,
+    visible_top_level_ids,
+)
 from cleave.viz.input_dispatch import (
     dispatch_keydown,
     dispatch_keyup,
@@ -647,7 +651,15 @@ def test_ctrl_up_down_cycles_visible_top_level_ids() -> None:
     runtime = _make_runtime(submenu_focused=False, panel_open=False)
     controls = runtime.controls
     ids = visible_top_level_ids(controls.session)
-    assert list(ids) == ["settings", "project", "render", "layers", "timeline"]
+    assert list(ids) == [
+        "settings",
+        "project",
+        "overlay",
+        "post_fx",
+        "pattern_mask",
+        "timeline",
+        "layers",
+    ]
     seen = [controls.shell_focus.selected_id]
     leftover = controls.focus_cursor
     for _ in ids:
@@ -731,11 +743,11 @@ def test_inspector_arrows_step_value_while_strip_is_open() -> None:
     session.timeline.selected_cue_t["layer_1"] = 4.0
     session.layers["layer_1"].opacity_pct = 50
     controls = runtime.controls
-    controls.shell_focus.selected_id = layer_node_id("layer_1")
+    controls.shell_focus.selected_id = layer_page_node_id("layer_1", "compositing")
     controls.inspector.focus_row(
         InspectorRow(
             descriptor=RowDescriptor(RowKind.TRACK_OPACITY, slot="layer_1"),
-            is_group=False,
+            is_heading=False,
             depth=1,
             navigable=True,
         )

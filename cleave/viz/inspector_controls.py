@@ -8,18 +8,13 @@ import pygame
 
 from cleave.viz.commands import command_by_id, command_context
 from cleave.viz.inspector import InspectorRow, build_inspector_rows
-from cleave.viz.row_hotkeys import handle_row_hotkey, node_header_descriptor
+from cleave.viz.row_hotkeys import handle_row_hotkey, node_control_descriptor
 from cleave.viz.row_spec import (
     REPEAT_ROW_KINDS,
     apply_field_action,
     apply_field_horizontal,
 )
-from cleave.viz.shell_focus import (
-    InspectorGroupKey,
-    ShellFocusState,
-    ShellRegion,
-    toggle_inspector_group,
-)
+from cleave.viz.shell_focus import ShellFocusState, ShellRegion
 
 if TYPE_CHECKING:
     from cleave.viz.controls import TuningControls
@@ -64,7 +59,7 @@ class InspectorControls:
 
     def handle_hotkey(self, event: pygame.event.Event) -> bool:
         """Letter, Delete, and Backspace for the focused inspector row."""
-        page_desc = node_header_descriptor(self._controls.shell_focus.selected_id)
+        page_desc = node_control_descriptor(self._controls.shell_focus.selected_id)
         row = self._current_row()
         if row is None or row.descriptor is None:
             if page_desc is None:
@@ -97,16 +92,9 @@ class InspectorControls:
         if row.descriptor is not None:
             self._controls.song_markers.sync_focus(row.descriptor)
 
-    def toggle_group(self, key: InspectorGroupKey) -> None:
-        focus = self._controls.shell_focus
-        toggle_inspector_group(focus.collapsed, focus.opened, key)
-
     def activate(self, row: InspectorRow) -> None:
         if row.command_id is not None:
             run_inspector_command(self._controls, row.command_id)
-            return
-        if row.is_group and row.descriptor is not None:
-            self.toggle_group(_group_key(row))
             return
         if row.descriptor is not None:
             apply_field_action(self._controls, row.descriptor)
@@ -120,10 +108,6 @@ class InspectorControls:
     ) -> None:
         row = self._current_row()
         if row is None or row.descriptor is None:
-            return
-        if row.is_group:
-            if not large:
-                self.toggle_group(_group_key(row))
             return
         desc = row.descriptor
         if not apply_field_horizontal(self._controls, desc, forward, large):
@@ -147,22 +131,13 @@ class InspectorControls:
 
     def _navigable_rows(self) -> tuple[InspectorRow, ...]:
         view = self._view()
-        focus = self._controls.shell_focus
-        rows = build_inspector_rows(
-            view, focus.selected_id, focus.collapsed, focus.opened
-        )
+        rows = build_inspector_rows(view, self._controls.shell_focus.selected_id)
         return tuple(row for row in rows if row.navigable)
 
     def _view(self) -> TuningViewState:
         return self._controls.build_view_state(
             paused=self._controls.playback.paused
         )
-
-
-def _group_key(row: InspectorRow) -> InspectorGroupKey:
-    desc = row.descriptor
-    assert desc is not None
-    return InspectorGroupKey(desc.kind, desc.slot, desc.card)
 
 
 def _cursor_index(rows: tuple[InspectorRow, ...], focus: ShellFocusState) -> int | None:

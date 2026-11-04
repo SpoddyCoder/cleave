@@ -147,16 +147,15 @@ def _apply_project_compositor_hdr(
 
 SPECS: dict[RowKind, RowSpec] = {
     RowKind.PROJECT_MILKDROP_HEADER: RowSpec(
-        affordance=RowAffordance.EXPAND,
+        affordance=RowAffordance.HEADING,
         panel_label="ProjectM",
-        present_style=RowPresentStyle.EXPAND_SUBHEADER,
+        present_style=RowPresentStyle.HEADING,
         fit_strategy=FitStrategy.NONE,
         help_title="ProjectM",
         help_description=(
             "Project default for ProjectM beat detection.",
             "Layers without their own beat sensitivity use this value.",
         ),
-        is_sub_header=True,
         is_pinned=True,
         parent_group="project",
     ),
@@ -180,9 +179,9 @@ SPECS: dict[RowKind, RowSpec] = {
         parent_group="project_milkdrop",
     ),
     RowKind.PROJECT_COMPOSITOR_HEADER: RowSpec(
-        affordance=RowAffordance.EXPAND,
+        affordance=RowAffordance.HEADING,
         panel_label="Compositor",
-        present_style=RowPresentStyle.EXPAND_SUBHEADER,
+        present_style=RowPresentStyle.HEADING,
         fit_strategy=FitStrategy.NONE,
         help_title="Compositor",
         help_description=(
@@ -190,7 +189,6 @@ SPECS: dict[RowKind, RowSpec] = {
             "hdr on uses 16-bit float FBOs; off uses 8-bit.",
             "Preset curation always composites in 8-bit.",
         ),
-        is_sub_header=True,
         is_pinned=True,
         parent_group="project",
     ),
@@ -212,16 +210,15 @@ SPECS: dict[RowKind, RowSpec] = {
         parent_group="project_compositor",
     ),
     RowKind.PROJECT_RENDER_HEADER: RowSpec(
-        affordance=RowAffordance.EXPAND,
+        affordance=RowAffordance.HEADING,
         panel_label="Render Project",
-        present_style=RowPresentStyle.EXPAND_SUBHEADER,
+        present_style=RowPresentStyle.HEADING,
         fit_strategy=FitStrategy.NONE,
         help_title="Render Project",
         help_description=(
             "Choose output size, frame rate, quality, and a time range,",
             "then render this project to MP4.",
         ),
-        is_sub_header=True,
         is_pinned=True,
         parent_group="project",
     ),

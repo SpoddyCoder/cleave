@@ -26,7 +26,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Help is a check on the Settings menu, and About Cleave is on the File menu. The Help menu and its Keyboard shortcuts item are gone.
 - Help is not a Tab stop, and clicking the column does not move focus.
 - Settings chooses the navigator column and the help column side separately. They start with the navigator and inspector on the left and help on the right. The Docked layout command is gone.
-- The navigator lists a single Overlays row. Opening and closing cards stay in the inspector.
+- The navigator holds all navigation and the inspector holds only the settings rows of the selected page. The roots are Settings, Project, Overlay, Post-FX, Pattern Mask, Timeline, and Layers, each with its own pages, and each layer has Preset Switching, Compositing, and Cleave Effects pages. Selecting a page closes the other branches. The Render row is gone. Inspector groups no longer collapse, and the deeper blocks, such as Title and Body on a card, are plain headings.
 - The navigator sits on top of the inspector in one column, and the visualiser uses the freed width.
 - Timeline is a top-level navigator row, and Song markers sits under it.
 - The menu bar lists commands and checks, and no longer repeats navigator destinations. Layer number keys and Ctrl+, still open the matching navigator page.
@@ -66,7 +66,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Menu and transport rows have more vertical padding. An open menu draws over the transport rule, and menu items use a lighter hover.
 - With a menu already open, a click on another top label switches to that menu. A second click on the open label closes it.
 - The menu bar rule is a solid white line under the menu names, and open menus draw above the side panels. The transport shows a green play or pause mark, an unbracketed clock, and bar, fps, and rec in the label colour, with a dark rule under the bar. The navigator has a dark border when idle, sits below that rule, and draws its rows in the label colour.
-- Inspector groups show an expand or collapse arrow and highlight when focused, so they open and close. Field labels use the label colour, stepped values show side arrows, and the inspector column is half again as wide.
+- Field labels use the label colour, stepped values show side arrows, and the inspector column is half again as wide.
 - The live menu bar no longer crashes at startup when Wayland is set and the window is using an X11 OpenGL context.
 - A launch failure after the editor has quit pygame is no longer replaced by a video-system error in the file picker.
 

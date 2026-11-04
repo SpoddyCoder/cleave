@@ -21,12 +21,9 @@ from cleave.viz.material_icons import FOLDER_GLYPH
 from cleave.viz.modal import ModalKind, ModalLabeledLine
 from cleave.viz.project_render_job import RenderJobStatus
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
-from cleave.viz.shell_focus import InspectorGroupKey
 from cleave.viz.row_spec import (
     RowPresentStyle,
     format_row_value,
-    labeled_row_prefix,
-    row_composite_header_display_text,
     row_spec,
 )
 from cleave.viz.theme import PRESET_ICON
@@ -60,68 +57,6 @@ def test_structure_signature_stable_for_render_quality_and_range() -> None:
     assert sig_before == sig_after
 
 
-def test_project_children_omitted_until_expanded() -> None:
-    from cleave.viz.inspector import build_inspector_rows
-
-    controls = _make_controls(("layer_1",))
-    view = controls.build_view_state(paused=False)
-    rows = build_inspector_rows(view, "project", frozenset())
-    kinds = [row.descriptor.kind for row in rows if row.descriptor is not None]
-    assert RowKind.PROJECT_MILKDROP_HEADER in kinds
-    assert RowKind.PROJECT_COMPOSITOR_HEADER in kinds
-    assert RowKind.PROJECT_RENDER_HEADER in kinds
-    collapsed = build_inspector_rows(
-        view,
-        "project",
-        frozenset({InspectorGroupKey(RowKind.PROJECT_MILKDROP_HEADER)}),
-    )
-    collapsed_kinds = [
-        row.descriptor.kind for row in collapsed if row.descriptor is not None
-    ]
-    assert RowKind.PROJECT_MILKDROP_BEAT_SENSITIVITY not in collapsed_kinds
-
-
-def test_project_render_children_omitted_until_expanded() -> None:
-    from cleave.viz.inspector import build_inspector_rows
-
-    controls = _make_controls(("layer_1",))
-    view = controls.build_view_state(paused=False)
-    rows = build_inspector_rows(view, "project", frozenset())
-    kinds = [row.descriptor.kind for row in rows if row.descriptor is not None]
-    assert RowKind.PROJECT_RENDER_OUTPUT in kinds
-    assert RowKind.PROJECT_RENDER_WIDTH in kinds
-    assert RowKind.PROJECT_RENDER_HEIGHT in kinds
-    assert RowKind.PROJECT_RENDER_FPS in kinds
-    assert RowKind.PROJECT_RENDER_QUALITY in kinds
-    assert RowKind.PROJECT_RENDER_START in kinds
-    assert RowKind.PROJECT_RENDER_END in kinds
-
-
-def test_project_milkdrop_children_omitted_until_expanded() -> None:
-    from cleave.viz.inspector import build_inspector_rows
-
-    controls = _make_controls(("layer_1",))
-    view = controls.build_view_state(paused=False)
-    hidden = build_inspector_rows(
-        view,
-        "project",
-        frozenset({InspectorGroupKey(RowKind.PROJECT_MILKDROP_HEADER)}),
-    )
-    hidden_kinds = [
-        row.descriptor.kind for row in hidden if row.descriptor is not None
-    ]
-    assert RowKind.PROJECT_MILKDROP_HEADER in hidden_kinds
-    assert RowKind.PROJECT_MILKDROP_BEAT_SENSITIVITY not in hidden_kinds
-    shown = build_inspector_rows(view, "project", frozenset())
-    beat = next(
-        row.descriptor
-        for row in shown
-        if row.descriptor is not None
-        and row.descriptor.kind == RowKind.PROJECT_MILKDROP_BEAT_SENSITIVITY
-    )
-    assert format_row_value(view, beat) == f"{DEFAULT_BEAT_SENSITIVITY:.2f}"
-
-
 def test_structure_signature_stable_for_compositor_hdr() -> None:
     controls = _make_controls(("layer_1",))
     session = controls.session
@@ -134,12 +69,12 @@ def test_structure_signature_stable_for_compositor_hdr() -> None:
     assert sig_before == sig_after
 
 
-def test_project_compositor_children_omitted_until_expanded() -> None:
+def test_compositor_page_shows_hdr() -> None:
     from cleave.viz.inspector import build_inspector_rows
 
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
-    shown = build_inspector_rows(view, "project", frozenset())
+    shown = build_inspector_rows(view, "project.compositor")
     hdr = next(
         row.descriptor
         for row in shown
@@ -181,11 +116,11 @@ def test_compositor_hdr_toggle_resyncs_live_format() -> None:
     post_process.set_color_format.assert_called_with(RGBA16F)
 
 
-def test_compositor_header_is_expand_only() -> None:
+def test_compositor_header_has_no_toggles() -> None:
     spec = row_spec(RowKind.PROJECT_COMPOSITOR_HEADER)
     assert spec.toggle_enabled is None
     assert spec.toggle_solo is None
-    assert spec.affordance == RowAffordance.EXPAND
+    assert spec.affordance == RowAffordance.HEADING
 
 
 def test_milkdrop_beat_sensitivity_keyboard_steps() -> None:
@@ -303,38 +238,6 @@ def test_output_path_uses_project_renders_dir_and_range_suffix(
     assert view.project.output_label.endswith("render_10-20s.mp4")
 
 
-def test_enter_on_headers_toggles_expand() -> None:
-    from cleave.viz.shell_focus import ShellRegion
-
-    controls = _make_controls(("layer_1",))
-    controls.shell_focus.region = ShellRegion.INSPECTOR
-    controls.shell_focus.selected_id = "project"
-    controls.shell_focus.inspector_cursor = RowDescriptor(
-        RowKind.PROJECT_MILKDROP_HEADER
-    )
-    controls.inspector.handle_keydown(_keydown(pygame.K_RETURN))
-    milkdrop = InspectorGroupKey(RowKind.PROJECT_MILKDROP_HEADER)
-    assert milkdrop in controls.shell_focus.collapsed
-    controls.inspector.handle_keydown(_keydown(pygame.K_RETURN))
-    assert milkdrop not in controls.shell_focus.collapsed
-
-
-def test_left_right_on_headers_toggles_expand() -> None:
-    from cleave.viz.shell_focus import ShellRegion
-
-    controls = _make_controls(("layer_1",))
-    controls.shell_focus.region = ShellRegion.INSPECTOR
-    controls.shell_focus.selected_id = "project"
-    controls.shell_focus.inspector_cursor = RowDescriptor(
-        RowKind.PROJECT_MILKDROP_HEADER
-    )
-    controls.inspector.handle_keydown(_keydown(pygame.K_RIGHT))
-    milkdrop = InspectorGroupKey(RowKind.PROJECT_MILKDROP_HEADER)
-    assert milkdrop in controls.shell_focus.collapsed
-    controls.inspector.handle_keydown(_keydown(pygame.K_LEFT))
-    assert milkdrop not in controls.shell_focus.collapsed
-
-
 def test_minimal_view_render_labels() -> None:
     state = _minimal_view_state(
         project=ProjectBlock(
@@ -355,7 +258,6 @@ def test_minimal_view_render_labels() -> None:
             )
         },
     )
-    assert labeled_row_prefix(RowKind.PROJECT_RENDER_QUALITY) == "  └─ quality: "
     quality = RowDescriptor(RowKind.PROJECT_RENDER_QUALITY)
     assert format_row_value(state, quality) == "high"
     width = RowDescriptor(RowKind.PROJECT_RENDER_WIDTH)

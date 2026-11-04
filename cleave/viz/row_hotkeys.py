@@ -12,7 +12,14 @@ from cleave.viz.key_repeat import (
     delete_key_pressed,
     mod_ctrl,
 )
-from cleave.viz.navigator import LAYER_ID_PREFIX, OVERLAY_CARD_ID_PREFIX
+from cleave.viz.navigator import (
+    LAYER_PAGE_COMPOSITING,
+    LAYER_PAGE_EFFECTS,
+    LAYER_PAGE_PRESET_SWITCHING,
+    layer_page_of,
+    layer_slot_of,
+    root_id,
+)
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.row_spec import (
     PRESET_FILE_ROW_KINDS,
@@ -27,29 +34,65 @@ if TYPE_CHECKING:
     from cleave.viz.controls import TuningControls
 
 
-_OVERLAY_CARDS = frozenset({"opening_card", "closing_card"})
+_NODE_HEADER_KINDS: dict[str, RowKind] = {
+    "settings.editor_window": RowKind.SETTINGS_EDITOR_WINDOW_HEADER,
+    "settings.ui": RowKind.SETTINGS_UI_HEADER,
+    "settings.latency": RowKind.SETTINGS_LATENCY_COMPENSATION_HEADER,
+    "project.projectm": RowKind.PROJECT_MILKDROP_HEADER,
+    "project.compositor": RowKind.PROJECT_COMPOSITOR_HEADER,
+    "project.render": RowKind.PROJECT_RENDER_HEADER,
+    "overlay": RowKind.RENDER_OVERLAYS_HEADER,
+    "post_fx": RowKind.RENDER_POST_FX_HEADER,
+    "post_fx.fade": RowKind.RENDER_POST_FX_FADE_HEADER,
+    "post_fx.highlight_rolloff": RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_HEADER,
+    "post_fx.chroma_boost": RowKind.RENDER_POST_FX_CHROMA_BOOST_HEADER,
+    "post_fx.limiter": RowKind.RENDER_POST_FX_LIMITER_HEADER,
+    "pattern_mask": RowKind.RENDER_PATTERN_MASK_HEADER,
+    "timeline": RowKind.RENDER_TIMELINE_HEADER,
+    "timeline.grid": RowKind.TIMELINE_BEAT_BAR_GRID_HEADER,
+    "timeline.cue_fades": RowKind.TIMELINE_CUTS_HEADER,
+    "timeline.song_markers": RowKind.SONG_MARKERS_HEADER,
+    "timeline.preset": RowKind.TIMELINE_PRESETS_HEADER,
+}
+
+_NODE_CARDS: dict[str, str] = {
+    "overlay.opening_card": "opening_card",
+    "overlay.closing_card": "closing_card",
+}
+
+_LAYER_PAGE_HEADER_KINDS: dict[str, RowKind] = {
+    LAYER_PAGE_PRESET_SWITCHING: RowKind.TRACK_PRESET_SWITCHING,
+    LAYER_PAGE_COMPOSITING: RowKind.TRACK_COMPOSITING_HEADER,
+    LAYER_PAGE_EFFECTS: RowKind.TRACK_EFFECTS_HEADER,
+}
 
 
 def node_header_descriptor(node_id: str) -> RowDescriptor | None:
-    """Header row for a navigator id, or None when that node has no header."""
-    if node_id.startswith(LAYER_ID_PREFIX):
-        return RowDescriptor(
-            RowKind.TRACK_HEADER, slot=node_id[len(LAYER_ID_PREFIX) :]
-        )
-    if node_id == "render.overlays":
-        return RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
-    if node_id == "render.post_fx":
-        return RowDescriptor(RowKind.RENDER_POST_FX_HEADER)
-    if node_id == "render.pattern_mask":
-        return RowDescriptor(RowKind.RENDER_PATTERN_MASK_HEADER)
-    if node_id == "timeline":
-        return RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
-    if node_id.startswith(OVERLAY_CARD_ID_PREFIX):
-        card = node_id[len(OVERLAY_CARD_ID_PREFIX) :]
-        if card not in _OVERLAY_CARDS:
-            return None
+    """Header row for a navigator page, or None when that node has no header."""
+    slot = layer_slot_of(node_id)
+    if slot is not None:
+        page = layer_page_of(node_id)
+        kind = RowKind.TRACK_HEADER if page is None else _LAYER_PAGE_HEADER_KINDS[page]
+        return RowDescriptor(kind, slot=slot)
+    card = _NODE_CARDS.get(node_id)
+    if card is not None:
         return RowDescriptor(RowKind.RENDER_OVERLAY_CARD_HEADER, card=card)
-    return None
+    kind = _NODE_HEADER_KINDS.get(node_id)
+    return None if kind is None else RowDescriptor(kind)
+
+
+def node_control_descriptor(node_id: str) -> RowDescriptor | None:
+    """Header that owns the chips and E/S/L keys for a navigator page.
+
+    A layer, a card, and a root own their own controls. Any other page uses
+    the controls of its parent.
+    """
+    slot = layer_slot_of(node_id)
+    if slot is not None:
+        return RowDescriptor(RowKind.TRACK_HEADER, slot=slot)
+    if node_id in _NODE_CARDS:
+        return node_header_descriptor(node_id)
+    return node_header_descriptor(root_id(node_id))
 
 
 def toggle_header_locked(controls: TuningControls, desc: RowDescriptor) -> bool:

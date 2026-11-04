@@ -6,7 +6,6 @@ from cleave.viz.navigator import TOP_LEVEL_IDS
 from cleave.viz.row_kinds import RowKind
 from cleave.viz.shell_focus import (
     CycleStop,
-    InspectorGroupKey,
     ShellFocusState,
     ShellRegion,
     escape_region,
@@ -62,7 +61,7 @@ def test_tab_cycle_with_strip_closed_skips_timeline() -> None:
 
 def test_quick_nav_walks_top_level_ids_and_wraps() -> None:
     ids = TOP_LEVEL_IDS
-    assert len(ids) == 5
+    assert len(ids) == 7
     selected = ids[0]
     for expected in ids[1:]:
         selected = quick_nav_id(ids, selected, 1)
@@ -126,13 +125,7 @@ def test_shell_focus_state_defaults() -> None:
     assert state.region is ShellRegion.NAVIGATOR
     assert state.selected_id == "settings"
     assert state.inspector_cursor is None
-    assert state.collapsed == frozenset()
-    assert state.opened == frozenset()
-    assert state.nav_expanded == {"layers", "render", "timeline"}
+    assert state.nav_expanded == {"settings"}
     other = ShellFocusState()
-    state.nav_expanded.add("render.overlays")
-    state.collapsed.add(InspectorGroupKey(RowKind.PROJECT_MILKDROP_HEADER))
-    state.opened.add(InspectorGroupKey(RowKind.TRACK_EFFECTS_HEADER, slot="layer_1"))
-    assert other.nav_expanded == {"layers", "render", "timeline"}
-    assert other.collapsed == frozenset()
-    assert other.opened == frozenset()
+    state.nav_expanded.add("overlay")
+    assert other.nav_expanded == {"settings"}

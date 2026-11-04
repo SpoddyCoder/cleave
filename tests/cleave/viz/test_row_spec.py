@@ -25,41 +25,27 @@ from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
 from cleave.viz.row_spec import (
     ACTION_ROW_KINDS,
     HEADER_ROW_KINDS,
-    LABELED_SUB_ROW_KINDS,
     REPEAT_ROW_KINDS,
     ROW_SPECS,
-    TRACK_EFFECT_SUB_ROW_KINDS,
     TRACK_SUB_ROW_KINDS,
     RowPresentStyle,
     apply_field_horizontal,
     apply_field_toggle_enabled,
     apply_field_toggle_solo,
-    composite_header_prefix_part,
-    composite_header_suffix_part,
-    expand_subheader_prefix,
-    expandable_row_kinds,
     apply_field_nav_button,
     format_row_markers,
     format_row_position,
     format_row_value,
-    full_line_prefix,
-    labeled_row_prefix,
+    row_dynamic_panel_label,
     row_blocked_by_section_lock,
-    row_composite_header_display_text,
-    row_dynamic_labeled_display_text,
-    row_dynamic_labeled_prefix,
-    row_expand_subheader_display_text,
     row_is_pinned,
     row_is_two_line,
-    row_labeled_display_text,
     row_navigable_when_section_locked,
     row_panel_label,
     row_spec,
     row_triggers_layer_delete,
     section_lock_blocks_mutation,
     section_locked,
-    tree_branch_leading_spaces,
-    tree_branch_prefix,
 )
 from cleave.viz.tuning_view_state import (
     ChromaBoostBlock,
@@ -217,15 +203,6 @@ def test_repeat_row_kinds() -> None:
     assert REPEAT_ROW_KINDS == _EXPECTED_REPEAT_ROW_KINDS
 
 
-def test_render_overlay_sub_headers_expand() -> None:
-    title = row_spec(RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER)
-    body = row_spec(RowKind.RENDER_OVERLAY_CARD_BODY_HEADER)
-    assert title.affordance == RowAffordance.EXPAND
-    assert title.is_sub_header is True
-    assert body.affordance == RowAffordance.EXPAND
-    assert body.is_sub_header is True
-
-
 def test_render_overlay_title_text_is_locked_action() -> None:
     spec = row_spec(RowKind.RENDER_OVERLAY_CARD_TITLE_TEXT)
     assert spec.affordance == RowAffordance.ACTION
@@ -310,17 +287,6 @@ def test_render_overlay_body_text_is_locked_action() -> None:
     assert spec.blocked_by_section_lock is True
     assert spec.panel_label == "body text"
     assert spec.parent_group == "render_overlay_body"
-
-
-def test_track_effects_header_expands() -> None:
-    behavior = row_spec(RowKind.TRACK_EFFECTS_HEADER)
-    assert behavior.affordance == RowAffordance.EXPAND
-
-
-def test_expandable_row_kinds() -> None:
-    assert expandable_row_kinds() == frozenset(
-        k for k, b in ROW_SPECS.items() if b.affordance == RowAffordance.EXPAND
-    )
 
 
 def test_parent_group_on_row_specs() -> None:
@@ -427,10 +393,6 @@ def test_track_sub_row_kinds() -> None:
     )
 
 
-def test_track_effect_sub_row_kinds() -> None:
-    assert TRACK_EFFECT_SUB_ROW_KINDS == frozenset({RowKind.TRACK_EFFECT})
-
-
 def test_locked_navigable_sub_row_kinds() -> None:
     navigable = frozenset(
         k for k in TRACK_SUB_ROW_KINDS if row_navigable_when_section_locked(k)
@@ -491,18 +453,6 @@ def test_only_effects_header_navigable_when_section_locked() -> None:
         assert row_navigable_when_section_locked(kind) == (kind in navigable_when_locked)
 
 
-def test_labeled_sub_row_kinds_exclude_headers() -> None:
-    assert LABELED_SUB_ROW_KINDS.isdisjoint(HEADER_ROW_KINDS)
-    for kind in LABELED_SUB_ROW_KINDS:
-        behavior = row_spec(kind)
-        assert behavior.affordance in {
-            RowAffordance.VALUE_STEP,
-            RowAffordance.PATH_DIR,
-            RowAffordance.PATH_PRESET,
-        }
-        assert not behavior.is_header
-
-
 def test_preset_list_actions_are_action_rows() -> None:
     for kind in (
         RowKind.TRACK_PRESET_LIST_POPULATE,
@@ -510,7 +460,6 @@ def test_preset_list_actions_are_action_rows() -> None:
         RowKind.TRACK_PRESET_SWITCHING_RESUME,
     ):
         assert kind in ACTION_ROW_KINDS
-        assert kind not in LABELED_SUB_ROW_KINDS
         assert row_spec(kind).affordance == RowAffordance.ACTION
 
 
@@ -630,56 +579,10 @@ def test_row_triggers_layer_delete_for_track_rows_only() -> None:
     assert row_triggers_layer_delete(RowKind.RENDER_OVERLAYS_HEADER) is False
 
 
-def test_tree_branch_prefix() -> None:
-    assert tree_branch_prefix(0) == ""
-    assert tree_branch_prefix(1) == "└─ "
-    assert tree_branch_prefix(2) == "  └─ "
-    assert tree_branch_prefix(3) == "    └─ "
-
-
-def test_tree_branch_leading_spaces() -> None:
-    assert tree_branch_leading_spaces(0) == ""
-    assert tree_branch_leading_spaces(1) == ""
-    assert tree_branch_leading_spaces(2) == "  "
-    assert tree_branch_leading_spaces(3) == "    "
-
-
 def test_row_panel_label_settings_header() -> None:
     assert row_panel_label(RowKind.PROJECT_MILKDROP_HEADER) == "ProjectM"
     assert row_panel_label(RowKind.PROJECT_COMPOSITOR_HEADER) == "Compositor"
     assert row_panel_label(RowKind.PROJECT_RENDER_HEADER) == "Render Project"
-
-
-def test_labeled_row_prefix_settings_children() -> None:
-    assert labeled_row_prefix(RowKind.SETTINGS_PREVIEW_QUALITY) == (
-        "  └─ preview quality: "
-    )
-    assert labeled_row_prefix(RowKind.SETTINGS_EDITOR_WINDOW_WIDTH) == "  └─ width: "
-    assert labeled_row_prefix(RowKind.SETTINGS_EDITOR_WINDOW_HEIGHT) == "  └─ height: "
-    assert labeled_row_prefix(RowKind.SETTINGS_EDITOR_WINDOW_UPSCALE) == "  └─ upscale: "
-    assert labeled_row_prefix(RowKind.SETTINGS_EDITOR_WINDOW_DISPLAY_SIZE) == (
-        "  └─ display size: "
-    )
-    assert labeled_row_prefix(RowKind.SETTINGS_NAVIGATOR_SIDE) == "  └─ navigator: "
-    assert labeled_row_prefix(RowKind.SETTINGS_HELP_SIDE) == "  └─ help: "
-
-
-def test_settings_ui_notification_display_prefix() -> None:
-    assert labeled_row_prefix(RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY) == (
-        "  └─ notification time: "
-    )
-    assert labeled_row_prefix(RowKind.PROJECT_RENDER_QUALITY) == "  └─ quality: "
-    assert labeled_row_prefix(RowKind.PROJECT_RENDER_WIDTH) == "  └─ width: "
-    assert labeled_row_prefix(RowKind.PROJECT_RENDER_HEIGHT) == "  └─ height: "
-    assert labeled_row_prefix(RowKind.PROJECT_RENDER_FPS) == "  └─ fps: "
-    assert labeled_row_prefix(RowKind.PROJECT_RENDER_START) == "  └─ start: "
-    assert labeled_row_prefix(RowKind.PROJECT_RENDER_END) == "  └─ end: "
-    assert labeled_row_prefix(RowKind.PROJECT_COMPOSITOR_HDR) == "  └─ hdr: "
-
-
-def test_labeled_row_prefix_track_depths() -> None:
-    assert labeled_row_prefix(RowKind.TRACK_STEM) == "driving stem: "
-    assert labeled_row_prefix(RowKind.TRACK_PRESET_SWITCHING_TRIGGER) == "trigger: "
 
 
 def test_format_row_value_settings() -> None:
@@ -835,18 +738,6 @@ def test_format_row_value_track_and_render() -> None:
     ) == "composite"
 
 
-def test_row_labeled_display_text_settings() -> None:
-    state = _minimal_view_state(
-        settings=SettingsBlock(preview_quality="balanced"),
-    )
-    desc = RowDescriptor(RowKind.SETTINGS_PREVIEW_QUALITY)
-    assert row_labeled_display_text(state, desc) == "  └─ preview quality: balanced"
-    toast_desc = RowDescriptor(RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY)
-    assert row_labeled_display_text(state, toast_desc) == (
-        f"  └─ notification time: {DEFAULT_NOTIFICATION_DISPLAY_SEC}s"
-    )
-
-
 def test_apply_field_horizontal_display_size_is_not_editable() -> None:
     controls = _make_controls()
     assert (
@@ -977,12 +868,11 @@ def test_overlay_cards_share_kinds_and_isolate_runtime() -> None:
     assert opening_desc.card == "opening_card"
     assert closing_desc.card == "closing_card"
     assert opening_desc != closing_desc
-    overlays = build_inspector_rows(view, "render.overlays", frozenset())
     cards = {
         row.descriptor.card
-        for row in overlays
-        if row.descriptor is not None
-        and row.descriptor.kind is RowKind.RENDER_OVERLAY_CARD_POSITION
+        for node_id in ("overlay.opening_card", "overlay.closing_card")
+        for row in build_inspector_rows(view, node_id)
+        if row.descriptor.kind is RowKind.RENDER_OVERLAY_CARD_POSITION
     }
     assert cards == {"opening_card", "closing_card"}
 
@@ -1043,87 +933,6 @@ def test_apply_field_horizontal_via_controls_keydown() -> None:
     assert controls.cfg.editor.navigator_side != before
 
 
-def test_expand_subheader_prefix_preset_switching() -> None:
-    assert (
-        expand_subheader_prefix(RowKind.TRACK_PRESET_SWITCHING)
-        == "preset switching "
-    )
-    assert expand_subheader_prefix(RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER) == (
-        "  └─ title "
-    )
-    assert expand_subheader_prefix(RowKind.RENDER_POST_FX_FADE_HEADER) == "└─ fade "
-    assert expand_subheader_prefix(RowKind.RENDER_POST_FX_FADE_IN_HEADER) == (
-        "  └─ fade in "
-    )
-    assert (
-        expand_subheader_prefix(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_HEADER)
-        == "└─ highlight rolloff "
-    )
-    assert (
-        expand_subheader_prefix(RowKind.RENDER_POST_FX_CHROMA_BOOST_HEADER)
-        == "└─ chroma boost "
-    )
-    assert expand_subheader_prefix(RowKind.RENDER_POST_FX_LIMITER_HEADER) == (
-        "└─ visual limiter "
-    )
-    assert expand_subheader_prefix(RowKind.RENDER_OVERLAY_CARD_ANIMATION_HEADER) == (
-        "  └─ animation "
-    )
-    assert expand_subheader_prefix(RowKind.SETTINGS_EDITOR_WINDOW_HEADER) == (
-        "└─ Editor Window "
-    )
-    assert expand_subheader_prefix(RowKind.SETTINGS_UI_HEADER) == "└─ UI "
-
-
-def test_row_expand_subheader_display_text() -> None:
-    desc = RowDescriptor(RowKind.TRACK_PRESET_SWITCHING, slot="layer_1")
-    state = _minimal_view_state(
-        tracks={
-            "layer_1": make_track_block(
-                preset_switching="on",
-                preset_switching_trigger="projectm",
-            )
-        }
-    )
-    assert (
-        row_expand_subheader_display_text(state, desc)
-        == "preset switching ▼"
-    )
-
-
-def test_expand_subheader_omits_child_status_value() -> None:
-    state = _minimal_view_state(
-        render_overlays=RenderOverlaysBlock(
-            opening_card=make_overlay_card_block(animation_type="slide"),
-            closing_card=make_overlay_card_block(animation_type="slide-fade")),
-        render_post_fx=RenderPostFxBlock(
-            highlight_rolloff=HighlightRolloffBlock(mode="per_layer"),
-            chroma_boost=ChromaBoostBlock(mode="composite"),
-            limiter=VisualLimiterBlock(enabled=False)),
-    )
-    assert row_expand_subheader_display_text(
-        state, RowDescriptor(RowKind.RENDER_POST_FX_LIMITER_HEADER)
-    ) == "└─ visual limiter ▼"
-    assert row_expand_subheader_display_text(
-        state,
-        RowDescriptor(
-            RowKind.RENDER_OVERLAY_CARD_ANIMATION_HEADER, card="opening_card"
-        ),
-    ) == "  └─ animation ▼"
-    assert row_expand_subheader_display_text(
-        state,
-        RowDescriptor(
-            RowKind.RENDER_OVERLAY_CARD_ANIMATION_HEADER, card="closing_card"
-        ),
-    ) == "  └─ animation ▼"
-    assert row_expand_subheader_display_text(
-        state, RowDescriptor(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_HEADER)
-    ) == "└─ highlight rolloff ▼"
-    assert row_expand_subheader_display_text(
-        state, RowDescriptor(RowKind.RENDER_POST_FX_CHROMA_BOOST_HEADER)
-    ) == "└─ chroma boost ▼"
-
-
 def test_format_row_value_timeline_cuts() -> None:
     state = _minimal_view_state(
         render_timeline=RenderTimelineBlock(
@@ -1151,29 +960,6 @@ def test_format_row_value_timeline_cuts() -> None:
     )
 
 
-def test_song_markers_expand_subheader_includes_count() -> None:
-    state = _minimal_view_state(
-        render_timeline=RenderTimelineBlock(
-            song_marker_times=(1.0, 2.0, 3.0, 4.0),
-        )
-    )
-    desc = RowDescriptor(RowKind.SONG_MARKERS_HEADER)
-    assert row_expand_subheader_display_text(state, desc) == "└─ song markers (4) ▼"
-
-
-def test_composite_header_render_overlay_metadata() -> None:
-    field = row_spec(RowKind.RENDER_OVERLAYS_HEADER)
-    assert field.present_style == RowPresentStyle.COMPOSITE_HEADER
-    assert field.header_prefix == "Render: "
-    assert field.header_suffix == "OVERLAYS"
-
-    state = _minimal_view_state()
-    desc = RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
-    assert composite_header_prefix_part(state, desc) == "Render: "
-    assert composite_header_suffix_part(state, desc) == "OVERLAYS"
-    assert row_composite_header_display_text(state, desc) == "Render: OVERLAYS ▼"
-
-
 def test_preset_list_populate_is_full_line_action() -> None:
     field = row_spec(RowKind.TRACK_PRESET_LIST_POPULATE)
     assert field.present_style == RowPresentStyle.FULL_LINE
@@ -1184,11 +970,8 @@ def test_preset_list_populate_is_full_line_action() -> None:
 
 
 def test_resume_switching_row_only_while_paused() -> None:
-    from cleave.viz.row_sections import (
-        TRACK_SECTION,
-        append_expand_section_rows,
-        row_tree_indent_depth,
-    )
+    from cleave.viz.inspector import build_inspector_rows
+    from cleave.viz.navigator import layer_node_id
 
     spec = row_spec(RowKind.TRACK_PRESET_SWITCHING_RESUME)
     assert spec.affordance == RowAffordance.ACTION
@@ -1196,10 +979,6 @@ def test_resume_switching_row_only_while_paused() -> None:
     assert spec.shows_enter_icon is True
     assert spec.blocked_by_section_lock is True
     assert spec.parent_group == "track"
-    assert row_tree_indent_depth(RowKind.TRACK_PRESET_SWITCHING_RESUME) == 0
-    assert full_line_prefix(RowKind.TRACK_PRESET_SWITCHING_RESUME) == (
-        "Switching Paused - Enter To Resume"
-    )
 
     def kinds(*, paused: bool) -> list[RowKind]:
         state = _minimal_view_state(
@@ -1219,9 +998,8 @@ def test_resume_switching_row_only_while_paused() -> None:
                 )
             }
         )
-        rows: list[RowDescriptor] = []
-        append_expand_section_rows(rows, TRACK_SECTION, state, "layer_1")
-        return [row.kind for row in rows]
+        rows = build_inspector_rows(state, layer_node_id("layer_1"))
+        return [row.descriptor.kind for row in rows if row.descriptor is not None]
 
     hidden = kinds(paused=False)
     assert RowKind.TRACK_PRESET_SWITCHING_RESUME not in hidden
@@ -1229,26 +1007,6 @@ def test_resume_switching_row_only_while_paused() -> None:
     assert shown.index(RowKind.TRACK_PRESET_SWITCHING_RESUME) == (
         shown.index(RowKind.TRACK_PRESET) + 1
     )
-    assert RowKind.TRACK_PRESET_SWITCHING_TRIGGER in shown
-    assert RowKind.TRACK_PRESET_LIST_ADD in shown
-
-
-def test_preset_list_add_populate_share_list_item_tree_chrome() -> None:
-    """FULL_LINE actions nest under the preset list header like list items."""
-    from cleave.viz.row_sections import row_tree_indent_depth
-
-    item_depth = row_tree_indent_depth(RowKind.TRACK_PRESET_LIST_ITEM)
-    branch = tree_branch_prefix(item_depth)
-    assert branch == ""
-    assert full_line_prefix(RowKind.TRACK_PRESET_LIST_ADD) == (
-        branch + "Add Current Preset"
-    )
-    populate_depth = row_tree_indent_depth(RowKind.TRACK_PRESET_LIST_POPULATE)
-    populate_branch = tree_branch_prefix(populate_depth)
-    assert full_line_prefix(RowKind.TRACK_PRESET_LIST_POPULATE) == (
-        populate_branch + "Populate Presets"
-    )
-    assert labeled_row_prefix(RowKind.TRACK_PRESET_LIST_ITEM).startswith(branch)
 
 
 def test_apply_field_horizontal_track_header_solo_and_expand() -> None:
@@ -1347,13 +1105,8 @@ def test_track_effect_dynamic_label_and_prefix() -> None:
     desc = RowDescriptor(
         RowKind.TRACK_EFFECT, slot="layer_1", effect_id="pulse", driver_slug="onset"
     )
-    assert row_dynamic_labeled_prefix(desc) == "pulse (onset): "
-    assert row_dynamic_labeled_display_text(state, desc) == "pulse (onset): 35%"
-
-
-def test_full_line_delete_layer_prefix() -> None:
-    assert full_line_prefix(RowKind.LAYER_MANAGEMENT_DELETE) == "└─ Delete Layer"
-    assert row_panel_label(RowKind.LAYER_MANAGEMENT_ADD) == "Add Layer"
+    assert row_dynamic_panel_label(desc) == "pulse (onset)"
+    assert format_row_value(state, desc) == "35%"
 
 
 def test_apply_field_horizontal_visual_limiter_enabled() -> None:

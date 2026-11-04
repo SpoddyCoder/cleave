@@ -27,7 +27,7 @@ from cleave.viz.navigator import layer_node_id
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.row_spec import apply_field_action, row_spec
 from cleave.viz.session import LayerRuntime
-from cleave.viz.shell_focus import InspectorGroupKey, ShellRegion
+from cleave.viz.shell_focus import ShellRegion
 from cleave.viz.theme import ACTION, CONFIG_DIRTY
 from tests.cleave.viz.test_controls import (
     _keydown,
@@ -51,9 +51,9 @@ _STATIC_IDS = (
     "layers.add",
     "layers.delete",
     "layers.preset_curation",
-    "render.overlays",
-    "render.post_fx",
-    "render.pattern_mask",
+    "overlay",
+    "post_fx",
+    "pattern_mask",
     "timeline.show_strip",
     "timeline.apply_preset",
     "timeline.reset",
@@ -181,9 +181,9 @@ def test_menus_list_taxonomy_ids_once() -> None:
         "layers.preset_curation",
     ]
     assert _row_ids(menus[3]) == [
-        "render.overlays",
-        "render.post_fx",
-        "render.pattern_mask",
+        "overlay",
+        "post_fx",
+        "pattern_mask",
     ]
     assert _row_ids(menus[4]) == [
         "timeline.show_strip",
@@ -296,7 +296,7 @@ def test_editor_shortcut_selects_the_settings_inspector() -> None:
     }
 
     editor.run(controls)
-    assert controls.shell_focus.selected_id == "settings"
+    assert controls.shell_focus.selected_id == "settings.editor_window"
     assert controls.shell_focus.region is ShellRegion.INSPECTOR
 
     assert command_for_shortcut(pygame.K_COMMA, pygame.KMOD_CTRL) is editor
@@ -568,13 +568,13 @@ def test_menu_and_inspector_share_layer_add_and_delete() -> None:
     focus = controls.shell_focus
     add_row = next(
         row
-        for row in build_inspector_rows(view, "layers", focus.collapsed, focus.opened)
+        for row in build_inspector_rows(view, "layers")
         if row.command_id == "layers.add"
     )
     delete_row = next(
         row
         for row in build_inspector_rows(
-            view, layer_node_id("layer_1"), focus.collapsed, focus.opened
+            view, layer_node_id("layer_1")
         )
         if row.command_id == "layers.delete"
     )
@@ -594,9 +594,9 @@ def test_menu_and_inspector_share_layer_add_and_delete() -> None:
 
 def test_render_menu_checks_mirror_flags() -> None:
     menus = _menus()
-    overlays = command_by_id("render.overlays", menus)
-    post_fx = command_by_id("render.post_fx", menus)
-    pattern = command_by_id("render.pattern_mask", menus)
+    overlays = command_by_id("overlay", menus)
+    post_fx = command_by_id("post_fx", menus)
+    pattern = command_by_id("pattern_mask", menus)
     checks = (overlays, post_fx, pattern)
     menu_ids = {command.id for command in iter_commands(menus)}
     assert "render.edit_overlays" not in menu_ids
@@ -844,8 +844,10 @@ def test_timeline_actions_share_run_with_the_inspector() -> None:
         assert command.enabled(curated) is False
 
     view = controls.build_view_state(paused=False)
-    opened = frozenset({InspectorGroupKey(RowKind.TIMELINE_BEAT_BAR_GRID_HEADER)})
-    rows = build_inspector_rows(view, "timeline", frozenset(), opened)
+    rows = (
+        *build_inspector_rows(view, "timeline.preset"),
+        *build_inspector_rows(view, "timeline.grid"),
+    )
     by_id = {row.command_id: row for row in rows if row.command_id}
     assert set(by_id) == {"timeline.apply_preset", "timeline.reset", "timeline.snap_cues"}
     assert all(row.descriptor is None for row in by_id.values())
@@ -928,7 +930,7 @@ def test_inspector_only_timeline_actions_are_not_menu_commands() -> None:
         controls.session.timeline.locked = False
 
     view = controls.build_view_state(paused=False)
-    marker_rows = build_inspector_rows(view, "song_markers", frozenset())
+    marker_rows = build_inspector_rows(view, "timeline.song_markers")
     snap = next(
         row
         for row in marker_rows

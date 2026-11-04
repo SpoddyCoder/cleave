@@ -6,7 +6,6 @@ import json
 from pathlib import Path
 
 from cleave.viz.inspector import build_inspector_rows
-from cleave.viz.navigator import overlay_card_node_id
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.tuning_view_state import view_state_structure_signature
 from tests.cleave.viz.test_controls import _make_controls
@@ -160,7 +159,7 @@ def test_structure_signature_invalidates_on_animation_type() -> None:
 
 
 def _inspector_kinds(state, node_id: str) -> list[RowKind]:
-    rows = build_inspector_rows(state, node_id, frozenset())
+    rows = build_inspector_rows(state, node_id)
     return [row.descriptor.kind for row in rows if row.descriptor is not None]
 
 
@@ -169,7 +168,7 @@ def test_builder_rebuilds_layout_when_animation_type_changes() -> None:
     session = controls.session
     session.render_overlays.opening_card.animation.type = "fade"
     view_fade = controls.build_view_state(paused=False)
-    node = overlay_card_node_id("opening_card")
+    node = "overlay.opening_card"
     fade_page = _inspector_kinds(view_fade, node)
     assert RowKind.RENDER_OVERLAY_CARD_ANIMATION_SLIDE_DIRECTION not in fade_page
     fade_structure = controls._view_state._structure
@@ -214,7 +213,7 @@ def test_builder_rebuilds_layout_when_highlight_rolloff_mode_changes() -> None:
     builder = controls._view_state
 
     view_on = builder.build(paused=False)
-    on_page = _inspector_kinds(view_on, "render.post_fx")
+    on_page = _inspector_kinds(view_on, "post_fx.highlight_rolloff")
     assert RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD in on_page
     on_structure = builder._structure
 
@@ -222,7 +221,7 @@ def test_builder_rebuilds_layout_when_highlight_rolloff_mode_changes() -> None:
     view_off = builder.build(paused=False)
     assert builder._structure is not on_structure
     assert RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD not in _inspector_kinds(
-        view_off, "render.post_fx"
+        view_off, "post_fx"
     )
 
 
@@ -301,7 +300,7 @@ def test_builder_mirrors_switching_paused_into_inspector() -> None:
     from cleave.viz.navigator import layer_node_id
 
     def inspector_kinds(view: object) -> set[RowKind]:
-        rows = build_inspector_rows(view, layer_node_id("layer_1"), frozenset())
+        rows = build_inspector_rows(view, layer_node_id("layer_1"))
         return {
             row.descriptor.kind
             for row in rows
@@ -457,13 +456,13 @@ def test_pattern_mask_seed_row_only_for_plasma() -> None:
     for mask_type in ("strips", "bars", "radial", "checker"):
         session.render_pattern_mask.type = mask_type
         view = builder.build(paused=False)
-        page = _inspector_kinds(view, "render.pattern_mask")
+        page = _inspector_kinds(view, "pattern_mask")
         assert RowKind.RENDER_PATTERN_MASK_FEATHER in page
         assert RowKind.RENDER_PATTERN_MASK_SEED not in page
 
     session.render_pattern_mask.type = "plasma"
     view_plasma = builder.build(paused=False)
-    plasma = _inspector_kinds(view_plasma, "render.pattern_mask")
+    plasma = _inspector_kinds(view_plasma, "pattern_mask")
     assert RowKind.RENDER_PATTERN_MASK_SEED in plasma
     assert RowKind.RENDER_PATTERN_MASK_FEATHER in plasma
 
@@ -539,7 +538,7 @@ def test_song_marker_items_stay_on_the_inspector() -> None:
     session.timeline.panel_open = True
     session.song_markers.times = [8.0, 32.5, 64.0]
     view = controls.build_view_state(paused=False)
-    rows = build_inspector_rows(view, "song_markers", frozenset(), frozenset())
+    rows = build_inspector_rows(view, "timeline.song_markers")
     items = [
         row.descriptor
         for row in rows

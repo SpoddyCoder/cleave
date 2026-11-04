@@ -47,8 +47,14 @@ from cleave.viz.focus_nav import MainFocus, TimelineFocus
 from cleave.viz.input_dispatch import dispatch_keydown
 from cleave.viz.menu_bar import MenuBarState
 from cleave.viz.inspector import build_inspector_rows
-from cleave.viz.shell_focus import InspectorGroupKey, ShellRegion
-from cleave.viz.navigator import layer_node_id, overlay_card_node_id
+from cleave.viz.shell_focus import ShellRegion
+from cleave.viz.navigator import (
+    LAYER_PAGE_COMPOSITING,
+    LAYER_PAGE_EFFECTS,
+    LAYER_PAGE_PRESET_SWITCHING,
+    layer_node_id,
+    layer_page_node_id,
+)
 from cleave.viz.key_repeat import mod_shift
 from cleave.viz.playback import format_mmss
 from tests.support.viz import (
@@ -75,14 +81,11 @@ from cleave.viz.session import (
 from cleave.viz.row_hotkeys import handle_row_hotkey
 from cleave.viz.row_spec import (
     REPEAT_ROW_KINDS,
-    RowPresentStyle,
     apply_field_action,
     apply_field_horizontal,
-    row_composite_header_display_text,
-    row_dynamic_labeled_display_text,
-    row_expand_subheader_display_text,
-    row_full_line_display_text,
-    row_labeled_display_text,
+    format_row_value,
+    row_dynamic_panel_label,
+    row_panel_label,
     row_spec,
 )
 from cleave.viz.commands import command_by_id, command_context
@@ -356,13 +359,15 @@ def _inspector_kinds(controls: TuningControls, slot: str) -> list[RowKind]:
     from cleave.viz.inspector import build_inspector_rows
 
     view = controls.build_view_state(paused=False)
-    focus = controls.shell_focus
-    rows = build_inspector_rows(
-        view, layer_node_id(slot), focus.collapsed, focus.opened
-    )
     return [
         row.descriptor.kind
-        for row in rows
+        for node_id in (
+            layer_node_id(slot),
+            layer_page_node_id(slot, LAYER_PAGE_PRESET_SWITCHING),
+            layer_page_node_id(slot, LAYER_PAGE_COMPOSITING),
+            layer_page_node_id(slot, LAYER_PAGE_EFFECTS),
+        )
+        for row in build_inspector_rows(view, node_id)
         if row.descriptor is not None
     ]
 
@@ -389,33 +394,27 @@ def _row_value_color(
 
 
 def _page_kinds(state: TuningViewState, node_id: str) -> list[RowKind]:
-    rows = build_inspector_rows(state, node_id, frozenset())
+    rows = build_inspector_rows(state, node_id)
     return [
         row.descriptor.kind for row in rows if row.descriptor is not None
     ]
 
 
 def _assert_card_order(state: TuningViewState, card: str, *kinds: RowKind) -> None:
-    page = _page_kinds(state, overlay_card_node_id(card))
+    page = _page_kinds(state, f"overlay.{card}")
     indexes = [page.index(kind) for kind in kinds]
     assert indexes == sorted(indexes)
     assert len(set(indexes)) == len(indexes)
 
 
 def _text_for_descriptor(state: TuningViewState, desc: RowDescriptor) -> str:
-    spec = row_spec(desc.kind)
-    style = spec.present_style
-    if style == RowPresentStyle.LABELED_VALUE:
-        return row_labeled_display_text(state, desc)
-    if style == RowPresentStyle.EXPAND_SUBHEADER:
-        return row_expand_subheader_display_text(state, desc)
-    if style in (RowPresentStyle.COMPOSITE_HEADER, RowPresentStyle.TRACK_HEADER):
-        return row_composite_header_display_text(state, desc)
-    if style == RowPresentStyle.FULL_LINE:
-        return row_full_line_display_text(state, desc)
-    if style == RowPresentStyle.DYNAMIC:
-        return row_dynamic_labeled_display_text(state, desc)
-    return ""
+    if desc.kind is RowKind.TRACK_EFFECT:
+        label = row_dynamic_panel_label(desc)
+    else:
+        label = row_panel_label(desc.kind, desc)
+    if row_spec(desc.kind).format_value is None:
+        return label
+    return f"{label}: {format_row_value(state, desc)}"
 
 
 def _row_text(state: TuningViewState, index: int | RowDescriptor) -> str:
@@ -485,13 +484,14 @@ def _focus_inspector_kind(
 ) -> None:
     focus = controls.shell_focus
     focus.region = ShellRegion.INSPECTOR
-    focus.selected_id = (
-        "song_markers" if kind in _SONG_INSPECTOR_KINDS else "timeline"
-    )
-    if kind in _BEAT_INSPECTOR_KINDS:
-        focus.opened.add(InspectorGroupKey(RowKind.TIMELINE_BEAT_BAR_GRID_HEADER))
-    if kind in _CUT_INSPECTOR_KINDS:
-        focus.opened.add(InspectorGroupKey(RowKind.TIMELINE_CUTS_HEADER))
+    if kind in _SONG_INSPECTOR_KINDS:
+        focus.selected_id = "timeline.song_markers"
+    elif kind in _BEAT_INSPECTOR_KINDS:
+        focus.selected_id = "timeline.grid"
+    elif kind in _CUT_INSPECTOR_KINDS:
+        focus.selected_id = "timeline.cue_fades"
+    else:
+        focus.selected_id = "timeline.preset"
     command_id = _INSPECTOR_COMMANDS.get(kind)
     if command_id is not None:
         focus.inspector_command_id = command_id
@@ -565,7 +565,7 @@ def test_disabled_render_overlay_can_expand_sub_rows() -> None:
     assert controls.session.render_overlays.opening_card.enabled is False
 
     view = controls.build_view_state(paused=False)
-    page = _page_kinds(view, overlay_card_node_id("opening_card"))
+    page = _page_kinds(view, "overlay.opening_card")
     assert RowKind.RENDER_OVERLAY_CARD_POSITION in page
 
 
@@ -581,7 +581,7 @@ def test_disabled_render_post_fx_can_expand_sub_rows() -> None:
     assert controls.session.render_post_fx.enabled is False
 
     view = controls.build_view_state(paused=False)
-    page = _page_kinds(view, "render.post_fx")
+    page = _page_kinds(view, "post_fx.fade")
     assert RowKind.RENDER_POST_FX_FADE_IN_START in page
 
 
@@ -836,35 +836,6 @@ def test_track_header_icons_render() -> None:
 
 
 
-def test_render_overlay_header_label_spacing() -> None:
-    controls = _make_controls()
-    view = controls.build_view_state(paused=False)
-    header_row = RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
-    assert _row_text(view, header_row) == "Render: OVERLAYS ▼"
-
-
-def test_render_overlay_title_header_expand_arrow() -> None:
-    controls = _make_controls()
-    view = controls.build_view_state(paused=False)
-    title_header = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER, card="opening_card")
-    assert _row_text(view, title_header) == "  └─ title ▼"
-
-    view = controls.build_view_state(paused=False)
-    title_header = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER, card="opening_card")
-    assert _row_text(view, title_header) == "  └─ title ▼"
-
-
-def test_render_overlay_body_header_expand_arrow() -> None:
-    controls = _make_controls()
-    view = controls.build_view_state(paused=False)
-    body_header = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_BODY_HEADER, card="opening_card")
-    assert _row_text(view, body_header) == "  └─ body ▼"
-
-    view = controls.build_view_state(paused=False)
-    body_header = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_BODY_HEADER, card="opening_card")
-    assert _row_text(view, body_header) == "  └─ body ▼"
-
-
 _OVERLAY_TEST_FONTS = ("alpha", "bravo", "charlie")
 
 
@@ -877,7 +848,7 @@ def test_render_overlay_title_font_row(_mock_fonts) -> None:
     controls.session.render_overlays.opening_card.title_font = "alpha"
     view = controls.build_view_state(paused=False)
     font_row = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_FONT, card="opening_card")
-    assert _row_text(view, font_row) == "    └─ font: alpha (1/3)"
+    assert _row_text(view, font_row) == "font: alpha (1/3)"
 
     controls.focus_descriptor = _desc(view, font_row)
     _press_focused(controls, _keydown(pygame.K_RIGHT))
@@ -893,7 +864,7 @@ def test_render_overlay_body_font_row(_mock_fonts) -> None:
     controls.session.render_overlays.opening_card.body_font = "bravo"
     view = controls.build_view_state(paused=False)
     font_row = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_BODY_FONT, card="opening_card")
-    assert _row_text(view, font_row) == "    └─ font: bravo (2/3)"
+    assert _row_text(view, font_row) == "font: bravo (2/3)"
 
     controls.focus_descriptor = _desc(view, font_row)
     _press_focused(controls, _keydown(pygame.K_LEFT))
@@ -905,7 +876,7 @@ def test_render_overlay_title_font_size_row() -> None:
     controls.session.render_overlays.opening_card.title_font_size = 12
     view = controls.build_view_state(paused=False)
     font_row = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_FONT_SIZE, card="opening_card")
-    assert _row_text(view, font_row) == "    └─ font size: 12px"
+    assert _row_text(view, font_row) == "font size: 12px"
 
     controls.focus_descriptor = _desc(view, font_row)
     _press_focused(controls, _keydown(pygame.K_RIGHT))
@@ -917,7 +888,7 @@ def test_render_overlay_title_margin_bottom_row() -> None:
     controls.session.render_overlays.opening_card.title_margin_bottom = 10
     view = controls.build_view_state(paused=False)
     margin_row = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_MARGIN_BOTTOM, card="opening_card")
-    assert _row_text(view, margin_row) == "    └─ margin bottom: 10px"
+    assert _row_text(view, margin_row) == "margin bottom: 10px"
 
     controls.focus_descriptor = _desc(view, margin_row)
     _press_focused(controls, _keydown(pygame.K_RIGHT))
@@ -929,7 +900,7 @@ def test_render_overlay_body_font_size_row() -> None:
     controls.session.render_overlays.opening_card.body_font_size = 18
     view = controls.build_view_state(paused=False)
     font_row = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_BODY_FONT_SIZE, card="opening_card")
-    assert _row_text(view, font_row) == "    └─ font size: 18px"
+    assert _row_text(view, font_row) == "font size: 18px"
 
     controls.focus_descriptor = _desc(view, font_row)
     _press_focused(controls, _keydown(pygame.K_LEFT))
@@ -958,7 +929,7 @@ def test_render_overlay_background_margin_row() -> None:
     controls.session.render_overlays.opening_card.background_margin = 40
     view = controls.build_view_state(paused=False)
     margin_row = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_BACKGROUND_MARGIN, card="opening_card")
-    assert _row_text(view, margin_row) == "  └─ background margin: 40px"
+    assert _row_text(view, margin_row) == "background margin: 40px"
 
     controls.focus_descriptor = _desc(view, margin_row)
     _press_focused(controls, _keydown(pygame.K_RIGHT))
@@ -972,7 +943,7 @@ def test_render_overlay_background_padding_row() -> None:
     controls.session.render_overlays.opening_card.background_padding = 20
     view = controls.build_view_state(paused=False)
     padding_row = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_BACKGROUND_PADDING, card="opening_card")
-    assert _row_text(view, padding_row) == "  └─ background padding: 20px"
+    assert _row_text(view, padding_row) == "background padding: 20px"
 
     controls.focus_descriptor = _desc(view, padding_row)
     _press_focused(controls, _keydown(pygame.K_LEFT))
@@ -1006,7 +977,7 @@ def test_render_overlay_title_text_formats_newlines_as_spaces() -> None:
     controls.session.render_overlays.opening_card.title_content = "Line one\nLine two"
     view = controls.build_view_state(paused=False)
     row = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_TEXT, card="opening_card")
-    assert _row_text(view, row) == "    └─ title text: Line one Line two"
+    assert _row_text(view, row) == "title text: Line one Line two"
 
 
 def test_render_overlay_title_text_enter_opens_single_line_modal() -> None:
@@ -1113,7 +1084,7 @@ def test_render_overlay_title_colour_formats_hex() -> None:
     controls.session.render_overlays.opening_card.title_colour = (255, 0, 0)
     view = controls.build_view_state(paused=False)
     row = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_COLOUR, card="opening_card")
-    assert _row_text(view, row) == "    └─ title colour: #ff0000"
+    assert _row_text(view, row) == "title colour: #ff0000"
 
 
 def test_render_overlay_title_colour_enter_opens_single_line_modal() -> None:
@@ -1223,7 +1194,7 @@ def test_render_overlay_body_text_formats_newlines_as_spaces() -> None:
     controls.session.render_overlays.opening_card.body_content = "Line one\nLine two"
     view = controls.build_view_state(paused=False)
     row = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_BODY_TEXT, card="opening_card")
-    assert _row_text(view, row) == "    └─ body text: Line one Line two"
+    assert _row_text(view, row) == "body text: Line one Line two"
 
 
 def test_render_overlay_body_text_enter_opens_multiline_modal() -> None:
@@ -1333,8 +1304,7 @@ def _assert_overlay_colour_row_present_confirm_cancel(
     assert closing_colour.card == "closing_card"
     _assert_card_order(view, "opening_card", after_kind, kind, before_kind)
     _assert_card_order(view, "closing_card", after_kind, kind, before_kind)
-    prefix = "    └─ " if nested else "  └─ "
-    assert _row_text(view, opening_colour) == f"{prefix}{label}: #ffffff"
+    assert _row_text(view, opening_colour) == f"{label}: #ffffff"
 
     controls.focus_descriptor = _desc(view, opening_colour)
     _press_focused(controls, _keydown(pygame.K_RETURN))
@@ -1429,8 +1399,8 @@ def test_render_overlay_optional_colour_formats_none() -> None:
     view = controls.build_view_state(paused=False)
     title_bg = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_BACKGROUND_COLOUR, card="opening_card")
     body_bg = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_BODY_BACKGROUND_COLOUR, card="opening_card")
-    assert _row_text(view, title_bg) == "    └─ title background: none"
-    assert _row_text(view, body_bg) == "    └─ body background: none"
+    assert _row_text(view, title_bg) == "title background: none"
+    assert _row_text(view, body_bg) == "body background: none"
     controls.focus_descriptor = _desc(view, title_bg)
     _press_focused(controls, _keydown(pygame.K_RETURN))
     modal = controls.modal_host.view_state()
@@ -3767,7 +3737,7 @@ def test_render_overlay_locked_skips_children_in_nav() -> None:
     )
     assert _row_value_color(view, position_row) == LOCKED
     assert RowKind.RENDER_OVERLAY_CARD_POSITION in _page_kinds(
-        view, overlay_card_node_id("opening_card")
+        view, "overlay.opening_card"
     )
 
 
@@ -3779,7 +3749,7 @@ def test_render_timeline_locked_dims_inspector_children() -> None:
     assert _row_value_color(
         view, RowDescriptor(RowKind.TIMELINE_PRESET_CHARACTER)
     ) == LOCKED
-    assert RowKind.TIMELINE_PRESET_CHARACTER in _page_kinds(view, "timeline")
+    assert RowKind.TIMELINE_PRESET_CHARACTER in _page_kinds(view, "timeline.preset")
 
 
 def test_locked_blocks_enable_disable() -> None:
@@ -5147,8 +5117,7 @@ def test_save_flushes_markers_to_project_yaml(tmp_path: Path) -> None:
 def test_song_marker_inspector_open_does_not_mark_dirty() -> None:
     controls = _make_controls(("layer_1",))
     assert not controls.config_dirty
-    controls.shell_focus.selected_id = "song_markers"
-    controls.inspector.toggle_group(InspectorGroupKey(RowKind.SONG_MARKERS_HEADER))
+    controls.shell_focus.selected_id = "timeline.song_markers"
     assert not controls.config_dirty
 
 

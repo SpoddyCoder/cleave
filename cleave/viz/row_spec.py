@@ -19,10 +19,6 @@ from cleave.viz.row_sections import (
     RENDER_PATTERN_MASK_SECTION_KINDS,
     RENDER_POST_FX_SECTION_KINDS,
     RENDER_TIMELINE_SECTION_KINDS,
-    expand_arrow_for_header,
-    expand_arrow_glyph,
-    row_tree_indent_depth,
-    section_header_from_section_tree,
 )
 from cleave.viz.tuning_view_state import TuningViewState
 
@@ -32,12 +28,10 @@ if TYPE_CHECKING:
 
 class RowPresentStyle(Enum):
     LABELED_VALUE = auto()
-    EXPAND_SUBHEADER = auto()
-    COMPOSITE_HEADER = auto()
+    HEADING = auto()
     PATH_ICON = auto()
     FULL_LINE = auto()
     DYNAMIC = auto()
-    TRACK_HEADER = auto()
     SPACER = auto()
 
 
@@ -76,8 +70,6 @@ class RowSpec:
     apply_action: ActionMutator | None = None
     # A mouse click only focuses the row. Double-click runs apply_action.
     activate_on_double_click: bool = False
-    header_prefix: str | None = None
-    header_suffix: str | None = None
     fit_strategy: FitStrategy = FitStrategy.PLAIN
     visibility_icon: VisibilityIconFn | None = None
     header_glyph: str | None = None
@@ -90,7 +82,6 @@ class RowSpec:
     help_mode_entries: tuple[tuple[str, str], ...] | None = None
     navigable: bool = True
     is_header: bool = False
-    is_sub_header: bool = False
     is_pinned: bool = False
     toggle_enabled: ActionMutator | None = None
     toggle_solo: ActionMutator | None = None
@@ -154,31 +145,10 @@ REPEAT_ROW_KINDS = frozenset(k for k, spec in ROW_SPECS.items() if spec.repeatab
 ACTION_ROW_KINDS = frozenset(
     k for k, spec in ROW_SPECS.items() if spec.affordance == RowAffordance.ACTION
 )
-LABELED_SUB_ROW_KINDS = frozenset(
-    k
-    for k, spec in ROW_SPECS.items()
-    if spec.affordance
-    in {
-        RowAffordance.VALUE_STEP,
-        RowAffordance.PATH_DIR,
-        RowAffordance.PATH_PRESET,
-    }
-    and not spec.is_header
-)
-
 TRACK_SUB_ROW_KINDS = frozenset(
     k for k, spec in ROW_SPECS.items() if spec.parent_group == "track"
 )
 TRACK_LOCK_KINDS = TRACK_SUB_ROW_KINDS | frozenset({RowKind.TRACK_HEADER})
-TRACK_EFFECT_SUB_ROW_KINDS = frozenset({RowKind.TRACK_EFFECT})
-TRACK_PRESET_LIST_SUB_ROW_KINDS = frozenset(
-    {
-        RowKind.TRACK_PRESET_LIST_ITEM,
-        RowKind.TRACK_PRESET_LIST_ADD,
-        RowKind.TRACK_PRESET_LIST_POPULATE,
-    }
-)
-SONG_MARKER_SUB_ROW_KINDS = frozenset({RowKind.SONG_MARKER_ITEM})
 PRESET_FILE_ROW_KINDS = frozenset({RowKind.TRACK_PRESET, RowKind.TRACK_PRESET_LIST_ITEM})
 
 _SECTION_LOCK_BLOCKING_AFFORDANCES = frozenset(
@@ -206,12 +176,6 @@ def row_is_pinned(kind: RowKind) -> bool:
     return spec.is_header or spec.is_pinned
 
 
-def expandable_row_kinds() -> frozenset[RowKind]:
-    return frozenset(
-        k for k, spec in ROW_SPECS.items() if spec.affordance == RowAffordance.EXPAND
-    )
-
-
 def _derived_blocked_by_section_lock(spec: RowSpec) -> bool:
     if spec.blocked_by_section_lock is not None:
         return spec.blocked_by_section_lock
@@ -224,9 +188,7 @@ def _derived_blocked_by_section_lock(spec: RowSpec) -> bool:
 def _derived_navigable_when_section_locked(spec: RowSpec) -> bool:
     if spec.navigable_when_section_locked is not None:
         return spec.navigable_when_section_locked
-    # Section and sub-section headers stay navigable so the section can still be
-    # expanded and viewed while locked.
-    return spec.affordance == RowAffordance.EXPAND
+    return spec.affordance == RowAffordance.HEADING
 
 
 def row_blocked_by_section_lock(kind: RowKind) -> bool:
@@ -313,35 +275,6 @@ def row_triggers_layer_delete(kind: RowKind) -> bool:
     return row_spec(kind).parent_group == "track"
 
 
-def section_header_descriptor(desc: RowDescriptor) -> RowDescriptor:
-    """Map a sub-row descriptor to its section header for focus fallback."""
-    from_tree = section_header_from_section_tree(desc)
-    if from_tree is not None:
-        return from_tree
-    kind = desc.kind
-    if kind in TRACK_EFFECT_SUB_ROW_KINDS:
-        return RowDescriptor(RowKind.TRACK_EFFECTS_HEADER, slot=desc.slot)
-    if kind in TRACK_PRESET_LIST_SUB_ROW_KINDS:
-        return RowDescriptor(RowKind.TRACK_PRESET_LIST, slot=desc.slot)
-    if kind in SONG_MARKER_SUB_ROW_KINDS:
-        return RowDescriptor(RowKind.SONG_MARKERS_HEADER)
-    return desc
-
-
-def tree_branch_leading_spaces(depth: int) -> str:
-    """Leading spaces before a branch glyph for nested tree depth."""
-    if depth <= 1:
-        return ""
-    return " " * (2 * (depth - 1))
-
-
-def tree_branch_prefix(depth: int) -> str:
-    """Branch glyph for tree depth; pixel indent comes from row_tree_indent_depth."""
-    if depth <= 0:
-        return ""
-    return tree_branch_leading_spaces(depth) + "└─ "
-
-
 def row_panel_label(kind: RowKind, desc: RowDescriptor | None = None) -> str:
     if desc is not None:
         overlay_label = overlay_card_panel_label(kind, desc.card)
@@ -373,129 +306,10 @@ def format_row_markers(state: TuningViewState, desc: RowDescriptor) -> str:
     return spec.format_markers(state, desc)
 
 
-def labeled_row_prefix(kind: RowKind, desc: RowDescriptor | None = None) -> str:
-    depth = row_tree_indent_depth(kind)
-    return tree_branch_prefix(depth) + row_panel_label(kind, desc) + ": "
-
-
-def row_labeled_display_text(state: TuningViewState, desc: RowDescriptor) -> str:
-    return labeled_row_prefix(desc.kind, desc) + format_row_value(state, desc)
-
-
-def expand_subheader_prefix(
-    kind: RowKind, desc: RowDescriptor | None = None
-) -> str:
-    depth = row_tree_indent_depth(kind)
-    spec = row_spec(kind)
-    label = tree_branch_prefix(depth) + row_panel_label(kind, desc)
-    if spec.format_value is not None:
-        # Status/value before the expand arrow uses labeled "label: value" form.
-        # Parenthetical suffixes (e.g. song markers "(N)") keep a space.
-        return label
-    return label + " "
-
-
-def format_expand_subheader_value(state: TuningViewState, desc: RowDescriptor) -> str:
-    arrow = expand_arrow_for_header(state, desc.kind, desc.slot, card=desc.card)
-    spec = row_spec(desc.kind)
-    if spec.format_value is not None:
-        suffix = spec.format_value(state, desc)
-        if suffix:
-            if suffix.startswith("("):
-                return f" {suffix} {arrow}"
-            return f": {suffix} {arrow}"
-    return arrow
-
-
-def row_expand_subheader_display_text(
-    state: TuningViewState, desc: RowDescriptor
-) -> str:
-    return expand_subheader_prefix(desc.kind, desc) + format_expand_subheader_value(
-        state, desc
-    )
-
-
-def _track_header_layer_prefix(state: TuningViewState, slot: str) -> str:
-    layer_num = state.layer_z_order.index(slot) + 1
-    return f"Layer {layer_num}: "
-
-
-def composite_header_prefix_part(
-    state: TuningViewState, desc: RowDescriptor
-) -> str:
-    spec = row_spec(desc.kind)
-    if spec.present_style == RowPresentStyle.TRACK_HEADER:
-        assert desc.slot is not None
-        return _track_header_layer_prefix(state, desc.slot)
-    if spec.header_prefix is not None:
-        return spec.header_prefix
-    return f"{spec.panel_label} "
-
-
-def composite_header_suffix_part(
-    state: TuningViewState, desc: RowDescriptor
-) -> str:
-    spec = row_spec(desc.kind)
-    if spec.present_style == RowPresentStyle.TRACK_HEADER:
-        assert desc.slot is not None
-        return stem_overlay_header(state.tracks[desc.slot].runtime.stem)
-    assert spec.header_suffix is not None
-    return spec.header_suffix
-
-
-def format_composite_header_expand_value(
-    state: TuningViewState, desc: RowDescriptor
-) -> str:
-    if desc.kind == RowKind.RENDER_TIMELINE_HEADER:
-        return expand_arrow_glyph(False)
-    return expand_arrow_for_header(state, desc.kind, desc.slot, card=desc.card)
-
-
-def row_composite_header_display_text(
-    state: TuningViewState, desc: RowDescriptor
-) -> str:
-    body = (composite_header_prefix_part(state, desc) + composite_header_suffix_part(
-        state, desc
-    )).rstrip()
-    arrow = format_composite_header_expand_value(state, desc)
-    return f"{body} {arrow}"
-
-
 def row_dynamic_panel_label(desc: RowDescriptor) -> str:
     assert desc.kind == RowKind.TRACK_EFFECT
     assert desc.effect_id is not None and desc.driver_slug is not None
     return f"{desc.effect_id} ({desc.driver_slug})"
-
-
-def _full_line_branch_depth(kind: RowKind) -> int:
-    if kind == RowKind.LAYER_MANAGEMENT_DELETE:
-        return 1
-    return row_tree_indent_depth(kind)
-
-
-def full_line_prefix(kind: RowKind) -> str:
-    return tree_branch_prefix(_full_line_branch_depth(kind)) + row_panel_label(kind)
-
-
-def row_full_line_display_text(state: TuningViewState, desc: RowDescriptor) -> str:
-    spec = row_spec(desc.kind)
-    if spec.format_value is not None:
-        return (
-            tree_branch_prefix(_full_line_branch_depth(desc.kind))
-            + spec.format_value(state, desc)
-        )
-    return full_line_prefix(desc.kind)
-
-
-def row_dynamic_labeled_prefix(desc: RowDescriptor) -> str:
-    depth = row_tree_indent_depth(desc.kind)
-    return tree_branch_prefix(depth) + row_dynamic_panel_label(desc) + ": "
-
-
-def row_dynamic_labeled_display_text(
-    state: TuningViewState, desc: RowDescriptor
-) -> str:
-    return row_dynamic_labeled_prefix(desc) + format_row_value(state, desc)
 
 
 def apply_field_horizontal(

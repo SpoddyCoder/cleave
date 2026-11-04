@@ -11,7 +11,7 @@ from cleave.viz.focus_nav import MainFocus
 from cleave.viz.input_dispatch import dispatch_keydown
 from cleave.viz.inspector import InspectorRow, build_inspector_rows
 from cleave.viz.menu_bar import MenuBarState
-from cleave.viz.navigator import layer_node_id, overlay_card_node_id
+from cleave.viz.navigator import layer_node_id, layer_page_node_id
 import cleave.viz.row_hotkeys as row_hotkeys
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.shell_focus import ShellRegion
@@ -19,7 +19,7 @@ from tests.cleave.viz.test_controls import (
     _make_controls,
     _make_controls_with_manager,
 )
-from tests.support.viz import keydown
+from tests.support.viz import keydown, layer_page_id_for_row
 
 _LAYER_DELETE = "Delete this Milkdrop visualisation layer?"
 
@@ -49,25 +49,60 @@ def test_node_header_descriptor_maps_render_and_layer_ids() -> None:
         RowKind.TRACK_HEADER, slot="layer_2"
     )
     header = row_hotkeys.node_header_descriptor
-    assert header("render.overlays") == RowDescriptor(
+    assert header("overlay") == RowDescriptor(
         RowKind.RENDER_OVERLAYS_HEADER
     )
-    assert header("render.post_fx") == RowDescriptor(
+    assert header("post_fx") == RowDescriptor(
         RowKind.RENDER_POST_FX_HEADER
     )
-    assert header("render.pattern_mask") == RowDescriptor(
+    assert header("pattern_mask") == RowDescriptor(
         RowKind.RENDER_PATTERN_MASK_HEADER
     )
     assert header("timeline") == RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
-    assert header(overlay_card_node_id("opening_card")) == (
+    assert header("overlay.opening_card") == (
         RowDescriptor(RowKind.RENDER_OVERLAY_CARD_HEADER, card="opening_card")
     )
-    assert header(overlay_card_node_id("closing_card")) == (
+    assert header("overlay.closing_card") == (
         RowDescriptor(RowKind.RENDER_OVERLAY_CARD_HEADER, card="closing_card")
     )
-    assert header("render.overlays.card:other") is None
+    assert header("overlay.other") is None
     assert header("render") is None
-    assert header("song_markers") is None
+    assert header("settings") is None
+    assert header("timeline.song_markers") == RowDescriptor(
+        RowKind.SONG_MARKERS_HEADER
+    )
+    assert header("post_fx.fade") == RowDescriptor(RowKind.RENDER_POST_FX_FADE_HEADER)
+    assert header(layer_page_node_id("layer_1", "compositing")) == RowDescriptor(
+        RowKind.TRACK_COMPOSITING_HEADER, slot="layer_1"
+    )
+
+
+def test_node_control_descriptor_resolves_to_the_owner() -> None:
+    assert row_hotkeys.node_control_descriptor("post_fx.fade") == RowDescriptor(
+        RowKind.RENDER_POST_FX_HEADER
+    )
+    assert row_hotkeys.node_control_descriptor("timeline.grid") == RowDescriptor(
+        RowKind.RENDER_TIMELINE_HEADER
+    )
+    assert row_hotkeys.node_control_descriptor("overlay.closing_card") == RowDescriptor(
+        RowKind.RENDER_OVERLAY_CARD_HEADER, card="closing_card"
+    )
+    assert row_hotkeys.node_control_descriptor(
+        layer_page_node_id("layer_1", "effects")
+    ) == RowDescriptor(RowKind.TRACK_HEADER, slot="layer_1")
+    assert row_hotkeys.node_control_descriptor("settings.ui") is None
+    assert row_hotkeys.node_control_descriptor("project.render") is None
+
+
+def test_hotkeys_on_a_child_page_reach_the_owner() -> None:
+    controls, _manager = _make_controls_with_manager(("layer_1",))
+    controls.navigator.select(layer_page_node_id("layer_1", "compositing"))
+    assert controls.navigator.handle_hotkey(keydown(pygame.K_l)) is True
+    assert controls.session.layers["layer_1"].locked is True
+
+    controls.navigator.select("post_fx.fade")
+    assert controls.navigator.handle_hotkey(keydown(pygame.K_e)) is True
+    assert controls.session.render_post_fx.enabled is False
 
 
 def test_navigator_layer_lock_and_delete_follow_selected_node() -> None:
@@ -109,12 +144,12 @@ def test_inspector_preset_item_delete_and_move_stay_on_the_item() -> None:
     controls.shell_focus.inspector_cursor = item
     view = controls.build_view_state(paused=False)
     rows = build_inspector_rows(
-        view,
-        layer_node_id("layer_1"),
-        controls.shell_focus.collapsed,
-        controls.shell_focus.opened,
+        view, layer_page_node_id("layer_1", "preset_switching")
     )
     assert any(row.descriptor == item for row in rows)
+    controls.shell_focus.selected_id = layer_page_node_id(
+        "layer_1", "preset_switching"
+    )
     runtime = _runtime(controls)
 
     assert dispatch_keydown(keydown(pygame.K_DELETE), runtime) is True
@@ -173,7 +208,7 @@ def test_move_mode_up_reorders_layers_before_navigator_cursor() -> None:
 def test_navigator_render_overlays_l_toggles_overlay_lock() -> None:
     controls = _make_controls(("layer_1",))
     controls.shell_focus.region = ShellRegion.NAVIGATOR
-    controls.shell_focus.selected_id = "render.overlays"
+    controls.shell_focus.selected_id = "overlay"
     runtime = _runtime(controls)
 
     assert dispatch_keydown(keydown(pygame.K_l), runtime) is True
@@ -183,6 +218,7 @@ def test_navigator_render_overlays_l_toggles_overlay_lock() -> None:
 
 def _focus_inspector(controls, slot: str, desc: RowDescriptor) -> None:
     _select_layer(controls, slot, region=ShellRegion.INSPECTOR)
+    controls.shell_focus.selected_id = layer_page_id_for_row(slot, desc.kind)
     controls.shell_focus.inspector_cursor = desc
 
 
@@ -204,10 +240,7 @@ def test_section_lock_inspector_refuses_edits_and_delete_still_prompts() -> None
     add = RowDescriptor(RowKind.TRACK_PRESET_LIST_ADD, slot="layer_1")
     view = controls.build_view_state(paused=False)
     built = build_inspector_rows(
-        view,
-        layer_node_id("layer_1"),
-        controls.shell_focus.collapsed,
-        controls.shell_focus.opened,
+        view, layer_page_node_id("layer_1", "preset_switching")
     )
     assert any(row.descriptor == add and row.navigable for row in built)
     _focus_inspector(controls, "layer_1", add)
@@ -230,7 +263,9 @@ def test_section_lock_inspector_refuses_edits_and_delete_still_prompts() -> None
     assert dispatch_keydown(keydown(pygame.K_l), runtime) is True
     assert layer.locked is True
 
-    _focus_inspector(controls, "layer_1", opacity)
+    _focus_inspector(
+        controls, "layer_1", RowDescriptor(RowKind.TRACK_PRESET, slot="layer_1")
+    )
     found_delete = False
     for _ in range(32):
         controls.inspector.move(1)
@@ -300,7 +335,7 @@ def test_curation_shell_allowlist() -> None:
     delete = RowDescriptor(RowKind.LAYER_MANAGEMENT_DELETE, slot="layer_1")
     _focus_inspector(controls, "layer_1", delete)
     controls.inspector._navigable_rows = lambda: (
-        InspectorRow(descriptor=delete, is_group=False, depth=0, navigable=True),
+        InspectorRow(descriptor=delete, is_heading=False, depth=0, navigable=True),
     )
     assert dispatch_keydown(keydown(pygame.K_RETURN), runtime) is True
     controls.layer_lifecycle.prompt_delete.assert_not_called()

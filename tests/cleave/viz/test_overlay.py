@@ -6,13 +6,12 @@ import pygame
 
 from cleave.viz.focus_nav import MainFocus
 from cleave.viz.inspector import build_inspector_rows
-from cleave.viz.navigator import overlay_card_node_id
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.row_present_renderers import (
     render_visibility_icon,
     row_value_color_for,
 )
-from cleave.viz.row_spec import row_full_line_display_text
+from cleave.viz.row_spec import row_panel_label
 from cleave.viz.theme import (
     ACTION,
     DISABLED,
@@ -122,7 +121,7 @@ def test_snap_to_song_markers_row_uses_action_color() -> None:
     )
     desc = RowDescriptor(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS)
     assert row_value_color_for(state, desc) == ACTION
-    text = row_full_line_display_text(state, desc)
+    text = row_panel_label(desc.kind)
     assert "▶" not in text
     assert "▼" not in text
 
@@ -143,10 +142,10 @@ def test_apply_cuts_to_cues_rows_use_action_color() -> None:
     assert row_value_color_for(state, hard_row) == ACTION
     assert row_value_color_for(state, remove_soft_row) == ACTION
     assert row_value_color_for(state, remove_hard_row) == ACTION
-    assert "Remove from Cues" in row_full_line_display_text(state, remove_soft_row)
-    assert "Remove from Cues" in row_full_line_display_text(state, remove_hard_row)
+    assert "Remove from Cues" in row_panel_label(remove_soft_row.kind)
+    assert "Remove from Cues" in row_panel_label(remove_hard_row.kind)
     for desc in (soft_row, hard_row):
-        text = row_full_line_display_text(state, desc)
+        text = row_panel_label(desc.kind)
         assert "▶" not in text
         assert "▼" not in text
 
@@ -178,13 +177,13 @@ def test_disabled_action_row_stays_disabled() -> None:
 
 
 def _inspector_kinds(state, node_id: str) -> list[RowKind]:
-    rows = build_inspector_rows(state, node_id, frozenset())
+    rows = build_inspector_rows(state, node_id)
     return [row.descriptor.kind for row in rows if row.descriptor is not None]
 
 
 def test_render_overlay_inspector_includes_header_and_sub_rows_when_expanded() -> None:
     state = _minimal_view_state()
-    opening = _inspector_kinds(state, overlay_card_node_id("opening_card"))
+    opening = _inspector_kinds(state, "overlay.opening_card")
     for kind in (
         RowKind.RENDER_OVERLAY_CARD_ANIMATION_HEADER,
         RowKind.RENDER_OVERLAY_CARD_POSITION,
@@ -210,7 +209,7 @@ def test_render_overlay_animation_rows_when_expanded() -> None:
             opening_card=make_overlay_card_block(animation_type="slide")
         ),
     )
-    kinds = _inspector_kinds(state, overlay_card_node_id("opening_card"))
+    kinds = _inspector_kinds(state, "overlay.opening_card")
     assert RowKind.RENDER_OVERLAY_CARD_ANIMATION_TYPE in kinds
     assert RowKind.RENDER_OVERLAY_CARD_ANIMATION_SLIDE_DIRECTION in kinds
     assert RowKind.RENDER_OVERLAY_CARD_TIME in kinds
@@ -223,14 +222,14 @@ def test_render_overlay_animation_hides_slide_direction_for_fade() -> None:
             opening_card=make_overlay_card_block(animation_type="fade")
         ),
     )
-    kinds = _inspector_kinds(state, overlay_card_node_id("opening_card"))
+    kinds = _inspector_kinds(state, "overlay.opening_card")
     assert RowKind.RENDER_OVERLAY_CARD_ANIMATION_TYPE in kinds
     assert RowKind.RENDER_OVERLAY_CARD_ANIMATION_SLIDE_DIRECTION not in kinds
 
 
 def test_render_overlay_title_and_body_font_rows_when_expanded() -> None:
     state = _minimal_view_state()
-    kinds = _inspector_kinds(state, overlay_card_node_id("opening_card"))
+    kinds = _inspector_kinds(state, "overlay.opening_card")
     for kind in (
         RowKind.RENDER_OVERLAY_CARD_TITLE_FONT_SIZE,
         RowKind.RENDER_OVERLAY_CARD_TITLE_FONT,
@@ -247,11 +246,10 @@ def test_render_overlay_title_and_body_font_rows_when_expanded() -> None:
         assert kind in kinds
 
 
-def test_render_overlay_collapsed_hides_sub_rows() -> None:
+def test_overlay_root_has_no_rows_and_cards_do() -> None:
     state = _minimal_view_state()
-    opening = _inspector_kinds(state, overlay_card_node_id("opening_card"))
-    closing = _inspector_kinds(state, overlay_card_node_id("closing_card"))
+    opening = _inspector_kinds(state, "overlay.opening_card")
+    closing = _inspector_kinds(state, "overlay.closing_card")
     assert RowKind.RENDER_OVERLAY_CARD_POSITION in opening
     assert RowKind.RENDER_OVERLAY_CARD_POSITION in closing
-    overlays = _inspector_kinds(state, "render.overlays")
-    assert overlays.count(RowKind.RENDER_OVERLAY_CARD_HEADER) == 2
+    assert _inspector_kinds(state, "overlay") == []

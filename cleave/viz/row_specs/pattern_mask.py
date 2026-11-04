@@ -14,7 +14,6 @@ from cleave.config_schema.render import (
 )
 from cleave.pattern_mask import pattern_mask_invert_display
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
-from cleave.viz.row_sections import apply_expand_toggle
 from cleave.viz.row_spec import FitStrategy, RowPresentStyle, RowSpec
 from cleave.viz.tuning_view_state import TuningViewState
 
@@ -59,16 +58,6 @@ def _toggle_render_pattern_mask_enabled(
     enabled = controls.session.render_pattern_mask.enabled
     controls.render_pattern_mask.set_enabled(not enabled)
 
-
-def _apply_render_pattern_mask_header(
-    controls: TuningControls,
-    desc: RowDescriptor,
-    forward: bool,
-    _large: bool,
-) -> None:
-    apply_expand_toggle(
-        controls, desc.kind, desc.slot, forward, card=desc.card
-    )
 
 def _apply_render_pattern_mask_type(
     controls: TuningControls,
@@ -141,12 +130,9 @@ def _visibility_pattern_mask(
 
 SPECS: dict[RowKind, RowSpec] = {
     RowKind.RENDER_PATTERN_MASK_HEADER: RowSpec(
-        affordance=RowAffordance.EXPAND,
+        affordance=RowAffordance.HEADING,
         panel_label="PATTERN MASK",
-        present_style=RowPresentStyle.COMPOSITE_HEADER,
-        apply_horizontal=_apply_render_pattern_mask_header,
-        header_prefix="Render: ",
-        header_suffix="PATTERN MASK",
+        present_style=RowPresentStyle.HEADING,
         fit_strategy=FitStrategy.NONE,
         visibility_icon=_visibility_pattern_mask,
         help_title="Pattern mask",

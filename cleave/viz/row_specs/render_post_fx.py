@@ -15,9 +15,7 @@ from cleave.config_schema.render import (
     VISUAL_LIMITER_THRESHOLD_STEP,
 )
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
-from cleave.viz.row_sections import apply_expand_toggle
 from cleave.viz.row_spec import FitStrategy, RowPresentStyle, RowSpec
-from cleave.viz.row_specs.common import apply_expand_subheader
 from cleave.viz.tuning_view_state import TuningViewState
 
 if TYPE_CHECKING:
@@ -300,16 +298,6 @@ def _toggle_render_post_fx_enabled(
     controls.render_post_fx.set_enabled(not enabled)
 
 
-def _apply_render_post_fx_header(
-    controls: TuningControls,
-    desc: RowDescriptor,
-    forward: bool,
-    _large: bool,
-) -> None:
-    apply_expand_toggle(
-        controls, desc.kind, desc.slot, forward, card=desc.card
-    )
-
 def _visibility_post_fx(
     state: TuningViewState, _desc: RowDescriptor
 ) -> tuple[bool, bool]:
@@ -318,12 +306,9 @@ def _visibility_post_fx(
 
 SPECS: dict[RowKind, RowSpec] = {
     RowKind.RENDER_POST_FX_HEADER: RowSpec(
-        affordance=RowAffordance.EXPAND,
+        affordance=RowAffordance.HEADING,
         panel_label="POST FX",
-        present_style=RowPresentStyle.COMPOSITE_HEADER,
-        apply_horizontal=_apply_render_post_fx_header,
-        header_prefix="Render: ",
-        header_suffix="POST FX",
+        present_style=RowPresentStyle.HEADING,
         fit_strategy=FitStrategy.NONE,
         visibility_icon=_visibility_post_fx,
         help_title="Post FX",
@@ -333,30 +318,26 @@ SPECS: dict[RowKind, RowSpec] = {
         toggle_enabled=_toggle_render_post_fx_enabled,
     ),
     RowKind.RENDER_POST_FX_FADE_HEADER: RowSpec(
-        affordance=RowAffordance.EXPAND,
+        affordance=RowAffordance.HEADING,
         panel_label="fade",
-        present_style=RowPresentStyle.EXPAND_SUBHEADER,
-        apply_horizontal=apply_expand_subheader,
+        present_style=RowPresentStyle.HEADING,
         fit_strategy=FitStrategy.NONE,
         help_title="Fade",
         help_description=(
             "Fades the picture in from the song start and out toward the song end.",
         ),
-        is_sub_header=True,
         parent_group="render_post_fx",
     ),
     RowKind.RENDER_POST_FX_FADE_IN_HEADER: RowSpec(
-        affordance=RowAffordance.EXPAND,
+        affordance=RowAffordance.HEADING,
         panel_label="fade in",
-        present_style=RowPresentStyle.EXPAND_SUBHEADER,
-        apply_horizontal=apply_expand_subheader,
+        present_style=RowPresentStyle.HEADING,
         fit_strategy=FitStrategy.NONE,
         help_title="Fade in",
         help_description=(
             "Offsets from the start of the song.",
             "The picture rises from start to end.",
         ),
-        is_sub_header=True,
         parent_group="render_post_fx_fade",
     ),
     RowKind.RENDER_POST_FX_FADE_IN_START: RowSpec(
@@ -400,10 +381,9 @@ SPECS: dict[RowKind, RowSpec] = {
         parent_group="render_post_fx_fade_in",
     ),
     RowKind.RENDER_POST_FX_FADE_OUT_HEADER: RowSpec(
-        affordance=RowAffordance.EXPAND,
+        affordance=RowAffordance.HEADING,
         panel_label="fade out",
-        present_style=RowPresentStyle.EXPAND_SUBHEADER,
-        apply_horizontal=apply_expand_subheader,
+        present_style=RowPresentStyle.HEADING,
         fit_strategy=FitStrategy.NONE,
         help_title="Fade out",
         help_description=(
@@ -411,7 +391,6 @@ SPECS: dict[RowKind, RowSpec] = {
             "The picture falls from start to end.",
             "Start is farther from the end than end.",
         ),
-        is_sub_header=True,
         parent_group="render_post_fx_fade",
     ),
     RowKind.RENDER_POST_FX_FADE_OUT_START: RowSpec(
@@ -458,10 +437,9 @@ SPECS: dict[RowKind, RowSpec] = {
         parent_group="render_post_fx_fade_out",
     ),
     RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_HEADER: RowSpec(
-        affordance=RowAffordance.EXPAND,
+        affordance=RowAffordance.HEADING,
         panel_label="highlight rolloff",
-        present_style=RowPresentStyle.EXPAND_SUBHEADER,
-        apply_horizontal=apply_expand_subheader,
+        present_style=RowPresentStyle.HEADING,
         fit_strategy=FitStrategy.NONE,
         help_title="Highlight rolloff",
         help_description=(
@@ -472,7 +450,6 @@ SPECS: dict[RowKind, RowSpec] = {
             "runs automatically; composite rolloff here is extra control.",
             "Per-layer rolloff is optional and can stay light.",
         ),
-        is_sub_header=True,
         parent_group="render_post_fx",
     ),
     RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_MODE: RowSpec(
@@ -578,10 +555,9 @@ SPECS: dict[RowKind, RowSpec] = {
         parent_group="render_post_fx_highlight_rolloff",
     ),
     RowKind.RENDER_POST_FX_CHROMA_BOOST_HEADER: RowSpec(
-        affordance=RowAffordance.EXPAND,
+        affordance=RowAffordance.HEADING,
         panel_label="chroma boost",
-        present_style=RowPresentStyle.EXPAND_SUBHEADER,
-        apply_horizontal=apply_expand_subheader,
+        present_style=RowPresentStyle.HEADING,
         fit_strategy=FitStrategy.NONE,
         help_title="Chroma boost",
         help_description=(
@@ -589,7 +565,6 @@ SPECS: dict[RowKind, RowSpec] = {
             "Useful after highlight compression to restore perceived color.",
             "Vibrance spares already-saturated pixels to avoid clipping primaries.",
         ),
-        is_sub_header=True,
         parent_group="render_post_fx",
     ),
     RowKind.RENDER_POST_FX_CHROMA_BOOST_MODE: RowSpec(
@@ -633,10 +608,9 @@ SPECS: dict[RowKind, RowSpec] = {
         parent_group="render_post_fx_chroma_boost",
     ),
     RowKind.RENDER_POST_FX_LIMITER_HEADER: RowSpec(
-        affordance=RowAffordance.EXPAND,
+        affordance=RowAffordance.HEADING,
         panel_label="visual limiter",
-        present_style=RowPresentStyle.EXPAND_SUBHEADER,
-        apply_horizontal=apply_expand_subheader,
+        present_style=RowPresentStyle.HEADING,
         fit_strategy=FitStrategy.NONE,
         help_title="Visual limiter",
         help_description=(
@@ -644,7 +618,6 @@ SPECS: dict[RowKind, RowSpec] = {
             "Works with the timeline off. Cue roles weight the cut when the timeline is on.",
             "Independent of the Post FX master switch and Post FX solo.",
         ),
-        is_sub_header=True,
         parent_group="render_post_fx",
         blocked_by_section_lock=False,
     ),

@@ -1,26 +1,17 @@
-"""Inspector row model: Settings, Project, Layers, collapse, and conditional rows."""
+"""Inspector row model: page rows, headings, and conditional rows."""
 
 from __future__ import annotations
 
+import pytest
+
 from cleave.effects.registry import effect_roster
 from cleave.viz.focus_nav import MainFocus
-from cleave.viz.inspector import build_inspector_rows, rows_for_section
-from cleave.viz.navigator import layer_node_id, overlay_card_node_id
+from cleave.viz.inspector import build_inspector_rows
+from cleave.viz.navigator import layer_node_id, layer_page_node_id
 from cleave.viz.row_kinds import RowDescriptor, RowKind
-from cleave.viz.row_sections import (
-    PROJECT_SECTION,
-    RENDER_OVERLAY_CLOSING_CARD_SECTION,
-    RENDER_OVERLAY_OPENING_CARD_SECTION,
-    RENDER_OVERLAYS_SECTION,
-    RENDER_PATTERN_MASK_SECTION,
-    RENDER_POST_FX_SECTION,
-    SETTINGS_SECTION,
-    ExpandSectionDef,
-)
 from cleave.viz.row_present_renderers import inspector_field_colors
-from cleave.viz.row_spec import format_row_value, row_spec
+from cleave.viz.row_spec import format_row_value
 from cleave.viz.theme import ACTION, LOCKED
-from cleave.viz.shell_focus import InspectorGroupKey, inspector_group_is_open
 from cleave.viz.tuning_view_state import SettingsBlock, TuningViewState
 from tests.support.config import TEST_LAYER_STEMS
 from tests.support.viz import make_track_block
@@ -38,380 +29,15 @@ def _view_state() -> TuningViewState:
 
 
 def _kinds(rows: tuple) -> list[RowKind]:
-    return [row.descriptor.kind for row in rows if row.descriptor is not None]
-
-
-def _leaf_descriptors(section: ExpandSectionDef) -> tuple[RowDescriptor, ...]:
-    leaves: list[RowDescriptor] = []
-    for child in section.children:
-        assert child.leaf_kind is not None
-        leaves.append(RowDescriptor(child.leaf_kind))
-    return tuple(leaves)
-
-
-def _group_leaves(rows: tuple, header: RowKind) -> tuple:
-    found = False
-    leaves = []
-    for row in rows:
-        if row.is_group and row.descriptor.kind == header:
-            found = True
-            continue
-        if not found:
-            continue
-        if row.is_group:
-            break
-        leaves.append(row)
-    assert found
-    return tuple(leaves)
-
-
-def test_project_builds_three_groups_matching_section_children() -> None:
-    state = _view_state()
-    rows = build_inspector_rows(state, "project", frozenset())
-    assert rows == rows_for_section(state, PROJECT_SECTION, frozenset())
-
-    expands = tuple(child.expand for child in PROJECT_SECTION.children)
-    assert len(expands) == 3
-    assert all(section is not None for section in expands)
-
-    groups = tuple(row for row in rows if row.is_group)
-    assert tuple(row.descriptor.kind for row in groups) == tuple(
-        section.header_kind for section in expands if section is not None
-    )
-    assert all(row.depth == 0 and row.is_group for row in groups)
-    for group in groups:
-        assert group.navigable is row_spec(group.descriptor.kind).navigable
-
-    for section in expands:
-        assert section is not None
-        leaves = _group_leaves(rows, section.header_kind)
-        fields = tuple(row for row in leaves if row.descriptor is not None)
-        commands = tuple(row.command_id for row in leaves if row.command_id)
-        assert tuple(row.descriptor for row in fields) == _leaf_descriptors(section)
-        if section.header_kind == RowKind.PROJECT_RENDER_HEADER:
-            assert commands == ("project.render",)
-        else:
-            assert commands == ()
-        assert all(row.depth == 1 and not row.is_group for row in leaves)
-        for leaf in leaves:
-            if leaf.descriptor is None:
-                assert leaf.navigable
-                continue
-            assert leaf.navigable is row_spec(leaf.descriptor.kind).navigable
-
-
-def test_collapsed_group_hides_children_and_keeps_header() -> None:
-    state = _view_state()
-    header = RowKind.PROJECT_COMPOSITOR_HEADER
-    rows = build_inspector_rows(
-        state, "project", frozenset({InspectorGroupKey(header)})
-    )
-    kinds = _kinds(rows)
-
-    assert header in kinds
-    assert RowKind.PROJECT_COMPOSITOR_HDR not in kinds
-    group = next(row for row in rows if row.descriptor.kind == header)
-    assert group.is_group is True
-    assert group.depth == 0
-    assert RowKind.PROJECT_MILKDROP_BEAT_SENSITIVITY in kinds
-    assert RowKind.PROJECT_RENDER_OUTPUT in kinds
-
-
-def test_conditional_rows_follow_pattern_mask_predicate() -> None:
-    state = _view_state()
-    assert state.render_pattern_mask.type != "plasma"
-    hidden = rows_for_section(state, RENDER_PATTERN_MASK_SECTION, frozenset())
-    hidden_kinds = _kinds(hidden)
-    assert RowKind.RENDER_PATTERN_MASK_SEED not in hidden_kinds
-    assert RowKind.RENDER_PATTERN_MASK_TYPE in hidden_kinds
-
-    state.render_pattern_mask.type = "plasma"
-    shown = rows_for_section(state, RENDER_PATTERN_MASK_SECTION, frozenset())
-    shown_kinds = _kinds(shown)
-    assert RowKind.RENDER_PATTERN_MASK_SEED in shown_kinds
-    assert RowKind.RENDER_PATTERN_MASK_TYPE in shown_kinds
-    seed = next(row for row in shown if row.descriptor.kind == RowKind.RENDER_PATTERN_MASK_SEED)
-    assert seed.is_group is False
-    assert seed.navigable is row_spec(RowKind.RENDER_PATTERN_MASK_SEED).navigable
-
-
-def test_settings_and_project_omit_top_headers() -> None:
-    state = _view_state()
-    settings = build_inspector_rows(state, "settings", frozenset())
-    project = build_inspector_rows(state, "project", frozenset())
-
-    assert settings == rows_for_section(state, SETTINGS_SECTION, frozenset())
-    latency = _group_leaves(settings, RowKind.SETTINGS_LATENCY_COMPENSATION_HEADER)
-    assert latency[-1].command_id == "settings.measure_latency"
-    assert RowKind.SETTINGS_EDITOR_WINDOW_HEADER in _kinds(settings)
-    assert RowKind.SETTINGS_UI_HEADER in _kinds(settings)
-    assert RowKind.SETTINGS_LATENCY_COMPENSATION_HEADER in _kinds(settings)
-
-
-def test_unmigrated_nodes_return_no_rows() -> None:
-    state = _view_state()
-    for node_id in (
-        "render",
-        "unknown",
-        "render.overlays.card:other",
-    ):
-        assert build_inspector_rows(state, node_id, frozenset()) == ()
-
-
-def test_render_timeline_page_is_three_groups() -> None:
-    state = _view_state()
-    preset_key = InspectorGroupKey(RowKind.TIMELINE_PRESETS_HEADER)
-    beat_key = InspectorGroupKey(RowKind.TIMELINE_BEAT_BAR_GRID_HEADER)
-    cuts_key = InspectorGroupKey(RowKind.TIMELINE_CUTS_HEADER)
-    assert inspector_group_is_open(preset_key, frozenset(), frozenset()) is True
-    assert inspector_group_is_open(beat_key, frozenset(), frozenset()) is False
-    assert inspector_group_is_open(cuts_key, frozenset(), frozenset()) is False
-
-    rows = build_inspector_rows(state, "timeline", frozenset())
-    kinds = _kinds(rows)
-    groups = tuple(row for row in rows if row.is_group)
-    assert tuple(row.descriptor.kind for row in groups) == (
-        RowKind.TIMELINE_PRESETS_HEADER,
-        RowKind.TIMELINE_BEAT_BAR_GRID_HEADER,
-        RowKind.TIMELINE_CUTS_HEADER,
-    )
-    assert all(row.depth == 0 for row in groups)
-    assert RowKind.RENDER_TIMELINE_HEADER not in kinds
-    assert [row.command_id for row in rows if row.command_id] == [
-        "timeline.apply_preset",
-        "timeline.reset",
-    ]
-    preset_leaves = _group_leaves(rows, RowKind.TIMELINE_PRESETS_HEADER)
-    assert [row.command_id for row in preset_leaves[-2:]] == [
-        "timeline.apply_preset",
-        "timeline.reset",
-    ]
-    assert all(row.descriptor is None for row in preset_leaves[-2:])
-    assert all(row.command_id is None for row in preset_leaves[:-2])
-    assert all(row.depth == 1 and not row.is_group for row in preset_leaves)
-    assert RowKind.TIMELINE_PLACEMENT_SNAP not in kinds
-    assert RowKind.TIMELINE_BAR_GRID not in kinds
-    assert RowKind.TIMELINE_HARD_CUTS not in kinds
-    assert RowKind.TIMELINE_SOFT_CUTS not in kinds
-    assert RowKind.TIMELINE_HARD_CUT_FADE_IN not in kinds
-
-    opened = frozenset({beat_key, cuts_key})
-    open_rows = build_inspector_rows(state, "timeline", frozenset(), opened)
-    open_kinds = _kinds(open_rows)
-    beat_leaves = _group_leaves(open_rows, RowKind.TIMELINE_BEAT_BAR_GRID_HEADER)
-    assert tuple(
-        row.descriptor.kind if row.descriptor is not None else None
-        for row in beat_leaves
-    ) == (
-        RowKind.TIMELINE_PLACEMENT_SNAP,
-        RowKind.TIMELINE_BAR_GRID,
-        RowKind.TIMELINE_BAR_PHASE,
-        None,
-    )
-    assert beat_leaves[-1].command_id == "timeline.snap_cues"
-    assert beat_leaves[-1].descriptor is None
-    assert RowKind.TIMELINE_HARD_CUTS in open_kinds
-    assert RowKind.TIMELINE_SOFT_CUTS in open_kinds
-    assert RowKind.TIMELINE_HARD_CUT_FADE_IN not in open_kinds
-    assert RowKind.TIMELINE_SOFT_CUT_FADE_IN not in open_kinds
-    assert RowKind.TIMELINE_APPLY_HARD_CUTS not in open_kinds
-    assert RowKind.TIMELINE_APPLY_SOFT_CUTS not in open_kinds
-
-    state.render_timeline.hard_cut_fades.enabled = True
-    state.render_timeline.soft_cut_fades.enabled = True
-    fade_kinds = _kinds(
-        build_inspector_rows(state, "timeline", frozenset(), opened)
-    )
-    hard_idx = fade_kinds.index(RowKind.TIMELINE_HARD_CUTS)
-    assert fade_kinds[hard_idx : hard_idx + 6] == [
-        RowKind.TIMELINE_HARD_CUTS,
-        RowKind.TIMELINE_HARD_CUT_FADE_IN,
-        RowKind.TIMELINE_HARD_CUT_FADE_OUT,
-        RowKind.TIMELINE_HARD_CUT_CROSSFADE,
-        RowKind.TIMELINE_APPLY_HARD_CUTS,
-        RowKind.TIMELINE_REMOVE_HARD_CUTS,
-    ]
-    soft_idx = fade_kinds.index(RowKind.TIMELINE_SOFT_CUTS)
-    assert fade_kinds[soft_idx : soft_idx + 6] == [
-        RowKind.TIMELINE_SOFT_CUTS,
-        RowKind.TIMELINE_SOFT_CUT_FADE_IN,
-        RowKind.TIMELINE_SOFT_CUT_FADE_OUT,
-        RowKind.TIMELINE_SOFT_CUT_CROSSFADE,
-        RowKind.TIMELINE_APPLY_SOFT_CUTS,
-        RowKind.TIMELINE_REMOVE_SOFT_CUTS,
-    ]
-
-    collapsed = frozenset({preset_key})
-    hidden_rows = build_inspector_rows(
-        state, "timeline", collapsed, opened
-    )
-    hidden = _kinds(hidden_rows)
-    hidden_commands = [row.command_id for row in hidden_rows if row.command_id]
-    assert RowKind.TIMELINE_PRESETS_HEADER in hidden
-    assert "timeline.apply_preset" not in hidden_commands
-    assert "timeline.reset" not in hidden_commands
-    assert hidden_commands == ["timeline.snap_cues"]
-    assert RowKind.TIMELINE_HARD_CUT_FADE_IN in hidden
-
-
-def test_song_markers_page_is_snap_and_marker_rows() -> None:
-    state = _view_state()
-    state.render_timeline.song_marker_times = (1.0, 4.0, 9.0)
-    rows = build_inspector_rows(state, "song_markers", frozenset())
-    kinds = _kinds(rows)
-
-    assert RowKind.SONG_MARKERS_HEADER not in kinds
-    assert all(not row.is_group for row in rows)
-    assert all(row.command_id is None for row in rows)
-    assert kinds[0] == RowKind.TIMELINE_SNAP_TO_SONG_MARKERS
-    markers = [
-        row.descriptor
-        for row in rows
-        if row.descriptor is not None
-        and row.descriptor.kind is RowKind.SONG_MARKER_ITEM
-    ]
-    assert [desc.marker_index for desc in markers] == [0, 1, 2]
-    assert all(row.depth == 0 for row in rows)
-
-
-def test_render_overlays_page_is_the_two_card_groups() -> None:
-    state = _view_state()
-    rows = build_inspector_rows(state, "render.overlays", frozenset())
-    assert rows == rows_for_section(state, RENDER_OVERLAYS_SECTION, frozenset())
-    assert all(row.command_id is None for row in rows)
-    groups = tuple(row for row in rows if row.is_group and row.depth == 0)
-    assert tuple(
-        (row.descriptor.kind, row.descriptor.card) for row in groups
-    ) == (
-        (RowKind.RENDER_OVERLAY_CARD_HEADER, "opening_card"),
-        (RowKind.RENDER_OVERLAY_CARD_HEADER, "closing_card"),
-    )
-    assert RowKind.RENDER_OVERLAYS_HEADER not in _kinds(rows)
-    for card in ("opening_card", "closing_card"):
-        assert any(
-            row.descriptor is not None
-            and row.descriptor.card == card
-            and row.descriptor.kind is RowKind.RENDER_OVERLAY_CARD_POSITION
-            for row in rows
-        )
-
-    collapsed = frozenset(
-        {InspectorGroupKey(RowKind.RENDER_OVERLAY_CARD_HEADER, card="opening_card")}
-    )
-    hidden = build_inspector_rows(state, "render.overlays", collapsed)
-    opening = tuple(
+    return [
         row.descriptor.kind
-        for row in hidden
-        if row.descriptor is not None and row.descriptor.card == "opening_card"
-    )
-    assert opening == (RowKind.RENDER_OVERLAY_CARD_HEADER,)
-    assert any(
-        row.descriptor is not None
-        and row.descriptor.card == "closing_card"
-        and row.descriptor.kind is RowKind.RENDER_OVERLAY_CARD_POSITION
-        for row in hidden
-    )
-
-
-def test_opening_card_page_omits_its_header() -> None:
-    state = _view_state()
-    node_id = overlay_card_node_id("opening_card")
-    rows = build_inspector_rows(state, node_id, frozenset())
-    assert rows == rows_for_section(
-        state, RENDER_OVERLAY_OPENING_CARD_SECTION, frozenset()
-    )
-    kinds = _kinds(rows)
-    assert RowKind.RENDER_OVERLAY_CARD_HEADER not in kinds
-    for kind in (
-        RowKind.RENDER_OVERLAY_CARD_ANIMATION_HEADER,
-        RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER,
-        RowKind.RENDER_OVERLAY_CARD_BODY_HEADER,
-        RowKind.RENDER_OVERLAY_CARD_POSITION,
-        RowKind.RENDER_OVERLAY_CARD_OPACITY,
-        RowKind.RENDER_OVERLAY_CARD_BACKGROUND_COLOUR,
-        RowKind.RENDER_OVERLAY_CARD_BACKGROUND_MARGIN,
-        RowKind.RENDER_OVERLAY_CARD_BACKGROUND_PADDING,
-        RowKind.RENDER_OVERLAY_CARD_BORDER_WIDTH,
-        RowKind.RENDER_OVERLAY_CARD_BORDER_COLOUR,
-    ):
-        assert kind in kinds
-    assert all(
-        row.descriptor is not None and row.descriptor.card == "opening_card"
         for row in rows
-    )
-
-    closing = build_inspector_rows(
-        state, overlay_card_node_id("closing_card"), frozenset()
-    )
-    assert closing == rows_for_section(
-        state, RENDER_OVERLAY_CLOSING_CARD_SECTION, frozenset()
-    )
-    assert RowKind.RENDER_OVERLAY_CARD_HEADER not in _kinds(closing)
-    assert all(
-        row.descriptor is not None and row.descriptor.card == "closing_card"
-        for row in closing
-    )
+        if row.descriptor is not None and not row.is_heading
+    ]
 
 
-def test_render_predicates_omit_rows() -> None:
-    state = _view_state()
-    mask = build_inspector_rows(state, "render.pattern_mask", frozenset())
-    assert mask == rows_for_section(state, RENDER_PATTERN_MASK_SECTION, frozenset())
-    assert state.render_pattern_mask.type != "plasma"
-    assert RowKind.RENDER_PATTERN_MASK_TYPE in _kinds(mask)
-    assert RowKind.RENDER_PATTERN_MASK_SEED not in _kinds(mask)
-    assert RowKind.RENDER_PATTERN_MASK_HEADER not in _kinds(mask)
-
-    card = build_inspector_rows(
-        state, overlay_card_node_id("opening_card"), frozenset()
-    )
-    assert state.render_overlays.opening_card.runtime.animation.type == "fade"
-    assert RowKind.RENDER_OVERLAY_CARD_ANIMATION_TYPE in _kinds(card)
-    assert RowKind.RENDER_OVERLAY_CARD_ANIMATION_SLIDE_DIRECTION not in _kinds(card)
-
-    post = build_inspector_rows(state, "render.post_fx", frozenset())
-    assert post == rows_for_section(state, RENDER_POST_FX_SECTION, frozenset())
-    assert state.render_post_fx.chroma_boost.mode == "off"
-    post_kinds = _kinds(post)
-    assert RowKind.RENDER_POST_FX_CHROMA_BOOST_MODE in post_kinds
-    assert RowKind.RENDER_POST_FX_CHROMA_BOOST_VARIANT not in post_kinds
-    assert RowKind.RENDER_POST_FX_CHROMA_BOOST_AMOUNT not in post_kinds
-    assert RowKind.RENDER_POST_FX_HEADER not in post_kinds
-
-
-def test_locked_render_blocks_still_build() -> None:
-    state = _view_state()
-    state.render_overlays.locked = True
-    state.render_post_fx.locked = True
-    state.render_pattern_mask.locked = True
-
-    overlays = build_inspector_rows(state, "render.overlays", frozenset())
-    position = next(
-        row.descriptor
-        for row in overlays
-        if row.descriptor is not None
-        and row.descriptor.kind is RowKind.RENDER_OVERLAY_CARD_POSITION
-        and row.descriptor.card == "opening_card"
-    )
-    assert inspector_field_colors(state, position) == (LOCKED, LOCKED)
-
-    post = build_inspector_rows(state, "render.post_fx", frozenset())
-    fade_start = next(
-        row.descriptor
-        for row in post
-        if row.descriptor is not None
-        and row.descriptor.kind is RowKind.RENDER_POST_FX_FADE_IN_START
-    )
-    assert inspector_field_colors(state, fade_start) == (LOCKED, LOCKED)
-
-    mask = build_inspector_rows(state, "render.pattern_mask", frozenset())
-    density = next(
-        row.descriptor
-        for row in mask
-        if row.descriptor is not None
-        and row.descriptor.kind is RowKind.RENDER_PATTERN_MASK_DENSITY
-    )
-    assert inspector_field_colors(state, density) == (LOCKED, LOCKED)
+def _headings(rows: tuple) -> list[RowKind]:
+    return [row.descriptor.kind for row in rows if row.is_heading]
 
 
 def _layer_view(
@@ -440,24 +66,217 @@ def _layer_view(
     )
 
 
-def test_layer_slot_page_has_groups_without_track_header() -> None:
+@pytest.mark.parametrize(
+    "node_id",
+    ("settings", "project", "overlay", "post_fx", "timeline", "render", "unknown"),
+)
+def test_parents_and_unknown_ids_have_no_rows(node_id: str) -> None:
+    assert build_inspector_rows(_view_state(), node_id) == ()
+
+
+def test_settings_pages() -> None:
+    state = _view_state()
+    window = build_inspector_rows(state, "settings.editor_window")
+    assert _kinds(window)[0] == RowKind.SETTINGS_PREVIEW_QUALITY
+    assert RowKind.SETTINGS_NAVIGATOR_SIDE in _kinds(window)
+    assert _kinds(build_inspector_rows(state, "settings.ui")) == [
+        RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY
+    ]
+    latency = build_inspector_rows(state, "settings.latency")
+    assert _kinds(latency) == [RowKind.SETTINGS_RESIDUAL_LATENCY_MS]
+    assert latency[-1].command_id == "settings.measure_latency"
+    assert latency[-1].depth == 0
+
+
+def test_project_pages() -> None:
+    state = _view_state()
+    assert _kinds(build_inspector_rows(state, "project.projectm")) == [
+        RowKind.PROJECT_MILKDROP_BEAT_SENSITIVITY
+    ]
+    assert _kinds(build_inspector_rows(state, "project.compositor")) == [
+        RowKind.PROJECT_COMPOSITOR_HDR
+    ]
+    render = build_inspector_rows(state, "project.render")
+    assert _kinds(render)[0] == RowKind.PROJECT_RENDER_OUTPUT
+    assert render[-1].command_id == "project.render"
+
+
+def test_page_header_is_never_a_row() -> None:
     state = _layer_view(("layer_1",))
-    rows = build_inspector_rows(state, layer_node_id("layer_1"), frozenset())
-    kinds = _kinds(rows)
-    assert RowKind.TRACK_HEADER not in kinds
+    for node_id, header in (
+        ("settings.ui", RowKind.SETTINGS_UI_HEADER),
+        ("post_fx.fade", RowKind.RENDER_POST_FX_FADE_HEADER),
+        ("pattern_mask", RowKind.RENDER_PATTERN_MASK_HEADER),
+        ("timeline.preset", RowKind.TIMELINE_PRESETS_HEADER),
+        ("overlay.opening_card", RowKind.RENDER_OVERLAY_CARD_HEADER),
+        (layer_node_id("layer_1"), RowKind.TRACK_HEADER),
+    ):
+        assert header not in _kinds(build_inspector_rows(state, node_id))
+
+
+def test_headings_are_static_and_show_their_rows() -> None:
+    state = _view_state()
+    rows = build_inspector_rows(state, "post_fx.fade")
+
+    assert _headings(rows) == [
+        RowKind.RENDER_POST_FX_FADE_IN_HEADER,
+        RowKind.RENDER_POST_FX_FADE_OUT_HEADER,
+    ]
+    assert all(not row.navigable for row in rows if row.is_heading)
+    assert all(row.depth == 0 for row in rows if row.is_heading)
+    assert all(row.depth == 1 for row in rows if not row.is_heading)
+    assert RowKind.RENDER_POST_FX_FADE_IN_START in _kinds(rows)
+    assert RowKind.RENDER_POST_FX_FADE_OUT_TYPE in _kinds(rows)
+
+
+def test_card_page_has_headings_and_card_identity() -> None:
+    state = _view_state()
+    rows = build_inspector_rows(state, "overlay.opening_card")
+
+    assert _headings(rows) == [
+        RowKind.RENDER_OVERLAY_CARD_ANIMATION_HEADER,
+        RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER,
+        RowKind.RENDER_OVERLAY_CARD_BODY_HEADER,
+    ]
     for kind in (
+        RowKind.RENDER_OVERLAY_CARD_POSITION,
+        RowKind.RENDER_OVERLAY_CARD_OPACITY,
+        RowKind.RENDER_OVERLAY_CARD_BORDER_COLOUR,
+        RowKind.RENDER_OVERLAY_CARD_TITLE_FONT,
+        RowKind.RENDER_OVERLAY_CARD_BODY_TEXT,
+    ):
+        assert kind in _kinds(rows)
+    assert all(row.descriptor.card == "opening_card" for row in rows)
+    closing = build_inspector_rows(state, "overlay.closing_card")
+    assert all(row.descriptor.card == "closing_card" for row in closing)
+
+
+def test_conditional_rows_follow_predicates() -> None:
+    state = _view_state()
+    assert state.render_pattern_mask.type != "plasma"
+    assert RowKind.RENDER_PATTERN_MASK_SEED not in _kinds(
+        build_inspector_rows(state, "pattern_mask")
+    )
+    state.render_pattern_mask.type = "plasma"
+    assert RowKind.RENDER_PATTERN_MASK_SEED in _kinds(
+        build_inspector_rows(state, "pattern_mask")
+    )
+
+    card = _kinds(build_inspector_rows(state, "overlay.opening_card"))
+    assert state.render_overlays.opening_card.runtime.animation.type == "fade"
+    assert RowKind.RENDER_OVERLAY_CARD_ANIMATION_TYPE in card
+    assert RowKind.RENDER_OVERLAY_CARD_ANIMATION_SLIDE_DIRECTION not in card
+
+    assert state.render_post_fx.chroma_boost.mode == "off"
+    assert _kinds(build_inspector_rows(state, "post_fx.chroma_boost")) == [
+        RowKind.RENDER_POST_FX_CHROMA_BOOST_MODE
+    ]
+
+
+def test_beat_bar_grid_page() -> None:
+    rows = build_inspector_rows(_view_state(), "timeline.grid")
+    assert _kinds(rows) == [
+        RowKind.TIMELINE_PLACEMENT_SNAP,
+        RowKind.TIMELINE_BAR_GRID,
+        RowKind.TIMELINE_BAR_PHASE,
+    ]
+    assert rows[-1].command_id == "timeline.snap_cues"
+
+
+def test_timeline_preset_page_ends_with_commands() -> None:
+    rows = build_inspector_rows(_view_state(), "timeline.preset")
+    assert [row.command_id for row in rows[-2:]] == [
+        "timeline.apply_preset",
+        "timeline.reset",
+    ]
+    assert all(row.command_id is None for row in rows[:-2])
+
+
+def test_cue_fades_page_follows_enabled_flags() -> None:
+    state = _view_state()
+    assert _kinds(build_inspector_rows(state, "timeline.cue_fades")) == [
+        RowKind.TIMELINE_HARD_CUTS,
+        RowKind.TIMELINE_SOFT_CUTS,
+    ]
+    state.render_timeline.hard_cut_fades.enabled = True
+    state.render_timeline.soft_cut_fades.enabled = True
+    kinds = _kinds(build_inspector_rows(state, "timeline.cue_fades"))
+    hard_idx = kinds.index(RowKind.TIMELINE_HARD_CUTS)
+    assert kinds[hard_idx : hard_idx + 6] == [
+        RowKind.TIMELINE_HARD_CUTS,
+        RowKind.TIMELINE_HARD_CUT_FADE_IN,
+        RowKind.TIMELINE_HARD_CUT_FADE_OUT,
+        RowKind.TIMELINE_HARD_CUT_CROSSFADE,
+        RowKind.TIMELINE_APPLY_HARD_CUTS,
+        RowKind.TIMELINE_REMOVE_HARD_CUTS,
+    ]
+    soft_idx = kinds.index(RowKind.TIMELINE_SOFT_CUTS)
+    assert kinds[soft_idx : soft_idx + 6] == [
+        RowKind.TIMELINE_SOFT_CUTS,
+        RowKind.TIMELINE_SOFT_CUT_FADE_IN,
+        RowKind.TIMELINE_SOFT_CUT_FADE_OUT,
+        RowKind.TIMELINE_SOFT_CUT_CROSSFADE,
+        RowKind.TIMELINE_APPLY_SOFT_CUTS,
+        RowKind.TIMELINE_REMOVE_SOFT_CUTS,
+    ]
+
+
+def test_song_markers_page_is_snap_and_marker_rows() -> None:
+    state = _view_state()
+    state.render_timeline.song_marker_times = (1.0, 4.0, 9.0)
+    rows = build_inspector_rows(state, "timeline.song_markers")
+    kinds = _kinds(rows)
+
+    assert kinds[0] == RowKind.TIMELINE_SNAP_TO_SONG_MARKERS
+    assert all(row.command_id is None for row in rows)
+    markers = [
+        row.descriptor
+        for row in rows
+        if row.descriptor.kind is RowKind.SONG_MARKER_ITEM
+    ]
+    assert [desc.marker_index for desc in markers] == [0, 1, 2]
+    assert all(row.depth == 0 for row in rows)
+
+
+def test_locked_blocks_still_build() -> None:
+    state = _view_state()
+    state.render_overlays.locked = True
+    state.render_post_fx.locked = True
+    state.render_pattern_mask.locked = True
+
+    position = next(
+        row.descriptor
+        for row in build_inspector_rows(state, "overlay.opening_card")
+        if row.descriptor.kind is RowKind.RENDER_OVERLAY_CARD_POSITION
+    )
+    assert inspector_field_colors(state, position) == (LOCKED, LOCKED)
+
+    fade_start = next(
+        row.descriptor
+        for row in build_inspector_rows(state, "post_fx.fade")
+        if row.descriptor.kind is RowKind.RENDER_POST_FX_FADE_IN_START
+    )
+    assert inspector_field_colors(state, fade_start) == (LOCKED, LOCKED)
+
+    density = next(
+        row.descriptor
+        for row in build_inspector_rows(state, "pattern_mask")
+        if row.descriptor.kind is RowKind.RENDER_PATTERN_MASK_DENSITY
+    )
+    assert inspector_field_colors(state, density) == (LOCKED, LOCKED)
+
+
+def test_layer_page_keeps_direct_rows_and_delete() -> None:
+    state = _layer_view(("layer_1",))
+    rows = build_inspector_rows(state, layer_node_id("layer_1"))
+    assert _kinds(rows) == [
+        RowKind.TRACK_STEM,
+        RowKind.TRACK_BEAT,
         RowKind.TRACK_PRESET_DIR,
         RowKind.TRACK_PRESET,
-        RowKind.TRACK_PRESET_SWITCHING,
-        RowKind.TRACK_COMPOSITING_HEADER,
-        RowKind.TRACK_EFFECTS_HEADER,
-    ):
-        assert kind in kinds
-    assert any(row.command_id == "layers.delete" and row.navigable for row in rows)
-    assert RowKind.LAYER_MANAGEMENT_DELETE not in kinds
-    assert RowKind.TRACK_BLEND in kinds
-    assert RowKind.TRACK_OPACITY in kinds
-    assert RowKind.TRACK_EFFECT not in kinds
+    ]
+    assert rows[-1].command_id == "layers.delete"
+    assert rows[-1].navigable is True
 
 
 def test_dynamic_effect_and_preset_rows_keep_slot_identity() -> None:
@@ -466,94 +285,32 @@ def test_dynamic_effect_and_preset_rows_keep_slot_identity() -> None:
         trigger="timer",
         preset_list=["/tmp/a.milk", "/tmp/b.milk"],
     )
-    opened = frozenset(
-        {InspectorGroupKey(RowKind.TRACK_EFFECTS_HEADER, slot="layer_1")}
-    )
-    rows = build_inspector_rows(state, layer_node_id("layer_1"), frozenset(), opened)
     effects = [
         row.descriptor
-        for row in rows
-        if row.descriptor is not None and row.descriptor.kind is RowKind.TRACK_EFFECT
+        for row in build_inspector_rows(
+            state, layer_page_node_id("layer_1", "effects")
+        )
     ]
     roster = effect_roster(state.tracks["layer_1"].runtime.stem)
     assert [(desc.effect_id, desc.driver_slug, desc.slot) for desc in effects] == [
         (item.effect_id, item.driver_slug, "layer_1") for item in roster
     ]
+
+    rows = build_inspector_rows(
+        state, layer_page_node_id("layer_1", "preset_switching")
+    )
+    assert _headings(rows) == [RowKind.TRACK_PRESET_LIST]
     items = [
         row.descriptor
         for row in rows
-        if row.descriptor is not None
-        and row.descriptor.kind is RowKind.TRACK_PRESET_LIST_ITEM
+        if row.descriptor.kind is RowKind.TRACK_PRESET_LIST_ITEM
     ]
     assert [(desc.slot, desc.preset_index) for desc in items] == [
         ("layer_1", 0),
         ("layer_1", 1),
     ]
-    kinds = _kinds(rows)
-    assert RowKind.TRACK_PRESET_LIST_ADD in kinds
-    assert RowKind.TRACK_PRESET_LIST_POPULATE in kinds
-
-    hidden = build_inspector_rows(
-        state,
-        layer_node_id("layer_1"),
-        frozenset({InspectorGroupKey(RowKind.TRACK_PRESET_LIST, slot="layer_1")}),
-        opened,
-    )
-    hidden_kinds = _kinds(hidden)
-    assert RowKind.TRACK_PRESET_LIST in hidden_kinds
-    assert RowKind.TRACK_PRESET_LIST_ITEM not in hidden_kinds
-    assert RowKind.TRACK_PRESET_LIST_ADD not in hidden_kinds
-    assert RowKind.TRACK_PRESET_LIST_POPULATE not in hidden_kinds
-    assert RowKind.TRACK_EFFECT in hidden_kinds
-
-
-def test_collapsing_compositing_is_per_slot() -> None:
-    state = _layer_view(("layer_1", "layer_2"))
-    collapsed = frozenset(
-        {InspectorGroupKey(RowKind.TRACK_COMPOSITING_HEADER, slot="layer_1")}
-    )
-    hidden = _kinds(
-        build_inspector_rows(state, layer_node_id("layer_1"), collapsed)
-    )
-    shown = _kinds(
-        build_inspector_rows(state, layer_node_id("layer_2"), collapsed)
-    )
-    assert RowKind.TRACK_COMPOSITING_HEADER in hidden
-    assert RowKind.TRACK_BLEND not in hidden
-    assert RowKind.TRACK_OPACITY not in hidden
-    assert RowKind.TRACK_BLEND in shown
-    assert RowKind.TRACK_OPACITY in shown
-
-
-def test_cleave_effects_start_closed_and_toggle_sticks_per_slot() -> None:
-    from tests.cleave.viz.test_controls import _make_controls
-
-    controls = _make_controls(("layer_1", "layer_2"))
-    view = controls.build_view_state(paused=False)
-    focus = controls.shell_focus
-    key = InspectorGroupKey(RowKind.TRACK_EFFECTS_HEADER, slot="layer_1")
-
-    def effect_slots(node_id: str) -> list[str | None]:
-        rows = build_inspector_rows(
-            view, node_id, focus.collapsed, focus.opened
-        )
-        return [
-            row.descriptor.slot
-            for row in rows
-            if row.descriptor is not None
-            and row.descriptor.kind is RowKind.TRACK_EFFECT
-        ]
-
-    assert effect_slots(layer_node_id("layer_1")) == []
-    assert effect_slots(layer_node_id("layer_2")) == []
-    controls.inspector.toggle_group(key)
-    assert effect_slots(layer_node_id("layer_1"))
-    assert all(slot == "layer_1" for slot in effect_slots(layer_node_id("layer_1")))
-    assert effect_slots(layer_node_id("layer_2")) == []
-    assert effect_slots(layer_node_id("layer_1"))
-    controls.inspector.toggle_group(key)
-    assert effect_slots(layer_node_id("layer_1")) == []
-    assert effect_slots(layer_node_id("layer_2")) == []
+    assert RowKind.TRACK_PRESET_LIST_ADD in _kinds(rows)
+    assert RowKind.TRACK_PRESET_LIST_POPULATE in _kinds(rows)
 
 
 def test_section_lock_inspector_field_colors() -> None:
@@ -568,28 +325,26 @@ def test_section_lock_inspector_field_colors() -> None:
     label, value = inspector_field_colors(state, delete)
     assert label == ACTION
     assert value != LOCKED
-    rows = build_inspector_rows(state, layer_node_id("layer_1"), frozenset())
+    rows = build_inspector_rows(state, layer_node_id("layer_1"))
     assert any(row.navigable and row.command_id == "layers.delete" for row in rows)
 
 
 def test_layers_root_count_and_curation_omits_add() -> None:
     state = _layer_view(("layer_1", "layer_2"))
-    rows = build_inspector_rows(state, "layers", frozenset())
+    rows = build_inspector_rows(state, "layers")
     assert _kinds(rows) == [RowKind.LAYER_MANAGEMENT_COUNT]
     assert rows[1].command_id == "layers.add"
     assert rows[1].navigable is True
-    assert rows[1].descriptor is None
     count = rows[0]
-    assert count.descriptor is not None
     assert count.navigable is False
-    assert count.is_group is False
+    assert count.is_heading is False
     assert format_row_value(state, count.descriptor) == "2 of 8 layers"
 
     state.settings.editor_mode = "preset_curation"
-    curation_rows = build_inspector_rows(state, "layers", frozenset())
+    curation_rows = build_inspector_rows(state, "layers")
     assert _kinds(curation_rows) == [RowKind.LAYER_MANAGEMENT_COUNT]
     assert all(row.command_id != "layers.add" for row in curation_rows)
-    assert _kinds(build_inspector_rows(state, layer_node_id("layer_1"), frozenset())) == [
+    assert _kinds(build_inspector_rows(state, layer_node_id("layer_1"))) == [
         RowKind.TRACK_STEM,
         RowKind.TRACK_BEAT,
         RowKind.TRACK_PRESET_DIR,

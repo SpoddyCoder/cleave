@@ -33,7 +33,7 @@ from imgui_bundle.python_backends.opengl_backend import ProgrammablePipelineRend
 from cleave.gl_state import restore_gl_state, save_gl_state
 from cleave.viz.imgui_theme import apply_imgui_theme
 from cleave.viz.overlay_primitives import overlay_font_path
-from cleave.viz.row_sections import INSPECTOR_GROUP_EXPANDED
+from cleave.viz.navigator import TWISTY_EXPANDED
 from cleave.viz.theme import tuning_ui_metrics
 
 RENDERER_CLASS = ProgrammablePipelineRenderer
@@ -215,7 +215,7 @@ def _shell_glyph_ranges() -> list[int]:
             ord("…"),
             ord("…"),
             ord(PLAY_GLYPH),
-            ord(INSPECTOR_GROUP_EXPANDED),
+            ord(TWISTY_EXPANDED),
             ord("✓"),
             ord("✓"),
             ord(PAUSE_GLYPH[0]),

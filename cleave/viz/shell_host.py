@@ -25,16 +25,20 @@ from cleave.viz.imgui_theme import rgba
 from cleave.viz.inspector import build_inspector_rows
 from cleave.viz.inspector_controls import inspector_command_enabled
 from cleave.viz.menu_bar import MenuBarState, menus_for_session
-from cleave.viz.navigator import NavNode, build_navigator
+from cleave.viz.navigator import (
+    TWISTY_COLLAPSED,
+    TWISTY_EXPANDED,
+    NavNode,
+    build_navigator,
+)
 from cleave.viz.panel_notification import (
     PanelNotificationActive,
     notification_attention,
 )
 from cleave.viz.playback import format_mmss
-from cleave.viz.row_hotkeys import activate_inspector_chip, node_header_descriptor
+from cleave.viz.row_hotkeys import activate_inspector_chip, node_control_descriptor
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.row_present_renderers import inspector_field_colors
-from cleave.viz.row_sections import inspector_group_glyph
 from cleave.viz.row_spec import (
     RowNavButton,
     apply_field_horizontal,
@@ -52,10 +56,8 @@ from cleave.viz.row_spec import (
 from cleave.viz.session import TuningSession
 from cleave.viz.shell_focus import (
     CycleStop,
-    InspectorGroupKey,
     ShellRegion,
     cycle_stop_for_focus,
-    inspector_group_is_open,
 )
 from cleave.viz.shell_layout import (
     ShellLayout,
@@ -207,7 +209,7 @@ def navigator_twisty(node: NavNode, expanded: Collection[str]) -> str | None:
     """Disclosure glyph for an expandable navigator node."""
     if not node.expandable:
         return None
-    return inspector_group_glyph(node.id in expanded)
+    return TWISTY_EXPANDED if node.id in expanded else TWISTY_COLLAPSED
 
 
 def navigator_lock_mark(node: NavNode) -> str | None:
@@ -254,19 +256,16 @@ def apply_value_drag(
     return remaining, True
 
 
-def selection_after_nav_toggle(
+def selection_after_nav_collapse(
     visible_ids: Sequence[str],
     selected_id: str,
     toggled_id: str,
-    *,
-    expanded: bool,
 ) -> str:
-    """Selection after a twisty click.
+    """Selection after a twisty collapses *toggled_id*.
 
-    Expanding keeps *selected_id*. Collapsing selects *toggled_id* when
-    *selected_id* is not in *visible_ids*.
+    *selected_id* stays unless the collapse hid it.
     """
-    if expanded or selected_id in visible_ids:
+    if selected_id in visible_ids:
         return selected_id
     return toggled_id
 
@@ -278,22 +277,24 @@ def inspector_header(
     *,
     curation: bool,
 ) -> InspectorHeader:
-    """Title for *selected_id*. A layer slot breadcrumbs to its parent.
+    """Breadcrumb title for *selected_id*.
 
-    Chips follow the node's header ``RowSpec`` and are omitted in preset
-    curation. Enabled, solo, then lock.
+    Chips follow the ``RowSpec`` of the header that owns the page and are
+    omitted in preset curation. Enabled, solo, then lock.
     """
     node = next((item for item in nodes if item.id == selected_id), None)
     if node is None:
         return InspectorHeader(selected_id)
-    title = node.label
-    if node.parent_id == "layers":
-        parent = next((item for item in nodes if item.id == node.parent_id), None)
-        if parent is not None:
-            title = f"{parent.label} > {node.label}"
+    by_id = {item.id: item for item in nodes}
+    labels = [node.label]
+    parent = by_id.get(node.parent_id)
+    while parent is not None:
+        labels.insert(0, parent.label)
+        parent = by_id.get(parent.parent_id)
+    title = " > ".join(labels)
     if curation:
         return InspectorHeader(title)
-    descriptor = node_header_descriptor(selected_id)
+    descriptor = node_control_descriptor(selected_id)
     if descriptor is None:
         return InspectorHeader(title)
     return InspectorHeader(
@@ -354,15 +355,14 @@ def _header_solo_active(session: TuningSession, desc: RowDescriptor) -> bool:
     return False
 
 
-def inspector_selectable_id(desc: RowDescriptor, *, group: bool) -> str:
-    """ImGui id for an inspector group or row.
+def inspector_selectable_id(desc: RowDescriptor) -> str:
+    """ImGui id for an inspector row.
 
     Slot, card, effect, and preset index stay in the id so repeated effect
-    rows and preset-list items do not collide. Group ids include the slot.
+    rows and preset-list items do not collide.
     """
-    tag = "grp" if group else "row"
     return (
-        f"##{tag}-{desc.kind.name}-{desc.slot}-{desc.card}-"
+        f"##row-{desc.kind.name}-{desc.slot}-{desc.card}-"
         f"{desc.effect_id}-{desc.driver_slug}-{desc.preset_index}"
     )
 
@@ -942,6 +942,7 @@ class ShellHost:
         self._menu_bar_height_px = bar_height
         # Drawn navigator list height, applied on the next frame. 0 until measured.
         self._nav_content_height_px = 0
+        self._nav_scrolled_id: str | None = None
         self._layout: ShellLayout | None = None
         self._value_drag_accum = 0.0
         self._value_drag_crossed = False
@@ -1465,6 +1466,9 @@ class ShellHost:
                     )
                     if ring:
                         _draw_item_focus_ring()
+                    if selected and self._nav_scrolled_id != node.id:
+                        imgui.set_scroll_here_y()
+                        self._nav_scrolled_id = node.id
                 finally:
                     if selected:
                         imgui.pop_style_color()
@@ -1483,22 +1487,20 @@ class ShellHost:
 
     def _toggle_nav_expanded(self, node_id: str) -> None:
         focus = self._controls.shell_focus
-        expanded = node_id not in focus.nav_expanded
-        if expanded:
-            focus.nav_expanded.add(node_id)
-        else:
-            focus.nav_expanded.discard(node_id)
+        if node_id not in focus.nav_expanded:
+            self._controls.navigator.select(node_id)
+            return
+        focus.nav_expanded.discard(node_id)
         visible = tuple(
             node.id
             for node in build_navigator(
                 self._controls.session, focus.nav_expanded
             )
         )
-        focus.selected_id = selection_after_nav_toggle(
+        focus.selected_id = selection_after_nav_collapse(
             visible,
             focus.selected_id,
             node_id,
-            expanded=expanded,
         )
 
     def _draw_inspector(self, state: Any) -> None:
@@ -1520,13 +1522,7 @@ class ShellHost:
         imgui.text(header.title)
         if header.chips:
             self._draw_inspector_chips(header)
-        rows = build_inspector_rows(
-            state, focus.selected_id, focus.collapsed, focus.opened
-        )
-        if not rows:
-            imgui.text_colored(rgba(DISABLED), "Edited on the panel")
-            return
-        for row in rows:
+        for row in build_inspector_rows(state, focus.selected_id):
             self._draw_inspector_row(state, row)
 
     def _draw_inspector_row(self, state: Any, row: Any) -> None:
@@ -1543,21 +1539,9 @@ class ShellHost:
             spec = row_spec(kind)
             label = row_panel_label(kind, desc)
             selected = _inspector_row_selected(focus, desc)
-            if row.is_group:
-                key = InspectorGroupKey(kind, desc.slot, desc.card)
-                glyph = inspector_group_glyph(
-                    inspector_group_is_open(key, focus.collapsed, focus.opened)
-                )
-                with _selected_header_wash(selected, inspector=True):
-                    clicked, _selected = imgui.selectable(
-                        f"{glyph} {label}{inspector_selectable_id(desc, group=True)}",
-                        selected,
-                    )
-                    if selected:
-                        _draw_item_focus_ring()
-                if clicked:
-                    self._controls.inspector.focus_row(row)
-                    self._controls.inspector.activate(row)
+            if row.is_heading:
+                value = format_row_value(state, desc) if spec.format_value else ""
+                imgui.text_colored(rgba(MUTED), f"{label} {value}".rstrip())
                 return
             label_color, value_color = inspector_field_colors(state, desc)
             if selected and label_color == LABEL:
@@ -1568,7 +1552,7 @@ class ShellHost:
             try:
                 with _selected_header_wash(selected, inspector=True):
                     clicked, _selected = imgui.selectable(
-                        f"{label}{inspector_selectable_id(desc, group=False)}",
+                        f"{label}{inspector_selectable_id(desc)}",
                         selected,
                         0,
                         imgui.ImVec2(0.0, row_height),

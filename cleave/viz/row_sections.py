@@ -1,4 +1,4 @@
-"""Expandable section composition for the live tuning panel."""
+"""Section composition for inspector pages."""
 
 from __future__ import annotations
 
@@ -11,67 +11,18 @@ from cleave.viz.editor_mode_controls import is_preset_curation_mode
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 
 if TYPE_CHECKING:
-    from cleave.viz.controls import TuningControls
     from cleave.viz.tuning_view_state import TuningViewState
 
 
-def expand_arrow_glyph(expanded: bool) -> str:
-    return "▼" if expanded else "▶"
-
-
-# Inspector disclosure marks from the shell design (U+25BE / U+25B8).
-# The ImGui atlas must include this range; the default Latin range draws them as "?".
-INSPECTOR_GROUP_EXPANDED = "▾"
-INSPECTOR_GROUP_COLLAPSED = "▸"
-
-
-def inspector_group_glyph(expanded: bool) -> str:
-    return INSPECTOR_GROUP_EXPANDED if expanded else INSPECTOR_GROUP_COLLAPSED
-
-
-ExpandToggleFn = Callable[["TuningControls", str | None, bool], None]
 AppendDynamicChildrenFn = Callable[[list[RowDescriptor], "TuningViewState", str | None], None]
-PanelAnchorToggleFn = Callable[["TuningControls", bool], None]
-
-
-def _inspector_group_expanded(_state: TuningViewState, _slot: str | None) -> bool:
-    """Inspector groups open from shell focus, not a session flag."""
-    return True
-
-
-def _inspector_group_toggle(
-    _controls: TuningControls, _slot: str | None, _forward: bool
-) -> None:
-    return None
-
-
-def _open_timeline_panel(controls: TuningControls, forward: bool) -> None:
-    if forward:
-        controls.open_timeline_panel()
-    else:
-        controls.close_timeline_panel()
-
-
-def apply_panel_anchor_toggle(
-    controls: TuningControls,
-    header_kind: RowKind,
-    forward: bool,
-) -> bool:
-    handler = PANEL_ANCHOR_TOGGLE_BY_HEADER.get(header_kind)
-    if handler is None:
-        return False
-    handler(controls, forward)
-    return True
-
-
 PredicateFn = Callable[["TuningViewState", RowDescriptor], bool]
 
 
 @dataclass(frozen=True)
 class ConditionalRowsDef:
-    """Value-gated rows (no expand arrow or expanded flag).
+    """Value-gated rows.
 
-    By default children share the parent's tree depth (siblings of the gating
+    By default children share the parent's depth (siblings of the gating
     control). Set ``child_indent_offset`` to nest them visually under that
     control (e.g. seed under shuffle).
     """
@@ -83,60 +34,35 @@ class ConditionalRowsDef:
 
 
 @dataclass(frozen=True)
-class PanelAnchorDef:
-    """Header row whose content lives in a separate panel host."""
-
-    header_kind: RowKind
-    content_host: Literal["timeline_strip"]
-    toggle: PanelAnchorToggleFn
-
-
-@dataclass(frozen=True)
 class SectionNode:
-    """Tree node: leaf row, expandable section, conditional group, or panel anchor."""
+    """Tree node: leaf row, headed subsection, or conditional group."""
 
     leaf_kind: RowKind | None = None
-    expand: ExpandSectionDef | None = None
+    subsection: SectionDef | None = None
     conditional: ConditionalRowsDef | None = None
-    panel_anchor: PanelAnchorDef | None = None
 
     def __post_init__(self) -> None:
         set_count = sum(
             x is not None
-            for x in (self.leaf_kind, self.expand, self.conditional, self.panel_anchor)
+            for x in (self.leaf_kind, self.subsection, self.conditional)
         )
         if set_count != 1:
             raise ValueError("SectionNode requires exactly one child type")
 
 
 @dataclass(frozen=True)
-class ExpandSectionDef:
+class SectionDef:
+    """Rows of one inspector page, or of a headed block inside a page.
+
+    A navigator node names the section for its page. A section nested through
+    ``SectionNode.subsection`` draws its header as a static heading.
+    """
+
     header_kind: RowKind | None
     context: Literal["global", "per_slot"]
-    read_expanded: Callable[["TuningViewState", str | None], bool]
-    toggle: ExpandToggleFn
     children: tuple[SectionNode, ...] = ()
     append_dynamic_children: AppendDynamicChildrenFn | None = None
     card: str | None = None
-
-
-TIMELINE_PANEL_ANCHOR = PanelAnchorDef(
-    header_kind=RowKind.RENDER_TIMELINE_HEADER,
-    content_host="timeline_strip",
-    toggle=_open_timeline_panel,
-)
-
-PANEL_ANCHORS: tuple[PanelAnchorDef, ...] = (TIMELINE_PANEL_ANCHOR,)
-
-PANEL_ANCHOR_BY_HEADER: dict[RowKind, PanelAnchorDef] = {
-    anchor.header_kind: anchor for anchor in PANEL_ANCHORS
-}
-
-PANEL_ANCHOR_TOGGLE_BY_HEADER: dict[RowKind, PanelAnchorToggleFn] = {
-    anchor.header_kind: anchor.toggle for anchor in PANEL_ANCHORS
-}
-
-PANEL_ANCHOR_HEADER_KINDS = frozenset(PANEL_ANCHOR_BY_HEADER)
 
 
 def _append_track_effect_rows(
@@ -189,11 +115,9 @@ def _append_song_marker_rows(
         )
 
 
-SETTINGS_EDITOR_WINDOW_SECTION = ExpandSectionDef(
+SETTINGS_EDITOR_WINDOW_SECTION = SectionDef(
     header_kind=RowKind.SETTINGS_EDITOR_WINDOW_HEADER,
     context="global",
-    read_expanded=_inspector_group_expanded,
-    toggle=_inspector_group_toggle,
     children=(
         SectionNode(leaf_kind=RowKind.SETTINGS_PREVIEW_QUALITY),
         SectionNode(leaf_kind=RowKind.SETTINGS_EDITOR_WINDOW_WIDTH),
@@ -205,63 +129,41 @@ SETTINGS_EDITOR_WINDOW_SECTION = ExpandSectionDef(
     ),
 )
 
-SETTINGS_UI_SECTION = ExpandSectionDef(
+SETTINGS_UI_SECTION = SectionDef(
     header_kind=RowKind.SETTINGS_UI_HEADER,
     context="global",
-    read_expanded=_inspector_group_expanded,
-    toggle=_inspector_group_toggle,
     children=(
         SectionNode(leaf_kind=RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY),
     ),
 )
 
-SETTINGS_LATENCY_COMPENSATION_SECTION = ExpandSectionDef(
+SETTINGS_LATENCY_COMPENSATION_SECTION = SectionDef(
     header_kind=RowKind.SETTINGS_LATENCY_COMPENSATION_HEADER,
     context="global",
-    read_expanded=_inspector_group_expanded,
-    toggle=_inspector_group_toggle,
     children=(
         SectionNode(leaf_kind=RowKind.SETTINGS_RESIDUAL_LATENCY_MS),
     ),
 )
 
-SETTINGS_SECTION = ExpandSectionDef(
-    header_kind=None,
-    context="global",
-    read_expanded=_inspector_group_expanded,
-    toggle=_inspector_group_toggle,
-    children=(
-        SectionNode(expand=SETTINGS_EDITOR_WINDOW_SECTION),
-        SectionNode(expand=SETTINGS_UI_SECTION),
-        SectionNode(expand=SETTINGS_LATENCY_COMPENSATION_SECTION),
-    ),
-)
-
-PROJECT_MILKDROP_SECTION = ExpandSectionDef(
+PROJECT_MILKDROP_SECTION = SectionDef(
     header_kind=RowKind.PROJECT_MILKDROP_HEADER,
     context="global",
-    read_expanded=_inspector_group_expanded,
-    toggle=_inspector_group_toggle,
     children=(
         SectionNode(leaf_kind=RowKind.PROJECT_MILKDROP_BEAT_SENSITIVITY),
     ),
 )
 
-PROJECT_COMPOSITOR_SECTION = ExpandSectionDef(
+PROJECT_COMPOSITOR_SECTION = SectionDef(
     header_kind=RowKind.PROJECT_COMPOSITOR_HEADER,
     context="global",
-    read_expanded=_inspector_group_expanded,
-    toggle=_inspector_group_toggle,
     children=(
         SectionNode(leaf_kind=RowKind.PROJECT_COMPOSITOR_HDR),
     ),
 )
 
-PROJECT_RENDER_SECTION = ExpandSectionDef(
+PROJECT_RENDER_SECTION = SectionDef(
     header_kind=RowKind.PROJECT_RENDER_HEADER,
     context="global",
-    read_expanded=_inspector_group_expanded,
-    toggle=_inspector_group_toggle,
     children=(
         SectionNode(leaf_kind=RowKind.PROJECT_RENDER_OUTPUT),
         SectionNode(leaf_kind=RowKind.PROJECT_RENDER_WIDTH),
@@ -270,18 +172,6 @@ PROJECT_RENDER_SECTION = ExpandSectionDef(
         SectionNode(leaf_kind=RowKind.PROJECT_RENDER_QUALITY),
         SectionNode(leaf_kind=RowKind.PROJECT_RENDER_START),
         SectionNode(leaf_kind=RowKind.PROJECT_RENDER_END),
-    ),
-)
-
-PROJECT_SECTION = ExpandSectionDef(
-    header_kind=None,
-    context="global",
-    read_expanded=_inspector_group_expanded,
-    toggle=_inspector_group_toggle,
-    children=(
-        SectionNode(expand=PROJECT_MILKDROP_SECTION),
-        SectionNode(expand=PROJECT_COMPOSITOR_SECTION),
-        SectionNode(expand=PROJECT_RENDER_SECTION),
     ),
 )
 
@@ -296,22 +186,18 @@ LAYERS_SHOW_ADD = ConditionalRowsDef(
     children=(SectionNode(leaf_kind=RowKind.LAYER_MANAGEMENT_ADD),),
 )
 
-LAYERS_SECTION = ExpandSectionDef(
+LAYERS_SECTION = SectionDef(
     header_kind=None,
     context="global",
-    read_expanded=_inspector_group_expanded,
-    toggle=_inspector_group_toggle,
     children=(
         SectionNode(leaf_kind=RowKind.LAYER_MANAGEMENT_COUNT),
         SectionNode(conditional=LAYERS_SHOW_ADD),
     ),
 )
 
-CURATION_LAYER_SECTION = ExpandSectionDef(
+CURATION_LAYER_SECTION = SectionDef(
     header_kind=RowKind.TRACK_HEADER,
     context="per_slot",
-    read_expanded=_inspector_group_expanded,
-    toggle=_inspector_group_toggle,
     children=(
         SectionNode(leaf_kind=RowKind.TRACK_STEM),
         SectionNode(leaf_kind=RowKind.TRACK_BEAT),
@@ -320,13 +206,11 @@ CURATION_LAYER_SECTION = ExpandSectionDef(
     ),
 )
 
-def _build_render_overlay_card_section(card: str) -> ExpandSectionDef:
-    title_section = ExpandSectionDef(
+def _build_render_overlay_card_section(card: str) -> SectionDef:
+    title_section = SectionDef(
         header_kind=RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER,
         context="global",
         card=card,
-        read_expanded=_inspector_group_expanded,
-        toggle=_inspector_group_toggle,
         children=(
             SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_TITLE_TEXT),
             SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_TITLE_COLOUR),
@@ -336,12 +220,10 @@ def _build_render_overlay_card_section(card: str) -> ExpandSectionDef:
             SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_TITLE_MARGIN_BOTTOM),
         ),
     )
-    body_section = ExpandSectionDef(
+    body_section = SectionDef(
         header_kind=RowKind.RENDER_OVERLAY_CARD_BODY_HEADER,
         context="global",
         card=card,
-        read_expanded=_inspector_group_expanded,
-        toggle=_inspector_group_toggle,
         children=(
             SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_BODY_TEXT),
             SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_BODY_COLOUR),
@@ -364,12 +246,10 @@ def _build_render_overlay_card_section(card: str) -> ExpandSectionDef:
             ),
         ),
     )
-    animation_section = ExpandSectionDef(
+    animation_section = SectionDef(
         header_kind=RowKind.RENDER_OVERLAY_CARD_ANIMATION_HEADER,
         context="global",
         card=card,
-        read_expanded=_inspector_group_expanded,
-        toggle=_inspector_group_toggle,
         children=(
             SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_ANIMATION_TYPE),
             SectionNode(conditional=slide_conditional),
@@ -377,14 +257,12 @@ def _build_render_overlay_card_section(card: str) -> ExpandSectionDef:
             SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_DISPLAY_TIME),
         ),
     )
-    return ExpandSectionDef(
+    return SectionDef(
         header_kind=RowKind.RENDER_OVERLAY_CARD_HEADER,
         context="global",
         card=card,
-        read_expanded=_inspector_group_expanded,
-        toggle=_inspector_group_toggle,
         children=(
-            SectionNode(expand=animation_section),
+            SectionNode(subsection=animation_section),
             SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_POSITION),
             SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_OPACITY),
             SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_BACKGROUND_COLOUR),
@@ -392,8 +270,8 @@ def _build_render_overlay_card_section(card: str) -> ExpandSectionDef:
             SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_BACKGROUND_PADDING),
             SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_BORDER_WIDTH),
             SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_BORDER_COLOUR),
-            SectionNode(expand=title_section),
-            SectionNode(expand=body_section),
+            SectionNode(subsection=title_section),
+            SectionNode(subsection=body_section),
         ),
     )
 
@@ -405,14 +283,12 @@ RENDER_OVERLAY_CLOSING_CARD_SECTION = _build_render_overlay_card_section(
     "closing_card"
 )
 
-RENDER_OVERLAYS_SECTION = ExpandSectionDef(
+RENDER_OVERLAYS_SECTION = SectionDef(
     header_kind=RowKind.RENDER_OVERLAYS_HEADER,
     context="global",
-    read_expanded=_inspector_group_expanded,
-    toggle=_inspector_group_toggle,
     children=(
-        SectionNode(expand=RENDER_OVERLAY_OPENING_CARD_SECTION),
-        SectionNode(expand=RENDER_OVERLAY_CLOSING_CARD_SECTION),
+        SectionNode(subsection=RENDER_OVERLAY_OPENING_CARD_SECTION),
+        SectionNode(subsection=RENDER_OVERLAY_CLOSING_CARD_SECTION),
     ),
 )
 
@@ -429,11 +305,9 @@ RENDER_POST_FX_HIGHLIGHT_ROLLOFF_ACTIVE = ConditionalRowsDef(
     ),
 )
 
-RENDER_POST_FX_HIGHLIGHT_ROLLOFF_SECTION = ExpandSectionDef(
+RENDER_POST_FX_HIGHLIGHT_ROLLOFF_SECTION = SectionDef(
     header_kind=RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_HEADER,
     context="global",
-    read_expanded=_inspector_group_expanded,
-    toggle=_inspector_group_toggle,
     children=(
         SectionNode(leaf_kind=RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_MODE),
         SectionNode(conditional=RENDER_POST_FX_HIGHLIGHT_ROLLOFF_ACTIVE),
@@ -465,33 +339,27 @@ RENDER_POST_FX_LIMITER_ACTIVE = ConditionalRowsDef(
     ),
 )
 
-RENDER_POST_FX_LIMITER_SECTION = ExpandSectionDef(
+RENDER_POST_FX_LIMITER_SECTION = SectionDef(
     header_kind=RowKind.RENDER_POST_FX_LIMITER_HEADER,
     context="global",
-    read_expanded=_inspector_group_expanded,
-    toggle=_inspector_group_toggle,
     children=(
         SectionNode(leaf_kind=RowKind.RENDER_POST_FX_LIMITER_ENABLED),
         SectionNode(conditional=RENDER_POST_FX_LIMITER_ACTIVE),
     ),
 )
 
-RENDER_POST_FX_CHROMA_BOOST_SECTION = ExpandSectionDef(
+RENDER_POST_FX_CHROMA_BOOST_SECTION = SectionDef(
     header_kind=RowKind.RENDER_POST_FX_CHROMA_BOOST_HEADER,
     context="global",
-    read_expanded=_inspector_group_expanded,
-    toggle=_inspector_group_toggle,
     children=(
         SectionNode(leaf_kind=RowKind.RENDER_POST_FX_CHROMA_BOOST_MODE),
         SectionNode(conditional=RENDER_POST_FX_CHROMA_BOOST_ACTIVE),
     ),
 )
 
-RENDER_POST_FX_FADE_IN_SECTION = ExpandSectionDef(
+RENDER_POST_FX_FADE_IN_SECTION = SectionDef(
     header_kind=RowKind.RENDER_POST_FX_FADE_IN_HEADER,
     context="global",
-    read_expanded=_inspector_group_expanded,
-    toggle=_inspector_group_toggle,
     children=(
         SectionNode(leaf_kind=RowKind.RENDER_POST_FX_FADE_IN_START),
         SectionNode(leaf_kind=RowKind.RENDER_POST_FX_FADE_IN_END),
@@ -499,11 +367,9 @@ RENDER_POST_FX_FADE_IN_SECTION = ExpandSectionDef(
     ),
 )
 
-RENDER_POST_FX_FADE_OUT_SECTION = ExpandSectionDef(
+RENDER_POST_FX_FADE_OUT_SECTION = SectionDef(
     header_kind=RowKind.RENDER_POST_FX_FADE_OUT_HEADER,
     context="global",
-    read_expanded=_inspector_group_expanded,
-    toggle=_inspector_group_toggle,
     children=(
         SectionNode(leaf_kind=RowKind.RENDER_POST_FX_FADE_OUT_START),
         SectionNode(leaf_kind=RowKind.RENDER_POST_FX_FADE_OUT_END),
@@ -511,27 +377,23 @@ RENDER_POST_FX_FADE_OUT_SECTION = ExpandSectionDef(
     ),
 )
 
-RENDER_POST_FX_FADE_SECTION = ExpandSectionDef(
+RENDER_POST_FX_FADE_SECTION = SectionDef(
     header_kind=RowKind.RENDER_POST_FX_FADE_HEADER,
     context="global",
-    read_expanded=_inspector_group_expanded,
-    toggle=_inspector_group_toggle,
     children=(
-        SectionNode(expand=RENDER_POST_FX_FADE_IN_SECTION),
-        SectionNode(expand=RENDER_POST_FX_FADE_OUT_SECTION),
+        SectionNode(subsection=RENDER_POST_FX_FADE_IN_SECTION),
+        SectionNode(subsection=RENDER_POST_FX_FADE_OUT_SECTION),
     ),
 )
 
-RENDER_POST_FX_SECTION = ExpandSectionDef(
+RENDER_POST_FX_SECTION = SectionDef(
     header_kind=RowKind.RENDER_POST_FX_HEADER,
     context="global",
-    read_expanded=_inspector_group_expanded,
-    toggle=_inspector_group_toggle,
     children=(
-        SectionNode(expand=RENDER_POST_FX_FADE_SECTION),
-        SectionNode(expand=RENDER_POST_FX_HIGHLIGHT_ROLLOFF_SECTION),
-        SectionNode(expand=RENDER_POST_FX_CHROMA_BOOST_SECTION),
-        SectionNode(expand=RENDER_POST_FX_LIMITER_SECTION),
+        SectionNode(subsection=RENDER_POST_FX_FADE_SECTION),
+        SectionNode(subsection=RENDER_POST_FX_HIGHLIGHT_ROLLOFF_SECTION),
+        SectionNode(subsection=RENDER_POST_FX_CHROMA_BOOST_SECTION),
+        SectionNode(subsection=RENDER_POST_FX_LIMITER_SECTION),
     ),
 )
 
@@ -543,11 +405,9 @@ RENDER_PATTERN_MASK_PLASMA_SEED = ConditionalRowsDef(
     ),
 )
 
-RENDER_PATTERN_MASK_SECTION = ExpandSectionDef(
+RENDER_PATTERN_MASK_SECTION = SectionDef(
     header_kind=RowKind.RENDER_PATTERN_MASK_HEADER,
     context="global",
-    read_expanded=_inspector_group_expanded,
-    toggle=_inspector_group_toggle,
     children=(
         SectionNode(leaf_kind=RowKind.RENDER_PATTERN_MASK_TYPE),
         SectionNode(leaf_kind=RowKind.RENDER_PATTERN_MASK_DENSITY),
@@ -608,11 +468,9 @@ HARD_CUT_ENABLED = ConditionalRowsDef(
     ),
 )
 
-PRESET_LIST_SECTION = ExpandSectionDef(
+PRESET_LIST_SECTION = SectionDef(
     header_kind=RowKind.TRACK_PRESET_LIST,
     context="per_slot",
-    read_expanded=_inspector_group_expanded,
-    toggle=_inspector_group_toggle,
     children=(),
     append_dynamic_children=_append_preset_list_rows,
 )
@@ -651,87 +509,60 @@ PRESET_SWITCHING_ACTIVE = ConditionalRowsDef(
         SectionNode(conditional=PRESET_SWITCHING_USES_DURATION),
         SectionNode(conditional=PRESET_SWITCHING_PROJECTM_TRIGGER),
         SectionNode(leaf_kind=RowKind.TRACK_PRESET_START_CLEAN),
-        SectionNode(expand=PRESET_LIST_SECTION),
+        SectionNode(subsection=PRESET_LIST_SECTION),
     ),
 )
 
-TRACK_PRESET_SWITCHING_SECTION = ExpandSectionDef(
+TRACK_PRESET_SWITCHING_SECTION = SectionDef(
     header_kind=RowKind.TRACK_PRESET_SWITCHING,
     context="per_slot",
-    read_expanded=_inspector_group_expanded,
-    toggle=_inspector_group_toggle,
     children=(
         SectionNode(leaf_kind=RowKind.TRACK_PRESET_SWITCHING_TRIGGER),
         SectionNode(conditional=PRESET_SWITCHING_ACTIVE),
     ),
 )
 
-TRACK_EFFECTS_SECTION = ExpandSectionDef(
+TRACK_EFFECTS_SECTION = SectionDef(
     header_kind=RowKind.TRACK_EFFECTS_HEADER,
     context="per_slot",
-    read_expanded=_inspector_group_expanded,
-    toggle=_inspector_group_toggle,
     children=(),
     append_dynamic_children=_append_track_effect_rows,
 )
 
-TRACK_COMPOSITING_SECTION = ExpandSectionDef(
+TRACK_COMPOSITING_SECTION = SectionDef(
     header_kind=RowKind.TRACK_COMPOSITING_HEADER,
     context="per_slot",
-    read_expanded=_inspector_group_expanded,
-    toggle=_inspector_group_toggle,
     children=(
         SectionNode(leaf_kind=RowKind.TRACK_BLEND),
         SectionNode(leaf_kind=RowKind.TRACK_OPACITY),
     ),
 )
 
-TRACK_SECTION = ExpandSectionDef(
+TRACK_SECTION = SectionDef(
     header_kind=RowKind.TRACK_HEADER,
     context="per_slot",
-    read_expanded=_inspector_group_expanded,
-    toggle=_inspector_group_toggle,
     children=(
         SectionNode(leaf_kind=RowKind.TRACK_STEM),
         SectionNode(leaf_kind=RowKind.TRACK_BEAT),
         SectionNode(leaf_kind=RowKind.TRACK_PRESET_DIR),
         SectionNode(leaf_kind=RowKind.TRACK_PRESET),
         SectionNode(conditional=PRESET_SWITCHING_PAUSED),
-        SectionNode(expand=TRACK_PRESET_SWITCHING_SECTION),
-        SectionNode(expand=TRACK_COMPOSITING_SECTION),
-        SectionNode(expand=TRACK_EFFECTS_SECTION),
         SectionNode(leaf_kind=RowKind.LAYER_MANAGEMENT_DELETE),
     ),
 )
 
-ROOT_SECTION_NODES: tuple[SectionNode, ...] = (
-    SectionNode(expand=SETTINGS_SECTION),
-    SectionNode(expand=PROJECT_SECTION),
-)
-
-RENDER_SECTION_NODES: tuple[SectionNode, ...] = (
-    SectionNode(expand=RENDER_OVERLAYS_SECTION),
-    SectionNode(expand=RENDER_POST_FX_SECTION),
-    SectionNode(expand=RENDER_PATTERN_MASK_SECTION),
-    SectionNode(panel_anchor=TIMELINE_PANEL_ANCHOR),
-)
-
-SONG_MARKERS_SECTION = ExpandSectionDef(
+SONG_MARKERS_SECTION = SectionDef(
     header_kind=RowKind.SONG_MARKERS_HEADER,
     context="global",
-    read_expanded=_inspector_group_expanded,
-    toggle=_inspector_group_toggle,
     children=(
         SectionNode(leaf_kind=RowKind.TIMELINE_SNAP_TO_SONG_MARKERS),
     ),
     append_dynamic_children=_append_song_marker_rows,
 )
 
-BEAT_BAR_GRID_SECTION = ExpandSectionDef(
+BEAT_BAR_GRID_SECTION = SectionDef(
     header_kind=RowKind.TIMELINE_BEAT_BAR_GRID_HEADER,
     context="global",
-    read_expanded=_inspector_group_expanded,
-    toggle=_inspector_group_toggle,
     children=(
         SectionNode(leaf_kind=RowKind.TIMELINE_PLACEMENT_SNAP),
         SectionNode(leaf_kind=RowKind.TIMELINE_BAR_GRID),
@@ -777,11 +608,9 @@ TIMELINE_SOFT_CUTS_ACTIVE = ConditionalRowsDef(
     ),
 )
 
-TIMELINE_CUTS_SECTION = ExpandSectionDef(
+TIMELINE_CUTS_SECTION = SectionDef(
     header_kind=RowKind.TIMELINE_CUTS_HEADER,
     context="global",
-    read_expanded=_inspector_group_expanded,
-    toggle=_inspector_group_toggle,
     children=(
         SectionNode(leaf_kind=RowKind.TIMELINE_HARD_CUTS),
         SectionNode(conditional=TIMELINE_HARD_CUTS_ACTIVE),
@@ -790,11 +619,9 @@ TIMELINE_CUTS_SECTION = ExpandSectionDef(
     ),
 )
 
-TIMELINE_PRESETS_SECTION = ExpandSectionDef(
+TIMELINE_PRESETS_SECTION = SectionDef(
     header_kind=RowKind.TIMELINE_PRESETS_HEADER,
     context="global",
-    read_expanded=_inspector_group_expanded,
-    toggle=_inspector_group_toggle,
     children=(
         SectionNode(leaf_kind=RowKind.TIMELINE_PRESET_CHARACTER),
         SectionNode(leaf_kind=RowKind.TIMELINE_PRESET_DENSITY),
@@ -809,126 +636,13 @@ TIMELINE_PRESETS_SECTION = ExpandSectionDef(
     ),
 )
 
-RENDER_TIMELINE_INSPECTOR_SECTION = ExpandSectionDef(
-    header_kind=None,
-    context="global",
-    read_expanded=_inspector_group_expanded,
-    toggle=_inspector_group_toggle,
-    children=(
-        SectionNode(expand=TIMELINE_PRESETS_SECTION),
-        SectionNode(expand=BEAT_BAR_GRID_SECTION),
-        SectionNode(expand=TIMELINE_CUTS_SECTION),
-    ),
-)
-
-
-def _collect_expand_sections(
-    *roots: ExpandSectionDef,
-    extra_nodes: tuple[SectionNode, ...] = (),
-) -> tuple[ExpandSectionDef, ...]:
-    seen: dict[RowKind, ExpandSectionDef] = {}
-    order: list[ExpandSectionDef] = []
-
-    def walk_section(section: ExpandSectionDef) -> None:
-        if section.header_kind is None:
-            walk_nodes(section.children)
-            return
-        if section.header_kind in seen:
-            return
-        seen[section.header_kind] = section
-        order.append(section)
-        walk_nodes(section.children)
-
-    def walk_nodes(nodes: tuple[SectionNode, ...]) -> None:
-        for child in nodes:
-            if child.expand is not None:
-                walk_section(child.expand)
-            elif child.conditional is not None:
-                walk_nodes(child.conditional.children)
-
-    for root in roots:
-        walk_section(root)
-    walk_nodes(extra_nodes)
-    return tuple(order)
-
-
-_ALL_EXPAND_SECTIONS = _collect_expand_sections(
-    SETTINGS_SECTION,
-    PROJECT_SECTION,
-    TRACK_SECTION,
-    BEAT_BAR_GRID_SECTION,
-    SONG_MARKERS_SECTION,
-    TIMELINE_CUTS_SECTION,
-    TIMELINE_PRESETS_SECTION,
-    extra_nodes=RENDER_SECTION_NODES,
-)
-
-EXPAND_SECTION_BY_HEADER: dict[RowKind, ExpandSectionDef] = {
-    section.header_kind: section
-    for section in _ALL_EXPAND_SECTIONS
-    if section.header_kind is not None
-}
-
-EXPAND_TOGGLE_BY_HEADER: dict[RowKind, ExpandToggleFn] = {
-    section.header_kind: section.toggle
-    for section in _ALL_EXPAND_SECTIONS
-    if section.header_kind is not None
-}
-
-EXPAND_HEADER_KINDS = frozenset(EXPAND_SECTION_BY_HEADER)
-
-
-def apply_expand_toggle(
-    controls: TuningControls,
-    header_kind: RowKind,
-    slot: str | None,
-    forward: bool,
-    card: str | None = None,
-) -> bool:
-    section = EXPAND_SECTION_BY_HEADER.get(header_kind)
-    if section is None:
-        return False
-    instance_key = card if card is not None else slot
-    section.toggle(controls, instance_key, forward)
-    return True
-
-
-def _root_expand_sections(nodes: tuple[SectionNode, ...]) -> tuple[ExpandSectionDef, ...]:
-    return tuple(node.expand for node in nodes if node.expand is not None)
-
-
-_GLOBAL_ROOT_EXPAND_SECTIONS = _root_expand_sections(ROOT_SECTION_NODES + RENDER_SECTION_NODES)
-
-
-def expand_section_expanded(
-    state: TuningViewState,
-    section: ExpandSectionDef,
-    slot: str | None,
-) -> bool:
-    return section.read_expanded(state, slot)
-
-
-def expand_arrow_for_header(
-    state: TuningViewState,
-    kind: RowKind,
-    slot: str | None = None,
-    card: str | None = None,
-) -> str:
-    section = EXPAND_SECTION_BY_HEADER[kind]
-    if section.card is not None:
-        instance_key = card
-    else:
-        instance_key = slot if section.context == "per_slot" else None
-    return expand_arrow_glyph(expand_section_expanded(state, section, instance_key))
-
-
-def leaf_kinds_in_expand_section(section: ExpandSectionDef) -> frozenset[RowKind]:
+def leaf_kinds_in_section(section: SectionDef) -> frozenset[RowKind]:
     kinds: set[RowKind] = set()
     for child in section.children:
         if child.leaf_kind is not None:
             kinds.add(child.leaf_kind)
-        if child.expand is not None:
-            kinds |= leaf_kinds_in_expand_section(child.expand)
+        if child.subsection is not None:
+            kinds |= leaf_kinds_in_section(child.subsection)
         if child.conditional is not None:
             kinds |= _leaf_kinds_in_nodes(child.conditional.children)
     return frozenset(kinds)
@@ -939,41 +653,32 @@ def _leaf_kinds_in_nodes(nodes: tuple[SectionNode, ...]) -> frozenset[RowKind]:
     for child in nodes:
         if child.leaf_kind is not None:
             kinds.add(child.leaf_kind)
-        if child.expand is not None:
-            kinds |= leaf_kinds_in_expand_section(child.expand)
+        if child.subsection is not None:
+            kinds |= leaf_kinds_in_section(child.subsection)
         if child.conditional is not None:
             kinds |= _leaf_kinds_in_nodes(child.conditional.children)
     return frozenset(kinds)
 
 
-def kinds_in_expand_section(section: ExpandSectionDef) -> frozenset[RowKind]:
+def kinds_in_section(section: SectionDef) -> frozenset[RowKind]:
     kinds: set[RowKind] = set()
     if section.header_kind is not None:
         kinds.add(section.header_kind)
     for child in section.children:
         if child.leaf_kind is not None:
             kinds.add(child.leaf_kind)
-        if child.expand is not None:
-            kinds |= kinds_in_expand_section(child.expand)
+        if child.subsection is not None:
+            kinds |= kinds_in_section(child.subsection)
         if child.conditional is not None:
             kinds |= _leaf_kinds_in_nodes(child.conditional.children)
     return frozenset(kinds)
 
 
-RENDER_OVERLAY_SECTION_KINDS = kinds_in_expand_section(RENDER_OVERLAYS_SECTION)
-RENDER_POST_FX_SECTION_KINDS = kinds_in_expand_section(RENDER_POST_FX_SECTION)
-RENDER_POST_FX_LIMITER_KINDS = kinds_in_expand_section(RENDER_POST_FX_LIMITER_SECTION)
-RENDER_PATTERN_MASK_SECTION_KINDS = kinds_in_expand_section(RENDER_PATTERN_MASK_SECTION)
-TRACK_COMPOSITING_SECTION_KINDS = kinds_in_expand_section(TRACK_COMPOSITING_SECTION)
-PRESET_SWITCHING_CHILD_KINDS = frozenset(
-    kinds_in_expand_section(TRACK_PRESET_SWITCHING_SECTION)
-    - {RowKind.TRACK_PRESET_SWITCHING}
-    | {
-        RowKind.TRACK_PRESET_LIST_ITEM,
-        RowKind.TRACK_PRESET_LIST_ADD,
-        RowKind.TRACK_PRESET_LIST_POPULATE,
-    }
-)
+RENDER_OVERLAY_SECTION_KINDS = kinds_in_section(RENDER_OVERLAYS_SECTION)
+RENDER_POST_FX_SECTION_KINDS = kinds_in_section(RENDER_POST_FX_SECTION)
+RENDER_POST_FX_LIMITER_KINDS = kinds_in_section(RENDER_POST_FX_LIMITER_SECTION)
+RENDER_PATTERN_MASK_SECTION_KINDS = kinds_in_section(RENDER_PATTERN_MASK_SECTION)
+TRACK_COMPOSITING_SECTION_KINDS = kinds_in_section(TRACK_COMPOSITING_SECTION)
 RENDER_TIMELINE_SECTION_KINDS = frozenset(
     {
         RowKind.RENDER_TIMELINE_HEADER,
@@ -1011,266 +716,3 @@ RENDER_TIMELINE_SECTION_KINDS = frozenset(
         RowKind.TIMELINE_REMOVE_HARD_CUTS,
     }
 )
-
-
-def _assign_indent_depth(
-    depths: dict[RowKind, int],
-    nodes: tuple[SectionNode, ...],
-    depth: int,
-) -> None:
-    for child in nodes:
-        if child.leaf_kind is not None:
-            depths[child.leaf_kind] = depth
-        elif child.expand is not None:
-            _assign_expand_indent_depth(depths, child.expand, depth)
-        elif child.conditional is not None:
-            _assign_indent_depth(
-                depths,
-                child.conditional.children,
-                depth + child.conditional.child_indent_offset,
-            )
-
-
-def _assign_expand_indent_depth(
-    depths: dict[RowKind, int],
-    section: ExpandSectionDef,
-    depth: int,
-) -> None:
-    if section.header_kind is not None:
-        depths[section.header_kind] = depth
-    _assign_indent_depth(depths, section.children, depth + 1)
-
-
-def _build_row_tree_indent_depth() -> dict[RowKind, int]:
-    depths: dict[RowKind, int] = {}
-    _assign_expand_indent_depth(depths, SETTINGS_SECTION, 0)
-    _assign_expand_indent_depth(depths, PROJECT_SECTION, 0)
-    for node in RENDER_SECTION_NODES:
-        if node.expand is not None:
-            _assign_expand_indent_depth(depths, node.expand, 0)
-    _assign_expand_indent_depth(depths, SONG_MARKERS_SECTION, 1)
-    depths[RowKind.SONG_MARKER_ITEM] = 2
-    _assign_expand_indent_depth(depths, BEAT_BAR_GRID_SECTION, 1)
-    _assign_expand_indent_depth(depths, TIMELINE_CUTS_SECTION, 1)
-    _assign_expand_indent_depth(depths, TIMELINE_PRESETS_SECTION, 1)
-    depths[RowKind.TIMELINE_HARD_CUT_FADE_IN] = 3
-    depths[RowKind.TIMELINE_HARD_CUT_FADE_OUT] = 3
-    depths[RowKind.TIMELINE_HARD_CUT_CROSSFADE] = 3
-    depths[RowKind.TIMELINE_APPLY_HARD_CUTS] = 3
-    depths[RowKind.TIMELINE_REMOVE_HARD_CUTS] = 3
-    depths[RowKind.TIMELINE_SOFT_CUT_FADE_IN] = 3
-    depths[RowKind.TIMELINE_SOFT_CUT_FADE_OUT] = 3
-    depths[RowKind.TIMELINE_SOFT_CUT_CROSSFADE] = 3
-    depths[RowKind.TIMELINE_APPLY_SOFT_CUTS] = 3
-    depths[RowKind.TIMELINE_REMOVE_SOFT_CUTS] = 3
-    return depths
-
-
-ROW_TREE_INDENT_DEPTH = _build_row_tree_indent_depth()
-
-
-def row_tree_indent_depth(kind: RowKind) -> int:
-    """Tree depth for draw indent (0 = no branch prefix, 1 = └─, 2 = nested)."""
-    return ROW_TREE_INDENT_DEPTH.get(kind, 0)
-
-
-def _expand_path_to_kind(
-    section: ExpandSectionDef,
-    kind: RowKind,
-    card: str | None = None,
-) -> list[ExpandSectionDef] | None:
-    """Expand sections from *section* (inclusive) down to the owner of *kind*."""
-    if section.card is not None and card is not None and section.card != card:
-        return None
-    if kind == section.header_kind:
-        return [section]
-    for child in section.children:
-        if child.leaf_kind == kind:
-            return [section]
-        if child.conditional is not None and kind in _leaf_kinds_in_nodes(
-            child.conditional.children
-        ):
-            return [section]
-        if child.expand is not None:
-            if child.expand.header_kind == kind:
-                if (
-                    child.expand.card is not None
-                    and card is not None
-                    and child.expand.card != card
-                ):
-                    continue
-                return [section]
-            nested = _expand_path_to_kind(child.expand, kind, card)
-            if nested is not None:
-                return [section, *nested]
-    return None
-
-
-def expand_section_sub_row_visible(
-    state: TuningViewState,
-    desc: RowDescriptor,
-    section: ExpandSectionDef,
-) -> bool | None:
-    kind = desc.kind
-    if kind == section.header_kind:
-        if (
-            section.card is not None
-            and desc.card is not None
-            and section.card != desc.card
-        ):
-            return None
-        return True
-    slot = desc.slot if section.context == "per_slot" else None
-    if kind not in leaf_kinds_in_expand_section(section):
-        return None
-    path = _expand_path_to_kind(section, kind, card=desc.card)
-    if path is None:
-        return None
-    for ancestor in path:
-        key = ancestor.card if ancestor.card is not None else slot
-        if not expand_section_expanded(state, ancestor, key):
-            return False
-    return True
-
-
-def sub_row_expand_visible(state: TuningViewState, desc: RowDescriptor) -> bool:
-    for section in _GLOBAL_ROOT_EXPAND_SECTIONS:
-        visible = expand_section_sub_row_visible(state, desc, section)
-        if visible is not None:
-            return visible
-    return True
-
-
-def _append_section_nodes(
-    row_list: list[RowDescriptor],
-    nodes: tuple[SectionNode, ...],
-    state: TuningViewState,
-    slot: str | None,
-    section_slot: str | None,
-    section_card: str | None,
-) -> None:
-    probe = RowDescriptor(
-        RowKind.TRACK_HEADER, slot=section_slot, card=section_card
-    )
-    for child in nodes:
-        if child.leaf_kind is not None:
-            row_list.append(
-                RowDescriptor(
-                    child.leaf_kind, slot=section_slot, card=section_card
-                )
-            )
-        elif child.expand is not None:
-            append_expand_section_rows(row_list, child.expand, state, slot)
-        elif child.conditional is not None:
-            if child.conditional.predicate(state, probe):
-                _append_section_nodes(
-                    row_list,
-                    child.conditional.children,
-                    state,
-                    slot,
-                    section_slot,
-                    section_card,
-                )
-        elif child.panel_anchor is not None:
-            row_list.append(RowDescriptor(child.panel_anchor.header_kind))
-
-
-def append_expand_section_rows(
-    row_list: list[RowDescriptor],
-    section: ExpandSectionDef,
-    state: TuningViewState,
-    slot: str | None = None,
-) -> None:
-    if section.header_kind is None:
-        return
-    section_slot = slot if section.context == "per_slot" else None
-    section_card = section.card
-    row_list.append(
-        RowDescriptor(section.header_kind, slot=section_slot, card=section_card)
-    )
-    instance_key = section_card if section_card is not None else slot
-    if not expand_section_expanded(state, section, instance_key):
-        return
-    _append_section_nodes(
-        row_list, section.children, state, slot, section_slot, section_card
-    )
-    if section.append_dynamic_children is not None:
-        section.append_dynamic_children(row_list, state, slot)
-
-
-_PER_SLOT_SECTION_HEADERS = frozenset(
-    {
-        RowKind.TRACK_HEADER,
-        RowKind.TRACK_PRESET_SWITCHING,
-        RowKind.TRACK_EFFECTS_HEADER,
-        RowKind.TRACK_COMPOSITING_HEADER,
-    }
-)
-_PER_CARD_SECTION_HEADERS = frozenset(
-    {
-        RowKind.RENDER_OVERLAY_CARD_HEADER,
-        RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER,
-        RowKind.RENDER_OVERLAY_CARD_BODY_HEADER,
-        RowKind.RENDER_OVERLAY_CARD_ANIMATION_HEADER,
-    }
-)
-
-
-def _register_section_header_parent(
-    out: dict[RowKind, RowKind],
-    parent_header: RowKind | None,
-    nodes: tuple[SectionNode, ...],
-) -> None:
-    for child in nodes:
-        if child.leaf_kind is not None:
-            if parent_header is not None:
-                out[child.leaf_kind] = parent_header
-        elif child.expand is not None:
-            if (
-                parent_header is not None
-                and child.expand.header_kind is not None
-            ):
-                out[child.expand.header_kind] = parent_header
-            _walk_expand_section_for_headers(child.expand, out)
-        elif child.conditional is not None:
-            _register_section_header_parent(out, parent_header, child.conditional.children)
-
-
-def _walk_expand_section_for_headers(
-    section: ExpandSectionDef,
-    out: dict[RowKind, RowKind],
-) -> None:
-    _register_section_header_parent(out, section.header_kind, section.children)
-
-
-def _build_section_header_parent_map() -> dict[RowKind, RowKind]:
-    out: dict[RowKind, RowKind] = {}
-    for section in _GLOBAL_ROOT_EXPAND_SECTIONS:
-        _walk_expand_section_for_headers(section, out)
-    _walk_expand_section_for_headers(TRACK_SECTION, out)
-    _walk_expand_section_for_headers(SONG_MARKERS_SECTION, out)
-    _walk_expand_section_for_headers(BEAT_BAR_GRID_SECTION, out)
-    _walk_expand_section_for_headers(TIMELINE_CUTS_SECTION, out)
-    _walk_expand_section_for_headers(TIMELINE_PRESETS_SECTION, out)
-    # The pause row sits outside the menu. When it disappears, focus lands on
-    # the preset switching header immediately below it.
-    out[RowKind.TRACK_PRESET_SWITCHING_RESUME] = RowKind.TRACK_PRESET_SWITCHING
-    out[RowKind.TIMELINE_BEAT_BAR_GRID_HEADER] = RowKind.RENDER_TIMELINE_HEADER
-    out[RowKind.TIMELINE_CUTS_HEADER] = RowKind.RENDER_TIMELINE_HEADER
-    out[RowKind.TIMELINE_PRESETS_HEADER] = RowKind.RENDER_TIMELINE_HEADER
-    return out
-
-
-_SECTION_HEADER_PARENTS = _build_section_header_parent_map()
-
-
-def section_header_from_section_tree(desc: RowDescriptor) -> RowDescriptor | None:
-    """Map a sub-row to its section header using the composition tree."""
-    parent_kind = _SECTION_HEADER_PARENTS.get(desc.kind)
-    if parent_kind is None:
-        return None
-    if parent_kind in _PER_SLOT_SECTION_HEADERS:
-        return RowDescriptor(parent_kind, slot=desc.slot)
-    if parent_kind in _PER_CARD_SECTION_HEADERS:
-        return RowDescriptor(parent_kind, card=desc.card)
-    return RowDescriptor(parent_kind)

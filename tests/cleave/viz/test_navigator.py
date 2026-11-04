@@ -1,4 +1,4 @@
-"""Navigator model: top-level ids, layer children, and tree keys."""
+"""Navigator model: roots, child pages, accordion, and tree keys."""
 
 from __future__ import annotations
 
@@ -15,10 +15,15 @@ from cleave.viz.navigator import (
     SOLO_BADGE,
     TOP_LEVEL_IDS,
     build_navigator,
+    expansion_path,
     layer_node_id,
+    layer_page_node_id,
+    layer_page_of,
+    layer_slot_of,
+    parent_id_of,
+    root_id,
     visible_top_level_ids,
 )
-from cleave.viz.row_kinds import RowKind
 from cleave.viz.session import LayerRuntime, TuningSession
 from cleave.viz.shell_focus import ShellRegion
 from tests.cleave.viz.test_controls import _keydown, _make_controls
@@ -26,87 +31,6 @@ from tests.cleave.viz.test_controls import _keydown, _make_controls
 
 def _session() -> TuningSession:
     return TuningSession(layer_z_order=[])
-
-
-def test_top_level_ids_in_order() -> None:
-    session = _session()
-    nodes = build_navigator(session)
-    top = tuple(node for node in nodes if node.depth == 0)
-
-    assert TOP_LEVEL_IDS == (
-        "settings",
-        "project",
-        "render",
-        "layers",
-        "timeline",
-    )
-    assert visible_top_level_ids(session) == TOP_LEVEL_IDS
-    assert tuple(node.id for node in top) == TOP_LEVEL_IDS
-    assert tuple(node.label for node in top) == (
-        "Settings",
-        "Project",
-        "Render",
-        "Layers",
-        "Timeline",
-    )
-    assert tuple(node.has_inspector for node in top) == (
-        True,
-        True,
-        False,
-        True,
-        True,
-    )
-    assert tuple(node.expandable for node in top) == (
-        False,
-        False,
-        True,
-        True,
-        True,
-    )
-    assert all(
-        node.parent_id is None and node.slot is None and node.locked is False
-        for node in top
-    )
-    assert top[0].badge is None
-    assert top[1].badge is None
-    assert top[2].badge is None
-    assert top[3].badge is None
-
-
-def test_song_markers_badge_is_marker_count() -> None:
-    empty = _session()
-    markers = build_navigator(empty)[-1]
-    assert markers.id == "song_markers"
-    assert markers.parent_id == "timeline"
-    assert markers.depth == 1
-    assert markers.has_inspector is True
-    assert markers.badge == "0"
-
-    session = _session()
-    session.song_markers.times = [1.0, 4.5, 9.0]
-    nodes = build_navigator(session)
-    assert nodes[-1].id == "song_markers"
-    assert nodes[-1].parent_id == "timeline"
-    assert nodes[-1].depth == 1
-    assert nodes[-1].has_inspector is True
-    assert nodes[-1].badge == "3"
-
-
-def test_preset_curation_omits_project_render_and_timeline() -> None:
-    session = _session()
-    session.settings.editor_mode = "preset_curation"
-    nodes = build_navigator(session)
-
-    assert visible_top_level_ids(session) == ("settings", "layers")
-    assert tuple(node.id for node in nodes) == ("settings", "layers")
-    assert "timeline" not in {node.id for node in nodes}
-    assert "song_markers" not in {node.id for node in nodes}
-    assert tuple(node.label for node in nodes) == ("Settings", "Layers")
-    assert nodes[0].has_inspector is True
-    assert nodes[1].has_inspector is True
-    assert nodes[1].expandable is True
-    assert all(node.badge is None for node in nodes)
-    assert all(node.depth == 0 for node in nodes)
 
 
 def _layer(
@@ -124,53 +48,202 @@ def _layer(
     )
 
 
-def test_layer_children_follow_z_order() -> None:
-    session = TuningSession(
+def _two_layers() -> TuningSession:
+    return TuningSession(
         layer_z_order=["layer_2", "layer_1"],
         layers={
             "layer_1": _layer("bass"),
             "layer_2": _layer("drums"),
         },
     )
-    session.song_markers.times = [1.0, 4.0]
-    nodes = build_navigator(session)
-    children = tuple(node for node in nodes if node.parent_id == "layers")
 
-    assert tuple(node.id for node in nodes) == (
+
+def _all_open(session: TuningSession) -> set[str]:
+    return set(TOP_LEVEL_IDS) | {layer_node_id(s) for s in session.layer_z_order}
+
+
+def test_top_level_order_labels_and_inspectors() -> None:
+    session = _session()
+    top = tuple(
+        node for node in build_navigator(session, frozenset()) if node.depth == 0
+    )
+
+    assert TOP_LEVEL_IDS == (
         "settings",
         "project",
-        "render",
-        "render.overlays",
-        "render.post_fx",
-        "render.pattern_mask",
-        "layers",
-        layer_node_id("layer_2"),
-        layer_node_id("layer_1"),
+        "overlay",
+        "post_fx",
+        "pattern_mask",
         "timeline",
-        "song_markers",
+        "layers",
     )
+    assert visible_top_level_ids(session) == TOP_LEVEL_IDS
+    assert tuple(node.id for node in top) == TOP_LEVEL_IDS
+    assert tuple(node.label for node in top) == (
+        "Settings",
+        "Project",
+        "Overlay",
+        "Post-FX",
+        "Pattern Mask",
+        "Timeline",
+        "Layers",
+    )
+    assert tuple(node.has_inspector for node in top) == (
+        False,
+        False,
+        True,
+        True,
+        True,
+        True,
+        True,
+    )
+    assert tuple(node.expandable for node in top) == (
+        True,
+        True,
+        True,
+        True,
+        False,
+        True,
+        True,
+    )
+
+
+def test_full_tree_order_and_labels() -> None:
+    session = _two_layers()
+    nodes = build_navigator(session, _all_open(session) | {layer_node_id("layer_2")})
+
+    assert tuple(node.label for node in nodes) == (
+        "Settings",
+        "Editor Window",
+        "UI",
+        "Latency Compensation",
+        "Project",
+        "ProjectM",
+        "Compositor",
+        "Render Project",
+        "Overlay",
+        "Opening Card",
+        "Closing Card",
+        "Post-FX",
+        "Fade",
+        "Highlight Rolloff",
+        "Chroma Boost",
+        "Visual Limiter",
+        "Pattern Mask",
+        "Timeline",
+        "Beat / Bar Grid",
+        "Cue Fades",
+        "Song Markers",
+        "Timeline Preset",
+        "Layers",
+        "1  DRUMS",
+        "Preset Switching",
+        "Compositing",
+        "Cleave Effects",
+        "2  BASS",
+        "Preset Switching",
+        "Compositing",
+        "Cleave Effects",
+    )
+    assert "render" not in {node.id for node in nodes}
+
+
+def test_default_tree_opens_only_settings() -> None:
+    nodes = build_navigator(_two_layers())
+    assert tuple(node.id for node in nodes) == (
+        "settings",
+        "settings.editor_window",
+        "settings.ui",
+        "settings.latency",
+        "project",
+        "overlay",
+        "post_fx",
+        "pattern_mask",
+        "timeline",
+        "layers",
+    )
+
+
+def test_node_id_helpers() -> None:
+    page = layer_page_node_id("layer_1", "compositing")
+    assert page == "layer:layer_1:compositing"
+    assert layer_slot_of(page) == "layer_1"
+    assert layer_slot_of(layer_node_id("layer_1")) == "layer_1"
+    assert layer_slot_of("settings") is None
+    assert layer_page_of(page) == "compositing"
+    assert layer_page_of(layer_node_id("layer_1")) is None
+    assert parent_id_of(page) == layer_node_id("layer_1")
+    assert parent_id_of(layer_node_id("layer_1")) == "layers"
+    assert parent_id_of("post_fx.fade") == "post_fx"
+    assert parent_id_of("post_fx") is None
+    assert root_id(page) == "layers"
+    assert root_id("timeline.grid") == "timeline"
+    assert root_id("pattern_mask") == "pattern_mask"
+    assert expansion_path(page) == {page, layer_node_id("layer_1"), "layers"}
+
+
+def test_song_markers_badge_is_marker_count() -> None:
+    session = _session()
+    markers = next(
+        node
+        for node in build_navigator(session, {"timeline"})
+        if node.id == "timeline.song_markers"
+    )
+    assert markers.parent_id == "timeline"
+    assert markers.depth == 1
+    assert markers.has_inspector is True
+    assert markers.badge == "0"
+
+    session.song_markers.times = [1.0, 4.5, 9.0]
+    nodes = {node.id: node for node in build_navigator(session, {"timeline"})}
+    assert nodes["timeline.song_markers"].badge == "3"
+
+
+def test_preset_curation_keeps_settings_and_layers() -> None:
+    session = _session()
+    session.settings.editor_mode = "preset_curation"
+    nodes = build_navigator(session, frozenset())
+
+    assert visible_top_level_ids(session) == ("settings", "layers")
+    assert tuple(node.id for node in nodes) == ("settings", "layers")
+    assert tuple(node.label for node in nodes) == ("Settings", "Layers")
+    assert nodes[0].has_inspector is False
+    assert nodes[1].has_inspector is True
+    assert nodes[1].expandable is True
+    assert all(node.badge is None for node in nodes)
+
+
+def test_layer_children_follow_z_order() -> None:
+    nodes = build_navigator(_two_layers(), {"layers"})
+    children = tuple(node for node in nodes if node.parent_id == "layers")
+
     assert tuple(node.slot for node in children) == ("layer_2", "layer_1")
     assert tuple(node.label for node in children) == ("1  DRUMS", "2  BASS")
     assert all(node.depth == 1 for node in children)
-    assert all(node.parent_id == "layers" for node in children)
     assert all(node.has_inspector for node in children)
-    assert all(not node.expandable for node in children)
-    assert nodes[-1].id == "song_markers"
-    assert nodes[-1].parent_id == "timeline"
-    assert nodes[-1].badge == "2"
+    assert all(node.expandable for node in children)
 
 
-def test_collapsed_layers_omits_children() -> None:
-    session = TuningSession(
-        layer_z_order=["layer_1"],
-        layers={"layer_1": _layer("drums")},
+def test_open_layer_shows_its_pages_only() -> None:
+    open_id = layer_node_id("layer_1")
+    nodes = build_navigator(_two_layers(), {"layers", open_id})
+    pages = tuple(node for node in nodes if node.depth == 2)
+
+    assert tuple(node.id for node in pages) == (
+        layer_page_node_id("layer_1", "preset_switching"),
+        layer_page_node_id("layer_1", "compositing"),
+        layer_page_node_id("layer_1", "effects"),
     )
-    nodes = build_navigator(session, expanded=frozenset())
+    assert all(node.parent_id == open_id for node in pages)
+    assert all(node.slot == "layer_1" for node in pages)
+
+
+def test_collapsed_tree_is_roots_only() -> None:
+    nodes = build_navigator(_two_layers(), expanded=frozenset())
     assert tuple(node.id for node in nodes) == TOP_LEVEL_IDS
-    assert all(node.parent_id is None for node in nodes)
 
 
-def test_curation_shows_only_the_focus_layer() -> None:
+def test_curation_shows_only_the_focus_layer_without_pages() -> None:
     session = TuningSession(
         layer_z_order=["layer_2", "layer_1"],
         layers={
@@ -179,63 +252,16 @@ def test_curation_shows_only_the_focus_layer() -> None:
         },
     )
     session.settings.editor_mode = "preset_curation"
-    nodes = build_navigator(session)
+    focus_id = layer_node_id("layer_2")
+    nodes = build_navigator(session, {"layers", focus_id})
     children = tuple(node for node in nodes if node.parent_id == "layers")
-    focus = curation_focus_slot(session)
 
-    assert tuple(node.id for node in nodes if node.depth == 0) == ("settings", "layers")
-    assert focus == "layer_2"
-    assert len(children) == 1
-    assert children[0].id == layer_node_id("layer_2")
-    assert children[0].slot == focus
+    assert curation_focus_slot(session) == "layer_2"
+    assert tuple(node.id for node in children) == (focus_id,)
     assert children[0].label == "1  VOCALS"
     assert children[0].locked is True
-    assert children[0].has_inspector is True
-
-
-def test_render_children_follow_overlays_post_fx_and_pattern_mask() -> None:
-    session = _session()
-    nodes = build_navigator(session)
-    children = tuple(node for node in nodes if node.parent_id == "render")
-
-    assert tuple(node.id for node in nodes) == (
-        "settings",
-        "project",
-        "render",
-        "render.overlays",
-        "render.post_fx",
-        "render.pattern_mask",
-        "layers",
-        "timeline",
-        "song_markers",
-    )
-    assert tuple(node.id for node in children) == (
-        "render.overlays",
-        "render.post_fx",
-        "render.pattern_mask",
-    )
-    assert tuple(node.label for node in children) == (
-        "Overlays",
-        "Post-FX",
-        "Pattern mask",
-    )
-    assert all(node.depth == 1 for node in children)
-    assert all(node.has_inspector for node in children)
-    assert all(node.slot is None for node in children)
     assert children[0].expandable is False
-    assert children[1].expandable is False
-    assert children[2].expandable is False
-    timeline = next(node for node in nodes if node.id == "timeline")
-    assert timeline.depth == 0
-    assert timeline.parent_id is None
-    assert timeline.expandable is True
-    assert timeline.has_inspector is True
-    assert timeline.badge is None
-    assert timeline.locked is False
-    markers = next(node for node in nodes if node.id == "song_markers")
-    assert markers.parent_id == "timeline"
-    assert markers.depth == 1
-    assert not any(node.parent_id == "render.overlays" for node in nodes)
+    assert not any(node.depth == 2 for node in nodes)
 
 
 def test_timeline_lock_follows_session_and_has_no_badge() -> None:
@@ -244,45 +270,39 @@ def test_timeline_lock_follows_session_and_has_no_badge() -> None:
     session.timeline.locked = True
     timeline = next(node for node in build_navigator(session) if node.id == "timeline")
 
-    assert timeline.label == "Timeline"
-    assert timeline.depth == 0
-    assert timeline.parent_id is None
-    assert timeline.has_inspector is True
     assert timeline.badge is None
     assert timeline.locked is True
-    assert timeline.expandable is True
 
     session.timeline.locked = False
-    session.timeline.enabled = True
     unlocked = next(node for node in build_navigator(session) if node.id == "timeline")
     assert unlocked.locked is False
-    assert unlocked.badge is None
 
 
-def test_render_off_solo_and_lock_marks() -> None:
+def test_off_solo_and_lock_marks() -> None:
     session = _session()
     session.render_overlays.opening_card.enabled = False
     session.render_overlays.closing_card.enabled = False
     session.render_post_fx.enabled = False
     session.render_pattern_mask.enabled = False
-    nodes = {node.id: node for node in build_navigator(session)}
+    nodes = {node.id: node for node in build_navigator(session, {"overlay"})}
 
-    assert nodes["render.overlays"].badge == OFF_BADGE
-    assert nodes["render.post_fx"].badge == OFF_BADGE
-    assert nodes["render.pattern_mask"].badge == OFF_BADGE
-    assert not any(node.parent_id == "render.overlays" for node in nodes.values())
+    assert nodes["overlay"].badge == OFF_BADGE
+    assert nodes["overlay.opening_card"].badge == OFF_BADGE
+    assert nodes["overlay.closing_card"].badge == OFF_BADGE
+    assert nodes["post_fx"].badge == OFF_BADGE
+    assert nodes["pattern_mask"].badge == OFF_BADGE
 
     session.render_overlay_solo = True
     solo = {node.id: node for node in build_navigator(session)}
-    assert solo["render.overlays"].badge == SOLO_BADGE
+    assert solo["overlay"].badge == SOLO_BADGE
 
     session.render_overlays.locked = True
     session.render_post_fx.locked = True
     session.render_pattern_mask.locked = True
     locked = {node.id: node for node in build_navigator(session)}
-    assert locked["render.overlays"].locked is True
-    assert locked["render.post_fx"].locked is True
-    assert locked["render.pattern_mask"].locked is True
+    assert locked["overlay"].locked is True
+    assert locked["post_fx"].locked is True
+    assert locked["pattern_mask"].locked is True
 
 
 def test_layer_lock_and_visibility_badges() -> None:
@@ -295,83 +315,83 @@ def test_layer_lock_and_visibility_badges() -> None:
         },
         solo_slot="layer_3",
     )
-    nodes = {node.id: node for node in build_navigator(session)}
+    nodes = {node.id: node for node in build_navigator(session, {"layers"})}
 
     assert nodes[layer_node_id("layer_1")].locked is True
     assert nodes[layer_node_id("layer_1")].badge is None
-    assert nodes[layer_node_id("layer_2")].locked is False
     assert nodes[layer_node_id("layer_2")].badge == HIDDEN_BADGE
     assert nodes[layer_node_id("layer_3")].badge == SOLO_BADGE
-    assert nodes["song_markers"].badge == "0"
 
-    session.settings.editor_mode = "preset_curation"
-    curated = {
-        node.id: node
-        for node in build_navigator(session)
-        if node.parent_id == "layers"
+
+def test_select_closes_other_branches() -> None:
+    controls = _make_controls(("layer_1", "layer_2"))
+    focus = controls.shell_focus
+    nav = controls.navigator
+
+    nav.select("post_fx.fade")
+    assert focus.nav_expanded == {"post_fx", "post_fx.fade"}
+
+    nav.select(layer_page_node_id("layer_2", "compositing"))
+    assert focus.selected_id == layer_page_node_id("layer_2", "compositing")
+    assert focus.nav_expanded == {
+        "layers",
+        layer_node_id("layer_2"),
+        layer_page_node_id("layer_2", "compositing"),
     }
-    assert tuple(curated) == (layer_node_id("layer_1"),)
-    assert curated[layer_node_id("layer_1")].locked is True
+    ids = {node.id for node in build_navigator(controls.session, focus.nav_expanded)}
+    assert "post_fx.fade" not in ids
+    assert layer_page_node_id("layer_1", "compositing") not in ids
 
 
 def test_tree_up_down_does_not_wrap() -> None:
     controls = _make_controls(("layer_1", "layer_2"))
     focus = controls.shell_focus
     nav = controls.navigator
-    nav.select("render")
-    assert controls.focus_descriptor.kind is RowKind.RENDER_TIMELINE_HEADER
-    focus.selected_id = "settings"
     focus.region = ShellRegion.NAVIGATOR
 
     nav.handle_keydown(_keydown(pygame.K_UP))
     assert focus.selected_id == "settings"
-    assert focus.region is ShellRegion.NAVIGATOR
 
     seen = [focus.selected_id]
-    for _ in range(12):
+    for _ in range(60):
         nav.handle_keydown(_keydown(pygame.K_DOWN))
         if focus.selected_id == seen[-1]:
             break
         seen.append(focus.selected_id)
         assert focus.region is ShellRegion.NAVIGATOR
-        if focus.selected_id == "layers" or focus.selected_id.startswith("layer:"):
-            assert controls.focus_descriptor.kind is RowKind.RENDER_TIMELINE_HEADER
 
-    nodes = build_navigator(controls.session, focus.nav_expanded)
-    assert seen == [node.id for node in nodes]
-    assert focus.selected_id == "song_markers"
+    assert seen[:5] == [
+        "settings",
+        "settings.editor_window",
+        "settings.ui",
+        "settings.latency",
+        "project",
+    ]
+    last = layer_page_node_id("layer_2", "effects")
+    assert seen[-1] == last
     nav.handle_keydown(_keydown(pygame.K_DOWN))
-    assert focus.selected_id == "song_markers"
-    assert focus.region is ShellRegion.NAVIGATOR
-    assert controls.focus_descriptor.kind is RowKind.RENDER_TIMELINE_HEADER
+    assert focus.selected_id == last
 
 
 def test_left_right_expand_move_collapse_and_parent() -> None:
     controls = _make_controls(("layer_1", "layer_2"))
     focus = controls.shell_focus
     focus.nav_expanded.clear()
-    focus.selected_id = "settings"
+    focus.selected_id = "layers"
     focus.region = ShellRegion.NAVIGATOR
     nav = controls.navigator
 
     nav.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert focus.selected_id == "settings"
-    assert focus.nav_expanded == set()
-
-    focus.selected_id = "layers"
-    nav.handle_keydown(_keydown(pygame.K_RIGHT))
     assert focus.selected_id == "layers"
     assert focus.nav_expanded == {"layers"}
-    expanded_ids = tuple(
-        node.id
-        for node in build_navigator(controls.session, focus.nav_expanded)
-    )
-    assert layer_node_id("layer_1") in expanded_ids
-    assert layer_node_id("layer_2") in expanded_ids
 
     nav.handle_keydown(_keydown(pygame.K_RIGHT))
     assert focus.selected_id == layer_node_id("layer_1")
-    assert "layers" in focus.nav_expanded
+    assert focus.nav_expanded == {"layers", layer_node_id("layer_1")}
+
+    nav.handle_keydown(_keydown(pygame.K_LEFT))
+    assert focus.selected_id == layer_node_id("layer_1")
+    assert layer_node_id("layer_1") not in focus.nav_expanded
 
     nav.handle_keydown(_keydown(pygame.K_LEFT))
     assert focus.selected_id == "layers"

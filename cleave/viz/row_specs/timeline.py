@@ -58,9 +58,7 @@ from cleave.timeline_presets.timeline_cuts import (
 )
 from cleave.viz.commands import command_by_id
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
-from cleave.viz.row_sections import apply_expand_toggle, apply_panel_anchor_toggle
 from cleave.viz.row_spec import FitStrategy, RowPresentStyle, RowSpec
-from cleave.viz.row_specs.common import apply_expand_subheader
 from cleave.viz.tuning_view_state import TuningViewState
 
 if TYPE_CHECKING:
@@ -382,14 +380,6 @@ def _toggle_render_timeline_enabled(
     controls.set_render_timeline_enabled(not enabled)
 
 
-def _apply_render_timeline_header(
-    controls: TuningControls,
-    desc: RowDescriptor,
-    forward: bool,
-    _large: bool,
-) -> None:
-    apply_panel_anchor_toggle(controls, desc.kind, forward)
-
 def _format_song_markers_count(state: TuningViewState, _desc: RowDescriptor) -> str:
     return f"({len(state.render_timeline.song_marker_times)})"
 
@@ -492,12 +482,9 @@ def _apply_song_marker_item(controls: TuningControls, desc: RowDescriptor) -> No
 
 SPECS: dict[RowKind, RowSpec] = {
     RowKind.RENDER_TIMELINE_HEADER: RowSpec(
-        affordance=RowAffordance.EXPAND,
+        affordance=RowAffordance.HEADING,
         panel_label="TIMELINE",
-        present_style=RowPresentStyle.COMPOSITE_HEADER,
-        apply_horizontal=_apply_render_timeline_header,
-        header_prefix="Render: ",
-        header_suffix="TIMELINE",
+        present_style=RowPresentStyle.HEADING,
         fit_strategy=FitStrategy.NONE,
         visibility_icon=_visibility_timeline,
         help_title="Timeline",
@@ -508,17 +495,15 @@ SPECS: dict[RowKind, RowSpec] = {
         toggle_enabled=_toggle_render_timeline_enabled,
     ),
     RowKind.TIMELINE_PRESETS_HEADER: RowSpec(
-        affordance=RowAffordance.EXPAND,
+        affordance=RowAffordance.HEADING,
         panel_label="timeline preset",
-        present_style=RowPresentStyle.EXPAND_SUBHEADER,
-        apply_horizontal=apply_expand_subheader,
+        present_style=RowPresentStyle.HEADING,
         fit_strategy=FitStrategy.NONE,
         help_title="Timeline preset",
         help_description=(
             "Stage character, density, re-populate, conductor, and mode,",
             "then apply a randomly generated timeline preset. Overwrites the current timeline.",
         ),
-        is_sub_header=True,
     ),
     RowKind.TIMELINE_PRESET_CHARACTER: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
@@ -667,16 +652,14 @@ SPECS: dict[RowKind, RowSpec] = {
         blocked_by_section_lock=True,
     ),
     RowKind.TIMELINE_BEAT_BAR_GRID_HEADER: RowSpec(
-        affordance=RowAffordance.EXPAND,
+        affordance=RowAffordance.HEADING,
         panel_label="beat / bar grid",
-        present_style=RowPresentStyle.EXPAND_SUBHEADER,
-        apply_horizontal=apply_expand_subheader,
+        present_style=RowPresentStyle.HEADING,
         fit_strategy=FitStrategy.NONE,
         help_title="Beat / bar grid",
         help_description=(
             "AI beat detection powered by Beat This!",
         ),
-        is_sub_header=True,
     ),
     RowKind.TIMELINE_BAR_PHASE: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
@@ -757,16 +740,14 @@ SPECS: dict[RowKind, RowSpec] = {
         blocked_by_section_lock=True,
     ),
     RowKind.TIMELINE_CUTS_HEADER: RowSpec(
-        affordance=RowAffordance.EXPAND,
+        affordance=RowAffordance.HEADING,
         panel_label="cue fades",
-        present_style=RowPresentStyle.EXPAND_SUBHEADER,
-        apply_horizontal=apply_expand_subheader,
+        present_style=RowPresentStyle.HEADING,
         fit_strategy=FitStrategy.NONE,
         help_title="Cue fades",
         help_description=(
             "Opacity fade in and out for timeline cue edges by cut type.",
         ),
-        is_sub_header=True,
     ),
     RowKind.TIMELINE_HARD_CUTS: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
@@ -951,18 +932,16 @@ SPECS: dict[RowKind, RowSpec] = {
         blocked_by_section_lock=True,
     ),
     RowKind.SONG_MARKERS_HEADER: RowSpec(
-        affordance=RowAffordance.EXPAND,
+        affordance=RowAffordance.HEADING,
         panel_label="song markers",
-        present_style=RowPresentStyle.EXPAND_SUBHEADER,
+        present_style=RowPresentStyle.HEADING,
         format_value=_format_song_markers_count,
-        apply_horizontal=apply_expand_subheader,
         fit_strategy=FitStrategy.NONE,
         help_title="Song markers",
         help_description=(
             "Manual song markers for major transitions.",
             "Ctrl+Enter drops a marker at the playhead.",
         ),
-        is_sub_header=True,
     ),
     RowKind.SONG_MARKER_ITEM: RowSpec(
         affordance=RowAffordance.ACTION,

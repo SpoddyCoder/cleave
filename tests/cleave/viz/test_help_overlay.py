@@ -31,8 +31,8 @@ from cleave.viz.help_content import (
     timeline_strip_section,
 )
 from cleave.viz.shell_focus import CycleStop, ShellFocusState, ShellRegion
-from cleave.viz.row_kinds import RowDescriptor, RowKind
-from cleave.viz.row_spec import ROW_SPECS
+from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
+from cleave.viz.row_spec import ROW_SPECS, RowSpec
 
 
 _ROW_SECTION_SKIP_TITLES = {NAVIGATION_SECTION.title, "Navigator"}
@@ -251,7 +251,7 @@ def test_help_follows_navigator_render_node() -> None:
         leftover,
         shell_focus=ShellFocusState(
             region=ShellRegion.NAVIGATOR,
-            selected_id="render.overlays",
+            selected_id="overlay",
         ),
     )
     description = _description_section(overlays)
@@ -266,7 +266,7 @@ def test_help_follows_navigator_render_node() -> None:
         leftover,
         shell_focus=ShellFocusState(
             region=ShellRegion.NAVIGATOR,
-            selected_id="render.post_fx",
+            selected_id="post_fx",
         ),
     )
     post_description = _description_section(post)
@@ -280,7 +280,7 @@ def test_help_follows_navigator_render_node() -> None:
 
 def test_navigator_other_nodes_keep_navigation_only() -> None:
     leftover = RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
-    for selected_id in ("settings", "project", "layers", "render", "song_markers"):
+    for selected_id in ("settings", "project", "layers"):
         sections = help_sections(
             leftover,
             shell_focus=ShellFocusState(
@@ -443,18 +443,16 @@ def test_blend_mode_help_lists_modes() -> None:
     assert [mode for mode, _ in description.entries] == list(BLEND_MODES)
 
 
-def test_switching_header_help_is_expand_collapse() -> None:
+def test_switching_page_help_is_description_only() -> None:
     sections = sections_for(RowKind.TRACK_PRESET_SWITCHING)
     description = _description_section(sections)
-    keyboard = _keyboard_section(sections)
     assert description is not None
     assert description.title == "Preset switching"
     assert description.lines == (
         "Automatic preset list advances for this layer.",
-        "Left/Right expands or collapses.",
     )
     assert not description.entries
-    assert keyboard.entries == (("Left/Right", "expand/collapse"),)
+    assert len(sections) == 1
 
 
 
@@ -511,16 +509,14 @@ def test_preset_switching_trigger_help_lists_options() -> None:
 def test_preset_list_help() -> None:
     sections = sections_for(RowKind.TRACK_PRESET_LIST)
     description = _description_section(sections)
-    keyboard = _keyboard_section(sections)
     assert description is not None
     assert description.title == "preset list"
     assert description.lines == (
         "Ordered presets used for automatic switching on this layer.",
-        "Expand to reorder, delete, or add the currently playing preset.",
+        "Reorder, delete, or add the currently playing preset.",
     )
     assert not description.entries
-    assert keyboard.title == KEYBOARD_CONTROLS_SECTION_TITLE
-    assert dict(keyboard.entries) == {"Left/Right": "expand/collapse"}
+    assert len(sections) == 1
 
 
 def test_preset_list_entry_help() -> None:
@@ -665,11 +661,8 @@ def test_compositing_header_and_opacity_help() -> None:
 
 
 def test_cleave_effects_help() -> None:
-    header = _keyboard_section(sections_for(RowKind.TRACK_EFFECTS_HEADER))
     effect = _keyboard_section(sections_for(RowKind.TRACK_EFFECT))
-    assert header.title == KEYBOARD_CONTROLS_SECTION_TITLE
     assert effect.title == KEYBOARD_CONTROLS_SECTION_TITLE
-    assert "PgUp/PgDn" not in [key for key, _ in header.entries]
     assert dict(effect.entries)["PgUp/PgDn"] == "large step"
 
 
@@ -685,26 +678,7 @@ def test_render_timeline_help_has_no_solo() -> None:
     section = _keyboard_section(sections_for(RowKind.RENDER_TIMELINE_HEADER))
     keys = [key for key, _ in section.entries]
     assert "S" not in keys
-    assert dict(section.entries)["Left/Right"] == "expand/collapse"
     assert dict(section.entries)["E"] == "enable/disable"
-
-
-def test_visual_limiter_header_help_expand_collapse() -> None:
-    section = _keyboard_section(
-        sections_for(RowKind.RENDER_POST_FX_LIMITER_HEADER)
-    )
-    assert dict(section.entries)["Left/Right"] == "expand/collapse"
-
-
-def test_render_overlay_sub_header_help_expand_collapse() -> None:
-    for row_kind in (
-        RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER,
-        RowKind.RENDER_OVERLAY_CARD_BODY_HEADER,
-    ):
-        section = _keyboard_section(sections_for(row_kind))
-        entries = dict(section.entries)
-        assert entries["Left/Right"] == "expand/collapse"
-        assert "adjust value" not in entries.values()
 
 
 def test_render_overlay_title_text_help() -> None:
@@ -781,13 +755,23 @@ def test_navigable_row_kinds_have_help_sections() -> None:
         ), f"{row_kind} returned only empty sections"
 
 
+def _page_without_keys(behavior: RowSpec) -> bool:
+    """A navigator page with no E or S key has a description and no key list."""
+    return (
+        behavior.affordance == RowAffordance.HEADING
+        and behavior.toggle_enabled is None
+        and behavior.toggle_solo is None
+        and not behavior.can_enter_move_mode
+    )
+
+
 def test_navigable_row_kinds_with_description_use_keyboard_controls_title() -> None:
     for row_kind, behavior in ROW_SPECS.items():
         if not behavior.navigable:
             continue
         if behavior.help_description is None and behavior.help_mode_entries is None:
             continue
-        if row_kind == RowKind.TRACK_EFFECT:
+        if row_kind == RowKind.TRACK_EFFECT or _page_without_keys(behavior):
             continue
         keyboard = _keyboard_section(sections_for(row_kind))
         assert keyboard.title == KEYBOARD_CONTROLS_SECTION_TITLE, row_kind
@@ -798,6 +782,8 @@ def test_navigable_row_kinds_with_description_have_three_sections() -> None:
         if not behavior.navigable:
             continue
         if behavior.help_description is None and behavior.help_mode_entries is None:
+            continue
+        if _page_without_keys(behavior):
             continue
         sections = sections_for(row_kind)
         assert len(sections) == 2, f"{row_kind} expected 2 sections, got {len(sections)}"

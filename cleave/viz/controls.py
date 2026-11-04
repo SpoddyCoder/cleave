@@ -572,7 +572,6 @@ class TuningControls:
         self.navigator.reconcile()
 
     def _focus_layer_inspector(self, node_id: str) -> None:
-        self.shell_focus.nav_expanded.add("layers")
         self.navigator.select(node_id)
         self.navigator.activate()
 
@@ -628,10 +627,12 @@ class TuningControls:
 
     def _focus_song_marker(self, marker_index: int | None) -> None:
         focus = self.shell_focus
-        if focus.selected_id != "song_markers":
+        if focus.selected_id != "timeline.song_markers":
             return
         if marker_index is None:
-            focus.inspector_cursor = RowDescriptor(RowKind.SONG_MARKERS_HEADER)
+            focus.inspector_cursor = RowDescriptor(
+                RowKind.TIMELINE_SNAP_TO_SONG_MARKERS
+            )
         else:
             focus.inspector_cursor = RowDescriptor(
                 RowKind.SONG_MARKER_ITEM,

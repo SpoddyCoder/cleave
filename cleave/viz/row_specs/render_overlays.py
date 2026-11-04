@@ -16,9 +16,7 @@ from cleave.viz.colour_parse import (
 )
 from cleave.viz.fonts import render_overlay_font_display
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
-from cleave.viz.row_sections import apply_expand_toggle
 from cleave.viz.row_spec import FitStrategy, RowPresentStyle, RowSpec
-from cleave.viz.row_specs.common import apply_expand_subheader
 from cleave.viz.tuning_view_state import TuningViewState
 
 if TYPE_CHECKING:
@@ -442,17 +440,6 @@ def _toggle_render_overlays_solo(
         controls.render_overlays.enter_solo()
 
 
-def _apply_render_overlays_header(
-    controls: TuningControls,
-    desc: RowDescriptor,
-    forward: bool,
-    _large: bool,
-) -> None:
-    apply_expand_toggle(
-        controls, desc.kind, desc.slot, forward, card=desc.card
-    )
-
-
 def _toggle_overlay_card_enabled(
     controls: TuningControls, desc: RowDescriptor
 ) -> None:
@@ -461,16 +448,6 @@ def _toggle_overlay_card_enabled(
     card = _overlay_card_block_session(controls, desc)
     _overlay_card_controls(controls, desc).set_enabled(not card.enabled)
 
-
-def _apply_overlay_card_header(
-    controls: TuningControls,
-    desc: RowDescriptor,
-    forward: bool,
-    _large: bool,
-) -> None:
-    apply_expand_toggle(
-        controls, desc.kind, desc.slot, forward, card=desc.card
-    )
 
 def _visibility_overlays(
     state: TuningViewState, _desc: RowDescriptor
@@ -483,12 +460,9 @@ def _visibility_overlays(
 
 SPECS: dict[RowKind, RowSpec] = {
     RowKind.RENDER_OVERLAYS_HEADER: RowSpec(
-        affordance=RowAffordance.EXPAND,
+        affordance=RowAffordance.HEADING,
         panel_label="OVERLAYS",
-        present_style=RowPresentStyle.COMPOSITE_HEADER,
-        apply_horizontal=_apply_render_overlays_header,
-        header_prefix="Render: ",
-        header_suffix="OVERLAYS",
+        present_style=RowPresentStyle.HEADING,
         fit_strategy=FitStrategy.NONE,
         visibility_icon=_visibility_overlays,
         help_title="Credits overlays",
@@ -499,34 +473,29 @@ SPECS: dict[RowKind, RowSpec] = {
         toggle_solo=_toggle_render_overlays_solo,
     ),
     RowKind.RENDER_OVERLAY_CARD_HEADER: RowSpec(
-        affordance=RowAffordance.EXPAND,
+        affordance=RowAffordance.HEADING,
         panel_label="card",
-        present_style=RowPresentStyle.EXPAND_SUBHEADER,
-        apply_horizontal=_apply_overlay_card_header,
+        present_style=RowPresentStyle.HEADING,
         fit_strategy=FitStrategy.NONE,
         help_title="Credits card",
         help_entries=(
-            ("Left/Right", "expand/collapse"),
             ("E", "enable/disable"),
         ),
         help_description=(
             "Opening card at the start of the song, or closing card near the end.",
         ),
-        is_sub_header=True,
         toggle_enabled=_toggle_overlay_card_enabled,
         parent_group="render_overlay",
     ),
     RowKind.RENDER_OVERLAY_CARD_ANIMATION_HEADER: RowSpec(
-        affordance=RowAffordance.EXPAND,
+        affordance=RowAffordance.HEADING,
         panel_label="animation",
-        present_style=RowPresentStyle.EXPAND_SUBHEADER,
-        apply_horizontal=apply_expand_subheader,
+        present_style=RowPresentStyle.HEADING,
         fit_strategy=FitStrategy.NONE,
         help_title="Card animation",
         help_description=(
             "Entrance and exit motion for this credits card.",
         ),
-        is_sub_header=True,
         parent_group="render_overlay",
     ),
     RowKind.RENDER_OVERLAY_CARD_ANIMATION_TYPE: RowSpec(
@@ -571,14 +540,12 @@ SPECS: dict[RowKind, RowSpec] = {
         parent_group="render_overlay",
     ),
     RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER: RowSpec(
-        affordance=RowAffordance.EXPAND,
+        affordance=RowAffordance.HEADING,
         panel_label="title",
-        present_style=RowPresentStyle.EXPAND_SUBHEADER,
-        apply_horizontal=apply_expand_subheader,
+        present_style=RowPresentStyle.HEADING,
         fit_strategy=FitStrategy.NONE,
         help_title="Card title",
         help_description=("Title line of this credits card.",),
-        is_sub_header=True,
         parent_group="render_overlay",
     ),
     RowKind.RENDER_OVERLAY_CARD_TITLE_FONT_SIZE: RowSpec(
@@ -659,14 +626,12 @@ SPECS: dict[RowKind, RowSpec] = {
         blocked_by_section_lock=True,
     ),
     RowKind.RENDER_OVERLAY_CARD_BODY_HEADER: RowSpec(
-        affordance=RowAffordance.EXPAND,
+        affordance=RowAffordance.HEADING,
         panel_label="body",
-        present_style=RowPresentStyle.EXPAND_SUBHEADER,
-        apply_horizontal=apply_expand_subheader,
+        present_style=RowPresentStyle.HEADING,
         fit_strategy=FitStrategy.NONE,
         help_title="Card body",
         help_description=("Body block of this credits card.",),
-        is_sub_header=True,
         parent_group="render_overlay",
     ),
     RowKind.RENDER_OVERLAY_CARD_BODY_FONT_SIZE: RowSpec(
