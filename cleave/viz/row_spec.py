@@ -264,6 +264,8 @@ def row_triggers_layer_delete(kind: RowKind) -> bool:
 
 def row_panel_label(kind: RowKind, desc: RowDescriptor | None = None) -> str:
     if desc is not None:
+        if kind == RowKind.TRACK_EFFECT:
+            return row_dynamic_panel_label(desc)
         overlay_label = overlay_card_panel_label(kind, desc.card)
         if overlay_label is not None:
             return overlay_label

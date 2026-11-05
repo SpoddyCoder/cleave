@@ -576,6 +576,17 @@ def test_row_triggers_layer_delete_for_track_rows_only() -> None:
     assert row_triggers_layer_delete(RowKind.OVERLAYS_HEADER) is False
 
 
+def test_row_panel_label_names_a_track_effect() -> None:
+    desc = RowDescriptor(
+        RowKind.TRACK_EFFECT,
+        slot="layer_1",
+        effect_id="kaleido",
+        driver_slug="kick",
+    )
+
+    assert row_panel_label(desc.kind, desc) == "kaleido (kick)"
+
+
 def test_row_panel_label_settings_header() -> None:
     assert row_panel_label(RowKind.PROJECT_MILKDROP_HEADER) == "ProjectM"
     assert row_panel_label(RowKind.PROJECT_COMPOSITOR_HEADER) == "Compositor"

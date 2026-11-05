@@ -1488,12 +1488,19 @@ class ShellHost:
                 twisty = navigator_twisty(node, focus.nav_expanded)
                 if twisty is not None:
                     width = imgui.calc_text_size(twisty).x
-                    twisty_clicked, _selected = imgui.selectable(
-                        f"{twisty}##nav-twisty-{node.id}",
-                        selected,
-                        0,
-                        imgui.ImVec2(width, 0.0),
-                    )
+                    root = node.depth == 0
+                    if root:
+                        imgui.push_style_color(imgui.Col_.text, rgba(VALUE))
+                    try:
+                        twisty_clicked, _selected = imgui.selectable(
+                            f"{twisty}##nav-twisty-{node.id}",
+                            selected,
+                            0,
+                            imgui.ImVec2(width, 0.0),
+                        )
+                    finally:
+                        if root:
+                            imgui.pop_style_color()
                     imgui.same_line()
                 bright = selected or node.depth == 0
                 if bright:
