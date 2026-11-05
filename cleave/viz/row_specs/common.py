@@ -10,6 +10,14 @@ if TYPE_CHECKING:
     from cleave.viz.controls import TuningControls
 
 
+def on_off_text(value: bool) -> str:
+    return "on" if value else "off"
+
+
+def lock_text(locked: bool) -> str:
+    return "locked" if locked else "unlocked"
+
+
 def noop_horizontal(
     _controls: TuningControls,
     _desc: RowDescriptor,

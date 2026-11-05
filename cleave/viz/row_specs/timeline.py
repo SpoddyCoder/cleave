@@ -59,6 +59,7 @@ from cleave.timeline_presets.timeline_cuts import (
 from cleave.viz.commands import command_by_id
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
 from cleave.viz.row_spec import FitStrategy, RowPresentStyle, RowSpec
+from cleave.viz.row_specs.common import lock_text, on_off_text
 from cleave.viz.tuning_view_state import TuningViewState
 
 if TYPE_CHECKING:
@@ -480,6 +481,37 @@ def _apply_song_marker_item(controls: TuningControls, desc: RowDescriptor) -> No
     controls.seek_song_marker(desc)
 
 
+def _format_timeline_enabled(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return on_off_text(state.timeline.enabled)
+
+
+def _format_timeline_locked(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return lock_text(state.timeline.locked)
+
+
+def _apply_timeline_enabled(
+    controls: TuningControls,
+    _desc: RowDescriptor,
+    forward: bool,
+    _large: bool,
+) -> None:
+    controls.set_timeline_enabled(forward)
+
+
+def _apply_timeline_locked(
+    controls: TuningControls,
+    _desc: RowDescriptor,
+    forward: bool,
+    _large: bool,
+) -> None:
+    if controls.session.timeline.locked != forward:
+        controls.toggle_timeline_locked()
+
+
 SPECS: dict[RowKind, RowSpec] = {
     RowKind.TIMELINE_HEADER: RowSpec(
         affordance=RowAffordance.HEADING,
@@ -493,6 +525,28 @@ SPECS: dict[RowKind, RowSpec] = {
             "When enabled, standard layer visibility is disabled.",
         ),
         toggle_enabled=_toggle_timeline_enabled,
+    ),
+    RowKind.TIMELINE_ENABLED: RowSpec(
+        affordance=RowAffordance.VALUE_STEP,
+        panel_label="enabled",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_timeline_enabled,
+        apply_horizontal=_apply_timeline_enabled,
+        help_title="Timeline enabled",
+        help_description=(
+            "When on, the timeline drives layer visibility and its strip opens.",
+        ),
+        blocked_by_section_lock=True,
+    ),
+    RowKind.TIMELINE_LOCKED: RowSpec(
+        affordance=RowAffordance.VALUE_STEP,
+        panel_label="lock",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_timeline_locked,
+        apply_horizontal=_apply_timeline_locked,
+        help_title="Timeline lock",
+        help_description=("Locked timeline settings cannot be edited.",),
+        blocked_by_section_lock=False,
     ),
     RowKind.TIMELINE_PRESETS_HEADER: RowSpec(
         affordance=RowAffordance.HEADING,

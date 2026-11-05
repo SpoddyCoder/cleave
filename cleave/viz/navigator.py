@@ -19,12 +19,15 @@ if TYPE_CHECKING:
 LAYER_ID_PREFIX = "layer:"
 SOLO_BADGE = "solo"
 HIDDEN_BADGE = "hidden"
-OFF_BADGE = "off"
 DEFAULT_SELECTED_ID = "settings"
 DEFAULT_EXPANDED_IDS = frozenset({"layers"})
 # The ImGui atlas must include these; the default Latin range draws them as "?".
 TWISTY_EXPANDED = "▾"
 TWISTY_COLLAPSED = "▸"
+
+TOGGLE_ENABLED = "enabled"
+TOGGLE_SOLO = "solo"
+TOGGLE_LOCK = "lock"
 
 LAYER_PAGE_PRESET_SWITCHING = "preset_switching"
 LAYER_PAGE_COMPOSITING = "compositing"
@@ -38,6 +41,20 @@ _LAYER_PAGES: tuple[tuple[str, str], ...] = (
 
 
 @dataclass(frozen=True)
+class NavToggle:
+    """One clickable icon on a navigator row.
+
+    ``id`` is ``TOGGLE_ENABLED``, ``TOGGLE_SOLO``, or ``TOGGLE_LOCK``. ``active``
+    is on, soloed, or locked. ``blocked`` is true while the section lock refuses
+    the toggle.
+    """
+
+    id: str
+    active: bool
+    blocked: bool = False
+
+
+@dataclass(frozen=True)
 class NavNode:
     id: str
     label: str
@@ -48,6 +65,7 @@ class NavNode:
     expandable: bool = False
     slot: str | None = None
     locked: bool = False
+    toggles: tuple[NavToggle, ...] = ()
 
 
 _TOP_LEVEL: tuple[NavNode, ...] = (
@@ -186,28 +204,30 @@ def build_navigator(
 
 def _root_node(session: TuningSession, node: NavNode) -> NavNode:
     if node.id == "overlay":
+        overlays = session.overlays
+        enabled = overlays.opening_card.enabled or overlays.closing_card.enabled
         return replace(
             node,
-            badge=_overlay_badge(session),
-            locked=session.overlays.locked,
+            toggles=(
+                NavToggle(TOGGLE_ENABLED, enabled, overlays.locked),
+                NavToggle(TOGGLE_SOLO, session.overlay_solo),
+                NavToggle(TOGGLE_LOCK, overlays.locked),
+            ),
         )
     if node.id == "post_fx":
-        post_fx = session.post_fx
-        return replace(
-            node,
-            badge=None if post_fx.enabled else OFF_BADGE,
-            locked=post_fx.locked,
-        )
+        return replace(node, toggles=_block_toggles(session.post_fx))
     if node.id == "pattern_mask":
-        pattern_mask = session.pattern_mask
-        return replace(
-            node,
-            badge=None if pattern_mask.enabled else OFF_BADGE,
-            locked=pattern_mask.locked,
-        )
+        return replace(node, toggles=_block_toggles(session.pattern_mask))
     if node.id == "timeline":
-        return replace(node, locked=session.timeline.locked)
+        return replace(node, toggles=_block_toggles(session.timeline))
     return node
+
+
+def _block_toggles(block: object) -> tuple[NavToggle, ...]:
+    return (
+        NavToggle(TOGGLE_ENABLED, block.enabled, block.locked),
+        NavToggle(TOGGLE_LOCK, block.locked),
+    )
 
 
 def _static_children(session: TuningSession, parent_id: str) -> tuple[NavNode, ...]:
@@ -219,6 +239,7 @@ def _static_children(session: TuningSession, parent_id: str) -> tuple[NavNode, .
             has_inspector=True,
             badge=_static_child_badge(session, node_id),
             parent_id=parent_id,
+            toggles=_static_child_toggles(session, node_id),
         )
         for node_id, label in _STATIC_CHILDREN.get(parent_id, ())
     )
@@ -227,11 +248,22 @@ def _static_children(session: TuningSession, parent_id: str) -> tuple[NavNode, .
 def _static_child_badge(session: TuningSession, node_id: str) -> str | None:
     if node_id == "timeline.song_markers":
         return str(len(session.song_markers.times))
-    if node_id == "overlay.opening_card":
-        return None if session.overlays.opening_card.enabled else OFF_BADGE
-    if node_id == "overlay.closing_card":
-        return None if session.overlays.closing_card.enabled else OFF_BADGE
     return None
+
+
+def _static_child_toggles(
+    session: TuningSession, node_id: str
+) -> tuple[NavToggle, ...]:
+    overlays = session.overlays
+    if node_id == "overlay.opening_card":
+        return (
+            NavToggle(TOGGLE_ENABLED, overlays.opening_card.enabled, overlays.locked),
+        )
+    if node_id == "overlay.closing_card":
+        return (
+            NavToggle(TOGGLE_ENABLED, overlays.closing_card.enabled, overlays.locked),
+        )
+    return ()
 
 
 def _layer_children(
@@ -294,11 +326,3 @@ def _layer_badge(session: TuningSession, slot: str) -> str | None:
         return HIDDEN_BADGE
     return None
 
-
-def _overlay_badge(session: TuningSession) -> str | None:
-    if session.overlay_solo:
-        return SOLO_BADGE
-    overlays = session.overlays
-    if not overlays.opening_card.enabled and not overlays.closing_card.enabled:
-        return OFF_BADGE
-    return None

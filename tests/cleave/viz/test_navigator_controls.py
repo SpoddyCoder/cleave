@@ -31,14 +31,20 @@ def test_enter_on_settings_opens_first_child() -> None:
     assert focus.region is ShellRegion.INSPECTOR
 
 
-def test_enter_on_chips_only_page_stays_on_navigator() -> None:
+def test_enter_on_root_page_focuses_its_enabled_row() -> None:
     controls = _make_controls(("layer_1",))
     focus = controls.shell_focus
-    for node_id in ("overlay", "post_fx", "timeline"):
+    for node_id, kind in (
+        ("overlay", RowKind.OVERLAYS_ENABLED),
+        ("post_fx", RowKind.POST_FX_ENABLED),
+        ("pattern_mask", RowKind.PATTERN_MASK_ENABLED),
+        ("timeline", RowKind.TIMELINE_ENABLED),
+    ):
         controls.navigator.select(node_id)
         controls.navigator.activate()
         assert focus.selected_id == node_id
-        assert focus.region is ShellRegion.NAVIGATOR
+        assert focus.region is ShellRegion.INSPECTOR
+        assert focus.inspector_cursor == RowDescriptor(kind)
 
 
 def test_enter_on_pages_focuses_first_navigable_row() -> None:

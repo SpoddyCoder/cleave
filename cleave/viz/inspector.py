@@ -26,16 +26,19 @@ from cleave.viz.row_sections import (
     PROJECT_RENDER_SECTION,
     OVERLAY_CLOSING_CARD_SECTION,
     OVERLAY_OPENING_CARD_SECTION,
+    OVERLAY_PAGE_SECTION,
     PATTERN_MASK_SECTION,
     POST_FX_CHROMA_BOOST_SECTION,
     POST_FX_FADE_SECTION,
     POST_FX_HIGHLIGHT_ROLLOFF_SECTION,
     POST_FX_LIMITER_SECTION,
+    POST_FX_PAGE_SECTION,
     SETTINGS_EDITOR_WINDOW_SECTION,
     SETTINGS_LATENCY_COMPENSATION_SECTION,
     SETTINGS_UI_SECTION,
     SONG_MARKERS_SECTION,
     TIMELINE_CUTS_SECTION,
+    TIMELINE_PAGE_SECTION,
     TIMELINE_PRESETS_SECTION,
     TRACK_COMPOSITING_SECTION,
     TRACK_EFFECTS_SECTION,
@@ -80,13 +83,16 @@ _PAGE_SECTIONS: dict[str, SectionDef] = {
     "project.projectm": PROJECT_MILKDROP_SECTION,
     "project.compositor": PROJECT_COMPOSITOR_SECTION,
     "project.render": PROJECT_RENDER_SECTION,
+    "overlay": OVERLAY_PAGE_SECTION,
     "overlay.opening_card": OVERLAY_OPENING_CARD_SECTION,
     "overlay.closing_card": OVERLAY_CLOSING_CARD_SECTION,
+    "post_fx": POST_FX_PAGE_SECTION,
     "post_fx.fade": POST_FX_FADE_SECTION,
     "post_fx.highlight_rolloff": POST_FX_HIGHLIGHT_ROLLOFF_SECTION,
     "post_fx.chroma_boost": POST_FX_CHROMA_BOOST_SECTION,
     "post_fx.limiter": POST_FX_LIMITER_SECTION,
     "pattern_mask": PATTERN_MASK_SECTION,
+    "timeline": TIMELINE_PAGE_SECTION,
     "timeline.grid": BEAT_BAR_GRID_SECTION,
     "timeline.cue_fades": TIMELINE_CUTS_SECTION,
     "timeline.song_markers": SONG_MARKERS_SECTION,
@@ -119,7 +125,7 @@ def build_inspector_rows(
 ) -> tuple[InspectorRow, ...]:
     """Inspector rows for a navigator node.
 
-    Settings, Project, Overlay, Post-FX, Timeline, and an unknown id are empty.
+    Settings, Project, and an unknown id are empty.
     """
     section = page_section(state, node_id)
     if section is None:

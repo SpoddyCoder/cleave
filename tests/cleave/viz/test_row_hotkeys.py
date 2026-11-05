@@ -14,6 +14,7 @@ from cleave.viz.menu_bar import MenuBarState
 from cleave.viz.navigator import layer_node_id, layer_page_node_id
 import cleave.viz.row_hotkeys as row_hotkeys
 from cleave.viz.row_kinds import RowDescriptor, RowKind
+from cleave.viz.row_spec import apply_field_horizontal
 from cleave.viz.shell_focus import ShellRegion
 from tests.cleave.viz.test_controls import (
     _make_controls,
@@ -353,3 +354,28 @@ def test_curation_shell_allowlist() -> None:
     _select_layer(controls, "layer_2", region=ShellRegion.NAVIGATOR)
     assert dispatch_keydown(keydown(pygame.K_UP), runtime) is True
     assert controls.session.layer_z_order == order
+
+
+def test_section_switch_rows_step_their_flags_and_respect_the_lock() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    enabled = RowDescriptor(RowKind.POST_FX_ENABLED)
+    locked = RowDescriptor(RowKind.POST_FX_LOCKED)
+
+    assert apply_field_horizontal(controls, enabled, False, False) is True
+    assert session.post_fx.enabled is False
+    assert apply_field_horizontal(controls, locked, True, False) is True
+    assert session.post_fx.locked is True
+    assert apply_field_horizontal(controls, enabled, True, False) is False
+    assert session.post_fx.enabled is False
+    assert apply_field_horizontal(controls, locked, False, False) is True
+    assert session.post_fx.locked is False
+
+
+def test_overlay_solo_row_ignores_the_section_lock() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.overlays.locked = True
+    solo = RowDescriptor(RowKind.OVERLAYS_SOLO)
+    assert apply_field_horizontal(controls, solo, True, False) is True
+    assert controls.session.overlay_solo is True
+

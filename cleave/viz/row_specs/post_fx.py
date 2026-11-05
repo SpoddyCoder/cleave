@@ -16,6 +16,7 @@ from cleave.config_schema.render import (
 )
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
 from cleave.viz.row_spec import FitStrategy, RowPresentStyle, RowSpec
+from cleave.viz.row_specs.common import lock_text, on_off_text
 from cleave.viz.tuning_view_state import TuningViewState
 
 if TYPE_CHECKING:
@@ -304,6 +305,33 @@ def _visibility_post_fx(
     block = state.post_fx
     return (block.enabled, block.solo)
 
+def _format_post_fx_enabled(state: TuningViewState, _desc: RowDescriptor) -> str:
+    return on_off_text(state.post_fx.enabled)
+
+
+def _format_post_fx_locked(state: TuningViewState, _desc: RowDescriptor) -> str:
+    return lock_text(state.post_fx.locked)
+
+
+def _apply_post_fx_enabled(
+    controls: TuningControls,
+    _desc: RowDescriptor,
+    forward: bool,
+    _large: bool,
+) -> None:
+    controls.post_fx.set_enabled(forward)
+
+
+def _apply_post_fx_locked(
+    controls: TuningControls,
+    _desc: RowDescriptor,
+    forward: bool,
+    _large: bool,
+) -> None:
+    if controls.session.post_fx.locked != forward:
+        controls.toggle_post_fx_locked()
+
+
 SPECS: dict[RowKind, RowSpec] = {
     RowKind.POST_FX_HEADER: RowSpec(
         affordance=RowAffordance.HEADING,
@@ -316,6 +344,29 @@ SPECS: dict[RowKind, RowSpec] = {
             "Post-processing effects applied during final compositing.",
         ),
         toggle_enabled=_toggle_post_fx_enabled,
+    ),
+    RowKind.POST_FX_ENABLED: RowSpec(
+        affordance=RowAffordance.VALUE_STEP,
+        panel_label="enabled",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_post_fx_enabled,
+        apply_horizontal=_apply_post_fx_enabled,
+        help_title="Post FX enabled",
+        help_description=(
+            "Turns fade, highlight rolloff, and chroma boost on or off.",
+            "The visual limiter has its own switch.",
+        ),
+        blocked_by_section_lock=True,
+    ),
+    RowKind.POST_FX_LOCKED: RowSpec(
+        affordance=RowAffordance.VALUE_STEP,
+        panel_label="lock",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_post_fx_locked,
+        apply_horizontal=_apply_post_fx_locked,
+        help_title="Post FX lock",
+        help_description=("Locked Post FX settings cannot be edited.",),
+        blocked_by_section_lock=False,
     ),
     RowKind.POST_FX_FADE_HEADER: RowSpec(
         affordance=RowAffordance.HEADING,

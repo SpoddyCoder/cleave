@@ -246,10 +246,14 @@ def test_overlay_title_and_body_font_rows_when_expanded() -> None:
         assert kind in kinds
 
 
-def test_overlay_root_has_no_rows_and_cards_do() -> None:
+def test_overlay_root_has_switches_and_cards_have_settings() -> None:
     state = _minimal_view_state()
     opening = _inspector_kinds(state, "overlay.opening_card")
     closing = _inspector_kinds(state, "overlay.closing_card")
     assert RowKind.OVERLAY_CARD_POSITION in opening
     assert RowKind.OVERLAY_CARD_POSITION in closing
-    assert _inspector_kinds(state, "overlay") == []
+    assert _inspector_kinds(state, "overlay") == [
+        RowKind.OVERLAYS_ENABLED,
+        RowKind.OVERLAYS_SOLO,
+        RowKind.OVERLAYS_LOCKED,
+    ]

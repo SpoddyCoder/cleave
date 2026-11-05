@@ -10,6 +10,7 @@ from cleave.viz.inspector import build_inspector_rows
 from cleave.viz.navigator import layer_node_id, layer_page_node_id
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.row_present_renderers import inspector_field_colors
+from cleave.viz.row_sections import SECTION_SWITCH_KINDS
 from cleave.viz.row_spec import format_row_value
 from cleave.viz.theme import ACTION, LOCKED
 from cleave.viz.tuning_view_state import SettingsBlock, TuningViewState
@@ -68,10 +69,55 @@ def _layer_view(
 
 @pytest.mark.parametrize(
     "node_id",
-    ("settings", "project", "overlay", "post_fx", "timeline", "render", "unknown"),
+    ("settings", "project", "render", "unknown"),
 )
 def test_parents_and_unknown_ids_have_no_rows(node_id: str) -> None:
     assert build_inspector_rows(_view_state(), node_id) == ()
+
+
+@pytest.mark.parametrize(
+    ("node_id", "kinds"),
+    (
+        (
+            "overlay",
+            (
+                RowKind.OVERLAYS_ENABLED,
+                RowKind.OVERLAYS_SOLO,
+                RowKind.OVERLAYS_LOCKED,
+            ),
+        ),
+        ("post_fx", (RowKind.POST_FX_ENABLED, RowKind.POST_FX_LOCKED)),
+        ("timeline", (RowKind.TIMELINE_ENABLED, RowKind.TIMELINE_LOCKED)),
+    ),
+)
+def test_root_pages_list_only_their_switches(
+    node_id: str, kinds: tuple[RowKind, ...]
+) -> None:
+    rows = build_inspector_rows(_view_state(), node_id)
+    assert tuple(row.descriptor.kind for row in rows) == kinds
+    assert all(row.navigable for row in rows)
+
+
+def test_pattern_mask_page_opens_with_its_switches() -> None:
+    rows = build_inspector_rows(_view_state(), "pattern_mask")
+    assert tuple(row.descriptor.kind for row in rows[:3]) == (
+        RowKind.PATTERN_MASK_ENABLED,
+        RowKind.PATTERN_MASK_LOCKED,
+        RowKind.PATTERN_MASK_TYPE,
+    )
+
+
+@pytest.mark.parametrize(
+    "node_id",
+    ("overlay.opening_card", "post_fx.fade", "timeline.song_markers"),
+)
+def test_child_pages_omit_the_root_switches(node_id: str) -> None:
+    kinds = {
+        row.descriptor.kind
+        for row in build_inspector_rows(_view_state(), node_id)
+        if row.descriptor is not None
+    }
+    assert not kinds & SECTION_SWITCH_KINDS
 
 
 def test_settings_pages() -> None:

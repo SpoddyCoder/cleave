@@ -30,6 +30,7 @@ from cleave.viz.row_sections import (
     PATTERN_MASK_SECTION_KINDS,
     POST_FX_LIMITER_KINDS,
     POST_FX_SECTION_KINDS,
+    SECTION_SWITCH_KINDS,
     TIMELINE_SECTION_KINDS,
     TRACK_COMPOSITING_SECTION_KINDS,
 )
@@ -84,6 +85,9 @@ def row_value_color_for(
         and field.present_style == RowPresentStyle.LABELED_VALUE
     ):
         return LABEL
+
+    if kind in SECTION_SWITCH_KINDS:
+        return LOCKED if locked_blocked else VALUE
 
     if kind in TIMELINE_SECTION_KINDS:
         if not state.timeline.enabled:

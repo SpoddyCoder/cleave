@@ -15,6 +15,7 @@ from cleave.config_schema.render import (
 from cleave.pattern_mask import pattern_mask_invert_display
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
 from cleave.viz.row_spec import FitStrategy, RowPresentStyle, RowSpec
+from cleave.viz.row_specs.common import lock_text, on_off_text
 from cleave.viz.tuning_view_state import TuningViewState
 
 if TYPE_CHECKING:
@@ -128,6 +129,37 @@ def _visibility_pattern_mask(
 ) -> tuple[bool, bool]:
     return (state.pattern_mask.enabled, False)
 
+def _format_pattern_mask_enabled(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return on_off_text(state.pattern_mask.enabled)
+
+
+def _format_pattern_mask_locked(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return lock_text(state.pattern_mask.locked)
+
+
+def _apply_pattern_mask_enabled(
+    controls: TuningControls,
+    _desc: RowDescriptor,
+    forward: bool,
+    _large: bool,
+) -> None:
+    controls.pattern_mask.set_enabled(forward)
+
+
+def _apply_pattern_mask_locked(
+    controls: TuningControls,
+    _desc: RowDescriptor,
+    forward: bool,
+    _large: bool,
+) -> None:
+    if controls.session.pattern_mask.locked != forward:
+        controls.toggle_pattern_mask_locked()
+
+
 SPECS: dict[RowKind, RowSpec] = {
     RowKind.PATTERN_MASK_HEADER: RowSpec(
         affordance=RowAffordance.HEADING,
@@ -143,6 +175,28 @@ SPECS: dict[RowKind, RowSpec] = {
             "(blend mode, opacity) are greyed out and ignored.",
         ),
         toggle_enabled=_toggle_pattern_mask_enabled,
+    ),
+    RowKind.PATTERN_MASK_ENABLED: RowSpec(
+        affordance=RowAffordance.VALUE_STEP,
+        panel_label="enabled",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_pattern_mask_enabled,
+        apply_horizontal=_apply_pattern_mask_enabled,
+        help_title="Pattern mask enabled",
+        help_description=(
+            "When on, the mask replaces each layer's Compositing rows.",
+        ),
+        blocked_by_section_lock=True,
+    ),
+    RowKind.PATTERN_MASK_LOCKED: RowSpec(
+        affordance=RowAffordance.VALUE_STEP,
+        panel_label="lock",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_pattern_mask_locked,
+        apply_horizontal=_apply_pattern_mask_locked,
+        help_title="Pattern mask lock",
+        help_description=("Locked pattern mask settings cannot be edited.",),
+        blocked_by_section_lock=False,
     ),
     RowKind.PATTERN_MASK_TYPE: RowSpec(
         affordance=RowAffordance.VALUE_STEP,

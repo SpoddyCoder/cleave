@@ -11,8 +11,11 @@ from cleave.stems import StemSource
 from cleave.viz.editor_mode_controls import curation_focus_slot
 from cleave.viz.navigator import (
     HIDDEN_BADGE,
-    OFF_BADGE,
     SOLO_BADGE,
+    TOGGLE_ENABLED,
+    TOGGLE_LOCK,
+    TOGGLE_SOLO,
+    NavToggle,
     TOP_LEVEL_IDS,
     build_navigator,
     ancestor_ids,
@@ -258,45 +261,58 @@ def test_curation_shows_only_the_focus_layer_without_pages() -> None:
     assert not any(node.depth == 2 for node in nodes)
 
 
-def test_timeline_lock_follows_session_and_has_no_badge() -> None:
-    session = _session()
-    session.timeline.enabled = False
-    session.timeline.locked = True
-    timeline = next(node for node in build_navigator(session) if node.id == "timeline")
-
-    assert timeline.badge is None
-    assert timeline.locked is True
-
-    session.timeline.locked = False
-    unlocked = next(node for node in build_navigator(session) if node.id == "timeline")
-    assert unlocked.locked is False
+def _toggles(node) -> dict[str, NavToggle]:
+    return {toggle.id: toggle for toggle in node.toggles}
 
 
-def test_off_solo_and_lock_marks() -> None:
+def test_root_toggles_follow_session_and_replace_marks() -> None:
     session = _session()
     session.overlays.opening_card.enabled = False
     session.overlays.closing_card.enabled = False
     session.post_fx.enabled = False
     session.pattern_mask.enabled = False
-    nodes = {node.id: node for node in build_navigator(session, {"overlay"})}
-
-    assert nodes["overlay"].badge == OFF_BADGE
-    assert nodes["overlay.opening_card"].badge == OFF_BADGE
-    assert nodes["overlay.closing_card"].badge == OFF_BADGE
-    assert nodes["post_fx"].badge == OFF_BADGE
-    assert nodes["pattern_mask"].badge == OFF_BADGE
-
+    session.timeline.enabled = False
     session.overlay_solo = True
-    solo = {node.id: node for node in build_navigator(session)}
-    assert solo["overlay"].badge == SOLO_BADGE
-
     session.overlays.locked = True
     session.post_fx.locked = True
     session.pattern_mask.locked = True
-    locked = {node.id: node for node in build_navigator(session)}
-    assert locked["overlay"].locked is True
-    assert locked["post_fx"].locked is True
-    assert locked["pattern_mask"].locked is True
+    session.timeline.locked = True
+    nodes = {node.id: node for node in build_navigator(session)}
+
+    overlay = _toggles(nodes["overlay"])
+    assert tuple(overlay) == (TOGGLE_ENABLED, TOGGLE_SOLO, TOGGLE_LOCK)
+    assert overlay[TOGGLE_ENABLED] == NavToggle(TOGGLE_ENABLED, False, True)
+    assert overlay[TOGGLE_SOLO] == NavToggle(TOGGLE_SOLO, True)
+    assert overlay[TOGGLE_LOCK] == NavToggle(TOGGLE_LOCK, True)
+    for node_id in ("post_fx", "pattern_mask", "timeline"):
+        toggles = _toggles(nodes[node_id])
+        assert tuple(toggles) == (TOGGLE_ENABLED, TOGGLE_LOCK)
+        assert toggles[TOGGLE_ENABLED] == NavToggle(TOGGLE_ENABLED, False, True)
+        assert toggles[TOGGLE_LOCK] == NavToggle(TOGGLE_LOCK, True)
+    for node_id in ("overlay", "post_fx", "pattern_mask", "timeline"):
+        assert nodes[node_id].badge is None
+        assert nodes[node_id].locked is False
+
+
+def test_cards_have_their_own_enabled_toggle() -> None:
+    session = _session()
+    session.overlays.opening_card.enabled = False
+    nodes = {node.id: node for node in build_navigator(session, {"overlay"})}
+
+    assert nodes["overlay.opening_card"].toggles == (
+        NavToggle(TOGGLE_ENABLED, False),
+    )
+    assert nodes["overlay.closing_card"].toggles == (
+        NavToggle(TOGGLE_ENABLED, True),
+    )
+    assert nodes["overlay.opening_card"].badge is None
+
+
+def test_layers_and_other_pages_have_no_toggles() -> None:
+    session = _session()
+    nodes = build_navigator(session, {"layers", "post_fx", "settings"})
+    with_toggles = {node.id for node in nodes if node.toggles}
+    assert with_toggles == {"overlay", "post_fx", "pattern_mask", "timeline"}
 
 
 def test_layer_lock_and_visibility_badges() -> None:

@@ -283,6 +283,16 @@ OVERLAY_CLOSING_CARD_SECTION = _build_overlay_card_section(
     "closing_card"
 )
 
+OVERLAY_PAGE_SECTION = SectionDef(
+    header_kind=None,
+    context="global",
+    children=(
+        SectionNode(leaf_kind=RowKind.OVERLAYS_ENABLED),
+        SectionNode(leaf_kind=RowKind.OVERLAYS_SOLO),
+        SectionNode(leaf_kind=RowKind.OVERLAYS_LOCKED),
+    ),
+)
+
 OVERLAYS_SECTION = SectionDef(
     header_kind=RowKind.OVERLAYS_HEADER,
     context="global",
@@ -386,6 +396,15 @@ POST_FX_FADE_SECTION = SectionDef(
     ),
 )
 
+POST_FX_PAGE_SECTION = SectionDef(
+    header_kind=None,
+    context="global",
+    children=(
+        SectionNode(leaf_kind=RowKind.POST_FX_ENABLED),
+        SectionNode(leaf_kind=RowKind.POST_FX_LOCKED),
+    ),
+)
+
 POST_FX_SECTION = SectionDef(
     header_kind=RowKind.POST_FX_HEADER,
     context="global",
@@ -409,6 +428,8 @@ PATTERN_MASK_SECTION = SectionDef(
     header_kind=RowKind.PATTERN_MASK_HEADER,
     context="global",
     children=(
+        SectionNode(leaf_kind=RowKind.PATTERN_MASK_ENABLED),
+        SectionNode(leaf_kind=RowKind.PATTERN_MASK_LOCKED),
         SectionNode(leaf_kind=RowKind.PATTERN_MASK_TYPE),
         SectionNode(leaf_kind=RowKind.PATTERN_MASK_DENSITY),
         SectionNode(leaf_kind=RowKind.PATTERN_MASK_FEATHER),
@@ -674,14 +695,29 @@ def kinds_in_section(section: SectionDef) -> frozenset[RowKind]:
     return frozenset(kinds)
 
 
-OVERLAY_SECTION_KINDS = kinds_in_section(OVERLAYS_SECTION)
-POST_FX_SECTION_KINDS = kinds_in_section(POST_FX_SECTION)
+TIMELINE_PAGE_SECTION = SectionDef(
+    header_kind=None,
+    context="global",
+    children=(
+        SectionNode(leaf_kind=RowKind.TIMELINE_ENABLED),
+        SectionNode(leaf_kind=RowKind.TIMELINE_LOCKED),
+    ),
+)
+
+OVERLAY_SECTION_KINDS = kinds_in_section(OVERLAYS_SECTION) | kinds_in_section(
+    OVERLAY_PAGE_SECTION
+)
+POST_FX_SECTION_KINDS = kinds_in_section(POST_FX_SECTION) | kinds_in_section(
+    POST_FX_PAGE_SECTION
+)
 POST_FX_LIMITER_KINDS = kinds_in_section(POST_FX_LIMITER_SECTION)
 PATTERN_MASK_SECTION_KINDS = kinds_in_section(PATTERN_MASK_SECTION)
 TRACK_COMPOSITING_SECTION_KINDS = kinds_in_section(TRACK_COMPOSITING_SECTION)
 TIMELINE_SECTION_KINDS = frozenset(
     {
         RowKind.TIMELINE_HEADER,
+        RowKind.TIMELINE_ENABLED,
+        RowKind.TIMELINE_LOCKED,
         RowKind.SONG_MARKERS_HEADER,
         RowKind.SONG_MARKER_ITEM,
         RowKind.TIMELINE_PRESETS_HEADER,
@@ -714,5 +750,21 @@ TIMELINE_SECTION_KINDS = frozenset(
         RowKind.TIMELINE_APPLY_HARD_CUTS,
         RowKind.TIMELINE_REMOVE_SOFT_CUTS,
         RowKind.TIMELINE_REMOVE_HARD_CUTS,
+    }
+)
+
+# On/off, solo, and lock rows of a root page. They stay readable while their
+# block is off, since they are how the user turns it back on.
+SECTION_SWITCH_KINDS = frozenset(
+    {
+        RowKind.OVERLAYS_ENABLED,
+        RowKind.OVERLAYS_SOLO,
+        RowKind.OVERLAYS_LOCKED,
+        RowKind.POST_FX_ENABLED,
+        RowKind.POST_FX_LOCKED,
+        RowKind.PATTERN_MASK_ENABLED,
+        RowKind.PATTERN_MASK_LOCKED,
+        RowKind.TIMELINE_ENABLED,
+        RowKind.TIMELINE_LOCKED,
     }
 )

@@ -25,10 +25,20 @@ from cleave.viz.imgui_theme import rgba
 from cleave.viz.inspector import build_inspector_rows
 from cleave.viz.inspector_controls import inspector_command_enabled
 from cleave.viz.menu_bar import MenuBarState, menus_for_session
+from cleave.viz.material_icons import (
+    LOCK_GLYPH,
+    LOCK_OPEN_GLYPH,
+    POWER_GLYPH,
+    SOLO_GLYPH,
+)
 from cleave.viz.navigator import (
+    TOGGLE_ENABLED,
+    TOGGLE_LOCK,
+    TOGGLE_SOLO,
     TWISTY_COLLAPSED,
     TWISTY_EXPANDED,
     NavNode,
+    NavToggle,
     build_navigator,
 )
 from cleave.viz.panel_notification import (
@@ -36,7 +46,7 @@ from cleave.viz.panel_notification import (
     notification_attention,
 )
 from cleave.viz.playback import format_mmss
-from cleave.viz.row_hotkeys import activate_inspector_chip, node_control_descriptor
+from cleave.viz.row_hotkeys import activate_header_toggle, node_control_descriptor
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.row_present_renderers import inspector_field_colors
 from cleave.viz.row_spec import (
@@ -47,7 +57,6 @@ from cleave.viz.row_spec import (
     format_row_position,
     format_row_value,
     row_is_two_line,
-    row_lock_section,
     row_panel_label,
     row_spec,
     section_lock_blocks_mutation,
@@ -76,6 +85,7 @@ from cleave.viz.theme import (
     HIGHLIGHT,
     LABEL,
     LOCK_ICON,
+    LOCKED,
     MUTED,
     NAVIGATOR_BORDER,
     NOTIFICATION_ON_FILL,
@@ -108,6 +118,8 @@ _MENU_BAR_FRAME_PADDING_Y = 8.0
 _MENU_POPUP_TOP_PAD_PX = 4.0
 _INSPECTOR_INDENT = 16.0
 _NAV_LOCK_MARK = "[lock]"
+# Fixed columns, so a row without solo keeps its icons under the rows that have it.
+_NAV_TOGGLE_COLUMNS = (TOGGLE_ENABLED, TOGGLE_SOLO, TOGGLE_LOCK)
 _TRANSPORT_GAP = 16.0
 # Border pushed onto navigator and inspector windows.
 _PANEL_BORDER_PX = 1.0
@@ -128,7 +140,7 @@ class TransportReadout:
 
 @dataclass(frozen=True)
 class InspectorChip:
-    """One inspector header toggle.
+    """One inspector header toggle on a layer page.
 
     ``id`` is ``enabled``, ``solo``, or ``lock``. ``active`` is on, soloed,
     or locked. The lock label is ``locked`` or ``lock``; solo stays ``solo``.
@@ -219,6 +231,43 @@ def navigator_lock_mark(node: NavNode) -> str | None:
     return _NAV_LOCK_MARK
 
 
+def navigator_toggle_glyph(toggle: NavToggle) -> str:
+    """Material icon for a navigator toggle."""
+    if toggle.id == TOGGLE_LOCK:
+        return LOCK_GLYPH if toggle.active else LOCK_OPEN_GLYPH
+    if toggle.id == TOGGLE_SOLO:
+        return SOLO_GLYPH
+    return POWER_GLYPH
+
+
+def navigator_toggle_color(toggle: NavToggle) -> tuple[int, int, int]:
+    """Resting icon color. Muted while inactive, so a lit icon stands out."""
+    if toggle.blocked:
+        return LOCKED
+    if not toggle.active:
+        return MUTED
+    return LOCK_ICON if toggle.id == TOGGLE_LOCK else ACTION
+
+
+def navigator_toggle_tooltip(toggle: NavToggle) -> str:
+    """Hover text naming the state and what a click does."""
+    if toggle.blocked:
+        return "Locked: unlock to change"
+    if toggle.id == TOGGLE_LOCK:
+        return "Locked: click to unlock" if toggle.active else "Unlocked: click to lock"
+    if toggle.id == TOGGLE_SOLO:
+        return "Solo: click to end solo" if toggle.active else "Click to solo"
+    return "On: click to turn off" if toggle.active else "Off: click to turn on"
+
+
+def navigator_toggle_x(
+    toggle_id: str, right_x: float, button_width: float, gap: float
+) -> float:
+    """Left edge of a toggle's column, counted back from *right_x*."""
+    columns_right = len(_NAV_TOGGLE_COLUMNS) - _NAV_TOGGLE_COLUMNS.index(toggle_id)
+    return right_x - columns_right * button_width - (columns_right - 1) * gap
+
+
 def value_drag_steps(accum: float, threshold: float) -> tuple[int, float]:
     """Split a signed pixel accumulator into steps and a sub-threshold remainder.
 
@@ -279,8 +328,8 @@ def inspector_header(
 ) -> InspectorHeader:
     """Breadcrumb title for *selected_id*.
 
-    Chips follow the ``RowSpec`` of the header that owns the page and are
-    omitted in preset curation. Enabled, solo, then lock.
+    Only layer pages have chips, and preset curation omits them. Enabled,
+    solo, then lock. Every other root keeps these controls on its navigator row.
     """
     node = next((item for item in nodes if item.id == selected_id), None)
     if node is None:
@@ -295,64 +344,23 @@ def inspector_header(
     if curation:
         return InspectorHeader(title)
     descriptor = node_control_descriptor(selected_id)
-    if descriptor is None:
+    if descriptor is None or descriptor.kind is not RowKind.TRACK_HEADER:
         return InspectorHeader(title)
     return InspectorHeader(
-        title, _header_chips(session, descriptor), descriptor
+        title, _layer_chips(session, descriptor), descriptor
     )
 
 
-def _header_chips(
+def _layer_chips(
     session: TuningSession, desc: RowDescriptor
 ) -> tuple[InspectorChip, ...]:
-    spec = row_spec(desc.kind)
-    chips: list[InspectorChip] = []
-    if spec.toggle_enabled is not None:
-        enabled = _header_enabled(session, desc)
-        chips.append(
-            InspectorChip("enabled", "on" if enabled else "off", enabled)
-        )
-    if spec.toggle_solo is not None:
-        chips.append(InspectorChip("solo", "solo", _header_solo_active(session, desc)))
-    if row_lock_section(desc.kind) is not None:
-        locked = section_locked(session, desc)
-        chips.append(InspectorChip("lock", "locked" if locked else "lock", locked))
-    return tuple(chips)
-
-
-def _header_enabled(session: TuningSession, desc: RowDescriptor) -> bool:
-    kind = desc.kind
-    if kind == RowKind.TRACK_HEADER:
-        slot = desc.slot
-        if slot is None:
-            return False
-        return bool(session.layers[slot].enabled)
-    if kind == RowKind.OVERLAYS_HEADER:
-        overlays = session.overlays
-        return bool(
-            overlays.opening_card.enabled or overlays.closing_card.enabled
-        )
-    if kind == RowKind.OVERLAY_CARD_HEADER:
-        if desc.card == "opening_card":
-            return bool(session.overlays.opening_card.enabled)
-        if desc.card == "closing_card":
-            return bool(session.overlays.closing_card.enabled)
-        return False
-    if kind == RowKind.POST_FX_HEADER:
-        return bool(session.post_fx.enabled)
-    if kind == RowKind.PATTERN_MASK_HEADER:
-        return bool(session.pattern_mask.enabled)
-    if kind == RowKind.TIMELINE_HEADER:
-        return bool(session.timeline.enabled)
-    return False
-
-
-def _header_solo_active(session: TuningSession, desc: RowDescriptor) -> bool:
-    if desc.kind == RowKind.TRACK_HEADER:
-        return session.solo_slot == desc.slot
-    if desc.kind == RowKind.OVERLAYS_HEADER:
-        return bool(session.overlay_solo)
-    return False
+    enabled = bool(session.layers[desc.slot].enabled)
+    locked = section_locked(session, desc)
+    return (
+        InspectorChip("enabled", "on" if enabled else "off", enabled),
+        InspectorChip("solo", "solo", session.solo_slot == desc.slot),
+        InspectorChip("lock", "locked" if locked else "lock", locked),
+    )
 
 
 def inspector_selectable_id(desc: RowDescriptor) -> str:
@@ -1510,6 +1518,7 @@ class ShellHost:
                     clicked, _selected = imgui.selectable(
                         f"{node.label}##nav-{node.id}",
                         selected,
+                        imgui.SelectableFlags_.allow_overlap if node.toggles else 0,
                     )
                     if ring:
                         _draw_item_focus_ring()
@@ -1524,6 +1533,8 @@ class ShellHost:
                 _draw_nav_lock_mark(text_pos, node.label, mark)
             if node.badge:
                 _draw_item_suffix(node.badge, rgba(LABEL))
+            if node.toggles:
+                self._draw_nav_toggles(node)
             if twisty_clicked:
                 self._toggle_nav_expanded(node.id)
             elif clicked:
@@ -1533,6 +1544,55 @@ class ShellHost:
         finally:
             if indent:
                 imgui.unindent(indent)
+
+    def _draw_nav_toggles(self, node: NavNode) -> None:
+        """Icon buttons at the right of the row just drawn.
+
+        The row selectable allows overlap, so a press here reaches the button
+        and leaves the selection alone. A blocked toggle has no hover fill.
+        """
+        descriptor = node_control_descriptor(node.id)
+        if descriptor is None:
+            return
+        style = imgui.get_style()
+        space = imgui.calc_text_size(" ").x
+        button_width = imgui.calc_text_size(POWER_GLYPH).x + space
+        line = imgui.get_text_line_height()
+        right_x = imgui.get_item_rect_max().x - style.frame_padding.x
+        window_x = imgui.get_window_pos().x - imgui.get_scroll_x()
+        draw = imgui.get_window_draw_list()
+        for toggle in node.toggles:
+            x = navigator_toggle_x(toggle.id, right_x, button_width, space * 0.5)
+            imgui.same_line(x - window_x)
+            pressed = imgui.invisible_button(
+                f"##nav-toggle-{node.id}-{toggle.id}",
+                imgui.ImVec2(button_width, line),
+            )
+            rect_min = imgui.get_item_rect_min()
+            hovered = imgui.is_item_hovered()
+            color = rgba(navigator_toggle_color(toggle))
+            if hovered and not toggle.blocked:
+                draw.add_rect_filled(
+                    rect_min,
+                    imgui.get_item_rect_max(),
+                    imgui.get_color_u32(
+                        rgba(NUDGE_HOVER_BG, NUDGE_HOVER_BG_ALPHA / 255.0)
+                    ),
+                )
+                color = rgba(NUDGE_HOVER_FG)
+            glyph = navigator_toggle_glyph(toggle)
+            draw.add_text(
+                imgui.ImVec2(
+                    rect_min.x + space * 0.5,
+                    rect_min.y + _icon_drop_to_text(glyph),
+                ),
+                imgui.get_color_u32(color),
+                glyph,
+            )
+            if hovered:
+                imgui.set_tooltip(navigator_toggle_tooltip(toggle))
+            if pressed and not toggle.blocked:
+                activate_header_toggle(self._controls, toggle.id, descriptor)
 
     def _toggle_nav_expanded(self, node_id: str) -> None:
         focus = self._controls.shell_focus
@@ -1947,7 +2007,7 @@ class ShellHost:
             finally:
                 imgui.pop_style_color()
             if clicked:
-                activate_inspector_chip(self._controls, chip.id, descriptor)
+                activate_header_toggle(self._controls, chip.id, descriptor)
 
     def _draw_bar(
         self, menu_state: MenuBarState

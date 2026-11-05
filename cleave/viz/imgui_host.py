@@ -182,6 +182,10 @@ def _merge_icon_glyphs(fonts: Any, size_pixels: float) -> tuple[Any, list[int]]:
         ARROW_DOWNWARD_GLYPH,
         ARROW_UPWARD_GLYPH,
         FOLDER_GLYPH,
+        LOCK_GLYPH,
+        LOCK_OPEN_GLYPH,
+        POWER_GLYPH,
+        SOLO_GLYPH,
         font_path,
     )
 
@@ -189,7 +193,15 @@ def _merge_icon_glyphs(fonts: Any, size_pixels: float) -> tuple[Any, list[int]]:
     config.merge_mode = True
     config.pixel_snap_h = True
     ranges: list[int] = []
-    for glyph in (FOLDER_GLYPH, ARROW_UPWARD_GLYPH, ARROW_DOWNWARD_GLYPH):
+    for glyph in (
+        FOLDER_GLYPH,
+        ARROW_UPWARD_GLYPH,
+        ARROW_DOWNWARD_GLYPH,
+        LOCK_GLYPH,
+        LOCK_OPEN_GLYPH,
+        POWER_GLYPH,
+        SOLO_GLYPH,
+    ):
         ranges.extend((ord(glyph), ord(glyph)))
     ranges.append(0)
     fonts.add_font_from_file_ttf(

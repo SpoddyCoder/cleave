@@ -9,17 +9,27 @@ import pytest
 
 from cleave.preset_playlist import PresetPlaylist
 from cleave.stems import StemSource
+from cleave.viz.material_icons import (
+    LOCK_GLYPH,
+    LOCK_OPEN_GLYPH,
+    POWER_GLYPH,
+    SOLO_GLYPH,
+)
 from cleave.viz.navigator import (
     HIDDEN_BADGE,
     SOLO_BADGE,
+    TOGGLE_ENABLED,
+    TOGGLE_LOCK,
+    TOGGLE_SOLO,
     TWISTY_COLLAPSED,
     TWISTY_EXPANDED,
+    NavToggle,
     build_navigator,
     ancestor_ids,
     layer_node_id,
     layer_page_node_id,
 )
-from cleave.viz.row_hotkeys import activate_inspector_chip
+from cleave.viz.row_hotkeys import activate_header_toggle
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.session import LayerRuntime, TuningSession
 from cleave.viz.shell_host import (
@@ -27,11 +37,23 @@ from cleave.viz.shell_host import (
     inspector_selectable_id,
     navigator_height_for_rows,
     navigator_lock_mark,
+    navigator_toggle_color,
+    navigator_toggle_glyph,
+    navigator_toggle_tooltip,
+    navigator_toggle_x,
     navigator_twisty,
     selectable_wash,
     selection_after_nav_collapse,
 )
-from cleave.viz.theme import FOCUS_WASH_ALPHA, HIGHLIGHT, SELECTED_WASH_ALPHA
+from cleave.viz.theme import (
+    ACTION,
+    FOCUS_WASH_ALPHA,
+    HIGHLIGHT,
+    LOCK_ICON,
+    LOCKED,
+    MUTED,
+    SELECTED_WASH_ALPHA,
+)
 from tests.cleave.viz.test_controls import _make_controls
 
 
@@ -146,7 +168,7 @@ def test_child_pages_breadcrumb_and_show_owner_chips() -> None:
         curation=False,
     )
     assert fade.title == "Post-FX > Fade"
-    assert fade.descriptor == RowDescriptor(RowKind.POST_FX_HEADER)
+    assert fade.chips == ()
 
     ui = inspector_header(
         build_navigator(session, {"settings"}),
@@ -174,85 +196,64 @@ def test_layer_header_has_enabled_solo_and_lock_chips() -> None:
     assert chips["lock"].active is False
 
 
-def test_render_block_headers_have_enabled_solo_and_lock_chips() -> None:
+@pytest.mark.parametrize(
+    ("node_id", "title"),
+    (
+        ("overlay", "Overlay"),
+        ("overlay.opening_card", "Overlay > Opening Card"),
+        ("post_fx", "Post-FX"),
+        ("pattern_mask", "Pattern Mask"),
+        ("timeline", "Timeline"),
+        ("timeline.song_markers", "Timeline > Song Markers"),
+    ),
+)
+def test_section_pages_have_no_header_chips(node_id: str, title: str) -> None:
     session = _session()
-    nodes = build_navigator(session)
-    overlays = _chips(
-        inspector_header(nodes, "overlay", session, curation=False)
-    )
-    assert tuple(overlays) == ("enabled", "solo", "lock")
-    assert overlays["enabled"].label == "on"
-    assert overlays["enabled"].active is True
-    assert overlays["solo"].label == "solo"
-    assert overlays["solo"].active is False
-    assert overlays["lock"].label == "lock"
-
-    session.overlays.opening_card.enabled = False
-    session.overlays.closing_card.enabled = False
-    session.overlay_solo = True
-    session.overlays.locked = True
-    solo_off = _chips(
-        inspector_header(nodes, "overlay", session, curation=False)
-    )
-    assert solo_off["enabled"].label == "off"
-    assert solo_off["enabled"].active is False
-    assert solo_off["solo"].active is True
-    assert solo_off["lock"].label == "locked"
-
-    post = _chips(inspector_header(nodes, "post_fx", session, curation=False))
-    mask = _chips(
-        inspector_header(nodes, "pattern_mask", session, curation=False)
-    )
-    assert tuple(post) == ("enabled", "lock")
-    assert tuple(mask) == ("enabled", "lock")
-    assert post["enabled"].label == "on"
-    assert mask["enabled"].label == "off"
-    assert "solo" not in post
-    assert "solo" not in mask
+    nodes = build_navigator(session, {"overlay", "timeline"})
+    header = inspector_header(nodes, node_id, session, curation=False)
+    assert header.title == title
+    assert header.chips == ()
 
 
-def test_timeline_inspector_header_chips_follow_enabled_and_lock() -> None:
-    session = _session()
-    nodes = build_navigator(session)
-    header = inspector_header(nodes, "timeline", session, curation=False)
-    chips = _chips(header)
-    assert header.title == "Timeline"
-    assert tuple(chips) == ("enabled", "lock")
-    assert chips["enabled"].label == "on"
-    assert chips["enabled"].active is True
-    assert chips["lock"].label == "lock"
-    assert chips["lock"].active is False
-
-    session.timeline.enabled = False
-    session.timeline.locked = True
-    off = _chips(
-        inspector_header(nodes, "timeline", session, curation=False)
-    )
-    assert off["enabled"].label == "off"
-    assert off["enabled"].active is False
-    assert off["lock"].label == "locked"
-    assert off["lock"].active is True
-
-    markers = inspector_header(
-        build_navigator(session, {"timeline"}),
-        "timeline.song_markers",
-        session,
-        curation=False,
-    )
-    assert markers.title == "Timeline > Song Markers"
-    assert tuple(_chips(markers)) == ("enabled", "lock")
-
+def test_timeline_toggle_opens_and_closes_the_strip() -> None:
     controls = _make_controls(("layer_1",), timeline_enabled=True)
     assert controls.session.timeline.panel_open is False
     desc = RowDescriptor(RowKind.TIMELINE_HEADER)
-    activate_inspector_chip(controls, "enabled", desc)
+    activate_header_toggle(controls, "enabled", desc)
     assert controls.session.timeline.enabled is False
     assert controls.session.timeline.panel_open is False
-    activate_inspector_chip(controls, "enabled", desc)
+    activate_header_toggle(controls, "enabled", desc)
     assert controls.session.timeline.enabled is True
     assert controls.session.timeline.panel_open is True
-    activate_inspector_chip(controls, "lock", desc)
+    activate_header_toggle(controls, "lock", desc)
     assert controls.session.timeline.locked is True
+
+
+def test_navigator_toggle_presentation() -> None:
+    on = NavToggle(TOGGLE_ENABLED, True)
+    off = NavToggle(TOGGLE_ENABLED, False)
+    blocked = NavToggle(TOGGLE_ENABLED, True, True)
+    locked = NavToggle(TOGGLE_LOCK, True)
+    unlocked = NavToggle(TOGGLE_LOCK, False)
+    solo = NavToggle(TOGGLE_SOLO, True)
+
+    assert navigator_toggle_glyph(on) == POWER_GLYPH
+    assert navigator_toggle_glyph(locked) == LOCK_GLYPH
+    assert navigator_toggle_glyph(unlocked) == LOCK_OPEN_GLYPH
+    assert navigator_toggle_glyph(solo) == SOLO_GLYPH
+    assert navigator_toggle_color(on) == ACTION
+    assert navigator_toggle_color(off) == MUTED
+    assert navigator_toggle_color(blocked) == LOCKED
+    assert navigator_toggle_color(locked) == LOCK_ICON
+    assert navigator_toggle_color(unlocked) == MUTED
+    assert navigator_toggle_tooltip(off) == "Off: click to turn on"
+    assert navigator_toggle_tooltip(blocked) == "Locked: unlock to change"
+
+
+def test_navigator_toggles_sit_in_fixed_columns() -> None:
+    assert navigator_toggle_x(TOGGLE_LOCK, 100.0, 20.0, 2.0) == 80.0
+    assert navigator_toggle_x(TOGGLE_SOLO, 100.0, 20.0, 2.0) == 58.0
+    assert navigator_toggle_x(TOGGLE_ENABLED, 100.0, 20.0, 2.0) == 36.0
 
 
 def test_preset_curation_omits_header_chips() -> None:
@@ -271,15 +272,15 @@ def test_inspector_chip_click_toggles_the_header_flag() -> None:
     controls = _make_controls(("layer_1",))
     post = RowDescriptor(RowKind.POST_FX_HEADER)
     assert controls.session.post_fx.enabled is True
-    activate_inspector_chip(controls, "enabled", post)
+    activate_header_toggle(controls, "enabled", post)
     assert controls.session.post_fx.enabled is False
-    activate_inspector_chip(controls, "lock", post)
+    activate_header_toggle(controls, "lock", post)
     assert controls.session.post_fx.locked is True
 
     overlays = RowDescriptor(RowKind.OVERLAYS_HEADER)
-    activate_inspector_chip(controls, "solo", overlays)
+    activate_header_toggle(controls, "solo", overlays)
     assert controls.session.overlay_solo is True
-    activate_inspector_chip(controls, "enabled", overlays)
+    activate_header_toggle(controls, "enabled", overlays)
     assert controls.session.overlays.opening_card.enabled is False
     assert controls.session.overlays.closing_card.enabled is False
 

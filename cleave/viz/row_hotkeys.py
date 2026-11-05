@@ -16,6 +16,9 @@ from cleave.viz.navigator import (
     LAYER_PAGE_COMPOSITING,
     LAYER_PAGE_EFFECTS,
     LAYER_PAGE_PRESET_SWITCHING,
+    TOGGLE_ENABLED,
+    TOGGLE_LOCK,
+    TOGGLE_SOLO,
     layer_page_of,
     layer_slot_of,
     root_id,
@@ -118,17 +121,17 @@ def toggle_header_locked(controls: TuningControls, desc: RowDescriptor) -> bool:
     return False
 
 
-def activate_inspector_chip(
-    controls: TuningControls, chip_id: str, desc: RowDescriptor
+def activate_header_toggle(
+    controls: TuningControls, toggle_id: str, desc: RowDescriptor
 ) -> None:
-    """Run the header mutation for an inspector chip click."""
-    if chip_id == "enabled":
+    """Run the header mutation for a navigator icon or inspector chip click."""
+    if toggle_id == TOGGLE_ENABLED:
         apply_field_toggle_enabled(controls, desc)
         return
-    if chip_id == "solo":
+    if toggle_id == TOGGLE_SOLO:
         apply_field_toggle_solo(controls, desc)
         return
-    if chip_id == "lock":
+    if toggle_id == TOGGLE_LOCK:
         toggle_header_locked(controls, desc)
 
 

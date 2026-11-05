@@ -17,6 +17,7 @@ from cleave.viz.colour_parse import (
 from cleave.viz.fonts import overlay_font_display
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
 from cleave.viz.row_spec import FitStrategy, RowPresentStyle, RowSpec
+from cleave.viz.row_specs.common import lock_text, on_off_text
 from cleave.viz.tuning_view_state import TuningViewState
 
 if TYPE_CHECKING:
@@ -440,6 +441,51 @@ def _toggle_overlays_solo(
         controls.overlays.enter_solo()
 
 
+def _format_overlays_enabled(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return on_off_text(_visibility_overlays(state, _desc)[0])
+
+
+def _format_overlays_solo(state: TuningViewState, _desc: RowDescriptor) -> str:
+    return on_off_text(state.overlays.solo)
+
+
+def _format_overlays_locked(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return lock_text(state.overlays.locked)
+
+
+def _apply_overlays_enabled(
+    controls: TuningControls,
+    _desc: RowDescriptor,
+    forward: bool,
+    _large: bool,
+) -> None:
+    controls.overlays.set_enabled(forward)
+
+
+def _apply_overlays_solo(
+    controls: TuningControls,
+    desc: RowDescriptor,
+    forward: bool,
+    _large: bool,
+) -> None:
+    if controls.session.overlay_solo != forward:
+        _toggle_overlays_solo(controls, desc)
+
+
+def _apply_overlays_locked(
+    controls: TuningControls,
+    _desc: RowDescriptor,
+    forward: bool,
+    _large: bool,
+) -> None:
+    if controls.session.overlays.locked != forward:
+        controls.toggle_overlay_locked()
+
+
 def _toggle_overlay_card_enabled(
     controls: TuningControls, desc: RowDescriptor
 ) -> None:
@@ -471,6 +517,36 @@ SPECS: dict[RowKind, RowSpec] = {
         ),
         toggle_enabled=_toggle_overlays_enabled,
         toggle_solo=_toggle_overlays_solo,
+    ),
+    RowKind.OVERLAYS_ENABLED: RowSpec(
+        affordance=RowAffordance.VALUE_STEP,
+        panel_label="enabled",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_overlays_enabled,
+        apply_horizontal=_apply_overlays_enabled,
+        help_title="Overlay enabled",
+        help_description=("Turns the opening and closing cards on or off together.",),
+        blocked_by_section_lock=True,
+    ),
+    RowKind.OVERLAYS_SOLO: RowSpec(
+        affordance=RowAffordance.VALUE_STEP,
+        panel_label="solo",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_overlays_solo,
+        apply_horizontal=_apply_overlays_solo,
+        help_title="Overlay solo",
+        help_description=("Shows the credits cards on their own.",),
+        blocked_by_section_lock=False,
+    ),
+    RowKind.OVERLAYS_LOCKED: RowSpec(
+        affordance=RowAffordance.VALUE_STEP,
+        panel_label="lock",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_overlays_locked,
+        apply_horizontal=_apply_overlays_locked,
+        help_title="Overlay lock",
+        help_description=("Locked overlay settings cannot be edited.",),
+        blocked_by_section_lock=False,
     ),
     RowKind.OVERLAY_CARD_HEADER: RowSpec(
         affordance=RowAffordance.HEADING,
