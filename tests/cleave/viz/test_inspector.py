@@ -98,6 +98,19 @@ def test_root_pages_list_only_their_switches(
     assert all(row.navigable for row in rows)
 
 
+@pytest.mark.parametrize("card", ("opening_card", "closing_card"))
+def test_card_pages_open_with_their_own_enabled_row(card: str) -> None:
+    rows = build_inspector_rows(_view_state(), f"overlay.{card}")
+    assert rows[0].descriptor == RowDescriptor(RowKind.OVERLAY_CARD_ENABLED, card=card)
+    switches = [
+        row
+        for row in rows
+        if row.descriptor is not None
+        and row.descriptor.kind in SECTION_SWITCH_KINDS
+    ]
+    assert switches == [rows[0]]
+
+
 def test_pattern_mask_page_opens_with_its_switches() -> None:
     rows = build_inspector_rows(_view_state(), "pattern_mask")
     assert tuple(row.descriptor.kind for row in rows[:3]) == (
@@ -109,7 +122,7 @@ def test_pattern_mask_page_opens_with_its_switches() -> None:
 
 @pytest.mark.parametrize(
     "node_id",
-    ("overlay.opening_card", "post_fx.fade", "timeline.song_markers"),
+    ("post_fx.fade", "timeline.song_markers"),
 )
 def test_child_pages_omit_the_root_switches(node_id: str) -> None:
     kinds = {

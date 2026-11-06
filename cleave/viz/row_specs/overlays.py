@@ -486,6 +486,21 @@ def _apply_overlays_locked(
         controls.toggle_overlay_locked()
 
 
+def _format_overlay_card_enabled(
+    state: TuningViewState, desc: RowDescriptor
+) -> str:
+    return on_off_text(_overlay_card_block(state, desc).runtime.enabled)
+
+
+def _apply_overlay_card_enabled(
+    controls: TuningControls,
+    desc: RowDescriptor,
+    forward: bool,
+    _large: bool,
+) -> None:
+    _overlay_card_controls(controls, desc).set_enabled(forward)
+
+
 def _toggle_overlay_card_enabled(
     controls: TuningControls, desc: RowDescriptor
 ) -> None:
@@ -562,6 +577,17 @@ SPECS: dict[RowKind, RowSpec] = {
         ),
         toggle_enabled=_toggle_overlay_card_enabled,
         parent_group="overlay",
+    ),
+    RowKind.OVERLAY_CARD_ENABLED: RowSpec(
+        affordance=RowAffordance.VALUE_STEP,
+        panel_label="enabled",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_overlay_card_enabled,
+        apply_horizontal=_apply_overlay_card_enabled,
+        help_title="Card enabled",
+        help_description=("Turns this credits card on or off.",),
+        parent_group="overlay",
+        blocked_by_section_lock=True,
     ),
     RowKind.OVERLAY_CARD_ANIMATION_HEADER: RowSpec(
         affordance=RowAffordance.HEADING,

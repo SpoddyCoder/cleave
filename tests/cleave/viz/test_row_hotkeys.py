@@ -379,3 +379,17 @@ def test_overlay_solo_row_ignores_the_section_lock() -> None:
     assert apply_field_horizontal(controls, solo, True, False) is True
     assert controls.session.overlay_solo is True
 
+
+def test_card_enabled_row_steps_one_card_and_respects_the_lock() -> None:
+    controls = _make_controls(("layer_1",))
+    overlays = controls.session.overlays
+    row = RowDescriptor(RowKind.OVERLAY_CARD_ENABLED, card="opening_card")
+
+    assert apply_field_horizontal(controls, row, False, False) is True
+    assert overlays.opening_card.enabled is False
+    assert overlays.closing_card.enabled is True
+
+    overlays.locked = True
+    assert apply_field_horizontal(controls, row, True, False) is False
+    assert overlays.opening_card.enabled is False
+

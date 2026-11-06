@@ -1549,7 +1549,8 @@ class ShellHost:
         """Icon buttons at the right of the row just drawn.
 
         The row selectable allows overlap, so a press here reaches the button
-        and leaves the selection alone. A blocked toggle has no hover fill.
+        and not the label. It selects the row but never opens or closes it. A
+        blocked toggle has no hover fill, and a press on it only selects.
         """
         descriptor = node_control_descriptor(node.id)
         if descriptor is None:
@@ -1591,8 +1592,10 @@ class ShellHost:
             )
             if hovered:
                 imgui.set_tooltip(navigator_toggle_tooltip(toggle))
-            if pressed and not toggle.blocked:
-                activate_header_toggle(self._controls, toggle.id, descriptor)
+            if pressed:
+                self._controls.navigator.select(node.id)
+                if not toggle.blocked:
+                    activate_header_toggle(self._controls, toggle.id, descriptor)
 
     def _toggle_nav_expanded(self, node_id: str) -> None:
         focus = self._controls.shell_focus

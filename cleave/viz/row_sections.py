@@ -262,6 +262,7 @@ def _build_overlay_card_section(card: str) -> SectionDef:
         context="global",
         card=card,
         children=(
+            SectionNode(leaf_kind=RowKind.OVERLAY_CARD_ENABLED),
             SectionNode(subsection=animation_section),
             SectionNode(leaf_kind=RowKind.OVERLAY_CARD_POSITION),
             SectionNode(leaf_kind=RowKind.OVERLAY_CARD_OPACITY),
@@ -753,13 +754,14 @@ TIMELINE_SECTION_KINDS = frozenset(
     }
 )
 
-# On/off, solo, and lock rows of a root page. They stay readable while their
-# block is off, since they are how the user turns it back on.
+# On/off, solo, and lock rows of a root page, and each card's on/off row. They
+# stay readable while their block is off, since they turn it back on.
 SECTION_SWITCH_KINDS = frozenset(
     {
         RowKind.OVERLAYS_ENABLED,
         RowKind.OVERLAYS_SOLO,
         RowKind.OVERLAYS_LOCKED,
+        RowKind.OVERLAY_CARD_ENABLED,
         RowKind.POST_FX_ENABLED,
         RowKind.POST_FX_LOCKED,
         RowKind.PATTERN_MASK_ENABLED,
