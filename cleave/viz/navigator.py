@@ -291,16 +291,27 @@ def _child_slots(session: TuningSession) -> tuple[str, ...]:
 def _layer_node(session: TuningSession, slot: str, *, expandable: bool) -> NavNode:
     layer = session.layers[slot]
     index = session.layer_z_order.index(slot)
+    curation = is_preset_curation_mode(session.settings.editor_mode)
     return NavNode(
         id=layer_node_id(slot),
         label=f"{index + 1}  {stem_overlay_header(layer.stem)}",
         depth=1,
         has_inspector=True,
-        badge=_layer_badge(session, slot),
+        badge=_layer_badge(session, slot) if curation else None,
         parent_id="layers",
         expandable=expandable,
         slot=slot,
-        locked=layer.locked,
+        locked=curation and layer.locked,
+        toggles=() if curation else _layer_toggles(session, slot),
+    )
+
+
+def _layer_toggles(session: TuningSession, slot: str) -> tuple[NavToggle, ...]:
+    layer = session.layers[slot]
+    return (
+        NavToggle(TOGGLE_ENABLED, layer.enabled, layer.locked),
+        NavToggle(TOGGLE_SOLO, session.solo_slot == slot),
+        NavToggle(TOGGLE_LOCK, layer.locked),
     )
 
 

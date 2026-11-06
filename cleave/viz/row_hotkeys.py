@@ -85,9 +85,9 @@ def node_header_descriptor(node_id: str) -> RowDescriptor | None:
 
 
 def node_control_descriptor(node_id: str) -> RowDescriptor | None:
-    """Header that owns the chips and E/S/L keys for a navigator page.
+    """Header that owns the navigator icons and E/S/L keys for a page.
 
-    A layer, a card, and a root own their own controls. Any other page uses
+    A layer, a card, and a root own their controls. Any other page uses
     the controls of its parent.
     """
     slot = layer_slot_of(node_id)
@@ -124,7 +124,7 @@ def toggle_header_locked(controls: TuningControls, desc: RowDescriptor) -> bool:
 def activate_header_toggle(
     controls: TuningControls, toggle_id: str, desc: RowDescriptor
 ) -> None:
-    """Run the header mutation for a navigator icon or inspector chip click."""
+    """Run the header mutation for a navigator icon click."""
     if toggle_id == TOGGLE_ENABLED:
         apply_field_toggle_enabled(controls, desc)
         return

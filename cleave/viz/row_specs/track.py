@@ -19,7 +19,7 @@ from cleave.viz.material_icons import ARROW_DOWNWARD_GLYPH, ARROW_UPWARD_GLYPH
 from cleave.viz.editor_mode_controls import is_preset_curation_mode
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
 from cleave.viz.row_spec import FitStrategy, RowNavButton, RowPresentStyle, RowSpec
-from cleave.viz.row_specs.common import noop_horizontal
+from cleave.viz.row_specs.common import lock_text, noop_horizontal, on_off_text
 from cleave.viz.tuning_view_state import TrackBlock, TuningViewState
 
 if TYPE_CHECKING:
@@ -204,6 +204,52 @@ def _toggle_track_solo(
         controls.layer_mutations.exit_solo(slot)
     else:
         controls.layer_mutations.enter_solo(slot)
+
+
+def _format_track_enabled(state: TuningViewState, desc: RowDescriptor) -> str:
+    return on_off_text(_track_block(state, desc).runtime.enabled)
+
+
+def _format_track_solo(state: TuningViewState, desc: RowDescriptor) -> str:
+    return on_off_text(state.solo_slot == desc.slot)
+
+
+def _format_track_locked(state: TuningViewState, desc: RowDescriptor) -> str:
+    return lock_text(_track_block(state, desc).runtime.locked)
+
+
+def _apply_track_enabled(
+    controls: TuningControls,
+    desc: RowDescriptor,
+    forward: bool,
+    _large: bool,
+) -> None:
+    assert desc.slot is not None
+    controls.layer_mutations.set_enabled(desc.slot, forward)
+
+
+def _apply_track_solo(
+    controls: TuningControls,
+    desc: RowDescriptor,
+    forward: bool,
+    _large: bool,
+) -> None:
+    assert desc.slot is not None
+    if forward:
+        controls.layer_mutations.enter_solo(desc.slot)
+    else:
+        controls.layer_mutations.exit_solo(desc.slot)
+
+
+def _apply_track_locked(
+    controls: TuningControls,
+    desc: RowDescriptor,
+    forward: bool,
+    _large: bool,
+) -> None:
+    assert desc.slot is not None
+    if controls.session.layers[desc.slot].locked != forward:
+        controls.toggle_layer_locked(desc.slot)
 
 
 def _format_track_preset_dir(state: TuningViewState, desc: RowDescriptor) -> str:
@@ -398,6 +444,42 @@ SPECS: dict[RowKind, RowSpec] = {
         toggle_enabled=_toggle_track_enabled,
         toggle_solo=_toggle_track_solo,
         can_enter_move_mode=True,
+    ),
+    RowKind.TRACK_ENABLED: RowSpec(
+        affordance=RowAffordance.VALUE_STEP,
+        panel_label="enabled",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_track_enabled,
+        apply_horizontal=_apply_track_enabled,
+        help_title="Layer enabled",
+        help_description=(
+            "Shows or hides this layer.",
+            "While the timeline is on, it controls layer visibility instead.",
+        ),
+        parent_group="track",
+        blocked_by_section_lock=True,
+    ),
+    RowKind.TRACK_SOLO: RowSpec(
+        affordance=RowAffordance.VALUE_STEP,
+        panel_label="solo",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_track_solo,
+        apply_horizontal=_apply_track_solo,
+        help_title="Layer solo",
+        help_description=("Shows this layer on its own.",),
+        parent_group="track",
+        blocked_by_section_lock=False,
+    ),
+    RowKind.TRACK_LOCKED: RowSpec(
+        affordance=RowAffordance.VALUE_STEP,
+        panel_label="lock",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_track_locked,
+        apply_horizontal=_apply_track_locked,
+        help_title="Layer lock",
+        help_description=("Locked layer settings cannot be edited.",),
+        parent_group="track",
+        blocked_by_section_lock=False,
     ),
     RowKind.TRACK_PRESET_DIR: RowSpec(
         affordance=RowAffordance.PATH_DIR,

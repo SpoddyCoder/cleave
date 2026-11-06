@@ -362,6 +362,9 @@ def test_parent_group_on_row_specs() -> None:
 def test_track_sub_row_kinds() -> None:
     assert TRACK_SUB_ROW_KINDS == frozenset(
         {
+            RowKind.TRACK_ENABLED,
+            RowKind.TRACK_SOLO,
+            RowKind.TRACK_LOCKED,
             RowKind.TRACK_PRESET_DIR,
             RowKind.TRACK_PRESET,
             RowKind.TRACK_PRESET_SWITCHING,
@@ -411,6 +414,7 @@ def test_track_value_rows_blocked_by_section_lock() -> None:
     )
     assert blocked == frozenset(
         {
+            RowKind.TRACK_ENABLED,
             RowKind.TRACK_PRESET_DIR,
             RowKind.TRACK_PRESET,
             RowKind.TRACK_PRESET_SWITCHING_TRIGGER,

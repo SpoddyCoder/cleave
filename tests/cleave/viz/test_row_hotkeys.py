@@ -393,3 +393,25 @@ def test_card_enabled_row_steps_one_card_and_respects_the_lock() -> None:
     assert apply_field_horizontal(controls, row, True, False) is False
     assert overlays.opening_card.enabled is False
 
+
+def test_layer_switch_rows_step_their_flags_and_respect_the_lock() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    layer = session.layers["layer_1"]
+    enabled = RowDescriptor(RowKind.TRACK_ENABLED, slot="layer_1")
+    solo = RowDescriptor(RowKind.TRACK_SOLO, slot="layer_1")
+    locked = RowDescriptor(RowKind.TRACK_LOCKED, slot="layer_1")
+
+    apply_field_horizontal(controls, enabled, False, False)
+    assert layer.enabled is False
+    apply_field_horizontal(controls, locked, True, False)
+    assert layer.locked is True
+    assert apply_field_horizontal(controls, enabled, True, False) is False
+    assert layer.enabled is False
+    assert apply_field_horizontal(controls, solo, True, False) is True
+    assert session.solo_slot == "layer_1"
+    apply_field_horizontal(controls, solo, False, False)
+    assert session.solo_slot is None
+    apply_field_horizontal(controls, locked, False, False)
+    assert layer.locked is False
+

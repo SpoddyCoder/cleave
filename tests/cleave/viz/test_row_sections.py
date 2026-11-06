@@ -50,6 +50,9 @@ def _switching_kinds(**overrides: object) -> list[RowKind]:
 
 def test_layer_page_holds_only_its_own_rows() -> None:
     assert _page_kinds(layer_node_id("layer_1")) == [
+        RowKind.TRACK_ENABLED,
+        RowKind.TRACK_SOLO,
+        RowKind.TRACK_LOCKED,
         RowKind.TRACK_STEM,
         RowKind.TRACK_BEAT,
         RowKind.TRACK_PRESET_DIR,

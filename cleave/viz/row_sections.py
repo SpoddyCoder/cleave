@@ -564,6 +564,9 @@ TRACK_SECTION = SectionDef(
     header_kind=RowKind.TRACK_HEADER,
     context="per_slot",
     children=(
+        SectionNode(leaf_kind=RowKind.TRACK_ENABLED),
+        SectionNode(leaf_kind=RowKind.TRACK_SOLO),
+        SectionNode(leaf_kind=RowKind.TRACK_LOCKED),
         SectionNode(leaf_kind=RowKind.TRACK_STEM),
         SectionNode(leaf_kind=RowKind.TRACK_BEAT),
         SectionNode(leaf_kind=RowKind.TRACK_PRESET_DIR),
@@ -754,10 +757,13 @@ TIMELINE_SECTION_KINDS = frozenset(
     }
 )
 
-# On/off, solo, and lock rows of a root page, and each card's on/off row. They
-# stay readable while their block is off, since they turn it back on.
+# On/off, solo, and lock rows of a root or layer page, and each card's on/off
+# row. They stay readable while their block is off, since they turn it back on.
 SECTION_SWITCH_KINDS = frozenset(
     {
+        RowKind.TRACK_ENABLED,
+        RowKind.TRACK_SOLO,
+        RowKind.TRACK_LOCKED,
         RowKind.OVERLAYS_ENABLED,
         RowKind.OVERLAYS_SOLO,
         RowKind.OVERLAYS_LOCKED,

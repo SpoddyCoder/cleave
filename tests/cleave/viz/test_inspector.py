@@ -98,6 +98,24 @@ def test_root_pages_list_only_their_switches(
     assert all(row.navigable for row in rows)
 
 
+def test_layer_page_opens_with_its_switches() -> None:
+    state = _layer_view(("layer_1",))
+    slot = "layer_1"
+    rows = build_inspector_rows(state, layer_node_id(slot))
+    assert tuple(row.descriptor for row in rows[:3]) == (
+        RowDescriptor(RowKind.TRACK_ENABLED, slot=slot),
+        RowDescriptor(RowKind.TRACK_SOLO, slot=slot),
+        RowDescriptor(RowKind.TRACK_LOCKED, slot=slot),
+    )
+    for page in ("preset_switching", "compositing", "effects"):
+        kinds = {
+            row.descriptor.kind
+            for row in build_inspector_rows(state, layer_page_node_id(slot, page))
+            if row.descriptor is not None
+        }
+        assert not kinds & SECTION_SWITCH_KINDS
+
+
 @pytest.mark.parametrize("card", ("opening_card", "closing_card"))
 def test_card_pages_open_with_their_own_enabled_row(card: str) -> None:
     rows = build_inspector_rows(_view_state(), f"overlay.{card}")
@@ -329,6 +347,9 @@ def test_layer_page_keeps_direct_rows_and_delete() -> None:
     state = _layer_view(("layer_1",))
     rows = build_inspector_rows(state, layer_node_id("layer_1"))
     assert _kinds(rows) == [
+        RowKind.TRACK_ENABLED,
+        RowKind.TRACK_SOLO,
+        RowKind.TRACK_LOCKED,
         RowKind.TRACK_STEM,
         RowKind.TRACK_BEAT,
         RowKind.TRACK_PRESET_DIR,

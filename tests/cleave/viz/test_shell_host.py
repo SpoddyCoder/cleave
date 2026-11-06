@@ -16,8 +16,6 @@ from cleave.viz.material_icons import (
     SOLO_GLYPH,
 )
 from cleave.viz.navigator import (
-    HIDDEN_BADGE,
-    SOLO_BADGE,
     TOGGLE_ENABLED,
     TOGGLE_LOCK,
     TOGGLE_SOLO,
@@ -33,8 +31,8 @@ from cleave.viz.row_hotkeys import activate_header_toggle
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.session import LayerRuntime, TuningSession
 from cleave.viz.shell_host import (
-    inspector_header,
     inspector_selectable_id,
+    inspector_title,
     navigator_height_for_rows,
     navigator_lock_mark,
     navigator_toggle_color,
@@ -86,10 +84,6 @@ def _session() -> TuningSession:
     return session
 
 
-def _chips(header) -> dict[str, object]:
-    return {chip.id: chip for chip in header.chips}
-
-
 def _wash_channels(color) -> tuple[float, float, float, float]:
     return (color.x, color.y, color.z, color.w)
 
@@ -122,97 +116,25 @@ def test_layer_breadcrumb_uses_navigator_label() -> None:
     nodes = build_navigator(session, {"layers", "timeline"})
     child = next(node for node in nodes if node.slot == "layer_2")
 
-    header = inspector_header(nodes, child.id, session, curation=False)
-
-    assert header.title == f"Layers > {child.label}"
-    assert _chips(header)["enabled"].label == "off"
-    assert _chips(header)["lock"].label == "lock"
-
-    locked = next(node for node in nodes if node.slot == "layer_1")
-    locked_header = inspector_header(nodes, locked.id, session, curation=False)
-    assert locked_header.title == f"Layers > {locked.label}"
-    assert _chips(locked_header)["lock"].label == "locked"
-    assert _chips(locked_header)["enabled"].label == "on"
+    assert inspector_title(nodes, child.id) == f"Layers > {child.label}"
 
 
-def test_settings_project_and_layers_have_no_chips() -> None:
-    session = _session()
-    nodes = build_navigator(session)
-
-    layers = inspector_header(nodes, "layers", session, curation=False)
-    settings = inspector_header(nodes, "settings", session, curation=False)
-    project = inspector_header(nodes, "project", session, curation=False)
-    assert layers.title == "Layers"
-    assert settings.title == "Settings"
-    assert project.title == "Project"
-    assert layers.chips == ()
-    assert settings.chips == ()
-    assert project.chips == ()
-
-
-def test_child_pages_breadcrumb_and_show_owner_chips() -> None:
+def test_child_page_breadcrumbs() -> None:
     session = _session()
     page = layer_page_node_id("layer_3", "compositing")
     nodes = build_navigator(session, ancestor_ids(page))
     layer = next(node for node in nodes if node.id == layer_node_id("layer_3"))
 
-    header = inspector_header(nodes, page, session, curation=False)
-    assert header.title == f"Layers > {layer.label} > Compositing"
-    assert tuple(_chips(header)) == ("enabled", "solo", "lock")
-    assert header.descriptor == RowDescriptor(RowKind.TRACK_HEADER, slot="layer_3")
-
-    fade = inspector_header(
-        build_navigator(session, {"post_fx"}),
-        "post_fx.fade",
-        session,
-        curation=False,
+    assert inspector_title(nodes, page) == f"Layers > {layer.label} > Compositing"
+    assert inspector_title(build_navigator(session), "layers") == "Layers"
+    assert (
+        inspector_title(build_navigator(session, {"post_fx"}), "post_fx.fade")
+        == "Post-FX > Fade"
     )
-    assert fade.title == "Post-FX > Fade"
-    assert fade.chips == ()
-
-    ui = inspector_header(
-        build_navigator(session, {"settings"}),
-        "settings.ui",
-        session,
-        curation=False,
+    assert (
+        inspector_title(build_navigator(session, {"settings"}), "settings.ui")
+        == "Settings > UI"
     )
-    assert ui.title == "Settings > UI"
-    assert ui.chips == ()
-
-
-def test_layer_header_has_enabled_solo_and_lock_chips() -> None:
-    session = _session()
-    nodes = build_navigator(session, {"layers", "timeline"})
-    solo = inspector_header(
-        nodes, layer_node_id("layer_3"), session, curation=False
-    )
-    chips = _chips(solo)
-    assert tuple(chips) == ("enabled", "solo", "lock")
-    assert chips["enabled"].label == "off"
-    assert chips["enabled"].active is False
-    assert chips["solo"].label == "solo"
-    assert chips["solo"].active is True
-    assert chips["lock"].label == "lock"
-    assert chips["lock"].active is False
-
-
-@pytest.mark.parametrize(
-    ("node_id", "title"),
-    (
-        ("overlay", "Overlay"),
-        ("overlay.opening_card", "Overlay > Opening Card"),
-        ("post_fx", "Post-FX"),
-        ("pattern_mask", "Pattern Mask"),
-        ("timeline", "Timeline"),
-        ("timeline.song_markers", "Timeline > Song Markers"),
-    ),
-)
-def test_section_pages_have_no_header_chips(node_id: str, title: str) -> None:
-    session = _session()
-    nodes = build_navigator(session, {"overlay", "timeline"})
-    header = inspector_header(nodes, node_id, session, curation=False)
-    assert header.title == title
-    assert header.chips == ()
 
 
 def test_timeline_toggle_opens_and_closes_the_strip() -> None:
@@ -256,19 +178,7 @@ def test_navigator_toggles_sit_in_fixed_columns() -> None:
     assert navigator_toggle_x(TOGGLE_ENABLED, 100.0, 20.0, 2.0) == 36.0
 
 
-def test_preset_curation_omits_header_chips() -> None:
-    session = _session()
-    nodes = build_navigator(session, {"layers", "timeline"})
-    layer = inspector_header(
-        nodes, layer_node_id("layer_1"), session, curation=True
-    )
-    overlays = inspector_header(nodes, "overlay", session, curation=True)
-    assert layer.title.startswith("Layers > ")
-    assert layer.chips == ()
-    assert overlays.chips == ()
-
-
-def test_inspector_chip_click_toggles_the_header_flag() -> None:
+def test_header_toggle_changes_the_header_flag() -> None:
     controls = _make_controls(("layer_1",))
     post = RowDescriptor(RowKind.POST_FX_HEADER)
     assert controls.session.post_fx.enabled is True
@@ -285,24 +195,23 @@ def test_inspector_chip_click_toggles_the_header_flag() -> None:
     assert controls.session.overlays.closing_card.enabled is False
 
 
-def test_lock_mark_is_separate_from_badges() -> None:
+def test_lock_mark_shows_only_in_preset_curation() -> None:
     session = _session()
-    nodes = {
-        node.id: node for node in build_navigator(session, {"layers", "timeline"})
-    }
-    locked = nodes[layer_node_id("layer_1")]
-    hidden = nodes[layer_node_id("layer_2")]
-    solo = nodes[layer_node_id("layer_3")]
-    markers = nodes["timeline.song_markers"]
+    layer_id = layer_node_id("layer_1")
+    node = next(
+        node for node in build_navigator(session, {"layers"}) if node.id == layer_id
+    )
+    assert navigator_lock_mark(node) is None
 
-    assert navigator_lock_mark(locked) == "[lock]"
-    assert locked.badge is None
-    assert navigator_lock_mark(hidden) is None
-    assert hidden.badge == HIDDEN_BADGE
-    assert navigator_lock_mark(solo) is None
-    assert solo.badge == SOLO_BADGE
-    assert navigator_lock_mark(markers) is None
-    assert markers.badge == "2"
+    session.settings.editor_mode = "preset_curation"
+    session.solo_slot = None
+    curation = next(
+        node
+        for node in build_navigator(session, {"layers"})
+        if node.slot is not None
+    )
+    assert curation.toggles == ()
+    assert navigator_lock_mark(replace(curation, locked=True)) == "[lock]"
 
 
 def test_only_expandable_nodes_show_a_twisty() -> None:

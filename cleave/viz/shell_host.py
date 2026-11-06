@@ -16,7 +16,6 @@ import pygame
 from imgui_bundle import imgui
 
 from cleave.viz.commands import Command, CommandContext, MenuSeparator, command_by_id
-from cleave.viz.editor_mode_controls import is_preset_curation_mode
 from cleave.viz.frame_rate import format_fps_value
 from cleave.viz.help_column import draw_help_column
 from cleave.viz.help_content import help_section_kwargs, help_sections_for_stop
@@ -47,7 +46,7 @@ from cleave.viz.panel_notification import (
 )
 from cleave.viz.playback import format_mmss
 from cleave.viz.row_hotkeys import activate_header_toggle, node_control_descriptor
-from cleave.viz.row_kinds import RowDescriptor, RowKind
+from cleave.viz.row_kinds import RowDescriptor
 from cleave.viz.row_present_renderers import inspector_field_colors
 from cleave.viz.row_spec import (
     RowNavButton,
@@ -60,9 +59,7 @@ from cleave.viz.row_spec import (
     row_panel_label,
     row_spec,
     section_lock_blocks_mutation,
-    section_locked,
 )
-from cleave.viz.session import TuningSession
 from cleave.viz.shell_focus import (
     CycleStop,
     ShellRegion,
@@ -136,28 +133,6 @@ class TransportReadout:
     duration_sec: float
     bar_text: str
     fps: float | None
-
-
-@dataclass(frozen=True)
-class InspectorChip:
-    """One inspector header toggle on a layer page.
-
-    ``id`` is ``enabled``, ``solo``, or ``lock``. ``active`` is on, soloed,
-    or locked. The lock label is ``locked`` or ``lock``; solo stays ``solo``.
-    """
-
-    id: str
-    label: str
-    active: bool
-
-
-@dataclass(frozen=True)
-class InspectorHeader:
-    """Inspector title line and the header chips for the selected node."""
-
-    title: str
-    chips: tuple[InspectorChip, ...] = ()
-    descriptor: RowDescriptor | None = None
 
 
 def transport_parts(readout: TransportReadout) -> list[tuple[str, tuple[int, int, int]]]:
@@ -319,48 +294,18 @@ def selection_after_nav_collapse(
     return toggled_id
 
 
-def inspector_header(
-    nodes: Sequence[NavNode],
-    selected_id: str,
-    session: TuningSession,
-    *,
-    curation: bool,
-) -> InspectorHeader:
-    """Breadcrumb title for *selected_id*.
-
-    Only layer pages have chips, and preset curation omits them. Enabled,
-    solo, then lock. Every other root keeps these controls on its navigator row.
-    """
+def inspector_title(nodes: Sequence[NavNode], selected_id: str) -> str:
+    """Breadcrumb title for *selected_id*."""
     node = next((item for item in nodes if item.id == selected_id), None)
     if node is None:
-        return InspectorHeader(selected_id)
+        return selected_id
     by_id = {item.id: item for item in nodes}
     labels = [node.label]
     parent = by_id.get(node.parent_id)
     while parent is not None:
         labels.insert(0, parent.label)
         parent = by_id.get(parent.parent_id)
-    title = " > ".join(labels)
-    if curation:
-        return InspectorHeader(title)
-    descriptor = node_control_descriptor(selected_id)
-    if descriptor is None or descriptor.kind is not RowKind.TRACK_HEADER:
-        return InspectorHeader(title)
-    return InspectorHeader(
-        title, _layer_chips(session, descriptor), descriptor
-    )
-
-
-def _layer_chips(
-    session: TuningSession, desc: RowDescriptor
-) -> tuple[InspectorChip, ...]:
-    enabled = bool(session.layers[desc.slot].enabled)
-    locked = section_locked(session, desc)
-    return (
-        InspectorChip("enabled", "on" if enabled else "off", enabled),
-        InspectorChip("solo", "solo", session.solo_slot == desc.slot),
-        InspectorChip("lock", "locked" if locked else "lock", locked),
-    )
+    return " > ".join(labels)
 
 
 def inspector_selectable_id(desc: RowDescriptor) -> str:
@@ -1621,19 +1566,7 @@ class ShellHost:
             self._controls.session,
             focus.nav_expanded,
         )
-        header = inspector_header(
-            nodes,
-            focus.selected_id,
-            self._controls.session,
-            curation=is_preset_curation_mode(
-                self._controls.session.settings.editor_mode
-            ),
-        )
-        if header.chips:
-            imgui.align_text_to_frame_padding()
-        imgui.text(header.title)
-        if header.chips:
-            self._draw_inspector_chips(header)
+        imgui.text(inspector_title(nodes, focus.selected_id))
         for row in build_inspector_rows(state, focus.selected_id):
             self._draw_inspector_row(state, row)
 
@@ -1973,44 +1906,6 @@ class ShellHost:
             self._controls.inspector.focus_row(row)
             if enabled:
                 self._controls.inspector.activate(row)
-
-    def _draw_inspector_chips(self, header: InspectorHeader) -> None:
-        chips = header.chips
-        descriptor = header.descriptor
-        if descriptor is None or not chips:
-            return
-        style = imgui.get_style()
-        gap = style.item_spacing.x
-        pad = style.frame_padding.x
-        widths = [
-            imgui.calc_text_size(chip.label).x + pad * 2.0 for chip in chips
-        ]
-        total = sum(widths) + gap * (len(chips) - 1)
-        avail = imgui.get_window_width()
-        imgui.same_line(
-            max(
-                imgui.get_cursor_pos_x(),
-                avail - total - style.window_padding.x,
-            )
-        )
-        for index, chip in enumerate(chips):
-            if index:
-                imgui.same_line(0.0, gap)
-            color = LOCK_ICON if chip.id == "lock" else (
-                ACTION if chip.active else LABEL
-            )
-            imgui.push_style_color(imgui.Col_.text, rgba(color))
-            try:
-                clicked, _selected = imgui.selectable(
-                    f"{chip.label}##insp-chip-{chip.id}",
-                    False,
-                    0,
-                    imgui.ImVec2(widths[index], 0.0),
-                )
-            finally:
-                imgui.pop_style_color()
-            if clicked:
-                activate_header_toggle(self._controls, chip.id, descriptor)
 
     def _draw_bar(
         self, menu_state: MenuBarState

@@ -13,7 +13,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
-- Overlay, Post-FX, Pattern Mask, and Timeline navigator rows have clickable on/off and lock icons, and Overlay also has a solo icon. Opening and closing card rows have their own on/off icon, with a matching row at the top of the card's inspector page. Clicking an icon selects its row. Selecting one of those top-level rows lists the same switches as value rows in the inspector, and the on, solo, and lock buttons are gone from the top of the inspector for those sections. Layers keep their buttons.
+- Overlay, Post-FX, Pattern Mask, Timeline, and layer navigator rows have clickable on/off and lock icons, and Overlay and layers also have a solo icon. Opening and closing card rows have their own on/off icon, with a matching row at the top of the card's inspector page. Clicking an icon selects its row. Selecting one of those rows lists the same switches as value rows in the inspector, and the on, solo, and lock buttons are gone from the top of the inspector.
 - The preset directory row has up and down arrows for the parent and first child directory, and they dim when there is no directory to move to. Clicking the row now only focuses it, and double-clicking opens the first child directory.
 - Preset directory, preset, and preset list rows use two lines, so long names no longer overlap the label. The label line holds the markers and the position, and the path or filename sits alone on the line below. Preset list rows show the position without side arrows, since Left and Right do nothing there.
 - The menu, navigator, and inspector stay visible. The auto-fade setting is gone.

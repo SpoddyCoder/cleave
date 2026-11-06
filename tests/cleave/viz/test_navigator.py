@@ -257,6 +257,7 @@ def test_curation_shows_only_the_focus_layer_without_pages() -> None:
     assert tuple(node.id for node in children) == (focus_id,)
     assert children[0].label == "1  VOCALS"
     assert children[0].locked is True
+    assert children[0].toggles == ()
     assert children[0].expandable is False
     assert not any(node.depth == 2 for node in nodes)
 
@@ -308,11 +309,18 @@ def test_cards_have_their_own_enabled_toggle() -> None:
     assert nodes["overlay.opening_card"].badge is None
 
 
-def test_layers_and_other_pages_have_no_toggles() -> None:
+def test_other_pages_have_no_toggles() -> None:
     session = _session()
-    nodes = build_navigator(session, {"layers", "post_fx", "settings"})
+    expanded = {"layers", "post_fx", "settings", layer_node_id("layer_1")}
+    nodes = build_navigator(session, expanded)
     with_toggles = {node.id for node in nodes if node.toggles}
-    assert with_toggles == {"overlay", "post_fx", "pattern_mask", "timeline"}
+    assert with_toggles == {
+        "overlay",
+        "post_fx",
+        "pattern_mask",
+        "timeline",
+        *(layer_node_id(slot) for slot in session.layer_z_order),
+    }
 
 
 def test_layer_lock_and_visibility_badges() -> None:
@@ -327,10 +335,21 @@ def test_layer_lock_and_visibility_badges() -> None:
     )
     nodes = {node.id: node for node in build_navigator(session, {"layers"})}
 
-    assert nodes[layer_node_id("layer_1")].locked is True
-    assert nodes[layer_node_id("layer_1")].badge is None
-    assert nodes[layer_node_id("layer_2")].badge == HIDDEN_BADGE
-    assert nodes[layer_node_id("layer_3")].badge == SOLO_BADGE
+    assert nodes[layer_node_id("layer_1")].toggles == (
+        NavToggle(TOGGLE_ENABLED, True, True),
+        NavToggle(TOGGLE_SOLO, False),
+        NavToggle(TOGGLE_LOCK, True),
+    )
+    assert nodes[layer_node_id("layer_2")].toggles == (
+        NavToggle(TOGGLE_ENABLED, False),
+        NavToggle(TOGGLE_SOLO, False),
+        NavToggle(TOGGLE_LOCK, False),
+    )
+    assert nodes[layer_node_id("layer_3")].toggles[1] == NavToggle(TOGGLE_SOLO, True)
+    for slot in ("layer_1", "layer_2", "layer_3"):
+        node = nodes[layer_node_id(slot)]
+        assert node.badge is None
+        assert node.locked is False
 
 
 def test_select_opens_ancestors_and_closes_nothing() -> None:

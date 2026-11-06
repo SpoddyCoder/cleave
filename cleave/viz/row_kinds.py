@@ -12,6 +12,9 @@ from enum import Enum, auto
 
 class RowKind(Enum):
     TRACK_HEADER = auto()
+    TRACK_ENABLED = auto()
+    TRACK_SOLO = auto()
+    TRACK_LOCKED = auto()
     TRACK_PRESET_DIR = auto()
     TRACK_PRESET = auto()
     TRACK_PRESET_SWITCHING = auto()
