@@ -23,6 +23,7 @@ from cleave.viz.navigator import (
     layer_page_node_id,
     layer_page_of,
     layer_slot_of,
+    navigator_tree_rails,
     parent_id_of,
     root_id,
     visible_top_level_ids,
@@ -63,6 +64,31 @@ def _two_layers() -> TuningSession:
 
 def _all_open(session: TuningSession) -> set[str]:
     return set(TOP_LEVEL_IDS) | {layer_node_id(s) for s in session.layer_z_order}
+
+
+def test_tree_rails_mark_tees_and_closing_elbows() -> None:
+    session = _session()
+    nodes = build_navigator(session, {"overlay", "layers"})
+    rails = dict(zip((node.id for node in nodes), navigator_tree_rails(nodes)))
+
+    assert rails["overlay"] == ()
+    assert rails["overlay.opening_card"] == (True,)
+    assert rails["overlay.closing_card"] == (False,)
+    assert rails["layers"] == ()
+
+
+def test_tree_rails_carry_the_outer_branch_past_nested_pages() -> None:
+    session = _two_layers()
+    first, second = session.layer_z_order
+    nodes = build_navigator(session, _all_open(session))
+    rails = dict(zip((node.id for node in nodes), navigator_tree_rails(nodes)))
+
+    assert rails[layer_node_id(first)] == (True,)
+    assert rails[layer_page_node_id(first, "preset_switching")] == (True, True)
+    assert rails[layer_page_node_id(first, "effects")] == (True, False)
+    assert rails[layer_node_id(second)] == (False,)
+    assert rails[layer_page_node_id(second, "preset_switching")] == (False, True)
+    assert rails[layer_page_node_id(second, "effects")] == (False, False)
 
 
 def test_top_level_order_labels_and_inspectors() -> None:

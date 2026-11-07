@@ -5,7 +5,7 @@ Nodes are data only. This module does not draw or read keyboard state.
 
 from __future__ import annotations
 
-from collections.abc import Collection
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
@@ -200,6 +200,24 @@ def build_navigator(
         else:
             nodes.extend(_static_children(session, node.id))
     return tuple(nodes)
+
+
+def navigator_tree_rails(nodes: Sequence[NavNode]) -> tuple[tuple[bool, ...], ...]:
+    """Tree rails for each row of *nodes*, in the same order.
+
+    A row has one entry per depth level, so a root has none. Entry ``k`` is true
+    while the branch at depth ``k + 1`` continues below this row. The last entry
+    is the row's own branch: true for a tee, false for a closing elbow.
+    """
+    continues: set[int] = set()
+    rails: list[tuple[bool, ...]] = []
+    for node in reversed(nodes):
+        continues = {depth for depth in continues if depth <= node.depth}
+        rails.append(
+            tuple(depth in continues for depth in range(1, node.depth + 1))
+        )
+        continues.add(node.depth)
+    return tuple(reversed(rails))
 
 
 def _root_node(session: TuningSession, node: NavNode) -> NavNode:

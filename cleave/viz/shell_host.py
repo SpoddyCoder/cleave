@@ -39,6 +39,7 @@ from cleave.viz.navigator import (
     NavNode,
     NavToggle,
     build_navigator,
+    navigator_tree_rails,
 )
 from cleave.viz.panel_notification import (
     PanelNotificationActive,
@@ -85,6 +86,7 @@ from cleave.viz.theme import (
     LOCKED,
     MUTED,
     NAVIGATOR_BORDER,
+    NAVIGATOR_TREE_LINE,
     NOTIFICATION_ON_FILL,
     NUDGE_HOVER_BG,
     NUDGE_HOVER_BG_ALPHA,
@@ -241,6 +243,35 @@ def navigator_toggle_x(
     """Left edge of a toggle's column, counted back from *right_x*."""
     columns_right = len(_NAV_TOGGLE_COLUMNS) - _NAV_TOGGLE_COLUMNS.index(toggle_id)
     return right_x - columns_right * button_width - (columns_right - 1) * gap
+
+
+def navigator_tree_lines(
+    rails: Sequence[bool],
+    first_stem_x: float,
+    indent: float,
+    elbow_right_x: float,
+    top_y: float,
+    mid_y: float,
+    bottom_y: float,
+) -> list[tuple[float, float, float, float]]:
+    """Connector segments ``(x1, y1, x2, y2)`` for one row's *rails*.
+
+    Stems sit *indent* apart from *first_stem_x*. An outer rail passes through
+    only while its branch continues. The last rail always reaches the row: it
+    runs on to *bottom_y* for a tee and stops at *mid_y* for a closing elbow,
+    and its arm runs to *elbow_right_x*.
+    """
+    if not rails:
+        return []
+    lines: list[tuple[float, float, float, float]] = []
+    for level, continues in enumerate(rails[:-1]):
+        if continues:
+            x = first_stem_x + level * indent
+            lines.append((x, top_y, x, bottom_y))
+    stem_x = first_stem_x + (len(rails) - 1) * indent
+    lines.append((stem_x, top_y, stem_x, bottom_y if rails[-1] else mid_y))
+    lines.append((stem_x, mid_y, elbow_right_x, mid_y))
+    return lines
 
 
 def value_drag_steps(accum: float, threshold: float) -> tuple[int, float]:
@@ -494,6 +525,37 @@ def _draw_mnemonic_underline(label: str, color: tuple[int, int, int]) -> None:
         imgui.ImVec2(origin_x + letter_width, y + 1.0),
         packed,
     )
+
+
+def _draw_nav_tree_lines(
+    rails: tuple[bool, ...], left_x: float, row_x: float
+) -> None:
+    """Connector lines in the gutter of the row just drawn.
+
+    Selectable rects tile with no gap, so stems join up between rows. Each stem
+    drops from the center of the parent's twisty, and the arm stops where the
+    row's highlight starts. Coordinates land on pixel centers to stay one pixel wide.
+    """
+    if not rails:
+        return
+    rect_min = imgui.get_item_rect_min()
+    rect_max = imgui.get_item_rect_max()
+    line = imgui.get_text_line_height()
+    first_stem_x = math.floor(left_x + imgui.calc_text_size(TWISTY_EXPANDED).x * 0.5)
+    mid_y = math.floor(_selectable_text_y(rect_min.y) + line * 0.5) + 0.5
+    elbow_right_x = row_x - math.floor(imgui.get_style().item_spacing.x * 0.5)
+    color = imgui.get_color_u32(rgba(NAVIGATOR_TREE_LINE))
+    draw = imgui.get_window_draw_list()
+    for x1, y1, x2, y2 in navigator_tree_lines(
+        rails,
+        first_stem_x + 0.5,
+        _INSPECTOR_INDENT,
+        elbow_right_x,
+        rect_min.y,
+        mid_y,
+        rect_max.y,
+    ):
+        draw.add_line(imgui.ImVec2(x1, y1), imgui.ImVec2(x2, y2), color)
 
 
 def _draw_nav_lock_mark(text_pos: imgui.ImVec2, label: str, mark: str) -> None:
@@ -1417,16 +1479,17 @@ class ShellHost:
         imgui.push_style_color(imgui.Col_.text, rgba(LABEL))
         try:
             nodes = self._visible_nav_nodes()
-            for node in nodes:
-                self._draw_nav_node(node)
+            for node, rails in zip(nodes, navigator_tree_rails(nodes)):
+                self._draw_nav_node(node, rails)
         finally:
             imgui.pop_style_color()
         self._nav_measured_rows = len(nodes)
         self._nav_content_height_px = _navigator_content_height_px()
 
-    def _draw_nav_node(self, node: NavNode) -> None:
+    def _draw_nav_node(self, node: NavNode, rails: tuple[bool, ...]) -> None:
         focus = self._controls.shell_focus
         indent = node.depth * _INSPECTOR_INDENT
+        left_x = imgui.get_cursor_screen_pos().x
         if indent:
             imgui.indent(indent)
         try:
@@ -1473,6 +1536,7 @@ class ShellHost:
                 finally:
                     if bright:
                         imgui.pop_style_color()
+            _draw_nav_tree_lines(rails, left_x, left_x + indent)
             mark = navigator_lock_mark(node)
             if mark is not None:
                 _draw_nav_lock_mark(text_pos, node.label, mark)

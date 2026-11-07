@@ -39,6 +39,7 @@ from cleave.viz.shell_host import (
     navigator_toggle_glyph,
     navigator_toggle_tooltip,
     navigator_toggle_x,
+    navigator_tree_lines,
     navigator_twisty,
     selectable_wash,
     selection_after_nav_collapse,
@@ -224,6 +225,38 @@ def test_only_expandable_nodes_show_a_twisty() -> None:
         if node.expandable:
             continue
         assert navigator_twisty(node, {"layers", node.id}) is None
+
+
+def test_tree_lines_for_a_root_are_empty() -> None:
+    assert navigator_tree_lines((), 4.5, 16.0, 12.0, 0.0, 10.0, 20.0) == []
+
+
+def test_tree_tee_runs_the_stem_through_the_row() -> None:
+    assert navigator_tree_lines((True,), 4.5, 16.0, 12.0, 0.0, 10.0, 20.0) == [
+        (4.5, 0.0, 4.5, 20.0),
+        (4.5, 10.0, 12.0, 10.0),
+    ]
+
+
+def test_tree_elbow_stops_the_stem_at_the_arm() -> None:
+    assert navigator_tree_lines((False,), 4.5, 16.0, 12.0, 0.0, 10.0, 20.0) == [
+        (4.5, 0.0, 4.5, 10.0),
+        (4.5, 10.0, 12.0, 10.0),
+    ]
+
+
+def test_tree_outer_rail_passes_only_while_its_branch_continues() -> None:
+    open_outer = navigator_tree_lines((True, False), 4.5, 16.0, 28.0, 0.0, 10.0, 20.0)
+    closed_outer = navigator_tree_lines(
+        (False, False), 4.5, 16.0, 28.0, 0.0, 10.0, 20.0
+    )
+
+    assert open_outer == [
+        (4.5, 0.0, 4.5, 20.0),
+        (20.5, 0.0, 20.5, 10.0),
+        (20.5, 10.0, 28.0, 10.0),
+    ]
+    assert closed_outer == open_outer[1:]
 
 
 def test_navigator_height_scales_with_row_count() -> None:
