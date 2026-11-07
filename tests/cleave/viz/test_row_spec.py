@@ -181,7 +181,7 @@ def test_row_is_pinned() -> None:
     assert row_is_pinned(RowKind.PROJECT_COMPOSITOR_HDR) is True
     assert row_is_pinned(RowKind.PROJECT_RENDER_QUALITY) is True
     assert row_is_pinned(RowKind.SETTINGS_PREVIEW_QUALITY) is True
-    assert row_is_pinned(RowKind.SETTINGS_EDITOR_WINDOW_HEADER) is True
+    assert row_is_pinned(RowKind.SETTINGS_PREVIEW_HEADER) is True
     assert row_is_pinned(RowKind.SETTINGS_NAVIGATOR_SIDE) is True
     assert row_is_pinned(RowKind.SETTINGS_HELP_SIDE) is True
     assert row_is_pinned(RowKind.SETTINGS_UI_HEADER) is True
@@ -332,15 +332,14 @@ def test_parent_group_on_row_specs() -> None:
         "post_fx_fade_out"
     )
     assert row_spec(RowKind.SETTINGS_PREVIEW_QUALITY).parent_group == (
-        "settings_editor_window"
+        "settings_preview"
     )
-    assert row_spec(RowKind.SETTINGS_EDITOR_WINDOW_HEADER).parent_group == "settings"
-    assert row_spec(RowKind.SETTINGS_NAVIGATOR_SIDE).parent_group == (
-        "settings_editor_window"
+    assert row_spec(RowKind.SETTINGS_RESIDUAL_LATENCY_MS).parent_group == (
+        "settings_preview"
     )
-    assert row_spec(RowKind.SETTINGS_HELP_SIDE).parent_group == (
-        "settings_editor_window"
-    )
+    assert row_spec(RowKind.SETTINGS_PREVIEW_HEADER).parent_group == "settings"
+    assert row_spec(RowKind.SETTINGS_NAVIGATOR_SIDE).parent_group == "settings_ui"
+    assert row_spec(RowKind.SETTINGS_HELP_SIDE).parent_group == "settings_ui"
     assert row_spec(RowKind.LAYER_MANAGEMENT_COUNT).navigable is False
     assert row_spec(RowKind.LAYER_MANAGEMENT_COUNT).affordance == (
         RowAffordance.DISPLAY

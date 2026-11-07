@@ -82,9 +82,8 @@ _TOP_LEVEL: tuple[NavNode, ...] = (
 
 _STATIC_CHILDREN: dict[str, tuple[tuple[str, str], ...]] = {
     "settings": (
-        ("settings.editor_window", "Editor Window"),
+        ("settings.preview", "Preview"),
         ("settings.ui", "UI"),
-        ("settings.latency", "Latency Compensation"),
     ),
     "project": (
         ("project.projectm", "ProjectM"),

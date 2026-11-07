@@ -301,7 +301,7 @@ def test_editor_shortcut_selects_the_settings_inspector() -> None:
     }
 
     editor.run(controls)
-    assert controls.shell_focus.selected_id == "settings.editor_window"
+    assert controls.shell_focus.selected_id == "settings.preview"
     assert controls.shell_focus.region is ShellRegion.INSPECTOR
 
     assert command_for_shortcut(pygame.K_COMMA, pygame.KMOD_CTRL) is editor

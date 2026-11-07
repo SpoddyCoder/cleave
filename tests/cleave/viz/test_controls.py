@@ -434,11 +434,7 @@ def _expand_settings_ui(controls: TuningControls) -> None:
     return None
 
 
-def _expand_settings_editor_window(controls: TuningControls) -> None:
-    return None
-
-
-def _expand_settings_latency(controls: TuningControls) -> None:
+def _expand_settings_preview(controls: TuningControls) -> None:
     return None
 
 
@@ -4170,7 +4166,7 @@ def test_project_resolution_set_directly_applies_live() -> None:
 def test_settings_cycle_preview_quality() -> None:
     controls = _make_controls(("layer_1",))
     assert controls.cfg.editor.preview_quality == DEFAULT_EDITOR_PREVIEW_QUALITY
-    _expand_settings_editor_window(controls)
+    _expand_settings_preview(controls)
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_PREVIEW_QUALITY)
 
@@ -4196,7 +4192,7 @@ def test_settings_cycle_preview_quality() -> None:
 def test_settings_preview_quality_change_does_not_mark_project_config_dirty() -> None:
     controls = _make_controls(("layer_1",))
     assert not controls.config_dirty
-    _expand_settings_editor_window(controls)
+    _expand_settings_preview(controls)
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_PREVIEW_QUALITY)
     _press_focused(controls, _keydown(pygame.K_RIGHT))
@@ -4210,7 +4206,7 @@ def test_settings_preview_quality_writes_user_config_without_dirty(
     controls = _make_controls(("layer_1",))
     controls.cfg.user_config_path = user_path
     assert not controls.config_dirty
-    _expand_settings_editor_window(controls)
+    _expand_settings_preview(controls)
     controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_PREVIEW_QUALITY)
     _press_focused(controls, _keydown(pygame.K_RIGHT))
     assert not controls.config_dirty
@@ -4221,7 +4217,7 @@ def test_settings_preview_quality_writes_user_config_without_dirty(
 
 def test_cycle_preview_quality_calls_apply_preview_resolutions() -> None:
     controls, layer_manager = _make_controls_with_manager(("layer_1",))
-    _expand_settings_editor_window(controls)
+    _expand_settings_preview(controls)
     controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_PREVIEW_QUALITY)
 
     _press_focused(controls, _keydown(pygame.K_RIGHT))
@@ -4294,7 +4290,7 @@ def test_settings_residual_latency_writes_user_config_without_dirty(
     controls = _make_controls(("layer_1",))
     controls.cfg.user_config_path = user_path
     assert not controls.config_dirty
-    _expand_settings_latency(controls)
+    _expand_settings_preview(controls)
     controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_RESIDUAL_LATENCY_MS)
     _press_focused(controls, _keydown(pygame.K_RIGHT))
     assert not controls.config_dirty

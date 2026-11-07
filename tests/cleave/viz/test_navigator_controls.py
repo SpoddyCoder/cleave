@@ -27,7 +27,7 @@ def test_enter_on_settings_opens_first_child() -> None:
     focus = controls.shell_focus
     controls.navigator.select("settings")
     controls.navigator.activate()
-    assert focus.selected_id == "settings.editor_window"
+    assert focus.selected_id == "settings.preview"
     assert focus.region is ShellRegion.INSPECTOR
 
 

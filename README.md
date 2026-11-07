@@ -40,7 +40,7 @@ This will separate the track into its component stems (bass, drums, vocals, othe
 * Press `h` at any time to show context-sensitive help and controls.
   * The help changes as you move around the interface with the arrow keys.
 * If you are using CPU rendering, the editor may run at low frame rates with multiple layers.
-  * Change `Settings` > `Editor Window` > `preview quality` to help with this.
+  * Change `Settings` > `Preview` > `preview quality` to help with this.
   * The final render will still be at full quality and full frame rate.
 
 ### Preset Curation

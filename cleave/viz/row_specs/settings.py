@@ -112,16 +112,16 @@ SPECS: dict[RowKind, RowSpec] = {
         help_mode_entries=EDITOR_PREVIEW_QUALITY_HELP_ENTRIES,
         is_pinned=True,
         repeatable=True,
-        parent_group="settings_editor_window",
+        parent_group="settings_preview",
     ),
-    RowKind.SETTINGS_EDITOR_WINDOW_HEADER: RowSpec(
+    RowKind.SETTINGS_PREVIEW_HEADER: RowSpec(
         affordance=RowAffordance.HEADING,
-        panel_label="Editor Window",
+        panel_label="Preview",
         present_style=RowPresentStyle.HEADING,
         fit_strategy=FitStrategy.NONE,
-        help_title="Editor Window",
+        help_title="Preview",
         help_description=(
-            "Live preview quality and column sides.",
+            "Live preview quality and audio latency compensation.",
             "The preview takes its shape from Project > Resolution and its size from the window.",
             "Drag the window edges, maximise it, or press F11 to set its size.",
         ),
@@ -130,11 +130,11 @@ SPECS: dict[RowKind, RowSpec] = {
     ),
     RowKind.SETTINGS_NAVIGATOR_SIDE: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
-        panel_label="navigator",
+        panel_label="navigator side",
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_settings_navigator_side,
         apply_horizontal=_apply_settings_navigator_side,
-        help_title="Navigator",
+        help_title="Navigator side",
         help_entries=(("Left/Right", "choose side"),),
         help_description=(
             "Side of the window for the navigator and inspector.",
@@ -142,15 +142,15 @@ SPECS: dict[RowKind, RowSpec] = {
         ),
         is_pinned=True,
         repeatable=True,
-        parent_group="settings_editor_window",
+        parent_group="settings_ui",
     ),
     RowKind.SETTINGS_HELP_SIDE: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
-        panel_label="help",
+        panel_label="help side",
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_settings_help_side,
         apply_horizontal=_apply_settings_help_side,
-        help_title="Help",
+        help_title="Help side",
         help_entries=(("Left/Right", "choose side"),),
         help_description=(
             "Side of the window for the help column.",
@@ -158,7 +158,7 @@ SPECS: dict[RowKind, RowSpec] = {
         ),
         is_pinned=True,
         repeatable=True,
-        parent_group="settings_editor_window",
+        parent_group="settings_ui",
     ),
     RowKind.SETTINGS_UI_HEADER: RowSpec(
         affordance=RowAffordance.HEADING,
@@ -167,7 +167,7 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="UI",
         help_description=(
-            "UI scale, notification time, and navigator height for the editor panels.",
+            "UI scale, notification time, navigator height, and column sides for the editor panels.",
         ),
         is_pinned=True,
         parent_group="settings",
@@ -236,20 +236,6 @@ SPECS: dict[RowKind, RowSpec] = {
         repeatable=True,
         parent_group="settings_ui",
     ),
-    RowKind.SETTINGS_LATENCY_COMPENSATION_HEADER: RowSpec(
-        affordance=RowAffordance.HEADING,
-        panel_label="Latency Compensation",
-        present_style=RowPresentStyle.HEADING,
-        fit_strategy=FitStrategy.NONE,
-        help_title="Latency Compensation",
-        help_description=(
-            "Use this to correct for bluetooth/wireless latency.",
-            "Affects new timeline cue & song marker placements only.",
-            "Already saved markers and cues do not move when you change this."
-        ),
-        is_pinned=True,
-        parent_group="settings",
-    ),
     RowKind.SETTINGS_RESIDUAL_LATENCY_MS: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
         panel_label="residual latency",
@@ -264,9 +250,12 @@ SPECS: dict[RowKind, RowSpec] = {
         help_description=(
             "Compensates for unmeasurable input/output lag for live monitoring",
             "and timeline cue/song marker placement.",
+            "Use this to correct for bluetooth/wireless latency.",
+            "Affects new timeline cue & song marker placements only.",
+            "Already saved markers and cues do not move when you change this.",
         ),
         is_pinned=True,
         repeatable=True,
-        parent_group="settings_latency_compensation",
+        parent_group="settings_preview",
     ),
 }

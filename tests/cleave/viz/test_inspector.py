@@ -154,18 +154,20 @@ def test_child_pages_omit_the_root_switches(node_id: str) -> None:
 
 def test_settings_pages() -> None:
     state = _view_state()
-    window = build_inspector_rows(state, "settings.editor_window")
-    assert _kinds(window)[0] == RowKind.SETTINGS_PREVIEW_QUALITY
-    assert RowKind.SETTINGS_NAVIGATOR_SIDE in _kinds(window)
+    preview = build_inspector_rows(state, "settings.preview")
+    assert _kinds(preview) == [
+        RowKind.SETTINGS_PREVIEW_QUALITY,
+        RowKind.SETTINGS_RESIDUAL_LATENCY_MS,
+    ]
+    assert preview[-1].command_ids == ("settings.measure_latency",)
+    assert preview[-1].depth == 0
     assert _kinds(build_inspector_rows(state, "settings.ui")) == [
         RowKind.SETTINGS_UI_SCALE,
         RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY,
         RowKind.SETTINGS_UI_NAVIGATOR_HEIGHT,
+        RowKind.SETTINGS_NAVIGATOR_SIDE,
+        RowKind.SETTINGS_HELP_SIDE,
     ]
-    latency = build_inspector_rows(state, "settings.latency")
-    assert _kinds(latency) == [RowKind.SETTINGS_RESIDUAL_LATENCY_MS]
-    assert latency[-1].command_ids == ("settings.measure_latency",)
-    assert latency[-1].depth == 0
 
 
 def test_project_pages() -> None:

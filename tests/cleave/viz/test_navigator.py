@@ -144,9 +144,8 @@ def test_full_tree_order_and_labels() -> None:
 
     assert tuple(node.label for node in nodes) == (
         "Settings",
-        "Editor Window",
+        "Preview",
         "UI",
-        "Latency Compensation",
         "Project",
         "ProjectM",
         "Compositor",

@@ -120,13 +120,13 @@ def _append_song_marker_rows(
         )
 
 
-SETTINGS_EDITOR_WINDOW_SECTION = SectionDef(
-    header_kind=RowKind.SETTINGS_EDITOR_WINDOW_HEADER,
+SETTINGS_PREVIEW_SECTION = SectionDef(
+    header_kind=RowKind.SETTINGS_PREVIEW_HEADER,
     context="global",
     children=(
         SectionNode(leaf_kind=RowKind.SETTINGS_PREVIEW_QUALITY),
-        SectionNode(leaf_kind=RowKind.SETTINGS_NAVIGATOR_SIDE),
-        SectionNode(leaf_kind=RowKind.SETTINGS_HELP_SIDE),
+        SectionNode(leaf_kind=RowKind.SETTINGS_RESIDUAL_LATENCY_MS),
+        SectionNode(commands=("settings.measure_latency",)),
     ),
 )
 
@@ -137,15 +137,8 @@ SETTINGS_UI_SECTION = SectionDef(
         SectionNode(leaf_kind=RowKind.SETTINGS_UI_SCALE),
         SectionNode(leaf_kind=RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY),
         SectionNode(leaf_kind=RowKind.SETTINGS_UI_NAVIGATOR_HEIGHT),
-    ),
-)
-
-SETTINGS_LATENCY_COMPENSATION_SECTION = SectionDef(
-    header_kind=RowKind.SETTINGS_LATENCY_COMPENSATION_HEADER,
-    context="global",
-    children=(
-        SectionNode(leaf_kind=RowKind.SETTINGS_RESIDUAL_LATENCY_MS),
-        SectionNode(commands=("settings.measure_latency",)),
+        SectionNode(leaf_kind=RowKind.SETTINGS_NAVIGATOR_SIDE),
+        SectionNode(leaf_kind=RowKind.SETTINGS_HELP_SIDE),
     ),
 )
 

@@ -34,8 +34,7 @@ from cleave.viz.row_sections import (
     POST_FX_HIGHLIGHT_ROLLOFF_SECTION,
     POST_FX_LIMITER_SECTION,
     POST_FX_PAGE_SECTION,
-    SETTINGS_EDITOR_WINDOW_SECTION,
-    SETTINGS_LATENCY_COMPENSATION_SECTION,
+    SETTINGS_PREVIEW_SECTION,
     SETTINGS_UI_SECTION,
     SONG_MARKERS_SECTION,
     TIMELINE_CUTS_SECTION,
@@ -64,9 +63,8 @@ class InspectorRow:
 
 
 _PAGE_SECTIONS: dict[str, SectionDef] = {
-    "settings.editor_window": SETTINGS_EDITOR_WINDOW_SECTION,
+    "settings.preview": SETTINGS_PREVIEW_SECTION,
     "settings.ui": SETTINGS_UI_SECTION,
-    "settings.latency": SETTINGS_LATENCY_COMPENSATION_SECTION,
     "project.projectm": PROJECT_MILKDROP_SECTION,
     "project.compositor": PROJECT_COMPOSITOR_SECTION,
     "project.resolution": PROJECT_RESOLUTION_SECTION,

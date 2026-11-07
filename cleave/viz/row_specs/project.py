@@ -196,14 +196,15 @@ SPECS: dict[RowKind, RowSpec] = {
     ),
     RowKind.PROJECT_COMPOSITOR_HDR: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
-        panel_label="hdr",
+        panel_label="hdr compositing",
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_project_compositor_hdr,
         apply_horizontal=_apply_project_compositor_hdr,
-        help_title="hdr",
+        help_title="HDR compositing",
         help_entries=(("Left/Right", "toggle on/off"),),
         help_description=(
             "16-bit float compositing when on; 8-bit when off.",
+            "Applies to the live view and the render. The rendered video is 8-bit either way.",
             "The HDR display shoulder in frame finish follows this flag.",
             "Changing it resizes compositor attachments immediately.",
         ),

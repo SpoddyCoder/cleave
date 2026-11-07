@@ -17,7 +17,7 @@ from tests.cleave.viz.test_controls import (
     _save_now,
     _desc,
     _expand_project,
-    _expand_settings_editor_window,
+    _expand_settings_preview,
     _expand_settings_ui,
     _keydown,
     _make_controls,
@@ -572,7 +572,7 @@ def _mutate_help_visible(controls: TuningControls) -> None:
 
 
 def _mutate_settings_preview_quality(controls: TuningControls) -> None:
-    _expand_settings_editor_window(controls)
+    _expand_settings_preview(controls)
     controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_PREVIEW_QUALITY)
     press_main_row(controls, _keydown(pygame.K_RIGHT))
 

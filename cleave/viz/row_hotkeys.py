@@ -38,9 +38,8 @@ if TYPE_CHECKING:
 
 
 _NODE_HEADER_KINDS: dict[str, RowKind] = {
-    "settings.editor_window": RowKind.SETTINGS_EDITOR_WINDOW_HEADER,
+    "settings.preview": RowKind.SETTINGS_PREVIEW_HEADER,
     "settings.ui": RowKind.SETTINGS_UI_HEADER,
-    "settings.latency": RowKind.SETTINGS_LATENCY_COMPENSATION_HEADER,
     "project.projectm": RowKind.PROJECT_MILKDROP_HEADER,
     "project.compositor": RowKind.PROJECT_COMPOSITOR_HEADER,
     "project.resolution": RowKind.PROJECT_RESOLUTION_HEADER,
