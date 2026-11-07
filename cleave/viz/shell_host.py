@@ -67,6 +67,7 @@ from cleave.viz.row_spec import (
     row_spec,
     section_lock_blocks_mutation,
 )
+from cleave.viz.scroll_follow import ScrollFollow
 from cleave.viz.shell_focus import (
     CycleStop,
     ShellRegion,
@@ -1034,7 +1035,8 @@ class ShellHost:
         # Drawn navigator list height, applied on the next frame. 0 until measured.
         self._nav_content_height_px = 0
         self._nav_measured_rows = 0
-        self._nav_scrolled_id: str | None = None
+        self._nav_follow = ScrollFollow()
+        self._insp_follow = ScrollFollow()
         self._layout: ShellLayout | None = None
         self._value_drag_accum = 0.0
         self._value_drag_crossed = False
@@ -1587,9 +1589,8 @@ class ShellHost:
                     )
                     if ring:
                         _draw_item_focus_ring()
-                    if selected and self._nav_scrolled_id != node.id:
-                        imgui.set_scroll_here_y()
-                        self._nav_scrolled_id = node.id
+                    if selected:
+                        self._nav_follow.follow(node.id)
                 finally:
                     if bright:
                         imgui.pop_style_color()
@@ -1744,6 +1745,7 @@ class ShellHost:
                     released = imgui.is_item_deactivated()
                     if selected:
                         _draw_item_focus_ring()
+                        self._insp_follow.follow((focus.selected_id, desc))
             finally:
                 imgui.pop_style_color()
             value = format_row_value(state, desc) if spec.format_value else ""
@@ -2145,6 +2147,8 @@ class ShellHost:
                 ),
                 selected=selected,
             )
+            if selected:
+                self._insp_follow.follow((focus.selected_id, command_id))
             if clicked:
                 self._controls.inspector.focus_command(row, command_id)
                 if enabled:

@@ -26,12 +26,10 @@ from cleave.viz.file_picker_surface import (
     FilePickerSurface,
     PickerPointerKind,
     apply_picker_pointer,
-    clamp_scroll,
     legend_rows,
     location_text,
     location_text_lift,
     row_text,
-    scroll_to_reveal,
     shortcut_chip_layout,
     shortcut_is_current,
     shortcut_is_selected,
@@ -134,28 +132,6 @@ def _assert_pointer_hover(surface: FilePickerSurface) -> None:
 
 def _draw_names() -> list[str]:
     return [str(draw_list._owner_name) for draw_list in imgui.get_draw_data().cmd_lists]
-
-
-def test_clamp_scroll_fits_the_list_when_it_is_short() -> None:
-    assert clamp_scroll(40, row_stride=10, view_height=50, row_count=3) == 0
-
-
-def test_scroll_to_reveal_keeps_a_visible_row() -> None:
-    assert (
-        scroll_to_reveal(0, 1, row_stride=10, view_height=50, row_count=20) == 0
-    )
-
-
-def test_scroll_to_reveal_brings_a_row_below_into_view() -> None:
-    assert (
-        scroll_to_reveal(0, 9, row_stride=10, view_height=50, row_count=20) == 50
-    )
-
-
-def test_scroll_to_reveal_brings_a_row_above_into_view() -> None:
-    assert (
-        scroll_to_reveal(50, 1, row_stride=10, view_height=50, row_count=20) == 10
-    )
 
 
 def test_visible_row_range_covers_rows_that_intersect_the_view() -> None:

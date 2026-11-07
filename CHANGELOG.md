@@ -58,6 +58,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- The inspector scrolls to keep the keyboard-focused row in view, so moving down a long preset list no longer loses the highlight below the window. The navigator scrolls the same way, just far enough to show the selected row.
 - Removing soft cuts no longer clears hard cuts as well, and the reverse. Set cut type now names the type and which cues it applies to.
 - Arrow keys move the highlight in dialogs and the file picker even when the pointer stays on another row. Moving the mouse switches back to pointer highlighting.
 - The file picker directory name lines up with the folder icon.

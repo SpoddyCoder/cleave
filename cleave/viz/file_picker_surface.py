@@ -23,6 +23,7 @@ from cleave.viz.file_picker import (
     PickerViewState,
 )
 from cleave.viz.material_icons import FOLDER_GLYPH
+from cleave.viz.scroll_follow import clamp_scroll, scroll_to_reveal
 from cleave.viz.text_fit import (
     fit_path_label_to_width,
     fit_text_to_width,
@@ -94,46 +95,6 @@ class _CallableSizer:
 
     def size(self, text: str) -> tuple[int, int]:
         return (self._text_width(text), 0)
-
-
-def clamp_scroll(
-    scroll_y: float,
-    *,
-    row_stride: int,
-    view_height: float,
-    row_count: int,
-) -> float:
-    """Clamp a list scroll offset so the last row can sit at the bottom."""
-    if row_stride <= 0 or view_height <= 0 or row_count <= 0:
-        return 0.0
-    limit = max(0.0, row_count * row_stride - view_height)
-    return min(max(0.0, scroll_y), limit)
-
-
-def scroll_to_reveal(
-    scroll_y: float,
-    row: int,
-    *,
-    row_stride: int,
-    view_height: float,
-    row_count: int,
-) -> float:
-    """Move *scroll_y* the least amount that puts *row* fully in the view."""
-    if row_stride <= 0 or view_height <= 0 or row_count <= 0:
-        return 0.0
-    row = min(max(0, row), row_count - 1)
-    top = float(row * row_stride)
-    bottom = top + float(row_stride)
-    if top < scroll_y:
-        scroll_y = top
-    elif bottom > scroll_y + view_height:
-        scroll_y = bottom - view_height
-    return clamp_scroll(
-        scroll_y,
-        row_stride=row_stride,
-        view_height=view_height,
-        row_count=row_count,
-    )
 
 
 def visible_row_range(
