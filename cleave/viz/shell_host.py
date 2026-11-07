@@ -76,6 +76,7 @@ from cleave.viz.shell_focus import (
 from cleave.viz.shell_layout import (
     ShellLayout,
     splitter_hit,
+    splitter_request_height,
     splitter_request_width,
 )
 from cleave.viz.text_fit import fit_path_or_name_to_width, fit_text_to_width
@@ -1047,13 +1048,14 @@ class ShellHost:
         self._nudge_swallow = False
         self._inline_field_hovered = False
         self._picker_pos = imgui.ImVec2(0.0, 0.0)
-        # Live drag requests. A drag that moves at least 1px persists the stack
-        # and help, then clears these.
+        # Live drag requests. A drag that moves at least 1px persists the stack,
+        # help, or navigator height, then clears these.
         self._insp_width: int | None = None
         self._help_width: int | None = None
+        self._navigator_height: int | None = None
         self._splitter: str | None = None
-        self._splitter_down_x = 0.0
-        self._resize_cursor = False
+        self._splitter_down = (0.0, 0.0)
+        self._resize_cursor = pygame.SYSTEM_CURSOR_ARROW
         self.transport_notice_clicked = False
         self.top_layer = TopLayer()
 
@@ -1102,6 +1104,11 @@ class ShellHost:
     def help_width(self) -> int | None:
         """Help width requested by an in-progress splitter drag."""
         return self._help_width
+
+    @property
+    def navigator_height(self) -> int | None:
+        """Navigator height requested by an in-progress splitter drag."""
+        return self._navigator_height
 
     def process_event(self, event: pygame.event.Event) -> None:
         """Mouse motion, buttons, and wheel only. Keys stay out of ImGui."""
@@ -1199,11 +1206,16 @@ class ShellHost:
             return None
         return splitter_hit(layout, x, y)
 
-    def _assign_splitter_width(self, which: str, pointer_x: float) -> None:
+    def _assign_splitter_request(
+        self, which: str, pointer: tuple[float, float]
+    ) -> None:
         layout = self._layout
         if layout is None:
             return
-        width = splitter_request_width(layout, which, pointer_x)
+        if which == "nav":
+            self._navigator_height = splitter_request_height(layout, pointer[1])
+            return
+        width = splitter_request_width(layout, which, pointer[0])
         if which == "help":
             self._help_width = width
         elif which == "insp":
@@ -1214,15 +1226,24 @@ class ShellHost:
         if which is None:
             return False
         self._splitter = which
-        self._splitter_down_x = float(pos[0])
-        self._set_resize_cursor(True)
+        self._splitter_down = (float(pos[0]), float(pos[1]))
+        self._set_resize_cursor(which)
         return True
 
     def _end_splitter_drag(self, pos: tuple[float, float]) -> None:
         which = self._splitter
-        x = float(pos[0])
-        if which is not None and abs(x - self._splitter_down_x) >= 1.0:
-            self._assign_splitter_width(which, x)
+        pointer = (float(pos[0]), float(pos[1]))
+        axis = 1 if which == "nav" else 0
+        moved = abs(pointer[axis] - self._splitter_down[axis]) >= 1.0
+        if which == "nav" and moved:
+            self._assign_splitter_request(which, pointer)
+            if self._navigator_height is not None:
+                self._controls.settings.set_navigator_height(
+                    self._navigator_height
+                )
+            self._navigator_height = None
+        elif which is not None and moved:
+            self._assign_splitter_request(which, pointer)
             editor = self._controls.cfg.editor
             insp = (
                 self._insp_width
@@ -1240,29 +1261,32 @@ class ShellHost:
         self._splitter = None
         # Layout catches up after this event. Keep the resize cursor until
         # the next motion, which tests the updated boundaries.
-        self._set_resize_cursor(True)
+        self._set_resize_cursor(which)
 
     def _cancel_splitter_drag(self) -> None:
         self._splitter = None
-        self._set_resize_cursor(False)
+        self._navigator_height = None
+        self._set_resize_cursor(None)
 
     def _track_splitter_motion(self, x: float, y: float) -> None:
         if self._splitter is not None:
-            self._assign_splitter_width(self._splitter, x)
-            self._set_resize_cursor(True)
+            self._assign_splitter_request(self._splitter, (x, y))
+            self._set_resize_cursor(self._splitter)
             return
-        self._set_resize_cursor(self._splitter_at(x, y) is not None)
+        self._set_resize_cursor(self._splitter_at(x, y))
 
-    def _set_resize_cursor(self, resize: bool) -> None:
-        if resize == self._resize_cursor:
+    def _set_resize_cursor(self, which: str | None) -> None:
+        """Arrow for None, up-down for ``nav``, left-right for a column."""
+        if which is None:
+            cursor = pygame.SYSTEM_CURSOR_ARROW
+        elif which == "nav":
+            cursor = pygame.SYSTEM_CURSOR_SIZENS
+        else:
+            cursor = pygame.SYSTEM_CURSOR_SIZEWE
+        if cursor == self._resize_cursor:
             return
-        cursor = (
-            pygame.SYSTEM_CURSOR_SIZEWE
-            if resize
-            else pygame.SYSTEM_CURSOR_ARROW
-        )
         pygame.mouse.set_cursor(cursor)
-        self._resize_cursor = resize
+        self._resize_cursor = cursor
 
     def draw_windows(
         self,

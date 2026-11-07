@@ -4,7 +4,8 @@ Rects are ``(x, y, w, h)`` in top-left origin pixels. One layout is computed
 per frame and shared by the shell host, overlay placement, and the compositor.
 
 The navigator and the inspector share one side column. The navigator is the
-top of that column, only as tall as its rows. The inspector is the remainder.
+top of that column. It fits its rows until the user drags the boundary, then
+keeps that height. The inspector is the remainder.
 Help is its own full-height column. Each column chooses left or right. When
 they share a side, help sits at the window edge and the navigator column
 stays against the visualiser.
@@ -143,11 +144,17 @@ def _column_widths(
     )
 
 
-def _stack_heights(columns_h: int, nav_content_h: int | None) -> tuple[int, int]:
+def _stack_heights(
+    columns_h: int,
+    nav_content_h: int | None,
+    navigator_height: int | None = None,
+) -> tuple[int, int]:
     """Navigator and inspector heights that sum to the column band.
 
-    A missing or non-positive content height is one row, so the first frame
-    can be measured. The inspector keeps at least half the band. A band
+    A positive *navigator_height* is the user's split. It is clamped so each
+    side keeps at least one row. Otherwise the navigator fits its rows: a
+    missing or non-positive content height is one row, so the first frame can
+    be measured, and the inspector keeps at least half the band. A band
     shorter than two rows gives the navigator one row and the inspector the
     rest. A taller tree scrolls inside the navigator window.
     """
@@ -155,6 +162,9 @@ def _stack_heights(columns_h: int, nav_content_h: int | None) -> tuple[int, int]
     if columns_h <= 0:
         return (0, 0)
     row = navigator_row_px()
+    if columns_h >= row * 2 and navigator_height is not None and navigator_height > 0:
+        nav_h = max(row, min(int(navigator_height), columns_h - row))
+        return (nav_h, columns_h - nav_h)
     if nav_content_h is None or int(nav_content_h) <= 0:
         requested = row
     else:
@@ -173,32 +183,36 @@ def splitter_hit(
     *,
     hit_px: float = SPLITTER_HIT_PX,
 ) -> str | None:
-    """``insp`` or ``help`` when (*x*, *y*) is in that hit zone.
+    """``insp``, ``help``, or ``nav`` when (*x*, *y*) is in that hit zone.
 
-    Each zone is *hit_px* wide, centered on the boundary, and only as tall as
-    the column band. ``insp`` resizes the shared stack. Help's zone exists
-    only when that column has positive width. The stack zone exists only when
-    the stack has positive width. The navigator/inspector boundary is not a
-    splitter. The hit-rects role is ``splitter``.
+    Each zone is *hit_px* across, centered on its boundary. ``insp`` and
+    ``help`` are vertical boundaries only as tall as the column band. ``insp``
+    resizes the shared stack. Help's zone exists only when that column has
+    positive width. The stack zone exists only when the stack has positive
+    width. ``nav`` is the horizontal navigator/inspector boundary, only as
+    wide as the stack, and exists only when the inspector has positive
+    height. The nearest boundary wins. The hit-rects role is ``splitter``.
     """
     top = layout.visualiser[1]
     height = layout.visualiser[3]
     if height <= 0 or hit_px <= 0 or y < top or y >= top + height:
         return None
     half = hit_px / 2.0
-    zones: list[tuple[str, float]] = []
-    stack_w = layout.navigator[2]
+    zones: list[tuple[str, float, float]] = []
+    stack_x, _stack_y, stack_w, _nav_h = layout.navigator
     if stack_w > 0:
         zones.append(
-            ("insp", _inner_edge(layout.navigator, layout.navigator_side))
+            ("insp", _inner_edge(layout.navigator, layout.navigator_side), x)
         )
+        if layout.inspector[3] > 0 and stack_x <= x < stack_x + stack_w:
+            zones.append(("nav", float(layout.inspector[1]), y))
     if layout.help[2] > 0:
-        zones.append(("help", _inner_edge(layout.help, layout.help_side)))
+        zones.append(("help", _inner_edge(layout.help, layout.help_side), x))
     best: str | None = None
     best_dist: float | None = None
-    for name, edge in zones:
-        if (edge - half) <= x < (edge + half):
-            dist = abs(x - edge)
+    for name, edge, coord in zones:
+        if (edge - half) <= coord < (edge + half):
+            dist = abs(coord - edge)
             if best_dist is None or dist < best_dist:
                 best = name
                 best_dist = dist
@@ -235,6 +249,11 @@ def splitter_request_width(layout: ShellLayout, which: str, pointer_x: float) ->
     return max(0, int(round(width)))
 
 
+def splitter_request_height(layout: ShellLayout, pointer_y: float) -> int:
+    """Unclamped navigator height *pointer_y* is asking for (``nav`` splitter)."""
+    return max(0, int(round(pointer_y - float(layout.navigator[1]))))
+
+
 @dataclass(frozen=True)
 class ShellLayout:
     menu: Rect
@@ -257,6 +276,7 @@ class ShellLayout:
         insp_width: int | None = None,
         help_width: int | None = None,
         nav_content_h: int | None = None,
+        navigator_height: int | None = None,
         *,
         navigator_side: ColumnSide = DEFAULT_NAVIGATOR_SIDE,
         help_side: ColumnSide = DEFAULT_HELP_SIDE,
@@ -264,9 +284,11 @@ class ShellLayout:
         """Column rects for one frame.
 
         The navigator column is *insp_width* wide (nominal 495 when omitted).
-        The navigator is the top of that column, *nav_content_h* tall after
-        the half-band clamp. None or a non-positive height is one row. The
-        inspector is the rest of the column. *help_width* None or 0 leaves
+        The navigator is the top of that column. A positive
+        *navigator_height* sets it, clamped so each side keeps one row.
+        Otherwise it is *nav_content_h* tall after the half-band clamp, and
+        None or a non-positive height is one row. The inspector is the rest
+        of the column. *help_width* None or 0 leaves
         the help column closed. Requests are clamped into this layout and
         are not written back.
 
@@ -287,7 +309,9 @@ class ShellLayout:
         stack_w, viz_w, help_w = _column_widths(
             display_w, insp_width, help_width
         )
-        nav_h, insp_h = _stack_heights(columns_h, nav_content_h)
+        nav_h, insp_h = _stack_heights(
+            columns_h, nav_content_h, navigator_height
+        )
 
         if timeline_h > 0:
             timeline = (0, display_h - timeline_h, display_w, timeline_h)

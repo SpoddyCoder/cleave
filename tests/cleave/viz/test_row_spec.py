@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import inspect
+from dataclasses import replace
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -22,6 +23,7 @@ from cleave.config_schema.editor import (
 )
 from cleave.config_schema.layers import hard_cut_enabled_display
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
+from cleave.viz.shell_layout import navigator_row_px
 from cleave.viz.row_spec import (
     HEADER_ROW_KINDS,
     REPEAT_ROW_KINDS,
@@ -132,6 +134,7 @@ _EXPECTED_REPEAT_ROW_KINDS = frozenset(
         RowKind.SETTINGS_NAVIGATOR_SIDE,
         RowKind.SETTINGS_HELP_SIDE,
         RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY,
+        RowKind.SETTINGS_UI_NAVIGATOR_HEIGHT,
         RowKind.SETTINGS_RESIDUAL_LATENCY_MS,
         RowKind.PROJECT_RENDER_QUALITY,
         RowKind.PROJECT_RENDER_WIDTH,
@@ -182,6 +185,7 @@ def test_row_is_pinned() -> None:
     assert row_is_pinned(RowKind.SETTINGS_HELP_SIDE) is True
     assert row_is_pinned(RowKind.SETTINGS_UI_HEADER) is True
     assert row_is_pinned(RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY) is True
+    assert row_is_pinned(RowKind.SETTINGS_UI_NAVIGATOR_HEIGHT) is True
     assert row_is_pinned(RowKind.TRACK_HEADER) is False
     assert row_is_pinned(RowKind.OVERLAYS_HEADER) is False
 
@@ -579,6 +583,7 @@ def test_format_row_value_settings() -> None:
             navigator_side="right",
             help_side="left",
             notification_display_sec=0,
+            navigator_height=240,
         ),
     )
     assert (
@@ -609,6 +614,15 @@ def test_format_row_value_settings() -> None:
     assert (
         format_row_value(state, RowDescriptor(RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY))
         == notification_display_label(0)
+    )
+    assert (
+        format_row_value(state, RowDescriptor(RowKind.SETTINGS_UI_NAVIGATOR_HEIGHT))
+        == "240 px"
+    )
+    fit = _minimal_view_state(settings=SettingsBlock(navigator_height=0))
+    assert (
+        format_row_value(fit, RowDescriptor(RowKind.SETTINGS_UI_NAVIGATOR_HEIGHT))
+        == "fit to rows"
     )
 
 
@@ -888,6 +902,30 @@ def test_apply_field_horizontal_adjusts_notification_display() -> None:
         controls.cfg.editor.notification_display_sec
         == DEFAULT_NOTIFICATION_DISPLAY_SEC + 1 - 5
     )
+
+
+def test_apply_field_horizontal_steps_navigator_height_from_drawn() -> None:
+    controls = _make_controls()
+    desc = RowDescriptor(RowKind.SETTINGS_UI_NAVIGATOR_HEIGHT)
+    row = navigator_row_px()
+    band = 600
+    controls.settings.note_shell_stack(200, band)
+    assert controls.cfg.editor.navigator_height == 0
+
+    apply_field_horizontal(controls, desc, True, False)
+    assert controls.cfg.editor.navigator_height == 210
+    apply_field_horizontal(controls, desc, True, True)
+    assert controls.cfg.editor.navigator_height == 260
+
+    for _ in range(40):
+        apply_field_horizontal(controls, desc, True, True)
+    assert controls.cfg.editor.navigator_height == band - row
+
+    controls.cfg.editor = replace(controls.cfg.editor, navigator_height=row + 5)
+    apply_field_horizontal(controls, desc, False, False)
+    assert controls.cfg.editor.navigator_height == row
+    apply_field_horizontal(controls, desc, False, False)
+    assert controls.cfg.editor.navigator_height == 0
 
 
 def test_apply_field_horizontal_adjusts_editor_window_size() -> None:

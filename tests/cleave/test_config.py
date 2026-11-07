@@ -245,6 +245,7 @@ def test_editor_config_from_settings_uses_user_editor() -> None:
         residual_latency_ms=0,
         inspector_width=640,
         help_width=360,
+        navigator_height=300,
         navigator_side="right",
         help_side="left",
     )
@@ -256,6 +257,7 @@ def test_editor_config_from_settings_uses_user_editor() -> None:
     assert cfg.notification_display_sec == 5
     assert cfg.inspector_width == 640
     assert cfg.help_width == 360
+    assert cfg.navigator_height == 300
     assert cfg.navigator_side == "right"
     assert cfg.help_side == "left"
 

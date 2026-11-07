@@ -355,7 +355,10 @@ def _host() -> Iterator[ShellHost]:
     )
     controls = SimpleNamespace(
         cfg=SimpleNamespace(editor=editor),
-        settings=SimpleNamespace(set_shell_column_widths=MagicMock()),
+        settings=SimpleNamespace(
+            set_shell_column_widths=MagicMock(),
+            set_navigator_height=MagicMock(),
+        ),
         set_shell_region=MagicMock(),
         disarm_value_nudge=MagicMock(),
     )
@@ -733,3 +736,38 @@ def test_splitter_hit_zone_is_six_pixels() -> None:
     assert splitter_hit(layout, edge + 3, 100) is None
     assert splitter_hit(layout, edge, 10) is None
     assert splitter_hit(layout, edge, layout.inspector[1] + 4) == "insp"
+
+
+def _nav_boundary(host: ShellHost) -> tuple[int, int]:
+    layout = host.layout
+    assert layout is not None
+    return (layout.navigator[0] + layout.navigator[2] // 2, layout.inspector[1])
+
+
+def test_nav_splitter_drag_sets_and_persists_navigator_height() -> None:
+    with _host() as host:
+        x, y = _nav_boundary(host)
+        top = host.layout.navigator[1]
+        with patch("cleave.viz.shell_host.pygame.mouse.set_cursor") as set_cursor:
+            host.process_event(_motion((x, y)))
+            set_cursor.assert_called_with(pygame.SYSTEM_CURSOR_SIZENS)
+            host.process_event(_button(pygame.MOUSEBUTTONDOWN, (x, y)))
+            assert host.imgui.queued_buttons == []
+            host.process_event(_motion((x + 30, top + 300)))
+            assert host.navigator_height == 300
+            assert host.insp_width is None
+            host.process_event(_button(pygame.MOUSEBUTTONUP, (x + 30, top + 300)))
+        host._controls.settings.set_navigator_height.assert_called_once_with(300)
+        host._controls.settings.set_shell_column_widths.assert_not_called()
+        assert host.navigator_height is None
+        assert host._splitter is None
+
+
+def test_nav_splitter_under_one_pixel_does_not_persist() -> None:
+    with _host() as host:
+        x, y = _nav_boundary(host)
+        with patch("cleave.viz.shell_host.pygame.mouse.set_cursor"):
+            host.process_event(_button(pygame.MOUSEBUTTONDOWN, (x, y)))
+            host.process_event(_button(pygame.MOUSEBUTTONUP, (x + 40, y)))
+        host._controls.settings.set_navigator_height.assert_not_called()
+        assert host._splitter is None

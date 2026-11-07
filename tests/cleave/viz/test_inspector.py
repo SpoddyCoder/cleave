@@ -158,7 +158,8 @@ def test_settings_pages() -> None:
     assert _kinds(window)[0] == RowKind.SETTINGS_PREVIEW_QUALITY
     assert RowKind.SETTINGS_NAVIGATOR_SIDE in _kinds(window)
     assert _kinds(build_inspector_rows(state, "settings.ui")) == [
-        RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY
+        RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY,
+        RowKind.SETTINGS_UI_NAVIGATOR_HEIGHT,
     ]
     latency = build_inspector_rows(state, "settings.latency")
     assert _kinds(latency) == [RowKind.SETTINGS_RESIDUAL_LATENCY_MS]

@@ -530,7 +530,11 @@ class VisualizerApp:
         if runtime.seed.session.help_visible:
             help_width = editor.help_width
         nav_content_h: int | None = None
+        navigator_height = editor.navigator_height
         if shell is not None:
+            live_nav = getattr(shell, "navigator_height", None)
+            if live_nav is not None:
+                navigator_height = live_nav
             live_insp = getattr(shell, "insp_width", None)
             if live_insp is not None:
                 insp_width = live_insp
@@ -550,6 +554,7 @@ class VisualizerApp:
             insp_width=insp_width,
             help_width=help_width,
             nav_content_h=nav_content_h,
+            navigator_height=navigator_height,
             navigator_side=editor.navigator_side,
             help_side=editor.help_side,
         )
@@ -562,6 +567,9 @@ class VisualizerApp:
             runtime.compositor.set_present_rect(None)
             return
         shell.set_layout(layout)
+        runtime.controls.settings.note_shell_stack(
+            layout.navigator[3], layout.navigator[3] + layout.inspector[3]
+        )
         runtime.compositor.set_present_rect(layout.visualiser)
 
     def _begin_live_frame(self, runtime: LiveVisualizerRuntime) -> ShellLayout:

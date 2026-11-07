@@ -17,6 +17,7 @@ from cleave.config_schema.editor import (
     DEFAULT_EDITOR_WIDTH,
     DEFAULT_RESIDUAL_LATENCY_MS,
     DEFAULT_HELP_SIDE,
+    DEFAULT_NAVIGATOR_HEIGHT,
     DEFAULT_NAVIGATOR_SIDE,
     DEFAULT_NOTIFICATION_DISPLAY_SEC,
 )
@@ -316,6 +317,7 @@ class SettingsBlock:
     navigator_side: str = DEFAULT_NAVIGATOR_SIDE
     help_side: str = DEFAULT_HELP_SIDE
     notification_display_sec: int = DEFAULT_NOTIFICATION_DISPLAY_SEC
+    navigator_height: int = DEFAULT_NAVIGATOR_HEIGHT
     residual_latency_ms: int = DEFAULT_RESIDUAL_LATENCY_MS
 
 
@@ -978,6 +980,7 @@ class TuningViewStateBuilder:
                 notification_display_sec=(
                     self._config_save.cfg.editor.notification_display_sec
                 ),
+                navigator_height=self._config_save.cfg.editor.navigator_height,
                 residual_latency_ms=self._config_save.cfg.editor.residual_latency_ms,
             ),
             project=_project_block_from_session(

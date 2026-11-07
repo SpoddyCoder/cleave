@@ -10,6 +10,7 @@ from cleave.viz.shell_layout import (
     ShellLayout,
     navigator_row_px,
     splitter_hit,
+    splitter_request_height,
     splitter_request_width,
 )
 
@@ -240,8 +241,11 @@ def test_splitter_resizes_the_stack_not_a_navigator_column() -> None:
 
     boundary_x = left.navigator[0] + left.navigator[2] // 2
     boundary_y = left.navigator[1] + left.navigator[3]
-    assert splitter_hit(left, boundary_x, boundary_y - 1) is None
-    assert splitter_hit(left, boundary_x, boundary_y) is None
+    assert splitter_hit(left, boundary_x, boundary_y - 1) == "nav"
+    assert splitter_hit(left, boundary_x, boundary_y) == "nav"
+    assert splitter_hit(left, boundary_x, boundary_y + 10) is None
+    viz_x = left.visualiser[0] + 20
+    assert splitter_hit(left, viz_x, boundary_y) is None
 
     assert splitter_request_width(left, "insp", left_edge + 40) == (
         left.inspector[2] + 40
@@ -475,3 +479,39 @@ def test_present_rect_aspect_fits_inside_the_rect() -> None:
     assert pillar == (60.0, 20.0, 100.0, 100.0)
     letter = _present_dest_rect((10, 20, 100, 200), 800, 600, 200, 100)
     assert letter == (10.0, 95.0, 100.0, 50.0)
+
+
+def test_navigator_height_overrides_the_row_fit() -> None:
+    row = navigator_row_px()
+    columns_h = 600
+    layout = ShellLayout.compute(
+        1280, columns_h, 0, 0, 0, nav_content_h=row * 2, navigator_height=450
+    )
+    assert layout.navigator[3] == 450
+    assert layout.inspector[1] == 450
+    assert layout.inspector[3] == columns_h - 450
+
+
+def test_navigator_height_leaves_each_side_one_row() -> None:
+    row = navigator_row_px()
+    columns_h = 600
+    tall = ShellLayout.compute(1280, columns_h, 0, 0, 0, navigator_height=10_000)
+    assert tall.navigator[3] == columns_h - row
+    assert tall.inspector[3] == row
+    short = ShellLayout.compute(1280, columns_h, 0, 0, 0, navigator_height=1)
+    assert short.navigator[3] == row
+
+
+def test_zero_navigator_height_fits_rows() -> None:
+    content = navigator_row_px() * 3
+    layout = ShellLayout.compute(
+        1280, 600, 0, 0, 0, nav_content_h=content, navigator_height=0
+    )
+    assert layout.navigator[3] == content
+
+
+def test_nav_splitter_request_height_is_from_the_navigator_top() -> None:
+    layout = ShellLayout.compute(1280, 720, 23, 23, 0)
+    top = layout.navigator[1]
+    assert splitter_request_height(layout, top + 300.0) == 300
+    assert splitter_request_height(layout, top - 50.0) == 0

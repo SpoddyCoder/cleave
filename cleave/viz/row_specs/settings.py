@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from cleave.config_schema.editor import (
     EDITOR_PREVIEW_QUALITY_HELP_ENTRIES,
     editor_display_size,
+    navigator_height_label,
     notification_display_label,
 )
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
@@ -61,6 +62,11 @@ def _format_settings_ui_notification_display(
 ) -> str:
     return notification_display_label(state.settings.notification_display_sec)
 
+def _format_settings_ui_navigator_height(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return navigator_height_label(state.settings.navigator_height)
+
 def _format_settings_residual_latency_ms(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
@@ -113,6 +119,11 @@ def _apply_settings_ui_notification_display(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, large: bool,
 ) -> None:
     controls.settings.adjust_notification_display_sec(forward=forward, large=large)
+
+def _apply_settings_ui_navigator_height(
+    controls: TuningControls, _desc: RowDescriptor, forward: bool, large: bool,
+) -> None:
+    controls.settings.adjust_navigator_height(forward=forward, large=large)
 
 def _apply_settings_residual_latency_ms(
     controls: TuningControls,
@@ -258,7 +269,7 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="UI",
         help_description=(
-            "Panel width and notification time for the main tuning overlay.",
+            "Notification time and navigator height for the editor panels.",
         ),
         is_pinned=True,
         parent_group="settings",
@@ -279,6 +290,28 @@ SPECS: dict[RowKind, RowSpec] = {
             "How long panel toasts stay visible before they disappear.",
             "Until dismissed keeps them until you press Enter.",
             "Enter dismisses the current toast at any remaining time.",
+        ),
+        is_pinned=True,
+        repeatable=True,
+        parent_group="settings_ui",
+    ),
+    RowKind.SETTINGS_UI_NAVIGATOR_HEIGHT: RowSpec(
+        affordance=RowAffordance.VALUE_STEP,
+        panel_label="navigator height",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_settings_ui_navigator_height,
+        apply_horizontal=_apply_settings_ui_navigator_height,
+        help_title="Navigator height",
+        help_entries=(
+            ("Left/Right", "adjust height (10 px)"),
+            ("PgUp/PgDn", "large step (50 px)"),
+            ("Drag", "the line between navigator and inspector"),
+        ),
+        help_description=(
+            "How much of the side column the navigator takes.",
+            "The inspector fills the rest below it.",
+            "Fit to rows sizes the navigator to its tree, up to half the column.",
+            "Step Left past the smallest height to return to fit to rows.",
         ),
         is_pinned=True,
         repeatable=True,
