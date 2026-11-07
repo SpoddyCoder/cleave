@@ -14,6 +14,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- The rule under the menu bar uses the same grey as the rule under the transport bar.
 - Overlay card title text and hex colours are edited in place in the inspector, and colour rows show a swatch that opens a colour picker with live preview. Esc reverts. Body text keeps its multi-line dialog. Song marker rows have a delete icon, and clicking a row seeks to the marker.
 - The preset list has a toolbar under it with Add current and Populate buttons, and paused switching shows a status line with a Resume button. The Layers navigator row has a + icon for adding a layer. Buttons in a locked section show the locked colour.
 - Timeline commands with parameters now open one dialog each, with a line showing what the choice will affect: Generate timeline (replaces the staged rows and Apply Timeline Preset), Snap cues (beats, bars, or song markers), and Set cut type (replaces the four Apply and Remove rows). Reset timeline and Populate presets also use this dialog. The Timeline Preset page is gone; Generate and Reset are on the Timeline page. Dialog values take effect only when confirmed, and Generate keeps its values in the project as before.

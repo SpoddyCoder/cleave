@@ -80,9 +80,9 @@ from cleave.viz.shell_layout import (
 )
 from cleave.viz.text_fit import fit_path_or_name_to_width, fit_text_to_width
 from cleave.viz.theme import (
+    BORDER_COLOR,
     BUTTON_BORDER,
     BACKGROUND,
-    BORDER_COLOR,
     DISABLED,
     ERROR_NOTIFICATION,
     FOCUS_BORDER_ALPHA,
@@ -1032,6 +1032,7 @@ class ShellHost:
         self._menu_state = menu_state
         self._controls = controls
         self._menu_bar_height_px = bar_height
+        self._dropdown_span: tuple[float, float] | None = None
         # Drawn navigator list height, applied on the next frame. 0 until measured.
         self._nav_content_height_px = 0
         self._nav_measured_rows = 0
@@ -1282,6 +1283,7 @@ class ShellHost:
         if self._layout is not None:
             self._draw_shell(menu_state, readout, notice)
         popup_hovered = False
+        self._dropdown_span = None
         if menu_state.dropdown_open and menus:
             popup_hovered = self._draw_dropdown(
                 menu_state, command_ctx, menus, anchors
@@ -1318,7 +1320,11 @@ class ShellHost:
                 draw.push_clip_rect(imgui.ImVec2(0.0, 0.0), display, False)
                 try:
                     if rule_y is not None:
-                        _stroke_h_rule(0.0, display.x, rule_y, BORDER_COLOR)
+                        _stroke_h_rule(0.0, display.x, rule_y, TRANSPORT_RULE)
+                        span = self._dropdown_span
+                        if span is not None:
+                            # The popup's top border sits on this row.
+                            _stroke_h_rule(span[0], span[1], rule_y, BORDER_COLOR)
                     layout = self._layout
                     if (
                         layout is not None
@@ -2230,6 +2236,8 @@ class ShellHost:
         try:
             if not visible:
                 return False
+            pos = imgui.get_window_pos()
+            self._dropdown_span = (pos.x, pos.x + imgui.get_window_width())
             hit = self._draw_rows(menu_state, command_ctx, menus, index, menu)
             return hit or _mouse_in_current_window()
         finally:

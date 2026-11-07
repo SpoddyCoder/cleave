@@ -440,7 +440,7 @@ def test_open_menu_paints_over_the_transport_rule() -> None:
     from cleave.viz import imgui_host, shell_host
     from cleave.viz.shell_host import draw_shell_frame
     from cleave.viz.shell_layout import ShellLayout
-    from cleave.viz.theme import BORDER_COLOR, TRANSPORT_RULE
+    from cleave.viz.theme import TRANSPORT_RULE
 
     overlay = _Overlay()
     overlay.visibility = 1.0
@@ -474,21 +474,18 @@ def test_open_menu_paints_over_the_transport_rule() -> None:
         chrome_at = names.index("##shell-chrome")
         assert transport_at < popup_at < chrome_at
         grey = _color_u32(TRANSPORT_RULE)
-        white = _color_u32(BORDER_COLOR)
         on_transport = _draw_list_has_color(content[transport_at], grey)
         transport_span = _color_span_x(content[transport_at], grey)
         popup_span = _color_span_x(content[popup_at], grey)
-        on_chrome = _draw_list_has_color(content[chrome_at], grey)
-        rule_on_chrome = _draw_list_has_color(content[chrome_at], white)
+        rule_on_chrome = _draw_list_has_color(content[chrome_at], grey)
         rule_on_foreground = any(
-            _draw_list_has_color(draw_list, white) for draw_list in foreground
+            _draw_list_has_color(draw_list, grey) for draw_list in foreground
         )
         del lists, content
     finally:
         host.imgui.destroy()
     assert on_transport
     assert transport_span > popup_span
-    assert not on_chrome
     assert rule_on_chrome
     assert not rule_on_foreground
 
