@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Sequence
 
 from cleave.config import (
@@ -9,9 +10,16 @@ from cleave.config import (
     EditorPreviewQuality,
     project_resolution,
 )
+from cleave.gl_fit import aspect_fit_size
 from cleave.viz.session import TuningSession
 
 PREVIEW_MIN_VIZ_SCALE = 0.25
+
+# Fitted live widths round up to this step so a window or splitter drag does
+# not reallocate the framebuffers for every pixel.
+LIVE_CONTENT_WIDTH_STEP = 64
+# Narrowest fitted live width (unless the project itself is narrower).
+LIVE_CONTENT_MIN_WIDTH = 256
 
 _BALANCED_SCALES: tuple[float, ...] = (1.00, 0.85, 0.70, 0.55, 0.40)
 _PERFORMANCE_SCALES: tuple[float, ...] = (0.75, 0.55, 0.40, 0.30)
@@ -20,8 +28,12 @@ _ULTRA_PERFORMANCE_SCALES: tuple[float, ...] = (0.50, 0.35, 0.25)
 _FLOOR_ONLY = 0.0
 
 
+def _full_size(preview_quality: EditorPreviewQuality) -> bool:
+    return preview_quality in ("output", "full-quality")
+
+
 def _requested_scale(preview_quality: EditorPreviewQuality, z_index: int) -> float:
-    if preview_quality == "full-quality":
+    if _full_size(preview_quality):
         return 1.0
     if preview_quality == "balanced":
         if z_index < len(_BALANCED_SCALES):
@@ -36,10 +48,34 @@ def _requested_scale(preview_quality: EditorPreviewQuality, z_index: int) -> flo
     return _FLOOR_ONLY
 
 
-def live_content_size(session: TuningSession) -> tuple[int, int]:
-    """Live visualiser content size: the project resolution."""
+def session_project_size(session: TuningSession) -> tuple[int, int]:
     resolution = session.project.resolution
     return resolution.width, resolution.height
+
+
+def live_content_size(
+    project_size: tuple[int, int],
+    draw_size: tuple[int, int] | None,
+    preview_quality: EditorPreviewQuality,
+) -> tuple[int, int]:
+    """Live content size: the project aspect fitted to the on-screen size.
+
+    The result never exceeds *project_size*. ``output`` quality, or no known
+    *draw_size*, uses *project_size* itself.
+    """
+    project_w, project_h = project_size
+    if preview_quality == "output" or draw_size is None:
+        return project_w, project_h
+    fit = aspect_fit_size((project_w, project_h), draw_size)
+    if fit is None:
+        return project_w, project_h
+    step = LIVE_CONTENT_WIDTH_STEP
+    width = math.ceil(fit[0] / step) * step
+    width = max(width, LIVE_CONTENT_MIN_WIDTH)
+    if width >= project_w:
+        return project_w, project_h
+    height = max(1, round(width * project_h / project_w))
+    return width, height
 
 
 def preview_layer_size(
@@ -49,7 +85,7 @@ def preview_layer_size(
 ) -> tuple[int, int]:
     """Layer size for *z_index*: *base* scaled by the preview quality tier."""
     layer_w, layer_h = base
-    if preview_quality == "full-quality":
+    if _full_size(preview_quality):
         return layer_w, layer_h
 
     requested_scale = _requested_scale(preview_quality, z_index)
@@ -91,9 +127,10 @@ def render_layer_size(
 def preview_sizes_for_session(
     cfg: CleaveConfig,
     session: TuningSession,
+    base: tuple[int, int],
 ) -> dict[str, tuple[int, int]]:
+    """Layer sizes for the live content size *base*, keyed by slot."""
     preview_quality = cfg.editor.preview_quality
-    base = live_content_size(session)
     return {
         slot: preview_layer_size(preview_quality, z_index, base)
         for z_index, slot in enumerate(session.layer_z_order)

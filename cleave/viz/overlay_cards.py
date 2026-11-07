@@ -681,7 +681,13 @@ def composite_overlay_with_alpha(
     solo: bool = False,
     song_duration: float | None = None,
 ) -> None:
-    """Upload and draw the overlay card at *alpha* visibility."""
+    """Upload and draw the overlay card at *alpha* visibility.
+
+    *width* x *height* is the output frame the card is laid out in. When the
+    compositor content is smaller (a live preview below the project
+    resolution), the card is drawn scaled by the same factor so it covers the
+    same share of the frame as in the render.
+    """
     if alpha <= _ALPHA_EPSILON:
         return
 
@@ -776,8 +782,18 @@ def _upload_and_draw(
         draw_surface = panel.subsurface((src_x, src_y, clip_w, clip_h))
 
     texture_id = compositor.upload_overlay_texture(draw_surface)
+    scale = compositor.content_width / width if width > 0 else 1.0
+    if scale == 1.0:
+        compositor.draw_content_overlay(
+            texture_id, clip_x, clip_y, clip_w, clip_h, alpha=alpha
+        )
+        return
+    left = round(clip_x * scale)
+    top = round(clip_y * scale)
+    right = round((clip_x + clip_w) * scale)
+    bottom = round((clip_y + clip_h) * scale)
     compositor.draw_content_overlay(
-        texture_id, clip_x, clip_y, clip_w, clip_h, alpha=alpha
+        texture_id, left, top, right - left, bottom - top, alpha=alpha
     )
 
 

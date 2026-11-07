@@ -105,6 +105,7 @@ def _composite_one_overlay_card(
     overlay_solo: bool,
     panel_cache: OverlayPanelCache | None,
     song_duration: float | None,
+    output_size: tuple[int, int],
 ) -> None:
     alpha = live_overlay_alpha(
         t_sec,
@@ -122,8 +123,8 @@ def _composite_one_overlay_card(
         core.compositor,
         card_cfg,
         alpha,
-        core.compositor.content_width,
-        core.compositor.content_height,
+        output_size[0],
+        output_size[1],
         layers=layers,
         t_sec=t_sec,
         solo=overlay_solo,
@@ -145,6 +146,8 @@ def _composite_overlay(
     overlays = session.overlays
     opening_cache = None if panel_cache is None else panel_cache.opening
     closing_cache = None if panel_cache is None else panel_cache.closing
+    resolution = session.project.resolution
+    output_size = (resolution.width, resolution.height)
     _composite_one_overlay_card(
         core,
         t_sec,
@@ -153,6 +156,7 @@ def _composite_overlay(
         overlay_solo=overlay_solo,
         panel_cache=opening_cache,
         song_duration=song_duration,
+        output_size=output_size,
     )
     _composite_one_overlay_card(
         core,
@@ -162,6 +166,7 @@ def _composite_overlay(
         overlay_solo=overlay_solo,
         panel_cache=closing_cache,
         song_duration=song_duration,
+        output_size=output_size,
     )
 
 

@@ -10,6 +10,8 @@ import pytest
 from cleave.config import CleaveConfig, LayerConfig, PathsConfig, EditorConfig
 from cleave.config_schema.layers import DEFAULT_LAYER_SLOTS
 from cleave.viz.layer_preview_resolution import (
+    LIVE_CONTENT_MIN_WIDTH,
+    LIVE_CONTENT_WIDTH_STEP,
     PREVIEW_MIN_VIZ_SCALE,
     live_content_size,
     offline_layer_sizes,
@@ -153,25 +155,74 @@ def test_full_quality_returns_base_size() -> None:
 def test_preview_sizes_for_session_keys_slots_with_z_order_indices() -> None:
     cfg = _cfg(preview_quality="balanced")
     session = _session(("layer_2", "layer_1"))
-    sizes = preview_sizes_for_session(cfg, session)
+    sizes = preview_sizes_for_session(cfg, session, BASE)
 
     assert set(sizes) == {"layer_2", "layer_1"}
     assert sizes["layer_2"] == preview_layer_size("balanced", 0, BASE)
     assert sizes["layer_1"] == preview_layer_size("balanced", 1, BASE)
 
 
-def test_preview_sizes_for_session_follow_session_render_size() -> None:
+def test_preview_sizes_for_session_scale_from_passed_base() -> None:
     cfg = _cfg(preview_quality="full-quality")
     session = _session(("layer_1",), size=(1080, 1920))
-    assert live_content_size(session) == (1080, 1920)
-    assert preview_sizes_for_session(cfg, session)["layer_1"] == (1080, 1920)
+    assert preview_sizes_for_session(cfg, session, (540, 960))["layer_1"] == (
+        540,
+        960,
+    )
 
 
 def test_preview_sizes_for_session_follows_cfg_preview_quality() -> None:
     cfg = replace(_cfg(), editor=_editor("performance"))
     session = _session(("layer_1",))
-    sizes = preview_sizes_for_session(cfg, session)
+    sizes = preview_sizes_for_session(cfg, session, (1280, 720))
     assert sizes["layer_1"] == (960, 540)
+
+
+def test_output_quality_returns_base_size_for_every_layer() -> None:
+    assert preview_layer_size("output", 0, (1600, 900)) == (1600, 900)
+    assert preview_layer_size("output", 5, (1600, 900)) == (1600, 900)
+
+
+def test_live_content_size_fits_width_limited_rect() -> None:
+    size = live_content_size((3840, 2160), (1600, 1200), "full-quality")
+    assert size == (1600, 900)
+
+
+def test_live_content_size_fits_height_limited_rect() -> None:
+    # 16:9 inside a tall-ish rect limited by height: 900 * 16 / 9 = 1600.
+    size = live_content_size((3840, 2160), (2400, 900), "full-quality")
+    assert size == (1600, 900)
+
+
+def test_live_content_size_rounds_width_up_to_step() -> None:
+    width, height = live_content_size((3840, 2160), (1601, 2000), "full-quality")
+    assert width == 1664
+    assert width % LIVE_CONTENT_WIDTH_STEP == 0
+    assert height == round(1664 * 2160 / 3840)
+
+
+def test_live_content_size_keeps_project_aspect() -> None:
+    width, height = live_content_size((1080, 1920), (1700, 700), "balanced")
+    assert width % LIVE_CONTENT_WIDTH_STEP == 0
+    assert width / height == pytest.approx(1080 / 1920, rel=0.01)
+    assert height >= 700
+
+
+def test_live_content_size_never_exceeds_project() -> None:
+    assert live_content_size((1280, 720), (5120, 1440), "full-quality") == (
+        1280,
+        720,
+    )
+
+
+def test_live_content_size_floor() -> None:
+    width, _height = live_content_size((3840, 2160), (40, 30), "full-quality")
+    assert width == LIVE_CONTENT_MIN_WIDTH
+
+
+def test_live_content_size_output_and_unknown_draw_use_project() -> None:
+    assert live_content_size((3840, 2160), (1600, 900), "output") == (3840, 2160)
+    assert live_content_size((3840, 2160), None, "full-quality") == (3840, 2160)
 
 
 def test_offline_layer_sizes_uses_passed_layer_z_order() -> None:

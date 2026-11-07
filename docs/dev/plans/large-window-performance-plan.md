@@ -4,7 +4,7 @@
 
 The editor window can now be resized. On a 5120x1440 monitor, a maximised window runs about 8-10 fps slower than the default 1920x1080 window.
 
-Drawing black is not the cost. The letterbox and other empty areas are a single `glClear` per frame, under 0.1 ms even at 5120x1440. The visualiser still renders at the configured content size (`editor.width/height`), so projectM, compositing and post-FX cost the same at any window size. At 5120x1440 the visualiser is limited by the window height, so it is shown only slightly larger, and that scaling costs the GPU almost nothing.
+Drawing black is not the cost. The letterbox and other empty areas are a single `glClear` per frame, under 0.1 ms even at 5120x1440. When this was measured, the visualiser rendered at a fixed content size, so projectM, compositing and post-FX cost the same at any window size. Since then the live content size is the project aspect fitted to the visualiser area, capped at the project resolution (`live_content_size` in [cleave/viz/layer_preview_resolution.py](cleave/viz/layer_preview_resolution.py)). Content cost now grows with the visualiser area up to the project resolution, which the frame timer should report as its own section.
 
 The extra cost comes from work that grows with the window size. Only the timeline strip cost below has been measured. The rest is likely but unproven until profiled on Windows.
 

@@ -596,6 +596,7 @@ def test_composite_overlay_draws_when_visible() -> None:
     pygame.init()
     compositor = recording_compositor()
     compositor.upload_overlay_texture.return_value = 99
+    compositor.content_width = 1280
     cfg = _overlay_cfg(appear_at=0.0, display_time=30.0)
     panel = build_panel_surface(cfg)
 
@@ -636,6 +637,7 @@ def test_composite_overlay_uses_content_not_display_target() -> None:
     cfg = _overlay_cfg(appear_at=0.0, display_time=30.0, position="bottom-right")
     panel = build_panel_surface(cfg)
     content_w, content_h = 1280, 720
+    compositor.content_width = content_w
 
     composite_overlay_with_alpha(
         compositor, cfg, 1.0, content_w, content_h, panel=panel
@@ -646,6 +648,29 @@ def test_composite_overlay_uses_content_not_display_target() -> None:
     pos = panel_position(cfg, panel.get_width(), panel.get_height(), content_w, content_h)
     compositor.draw_content_overlay.assert_called_with(
         7, pos[0], pos[1], panel.get_width(), panel.get_height(), alpha=1.0
+    )
+
+
+def test_composite_overlay_scales_to_smaller_content() -> None:
+    pygame.init()
+    compositor = recording_compositor()
+    compositor.upload_overlay_texture.return_value = 7
+    cfg = _overlay_cfg(appear_at=0.0, display_time=30.0, position="bottom-right")
+    panel = build_panel_surface(cfg)
+    output_w, output_h = 1920, 1080
+    compositor.content_width = 960
+
+    composite_overlay_with_alpha(
+        compositor, cfg, 1.0, output_w, output_h, panel=panel
+    )
+
+    pos = panel_position(cfg, panel.get_width(), panel.get_height(), output_w, output_h)
+    left = round(pos[0] * 0.5)
+    top = round(pos[1] * 0.5)
+    right = round((pos[0] + panel.get_width()) * 0.5)
+    bottom = round((pos[1] + panel.get_height()) * 0.5)
+    compositor.draw_content_overlay.assert_called_once_with(
+        7, left, top, right - left, bottom - top, alpha=1.0
     )
 
 

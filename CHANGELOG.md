@@ -16,11 +16,12 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Settings > UI > UI scale (80% to 200%) resizes all editor text and the spacing around it: menus, navigator, inspector, help, transport, notifications, tooltips, dialogs, the file picker, the loading screen, and the timeline strip. It applies at once and is kept as an editor preference. Overlay cards in the visualiser keep their own font sizes.
 - Drag the boundary between the navigator and the inspector to set how tall the navigator is, or step it with Settings > UI > navigator height. The height is kept as an editor preference. Fit to rows, the default, sizes the navigator to its tree as before, and stepping Left past the smallest height returns to it.
 - Timeline > Undo (Ctrl+Z) and Redo (Ctrl+Y) cover Generate timeline, Reset timeline, Snap cues, and Set cut type, including any preset lists and pattern mask settings Generate changed. Undo is unavailable after hand edits to cues, so it never discards them.
+- Settings > Editor Window > preview quality has an output setting that renders the live preview at the full project resolution, to check how it will look in the render.
 - File > New project (Ctrl+N) asks for an audio file, and File > Open project (Ctrl+O) asks for a project. Both switch the live session without quitting. A project with unsaved changes asks before leaving.
 
 ### Changed
 
-- The live preview takes its resolution and shape from Project > Resolution width and height, so it matches the rendered video, and letterboxes in the visualiser area. Changes apply live. The window size is separate.
+- The live preview takes its shape from Project > Resolution width and height, so it matches the rendered video, and letterboxes in the visualiser area. It renders only as many pixels as the visualiser area shows, up to the project resolution, so a 4K project no longer renders at 4K in a small window. The size follows window and column resizes. Overlay cards keep their size relative to the frame.
 - Project > Render Project is split into Project > Resolution (width and height, shared by the live preview and the render) and Project > Render (output, fps, quality, start, end). Width and height are stored in `project.yaml` under `resolution:`; `render:` keeps fps. Existing `render.width` and `render.height` are no longer read, so projects return to 1920x1080 until they are set again.
 - Hovering a menu bar title opens its menu without a click, and hovering another title switches to it.
 - The rule under the menu bar uses the same grey as the rule under the transport bar.
@@ -68,6 +69,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- Bloom and chromatic aberration look the same in a reduced-size live preview as in the render, instead of growing larger as the preview gets smaller.
 - A top menu dropdown no longer shows a second line a few pixels above its top border the first time it opens.
 - The inspector scrolls to keep the keyboard-focused row in view, so moving down a long preset list no longer loses the highlight below the window. The navigator scrolls the same way, just far enough to show the selected row.
 - Removing soft cuts no longer clears hard cuts as well, and the reverse. Set cut type now names the type and which cues it applies to.

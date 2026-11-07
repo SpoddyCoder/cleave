@@ -11,7 +11,7 @@ from cleave.milk_textures import project_texture_search_paths
 from cleave.effects.runtime import EffectRuntime
 from cleave.gl_compositor import GlCompositor
 from cleave.gl_masked_compositor import GlMaskedCompositor
-from cleave.gl_post_process import GlPostProcess
+from cleave.gl_post_process import BLOOM_BLUR_RADIUS, GlPostProcess
 from cleave.layer_composite import LayerCompositeRequest
 from cleave.pattern_mask import PatternMaskParams
 from cleave.preset_playlist import PresetPlaylist
@@ -24,7 +24,6 @@ from cleave.signals import Signals
 from cleave.stem_pcm import StemPcmBank, fold_pcm_to_max_samples
 from cleave.viz.layer import StemLayer
 from cleave.viz.layer_preview_resolution import (
-    live_content_size,
     preview_layer_size,
     preview_sizes_for_session,
     render_layer_size,
@@ -154,7 +153,16 @@ def _render_layer_fbo(layer: StemLayer, pm: ProjectM) -> None:
         pm.render_to_fbo(fbo.fbo_id)
 
 
-def _apply_layer_bloom(layer: StemLayer, post_process: GlPostProcess | None) -> None:
+def output_px_scale(layer_width: int, output_width: int) -> float:
+    """Factor from output pixels to layer pixels (1 at full output size)."""
+    if output_width <= 0:
+        return 1.0
+    return layer_width / output_width
+
+
+def _apply_layer_bloom(
+    layer: StemLayer, post_process: GlPostProcess | None, output_width: int
+) -> None:
     if post_process is None:
         return
     fbo = layer.fbo
@@ -165,10 +173,13 @@ def _apply_layer_bloom(layer: StemLayer, post_process: GlPostProcess | None) -> 
         fbo.width,
         fbo.height,
         fbo.bloom_strength,
+        blur_radius=BLOOM_BLUR_RADIUS * output_px_scale(fbo.width, output_width),
     )
 
 
-def _apply_layer_grit(layer: StemLayer, post_process: GlPostProcess | None) -> None:
+def _apply_layer_grit(
+    layer: StemLayer, post_process: GlPostProcess | None, output_width: int
+) -> None:
     if post_process is None:
         return
     fbo = layer.fbo
@@ -179,7 +190,7 @@ def _apply_layer_grit(layer: StemLayer, post_process: GlPostProcess | None) -> N
         fbo.width,
         fbo.height,
         fbo.grit_strength,
-        fbo.aberration_px,
+        fbo.aberration_px * output_px_scale(fbo.width, output_width),
     )
 
 
@@ -225,8 +236,12 @@ class LayerFramePipeline:
         layers_by_slot: dict[str, StemLayer],
         compositor: GlCompositor,
     ) -> bool:
-        """Resize layers to their preview sizes. True when any layer changed."""
-        sizes = preview_sizes_for_session(cfg, session)
+        """Resize layers to their preview sizes. True when any layer changed.
+
+        The base is the compositor's live content size.
+        """
+        base = (compositor.content_width, compositor.content_height)
+        sizes = preview_sizes_for_session(cfg, session, base)
         resized = False
         for slot, (width, height) in sizes.items():
             layer = layers_by_slot[slot]
@@ -328,7 +343,7 @@ class LayerFramePipeline:
 
         if preview_resolutions:
             preview_quality = cfg.editor.preview_quality
-            base = live_content_size(session)
+            base = (compositor.content_width, compositor.content_height)
 
             def layer_size(slot: str) -> tuple[int, int]:
                 z_index = z_order.index(slot)
@@ -475,6 +490,7 @@ class LayerFramePipeline:
         )
 
         pp = session.post_fx
+        output_width = session.project.resolution.width
         sections_on = render_sections_active(session.settings.editor_mode)
         hr = pp.highlight_rolloff
         cb = pp.chroma_boost
@@ -495,8 +511,8 @@ class LayerFramePipeline:
             for layer in layers:
                 if _slot_should_render(layer, live_by_slot):
                     _render_layer_fbo(layer, layer.pm)
-                    _apply_layer_bloom(layer, post_process)
-                    _apply_layer_grit(layer, post_process)
+                    _apply_layer_bloom(layer, post_process, output_width)
+                    _apply_layer_grit(layer, post_process, output_width)
                     if per_layer_rolloff:
                         compositor.copy_layer_to_rolloff_source(
                             post_process,

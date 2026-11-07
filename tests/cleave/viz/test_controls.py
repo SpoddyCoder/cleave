@@ -4136,9 +4136,9 @@ def test_project_render_size_applies_live_once_after_steps_settle() -> None:
     apply.assert_not_called()
 
     controls.tick(VISUALISER_RESOLUTION_SETTLE_SEC)
-    apply.assert_called_once_with()
+    apply.assert_called_once_with((1930, 1090))
     controls.tick(VISUALISER_RESOLUTION_SETTLE_SEC)
-    apply.assert_called_once_with()
+    apply.assert_called_once_with((1930, 1090))
 
 
 def test_project_render_size_step_and_back_does_not_apply() -> None:
@@ -4164,7 +4164,7 @@ def test_project_resolution_set_directly_applies_live() -> None:
     resolution.width, resolution.height = 1080, 1920
     controls.tick(0.0)
     controls.tick(VISUALISER_RESOLUTION_SETTLE_SEC)
-    apply.assert_called_once_with()
+    apply.assert_called_once_with((1080, 1920))
 
 
 def test_settings_cycle_preview_quality() -> None:
@@ -4184,10 +4184,13 @@ def test_settings_cycle_preview_quality() -> None:
     assert controls.cfg.editor.preview_quality == "ultra-performance"
 
     _press_focused(controls, _keydown(pygame.K_RIGHT))
+    assert controls.cfg.editor.preview_quality == "output"
+
+    _press_focused(controls, _keydown(pygame.K_RIGHT))
     assert controls.cfg.editor.preview_quality == "full-quality"
 
     _press_focused(controls, _keydown(pygame.K_LEFT))
-    assert controls.cfg.editor.preview_quality == "ultra-performance"
+    assert controls.cfg.editor.preview_quality == "output"
 
 
 def test_settings_preview_quality_change_does_not_mark_project_config_dirty() -> None:

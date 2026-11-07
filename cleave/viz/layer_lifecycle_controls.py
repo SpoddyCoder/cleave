@@ -45,9 +45,9 @@ class LayerLifecycleController:
         if self._layer_manager is not None:
             self._layer_manager.apply_preview_resolutions()
 
-    def apply_visualiser_resolution(self) -> None:
+    def apply_visualiser_resolution(self, size: tuple[int, int]) -> None:
         if self._layer_manager is not None:
-            self._layer_manager.apply_visualiser_resolution()
+            self._layer_manager.apply_visualiser_resolution(size)
 
     def signature_payload(self) -> dict[str, list[str]] | None:
         if (

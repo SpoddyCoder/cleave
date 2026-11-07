@@ -21,12 +21,10 @@ def _make_core(*, hdr: bool = False) -> MagicMock:
     return core
 
 
-def test_overlay_card_layout_uses_compositor_content_size() -> None:
+def test_overlay_card_layout_uses_output_size() -> None:
     core = _make_core()
-    core.seed.width = 1920
-    core.seed.height = 1080
-    core.compositor.content_width = 1080
-    core.compositor.content_height = 1920
+    core.compositor.content_width = 540
+    core.compositor.content_height = 960
     card_cfg = MagicMock()
 
     with (
@@ -41,6 +39,7 @@ def test_overlay_card_layout_uses_compositor_content_size() -> None:
             overlay_solo=False,
             panel_cache=None,
             song_duration=60.0,
+            output_size=(1080, 1920),
         )
 
     composite.assert_called_once()

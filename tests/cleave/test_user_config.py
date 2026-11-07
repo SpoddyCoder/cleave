@@ -394,3 +394,16 @@ def test_editor_size_keys_are_ignored(tmp_path: Path) -> None:
     )
     cfg = load_user_config(config_path)
     assert cfg.editor == default_editor_settings()
+
+
+def test_output_preview_quality_round_trips(tmp_path: Path) -> None:
+    user_path = tmp_path / "config.yaml"
+    cfg = replace(
+        make_test_cfg(("layer_1",)),
+        user_config_path=user_path,
+        editor=EditorConfig(preview_quality="output"),
+    )
+
+    persist_editor_settings(cfg)
+
+    assert load_user_config(user_path).editor.preview_quality == "output"

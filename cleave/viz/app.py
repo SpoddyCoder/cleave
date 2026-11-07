@@ -568,12 +568,14 @@ class VisualizerApp:
         shell = self._shell
         if shell is None:
             runtime.compositor.set_present_rect(None)
+            runtime.controls.visualiser_resolution.note_draw_rect(None)
             return
         shell.set_layout(layout)
         runtime.controls.settings.note_shell_stack(
             layout.navigator[3], layout.navigator[3] + layout.inspector[3]
         )
         runtime.compositor.set_present_rect(layout.visualiser)
+        runtime.controls.visualiser_resolution.note_draw_rect(layout.visualiser)
 
     def _begin_live_frame(self, runtime: LiveVisualizerRuntime) -> ShellLayout:
         layout = self._live_shell_layout(runtime)

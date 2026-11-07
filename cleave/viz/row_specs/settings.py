@@ -106,7 +106,8 @@ SPECS: dict[RowKind, RowSpec] = {
         help_entries=(("Left/Right", "cycle mode"),),
         help_description=(
             "Trade-off between visual quality and CPU/GPU load.",
-            "Affects layer resolution scaling in the live view only.",
+            "Affects the live view only; renders use the project resolution.",
+            "Milkdrop and grain can look slightly different below it; use output to check.",
         ),
         help_mode_entries=EDITOR_PREVIEW_QUALITY_HELP_ENTRIES,
         is_pinned=True,
@@ -121,7 +122,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Editor Window",
         help_description=(
             "Live preview quality and column sides.",
-            "The preview takes its size and shape from Project > Render.",
+            "The preview takes its shape from Project > Resolution and its size from the window.",
             "Drag the window edges, maximise it, or press F11 to set its size.",
         ),
         is_pinned=True,

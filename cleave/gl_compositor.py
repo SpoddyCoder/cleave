@@ -13,6 +13,7 @@ from cleave.gl_color_format import (
     GlColorFormat,
     require_supported_color_format,
 )
+from cleave.gl_fit import aspect_fit_size
 from cleave.gl_post_process import GlPostProcess
 from cleave.layer_blend import (
     LAYER_FLASH_MIN_ALPHA,
@@ -204,16 +205,10 @@ def _present_dest_rect(
             return None
         return (0.0, 0.0, float(display_width), float(display_height))
     rx, ry, rw, rh = present_rect
-    if rw <= 0 or rh <= 0 or content_width <= 0 or content_height <= 0:
+    fit = aspect_fit_size((content_width, content_height), (rw, rh))
+    if fit is None:
         return None
-    content_aspect = content_width / content_height
-    rect_aspect = rw / rh
-    if content_aspect >= rect_aspect:
-        fit_w = float(rw)
-        fit_h = fit_w / content_aspect
-    else:
-        fit_h = float(rh)
-        fit_w = fit_h * content_aspect
+    fit_w, fit_h = fit
     return (
         rx + (rw - fit_w) / 2.0,
         ry + (rh - fit_h) / 2.0,

@@ -5,7 +5,8 @@ How Cleave stacks Milkdrop layers, applies stem-driven effects, and adds render 
 ## Compositing
 
 - Up to eight libprojectM layers, at tiered resolutions.
-- Live preview composites at the project render resolution (Project > Resolution width and height, applied live), scaled per layer by Settings > Editor Window > preview quality, at display frame rate. It then fits that picture into the visualiser area of the window, letterboxed to the render shape. The window size is separate: drag its edges, maximise it, or use Settings > Fullscreen (F11).
+- Live preview takes its shape from Project > Resolution width and height and fits into the visualiser area of the window, letterboxed to the render shape. It renders only as many pixels as that area shows, up to the project resolution, so a 4K project in a small window does not cost a 4K render. The size follows the window and columns (drag the window edges, maximise it, or use Settings > Fullscreen (F11)). It runs at display frame rate.
+- Preview quality: output renders every layer at the project resolution; full-quality (the default) renders every layer at the size shown; balanced, performance, and ultra-performance step lower layers down from that size. Overlay cards, bloom, and chromatic aberration keep their size relative to the frame. Milkdrop presets and film grain can look slightly different below the project resolution, so use output to check a look before rendering.
 - Offline render size is Project > Resolution and frame rate is Project > Render (default 1920x1080 at 60fps; stored in `project.yaml` under `resolution:` and `render:`).
 - Each layer's libprojectM instance receives PCM from its assigned stem; stereo stems are fed as stereo, mono as mono.
 - Milkdrop draws on black, so Cleave treats black as transparent and uses pixel brightness as blend weight (`black-key` default).

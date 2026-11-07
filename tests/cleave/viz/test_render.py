@@ -1048,7 +1048,8 @@ def test_render_calls_overlay_compositing_when_enabled(
     for call in mock_composite.call_args_list:
         assert call.args[0] == compositor
         assert call.args[1] == expected_cfg
-        assert call.args[3:5] == (compositor.content_width, compositor.content_height)
+        resolution = runtime.seed.session.project.resolution
+        assert call.args[3:5] == (resolution.width, resolution.height)
         assert call.kwargs["layers"] is overlay_layers
         assert call.kwargs["solo"] is False
         assert "t_sec" in call.kwargs

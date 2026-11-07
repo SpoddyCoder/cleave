@@ -252,7 +252,10 @@ class TuningControls:
         )
         self.visualiser_resolution = VisualiserResolutionSync(
             session,
-            on_apply=lambda: self.layer_lifecycle.apply_visualiser_resolution(),
+            cfg,
+            on_apply=lambda size: self.layer_lifecycle.apply_visualiser_resolution(
+                size
+            ),
         )
         self.project_render = ProjectRenderController(
             session,

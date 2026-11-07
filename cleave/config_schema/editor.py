@@ -20,10 +20,11 @@ BEAT_SENSITIVITY_MIN = 0.0
 BEAT_SENSITIVITY_MAX = 5.0
 
 EditorPreviewQuality = Literal[
-    "full-quality", "balanced", "performance", "ultra-performance"
+    "output", "full-quality", "balanced", "performance", "ultra-performance"
 ]
 
 EDITOR_PREVIEW_QUALITIES: tuple[EditorPreviewQuality, ...] = (
+    "output",
     "full-quality",
     "balanced",
     "performance",
@@ -33,7 +34,11 @@ EDITOR_PREVIEW_QUALITIES: tuple[EditorPreviewQuality, ...] = (
 EDITOR_PREVIEW_QUALITY_HELP_ENTRIES: tuple[
     tuple[EditorPreviewQuality, str], ...
 ] = (
-    ("full-quality", "every layer at configured resolution."),
+    ("output", "every layer at the project resolution, to check true output."),
+    (
+        "full-quality",
+        "every layer at the size it is shown, up to the project resolution.",
+    ),
     ("balanced", "top layer full size; lower layers step down."),
     ("performance", "more aggressive downscale from top."),
     ("ultra-performance", "lowest preview resolution for heaviest load reduction."),

@@ -11,7 +11,6 @@ from cleave.viz.layer import StemLayer
 from cleave.viz.layer_pipeline import LayerFramePipeline
 from cleave.config import project_resolution
 from cleave.viz.layer_preview_resolution import (
-    live_content_size,
     preview_layer_size,
 )
 from cleave.viz.session import LayerRuntime, TuningSession
@@ -34,6 +33,13 @@ def _stem_layer(slot: str, *, width: int = 1280, height: int = 720) -> StemLayer
             index=0,
         ),
     )
+
+
+def _sized_compositor(width: int, height: int) -> MagicMock:
+    compositor = MagicMock()
+    compositor.content_width = width
+    compositor.content_height = height
+    return compositor
 
 
 def _session(slots: tuple[str, ...]) -> TuningSession:
@@ -84,10 +90,8 @@ def test_apply_preview_resolutions_resizes_when_size_changes() -> None:
     base_cfg = make_test_cfg(("layer_1",))
     cfg = replace(base_cfg, editor=replace(base_cfg.editor, preview_quality="performance"))
     session = _session(("layer_1",))
-    preview_w, preview_h = preview_layer_size(
-        "performance", 0, live_content_size(session)
-    )
-    compositor = MagicMock()
+    compositor = _sized_compositor(1280, 720)
+    preview_w, preview_h = preview_layer_size("performance", 0, (1280, 720))
 
     LayerFramePipeline.apply_preview_resolutions(
         cfg, session, {"layer_1": layer}, compositor
@@ -101,11 +105,9 @@ def test_apply_preview_resolutions_skips_when_unchanged() -> None:
     base_cfg = make_test_cfg(("layer_1",))
     cfg = replace(base_cfg, editor=replace(base_cfg.editor, preview_quality="performance"))
     session = _session(("layer_1",))
-    preview_w, preview_h = preview_layer_size(
-        "performance", 0, live_content_size(session)
-    )
+    preview_w, preview_h = preview_layer_size("performance", 0, (1280, 720))
     layer = _stem_layer("layer_1", width=preview_w, height=preview_h)
-    compositor = MagicMock()
+    compositor = _sized_compositor(1280, 720)
 
     LayerFramePipeline.apply_preview_resolutions(
         cfg, session, {"layer_1": layer}, compositor
@@ -232,7 +234,7 @@ def test_build_preview_resolutions_true_builds_at_preview_size(
     base_cfg = make_test_cfg((slot,))
     cfg = replace(base_cfg, editor=replace(base_cfg.editor, preview_quality="performance"))
     session = _session((slot,))
-    compositor = MagicMock()
+    compositor = _sized_compositor(1600, 900)
     playlist = stem_layer.playlist
 
     LayerFramePipeline.build(
@@ -245,9 +247,7 @@ def test_build_preview_resolutions_true_builds_at_preview_size(
     )
 
     build_single.assert_called_once()
-    preview_w, preview_h = preview_layer_size(
-        "performance", 0, live_content_size(session)
-    )
+    preview_w, preview_h = preview_layer_size("performance", 0, (1600, 900))
     assert build_single.call_args.kwargs["width"] == preview_w
     assert build_single.call_args.kwargs["height"] == preview_h
     apply_preview_resolutions.assert_called_once_with(
@@ -468,3 +468,26 @@ def test_render_frame_skips_per_layer_chroma_boost_when_amount_zero() -> None:
     compositor.copy_layer_to_chroma_source.assert_not_called()
     post_process.apply_chroma_boost.assert_not_called()
 
+
+
+def test_layer_bloom_and_aberration_scale_to_output_pixels() -> None:
+    from cleave.gl_post_process import BLOOM_BLUR_RADIUS
+    from cleave.viz.layer_pipeline import _apply_layer_bloom, _apply_layer_grit
+
+    layer = _stem_layer("layer_1", width=960, height=540)
+    layer.fbo.bloom_strength = 0.5
+    layer.fbo.grit_strength = 0.2
+    layer.fbo.aberration_px = 4.0
+    post = MagicMock()
+
+    _apply_layer_bloom(layer, post, 1920)
+    _apply_layer_grit(layer, post, 1920)
+
+    assert post.apply_bloom.call_args.kwargs["blur_radius"] == BLOOM_BLUR_RADIUS / 2
+    assert post.apply_grit.call_args.args[4] == 2.0
+
+    post.reset_mock()
+    _apply_layer_bloom(layer, post, 960)
+    _apply_layer_grit(layer, post, 960)
+    assert post.apply_bloom.call_args.kwargs["blur_radius"] == BLOOM_BLUR_RADIUS
+    assert post.apply_grit.call_args.args[4] == 4.0
