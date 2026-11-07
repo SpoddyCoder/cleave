@@ -8,10 +8,10 @@ from pathlib import Path
 import pytest
 
 from cleave.config import CleaveConfig, LayerConfig, PathsConfig, EditorConfig
-from cleave.config_schema.editor import DEFAULT_VISUALISER_HEIGHT, DEFAULT_VISUALISER_WIDTH
 from cleave.config_schema.layers import DEFAULT_LAYER_SLOTS
 from cleave.viz.layer_preview_resolution import (
     PREVIEW_MIN_VIZ_SCALE,
+    live_content_size,
     offline_layer_sizes,
     preview_layer_size,
     preview_sizes_for_session,
@@ -29,22 +29,20 @@ def _layer_cfg(*, slot: str = "layer_1") -> LayerConfig:
     )
 
 
-def _visualizer(
-    width: int = 1280,
-    height: int = 720,
+BASE = (1280, 720)
+
+
+def _editor(preview_quality: str = "balanced") -> EditorConfig:
+    return EditorConfig(preview_quality=preview_quality)  # type: ignore[arg-type]
+
+
+def _session(
+    slots: tuple[str, ...] = ("layer_1", "layer_2", "layer_3", "layer_4"),
     *,
-    preview_quality: str = "balanced",
-) -> EditorConfig:
-    return EditorConfig(
-        visualiser_width=width,
-        visualiser_height=height,
-        preview_quality=preview_quality,
-    )  # type: ignore[arg-type]
-
-
-def _session(slots: tuple[str, ...] = ("layer_1", "layer_2", "layer_3", "layer_4")) -> TuningSession:
+    size: tuple[int, int] = BASE,
+) -> TuningSession:
     preset_root = Path("/tmp/presets")
-    return TuningSession(
+    session = TuningSession(
         layer_z_order=list(slots),
         layers={
             slot: LayerRuntime(
@@ -55,6 +53,8 @@ def _session(slots: tuple[str, ...] = ("layer_1", "layer_2", "layer_3", "layer_4
             for slot in slots
         },
     )
+    session.project.render.width, session.project.render.height = size
+    return session
 
 
 def _cfg(
@@ -71,7 +71,9 @@ def _cfg(
         paths=PathsConfig(preset_root=preset_root, texture_paths=()),
         layers=layers,
         layer_z_order=list(slots),
-        editor=_visualizer(preview_quality=preview_quality),
+        editor=_editor(preview_quality),
+        render_width=BASE[0],
+        render_height=BASE[1],
         config_path=Path("/tmp/test/cleave.config.yaml"),
         user_config_path=Path("/tmp/user-config.yaml"),
     )
@@ -105,51 +107,47 @@ def test_preview_layer_size_table_scales(
     size = preview_layer_size(
         preview_quality,  # type: ignore[arg-type]
         z_index,
-        _visualizer(),
+        BASE,
     )
     assert size == expected
 
 
-def test_balanced_floor_boundary_index_5_uses_visualizer_floor() -> None:
-    visualizer = _visualizer(width=1920, height=1080)
-    size = preview_layer_size("balanced", 5, visualizer)
-    min_w = round(visualizer.visualiser_width * PREVIEW_MIN_VIZ_SCALE)
-    min_h = round(visualizer.visualiser_height * PREVIEW_MIN_VIZ_SCALE)
+def test_balanced_floor_boundary_index_5_uses_base_floor() -> None:
+    base = (1920, 1080)
+    size = preview_layer_size("balanced", 5, base)
+    min_w = round(base[0] * PREVIEW_MIN_VIZ_SCALE)
+    min_h = round(base[1] * PREVIEW_MIN_VIZ_SCALE)
     assert size == (min_w, min_h)
 
 
-def test_performance_floor_boundary_index_4_uses_visualizer_floor() -> None:
-    visualizer = _visualizer(width=1920, height=1080)
-    size = preview_layer_size("performance", 4, visualizer)
-    min_w = round(visualizer.visualiser_width * PREVIEW_MIN_VIZ_SCALE)
-    min_h = round(visualizer.visualiser_height * PREVIEW_MIN_VIZ_SCALE)
+def test_performance_floor_boundary_index_4_uses_base_floor() -> None:
+    base = (1920, 1080)
+    size = preview_layer_size("performance", 4, base)
+    min_w = round(base[0] * PREVIEW_MIN_VIZ_SCALE)
+    min_h = round(base[1] * PREVIEW_MIN_VIZ_SCALE)
     assert size == (min_w, min_h)
 
 
-def test_ultra_performance_floor_boundary_index_3_uses_visualizer_floor() -> None:
-    visualizer = _visualizer(width=1920, height=1080)
-    size = preview_layer_size("ultra-performance", 3, visualizer)
-    min_w = round(visualizer.visualiser_width * PREVIEW_MIN_VIZ_SCALE)
-    min_h = round(visualizer.visualiser_height * PREVIEW_MIN_VIZ_SCALE)
+def test_ultra_performance_floor_boundary_index_3_uses_base_floor() -> None:
+    base = (1920, 1080)
+    size = preview_layer_size("ultra-performance", 3, base)
+    min_w = round(base[0] * PREVIEW_MIN_VIZ_SCALE)
+    min_h = round(base[1] * PREVIEW_MIN_VIZ_SCALE)
     assert size == (min_w, min_h)
 
 
-def test_floor_clamp_preserves_visualizer_aspect() -> None:
-    visualizer = _visualizer(width=1920, height=1080)
-    size = preview_layer_size("balanced", 5, visualizer)
-    min_w = round(visualizer.visualiser_width * PREVIEW_MIN_VIZ_SCALE)
+def test_floor_clamp_preserves_base_aspect() -> None:
+    base = (1920, 1080)
+    size = preview_layer_size("balanced", 5, base)
+    min_w = round(base[0] * PREVIEW_MIN_VIZ_SCALE)
     assert size[0] == min_w
     assert size[0] / size[1] == pytest.approx(
-        visualizer.visualiser_width / visualizer.visualiser_height, rel=0.02
+        base[0] / base[1], rel=0.02
     )
 
 
-def test_full_quality_returns_visualizer_size() -> None:
-    visualizer = _visualizer(width=1600, height=900)
-    assert preview_layer_size("full-quality", 0, visualizer) == (
-        1600,
-        900,
-    )
+def test_full_quality_returns_base_size() -> None:
+    assert preview_layer_size("full-quality", 0, (1600, 900)) == (1600, 900)
 
 
 def test_preview_sizes_for_session_keys_slots_with_z_order_indices() -> None:
@@ -158,12 +156,19 @@ def test_preview_sizes_for_session_keys_slots_with_z_order_indices() -> None:
     sizes = preview_sizes_for_session(cfg, session)
 
     assert set(sizes) == {"layer_2", "layer_1"}
-    assert sizes["layer_2"] == preview_layer_size("balanced", 0, cfg.editor)
-    assert sizes["layer_1"] == preview_layer_size("balanced", 1, cfg.editor)
+    assert sizes["layer_2"] == preview_layer_size("balanced", 0, BASE)
+    assert sizes["layer_1"] == preview_layer_size("balanced", 1, BASE)
+
+
+def test_preview_sizes_for_session_follow_session_render_size() -> None:
+    cfg = _cfg(preview_quality="full-quality")
+    session = _session(("layer_1",), size=(1080, 1920))
+    assert live_content_size(session) == (1080, 1920)
+    assert preview_sizes_for_session(cfg, session)["layer_1"] == (1080, 1920)
 
 
 def test_preview_sizes_for_session_follows_cfg_preview_quality() -> None:
-    cfg = replace(_cfg(), editor=_visualizer(preview_quality="performance"))
+    cfg = replace(_cfg(), editor=_editor("performance"))
     session = _session(("layer_1",))
     sizes = preview_sizes_for_session(cfg, session)
     assert sizes["layer_1"] == (960, 540)
@@ -174,8 +179,17 @@ def test_offline_layer_sizes_uses_passed_layer_z_order() -> None:
     sizes = offline_layer_sizes(cfg, ("layer_2", "layer_1"))
 
     assert set(sizes) == {"layer_2", "layer_1"}
-    assert sizes["layer_2"] == preview_layer_size("balanced", 0, cfg.editor)
-    assert sizes["layer_1"] == preview_layer_size("balanced", 1, cfg.editor)
+    assert sizes["layer_2"] == preview_layer_size("balanced", 0, BASE)
+    assert sizes["layer_1"] == preview_layer_size("balanced", 1, BASE)
+
+
+def test_offline_layer_sizes_follow_render_output_size() -> None:
+    cfg = replace(
+        _cfg(preview_quality="performance", slots=("layer_1",)),
+        render_width=1080,
+        render_height=1920,
+    )
+    assert offline_layer_sizes(cfg, ("layer_1",))["layer_1"] == (810, 1440)
 
 
 def test_render_layer_size_full_quality_uses_render_output() -> None:
@@ -193,9 +207,6 @@ def test_render_layer_size_full_quality_uses_output_at_mismatched_aspect() -> No
         _cfg(),
         render_width=1080,
         render_height=1920,
-        editor=_visualizer(
-            width=DEFAULT_VISUALISER_WIDTH, height=DEFAULT_VISUALISER_HEIGHT
-        ),
     )
     assert render_layer_size(cfg, 0, viz_quality=False) == (1080, 1920)
     assert render_layer_size(cfg, 3, viz_quality=False) == (1080, 1920)

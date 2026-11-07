@@ -34,7 +34,6 @@ from cleave.config_schema.editor import (
     BEAT_SENSITIVITY_MAX,
     BEAT_SENSITIVITY_MIN,
     DEFAULT_BEAT_SENSITIVITY,
-    DEFAULT_VISUALISER_HEIGHT,
     DEFAULT_NOTIFICATION_DISPLAY_SEC,
     DEFAULT_RESIDUAL_LATENCY_MS,
     DEFAULT_HELP_WIDTH,
@@ -44,7 +43,6 @@ from cleave.config_schema.editor import (
     DEFAULT_HELP_SIDE,
     DEFAULT_NAVIGATOR_SIDE,
     DEFAULT_EDITOR_PREVIEW_QUALITY,
-    DEFAULT_VISUALISER_WIDTH,
     EDITOR_PREVIEW_QUALITIES,
     ColumnSide,
     EditorPreviewQuality,
@@ -205,8 +203,6 @@ class LayerConfig:
 
 @dataclass(frozen=True)
 class EditorConfig:
-    visualiser_width: int = DEFAULT_VISUALISER_WIDTH
-    visualiser_height: int = DEFAULT_VISUALISER_HEIGHT
     preview_quality: EditorPreviewQuality = DEFAULT_EDITOR_PREVIEW_QUALITY
     notification_display_sec: int = DEFAULT_NOTIFICATION_DISPLAY_SEC
     residual_latency_ms: int = DEFAULT_RESIDUAL_LATENCY_MS

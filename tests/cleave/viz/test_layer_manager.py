@@ -183,14 +183,11 @@ def test_discard_timeline_slot_strips_slot_from_timeline_state() -> None:
 def test_apply_visualiser_resolution_resizes_content_and_layers(
     mock_apply_preview: MagicMock,
 ) -> None:
-    from dataclasses import replace
-
     manager, compositor = _manager(("layer_1",))
     post_process = MagicMock()
     manager.post_process = post_process
-    manager.cfg.editor = replace(
-        manager.cfg.editor, visualiser_width=1280, visualiser_height=720
-    )
+    render = manager.session.project.render
+    render.width, render.height = 1280, 720
 
     manager.apply_visualiser_resolution()
 

@@ -13,8 +13,6 @@ import yaml
 from cleave.config import CleaveConfig, EditorConfig, dump_yaml
 from cleave.paths import WINDOWS_APP_FOLDER, XDG_APP_FOLDER
 from cleave.config_schema.editor import (
-    DEFAULT_VISUALISER_HEIGHT,
-    DEFAULT_VISUALISER_WIDTH,
     DEFAULT_HELP_WIDTH,
     DEFAULT_NAVIGATOR_HEIGHT,
     DEFAULT_UI_SCALE,
@@ -60,8 +58,6 @@ def user_config_path() -> Path:
 
 @dataclass(frozen=True)
 class EditorSettings:
-    visualiser_width: int
-    visualiser_height: int
     preview_quality: EditorPreviewQuality
     notification_display_sec: int
     residual_latency_ms: int
@@ -83,8 +79,6 @@ class UserConfig:
 
 def default_editor_settings() -> EditorSettings:
     return EditorSettings(
-        visualiser_width=DEFAULT_VISUALISER_WIDTH,
-        visualiser_height=DEFAULT_VISUALISER_HEIGHT,
         preview_quality=DEFAULT_EDITOR_PREVIEW_QUALITY,
         notification_display_sec=DEFAULT_NOTIFICATION_DISPLAY_SEC,
         residual_latency_ms=DEFAULT_RESIDUAL_LATENCY_MS,
@@ -164,8 +158,6 @@ def saved_ui_scale(path: Path | None = None) -> int:
 
 def editor_settings_from_config(cfg: EditorConfig) -> EditorSettings:
     return EditorSettings(
-        visualiser_width=cfg.visualiser_width,
-        visualiser_height=cfg.visualiser_height,
         preview_quality=cfg.preview_quality,
         notification_display_sec=cfg.notification_display_sec,
         residual_latency_ms=cfg.residual_latency_ms,

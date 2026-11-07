@@ -6,11 +6,14 @@ from dataclasses import replace
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from cleave.config_schema.editor import DEFAULT_VISUALISER_HEIGHT, DEFAULT_VISUALISER_WIDTH
 from cleave.preset_playlist import PresetPlaylist
 from cleave.viz.layer import StemLayer
 from cleave.viz.layer_pipeline import LayerFramePipeline
-from cleave.viz.layer_preview_resolution import preview_layer_size
+from cleave.config import render_output_size
+from cleave.viz.layer_preview_resolution import (
+    live_content_size,
+    preview_layer_size,
+)
 from cleave.viz.session import LayerRuntime, TuningSession
 from tests.support.config import TEST_LAYER_STEMS, default_post_fx_runtime
 from tests.support.viz import make_test_cfg
@@ -80,8 +83,10 @@ def test_apply_preview_resolutions_resizes_when_size_changes() -> None:
     layer = _stem_layer("layer_1")
     base_cfg = make_test_cfg(("layer_1",))
     cfg = replace(base_cfg, editor=replace(base_cfg.editor, preview_quality="performance"))
-    preview_w, preview_h = preview_layer_size("performance", 0, cfg.editor)
     session = _session(("layer_1",))
+    preview_w, preview_h = preview_layer_size(
+        "performance", 0, live_content_size(session)
+    )
     compositor = MagicMock()
 
     LayerFramePipeline.apply_preview_resolutions(
@@ -95,9 +100,11 @@ def test_apply_preview_resolutions_resizes_when_size_changes() -> None:
 def test_apply_preview_resolutions_skips_when_unchanged() -> None:
     base_cfg = make_test_cfg(("layer_1",))
     cfg = replace(base_cfg, editor=replace(base_cfg.editor, preview_quality="performance"))
-    preview_w, preview_h = preview_layer_size("performance", 0, cfg.editor)
-    layer = _stem_layer("layer_1", width=preview_w, height=preview_h)
     session = _session(("layer_1",))
+    preview_w, preview_h = preview_layer_size(
+        "performance", 0, live_content_size(session)
+    )
+    layer = _stem_layer("layer_1", width=preview_w, height=preview_h)
     compositor = MagicMock()
 
     LayerFramePipeline.apply_preview_resolutions(
@@ -155,12 +162,7 @@ def test_build_preview_resolutions_false_uses_output_size_at_mismatched_aspect(
         base_cfg,
         render_width=1080,
         render_height=1920,
-        editor=replace(
-            base_cfg.editor,
-            visualiser_width=DEFAULT_VISUALISER_WIDTH,
-            visualiser_height=DEFAULT_VISUALISER_HEIGHT,
-            preview_quality="performance",
-        ),
+        editor=replace(base_cfg.editor, preview_quality="performance"),
     )
     compositor = MagicMock()
     playlists = {slot: layers[slot].playlist for slot in slots}
@@ -211,7 +213,9 @@ def test_build_preview_resolutions_false_viz_quality_uses_preview_sizes(
     )
 
     build_single.assert_called_once()
-    preview_w, preview_h = preview_layer_size("performance", 0, cfg.editor)
+    preview_w, preview_h = preview_layer_size(
+        "performance", 0, render_output_size(cfg)
+    )
     assert build_single.call_args.kwargs["width"] == preview_w
     assert build_single.call_args.kwargs["height"] == preview_h
 
@@ -241,7 +245,9 @@ def test_build_preview_resolutions_true_builds_at_preview_size(
     )
 
     build_single.assert_called_once()
-    preview_w, preview_h = preview_layer_size("performance", 0, cfg.editor)
+    preview_w, preview_h = preview_layer_size(
+        "performance", 0, live_content_size(session)
+    )
     assert build_single.call_args.kwargs["width"] == preview_w
     assert build_single.call_args.kwargs["height"] == preview_h
     apply_preview_resolutions.assert_called_once_with(

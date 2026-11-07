@@ -62,6 +62,7 @@ from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.row_spec import section_lock_blocks_mutation
 from cleave.viz.session import TuningSession
 from cleave.viz.tuning_view_state import TuningViewState, TuningViewStateBuilder
+from cleave.viz.visualiser_resolution import VisualiserResolutionSync
 
 if TYPE_CHECKING:
     from cleave.gl_compositor import GlCompositor
@@ -243,14 +244,15 @@ class TuningControls:
             cfg,
             on_notification=self.show_notification,
             on_notification_display_changed=self._notification_host.set_display_sec,
-            on_visualiser_resolution_changed=lambda: (
-                self.layer_lifecycle.apply_visualiser_resolution()
-            ),
         )
         self.project = ProjectControls(
             session,
             duration_sec=duration_sec,
             on_compositor_format_changed=self._sync_live_compositor_format,
+        )
+        self.visualiser_resolution = VisualiserResolutionSync(
+            session,
+            on_apply=lambda: self.layer_lifecycle.apply_visualiser_resolution(),
         )
         self.project_render = ProjectRenderController(
             session,
@@ -475,7 +477,7 @@ class TuningControls:
         self.inline_edit.tick(dt_sec)
         self.project_switch.tick(dt_sec)
         self.value_nudge.tick(dt_sec)
-        self.settings.tick(dt_sec)
+        self.visualiser_resolution.tick(dt_sec)
         self._notification_host.clear_expired()
         self.project_render.tick()
 

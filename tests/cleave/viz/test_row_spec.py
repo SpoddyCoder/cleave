@@ -11,9 +11,7 @@ import pygame
 import pytest
 
 from cleave.config_schema.editor import (
-    DEFAULT_VISUALISER_HEIGHT,
     DEFAULT_EDITOR_PREVIEW_QUALITY,
-    DEFAULT_VISUALISER_WIDTH,
     DEFAULT_NOTIFICATION_DISPLAY_SEC,
     DEFAULT_HELP_SIDE,
     DEFAULT_NAVIGATOR_SIDE,
@@ -134,8 +132,6 @@ _EXPECTED_REPEAT_ROW_KINDS = frozenset(
         RowKind.PATTERN_MASK_TRANSITION,
         RowKind.PATTERN_MASK_SEED,
         RowKind.SETTINGS_PREVIEW_QUALITY,
-        RowKind.SETTINGS_VISUALISER_WIDTH,
-        RowKind.SETTINGS_VISUALISER_HEIGHT,
         RowKind.SETTINGS_NAVIGATOR_SIDE,
         RowKind.SETTINGS_HELP_SIDE,
         RowKind.SETTINGS_UI_SCALE,
@@ -186,7 +182,6 @@ def test_row_is_pinned() -> None:
     assert row_is_pinned(RowKind.PROJECT_RENDER_QUALITY) is True
     assert row_is_pinned(RowKind.SETTINGS_PREVIEW_QUALITY) is True
     assert row_is_pinned(RowKind.SETTINGS_EDITOR_WINDOW_HEADER) is True
-    assert row_is_pinned(RowKind.SETTINGS_VISUALISER_WIDTH) is True
     assert row_is_pinned(RowKind.SETTINGS_NAVIGATOR_SIDE) is True
     assert row_is_pinned(RowKind.SETTINGS_HELP_SIDE) is True
     assert row_is_pinned(RowKind.SETTINGS_UI_HEADER) is True
@@ -340,9 +335,6 @@ def test_parent_group_on_row_specs() -> None:
         "settings_editor_window"
     )
     assert row_spec(RowKind.SETTINGS_EDITOR_WINDOW_HEADER).parent_group == "settings"
-    assert row_spec(RowKind.SETTINGS_VISUALISER_WIDTH).parent_group == (
-        "settings_editor_window"
-    )
     assert row_spec(RowKind.SETTINGS_NAVIGATOR_SIDE).parent_group == (
         "settings_editor_window"
     )
@@ -583,8 +575,6 @@ def test_format_row_value_settings() -> None:
     state = _minimal_view_state(
         settings=SettingsBlock(
             preview_quality="performance",
-            visualiser_width=1920,
-            visualiser_height=1080,
             navigator_side="right",
             help_side="left",
             notification_display_sec=0,
@@ -595,12 +585,6 @@ def test_format_row_value_settings() -> None:
         format_row_value(state, RowDescriptor(RowKind.SETTINGS_PREVIEW_QUALITY))
         == "performance"
     )
-    assert format_row_value(
-        state, RowDescriptor(RowKind.SETTINGS_VISUALISER_WIDTH)
-    ) == "1920"
-    assert format_row_value(
-        state, RowDescriptor(RowKind.SETTINGS_VISUALISER_HEIGHT)
-    ) == "1080"
     assert (
         format_row_value(state, RowDescriptor(RowKind.SETTINGS_NAVIGATOR_SIDE))
         == "right"
@@ -950,18 +934,6 @@ def test_apply_field_horizontal_steps_ui_scale_and_applies_live() -> None:
         assert controls.cfg.editor.ui_scale == UI_SCALE_MIN
     finally:
         set_ui_scale_percent(DEFAULT_UI_SCALE)
-
-
-def test_apply_field_horizontal_adjusts_visualiser_resolution() -> None:
-    controls = _make_controls()
-    apply_field_horizontal(
-        controls, RowDescriptor(RowKind.SETTINGS_VISUALISER_WIDTH), True, False
-    )
-    assert controls.cfg.editor.visualiser_width == DEFAULT_VISUALISER_WIDTH + 10
-    apply_field_horizontal(
-        controls, RowDescriptor(RowKind.SETTINGS_VISUALISER_HEIGHT), True, True
-    )
-    assert controls.cfg.editor.visualiser_height == DEFAULT_VISUALISER_HEIGHT + 100
 
 
 def test_apply_field_horizontal_via_controls_keydown() -> None:

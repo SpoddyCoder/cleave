@@ -248,7 +248,10 @@ SPECS: dict[RowKind, RowSpec] = {
             ("Left/Right", f"adjust width ({RENDER_SIZE_STEP} px)"),
             ("PgUp/PgDn", f"large step ({RENDER_SIZE_STEP_LARGE} px)"),
         ),
-        help_description=("Offline render output width in pixels.",),
+        help_description=(
+            "Offline render output width in pixels.",
+            "The live preview uses the same size and shape.",
+        ),
         is_pinned=True,
         repeatable=True,
         parent_group="project_render",
@@ -264,7 +267,10 @@ SPECS: dict[RowKind, RowSpec] = {
             ("Left/Right", f"adjust height ({RENDER_SIZE_STEP} px)"),
             ("PgUp/PgDn", f"large step ({RENDER_SIZE_STEP_LARGE} px)"),
         ),
-        help_description=("Offline render output height in pixels.",),
+        help_description=(
+            "Offline render output height in pixels.",
+            "The live preview uses the same size and shape.",
+        ),
         is_pinned=True,
         repeatable=True,
         parent_group="project_render",

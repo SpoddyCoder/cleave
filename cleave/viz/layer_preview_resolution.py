@@ -6,7 +6,6 @@ from collections.abc import Sequence
 
 from cleave.config import (
     CleaveConfig,
-    EditorConfig,
     EditorPreviewQuality,
     render_output_size,
 )
@@ -37,19 +36,25 @@ def _requested_scale(preview_quality: EditorPreviewQuality, z_index: int) -> flo
     return _FLOOR_ONLY
 
 
+def live_content_size(session: TuningSession) -> tuple[int, int]:
+    """Live visualiser content size: the project render output size."""
+    render = session.project.render
+    return render.width, render.height
+
+
 def preview_layer_size(
     preview_quality: EditorPreviewQuality,
     z_index: int,
-    visualizer: EditorConfig,
+    base: tuple[int, int],
 ) -> tuple[int, int]:
-    layer_w = visualizer.visualiser_width
-    layer_h = visualizer.visualiser_height
+    """Layer size for *z_index*: *base* scaled by the preview quality tier."""
+    layer_w, layer_h = base
     if preview_quality == "full-quality":
         return layer_w, layer_h
 
     requested_scale = _requested_scale(preview_quality, z_index)
-    min_w = round(visualizer.visualiser_width * PREVIEW_MIN_VIZ_SCALE)
-    min_h = round(visualizer.visualiser_height * PREVIEW_MIN_VIZ_SCALE)
+    min_w = round(layer_w * PREVIEW_MIN_VIZ_SCALE)
+    min_h = round(layer_h * PREVIEW_MIN_VIZ_SCALE)
     effective_scale = max(requested_scale, min_w / layer_w, min_h / layer_h)
     w = max(1, round(layer_w * effective_scale))
     h = max(1, round(layer_h * effective_scale))
@@ -61,9 +66,9 @@ def offline_layer_sizes(
     layer_z_order: Sequence[str],
 ) -> dict[str, tuple[int, int]]:
     preview_quality = cfg.editor.preview_quality
-    visualizer = cfg.editor
+    base = render_output_size(cfg)
     return {
-        slot: preview_layer_size(preview_quality, z_index, visualizer)
+        slot: preview_layer_size(preview_quality, z_index, base)
         for z_index, slot in enumerate(layer_z_order)
     }
 
@@ -79,7 +84,7 @@ def render_layer_size(
     return preview_layer_size(
         cfg.editor.preview_quality,
         z_index,
-        cfg.editor,
+        render_output_size(cfg),
     )
 
 
@@ -88,8 +93,8 @@ def preview_sizes_for_session(
     session: TuningSession,
 ) -> dict[str, tuple[int, int]]:
     preview_quality = cfg.editor.preview_quality
-    visualizer = cfg.editor
+    base = live_content_size(session)
     return {
-        slot: preview_layer_size(preview_quality, z_index, visualizer)
+        slot: preview_layer_size(preview_quality, z_index, base)
         for z_index, slot in enumerate(session.layer_z_order)
     }

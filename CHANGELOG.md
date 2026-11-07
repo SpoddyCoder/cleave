@@ -20,7 +20,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
-- Settings > Editor Window > visualiser width and height set only the visualiser render resolution, and apply live without a restart. The window size is separate. Earlier saved width and height values are not carried over, so the resolution starts at 1920x1080.
+- The live preview takes its resolution and shape from Project > Render width and height, so it matches the rendered video, and letterboxes in the visualiser area. Changes apply live. The window size is separate.
 - Hovering a menu bar title opens its menu without a click, and hovering another title switches to it.
 - The rule under the menu bar uses the same grey as the rule under the transport bar.
 - Overlay card title text and hex colours are edited in place in the inspector, and colour rows show a swatch that opens a colour picker with live preview. Esc reverts. Body text keeps its multi-line dialog. Song marker rows have a delete icon, and clicking a row seeks to the marker.
@@ -94,7 +94,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Removed
 
-- Settings > Editor Window > upscale and display size. The window size now comes from the window itself.
+- Settings > Editor Window > upscale, display size, and visualiser width and height. The window size comes from the window itself, and the preview resolution from Project > Render.
 - Settings > UI width mode, max width, and min width rows, and their `ui_width_mode`, `ui_width`, and `ui_min_width` keys in the user config. The shell layout no longer used them.
 
 ## [0.3.0] - 2026-10-12

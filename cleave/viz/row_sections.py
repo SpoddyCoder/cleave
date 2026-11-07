@@ -125,8 +125,6 @@ SETTINGS_EDITOR_WINDOW_SECTION = SectionDef(
     context="global",
     children=(
         SectionNode(leaf_kind=RowKind.SETTINGS_PREVIEW_QUALITY),
-        SectionNode(leaf_kind=RowKind.SETTINGS_VISUALISER_WIDTH),
-        SectionNode(leaf_kind=RowKind.SETTINGS_VISUALISER_HEIGHT),
         SectionNode(leaf_kind=RowKind.SETTINGS_NAVIGATOR_SIDE),
         SectionNode(leaf_kind=RowKind.SETTINGS_HELP_SIDE),
     ),

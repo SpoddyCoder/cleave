@@ -22,16 +22,6 @@ def _format_settings_preview_quality(
 ) -> str:
     return state.settings.preview_quality
 
-def _format_settings_visualiser_width(
-    state: TuningViewState, _desc: RowDescriptor
-) -> str:
-    return str(state.settings.visualiser_width)
-
-def _format_settings_visualiser_height(
-    state: TuningViewState, _desc: RowDescriptor
-) -> str:
-    return str(state.settings.visualiser_height)
-
 def _format_settings_navigator_side(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
@@ -70,22 +60,6 @@ def _apply_settings_preview_quality(
 ) -> None:
     controls.settings.cycle_preview_quality(forward=forward)
     controls.layer_lifecycle.apply_preview_resolutions()
-
-def _apply_settings_visualiser_width(
-    controls: TuningControls,
-    _desc: RowDescriptor,
-    forward: bool,
-    large: bool,
-) -> None:
-    controls.settings.adjust_visualiser_width(forward=forward, large=large)
-
-def _apply_settings_visualiser_height(
-    controls: TuningControls,
-    _desc: RowDescriptor,
-    forward: bool,
-    large: bool,
-) -> None:
-    controls.settings.adjust_visualiser_height(forward=forward, large=large)
 
 def _apply_settings_navigator_side(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, _large: bool,
@@ -146,49 +120,12 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="Editor Window",
         help_description=(
-            "Live preview quality, visualiser resolution, and column sides.",
+            "Live preview quality and column sides.",
+            "The preview takes its size and shape from Project > Render.",
             "Drag the window edges, maximise it, or press F11 to set its size.",
         ),
         is_pinned=True,
         parent_group="settings",
-    ),
-    RowKind.SETTINGS_VISUALISER_WIDTH: RowSpec(
-        affordance=RowAffordance.VALUE_STEP,
-        panel_label="visualiser width",
-        present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_settings_visualiser_width,
-        apply_horizontal=_apply_settings_visualiser_width,
-        help_title="Visualiser width",
-        help_entries=(
-            ("Left/Right", "adjust width (10 px)"),
-            ("PgUp/PgDn", "large step (100 px)"),
-        ),
-        help_description=(
-            "Visualiser render width in pixels. Applies live.",
-            "The window size is separate.",
-        ),
-        is_pinned=True,
-        repeatable=True,
-        parent_group="settings_editor_window",
-    ),
-    RowKind.SETTINGS_VISUALISER_HEIGHT: RowSpec(
-        affordance=RowAffordance.VALUE_STEP,
-        panel_label="visualiser height",
-        present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_settings_visualiser_height,
-        apply_horizontal=_apply_settings_visualiser_height,
-        help_title="Visualiser height",
-        help_entries=(
-            ("Left/Right", "adjust height (10 px)"),
-            ("PgUp/PgDn", "large step (100 px)"),
-        ),
-        help_description=(
-            "Visualiser render height in pixels. Applies live.",
-            "The window size is separate.",
-        ),
-        is_pinned=True,
-        repeatable=True,
-        parent_group="settings_editor_window",
     ),
     RowKind.SETTINGS_NAVIGATOR_SIDE: RowSpec(
         affordance=RowAffordance.VALUE_STEP,

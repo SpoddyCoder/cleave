@@ -10,8 +10,6 @@ import pytest
 
 from cleave.config import EditorConfig
 from cleave.config_schema.editor import (
-    DEFAULT_VISUALISER_HEIGHT,
-    DEFAULT_VISUALISER_WIDTH,
     DEFAULT_INSPECTOR_WIDTH,
 )
 from cleave.config_schema.layers import DEFAULT_LAYER_SLOTS
@@ -902,44 +900,26 @@ def test_init_gl_resources_render_content_canvas_matches_output(
 @patch("cleave.viz.app.GlPostProcess")
 @patch("cleave.viz.app.GlCompositor")
 @patch("cleave.viz.app._compositor_color_format")
-def test_init_gl_resources_cheap_uses_editor_canvas_not_render_output(
+def test_init_gl_resources_cheap_uses_seed_content_size_and_window_display(
     mock_format: MagicMock,
     mock_gl: MagicMock,
     mock_post: MagicMock,
     mock_masked: MagicMock,
 ) -> None:
-    seed = _run_seed(
-        width=DEFAULT_VISUALISER_WIDTH,
-        height=DEFAULT_VISUALISER_HEIGHT,
-    )
-    seed.cfg = replace(
-        seed.cfg,
-        render_width=1080,
-        render_height=1920,
-        editor=replace(
-            seed.cfg.editor,
-            visualiser_width=DEFAULT_VISUALISER_WIDTH,
-            visualiser_height=DEFAULT_VISUALISER_HEIGHT,
-        ),
-    )
-    seed.session.project.render.width = 1080
-    seed.session.project.render.height = 1920
+    seed = _run_seed(width=1080, height=1920)
     mock_format.return_value = MagicMock()
     mock_gl.return_value = MagicMock()
     mock_post.return_value = MagicMock()
     mock_masked.return_value = MagicMock()
 
-    init_gl_resources_cheap(seed, (DEFAULT_VISUALISER_WIDTH, DEFAULT_VISUALISER_HEIGHT))
+    init_gl_resources_cheap(seed, (1600, 900))
 
     mock_gl.assert_called_once()
-    assert mock_gl.call_args.args[:2] == (DEFAULT_VISUALISER_WIDTH, DEFAULT_VISUALISER_HEIGHT)
-    assert mock_gl.call_args.kwargs["display_width"] == DEFAULT_VISUALISER_WIDTH
-    assert mock_gl.call_args.kwargs["display_height"] == DEFAULT_VISUALISER_HEIGHT
+    assert mock_gl.call_args.args[:2] == (1080, 1920)
+    assert mock_gl.call_args.kwargs["display_width"] == 1600
+    assert mock_gl.call_args.kwargs["display_height"] == 900
     mock_masked.assert_called_once()
-    assert mock_masked.call_args.args[:2] == (
-        DEFAULT_VISUALISER_WIDTH,
-        DEFAULT_VISUALISER_HEIGHT,
-    )
+    assert mock_masked.call_args.args[:2] == (1080, 1920)
 
 
 @patch("cleave.viz.app.OverlayDrawer.draw_timeline")

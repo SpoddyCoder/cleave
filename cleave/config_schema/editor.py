@@ -15,11 +15,6 @@ from cleave.config_schema.descriptors import (
     require_non_negative_number,
 )
 
-# Visualiser render resolution. The window size is separate (config_schema/window.py).
-DEFAULT_VISUALISER_WIDTH = 1920
-DEFAULT_VISUALISER_HEIGHT = 1080
-VISUALISER_WIDTH_MIN = 320
-VISUALISER_HEIGHT_MIN = 240
 DEFAULT_BEAT_SENSITIVITY = 1.0
 BEAT_SENSITIVITY_MIN = 0.0
 BEAT_SENSITIVITY_MAX = 5.0
@@ -69,14 +64,6 @@ ColumnSide = Literal["left", "right"]
 COLUMN_SIDES: tuple[ColumnSide, ...] = ("left", "right")
 DEFAULT_NAVIGATOR_SIDE: ColumnSide = "left"
 DEFAULT_HELP_SIDE: ColumnSide = "right"
-
-
-def clamp_visualiser_width(value: int | float) -> int:
-    return max(VISUALISER_WIDTH_MIN, int(round(value)))
-
-
-def clamp_visualiser_height(value: int | float) -> int:
-    return max(VISUALISER_HEIGHT_MIN, int(round(value)))
 
 
 def clamp_beat_sensitivity(value: float) -> float:
@@ -142,22 +129,6 @@ def _parse_column_side(
 
 
 EDITOR_FIELDS: tuple[FieldDescriptor, ...] = (
-    FieldDescriptor(
-        "visualiser_width",
-        DEFAULT_VISUALISER_WIDTH,
-        lambda raw, ctx, label: clamp_visualiser_width(
-            int(require_non_negative_number(raw, label, as_int=True))
-        ),
-        lambda value, _ctx: clamp_visualiser_width(value),
-    ),
-    FieldDescriptor(
-        "visualiser_height",
-        DEFAULT_VISUALISER_HEIGHT,
-        lambda raw, ctx, label: clamp_visualiser_height(
-            int(require_non_negative_number(raw, label, as_int=True))
-        ),
-        lambda value, _ctx: clamp_visualiser_height(value),
-    ),
     FieldDescriptor(
         "preview_quality",
         DEFAULT_EDITOR_PREVIEW_QUALITY,
@@ -236,8 +207,6 @@ def parse_editor_section(data: dict[str, Any]) -> Any:
     for field in EDITOR_FIELDS:
         parsed[field.yaml_key] = parse_field(editor, field, ctx, "editor")
     return EditorSettings(
-        visualiser_width=parsed["visualiser_width"],
-        visualiser_height=parsed["visualiser_height"],
         preview_quality=parsed["preview_quality"],
         notification_display_sec=parsed["notification_display_sec"],
         residual_latency_ms=parsed["residual_latency_ms"],
@@ -252,8 +221,6 @@ def parse_editor_section(data: dict[str, Any]) -> Any:
 
 def dump_editor_section(editor: Any) -> dict[str, Any]:
     values = {
-        "visualiser_width": editor.visualiser_width,
-        "visualiser_height": editor.visualiser_height,
         "preview_quality": editor.preview_quality,
         "notification_display_sec": editor.notification_display_sec,
         "residual_latency_ms": editor.residual_latency_ms,
@@ -276,8 +243,6 @@ def editor_config_from_settings(editor: Any | None = None) -> Any:
     if editor is None:
         editor = default_editor_settings()
     return EditorConfig(
-        visualiser_width=editor.visualiser_width,
-        visualiser_height=editor.visualiser_height,
         preview_quality=editor.preview_quality,
         notification_display_sec=editor.notification_display_sec,
         residual_latency_ms=editor.residual_latency_ms,

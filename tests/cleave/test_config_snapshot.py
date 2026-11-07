@@ -522,7 +522,7 @@ def test_write_session_snapshot_omits_window_size() -> None:
             )
             for slot in DEFAULT_LAYER_SLOTS
             },
-            editor=EditorConfig(visualiser_width=1280, visualiser_height=720),
+            editor=EditorConfig(ui_scale=150),
             config_path=config_path,
             user_config_path=root / "user-config.yaml",
         )
@@ -1631,10 +1631,7 @@ def test_session_snapshot_full_round_trip(tmp_path: Path) -> None:
     cfg_editor_changed = CleaveConfig(
         paths=cfg.paths,
         layers=cfg.layers,
-        editor=EditorConfig(
-            visualiser_width=cfg.editor.visualiser_width + 320,
-            visualiser_height=cfg.editor.visualiser_height,
-        ),
+        editor=EditorConfig(ui_scale=cfg.editor.ui_scale + 20),
         config_path=cfg.config_path,
         user_config_path=cfg.user_config_path,
         layer_z_order=cfg.layer_z_order,

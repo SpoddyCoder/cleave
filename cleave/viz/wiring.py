@@ -20,7 +20,7 @@ from cleave.preset_playlist import PresetPlaylist, scan_single_layer
 from cleave.signals import Signals
 from cleave.viz.controls import TuningControls
 from cleave.viz.project_switch import ProjectSwitchController
-from cleave.viz.layer_preview_resolution import preview_layer_size
+from cleave.viz.layer_preview_resolution import live_content_size, preview_layer_size
 from cleave.viz.live_layer_binding_factory import (
     LiveLayerBindingContext,
     LiveLayerBindingsFactory,
@@ -105,7 +105,7 @@ class LayerManager:
         width, height = preview_layer_size(
             self.cfg.editor.preview_quality,
             z_index,
-            self.cfg.editor,
+            live_content_size(self.session),
         )
         stem_layer = LayerFramePipeline.build_single(
             slot,
@@ -136,11 +136,8 @@ class LayerManager:
             self.post_process.release_sized_buffers()
 
     def apply_visualiser_resolution(self) -> None:
-        """Reallocate the content and layer framebuffers for the Settings resolution."""
-        editor = self.cfg.editor
-        self.compositor.set_content_size(
-            editor.visualiser_width, editor.visualiser_height
-        )
+        """Reallocate the content and layer framebuffers for the project render size."""
+        self.compositor.set_content_size(*live_content_size(self.session))
         self.apply_preview_resolutions()
         if self.post_process is not None:
             self.post_process.release_sized_buffers()

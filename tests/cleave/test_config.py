@@ -53,8 +53,6 @@ from cleave.config_schema.descriptors import (
 )
 from cleave.config_schema.editor import (
     DEFAULT_BEAT_SENSITIVITY,
-    DEFAULT_VISUALISER_HEIGHT,
-    DEFAULT_VISUALISER_WIDTH,
     DEFAULT_HELP_WIDTH,
     DEFAULT_INSPECTOR_WIDTH,
     DEFAULT_NOTIFICATION_DISPLAY_SEC,
@@ -200,15 +198,6 @@ def test_clamp_beat_sensitivity() -> None:
     assert clamp_beat_sensitivity(1.25) == 1.25
 
 
-def test_clamp_visualiser_width_and_height() -> None:
-    from cleave.config_schema.editor import clamp_visualiser_height, clamp_visualiser_width
-
-    assert clamp_visualiser_width(1280) == 1280
-    assert clamp_visualiser_width(100) == 320
-    assert clamp_visualiser_height(720) == 720
-    assert clamp_visualiser_height(100) == 240
-
-
 def test_clamp_notification_display_sec() -> None:
     assert clamp_notification_display_sec(5) == 5
     assert clamp_notification_display_sec(-1) == 0
@@ -219,8 +208,6 @@ def test_clamp_notification_display_sec() -> None:
 
 def test_editor_config_from_settings_defaults() -> None:
     cfg = editor_config_from_settings()
-    assert cfg.visualiser_width == DEFAULT_VISUALISER_WIDTH
-    assert cfg.visualiser_height == DEFAULT_VISUALISER_HEIGHT
     assert not hasattr(cfg, "upscale")
     assert cfg.preview_quality == DEFAULT_EDITOR_PREVIEW_QUALITY
     assert cfg.notification_display_sec == DEFAULT_NOTIFICATION_DISPLAY_SEC
@@ -232,8 +219,6 @@ def test_editor_config_from_settings_defaults() -> None:
 
 def test_editor_config_from_settings_uses_user_editor() -> None:
     editor = EditorSettings(
-        visualiser_width=1920,
-        visualiser_height=1080,
         preview_quality="performance",
         notification_display_sec=5,
         residual_latency_ms=0,
@@ -245,8 +230,6 @@ def test_editor_config_from_settings_uses_user_editor() -> None:
         help_side="left",
     )
     cfg = editor_config_from_settings(editor)
-    assert cfg.visualiser_width == 1920
-    assert cfg.visualiser_height == 1080
     assert cfg.preview_quality == "performance"
     assert cfg.notification_display_sec == 5
     assert cfg.inspector_width == 640
@@ -262,22 +245,6 @@ def test_parse_editor_section_clamps_ui_scale() -> None:
     assert parse_editor_section({"editor": {"ui_scale": 130}}).ui_scale == 130
     assert parse_editor_section({"editor": {"ui_scale": 10}}).ui_scale == UI_SCALE_MIN
     assert parse_editor_section({"editor": {"ui_scale": 900}}).ui_scale == UI_SCALE_MAX
-
-
-def test_parse_editor_section_reads_visualiser_size() -> None:
-    settings = parse_editor_section(
-        {"editor": {"visualiser_width": 1280, "visualiser_height": 720}}
-    )
-    assert settings.visualiser_width == 1280
-    assert settings.visualiser_height == 720
-
-
-def test_parse_editor_section_clamps_visualiser_size() -> None:
-    settings = parse_editor_section(
-        {"editor": {"visualiser_width": 100, "visualiser_height": 50}}
-    )
-    assert settings.visualiser_width == 320
-    assert settings.visualiser_height == 240
 
 
 def test_persisted_session_payload_omits_editor() -> None:
@@ -521,8 +488,6 @@ def test_load_config_user_paths_when_project_omits_paths(tmp_path: Path) -> None
 
 def test_load_config_editor_settings_from_user_config(tmp_path: Path) -> None:
     editor = EditorSettings(
-        visualiser_width=1920,
-        visualiser_height=1080,
         preview_quality="performance",
         notification_display_sec=5,
         residual_latency_ms=0,
@@ -535,8 +500,6 @@ def test_load_config_editor_settings_from_user_config(tmp_path: Path) -> None:
     write_minimal_config(project_dir, preset_root)
 
     cfg = load_config(project_root=project_dir, user_config_path=user_cfg_path)
-    assert cfg.editor.visualiser_width == 1920
-    assert cfg.editor.visualiser_height == 1080
     assert cfg.editor.preview_quality == "performance"
     assert cfg.editor.notification_display_sec == 5
     assert cfg.user_config_path == user_cfg_path.resolve()
@@ -544,8 +507,6 @@ def test_load_config_editor_settings_from_user_config(tmp_path: Path) -> None:
 
 def test_load_config_ignores_editor_fields_in_project_yaml(tmp_path: Path) -> None:
     user_editor = EditorSettings(
-        visualiser_width=1920,
-        visualiser_height=1080,
         preview_quality="performance",
         notification_display_sec=5,
         residual_latency_ms=0,
@@ -569,8 +530,6 @@ def test_load_config_ignores_editor_fields_in_project_yaml(tmp_path: Path) -> No
     )
 
     cfg = load_config(project_root=project_dir, user_config_path=user_cfg_path)
-    assert cfg.editor.visualiser_width == 1920
-    assert cfg.editor.visualiser_height == 1080
     assert cfg.editor.preview_quality == "performance"
     assert cfg.milkdrop_beat_sensitivity == DEFAULT_BEAT_SENSITIVITY
 
@@ -579,7 +538,6 @@ def test_load_config_round_trip(minimal_project: Path) -> None:
     cfg = load_config(project_root=minimal_project)
     assert cfg.config_path == (minimal_project / VIZ_CONFIG_FILENAME).resolve()
     assert set(cfg.layers) == set(DEFAULT_LAYER_SLOTS)
-    assert cfg.editor.visualiser_width > 0
     assert cfg.paths.preset_root.is_dir()
     for slot in DEFAULT_LAYER_SLOTS:
         assert cfg.layers[slot].preset.is_file()

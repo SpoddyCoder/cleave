@@ -24,6 +24,7 @@ from cleave.signals import Signals
 from cleave.stem_pcm import StemPcmBank, fold_pcm_to_max_samples
 from cleave.viz.layer import StemLayer
 from cleave.viz.layer_preview_resolution import (
+    live_content_size,
     preview_layer_size,
     preview_sizes_for_session,
     render_layer_size,
@@ -327,11 +328,11 @@ class LayerFramePipeline:
 
         if preview_resolutions:
             preview_quality = cfg.editor.preview_quality
-            visualizer = cfg.editor
+            base = live_content_size(session)
 
             def layer_size(slot: str) -> tuple[int, int]:
                 z_index = z_order.index(slot)
-                return preview_layer_size(preview_quality, z_index, visualizer)
+                return preview_layer_size(preview_quality, z_index, base)
         else:
 
             def layer_size(slot: str) -> tuple[int, int]:

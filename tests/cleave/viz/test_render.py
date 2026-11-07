@@ -183,14 +183,10 @@ def _setup_render_project(
     render_fps: int = 10,
     render_width: int | None = None,
     render_height: int | None = None,
-    editor: dict | None = None,
 ) -> Path:
     preset_root = tmp_path / "presets"
     project = tmp_path / "my-track"
-    overrides: dict = {}
-    if editor is not None:
-        overrides["editor"] = editor
-    write_minimal_config(project, preset_root, **overrides)
+    write_minimal_config(project, preset_root)
     _write_stub_stems(project)
     (project / "signals.json").write_text('{"version": 4}')
     mix = project / "my-track.flac"
@@ -1174,70 +1170,6 @@ def test_render_composites_default_overlay_when_render_absent(
 
     # Default overlays enable both opening and closing cards.
     assert mock_composite.call_count == frame_count * 2
-
-
-@patch.object(render_mod, "pygame")
-@patch.object(render_mod, "ffmpeg_executable", return_value="/usr/bin/ffmpeg")
-@patch.object(render_mod, "subprocess")
-@patch.object(render_mod, "init_gl_resources_render")
-@patch.object(render_mod, "build_runtime_base")
-@patch.object(render_mod, "scan_all_layers", return_value={})
-@patch.object(render_mod, "VisualizerApp")
-def test_render_ffmpeg_ignores_visualiser_size_uses_render_resolution(
-    mock_app_cls: MagicMock,
-    _mock_scan: MagicMock,
-    mock_build: MagicMock,
-    mock_init_gl: MagicMock,
-    mock_subprocess: MagicMock,
-    _mock_ffmpeg: MagicMock,
-    _mock_pygame: MagicMock,
-    tmp_path: Path,
-) -> None:
-    project = _setup_render_project(
-        tmp_path,
-        render_fps=10,
-        render_width=1280,
-        render_height=720,
-        editor={
-            "visualiser_width": 640,
-            "visualiser_height": 360,
-        },
-    )
-    content_w, content_h, fps = 640, 360, 10
-    render_w, render_h = 1280, 720
-    duration_sec = 2.0
-
-    compositor = MagicMock()
-    compositor.read_rgba_frame.return_value = b"\xff" * (render_w * render_h * 4)
-
-    seed, runtime = _mock_render_runtime(
-        width=content_w,
-        height=content_h,
-        fps=fps,
-        duration_sec=duration_sec,
-        output_width=render_w,
-        output_height=render_h,
-    )
-    runtime.compositor = compositor
-    mock_build.return_value = seed
-    mock_init_gl.return_value = runtime
-    mock_app_cls.return_value = MagicMock()
-
-    proc = MagicMock()
-    proc.stdin = MagicMock()
-    proc.wait.return_value = 0
-    mock_subprocess.Popen.return_value = proc
-
-    _attach_post_fx_session(runtime)
-
-    render_mod.render(project)
-
-    cmd = mock_subprocess.Popen.call_args[0][0]
-    assert "-s" in cmd and f"{render_w}x{render_h}" in cmd
-    mock_init_gl.assert_called_once_with(
-        seed, output_width=render_w, output_height=render_h, viz_quality=False
-    )
-    assert compositor.present_content.call_count == math.ceil(duration_sec * fps)
 
 
 @patch.object(render_mod, "pygame")
