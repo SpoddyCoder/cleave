@@ -52,9 +52,6 @@ _STATIC_IDS = (
     "layers.add",
     "layers.delete",
     "layers.preset_curation",
-    "overlay",
-    "post_fx",
-    "pattern_mask",
     "timeline.show_strip",
     "timeline.generate",
     "timeline.set_cut_type",
@@ -160,7 +157,6 @@ def test_menus_list_taxonomy_ids_once() -> None:
         "File",
         "Project",
         "Layers",
-        "Render",
         "Timeline",
         "Settings",
     ]
@@ -187,11 +183,6 @@ def test_menus_list_taxonomy_ids_once() -> None:
         "layers.preset_curation",
     ]
     assert _row_ids(menus[3]) == [
-        "overlay",
-        "post_fx",
-        "pattern_mask",
-    ]
-    assert _row_ids(menus[4]) == [
         "timeline.show_strip",
         None,
         "timeline.generate",
@@ -201,7 +192,7 @@ def test_menus_list_taxonomy_ids_once() -> None:
         "timeline.undo",
         "timeline.redo",
     ]
-    assert _row_ids(menus[5]) == ["settings.measure_latency", "help.overlay"]
+    assert _row_ids(menus[4]) == ["settings.measure_latency", "help.overlay"]
     ids = [command.id for command in iter_commands(menus)]
     assert len(ids) == len(set(ids))
     assert set(ids) == set(_STATIC_IDS)
@@ -598,89 +589,6 @@ def test_menu_and_inspector_share_layer_add_and_delete() -> None:
     controls.inspector.activate(delete_row)
     controls.layer_lifecycle.prompt_delete.assert_called_once_with("layer_1")
     controls.layer_lifecycle.add.assert_not_called()
-
-
-def test_render_menu_checks_mirror_flags() -> None:
-    menus = _menus()
-    overlays = command_by_id("overlay", menus)
-    post_fx = command_by_id("post_fx", menus)
-    pattern = command_by_id("pattern_mask", menus)
-    checks = (overlays, post_fx, pattern)
-    menu_ids = {command.id for command in iter_commands(menus)}
-    assert "render.edit_overlays" not in menu_ids
-    assert "render.edit_post_fx" not in menu_ids
-
-    assert all(command.kind == "check" and command.shortcut is None for command in checks)
-    assert overlays.checked(CommandContext(overlays_enabled=True)) is True
-    assert overlays.checked(CommandContext()) is False
-    assert post_fx.checked(CommandContext(post_fx_enabled=True)) is True
-    assert post_fx.checked(CommandContext()) is False
-    assert pattern.checked(CommandContext(pattern_mask_enabled=True)) is True
-    assert pattern.checked(CommandContext()) is False
-
-    visualizer = CommandContext()
-    curation = CommandContext(editor_mode="preset_curation")
-    for command in checks:
-        assert command.enabled(visualizer) is True
-        assert command.enabled(curation) is False
-    assert overlays.enabled(CommandContext(overlays_locked=True)) is False
-    assert post_fx.enabled(CommandContext(post_fx_locked=True)) is False
-    assert pattern.enabled(CommandContext(pattern_mask_locked=True)) is False
-
-    live = _make_controls(("layer_1",))
-    ctx = command_context(live)
-    assert ctx.overlays_enabled is True
-    assert ctx.post_fx_enabled is True
-    assert ctx.pattern_mask_enabled is False
-    assert ctx.overlays_locked is False
-    assert ctx.post_fx_locked is False
-    assert ctx.pattern_mask_locked is False
-    assert overlays.checked(ctx) is True
-    assert post_fx.checked(ctx) is True
-    assert pattern.checked(ctx) is False
-    live.session.overlays.opening_card.enabled = False
-    assert overlays.checked(command_context(live)) is True
-    live.session.overlays.closing_card.enabled = False
-    assert overlays.checked(command_context(live)) is False
-    live.session.post_fx.enabled = False
-    live.session.pattern_mask.enabled = True
-    assert post_fx.checked(command_context(live)) is False
-    assert pattern.checked(command_context(live)) is True
-
-    toggled = _make_controls(("layer_1",))
-    overlays.run(toggled)
-    assert toggled.session.overlays.opening_card.enabled is False
-    assert toggled.session.overlays.closing_card.enabled is False
-    post_fx.run(toggled)
-    assert toggled.session.post_fx.enabled is False
-    pattern.run(toggled)
-    assert toggled.session.pattern_mask.enabled is True
-
-    locked = _make_controls(("layer_1",))
-    locked.session.overlays.locked = True
-    locked.session.post_fx.locked = True
-    locked.session.pattern_mask.locked = True
-    locked_ctx = command_context(locked)
-    assert locked_ctx.overlays_locked is True
-    assert overlays.enabled(locked_ctx) is False
-    assert post_fx.enabled(locked_ctx) is False
-    assert pattern.enabled(locked_ctx) is False
-    overlays.run(locked)
-    post_fx.run(locked)
-    pattern.run(locked)
-    assert locked.session.overlays.opening_card.enabled is True
-    assert locked.session.post_fx.enabled is True
-    assert locked.session.pattern_mask.enabled is False
-
-    curated = _make_controls(("layer_1",))
-    curated.session.settings.editor_mode = "preset_curation"
-    curated.shell_focus.selected_id = "project"
-    curated.shell_focus.region = ShellRegion.NAVIGATOR
-    assert command_context(curated).editor_mode == "preset_curation"
-    overlays.run(curated)
-    assert curated.session.overlays.opening_card.enabled is True
-    assert curated.shell_focus.selected_id == "project"
-    assert curated.shell_focus.region is ShellRegion.NAVIGATOR
 
 
 def test_layer_jumps_select_the_layer_inspector() -> None:

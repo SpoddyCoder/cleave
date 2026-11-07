@@ -59,12 +59,6 @@ class CommandContext:
     timeline_locked: bool = False
     timeline_can_undo: bool = False
     timeline_can_redo: bool = False
-    overlays_enabled: bool = False
-    post_fx_enabled: bool = False
-    pattern_mask_enabled: bool = False
-    overlays_locked: bool = False
-    post_fx_locked: bool = False
-    pattern_mask_locked: bool = False
     help_visible: bool = False
 
 
@@ -117,9 +111,6 @@ def command_context(controls: Any) -> CommandContext:
         controls.shell_focus.region is ShellRegion.TIMELINE
         or bool(timeline.recording)
     )
-    overlays = session.overlays
-    post_fx = session.post_fx
-    pattern_mask = session.pattern_mask
     return CommandContext(
         editor_mode=session.settings.editor_mode,
         solo_slot=session.solo_slot,
@@ -139,14 +130,6 @@ def command_context(controls: Any) -> CommandContext:
         timeline_locked=bool(timeline.locked),
         timeline_can_undo=controls.timeline_history.can_undo,
         timeline_can_redo=controls.timeline_history.can_redo,
-        overlays_enabled=bool(
-            overlays.opening_card.enabled or overlays.closing_card.enabled
-        ),
-        post_fx_enabled=bool(post_fx.enabled),
-        pattern_mask_enabled=bool(pattern_mask.enabled),
-        overlays_locked=bool(overlays.locked),
-        post_fx_locked=bool(post_fx.locked),
-        pattern_mask_locked=bool(pattern_mask.locked),
         help_visible=bool(session.help_visible),
     )
 
@@ -291,47 +274,6 @@ def _run_delete(controls: Any) -> None:
     if slot is None:
         return
     controls.layer_lifecycle.prompt_delete(slot)
-
-
-def _render_block_menu_enabled(locked: bool, editor_mode: str) -> bool:
-    return not locked and not is_preset_curation_mode(editor_mode)
-
-
-def _overlays_menu_enabled(ctx: CommandContext) -> bool:
-    return _render_block_menu_enabled(ctx.overlays_locked, ctx.editor_mode)
-
-
-def _post_fx_menu_enabled(ctx: CommandContext) -> bool:
-    return _render_block_menu_enabled(ctx.post_fx_locked, ctx.editor_mode)
-
-
-def _pattern_mask_menu_enabled(ctx: CommandContext) -> bool:
-    return _render_block_menu_enabled(ctx.pattern_mask_locked, ctx.editor_mode)
-
-
-def _overlays_checked(ctx: CommandContext) -> bool:
-    return ctx.overlays_enabled
-
-
-def _post_fx_checked(ctx: CommandContext) -> bool:
-    return ctx.post_fx_enabled
-
-
-def _pattern_mask_checked(ctx: CommandContext) -> bool:
-    return ctx.pattern_mask_enabled
-
-
-def _run_toggle_enabled(node_id: str) -> Callable[[Any], None]:
-    def run(controls: Any) -> None:
-        from cleave.viz.row_hotkeys import node_header_descriptor
-        from cleave.viz.row_spec import apply_field_toggle_enabled
-
-        descriptor = node_header_descriptor(node_id)
-        if descriptor is None:
-            return
-        apply_field_toggle_enabled(controls, descriptor)
-
-    return run
 
 
 def _show_strip_enabled(ctx: CommandContext) -> bool:
@@ -519,32 +461,6 @@ _CURATION = Command(
     checked=_curation_checked,
 )
 
-_OVERLAYS = Command(
-    id="overlay",
-    label="Overlays",
-    kind="check",
-    enabled=_overlays_menu_enabled,
-    run=_when_enabled(_overlays_menu_enabled, _run_toggle_enabled("overlay")),
-    checked=_overlays_checked,
-)
-_POST_FX = Command(
-    id="post_fx",
-    label="Post-FX",
-    kind="check",
-    enabled=_post_fx_menu_enabled,
-    run=_when_enabled(_post_fx_menu_enabled, _run_toggle_enabled("post_fx")),
-    checked=_post_fx_checked,
-)
-_PATTERN_MASK = Command(
-    id="pattern_mask",
-    label="Pattern mask",
-    kind="check",
-    enabled=_pattern_mask_menu_enabled,
-    run=_when_enabled(
-        _pattern_mask_menu_enabled, _run_toggle_enabled("pattern_mask")
-    ),
-    checked=_pattern_mask_checked,
-)
 _SHOW_STRIP = Command(
     id="timeline.show_strip",
     label="Show timeline strip",
@@ -722,7 +638,6 @@ def build_menus(
                 (_SEPARATE, _RENDER, SEPARATOR, _BACKUP, _RESTORE),
             ),
             Menu("Layers", (_ADD, _DELETE, SEPARATOR, _CURATION)),
-            Menu("Render", (_OVERLAYS, _POST_FX, _PATTERN_MASK)),
             Menu(
                 "Timeline",
                 (

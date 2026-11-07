@@ -20,7 +20,7 @@ from cleave.viz.commands import (
 from cleave.viz.menu_bar import MenuBarState, menu_index_for_mnemonic, menu_mnemonic
 from cleave.viz.shell_focus import ShellRegion
 
-_LABELS = ("File", "Project", "Layers", "Render", "Timeline", "Settings", "Help")
+_LABELS = ("File", "Project", "Layers", "Timeline", "Settings", "Help")
 
 
 def _command(command_id: str, runs: list[tuple[str, bool]], *, enabled: bool = True) -> Command:
@@ -142,7 +142,7 @@ def test_disabled_enter_does_not_run() -> None:
 
 def test_menu_mnemonics_are_the_unique_first_letters() -> None:
     letters = tuple(menu_mnemonic(menu.label).upper() for menu in MENUS)
-    assert letters == ("F", "P", "L", "R", "T", "S")
+    assert letters == ("F", "P", "L", "T", "S")
     assert len(set(letters)) == len(letters)
     assert MENUS[0].label == "File"
     assert menu_index_for_mnemonic(MENUS, "F") == 0

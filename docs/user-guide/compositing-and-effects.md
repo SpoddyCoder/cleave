@@ -24,7 +24,7 @@ Signal-driven compositor modifiers on top of each layer. Tune depths (0-100%).
 
 ## Render overlay
 
-Opening and closing cards drawn on the final frame (live preview and offline render). Each card has its own enabled flag. Tune them under Render > Overlays.
+Opening and closing cards drawn on the final frame (live preview and offline render). Each card has its own enabled flag. Tune them under Overlay in the navigator.
 
 - **Opening card** appears at a chosen time (default 10s) and stays for a display duration.
 - **Closing card** disappears at a chosen time (default 0s from the end).
@@ -36,7 +36,7 @@ Default title is `Cleave Final Render`. Use the cards for credits, musician name
 
 ## Post-processing
 
-GPU passes after the layer stack (Render > Post FX). A parent `enabled` flag gates every child. The fade section fades the picture in from the song start (start and end in seconds) and out counted back from the song end (start and end in seconds), using a curve (linear, smoothstep, ease out cubic, or ease out expo).
+GPU passes after the layer stack (Post-FX in the navigator). A parent `enabled` flag gates every child. The fade section fades the picture in from the song start (start and end in seconds) and out counted back from the song end (start and end in seconds), using a curve (linear, smoothstep, ease out cubic, or ease out expo).
 
 **Highlight rolloff** compresses bright peaks. Apply per layer, on the composite (default), or off. Curves: rolloff (Reinhard-style), smoothstep, aces_fit. Threshold, ceiling, strength, softness, and desaturation are percentages.
 

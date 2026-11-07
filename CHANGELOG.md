@@ -52,10 +52,10 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Settings remembers the inspector and help widths in user editor settings (not the project file), opens a menu with Alt plus its underlined letter, and keeps a visible focus ring on the focused shell row when hovered.
 - Mouse gestures: hover highlights, wheel scroll on the navigator and inspector, sideways drag on numeric values, and draggable column splitters.
 - Timeline and song markers edit in the inspector, and the old tuning list is gone. The Timeline menu opens the strip, applies and resets the timeline, and snaps cues.
-- Overlays, Post-FX, and Pattern mask edit in the inspector. The Render menu toggles them, and those sections are gone from the leftover panel.
+- Overlays, Post-FX, and Pattern mask edit in the inspector, and those sections are gone from the leftover panel.
 - Each layer is a navigator node and edits in the inspector. Add layer (Ctrl+L) and Delete layer are on the Layers menu and the inspector. Keys 1-8 jump to layers when the timeline strip is not focused.
 - The editor shell now has a navigator, an inspector, and a transport bar. Settings and Project edit in the inspector. Tab cycles regions, and Ctrl+Up/Down move between the top-level sections.
-- The editor has a menu bar (File, Project, Layers, Render, Timeline, Settings, Help). Save, Render, Measure latency, and Preset curation moved from the panel to the menus. Ctrl+R starts a render.
+- The editor has a menu bar (File, Project, Layers, Timeline, Settings). Save, Render, Measure latency, and Preset curation moved from the panel to the menus. Ctrl+R starts a render.
 - Agent rules and skills now work in both Claude Code and Cursor. Shared instructions are in `AGENTS.md`, and rules and skills live in `.claude/` with symlinks from `.cursor/`.
 
 ### Fixed
