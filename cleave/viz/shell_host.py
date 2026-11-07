@@ -1033,6 +1033,9 @@ class ShellHost:
         self._controls = controls
         self._menu_bar_height_px = bar_height
         self._dropdown_span: tuple[float, float] | None = None
+        # Top label under the pointer last frame. Hover opens on entry only, so
+        # a click that closes a menu is not undone while the pointer stays put.
+        self._bar_hover_index: int | None = None
         # Drawn navigator list height, applied on the next frame. 0 until measured.
         self._nav_content_height_px = 0
         self._nav_measured_rows = 0
@@ -2171,6 +2174,8 @@ class ShellHost:
         imgui.push_style_var(imgui.StyleVar_.window_border_size, 0.0)
         bar_open = imgui.begin_main_menu_bar()
         rule_y: float | None = None
+        hovered_index = self._bar_hover_index
+        hovered_now: int | None = None
         try:
             if bar_open:
                 bar_bottom = imgui.get_window_pos().y + imgui.get_window_height()
@@ -2203,9 +2208,14 @@ class ShellHost:
                     anchors[index] = (rect_min.x, rect_max.y)
                     if clicked:
                         menu_state.click_top(index, menus)
+                    elif imgui.is_item_hovered() and hovered_index != index:
+                        menu_state.hover_top(index, menus)
+                    if imgui.is_item_hovered():
+                        hovered_now = index
         finally:
             if bar_open:
                 imgui.end_main_menu_bar()
+            self._bar_hover_index = hovered_now
             imgui.pop_style_var()
             imgui.pop_style_color()
         return rule_y, anchors, menus

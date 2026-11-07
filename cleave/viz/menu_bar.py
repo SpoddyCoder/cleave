@@ -83,6 +83,7 @@ class MenuBarState:
         self.dropdown_open = False
         self.item_index = 0
         self._alt_tap_pending = False
+        self._opened_by_hover = False
 
     def focus(self) -> bool:
         """Focus the bar without opening a dropdown. True when focus was gained."""
@@ -181,6 +182,7 @@ class MenuBarState:
         Alt keyup does not treat the chord as a bare Alt tap.
         """
         self.cancel_alt_tap()
+        self._opened_by_hover = False
         if not menus:
             return
         self.focused = True
@@ -198,12 +200,29 @@ class MenuBarState:
             return
         index = index % len(menus)
         self.focused = True
+        by_hover = self._opened_by_hover
+        self._opened_by_hover = False
         if self.dropdown_open and self.menu_index == index:
-            self.dropdown_open = False
+            # A click on a menu that hover just opened keeps it open.
+            self.dropdown_open = by_hover
             return
         self.menu_index = index
         self.dropdown_open = True
         self.item_index = -1
+
+    def hover_top(self, index: int, menus: tuple[Menu, ...] | list[Menu]) -> None:
+        """Open the dropdown under a top label the pointer just entered.
+
+        Opens like a mouse click, but never closes: an already open label
+        stays open. A click on that label keeps it open once, then toggles.
+        """
+        if not menus:
+            return
+        index = index % len(menus)
+        if self.dropdown_open and self.menu_index == index:
+            return
+        self.click_top(index, menus)
+        self._opened_by_hover = True
 
     def click_item(
         self,

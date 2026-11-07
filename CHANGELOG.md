@@ -14,6 +14,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- Hovering a menu bar title opens its menu without a click, and hovering another title switches to it.
 - The rule under the menu bar uses the same grey as the rule under the transport bar.
 - Overlay card title text and hex colours are edited in place in the inspector, and colour rows show a swatch that opens a colour picker with live preview. Esc reverts. Body text keeps its multi-line dialog. Song marker rows have a delete icon, and clicking a row seeks to the marker.
 - The preset list has a toolbar under it with Add current and Populate buttons, and paused switching shows a status line with a Resume button. The Layers navigator row has a + icon for adding a layer. Buttons in a locked section show the locked colour.

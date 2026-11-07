@@ -186,6 +186,22 @@ def test_click_top_opens_without_a_keyboard_row() -> None:
     assert state.focused
 
 
+def test_hover_top_opens_and_never_closes() -> None:
+    menus = _menus([])
+    state = MenuBarState()
+    state.hover_top(0, menus)
+    assert state.focused
+    assert state.dropdown_open
+    assert state.menu_index == 0
+    assert state.item_index == -1
+    state.hover_top(0, menus)
+    assert state.dropdown_open
+    state.click_top(0, menus)
+    assert state.dropdown_open
+    state.click_top(0, menus)
+    assert not state.dropdown_open
+
+
 def test_arrow_after_click_top_selects_an_end_command() -> None:
     runs: list[tuple[str, bool]] = []
     menus = _menus(runs)
