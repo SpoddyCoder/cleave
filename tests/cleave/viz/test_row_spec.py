@@ -18,12 +18,20 @@ from cleave.config_schema.editor import (
     DEFAULT_NOTIFICATION_DISPLAY_SEC,
     DEFAULT_HELP_SIDE,
     DEFAULT_NAVIGATOR_SIDE,
+    DEFAULT_UI_SCALE,
+    UI_SCALE_MAX,
+    UI_SCALE_MIN,
     editor_display_size,
     notification_display_label,
 )
 from cleave.config_schema.layers import hard_cut_enabled_display
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
 from cleave.viz.shell_layout import navigator_row_px
+from cleave.viz.theme import (
+    set_ui_scale_percent,
+    ui_scale_generation,
+    ui_scale_percent,
+)
 from cleave.viz.row_spec import (
     HEADER_ROW_KINDS,
     REPEAT_ROW_KINDS,
@@ -133,6 +141,7 @@ _EXPECTED_REPEAT_ROW_KINDS = frozenset(
         RowKind.SETTINGS_EDITOR_WINDOW_UPSCALE,
         RowKind.SETTINGS_NAVIGATOR_SIDE,
         RowKind.SETTINGS_HELP_SIDE,
+        RowKind.SETTINGS_UI_SCALE,
         RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY,
         RowKind.SETTINGS_UI_NAVIGATOR_HEIGHT,
         RowKind.SETTINGS_RESIDUAL_LATENCY_MS,
@@ -619,6 +628,11 @@ def test_format_row_value_settings() -> None:
         format_row_value(state, RowDescriptor(RowKind.SETTINGS_UI_NAVIGATOR_HEIGHT))
         == "240 px"
     )
+    scaled = _minimal_view_state(settings=SettingsBlock(ui_scale=120))
+    assert (
+        format_row_value(scaled, RowDescriptor(RowKind.SETTINGS_UI_SCALE))
+        == "120%"
+    )
     fit = _minimal_view_state(settings=SettingsBlock(navigator_height=0))
     assert (
         format_row_value(fit, RowDescriptor(RowKind.SETTINGS_UI_NAVIGATOR_HEIGHT))
@@ -926,6 +940,27 @@ def test_apply_field_horizontal_steps_navigator_height_from_drawn() -> None:
     assert controls.cfg.editor.navigator_height == row
     apply_field_horizontal(controls, desc, False, False)
     assert controls.cfg.editor.navigator_height == 0
+
+
+def test_apply_field_horizontal_steps_ui_scale_and_applies_live() -> None:
+    controls = _make_controls()
+    desc = RowDescriptor(RowKind.SETTINGS_UI_SCALE)
+    generation = ui_scale_generation()
+    try:
+        apply_field_horizontal(controls, desc, True, False)
+        assert controls.cfg.editor.ui_scale == DEFAULT_UI_SCALE + 10
+        assert ui_scale_percent() == DEFAULT_UI_SCALE + 10
+        assert ui_scale_generation() == generation + 1
+        apply_field_horizontal(controls, desc, True, True)
+        assert controls.cfg.editor.ui_scale == DEFAULT_UI_SCALE + 60
+        for _ in range(10):
+            apply_field_horizontal(controls, desc, True, True)
+        assert controls.cfg.editor.ui_scale == UI_SCALE_MAX
+        for _ in range(20):
+            apply_field_horizontal(controls, desc, False, True)
+        assert controls.cfg.editor.ui_scale == UI_SCALE_MIN
+    finally:
+        set_ui_scale_percent(DEFAULT_UI_SCALE)
 
 
 def test_apply_field_horizontal_adjusts_editor_window_size() -> None:

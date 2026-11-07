@@ -57,6 +57,10 @@ DEFAULT_INSPECTOR_WIDTH = 495
 DEFAULT_HELP_WIDTH = 320
 # Navigator height in the shared stack. 0 fits the navigator to its rows.
 DEFAULT_NAVIGATOR_HEIGHT = 0
+# Editor chrome scale in percent: text plus the spacing around it.
+DEFAULT_UI_SCALE = 100
+UI_SCALE_MIN = 80
+UI_SCALE_MAX = 200
 # Side columns stay at least this wide once the display can hold every open
 # side column and a 1px visualiser. A narrower window skips the floor.
 MIN_COLUMN_WIDTH = 60
@@ -119,6 +123,14 @@ def navigator_height_label(px: int) -> str:
     if px <= 0:
         return "fit to rows"
     return f"{px} px"
+
+
+def clamp_ui_scale(value: int | float) -> int:
+    return max(UI_SCALE_MIN, min(UI_SCALE_MAX, int(round(value))))
+
+
+def ui_scale_label(percent: int) -> str:
+    return f"{percent}%"
 
 
 def clamp_notification_display_sec(value: int | float) -> int:
@@ -227,6 +239,14 @@ EDITOR_FIELDS: tuple[FieldDescriptor, ...] = (
         lambda value, _ctx: clamp_navigator_height(value),
     ),
     FieldDescriptor(
+        "ui_scale",
+        DEFAULT_UI_SCALE,
+        lambda raw, ctx, label: clamp_ui_scale(
+            int(require_non_negative_number(raw, label, as_int=True))
+        ),
+        lambda value, _ctx: clamp_ui_scale(value),
+    ),
+    FieldDescriptor(
         "navigator_side",
         DEFAULT_NAVIGATOR_SIDE,
         lambda raw, ctx, label: _parse_column_side(raw, ctx, label),
@@ -259,6 +279,7 @@ def parse_editor_section(data: dict[str, Any]) -> Any:
         inspector_width=parsed["inspector_width"],
         help_width=parsed["help_width"],
         navigator_height=parsed["navigator_height"],
+        ui_scale=parsed["ui_scale"],
         navigator_side=parsed["navigator_side"],
         help_side=parsed["help_side"],
     )
@@ -275,6 +296,7 @@ def dump_editor_section(editor: Any) -> dict[str, Any]:
         "inspector_width": editor.inspector_width,
         "help_width": editor.help_width,
         "navigator_height": editor.navigator_height,
+        "ui_scale": editor.ui_scale,
         "navigator_side": editor.navigator_side,
         "help_side": editor.help_side,
     }
@@ -299,6 +321,7 @@ def editor_config_from_settings(editor: Any | None = None) -> Any:
         inspector_width=editor.inspector_width,
         help_width=editor.help_width,
         navigator_height=editor.navigator_height,
+        ui_scale=editor.ui_scale,
         navigator_side=editor.navigator_side,
         help_side=editor.help_side,
     )

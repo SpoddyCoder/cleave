@@ -138,6 +138,7 @@ SETTINGS_UI_SECTION = SectionDef(
     header_kind=RowKind.SETTINGS_UI_HEADER,
     context="global",
     children=(
+        SectionNode(leaf_kind=RowKind.SETTINGS_UI_SCALE),
         SectionNode(leaf_kind=RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY),
         SectionNode(leaf_kind=RowKind.SETTINGS_UI_NAVIGATOR_HEIGHT),
     ),

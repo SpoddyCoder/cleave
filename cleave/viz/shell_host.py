@@ -103,6 +103,7 @@ from cleave.viz.theme import (
     TRANSPORT_RULE,
     VALUE,
     tuning_ui_metrics,
+    ui_chrome_px,
 )
 from cleave.viz.value_nudge import (
     NudgeRect,
@@ -417,7 +418,8 @@ def menu_bar_height_px() -> int:
     bar uses the same height.
     """
     font_size = float(tuning_ui_metrics().font_size)
-    return max(1, int(round(font_size + _MENU_BAR_FRAME_PADDING_Y * 2.0)))
+    pad_y = ui_chrome_px(_MENU_BAR_FRAME_PADDING_Y)
+    return max(1, int(round(font_size + pad_y * 2.0)))
 
 
 @contextmanager
@@ -426,7 +428,7 @@ def _menu_bar_frame_padding() -> Iterator[None]:
     style = imgui.get_style()
     imgui.push_style_var(
         imgui.StyleVar_.frame_padding,
-        imgui.ImVec2(style.frame_padding.x, _MENU_BAR_FRAME_PADDING_Y),
+        imgui.ImVec2(style.frame_padding.x, ui_chrome_px(_MENU_BAR_FRAME_PADDING_Y)),
     )
     try:
         yield
@@ -564,7 +566,7 @@ def _draw_nav_tree_lines(
     for x1, y1, x2, y2 in navigator_tree_lines(
         rails,
         first_stem_x + 0.5,
-        _INSPECTOR_INDENT,
+        ui_chrome_px(_INSPECTOR_INDENT),
         elbow_right_x,
         rect_min.y,
         mid_y,
@@ -1545,7 +1547,7 @@ class ShellHost:
     ) -> None:
         for index, (text, color) in enumerate(transport_parts(readout)):
             if index:
-                imgui.same_line(0.0, _TRANSPORT_GAP)
+                imgui.same_line(0.0, ui_chrome_px(_TRANSPORT_GAP))
             imgui.text_colored(rgba(color), text)
         fps = transport_fps_text(readout)
         width = imgui.calc_text_size(fps).x
@@ -1580,7 +1582,7 @@ class ShellHost:
 
     def _draw_nav_node(self, node: NavNode, rails: tuple[bool, ...]) -> None:
         focus = self._controls.shell_focus
-        indent = node.depth * _INSPECTOR_INDENT
+        indent = node.depth * ui_chrome_px(_INSPECTOR_INDENT)
         left_x = imgui.get_cursor_screen_pos().x
         if indent:
             imgui.indent(indent)
@@ -1740,7 +1742,7 @@ class ShellHost:
 
     def _draw_inspector_row(self, state: Any, row: Any) -> None:
         focus = self._controls.shell_focus
-        indent = row.depth * _INSPECTOR_INDENT
+        indent = row.depth * ui_chrome_px(_INSPECTOR_INDENT)
         if indent:
             imgui.indent(indent)
         try:
@@ -1901,7 +1903,7 @@ class ShellHost:
         rect_max = imgui.get_item_rect_max()
         pad = imgui.get_style().frame_padding.x
         text_w = sum(imgui.calc_text_size(text).x for text, _color in parts)
-        right = rect_max.x - pad - text_w - _SWATCH_GAP
+        right = rect_max.x - pad - text_w - ui_chrome_px(_SWATCH_GAP)
         y = _selectable_text_y(rect_min.y)
         swatch_min = imgui.ImVec2(right - line * _SWATCH_ASPECT, y)
         swatch_max = imgui.ImVec2(right, y + line)
@@ -2289,7 +2291,7 @@ class ShellHost:
         style = imgui.get_style()
         pad_x = style.frame_padding.x
         check_w = imgui.calc_text_size("✓").x
-        gap = max(imgui.calc_text_size("  ").x, 16.0)
+        gap = max(imgui.calc_text_size("  ").x, ui_chrome_px(16.0))
         label_w = 0.0
         shortcut_w = 0.0
         for item in menu.items:
@@ -2300,7 +2302,9 @@ class ShellHost:
                 shortcut_w = max(shortcut_w, imgui.calc_text_size(item.shortcut).x)
         row_w = pad_x * 2.0 + check_w + gap + label_w + gap + shortcut_w + pad_x
         draw_list = imgui.get_window_draw_list()
-        imgui.set_cursor_pos_y(imgui.get_cursor_pos_y() + _MENU_POPUP_TOP_PAD_PX)
+        imgui.set_cursor_pos_y(
+            imgui.get_cursor_pos_y() + ui_chrome_px(_MENU_POPUP_TOP_PAD_PX)
+        )
         for item_index, item in enumerate(menu.items):
             if isinstance(item, MenuSeparator):
                 imgui.separator()

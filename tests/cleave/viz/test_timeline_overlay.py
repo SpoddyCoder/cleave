@@ -39,7 +39,6 @@ from cleave.viz.theme import (
 from cleave.viz.timeline_overlay import (
     ARM_FLASH_DURATION_MS,
     ARM_FLASH_HALF_MS,
-    BAR_VERTICAL_INSET,
     PLAYHEAD_FLASH_MS,
     ROLE_GLYPH_BOTTOM_PAD,
     ROLE_GLYPH_TICK_GAP,
@@ -1417,9 +1416,9 @@ def test_role_glyph_xor_drawn_late_on_upload_not_static() -> None:
     row_y = overlay._padding
     bar_rect = pygame.Rect(
         bar_left,
-        row_y + BAR_VERTICAL_INSET,
+        row_y + timeline_ui_metrics().bar_vertical_inset,
         bar_width,
-        max(1, row_h - BAR_VERTICAL_INSET * 2),
+        max(1, row_h - timeline_ui_metrics().bar_vertical_inset * 2),
     )
     bold = overlay_font(timeline_ui_metrics().font_size, bold=True)
     glyph_w, glyph_h = bold.size("L")

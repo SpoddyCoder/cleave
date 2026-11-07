@@ -13,29 +13,53 @@ from cleave.viz.modal import (
     ModalViewState,
 )
 from cleave.viz.text_fit import TextSizer, wrap_text_to_width
-from cleave.viz.theme import UI_SCALE, scale_px, tuning_ui_metrics
+from cleave.viz.theme import tuning_ui_metrics, ui_px
 
 # Message wrap width and text-panel height cap, as a fraction of the viewport.
 MESSAGE_MAX_SCREEN_FRACTION = 0.5
 # Modal panel minimum width as a fraction of the viewport.
 PANEL_MIN_SCREEN_FRACTION = 0.2
 
-_tuning_ui = tuning_ui_metrics()
-PANEL_PAD_X = _tuning_ui.modal_panel_pad_x
-PANEL_PAD_Y = _tuning_ui.modal_panel_pad_y
-BAR_HEIGHT = scale_px(10, scale=UI_SCALE)
 TEXT_BUTTON_LABELS = ("Confirm", "Cancel")
-BUTTON_GAP = scale_px(8, scale=UI_SCALE)
-BUTTON_PAD_Y = scale_px(3, scale=UI_SCALE)
-FORM_ROW_PAD_Y = scale_px(3, scale=UI_SCALE)
-FORM_LABEL_GAP = scale_px(24, scale=UI_SCALE)
-FORM_SEGMENT_PAD_X = scale_px(8, scale=UI_SCALE)
 FORM_STEP_ARROW_LEFT = "<"
 FORM_STEP_ARROW_RIGHT = ">"
 FORM_RADIO_ON = "(*) "
 FORM_RADIO_OFF = "( ) "
 EDITING_HINT = "Press Enter to confirm or ESC to cancel"
 CARET_WIDTH = 2
+
+
+# Spacing reads the live UI scale, so a scale change applies on the next frame.
+def panel_pad_x() -> int:
+    return tuning_ui_metrics().modal_panel_pad_x
+
+
+def panel_pad_y() -> int:
+    return tuning_ui_metrics().modal_panel_pad_y
+
+
+def bar_height() -> int:
+    return ui_px(10)
+
+
+def button_gap() -> int:
+    return ui_px(8)
+
+
+def button_pad_y() -> int:
+    return ui_px(3)
+
+
+def form_row_pad_y() -> int:
+    return ui_px(3)
+
+
+def form_label_gap() -> int:
+    return ui_px(24)
+
+
+def form_segment_pad_x() -> int:
+    return ui_px(8)
 
 
 class TextMeasure(TextSizer, Protocol):
@@ -100,25 +124,25 @@ def button_widths(measure: TextMeasure, labels: tuple[str, ...]) -> tuple[int, .
 
 
 def button_height(measure: TextMeasure) -> int:
-    return measure.get_linesize() + BUTTON_PAD_Y * 2
+    return measure.get_linesize() + button_pad_y() * 2
 
 
 def measure_button_row(
     measure: TextMeasure, labels: tuple[str, ...]
 ) -> tuple[int, int]:
     widths = button_widths(measure, labels)
-    gaps = BUTTON_GAP * max(0, len(widths) - 1)
+    gaps = button_gap() * max(0, len(widths) - 1)
     return sum(widths) + gaps, button_height(measure)
 
 
 def form_row_height(row: FormRowView, line_h: int, line_gap: int) -> int:
     lines = len(row.options) if row.kind is FormFieldKind.RADIO else 1
-    return lines_block_height(lines, line_h, line_gap) + FORM_ROW_PAD_Y * 2
+    return lines_block_height(lines, line_h, line_gap) + form_row_pad_y() * 2
 
 
 def form_segment_widths(measure: TextMeasure, row: FormRowView) -> tuple[int, ...]:
     return tuple(
-        measure.size(option)[0] + FORM_SEGMENT_PAD_X * 2 for option in row.options
+        measure.size(option)[0] + form_segment_pad_x() * 2 for option in row.options
     )
 
 
@@ -143,7 +167,7 @@ def measure_form(
     width = 0
     height = 0
     for row in state.form_rows:
-        row_w = measure.size(row.label)[0] + FORM_LABEL_GAP
+        row_w = measure.size(row.label)[0] + form_label_gap()
         width = max(width, row_w + form_control_width(measure, row))
         height += form_row_height(row, line_h, line_gap)
     if state.form_info is not None:
@@ -192,7 +216,7 @@ def measure_panel(
     if has_bar:
         if has_message or has_labeled:
             content_h += line_h + line_gap
-        content_h += BAR_HEIGHT
+        content_h += bar_height()
 
     if state.form_rows or state.form_info is not None:
         if has_message:
@@ -214,8 +238,8 @@ def measure_panel(
         content_h += options_h
 
     return (
-        max(content_w + PANEL_PAD_X * 2, panel_min_width(screen_w)),
-        content_h + PANEL_PAD_Y * 2,
+        max(content_w + panel_pad_x() * 2, panel_min_width(screen_w)),
+        content_h + panel_pad_y() * 2,
     )
 
 
@@ -261,7 +285,7 @@ def text_max_field_lines(
     max_panel_h = max(1, int(screen_h * MESSAGE_MAX_SCREEN_FRACTION))
     cta_h = lines_block_height(cta_line_count, line_h, line_gap)
     section_gap = line_h + line_gap
-    overhead = PANEL_PAD_Y * 2 + cta_h + section_gap * 2 + line_h
+    overhead = panel_pad_y() * 2 + cta_h + section_gap * 2 + line_h
     if has_error:
         overhead += line_h + line_gap
     max_field_h = max(line_h, max_panel_h - overhead)
@@ -343,8 +367,8 @@ def measure_text_panel(
     if error_line is not None:
         content_h += line_h + line_gap
     return (
-        max(content_w + PANEL_PAD_X * 2, panel_min_width(screen_w)),
-        content_h + PANEL_PAD_Y * 2,
+        max(content_w + panel_pad_x() * 2, panel_min_width(screen_w)),
+        content_h + panel_pad_y() * 2,
     )
 
 

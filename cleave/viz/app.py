@@ -39,6 +39,7 @@ from cleave.viz.preset_switching import advance_timeline_preset_switching
 from cleave.viz.modal import ModalHost
 from cleave.viz.overlay_draw import OverlayDrawer
 from cleave.viz.loading import LoadingWindow, open_loading_window
+from cleave.viz.theme import set_ui_scale_percent
 from cleave.viz.timeline_controls import TimelineControls
 from cleave.viz.shell_layout import ShellLayout
 from cleave.viz.timeline_overlay import (
@@ -630,6 +631,7 @@ class VisualizerApp:
                 width=seed.display_width, height=seed.display_height
             )
         pygame.display.set_caption(seed.window_title)
+        set_ui_scale_percent(seed.cfg.editor.ui_scale)
         if (
             window.display_width != seed.display_width
             or window.display_height != seed.display_height

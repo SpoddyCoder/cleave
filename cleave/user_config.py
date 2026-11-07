@@ -18,6 +18,7 @@ from cleave.config_schema.editor import (
     DEFAULT_EDITOR_UPSCALE,
     DEFAULT_HELP_WIDTH,
     DEFAULT_NAVIGATOR_HEIGHT,
+    DEFAULT_UI_SCALE,
     DEFAULT_INSPECTOR_WIDTH,
     DEFAULT_HELP_SIDE,
     DEFAULT_NAVIGATOR_SIDE,
@@ -63,6 +64,7 @@ class EditorSettings:
     inspector_width: int = DEFAULT_INSPECTOR_WIDTH
     help_width: int = DEFAULT_HELP_WIDTH
     navigator_height: int = DEFAULT_NAVIGATOR_HEIGHT
+    ui_scale: int = DEFAULT_UI_SCALE
     navigator_side: ColumnSide = DEFAULT_NAVIGATOR_SIDE
     help_side: ColumnSide = DEFAULT_HELP_SIDE
 
@@ -86,6 +88,7 @@ def default_editor_settings() -> EditorSettings:
         inspector_width=DEFAULT_INSPECTOR_WIDTH,
         help_width=DEFAULT_HELP_WIDTH,
         navigator_height=DEFAULT_NAVIGATOR_HEIGHT,
+        ui_scale=DEFAULT_UI_SCALE,
         navigator_side=DEFAULT_NAVIGATOR_SIDE,
         help_side=DEFAULT_HELP_SIDE,
     )
@@ -144,6 +147,18 @@ def load_user_config(path: Path | None = None) -> UserConfig:
     )
 
 
+def saved_ui_scale(path: Path | None = None) -> int:
+    """The saved editor UI scale, for the window before the project config loads.
+
+    An unreadable user config falls back to the default; the full config load
+    reports that error in the window.
+    """
+    try:
+        return load_user_config(path).editor.ui_scale
+    except (OSError, ValueError, yaml.YAMLError):
+        return DEFAULT_UI_SCALE
+
+
 def editor_settings_from_config(cfg: EditorConfig) -> EditorSettings:
     return EditorSettings(
         width=cfg.width,
@@ -155,6 +170,7 @@ def editor_settings_from_config(cfg: EditorConfig) -> EditorSettings:
         inspector_width=cfg.inspector_width,
         help_width=cfg.help_width,
         navigator_height=cfg.navigator_height,
+        ui_scale=cfg.ui_scale,
         navigator_side=cfg.navigator_side,
         help_side=cfg.help_side,
     )

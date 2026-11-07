@@ -34,9 +34,9 @@ from cleave.viz.theme import (
     BORDER_COLOR,
     BORDER_WIDTH,
     LABEL,
-    UI_SCALE,
     VALUE,
-    scale_px,
+    set_ui_scale_percent,
+    ui_px,
 )
 
 if TYPE_CHECKING:
@@ -87,9 +87,10 @@ def _scrim_flags() -> int:
 
 _BAR_WIDTH_FRACTION = 0.4
 _TEXT_MAX_WIDTH_FRACTION = 0.8
-_BAR_HEIGHT = scale_px(10, scale=UI_SCALE)
-_LINE_GAP = scale_px(8, scale=UI_SCALE)
-_BAR_GAP = scale_px(16, scale=UI_SCALE)
+# Base px at 100% UI scale; read through ui_px at layout time.
+_BAR_HEIGHT_BASE = 10
+_LINE_GAP_BASE = 8
+_BAR_GAP_BASE = 16
 _LOADING_WINDOW = "##loading"
 _SCRIM_WINDOW = "##loading-scrim"
 
@@ -122,13 +123,19 @@ def loading_content_layout(
     *,
     detail_size: tuple[int, int] | None = None,
     fraction: float | None = None,
-    line_gap: int = _LINE_GAP,
-    bar_gap: int = _BAR_GAP,
+    line_gap: int | None = None,
+    bar_gap: int | None = None,
     bar_width: int | None = None,
-    bar_height: int = _BAR_HEIGHT,
+    bar_height: int | None = None,
     border_width: int = BORDER_WIDTH,
 ) -> LoadingContentLayout:
     """Vertically stack message, detail, and bar; center the block in the viewport."""
+    if line_gap is None:
+        line_gap = ui_px(_LINE_GAP_BASE)
+    if bar_gap is None:
+        bar_gap = ui_px(_BAR_GAP_BASE)
+    if bar_height is None:
+        bar_height = ui_px(_BAR_HEIGHT_BASE)
     message_w, message_h = message_size
     stack_h = message_h
     if detail_size is not None:
@@ -487,8 +494,10 @@ def open_loading_window(
         color_format=RGBA8,
     )
     compositor.init()
+    from cleave.user_config import saved_ui_scale
     from cleave.viz.imgui_host import ImGuiHost
 
+    set_ui_scale_percent(saved_ui_scale())
     imgui_host = ImGuiHost.create()
     overlay_surface = pygame.Surface((width, height), pygame.SRCALPHA)
     window = LoadingWindow(

@@ -2,11 +2,21 @@
 
 from __future__ import annotations
 
+import re
+from pathlib import Path
+
+from cleave.config_schema.editor import DEFAULT_UI_SCALE, UI_SCALE_MAX
 from cleave.viz.theme import (
+    BASE_UI_SCALE,
     scale_px,
+    set_ui_scale_percent,
     timeline_panel_height_px,
     timeline_ui_metrics,
     tuning_ui_metrics,
+    ui_px,
+    ui_scale,
+    ui_scale_generation,
+    ui_scale_percent,
 )
 
 
@@ -49,3 +59,44 @@ def test_baseline_tuning_ui_metrics() -> None:
     assert metrics.font_size == 14
     assert metrics.padding == 8
     assert metrics.tree_indent == 8
+
+
+def test_live_scale_defaults_to_base_at_100_percent() -> None:
+    assert ui_scale_percent() == DEFAULT_UI_SCALE
+    assert ui_scale() == BASE_UI_SCALE
+    assert tuning_ui_metrics() == tuning_ui_metrics(scale=BASE_UI_SCALE)
+    assert timeline_ui_metrics() == timeline_ui_metrics(scale=BASE_UI_SCALE)
+
+
+def test_set_ui_scale_percent_drives_metrics_and_generation() -> None:
+    generation = ui_scale_generation()
+    try:
+        set_ui_scale_percent(200)
+        assert ui_scale_generation() == generation + 1
+        assert ui_scale() == BASE_UI_SCALE * 2
+        assert tuning_ui_metrics().font_size == 34
+        assert timeline_ui_metrics().row_height == 60
+        assert ui_px(10) == 24
+        set_ui_scale_percent(200)
+        assert ui_scale_generation() == generation + 1
+        set_ui_scale_percent(1000)
+        assert ui_scale_percent() == UI_SCALE_MAX
+    finally:
+        set_ui_scale_percent(DEFAULT_UI_SCALE)
+    assert tuning_ui_metrics().font_size == 17
+
+
+def test_no_import_time_metric_captures_in_viz() -> None:
+    """Module-level metric reads freeze the scale; read them at draw time."""
+    pattern = re.compile(
+        r"^[A-Za-z_][A-Za-z_0-9]*(?:\s*:\s*[^=]+)?\s*=\s*.*"
+        r"(tuning_ui_metrics\(|timeline_ui_metrics\(|ui_px\(|scale=BASE_UI_SCALE)",
+        re.MULTILINE,
+    )
+    viz = Path(__file__).resolve().parents[3] / "cleave" / "viz"
+    offenders = [
+        f"{path.relative_to(viz)}: {match.group(0).strip()}"
+        for path in sorted(viz.rglob("*.py"))
+        for match in pattern.finditer(path.read_text(encoding="utf-8"))
+    ]
+    assert offenders == []

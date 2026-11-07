@@ -9,6 +9,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 
+- Settings > UI > UI scale (80% to 200%) resizes all editor text and the spacing around it: menus, navigator, inspector, help, transport, notifications, tooltips, dialogs, the file picker, the loading screen, and the timeline strip. It applies at once and is kept as an editor preference. Overlay cards in the visualiser keep their own font sizes.
 - Drag the boundary between the navigator and the inspector to set how tall the navigator is, or step it with Settings > UI > navigator height. The height is kept as an editor preference. Fit to rows, the default, sizes the navigator to its tree as before, and stepping Left past the smallest height returns to it.
 - Timeline > Undo (Ctrl+Z) and Redo (Ctrl+Y) cover Generate timeline, Reset timeline, Snap cues, and Set cut type, including any preset lists and pattern mask settings Generate changed. Undo is unavailable after hand edits to cues, so it never discards them.
 - File > New project (Ctrl+N) asks for an audio file, and File > Open project (Ctrl+O) asks for a project. Both switch the live session without quitting. A project with unsaved changes asks before leaving.

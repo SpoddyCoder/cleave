@@ -8,6 +8,7 @@ from cleave.config_schema.editor import (
     EDITOR_PREVIEW_QUALITY_HELP_ENTRIES,
     editor_display_size,
     navigator_height_label,
+    ui_scale_label,
     notification_display_label,
 )
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
@@ -61,6 +62,11 @@ def _format_settings_ui_notification_display(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
     return notification_display_label(state.settings.notification_display_sec)
+
+def _format_settings_ui_scale(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return ui_scale_label(state.settings.ui_scale)
 
 def _format_settings_ui_navigator_height(
     state: TuningViewState, _desc: RowDescriptor
@@ -119,6 +125,11 @@ def _apply_settings_ui_notification_display(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, large: bool,
 ) -> None:
     controls.settings.adjust_notification_display_sec(forward=forward, large=large)
+
+def _apply_settings_ui_scale(
+    controls: TuningControls, _desc: RowDescriptor, forward: bool, large: bool,
+) -> None:
+    controls.settings.adjust_ui_scale(forward=forward, large=large)
 
 def _apply_settings_ui_navigator_height(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, large: bool,
@@ -269,7 +280,7 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="UI",
         help_description=(
-            "Notification time and navigator height for the editor panels.",
+            "UI scale, notification time, and navigator height for the editor panels.",
         ),
         is_pinned=True,
         parent_group="settings",
@@ -290,6 +301,27 @@ SPECS: dict[RowKind, RowSpec] = {
             "How long panel toasts stay visible before they disappear.",
             "Until dismissed keeps them until you press Enter.",
             "Enter dismisses the current toast at any remaining time.",
+        ),
+        is_pinned=True,
+        repeatable=True,
+        parent_group="settings_ui",
+    ),
+    RowKind.SETTINGS_UI_SCALE: RowSpec(
+        affordance=RowAffordance.VALUE_STEP,
+        panel_label="UI scale",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_settings_ui_scale,
+        apply_horizontal=_apply_settings_ui_scale,
+        help_title="UI scale",
+        help_entries=(
+            ("Left/Right", "adjust scale (10%)"),
+            ("PgUp/PgDn", "large step (50%)"),
+        ),
+        help_description=(
+            "Size of all editor text and the spacing around it.",
+            "Covers the menu, navigator, inspector, help, transport,",
+            "notifications, dialogs, and the timeline strip.",
+            "Overlay cards in the visualiser keep their own font sizes.",
         ),
         is_pinned=True,
         repeatable=True,

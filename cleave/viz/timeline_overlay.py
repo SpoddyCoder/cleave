@@ -64,8 +64,6 @@ from cleave.viz.theme import (
 )
 from cleave.viz.ui_tint import blit_tint
 
-_timeline_ui = timeline_ui_metrics()
-TIMELINE_PANEL_GAP: int = _timeline_ui.panel_gap
 OFF_SEGMENT_COLOR: tuple[int, int, int] = (40, 40, 40)
 # Dim end of the level-bar colour ramp (quarter beds stay readable).
 _BAR_LEVEL_DIM: tuple[int, int, int] = tuple(
@@ -114,7 +112,6 @@ def cue_readout_panel_clearance_px(panel_margin_y: int) -> int:
     return max(0, badge + metrics.rec_badge_gap - gap_above_timeline)
 
 
-BAR_VERTICAL_INSET: int = _timeline_ui.bar_vertical_inset
 ARMED_BG_ALPHA: int = 220
 CUE_TICK_ALPHA: int = 120
 CUE_TICK_WIDTH: int = 1
@@ -122,11 +119,6 @@ CUE_TICK_WIDTH: int = 1
 SELECTED_CUE_TICK_WIDTH: int = 3
 # Thick width while the selection flash is active.
 SELECTED_CUE_FLASH_TICK_WIDTH: int = 7
-PLAYHEAD_WIDTH: int = _timeline_ui.playhead_width
-REC_BADGE_GAP: int = _timeline_ui.rec_badge_gap
-REC_BADGE_PAD_X: int = _timeline_ui.rec_badge_pad_x
-REC_BADGE_PAD_Y: int = _timeline_ui.rec_badge_pad_y
-REC_TIME_GAP: int = _timeline_ui.rec_time_gap
 REC_FLASH_MS: int = 500
 PLAYHEAD_FLASH_MS: int = 400
 ARM_FLASH_HALF_MS: int = 150
@@ -894,19 +886,11 @@ class TimelineOverlay:
         padding: int | None = None,
         row_gap: int | None = None,
     ) -> None:
-        metrics = timeline_ui_metrics()
-        if margin is None:
-            margin = metrics.margin
-        if font_size is None:
-            font_size = metrics.font_size
-        if padding is None:
-            padding = metrics.padding
-        if row_gap is None:
-            row_gap = metrics.row_gap
-        self._margin = margin
-        self._font_size = font_size
-        self._padding = padding
-        self._row_gap = row_gap
+        # Overrides pin a value for tests; None follows the live UI scale.
+        self._margin_override = margin
+        self._font_size_override = font_size
+        self._padding_override = padding
+        self._row_gap_override = row_gap
         self._panel_rect: tuple[int, int, int, int] | None = None
         self._header_badge_rect: tuple[int, int, int, int] | None = None
         self._layer_num_width: int = 0
@@ -917,6 +901,30 @@ class TimelineOverlay:
         self._visibility = 1.0
         self._upload_scratch: pygame.Surface | None = None
         self._blit_src: tuple[int, int] = (0, 0)
+
+    @property
+    def _margin(self) -> int:
+        if self._margin_override is not None:
+            return self._margin_override
+        return timeline_ui_metrics().margin
+
+    @property
+    def _font_size(self) -> int:
+        if self._font_size_override is not None:
+            return self._font_size_override
+        return timeline_ui_metrics().font_size
+
+    @property
+    def _padding(self) -> int:
+        if self._padding_override is not None:
+            return self._padding_override
+        return timeline_ui_metrics().padding
+
+    @property
+    def _row_gap(self) -> int:
+        if self._row_gap_override is not None:
+            return self._row_gap_override
+        return timeline_ui_metrics().row_gap
 
     def _font_get(self) -> pygame.font.Font:
         return overlay_font(self._font_size)
@@ -1047,9 +1055,9 @@ class TimelineOverlay:
             row_rect = pygame.Rect(self._padding, row_y, panel_w - self._padding * 2, row_h)
             bar_rect = pygame.Rect(
                 bar_left,
-                row_y + BAR_VERTICAL_INSET,
+                row_y + timeline_ui_metrics().bar_vertical_inset,
                 bar_width,
-                max(1, row_h - BAR_VERTICAL_INSET * 2),
+                max(1, row_h - timeline_ui_metrics().bar_vertical_inset * 2),
             )
             armed = slot in state.armed_slots
             focused = state.submenu_focused and row_index == state.focus_row
@@ -1141,10 +1149,10 @@ class TimelineOverlay:
                         CUE_TICK_WIDTH,
                     )
 
-            if focused and BAR_VERTICAL_INSET > 0:
+            if focused and timeline_ui_metrics().bar_vertical_inset > 0:
                 blit_tint(
                     panel,
-                    pygame.Rect(bar_left, row_y, bar_width, BAR_VERTICAL_INSET),
+                    pygame.Rect(bar_left, row_y, bar_width, timeline_ui_metrics().bar_vertical_inset),
                     HIGHLIGHT,
                 )
                 blit_tint(
@@ -1153,7 +1161,7 @@ class TimelineOverlay:
                         bar_left,
                         bar_rect.bottom,
                         bar_width,
-                        BAR_VERTICAL_INSET,
+                        timeline_ui_metrics().bar_vertical_inset,
                     ),
                     HIGHLIGHT,
                 )
@@ -1188,9 +1196,9 @@ class TimelineOverlay:
             row_y = self._row_y(display_i, row_h)
             bar_rect = pygame.Rect(
                 layout.bar_left,
-                row_y + BAR_VERTICAL_INSET,
+                row_y + timeline_ui_metrics().bar_vertical_inset,
                 layout.bar_width,
-                max(1, row_h - BAR_VERTICAL_INSET * 2),
+                max(1, row_h - timeline_ui_metrics().bar_vertical_inset * 2),
             )
             for cue in bar_cues_for_row(state, slot):
                 if cue.role is None or cue.level <= LEVEL_EPS:
@@ -1421,9 +1429,9 @@ class TimelineOverlay:
             layout.bar_left,
             min(layout.bar_left + layout.bar_width - 1, playhead_px),
         )
-        x = playhead_left - max(1, PLAYHEAD_WIDTH)
+        x = playhead_left - max(1, timeline_ui_metrics().playhead_width)
         y = y_offset + layout.bar_top
-        w = max(1, PLAYHEAD_WIDTH) * 2 + 1
+        w = max(1, timeline_ui_metrics().playhead_width) * 2 + 1
         h = layout.bar_bottom - layout.bar_top
         return (x, y, w, h)
 
@@ -1446,7 +1454,7 @@ class TimelineOverlay:
             playhead_color(),
             (playhead_left, y0),
             (playhead_left, y1),
-            PLAYHEAD_WIDTH,
+            timeline_ui_metrics().playhead_width,
         )
         return self._playhead_strip_rect(layout, playhead_px, y_offset=y_offset)
 
@@ -1462,36 +1470,36 @@ class TimelineOverlay:
         cue_readout: pygame.Surface | None = None,
     ) -> tuple[int, int, int, int]:
         time_surf = font.render(transport_time_text(position_sec), True, VALUE)
-        time_w = time_surf.get_width() + REC_BADGE_PAD_X * 2
-        time_h = time_surf.get_height() + REC_BADGE_PAD_Y * 2
+        time_w = time_surf.get_width() + timeline_ui_metrics().rec_badge_pad_x * 2
+        time_h = time_surf.get_height() + timeline_ui_metrics().rec_badge_pad_y * 2
 
         rec_w = 0
         rec_surf: pygame.Surface | None = None
         if recording:
             rec_surf = font.render("REC", True, VALUE)
-            rec_w = rec_surf.get_width() + REC_BADGE_PAD_X * 2
+            rec_w = rec_surf.get_width() + timeline_ui_metrics().rec_badge_pad_x * 2
 
         badge_h = time_h
-        gap = REC_TIME_GAP if recording else 0
+        gap = timeline_ui_metrics().rec_time_gap if recording else 0
         right_w = time_w + gap + rec_w
         time_x = panel_w - time_w
         badge_y = y_offset
 
         readout_w = 0
         if cue_readout is not None:
-            readout_w = cue_readout.get_width() + REC_BADGE_PAD_X * 2
+            readout_w = cue_readout.get_width() + timeline_ui_metrics().rec_badge_pad_x * 2
             pygame.draw.rect(
                 surface, BACKGROUND, (0, badge_y, readout_w, badge_h)
             )
             surface.blit(
                 cue_readout,
-                (REC_BADGE_PAD_X, badge_y + REC_BADGE_PAD_Y),
+                (timeline_ui_metrics().rec_badge_pad_x, badge_y + timeline_ui_metrics().rec_badge_pad_y),
             )
 
         pygame.draw.rect(surface, BACKGROUND, (time_x, badge_y, time_w, badge_h))
         surface.blit(
             time_surf,
-            (time_x + REC_BADGE_PAD_X, badge_y + REC_BADGE_PAD_Y),
+            (time_x + timeline_ui_metrics().rec_badge_pad_x, badge_y + timeline_ui_metrics().rec_badge_pad_y),
         )
 
         header_x = time_x
@@ -1502,7 +1510,7 @@ class TimelineOverlay:
                 pygame.draw.rect(surface, REC_BG, (rec_x, badge_y, rec_w, badge_h))
             surface.blit(
                 rec_surf,
-                (rec_x + REC_BADGE_PAD_X, badge_y + REC_BADGE_PAD_Y),
+                (rec_x + timeline_ui_metrics().rec_badge_pad_x, badge_y + timeline_ui_metrics().rec_badge_pad_y),
             )
 
         if readout_w > 0:

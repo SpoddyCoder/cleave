@@ -24,23 +24,21 @@ from cleave.viz.modal import (
     TextFocusRegion,
 )
 from cleave.viz.modal_layout import (
-    BAR_HEIGHT,
-    BUTTON_GAP,
     CARET_WIDTH,
     FORM_RADIO_OFF,
     FORM_RADIO_ON,
-    FORM_ROW_PAD_Y,
     FORM_STEP_ARROW_LEFT,
     FORM_STEP_ARROW_RIGHT,
-    PANEL_PAD_X,
-    PANEL_PAD_Y,
     TEXT_BUTTON_LABELS,
     TextMeasure,
+    bar_height,
+    button_gap,
     button_widths,
     caret_index_at_point,
     focus_highlight_rect,
     form_control_width,
     form_row_height,
+    form_row_pad_y,
     form_segment_widths,
     lines_block_height,
     measure_button_row,
@@ -49,6 +47,8 @@ from cleave.viz.modal_layout import (
     measure_text_panel,
     message_lines,
     option_text,
+    panel_pad_x,
+    panel_pad_y,
     single_line_scroll_x,
     text_cta_lines,
     text_error_line,
@@ -311,7 +311,7 @@ def _draw_bar(
         return
     frac = max(0.0, min(1.0, fraction))
     inner_w = width - 2 * BORDER_WIDTH
-    inner_h = BAR_HEIGHT - 2 * BORDER_WIDTH
+    inner_h = bar_height() - 2 * BORDER_WIDTH
     fill_w = min(inner_w, int(round(inner_w * frac)))
     if fill_w > 0 and inner_h > 0:
         draw.add_rect_filled(
@@ -324,7 +324,7 @@ def _draw_bar(
         )
     draw.add_rect(
         imgui.ImVec2(float(x), float(y)),
-        imgui.ImVec2(float(x + width), float(y + BAR_HEIGHT)),
+        imgui.ImVec2(float(x + width), float(y + bar_height())),
         _packed(BORDER_COLOR),
         0.0,
         0,
@@ -346,8 +346,8 @@ def _draw_options(
 ) -> tuple[Rect, ...]:
     labels = view.options
     options_w, _ = measure_options(measure, labels, line_gap=line_gap)
-    content_w = panel_w - PANEL_PAD_X * 2
-    option_x = ox + PANEL_PAD_X + max(0, (content_w - options_w) // 2)
+    content_w = panel_w - panel_pad_x() * 2
+    option_x = ox + panel_pad_x() + max(0, (content_w - options_w) // 2)
     rects: list[Rect] = []
     for index, label in enumerate(labels):
         focused = index == view.focus_index
@@ -527,15 +527,15 @@ def _draw_form_rows(
 ) -> tuple[int, tuple[_FormHit, ...]]:
     """Draw every field. Returns the y below them and the clickable parts."""
     hits: list[_FormHit] = []
-    left = ox + PANEL_PAD_X
-    right = ox + panel_w - PANEL_PAD_X
+    left = ox + panel_pad_x()
+    right = ox + panel_w - panel_pad_x()
     for index, row in enumerate(view.form_rows):
         height = form_row_height(row, line_h, line_gap)
         rect = (left, y, right - left, height)
         hits.append(_FormHit(rect, ModalPointerKind.FOCUS_FORM_ROW, index))
         if row.focused:
             _highlight_option(draw, _outset(rect, 0))
-        text_y = y + FORM_ROW_PAD_Y
+        text_y = y + form_row_pad_y()
         _text(draw, left, text_y, row.label, HIGHLIGHT if row.focused else LABEL)
         width = form_control_width(measure, row)
         x = right - width
@@ -582,7 +582,7 @@ def _draw_button_row(
     """Buttons along the bottom right of the panel, in option order."""
     widths = button_widths(measure, view.options)
     total_w, height = measure_button_row(measure, view.options)
-    x = ox + panel_w - PANEL_PAD_X - total_w
+    x = ox + panel_w - panel_pad_x() - total_w
     rects: list[Rect] = []
     for index, label in enumerate(view.options):
         rect = (x, y, widths[index], height)
@@ -595,7 +595,7 @@ def _draw_button_row(
             focused=_button_focused(view, index, rect),
         )
         rects.append(rect)
-        x += widths[index] + BUTTON_GAP
+        x += widths[index] + button_gap()
     return tuple(rects)
 
 
@@ -611,7 +611,7 @@ def _draw_text_buttons(
 ) -> tuple[Rect, ...]:
     widths = button_widths(measure, TEXT_BUTTON_LABELS)
     total_w, height = measure_button_row(measure, TEXT_BUTTON_LABELS)
-    bx = ox + panel_w - PANEL_PAD_X - total_w
+    bx = ox + panel_w - panel_pad_x() - total_w
     buttons_focused = view.focus_region == TextFocusRegion.BUTTONS
     field_focused = view.focus_region == TextFocusRegion.FIELD
     rects: list[Rect] = []
@@ -632,7 +632,7 @@ def _draw_text_buttons(
             text_role=DISABLED if field_focused and not pointer_hover else VALUE,
         )
         rects.append(rect)
-        bx += width + BUTTON_GAP
+        bx += width + button_gap()
     return tuple(rects)
 
 
@@ -734,8 +734,8 @@ class ModalSurface:
         view = self.view
         measure = self.measure
         line_h = measure.get_linesize()
-        x = ox + PANEL_PAD_X
-        y = oy + PANEL_PAD_Y
+        x = ox + panel_pad_x()
+        y = oy + panel_pad_y()
         draw = imgui.get_window_draw_list()
         has_message = view.message is not None or view.body is not None
         has_labeled = bool(view.labeled_lines)
@@ -775,10 +775,10 @@ class ModalSurface:
                 draw,
                 x,
                 y,
-                panel_w - PANEL_PAD_X * 2,
+                panel_w - panel_pad_x() * 2,
                 view.progress_fraction or 0.0,
             )
-            y += BAR_HEIGHT
+            y += bar_height()
         if view.form_rows or view.form_info is not None:
             if has_message:
                 y += line_h
@@ -829,9 +829,9 @@ class ModalSurface:
         measure = self.measure
         line_h = measure.get_linesize()
         section_gap = line_h + line_gap
-        x = ox + PANEL_PAD_X
-        content_w = panel_w - PANEL_PAD_X * 2
-        y = oy + PANEL_PAD_Y
+        x = ox + panel_pad_x()
+        content_w = panel_w - panel_pad_x() * 2
+        y = oy + panel_pad_y()
         draw = imgui.get_window_draw_list()
 
         cta = text_cta_lines(view)

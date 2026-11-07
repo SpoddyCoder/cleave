@@ -57,6 +57,48 @@ def rgba(rgb: tuple[int, int, int], alpha: float = 1.0) -> imgui.ImVec4:
     return imgui.ImVec4(rgb[0] / 255.0, rgb[1] / 255.0, rgb[2] / 255.0, alpha)
 
 
+# Every size ``ImGuiStyle::ScaleAllSizes`` scales, as imgui-bundle attributes.
+_STYLE_SIZE_FIELDS = (
+    "window_padding",
+    "window_rounding",
+    "window_min_size",
+    "child_rounding",
+    "popup_rounding",
+    "frame_padding",
+    "frame_rounding",
+    "item_spacing",
+    "item_inner_spacing",
+    "cell_padding",
+    "touch_extra_padding",
+    "indent_spacing",
+    "columns_min_spacing",
+    "scrollbar_size",
+    "scrollbar_rounding",
+    "grab_min_size",
+    "grab_rounding",
+    "log_slider_deadzone",
+    "tab_rounding",
+    "tab_min_width_for_close_button",
+    "separator_text_padding",
+    "display_window_padding",
+    "display_safe_area_padding",
+    "mouse_cursor_scale",
+)
+
+
+def apply_imgui_style_scale(factor: float) -> None:
+    """Set style sizes to ImGui's defaults scaled by *factor*.
+
+    Starts from a fresh default style each time, so repeated changes do not
+    compound ImGui's per-call rounding.
+    """
+    scaled = imgui.Style()
+    scaled.scale_all_sizes(factor)
+    style = imgui.get_style()
+    for name in _STYLE_SIZE_FIELDS:
+        setattr(style, name, getattr(scaled, name))
+
+
 def apply_imgui_theme() -> None:
     """Write ``IMGUI_COLOR_ROLES`` and the shell's square corners onto the style."""
     style = imgui.get_style()

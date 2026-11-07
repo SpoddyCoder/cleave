@@ -63,6 +63,9 @@ from cleave.config_schema.editor import (
     DEFAULT_HELP_SIDE,
     DEFAULT_NAVIGATOR_SIDE,
     DEFAULT_EDITOR_PREVIEW_QUALITY,
+    DEFAULT_UI_SCALE,
+    UI_SCALE_MAX,
+    UI_SCALE_MIN,
     clamp_notification_display_sec,
     dump_editor_section,
     editor_config_from_settings,
@@ -246,6 +249,7 @@ def test_editor_config_from_settings_uses_user_editor() -> None:
         inspector_width=640,
         help_width=360,
         navigator_height=300,
+        ui_scale=150,
         navigator_side="right",
         help_side="left",
     )
@@ -258,8 +262,16 @@ def test_editor_config_from_settings_uses_user_editor() -> None:
     assert cfg.inspector_width == 640
     assert cfg.help_width == 360
     assert cfg.navigator_height == 300
+    assert cfg.ui_scale == 150
     assert cfg.navigator_side == "right"
     assert cfg.help_side == "left"
+
+
+def test_parse_editor_section_clamps_ui_scale() -> None:
+    assert parse_editor_section({}).ui_scale == DEFAULT_UI_SCALE
+    assert parse_editor_section({"editor": {"ui_scale": 130}}).ui_scale == 130
+    assert parse_editor_section({"editor": {"ui_scale": 10}}).ui_scale == UI_SCALE_MIN
+    assert parse_editor_section({"editor": {"ui_scale": 900}}).ui_scale == UI_SCALE_MAX
 
 
 def test_parse_editor_section_reads_width_height_upscale() -> None:

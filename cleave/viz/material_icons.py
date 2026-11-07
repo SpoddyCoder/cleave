@@ -39,9 +39,6 @@ ARROW_DOWNWARD_GLYPH = "\ue5db"
 RETURN_ARROW_GLYPH = "\ue5d9"
 _RETURN_ARROW_BOLD_PAD = 1
 
-_tuning_ui = tuning_ui_metrics()
-_SUFFIX_ICON_GAP = _tuning_ui.icon_suffix_gap
-_LABEL_SUFFIX_GAP = _tuning_ui.icon_label_gap
 
 _font_cache: dict[int, pygame.font.Font] = {}
 
@@ -114,7 +111,7 @@ def render_transport_icons(
 def row_icon_prefix_width(line_height: int) -> int:
     icon_h = _icon_height(line_height)
     font = material_font(icon_h)
-    return font.size(FOLDER_GLYPH)[0] + _LABEL_SUFFIX_GAP
+    return font.size(FOLDER_GLYPH)[0] + tuning_ui_metrics().icon_label_gap
 
 
 def _suffix_icon_width(line_height: int, glyph: str) -> int:
@@ -123,20 +120,21 @@ def _suffix_icon_width(line_height: int, glyph: str) -> int:
     return font.size(glyph)[0]
 
 
-VISIBILITY_ICON_PAD_X = _tuning_ui.visibility_icon_pad_x
+def visibility_icon_pad_x() -> int:
+    return tuning_ui_metrics().visibility_icon_pad_x
 
 
 def visibility_icon_slot_width(line_height: int) -> int:
     """Fixed eye slot width (glyph plus horizontal pad for solo background)."""
-    return _suffix_icon_width(line_height, VISIBILITY_GLYPH) + VISIBILITY_ICON_PAD_X * 2
+    return _suffix_icon_width(line_height, VISIBILITY_GLYPH) + visibility_icon_pad_x() * 2
 
 
 def visibility_icon_prefix_width(line_height: int) -> int:
-    return visibility_icon_slot_width(line_height) + _LABEL_SUFFIX_GAP
+    return visibility_icon_slot_width(line_height) + tuning_ui_metrics().icon_label_gap
 
 
 def track_header_lock_suffix_width(line_height: int) -> int:
-    return _SUFFIX_ICON_GAP + _suffix_icon_width(line_height, LOCK_GLYPH)
+    return tuning_ui_metrics().icon_suffix_gap + _suffix_icon_width(line_height, LOCK_GLYPH)
 
 
 def render_action_enter_icon(
@@ -162,7 +160,7 @@ def render_action_enter_icon(
 def action_enter_icon_suffix_width(line_height: int) -> int:
     """Gap plus bold return-arrow width for focused action rows."""
     return (
-        _SUFFIX_ICON_GAP
+        tuning_ui_metrics().icon_suffix_gap
         + _suffix_icon_width(line_height, RETURN_ARROW_GLYPH)
         + _RETURN_ARROW_BOLD_PAD
     )

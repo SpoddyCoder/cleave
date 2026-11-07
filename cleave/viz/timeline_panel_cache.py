@@ -12,7 +12,11 @@ from cleave.timeline import SlotCue, TimelineLane
 from cleave.viz.overlay_primitives import overlay_font, visibility_bucket
 from cleave.viz.overlay_upload import OverlayGpuState, UploadSignature
 from cleave.viz.playback import format_mmss
-from cleave.viz.theme import timeline_panel_height_px, timeline_ui_metrics
+from cleave.viz.theme import (
+    timeline_panel_height_px,
+    timeline_ui_metrics,
+    ui_scale_generation,
+)
 
 if TYPE_CHECKING:
     from cleave.viz.timeline_overlay import TimelineViewState
@@ -71,6 +75,7 @@ class TimelineStaticSignature:
     soft_cut_fade_out: float
     soft_cut_crossfade: bool
     selected_cue_t: tuple[tuple[str, float], ...]
+    ui_scale_generation: int
 
 
 @dataclass
@@ -170,6 +175,7 @@ def timeline_static_signature(
         soft_cut_fade_out=state.soft_cut_fades.fade_out,
         soft_cut_crossfade=state.soft_cut_fades.crossfade,
         selected_cue_t=tuple(sorted(state.selected_cue_t.items())),
+        ui_scale_generation=ui_scale_generation(),
     )
 
 

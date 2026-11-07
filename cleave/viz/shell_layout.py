@@ -22,7 +22,7 @@ from cleave.config_schema.editor import (
     MIN_COLUMN_WIDTH,
     ColumnSide,
 )
-from cleave.viz.theme import tuning_ui_metrics
+from cleave.viz.theme import tuning_ui_metrics, ui_chrome_px
 
 Rect = tuple[int, int, int, int]
 
@@ -37,7 +37,7 @@ SPLITTER_HIT_PX = 6
 def navigator_row_px() -> int:
     """One navigator row when the list height is not yet measured."""
     font_size = float(tuning_ui_metrics().font_size)
-    return max(1, int(round(font_size + _NAV_ROW_FRAME_PAD_Y * 2.0)))
+    return max(1, int(round(font_size + ui_chrome_px(_NAV_ROW_FRAME_PAD_Y) * 2.0)))
 
 
 def clamp_column_widths(

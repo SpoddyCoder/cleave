@@ -13,6 +13,7 @@ from cleave.config_schema.editor import (
     clamp_editor_width,
     clamp_residual_latency_ms,
     clamp_navigator_height,
+    clamp_ui_scale,
     clamp_shell_column_width,
     clamp_notification_display_sec,
     clamp_upscale,
@@ -20,6 +21,7 @@ from cleave.config_schema.editor import (
 from cleave.user_config import persist_editor_settings
 from cleave.viz.session import TuningSession
 from cleave.viz.shell_layout import navigator_row_px
+from cleave.viz.theme import set_ui_scale_percent
 
 EDITOR_WINDOW_RESTART_TOAST = (
     "Restart the application for changes to take effect."
@@ -173,6 +175,16 @@ class SettingsControls:
         self.cfg.editor = replace(
             self.cfg.editor, navigator_height=clamp_navigator_height(height)
         )
+        persist_editor_settings(self.cfg)
+
+    def adjust_ui_scale(self, *, forward: bool, large: bool) -> None:
+        step = 50 if large else 10
+        current = self.cfg.editor.ui_scale
+        new_value = clamp_ui_scale(current + (step if forward else -step))
+        if new_value == current:
+            return
+        self.cfg.editor = replace(self.cfg.editor, ui_scale=new_value)
+        set_ui_scale_percent(new_value)
         persist_editor_settings(self.cfg)
 
     def adjust_notification_display_sec(self, *, forward: bool, large: bool) -> None:

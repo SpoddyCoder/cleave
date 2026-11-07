@@ -7,7 +7,7 @@ import pygame
 from cleave.viz.material_icons import (
     VISIBILITY_GLYPH,
     VISIBILITY_OFF_GLYPH,
-    VISIBILITY_ICON_PAD_X,
+    visibility_icon_pad_x,
     render_glyph,
     visibility_icon_slot_width,
 )
@@ -196,5 +196,5 @@ def render_visibility_icon(
         pygame.draw.rect(surf, SOLO_BG, (0, 0, slot_w, line_height))
     elif override:
         pygame.draw.rect(surf, OVERRIDE_BG, (0, 0, slot_w, line_height))
-    surf.blit(glyph_surf, (VISIBILITY_ICON_PAD_X, 0))
+    surf.blit(glyph_surf, (visibility_icon_pad_x(), 0))
     return surf

@@ -515,3 +515,18 @@ def test_nav_splitter_request_height_is_from_the_navigator_top() -> None:
     top = layout.navigator[1]
     assert splitter_request_height(layout, top + 300.0) == 300
     assert splitter_request_height(layout, top - 50.0) == 0
+
+
+def test_shell_row_heights_grow_with_ui_scale() -> None:
+    from cleave.config_schema.editor import DEFAULT_UI_SCALE
+    from cleave.viz.shell_host import menu_bar_height_px
+    from cleave.viz.theme import set_ui_scale_percent
+
+    row, bar = navigator_row_px(), menu_bar_height_px()
+    try:
+        set_ui_scale_percent(200)
+        assert navigator_row_px() == row * 2
+        assert menu_bar_height_px() == bar * 2
+    finally:
+        set_ui_scale_percent(DEFAULT_UI_SCALE)
+    assert navigator_row_px() == row

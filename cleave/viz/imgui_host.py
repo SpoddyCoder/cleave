@@ -31,10 +31,10 @@ from imgui_bundle import imgui
 from imgui_bundle.python_backends.opengl_backend import ProgrammablePipelineRenderer
 
 from cleave.gl_state import restore_gl_state, save_gl_state
-from cleave.viz.imgui_theme import apply_imgui_theme
+from cleave.viz.imgui_theme import apply_imgui_style_scale, apply_imgui_theme
 from cleave.viz.overlay_primitives import overlay_font_path
 from cleave.viz.navigator import TWISTY_EXPANDED
-from cleave.viz.theme import tuning_ui_metrics
+from cleave.viz.theme import tuning_ui_metrics, ui_scale_generation, ui_scale_percent
 
 RENDERER_CLASS = ProgrammablePipelineRenderer
 
@@ -242,6 +242,26 @@ def _shell_glyph_ranges() -> list[int]:
     return ranges
 
 
+def _load_shell_fonts() -> tuple[Any, ...]:
+    """Replace the atlas fonts with the shell font at the live UI scale.
+
+    Returns the glyph-range buffers, which must outlive the atlas build.
+    """
+    io = imgui.get_io()
+    io.fonts.clear()
+    font_size = float(tuning_ui_metrics().font_size)
+    text_ranges = _shell_glyph_ranges()
+    font = io.fonts.add_font_from_file_ttf(
+        str(overlay_font_path()),
+        font_size,
+        None,
+        text_ranges,
+    )
+    io.font_default = font
+    icon_config, icon_ranges = _merge_icon_glyphs(io.fonts, font_size)
+    return (text_ranges, icon_config, icon_ranges)
+
+
 def _ensure_font_atlas() -> None:
     """Build the atlas before ``imgui.new_frame``.
 
@@ -313,6 +333,10 @@ class ImGuiHost:
         self._held: set[int] = set()
         self._wheel_x = 0.0
         self._wheel_y = 0.0
+        # Font and style match this UI scale generation.
+        self._ui_scale_generation = ui_scale_generation()
+        # ImFontConfig is copied, but the glyph-range buffers must outlive Build.
+        self._glyph_ranges: tuple[Any, ...] = ()
 
     @classmethod
     def create(cls) -> ImGuiHost:
@@ -322,15 +346,8 @@ class ImGuiHost:
             io = imgui.get_io()
             _keep_keyboard_nav_off()
             io.set_ini_filename(os.devnull)
-            font_size = float(tuning_ui_metrics().font_size)
-            font = io.fonts.add_font_from_file_ttf(
-                str(overlay_font_path()),
-                font_size,
-                None,
-                _shell_glyph_ranges(),
-            )
-            io.font_default = font
-            icon_font = _merge_icon_glyphs(io.fonts, font_size)
+            glyph_ranges = _load_shell_fonts()
+            apply_imgui_style_scale(ui_scale_percent() / 100.0)
             apply_imgui_theme()
             renderer = _select_renderer_class()()
         except Exception:
@@ -342,9 +359,20 @@ class ImGuiHost:
         else:
             display_size = surface.get_size()
         host = cls(context, renderer, display_size)
-        # ImFontConfig is copied, but the glyph-range buffer must outlive Build.
-        host._icon_font = icon_font
+        host._glyph_ranges = glyph_ranges
         return host
+
+    def apply_ui_scale(self) -> None:
+        """Rebuild the font atlas and style sizes at the live UI scale.
+
+        Call between frames only. ImGui 1.90 bakes the font size into the atlas.
+        """
+        self._glyph_ranges = _load_shell_fonts()
+        apply_imgui_style_scale(ui_scale_percent() / 100.0)
+        refresh = getattr(self.renderer, "refresh_font_texture", None)
+        if refresh is not None:
+            refresh()
+        self._ui_scale_generation = ui_scale_generation()
 
     @property
     def mouse_pos(self) -> tuple[float, float] | None:
@@ -381,6 +409,8 @@ class ImGuiHost:
             self._wheel_y += float(event.y)
 
     def begin_frame(self, dt: float) -> None:
+        if self._ui_scale_generation != ui_scale_generation():
+            self.apply_ui_scale()
         self._submit_input(dt)
         _keep_keyboard_nav_off()
         _ensure_font_atlas()

@@ -26,15 +26,17 @@ Shell rules (not text roles):
   NUDGE_HOVER_BG - background for the side arrows on an adjustable inspector value
   NUDGE_HOVER_BG_ALPHA - wash alpha for those arrows (stronger than HOVER_BG_ALPHA)
 
-Layout scales:
-  UI_SCALE (1.2) — main tuning panel, help, modals, and Material Icons spacing
-  TIMELINE_UI_SCALE (1.2) — bottom timeline strip typography and spacing
+Layout scale:
+  BASE_UI_SCALE (1.2) is the editor chrome at 100%. The Settings > UI > UI scale
+  preference multiplies it through set_ui_scale_percent(); ui_scale() is the live
+  factor for every panel, modal, help column, and the timeline strip. Read metrics
+  at draw time, never at import, so a scale change applies on the next frame.
 
 Timeline panel height is derived from a fixed per-row height (BASE_TIMELINE_ROW_HEIGHT)
 times row count plus padding and gaps via timeline_panel_height_px().
 
-Use tuning_ui_metrics(), timeline_ui_metrics(), and timeline_panel_height_px() for
-scaled layout; BORDER_WIDTH is not scaled.
+Use tuning_ui_metrics(), timeline_ui_metrics(), timeline_panel_height_px(), and
+ui_px() for scaled layout; BORDER_WIDTH is not scaled.
 
 See [live-tuning-ui](../.claude/rules/live-tuning-ui.md) for how
 rows apply these roles, including intentional exceptions.
@@ -44,14 +46,52 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from cleave.config_schema.editor import DEFAULT_UI_SCALE, clamp_ui_scale
+
 BASE_UI_FONT_SIZE: int = 14
-UI_SCALE: float = 1.2
-TIMELINE_UI_SCALE: float = 1.2
+BASE_UI_SCALE: float = 1.2
 BASE_TIMELINE_ROW_HEIGHT: int = 25
+
+_ui_scale_percent: int = DEFAULT_UI_SCALE
+_ui_scale_generation: int = 0
 
 
 def scale_px(value: float, *, scale: float) -> int:
     return max(1, round(value * scale))
+
+
+def set_ui_scale_percent(percent: int) -> None:
+    """Set the editor UI scale. Bumps the generation when the value changes."""
+    global _ui_scale_percent, _ui_scale_generation
+    clamped = clamp_ui_scale(percent)
+    if clamped == _ui_scale_percent:
+        return
+    _ui_scale_percent = clamped
+    _ui_scale_generation += 1
+
+
+def ui_scale_percent() -> int:
+    return _ui_scale_percent
+
+
+def ui_scale() -> float:
+    """Live layout factor: BASE_UI_SCALE at 100%."""
+    return BASE_UI_SCALE * _ui_scale_percent / 100.0
+
+
+def ui_scale_generation() -> int:
+    """Changes whenever the UI scale changes, so caches can rebuild."""
+    return _ui_scale_generation
+
+
+def ui_px(value: float) -> int:
+    """A base (unscaled) pixel value at the live UI scale."""
+    return scale_px(value, scale=ui_scale())
+
+
+def ui_chrome_px(value: float) -> float:
+    """A shell pixel value tuned at 100% UI scale, at the live UI scale."""
+    return value * _ui_scale_percent / 100.0
 
 
 @dataclass(frozen=True)
@@ -89,8 +129,10 @@ class TimelineUiMetrics:
 
 def tuning_ui_metrics(
     *,
-    scale: float = UI_SCALE,
+    scale: float | None = None,
 ) -> TuningUiMetrics:
+    if scale is None:
+        scale = ui_scale()
     return TuningUiMetrics(
         font_size=scale_px(BASE_UI_FONT_SIZE, scale=scale),
         padding=scale_px(8, scale=scale),
@@ -108,7 +150,9 @@ def tuning_ui_metrics(
     )
 
 
-def timeline_ui_metrics(*, scale: float = TIMELINE_UI_SCALE) -> TimelineUiMetrics:
+def timeline_ui_metrics(*, scale: float | None = None) -> TimelineUiMetrics:
+    if scale is None:
+        scale = ui_scale()
     return TimelineUiMetrics(
         font_size=scale_px(14, scale=scale),
         padding=scale_px(8, scale=scale),
@@ -128,7 +172,7 @@ def timeline_ui_metrics(*, scale: float = TIMELINE_UI_SCALE) -> TimelineUiMetric
 def timeline_panel_height_px(
     row_count: int,
     *,
-    scale: float = TIMELINE_UI_SCALE,
+    scale: float | None = None,
 ) -> int:
     """Scaled bottom timeline strip height in pixels."""
     if row_count <= 0:
@@ -136,10 +180,6 @@ def timeline_panel_height_px(
     m = timeline_ui_metrics(scale=scale)
     return m.padding * 2 + row_count * m.row_height + max(0, row_count - 1) * m.row_gap
 
-
-_tuning_ui = tuning_ui_metrics()
-SCROLLBAR_WIDTH: int = _tuning_ui.scrollbar_width
-SCROLLBAR_CONTENT_GAP: int = _tuning_ui.scrollbar_content_gap
 
 BACKGROUND: tuple[int, int, int] = (0, 0, 0)
 BACKGROUND_ALPHA: int = int(1.0 * 255)

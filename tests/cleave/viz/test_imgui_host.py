@@ -124,3 +124,31 @@ def test_shell_frames_build_the_font_atlas_without_gl() -> None:
     assert not imgui.get_current_context()
 
 
+
+
+def test_ui_scale_change_rebuilds_the_font_atlas_on_the_next_frame() -> None:
+    from imgui_bundle import imgui
+
+    from cleave.config_schema.editor import DEFAULT_UI_SCALE
+    from cleave.viz import imgui_host
+    from cleave.viz.shell_host import draw_shell_frame
+    from cleave.viz.theme import set_ui_scale_percent, tuning_ui_metrics
+
+    menu = MenuBarState()
+    with patch.object(imgui_host, "_gl_context_current", return_value=False):
+        host = _open_shell(menu)
+    try:
+        draw_shell_frame(host, menu, CommandContext(), 1.0 / 60.0)
+        base_size = imgui.get_io().font_default.font_size
+        base_pad = imgui.get_style().item_spacing.x
+        assert base_size == tuning_ui_metrics().font_size
+        set_ui_scale_percent(200)
+        draw_shell_frame(host, menu, CommandContext(), 1.0 / 60.0)
+        draw_shell_frame(host, menu, CommandContext(), 1.0 / 60.0)
+        assert imgui.get_io().font_default.font_size == tuning_ui_metrics().font_size
+        assert imgui.get_io().font_default.font_size > base_size
+        assert imgui.get_style().item_spacing.x == base_pad * 2
+        assert imgui.get_io().fonts.is_built()
+    finally:
+        set_ui_scale_percent(DEFAULT_UI_SCALE)
+        host.imgui.destroy()
