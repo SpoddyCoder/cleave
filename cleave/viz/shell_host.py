@@ -2229,9 +2229,11 @@ class ShellHost:
                     _draw_mnemonic_underline(
                         menu.label, BACKGROUND if active else LABEL
                     )
-                    rect_min = imgui.get_item_rect_min()
-                    rect_max = imgui.get_item_rect_max()
-                    anchors[index] = (rect_min.x, rect_max.y)
+                    # The dropdown's top border sits on the rule row. The
+                    # title's item rect ends a few pixels above the bar
+                    # bottom, so anchoring there doubled the top border
+                    # whenever the popup drew in front of the bar.
+                    anchors[index] = (imgui.get_item_rect_min().x, rule_y)
                     if clicked:
                         menu_state.click_top(index, menus)
                     elif imgui.is_item_hovered() and hovered_index != index:
@@ -2258,7 +2260,7 @@ class ShellHost:
         anchor = anchors.get(index)
         if anchor is None:
             origin_x = 0.0
-            origin_y = float(self._menu_bar_height_px)
+            origin_y = float(self._menu_bar_height_px) - 1.0
         else:
             origin_x, origin_y = anchor
         imgui.set_next_window_pos(
