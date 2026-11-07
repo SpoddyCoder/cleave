@@ -39,6 +39,7 @@ from cleave.viz.navigator import (
     NavNode,
     NavToggle,
     build_navigator,
+    navigator_row_bright,
     navigator_tree_rails,
 )
 from cleave.viz.panel_notification import (
@@ -1504,8 +1505,8 @@ class ShellHost:
                 twisty = navigator_twisty(node, focus.nav_expanded)
                 if twisty is not None:
                     width = imgui.calc_text_size(twisty).x
-                    root = node.depth == 0
-                    if root:
+                    row_bright = navigator_row_bright(node)
+                    if row_bright:
                         imgui.push_style_color(imgui.Col_.text, rgba(VALUE))
                     try:
                         twisty_clicked, _selected = imgui.selectable(
@@ -1515,10 +1516,10 @@ class ShellHost:
                             imgui.ImVec2(width, 0.0),
                         )
                     finally:
-                        if root:
+                        if row_bright:
                             imgui.pop_style_color()
                     imgui.same_line()
-                bright = selected or node.depth == 0
+                bright = selected or navigator_row_bright(node)
                 if bright:
                     imgui.push_style_color(imgui.Col_.text, rgba(VALUE))
                 try:

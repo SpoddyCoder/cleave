@@ -23,6 +23,7 @@ from cleave.viz.navigator import (
     layer_page_node_id,
     layer_page_of,
     layer_slot_of,
+    navigator_row_bright,
     navigator_tree_rails,
     parent_id_of,
     root_id,
@@ -245,6 +246,17 @@ def test_layer_children_follow_z_order() -> None:
     assert all(node.depth == 1 for node in children)
     assert all(node.has_inspector for node in children)
     assert all(node.expandable for node in children)
+
+
+def test_roots_and_layer_rows_are_bright_but_not_their_children() -> None:
+    open_id = layer_node_id("layer_1")
+    nodes = build_navigator(_two_layers(), {"layers", "settings", open_id})
+
+    for node in nodes:
+        expected = node.depth == 0 or node.parent_id == "layers"
+        assert navigator_row_bright(node) is expected
+    assert any(node.depth == 1 and not navigator_row_bright(node) for node in nodes)
+    assert any(node.depth == 2 and not navigator_row_bright(node) for node in nodes)
 
 
 def test_open_layer_shows_its_pages_only() -> None:

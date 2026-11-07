@@ -202,6 +202,11 @@ def build_navigator(
     return tuple(nodes)
 
 
+def navigator_row_bright(node: NavNode) -> bool:
+    """True for rows drawn in the value colour: roots and the layer rows."""
+    return node.depth == 0 or node.parent_id == "layers"
+
+
 def navigator_tree_rails(nodes: Sequence[NavNode]) -> tuple[tuple[bool, ...], ...]:
     """Tree rails for each row of *nodes*, in the same order.
 

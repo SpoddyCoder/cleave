@@ -13,6 +13,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- Layer rows in the navigator are white, matching the top-level rows.
 - Navigator sub-rows hang off tree lines that connect each row to its parent.
 - Overlay, Post-FX, Pattern Mask, Timeline, and layer navigator rows have clickable on/off and lock icons, and Overlay and layers also have a solo icon. Opening and closing card rows have their own on/off icon, with a matching row at the top of the card's inspector page. Clicking an icon selects its row. Selecting one of those rows lists the same switches as value rows in the inspector, and the on, solo, and lock buttons are gone from the top of the inspector.
 - The preset directory row has up and down arrows for the parent and first child directory, and they dim when there is no directory to move to. Clicking the row now only focuses it, and double-clicking opens the first child directory.
