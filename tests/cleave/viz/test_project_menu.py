@@ -370,8 +370,8 @@ def test_render_action_enter_opens_yes_cancel_modal() -> None:
     _prompt_project_render(controls)
     modal_view = controls.modal_host.view_state()
     assert modal_view is not None
-    assert modal_view.kind == ModalKind.YES_NO
-    assert modal_view.options == ("Yes", "Cancel")
+    assert modal_view.kind == ModalKind.CONFIRM
+    assert modal_view.options == ("Render", "Cancel")
     assert modal_view.message == "Render the project?"
     assert modal_view.labeled_lines == (
         ModalLabeledLine("output", "renders/render.mp4"),
@@ -407,7 +407,7 @@ def test_render_confirm_shows_progress_then_success(
     _wire_fake_job(controls, tmp_path, job)
     _prompt_project_render(controls)
     assert not controls.playback.paused
-    _choose_modal_option(controls, "Yes")
+    _choose_modal_option(controls, "Render")
     assert controls.playback.paused is True
     assert controls.project_render.busy is True
     modal_view = controls.modal_host.view_state()
@@ -448,12 +448,12 @@ def test_render_confirm_shows_progress_then_success(
     assert done is not None
     assert done.kind == ModalKind.CHOICE
     assert done.message == "Render complete"
-    assert done.options == ("Ok",)
+    assert done.options == ("OK",)
     assert done.labeled_lines == (
         ModalLabeledLine("output", "renders/render.mp4"),
     )
     assert controls.playback.paused is True
-    _choose_modal_option(controls, "Ok")
+    _choose_modal_option(controls, "OK")
     assert controls.modal_host.view_state() is None
     assert controls.playback.paused is False
 
@@ -467,7 +467,7 @@ def test_render_confirm_failure_shows_error_modal(
     job = _ScriptedRenderJob()
     _wire_fake_job(controls, tmp_path, job)
     _prompt_project_render(controls)
-    _choose_modal_option(controls, "Yes")
+    _choose_modal_option(controls, "Render")
     job.finish(ok=False, error="ffmpeg exited with status 1")
     controls.tick(0.016)
     view = controls.modal_host.view_state()

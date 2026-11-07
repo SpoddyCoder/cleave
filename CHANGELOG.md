@@ -9,10 +9,17 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 
+- Timeline > Undo (Ctrl+Z) and Redo (Ctrl+Y) cover Generate timeline, Reset timeline, Snap cues, and Set cut type, including any preset lists and pattern mask settings Generate changed. Undo is unavailable after hand edits to cues, so it never discards them.
 - File > New project (Ctrl+N) asks for an audio file, and File > Open project (Ctrl+O) asks for a project. Both switch the live session without quitting. A project with unsaved changes asks before leaving.
 
 ### Changed
 
+- Overlay card title text and hex colours are edited in place in the inspector, and colour rows show a swatch that opens a colour picker with live preview. Esc reverts. Body text keeps its multi-line dialog. Song marker rows have a delete icon, and clicking a row seeks to the marker.
+- The preset list has a toolbar under it with Add current and Populate buttons, and paused switching shows a status line with a Resume button. The Layers navigator row has a + icon for adding a layer. Buttons in a locked section show the locked colour.
+- Timeline commands with parameters now open one dialog each, with a line showing what the choice will affect: Generate timeline (replaces the staged rows and Apply Timeline Preset), Snap cues (beats, bars, or song markers), and Set cut type (replaces the four Apply and Remove rows). Reset timeline and Populate presets also use this dialog. The Timeline Preset page is gone; Generate and Reset are on the Timeline page. Dialog values take effect only when confirmed, and Generate keeps its values in the project as before.
+- Dialogs use buttons named for what they do, such as Delete layer and Cancel, in place of Yes and No. Destructive dialogs have a red button and start on Cancel. The Y and N keys no longer choose in a dialog.
+- Add Layer and Add Current Preset run at once and report it in a notification, with no prompt. Folder and role names in dialogs keep their own capitalisation.
+- Commands in the inspector are real buttons, and related commands sit side by side. Left and Right move between buttons in a row. Green is gone from the interface: menu commands, check marks, the play state, and active icons are white, and file picker shortcuts are light blue.
 - Layer rows in the navigator are white, matching the top-level rows.
 - Navigator sub-rows hang off tree lines that connect each row to its parent.
 - Overlay, Post-FX, Pattern Mask, Timeline, and layer navigator rows have clickable on/off and lock icons, and Overlay and layers also have a solo icon. Opening and closing card rows have their own on/off icon, with a matching row at the top of the card's inspector page. Clicking an icon selects its row. Selecting one of those rows lists the same switches as value rows in the inspector, and the on, solo, and lock buttons are gone from the top of the inspector.
@@ -51,6 +58,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- Removing soft cuts no longer clears hard cuts as well, and the reverse. Set cut type now names the type and which cues it applies to.
 - Arrow keys move the highlight in dialogs and the file picker even when the pointer stays on another row. Moving the mouse switches back to pointer highlighting.
 - The file picker directory name lines up with the folder icon.
 - The file picker row highlight keeps its left border, and its top border on the first row.

@@ -12,7 +12,7 @@ from imgui_bundle import imgui
 
 from cleave.viz.imgui_theme import rgba
 from cleave.viz.info_panel import InfoPanelViewState
-from cleave.viz.theme import ACTION, LABEL, VALUE
+from cleave.viz.theme import LABEL, VALUE
 
 Rect = tuple[int, int, int, int]
 
@@ -127,7 +127,7 @@ class InfoPanelSurface:
             if view.footer_line is not None:
                 if view.title_lines or view.body_lines:
                     imgui.spacing()
-                imgui.text_colored(rgba(ACTION), view.footer_line)
+                imgui.text_colored(rgba(VALUE), view.footer_line)
             return _current_rect()
         finally:
             imgui.end()

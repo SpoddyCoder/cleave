@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import TYPE_CHECKING
 
+from cleave.viz.inline_edit import ColourTarget
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
 from cleave.viz.row_sections import (
     OVERLAY_SECTION_KINDS,
@@ -41,6 +42,7 @@ class FitStrategy(Enum):
 
 FieldMutator = Callable[["TuningControls", RowDescriptor, bool, bool], None]
 ActionMutator = Callable[["TuningControls", RowDescriptor], None]
+ColourTargetFn = Callable[["TuningControls", RowDescriptor], ColourTarget]
 VisibilityIconFn = Callable[[TuningViewState, RowDescriptor], tuple[bool, bool]]
 
 
@@ -66,13 +68,14 @@ class RowSpec:
     nav_buttons: tuple[RowNavButton, ...] = ()
     apply_horizontal: FieldMutator | None = None
     apply_action: ActionMutator | None = None
+    # Set on colour rows. The inspector paints a swatch that opens the picker.
+    colour_target: ColourTargetFn | None = None
     # A mouse click only focuses the row. Double-click runs apply_action.
     activate_on_double_click: bool = False
     fit_strategy: FitStrategy = FitStrategy.PLAIN
     visibility_icon: VisibilityIconFn | None = None
     header_glyph: str | None = None
     header_glyph_color: tuple[int, int, int] | None = None
-    shows_enter_icon: bool = False
     shows_dirty_suffix: bool = False
     help_title: str = ""
     help_entries: tuple[tuple[str, str], ...] | None = None
@@ -137,9 +140,6 @@ def row_spec(kind: RowKind) -> RowSpec:
 
 HEADER_ROW_KINDS = frozenset(k for k, spec in ROW_SPECS.items() if spec.is_header)
 REPEAT_ROW_KINDS = frozenset(k for k, spec in ROW_SPECS.items() if spec.repeatable)
-ACTION_ROW_KINDS = frozenset(
-    k for k, spec in ROW_SPECS.items() if spec.affordance == RowAffordance.ACTION
-)
 TRACK_SUB_ROW_KINDS = frozenset(
     k for k, spec in ROW_SPECS.items() if spec.parent_group == "track"
 )
@@ -149,6 +149,8 @@ PRESET_FILE_ROW_KINDS = frozenset({RowKind.TRACK_PRESET, RowKind.TRACK_PRESET_LI
 _SECTION_LOCK_BLOCKING_AFFORDANCES = frozenset(
     {
         RowAffordance.VALUE_STEP,
+        RowAffordance.VALUE_TEXT,
+        RowAffordance.VALUE_COLOUR,
         RowAffordance.PATH_DIR,
         RowAffordance.PATH_PRESET,
     }

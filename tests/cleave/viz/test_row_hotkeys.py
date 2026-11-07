@@ -22,7 +22,7 @@ from tests.cleave.viz.test_controls import (
 )
 from tests.support.viz import keydown, layer_page_id_for_row
 
-_LAYER_DELETE = "Delete this Milkdrop visualisation layer?"
+_LAYER_DELETE = "Delete layer"
 
 
 def _runtime(controls):
@@ -126,7 +126,8 @@ def test_navigator_layer_lock_and_delete_follow_selected_node() -> None:
     assert dispatch_keydown(keydown(pygame.K_DELETE), runtime) is True
     modal = controls.modal_host.view_state()
     assert modal is not None
-    assert modal.message == _LAYER_DELETE
+    assert modal.message.startswith(_LAYER_DELETE)
+    assert dispatch_keydown(keydown(pygame.K_LEFT), runtime) is True
     assert dispatch_keydown(keydown(pygame.K_RETURN), runtime) is True
     manager.remove_layer.assert_called_once_with("layer_2")
     assert "layer_2" not in controls.session.layer_z_order
@@ -238,13 +239,19 @@ def test_section_lock_inspector_refuses_edits_and_delete_still_prompts() -> None
     assert dispatch_keydown(keydown(pygame.K_LEFT), runtime) is True
     assert layer.opacity_pct == before
 
-    add = RowDescriptor(RowKind.TRACK_PRESET_LIST_ADD, slot="layer_1")
     view = controls.build_view_state(paused=False)
     built = build_inspector_rows(
         view, layer_page_node_id("layer_1", "preset_switching")
     )
-    assert any(row.descriptor == add and row.navigable for row in built)
-    _focus_inspector(controls, "layer_1", add)
+    add_row = next(
+        row for row in built if "layers.add_current_preset" in row.command_ids
+    )
+    assert add_row.navigable
+    controls.shell_focus.selected_id = layer_page_node_id(
+        "layer_1", "preset_switching"
+    )
+    controls.inspector.focus_command(add_row, "layers.add_current_preset")
+    assert dispatch_keydown(keydown(pygame.K_LEFT), runtime) is True
     assert dispatch_keydown(keydown(pygame.K_RETURN), runtime) is True
     assert controls.modal_host.view_state() is None
 
@@ -278,7 +285,7 @@ def test_section_lock_inspector_refuses_edits_and_delete_still_prompts() -> None
     assert dispatch_keydown(keydown(pygame.K_RETURN), runtime) is True
     modal = controls.modal_host.view_state()
     assert modal is not None
-    assert modal.message == _LAYER_DELETE
+    assert modal.message.startswith(_LAYER_DELETE)
 
 
 def test_curation_shell_allowlist() -> None:
@@ -291,7 +298,7 @@ def test_curation_shell_allowlist() -> None:
     current.write_text("milk", encoding="utf-8")
     layer.preset_switching = "on"
     controls.layer_lifecycle.prompt_delete = MagicMock()
-    controls.layer_lifecycle.prompt_add = MagicMock()
+    controls.layer_lifecycle.add = MagicMock()
     mock_curation = MagicMock()
     controls._preset_curation = mock_curation
     runtime = _runtime(controls)
@@ -340,7 +347,7 @@ def test_curation_shell_allowlist() -> None:
     )
     assert dispatch_keydown(keydown(pygame.K_RETURN), runtime) is True
     controls.layer_lifecycle.prompt_delete.assert_not_called()
-    controls.layer_lifecycle.prompt_add.assert_not_called()
+    controls.layer_lifecycle.add.assert_not_called()
 
     assert dispatch_keydown(keydown(pygame.K_ESCAPE), runtime) is True
     assert controls.shell_focus.region is ShellRegion.NAVIGATOR

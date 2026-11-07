@@ -5,6 +5,9 @@ from __future__ import annotations
 from imgui_bundle import imgui
 
 from cleave.viz.theme import (
+    BUTTON_ACTIVE_BG,
+    BUTTON_BG,
+    BUTTON_HOVER_BG,
     BACKGROUND,
     BORDER_COLOR,
     DISABLED,
@@ -35,9 +38,9 @@ IMGUI_COLOR_ROLES: dict[imgui.Col_, tuple[tuple[int, int, int], float]] = {
     imgui.Col_.header: (HIGHLIGHT, _SELECTED_WASH),
     imgui.Col_.header_hovered: (HOVER, _HOVER_WASH),
     imgui.Col_.header_active: (HOVER, _HOVER_WASH),
-    imgui.Col_.button: (BACKGROUND, 1.0),
-    imgui.Col_.button_hovered: (HOVER, _HOVER_WASH),
-    imgui.Col_.button_active: (HOVER, _HOVER_WASH),
+    imgui.Col_.button: (BUTTON_BG, 1.0),
+    imgui.Col_.button_hovered: (BUTTON_HOVER_BG, 1.0),
+    imgui.Col_.button_active: (BUTTON_ACTIVE_BG, 1.0),
     imgui.Col_.frame_bg: (BACKGROUND, 1.0),
     imgui.Col_.title_bg: (BACKGROUND, 1.0),
     imgui.Col_.title_bg_active: (BACKGROUND, 1.0),

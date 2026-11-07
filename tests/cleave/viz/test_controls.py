@@ -72,7 +72,7 @@ from cleave.viz.controls import (
     TuningControls,
 )
 from cleave.viz.settings_controls import EDITOR_WINDOW_RESTART_TOAST
-from cleave.viz.modal import ModalKind, ModalLabeledLine
+from cleave.viz.modal import ButtonRole, ModalKind, ModalLabeledLine
 from cleave.viz.session import (
     LayerRuntime,
     TimelineRuntime,
@@ -90,7 +90,6 @@ from cleave.viz.row_spec import (
 )
 from cleave.viz.commands import command_by_id, command_context
 from cleave.viz.theme import (
-    ACTION,
     CONFIG_DIRTY,
     DISABLED,
     HIGHLIGHT,
@@ -292,6 +291,7 @@ def test_delete_layer_confirm_calls_manager(confirm_key: int) -> None:
     controls.focus_descriptor = RowDescriptor(RowKind.LAYER_MANAGEMENT_DELETE, slot="layer_2")
 
     press_layer_row(controls, RowDescriptor(RowKind.LAYER_MANAGEMENT_DELETE, slot="layer_2"), _keydown(confirm_key))
+    press_layer_row(controls, RowDescriptor(RowKind.LAYER_MANAGEMENT_DELETE, slot="layer_2"), _keydown(pygame.K_LEFT))
     press_layer_row(controls, RowDescriptor(RowKind.LAYER_MANAGEMENT_DELETE, slot="layer_2"), _keydown(pygame.K_RETURN))
 
     manager.remove_layer.assert_called_once_with("layer_2")
@@ -310,6 +310,7 @@ def test_delete_layer_from_header_with_delete_key() -> None:
     controls.focus_descriptor = RowDescriptor(RowKind.TRACK_HEADER, slot="layer_2")
 
     press_layer_row(controls, RowDescriptor(RowKind.TRACK_HEADER, slot="layer_2"), _keydown(pygame.K_DELETE))
+    press_layer_row(controls, RowDescriptor(RowKind.TRACK_HEADER, slot="layer_2"), _keydown(pygame.K_LEFT))
     press_layer_row(controls, RowDescriptor(RowKind.TRACK_HEADER, slot="layer_2"), _keydown(pygame.K_RETURN))
 
     manager.remove_layer.assert_called_once_with("layer_2")
@@ -349,6 +350,7 @@ def test_delete_layer_exits_move_mode() -> None:
     assert controls.layer_lifecycle.move_mode_slot == "layer_1"
 
     controls.layer_lifecycle.prompt_delete("layer_2")
+    press_layer_row(controls, RowDescriptor(RowKind.TRACK_HEADER, slot="layer_1"), _keydown(pygame.K_LEFT))
     press_layer_row(controls, RowDescriptor(RowKind.TRACK_HEADER, slot="layer_1"), _keydown(pygame.K_RETURN))
 
     assert controls.layer_lifecycle.move_mode_slot is None
@@ -445,7 +447,7 @@ def _expand_settings_latency(controls: TuningControls) -> None:
 
 
 _INSPECTOR_COMMANDS = {
-    RowKind.TIMELINE_PRESETS: "timeline.apply_preset",
+    RowKind.TIMELINE_GENERATE: "timeline.generate",
     RowKind.TIMELINE_RESET: "timeline.reset",
     RowKind.TIMELINE_SNAP_CUES: "timeline.snap_cues",
 }
@@ -464,15 +466,10 @@ _CUT_INSPECTOR_KINDS = {
     RowKind.TIMELINE_SOFT_CUT_FADE_IN,
     RowKind.TIMELINE_SOFT_CUT_FADE_OUT,
     RowKind.TIMELINE_SOFT_CUT_CROSSFADE,
-    RowKind.TIMELINE_APPLY_SOFT_CUTS,
-    RowKind.TIMELINE_APPLY_HARD_CUTS,
-    RowKind.TIMELINE_REMOVE_SOFT_CUTS,
-    RowKind.TIMELINE_REMOVE_HARD_CUTS,
 }
 _SONG_INSPECTOR_KINDS = {
     RowKind.SONG_MARKERS_HEADER,
     RowKind.SONG_MARKER_ITEM,
-    RowKind.TIMELINE_SNAP_TO_SONG_MARKERS,
 }
 
 
@@ -491,7 +488,7 @@ def _focus_inspector_kind(
     elif kind in _CUT_INSPECTOR_KINDS:
         focus.selected_id = "timeline.cue_fades"
     else:
-        focus.selected_id = "timeline.preset"
+        focus.selected_id = "timeline"
     command_id = _INSPECTOR_COMMANDS.get(kind)
     if command_id is not None:
         focus.inspector_command_id = command_id
@@ -507,6 +504,8 @@ def _press_focused(controls: TuningControls, event: pygame.event.Event) -> bool:
     Inspector region uses the inspector. A main-list cursor still applies
     that descriptor's row action so field tests do not need the old tree.
     """
+    if controls.inline_edit.handle_keydown(event):
+        return True
     if controls.modal_host.active:
         return TuningControls.handle_keydown(controls, event)
     if controls.shell_focus.region is ShellRegion.INSPECTOR:
@@ -703,7 +702,7 @@ def test_save_command_label() -> None:
     command = command_by_id("file.save")
     assert command.label == "Save"
     assert command.enabled(command_context(controls)) is True
-    assert command.label_role(command_context(controls)) == ACTION
+    assert command.label_role(command_context(controls)) == VALUE
 
 
 def test_save_command_label_role_when_dirty() -> None:
@@ -980,7 +979,7 @@ def test_overlay_title_text_formats_newlines_as_spaces() -> None:
     assert _row_text(view, row) == "title text: Line one Line two"
 
 
-def test_overlay_title_text_enter_opens_single_line_modal() -> None:
+def test_overlay_title_text_enter_edits_in_place() -> None:
     controls = _make_controls()
     _expand_overlay_card_title(controls, "opening_card")
     controls.session.overlays.opening_card.title_content = "Opening title"
@@ -988,13 +987,9 @@ def test_overlay_title_text_enter_opens_single_line_modal() -> None:
     row = RowDescriptor(RowKind.OVERLAY_CARD_TITLE_TEXT, card="opening_card")
     controls.focus_descriptor = _desc(view, row)
     _press_focused(controls, _keydown(pygame.K_RETURN))
-    modal = controls.modal_host.view_state()
-    assert modal is not None
-    assert modal.kind == ModalKind.TEXT
-    assert modal.single_line is True
-    assert modal.cta == "Change text..."
-    assert modal.draft == "Opening title"
-    assert modal.editing is True
+    edit = controls.inline_edit.text_view()
+    assert edit is not None
+    assert edit.draft == "Opening title"
 
 
 def test_overlay_title_text_confirm_updates_session() -> None:
@@ -1005,10 +1000,9 @@ def test_overlay_title_text_confirm_updates_session() -> None:
     row = RowDescriptor(RowKind.OVERLAY_CARD_TITLE_TEXT, card="opening_card")
     controls.focus_descriptor = _desc(view, row)
     _press_focused(controls, _keydown(pygame.K_RETURN))
-    controls.modal_host.handle_text_input(" edited")
+    controls.inline_edit.handle_text_input(" edited")
     _press_focused(controls, _keydown(pygame.K_RETURN))
-    _press_focused(controls, _keydown(pygame.K_RETURN))
-    assert controls.modal_host.view_state() is None
+    assert not controls.inline_edit.active
     assert (
         controls.session.overlays.opening_card.title_content
         == "Opening title edited"
@@ -1023,10 +1017,9 @@ def test_overlay_title_text_cancel_keeps_session() -> None:
     row = RowDescriptor(RowKind.OVERLAY_CARD_TITLE_TEXT, card="closing_card")
     controls.focus_descriptor = _desc(view, row)
     _press_focused(controls, _keydown(pygame.K_RETURN))
-    controls.modal_host.handle_text_input(" edited")
+    controls.inline_edit.handle_text_input(" edited")
     _press_focused(controls, _keydown(pygame.K_ESCAPE))
-    _press_focused(controls, _keydown(pygame.K_ESCAPE))
-    assert controls.modal_host.view_state() is None
+    assert not controls.inline_edit.active
     assert controls.session.overlays.closing_card.title_content == (
         "Closing title"
     )
@@ -1040,20 +1033,19 @@ def test_overlay_title_text_lock_blocks_enter() -> None:
     controls.focus_descriptor = _desc(view, row)
     controls.session.overlays.locked = True
     _press_focused(controls, _keydown(pygame.K_RETURN))
-    assert controls.modal_host.view_state() is None
+    assert not controls.inline_edit.active
 
 
-def _replace_text_modal_draft(controls: TuningControls, text: str) -> None:
-    view = controls.modal_host.view_state()
+def _replace_inline_draft(controls: TuningControls, text: str) -> None:
+    view = controls.inline_edit.text_view()
     assert view is not None
     for _ in range(len(view.draft)):
         _press_focused(controls, _keydown(pygame.K_BACKSPACE))
     if text:
-        controls.modal_host.handle_text_input(text)
+        controls.inline_edit.handle_text_input(text)
 
 
-def _confirm_text_modal(controls: TuningControls) -> None:
-    _press_focused(controls, _keydown(pygame.K_RETURN))
+def _confirm_inline(controls: TuningControls) -> None:
     _press_focused(controls, _keydown(pygame.K_RETURN))
 
 
@@ -1087,7 +1079,7 @@ def test_overlay_title_colour_formats_hex() -> None:
     assert _row_text(view, row) == "title colour: #ff0000"
 
 
-def test_overlay_title_colour_enter_opens_single_line_modal() -> None:
+def test_overlay_title_colour_enter_edits_hex_in_place() -> None:
     controls = _make_controls()
     _expand_overlay_card_title(controls, "opening_card")
     controls.session.overlays.opening_card.title_colour = (255, 255, 255)
@@ -1095,13 +1087,9 @@ def test_overlay_title_colour_enter_opens_single_line_modal() -> None:
     row = RowDescriptor(RowKind.OVERLAY_CARD_TITLE_COLOUR, card="opening_card")
     controls.focus_descriptor = _desc(view, row)
     _press_focused(controls, _keydown(pygame.K_RETURN))
-    modal = controls.modal_host.view_state()
-    assert modal is not None
-    assert modal.kind == ModalKind.TEXT
-    assert modal.single_line is True
-    assert modal.cta == "Change colour (#rgb or #rrggbb)..."
-    assert modal.draft == "#ffffff"
-    assert modal.editing is True
+    edit = controls.inline_edit.text_view()
+    assert edit is not None
+    assert edit.draft == "#ffffff"
 
 
 def test_overlay_title_colour_confirm_updates_session() -> None:
@@ -1112,9 +1100,9 @@ def test_overlay_title_colour_confirm_updates_session() -> None:
     row = RowDescriptor(RowKind.OVERLAY_CARD_TITLE_COLOUR, card="opening_card")
     controls.focus_descriptor = _desc(view, row)
     _press_focused(controls, _keydown(pygame.K_RETURN))
-    _replace_text_modal_draft(controls, "#ff0000")
-    _confirm_text_modal(controls)
-    assert controls.modal_host.view_state() is None
+    _replace_inline_draft(controls, "#ff0000")
+    _confirm_inline(controls)
+    assert not controls.inline_edit.active
     assert controls.session.overlays.opening_card.title_colour == (255, 0, 0)
 
 
@@ -1126,12 +1114,11 @@ def test_overlay_title_colour_confirm_invalid_stays_open() -> None:
     row = RowDescriptor(RowKind.OVERLAY_CARD_TITLE_COLOUR, card="opening_card")
     controls.focus_descriptor = _desc(view, row)
     _press_focused(controls, _keydown(pygame.K_RETURN))
-    _replace_text_modal_draft(controls, "bad")
-    _confirm_text_modal(controls)
-    modal = controls.modal_host.view_state()
-    assert modal is not None
-    assert modal.kind == ModalKind.TEXT
-    assert modal.error == "invalid hex colour (use #rgb or #rrggbb)"
+    _replace_inline_draft(controls, "bad")
+    _confirm_inline(controls)
+    edit = controls.inline_edit.text_view()
+    assert edit is not None
+    assert edit.error == "invalid hex colour (use #rgb or #rrggbb)"
     assert controls.session.overlays.opening_card.title_colour == (
         255,
         255,
@@ -1147,10 +1134,9 @@ def test_overlay_title_colour_cancel_keeps_session() -> None:
     row = RowDescriptor(RowKind.OVERLAY_CARD_TITLE_COLOUR, card="closing_card")
     controls.focus_descriptor = _desc(view, row)
     _press_focused(controls, _keydown(pygame.K_RETURN))
-    _replace_text_modal_draft(controls, "#ff0000")
+    _replace_inline_draft(controls, "#ff0000")
     _press_focused(controls, _keydown(pygame.K_ESCAPE))
-    _press_focused(controls, _keydown(pygame.K_ESCAPE))
-    assert controls.modal_host.view_state() is None
+    assert not controls.inline_edit.active
     assert controls.session.overlays.closing_card.title_colour == (
         255,
         255,
@@ -1166,7 +1152,7 @@ def test_overlay_title_colour_lock_blocks_enter() -> None:
     controls.focus_descriptor = _desc(view, row)
     controls.session.overlays.locked = True
     _press_focused(controls, _keydown(pygame.K_RETURN))
-    assert controls.modal_host.view_state() is None
+    assert not controls.inline_edit.active
 
 
 def _expand_overlay_card_body(controls: TuningControls, card: str) -> None:
@@ -1308,25 +1294,21 @@ def _assert_overlay_colour_row_present_confirm_cancel(
 
     controls.focus_descriptor = _desc(view, opening_colour)
     _press_focused(controls, _keydown(pygame.K_RETURN))
-    modal = controls.modal_host.view_state()
-    assert modal is not None
-    assert modal.kind == ModalKind.TEXT
-    assert modal.single_line is True
-    assert modal.cta == "Change colour (#rgb or #rrggbb)..."
-    assert modal.draft == "#ffffff"
-    _replace_text_modal_draft(controls, "#ff0000")
-    _confirm_text_modal(controls)
-    assert controls.modal_host.view_state() is None
+    edit = controls.inline_edit.text_view()
+    assert edit is not None
+    assert edit.draft == "#ffffff"
+    _replace_inline_draft(controls, "#ff0000")
+    _confirm_inline(controls)
+    assert not controls.inline_edit.active
     assert getattr(opening_card, field) == (255, 0, 0)
 
     view = controls.build_view_state(paused=False)
     closing_colour = RowDescriptor(kind, card="closing_card")
     controls.focus_descriptor = closing_colour
     _press_focused(controls, _keydown(pygame.K_RETURN))
-    _replace_text_modal_draft(controls, "#00ff00")
+    _replace_inline_draft(controls, "#00ff00")
     _press_focused(controls, _keydown(pygame.K_ESCAPE))
-    _press_focused(controls, _keydown(pygame.K_ESCAPE))
-    assert controls.modal_host.view_state() is None
+    assert not controls.inline_edit.active
     assert getattr(closing_card, field) == (255, 255, 255)
 
 
@@ -1403,9 +1385,9 @@ def test_overlay_optional_colour_formats_none() -> None:
     assert _row_text(view, body_bg) == "body background: none"
     controls.focus_descriptor = _desc(view, title_bg)
     _press_focused(controls, _keydown(pygame.K_RETURN))
-    modal = controls.modal_host.view_state()
-    assert modal is not None
-    assert modal.draft == ""
+    edit = controls.inline_edit.text_view()
+    assert edit is not None
+    assert edit.draft == ""
 
 
 def test_overlay_optional_colour_empty_confirm_clears() -> None:
@@ -1427,12 +1409,12 @@ def test_overlay_optional_colour_empty_confirm_clears() -> None:
     ):
         view, _row = _focus_overlay_colour_row(controls, kind, "opening_card")
         _press_focused(controls, _keydown(pygame.K_RETURN))
-        modal = controls.modal_host.view_state()
-        assert modal is not None
-        assert modal.draft != ""
-        _replace_text_modal_draft(controls, "")
-        _confirm_text_modal(controls)
-        assert controls.modal_host.view_state() is None
+        edit = controls.inline_edit.text_view()
+        assert edit is not None
+        assert edit.draft != ""
+        _replace_inline_draft(controls, "")
+        _confirm_inline(controls)
+        assert not controls.inline_edit.active
         assert getattr(opening, field) is None
 
 
@@ -1461,16 +1443,14 @@ def test_overlay_remaining_colour_rows_invalid_hex_stays_open() -> None:
     ):
         _focus_overlay_colour_row(controls, kind, "opening_card")
         _press_focused(controls, _keydown(pygame.K_RETURN))
-        _replace_text_modal_draft(controls, "bad")
-        _confirm_text_modal(controls)
-        modal = controls.modal_host.view_state()
-        assert modal is not None
-        assert modal.kind == ModalKind.TEXT
-        assert modal.error == "invalid hex colour (use #rgb or #rrggbb)"
+        _replace_inline_draft(controls, "bad")
+        _confirm_inline(controls)
+        edit = controls.inline_edit.text_view()
+        assert edit is not None
+        assert edit.error == "invalid hex colour (use #rgb or #rrggbb)"
         assert getattr(opening, field) == (255, 255, 255)
         _press_focused(controls, _keydown(pygame.K_ESCAPE))
-        _press_focused(controls, _keydown(pygame.K_ESCAPE))
-        assert controls.modal_host.view_state() is None
+        assert not controls.inline_edit.active
 
 
 def test_overlay_remaining_colour_rows_lock_blocks_enter() -> None:
@@ -1487,7 +1467,7 @@ def test_overlay_remaining_colour_rows_lock_blocks_enter() -> None:
         _focus_overlay_colour_row(controls, kind, "opening_card")
         controls.session.overlays.locked = True
         _press_focused(controls, _keydown(pygame.K_RETURN))
-        assert controls.modal_host.view_state() is None
+        assert not controls.inline_edit.active
         controls.session.overlays.locked = False
 
 
@@ -1637,7 +1617,7 @@ def test_post_fx_highlight_rolloff_mode_off_keeps_section_expanded() -> None:
 
 
 def _focus_timeline_presets(controls: TuningControls) -> None:
-    _focus_inspector_kind(controls, RowKind.TIMELINE_PRESETS)
+    _focus_inspector_kind(controls, RowKind.TIMELINE_GENERATE)
 
 
 def _focus_timeline_snap_cues(controls: TuningControls) -> None:
@@ -1645,27 +1625,19 @@ def _focus_timeline_snap_cues(controls: TuningControls) -> None:
 
 
 def _focus_timeline_snap_song_markers(controls: TuningControls) -> None:
-    _focus_inspector_kind(controls, RowKind.TIMELINE_SNAP_TO_SONG_MARKERS)
+    focus = controls.shell_focus
+    focus.region = ShellRegion.INSPECTOR
+    focus.selected_id = "timeline.song_markers"
+    focus.inspector_cursor = None
+    focus.inspector_command_id = "timeline.snap_to_markers"
 
 
-def _focus_timeline_apply_soft_cuts(controls: TuningControls) -> None:
-    controls.session.timeline.soft_cut_fades.enabled = True
-    _focus_inspector_kind(controls, RowKind.TIMELINE_APPLY_SOFT_CUTS)
-
-
-def _focus_timeline_apply_hard_cuts(controls: TuningControls) -> None:
-    controls.session.timeline.hard_cut_fades.enabled = True
-    _focus_inspector_kind(controls, RowKind.TIMELINE_APPLY_HARD_CUTS)
-
-
-def _focus_timeline_remove_soft_cuts(controls: TuningControls) -> None:
-    controls.session.timeline.soft_cut_fades.enabled = True
-    _focus_inspector_kind(controls, RowKind.TIMELINE_REMOVE_SOFT_CUTS)
-
-
-def _focus_timeline_remove_hard_cuts(controls: TuningControls) -> None:
-    controls.session.timeline.hard_cut_fades.enabled = True
-    _focus_inspector_kind(controls, RowKind.TIMELINE_REMOVE_HARD_CUTS)
+def _focus_timeline_set_cut_type(controls: TuningControls) -> None:
+    focus = controls.shell_focus
+    focus.region = ShellRegion.INSPECTOR
+    focus.selected_id = "timeline.cue_fades"
+    focus.inspector_cursor = None
+    focus.inspector_command_id = "timeline.set_cut_type"
 
 
 def _focus_timeline_bar_phase(controls: TuningControls) -> None:
@@ -1683,8 +1655,9 @@ def _confirm_snap_song_markers(
     scope_label: str = "All Layers",
 ) -> None:
     _press_focused(controls, _keydown(pygame.K_RETURN))
-    _choose_modal_option(controls, proximity_label)
-    _choose_modal_option(controls, scope_label)
+    _set_form_field(controls, "proximity", proximity_label)
+    _set_form_field(controls, "layers", scope_label)
+    _choose_modal_option(controls, "Snap cues")
 
 
 def _focus_timeline_bar_phase(controls: TuningControls) -> None:
@@ -1704,13 +1677,31 @@ def _focus_timeline_bar_grid(controls: TuningControls) -> None:
 def _choose_modal_option(controls: TuningControls, label: str) -> None:
     modal_view = controls.modal_host.view_state()
     assert modal_view is not None
-    target = modal_view.options.index(label)
-    while controls.modal_host.view_state().focus_index != target:
-        controls.handle_modal_keydown(_keydown(pygame.K_RIGHT))
-    controls.handle_modal_keydown(_keydown(pygame.K_RETURN))
+    controls.modal_host.activate_option(modal_view.options.index(label))
 
 
-def test_timeline_presets_enter_opens_yes_cancel_modal() -> None:
+def _set_form_field(controls: TuningControls, label: str, option: str) -> None:
+    modal_view = controls.modal_host.view_state()
+    assert modal_view is not None
+    for index, row in enumerate(modal_view.form_rows):
+        if row.label == label:
+            controls.modal_host.set_form_value(index, row.options.index(option))
+            return
+    raise AssertionError(f"no form field {label!r}")
+
+
+def _snap_to(controls: TuningControls, target: str) -> None:
+    _set_form_field(controls, "snap to", target)
+    _choose_modal_option(controls, "Snap cues")
+
+
+def _set_cut_type(controls: TuningControls, cut: str, scope: str) -> None:
+    _set_form_field(controls, "cut type", cut)
+    _set_form_field(controls, "applies to", scope)
+    _choose_modal_option(controls, "Set cut type")
+
+
+def test_generate_opens_a_form_seeded_from_the_session() -> None:
     controls = _make_controls(("layer_1", "layer_2", "layer_3", "layer_4"))
     controls.session.timeline.timeline_preset_kind = "arc"
     controls.session.timeline.timeline_preset_conductor = True
@@ -1718,90 +1709,45 @@ def test_timeline_presets_enter_opens_yes_cancel_modal() -> None:
     assert _press_focused(controls, _keydown(pygame.K_RETURN)) is True
     modal_view = controls.modal_host.view_state()
     assert modal_view is not None
-    assert modal_view.kind == ModalKind.YES_NO
-    assert modal_view.options == ("Yes", "Cancel")
-    assert modal_view.message == "Apply timeline preset?"
-    assert modal_view.labeled_lines == (
-        ModalLabeledLine("character", "arc"),
-        ModalLabeledLine("density", "normal"),
-        ModalLabeledLine("cue snap", "none"),
-        ModalLabeledLine("song marker snap", "none"),
-        ModalLabeledLine("timeline cuts", "by marker"),
-        ModalLabeledLine("re-populate preset lists", "no"),
-        ModalLabeledLine("conductor", "on"),
-        ModalLabeledLine("mode", "layers"),
+    assert modal_view.kind == ModalKind.FORM
+    assert modal_view.options == ("Generate", "Cancel")
+    assert modal_view.message == "Generate timeline"
+    assert [
+        (row.label, row.options[row.value]) for row in modal_view.form_rows
+    ] == [
+        ("character", "arc"),
+        ("density", "normal"),
+        ("cue snap", "none"),
+        ("song marker snap", "none"),
+        ("timeline cuts", "by marker"),
+        ("re-populate preset lists", "no"),
+        ("conductor", "on"),
+        ("mode", "layers"),
+    ]
+
+
+def test_generate_writes_values_only_on_confirm() -> None:
+    controls = _make_controls(
+        ("layer_1",),
+        beat_times=tuple(float(i) for i in range(241)),
+        bar_times=tuple(float(i) for i in range(0, 241, 4)),
     )
+    tl = controls.session.timeline
+    _focus_timeline_presets(controls)
+    _press_focused(controls, _keydown(pygame.K_RETURN))
+    _set_form_field(controls, "cue snap", "beats")
+    _set_form_field(controls, "timeline cuts", "all soft")
+    assert tl.timeline_preset_cue_snap == "none"
+    _choose_modal_option(controls, "Cancel")
+    assert tl.timeline_preset_cue_snap == "none"
+    assert tl.timeline_preset_timeline_cuts == "by marker"
 
-
-def test_timeline_preset_cue_snap_row_cycles() -> None:
-    controls = _make_controls(timeline_enabled=True)
-    controls.session.timeline.panel_open = True
-    _focus_inspector_kind(controls, RowKind.TIMELINE_PRESET_CUE_SNAP)
-    view = controls.build_view_state(paused=False)
-    row = RowDescriptor(RowKind.TIMELINE_PRESET_CUE_SNAP)
-    assert controls.session.timeline.timeline_preset_cue_snap == "none"
-    assert _press_focused(controls, _keydown(pygame.K_RIGHT)) is True
-    assert controls.session.timeline.timeline_preset_cue_snap == "beats"
-    assert _press_focused(controls, _keydown(pygame.K_RIGHT)) is True
-    assert controls.session.timeline.timeline_preset_cue_snap == "bars"
-    assert _press_focused(controls, _keydown(pygame.K_LEFT)) is True
-    assert controls.session.timeline.timeline_preset_cue_snap == "beats"
-    view = controls.build_view_state(paused=False)
-    assert "beats" in _row_text(view, row)
-
-
-def test_timeline_preset_song_marker_snap_row_cycles() -> None:
-    controls = _make_controls(timeline_enabled=True)
-    controls.session.timeline.panel_open = True
-    _focus_inspector_kind(controls, RowKind.TIMELINE_PRESET_SONG_MARKER_SNAP)
-    view = controls.build_view_state(paused=False)
-    row = RowDescriptor(RowKind.TIMELINE_PRESET_SONG_MARKER_SNAP)
-    assert controls.session.timeline.timeline_preset_song_marker_snap is None
-    assert _press_focused(controls, _keydown(pygame.K_RIGHT)) is True
-    assert controls.session.timeline.timeline_preset_song_marker_snap == 0.5
-    assert _press_focused(controls, _keydown(pygame.K_RIGHT)) is True
-    assert controls.session.timeline.timeline_preset_song_marker_snap == 1.0
-    assert _press_focused(controls, _keydown(pygame.K_LEFT)) is True
-    assert controls.session.timeline.timeline_preset_song_marker_snap == 0.5
-    view = controls.build_view_state(paused=False)
-    assert "0.5s" in _row_text(view, row)
-
-
-def test_timeline_preset_timeline_cuts_row_cycles() -> None:
-    controls = _make_controls(timeline_enabled=True)
-    controls.session.timeline.panel_open = True
-    _focus_inspector_kind(controls, RowKind.TIMELINE_PRESET_TIMELINE_CUTS)
-    view = controls.build_view_state(paused=False)
-    row = RowDescriptor(RowKind.TIMELINE_PRESET_TIMELINE_CUTS)
-    assert controls.session.timeline.timeline_preset_timeline_cuts == "by marker"
-    assert _press_focused(controls, _keydown(pygame.K_RIGHT)) is True
-    assert controls.session.timeline.timeline_preset_timeline_cuts == "all soft"
-    assert _press_focused(controls, _keydown(pygame.K_RIGHT)) is True
-    assert controls.session.timeline.timeline_preset_timeline_cuts == "all hard"
-    assert _press_focused(controls, _keydown(pygame.K_LEFT)) is True
-    assert controls.session.timeline.timeline_preset_timeline_cuts == "all soft"
-    view = controls.build_view_state(paused=False)
-    assert "all soft" in _row_text(view, row)
-
-
-def test_timeline_preset_repopulate_row_cycles() -> None:
-    controls = _make_controls(timeline_enabled=True)
-    controls.session.timeline.panel_open = True
-    _focus_inspector_kind(controls, RowKind.TIMELINE_PRESET_REPOPULATE)
-    view = controls.build_view_state(paused=False)
-    row = RowDescriptor(RowKind.TIMELINE_PRESET_REPOPULATE)
-    assert controls.session.timeline.timeline_preset_repopulate == "no"
-    assert _press_focused(controls, _keydown(pygame.K_RIGHT)) is True
-    assert controls.session.timeline.timeline_preset_repopulate == "cue roles"
-    assert _press_focused(controls, _keydown(pygame.K_RIGHT)) is True
-    assert (
-        controls.session.timeline.timeline_preset_repopulate
-        == "directory random"
-    )
-    assert _press_focused(controls, _keydown(pygame.K_LEFT)) is True
-    assert controls.session.timeline.timeline_preset_repopulate == "cue roles"
-    view = controls.build_view_state(paused=False)
-    assert "cue roles" in _row_text(view, row)
+    _press_focused(controls, _keydown(pygame.K_RETURN))
+    _set_form_field(controls, "cue snap", "beats")
+    _set_form_field(controls, "timeline cuts", "all soft")
+    _choose_modal_option(controls, "Generate")
+    assert tl.timeline_preset_cue_snap == "beats"
+    assert tl.timeline_preset_timeline_cuts == "all soft"
 
 
 def test_timeline_presets_cuts_none_keeps_cut_none() -> None:
@@ -1865,7 +1811,7 @@ def _lane(
 
 def _confirm_timeline_preset(controls: TuningControls) -> None:
     _press_focused(controls, _keydown(pygame.K_RETURN))
-    _choose_modal_option(controls, "Yes")
+    _choose_modal_option(controls, "Generate")
 
 
 def test_timeline_presets_breathing_clears_and_applies() -> None:
@@ -1975,8 +1921,10 @@ def test_timeline_reset_enter_opens_choice_modal() -> None:
     assert _press_focused(controls, _keydown(pygame.K_RETURN)) is True
     modal_view = controls.modal_host.view_state()
     assert modal_view is not None
-    assert modal_view.kind == ModalKind.CHOICE
-    assert modal_view.options == ("All Off", "All On", "Cancel")
+    assert modal_view.kind == ModalKind.FORM
+    assert modal_view.options == ("Reset timeline", "Cancel")
+    assert modal_view.option_roles[0] is ButtonRole.DANGER
+    assert modal_view.focus_index == 1
     assert "reset" in modal_view.message.lower()
 
 
@@ -1991,7 +1939,8 @@ def test_timeline_reset_all_off() -> None:
     controls.session.timeline.armed_slots.add("layer_1")
     _focus_timeline_reset(controls)
     _press_focused(controls, _keydown(pygame.K_RETURN))
-    _choose_modal_option(controls, "All Off")
+    _set_form_field(controls, "layers after reset", "off")
+    _choose_modal_option(controls, "Reset timeline")
     assert not controls.modal_host.active
     assert controls.session.timeline.enabled is True
     assert controls.session.timeline.recording is False
@@ -2011,7 +1960,8 @@ def test_timeline_reset_all_on() -> None:
     controls.session.timeline.enabled = False
     _focus_timeline_reset(controls)
     _press_focused(controls, _keydown(pygame.K_RETURN))
-    _choose_modal_option(controls, "All On")
+    _set_form_field(controls, "layers after reset", "on")
+    _choose_modal_option(controls, "Reset timeline")
     assert not controls.modal_host.active
     assert controls.session.timeline.enabled is True
     lanes = controls.session.timeline.lanes
@@ -2149,7 +2099,7 @@ def test_timeline_presets_cancel_and_escape_leave_unchanged() -> None:
     assert controls.session.timeline.enabled is False
 
 
-def test_timeline_snap_cues_enter_opens_beats_or_bars_modal() -> None:
+def test_timeline_snap_cues_opens_a_form() -> None:
     controls = _make_controls(
         ("layer_1",),
         beat_times=(0.0, 1.0, 2.0),
@@ -2159,15 +2109,15 @@ def test_timeline_snap_cues_enter_opens_beats_or_bars_modal() -> None:
         "layer_1": _lane(None, (0.4, True)),
     }
     _focus_timeline_snap_cues(controls)
-    view = controls.build_view_state(paused=False)
-    snap_row = RowDescriptor(RowKind.TIMELINE_SNAP_CUES)
-    assert "Snap Cues" in _row_text(view, snap_row)
     assert _press_focused(controls, _keydown(pygame.K_RETURN)) is True
     modal_view = controls.modal_host.view_state()
     assert modal_view is not None
-    assert modal_view.kind == ModalKind.CHOICE
-    assert modal_view.options == ("Beats", "Bars", "Cancel")
-    assert modal_view.message == "Snap timeline cues to?"
+    assert modal_view.kind == ModalKind.FORM
+    assert modal_view.options == ("Snap cues", "Cancel")
+    assert modal_view.message == "Snap cues"
+    assert [row.label for row in modal_view.form_rows] == ["snap to"]
+    assert modal_view.form_rows[0].options == ("beats", "bars")
+    assert modal_view.form_info == "Moves 1 of 1 cues."
 
 
 def test_timeline_snap_beats_mutates_cues() -> None:
@@ -2181,7 +2131,7 @@ def test_timeline_snap_beats_mutates_cues() -> None:
     }
     _focus_timeline_snap_cues(controls)
     _press_focused(controls, _keydown(pygame.K_RETURN))
-    _choose_modal_option(controls, "Beats")
+    _snap_to(controls, "beats")
     assert not controls.modal_host.active
     assert controls.session.timeline.lanes["layer_1"].cues == [
         SlotCue(t=0.0, level=1.0),
@@ -2205,7 +2155,7 @@ def test_timeline_snap_bars_mutates_cues() -> None:
     }
     _focus_timeline_snap_cues(controls)
     _press_focused(controls, _keydown(pygame.K_RETURN))
-    _choose_modal_option(controls, "Bars")
+    _snap_to(controls, "bars")
     assert not controls.modal_host.active
     assert controls.session.timeline.lanes["layer_1"].cues == [
         SlotCue(t=0.0, level=1.0),
@@ -2337,7 +2287,7 @@ def test_timeline_snap_bars_no_bars_notifies() -> None:
     }
     _focus_timeline_snap_cues(controls)
     assert _press_focused(controls, _keydown(pygame.K_RETURN)) is True
-    _choose_modal_option(controls, "Bars")
+    _snap_to(controls, "bars")
     assert not controls.modal_host.active
     view = controls.build_view_state(paused=False)
     assert view.notification_message == "No bars available; re-run separate"
@@ -2354,13 +2304,13 @@ def test_timeline_snap_beats_no_beats_notifies() -> None:
     }
     _focus_timeline_snap_cues(controls)
     assert _press_focused(controls, _keydown(pygame.K_RETURN)) is True
-    _choose_modal_option(controls, "Beats")
+    _snap_to(controls, "beats")
     assert not controls.modal_host.active
     view = controls.build_view_state(paused=False)
     assert view.notification_message == "No beats available; re-run separate"
 
 
-def test_timeline_snap_song_markers_enter_opens_proximity_then_scope_modals() -> None:
+def test_snap_to_markers_opens_one_form_with_proximity_and_layers() -> None:
     controls = _make_controls(("layer_1", "layer_2"))
     controls.session.song_markers.times = [10.0, 40.0]
     controls.session.timeline.lanes = {
@@ -2370,22 +2320,30 @@ def test_timeline_snap_song_markers_enter_opens_proximity_then_scope_modals() ->
     assert _press_focused(controls, _keydown(pygame.K_RETURN)) is True
     modal_view = controls.modal_host.view_state()
     assert modal_view is not None
-    assert modal_view.kind == ModalKind.CHOICE
-    assert modal_view.message == "Proximity of cues to pull onto song markers..."
-    assert "5.0s" in modal_view.options
-    assert modal_view.options[-1] == "Cancel"
-    assert modal_view.options[modal_view.focus_index] == "5.0s"
+    assert modal_view.kind == ModalKind.FORM
+    assert [row.label for row in modal_view.form_rows] == [
+        "snap to",
+        "proximity",
+        "layers",
+    ]
+    target, proximity, layers = modal_view.form_rows
+    assert target.options[target.value] == "song markers"
+    assert proximity.options[proximity.value] == "5.0s"
+    assert layers.options[layers.value] == "All Layers"
+    assert "Closest Wins" in layers.options
+    assert "Layer 1" in layers.options
+    assert modal_view.form_info == "Moves 1 of 1 cues."
 
-    _choose_modal_option(controls, "5.0s")
-    scope_view = controls.modal_host.view_state()
-    assert scope_view is not None
-    assert scope_view.kind == ModalKind.CHOICE
-    assert scope_view.message == "Layer scope?"
-    assert "All Layers" in scope_view.options
-    assert "Closest Wins" in scope_view.options
-    assert "Layer 1" in scope_view.options
-    assert scope_view.options[-1] == "Cancel"
-    assert scope_view.options[scope_view.focus_index] == "All Layers"
+
+def test_snap_form_hides_marker_fields_for_beats() -> None:
+    controls = _make_controls(("layer_1",), beat_times=(0.0, 1.0))
+    controls.session.song_markers.times = [10.0]
+    controls.session.timeline.lanes = {"layer_1": _lane(None, (9.0, True))}
+    _focus_timeline_snap_song_markers(controls)
+    _press_focused(controls, _keydown(pygame.K_RETURN))
+    _set_form_field(controls, "snap to", "beats")
+    modal_view = controls.modal_host.view_state()
+    assert [row.label for row in modal_view.form_rows] == ["snap to"]
 
 
 def test_timeline_snap_song_markers_layer_mutates_only_that_lane() -> None:
@@ -2480,19 +2438,6 @@ def test_timeline_snap_song_markers_no_cues_notifies() -> None:
     assert view.notification_message == "No timeline cues to snap"
 
 
-def test_timeline_snap_song_markers_is_plain_action_row() -> None:
-    controls = _make_controls(("layer_1",))
-    controls.session.timeline.panel_open = True
-    view = controls.build_view_state(paused=False)
-    snap_row = RowDescriptor(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS)
-    text = _row_text(view, snap_row)
-    assert "Snap Cues" in text
-    assert "▶" not in text
-    assert "▼" not in text
-    _focus_inspector_kind(controls, RowKind.TIMELINE_SNAP_TO_SONG_MARKERS)
-    assert _press_focused(controls, _keydown(pygame.K_RIGHT)) is True
-
-
 def test_timeline_snap_song_markers_uses_proximity() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.song_markers.times = [5.0]
@@ -2508,26 +2453,40 @@ def test_timeline_snap_song_markers_uses_proximity() -> None:
     assert view.notification_message == "No cues within snap proximity"
 
 
-def test_timeline_apply_soft_cuts_enter_opens_scope_modal() -> None:
+def test_set_cut_type_opens_one_form_with_a_live_count() -> None:
     controls = _make_controls(("layer_1",))
+    controls.session.song_markers.times = [10.0]
     controls.session.timeline.lanes = {
         "layer_1": _lane(None, (4.0, True), (10.0, False)),
     }
-    _focus_timeline_apply_soft_cuts(controls)
+    before = dict(controls.session.timeline.lanes)
+    _focus_timeline_set_cut_type(controls)
     assert _press_focused(controls, _keydown(pygame.K_RETURN)) is True
     modal_view = controls.modal_host.view_state()
     assert modal_view is not None
-    assert modal_view.kind == ModalKind.CHOICE
-    assert modal_view.message == "Apply soft cuts to cues?"
-    assert modal_view.options == (
-        "All Cues",
-        "All Cues Except Song Marker Cues",
-        "Song Marker Cues Only",
-        "Cancel",
-    )
+    assert modal_view.kind == ModalKind.FORM
+    assert modal_view.message == "Set cut type"
+    assert [row.label for row in modal_view.form_rows] == ["cut type", "applies to"]
+    assert modal_view.form_rows[0].options == ("hard", "soft", "none")
+    assert modal_view.form_info == "Changes 2 of 2 cues."
+    _set_form_field(controls, "applies to", "markers only")
+    assert controls.modal_host.view_state().form_info == "Changes 1 of 2 cues."
+    assert controls.session.timeline.lanes == before
 
 
-def test_timeline_apply_hard_cuts_markers_only() -> None:
+def test_set_cut_type_remembers_its_values() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.timeline.lanes = {"layer_1": _lane(None, (4.0, True))}
+    _focus_timeline_set_cut_type(controls)
+    _press_focused(controls, _keydown(pygame.K_RETURN))
+    _set_cut_type(controls, "hard", "except markers")
+    _press_focused(controls, _keydown(pygame.K_RETURN))
+    cut, scope = controls.modal_host.view_state().form_rows
+    assert cut.options[cut.value] == "hard"
+    assert scope.options[scope.value] == "except markers"
+
+
+def test_set_cut_type_hard_on_markers_only() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.song_markers.times = [10.0]
     controls.session.timeline.lanes = {
@@ -2539,9 +2498,9 @@ def test_timeline_apply_hard_cuts_markers_only() -> None:
             ],
         ),
     }
-    _focus_timeline_apply_hard_cuts(controls)
+    _focus_timeline_set_cut_type(controls)
     _press_focused(controls, _keydown(pygame.K_RETURN))
-    _choose_modal_option(controls, "Song Marker Cues Only")
+    _set_cut_type(controls, "hard", "markers only")
     assert not controls.modal_host.active
     assert controls.session.timeline.lanes["layer_1"].cues == [
         SlotCue(t=4.0, level=1.0, cut="soft"),
@@ -2551,7 +2510,7 @@ def test_timeline_apply_hard_cuts_markers_only() -> None:
     assert view.notification_message == "Applied hard cuts to 1 cue"
 
 
-def test_timeline_apply_hard_cuts_all_updates_on_and_off() -> None:
+def test_set_cut_type_hard_on_all_cues() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.timeline.lanes = {
         "layer_1": TimelineLane(
@@ -2562,9 +2521,9 @@ def test_timeline_apply_hard_cuts_all_updates_on_and_off() -> None:
             ],
         ),
     }
-    _focus_timeline_apply_hard_cuts(controls)
+    _focus_timeline_set_cut_type(controls)
     _press_focused(controls, _keydown(pygame.K_RETURN))
-    _choose_modal_option(controls, "All Cues")
+    _set_cut_type(controls, "hard", "all cues")
     assert controls.session.timeline.lanes["layer_1"].cues == [
         SlotCue(t=4.0, level=1.0, cut="hard"),
         SlotCue(t=10.0, level=0.0, cut="hard"),
@@ -2573,7 +2532,7 @@ def test_timeline_apply_hard_cuts_all_updates_on_and_off() -> None:
     assert view.notification_message == "Applied hard cuts to 2 cues"
 
 
-def test_timeline_apply_soft_cuts_except_markers() -> None:
+def test_set_cut_type_soft_except_markers() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.song_markers.times = [10.0]
     controls.session.timeline.lanes = {
@@ -2585,35 +2544,16 @@ def test_timeline_apply_soft_cuts_except_markers() -> None:
             ],
         ),
     }
-    _focus_timeline_apply_soft_cuts(controls)
+    _focus_timeline_set_cut_type(controls)
     _press_focused(controls, _keydown(pygame.K_RETURN))
-    _choose_modal_option(controls, "All Cues Except Song Marker Cues")
+    _set_cut_type(controls, "soft", "except markers")
     assert controls.session.timeline.lanes["layer_1"].cues == [
         SlotCue(t=4.0, level=1.0, cut="soft"),
         SlotCue(t=10.0, level=0.0),
     ]
 
 
-def test_timeline_remove_cuts_enter_opens_scope_modal() -> None:
-    controls = _make_controls(("layer_1",))
-    controls.session.timeline.lanes = {
-        "layer_1": _lane(None, (4.0, True), (10.0, False)),
-    }
-    _focus_timeline_remove_soft_cuts(controls)
-    assert _press_focused(controls, _keydown(pygame.K_RETURN)) is True
-    modal_view = controls.modal_host.view_state()
-    assert modal_view is not None
-    assert modal_view.kind == ModalKind.CHOICE
-    assert modal_view.message == "Remove cuts from cues?"
-    assert modal_view.options == (
-        "All Cues",
-        "All Cues Except Song Marker Cues",
-        "Song Marker Cues Only",
-        "Cancel",
-    )
-
-
-def test_timeline_remove_hard_cuts_markers_only() -> None:
+def test_set_cut_type_none_on_markers_only() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.song_markers.times = [10.0]
     controls.session.timeline.lanes = {
@@ -2625,9 +2565,9 @@ def test_timeline_remove_hard_cuts_markers_only() -> None:
             ],
         ),
     }
-    _focus_timeline_remove_hard_cuts(controls)
+    _focus_timeline_set_cut_type(controls)
     _press_focused(controls, _keydown(pygame.K_RETURN))
-    _choose_modal_option(controls, "Song Marker Cues Only")
+    _set_cut_type(controls, "none", "markers only")
     assert not controls.modal_host.active
     assert controls.session.timeline.lanes["layer_1"].cues == [
         SlotCue(t=4.0, level=1.0, cut="hard"),
@@ -2637,7 +2577,7 @@ def test_timeline_remove_hard_cuts_markers_only() -> None:
     assert view.notification_message == "Removed cuts from 1 cue"
 
 
-def test_timeline_remove_soft_cuts_all_clears_on_and_off() -> None:
+def test_set_cut_type_none_on_all_clears_every_cut() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.timeline.lanes = {
         "layer_1": TimelineLane(
@@ -2648,9 +2588,9 @@ def test_timeline_remove_soft_cuts_all_clears_on_and_off() -> None:
             ],
         ),
     }
-    _focus_timeline_remove_soft_cuts(controls)
+    _focus_timeline_set_cut_type(controls)
     _press_focused(controls, _keydown(pygame.K_RETURN))
-    _choose_modal_option(controls, "All Cues")
+    _set_cut_type(controls, "none", "all cues")
     assert controls.session.timeline.lanes["layer_1"].cues == [
         SlotCue(t=4.0, level=1.0, cut="none"),
         SlotCue(t=10.0, level=0.0, cut="none"),
@@ -2819,8 +2759,8 @@ def test_panel_notification_enter_dismisses_before_timeout() -> None:
         assert view.notification_message == "Song marker 00:00.00"
         assert controls.focus_cursor == before
         confirmed: list[bool] = []
-        controls.modal_host.prompt_yes_no(
-            "Leave?", lambda: confirmed.append(True)
+        controls.modal_host.prompt_confirm(
+            "Leave?", "Leave", lambda: confirmed.append(True)
         )
         assert dispatch_keydown(_keydown(pygame.K_RETURN), runtime) is True
         assert confirmed == [True]
@@ -2924,7 +2864,6 @@ def test_timeline_sub_rows_dim_when_disabled() -> None:
         RowKind.TIMELINE_BAR_GRID,
         RowKind.TIMELINE_PLACEMENT_SNAP,
         RowKind.TIMELINE_SNAP_CUES,
-        RowKind.TIMELINE_SNAP_TO_SONG_MARKERS,
         RowKind.TIMELINE_CUTS_HEADER,
         RowKind.TIMELINE_HARD_CUTS,
         RowKind.TIMELINE_HARD_CUT_FADE_IN,
@@ -2934,20 +2873,7 @@ def test_timeline_sub_rows_dim_when_disabled() -> None:
         RowKind.TIMELINE_SOFT_CUT_FADE_IN,
         RowKind.TIMELINE_SOFT_CUT_FADE_OUT,
         RowKind.TIMELINE_SOFT_CUT_CROSSFADE,
-        RowKind.TIMELINE_APPLY_SOFT_CUTS,
-        RowKind.TIMELINE_APPLY_HARD_CUTS,
-        RowKind.TIMELINE_REMOVE_SOFT_CUTS,
-        RowKind.TIMELINE_REMOVE_HARD_CUTS,
-        RowKind.TIMELINE_PRESETS_HEADER,
-        RowKind.TIMELINE_PRESET_CHARACTER,
-        RowKind.TIMELINE_PRESET_DENSITY,
-        RowKind.TIMELINE_PRESET_CUE_SNAP,
-        RowKind.TIMELINE_PRESET_SONG_MARKER_SNAP,
-        RowKind.TIMELINE_PRESET_TIMELINE_CUTS,
-        RowKind.TIMELINE_PRESET_REPOPULATE,
-        RowKind.TIMELINE_PRESET_CONDUCTOR,
-        RowKind.TIMELINE_PRESET_MODE,
-        RowKind.TIMELINE_PRESETS,
+        RowKind.TIMELINE_GENERATE,
         RowKind.TIMELINE_RESET,
     ):
         assert _row_value_color(view, RowDescriptor(kind)) == DISABLED, kind
@@ -3539,7 +3465,6 @@ def test_preset_list_enter_auditions_item_and_resumes() -> None:
     item = RowDescriptor(
         RowKind.TRACK_PRESET_LIST_ITEM, slot="layer_1", preset_index=2
     )
-    resume_row = RowDescriptor(RowKind.TRACK_PRESET_SWITCHING_RESUME, slot="layer_1")
 
     assert press_layer_row(controls, item, _keydown(pygame.K_RETURN)) is True
     assert auditioned == [("layer_1", 2)]
@@ -3549,11 +3474,17 @@ def test_preset_list_enter_auditions_item_and_resumes() -> None:
     assert auditioned == [("layer_1", 2)]
 
     layer.locked = False
-    assert press_layer_row(controls, resume_row, _keydown(pygame.K_RETURN)) is True
+    controls.shell_focus.selected_id = layer_page_node_id(
+        "layer_1", "preset_switching"
+    )
+    command_by_id("layers.resume_switching").run(controls)
     assert resumed == ["layer_1"]
 
     layer.locked = True
-    assert press_layer_row(controls, resume_row, _keydown(pygame.K_RETURN)) is True
+    controls.shell_focus.selected_id = layer_page_node_id(
+        "layer_1", "preset_switching"
+    )
+    command_by_id("layers.resume_switching").run(controls)
     assert resumed == ["layer_1"]
 
 
@@ -3747,9 +3678,9 @@ def test_timeline_locked_dims_inspector_children() -> None:
     controls.session.timeline.locked = True
     view = controls.build_view_state(paused=False)
     assert _row_value_color(
-        view, RowDescriptor(RowKind.TIMELINE_PRESET_CHARACTER)
+        view, RowDescriptor(RowKind.TIMELINE_PLACEMENT_SNAP)
     ) == LOCKED
-    assert RowKind.TIMELINE_PRESET_CHARACTER in _page_kinds(view, "timeline.preset")
+    assert RowKind.TIMELINE_PLACEMENT_SNAP in _page_kinds(view, "timeline.grid")
 
 
 def test_locked_blocks_enable_disable() -> None:
@@ -4932,9 +4863,9 @@ def test_delete_song_marker_opens_confirm_modal() -> None:
     assert _press_focused(controls, _keydown(pygame.K_DELETE)) is True
     modal_view = controls.modal_host.view_state()
     assert modal_view is not None
-    assert modal_view.kind == ModalKind.YES_NO
-    assert modal_view.options == ("Yes", "No")
-    assert modal_view.message == "Remove song marker 00:15.00?"
+    assert modal_view.kind == ModalKind.CONFIRM
+    assert modal_view.options == ("Delete marker", "Cancel")
+    assert modal_view.message == "Delete song marker 00:15.00?"
     assert markers.times == [5.0, 15.0, 25.0]
     assert markers.selected_index == 1
 
@@ -4947,6 +4878,7 @@ def test_delete_song_marker_confirm_removes_and_adjusts_selection() -> None:
     markers.selected_index = 1
     _focus_inspector_kind(controls, RowKind.SONG_MARKER_ITEM, marker_index=1)
     assert _press_focused(controls, _keydown(pygame.K_DELETE)) is True
+    controls.handle_modal_keydown(_keydown(pygame.K_LEFT))
     controls.handle_modal_keydown(_keydown(pygame.K_RETURN))
     assert not controls.modal_host.active
     assert markers.times == [5.0, 25.0]
@@ -5032,6 +4964,7 @@ def test_delete_song_marker_does_not_write_project_yaml(tmp_path: Path) -> None:
     controls.session.timeline.panel_open = True
     _focus_inspector_kind(controls, RowKind.SONG_MARKER_ITEM, marker_index=1)
     assert _press_focused(controls, _keydown(pygame.K_DELETE)) is True
+    controls.handle_modal_keydown(_keydown(pygame.K_LEFT))
     controls.handle_modal_keydown(_keydown(pygame.K_RETURN))
     assert markers.times == [5.0, 25.0]
     assert load_manifest(project).song_markers == _song_markers(5.0, 15.0, 25.0)
@@ -5247,36 +5180,30 @@ def test_populate_modal_options_keyed_by_timeline_trigger() -> None:
     controls.session.layers["layer_1"].preset_switching = "on"
     controls.session.layers["layer_1"].preset_switching_trigger = "timeline"
     controls.session.timeline.enabled = False
-    prompted: list[tuple[str, list[str]]] = []
-
-    def capture_prompt(title, options, on_dismiss=None):
-        del on_dismiss
-        prompted.append((title, [opt.label for opt in options]))
-
-    controls._modal_host.prompt_choice = capture_prompt  # type: ignore[method-assign]
     controls.preset_list.project_dir = Path("/tmp/project")
     controls.preset_list.prompt_populate("layer_1")
-    assert prompted
-    assert prompted[0][0] == "Populate the preset list with 1 presets from?"
-    labels = prompted[0][1]
+    view = controls.modal_host.view_state()
+    assert view is not None
+    assert view.message == "Populate preset list"
+    assert view.body == "Replaces the whole list with 1 preset."
+    labels = list(view.form_rows[0].options)
     assert labels == [
         "Using Cue Marker Roles (random)",
         "Current Directory (random)",
         "Current Directory (sequential)",
-        "Cancel",
     ]
 
-    prompted.clear()
+    controls.modal_host.cancel()
     controls.session.layers["layer_1"].preset_switching_trigger = "timer"
     controls.session.timeline.enabled = True
     controls.preset_list.prompt_populate("layer_1")
     # 120s song / 30s duration = 4 needed; fixture browse dir has 1 milk
-    assert prompted[0][0] == "Populate the preset list with 1 presets from?"
-    labels = prompted[0][1]
+    view = controls.modal_host.view_state()
+    assert view.body == "Replaces the whole list with 1 preset."
+    labels = list(view.form_rows[0].options)
     assert labels == [
         "Current Directory (random)",
         "Current Directory (sequential)",
-        "Cancel",
     ]
     assert "Using Cue Marker Roles (random)" not in labels
 

@@ -22,16 +22,21 @@ from cleave.viz.help_content import help_section_kwargs, help_sections_for_stop
 from cleave.viz.imgui_host import ImGuiHost, PAUSE_GLYPH, PLAY_GLYPH, mouse_button
 from cleave.viz.imgui_theme import rgba
 from cleave.viz.inspector import build_inspector_rows
-from cleave.viz.inspector_controls import inspector_command_enabled
+from cleave.viz.inspector_controls import (
+    inspector_command_enabled,
+    inspector_command_locked,
+)
 from cleave.viz.menu_bar import MenuBarState, menus_for_session
 from cleave.viz.material_icons import (
     LOCK_GLYPH,
     LOCK_OPEN_GLYPH,
+    ADD_GLYPH,
     POWER_GLYPH,
     SOLO_GLYPH,
 )
 from cleave.viz.navigator import (
     TOGGLE_ENABLED,
+    TOGGLE_ADD,
     TOGGLE_LOCK,
     TOGGLE_SOLO,
     TWISTY_COLLAPSED,
@@ -74,7 +79,7 @@ from cleave.viz.shell_layout import (
 )
 from cleave.viz.text_fit import fit_path_or_name_to_width, fit_text_to_width
 from cleave.viz.theme import (
-    ACTION,
+    BUTTON_BORDER,
     BACKGROUND,
     BORDER_COLOR,
     DISABLED,
@@ -151,7 +156,7 @@ def transport_parts(readout: TransportReadout) -> list[tuple[str, tuple[int, int
         f"{format_mmss(readout.position_sec)} / {format_mmss(readout.duration_sec)}"
     )
     return [
-        (f"{icon} {word}", ACTION),
+        (f"{icon} {word}", VALUE),
         (clock, VALUE),
         (f"bar {readout.bar_text}", MUTED),
     ]
@@ -211,6 +216,8 @@ def navigator_lock_mark(node: NavNode) -> str | None:
 
 def navigator_toggle_glyph(toggle: NavToggle) -> str:
     """Material icon for a navigator toggle."""
+    if toggle.id == TOGGLE_ADD:
+        return ADD_GLYPH
     if toggle.id == TOGGLE_LOCK:
         return LOCK_GLYPH if toggle.active else LOCK_OPEN_GLYPH
     if toggle.id == TOGGLE_SOLO:
@@ -220,15 +227,19 @@ def navigator_toggle_glyph(toggle: NavToggle) -> str:
 
 def navigator_toggle_color(toggle: NavToggle) -> tuple[int, int, int]:
     """Resting icon color. Muted while inactive, so a lit icon stands out."""
+    if toggle.id == TOGGLE_ADD:
+        return DISABLED if toggle.blocked else VALUE
     if toggle.blocked:
         return LOCKED
     if not toggle.active:
         return MUTED
-    return LOCK_ICON if toggle.id == TOGGLE_LOCK else ACTION
+    return LOCK_ICON if toggle.id == TOGGLE_LOCK else VALUE
 
 
 def navigator_toggle_tooltip(toggle: NavToggle) -> str:
     """Hover text naming the state and what a click does."""
+    if toggle.id == TOGGLE_ADD:
+        return "Layer limit reached" if toggle.blocked else "Add layer"
     if toggle.blocked:
         return "Locked: unlock to change"
     if toggle.id == TOGGLE_LOCK:
@@ -242,7 +253,8 @@ def navigator_toggle_x(
     toggle_id: str, right_x: float, button_width: float, gap: float
 ) -> float:
     """Left edge of a toggle's column, counted back from *right_x*."""
-    columns_right = len(_NAV_TOGGLE_COLUMNS) - _NAV_TOGGLE_COLUMNS.index(toggle_id)
+    column = TOGGLE_LOCK if toggle_id == TOGGLE_ADD else toggle_id
+    columns_right = len(_NAV_TOGGLE_COLUMNS) - _NAV_TOGGLE_COLUMNS.index(column)
     return right_x - columns_right * button_width - (columns_right - 1) * gap
 
 
@@ -588,6 +600,24 @@ def _draw_aligned_parts(parts: list[tuple[str, imgui.ImVec4]]) -> None:
         x += width
 
 
+_INLINE_FIELD_WIDTH_FRACTION = 0.6
+_SWATCH_ASPECT = 1.6
+_SWATCH_GAP = 6.0
+_PICKER_UNSET = VALUE
+_PICKER_FLAGS = (
+    int(imgui.WindowFlags_.no_title_bar)
+    | int(imgui.WindowFlags_.no_resize)
+    | int(imgui.WindowFlags_.no_move)
+    | int(imgui.WindowFlags_.no_saved_settings)
+    | int(imgui.WindowFlags_.always_auto_resize)
+)
+_PICKER_COLOUR_FLAGS = (
+    int(imgui.ColorEditFlags_.no_alpha)
+    | int(imgui.ColorEditFlags_.no_side_preview)
+    | int(imgui.ColorEditFlags_.display_hex)
+)
+
+
 class _ImguiTextSizer:
     """Measure text with the current ImGui font for the text fitters."""
 
@@ -929,6 +959,30 @@ def selectable_wash(*, inspector: bool) -> tuple[imgui.ImVec4, imgui.ImVec4]:
     return fill, fill
 
 
+def _button_text_role(enabled: bool, locked: bool) -> tuple[int, int, int]:
+    """Button label colour. A section lock reads as locked, not as disabled."""
+    if locked:
+        return LOCKED
+    return VALUE if enabled else DISABLED
+
+
+def _draw_button(
+    label: str, *, text_role: tuple[int, int, int], selected: bool
+) -> bool:
+    """A bordered panel button. Returns whether it was clicked."""
+    imgui.push_style_color(imgui.Col_.border, rgba(BUTTON_BORDER))
+    imgui.push_style_color(imgui.Col_.text, rgba(text_role))
+    imgui.push_style_var(imgui.StyleVar_.frame_border_size, 1.0)
+    try:
+        clicked = imgui.button(label)
+    finally:
+        imgui.pop_style_var()
+        imgui.pop_style_color(2)
+    if selected:
+        _draw_item_focus_ring()
+    return clicked
+
+
 @contextmanager
 def _selected_header_wash(selected: bool, *, inspector: bool = False) -> Iterator[None]:
     """Push a selected-row header fill, then pop.
@@ -985,6 +1039,8 @@ class ShellHost:
         self._value_drag_accum = 0.0
         self._value_drag_crossed = False
         self._nudge_swallow = False
+        self._inline_field_hovered = False
+        self._picker_pos = imgui.ImVec2(0.0, 0.0)
         # Live drag requests. A drag that moves at least 1px persists the stack
         # and help, then clears these.
         self._insp_width: int | None = None
@@ -1563,7 +1619,7 @@ class ShellHost:
         blocked toggle has no hover fill, and a press on it only selects.
         """
         descriptor = node_control_descriptor(node.id)
-        if descriptor is None:
+        if descriptor is None and not node.toggles:
             return
         style = imgui.get_style()
         space = imgui.calc_text_size(" ").x
@@ -1604,7 +1660,11 @@ class ShellHost:
                 imgui.set_tooltip(navigator_toggle_tooltip(toggle))
             if pressed:
                 self._controls.navigator.select(node.id)
-                if not toggle.blocked:
+                if toggle.blocked:
+                    continue
+                if toggle.id == TOGGLE_ADD:
+                    command_by_id("layers.add").run(self._controls)
+                else:
                     activate_header_toggle(self._controls, toggle.id, descriptor)
 
     def _toggle_nav_expanded(self, node_id: str) -> None:
@@ -1632,8 +1692,17 @@ class ShellHost:
             focus.nav_expanded,
         )
         imgui.text(inspector_title(nodes, focus.selected_id))
+        self._inline_field_hovered = False
         for row in build_inspector_rows(state, focus.selected_id):
             self._draw_inspector_row(state, row)
+        self._draw_colour_picker()
+        inline = self._controls.inline_edit
+        if (
+            inline.text_target is not None
+            and imgui.is_mouse_clicked(0)
+            and not self._inline_field_hovered
+        ):
+            inline.finish()
 
     def _draw_inspector_row(self, state: Any, row: Any) -> None:
         focus = self._controls.shell_focus
@@ -1641,7 +1710,7 @@ class ShellHost:
         if indent:
             imgui.indent(indent)
         try:
-            if row.command_id is not None:
+            if row.command_ids:
                 self._draw_command_row(row)
                 return
             desc = row.descriptor
@@ -1682,6 +1751,10 @@ class ShellHost:
             if spec.shows_dirty_suffix and state.config_dirty:
                 value = f"{value}*" if value else "*"
             cluster = format_row_position(state, desc) if two_line else value
+            inline = self._controls.inline_edit
+            if inline.text_target == desc:
+                self._draw_inline_field(inline.text_view())
+                return
             if cluster:
                 parts = value_parts(
                     cluster,
@@ -1709,6 +1782,8 @@ class ShellHost:
                         stepped=stepped,
                         activated=activated,
                     )
+                if self._handle_colour_swatch(state, row, desc, spec, parts, clicked):
+                    return
                 if stepped:
                     self._handle_value_nudge(
                         row,
@@ -1742,6 +1817,105 @@ class ShellHost:
         finally:
             if indent:
                 imgui.unindent(indent)
+
+    def _draw_inline_field(self, view: Any) -> None:
+        """The value area of the row just drawn, as a text field with a caret."""
+        rect_min = imgui.get_item_rect_min()
+        rect_max = imgui.get_item_rect_max()
+        pad = imgui.get_style().frame_padding.x
+        width = (rect_max.x - rect_min.x) * _INLINE_FIELD_WIDTH_FRACTION
+        field_min = imgui.ImVec2(rect_max.x - pad - width, rect_min.y)
+        field_max = imgui.ImVec2(rect_max.x - pad, rect_max.y)
+        self._inline_field_hovered = imgui.is_mouse_hovering_rect(field_min, field_max)
+        draw = imgui.get_window_draw_list()
+        draw.add_rect_filled(field_min, field_max, imgui.get_color_u32(rgba(BACKGROUND)))
+        border = ERROR_NOTIFICATION if view.error is not None else HIGHLIGHT
+        draw.add_rect(field_min, field_max, imgui.get_color_u32(rgba(border)))
+        inner = width - pad * 2
+        caret_x = imgui.calc_text_size(view.draft[: view.caret_index]).x
+        text_x = field_min.x + pad - max(0.0, caret_x - inner)
+        y = _selectable_text_y(rect_min.y)
+        draw.push_clip_rect(field_min, field_max, True)
+        draw.add_text(imgui.ImVec2(text_x, y), imgui.get_color_u32(rgba(VALUE)), view.draft)
+        if view.caret_visible:
+            line = imgui.get_text_line_height()
+            draw.add_line(
+                imgui.ImVec2(text_x + caret_x, y),
+                imgui.ImVec2(text_x + caret_x, y + line),
+                imgui.get_color_u32(rgba(HIGHLIGHT)),
+            )
+        draw.pop_clip_rect()
+        if view.error is not None:
+            imgui.set_tooltip(view.error)
+
+    def _handle_colour_swatch(
+        self,
+        state: Any,
+        row: Any,
+        desc: RowDescriptor,
+        spec: Any,
+        parts: list[tuple[str, imgui.ImVec4]],
+        clicked: bool,
+    ) -> bool:
+        """Paint the swatch left of the hex value. True when it took the click."""
+        if spec.colour_target is None:
+            return False
+        target = spec.colour_target(self._controls, desc)
+        line = imgui.get_text_line_height()
+        rect_min = imgui.get_item_rect_min()
+        rect_max = imgui.get_item_rect_max()
+        pad = imgui.get_style().frame_padding.x
+        text_w = sum(imgui.calc_text_size(text).x for text, _color in parts)
+        right = rect_max.x - pad - text_w - _SWATCH_GAP
+        y = _selectable_text_y(rect_min.y)
+        swatch_min = imgui.ImVec2(right - line * _SWATCH_ASPECT, y)
+        swatch_max = imgui.ImVec2(right, y + line)
+        draw = imgui.get_window_draw_list()
+        if target.current is not None:
+            draw.add_rect_filled(
+                swatch_min, swatch_max, imgui.get_color_u32(rgba(target.current))
+            )
+        draw.add_rect(swatch_min, swatch_max, imgui.get_color_u32(rgba(BUTTON_BORDER)))
+        if not imgui.is_mouse_hovering_rect(swatch_min, swatch_max):
+            return False
+        if clicked and not section_lock_blocks_mutation(state, desc):
+            self._controls.inspector.focus_row(row)
+            self._controls.inline_edit.begin_colour(desc, target)
+            self._picker_pos = imgui.ImVec2(swatch_min.x, swatch_max.y)
+        return True
+
+    def _draw_colour_picker(self) -> None:
+        """The picker window for the colour being edited, updating it live."""
+        inline = self._controls.inline_edit
+        edit = inline.colour_edit
+        if edit is None:
+            return
+        imgui.set_next_window_pos(self._picker_pos, imgui.Cond_.always)
+        imgui.begin("##colour-picker", None, _PICKER_FLAGS)
+        try:
+            value = edit.value if edit.value is not None else _PICKER_UNSET
+            changed, picked = imgui.color_picker3(
+                "##colour",
+                [channel / 255.0 for channel in value],
+                _PICKER_COLOUR_FLAGS,
+            )
+            if changed:
+                inline.set_colour(
+                    tuple(int(round(channel * 255.0)) for channel in picked)
+                )
+            done = imgui.button("Done")
+            if edit.target.optional:
+                imgui.same_line()
+                if imgui.button("None"):
+                    inline.set_colour(None)
+                    done = True
+            hovered = imgui.is_window_hovered(
+                imgui.HoveredFlags_.root_and_child_windows
+            )
+            if done or (imgui.is_mouse_clicked(0) and not hovered):
+                inline.finish()
+        finally:
+            imgui.end()
 
     def _handle_nav_buttons(
         self,
@@ -1948,29 +2122,33 @@ class ShellHost:
             self._clear_value_drag()
 
     def _draw_command_row(self, row: Any) -> None:
-        command = command_by_id(row.command_id)
-        enabled = inspector_command_enabled(self._controls, row.command_id)
+        """One row of buttons. A click focuses that button, then runs it."""
         focus = self._controls.shell_focus
-        selected = (
-            focus.region is ShellRegion.INSPECTOR
-            and focus.inspector_command_id == row.command_id
-        )
-        color = ACTION if enabled else DISABLED
-        imgui.push_style_color(imgui.Col_.text, rgba(color))
-        try:
-            with _selected_header_wash(selected, inspector=True):
-                clicked, _selected = imgui.selectable(
-                    f"{command.label}##cmd-{row.command_id}",
-                    selected,
-                )
-                if selected:
-                    _draw_item_focus_ring()
-        finally:
-            imgui.pop_style_color()
-        if clicked:
-            self._controls.inspector.focus_row(row)
-            if enabled:
-                self._controls.inspector.activate(row)
+        if row.status is not None:
+            imgui.align_text_to_frame_padding()
+            imgui.text(row.status)
+            imgui.same_line()
+        for index, command_id in enumerate(row.command_ids):
+            if index:
+                imgui.same_line()
+            command = command_by_id(command_id)
+            enabled = inspector_command_enabled(self._controls, command_id)
+            selected = (
+                focus.region is ShellRegion.INSPECTOR
+                and focus.inspector_command_id == command_id
+            )
+            clicked = _draw_button(
+                f"{command.label}##cmd-{command_id}",
+                text_role=_button_text_role(
+                    enabled,
+                    inspector_command_locked(self._controls, command_id),
+                ),
+                selected=selected,
+            )
+            if clicked:
+                self._controls.inspector.focus_command(row, command_id)
+                if enabled:
+                    self._controls.inspector.activate(row)
 
     def _draw_bar(
         self, menu_state: MenuBarState
@@ -2103,7 +2281,7 @@ class ShellHost:
                 label_color = check_color = shortcut_color = ink
             else:
                 label_color = _row_color(item, command_ctx, enabled)
-                check_color = rgba(ACTION)
+                check_color = rgba(VALUE)
                 shortcut_color = rgba(MUTED)
             # Selectable anchors the label at the cursor and pads the highlight
             # with half of ItemSpacing on each side. Frame padding would push

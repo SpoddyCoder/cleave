@@ -83,18 +83,26 @@ class InspectorControls:
     def focus_row(self, row: InspectorRow) -> None:
         focus = self._controls.shell_focus
         self._controls.set_shell_region(ShellRegion.INSPECTOR)
-        if row.command_id is not None:
-            focus.inspector_cursor = None
-            focus.inspector_command_id = row.command_id
+        if row.command_ids:
+            self.focus_command(row, row.command_ids[0])
             return
         focus.inspector_cursor = row.descriptor
         focus.inspector_command_id = None
         if row.descriptor is not None:
             self._controls.song_markers.sync_focus(row.descriptor)
 
+    def focus_command(self, row: InspectorRow, command_id: str) -> None:
+        """Focus one button of a button row."""
+        focus = self._controls.shell_focus
+        self._controls.set_shell_region(ShellRegion.INSPECTOR)
+        focus.inspector_cursor = None
+        focus.inspector_command_id = command_id
+
     def activate(self, row: InspectorRow) -> None:
-        if row.command_id is not None:
-            run_inspector_command(self._controls, row.command_id)
+        if row.command_ids:
+            focused = self._controls.shell_focus.inspector_command_id
+            command_id = focused if focused in row.command_ids else row.command_ids[0]
+            run_inspector_command(self._controls, command_id)
             return
         if row.descriptor is not None:
             apply_field_action(self._controls, row.descriptor)
@@ -107,6 +115,9 @@ class InspectorControls:
         event: pygame.event.Event,
     ) -> None:
         row = self._current_row()
+        if row is not None and row.command_ids:
+            self._step_button(row, forward=forward)
+            return
         if row is None or row.descriptor is None:
             return
         desc = row.descriptor
@@ -121,6 +132,14 @@ class InspectorControls:
             apply_field_horizontal(self._controls, desc, step_forward, page)
 
         self._controls.arm_key_repeat(event.key, event.mod, on_repeat=on_repeat)
+
+    def _step_button(self, row: InspectorRow, *, forward: bool) -> None:
+        """Left and Right move between the buttons of a row, stopping at the ends."""
+        ids = row.command_ids
+        focused = self._controls.shell_focus.inspector_command_id
+        index = ids.index(focused) if focused in ids else 0
+        index = max(0, min(len(ids) - 1, index + (1 if forward else -1)))
+        self.focus_command(row, ids[index])
 
     def _current_row(self) -> InspectorRow | None:
         rows = self._navigable_rows()
@@ -142,8 +161,8 @@ class InspectorControls:
 
 def _cursor_index(rows: tuple[InspectorRow, ...], focus: ShellFocusState) -> int | None:
     for index, row in enumerate(rows):
-        if row.command_id is not None:
-            if focus.inspector_command_id == row.command_id:
+        if row.command_ids:
+            if focus.inspector_command_id in row.command_ids:
                 return index
             continue
         if (
@@ -157,6 +176,11 @@ def _cursor_index(rows: tuple[InspectorRow, ...], focus: ShellFocusState) -> int
 def inspector_command_enabled(controls: TuningControls, command_id: str) -> bool:
     command = command_by_id(command_id)
     return bool(command.enabled(command_context(controls)))
+
+
+def inspector_command_locked(controls: TuningControls, command_id: str) -> bool:
+    command = command_by_id(command_id)
+    return bool(command.locked(command_context(controls)))
 
 
 def run_inspector_command(controls: TuningControls, command_id: str) -> None:

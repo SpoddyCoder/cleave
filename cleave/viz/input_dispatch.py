@@ -377,6 +377,10 @@ def dispatch_keydown(event: pygame.event.Event, runtime: LiveVisualizerRuntime) 
         runtime.menu_bar.cancel_alt_tap()
         return runtime.controls.handle_modal_keydown(event)
 
+    if runtime.controls.inline_edit.handle_keydown(event):
+        runtime.menu_bar.cancel_alt_tap()
+        return True
+
     if runtime.controls.project_switch.active:
         runtime.menu_bar.cancel_alt_tap()
         return runtime.controls.project_switch.handle_keydown(event)
@@ -421,6 +425,8 @@ def dispatch_keydown(event: pygame.event.Event, runtime: LiveVisualizerRuntime) 
 
 def dispatch_keyup(event: pygame.event.Event, runtime: LiveVisualizerRuntime) -> None:
     if event.type != pygame.KEYUP:
+        return
+    if runtime.controls.inline_edit.handle_keyup(event):
         return
     if runtime.modal_host.active:
         runtime.menu_bar.cancel_alt_tap()

@@ -14,14 +14,19 @@ from imgui_bundle import imgui
 from cleave.viz.commands import CommandContext
 from cleave.viz.imgui_theme import rgba
 from cleave.viz.menu_bar import MenuBarState
+from cleave.viz.text_edit import caret_line_column
 from cleave.viz.modal import (
+    BUTTON_ROW_KINDS,
+    ButtonRole,
+    FormField,
+    FormFieldKind,
+    FormSpec,
     ModalHost,
     ModalKind,
     ModalLabeledLine,
     ModalOption,
     ModalViewState,
     TextFocusRegion,
-    caret_line_column,
 )
 from cleave.viz.modal_layout import (
     EDITING_HINT,
@@ -215,10 +220,11 @@ def _pointer(host: object, surface: ModalSurface, pos: tuple[int, int], *, click
 
 def _yes_no() -> ModalViewState:
     return ModalViewState(
-        kind=ModalKind.YES_NO,
+        kind=ModalKind.CONFIRM,
         message="Save changes?",
         options=("Yes", "No"),
         focus_index=0,
+        option_roles=(ButtonRole.PRIMARY, ButtonRole.PLAIN),
     )
 
 
@@ -235,8 +241,9 @@ def _unsaved() -> ModalViewState:
     return ModalViewState(
         kind=ModalKind.UNSAVED_QUIT,
         message="Unsaved changes - save changes before exit?",
-        options=("Save", "Don't Save", "Cancel"),
+        options=("Save", "Don't save", "Cancel"),
         focus_index=0,
+        option_roles=(ButtonRole.PRIMARY, ButtonRole.PLAIN, ButtonRole.PLAIN),
     )
 
 
@@ -343,8 +350,12 @@ def test_kind_renders_with_idle_mouse(view: ModalViewState) -> None:
             assert border not in colors
         else:
             focused = view.options[view.focus_index]
-            assert colors.get(_pack(HIGHLIGHT), 0) == 4 * _glyphs(focused)
-            assert colors.get(wash, 0) == 4
+            if view.kind in BUTTON_ROW_KINDS:
+                assert _pack(HIGHLIGHT) not in colors
+                assert wash not in colors
+            else:
+                assert colors.get(_pack(HIGHLIGHT), 0) == 4 * _glyphs(focused)
+                assert colors.get(wash, 0) == 4
             assert colors.get(border, 0) > 0
             assert colors.get(_pack(VALUE), 0) > 0
         if view.kind == ModalKind.TEXT:
@@ -534,14 +545,14 @@ def test_apply_modal_pointer_dispatches_each_kind() -> None:
 
     ran: list[str] = []
     modal = ModalHost()
-    modal.prompt_yes_no("Save?", on_confirm=lambda: ran.append("yes"))
+    modal.prompt_confirm("Save?", "Confirm", on_confirm=lambda: ran.append("yes"))
     apply_modal_pointer(
         modal, ModalPointerIntent(ModalPointerKind.ACTIVATE_OPTION, index=0)
     )
     assert ran == ["yes"]
     assert not modal.active
 
-    modal.prompt_yes_no("Save?", on_confirm=lambda: None)
+    modal.prompt_confirm("Save?", "Confirm", on_confirm=lambda: None)
     apply_modal_pointer(modal, ModalPointerIntent(ModalPointerKind.CANCEL))
     assert not modal.active
 
@@ -586,7 +597,7 @@ def test_navigator_click_does_not_set_shell_region() -> None:
 
 def test_modal_host_active_routes_navigator_click_before_draw() -> None:
     with _host() as host:
-        host._controls.modal_host.prompt_yes_no("Save?", on_confirm=lambda: None)
+        host._controls.modal_host.prompt_confirm("Save?", "Confirm", on_confirm=lambda: None)
         assert host._controls.modal_host.active
         assert not host.top_layer.modal_active
         layout = host.layout
@@ -822,8 +833,7 @@ def test_text_button_colours_follow_focus() -> None:
         _idle(host, surface)
         colors = _color_counts()
         assert _pack(DISABLED) not in colors
-        assert colors.get(_pack(HIGHLIGHT), 0) == 4 * _glyphs(TEXT_BUTTON_LABELS[0])
-        assert colors.get(wash, 0) == 4
+        assert _pack(HIGHLIGHT) not in colors
         assert colors.get(border, 0) > 0
         _pointer(host, surface, _center(surface.text_button_rects[1]), click=False)
         assert surface.intent == ModalPointerIntent(
@@ -844,11 +854,8 @@ def test_hover_text_button_while_editing_keeps_the_caret() -> None:
         colors = _color_counts()
         wash = _pack(HIGHLIGHT, FOCUS_WASH_ALPHA / 255.0)
         border = _pack(HIGHLIGHT, FOCUS_BORDER_ALPHA / 255.0)
-        assert colors.get(wash, 0) == 4
         assert colors.get(border, 0) > 0
-        assert colors.get(_pack(HIGHLIGHT), 0) == 4 * (
-            _glyphs(TEXT_BUTTON_LABELS[0]) + 1
-        )
+        assert colors.get(_pack(HIGHLIGHT), 0) == 4
         assert colors.get(_pack(DISABLED), 0) == 4 * (
             _glyphs(EDITING_HINT) + _glyphs(TEXT_BUTTON_LABELS[1])
         )
@@ -856,3 +863,102 @@ def test_hover_text_button_while_editing_keeps_the_caret() -> None:
         assert surface.intent == ModalPointerIntent(
             ModalPointerKind.ACTIVATE_TEXT_BUTTON, index=0
         )
+
+
+def _form_host_view() -> tuple[ModalHost, list[dict[str, int]]]:
+    modal = ModalHost()
+    confirmed: list[dict[str, int]] = []
+    modal.prompt_form(
+        FormSpec(
+            title="Snap cues",
+            body="Moves cues.",
+            fields=(
+                FormField("target", "snap to", FormFieldKind.SEGMENT, ("a", "b"), 0),
+                FormField("step", "proximity", FormFieldKind.STEP, ("1s", "2s"), 0),
+                FormField("source", "from", FormFieldKind.RADIO, ("x", "y"), 0),
+            ),
+            confirm_label="Go",
+            on_confirm=confirmed.append,
+            info=lambda values: f"target {values['target']}",
+        )
+    )
+    return modal, confirmed
+
+
+def test_form_draws_and_a_segment_click_sets_the_value() -> None:
+    modal, confirmed = _form_host_view()
+    with _host() as host:
+        surface = ModalSurface(modal.view_state(), ImGuiTextMeasure())
+        _idle(host, surface)
+        assert len(surface.option_rects) == 2
+        hits = [
+            hit
+            for hit in surface._form_hits
+            if hit.kind is ModalPointerKind.SET_FORM_VALUE and hit.row == 0
+        ]
+        assert len(hits) == 2
+        _pointer(host, surface, _center(hits[1].rect), click=True)
+        assert surface.intent == ModalPointerIntent(
+            ModalPointerKind.SET_FORM_VALUE, index=0, value=1
+        )
+        apply_modal_pointer(modal, surface.intent)
+        assert modal.view_state().form_rows[0].value == 1
+        assert modal.view_state().form_info == "target 1"
+
+    # The harness never releases the button, so a second click needs a new host.
+    with _host() as host:
+        surface = ModalSurface(modal.view_state(), ImGuiTextMeasure())
+        _idle(host, surface)
+        _pointer(host, surface, _center(surface.option_rects[0]), click=True)
+        apply_modal_pointer(modal, surface.intent)
+    assert confirmed == [{"target": 1, "step": 0, "source": 0}]
+
+
+def test_form_stepper_arrow_click_steps_the_value() -> None:
+    modal, _confirmed = _form_host_view()
+    with _host() as host:
+        surface = ModalSurface(modal.view_state(), ImGuiTextMeasure())
+        _idle(host, surface)
+        right = next(
+            hit
+            for hit in surface._form_hits
+            if hit.kind is ModalPointerKind.STEP_FORM_VALUE and hit.value == 1
+        )
+        _pointer(host, surface, _center(right.rect), click=True)
+        apply_modal_pointer(modal, surface.intent)
+    assert modal.view_state().form_rows[1].value == 1
+
+
+def test_inspector_button_inline_field_and_colour_picker_draw() -> None:
+    from imgui_bundle import imgui
+
+    from cleave.viz import shell_host
+    from cleave.viz.inline_edit import ColourTarget, InlineEditController, InlineTextView
+    from cleave.viz.row_kinds import RowDescriptor, RowKind
+
+    row = RowDescriptor(RowKind.OVERLAY_CARD_TITLE_COLOUR, card="opening_card")
+    applied: list[object] = []
+    inline = InlineEditController()
+    inline.begin_colour(row, ColourTarget((10, 20, 30), applied.append, optional=True))
+    drawn: list[bool] = []
+
+    with _host() as host:
+        host._controls.inline_edit = inline
+
+        def draw_inspector(_state: object) -> None:
+            imgui.selectable("label##row", False)
+            for error in (None, "bad value"):
+                host._draw_inline_field(InlineTextView("#ffffff", 3, True, error))
+            drawn.append(
+                shell_host._draw_button(
+                    "Go##button", text_role=shell_host.VALUE, selected=True
+                )
+            )
+            host._draw_colour_picker()
+
+        host._draw_inspector = draw_inspector
+        _draw(host)
+        _draw(host)
+    assert drawn
+    assert inline.colour_edit is not None
+    assert applied == []

@@ -66,7 +66,7 @@ def test_prompt_favourite_no_subdirs_uses_yes_no() -> None:
         view = modal.view_state()
         assert view is not None
         assert view.message == "Favourite preset: demo.milk?"
-        assert view.options == ("Yes", "No")
+        assert view.options[-1] == "Cancel"
 
 
 def test_prompt_favourite_with_subdirs_uses_choice_modal() -> None:
@@ -81,7 +81,7 @@ def test_prompt_favourite_with_subdirs_uses_choice_modal() -> None:
 
         view = modal.view_state()
         assert view is not None
-        assert view.options == ("(Root)", "Keepers", "Cancel")
+        assert view.options == ("(Root)", "keepers", "Cancel")
 
 
 def test_confirm_favourite_copies_without_session_mutation() -> None:
@@ -175,7 +175,7 @@ def test_prompt_favourite_already_in_favourites_uses_move_wording() -> None:
         view = modal.view_state()
         assert view is not None
         assert view.message == "Move favourite preset: demo.milk?"
-        assert view.options == ("(Root)", "Keepers", "Cancel")
+        assert view.options == ("(Root)", "keepers", "Cancel")
         assert locked == ["layer_1"]
 
 
@@ -224,7 +224,7 @@ def test_prompt_blacklist_already_in_blacklist_uses_move_wording() -> None:
         view = modal.view_state()
         assert view is not None
         assert view.message == "Move blacklist preset: demo.milk?"
-        assert view.options == ("(Root)", "Reject", "Cancel")
+        assert view.options == ("(Root)", "reject", "Cancel")
         assert locked == ["layer_1"]
 
 
@@ -324,7 +324,7 @@ def test_prompt_restore_favourite_uses_remove_modal() -> None:
         view = modal.view_state()
         assert view is not None
         assert view.message == "Remove favourite: demo.milk?"
-        assert view.options == ("Yes", "No")
+        assert view.options[-1] == "Cancel"
         assert locked == ["layer_1"]
 
 
@@ -345,6 +345,7 @@ def test_confirm_restore_removes_favourite() -> None:
         user_presets_before = list(session.layers["layer_1"].preset_list)
 
         controller.prompt_restore("layer_1", src)
+        modal.handle_keydown(keydown(pygame.K_LEFT))
         modal.handle_keydown(keydown(pygame.K_RETURN))
 
         assert not fav.exists()
@@ -384,6 +385,7 @@ def test_confirm_remove_favourite_scrubs_playlist_and_user_presets() -> None:
         session.layers["layer_1"].preset_list = [str(remove)]
 
         controller.prompt_restore("layer_1", remove)
+        modal.handle_keydown(keydown(pygame.K_LEFT))
         modal.handle_keydown(keydown(pygame.K_RETURN))
 
         assert not remove.exists()
@@ -462,7 +464,7 @@ def test_prompt_restore_blacklist_with_origin_uses_yes_no() -> None:
         view = modal.view_state()
         assert view is not None
         assert view.message == "Restore blacklisted preset: demo.milk?"
-        assert view.options == ("Yes", "No")
+        assert view.options[-1] == "Cancel"
 
 
 def test_confirm_restore_blacklist_moves_to_origin() -> None:
@@ -520,7 +522,7 @@ def test_confirm_restore_blacklist_without_origin_uses_choice_modal() -> None:
         view = modal.view_state()
         assert view is not None
         assert view.message == "Restore blacklisted preset: demo.milk?"
-        assert view.options == ("(Root)", "Other", "Pack", "Cancel")
+        assert view.options == ("(Root)", "other", "pack", "Cancel")
         assert unlocked == []
 
         modal.handle_keydown(keydown(pygame.K_RIGHT))  # other
@@ -583,7 +585,7 @@ def test_prompt_cast_not_yet_cast_uses_role_choice() -> None:
         view = modal.view_state()
         assert view is not None
         assert view.message == "Cast preset: demo.milk?"
-        assert view.options == ("Bed", "Pulse", "Lead", "Accent", "Cancel")
+        assert view.options == ("bed", "pulse", "lead", "accent", "Cancel")
         assert locked == ["layer_1"]
 
 
@@ -627,7 +629,7 @@ def test_prompt_cast_already_cast_uses_move_wording() -> None:
         view = modal.view_state()
         assert view is not None
         assert view.message == "Move cast: demo.milk?"
-        assert view.options == ("Bed", "Pulse", "Lead", "Accent", "Cancel")
+        assert view.options == ("bed", "pulse", "lead", "accent", "Cancel")
 
 
 def test_confirm_cast_move_deletes_old_role_and_copies_new() -> None:
@@ -678,7 +680,7 @@ def test_prompt_restore_role_only_uses_yes_no() -> None:
         view = modal.view_state()
         assert view is not None
         assert view.message == "Remove cast (lead)?"
-        assert view.options == ("Yes", "No")
+        assert view.options[-1] == "Cancel"
         assert locked == ["layer_1"]
 
 
@@ -701,6 +703,7 @@ def test_confirm_restore_removes_role_cast() -> None:
         session.layers["layer_1"].preset_switching = "on"
 
         controller.prompt_restore("layer_1", src)
+        modal.handle_keydown(keydown(pygame.K_LEFT))
         modal.handle_keydown(keydown(pygame.K_RETURN))
 
         assert not cast.exists()
@@ -726,8 +729,8 @@ def test_prompt_restore_favourite_and_role_uses_choice_modal() -> None:
         assert view.message == "Remove from: demo.milk?"
         assert view.options == (
             "Favourites",
-            "Cast (Bed)",
-            "Cast (Lead)",
+            "Cast (bed)",
+            "Cast (lead)",
             "Cancel",
         )
 
@@ -797,7 +800,7 @@ def test_prompt_restore_path_under_roles_uses_remove_cast() -> None:
         view = modal.view_state()
         assert view is not None
         assert view.message == "Remove cast (accent)?"
-        assert view.options == ("Yes", "No")
+        assert view.options[-1] == "Cancel"
 
 
 def test_prompt_restore_neither_marker_is_noop() -> None:

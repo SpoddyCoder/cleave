@@ -13,22 +13,22 @@ from cleave.timeline import (
     canonicalize,
     matches_song_marker,
 )
-from cleave.viz.modal import ModalHost, ModalOption
+from cleave.viz.modal import (
+    FormField,
+    FormFieldKind,
+    FormSpec,
+    FormValues,
+    ModalHost,
+)
 from cleave.viz.session import TuningSession
+from cleave.viz.timeline_history import TimelineHistory
 
 ApplyCutScope = Literal["all", "except_markers", "markers_only"]
 
-_ALL_LABEL = "All cues"
-_EXCEPT_MARKERS_LABEL = "All cues except song marker cues"
-_MARKERS_ONLY_LABEL = "Song marker cues only"
-_CANCEL_LABEL = "Cancel"
-
-
-def _prompt_title(cut: CutType) -> str:
-    if cut == "none":
-        return "Remove cuts from cues?"
-    label = "soft" if cut == "soft" else "hard"
-    return f"Apply {label} cuts to cues?"
+_CUT_OPTIONS: tuple[CutType, ...] = ("hard", "soft", "none")
+_SCOPE_OPTIONS: tuple[ApplyCutScope, ...] = ("all", "except_markers", "markers_only")
+_SCOPE_LABELS = ("all cues", "except markers", "markers only")
+_DEFAULT_CUT_INDEX = 1
 
 
 def _applied_prefix(cut: CutType) -> str:
@@ -97,21 +97,18 @@ class TimelineCutController:
         modal_host: ModalHost,
         *,
         on_notification: Callable[[str], None] | None = None,
+        history: TimelineHistory | None = None,
     ) -> None:
         self.session = session
         self._modal = modal_host
+        self._history = history if history is not None else TimelineHistory(session)
         self._on_notification = on_notification
+        self._last_values: FormValues = {
+            "cut": _DEFAULT_CUT_INDEX,
+            "scope": 0,
+        }
 
-    def prompt_soft(self) -> None:
-        self._prompt("soft")
-
-    def prompt_hard(self) -> None:
-        self._prompt("hard")
-
-    def prompt_remove(self) -> None:
-        self._prompt("none")
-
-    def _prompt(self, cut: CutType) -> None:
+    def prompt(self) -> None:
         tl = self.session.timeline
         if tl.locked:
             return
@@ -120,27 +117,47 @@ class TimelineCutController:
         if not any(lane.cues for lane in tl.lanes.values()):
             self._notify("No timeline cues to update")
             return
-        dismiss = lambda: None
-        options = [
-            ModalOption(
-                _ALL_LABEL,
-                lambda: self._apply(cut, "all"),
-            ),
-            ModalOption(
-                _EXCEPT_MARKERS_LABEL,
-                lambda: self._apply(cut, "except_markers"),
-            ),
-            ModalOption(
-                _MARKERS_ONLY_LABEL,
-                lambda: self._apply(cut, "markers_only"),
-            ),
-            ModalOption(_CANCEL_LABEL, dismiss),
-        ]
-        self._modal.prompt_choice(
-            _prompt_title(cut),
-            options,
-            on_dismiss=dismiss,
+        self._modal.prompt_form(
+            FormSpec(
+                title="Set cut type",
+                fields=(
+                    FormField(
+                        "cut",
+                        "cut type",
+                        FormFieldKind.SEGMENT,
+                        _CUT_OPTIONS,
+                        self._last_values["cut"],
+                    ),
+                    FormField(
+                        "scope",
+                        "applies to",
+                        FormFieldKind.SEGMENT,
+                        _SCOPE_LABELS,
+                        self._last_values["scope"],
+                    ),
+                ),
+                confirm_label="Set cut type",
+                on_confirm=self._confirm,
+                info=self._change_info,
+            )
         )
+
+    def _change_info(self, values: FormValues) -> str:
+        """How many cues the draft would change, from a dry run on a copy."""
+        tl = self.session.timeline
+        total = sum(len(lane.cues) for lane in tl.lanes.values())
+        changed = apply_cut_to_lanes(
+            dict(tl.lanes),
+            _CUT_OPTIONS[values["cut"]],
+            song_marker_times=self.session.song_markers.times,
+            scope=_SCOPE_OPTIONS[values["scope"]],
+        )
+        return f"Changes {changed} of {total} cues."
+
+    def _confirm(self, values: FormValues) -> None:
+        self._last_values = values
+        with self._history.recording("Set cut type"):
+            self._apply(_CUT_OPTIONS[values["cut"]], _SCOPE_OPTIONS[values["scope"]])
 
     def _apply(self, cut: CutType, scope: ApplyCutScope) -> None:
         tl = self.session.timeline

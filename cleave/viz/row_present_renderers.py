@@ -35,7 +35,6 @@ from cleave.viz.row_sections import (
     TRACK_COMPOSITING_SECTION_KINDS,
 )
 from cleave.viz.theme import (
-    ACTION,
     DISABLED,
     HIGHLIGHT,
     LABEL,
@@ -93,7 +92,7 @@ def row_value_color_for(
         if not state.timeline.enabled:
             return DISABLED
 
-    if affordance == RowAffordance.ACTION:
+    if affordance == RowAffordance.COMMAND:
         if (
             field is not None
             and field.present_style == RowPresentStyle.PATH_ICON
@@ -101,12 +100,9 @@ def row_value_color_for(
             and state.solo_active
         ):
             return DISABLED
-        if field is not None and field.panel_label == "Delete Layer":
-            if len(state.layer_z_order) == 1:
-                return DISABLED
         if locked_blocked:
             return LOCKED
-        return ACTION
+        return VALUE
 
     stem = desc.slot
 
@@ -174,11 +170,8 @@ def inspector_field_colors(
     """Label and value colors. Locked blocked rows use LOCKED for both."""
     if section_lock_blocks_mutation(state, desc):
         return LOCKED, LOCKED
-    label = (
-        ACTION
-        if row_spec(desc.kind).affordance is RowAffordance.ACTION
-        else LABEL
-    )
+    spec = row_spec(desc.kind)
+    label = VALUE if spec.present_style == RowPresentStyle.FULL_LINE else LABEL
     return label, row_value_color_for(state, desc)
 
 

@@ -68,9 +68,9 @@ def test_enter_curation_confirms_via_modal() -> None:
     assert view is not None
     assert view.kind == ModalKind.CHOICE
     assert view.message == "Switch the editor to Preset Curation mode?"
-    assert list(view.options) == ["Ok", "Cancel"]
+    assert list(view.options) == ["OK", "Cancel"]
     assert view.focus_index == 0
-    _choose_editor_mode_option(controls, "Ok")
+    _choose_editor_mode_option(controls, "OK")
     assert not controls.modal_host.active
     assert controls.session.settings.editor_mode == "preset_curation"
 
@@ -109,7 +109,7 @@ def test_enter_curation_defaults_full_mix_and_disables_rotation() -> None:
     controls.editor_mode._layer_bindings = mock_bindings
     controls._layer_bindings = mock_bindings
 
-    _choose_editor_mode_option(controls, "Ok")
+    _choose_editor_mode_option(controls, "OK")
 
     assert not controls.modal_host.active
     assert controls.session.settings.editor_mode == "preset_curation"
@@ -167,11 +167,11 @@ def test_curation_ignores_layer_lock() -> None:
 def test_dirty_enter_modal_cancel_stays_visualizer() -> None:
     controls = _make_controls(("layer_1",))
     _mutate_dirty(controls)
-    _choose_editor_mode_option(controls, "Ok")
+    _choose_editor_mode_option(controls, "OK")
     assert controls.modal_host.active
     view = controls.modal_host.view_state()
     assert view.kind == ModalKind.CHOICE
-    assert list(view.options) == ["Yes", "Discard Changes", "Cancel"]
+    assert list(view.options) == ["Save", "Discard changes", "Cancel"]
 
     controls.handle_keydown(keydown(pygame.K_ESCAPE))
     assert not controls.modal_host.active
@@ -212,8 +212,8 @@ def test_exit_curation_reloads_and_clears_dirty() -> None:
         view = controls.modal_host.view_state()
         assert view is not None
         assert view.message == "Switch the editor to Visual Editor mode?"
-        assert list(view.options) == ["Ok", "Cancel"]
-        _choose_editor_mode_option(controls, "Ok")
+        assert list(view.options) == ["OK", "Cancel"]
+        _choose_editor_mode_option(controls, "OK")
         assert not controls.modal_host.active
 
     assert controls.session.settings.editor_mode == "visualizer"

@@ -9,7 +9,7 @@ from pathlib import Path
 from cleave.preset_playlist import milk_files_in_dir, scan_preset_playlist
 from cleave.viz.layer import StemLayer
 from cleave.viz.live_layer_bindings import LiveLayerBindings
-from cleave.viz.modal import ModalHost, ModalOption
+from cleave.viz.modal import FormField, FormFieldKind, FormSpec, ModalHost
 from cleave.viz.preset_list_populate import (
     needed_preset_count,
     on_segment_populate_count,
@@ -128,6 +128,11 @@ class PresetListController:
         self.move_mode_preset = None
         self._move_mode_original_preset_list = None
 
+    def refresh_switching(self, slot: str) -> None:
+        """Tell the live layer its preset list changed."""
+        if self._layer_bindings is not None:
+            self._layer_bindings.on_preset_switching_change(slot)
+
     def repopulate(self) -> None:
         if self.project_dir is None:
             return
@@ -148,17 +153,11 @@ class PresetListController:
             return
         if self._layer_bindings is not None:
             self._layer_bindings.lock_preset_for_modal(slot)
-        options: list[ModalOption] = []
         layer = self.session.layers[slot]
-        timeline_trigger = layer.preset_switching_trigger == "timeline"
-        if timeline_trigger:
+        sources: list[tuple[str, str]] = []
+        if layer.preset_switching_trigger == "timeline":
             populate_count = on_segment_populate_count(self.session, slot)
-            options.append(
-                ModalOption(
-                    "Using Cue Marker Roles (random)",
-                    action=lambda: self.confirm_populate(slot, "cue_roles"),
-                )
-            )
+            sources.append(("Using Cue Marker Roles (random)", "cue_roles"))
         else:
             needed = needed_preset_count(
                 song_duration_sec=self.duration_sec,
@@ -167,30 +166,27 @@ class PresetListController:
             )
             available = len(milk_files_in_dir(layer.playlist.current_dir))
             populate_count = min(needed, available)
-        options.extend(
-            [
-                ModalOption(
-                    "Current Directory (random)",
-                    action=lambda: self.confirm_populate(slot, "directory_random"),
-                ),
-                ModalOption(
-                    "Current Directory (sequential)",
-                    action=lambda: self.confirm_populate(
-                        slot, "directory_sequential"
+        noun = "1 preset" if populate_count == 1 else f"{populate_count} presets"
+        sources.append(("Current Directory (random)", "directory_random"))
+        sources.append(("Current Directory (sequential)", "directory_sequential"))
+        self._modal.prompt_form(
+            FormSpec(
+                title="Populate preset list",
+                body=f"Replaces the whole list with {noun}.",
+                fields=(
+                    FormField(
+                        "source",
+                        "from",
+                        FormFieldKind.RADIO,
+                        tuple(label for label, _mode in sources),
                     ),
                 ),
-            ]
-        )
-        options.append(
-            ModalOption(
-                "Cancel",
-                action=lambda: self._unlock_preset_after_modal(slot),
+                confirm_label="Populate",
+                on_confirm=lambda values: self.confirm_populate(
+                    slot, sources[values["source"]][1]
+                ),
+                on_cancel=lambda: self._unlock_preset_after_modal(slot),
             )
-        )
-        self._modal.prompt_choice(
-            f"Populate the preset list with {populate_count} presets from?",
-            options,
-            on_dismiss=lambda: self._unlock_preset_after_modal(slot),
         )
 
     def confirm_populate(self, slot: str, mode: str) -> None:
@@ -263,37 +259,29 @@ class PresetListController:
         src_path = self.current_preset_path(slot)
         if src_path is None:
             return
+        dest_dir = self._user_presets_dir()
+        if dest_dir is None:
+            return
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        dest_path, needs_copy = resolve_user_preset_dest(dest_dir, src_path)
+        if needs_copy:
+            shutil.copy2(src_path, dest_path)
+        self.session.layers[slot].preset_list.append(str(dest_path.resolve()))
         if self._layer_bindings is not None:
-            self._layer_bindings.lock_preset_for_modal(slot)
-        self._modal.prompt_yes_no(
-            f"Add preset: {src_path.name}?",
-            on_confirm=lambda: self.confirm_add(slot, src_path),
-            on_cancel=lambda: self._unlock_preset_after_modal(slot),
-        )
-
-    def confirm_add(self, slot: str, src_path: Path) -> None:
-        try:
-            dest_dir = self._user_presets_dir()
-            if dest_dir is None:
-                return
-            dest_dir.mkdir(parents=True, exist_ok=True)
-            dest_path, needs_copy = resolve_user_preset_dest(dest_dir, src_path)
-            if needs_copy:
-                shutil.copy2(src_path, dest_path)
-            self.session.layers[slot].preset_list.append(str(dest_path.resolve()))
-            if self._layer_bindings is not None:
-                self._layer_bindings.on_preset_switching_change(slot)
-        finally:
-            self._unlock_preset_after_modal(slot)
+            self._layer_bindings.on_preset_switching_change(slot)
+        if self._on_notification is not None:
+            self._on_notification(f"Added preset: {src_path.name}")
 
     def prompt_delete(self, slot: str, index: int) -> None:
         layer = self.session.layers[slot]
         if index < 0 or index >= len(layer.preset_list):
             return
         label = preset_list_item_display_name(layer.preset_list, index)
-        self._modal.prompt_yes_no(
+        self._modal.prompt_confirm(
             f"Remove preset: {label}?",
-            on_confirm=lambda: self.confirm_delete(slot, index),
+            "Remove preset",
+            lambda: self.confirm_delete(slot, index),
+            destructive=True,
         )
 
     def confirm_delete(self, slot: str, index: int) -> None:

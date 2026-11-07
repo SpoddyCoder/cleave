@@ -29,7 +29,6 @@ from cleave.viz.text_fit import (
     wrap_text_to_width,
 )
 from cleave.viz.theme import (
-    ACTION,
     BORDER_WIDTH,
     DISABLED,
     ERROR_NOTIFICATION,
@@ -276,7 +275,7 @@ def _row_color(row: PickerRow) -> _Role:
     if row.kind is PickerRowKind.NOTE:
         return DISABLED
     if row.kind in (PickerRowKind.PARENT, PickerRowKind.DRIVE):
-        return ACTION
+        return LABEL
     if row.kind is PickerRowKind.PROJECT:
         return HIGHLIGHT
     return VALUE
@@ -673,7 +672,7 @@ class FilePickerSurface:
             )
             if lit:
                 _highlight(draw, hit)
-            color = HIGHLIGHT if lit or current else ACTION
+            color = HIGHLIGHT if lit or current else LABEL
             _text(draw, screen_x, y, text, color)
             rects.append(hit)
             indices.append(index)

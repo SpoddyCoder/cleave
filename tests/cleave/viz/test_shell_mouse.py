@@ -169,10 +169,6 @@ def _seed_placement_snap_off(controls) -> None:
     controls.session.timeline.placement_snap = "off"
 
 
-def _seed_conductor_off(controls) -> None:
-    controls.session.timeline.timeline_preset_conductor = False
-
-
 def _seed_hard_crossfade_off(controls) -> None:
     controls.session.timeline.hard_cut_fades.crossfade = False
 
@@ -217,12 +213,6 @@ def _preset_switching_trigger(controls) -> str:
             _seed_placement_snap_off,
             lambda controls: controls.session.timeline.placement_snap,
             id="placement_snap",
-        ),
-        pytest.param(
-            RowDescriptor(RowKind.TIMELINE_PRESET_CONDUCTOR),
-            _seed_conductor_off,
-            lambda controls: controls.session.timeline.timeline_preset_conductor,
-            id="conductor",
         ),
         pytest.param(
             RowDescriptor(RowKind.TIMELINE_HARD_CUT_CROSSFADE),

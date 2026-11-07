@@ -1,0 +1,218 @@
+"""Inline editing of an inspector row: a text field or a colour picker.
+
+One edit runs at a time. While one is active it owns the keyboard, so typing
+never reaches a hotkey.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Callable
+from dataclasses import dataclass
+
+import pygame
+
+from cleave.viz.key_repeat import KeyRepeatController
+from cleave.viz.row_kinds import RowDescriptor
+from cleave.viz.text_edit import (
+    TEXT_EDIT_REPEAT_KEYS,
+    apply_text_edit_key,
+    insert_text_at_caret,
+    reset_caret_blink,
+    text_caret_visible,
+)
+
+Rgb = tuple[int, int, int]
+
+
+@dataclass
+class InlineTextState:
+    descriptor: RowDescriptor
+    draft: str
+    caret_index: int
+    initial: str
+    on_commit: Callable[[str], None]
+    validate: Callable[[str], str | None] | None
+    editing: bool = True
+    error: str | None = None
+    caret_blink_sec: float = 0.0
+
+
+@dataclass(frozen=True)
+class InlineTextView:
+    draft: str
+    caret_index: int
+    caret_visible: bool
+    error: str | None
+
+
+@dataclass(frozen=True)
+class ColourTarget:
+    """A colour property. ``current`` is None when an optional colour is unset."""
+
+    current: Rgb | None
+    apply: Callable[[Rgb | None], None]
+    optional: bool = False
+
+
+@dataclass
+class ColourEditState:
+    descriptor: RowDescriptor
+    target: ColourTarget
+    value: Rgb | None
+
+
+class InlineEditController:
+    """The one inline edit in progress, if any."""
+
+    def __init__(
+        self,
+        on_start_text_input: Callable[[], None] | None = None,
+        on_stop_text_input: Callable[[], None] | None = None,
+    ) -> None:
+        self._on_start_text_input = on_start_text_input
+        self._on_stop_text_input = on_stop_text_input
+        self._text: InlineTextState | None = None
+        self._colour: ColourEditState | None = None
+        self._key_repeat = KeyRepeatController()
+
+    @property
+    def active(self) -> bool:
+        return self._text is not None or self._colour is not None
+
+    @property
+    def text_target(self) -> RowDescriptor | None:
+        return None if self._text is None else self._text.descriptor
+
+    @property
+    def colour_edit(self) -> ColourEditState | None:
+        return self._colour
+
+    def text_view(self) -> InlineTextView | None:
+        state = self._text
+        if state is None:
+            return None
+        return InlineTextView(
+            state.draft,
+            state.caret_index,
+            text_caret_visible(state),
+            state.error,
+        )
+
+    def begin_text(
+        self,
+        descriptor: RowDescriptor,
+        initial: str,
+        on_commit: Callable[[str], None],
+        *,
+        validate: Callable[[str], str | None] | None = None,
+    ) -> None:
+        self.finish()
+        self._text = InlineTextState(
+            descriptor=descriptor,
+            draft=initial,
+            caret_index=len(initial),
+            initial=initial,
+            on_commit=on_commit,
+            validate=validate,
+        )
+        if self._on_start_text_input is not None:
+            self._on_start_text_input()
+
+    def begin_colour(self, descriptor: RowDescriptor, target: ColourTarget) -> None:
+        self.finish()
+        self._colour = ColourEditState(descriptor, target, target.current)
+
+    def set_colour(self, value: Rgb | None) -> None:
+        """Apply a picked colour live. Esc restores the one from when it opened."""
+        state = self._colour
+        if state is None or value == state.value:
+            return
+        state.value = value
+        state.target.apply(value)
+
+    def finish(self) -> None:
+        """Keep the edit: commit valid text, leave a colour as picked.
+
+        Clicking away is not an error. Text that fails validation is dropped.
+        """
+        self._colour = None
+        state = self._text
+        if state is None:
+            return
+        valid = state.validate is None or state.validate(state.draft) is None
+        self._end_text()
+        if valid and state.draft != state.initial:
+            state.on_commit(state.draft)
+
+    def cancel(self) -> None:
+        colour = self._colour
+        if colour is not None:
+            self._colour = None
+            if colour.value != colour.target.current:
+                colour.target.apply(colour.target.current)
+        if self._text is not None:
+            self._end_text()
+
+    def handle_keydown(self, event: pygame.event.Event) -> bool:
+        """Consume every key while an edit is active."""
+        if not self.active:
+            return False
+        if event.key == pygame.K_ESCAPE:
+            self.cancel()
+            return True
+        state = self._text
+        if state is None:
+            if event.key in (pygame.K_RETURN, pygame.K_KP_ENTER, pygame.K_TAB):
+                self.finish()
+            return True
+        if event.key == pygame.K_TAB:
+            self.finish()
+            return True
+        if event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+            self._commit_from_enter(state)
+        elif event.key in TEXT_EDIT_REPEAT_KEYS:
+            apply_text_edit_key(state, event.key)
+            self._key_repeat.on_keydown(
+                event.key,
+                event.mod,
+                on_repeat=lambda key, _mod: self._repeat_key(key),
+            )
+        return True
+
+    def handle_keyup(self, event: pygame.event.Event) -> bool:
+        if not self.active:
+            return False
+        self._key_repeat.on_keyup(event.key)
+        return True
+
+    def handle_text_input(self, text: str) -> bool:
+        state = self._text
+        if state is None:
+            return False
+        insert_text_at_caret(state, text)
+        return True
+
+    def tick(self, dt_sec: float) -> None:
+        state = self._text
+        if state is None:
+            return
+        state.caret_blink_sec += dt_sec
+        self._key_repeat.tick(dt_sec)
+
+    def _commit_from_enter(self, state: InlineTextState) -> None:
+        error = None if state.validate is None else state.validate(state.draft)
+        if error is not None:
+            state.error = error
+            reset_caret_blink(state)
+            return
+        self.finish()
+
+    def _repeat_key(self, key: int) -> None:
+        if self._text is not None:
+            apply_text_edit_key(self._text, key)
+
+    def _end_text(self) -> None:
+        self._text = None
+        self._key_repeat.disarm()
+        if self._on_stop_text_input is not None:
+            self._on_stop_text_input()

@@ -21,15 +21,3 @@ _MODE_DISPLAY: dict[TimelinePresetMode, str] = {
 
 def timeline_preset_mode_display(mode: TimelinePresetMode) -> str:
     return _MODE_DISPLAY.get(mode, _MODE_DISPLAY[DEFAULT_TIMELINE_PRESET_MODE])
-
-
-def cycle_timeline_preset_mode(
-    value: TimelinePresetMode, *, forward: bool
-) -> TimelinePresetMode:
-    options = TIMELINE_PRESET_MODE_OPTIONS
-    try:
-        index = options.index(value)
-    except ValueError:
-        index = options.index(DEFAULT_TIMELINE_PRESET_MODE)
-    delta = 1 if forward else -1
-    return options[(index + delta) % len(options)]

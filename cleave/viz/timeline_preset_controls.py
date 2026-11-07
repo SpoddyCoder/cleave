@@ -1,4 +1,4 @@
-"""Timeline preset confirm modal and clear+apply orchestration."""
+"""Generate and Reset timeline dialogs and their clear+apply orchestration."""
 
 from __future__ import annotations
 
@@ -21,31 +21,54 @@ from cleave.timeline_presets import (
     build_pulse_cues,
     compose_pattern_mask_timeline,
 )
-from cleave.timeline_presets.characters import timeline_preset_kind_display
+from cleave.timeline_presets.characters import (
+    TIMELINE_PRESET_KIND_OPTIONS,
+    timeline_preset_kind_display,
+)
 from cleave.timeline_presets.conductor import timeline_preset_conductor_display
-from cleave.timeline_presets.mode import timeline_preset_mode_display
+from cleave.timeline_presets.mode import (
+    TIMELINE_PRESET_MODE_OPTIONS,
+    timeline_preset_mode_display,
+)
 from cleave.timeline_presets.accent import apply_accent
 from cleave.timeline_presets.crescendo import apply_crescendo
-from cleave.timeline_presets.cue_snap import timeline_preset_cue_snap_display
+from cleave.timeline_presets.cue_snap import (
+    TIMELINE_PRESET_CUE_SNAP_OPTIONS,
+    timeline_preset_cue_snap_display,
+)
 from cleave.timeline_presets.density import (
+    TIMELINE_PRESET_DENSITY_OPTIONS,
     density_bias_for,
     timeline_preset_density_display,
 )
-from cleave.timeline_presets.repopulate import timeline_preset_repopulate_display
+from cleave.timeline_presets.repopulate import (
+    TIMELINE_PRESET_REPOPULATE_OPTIONS,
+    timeline_preset_repopulate_display,
+)
 from cleave.timeline_presets.song_marker_snap import (
+    TIMELINE_PRESET_SONG_MARKER_SNAP_OPTIONS,
     timeline_preset_song_marker_snap_display,
 )
 from cleave.timeline_presets.timeline_cuts import (
+    TIMELINE_PRESET_TIMELINE_CUTS_OPTIONS,
     TimelinePresetTimelineCuts,
     timeline_preset_timeline_cuts_display,
 )
-from cleave.viz.modal import ModalHost, ModalLabeledLine, ModalOption
+from cleave.viz.modal import (
+    FormField,
+    FormFieldKind,
+    FormSpec,
+    FormValues,
+    ModalHost,
+)
 from cleave.viz.session import TuningSession
 from cleave.viz.timeline_cut_controls import apply_cut_to_lanes
+from cleave.viz.timeline_history import TimelineHistory
 
-_CANCEL_LABEL = "Cancel"
-_APPLY_PROMPT_TITLE = "Apply timeline preset?"
-_RESET_PROMPT_MESSAGE = "Reset timeline?"
+_GENERATE_TITLE = "Generate timeline"
+_RESET_TITLE = "Reset timeline?"
+_CONDUCTOR_OPTIONS = (False, True)
+_RESET_LAYER_OPTIONS = ("off", "on")
 _PATTERN_MASK_TRANSITION_SEC = 1.0
 
 _KIND_BUILDERS = {
@@ -54,6 +77,27 @@ _KIND_BUILDERS = {
     "arc": (build_arc_cues, "Applied Arc timeline preset"),
     "pulse": (build_pulse_cues, "Applied Pulse timeline preset"),
 }
+
+
+def _choice_field(
+    field_id: str,
+    label: str,
+    kind: FormFieldKind,
+    options: Sequence[object],
+    current: object,
+    display: Callable[..., str],
+) -> FormField:
+    return FormField(
+        field_id,
+        label,
+        kind,
+        tuple(display(option) for option in options),
+        options.index(current),
+    )
+
+
+def _cues_label(count: int) -> str:
+    return "1 cue" if count == 1 else f"{count} cues"
 
 
 class TimelinePresetController:
@@ -69,9 +113,11 @@ class TimelinePresetController:
         signals: Signals | None = None,
         on_notification: Callable[[str], None] | None = None,
         on_repopulate: Callable[[], None] | None = None,
+        history: TimelineHistory | None = None,
     ) -> None:
         self.session = session
         self._modal = modal_host
+        self._history = history if history is not None else TimelineHistory(session)
         self._beat_times = tuple(beat_times)
         self._bar_times = tuple(bar_times)
         self._signals = signals
@@ -79,67 +125,139 @@ class TimelinePresetController:
         self._on_repopulate = on_repopulate
 
     def prompt(self, duration_sec: float) -> None:
-        if self.session.timeline.locked:
+        tl = self.session.timeline
+        if tl.locked:
             return
-        dismiss = lambda: None
-        self._modal.prompt_yes_no(
-            _APPLY_PROMPT_TITLE,
-            on_confirm=lambda: self._confirm_apply(duration_sec),
-            on_cancel=dismiss,
-            cancel_label=_CANCEL_LABEL,
-            labeled_lines=self._apply_prompt_labeled_lines(),
+        step = FormFieldKind.STEP
+        segment = FormFieldKind.SEGMENT
+        self._modal.prompt_form(
+            FormSpec(
+                title=_GENERATE_TITLE,
+                fields=(
+                    _choice_field(
+                        "character",
+                        "character",
+                        step,
+                        TIMELINE_PRESET_KIND_OPTIONS,
+                        tl.timeline_preset_kind,
+                        timeline_preset_kind_display,
+                    ),
+                    _choice_field(
+                        "density",
+                        "density",
+                        step,
+                        TIMELINE_PRESET_DENSITY_OPTIONS,
+                        tl.timeline_preset_density,
+                        timeline_preset_density_display,
+                    ),
+                    _choice_field(
+                        "cue_snap",
+                        "cue snap",
+                        segment,
+                        TIMELINE_PRESET_CUE_SNAP_OPTIONS,
+                        tl.timeline_preset_cue_snap,
+                        timeline_preset_cue_snap_display,
+                    ),
+                    _choice_field(
+                        "song_marker_snap",
+                        "song marker snap",
+                        step,
+                        TIMELINE_PRESET_SONG_MARKER_SNAP_OPTIONS,
+                        tl.timeline_preset_song_marker_snap,
+                        timeline_preset_song_marker_snap_display,
+                    ),
+                    _choice_field(
+                        "timeline_cuts",
+                        "timeline cuts",
+                        step,
+                        TIMELINE_PRESET_TIMELINE_CUTS_OPTIONS,
+                        tl.timeline_preset_timeline_cuts,
+                        timeline_preset_timeline_cuts_display,
+                    ),
+                    _choice_field(
+                        "repopulate",
+                        "re-populate preset lists",
+                        step,
+                        TIMELINE_PRESET_REPOPULATE_OPTIONS,
+                        tl.timeline_preset_repopulate,
+                        timeline_preset_repopulate_display,
+                    ),
+                    _choice_field(
+                        "conductor",
+                        "conductor",
+                        segment,
+                        _CONDUCTOR_OPTIONS,
+                        tl.timeline_preset_conductor,
+                        timeline_preset_conductor_display,
+                    ),
+                    _choice_field(
+                        "mode",
+                        "mode",
+                        segment,
+                        TIMELINE_PRESET_MODE_OPTIONS,
+                        tl.timeline_preset_mode,
+                        timeline_preset_mode_display,
+                    ),
+                ),
+                confirm_label="Generate",
+                on_confirm=lambda values: self._confirm_generate(
+                    values, duration_sec
+                ),
+                info=lambda _values: self._generate_info(),
+            )
         )
 
-    def _apply_prompt_labeled_lines(self) -> tuple[ModalLabeledLine, ...]:
+    def _generate_info(self) -> str | None:
+        count = self._cue_count()
+        if count == 0:
+            return None
+        return f"Replaces {_cues_label(count)} on the timeline."
+
+    def _cue_count(self) -> int:
+        return sum(len(lane.cues) for lane in self.session.timeline.lanes.values())
+
+    def _confirm_generate(self, values: FormValues, duration_sec: float) -> None:
         tl = self.session.timeline
-        return (
-            ModalLabeledLine(
-                "character", timeline_preset_kind_display(tl.timeline_preset_kind)
-            ),
-            ModalLabeledLine(
-                "density", timeline_preset_density_display(tl.timeline_preset_density)
-            ),
-            ModalLabeledLine(
-                "cue snap",
-                timeline_preset_cue_snap_display(tl.timeline_preset_cue_snap),
-            ),
-            ModalLabeledLine(
-                "song marker snap",
-                timeline_preset_song_marker_snap_display(
-                    tl.timeline_preset_song_marker_snap
-                ),
-            ),
-            ModalLabeledLine(
-                "timeline cuts",
-                timeline_preset_timeline_cuts_display(tl.timeline_preset_timeline_cuts),
-            ),
-            ModalLabeledLine(
-                "re-populate preset lists",
-                timeline_preset_repopulate_display(tl.timeline_preset_repopulate),
-            ),
-            ModalLabeledLine(
-                "conductor",
-                timeline_preset_conductor_display(tl.timeline_preset_conductor),
-            ),
-            ModalLabeledLine(
-                "mode",
-                timeline_preset_mode_display(tl.timeline_preset_mode),
-            ),
-        )
+        tl.timeline_preset_kind = TIMELINE_PRESET_KIND_OPTIONS[values["character"]]
+        tl.timeline_preset_density = TIMELINE_PRESET_DENSITY_OPTIONS[values["density"]]
+        tl.timeline_preset_cue_snap = TIMELINE_PRESET_CUE_SNAP_OPTIONS[
+            values["cue_snap"]
+        ]
+        tl.timeline_preset_song_marker_snap = TIMELINE_PRESET_SONG_MARKER_SNAP_OPTIONS[
+            values["song_marker_snap"]
+        ]
+        tl.timeline_preset_timeline_cuts = TIMELINE_PRESET_TIMELINE_CUTS_OPTIONS[
+            values["timeline_cuts"]
+        ]
+        tl.timeline_preset_repopulate = TIMELINE_PRESET_REPOPULATE_OPTIONS[
+            values["repopulate"]
+        ]
+        tl.timeline_preset_conductor = _CONDUCTOR_OPTIONS[values["conductor"]]
+        tl.timeline_preset_mode = TIMELINE_PRESET_MODE_OPTIONS[values["mode"]]
+        with self._history.recording("Generate timeline"):
+            self._apply(tl.timeline_preset_kind, duration_sec)
 
     def prompt_reset(self) -> None:
         if self.session.timeline.locked:
             return
-        dismiss = lambda: None
-        options = [
-            ModalOption("All Off", lambda: self._reset(all_on=False)),
-            ModalOption("All On", lambda: self._reset(all_on=True)),
-            ModalOption(_CANCEL_LABEL, dismiss),
-        ]
-        self._modal.prompt_choice(_RESET_PROMPT_MESSAGE, options, on_dismiss=dismiss)
-
-    def _confirm_apply(self, duration_sec: float) -> None:
-        self._apply(self.session.timeline.timeline_preset_kind, duration_sec)
+        count = self._cue_count()
+        self._modal.prompt_form(
+            FormSpec(
+                title=_RESET_TITLE,
+                body=f"Removes {_cues_label(count)}.",
+                fields=(
+                    FormField(
+                        "layers",
+                        "layers after reset",
+                        FormFieldKind.SEGMENT,
+                        _RESET_LAYER_OPTIONS,
+                    ),
+                ),
+                confirm_label="Reset timeline",
+                on_confirm=self._confirm_reset,
+                destructive=True,
+            )
+        )
 
     def _apply(
         self,
@@ -314,6 +432,10 @@ class TimelinePresetController:
             apply_cut_to_lanes(
                 lanes, "hard", song_marker_times=markers, scope="all"
             )
+
+    def _confirm_reset(self, values: FormValues) -> None:
+        with self._history.recording("Reset timeline"):
+            self._reset(all_on=values["layers"] == 1)
 
     def _reset(self, *, all_on: bool) -> None:
         self._clear_timeline_state()

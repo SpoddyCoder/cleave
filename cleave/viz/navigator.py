@@ -10,6 +10,7 @@ from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
 from cleave.stems import stem_overlay_header
+from cleave.config_schema.layers import MAX_LAYER_COUNT
 from cleave.viz.editor_mode_controls import curation_focus_slot, is_preset_curation_mode
 
 if TYPE_CHECKING:
@@ -28,6 +29,7 @@ TWISTY_COLLAPSED = "▸"
 TOGGLE_ENABLED = "enabled"
 TOGGLE_SOLO = "solo"
 TOGGLE_LOCK = "lock"
+TOGGLE_ADD = "add"
 
 LAYER_PAGE_PRESET_SWITCHING = "preset_switching"
 LAYER_PAGE_COMPOSITING = "compositing"
@@ -44,9 +46,9 @@ _LAYER_PAGES: tuple[tuple[str, str], ...] = (
 class NavToggle:
     """One clickable icon on a navigator row.
 
-    ``id`` is ``TOGGLE_ENABLED``, ``TOGGLE_SOLO``, or ``TOGGLE_LOCK``. ``active``
-    is on, soloed, or locked. ``blocked`` is true while the section lock refuses
-    the toggle.
+    ``id`` is ``TOGGLE_ENABLED``, ``TOGGLE_SOLO``, ``TOGGLE_LOCK``, or
+    ``TOGGLE_ADD``. ``active`` is on, soloed, or locked. ``blocked`` is true
+    while the section lock refuses the toggle, or Add has no room.
     """
 
     id: str
@@ -103,7 +105,6 @@ _STATIC_CHILDREN: dict[str, tuple[tuple[str, str], ...]] = {
         ("timeline.grid", "Beat / Bar Grid"),
         ("timeline.cue_fades", "Cue Fades"),
         ("timeline.song_markers", "Song Markers"),
-        ("timeline.preset", "Timeline Preset"),
     ),
 }
 
@@ -243,6 +244,11 @@ def _root_node(session: TuningSession, node: NavNode) -> NavNode:
         return replace(node, toggles=_block_toggles(session.pattern_mask))
     if node.id == "timeline":
         return replace(node, toggles=_block_toggles(session.timeline))
+    if node.id == "layers" and not is_preset_curation_mode(
+        session.settings.editor_mode
+    ):
+        full = len(session.layer_z_order) >= MAX_LAYER_COUNT
+        return replace(node, toggles=(NavToggle(TOGGLE_ADD, True, full),))
     return node
 
 

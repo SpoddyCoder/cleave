@@ -184,6 +184,8 @@ def _merge_icon_glyphs(fonts: Any, size_pixels: float) -> tuple[Any, list[int]]:
         FOLDER_GLYPH,
         LOCK_GLYPH,
         LOCK_OPEN_GLYPH,
+        ADD_GLYPH,
+        DELETE_GLYPH,
         POWER_GLYPH,
         SOLO_GLYPH,
         font_path,
@@ -199,6 +201,8 @@ def _merge_icon_glyphs(fonts: Any, size_pixels: float) -> tuple[Any, list[int]]:
         ARROW_DOWNWARD_GLYPH,
         LOCK_GLYPH,
         LOCK_OPEN_GLYPH,
+        ADD_GLYPH,
+        DELETE_GLYPH,
         POWER_GLYPH,
         SOLO_GLYPH,
     ):

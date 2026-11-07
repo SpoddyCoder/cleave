@@ -162,12 +162,13 @@ def test_prompt_populate_timeline_trigger_includes_cue_roles() -> None:
         controller.prompt_populate("layer_1")
         view = modal.view_state()
         assert view is not None
-        assert view.message == "Populate the preset list with 1 presets from?"
-        assert view.options == (
-            "Using Cue Marker Roles (Random)",
-            "Current Directory (Random)",
-            "Current Directory (Sequential)",
-            "Cancel",
+        assert view.message == "Populate preset list"
+        assert view.body == "Replaces the whole list with 1 preset."
+        assert view.options == ("Populate", "Cancel")
+        assert view.form_rows[0].options == (
+            "Using Cue Marker Roles (random)",
+            "Current Directory (random)",
+            "Current Directory (sequential)",
         )
 
 
@@ -180,10 +181,9 @@ def test_prompt_populate_timer_omits_cue_roles() -> None:
         controller.prompt_populate("layer_1")
         view = modal.view_state()
         assert view is not None
-        assert view.options == (
-            "Current Directory (Random)",
-            "Current Directory (Sequential)",
-            "Cancel",
+        assert view.form_rows[0].options == (
+            "Current Directory (random)",
+            "Current Directory (sequential)",
         )
 
 
@@ -207,10 +207,7 @@ def test_add_current_uses_playing_auto_preset_not_browse() -> None:
             RowDescriptor(RowKind.TRACK_PRESET, slot="layer_1"),
         ) == playing.resolve()
         controller.add_current("layer_1")
-        view = modal.view_state()
-        assert view is not None
-        assert view.message == "Add preset: later.milk?"
-        modal.handle_keydown(keydown(pygame.K_RETURN))
+        assert modal.view_state() is None
         dest = project / "presets" / "later.milk"
         assert dest.is_file()
         assert session.layers["layer_1"].preset_list == [str(dest.resolve())]
@@ -245,9 +242,7 @@ def test_add_current_uses_projectm_playlist_position_not_stale_first() -> None:
         session.layers["layer_1"].auto_preset_path = first.resolve()
         assert controller.current_preset_path("layer_1") == later.resolve()
         controller.add_current("layer_1")
-        view = modal.view_state()
-        assert view is not None
-        assert view.message == "Add preset: later.milk?"
+        assert modal.view_state() is None
 
 
 def test_add_current_copies_into_user_presets() -> None:
@@ -265,10 +260,7 @@ def test_add_current_copies_into_user_presets() -> None:
             ),
         )
         controller.add_current("layer_1")
-        view = modal.view_state()
-        assert view is not None
-        assert view.message == "Add preset: demo.milk?"
-        modal.handle_keydown(keydown(pygame.K_RETURN))
+        assert modal.view_state() is None
         dest = project / "presets" / "demo.milk"
         assert dest.is_file()
         assert session.layers["layer_1"].preset_list == [str(dest.resolve())]
@@ -319,9 +311,7 @@ def test_current_preset_path_uses_browsed_preset_while_paused() -> None:
         controller._layers_by_slot = {"layer_1": stem}
         assert controller.current_preset_path("layer_1") == browse.resolve()
         controller.add_current("layer_1")
-        view = modal.view_state()
-        assert view is not None
-        assert view.message == "Add preset: demo.milk?"
+        assert modal.view_state() is None
 
 
 def test_audition_pauses_switching_and_resume_clears_it() -> None:

@@ -57,26 +57,23 @@ def _make_controller(
     return controller, session, modal, manager
 
 
-def test_prompt_add_opens_confirm_and_confirm_calls_manager() -> None:
+def test_add_runs_at_once_without_a_prompt() -> None:
     rebuilt: list[str] = []
     focused: list[str] = []
     controller, _session, modal, manager = _make_controller(
         on_rebuild_view=lambda: rebuilt.append("rebuild"),
         on_focus_after_add=lambda: focused.append("focus"),
     )
-    controller.prompt_add()
-    view = modal.view_state()
-    assert view is not None
-    assert view.message == "Add new Milkdrop visualisation layer?"
-    modal.handle_keydown(keydown(pygame.K_RETURN))
+    controller.add()
+    assert modal.view_state() is None
     manager.add_layer.assert_called_once()
     assert rebuilt == ["rebuild"]
     assert focused == ["focus"]
 
 
-def test_prompt_add_skipped_when_cannot_add() -> None:
+def test_add_skipped_when_cannot_add() -> None:
     controller, _session, modal, manager = _make_controller(can_add=False)
-    controller.prompt_add()
+    controller.add()
     assert modal.view_state() is None
     manager.add_layer.assert_not_called()
 
@@ -102,6 +99,7 @@ def test_confirm_delete_rebuilds_and_focuses() -> None:
         on_focus_after_delete=lambda slot, index: focused.append((slot, index)),
     )
     controller.prompt_delete("layer_2")
+    modal.handle_keydown(keydown(pygame.K_LEFT))
     modal.handle_keydown(keydown(pygame.K_RETURN))
     manager.remove_layer.assert_called_once_with("layer_2")
     assert rebuilt == ["rebuild"]

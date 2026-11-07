@@ -55,7 +55,6 @@ _NODE_HEADER_KINDS: dict[str, RowKind] = {
     "timeline.grid": RowKind.TIMELINE_BEAT_BAR_GRID_HEADER,
     "timeline.cue_fades": RowKind.TIMELINE_CUTS_HEADER,
     "timeline.song_markers": RowKind.SONG_MARKERS_HEADER,
-    "timeline.preset": RowKind.TIMELINE_PRESETS_HEADER,
 }
 
 _NODE_CARDS: dict[str, str] = {

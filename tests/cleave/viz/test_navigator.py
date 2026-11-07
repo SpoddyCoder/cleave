@@ -164,7 +164,6 @@ def test_full_tree_order_and_labels() -> None:
         "Beat / Bar Grid",
         "Cue Fades",
         "Song Markers",
-        "Timeline Preset",
         "Layers",
         "1  DRUMS",
         "Preset Switching",
@@ -353,6 +352,7 @@ def test_other_pages_have_no_toggles() -> None:
     nodes = build_navigator(session, expanded)
     with_toggles = {node.id for node in nodes if node.toggles}
     assert with_toggles == {
+        "layers",
         "overlay",
         "post_fx",
         "pattern_mask",

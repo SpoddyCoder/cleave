@@ -39,7 +39,6 @@ from cleave.viz.row_sections import (
     SONG_MARKERS_SECTION,
     TIMELINE_CUTS_SECTION,
     TIMELINE_PAGE_SECTION,
-    TIMELINE_PRESETS_SECTION,
     TRACK_COMPOSITING_SECTION,
     TRACK_EFFECTS_SECTION,
     TRACK_PRESET_SWITCHING_SECTION,
@@ -59,22 +58,9 @@ class InspectorRow:
     is_heading: bool
     depth: int
     navigable: bool
-    command_id: str | None = None
+    command_ids: tuple[str, ...] = ()
+    status: str | None = None
 
-
-# Appended after the page's own rows.
-_PAGE_COMMANDS: dict[RowKind, str] = {
-    RowKind.SETTINGS_LATENCY_COMPENSATION_HEADER: "settings.measure_latency",
-    RowKind.PROJECT_RENDER_HEADER: "project.render",
-}
-
-_LEAF_COMMANDS: dict[RowKind, str] = {
-    RowKind.LAYER_MANAGEMENT_ADD: "layers.add",
-    RowKind.LAYER_MANAGEMENT_DELETE: "layers.delete",
-    RowKind.TIMELINE_PRESETS: "timeline.apply_preset",
-    RowKind.TIMELINE_RESET: "timeline.reset",
-    RowKind.TIMELINE_SNAP_CUES: "timeline.snap_cues",
-}
 
 _PAGE_SECTIONS: dict[str, SectionDef] = {
     "settings.editor_window": SETTINGS_EDITOR_WINDOW_SECTION,
@@ -96,7 +82,6 @@ _PAGE_SECTIONS: dict[str, SectionDef] = {
     "timeline.grid": BEAT_BAR_GRID_SECTION,
     "timeline.cue_fades": TIMELINE_CUTS_SECTION,
     "timeline.song_markers": SONG_MARKERS_SECTION,
-    "timeline.preset": TIMELINE_PRESETS_SECTION,
     "layers": LAYERS_SECTION,
 }
 
@@ -132,8 +117,6 @@ def build_inspector_rows(
         return ()
     rows: list[InspectorRow] = []
     _append_section_children(rows, section, state, 0, layer_slot_of(node_id))
-    if section.header_kind in _PAGE_COMMANDS:
-        rows.append(_command_row(_PAGE_COMMANDS[section.header_kind], 0))
     return tuple(rows)
 
 
@@ -152,13 +135,18 @@ def _inspector_row(
     )
 
 
-def _command_row(command_id: str, depth: int) -> InspectorRow:
+def _command_row(
+    command_ids: tuple[str, ...],
+    depth: int,
+    status: str | None = None,
+) -> InspectorRow:
     return InspectorRow(
         descriptor=None,
         is_heading=False,
         depth=depth,
         navigable=True,
-        command_id=command_id,
+        command_ids=command_ids,
+        status=status,
     )
 
 
@@ -195,6 +183,8 @@ def _append_section_children(
                 navigable=row_spec(desc.kind).navigable,
             )
         )
+    if section.trailing_commands:
+        rows.append(_command_row(section.trailing_commands, depth))
 
 
 def _append_subsection(
@@ -232,10 +222,6 @@ def _append_nodes(
 ) -> None:
     for child in nodes:
         if child.leaf_kind is not None:
-            command_id = _LEAF_COMMANDS.get(child.leaf_kind)
-            if command_id is not None:
-                rows.append(_command_row(command_id, depth))
-                continue
             rows.append(
                 _inspector_row(
                     child.leaf_kind,
@@ -244,6 +230,8 @@ def _append_nodes(
                     depth=depth,
                 )
             )
+        elif child.commands is not None:
+            rows.append(_command_row(child.commands, depth, child.status))
         elif child.subsection is not None:
             _append_subsection(rows, child.subsection, state, depth, slot)
         elif child.conditional is not None:

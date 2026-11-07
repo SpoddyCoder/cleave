@@ -35,16 +35,22 @@ class ConditionalRowsDef:
 
 @dataclass(frozen=True)
 class SectionNode:
-    """Tree node: leaf row, headed subsection, or conditional group."""
+    """Tree node: leaf row, headed subsection, conditional group, or buttons.
+
+    ``commands`` is one row of buttons, as ids in the command registry.
+    ``status`` is a line of text at the start of that row.
+    """
 
     leaf_kind: RowKind | None = None
     subsection: SectionDef | None = None
     conditional: ConditionalRowsDef | None = None
+    commands: tuple[str, ...] | None = None
+    status: str | None = None
 
     def __post_init__(self) -> None:
         set_count = sum(
             x is not None
-            for x in (self.leaf_kind, self.subsection, self.conditional)
+            for x in (self.leaf_kind, self.subsection, self.conditional, self.commands)
         )
         if set_count != 1:
             raise ValueError("SectionNode requires exactly one child type")
@@ -63,6 +69,7 @@ class SectionDef:
     children: tuple[SectionNode, ...] = ()
     append_dynamic_children: AppendDynamicChildrenFn | None = None
     card: str | None = None
+    trailing_commands: tuple[str, ...] = ()
 
 
 def _append_track_effect_rows(
@@ -100,8 +107,6 @@ def _append_preset_list_rows(
                 preset_index=index,
             )
         )
-    row_list.append(RowDescriptor(RowKind.TRACK_PRESET_LIST_ADD, slot=slot))
-    row_list.append(RowDescriptor(RowKind.TRACK_PRESET_LIST_POPULATE, slot=slot))
 
 
 def _append_song_marker_rows(
@@ -142,6 +147,7 @@ SETTINGS_LATENCY_COMPENSATION_SECTION = SectionDef(
     context="global",
     children=(
         SectionNode(leaf_kind=RowKind.SETTINGS_RESIDUAL_LATENCY_MS),
+        SectionNode(commands=("settings.measure_latency",)),
     ),
 )
 
@@ -172,6 +178,7 @@ PROJECT_RENDER_SECTION = SectionDef(
         SectionNode(leaf_kind=RowKind.PROJECT_RENDER_QUALITY),
         SectionNode(leaf_kind=RowKind.PROJECT_RENDER_START),
         SectionNode(leaf_kind=RowKind.PROJECT_RENDER_END),
+        SectionNode(commands=("project.render",)),
     ),
 )
 
@@ -183,7 +190,7 @@ def _layers_show_add(state: TuningViewState, _desc: RowDescriptor) -> bool:
 LAYERS_SHOW_ADD = ConditionalRowsDef(
     name="layers_show_add",
     predicate=_layers_show_add,
-    children=(SectionNode(leaf_kind=RowKind.LAYER_MANAGEMENT_ADD),),
+    children=(SectionNode(commands=("layers.add",)),),
 )
 
 LAYERS_SECTION = SectionDef(
@@ -495,6 +502,7 @@ PRESET_LIST_SECTION = SectionDef(
     context="per_slot",
     children=(),
     append_dynamic_children=_append_preset_list_rows,
+    trailing_commands=("layers.add_current_preset", "layers.populate_presets"),
 )
 
 PRESET_SWITCHING_USES_DURATION = ConditionalRowsDef(
@@ -520,7 +528,10 @@ PRESET_SWITCHING_PAUSED = ConditionalRowsDef(
     name="preset_switching_paused",
     predicate=_preset_switching_paused,
     children=(
-        SectionNode(leaf_kind=RowKind.TRACK_PRESET_SWITCHING_RESUME),
+        SectionNode(
+            commands=("layers.resume_switching",),
+            status="Switching paused",
+        ),
     ),
 )
 
@@ -572,7 +583,7 @@ TRACK_SECTION = SectionDef(
         SectionNode(leaf_kind=RowKind.TRACK_PRESET_DIR),
         SectionNode(leaf_kind=RowKind.TRACK_PRESET),
         SectionNode(conditional=PRESET_SWITCHING_PAUSED),
-        SectionNode(leaf_kind=RowKind.LAYER_MANAGEMENT_DELETE),
+        SectionNode(commands=("layers.delete",)),
     ),
 )
 
@@ -580,7 +591,7 @@ SONG_MARKERS_SECTION = SectionDef(
     header_kind=RowKind.SONG_MARKERS_HEADER,
     context="global",
     children=(
-        SectionNode(leaf_kind=RowKind.TIMELINE_SNAP_TO_SONG_MARKERS),
+        SectionNode(commands=("timeline.snap_to_markers",)),
     ),
     append_dynamic_children=_append_song_marker_rows,
 )
@@ -592,7 +603,7 @@ BEAT_BAR_GRID_SECTION = SectionDef(
         SectionNode(leaf_kind=RowKind.TIMELINE_PLACEMENT_SNAP),
         SectionNode(leaf_kind=RowKind.TIMELINE_BAR_GRID),
         SectionNode(leaf_kind=RowKind.TIMELINE_BAR_PHASE),
-        SectionNode(leaf_kind=RowKind.TIMELINE_SNAP_CUES),
+        SectionNode(commands=("timeline.snap_cues",)),
     ),
 )
 
@@ -616,8 +627,6 @@ TIMELINE_HARD_CUTS_ACTIVE = ConditionalRowsDef(
         SectionNode(leaf_kind=RowKind.TIMELINE_HARD_CUT_FADE_IN),
         SectionNode(leaf_kind=RowKind.TIMELINE_HARD_CUT_FADE_OUT),
         SectionNode(leaf_kind=RowKind.TIMELINE_HARD_CUT_CROSSFADE),
-        SectionNode(leaf_kind=RowKind.TIMELINE_APPLY_HARD_CUTS),
-        SectionNode(leaf_kind=RowKind.TIMELINE_REMOVE_HARD_CUTS),
     ),
 )
 
@@ -628,8 +637,6 @@ TIMELINE_SOFT_CUTS_ACTIVE = ConditionalRowsDef(
         SectionNode(leaf_kind=RowKind.TIMELINE_SOFT_CUT_FADE_IN),
         SectionNode(leaf_kind=RowKind.TIMELINE_SOFT_CUT_FADE_OUT),
         SectionNode(leaf_kind=RowKind.TIMELINE_SOFT_CUT_CROSSFADE),
-        SectionNode(leaf_kind=RowKind.TIMELINE_APPLY_SOFT_CUTS),
-        SectionNode(leaf_kind=RowKind.TIMELINE_REMOVE_SOFT_CUTS),
     ),
 )
 
@@ -641,23 +648,7 @@ TIMELINE_CUTS_SECTION = SectionDef(
         SectionNode(conditional=TIMELINE_HARD_CUTS_ACTIVE),
         SectionNode(leaf_kind=RowKind.TIMELINE_SOFT_CUTS),
         SectionNode(conditional=TIMELINE_SOFT_CUTS_ACTIVE),
-    ),
-)
-
-TIMELINE_PRESETS_SECTION = SectionDef(
-    header_kind=RowKind.TIMELINE_PRESETS_HEADER,
-    context="global",
-    children=(
-        SectionNode(leaf_kind=RowKind.TIMELINE_PRESET_CHARACTER),
-        SectionNode(leaf_kind=RowKind.TIMELINE_PRESET_DENSITY),
-        SectionNode(leaf_kind=RowKind.TIMELINE_PRESET_CUE_SNAP),
-        SectionNode(leaf_kind=RowKind.TIMELINE_PRESET_SONG_MARKER_SNAP),
-        SectionNode(leaf_kind=RowKind.TIMELINE_PRESET_TIMELINE_CUTS),
-        SectionNode(leaf_kind=RowKind.TIMELINE_PRESET_REPOPULATE),
-        SectionNode(leaf_kind=RowKind.TIMELINE_PRESET_CONDUCTOR),
-        SectionNode(leaf_kind=RowKind.TIMELINE_PRESET_MODE),
-        SectionNode(leaf_kind=RowKind.TIMELINE_PRESETS),
-        SectionNode(leaf_kind=RowKind.TIMELINE_RESET),
+        SectionNode(commands=("timeline.set_cut_type",)),
     ),
 )
 
@@ -705,6 +696,7 @@ TIMELINE_PAGE_SECTION = SectionDef(
     children=(
         SectionNode(leaf_kind=RowKind.TIMELINE_ENABLED),
         SectionNode(leaf_kind=RowKind.TIMELINE_LOCKED),
+        SectionNode(commands=("timeline.generate", "timeline.reset")),
     ),
 )
 
@@ -724,23 +716,13 @@ TIMELINE_SECTION_KINDS = frozenset(
         RowKind.TIMELINE_LOCKED,
         RowKind.SONG_MARKERS_HEADER,
         RowKind.SONG_MARKER_ITEM,
-        RowKind.TIMELINE_PRESETS_HEADER,
-        RowKind.TIMELINE_PRESET_CHARACTER,
-        RowKind.TIMELINE_PRESET_DENSITY,
-        RowKind.TIMELINE_PRESET_CUE_SNAP,
-        RowKind.TIMELINE_PRESET_SONG_MARKER_SNAP,
-        RowKind.TIMELINE_PRESET_TIMELINE_CUTS,
-        RowKind.TIMELINE_PRESET_REPOPULATE,
-        RowKind.TIMELINE_PRESET_CONDUCTOR,
-        RowKind.TIMELINE_PRESET_MODE,
-        RowKind.TIMELINE_PRESETS,
+        RowKind.TIMELINE_GENERATE,
         RowKind.TIMELINE_RESET,
         RowKind.TIMELINE_BEAT_BAR_GRID_HEADER,
         RowKind.TIMELINE_PLACEMENT_SNAP,
         RowKind.TIMELINE_BAR_GRID,
         RowKind.TIMELINE_BAR_PHASE,
         RowKind.TIMELINE_SNAP_CUES,
-        RowKind.TIMELINE_SNAP_TO_SONG_MARKERS,
         RowKind.TIMELINE_CUTS_HEADER,
         RowKind.TIMELINE_HARD_CUTS,
         RowKind.TIMELINE_HARD_CUT_FADE_IN,
@@ -750,10 +732,7 @@ TIMELINE_SECTION_KINDS = frozenset(
         RowKind.TIMELINE_SOFT_CUT_FADE_IN,
         RowKind.TIMELINE_SOFT_CUT_FADE_OUT,
         RowKind.TIMELINE_SOFT_CUT_CROSSFADE,
-        RowKind.TIMELINE_APPLY_SOFT_CUTS,
-        RowKind.TIMELINE_APPLY_HARD_CUTS,
-        RowKind.TIMELINE_REMOVE_SOFT_CUTS,
-        RowKind.TIMELINE_REMOVE_HARD_CUTS,
+        RowKind.TIMELINE_SET_CUT_TYPE,
     }
 )
 

@@ -37,17 +37,5 @@ def timeline_preset_density_display(density: TimelinePresetDensity) -> str:
     return DEFAULT_TIMELINE_PRESET_DENSITY
 
 
-def cycle_timeline_preset_density(
-    value: TimelinePresetDensity, *, forward: bool
-) -> TimelinePresetDensity:
-    options = TIMELINE_PRESET_DENSITY_OPTIONS
-    try:
-        index = options.index(value)
-    except ValueError:
-        index = options.index(DEFAULT_TIMELINE_PRESET_DENSITY)
-    delta = 1 if forward else -1
-    return options[(index + delta) % len(options)]
-
-
 def density_bias_for(density: TimelinePresetDensity) -> int:
     return _DENSITY_BIAS.get(density, _DENSITY_BIAS[DEFAULT_TIMELINE_PRESET_DENSITY])

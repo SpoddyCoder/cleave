@@ -20,6 +20,7 @@ from cleave.viz.preset_curation_controls import PresetCurationController
 from cleave.viz.preset_list_controls import PresetListController
 from cleave.viz.key_repeat import KeyRepeatController
 from cleave.viz.value_nudge import ValueNudgeHold
+from cleave.viz.inline_edit import InlineEditController
 from cleave.viz.modal import ModalHost
 from cleave.viz.panel_notification import (
     PanelNotificationActive,
@@ -38,6 +39,7 @@ from cleave.viz.project_switch import ProjectSwitchController
 from cleave.viz.song_marker_controls import SongMarkerController
 from cleave.viz.tap_sync_controls import TapSyncControls, TapSyncUiSnapshot
 from cleave.viz.timeline_phase_controls import TimelinePhaseController
+from cleave.viz.timeline_history import TimelineHistory
 from cleave.viz.timeline_preset_controls import TimelinePresetController
 from cleave.viz.timeline_cut_controls import TimelineCutController
 from cleave.viz.timeline_snap_controls import TimelineSnapController
@@ -113,6 +115,10 @@ class TuningControls:
         self._post_process = post_process
         self._masked_compositor = masked_compositor
         self._modal_host = modal_host if modal_host is not None else ModalHost()
+        self.inline_edit = InlineEditController(
+            self._modal_host.start_text_input,
+            self._modal_host.stop_text_input,
+        )
 
         self.shell_focus = ShellFocusState()
         self._focus_cursor: FocusCursor = MainFocus(
@@ -178,6 +184,10 @@ class TuningControls:
             layer_bindings,
             curation_index,
         )
+        self.timeline_history = TimelineHistory(
+            session,
+            on_preset_list_change=self.preset_list.refresh_switching,
+        )
         self._timeline_presets = TimelinePresetController(
             session,
             self._modal_host,
@@ -186,6 +196,7 @@ class TuningControls:
             signals=signals,
             on_notification=self.show_notification,
             on_repopulate=self.preset_list.repopulate,
+            history=self.timeline_history,
         )
         self.timeline_phase = TimelinePhaseController(
             session,
@@ -198,11 +209,13 @@ class TuningControls:
             beat_times,
             bar_times,
             on_notification=self.show_notification,
+            history=self.timeline_history,
         )
         self._timeline_cuts = TimelineCutController(
             session,
             self._modal_host,
             on_notification=self.show_notification,
+            history=self.timeline_history,
         )
         self._view_state = TuningViewStateBuilder(
             session,
@@ -454,6 +467,7 @@ class TuningControls:
         if not pygame.mouse.get_pressed()[0] or self._modal_host.active:
             self.value_nudge.release()
         self._key_repeat.tick(dt_sec)
+        self.inline_edit.tick(dt_sec)
         self.project_switch.tick(dt_sec)
         self.value_nudge.tick(dt_sec)
         self._notification_host.clear_expired()
@@ -630,15 +644,14 @@ class TuningControls:
         if focus.selected_id != "timeline.song_markers":
             return
         if marker_index is None:
-            focus.inspector_cursor = RowDescriptor(
-                RowKind.TIMELINE_SNAP_TO_SONG_MARKERS
-            )
+            focus.inspector_cursor = None
+            focus.inspector_command_id = "timeline.snap_to_markers"
         else:
             focus.inspector_cursor = RowDescriptor(
                 RowKind.SONG_MARKER_ITEM,
                 marker_index=marker_index,
             )
-        focus.inspector_command_id = None
+            focus.inspector_command_id = None
         self.set_shell_region(ShellRegion.INSPECTOR)
 
     def toggle_layer_locked(self, slot: str) -> None:
@@ -705,7 +718,7 @@ class TuningControls:
     def notification_active(self) -> PanelNotificationActive:
         return self._notification_host.active()
 
-    def prompt_apply_timeline_preset(self) -> None:
+    def prompt_generate_timeline(self) -> None:
         self._timeline_presets.prompt(self.duration_sec)
 
     def prompt_reset_timeline(self) -> None:
@@ -717,14 +730,18 @@ class TuningControls:
     def prompt_snap_cues_to_song_markers(self) -> None:
         self._timeline_snap.prompt_song_markers()
 
-    def prompt_apply_soft_cuts(self) -> None:
-        self._timeline_cuts.prompt_soft()
+    def prompt_set_cut_type(self) -> None:
+        self._timeline_cuts.prompt()
 
-    def prompt_apply_hard_cuts(self) -> None:
-        self._timeline_cuts.prompt_hard()
+    def undo_timeline(self) -> None:
+        label = self.timeline_history.undo()
+        if label is not None:
+            self.show_notification(f"Undid {label}")
 
-    def prompt_remove_timeline_cuts(self) -> None:
-        self._timeline_cuts.prompt_remove()
+    def redo_timeline(self) -> None:
+        label = self.timeline_history.redo()
+        if label is not None:
+            self.show_notification(f"Redid {label}")
 
     def seek_song_marker(self, desc: RowDescriptor) -> None:
         if desc.marker_index is None:

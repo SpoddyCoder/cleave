@@ -136,7 +136,7 @@ def test_prompt_start_opens_confirm_modal_without_signals() -> None:
     view = modal.view_state()
     assert view is not None
     assert view.message == _TAP_SYNC_CONFIRM_MESSAGE
-    assert view.options == ("Yes", "Cancel")
+    assert view.options == ("Start", "Cancel")
     assert not controls.active
     assert ui_log == []
 

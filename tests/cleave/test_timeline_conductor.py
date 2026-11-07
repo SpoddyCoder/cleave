@@ -28,7 +28,6 @@ from cleave.timeline_presets.conductor import (
     DEFAULT_TIMELINE_PRESET_CONDUCTOR,
     PhraseWeights,
     StemConductor,
-    cycle_timeline_preset_conductor,
     support_floor_for,
     timeline_preset_conductor_display,
 )
@@ -443,16 +442,6 @@ def test_chord_score_does_not_penalise_larger_chords() -> None:
     quartet = conductor.chord_score(frozenset(_slot_stems()), weights)
     assert solo == pytest.approx(0.0)
     assert quartet == pytest.approx(solo)
-
-
-def test_staging_display_and_cycle() -> None:
-    assert DEFAULT_TIMELINE_PRESET_CONDUCTOR is False
-    assert timeline_preset_conductor_display(False) == "off"
-    assert timeline_preset_conductor_display(True) == "on"
-    assert cycle_timeline_preset_conductor(False, forward=True) is True
-    assert cycle_timeline_preset_conductor(True, forward=True) is False
-    assert cycle_timeline_preset_conductor(False, forward=False) is True
-    assert cycle_timeline_preset_conductor(True, forward=False) is False
 
 
 def _bar_times(duration_sec: float, bar_sec: float = 2.0) -> list[float]:

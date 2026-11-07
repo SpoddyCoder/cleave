@@ -12,12 +12,32 @@ Open the HTML and append the hash, or evaluate `cleaveDesign.apply(name)`. `clea
 | --- | --- | --- |
 | `shell-split` | [shell-split.png](menu-overhaul-stills/shell-split.png) | Default chrome. Menu, transport under the menu, navigator, visualiser, inspector, timeline strip. Navigator focused on Layer 2. Columns start at 230px and 495px. The mock still draws the inspector at 330px. |
 | `shell-docked` | [shell-docked.png](menu-overhaul-stills/shell-docked.png) | Navigator and inspector docked left; visualiser fills the rest. Same scopes and timeline. |
-| `menu-layers` | [menu-layers.png](menu-overhaul-stills/menu-layers.png) | Layers menu open. Green items are commands. Plain items jump to a navigator node. Check mark mirrors `checked(state)`. Grey text is disabled. Shortcut column on the right. |
+| `menu-layers` | [menu-layers.png](menu-overhaul-stills/menu-layers.png) | Layers menu open. Items run a command or jump to a navigator node, and both read as plain text. Check mark mirrors `checked(state)`. Grey text is disabled. Shortcut column on the right. |
 | `inspector-locked` | [inspector-locked.png](menu-overhaul-stills/inspector-locked.png) | Layer 3 selected, inspector focused. Locked rows and the lock control use the locked role. The navigator shows the lock mark. |
 | `inspector-card` | [inspector-card.png](menu-overhaul-stills/inspector-card.png) | One overlay card. Collapsible groups stay inside the inspector. Dirty fields show an asterisk. Focus ring is on the dirty field, not on a global tree. |
 | `hit-rects` | [hit-rects.png](menu-overhaul-stills/hit-rects.png) | Dashed outlines are the clickable roles (`data-role` on the mock): `menu`, `menu_item`, `tree_node`, `field`, `group`, `toggle`, `splitter`, `timeline_lane`, `transport`. The plan draws these as ImGui items. |
 
 `#win` is the shell. Screenshot that element when recapturing a still.
+
+## Action views
+
+These views show buttons, dialogs, and inline editors. The dialogs work with mouse and keyboard. These views have no stills yet, and the stills above predate the buttons.
+
+| View | What it shows |
+| --- | --- |
+| `actions-timeline` | Timeline page with only live properties and buttons. The staged preset rows have moved to a dialog. |
+| `actions-layer` | Status line with Resume, preset list toolbar, and Delete layer. The Layers navigator row gains a `+` icon. |
+| `actions-card` | Overlay text as inline fields and colours as swatches. |
+| `actions-colour` | Colour picker popup on a swatch. The editor would use the ImGui colour picker. |
+| `actions-markers` | Song markers as list rows: click to seek, step the type, delete icon on hover. |
+| `dialog-generate` | Generate timeline: the 8 preset fields, with a warning about replacing cues. |
+| `dialog-snap` | Snap cues set to song markers. Proximity and layers appear only for that target. |
+| `dialog-cut-type` | Set cut type: type and scope, with a count of cues affected. |
+| `dialog-reset` | Reset timeline: destructive, so the confirm button is red and Cancel takes focus. |
+| `dialog-populate` | Populate preset list: source as a radio list. |
+| `dialog-delete-layer` | Simple destructive confirm with verb buttons. |
+
+Section `#actions` on the page holds the rule, the table of what each action became, colour roles, and dialog keyboard behaviour.
 
 ## Static sections
 
@@ -39,7 +59,10 @@ Mock CSS variables are appearance targets. Draw with the existing constants in [
 | --- | --- |
 | `--label` | `LABEL` |
 | `--value` | `VALUE` |
-| `--action` | `ACTION` |
+| `--btn-bg` | `BUTTON_BG` |
+| `--btn-border` | `BUTTON_BORDER` |
+| `--btn-primary` | `BUTTON_PRIMARY_BG` |
+| `--btn-danger` | `BUTTON_DANGER_BG` |
 | `--disabled` | `DISABLED` |
 | `--locked` | `LOCKED` |
 | `--lock-icon` | `LOCK_ICON` |

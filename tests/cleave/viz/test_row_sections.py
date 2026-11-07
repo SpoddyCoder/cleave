@@ -9,7 +9,6 @@ from cleave.viz.row_kinds import RowKind
 from cleave.viz.row_sections import (
     OVERLAY_OPENING_CARD_SECTION,
     OVERLAY_SECTION_KINDS,
-    TIMELINE_PRESETS_SECTION,
 )
 from cleave.viz.tuning_view_state import TrackBlock
 from tests.cleave.viz.test_overlay import _minimal_view_state
@@ -73,8 +72,6 @@ def test_preset_switching_conditional_rows_when_predicates_pass() -> None:
     assert RowKind.TRACK_PRESET_DURATION in timer_kinds
     assert RowKind.TRACK_PRESET_START_CLEAN in timer_kinds
     assert RowKind.TRACK_PRESET_LIST in timer_kinds
-    assert RowKind.TRACK_PRESET_LIST_ADD in timer_kinds
-    assert RowKind.TRACK_PRESET_LIST_POPULATE in timer_kinds
     assert RowKind.TRACK_SOFT_CUT_DURATION not in timer_kinds
     assert RowKind.TRACK_HARD_CUT_ENABLED not in timer_kinds
 
@@ -83,7 +80,6 @@ def test_preset_switching_conditional_rows_when_predicates_pass() -> None:
     assert RowKind.TRACK_SOFT_CUT_DURATION not in timeline_kinds
     assert RowKind.TRACK_EASTER_EGG not in timeline_kinds
     assert RowKind.TRACK_PRESET_START_CLEAN in timeline_kinds
-    assert RowKind.TRACK_PRESET_LIST_POPULATE in timeline_kinds
 
 
 def test_preset_switching_hard_cut_rows_follow_hard_cut_enabled() -> None:
@@ -112,8 +108,6 @@ def test_preset_switching_row_order() -> None:
         RowKind.TRACK_PRESET_LIST,
         RowKind.TRACK_PRESET_LIST_ITEM,
         RowKind.TRACK_PRESET_LIST_ITEM,
-        RowKind.TRACK_PRESET_LIST_ADD,
-        RowKind.TRACK_PRESET_LIST_POPULATE,
     ]
 
 
@@ -200,10 +194,3 @@ def test_overlay_body_text_is_first_body_child() -> None:
     assert body_section.children[0].leaf_kind == RowKind.OVERLAY_CARD_BODY_TEXT
 
 
-def test_timeline_reset_follows_presets_section() -> None:
-    leaves = tuple(
-        child.leaf_kind
-        for child in TIMELINE_PRESETS_SECTION.children
-        if child.leaf_kind is not None
-    )
-    assert leaves[-2:] == (RowKind.TIMELINE_PRESETS, RowKind.TIMELINE_RESET)

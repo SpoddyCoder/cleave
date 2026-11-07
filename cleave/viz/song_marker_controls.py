@@ -104,9 +104,11 @@ class SongMarkerController:
         if index < 0 or index >= len(markers.markers):
             return
         label = format_marker_time(markers.markers[index].time)
-        self._modal.prompt_yes_no(
-            f"Remove song marker {label}?",
-            on_confirm=lambda: self.confirm_delete(index),
+        self._modal.prompt_confirm(
+            f"Delete song marker {label}?",
+            "Delete marker",
+            lambda: self.confirm_delete(index),
+            destructive=True,
         )
 
     def confirm_delete(self, index: int) -> None:

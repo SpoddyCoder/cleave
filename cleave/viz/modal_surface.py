@@ -11,32 +11,45 @@ from typing import Iterator
 from imgui_bundle import imgui
 
 from cleave.viz.imgui_theme import rgba
+from cleave.viz.text_edit import caret_line_column
 from cleave.viz.modal import (
+    BUTTON_ROW_KINDS,
+    ButtonRole,
+    FormFieldKind,
+    FormRowView,
     ModalHost,
     ModalKind,
     ModalLabeledLine,
     ModalViewState,
     TextFocusRegion,
-    caret_line_column,
 )
 from cleave.viz.modal_layout import (
     BAR_HEIGHT,
+    BUTTON_GAP,
     CARET_WIDTH,
+    FORM_RADIO_OFF,
+    FORM_RADIO_ON,
+    FORM_ROW_PAD_Y,
+    FORM_STEP_ARROW_LEFT,
+    FORM_STEP_ARROW_RIGHT,
     PANEL_PAD_X,
     PANEL_PAD_Y,
-    TEXT_BUTTON_GAP,
     TEXT_BUTTON_LABELS,
     TextMeasure,
+    button_widths,
     caret_index_at_point,
     focus_highlight_rect,
+    form_control_width,
+    form_row_height,
+    form_segment_widths,
     lines_block_height,
+    measure_button_row,
     measure_options,
     measure_panel,
     measure_text_panel,
     message_lines,
     option_text,
     single_line_scroll_x,
-    text_button_widths,
     text_cta_lines,
     text_error_line,
     text_field_lines,
@@ -46,11 +59,16 @@ from cleave.viz.modal_layout import (
 from cleave.viz.theme import (
     BORDER_COLOR,
     BORDER_WIDTH,
+    BUTTON_BG,
+    BUTTON_BORDER,
+    BUTTON_DANGER_BG,
+    BUTTON_PRIMARY_BG,
     DISABLED,
     FOCUS_BORDER_ALPHA,
     FOCUS_WASH_ALPHA,
     HIGHLIGHT,
     LABEL,
+    MUTED,
     VALUE,
     tuning_ui_metrics,
 )
@@ -83,15 +101,23 @@ class ModalPointerKind(Enum):
     HOVER_TEXT_FIELD = "hover_text_field"
     HOVER_TEXT_BUTTON = "hover_text_button"
     ACTIVATE_TEXT_BUTTON = "activate_text_button"
+    FOCUS_FORM_ROW = "focus_form_row"
+    SET_FORM_VALUE = "set_form_value"
+    STEP_FORM_VALUE = "step_form_value"
 
 
 @dataclass(frozen=True)
 class ModalPointerIntent:
-    """One pointer result for the frame. ``index`` is an option or text button."""
+    """One pointer result for the frame.
+
+    ``index`` is an option, a text button, or a form row. ``value`` is the form
+    option chosen, or the step for ``STEP_FORM_VALUE``.
+    """
 
     kind: ModalPointerKind
     index: int | None = None
     caret_index: int | None = None
+    value: int = 0
 
 
 def _intent_index(intent: ModalPointerIntent) -> int:
@@ -118,6 +144,12 @@ def apply_modal_pointer(host: ModalHost, intent: ModalPointerIntent | None) -> N
         host.hover_text_button(_intent_index(intent))
     elif kind is ModalPointerKind.ACTIVATE_TEXT_BUTTON:
         host.activate_text_button(_intent_index(intent))
+    elif kind is ModalPointerKind.FOCUS_FORM_ROW:
+        host.focus_form_row(_intent_index(intent))
+    elif kind is ModalPointerKind.SET_FORM_VALUE:
+        host.set_form_value(_intent_index(intent), intent.value)
+    elif kind is ModalPointerKind.STEP_FORM_VALUE:
+        host.step_form_value(_intent_index(intent), intent.value)
 
 
 @dataclass(frozen=True)
@@ -334,6 +366,239 @@ def _draw_options(
     return tuple(rects)
 
 
+def _button_focused(view: ModalViewState, index: int, rect: Rect) -> bool:
+    """A form's fields hold focus until Tab reaches the buttons. Hover still shows."""
+    if view.kind is ModalKind.FORM and not view.form_buttons_focused:
+        return _pointer_inside(rect)
+    return index == view.focus_index
+
+
+_BUTTON_FILLS: dict[ButtonRole, _Role] = {
+    ButtonRole.PLAIN: BUTTON_BG,
+    ButtonRole.PRIMARY: BUTTON_PRIMARY_BG,
+    ButtonRole.DANGER: BUTTON_DANGER_BG,
+}
+
+
+def _draw_button(
+    draw: imgui.ImDrawList,
+    rect: Rect,
+    label: str,
+    role: ButtonRole,
+    measure: TextMeasure,
+    *,
+    focused: bool,
+    text_role: _Role = VALUE,
+) -> None:
+    """The modal button: role fill, border, centred label, focus outline."""
+    x, y, w, h = rect
+    top_left = imgui.ImVec2(float(x), float(y))
+    bottom_right = imgui.ImVec2(float(x + w), float(y + h))
+    border = role is ButtonRole.PLAIN
+    fill = _BUTTON_FILLS[role]
+    draw.add_rect_filled(top_left, bottom_right, _packed(fill))
+    draw.add_rect(top_left, bottom_right, _packed(BUTTON_BORDER if border else fill))
+    text = option_text(label)
+    text_w, text_h = measure.size(text)
+    _text(draw, x + (w - text_w) // 2, y + (h - text_h) // 2, text, text_role)
+    if focused:
+        _focus_border(draw, _outset(rect))
+
+
+@dataclass(frozen=True)
+class _FormHit:
+    """A clickable part of a form row. ``kind`` says what a click does."""
+
+    rect: Rect
+    kind: ModalPointerKind
+    row: int
+    value: int = 0
+
+
+def _draw_form_step(
+    draw: imgui.ImDrawList,
+    measure: TextMeasure,
+    row: FormRowView,
+    index: int,
+    *,
+    x: int,
+    y: int,
+    width: int,
+    line_h: int,
+) -> list[_FormHit]:
+    left_w = measure.size(f" {FORM_STEP_ARROW_LEFT} ")[0]
+    right_w = measure.size(f" {FORM_STEP_ARROW_RIGHT} ")[0]
+    left = (x, y, left_w, line_h)
+    right = (x + width - right_w, y, right_w, line_h)
+    hits = []
+    for rect, glyph, delta in (
+        (left, FORM_STEP_ARROW_LEFT, -1),
+        (right, FORM_STEP_ARROW_RIGHT, 1),
+    ):
+        role = HIGHLIGHT if _pointer_inside(rect) else MUTED
+        _text(draw, rect[0], y, f" {glyph} ", role)
+        hits.append(_FormHit(rect, ModalPointerKind.STEP_FORM_VALUE, index, delta))
+    text = row.options[row.value]
+    text_w = measure.size(text)[0]
+    _text(draw, x + (width - text_w) // 2, y, text, VALUE)
+    return hits
+
+
+def _draw_form_segments(
+    draw: imgui.ImDrawList,
+    measure: TextMeasure,
+    row: FormRowView,
+    index: int,
+    *,
+    x: int,
+    y: int,
+    line_h: int,
+) -> list[_FormHit]:
+    hits = []
+    for option_index, width in enumerate(form_segment_widths(measure, row)):
+        rect = (x, y, width, line_h)
+        chosen = option_index == row.value
+        _draw_segment(draw, rect, row.options[option_index], measure, chosen=chosen)
+        hits.append(
+            _FormHit(rect, ModalPointerKind.SET_FORM_VALUE, index, option_index)
+        )
+        x += width
+    return hits
+
+
+def _draw_segment(
+    draw: imgui.ImDrawList,
+    rect: Rect,
+    label: str,
+    measure: TextMeasure,
+    *,
+    chosen: bool,
+) -> None:
+    x, y, w, h = rect
+    top_left = imgui.ImVec2(float(x), float(y))
+    bottom_right = imgui.ImVec2(float(x + w), float(y + h))
+    if chosen:
+        draw.add_rect_filled(top_left, bottom_right, _packed(BUTTON_PRIMARY_BG))
+    elif _pointer_inside(rect):
+        draw.add_rect_filled(top_left, bottom_right, _packed(BUTTON_BG))
+    draw.add_rect(top_left, bottom_right, _packed(BUTTON_BORDER))
+    text_w = measure.size(label)[0]
+    _text(draw, x + (w - text_w) // 2, y, label, VALUE if chosen else MUTED)
+
+
+def _draw_form_radio(
+    draw: imgui.ImDrawList,
+    row: FormRowView,
+    index: int,
+    *,
+    x: int,
+    y: int,
+    width: int,
+    line_h: int,
+    line_gap: int,
+) -> list[_FormHit]:
+    hits = []
+    for option_index, option in enumerate(row.options):
+        chosen = option_index == row.value
+        prefix = FORM_RADIO_ON if chosen else FORM_RADIO_OFF
+        _text(draw, x, y, f"{prefix}{option}", VALUE)
+        hits.append(
+            _FormHit(
+                (x, y, width, line_h),
+                ModalPointerKind.SET_FORM_VALUE,
+                index,
+                option_index,
+            )
+        )
+        y += line_h + line_gap
+    return hits
+
+
+def _draw_form_rows(
+    draw: imgui.ImDrawList,
+    view: ModalViewState,
+    measure: TextMeasure,
+    *,
+    ox: int,
+    panel_w: int,
+    y: int,
+    line_h: int,
+    line_gap: int,
+) -> tuple[int, tuple[_FormHit, ...]]:
+    """Draw every field. Returns the y below them and the clickable parts."""
+    hits: list[_FormHit] = []
+    left = ox + PANEL_PAD_X
+    right = ox + panel_w - PANEL_PAD_X
+    for index, row in enumerate(view.form_rows):
+        height = form_row_height(row, line_h, line_gap)
+        rect = (left, y, right - left, height)
+        hits.append(_FormHit(rect, ModalPointerKind.FOCUS_FORM_ROW, index))
+        if row.focused:
+            _highlight_option(draw, _outset(rect, 0))
+        text_y = y + FORM_ROW_PAD_Y
+        _text(draw, left, text_y, row.label, HIGHLIGHT if row.focused else LABEL)
+        width = form_control_width(measure, row)
+        x = right - width
+        if row.kind is FormFieldKind.STEP:
+            parts = _draw_form_step(
+                draw,
+                measure,
+                row,
+                index,
+                x=x,
+                y=text_y,
+                width=width,
+                line_h=line_h,
+            )
+        elif row.kind is FormFieldKind.SEGMENT:
+            parts = _draw_form_segments(
+                draw, measure, row, index, x=x, y=text_y, line_h=line_h
+            )
+        else:
+            parts = _draw_form_radio(
+                draw,
+                row,
+                index,
+                x=x,
+                y=text_y,
+                width=width,
+                line_h=line_h,
+                line_gap=line_gap,
+            )
+        hits.extend(parts)
+        y += height
+    return y, tuple(hits)
+
+
+def _draw_button_row(
+    draw: imgui.ImDrawList,
+    view: ModalViewState,
+    measure: TextMeasure,
+    *,
+    ox: int,
+    panel_w: int,
+    y: int,
+) -> tuple[Rect, ...]:
+    """Buttons along the bottom right of the panel, in option order."""
+    widths = button_widths(measure, view.options)
+    total_w, height = measure_button_row(measure, view.options)
+    x = ox + panel_w - PANEL_PAD_X - total_w
+    rects: list[Rect] = []
+    for index, label in enumerate(view.options):
+        rect = (x, y, widths[index], height)
+        _draw_button(
+            draw,
+            rect,
+            label,
+            view.option_roles[index],
+            measure,
+            focused=_button_focused(view, index, rect),
+        )
+        rects.append(rect)
+        x += widths[index] + BUTTON_GAP
+    return tuple(rects)
+
+
 def _draw_text_buttons(
     draw: imgui.ImDrawList,
     view: ModalViewState,
@@ -344,30 +609,30 @@ def _draw_text_buttons(
     y: int,
     line_h: int,
 ) -> tuple[Rect, ...]:
-    confirm_w, cancel_w = text_button_widths(measure)
-    total_w = confirm_w + TEXT_BUTTON_GAP + cancel_w
-    content_w = panel_w - PANEL_PAD_X * 2
-    bx = ox + PANEL_PAD_X + max(0, (content_w - total_w) // 2)
+    widths = button_widths(measure, TEXT_BUTTON_LABELS)
+    total_w, height = measure_button_row(measure, TEXT_BUTTON_LABELS)
+    bx = ox + panel_w - PANEL_PAD_X - total_w
     buttons_focused = view.focus_region == TextFocusRegion.BUTTONS
     field_focused = view.focus_region == TextFocusRegion.FIELD
     rects: list[Rect] = []
     for index, label in enumerate(TEXT_BUTTON_LABELS):
-        width = (confirm_w, cancel_w)[index]
-        rect = _outset((bx, y, width, line_h))
+        width = widths[index]
+        rect = (bx, y, width, height)
         focused = buttons_focused and view.button_index == index
         # The caret stays put while editing. The button under the pointer
         # still takes the hover highlight; only a click leaves the field.
         pointer_hover = view.editing and _pointer_inside(rect)
-        if focused or pointer_hover:
-            _highlight_option(draw, rect)
-            role: _Role = HIGHLIGHT
-        elif field_focused:
-            role = DISABLED
-        else:
-            role = VALUE
-        _text(draw, bx, y, option_text(label), role)
+        _draw_button(
+            draw,
+            rect,
+            label,
+            ButtonRole.PRIMARY if index == 0 else ButtonRole.PLAIN,
+            measure,
+            focused=focused or pointer_hover,
+            text_role=DISABLED if field_focused and not pointer_hover else VALUE,
+        )
         rects.append(rect)
-        bx += width + TEXT_BUTTON_GAP
+        bx += width + BUTTON_GAP
     return tuple(rects)
 
 
@@ -388,6 +653,7 @@ class ModalSurface:
         self.panel_rect: Rect | None = None
         self.option_rects: tuple[Rect, ...] = ()
         self.text_button_rects: tuple[Rect, ...] = ()
+        self._form_hits: tuple[_FormHit, ...] = ()
         self.text_field_rect: Rect | None = None
         self._text_field_hit: _TextFieldHit | None = None
 
@@ -396,6 +662,7 @@ class ModalSurface:
         self.panel_rect = None
         self.option_rects = ()
         self.text_button_rects = ()
+        self._form_hits = ()
         self.text_field_rect = None
         self._text_field_hit = None
 
@@ -470,7 +737,7 @@ class ModalSurface:
         x = ox + PANEL_PAD_X
         y = oy + PANEL_PAD_Y
         draw = imgui.get_window_draw_list()
-        has_message = view.message is not None
+        has_message = view.message is not None or view.body is not None
         has_labeled = bool(view.labeled_lines)
         has_bar = view.progress_fraction is not None
         if view.message is not None:
@@ -480,6 +747,18 @@ class ModalSurface:
                 y,
                 message_lines(measure, view.message, screen_w=screen_w),
                 LABEL,
+                line_h,
+                line_gap,
+            )
+        if view.body is not None:
+            if view.message is not None:
+                y += line_gap
+            y = _draw_line_block(
+                draw,
+                x,
+                y,
+                message_lines(measure, view.body, screen_w=screen_w),
+                VALUE,
                 line_h,
                 line_gap,
             )
@@ -500,9 +779,31 @@ class ModalSurface:
                 view.progress_fraction or 0.0,
             )
             y += BAR_HEIGHT
+        if view.form_rows or view.form_info is not None:
+            if has_message:
+                y += line_h
+            y, self._form_hits = _draw_form_rows(
+                draw,
+                view,
+                measure,
+                ox=ox,
+                panel_w=panel_w,
+                y=y,
+                line_h=line_h,
+                line_gap=line_gap,
+            )
+            if view.form_info is not None:
+                y += line_gap
+                _text(draw, x, y, view.form_info, HIGHLIGHT)
+                y += line_h
         if view.options:
             if has_message or has_labeled or has_bar:
                 y += line_h + line_gap
+            if view.kind in BUTTON_ROW_KINDS:
+                self.option_rects = _draw_button_row(
+                    draw, view, measure, ox=ox, panel_w=panel_w, y=y
+                )
+                return
             self.option_rects = _draw_options(
                 draw,
                 view,
@@ -639,6 +940,8 @@ class ModalSurface:
                 ModalPointerKind.ACTIVATE_OPTION, index=hit
             )
             return
+        if clicked and self._record_form_click(x, y):
+            return
         if clicked and not _contains(panel, x, y):
             self.intent = ModalPointerIntent(ModalPointerKind.CANCEL)
             return
@@ -646,6 +949,16 @@ class ModalSurface:
             self.intent = ModalPointerIntent(
                 ModalPointerKind.HOVER_OPTION, index=hit
             )
+
+    def _record_form_click(self, x: float, y: float) -> bool:
+        """Take the smallest part under the pointer: a control over its row."""
+        for form_hit in reversed(self._form_hits):
+            if _contains(form_hit.rect, x, y):
+                self.intent = ModalPointerIntent(
+                    form_hit.kind, index=form_hit.row, value=form_hit.value
+                )
+                return True
+        return False
 
     def _record_text(
         self, panel: Rect, x: float, y: float, clicked: bool

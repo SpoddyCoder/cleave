@@ -307,7 +307,7 @@ def test_inspector_command_rows_use_layer_management_help() -> None:
     add_description = _description_section(add)
     assert add_description is not None
     assert add_description.title == "Add Layer"
-    assert dict(_keyboard_section(add).entries)["Enter"] == "confirm add"
+    assert dict(_keyboard_section(add).entries)["Enter"] == "add layer"
     delete = help_sections(
         leftover,
         shell_focus=ShellFocusState(
@@ -457,13 +457,15 @@ def test_switching_page_help_is_description_only() -> None:
 
 
 def test_timeline_presets_help_lists_characters() -> None:
-    sections = sections_for(RowKind.TIMELINE_PRESET_CHARACTER)
+    sections = sections_for(RowKind.TIMELINE_GENERATE)
     description = _description_section(sections)
     assert description is not None
-    assert description.title == "Character"
+    assert description.title == "Generate timeline"
     assert description.lines == (
-        "Procedural timeline character used when applying a preset.",
-        "Song markers favour cue placement; crescendo types build crescendos.",
+        "Build a new timeline from character, density, snaps, cuts,",
+        "re-populate, conductor, and mode. Replaces the current cues.",
+        "Crescendo song markers build crescendos.",
+        "The dialog remembers its values in the project.",
     )
     assert description.entries == TIMELINE_PRESET_HELP_ENTRIES
     assert [name for name, _ in description.entries] == [
@@ -474,7 +476,7 @@ def test_timeline_presets_help_lists_characters() -> None:
     ]
     keyboard = _keyboard_section(sections)
     assert keyboard.title == KEYBOARD_CONTROLS_SECTION_TITLE
-    assert keyboard.entries == (("Left/Right", "cycle character"),)
+    assert keyboard.entries == (("Enter", "open generate dialog"),)
 
 
 def test_timeline_reset_help_lists_choices() -> None:
@@ -483,11 +485,11 @@ def test_timeline_reset_help_lists_choices() -> None:
     sections = sections_for(RowKind.TIMELINE_RESET)
     description = _description_section(sections)
     assert description is not None
-    assert description.title == "Reset Timeline"
+    assert description.title == "Reset timeline"
     assert description.entries == TIMELINE_RESET_HELP_ENTRIES
-    assert [name for name, _ in description.entries] == ["All Off", "All On"]
+    assert [name for name, _ in description.entries] == ["Layers off", "Layers on"]
     keyboard = _keyboard_section(sections)
-    assert keyboard.entries == (("Enter", "reset timeline"),)
+    assert keyboard.entries == (("Enter", "open reset dialog"),)
 
 
 
@@ -563,7 +565,7 @@ def test_preset_list_add_and_resume_switching_help() -> None:
     resume_description = _description_section(resume_sections)
     resume_keyboard = _keyboard_section(resume_sections)
     assert resume_description is not None
-    assert resume_description.title == "Switching Paused - Enter To Resume"
+    assert resume_description.title == "Resume switching"
     assert resume_description.lines == (
         "End manual browsing of presets and resume preset switching.",
     )
@@ -688,7 +690,7 @@ def test_overlay_title_text_help() -> None:
 
 def test_overlay_title_colour_help() -> None:
     section = _keyboard_section(sections_for(RowKind.OVERLAY_CARD_TITLE_COLOUR))
-    assert dict(section.entries)["Enter"] == "edit colour"
+    assert dict(section.entries)["Enter"] == "edit hex value"
 
 
 def test_overlay_remaining_colour_rows_help() -> None:
@@ -700,7 +702,7 @@ def test_overlay_remaining_colour_rows_help() -> None:
         RowKind.OVERLAY_CARD_BORDER_COLOUR,
     ):
         section = _keyboard_section(sections_for(kind))
-        assert dict(section.entries)["Enter"] == "edit colour"
+        assert dict(section.entries)["Enter"] == "edit hex value"
 
 
 def test_overlay_background_margin_and_padding_help() -> None:
@@ -722,7 +724,7 @@ def test_overlay_body_text_help() -> None:
 def test_layer_management_add_help() -> None:
     section = _keyboard_section(sections_for(RowKind.LAYER_MANAGEMENT_ADD))
     assert section.title == KEYBOARD_CONTROLS_SECTION_TITLE
-    assert dict(section.entries)["Enter"] == "confirm add"
+    assert dict(section.entries)["Enter"] == "add layer"
 
 
 def test_layer_management_delete_help() -> None:
@@ -731,7 +733,7 @@ def test_layer_management_delete_help() -> None:
     description = _description_section(sections)
     assert section.title == KEYBOARD_CONTROLS_SECTION_TITLE
     entries = dict(section.entries)
-    assert entries["Enter/Delete"] == "confirm delete"
+    assert entries["Enter/Delete"] == "delete layer"
     assert "" not in entries
     assert description is not None
     assert "At least one layer must remain." in description.lines

@@ -21,7 +21,6 @@ from cleave.viz.project_render_job import (
 )
 from cleave.viz.session import TuningSession
 
-_CANCEL_LABEL = "Cancel"
 _CONFIRM_TITLE = "Render the project?"
 _PROGRESS_MESSAGE = "Rendering project..."
 _SUCCESS_MESSAGE = "Render complete"
@@ -112,11 +111,11 @@ class ProjectRenderController:
         output_path = self._resolved_output_path()
         if output_path is None:
             output_path = Path(DEFAULT_PROJECT_RENDER_OUTPUT_LABEL)
-        self._modal.prompt_yes_no(
+        self._modal.prompt_confirm(
             _CONFIRM_TITLE,
-            on_confirm=self._confirm,
-            on_cancel=lambda: None,
-            cancel_label=_CANCEL_LABEL,
+            "Render",
+            self._confirm,
+            lambda: None,
             labeled_lines=project_render_labeled_lines(
                 self.session,
                 duration_sec=self.duration_sec,

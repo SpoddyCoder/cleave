@@ -14,7 +14,7 @@
     --panel-border: rgba(255, 255, 255, 0.85);
     --label: rgb(170, 210, 255);
     --value: rgb(255, 255, 255);
-    --action: rgb(80, 190, 125);
+    --action: rgb(255, 255, 255);
     --disabled: rgb(140, 140, 140);
     --highlight: rgb(255, 235, 130);
     --hover: rgba(170, 210, 255, 0.14);
@@ -224,6 +224,72 @@
 
   .help-row { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 12px; color: var(--muted); }
 
+  /* ---------- proposed actions: buttons, dialogs, inline editors ---------- */
+  :root {
+    --btn-bg: rgb(48, 54, 66);
+    --btn-border: rgb(85, 95, 115);
+    --btn-primary: rgb(45, 85, 150);
+    --btn-danger: rgb(200, 40, 40);
+  }
+  #popHost, #dlgHost { display: contents; }
+  .btn {
+    appearance: none; font: inherit; color: var(--value); background: var(--btn-bg);
+    border: 1px solid var(--btn-border); border-radius: 3px; padding: 2px 12px; cursor: default; white-space: nowrap;
+  }
+  .btn:hover { filter: brightness(1.25); }
+  .btn.primary { background: var(--btn-primary); border-color: var(--btn-primary); }
+  .btn.danger { background: var(--btn-danger); border-color: var(--btn-danger); }
+  .btn.off { color: var(--locked); background: transparent; }
+  .btn.focus { outline: 1px solid var(--highlight); outline-offset: 1px; }
+  .field.btns { justify-content: flex-start; flex-wrap: wrap; gap: 6px; padding-top: 5px; padding-bottom: 5px; }
+  .field.btns:hover, .field.btns.cur { background: none; outline: none; }
+  .field.btns.status { justify-content: space-between; align-items: center; background: rgba(170, 210, 255, 0.08); }
+  .field.btns .note { color: var(--value); }
+  .field.item .l { color: var(--muted); }
+  .field .txt { display: inline-block; min-width: 130px; padding: 0 5px; text-align: left; border: 1px solid #444; background: rgba(255,255,255,0.05); }
+  .field input.txt { font: inherit; color: var(--value); outline: 1px solid var(--highlight); }
+  .sw { display: inline-block; width: 22px; height: 12px; margin-right: 6px; border: 1px solid #888; vertical-align: -1px; }
+  .sw.none { background: repeating-conic-gradient(#777 0 25%, #333 0 50%) 0 0 / 8px 8px; }
+  .del { color: var(--muted); padding: 0 2px 0 8px; visibility: hidden; }
+  .field:hover .del, .field.cur .del { visibility: visible; }
+  .del:hover { color: var(--value); }
+  .nav-add { margin-left: auto; padding: 0 5px; color: var(--muted); border: 1px solid #555; line-height: 1.1; }
+  .nav-add:hover { color: var(--value); background: var(--hover); }
+  .pop {
+    position: absolute; z-index: 35; width: 196px; padding: 8px; background: #000;
+    border: 1px solid var(--panel-border); display: flex; flex-direction: column; gap: 8px;
+  }
+  .pop .sv { height: 92px; background: linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, var(--pop-hue, #2878ff)); }
+  .pop .hue { height: 10px; background: linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00); }
+  .pop .pal { display: grid; grid-template-columns: repeat(8, 1fr); gap: 3px; }
+  .pop .pal i { height: 16px; border: 1px solid #555; }
+  .pop .pal i:hover { outline: 1px solid var(--highlight); }
+  .pop .hex { color: var(--label); display: flex; justify-content: space-between; }
+  .scrim { position: absolute; inset: 0; z-index: 40; background: rgba(0, 0, 0, 0.55); display: flex; align-items: center; justify-content: center; }
+  .dlg { width: 430px; background: #000; border: 1px solid var(--panel-border); padding: 12px 0 12px; display: flex; flex-direction: column; gap: 6px; }
+  .dlg-t { padding: 0 14px 6px; font-weight: 700; color: var(--value); border-bottom: 1px solid #333; }
+  .dlg-p { padding: 2px 14px; color: var(--value); }
+  .dlg-i { padding: 2px 14px; color: var(--highlight); }
+  .dlg .row { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 2px 14px; min-height: 24px; }
+  .dlg .row.top { align-items: flex-start; }
+  .dlg .row .l { color: var(--label); white-space: nowrap; }
+  .dlg .row.cur { outline: 1px solid var(--highlight); outline-offset: -1px; background: rgba(255,235,130,0.10); }
+  .dlg .row.cur .l { color: var(--highlight); }
+  .dlg .arr { color: var(--muted); padding: 0 4px; }
+  .dlg .arr:hover { color: var(--highlight); background: var(--hover); }
+  .seg { display: inline-flex; }
+  .seg span { padding: 1px 9px; border: 1px solid var(--btn-border); margin-left: -1px; color: var(--muted); white-space: nowrap; }
+  .seg span.on { background: var(--btn-primary); border-color: var(--btn-primary); color: var(--value); position: relative; }
+  .seg span:hover:not(.on) { background: var(--hover); color: var(--value); }
+  .radio { display: flex; flex-direction: column; gap: 2px; align-items: flex-start; min-width: 240px; }
+  .radio span { color: var(--value); }
+  .radio span::before { content: "( ) "; color: var(--muted); }
+  .radio span.on::before { content: "(*) "; color: var(--label); }
+  .dlg-b { display: flex; justify-content: flex-end; gap: 8px; padding: 8px 14px 0; border-top: 1px solid #333; margin-top: 4px; }
+  .role-sw { display: inline-block; width: 42px; height: 16px; border-radius: 3px; vertical-align: -3px; margin-right: 8px; border: 1px solid #555; }
+  .view-links { display: flex; flex-wrap: wrap; gap: 6px; }
+  .view-links a { text-decoration: none; }
+
   /* ---------- static diagrams ---------- */
   .menus-row { display: flex; gap: 10px; flex-wrap: wrap; font-family: var(--mono); font-size: 12px; }
   .menu-col { background: #000; border: 1px solid #ddd; min-width: 210px; flex: 1; }
@@ -296,7 +362,8 @@
   Everything is drawn in-window over the projectM output (OpenGL chrome, no native menu bar). Labels come from the current
   <code>row_specs/*</code>; shortcuts and values are illustrative.
   Named views for review: <code>#shell-split</code>, <code>#shell-docked</code>, <code>#menu-layers</code>,
-  <code>#inspector-locked</code>, <code>#inspector-card</code>, <code>#hit-rects</code>
+  <code>#inspector-locked</code>, <code>#inspector-card</code>, <code>#hit-rects</code>, and the action views in
+  <a href="#actions" style="color: var(--label)">section 7</a>
   (<code>cleaveDesign.apply(name)</code> in the console). See
   <a href="menu-overhaul-design.md" style="color: var(--label)">menu-overhaul-design.md</a>.</p>
 </header>
@@ -343,6 +410,8 @@
     <div class="insp region" id="insp" data-scope="insp"></div>
     <div class="tl region" id="tl" data-scope="tl"></div>
     <div class="toast" id="toast"></div>
+    <div id="popHost"></div>
+    <div id="dlgHost"></div>
   </div>
   <p class="note">The transport sits in a slim bar under the menu (the placement the plan locks). The timeline strip
   stays its own host and focus scope; it is not folded into the inspector. Asterisks mark dirty fields; red rows are under a section lock (Layer 3).</p>
@@ -352,7 +421,7 @@
 <section class="card" id="taxonomy">
   <h2>2. Menu taxonomy<span class="sub">commands and navigation jumps only, never every parameter</span></h2>
   <div class="menus-row" id="menusStatic"></div>
-  <p class="note">Green items run a command from the registry; plain items jump the navigator and inspector to a root. Check marks mirror
+  <p class="note">Items run a command from the registry or jump the navigator and inspector to a root. Check marks mirror
   <code>checked(state)</code>; grey items are <code>enabled(state) == False</code>. Long jobs (render, separate, backup) open the in-window loading screen.</p>
 </section>
 
@@ -550,6 +619,61 @@ LayoutItem(id="scroll:inspector",      rect=(1036, 52, 6, 520), role="scrollbar"
   </div>
 </section>
 
+<!-- 7. Action proposal -->
+<section class="card" id="actions">
+  <h2>7. Buttons, dialogs, and inline editors<span class="sub">open the views below</span></h2>
+  <p class="note"><b style="color:#fff">The rule:</b> the inspector holds live properties. Commands are real buttons. A command that needs
+  parameters opens one dialog, and its label ends in "...". Nothing in the inspector waits for a later Apply.</p>
+  <div class="view-links">
+    <a class="pill" href="#actions-timeline">Timeline page</a>
+    <a class="pill" href="#actions-layer">Layer page</a>
+    <a class="pill" href="#actions-card">Overlay card</a>
+    <a class="pill" href="#actions-colour">Colour picker</a>
+    <a class="pill" href="#actions-markers">Song markers</a>
+    <a class="pill" href="#dialog-generate">Generate timeline</a>
+    <a class="pill" href="#dialog-snap">Snap cues</a>
+    <a class="pill" href="#dialog-cut-type">Set cut type</a>
+    <a class="pill" href="#dialog-reset">Reset timeline</a>
+    <a class="pill" href="#dialog-populate">Populate presets</a>
+    <a class="pill" href="#dialog-delete-layer">Delete layer</a>
+  </div>
+  <table class="t">
+    <tr><th>Was</th><th>Now</th><th>Why</th></tr>
+    <tr><td>Title and body text, 6 colour rows: green label, Enter opens a modal</td><td>Normal rows: inline text field, swatch with a picker popup</td><td>They are properties, not actions</td></tr>
+    <tr><td>Song marker row: green, Left/Right for type, Delete to remove</td><td>List row: click to seek, type stepper, delete icon on hover</td><td>It is a list item</td></tr>
+    <tr><td>Add Layer, Add Current Preset: confirm prompt</td><td>Button runs at once, toast reports it</td><td>Harmless, so no prompt needed</td></tr>
+    <tr><td>Switching Paused - Enter To Resume</td><td>Status line with a Resume button</td><td>Works for mouse and keyboard</td></tr>
+    <tr><td>Snap Cues x2, then 1 to 2 chained choice modals</td><td><code>Snap cues...</code>: one dialog, proximity and layers appear for song markers</td><td>One command, parameters all visible</td></tr>
+    <tr><td>Apply to Cues x2, Remove from Cues x2, then a scope modal</td><td><code>Set cut type...</code>: type and scope in one dialog, with a count of cues affected</td><td>Four rows become one. Also fixes both Remove rows clearing every cut type</td></tr>
+    <tr><td>8 staged rows in the inspector, Apply, then a modal repeating all 8</td><td><code>Generate timeline...</code>: the same 8 fields in a dialog, values remembered</td><td>Staged rows looked live but did nothing</td></tr>
+    <tr><td>Reset Timeline: All Off / All On / Cancel</td><td><code>Reset timeline...</code>: pick layers on or off, one red Reset button</td><td>States the outcome</td></tr>
+    <tr><td>Populate Presets: choice modal</td><td><code>Populate...</code> in a small toolbar under the preset list</td><td>List commands live with the list</td></tr>
+    <tr><td>Yes / No prompts</td><td>Verb buttons: <code>Delete layer</code> / <code>Cancel</code>. Cancel takes focus on destructive dialogs</td><td>Desktop convention, safer default</td></tr>
+  </table>
+  <div class="two-col">
+    <div>
+      <h3 style="margin:0 0 6px;font-size:14px;color:#fff">Colour roles</h3>
+      <table class="t">
+        <tr><td><span class="role-sw" style="background:var(--btn-bg)"></span>Button</td><td>Every button in the panels</td></tr>
+        <tr><td><span class="role-sw" style="background:var(--btn-primary)"></span>Primary</td><td>The one confirm button in a dialog; selected segment</td></tr>
+        <tr><td><span class="role-sw" style="background:var(--btn-danger)"></span>Destructive</td><td>Confirm button of a destructive dialog only. Red in panels stays solo, lock and record</td></tr>
+        <tr><td><span class="role-sw" style="background:var(--highlight)"></span>Focus</td><td>Unchanged: focus and selection only</td></tr>
+        <tr><td><span class="role-sw" style="background:var(--value)"></span>Value</td><td>Replaces green for menu commands, check marks, play state and active toggles</td></tr>
+      </table>
+    </div>
+    <div>
+      <h3 style="margin:0 0 6px;font-size:14px;color:#fff">Keyboard in a dialog</h3>
+      <ul class="bul">
+        <li><kbd>Up</kbd>/<kbd>Down</kbd> or <kbd>Tab</kbd> move through fields, then the buttons.</li>
+        <li><kbd>Left</kbd>/<kbd>Right</kbd> change a field, or move between buttons.</li>
+        <li><kbd>Enter</kbd> runs the focused button. On a field it runs the confirm button, except on destructive dialogs.</li>
+        <li><kbd>Esc</kbd> cancels and restores the values from when the dialog opened.</li>
+        <li>Inspector button rows: <kbd>Left</kbd>/<kbd>Right</kbd> pick a button, <kbd>Enter</kbd> runs it.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
 </div>
 
 <script>
@@ -655,16 +779,158 @@ LayoutItem(id="scroll:inspector",      rect=(1036, 52, 6, 520), role="scrollbar"
   for (let i = 1; i <= 4; i++) PAGES["layer" + i] = layerPage(i);
   PAGES.layers = { crumb: ["Layers"], groups: [G(null, [path("layers", "4 of 8"), act("Add Layer")])] };
 
+  /* Proposed action model (section 7). Current pages above stay as they are. */
+  const btns = (list, note) => ({ k: "btns", btns: list, note });
+  const text = (l, v) => ({ l, k: "text", v });
+  const colour = (l, v) => ({ l, k: "colour", v });
+  const item = (l, v) => ({ l, k: "item", v });
+  const TOOL = {
+    "Measure Latency": { l: "Measure latency...", dlg: "latency" },
+    "Switch to Preset Curation": { l: "Switch to preset curation", msg: "Preset curation mode on" },
+    "Render the Project": { l: "Render project...", dlg: "render" },
+    "Add Card": { l: "Add card", msg: "Card 3 added" },
+    "Add Layer": { l: "Add layer", msg: "Layer 5 added at the top of the z-order" },
+  };
+  function buttonised(page) {
+    return Object.assign({}, page, { groups: page.groups.map((g) => Object.assign({}, g, {
+      rows: g.rows.map((r) => (r.k === "act" ? btns([TOOL[r.l]]) : r)),
+    })) });
+  }
+  function proposedLayer(n) {
+    const p = PAGES["layer" + n];
+    const L = (r) => (p.locked ? Object.assign(r, { locked: true }) : r);
+    const [head, sw, comp, fx] = p.groups;
+    const switching = sw.rows.filter((r) => r.k !== "act");
+    if (n === 2) switching.unshift(btns([{ l: "Resume", msg: "Preset switching resumed" }], "Switching paused"));
+    return Object.assign({}, p, { groups: [
+      head,
+      Object.assign({}, sw, { rows: switching }),
+      G("preset list", [
+        L(item("1", PRESETS[n % 4])), L(item("2", PRESETS[(n + 1) % 4])), L(item("3", PRESETS[(n + 2) % 4])),
+        L(btns([{ l: "+ Add current", msg: "Added preset to the list" }, { l: "Populate...", dlg: "populate" }])),
+      ]),
+      comp, fx,
+      G(null, [btns([{ l: "Delete layer...", dlg: "deleteLayer", always: true }])]),
+    ] });
+  }
+  function proposedCard(n) {
+    const p = PAGES["card" + n];
+    const swap = (r) => {
+      if (/ text$/.test(r.l)) return text(r.l, r.v);
+      if (r.k === "path") return colour(r.l, r.v);
+      return r;
+    };
+    return Object.assign({}, p, { groups: p.groups.map((g) => Object.assign({}, g, { rows: g.rows.map(swap) })) });
+  }
+  const marker = (t, i) => Object.assign(opt(t, ["-", "crescendo", "diminuendo"], i), { del: true, seek: true });
+  const PROPOSED = {
+    settings: buttonised(PAGES.settings),
+    project: buttonised(PAGES.project),
+    overlays: buttonised(PAGES.overlays),
+    layers: buttonised(PAGES.layers),
+    card1: proposedCard(1), card2: proposedCard(2),
+    timeline: { crumb: PAGES.timeline.crumb, groups: [
+      G(null, [btns([{ l: "Generate timeline...", dlg: "generate" }, { l: "Reset timeline...", dlg: "reset" }])]),
+      G("beat / bar grid", [num("bar phase", 0, 0, 3, 1, 0), opt("bar grid", ["show", "hide"], 0), opt("placement snap", ["off", "beat", "bar"], 2), btns([{ l: "Snap cues...", dlg: "snap" }])]),
+      G("hard cuts", [num("fade in duration", 0, 0, 2, 0.05, 2, { unit: " s" }), num("fade out duration", 0, 0, 2, 0.05, 2, { unit: " s" }), opt("shift for crossfade", ["off", "on"], 0)]),
+      G("soft cuts", [num("fade in duration", 0.5, 0, 4, 0.05, 2, { unit: " s" }), num("fade out duration", 0.5, 0, 4, 0.05, 2, { unit: " s" }), opt("shift for crossfade", ["off", "on"], 1)]),
+      G(null, [btns([{ l: "Set cut type...", dlg: "cutType" }])]),
+    ] },
+    markers: { crumb: PAGES.markers.crumb, groups: [
+      G(null, [marker("00:00.0", 0), marker("00:32.1", 0), marker("01:04.3", 1), marker("01:58.0", 0), marker("02:30.2", 1), marker("03:46.9", 2)]),
+      G(null, [btns([{ l: "Snap cues to markers...", dlg: "snap", init: { target: 2 } }])]),
+    ] },
+  };
+  for (let i = 1; i <= 4; i++) PROPOSED["layer" + i] = proposedLayer(i);
+
+  const CUE_TOTAL = 11, CUE_ON_MARKERS = 3;
+  const seg = (id, l, opts, i, show) => ({ id, l, t: "seg", opts, i: i || 0, show });
+  const step = (id, l, opts, i, show) => ({ id, l, t: "step", opts, i: i || 0, show });
+  const radio = (id, l, opts, i) => ({ id, l, t: "radio", opts, i: i || 0 });
+  const CANCEL = { l: "Cancel" };
+  const DIALOGS = {
+    generate: () => ({
+      title: "Generate timeline", remember: true,
+      fields: [
+        step("character", "character", ["breathing", "dialogue", "arc", "pulse"], 2),
+        step("density", "density", ["very sparse", "sparse", "normal", "dense", "very dense"], 2),
+        seg("cueSnap", "cue snap", ["beats", "bars", "none"], 1),
+        step("markerSnap", "song marker snap", ["none", "0.5s", "1.0s", "2.0s", "5.0s", "10.0s", "15.0s", "30.0s"], 3),
+        step("cuts", "timeline cuts", ["by marker", "all soft", "all hard", "none"], 0),
+        step("repopulate", "re-populate preset lists", ["no", "cue roles", "directory random", "directory sequential"], 0),
+        seg("conductor", "conductor", ["off", "on"], 1),
+        seg("mode", "mode", ["layers", "pattern mask"], 0),
+      ],
+      info: () => "Replaces all " + CUE_TOTAL + " cues on the timeline.",
+      buttons: [{ l: "Generate", kind: "primary", msg: "Timeline generated: 14 cues" }, CANCEL],
+    }),
+    snap: () => ({
+      title: "Snap cues", remember: true,
+      fields: [
+        seg("target", "snap to", ["beats", "bars", "song markers"], 1),
+        step("proximity", "proximity", ["0.5s", "1.0s", "2.0s", "5.0s", "10.0s", "15.0s", "30.0s"], 2, (v) => v.target === 2),
+        step("scope", "layers", ["All Layers", "Closest Wins", "Layer 1", "Layer 2", "Layer 3", "Layer 4"], 0, (v) => v.target === 2),
+      ],
+      info: (v) => (v.target === 2 ? "Moves 5 of " + CUE_TOTAL + " cues." : "Moves all " + CUE_TOTAL + " cues."),
+      buttons: [{ l: "Snap cues", kind: "primary", msg: "Snapped cues" }, CANCEL],
+    }),
+    cutType: () => ({
+      title: "Set cut type", remember: true,
+      fields: [
+        seg("type", "cut type", ["hard", "soft", "none"], 1),
+        seg("scope", "applies to", ["all cues", "except markers", "markers only"], 0),
+      ],
+      info: (v) => "Changes " + [CUE_TOTAL, CUE_TOTAL - CUE_ON_MARKERS, CUE_ON_MARKERS][v.scope] + " of " + CUE_TOTAL + " cues.",
+      buttons: [{ l: "Set cut type", kind: "primary", msg: "Cut type updated" }, CANCEL],
+    }),
+    reset: () => ({
+      title: "Reset timeline?", danger: true,
+      body: "Removes all " + CUE_TOTAL + " cues.",
+      fields: [seg("layers", "layers after reset", ["off", "on"], 0)],
+      buttons: [{ l: "Reset timeline", kind: "danger", msg: "Timeline reset" }, CANCEL],
+    }),
+    populate: () => ({
+      title: "Populate preset list",
+      body: "Replaces the whole list with 24 presets.",
+      fields: [radio("source", "from", ["Using Cue Marker Roles (random)", "Current Directory (random)", "Current Directory (sequential)"], 1)],
+      buttons: [{ l: "Populate", kind: "primary", msg: "Preset list populated" }, CANCEL],
+    }),
+    deleteLayer: () => ({
+      title: "Delete layer " + st.sel.replace("layer", "") + " (" + STEMS[+st.sel.replace("layer", "") - 1] + ")?", danger: true,
+      body: "The layer and its preset list are removed.",
+      fields: [],
+      buttons: [{ l: "Delete layer", kind: "danger", msg: "Layer deleted" }, CANCEL],
+    }),
+    deleteMarker: () => ({
+      title: "Delete song marker?", danger: true,
+      fields: [],
+      buttons: [{ l: "Delete marker", kind: "danger", msg: "Song marker deleted" }, CANCEL],
+    }),
+    render: () => ({
+      title: "Render project",
+      body: "1920 x 1080 at 60 fps, 00:00.0 to 04:12.0. The window stays open and shows progress.",
+      fields: [],
+      buttons: [{ l: "Render", kind: "primary", msg: "Rendering: progress shows in the window" }, CANCEL],
+    }),
+    latency: () => ({
+      title: "Measure latency",
+      body: "Tap along with the click track. Playback pauses while you measure.",
+      fields: [],
+      buttons: [{ l: "Start", kind: "primary", msg: "Tap along with the clicks" }, CANCEL],
+    }),
+  };
+  const remembered = {};
+
   const MENUS = [
     { name: "File", key: "F", items: [
       { l: "Open project...", sc: "Ctrl+O", cmd: 1 }, { l: "Save", sc: "Ctrl+S", cmd: 1 }, "sep",
       { l: "Quit", sc: "Ctrl+Q", cmd: 1 } ] },
     { name: "Project", key: "P", items: [
       { l: "Project settings", go: "project" }, "sep",
-      { l: "Separate stems...", cmd: 1 }, { l: "Render project...", sc: "Ctrl+R", cmd: 1 }, "sep",
+      { l: "Separate stems...", cmd: 1 }, { l: "Render project...", sc: "Ctrl+R", dlg: "render", cmd: 1 }, "sep",
       { l: "Backup...", cmd: 1 }, { l: "Restore...", cmd: 1 } ] },
     { name: "Layers", key: "L", items: [
-      { l: "Add layer", sc: "Ctrl+L", cmd: 1 }, { l: "Delete layer", cmd: 1 }, "sep",
+      { l: "Add layer", sc: "Ctrl+L", cmd: 1 }, { l: "Delete layer", pl: "Delete layer...", dlg: "deleteLayer", cmd: 1 }, "sep",
       { l: "Layer 1  drums", sc: "1", go: "layer1" }, { l: "Layer 2  bass", sc: "2", go: "layer2" },
       { l: "Layer 3  vocals", sc: "3", go: "layer3" }, { l: "Layer 4  other", sc: "4", go: "layer4" }, "sep",
       { l: "Preset curation mode", chk: false, cmd: 1 } ] },
@@ -674,10 +940,11 @@ LayoutItem(id="scroll:inspector",      rect=(1036, 52, 6, 520), role="scrollbar"
       { l: "Start render...", sc: "Ctrl+R", cmd: 1 } ] },
     { name: "Timeline", key: "T", items: [
       { l: "Show timeline strip", sc: "T", chk: true, tl: 1 }, "sep",
-      { l: "Apply timeline preset", cmd: 1 }, { l: "Reset timeline", cmd: 1 }, { l: "Snap cues", cmd: 1 },
-      { l: "Undo last cut", dis: 1 }, "sep", { l: "Song markers", go: "markers" } ] },
+      { l: "Apply timeline preset", pl: "Generate timeline...", dlg: "generate", cmd: 1 }, { l: "Reset timeline", pl: "Reset timeline...", dlg: "reset", cmd: 1 }, { l: "Snap cues", pl: "Snap cues...", dlg: "snap", cmd: 1 },
+      { l: "Set cut type...", dlg: "cutType", cmd: 1, proposedOnly: 1 },
+      { l: "Undo", sc: "Ctrl+Z", dis: 1 }, { l: "Redo", sc: "Ctrl+Y", dis: 1 }, "sep", { l: "Song markers", go: "markers" } ] },
     { name: "Settings", key: "S", items: [
-      { l: "Editor settings", sc: "Ctrl+,", go: "settings" }, { l: "Measure latency...", cmd: 1 } ] },
+      { l: "Editor settings", sc: "Ctrl+,", go: "settings" }, { l: "Measure latency...", dlg: "latency", cmd: 1 } ] },
     { name: "Help", key: "H", items: [
       { l: "Help overlay", sc: "H", cmd: 1 }, { l: "Keyboard shortcuts", cmd: 1 }, "sep", { l: "About Cleave", cmd: 1 } ] },
   ];
@@ -697,7 +964,10 @@ LayoutItem(id="scroll:inspector",      rect=(1036, 52, 6, 520), role="scrollbar"
     inspCur: 0,
     menuOpen: -1, menuTop: 0, menuItem: -1,
     tlOpen: true, playhead: 0.33,
+    proposed: true, btnCur: 0, dlg: null, pop: null, edit: null,
   };
+  const curPage = () => (st.proposed && PROPOSED[st.sel]) || PAGES[st.sel];
+  const menuHidden = (it) => it !== "sep" && it.proposedOnly && !st.proposed;
 
   function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
   function toast(title, msg) {
@@ -735,12 +1005,13 @@ LayoutItem(id="scroll:inspector",      rect=(1036, 52, 6, 520), role="scrollbar"
       h += '<div class="' + cls.join(" ") + '" data-role="tree_node" data-id="' + n.id + '" style="padding-left:' + (8 + d * 14) + 'px">' +
         '<span class="tw" data-tw="1">' + tw + "</span>" + esc(n.label) +
         (n.lock ? ' <span class="lock">[lock]</span>' : "") +
-        (n.badge ? '<span class="badge">' + esc(n.badge) + "</span>" : "") + "</div>";
+        (n.badge ? '<span class="badge">' + esc(n.badge) + "</span>" : "") +
+        (st.proposed && n.id === "layers" ? '<span class="nav-add" data-add="1" data-role="button" title="Add layer">+</span>' : "") + "</div>";
     }
     navEl.innerHTML = h;
   }
   function select(id, focusInsp) {
-    st.sel = id; st.inspCur = 0;
+    st.sel = id; st.inspCur = 0; st.btnCur = 0; st.pop = null; st.edit = null;
     const f = findNode(id, TREE, []);
     if (f) f.parents.forEach((p) => st.expanded.add(p));
     if (focusInsp) st.scope = "insp";
@@ -749,7 +1020,7 @@ LayoutItem(id="scroll:inspector",      rect=(1036, 52, 6, 520), role="scrollbar"
 
   /* inspector */
   function inspItems() {
-    const p = PAGES[st.sel];
+    const p = curPage();
     const items = [];
     p.groups.forEach((g, gi) => {
       if (g.title) items.push({ t: "g", g, gi });
@@ -766,12 +1037,17 @@ LayoutItem(id="scroll:inspector",      rect=(1036, 52, 6, 520), role="scrollbar"
         return '<span class="arr">&lt;</span> ' + s + ' <span class="arr">&gt;</span>';
       }
       case "bool": return r.v ? "on" : "off";
-      case "path": return esc(r.v);
+      case "path": case "item": return esc(r.v);
+      case "text":
+        if (st.edit === r) return '<input class="txt" id="inlineEdit" value="' + esc(r.v).replace(/"/g, "&quot;") + '" />';
+        return '<span class="txt">' + esc(r.v) + "</span>";
+      case "colour":
+        return r.v === "none" ? '<span class="sw none"></span>none' : '<span class="sw" style="background:' + esc(r.v) + '"></span>' + esc(r.v);
       default: return "";
     }
   }
   function renderInsp() {
-    const p = PAGES[st.sel];
+    const p = curPage();
     const crumb = p.crumb.map((c, i) => (i === p.crumb.length - 1 ? "<b>" + esc(c) + "</b>" : esc(c))).join(" &rsaquo; ");
     let h = '<div class="r-head">Inspector</div><div class="crumb">' + crumb +
       (p.lockable ? '<span class="lockbtn' + (p.locked ? " on" : "") + '" data-lock="1" data-role="toggle">' + (p.locked ? "locked" : "lock") + "</span>" : "") + "</div>";
@@ -781,16 +1057,115 @@ LayoutItem(id="scroll:inspector",      rect=(1036, 52, 6, 520), role="scrollbar"
         h += '<div class="grp-h' + cur + '" data-role="group" data-idx="' + idx + '"><span class="tw">' + (it.g.open ? "&#9662;" : "&#9656;") + "</span>" + esc(it.g.title) + "</div>";
       } else {
         const r = it.r;
+        if (r.k === "btns") { h += btnRow(r, idx, it.top, cur); return; }
         const cls = ["field", r.k];
         if (it.top) cls.push("top");
         if (r.locked) cls.push("locked");
         if (r.dirty) cls.push("dirty");
-        h += '<div class="' + cls.join(" ") + cur + '" data-role="field" data-idx="' + idx + '"><span class="l">' + esc(r.l) + '</span><span class="v">' + fmtVal(r) + "</span></div>";
+        h += '<div class="' + cls.join(" ") + cur + '" data-role="field" data-idx="' + idx + '"><span class="l">' + esc(r.l) + '</span><span class="v">' + fmtVal(r) + "</span>" + (r.del ? '<span class="del" data-del="1" data-role="button" title="Delete">x</span>' : "") + "</div>";
       }
     });
     inspEl.innerHTML = h;
+    const edit = document.getElementById("inlineEdit");
+    if (edit) { edit.focus(); edit.select(); }
+  }
+  function btnRow(r, idx, top, cur) {
+    const focused = cur ? Math.min(st.btnCur, r.btns.length - 1) : -1;
+    const list = r.btns.map((b, bi) => '<button class="btn' + (bi === focused ? " focus" : "") + (r.locked && !b.always ? " off" : "") +
+      '" data-role="button" data-b="' + bi + '" tabindex="-1">' + esc(b.l) + "</button>").join("");
+    return '<div class="field btns' + (r.note ? " status" : "") + (top ? " top" : "") + cur + '" data-idx="' + idx + '">' +
+      (r.note ? '<span class="note">' + esc(r.note) + "</span>" : "") + list + "</div>";
+  }
+  function runBtn(r, bi) {
+    const b = r.btns[Math.min(bi, r.btns.length - 1)];
+    if (r.locked && !b.always) { toast("Section locked", "Unlock this section to run this action."); return; }
+    if (b.dlg) openDlg(b.dlg, b.init);
+    else toast(b.l.replace(/\.\.\.$/, ""), b.msg);
+  }
+
+  /* dialogs */
+  function openDlg(key, init) {
+    const def = DIALOGS[key]();
+    const vals = {};
+    def.fields.forEach((f) => (vals[f.id] = f.i));
+    Object.assign(vals, remembered[key] || {}, init || {});
+    st.pop = null;
+    st.dlg = { key, def, vals, cur: 0, btn: 0 };
+    if (!def.fields.length || def.danger) { st.dlg.cur = -1; st.dlg.btn = def.danger ? def.buttons.length - 1 : 0; }
+    win.focus();
+    renderAll();
+  }
+  const dlgFields = (d) => d.def.fields.filter((f) => !f.show || f.show(d.vals));
+  function closeDlg(button) {
+    const d = st.dlg;
+    st.dlg = null;
+    if (button && button.kind) {
+      if (d.def.remember) remembered[d.key] = d.vals;
+      toast(d.def.title.replace(/\?$/, ""), button.msg);
+    }
+    renderAll();
+  }
+  function renderDlg() {
+    const host = document.getElementById("dlgHost");
+    const d = st.dlg;
+    if (!d) { host.innerHTML = ""; return; }
+    let h = '<div class="scrim"><div class="dlg" data-role="dialog"><div class="dlg-t">' + esc(d.def.title) + "</div>";
+    if (d.def.body) h += '<div class="dlg-p">' + esc(d.def.body) + "</div>";
+    dlgFields(d).forEach((f, fi) => {
+      const v = d.vals[f.id];
+      let c;
+      if (f.t === "step") c = '<span><span class="arr" data-step="-1" data-f="' + f.id + '">&lt;</span>' + esc(f.opts[v]) + '<span class="arr" data-step="1" data-f="' + f.id + '">&gt;</span></span>';
+      else c = '<span class="' + f.t + '">' + f.opts.map((o, oi) => '<span class="' + (oi === v ? "on" : "") + '" data-f="' + f.id + '" data-o="' + oi + '">' + esc(o) + "</span>").join("") + "</span>";
+      h += '<div class="row' + (f.t === "radio" ? " top" : "") + (fi === d.cur ? " cur" : "") + '" data-fi="' + fi + '"><span class="l">' + esc(f.l) + "</span>" + c + "</div>";
+    });
+    if (d.def.info) h += '<div class="dlg-i">' + esc(d.def.info(d.vals)) + "</div>";
+    h += '<div class="dlg-b">' + d.def.buttons.map((b, bi) =>
+      '<button class="btn' + (b.kind ? " " + b.kind : "") + (d.cur < 0 && bi === d.btn ? " focus" : "") + '" data-role="button" data-db="' + bi + '" tabindex="-1">' + esc(b.l) + "</button>").join("") + "</div></div></div>";
+    host.innerHTML = h;
+  }
+  function dlgKey(e) {
+    const d = st.dlg, k = e.key;
+    const fields = dlgFields(d);
+    const onButtons = d.cur < 0;
+    const move = (dir) => {
+      const slots = fields.length + 1;
+      const pos = onButtons ? fields.length : d.cur;
+      const next = (pos + dir + slots) % slots;
+      d.cur = next === fields.length ? -1 : next;
+    };
+    if (k === "Escape") { closeDlg(null); return; }
+    if (k === "Tab") { move(e.shiftKey ? -1 : 1); }
+    else if (k === "ArrowDown") move(1);
+    else if (k === "ArrowUp") move(-1);
+    else if (k === "ArrowLeft" || k === "ArrowRight") {
+      const dir = k === "ArrowLeft" ? -1 : 1;
+      if (onButtons) d.btn = (d.btn + dir + d.def.buttons.length) % d.def.buttons.length;
+      else { const f = fields[d.cur]; d.vals[f.id] = (d.vals[f.id] + dir + f.opts.length) % f.opts.length; }
+    } else if (k === "Enter") {
+      if (onButtons) { closeDlg(d.def.buttons[d.btn]); return; }
+      if (!d.def.danger) { closeDlg(d.def.buttons[0]); return; }
+      d.cur = -1; d.btn = d.def.buttons.length - 1;
+    } else return;
+    renderDlg();
+  }
+
+  /* colour popup */
+  const PALETTE = ["#ffffff", "#dddddd", "#888888", "#000000", "#ff5a5a", "#ffb03c", "#ffeb82", "#50be7d", "#3cc8ff", "#2878ff", "#8c5aff", "#ff50b4", "#7fd1ff", "#b7a6ff", "#ffd27f", "#9cf0b0"];
+  function renderPop() {
+    const host = document.getElementById("popHost");
+    if (!st.pop) { host.innerHTML = ""; return; }
+    const r = st.pop.r;
+    const rowEl = inspEl.querySelector('[data-idx="' + st.pop.idx + '"]');
+    if (!rowEl) { host.innerHTML = ""; return; }
+    const w = win.getBoundingClientRect(), b = rowEl.getBoundingClientRect();
+    const top = Math.max(60, Math.min(b.bottom - w.top + 2, w.height - 240));
+    const left = Math.max(8, b.right - w.left - 204);
+    host.innerHTML = '<div class="pop" data-role="dialog" style="top:' + top + "px;left:" + left + 'px"><div class="sv"></div><div class="hue"></div><div class="pal">' +
+      PALETTE.map((c) => '<i data-c="' + c + '" style="background:' + c + '"></i>').join("") + '</div><div class="hex"><span>hex</span><span style="color:var(--value)">' + esc(r.v) + "</span></div></div>";
   }
   function stepRow(r, dir) {
+    if (r.k === "btns") { st.btnCur = Math.max(0, Math.min(r.btns.length - 1, st.btnCur + dir)); renderInsp(); return; }
+    if (r.k === "text" || r.k === "colour" || r.k === "item") return;
     if (r.locked) { toast("Section locked", "Unlock Layer 3 to edit this field."); return; }
     if (r.k === "opt") r.i = (r.i + dir + r.opts.length) % r.opts.length;
     else if (r.k === "num") r.v = Math.min(r.max, Math.max(r.min, +(r.v + dir * r.step).toFixed(4)));
@@ -804,6 +1179,11 @@ LayoutItem(id="scroll:inspector",      rect=(1036, 52, 6, 520), role="scrollbar"
     if (!it) return;
     if (it.t === "g") { it.g.open = !it.g.open; renderInsp(); return; }
     const r = it.r;
+    if (r.k === "btns") { runBtn(r, st.btnCur); return; }
+    if (r.k === "text") { st.edit = r; renderInsp(); return; }
+    if (r.k === "colour") { st.pop = st.pop && st.pop.r === r ? null : { r, idx }; renderPop(); return; }
+    if (r.k === "item") { toast("Audition", r.v + " plays on this layer."); return; }
+    if (r.seek) { toast("Seek", "Playhead moved to " + r.l); return; }
     if (r.k === "act") {
       if (r.locked) { toast("Section locked", "Unlock Layer 3 to run this action."); return; }
       toast("Contextual action", r.l + " (RowSpec.apply_action)");
@@ -822,12 +1202,13 @@ LayoutItem(id="scroll:inspector",      rect=(1036, 52, 6, 520), role="scrollbar"
         h += '<div class="dropdown">';
         m.items.forEach((it, ii) => {
           if (it === "sep") { h += '<div class="m-sep"></div>'; return; }
+          if (menuHidden(it)) return;
           const chk = it.tl ? st.tlOpen : it.chk;
           const cls = ["m-item"];
           if (it.cmd || it.tl) cls.push("cmd");
           if (it.dis) cls.push("dis");
           if (ii === st.menuItem) cls.push("cur");
-          h += '<div class="' + cls.join(" ") + '" data-role="menu_item" data-mi="' + mi + '" data-ii="' + ii + '"><span><span class="chk">' + (chk === true ? "&#10003;" : "") + "</span>" + esc(it.l) + '</span><span class="sc">' + (it.sc || "") + "</span></div>";
+          h += '<div class="' + cls.join(" ") + '" data-role="menu_item" data-mi="' + mi + '" data-ii="' + ii + '"><span><span class="chk">' + (chk === true ? "&#10003;" : "") + "</span>" + esc((st.proposed && it.pl) || it.l) + '</span><span class="sc">' + (it.sc || "") + "</span></div>";
         });
         h += "</div>";
       }
@@ -840,7 +1221,7 @@ LayoutItem(id="scroll:inspector",      rect=(1036, 52, 6, 520), role="scrollbar"
     let i = from;
     for (let n = 0; n < items.length; n++) {
       i = (i + dir + items.length) % items.length;
-      if (items[i] !== "sep" && !items[i].dis) return i;
+      if (items[i] !== "sep" && !items[i].dis && !menuHidden(items[i])) return i;
     }
     return -1;
   }
@@ -850,6 +1231,10 @@ LayoutItem(id="scroll:inspector",      rect=(1036, 52, 6, 520), role="scrollbar"
     const it = MENUS[mi].items[ii];
     if (!it || it === "sep" || it.dis) return;
     closeMenu(true);
+    if (st.proposed && it.dlg) {
+      if (it.dlg === "deleteLayer" && !/^layer/.test(st.sel)) select("layer2");
+      st.scope = "nav"; openDlg(it.dlg); return;
+    }
     if (it.go) { select(it.go, true); toast("Jump", MENUS[mi].name + " > " + it.l + " selects the node and focuses the inspector."); return; }
     if (it.tl) { setTimeline(!st.tlOpen); return; }
     if (it.chk !== undefined) it.chk = !it.chk;
@@ -890,15 +1275,25 @@ LayoutItem(id="scroll:inspector",      rect=(1036, 52, 6, 520), role="scrollbar"
   }
 
   function renderAll() {
-    renderMenu(); renderNav(); renderInsp(); renderTl();
+    renderMenu(); renderNav(); renderInsp(); renderTl(); renderPop(); renderDlg();
     document.querySelectorAll(".win .region").forEach((r) => r.classList.toggle("scope-on", r.dataset.scope === st.scope));
-    scopeInd.textContent = "scope: " + { menu: "menu bar", nav: "navigator", insp: "inspector", tl: "timeline strip" }[st.scope];
+    scopeInd.textContent = "scope: " + st.dlg ? "dialog" : { menu: "menu bar", nav: "navigator", insp: "inspector", tl: "timeline strip" }[st.scope];
   }
 
   /* keyboard */
   function scopes() { return st.tlOpen ? ["menu", "nav", "insp", "tl"] : ["menu", "nav", "insp"]; }
   win.addEventListener("keydown", (e) => {
     const k = e.key;
+    if (e.target.id === "inlineEdit") {
+      if (k === "Enter" || k === "Escape") {
+        if (k === "Enter") { st.edit.v = e.target.value; st.edit.dirty = true; }
+        st.edit = null; win.focus(); renderInsp();
+      }
+      e.stopPropagation();
+      return;
+    }
+    if (st.dlg) { e.preventDefault(); dlgKey(e); return; }
+    if (st.pop && k === "Escape") { st.pop = null; renderPop(); return; }
     if (k === "Tab") {
       e.preventDefault();
       const s = scopes();
@@ -912,7 +1307,7 @@ LayoutItem(id="scroll:inspector",      rect=(1036, 52, 6, 520), role="scrollbar"
       if (mi >= 0) { e.preventDefault(); openMenu(mi); }
       return;
     }
-    if (!["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Enter", "Escape"].includes(k)) return;
+    if (!["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Enter", "Escape", "Delete"].includes(k)) return;
     e.preventDefault();
 
     if (st.scope === "menu") {
@@ -943,8 +1338,9 @@ LayoutItem(id="scroll:inspector",      rect=(1036, 52, 6, 520), role="scrollbar"
     }
     if (st.scope === "insp") {
       const items = inspItems();
-      if (k === "ArrowDown") st.inspCur = Math.min(items.length - 1, st.inspCur + 1);
-      else if (k === "ArrowUp") st.inspCur = Math.max(0, st.inspCur - 1);
+      if (k === "Delete") { const it = items[st.inspCur]; if (it.r && it.r.del) openDlg("deleteMarker"); return; }
+      if (k === "ArrowDown") { st.inspCur = Math.min(items.length - 1, st.inspCur + 1); st.btnCur = 0; st.pop = null; }
+      else if (k === "ArrowUp") { st.inspCur = Math.max(0, st.inspCur - 1); st.btnCur = 0; st.pop = null; }
       else if (k === "Escape") st.scope = "nav";
       else if (k === "Enter") { activateInsp(st.inspCur); return; }
       else {
@@ -982,6 +1378,7 @@ LayoutItem(id="scroll:inspector",      rect=(1036, 52, 6, 520), role="scrollbar"
     if (!node) return;
     const id = node.dataset.id;
     st.scope = "nav";
+    if (e.target.dataset.add) { toast("Add layer", TOOL["Add Layer"].msg); return; }
     if (e.target.dataset.tw) { st.expanded.has(id) ? st.expanded.delete(id) : st.expanded.add(id); renderAll(); return; }
     select(id);
   });
@@ -996,10 +1393,12 @@ LayoutItem(id="scroll:inspector",      rect=(1036, 52, 6, 520), role="scrollbar"
   let drag = null;
   inspEl.addEventListener("mousedown", (e) => {
     if (e.target.closest("[data-lock]")) {
-      const p = PAGES[st.sel];
-      p.locked = !p.locked;
-      p.groups.forEach((g) => g.rows.forEach((r) => (r.locked = p.locked)));
-      const f = findNode(st.sel, TREE, []); if (f) f.n.lock = p.locked;
+      const locked = !curPage().locked;
+      [PAGES[st.sel], PROPOSED[st.sel]].filter(Boolean).forEach((p) => {
+        p.locked = locked;
+        p.groups.forEach((g) => g.rows.forEach((r) => (r.locked = locked)));
+      });
+      const f = findNode(st.sel, TREE, []); if (f) f.n.lock = locked;
       renderAll(); return;
     }
     const el = e.target.closest("[data-idx]");
@@ -1007,6 +1406,20 @@ LayoutItem(id="scroll:inspector",      rect=(1036, 52, 6, 520), role="scrollbar"
     const idx = +el.dataset.idx;
     st.scope = "insp"; st.inspCur = idx;
     const it = inspItems()[idx];
+    if (e.target.closest("input")) return;
+    if (st.pop && !(it.r && it.r.k === "colour")) st.pop = null;
+    if (it.r && it.r.k === "text") e.preventDefault();
+    if (it.t === "r" && it.r.k === "btns") {
+      const b = e.target.closest("[data-b]");
+      if (!b) { renderAll(); return; }
+      e.preventDefault();
+      st.btnCur = +b.dataset.b;
+      renderAll();
+      runBtn(it.r, st.btnCur);
+      return;
+    }
+    if (e.target.dataset.del) { renderAll(); openDlg("deleteMarker"); return; }
+    if (it.r && it.r.seek && e.target.closest(".v")) { renderAll(); return; }
     if (it.t === "r" && it.r.k === "num" && !it.r.locked) { drag = { r: it.r, x: e.clientX, acc: 0 }; renderAll(); return; }
     renderAll();
     activateInsp(idx);
@@ -1017,6 +1430,39 @@ LayoutItem(id="scroll:inspector",      rect=(1036, 52, 6, 520), role="scrollbar"
     const it = inspItems()[st.inspCur];
     if (it && it.t === "r") stepRow(it.r, e.offsetX < el.offsetWidth / 2 ? -1 : 1);
   });
+  document.getElementById("dlgHost").addEventListener("mousedown", (e) => {
+    const d = st.dlg;
+    if (!d) return;
+    e.preventDefault();
+    win.focus();
+    const b = e.target.closest("[data-db]");
+    if (b) { closeDlg(d.def.buttons[+b.dataset.db]); return; }
+    const t = e.target.closest("[data-f]");
+    if (t) {
+      const f = d.def.fields.find((x) => x.id === t.dataset.f);
+      d.vals[f.id] = t.dataset.o !== undefined ? +t.dataset.o : (d.vals[f.id] + +t.dataset.step + f.opts.length) % f.opts.length;
+    }
+    const row = e.target.closest("[data-fi]");
+    if (row) d.cur = +row.dataset.fi;
+    renderDlg();
+  });
+  document.getElementById("popHost").addEventListener("mousedown", (e) => {
+    const c = e.target.dataset.c;
+    if (c && st.pop) { st.pop.r.v = c; st.pop.r.dirty = true; renderInsp(); renderPop(); }
+    e.stopPropagation();
+  });
+  document.addEventListener("mousedown", (e) => {
+    if (st.pop && !inspEl.contains(e.target)) { st.pop = null; renderPop(); }
+  });
+  /* Clicking away commits an inline edit, as a desktop text field does. */
+  document.addEventListener("mousedown", (e) => {
+    const input = document.getElementById("inlineEdit");
+    if (!st.edit || !input || e.target === input) return;
+    st.edit.v = input.value;
+    st.edit.dirty = true;
+    st.edit = null;
+    setTimeout(renderInsp, 0);
+  }, true);
   let splitDrag = null;
   ["s1", "s2"].forEach((id) => {
     document.getElementById(id).addEventListener("mousedown", (e) => {
@@ -1060,6 +1506,10 @@ LayoutItem(id="scroll:inspector",      rect=(1036, 52, 6, 520), role="scrollbar"
   const bRects = document.getElementById("btnRects");
   bRects.onclick = () => { const on = !win.classList.contains("rects"); win.classList.toggle("rects", on); bRects.setAttribute("aria-pressed", on); };
 
+  function showActionPage() {
+    st.inspCur = 0; st.btnCur = 0; st.pop = null; st.edit = null; st.dlg = null;
+  }
+
   /* Named views. Hash or cleaveDesign.apply(name). Toolbar clicks do not change the hash. */
   const VIEWS = {
     "shell-split": function () {},
@@ -1080,6 +1530,21 @@ LayoutItem(id="scroll:inspector",      rect=(1036, 52, 6, 520), role="scrollbar"
       win.classList.add("rects");
       bRects.setAttribute("aria-pressed", "true");
     },
+    "actions-timeline": function () { showActionPage(); select("timeline", true); },
+    "actions-layer": function () { showActionPage(); select("layer2", true); },
+    "actions-card": function () { showActionPage(); select("card1", true); },
+    "actions-colour": function () {
+      showActionPage(); select("card1", true);
+      st.inspCur = inspItems().findIndex((it) => it.r && it.r.k === "colour");
+      st.pop = { r: inspItems()[st.inspCur].r, idx: st.inspCur };
+    },
+    "actions-markers": function () { showActionPage(); select("markers", true); },
+    "dialog-generate": function () { showActionPage(); select("timeline", true); openDlg("generate"); },
+    "dialog-snap": function () { showActionPage(); select("timeline", true); openDlg("snap", { target: 2 }); },
+    "dialog-cut-type": function () { showActionPage(); select("timeline", true); openDlg("cutType"); },
+    "dialog-reset": function () { showActionPage(); select("timeline", true); openDlg("reset"); },
+    "dialog-populate": function () { showActionPage(); select("layer2", true); openDlg("populate"); },
+    "dialog-delete-layer": function () { showActionPage(); select("layer2", true); openDlg("deleteLayer"); },
   };
 
   function resetView() {
@@ -1087,6 +1552,7 @@ LayoutItem(id="scroll:inspector",      rect=(1036, 52, 6, 520), role="scrollbar"
     bSplit.setAttribute("aria-pressed", "true");
     bDock.setAttribute("aria-pressed", "false");
     bRects.setAttribute("aria-pressed", "false");
+    showActionPage();
     st.scope = "nav";
     st.expanded = new Set(["render", "overlays", "layers"]);
     st.sel = "layer2";
@@ -1129,7 +1595,7 @@ LayoutItem(id="scroll:inspector",      rect=(1036, 52, 6, 520), role="scrollbar"
       if (it.cmd || it.tl) cls.push("cmd");
       if (it.dis) cls.push("dis");
       const chk = it.tl ? true : it.chk;
-      return '<div class="' + cls.join(" ") + '"><span><span class="chk">' + (chk === true ? "&#10003;" : "") + "</span>" + esc(it.l) + '</span><span class="sc">' + (it.sc || "") + "</span></div>";
+      return '<div class="' + cls.join(" ") + '"><span><span class="chk">' + (chk === true ? "&#10003;" : "") + "</span>" + esc(it.pl || it.l) + '</span><span class="sc">' + (it.sc || "") + "</span></div>";
     }).join("") + "</div>").join("");
 
   /* static: mini before/after */

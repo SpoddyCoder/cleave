@@ -13,7 +13,7 @@ from cleave.viz.row_present_renderers import (
 )
 from cleave.viz.row_spec import row_panel_label
 from cleave.viz.theme import (
-    ACTION,
+    VALUE,
     DISABLED,
     LABEL,
     LOCKED,
@@ -95,12 +95,6 @@ def test_locked_stem_row_uses_locked_color() -> None:
     assert row_value_color_for(state, stem) == LOCKED
 
 
-def test_delete_row_disabled_color_single_layer() -> None:
-    state = _minimal_view_state()
-    delete_row = RowDescriptor(RowKind.LAYER_MANAGEMENT_DELETE, slot="layer_1")
-    assert row_value_color_for(state, delete_row) == DISABLED
-
-
 def test_action_row_value_color() -> None:
     state = _minimal_view_state(
         tracks={
@@ -111,43 +105,8 @@ def test_action_row_value_color() -> None:
     )
     add_row = RowDescriptor(RowKind.LAYER_MANAGEMENT_DELETE, slot="layer_2")
     delete_row = RowDescriptor(RowKind.LAYER_MANAGEMENT_DELETE, slot="layer_1")
-    assert row_value_color_for(state, add_row) == ACTION
-    assert row_value_color_for(state, delete_row) == ACTION
-
-
-def test_snap_to_song_markers_row_uses_action_color() -> None:
-    state = _minimal_view_state(
-        timeline=TimelineBlock(enabled=True),
-    )
-    desc = RowDescriptor(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS)
-    assert row_value_color_for(state, desc) == ACTION
-    text = row_panel_label(desc.kind)
-    assert "▶" not in text
-    assert "▼" not in text
-
-
-def test_apply_cuts_to_cues_rows_use_action_color() -> None:
-    state = _minimal_view_state(
-        timeline=TimelineBlock(
-            enabled=True,
-            hard_cut_fades=TimelineFadeGroupBlock(enabled=True),
-            soft_cut_fades=TimelineFadeGroupBlock(enabled=True),
-        ),
-    )
-    soft_row = RowDescriptor(RowKind.TIMELINE_APPLY_SOFT_CUTS)
-    hard_row = RowDescriptor(RowKind.TIMELINE_APPLY_HARD_CUTS)
-    remove_soft_row = RowDescriptor(RowKind.TIMELINE_REMOVE_SOFT_CUTS)
-    remove_hard_row = RowDescriptor(RowKind.TIMELINE_REMOVE_HARD_CUTS)
-    assert row_value_color_for(state, soft_row) == ACTION
-    assert row_value_color_for(state, hard_row) == ACTION
-    assert row_value_color_for(state, remove_soft_row) == ACTION
-    assert row_value_color_for(state, remove_hard_row) == ACTION
-    assert "Remove from Cues" in row_panel_label(remove_soft_row.kind)
-    assert "Remove from Cues" in row_panel_label(remove_hard_row.kind)
-    for desc in (soft_row, hard_row):
-        text = row_panel_label(desc.kind)
-        assert "▶" not in text
-        assert "▼" not in text
+    assert row_value_color_for(state, add_row) == VALUE
+    assert row_value_color_for(state, delete_row) == VALUE
 
 
 def test_display_size_row_uses_label_color() -> None:
@@ -166,14 +125,7 @@ def test_preset_list_populate_uses_action_color() -> None:
         },
     )
     populate_row = RowDescriptor(RowKind.TRACK_PRESET_LIST_POPULATE, slot="layer_1")
-    assert row_value_color_for(state, populate_row) == ACTION
-
-
-def test_disabled_action_row_stays_disabled() -> None:
-    state = _minimal_view_state()
-    delete_row = RowDescriptor(RowKind.LAYER_MANAGEMENT_DELETE, slot="layer_1")
-    state.focus_descriptor = delete_row
-    assert row_value_color_for(state, delete_row) == DISABLED
+    assert row_value_color_for(state, populate_row) == VALUE
 
 
 def _inspector_kinds(state, node_id: str) -> list[RowKind]:

@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 import pygame
 import pytest
 
+from cleave.viz.inline_edit import InlineEditController
 from cleave.viz.commands import (
     MENUS,
     SEPARATOR,
@@ -840,12 +841,11 @@ def test_open_menu_ink_matches_the_mock() -> None:
     from cleave.viz import imgui_host
     from cleave.viz.shell_layout import ShellLayout
     from cleave.viz.theme import (
-        ACTION,
+        VALUE,
         BACKGROUND,
         HIGHLIGHT,
         LABEL,
         MUTED,
-        VALUE,
     )
 
     overlay = _Overlay()
@@ -884,11 +884,11 @@ def test_open_menu_ink_matches_the_mock() -> None:
         title_ink = _ink_on_fill(bar, ink, gold)
         row_ink = _ink_on_fill(popup, ink, gold)
         scope = _draw_list_has_color(transport, gold)
-        unfocused_check = _draw_list_has_color(popup, _color_u32(ACTION))
+        unfocused_check = _draw_list_has_color(popup, _color_u32(VALUE))
         unfocused_shortcut = _draw_list_has_color(popup, _color_u32(MUTED))
         unfocused_label = _draw_list_has_color(popup, _color_u32(VALUE))
         idle_title = _draw_list_has_color(bar, _color_u32(LABEL))
-        check_on_current = _ink_on_fill(popup, _color_u32(ACTION), gold)
+        check_on_current = _ink_on_fill(popup, _color_u32(VALUE), gold)
         shortcut_on_current = _ink_on_fill(popup, _color_u32(MUTED), gold)
         menu.item_index = 1
         lists = _paint_shell(host, menu, ctx)
@@ -1024,7 +1024,7 @@ def test_focused_inspector_label_is_highlight() -> None:
     )
     rows = build_inspector_rows(view, "post_fx.fade")
     group = next(row for row in rows if row.is_heading)
-    field = next(row for row in rows if not row.is_heading and row.command_id is None)
+    field = next(row for row in rows if not row.is_heading and not row.command_ids)
     focus = ShellFocusState(
         region=ShellRegion.INSPECTOR,
         selected_id="post_fx.fade",
@@ -1037,6 +1037,7 @@ def test_focused_inspector_label_is_highlight() -> None:
     controls.build_view_state = lambda **_kwargs: None
     controls.focus_cursor = None
     controls.shell_focus = focus
+    controls.inline_edit = InlineEditController()
     controls.inspector = SimpleNamespace(
         focus_row=lambda *_args, **_kwargs: None,
         activate=lambda *_args, **_kwargs: None,
@@ -1156,6 +1157,7 @@ def test_preset_row_draws_two_lines_and_fits_the_filename() -> None:
     heights: dict[str, float] = {}
 
     with patch.object(imgui_host, "_gl_context_current", return_value=False):
+        controls.inline_edit = InlineEditController()
         host = _open_shell(overlay, menu, controls)
     try:
         host.imgui.display_size = (1280, 720)
@@ -1233,6 +1235,7 @@ def test_directory_nav_button_press_skips_the_row_action(
     )
     controls.inspector = MagicMock()
     controls.layer_mutations = MagicMock()
+    controls.inline_edit = InlineEditController()
     controls.value_nudge = SimpleNamespace(armed=False, desc=None, forward=False)
     controls.session.layers = {slot: SimpleNamespace(locked=False, stem="drums")}
     controls.session.layer_z_order = (slot,)

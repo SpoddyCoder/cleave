@@ -128,12 +128,25 @@ _LAYER_JUMP_ACTION = "jump to layer"
 
 _CURATION_LAYER_SECTION = HelpSection("Layer", ())
 
+_ENTER_AFFORDANCES = frozenset(
+    {
+        RowAffordance.COMMAND,
+        RowAffordance.VALUE_TEXT,
+        RowAffordance.VALUE_COLOUR,
+    }
+)
+
 _INSPECTOR_COMMAND_KINDS = {
     "layers.add": RowKind.LAYER_MANAGEMENT_ADD,
     "layers.delete": RowKind.LAYER_MANAGEMENT_DELETE,
-    "timeline.apply_preset": RowKind.TIMELINE_PRESETS,
+    "layers.add_current_preset": RowKind.TRACK_PRESET_LIST_ADD,
+    "layers.populate_presets": RowKind.TRACK_PRESET_LIST_POPULATE,
+    "layers.resume_switching": RowKind.TRACK_PRESET_SWITCHING_RESUME,
+    "timeline.generate": RowKind.TIMELINE_GENERATE,
     "timeline.reset": RowKind.TIMELINE_RESET,
     "timeline.snap_cues": RowKind.TIMELINE_SNAP_CUES,
+    "timeline.snap_to_markers": RowKind.TIMELINE_SNAP_CUES,
+    "timeline.set_cut_type": RowKind.TIMELINE_SET_CUT_TYPE,
 }
 
 
@@ -416,14 +429,14 @@ def sections_for(
     elif row_kind == RowKind.LAYER_MANAGEMENT_ADD:
         primary = HelpSection(
             behavior.help_title or "Add Layer",
-            (("Enter", "confirm add"),),
+            (("Enter", "add layer"),),
         )
     elif row_kind == RowKind.LAYER_MANAGEMENT_DELETE:
         primary = HelpSection(
             behavior.help_title or "Delete layer",
-            (("Enter/Delete", "confirm delete"),),
+            (("Enter/Delete", "delete layer"),),
         )
-    elif behavior.affordance == RowAffordance.ACTION:
+    elif behavior.affordance in _ENTER_AFFORDANCES:
         primary = HelpSection(
             behavior.help_title or "Edit",
             behavior.help_entries or (),

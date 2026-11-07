@@ -179,12 +179,13 @@ class PresetCurationController:
         root = favourites_root(self._preset_root)
         subdirs = list_destination_subdirs(root)
         if not subdirs:
-            self._modal.prompt_yes_no(
+            self._modal.prompt_confirm(
                 message,
-                on_confirm=lambda: self._confirm_favourite(
+                "Favourite",
+                lambda: self._confirm_favourite(
                     slot, src, root, relocating=relocating
                 ),
-                on_cancel=lambda: self._unlock_preset(slot),
+                lambda: self._unlock_preset(slot),
             )
             return
 
@@ -229,16 +230,17 @@ class PresetCurationController:
         root = blacklist_root(self._preset_root)
         subdirs = list_destination_subdirs(root)
         if not subdirs:
-            self._modal.prompt_yes_no(
+            self._modal.prompt_confirm(
                 message,
-                on_confirm=lambda: self._confirm_blacklist(
+                "Blacklist",
+                lambda: self._confirm_blacklist(
                     slot,
                     src,
                     root,
                     from_user_preset=from_user_preset,
                     relocating=relocating,
                 ),
-                on_cancel=lambda: self._unlock_preset(slot),
+                lambda: self._unlock_preset(slot),
             )
             return
 
@@ -365,10 +367,12 @@ class PresetCurationController:
 
     def _prompt_remove_favourite(self, slot: str, src: Path) -> None:
         self._lock_preset(slot)
-        self._modal.prompt_yes_no(
+        self._modal.prompt_confirm(
             f"Remove favourite: {src.name}?",
-            on_confirm=lambda: self._confirm_remove_favourite(slot, src),
-            on_cancel=lambda: self._unlock_preset(slot),
+            "Remove favourite",
+            lambda: self._confirm_remove_favourite(slot, src),
+            lambda: self._unlock_preset(slot),
+            destructive=True,
         )
 
     def _confirm_remove_favourite(self, slot: str, src: Path) -> None:
@@ -382,10 +386,12 @@ class PresetCurationController:
 
     def _prompt_remove_cast(self, slot: str, src: Path, role: CueRole) -> None:
         self._lock_preset(slot)
-        self._modal.prompt_yes_no(
+        self._modal.prompt_confirm(
             f"Remove cast ({role})?",
-            on_confirm=lambda: self._confirm_remove_cast(slot, src, role),
-            on_cancel=lambda: self._unlock_preset(slot),
+            "Remove cast",
+            lambda: self._confirm_remove_cast(slot, src, role),
+            lambda: self._unlock_preset(slot),
+            destructive=True,
         )
 
     def _confirm_remove_cast(self, slot: str, src: Path, role: CueRole) -> None:
@@ -419,10 +425,11 @@ class PresetCurationController:
 
     def _prompt_restore_blacklist(self, slot: str, src: Path) -> None:
         self._lock_preset(slot)
-        self._modal.prompt_yes_no(
+        self._modal.prompt_confirm(
             f"Restore blacklisted preset: {src.name}?",
-            on_confirm=lambda: self._confirm_restore_blacklist(slot, src),
-            on_cancel=lambda: self._unlock_preset(slot),
+            "Restore preset",
+            lambda: self._confirm_restore_blacklist(slot, src),
+            lambda: self._unlock_preset(slot),
         )
 
     def _confirm_restore_blacklist(self, slot: str, src: Path) -> None:

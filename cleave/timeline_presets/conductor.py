@@ -91,16 +91,6 @@ def timeline_preset_conductor_display(conductor: bool) -> str:
     return "on" if conductor else "off"
 
 
-def cycle_timeline_preset_conductor(value: bool, *, forward: bool) -> bool:
-    options = (False, True)
-    try:
-        index = options.index(bool(value))
-    except ValueError:
-        index = options.index(DEFAULT_TIMELINE_PRESET_CONDUCTOR)
-    delta = 1 if forward else -1
-    return options[(index + delta) % len(options)]
-
-
 class StemConductor:
     def __init__(
         self,

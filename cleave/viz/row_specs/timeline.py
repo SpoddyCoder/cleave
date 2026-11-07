@@ -24,41 +24,10 @@ from cleave.timeline_presets import (
     TIMELINE_PRESET_HELP_ENTRIES,
     TIMELINE_RESET_HELP_ENTRIES,
 )
-from cleave.timeline_presets.characters import (
-    cycle_timeline_preset_kind,
-    timeline_preset_kind_display,
-)
-from cleave.timeline_presets.conductor import (
-    cycle_timeline_preset_conductor,
-    timeline_preset_conductor_display,
-)
-from cleave.timeline_presets.cue_snap import (
-    cycle_timeline_preset_cue_snap,
-    timeline_preset_cue_snap_display,
-)
-from cleave.timeline_presets.density import (
-    cycle_timeline_preset_density,
-    timeline_preset_density_display,
-)
-from cleave.timeline_presets.mode import (
-    cycle_timeline_preset_mode,
-    timeline_preset_mode_display,
-)
-from cleave.timeline_presets.repopulate import (
-    cycle_timeline_preset_repopulate,
-    timeline_preset_repopulate_display,
-)
-from cleave.timeline_presets.song_marker_snap import (
-    cycle_timeline_preset_song_marker_snap,
-    timeline_preset_song_marker_snap_display,
-)
-from cleave.timeline_presets.timeline_cuts import (
-    cycle_timeline_preset_timeline_cuts,
-    timeline_preset_timeline_cuts_display,
-)
 from cleave.viz.commands import command_by_id
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
-from cleave.viz.row_spec import FitStrategy, RowPresentStyle, RowSpec
+from cleave.viz.material_icons import DELETE_GLYPH
+from cleave.viz.row_spec import FitStrategy, RowNavButton, RowPresentStyle, RowSpec
 from cleave.viz.row_specs.common import lock_text, on_off_text
 from cleave.viz.tuning_view_state import TuningViewState
 
@@ -105,154 +74,6 @@ def _apply_timeline_placement_snap(
     tl = controls.session.timeline
     tl.placement_snap = cycle_timeline_placement_snap(
         tl.placement_snap,
-        forward=forward,
-    )
-
-def _format_timeline_preset_character(
-    state: TuningViewState, _desc: RowDescriptor
-) -> str:
-    return timeline_preset_kind_display(state.timeline.timeline_preset_kind)
-
-def _apply_timeline_preset_character(
-    controls: TuningControls,
-    _desc: RowDescriptor,
-    forward: bool,
-    _large: bool,
-) -> None:
-    tl = controls.session.timeline
-    tl.timeline_preset_kind = cycle_timeline_preset_kind(
-        tl.timeline_preset_kind,
-        forward=forward,
-    )
-
-def _format_timeline_preset_density(
-    state: TuningViewState, _desc: RowDescriptor
-) -> str:
-    return timeline_preset_density_display(
-        state.timeline.timeline_preset_density
-    )
-
-def _apply_timeline_preset_density(
-    controls: TuningControls,
-    _desc: RowDescriptor,
-    forward: bool,
-    _large: bool,
-) -> None:
-    tl = controls.session.timeline
-    tl.timeline_preset_density = cycle_timeline_preset_density(
-        tl.timeline_preset_density,
-        forward=forward,
-    )
-
-def _format_timeline_preset_cue_snap(
-    state: TuningViewState, _desc: RowDescriptor
-) -> str:
-    return timeline_preset_cue_snap_display(
-        state.timeline.timeline_preset_cue_snap
-    )
-
-def _apply_timeline_preset_cue_snap(
-    controls: TuningControls,
-    _desc: RowDescriptor,
-    forward: bool,
-    _large: bool,
-) -> None:
-    tl = controls.session.timeline
-    tl.timeline_preset_cue_snap = cycle_timeline_preset_cue_snap(
-        tl.timeline_preset_cue_snap,
-        forward=forward,
-    )
-
-def _format_timeline_preset_song_marker_snap(
-    state: TuningViewState, _desc: RowDescriptor
-) -> str:
-    return timeline_preset_song_marker_snap_display(
-        state.timeline.timeline_preset_song_marker_snap
-    )
-
-def _apply_timeline_preset_song_marker_snap(
-    controls: TuningControls,
-    _desc: RowDescriptor,
-    forward: bool,
-    _large: bool,
-) -> None:
-    tl = controls.session.timeline
-    tl.timeline_preset_song_marker_snap = cycle_timeline_preset_song_marker_snap(
-        tl.timeline_preset_song_marker_snap,
-        forward=forward,
-    )
-
-def _format_timeline_preset_timeline_cuts(
-    state: TuningViewState, _desc: RowDescriptor
-) -> str:
-    return timeline_preset_timeline_cuts_display(
-        state.timeline.timeline_preset_timeline_cuts
-    )
-
-def _apply_timeline_preset_timeline_cuts(
-    controls: TuningControls,
-    _desc: RowDescriptor,
-    forward: bool,
-    _large: bool,
-) -> None:
-    tl = controls.session.timeline
-    tl.timeline_preset_timeline_cuts = cycle_timeline_preset_timeline_cuts(
-        tl.timeline_preset_timeline_cuts,
-        forward=forward,
-    )
-
-def _format_timeline_preset_repopulate(
-    state: TuningViewState, _desc: RowDescriptor
-) -> str:
-    return timeline_preset_repopulate_display(
-        state.timeline.timeline_preset_repopulate
-    )
-
-def _apply_timeline_preset_repopulate(
-    controls: TuningControls,
-    _desc: RowDescriptor,
-    forward: bool,
-    _large: bool,
-) -> None:
-    tl = controls.session.timeline
-    tl.timeline_preset_repopulate = cycle_timeline_preset_repopulate(
-        tl.timeline_preset_repopulate,
-        forward=forward,
-    )
-
-def _format_timeline_preset_conductor(
-    state: TuningViewState, _desc: RowDescriptor
-) -> str:
-    return timeline_preset_conductor_display(
-        state.timeline.timeline_preset_conductor
-    )
-
-def _apply_timeline_preset_conductor(
-    controls: TuningControls,
-    _desc: RowDescriptor,
-    forward: bool,
-    _large: bool,
-) -> None:
-    tl = controls.session.timeline
-    tl.timeline_preset_conductor = cycle_timeline_preset_conductor(
-        tl.timeline_preset_conductor,
-        forward=forward,
-    )
-
-def _format_timeline_preset_mode(
-    state: TuningViewState, _desc: RowDescriptor
-) -> str:
-    return timeline_preset_mode_display(state.timeline.timeline_preset_mode)
-
-def _apply_timeline_preset_mode(
-    controls: TuningControls,
-    _desc: RowDescriptor,
-    forward: bool,
-    _large: bool,
-) -> None:
-    tl = controls.session.timeline
-    tl.timeline_preset_mode = cycle_timeline_preset_mode(
-        tl.timeline_preset_mode,
         forward=forward,
     )
 
@@ -437,8 +258,14 @@ def _section_lock_blocks(controls: TuningControls, desc: RowDescriptor) -> bool:
     return section_lock_blocks_mutation(controls.session, desc)
 
 
-def _apply_timeline_presets(controls: TuningControls, _desc: RowDescriptor) -> None:
-    command_by_id("timeline.apply_preset").run(controls)
+def _apply_timeline_generate(controls: TuningControls, _desc: RowDescriptor) -> None:
+    command_by_id("timeline.generate").run(controls)
+
+
+def _apply_timeline_set_cut_type(
+    controls: TuningControls, _desc: RowDescriptor
+) -> None:
+    command_by_id("timeline.set_cut_type").run(controls)
 
 
 def _apply_timeline_reset(controls: TuningControls, _desc: RowDescriptor) -> None:
@@ -449,30 +276,13 @@ def _apply_timeline_snap_cues(controls: TuningControls, _desc: RowDescriptor) ->
     command_by_id("timeline.snap_cues").run(controls)
 
 
-def _apply_timeline_soft_cuts(controls: TuningControls, desc: RowDescriptor) -> None:
-    if _section_lock_blocks(controls, desc):
-        return
-    controls.prompt_apply_soft_cuts()
+def _always_available(_state: TuningViewState, _desc: RowDescriptor) -> bool:
+    return True
 
 
-def _apply_timeline_hard_cuts(controls: TuningControls, desc: RowDescriptor) -> None:
-    if _section_lock_blocks(controls, desc):
-        return
-    controls.prompt_apply_hard_cuts()
-
-
-def _apply_timeline_remove_cuts(controls: TuningControls, desc: RowDescriptor) -> None:
-    if _section_lock_blocks(controls, desc):
-        return
-    controls.prompt_remove_timeline_cuts()
-
-
-def _apply_timeline_snap_to_song_markers(
-    controls: TuningControls, desc: RowDescriptor
-) -> None:
-    if _section_lock_blocks(controls, desc):
-        return
-    controls.prompt_snap_cues_to_song_markers()
+def _delete_song_marker(controls: TuningControls, desc: RowDescriptor) -> None:
+    if desc.marker_index is not None:
+        controls.song_markers.prompt_delete(desc.marker_index)
 
 
 def _apply_song_marker_item(controls: TuningControls, desc: RowDescriptor) -> None:
@@ -548,156 +358,45 @@ SPECS: dict[RowKind, RowSpec] = {
         help_description=("Locked timeline settings cannot be edited.",),
         blocked_by_section_lock=False,
     ),
-    RowKind.TIMELINE_PRESETS_HEADER: RowSpec(
-        affordance=RowAffordance.HEADING,
-        panel_label="timeline preset",
-        present_style=RowPresentStyle.HEADING,
+    RowKind.TIMELINE_GENERATE: RowSpec(
+        affordance=RowAffordance.COMMAND,
+        panel_label="Generate timeline...",
+        present_style=RowPresentStyle.FULL_LINE,
+        apply_action=_apply_timeline_generate,
         fit_strategy=FitStrategy.NONE,
-        help_title="Timeline preset",
+        help_title="Generate timeline",
+        help_entries=(("Enter", "open generate dialog"),),
         help_description=(
-            "Stage character, density, re-populate, conductor, and mode,",
-            "then apply a randomly generated timeline preset. Overwrites the current timeline.",
-        ),
-    ),
-    RowKind.TIMELINE_PRESET_CHARACTER: RowSpec(
-        affordance=RowAffordance.VALUE_STEP,
-        panel_label="character",
-        present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_timeline_preset_character,
-        apply_horizontal=_apply_timeline_preset_character,
-        help_title="Character",
-        help_entries=(("Left/Right", "cycle character"),),
-        help_description=(
-            "Procedural timeline character used when applying a preset.",
-            "Song markers favour cue placement; crescendo types build crescendos.",
+            "Build a new timeline from character, density, snaps, cuts,",
+            "re-populate, conductor, and mode. Replaces the current cues.",
+            "Crescendo song markers build crescendos.",
+            "The dialog remembers its values in the project.",
         ),
         help_mode_entries=TIMELINE_PRESET_HELP_ENTRIES,
         blocked_by_section_lock=True,
     ),
-    RowKind.TIMELINE_PRESET_DENSITY: RowSpec(
-        affordance=RowAffordance.VALUE_STEP,
-        panel_label="density",
-        present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_timeline_preset_density,
-        apply_horizontal=_apply_timeline_preset_density,
-        help_title="Density",
-        help_entries=(("Left/Right", "cycle density"),),
-        help_description=(
-            "How aggressively the generator favors denser layer stacks.",
-            "Normal matches the default stack-cost ramp for the layer count.",
-        ),
-        blocked_by_section_lock=True,
-    ),
-    RowKind.TIMELINE_PRESET_CUE_SNAP: RowSpec(
-        affordance=RowAffordance.VALUE_STEP,
-        panel_label="cue snap",
-        present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_timeline_preset_cue_snap,
-        apply_horizontal=_apply_timeline_preset_cue_snap,
-        help_title="Cue snap",
-        help_entries=(("Left/Right", "cycle cue snap"),),
-        help_description=(
-            "After build, snap cues to the beat or bar grid.",
-            "None leaves cue times from the generator unchanged.",
-        ),
-        blocked_by_section_lock=True,
-    ),
-    RowKind.TIMELINE_PRESET_SONG_MARKER_SNAP: RowSpec(
-        affordance=RowAffordance.VALUE_STEP,
-        panel_label="song marker snap",
-        present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_timeline_preset_song_marker_snap,
-        apply_horizontal=_apply_timeline_preset_song_marker_snap,
-        help_title="Song marker snap",
-        help_entries=(("Left/Right", "cycle song marker snap proximity"),),
-        help_description=(
-            "After cue snap, pull nearby cues onto song markers.",
-            "Applies each_layer scope across all slots; none skips.",
-        ),
-        blocked_by_section_lock=True,
-    ),
-    RowKind.TIMELINE_PRESET_TIMELINE_CUTS: RowSpec(
-        affordance=RowAffordance.VALUE_STEP,
-        panel_label="timeline cuts",
-        present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_timeline_preset_timeline_cuts,
-        apply_horizontal=_apply_timeline_preset_timeline_cuts,
-        help_title="Timeline cuts",
-        help_entries=(("Left/Right", "cycle timeline cuts"),),
-        help_description=(
-            "After snaps, assign hard/soft cut types to cues.",
-            "By marker sets soft everywhere then hard on song markers.",
-        ),
-        blocked_by_section_lock=True,
-    ),
-    RowKind.TIMELINE_PRESET_REPOPULATE: RowSpec(
-        affordance=RowAffordance.VALUE_STEP,
-        panel_label="re-populate preset lists",
-        present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_timeline_preset_repopulate,
-        apply_horizontal=_apply_timeline_preset_repopulate,
-        help_title="Re-populate Preset Lists",
-        help_entries=(("Left/Right", "cycle re-populate mode"),),
-        help_description=(
-            "When Apply runs, optionally rebuild preset lists on layers with",
-            "timeline-trigger switching: cue roles, directory random, or",
-            "directory sequential. Choose no to leave lists unchanged.",
-        ),
-        blocked_by_section_lock=True,
-    ),
-    RowKind.TIMELINE_PRESET_CONDUCTOR: RowSpec(
-        affordance=RowAffordance.VALUE_STEP,
-        panel_label="conductor",
-        present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_timeline_preset_conductor,
-        apply_horizontal=_apply_timeline_preset_conductor,
-        help_title="Conductor",
-        help_entries=(("Left/Right", "toggle conductor on/off"),),
-        help_description=(
-            "When on, stem energy shapes motif casting and cue levels.",
-            "Requires project signals; otherwise apply skips the conductor.",
-        ),
-        blocked_by_section_lock=True,
-    ),
-    RowKind.TIMELINE_PRESET_MODE: RowSpec(
-        affordance=RowAffordance.VALUE_STEP,
-        panel_label="mode",
-        present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_timeline_preset_mode,
-        apply_horizontal=_apply_timeline_preset_mode,
-        help_title="Mode",
-        help_entries=(("Left/Right", "cycle layers / pattern mask"),),
-        help_description=(
-            "Layers uses the stacked timeline. Pattern mask enables",
-            "render pattern mask with strips on Apply.",
-        ),
-        blocked_by_section_lock=True,
-    ),
-    RowKind.TIMELINE_PRESETS: RowSpec(
-        affordance=RowAffordance.ACTION,
-        panel_label="Apply Timeline Preset",
+    RowKind.TIMELINE_SET_CUT_TYPE: RowSpec(
+        affordance=RowAffordance.COMMAND,
+        panel_label="Set cut type...",
         present_style=RowPresentStyle.FULL_LINE,
-        apply_action=_apply_timeline_presets,
+        apply_action=_apply_timeline_set_cut_type,
         fit_strategy=FitStrategy.NONE,
-        shows_enter_icon=True,
-        help_title="Apply Timeline Preset",
-        help_entries=(("Enter", "apply timeline preset"),),
+        help_title="Set cut type",
+        help_entries=(("Enter", "open set cut type dialog"),),
         help_description=(
-            "Apply the staged character, density, snaps, cuts, re-populate,",
-            "conductor, and mode. Crescendo song markers build crescendos.",
-            "Overwrites the timeline.",
+            "Set hard, soft, or no cut on all cues, on song marker cues,",
+            "or on all cues except song markers.",
         ),
         blocked_by_section_lock=True,
     ),
     RowKind.TIMELINE_RESET: RowSpec(
-        affordance=RowAffordance.ACTION,
-        panel_label="Reset Timeline",
+        affordance=RowAffordance.COMMAND,
+        panel_label="Reset timeline...",
         present_style=RowPresentStyle.FULL_LINE,
         apply_action=_apply_timeline_reset,
         fit_strategy=FitStrategy.NONE,
-        shows_enter_icon=True,
-        help_title="Reset Timeline",
-        help_entries=(("Enter", "reset timeline"),),
+        help_title="Reset timeline",
+        help_entries=(("Enter", "open reset dialog"),),
         help_description=(
             "Clear all timeline cues and set every layer",
             "on or off for the whole track.",
@@ -766,30 +465,16 @@ SPECS: dict[RowKind, RowSpec] = {
         blocked_by_section_lock=True,
     ),
     RowKind.TIMELINE_SNAP_CUES: RowSpec(
-        affordance=RowAffordance.ACTION,
-        panel_label="Snap Cues",
+        affordance=RowAffordance.COMMAND,
+        panel_label="Snap cues...",
         present_style=RowPresentStyle.FULL_LINE,
         apply_action=_apply_timeline_snap_cues,
         fit_strategy=FitStrategy.NONE,
-        shows_enter_icon=True,
-        help_title="Snap Cues",
-        help_entries=(("Enter", "snap cues to beats or bars"),),
+        help_title="Snap cues",
+        help_entries=(("Enter", "open snap dialog"),),
         help_description=(
-            "Snap all timeline cues to the nearest beat or bar.",
-        ),
-        blocked_by_section_lock=True,
-    ),
-    RowKind.TIMELINE_SNAP_TO_SONG_MARKERS: RowSpec(
-        affordance=RowAffordance.ACTION,
-        panel_label="Snap Cues",
-        present_style=RowPresentStyle.FULL_LINE,
-        apply_action=_apply_timeline_snap_to_song_markers,
-        fit_strategy=FitStrategy.NONE,
-        shows_enter_icon=True,
-        help_title="Snap Cues",
-        help_entries=(("Enter", "snap cues to song markers"),),
-        help_description=(
-            "Pull closest cues within proximity onto song markers.",
+            "Snap timeline cues to the nearest beat or bar,",
+            "or pull cues within proximity onto song markers.",
         ),
         blocked_by_section_lock=True,
     ),
@@ -929,62 +614,6 @@ SPECS: dict[RowKind, RowSpec] = {
         repeatable=True,
         blocked_by_section_lock=True,
     ),
-    RowKind.TIMELINE_APPLY_SOFT_CUTS: RowSpec(
-        affordance=RowAffordance.ACTION,
-        panel_label="Apply to Cues",
-        present_style=RowPresentStyle.FULL_LINE,
-        apply_action=_apply_timeline_soft_cuts,
-        fit_strategy=FitStrategy.NONE,
-        shows_enter_icon=True,
-        help_title="Apply to Cues",
-        help_entries=(("Enter", "apply soft cuts"),),
-        help_description=(
-            "Set cut type soft on all cues, song-marker cues, or all except markers.",
-        ),
-        blocked_by_section_lock=True,
-    ),
-    RowKind.TIMELINE_APPLY_HARD_CUTS: RowSpec(
-        affordance=RowAffordance.ACTION,
-        panel_label="Apply to Cues",
-        present_style=RowPresentStyle.FULL_LINE,
-        apply_action=_apply_timeline_hard_cuts,
-        fit_strategy=FitStrategy.NONE,
-        shows_enter_icon=True,
-        help_title="Apply to Cues",
-        help_entries=(("Enter", "apply hard cuts"),),
-        help_description=(
-            "Set cut type hard on all cues, song-marker cues, or all except markers.",
-        ),
-        blocked_by_section_lock=True,
-    ),
-    RowKind.TIMELINE_REMOVE_SOFT_CUTS: RowSpec(
-        affordance=RowAffordance.ACTION,
-        panel_label="Remove from Cues",
-        present_style=RowPresentStyle.FULL_LINE,
-        apply_action=_apply_timeline_remove_cuts,
-        fit_strategy=FitStrategy.NONE,
-        shows_enter_icon=True,
-        help_title="Remove from Cues",
-        help_entries=(("Enter", "remove soft cuts"),),
-        help_description=(
-            "Set cut type none on all cues, song-marker cues, or all except markers.",
-        ),
-        blocked_by_section_lock=True,
-    ),
-    RowKind.TIMELINE_REMOVE_HARD_CUTS: RowSpec(
-        affordance=RowAffordance.ACTION,
-        panel_label="Remove from Cues",
-        present_style=RowPresentStyle.FULL_LINE,
-        apply_action=_apply_timeline_remove_cuts,
-        fit_strategy=FitStrategy.NONE,
-        shows_enter_icon=True,
-        help_title="Remove from Cues",
-        help_entries=(("Enter", "remove hard cuts"),),
-        help_description=(
-            "Set cut type none on all cues, song-marker cues, or all except markers.",
-        ),
-        blocked_by_section_lock=True,
-    ),
     RowKind.SONG_MARKERS_HEADER: RowSpec(
         affordance=RowAffordance.HEADING,
         panel_label="song markers",
@@ -998,14 +627,16 @@ SPECS: dict[RowKind, RowSpec] = {
         ),
     ),
     RowKind.SONG_MARKER_ITEM: RowSpec(
-        affordance=RowAffordance.ACTION,
+        affordance=RowAffordance.VALUE_STEP,
         panel_label="",
         present_style=RowPresentStyle.FULL_LINE,
         format_value=_format_song_marker_item,
+        nav_buttons=(
+            RowNavButton(DELETE_GLYPH, _always_available, _delete_song_marker),
+        ),
         apply_horizontal=_apply_song_marker_type,
         apply_action=_apply_song_marker_item,
         fit_strategy=FitStrategy.NONE,
-        shows_enter_icon=True,
         help_title="Song marker",
         help_entries=(
             ("Enter", "seek to marker"),

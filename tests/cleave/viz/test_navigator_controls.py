@@ -55,7 +55,7 @@ def test_enter_on_pages_focuses_first_navigable_row() -> None:
         "overlay.opening_card",
         "post_fx.fade",
         "pattern_mask",
-        "timeline.song_markers",
+        "timeline.grid",
         layer_page_node_id("layer_1", "compositing"),
     ):
         controls.navigator.select(node_id)

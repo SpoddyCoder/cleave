@@ -22,7 +22,7 @@ A new field is a page child or a command. Pages are `SectionDef`s in `row_sectio
 - Overlay: `OVERLAY_PAGE_SECTION`, `OVERLAY_OPENING_CARD_SECTION`, `OVERLAY_CLOSING_CARD_SECTION`
 - Post-FX: `POST_FX_PAGE_SECTION`, `POST_FX_FADE_SECTION`, `POST_FX_HIGHLIGHT_ROLLOFF_SECTION`, `POST_FX_CHROMA_BOOST_SECTION`, `POST_FX_LIMITER_SECTION`
 - Pattern Mask: `PATTERN_MASK_SECTION`
-- Timeline: `TIMELINE_PAGE_SECTION`, `BEAT_BAR_GRID_SECTION`, `TIMELINE_CUTS_SECTION`, `SONG_MARKERS_SECTION`, `TIMELINE_PRESETS_SECTION`
+- Timeline: `TIMELINE_PAGE_SECTION`, `BEAT_BAR_GRID_SECTION`, `TIMELINE_CUTS_SECTION`, `SONG_MARKERS_SECTION`
 - Layers: `LAYERS_SECTION`, and per layer `TRACK_SECTION` (preset curation uses `CURATION_LAYER_SECTION`), `TRACK_PRESET_SWITCHING_SECTION`, `TRACK_COMPOSITING_SECTION`, `TRACK_EFFECTS_SECTION`
 
 A new page needs a navigator entry in `navigator.py`, a section mapping in `inspector.py`, and a header mapping in `row_hotkeys.py`.
@@ -37,9 +37,13 @@ The timeline strip stays its own host in `timeline_overlay.py`. Cue blocks are e
 
 ## Parameterized actions
 
-When an action needs parameters, keep the inspector row as a plain `ACTION` line. On Enter, chain one modal per parameter, then apply.
+The inspector holds live properties. Commands are buttons. A command that needs parameters opens one dialog, and its label ends in "...". Nothing in the inspector waits for a later Apply.
 
-Exception: timeline preset parameters live as value rows on the Timeline Preset page. Apply confirms with Yes/Cancel and lists staged choices as `labeled_lines`.
+A button is a command in `commands.py`, placed with `SectionNode(commands=...)` or `SectionDef.trailing_commands`. Commands that have no menu row go in `_INSPECTOR_COMMANDS`. `help_content._INSPECTOR_COMMAND_KINDS` maps a command to the `RowAffordance.COMMAND` row that holds its help text.
+
+Dialogs with parameters use `ModalHost.prompt_form` with a `FormSpec`. Fields edit draft values, so Cancel needs no restore. Use `info` to show what the draft would affect, from a dry run. Confirm-only dialogs use `prompt_confirm` with a verb label; `destructive=True` fills the button red and starts on Cancel.
+
+Text and colour properties are `VALUE_TEXT` and `VALUE_COLOUR` rows. They edit in place through `controls.inline_edit`, which owns the keyboard while active. Multi-line text keeps the text modal. Bulk timeline commands record through `TimelineHistory.recording`.
 
 ## Enabled gates the frame path
 
@@ -47,12 +51,12 @@ Exception: timeline preset parameters live as value rows on the Timeline Preset 
 
 ## Typography
 
-Colors live in `cleave/viz/theme.py`. Use existing roles (`LABEL`, `VALUE`, `ACTION`, `DISABLED`, `MUTED`, `LOCKED`) plus the accent constants already there. Do not invent a new color without adding a theme constant.
+Colors live in `cleave/viz/theme.py`. Use existing roles (`LABEL`, `VALUE`, `DISABLED`, `MUTED`, `LOCKED`) plus the accent constants already there. Do not invent a new color without adding a theme constant.
 
-Label+value rows: prefix in `LABEL`, value in the row value color. Exceptions (single-color action rows, settings and project headers, transport, notifications, modals) are deliberate; match nearby rows.
+Label+value rows: prefix in `LABEL`, value in the row value color. Exceptions (settings and project headers, transport, notifications, modals) are deliberate; match nearby rows.
 
 ## Keyboard dispatch
 
-Layered in `input_dispatch.py`. Modal keys first. Then Tab / Shift+Tab cycles Menu, Navigator, Inspector, and Timeline. Timeline is skipped when the strip is closed. Then the menu bar, command shortcuts, and Ctrl+Up / Ctrl+Down (previous / next top-level navigator node; no effect while the menu bar is focused). Navigator and inspector own their arrows, Enter, Esc, and PageUp/PageDown. An open strip does not take keys. Timeline takes arrows, Enter, Esc, and cue keys only while that region is active. `h` toggles the help column and stays global. Opening or closing help does not move focus. The help column is not a Tab stop, and a click in it does not move focus. There is no panel region and no main-list focus ring.
+Layered in `input_dispatch.py`. Modal keys first, then an active inline edit, which takes every key. Then Tab / Shift+Tab cycles Menu, Navigator, Inspector, and Timeline. Timeline is skipped when the strip is closed. Then the menu bar, command shortcuts, and Ctrl+Up / Ctrl+Down (previous / next top-level navigator node; no effect while the menu bar is focused). Navigator and inspector own their arrows, Enter, Esc, and PageUp/PageDown. An open strip does not take keys. Timeline takes arrows, Enter, Esc, and cue keys only while that region is active. `h` toggles the help column and stays global. Opening or closing help does not move focus. The help column is not a Tab stop, and a click in it does not move focus. There is no panel region and no main-list focus ring.
 
 `row_hotkeys.handle_row_hotkey` is the per-descriptor path for letter, Delete, and Backspace keys, used by the navigator and the inspector.

@@ -12,7 +12,7 @@ from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.row_present_renderers import inspector_field_colors
 from cleave.viz.row_sections import SECTION_SWITCH_KINDS
 from cleave.viz.row_spec import format_row_value
-from cleave.viz.theme import ACTION, LOCKED
+from cleave.viz.theme import VALUE, LOCKED
 from cleave.viz.tuning_view_state import SettingsBlock, TuningViewState
 from tests.support.config import TEST_LAYER_STEMS
 from tests.support.viz import make_track_block
@@ -94,7 +94,8 @@ def test_root_pages_list_only_their_switches(
     node_id: str, kinds: tuple[RowKind, ...]
 ) -> None:
     rows = build_inspector_rows(_view_state(), node_id)
-    assert tuple(row.descriptor.kind for row in rows) == kinds
+    fields = tuple(row for row in rows if not row.command_ids)
+    assert tuple(row.descriptor.kind for row in fields) == kinds
     assert all(row.navigable for row in rows)
 
 
@@ -161,7 +162,7 @@ def test_settings_pages() -> None:
     ]
     latency = build_inspector_rows(state, "settings.latency")
     assert _kinds(latency) == [RowKind.SETTINGS_RESIDUAL_LATENCY_MS]
-    assert latency[-1].command_id == "settings.measure_latency"
+    assert latency[-1].command_ids == ("settings.measure_latency",)
     assert latency[-1].depth == 0
 
 
@@ -175,7 +176,7 @@ def test_project_pages() -> None:
     ]
     render = build_inspector_rows(state, "project.render")
     assert _kinds(render)[0] == RowKind.PROJECT_RENDER_OUTPUT
-    assert render[-1].command_id == "project.render"
+    assert render[-1].command_ids == ("project.render",)
 
 
 def test_page_header_is_never_a_row() -> None:
@@ -184,7 +185,6 @@ def test_page_header_is_never_a_row() -> None:
         ("settings.ui", RowKind.SETTINGS_UI_HEADER),
         ("post_fx.fade", RowKind.POST_FX_FADE_HEADER),
         ("pattern_mask", RowKind.PATTERN_MASK_HEADER),
-        ("timeline.preset", RowKind.TIMELINE_PRESETS_HEADER),
         ("overlay.opening_card", RowKind.OVERLAY_CARD_HEADER),
         (layer_node_id("layer_1"), RowKind.TRACK_HEADER),
     ):
@@ -257,16 +257,18 @@ def test_beat_bar_grid_page() -> None:
         RowKind.TIMELINE_BAR_GRID,
         RowKind.TIMELINE_BAR_PHASE,
     ]
-    assert rows[-1].command_id == "timeline.snap_cues"
+    assert rows[-1].command_ids == ("timeline.snap_cues",)
 
 
-def test_timeline_preset_page_ends_with_commands() -> None:
-    rows = build_inspector_rows(_view_state(), "timeline.preset")
-    assert [row.command_id for row in rows[-2:]] == [
-        "timeline.apply_preset",
-        "timeline.reset",
-    ]
-    assert all(row.command_id is None for row in rows[:-2])
+def test_timeline_page_ends_with_generate_and_reset() -> None:
+    rows = build_inspector_rows(_view_state(), "timeline")
+    assert rows[-1].command_ids == ("timeline.generate", "timeline.reset")
+    assert all(not row.command_ids for row in rows[:-1])
+
+
+def test_cue_fades_page_ends_with_set_cut_type() -> None:
+    rows = build_inspector_rows(_view_state(), "timeline.cue_fades")
+    assert rows[-1].command_ids == ("timeline.set_cut_type",)
 
 
 def test_cue_fades_page_follows_enabled_flags() -> None:
@@ -279,22 +281,18 @@ def test_cue_fades_page_follows_enabled_flags() -> None:
     state.timeline.soft_cut_fades.enabled = True
     kinds = _kinds(build_inspector_rows(state, "timeline.cue_fades"))
     hard_idx = kinds.index(RowKind.TIMELINE_HARD_CUTS)
-    assert kinds[hard_idx : hard_idx + 6] == [
+    assert kinds[hard_idx : hard_idx + 4] == [
         RowKind.TIMELINE_HARD_CUTS,
         RowKind.TIMELINE_HARD_CUT_FADE_IN,
         RowKind.TIMELINE_HARD_CUT_FADE_OUT,
         RowKind.TIMELINE_HARD_CUT_CROSSFADE,
-        RowKind.TIMELINE_APPLY_HARD_CUTS,
-        RowKind.TIMELINE_REMOVE_HARD_CUTS,
     ]
     soft_idx = kinds.index(RowKind.TIMELINE_SOFT_CUTS)
-    assert kinds[soft_idx : soft_idx + 6] == [
+    assert kinds[soft_idx : soft_idx + 4] == [
         RowKind.TIMELINE_SOFT_CUTS,
         RowKind.TIMELINE_SOFT_CUT_FADE_IN,
         RowKind.TIMELINE_SOFT_CUT_FADE_OUT,
         RowKind.TIMELINE_SOFT_CUT_CROSSFADE,
-        RowKind.TIMELINE_APPLY_SOFT_CUTS,
-        RowKind.TIMELINE_REMOVE_SOFT_CUTS,
     ]
 
 
@@ -304,11 +302,11 @@ def test_song_markers_page_is_snap_and_marker_rows() -> None:
     rows = build_inspector_rows(state, "timeline.song_markers")
     kinds = _kinds(rows)
 
-    assert kinds[0] == RowKind.TIMELINE_SNAP_TO_SONG_MARKERS
-    assert all(row.command_id is None for row in rows)
+    assert rows[0].command_ids == ("timeline.snap_to_markers",)
+    assert all(not row.command_ids for row in rows[1:])
     markers = [
         row.descriptor
-        for row in rows
+        for row in rows[1:]
         if row.descriptor.kind is RowKind.SONG_MARKER_ITEM
     ]
     assert [desc.marker_index for desc in markers] == [0, 1, 2]
@@ -355,7 +353,7 @@ def test_layer_page_keeps_direct_rows_and_delete() -> None:
         RowKind.TRACK_PRESET_DIR,
         RowKind.TRACK_PRESET,
     ]
-    assert rows[-1].command_id == "layers.delete"
+    assert rows[-1].command_ids == ("layers.delete",)
     assert rows[-1].navigable is True
 
 
@@ -383,14 +381,17 @@ def test_dynamic_effect_and_preset_rows_keep_slot_identity() -> None:
     items = [
         row.descriptor
         for row in rows
-        if row.descriptor.kind is RowKind.TRACK_PRESET_LIST_ITEM
+        if row.descriptor is not None
+        and row.descriptor.kind is RowKind.TRACK_PRESET_LIST_ITEM
     ]
     assert [(desc.slot, desc.preset_index) for desc in items] == [
         ("layer_1", 0),
         ("layer_1", 1),
     ]
-    assert RowKind.TRACK_PRESET_LIST_ADD in _kinds(rows)
-    assert RowKind.TRACK_PRESET_LIST_POPULATE in _kinds(rows)
+    assert rows[-1].command_ids == (
+        "layers.add_current_preset",
+        "layers.populate_presets",
+    )
 
 
 def test_section_lock_inspector_field_colors() -> None:
@@ -403,17 +404,17 @@ def test_section_lock_inspector_field_colors() -> None:
     delete = RowDescriptor(RowKind.LAYER_MANAGEMENT_DELETE, slot="layer_1")
     assert inspector_field_colors(state, opacity) == (LOCKED, LOCKED)
     label, value = inspector_field_colors(state, delete)
-    assert label == ACTION
+    assert label == VALUE
     assert value != LOCKED
     rows = build_inspector_rows(state, layer_node_id("layer_1"))
-    assert any(row.navigable and row.command_id == "layers.delete" for row in rows)
+    assert any(row.navigable and "layers.delete" in row.command_ids for row in rows)
 
 
 def test_layers_root_count_and_curation_omits_add() -> None:
     state = _layer_view(("layer_1", "layer_2"))
     rows = build_inspector_rows(state, "layers")
     assert _kinds(rows) == [RowKind.LAYER_MANAGEMENT_COUNT]
-    assert rows[1].command_id == "layers.add"
+    assert rows[1].command_ids == ("layers.add",)
     assert rows[1].navigable is True
     count = rows[0]
     assert count.navigable is False
@@ -423,7 +424,7 @@ def test_layers_root_count_and_curation_omits_add() -> None:
     state.settings.editor_mode = "preset_curation"
     curation_rows = build_inspector_rows(state, "layers")
     assert _kinds(curation_rows) == [RowKind.LAYER_MANAGEMENT_COUNT]
-    assert all(row.command_id != "layers.add" for row in curation_rows)
+    assert all("layers.add" not in row.command_ids for row in curation_rows)
     assert _kinds(build_inspector_rows(state, layer_node_id("layer_1"))) == [
         RowKind.TRACK_STEM,
         RowKind.TRACK_BEAT,

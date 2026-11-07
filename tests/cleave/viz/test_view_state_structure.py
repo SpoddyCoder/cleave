@@ -299,22 +299,18 @@ def test_builder_mirrors_switching_paused_into_inspector() -> None:
     from cleave.viz.inspector import build_inspector_rows
     from cleave.viz.navigator import layer_node_id
 
-    def inspector_kinds(view: object) -> set[RowKind]:
+    def inspector_commands(view: object) -> set[str]:
         rows = build_inspector_rows(view, layer_node_id("layer_1"))
-        return {
-            row.descriptor.kind
-            for row in rows
-            if row.descriptor is not None
-        }
+        return {command for row in rows for command in row.command_ids}
 
     hidden = controls.build_view_state(paused=False)
-    assert RowKind.TRACK_PRESET_SWITCHING_RESUME not in inspector_kinds(hidden)
+    assert "layers.resume_switching" not in inspector_commands(hidden)
     assert session.layers["layer_1"].switching_paused is False
 
     stem.switching_paused = True
     shown = controls.build_view_state(paused=False)
     assert session.layers["layer_1"].switching_paused is True
-    assert RowKind.TRACK_PRESET_SWITCHING_RESUME in inspector_kinds(shown)
+    assert "layers.resume_switching" in inspector_commands(shown)
 
 
 def test_structure_signature_invalidates_on_auto_preset_path() -> None:

@@ -35,7 +35,7 @@ def _option_view(
     message: str = "Hi", options: tuple[str, ...] = ("Yes", "No")
 ) -> ModalViewState:
     return ModalViewState(
-        kind=ModalKind.YES_NO,
+        kind=ModalKind.CONFIRM,
         message=message,
         options=options,
         focus_index=0,
@@ -105,14 +105,14 @@ def test_labeled_line_block_height() -> None:
     assert height == 2 * line_h + line_gap
 
     with_lines = ModalViewState(
-        kind=ModalKind.YES_NO,
+        kind=ModalKind.CONFIRM,
         message="Apply?",
         options=("Yes", "Cancel"),
         focus_index=0,
         labeled_lines=labeled,
     )
     without = ModalViewState(
-        kind=ModalKind.YES_NO,
+        kind=ModalKind.CONFIRM,
         message="Apply?",
         options=("Yes", "Cancel"),
         focus_index=0,

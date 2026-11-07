@@ -6,6 +6,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from cleave.viz.live_layer_bindings import LiveLayerBindings
+from cleave.stems import stem_control_label
 from cleave.viz.modal import ModalHost
 from cleave.viz.session import TuningSession
 
@@ -89,22 +90,16 @@ class LayerLifecycleController:
             return False
         return bool(self._layer_manager.can_remove())
 
-    def prompt_add(self) -> None:
-        if not self.can_add():
-            return
-        self._modal.prompt_yes_no(
-            "Add new Milkdrop visualisation layer?",
-            on_confirm=self.confirm_add,
-        )
-
-    def confirm_add(self) -> None:
-        if self._layer_manager is None:
+    def add(self) -> None:
+        if self._layer_manager is None or not self.can_add():
             return
         self._layer_manager.add_layer()
         if self._on_rebuild_view is not None:
             self._on_rebuild_view()
         if self._on_focus_after_add is not None:
             self._on_focus_after_add()
+        if self._on_notification is not None:
+            self._on_notification(f"Added layer {len(self.session.layer_z_order)}")
 
     def prompt_delete(self, slot: str) -> None:
         if self._layer_manager is None:
@@ -113,9 +108,14 @@ class LayerLifecycleController:
             if self._on_notification is not None:
                 self._on_notification("Must have at least 1 layer")
             return
-        self._modal.prompt_yes_no(
-            "Delete this Milkdrop visualisation layer?",
-            on_confirm=lambda: self.confirm_delete(slot),
+        number = self.session.layer_z_order.index(slot) + 1
+        stem = stem_control_label(self.session.layers[slot].stem)
+        self._modal.prompt_confirm(
+            f"Delete layer {number} ({stem})?",
+            "Delete layer",
+            lambda: self.confirm_delete(slot),
+            body="The layer and its preset list are removed.",
+            destructive=True,
         )
 
     def confirm_delete(self, slot: str) -> None:

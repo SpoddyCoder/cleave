@@ -3,7 +3,6 @@
 Typography roles for the live tuning overlay:
   LABEL    — light blue text for row labels and prefixes
   VALUE    — white text for values and state indicators (default)
-  ACTION   — dark mint text for action rows and staged action-parameter labels
   DISABLED — dimmed text when a row or control is inactive
   MUTED    — muted blue-grey text (#9ba6bc)
   LOCKED   — tinted text for locked sub-rows that cannot be edited
@@ -12,6 +11,11 @@ Accent colors for modes and icons (not label/value roles):
   HIGHLIGHT, ERROR_NOTIFICATION, NOTIFICATION_ON_FILL, MOVE_MODE, LOCK_ICON,
   PRESET_ICON, PRESET_FILE_ICON,
   TIMELINE_BAR_ON, BAR_GRID, PLAYHEAD, PLAYHEAD_FLASH, SONG_MARKER, SONG_MARKER_SELECTED
+
+Buttons (fills, not text roles):
+  BUTTON_BG, BUTTON_HOVER_BG, BUTTON_ACTIVE_BG, BUTTON_BORDER - every panel button
+  BUTTON_PRIMARY_BG - the confirm button of a dialog, and a selected segment
+  BUTTON_DANGER_BG - the confirm button of a destructive dialog
 
 Shell rules (not text roles):
   TRANSPORT_RULE — dark rule under the transport bar
@@ -148,7 +152,6 @@ NAVIGATOR_TREE_LINE: tuple[int, int, int] = (110, 125, 150)
 LABEL: tuple[int, int, int] = (170, 210, 255)
 HOVER: tuple[int, int, int] = (170, 210, 255)
 VALUE: tuple[int, int, int] = (255, 255, 255)
-ACTION: tuple[int, int, int] = (80, 190, 125)
 DISABLED: tuple[int, int, int] = (140, 140, 140)
 MUTED: tuple[int, int, int] = (155, 166, 188)
 HIGHLIGHT: tuple[int, int, int] = (255, 235, 130)
@@ -164,6 +167,12 @@ SOLO_BG: tuple[int, int, int] = (200, 40, 40)
 OVERRIDE_BG: tuple[int, int, int] = (255, 200, 60)
 CONFIG_DIRTY: tuple[int, int, int] = (255, 255, 0)
 ARMED_BG: tuple[int, int, int] = SOLO_BG
+BUTTON_BG: tuple[int, int, int] = (48, 54, 66)
+BUTTON_HOVER_BG: tuple[int, int, int] = (64, 72, 88)
+BUTTON_ACTIVE_BG: tuple[int, int, int] = (80, 90, 110)
+BUTTON_BORDER: tuple[int, int, int] = (85, 95, 115)
+BUTTON_PRIMARY_BG: tuple[int, int, int] = (45, 85, 150)
+BUTTON_DANGER_BG: tuple[int, int, int] = SOLO_BG
 OVERRIDE_GLYPH: tuple[int, int, int] = (0, 0, 0)
 OVERRIDE_GLYPH_OFF: tuple[int, int, int] = DISABLED
 FOCUS_ROW_BG_ALPHA: int = 130

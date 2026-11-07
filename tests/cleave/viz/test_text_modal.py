@@ -8,12 +8,12 @@ import pygame
 
 from cleave.viz.key_repeat import INITIAL_DELAY_SEC
 from cleave.viz.modal import (
+    ButtonRole,
     ModalHost,
     ModalKind,
     ModalLabeledLine,
     ModalOption,
     TextFocusRegion,
-    capital_case_modal_option,
 )
 
 
@@ -611,7 +611,7 @@ def test_handle_text_input_while_not_editing_returns_false() -> None:
 def test_handle_text_input_without_text_modal_returns_false() -> None:
     modal = ModalHost()
     assert modal.handle_text_input("x") is False
-    modal.prompt_yes_no("Overwrite?", on_confirm=lambda: None)
+    modal.prompt_confirm("Overwrite?", "Confirm", on_confirm=lambda: None)
     assert modal.handle_text_input("x") is False
     assert modal.active
 
@@ -692,7 +692,7 @@ def test_dismiss_while_editing_fires_stop() -> None:
 def test_prompt_replacing_text_modal_fires_stop() -> None:
     modal, starts, stops = _host_with_text_callbacks()
     _open_text(modal)
-    modal.prompt_yes_no("Overwrite?", on_confirm=lambda: None)
+    modal.prompt_confirm("Overwrite?", "Confirm", on_confirm=lambda: None)
     assert starts == ["start"]
     assert stops == ["stop"]
 
@@ -710,7 +710,7 @@ def test_shift_enter_does_not_fire_stop() -> None:
 
 def test_yes_no_prompt_does_not_fire_start_or_stop() -> None:
     modal, starts, stops = _host_with_text_callbacks()
-    modal.prompt_yes_no("Overwrite?", on_confirm=lambda: None)
+    modal.prompt_confirm("Overwrite?", "Confirm", on_confirm=lambda: None)
     assert starts == []
     assert stops == []
     modal.handle_keydown(_keydown(pygame.K_ESCAPE))
@@ -778,13 +778,13 @@ def test_prompt_replacing_text_modal_disarms_repeat() -> None:
     _open_text(modal, initial="hello")
     modal.handle_keydown(_keydown(pygame.K_LEFT))
     assert modal.text_key_repeat_armed is True
-    modal.prompt_yes_no("Overwrite?", on_confirm=lambda: None)
+    modal.prompt_confirm("Overwrite?", "Confirm", on_confirm=lambda: None)
     assert modal.text_key_repeat_armed is False
 
 
 def test_yes_no_arrow_does_not_arm_text_repeat() -> None:
     modal = ModalHost()
-    modal.prompt_yes_no("Overwrite?", on_confirm=lambda: None)
+    modal.prompt_confirm("Overwrite?", "Confirm", on_confirm=lambda: None)
     assert modal.handle_keydown(_keydown(pygame.K_LEFT)) is True
     assert modal.handle_keydown(_keydown(pygame.K_RIGHT)) is True
     assert modal.handle_keydown(_keydown(pygame.K_UP)) is True
@@ -943,8 +943,8 @@ def test_hover_option_matches_arrow_focus() -> None:
 
     yes_key = ModalHost()
     yes_pointer = ModalHost()
-    yes_key.prompt_yes_no("Overwrite?", on_confirm=lambda: None)
-    yes_pointer.prompt_yes_no("Overwrite?", on_confirm=lambda: None)
+    yes_key.prompt_confirm("Overwrite?", "Confirm", on_confirm=lambda: None)
+    yes_pointer.prompt_confirm("Overwrite?", "Confirm", on_confirm=lambda: None)
     yes_key.handle_keydown(_keydown(pygame.K_UP))
     yes_pointer.hover_option(1)
     assert yes_key.view_state() == yes_pointer.view_state()
@@ -999,13 +999,15 @@ def test_cancel_matches_escape_for_yes_no_and_text() -> None:
     pointer_dismissed: list[str] = []
     keyed = ModalHost()
     pointed = ModalHost()
-    keyed.prompt_yes_no(
+    keyed.prompt_confirm(
         "Overwrite?",
+        "Confirm",
         on_confirm=lambda: None,
         on_cancel=lambda: key_dismissed.append("dismiss"),
     )
-    pointed.prompt_yes_no(
+    pointed.prompt_confirm(
         "Overwrite?",
+        "Confirm",
         on_confirm=lambda: None,
         on_cancel=lambda: pointer_dismissed.append("dismiss"),
     )
@@ -1204,7 +1206,7 @@ def test_hover_text_field_while_editing_stays_editing() -> None:
 
 def test_text_pointer_methods_noop_on_yes_no() -> None:
     modal = ModalHost()
-    modal.prompt_yes_no("Overwrite?", on_confirm=lambda: None)
+    modal.prompt_confirm("Overwrite?", "Confirm", on_confirm=lambda: None)
     before = modal.view_state()
     modal.focus_text_field(0)
     modal.activate_text_button(0)
@@ -1212,16 +1214,6 @@ def test_text_pointer_methods_noop_on_yes_no() -> None:
     modal.hover_text_field()
     assert modal.active
     assert modal.view_state() == before
-
-
-def test_capital_case_modal_option() -> None:
-    assert capital_case_modal_option("YES") == "Yes"
-    assert capital_case_modal_option("save as new") == "Save As New"
-    assert capital_case_modal_option("DON'T SAVE") == "Don't Save"
-    assert capital_case_modal_option("(root)") == "(Root)"
-    assert capital_case_modal_option("keepers") == "Keepers"
-    assert capital_case_modal_option("5.0s") == "5.0s"
-    assert capital_case_modal_option("a-tier") == "A-tier"
 
 
 def test_prompt_choice_renders_n_options() -> None:
@@ -1238,7 +1230,7 @@ def test_prompt_choice_renders_n_options() -> None:
     view = modal.view_state()
     assert view is not None
     assert view.kind == ModalKind.CHOICE
-    assert view.options == ("(Root)", "Keepers", "Wip", "Cancel")
+    assert view.options == ("(root)", "keepers", "wip", "Cancel")
 
 
 def test_prompt_choice_up_down_and_left_right_cycle_options() -> None:
@@ -1272,23 +1264,48 @@ def test_prompt_choice_up_down_and_left_right_cycle_options() -> None:
     assert modal.view_state().focus_index == 1
 
 
-def test_prompt_yes_no_passes_labeled_lines() -> None:
+def test_destructive_confirm_starts_on_cancel_with_a_danger_button() -> None:
+    modal = ModalHost()
+    ran: list[str] = []
+    modal.prompt_confirm(
+        "Delete?", "Delete", lambda: ran.append("delete"), destructive=True
+    )
+    view = modal.view_state()
+    assert view is not None
+    assert view.options == ("Delete", "Cancel")
+    assert view.focus_index == 1
+    assert view.option_roles == (ButtonRole.DANGER, ButtonRole.PLAIN)
+    modal.handle_keydown(_keydown(pygame.K_RETURN))
+    assert ran == []
+
+
+def test_plain_confirm_starts_on_a_primary_button() -> None:
+    modal = ModalHost()
+    modal.prompt_confirm("Render?", "Render", lambda: None, body="Takes a while.")
+    view = modal.view_state()
+    assert view is not None
+    assert view.focus_index == 0
+    assert view.body == "Takes a while."
+    assert view.option_roles == (ButtonRole.PRIMARY, ButtonRole.PLAIN)
+
+
+def test_prompt_confirm_passes_labeled_lines() -> None:
     modal = ModalHost()
     labeled = (
         ModalLabeledLine("character", "arc"),
         ModalLabeledLine("conductor", "on"),
     )
-    modal.prompt_yes_no(
+    modal.prompt_confirm(
         "Apply timeline preset?",
+        "Confirm",
         on_confirm=lambda: None,
-        cancel_label="Cancel",
         labeled_lines=labeled,
     )
     view = modal.view_state()
     assert view is not None
     assert view.message == "Apply timeline preset?"
     assert view.labeled_lines == labeled
-    assert view.options == ("Yes", "Cancel")
+    assert view.options == ("Confirm", "Cancel")
 
 
 def test_prompt_progress_has_bar_and_ignores_keys() -> None:
@@ -1330,4 +1347,4 @@ def test_prompt_choice_passes_labeled_lines() -> None:
     assert view is not None
     assert view.message == "Render complete"
     assert view.labeled_lines == labeled
-    assert view.options == ("Ok",)
+    assert view.options == ("OK",)

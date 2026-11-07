@@ -23,7 +23,6 @@ from cleave.config_schema.editor import (
 from cleave.config_schema.layers import hard_cut_enabled_display
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
 from cleave.viz.row_spec import (
-    ACTION_ROW_KINDS,
     HEADER_ROW_KINDS,
     REPEAT_ROW_KINDS,
     ROW_SPECS,
@@ -171,15 +170,6 @@ def test_header_row_kinds() -> None:
     assert "TRANSPORT" not in names
 
 
-def test_action_row_kinds_match_affordance() -> None:
-    assert ACTION_ROW_KINDS == frozenset(
-        k for k, b in ROW_SPECS.items() if b.affordance == RowAffordance.ACTION
-    )
-    assert RowKind.LAYER_MANAGEMENT_ADD in ACTION_ROW_KINDS
-    assert RowKind.PROJECT_RENDER_OUTPUT not in ACTION_ROW_KINDS
-    assert RowKind.SETTINGS_EDITOR_WINDOW_DISPLAY_SIZE not in ACTION_ROW_KINDS
-
-
 def test_row_is_pinned() -> None:
     assert row_is_pinned(RowKind.PROJECT_RENDER_HEADER) is True
     assert row_is_pinned(RowKind.PROJECT_COMPOSITOR_HEADER) is True
@@ -202,9 +192,8 @@ def test_repeat_row_kinds() -> None:
 
 def test_overlay_title_text_is_locked_action() -> None:
     spec = row_spec(RowKind.OVERLAY_CARD_TITLE_TEXT)
-    assert spec.affordance == RowAffordance.ACTION
+    assert spec.affordance == RowAffordance.VALUE_TEXT
     assert spec.present_style == RowPresentStyle.LABELED_VALUE
-    assert spec.shows_enter_icon is True
     assert spec.apply_action is not None
     assert spec.blocked_by_section_lock is True
     assert spec.panel_label == "title text"
@@ -213,9 +202,8 @@ def test_overlay_title_text_is_locked_action() -> None:
 
 def test_overlay_title_colour_is_locked_action() -> None:
     spec = row_spec(RowKind.OVERLAY_CARD_TITLE_COLOUR)
-    assert spec.affordance == RowAffordance.ACTION
+    assert spec.affordance == RowAffordance.VALUE_COLOUR
     assert spec.present_style == RowPresentStyle.LABELED_VALUE
-    assert spec.shows_enter_icon is True
     assert spec.apply_action is not None
     assert spec.blocked_by_section_lock is True
     assert spec.panel_label == "title colour"
@@ -251,9 +239,8 @@ def test_overlay_remaining_colour_rows_are_locked_actions() -> None:
         ),
     ):
         spec = row_spec(kind)
-        assert spec.affordance == RowAffordance.ACTION
+        assert spec.affordance == RowAffordance.VALUE_COLOUR
         assert spec.present_style == RowPresentStyle.LABELED_VALUE
-        assert spec.shows_enter_icon is True
         assert spec.apply_action is not None
         assert spec.blocked_by_section_lock is True
         assert spec.panel_label == label
@@ -277,9 +264,8 @@ def test_overlay_background_margin_and_padding_are_value_steps() -> None:
 
 def test_overlay_body_text_is_locked_action() -> None:
     spec = row_spec(RowKind.OVERLAY_CARD_BODY_TEXT)
-    assert spec.affordance == RowAffordance.ACTION
+    assert spec.affordance == RowAffordance.VALUE_TEXT
     assert spec.present_style == RowPresentStyle.LABELED_VALUE
-    assert spec.shows_enter_icon is True
     assert spec.apply_action is not None
     assert spec.blocked_by_section_lock is True
     assert spec.panel_label == "body text"
@@ -460,8 +446,7 @@ def test_preset_list_actions_are_action_rows() -> None:
         RowKind.TRACK_PRESET_LIST_ADD,
         RowKind.TRACK_PRESET_SWITCHING_RESUME,
     ):
-        assert kind in ACTION_ROW_KINDS
-        assert row_spec(kind).affordance == RowAffordance.ACTION
+        assert row_spec(kind).affordance == RowAffordance.COMMAND
 
 
 def _render_lock_state(
@@ -499,23 +484,13 @@ def test_render_value_children_blocked_by_section_lock() -> None:
     assert row_blocked_by_section_lock(RowKind.OVERLAY_CARD_BORDER_COLOUR) is True
     assert row_blocked_by_section_lock(RowKind.POST_FX_FADE_IN_START) is True
     assert row_blocked_by_section_lock(RowKind.POST_FX_CHROMA_BOOST_AMOUNT) is True
-    assert row_blocked_by_section_lock(RowKind.TIMELINE_PRESETS) is True
-    assert row_blocked_by_section_lock(RowKind.TIMELINE_PRESET_CHARACTER) is True
-    assert row_blocked_by_section_lock(RowKind.TIMELINE_PRESET_DENSITY) is True
-    assert row_blocked_by_section_lock(RowKind.TIMELINE_PRESET_CUE_SNAP) is True
-    assert row_blocked_by_section_lock(RowKind.TIMELINE_PRESET_SONG_MARKER_SNAP) is True
-    assert row_blocked_by_section_lock(RowKind.TIMELINE_PRESET_TIMELINE_CUTS) is True
-    assert row_blocked_by_section_lock(RowKind.TIMELINE_PRESET_REPOPULATE) is True
-    assert row_blocked_by_section_lock(RowKind.TIMELINE_PRESET_CONDUCTOR) is True
-    assert row_blocked_by_section_lock(RowKind.TIMELINE_PRESET_MODE) is True
+    assert row_blocked_by_section_lock(RowKind.TIMELINE_GENERATE) is True
     assert row_blocked_by_section_lock(RowKind.TRACK_PRESET_LIST_POPULATE) is True
     assert row_blocked_by_section_lock(RowKind.TIMELINE_BAR_PHASE) is True
     assert row_blocked_by_section_lock(RowKind.TIMELINE_SNAP_CUES) is True
-    assert row_blocked_by_section_lock(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS) is True
     assert row_blocked_by_section_lock(RowKind.SONG_MARKER_ITEM) is True
     assert row_blocked_by_section_lock(RowKind.SONG_MARKERS_HEADER) is False
     assert row_blocked_by_section_lock(RowKind.TIMELINE_BEAT_BAR_GRID_HEADER) is False
-    assert row_blocked_by_section_lock(RowKind.TIMELINE_PRESETS_HEADER) is False
 
 
 def test_render_headers_navigable_when_section_locked() -> None:
@@ -527,20 +502,17 @@ def test_render_headers_navigable_when_section_locked() -> None:
         RowKind.POST_FX_CHROMA_BOOST_HEADER,
         RowKind.SONG_MARKERS_HEADER,
         RowKind.TIMELINE_BEAT_BAR_GRID_HEADER,
-        RowKind.TIMELINE_PRESETS_HEADER,
     ):
         assert row_navigable_when_section_locked(kind) is True
     assert row_navigable_when_section_locked(RowKind.OVERLAY_CARD_POSITION) is False
-    assert row_navigable_when_section_locked(RowKind.TIMELINE_PRESETS) is False
-    assert row_navigable_when_section_locked(RowKind.TIMELINE_PRESET_CHARACTER) is False
-    assert row_navigable_when_section_locked(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS) is False
+    assert row_navigable_when_section_locked(RowKind.TIMELINE_GENERATE) is False
     assert row_navigable_when_section_locked(RowKind.SONG_MARKER_ITEM) is False
 
 
 def test_section_locked_resolves_render_sections() -> None:
     overlay_desc = RowDescriptor(RowKind.OVERLAY_CARD_POSITION)
     post_fx_desc = RowDescriptor(RowKind.POST_FX_FADE_IN_START)
-    timeline_desc = RowDescriptor(RowKind.TIMELINE_PRESETS)
+    timeline_desc = RowDescriptor(RowKind.TIMELINE_GENERATE)
     assert section_locked(_render_lock_state(overlay=True), overlay_desc) is True
     assert section_locked(_render_lock_state(), overlay_desc) is False
     assert section_locked(_render_lock_state(post_fx=True), post_fx_desc) is True
@@ -553,7 +525,7 @@ def test_section_locked_reads_session_timeline_attribute() -> None:
         post_fx=SimpleNamespace(locked=False),
         timeline=SimpleNamespace(locked=True),
     )
-    assert section_locked(session_like, RowDescriptor(RowKind.TIMELINE_PRESETS)) is True
+    assert section_locked(session_like, RowDescriptor(RowKind.TIMELINE_GENERATE)) is True
 
 
 def test_section_locked_ignored_in_preset_curation() -> None:
@@ -975,10 +947,10 @@ def test_format_row_value_timeline_cuts() -> None:
 def test_preset_list_populate_is_full_line_action() -> None:
     field = row_spec(RowKind.TRACK_PRESET_LIST_POPULATE)
     assert field.present_style == RowPresentStyle.FULL_LINE
-    assert field.panel_label == "Populate Presets"
+    assert field.panel_label == "Populate..."
     add_field = row_spec(RowKind.TRACK_PRESET_LIST_ADD)
     assert add_field.present_style == RowPresentStyle.FULL_LINE
-    assert add_field.panel_label == "Add Current Preset"
+    assert add_field.panel_label == "+ Add current"
 
 
 def test_resume_switching_row_only_while_paused() -> None:
@@ -986,9 +958,8 @@ def test_resume_switching_row_only_while_paused() -> None:
     from cleave.viz.navigator import layer_node_id
 
     spec = row_spec(RowKind.TRACK_PRESET_SWITCHING_RESUME)
-    assert spec.affordance == RowAffordance.ACTION
-    assert spec.panel_label == "Switching Paused - Enter To Resume"
-    assert spec.shows_enter_icon is True
+    assert spec.affordance == RowAffordance.COMMAND
+    assert spec.panel_label == "Resume"
     assert spec.blocked_by_section_lock is True
     assert spec.parent_group == "track"
 
@@ -1011,14 +982,20 @@ def test_resume_switching_row_only_while_paused() -> None:
             }
         )
         rows = build_inspector_rows(state, layer_node_id("layer_1"))
-        return [row.descriptor.kind for row in rows if row.descriptor is not None]
+        return rows
 
-    hidden = kinds(paused=False)
-    assert RowKind.TRACK_PRESET_SWITCHING_RESUME not in hidden
+    def resume_index(rows) -> int | None:
+        for index, row in enumerate(rows):
+            if row.command_ids == ("layers.resume_switching",):
+                return index
+        return None
+
+    assert resume_index(kinds(paused=False)) is None
     shown = kinds(paused=True)
-    assert shown.index(RowKind.TRACK_PRESET_SWITCHING_RESUME) == (
-        shown.index(RowKind.TRACK_PRESET) + 1
-    )
+    index = resume_index(shown)
+    assert index is not None
+    assert shown[index].status == "Switching paused"
+    assert shown[index - 1].descriptor.kind is RowKind.TRACK_PRESET
 
 
 def test_apply_field_horizontal_track_header_solo_and_expand() -> None:

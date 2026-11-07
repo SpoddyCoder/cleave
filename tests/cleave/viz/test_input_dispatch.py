@@ -557,7 +557,7 @@ def test_ctrl_r_runs_render_bare_r_stays_on_timeline() -> None:
     ) is True
     modal_view = runtime.modal_host.view_state()
     assert modal_view is not None
-    assert modal_view.kind == ModalKind.YES_NO
+    assert modal_view.kind == ModalKind.CONFIRM
     assert runtime.seed.session.timeline.recording is False
 
     runtime = _make_runtime()
@@ -719,9 +719,9 @@ def test_ctrl_l_adds_during_timeline_scope_digits_do_not_jump() -> None:
     controls = runtime.controls
     controls.shell_focus.selected_id = "settings"
     controls.layer_lifecycle.can_add = lambda: True
-    controls.layer_lifecycle.prompt_add = MagicMock()
+    controls.layer_lifecycle.add = MagicMock()
     assert dispatch_keydown(keydown(pygame.K_l, mod=pygame.KMOD_CTRL), runtime) is True
-    controls.layer_lifecycle.prompt_add.assert_called_once_with()
+    controls.layer_lifecycle.add.assert_called_once_with()
     assert controls.shell_focus.selected_id == "settings"
 
     assert dispatch_keydown(keydown(pygame.K_1), runtime) is True

@@ -198,9 +198,9 @@ class NavigatorControls:
 
 
 def _set_inspector_cursor(focus, row: InspectorRow) -> None:
-    if row.command_id is not None:
+    if row.command_ids:
         focus.inspector_cursor = None
-        focus.inspector_command_id = row.command_id
+        focus.inspector_command_id = row.command_ids[0]
         return
     focus.inspector_cursor = row.descriptor
     focus.inspector_command_id = None

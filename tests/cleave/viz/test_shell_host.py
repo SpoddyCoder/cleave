@@ -45,7 +45,7 @@ from cleave.viz.shell_host import (
     selection_after_nav_collapse,
 )
 from cleave.viz.theme import (
-    ACTION,
+    VALUE,
     FOCUS_WASH_ALPHA,
     HIGHLIGHT,
     LOCK_ICON,
@@ -164,7 +164,7 @@ def test_navigator_toggle_presentation() -> None:
     assert navigator_toggle_glyph(locked) == LOCK_GLYPH
     assert navigator_toggle_glyph(unlocked) == LOCK_OPEN_GLYPH
     assert navigator_toggle_glyph(solo) == SOLO_GLYPH
-    assert navigator_toggle_color(on) == ACTION
+    assert navigator_toggle_color(on) == VALUE
     assert navigator_toggle_color(off) == MUTED
     assert navigator_toggle_color(blocked) == LOCKED
     assert navigator_toggle_color(locked) == LOCK_ICON

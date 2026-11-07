@@ -11,7 +11,7 @@ from cleave.viz.shell_host import (
     transport_notice,
     transport_parts,
 )
-from cleave.viz.theme import ACTION, ERROR_NOTIFICATION, HIGHLIGHT, MUTED, VALUE
+from cleave.viz.theme import ERROR_NOTIFICATION, HIGHLIGHT, MUTED, VALUE
 
 
 def test_transport_parts_while_playing() -> None:
@@ -23,7 +23,7 @@ def test_transport_parts_while_playing() -> None:
         fps=60.0,
     )
     assert transport_parts(readout) == [
-        ("\u25b6 playing", ACTION),
+        ("\u25b6 playing", VALUE),
         ("01:23 / 04:12", VALUE),
         ("bar 34", MUTED),
     ]
@@ -39,7 +39,7 @@ def test_transport_parts_while_paused() -> None:
         fps=None,
     )
     assert transport_parts(readout) == [
-        ("\u275a\u275a pause", ACTION),
+        ("\u275a\u275a pause", VALUE),
         ("00:00 / 00:00", VALUE),
         ("bar —", MUTED),
     ]

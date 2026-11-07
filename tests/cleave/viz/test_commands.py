@@ -28,7 +28,8 @@ from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.row_spec import apply_field_action, row_spec
 from cleave.viz.session import LayerRuntime
 from cleave.viz.shell_focus import ShellRegion
-from cleave.viz.theme import ACTION, CONFIG_DIRTY
+from cleave.timeline import SlotCue, TimelineLane
+from cleave.viz.theme import VALUE, CONFIG_DIRTY
 from tests.cleave.viz.test_controls import (
     _keydown,
     _make_controls,
@@ -55,10 +56,12 @@ _STATIC_IDS = (
     "post_fx",
     "pattern_mask",
     "timeline.show_strip",
-    "timeline.apply_preset",
+    "timeline.generate",
+    "timeline.set_cut_type",
     "timeline.reset",
     "timeline.snap_cues",
-    "timeline.undo_cut",
+    "timeline.undo",
+    "timeline.redo",
     "settings.measure_latency",
     "help.overlay",
     "file.about",
@@ -77,7 +80,8 @@ _DISABLED_IDS = (
     "project.backup",
     "project.restore",
     "file.about",
-    "timeline.undo_cut",
+    "timeline.undo",
+    "timeline.redo",
     "layers.add",
     "layers.delete",
 )
@@ -107,8 +111,10 @@ def _fake_controls(
     recording: bool = False,
 ):
     return SimpleNamespace(
+        timeline_history=SimpleNamespace(can_undo=False, can_redo=False),
         session=SimpleNamespace(
             settings=SimpleNamespace(editor_mode=editor_mode),
+            layers={},
             solo_slot=solo_slot,
             help_visible=help_visible,
             timeline=SimpleNamespace(
@@ -138,7 +144,7 @@ def _fake_controls(
         layer_lifecycle=SimpleNamespace(
             can_add=lambda: can_add,
             can_remove=lambda: can_remove,
-            prompt_add=MagicMock(),
+            add=MagicMock(),
             prompt_delete=MagicMock(),
         ),
         navigator=SimpleNamespace(select=MagicMock(), activate=MagicMock()),
@@ -188,10 +194,12 @@ def test_menus_list_taxonomy_ids_once() -> None:
     assert _row_ids(menus[4]) == [
         "timeline.show_strip",
         None,
-        "timeline.apply_preset",
+        "timeline.generate",
         "timeline.reset",
         "timeline.snap_cues",
-        "timeline.undo_cut",
+        "timeline.set_cut_type",
+        "timeline.undo",
+        "timeline.redo",
     ]
     assert _row_ids(menus[5]) == ["settings.measure_latency", "help.overlay"]
     ids = [command.id for command in iter_commands(menus)]
@@ -352,7 +360,7 @@ def test_disabled_run_does_not_call_a_controller() -> None:
     controls.project_render.prompt.assert_not_called()
     controls.editor_mode.prompt_change_editor_mode.assert_not_called()
     controls.tap_sync.prompt_start.assert_not_called()
-    controls.layer_lifecycle.prompt_add.assert_not_called()
+    controls.layer_lifecycle.add.assert_not_called()
     controls.layer_lifecycle.prompt_delete.assert_not_called()
     controls.navigator.select.assert_not_called()
     controls.navigator.activate.assert_not_called()
@@ -363,7 +371,7 @@ def test_save_and_render_honor_curation_solo_and_busy() -> None:
     save = command_by_id("file.save", menus)
     render = command_by_id("project.render", menus)
     assert save.label_role is not None
-    assert save.label_role(CommandContext()) == ACTION
+    assert save.label_role(CommandContext()) == VALUE
     assert save.label_role(CommandContext(config_dirty=True)) == CONFIG_DIRTY
     assert save.enabled(CommandContext()) is True
     assert save.enabled(CommandContext(editor_mode="preset_curation")) is False
@@ -486,7 +494,7 @@ def test_layer_add_and_delete_follow_context_flags() -> None:
     )
     add.run(curated)
     delete.run(curated)
-    curated.layer_lifecycle.prompt_add.assert_not_called()
+    curated.layer_lifecycle.add.assert_not_called()
     curated.layer_lifecycle.prompt_delete.assert_not_called()
 
     missing_slot = _fake_controls(can_add=True, can_remove=True, selected_id="layers")
@@ -504,7 +512,7 @@ def test_layer_add_and_delete_follow_context_flags() -> None:
     assert ctx.timeline_scope is False
     add.run(ready)
     delete.run(ready)
-    ready.layer_lifecycle.prompt_add.assert_called_once_with()
+    ready.layer_lifecycle.add.assert_called_once_with()
     ready.layer_lifecycle.prompt_delete.assert_called_once_with("layer_1")
 
     recording = _fake_controls(recording=True)
@@ -552,7 +560,7 @@ def test_menu_and_inspector_share_layer_add_and_delete() -> None:
     menus = _menus()
     controls, _manager = _make_controls_with_manager(("layer_1", "layer_2"))
     controls.shell_focus.selected_id = layer_node_id("layer_1")
-    controls.layer_lifecycle.prompt_add = MagicMock()
+    controls.layer_lifecycle.add = MagicMock()
     controls.layer_lifecycle.prompt_delete = MagicMock()
     add = command_by_id("layers.add", menus)
     delete = command_by_id("layers.delete", menus)
@@ -560,7 +568,7 @@ def test_menu_and_inspector_share_layer_add_and_delete() -> None:
     assert delete.run is command_by_id("layers.delete").run
 
     add.run(controls)
-    controls.layer_lifecycle.prompt_add.assert_called_once_with()
+    controls.layer_lifecycle.add.assert_called_once_with()
     delete.run(controls)
     controls.layer_lifecycle.prompt_delete.assert_called_once_with("layer_1")
 
@@ -569,27 +577,27 @@ def test_menu_and_inspector_share_layer_add_and_delete() -> None:
     add_row = next(
         row
         for row in build_inspector_rows(view, "layers")
-        if row.command_id == "layers.add"
+        if "layers.add" in row.command_ids
     )
     delete_row = next(
         row
         for row in build_inspector_rows(
             view, layer_node_id("layer_1")
         )
-        if row.command_id == "layers.delete"
+        if "layers.delete" in row.command_ids
     )
-    controls.layer_lifecycle.prompt_add.reset_mock()
+    controls.layer_lifecycle.add.reset_mock()
     controls.layer_lifecycle.prompt_delete.reset_mock()
     controls.shell_focus.selected_id = "layers"
     controls.inspector.activate(add_row)
-    controls.layer_lifecycle.prompt_add.assert_called_once_with()
+    controls.layer_lifecycle.add.assert_called_once_with()
     controls.layer_lifecycle.prompt_delete.assert_not_called()
 
-    controls.layer_lifecycle.prompt_add.reset_mock()
+    controls.layer_lifecycle.add.reset_mock()
     controls.shell_focus.selected_id = layer_node_id("layer_1")
     controls.inspector.activate(delete_row)
     controls.layer_lifecycle.prompt_delete.assert_called_once_with("layer_1")
-    controls.layer_lifecycle.prompt_add.assert_not_called()
+    controls.layer_lifecycle.add.assert_not_called()
 
 
 def test_render_menu_checks_mirror_flags() -> None:
@@ -741,7 +749,7 @@ def test_add_selects_new_layer_and_delete_selects_neighbour() -> None:
         return slot
 
     manager.add_layer.side_effect = add_layer
-    controls.layer_lifecycle.confirm_add()
+    controls.layer_lifecycle.add()
     assert controls.shell_focus.selected_id == layer_node_id("layer_3")
     assert controls.shell_focus.region is ShellRegion.INSPECTOR
     assert "layers" in controls.shell_focus.nav_expanded
@@ -814,21 +822,75 @@ def test_show_strip_toggles_panel_and_is_disabled_while_recording_or_curating() 
     assert curated.session.timeline.panel_open is False
 
 
-def test_undo_cut_stays_disabled_and_run_is_a_noop() -> None:
-    undo = command_by_id("timeline.undo_cut")
+def test_undo_is_disabled_with_no_history_and_run_is_a_noop() -> None:
+    undo = command_by_id("timeline.undo")
     assert undo.enabled(CommandContext()) is False
-    sentinel = MagicMock()
-    undo.run(sentinel)
-    assert sentinel.mock_calls == []
+    controls = _make_controls(("layer_1",))
+    controls.undo_timeline = MagicMock()
+    undo.run(controls)
+    controls.undo_timeline.assert_not_called()
+
+
+def test_undo_and_redo_follow_a_snap_and_their_shortcuts_resolve() -> None:
+    controls = _make_controls(("layer_1",), beat_times=(0.0, 1.0))
+    lanes = controls.session.timeline.lanes
+    lanes["layer_1"] = TimelineLane(
+        baseline=None, cues=[SlotCue(t=0.4, level=1.0)]
+    )
+    undo = command_by_id("timeline.undo")
+    redo = command_by_id("timeline.redo")
+    assert undo.enabled(command_context(controls)) is False
+
+    controls.prompt_snap_cues()
+    view = controls.modal_host.view_state()
+    controls.modal_host.set_form_value(0, view.form_rows[0].options.index("beats"))
+    controls.modal_host.activate_option(0)
+    assert controls.session.timeline.lanes["layer_1"].cues[0].t == 0.0
+    assert undo.enabled(command_context(controls)) is True
+
+    undo.run(controls)
+    assert controls.session.timeline.lanes["layer_1"].cues[0].t == 0.4
+    assert redo.enabled(command_context(controls)) is True
+    redo.run(controls)
+    assert controls.session.timeline.lanes["layer_1"].cues[0].t == 0.0
+
+    assert command_for_shortcut(pygame.K_z, pygame.KMOD_CTRL) is undo
+    assert command_for_shortcut(pygame.K_y, pygame.KMOD_CTRL) is redo
+
+
+def test_left_and_right_move_between_paired_buttons() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.prompt_reset_timeline = MagicMock()
+    controls.prompt_generate_timeline = MagicMock()
+    view = controls.build_view_state(paused=False)
+    row = build_inspector_rows(view, "timeline")[-1]
+    focus = controls.shell_focus
+    focus.selected_id = "timeline"
+    controls.inspector.focus_row(row)
+    assert focus.inspector_command_id == "timeline.generate"
+
+    right = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RIGHT, mod=0)
+    left = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_LEFT, mod=0)
+    controls.inspector.handle_keydown(right)
+    assert focus.inspector_command_id == "timeline.reset"
+    controls.inspector.handle_keydown(right)
+    assert focus.inspector_command_id == "timeline.reset"
+
+    controls.inspector.activate(row)
+    controls.prompt_reset_timeline.assert_called_once_with()
+    controls.prompt_generate_timeline.assert_not_called()
+
+    controls.inspector.handle_keydown(left)
+    assert focus.inspector_command_id == "timeline.generate"
 
 
 def test_timeline_actions_share_run_with_the_inspector() -> None:
     controls = _make_controls(("layer_1",))
-    controls.prompt_apply_timeline_preset = MagicMock()
+    controls.prompt_generate_timeline = MagicMock()
     controls.prompt_reset_timeline = MagicMock()
     controls.prompt_snap_cues = MagicMock()
     actions = (
-        ("timeline.apply_preset", RowKind.TIMELINE_PRESETS, controls.prompt_apply_timeline_preset),
+        ("timeline.generate", RowKind.TIMELINE_GENERATE, controls.prompt_generate_timeline),
         ("timeline.reset", RowKind.TIMELINE_RESET, controls.prompt_reset_timeline),
         ("timeline.snap_cues", RowKind.TIMELINE_SNAP_CUES, controls.prompt_snap_cues),
     )
@@ -845,16 +907,16 @@ def test_timeline_actions_share_run_with_the_inspector() -> None:
 
     view = controls.build_view_state(paused=False)
     rows = (
-        *build_inspector_rows(view, "timeline.preset"),
+        *build_inspector_rows(view, "timeline"),
         *build_inspector_rows(view, "timeline.grid"),
     )
-    by_id = {row.command_id: row for row in rows if row.command_id}
-    assert set(by_id) == {"timeline.apply_preset", "timeline.reset", "timeline.snap_cues"}
+    by_id = {command: row for row in rows for command in row.command_ids}
+    assert set(by_id) == {"timeline.generate", "timeline.reset", "timeline.snap_cues"}
     assert all(row.descriptor is None for row in by_id.values())
     descriptor_kinds = {
         row.descriptor.kind for row in rows if row.descriptor is not None
     }
-    assert RowKind.TIMELINE_PRESETS not in descriptor_kinds
+    assert RowKind.TIMELINE_GENERATE not in descriptor_kinds
     assert RowKind.TIMELINE_RESET not in descriptor_kinds
     assert RowKind.TIMELINE_SNAP_CUES not in descriptor_kinds
 
@@ -865,6 +927,7 @@ def test_timeline_actions_share_run_with_the_inspector() -> None:
         command_by_id(command_id).run(controls)
         prompt.assert_called_once_with()
         prompt.reset_mock()
+        controls.inspector.focus_command(by_id[command_id], command_id)
         controls.inspector.activate(by_id[command_id])
         prompt.assert_called_once_with()
         prompt.reset_mock()
@@ -882,6 +945,7 @@ def test_timeline_actions_share_run_with_the_inspector() -> None:
     for command_id, kind, prompt in actions:
         prompt.reset_mock()
         command_by_id(command_id).run(controls)
+        controls.inspector.focus_command(by_id[command_id], command_id)
         controls.inspector.activate(by_id[command_id])
         apply_field_action(controls, RowDescriptor(kind))
         prompt.assert_not_called()
@@ -891,6 +955,7 @@ def test_timeline_actions_share_run_with_the_inspector() -> None:
     for command_id, kind, prompt in actions:
         prompt.reset_mock()
         command_by_id(command_id).run(controls)
+        controls.inspector.focus_command(by_id[command_id], command_id)
         controls.inspector.activate(by_id[command_id])
         apply_field_action(controls, RowDescriptor(kind))
         prompt.assert_not_called()
@@ -906,45 +971,38 @@ def test_inspector_only_timeline_actions_are_not_menu_commands() -> None:
     labels = [command.label for command in iter_commands(MENUS)]
     assert "Apply to Cues" not in labels
     assert "Remove from Cues" not in labels
-    assert labels.count("Snap cues") == 1
+    assert labels.count("Snap cues...") == 1
+    assert labels.count("Set cut type...") == 1
+    assert "Snap cues to markers..." not in labels
 
     controls = _make_controls(("layer_1",))
     controls.session.song_markers.times = [10.0, 40.0]
     prompts = (
-        (RowKind.TIMELINE_APPLY_SOFT_CUTS, "prompt_apply_soft_cuts"),
-        (RowKind.TIMELINE_APPLY_HARD_CUTS, "prompt_apply_hard_cuts"),
-        (RowKind.TIMELINE_REMOVE_SOFT_CUTS, "prompt_remove_timeline_cuts"),
-        (RowKind.TIMELINE_REMOVE_HARD_CUTS, "prompt_remove_timeline_cuts"),
-        (RowKind.TIMELINE_SNAP_TO_SONG_MARKERS, "prompt_snap_cues_to_song_markers"),
+        ("timeline.set_cut_type", "prompt_set_cut_type"),
+        ("timeline.snap_to_markers", "prompt_snap_cues_to_song_markers"),
     )
-    for kind, method_name in prompts:
+    for command_id, method_name in prompts:
         method = MagicMock()
         setattr(controls, method_name, method)
-        desc = RowDescriptor(kind)
-        row_spec(kind).apply_action(controls, desc)
+        command = command_by_id(command_id)
+        command.run(controls)
         method.assert_called_once_with()
         controls.session.timeline.locked = True
         method.reset_mock()
-        row_spec(kind).apply_action(controls, desc)
+        command.run(controls)
         method.assert_not_called()
         controls.session.timeline.locked = False
 
     view = controls.build_view_state(paused=False)
     marker_rows = build_inspector_rows(view, "timeline.song_markers")
-    snap = next(
-        row
-        for row in marker_rows
-        if row.descriptor is not None
-        and row.descriptor.kind is RowKind.TIMELINE_SNAP_TO_SONG_MARKERS
-    )
-    assert snap.command_id is None
+    assert marker_rows[0].command_ids == ("timeline.snap_to_markers",)
     marker = next(
         row
         for row in marker_rows
         if row.descriptor is not None
         and row.descriptor.kind is RowKind.SONG_MARKER_ITEM
     )
-    assert marker.command_id is None
+    assert not marker.command_ids
 
     controls.seek_to = MagicMock()
     marker_desc = RowDescriptor(RowKind.SONG_MARKER_ITEM, marker_index=1)

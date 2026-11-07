@@ -91,8 +91,8 @@ def test_prompt_delete_opens_yes_no() -> None:
     controller.prompt_delete(1)
     view = modal.view_state()
     assert view is not None
-    assert view.message == "Remove song marker 00:15.00?"
-    assert view.options == ("Yes", "No")
+    assert view.message == "Delete song marker 00:15.00?"
+    assert view.options == ("Delete marker", "Cancel")
     assert session.song_markers.times == [5.0, 15.0]
 
 
@@ -106,6 +106,7 @@ def test_confirm_delete_adjusts_selection_and_focus() -> None:
     session.song_markers.times = [5.0, 15.0, 25.0]
     session.song_markers.selected_index = 1
     controller.prompt_delete(1)
+    modal.handle_keydown(keydown(pygame.K_LEFT))
     modal.handle_keydown(keydown(pygame.K_RETURN))
     assert session.song_markers.times == [5.0, 25.0]
     assert session.song_markers.selected_index == 1

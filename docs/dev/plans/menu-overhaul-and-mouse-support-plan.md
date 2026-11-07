@@ -174,7 +174,7 @@ The timeline strip stays its own host. Cue blocks are edited on the strip. The t
 
 ### Menu taxonomy
 
-`MENUS` in the design page is the item list. Green in `menu-layers` means command. Plain means jump. A check mirrors `checked(state)`. Grey means disabled. The shortcut column is normative, except Render has no "Start render..." item and no second `Ctrl+R`.
+`MENUS` in the design page is the item list. A check mirrors `checked(state)`. Grey means disabled. The shortcut column is normative, except Render has no "Start render..." item and no second `Ctrl+R`.
 
 | Menu | Item | Kind | Shortcut | When it runs |
 | --- | --- | --- | --- | --- |
@@ -196,10 +196,12 @@ The timeline strip stays its own host. Cue blocks are edited on the strip. The t
 | Render | Edit overlays | jump | | Phase 4. |
 | Render | Edit post-FX | jump | | Phase 4. |
 | Timeline | Show timeline strip | check | `T` | Phase 5. Same open/close as today's `T`. |
-| Timeline | Apply timeline preset | command | | Phase 5. Same action as the row. |
-| Timeline | Reset timeline | command | | Phase 5. |
-| Timeline | Snap cues | command | | Phase 5. |
-| Timeline | Undo last cut | command | | Stays disabled. No cut-undo command exists. |
+| Timeline | Generate timeline... | command | | Phase 5. Opens the form dialog. |
+| Timeline | Reset timeline... | command | | Phase 5. |
+| Timeline | Snap cues... | command | | Phase 5. |
+| Timeline | Set cut type... | command | | Opens the form dialog. |
+| Timeline | Undo | command | `Ctrl+Z` | Bulk timeline commands. |
+| Timeline | Redo | command | `Ctrl+Y` | Bulk timeline commands. |
 | Timeline | Song markers | jump | | Phase 5. |
 | Settings | Editor settings | jump | `Ctrl+,` | Phase 2. Selects Settings. |
 | Settings | Measure latency... | command | | Phase 1. Existing measure-latency action. |
@@ -256,7 +258,7 @@ Phase 1 adds `cleave/viz/shell_host.py`.
 - The run loop already pumps `pygame.event.get()` once. Pass mouse and window events to the backend from that loop. Do not pump events a second time inside the backend.
 - Draw one ImGui frame per editor frame, after the overlay textures in `_tick_frame_live_overlay` / [overlay_draw.py](../../../cleave/viz/overlay_draw.py), and before `pygame.display.flip()`.
 - Save and restore GL state around the ImGui render. Post passes in [gl_post_process.py](../../../cleave/gl_post_process.py) already do this because the compositor and ImGui share the pygame context. A dirty VAO, shader, scissor, or viewport will blank the next visualiser frame.
-- Map colors from existing [theme.py](../../../cleave/viz/theme.py) roles (`LABEL`, `VALUE`, `ACTION`, `DISABLED`, `LOCKED`, `HIGHLIGHT`, `CONFIG_DIRTY`, and the timeline accents). Add a hover role only in phase 6.
+- Map colors from existing [theme.py](../../../cleave/viz/theme.py) roles (`LABEL`, `VALUE`, `DISABLED`, `LOCKED`, `HIGHLIGHT`, `CONFIG_DIRTY`, and the timeline accents). Add a hover role only in phase 6.
 
 Help, modals, and the timeline strip stay on the pygame overlay path. The shell does not reimplement them as ImGui windows.
 
@@ -291,7 +293,7 @@ Tests use `/home/fernpa/anaconda3/envs/cleave/bin/python tests/run_unit_tests.py
 - `commands.py` and a menu draw (`BeginMainMenuBar`) of every item in the taxonomy table. Disabled items stay visible.
 - Wire Save, Quit, Help overlay, Keyboard shortcuts (same overlay), Render project (`Ctrl+R`), Measure latency, and Preset curation mode. Each `run` calls the controller named in the table.
 - Remove the matching tree rows in this commit: the project save row (`CONFIG_HEADER`), `PROJECT_RENDER_ACTION`, `SETTINGS_MEASURE_LATENCY`, and `SETTINGS_EDITOR_MODE`. Leave every other row.
-- Leave Open, Separate, Backup, Restore, About, Undo last cut, and every jump disabled.
+- Leave Open, Separate, Backup, Restore, About, and every jump disabled.
 - Keyboard nav flag off, as in [Focus scopes](#focus-scopes). `F10` / `Alt` and arrows operate the bar. Alt+letter waits for phase 7.
 - Update [editor-first](../../../AGENTS.md): "No native menu bar" means no Win32 menu. An ImGui menu bar in the OpenGL window is the intended chrome.
 - Help: add `F10` / `Alt` and `Ctrl+R` only. Leave the tree navigation lines until the keys they describe have changed.
@@ -371,7 +373,7 @@ Tests use `/home/fernpa/anaconda3/envs/cleave/bin/python tests/run_unit_tests.py
 - Timeline child under Render. Inspector groups: timeline preset, beat / bar grid, cue fades. Actions (Apply, Reset, Snap cues, Apply to Cues, Remove from Cues) call the existing row actions. Menu and inspector share `run` where the mock shows both.
 - Song markers node. Inspector is the marker list. The menu jump selects it.
 - Show timeline strip (`T`) calls the same open/close as today. Timeline scope, cue editing, and `timeline_overlay.py` stay as they are. Do not fold cue blocks into the inspector.
-- Enable the Timeline menu commands except Undo last cut.
+- Enable the Timeline menu commands.
 - Delete the leftover tuning panel, `build_focus_ring` for the main list, expand-in-list Left/Right, and session `expanded` flags that only served that list. Inspector group open/closed state is view state, not those flags.
 - Remove the migration bridge (`Esc` to the leftover panel, unmigrated-node handoff).
 - Rewrite [live-tuning-ui](../../../.claude/rules/live-tuning-ui.md) and [change-touchpoints](../../../.claude/rules/change-touchpoints.md) so new fields go to an inspector group or a command, conditional rows and the structure signature stay, and the timeline strip stays a panel anchor.
@@ -461,4 +463,4 @@ Per phase above. Shared rules:
 - A native Win32 menu.
 - Mid-session Open (`Ctrl+O`), which remains [file-picker-plan.md](file-picker-plan.md) phase 3.
 - Swapping ImGui for another widget backend.
-- In-window Separate, Backup, Restore, About, and Undo last cut.
+- In-window Separate, Backup, Restore, and About.

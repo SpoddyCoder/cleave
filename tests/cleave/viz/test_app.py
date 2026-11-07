@@ -97,6 +97,9 @@ def _minimal_runtime(compositor: MagicMock, *, upscale: float = 2.0) -> LiveVisu
         ),
     )
     controls = MagicMock()
+    controls.inline_edit.handle_keydown.return_value = False
+    controls.inline_edit.handle_keyup.return_value = False
+    controls.inline_edit.handle_text_input.return_value = False
     controls.build_view_state.return_value = MagicMock()
     _silence_tap_sync(controls)
     controls.project_render.busy = False
@@ -247,6 +250,9 @@ def _heavy_init_side_effect(
     if on_progress is not None:
         on_progress("Building layers...")
     controls = MagicMock()
+    controls.inline_edit.handle_keydown.return_value = False
+    controls.inline_edit.handle_keyup.return_value = False
+    controls.inline_edit.handle_text_input.return_value = False
     controls.build_view_state.return_value = MagicMock()
     _silence_tap_sync(controls)
     controls.tick = MagicMock()
@@ -365,6 +371,9 @@ def test_run_pygame_quit_clean_exits_via_try_quit(
         pygame.Surface((seed.display_width, seed.display_height), pygame.SRCALPHA),
     )
     controls = MagicMock()
+    controls.inline_edit.handle_keydown.return_value = False
+    controls.inline_edit.handle_keyup.return_value = False
+    controls.inline_edit.handle_text_input.return_value = False
     _silence_tap_sync(controls)
     controls.try_quit.return_value = True
     controls.consume_pending_exit.return_value = False
@@ -428,6 +437,9 @@ def test_run_pending_switch_returns_target_and_keeps_compositor(
         pygame.Surface((seed.display_width, seed.display_height), pygame.SRCALPHA),
     )
     controls = MagicMock()
+    controls.inline_edit.handle_keydown.return_value = False
+    controls.inline_edit.handle_keyup.return_value = False
+    controls.inline_edit.handle_text_input.return_value = False
     _silence_tap_sync(controls)
     controls.consume_pending_exit.return_value = False
     controls.consume_pending_switch.return_value = True
@@ -483,6 +495,9 @@ def test_run_ctrl_q_clean_exits(
         pygame.Surface((seed.display_width, seed.display_height), pygame.SRCALPHA),
     )
     controls = MagicMock()
+    controls.inline_edit.handle_keydown.return_value = False
+    controls.inline_edit.handle_keyup.return_value = False
+    controls.inline_edit.handle_text_input.return_value = False
     _silence_tap_sync(controls)
     controls.pending_exit = False
     controls.consume_pending_exit.return_value = False
@@ -553,6 +568,9 @@ def test_run_pygame_quit_dirty_stays_open(
         pygame.Surface((seed.display_width, seed.display_height), pygame.SRCALPHA),
     )
     controls = MagicMock()
+    controls.inline_edit.handle_keydown.return_value = False
+    controls.inline_edit.handle_keyup.return_value = False
+    controls.inline_edit.handle_text_input.return_value = False
     _silence_tap_sync(controls)
     controls.try_quit.return_value = False
     controls.consume_pending_exit.return_value = False
@@ -616,6 +634,9 @@ def test_run_main_loop_stays_open_without_quit_event(
         pygame.Surface((seed.display_width, seed.display_height), pygame.SRCALPHA),
     )
     controls = MagicMock()
+    controls.inline_edit.handle_keydown.return_value = False
+    controls.inline_edit.handle_keyup.return_value = False
+    controls.inline_edit.handle_text_input.return_value = False
     _silence_tap_sync(controls)
     controls.try_quit.return_value = True
     controls.consume_pending_exit.return_value = False
@@ -719,6 +740,9 @@ def test_run_holds_content_and_overlay_while_project_render_busy(
         pygame.Surface((seed.display_width, seed.display_height), pygame.SRCALPHA),
     )
     controls = MagicMock()
+    controls.inline_edit.handle_keydown.return_value = False
+    controls.inline_edit.handle_keyup.return_value = False
+    controls.inline_edit.handle_text_input.return_value = False
     _silence_tap_sync(controls)
     controls.try_quit.return_value = True
     controls.consume_pending_exit.return_value = False
@@ -1077,7 +1101,7 @@ def test_tick_frame_skips_tuning_when_only_a_modal_is_active(
     compositor = recording_compositor()
     runtime = _minimal_runtime(compositor)
     runtime.controls.build_view_state = MagicMock(return_value=MagicMock())
-    runtime.modal_host.prompt_yes_no("test?", on_confirm=lambda: None)
+    runtime.modal_host.prompt_confirm("test?", "Confirm", on_confirm=lambda: None)
 
     app = VisualizerApp(runtime)
     app.tick_frame(1.0, paused=True, draw_overlay=True, n_pcm=735)

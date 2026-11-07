@@ -19,7 +19,7 @@ from cleave.viz.editor_mode_controls import is_preset_curation_mode
 from cleave.viz.key_repeat import mod_ctrl
 from cleave.viz.navigator import layer_node_id, layer_slot_of
 from cleave.viz.shell_focus import ShellRegion
-from cleave.viz.theme import ACTION, CONFIG_DIRTY
+from cleave.viz.theme import CONFIG_DIRTY, VALUE
 
 CommandKind = Literal["command", "jump", "check"]
 LabelRole = tuple[int, int, int]
@@ -35,6 +35,8 @@ _RESOLVED_SHORTCUT_IDS = frozenset(
         "settings.editor",
         "layers.add",
         "timeline.show_strip",
+        "timeline.undo",
+        "timeline.redo",
     }
 )
 
@@ -50,10 +52,13 @@ class CommandContext:
     selected_slot: str | None = None
     can_add_layer: bool = False
     can_remove_layer: bool = False
+    selected_layer_locked: bool = False
     timeline_scope: bool = False
     timeline_panel_open: bool = False
     timeline_recording: bool = False
     timeline_locked: bool = False
+    timeline_can_undo: bool = False
+    timeline_can_redo: bool = False
     overlays_enabled: bool = False
     post_fx_enabled: bool = False
     pattern_mask_enabled: bool = False
@@ -85,6 +90,7 @@ class Command:
     run: Callable[[Any], None] = _noop
     checked: Callable[[CommandContext], bool] | None = None
     label_role: Callable[[CommandContext], LabelRole] | None = None
+    locked: Callable[[CommandContext], bool] = _disabled
 
 
 class MenuSeparator:
@@ -122,10 +128,17 @@ def command_context(controls: Any) -> CommandContext:
         selected_slot=selected_slot,
         can_add_layer=lifecycle.can_add(),
         can_remove_layer=lifecycle.can_remove(),
+        selected_layer_locked=(
+            selected_slot is not None
+            and selected_slot in session.layers
+            and bool(session.layers[selected_slot].locked)
+        ),
         timeline_scope=timeline_scope,
         timeline_panel_open=bool(timeline.panel_open),
         timeline_recording=bool(timeline.recording),
         timeline_locked=bool(timeline.locked),
+        timeline_can_undo=controls.timeline_history.can_undo,
+        timeline_can_redo=controls.timeline_history.can_redo,
         overlays_enabled=bool(
             overlays.opening_card.enabled or overlays.closing_card.enabled
         ),
@@ -194,7 +207,7 @@ def _save_enabled(ctx: CommandContext) -> bool:
 def _save_label_role(ctx: CommandContext) -> LabelRole:
     if ctx.config_dirty:
         return CONFIG_DIRTY
-    return ACTION
+    return VALUE
 
 
 def _render_enabled(ctx: CommandContext) -> bool:
@@ -241,8 +254,36 @@ def _delete_enabled(ctx: CommandContext) -> bool:
     )
 
 
+def _preset_list_enabled(ctx: CommandContext) -> bool:
+    return ctx.selected_slot is not None and not ctx.selected_layer_locked
+
+
+def _layer_locked(ctx: CommandContext) -> bool:
+    return ctx.selected_layer_locked
+
+
+def _timeline_locked(ctx: CommandContext) -> bool:
+    return ctx.timeline_locked
+
+
+def _selected_slot(controls: Any) -> str:
+    return command_context(controls).selected_slot
+
+
+def _run_add_current_preset(controls: Any) -> None:
+    controls.preset_list.add_current(_selected_slot(controls))
+
+
+def _run_populate_presets(controls: Any) -> None:
+    controls.preset_list.prompt_populate(_selected_slot(controls))
+
+
+def _run_resume_switching(controls: Any) -> None:
+    controls.preset_list.resume(_selected_slot(controls))
+
+
 def _run_add(controls: Any) -> None:
-    controls.layer_lifecycle.prompt_add()
+    controls.layer_lifecycle.add()
 
 
 def _run_delete(controls: Any) -> None:
@@ -316,8 +357,8 @@ def _run_show_strip(controls: Any) -> None:
         controls.open_timeline_panel(enter_submenu=True)
 
 
-def _run_apply_preset(controls: Any) -> None:
-    controls.prompt_apply_timeline_preset()
+def _run_generate(controls: Any) -> None:
+    controls.prompt_generate_timeline()
 
 
 def _run_reset_timeline(controls: Any) -> None:
@@ -326,6 +367,38 @@ def _run_reset_timeline(controls: Any) -> None:
 
 def _run_snap_cues(controls: Any) -> None:
     controls.prompt_snap_cues()
+
+
+def _run_snap_to_markers(controls: Any) -> None:
+    controls.prompt_snap_cues_to_song_markers()
+
+
+def _run_set_cut_type(controls: Any) -> None:
+    controls.prompt_set_cut_type()
+
+
+def _undo_enabled(ctx: CommandContext) -> bool:
+    return (
+        ctx.timeline_can_undo
+        and _timeline_actions_enabled(ctx)
+        and not ctx.timeline_recording
+    )
+
+
+def _redo_enabled(ctx: CommandContext) -> bool:
+    return (
+        ctx.timeline_can_redo
+        and _timeline_actions_enabled(ctx)
+        and not ctx.timeline_recording
+    )
+
+
+def _run_undo(controls: Any) -> None:
+    controls.undo_timeline()
+
+
+def _run_redo(controls: Any) -> None:
+    controls.redo_timeline()
 
 
 def _run_focus_node(node_id: str) -> Callable[[Any], None]:
@@ -408,10 +481,34 @@ _ADD = Command(
 )
 _DELETE = Command(
     id="layers.delete",
-    label="Delete layer",
+    label="Delete layer...",
     kind="command",
     enabled=_delete_enabled,
     run=_when_enabled(_delete_enabled, _run_delete),
+)
+_ADD_CURRENT_PRESET = Command(
+    id="layers.add_current_preset",
+    label="+ Add current",
+    kind="command",
+    enabled=_preset_list_enabled,
+    run=_when_enabled(_preset_list_enabled, _run_add_current_preset),
+    locked=_layer_locked,
+)
+_POPULATE_PRESETS = Command(
+    id="layers.populate_presets",
+    label="Populate...",
+    kind="command",
+    enabled=_preset_list_enabled,
+    run=_when_enabled(_preset_list_enabled, _run_populate_presets),
+    locked=_layer_locked,
+)
+_RESUME_SWITCHING = Command(
+    id="layers.resume_switching",
+    label="Resume",
+    kind="command",
+    enabled=_preset_list_enabled,
+    run=_when_enabled(_preset_list_enabled, _run_resume_switching),
+    locked=_layer_locked,
 )
 _CURATION = Command(
     id="layers.preset_curation",
@@ -457,28 +554,62 @@ _SHOW_STRIP = Command(
     run=_when_enabled(_show_strip_enabled, _run_show_strip),
     checked=_show_strip_checked,
 )
-_APPLY_PRESET = Command(
-    id="timeline.apply_preset",
-    label="Apply timeline preset",
+_GENERATE = Command(
+    id="timeline.generate",
+    label="Generate timeline...",
     kind="command",
     enabled=_timeline_actions_enabled,
-    run=_when_enabled(_timeline_actions_enabled, _run_apply_preset),
+    run=_when_enabled(_timeline_actions_enabled, _run_generate),
+    locked=_timeline_locked,
 )
 _RESET = Command(
     id="timeline.reset",
-    label="Reset timeline",
+    label="Reset timeline...",
     kind="command",
     enabled=_timeline_actions_enabled,
     run=_when_enabled(_timeline_actions_enabled, _run_reset_timeline),
+    locked=_timeline_locked,
 )
 _SNAP = Command(
     id="timeline.snap_cues",
-    label="Snap cues",
+    label="Snap cues...",
     kind="command",
     enabled=_timeline_actions_enabled,
     run=_when_enabled(_timeline_actions_enabled, _run_snap_cues),
+    locked=_timeline_locked,
 )
-_UNDO_CUT = _later("timeline.undo_cut", "Undo last cut", "command")
+_SNAP_TO_MARKERS = Command(
+    id="timeline.snap_to_markers",
+    label="Snap cues to markers...",
+    kind="command",
+    enabled=_timeline_actions_enabled,
+    run=_when_enabled(_timeline_actions_enabled, _run_snap_to_markers),
+    locked=_timeline_locked,
+)
+_SET_CUT_TYPE = Command(
+    id="timeline.set_cut_type",
+    label="Set cut type...",
+    kind="command",
+    enabled=_timeline_actions_enabled,
+    run=_when_enabled(_timeline_actions_enabled, _run_set_cut_type),
+    locked=_timeline_locked,
+)
+_UNDO = Command(
+    id="timeline.undo",
+    label="Undo",
+    kind="command",
+    shortcut="Ctrl+Z",
+    enabled=_undo_enabled,
+    run=_when_enabled(_undo_enabled, _run_undo),
+)
+_REDO = Command(
+    id="timeline.redo",
+    label="Redo",
+    kind="command",
+    shortcut="Ctrl+Y",
+    enabled=_redo_enabled,
+    run=_when_enabled(_redo_enabled, _run_redo),
+)
 
 _EDITOR = Command(
     id="settings.editor",
@@ -513,6 +644,8 @@ _SHORTCUT_KEYS: dict[str, tuple[int, bool]] = {
     "Ctrl+Q": (pygame.K_q, True),
     "Ctrl+L": (pygame.K_l, True),
     "Ctrl+R": (pygame.K_r, True),
+    "Ctrl+Y": (pygame.K_y, True),
+    "Ctrl+Z": (pygame.K_z, True),
     "Ctrl+,": (pygame.K_COMMA, True),
     "T": (pygame.K_t, False),
     "H": (pygame.K_h, False),
@@ -595,10 +728,12 @@ def build_menus(
                 (
                     _SHOW_STRIP,
                     SEPARATOR,
-                    _APPLY_PRESET,
+                    _GENERATE,
                     _RESET,
                     _SNAP,
-                    _UNDO_CUT,
+                    _SET_CUT_TYPE,
+                    _UNDO,
+                    _REDO,
                 ),
             ),
             Menu("Settings", (_MEASURE_LATENCY, _HELP_OVERLAY)),
@@ -608,6 +743,14 @@ def build_menus(
 
 
 MENUS: tuple[Menu, ...] = build_menus()
+
+# Reachable from an inspector button only.
+_INSPECTOR_COMMANDS: tuple[Command, ...] = (
+    _SNAP_TO_MARKERS,
+    _ADD_CURRENT_PRESET,
+    _POPULATE_PRESETS,
+    _RESUME_SWITCHING,
+)
 
 
 def iter_commands(menus: Sequence[Menu]) -> Iterator[Command]:
@@ -622,7 +765,7 @@ def command_by_id(
     menus: Sequence[Menu] | None = None,
 ) -> Command:
     source = MENUS if menus is None else menus
-    for command in iter_commands(source):
+    for command in (*iter_commands(source), *_INSPECTOR_COMMANDS):
         if command.id == command_id:
             return command
     raise KeyError(command_id)
@@ -653,8 +796,8 @@ def command_for_shortcut(
 ) -> Command | None:
     """Resolved shortcut, or None.
 
-    New, open, save, quit, render, the help overlay, add-layer, and
-    show-timeline-strip resolve from menu rows. Editor settings (Ctrl+,) and
+    New, open, save, quit, render, the help overlay, add-layer, undo, redo,
+    and show-timeline-strip resolve from menu rows. Editor settings (Ctrl+,) and
     layer jumps (``1``–``8``) resolve from commands that are not menu rows.
     Layer jumps
     stay unresolved while *timeline_scope* is set. Other shortcut text stays

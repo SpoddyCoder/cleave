@@ -8,37 +8,111 @@ from enum import Enum
 
 import pygame
 
+from cleave.viz.text_edit import (
+    TEXT_EDIT_REPEAT_KEYS,
+    apply_text_edit_key,
+    insert_text_at_caret,
+    reset_caret_blink,
+    text_caret_visible,
+)
 from cleave.viz.input_modality import InputModality, PointerMotionTracker
 from cleave.viz.key_repeat import KeyRepeatController, mod_shift
 
 
 class ModalKind(Enum):
-    YES_NO = "yes_no"
+    CONFIRM = "confirm"
+    FORM = "form"
     UNSAVED_QUIT = "unsaved_quit"
     CHOICE = "choice"
     PROGRESS = "progress"
     TEXT = "text"
 
 
+class ButtonRole(Enum):
+    """Fill of a modal button. One primary or danger button per dialog."""
+
+    PLAIN = "plain"
+    PRIMARY = "primary"
+    DANGER = "danger"
+
+
+BUTTON_ROW_KINDS = frozenset(
+    {ModalKind.CONFIRM, ModalKind.FORM, ModalKind.UNSAVED_QUIT}
+)
+
+
+class FormFieldKind(Enum):
+    """How a form field shows its options."""
+
+    STEP = "step"
+    SEGMENT = "segment"
+    RADIO = "radio"
+
+
+FormValues = dict[str, int]
+
+
+@dataclass(frozen=True)
+class FormField:
+    """One parameter of a form. ``value`` is an index into ``options``."""
+
+    id: str
+    label: str
+    kind: FormFieldKind
+    options: tuple[str, ...]
+    value: int = 0
+    visible: Callable[[FormValues], bool] | None = None
+
+
+@dataclass(frozen=True)
+class FormSpec:
+    """A dialog of parameters. Nothing is applied until confirm.
+
+    ``info`` is a line of feedback on the draft values, such as a count of the
+    cues a command would change. It runs when a value changes, not every frame.
+    """
+
+    title: str
+    fields: tuple[FormField, ...]
+    confirm_label: str
+    on_confirm: Callable[[FormValues], None]
+    on_cancel: Callable[[], None] | None = None
+    body: str | None = None
+    info: Callable[[FormValues], str | None] | None = None
+    destructive: bool = False
+
+
+@dataclass(frozen=True)
+class FormRowView:
+    label: str
+    kind: FormFieldKind
+    options: tuple[str, ...]
+    value: int
+    focused: bool
+
+
+@dataclass
+class FormState:
+    spec: FormSpec
+    values: FormValues
+    field_index: int | None
+    info: str | None = None
+
+    def visible_fields(self) -> tuple[FormField, ...]:
+        return tuple(
+            field
+            for field in self.spec.fields
+            if field.visible is None or field.visible(self.values)
+        )
+
+    def refresh_info(self) -> None:
+        info = self.spec.info
+        self.info = None if info is None else info(self.values)
+
+
 class TextFocusRegion(Enum):
     FIELD = "field"
     BUTTONS = "buttons"
-
-
-def capital_case_modal_option(label: str) -> str:
-    """Capital Case each whitespace-separated word; leave numeric tokens unchanged."""
-
-    def _word(word: str) -> str:
-        if not word:
-            return word
-        for index, char in enumerate(word):
-            if char.isalpha():
-                return word[:index] + char.upper() + word[index + 1 :].lower()
-            if char.isdigit():
-                return word
-        return word
-
-    return " ".join(_word(part) for part in label.split(" "))
 
 
 def clamp_modal_focus_index(index: int, option_count: int) -> int:
@@ -48,167 +122,11 @@ def clamp_modal_focus_index(index: int, option_count: int) -> int:
     return index
 
 
-def text_field_lines(
-    draft: str,
-    *,
-    single_line: bool,
-    wrap: Callable[[str], list[str]] | None = None,
-) -> list[str]:
-    """Visual lines for caret movement: wrap when provided, else ``split("\\n")``."""
-    if single_line:
-        return [draft]
-    if wrap is not None:
-        lines = wrap(draft)
-        return lines if lines else [""]
-    return draft.split("\n")
-
-
-def caret_line_column(
-    text: str, lines: list[str], caret_index: int
-) -> tuple[int, int]:
-    """Map caret_index in *text* to (line, column) in wrapped *lines*.
-
-    Hard newlines sit at the end of the preceding visual line. Spaces dropped
-    at wrap points sit at the end of the line before the wrap.
-    """
-    caret_index = max(0, min(caret_index, len(text)))
-    if not lines:
-        return 0, 0
-    if not text:
-        return 0, 0
-
-    src = 0
-    last_i = len(lines) - 1
-    for line_i, line in enumerate(lines):
-        if not line:
-            if caret_index <= src:
-                return line_i, 0
-            if src < len(text) and text[src] == "\n":
-                src += 1
-                continue
-            return line_i, 0
-
-        while (
-            src < len(text)
-            and text[src].isspace()
-            and text[src] != "\n"
-            and not text.startswith(line, src)
-        ):
-            if caret_index == src:
-                return line_i, 0
-            src += 1
-
-        line_start = src
-        if text.startswith(line, src):
-            src += len(line)
-        else:
-            found = text.find(line, src)
-            newline = text.find("\n", src)
-            if found >= 0 and (newline < 0 or found <= newline):
-                line_start = found
-                src = found + len(line)
-            else:
-                src = min(len(text), src + len(line))
-        line_end = src
-
-        if line_start <= caret_index <= line_end:
-            return line_i, caret_index - line_start
-
-        trail = src
-        while (
-            trail < len(text)
-            and text[trail].isspace()
-            and text[trail] != "\n"
-        ):
-            trail += 1
-        if line_end < caret_index < trail:
-            return line_i, len(line)
-
-        src = trail
-        if src < len(text) and text[src] == "\n":
-            if caret_index == src:
-                return line_i, len(line)
-            src += 1
-
-    return last_i, len(lines[last_i])
-
-
-def caret_index_for_line_column(
-    text: str, lines: list[str], line: int, column: int
-) -> int:
-    """Source index for *column* on visual *line* in wrapped *lines*."""
-    if not lines:
-        return 0
-    line = max(0, min(line, len(lines) - 1))
-    src = 0
-    for line_i, line_text in enumerate(lines):
-        if not line_text:
-            if line_i == line:
-                return src
-            if src < len(text) and text[src] == "\n":
-                src += 1
-            continue
-
-        while (
-            src < len(text)
-            and text[src].isspace()
-            and text[src] != "\n"
-            and not text.startswith(line_text, src)
-        ):
-            src += 1
-
-        line_start = src
-        if text.startswith(line_text, src):
-            src += len(line_text)
-        else:
-            found = text.find(line_text, src)
-            newline = text.find("\n", src)
-            if found >= 0 and (newline < 0 or found <= newline):
-                line_start = found
-                src = found + len(line_text)
-            else:
-                src = min(len(text), src + len(line_text))
-        line_end = src
-
-        if line_i == line:
-            return min(line_start + max(0, column), line_end)
-
-        trail = src
-        while (
-            trail < len(text)
-            and text[trail].isspace()
-            and text[trail] != "\n"
-        ):
-            trail += 1
-        src = trail
-        if src < len(text) and text[src] == "\n":
-            src += 1
-
-    return len(text)
-
-
-def _move_caret_vertical(
-    state: TextModalState,
-    delta: int,
-    wrap: Callable[[str], list[str]] | None,
-) -> None:
-    if state.single_line:
-        return
-    lines = text_field_lines(state.draft, single_line=False, wrap=wrap)
-    line, column = caret_line_column(state.draft, lines, state.caret_index)
-    target = line + delta
-    if target < 0 or target >= len(lines):
-        return
-    dest_col = min(column, len(lines[target]))
-    state.caret_index = caret_index_for_line_column(
-        state.draft, lines, target, dest_col
-    )
-
-
 @dataclass
 class ModalOption:
     label: str
     action: Callable[[], None]
+    role: ButtonRole = ButtonRole.PLAIN
 
 
 @dataclass(frozen=True)
@@ -242,63 +160,6 @@ class TextModalState:
     caret_blink_sec: float = 0.0
 
 
-_TEXT_EDIT_REPEAT_KEYS = frozenset(
-    {
-        pygame.K_LEFT,
-        pygame.K_RIGHT,
-        pygame.K_UP,
-        pygame.K_DOWN,
-        pygame.K_BACKSPACE,
-    }
-)
-_CARET_BLINK_CYCLE_SEC = 1.0
-_CARET_BLINK_VISIBLE_SEC = 0.5
-
-
-def _reset_caret_blink(state: TextModalState) -> None:
-    state.caret_blink_sec = 0.0
-
-
-def _text_caret_visible(state: TextModalState) -> bool:
-    if not state.editing:
-        return False
-    return (state.caret_blink_sec % _CARET_BLINK_CYCLE_SEC) < _CARET_BLINK_VISIBLE_SEC
-
-
-def _insert_text_at_caret(state: TextModalState, text: str) -> None:
-    caret = state.caret_index
-    state.draft = state.draft[:caret] + text + state.draft[caret:]
-    state.caret_index = caret + len(text)
-    state.error = None
-    _reset_caret_blink(state)
-
-
-def _apply_text_edit_key(
-    state: TextModalState,
-    key: int,
-    wrap: Callable[[str], list[str]] | None = None,
-) -> None:
-    _reset_caret_blink(state)
-    if key == pygame.K_BACKSPACE:
-        if state.caret_index > 0:
-            caret = state.caret_index
-            state.draft = state.draft[:caret - 1] + state.draft[caret:]
-            state.caret_index = caret - 1
-            state.error = None
-        return
-    if key == pygame.K_LEFT:
-        state.caret_index = max(0, state.caret_index - 1)
-        return
-    if key == pygame.K_RIGHT:
-        state.caret_index = min(len(state.draft), state.caret_index + 1)
-        return
-    if key == pygame.K_UP:
-        _move_caret_vertical(state, -1, wrap)
-        return
-    if key == pygame.K_DOWN:
-        _move_caret_vertical(state, 1, wrap)
-
-
 @dataclass
 class ModalRequest:
     kind: ModalKind
@@ -308,6 +169,7 @@ class ModalRequest:
     initial_focus_index: int = 0
     labeled_lines: tuple[ModalLabeledLine, ...] = ()
     progress_fraction: float | None = None
+    body: str | None = None
 
 
 @dataclass(frozen=True)
@@ -327,6 +189,11 @@ class ModalViewState:
     button_index: int = 0
     caret_visible: bool = True
     error: str | None = None
+    body: str | None = None
+    option_roles: tuple[ButtonRole, ...] = ()
+    form_rows: tuple[FormRowView, ...] = ()
+    form_info: str | None = None
+    form_buttons_focused: bool = False
 
 
 _UNSAVED_QUIT_MESSAGE = "Unsaved changes - save changes before exit?"
@@ -342,6 +209,7 @@ class ModalHost:
     ) -> None:
         self._request: ModalRequest | None = None
         self._text_state: TextModalState | None = None
+        self._form_state: FormState | None = None
         self._focus_index = 0
         self._on_start_text_input = on_start_text_input
         self._on_stop_text_input = on_stop_text_input
@@ -382,25 +250,41 @@ class ModalHost:
                 caret_index=text.caret_index,
                 focus_region=text.focus_region,
                 button_index=text.button_index,
-                caret_visible=_text_caret_visible(text),
+                caret_visible=text_caret_visible(text),
                 error=text.error,
+            )
+        form = self._form_state
+        form_rows: tuple[FormRowView, ...] = ()
+        if form is not None:
+            form_rows = tuple(
+                FormRowView(
+                    field.label,
+                    field.kind,
+                    field.options,
+                    form.values[field.id],
+                    index == form.field_index,
+                )
+                for index, field in enumerate(form.visible_fields())
             )
         return ModalViewState(
             kind=self._request.kind,
             message=self._request.message,
-            options=tuple(
-                capital_case_modal_option(option.label)
-                for option in self._request.options
-            ),
+            options=tuple(option.label for option in self._request.options),
             focus_index=self._focus_index,
             labeled_lines=self._request.labeled_lines,
             progress_fraction=self._request.progress_fraction,
+            body=self._request.body,
+            option_roles=tuple(option.role for option in self._request.options),
+            form_rows=form_rows,
+            form_info=None if form is None else form.info,
+            form_buttons_focused=form is not None and form.field_index is None,
         )
 
     def prompt(self, request: ModalRequest) -> None:
-        self._stop_text_input()
+        self.stop_text_input()
         self._request = request
         self._text_state = None
+        self._form_state = None
         self._input_modality = InputModality.POINTER
         self._pointer_motion.reset()
         self._focus_index = clamp_modal_focus_index(
@@ -418,29 +302,43 @@ class ModalHost:
         if self._pointer_motion.moved(event):
             self.enter_pointer_modality()
 
-    def prompt_yes_no(
+    def prompt_confirm(
         self,
         message: str,
+        confirm_label: str,
         on_confirm: Callable[[], None],
         on_cancel: Callable[[], None] | None = None,
         *,
-        cancel_label: str = "No",
+        body: str | None = None,
+        destructive: bool = False,
         labeled_lines: Sequence[ModalLabeledLine] = (),
     ) -> None:
+        """Ask once, with a verb button and Cancel.
+
+        A destructive prompt fills the button red and starts on Cancel, so a
+        stray Enter does nothing.
+        """
+
         def on_cancel_action() -> None:
             if on_cancel is not None:
                 on_cancel()
 
         self.prompt(
             ModalRequest(
-                kind=ModalKind.YES_NO,
+                kind=ModalKind.CONFIRM,
                 message=message,
                 options=[
-                    ModalOption("Yes", on_confirm),
-                    ModalOption(cancel_label, on_cancel_action),
+                    ModalOption(
+                        confirm_label,
+                        on_confirm,
+                        ButtonRole.DANGER if destructive else ButtonRole.PRIMARY,
+                    ),
+                    ModalOption("Cancel", on_cancel_action),
                 ],
                 on_dismiss=on_cancel,
+                initial_focus_index=1 if destructive else 0,
                 labeled_lines=tuple(labeled_lines),
+                body=body,
             )
         )
 
@@ -517,10 +415,126 @@ class ModalHost:
             initial=initial,
             validate=validate,
         )
-        self._start_text_input()
+        self.start_text_input()
 
     def dismiss(self) -> None:
         self._dismiss()
+
+    def prompt_form(self, spec: FormSpec) -> None:
+        """Open a dialog of parameters. Cancel leaves everything untouched.
+
+        Focus starts on the first field. A destructive form starts on Cancel.
+        """
+        fields_first = bool(spec.fields) and not spec.destructive
+        state = FormState(
+            spec=spec,
+            values={field.id: field.value for field in spec.fields},
+            field_index=0 if fields_first else None,
+        )
+        state.refresh_info()
+
+        def confirm() -> None:
+            spec.on_confirm(dict(state.values))
+
+        def cancel() -> None:
+            if spec.on_cancel is not None:
+                spec.on_cancel()
+
+        role = ButtonRole.DANGER if spec.destructive else ButtonRole.PRIMARY
+        self.prompt(
+            ModalRequest(
+                kind=ModalKind.FORM,
+                message=spec.title,
+                options=[
+                    ModalOption(spec.confirm_label, confirm, role),
+                    ModalOption("Cancel", cancel),
+                ],
+                on_dismiss=spec.on_cancel,
+                initial_focus_index=1 if spec.destructive else 0,
+                body=spec.body,
+            )
+        )
+        self._form_state = state
+
+    def set_form_value(self, row: int, value: int) -> None:
+        """Focus row ``row`` and choose option ``value``."""
+        state = self._form_state
+        if state is None:
+            return
+        fields = state.visible_fields()
+        if not 0 <= row < len(fields):
+            return
+        state.field_index = row
+        field = fields[row]
+        state.values[field.id] = max(0, min(value, len(field.options) - 1))
+        self._after_form_change(state)
+
+    def step_form_value(self, row: int, delta: int) -> None:
+        """Focus row ``row`` and step its option, wrapping at the ends."""
+        state = self._form_state
+        if state is None:
+            return
+        fields = state.visible_fields()
+        if not 0 <= row < len(fields):
+            return
+        state.field_index = row
+        field = fields[row]
+        count = len(field.options)
+        state.values[field.id] = (state.values[field.id] + delta) % count
+        self._after_form_change(state)
+
+    def focus_form_row(self, row: int) -> None:
+        state = self._form_state
+        if state is not None and 0 <= row < len(state.visible_fields()):
+            state.field_index = row
+
+    def _after_form_change(self, state: FormState) -> None:
+        state.refresh_info()
+        visible = len(state.visible_fields())
+        if state.field_index is not None and state.field_index >= visible:
+            state.field_index = visible - 1 if visible else None
+
+    def _move_form_focus(self, state: FormState, delta: int) -> None:
+        """Walk the fields, then the button row as one stop, and wrap."""
+        count = len(state.visible_fields())
+        slots = count + 1
+        position = count if state.field_index is None else state.field_index
+        position = (position + delta) % slots
+        state.field_index = None if position == count else position
+
+    def _handle_form_keydown(self, event: pygame.event.Event) -> bool:
+        state = self._form_state
+        assert state is not None
+        key = event.key
+        self.enter_keyboard_modality()
+        if key == pygame.K_ESCAPE:
+            self.cancel()
+        elif key == pygame.K_TAB:
+            self._move_form_focus(state, -1 if event.mod & pygame.KMOD_SHIFT else 1)
+        elif key in (pygame.K_UP, pygame.K_DOWN):
+            self._move_form_focus(state, -1 if key == pygame.K_UP else 1)
+        elif key in (pygame.K_LEFT, pygame.K_RIGHT):
+            delta = -1 if key == pygame.K_LEFT else 1
+            if state.field_index is None:
+                self._focus_index = (self._focus_index + delta) % self._option_count()
+            else:
+                self.step_form_value(state.field_index, delta)
+        elif key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+            self._activate_form(state)
+        return True
+
+    def _activate_form(self, state: FormState) -> None:
+        """Enter runs the focused button.
+
+        On a field it confirms. A destructive form moves to its buttons first,
+        so Enter on a field can never delete anything.
+        """
+        if state.field_index is None:
+            self.activate_option(self._focus_index)
+        elif state.spec.destructive:
+            state.field_index = None
+        else:
+            self.activate_option(0)
 
     def prompt_unsaved_quit(
         self,
@@ -537,8 +551,8 @@ class ModalHost:
                 kind=ModalKind.UNSAVED_QUIT,
                 message=_UNSAVED_QUIT_MESSAGE,
                 options=[
-                    ModalOption("Save", on_save),
-                    ModalOption("Don't Save", on_discard),
+                    ModalOption("Save", on_save, ButtonRole.PRIMARY),
+                    ModalOption("Don't save", on_discard),
                     ModalOption("Cancel", on_cancel_action),
                 ],
                 on_dismiss=on_cancel,
@@ -612,7 +626,7 @@ class ModalHost:
         if state is None:
             return
         if state.editing:
-            self._stop_text_input()
+            self.stop_text_input()
             state.editing = False
         state.focus_region = TextFocusRegion.BUTTONS
         state.button_index = max(0, min(index, 1))
@@ -640,6 +654,8 @@ class ModalHost:
             return True
         if request.kind == ModalKind.TEXT:
             return self._handle_text_keydown(event)
+        if request.kind == ModalKind.FORM:
+            return self._handle_form_keydown(event)
 
         if event.key == pygame.K_ESCAPE:
             self.cancel()
@@ -656,16 +672,6 @@ class ModalHost:
             self.enter_keyboard_modality()
             self._focus_index = (self._focus_index + 1) % option_count
             return True
-
-        if option_count == 2:
-            if event.key == pygame.K_y:
-                self.enter_keyboard_modality()
-                self._focus_option(0)
-                return True
-            if event.key == pygame.K_n:
-                self.enter_keyboard_modality()
-                self._focus_option(1)
-                return True
 
         if event.key == pygame.K_RETURN:
             self.activate_option(self._focus_index)
@@ -699,7 +705,7 @@ class ModalHost:
             return False
         if not text or (state.single_line and "\n" in text):
             return True
-        _insert_text_at_caret(state, text)
+        insert_text_at_caret(state, text)
         return True
 
     def _handle_text_keydown(self, event: pygame.event.Event) -> bool:
@@ -721,7 +727,7 @@ class ModalHost:
         if event.key == pygame.K_RETURN:
             if mod_shift(event.mod):
                 if not state.single_line:
-                    _insert_text_at_caret(state, "\n")
+                    insert_text_at_caret(state, "\n")
                 return True
             if self._show_text_validation_error(state):
                 return True
@@ -729,8 +735,8 @@ class ModalHost:
                 state, focus_region=TextFocusRegion.BUTTONS
             )
             return True
-        if event.key in _TEXT_EDIT_REPEAT_KEYS:
-            _apply_text_edit_key(state, event.key, self._text_field_wrap)
+        if event.key in TEXT_EDIT_REPEAT_KEYS:
+            apply_text_edit_key(state, event.key, self._text_field_wrap)
             self._text_key_repeat.on_keydown(
                 event.key,
                 event.mod,
@@ -743,7 +749,7 @@ class ModalHost:
         state = self._text_state
         if state is None or not state.editing:
             return
-        _apply_text_edit_key(state, key, self._text_field_wrap)
+        apply_text_edit_key(state, key, self._text_field_wrap)
 
     def _handle_text_navigate_keydown(
         self,
@@ -756,7 +762,7 @@ class ModalHost:
         if event.key in (pygame.K_UP, pygame.K_DOWN):
             self.enter_keyboard_modality()
             if state.focus_region == TextFocusRegion.FIELD:
-                self._stop_text_input()
+                self.stop_text_input()
                 state.editing = False
                 state.focus_region = TextFocusRegion.BUTTONS
                 state.button_index = 0
@@ -813,8 +819,8 @@ class ModalHost:
         state.focus_region = TextFocusRegion.FIELD
         if caret_index is not None:
             state.caret_index = max(0, min(caret_index, len(state.draft)))
-        _reset_caret_blink(state)
-        self._start_text_input()
+        reset_caret_blink(state)
+        self.start_text_input()
 
     def _leave_text_edit(
         self,
@@ -822,20 +828,20 @@ class ModalHost:
         *,
         focus_region: TextFocusRegion = TextFocusRegion.FIELD,
     ) -> None:
-        self._stop_text_input()
+        self.stop_text_input()
         state.editing = False
         state.focus_region = focus_region
         if focus_region == TextFocusRegion.BUTTONS:
             state.button_index = 0
 
-    def _start_text_input(self) -> None:
+    def start_text_input(self) -> None:
         if self._text_input_started:
             return
         self._text_input_started = True
         if self._on_start_text_input is not None:
             self._on_start_text_input()
 
-    def _stop_text_input(self) -> None:
+    def stop_text_input(self) -> None:
         self._text_key_repeat.disarm()
         if not self._text_input_started:
             return
@@ -844,7 +850,7 @@ class ModalHost:
             self._on_stop_text_input()
 
     def _dismiss_text(self, *, invoke_cancel: bool) -> None:
-        self._stop_text_input()
+        self.stop_text_input()
         state = self._text_state
         self._text_state = None
         self._request = None
@@ -853,10 +859,11 @@ class ModalHost:
             state.on_cancel()
 
     def _dismiss(self) -> None:
-        self._stop_text_input()
+        self.stop_text_input()
         request = self._request
         self._request = None
         self._text_state = None
+        self._form_state = None
         self._focus_index = 0
         if request is not None and request.on_dismiss is not None:
             request.on_dismiss()
@@ -865,9 +872,10 @@ class ModalHost:
         request = self._request
         if request is None:
             return
-        self._stop_text_input()
+        self.stop_text_input()
         focus_index = self._focus_index
         self._request = None
         self._text_state = None
+        self._form_state = None
         self._focus_index = 0
         request.options[focus_index].action()

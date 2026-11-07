@@ -777,7 +777,8 @@ class VisualizerApp:
                     elif event.type == pygame.KEYUP:
                         dispatch_keyup(event, rt)
                     elif event.type == pygame.TEXTINPUT:
-                        rt.modal_host.handle_text_input(event.text)
+                        if not rt.controls.inline_edit.handle_text_input(event.text):
+                            rt.modal_host.handle_text_input(event.text)
 
                 if rt.controls.consume_pending_exit():
                     running = False

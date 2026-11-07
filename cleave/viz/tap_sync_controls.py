@@ -141,10 +141,10 @@ class TapSyncControls:
 
     def prompt_start(self) -> None:
         self._pause_transport()
-        self._modal_host.prompt_yes_no(
+        self._modal_host.prompt_confirm(
             _TAP_SYNC_CONFIRM_MESSAGE,
-            on_confirm=self._begin_calibration,
-            cancel_label="Cancel",
+            "Start",
+            self._begin_calibration,
         )
 
     def _begin_calibration(self) -> None:
@@ -220,11 +220,11 @@ class TapSyncControls:
         latency_ms = clamp_residual_latency_ms(
             int(round(self._proposed_latency_sec() * 1000.0))
         )
-        self._modal_host.prompt_yes_no(
+        self._modal_host.prompt_confirm(
             f"Detected latency: {latency_ms} ms. Apply?",
-            on_confirm=lambda: self._apply_detected_latency(latency_ms),
-            on_cancel=self._dismiss_without_apply,
-            cancel_label="Cancel",
+            "Apply",
+            lambda: self._apply_detected_latency(latency_ms),
+            self._dismiss_without_apply,
         )
 
     def _apply_detected_latency(self, latency_ms: int) -> None:

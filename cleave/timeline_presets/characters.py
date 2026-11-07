@@ -149,13 +149,3 @@ CHARACTER_HELP_ENTRIES: tuple[tuple[str, str], ...] = (
 
 def timeline_preset_kind_display(kind: str) -> str:
     return _CHARACTER_DISPLAY.get(kind, _CHARACTER_DISPLAY[DEFAULT_TIMELINE_PRESET_KIND])
-
-
-def cycle_timeline_preset_kind(value: str, *, forward: bool) -> str:
-    options = TIMELINE_PRESET_KIND_OPTIONS
-    try:
-        index = options.index(value)
-    except ValueError:
-        index = options.index(DEFAULT_TIMELINE_PRESET_KIND)
-    delta = 1 if forward else -1
-    return options[(index + delta) % len(options)]

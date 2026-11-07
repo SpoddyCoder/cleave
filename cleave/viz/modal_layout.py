@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from typing import Protocol
 
+from cleave.viz.text_edit import caret_index_for_line_column, caret_line_column
 from cleave.viz.modal import (
+    BUTTON_ROW_KINDS,
+    FormFieldKind,
+    FormRowView,
     ModalLabeledLine,
     ModalViewState,
-    caret_index_for_line_column,
-    caret_line_column,
 )
 from cleave.viz.text_fit import TextSizer, wrap_text_to_width
 from cleave.viz.theme import UI_SCALE, scale_px, tuning_ui_metrics
@@ -23,7 +25,15 @@ PANEL_PAD_X = _tuning_ui.modal_panel_pad_x
 PANEL_PAD_Y = _tuning_ui.modal_panel_pad_y
 BAR_HEIGHT = scale_px(10, scale=UI_SCALE)
 TEXT_BUTTON_LABELS = ("Confirm", "Cancel")
-TEXT_BUTTON_GAP = scale_px(24, scale=UI_SCALE)
+BUTTON_GAP = scale_px(8, scale=UI_SCALE)
+BUTTON_PAD_Y = scale_px(3, scale=UI_SCALE)
+FORM_ROW_PAD_Y = scale_px(3, scale=UI_SCALE)
+FORM_LABEL_GAP = scale_px(24, scale=UI_SCALE)
+FORM_SEGMENT_PAD_X = scale_px(8, scale=UI_SCALE)
+FORM_STEP_ARROW_LEFT = "<"
+FORM_STEP_ARROW_RIGHT = ">"
+FORM_RADIO_ON = "(*) "
+FORM_RADIO_OFF = "( ) "
 EDITING_HINT = "Press Enter to confirm or ESC to cancel"
 CARET_WIDTH = 2
 
@@ -85,6 +95,63 @@ def measure_options(
     return total_w, total_h
 
 
+def button_widths(measure: TextMeasure, labels: tuple[str, ...]) -> tuple[int, ...]:
+    return tuple(measure.size(option_text(label))[0] for label in labels)
+
+
+def button_height(measure: TextMeasure) -> int:
+    return measure.get_linesize() + BUTTON_PAD_Y * 2
+
+
+def measure_button_row(
+    measure: TextMeasure, labels: tuple[str, ...]
+) -> tuple[int, int]:
+    widths = button_widths(measure, labels)
+    gaps = BUTTON_GAP * max(0, len(widths) - 1)
+    return sum(widths) + gaps, button_height(measure)
+
+
+def form_row_height(row: FormRowView, line_h: int, line_gap: int) -> int:
+    lines = len(row.options) if row.kind is FormFieldKind.RADIO else 1
+    return lines_block_height(lines, line_h, line_gap) + FORM_ROW_PAD_Y * 2
+
+
+def form_segment_widths(measure: TextMeasure, row: FormRowView) -> tuple[int, ...]:
+    return tuple(
+        measure.size(option)[0] + FORM_SEGMENT_PAD_X * 2 for option in row.options
+    )
+
+
+def form_control_width(measure: TextMeasure, row: FormRowView) -> int:
+    """Width of a row's control. A stepper fits its widest option, so it holds still."""
+    if row.kind is FormFieldKind.SEGMENT:
+        return sum(form_segment_widths(measure, row))
+    if row.kind is FormFieldKind.RADIO:
+        return max(measure.size(FORM_RADIO_ON + o)[0] for o in row.options)
+    arrows = measure.size(f" {FORM_STEP_ARROW_LEFT} {FORM_STEP_ARROW_RIGHT} ")[0]
+    return max(measure.size(o)[0] for o in row.options) + arrows
+
+
+def measure_form(
+    measure: TextMeasure,
+    state: ModalViewState,
+    *,
+    line_gap: int,
+) -> tuple[int, int]:
+    """Width and height of the field rows and the info line."""
+    line_h = measure.get_linesize()
+    width = 0
+    height = 0
+    for row in state.form_rows:
+        row_w = measure.size(row.label)[0] + FORM_LABEL_GAP
+        width = max(width, row_w + form_control_width(measure, row))
+        height += form_row_height(row, line_h, line_gap)
+    if state.form_info is not None:
+        width = max(width, measure.size(state.form_info)[0])
+        height += line_gap + line_h
+    return width, height
+
+
 def measure_panel(
     measure: TextMeasure,
     state: ModalViewState,
@@ -95,7 +162,7 @@ def measure_panel(
     line_h = measure.get_linesize()
     content_w = 0
     content_h = 0
-    has_message = state.message is not None
+    has_message = state.message is not None or state.body is not None
     has_labeled = bool(state.labeled_lines)
     has_bar = state.progress_fraction is not None
 
@@ -103,6 +170,14 @@ def measure_panel(
         lines = message_lines(measure, state.message, screen_w=screen_w)
         msg_w = max((measure.size(line)[0] for line in lines), default=0)
         content_w = max(content_w, msg_w)
+        content_h += len(lines) * line_h + max(0, len(lines) - 1) * line_gap
+
+    if state.body is not None:
+        if state.message is not None:
+            content_h += line_gap
+        lines = message_lines(measure, state.body, screen_w=screen_w)
+        body_w = max((measure.size(line)[0] for line in lines), default=0)
+        content_w = max(content_w, body_w)
         content_h += len(lines) * line_h + max(0, len(lines) - 1) * line_gap
 
     if has_labeled:
@@ -119,12 +194,22 @@ def measure_panel(
             content_h += line_h + line_gap
         content_h += BAR_HEIGHT
 
+    if state.form_rows or state.form_info is not None:
+        if has_message:
+            content_h += line_h
+        form_w, form_h = measure_form(measure, state, line_gap=line_gap)
+        content_w = max(content_w, form_w)
+        content_h += form_h
+
     if state.options:
         if has_message or has_labeled or has_bar:
             content_h += line_h + line_gap
-        options_w, options_h = measure_options(
-            measure, state.options, line_gap=line_gap
-        )
+        if state.kind in BUTTON_ROW_KINDS:
+            options_w, options_h = measure_button_row(measure, state.options)
+        else:
+            options_w, options_h = measure_options(
+                measure, state.options, line_gap=line_gap
+            )
         content_w = max(content_w, options_w)
         content_h += options_h
 
@@ -161,18 +246,6 @@ def text_field_lines(
         return [""]
     lines = message_lines(measure, draft, screen_w=screen_w)
     return lines if lines else [""]
-
-
-def text_button_widths(measure: TextMeasure) -> tuple[int, int]:
-    return (
-        measure.size(option_text(TEXT_BUTTON_LABELS[0]))[0],
-        measure.size(option_text(TEXT_BUTTON_LABELS[1]))[0],
-    )
-
-
-def text_buttons_width(measure: TextMeasure) -> int:
-    confirm_w, cancel_w = text_button_widths(measure)
-    return confirm_w + TEXT_BUTTON_GAP + cancel_w
 
 
 def text_max_field_lines(
@@ -261,8 +334,7 @@ def measure_text_panel(
     visible_lines, _ = visible_field_lines(field_lines, caret_line, max_field_lines)
     field_h = lines_block_height(len(visible_lines), line_h, line_gap)
 
-    buttons_w = text_buttons_width(measure)
-    buttons_h = line_h
+    buttons_w, buttons_h = measure_button_row(measure, TEXT_BUTTON_LABELS)
 
     content_w = max(cta_w, field_w, buttons_w)
     if error_line is not None:

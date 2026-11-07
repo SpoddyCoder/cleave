@@ -27,15 +27,3 @@ def timeline_preset_repopulate_display(
     if mode in TIMELINE_PRESET_REPOPULATE_OPTIONS:
         return mode
     return DEFAULT_TIMELINE_PRESET_REPOPULATE
-
-
-def cycle_timeline_preset_repopulate(
-    value: TimelinePresetRepopulate, *, forward: bool
-) -> TimelinePresetRepopulate:
-    options = TIMELINE_PRESET_REPOPULATE_OPTIONS
-    try:
-        index = options.index(value)
-    except ValueError:
-        index = options.index(DEFAULT_TIMELINE_PRESET_REPOPULATE)
-    delta = 1 if forward else -1
-    return options[(index + delta) % len(options)]
