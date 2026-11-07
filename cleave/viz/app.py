@@ -632,11 +632,9 @@ class VisualizerApp:
             )
         pygame.display.set_caption(seed.window_title)
         set_ui_scale_percent(seed.cfg.editor.ui_scale)
-        if (
-            window.display_width != seed.display_width
-            or window.display_height != seed.display_height
-        ):
-            window.adopt_display_size(seed.display_width, seed.display_height)
+        # An open window keeps the size the user dragged it to.
+        seed.display_width = window.display_width
+        seed.display_height = window.display_height
         clock = pygame.time.Clock()
 
         rt: LiveVisualizerRuntime | None = None
@@ -776,6 +774,7 @@ class VisualizerApp:
             while running:
                 frame_rate.begin_frame()
                 for event in pygame.event.get():
+                    window.note_event(event)
                     dispatch_window_event(event, rt)
                     shell.process_event(event)
                     if event.type == pygame.QUIT:
@@ -801,6 +800,10 @@ class VisualizerApp:
                 rt.timeline_controls.tick(self._overlay_dt)
                 rt.modal_host.tick(self._overlay_dt)
 
+                if window.apply_pending_resize():
+                    rt.overlay_surface = window.overlay_surface
+                    rt.seed.display_width = window.display_width
+                    rt.seed.display_height = window.display_height
                 t_sec = current_sec(rt.playback, rt.seed.duration_sec)
                 layout = self._begin_live_frame(rt)
                 if rt.controls.project_render.busy:

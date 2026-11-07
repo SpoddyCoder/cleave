@@ -402,7 +402,7 @@ def test_open_loading_window_uses_editor_defaults(
     window = open_loading_window()
     width, height = editor_display_size()
     mock_set_mode.assert_called_once_with(
-        (width, height), pygame.OPENGL | pygame.DOUBLEBUF
+        (width, height), pygame.OPENGL | pygame.DOUBLEBUF | pygame.RESIZABLE
     )
     mock_set_caption.assert_called_once_with("Cleave")
     mock_gl.assert_called_once_with(
@@ -505,25 +505,76 @@ def test_loading_window_update_quit_skips_draw(
     mock_draw.assert_not_called()
 
 
-@patch("cleave.viz.loading._set_gl_mode")
-def test_adopt_display_size_resizes_only_when_changed(
-    mock_set_mode: MagicMock,
-) -> None:
+def _size_event(width: int, height: int) -> pygame.event.Event:
+    return pygame.event.Event(pygame.WINDOWSIZECHANGED, x=width, y=height)
+
+
+def _resizable_window() -> tuple[LoadingWindow, MagicMock, MagicMock]:
     pygame.init()
     compositor = MagicMock()
+    host = MagicMock()
     window = LoadingWindow(
         compositor=compositor,
         display_width=640,
         display_height=360,
         overlay_surface=pygame.Surface((640, 360), pygame.SRCALPHA),
+        imgui=host,
     )
-    window.adopt_display_size(640, 360)
+    return window, compositor, host
+
+
+@patch("cleave.viz.loading._set_gl_mode")
+def test_apply_pending_resize_applies_last_size_in_place(
+    mock_set_mode: MagicMock,
+) -> None:
+    window, compositor, host = _resizable_window()
+    window.note_event(_size_event(800, 600))
+    window.note_event(_size_event(1280, 720))
+    assert window.apply_pending_resize() is True
     mock_set_mode.assert_not_called()
-    window.adopt_display_size(1280, 720)
-    mock_set_mode.assert_called_once_with(1280, 720)
-    assert window.display_width == 1280
-    assert window.display_height == 720
+    compositor.set_display_size.assert_called_once_with(1280, 720)
+    host.set_display_size.assert_called_once_with(1280, 720)
+    assert (window.display_width, window.display_height) == (1280, 720)
     assert window.overlay_surface.get_size() == (1280, 720)
+    assert window.pending_size is None
+    assert window.apply_pending_resize() is False
+
+
+def test_apply_pending_resize_ignores_same_and_zero_sizes() -> None:
+    window, compositor, host = _resizable_window()
+    surface = window.overlay_surface
+    window.note_event(_size_event(0, 0))
+    assert window.apply_pending_resize() is False
+    window.note_event(_size_event(640, 360))
+    assert window.apply_pending_resize() is False
+    compositor.set_display_size.assert_not_called()
+    host.set_display_size.assert_not_called()
+    assert window.overlay_surface is surface
+
+
+def test_note_event_ignores_other_events() -> None:
+    window, _compositor, _host = _resizable_window()
+    window.note_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_a))
+    assert window.pending_size is None
+
+
+@patch("cleave.viz.loading.pygame.display.flip")
+@patch("cleave.viz.loading._clear_display")
+def test_present_frame_applies_pending_resize(
+    mock_clear: MagicMock,
+    _mock_flip: MagicMock,
+) -> None:
+    window, compositor, _host = _resizable_window()
+    window.note_event(_size_event(1024, 768))
+    present_frame(window, lambda: None)
+    compositor.set_display_size.assert_called_once_with(1024, 768)
+    mock_clear.assert_called_once_with(1024, 768)
+
+
+def test_display_flags_make_the_window_resizable() -> None:
+    from cleave.viz import loading
+
+    assert loading._GL_DISPLAY_FLAGS & pygame.RESIZABLE
 
 
 @patch("cleave.viz.loading.pygame.quit")

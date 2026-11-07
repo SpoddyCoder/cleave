@@ -356,6 +356,7 @@ def present_frame(
     ``draw`` runs inside the frame, after the scrim when ``scrim`` is set.
     No ImGui host skips the clear, the frame, and the callback.
     """
+    window.apply_pending_resize()
     host = window.imgui
     if host is None:
         return
@@ -388,7 +389,7 @@ class _LoadingDraw:
         )
 
 
-_GL_DISPLAY_FLAGS = pygame.OPENGL | pygame.DOUBLEBUF
+_GL_DISPLAY_FLAGS = pygame.OPENGL | pygame.DOUBLEBUF | pygame.RESIZABLE
 _LOADING_CAPTION = "Cleave"
 
 
@@ -413,6 +414,39 @@ class LoadingWindow:
     quit_requested: bool = field(default=False)
     video_quit: bool = field(default=False)
     imgui: ImGuiHost | None = None
+    # Latest size from a drag or maximise, applied once before the next draw.
+    pending_size: tuple[int, int] | None = None
+
+    def note_event(self, event: pygame.event.Event) -> None:
+        """Record a window resize. The last size in a burst of events wins."""
+        if event.type != pygame.WINDOWSIZECHANGED:
+            return
+        width = int(event.x)
+        height = int(event.y)
+        if width <= 0 or height <= 0:
+            return
+        self.pending_size = (width, height)
+
+    def apply_pending_resize(self) -> bool:
+        """Resize the display viewport, overlay surface, and ImGui in place.
+
+        Keeps the GL context: the window is never reopened with ``set_mode``.
+        True when the size changed.
+        """
+        size = self.pending_size
+        self.pending_size = None
+        if size is None:
+            return False
+        width, height = size
+        if width == self.display_width and height == self.display_height:
+            return False
+        self.compositor.set_display_size(width, height)
+        self.overlay_surface = pygame.Surface((width, height), pygame.SRCALPHA)
+        self.display_width = width
+        self.display_height = height
+        if self.imgui is not None:
+            self.imgui.set_display_size(width, height)
+        return True
 
     def update(
         self,
@@ -422,6 +456,7 @@ class LoadingWindow:
     ) -> bool:
         """Draw the loading screen and pump events. False if the user quit."""
         for event in pygame.event.get():
+            self.note_event(event)
             if event.type == pygame.QUIT:
                 self.quit_requested = True
                 return False
@@ -439,15 +474,6 @@ class LoadingWindow:
             scrim=False,
         )
         return True
-
-    def adopt_display_size(self, width: int, height: int) -> None:
-        """Resize the pygame window when the project display size differs."""
-        if width == self.display_width and height == self.display_height:
-            return
-        _set_gl_mode(width, height)
-        self.display_width = width
-        self.display_height = height
-        self.overlay_surface = pygame.Surface((width, height), pygame.SRCALPHA)
 
     def release_imgui(self) -> None:
         """Destroy the ImGui host. A second call is a no-op."""
@@ -467,6 +493,7 @@ class LoadingWindow:
         from cleave.viz.imgui_host import ImGuiHost
 
         self.imgui = ImGuiHost.create()
+        self.imgui.set_display_size(self.display_width, self.display_height)
 
     def close(self) -> None:
         self.release_imgui()

@@ -97,6 +97,7 @@ def run_file_picker(
     while accepted is None and not picker.cancelled and not window.quit_requested:
         pending[0] = None
         for event in pygame.event.get():
+            window.note_event(event)
             if event.type == pygame.QUIT:
                 window.quit_requested = True
                 break
@@ -151,6 +152,7 @@ def show_picker_error(window: LoadingWindow, message: str) -> bool:
 
     while True:
         for event in pygame.event.get():
+            window.note_event(event)
             if event.type == pygame.QUIT:
                 window.quit_requested = True
                 return False

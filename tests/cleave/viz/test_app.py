@@ -177,6 +177,7 @@ def _boot_window(seed: VisualizerSeed, compositor: MagicMock) -> MagicMock:
     window.display_width = seed.display_width
     window.display_height = seed.display_height
     window.quit_requested = False
+    window.apply_pending_resize.return_value = False
     window.compositor = compositor
     window.overlay_surface = pygame.Surface(
         (seed.display_width, seed.display_height), pygame.SRCALPHA
@@ -337,7 +338,6 @@ def test_run_boot_order_audio_starts_after_first_frame(
 
     loading_compositor.destroy.assert_not_called()
     mock_pygame.quit.assert_not_called()
-    window.adopt_display_size.assert_not_called()
     mock_pygame.display.set_mode.assert_not_called()
     mock_init_cheap.assert_called_once_with(seed, compositor=loading_compositor)
     mock_init_heavy.assert_called_once()
@@ -678,7 +678,7 @@ def test_run_main_loop_stays_open_without_quit_event(
 @patch("cleave.viz.app.init_gl_resources_heavy")
 @patch("cleave.viz.app.init_gl_resources_cheap")
 @patch.object(VisualizerApp, "tick_frame")
-def test_run_resizes_when_loading_window_size_differs(
+def test_run_keeps_open_window_size_on_project_switch(
     mock_tick_frame: MagicMock,
     mock_init_cheap: MagicMock,
     mock_init_heavy: MagicMock,
@@ -688,6 +688,7 @@ def test_run_resizes_when_loading_window_size_differs(
     seed = _run_seed()
     loading = MagicMock()
     window = _boot_window(seed, loading)
+    config_size = (seed.display_width, seed.display_height)
     window.display_width = seed.display_width // 2
     window.display_height = seed.display_height // 2
 
@@ -708,8 +709,9 @@ def test_run_resizes_when_loading_window_size_differs(
     except RuntimeError:
         pass
 
-    window.adopt_display_size.assert_called_once_with(
-        seed.display_width, seed.display_height
+    assert (seed.display_width, seed.display_height) == (
+        config_size[0] // 2,
+        config_size[1] // 2,
     )
     loading.destroy.assert_not_called()
     mock_pygame.display.set_mode.assert_not_called()

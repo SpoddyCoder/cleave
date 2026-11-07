@@ -152,3 +152,27 @@ def test_ui_scale_change_rebuilds_the_font_atlas_on_the_next_frame() -> None:
     finally:
         set_ui_scale_percent(DEFAULT_UI_SCALE)
         host.imgui.destroy()
+
+
+def test_frames_use_the_pushed_display_size_not_the_pygame_surface() -> None:
+    """A resized GL window keeps its old pygame surface size; the host trusts the push."""
+    from imgui_bundle import imgui
+
+    from cleave.viz import imgui_host
+    from cleave.viz.imgui_host import ImGuiHost
+
+    pygame.init()
+    with patch.object(imgui_host, "_gl_context_current", return_value=False):
+        host = ImGuiHost.create()
+    try:
+        host.set_display_size(1234, 567)
+        stale = MagicMock()
+        stale.get_size.return_value = (640, 360)
+        with patch.object(imgui_host.pygame.display, "get_surface", return_value=stale):
+            for _ in range(2):
+                host.begin_frame(1.0 / 60.0)
+                size = imgui.get_io().display_size
+                host.end_frame()
+        assert (size.x, size.y) == (1234.0, 567.0)
+    finally:
+        host.destroy()

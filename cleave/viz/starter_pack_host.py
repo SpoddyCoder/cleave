@@ -49,6 +49,7 @@ def _show_error(window: LoadingWindow, message: str) -> bool:
     )
     while True:
         for event in pygame.event.get():
+            window.note_event(event)
             if event.type == pygame.QUIT:
                 window.quit_requested = True
                 return False
@@ -67,6 +68,7 @@ def run_starter_pack_prompt(window: LoadingWindow) -> bool | None:
     clock = pygame.time.Clock()
     while not window.quit_requested:
         for event in pygame.event.get():
+            window.note_event(event)
             if event.type == pygame.QUIT:
                 window.quit_requested = True
                 return None

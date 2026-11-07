@@ -362,6 +362,10 @@ class ImGuiHost:
         host._glyph_ranges = glyph_ranges
         return host
 
+    def set_display_size(self, width: int, height: int) -> None:
+        """Track the window size; the window owns it and pushes every change."""
+        self.display_size = (int(width), int(height))
+
     def apply_ui_scale(self) -> None:
         """Rebuild the font atlas and style sizes at the live UI scale.
 
@@ -440,10 +444,6 @@ class ImGuiHost:
     def _submit_input(self, dt: float) -> None:
         io = imgui.get_io()
         width, height = self.display_size
-        surface = pygame.display.get_surface()
-        if surface is not None:
-            width, height = surface.get_size()
-            self.display_size = (width, height)
         io.display_size = imgui.ImVec2(float(width), float(height))
         io.display_framebuffer_scale = imgui.ImVec2(1.0, 1.0)
         io.delta_time = dt if dt > 0.0 else 1.0 / 60.0
