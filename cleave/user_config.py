@@ -13,9 +13,8 @@ import yaml
 from cleave.config import CleaveConfig, EditorConfig, dump_yaml
 from cleave.paths import WINDOWS_APP_FOLDER, XDG_APP_FOLDER
 from cleave.config_schema.editor import (
-    DEFAULT_EDITOR_HEIGHT,
-    DEFAULT_EDITOR_WIDTH,
-    DEFAULT_EDITOR_UPSCALE,
+    DEFAULT_VISUALISER_HEIGHT,
+    DEFAULT_VISUALISER_WIDTH,
     DEFAULT_HELP_WIDTH,
     DEFAULT_NAVIGATOR_HEIGHT,
     DEFAULT_UI_SCALE,
@@ -29,6 +28,12 @@ from cleave.config_schema.editor import (
     EditorPreviewQuality,
     dump_editor_section,
     parse_editor_section,
+)
+from cleave.config_schema.window import (
+    WINDOW_SECTION_KEY,
+    WindowGeometry,
+    dump_window_section,
+    parse_window_section,
 )
 
 USER_CONFIG_FILENAME = "config.yaml"
@@ -55,9 +60,8 @@ def user_config_path() -> Path:
 
 @dataclass(frozen=True)
 class EditorSettings:
-    width: int
-    height: int
-    upscale: float
+    visualiser_width: int
+    visualiser_height: int
     preview_quality: EditorPreviewQuality
     notification_display_sec: int
     residual_latency_ms: int
@@ -79,9 +83,8 @@ class UserConfig:
 
 def default_editor_settings() -> EditorSettings:
     return EditorSettings(
-        width=DEFAULT_EDITOR_WIDTH,
-        height=DEFAULT_EDITOR_HEIGHT,
-        upscale=DEFAULT_EDITOR_UPSCALE,
+        visualiser_width=DEFAULT_VISUALISER_WIDTH,
+        visualiser_height=DEFAULT_VISUALISER_HEIGHT,
         preview_quality=DEFAULT_EDITOR_PREVIEW_QUALITY,
         notification_display_sec=DEFAULT_NOTIFICATION_DISPLAY_SEC,
         residual_latency_ms=DEFAULT_RESIDUAL_LATENCY_MS,
@@ -161,9 +164,8 @@ def saved_ui_scale(path: Path | None = None) -> int:
 
 def editor_settings_from_config(cfg: EditorConfig) -> EditorSettings:
     return EditorSettings(
-        width=cfg.width,
-        height=cfg.height,
-        upscale=cfg.upscale,
+        visualiser_width=cfg.visualiser_width,
+        visualiser_height=cfg.visualiser_height,
         preview_quality=cfg.preview_quality,
         notification_display_sec=cfg.notification_display_sec,
         residual_latency_ms=cfg.residual_latency_ms,
@@ -183,7 +185,8 @@ def persist_editor_settings(cfg: CleaveConfig) -> None:
     )
 
 
-def write_user_config(editor: EditorSettings, path: Path) -> None:
+def _write_user_config_section(path: Path, key: str, section: dict[str, Any]) -> None:
+    """Replace one top-level section and keep the rest of the file."""
     data: dict[str, Any] = {}
     if path.is_file():
         with path.open(encoding="utf-8") as fh:
@@ -193,7 +196,39 @@ def write_user_config(editor: EditorSettings, path: Path) -> None:
         elif existing is not None:
             raise ValueError(f"user config root must be a mapping: {path}")
 
-    data["editor"] = dump_editor_section(editor)
+    data[key] = section
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as fh:
         dump_yaml(data, fh)
+
+
+def write_user_config(editor: EditorSettings, path: Path) -> None:
+    _write_user_config_section(path, "editor", dump_editor_section(editor))
+
+
+def saved_window_geometry(path: Path | None = None) -> WindowGeometry:
+    """The saved window size and maximised state, before any project loads.
+
+    A missing or unreadable user config gives the default geometry.
+    """
+    resolved = (path or user_config_path()).resolve()
+    try:
+        if not resolved.is_file():
+            return WindowGeometry()
+        with resolved.open(encoding="utf-8") as fh:
+            data = yaml.safe_load(fh)
+        if not isinstance(data, dict):
+            return WindowGeometry()
+        return parse_window_section(data)
+    except (OSError, ValueError, yaml.YAMLError):
+        return WindowGeometry()
+
+
+def persist_window_geometry(
+    geometry: WindowGeometry, path: Path | None = None
+) -> None:
+    """Write only the ``window:`` section of the user config."""
+    resolved = (path or user_config_path()).resolve()
+    _write_user_config_section(
+        resolved, WINDOW_SECTION_KEY, dump_window_section(geometry)
+    )

@@ -383,16 +383,21 @@ def test_present_frame_scrim_precedes_loading_content(
 @patch("cleave.viz.loading.present_frame")
 @patch("cleave.viz.loading.GlCompositor")
 @patch("cleave.viz.loading.pygame.display.set_caption")
+@patch("cleave.viz.loading._desktop_size", return_value=(3840, 2160))
+@patch("cleave.viz.loading._maximise")
 @patch("cleave.viz.loading.pygame.display.set_mode")
-def test_open_loading_window_uses_editor_defaults(
+def test_open_loading_window_uses_default_window_geometry(
     mock_set_mode: MagicMock,
+    mock_maximise: MagicMock,
+    _mock_desktop: MagicMock,
     mock_set_caption: MagicMock,
     mock_gl: MagicMock,
     mock_draw: MagicMock,
     mock_imgui_create: MagicMock,
 ) -> None:
-    from cleave.config_schema.editor import editor_display_size
+    from cleave.config_schema.window import WindowGeometry
     from cleave.gl_color_format import RGBA8
+    from cleave.user_config import saved_window_geometry
 
     compositor = MagicMock()
     mock_gl.return_value = compositor
@@ -400,7 +405,8 @@ def test_open_loading_window_uses_editor_defaults(
     mock_imgui_create.return_value = host
     pygame.init()
     window = open_loading_window()
-    width, height = editor_display_size()
+    width, height = WindowGeometry().width, WindowGeometry().height
+    mock_maximise.assert_not_called()
     mock_set_mode.assert_called_once_with(
         (width, height), pygame.OPENGL | pygame.DOUBLEBUF | pygame.RESIZABLE
     )
@@ -436,6 +442,7 @@ def test_open_loading_window_uses_editor_defaults(
         window.close()
     host.destroy.assert_called_once()
     assert order == ["destroy", "quit", "quit"]
+    assert saved_window_geometry() == WindowGeometry(width=width, height=height)
 
 
 def test_ensure_imgui_recreates_host_after_release() -> None:
@@ -590,3 +597,104 @@ def test_set_gl_mode_raises_launch_error(
     with pytest.raises(LaunchError, match="failed to open OpenGL window"):
         _set_gl_mode(640, 360)
     mock_quit.assert_called_once()
+
+
+@patch("cleave.viz.imgui_host.ImGuiHost.create")
+@patch("cleave.viz.loading.present_frame")
+@patch("cleave.viz.loading.GlCompositor")
+@patch("cleave.viz.loading.pygame.display.set_caption")
+@patch("cleave.viz.loading._desktop_size", return_value=(1366, 768))
+@patch("cleave.viz.loading._maximise")
+@patch("cleave.viz.loading.sdl_window.set_minimum_size")
+@patch("cleave.viz.loading.pygame.display.set_mode")
+def test_open_loading_window_fits_saved_size_to_desktop_and_maximises(
+    mock_set_mode: MagicMock,
+    mock_min_size: MagicMock,
+    mock_maximise: MagicMock,
+    _mock_desktop: MagicMock,
+    _mock_caption: MagicMock,
+    _mock_gl: MagicMock,
+    _mock_draw: MagicMock,
+    _mock_imgui: MagicMock,
+) -> None:
+    from cleave.config_schema.window import WINDOW_DESKTOP_MARGIN, WindowGeometry
+    from cleave.user_config import persist_window_geometry
+    from cleave.viz.theme import set_ui_scale_percent
+
+    persist_window_geometry(WindowGeometry(width=2560, height=1440))
+    pygame.init()
+    window = open_loading_window()
+    try:
+        fitted = (1366 - WINDOW_DESKTOP_MARGIN, 768 - WINDOW_DESKTOP_MARGIN)
+        mock_set_mode.assert_called_once()
+        assert mock_set_mode.call_args.args[0] == fitted
+        mock_maximise.assert_called_once_with()
+        assert window.maximised is True
+        assert window.geometry() == WindowGeometry(*fitted, maximised=True)
+        mock_min_size.assert_called_once_with(1024, 600)
+    finally:
+        set_ui_scale_percent(100)
+
+
+@patch("cleave.viz.loading.sdl_window.window_flags", return_value=None)
+def test_restored_size_ignores_sizes_while_maximised(_mock_flags: MagicMock) -> None:
+    from cleave.config_schema.window import WindowGeometry
+
+    window, _compositor, _host = _resizable_window()
+    window.note_event(_size_event(1000, 700))
+    window.note_event(pygame.event.Event(pygame.WINDOWMAXIMIZED))
+    window.note_event(_size_event(1920, 1040))
+    assert window.geometry() == WindowGeometry(1000, 700, maximised=True)
+    assert window.pending_size == (1920, 1040)
+    window.note_event(pygame.event.Event(pygame.WINDOWRESTORED))
+    window.note_event(_size_event(1000, 700))
+    assert window.geometry() == WindowGeometry(1000, 700, maximised=False)
+
+
+def test_restored_size_reads_sdl_maximised_flag() -> None:
+    from cleave.viz import sdl_window
+
+    window, _compositor, _host = _resizable_window()
+    window.restored_size = (900, 600)
+    with patch(
+        "cleave.viz.loading.sdl_window.window_flags",
+        return_value=sdl_window.SDL_WINDOW_MAXIMIZED,
+    ):
+        # The size change can arrive before the maximise event.
+        window.note_event(_size_event(1920, 1040))
+    assert window.restored_size == (900, 600)
+    assert window.maximised is True
+
+
+@patch("cleave.viz.loading.sdl_window.set_minimum_size")
+@patch("cleave.viz.loading._desktop_size", return_value=(5120, 1440))
+def test_sync_minimum_size_follows_ui_scale(
+    _mock_desktop: MagicMock, mock_min_size: MagicMock
+) -> None:
+    from cleave.viz.theme import set_ui_scale_percent
+
+    window, _compositor, _host = _resizable_window()
+    try:
+        set_ui_scale_percent(100)
+        window.sync_minimum_size()
+        window.sync_minimum_size()
+        mock_min_size.assert_called_once_with(1024, 600)
+        set_ui_scale_percent(200)
+        window.sync_minimum_size()
+        assert mock_min_size.call_args.args == (2048, 1200)
+    finally:
+        set_ui_scale_percent(100)
+
+
+def test_toggle_fullscreen_switches_desktop_fullscreen_and_back() -> None:
+    window, _compositor, _host = _resizable_window()
+    sdl_window_obj = MagicMock()
+    window_cls = MagicMock()
+    window_cls.from_display_module.return_value = sdl_window_obj
+    with patch("pygame._sdl2.video.Window", window_cls):
+        window.toggle_fullscreen()
+        sdl_window_obj.set_fullscreen.assert_called_once_with(desktop=True)
+        assert window.fullscreen is True
+        window.toggle_fullscreen()
+        sdl_window_obj.set_windowed.assert_called_once_with()
+        assert window.fullscreen is False

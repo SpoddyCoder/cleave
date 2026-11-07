@@ -33,7 +33,6 @@ from cleave.config import (
     EditorConfig,
     clamp_beat_sensitivity,
     clamp_effect_pct,
-    clamp_upscale,
     dump_yaml,
     bundled_viz_template_path,
     ensure_project_viz_config,
@@ -54,9 +53,8 @@ from cleave.config_schema.descriptors import (
 )
 from cleave.config_schema.editor import (
     DEFAULT_BEAT_SENSITIVITY,
-    DEFAULT_EDITOR_HEIGHT,
-    DEFAULT_EDITOR_UPSCALE,
-    DEFAULT_EDITOR_WIDTH,
+    DEFAULT_VISUALISER_HEIGHT,
+    DEFAULT_VISUALISER_WIDTH,
     DEFAULT_HELP_WIDTH,
     DEFAULT_INSPECTOR_WIDTH,
     DEFAULT_NOTIFICATION_DISPLAY_SEC,
@@ -202,19 +200,13 @@ def test_clamp_beat_sensitivity() -> None:
     assert clamp_beat_sensitivity(1.25) == 1.25
 
 
-def test_clamp_upscale() -> None:
-    assert clamp_upscale(1.0) == 1.0
-    assert clamp_upscale(1.5) == 1.5
-    assert clamp_upscale(0.5) == 1.0
+def test_clamp_visualiser_width_and_height() -> None:
+    from cleave.config_schema.editor import clamp_visualiser_height, clamp_visualiser_width
 
-
-def test_clamp_editor_width_and_height() -> None:
-    from cleave.config_schema.editor import clamp_editor_height, clamp_editor_width
-
-    assert clamp_editor_width(1280) == 1280
-    assert clamp_editor_width(100) == 320
-    assert clamp_editor_height(720) == 720
-    assert clamp_editor_height(100) == 240
+    assert clamp_visualiser_width(1280) == 1280
+    assert clamp_visualiser_width(100) == 320
+    assert clamp_visualiser_height(720) == 720
+    assert clamp_visualiser_height(100) == 240
 
 
 def test_clamp_notification_display_sec() -> None:
@@ -227,9 +219,9 @@ def test_clamp_notification_display_sec() -> None:
 
 def test_editor_config_from_settings_defaults() -> None:
     cfg = editor_config_from_settings()
-    assert cfg.upscale == DEFAULT_EDITOR_UPSCALE
-    assert cfg.width == DEFAULT_EDITOR_WIDTH
-    assert cfg.height == DEFAULT_EDITOR_HEIGHT
+    assert cfg.visualiser_width == DEFAULT_VISUALISER_WIDTH
+    assert cfg.visualiser_height == DEFAULT_VISUALISER_HEIGHT
+    assert not hasattr(cfg, "upscale")
     assert cfg.preview_quality == DEFAULT_EDITOR_PREVIEW_QUALITY
     assert cfg.notification_display_sec == DEFAULT_NOTIFICATION_DISPLAY_SEC
     assert cfg.inspector_width == DEFAULT_INSPECTOR_WIDTH == 495
@@ -240,9 +232,8 @@ def test_editor_config_from_settings_defaults() -> None:
 
 def test_editor_config_from_settings_uses_user_editor() -> None:
     editor = EditorSettings(
-        width=1920,
-        height=1080,
-        upscale=2.0,
+        visualiser_width=1920,
+        visualiser_height=1080,
         preview_quality="performance",
         notification_display_sec=5,
         residual_latency_ms=0,
@@ -254,9 +245,8 @@ def test_editor_config_from_settings_uses_user_editor() -> None:
         help_side="left",
     )
     cfg = editor_config_from_settings(editor)
-    assert cfg.width == 1920
-    assert cfg.height == 1080
-    assert cfg.upscale == 2.0
+    assert cfg.visualiser_width == 1920
+    assert cfg.visualiser_height == 1080
     assert cfg.preview_quality == "performance"
     assert cfg.notification_display_sec == 5
     assert cfg.inspector_width == 640
@@ -274,34 +264,20 @@ def test_parse_editor_section_clamps_ui_scale() -> None:
     assert parse_editor_section({"editor": {"ui_scale": 900}}).ui_scale == UI_SCALE_MAX
 
 
-def test_parse_editor_section_reads_width_height_upscale() -> None:
+def test_parse_editor_section_reads_visualiser_size() -> None:
     settings = parse_editor_section(
-        {"editor": {"width": 1920, "height": 1080, "upscale": 2.0}}
+        {"editor": {"visualiser_width": 1280, "visualiser_height": 720}}
     )
-    assert settings.width == 1920
-    assert settings.height == 1080
-    assert settings.upscale == 2.0
+    assert settings.visualiser_width == 1280
+    assert settings.visualiser_height == 720
 
 
-def test_parse_editor_section_clamps_width_height() -> None:
-    settings = parse_editor_section({"editor": {"width": 100, "height": 50}})
-    assert settings.width == 320
-    assert settings.height == 240
-
-
-def test_parse_editor_section_rejects_upscale_below_one() -> None:
-    with pytest.raises(ValueError, match="editor.upscale must be >= 1.0"):
-        parse_editor_section({"editor": {"upscale": 0.5}})
-
-
-def test_visualizer_display_dimensions() -> None:
-    cfg = EditorConfig(width=1280, height=720, upscale=1.5)
-    assert cfg.display_width == 1920
-    assert cfg.display_height == 1080
-
-    cfg_round = EditorConfig(width=100, height=100, upscale=1.33)
-    assert cfg_round.display_width == 133
-    assert cfg_round.display_height == 133
+def test_parse_editor_section_clamps_visualiser_size() -> None:
+    settings = parse_editor_section(
+        {"editor": {"visualiser_width": 100, "visualiser_height": 50}}
+    )
+    assert settings.visualiser_width == 320
+    assert settings.visualiser_height == 240
 
 
 def test_persisted_session_payload_omits_editor() -> None:
@@ -545,9 +521,8 @@ def test_load_config_user_paths_when_project_omits_paths(tmp_path: Path) -> None
 
 def test_load_config_editor_settings_from_user_config(tmp_path: Path) -> None:
     editor = EditorSettings(
-        width=1920,
-        height=1080,
-        upscale=1.5,
+        visualiser_width=1920,
+        visualiser_height=1080,
         preview_quality="performance",
         notification_display_sec=5,
         residual_latency_ms=0,
@@ -560,9 +535,8 @@ def test_load_config_editor_settings_from_user_config(tmp_path: Path) -> None:
     write_minimal_config(project_dir, preset_root)
 
     cfg = load_config(project_root=project_dir, user_config_path=user_cfg_path)
-    assert cfg.editor.width == 1920
-    assert cfg.editor.height == 1080
-    assert cfg.editor.upscale == 1.5
+    assert cfg.editor.visualiser_width == 1920
+    assert cfg.editor.visualiser_height == 1080
     assert cfg.editor.preview_quality == "performance"
     assert cfg.editor.notification_display_sec == 5
     assert cfg.user_config_path == user_cfg_path.resolve()
@@ -570,9 +544,8 @@ def test_load_config_editor_settings_from_user_config(tmp_path: Path) -> None:
 
 def test_load_config_ignores_editor_fields_in_project_yaml(tmp_path: Path) -> None:
     user_editor = EditorSettings(
-        width=1920,
-        height=1080,
-        upscale=1.5,
+        visualiser_width=1920,
+        visualiser_height=1080,
         preview_quality="performance",
         notification_display_sec=5,
         residual_latency_ms=0,
@@ -596,9 +569,8 @@ def test_load_config_ignores_editor_fields_in_project_yaml(tmp_path: Path) -> No
     )
 
     cfg = load_config(project_root=project_dir, user_config_path=user_cfg_path)
-    assert cfg.editor.width == 1920
-    assert cfg.editor.height == 1080
-    assert cfg.editor.upscale == 1.5
+    assert cfg.editor.visualiser_width == 1920
+    assert cfg.editor.visualiser_height == 1080
     assert cfg.editor.preview_quality == "performance"
     assert cfg.milkdrop_beat_sensitivity == DEFAULT_BEAT_SENSITIVITY
 
@@ -607,7 +579,7 @@ def test_load_config_round_trip(minimal_project: Path) -> None:
     cfg = load_config(project_root=minimal_project)
     assert cfg.config_path == (minimal_project / VIZ_CONFIG_FILENAME).resolve()
     assert set(cfg.layers) == set(DEFAULT_LAYER_SLOTS)
-    assert cfg.editor.width > 0
+    assert cfg.editor.visualiser_width > 0
     assert cfg.paths.preset_root.is_dir()
     for slot in DEFAULT_LAYER_SLOTS:
         assert cfg.layers[slot].preset.is_file()

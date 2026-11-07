@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from cleave.config import CleaveConfig, LayerConfig, PathsConfig, EditorConfig
-from cleave.config_schema.editor import DEFAULT_EDITOR_HEIGHT, DEFAULT_EDITOR_WIDTH
+from cleave.config_schema.editor import DEFAULT_VISUALISER_HEIGHT, DEFAULT_VISUALISER_WIDTH
 from cleave.config_schema.layers import DEFAULT_LAYER_SLOTS
 from cleave.viz.layer_preview_resolution import (
     PREVIEW_MIN_VIZ_SCALE,
@@ -36,7 +36,9 @@ def _visualizer(
     preview_quality: str = "balanced",
 ) -> EditorConfig:
     return EditorConfig(
-        width=width, height=height, preview_quality=preview_quality
+        visualiser_width=width,
+        visualiser_height=height,
+        preview_quality=preview_quality,
     )  # type: ignore[arg-type]
 
 
@@ -111,34 +113,34 @@ def test_preview_layer_size_table_scales(
 def test_balanced_floor_boundary_index_5_uses_visualizer_floor() -> None:
     visualizer = _visualizer(width=1920, height=1080)
     size = preview_layer_size("balanced", 5, visualizer)
-    min_w = round(visualizer.width * PREVIEW_MIN_VIZ_SCALE)
-    min_h = round(visualizer.height * PREVIEW_MIN_VIZ_SCALE)
+    min_w = round(visualizer.visualiser_width * PREVIEW_MIN_VIZ_SCALE)
+    min_h = round(visualizer.visualiser_height * PREVIEW_MIN_VIZ_SCALE)
     assert size == (min_w, min_h)
 
 
 def test_performance_floor_boundary_index_4_uses_visualizer_floor() -> None:
     visualizer = _visualizer(width=1920, height=1080)
     size = preview_layer_size("performance", 4, visualizer)
-    min_w = round(visualizer.width * PREVIEW_MIN_VIZ_SCALE)
-    min_h = round(visualizer.height * PREVIEW_MIN_VIZ_SCALE)
+    min_w = round(visualizer.visualiser_width * PREVIEW_MIN_VIZ_SCALE)
+    min_h = round(visualizer.visualiser_height * PREVIEW_MIN_VIZ_SCALE)
     assert size == (min_w, min_h)
 
 
 def test_ultra_performance_floor_boundary_index_3_uses_visualizer_floor() -> None:
     visualizer = _visualizer(width=1920, height=1080)
     size = preview_layer_size("ultra-performance", 3, visualizer)
-    min_w = round(visualizer.width * PREVIEW_MIN_VIZ_SCALE)
-    min_h = round(visualizer.height * PREVIEW_MIN_VIZ_SCALE)
+    min_w = round(visualizer.visualiser_width * PREVIEW_MIN_VIZ_SCALE)
+    min_h = round(visualizer.visualiser_height * PREVIEW_MIN_VIZ_SCALE)
     assert size == (min_w, min_h)
 
 
 def test_floor_clamp_preserves_visualizer_aspect() -> None:
     visualizer = _visualizer(width=1920, height=1080)
     size = preview_layer_size("balanced", 5, visualizer)
-    min_w = round(visualizer.width * PREVIEW_MIN_VIZ_SCALE)
+    min_w = round(visualizer.visualiser_width * PREVIEW_MIN_VIZ_SCALE)
     assert size[0] == min_w
     assert size[0] / size[1] == pytest.approx(
-        visualizer.width / visualizer.height, rel=0.02
+        visualizer.visualiser_width / visualizer.visualiser_height, rel=0.02
     )
 
 
@@ -192,7 +194,7 @@ def test_render_layer_size_full_quality_uses_output_at_mismatched_aspect() -> No
         render_width=1080,
         render_height=1920,
         editor=_visualizer(
-            width=DEFAULT_EDITOR_WIDTH, height=DEFAULT_EDITOR_HEIGHT
+            width=DEFAULT_VISUALISER_WIDTH, height=DEFAULT_VISUALISER_HEIGHT
         ),
     )
     assert render_layer_size(cfg, 0, viz_quality=False) == (1080, 1920)

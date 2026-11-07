@@ -155,7 +155,7 @@ def test_off_value_keeps_side_arrows_and_stepped_ignores_the_text() -> None:
     unlocked.session.timeline.locked = True
     assert inspector_row_stepped(unlocked.session, snap) is False
 
-    display = RowDescriptor(RowKind.SETTINGS_EDITOR_WINDOW_DISPLAY_SIZE)
+    display = RowDescriptor(RowKind.LAYER_MANAGEMENT_COUNT)
     assert row_spec(display.kind).apply_horizontal is None
     assert inspector_row_stepped(unlocked.session, display) is False
 

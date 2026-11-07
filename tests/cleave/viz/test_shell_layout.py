@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from cleave.config_schema.editor import DEFAULT_HELP_WIDTH
+from cleave.config_schema.editor import DEFAULT_HELP_WIDTH, DEFAULT_INSPECTOR_WIDTH
 from cleave.gl_compositor import _present_dest_rect
 from cleave.viz.shell_layout import (
     INSPECTOR_WIDTH,
@@ -530,3 +530,33 @@ def test_shell_row_heights_grow_with_ui_scale() -> None:
     finally:
         set_ui_scale_percent(DEFAULT_UI_SCALE)
     assert navigator_row_px() == row
+
+
+def test_minimum_window_keeps_every_column_and_both_stack_panes() -> None:
+    from cleave.config_schema.window import window_minimum_size
+    from cleave.viz.shell_host import menu_bar_height_px
+    from cleave.viz.theme import set_ui_scale_percent
+    from cleave.viz.timeline_overlay import timeline_band_height_px
+
+    try:
+        for percent in (100, 200):
+            set_ui_scale_percent(percent)
+            width, height = window_minimum_size(percent / 100.0, None)
+            bar_h = menu_bar_height_px()
+            layout = ShellLayout.compute(
+                width,
+                height,
+                bar_h,
+                bar_h,
+                timeline_band_height_px(4),
+                insp_width=DEFAULT_INSPECTOR_WIDTH,
+                help_width=DEFAULT_HELP_WIDTH,
+            )
+            row = navigator_row_px()
+            assert layout.navigator[2] >= MIN_COLUMN_WIDTH
+            assert layout.help[2] >= MIN_COLUMN_WIDTH
+            assert layout.visualiser[2] >= MIN_COLUMN_WIDTH
+            assert layout.navigator[3] >= row
+            assert layout.inspector[3] >= row
+    finally:
+        set_ui_scale_percent(100)

@@ -34,7 +34,7 @@ from cleave.config_schema.editor import (
     BEAT_SENSITIVITY_MAX,
     BEAT_SENSITIVITY_MIN,
     DEFAULT_BEAT_SENSITIVITY,
-    DEFAULT_EDITOR_HEIGHT,
+    DEFAULT_VISUALISER_HEIGHT,
     DEFAULT_NOTIFICATION_DISPLAY_SEC,
     DEFAULT_RESIDUAL_LATENCY_MS,
     DEFAULT_HELP_WIDTH,
@@ -44,16 +44,12 @@ from cleave.config_schema.editor import (
     DEFAULT_HELP_SIDE,
     DEFAULT_NAVIGATOR_SIDE,
     DEFAULT_EDITOR_PREVIEW_QUALITY,
-    DEFAULT_EDITOR_UPSCALE,
-    DEFAULT_EDITOR_WIDTH,
-    UPSCALE_MIN,
+    DEFAULT_VISUALISER_WIDTH,
     EDITOR_PREVIEW_QUALITIES,
     ColumnSide,
     EditorPreviewQuality,
     clamp_beat_sensitivity,
-    clamp_upscale,
     editor_config_from_settings,
-    editor_display_size,
 )
 from cleave.config_schema.layers import (
     DEFAULT_BLEND_MODE,
@@ -209,9 +205,8 @@ class LayerConfig:
 
 @dataclass(frozen=True)
 class EditorConfig:
-    width: int = DEFAULT_EDITOR_WIDTH
-    height: int = DEFAULT_EDITOR_HEIGHT
-    upscale: float = DEFAULT_EDITOR_UPSCALE
+    visualiser_width: int = DEFAULT_VISUALISER_WIDTH
+    visualiser_height: int = DEFAULT_VISUALISER_HEIGHT
     preview_quality: EditorPreviewQuality = DEFAULT_EDITOR_PREVIEW_QUALITY
     notification_display_sec: int = DEFAULT_NOTIFICATION_DISPLAY_SEC
     residual_latency_ms: int = DEFAULT_RESIDUAL_LATENCY_MS
@@ -221,14 +216,6 @@ class EditorConfig:
     ui_scale: int = DEFAULT_UI_SCALE
     navigator_side: ColumnSide = DEFAULT_NAVIGATOR_SIDE
     help_side: ColumnSide = DEFAULT_HELP_SIDE
-
-    @property
-    def display_width(self) -> int:
-        return editor_display_size(self.width, self.height, upscale=self.upscale)[0]
-
-    @property
-    def display_height(self) -> int:
-        return editor_display_size(self.width, self.height, upscale=self.upscale)[1]
 
 
 @dataclass(frozen=True)

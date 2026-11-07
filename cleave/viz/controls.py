@@ -38,6 +38,7 @@ from cleave.viz.project_render_controls import ProjectRenderController
 from cleave.viz.project_switch import ProjectSwitchController
 from cleave.viz.song_marker_controls import SongMarkerController
 from cleave.viz.tap_sync_controls import TapSyncControls, TapSyncUiSnapshot
+from cleave.viz.window_controls import WindowControls
 from cleave.viz.timeline_phase_controls import TimelinePhaseController
 from cleave.viz.timeline_history import TimelineHistory
 from cleave.viz.timeline_preset_controls import TimelinePresetController
@@ -127,6 +128,7 @@ class TuningControls:
         self._notification_host = PanelNotificationHost()
         self._key_repeat = KeyRepeatController()
         self.value_nudge = ValueNudgeHold(self)
+        self.window = WindowControls()
         self.layer_lifecycle = LayerLifecycleController(
             session,
             layer_manager,
@@ -241,6 +243,9 @@ class TuningControls:
             cfg,
             on_notification=self.show_notification,
             on_notification_display_changed=self._notification_host.set_display_sec,
+            on_visualiser_resolution_changed=lambda: (
+                self.layer_lifecycle.apply_visualiser_resolution()
+            ),
         )
         self.project = ProjectControls(
             session,
@@ -470,6 +475,7 @@ class TuningControls:
         self.inline_edit.tick(dt_sec)
         self.project_switch.tick(dt_sec)
         self.value_nudge.tick(dt_sec)
+        self.settings.tick(dt_sec)
         self._notification_host.clear_expired()
         self.project_render.tick()
 

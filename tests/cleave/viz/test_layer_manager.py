@@ -177,3 +177,36 @@ def test_discard_timeline_slot_strips_slot_from_timeline_state() -> None:
     assert session.timeline.record_buffer == {
         "layer_1": [SlotCue(t=1.0, level=1.0)],
     }
+
+
+@patch("cleave.viz.wiring.LayerFramePipeline.apply_preview_resolutions", return_value=True)
+def test_apply_visualiser_resolution_resizes_content_and_layers(
+    mock_apply_preview: MagicMock,
+) -> None:
+    from dataclasses import replace
+
+    manager, compositor = _manager(("layer_1",))
+    post_process = MagicMock()
+    manager.post_process = post_process
+    manager.cfg.editor = replace(
+        manager.cfg.editor, visualiser_width=1280, visualiser_height=720
+    )
+
+    manager.apply_visualiser_resolution()
+
+    compositor.set_content_size.assert_called_once_with(1280, 720)
+    mock_apply_preview.assert_called_once_with(
+        manager.cfg, manager.session, manager.layers_by_slot, compositor
+    )
+    post_process.release_sized_buffers.assert_called()
+
+
+@patch("cleave.viz.wiring.LayerFramePipeline.apply_preview_resolutions", return_value=False)
+def test_apply_preview_resolutions_keeps_post_buffers_when_nothing_resized(
+    _mock_apply_preview: MagicMock,
+) -> None:
+    manager, _compositor = _manager(("layer_1",))
+    post_process = MagicMock()
+    manager.post_process = post_process
+    manager.apply_preview_resolutions()
+    post_process.release_sized_buffers.assert_not_called()

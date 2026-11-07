@@ -6,7 +6,7 @@ from dataclasses import replace
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from cleave.config_schema.editor import DEFAULT_EDITOR_HEIGHT, DEFAULT_EDITOR_WIDTH
+from cleave.config_schema.editor import DEFAULT_VISUALISER_HEIGHT, DEFAULT_VISUALISER_WIDTH
 from cleave.preset_playlist import PresetPlaylist
 from cleave.viz.layer import StemLayer
 from cleave.viz.layer_pipeline import LayerFramePipeline
@@ -157,8 +157,8 @@ def test_build_preview_resolutions_false_uses_output_size_at_mismatched_aspect(
         render_height=1920,
         editor=replace(
             base_cfg.editor,
-            width=DEFAULT_EDITOR_WIDTH,
-            height=DEFAULT_EDITOR_HEIGHT,
+            visualiser_width=DEFAULT_VISUALISER_WIDTH,
+            visualiser_height=DEFAULT_VISUALISER_HEIGHT,
             preview_quality="performance",
         ),
     )

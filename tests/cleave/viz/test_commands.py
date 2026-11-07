@@ -61,6 +61,7 @@ _STATIC_IDS = (
     "timeline.redo",
     "settings.measure_latency",
     "help.overlay",
+    "settings.fullscreen",
     "file.about",
 )
 
@@ -192,7 +193,11 @@ def test_menus_list_taxonomy_ids_once() -> None:
         "timeline.undo",
         "timeline.redo",
     ]
-    assert _row_ids(menus[4]) == ["settings.measure_latency", "help.overlay"]
+    assert _row_ids(menus[4]) == [
+        "settings.measure_latency",
+        "help.overlay",
+        "settings.fullscreen",
+    ]
     ids = [command.id for command in iter_commands(menus)]
     assert len(ids) == len(set(ids))
     assert set(ids) == set(_STATIC_IDS)
@@ -269,6 +274,7 @@ def test_later_shortcuts_stay_on_rows_but_do_not_resolve() -> None:
     assert command_for_shortcut(pygame.K_q, pygame.KMOD_CTRL).id == "file.quit"
     assert command_for_shortcut(pygame.K_h, 0).id == "help.overlay"
     assert command_for_shortcut(pygame.K_h, pygame.KMOD_CTRL) is None
+    assert command_for_shortcut(pygame.K_F11, 0).id == "settings.fullscreen"
 
 
 def test_disabled_items_stay_disabled() -> None:
@@ -421,6 +427,24 @@ def test_wired_run_calls_controllers() -> None:
     help_item.run(controls)
     assert controls.session.help_visible is False
     assert help_item.checked(command_context(controls)) is False
+
+
+def test_fullscreen_command_requests_toggle_and_reads_window_state() -> None:
+    menus = _menus()
+    controls = _make_controls(("layer_1",))
+    item = command_by_id("settings.fullscreen", menus)
+    assert item.label == "Fullscreen"
+    assert item.kind == "check"
+    assert item.shortcut == "F11"
+    assert item.checked is not None
+    assert item.checked(command_context(controls)) is False
+
+    item.run(controls)
+    assert controls.window.consume_fullscreen_toggle() is True
+    assert controls.window.consume_fullscreen_toggle() is False
+
+    controls.window.fullscreen = True
+    assert item.checked(command_context(controls)) is True
 
 
 def test_request_quit_clean_sets_pending_exit() -> None:

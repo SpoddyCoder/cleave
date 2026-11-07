@@ -23,6 +23,14 @@ def _pygame_session() -> None:
         pygame.init()
 
 
+@pytest.fixture(autouse=True)
+def _isolated_user_config(tmp_path_factory, monkeypatch) -> None:
+    """Point the default user config at a temp dir, so tests never write the real one."""
+    config_home = tmp_path_factory.mktemp("user_config")
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(config_home))
+    monkeypatch.setenv("APPDATA", str(config_home))
+
+
 @pytest.fixture
 def signals_onset() -> Signals:
     return make_onset_signals([0.0, 1.0, 0.0])

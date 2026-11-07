@@ -10,8 +10,8 @@ import pytest
 
 from cleave.config import EditorConfig
 from cleave.config_schema.editor import (
-    DEFAULT_EDITOR_HEIGHT,
-    DEFAULT_EDITOR_WIDTH,
+    DEFAULT_VISUALISER_HEIGHT,
+    DEFAULT_VISUALISER_WIDTH,
     DEFAULT_INSPECTOR_WIDTH,
 )
 from cleave.config_schema.layers import DEFAULT_LAYER_SLOTS
@@ -83,9 +83,14 @@ def _assert_warmup_tick(tick_call: object) -> None:
     )
 
 
-def _minimal_runtime(compositor: MagicMock, *, upscale: float = 2.0) -> LiveVisualizerRuntime:
-    display_w = int(1280 * upscale)
-    display_h = int(720 * upscale)
+# Window size in these tests: twice the 1280x720 visualiser content.
+_DISPLAY = (2560, 1440)
+
+
+def _minimal_runtime(
+    compositor: MagicMock, *, display: tuple[int, int] = _DISPLAY
+) -> LiveVisualizerRuntime:
+    display_w, display_h = display
     session = TuningSession(layer_z_order=[], layers={})
     post_fx = default_post_fx_runtime(enabled=False)
     session.post_fx = replace(
@@ -109,9 +114,6 @@ def _minimal_runtime(compositor: MagicMock, *, upscale: float = 2.0) -> LiveVisu
         audio_path=MagicMock(),
         width=1280,
         height=720,
-        upscale=upscale,
-        display_width=display_w,
-        display_height=display_h,
         window_title="test",
         session=session,
         cfg=MagicMock(),
@@ -145,21 +147,15 @@ def _minimal_runtime(compositor: MagicMock, *, upscale: float = 2.0) -> LiveVisu
 
 def _run_seed(
     *,
-    upscale: float = 2.0,
     width: int = 1280,
     height: int = 720,
 ) -> VisualizerSeed:
-    display_w = int(width * upscale)
-    display_h = int(height * upscale)
     cfg = make_test_cfg(("layer_1",))
     return VisualizerSeed(
         project_dir=MagicMock(),
         audio_path=MagicMock(),
         width=width,
         height=height,
-        upscale=upscale,
-        display_width=display_w,
-        display_height=display_h,
         window_title="test",
         session=MagicMock(),
         cfg=cfg,
@@ -174,13 +170,12 @@ def _run_seed(
 
 def _boot_window(seed: VisualizerSeed, compositor: MagicMock) -> MagicMock:
     window = MagicMock()
-    window.display_width = seed.display_width
-    window.display_height = seed.display_height
+    window.display_width, window.display_height = _DISPLAY
     window.quit_requested = False
     window.apply_pending_resize.return_value = False
     window.compositor = compositor
     window.overlay_surface = pygame.Surface(
-        (seed.display_width, seed.display_height), pygame.SRCALPHA
+        _DISPLAY, pygame.SRCALPHA
     )
     return window
 
@@ -300,10 +295,11 @@ def test_run_boot_order_audio_starts_after_first_frame(
     window = _boot_window(seed, loading_compositor)
 
     call_order: list[str] = []
-    overlay_surface = pygame.Surface((seed.display_width, seed.display_height), pygame.SRCALPHA)
+    overlay_surface = pygame.Surface(_DISPLAY, pygame.SRCALPHA)
 
     def cheap_side_effect(
         rt: VisualizerSeed,
+        display_size: tuple[int, int],
         compositor: MagicMock | None = None,
     ) -> tuple[MagicMock, MagicMock, MagicMock, pygame.Surface]:
         call_order.append("init_cheap")
@@ -339,7 +335,9 @@ def test_run_boot_order_audio_starts_after_first_frame(
     loading_compositor.destroy.assert_not_called()
     mock_pygame.quit.assert_not_called()
     mock_pygame.display.set_mode.assert_not_called()
-    mock_init_cheap.assert_called_once_with(seed, compositor=loading_compositor)
+    mock_init_cheap.assert_called_once_with(
+        seed, _DISPLAY, compositor=loading_compositor
+    )
     mock_init_heavy.assert_called_once()
     mock_tick_frame.assert_called()
     _assert_warmup_tick(mock_tick_frame.call_args_list[0])
@@ -364,11 +362,11 @@ def test_run_pygame_quit_clean_exits_via_try_quit(
     seed = _run_seed()
     window = _boot_window(seed, MagicMock())
 
-    mock_init_cheap.side_effect = lambda rt, compositor=None: (
+    mock_init_cheap.side_effect = lambda rt, display_size, compositor=None: (
         compositor,
         MagicMock(),
         MagicMock(),
-        pygame.Surface((seed.display_width, seed.display_height), pygame.SRCALPHA),
+        pygame.Surface(_DISPLAY, pygame.SRCALPHA),
     )
     controls = MagicMock()
     controls.inline_edit.handle_keydown.return_value = False
@@ -416,6 +414,67 @@ def test_run_pygame_quit_clean_exits_via_try_quit(
 @patch("cleave.viz.app.init_gl_resources_heavy")
 @patch("cleave.viz.app.init_gl_resources_cheap")
 @patch.object(VisualizerApp, "tick_frame")
+def test_run_carries_out_a_fullscreen_request_on_the_window(
+    mock_tick_frame: MagicMock,
+    mock_init_cheap: MagicMock,
+    mock_init_heavy: MagicMock,
+    mock_pygame: MagicMock,
+    _mock_current_sec: MagicMock,
+) -> None:
+    from cleave.viz.window_controls import WindowControls
+
+    seed = _run_seed()
+    window = _boot_window(seed, MagicMock())
+    window.fullscreen = False
+
+    def toggle() -> None:
+        window.fullscreen = not window.fullscreen
+
+    window.toggle_fullscreen.side_effect = toggle
+    mock_init_cheap.side_effect = lambda rt, display_size, compositor=None: (
+        compositor,
+        MagicMock(),
+        MagicMock(),
+        pygame.Surface(_DISPLAY, pygame.SRCALPHA),
+    )
+    window_controls = WindowControls()
+    window_controls.request_fullscreen_toggle()
+
+    def heavy_with_window_controls(
+        rt: VisualizerSeed,
+        comp: MagicMock,
+        post: MagicMock,
+        masked: MagicMock,
+        surface: pygame.Surface,
+        on_progress=None,
+    ) -> LiveVisualizerRuntime:
+        live = _heavy_init_side_effect(rt, comp, post, masked, surface, on_progress)
+        live.controls.window = window_controls
+        live.controls.try_quit.return_value = True
+        live.controls.consume_pending_exit.return_value = False
+        return live
+
+    mock_init_heavy.side_effect = heavy_with_window_controls
+    mock_tick_frame.side_effect = lambda *_a, **_k: None
+    quit_event = MagicMock()
+    quit_event.type = pygame.QUIT
+    mock_pygame.event.get.side_effect = [[], [quit_event]]
+    mock_pygame.QUIT = pygame.QUIT
+    mock_pygame.time.Clock.return_value.tick.return_value = 33
+
+    VisualizerApp(seed).run(window)
+
+    window.toggle_fullscreen.assert_called_once_with()
+    assert window_controls.fullscreen is True
+    assert window_controls.consume_fullscreen_toggle() is False
+    window.sync_minimum_size.assert_called()
+
+
+@patch("cleave.viz.app.current_sec", return_value=0.0)
+@patch("cleave.viz.app.pygame")
+@patch("cleave.viz.app.init_gl_resources_heavy")
+@patch("cleave.viz.app.init_gl_resources_cheap")
+@patch.object(VisualizerApp, "tick_frame")
 def test_run_pending_switch_returns_target_and_keeps_compositor(
     mock_tick_frame: MagicMock,
     mock_init_cheap: MagicMock,
@@ -430,11 +489,11 @@ def test_run_pending_switch_returns_target_and_keeps_compositor(
     window = _boot_window(seed, compositor)
     target = OpenTarget(path=seed.project_dir, kind=OpenTargetKind.PROJECT)
 
-    mock_init_cheap.side_effect = lambda rt, compositor=None: (
+    mock_init_cheap.side_effect = lambda rt, display_size, compositor=None: (
         compositor,
         MagicMock(),
         MagicMock(),
-        pygame.Surface((seed.display_width, seed.display_height), pygame.SRCALPHA),
+        pygame.Surface(_DISPLAY, pygame.SRCALPHA),
     )
     controls = MagicMock()
     controls.inline_edit.handle_keydown.return_value = False
@@ -488,11 +547,11 @@ def test_run_ctrl_q_clean_exits(
     seed = _run_seed()
     window = _boot_window(seed, MagicMock())
 
-    mock_init_cheap.side_effect = lambda rt, compositor=None: (
+    mock_init_cheap.side_effect = lambda rt, display_size, compositor=None: (
         compositor,
         MagicMock(),
         MagicMock(),
-        pygame.Surface((seed.display_width, seed.display_height), pygame.SRCALPHA),
+        pygame.Surface(_DISPLAY, pygame.SRCALPHA),
     )
     controls = MagicMock()
     controls.inline_edit.handle_keydown.return_value = False
@@ -561,11 +620,11 @@ def test_run_pygame_quit_dirty_stays_open(
     seed = _run_seed()
     window = _boot_window(seed, MagicMock())
 
-    mock_init_cheap.side_effect = lambda rt, compositor=None: (
+    mock_init_cheap.side_effect = lambda rt, display_size, compositor=None: (
         compositor,
         MagicMock(),
         MagicMock(),
-        pygame.Surface((seed.display_width, seed.display_height), pygame.SRCALPHA),
+        pygame.Surface(_DISPLAY, pygame.SRCALPHA),
     )
     controls = MagicMock()
     controls.inline_edit.handle_keydown.return_value = False
@@ -627,11 +686,11 @@ def test_run_main_loop_stays_open_without_quit_event(
     seed = _run_seed()
     window = _boot_window(seed, MagicMock())
 
-    mock_init_cheap.side_effect = lambda rt, compositor=None: (
+    mock_init_cheap.side_effect = lambda rt, display_size, compositor=None: (
         compositor,
         MagicMock(),
         MagicMock(),
-        pygame.Surface((seed.display_width, seed.display_height), pygame.SRCALPHA),
+        pygame.Surface(_DISPLAY, pygame.SRCALPHA),
     )
     controls = MagicMock()
     controls.inline_edit.handle_keydown.return_value = False
@@ -688,15 +747,14 @@ def test_run_keeps_open_window_size_on_project_switch(
     seed = _run_seed()
     loading = MagicMock()
     window = _boot_window(seed, loading)
-    config_size = (seed.display_width, seed.display_height)
-    window.display_width = seed.display_width // 2
-    window.display_height = seed.display_height // 2
+    dragged = (_DISPLAY[0] // 2, _DISPLAY[1] // 2)
+    window.display_width, window.display_height = dragged
 
-    mock_init_cheap.side_effect = lambda rt, compositor=None: (
+    mock_init_cheap.side_effect = lambda rt, display_size, compositor=None: (
         compositor,
         MagicMock(),
         MagicMock(),
-        pygame.Surface((seed.display_width, seed.display_height), pygame.SRCALPHA),
+        pygame.Surface(_DISPLAY, pygame.SRCALPHA),
     )
     mock_init_heavy.side_effect = _heavy_init_side_effect
     mock_tick_frame.side_effect = lambda *_a, **_k: None
@@ -709,13 +767,9 @@ def test_run_keeps_open_window_size_on_project_switch(
     except RuntimeError:
         pass
 
-    assert (seed.display_width, seed.display_height) == (
-        config_size[0] // 2,
-        config_size[1] // 2,
-    )
     loading.destroy.assert_not_called()
     mock_pygame.display.set_mode.assert_not_called()
-    mock_init_cheap.assert_called_once_with(seed, compositor=loading)
+    mock_init_cheap.assert_called_once_with(seed, dragged, compositor=loading)
 
 
 @patch("cleave.viz.app._tick_frame_live_overlay")
@@ -735,11 +789,11 @@ def test_run_holds_content_and_overlay_while_project_render_busy(
     seed = _run_seed()
     window = _boot_window(seed, MagicMock())
 
-    mock_init_cheap.side_effect = lambda rt, compositor=None: (
+    mock_init_cheap.side_effect = lambda rt, display_size, compositor=None: (
         compositor,
         MagicMock(),
         MagicMock(),
-        pygame.Surface((seed.display_width, seed.display_height), pygame.SRCALPHA),
+        pygame.Surface(_DISPLAY, pygame.SRCALPHA),
     )
     controls = MagicMock()
     controls.inline_edit.handle_keydown.return_value = False
@@ -800,20 +854,19 @@ def test_init_gl_resources_cheap_reuses_loading_compositor(
     mock_make_masked.return_value = MagicMock()
 
     compositor, post_process, _masked, overlay = init_gl_resources_cheap(
-        seed, compositor=loading
+        seed, _DISPLAY, compositor=loading
     )
 
     mock_make_compositor.assert_not_called()
     loading.destroy.assert_not_called()
-    loading.set_display_size.assert_called_once_with(
-        seed.display_width, seed.display_height
-    )
+    # The loading compositor keeps the window's display size.
+    loading.set_display_size.assert_not_called()
     loading.set_content_size.assert_called_once_with(seed.width, seed.height)
     loading.set_color_format.assert_called_once()
     post.init.assert_called_once()
     assert compositor is loading
     assert post_process is post
-    assert overlay.get_size() == (seed.display_width, seed.display_height)
+    assert overlay.get_size() == _DISPLAY
 
 
 @patch("cleave.viz.app.LayerFramePipeline.build", return_value=([], {}))
@@ -856,9 +909,8 @@ def test_init_gl_resources_cheap_uses_editor_canvas_not_render_output(
     mock_masked: MagicMock,
 ) -> None:
     seed = _run_seed(
-        upscale=1.0,
-        width=DEFAULT_EDITOR_WIDTH,
-        height=DEFAULT_EDITOR_HEIGHT,
+        width=DEFAULT_VISUALISER_WIDTH,
+        height=DEFAULT_VISUALISER_HEIGHT,
     )
     seed.cfg = replace(
         seed.cfg,
@@ -866,8 +918,8 @@ def test_init_gl_resources_cheap_uses_editor_canvas_not_render_output(
         render_height=1920,
         editor=replace(
             seed.cfg.editor,
-            width=DEFAULT_EDITOR_WIDTH,
-            height=DEFAULT_EDITOR_HEIGHT,
+            visualiser_width=DEFAULT_VISUALISER_WIDTH,
+            visualiser_height=DEFAULT_VISUALISER_HEIGHT,
         ),
     )
     seed.session.project.render.width = 1080
@@ -877,16 +929,16 @@ def test_init_gl_resources_cheap_uses_editor_canvas_not_render_output(
     mock_post.return_value = MagicMock()
     mock_masked.return_value = MagicMock()
 
-    init_gl_resources_cheap(seed)
+    init_gl_resources_cheap(seed, (DEFAULT_VISUALISER_WIDTH, DEFAULT_VISUALISER_HEIGHT))
 
     mock_gl.assert_called_once()
-    assert mock_gl.call_args.args[:2] == (DEFAULT_EDITOR_WIDTH, DEFAULT_EDITOR_HEIGHT)
-    assert mock_gl.call_args.kwargs["display_width"] == DEFAULT_EDITOR_WIDTH
-    assert mock_gl.call_args.kwargs["display_height"] == DEFAULT_EDITOR_HEIGHT
+    assert mock_gl.call_args.args[:2] == (DEFAULT_VISUALISER_WIDTH, DEFAULT_VISUALISER_HEIGHT)
+    assert mock_gl.call_args.kwargs["display_width"] == DEFAULT_VISUALISER_WIDTH
+    assert mock_gl.call_args.kwargs["display_height"] == DEFAULT_VISUALISER_HEIGHT
     mock_masked.assert_called_once()
     assert mock_masked.call_args.args[:2] == (
-        DEFAULT_EDITOR_WIDTH,
-        DEFAULT_EDITOR_HEIGHT,
+        DEFAULT_VISUALISER_WIDTH,
+        DEFAULT_VISUALISER_HEIGHT,
     )
 
 
@@ -896,7 +948,7 @@ def test_init_gl_resources_cheap_uses_editor_canvas_not_render_output(
 @patch("cleave.viz.app.LayerFramePipeline.composite")
 @patch("cleave.viz.app.LayerFramePipeline.render_frame")
 @patch("cleave.viz.app.apply_layer_visibility")
-def test_tick_frame_overlay_order_at_upscale_one(
+def test_tick_frame_overlay_order_when_display_matches_content(
     _mock_visibility: MagicMock,
     _mock_effects: MagicMock,
     _mock_composite: MagicMock,
@@ -906,7 +958,7 @@ def test_tick_frame_overlay_order_at_upscale_one(
 ) -> None:
     pygame.init()
     compositor = recording_compositor()
-    runtime = _minimal_runtime(compositor, upscale=1.0)
+    runtime = _minimal_runtime(compositor, display=(1280, 720))
     runtime.seed.session.timeline.panel_open = True
     call_order: list[str] = []
 

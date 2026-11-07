@@ -42,14 +42,14 @@ def preview_layer_size(
     z_index: int,
     visualizer: EditorConfig,
 ) -> tuple[int, int]:
-    layer_w = visualizer.width
-    layer_h = visualizer.height
+    layer_w = visualizer.visualiser_width
+    layer_h = visualizer.visualiser_height
     if preview_quality == "full-quality":
         return layer_w, layer_h
 
     requested_scale = _requested_scale(preview_quality, z_index)
-    min_w = round(visualizer.width * PREVIEW_MIN_VIZ_SCALE)
-    min_h = round(visualizer.height * PREVIEW_MIN_VIZ_SCALE)
+    min_w = round(visualizer.visualiser_width * PREVIEW_MIN_VIZ_SCALE)
+    min_h = round(visualizer.visualiser_height * PREVIEW_MIN_VIZ_SCALE)
     effective_scale = max(requested_scale, min_w / layer_w, min_h / layer_h)
     w = max(1, round(layer_w * effective_scale))
     h = max(1, round(layer_h * effective_scale))

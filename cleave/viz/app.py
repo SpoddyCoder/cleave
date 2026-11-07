@@ -73,9 +73,6 @@ class VisualizerSeed:
     audio_path: Path
     width: int
     height: int
-    upscale: float
-    display_width: int
-    display_height: int
     window_title: str
     session: TuningSession
     cfg: CleaveConfig
@@ -138,11 +135,8 @@ def build_runtime_base(
     return VisualizerSeed(
         project_dir=project_dir,
         audio_path=audio_path,
-        width=cfg.editor.width,
-        height=cfg.editor.height,
-        upscale=cfg.editor.upscale,
-        display_width=cfg.editor.display_width,
-        display_height=cfg.editor.display_height,
+        width=cfg.editor.visualiser_width,
+        height=cfg.editor.visualiser_height,
         window_title=f"Cleave — {project_dir.name}",
         session=session,
         cfg=cfg,
@@ -164,13 +158,15 @@ def _compositor_color_format(seed: VisualizerSeed) -> GlColorFormat:
     )
 
 
-def _make_compositor(seed: VisualizerSeed) -> GlCompositor:
+def _make_compositor(
+    seed: VisualizerSeed, display_size: tuple[int, int]
+) -> GlCompositor:
     color_format = _compositor_color_format(seed)
     c = GlCompositor(
         seed.width,
         seed.height,
-        display_width=seed.display_width,
-        display_height=seed.display_height,
+        display_width=display_size[0],
+        display_height=display_size[1],
         color_format=color_format,
     )
     c.init()
@@ -191,8 +187,10 @@ def _make_masked_compositor(seed: VisualizerSeed) -> GlMaskedCompositor:
 def _adopt_loading_compositor(
     seed: VisualizerSeed, compositor: GlCompositor
 ) -> GlCompositor:
-    """Reconfigure the loading-screen compositor for the project; same GL context."""
-    compositor.set_display_size(seed.display_width, seed.display_height)
+    """Reconfigure the loading-screen compositor for the project; same GL context.
+
+    The display size stays the window's.
+    """
     compositor.set_content_size(seed.width, seed.height)
     compositor.set_color_format(_compositor_color_format(seed))
     return compositor
@@ -200,11 +198,12 @@ def _adopt_loading_compositor(
 
 def _init_compositor_and_post(
     seed: VisualizerSeed,
+    display_size: tuple[int, int],
     compositor: GlCompositor | None = None,
 ) -> tuple[GlCompositor, GlPostProcess, GlMaskedCompositor]:
     color_format = _compositor_color_format(seed)
     if compositor is None:
-        compositor = _make_compositor(seed)
+        compositor = _make_compositor(seed, display_size)
     else:
         compositor = _adopt_loading_compositor(seed, compositor)
     post_process = GlPostProcess(color_format=color_format)
@@ -215,14 +214,14 @@ def _init_compositor_and_post(
 
 def init_gl_resources_cheap(
     seed: VisualizerSeed,
+    display_size: tuple[int, int],
     compositor: GlCompositor | None = None,
 ) -> tuple[GlCompositor, GlPostProcess, GlMaskedCompositor, pygame.Surface]:
+    """Compositor, post-process, and overlay surface. *display_size* is the window's."""
     compositor, post_process, masked_compositor = _init_compositor_and_post(
-        seed, compositor=compositor
+        seed, display_size, compositor=compositor
     )
-    overlay_surface = pygame.Surface(
-        (seed.display_width, seed.display_height), pygame.SRCALPHA
-    )
+    overlay_surface = pygame.Surface(display_size, pygame.SRCALPHA)
     return compositor, post_process, masked_compositor, overlay_surface
 
 
@@ -270,6 +269,7 @@ def init_gl_resources_heavy(
         texture_paths=project_texture_search_paths(
             seed.project_dir, seed.cfg.paths.texture_paths
         ),
+        post_process=post_process,
     )
     controls = make_tuning_controls(
         session=seed.session,
@@ -627,14 +627,9 @@ class VisualizerApp:
 
         seed = self._runtime
         if window is None:
-            window = open_loading_window(
-                width=seed.display_width, height=seed.display_height
-            )
+            window = open_loading_window()
         pygame.display.set_caption(seed.window_title)
         set_ui_scale_percent(seed.cfg.editor.ui_scale)
-        # An open window keeps the size the user dragged it to.
-        seed.display_width = window.display_width
-        seed.display_height = window.display_height
         clock = pygame.time.Clock()
 
         rt: LiveVisualizerRuntime | None = None
@@ -642,12 +637,14 @@ class VisualizerApp:
         switch_target: OpenTarget | None = None
         try:
             compositor, post_process, masked_compositor, overlay_surface = (
-                init_gl_resources_cheap(seed, compositor=window.compositor)
+                init_gl_resources_cheap(
+                    seed,
+                    (window.display_width, window.display_height),
+                    compositor=window.compositor,
+                )
             )
             window.compositor = compositor
             window.overlay_surface = overlay_surface
-            window.display_width = seed.display_width
-            window.display_height = seed.display_height
             window.update("Loading...")
 
             def on_progress(message: str) -> None:
@@ -789,6 +786,11 @@ class VisualizerApp:
                         if not rt.controls.inline_edit.handle_text_input(event.text):
                             rt.modal_host.handle_text_input(event.text)
 
+                if rt.controls.window.consume_fullscreen_toggle():
+                    window.toggle_fullscreen()
+                rt.controls.window.fullscreen = window.fullscreen
+                window.sync_minimum_size()
+
                 if rt.controls.consume_pending_exit():
                     running = False
                 elif rt.controls.consume_pending_switch():
@@ -802,8 +804,6 @@ class VisualizerApp:
 
                 if window.apply_pending_resize():
                     rt.overlay_surface = window.overlay_surface
-                    rt.seed.display_width = window.display_width
-                    rt.seed.display_height = window.display_height
                 t_sec = current_sec(rt.playback, rt.seed.duration_sec)
                 layout = self._begin_live_frame(rt)
                 if rt.controls.project_render.busy:

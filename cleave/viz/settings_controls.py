@@ -9,23 +9,22 @@ from cleave.config import CleaveConfig, EditorConfig
 from cleave.config_schema.editor import (
     COLUMN_SIDES,
     EDITOR_PREVIEW_QUALITIES,
-    clamp_editor_height,
-    clamp_editor_width,
+    clamp_visualiser_height,
+    clamp_visualiser_width,
     clamp_residual_latency_ms,
     clamp_navigator_height,
     clamp_ui_scale,
     clamp_shell_column_width,
     clamp_notification_display_sec,
-    clamp_upscale,
 )
 from cleave.user_config import persist_editor_settings
 from cleave.viz.session import TuningSession
 from cleave.viz.shell_layout import navigator_row_px
 from cleave.viz.theme import set_ui_scale_percent
 
-EDITOR_WINDOW_RESTART_TOAST = (
-    "Restart the application for changes to take effect."
-)
+# Quiet time after the last visualiser width/height step before the layer
+# framebuffers are reallocated, so a held key does not reallocate every step.
+VISUALISER_RESOLUTION_SETTLE_SEC = 0.25
 
 
 class SettingsControls:
@@ -38,11 +37,15 @@ class SettingsControls:
         *,
         on_notification: Callable[[str], None] | None = None,
         on_notification_display_changed: Callable[[int], None] | None = None,
+        on_visualiser_resolution_changed: Callable[[], None] | None = None,
     ) -> None:
         self.session = session
         self.cfg = cfg
         self._on_notification = on_notification
         self._on_notification_display_changed = on_notification_display_changed
+        self._on_visualiser_resolution_changed = on_visualiser_resolution_changed
+        # Seconds left before a stepped visualiser resolution is applied.
+        self._resolution_settle_sec: float | None = None
         # Last drawn navigator height and stack band, so stepping the
         # navigator height starts from what is on screen.
         self._drawn_navigator_px = 0
@@ -68,40 +71,47 @@ class SettingsControls:
         )
         persist_editor_settings(self.cfg)
 
-    def adjust_editor_window_width(self, *, forward: bool, large: bool) -> None:
+    def adjust_visualiser_width(self, *, forward: bool, large: bool) -> None:
         step = 100 if large else 10
         delta = step if forward else -step
-        current = self.cfg.editor.width
-        self._commit_editor_window(
-            replace(self.cfg.editor, width=clamp_editor_width(current + delta))
-        )
-
-    def adjust_editor_window_height(self, *, forward: bool, large: bool) -> None:
-        step = 100 if large else 10
-        delta = step if forward else -step
-        current = self.cfg.editor.height
-        self._commit_editor_window(
-            replace(self.cfg.editor, height=clamp_editor_height(current + delta))
-        )
-
-    def adjust_editor_window_upscale(self, *, forward: bool, large: bool) -> None:
-        step = 0.5 if large else 0.1
-        delta = step if forward else -step
-        current = self.cfg.editor.upscale
-        self._commit_editor_window(
+        current = self.cfg.editor.visualiser_width
+        self._commit_visualiser_resolution(
             replace(
                 self.cfg.editor,
-                upscale=clamp_upscale(round(current + delta, 1)),
+                visualiser_width=clamp_visualiser_width(current + delta),
             )
         )
 
-    def _commit_editor_window(self, editor: EditorConfig) -> None:
+    def adjust_visualiser_height(self, *, forward: bool, large: bool) -> None:
+        step = 100 if large else 10
+        delta = step if forward else -step
+        current = self.cfg.editor.visualiser_height
+        self._commit_visualiser_resolution(
+            replace(
+                self.cfg.editor,
+                visualiser_height=clamp_visualiser_height(current + delta),
+            )
+        )
+
+    def _commit_visualiser_resolution(self, editor: EditorConfig) -> None:
         if editor == self.cfg.editor:
             return
         self.cfg.editor = editor
         persist_editor_settings(self.cfg)
-        if self._on_notification is not None:
-            self._on_notification(EDITOR_WINDOW_RESTART_TOAST)
+        self._resolution_settle_sec = VISUALISER_RESOLUTION_SETTLE_SEC
+
+    def tick(self, dt_sec: float) -> None:
+        """Apply a stepped visualiser resolution once the steps have settled."""
+        remaining = self._resolution_settle_sec
+        if remaining is None:
+            return
+        remaining -= max(0.0, dt_sec)
+        if remaining > 0.0:
+            self._resolution_settle_sec = remaining
+            return
+        self._resolution_settle_sec = None
+        if self._on_visualiser_resolution_changed is not None:
+            self._on_visualiser_resolution_changed()
 
     def cycle_preview_quality(self, *, forward: bool) -> None:
         modes = EDITOR_PREVIEW_QUALITIES

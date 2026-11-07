@@ -223,14 +223,18 @@ class LayerFramePipeline:
         session: TuningSession,
         layers_by_slot: dict[str, StemLayer],
         compositor: GlCompositor,
-    ) -> None:
+    ) -> bool:
+        """Resize layers to their preview sizes. True when any layer changed."""
         sizes = preview_sizes_for_session(cfg, session)
+        resized = False
         for slot, (width, height) in sizes.items():
             layer = layers_by_slot[slot]
             fbo = layer.fbo
             if fbo.width == width and fbo.height == height:
                 continue
             LayerFramePipeline.resize_layer(layer, compositor, width, height)
+            resized = True
+        return resized
 
     @staticmethod
     def set_projectm_fps(layers: list[StemLayer], fps: int) -> None:

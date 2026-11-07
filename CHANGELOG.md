@@ -9,7 +9,10 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 
-- Resize the editor window by dragging its edges or corners, or maximise it. The menu bar, columns, timeline strip, and visualiser follow the new size, and a project switch keeps it. A new window still opens at the Settings > Editor window size.
+- Settings > Fullscreen (F11) switches the editor to borderless fullscreen and back.
+- The editor window remembers its size and whether it was maximised, and opens centred. A saved size bigger than the screen opens maximised.
+- The editor window has a minimum size, so the menu bar, columns, and timeline strip can't collapse. It grows with the UI scale.
+- Resize the editor window by dragging its edges or corners, or maximise it. The menu bar, columns, timeline strip, and visualiser follow the new size, and a project switch keeps it.
 - Settings > UI > UI scale (80% to 200%) resizes all editor text and the spacing around it: menus, navigator, inspector, help, transport, notifications, tooltips, dialogs, the file picker, the loading screen, and the timeline strip. It applies at once and is kept as an editor preference. Overlay cards in the visualiser keep their own font sizes.
 - Drag the boundary between the navigator and the inspector to set how tall the navigator is, or step it with Settings > UI > navigator height. The height is kept as an editor preference. Fit to rows, the default, sizes the navigator to its tree as before, and stepping Left past the smallest height returns to it.
 - Timeline > Undo (Ctrl+Z) and Redo (Ctrl+Y) cover Generate timeline, Reset timeline, Snap cues, and Set cut type, including any preset lists and pattern mask settings Generate changed. Undo is unavailable after hand edits to cues, so it never discards them.
@@ -17,6 +20,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- Settings > Editor Window > visualiser width and height set only the visualiser render resolution, and apply live without a restart. The window size is separate. Earlier saved width and height values are not carried over, so the resolution starts at 1920x1080.
 - Hovering a menu bar title opens its menu without a click, and hovering another title switches to it.
 - The rule under the menu bar uses the same grey as the rule under the transport bar.
 - Overlay card title text and hex colours are edited in place in the inspector, and colour rows show a swatch that opens a colour picker with live preview. Esc reverts. Body text keeps its multi-line dialog. Song marker rows have a delete icon, and clicking a row seeks to the marker.
@@ -90,6 +94,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Removed
 
+- Settings > Editor Window > upscale and display size. The window size now comes from the window itself.
 - Settings > UI width mode, max width, and min width rows, and their `ui_width_mode`, `ui_width`, and `ui_min_width` keys in the user config. The shell layout no longer used them.
 
 ## [0.3.0] - 2026-10-12

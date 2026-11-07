@@ -45,15 +45,11 @@ class LaunchError(RuntimeError):
     """Editor boot failed. The caller decides between exiting and retrying."""
 
 
-def open_loading_window(
-    *,
-    width: int | None = None,
-    height: int | None = None,
-) -> LoadingWindow:
-    """Open the pygame/GL window and draw the loading screen."""
+def open_loading_window() -> LoadingWindow:
+    """Open the pygame/GL window at the saved size and draw the loading screen."""
     from cleave.viz.loading import open_loading_window as _open_loading_window
 
-    return _open_loading_window(width=width, height=height)
+    return _open_loading_window()
 
 
 def continue_launch(

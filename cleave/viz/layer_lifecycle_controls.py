@@ -45,6 +45,10 @@ class LayerLifecycleController:
         if self._layer_manager is not None:
             self._layer_manager.apply_preview_resolutions()
 
+    def apply_visualiser_resolution(self) -> None:
+        if self._layer_manager is not None:
+            self._layer_manager.apply_visualiser_resolution()
+
     def signature_payload(self) -> dict[str, list[str]] | None:
         if (
             self.move_mode_slot is not None

@@ -229,8 +229,9 @@ class GlCompositor:
     (first = topmost) and draws bottom-to-top. Layer blend mode ``black-key``
     treats each pixel's RGB as its compositing weight (black is fully
     transparent). Stem composite and post-FX always render into the content FBO;
-    ``present_content()`` blits to the default framebuffer at display size
-    (1:1 when upscale is 1.0). The tuning overlay uses SRCALPHA blending on the
+    ``present_content()`` blits to the default framebuffer, aspect-fit into the
+    present rect (the visualiser column) or stretched to the display when there
+    is none. The tuning overlay uses SRCALPHA blending on the
     display framebuffer after present.
     """
 

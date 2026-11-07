@@ -16,15 +16,13 @@ import pytest
 _MOVE_MODE_KEY = pygame.K_m
 
 from cleave.config_schema.editor import (
-    DEFAULT_EDITOR_HEIGHT,
+    DEFAULT_VISUALISER_HEIGHT,
     DEFAULT_EDITOR_PREVIEW_QUALITY,
-    DEFAULT_EDITOR_UPSCALE,
-    DEFAULT_EDITOR_WIDTH,
+    DEFAULT_VISUALISER_WIDTH,
     DEFAULT_NOTIFICATION_DISPLAY_SEC,
     DEFAULT_HELP_SIDE,
     DEFAULT_NAVIGATOR_SIDE,
     MIN_COLUMN_WIDTH,
-    editor_display_size,
 )
 from cleave.config_schema.layers import (
     DEFAULT_LAYER_SLOTS,
@@ -71,7 +69,7 @@ from cleave.viz.controls import (
     SEEK_SHORT,
     TuningControls,
 )
-from cleave.viz.settings_controls import EDITOR_WINDOW_RESTART_TOAST
+from cleave.viz.settings_controls import VISUALISER_RESOLUTION_SETTLE_SEC
 from cleave.viz.modal import ButtonRole, ModalKind, ModalLabeledLine
 from cleave.viz.session import (
     LayerRuntime,
@@ -4127,88 +4125,73 @@ def test_cycle_stem_to_full_mix() -> None:
 
 
 
-def test_settings_editor_window_adjusts_width_height_upscale() -> None:
+def test_settings_visualiser_resolution_steps_and_clamps() -> None:
     controls = _make_controls(("layer_1",))
-    assert controls.cfg.editor.width == DEFAULT_EDITOR_WIDTH
-    assert controls.cfg.editor.height == DEFAULT_EDITOR_HEIGHT
-    assert controls.cfg.editor.upscale == DEFAULT_EDITOR_UPSCALE
+    assert controls.cfg.editor.visualiser_width == DEFAULT_VISUALISER_WIDTH
+    assert controls.cfg.editor.visualiser_height == DEFAULT_VISUALISER_HEIGHT
 
-    controls.settings.adjust_editor_window_width(forward=True, large=False)
-    assert controls.cfg.editor.width == DEFAULT_EDITOR_WIDTH + 10
-    controls.settings.adjust_editor_window_width(forward=False, large=True)
-    assert controls.cfg.editor.width == DEFAULT_EDITOR_WIDTH - 90
+    controls.settings.adjust_visualiser_width(forward=True, large=False)
+    assert controls.cfg.editor.visualiser_width == DEFAULT_VISUALISER_WIDTH + 10
+    controls.settings.adjust_visualiser_width(forward=False, large=True)
+    assert controls.cfg.editor.visualiser_width == DEFAULT_VISUALISER_WIDTH - 90
 
-    controls.settings.adjust_editor_window_height(forward=True, large=False)
-    assert controls.cfg.editor.height == DEFAULT_EDITOR_HEIGHT + 10
-    controls.settings.adjust_editor_window_height(forward=False, large=True)
-    assert controls.cfg.editor.height == DEFAULT_EDITOR_HEIGHT - 90
-
-    controls.settings.adjust_editor_window_upscale(forward=True, large=False)
-    assert controls.cfg.editor.upscale == pytest.approx(DEFAULT_EDITOR_UPSCALE + 0.1)
-    controls.settings.adjust_editor_window_upscale(forward=True, large=True)
-    assert controls.cfg.editor.upscale == pytest.approx(DEFAULT_EDITOR_UPSCALE + 0.6)
+    controls.settings.adjust_visualiser_height(forward=True, large=False)
+    assert controls.cfg.editor.visualiser_height == DEFAULT_VISUALISER_HEIGHT + 10
+    controls.settings.adjust_visualiser_height(forward=False, large=True)
+    assert controls.cfg.editor.visualiser_height == DEFAULT_VISUALISER_HEIGHT - 90
 
     from dataclasses import replace as _replace
 
-    controls.cfg.editor = _replace(controls.cfg.editor, width=330)
-    controls.settings.adjust_editor_window_width(forward=False, large=False)
-    assert controls.cfg.editor.width == 320
-    controls.settings.adjust_editor_window_width(forward=False, large=False)
-    assert controls.cfg.editor.width == 320
+    controls.cfg.editor = _replace(controls.cfg.editor, visualiser_width=330)
+    controls.settings.adjust_visualiser_width(forward=False, large=False)
+    assert controls.cfg.editor.visualiser_width == 320
+    controls.settings.adjust_visualiser_width(forward=False, large=False)
+    assert controls.cfg.editor.visualiser_width == 320
 
 
-def test_settings_editor_window_display_size_tracks_width_height_upscale() -> None:
-    from cleave.viz.row_spec import format_row_value
-
-    controls = _make_controls(("layer_1",))
-    view = controls.build_view_state(paused=False)
-    desc = RowDescriptor(RowKind.SETTINGS_EDITOR_WINDOW_DISPLAY_SIZE)
-    display_w, display_h = editor_display_size(
-        DEFAULT_EDITOR_WIDTH, DEFAULT_EDITOR_HEIGHT, upscale=DEFAULT_EDITOR_UPSCALE
-    )
-    assert format_row_value(view, desc) == f"{display_w} x {display_h}"
-
-    controls.settings.adjust_editor_window_width(forward=True, large=True)
-    controls.settings.adjust_editor_window_height(forward=True, large=False)
-    controls.settings.adjust_editor_window_upscale(forward=True, large=False)
-    view = controls.build_view_state(paused=False)
-    display_w, display_h = editor_display_size(
-        DEFAULT_EDITOR_WIDTH + 100,
-        DEFAULT_EDITOR_HEIGHT + 10,
-        upscale=DEFAULT_EDITOR_UPSCALE + 0.1,
-    )
-    assert format_row_value(view, desc) == f"{display_w} x {display_h}"
-
-
-def test_settings_editor_window_nudge_toasts_restart_and_persists(
+def test_settings_visualiser_resolution_persists_without_toast(
     tmp_path: Path,
 ) -> None:
     controls = _make_controls(("layer_1",))
     user_path = tmp_path / "config.yaml"
     controls.cfg.user_config_path = user_path
-    controls.settings.adjust_editor_window_width(forward=True, large=True)
-    assert controls.cfg.editor.width == DEFAULT_EDITOR_WIDTH + 100
+    controls.settings.adjust_visualiser_width(forward=True, large=True)
+    assert controls.cfg.editor.visualiser_width == DEFAULT_VISUALISER_WIDTH + 100
     assert not controls.config_dirty
-    assert (
-        controls.build_view_state(paused=False).notification_message
-        == EDITOR_WINDOW_RESTART_TOAST
-    )
+    assert controls.build_view_state(paused=False).notification_message is None
     loaded = load_user_config(user_path)
-    assert loaded.editor.width == DEFAULT_EDITOR_WIDTH + 100
-    assert loaded.editor.height == DEFAULT_EDITOR_HEIGHT
-    assert loaded.editor.upscale == pytest.approx(DEFAULT_EDITOR_UPSCALE)
+    assert loaded.editor.visualiser_width == DEFAULT_VISUALISER_WIDTH + 100
+    assert loaded.editor.visualiser_height == DEFAULT_VISUALISER_HEIGHT
 
 
-def test_settings_editor_window_nudge_at_clamp_does_not_toast() -> None:
+def test_settings_visualiser_resolution_applies_once_after_steps_settle() -> None:
+    controls = _make_controls(("layer_1",))
+    apply = MagicMock()
+    controls.layer_lifecycle.apply_visualiser_resolution = apply
+
+    controls.settings.adjust_visualiser_width(forward=True, large=False)
+    controls.tick(VISUALISER_RESOLUTION_SETTLE_SEC / 2)
+    controls.settings.adjust_visualiser_width(forward=True, large=False)
+    controls.tick(VISUALISER_RESOLUTION_SETTLE_SEC / 2)
+    apply.assert_not_called()
+
+    controls.tick(VISUALISER_RESOLUTION_SETTLE_SEC)
+    apply.assert_called_once_with()
+    controls.tick(VISUALISER_RESOLUTION_SETTLE_SEC)
+    apply.assert_called_once_with()
+
+
+def test_settings_visualiser_resolution_at_clamp_does_not_apply() -> None:
     from dataclasses import replace as _replace
 
     controls = _make_controls(("layer_1",))
-    controls.cfg.editor = _replace(controls.cfg.editor, width=320)
-    controls.settings.adjust_editor_window_width(forward=False, large=False)
-    assert controls.cfg.editor.width == 320
-    assert controls.build_view_state(paused=False).notification_message is None
-
-
+    apply = MagicMock()
+    controls.layer_lifecycle.apply_visualiser_resolution = apply
+    controls.cfg.editor = _replace(controls.cfg.editor, visualiser_width=320)
+    controls.settings.adjust_visualiser_width(forward=False, large=False)
+    controls.tick(VISUALISER_RESOLUTION_SETTLE_SEC * 2)
+    assert controls.cfg.editor.visualiser_width == 320
+    apply.assert_not_called()
 
 
 def test_settings_cycle_preview_quality() -> None:

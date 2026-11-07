@@ -9,9 +9,8 @@ import pytest
 import yaml
 
 from cleave.config_schema.editor import (
-    DEFAULT_EDITOR_HEIGHT,
-    DEFAULT_EDITOR_UPSCALE,
-    DEFAULT_EDITOR_WIDTH,
+    DEFAULT_VISUALISER_HEIGHT,
+    DEFAULT_VISUALISER_WIDTH,
     DEFAULT_HELP_WIDTH,
     DEFAULT_INSPECTOR_WIDTH,
     DEFAULT_HELP_SIDE,
@@ -43,9 +42,8 @@ def test_load_user_config_missing_file_returns_defaults(tmp_path: Path) -> None:
     assert cfg.path == missing.resolve()
     assert cfg.preset_root is None
     assert cfg.texture_paths is None
-    assert cfg.editor.width == DEFAULT_EDITOR_WIDTH
-    assert cfg.editor.height == DEFAULT_EDITOR_HEIGHT
-    assert cfg.editor.upscale == DEFAULT_EDITOR_UPSCALE
+    assert cfg.editor.visualiser_width == DEFAULT_VISUALISER_WIDTH
+    assert cfg.editor.visualiser_height == DEFAULT_VISUALISER_HEIGHT
     assert cfg.editor.preview_quality == DEFAULT_EDITOR_PREVIEW_QUALITY
     assert cfg.editor.notification_display_sec == DEFAULT_NOTIFICATION_DISPLAY_SEC
     assert cfg.editor.residual_latency_ms == DEFAULT_RESIDUAL_LATENCY_MS
@@ -57,9 +55,8 @@ def test_load_user_config_missing_file_returns_defaults(tmp_path: Path) -> None:
 
 def test_default_editor_settings_matches_schema_defaults() -> None:
     editor = default_editor_settings()
-    assert editor.width == DEFAULT_EDITOR_WIDTH
-    assert editor.height == DEFAULT_EDITOR_HEIGHT
-    assert editor.upscale == DEFAULT_EDITOR_UPSCALE
+    assert editor.visualiser_width == DEFAULT_VISUALISER_WIDTH
+    assert editor.visualiser_height == DEFAULT_VISUALISER_HEIGHT
     assert editor.preview_quality == DEFAULT_EDITOR_PREVIEW_QUALITY
     assert editor.notification_display_sec == DEFAULT_NOTIFICATION_DISPLAY_SEC
     assert editor.residual_latency_ms == DEFAULT_RESIDUAL_LATENCY_MS
@@ -139,9 +136,8 @@ def test_write_user_config_preserves_paths_and_rewrites_editor(tmp_path: Path) -
     )
 
     new_editor = EditorSettings(
-        width=1920,
-        height=1080,
-        upscale=1.5,
+        visualiser_width=1920,
+        visualiser_height=1080,
         preview_quality="ultra-performance",
         notification_display_sec=12,
         residual_latency_ms=210,
@@ -151,9 +147,9 @@ def test_write_user_config_preserves_paths_and_rewrites_editor(tmp_path: Path) -
     with config_path.open(encoding="utf-8") as fh:
         data = yaml.safe_load(fh)
 
-    assert data["editor"]["width"] == 1920
-    assert data["editor"]["height"] == 1080
-    assert data["editor"]["upscale"] == 1.5
+    assert data["editor"]["visualiser_width"] == 1920
+    assert data["editor"]["visualiser_height"] == 1080
+    assert "upscale" not in data["editor"]
     assert data["editor"]["preview_quality"] == "ultra-performance"
     assert "ui_fade" not in data["editor"]
     assert data["editor"]["notification_display_sec"] == 12
@@ -165,9 +161,8 @@ def test_write_user_config_preserves_paths_and_rewrites_editor(tmp_path: Path) -
 
 def test_editor_settings_from_config() -> None:
     vis = EditorConfig(
-        width=1920,
-        height=1080,
-        upscale=1.5,
+        visualiser_width=1920,
+        visualiser_height=1080,
         preview_quality="performance",
         notification_display_sec=8,
         residual_latency_ms=150,
@@ -178,9 +173,8 @@ def test_editor_settings_from_config() -> None:
     )
     editor = editor_settings_from_config(vis)
     assert editor == EditorSettings(
-        width=1920,
-        height=1080,
-        upscale=1.5,
+        visualiser_width=1920,
+        visualiser_height=1080,
         preview_quality="performance",
         notification_display_sec=8,
         residual_latency_ms=150,
@@ -199,9 +193,8 @@ def test_persist_editor_settings_writes_visualizer_editor_fields(
         make_test_cfg(("layer_1",)),
         user_config_path=user_path,
         editor=EditorConfig(
-            width=1920,
-            height=1080,
-            upscale=1.5,
+            visualiser_width=1920,
+            visualiser_height=1080,
             preview_quality="ultra-performance",
             notification_display_sec=3,
             residual_latency_ms=200,
@@ -215,9 +208,8 @@ def test_persist_editor_settings_writes_visualizer_editor_fields(
     persist_editor_settings(cfg)
 
     loaded = load_user_config(user_path)
-    assert loaded.editor.width == 1920
-    assert loaded.editor.height == 1080
-    assert loaded.editor.upscale == 1.5
+    assert loaded.editor.visualiser_width == 1920
+    assert loaded.editor.visualiser_height == 1080
     assert loaded.editor.preview_quality == "ultra-performance"
     assert loaded.editor.notification_display_sec == 3
     assert loaded.editor.residual_latency_ms == 200
@@ -250,7 +242,7 @@ def test_shell_column_settings_round_trip(tmp_path: Path) -> None:
 def test_shell_column_settings_absent_keys_use_defaults(tmp_path: Path) -> None:
     config_path = tmp_path / "config.yaml"
     config_path.write_text(
-        yaml.safe_dump({"editor": {"upscale": 1.5}}, sort_keys=False),
+        yaml.safe_dump({"editor": {"preview_quality": "balanced"}}, sort_keys=False),
         encoding="utf-8",
     )
 
@@ -365,3 +357,49 @@ def test_user_config_path_windows_without_appdata(
         Path.home() / "AppData" / "Roaming" / "Cleave" / "config.yaml"
     ).resolve()
     assert user_config_path() == expected
+
+
+def test_window_geometry_defaults_when_missing_or_unreadable(tmp_path: Path) -> None:
+    from cleave.config_schema.window import WindowGeometry
+    from cleave.user_config import saved_window_geometry
+
+    assert saved_window_geometry(tmp_path / "missing.yaml") == WindowGeometry()
+    broken = tmp_path / "broken.yaml"
+    broken.write_text("window: [not, a, mapping]\n", encoding="utf-8")
+    assert saved_window_geometry(broken) == WindowGeometry()
+    bad_yaml = tmp_path / "bad.yaml"
+    bad_yaml.write_text("window: {width: [\n", encoding="utf-8")
+    assert saved_window_geometry(bad_yaml) == WindowGeometry()
+
+
+def test_window_geometry_round_trip_keeps_other_sections(tmp_path: Path) -> None:
+    from cleave.config_schema.window import WindowGeometry
+    from cleave.user_config import persist_window_geometry, saved_window_geometry
+
+    config_path = tmp_path / "config.yaml"
+    write_user_config(
+        replace(default_editor_settings(), visualiser_width=1280), config_path
+    )
+    persist_window_geometry(
+        WindowGeometry(width=1600, height=900, maximised=True), config_path
+    )
+    assert saved_window_geometry(config_path) == WindowGeometry(
+        width=1600, height=900, maximised=True
+    )
+    # A later settings write keeps the window section.
+    write_user_config(default_editor_settings(), config_path)
+    assert saved_window_geometry(config_path).width == 1600
+    data = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    assert data["window"] == {"width": 1600, "height": 900, "maximised": True}
+    assert "width" not in data["editor"]
+
+
+def test_editor_width_key_is_not_the_visualiser_width(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        yaml.safe_dump({"editor": {"width": 640, "height": 360}}, sort_keys=False),
+        encoding="utf-8",
+    )
+    cfg = load_user_config(config_path)
+    assert cfg.editor.visualiser_width == DEFAULT_VISUALISER_WIDTH
+    assert cfg.editor.visualiser_height == DEFAULT_VISUALISER_HEIGHT

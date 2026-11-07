@@ -330,6 +330,17 @@ class GlPostProcess:
         self._color_format = color_format
         self._release_format_dependent_buffers()
 
+    def release_sized_buffers(self) -> None:
+        """Free every buffer sized to a layer or the content.
+
+        Call after the visualiser or preview resolution changes. Buffers for
+        the new sizes are rebuilt on the next draw.
+        """
+        self._release_format_dependent_buffers()
+        for buffers in self._luma_grid_buffers.values():
+            buffers.release()
+        self._luma_grid_buffers.clear()
+
     def _release_format_dependent_buffers(self) -> None:
         for fbo in self._dest_fbos.values():
             fbo.release()

@@ -15,12 +15,11 @@ from cleave.config_schema.descriptors import (
     require_non_negative_number,
 )
 
-DEFAULT_EDITOR_WIDTH = 1920
-DEFAULT_EDITOR_HEIGHT = 1080
-DEFAULT_EDITOR_UPSCALE = 1.0
-EDITOR_WIDTH_MIN = 320
-EDITOR_HEIGHT_MIN = 240
-UPSCALE_MIN = 1.0
+# Visualiser render resolution. The window size is separate (config_schema/window.py).
+DEFAULT_VISUALISER_WIDTH = 1920
+DEFAULT_VISUALISER_HEIGHT = 1080
+VISUALISER_WIDTH_MIN = 320
+VISUALISER_HEIGHT_MIN = 240
 DEFAULT_BEAT_SENSITIVITY = 1.0
 BEAT_SENSITIVITY_MIN = 0.0
 BEAT_SENSITIVITY_MAX = 5.0
@@ -72,43 +71,16 @@ DEFAULT_NAVIGATOR_SIDE: ColumnSide = "left"
 DEFAULT_HELP_SIDE: ColumnSide = "right"
 
 
-def editor_display_size(
-    width: int = DEFAULT_EDITOR_WIDTH,
-    height: int = DEFAULT_EDITOR_HEIGHT,
-    *,
-    upscale: float = DEFAULT_EDITOR_UPSCALE,
-) -> tuple[int, int]:
-    """Window size from editor content size and upscale (same as ``EditorConfig``)."""
-    return (
-        max(1, round(width * upscale)),
-        max(1, round(height * upscale)),
-    )
+def clamp_visualiser_width(value: int | float) -> int:
+    return max(VISUALISER_WIDTH_MIN, int(round(value)))
 
 
-def clamp_upscale(value: float) -> float:
-    return max(UPSCALE_MIN, float(value))
-
-
-def clamp_editor_width(value: int | float) -> int:
-    return max(EDITOR_WIDTH_MIN, int(round(value)))
-
-
-def clamp_editor_height(value: int | float) -> int:
-    return max(EDITOR_HEIGHT_MIN, int(round(value)))
+def clamp_visualiser_height(value: int | float) -> int:
+    return max(VISUALISER_HEIGHT_MIN, int(round(value)))
 
 
 def clamp_beat_sensitivity(value: float) -> float:
     return max(BEAT_SENSITIVITY_MIN, min(BEAT_SENSITIVITY_MAX, float(value)))
-
-
-def _parse_upscale(raw: Any, ctx: ParseCtx, label: str) -> float:
-    try:
-        upscale = float(raw)
-    except (TypeError, ValueError) as exc:
-        raise ValueError(f"{label} must be a number") from exc
-    if upscale < UPSCALE_MIN:
-        raise ValueError(f"{label} must be >= {UPSCALE_MIN}")
-    return clamp_upscale(upscale)
 
 
 def clamp_shell_column_width(value: int | float) -> int:
@@ -171,26 +143,20 @@ def _parse_column_side(
 
 EDITOR_FIELDS: tuple[FieldDescriptor, ...] = (
     FieldDescriptor(
-        "width",
-        DEFAULT_EDITOR_WIDTH,
-        lambda raw, ctx, label: clamp_editor_width(
+        "visualiser_width",
+        DEFAULT_VISUALISER_WIDTH,
+        lambda raw, ctx, label: clamp_visualiser_width(
             int(require_non_negative_number(raw, label, as_int=True))
         ),
-        lambda value, _ctx: clamp_editor_width(value),
+        lambda value, _ctx: clamp_visualiser_width(value),
     ),
     FieldDescriptor(
-        "height",
-        DEFAULT_EDITOR_HEIGHT,
-        lambda raw, ctx, label: clamp_editor_height(
+        "visualiser_height",
+        DEFAULT_VISUALISER_HEIGHT,
+        lambda raw, ctx, label: clamp_visualiser_height(
             int(require_non_negative_number(raw, label, as_int=True))
         ),
-        lambda value, _ctx: clamp_editor_height(value),
-    ),
-    FieldDescriptor(
-        "upscale",
-        DEFAULT_EDITOR_UPSCALE,
-        _parse_upscale,
-        lambda value, _ctx: clamp_upscale(value),
+        lambda value, _ctx: clamp_visualiser_height(value),
     ),
     FieldDescriptor(
         "preview_quality",
@@ -270,9 +236,8 @@ def parse_editor_section(data: dict[str, Any]) -> Any:
     for field in EDITOR_FIELDS:
         parsed[field.yaml_key] = parse_field(editor, field, ctx, "editor")
     return EditorSettings(
-        width=parsed["width"],
-        height=parsed["height"],
-        upscale=parsed["upscale"],
+        visualiser_width=parsed["visualiser_width"],
+        visualiser_height=parsed["visualiser_height"],
         preview_quality=parsed["preview_quality"],
         notification_display_sec=parsed["notification_display_sec"],
         residual_latency_ms=parsed["residual_latency_ms"],
@@ -287,9 +252,8 @@ def parse_editor_section(data: dict[str, Any]) -> Any:
 
 def dump_editor_section(editor: Any) -> dict[str, Any]:
     values = {
-        "width": editor.width,
-        "height": editor.height,
-        "upscale": editor.upscale,
+        "visualiser_width": editor.visualiser_width,
+        "visualiser_height": editor.visualiser_height,
         "preview_quality": editor.preview_quality,
         "notification_display_sec": editor.notification_display_sec,
         "residual_latency_ms": editor.residual_latency_ms,
@@ -312,9 +276,8 @@ def editor_config_from_settings(editor: Any | None = None) -> Any:
     if editor is None:
         editor = default_editor_settings()
     return EditorConfig(
-        width=editor.width,
-        height=editor.height,
-        upscale=editor.upscale,
+        visualiser_width=editor.visualiser_width,
+        visualiser_height=editor.visualiser_height,
         preview_quality=editor.preview_quality,
         notification_display_sec=editor.notification_display_sec,
         residual_latency_ms=editor.residual_latency_ms,

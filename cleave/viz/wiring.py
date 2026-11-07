@@ -72,8 +72,10 @@ class LayerManager:
         project_dir: Path,
         projectm_fps: int,
         texture_paths: list[Path],
+        post_process: GlPostProcess | None = None,
     ) -> None:
         self.cfg = cfg
+        self.post_process = post_process
         self.session = session
         self.compositor = compositor
         self.layers = layers
@@ -124,12 +126,24 @@ class LayerManager:
         return slot
 
     def apply_preview_resolutions(self) -> None:
-        LayerFramePipeline.apply_preview_resolutions(
+        resized = LayerFramePipeline.apply_preview_resolutions(
             self.cfg,
             self.session,
             self.layers_by_slot,
             self.compositor,
         )
+        if resized and self.post_process is not None:
+            self.post_process.release_sized_buffers()
+
+    def apply_visualiser_resolution(self) -> None:
+        """Reallocate the content and layer framebuffers for the Settings resolution."""
+        editor = self.cfg.editor
+        self.compositor.set_content_size(
+            editor.visualiser_width, editor.visualiser_height
+        )
+        self.apply_preview_resolutions()
+        if self.post_process is not None:
+            self.post_process.release_sized_buffers()
 
     def remove_layer(self, slot: str) -> None:
         _discard_timeline_slot(self.session, slot)

@@ -32,6 +32,7 @@ _RESOLVED_SHORTCUT_IDS = frozenset(
         "file.quit",
         "project.render",
         "help.overlay",
+        "settings.fullscreen",
         "settings.editor",
         "layers.add",
         "timeline.show_strip",
@@ -60,6 +61,7 @@ class CommandContext:
     timeline_can_undo: bool = False
     timeline_can_redo: bool = False
     help_visible: bool = False
+    fullscreen: bool = False
 
 
 def _disabled(_ctx: CommandContext) -> bool:
@@ -131,6 +133,8 @@ def command_context(controls: Any) -> CommandContext:
         timeline_can_undo=controls.timeline_history.can_undo,
         timeline_can_redo=controls.timeline_history.can_redo,
         help_visible=bool(session.help_visible),
+        # Command fakes without window controls read as windowed.
+        fullscreen=bool(getattr(getattr(controls, "window", None), "fullscreen", False)),
     )
 
 
@@ -223,6 +227,10 @@ def _run_measure_latency(controls: Any) -> None:
 
 def _help_checked(ctx: CommandContext) -> bool:
     return ctx.help_visible
+
+
+def _fullscreen_checked(ctx: CommandContext) -> bool:
+    return ctx.fullscreen
 
 
 def _add_enabled(ctx: CommandContext) -> bool:
@@ -553,6 +561,20 @@ _HELP_OVERLAY = Command(
     checked=_help_checked,
 )
 
+def _toggle_fullscreen(controls: Any) -> None:
+    controls.window.request_fullscreen_toggle()
+
+
+_FULLSCREEN = Command(
+    id="settings.fullscreen",
+    label="Fullscreen",
+    kind="check",
+    shortcut="F11",
+    enabled=_enabled,
+    run=_toggle_fullscreen,
+    checked=_fullscreen_checked,
+)
+
 _SHORTCUT_KEYS: dict[str, tuple[int, bool]] = {
     "Ctrl+N": (pygame.K_n, True),
     "Ctrl+O": (pygame.K_o, True),
@@ -565,6 +587,7 @@ _SHORTCUT_KEYS: dict[str, tuple[int, bool]] = {
     "Ctrl+,": (pygame.K_COMMA, True),
     "T": (pygame.K_t, False),
     "H": (pygame.K_h, False),
+    "F11": (pygame.K_F11, False),
     "1": (pygame.K_1, False),
     "2": (pygame.K_2, False),
     "3": (pygame.K_3, False),
@@ -651,7 +674,7 @@ def build_menus(
                     _REDO,
                 ),
             ),
-            Menu("Settings", (_MEASURE_LATENCY, _HELP_OVERLAY)),
+            Menu("Settings", (_MEASURE_LATENCY, _HELP_OVERLAY, _FULLSCREEN)),
         ),
         tuple(layer_slots),
     )
@@ -711,7 +734,8 @@ def command_for_shortcut(
 ) -> Command | None:
     """Resolved shortcut, or None.
 
-    New, open, save, quit, render, the help overlay, add-layer, undo, redo,
+    New, open, save, quit, render, the help overlay, fullscreen, add-layer,
+    undo, redo,
     and show-timeline-strip resolve from menu rows. Editor settings (Ctrl+,) and
     layer jumps (``1``–``8``) resolve from commands that are not menu rows.
     Layer jumps

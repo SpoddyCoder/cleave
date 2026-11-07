@@ -131,18 +131,12 @@ def _mock_render_runtime(
     height: int,
     fps: int,
     duration_sec: float,
-    upscale: float = 1.0,
-    display_width: int | None = None,
-    display_height: int | None = None,
     output_width: int | None = None,
     output_height: int | None = None,
 ) -> tuple[MagicMock, MagicMock]:
     seed = MagicMock()
     seed.width = width
     seed.height = height
-    seed.upscale = upscale
-    seed.display_width = width if display_width is None else display_width
-    seed.display_height = height if display_height is None else display_height
     seed.duration_sec = duration_sec
     seed.pcm_bank = MagicMock()
     render_w = DEFAULT_RENDER_WIDTH if output_width is None else output_width
@@ -1189,7 +1183,7 @@ def test_render_composites_default_overlay_when_render_absent(
 @patch.object(render_mod, "build_runtime_base")
 @patch.object(render_mod, "scan_all_layers", return_value={})
 @patch.object(render_mod, "VisualizerApp")
-def test_render_ffmpeg_ignores_upscale_uses_render_resolution(
+def test_render_ffmpeg_ignores_visualiser_size_uses_render_resolution(
     mock_app_cls: MagicMock,
     _mock_scan: MagicMock,
     mock_build: MagicMock,
@@ -1205,15 +1199,11 @@ def test_render_ffmpeg_ignores_upscale_uses_render_resolution(
         render_width=1280,
         render_height=720,
         editor={
-            "width": 640,
-            "height": 360,
-            "upscale": 2.0,
+            "visualiser_width": 640,
+            "visualiser_height": 360,
         },
     )
     content_w, content_h, fps = 640, 360, 10
-    upscale = 2.0
-    live_display_w = int(content_w * upscale)
-    live_display_h = int(content_h * upscale)
     render_w, render_h = 1280, 720
     duration_sec = 2.0
 
@@ -1225,9 +1215,6 @@ def test_render_ffmpeg_ignores_upscale_uses_render_resolution(
         height=content_h,
         fps=fps,
         duration_sec=duration_sec,
-        upscale=upscale,
-        display_width=live_display_w,
-        display_height=live_display_h,
         output_width=render_w,
         output_height=render_h,
     )
@@ -1316,7 +1303,7 @@ def test_render_ffmpeg_uses_explicit_render_resolution(
 @patch.object(render_mod, "build_runtime_base")
 @patch.object(render_mod, "scan_all_layers", return_value={})
 @patch.object(render_mod, "VisualizerApp")
-def test_render_present_content_every_frame_at_upscale_one(
+def test_render_present_content_every_frame(
     mock_app_cls: MagicMock,
     _mock_scan: MagicMock,
     mock_build: MagicMock,
@@ -1328,7 +1315,6 @@ def test_render_present_content_every_frame_at_upscale_one(
 ) -> None:
     project = _setup_render_project(tmp_path)
     content_w, content_h, fps = DEFAULT_RENDER_WIDTH, DEFAULT_RENDER_HEIGHT, 10
-    upscale = 1.0
     render_w, render_h = DEFAULT_RENDER_WIDTH, DEFAULT_RENDER_HEIGHT
     duration_sec = 2.0
 
@@ -1340,7 +1326,6 @@ def test_render_present_content_every_frame_at_upscale_one(
         height=content_h,
         fps=fps,
         duration_sec=duration_sec,
-        upscale=upscale,
         output_width=render_w,
         output_height=render_h,
     )
@@ -1374,7 +1359,7 @@ def test_render_present_content_every_frame_at_upscale_one(
 @patch.object(render_mod, "scan_all_layers", return_value={})
 @patch.object(render_mod, "VisualizerApp")
 @patch.object(render_mod, "load_config")
-def test_render_upscale_overlay_frame_order_uses_content_dims(
+def test_render_overlay_frame_order_uses_content_dims(
     mock_load_config: MagicMock,
     mock_app_cls: MagicMock,
     _mock_scan: MagicMock,
@@ -1389,9 +1374,6 @@ def test_render_upscale_overlay_frame_order_uses_content_dims(
 ) -> None:
     project = _setup_render_project(tmp_path)
     seed_w, seed_h, fps = 4, 4, 10
-    upscale = 2.0
-    live_display_w = int(seed_w * upscale)
-    live_display_h = int(seed_h * upscale)
     render_w, render_h = 1280, 720
     duration_sec = 2.0
     frame_count = math.ceil(duration_sec * fps)
@@ -1438,9 +1420,6 @@ def test_render_upscale_overlay_frame_order_uses_content_dims(
         height=seed_h,
         fps=fps,
         duration_sec=duration_sec,
-        upscale=upscale,
-        display_width=live_display_w,
-        display_height=live_display_h,
         output_width=render_w,
         output_height=render_h,
     )

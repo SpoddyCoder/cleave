@@ -109,9 +109,9 @@ def test_action_row_value_color() -> None:
     assert row_value_color_for(state, delete_row) == VALUE
 
 
-def test_display_size_row_uses_label_color() -> None:
+def test_display_row_uses_label_color() -> None:
     state = _minimal_view_state()
-    desc = RowDescriptor(RowKind.SETTINGS_EDITOR_WINDOW_DISPLAY_SIZE)
+    desc = RowDescriptor(RowKind.LAYER_MANAGEMENT_COUNT)
     assert row_value_color_for(state, desc) == LABEL
 
 

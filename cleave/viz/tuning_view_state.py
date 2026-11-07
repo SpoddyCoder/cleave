@@ -11,10 +11,9 @@ from typing import TYPE_CHECKING
 from cleave.config_schema.compositor import DEFAULT_COMPOSITOR_HDR
 from cleave.config_schema.editor import (
     DEFAULT_BEAT_SENSITIVITY,
-    DEFAULT_EDITOR_HEIGHT,
+    DEFAULT_VISUALISER_HEIGHT,
     DEFAULT_EDITOR_PREVIEW_QUALITY,
-    DEFAULT_EDITOR_UPSCALE,
-    DEFAULT_EDITOR_WIDTH,
+    DEFAULT_VISUALISER_WIDTH,
     DEFAULT_RESIDUAL_LATENCY_MS,
     DEFAULT_HELP_SIDE,
     DEFAULT_NAVIGATOR_HEIGHT,
@@ -312,9 +311,8 @@ class TimelineBlock:
 class SettingsBlock:
     editor_mode: str = "visualizer"
     preview_quality: str = DEFAULT_EDITOR_PREVIEW_QUALITY
-    editor_window_width: int = DEFAULT_EDITOR_WIDTH
-    editor_window_height: int = DEFAULT_EDITOR_HEIGHT
-    editor_window_upscale: float = DEFAULT_EDITOR_UPSCALE
+    visualiser_width: int = DEFAULT_VISUALISER_WIDTH
+    visualiser_height: int = DEFAULT_VISUALISER_HEIGHT
     navigator_side: str = DEFAULT_NAVIGATOR_SIDE
     help_side: str = DEFAULT_HELP_SIDE
     notification_display_sec: int = DEFAULT_NOTIFICATION_DISPLAY_SEC
@@ -974,9 +972,8 @@ class TuningViewStateBuilder:
                 structure.settings,
                 editor_mode=self.session.settings.editor_mode,
                 preview_quality=self._config_save.cfg.editor.preview_quality,
-                editor_window_width=self._config_save.cfg.editor.width,
-                editor_window_height=self._config_save.cfg.editor.height,
-                editor_window_upscale=self._config_save.cfg.editor.upscale,
+                visualiser_width=self._config_save.cfg.editor.visualiser_width,
+                visualiser_height=self._config_save.cfg.editor.visualiser_height,
                 navigator_side=self._config_save.cfg.editor.navigator_side,
                 help_side=self._config_save.cfg.editor.help_side,
                 notification_display_sec=(

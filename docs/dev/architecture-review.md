@@ -18,7 +18,7 @@ Related: [architecture-principles](../../.claude/rules/architecture-principles.m
 - Panel row registry (`RowSpec`, `present_style`, `fit_strategy`, `visibility_icon`) in [row_spec.py](../../cleave/viz/row_spec.py) and [row_specs/](../../cleave/viz/row_specs/); kinds in [row_kinds.py](../../cleave/viz/row_kinds.py); draw through [row_present_renderers.py](../../cleave/viz/row_present_renderers.py); mutations through [layer_mutations.py](../../cleave/viz/layer_mutations.py)
 - `RowDescriptor` carries `slot` (per-track) and `card` (per overlay card); overlay rows share one `RowKind` set instanced by card key
 - Focus as `FocusCursor` in [cleave/viz/focus_nav.py](../../cleave/viz/focus_nav.py)
-- User editor prefs (including window size) in [cleave/user_config.py](../../cleave/user_config.py); project Milkdrop beat lives in `project.yaml`
+- User editor prefs in [cleave/user_config.py](../../cleave/user_config.py) (`editor:`), window size and maximised state in its own `window:` section ([cleave/config_schema/window.py](../../cleave/config_schema/window.py)); project Milkdrop beat lives in `project.yaml`
 - Timeline panel cache ([cleave/viz/timeline_panel_cache.py](../../cleave/viz/timeline_panel_cache.py)) and overlay upload in [cleave/viz/overlay_upload.py](../../cleave/viz/overlay_upload.py)
 - Shared overlay primitives in [cleave/viz/overlay_primitives.py](../../cleave/viz/overlay_primitives.py)
 - Feature controllers on `TuningControls` (`preset_list`, `song_markers`, `layer_lifecycle`, plus settings / overlays / post-FX / pattern mask / curation); live GPU bindings from [live_layer_binding_factory.py](../../cleave/viz/live_layer_binding_factory.py)

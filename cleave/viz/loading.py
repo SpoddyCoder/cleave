@@ -11,6 +11,7 @@ draw phase messages with ImGui, then hand the same display to
 from __future__ import annotations
 
 import functools
+import os
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
@@ -25,7 +26,11 @@ from OpenGL.GL import (
     glViewport,
 )
 
-from cleave.config_schema.editor import editor_display_size
+from cleave.config_schema.window import (
+    WindowGeometry,
+    fit_window_to_desktop,
+    window_minimum_size,
+)
 from cleave.gl_color_format import RGBA8
 from cleave.gl_compositor import GlCompositor
 from cleave.viz.text_fit import TextSizer, fit_text_to_width
@@ -37,7 +42,9 @@ from cleave.viz.theme import (
     VALUE,
     set_ui_scale_percent,
     ui_px,
+    ui_scale_percent,
 )
+from cleave.viz import sdl_window
 
 if TYPE_CHECKING:
     from imgui_bundle import imgui
@@ -416,9 +423,21 @@ class LoadingWindow:
     imgui: ImGuiHost | None = None
     # Latest size from a drag or maximise, applied once before the next draw.
     pending_size: tuple[int, int] | None = None
+    # Size to reopen at: the last size while neither maximised nor fullscreen.
+    restored_size: tuple[int, int] | None = None
+    maximised: bool = False
+    fullscreen: bool = False
+    # UI scale percent the minimum window size was last set for.
+    minimum_size_scale: int | None = None
 
     def note_event(self, event: pygame.event.Event) -> None:
-        """Record a window resize. The last size in a burst of events wins."""
+        """Track window size and maximised state. The last size in a burst wins."""
+        if event.type == pygame.WINDOWMAXIMIZED:
+            self.maximised = True
+            return
+        if event.type == pygame.WINDOWRESTORED:
+            self.maximised = False
+            return
         if event.type != pygame.WINDOWSIZECHANGED:
             return
         width = int(event.x)
@@ -426,6 +445,57 @@ class LoadingWindow:
         if width <= 0 or height <= 0:
             return
         self.pending_size = (width, height)
+        if not self._size_is_transient():
+            self.restored_size = (width, height)
+
+    def _size_is_transient(self) -> bool:
+        """True while maximised, fullscreen, or minimised, so the size is not kept.
+
+        Reads SDL's live flags when they are available, because SDL may send
+        the size change before or after the maximise event.
+        """
+        flags = sdl_window.window_flags()
+        if flags is None:
+            return self.maximised or self.fullscreen
+        self.maximised = bool(flags & sdl_window.SDL_WINDOW_MAXIMIZED)
+        transient = (
+            sdl_window.SDL_WINDOW_MAXIMIZED
+            | sdl_window.SDL_WINDOW_FULLSCREEN
+            | sdl_window.SDL_WINDOW_MINIMIZED
+        )
+        return bool(flags & transient) or self.fullscreen
+
+    def geometry(self) -> WindowGeometry:
+        """Size and maximised state to reopen with."""
+        width, height = self.restored_size or (self.display_width, self.display_height)
+        return WindowGeometry(width=width, height=height, maximised=self.maximised)
+
+    def sync_minimum_size(self) -> None:
+        """Set the minimum window size for the live UI scale. No-op when unchanged."""
+        percent = ui_scale_percent()
+        if percent == self.minimum_size_scale:
+            return
+        self.minimum_size_scale = percent
+        width, height = window_minimum_size(percent / 100.0, _desktop_size())
+        sdl_window.set_minimum_size(width, height)
+
+    def toggle_fullscreen(self) -> None:
+        """Switch between borderless desktop fullscreen and the windowed state.
+
+        Leaving fullscreen returns to the earlier size or maximised state.
+        The size change arrives as a normal resize event.
+        """
+        from pygame._sdl2.video import Window
+
+        try:
+            window = Window.from_display_module()
+            if self.fullscreen:
+                window.set_windowed()
+            else:
+                window.set_fullscreen(desktop=True)
+        except pygame.error:
+            return
+        self.fullscreen = not self.fullscreen
 
     def apply_pending_resize(self) -> bool:
         """Resize the display viewport, overlay surface, and ImGui in place.
@@ -496,21 +566,61 @@ class LoadingWindow:
         self.imgui.set_display_size(self.display_width, self.display_height)
 
     def close(self) -> None:
+        if not self.video_quit:
+            _persist_geometry(self.geometry())
         self.release_imgui()
         self.compositor.destroy()
         self.video_quit = True
         pygame.quit()
 
 
-def open_loading_window(
-    *,
-    width: int | None = None,
-    height: int | None = None,
-) -> LoadingWindow:
-    """Create the pygame/GL window and draw ``Loading...``. Does not import torch."""
-    if width is None or height is None:
-        width, height = editor_display_size()
+def _desktop_size() -> tuple[int, int] | None:
+    try:
+        sizes = pygame.display.get_desktop_sizes()
+    except pygame.error:
+        return None
+    if not sizes:
+        return None
+    width, height = sizes[0]
+    if width <= 0 or height <= 0:
+        return None
+    return (int(width), int(height))
+
+
+def _persist_geometry(geometry: WindowGeometry) -> None:
+    """Save the window geometry. A bad user config is reported when it loads."""
+    import yaml
+
+    from cleave.user_config import persist_window_geometry
+
+    try:
+        persist_window_geometry(geometry)
+    except (OSError, ValueError, yaml.YAMLError):
+        return
+
+
+def _maximise() -> None:
+    from pygame._sdl2.video import Window
+
+    try:
+        Window.from_display_module().maximize()
+    except pygame.error:
+        return
+
+
+def open_loading_window() -> LoadingWindow:
+    """Open the GL window at the saved size and draw ``Loading...``.
+
+    The window opens centred. A saved maximised state, or a saved size bigger
+    than the desktop, opens maximised. Does not import torch.
+    """
+    from cleave.user_config import saved_ui_scale, saved_window_geometry
+    from cleave.viz.imgui_host import ImGuiHost
+
+    os.environ.setdefault("SDL_VIDEO_CENTERED", "1")
     pygame.init()
+    geometry = fit_window_to_desktop(saved_window_geometry(), _desktop_size())
+    width, height = geometry.width, geometry.height
     _set_gl_mode(width, height)
     pygame.display.set_caption(_LOADING_CAPTION)
     compositor = GlCompositor(
@@ -521,11 +631,9 @@ def open_loading_window(
         color_format=RGBA8,
     )
     compositor.init()
-    from cleave.user_config import saved_ui_scale
-    from cleave.viz.imgui_host import ImGuiHost
-
     set_ui_scale_percent(saved_ui_scale())
     imgui_host = ImGuiHost.create()
+    imgui_host.set_display_size(width, height)
     overlay_surface = pygame.Surface((width, height), pygame.SRCALPHA)
     window = LoadingWindow(
         compositor=compositor,
@@ -533,6 +641,11 @@ def open_loading_window(
         display_height=height,
         overlay_surface=overlay_surface,
         imgui=imgui_host,
+        restored_size=(width, height),
     )
+    window.sync_minimum_size()
+    if geometry.maximised:
+        _maximise()
+        window.maximised = True
     window.update("Loading...")
     return window

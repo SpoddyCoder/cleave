@@ -522,7 +522,7 @@ def test_write_session_snapshot_omits_window_size() -> None:
             )
             for slot in DEFAULT_LAYER_SLOTS
             },
-            editor=EditorConfig(width=1280, height=720, upscale=2.0),
+            editor=EditorConfig(visualiser_width=1280, visualiser_height=720),
             config_path=config_path,
             user_config_path=root / "user-config.yaml",
         )
@@ -1628,13 +1628,12 @@ def test_session_snapshot_full_round_trip(tmp_path: Path) -> None:
     assert cfg.milkdrop_beat_sensitivity == 2.2
 
     sig_before = persisted_session_signature(cfg, session)
-    cfg_upscale_changed = CleaveConfig(
+    cfg_editor_changed = CleaveConfig(
         paths=cfg.paths,
         layers=cfg.layers,
         editor=EditorConfig(
-            width=cfg.editor.width,
-            height=cfg.editor.height,
-            upscale=2.0,
+            visualiser_width=cfg.editor.visualiser_width + 320,
+            visualiser_height=cfg.editor.visualiser_height,
         ),
         config_path=cfg.config_path,
         user_config_path=cfg.user_config_path,
@@ -1644,7 +1643,7 @@ def test_session_snapshot_full_round_trip(tmp_path: Path) -> None:
         milkdrop_beat_sensitivity=cfg.milkdrop_beat_sensitivity,
         project_slug=cfg.project_slug,
     )
-    assert persisted_session_signature(cfg_upscale_changed, session) == sig_before
+    assert persisted_session_signature(cfg_editor_changed, session) == sig_before
 
     snapshot_path = root / "snapshot.yaml"
     write_session_snapshot(snapshot_path, cfg=cfg, session=session)
