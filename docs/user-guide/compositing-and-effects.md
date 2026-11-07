@@ -5,8 +5,8 @@ How Cleave stacks Milkdrop layers, applies stem-driven effects, and adds render 
 ## Compositing
 
 - Up to eight libprojectM layers, at tiered resolutions.
-- Live preview composites at the project render resolution (Project > Render width and height, applied live), scaled per layer by Settings > Editor Window > preview quality, at display frame rate. It then fits that picture into the visualiser area of the window, letterboxed to the render shape. The window size is separate: drag its edges, maximise it, or use Settings > Fullscreen (F11).
-- Offline render size and frame rate are Project > Render (default 1920x1080 at 60fps; stored in `project.yaml`).
+- Live preview composites at the project render resolution (Project > Resolution width and height, applied live), scaled per layer by Settings > Editor Window > preview quality, at display frame rate. It then fits that picture into the visualiser area of the window, letterboxed to the render shape. The window size is separate: drag its edges, maximise it, or use Settings > Fullscreen (F11).
+- Offline render size is Project > Resolution and frame rate is Project > Render (default 1920x1080 at 60fps; stored in `project.yaml` under `resolution:` and `render:`).
 - Each layer's libprojectM instance receives PCM from its assigned stem; stereo stems are fed as stereo, mono as mono.
 - Milkdrop draws on black, so Cleave treats black as transparent and uses pixel brightness as blend weight (`black-key` default).
 - Each layer's blend mode and opacity live under a Compositing submenu. While Pattern Mask is enabled, those rows are greyed out and ignored: blend is identity (`black-key`) and the layer's opacity is treated as 100%. Effect pulse, timeline level, and limiter gain still apply.

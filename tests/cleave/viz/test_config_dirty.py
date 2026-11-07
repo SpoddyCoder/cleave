@@ -392,13 +392,13 @@ def _mutate_compositor_hdr(controls: TuningControls) -> None:
     press_main_row(controls, _keydown(pygame.K_RIGHT))
 
 
-def _mutate_render_width(controls: TuningControls) -> None:
-    controls.focus_descriptor = RowDescriptor(RowKind.PROJECT_RENDER_WIDTH)
+def _mutate_resolution_width(controls: TuningControls) -> None:
+    controls.focus_descriptor = RowDescriptor(RowKind.PROJECT_RESOLUTION_WIDTH)
     press_main_row(controls, _keydown(pygame.K_RIGHT))
 
 
-def _mutate_render_height(controls: TuningControls) -> None:
-    controls.focus_descriptor = RowDescriptor(RowKind.PROJECT_RENDER_HEIGHT)
+def _mutate_resolution_height(controls: TuningControls) -> None:
+    controls.focus_descriptor = RowDescriptor(RowKind.PROJECT_RESOLUTION_HEIGHT)
     press_main_row(controls, _keydown(pygame.K_RIGHT))
 
 
@@ -472,8 +472,8 @@ _PERSISTED_MUTATIONS: list[
     ("timeline.locked", _mutate_timeline_locked, ("layer_1",), {}),
     ("project.milkdrop_beat_sensitivity", _mutate_milkdrop_beat_sensitivity, ("layer_1",), {}),
     ("project.compositor.hdr", _mutate_compositor_hdr, ("layer_1",), {}),
-    ("project.render.width", _mutate_render_width, ("layer_1",), {}),
-    ("project.render.height", _mutate_render_height, ("layer_1",), {}),
+    ("project.resolution.width", _mutate_resolution_width, ("layer_1",), {}),
+    ("project.resolution.height", _mutate_resolution_height, ("layer_1",), {}),
     ("project.render.fps", _mutate_render_fps, ("layer_1",), {}),
 ]
 
@@ -710,14 +710,15 @@ def test_commit_save_flushes_render_to_project_yaml(tmp_path: Path) -> None:
         separated_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
     )
     controls = _make_controls(("layer_1",), project_dir=tmp_path)
-    controls.session.project.render.width = 1280
-    controls.session.project.render.height = 720
+    controls.session.project.resolution.width = 1280
+    controls.session.project.resolution.height = 720
     controls.session.project.render.fps = 24
     assert controls.config_dirty
     controls._config_save._commit_save()
     assert not controls.config_dirty
     manifest = load_manifest(tmp_path)
+    assert manifest.resolution is not None
+    assert manifest.resolution.width == 1280
+    assert manifest.resolution.height == 720
     assert manifest.render is not None
-    assert manifest.render.width == 1280
-    assert manifest.render.height == 720
     assert manifest.render.fps == 24

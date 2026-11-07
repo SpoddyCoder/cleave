@@ -53,7 +53,7 @@ def _session(
             for slot in slots
         },
     )
-    session.project.render.width, session.project.render.height = size
+    session.project.resolution.width, session.project.resolution.height = size
     return session
 
 
@@ -72,8 +72,8 @@ def _cfg(
         layers=layers,
         layer_z_order=list(slots),
         editor=_editor(preview_quality),
-        render_width=BASE[0],
-        render_height=BASE[1],
+        resolution_width=BASE[0],
+        resolution_height=BASE[1],
         config_path=Path("/tmp/test/cleave.config.yaml"),
         user_config_path=Path("/tmp/user-config.yaml"),
     )
@@ -186,8 +186,8 @@ def test_offline_layer_sizes_uses_passed_layer_z_order() -> None:
 def test_offline_layer_sizes_follow_render_output_size() -> None:
     cfg = replace(
         _cfg(preview_quality="performance", slots=("layer_1",)),
-        render_width=1080,
-        render_height=1920,
+        resolution_width=1080,
+        resolution_height=1920,
     )
     assert offline_layer_sizes(cfg, ("layer_1",))["layer_1"] == (810, 1440)
 
@@ -195,8 +195,8 @@ def test_offline_layer_sizes_follow_render_output_size() -> None:
 def test_render_layer_size_full_quality_uses_render_output() -> None:
     cfg = replace(
         _cfg(),
-        render_width=1920,
-        render_height=1080,
+        resolution_width=1920,
+        resolution_height=1080,
     )
     assert render_layer_size(cfg, 0, viz_quality=False) == (1920, 1080)
     assert render_layer_size(cfg, 3, viz_quality=False) == (1920, 1080)
@@ -205,8 +205,8 @@ def test_render_layer_size_full_quality_uses_render_output() -> None:
 def test_render_layer_size_full_quality_uses_output_at_mismatched_aspect() -> None:
     cfg = replace(
         _cfg(),
-        render_width=1080,
-        render_height=1920,
+        resolution_width=1080,
+        resolution_height=1920,
     )
     assert render_layer_size(cfg, 0, viz_quality=False) == (1080, 1920)
     assert render_layer_size(cfg, 3, viz_quality=False) == (1080, 1920)

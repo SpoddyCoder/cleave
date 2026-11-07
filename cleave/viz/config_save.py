@@ -14,6 +14,7 @@ from cleave.project import (
     save_compositor_settings,
     save_milkdrop_settings,
     save_render_settings,
+    save_resolution_settings,
     save_song_markers,
 )
 from cleave.viz.modal import ModalHost, ModalKind
@@ -62,8 +63,8 @@ class ConfigSaveController:
         self._saved_song_markers = tuple(session.song_markers.markers)
         self._saved_milkdrop_beat = session.project.milkdrop_beat_sensitivity
         self._saved_compositor_hdr = session.project.compositor_hdr
-        self._saved_render_width = session.project.render.width
-        self._saved_render_height = session.project.render.height
+        self._saved_resolution_width = session.project.resolution.width
+        self._saved_resolution_height = session.project.resolution.height
         self._saved_render_fps = session.project.render.fps
         self._pending = PendingAction.NONE
         self._on_commit_save: list[Callable[[], None]] = []
@@ -90,8 +91,11 @@ class ConfigSaveController:
                 != self._saved_milkdrop_beat
             )
             or self.session.project.compositor_hdr != self._saved_compositor_hdr
-            or self.session.project.render.width != self._saved_render_width
-            or self.session.project.render.height != self._saved_render_height
+            or self.session.project.resolution.width != self._saved_resolution_width
+            or (
+                self.session.project.resolution.height
+                != self._saved_resolution_height
+            )
             or self.session.project.render.fps != self._saved_render_fps
         )
 
@@ -100,8 +104,8 @@ class ConfigSaveController:
         self._saved_song_markers = tuple(self.session.song_markers.markers)
         self._saved_milkdrop_beat = self.session.project.milkdrop_beat_sensitivity
         self._saved_compositor_hdr = self.session.project.compositor_hdr
-        self._saved_render_width = self.session.project.render.width
-        self._saved_render_height = self.session.project.render.height
+        self._saved_resolution_width = self.session.project.resolution.width
+        self._saved_resolution_height = self.session.project.resolution.height
         self._saved_render_fps = self.session.project.render.fps
 
     def _flush_song_markers(self) -> None:
@@ -123,22 +127,27 @@ class ConfigSaveController:
             self._project_dir, self.session.project.compositor_hdr
         )
 
+    def _flush_resolution(self) -> None:
+        if self._project_dir is None:
+            return
+        resolution = self.session.project.resolution
+        save_resolution_settings(
+            self._project_dir,
+            width=resolution.width,
+            height=resolution.height,
+        )
+
     def _flush_render(self) -> None:
         if self._project_dir is None:
             return
-        render = self.session.project.render
-        save_render_settings(
-            self._project_dir,
-            width=render.width,
-            height=render.height,
-            fps=render.fps,
-        )
+        save_render_settings(self._project_dir, fps=self.session.project.render.fps)
 
     def _commit_save(self) -> None:
         """Flush project.yaml fields (when available) and clear dirty baselines."""
         self._flush_song_markers()
         self._flush_milkdrop()
         self._flush_compositor()
+        self._flush_resolution()
         self._flush_render()
         self.clear_config_dirty()
         for callback in self._on_commit_save:

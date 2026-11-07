@@ -16,11 +16,13 @@ from cleave.config_schema.editor import (
 )
 from cleave.config_schema.project_render import (
     DEFAULT_RENDER_FPS,
-    DEFAULT_RENDER_HEIGHT,
-    DEFAULT_RENDER_WIDTH,
     clamp_render_fps,
-    clamp_render_height,
-    clamp_render_width,
+)
+from cleave.config_schema.project_resolution import (
+    DEFAULT_RESOLUTION_HEIGHT,
+    DEFAULT_RESOLUTION_WIDTH,
+    clamp_resolution_height,
+    clamp_resolution_width,
 )
 from cleave.song_markers import (
     DEFAULT_SONG_MARKER_TYPE,
@@ -88,10 +90,27 @@ def _parse_compositor(raw: object) -> CompositorSettings | None:
     return CompositorSettings(hdr=hdr_raw)
 
 
-def _parse_render_int(raw: object, label: str) -> int:
+def _parse_manifest_int(raw: object, label: str) -> int:
     if isinstance(raw, bool) or not isinstance(raw, int):
         raise ValueError(f"invalid project manifest: {label}")
     return raw
+
+
+def _parse_resolution(raw: object) -> ProjectResolutionSettings | None:
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise ValueError("invalid project manifest: resolution")
+    width_raw = raw.get("width", DEFAULT_RESOLUTION_WIDTH)
+    height_raw = raw.get("height", DEFAULT_RESOLUTION_HEIGHT)
+    return ProjectResolutionSettings(
+        width=clamp_resolution_width(
+            _parse_manifest_int(width_raw, "resolution.width")
+        ),
+        height=clamp_resolution_height(
+            _parse_manifest_int(height_raw, "resolution.height")
+        ),
+    )
 
 
 def _parse_render(raw: object) -> ProjectRenderSettings | None:
@@ -99,13 +118,9 @@ def _parse_render(raw: object) -> ProjectRenderSettings | None:
         return None
     if not isinstance(raw, dict):
         raise ValueError("invalid project manifest: render")
-    width_raw = raw.get("width", DEFAULT_RENDER_WIDTH)
-    height_raw = raw.get("height", DEFAULT_RENDER_HEIGHT)
     fps_raw = raw.get("fps", DEFAULT_RENDER_FPS)
     return ProjectRenderSettings(
-        width=clamp_render_width(_parse_render_int(width_raw, "render.width")),
-        height=clamp_render_height(_parse_render_int(height_raw, "render.height")),
-        fps=clamp_render_fps(_parse_render_int(fps_raw, "render.fps")),
+        fps=clamp_render_fps(_parse_manifest_int(fps_raw, "render.fps")),
     )
 
 
@@ -120,9 +135,13 @@ class CompositorSettings:
 
 
 @dataclass(frozen=True)
+class ProjectResolutionSettings:
+    width: int = DEFAULT_RESOLUTION_WIDTH
+    height: int = DEFAULT_RESOLUTION_HEIGHT
+
+
+@dataclass(frozen=True)
 class ProjectRenderSettings:
-    width: int = DEFAULT_RENDER_WIDTH
-    height: int = DEFAULT_RENDER_HEIGHT
     fps: int = DEFAULT_RENDER_FPS
 
 
@@ -138,6 +157,7 @@ class ProjectManifest:
     song_markers: tuple[SongMarker, ...] = ()
     milkdrop: MilkdropSettings | None = None
     compositor: CompositorSettings | None = None
+    resolution: ProjectResolutionSettings | None = None
     render: ProjectRenderSettings | None = None
 
     @classmethod
@@ -162,6 +182,7 @@ class ProjectManifest:
             song_markers=_parse_song_markers(data.get("song-markers")),
             milkdrop=_parse_milkdrop(data.get("milkdrop")),
             compositor=_parse_compositor(data.get("compositor")),
+            resolution=_parse_resolution(data.get("resolution")),
             render=_parse_render(data.get("render")),
         )
 
@@ -188,12 +209,13 @@ class ProjectManifest:
             data["compositor"] = {
                 "hdr": self.compositor.hdr,
             }
-        if self.render is not None:
-            data["render"] = {
-                "width": self.render.width,
-                "height": self.render.height,
-                "fps": self.render.fps,
+        if self.resolution is not None:
+            data["resolution"] = {
+                "width": self.resolution.width,
+                "height": self.resolution.height,
             }
+        if self.render is not None:
+            data["render"] = {"fps": self.render.fps}
         return data
 
 
@@ -287,13 +309,14 @@ def write_manifest(
     song_markers: Sequence[SongMarker | float] | None = None,
     milkdrop: MilkdropSettings | None = None,
     compositor: CompositorSettings | None = None,
+    resolution: ProjectResolutionSettings | None = None,
     render: ProjectRenderSettings | None = None,
 ) -> Path:
     """Create or update ``project.yaml`` mix and ingest fields.
 
     When the file already exists, only ``slug``, ``mix.filename``, and
     ``ingest`` are updated. ``song-markers``, ``milkdrop``, ``compositor``,
-    ``render``, ``restored-from``, and other fields are preserved unless
+    ``resolution``, ``render``, ``restored-from``, and other fields are preserved unless
     passed explicitly.
     """
     when = separated_at or datetime.now(timezone.utc)
@@ -317,11 +340,12 @@ def write_manifest(
                 )
             if compositor is not None:
                 _ensure_mapping(data, "compositor")["hdr"] = compositor.hdr
+            if resolution is not None:
+                section = _ensure_mapping(data, "resolution")
+                section["width"] = resolution.width
+                section["height"] = resolution.height
             if render is not None:
-                section = _ensure_mapping(data, "render")
-                section["width"] = render.width
-                section["height"] = render.height
-                section["fps"] = render.fps
+                _ensure_mapping(data, "render")["fps"] = render.fps
 
         return _patch_manifest(project_dir, patch)
 
@@ -335,6 +359,7 @@ def write_manifest(
         song_markers=coerce_song_markers(song_markers),
         milkdrop=milkdrop,
         compositor=compositor,
+        resolution=resolution,
         render=render,
     )
     with path.open("w", encoding="utf-8") as handle:
@@ -380,16 +405,22 @@ def save_compositor_settings(project_dir: Path, hdr: bool) -> Path:
     return _patch_manifest(project_dir, patch)
 
 
-def save_render_settings(
-    project_dir: Path, *, width: int, height: int, fps: int
-) -> Path:
+def save_resolution_settings(project_dir: Path, *, width: int, height: int) -> Path:
+    """Replace ``resolution`` in ``project.yaml``, preserving ingest and provenance."""
+
+    def patch(data: dict) -> None:
+        section = _ensure_mapping(data, "resolution")
+        section["width"] = clamp_resolution_width(width)
+        section["height"] = clamp_resolution_height(height)
+
+    return _patch_manifest(project_dir, patch)
+
+
+def save_render_settings(project_dir: Path, *, fps: int) -> Path:
     """Replace ``render`` in ``project.yaml``, preserving ingest and provenance."""
 
     def patch(data: dict) -> None:
-        section = _ensure_mapping(data, "render")
-        section["width"] = clamp_render_width(width)
-        section["height"] = clamp_render_height(height)
-        section["fps"] = clamp_render_fps(fps)
+        _ensure_mapping(data, "render")["fps"] = clamp_render_fps(fps)
 
     return _patch_manifest(project_dir, patch)
 

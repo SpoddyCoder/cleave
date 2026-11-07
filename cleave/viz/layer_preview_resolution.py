@@ -7,7 +7,7 @@ from collections.abc import Sequence
 from cleave.config import (
     CleaveConfig,
     EditorPreviewQuality,
-    render_output_size,
+    project_resolution,
 )
 from cleave.viz.session import TuningSession
 
@@ -37,9 +37,9 @@ def _requested_scale(preview_quality: EditorPreviewQuality, z_index: int) -> flo
 
 
 def live_content_size(session: TuningSession) -> tuple[int, int]:
-    """Live visualiser content size: the project render output size."""
-    render = session.project.render
-    return render.width, render.height
+    """Live visualiser content size: the project resolution."""
+    resolution = session.project.resolution
+    return resolution.width, resolution.height
 
 
 def preview_layer_size(
@@ -66,7 +66,7 @@ def offline_layer_sizes(
     layer_z_order: Sequence[str],
 ) -> dict[str, tuple[int, int]]:
     preview_quality = cfg.editor.preview_quality
-    base = render_output_size(cfg)
+    base = project_resolution(cfg)
     return {
         slot: preview_layer_size(preview_quality, z_index, base)
         for z_index, slot in enumerate(layer_z_order)
@@ -80,11 +80,11 @@ def render_layer_size(
     viz_quality: bool,
 ) -> tuple[int, int]:
     if not viz_quality:
-        return render_output_size(cfg)
+        return project_resolution(cfg)
     return preview_layer_size(
         cfg.editor.preview_quality,
         z_index,
-        render_output_size(cfg),
+        project_resolution(cfg),
     )
 
 

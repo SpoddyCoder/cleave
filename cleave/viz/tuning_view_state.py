@@ -24,10 +24,12 @@ from cleave.config_schema.project_render import (
     DEFAULT_PROJECT_RENDER_QUALITY,
     DEFAULT_PROJECT_RENDER_START_SEC,
     DEFAULT_RENDER_FPS,
-    DEFAULT_RENDER_HEIGHT,
-    DEFAULT_RENDER_WIDTH,
     default_project_render_path,
     resolved_project_render_end_sec,
+)
+from cleave.config_schema.project_resolution import (
+    DEFAULT_RESOLUTION_HEIGHT,
+    DEFAULT_RESOLUTION_WIDTH,
 )
 from cleave.config_schema.render import (
     DEFAULT_CHROMA_BOOST_AMOUNT_PCT,
@@ -324,8 +326,8 @@ class ProjectBlock:
     quality: str = DEFAULT_PROJECT_RENDER_QUALITY
     start_sec: int = DEFAULT_PROJECT_RENDER_START_SEC
     end_sec: int = DEFAULT_PROJECT_RENDER_START_SEC
-    width: int = DEFAULT_RENDER_WIDTH
-    height: int = DEFAULT_RENDER_HEIGHT
+    width: int = DEFAULT_RESOLUTION_WIDTH
+    height: int = DEFAULT_RESOLUTION_HEIGHT
     fps: int = DEFAULT_RENDER_FPS
     output_label: str = DEFAULT_PROJECT_RENDER_OUTPUT_LABEL
 
@@ -505,6 +507,7 @@ def _project_block_from_session(
     project_slug: str,
 ) -> ProjectBlock:
     render = session.project.render
+    resolution = session.project.resolution
     end_sec = resolved_project_render_end_sec(render.end_sec, duration_sec)
     root = project_dir if project_dir is not None else Path(".")
     return ProjectBlock(
@@ -513,8 +516,8 @@ def _project_block_from_session(
         quality=render.quality,
         start_sec=render.start_sec,
         end_sec=end_sec,
-        width=render.width,
-        height=render.height,
+        width=resolution.width,
+        height=resolution.height,
         fps=render.fps,
         output_label=default_project_render_path(
             root,

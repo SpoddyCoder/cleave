@@ -73,8 +73,8 @@ def _replace_cfg(target: CleaveConfig, fresh: CleaveConfig) -> None:
     target.user_config_path = fresh.user_config_path
     target.milkdrop_beat_sensitivity = fresh.milkdrop_beat_sensitivity
     target.compositor_hdr = fresh.compositor_hdr
-    target.render_width = fresh.render_width
-    target.render_height = fresh.render_height
+    target.resolution_width = fresh.resolution_width
+    target.resolution_height = fresh.resolution_height
     target.render_fps = fresh.render_fps
     target.project_slug = fresh.project_slug
 
@@ -103,8 +103,8 @@ def _merge_session_state(
         fresh.project.milkdrop_beat_sensitivity
     )
     target.project.compositor_hdr = fresh.project.compositor_hdr
-    target.project.render.width = fresh.project.render.width
-    target.project.render.height = fresh.project.render.height
+    target.project.resolution.width = fresh.project.resolution.width
+    target.project.resolution.height = fresh.project.resolution.height
     target.project.render.fps = fresh.project.render.fps
 
     mode = editor_mode if editor_mode is not None else preserve_editor_mode

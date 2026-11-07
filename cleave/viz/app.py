@@ -13,7 +13,7 @@ from cleave.config import (
     CleaveConfig,
     missing_preset_anchor_notification,
     render_fps,
-    render_output_size,
+    project_resolution,
 )
 from cleave.user_config import persist_editor_settings
 from cleave.effects.runtime import EffectRuntime
@@ -133,7 +133,7 @@ def build_runtime_base(
     pcm_bank = load_stem_pcm(project_dir)
     session = session_from_cfg(cfg, playlists)
     session.song_markers.markers = list(load_manifest(project_dir).song_markers)
-    content_w, content_h = render_output_size(cfg)
+    content_w, content_h = project_resolution(cfg)
     return VisualizerSeed(
         project_dir=project_dir,
         audio_path=audio_path,

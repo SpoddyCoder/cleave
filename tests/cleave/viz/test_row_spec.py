@@ -139,8 +139,8 @@ _EXPECTED_REPEAT_ROW_KINDS = frozenset(
         RowKind.SETTINGS_UI_NAVIGATOR_HEIGHT,
         RowKind.SETTINGS_RESIDUAL_LATENCY_MS,
         RowKind.PROJECT_RENDER_QUALITY,
-        RowKind.PROJECT_RENDER_WIDTH,
-        RowKind.PROJECT_RENDER_HEIGHT,
+        RowKind.PROJECT_RESOLUTION_WIDTH,
+        RowKind.PROJECT_RESOLUTION_HEIGHT,
         RowKind.PROJECT_RENDER_FPS,
         RowKind.PROJECT_RENDER_START,
         RowKind.PROJECT_RENDER_END,
@@ -568,7 +568,8 @@ def test_row_panel_label_names_a_track_effect() -> None:
 def test_row_panel_label_settings_header() -> None:
     assert row_panel_label(RowKind.PROJECT_MILKDROP_HEADER) == "ProjectM"
     assert row_panel_label(RowKind.PROJECT_COMPOSITOR_HEADER) == "Compositor"
-    assert row_panel_label(RowKind.PROJECT_RENDER_HEADER) == "Render Project"
+    assert row_panel_label(RowKind.PROJECT_RESOLUTION_HEADER) == "Resolution"
+    assert row_panel_label(RowKind.PROJECT_RENDER_HEADER) == "Render"
 
 
 def test_format_row_value_settings() -> None:

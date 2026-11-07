@@ -43,6 +43,7 @@ _NODE_HEADER_KINDS: dict[str, RowKind] = {
     "settings.latency": RowKind.SETTINGS_LATENCY_COMPENSATION_HEADER,
     "project.projectm": RowKind.PROJECT_MILKDROP_HEADER,
     "project.compositor": RowKind.PROJECT_COMPOSITOR_HEADER,
+    "project.resolution": RowKind.PROJECT_RESOLUTION_HEADER,
     "project.render": RowKind.PROJECT_RENDER_HEADER,
     "overlay": RowKind.OVERLAYS_HEADER,
     "post_fx": RowKind.POST_FX_HEADER,

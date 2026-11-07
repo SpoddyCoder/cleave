@@ -499,13 +499,13 @@ def build_parser() -> argparse.ArgumentParser:
         "--width",
         type=int,
         metavar="PX",
-        help="Output width in pixels (default: project.yaml render.width)",
+        help="Output width in pixels (default: project.yaml resolution.width)",
     )
     render.add_argument(
         "--height",
         type=int,
         metavar="PX",
-        help="Output height in pixels (default: project.yaml render.height)",
+        help="Output height in pixels (default: project.yaml resolution.height)",
     )
     render.add_argument(
         "--fps",

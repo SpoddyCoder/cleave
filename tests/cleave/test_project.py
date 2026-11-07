@@ -14,6 +14,7 @@ from cleave.project import (
     MilkdropSettings,
     ProjectManifest,
     ProjectRenderSettings,
+    ProjectResolutionSettings,
     load_manifest,
     manifest_path,
     mix_path,
@@ -22,6 +23,7 @@ from cleave.project import (
     save_compositor_settings,
     save_milkdrop_settings,
     save_render_settings,
+    save_resolution_settings,
     save_song_markers,
     write_manifest,
 )
@@ -576,7 +578,7 @@ def test_parse_compositor_rejects_non_bool_hdr(tmp_path: Path) -> None:
         load_manifest(project)
 
 
-def test_save_render_settings_preserves_ingest_and_markers(tmp_path: Path) -> None:
+def test_save_resolution_and_render_preserve_ingest_and_markers(tmp_path: Path) -> None:
     project = tmp_path / "song"
     project.mkdir()
     original = tmp_path / "source.flac"
@@ -590,16 +592,18 @@ def test_save_render_settings_preserves_ingest_and_markers(tmp_path: Path) -> No
         song_markers=(10.0, 42.5),
     )
     rewrite_manifest_slug(project, "song", restored_from="archived-slug")
-    save_render_settings(project, width=1280, height=720, fps=24)
+    save_resolution_settings(project, width=1280, height=720)
+    save_render_settings(project, fps=24)
 
     manifest = load_manifest(project)
-    assert manifest.render == ProjectRenderSettings(width=1280, height=720, fps=24)
+    assert manifest.resolution == ProjectResolutionSettings(width=1280, height=720)
+    assert manifest.render == ProjectRenderSettings(fps=24)
     assert [m.time for m in manifest.song_markers] == [10.0, 42.5]
     assert manifest.restored_from == "archived-slug"
     assert manifest.mix_filename == "song.flac"
 
 
-def test_write_manifest_preserves_render_settings(tmp_path: Path) -> None:
+def test_write_manifest_preserves_resolution_and_render(tmp_path: Path) -> None:
     project = tmp_path / "song"
     project.mkdir()
     original = tmp_path / "source.flac"
@@ -610,7 +614,8 @@ def test_write_manifest_preserves_render_settings(tmp_path: Path) -> None:
         mix_filename="song.flac",
         original_path=original,
         demucs_model="htdemucs",
-        render=ProjectRenderSettings(width=3840, height=2160, fps=48),
+        resolution=ProjectResolutionSettings(width=3840, height=2160),
+        render=ProjectRenderSettings(fps=48),
     )
     write_manifest(
         project,
@@ -621,14 +626,15 @@ def test_write_manifest_preserves_render_settings(tmp_path: Path) -> None:
     )
     manifest = load_manifest(project)
     assert manifest.mix_filename == "song.wav"
-    assert manifest.render == ProjectRenderSettings(width=3840, height=2160, fps=48)
+    assert manifest.resolution == ProjectResolutionSettings(width=3840, height=2160)
+    assert manifest.render == ProjectRenderSettings(fps=48)
 
 
-def test_parse_render_defaults_when_section_omits_keys(tmp_path: Path) -> None:
-    from cleave.config_schema.project_render import (
-        DEFAULT_RENDER_FPS,
-        DEFAULT_RENDER_HEIGHT,
-        DEFAULT_RENDER_WIDTH,
+def test_parse_sections_default_when_keys_omitted(tmp_path: Path) -> None:
+    from cleave.config_schema.project_render import DEFAULT_RENDER_FPS
+    from cleave.config_schema.project_resolution import (
+        DEFAULT_RESOLUTION_HEIGHT,
+        DEFAULT_RESOLUTION_WIDTH,
     )
 
     project = tmp_path / "song"
@@ -642,17 +648,19 @@ def test_parse_render_defaults_when_section_omits_keys(tmp_path: Path) -> None:
     )
     path = project / PROJECT_FILENAME
     data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    data["resolution"] = {}
     data["render"] = {}
     with path.open("w", encoding="utf-8") as handle:
         yaml.safe_dump(data, handle, sort_keys=False)
-    assert load_manifest(project).render == ProjectRenderSettings(
-        width=DEFAULT_RENDER_WIDTH,
-        height=DEFAULT_RENDER_HEIGHT,
-        fps=DEFAULT_RENDER_FPS,
+    manifest = load_manifest(project)
+    assert manifest.resolution == ProjectResolutionSettings(
+        width=DEFAULT_RESOLUTION_WIDTH,
+        height=DEFAULT_RESOLUTION_HEIGHT,
     )
+    assert manifest.render == ProjectRenderSettings(fps=DEFAULT_RENDER_FPS)
 
 
-def test_parse_render_rejects_non_int_width(tmp_path: Path) -> None:
+def test_parse_resolution_rejects_non_int_width(tmp_path: Path) -> None:
     project = tmp_path / "song"
     project.mkdir()
     write_manifest(
@@ -664,10 +672,10 @@ def test_parse_render_rejects_non_int_width(tmp_path: Path) -> None:
     )
     path = project / PROJECT_FILENAME
     data = yaml.safe_load(path.read_text(encoding="utf-8"))
-    data["render"] = {"width": "wide"}
+    data["resolution"] = {"width": "wide"}
     with path.open("w", encoding="utf-8") as handle:
         yaml.safe_dump(data, handle, sort_keys=False)
-    with pytest.raises(ValueError, match="render.width"):
+    with pytest.raises(ValueError, match="resolution.width"):
         load_manifest(project)
 
 
@@ -677,12 +685,8 @@ def _write_unknown_key(project: Path) -> None:
     data["custom_metadata"] = True
     data["milkdrop"] = {"beat_sensitivity": 4.0, "extra_pm": "keep"}
     data["compositor"] = {"hdr": True, "extra_comp": 1}
-    data["render"] = {
-        "width": 1920,
-        "height": 1080,
-        "fps": 60,
-        "extra_render": "keep",
-    }
+    data["resolution"] = {"width": 1920, "height": 1080, "extra_res": "keep"}
+    data["render"] = {"fps": 60, "extra_render": "keep"}
     with path.open("w", encoding="utf-8") as handle:
         yaml.safe_dump(data, handle, sort_keys=False)
 
@@ -694,6 +698,7 @@ def _assert_unknown_keys_survive(project: Path) -> None:
     assert data["custom_metadata"] is True
     assert data["milkdrop"]["extra_pm"] == "keep"
     assert data["compositor"]["extra_comp"] == 1
+    assert data["resolution"]["extra_res"] == "keep"
     assert data["render"]["extra_render"] == "keep"
 
 
@@ -732,11 +737,18 @@ def test_save_compositor_settings_preserves_unknown_keys(tmp_path: Path) -> None
     assert load_manifest(project).compositor == CompositorSettings(False)
 
 
+def test_save_resolution_settings_preserves_unknown_keys(tmp_path: Path) -> None:
+    project = _seed_manifest(tmp_path)
+    save_resolution_settings(project, width=1280, height=720)
+    _assert_unknown_keys_survive(project)
+    assert load_manifest(project).resolution == ProjectResolutionSettings(1280, 720)
+
+
 def test_save_render_settings_preserves_unknown_keys(tmp_path: Path) -> None:
     project = _seed_manifest(tmp_path)
-    save_render_settings(project, width=1280, height=720, fps=24)
+    save_render_settings(project, fps=24)
     _assert_unknown_keys_survive(project)
-    assert load_manifest(project).render == ProjectRenderSettings(1280, 720, 24)
+    assert load_manifest(project).render == ProjectRenderSettings(24)
 
 
 def test_rewrite_manifest_slug_preserves_unknown_keys(tmp_path: Path) -> None:

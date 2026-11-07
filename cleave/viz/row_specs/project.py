@@ -1,4 +1,4 @@
-"""Project header, ProjectM, compositor, and render row specs."""
+"""Project header, ProjectM, compositor, resolution, and render row specs."""
 
 from __future__ import annotations
 
@@ -8,8 +8,10 @@ from cleave.config_schema.project_render import (
     PROJECT_RENDER_QUALITY_HELP_ENTRIES,
     RENDER_FPS_STEP,
     RENDER_FPS_STEP_LARGE,
-    RENDER_SIZE_STEP,
-    RENDER_SIZE_STEP_LARGE,
+)
+from cleave.config_schema.project_resolution import (
+    RESOLUTION_STEP,
+    RESOLUTION_STEP_LARGE,
 )
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
 from cleave.viz.row_spec import FitStrategy, RowPresentStyle, RowSpec
@@ -25,13 +27,13 @@ def _format_project_render_output(
     return state.project.output_label
 
 
-def _format_project_render_width(
+def _format_project_resolution_width(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
     return str(state.project.width)
 
 
-def _format_project_render_height(
+def _format_project_resolution_height(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
     return str(state.project.height)
@@ -73,7 +75,7 @@ def _format_project_compositor_hdr(
     return "on" if state.project.compositor_hdr else "off"
 
 
-def _apply_project_render_width(
+def _apply_project_resolution_width(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
@@ -82,7 +84,7 @@ def _apply_project_render_width(
     controls.project.adjust_width(forward=forward, large=large)
 
 
-def _apply_project_render_height(
+def _apply_project_resolution_height(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
@@ -209,15 +211,66 @@ SPECS: dict[RowKind, RowSpec] = {
         repeatable=True,
         parent_group="project_compositor",
     ),
-    RowKind.PROJECT_RENDER_HEADER: RowSpec(
+    RowKind.PROJECT_RESOLUTION_HEADER: RowSpec(
         affordance=RowAffordance.HEADING,
-        panel_label="Render Project",
+        panel_label="Resolution",
         present_style=RowPresentStyle.HEADING,
         fit_strategy=FitStrategy.NONE,
-        help_title="Render Project",
+        help_title="Resolution",
         help_description=(
-            "Choose output size, frame rate, quality, and a time range,",
-            "then render this project to MP4.",
+            "Project width and height in pixels.",
+            "The render output and the live preview both use this size.",
+        ),
+        is_pinned=True,
+        parent_group="project",
+    ),
+    RowKind.PROJECT_RESOLUTION_WIDTH: RowSpec(
+        affordance=RowAffordance.VALUE_STEP,
+        panel_label="width",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_project_resolution_width,
+        apply_horizontal=_apply_project_resolution_width,
+        help_title="Resolution width",
+        help_entries=(
+            ("Left/Right", f"adjust width ({RESOLUTION_STEP} px)"),
+            ("PgUp/PgDn", f"large step ({RESOLUTION_STEP_LARGE} px)"),
+        ),
+        help_description=(
+            "Project width in pixels.",
+            "Sets the render output and the live preview size and shape.",
+        ),
+        is_pinned=True,
+        repeatable=True,
+        parent_group="project_resolution",
+    ),
+    RowKind.PROJECT_RESOLUTION_HEIGHT: RowSpec(
+        affordance=RowAffordance.VALUE_STEP,
+        panel_label="height",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_project_resolution_height,
+        apply_horizontal=_apply_project_resolution_height,
+        help_title="Resolution height",
+        help_entries=(
+            ("Left/Right", f"adjust height ({RESOLUTION_STEP} px)"),
+            ("PgUp/PgDn", f"large step ({RESOLUTION_STEP_LARGE} px)"),
+        ),
+        help_description=(
+            "Project height in pixels.",
+            "Sets the render output and the live preview size and shape.",
+        ),
+        is_pinned=True,
+        repeatable=True,
+        parent_group="project_resolution",
+    ),
+    RowKind.PROJECT_RENDER_HEADER: RowSpec(
+        affordance=RowAffordance.HEADING,
+        panel_label="Render",
+        present_style=RowPresentStyle.HEADING,
+        fit_strategy=FitStrategy.NONE,
+        help_title="Render",
+        help_description=(
+            "Choose frame rate, quality, and a time range,",
+            "then render this project to MP4 at the project resolution.",
         ),
         is_pinned=True,
         parent_group="project",
@@ -235,44 +288,6 @@ SPECS: dict[RowKind, RowSpec] = {
             "Not editable.",
         ),
         is_pinned=True,
-        parent_group="project_render",
-    ),
-    RowKind.PROJECT_RENDER_WIDTH: RowSpec(
-        affordance=RowAffordance.VALUE_STEP,
-        panel_label="width",
-        present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_project_render_width,
-        apply_horizontal=_apply_project_render_width,
-        help_title="Render width",
-        help_entries=(
-            ("Left/Right", f"adjust width ({RENDER_SIZE_STEP} px)"),
-            ("PgUp/PgDn", f"large step ({RENDER_SIZE_STEP_LARGE} px)"),
-        ),
-        help_description=(
-            "Offline render output width in pixels.",
-            "The live preview uses the same size and shape.",
-        ),
-        is_pinned=True,
-        repeatable=True,
-        parent_group="project_render",
-    ),
-    RowKind.PROJECT_RENDER_HEIGHT: RowSpec(
-        affordance=RowAffordance.VALUE_STEP,
-        panel_label="height",
-        present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_project_render_height,
-        apply_horizontal=_apply_project_render_height,
-        help_title="Render height",
-        help_entries=(
-            ("Left/Right", f"adjust height ({RENDER_SIZE_STEP} px)"),
-            ("PgUp/PgDn", f"large step ({RENDER_SIZE_STEP_LARGE} px)"),
-        ),
-        help_description=(
-            "Offline render output height in pixels.",
-            "The live preview uses the same size and shape.",
-        ),
-        is_pinned=True,
-        repeatable=True,
         parent_group="project_render",
     ),
     RowKind.PROJECT_RENDER_FPS: RowSpec(

@@ -73,8 +73,10 @@ from cleave.config_schema.layers import (
 from cleave.config_schema.compositor import DEFAULT_COMPOSITOR_HDR
 from cleave.config_schema.project_render import (
     DEFAULT_RENDER_FPS,
-    DEFAULT_RENDER_HEIGHT,
-    DEFAULT_RENDER_WIDTH,
+)
+from cleave.config_schema.project_resolution import (
+    DEFAULT_RESOLUTION_HEIGHT,
+    DEFAULT_RESOLUTION_WIDTH,
 )
 from cleave.config_schema.render import (
     CHROMA_BOOST_APPLY_MODES,
@@ -412,8 +414,8 @@ class CleaveConfig:
     timeline: TimelineConfig | None = None
     milkdrop_beat_sensitivity: float = DEFAULT_BEAT_SENSITIVITY
     compositor_hdr: bool = DEFAULT_COMPOSITOR_HDR
-    render_width: int = DEFAULT_RENDER_WIDTH
-    render_height: int = DEFAULT_RENDER_HEIGHT
+    resolution_width: int = DEFAULT_RESOLUTION_WIDTH
+    resolution_height: int = DEFAULT_RESOLUTION_HEIGHT
     render_fps: int = DEFAULT_RENDER_FPS
     project_slug: str = DEFAULT_PROJECT_SLUG
 
@@ -427,9 +429,9 @@ def render_fps(cfg: CleaveConfig) -> int:
     return cfg.render_fps
 
 
-def render_output_size(cfg: CleaveConfig) -> tuple[int, int]:
-    """Offline render output resolution from project.yaml."""
-    return cfg.render_width, cfg.render_height
+def project_resolution(cfg: CleaveConfig) -> tuple[int, int]:
+    """Project resolution from project.yaml (render output and live preview)."""
+    return cfg.resolution_width, cfg.resolution_height
 
 
 def _expand_path(path: Path | str) -> Path:
@@ -621,13 +623,15 @@ def load_config(
         compositor_hdr = manifest.compositor.hdr
     else:
         compositor_hdr = DEFAULT_COMPOSITOR_HDR
+    if manifest is not None and manifest.resolution is not None:
+        resolution_width = manifest.resolution.width
+        resolution_height = manifest.resolution.height
+    else:
+        resolution_width = DEFAULT_RESOLUTION_WIDTH
+        resolution_height = DEFAULT_RESOLUTION_HEIGHT
     if manifest is not None and manifest.render is not None:
-        render_width = manifest.render.width
-        render_height = manifest.render.height
         render_fps = manifest.render.fps
     else:
-        render_width = DEFAULT_RENDER_WIDTH
-        render_height = DEFAULT_RENDER_HEIGHT
         render_fps = DEFAULT_RENDER_FPS
     project_slug = manifest.slug if manifest is not None else DEFAULT_PROJECT_SLUG
 
@@ -642,8 +646,8 @@ def load_config(
         timeline=timeline,
         milkdrop_beat_sensitivity=milkdrop_beat_sensitivity,
         compositor_hdr=compositor_hdr,
-        render_width=render_width,
-        render_height=render_height,
+        resolution_width=resolution_width,
+        resolution_height=resolution_height,
         render_fps=render_fps,
         project_slug=project_slug,
     )

@@ -1,4 +1,4 @@
-"""Apply the project render size to the live visualiser once edits settle."""
+"""Apply the project resolution to the live visualiser once edits settle."""
 
 from __future__ import annotations
 
@@ -7,16 +7,16 @@ from collections.abc import Callable
 from cleave.viz.layer_preview_resolution import live_content_size
 from cleave.viz.session import TuningSession
 
-# Quiet time after the last render width/height change before the layer
+# Quiet time after the last resolution width/height change before the layer
 # framebuffers are reallocated, so a held key does not reallocate every step.
 VISUALISER_RESOLUTION_SETTLE_SEC = 0.25
 
 
 class VisualiserResolutionSync:
-    """Watch ``session.project.render`` size and reallocate the live framebuffers.
+    """Watch ``session.project.resolution`` and reallocate the live framebuffers.
 
     Polling the session covers every source of change: stepping the Project >
-    Render rows, revert, and editor-mode reloads.
+    Resolution rows, revert, and editor-mode reloads.
     """
 
     def __init__(

@@ -41,7 +41,7 @@ from cleave.config import (
     missing_preset_anchor_notification,
     project_viz_config_path,
     render_fps,
-    render_output_size,
+    project_resolution,
     _parse_layers,
 )
 from tests.support.config import default_highlight_rolloff_config, default_post_fx_config
@@ -76,8 +76,10 @@ from cleave.config_schema.layers import (
 )
 from cleave.config_schema.project_render import (
     DEFAULT_RENDER_FPS,
-    DEFAULT_RENDER_HEIGHT,
-    DEFAULT_RENDER_WIDTH,
+)
+from cleave.config_schema.project_resolution import (
+    DEFAULT_RESOLUTION_HEIGHT,
+    DEFAULT_RESOLUTION_WIDTH,
 )
 from cleave.config_schema.render import (
     FADE_CURVES,
@@ -893,17 +895,21 @@ def test_load_config_render_size_defaults_without_project_yaml(
     minimal_project: Path,
 ) -> None:
     cfg = load_config(project_root=minimal_project)
-    assert cfg.render_width == DEFAULT_RENDER_WIDTH
-    assert cfg.render_height == DEFAULT_RENDER_HEIGHT
+    assert cfg.resolution_width == DEFAULT_RESOLUTION_WIDTH
+    assert cfg.resolution_height == DEFAULT_RESOLUTION_HEIGHT
     assert cfg.render_fps == DEFAULT_RENDER_FPS
-    assert render_output_size(cfg) == (DEFAULT_RENDER_WIDTH, DEFAULT_RENDER_HEIGHT)
+    assert project_resolution(cfg) == (DEFAULT_RESOLUTION_WIDTH, DEFAULT_RESOLUTION_HEIGHT)
     assert render_fps(cfg) == DEFAULT_RENDER_FPS
 
 
-def test_load_config_render_size_from_project_yaml(tmp_path: Path) -> None:
+def test_load_config_resolution_and_fps_from_project_yaml(tmp_path: Path) -> None:
     from datetime import datetime, timezone
 
-    from cleave.project import save_render_settings, write_manifest
+    from cleave.project import (
+        save_render_settings,
+        save_resolution_settings,
+        write_manifest,
+    )
 
     preset_root = tmp_path / "presets"
     project_dir = tmp_path / "project"
@@ -916,13 +922,14 @@ def test_load_config_render_size_from_project_yaml(tmp_path: Path) -> None:
         demucs_model="htdemucs",
         separated_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
     )
-    save_render_settings(project_dir, width=3840, height=2160, fps=24)
+    save_resolution_settings(project_dir, width=3840, height=2160)
+    save_render_settings(project_dir, fps=24)
 
     cfg = load_config(project_root=project_dir)
-    assert cfg.render_width == 3840
-    assert cfg.render_height == 2160
+    assert cfg.resolution_width == 3840
+    assert cfg.resolution_height == 2160
     assert cfg.render_fps == 24
-    assert render_output_size(cfg) == (3840, 2160)
+    assert project_resolution(cfg) == (3840, 2160)
     assert render_fps(cfg) == 24
 
 

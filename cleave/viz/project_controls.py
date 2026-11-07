@@ -9,13 +9,15 @@ from cleave.config_schema.project_render import (
     PROJECT_RENDER_QUALITIES,
     RENDER_FPS_STEP,
     RENDER_FPS_STEP_LARGE,
-    RENDER_SIZE_STEP,
-    RENDER_SIZE_STEP_LARGE,
     clamp_render_fps,
-    clamp_render_height,
-    clamp_render_width,
     project_render_duration_ceil_sec,
     resolved_project_render_end_sec,
+)
+from cleave.config_schema.project_resolution import (
+    RESOLUTION_STEP,
+    RESOLUTION_STEP_LARGE,
+    clamp_resolution_height,
+    clamp_resolution_width,
 )
 from cleave.viz.session import TuningSession
 
@@ -24,7 +26,7 @@ _BEAT_SENSITIVITY_LARGE_STEP = 0.5
 
 
 class ProjectControls:
-    """Mutations for Project header, Milkdrop, Compositor, and Render Project rows."""
+    """Mutations for Project header, Milkdrop, Compositor, Resolution, and Render rows."""
 
     def __init__(
         self,
@@ -80,16 +82,16 @@ class ProjectControls:
         render.end_sec = None if new_end == ceil else new_end
 
     def adjust_width(self, *, forward: bool, large: bool) -> None:
-        step = RENDER_SIZE_STEP_LARGE if large else RENDER_SIZE_STEP
+        step = RESOLUTION_STEP_LARGE if large else RESOLUTION_STEP
         delta = step if forward else -step
-        render = self.session.project.render
-        render.width = clamp_render_width(render.width + delta)
+        resolution = self.session.project.resolution
+        resolution.width = clamp_resolution_width(resolution.width + delta)
 
     def adjust_height(self, *, forward: bool, large: bool) -> None:
-        step = RENDER_SIZE_STEP_LARGE if large else RENDER_SIZE_STEP
+        step = RESOLUTION_STEP_LARGE if large else RESOLUTION_STEP
         delta = step if forward else -step
-        render = self.session.project.render
-        render.height = clamp_render_height(render.height + delta)
+        resolution = self.session.project.resolution
+        resolution.height = clamp_resolution_height(resolution.height + delta)
 
     def adjust_fps(self, *, forward: bool, large: bool) -> None:
         step = RENDER_FPS_STEP_LARGE if large else RENDER_FPS_STEP

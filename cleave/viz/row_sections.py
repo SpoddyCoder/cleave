@@ -165,13 +165,20 @@ PROJECT_COMPOSITOR_SECTION = SectionDef(
     ),
 )
 
+PROJECT_RESOLUTION_SECTION = SectionDef(
+    header_kind=RowKind.PROJECT_RESOLUTION_HEADER,
+    context="global",
+    children=(
+        SectionNode(leaf_kind=RowKind.PROJECT_RESOLUTION_WIDTH),
+        SectionNode(leaf_kind=RowKind.PROJECT_RESOLUTION_HEIGHT),
+    ),
+)
+
 PROJECT_RENDER_SECTION = SectionDef(
     header_kind=RowKind.PROJECT_RENDER_HEADER,
     context="global",
     children=(
         SectionNode(leaf_kind=RowKind.PROJECT_RENDER_OUTPUT),
-        SectionNode(leaf_kind=RowKind.PROJECT_RENDER_WIDTH),
-        SectionNode(leaf_kind=RowKind.PROJECT_RENDER_HEIGHT),
         SectionNode(leaf_kind=RowKind.PROJECT_RENDER_FPS),
         SectionNode(leaf_kind=RowKind.PROJECT_RENDER_QUALITY),
         SectionNode(leaf_kind=RowKind.PROJECT_RENDER_START),

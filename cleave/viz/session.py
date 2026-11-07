@@ -19,9 +19,11 @@ from cleave.config_schema.project_render import (
     DEFAULT_PROJECT_RENDER_QUALITY,
     DEFAULT_PROJECT_RENDER_START_SEC,
     DEFAULT_RENDER_FPS,
-    DEFAULT_RENDER_HEIGHT,
-    DEFAULT_RENDER_WIDTH,
     ProjectRenderQuality,
+)
+from cleave.config_schema.project_resolution import (
+    DEFAULT_RESOLUTION_HEIGHT,
+    DEFAULT_RESOLUTION_WIDTH,
 )
 from cleave.config_schema.layers import (
     DEFAULT_BLEND_MODE,
@@ -399,15 +401,22 @@ class ProjectRenderRuntime:
     quality: ProjectRenderQuality = DEFAULT_PROJECT_RENDER_QUALITY
     start_sec: int = DEFAULT_PROJECT_RENDER_START_SEC
     end_sec: int | None = None
-    width: int = DEFAULT_RENDER_WIDTH
-    height: int = DEFAULT_RENDER_HEIGHT
     fps: int = DEFAULT_RENDER_FPS
+
+
+@dataclass
+class ProjectResolutionRuntime:
+    width: int = DEFAULT_RESOLUTION_WIDTH
+    height: int = DEFAULT_RESOLUTION_HEIGHT
 
 
 @dataclass
 class ProjectRuntime:
     milkdrop_beat_sensitivity: float = DEFAULT_BEAT_SENSITIVITY
     compositor_hdr: bool = DEFAULT_COMPOSITOR_HDR
+    resolution: ProjectResolutionRuntime = field(
+        default_factory=ProjectResolutionRuntime
+    )
     render: ProjectRenderRuntime = field(default_factory=ProjectRenderRuntime)
 
 
@@ -724,11 +733,11 @@ def session_from_cfg(
         project=ProjectRuntime(
             milkdrop_beat_sensitivity=cfg.milkdrop_beat_sensitivity,
             compositor_hdr=cfg.compositor_hdr,
-            render=ProjectRenderRuntime(
-                width=cfg.render_width,
-                height=cfg.render_height,
-                fps=cfg.render_fps,
+            resolution=ProjectResolutionRuntime(
+                width=cfg.resolution_width,
+                height=cfg.resolution_height,
             ),
+            render=ProjectRenderRuntime(fps=cfg.render_fps),
         ),
         layers={
             slot: LayerRuntime(

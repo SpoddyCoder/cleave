@@ -4154,14 +4154,14 @@ def test_project_render_size_step_and_back_does_not_apply() -> None:
     apply.assert_not_called()
 
 
-def test_project_render_size_set_directly_applies_live() -> None:
+def test_project_resolution_set_directly_applies_live() -> None:
     controls = _make_controls(("layer_1",))
     apply = MagicMock()
     controls.layer_lifecycle.apply_visualiser_resolution = apply
 
     # Revert and editor-mode reloads write the session directly.
-    render = controls.session.project.render
-    render.width, render.height = 1080, 1920
+    resolution = controls.session.project.resolution
+    resolution.width, resolution.height = 1080, 1920
     controls.tick(0.0)
     controls.tick(VISUALISER_RESOLUTION_SETTLE_SEC)
     apply.assert_called_once_with()

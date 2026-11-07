@@ -186,8 +186,8 @@ def test_apply_visualiser_resolution_resizes_content_and_layers(
     manager, compositor = _manager(("layer_1",))
     post_process = MagicMock()
     manager.post_process = post_process
-    render = manager.session.project.render
-    render.width, render.height = 1280, 720
+    resolution = manager.session.project.resolution
+    resolution.width, resolution.height = 1280, 720
 
     manager.apply_visualiser_resolution()
 

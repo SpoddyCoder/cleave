@@ -89,7 +89,8 @@ _STATIC_CHILDREN: dict[str, tuple[tuple[str, str], ...]] = {
     "project": (
         ("project.projectm", "ProjectM"),
         ("project.compositor", "Compositor"),
-        ("project.render", "Render Project"),
+        ("project.resolution", "Resolution"),
+        ("project.render", "Render"),
     ),
     "overlay": (
         ("overlay.opening_card", "Opening Card"),

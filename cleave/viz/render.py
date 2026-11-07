@@ -17,13 +17,15 @@ from cleave.config import (
     load_config,
     missing_preset_anchor_notification,
     render_fps,
-    render_output_size,
+    project_resolution,
 )
 from cleave.config_schema.project_render import (
     clamp_render_fps,
-    clamp_render_height,
-    clamp_render_width,
     default_project_render_path,
+)
+from cleave.config_schema.project_resolution import (
+    clamp_resolution_height,
+    clamp_resolution_width,
 )
 from cleave.ffmpeg import ffmpeg_executable
 from cleave.paths import default_project_config, resolve_project
@@ -205,9 +207,9 @@ def render(
     config_path = _resolve_render_config_path(config, project)
     cfg = load_config(config_path, project)
     if width is not None:
-        cfg.render_width = clamp_render_width(width)
+        cfg.resolution_width = clamp_resolution_width(width)
     if height is not None:
-        cfg.render_height = clamp_render_height(height)
+        cfg.resolution_height = clamp_resolution_height(height)
     if fps is not None:
         cfg.render_fps = clamp_render_fps(fps)
 
@@ -227,7 +229,7 @@ def render(
     if missing_anchor is not None:
         print(f"warning: {missing_anchor}", file=sys.stderr)
 
-    output_width, output_height = render_output_size(cfg)
+    output_width, output_height = project_resolution(cfg)
 
     os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
     pygame.init()

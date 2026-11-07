@@ -59,11 +59,12 @@ def project_render_labeled_lines(
     output_path: Path,
 ) -> tuple[ModalLabeledLine, ...]:
     render = session.project.render
+    resolution = session.project.resolution
     end_sec = resolved_project_render_end_sec(render.end_sec, duration_sec)
     return (
         ModalLabeledLine("output", project_render_output_label(output_path)),
-        ModalLabeledLine("width", str(render.width)),
-        ModalLabeledLine("height", str(render.height)),
+        ModalLabeledLine("width", str(resolution.width)),
+        ModalLabeledLine("height", str(resolution.height)),
         ModalLabeledLine("fps", str(render.fps)),
         ModalLabeledLine("quality", render.quality),
         ModalLabeledLine("start", f"{render.start_sec}s"),
@@ -167,6 +168,7 @@ class ProjectRenderController:
             self._prompt_error(str(exc) or "Could not write render snapshot.")
             return
         render = self.session.project.render
+        resolution = self.session.project.resolution
         end_sec = resolved_project_render_end_sec(render.end_sec, self.duration_sec)
         spec = ProjectRenderSpec(
             project_dir=project_dir,
@@ -175,8 +177,8 @@ class ProjectRenderController:
             quality=render.quality,
             start_sec=render.start_sec,
             end_sec=end_sec,
-            width=render.width,
-            height=render.height,
+            width=resolution.width,
+            height=resolution.height,
             fps=render.fps,
         )
         self._snapshot_path = snapshot

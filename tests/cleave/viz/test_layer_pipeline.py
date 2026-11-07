@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 from cleave.preset_playlist import PresetPlaylist
 from cleave.viz.layer import StemLayer
 from cleave.viz.layer_pipeline import LayerFramePipeline
-from cleave.config import render_output_size
+from cleave.config import project_resolution
 from cleave.viz.layer_preview_resolution import (
     live_content_size,
     preview_layer_size,
@@ -125,8 +125,8 @@ def test_build_preview_resolutions_false_uses_render_output_size(
     base_cfg = make_test_cfg((slot,))
     cfg = replace(
         base_cfg,
-        render_width=1920,
-        render_height=1080,
+        resolution_width=1920,
+        resolution_height=1080,
         editor=replace(base_cfg.editor, preview_quality="performance"),
     )
     compositor = MagicMock()
@@ -160,8 +160,8 @@ def test_build_preview_resolutions_false_uses_output_size_at_mismatched_aspect(
     base_cfg = make_test_cfg(slots)
     cfg = replace(
         base_cfg,
-        render_width=1080,
-        render_height=1920,
+        resolution_width=1080,
+        resolution_height=1920,
         editor=replace(base_cfg.editor, preview_quality="performance"),
     )
     compositor = MagicMock()
@@ -195,8 +195,8 @@ def test_build_preview_resolutions_false_viz_quality_uses_preview_sizes(
     base_cfg = make_test_cfg((slot,))
     cfg = replace(
         base_cfg,
-        render_width=1920,
-        render_height=1080,
+        resolution_width=1920,
+        resolution_height=1080,
         editor=replace(base_cfg.editor, preview_quality="performance"),
     )
     compositor = MagicMock()
@@ -214,7 +214,7 @@ def test_build_preview_resolutions_false_viz_quality_uses_preview_sizes(
 
     build_single.assert_called_once()
     preview_w, preview_h = preview_layer_size(
-        "performance", 0, render_output_size(cfg)
+        "performance", 0, project_resolution(cfg)
     )
     assert build_single.call_args.kwargs["width"] == preview_w
     assert build_single.call_args.kwargs["height"] == preview_h

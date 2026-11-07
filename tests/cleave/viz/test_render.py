@@ -26,12 +26,16 @@ from cleave.viz.session import (
 from tests.support.config import TEST_LAYER_STEMS, default_post_fx_runtime
 from cleave.paths import repo_root
 from cleave.config_schema.layers import DEFAULT_LAYER_SLOTS
-from cleave.config_schema.project_render import (
-    DEFAULT_RENDER_HEIGHT,
-    DEFAULT_RENDER_WIDTH,
+from cleave.config_schema.project_resolution import (
+    DEFAULT_RESOLUTION_HEIGHT,
+    DEFAULT_RESOLUTION_WIDTH,
 )
 from cleave.stems import STEM_NAMES, stems_dir
-from cleave.project import ProjectRenderSettings, write_manifest
+from cleave.project import (
+    ProjectRenderSettings,
+    ProjectResolutionSettings,
+    write_manifest,
+)
 from cleave.separate import project_stems_complete
 
 render_mod = importlib.import_module("cleave.viz.render")
@@ -52,7 +56,7 @@ from tests.support.config import write_minimal_config
 
 
 def _render_frame_bytes(
-    width: int = DEFAULT_RENDER_WIDTH, height: int = DEFAULT_RENDER_HEIGHT
+    width: int = DEFAULT_RESOLUTION_WIDTH, height: int = DEFAULT_RESOLUTION_HEIGHT
 ) -> bytes:
     return b"\xff" * (width * height * 4)
 
@@ -139,11 +143,11 @@ def _mock_render_runtime(
     seed.height = height
     seed.duration_sec = duration_sec
     seed.pcm_bank = MagicMock()
-    render_w = DEFAULT_RENDER_WIDTH if output_width is None else output_width
-    render_h = DEFAULT_RENDER_HEIGHT if output_height is None else output_height
+    render_w = DEFAULT_RESOLUTION_WIDTH if output_width is None else output_width
+    render_h = DEFAULT_RESOLUTION_HEIGHT if output_height is None else output_height
     seed.cfg = MagicMock()
-    seed.cfg.render_width = render_w
-    seed.cfg.render_height = render_h
+    seed.cfg.resolution_width = render_w
+    seed.cfg.resolution_height = render_h
     seed.cfg.render_fps = fps
     seed.cfg.render = RenderConfig()
     seed.session = TuningSession(
@@ -181,8 +185,8 @@ def _setup_render_project(
     tmp_path: Path,
     *,
     render_fps: int = 10,
-    render_width: int | None = None,
-    render_height: int | None = None,
+    resolution_width: int | None = None,
+    resolution_height: int | None = None,
 ) -> Path:
     preset_root = tmp_path / "presets"
     project = tmp_path / "my-track"
@@ -197,11 +201,13 @@ def _setup_render_project(
         mix_filename="my-track.flac",
         original_path=tmp_path / "source.flac",
         demucs_model="htdemucs",
-        render=ProjectRenderSettings(
-            width=DEFAULT_RENDER_WIDTH if render_width is None else render_width,
-            height=DEFAULT_RENDER_HEIGHT if render_height is None else render_height,
-            fps=render_fps,
+        resolution=ProjectResolutionSettings(
+            width=DEFAULT_RESOLUTION_WIDTH if resolution_width is None else resolution_width,
+            height=(
+                DEFAULT_RESOLUTION_HEIGHT if resolution_height is None else resolution_height
+            ),
         ),
+        render=ProjectRenderSettings(fps=render_fps),
     )
     return project
 
@@ -384,8 +390,8 @@ def test_render_default_passes_viz_quality_false_to_init_gl(
 ) -> None:
     project = _setup_render_project(
         tmp_path,
-        render_width=1920,
-        render_height=1080,
+        resolution_width=1920,
+        resolution_height=1080,
     )
     fps = 10
     duration_sec = 2.0
@@ -438,8 +444,8 @@ def test_render_load_config_uses_project_dir_for_snapshot(
 ) -> None:
     project = _setup_render_project(
         tmp_path,
-        render_width=1920,
-        render_height=1080,
+        resolution_width=1920,
+        resolution_height=1080,
     )
     snapshot = tmp_path / "cleave-render-outside.yaml"
     snapshot.write_text(
@@ -496,8 +502,8 @@ def test_render_reports_on_progress_fraction(
 ) -> None:
     project = _setup_render_project(
         tmp_path,
-        render_width=1920,
-        render_height=1080,
+        resolution_width=1920,
+        resolution_height=1080,
     )
     fps = 10
     duration_sec = 2.0
@@ -550,8 +556,8 @@ def test_render_viz_quality_passes_flag_to_init_gl(
 ) -> None:
     project = _setup_render_project(
         tmp_path,
-        render_width=1920,
-        render_height=1080,
+        resolution_width=1920,
+        resolution_height=1080,
     )
     fps = 10
     duration_sec = 2.0
@@ -638,7 +644,7 @@ def test_render_frame_count_and_ffmpeg_args(
 
     cmd = mock_subprocess.Popen.call_args[0][0]
     assert cmd[0] == "/usr/bin/ffmpeg"
-    assert "-s" in cmd and f"{DEFAULT_RENDER_WIDTH}x{DEFAULT_RENDER_HEIGHT}" in cmd
+    assert "-s" in cmd and f"{DEFAULT_RESOLUTION_WIDTH}x{DEFAULT_RESOLUTION_HEIGHT}" in cmd
     assert "-r" in cmd and str(fps) in cmd
     assert "-preset" not in cmd
     assert str(project / "my-track.flac") in cmd
@@ -1190,7 +1196,7 @@ def test_render_ffmpeg_uses_explicit_render_resolution(
     tmp_path: Path,
 ) -> None:
     project = _setup_render_project(
-        tmp_path, render_fps=10, render_width=1920, render_height=1080
+        tmp_path, render_fps=10, resolution_width=1920, resolution_height=1080
     )
     content_w, content_h, fps = 1920, 1080, 10
     render_w, render_h = 1920, 1080
@@ -1246,8 +1252,8 @@ def test_render_present_content_every_frame(
     tmp_path: Path,
 ) -> None:
     project = _setup_render_project(tmp_path)
-    content_w, content_h, fps = DEFAULT_RENDER_WIDTH, DEFAULT_RENDER_HEIGHT, 10
-    render_w, render_h = DEFAULT_RENDER_WIDTH, DEFAULT_RENDER_HEIGHT
+    content_w, content_h, fps = DEFAULT_RESOLUTION_WIDTH, DEFAULT_RESOLUTION_HEIGHT, 10
+    render_w, render_h = DEFAULT_RESOLUTION_WIDTH, DEFAULT_RESOLUTION_HEIGHT
     duration_sec = 2.0
 
     compositor = MagicMock()
@@ -1315,8 +1321,8 @@ def test_render_overlay_frame_order_uses_content_dims(
     mock_load_config.return_value = replace(
         base_cfg,
         render_fps=fps,
-        render_width=render_w,
-        render_height=render_h,
+        resolution_width=render_w,
+        resolution_height=render_h,
         render=RenderConfig(
             overlays=_overlays_cfg(
                 opening=overlay_cfg,
