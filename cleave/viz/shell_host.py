@@ -2507,6 +2507,13 @@ class ShellHost:
         open_here = list_view is not None and list_view.target == desc
         hover = list_view is None and not self._nudge_input_blocked()
         self._choice_rects[desc] = rect
+        if open_here and activated:
+            # A press anywhere on the open row closes its list. Swallow it so
+            # the release does not activate the row and open the list again.
+            inline.finish()
+            self._clear_value_drag()
+            self._nudge_swallow = True
+            return
         if choice_kind(len(labels)) is ChoiceKind.SEGMENT:
             rects = draw_segments(
                 draw,

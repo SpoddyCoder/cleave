@@ -143,3 +143,69 @@ def test_a_stepper_keeps_the_widest_width_it_has_shown() -> None:
         kind = RowKind.SETTINGS_RESIDUAL_LATENCY_MS
         assert host._fixed_width_value(kind, "100 ms") == "100 ms"
         assert host._fixed_width_value(kind, "5 ms") == " 5 ms "
+
+
+def test_a_second_click_on_the_open_combo_closes_it() -> None:
+    with _inspector("settings.preview") as (host, controls):
+        _frame(host, (0, 0))
+        combo = _center(host._choice_rects[_QUALITY])
+        _frame(host, combo, click=True)
+        assert controls.inline_edit.choice_view is not None
+        _frame(host, combo, click=True)
+        _frame(host, combo)
+        assert controls.inline_edit.choice_view is None
+        assert controls.cfg.editor.preview_quality == "full-quality"
+
+
+def test_a_click_on_the_open_row_label_closes_the_list() -> None:
+    with _inspector("settings.preview") as (host, controls):
+        _frame(host, (0, 0))
+        x, y, _w, h = host._choice_rects[_QUALITY]
+        _frame(host, _center(host._choice_rects[_QUALITY]), click=True)
+        _frame(host, (x - 40, y + h // 2), click=True)
+        _frame(host, (x - 40, y + h // 2))
+        assert controls.inline_edit.choice_view is None
+
+
+def test_a_second_click_on_an_open_dialog_combo_closes_it() -> None:
+    from cleave.viz.modal import FormField, FormSpec, ModalHost
+    from cleave.viz.modal_surface import ImGuiTextMeasure, ModalPointerKind, ModalSurface, apply_modal_pointer
+
+    modal = ModalHost()
+    modal.prompt_form(
+        FormSpec(
+            title="Pick",
+            fields=(FormField("shape", "shape", ("one", "two", "three", "four"), 0),),
+            confirm_label="Go",
+            on_confirm=lambda _values: None,
+        )
+    )
+
+    def frame(host: object, pos: tuple[int, int], *, click: bool = False) -> None:
+        for event in ([_motion(pos), _button(pos)] if click else [_motion(pos)]):
+            host.process_event(event)
+            surface = ModalSurface(modal.view_state(), ImGuiTextMeasure())
+            host.top_layer.push(surface)
+            _draw(host)
+            apply_modal_pointer(modal, surface.intent)
+        if click:
+            host.process_event(_release(pos))
+            surface = ModalSurface(modal.view_state(), ImGuiTextMeasure())
+            host.top_layer.push(surface)
+            _draw(host)
+            apply_modal_pointer(modal, surface.intent)
+        frame.surface = surface
+
+    with _host() as host:
+        frame(host, (0, 0))
+        combo = next(
+            hit.rect
+            for hit in frame.surface._form_hits
+            if hit.kind is ModalPointerKind.OPEN_FORM_CHOICE
+        )
+        frame(host, _center(combo), click=True)
+        assert modal.view_state().form_choice is not None
+        frame(host, _center(combo), click=True)
+        frame(host, _center(combo))
+        assert modal.view_state().form_choice is None
+        assert modal.view_state().form_rows[0].value == 0
