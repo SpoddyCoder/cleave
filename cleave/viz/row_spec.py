@@ -33,6 +33,9 @@ class RowPresentStyle(Enum):
     PATH_ICON = auto()
     FULL_LINE = auto()
     DYNAMIC = auto()
+    # A list entry: label, then the choice right after it, then the nav
+    # buttons at the row's right edge.
+    LIST_ITEM = auto()
 
 
 class FitStrategy(Enum):
@@ -72,7 +75,10 @@ def row_choice_kind(kind: RowKind) -> ChoiceKind | None:
 
 @dataclass(frozen=True)
 class RowNavButton:
-    """Icon button after a row label. Dims when *available* is false."""
+    """Icon button after a row label, or at the right edge of a list item.
+
+    Dims when *available* is false.
+    """
 
     glyph: str
     available: Callable[[TuningViewState, RowDescriptor], bool]
@@ -85,6 +91,8 @@ class RowSpec:
     panel_label: str
     present_style: RowPresentStyle
     format_value: Callable[[TuningViewState, RowDescriptor], str] | None = None
+    # Label from view state, for rows whose label is data (a list item's time).
+    format_label: Callable[[TuningViewState, RowDescriptor], str] | None = None
     # Set on two-line rows: position sits in the arrows on the label line, with
     # the markers after the label. format_value is the second line.
     format_position: Callable[[TuningViewState, RowDescriptor], str] | None = None
@@ -299,6 +307,14 @@ def row_panel_label(kind: RowKind, desc: RowDescriptor | None = None) -> str:
         if overlay_label is not None:
             return overlay_label
     return row_spec(kind).panel_label
+
+
+def row_label(state: TuningViewState, desc: RowDescriptor) -> str:
+    """The label an inspector row shows, from view state when the row has one."""
+    spec = row_spec(desc.kind)
+    if spec.format_label is not None:
+        return spec.format_label(state, desc)
+    return row_panel_label(desc.kind, desc)
 
 
 def format_row_value(state: TuningViewState, desc: RowDescriptor) -> str:

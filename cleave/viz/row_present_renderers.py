@@ -171,7 +171,8 @@ def inspector_field_colors(
     if section_lock_blocks_mutation(state, desc):
         return LOCKED, LOCKED
     spec = row_spec(desc.kind)
-    label = VALUE if spec.present_style == RowPresentStyle.FULL_LINE else LABEL
+    full_line = spec.present_style in (RowPresentStyle.FULL_LINE, RowPresentStyle.LIST_ITEM)
+    label = VALUE if full_line else LABEL
     return label, row_value_color_for(state, desc)
 
 

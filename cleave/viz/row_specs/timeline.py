@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
+from cleave.choice import step_choice
 from cleave.config_schema.layers import hard_cut_enabled_display
 from cleave.config_schema.timeline import (
     TIMELINE_FADE_DURATION_STEP,
@@ -13,7 +15,9 @@ from cleave.config_schema.timeline import (
 )
 from cleave.song_markers import (
     DEFAULT_SONG_MARKER_TYPE,
+    SONG_MARKER_TYPES,
     SongMarker,
+    SongMarkerType,
     step_song_marker_type,
     format_marker_time,
     parse_song_marker_type,
@@ -212,26 +216,23 @@ def _song_marker_type_display(marker_type: str) -> str:
         return "-"
     return marker_type
 
-def _format_song_marker_item(state: TuningViewState, desc: RowDescriptor) -> str:
+def _song_marker_type(state: TuningViewState, desc: RowDescriptor) -> str:
     assert desc.marker_index is not None
-    index = desc.marker_index
-    times = state.timeline.song_marker_times
     types = state.timeline.song_marker_types
-    marker_type = (
-        types[index]
-        if 0 <= index < len(types)
-        else DEFAULT_SONG_MARKER_TYPE
-    )
-    return (
-        f"[{format_marker_time(times[index])}] "
-        f"{_song_marker_type_display(marker_type)}"
-    )
+    index = desc.marker_index
+    return types[index] if 0 <= index < len(types) else DEFAULT_SONG_MARKER_TYPE
 
-def _apply_song_marker_type(
+def _format_song_marker_time(state: TuningViewState, desc: RowDescriptor) -> str:
+    assert desc.marker_index is not None
+    return format_marker_time(state.timeline.song_marker_times[desc.marker_index])
+
+def _format_song_marker_type(state: TuningViewState, desc: RowDescriptor) -> str:
+    return _song_marker_type_display(_song_marker_type(state, desc))
+
+def _set_song_marker_type(
     controls: TuningControls,
     desc: RowDescriptor,
-    forward: bool,
-    _large: bool,
+    step: Callable[[SongMarkerType], SongMarkerType],
 ) -> None:
     assert desc.marker_index is not None
     markers = controls.session.song_markers
@@ -239,14 +240,34 @@ def _apply_song_marker_type(
     if index < 0 or index >= len(markers.markers):
         return
     current = markers.markers[index]
-    next_type = step_song_marker_type(
-        parse_song_marker_type(current.marker_type),
-        forward=forward,
-    )
+    next_type = step(parse_song_marker_type(current.marker_type))
+    if next_type == current.marker_type:
+        return
     markers.markers[index] = SongMarker(current.time, next_type)
     warning = song_marker_gesture_warning(markers.markers, index)
     if warning is not None:
         controls.show_notification(warning)
+
+def _apply_song_marker_type(
+    controls: TuningControls,
+    desc: RowDescriptor,
+    forward: bool,
+    _large: bool,
+) -> None:
+    _set_song_marker_type(
+        controls,
+        desc,
+        lambda current: step_song_marker_type(current, forward=forward),
+    )
+
+def _jump_song_marker_type(
+    controls: TuningControls, desc: RowDescriptor, delta: int
+) -> None:
+    _set_song_marker_type(
+        controls,
+        desc,
+        lambda current: step_choice(SONG_MARKER_TYPES, current, delta),
+    )
 
 def _visibility_timeline(
     state: TuningViewState, _desc: RowDescriptor
@@ -639,13 +660,20 @@ SPECS: dict[RowKind, RowSpec] = {
     RowKind.SONG_MARKER_ITEM: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
         panel_label="",
-        present_style=RowPresentStyle.FULL_LINE,
-        format_value=_format_song_marker_item,
+        present_style=RowPresentStyle.LIST_ITEM,
+        format_label=_format_song_marker_time,
+        format_value=_format_song_marker_type,
         nav_buttons=(
             RowNavButton(DELETE_GLYPH, _always_available, _delete_song_marker),
         ),
         apply_horizontal=_apply_song_marker_type,
         apply_action=_apply_song_marker_item,
+        choice=options_choice(
+            SONG_MARKER_TYPES,
+            _song_marker_type,
+            _song_marker_type_display,
+            jump=_jump_song_marker_type,
+        ),
         fit_strategy=FitStrategy.NONE,
         help_title="Song marker",
         help_entries=(
@@ -654,9 +682,9 @@ SPECS: dict[RowKind, RowSpec] = {
             ("Delete", "confirm remove"),
         ),
         help_description=(
-            "A song marker time and type (-, crescendo,",
-            "diminuendo). Crescendo markers build crescendos on",
-            "timeline preset apply. Enter seeks; Left/Right chooses type.",
+            "A song marker time and type. Crescendo markers build",
+            "crescendos on timeline preset apply. Enter or a click seeks;",
+            "Left/Right or the list chooses type; the bin deletes.",
         ),
         blocked_by_section_lock=True,
     ),

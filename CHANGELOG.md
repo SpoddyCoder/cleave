@@ -29,6 +29,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Choices look and work the same in the inspector and in dialogs. Up to three options show as segments: click one to choose it. Longer lists show as a dropdown: click it or press Enter (Space in a dialog) to open the list, pick with the mouse or Up/Down and Enter, and Esc closes it unchanged. Left/Right still step any choice. Number values keep their side arrows still as the number changes.
 - The Project menu lists its pages as Resolution, Render, Compositor, then ProjectM. Render project... sits above Separate stems..., which is renamed Re-separate stems... (still disabled; use `cleave separate`).
 - The navigator holds only the parts of the picture: Overlay, Post-FX, Pattern Mask, Timeline, and Layers. Settings and Project pages open from their menus into the inspector (Ctrl+, opens Settings > Preview). The menu bar is File, Edit (Undo, Redo), View (Fullscreen, timeline strip, preset curation mode), Project, Settings, and Help (Help, About). The Layers and Timeline menus are gone; add and delete layer and the timeline actions are buttons on their inspector pages.
+- Song marker rows show the time, then a dropdown for the marker type, with the delete icon at the right edge, in place of a stepper over time and type together.
 - Settings has two pages. Preview holds preview quality, residual latency, and Measure latency, replacing Editor Window and Latency Compensation. Navigator side and help side move to UI.
 - Project > Compositor > hdr is labelled hdr compositing, and its help says the rendered video is 8-bit either way.
 - The live preview takes its shape from Project > Resolution width and height, so it matches the rendered video, and letterboxes in the visualiser area. It renders only as many pixels as the visualiser area shows, up to the project resolution, so a 4K project no longer renders at 4K in a small window. The size follows window and column resizes. Overlay cards keep their size relative to the frame.
@@ -83,6 +84,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- Every song marker row takes the mouse, not just the first, and its delete icon highlights on hover and asks to delete that marker.
 - Bloom and chromatic aberration look the same in a reduced-size live preview as in the render, instead of growing larger as the preview gets smaller.
 - A top menu dropdown no longer shows a second line a few pixels above its top border the first time it opens.
 - The inspector scrolls to keep the keyboard-focused row in view, so moving down a long preset list no longer loses the highlight below the window. The navigator scrolls the same way, just far enough to show the selected row.

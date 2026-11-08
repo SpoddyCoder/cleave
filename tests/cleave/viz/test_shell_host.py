@@ -314,6 +314,9 @@ def test_inspector_selectable_id_changes_with_effect_and_preset() -> None:
     assert group_id.startswith("##row-")
     assert "layer_1" in group_id
     assert inspector_selectable_id(card) != inspector_selectable_id(other_card)
+    marker = RowDescriptor(RowKind.SONG_MARKER_ITEM, marker_index=0)
+    other_marker = replace(marker, marker_index=1)
+    assert inspector_selectable_id(marker) != inspector_selectable_id(other_marker)
 
 
 def test_scrollable_shell_flags_drop_only_the_scroll_bits() -> None:

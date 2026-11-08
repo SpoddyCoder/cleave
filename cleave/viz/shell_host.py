@@ -60,6 +60,7 @@ from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.row_present_renderers import inspector_field_colors
 from cleave.viz.row_spec import (
     RowNavButton,
+    RowPresentStyle,
     apply_field_choice,
     apply_field_horizontal,
     apply_field_nav_button,
@@ -67,7 +68,7 @@ from cleave.viz.row_spec import (
     format_row_position,
     format_row_value,
     row_is_two_line,
-    row_panel_label,
+    row_label,
     row_spec,
     section_lock_blocks_mutation,
 )
@@ -407,12 +408,13 @@ def inspector_title(nodes: Sequence[NavNode], selected_id: str) -> str:
 def inspector_selectable_id(desc: RowDescriptor) -> str:
     """ImGui id for an inspector row.
 
-    Slot, card, effect, and preset index stay in the id so repeated effect
-    rows and preset-list items do not collide.
+    Slot, card, effect, preset index, and marker index stay in the id so
+    repeated effect rows, preset-list items, and song markers do not collide.
     """
     return (
         f"##row-{desc.kind.name}-{desc.slot}-{desc.card}-"
-        f"{desc.effect_id}-{desc.driver_slug}-{desc.preset_index}"
+        f"{desc.effect_id}-{desc.driver_slug}-{desc.preset_index}-"
+        f"{desc.marker_index}"
     )
 
 
@@ -1925,7 +1927,8 @@ class ShellHost:
             desc = row.descriptor
             kind = desc.kind
             spec = row_spec(kind)
-            label = row_panel_label(kind, desc)
+            label = row_label(state, desc)
+            list_item = spec.present_style is RowPresentStyle.LIST_ITEM
             selected = _inspector_row_selected(focus, desc)
             if row.is_heading:
                 value = format_row_value(state, desc) if spec.format_value else ""
@@ -1978,7 +1981,14 @@ class ShellHost:
             )
             if labels:
                 self._draw_choice_value(
-                    state, row, desc, labels, value, enabled=stepped, activated=activated
+                    state,
+                    row,
+                    desc,
+                    labels,
+                    value,
+                    enabled=stepped,
+                    activated=activated,
+                    after_label=label if list_item else None,
                 )
                 cluster = ""
             elif stepped and cluster and not two_line:
@@ -2000,7 +2010,7 @@ class ShellHost:
                         rgba(value_color),
                         lead=lead,
                     )
-                if spec.nav_buttons:
+                if spec.nav_buttons and not list_item:
                     self._handle_nav_buttons(
                         state,
                         row,
@@ -2010,6 +2020,7 @@ class ShellHost:
                         rgba(value_color),
                         stepped=stepped,
                         activated=activated,
+                        two_line=two_line,
                     )
                 if self._handle_colour_swatch(state, row, desc, spec, parts, clicked):
                     return
@@ -2022,6 +2033,18 @@ class ShellHost:
                         activated=activated,
                         two_line=two_line,
                     )
+            if spec.nav_buttons and list_item:
+                self._handle_nav_buttons(
+                    state,
+                    row,
+                    desc,
+                    None,
+                    spec.nav_buttons,
+                    rgba(value_color),
+                    stepped=stepped,
+                    activated=activated,
+                    two_line=two_line,
+                )
             if lead:
                 self._preset_row_drag(
                     row,
@@ -2304,27 +2327,40 @@ class ShellHost:
         state: Any,
         row: Any,
         desc: RowDescriptor,
-        label: str,
+        label: str | None,
         buttons: tuple[RowNavButton, ...],
         value_color: imgui.ImVec4,
         *,
         stepped: bool,
         activated: bool,
+        two_line: bool,
     ) -> None:
-        """Paint the icon buttons after the label, and take hover and press.
+        """Paint the icon buttons, and take hover and press.
 
+        The buttons follow *label*, or sit at the row's right edge when
+        *label* is None. On a two-line row they cover the first line only.
         A press on a dimmed button is swallowed. Otherwise a double-click on
         it would reach the row and open a child directory.
         """
         origin_x, text_y = _selectable_label_origin()
         rect_min = imgui.get_item_rect_min()
+        rect_max = imgui.get_item_rect_max()
         line = imgui.get_text_line_height()
         space = imgui.calc_text_size(" ").x
+        widths = [imgui.calc_text_size(button.glyph).x for button in buttons]
+        if label is None:
+            start_x = (
+                rect_max.x
+                - imgui.get_style().frame_padding.x
+                - sum(width + space for width in widths)
+            )
+        else:
+            start_x = origin_x + imgui.calc_text_size(f"{label} ").x
         rects = nav_button_rects(
-            origin_x + imgui.calc_text_size(f"{label} ").x,
+            start_x,
             rect_min.y,
-            imgui.get_item_rect_max().y - line,
-            [imgui.calc_text_size(button.glyph).x for button in buttons],
+            rect_max.y - line if two_line else rect_max.y,
+            widths,
             gap=space,
         )
         blocked = not stepped or self._nudge_input_blocked()
@@ -2479,9 +2515,11 @@ class ShellHost:
         *,
         enabled: bool,
         activated: bool,
+        after_label: str | None = None,
     ) -> None:
         """Segments or a combo at the row's right edge, and their clicks.
 
+        With *after_label*, the control sits just after that label instead.
         A segment click chooses that option; a combo click opens its list. Either
         press skips the row's own click.
         """
@@ -2497,9 +2535,13 @@ class ShellHost:
         width = choice_width(measure, labels)
         if choice_kind(len(labels)) is ChoiceKind.COMBO:
             width = max(width, combo_width(measure, (value,)))
-        right = int(rect_max.x - imgui.get_style().frame_padding.x)
+        if after_label is None:
+            left = int(rect_max.x - imgui.get_style().frame_padding.x) - width
+        else:
+            origin_x, _origin_y = _selectable_label_origin()
+            left = int(origin_x + imgui.calc_text_size(f"{after_label}  ").x)
         top = int(_selectable_text_y(rect_min.y)) - pad_y
-        rect = (right - width, top, width, int(line) + pad_y * 2)
+        rect = (left, top, width, int(line) + pad_y * 2)
         index = spec.choice.index(state, desc)
         draw = imgui.get_window_draw_list()
         inline = self._controls.inline_edit

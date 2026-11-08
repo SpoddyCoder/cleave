@@ -78,10 +78,11 @@ from cleave.viz.row_hotkeys import handle_row_hotkey
 from cleave.viz.row_spec import (
     REPEAT_ROW_KINDS,
     apply_field_action,
+    apply_field_choice,
     apply_field_horizontal,
     format_row_value,
     row_dynamic_panel_label,
-    row_panel_label,
+    row_label,
     row_spec,
 )
 from cleave.viz.commands import command_by_id, command_context
@@ -409,7 +410,7 @@ def _text_for_descriptor(state: TuningViewState, desc: RowDescriptor) -> str:
     if desc.kind is RowKind.TRACK_EFFECT:
         label = row_dynamic_panel_label(desc)
     else:
-        label = row_panel_label(desc.kind, desc)
+        label = row_label(state, desc)
     if row_spec(desc.kind).format_value is None:
         return label
     return f"{label}: {format_row_value(state, desc)}"
@@ -4717,14 +4718,14 @@ def test_song_marker_left_right_steps_type() -> None:
 
     view = controls.build_view_state(paused=False)
     row = RowDescriptor(RowKind.SONG_MARKER_ITEM, marker_index=0)
-    assert "[00:26.02] -" in _row_text(view, row)
+    assert _row_text(view, row) == "00:26.02: -"
 
     assert _press_focused(controls, _keydown(pygame.K_RIGHT)) is True
     assert markers.markers[0].marker_type == "begin"
     assert controls.config_dirty
     view = controls.build_view_state(paused=False)
     row = RowDescriptor(RowKind.SONG_MARKER_ITEM, marker_index=0)
-    assert "[00:26.02] begin" in _row_text(view, row)
+    assert _row_text(view, row) == "00:26.02: begin"
 
     assert _press_focused(controls, _keydown(pygame.K_RIGHT)) is True
     assert markers.markers[0].marker_type == "sustain"
@@ -4735,6 +4736,21 @@ def test_song_marker_left_right_steps_type() -> None:
     assert _press_focused(controls, _keydown(pygame.K_RIGHT)) is True
     assert markers.markers[0].marker_type == "diminuendo"
     assert _press_focused(controls, _keydown(pygame.K_LEFT)) is True
+    assert markers.markers[0].marker_type == "crescendo"
+
+
+def test_song_marker_combo_pick_sets_type_in_one_change() -> None:
+    controls = _make_controls(("layer_1",))
+    markers = controls.session.song_markers
+    markers.markers = [SongMarker(26.02, "standard")]
+    desc = RowDescriptor(RowKind.SONG_MARKER_ITEM, marker_index=0)
+    view = controls.build_view_state(paused=False)
+    choice = row_spec(RowKind.SONG_MARKER_ITEM).choice
+    assert choice is not None
+    assert choice.labels() == ("-", "begin", "sustain", "crescendo", "diminuendo")
+    assert choice.index(view, desc) == 0
+
+    assert apply_field_choice(controls, desc, 3) is True
     assert markers.markers[0].marker_type == "crescendo"
 
 
