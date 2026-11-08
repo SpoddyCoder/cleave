@@ -447,7 +447,7 @@ _QUIT = Command(
 )
 _ABOUT = _later("help.about", "About Cleave", "command")
 
-_SEPARATE = _later("project.separate", "Separate stems...", "command")
+_SEPARATE = _later("project.separate", "Re-separate stems...", "command")
 _RENDER = Command(
     id="project.render",
     label="Render project...",

@@ -182,7 +182,7 @@ The timeline strip stays its own host. Cue blocks are edited on the strip. The t
 | File | Save | command | `Ctrl+S` | Phase 1. `TuningControls.prompt_save_config`. |
 | File | Quit | command | `Ctrl+Q` | Phase 1. `TuningControls.try_quit`. |
 | Project | Project settings | jump | | Phase 2. Selects the Project node. |
-| Project | Separate stems... | command | | Stays disabled. CLI `cleave separate` only. |
+| Project | Re-separate stems... | command | | Stays disabled. CLI `cleave separate` only. |
 | Project | Render project... | command | `Ctrl+R` | Phase 1. `ProjectRenderController.prompt`. |
 | Project | Backup... | command | | Stays disabled. CLI `cleave backup` only. |
 | Project | Restore... | command | | Stays disabled. CLI `cleave restore` only. |

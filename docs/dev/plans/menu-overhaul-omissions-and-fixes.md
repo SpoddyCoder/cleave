@@ -23,7 +23,7 @@ These are not bugs; they were non-goals, disabled menu items, or deferred to oth
 
 | Menu path | Reason |
 | --- | --- |
-| Project > Separate stems... | CLI `cleave separate` only. |
+| Project > Re-separate stems... | CLI `cleave separate` only. |
 | Project > Backup... / Restore... | CLI `cleave backup` / `cleave restore` only. |
 | Timeline > Undo last cut | No cut-undo command exists yet. |
 | Help > About Cleave | No about command exists yet. |
