@@ -37,6 +37,11 @@ LAYER_PAGE_PRESET_LIST = "preset_list"
 LAYER_PAGE_COMPOSITING = "compositing"
 LAYER_PAGE_EFFECTS = "effects"
 
+# Layer pages nested under another layer page, keyed by child page.
+_LAYER_SUBPAGE_PARENTS: dict[str, str] = {
+    LAYER_PAGE_PRESET_LIST: LAYER_PAGE_PRESET_SWITCHING,
+}
+
 _LAYER_PAGES: tuple[tuple[str, str], ...] = (
     (LAYER_PAGE_MILKDROP_PRESET, "Milkdrop Preset"),
     (LAYER_PAGE_PRESET_SWITCHING, "Preset Switching"),
@@ -135,7 +140,13 @@ def parent_id_of(node_id: str) -> str | None:
     """Parent navigator id, or None for a root."""
     slot = layer_slot_of(node_id)
     if slot is not None:
-        return "layers" if layer_page_of(node_id) is None else layer_node_id(slot)
+        page = layer_page_of(node_id)
+        if page is None:
+            return "layers"
+        parent_page = _LAYER_SUBPAGE_PARENTS.get(page)
+        if parent_page is None:
+            return layer_node_id(slot)
+        return layer_page_node_id(slot, parent_page)
     root, separator, _child = node_id.partition(".")
     return root if separator else None
 
@@ -347,9 +358,9 @@ def _layer_page_nodes(session: TuningSession, slot: str) -> tuple[NavNode, ...]:
         NavNode(
             id=layer_page_node_id(slot, page),
             label=label,
-            depth=2,
+            depth=3 if page in _LAYER_SUBPAGE_PARENTS else 2,
             badge=None,
-            parent_id=layer_node_id(slot),
+            parent_id=parent_id_of(layer_page_node_id(slot, page)),
             slot=slot,
         )
         for page, label in _LAYER_PAGES

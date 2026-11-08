@@ -244,12 +244,32 @@ def test_open_layer_shows_its_pages_only() -> None:
     assert tuple(node.id for node in pages) == (
         layer_page_node_id("layer_1", "milkdrop_preset"),
         layer_page_node_id("layer_1", "preset_switching"),
-        layer_page_node_id("layer_1", "preset_list"),
         layer_page_node_id("layer_1", "compositing"),
         layer_page_node_id("layer_1", "effects"),
     )
     assert all(node.parent_id == open_id for node in pages)
     assert all(node.slot == "layer_1" for node in pages)
+
+
+def test_preset_list_page_nests_under_preset_switching() -> None:
+    switching_id = layer_page_node_id("layer_1", "preset_switching")
+    list_id = layer_page_node_id("layer_1", "preset_list")
+    session = _two_layers()
+    session.layers["layer_1"].preset_switching_trigger = "timer"
+    nodes = build_navigator(session, {"layers", layer_node_id("layer_1")})
+    ids = [node.id for node in nodes]
+    by_id = {node.id: node for node in nodes}
+
+    assert ids.index(list_id) == ids.index(switching_id) + 1
+    assert by_id[list_id].depth == 3
+    assert by_id[list_id].parent_id == switching_id
+    assert by_id[switching_id].expandable is False
+    assert parent_id_of(list_id) == switching_id
+    assert ancestor_ids(list_id) == {
+        "layers",
+        layer_node_id("layer_1"),
+        switching_id,
+    }
 
 
 def test_preset_list_page_hides_while_switching_is_off() -> None:
