@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 import pygame
 
+from cleave.viz.config_pages import available_config_page_ids
 from cleave.viz.inspector import InspectorRow, build_inspector_rows
 from cleave.viz.navigator import (
     NavNode,
@@ -82,6 +83,7 @@ class NavigatorControls:
             focus.selected_id,
             self._controls.session.layer_z_order,
             prior_index=prior,
+            pages=self._pages(),
         )
         if repaired != focus.selected_id:
             focus.nav_expanded |= ancestor_ids(repaired)
@@ -108,26 +110,25 @@ class NavigatorControls:
         focus.selected_id = node_id
 
     def activate(self) -> None:
-        """Open an inspector.
+        """Open the selected node's inspector.
 
-        An expandable node with no inspector expands and opens its first
-        child's inspector. A page with no rows keeps focus on the navigator.
+        A page with no rows keeps focus on the navigator.
         """
-        focus = self._controls.shell_focus
-        node = self._node(focus.selected_id)
+        node = self._node(self._controls.shell_focus.selected_id)
         if node is None:
             return
-        if node.has_inspector:
-            self._enter_inspector(node.id)
-            return
-        if not node.expandable:
-            return
-        focus.nav_expanded.add(node.id)
-        child = self._first_child(node.id)
-        if child is None:
-            return
-        self.select(child.id)
-        self._enter_inspector(child.id)
+        self._enter_inspector(node.id)
+
+    def open_page(self, page_id: str) -> None:
+        """Show a Settings or Project page in the inspector.
+
+        The page has no navigator row, so no row is selected and no node
+        opens. Focus moves into the inspector when the page has rows.
+        """
+        focus = self._controls.shell_focus
+        focus.selected_id = page_id
+        self._controls.set_shell_region(ShellRegion.NAVIGATOR)
+        self._enter_inspector(page_id)
 
     def _enter_inspector(self, node_id: str) -> None:
         focus = self._controls.shell_focus
@@ -176,6 +177,9 @@ class NavigatorControls:
             if node.parent_id == parent_id:
                 return node
         return None
+
+    def _pages(self) -> tuple[str, ...]:
+        return available_config_page_ids(self._controls.session.settings.editor_mode)
 
     def _visible_ids(self) -> tuple[str, ...]:
         return tuple(node.id for node in self._nodes())

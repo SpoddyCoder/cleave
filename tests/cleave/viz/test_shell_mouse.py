@@ -587,7 +587,7 @@ def test_navigator_height_follows_rows_opened_before_the_next_draw() -> None:
         controls.shell_focus.nav_expanded.clear()
         draw_shell_frame(host, MenuBarState(), command_context(controls), 1 / 60)
         closed = host.nav_content_height_px
-        controls.shell_focus.nav_expanded.add("settings")
+        controls.shell_focus.nav_expanded.add("post_fx")
         predicted = host.nav_content_height_px
         assert predicted > closed
         draw_shell_frame(host, MenuBarState(), command_context(controls), 1 / 60)

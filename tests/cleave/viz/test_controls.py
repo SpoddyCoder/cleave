@@ -580,7 +580,7 @@ def test_disabled_timeline_can_open_panel() -> None:
     controls = _make_controls(("layer_1",))
     assert controls.session.timeline.enabled is False
     assert controls.session.timeline.panel_open is False
-    command_by_id("timeline.show_strip").run(controls)
+    command_by_id("view.timeline_strip").run(controls)
     assert controls.session.timeline.enabled is False
     assert controls.session.timeline.panel_open is True
     assert controls.shell_focus.region is ShellRegion.TIMELINE
@@ -2934,7 +2934,7 @@ def test_t_opens_timeline_panel_when_enabled() -> None:
     controls.session.timeline.focus_row = 2
     assert controls.session.timeline.panel_open is False
 
-    command_by_id("timeline.show_strip").run(controls)
+    command_by_id("view.timeline_strip").run(controls)
     assert controls.session.timeline.panel_open is True
     assert controls.shell_focus.region is ShellRegion.TIMELINE
     assert controls.focus_cursor == TimelineFocus(2)
@@ -2945,7 +2945,7 @@ def test_t_closes_timeline_panel_without_moving_a_main_cursor() -> None:
     controls = _make_controls(timeline_enabled=True)
     controls.session.timeline.panel_open = True
     controls.focus_descriptor = RowDescriptor(RowKind.OVERLAYS_HEADER)
-    command_by_id("timeline.show_strip").run(controls)
+    command_by_id("view.timeline_strip").run(controls)
     assert controls.session.timeline.panel_open is False
     assert not isinstance(controls.focus_cursor, TimelineFocus)
     assert controls.focus_descriptor.kind == RowKind.OVERLAYS_HEADER
@@ -2954,10 +2954,10 @@ def test_t_closes_timeline_panel_without_moving_a_main_cursor() -> None:
 def test_t_from_timeline_region_closes_onto_navigator() -> None:
     controls = _make_controls(timeline_enabled=True)
     controls.session.timeline.focus_row = 1
-    command_by_id("timeline.show_strip").run(controls)
+    command_by_id("view.timeline_strip").run(controls)
     assert controls.shell_focus.region is ShellRegion.TIMELINE
     assert controls.focus_cursor == TimelineFocus(1)
-    command_by_id("timeline.show_strip").run(controls)
+    command_by_id("view.timeline_strip").run(controls)
     assert controls.session.timeline.panel_open is False
     assert controls.shell_focus.region is ShellRegion.NAVIGATOR
     assert isinstance(controls.focus_cursor, MainFocus)
@@ -2971,7 +2971,7 @@ def test_t_opens_timeline_panel_when_disabled() -> None:
     controls.session.timeline.focus_row = 2
     assert controls.session.timeline.panel_open is False
 
-    command_by_id("timeline.show_strip").run(controls)
+    command_by_id("view.timeline_strip").run(controls)
     assert controls.session.timeline.enabled is False
     assert controls.session.timeline.panel_open is True
     assert controls.shell_focus.region is ShellRegion.TIMELINE

@@ -649,14 +649,13 @@ def test_ctrl_up_down_cycles_visible_top_level_ids() -> None:
     controls = runtime.controls
     ids = visible_top_level_ids(controls.session)
     assert list(ids) == [
-        "settings",
-        "project",
         "overlay",
         "post_fx",
         "pattern_mask",
         "timeline",
         "layers",
     ]
+    controls.shell_focus.selected_id = ids[0]
     seen = [controls.shell_focus.selected_id]
     leftover = controls.focus_cursor
     for _ in ids:
@@ -827,10 +826,10 @@ def test_h_toggle_does_not_move_region() -> None:
 def test_ctrl_down_from_timeline_moves_to_navigator() -> None:
     runtime = _make_runtime(submenu_focused=True, panel_open=True)
     controls = runtime.controls
-    controls.shell_focus.selected_id = "settings"
+    controls.shell_focus.selected_id = "overlay"
     assert dispatch_keydown(keydown(pygame.K_DOWN, mod=pygame.KMOD_CTRL), runtime) is True
     assert controls.shell_focus.region is ShellRegion.NAVIGATOR
     assert isinstance(controls.focus_cursor, MainFocus)
-    assert controls.shell_focus.selected_id == "project"
+    assert controls.shell_focus.selected_id == "post_fx"
     assert runtime.seed.session.timeline.panel_open is True
     assert runtime.seed.session.timeline.focus_row == 0

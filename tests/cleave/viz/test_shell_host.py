@@ -129,6 +129,10 @@ def test_child_page_breadcrumbs() -> None:
     assert inspector_title(nodes, page) == f"Layers > {layer.label} > Compositing"
     assert inspector_title(build_navigator(session), "layers") == "Layers"
     assert (
+        inspector_title(build_navigator(session), "project.resolution")
+        == "Project > Resolution"
+    )
+    assert (
         inspector_title(build_navigator(session, {"post_fx"}), "post_fx.fade")
         == "Post-FX > Fade"
     )
@@ -355,4 +359,8 @@ def test_collapsing_layers_moves_selection_off_a_hidden_child() -> None:
     assert child_id not in collapsed
     assert child_id in opened
     assert selection_after_nav_collapse(collapsed, child_id, "layers") == "layers"
-    assert selection_after_nav_collapse(collapsed, "settings", "layers") == "settings"
+    assert selection_after_nav_collapse(collapsed, "post_fx", "layers") == "post_fx"
+    assert (
+        selection_after_nav_collapse(collapsed, "project.render", "layers")
+        == "project.render"
+    )

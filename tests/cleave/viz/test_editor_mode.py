@@ -17,7 +17,7 @@ from tests.support.viz import press_layer_row, keydown, make_playlist, make_test
 
 
 def _prompt_editor_mode(controls) -> None:
-    command_by_id("layers.preset_curation").run(controls)
+    command_by_id("view.preset_curation").run(controls)
 
 
 def _choose_editor_mode_option(controls, option_label: str) -> None:

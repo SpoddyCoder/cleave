@@ -142,7 +142,7 @@ def test_disabled_enter_does_not_run() -> None:
 
 def test_menu_mnemonics_are_the_unique_first_letters() -> None:
     letters = tuple(menu_mnemonic(menu.label).upper() for menu in MENUS)
-    assert letters == ("F", "P", "L", "T", "S")
+    assert letters == ("F", "E", "V", "P", "S", "H")
     assert len(set(letters)) == len(letters)
     assert MENUS[0].label == "File"
     assert menu_index_for_mnemonic(MENUS, "F") == 0
@@ -848,8 +848,8 @@ def test_open_menu_ink_matches_the_mock() -> None:
     """Open title and the current row use background ink on opaque highlight.
 
     An unfocused check is action and its shortcut is muted. The transport
-    bar has no highlight readout. The Settings menu Help row's label, check,
-    and shortcut are background ink while that row is current.
+    bar has no highlight readout. The View menu timeline strip row's label,
+    check, and shortcut are background ink while that row is current.
     """
     from cleave.viz import imgui_host
     from cleave.viz.shell_layout import ShellLayout
@@ -868,8 +868,8 @@ def test_open_menu_ink_matches_the_mock() -> None:
     controls.build_view_state = lambda **_kwargs: None
     controls.focus_cursor = None
     controls.shell_focus = SimpleNamespace(region=ShellRegion.NAVIGATOR)
-    settings_index = next(
-        index for index, item in enumerate(MENUS) if item.label == "Settings"
+    view_index = next(
+        index for index, item in enumerate(MENUS) if item.label == "View"
     )
     with patch.object(imgui_host, "_gl_context_current", return_value=False):
         host = _open_shell(overlay, menu, controls)
@@ -882,9 +882,9 @@ def test_open_menu_ink_matches_the_mock() -> None:
         host.process_event(_motion(4))
         host._draw_navigator = lambda: None
         host._draw_inspector = lambda _state: None
-        ctx = CommandContext(help_visible=True)
+        ctx = CommandContext(timeline_panel_open=True)
         _paint_shell(host, menu, ctx, frames=1)
-        menu.open_menu(settings_index, MENUS)
+        menu.open_menu(view_index, MENUS)
         menu.item_index = 0
         lists = _paint_shell(host, menu, ctx)
         content = _content_lists(lists)
@@ -942,9 +942,9 @@ def test_navigator_focus_ring_only_while_that_region_is_active() -> None:
     overlay.visibility = 1.0
     menu = MenuBarState()
     nodes = (
-        NavNode("settings", "Settings", 0, True, None, locked=True),
-        NavNode("settings.ui", "UI", 1, True, None, parent_id="settings"),
-        NavNode("project", "Project", 0, True, None),
+        NavNode("settings", "Settings", 0, None, locked=True),
+        NavNode("settings.ui", "UI", 1, None, parent_id="settings"),
+        NavNode("project", "Project", 0, None),
     )
     focus = ShellFocusState(region=ShellRegion.NAVIGATOR, selected_id="settings")
     controls = _shell_controls()

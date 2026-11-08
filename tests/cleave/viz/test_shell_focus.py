@@ -60,7 +60,7 @@ def test_tab_cycle_with_strip_closed_skips_timeline() -> None:
 
 def test_quick_nav_walks_top_level_ids_and_wraps() -> None:
     ids = TOP_LEVEL_IDS
-    assert len(ids) == 7
+    assert len(ids) == 5
     selected = ids[0]
     for expected in ids[1:]:
         selected = quick_nav_id(ids, selected, 1)
@@ -119,10 +119,16 @@ def test_reconcile_nav_id_repairs_a_missing_layer() -> None:
     assert reconcile_nav_id((), "layer:a", ("a",)) == "layer:a"
 
 
+def test_reconcile_keeps_an_open_config_page() -> None:
+    ids = TOP_LEVEL_IDS
+    assert reconcile_nav_id(ids, "settings.ui", (), pages=("settings.ui",)) == "settings.ui"
+    assert reconcile_nav_id(ids, "project.render", (), pages=("settings.ui",)) == "layers"
+
+
 def test_shell_focus_state_defaults() -> None:
     state = ShellFocusState()
     assert state.region is ShellRegion.NAVIGATOR
-    assert state.selected_id == "settings"
+    assert state.selected_id == "layers"
     assert state.inspector_cursor is None
     assert state.nav_expanded == {"layers"}
     other = ShellFocusState()

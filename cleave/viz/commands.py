@@ -1,9 +1,9 @@
 """Menu command registry for the live editor.
 
-Static rows match the menu taxonomy. Layer-focus and editor-settings
-commands are shortcut-only: they are not menu rows. Layer focus is built
-from a z-order of ``(slot, stem_label)`` pairs so stem names stay with the
-project.
+Static rows match the menu taxonomy. Settings and Project menus open their
+pages in the inspector. Layer-focus commands are shortcut-only: they are
+not menu rows. Layer focus is built from a z-order of ``(slot, stem_label)``
+pairs so stem names stay with the project.
 """
 
 from __future__ import annotations
@@ -15,6 +15,7 @@ from typing import Any, Literal
 import pygame
 
 from cleave.config_schema.layers import MAX_LAYER_COUNT
+from cleave.viz.config_pages import CONFIG_PAGES, ConfigPage
 from cleave.viz.editor_mode_controls import is_preset_curation_mode
 from cleave.viz.key_repeat import mod_ctrl
 from cleave.viz.navigator import layer_node_id, layer_slot_of
@@ -32,12 +33,12 @@ _RESOLVED_SHORTCUT_IDS = frozenset(
         "file.quit",
         "project.render",
         "help.overlay",
-        "settings.fullscreen",
-        "settings.editor",
+        "view.fullscreen",
+        "page.settings.preview",
         "layers.add",
-        "timeline.show_strip",
-        "timeline.undo",
-        "timeline.redo",
+        "view.timeline_strip",
+        "edit.undo",
+        "edit.redo",
     }
 )
 
@@ -351,6 +352,43 @@ def _run_redo(controls: Any) -> None:
     controls.redo_timeline()
 
 
+def _run_open_page(page_id: str) -> Callable[[Any], None]:
+    """Show a Settings or Project page in the inspector."""
+
+    def run(controls: Any) -> None:
+        controls.navigator.open_page(page_id)
+
+    return run
+
+
+def _project_page_enabled(ctx: CommandContext) -> bool:
+    return not is_preset_curation_mode(ctx.editor_mode)
+
+
+_PAGE_SHORTCUTS: dict[str, str] = {"settings.preview": "Ctrl+,"}
+
+
+def page_command_id(page_id: str) -> str:
+    """Command id for the menu row that opens *page_id*."""
+    return f"page.{page_id}"
+
+
+def _page_command(page: ConfigPage) -> Command:
+    enabled = _project_page_enabled if page.menu == "Project" else _enabled
+    return Command(
+        id=page_command_id(page.id),
+        label=page.label,
+        kind="jump",
+        shortcut=_PAGE_SHORTCUTS.get(page.id),
+        enabled=enabled,
+        run=_when_enabled(enabled, _run_open_page(page.id)),
+    )
+
+
+def _page_commands(menu: str) -> tuple[Command, ...]:
+    return tuple(_page_command(page) for page in CONFIG_PAGES if page.menu == menu)
+
+
 def _run_focus_node(node_id: str) -> Callable[[Any], None]:
     """Select a navigator node and focus its inspector."""
 
@@ -407,7 +445,7 @@ _QUIT = Command(
     enabled=_enabled,
     run=_run_quit,
 )
-_ABOUT = _later("file.about", "About Cleave", "command")
+_ABOUT = _later("help.about", "About Cleave", "command")
 
 _SEPARATE = _later("project.separate", "Separate stems...", "command")
 _RENDER = Command(
@@ -461,7 +499,7 @@ _RESUME_SWITCHING = Command(
     locked=_layer_locked,
 )
 _CURATION = Command(
-    id="layers.preset_curation",
+    id="view.preset_curation",
     label="Preset curation mode",
     kind="check",
     enabled=_enabled,
@@ -470,7 +508,7 @@ _CURATION = Command(
 )
 
 _SHOW_STRIP = Command(
-    id="timeline.show_strip",
+    id="view.timeline_strip",
     label="Show timeline strip",
     kind="check",
     shortcut="T",
@@ -519,7 +557,7 @@ _SET_CUT_TYPE = Command(
     locked=_timeline_locked,
 )
 _UNDO = Command(
-    id="timeline.undo",
+    id="edit.undo",
     label="Undo",
     kind="command",
     shortcut="Ctrl+Z",
@@ -527,7 +565,7 @@ _UNDO = Command(
     run=_when_enabled(_undo_enabled, _run_undo),
 )
 _REDO = Command(
-    id="timeline.redo",
+    id="edit.redo",
     label="Redo",
     kind="command",
     shortcut="Ctrl+Y",
@@ -535,14 +573,6 @@ _REDO = Command(
     run=_when_enabled(_redo_enabled, _run_redo),
 )
 
-_EDITOR = Command(
-    id="settings.editor",
-    label="Editor settings",
-    kind="jump",
-    shortcut="Ctrl+,",
-    enabled=_enabled,
-    run=_run_focus_node("settings"),
-)
 _MEASURE_LATENCY = Command(
     id="settings.measure_latency",
     label="Measure latency...",
@@ -566,7 +596,7 @@ def _toggle_fullscreen(controls: Any) -> None:
 
 
 _FULLSCREEN = Command(
-    id="settings.fullscreen",
+    id="view.fullscreen",
     label="Fullscreen",
     kind="check",
     shortcut="F11",
@@ -643,38 +673,37 @@ def layer_focus_commands(
     return tuple(commands)
 
 
+_PROJECT_PAGES = _page_commands("Project")
+_SETTINGS_PAGES = _page_commands("Settings")
+
+
 def build_menus(
     layer_slots: Sequence[tuple[str, str]] = (),
 ) -> MenuSet:
-    """Full menu bar. Commands and checks only; no navigator jumps.
+    """Full menu bar. Commands, checks, and Settings / Project page opens.
 
-    ``layer_slots`` is stored for number-key shortcuts and is not shown.
+    Navigator rows have no menu jump. ``layer_slots`` is stored for
+    number-key shortcuts and is not shown.
     """
     return MenuSet(
         (
-            Menu(
-                "File",
-                (_NEW, _OPEN, _SAVE, SEPARATOR, _QUIT, SEPARATOR, _ABOUT),
-            ),
+            Menu("File", (_NEW, _OPEN, _SAVE, SEPARATOR, _QUIT)),
+            Menu("Edit", (_UNDO, _REDO)),
+            Menu("View", (_FULLSCREEN, _SHOW_STRIP, SEPARATOR, _CURATION)),
             Menu(
                 "Project",
-                (_SEPARATE, _RENDER, SEPARATOR, _BACKUP, _RESTORE),
-            ),
-            Menu("Layers", (_ADD, _DELETE, SEPARATOR, _CURATION)),
-            Menu(
-                "Timeline",
                 (
-                    _SHOW_STRIP,
+                    *_PROJECT_PAGES,
                     SEPARATOR,
-                    _GENERATE,
-                    _RESET,
-                    _SNAP,
-                    _SET_CUT_TYPE,
-                    _UNDO,
-                    _REDO,
+                    _SEPARATE,
+                    _RENDER,
+                    SEPARATOR,
+                    _BACKUP,
+                    _RESTORE,
                 ),
             ),
-            Menu("Settings", (_MEASURE_LATENCY, _HELP_OVERLAY, _FULLSCREEN)),
+            Menu("Settings", (*_SETTINGS_PAGES, SEPARATOR, _MEASURE_LATENCY)),
+            Menu("Help", (_HELP_OVERLAY, SEPARATOR, _ABOUT)),
         ),
         tuple(layer_slots),
     )
@@ -684,6 +713,12 @@ MENUS: tuple[Menu, ...] = build_menus()
 
 # Reachable from an inspector button only.
 _INSPECTOR_COMMANDS: tuple[Command, ...] = (
+    _ADD,
+    _DELETE,
+    _GENERATE,
+    _RESET,
+    _SNAP,
+    _SET_CUT_TYPE,
     _SNAP_TO_MARKERS,
     _ADD_CURRENT_PRESET,
     _POPULATE_PRESETS,
@@ -718,11 +753,11 @@ def _shortcut_resolves(command: Command, *, timeline_scope: bool) -> bool:
 
 
 def _shortcut_commands(menus: Sequence[Menu]) -> Iterator[Command]:
-    """Menu rows, then shortcut-only layer focus and editor settings."""
+    """Menu rows, inspector buttons, then shortcut-only layer focus."""
     yield from iter_commands(menus)
+    yield from _INSPECTOR_COMMANDS
     slots = getattr(menus, "layer_slots", ())
     yield from layer_focus_commands(slots)
-    yield _EDITOR
 
 
 def command_for_shortcut(
@@ -734,12 +769,11 @@ def command_for_shortcut(
 ) -> Command | None:
     """Resolved shortcut, or None.
 
-    New, open, save, quit, render, the help overlay, fullscreen, add-layer,
-    undo, redo,
-    and show-timeline-strip resolve from menu rows. Editor settings (Ctrl+,) and
-    layer jumps (``1``–``8``) resolve from commands that are not menu rows.
-    Layer jumps
-    stay unresolved while *timeline_scope* is set. Other shortcut text stays
+    New, open, save, quit, render, the help overlay, fullscreen, undo, redo,
+    show-timeline-strip, and Settings > Preview (Ctrl+,) resolve from menu
+    rows. Add-layer resolves from its inspector button. Layer jumps
+    (``1``–``8``) resolve from commands that are not menu rows, and stay
+    unresolved while *timeline_scope* is set. Other shortcut text stays
     on its row. Bare R does not resolve.
     """
     source = MENUS if menus is None else menus

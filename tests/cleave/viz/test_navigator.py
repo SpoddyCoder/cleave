@@ -92,15 +92,13 @@ def test_tree_rails_carry_the_outer_branch_past_nested_pages() -> None:
     assert rails[layer_page_node_id(second, "effects")] == (False, False)
 
 
-def test_top_level_order_labels_and_inspectors() -> None:
+def test_top_level_order_and_labels() -> None:
     session = _session()
     top = tuple(
         node for node in build_navigator(session, frozenset()) if node.depth == 0
     )
 
     assert TOP_LEVEL_IDS == (
-        "settings",
-        "project",
         "overlay",
         "post_fx",
         "pattern_mask",
@@ -110,26 +108,13 @@ def test_top_level_order_labels_and_inspectors() -> None:
     assert visible_top_level_ids(session) == TOP_LEVEL_IDS
     assert tuple(node.id for node in top) == TOP_LEVEL_IDS
     assert tuple(node.label for node in top) == (
-        "Settings",
-        "Project",
         "Overlay",
         "Post-FX",
         "Pattern Mask",
         "Timeline",
         "Layers",
     )
-    assert tuple(node.has_inspector for node in top) == (
-        False,
-        False,
-        True,
-        True,
-        True,
-        True,
-        True,
-    )
     assert tuple(node.expandable for node in top) == (
-        True,
-        True,
         True,
         True,
         False,
@@ -143,14 +128,6 @@ def test_full_tree_order_and_labels() -> None:
     nodes = build_navigator(session, _all_open(session) | {layer_node_id("layer_2")})
 
     assert tuple(node.label for node in nodes) == (
-        "Settings",
-        "Preview",
-        "UI",
-        "Project",
-        "ProjectM",
-        "Compositor",
-        "Resolution",
-        "Render",
         "Overlay",
         "Opening Card",
         "Closing Card",
@@ -214,7 +191,6 @@ def test_song_markers_badge_is_marker_count() -> None:
     )
     assert markers.parent_id == "timeline"
     assert markers.depth == 1
-    assert markers.has_inspector is True
     assert markers.badge == "0"
 
     session.song_markers.times = [1.0, 4.5, 9.0]
@@ -222,17 +198,14 @@ def test_song_markers_badge_is_marker_count() -> None:
     assert nodes["timeline.song_markers"].badge == "3"
 
 
-def test_preset_curation_keeps_settings_and_layers() -> None:
+def test_preset_curation_keeps_only_layers() -> None:
     session = _session()
     session.settings.editor_mode = "preset_curation"
     nodes = build_navigator(session, frozenset())
 
-    assert visible_top_level_ids(session) == ("settings", "layers")
-    assert tuple(node.id for node in nodes) == ("settings", "layers")
-    assert tuple(node.label for node in nodes) == ("Settings", "Layers")
-    assert nodes[0].has_inspector is False
-    assert nodes[1].has_inspector is True
-    assert nodes[1].expandable is True
+    assert visible_top_level_ids(session) == ("layers",)
+    assert tuple(node.id for node in nodes) == ("layers",)
+    assert nodes[0].expandable is True
     assert all(node.badge is None for node in nodes)
 
 
@@ -243,13 +216,12 @@ def test_layer_children_follow_z_order() -> None:
     assert tuple(node.slot for node in children) == ("layer_2", "layer_1")
     assert tuple(node.label for node in children) == ("1  DRUMS", "2  BASS")
     assert all(node.depth == 1 for node in children)
-    assert all(node.has_inspector for node in children)
     assert all(node.expandable for node in children)
 
 
 def test_roots_and_layer_rows_are_bright_but_not_their_children() -> None:
     open_id = layer_node_id("layer_1")
-    nodes = build_navigator(_two_layers(), {"layers", "settings", open_id})
+    nodes = build_navigator(_two_layers(), {"layers", "post_fx", open_id})
 
     for node in nodes:
         expected = node.depth == 0 or node.parent_id == "layers"
@@ -427,8 +399,9 @@ def test_tree_up_down_does_not_wrap() -> None:
     nav = controls.navigator
     focus.region = ShellRegion.NAVIGATOR
 
-    nav.handle_keydown(_keydown(pygame.K_UP))
-    assert focus.selected_id == "settings"
+    for _ in range(60):
+        nav.handle_keydown(_keydown(pygame.K_UP))
+    assert focus.selected_id == "overlay"
 
     seen = [focus.selected_id]
     for _ in range(60):

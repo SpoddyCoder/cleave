@@ -16,6 +16,7 @@ import pygame
 from imgui_bundle import imgui
 
 from cleave.viz.commands import Command, CommandContext, MenuSeparator, command_by_id
+from cleave.viz.config_pages import config_page_title, is_config_page
 from cleave.viz.frame_rate import format_fps_value
 from cleave.viz.help_column import draw_help_column
 from cleave.viz.help_content import help_section_kwargs, help_sections_for_stop
@@ -334,15 +335,18 @@ def selection_after_nav_collapse(
 ) -> str:
     """Selection after a twisty collapses *toggled_id*.
 
-    *selected_id* stays unless the collapse hid it.
+    *selected_id* stays unless the collapse hid it. A Settings or Project
+    page has no row, so a collapse never hides it.
     """
-    if selected_id in visible_ids:
+    if selected_id in visible_ids or is_config_page(selected_id):
         return selected_id
     return toggled_id
 
 
 def inspector_title(nodes: Sequence[NavNode], selected_id: str) -> str:
     """Breadcrumb title for *selected_id*."""
+    if is_config_page(selected_id):
+        return config_page_title(selected_id)
     node = next((item for item in nodes if item.id == selected_id), None)
     if node is None:
         return selected_id

@@ -8,7 +8,7 @@ timeline strip. ``CycleStop`` is the Tab ring. The menu bar stays
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass, field
 from enum import Enum, auto
 
@@ -161,8 +161,13 @@ def reconcile_nav_id(
     layer_z_order: Sequence[str],
     *,
     prior_index: int | None = None,
+    pages: Collection[str] = (),
 ) -> str:
-    """Return *selected_id* when it is visible, otherwise a nearby stand-in.
+    """Return *selected_id* when it is visible or one of *pages*, otherwise a
+    nearby stand-in.
+
+    *pages* are the Settings and Project pages the menu can open; they have
+    no navigator row.
 
     A missing page under a visible layer lands on that layer. A missing
     ``layer:<slot>`` or a page under a removed layer lands on the nearest
@@ -170,7 +175,7 @@ def reconcile_nav_id(
     visible, then the first visible id. An empty *visible_ids* returns
     *selected_id*.
     """
-    if not visible_ids:
+    if not visible_ids or selected_id in pages:
         return selected_id
     ids = tuple(visible_ids)
     if selected_id in ids:

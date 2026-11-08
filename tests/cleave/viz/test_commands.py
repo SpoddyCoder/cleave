@@ -40,29 +40,33 @@ from tests.cleave.viz.test_controls import (
 
 _SLOTS = (("slot_a", "snare"), ("slot_b", "pad"))
 
+_PROJECT_PAGE_IDS = (
+    "page.project.projectm",
+    "page.project.compositor",
+    "page.project.resolution",
+    "page.project.render",
+)
+_SETTINGS_PAGE_IDS = ("page.settings.preview", "page.settings.ui")
+
 _STATIC_IDS = (
     "file.new",
     "file.open",
     "file.save",
     "file.quit",
+    "edit.undo",
+    "edit.redo",
+    "view.fullscreen",
+    "view.timeline_strip",
+    "view.preset_curation",
+    *_PROJECT_PAGE_IDS,
     "project.separate",
     "project.render",
     "project.backup",
     "project.restore",
-    "layers.add",
-    "layers.delete",
-    "layers.preset_curation",
-    "timeline.show_strip",
-    "timeline.generate",
-    "timeline.set_cut_type",
-    "timeline.reset",
-    "timeline.snap_cues",
-    "timeline.undo",
-    "timeline.redo",
+    *_SETTINGS_PAGE_IDS,
     "settings.measure_latency",
     "help.overlay",
-    "settings.fullscreen",
-    "file.about",
+    "help.about",
 )
 
 _OFF_MENU_IDS = (
@@ -70,16 +74,21 @@ _OFF_MENU_IDS = (
     "render.edit_overlays",
     "render.edit_post_fx",
     "timeline.song_markers",
-    "settings.editor",
+    "layers.add",
+    "layers.delete",
+    "timeline.generate",
+    "timeline.reset",
+    "timeline.snap_cues",
+    "timeline.set_cut_type",
 )
 
 _DISABLED_IDS = (
     "project.separate",
     "project.backup",
     "project.restore",
-    "file.about",
-    "timeline.undo",
-    "timeline.redo",
+    "help.about",
+    "edit.undo",
+    "edit.redo",
     "layers.add",
     "layers.delete",
 )
@@ -156,10 +165,11 @@ def test_menus_list_taxonomy_ids_once() -> None:
     menus = _menus()
     assert [menu.label for menu in menus] == [
         "File",
+        "Edit",
+        "View",
         "Project",
-        "Layers",
-        "Timeline",
         "Settings",
+        "Help",
     ]
     assert _row_ids(menus[0]) == [
         "file.new",
@@ -167,37 +177,29 @@ def test_menus_list_taxonomy_ids_once() -> None:
         "file.save",
         None,
         "file.quit",
-        None,
-        "file.about",
     ]
-    assert _row_ids(menus[1]) == [
+    assert _row_ids(menus[1]) == ["edit.undo", "edit.redo"]
+    assert _row_ids(menus[2]) == [
+        "view.fullscreen",
+        "view.timeline_strip",
+        None,
+        "view.preset_curation",
+    ]
+    assert _row_ids(menus[3]) == [
+        *_PROJECT_PAGE_IDS,
+        None,
         "project.separate",
         "project.render",
         None,
         "project.backup",
         "project.restore",
     ]
-    assert _row_ids(menus[2]) == [
-        "layers.add",
-        "layers.delete",
-        None,
-        "layers.preset_curation",
-    ]
-    assert _row_ids(menus[3]) == [
-        "timeline.show_strip",
-        None,
-        "timeline.generate",
-        "timeline.reset",
-        "timeline.snap_cues",
-        "timeline.set_cut_type",
-        "timeline.undo",
-        "timeline.redo",
-    ]
     assert _row_ids(menus[4]) == [
+        *_SETTINGS_PAGE_IDS,
+        None,
         "settings.measure_latency",
-        "help.overlay",
-        "settings.fullscreen",
     ]
+    assert _row_ids(menus[5]) == ["help.overlay", None, "help.about"]
     ids = [command.id for command in iter_commands(menus)]
     assert len(ids) == len(set(ids))
     assert set(ids) == set(_STATIC_IDS)
@@ -250,12 +252,12 @@ def test_later_shortcuts_stay_on_rows_but_do_not_resolve() -> None:
     assert command_by_id("file.new", menus).shortcut == "Ctrl+N"
     assert command_by_id("file.open", menus).shortcut == "Ctrl+O"
     assert command_by_id("layers.add", menus).shortcut == "Ctrl+L"
-    assert command_by_id("timeline.show_strip", menus).shortcut == "T"
+    assert command_by_id("view.timeline_strip", menus).shortcut == "T"
     editor = command_for_shortcut(pygame.K_COMMA, pygame.KMOD_CTRL)
     assert editor is not None
-    assert editor.id == "settings.editor"
+    assert editor.id == "page.settings.preview"
     assert editor.shortcut == "Ctrl+,"
-    assert editor not in tuple(iter_commands(menus))
+    assert command_for_shortcut(pygame.K_l, pygame.KMOD_CTRL).id == "layers.add"
     layer = command_for_shortcut(pygame.K_1, 0, menus)
     assert layer is not None
     assert layer.id == "layers.focus.slot_a"
@@ -263,18 +265,18 @@ def test_later_shortcuts_stay_on_rows_but_do_not_resolve() -> None:
     assert layer not in tuple(iter_commands(menus))
     assert command_for_shortcut(pygame.K_n, pygame.KMOD_CTRL).id == "file.new"
     assert command_for_shortcut(pygame.K_o, pygame.KMOD_CTRL).id == "file.open"
-    assert command_for_shortcut(pygame.K_t, 0).id == "timeline.show_strip"
+    assert command_for_shortcut(pygame.K_t, 0).id == "view.timeline_strip"
     assert (
         command_for_shortcut(pygame.K_t, 0, timeline_scope=True).id
-        == "timeline.show_strip"
+        == "view.timeline_strip"
     )
-    assert command_for_shortcut(pygame.K_COMMA, pygame.KMOD_CTRL).id == "settings.editor"
+    assert command_for_shortcut(pygame.K_COMMA, pygame.KMOD_CTRL).id == "page.settings.preview"
     assert command_for_shortcut(pygame.K_1, 0) is None
     assert command_for_shortcut(pygame.K_s, pygame.KMOD_CTRL).id == "file.save"
     assert command_for_shortcut(pygame.K_q, pygame.KMOD_CTRL).id == "file.quit"
     assert command_for_shortcut(pygame.K_h, 0).id == "help.overlay"
     assert command_for_shortcut(pygame.K_h, pygame.KMOD_CTRL) is None
-    assert command_for_shortcut(pygame.K_F11, 0).id == "settings.fullscreen"
+    assert command_for_shortcut(pygame.K_F11, 0).id == "view.fullscreen"
 
 
 def test_disabled_items_stay_disabled() -> None:
@@ -282,23 +284,23 @@ def test_disabled_items_stay_disabled() -> None:
     ctx = CommandContext()
     for command_id in _DISABLED_IDS:
         assert command_by_id(command_id, menus).enabled(ctx) is False
-    assert not any(command.kind == "jump" for command in iter_commands(menus))
+    assert {
+        command.id for command in iter_commands(menus) if command.kind == "jump"
+    } == {*_PROJECT_PAGE_IDS, *_SETTINGS_PAGE_IDS}
     for command in layer_focus_commands(_SLOTS):
         assert command.enabled(ctx) is True
         assert command.kind == "jump"
 
 
-def test_editor_shortcut_selects_the_settings_inspector() -> None:
+def test_editor_shortcut_opens_the_settings_preview_page() -> None:
     menus = _menus()
     controls = _make_controls(("layer_1",))
     editor = command_for_shortcut(pygame.K_COMMA, pygame.KMOD_CTRL, menus)
     assert editor is not None
-    assert editor.id == "settings.editor"
+    assert editor.id == "page.settings.preview"
     assert editor.kind == "jump"
     assert editor.enabled(CommandContext()) is True
-    assert "settings.editor" not in {
-        command.id for command in iter_commands(menus)
-    }
+    assert editor in tuple(iter_commands(menus))
 
     editor.run(controls)
     assert controls.shell_focus.selected_id == "settings.preview"
@@ -398,7 +400,7 @@ def test_wired_run_calls_controllers() -> None:
     command_by_id("file.save", menus).run(controls)
     command_by_id("file.quit", menus).run(controls)
     command_by_id("project.render", menus).run(controls)
-    command_by_id("layers.preset_curation", menus).run(controls)
+    command_by_id("view.preset_curation", menus).run(controls)
     command_by_id("settings.measure_latency", menus).run(controls)
     controls.prompt_save_config.assert_called_once_with()
     controls.request_quit.assert_called_once_with()
@@ -406,7 +408,7 @@ def test_wired_run_calls_controllers() -> None:
     controls.editor_mode.prompt_change_editor_mode.assert_called_once_with()
     controls.tap_sync.prompt_start.assert_called_once_with()
 
-    curation = command_by_id("layers.preset_curation", menus)
+    curation = command_by_id("view.preset_curation", menus)
     assert curation.kind == "check"
     assert curation.checked is not None
     assert curation.checked(CommandContext()) is False
@@ -432,7 +434,7 @@ def test_wired_run_calls_controllers() -> None:
 def test_fullscreen_command_requests_toggle_and_reads_window_state() -> None:
     menus = _menus()
     controls = _make_controls(("layer_1",))
-    item = command_by_id("settings.fullscreen", menus)
+    item = command_by_id("view.fullscreen", menus)
     assert item.label == "Fullscreen"
     assert item.kind == "check"
     assert item.shortcut == "F11"
@@ -705,7 +707,7 @@ def test_add_selects_new_layer_and_delete_selects_neighbour() -> None:
 
 
 def test_show_strip_toggles_panel_and_is_disabled_while_recording_or_curating() -> None:
-    show = command_by_id("timeline.show_strip")
+    show = command_by_id("view.timeline_strip")
     assert show.kind == "check"
     assert show.label == "Show timeline strip"
     assert show.shortcut == "T"
@@ -714,7 +716,7 @@ def test_show_strip_toggles_panel_and_is_disabled_while_recording_or_curating() 
     assert command_for_shortcut(pygame.K_r, 0) is None
     assert command_for_shortcut(pygame.K_r, pygame.KMOD_CTRL).id == "project.render"
     assert [command.id for command in iter_commands(MENUS) if command.shortcut == "T"] == [
-        "timeline.show_strip"
+        "view.timeline_strip"
     ]
 
     assert show.checked(CommandContext(timeline_panel_open=False)) is False
@@ -755,7 +757,7 @@ def test_show_strip_toggles_panel_and_is_disabled_while_recording_or_curating() 
 
 
 def test_undo_is_disabled_with_no_history_and_run_is_a_noop() -> None:
-    undo = command_by_id("timeline.undo")
+    undo = command_by_id("edit.undo")
     assert undo.enabled(CommandContext()) is False
     controls = _make_controls(("layer_1",))
     controls.undo_timeline = MagicMock()
@@ -769,8 +771,8 @@ def test_undo_and_redo_follow_a_snap_and_their_shortcuts_resolve() -> None:
     lanes["layer_1"] = TimelineLane(
         baseline=None, cues=[SlotCue(t=0.4, level=1.0)]
     )
-    undo = command_by_id("timeline.undo")
-    redo = command_by_id("timeline.redo")
+    undo = command_by_id("edit.undo")
+    redo = command_by_id("edit.redo")
     assert undo.enabled(command_context(controls)) is False
 
     controls.prompt_snap_cues()
@@ -903,9 +905,14 @@ def test_inspector_only_timeline_actions_are_not_menu_commands() -> None:
     labels = [command.label for command in iter_commands(MENUS)]
     assert "Apply to Cues" not in labels
     assert "Remove from Cues" not in labels
-    assert labels.count("Snap cues...") == 1
-    assert labels.count("Set cut type...") == 1
-    assert "Snap cues to markers..." not in labels
+    for label in (
+        "Generate timeline...",
+        "Reset timeline...",
+        "Snap cues...",
+        "Set cut type...",
+        "Snap cues to markers...",
+    ):
+        assert label not in labels
 
     controls = _make_controls(("layer_1",))
     controls.session.song_markers.times = [10.0, 40.0]

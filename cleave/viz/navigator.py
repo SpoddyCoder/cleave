@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 LAYER_ID_PREFIX = "layer:"
 SOLO_BADGE = "solo"
 HIDDEN_BADGE = "hidden"
-DEFAULT_SELECTED_ID = "settings"
+DEFAULT_SELECTED_ID = "layers"
 DEFAULT_EXPANDED_IDS = frozenset({"layers"})
 # The ImGui atlas must include these; the default Latin range draws them as "?".
 TWISTY_EXPANDED = "▾"
@@ -61,7 +61,6 @@ class NavNode:
     id: str
     label: str
     depth: int
-    has_inspector: bool
     badge: str | None
     parent_id: str | None = None
     expandable: bool = False
@@ -71,26 +70,14 @@ class NavNode:
 
 
 _TOP_LEVEL: tuple[NavNode, ...] = (
-    NavNode("settings", "Settings", 0, False, None, expandable=True),
-    NavNode("project", "Project", 0, False, None, expandable=True),
-    NavNode("overlay", "Overlay", 0, True, None, expandable=True),
-    NavNode("post_fx", "Post-FX", 0, True, None, expandable=True),
-    NavNode("pattern_mask", "Pattern Mask", 0, True, None),
-    NavNode("timeline", "Timeline", 0, True, None, expandable=True),
-    NavNode("layers", "Layers", 0, True, None, expandable=True),
+    NavNode("overlay", "Overlay", 0, None, expandable=True),
+    NavNode("post_fx", "Post-FX", 0, None, expandable=True),
+    NavNode("pattern_mask", "Pattern Mask", 0, None),
+    NavNode("timeline", "Timeline", 0, None, expandable=True),
+    NavNode("layers", "Layers", 0, None, expandable=True),
 )
 
 _STATIC_CHILDREN: dict[str, tuple[tuple[str, str], ...]] = {
-    "settings": (
-        ("settings.preview", "Preview"),
-        ("settings.ui", "UI"),
-    ),
-    "project": (
-        ("project.projectm", "ProjectM"),
-        ("project.compositor", "Compositor"),
-        ("project.resolution", "Resolution"),
-        ("project.render", "Render"),
-    ),
     "overlay": (
         ("overlay.opening_card", "Opening Card"),
         ("overlay.closing_card", "Closing Card"),
@@ -110,9 +97,7 @@ _STATIC_CHILDREN: dict[str, tuple[tuple[str, str], ...]] = {
 
 TOP_LEVEL_IDS: tuple[str, ...] = tuple(node.id for node in _TOP_LEVEL)
 
-_HIDDEN_IN_CURATION = frozenset(
-    {"project", "overlay", "post_fx", "pattern_mask", "timeline"}
-)
+_HIDDEN_IN_CURATION = frozenset({"overlay", "post_fx", "pattern_mask", "timeline"})
 
 
 def layer_node_id(slot: str) -> str:
@@ -182,7 +167,7 @@ def build_navigator(
 
     *expanded* defaults to ``DEFAULT_EXPANDED_IDS``. A node's children are
     included only while its id is in *expanded*. Preset curation omits every
-    root except Settings and Layers, and keeps one childless layer for the
+    root except Layers, and keeps one childless layer for the
     curation focus slot. Song Markers carries the marker count as its badge,
     including ``"0"``.
     """
@@ -265,7 +250,6 @@ def _static_children(session: TuningSession, parent_id: str) -> tuple[NavNode, .
             id=node_id,
             label=label,
             depth=1,
-            has_inspector=True,
             badge=_static_child_badge(session, node_id),
             parent_id=parent_id,
             toggles=_static_child_toggles(session, node_id),
@@ -325,7 +309,6 @@ def _layer_node(session: TuningSession, slot: str, *, expandable: bool) -> NavNo
         id=layer_node_id(slot),
         label=f"{index + 1}  {stem_overlay_header(layer.stem)}",
         depth=1,
-        has_inspector=True,
         badge=_layer_badge(session, slot) if curation else None,
         parent_id="layers",
         expandable=expandable,
@@ -350,7 +333,6 @@ def _layer_page_nodes(slot: str) -> tuple[NavNode, ...]:
             id=layer_page_node_id(slot, page),
             label=label,
             depth=2,
-            has_inspector=True,
             badge=None,
             parent_id=layer_node_id(slot),
             slot=slot,

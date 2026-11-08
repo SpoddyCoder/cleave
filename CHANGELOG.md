@@ -9,18 +9,19 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 
-- Settings > Fullscreen (F11) switches the editor to borderless fullscreen and back.
+- View > Fullscreen (F11) switches the editor to borderless fullscreen and back.
 - The editor window remembers its size and whether it was maximised, and opens centred. A saved size bigger than the screen opens maximised.
 - The editor window has a minimum size, so the menu bar, columns, and timeline strip can't collapse. It grows with the UI scale.
 - Resize the editor window by dragging its edges or corners, or maximise it. The menu bar, columns, timeline strip, and visualiser follow the new size, and a project switch keeps it.
 - Settings > UI > UI scale (80% to 200%) resizes all editor text and the spacing around it: menus, navigator, inspector, help, transport, notifications, tooltips, dialogs, the file picker, the loading screen, and the timeline strip. It applies at once and is kept as an editor preference. Overlay cards in the visualiser keep their own font sizes.
 - Drag the boundary between the navigator and the inspector to set how tall the navigator is, or step it with Settings > UI > navigator height. The height is kept as an editor preference. Fit to rows, the default, sizes the navigator to its tree as before, and stepping Left past the smallest height returns to it.
-- Timeline > Undo (Ctrl+Z) and Redo (Ctrl+Y) cover Generate timeline, Reset timeline, Snap cues, and Set cut type, including any preset lists and pattern mask settings Generate changed. Undo is unavailable after hand edits to cues, so it never discards them.
+- Edit > Undo (Ctrl+Z) and Redo (Ctrl+Y) cover Generate timeline, Reset timeline, Snap cues, and Set cut type, including any preset lists and pattern mask settings Generate changed. Undo is unavailable after hand edits to cues, so it never discards them.
 - Settings > Preview > preview quality has an output setting that renders the live preview at the full project resolution, to check how it will look in the render.
 - File > New project (Ctrl+N) asks for an audio file, and File > Open project (Ctrl+O) asks for a project. Both switch the live session without quitting. A project with unsaved changes asks before leaving.
 
 ### Changed
 
+- The navigator holds only the parts of the picture: Overlay, Post-FX, Pattern Mask, Timeline, and Layers. Settings and Project pages open from their menus into the inspector (Ctrl+, opens Settings > Preview). The menu bar is File, Edit (Undo, Redo), View (Fullscreen, timeline strip, preset curation mode), Project, Settings, and Help (Help, About). The Layers and Timeline menus are gone; add and delete layer and the timeline actions are buttons on their inspector pages.
 - Settings has two pages. Preview holds preview quality, residual latency, and Measure latency, replacing Editor Window and Latency Compensation. Navigator side and help side move to UI.
 - Project > Compositor > hdr is labelled hdr compositing, and its help says the rendered video is 8-bit either way.
 - The live preview takes its shape from Project > Resolution width and height, so it matches the rendered video, and letterboxes in the visualiser area. It renders only as many pixels as the visualiser area shows, up to the project resolution, so a 4K project no longer renders at 4K in a small window. The size follows window and column resizes. Overlay cards keep their size relative to the frame.

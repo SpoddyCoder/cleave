@@ -9,26 +9,32 @@ from cleave.viz.shell_focus import ShellRegion
 from tests.cleave.viz.test_controls import _make_controls, _make_controls_with_manager
 
 
-def test_enter_on_project_opens_first_child() -> None:
+def test_open_page_shows_a_project_page_without_a_navigator_row() -> None:
     controls = _make_controls(("layer_1",))
     focus = controls.shell_focus
-    controls.navigator.select("project")
-    controls.navigator.activate()
+    expanded = set(focus.nav_expanded)
+    controls.navigator.open_page("project.projectm")
     assert focus.selected_id == "project.projectm"
     assert focus.region is ShellRegion.INSPECTOR
-    assert "project" in focus.nav_expanded
+    assert focus.nav_expanded == expanded
     assert focus.inspector_cursor == RowDescriptor(
         RowKind.PROJECT_MILKDROP_BEAT_SENSITIVITY
     )
 
 
-def test_enter_on_settings_opens_first_child() -> None:
+def test_open_page_survives_reconcile_and_quick_step_leaves_it() -> None:
     controls = _make_controls(("layer_1",))
     focus = controls.shell_focus
-    controls.navigator.select("settings")
-    controls.navigator.activate()
+    controls.navigator.open_page("settings.preview")
+    controls.navigator.reconcile()
     assert focus.selected_id == "settings.preview"
     assert focus.region is ShellRegion.INSPECTOR
+
+    controls.navigator.quick_step(1)
+    assert focus.selected_id == "overlay"
+    controls.navigator.open_page("settings.ui")
+    controls.navigator.quick_step(-1)
+    assert focus.selected_id == "layers"
 
 
 def test_enter_on_root_page_focuses_its_enabled_row() -> None:
@@ -124,7 +130,7 @@ def test_quick_step_stays_on_top_level_ids() -> None:
     controls.navigator.quick_step(1)
     assert focus.selected_id == "layers"
     controls.navigator.quick_step(1)
-    assert focus.selected_id == "settings"
+    assert focus.selected_id == "overlay"
     controls.navigator.quick_step(-1)
     assert focus.selected_id == "layers"
 
@@ -174,7 +180,7 @@ def test_delete_from_a_layer_page_lands_on_a_sibling_layer() -> None:
 def test_reconcile_opens_the_branch_it_lands_on() -> None:
     controls = _make_controls(("layer_1",))
     focus = controls.shell_focus
-    controls.navigator.select("project.render")
+    controls.navigator.open_page("project.render")
     controls.session.settings.editor_mode = "preset_curation"
     controls.navigator.reconcile()
     assert focus.selected_id == "layers"
