@@ -34,6 +34,8 @@ from cleave.viz.material_icons import (
     LOCK_OPEN_GLYPH,
     ADD_GLYPH,
     DRAG_INDICATOR_GLYPH,
+    FILE_GLYPH,
+    FOLDER_GLYPH,
     POWER_GLYPH,
     SOLO_GLYPH,
 )
@@ -56,7 +58,7 @@ from cleave.viz.panel_notification import (
 )
 from cleave.viz.playback import format_mmss
 from cleave.viz.row_hotkeys import activate_header_toggle, node_control_descriptor
-from cleave.viz.row_kinds import RowDescriptor, RowKind
+from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
 from cleave.viz.row_present_renderers import inspector_field_colors
 from cleave.viz.row_spec import (
     RowNavButton,
@@ -106,6 +108,8 @@ from cleave.viz.theme import (
     NUDGE_HOVER_BG,
     NUDGE_HOVER_BG_ALPHA,
     NUDGE_HOVER_FG,
+    PRESET_FILE_ICON,
+    PRESET_ICON,
     SELECTED_WASH_ALPHA,
     TRANSPORT_RULE,
     VALUE,
@@ -710,15 +714,58 @@ def _icon_drop_to_text(glyph: str) -> float:
     return float(round(((cap.y0 + cap.y1) - (icon.y0 + icon.y1)) * 0.5))
 
 
+def path_row_icon(kind: RowKind) -> tuple[str, tuple[int, int, int]] | None:
+    """Folder or file glyph, with its accent, in front of a path row's value."""
+    spec = row_spec(kind)
+    if spec.present_style is not RowPresentStyle.PATH_ICON:
+        return None
+    if spec.affordance is RowAffordance.PATH_DIR:
+        return FOLDER_GLYPH, PRESET_ICON
+    return FILE_GLYPH, PRESET_FILE_ICON
+
+
+def path_icon_color(
+    accent: tuple[int, int, int], value_color: tuple[int, int, int]
+) -> tuple[int, int, int]:
+    """Icon accent, or the value color when the row is dimmed or locked."""
+    return value_color if value_color in (DISABLED, LOCKED) else accent
+
+
+def _draw_path_value(
+    x: float,
+    y: float,
+    right_x: float,
+    value: str,
+    value_color: tuple[int, int, int],
+    icon: tuple[str, tuple[int, int, int]] | None,
+) -> None:
+    """*value* fitted between *x* and *right_x*, after the row's path icon."""
+    draw = imgui.get_window_draw_list()
+    if icon is not None:
+        glyph, accent = icon
+        draw.add_text(
+            imgui.ImVec2(x, y + _icon_drop_to_text(glyph)),
+            imgui.get_color_u32(rgba(path_icon_color(accent, value_color))),
+            glyph,
+        )
+        x += imgui.calc_text_size(f"{glyph} ").x
+    draw.add_text(
+        imgui.ImVec2(x, y),
+        imgui.get_color_u32(rgba(value_color)),
+        fit_path_or_name_to_width(_ImguiTextSizer(), value, int(right_x - x)),
+    )
+
+
 def _draw_two_line_row_text(
     label: str,
     markers: str,
     value: str,
     parts: list[tuple[str, imgui.ImVec4]],
     label_color: imgui.ImVec4,
-    value_color: imgui.ImVec4,
+    value_color: tuple[int, int, int],
     *,
     lead: str = "",
+    icon: tuple[str, tuple[int, int, int]] | None = None,
 ) -> None:
     """Markers after the label, stopping short of the arrows, and the value below.
 
@@ -747,11 +794,13 @@ def _draw_two_line_row_text(
             imgui.get_color_u32(label_color),
             fitted,
         )
-    value_x = origin_x + lead_x
-    draw.add_text(
-        imgui.ImVec2(value_x, origin_y + imgui.get_text_line_height()),
-        imgui.get_color_u32(value_color),
-        fit_path_or_name_to_width(sizer, value, int(right_x - pad - value_x)),
+    _draw_path_value(
+        origin_x + lead_x,
+        origin_y + imgui.get_text_line_height(),
+        right_x - pad,
+        value,
+        value_color,
+        icon,
     )
 
 
@@ -2009,6 +2058,20 @@ class ShellHost:
                 cluster = ""
             elif stepped and cluster and not two_line:
                 cluster = self._fixed_width_value(kind, cluster)
+            icon = path_row_icon(kind)
+            if icon is not None and not two_line:
+                origin_x, origin_y = _selectable_label_origin()
+                if label:
+                    origin_x += imgui.calc_text_size(f"{lead}{label} ").x
+                _draw_path_value(
+                    origin_x,
+                    origin_y,
+                    imgui.get_item_rect_max().x - imgui.get_style().frame_padding.x,
+                    cluster,
+                    value_color,
+                    icon,
+                )
+                cluster = ""
             if cluster:
                 parts = value_parts(
                     cluster,
@@ -2023,8 +2086,9 @@ class ShellHost:
                         value,
                         parts,
                         rgba(label_color),
-                        rgba(value_color),
+                        value_color,
                         lead=lead,
+                        icon=icon,
                     )
                 if spec.nav_buttons and not list_item:
                     self._handle_nav_buttons(

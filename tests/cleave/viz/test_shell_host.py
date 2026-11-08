@@ -42,10 +42,16 @@ from cleave.viz.shell_host import (
     navigator_toggle_x,
     navigator_tree_lines,
     navigator_twisty,
+    path_icon_color,
+    path_row_icon,
     selectable_wash,
     selection_after_nav_collapse,
 )
+from cleave.viz.material_icons import FILE_GLYPH, FOLDER_GLYPH
 from cleave.viz.theme import (
+    DISABLED,
+    PRESET_FILE_ICON,
+    PRESET_ICON,
     VALUE,
     FOCUS_WASH_ALPHA,
     HIGHLIGHT,
@@ -375,3 +381,26 @@ def test_drag_handle_lead_covers_glyph_plus_a_gap() -> None:
     assert drag_handle_lead(15.0, 8.0) == 3
     assert drag_handle_lead(8.0, 8.0) == 2
     assert drag_handle_lead(16.0, 0.0) == 0
+
+
+def test_path_row_icon_folder_for_preset_directory() -> None:
+    assert path_row_icon(RowKind.TRACK_PRESET_DIR) == (FOLDER_GLYPH, PRESET_ICON)
+
+
+def test_path_row_icon_file_for_presets_and_render_output() -> None:
+    for kind in (
+        RowKind.TRACK_PRESET,
+        RowKind.TRACK_PRESET_LIST_ITEM,
+        RowKind.PROJECT_RENDER_OUTPUT,
+    ):
+        assert path_row_icon(kind) == (FILE_GLYPH, PRESET_FILE_ICON)
+
+
+def test_path_row_icon_none_for_other_rows() -> None:
+    assert path_row_icon(RowKind.TRACK_PRESET_SWITCHING_TRIGGER) is None
+
+
+def test_path_icon_color_dims_with_row() -> None:
+    assert path_icon_color(PRESET_ICON, VALUE) == PRESET_ICON
+    assert path_icon_color(PRESET_ICON, DISABLED) == DISABLED
+    assert path_icon_color(PRESET_ICON, LOCKED) == LOCKED

@@ -181,6 +181,7 @@ def _merge_icon_glyphs(fonts: Any, size_pixels: float) -> tuple[Any, list[int]]:
     from cleave.viz.material_icons import (
         ARROW_DOWNWARD_GLYPH,
         ARROW_UPWARD_GLYPH,
+        FILE_GLYPH,
         FOLDER_GLYPH,
         LOCK_GLYPH,
         LOCK_OPEN_GLYPH,
@@ -198,6 +199,7 @@ def _merge_icon_glyphs(fonts: Any, size_pixels: float) -> tuple[Any, list[int]]:
     ranges: list[int] = []
     for glyph in (
         FOLDER_GLYPH,
+        FILE_GLYPH,
         ARROW_UPWARD_GLYPH,
         ARROW_DOWNWARD_GLYPH,
         LOCK_GLYPH,

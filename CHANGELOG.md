@@ -9,6 +9,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 
+- The preset directory row shows a folder icon, and the preset, preset list entries, and render output rows show a file icon.
 - Drag a preset list entry by the handle in front of its name to reorder it. Esc during the drag puts it back.
 - Drag a layer by the handle in front of its name in the navigator to change its z-order. Locked layers can't be dragged.
 - View > Fullscreen (F11) switches the editor to borderless fullscreen and back.
