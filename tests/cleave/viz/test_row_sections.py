@@ -53,15 +53,36 @@ def test_layer_page_holds_only_its_own_rows() -> None:
         RowKind.TRACK_SOLO,
         RowKind.TRACK_LOCKED,
         RowKind.TRACK_STEM,
-        RowKind.TRACK_BEAT,
     ]
 
 
-def test_milkdrop_preset_page_holds_dir_and_preset() -> None:
+def test_milkdrop_preset_page_holds_dir_preset_and_beat() -> None:
     assert _page_kinds(layer_page_node_id("layer_1", "milkdrop_preset")) == [
         RowKind.TRACK_PRESET_DIR,
         RowKind.TRACK_PRESET,
+        RowKind.TRACK_BEAT,
     ]
+    rows = build_inspector_rows(
+        _minimal_view_state(tracks={"layer_1": _track_block()}),
+        layer_page_node_id("layer_1", "milkdrop_preset"),
+    )
+    assert rows[-1].command_ids == ("layers.add_current_preset",)
+
+
+def test_add_to_preset_list_hides_while_switching_is_off() -> None:
+    rows = build_inspector_rows(
+        _minimal_view_state(
+            tracks={
+                "layer_1": _track_block(
+                    preset_switching="off", preset_switching_trigger="off"
+                )
+            }
+        ),
+        layer_page_node_id("layer_1", "milkdrop_preset"),
+    )
+    assert all(
+        "layers.add_current_preset" not in row.command_ids for row in rows
+    )
 
 
 def test_preset_switching_trigger_off_hides_switching_rows() -> None:

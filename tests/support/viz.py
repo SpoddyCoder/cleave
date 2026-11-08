@@ -254,11 +254,17 @@ _PRESET_LIST_PAGE_KINDS = frozenset(
     {
         RowKind.TRACK_PRESET_LIST,
         RowKind.TRACK_PRESET_LIST_ITEM,
-        RowKind.TRACK_PRESET_LIST_ADD,
         RowKind.TRACK_PRESET_LIST_POPULATE,
     }
 )
-_MILKDROP_PRESET_PAGE_KINDS = frozenset({RowKind.TRACK_PRESET_DIR, RowKind.TRACK_PRESET})
+_MILKDROP_PRESET_PAGE_KINDS = frozenset(
+    {
+        RowKind.TRACK_PRESET_DIR,
+        RowKind.TRACK_PRESET,
+        RowKind.TRACK_BEAT,
+        RowKind.TRACK_PRESET_LIST_ADD,
+    }
+)
 _COMPOSITING_PAGE_KINDS = frozenset({RowKind.TRACK_BLEND, RowKind.TRACK_OPACITY})
 
 

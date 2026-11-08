@@ -476,7 +476,7 @@ _DELETE = Command(
 )
 _ADD_CURRENT_PRESET = Command(
     id="layers.add_current_preset",
-    label="+ Add current",
+    label="Add To Preset List",
     kind="command",
     enabled=_preset_list_enabled,
     run=_when_enabled(_preset_list_enabled, _run_add_current_preset),

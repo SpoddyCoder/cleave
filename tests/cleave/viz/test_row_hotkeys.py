@@ -241,14 +241,14 @@ def test_section_lock_inspector_refuses_edits_and_delete_still_prompts() -> None
 
     view = controls.build_view_state(paused=False)
     built = build_inspector_rows(
-        view, layer_page_node_id("layer_1", "preset_list")
+        view, layer_page_node_id("layer_1", "milkdrop_preset")
     )
     add_row = next(
         row for row in built if "layers.add_current_preset" in row.command_ids
     )
     assert add_row.navigable
     controls.shell_focus.selected_id = layer_page_node_id(
-        "layer_1", "preset_list"
+        "layer_1", "milkdrop_preset"
     )
     controls.inspector.focus_command(add_row, "layers.add_current_preset")
     assert dispatch_keydown(keydown(pygame.K_LEFT), runtime) is True
@@ -272,7 +272,7 @@ def test_section_lock_inspector_refuses_edits_and_delete_still_prompts() -> None
     assert layer.locked is True
 
     _focus_inspector(
-        controls, "layer_1", RowDescriptor(RowKind.TRACK_BEAT, slot="layer_1")
+        controls, "layer_1", RowDescriptor(RowKind.TRACK_STEM, slot="layer_1")
     )
     found_delete = False
     for _ in range(32):

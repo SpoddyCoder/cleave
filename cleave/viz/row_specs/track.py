@@ -488,7 +488,7 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="Milkdrop Preset",
         help_description=(
-            "Preset directory and active Milkdrop preset for this layer.",
+            "Preset directory, active Milkdrop preset, and beat sensitivity for this layer.",
         ),
         parent_group="track",
     ),
@@ -621,12 +621,12 @@ SPECS: dict[RowKind, RowSpec] = {
     ),
     RowKind.TRACK_PRESET_LIST_ADD: RowSpec(
         affordance=RowAffordance.COMMAND,
-        panel_label="+ Add current",
+        panel_label="Add To Preset List",
         present_style=RowPresentStyle.FULL_LINE,
         apply_horizontal=noop_horizontal,
         apply_action=_apply_preset_list_add_action,
         fit_strategy=FitStrategy.NONE,
-        help_title="Add current preset",
+        help_title="Add To Preset List",
         help_description=(
             "Add the layer's currently playing or browsed preset to the end of the list.",
             "While switching is paused, that is the browsed preset.",

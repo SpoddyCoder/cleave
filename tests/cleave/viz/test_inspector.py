@@ -353,7 +353,6 @@ def test_layer_page_keeps_direct_rows_and_delete() -> None:
         RowKind.TRACK_SOLO,
         RowKind.TRACK_LOCKED,
         RowKind.TRACK_STEM,
-        RowKind.TRACK_BEAT,
     ]
     assert rows[-1].command_ids == ("layers.delete",)
     assert rows[-1].navigable is True
@@ -390,10 +389,7 @@ def test_dynamic_effect_and_preset_rows_keep_slot_identity() -> None:
         ("layer_1", 0),
         ("layer_1", 1),
     ]
-    assert rows[-1].command_ids == (
-        "layers.add_current_preset",
-        "layers.populate_presets",
-    )
+    assert rows[-1].command_ids == ("layers.populate_presets",)
 
 
 def test_section_lock_inspector_field_colors() -> None:

@@ -983,7 +983,7 @@ def test_preset_list_populate_is_full_line_action() -> None:
     assert field.panel_label == "Populate..."
     add_field = row_spec(RowKind.TRACK_PRESET_LIST_ADD)
     assert add_field.present_style == RowPresentStyle.FULL_LINE
-    assert add_field.panel_label == "+ Add current"
+    assert add_field.panel_label == "Add To Preset List"
 
 
 def test_resume_switching_row_only_while_paused() -> None:
@@ -1030,7 +1030,7 @@ def test_resume_switching_row_only_while_paused() -> None:
     index = resume_index(shown)
     assert index is not None
     assert shown[index].status == "Switching paused"
-    assert shown[index - 1].descriptor.kind is RowKind.TRACK_PRESET
+    assert shown[index - 1].command_ids == ("layers.add_current_preset",)
 
 
 def test_apply_field_horizontal_track_header_solo_and_expand() -> None:

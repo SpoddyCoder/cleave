@@ -500,7 +500,7 @@ TRACK_PRESET_LIST_SECTION = SectionDef(
     context="per_slot",
     children=(),
     append_dynamic_children=_append_preset_list_rows,
-    trailing_commands=("layers.add_current_preset", "layers.populate_presets"),
+    trailing_commands=("layers.populate_presets",),
 )
 
 PRESET_SWITCHING_USES_DURATION = ConditionalRowsDef(
@@ -543,12 +543,22 @@ PRESET_SWITCHING_ACTIVE = ConditionalRowsDef(
     ),
 )
 
+PRESET_SWITCHING_ADD_TO_LIST = ConditionalRowsDef(
+    name="preset_switching_add_to_list",
+    predicate=_preset_switching_active,
+    children=(
+        SectionNode(commands=("layers.add_current_preset",)),
+    ),
+)
+
 TRACK_MILKDROP_PRESET_SECTION = SectionDef(
     header_kind=RowKind.TRACK_MILKDROP_PRESET_HEADER,
     context="per_slot",
     children=(
         SectionNode(leaf_kind=RowKind.TRACK_PRESET_DIR),
         SectionNode(leaf_kind=RowKind.TRACK_PRESET),
+        SectionNode(leaf_kind=RowKind.TRACK_BEAT),
+        SectionNode(conditional=PRESET_SWITCHING_ADD_TO_LIST),
         SectionNode(conditional=PRESET_SWITCHING_PAUSED),
     ),
 )
@@ -586,7 +596,6 @@ TRACK_SECTION = SectionDef(
         SectionNode(leaf_kind=RowKind.TRACK_SOLO),
         SectionNode(leaf_kind=RowKind.TRACK_LOCKED),
         SectionNode(leaf_kind=RowKind.TRACK_STEM),
-        SectionNode(leaf_kind=RowKind.TRACK_BEAT),
         SectionNode(commands=("layers.delete",)),
     ),
 )
