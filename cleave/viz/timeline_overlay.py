@@ -44,16 +44,16 @@ from cleave.viz.timeline_panel_cache import (
     timeline_static_signature,
     timeline_upload_signature,
 )
-from cleave.viz.playback import format_mmss
 from cleave.viz.theme import (
     ARMED_BG,
-    BACKGROUND,
     BAR_GRID,
+    FOCUS_BORDER_ALPHA,
     HIGHLIGHT,
     LABEL,
     PLAYHEAD,
     PLAYHEAD_FLASH,
     REC_BG,
+    SELECTED_WASH_ALPHA,
     SONG_MARKER,
     SONG_MARKER_SELECTED,
     TIMELINE_BAR_ON,
@@ -352,104 +352,15 @@ def bar_tick_times_for_row(state: TimelineViewState, slot: str) -> list[float]:
     return [cue.t for cue in bar_cues_for_row(state, slot)]
 
 
-def selected_cue_readout_segments(
-    cue: SlotCue,
-    *,
-    show_role: bool = False,
-) -> list[tuple[str, tuple[int, int, int]]]:
-    """Label/value segments for the selected-cue badge readout."""
-    cut = cue.cut if cue.cut is not None else "none"
-    segments: list[tuple[str, tuple[int, int, int]]] = [
-        (f"[{format_mmss(cue.t)}] ", VALUE),
-    ]
-    if float(cue.level) <= LEVEL_EPS:
-        segments.extend(
-            [
-                ("cut: ", LABEL),
-                (str(cut), VALUE),
-            ]
-        )
-        return segments
-    blend = cue.blend if cue.blend is not None else "-"
-    opacity_pct = int(round(float(cue.level) * 100.0))
-    segments.extend(
-        [
-            ("opacity: ", LABEL),
-            (f"{opacity_pct}% ", VALUE),
-            ("cut: ", LABEL),
-            (f"{cut} ", VALUE),
-            ("blend: ", LABEL),
-            (f"{blend}" if not show_role else f"{blend} ", VALUE),
-        ]
-    )
-    if show_role:
-        role = cue.role if cue.role is not None else "-"
-        segments.extend(
-            [
-                ("role: ", LABEL),
-                (str(role), VALUE),
-            ]
-        )
-    return segments
-
-
-def selected_cue_readout_text(cue: SlotCue, *, show_role: bool = False) -> str:
-    """Plain-text form of the selected-cue badge readout."""
-    return "".join(
-        text for text, _ in selected_cue_readout_segments(cue, show_role=show_role)
-    )
-
-
-def cue_readout_pair_gap_px(font: pygame.font.Font) -> int:
-    """Extra space between readout pairs, on top of the trailing space."""
-    return font.size(" ")[0]
-
-
-def render_selected_cue_readout(
-    font: pygame.font.Font, cue: SlotCue, *, show_role: bool = False
-) -> pygame.Surface:
-    """Badge-strip surface: LABEL prefixes, VALUE for time and field values."""
-    segments = selected_cue_readout_segments(cue, show_role=show_role)
-    surfs = [font.render(text, True, color) for text, color in segments]
-    pair_gap = cue_readout_pair_gap_px(font)
-    # Value chunks already end with one space. Add another space before the next pair.
-    extras = [
-        pair_gap if color == VALUE and index + 1 < len(segments) else 0
-        for index, (_, color) in enumerate(segments)
-    ]
-    width = sum(surf.get_width() for surf in surfs) + sum(extras)
-    height = max((surf.get_height() for surf in surfs), default=0)
-    out = pygame.Surface((max(1, width), max(1, height)), pygame.SRCALPHA)
-    x = 0
-    for surf, extra in zip(surfs, extras):
-        out.blit(surf, (x, 0))
-        x += surf.get_width() + extra
-    return out
-
-
-def _selected_cue_for_focus(state: TimelineViewState) -> SlotCue | None:
-    if not state.layer_z_order:
-        return None
-    focus = state.focus_row
-    if focus < 0 or focus >= len(state.layer_z_order):
-        return None
-    slot = state.layer_z_order[focus]
-    selected_t = state.selected_cue_t.get(slot)
-    if selected_t is None:
-        return None
-    for cue in bar_cues_for_row(state, slot):
-        if cue.t == selected_t:
-            return cue
-    lane = _lane_for_view(state, slot)
-    for cue in lane.cues:
-        if cue.t == selected_t:
-            return cue
-    return None
-
-
-def focused_cue_readout_visible(state: TimelineViewState) -> bool:
-    """True when the focused row's selected cue draws the left-hand readout."""
-    return _selected_cue_for_focus(state) is not None
+def _draw_focus_outline(surface: pygame.Surface, rect: pygame.Rect) -> None:
+    """1px highlight outline at the shell's focus alpha, as on inspector rows."""
+    for edge in (
+        pygame.Rect(rect.x, rect.y, rect.w, 1),
+        pygame.Rect(rect.x, rect.bottom - 1, rect.w, 1),
+        pygame.Rect(rect.x, rect.y + 1, 1, rect.h - 2),
+        pygame.Rect(rect.right - 1, rect.y + 1, 1, rect.h - 2),
+    ):
+        blit_tint(surface, edge, HIGHLIGHT, alpha=FOCUS_BORDER_ALPHA)
 
 
 def _lerp_rgb(
@@ -1032,7 +943,7 @@ class TimelineOverlay:
             monitor_eye_x = stem_abbrev_x + layout.stem_abbrev_width
 
             if focused:
-                blit_tint(panel, row_rect, HIGHLIGHT)
+                blit_tint(panel, row_rect, HIGHLIGHT, alpha=SELECTED_WASH_ALPHA)
 
             abbrev_rect = pygame.Rect(
                 stem_abbrev_x, row_y, layout.stem_abbrev_width, row_h
@@ -1067,10 +978,6 @@ class TimelineOverlay:
                 timeline_level, line_height=row_h
             )
             panel.blit(timeline_icon, (timeline_eye_x, row_y))
-
-            bar_column_rect = pygame.Rect(bar_left, row_y, bar_width, row_h)
-            if focused:
-                blit_tint(panel, bar_column_rect, HIGHLIGHT)
 
             _draw_level_bar(
                 panel,
@@ -1109,22 +1016,8 @@ class TimelineOverlay:
                         CUE_TICK_WIDTH,
                     )
 
-            if focused and timeline_ui_metrics().bar_vertical_inset > 0:
-                blit_tint(
-                    panel,
-                    pygame.Rect(bar_left, row_y, bar_width, timeline_ui_metrics().bar_vertical_inset),
-                    HIGHLIGHT,
-                )
-                blit_tint(
-                    panel,
-                    pygame.Rect(
-                        bar_left,
-                        bar_rect.bottom,
-                        bar_width,
-                        timeline_ui_metrics().bar_vertical_inset,
-                    ),
-                    HIGHLIGHT,
-                )
+            if focused:
+                _draw_focus_outline(panel, row_rect)
 
         for marker_i, marker_t in enumerate(state.song_marker_times):
             marker_x = time_to_x(marker_t, bar_left, bar_width, state.duration_sec)
@@ -1430,21 +1323,14 @@ class TimelineOverlay:
         recording: bool,
         *,
         y_offset: int = 0,
-        cue_readout: pygame.Surface | None = None,
     ) -> tuple[int, int, int, int] | None:
-        """Selected-cue readout on the left and REC on the right, above the strip."""
+        """REC badge on the right, above the strip."""
         metrics = timeline_ui_metrics()
         pad_x = metrics.rec_badge_pad_x
         pad_y = metrics.rec_badge_pad_y
         badge_y = y_offset
         badge_h = font.get_height() + pad_y * 2
         rects: list[tuple[int, int, int, int]] = []
-
-        if cue_readout is not None:
-            readout_w = cue_readout.get_width() + pad_x * 2
-            pygame.draw.rect(surface, BACKGROUND, (0, badge_y, readout_w, badge_h))
-            surface.blit(cue_readout, (pad_x, badge_y + pad_y))
-            rects.append((0, badge_y, readout_w, badge_h))
 
         if recording:
             rec_surf = font.render("REC", True, VALUE)
@@ -1519,25 +1405,12 @@ class TimelineOverlay:
                 panel_y_offset=panel_y_offset,
             )
 
-        selected_cue = _selected_cue_for_focus(state)
-        focused_slot = (
-            state.layer_z_order[state.focus_row]
-            if 0 <= state.focus_row < len(state.layer_z_order)
-            else None
-        )
-        show_role = focused_slot is not None
-        cue_readout = (
-            render_selected_cue_readout(font, selected_cue, show_role=show_role)
-            if selected_cue is not None
-            else None
-        )
         badge_rect = self._draw_header_badges_on_surface(
             upload,
             font,
             layout.panel_w,
             state.recording,
             y_offset=badge_top,
-            cue_readout=cue_readout,
         )
         cache.last_badge_rect = badge_rect
 

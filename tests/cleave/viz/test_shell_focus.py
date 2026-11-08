@@ -134,3 +134,10 @@ def test_shell_focus_state_defaults() -> None:
     other = ShellFocusState()
     state.nav_expanded.add("overlay")
     assert other.nav_expanded == {"layers"}
+
+
+def test_reconcile_keeps_an_open_timeline_row_page() -> None:
+    ids = TOP_LEVEL_IDS
+    page = "timeline.row:a"
+    assert reconcile_nav_id(ids, page, ("a",), pages=(page,)) == page
+    assert reconcile_nav_id(ids, page, ("a",), pages=()) == "timeline"

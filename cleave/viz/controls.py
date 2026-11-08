@@ -52,7 +52,12 @@ from cleave.viz.focus_nav import (
     cursor_main_descriptor,
 )
 from cleave.viz.inspector_controls import InspectorControls
-from cleave.viz.navigator import build_navigator, layer_node_id
+from cleave.viz.navigator import (
+    build_navigator,
+    layer_node_id,
+    timeline_row_node_id,
+    timeline_row_slot_of,
+)
 from cleave.viz.navigator_controls import NavigatorControls
 from cleave.viz.shell_focus import (
     ShellFocusState,
@@ -528,9 +533,22 @@ class TuningControls:
                 # selection shows the settled tick, not a restart blink.
                 tl.selected_cue_flash_start_ms = None
             tl.focus_row = cursor.row
+            self._select_timeline_row_page(cursor.row)
             return
         if isinstance(cursor, MainFocus):
             self.song_markers.sync_focus(cursor.descriptor)
+
+    def _select_timeline_row_page(self, row: int) -> None:
+        """Show the strip row at *row* in the inspector, like a navigator row."""
+        order = self.session.layer_z_order
+        if not 0 <= row < len(order):
+            return
+        self.shell_focus.selected_id = timeline_row_node_id(order[row])
+
+    def _leave_timeline_row_page(self) -> None:
+        """Return a timeline row page to the Timeline page once the strip closes."""
+        if timeline_row_slot_of(self.shell_focus.selected_id) is not None:
+            self.shell_focus.selected_id = "timeline"
 
     def _on_editor_mode_changed(self) -> None:
         self._sync_live_compositor_format()
@@ -824,6 +842,7 @@ class TuningControls:
         tl.panel_open = False
         if self.shell_focus.region is ShellRegion.TIMELINE:
             self.set_shell_region(ShellRegion.NAVIGATOR)
+        self._leave_timeline_row_page()
 
     def exit_timeline_submenu(self) -> None:
         if self.shell_focus.region is ShellRegion.TIMELINE:

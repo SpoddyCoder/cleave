@@ -51,6 +51,8 @@ from cleave.viz.navigator import (
     build_navigator,
     navigator_row_bright,
     navigator_tree_rails,
+    timeline_row_slot_of,
+    timeline_row_title,
 )
 from cleave.viz.panel_notification import (
     PanelNotificationActive,
@@ -69,6 +71,7 @@ from cleave.viz.row_spec import (
     format_row_markers,
     format_row_position,
     format_row_value,
+    row_available,
     row_is_two_line,
     row_label,
     row_spec,
@@ -392,9 +395,13 @@ def selection_after_nav_collapse(
     """Selection after a twisty collapses *toggled_id*.
 
     *selected_id* stays unless the collapse hid it. A Settings or Project
-    page has no row, so a collapse never hides it.
+    page and a timeline row page have no row, so a collapse never hides them.
     """
-    if selected_id in visible_ids or is_config_page(selected_id):
+    if (
+        selected_id in visible_ids
+        or is_config_page(selected_id)
+        or timeline_row_slot_of(selected_id) is not None
+    ):
         return selected_id
     return toggled_id
 
@@ -840,11 +847,13 @@ def _inspector_row_selected(focus: Any, desc: Any) -> bool:
 def inspector_row_stepped(state: object, desc: RowDescriptor) -> bool:
     """Whether this inspector row paints side arrows and accepts a sideways drag.
 
-    The section-lock rule matches Left/Right.
+    The section-lock rule matches Left/Right. A row with nothing to edit
+    (``RowSpec.available``) has no arrows.
     """
     return (
         row_spec(desc.kind).apply_horizontal is not None
         and not section_lock_blocks_mutation(state, desc)
+        and row_available(state, desc)
     )
 
 
@@ -1975,7 +1984,13 @@ class ShellHost:
             self._controls.session,
             focus.nav_expanded,
         )
-        imgui.text(inspector_title(nodes, focus.selected_id))
+        row_slot = timeline_row_slot_of(focus.selected_id)
+        title = (
+            inspector_title(nodes, focus.selected_id)
+            if row_slot is None
+            else timeline_row_title(self._controls.session, row_slot)
+        )
+        imgui.text(title)
         _draw_inspector_divider()
         self._choice_rects = {}
         # Selectables grow by half the item spacing above and below, so this

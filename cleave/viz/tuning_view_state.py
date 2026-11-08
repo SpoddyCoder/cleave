@@ -98,6 +98,7 @@ from cleave.timeline_presets.song_marker_snap import (
     DEFAULT_TIMELINE_PRESET_SONG_MARKER_SNAP,
     TimelinePresetSongMarkerSnap,
 )
+from cleave.timeline import SlotCue, cue_at_time, empty_lane
 from cleave.timeline_presets.timeline_cuts import (
     DEFAULT_TIMELINE_PRESET_TIMELINE_CUTS,
     TimelinePresetTimelineCuts,
@@ -305,6 +306,22 @@ class TimelineBlock:
     locked: bool = DEFAULT_TIMELINE_LOCKED
     song_marker_times: tuple[float, ...] = ()
     song_marker_types: tuple[str, ...] = ()
+    # Selected strip cue per slot, for the timeline row inspector page.
+    selected_cues: dict[str, SlotCue] = field(default_factory=dict)
+
+
+def selected_timeline_cues(session: TuningSession) -> dict[str, SlotCue]:
+    """Each layer's selected strip cue, when that cue still exists."""
+    tl = session.timeline
+    cues: dict[str, SlotCue] = {}
+    for slot in session.layer_z_order:
+        cue_t = tl.selected_cue_t.get(slot)
+        if cue_t is None:
+            continue
+        cue = cue_at_time(tl.lanes.get(slot) or empty_lane(), cue_t)
+        if cue is not None:
+            cues[slot] = cue
+    return cues
 
 
 @dataclass
@@ -797,6 +814,7 @@ class TuningViewStateBuilder:
             song_marker_types=tuple(
                 m.marker_type for m in self.session.song_markers.markers
             ),
+            selected_cues=selected_timeline_cues(self.session),
         )
         return _ViewStateStructure(
             signature=signature,
@@ -966,6 +984,7 @@ class TuningViewStateBuilder:
                 song_marker_types=tuple(
                     m.marker_type for m in self.session.song_markers.markers
                 ),
+                selected_cues=selected_timeline_cues(self.session),
             ),
             settings=replace(
                 structure.settings,

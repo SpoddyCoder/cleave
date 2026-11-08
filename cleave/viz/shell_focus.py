@@ -19,6 +19,7 @@ from cleave.viz.navigator import (
     layer_node_id,
     layer_page_of,
     layer_slot_of,
+    timeline_row_slot_of,
 )
 from cleave.viz.row_kinds import RowDescriptor
 
@@ -166,8 +167,9 @@ def reconcile_nav_id(
     """Return *selected_id* when it is visible or one of *pages*, otherwise a
     nearby stand-in.
 
-    *pages* are the Settings and Project pages the menu can open; they have
-    no navigator row.
+    *pages* are the inspector pages with no navigator row: the Settings and
+    Project pages the menu can open, and the open strip's timeline rows.
+    A timeline row page that is not one of *pages* lands on ``timeline``.
 
     A missing page under a visible layer lands on that layer. A missing
     ``layer:<slot>`` or a page under a removed layer lands on the nearest
@@ -180,6 +182,8 @@ def reconcile_nav_id(
     ids = tuple(visible_ids)
     if selected_id in ids:
         return selected_id
+    if timeline_row_slot_of(selected_id) is not None and "timeline" in ids:
+        return "timeline"
     slot = layer_slot_of(selected_id)
     if slot is not None:
         if layer_page_of(selected_id) is not None and layer_node_id(slot) in ids:

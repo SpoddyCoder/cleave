@@ -17,6 +17,7 @@ from cleave.viz.navigator import (
     LAYER_PAGE_PRESET_SWITCHING,
     layer_page_of,
     layer_slot_of,
+    timeline_row_slot_of,
 )
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.row_sections import (
@@ -41,6 +42,7 @@ from cleave.viz.row_sections import (
     SONG_MARKERS_SECTION,
     TIMELINE_CUTS_SECTION,
     TIMELINE_PAGE_SECTION,
+    TIMELINE_ROW_SECTION,
     TRACK_COMPOSITING_SECTION,
     TRACK_EFFECTS_SECTION,
     TRACK_MILKDROP_PRESET_SECTION,
@@ -112,6 +114,8 @@ _LAYER_PAGE_SECTIONS: dict[str, SectionDef] = {
 
 def page_section(state: TuningViewState, node_id: str) -> SectionDef | None:
     """Section behind a navigator page, or None for a page with no rows."""
+    if timeline_row_slot_of(node_id) is not None:
+        return TIMELINE_ROW_SECTION
     if layer_slot_of(node_id) is None:
         return _PAGE_SECTIONS.get(node_id)
     page = layer_page_of(node_id)
@@ -128,15 +132,15 @@ def build_inspector_rows(
 ) -> tuple[InspectorRow, ...]:
     """Inspector rows for a navigator node.
 
-    Settings, Project, and an unknown id are empty. A layer not yet in
-    *state* (added this frame, after the view state was built) is empty
-    until the next frame. Button rows go to the bottom of the page in their
+    Settings, Project, and an unknown id are empty. A layer or timeline row
+    not yet in *state* (added this frame, after the view state was built) is
+    empty until the next frame. Button rows go to the bottom of the page in their
     page order, under a divider when other rows sit above them.
     """
     section = page_section(state, node_id)
     if section is None:
         return ()
-    slot = layer_slot_of(node_id)
+    slot = layer_slot_of(node_id) or timeline_row_slot_of(node_id)
     if slot is not None and slot not in state.tracks:
         return ()
     rows: list[InspectorRow] = []

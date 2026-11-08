@@ -16,6 +16,7 @@ from cleave.viz.row_spec import (
     apply_field_action,
     apply_field_choice,
     apply_field_horizontal,
+    row_available,
     row_spec,
     section_lock_blocks_mutation,
 )
@@ -125,6 +126,8 @@ class InspectorControls:
         if choice is None or section_lock_blocks_mutation(self._controls.session, desc):
             return
         view = self._view()
+        if not row_available(view, desc):
+            return
         labels = choice.labels()
         if choice_kind(len(labels)) is not ChoiceKind.COMBO:
             return

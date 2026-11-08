@@ -126,6 +126,15 @@ class RowSpec:
     blocked_by_section_lock: bool | None = None
     navigable_when_section_locked: bool | None = None
     choice: RowChoice | None = None
+    # False while the row has nothing to edit (a cue row with no cue): it
+    # draws disabled, without arrows. Its mutators must no-op then too.
+    available: Callable[[TuningViewState, RowDescriptor], bool] | None = None
+
+
+def row_available(state: object, desc: RowDescriptor) -> bool:
+    """Whether *desc* has something to edit now (``RowSpec.available``)."""
+    available = ROW_SPECS[desc.kind].available
+    return available is None or bool(available(state, desc))
 
 
 # Domain modules import RowSpec from this module, so assembly happens after the

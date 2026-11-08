@@ -16,6 +16,7 @@ from cleave.viz.row_spec import (
     FitStrategy,
     ROW_SPECS,
     RowPresentStyle,
+    row_available,
     row_blocked_by_section_lock,
     row_spec,
     section_lock_blocks_mutation,
@@ -89,8 +90,12 @@ def row_value_color_for(
         return LOCKED if locked_blocked else VALUE
 
     if kind in TIMELINE_SECTION_KINDS:
-        if not state.timeline.enabled:
+        if not state.timeline.enabled or not row_available(state, desc):
             return DISABLED
+        if affordance != RowAffordance.COMMAND:
+            # Cue rows carry a slot, but the layer's live visibility does not
+            # dim them.
+            return LOCKED if locked_blocked else VALUE
 
     if affordance == RowAffordance.COMMAND:
         if (

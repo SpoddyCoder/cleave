@@ -10,20 +10,11 @@ from cleave.blend_modes import BLEND_MODES, BlendMode
 from cleave.cue_roles import CUE_ROLES, CueRole
 from cleave.cut_types import CUT_TYPES, CutType
 from cleave.timeline import (
-    LEVEL_EDIT_MIN,
     LEVEL_EPS,
-    LEVEL_STEP_LARGE,
-    LEVEL_STEP_SMALL,
     SlotCue,
     canonicalize,
-    cue_at_time,
-    cue_editable_for_blend_role,
-    empty_lane,
-    levels_equal,
-    navigable_cue_times,
     should_accept_toggle,
     snap_placement_time,
-    update_lane_cue,
 )
 from cleave.viz.controls import SEEK_LONG, SEEK_SHORT, SEEK_TINY
 from cleave.viz.session import TuningSession
@@ -35,6 +26,25 @@ from cleave.viz.layer_visibility import (
     snapshot_monitor_from_output,
 )
 from cleave.viz.playback import PlaybackState, current_sec, seek, toggle_pause
+from cleave.viz.timeline_cue_edits import (
+    cue_edits_allowed,
+    cue_selection_allowed,
+    nudge_cue_level,
+    selected_cue,
+    set_cue_blend,
+    set_cue_cut,
+    set_cue_role,
+    step_cue_selection,
+)
+
+def _next_option(options: tuple, current: object) -> object:
+    """Option after *current*, wrapping; the first when *current* is not listed."""
+    try:
+        index = options.index(current)
+    except ValueError:
+        index = 0
+    return options[(index + 1) % len(options)]
+
 
 _LAYER_KEY_INDEX: dict[int, int] = {
     pygame.K_1: 0,
@@ -326,44 +336,21 @@ class TimelineControls:
     def _focused_slot(self) -> str:
         return self.session.layer_z_order[self.session.timeline.focus_row]
 
-    def _cue_selection_allowed(self) -> bool:
-        return not self.session.timeline.recording
-
     def _cue_edits_allowed(self) -> bool:
-        tl = self.session.timeline
-        return not tl.locked and not tl.recording
+        return cue_edits_allowed(self.session)
 
     def _step_selected_cue(self, *, forward: bool) -> None:
-        if not self._cue_selection_allowed():
-            return
-        tl = self.session.timeline
-        slot = self._focused_slot()
-        lane = tl.lanes.get(slot) or empty_lane()
-        times = navigable_cue_times(lane)
-        if not times:
-            return
-        selected = tl.selected_cue_t.get(slot)
-        if selected is None or selected not in times:
-            playhead = current_sec(self.playback, self.duration_sec)
-            if forward:
-                pick = next((t for t in times if t >= playhead), times[-1])
-            else:
-                pick = next((t for t in reversed(times) if t <= playhead), times[0])
-            self._set_selected_cue(slot, pick)
-            return
-        index = times.index(selected)
-        if forward:
-            index = min(index + 1, len(times) - 1)
-        else:
-            index = max(index - 1, 0)
-        self._set_selected_cue(slot, times[index])
+        step_cue_selection(
+            self.session,
+            self._focused_slot(),
+            forward=forward,
+            playhead_sec=current_sec(self.playback, self.duration_sec),
+        )
 
     def _seek_to_selected_cue(self) -> None:
-        if not self._cue_selection_allowed():
+        if not cue_selection_allowed(self.session):
             return
-        tl = self.session.timeline
-        slot = self._focused_slot()
-        target = tl.selected_cue_t.get(slot)
+        target = self.session.timeline.selected_cue_t.get(self._focused_slot())
         if target is None:
             return
         current = current_sec(self.playback, self.duration_sec)
@@ -373,124 +360,33 @@ class TimelineControls:
         else:
             seek(self.playback, delta, self.duration_sec)
 
-    def _set_selected_cue(self, slot: str, cue_t: float) -> None:
-        tl = self.session.timeline
-        if tl.selected_cue_t.get(slot) == cue_t:
-            return
-        tl.selected_cue_t[slot] = cue_t
-        tl.selected_cue_flash_start_ms = pygame.time.get_ticks()
-
-    def _selected_cue(self) -> tuple[str, SlotCue] | None:
-        tl = self.session.timeline
-        slot = self._focused_slot()
-        selected = tl.selected_cue_t.get(slot)
-        if selected is None:
-            return None
-        lane = tl.lanes.get(slot) or empty_lane()
-        cue = cue_at_time(lane, selected)
-        if cue is None:
-            return None
-        return slot, cue
-
     def _nudge_selected_cue_level(self, *, forward: bool, large: bool) -> None:
         """Adjust selected on-cue timeline opacity (multiplies into layer opacity)."""
-        if not self._cue_edits_allowed():
-            return
-        selected = self._selected_cue()
-        if selected is None:
-            return
-        slot, cue = selected
-        if not cue_editable_for_blend_role(cue):
-            return
-        # Integer percent math matches the layer opacity fader (1% / 10%).
-        step_pct = int(round(
-            (LEVEL_STEP_LARGE if large else LEVEL_STEP_SMALL) * 100.0
-        ))
-        min_pct = int(round(LEVEL_EDIT_MIN * 100.0))
-        pct = int(round(float(cue.level) * 100.0))
-        new_pct = max(min_pct, min(100, pct + (step_pct if forward else -step_pct)))
-        new_level = new_pct / 100.0
-        if levels_equal(new_level, cue.level):
-            return
-        self._apply_selected_cue_update(
-            slot,
-            cue.t,
-            blend=cue.blend,
-            role=cue.role,
-            cut=cue.cut,
-            level=new_level,
-        )
+        nudge_cue_level(self.session, self._focused_slot(), forward=forward, large=large)
 
     def _cycle_selected_cue_blend(self) -> None:
-        if not self._cue_edits_allowed():
-            return
-        selected = self._selected_cue()
-        if selected is None:
-            return
-        slot, cue = selected
-        if not cue_editable_for_blend_role(cue):
+        slot = self._focused_slot()
+        cue = selected_cue(self.session, slot)
+        if cue is None:
             return
         options: tuple[BlendMode | None, ...] = (None, *BLEND_MODES)
-        try:
-            index = options.index(cue.blend)
-        except ValueError:
-            index = 0
-        index = (index + 1) % len(options)
-        self._apply_selected_cue_update(
-            slot, cue.t, blend=options[index], role=cue.role, cut=cue.cut
-        )
+        set_cue_blend(self.session, slot, _next_option(options, cue.blend))
 
     def _cycle_selected_cue_role(self) -> None:
-        if not self._cue_edits_allowed():
-            return
-        selected = self._selected_cue()
-        if selected is None:
-            return
-        slot, cue = selected
-        if not cue_editable_for_blend_role(cue):
+        slot = self._focused_slot()
+        cue = selected_cue(self.session, slot)
+        if cue is None:
             return
         options: tuple[CueRole | None, ...] = (None, *CUE_ROLES)
-        try:
-            index = options.index(cue.role)
-        except ValueError:
-            index = 0
-        index = (index + 1) % len(options)
-        self._apply_selected_cue_update(
-            slot, cue.t, blend=cue.blend, role=options[index], cut=cue.cut
-        )
+        set_cue_role(self.session, slot, _next_option(options, cue.role))
 
     def _cycle_selected_cue_cut(self) -> None:
-        if not self._cue_edits_allowed():
+        slot = self._focused_slot()
+        cue = selected_cue(self.session, slot)
+        if cue is None:
             return
-        selected = self._selected_cue()
-        if selected is None:
-            return
-        slot, cue = selected
         current: CutType = cue.cut if cue.cut in CUT_TYPES else "none"
-        index = (CUT_TYPES.index(current) + 1) % len(CUT_TYPES)
-        self._apply_selected_cue_update(
-            slot, cue.t, blend=cue.blend, role=cue.role, cut=CUT_TYPES[index]
-        )
-
-    def _apply_selected_cue_update(
-        self,
-        slot: str,
-        cue_t: float,
-        *,
-        blend: BlendMode | None,
-        role: CueRole | None,
-        cut: CutType | None = None,
-        level: float | None = None,
-    ) -> None:
-        tl = self.session.timeline
-        lane = tl.lanes.get(slot) or empty_lane()
-        updated = update_lane_cue(
-            lane, cue_t, blend=blend, role=role, level=level, cut=cut
-        )
-        tl.lanes[slot] = updated
-        if cue_t not in navigable_cue_times(updated):
-            tl.selected_cue_t.pop(slot, None)
-            tl.selected_cue_flash_start_ms = None
+        set_cue_cut(self.session, slot, _next_option(CUT_TYPES, current))
 
     def _toggle_arm(self) -> None:
         slot = self._focused_slot()

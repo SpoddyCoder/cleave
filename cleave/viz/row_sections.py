@@ -600,6 +600,25 @@ TRACK_SECTION = SectionDef(
     ),
 )
 
+TIMELINE_CUE_SECTION = SectionDef(
+    header_kind=RowKind.TIMELINE_CUE_HEADER,
+    context="per_slot",
+    children=(
+        SectionNode(leaf_kind=RowKind.TIMELINE_CUE_TIME),
+        SectionNode(leaf_kind=RowKind.TIMELINE_CUE_OPACITY),
+        SectionNode(leaf_kind=RowKind.TIMELINE_CUE_CUT),
+        SectionNode(leaf_kind=RowKind.TIMELINE_CUE_BLEND),
+        SectionNode(leaf_kind=RowKind.TIMELINE_CUE_ROLE),
+    ),
+)
+
+# Page of one timeline strip row, shown while that row is selected.
+TIMELINE_ROW_SECTION = SectionDef(
+    header_kind=None,
+    context="per_slot",
+    children=(SectionNode(subsection=TIMELINE_CUE_SECTION),),
+)
+
 SONG_MARKERS_SECTION = SectionDef(
     header_kind=RowKind.SONG_MARKERS_HEADER,
     context="global",
@@ -746,6 +765,12 @@ TIMELINE_SECTION_KINDS = frozenset(
         RowKind.TIMELINE_SOFT_CUT_FADE_OUT,
         RowKind.TIMELINE_SOFT_CUT_CROSSFADE,
         RowKind.TIMELINE_SET_CUT_TYPE,
+        RowKind.TIMELINE_CUE_HEADER,
+        RowKind.TIMELINE_CUE_TIME,
+        RowKind.TIMELINE_CUE_OPACITY,
+        RowKind.TIMELINE_CUE_CUT,
+        RowKind.TIMELINE_CUE_BLEND,
+        RowKind.TIMELINE_CUE_ROLE,
     }
 )
 

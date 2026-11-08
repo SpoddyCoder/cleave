@@ -13,6 +13,8 @@ from cleave.viz.navigator import (
     ancestor_ids,
     build_navigator,
     root_id,
+    timeline_row_node_id,
+    timeline_row_slot_of,
     visible_top_level_ids,
 )
 from cleave.viz.row_hotkeys import handle_row_hotkey, node_control_descriptor
@@ -142,6 +144,10 @@ class NavigatorControls:
 
     def _tree_step(self, delta: int) -> None:
         focus = self._controls.shell_focus
+        if timeline_row_slot_of(focus.selected_id) is not None:
+            # A strip row has no navigator row; arrows start from Timeline.
+            self.select("timeline")
+            return
         self.select(tree_nav_id(self._visible_ids(), focus.selected_id, delta))
 
     def _horizontal(self, key: int) -> None:
@@ -179,7 +185,14 @@ class NavigatorControls:
         return None
 
     def _pages(self) -> tuple[str, ...]:
-        return available_config_page_ids(self._controls.session.settings.editor_mode)
+        """Inspector pages with no navigator row: config pages and strip rows."""
+        session = self._controls.session
+        pages = available_config_page_ids(session.settings.editor_mode)
+        if not session.timeline.panel_open:
+            return pages
+        return pages + tuple(
+            timeline_row_node_id(slot) for slot in session.layer_z_order
+        )
 
     def _visible_ids(self) -> tuple[str, ...]:
         return tuple(node.id for node in self._nodes())

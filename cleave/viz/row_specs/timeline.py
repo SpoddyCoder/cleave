@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from typing import TYPE_CHECKING
+from collections.abc import Callable, Sequence
+from typing import TYPE_CHECKING, TypeVar
 
 from cleave.choice import step_choice
 from cleave.config_schema.layers import hard_cut_enabled_display
@@ -27,10 +27,33 @@ from cleave.timeline_presets import (
     TIMELINE_PRESET_HELP_ENTRIES,
     TIMELINE_RESET_HELP_ENTRIES,
 )
+from cleave.blend_modes import BLEND_MODES, BlendMode
+from cleave.choice import choice_index
+from cleave.cue_roles import CUE_ROLES, CueRole
+from cleave.cut_types import CUT_TYPES, CutType
+from cleave.timeline import SlotCue, cue_editable_for_blend_role
 from cleave.viz.commands import command_by_id
+from cleave.viz.playback import current_sec, format_mmss
+from cleave.viz.timeline_cue_edits import (
+    cue_selection_allowed,
+    nudge_cue_level,
+    selected_cue,
+    set_cue_blend,
+    set_cue_cut,
+    set_cue_role,
+    step_cue_selection,
+)
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
 from cleave.viz.material_icons import DELETE_GLYPH
-from cleave.viz.row_spec import FitStrategy, RowNavButton, RowPresentStyle, RowSpec
+from cleave.viz.row_spec import (
+    ChoiceJump,
+    FieldMutator,
+    FitStrategy,
+    RowChoice,
+    RowNavButton,
+    RowPresentStyle,
+    RowSpec,
+)
 from cleave.viz.row_specs.common import lock_text, on_off_text
 from cleave.viz.tuning_view_state import TuningViewState
 
@@ -38,6 +61,9 @@ from cleave.config_schema.timeline import TIMELINE_PLACEMENT_SNAP_OPTIONS
 from cleave.viz.row_specs.common import bool_choice, options_choice
 if TYPE_CHECKING:
     from cleave.viz.controls import TuningControls
+    from cleave.viz.session import TuningSession
+
+T = TypeVar("T")
 
 def _format_timeline_bar_phase(
     state: TuningViewState, _desc: RowDescriptor
@@ -343,6 +369,191 @@ def _apply_timeline_locked(
 ) -> None:
     if controls.session.timeline.locked != forward:
         controls.toggle_timeline_locked()
+
+
+def _selected_cue(state: TuningViewState, desc: RowDescriptor) -> SlotCue | None:
+    if desc.slot is None:
+        return None
+    return state.timeline.selected_cues.get(desc.slot)
+
+
+def _selected_on_cue(state: TuningViewState, desc: RowDescriptor) -> SlotCue | None:
+    cue = _selected_cue(state, desc)
+    if cue is None or not cue_editable_for_blend_role(cue):
+        return None
+    return cue
+
+
+def _cue_time_available(state: TuningViewState, _desc: RowDescriptor) -> bool:
+    return not state.timeline_recording
+
+
+def _cue_available(state: TuningViewState, desc: RowDescriptor) -> bool:
+    return not state.timeline_recording and _selected_cue(state, desc) is not None
+
+
+def _on_cue_available(state: TuningViewState, desc: RowDescriptor) -> bool:
+    return not state.timeline_recording and _selected_on_cue(state, desc) is not None
+
+
+def _format_cue_time(state: TuningViewState, desc: RowDescriptor) -> str:
+    cue = _selected_cue(state, desc)
+    return "none" if cue is None else format_mmss(cue.t)
+
+
+def _apply_cue_time(
+    controls: TuningControls, desc: RowDescriptor, forward: bool, _large: bool
+) -> None:
+    """Left/Right select the previous or next cue on the row."""
+    assert desc.slot is not None
+    step_cue_selection(
+        controls.session,
+        desc.slot,
+        forward=forward,
+        playhead_sec=current_sec(controls.playback, controls.duration_sec),
+    )
+
+
+def _seek_to_cue(controls: TuningControls, desc: RowDescriptor) -> None:
+    assert desc.slot is not None
+    cue = selected_cue(controls.session, desc.slot)
+    if cue is not None and cue_selection_allowed(controls.session):
+        controls.seek_to(cue.t)
+
+
+def _format_cue_opacity(state: TuningViewState, desc: RowDescriptor) -> str:
+    cue = _selected_cue(state, desc)
+    if cue is None:
+        return "-"
+    if not cue_editable_for_blend_role(cue):
+        return "off"
+    return f"{int(round(float(cue.level) * 100.0))}%"
+
+
+def _apply_cue_opacity(
+    controls: TuningControls, desc: RowDescriptor, forward: bool, large: bool
+) -> None:
+    assert desc.slot is not None
+    nudge_cue_level(controls.session, desc.slot, forward=forward, large=large)
+
+
+def _cut_value(cue: SlotCue | None) -> CutType:
+    return cue.cut if cue is not None and cue.cut in CUT_TYPES else "none"
+
+
+_BLEND_OPTIONS: tuple[BlendMode | None, ...] = (None, *BLEND_MODES)
+_ROLE_OPTIONS: tuple[CueRole | None, ...] = (None, *CUE_ROLES)
+
+
+def _blend_display(blend: BlendMode | None) -> str:
+    # No cue blend holds the layer's own blend mode.
+    return "layer" if blend is None else blend
+
+
+def _role_display(role: CueRole | None) -> str:
+    return "none" if role is None else role
+
+
+def _cue_cut_value(state: TuningViewState, desc: RowDescriptor) -> CutType:
+    return _cut_value(_selected_cue(state, desc))
+
+
+def _cue_blend_value(state: TuningViewState, desc: RowDescriptor) -> BlendMode | None:
+    cue = _selected_on_cue(state, desc)
+    return None if cue is None else cue.blend
+
+
+def _cue_role_value(state: TuningViewState, desc: RowDescriptor) -> CueRole | None:
+    cue = _selected_on_cue(state, desc)
+    return None if cue is None else cue.role
+
+
+def _format_cue_cut(state: TuningViewState, desc: RowDescriptor) -> str:
+    return "-" if _selected_cue(state, desc) is None else _cue_cut_value(state, desc)
+
+
+def _format_cue_blend(state: TuningViewState, desc: RowDescriptor) -> str:
+    if _selected_on_cue(state, desc) is None:
+        return "-"
+    return _blend_display(_cue_blend_value(state, desc))
+
+
+def _format_cue_role(state: TuningViewState, desc: RowDescriptor) -> str:
+    if _selected_on_cue(state, desc) is None:
+        return "-"
+    return _role_display(_cue_role_value(state, desc))
+
+
+def _cue_option_rows(
+    options: Sequence[T],
+    value: Callable[[SlotCue | None], T],
+    write: Callable[[TuningSession, str, T], None],
+) -> tuple[FieldMutator, ChoiceJump]:
+    """Left/Right and a list pick for one cue field, clamped at the ends."""
+
+    def move(controls: TuningControls, desc: RowDescriptor, delta: int) -> None:
+        assert desc.slot is not None
+        cue = selected_cue(controls.session, desc.slot)
+        if cue is None:
+            return
+        index = choice_index(options, value(cue)) + delta
+        write(
+            controls.session,
+            desc.slot,
+            options[max(0, min(len(options) - 1, index))],
+        )
+
+    def horizontal(
+        controls: TuningControls, desc: RowDescriptor, forward: bool, _large: bool
+    ) -> None:
+        move(controls, desc, 1 if forward else -1)
+
+    return horizontal, move
+
+
+_apply_cue_cut, _jump_cue_cut = _cue_option_rows(CUT_TYPES, _cut_value, set_cue_cut)
+_apply_cue_blend, _jump_cue_blend = _cue_option_rows(
+    _BLEND_OPTIONS,
+    lambda cue: None if cue is None else cue.blend,
+    set_cue_blend,
+)
+_apply_cue_role, _jump_cue_role = _cue_option_rows(
+    _ROLE_OPTIONS,
+    lambda cue: None if cue is None else cue.role,
+    set_cue_role,
+)
+
+
+def _cue_spec(
+    label: str,
+    format_value: Callable[[TuningViewState, RowDescriptor], str],
+    apply_horizontal: FieldMutator,
+    available: Callable[[TuningViewState, RowDescriptor], bool],
+    *,
+    help_title: str,
+    help_entries: tuple[tuple[str, str], ...],
+    help_description: tuple[str, ...],
+    choice: RowChoice | None = None,
+    apply_action: Callable[[TuningControls, RowDescriptor], None] | None = None,
+    repeatable: bool = False,
+    blocked_by_section_lock: bool = True,
+) -> RowSpec:
+    """One field of the selected strip cue. Edits match the strip's cue keys."""
+    return RowSpec(
+        affordance=RowAffordance.VALUE_STEP,
+        panel_label=label,
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=format_value,
+        apply_horizontal=apply_horizontal,
+        apply_action=apply_action,
+        choice=choice,
+        available=available,
+        repeatable=repeatable,
+        help_title=help_title,
+        help_entries=help_entries,
+        help_description=help_description,
+        blocked_by_section_lock=blocked_by_section_lock,
+    )
 
 
 SPECS: dict[RowKind, RowSpec] = {
@@ -687,5 +898,99 @@ SPECS: dict[RowKind, RowSpec] = {
             "Left/Right or the list chooses type; the bin deletes.",
         ),
         blocked_by_section_lock=True,
+    ),
+    RowKind.TIMELINE_CUE_HEADER: RowSpec(
+        affordance=RowAffordance.HEADING,
+        panel_label="selected cue",
+        present_style=RowPresentStyle.HEADING,
+        fit_strategy=FitStrategy.NONE,
+        navigable=False,
+    ),
+    RowKind.TIMELINE_CUE_TIME: _cue_spec(
+        "time",
+        _format_cue_time,
+        _apply_cue_time,
+        _cue_time_available,
+        apply_action=_seek_to_cue,
+        # Selecting and seeking stay open on a locked timeline, as on the strip.
+        blocked_by_section_lock=False,
+        help_title="Selected cue",
+        help_entries=(
+            ("Left/Right", "select previous / next cue"),
+            ("Enter", "seek to cue"),
+        ),
+        help_description=(
+            "The cue selected on this timeline row.",
+            "With none selected, Right picks the next cue after the playhead.",
+        ),
+    ),
+    RowKind.TIMELINE_CUE_OPACITY: _cue_spec(
+        "opacity",
+        _format_cue_opacity,
+        _apply_cue_opacity,
+        _on_cue_available,
+        repeatable=True,
+        help_title="Cue opacity",
+        help_entries=(
+            ("Left/Right", "1% step"),
+            ("PageUp/PageDown", "10% step"),
+        ),
+        help_description=(
+            "Timeline opacity from this cue on, multiplied into the layer's.",
+            "Off cues have no opacity.",
+        ),
+    ),
+    RowKind.TIMELINE_CUE_CUT: _cue_spec(
+        "cut",
+        _format_cue_cut,
+        _apply_cue_cut,
+        _cue_available,
+        choice=options_choice(
+            CUT_TYPES,
+            _cue_cut_value,
+            jump=_jump_cue_cut,
+        ),
+        help_title="Cue cut",
+        help_entries=(("Left/Right", "choose none / hard / soft"),),
+        help_description=(
+            "How the layer fades at this cue: none, a hard cut, or a soft cut.",
+            "Fade lengths are on Timeline > Cue Fades.",
+        ),
+    ),
+    RowKind.TIMELINE_CUE_BLEND: _cue_spec(
+        "blend",
+        _format_cue_blend,
+        _apply_cue_blend,
+        _on_cue_available,
+        choice=options_choice(
+            _BLEND_OPTIONS,
+            _cue_blend_value,
+            _blend_display,
+            jump=_jump_cue_blend,
+        ),
+        help_title="Cue blend",
+        help_entries=(("Left/Right", "choose blend mode"),),
+        help_description=(
+            "Blend mode from this cue on. Layer keeps the layer's own blend.",
+            "Off cues have no blend.",
+        ),
+    ),
+    RowKind.TIMELINE_CUE_ROLE: _cue_spec(
+        "role",
+        _format_cue_role,
+        _apply_cue_role,
+        _on_cue_available,
+        choice=options_choice(
+            _ROLE_OPTIONS,
+            _cue_role_value,
+            _role_display,
+            jump=_jump_cue_role,
+        ),
+        help_title="Cue role",
+        help_entries=(("Left/Right", "choose role"),),
+        help_description=(
+            "Role from this cue on: bed, pulse, lead, or accent.",
+            "Off cues have no role.",
+        ),
     ),
 }

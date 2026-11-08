@@ -71,11 +71,6 @@ from cleave.viz.timeline_overlay import (
     row_prefix_width,
     selected_cue_flash_active,
     selected_cue_flash_bright,
-    cue_readout_pair_gap_px,
-    focused_cue_readout_visible,
-    render_selected_cue_readout,
-    selected_cue_readout_segments,
-    selected_cue_readout_text,
     selected_cue_tick_color,
     stem_abbrev_label,
     stem_label_text,
@@ -1001,73 +996,6 @@ def test_bar_without_high_water_mark_behaves_as_before() -> None:
     assert _bar_visible_at(state, slot, 30.0) is True
 
 
-def test_focused_cue_readout_visible_follows_focused_row() -> None:
-    hidden = _view_state(layer_z_order=["layer_1"], focus_row=0)
-    assert focused_cue_readout_visible(hidden) is False
-    shown = _view_state(
-        layer_z_order=["layer_1"],
-        lanes={
-            "layer_1": TimelineLane(
-                baseline=0.0,
-                cues=[SlotCue(t=10.0, level=1.0)],
-            )
-        },
-        focus_row=0,
-        selected_cue_t={"layer_1": 10.0},
-    )
-    assert focused_cue_readout_visible(shown) is True
-    other_row = _view_state(
-        layer_z_order=["layer_1", "layer_2"],
-        lanes={
-            "layer_1": TimelineLane(
-                baseline=0.0,
-                cues=[SlotCue(t=10.0, level=1.0)],
-            )
-        },
-        focus_row=1,
-        selected_cue_t={"layer_1": 10.0},
-    )
-    assert focused_cue_readout_visible(other_row) is False
-
-
-def test_selected_cue_readout_pair_gap_is_one_extra_space() -> None:
-    pygame.init()
-    font = overlay_font(timeline_ui_metrics().font_size)
-    cue = SlotCue(t=65.0, level=1.0, blend="add", role="lead", cut="soft")
-    segments = selected_cue_readout_segments(cue, show_role=True)
-    surf = render_selected_cue_readout(font, cue, show_role=True)
-    text_w = sum(font.size(text)[0] for text, _ in segments)
-    separators = sum(
-        1
-        for index, (_, color) in enumerate(segments)
-        if color == VALUE and index + 1 < len(segments)
-    )
-    assert separators == 4
-    assert cue_readout_pair_gap_px(font) == font.size(" ")[0]
-    assert surf.get_width() == text_w + separators * cue_readout_pair_gap_px(font)
-
-
-def test_selected_cue_readout_text_format() -> None:
-    assert selected_cue_readout_text(
-        SlotCue(t=65.0, level=1.0, blend="add", role="lead", cut="soft")
-    ) == "[01:05] opacity: 100% cut: soft blend: add"
-    assert selected_cue_readout_text(
-        SlotCue(t=65.0, level=1.0, blend="add", role="lead", cut="soft"),
-        show_role=True,
-    ) == "[01:05] opacity: 100% cut: soft blend: add role: lead"
-    assert selected_cue_readout_text(
-        SlotCue(t=0.0, level=0.25, blend=None, role=None),
-        show_role=True,
-    ) == "[00:00] opacity: 25% cut: none blend: - role: -"
-    assert selected_cue_readout_text(
-        SlotCue(t=65.0, level=0.0, cut="hard"),
-    ) == "[01:05] cut: hard"
-    assert selected_cue_readout_text(
-        SlotCue(t=65.0, level=0.0, blend="add", role="lead", cut="hard"),
-        show_role=True,
-    ) == "[01:05] cut: hard"
-
-
 def test_draw_with_selected_cue_and_role_does_not_crash() -> None:
     pygame.init()
     overlay = TimelineOverlay()
@@ -1089,7 +1017,8 @@ def test_draw_with_selected_cue_and_role_does_not_crash() -> None:
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
     _draw(overlay, surface, state)
     assert overlay.panel_rect is not None
-    assert overlay.header_badge_rect is not None
+    # The selected cue shows in the inspector; only REC uses the badge row.
+    assert overlay.header_badge_rect is None
 
 
 def test_role_glyph_not_drawn_on_off_cue() -> None:

@@ -25,6 +25,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- Selecting a timeline strip row opens it in the inspector, titled like `Timeline > 1  Drums`, the way a navigator row opens its page. The selected cue's time, opacity, cut, blend, and role show there instead of above the strip, and can be edited there: Left/Right on time selects the previous or next cue and Enter seeks to it. Opacity, blend, and role are unavailable on off cues.
+- The selected timeline row uses the same quiet highlight wash and outline as navigator and inspector rows.
 - Editor text and spacing are 20% larger at the default 100% UI scale.
 - A thin divider sits under the inspector's page title. Buttons on a page always sit at the bottom, below a divider, instead of among its settings.
 - Left/Right on a choice stops at the first or last option instead of wrapping round, in the inspector and in dialogs. On/off rows go off with Left and on with Right, so pressing the same key again leaves them alone.

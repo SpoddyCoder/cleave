@@ -7,17 +7,23 @@ import pytest
 from cleave.effects.registry import effect_roster
 from cleave.viz.focus_nav import MainFocus
 from cleave.viz.inspector import build_inspector_rows
+from cleave.timeline import SlotCue
 from cleave.viz.navigator import (
     LAYER_PAGE_MILKDROP_PRESET,
     layer_node_id,
     layer_page_node_id,
+    timeline_row_node_id,
 )
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.row_present_renderers import inspector_field_colors
 from cleave.viz.row_sections import SECTION_SWITCH_KINDS
-from cleave.viz.row_spec import format_row_value
-from cleave.viz.theme import VALUE, LOCKED
-from cleave.viz.tuning_view_state import SettingsBlock, TuningViewState
+from cleave.viz.row_spec import format_row_value, row_available
+from cleave.viz.theme import DISABLED, VALUE, LOCKED
+from cleave.viz.tuning_view_state import (
+    SettingsBlock,
+    TimelineBlock,
+    TuningViewState,
+)
 from tests.support.config import TEST_LAYER_STEMS
 from tests.support.viz import make_track_block
 
@@ -484,3 +490,57 @@ def test_paused_switching_button_moves_below_preset_fields() -> None:
     assert rows[-3].divider
     assert rows[-1].status == "Switching paused"
 
+
+
+_CUE_KINDS = [
+    RowKind.TIMELINE_CUE_TIME,
+    RowKind.TIMELINE_CUE_OPACITY,
+    RowKind.TIMELINE_CUE_CUT,
+    RowKind.TIMELINE_CUE_BLEND,
+    RowKind.TIMELINE_CUE_ROLE,
+]
+
+
+def _cue_values(state: TuningViewState, slot: str) -> list[str]:
+    return [
+        format_row_value(state, RowDescriptor(kind, slot=slot)) for kind in _CUE_KINDS
+    ]
+
+
+def test_timeline_row_page_lists_the_selected_cue() -> None:
+    state = _layer_view(("layer_1",))
+    rows = build_inspector_rows(state, timeline_row_node_id("layer_1"))
+    assert _headings(rows) == [RowKind.TIMELINE_CUE_HEADER]
+    assert _kinds(rows) == _CUE_KINDS
+    assert all(row.descriptor.slot == "layer_1" for row in rows)
+    assert [row.navigable for row in rows if not row.is_heading] == [True] * 5
+    assert _cue_values(state, "layer_1") == ["none", "-", "-", "-", "-"]
+
+
+def test_timeline_row_page_formats_on_and_off_cues() -> None:
+    state = _layer_view(("layer_1", "layer_2"))
+    state.timeline = TimelineBlock(
+        selected_cues={
+            "layer_1": SlotCue(t=65.0, level=0.25, blend="add", role="lead", cut="soft"),
+            "layer_2": SlotCue(t=5.0, level=0.0, blend="add", role="lead", cut="hard"),
+        }
+    )
+    assert _cue_values(state, "layer_1") == ["01:05", "25%", "soft", "add", "lead"]
+    assert _cue_values(state, "layer_2") == ["00:05", "off", "hard", "-", "-"]
+    # Off cues have no opacity, blend, or role to edit.
+    assert [
+        row_available(state, RowDescriptor(kind, slot="layer_2")) for kind in _CUE_KINDS
+    ] == [True, False, True, False, False]
+    _label, value = inspector_field_colors(
+        state, RowDescriptor(RowKind.TIMELINE_CUE_OPACITY, slot="layer_2")
+    )
+    assert value == DISABLED
+    _label, value = inspector_field_colors(
+        state, RowDescriptor(RowKind.TIMELINE_CUE_TIME, slot="layer_1")
+    )
+    assert value == VALUE
+
+
+def test_timeline_row_page_for_a_missing_layer_is_empty() -> None:
+    state = _layer_view(("layer_1",))
+    assert build_inspector_rows(state, timeline_row_node_id("gone")) == ()

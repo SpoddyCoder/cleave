@@ -18,6 +18,8 @@ if TYPE_CHECKING:
 
 
 LAYER_ID_PREFIX = "layer:"
+# Inspector page of one timeline strip row. It has no navigator row.
+TIMELINE_ROW_ID_PREFIX = "timeline.row:"
 SOLO_BADGE = "solo"
 HIDDEN_BADGE = "hidden"
 DEFAULT_SELECTED_ID = "layers"
@@ -120,6 +122,27 @@ def layer_node_id(slot: str) -> str:
 def layer_page_node_id(slot: str, page: str) -> str:
     """Navigator id for one page nested under a layer."""
     return f"{layer_node_id(slot)}:{page}"
+
+
+def timeline_row_node_id(slot: str) -> str:
+    """Inspector page id for the timeline strip row of *slot*."""
+    return f"{TIMELINE_ROW_ID_PREFIX}{slot}"
+
+
+def timeline_row_slot_of(node_id: str) -> str | None:
+    """Slot of a timeline row page, or None for any other id."""
+    if not node_id.startswith(TIMELINE_ROW_ID_PREFIX):
+        return None
+    return node_id[len(TIMELINE_ROW_ID_PREFIX) :] or None
+
+
+def timeline_row_title(session: TuningSession, slot: str) -> str:
+    """Breadcrumb for a timeline row page, such as ``Timeline > 1  Drums``."""
+    if slot not in session.layers:
+        return "Timeline"
+    index = session.layer_z_order.index(slot)
+    header = stem_overlay_header(session.layers[slot].stem)
+    return f"Timeline > {index + 1}  {header}"
 
 
 def layer_slot_of(node_id: str) -> str | None:

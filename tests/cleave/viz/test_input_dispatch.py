@@ -776,8 +776,11 @@ def test_layer_digits_jump_from_inspector_while_strip_is_open() -> None:
     assert controls.shell_focus.region is ShellRegion.INSPECTOR
 
     controls.set_shell_region(ShellRegion.TIMELINE)
+    # Entering the strip shows its focused row in the inspector; digits stay there.
+    row_page = controls.shell_focus.selected_id
+    assert row_page.startswith("timeline.row:")
     assert dispatch_keydown(keydown(pygame.K_1), runtime) is True
-    assert controls.shell_focus.selected_id == layer_node_id("layer_2")
+    assert controls.shell_focus.selected_id == row_page
     assert controls.shell_focus.region is ShellRegion.TIMELINE
 
 

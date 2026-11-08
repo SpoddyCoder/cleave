@@ -93,6 +93,7 @@ _EXPECTED_REPEAT_ROW_KINDS = frozenset(
         RowKind.TRACK_STEM,
         RowKind.TRACK_BLEND,
         RowKind.TRACK_OPACITY,
+        RowKind.TIMELINE_CUE_OPACITY,
         RowKind.TRACK_BEAT,
         RowKind.TRACK_EFFECT,
         RowKind.OVERLAY_CARD_POSITION,
