@@ -246,10 +246,11 @@ def _focus_border(draw: imgui.ImDrawList, rect: Rect) -> None:
     )
 
 
-def _outset(rect: Rect, pad: int = _HIGHLIGHT_PAD) -> Rect:
-    """Grow *rect* by *pad* on every side."""
+def _outset(rect: Rect, pad: int = _HIGHLIGHT_PAD, *, pad_y: int | None = None) -> Rect:
+    """Grow *rect* by *pad* on the sides and *pad_y* (default *pad*) top and bottom."""
     x, y, width, height = rect
-    return (x - pad, y - pad, width + 2 * pad, height + 2 * pad)
+    dy = pad if pad_y is None else pad_y
+    return (x - pad, y - dy, width + 2 * pad, height + 2 * dy)
 
 
 def _highlight_option(draw: imgui.ImDrawList, rect: Rect) -> None:
@@ -475,7 +476,8 @@ def _draw_form_rows(
         rect = (left, y, right - left, height)
         hits.append(_FormHit(rect, ModalPointerKind.FOCUS_FORM_ROW, index))
         if row.focused:
-            _highlight_option(draw, _outset(rect, 0))
+            # A 2px gap between the outline and the label / control.
+            _highlight_option(draw, _outset(rect, _HIGHLIGHT_PAD + 1, pad_y=0))
         text_y = y + form_row_pad_y()
         _text(draw, left, text_y, row.label, HIGHLIGHT if row.focused else LABEL)
         width = form_control_width(measure, row)
