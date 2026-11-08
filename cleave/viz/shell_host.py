@@ -146,6 +146,9 @@ _MENU_BAR_FRAME_PADDING_Y = 8.0
 # Extra space between the menu-bar rule and the first popup row.
 _MENU_POPUP_TOP_PAD_PX = 4.0
 _INSPECTOR_INDENT = 16.0
+# Extra space above and below each inspector row, so a focused row's outline
+# clears its segments, combo box, or buttons.
+_INSPECTOR_ROW_PAD_Y = 2.0
 # Height of an inspector divider, as a fraction of the text line.
 _INSPECTOR_DIVIDER_LINES = 0.5
 _NAV_LOCK_MARK = "[lock]"
@@ -1971,11 +1974,23 @@ class ShellHost:
         imgui.text(inspector_title(nodes, focus.selected_id))
         _draw_inspector_divider()
         self._choice_rects = {}
-        for row in build_inspector_rows(state, focus.selected_id):
-            if row.divider:
-                _draw_inspector_divider()
-                continue
-            self._draw_inspector_row(state, row)
+        # Selectables grow by half the item spacing above and below, so this
+        # adds _INSPECTOR_ROW_PAD_Y to each side of every row's highlight.
+        spacing = imgui.get_style().item_spacing
+        imgui.push_style_var(
+            imgui.StyleVar_.item_spacing,
+            imgui.ImVec2(
+                spacing.x, spacing.y + 2.0 * ui_chrome_px(_INSPECTOR_ROW_PAD_Y)
+            ),
+        )
+        try:
+            for row in build_inspector_rows(state, focus.selected_id):
+                if row.divider:
+                    _draw_inspector_divider()
+                    continue
+                self._draw_inspector_row(state, row)
+        finally:
+            imgui.pop_style_var()
         self._finish_row_drag(DRAG_PRESET)
         self._draw_colour_picker()
         self._draw_choice_list()
