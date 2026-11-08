@@ -18,7 +18,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Edit > Undo (Ctrl+Z) and Redo (Ctrl+Y) cover Generate timeline, Reset timeline, Snap cues, and Set cut type, including any preset lists and pattern mask settings Generate changed. Undo is unavailable after hand edits to cues, so it never discards them.
 - Settings > Preview > preview quality has an output setting that renders the live preview at the full project resolution, to check how it will look in the render.
 - File > New project (Ctrl+N) asks for an audio file, and File > Open project (Ctrl+O) asks for a project. Both switch the live session without quitting. A project with unsaved changes asks before leaving.
-- The transport bar takes the mouse. Click PLAYING / PAUSE to play or pause. Drag the current time or BAR sideways to scrub by a second or a bar, or double-click either to type a time (M:SS or seconds) or a bar number. Each highlights on hover.
+- The transport bar takes the mouse. Click PLAYING / PAUSED to play or pause. Drag the current time or BAR sideways to scrub by a second or a bar, or double-click either to type a time (M:SS or seconds) or a bar number. Each highlights on hover.
 
 ### Changed
 

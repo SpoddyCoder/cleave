@@ -177,7 +177,7 @@ def transport_parts(readout: TransportReadout) -> list[TransportPart]:
     ``transport_fps_text`` so the bar can pin it to the right.
     """
     icon = PAUSE_GLYPH if readout.paused else PLAY_GLYPH
-    word = "PAUSE" if readout.paused else "PLAYING"
+    word = "PAUSED" if readout.paused else "PLAYING"
     has_bars = readout.bar_text != "—"
     return [
         TransportPart(word, VALUE, TransportField.PLAY, icon=icon),

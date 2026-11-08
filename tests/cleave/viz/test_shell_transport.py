@@ -42,7 +42,7 @@ def test_transport_parts_while_paused() -> None:
         fps=None,
     )
     assert transport_parts(readout) == [
-        TransportPart("PAUSE", VALUE, TransportField.PLAY, icon="\u275a\u275a"),
+        TransportPart("PAUSED", VALUE, TransportField.PLAY, icon="\u275a\u275a"),
         TransportPart("00:00", VALUE, TransportField.TIME),
         TransportPart("/ 00:00", VALUE, gap=False),
         TransportPart("BAR —", VALUE),
