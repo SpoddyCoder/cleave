@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pygame
+import pytest
 
 from cleave.viz.commands import CommandContext
 from cleave.viz.menu_bar import MenuBarState
@@ -147,7 +148,7 @@ def test_ui_scale_change_rebuilds_the_font_atlas_on_the_next_frame() -> None:
         draw_shell_frame(host, menu, CommandContext(), 1.0 / 60.0)
         assert imgui.get_io().font_default.font_size == tuning_ui_metrics().font_size
         assert imgui.get_io().font_default.font_size > base_size
-        assert imgui.get_style().item_spacing.x == base_pad * 2
+        assert imgui.get_style().item_spacing.x == pytest.approx(base_pad * 2, abs=1.0)
         assert imgui.get_io().fonts.is_built()
     finally:
         set_ui_scale_percent(DEFAULT_UI_SCALE)

@@ -34,7 +34,7 @@ from cleave.gl_state import restore_gl_state, save_gl_state
 from cleave.viz.imgui_theme import apply_imgui_style_scale, apply_imgui_theme
 from cleave.viz.overlay_primitives import overlay_font_path
 from cleave.viz.navigator import TWISTY_EXPANDED
-from cleave.viz.theme import tuning_ui_metrics, ui_scale_generation, ui_scale_percent
+from cleave.viz.theme import shell_scale, tuning_ui_metrics, ui_scale_generation
 
 RENDERER_CLASS = ProgrammablePipelineRenderer
 
@@ -351,7 +351,7 @@ class ImGuiHost:
             _keep_keyboard_nav_off()
             io.set_ini_filename(os.devnull)
             glyph_ranges = _load_shell_fonts()
-            apply_imgui_style_scale(ui_scale_percent() / 100.0)
+            apply_imgui_style_scale(shell_scale())
             apply_imgui_theme()
             renderer = _select_renderer_class()()
         except Exception:
@@ -376,7 +376,7 @@ class ImGuiHost:
         Call between frames only. ImGui 1.90 bakes the font size into the atlas.
         """
         self._glyph_ranges = _load_shell_fonts()
-        apply_imgui_style_scale(ui_scale_percent() / 100.0)
+        apply_imgui_style_scale(shell_scale())
         refresh = getattr(self.renderer, "refresh_font_texture", None)
         if refresh is not None:
             refresh()

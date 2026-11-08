@@ -322,11 +322,12 @@ def test_menu_bar_height_px_needs_no_gl_context() -> None:
     from imgui_bundle import imgui
 
     from cleave.viz.shell_host import menu_bar_height_px
-    from cleave.viz.theme import tuning_ui_metrics
+    from cleave.viz.theme import tuning_ui_metrics, ui_chrome_px
 
     assert imgui.get_current_context() is None
     height = menu_bar_height_px()
-    assert height == max(1, round(float(tuning_ui_metrics().font_size) + 16.0))
+    pad_y = round(ui_chrome_px(8.0))
+    assert height == max(1, round(float(tuning_ui_metrics().font_size) + 2.0 * pad_y))
     assert imgui.get_current_context() is None
 
 

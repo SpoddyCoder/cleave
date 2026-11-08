@@ -82,16 +82,16 @@ def test_set_ui_scale_percent_drives_metrics_and_generation() -> None:
         set_ui_scale_percent(200)
         assert ui_scale_generation() == generation + 1
         assert ui_scale() == BASE_UI_SCALE * 2
-        assert tuning_ui_metrics().font_size == 34
-        assert timeline_ui_metrics().row_height == 48
-        assert ui_px(10) == 24
+        assert tuning_ui_metrics().font_size == 40
+        assert timeline_ui_metrics().row_height == 58
+        assert ui_px(10) == 29
         set_ui_scale_percent(200)
         assert ui_scale_generation() == generation + 1
         set_ui_scale_percent(1000)
         assert ui_scale_percent() == UI_SCALE_MAX
     finally:
         set_ui_scale_percent(DEFAULT_UI_SCALE)
-    assert tuning_ui_metrics().font_size == 17
+    assert tuning_ui_metrics().font_size == 20
 
 
 def test_no_import_time_metric_captures_in_viz() -> None:

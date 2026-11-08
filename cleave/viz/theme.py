@@ -29,9 +29,11 @@ Shell rules (not text roles):
   NUDGE_HOVER_BG_ALPHA - wash alpha for those arrows (stronger than HOVER_BG_ALPHA)
 
 Layout scale:
-  BASE_UI_SCALE (1.2) is the editor chrome at 100%. The Settings > UI > UI scale
+  BASE_UI_SCALE (1.44) is the editor chrome at 100%. The Settings > UI > UI scale
   preference multiplies it through set_ui_scale_percent(); ui_scale() is the live
-  factor for every panel, modal, help column, and the timeline strip. Read metrics
+  factor for every panel, modal, help column, and the timeline strip.
+  ImGui style sizes and shell pixel values are tuned at a factor of 1.0, so
+  shell_scale() (SHELL_UI_SCALE 1.2 at 100%) scales them. Read metrics
   at draw time, never at import, so a scale change applies on the next frame.
 
 The timeline strip draws at TIMELINE_SCALE of the UI scale. Its panel height is
@@ -52,7 +54,9 @@ from dataclasses import dataclass
 from cleave.config_schema.editor import DEFAULT_UI_SCALE, clamp_ui_scale
 
 BASE_UI_FONT_SIZE: int = 14
-BASE_UI_SCALE: float = 1.2
+BASE_UI_SCALE: float = 1.44
+# ImGui style and shell pixel values at 100% UI scale.
+SHELL_UI_SCALE: float = 1.2
 BASE_TIMELINE_ROW_HEIGHT: int = 25
 # The timeline strip is this fraction of the UI scale at every scale.
 TIMELINE_SCALE: float = 0.8
@@ -84,6 +88,11 @@ def ui_scale() -> float:
     return BASE_UI_SCALE * _ui_scale_percent / 100.0
 
 
+def shell_scale() -> float:
+    """Live factor for ImGui style sizes and shell pixel values: SHELL_UI_SCALE at 100%."""
+    return SHELL_UI_SCALE * _ui_scale_percent / 100.0
+
+
 def ui_scale_generation() -> int:
     """Changes whenever the UI scale changes, so caches can rebuild."""
     return _ui_scale_generation
@@ -95,8 +104,8 @@ def ui_px(value: float) -> int:
 
 
 def ui_chrome_px(value: float) -> float:
-    """A shell pixel value tuned at 100% UI scale, at the live UI scale."""
-    return value * _ui_scale_percent / 100.0
+    """A shell pixel value tuned at a factor of 1.0, at the live UI scale."""
+    return value * shell_scale()
 
 
 @dataclass(frozen=True)

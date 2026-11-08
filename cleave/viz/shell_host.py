@@ -479,8 +479,12 @@ def menu_bar_height_px() -> int:
     bar uses the same height.
     """
     font_size = float(tuning_ui_metrics().font_size)
-    pad_y = ui_chrome_px(_MENU_BAR_FRAME_PADDING_Y)
-    return max(1, int(round(font_size + pad_y * 2.0)))
+    return max(1, int(round(font_size + _menu_bar_pad_y() * 2.0)))
+
+
+def _menu_bar_pad_y() -> float:
+    """Menu bar frame padding in whole pixels, so its labels and underlines stay on the pixel grid."""
+    return float(round(ui_chrome_px(_MENU_BAR_FRAME_PADDING_Y)))
 
 
 @contextmanager
@@ -489,7 +493,7 @@ def _menu_bar_frame_padding() -> Iterator[None]:
     style = imgui.get_style()
     imgui.push_style_var(
         imgui.StyleVar_.frame_padding,
-        imgui.ImVec2(style.frame_padding.x, ui_chrome_px(_MENU_BAR_FRAME_PADDING_Y)),
+        imgui.ImVec2(style.frame_padding.x, _menu_bar_pad_y()),
     )
     try:
         yield
@@ -2901,8 +2905,10 @@ class ShellHost:
                 shortcut_w = max(shortcut_w, imgui.calc_text_size(item.shortcut).x)
         row_w = pad_x * 2.0 + check_w + gap + label_w + gap + shortcut_w + pad_x
         draw_list = imgui.get_window_draw_list()
+        # Whole pixels: text snaps down to a pixel, so a fractional row top
+        # leaves the label off-centre in its fill.
         imgui.set_cursor_pos_y(
-            imgui.get_cursor_pos_y() + ui_chrome_px(_MENU_POPUP_TOP_PAD_PX)
+            imgui.get_cursor_pos_y() + round(ui_chrome_px(_MENU_POPUP_TOP_PAD_PX))
         )
         for item_index, item in enumerate(menu.items):
             if isinstance(item, MenuSeparator):

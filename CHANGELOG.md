@@ -25,6 +25,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- Editor text and spacing are 20% larger at the default 100% UI scale.
 - A thin divider sits under the inspector's page title. Buttons on a page always sit at the bottom, below a divider, instead of among its settings.
 - Left/Right on a choice stops at the first or last option instead of wrapping round, in the inspector and in dialogs. On/off rows go off with Left and on with Right, so pressing the same key again leaves them alone.
 - Settings > Preview > preview quality lists ultra-performance first and output last, so Right raises quality. Generate timeline... lists cue snap as none, beats, bars.
@@ -87,6 +88,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- Menu dropdown labels sit centred in their highlight, and the menu-bar letter underline sits two pixels under the letter at every UI scale.
 - Dragging or moving a preset in the Preset List carries the selection highlight with it, as layer reordering does, instead of leaving it on the old position.
 - Every song marker row takes the mouse, not just the first, and its delete icon highlights on hover and asks to delete that marker.
 - Bloom and chromatic aberration look the same in a reduced-size live preview as in the render, instead of growing larger as the preview gets smaller.
