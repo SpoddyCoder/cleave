@@ -117,14 +117,11 @@ class TimelineUiMetrics:
     padding: int
     row_height: int
     row_gap: int
-    margin: int
-    panel_gap: int
     bar_vertical_inset: int
     playhead_width: int
     rec_badge_gap: int
     rec_badge_pad_x: int
     rec_badge_pad_y: int
-    rec_time_gap: int
 
 
 def tuning_ui_metrics(
@@ -158,14 +155,11 @@ def timeline_ui_metrics(*, scale: float | None = None) -> TimelineUiMetrics:
         padding=scale_px(8, scale=scale),
         row_height=scale_px(BASE_TIMELINE_ROW_HEIGHT, scale=scale),
         row_gap=scale_px(2, scale=scale),
-        margin=scale_px(10, scale=scale),
-        panel_gap=scale_px(16, scale=scale),
         bar_vertical_inset=scale_px(3, scale=scale),
         playhead_width=scale_px(2, scale=scale),
         rec_badge_gap=scale_px(4, scale=scale),
         rec_badge_pad_x=scale_px(8, scale=scale),
         rec_badge_pad_y=scale_px(4, scale=scale),
-        rec_time_gap=scale_px(2, scale=scale),
     )
 
 

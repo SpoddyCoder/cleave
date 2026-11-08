@@ -11,7 +11,6 @@ from cleave.config_schema.layers import MAX_LAYER_COUNT
 from cleave.timeline import SlotCue, TimelineLane
 from cleave.viz.overlay_primitives import overlay_font, visibility_bucket
 from cleave.viz.overlay_upload import OverlayGpuState, UploadSignature
-from cleave.viz.playback import format_mmss
 from cleave.viz.theme import (
     timeline_panel_height_px,
     timeline_ui_metrics,
@@ -191,26 +190,25 @@ def timeline_upload_signature(
     )
 
 
-def timeline_badge_reserve_px(*, font_size: int | None = None) -> int:
+def timeline_badge_reserve_px(
+    *, font_size: int | None = None, padding: int | None = None
+) -> int:
+    """Height added above the strip for the badge row (cue readout, REC).
+
+    The badge row sits at the top of the band and takes the place of the
+    strip's top padding, so only the part taller than that padding is added.
+    """
     metrics = timeline_ui_metrics()
     if font_size is None:
         font_size = metrics.font_size
-    font = overlay_font(font_size)
-    sample = font.render(f"[{format_mmss(0.0)}]", True, (255, 255, 255))
-    badge_h = sample.get_height() + metrics.rec_badge_pad_y * 2
-    return badge_h + metrics.rec_badge_gap
+    if padding is None:
+        padding = metrics.padding
+    badge_h = overlay_font(font_size).get_height() + metrics.rec_badge_pad_y * 2
+    return max(0, badge_h + metrics.rec_badge_gap - padding)
 
 
-def timeline_panel_max_dimensions(
-    viewport_w: int,
-    viewport_h: int,
-    *,
-    margin: int | None = None,
-) -> tuple[int, int]:
-    metrics = timeline_ui_metrics()
-    if margin is None:
-        margin = metrics.margin
-    panel_w = max(1, viewport_w - margin * 2)
+def timeline_panel_max_dimensions(viewport_w: int) -> tuple[int, int]:
+    panel_w = max(1, viewport_w)
     panel_h = timeline_panel_height_px(MAX_LAYER_COUNT)
-    badge_reserve = timeline_badge_reserve_px(font_size=metrics.font_size)
+    badge_reserve = timeline_badge_reserve_px()
     return panel_w, panel_h + badge_reserve

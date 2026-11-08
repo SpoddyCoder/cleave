@@ -79,7 +79,6 @@ from cleave.viz.timeline_overlay import (
     selected_cue_tick_color,
     stem_abbrev_label,
     stem_label_text,
-    transport_time_text,
     time_to_x,
     clip_breakpoints,
 )
@@ -241,9 +240,8 @@ def test_layer_num_width_probe_scales_with_eight_layers() -> None:
 
 def test_dual_eye_positions_monitor_left_committed_right() -> None:
     pygame.init()
-    margin = 10
     padding = 8
-    overlay = TimelineOverlay(margin=margin, padding=padding)
+    overlay = TimelineOverlay(padding=padding)
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
     _draw(overlay, surface, _view_state())
 
@@ -749,15 +747,41 @@ def test_compose_panel_occupies_timeline_band() -> None:
     panel = overlay.panel_rect
     assert panel is not None
     px, py, pw, ph = panel
-    metrics = timeline_ui_metrics()
-    assert px == metrics.margin
-    assert pw == viewport_w - metrics.margin * 2
+    assert px == 0
+    assert pw == viewport_w
     assert ph == timeline_panel_height_px(row_count)
-    assert py == viewport_h - ph - metrics.margin
-    badge = overlay.header_badge_rect
-    assert badge is not None
-    assert badge[1] >= band[1]
-    assert badge[1] + badge[3] <= py
+    assert py == viewport_h - ph
+    assert overlay.header_badge_rect is None
+
+
+def test_compose_panel_fills_band_width_inside_container() -> None:
+    pygame.init()
+    from cleave.viz.timeline_overlay import timeline_band_height_px
+
+    overlay = TimelineOverlay()
+    state = _view_state()
+    band_h = timeline_band_height_px(len(state.layer_z_order))
+    band = (40, 720 - band_h, 1000, band_h)
+    overlay.compose_panel(
+        state, viewport_width=1280, viewport_height=720, timeline_rect=band
+    )
+    assert overlay.panel_rect is not None
+    px, _py, pw, _ph = overlay.panel_rect
+    assert (px, pw) == (40, 1000)
+
+
+def test_static_panel_has_no_border() -> None:
+    pygame.init()
+    from cleave.viz.theme import BORDER_COLOR
+
+    overlay = TimelineOverlay()
+    surface = pygame.Surface((800, 400), pygame.SRCALPHA)
+    _draw(overlay, surface, _view_state())
+    panel = overlay._cache.panel
+    assert panel is not None
+    assert panel.get_at((0, 0))[:3] != BORDER_COLOR
+    edge = (panel.get_width() - 1, panel.get_height() // 2)
+    assert panel.get_at(edge)[:3] != BORDER_COLOR
 
 
 def test_song_markers_drawn_on_static_panel() -> None:
@@ -835,16 +859,10 @@ def test_focus_row_index_matches_stem() -> None:
     assert overlay.panel_rect is not None
 
 
-def test_transport_time_text_matches_main_ui_format() -> None:
-    assert transport_time_text(0.0) == "[00:00]"
-    assert transport_time_text(65.0) == "[01:05]"
-    assert transport_time_text(3725.9) == "[62:05]"
-
-
 def test_header_badge_rect_is_above_panel() -> None:
     pygame.init()
     overlay = TimelineOverlay()
-    state = _view_state(position_sec=30.0)
+    state = _view_state(position_sec=30.0, recording=True)
     surface = pygame.Surface((800, 400), pygame.SRCALPHA)
     _draw(overlay, surface, state)
 
@@ -854,22 +872,30 @@ def test_header_badge_rect_is_above_panel() -> None:
     assert header is not None
     _, panel_y, _, _ = panel
     _, header_y, _, header_h = header
-    assert header_y + header_h <= panel_y
+    first_row_y = panel_y + overlay.row_layout[0][2]
+    # Just above the first layer row, inside the strip's top padding.
+    assert header_y + header_h == first_row_y - timeline_ui_metrics().rec_badge_gap
+    assert header_y + header_h > panel_y
+    from cleave.viz.timeline_panel_cache import timeline_badge_reserve_px
+
+    # Top of the band: no padding above the badge row.
+    assert header_y == panel_y - timeline_badge_reserve_px()
 
 
-def test_header_badge_wider_when_recording() -> None:
+def test_header_badge_shows_only_while_recording() -> None:
     pygame.init()
     overlay = TimelineOverlay()
     surface = pygame.Surface((800, 400), pygame.SRCALPHA)
 
     _draw(overlay, surface, _view_state(position_sec=0.0, recording=False))
-    idle_w = overlay.header_badge_rect
-    assert idle_w is not None
+    assert overlay.header_badge_rect is None
 
     _draw(overlay, surface, _view_state(position_sec=0.0, recording=True))
-    rec_w = overlay.header_badge_rect
-    assert rec_w is not None
-    assert rec_w[2] > idle_w[2]
+    rec = overlay.header_badge_rect
+    panel = overlay.panel_rect
+    assert rec is not None and panel is not None
+    # REC sits flush with the strip's right edge.
+    assert rec[0] + rec[2] == panel[0] + panel[2]
 
 
 def test_upscale_expands_bar_width_not_row_height() -> None:

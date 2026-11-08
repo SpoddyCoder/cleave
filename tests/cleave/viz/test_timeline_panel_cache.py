@@ -275,13 +275,15 @@ def test_compose_rebuilds_static_panel_when_recording_playhead_moves() -> None:
     assert overlay._cache.panel is not cached_panel
 
 
-def test_live_signature_changes_on_position_sec() -> None:
+def test_live_signature_ignores_position_at_same_playhead_px() -> None:
     pygame.init()
-    paused = _view_state(position_sec=0.0)
-    moved = _view_state(position_sec=12.5)
-    kwargs = dict(playhead_px=100, bar_left=80, bar_width=900, row_count=4, row_h=20)
-    assert timeline_live_signature(paused, **kwargs) != timeline_live_signature(
-        moved, **kwargs
+    early = _view_state(position_sec=12.0)
+    late = _view_state(position_sec=12.5)
+    kwargs = dict(
+        playhead_px=100, bar_left=80, bar_width=900, row_count=4, row_h=20, ticks_ms=0
+    )
+    assert timeline_live_signature(early, **kwargs) == timeline_live_signature(
+        late, **kwargs
     )
 
 
@@ -356,7 +358,7 @@ def test_upload_plan_partial_when_position_moves() -> None:
 
 def test_timeline_panel_max_dimensions_uses_max_layer_count() -> None:
     pygame.init()
-    w, h = timeline_panel_max_dimensions(1280, 720)
+    w, h = timeline_panel_max_dimensions(1280)
     overlay = TimelineOverlay()
     max_rows = _view_state(
         layer_z_order=[f"layer_{i}" for i in range(1, MAX_LAYER_COUNT + 1)],

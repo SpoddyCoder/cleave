@@ -28,7 +28,6 @@ from cleave.viz.material_icons import visibility_icon_slot_width
 from cleave.viz.overlay_primitives import (
     ComposedPanel,
     clip_rect_to_bounds,
-    draw_panel_border,
     overlay_font,
     overlay_panel_surface,
 )
@@ -79,37 +78,13 @@ _ROLE_GLYPH: dict[CueRole, str] = {
 
 
 def timeline_band_height_px(row_count: int) -> int:
-    """Shell band under the columns: strip, bottom margin, and the badge above it."""
+    """Shell band under the columns: the strip and the badge row above it."""
     if row_count <= 0:
         return 0
     metrics = timeline_ui_metrics()
-    return (
-        timeline_panel_height_px(row_count)
-        + metrics.margin
-        + timeline_badge_reserve_px(font_size=metrics.font_size)
+    return timeline_panel_height_px(row_count) + timeline_badge_reserve_px(
+        font_size=metrics.font_size
     )
-
-
-def timeline_viewport_reserve_px(row_count: int, *, margin: int | None = None) -> int:
-    metrics = timeline_ui_metrics()
-    if margin is None:
-        margin = metrics.margin
-    panel_h = timeline_panel_height_px(row_count)
-    return panel_h + margin + metrics.panel_gap
-
-
-def cue_readout_panel_clearance_px(panel_margin_y: int) -> int:
-    """Extra tuning-panel shrink so the selected-cue badge stays clear.
-
-    The tuning panel already stops ``panel_gap + panel_margin_y`` above the
-    timeline strip. The cue badge occupies the top of that gap. Return the
-    additional pixels needed to leave ``rec_badge_gap`` between the panel and
-    the badge.
-    """
-    metrics = timeline_ui_metrics()
-    badge = timeline_badge_reserve_px(font_size=metrics.font_size)
-    gap_above_timeline = metrics.panel_gap + panel_margin_y
-    return max(0, badge + metrics.rec_badge_gap - gap_above_timeline)
 
 
 ARMED_BG_ALPHA: int = 220
@@ -803,10 +778,6 @@ def stem_abbrev_label(stem: str) -> str:
     return f" {stem_abbreviation(stem)} "
 
 
-def transport_time_text(position_sec: float) -> str:
-    return f"[{format_mmss(position_sec)}]"
-
-
 def playback_bar_text(position_sec: float, downbeat_times: Sequence[float]) -> str:
     """1-based bar at the playhead. Empty grids show an em dash."""
     if not downbeat_times:
@@ -849,7 +820,6 @@ def timeline_live_signature(
         bar_width,
         row_count,
         row_h,
-        transport_time_text(state.position_sec),
         rec_flash,
         playhead_flash_bright(ticks_ms),
         flash_sig,
@@ -881,13 +851,11 @@ class TimelineOverlay:
     def __init__(
         self,
         *,
-        margin: int | None = None,
         font_size: int | None = None,
         padding: int | None = None,
         row_gap: int | None = None,
     ) -> None:
         # Overrides pin a value for tests; None follows the live UI scale.
-        self._margin_override = margin
         self._font_size_override = font_size
         self._padding_override = padding
         self._row_gap_override = row_gap
@@ -901,12 +869,6 @@ class TimelineOverlay:
         self._visibility = 1.0
         self._upload_scratch: pygame.Surface | None = None
         self._blit_src: tuple[int, int] = (0, 0)
-
-    @property
-    def _margin(self) -> int:
-        if self._margin_override is not None:
-            return self._margin_override
-        return timeline_ui_metrics().margin
 
     @property
     def _font_size(self) -> int:
@@ -969,20 +931,18 @@ class TimelineOverlay:
         metrics = timeline_ui_metrics()
         row_h = metrics.row_height
         panel_h = timeline_panel_height_px(row_count)
+        # The shell's timeline band is the container; the strip fills its width.
         if timeline_rect is None:
-            panel_w = viewport_width - self._margin * 2
-            panel_x = self._margin
-            panel_y = viewport_height - panel_h - self._margin
-        else:
-            band_x, band_y, band_w, band_h = timeline_rect
-            if band_w <= 0 or band_h <= 0:
-                return None
-            panel_w = band_w - self._margin * 2
-            if panel_w <= 0:
-                return None
-            panel_x = band_x + self._margin
-            panel_y = band_y + band_h - panel_h - self._margin
-        badge_reserve = timeline_badge_reserve_px(font_size=self._font_size)
+            timeline_rect = (0, 0, viewport_width, viewport_height)
+        band_x, band_y, band_w, band_h = timeline_rect
+        if band_w <= 0 or band_h <= 0:
+            return None
+        panel_w = band_w
+        panel_x = band_x
+        panel_y = band_y + band_h - panel_h
+        badge_reserve = timeline_badge_reserve_px(
+            font_size=self._font_size, padding=self._padding
+        )
 
         font = self._font_get()
         num_sample = font.render(layer_num_prefix(max(row_count, 1)), True, LABEL)
@@ -1177,7 +1137,6 @@ class TimelineOverlay:
                 4 if selected else 2,
             )
 
-        draw_panel_border(panel)
         return panel
 
     def _draw_role_glyphs(
@@ -1246,7 +1205,12 @@ class TimelineOverlay:
     ) -> None:
         x, y, w, h = rect
         panel_y = y - panel_y_offset
-        if panel_y < 0 or panel_y >= static_panel.get_height():
+        if panel_y < 0:
+            # Only the part over the static panel has pixels to restore.
+            h += panel_y
+            y -= panel_y
+            panel_y = 0
+        if panel_y >= static_panel.get_height():
             return
         clip_h = min(h, static_panel.get_height() - panel_y)
         if clip_h <= 0:
@@ -1463,59 +1427,39 @@ class TimelineOverlay:
         surface: pygame.Surface,
         font: pygame.font.Font,
         panel_w: int,
-        position_sec: float,
         recording: bool,
         *,
         y_offset: int = 0,
         cue_readout: pygame.Surface | None = None,
-    ) -> tuple[int, int, int, int]:
-        time_surf = font.render(transport_time_text(position_sec), True, VALUE)
-        time_w = time_surf.get_width() + timeline_ui_metrics().rec_badge_pad_x * 2
-        time_h = time_surf.get_height() + timeline_ui_metrics().rec_badge_pad_y * 2
+    ) -> tuple[int, int, int, int] | None:
+        """Selected-cue readout on the left and REC on the right, above the strip."""
+        metrics = timeline_ui_metrics()
+        pad_x = metrics.rec_badge_pad_x
+        pad_y = metrics.rec_badge_pad_y
+        badge_y = y_offset
+        badge_h = font.get_height() + pad_y * 2
+        rects: list[tuple[int, int, int, int]] = []
 
-        rec_w = 0
-        rec_surf: pygame.Surface | None = None
+        if cue_readout is not None:
+            readout_w = cue_readout.get_width() + pad_x * 2
+            pygame.draw.rect(surface, BACKGROUND, (0, badge_y, readout_w, badge_h))
+            surface.blit(cue_readout, (pad_x, badge_y + pad_y))
+            rects.append((0, badge_y, readout_w, badge_h))
+
         if recording:
             rec_surf = font.render("REC", True, VALUE)
-            rec_w = rec_surf.get_width() + timeline_ui_metrics().rec_badge_pad_x * 2
-
-        badge_h = time_h
-        gap = timeline_ui_metrics().rec_time_gap if recording else 0
-        right_w = time_w + gap + rec_w
-        time_x = panel_w - time_w
-        badge_y = y_offset
-
-        readout_w = 0
-        if cue_readout is not None:
-            readout_w = cue_readout.get_width() + timeline_ui_metrics().rec_badge_pad_x * 2
-            pygame.draw.rect(
-                surface, BACKGROUND, (0, badge_y, readout_w, badge_h)
-            )
-            surface.blit(
-                cue_readout,
-                (timeline_ui_metrics().rec_badge_pad_x, badge_y + timeline_ui_metrics().rec_badge_pad_y),
-            )
-
-        pygame.draw.rect(surface, BACKGROUND, (time_x, badge_y, time_w, badge_h))
-        surface.blit(
-            time_surf,
-            (time_x + timeline_ui_metrics().rec_badge_pad_x, badge_y + timeline_ui_metrics().rec_badge_pad_y),
-        )
-
-        header_x = time_x
-        if recording and rec_surf is not None:
-            rec_x = time_x - gap - rec_w
-            header_x = rec_x
+            rec_w = rec_surf.get_width() + pad_x * 2
+            rec_x = panel_w - rec_w
             if rec_flash_visible():
                 pygame.draw.rect(surface, REC_BG, (rec_x, badge_y, rec_w, badge_h))
-            surface.blit(
-                rec_surf,
-                (rec_x + timeline_ui_metrics().rec_badge_pad_x, badge_y + timeline_ui_metrics().rec_badge_pad_y),
-            )
+            surface.blit(rec_surf, (rec_x + pad_x, badge_y + pad_y))
+            rects.append((rec_x, badge_y, rec_w, badge_h))
 
-        if readout_w > 0:
-            return (0, badge_y, panel_w, badge_h)
-        return (header_x, badge_y, right_w, badge_h)
+        if not rects:
+            return None
+        left = min(r[0] for r in rects)
+        right = max(r[0] + r[2] for r in rects)
+        return (left, badge_y, right - left, badge_h)
 
     def _ensure_upload_scratch(
         self,
@@ -1563,10 +1507,17 @@ class TimelineOverlay:
         )
         cache.last_playhead_rect = playhead_rect
 
-        badge_top = panel_y_offset - layout.badge_reserve
+        # The badge row starts at the top of the band, over the strip's top
+        # padding, and ends ``rec_badge_gap`` above the first layer row.
+        badge_top = 0
         if incremental and cache.last_badge_rect is not None:
-            bx, by, bw, bh = cache.last_badge_rect
-            upload.fill((0, 0, 0, 0), (bx, by, bw, bh))
+            upload.fill((0, 0, 0, 0), cache.last_badge_rect)
+            self._restore_upload_rect_from_static(
+                upload,
+                static_panel,
+                cache.last_badge_rect,
+                panel_y_offset=panel_y_offset,
+            )
 
         selected_cue = _selected_cue_for_focus(state)
         focused_slot = (
@@ -1584,7 +1535,6 @@ class TimelineOverlay:
             upload,
             font,
             layout.panel_w,
-            state.position_sec,
             state.recording,
             y_offset=badge_top,
             cue_readout=cue_readout,
@@ -1722,11 +1672,7 @@ class TimelineOverlay:
                 viewport_height,
             )
 
-        capacity = timeline_panel_max_dimensions(
-            viewport_width,
-            viewport_height,
-            margin=self._margin,
-        )
+        capacity = timeline_panel_max_dimensions(viewport_width)
         live_sig = timeline_live_signature(
             state,
             playhead_px=playhead_px,

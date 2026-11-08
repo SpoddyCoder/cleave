@@ -34,7 +34,6 @@ def test_timeline_ui_metrics_default_scale() -> None:
     assert metrics.padding == 8
     assert metrics.row_height == 25
     assert metrics.row_gap == 2
-    assert metrics.panel_gap == 16
 
 
 def test_timeline_panel_height_px_scales_with_ui_scale() -> None:

@@ -538,8 +538,8 @@ def test_open_menu_paints_over_the_focus_ring() -> None:
 
         host._draw_navigator = draw_focused_row
         host._draw_inspector = lambda _state: None
-        # The font atlas is built on the first frame. The strip border is on
-        # chrome while the strip has focus; an open menu takes that focus.
+        # The font atlas is built on the first frame. The strip border shares
+        # the panel border window, under the menu popup; an open menu takes focus.
         draw_shell_frame(host, menu, CommandContext(), 1.0 / 60.0)
         strip_lists = list(imgui.get_draw_data().cmd_lists)
         strip_content = _content_lists(strip_lists)
@@ -548,8 +548,8 @@ def test_open_menu_paints_over_the_focus_ring() -> None:
         gold = _color_u32(HIGHLIGHT)
         ring = _color_u32_alpha(HIGHLIGHT, FOCUS_BORDER_ALPHA / 255.0)
         white = _color_u32(BORDER_COLOR)
-        strip_on_chrome = _draw_list_has_color(
-            strip_content[strip_names.index("##shell-chrome")], ring
+        strip_on_border = _draw_list_has_color(
+            strip_content[strip_names.index("##shell-focus-border")], ring
         )
         strip_on_foreground = any(
             _draw_list_has_color(draw_list, gold) for draw_list in strip_foreground
@@ -588,7 +588,7 @@ def test_open_menu_paints_over_the_focus_ring() -> None:
         del lists, content
     finally:
         host.imgui.destroy()
-    assert strip_on_chrome
+    assert strip_on_border
     assert not strip_on_foreground
     assert not rule_on_foreground
     assert ring_on_nav

@@ -897,33 +897,17 @@ def _focus_border_rgba() -> imgui.ImVec4:
     return rgba(HIGHLIGHT, FOCUS_BORDER_ALPHA / 255.0)
 
 
-def _draw_rect_border(rect: tuple[int, int, int, int]) -> None:
-    """1px highlight around *rect* on the current window."""
-    x, y, w, h = rect
-    if w <= 0 or h <= 0:
-        return
-    color = imgui.get_color_u32(_focus_border_rgba())
-    imgui.get_window_draw_list().add_rect(
-        imgui.ImVec2(float(x), float(y)),
-        imgui.ImVec2(float(x + w), float(y + h)),
-        color,
-        0.0,
-        0,
-        1.0,
-    )
-
-
-def _fill_rect_border(rect: tuple[int, int, int, int]) -> None:
-    """1px highlight around *rect* on the current window.
+def _fill_rect_border(rect: tuple[int, int, int, int], color_rgba: imgui.ImVec4) -> None:
+    """1px outline around *rect* on the current window.
 
     A stroked border is anti-aliased, so the solid rule underneath shows
-    through it. Filled edges cover that rule. The fill uses the quieter
-    focus-outline alpha, so the rule tints the shared edge.
+    through it. Filled edges cover that rule. The focus outline uses the
+    quieter focus alpha, so the rule tints the shared edge.
     """
     x, y, w, h = rect
     if w <= 1 or h <= 1:
         return
-    color = imgui.get_color_u32(_focus_border_rgba())
+    color = imgui.get_color_u32(color_rgba)
     draw = imgui.get_window_draw_list()
     x0, y0 = float(x), float(y)
     x1, y1 = x0 + float(w), y0 + float(h)
@@ -933,8 +917,10 @@ def _fill_rect_border(rect: tuple[int, int, int, int]) -> None:
     draw.add_rect_filled(imgui.ImVec2(x1 - 1.0, y0), imgui.ImVec2(x1, y1), color)
 
 
-def _draw_panel_focus_border(rect: tuple[int, int, int, int]) -> None:
-    """Highlight outline above the shell windows that share its edges.
+def _draw_panel_border(
+    rect: tuple[int, int, int, int], color_rgba: imgui.ImVec4
+) -> None:
+    """Outline above the shell windows that share its edges.
 
     Shell windows stay in an earlier display slot, so a border drawn with
     its panel sits under the rule it overlaps. This window is moved in front
@@ -957,7 +943,7 @@ def _draw_panel_focus_border(rect: tuple[int, int, int, int]) -> None:
             draw = imgui.get_window_draw_list()
             draw.push_clip_rect(imgui.ImVec2(0.0, 0.0), display, False)
             try:
-                _fill_rect_border(rect)
+                _fill_rect_border(rect, color_rgba)
             finally:
                 draw.pop_clip_rect()
         finally:
@@ -1365,7 +1351,7 @@ class ShellHost:
         return rule_y
 
     def draw_chrome(self, menu_state: MenuBarState, rule_y: float | None) -> None:
-        """Menu rule and timeline focus border, above the shell windows.
+        """Menu rule, above the shell windows.
 
         Full-display, no background, and no inputs. Raised after Begin so the
         order stays shell windows, dropdown, then this window.
@@ -1392,12 +1378,6 @@ class ShellHost:
                         if span is not None:
                             # The popup's top border sits on this row.
                             _stroke_h_rule(span[0], span[1], rule_y, BORDER_COLOR)
-                    layout = self._layout
-                    if (
-                        layout is not None
-                        and self._cycle_stop(menu_state) is CycleStop.TIMELINE
-                    ):
-                        _draw_rect_border(layout.timeline)
                 finally:
                     draw.pop_clip_rect()
             finally:
@@ -1499,10 +1479,19 @@ class ShellHost:
                 state=state,
                 menu_state=menu_state,
             )
+            if layout.timeline[3] > 0:
+                # The strip has no ImGui window, so its container outline is
+                # drawn here, sharing the rule under the columns above it.
+                _draw_panel_border(
+                    _overlap_panel(layout.timeline, overlap),
+                    _focus_border_rgba()
+                    if stop is CycleStop.TIMELINE
+                    else rgba(NAVIGATOR_BORDER),
+                )
             if stop is CycleStop.NAVIGATOR:
-                _draw_panel_focus_border(navigator)
+                _draw_panel_border(navigator, _focus_border_rgba())
             elif stop is CycleStop.INSPECTOR:
-                _draw_panel_focus_border(inspector)
+                _draw_panel_border(inspector, _focus_border_rgba())
         finally:
             style.window_min_size = imgui.ImVec2(saved_min_x, saved_min_y)
         inline = self._controls.inline_edit

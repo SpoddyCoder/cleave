@@ -28,6 +28,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - The live preview takes its shape from Project > Resolution width and height, so it matches the rendered video, and letterboxes in the visualiser area. It renders only as many pixels as the visualiser area shows, up to the project resolution, so a 4K project no longer renders at 4K in a small window. The size follows window and column resizes. Overlay cards keep their size relative to the frame.
 - Project > Render Project is split into Project > Resolution (width and height, shared by the live preview and the render) and Project > Render (output, fps, quality, start, end). Width and height are stored in `project.yaml` under `resolution:`; `render:` keeps fps. Existing `render.width` and `render.height` are no longer read, so projects return to 1920x1080 until they are set again.
 - Hovering a menu bar title opens its menu without a click, and hovering another title switches to it.
+- The timeline strip fills the width of its panel, which has the same grey outline as the navigator and inspector instead of a white border. The panel is shorter, leaving more height for the visualiser, navigator, and inspector, and the selected-cue readout sits just above the first layer row.
 - The rule under the menu bar uses the same grey as the rule under the transport bar.
 - Transport bar text is uppercase, and BAR and FPS are white like the clock.
 - Overlay card title text and hex colours are edited in place in the inspector, and colour rows show a swatch that opens a colour picker with live preview. Esc reverts. Body text keeps its multi-line dialog. Song marker rows have a delete icon, and clicking a row seeks to the marker.
@@ -104,6 +105,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 - Settings > Editor Window > upscale, display size, and visualiser width and height. The window size comes from the window itself, and the preview resolution from Project > Render.
 - Settings > UI width mode, max width, and min width rows, and their `ui_width_mode`, `ui_width`, and `ui_min_width` keys in the user config. The shell layout no longer used them.
+- The current time badge above the timeline strip. The transport bar shows the time. REC still shows there while recording.
 
 ## [0.3.0] - 2026-10-12
 
