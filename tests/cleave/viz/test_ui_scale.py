@@ -30,20 +30,29 @@ def test_tuning_ui_metrics_default_scale() -> None:
 
 def test_timeline_ui_metrics_default_scale() -> None:
     metrics = timeline_ui_metrics(scale=1.0)
-    assert metrics.font_size == 14
-    assert metrics.padding == 8
-    assert metrics.row_height == 25
+    assert metrics.font_size == 11
+    assert metrics.padding == 6
+    assert metrics.row_height == 20
     assert metrics.row_gap == 2
 
 
 def test_timeline_panel_height_px_scales_with_ui_scale() -> None:
-    assert timeline_panel_height_px(4, scale=1.0) == 122
-    assert timeline_panel_height_px(4, scale=1.2) == 146
+    assert timeline_panel_height_px(4, scale=1.0) == 98
+    assert timeline_panel_height_px(4, scale=1.2) == 118
 
 
 def test_timeline_ui_metrics_row_height_scales() -> None:
-    assert timeline_ui_metrics(scale=1.0).row_height == 25
-    assert timeline_ui_metrics(scale=1.2).row_height == 30
+    assert timeline_ui_metrics(scale=1.0).row_height == 20
+    assert timeline_ui_metrics(scale=1.2).row_height == 24
+
+
+def test_timeline_is_smaller_than_ui_scale_at_every_scale() -> None:
+    from cleave.viz.theme import TIMELINE_SCALE, scale_px
+
+    for scale in (0.96, 1.2, 1.8, 2.4):
+        metrics = timeline_ui_metrics(scale=scale)
+        assert metrics.row_height == scale_px(25, scale=scale * TIMELINE_SCALE)
+        assert metrics.font_size == scale_px(14, scale=scale * TIMELINE_SCALE)
 
 
 def test_scale_px_rounds_and_clamps() -> None:
@@ -74,7 +83,7 @@ def test_set_ui_scale_percent_drives_metrics_and_generation() -> None:
         assert ui_scale_generation() == generation + 1
         assert ui_scale() == BASE_UI_SCALE * 2
         assert tuning_ui_metrics().font_size == 34
-        assert timeline_ui_metrics().row_height == 60
+        assert timeline_ui_metrics().row_height == 48
         assert ui_px(10) == 24
         set_ui_scale_percent(200)
         assert ui_scale_generation() == generation + 1

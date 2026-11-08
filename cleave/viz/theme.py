@@ -32,8 +32,9 @@ Layout scale:
   factor for every panel, modal, help column, and the timeline strip. Read metrics
   at draw time, never at import, so a scale change applies on the next frame.
 
-Timeline panel height is derived from a fixed per-row height (BASE_TIMELINE_ROW_HEIGHT)
-times row count plus padding and gaps via timeline_panel_height_px().
+The timeline strip draws at TIMELINE_SCALE of the UI scale. Its panel height is
+derived from a fixed per-row height (BASE_TIMELINE_ROW_HEIGHT) times row count plus
+padding and gaps via timeline_panel_height_px().
 
 Use tuning_ui_metrics(), timeline_ui_metrics(), timeline_panel_height_px(), and
 ui_px() for scaled layout; BORDER_WIDTH is not scaled.
@@ -51,6 +52,8 @@ from cleave.config_schema.editor import DEFAULT_UI_SCALE, clamp_ui_scale
 BASE_UI_FONT_SIZE: int = 14
 BASE_UI_SCALE: float = 1.2
 BASE_TIMELINE_ROW_HEIGHT: int = 25
+# The timeline strip is this fraction of the UI scale at every scale.
+TIMELINE_SCALE: float = 0.8
 
 _ui_scale_percent: int = DEFAULT_UI_SCALE
 _ui_scale_generation: int = 0
@@ -148,8 +151,10 @@ def tuning_ui_metrics(
 
 
 def timeline_ui_metrics(*, scale: float | None = None) -> TimelineUiMetrics:
+    """Timeline strip metrics for UI *scale* (default: the live scale)."""
     if scale is None:
         scale = ui_scale()
+    scale *= TIMELINE_SCALE
     return TimelineUiMetrics(
         font_size=scale_px(14, scale=scale),
         padding=scale_px(8, scale=scale),
