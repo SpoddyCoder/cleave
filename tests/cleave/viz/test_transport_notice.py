@@ -11,6 +11,7 @@ import pygame
 from imgui_bundle import imgui
 
 from cleave.viz.commands import CommandContext
+from cleave.viz.inline_edit import InlineEditController
 from cleave.viz.menu_bar import MenuBarState
 from cleave.viz.panel_notification import PanelNotificationActive
 from cleave.viz.shell_focus import ShellRegion
@@ -51,6 +52,8 @@ def _host() -> Iterator[object]:
         shell_focus=SimpleNamespace(region=ShellRegion.NAVIGATOR),
         build_view_state=lambda **_kwargs: None,
         set_shell_region=MagicMock(),
+        inline_edit=InlineEditController(),
+        transport=MagicMock(),
     )
     menu = MenuBarState()
     with patch.object(imgui_host, "_gl_context_current", return_value=False):

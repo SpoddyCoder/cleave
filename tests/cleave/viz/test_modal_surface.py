@@ -11,6 +11,7 @@ import pygame
 import pytest
 from imgui_bundle import imgui
 
+from cleave.viz.inline_edit import InlineEditController
 from cleave.viz.commands import CommandContext
 from cleave.viz.imgui_theme import rgba
 from cleave.viz.menu_bar import MenuBarState
@@ -97,6 +98,8 @@ def _host() -> Iterator[object]:
         set_shell_region=MagicMock(),
         modal_host=ModalHost(),
         disarm_value_nudge=MagicMock(),
+        inline_edit=InlineEditController(),
+        transport=MagicMock(),
     )
     with patch.object(imgui_host, "_gl_context_current", return_value=False):
         host = ShellHost(

@@ -17,6 +17,8 @@ from cleave.config_schema.render import (
     HIGHLIGHT_ROLLOFF_CURVES,
 )
 from cleave.timeline_presets import TIMELINE_PRESET_HELP_ENTRIES
+from unittest.mock import MagicMock
+from cleave.viz.inline_edit import InlineEditController
 from cleave.viz.help_column import help_column_text
 from cleave.viz.help_content import (
     DescriptionSection,
@@ -1024,6 +1026,8 @@ def test_help_column_draws_the_subject_stop() -> None:
             layer_z_order=("drums",),
             tracks={},
         ),
+        inline_edit=InlineEditController(),
+        transport=MagicMock(),
     )
     with patch.object(imgui_host, "_gl_context_current", return_value=False):
         from cleave.viz.imgui_host import ImGuiHost

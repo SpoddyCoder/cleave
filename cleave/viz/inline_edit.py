@@ -1,4 +1,7 @@
-"""Inline editing of an inspector row: a text field or a colour picker.
+"""Inline editing of a value in place: a text field or a colour picker.
+
+The target is an inspector ``RowDescriptor`` or another hashable key, such as
+a transport bar field.
 
 One edit runs at a time. While one is active it owns the keyboard, so typing
 never reaches a hotkey.
@@ -6,7 +9,7 @@ never reaches a hotkey.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Hashable
 from dataclasses import dataclass
 
 import pygame
@@ -26,7 +29,7 @@ Rgb = tuple[int, int, int]
 
 @dataclass
 class InlineTextState:
-    descriptor: RowDescriptor
+    target: Hashable
     draft: str
     caret_index: int
     initial: str
@@ -80,8 +83,8 @@ class InlineEditController:
         return self._text is not None or self._colour is not None
 
     @property
-    def text_target(self) -> RowDescriptor | None:
-        return None if self._text is None else self._text.descriptor
+    def text_target(self) -> Hashable | None:
+        return None if self._text is None else self._text.target
 
     @property
     def colour_edit(self) -> ColourEditState | None:
@@ -100,7 +103,7 @@ class InlineEditController:
 
     def begin_text(
         self,
-        descriptor: RowDescriptor,
+        target: Hashable,
         initial: str,
         on_commit: Callable[[str], None],
         *,
@@ -108,7 +111,7 @@ class InlineEditController:
     ) -> None:
         self.finish()
         self._text = InlineTextState(
-            descriptor=descriptor,
+            target=target,
             draft=initial,
             caret_index=len(initial),
             initial=initial,

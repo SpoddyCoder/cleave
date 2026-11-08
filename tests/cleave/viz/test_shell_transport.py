@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from cleave.viz.panel_notification import PanelNotificationActive
 from cleave.viz.shell_host import (
+    TransportPart,
     TransportReadout,
     panel_border_overlap_px,
     transport_content_pad_y,
@@ -11,7 +12,8 @@ from cleave.viz.shell_host import (
     transport_notice,
     transport_parts,
 )
-from cleave.viz.theme import ERROR_NOTIFICATION, HIGHLIGHT, MUTED, VALUE
+from cleave.viz.theme import ERROR_NOTIFICATION, HIGHLIGHT, VALUE
+from cleave.viz.transport_controls import TransportField
 
 
 def test_transport_parts_while_playing() -> None:
@@ -23,11 +25,12 @@ def test_transport_parts_while_playing() -> None:
         fps=60.0,
     )
     assert transport_parts(readout) == [
-        ("\u25b6 playing", VALUE),
-        ("01:23 / 04:12", VALUE),
-        ("bar 34", MUTED),
+        TransportPart("PLAYING", VALUE, TransportField.PLAY, icon="\u25b6"),
+        TransportPart("01:23", VALUE, TransportField.TIME),
+        TransportPart("/ 04:12", VALUE, gap=False),
+        TransportPart("BAR 34", VALUE, TransportField.BAR),
     ]
-    assert transport_fps_text(readout) == "60 fps"
+    assert transport_fps_text(readout) == "60 FPS"
 
 
 def test_transport_parts_while_paused() -> None:
@@ -39,11 +42,12 @@ def test_transport_parts_while_paused() -> None:
         fps=None,
     )
     assert transport_parts(readout) == [
-        ("\u275a\u275a pause", VALUE),
-        ("00:00 / 00:00", VALUE),
-        ("bar —", MUTED),
+        TransportPart("PAUSE", VALUE, TransportField.PLAY, icon="\u275a\u275a"),
+        TransportPart("00:00", VALUE, TransportField.TIME),
+        TransportPart("/ 00:00", VALUE, gap=False),
+        TransportPart("BAR —", VALUE),
     ]
-    assert transport_fps_text(readout) == "— fps"
+    assert transport_fps_text(readout) == "— FPS"
 
 
 def _active(

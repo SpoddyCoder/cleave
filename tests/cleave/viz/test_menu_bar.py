@@ -1312,6 +1312,8 @@ def _shell_controls() -> SimpleNamespace:
         value_nudge=SimpleNamespace(armed=False, desc=None, forward=False),
         disarm_value_nudge=MagicMock(),
         begin_value_nudge=MagicMock(),
+        inline_edit=InlineEditController(),
+        transport=MagicMock(),
     )
 
 

@@ -119,6 +119,7 @@ from cleave.viz.value_nudge import (
     value_parts,
 )
 from cleave.viz.top_layer import TopLayer
+from cleave.viz.transport_controls import TransportField
 
 # Vertical padding for the menu bar and the transport bar, which shares its height.
 # Dear ImGui's default FramePadding.y is 3, which leaves both rows cramped.
@@ -147,29 +148,60 @@ class TransportReadout:
     fps: float | None
 
 
-def transport_parts(readout: TransportReadout) -> list[tuple[str, tuple[int, int, int]]]:
-    """Play state, clock, and bar for the transport bar.
+@dataclass(frozen=True)
+class TransportPart:
+    """One piece of transport bar text.
 
-    Play and pause use the action role. The clock uses the value role.
-    The bar uses the muted role. Frame rate is ``transport_fps_text`` so the
-    bar can pin it to the right.
+    ``field`` is set on a part the pointer can use. ``gap`` is false on a
+    part that runs on from the one before it, such as the clock's duration.
+    ``icon`` is drawn before the text, one space apart, centred on its capitals.
+    """
+
+    text: str
+    color: tuple[int, int, int]
+    field: TransportField | None = None
+    gap: bool = True
+    icon: str = ""
+
+    @property
+    def label(self) -> str:
+        """Icon and text as laid out, for measuring."""
+        return f"{self.icon} {self.text}" if self.icon else self.text
+
+
+def transport_parts(readout: TransportReadout) -> list[TransportPart]:
+    """Play state, clock, and bar for the transport bar, all in the value role.
+
+    Play and pause, the current time, and the bar take the pointer. The bar
+    has no field when there is no downbeat grid. Frame rate is
+    ``transport_fps_text`` so the bar can pin it to the right.
     """
     icon = PAUSE_GLYPH if readout.paused else PLAY_GLYPH
-    word = "pause" if readout.paused else "playing"
-    clock = (
-        f"{format_mmss(readout.position_sec)} / {format_mmss(readout.duration_sec)}"
-    )
+    word = "PAUSE" if readout.paused else "PLAYING"
+    has_bars = readout.bar_text != "—"
     return [
-        (f"{icon} {word}", VALUE),
-        (clock, VALUE),
-        (f"bar {readout.bar_text}", MUTED),
+        TransportPart(word, VALUE, TransportField.PLAY, icon=icon),
+        TransportPart(format_mmss(readout.position_sec), VALUE, TransportField.TIME),
+        TransportPart(f"/ {format_mmss(readout.duration_sec)}", VALUE, gap=False),
+        TransportPart(
+            f"BAR {readout.bar_text}",
+            VALUE,
+            TransportField.BAR if has_bars else None,
+        ),
     ]
 
 
 def transport_fps_text(readout: TransportReadout) -> str:
-    """Muted frame-rate label pinned to the right of the transport bar."""
+    """Frame-rate label pinned to the right of the transport bar."""
     fps = format_fps_value(readout.fps) if readout.fps is not None else "—"
-    return f"{fps} fps"
+    return f"{fps} FPS"
+
+
+# Widest text the transport time and bar fields are sized for.
+_TRANSPORT_FIELD_TEMPLATE = {
+    TransportField.TIME: "000:00.0",
+    TransportField.BAR: "00000",
+}
 
 
 @dataclass(frozen=True)
@@ -1053,6 +1085,8 @@ class ShellHost:
         self._value_drag_crossed = False
         self._nudge_swallow = False
         self._inline_field_hovered = False
+        self._inline_began = False
+        self._transport_drag_accum = 0.0
         self._picker_pos = imgui.ImVec2(0.0, 0.0)
         # Live drag requests. A drag that moves at least 1px persists the stack,
         # help, or navigator height, then clears these.
@@ -1415,6 +1449,8 @@ class ShellHost:
             fps=readout.fps,
         )
         stop = self._cycle_stop(menu_state)
+        self._inline_field_hovered = False
+        self._inline_began = False
         style = imgui.get_style()
         # Default WindowMinSize is 32px, taller than this one-line bar, so the
         # transport was painted through its own text and over the side panels.
@@ -1469,6 +1505,16 @@ class ShellHost:
                 _draw_panel_focus_border(inspector)
         finally:
             style.window_min_size = imgui.ImVec2(saved_min_x, saved_min_y)
+        inline = self._controls.inline_edit
+        # A click outside the open text field keeps the edit. The click that
+        # opened a transport field this frame is not one.
+        if (
+            inline.text_target is not None
+            and imgui.is_mouse_clicked(0)
+            and not self._inline_field_hovered
+            and not self._inline_began
+        ):
+            inline.finish()
 
     def _draw_fixed_window(
         self,
@@ -1549,16 +1595,17 @@ class ShellHost:
         readout: TransportReadout,
         notice: PanelNotificationActive | None,
     ) -> None:
-        for index, (text, color) in enumerate(transport_parts(readout)):
+        for index, part in enumerate(transport_parts(readout)):
             if index:
-                imgui.same_line(0.0, ui_chrome_px(_TRANSPORT_GAP))
-            imgui.text_colored(rgba(color), text)
+                gap = ui_chrome_px(_TRANSPORT_GAP) if part.gap else 0.0
+                imgui.same_line(0.0, gap)
+            self._draw_transport_part(part)
         fps = transport_fps_text(readout)
         width = imgui.calc_text_size(fps).x
         avail = imgui.get_window_width()
         pad = imgui.get_style().window_padding.x
         imgui.same_line(max(imgui.get_cursor_pos_x(), avail - width - pad))
-        imgui.text_colored(rgba(MUTED), fps)
+        imgui.text_colored(rgba(VALUE), fps)
         line = None if notice is None else transport_notice(notice)
         if line is not None:
             chip = _draw_transport_notice(line)
@@ -1572,6 +1619,86 @@ class ShellHost:
             origin.y + size.y - 1.0,
             TRANSPORT_RULE,
         )
+
+    def _draw_transport_part(self, part: TransportPart) -> None:
+        """One transport part, with half a space each side for the hover fill.
+
+        Play and pause toggle on click. The time and the bar step while
+        dragged sideways and open a text field on double-click.
+        """
+        space = imgui.calc_text_size(" ").x
+        line = imgui.get_text_line_height()
+        text_w = imgui.calc_text_size(part.label).x
+        field = part.field
+        inline = self._controls.inline_edit
+        if field is not None and inline.text_target is field:
+            template = _TRANSPORT_FIELD_TEMPLATE[field]
+            width = max(text_w, imgui.calc_text_size(template).x) + space
+            imgui.dummy(imgui.ImVec2(width, line))
+            view = inline.text_view()
+            if view is not None:
+                self._paint_inline_field(
+                    imgui.get_item_rect_min(), imgui.get_item_rect_max(), view
+                )
+            return
+        if field is None or self._nudge_input_blocked():
+            imgui.dummy(imgui.ImVec2(text_w + space, line))
+            self._paint_transport_text(part, rgba(part.color), hovered=False)
+            return
+        transport = self._controls.transport
+        pressed = imgui.invisible_button(
+            f"##transport-{field.value}", imgui.ImVec2(text_w + space, line)
+        )
+        hovered = imgui.is_item_hovered()
+        active = imgui.is_item_active()
+        activated = imgui.is_item_activated()
+        released = imgui.is_item_deactivated()
+        self._paint_transport_text(
+            part, rgba(part.color), hovered=hovered or active
+        )
+        if field is TransportField.PLAY:
+            if pressed:
+                transport.toggle_pause()
+            return
+        if activated:
+            self._transport_drag_accum = 0.0
+            transport.begin_drag(field)
+        if active:
+            steps, self._transport_drag_accum = value_drag_steps(
+                self._transport_drag_accum + float(imgui.get_io().mouse_delta.x),
+                _VALUE_DRAG_THRESHOLD_PX,
+            )
+            transport.drag_step(field, steps)
+        if released:
+            transport.end_drag()
+        if hovered and imgui.is_mouse_double_clicked(0):
+            transport.end_drag()
+            transport.begin_entry(field)
+            self._inline_began = True
+
+    def _paint_transport_text(
+        self, part: TransportPart, color: imgui.ImVec4, *, hovered: bool
+    ) -> None:
+        rect_min = imgui.get_item_rect_min()
+        rect_max = imgui.get_item_rect_max()
+        draw = imgui.get_window_draw_list()
+        if hovered:
+            draw.add_rect_filled(
+                rect_min,
+                rect_max,
+                imgui.get_color_u32(
+                    rgba(NUDGE_HOVER_BG, NUDGE_HOVER_BG_ALPHA / 255.0)
+                ),
+            )
+            color = rgba(NUDGE_HOVER_FG)
+        space = imgui.calc_text_size(" ").x
+        u32 = imgui.get_color_u32(color)
+        x = rect_min.x + space * 0.5
+        if part.icon:
+            drop = _icon_drop_to_text(part.icon[0])
+            draw.add_text(imgui.ImVec2(x, rect_min.y + drop), u32, part.icon)
+            x += imgui.calc_text_size(f"{part.icon} ").x
+        draw.add_text(imgui.ImVec2(x, rect_min.y), u32, part.text)
 
     def _draw_navigator(self) -> None:
         imgui.push_style_color(imgui.Col_.text, rgba(LABEL))
@@ -1732,17 +1859,9 @@ class ShellHost:
             focus.nav_expanded,
         )
         imgui.text(inspector_title(nodes, focus.selected_id))
-        self._inline_field_hovered = False
         for row in build_inspector_rows(state, focus.selected_id):
             self._draw_inspector_row(state, row)
         self._draw_colour_picker()
-        inline = self._controls.inline_edit
-        if (
-            inline.text_target is not None
-            and imgui.is_mouse_clicked(0)
-            and not self._inline_field_hovered
-        ):
-            inline.finish()
 
     def _draw_inspector_row(self, state: Any, row: Any) -> None:
         focus = self._controls.shell_focus
@@ -1865,9 +1984,26 @@ class ShellHost:
         rect_max = imgui.get_item_rect_max()
         pad = imgui.get_style().frame_padding.x
         width = (rect_max.x - rect_min.x) * _INLINE_FIELD_WIDTH_FRACTION
-        field_min = imgui.ImVec2(rect_max.x - pad - width, rect_min.y)
-        field_max = imgui.ImVec2(rect_max.x - pad, rect_max.y)
-        self._inline_field_hovered = imgui.is_mouse_hovering_rect(field_min, field_max)
+        self._paint_inline_field(
+            imgui.ImVec2(rect_max.x - pad - width, rect_min.y),
+            imgui.ImVec2(rect_max.x - pad, rect_max.y),
+            view,
+            text_y=_selectable_text_y(rect_min.y),
+        )
+
+    def _paint_inline_field(
+        self,
+        field_min: imgui.ImVec2,
+        field_max: imgui.ImVec2,
+        view: Any,
+        *,
+        text_y: float | None = None,
+    ) -> None:
+        """A text field with a caret. *text_y* defaults to the field's top."""
+        if imgui.is_mouse_hovering_rect(field_min, field_max):
+            self._inline_field_hovered = True
+        pad = imgui.get_style().frame_padding.x
+        width = field_max.x - field_min.x
         draw = imgui.get_window_draw_list()
         draw.add_rect_filled(field_min, field_max, imgui.get_color_u32(rgba(BACKGROUND)))
         border = ERROR_NOTIFICATION if view.error is not None else HIGHLIGHT
@@ -1875,7 +2011,7 @@ class ShellHost:
         inner = width - pad * 2
         caret_x = imgui.calc_text_size(view.draft[: view.caret_index]).x
         text_x = field_min.x + pad - max(0.0, caret_x - inner)
-        y = _selectable_text_y(rect_min.y)
+        y = field_min.y if text_y is None else text_y
         draw.push_clip_rect(field_min, field_max, True)
         draw.add_text(imgui.ImVec2(text_x, y), imgui.get_color_u32(rgba(VALUE)), view.draft)
         if view.caret_visible:

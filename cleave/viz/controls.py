@@ -26,7 +26,7 @@ from cleave.viz.panel_notification import (
     PanelNotificationActive,
     PanelNotificationHost,
 )
-from cleave.viz.playback import PlaybackState, current_sec, seek, seek_to, toggle_pause
+from cleave.viz.playback import PlaybackState, current_sec, seek, seek_to
 from cleave.viz.live_layer_bindings import LiveLayerBindings
 from cleave.viz.overlay_controls import OverlaysControls
 from cleave.viz.pattern_mask_controls import PatternMaskControls
@@ -38,6 +38,7 @@ from cleave.viz.project_render_controls import ProjectRenderController
 from cleave.viz.project_switch import ProjectSwitchController
 from cleave.viz.song_marker_controls import SongMarkerController
 from cleave.viz.tap_sync_controls import TapSyncControls, TapSyncUiSnapshot
+from cleave.viz.transport_controls import TransportControls
 from cleave.viz.window_controls import WindowControls
 from cleave.viz.timeline_phase_controls import TimelinePhaseController
 from cleave.viz.timeline_history import TimelineHistory
@@ -130,6 +131,13 @@ class TuningControls:
         self._key_repeat = KeyRepeatController()
         self.value_nudge = ValueNudgeHold(self)
         self.window = WindowControls()
+        self.transport = TransportControls(
+            playback,
+            duration_sec,
+            bar_times,
+            self.inline_edit,
+            self.seek_to,
+        )
         self.layer_lifecycle = LayerLifecycleController(
             session,
             layer_manager,
@@ -435,7 +443,7 @@ class TuningControls:
             return self._tap_sync.handle_keydown(event) or True
 
         if event.key == pygame.K_SPACE:
-            toggle_pause(self.playback, self.duration_sec)
+            self.transport.toggle_pause()
             return True
 
         return True

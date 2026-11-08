@@ -18,6 +18,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Edit > Undo (Ctrl+Z) and Redo (Ctrl+Y) cover Generate timeline, Reset timeline, Snap cues, and Set cut type, including any preset lists and pattern mask settings Generate changed. Undo is unavailable after hand edits to cues, so it never discards them.
 - Settings > Preview > preview quality has an output setting that renders the live preview at the full project resolution, to check how it will look in the render.
 - File > New project (Ctrl+N) asks for an audio file, and File > Open project (Ctrl+O) asks for a project. Both switch the live session without quitting. A project with unsaved changes asks before leaving.
+- The transport bar takes the mouse. Click PLAYING / PAUSE to play or pause. Drag the current time or BAR sideways to scrub by a second or a bar, or double-click either to type a time (M:SS or seconds) or a bar number. Each highlights on hover.
 
 ### Changed
 
@@ -28,6 +29,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Project > Render Project is split into Project > Resolution (width and height, shared by the live preview and the render) and Project > Render (output, fps, quality, start, end). Width and height are stored in `project.yaml` under `resolution:`; `render:` keeps fps. Existing `render.width` and `render.height` are no longer read, so projects return to 1920x1080 until they are set again.
 - Hovering a menu bar title opens its menu without a click, and hovering another title switches to it.
 - The rule under the menu bar uses the same grey as the rule under the transport bar.
+- Transport bar text is uppercase, and BAR and FPS are white like the clock.
 - Overlay card title text and hex colours are edited in place in the inspector, and colour rows show a swatch that opens a colour picker with live preview. Esc reverts. Body text keeps its multi-line dialog. Song marker rows have a delete icon, and clicking a row seeks to the marker.
 - The preset list has a toolbar under it with Add current and Populate buttons, and paused switching shows a status line with a Resume button. The Layers navigator row has a + icon for adding a layer. Buttons in a locked section show the locked colour.
 - Timeline commands with parameters now open one dialog each, with a line showing what the choice will affect: Generate timeline (replaces the staged rows and Apply Timeline Preset), Snap cues (beats, bars, or song markers), and Set cut type (replaces the four Apply and Remove rows). Reset timeline and Populate presets also use this dialog. The Timeline Preset page is gone; Generate and Reset are on the Timeline page. Dialog values take effect only when confirmed, and Generate keeps its values in the project as before.
