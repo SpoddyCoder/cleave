@@ -272,7 +272,7 @@ def test_section_lock_inspector_refuses_edits_and_delete_still_prompts() -> None
     assert layer.locked is True
 
     _focus_inspector(
-        controls, "layer_1", RowDescriptor(RowKind.TRACK_PRESET, slot="layer_1")
+        controls, "layer_1", RowDescriptor(RowKind.TRACK_BEAT, slot="layer_1")
     )
     found_delete = False
     for _ in range(32):

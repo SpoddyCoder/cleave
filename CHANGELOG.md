@@ -32,6 +32,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Project > Render Project is split into Project > Resolution (width and height, shared by the live preview and the render) and Project > Render (output, fps, quality, start, end). Width and height are stored in `project.yaml` under `resolution:`; `render:` keeps fps. Existing `render.width` and `render.height` are no longer read, so projects return to 1920x1080 until they are set again.
 - Hovering a menu bar title opens its menu without a click, and hovering another title switches to it.
 - A layer's preset list has its own Preset List page in the navigator, below Preset Switching. It is hidden while the switching trigger is Off.
+- A layer's preset directory and preset rows, and the Switching paused / Resume row, have their own Milkdrop Preset page in the navigator, above Preset Switching.
 - The timeline strip fills the width of its panel, which has the same grey outline as the navigator and inspector instead of a white border. The panel is shorter, leaving more height for the visualiser, navigator, and inspector, and the selected-cue readout sits just above the first layer row. The strip's text, rows, and spacing are 20% smaller than the rest of the UI at every UI scale.
 - The rule under the menu bar uses the same grey as the rule under the transport bar.
 - Transport bar text is uppercase, and BAR and FPS are white like the clock.

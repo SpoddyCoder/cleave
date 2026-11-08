@@ -144,11 +144,13 @@ def test_full_tree_order_and_labels() -> None:
         "Song Markers",
         "Layers",
         "1  DRUMS",
+        "Milkdrop Preset",
         "Preset Switching",
         "Preset List",
         "Compositing",
         "Cleave Effects",
         "2  BASS",
+        "Milkdrop Preset",
         "Preset Switching",
         "Compositing",
         "Cleave Effects",
@@ -240,6 +242,7 @@ def test_open_layer_shows_its_pages_only() -> None:
     pages = tuple(node for node in nodes if node.depth == 2)
 
     assert tuple(node.id for node in pages) == (
+        layer_page_node_id("layer_1", "milkdrop_preset"),
         layer_page_node_id("layer_1", "preset_switching"),
         layer_page_node_id("layer_1", "preset_list"),
         layer_page_node_id("layer_1", "compositing"),

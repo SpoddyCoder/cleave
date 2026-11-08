@@ -352,6 +352,7 @@ def test_track_sub_row_kinds() -> None:
             RowKind.TRACK_ENABLED,
             RowKind.TRACK_SOLO,
             RowKind.TRACK_LOCKED,
+            RowKind.TRACK_MILKDROP_PRESET_HEADER,
             RowKind.TRACK_PRESET_DIR,
             RowKind.TRACK_PRESET,
             RowKind.TRACK_PRESET_SWITCHING,
@@ -386,6 +387,7 @@ def test_locked_navigable_sub_row_kinds() -> None:
     )
     assert navigable == frozenset(
         {
+            RowKind.TRACK_MILKDROP_PRESET_HEADER,
             RowKind.TRACK_PRESET_SWITCHING,
             RowKind.TRACK_PRESET_LIST,
             RowKind.TRACK_COMPOSITING_HEADER,
@@ -431,6 +433,7 @@ def test_track_value_rows_blocked_by_section_lock() -> None:
 
 def test_only_effects_header_navigable_when_section_locked() -> None:
     navigable_when_locked = {
+        RowKind.TRACK_MILKDROP_PRESET_HEADER,
         RowKind.TRACK_PRESET_SWITCHING,
         RowKind.TRACK_PRESET_LIST,
         RowKind.TRACK_COMPOSITING_HEADER,
@@ -985,7 +988,7 @@ def test_preset_list_populate_is_full_line_action() -> None:
 
 def test_resume_switching_row_only_while_paused() -> None:
     from cleave.viz.inspector import build_inspector_rows
-    from cleave.viz.navigator import layer_node_id
+    from cleave.viz.navigator import layer_page_node_id
 
     spec = row_spec(RowKind.TRACK_PRESET_SWITCHING_RESUME)
     assert spec.affordance == RowAffordance.COMMAND
@@ -1011,7 +1014,9 @@ def test_resume_switching_row_only_while_paused() -> None:
                 )
             }
         )
-        rows = build_inspector_rows(state, layer_node_id("layer_1"))
+        rows = build_inspector_rows(
+            state, layer_page_node_id("layer_1", "milkdrop_preset")
+        )
         return rows
 
     def resume_index(rows) -> int | None:

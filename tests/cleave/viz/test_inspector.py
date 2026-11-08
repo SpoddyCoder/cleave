@@ -354,8 +354,6 @@ def test_layer_page_keeps_direct_rows_and_delete() -> None:
         RowKind.TRACK_LOCKED,
         RowKind.TRACK_STEM,
         RowKind.TRACK_BEAT,
-        RowKind.TRACK_PRESET_DIR,
-        RowKind.TRACK_PRESET,
     ]
     assert rows[-1].command_ids == ("layers.delete",)
     assert rows[-1].navigable is True

@@ -297,10 +297,12 @@ def test_builder_mirrors_switching_paused_into_inspector() -> None:
     controls._view_state._layers_by_slot = {"layer_1": stem}
 
     from cleave.viz.inspector import build_inspector_rows
-    from cleave.viz.navigator import layer_node_id
+    from cleave.viz.navigator import layer_page_node_id
 
     def inspector_commands(view: object) -> set[str]:
-        rows = build_inspector_rows(view, layer_node_id("layer_1"))
+        rows = build_inspector_rows(
+            view, layer_page_node_id("layer_1", "milkdrop_preset")
+        )
         return {command for row in rows for command in row.command_ids}
 
     hidden = controls.build_view_state(paused=False)

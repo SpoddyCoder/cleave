@@ -31,12 +31,14 @@ TOGGLE_SOLO = "solo"
 TOGGLE_LOCK = "lock"
 TOGGLE_ADD = "add"
 
+LAYER_PAGE_MILKDROP_PRESET = "milkdrop_preset"
 LAYER_PAGE_PRESET_SWITCHING = "preset_switching"
 LAYER_PAGE_PRESET_LIST = "preset_list"
 LAYER_PAGE_COMPOSITING = "compositing"
 LAYER_PAGE_EFFECTS = "effects"
 
 _LAYER_PAGES: tuple[tuple[str, str], ...] = (
+    (LAYER_PAGE_MILKDROP_PRESET, "Milkdrop Preset"),
     (LAYER_PAGE_PRESET_SWITCHING, "Preset Switching"),
     (LAYER_PAGE_PRESET_LIST, "Preset List"),
     (LAYER_PAGE_COMPOSITING, "Compositing"),

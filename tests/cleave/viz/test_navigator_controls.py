@@ -106,7 +106,8 @@ def test_enter_on_layers_opens_inspector() -> None:
         if row.descriptor is not None
     ]
     assert RowKind.TRACK_HEADER not in layer_kinds
-    assert RowKind.TRACK_PRESET in layer_kinds
+    assert RowKind.TRACK_BEAT in layer_kinds
+    assert RowKind.TRACK_PRESET not in layer_kinds
     assert focus.inspector_cursor == next(
         row.descriptor
         for row in layer_rows

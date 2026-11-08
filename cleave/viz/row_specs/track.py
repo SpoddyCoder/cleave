@@ -481,6 +481,17 @@ SPECS: dict[RowKind, RowSpec] = {
         parent_group="track",
         blocked_by_section_lock=False,
     ),
+    RowKind.TRACK_MILKDROP_PRESET_HEADER: RowSpec(
+        affordance=RowAffordance.HEADING,
+        panel_label="milkdrop preset",
+        present_style=RowPresentStyle.HEADING,
+        fit_strategy=FitStrategy.NONE,
+        help_title="Milkdrop Preset",
+        help_description=(
+            "Preset directory and active Milkdrop preset for this layer.",
+        ),
+        parent_group="track",
+    ),
     RowKind.TRACK_PRESET_DIR: RowSpec(
         affordance=RowAffordance.PATH_DIR,
         panel_label="preset directory",

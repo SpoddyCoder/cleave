@@ -54,6 +54,11 @@ def test_layer_page_holds_only_its_own_rows() -> None:
         RowKind.TRACK_LOCKED,
         RowKind.TRACK_STEM,
         RowKind.TRACK_BEAT,
+    ]
+
+
+def test_milkdrop_preset_page_holds_dir_and_preset() -> None:
+    assert _page_kinds(layer_page_node_id("layer_1", "milkdrop_preset")) == [
         RowKind.TRACK_PRESET_DIR,
         RowKind.TRACK_PRESET,
     ]

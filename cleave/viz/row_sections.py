@@ -543,6 +543,16 @@ PRESET_SWITCHING_ACTIVE = ConditionalRowsDef(
     ),
 )
 
+TRACK_MILKDROP_PRESET_SECTION = SectionDef(
+    header_kind=RowKind.TRACK_MILKDROP_PRESET_HEADER,
+    context="per_slot",
+    children=(
+        SectionNode(leaf_kind=RowKind.TRACK_PRESET_DIR),
+        SectionNode(leaf_kind=RowKind.TRACK_PRESET),
+        SectionNode(conditional=PRESET_SWITCHING_PAUSED),
+    ),
+)
+
 TRACK_PRESET_SWITCHING_SECTION = SectionDef(
     header_kind=RowKind.TRACK_PRESET_SWITCHING,
     context="per_slot",
@@ -577,9 +587,6 @@ TRACK_SECTION = SectionDef(
         SectionNode(leaf_kind=RowKind.TRACK_LOCKED),
         SectionNode(leaf_kind=RowKind.TRACK_STEM),
         SectionNode(leaf_kind=RowKind.TRACK_BEAT),
-        SectionNode(leaf_kind=RowKind.TRACK_PRESET_DIR),
-        SectionNode(leaf_kind=RowKind.TRACK_PRESET),
-        SectionNode(conditional=PRESET_SWITCHING_PAUSED),
         SectionNode(commands=("layers.delete",)),
     ),
 )

@@ -15,6 +15,7 @@ class RowKind(Enum):
     TRACK_ENABLED = auto()
     TRACK_SOLO = auto()
     TRACK_LOCKED = auto()
+    TRACK_MILKDROP_PRESET_HEADER = auto()
     TRACK_PRESET_DIR = auto()
     TRACK_PRESET = auto()
     TRACK_PRESET_SWITCHING = auto()
