@@ -394,20 +394,22 @@ def _draw_level_bar(
     pygame.draw.rect(panel, OFF_SEGMENT_COLOR, bar_rect)
     if duration_sec <= 0.0 or len(breakpoints) < 2:
         return
-    bottom = bar_rect.bottom
+    # Polygon fills include their vertices; Rect.bottom/right are exclusive.
+    bottom = bar_rect.bottom - 1
+    right = bar_rect.right - 1
     for index in range(len(breakpoints) - 1):
         t0, level0 = breakpoints[index]
         t1, level1 = breakpoints[index + 1]
         if t1 <= t0:
             continue
         x0 = time_to_x(t0, bar_left, bar_width, duration_sec)
-        x1 = time_to_x(t1, bar_left, bar_width, duration_sec)
+        x1 = min(time_to_x(t1, bar_left, bar_width, duration_sec), right)
         if x1 <= x0:
             continue
         if level0 <= LEVEL_EPS and level1 <= LEVEL_EPS:
             continue
-        y0 = bar_level_y(bar_rect, level0)
-        y1 = bar_level_y(bar_rect, level1)
+        y0 = min(bar_level_y(bar_rect, level0), bottom)
+        y1 = min(bar_level_y(bar_rect, level1), bottom)
         mean_level = 0.5 * (level0 + level1)
         color = _lerp_rgb(_BAR_LEVEL_DIM, TIMELINE_BAR_ON, mean_level)
         pygame.draw.polygon(

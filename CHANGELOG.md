@@ -90,6 +90,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- Timeline on sections no longer draw a 1px line below the bar (or past its right end), so the strip sits centred.
 - Menu dropdown labels sit centred in their highlight, and the menu-bar letter underline sits two pixels under the letter at every UI scale.
 - Dragging or moving a preset in the Preset List carries the selection highlight with it, as layer reordering does, instead of leaving it on the old position.
 - Every song marker row takes the mouse, not just the first, and its delete icon highlights on hover and asks to delete that marker.
