@@ -32,11 +32,13 @@ TOGGLE_LOCK = "lock"
 TOGGLE_ADD = "add"
 
 LAYER_PAGE_PRESET_SWITCHING = "preset_switching"
+LAYER_PAGE_PRESET_LIST = "preset_list"
 LAYER_PAGE_COMPOSITING = "compositing"
 LAYER_PAGE_EFFECTS = "effects"
 
 _LAYER_PAGES: tuple[tuple[str, str], ...] = (
     (LAYER_PAGE_PRESET_SWITCHING, "Preset Switching"),
+    (LAYER_PAGE_PRESET_LIST, "Preset List"),
     (LAYER_PAGE_COMPOSITING, "Compositing"),
     (LAYER_PAGE_EFFECTS, "Cleave Effects"),
 )
@@ -288,7 +290,7 @@ def _layer_children(
         node = _layer_node(session, slot, expandable=not curation)
         nodes.append(node)
         if not curation and node.id in expanded:
-            nodes.extend(_layer_page_nodes(slot))
+            nodes.extend(_layer_page_nodes(session, slot))
     return tuple(nodes)
 
 
@@ -327,7 +329,13 @@ def _layer_toggles(session: TuningSession, slot: str) -> tuple[NavToggle, ...]:
     )
 
 
-def _layer_page_nodes(slot: str) -> tuple[NavNode, ...]:
+def _layer_page_visible(session: TuningSession, slot: str, page: str) -> bool:
+    if page == LAYER_PAGE_PRESET_LIST:
+        return session.layers[slot].preset_switching_trigger != "off"
+    return True
+
+
+def _layer_page_nodes(session: TuningSession, slot: str) -> tuple[NavNode, ...]:
     return tuple(
         NavNode(
             id=layer_page_node_id(slot, page),
@@ -338,6 +346,7 @@ def _layer_page_nodes(slot: str) -> tuple[NavNode, ...]:
             slot=slot,
         )
         for page, label in _LAYER_PAGES
+        if _layer_page_visible(session, slot, page)
     )
 
 

@@ -379,9 +379,9 @@ def test_dynamic_effect_and_preset_rows_keep_slot_identity() -> None:
     ]
 
     rows = build_inspector_rows(
-        state, layer_page_node_id("layer_1", "preset_switching")
+        state, layer_page_node_id("layer_1", "preset_list")
     )
-    assert _headings(rows) == [RowKind.TRACK_PRESET_LIST]
+    assert _headings(rows) == []
     items = [
         row.descriptor
         for row in rows

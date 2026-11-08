@@ -495,7 +495,7 @@ HARD_CUT_ENABLED = ConditionalRowsDef(
     ),
 )
 
-PRESET_LIST_SECTION = SectionDef(
+TRACK_PRESET_LIST_SECTION = SectionDef(
     header_kind=RowKind.TRACK_PRESET_LIST,
     context="per_slot",
     children=(),
@@ -540,7 +540,6 @@ PRESET_SWITCHING_ACTIVE = ConditionalRowsDef(
         SectionNode(conditional=PRESET_SWITCHING_USES_DURATION),
         SectionNode(conditional=PRESET_SWITCHING_PROJECTM_TRIGGER),
         SectionNode(leaf_kind=RowKind.TRACK_PRESET_START_CLEAN),
-        SectionNode(subsection=PRESET_LIST_SECTION),
     ),
 )
 

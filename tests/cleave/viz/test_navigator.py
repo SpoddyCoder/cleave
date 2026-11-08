@@ -125,6 +125,7 @@ def test_top_level_order_and_labels() -> None:
 
 def test_full_tree_order_and_labels() -> None:
     session = _two_layers()
+    session.layers["layer_2"].preset_switching_trigger = "timer"
     nodes = build_navigator(session, _all_open(session) | {layer_node_id("layer_2")})
 
     assert tuple(node.label for node in nodes) == (
@@ -144,6 +145,7 @@ def test_full_tree_order_and_labels() -> None:
         "Layers",
         "1  DRUMS",
         "Preset Switching",
+        "Preset List",
         "Compositing",
         "Cleave Effects",
         "2  BASS",
@@ -232,16 +234,27 @@ def test_roots_and_layer_rows_are_bright_but_not_their_children() -> None:
 
 def test_open_layer_shows_its_pages_only() -> None:
     open_id = layer_node_id("layer_1")
-    nodes = build_navigator(_two_layers(), {"layers", open_id})
+    session = _two_layers()
+    session.layers["layer_1"].preset_switching_trigger = "timer"
+    nodes = build_navigator(session, {"layers", open_id})
     pages = tuple(node for node in nodes if node.depth == 2)
 
     assert tuple(node.id for node in pages) == (
         layer_page_node_id("layer_1", "preset_switching"),
+        layer_page_node_id("layer_1", "preset_list"),
         layer_page_node_id("layer_1", "compositing"),
         layer_page_node_id("layer_1", "effects"),
     )
     assert all(node.parent_id == open_id for node in pages)
     assert all(node.slot == "layer_1" for node in pages)
+
+
+def test_preset_list_page_hides_while_switching_is_off() -> None:
+    open_id = layer_node_id("layer_1")
+    nodes = build_navigator(_two_layers(), {"layers", open_id})
+    assert layer_page_node_id("layer_1", "preset_list") not in {
+        node.id for node in nodes
+    }
 
 
 def test_collapsed_tree_is_roots_only() -> None:

@@ -146,11 +146,11 @@ def test_inspector_preset_item_delete_and_move_stay_on_the_item() -> None:
     controls.shell_focus.inspector_cursor = item
     view = controls.build_view_state(paused=False)
     rows = build_inspector_rows(
-        view, layer_page_node_id("layer_1", "preset_switching")
+        view, layer_page_node_id("layer_1", "preset_list")
     )
     assert any(row.descriptor == item for row in rows)
     controls.shell_focus.selected_id = layer_page_node_id(
-        "layer_1", "preset_switching"
+        "layer_1", "preset_list"
     )
     runtime = _runtime(controls)
 
@@ -241,14 +241,14 @@ def test_section_lock_inspector_refuses_edits_and_delete_still_prompts() -> None
 
     view = controls.build_view_state(paused=False)
     built = build_inspector_rows(
-        view, layer_page_node_id("layer_1", "preset_switching")
+        view, layer_page_node_id("layer_1", "preset_list")
     )
     add_row = next(
         row for row in built if "layers.add_current_preset" in row.command_ids
     )
     assert add_row.navigable
     controls.shell_focus.selected_id = layer_page_node_id(
-        "layer_1", "preset_switching"
+        "layer_1", "preset_list"
     )
     controls.inspector.focus_command(add_row, "layers.add_current_preset")
     assert dispatch_keydown(keydown(pygame.K_LEFT), runtime) is True

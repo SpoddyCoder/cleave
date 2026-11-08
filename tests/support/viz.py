@@ -18,6 +18,7 @@ from cleave.viz.focus_nav import MainFocus
 from cleave.viz.navigator import (
     LAYER_PAGE_COMPOSITING,
     LAYER_PAGE_EFFECTS,
+    LAYER_PAGE_PRESET_LIST,
     LAYER_PAGE_PRESET_SWITCHING,
     layer_node_id,
     layer_page_node_id,
@@ -246,6 +247,10 @@ _PRESET_SWITCHING_PAGE_KINDS = frozenset(
         RowKind.TRACK_HARD_CUT_DURATION,
         RowKind.TRACK_HARD_CUT_SENSITIVITY,
         RowKind.TRACK_PRESET_START_CLEAN,
+    }
+)
+_PRESET_LIST_PAGE_KINDS = frozenset(
+    {
         RowKind.TRACK_PRESET_LIST,
         RowKind.TRACK_PRESET_LIST_ITEM,
         RowKind.TRACK_PRESET_LIST_ADD,
@@ -259,6 +264,8 @@ def layer_page_id_for_row(slot: str, kind: RowKind) -> str:
     """Navigator id of the page that shows *kind* for *slot*."""
     if kind in _PRESET_SWITCHING_PAGE_KINDS:
         return layer_page_node_id(slot, LAYER_PAGE_PRESET_SWITCHING)
+    if kind in _PRESET_LIST_PAGE_KINDS:
+        return layer_page_node_id(slot, LAYER_PAGE_PRESET_LIST)
     if kind in _COMPOSITING_PAGE_KINDS:
         return layer_page_node_id(slot, LAYER_PAGE_COMPOSITING)
     if kind is RowKind.TRACK_EFFECT:

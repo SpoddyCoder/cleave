@@ -185,3 +185,18 @@ def test_reconcile_opens_the_branch_it_lands_on() -> None:
     controls.navigator.reconcile()
     assert focus.selected_id == "layers"
     assert "layers" in focus.nav_expanded
+
+
+def test_switching_off_moves_selection_off_the_preset_list_page() -> None:
+    controls = _make_controls(("layer_1",))
+    focus = controls.shell_focus
+    layer = controls.session.layers["layer_1"]
+    layer.preset_switching_trigger = "timer"
+    page = layer_page_node_id("layer_1", "preset_list")
+    controls.navigator.select(page)
+    controls.navigator.reconcile()
+    assert focus.selected_id == page
+
+    layer.preset_switching_trigger = "off"
+    controls.navigator.reconcile()
+    assert focus.selected_id == layer_node_id("layer_1")

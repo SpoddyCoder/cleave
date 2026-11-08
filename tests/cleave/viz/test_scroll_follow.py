@@ -14,7 +14,7 @@ from cleave.viz.commands import CommandContext
 from cleave.viz.imgui_host import ImGuiHost
 from cleave.viz.menu_bar import MenuBarState
 from cleave.viz.navigator import (
-    LAYER_PAGE_PRESET_SWITCHING,
+    LAYER_PAGE_PRESET_LIST,
     TOP_LEVEL_IDS,
     layer_node_id,
     layer_page_node_id,
@@ -144,7 +144,7 @@ def _long_preset_page():
     block.preset_switching_trigger = "timer"
     block.preset_list = [f"/tmp/presets/layer_1/preset-{i}.milk" for i in range(60)]
     controls.navigator.select(
-        layer_page_node_id("layer_1", LAYER_PAGE_PRESET_SWITCHING)
+        layer_page_node_id("layer_1", LAYER_PAGE_PRESET_LIST)
     )
     controls.navigator.activate()
     assert controls.shell_focus.region is ShellRegion.INSPECTOR

@@ -71,7 +71,7 @@ def test_preset_switching_conditional_rows_when_predicates_pass() -> None:
     timer_kinds = _switching_kinds(preset_switching_trigger="timer")
     assert RowKind.TRACK_PRESET_DURATION in timer_kinds
     assert RowKind.TRACK_PRESET_START_CLEAN in timer_kinds
-    assert RowKind.TRACK_PRESET_LIST in timer_kinds
+    assert RowKind.TRACK_PRESET_LIST not in timer_kinds
     assert RowKind.TRACK_SOFT_CUT_DURATION not in timer_kinds
     assert RowKind.TRACK_HARD_CUT_ENABLED not in timer_kinds
 
@@ -105,7 +105,15 @@ def test_preset_switching_row_order() -> None:
         RowKind.TRACK_HARD_CUT_DURATION,
         RowKind.TRACK_HARD_CUT_SENSITIVITY,
         RowKind.TRACK_PRESET_START_CLEAN,
-        RowKind.TRACK_PRESET_LIST,
+    ]
+
+
+def test_preset_list_page_holds_the_list() -> None:
+    assert _page_kinds(
+        layer_page_node_id("layer_1", "preset_list"),
+        preset_switching_trigger="off",
+        preset_list=["a.milk", "b.milk"],
+    ) == [
         RowKind.TRACK_PRESET_LIST_ITEM,
         RowKind.TRACK_PRESET_LIST_ITEM,
     ]
