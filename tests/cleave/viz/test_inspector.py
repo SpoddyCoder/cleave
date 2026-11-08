@@ -7,7 +7,11 @@ import pytest
 from cleave.effects.registry import effect_roster
 from cleave.viz.focus_nav import MainFocus
 from cleave.viz.inspector import build_inspector_rows
-from cleave.viz.navigator import layer_node_id, layer_page_node_id
+from cleave.viz.navigator import (
+    LAYER_PAGE_MILKDROP_PRESET,
+    layer_node_id,
+    layer_page_node_id,
+)
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.row_present_renderers import inspector_field_colors
 from cleave.viz.row_sections import SECTION_SWITCH_KINDS
@@ -94,9 +98,9 @@ def test_root_pages_list_only_their_switches(
     node_id: str, kinds: tuple[RowKind, ...]
 ) -> None:
     rows = build_inspector_rows(_view_state(), node_id)
-    fields = tuple(row for row in rows if not row.command_ids)
+    fields = tuple(row for row in rows if not row.command_ids and not row.divider)
     assert tuple(row.descriptor.kind for row in fields) == kinds
-    assert all(row.navigable for row in rows)
+    assert all(row.navigable for row in rows if not row.divider)
 
 
 def test_layer_page_opens_with_its_switches() -> None:
@@ -306,11 +310,12 @@ def test_song_markers_page_is_snap_and_marker_rows() -> None:
     rows = build_inspector_rows(state, "timeline.song_markers")
     kinds = _kinds(rows)
 
-    assert rows[0].command_ids == ("timeline.snap_to_markers",)
-    assert all(not row.command_ids for row in rows[1:])
+    assert rows[-1].command_ids == ("timeline.snap_to_markers",)
+    assert rows[-2].divider
+    assert all(not row.command_ids for row in rows[:-1])
     markers = [
         row.descriptor
-        for row in rows[1:]
+        for row in rows[:-2]
         if row.descriptor.kind is RowKind.SONG_MARKER_ITEM
     ]
     assert [desc.marker_index for desc in markers] == [0, 1, 2]
@@ -412,8 +417,9 @@ def test_layers_root_count_and_curation_omits_add() -> None:
     state = _layer_view(("layer_1", "layer_2"))
     rows = build_inspector_rows(state, "layers")
     assert _kinds(rows) == [RowKind.LAYER_MANAGEMENT_COUNT]
-    assert rows[1].command_ids == ("layers.add",)
-    assert rows[1].navigable is True
+    assert rows[1].divider and rows[1].navigable is False
+    assert rows[2].command_ids == ("layers.add",)
+    assert rows[2].navigable is True
     count = rows[0]
     assert count.navigable is False
     assert count.is_heading is False
@@ -440,3 +446,41 @@ def test_layer_missing_from_view_state_has_no_rows(page: str | None) -> None:
         else layer_page_node_id("layer_6", page)
     )
     assert build_inspector_rows(state, node_id) == ()
+
+
+@pytest.mark.parametrize(
+    "node_id",
+    (
+        "settings.preview",
+        "project.render",
+        "timeline",
+        "timeline.grid",
+        "timeline.cue_fades",
+        "timeline.song_markers",
+        "layers",
+    ),
+)
+def test_buttons_sit_at_page_bottom_under_one_divider(node_id: str) -> None:
+    state = _layer_view(("layer_1",))
+    state.timeline.song_marker_times = (1.0, 4.0)
+    rows = build_inspector_rows(state, node_id)
+    first_command = next(i for i, row in enumerate(rows) if row.command_ids)
+    assert rows[first_command - 1].divider
+    assert sum(row.divider for row in rows) == 1
+    assert all(row.command_ids and row.depth == 0 for row in rows[first_command:])
+
+
+def test_paused_switching_button_moves_below_preset_fields() -> None:
+    slot = "layer_1"
+    state = _layer_view((slot,), trigger="timer")
+    state.tracks[slot].runtime.switching_paused = True
+    rows = build_inspector_rows(
+        state, layer_page_node_id(slot, LAYER_PAGE_MILKDROP_PRESET)
+    )
+    assert [row.command_ids for row in rows[-2:]] == [
+        ("layers.add_current_preset",),
+        ("layers.resume_switching",),
+    ]
+    assert rows[-3].divider
+    assert rows[-1].status == "Switching paused"
+

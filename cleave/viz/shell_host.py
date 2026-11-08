@@ -94,6 +94,7 @@ from cleave.viz.theme import (
     FOCUS_BORDER_ALPHA,
     FOCUS_WASH_ALPHA,
     HIGHLIGHT,
+    INSPECTOR_DIVIDER,
     LABEL,
     LOCK_ICON,
     LOCKED,
@@ -141,6 +142,8 @@ _MENU_BAR_FRAME_PADDING_Y = 8.0
 # Extra space between the menu-bar rule and the first popup row.
 _MENU_POPUP_TOP_PAD_PX = 4.0
 _INSPECTOR_INDENT = 16.0
+# Height of an inspector divider, as a fraction of the text line.
+_INSPECTOR_DIVIDER_LINES = 0.5
 _NAV_LOCK_MARK = "[lock]"
 # Fixed columns, so a row without solo keeps its icons under the rows that have it.
 _NAV_TOGGLE_COLUMNS = (TOGGLE_ENABLED, TOGGLE_SOLO, TOGGLE_LOCK)
@@ -928,6 +931,15 @@ def _stroke_h_rule(
         imgui.ImVec2(x1, y + 1.0),
         color,
     )
+
+
+def _draw_inspector_divider() -> None:
+    """Thin rule across the inspector, shorter than a row; takes no input."""
+    height = imgui.get_text_line_height() * _INSPECTOR_DIVIDER_LINES
+    origin = imgui.get_cursor_screen_pos()
+    x1 = origin.x + imgui.get_content_region_avail().x
+    _stroke_h_rule(origin.x, x1, float(int(origin.y + height * 0.5)), INSPECTOR_DIVIDER)
+    imgui.dummy(imgui.ImVec2(0.0, height))
 
 
 def _focus_border_rgba() -> imgui.ImVec4:
@@ -1908,8 +1920,12 @@ class ShellHost:
             focus.nav_expanded,
         )
         imgui.text(inspector_title(nodes, focus.selected_id))
+        _draw_inspector_divider()
         self._choice_rects = {}
         for row in build_inspector_rows(state, focus.selected_id):
+            if row.divider:
+                _draw_inspector_divider()
+                continue
             self._draw_inspector_row(state, row)
         self._finish_row_drag(DRAG_PRESET)
         self._draw_colour_picker()

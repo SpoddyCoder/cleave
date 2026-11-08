@@ -5,7 +5,7 @@ Rows are a pure function of view state and node id. This module does not draw.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
 from cleave.viz.editor_mode_controls import is_preset_curation_mode
@@ -64,6 +64,18 @@ class InspectorRow:
     navigable: bool
     command_ids: tuple[str, ...] = ()
     status: str | None = None
+    divider: bool = False
+
+
+# A thin rule between rows. It is not a row: no cursor, no click, and less
+# than a row of height.
+DIVIDER_ROW = InspectorRow(
+    descriptor=None,
+    is_heading=False,
+    depth=0,
+    navigable=False,
+    divider=True,
+)
 
 
 _PAGE_SECTIONS: dict[str, SectionDef] = {
@@ -118,7 +130,8 @@ def build_inspector_rows(
 
     Settings, Project, and an unknown id are empty. A layer not yet in
     *state* (added this frame, after the view state was built) is empty
-    until the next frame.
+    until the next frame. Button rows go to the bottom of the page in their
+    page order, under a divider when other rows sit above them.
     """
     section = page_section(state, node_id)
     if section is None:
@@ -128,7 +141,15 @@ def build_inspector_rows(
         return ()
     rows: list[InspectorRow] = []
     _append_section_children(rows, section, state, 0, slot)
-    return tuple(rows)
+    return _commands_last(rows)
+
+
+def _commands_last(rows: list[InspectorRow]) -> tuple[InspectorRow, ...]:
+    fields = [row for row in rows if not row.command_ids]
+    commands = [replace(row, depth=0) for row in rows if row.command_ids]
+    if fields and commands:
+        return (*fields, DIVIDER_ROW, *commands)
+    return (*fields, *commands)
 
 
 def _inspector_row(

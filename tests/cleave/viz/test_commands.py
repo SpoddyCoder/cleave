@@ -934,7 +934,7 @@ def test_inspector_only_timeline_actions_are_not_menu_commands() -> None:
 
     view = controls.build_view_state(paused=False)
     marker_rows = build_inspector_rows(view, "timeline.song_markers")
-    assert marker_rows[0].command_ids == ("timeline.snap_to_markers",)
+    assert marker_rows[-1].command_ids == ("timeline.snap_to_markers",)
     marker = next(
         row
         for row in marker_rows

@@ -22,6 +22,7 @@ Shell rules (not text roles):
   TRANSPORT_RULE — dark rule under the transport bar
   NAVIGATOR_BORDER — dark border around the navigator when it is not the active region
   NAVIGATOR_TREE_LINE — connector lines between navigator rows
+  INSPECTOR_DIVIDER — thin rule under the inspector title and above its buttons
   HOVER - translucent label wash for pointer hover
   NUDGE_HOVER_FG - foreground for the side arrows on an adjustable inspector value
   NUDGE_HOVER_BG - background for the side arrows on an adjustable inspector value
@@ -188,6 +189,7 @@ BORDER_COLOR: tuple[int, int, int] = (255, 255, 255)
 TRANSPORT_RULE: tuple[int, int, int] = (68, 68, 68)
 NAVIGATOR_BORDER: tuple[int, int, int] = (85, 85, 85)
 NAVIGATOR_TREE_LINE: tuple[int, int, int] = (110, 125, 150)
+INSPECTOR_DIVIDER: tuple[int, int, int] = (70, 78, 95)
 
 LABEL: tuple[int, int, int] = (170, 210, 255)
 HOVER: tuple[int, int, int] = (170, 210, 255)
