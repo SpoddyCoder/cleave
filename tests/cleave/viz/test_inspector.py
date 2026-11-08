@@ -17,7 +17,7 @@ from cleave.viz.navigator import (
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.row_present_renderers import inspector_field_colors
 from cleave.viz.row_sections import SECTION_SWITCH_KINDS
-from cleave.viz.row_spec import format_row_value, row_available
+from cleave.viz.row_spec import format_row_value, row_available, row_label
 from cleave.viz.theme import DISABLED, VALUE, LOCKED
 from cleave.viz.tuning_view_state import (
     SettingsBlock,
@@ -501,44 +501,61 @@ _CUE_KINDS = [
 ]
 
 
-def _cue_values(state: TuningViewState, slot: str) -> list[str]:
-    return [
-        format_row_value(state, RowDescriptor(kind, slot=slot)) for kind in _CUE_KINDS
-    ]
+def _cue_page(state: TuningViewState, slot: str) -> tuple[str, list[RowKind], list[str]]:
+    """Heading label, shown cue row kinds, and their values."""
+    rows = build_inspector_rows(state, timeline_row_node_id(slot))
+    heading = next(row.descriptor for row in rows if row.is_heading)
+    kinds = _kinds(rows)
+    values = [format_row_value(state, RowDescriptor(k, slot=slot)) for k in kinds]
+    return row_label(state, heading), kinds, values
 
 
-def test_timeline_row_page_lists_the_selected_cue() -> None:
-    state = _layer_view(("layer_1",))
-    rows = build_inspector_rows(state, timeline_row_node_id("layer_1"))
-    assert _headings(rows) == [RowKind.TIMELINE_CUE_HEADER]
-    assert _kinds(rows) == _CUE_KINDS
-    assert all(row.descriptor.slot == "layer_1" for row in rows)
-    assert [row.navigable for row in rows if not row.is_heading] == [True] * 5
-    assert _cue_values(state, "layer_1") == ["none", "-", "-", "-", "-"]
-
-
-def test_timeline_row_page_formats_on_and_off_cues() -> None:
-    state = _layer_view(("layer_1", "layer_2"))
+def _cue_view() -> TuningViewState:
+    state = _layer_view(("layer_1", "layer_2", "layer_3"))
     state.timeline = TimelineBlock(
         selected_cues={
             "layer_1": SlotCue(t=65.0, level=0.25, blend="add", role="lead", cut="soft"),
-            "layer_2": SlotCue(t=5.0, level=0.0, blend="add", role="lead", cut="hard"),
+            "layer_2": SlotCue(t=5.0, level=0.0, cut="hard"),
         }
     )
-    assert _cue_values(state, "layer_1") == ["01:05", "25%", "soft", "add", "lead"]
-    assert _cue_values(state, "layer_2") == ["00:05", "off", "hard", "-", "-"]
-    # Off cues have no opacity, blend, or role to edit.
-    assert [
-        row_available(state, RowDescriptor(kind, slot="layer_2")) for kind in _CUE_KINDS
-    ] == [True, False, True, False, False]
-    _label, value = inspector_field_colors(
-        state, RowDescriptor(RowKind.TIMELINE_CUE_OPACITY, slot="layer_2")
+    return state
+
+
+def test_timeline_row_page_hides_cue_rows_with_no_cue_selected() -> None:
+    assert _cue_page(_cue_view(), "layer_3") == ("no cue selected", [], [])
+
+
+def test_timeline_row_page_shows_every_field_of_a_start_cue() -> None:
+    state = _cue_view()
+    assert _cue_page(state, "layer_1") == (
+        "start cue",
+        _CUE_KINDS,
+        ["01:05", "25%", "soft", "add", "lead"],
     )
-    assert value == DISABLED
+    rows = build_inspector_rows(state, timeline_row_node_id("layer_1"))
+    assert all(row.descriptor.slot == "layer_1" for row in rows)
+    assert all(row.navigable for row in rows if not row.is_heading)
     _label, value = inspector_field_colors(
         state, RowDescriptor(RowKind.TIMELINE_CUE_TIME, slot="layer_1")
     )
     assert value == VALUE
+
+
+def test_timeline_row_page_shows_time_and_cut_of_an_end_cue() -> None:
+    assert _cue_page(_cue_view(), "layer_2") == (
+        "end cue",
+        [RowKind.TIMELINE_CUE_TIME, RowKind.TIMELINE_CUE_CUT],
+        ["00:05", "hard"],
+    )
+
+
+def test_timeline_cue_rows_are_unavailable_while_recording() -> None:
+    state = _cue_view()
+    state.timeline_recording = True
+    desc = RowDescriptor(RowKind.TIMELINE_CUE_OPACITY, slot="layer_1")
+    assert row_available(state, desc) is False
+    _label, value = inspector_field_colors(state, desc)
+    assert value == DISABLED
 
 
 def test_timeline_row_page_for_a_missing_layer_is_empty() -> None:

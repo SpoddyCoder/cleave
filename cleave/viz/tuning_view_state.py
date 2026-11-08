@@ -98,7 +98,12 @@ from cleave.timeline_presets.song_marker_snap import (
     DEFAULT_TIMELINE_PRESET_SONG_MARKER_SNAP,
     TimelinePresetSongMarkerSnap,
 )
-from cleave.timeline import SlotCue, cue_at_time, empty_lane
+from cleave.timeline import (
+    SlotCue,
+    cue_at_time,
+    cue_editable_for_blend_role,
+    empty_lane,
+)
 from cleave.timeline_presets.timeline_cuts import (
     DEFAULT_TIMELINE_PRESET_TIMELINE_CUTS,
     TimelinePresetTimelineCuts,
@@ -310,6 +315,13 @@ class TimelineBlock:
     selected_cues: dict[str, SlotCue] = field(default_factory=dict)
 
 
+def timeline_cue_kind(cue: SlotCue | None) -> str:
+    """``start`` for a cue that turns the layer on, ``end`` for one that turns it off."""
+    if cue is None:
+        return "none"
+    return "start" if cue_editable_for_blend_role(cue) else "end"
+
+
 def selected_timeline_cues(session: TuningSession) -> dict[str, SlotCue]:
     """Each layer's selected strip cue, when that cue still exists."""
     tl = session.timeline
@@ -494,6 +506,11 @@ def view_state_structure_signature(
             "song_marker_count": len(session.song_markers.times),
             "hard_cut_fades_enabled": tl.hard_cut_fades.enabled,
             "soft_cut_fades_enabled": tl.soft_cut_fades.enabled,
+            # Start or end cue per slot gates the timeline row page's cue rows.
+            "selected_cue_kinds": {
+                slot: timeline_cue_kind(cue)
+                for slot, cue in selected_timeline_cues(session).items()
+            },
         },
     }
     return json.dumps(payload, sort_keys=True, separators=(",", ":"))

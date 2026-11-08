@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal
 
 from cleave.effects.registry import effect_roster
+from cleave.timeline import cue_editable_for_blend_role
 from cleave.viz.editor_mode_controls import is_preset_curation_mode
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 
@@ -600,15 +601,56 @@ TRACK_SECTION = SectionDef(
     ),
 )
 
+def _timeline_cue_selected(state: TuningViewState, desc: RowDescriptor) -> bool:
+    return desc.slot is not None and desc.slot in state.timeline.selected_cues
+
+
+def _timeline_start_cue_selected(
+    state: TuningViewState, desc: RowDescriptor
+) -> bool:
+    if desc.slot is None:
+        return False
+    cue = state.timeline.selected_cues.get(desc.slot)
+    return cue is not None and cue_editable_for_blend_role(cue)
+
+
+TIMELINE_CUE_SELECTED = ConditionalRowsDef(
+    name="timeline_cue_selected",
+    predicate=_timeline_cue_selected,
+    children=(SectionNode(leaf_kind=RowKind.TIMELINE_CUE_TIME),),
+)
+
+TIMELINE_START_CUE_LEVEL = ConditionalRowsDef(
+    name="timeline_start_cue_selected",
+    predicate=_timeline_start_cue_selected,
+    children=(SectionNode(leaf_kind=RowKind.TIMELINE_CUE_OPACITY),),
+)
+
+TIMELINE_CUE_CUT = ConditionalRowsDef(
+    name="timeline_cue_selected",
+    predicate=_timeline_cue_selected,
+    children=(SectionNode(leaf_kind=RowKind.TIMELINE_CUE_CUT),),
+)
+
+TIMELINE_START_CUE_LOOK = ConditionalRowsDef(
+    name="timeline_start_cue_selected",
+    predicate=_timeline_start_cue_selected,
+    children=(
+        SectionNode(leaf_kind=RowKind.TIMELINE_CUE_BLEND),
+        SectionNode(leaf_kind=RowKind.TIMELINE_CUE_ROLE),
+    ),
+)
+
+# The heading names the cue (start, end, or none selected). An end cue only
+# turns the layer off, so it has no opacity, blend, or role.
 TIMELINE_CUE_SECTION = SectionDef(
     header_kind=RowKind.TIMELINE_CUE_HEADER,
     context="per_slot",
     children=(
-        SectionNode(leaf_kind=RowKind.TIMELINE_CUE_TIME),
-        SectionNode(leaf_kind=RowKind.TIMELINE_CUE_OPACITY),
-        SectionNode(leaf_kind=RowKind.TIMELINE_CUE_CUT),
-        SectionNode(leaf_kind=RowKind.TIMELINE_CUE_BLEND),
-        SectionNode(leaf_kind=RowKind.TIMELINE_CUE_ROLE),
+        SectionNode(conditional=TIMELINE_CUE_SELECTED),
+        SectionNode(conditional=TIMELINE_START_CUE_LEVEL),
+        SectionNode(conditional=TIMELINE_CUE_CUT),
+        SectionNode(conditional=TIMELINE_START_CUE_LOOK),
     ),
 )
 

@@ -384,16 +384,18 @@ def _selected_on_cue(state: TuningViewState, desc: RowDescriptor) -> SlotCue | N
     return cue
 
 
-def _cue_time_available(state: TuningViewState, _desc: RowDescriptor) -> bool:
+def _cue_edits_available(state: TuningViewState, _desc: RowDescriptor) -> bool:
+    # Cue rows only show for a selected cue that has the field; recording
+    # pauses cue selection and edits.
     return not state.timeline_recording
 
 
-def _cue_available(state: TuningViewState, desc: RowDescriptor) -> bool:
-    return not state.timeline_recording and _selected_cue(state, desc) is not None
-
-
-def _on_cue_available(state: TuningViewState, desc: RowDescriptor) -> bool:
-    return not state.timeline_recording and _selected_on_cue(state, desc) is not None
+def _format_cue_heading(state: TuningViewState, desc: RowDescriptor) -> str:
+    """Start cues turn the layer on and carry its look; end cues turn it off."""
+    cue = _selected_cue(state, desc)
+    if cue is None:
+        return "no cue selected"
+    return "start cue" if cue_editable_for_blend_role(cue) else "end cue"
 
 
 def _format_cue_time(state: TuningViewState, desc: RowDescriptor) -> str:
@@ -422,11 +424,9 @@ def _seek_to_cue(controls: TuningControls, desc: RowDescriptor) -> None:
 
 
 def _format_cue_opacity(state: TuningViewState, desc: RowDescriptor) -> str:
-    cue = _selected_cue(state, desc)
+    cue = _selected_on_cue(state, desc)
     if cue is None:
         return "-"
-    if not cue_editable_for_blend_role(cue):
-        return "off"
     return f"{int(round(float(cue.level) * 100.0))}%"
 
 
@@ -903,6 +903,7 @@ SPECS: dict[RowKind, RowSpec] = {
         affordance=RowAffordance.HEADING,
         panel_label="selected cue",
         present_style=RowPresentStyle.HEADING,
+        format_label=_format_cue_heading,
         fit_strategy=FitStrategy.NONE,
         navigable=False,
     ),
@@ -910,7 +911,7 @@ SPECS: dict[RowKind, RowSpec] = {
         "time",
         _format_cue_time,
         _apply_cue_time,
-        _cue_time_available,
+        _cue_edits_available,
         apply_action=_seek_to_cue,
         # Selecting and seeking stay open on a locked timeline, as on the strip.
         blocked_by_section_lock=False,
@@ -920,15 +921,15 @@ SPECS: dict[RowKind, RowSpec] = {
             ("Enter", "seek to cue"),
         ),
         help_description=(
-            "The cue selected on this timeline row.",
-            "With none selected, Right picks the next cue after the playhead.",
+            "Time of the cue selected on this timeline row.",
+            "A start cue turns the layer on; an end cue turns it off.",
         ),
     ),
     RowKind.TIMELINE_CUE_OPACITY: _cue_spec(
         "opacity",
         _format_cue_opacity,
         _apply_cue_opacity,
-        _on_cue_available,
+        _cue_edits_available,
         repeatable=True,
         help_title="Cue opacity",
         help_entries=(
@@ -937,14 +938,14 @@ SPECS: dict[RowKind, RowSpec] = {
         ),
         help_description=(
             "Timeline opacity from this cue on, multiplied into the layer's.",
-            "Off cues have no opacity.",
+            "Start cues only.",
         ),
     ),
     RowKind.TIMELINE_CUE_CUT: _cue_spec(
         "cut",
         _format_cue_cut,
         _apply_cue_cut,
-        _cue_available,
+        _cue_edits_available,
         choice=options_choice(
             CUT_TYPES,
             _cue_cut_value,
@@ -961,7 +962,7 @@ SPECS: dict[RowKind, RowSpec] = {
         "blend",
         _format_cue_blend,
         _apply_cue_blend,
-        _on_cue_available,
+        _cue_edits_available,
         choice=options_choice(
             _BLEND_OPTIONS,
             _cue_blend_value,
@@ -972,14 +973,14 @@ SPECS: dict[RowKind, RowSpec] = {
         help_entries=(("Left/Right", "choose blend mode"),),
         help_description=(
             "Blend mode from this cue on. Layer keeps the layer's own blend.",
-            "Off cues have no blend.",
+            "Start cues only.",
         ),
     ),
     RowKind.TIMELINE_CUE_ROLE: _cue_spec(
         "role",
         _format_cue_role,
         _apply_cue_role,
-        _on_cue_available,
+        _cue_edits_available,
         choice=options_choice(
             _ROLE_OPTIONS,
             _cue_role_value,
@@ -990,7 +991,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_entries=(("Left/Right", "choose role"),),
         help_description=(
             "Role from this cue on: bed, pulse, lead, or accent.",
-            "Off cues have no role.",
+            "Start cues only.",
         ),
     ),
 }
