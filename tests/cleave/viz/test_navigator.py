@@ -281,6 +281,7 @@ def test_curation_shows_only_the_focus_layer_without_pages() -> None:
     assert children[0].locked is True
     assert children[0].toggles == ()
     assert children[0].expandable is False
+    assert children[0].draggable is False
     assert not any(node.depth == 2 for node in nodes)
 
 
@@ -466,3 +467,20 @@ def test_left_right_expand_move_collapse_and_parent() -> None:
     nav.handle_keydown(_keydown(pygame.K_LEFT))
     assert focus.selected_id == "layers"
     assert focus.region is ShellRegion.NAVIGATOR
+
+
+def test_layer_rows_are_draggable_unless_locked() -> None:
+    session = TuningSession(
+        layer_z_order=["layer_2", "layer_1"],
+        layers={
+            "layer_1": _layer("bass"),
+            "layer_2": _layer("vocals", locked=True),
+        },
+    )
+    nodes = build_navigator(session, {"layers"})
+    rows = {node.slot: node for node in nodes if node.parent_id == "layers"}
+
+    assert all(node.draggable for node in rows.values())
+    assert rows["layer_1"].drag_blocked is False
+    assert rows["layer_2"].drag_blocked is True
+    assert not any(node.draggable for node in nodes if node.parent_id != "layers")

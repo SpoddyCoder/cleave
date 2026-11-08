@@ -16,6 +16,7 @@ import pygame
 from imgui_bundle import imgui
 
 from cleave.viz.commands import Command, CommandContext, MenuSeparator, command_by_id
+from cleave.viz.drag_reorder import DRAG_LAYER, DRAG_PRESET, RowDragGesture
 from cleave.viz.config_pages import config_page_title, is_config_page
 from cleave.viz.frame_rate import format_fps_value
 from cleave.viz.help_column import draw_help_column
@@ -32,6 +33,7 @@ from cleave.viz.material_icons import (
     LOCK_GLYPH,
     LOCK_OPEN_GLYPH,
     ADD_GLYPH,
+    DRAG_INDICATOR_GLYPH,
     POWER_GLYPH,
     SOLO_GLYPH,
 )
@@ -93,6 +95,7 @@ from cleave.viz.theme import (
     LABEL,
     LOCK_ICON,
     LOCKED,
+    MOVE_MODE,
     MUTED,
     NAVIGATOR_BORDER,
     NAVIGATOR_TREE_LINE,
@@ -562,6 +565,22 @@ def _selectable_label_origin() -> tuple[float, float]:
     )
 
 
+def drag_handle_lead(glyph_width: float, space_width: float) -> int:
+    """Spaces to put before a row label so the drag handle fits in front of it."""
+    if space_width <= 0:
+        return 0
+    return max(1, math.ceil((glyph_width + space_width) / space_width))
+
+
+def _drag_lead() -> str:
+    """Label prefix that reserves the leading drag-handle column."""
+    count = drag_handle_lead(
+        imgui.calc_text_size(DRAG_INDICATOR_GLYPH).x,
+        imgui.calc_text_size(" ").x,
+    )
+    return " " * count
+
+
 def _draw_mnemonic_underline(label: str, color: tuple[int, int, int]) -> None:
     """1px underline two pixels under the ink of a top menu's first letter."""
     letter = label[:1]
@@ -681,19 +700,23 @@ def _draw_two_line_row_text(
     parts: list[tuple[str, imgui.ImVec4]],
     label_color: imgui.ImVec4,
     value_color: imgui.ImVec4,
+    *,
+    lead: str = "",
 ) -> None:
     """Markers after the label, stopping short of the arrows, and the value below.
 
     Markers are painted, not part of the selectable label: ImGui hashes the
     visible label into the id, and a press must survive the markers changing.
+    *lead* is the drag-handle prefix of the label; the value lines up after it.
     """
     origin_x, origin_y = _selectable_label_origin()
+    lead_x = imgui.calc_text_size(lead).x if lead else 0.0
     right_x = imgui.get_item_rect_max().x
     pad = imgui.get_style().frame_padding.x
     sizer = _ImguiTextSizer()
     draw = imgui.get_window_draw_list()
     if markers:
-        marker_x = origin_x + imgui.calc_text_size(f"{label} ").x
+        marker_x = origin_x + imgui.calc_text_size(f"{lead}{label} ").x
         cluster_x = nudge_cluster_origin_x(
             right_x,
             [imgui.calc_text_size(text).x for text, _color in parts],
@@ -707,10 +730,11 @@ def _draw_two_line_row_text(
             imgui.get_color_u32(label_color),
             fitted,
         )
+    value_x = origin_x + lead_x
     draw.add_text(
-        imgui.ImVec2(origin_x, origin_y + imgui.get_text_line_height()),
+        imgui.ImVec2(value_x, origin_y + imgui.get_text_line_height()),
         imgui.get_color_u32(value_color),
-        fit_path_or_name_to_width(sizer, value, int(right_x - pad - origin_x)),
+        fit_path_or_name_to_width(sizer, value, int(right_x - pad - value_x)),
     )
 
 
@@ -1070,6 +1094,8 @@ class ShellHost:
         self._value_drag_accum = 0.0
         self._value_drag_crossed = False
         self._nudge_swallow = False
+        # Held row drag handle (preset list item or layer), or None.
+        self._row_drag: RowDragGesture | None = None
         self._inline_field_hovered = False
         self._inline_began = False
         self._transport_drag_accum = 0.0
@@ -1697,6 +1723,7 @@ class ShellHost:
                 self._draw_nav_node(node, rails)
         finally:
             imgui.pop_style_color()
+        self._finish_row_drag(DRAG_LAYER)
         self._nav_measured_rows = len(nodes)
         self._nav_content_height_px = _navigator_content_height_px()
 
@@ -1732,16 +1759,26 @@ class ShellHost:
                         if row_bright:
                             imgui.pop_style_color()
                     imgui.same_line()
-                bright = selected or navigator_row_bright(node)
+                moving = (
+                    node.draggable
+                    and node.slot is not None
+                    and node.slot == self._controls.layer_lifecycle.move_mode_slot
+                )
+                bright = moving or selected or navigator_row_bright(node)
                 if bright:
-                    imgui.push_style_color(imgui.Col_.text, rgba(VALUE))
+                    imgui.push_style_color(
+                        imgui.Col_.text, rgba(MOVE_MODE if moving else VALUE)
+                    )
                 try:
                     text_pos = imgui.get_cursor_screen_pos()
+                    lead = _drag_lead() if node.draggable else ""
+                    overlap = bool(node.toggles) or node.draggable
                     clicked, _selected = imgui.selectable(
-                        f"{node.label}##nav-{node.id}",
+                        f"{lead}{node.label}##nav-{node.id}",
                         selected,
-                        imgui.SelectableFlags_.allow_overlap if node.toggles else 0,
+                        imgui.SelectableFlags_.allow_overlap if overlap else 0,
                     )
+                    span = (imgui.get_item_rect_min().y, imgui.get_item_rect_max().y)
                     if ring:
                         _draw_item_focus_ring()
                     if selected:
@@ -1757,6 +1794,8 @@ class ShellHost:
                 _draw_item_suffix(node.badge, rgba(LABEL))
             if node.toggles:
                 self._draw_nav_toggles(node)
+            if node.draggable:
+                self._layer_row_drag(node, text_pos.x, span)
             if twisty_clicked:
                 self._toggle_nav_expanded(node.id)
             elif clicked:
@@ -1850,6 +1889,7 @@ class ShellHost:
         imgui.text(inspector_title(nodes, focus.selected_id))
         for row in build_inspector_rows(state, focus.selected_id):
             self._draw_inspector_row(state, row)
+        self._finish_row_drag(DRAG_PRESET)
         self._draw_colour_picker()
 
     def _draw_inspector_row(self, state: Any, row: Any) -> None:
@@ -1875,14 +1915,20 @@ class ShellHost:
                 label_color = HIGHLIGHT
             two_line = row_is_two_line(kind)
             row_height = 2.0 * imgui.get_text_line_height() if two_line else 0.0
+            lead = _drag_lead() if spec.drag_reorder else ""
             imgui.push_style_color(imgui.Col_.text, rgba(label_color))
             try:
                 with _selected_header_wash(selected, inspector=True):
+                    text_x = imgui.get_cursor_screen_pos().x
                     clicked, _selected = imgui.selectable(
-                        f"{label}{inspector_selectable_id(desc)}",
+                        f"{lead}{label}{inspector_selectable_id(desc)}",
                         selected,
-                        0,
+                        imgui.SelectableFlags_.allow_overlap if lead else 0,
                         imgui.ImVec2(0.0, row_height),
+                    )
+                    span = (
+                        imgui.get_item_rect_min().y,
+                        imgui.get_item_rect_max().y,
                     )
                     # Item flags are only valid while this selectable is current.
                     # Release clears the active id inside the widget, so the
@@ -1919,6 +1965,7 @@ class ShellHost:
                         parts,
                         rgba(label_color),
                         rgba(value_color),
+                        lead=lead,
                     )
                 if spec.nav_buttons:
                     self._handle_nav_buttons(
@@ -1942,6 +1989,14 @@ class ShellHost:
                         activated=activated,
                         two_line=two_line,
                     )
+            if lead:
+                self._preset_row_drag(
+                    row,
+                    desc,
+                    text_x,
+                    span,
+                    blocked=section_lock_blocks_mutation(state, desc),
+                )
             if stepped and not self._nudge_swallow:
                 self._track_value_drag(
                     row,
@@ -1966,6 +2021,134 @@ class ShellHost:
         finally:
             if indent:
                 imgui.unindent(indent)
+
+    def _draw_drag_handle(self, item_id: str, x: float, *, blocked: bool) -> bool:
+        """Leading reorder handle on the row just drawn, with its left edge at *x*.
+
+        The row selectable allows overlap, so the press reaches this button.
+        True on the press that starts a drag; a blocked handle never starts one.
+        """
+        glyph = DRAG_INDICATOR_GLYPH
+        width = imgui.calc_text_size(_drag_lead()).x
+        window_x = imgui.get_window_pos().x - imgui.get_scroll_x()
+        imgui.same_line(x - window_x)
+        imgui.invisible_button(
+            item_id, imgui.ImVec2(width, imgui.get_text_line_height())
+        )
+        activated = imgui.is_item_activated()
+        hovered = imgui.is_item_hovered()
+        held = imgui.is_item_active()
+        rect_min = imgui.get_item_rect_min()
+        draw = imgui.get_window_draw_list()
+        color = rgba(MUTED)
+        if blocked:
+            color = rgba(LOCKED)
+        elif hovered or held:
+            draw.add_rect_filled(
+                rect_min,
+                imgui.get_item_rect_max(),
+                imgui.get_color_u32(rgba(NUDGE_HOVER_BG, NUDGE_HOVER_BG_ALPHA / 255.0)),
+            )
+            color = rgba(NUDGE_HOVER_FG)
+        glyph_width = imgui.calc_text_size(glyph).x
+        draw.add_text(
+            imgui.ImVec2(
+                rect_min.x + (width - glyph_width) * 0.5,
+                rect_min.y + _icon_drop_to_text(glyph),
+            ),
+            imgui.get_color_u32(color),
+            glyph,
+        )
+        if hovered and not held:
+            imgui.set_tooltip("Locked: unlock to reorder" if blocked else "Drag to reorder")
+        return activated and not blocked
+
+    def _preset_row_drag(
+        self,
+        row: Any,
+        desc: RowDescriptor,
+        x: float,
+        span: tuple[float, float],
+        *,
+        blocked: bool,
+    ) -> None:
+        slot, index = desc.slot, desc.preset_index
+        if slot is None or index is None:
+            return
+        if self._draw_drag_handle(
+            f"##drag-preset-{slot}-{index}", x, blocked=blocked
+        ):
+            self._begin_row_drag(DRAG_PRESET, slot, index)
+            self._controls.inspector.focus_row(row)
+        drag = self._row_drag
+        if drag is not None and drag.kind == DRAG_PRESET and drag.slot == slot:
+            drag.record_span(index, *span)
+
+    def _layer_row_drag(
+        self, node: NavNode, x: float, span: tuple[float, float]
+    ) -> None:
+        slot = node.slot
+        order = self._controls.session.layer_z_order
+        if slot is None or slot not in order:
+            return
+        index = order.index(slot)
+        if self._draw_drag_handle(
+            f"##drag-layer-{slot}", x, blocked=node.drag_blocked
+        ):
+            self._begin_row_drag(DRAG_LAYER, slot, index)
+            self._controls.navigator.select(node.id)
+        drag = self._row_drag
+        if drag is not None and drag.kind == DRAG_LAYER:
+            drag.record_span(index, *span)
+
+    def _begin_row_drag(self, kind: str, slot: str, index: int) -> None:
+        """Start a mouse reorder as move mode, so Esc restores and release keeps it."""
+        controls = self._controls
+        controls.layer_lifecycle.confirm_move_mode()
+        controls.preset_list.confirm_move_mode()
+        if kind == DRAG_PRESET:
+            controls.preset_list.enter_move_mode(slot, index)
+        else:
+            controls.layer_lifecycle.enter_move_mode(slot)
+        self._row_drag = RowDragGesture(kind, slot, index)
+
+    def _row_drag_in_move_mode(self, drag: RowDragGesture) -> bool:
+        controls = self._controls
+        if drag.kind == DRAG_PRESET:
+            return controls.preset_list.move_mode_preset == (drag.slot, drag.index)
+        return controls.layer_lifecycle.move_mode_slot == drag.slot
+
+    def _finish_row_drag(self, kind: str) -> None:
+        """Move the dragged row under the pointer, or confirm it on release.
+
+        Esc (or a view rebuild) ends move mode while the button is still down;
+        the gesture then drops without moving anything further.
+        """
+        drag = self._row_drag
+        if drag is None or drag.kind != kind:
+            return
+        if not self._row_drag_in_move_mode(drag):
+            self._row_drag = None
+            return
+        controls = self._controls
+        if not imgui.is_mouse_down(0):
+            if kind == DRAG_PRESET:
+                controls.preset_list.confirm_move_mode()
+            else:
+                controls.layer_lifecycle.confirm_move_mode()
+            self._row_drag = None
+            return
+        target = drag.target(imgui.get_mouse_pos().y)
+        drag.clear_spans()
+        if target is None or target == drag.index:
+            return
+        if kind == DRAG_PRESET:
+            controls.preset_list.move_item_to(target)
+            moved = controls.preset_list.move_mode_preset
+            drag.index = drag.index if moved is None else moved[1]
+        else:
+            controls.layer_lifecycle.move_slot_to(drag.slot, target)
+            drag.index = controls.session.layer_z_order.index(drag.slot)
 
     def _draw_inline_field(self, view: Any) -> None:
         """The value area of the row just drawn, as a text field with a caret."""

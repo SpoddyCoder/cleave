@@ -120,6 +120,23 @@ def test_enter_and_swap_move_mode() -> None:
     manager.apply_preview_resolutions.assert_called_once()
 
 
+def test_move_slot_to_jumps_and_cancel_restores() -> None:
+    controller, session, _modal, manager = _make_controller(
+        ("layer_1", "layer_2", "layer_3")
+    )
+    controller.enter_move_mode("layer_3")
+    controller.move_slot_to("layer_3", 0)
+    assert session.layer_z_order == ["layer_3", "layer_1", "layer_2"]
+    manager.apply_preview_resolutions.assert_called_once()
+    manager.apply_preview_resolutions.reset_mock()
+    controller.move_slot_to("layer_3", 0)
+    controller.move_slot_to("layer_3", 3)
+    controller.move_slot_to("missing", 0)
+    manager.apply_preview_resolutions.assert_not_called()
+    controller.cancel_move_mode()
+    assert session.layer_z_order == ["layer_1", "layer_2", "layer_3"]
+
+
 def test_cancel_move_mode_restores_z_order() -> None:
     controller, session, _modal, manager = _make_controller(
         ("layer_1", "layer_2", "layer_3")

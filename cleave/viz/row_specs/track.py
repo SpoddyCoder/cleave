@@ -605,6 +605,7 @@ SPECS: dict[RowKind, RowSpec] = {
         ),
         help_mode_entries=CUE_ROLE_MARKER_HELP_ENTRIES,
         can_enter_move_mode=True,
+        drag_reorder=True,
         parent_group="track",
     ),
     RowKind.TRACK_PRESET_LIST_ADD: RowSpec(

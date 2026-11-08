@@ -1187,11 +1187,13 @@ def test_preset_row_draws_two_lines_and_fits_the_filename() -> None:
             host._draw_inspector_row(view, stem)
             heights["preset"] = middle - top
             heights["stem"] = imgui.get_cursor_pos().y - middle
+            # The stem row ends on its full-width selectable; the list item
+            # ends on its narrow leading drag handle.
+            heights["right"] = imgui.get_item_rect_max().x
             before_item = imgui.get_cursor_pos().y
             host._draw_inspector_row(view, item)
             heights["item"] = imgui.get_cursor_pos().y - before_item
             heights["line"] = imgui.get_text_line_height()
-            heights["right"] = imgui.get_item_rect_max().x
 
         host._draw_inspector = draw_inspector
         _paint_shell(host, menu, CommandContext(), frames=1)

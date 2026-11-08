@@ -31,6 +31,7 @@ from cleave.viz.row_hotkeys import activate_header_toggle
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.session import LayerRuntime, TuningSession
 from cleave.viz.shell_host import (
+    drag_handle_lead,
     inspector_selectable_id,
     inspector_title,
     navigator_height_for_rows,
@@ -364,3 +365,10 @@ def test_collapsing_layers_moves_selection_off_a_hidden_child() -> None:
         selection_after_nav_collapse(collapsed, "project.render", "layers")
         == "project.render"
     )
+
+
+def test_drag_handle_lead_covers_glyph_plus_a_gap() -> None:
+    assert drag_handle_lead(16.0, 8.0) == 3
+    assert drag_handle_lead(15.0, 8.0) == 3
+    assert drag_handle_lead(8.0, 8.0) == 2
+    assert drag_handle_lead(16.0, 0.0) == 0

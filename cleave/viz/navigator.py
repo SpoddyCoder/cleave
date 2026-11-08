@@ -69,6 +69,9 @@ class NavNode:
     slot: str | None = None
     locked: bool = False
     toggles: tuple[NavToggle, ...] = ()
+    # Leading drag handle that reorders the row; blocked draws it inert.
+    draggable: bool = False
+    drag_blocked: bool = False
 
 
 _TOP_LEVEL: tuple[NavNode, ...] = (
@@ -317,6 +320,8 @@ def _layer_node(session: TuningSession, slot: str, *, expandable: bool) -> NavNo
         slot=slot,
         locked=curation and layer.locked,
         toggles=() if curation else _layer_toggles(session, slot),
+        draggable=not curation,
+        drag_blocked=layer.locked,
     )
 
 

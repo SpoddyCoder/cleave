@@ -113,6 +113,45 @@ def test_enter_move_mode_and_swap_updates_list_and_focus() -> None:
         assert focused == [("layer_1", 1)]
 
 
+def test_move_item_to_jumps_and_focuses() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp) / "presets"
+        _write(root / "pack" / "demo.milk", "milk")
+        focused: list[tuple[str, int]] = []
+        a, b, c, d = (str(root / f"{name}.milk") for name in "abcd")
+        controller, session, _modal = _make_controller(
+            preset_root=root,
+            preset_list=[a, b, c, d],
+            on_focus_preset_item=lambda slot, index: focused.append((slot, index)),
+        )
+        controller.enter_move_mode("layer_1", 0)
+        controller.move_item_to(2)
+        assert session.layers["layer_1"].preset_list == [b, c, a, d]
+        assert controller.move_mode_preset == ("layer_1", 2)
+        controller.move_item_to(0)
+        assert session.layers["layer_1"].preset_list == [a, b, c, d]
+        controller.move_item_to(4)
+        controller.move_item_to(-1)
+        assert session.layers["layer_1"].preset_list == [a, b, c, d]
+        assert focused == [("layer_1", 2), ("layer_1", 0)]
+        controller.move_item_to(3)
+        controller.cancel_move_mode()
+        assert session.layers["layer_1"].preset_list == [a, b, c, d]
+
+
+def test_move_item_to_without_move_mode_is_noop() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp) / "presets"
+        _write(root / "pack" / "demo.milk", "milk")
+        a, b = str(root / "a.milk"), str(root / "b.milk")
+        controller, session, _modal = _make_controller(
+            preset_root=root,
+            preset_list=[a, b],
+        )
+        controller.move_item_to(1)
+        assert session.layers["layer_1"].preset_list == [a, b]
+
+
 def test_cancel_move_mode_restores_original_order() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp) / "presets"

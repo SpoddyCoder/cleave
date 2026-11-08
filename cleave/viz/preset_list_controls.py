@@ -97,12 +97,18 @@ class PresetListController:
     def swap_item(self, direction: int) -> None:
         if self.move_mode_preset is None:
             return
+        _slot, index = self.move_mode_preset
+        self.move_item_to(index + direction)
+
+    def move_item_to(self, target: int) -> None:
+        """Move the item in move mode to *target*; out-of-range is ignored."""
+        if self.move_mode_preset is None:
+            return
         slot, index = self.move_mode_preset
         presets = self.session.layers[slot].preset_list
-        target = index + direction
-        if target < 0 or target >= len(presets):
+        if target == index or target < 0 or target >= len(presets):
             return
-        presets[index], presets[target] = presets[target], presets[index]
+        presets.insert(target, presets.pop(index))
         self.move_mode_preset = (slot, target)
         if self._on_focus_preset_item is not None:
             self._on_focus_preset_item(slot, target)

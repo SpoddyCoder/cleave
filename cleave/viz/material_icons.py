@@ -34,6 +34,7 @@ VISIBILITY_GLYPH = "\ue8f4"
 VISIBILITY_OFF_GLYPH = "\ue8f5"
 ARROW_UPWARD_GLYPH = "\ue5d8"
 ARROW_DOWNWARD_GLYPH = "\ue5db"
+DRAG_INDICATOR_GLYPH = "\ue945"
 # Classic ↵ return corner (subdirectory_arrow_left). Material Icons is single-weight;
 # bold is faked in render_action_enter_icon via offset blits.
 RETURN_ARROW_GLYPH = "\ue5d9"

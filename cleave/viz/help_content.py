@@ -117,6 +117,7 @@ _NAVIGATOR_SECTION = HelpSection(
 
 _LAYER_SECTION_BASE: tuple[tuple[str, str], ...] = (
     ("M", "move z-order"),
+    ("Drag handle", "move z-order with the mouse"),
     ("L", "lock/unlock layer"),
     ("S", "solo layer"),
     ("Delete", "delete layer"),
@@ -208,6 +209,7 @@ _PRESET_LIST_ITEM_SECTION = HelpSection(
     (
         ("Enter", "audition preset and pause switching"),
         ("M", "reorder in list"),
+        ("Drag handle", "reorder with the mouse"),
         ("Delete", "remove preset"),
         *_PRESET_CURATION_SHORTCUTS,
     ),

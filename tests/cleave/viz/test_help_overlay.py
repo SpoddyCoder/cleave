@@ -542,6 +542,7 @@ def test_preset_list_entry_help() -> None:
     assert entries == {
         "Enter": "audition preset and pause switching",
         "M": "reorder in list",
+        "Drag handle": "reorder with the mouse",
         "Delete": "remove preset",
         "F": "favourite preset",
         "B": "blacklist preset",

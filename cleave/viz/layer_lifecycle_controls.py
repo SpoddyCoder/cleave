@@ -63,14 +63,19 @@ class LayerLifecycleController:
 
     def swap_stem_in_z_order(self, stem: str, direction: int) -> None:
         order = self.session.layer_z_order
-        try:
-            index = order.index(stem)
-        except ValueError:
+        if stem not in order:
             return
-        target = index + direction
-        if target < 0 or target >= len(order):
+        self.move_slot_to(stem, order.index(stem) + direction)
+
+    def move_slot_to(self, slot: str, target: int) -> None:
+        """Move *slot* to z-order *target*; out-of-range is ignored."""
+        order = self.session.layer_z_order
+        if slot not in order:
             return
-        order[index], order[target] = order[target], order[index]
+        index = order.index(slot)
+        if target == index or target < 0 or target >= len(order):
+            return
+        order.insert(target, order.pop(index))
         self.apply_preview_resolutions()
 
     def confirm_move_mode(self) -> None:

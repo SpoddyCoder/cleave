@@ -87,6 +87,8 @@ class RowSpec:
     toggle_enabled: ActionMutator | None = None
     toggle_solo: ActionMutator | None = None
     can_enter_move_mode: bool = False
+    # Draws a leading drag handle that reorders the row with the mouse.
+    drag_reorder: bool = False
     repeatable: bool = False
     parent_group: str | None = None
     blocked_by_section_lock: bool | None = None

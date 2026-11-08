@@ -9,6 +9,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 
+- Drag a preset list entry by the handle in front of its name to reorder it. Esc during the drag puts it back.
+- Drag a layer by the handle in front of its name in the navigator to change its z-order. Locked layers can't be dragged.
 - View > Fullscreen (F11) switches the editor to borderless fullscreen and back.
 - The editor window remembers its size and whether it was maximised, and opens centred. A saved size bigger than the screen opens maximised.
 - The editor window has a minimum size, so the menu bar, columns, and timeline strip can't collapse. It grows with the UI scale.
