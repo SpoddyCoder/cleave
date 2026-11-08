@@ -36,7 +36,7 @@ def draw_help_column(sections: tuple[HelpContent, ...]) -> None:
     gap = imgui.calc_text_size("  ").x
     for index, section in enumerate(sections):
         if index:
-            imgui.spacing()
+            imgui.dummy(imgui.ImVec2(0.0, imgui.get_text_line_height()))
         _draw_wrapped(section.title, HIGHLIGHT, wrap_x)
         if isinstance(section, DescriptionSection):
             for line in section.lines:
