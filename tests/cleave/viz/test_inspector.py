@@ -435,3 +435,14 @@ def test_layers_root_count_and_curation_omits_add() -> None:
         RowKind.TRACK_PRESET_DIR,
         RowKind.TRACK_PRESET,
     ]
+
+
+@pytest.mark.parametrize("page", (None, "presets"))
+def test_layer_missing_from_view_state_has_no_rows(page: str | None) -> None:
+    state = _layer_view(("layer_1",))
+    node_id = (
+        layer_node_id("layer_6")
+        if page is None
+        else layer_page_node_id("layer_6", page)
+    )
+    assert build_inspector_rows(state, node_id) == ()

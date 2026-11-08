@@ -110,13 +110,18 @@ def build_inspector_rows(
 ) -> tuple[InspectorRow, ...]:
     """Inspector rows for a navigator node.
 
-    Settings, Project, and an unknown id are empty.
+    Settings, Project, and an unknown id are empty. A layer not yet in
+    *state* (added this frame, after the view state was built) is empty
+    until the next frame.
     """
     section = page_section(state, node_id)
     if section is None:
         return ()
+    slot = layer_slot_of(node_id)
+    if slot is not None and slot not in state.tracks:
+        return ()
     rows: list[InspectorRow] = []
-    _append_section_children(rows, section, state, 0, layer_slot_of(node_id))
+    _append_section_children(rows, section, state, 0, slot)
     return tuple(rows)
 
 
