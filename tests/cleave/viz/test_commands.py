@@ -41,10 +41,10 @@ from tests.cleave.viz.test_controls import (
 _SLOTS = (("slot_a", "snare"), ("slot_b", "pad"))
 
 _PROJECT_PAGE_IDS = (
-    "page.project.projectm",
-    "page.project.compositor",
     "page.project.resolution",
     "page.project.render",
+    "page.project.compositor",
+    "page.project.projectm",
 )
 _SETTINGS_PAGE_IDS = ("page.settings.preview", "page.settings.ui")
 

@@ -21,10 +21,10 @@ class ConfigPage:
 CONFIG_PAGES: tuple[ConfigPage, ...] = (
     ConfigPage("settings.preview", "Settings", "Preview"),
     ConfigPage("settings.ui", "Settings", "UI"),
-    ConfigPage("project.projectm", "Project", "ProjectM"),
-    ConfigPage("project.compositor", "Project", "Compositor"),
     ConfigPage("project.resolution", "Project", "Resolution"),
     ConfigPage("project.render", "Project", "Render"),
+    ConfigPage("project.compositor", "Project", "Compositor"),
+    ConfigPage("project.projectm", "Project", "ProjectM"),
 )
 
 _BY_ID: dict[str, ConfigPage] = {page.id: page for page in CONFIG_PAGES}
