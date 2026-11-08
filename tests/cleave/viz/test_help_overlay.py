@@ -641,7 +641,7 @@ def test_stem_row_help() -> None:
     assert description is not None
     assert description.title == "Stem"
     assert section.title == KEYBOARD_CONTROLS_SECTION_TITLE
-    assert dict(section.entries)["Left/Right"] == "cycle stem source"
+    assert dict(section.entries)["Left/Right"] == "choose stem source"
     assert "Effects reset when the stem changes." in description.lines
 
 
@@ -815,7 +815,10 @@ def test_settings_preview_quality_description_separated_from_keyboard() -> None:
     sections = sections_for(RowKind.SETTINGS_PREVIEW_QUALITY)
     keyboard = _keyboard_section(sections)
     description = _description_section(sections)
-    assert dict(keyboard.entries) == {"Left/Right": "cycle mode"}
+    assert dict(keyboard.entries) == {
+        "Left/Right": "choose mode",
+        "Enter": "open the list",
+    }
     assert description is not None
     assert "live view only" in " ".join(description.lines)
 

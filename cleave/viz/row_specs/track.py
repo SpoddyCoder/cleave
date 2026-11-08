@@ -22,6 +22,10 @@ from cleave.viz.row_spec import FitStrategy, RowNavButton, RowPresentStyle, RowS
 from cleave.viz.row_specs.common import lock_text, noop_horizontal, on_off_text
 from cleave.viz.tuning_view_state import TrackBlock, TuningViewState
 
+from cleave.blend_modes import BLEND_MODES
+from cleave.config_schema.layers import PRESET_SWITCHING_TRIGGERS
+from cleave.stems import STEM_SOURCES
+from cleave.viz.row_specs.common import bool_choice, options_choice
 if TYPE_CHECKING:
     from cleave.viz.controls import TuningControls
 
@@ -88,14 +92,14 @@ def _apply_track_stem(
 ) -> None:
     if desc.slot is None:
         return
-    controls.layer_mutations.cycle_stem(desc.slot, forward=forward)
+    controls.layer_mutations.step_stem(desc.slot, delta=1 if forward else -1)
 
 def _apply_track_blend(
     controls: TuningControls, desc: RowDescriptor, forward: bool, _large: bool,
 ) -> None:
     if desc.slot is None:
         return
-    controls.layer_mutations.cycle_blend(desc.slot, forward=forward)
+    controls.layer_mutations.step_blend(desc.slot, delta=1 if forward else -1)
 
 def _apply_track_opacity(
     controls: TuningControls, desc: RowDescriptor, forward: bool, large: bool,
@@ -127,7 +131,7 @@ def _apply_track_preset_switching_trigger(
 ) -> None:
     if desc.slot is None:
         return
-    controls.layer_mutations.cycle_preset_switching_trigger(desc.slot, forward=forward)
+    controls.layer_mutations.step_preset_switching_trigger(desc.slot, delta=1 if forward else -1)
 
 def _apply_track_preset_duration(
     controls: TuningControls, desc: RowDescriptor, forward: bool, large: bool,
@@ -155,14 +159,14 @@ def _apply_track_preset_start_clean(
 ) -> None:
     if desc.slot is None:
         return
-    controls.layer_mutations.cycle_preset_start_clean(desc.slot, forward=forward)
+    controls.layer_mutations.step_preset_start_clean(desc.slot, forward=forward)
 
 def _apply_track_hard_cut_enabled(
     controls: TuningControls, desc: RowDescriptor, forward: bool, _large: bool,
 ) -> None:
     if desc.slot is None:
         return
-    controls.layer_mutations.cycle_hard_cut_enabled(desc.slot, forward=forward)
+    controls.layer_mutations.step_hard_cut_enabled(desc.slot, forward=forward)
 
 def _apply_track_hard_cut_duration(
     controls: TuningControls, desc: RowDescriptor, forward: bool, large: bool,
@@ -430,6 +434,20 @@ def _apply_layer_delete_action(controls: TuningControls, _desc: RowDescriptor) -
     command_by_id("layers.delete").run(controls)
 
 
+def _jump_track_preset_switching_trigger(
+    controls: TuningControls, desc: RowDescriptor, delta: int
+) -> None:
+    if desc.slot is not None:
+        controls.layer_mutations.step_preset_switching_trigger(desc.slot, delta=delta)
+
+def _jump_track_stem(controls: TuningControls, desc: RowDescriptor, delta: int) -> None:
+    if desc.slot is not None:
+        controls.layer_mutations.step_stem(desc.slot, delta=delta)
+
+def _jump_track_blend(controls: TuningControls, desc: RowDescriptor, delta: int) -> None:
+    if desc.slot is not None:
+        controls.layer_mutations.step_blend(desc.slot, delta=delta)
+
 SPECS: dict[RowKind, RowSpec] = {
     RowKind.TRACK_HEADER: RowSpec(
         affordance=RowAffordance.HEADING,
@@ -451,6 +469,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_track_enabled,
         apply_horizontal=_apply_track_enabled,
+        choice=bool_choice(lambda s, d: _track_block(s, d).runtime.enabled),
         help_title="Layer enabled",
         help_description=(
             "Shows or hides this layer.",
@@ -465,6 +484,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_track_solo,
         apply_horizontal=_apply_track_solo,
+        choice=bool_choice(lambda s, d: s.solo_slot == d.slot),
         help_title="Layer solo",
         help_description=("Shows this layer on its own.",),
         parent_group="track",
@@ -476,6 +496,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_track_locked,
         apply_horizontal=_apply_track_locked,
+        choice=bool_choice(lambda s, d: _track_block(s, d).runtime.locked, lock_text),
         help_title="Layer lock",
         help_description=("Locked layer settings cannot be edited.",),
         parent_group="track",
@@ -574,8 +595,9 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_track_preset_switching_trigger,
         apply_horizontal=_apply_track_preset_switching_trigger,
+        choice=options_choice(PRESET_SWITCHING_TRIGGERS, lambda s, d: _track_block(s, d).runtime.preset_switching_trigger, preset_switching_trigger_display, jump=_jump_track_preset_switching_trigger),
         help_title="Trigger",
-        help_entries=(("Left/Right", "cycle trigger"),),
+        help_entries=(("Left/Right", "choose trigger"),),
         help_description=(
             "How the ordered preset list advances.",
             "Off disables switching and hides the other rows.",
@@ -702,6 +724,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_track_preset_start_clean,
         apply_horizontal=_apply_track_preset_start_clean,
+        choice=bool_choice(lambda s, d: _track_block(s, d).runtime.preset_start_clean, preset_start_clean_display),
         help_title="Start clean",
         help_entries=(("Left/Right", "yes / no"),),
         help_description=(
@@ -717,6 +740,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_track_hard_cut_enabled,
         apply_horizontal=_apply_track_hard_cut_enabled,
+        choice=bool_choice(lambda s, d: _track_block(s, d).runtime.hard_cut_enabled, hard_cut_enabled_display),
         help_title="Hard cut",
         help_entries=(("Left/Right", "enabled / disabled"),),
         help_description=(
@@ -761,8 +785,9 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_track_stem,
         apply_horizontal=_apply_track_stem,
+        choice=options_choice(STEM_SOURCES, lambda s, d: _track_block(s, d).runtime.stem, stem_control_label, jump=_jump_track_stem),
         help_title="Stem",
-        help_entries=(("Left/Right", "cycle stem source"),),
+        help_entries=(("Left/Right", "choose stem source"),),
         help_description=(
             "Audio stem fed to libprojectM for this layer's beat detection",
             "and waveform display.",
@@ -777,6 +802,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_track_blend,
         apply_horizontal=_apply_track_blend,
+        choice=options_choice(BLEND_MODES, lambda s, d: _track_block(s, d).runtime.blend_mode, jump=_jump_track_blend),
         help_title="Blend mode",
         help_description=(
             "How this layer is composited onto the layers below it.",

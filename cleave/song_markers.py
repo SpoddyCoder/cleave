@@ -6,6 +6,8 @@ import bisect
 from dataclasses import dataclass
 from typing import Literal, Sequence
 
+from cleave.choice import step_choice
+
 SongMarkerType = Literal[
     "standard", "begin", "sustain", "crescendo", "diminuendo"
 ]
@@ -31,15 +33,10 @@ class SongMarker:
     marker_type: SongMarkerType = DEFAULT_SONG_MARKER_TYPE
 
 
-def cycle_song_marker_type(
+def step_song_marker_type(
     value: SongMarkerType, *, forward: bool
 ) -> SongMarkerType:
-    try:
-        index = SONG_MARKER_TYPES.index(value)
-    except ValueError:
-        index = 0
-    delta = 1 if forward else -1
-    return SONG_MARKER_TYPES[(index + delta) % len(SONG_MARKER_TYPES)]
+    return step_choice(SONG_MARKER_TYPES, value, 1 if forward else -1)
 
 
 def parse_song_marker_type(raw: object) -> SongMarkerType:

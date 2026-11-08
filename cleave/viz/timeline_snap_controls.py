@@ -16,7 +16,6 @@ from cleave.timeline_presets.song_marker_snap import (
 )
 from cleave.viz.modal import (
     FormField,
-    FormFieldKind,
     FormSpec,
     FormValues,
     ModalHost,
@@ -157,14 +156,12 @@ class TimelineSnapController:
                     FormField(
                         "target",
                         "snap to",
-                        FormFieldKind.SEGMENT,
                         target_options,
                         target_options.index(target),
                     ),
                     FormField(
                         "proximity",
                         "proximity",
-                        FormFieldKind.STEP,
                         tuple(
                             song_marker_snap_proximity_label(option)
                             for option in SONG_MARKER_SNAP_PROXIMITY_OPTIONS
@@ -175,7 +172,6 @@ class TimelineSnapController:
                     FormField(
                         "scope",
                         "layers",
-                        FormFieldKind.STEP,
                         tuple(
                             song_marker_snap_scope_label(option, layer_z_order)
                             for option in scopes

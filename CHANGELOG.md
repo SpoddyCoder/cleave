@@ -24,6 +24,9 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- Left/Right on a choice stops at the first or last option instead of wrapping round, in the inspector and in dialogs. On/off rows go off with Left and on with Right, so pressing the same key again leaves them alone.
+- Settings > Preview > preview quality lists ultra-performance first and output last, so Right raises quality. Generate timeline... lists cue snap as none, beats, bars.
+- Choices look and work the same in the inspector and in dialogs. Up to three options show as segments: click one to choose it. Longer lists show as a dropdown: click it or press Enter (Space in a dialog) to open the list, pick with the mouse or Up/Down and Enter, and Esc closes it unchanged. Left/Right still step any choice. Number values keep their side arrows still as the number changes.
 - The Project menu lists its pages as Resolution, Render, Compositor, then ProjectM. Render project... sits above Separate stems..., which is renamed Re-separate stems... (still disabled; use `cleave separate`).
 - The navigator holds only the parts of the picture: Overlay, Post-FX, Pattern Mask, Timeline, and Layers. Settings and Project pages open from their menus into the inspector (Ctrl+, opens Settings > Preview). The menu bar is File, Edit (Undo, Redo), View (Fullscreen, timeline strip, preset curation mode), Project, Settings, and Help (Help, About). The Layers and Timeline menus are gone; add and delete layer and the timeline actions are buttons on their inspector pages.
 - Settings has two pages. Preview holds preview quality, residual latency, and Measure latency, replacing Editor Window and Latency Compensation. Navigator side and help side move to UI.

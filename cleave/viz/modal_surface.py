@@ -10,12 +10,13 @@ from typing import Iterator
 
 from imgui_bundle import imgui
 
+from cleave.choice import ChoiceKind
+from cleave.viz.choice_widgets import draw_choice_list, draw_combo, draw_segments
 from cleave.viz.imgui_theme import rgba
 from cleave.viz.text_edit import caret_line_column
 from cleave.viz.modal import (
     BUTTON_ROW_KINDS,
     ButtonRole,
-    FormFieldKind,
     FormRowView,
     ModalHost,
     ModalKind,
@@ -25,10 +26,6 @@ from cleave.viz.modal import (
 )
 from cleave.viz.modal_layout import (
     CARET_WIDTH,
-    FORM_RADIO_OFF,
-    FORM_RADIO_ON,
-    FORM_STEP_ARROW_LEFT,
-    FORM_STEP_ARROW_RIGHT,
     TEXT_BUTTON_LABELS,
     TextMeasure,
     bar_height,
@@ -39,7 +36,6 @@ from cleave.viz.modal_layout import (
     form_control_width,
     form_row_height,
     form_row_pad_y,
-    form_segment_widths,
     lines_block_height,
     measure_button_row,
     measure_options,
@@ -68,7 +64,6 @@ from cleave.viz.theme import (
     FOCUS_WASH_ALPHA,
     HIGHLIGHT,
     LABEL,
-    MUTED,
     VALUE,
     tuning_ui_metrics,
 )
@@ -104,6 +99,10 @@ class ModalPointerKind(Enum):
     FOCUS_FORM_ROW = "focus_form_row"
     SET_FORM_VALUE = "set_form_value"
     STEP_FORM_VALUE = "step_form_value"
+    OPEN_FORM_CHOICE = "open_form_choice"
+    HOVER_FORM_CHOICE = "hover_form_choice"
+    PICK_FORM_CHOICE = "pick_form_choice"
+    CLOSE_FORM_CHOICE = "close_form_choice"
 
 
 @dataclass(frozen=True)
@@ -111,7 +110,8 @@ class ModalPointerIntent:
     """One pointer result for the frame.
 
     ``index`` is an option, a text button, or a form row. ``value`` is the form
-    option chosen, or the step for ``STEP_FORM_VALUE``.
+    option chosen, the step for ``STEP_FORM_VALUE``, or the list row for
+    ``HOVER_FORM_CHOICE`` and ``PICK_FORM_CHOICE``.
     """
 
     kind: ModalPointerKind
@@ -150,6 +150,14 @@ def apply_modal_pointer(host: ModalHost, intent: ModalPointerIntent | None) -> N
         host.set_form_value(_intent_index(intent), intent.value)
     elif kind is ModalPointerKind.STEP_FORM_VALUE:
         host.step_form_value(_intent_index(intent), intent.value)
+    elif kind is ModalPointerKind.OPEN_FORM_CHOICE:
+        host.open_form_choice(_intent_index(intent))
+    elif kind is ModalPointerKind.HOVER_FORM_CHOICE:
+        host.hover_form_choice(intent.value)
+    elif kind is ModalPointerKind.PICK_FORM_CHOICE:
+        host.pick_form_choice(intent.value)
+    elif kind is ModalPointerKind.CLOSE_FORM_CHOICE:
+        host.close_form_choice()
 
 
 @dataclass(frozen=True)
@@ -415,103 +423,30 @@ class _FormHit:
     value: int = 0
 
 
-def _draw_form_step(
+def _draw_form_control(
     draw: imgui.ImDrawList,
     measure: TextMeasure,
     row: FormRowView,
     index: int,
     *,
-    x: int,
-    y: int,
-    width: int,
-    line_h: int,
-) -> list[_FormHit]:
-    left_w = measure.size(f" {FORM_STEP_ARROW_LEFT} ")[0]
-    right_w = measure.size(f" {FORM_STEP_ARROW_RIGHT} ")[0]
-    left = (x, y, left_w, line_h)
-    right = (x + width - right_w, y, right_w, line_h)
-    hits = []
-    for rect, glyph, delta in (
-        (left, FORM_STEP_ARROW_LEFT, -1),
-        (right, FORM_STEP_ARROW_RIGHT, 1),
-    ):
-        role = HIGHLIGHT if _pointer_inside(rect) else MUTED
-        _text(draw, rect[0], y, f" {glyph} ", role)
-        hits.append(_FormHit(rect, ModalPointerKind.STEP_FORM_VALUE, index, delta))
-    text = row.options[row.value]
-    text_w = measure.size(text)[0]
-    _text(draw, x + (width - text_w) // 2, y, text, VALUE)
-    return hits
-
-
-def _draw_form_segments(
-    draw: imgui.ImDrawList,
-    measure: TextMeasure,
-    row: FormRowView,
-    index: int,
-    *,
-    x: int,
-    y: int,
-    line_h: int,
-) -> list[_FormHit]:
-    hits = []
-    for option_index, width in enumerate(form_segment_widths(measure, row)):
-        rect = (x, y, width, line_h)
-        chosen = option_index == row.value
-        _draw_segment(draw, rect, row.options[option_index], measure, chosen=chosen)
-        hits.append(
-            _FormHit(rect, ModalPointerKind.SET_FORM_VALUE, index, option_index)
-        )
-        x += width
-    return hits
-
-
-def _draw_segment(
-    draw: imgui.ImDrawList,
     rect: Rect,
-    label: str,
-    measure: TextMeasure,
-    *,
-    chosen: bool,
-) -> None:
-    x, y, w, h = rect
-    top_left = imgui.ImVec2(float(x), float(y))
-    bottom_right = imgui.ImVec2(float(x + w), float(y + h))
-    if chosen:
-        draw.add_rect_filled(top_left, bottom_right, _packed(BUTTON_PRIMARY_BG))
-    elif _pointer_inside(rect):
-        draw.add_rect_filled(top_left, bottom_right, _packed(BUTTON_BG))
-    draw.add_rect(top_left, bottom_right, _packed(BUTTON_BORDER))
-    text_w = measure.size(label)[0]
-    _text(draw, x + (w - text_w) // 2, y, label, VALUE if chosen else MUTED)
-
-
-def _draw_form_radio(
-    draw: imgui.ImDrawList,
-    row: FormRowView,
-    index: int,
-    *,
-    x: int,
-    y: int,
-    width: int,
-    line_h: int,
-    line_gap: int,
+    open_: bool,
+    hover: bool,
 ) -> list[_FormHit]:
-    hits = []
-    for option_index, option in enumerate(row.options):
-        chosen = option_index == row.value
-        prefix = FORM_RADIO_ON if chosen else FORM_RADIO_OFF
-        _text(draw, x, y, f"{prefix}{option}", VALUE)
-        hits.append(
-            _FormHit(
-                (x, y, width, line_h),
-                ModalPointerKind.SET_FORM_VALUE,
-                index,
-                option_index,
-            )
+    """Segments, or a combo that opens the row's list, filling ``rect``."""
+    x, y, _w, h = rect
+    if row.kind is ChoiceKind.SEGMENT:
+        rects = draw_segments(
+            draw, measure, row.options, row.value, x=x, y=y, height=h, hover=hover
         )
-        y += line_h + line_gap
-    return hits
+        return [
+            _FormHit(segment, ModalPointerKind.SET_FORM_VALUE, index, option)
+            for option, segment in enumerate(rects)
+        ]
+    draw_combo(
+        draw, measure, row.options[row.value], rect=rect, open_=open_, hover=hover
+    )
+    return [_FormHit(rect, ModalPointerKind.OPEN_FORM_CHOICE, index)]
 
 
 def _draw_form_rows(
@@ -524,13 +459,19 @@ def _draw_form_rows(
     y: int,
     line_h: int,
     line_gap: int,
-) -> tuple[int, tuple[_FormHit, ...]]:
-    """Draw every field. Returns the y below them and the clickable parts."""
+) -> tuple[int, tuple[_FormHit, ...], dict[int, Rect]]:
+    """Draw every field.
+
+    Returns the y below them, the clickable parts, and each row's control rect
+    (the anchor for an open list).
+    """
     hits: list[_FormHit] = []
+    controls: dict[int, Rect] = {}
+    open_row = None if view.form_choice is None else view.form_choice.target
     left = ox + panel_pad_x()
     right = ox + panel_w - panel_pad_x()
     for index, row in enumerate(view.form_rows):
-        height = form_row_height(row, line_h, line_gap)
+        height = form_row_height(line_h)
         rect = (left, y, right - left, height)
         hits.append(_FormHit(rect, ModalPointerKind.FOCUS_FORM_ROW, index))
         if row.focused:
@@ -538,36 +479,20 @@ def _draw_form_rows(
         text_y = y + form_row_pad_y()
         _text(draw, left, text_y, row.label, HIGHLIGHT if row.focused else LABEL)
         width = form_control_width(measure, row)
-        x = right - width
-        if row.kind is FormFieldKind.STEP:
-            parts = _draw_form_step(
-                draw,
-                measure,
-                row,
-                index,
-                x=x,
-                y=text_y,
-                width=width,
-                line_h=line_h,
-            )
-        elif row.kind is FormFieldKind.SEGMENT:
-            parts = _draw_form_segments(
-                draw, measure, row, index, x=x, y=text_y, line_h=line_h
-            )
-        else:
-            parts = _draw_form_radio(
-                draw,
-                row,
-                index,
-                x=x,
-                y=text_y,
-                width=width,
-                line_h=line_h,
-                line_gap=line_gap,
-            )
+        control = (right - width, text_y, width, line_h)
+        controls[index] = control
+        parts = _draw_form_control(
+            draw,
+            measure,
+            row,
+            index,
+            rect=control,
+            open_=open_row == index,
+            hover=open_row is None,
+        )
         hits.extend(parts)
         y += height
-    return y, tuple(hits)
+    return y, tuple(hits), controls
 
 
 def _draw_button_row(
@@ -654,6 +579,8 @@ class ModalSurface:
         self.option_rects: tuple[Rect, ...] = ()
         self.text_button_rects: tuple[Rect, ...] = ()
         self._form_hits: tuple[_FormHit, ...] = ()
+        self._form_controls: dict[int, Rect] = {}
+        self.choice_list_rows: tuple[Rect, ...] = ()
         self.text_field_rect: Rect | None = None
         self._text_field_hit: _TextFieldHit | None = None
 
@@ -663,6 +590,8 @@ class ModalSurface:
         self.option_rects = ()
         self.text_button_rects = ()
         self._form_hits = ()
+        self._form_controls = {}
+        self.choice_list_rows = ()
         self.text_field_rect = None
         self._text_field_hit = None
 
@@ -719,7 +648,6 @@ class ModalSurface:
             panel = (ox, oy, max(0, int(size.x)), max(0, int(size.y)))
             self.panel_rect = panel
             self._record_pointer(panel)
-            return panel
         finally:
             try:
                 if begun:
@@ -727,6 +655,31 @@ class ModalSurface:
             finally:
                 if pushed:
                     imgui.pop_style_var(pushed)
+        self._draw_form_choice()
+        return panel
+
+    def _draw_form_choice(self) -> None:
+        """The open combo list of a form row, above the panel. It owns the pointer."""
+        choice = self.view.form_choice
+        if choice is None:
+            return
+        anchor = self._form_controls.get(int(choice.target))
+        if anchor is None:
+            return
+        pointer = draw_choice_list(
+            "modal-choice-list", choice, self.measure, anchor=anchor
+        )
+        self.choice_list_rows = pointer.rows
+        if pointer.picked is not None:
+            self.intent = ModalPointerIntent(
+                ModalPointerKind.PICK_FORM_CHOICE, value=pointer.picked
+            )
+        elif pointer.outside:
+            self.intent = ModalPointerIntent(ModalPointerKind.CLOSE_FORM_CHOICE)
+        elif pointer.hovered is not None:
+            self.intent = ModalPointerIntent(
+                ModalPointerKind.HOVER_FORM_CHOICE, value=pointer.hovered
+            )
 
     def _draw_standard(
         self, ox: int, oy: int, panel_w: int, line_gap: int, screen_w: int
@@ -782,7 +735,7 @@ class ModalSurface:
         if view.form_rows or view.form_info is not None:
             if has_message:
                 y += line_h
-            y, self._form_hits = _draw_form_rows(
+            y, self._form_hits, self._form_controls = _draw_form_rows(
                 draw,
                 view,
                 measure,
@@ -926,6 +879,9 @@ class ModalSurface:
 
     def _record_pointer(self, panel: Rect) -> None:
         if self.view.kind == ModalKind.PROGRESS:
+            return
+        if self.view.form_choice is not None:
+            # The open list takes the pointer; see _draw_form_choice.
             return
         io = imgui.get_io()
         pos = io.mouse_pos

@@ -17,6 +17,8 @@ from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
 from cleave.viz.row_spec import FitStrategy, RowPresentStyle, RowSpec
 from cleave.viz.tuning_view_state import TuningViewState
 
+from cleave.config_schema.project_render import PROJECT_RENDER_QUALITIES
+from cleave.viz.row_specs.common import bool_choice, options_choice
 if TYPE_CHECKING:
     from cleave.viz.controls import TuningControls
 
@@ -108,7 +110,7 @@ def _apply_project_render_quality(
     forward: bool,
     _large: bool,
 ) -> None:
-    controls.project.cycle_quality(forward=forward)
+    controls.project.step_quality(forward=forward)
 
 
 def _apply_project_render_start(
@@ -141,10 +143,10 @@ def _apply_project_milkdrop_beat(
 def _apply_project_compositor_hdr(
     controls: TuningControls,
     _desc: RowDescriptor,
-    _forward: bool,
+    forward: bool,
     _large: bool,
 ) -> None:
-    controls.project.toggle_compositor_hdr()
+    controls.project.set_compositor_hdr(forward)
 
 
 SPECS: dict[RowKind, RowSpec] = {
@@ -200,8 +202,9 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_project_compositor_hdr,
         apply_horizontal=_apply_project_compositor_hdr,
+        choice=bool_choice(lambda s, _d: s.project.compositor_hdr),
         help_title="HDR compositing",
-        help_entries=(("Left/Right", "toggle on/off"),),
+        help_entries=(("Left/Right", "off / on"),),
         help_description=(
             "16-bit float compositing when on; 8-bit when off.",
             "Applies to the live view and the render. The rendered video is 8-bit either way.",
@@ -313,8 +316,9 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_project_render_quality,
         apply_horizontal=_apply_project_render_quality,
+        choice=options_choice(PROJECT_RENDER_QUALITIES, lambda s, _d: s.project.quality),
         help_title="Render quality",
-        help_entries=(("Left/Right", "cycle mode"),),
+        help_entries=(("Left/Right", "choose mode"),),
         help_description=("Encode and layer-resolution trade-off for this render.",),
         help_mode_entries=PROJECT_RENDER_QUALITY_HELP_ENTRIES,
         is_pinned=True,

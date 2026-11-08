@@ -9,7 +9,8 @@ from cleave.config import (
     RENDER_OVERLAY_POSITIONS,
     RENDER_OVERLAY_SLIDE_DIRECTIONS,
 )
-from cleave.viz.fonts import cycle_overlay_font
+from cleave.choice import step_choice
+from cleave.viz.fonts import step_overlay_font
 from cleave.viz.session import (
     OverlayCardRuntime,
     OverlayClosingAnimationRuntime,
@@ -42,48 +43,30 @@ class OverlayCardControls:
             ):
                 self.session.overlay_solo = False
 
-    def cycle_position(self, *, forward: bool) -> None:
+    def step_position(self, *, delta: int) -> None:
         card = self._card()
-        positions = RENDER_OVERLAY_POSITIONS
-        try:
-            index = positions.index(card.position)
-        except ValueError:
-            index = 0
-        if forward:
-            card.position = positions[(index + 1) % len(positions)]
-        else:
-            card.position = positions[(index - 1) % len(positions)]
+        card.position = step_choice(
+            RENDER_OVERLAY_POSITIONS, card.position, delta
+        )
 
-    def cycle_animation_type(self, *, forward: bool) -> None:
+    def step_animation_type(self, *, delta: int) -> None:
         anim = self._card().animation
-        types = RENDER_OVERLAY_ANIMATION_TYPES
-        try:
-            index = types.index(anim.type)
-        except ValueError:
-            index = 0
-        if forward:
-            anim.type = types[(index + 1) % len(types)]
-        else:
-            anim.type = types[(index - 1) % len(types)]
+        anim.type = step_choice(
+            RENDER_OVERLAY_ANIMATION_TYPES, anim.type, delta
+        )
 
-    def cycle_slide_direction(self, *, forward: bool) -> None:
+    def step_slide_direction(self, *, delta: int) -> None:
         anim = self._card().animation
-        directions = RENDER_OVERLAY_SLIDE_DIRECTIONS
-        try:
-            index = directions.index(anim.slide_direction)
-        except ValueError:
-            index = 0
-        if forward:
-            anim.slide_direction = directions[(index + 1) % len(directions)]
-        else:
-            anim.slide_direction = directions[(index - 1) % len(directions)]
+        anim.slide_direction = step_choice(
+            RENDER_OVERLAY_SLIDE_DIRECTIONS, anim.slide_direction, delta
+        )
 
     def set_title_font_size(self, size: int) -> None:
         self._card().title_font_size = max(1, size)
 
-    def cycle_title_font(self, *, forward: bool) -> None:
+    def step_title_font(self, *, delta: int) -> None:
         card = self._card()
-        card.title_font = cycle_overlay_font(card.title_font, forward=forward)
+        card.title_font = step_overlay_font(card.title_font, delta=delta)
 
     def set_title_margin_bottom(self, margin: int) -> None:
         self._card().title_margin_bottom = max(0, margin)
@@ -125,9 +108,9 @@ class OverlayCardControls:
     def set_body_font_size(self, size: int) -> None:
         self._card().body_font_size = max(1, size)
 
-    def cycle_body_font(self, *, forward: bool) -> None:
+    def step_body_font(self, *, delta: int) -> None:
         card = self._card()
-        card.body_font = cycle_overlay_font(card.body_font, forward=forward)
+        card.body_font = step_overlay_font(card.body_font, delta=delta)
 
     def set_opacity(self, pct: int) -> None:
         self._card().opacity_pct = max(0, min(100, pct))

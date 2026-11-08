@@ -14,6 +14,7 @@ from cleave.config_schema.layers import (
 )
 from cleave.stems import STEM_SOURCES
 from cleave.preset_playlist import is_top_level_browse_dir
+from cleave.choice import step_choice
 from cleave.viz.live_layer_bindings import LiveLayerBindings
 from cleave.viz.preset_list_populate import needed_preset_count
 from cleave.viz.preset_switching import layer_notification
@@ -116,18 +117,15 @@ class LayerMutations:
             playlist.prev()
         self._publish_browse_preset(slot)
 
-    def cycle_preset_switching_trigger(self, slot: str, *, forward: bool) -> None:
+    def step_preset_switching_trigger(self, slot: str, *, delta: int) -> None:
         layer = self.session.layers[slot]
-        options = PRESET_SWITCHING_TRIGGERS
-        try:
-            index = options.index(layer.preset_switching_trigger)
-        except ValueError:
-            index = 0
         previous = layer.preset_switching_trigger
-        if forward:
-            layer.preset_switching_trigger = options[(index + 1) % len(options)]
-        else:
-            layer.preset_switching_trigger = options[(index - 1) % len(options)]
+        trigger = step_choice(
+            PRESET_SWITCHING_TRIGGERS, previous, delta
+        )
+        if trigger == previous:
+            return
+        layer.preset_switching_trigger = trigger
         layer.preset_switching = preset_switching_mode_for_trigger(
             layer.preset_switching_trigger
         )
@@ -196,18 +194,20 @@ class LayerMutations:
         if bindings is not None:
             bindings.on_preset_switching_change(slot)
 
-    def cycle_preset_start_clean(self, slot: str, *, forward: bool) -> None:
-        del forward
+    def step_preset_start_clean(self, slot: str, *, forward: bool) -> None:
         layer = self.session.layers[slot]
-        layer.preset_start_clean = not layer.preset_start_clean
+        if layer.preset_start_clean == forward:
+            return
+        layer.preset_start_clean = forward
         bindings = self._bindings()
         if bindings is not None:
             bindings.on_preset_switching_change(slot)
 
-    def cycle_hard_cut_enabled(self, slot: str, *, forward: bool) -> None:
-        del forward
+    def step_hard_cut_enabled(self, slot: str, *, forward: bool) -> None:
         layer = self.session.layers[slot]
-        layer.hard_cut_enabled = not layer.hard_cut_enabled
+        if layer.hard_cut_enabled == forward:
+            return
+        layer.hard_cut_enabled = forward
         bindings = self._bindings()
         if bindings is not None:
             bindings.on_preset_switching_change(slot)
@@ -230,27 +230,18 @@ class LayerMutations:
         if bindings is not None:
             bindings.on_preset_switching_change(slot)
 
-    def cycle_blend(self, slot: str, *, forward: bool) -> None:
+    def step_blend(self, slot: str, *, delta: int) -> None:
         layer = self.session.layers[slot]
-        try:
-            index = BLEND_MODES.index(layer.blend_mode)
-        except ValueError:
-            index = 0
-        if forward:
-            layer.blend_mode = BLEND_MODES[(index + 1) % len(BLEND_MODES)]
-        else:
-            layer.blend_mode = BLEND_MODES[(index - 1) % len(BLEND_MODES)]
+        layer.blend_mode = step_choice(
+            BLEND_MODES, layer.blend_mode, delta
+        )
 
-    def cycle_stem(self, slot: str, *, forward: bool) -> None:
+    def step_stem(self, slot: str, *, delta: int) -> None:
         layer = self.session.layers[slot]
-        try:
-            index = STEM_SOURCES.index(layer.stem)
-        except ValueError:
-            index = 0
-        if forward:
-            layer.stem = STEM_SOURCES[(index + 1) % len(STEM_SOURCES)]
-        else:
-            layer.stem = STEM_SOURCES[(index - 1) % len(STEM_SOURCES)]
+        stem = step_choice(STEM_SOURCES, layer.stem, delta)
+        if stem == layer.stem:
+            return
+        layer.stem = stem
         layer.effects = {}
         bindings = self._bindings()
         if bindings is not None:

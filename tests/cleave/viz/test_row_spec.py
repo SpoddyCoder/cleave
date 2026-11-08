@@ -768,13 +768,13 @@ def test_apply_field_horizontal_cycles_column_sides() -> None:
     assert controls.cfg.editor.navigator_side == DEFAULT_NAVIGATOR_SIDE
 
 
-def test_apply_field_horizontal_cycles_preview_quality() -> None:
+def test_apply_field_horizontal_steps_preview_quality() -> None:
     controls = _make_controls()
     desc = RowDescriptor(RowKind.SETTINGS_PREVIEW_QUALITY)
     assert controls.cfg.editor.preview_quality == DEFAULT_EDITOR_PREVIEW_QUALITY
 
     assert apply_field_horizontal(controls, desc, True, False) is True
-    assert controls.cfg.editor.preview_quality == "balanced"
+    assert controls.cfg.editor.preview_quality == "output"
 
     apply_field_horizontal(controls, desc, False, False)
     assert controls.cfg.editor.preview_quality == DEFAULT_EDITOR_PREVIEW_QUALITY

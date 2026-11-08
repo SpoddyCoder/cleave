@@ -6,7 +6,7 @@ import pytest
 
 from cleave.song_markers import (
     SongMarker,
-    cycle_song_marker_type,
+    step_song_marker_type,
     format_marker_time,
     nearest_index,
     place_marker,
@@ -92,15 +92,15 @@ def test_format_marker_time() -> None:
     assert format_marker_time(-1.0) == "00:00.00"
 
 
-def test_cycle_song_marker_type() -> None:
-    assert cycle_song_marker_type("standard", forward=True) == "begin"
-    assert cycle_song_marker_type("begin", forward=True) == "sustain"
-    assert cycle_song_marker_type("sustain", forward=True) == "crescendo"
-    assert cycle_song_marker_type("crescendo", forward=True) == "diminuendo"
-    assert cycle_song_marker_type("diminuendo", forward=True) == "standard"
-    assert cycle_song_marker_type("standard", forward=False) == "diminuendo"
-    assert cycle_song_marker_type("begin", forward=False) == "standard"
-    assert cycle_song_marker_type("crescendo", forward=False) == "sustain"
+def test_step_song_marker_type() -> None:
+    assert step_song_marker_type("standard", forward=True) == "begin"
+    assert step_song_marker_type("begin", forward=True) == "sustain"
+    assert step_song_marker_type("sustain", forward=True) == "crescendo"
+    assert step_song_marker_type("crescendo", forward=True) == "diminuendo"
+    assert step_song_marker_type("diminuendo", forward=True) == "diminuendo"
+    assert step_song_marker_type("standard", forward=False) == "standard"
+    assert step_song_marker_type("begin", forward=False) == "standard"
+    assert step_song_marker_type("crescendo", forward=False) == "sustain"
 
 
 def test_song_marker_gesture_warning_orphan_begin() -> None:

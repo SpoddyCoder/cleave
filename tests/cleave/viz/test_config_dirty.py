@@ -303,7 +303,7 @@ def _mutate_post_fx_highlight_rolloff_mode(controls: TuningControls) -> None:
     _expand_post_fx_highlight_rolloff(controls)
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(RowKind.POST_FX_HIGHLIGHT_ROLLOFF_MODE)
-    press_main_row(controls, _keydown(pygame.K_RIGHT))
+    press_main_row(controls, _keydown(pygame.K_LEFT))
 
 
 def _mutate_post_fx_highlight_rolloff_curve(controls: TuningControls) -> None:
@@ -389,7 +389,7 @@ def _mutate_milkdrop_beat_sensitivity(controls: TuningControls) -> None:
 
 def _mutate_compositor_hdr(controls: TuningControls) -> None:
     controls.focus_descriptor = RowDescriptor(RowKind.PROJECT_COMPOSITOR_HDR)
-    press_main_row(controls, _keydown(pygame.K_RIGHT))
+    press_main_row(controls, _keydown(pygame.K_LEFT))
 
 
 def _mutate_resolution_width(controls: TuningControls) -> None:

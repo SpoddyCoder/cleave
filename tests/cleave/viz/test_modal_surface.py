@@ -20,7 +20,6 @@ from cleave.viz.modal import (
     BUTTON_ROW_KINDS,
     ButtonRole,
     FormField,
-    FormFieldKind,
     FormSpec,
     ModalHost,
     ModalKind,
@@ -876,9 +875,9 @@ def _form_host_view() -> tuple[ModalHost, list[dict[str, int]]]:
             title="Snap cues",
             body="Moves cues.",
             fields=(
-                FormField("target", "snap to", FormFieldKind.SEGMENT, ("a", "b"), 0),
-                FormField("step", "proximity", FormFieldKind.STEP, ("1s", "2s"), 0),
-                FormField("source", "from", FormFieldKind.RADIO, ("x", "y"), 0),
+                FormField("target", "snap to", ("a", "b"), 0),
+                FormField("step", "proximity", ("1s", "2s"), 0),
+                FormField("source", "from", ("x", "y"), 0),
             ),
             confirm_label="Go",
             on_confirm=confirmed.append,
@@ -917,19 +916,44 @@ def test_form_draws_and_a_segment_click_sets_the_value() -> None:
     assert confirmed == [{"target": 1, "step": 0, "source": 0}]
 
 
-def test_form_stepper_arrow_click_steps_the_value() -> None:
-    modal, _confirmed = _form_host_view()
+def test_form_combo_click_opens_its_list_and_a_row_click_picks() -> None:
+    modal = ModalHost()
+    modal.prompt_form(
+        FormSpec(
+            title="Pick",
+            fields=(FormField("shape", "shape", ("one", "two", "three", "four"), 0),),
+            confirm_label="Go",
+            on_confirm=lambda _values: None,
+        )
+    )
     with _host() as host:
         surface = ModalSurface(modal.view_state(), ImGuiTextMeasure())
         _idle(host, surface)
-        right = next(
+        combo = next(
             hit
             for hit in surface._form_hits
-            if hit.kind is ModalPointerKind.STEP_FORM_VALUE and hit.value == 1
+            if hit.kind is ModalPointerKind.OPEN_FORM_CHOICE
         )
-        _pointer(host, surface, _center(right.rect), click=True)
+        _pointer(host, surface, _center(combo.rect), click=True)
+        assert surface.intent == ModalPointerIntent(
+            ModalPointerKind.OPEN_FORM_CHOICE, index=0
+        )
         apply_modal_pointer(modal, surface.intent)
-    assert modal.view_state().form_rows[1].value == 1
+    assert modal.view_state().form_choice is not None
+
+    with _host() as host:
+        surface = ModalSurface(modal.view_state(), ImGuiTextMeasure())
+        _idle(host, surface)
+        assert len(surface.choice_list_rows) == 4
+        row = surface.choice_list_rows[2]
+        _pointer(host, surface, _center(row), click=True)
+        assert surface.intent == ModalPointerIntent(
+            ModalPointerKind.PICK_FORM_CHOICE, value=2
+        )
+        apply_modal_pointer(modal, surface.intent)
+    view = modal.view_state()
+    assert view.form_choice is None
+    assert view.form_rows[0].value == 2
 
 
 def test_inspector_button_inline_field_and_colour_picker_draw() -> None:

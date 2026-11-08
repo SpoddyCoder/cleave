@@ -19,6 +19,7 @@ from cleave.config_schema.project_resolution import (
     clamp_resolution_height,
     clamp_resolution_width,
 )
+from cleave.choice import step_choice
 from cleave.viz.session import TuningSession
 
 _BEAT_SENSITIVITY_STEP = 0.1
@@ -47,23 +48,19 @@ class ProjectControls:
             project.milkdrop_beat_sensitivity + delta
         )
 
-    def toggle_compositor_hdr(self) -> None:
+    def set_compositor_hdr(self, enabled: bool) -> None:
         project = self.session.project
-        project.compositor_hdr = not project.compositor_hdr
+        if project.compositor_hdr == enabled:
+            return
+        project.compositor_hdr = enabled
         if self._on_compositor_format_changed is not None:
             self._on_compositor_format_changed()
 
-    def cycle_quality(self, *, forward: bool) -> None:
-        modes = PROJECT_RENDER_QUALITIES
+    def step_quality(self, *, forward: bool) -> None:
         render = self.session.project.render
-        try:
-            index = modes.index(render.quality)
-        except ValueError:
-            index = 0
-        if forward:
-            render.quality = modes[(index + 1) % len(modes)]
-        else:
-            render.quality = modes[(index - 1) % len(modes)]
+        render.quality = step_choice(
+            PROJECT_RENDER_QUALITIES, render.quality, 1 if forward else -1
+        )
 
     def adjust_start(self, *, forward: bool, large: bool) -> None:
         step = 10 if large else 1

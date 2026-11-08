@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import TYPE_CHECKING
 
+from cleave.choice import ChoiceKind, choice_kind
 from cleave.viz.inline_edit import ColourTarget
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
 from cleave.viz.row_sections import (
@@ -44,6 +45,29 @@ FieldMutator = Callable[["TuningControls", RowDescriptor, bool, bool], None]
 ActionMutator = Callable[["TuningControls", RowDescriptor], None]
 ColourTargetFn = Callable[["TuningControls", RowDescriptor], ColourTarget]
 VisibilityIconFn = Callable[[TuningViewState, RowDescriptor], tuple[bool, bool]]
+ChoiceJump = Callable[["TuningControls", RowDescriptor, int], None]
+
+
+@dataclass(frozen=True)
+class RowChoice:
+    """A row whose value is one of a fixed list of options.
+
+    ``labels`` are the options as shown, in order; ``index`` is the current one.
+    Up to three options draw as segments, more as a combo (``choice_kind``).
+    ``jump`` moves by any number of options in one change. Without it, a pick
+    steps through ``apply_horizontal`` one option at a time, which suits rows
+    with few options and no costly side effect.
+    """
+
+    labels: Callable[[], tuple[str, ...]]
+    index: Callable[[TuningViewState, RowDescriptor], int]
+    jump: ChoiceJump | None = None
+
+
+def row_choice_kind(kind: RowKind) -> ChoiceKind | None:
+    """Segments or combo for a choice row; None for any other row."""
+    choice = ROW_SPECS[kind].choice
+    return None if choice is None else choice_kind(len(choice.labels()))
 
 
 @dataclass(frozen=True)
@@ -93,6 +117,7 @@ class RowSpec:
     parent_group: str | None = None
     blocked_by_section_lock: bool | None = None
     navigable_when_section_locked: bool | None = None
+    choice: RowChoice | None = None
 
 
 # Domain modules import RowSpec from this module, so assembly happens after the
@@ -317,6 +342,26 @@ def apply_field_horizontal(
     if section_lock_blocks_mutation(controls.session, desc):
         return False
     spec.apply_horizontal(controls, desc, forward, large)
+    return True
+
+
+def apply_field_choice(
+    controls: TuningControls,
+    desc: RowDescriptor,
+    delta: int,
+) -> bool:
+    """Move a choice row ``delta`` options, as a segment click or a combo pick does."""
+    spec = ROW_SPECS.get(desc.kind)
+    if spec is None or spec.choice is None or delta == 0:
+        return False
+    if section_lock_blocks_mutation(controls.session, desc):
+        return False
+    if spec.choice.jump is not None:
+        spec.choice.jump(controls, desc, delta)
+        return True
+    assert spec.apply_horizontal is not None
+    for _ in range(abs(delta)):
+        spec.apply_horizontal(controls, desc, delta > 0, False)
     return True
 
 

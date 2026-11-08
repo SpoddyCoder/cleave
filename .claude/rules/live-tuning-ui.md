@@ -41,6 +41,8 @@ The inspector holds live properties. Commands are buttons. A command that needs 
 
 A button is a command in `commands.py`, placed with `SectionNode(commands=...)` or `SectionDef.trailing_commands`. Commands that have no menu row go in `_INSPECTOR_COMMANDS`. `help_content._INSPECTOR_COMMAND_KINDS` maps a command to the `RowAffordance.COMMAND` row that holds its help text.
 
+A property with a fixed list of options sets `RowSpec.choice` (`bool_choice` / `options_choice` in `row_specs/common.py`); a form field is a `FormField` with its options. The option count picks the control (`cleave/choice.py`): three or fewer draw as segments, more as a combo whose list opens on click or Enter (Space in a dialog). Lists order low to high, so Right means more, and every step clamps at the ends. On/off rows are false then true. Give a combo row a `jump` when one change must not repeat side effects. Numbers stay `< value >` steppers, padded to the widest value shown. Drawing is shared in `choice_widgets.py`; do not add a per-dialog control.
+
 Dialogs with parameters use `ModalHost.prompt_form` with a `FormSpec`. Fields edit draft values, so Cancel needs no restore. Use `info` to show what the draft would affect, from a dry run. Confirm-only dialogs use `prompt_confirm` with a verb label; `destructive=True` fills the button red and starts on Cancel.
 
 Text and colour properties are `VALUE_TEXT` and `VALUE_COLOUR` rows. They edit in place through `controls.inline_edit`, which owns the keyboard while active. Multi-line text keeps the text modal. Bulk timeline commands record through `TimelineHistory.recording`.

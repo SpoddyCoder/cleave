@@ -56,7 +56,6 @@ from cleave.timeline_presets.timeline_cuts import (
 )
 from cleave.viz.modal import (
     FormField,
-    FormFieldKind,
     FormSpec,
     FormValues,
     ModalHost,
@@ -82,7 +81,6 @@ _KIND_BUILDERS = {
 def _choice_field(
     field_id: str,
     label: str,
-    kind: FormFieldKind,
     options: Sequence[object],
     current: object,
     display: Callable[..., str],
@@ -90,7 +88,6 @@ def _choice_field(
     return FormField(
         field_id,
         label,
-        kind,
         tuple(display(option) for option in options),
         options.index(current),
     )
@@ -128,8 +125,6 @@ class TimelinePresetController:
         tl = self.session.timeline
         if tl.locked:
             return
-        step = FormFieldKind.STEP
-        segment = FormFieldKind.SEGMENT
         self._modal.prompt_form(
             FormSpec(
                 title=_GENERATE_TITLE,
@@ -137,7 +132,6 @@ class TimelinePresetController:
                     _choice_field(
                         "character",
                         "character",
-                        step,
                         TIMELINE_PRESET_KIND_OPTIONS,
                         tl.timeline_preset_kind,
                         timeline_preset_kind_display,
@@ -145,7 +139,6 @@ class TimelinePresetController:
                     _choice_field(
                         "density",
                         "density",
-                        step,
                         TIMELINE_PRESET_DENSITY_OPTIONS,
                         tl.timeline_preset_density,
                         timeline_preset_density_display,
@@ -153,7 +146,6 @@ class TimelinePresetController:
                     _choice_field(
                         "cue_snap",
                         "cue snap",
-                        segment,
                         TIMELINE_PRESET_CUE_SNAP_OPTIONS,
                         tl.timeline_preset_cue_snap,
                         timeline_preset_cue_snap_display,
@@ -161,7 +153,6 @@ class TimelinePresetController:
                     _choice_field(
                         "song_marker_snap",
                         "song marker snap",
-                        step,
                         TIMELINE_PRESET_SONG_MARKER_SNAP_OPTIONS,
                         tl.timeline_preset_song_marker_snap,
                         timeline_preset_song_marker_snap_display,
@@ -169,7 +160,6 @@ class TimelinePresetController:
                     _choice_field(
                         "timeline_cuts",
                         "timeline cuts",
-                        step,
                         TIMELINE_PRESET_TIMELINE_CUTS_OPTIONS,
                         tl.timeline_preset_timeline_cuts,
                         timeline_preset_timeline_cuts_display,
@@ -177,7 +167,6 @@ class TimelinePresetController:
                     _choice_field(
                         "repopulate",
                         "re-populate preset lists",
-                        step,
                         TIMELINE_PRESET_REPOPULATE_OPTIONS,
                         tl.timeline_preset_repopulate,
                         timeline_preset_repopulate_display,
@@ -185,7 +174,6 @@ class TimelinePresetController:
                     _choice_field(
                         "conductor",
                         "conductor",
-                        segment,
                         _CONDUCTOR_OPTIONS,
                         tl.timeline_preset_conductor,
                         timeline_preset_conductor_display,
@@ -193,7 +181,6 @@ class TimelinePresetController:
                     _choice_field(
                         "mode",
                         "mode",
-                        segment,
                         TIMELINE_PRESET_MODE_OPTIONS,
                         tl.timeline_preset_mode,
                         timeline_preset_mode_display,
@@ -249,7 +236,6 @@ class TimelinePresetController:
                     FormField(
                         "layers",
                         "layers after reset",
-                        FormFieldKind.SEGMENT,
                         _RESET_LAYER_OPTIONS,
                     ),
                 ),

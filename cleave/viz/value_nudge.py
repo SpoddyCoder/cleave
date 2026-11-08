@@ -41,6 +41,17 @@ def value_parts(
     ]
 
 
+def centre_pad(text: str, width: int) -> str:
+    """``text`` padded with spaces to ``width`` characters, centred.
+
+    The shell font is monospace, so this fixes the painted width of a value
+    and the side arrows around it hold still as the value changes.
+    """
+    gap = max(0, width - len(text))
+    left = gap // 2
+    return f"{' ' * left}{text}{' ' * (gap - left)}"
+
+
 def selectable_text_y(
     item_min_y: float,
     item_spacing_y: float,

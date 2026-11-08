@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any, Literal
 
 from cleave.blend_modes import BlendMode
+from cleave.choice import step_choice
 from cleave.config_schema.descriptors import (
     ParseCtx,
     PersistCtx,
@@ -77,16 +78,12 @@ TIMELINE_PLACEMENT_SNAP_OPTIONS: tuple[TimelinePlacementSnap, ...] = (
 DEFAULT_TIMELINE_PLACEMENT_SNAP: TimelinePlacementSnap = "beat"
 
 
-def cycle_timeline_placement_snap(
+def step_timeline_placement_snap(
     value: str, *, forward: bool
 ) -> TimelinePlacementSnap:
     options = TIMELINE_PLACEMENT_SNAP_OPTIONS
-    try:
-        index = options.index(value)  # type: ignore[arg-type]
-    except ValueError:
-        index = options.index(DEFAULT_TIMELINE_PLACEMENT_SNAP)
-    delta = 1 if forward else -1
-    return options[(index + delta) % len(options)]
+    current = value if value in options else DEFAULT_TIMELINE_PLACEMENT_SNAP
+    return step_choice(options, current, 1 if forward else -1)  # type: ignore[arg-type]
 
 
 def clamp_timeline_fade_duration(value: float) -> float:
@@ -188,16 +185,6 @@ def parse_timeline_preset_mode(raw: Any, label: str) -> TimelinePresetMode:
 
 def timeline_crossfade_display(crossfade: bool) -> str:
     return "on" if crossfade else "off"
-
-
-def cycle_timeline_crossfade(value: bool, *, forward: bool) -> bool:
-    options = (False, True)
-    try:
-        index = options.index(bool(value))
-    except ValueError:
-        index = options.index(DEFAULT_TIMELINE_CROSSFADE)
-    delta = 1 if forward else -1
-    return options[(index + delta) % len(options)]
 
 
 def _parse_timeline_fade_group(

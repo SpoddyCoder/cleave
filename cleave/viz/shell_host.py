@@ -56,10 +56,11 @@ from cleave.viz.panel_notification import (
 )
 from cleave.viz.playback import format_mmss
 from cleave.viz.row_hotkeys import activate_header_toggle, node_control_descriptor
-from cleave.viz.row_kinds import RowDescriptor
+from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.row_present_renderers import inspector_field_colors
 from cleave.viz.row_spec import (
     RowNavButton,
+    apply_field_choice,
     apply_field_horizontal,
     apply_field_nav_button,
     format_row_markers,
@@ -118,10 +119,19 @@ from cleave.viz.value_nudge import (
     nudge_hit_at,
     nudge_hover_fill_rect,
     nudge_press_skips_row,
+    centre_pad,
     selectable_text_y,
     value_parts,
 )
 from cleave.viz.top_layer import TopLayer
+from cleave.choice import ChoiceKind, choice_kind
+from cleave.viz.choice_layout import (
+    choice_width,
+    combo_width,
+    rect_contains,
+    rect_index_at,
+)
+from cleave.viz.choice_widgets import draw_choice_list, draw_combo, draw_segments
 from cleave.viz.transport_controls import TransportField
 
 # Vertical padding for the menu bar and the transport bar, which shares its height.
@@ -659,6 +669,8 @@ def _draw_aligned_parts(parts: list[tuple[str, imgui.ImVec4]]) -> None:
         x += width
 
 
+# Space above and below a segment or combo box, around the row's text line.
+_CHOICE_PAD_Y = 1.0
 _INLINE_FIELD_WIDTH_FRACTION = 0.6
 _SWATCH_ASPECT = 1.6
 _SWATCH_GAP = 6.0
@@ -1100,6 +1112,13 @@ class ShellHost:
         self._inline_began = False
         self._transport_drag_accum = 0.0
         self._picker_pos = imgui.ImVec2(0.0, 0.0)
+        # This frame's segment or combo rect for each choice row; an open list
+        # hangs from its row's rect.
+        self._choice_rects: dict[RowDescriptor, tuple[int, int, int, int]] = {}
+        self._choice_list_rows: tuple[tuple[int, int, int, int], ...] = ()
+        # Widest value each stepped row has shown, in characters, so its arrows
+        # hold still as the number changes. The shell font is monospace.
+        self._stepper_chars: dict[tuple[RowKind, int], int] = {}
         # Live drag requests. A drag that moves at least 1px persists the stack,
         # help, or navigator height, then clears these.
         self._insp_width: int | None = None
@@ -1887,10 +1906,12 @@ class ShellHost:
             focus.nav_expanded,
         )
         imgui.text(inspector_title(nodes, focus.selected_id))
+        self._choice_rects = {}
         for row in build_inspector_rows(state, focus.selected_id):
             self._draw_inspector_row(state, row)
         self._finish_row_drag(DRAG_PRESET)
         self._draw_colour_picker()
+        self._draw_choice_list()
 
     def _draw_inspector_row(self, state: Any, row: Any) -> None:
         focus = self._controls.shell_focus
@@ -1950,6 +1971,18 @@ class ShellHost:
             if inline.text_target == desc:
                 self._draw_inline_field(inline.text_view())
                 return
+            labels = (
+                spec.choice.labels()
+                if spec.choice is not None and not two_line
+                else ()
+            )
+            if labels:
+                self._draw_choice_value(
+                    state, row, desc, labels, value, enabled=stepped, activated=activated
+                )
+                cluster = ""
+            elif stepped and cluster and not two_line:
+                cluster = self._fixed_width_value(kind, cluster)
             if cluster:
                 parts = value_parts(
                     cluster,
@@ -1997,7 +2030,7 @@ class ShellHost:
                     span,
                     blocked=section_lock_blocks_mutation(state, desc),
                 )
-            if stepped and not self._nudge_swallow:
+            if stepped and not labels and not self._nudge_swallow:
                 self._track_value_drag(
                     row,
                     desc,
@@ -2423,7 +2456,115 @@ class ShellHost:
         )
 
     def _nudge_input_blocked(self) -> bool:
-        return self._modal_has_pointer()
+        return self._modal_has_pointer() or self._choice_list_open()
+
+    def _choice_list_open(self) -> bool:
+        inline = getattr(self._controls, "inline_edit", None)
+        return inline is not None and inline.choice_view is not None
+
+    def _fixed_width_value(self, kind: RowKind, text: str) -> str:
+        """``text`` centred in the widest value this row has shown."""
+        key = (kind, tuning_ui_metrics().font_size)
+        width = max(len(text), self._stepper_chars.get(key, 0))
+        self._stepper_chars[key] = width
+        return centre_pad(text, width)
+
+    def _draw_choice_value(
+        self,
+        state: Any,
+        row: Any,
+        desc: RowDescriptor,
+        labels: tuple[str, ...],
+        value: str,
+        *,
+        enabled: bool,
+        activated: bool,
+    ) -> None:
+        """Segments or a combo at the row's right edge, and their clicks.
+
+        A segment click chooses that option; a combo click opens its list. Either
+        press skips the row's own click.
+        """
+        spec = row_spec(desc.kind)
+        assert spec.choice is not None
+        measure = _ImguiTextSizer()
+        rect_min = imgui.get_item_rect_min()
+        rect_max = imgui.get_item_rect_max()
+        line = imgui.get_text_line_height()
+        pad_y = max(1, int(round(ui_chrome_px(_CHOICE_PAD_Y))))
+        # A combo shows the row's value, which can add to the label (a font's
+        # place in the list), so it fits that too.
+        width = choice_width(measure, labels)
+        if choice_kind(len(labels)) is ChoiceKind.COMBO:
+            width = max(width, combo_width(measure, (value,)))
+        right = int(rect_max.x - imgui.get_style().frame_padding.x)
+        top = int(_selectable_text_y(rect_min.y)) - pad_y
+        rect = (right - width, top, width, int(line) + pad_y * 2)
+        index = spec.choice.index(state, desc)
+        draw = imgui.get_window_draw_list()
+        inline = self._controls.inline_edit
+        list_view = inline.choice_view
+        open_here = list_view is not None and list_view.target == desc
+        hover = list_view is None and not self._nudge_input_blocked()
+        self._choice_rects[desc] = rect
+        if choice_kind(len(labels)) is ChoiceKind.SEGMENT:
+            rects = draw_segments(
+                draw,
+                measure,
+                labels,
+                index,
+                x=rect[0],
+                y=rect[1],
+                height=rect[3],
+                enabled=enabled,
+                hover=hover,
+            )
+            mouse = imgui.get_mouse_pos()
+            hit = rect_index_at(rects, mouse.x, mouse.y)
+            if not activated or not enabled or not hover or hit is None:
+                return
+            self._controls.inspector.focus_row(row)
+            apply_field_choice(self._controls, desc, hit - index)
+        else:
+            draw_combo(
+                draw,
+                measure,
+                value,
+                rect=rect,
+                open_=open_here,
+                enabled=enabled,
+                hover=hover,
+            )
+            mouse = imgui.get_mouse_pos()
+            if not activated or not enabled or not hover:
+                return
+            if not rect_contains(rect, mouse.x, mouse.y):
+                return
+            self._controls.inspector.open_choice(row)
+        self._clear_value_drag()
+        self._nudge_swallow = True
+
+    def _draw_choice_list(self) -> None:
+        """The open combo list of an inspector row, over every other window."""
+        inline = self._controls.inline_edit
+        view = inline.choice_view
+        if view is None:
+            return
+        anchor = self._choice_rects.get(view.target)
+        if anchor is None:
+            # The row scrolled away or left the page.
+            inline.finish()
+            return
+        pointer = draw_choice_list(
+            "inspector-choice-list", view, _ImguiTextSizer(), anchor=anchor
+        )
+        self._choice_list_rows = pointer.rows
+        if pointer.picked is not None:
+            inline.pick_choice(pointer.picked)
+        elif pointer.outside:
+            inline.finish()
+        elif pointer.hovered is not None:
+            inline.hover_choice(pointer.hovered)
 
     def _modal_has_pointer(self) -> bool:
         modal_host = getattr(self._controls, "modal_host", None)

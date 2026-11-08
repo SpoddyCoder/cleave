@@ -23,25 +23,26 @@ EditorPreviewQuality = Literal[
     "output", "full-quality", "balanced", "performance", "ultra-performance"
 ]
 
+# Lowest to highest, so a forward step raises quality.
 EDITOR_PREVIEW_QUALITIES: tuple[EditorPreviewQuality, ...] = (
-    "output",
-    "full-quality",
-    "balanced",
-    "performance",
     "ultra-performance",
+    "performance",
+    "balanced",
+    "full-quality",
+    "output",
 )
 
 EDITOR_PREVIEW_QUALITY_HELP_ENTRIES: tuple[
     tuple[EditorPreviewQuality, str], ...
 ] = (
-    ("output", "every layer at the project resolution, to check true output."),
+    ("ultra-performance", "lowest preview resolution for heaviest load reduction."),
+    ("performance", "more aggressive downscale from top."),
+    ("balanced", "top layer full size; lower layers step down."),
     (
         "full-quality",
         "every layer at the size it is shown, up to the project resolution.",
     ),
-    ("balanced", "top layer full size; lower layers step down."),
-    ("performance", "more aggressive downscale from top."),
-    ("ultra-performance", "lowest preview resolution for heaviest load reduction."),
+    ("output", "every layer at the project resolution, to check true output."),
 )
 
 DEFAULT_EDITOR_PREVIEW_QUALITY: EditorPreviewQuality = "full-quality"

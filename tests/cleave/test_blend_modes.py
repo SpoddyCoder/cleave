@@ -35,28 +35,28 @@ def test_parse_blend_mode_rejects_unknown() -> None:
         raise AssertionError("expected ValueError for unknown blend mode")
 
 
-def test_cycle_blend_wraps_forward() -> None:
+def test_step_blend_stops_at_last_mode() -> None:
     controls = make_controls(("layer_1",))
     layer = controls.session.layers["layer_1"]
     layer.blend_mode = "pure-add"
 
-    controls.layer_mutations.cycle_blend("layer_1", forward=True)
-    assert layer.blend_mode == "black-key"
+    controls.layer_mutations.step_blend("layer_1", delta=1)
+    assert layer.blend_mode == "pure-add"
 
 
-def test_cycle_blend_steps_backward() -> None:
+def test_step_blend_steps_backward() -> None:
     controls = make_controls(("layer_1",))
     layer = controls.session.layers["layer_1"]
     layer.blend_mode = "add"
 
-    controls.layer_mutations.cycle_blend("layer_1", forward=False)
+    controls.layer_mutations.step_blend("layer_1", delta=-1)
     assert layer.blend_mode == "black-key"
 
 
-def test_cycle_blend_recovers_from_unknown_mode() -> None:
+def test_step_blend_recovers_from_unknown_mode() -> None:
     controls = make_controls(("layer_1",))
     layer = controls.session.layers["layer_1"]
     layer.blend_mode = "legacy"  # type: ignore[assignment]
 
-    controls.layer_mutations.cycle_blend("layer_1", forward=True)
+    controls.layer_mutations.step_blend("layer_1", delta=1)
     assert layer.blend_mode == "add"

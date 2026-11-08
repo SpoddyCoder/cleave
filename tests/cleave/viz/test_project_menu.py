@@ -86,13 +86,17 @@ def test_compositor_page_shows_hdr() -> None:
     assert format_row_value(view, hdr) == "on"
 
 
-def test_compositor_hdr_keyboard_toggles() -> None:
+def test_compositor_hdr_keyboard_left_off_right_on() -> None:
     controls = _make_controls(("layer_1",))
     controls.focus_descriptor = RowDescriptor(RowKind.PROJECT_COMPOSITOR_HDR)
     assert controls.session.project.compositor_hdr is True
     press_main_row(controls, _keydown(pygame.K_RIGHT))
+    assert controls.session.project.compositor_hdr is True
+    press_main_row(controls, _keydown(pygame.K_LEFT))
     assert controls.session.project.compositor_hdr is False
     press_main_row(controls, _keydown(pygame.K_LEFT))
+    assert controls.session.project.compositor_hdr is False
+    press_main_row(controls, _keydown(pygame.K_RIGHT))
     assert controls.session.project.compositor_hdr is True
 
 
@@ -107,13 +111,13 @@ def test_compositor_hdr_toggle_resyncs_live_format() -> None:
     controls._compositor = compositor
     controls._post_process = post_process
     controls.session.project.compositor_hdr = True
-    controls.project.toggle_compositor_hdr()
+    controls.project.set_compositor_hdr(False)
     assert controls.session.project.compositor_hdr is False
     compositor.set_color_format.assert_called_with(RGBA8)
     post_process.set_color_format.assert_called_with(RGBA8)
     compositor.reset_mock()
     post_process.reset_mock()
-    controls.project.toggle_compositor_hdr()
+    controls.project.set_compositor_hdr(True)
     compositor.set_color_format.assert_called_with(RGBA16F)
     post_process.set_color_format.assert_called_with(RGBA16F)
 
@@ -180,17 +184,17 @@ def test_project_render_defaults() -> None:
     ) == "120s"
 
 
-def test_cycle_quality_does_not_mark_dirty() -> None:
+def test_step_quality_does_not_mark_dirty() -> None:
     controls = _make_controls(("layer_1",))
     assert not controls.config_dirty
-    controls.project.cycle_quality(forward=True)
+    controls.project.step_quality(forward=True)
     assert controls.session.project.render.quality == "high"
-    controls.project.cycle_quality(forward=True)
+    controls.project.step_quality(forward=True)
     assert controls.session.project.render.quality == "viz"
-    controls.project.cycle_quality(forward=True)
-    assert controls.session.project.render.quality == "normal"
-    controls.project.cycle_quality(forward=False)
+    controls.project.step_quality(forward=True)
     assert controls.session.project.render.quality == "viz"
+    controls.project.step_quality(forward=False)
+    assert controls.session.project.render.quality == "high"
     assert not controls.config_dirty
 
 

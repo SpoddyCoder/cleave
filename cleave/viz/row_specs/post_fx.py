@@ -19,6 +19,8 @@ from cleave.viz.row_spec import FitStrategy, RowPresentStyle, RowSpec
 from cleave.viz.row_specs.common import lock_text, on_off_text
 from cleave.viz.tuning_view_state import TuningViewState
 
+from cleave.config_schema.render import CHROMA_BOOST_APPLY_MODES, CHROMA_BOOST_VARIANTS, FADE_CURVES, HIGHLIGHT_ROLLOFF_APPLY_MODES, HIGHLIGHT_ROLLOFF_CURVES
+from cleave.viz.row_specs.common import bool_choice, options_choice
 if TYPE_CHECKING:
     from cleave.viz.controls import TuningControls
 
@@ -128,7 +130,7 @@ def _apply_post_fx_fade_in_end(
 def _apply_post_fx_fade_in_type(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, _large: bool,
 ) -> None:
-    controls.post_fx.cycle_fade_type("fade_in", forward=forward)
+    controls.post_fx.step_fade_type("fade_in", delta=1 if forward else -1)
 
 def _apply_post_fx_fade_out_start(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, large: bool,
@@ -149,17 +151,17 @@ def _apply_post_fx_fade_out_end(
 def _apply_post_fx_fade_out_type(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, _large: bool,
 ) -> None:
-    controls.post_fx.cycle_fade_type("fade_out", forward=forward)
+    controls.post_fx.step_fade_type("fade_out", delta=1 if forward else -1)
 
 def _apply_post_fx_highlight_rolloff_mode(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, _large: bool,
 ) -> None:
-    controls.post_fx.cycle_highlight_rolloff_mode(forward=forward)
+    controls.post_fx.step_highlight_rolloff_mode(forward=forward)
 
 def _apply_post_fx_highlight_rolloff_curve(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, _large: bool,
 ) -> None:
-    controls.post_fx.cycle_highlight_rolloff_curve(forward=forward)
+    controls.post_fx.step_highlight_rolloff_curve(forward=forward)
 
 def _apply_post_fx_highlight_rolloff_threshold(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, large: bool,
@@ -214,12 +216,12 @@ def _apply_post_fx_highlight_rolloff_desaturation(
 def _apply_post_fx_chroma_boost_mode(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, _large: bool,
 ) -> None:
-    controls.post_fx.cycle_chroma_boost_mode(forward=forward)
+    controls.post_fx.step_chroma_boost_mode(forward=forward)
 
 def _apply_post_fx_chroma_boost_variant(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, _large: bool,
 ) -> None:
-    controls.post_fx.cycle_chroma_boost_variant(forward=forward)
+    controls.post_fx.step_chroma_boost_variant(forward=forward)
 
 def _apply_post_fx_chroma_boost_amount(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, large: bool,
@@ -332,6 +334,16 @@ def _apply_post_fx_locked(
         controls.toggle_post_fx_locked()
 
 
+def _jump_post_fx_fade_in_type(
+    controls: TuningControls, _desc: RowDescriptor, delta: int
+) -> None:
+    controls.post_fx.step_fade_type("fade_in", delta=delta)
+
+def _jump_post_fx_fade_out_type(
+    controls: TuningControls, _desc: RowDescriptor, delta: int
+) -> None:
+    controls.post_fx.step_fade_type("fade_out", delta=delta)
+
 SPECS: dict[RowKind, RowSpec] = {
     RowKind.POST_FX_HEADER: RowSpec(
         affordance=RowAffordance.HEADING,
@@ -351,6 +363,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_post_fx_enabled,
         apply_horizontal=_apply_post_fx_enabled,
+        choice=bool_choice(lambda s, _d: s.post_fx.enabled),
         help_title="Post FX enabled",
         help_description=(
             "Turns fade, highlight rolloff, and chroma boost on or off.",
@@ -364,6 +377,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_post_fx_locked,
         apply_horizontal=_apply_post_fx_locked,
+        choice=bool_choice(lambda s, _d: s.post_fx.locked, lock_text),
         help_title="Post FX lock",
         help_description=("Locked Post FX settings cannot be edited.",),
         blocked_by_section_lock=False,
@@ -424,8 +438,9 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_post_fx_fade_in_type,
         apply_horizontal=_apply_post_fx_fade_in_type,
+        choice=options_choice(FADE_CURVES, lambda s, _d: s.post_fx.fade.fade_in.type, jump=_jump_post_fx_fade_in_type),
         help_title="Type",
-        help_entries=(("Left/Right", "cycle type"),),
+        help_entries=(("Left/Right", "choose type"),),
         help_description=("Curve used while the picture rises.",),
         help_mode_entries=FADE_CURVE_HELP_ENTRIES,
         repeatable=True,
@@ -477,8 +492,9 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_post_fx_fade_out_type,
         apply_horizontal=_apply_post_fx_fade_out_type,
+        choice=options_choice(FADE_CURVES, lambda s, _d: s.post_fx.fade.fade_out.type, jump=_jump_post_fx_fade_out_type),
         help_title="Type",
-        help_entries=(("Left/Right", "cycle type"),),
+        help_entries=(("Left/Right", "choose type"),),
         help_description=(
             "Curve used while the picture falls.",
             "Times on this fade count backward from the song end.",
@@ -509,8 +525,9 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_post_fx_highlight_rolloff_mode,
         apply_horizontal=_apply_post_fx_highlight_rolloff_mode,
+        choice=options_choice(HIGHLIGHT_ROLLOFF_APPLY_MODES, lambda s, _d: s.post_fx.highlight_rolloff.mode),
         help_title="Mode",
-        help_entries=(("Left/Right", "cycle mode"),),
+        help_entries=(("Left/Right", "choose mode"),),
         help_description=("Where highlight rolloff is applied.",),
         help_mode_entries=HIGHLIGHT_ROLLOFF_APPLY_MODE_HELP_ENTRIES,
         repeatable=True,
@@ -522,8 +539,9 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_post_fx_highlight_rolloff_curve,
         apply_horizontal=_apply_post_fx_highlight_rolloff_curve,
+        choice=options_choice(HIGHLIGHT_ROLLOFF_CURVES, lambda s, _d: s.post_fx.highlight_rolloff.curve),
         help_title="Curve",
-        help_entries=(("Left/Right", "cycle curve"),),
+        help_entries=(("Left/Right", "choose curve"),),
         help_description=("Shoulder curve used above the soft knee.",),
         help_mode_entries=HIGHLIGHT_ROLLOFF_CURVE_HELP_ENTRIES,
         repeatable=True,
@@ -624,8 +642,9 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_post_fx_chroma_boost_mode,
         apply_horizontal=_apply_post_fx_chroma_boost_mode,
+        choice=options_choice(CHROMA_BOOST_APPLY_MODES, lambda s, _d: s.post_fx.chroma_boost.mode),
         help_title="Mode",
-        help_entries=(("Left/Right", "cycle mode"),),
+        help_entries=(("Left/Right", "choose mode"),),
         help_description=("Where chroma boost is applied.",),
         help_mode_entries=CHROMA_BOOST_APPLY_MODE_HELP_ENTRIES,
         repeatable=True,
@@ -637,8 +656,9 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_post_fx_chroma_boost_variant,
         apply_horizontal=_apply_post_fx_chroma_boost_variant,
+        choice=options_choice(CHROMA_BOOST_VARIANTS, lambda s, _d: s.post_fx.chroma_boost.variant),
         help_title="Variant",
-        help_entries=(("Left/Right", "cycle variant"),),
+        help_entries=(("Left/Right", "choose variant"),),
         help_description=("Saturation vs vibrance weighting.",),
         help_mode_entries=CHROMA_BOOST_VARIANT_HELP_ENTRIES,
         repeatable=True,
@@ -678,6 +698,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_post_fx_limiter_enabled,
         apply_horizontal=_apply_post_fx_limiter_enabled,
+        choice=bool_choice(lambda s, _d: s.post_fx.limiter.enabled),
         help_title="Visual limiter enabled",
         help_entries=(("Left/Right", "off / on"),),
         help_description=(

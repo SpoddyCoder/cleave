@@ -18,6 +18,8 @@ from cleave.viz.row_spec import FitStrategy, RowPresentStyle, RowSpec
 from cleave.viz.row_specs.common import lock_text, on_off_text
 from cleave.viz.tuning_view_state import TuningViewState
 
+from cleave.config_schema.render import PATTERN_MASK_TYPES
+from cleave.viz.row_specs.common import bool_choice, options_choice
 if TYPE_CHECKING:
     from cleave.viz.controls import TuningControls
 
@@ -66,7 +68,7 @@ def _apply_pattern_mask_type(
     forward: bool,
     _large: bool,
 ) -> None:
-    controls.pattern_mask.cycle_type(forward=forward)
+    controls.pattern_mask.step_type(delta=1 if forward else -1)
 
 def _apply_pattern_mask_feather(
     controls: TuningControls,
@@ -100,7 +102,7 @@ def _apply_pattern_mask_invert(
     forward: bool,
     _large: bool,
 ) -> None:
-    controls.pattern_mask.cycle_invert(forward=forward)
+    controls.pattern_mask.step_invert(forward=forward)
 
 def _apply_pattern_mask_transition(
     controls: TuningControls,
@@ -160,6 +162,11 @@ def _apply_pattern_mask_locked(
         controls.toggle_pattern_mask_locked()
 
 
+def _jump_pattern_mask_type(
+    controls: TuningControls, _desc: RowDescriptor, delta: int
+) -> None:
+    controls.pattern_mask.step_type(delta=delta)
+
 SPECS: dict[RowKind, RowSpec] = {
     RowKind.PATTERN_MASK_HEADER: RowSpec(
         affordance=RowAffordance.HEADING,
@@ -182,6 +189,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_pattern_mask_enabled,
         apply_horizontal=_apply_pattern_mask_enabled,
+        choice=bool_choice(lambda s, _d: s.pattern_mask.enabled),
         help_title="Pattern mask enabled",
         help_description=(
             "When on, the mask replaces each layer's Compositing rows.",
@@ -194,6 +202,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_pattern_mask_locked,
         apply_horizontal=_apply_pattern_mask_locked,
+        choice=bool_choice(lambda s, _d: s.pattern_mask.locked, lock_text),
         help_title="Pattern mask lock",
         help_description=("Locked pattern mask settings cannot be edited.",),
         blocked_by_section_lock=False,
@@ -204,8 +213,9 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_pattern_mask_type,
         apply_horizontal=_apply_pattern_mask_type,
+        choice=options_choice(PATTERN_MASK_TYPES, lambda s, _d: s.pattern_mask.type, jump=_jump_pattern_mask_type),
         help_title="Type",
-        help_entries=(("Left/Right", "cycle pattern type"),),
+        help_entries=(("Left/Right", "choose pattern type"),),
         help_description=("Pattern geometry used to partition the frame.",),
         repeatable=True,
         parent_group="pattern_mask",
@@ -248,8 +258,9 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_pattern_mask_invert,
         apply_horizontal=_apply_pattern_mask_invert,
+        choice=bool_choice(lambda s, _d: s.pattern_mask.invert, pattern_mask_invert_display),
         help_title="Invert",
-        help_entries=(("Left/Right", "toggle invert on/off"),),
+        help_entries=(("Left/Right", "off / on"),),
         help_description=("Reverse layer assignment order across the pattern.",),
         repeatable=True,
         parent_group="pattern_mask",

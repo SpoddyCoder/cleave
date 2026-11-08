@@ -8,14 +8,13 @@ from cleave.config_schema.layers import hard_cut_enabled_display
 from cleave.config_schema.timeline import (
     TIMELINE_FADE_DURATION_STEP,
     clamp_timeline_fade_duration,
-    cycle_timeline_crossfade,
-    cycle_timeline_placement_snap,
+    step_timeline_placement_snap,
     timeline_crossfade_display,
 )
 from cleave.song_markers import (
     DEFAULT_SONG_MARKER_TYPE,
     SongMarker,
-    cycle_song_marker_type,
+    step_song_marker_type,
     format_marker_time,
     parse_song_marker_type,
     song_marker_gesture_warning,
@@ -31,6 +30,8 @@ from cleave.viz.row_spec import FitStrategy, RowNavButton, RowPresentStyle, RowS
 from cleave.viz.row_specs.common import lock_text, on_off_text
 from cleave.viz.tuning_view_state import TuningViewState
 
+from cleave.config_schema.timeline import TIMELINE_PLACEMENT_SNAP_OPTIONS
+from cleave.viz.row_specs.common import bool_choice, options_choice
 if TYPE_CHECKING:
     from cleave.viz.controls import TuningControls
 
@@ -50,7 +51,10 @@ def _apply_timeline_bar_phase(
 def _format_timeline_bar_grid(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return "show" if state.timeline.show_bar_grid else "hide"
+    return _bar_grid_display(state.timeline.show_bar_grid)
+
+def _bar_grid_display(show: bool) -> str:
+    return "show" if show else "hide"
 
 def _apply_timeline_bar_grid(
     controls: TuningControls,
@@ -72,7 +76,7 @@ def _apply_timeline_placement_snap(
     _large: bool,
 ) -> None:
     tl = controls.session.timeline
-    tl.placement_snap = cycle_timeline_placement_snap(
+    tl.placement_snap = step_timeline_placement_snap(
         tl.placement_snap,
         forward=forward,
     )
@@ -85,11 +89,10 @@ def _format_timeline_hard_cut_fades_enabled(
 def _apply_timeline_hard_cut_fades_enabled(
     controls: TuningControls,
     _desc: RowDescriptor,
-    _forward: bool,
+    forward: bool,
     _large: bool,
 ) -> None:
-    group = controls.session.timeline.hard_cut_fades
-    group.enabled = not group.enabled
+    controls.session.timeline.hard_cut_fades.enabled = forward
 
 def _format_timeline_hard_cut_fade_in(
     state: TuningViewState, _desc: RowDescriptor
@@ -129,11 +132,10 @@ def _format_timeline_soft_cut_fades_enabled(
 def _apply_timeline_soft_cut_fades_enabled(
     controls: TuningControls,
     _desc: RowDescriptor,
-    _forward: bool,
+    forward: bool,
     _large: bool,
 ) -> None:
-    group = controls.session.timeline.soft_cut_fades
-    group.enabled = not group.enabled
+    controls.session.timeline.soft_cut_fades.enabled = forward
 
 def _format_timeline_soft_cut_fade_in(
     state: TuningViewState, _desc: RowDescriptor
@@ -177,7 +179,7 @@ def _apply_timeline_hard_cut_crossfade(
     _large: bool,
 ) -> None:
     group = controls.session.timeline.hard_cut_fades
-    group.crossfade = cycle_timeline_crossfade(group.crossfade, forward=forward)
+    group.crossfade = forward
 
 def _format_timeline_soft_cut_crossfade(
     state: TuningViewState, _desc: RowDescriptor
@@ -191,7 +193,7 @@ def _apply_timeline_soft_cut_crossfade(
     _large: bool,
 ) -> None:
     group = controls.session.timeline.soft_cut_fades
-    group.crossfade = cycle_timeline_crossfade(group.crossfade, forward=forward)
+    group.crossfade = forward
 
 def _toggle_timeline_enabled(
     controls: TuningControls, _desc: RowDescriptor
@@ -237,7 +239,7 @@ def _apply_song_marker_type(
     if index < 0 or index >= len(markers.markers):
         return
     current = markers.markers[index]
-    next_type = cycle_song_marker_type(
+    next_type = step_song_marker_type(
         parse_song_marker_type(current.marker_type),
         forward=forward,
     )
@@ -342,6 +344,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_timeline_enabled,
         apply_horizontal=_apply_timeline_enabled,
+        choice=bool_choice(lambda s, _d: s.timeline.enabled),
         help_title="Timeline enabled",
         help_description=(
             "When on, the timeline drives layer visibility and its strip opens.",
@@ -354,6 +357,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_timeline_locked,
         apply_horizontal=_apply_timeline_locked,
+        choice=bool_choice(lambda s, _d: s.timeline.locked, lock_text),
         help_title="Timeline lock",
         help_description=("Locked timeline settings cannot be edited.",),
         blocked_by_section_lock=False,
@@ -438,6 +442,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_timeline_bar_grid,
         apply_horizontal=_apply_timeline_bar_grid,
+        choice=bool_choice(lambda s, _d: s.timeline.show_bar_grid, _bar_grid_display),
         help_title="Bar grid",
         help_entries=(
             ("Left", "hide detected bar lines"),
@@ -455,8 +460,9 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_timeline_placement_snap,
         apply_horizontal=_apply_timeline_placement_snap,
+        choice=options_choice(TIMELINE_PLACEMENT_SNAP_OPTIONS, lambda s, _d: s.timeline.placement_snap),
         help_title="Placement snap",
-        help_entries=(("Left/Right", "cycle off / beat / bar"),),
+        help_entries=(("Left/Right", "choose off / beat / bar"),),
         help_description=(
             "Applies when placing song markers and timeline cues",
             "Snap to the nearest beat or bar.",
@@ -494,6 +500,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_timeline_hard_cut_fades_enabled,
         apply_horizontal=_apply_timeline_hard_cut_fades_enabled,
+        choice=bool_choice(lambda s, _d: s.timeline.hard_cut_fades.enabled, hard_cut_enabled_display),
         help_title="Hard cuts",
         help_entries=(("Left/Right", "enabled / disabled"),),
         help_description=(
@@ -542,6 +549,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_timeline_hard_cut_crossfade,
         apply_horizontal=_apply_timeline_hard_cut_crossfade,
+        choice=bool_choice(lambda s, _d: s.timeline.hard_cut_fades.crossfade, timeline_crossfade_display),
         help_title="Hard cut shift for crossfade",
         help_entries=(("Left/Right", "off / on"),),
         help_description=(
@@ -557,6 +565,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_timeline_soft_cut_fades_enabled,
         apply_horizontal=_apply_timeline_soft_cut_fades_enabled,
+        choice=bool_choice(lambda s, _d: s.timeline.soft_cut_fades.enabled, hard_cut_enabled_display),
         help_title="Soft cuts",
         help_entries=(("Left/Right", "enabled / disabled"),),
         help_description=(
@@ -605,6 +614,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_timeline_soft_cut_crossfade,
         apply_horizontal=_apply_timeline_soft_cut_crossfade,
+        choice=bool_choice(lambda s, _d: s.timeline.soft_cut_fades.crossfade, timeline_crossfade_display),
         help_title="Soft cut shift for crossfade",
         help_entries=(("Left/Right", "off / on"),),
         help_description=(
@@ -640,13 +650,13 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Song marker",
         help_entries=(
             ("Enter", "seek to marker"),
-            ("Left / Right", "cycle marker type"),
+            ("Left / Right", "choose marker type"),
             ("Delete", "confirm remove"),
         ),
         help_description=(
             "A song marker time and type (-, crescendo,",
             "diminuendo). Crescendo markers build crescendos on",
-            "timeline preset apply. Enter seeks; Left/Right cycles type.",
+            "timeline preset apply. Enter seeks; Left/Right chooses type.",
         ),
         blocked_by_section_lock=True,
     ),

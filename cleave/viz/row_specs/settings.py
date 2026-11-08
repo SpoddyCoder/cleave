@@ -14,6 +14,8 @@ from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
 from cleave.viz.row_spec import FitStrategy, RowPresentStyle, RowSpec
 from cleave.viz.tuning_view_state import TuningViewState
 
+from cleave.config_schema.editor import COLUMN_SIDES, EDITOR_PREVIEW_QUALITIES
+from cleave.viz.row_specs.common import options_choice
 if TYPE_CHECKING:
     from cleave.viz.controls import TuningControls
 
@@ -58,18 +60,18 @@ def _apply_settings_preview_quality(
     forward: bool,
     _large: bool,
 ) -> None:
-    controls.settings.cycle_preview_quality(forward=forward)
+    controls.settings.step_preview_quality(delta=1 if forward else -1)
     controls.layer_lifecycle.apply_preview_resolutions()
 
 def _apply_settings_navigator_side(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, _large: bool,
 ) -> None:
-    controls.settings.cycle_navigator_side(forward=forward)
+    controls.settings.step_navigator_side(forward=forward)
 
 def _apply_settings_help_side(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, _large: bool,
 ) -> None:
-    controls.settings.cycle_help_side(forward=forward)
+    controls.settings.step_help_side(forward=forward)
 
 def _apply_settings_ui_notification_display(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, large: bool,
@@ -95,6 +97,12 @@ def _apply_settings_residual_latency_ms(
     controls.settings.adjust_residual_latency_ms(forward=forward, large=large)
     controls.on_residual_latency_changed()
 
+def _jump_settings_preview_quality(
+    controls: TuningControls, _desc: RowDescriptor, delta: int
+) -> None:
+    controls.settings.step_preview_quality(delta=delta)
+    controls.layer_lifecycle.apply_preview_resolutions()
+
 SPECS: dict[RowKind, RowSpec] = {
     RowKind.SETTINGS_PREVIEW_QUALITY: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
@@ -102,8 +110,9 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_settings_preview_quality,
         apply_horizontal=_apply_settings_preview_quality,
+        choice=options_choice(EDITOR_PREVIEW_QUALITIES, lambda s, _d: s.settings.preview_quality, jump=_jump_settings_preview_quality),
         help_title="Preview quality",
-        help_entries=(("Left/Right", "cycle mode"),),
+        help_entries=(("Left/Right", "choose mode"),),
         help_description=(
             "Trade-off between visual quality and CPU/GPU load.",
             "Affects the live view only; renders use the project resolution.",
@@ -134,6 +143,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_settings_navigator_side,
         apply_horizontal=_apply_settings_navigator_side,
+        choice=options_choice(COLUMN_SIDES, lambda s, _d: s.settings.navigator_side),
         help_title="Navigator side",
         help_entries=(("Left/Right", "choose side"),),
         help_description=(
@@ -150,6 +160,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_settings_help_side,
         apply_horizontal=_apply_settings_help_side,
+        choice=options_choice(COLUMN_SIDES, lambda s, _d: s.settings.help_side),
         help_title="Help side",
         help_entries=(("Left/Right", "choose side"),),
         help_description=(

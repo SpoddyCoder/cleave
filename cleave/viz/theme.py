@@ -13,7 +13,8 @@ Accent colors for modes and icons (not label/value roles):
   TIMELINE_BAR_ON, BAR_GRID, PLAYHEAD, PLAYHEAD_FLASH, SONG_MARKER, SONG_MARKER_SELECTED
 
 Buttons (fills, not text roles):
-  BUTTON_BG, BUTTON_HOVER_BG, BUTTON_ACTIVE_BG, BUTTON_BORDER - every panel button
+  BUTTON_BG, BUTTON_HOVER_BG, BUTTON_ACTIVE_BG, BUTTON_BORDER - every panel button,
+    segment, combo box, and open combo list
   BUTTON_PRIMARY_BG - the confirm button of a dialog, and a selected segment
   BUTTON_DANGER_BG - the confirm button of a destructive dialog
 

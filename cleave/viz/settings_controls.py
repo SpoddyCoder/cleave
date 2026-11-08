@@ -16,6 +16,7 @@ from cleave.config_schema.editor import (
     clamp_notification_display_sec,
 )
 from cleave.user_config import persist_editor_settings
+from cleave.choice import step_choice
 from cleave.viz.session import TuningSession
 from cleave.viz.shell_layout import navigator_row_px
 from cleave.viz.theme import set_ui_scale_percent
@@ -60,35 +61,25 @@ class SettingsControls:
         )
         persist_editor_settings(self.cfg)
 
-    def cycle_preview_quality(self, *, forward: bool) -> None:
-        modes = EDITOR_PREVIEW_QUALITIES
+    def step_preview_quality(self, *, delta: int) -> None:
         current = self.cfg.editor.preview_quality
-        try:
-            index = modes.index(current)
-        except ValueError:
-            index = 0
-        if forward:
-            new_mode = modes[(index + 1) % len(modes)]
-        else:
-            new_mode = modes[(index - 1) % len(modes)]
+        new_mode = step_choice(EDITOR_PREVIEW_QUALITIES, current, delta)
+        if new_mode == current:
+            return
         self.cfg.editor = replace(self.cfg.editor, preview_quality=new_mode)
         persist_editor_settings(self.cfg)
 
-    def cycle_navigator_side(self, *, forward: bool) -> None:
-        self._cycle_column_side("navigator_side", forward=forward)
+    def step_navigator_side(self, *, forward: bool) -> None:
+        self._step_column_side("navigator_side", forward=forward)
 
-    def cycle_help_side(self, *, forward: bool) -> None:
-        self._cycle_column_side("help_side", forward=forward)
+    def step_help_side(self, *, forward: bool) -> None:
+        self._step_column_side("help_side", forward=forward)
 
-    def _cycle_column_side(self, field: str, *, forward: bool) -> None:
-        sides = COLUMN_SIDES
+    def _step_column_side(self, field: str, *, forward: bool) -> None:
         current = getattr(self.cfg.editor, field)
-        try:
-            index = sides.index(current)
-        except ValueError:
-            index = 0
-        step = 1 if forward else -1
-        new_side = sides[(index + step) % len(sides)]
+        new_side = step_choice(COLUMN_SIDES, current, 1 if forward else -1)
+        if new_side == current:
+            return
         self.cfg.editor = replace(self.cfg.editor, **{field: new_side})
         persist_editor_settings(self.cfg)
 

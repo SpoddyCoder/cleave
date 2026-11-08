@@ -8,6 +8,14 @@ from enum import Enum
 
 import pygame
 
+from cleave.choice import ChoiceKind, choice_kind, step_index
+from cleave.viz.choice_list import (
+    ChoiceListKey,
+    ChoiceListState,
+    ChoiceListView,
+    choice_list_view,
+    handle_choice_list_key,
+)
 from cleave.viz.text_edit import (
     TEXT_EDIT_REPEAT_KEYS,
     apply_text_edit_key,
@@ -41,24 +49,18 @@ BUTTON_ROW_KINDS = frozenset(
 )
 
 
-class FormFieldKind(Enum):
-    """How a form field shows its options."""
-
-    STEP = "step"
-    SEGMENT = "segment"
-    RADIO = "radio"
-
-
 FormValues = dict[str, int]
 
 
 @dataclass(frozen=True)
 class FormField:
-    """One parameter of a form. ``value`` is an index into ``options``."""
+    """One parameter of a form. ``value`` is an index into ``options``.
+
+    Up to three options show as segments, more as a combo (``choice_kind``).
+    """
 
     id: str
     label: str
-    kind: FormFieldKind
     options: tuple[str, ...]
     value: int = 0
     visible: Callable[[FormValues], bool] | None = None
@@ -85,7 +87,7 @@ class FormSpec:
 @dataclass(frozen=True)
 class FormRowView:
     label: str
-    kind: FormFieldKind
+    kind: ChoiceKind
     options: tuple[str, ...]
     value: int
     focused: bool
@@ -194,6 +196,8 @@ class ModalViewState:
     form_rows: tuple[FormRowView, ...] = ()
     form_info: str | None = None
     form_buttons_focused: bool = False
+    # The open combo list of a form row; ``target`` is the row index.
+    form_choice: ChoiceListView | None = None
 
 
 _UNSAVED_QUIT_MESSAGE = "Unsaved changes - save changes before exit?"
@@ -210,6 +214,7 @@ class ModalHost:
         self._request: ModalRequest | None = None
         self._text_state: TextModalState | None = None
         self._form_state: FormState | None = None
+        self._form_choice: ChoiceListState | None = None
         self._focus_index = 0
         self._on_start_text_input = on_start_text_input
         self._on_stop_text_input = on_stop_text_input
@@ -259,7 +264,7 @@ class ModalHost:
             form_rows = tuple(
                 FormRowView(
                     field.label,
-                    field.kind,
+                    choice_kind(len(field.options)),
                     field.options,
                     form.values[field.id],
                     index == form.field_index,
@@ -278,6 +283,7 @@ class ModalHost:
             form_rows=form_rows,
             form_info=None if form is None else form.info,
             form_buttons_focused=form is not None and form.field_index is None,
+            form_choice=choice_list_view(self._form_choice),
         )
 
     def prompt(self, request: ModalRequest) -> None:
@@ -285,6 +291,7 @@ class ModalHost:
         self._request = request
         self._text_state = None
         self._form_state = None
+        self._form_choice = None
         self._input_modality = InputModality.POINTER
         self._pointer_motion.reset()
         self._focus_index = clamp_modal_focus_index(
@@ -470,7 +477,7 @@ class ModalHost:
         self._after_form_change(state)
 
     def step_form_value(self, row: int, delta: int) -> None:
-        """Focus row ``row`` and step its option, wrapping at the ends."""
+        """Focus row ``row`` and step its option, stopping at either end."""
         state = self._form_state
         if state is None:
             return
@@ -479,9 +486,43 @@ class ModalHost:
             return
         state.field_index = row
         field = fields[row]
-        count = len(field.options)
-        state.values[field.id] = (state.values[field.id] + delta) % count
+        state.values[field.id] = step_index(
+            state.values[field.id], len(field.options), delta
+        )
         self._after_form_change(state)
+
+    def open_form_choice(self, row: int) -> None:
+        """Focus row ``row`` and open its option list, when it is a combo."""
+        state = self._form_state
+        if state is None:
+            return
+        fields = state.visible_fields()
+        if not 0 <= row < len(fields):
+            return
+        state.field_index = row
+        field = fields[row]
+        if choice_kind(len(field.options)) is not ChoiceKind.COMBO:
+            return
+        self._form_choice = ChoiceListState(
+            target=row,
+            options=field.options,
+            start=state.values[field.id],
+            on_pick=lambda index: self.set_form_value(row, index),
+        )
+
+    def hover_form_choice(self, index: int) -> None:
+        if self._form_choice is not None:
+            self._form_choice.hover(index)
+
+    def pick_form_choice(self, index: int) -> None:
+        choice = self._form_choice
+        if choice is None:
+            return
+        self._form_choice = None
+        choice.pick(index)
+
+    def close_form_choice(self) -> None:
+        self._form_choice = None
 
     def focus_form_row(self, row: int) -> None:
         state = self._form_state
@@ -507,6 +548,18 @@ class ModalHost:
         assert state is not None
         key = event.key
         self.enter_keyboard_modality()
+        choice = self._form_choice
+        if choice is not None:
+            outcome = handle_choice_list_key(choice, key)
+            if outcome in (ChoiceListKey.PICKED, ChoiceListKey.CLOSED):
+                self._form_choice = None
+            return True
+        opens_list = key == pygame.K_SPACE or (
+            key == pygame.K_DOWN and event.mod & pygame.KMOD_ALT
+        )
+        if opens_list and state.field_index is not None:
+            self.open_form_choice(state.field_index)
+            return True
         if key == pygame.K_ESCAPE:
             self.cancel()
         elif key == pygame.K_TAB:
@@ -864,6 +917,7 @@ class ModalHost:
         self._request = None
         self._text_state = None
         self._form_state = None
+        self._form_choice = None
         self._focus_index = 0
         if request is not None and request.on_dismiss is not None:
             request.on_dismiss()

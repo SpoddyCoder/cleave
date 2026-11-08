@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import pygame
 
+from cleave.choice import step_choice
+
 _font_names_cache: tuple[str, ...] | None = None
 _LATIN_PROBE_SIZE = 24
 
@@ -49,14 +51,9 @@ def overlay_font_display(name: str) -> str:
     return f"{name} ({position}/{len(fonts)})"
 
 
-def cycle_overlay_font(current: str, *, forward: bool) -> str:
+def step_overlay_font(current: str, *, delta: int) -> str:
+    """The next or previous Latin font, stopping at either end of the list."""
     fonts = overlay_system_fonts()
     if not fonts:
         return current
-    try:
-        index = fonts.index(current)
-    except ValueError:
-        index = 0
-    if forward:
-        return fonts[(index + 1) % len(fonts)]
-    return fonts[(index - 1) % len(fonts)]
+    return step_choice(fonts, current, delta)

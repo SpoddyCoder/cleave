@@ -1593,17 +1593,17 @@ def test_post_fx_fade_setters_clamp_and_cycle() -> None:
     assert fade.fade_out.start == 5.0
 
     assert fade.fade_in.type == "smoothstep"
-    controls.post_fx.cycle_fade_type("fade_in", forward=True)
+    controls.post_fx.step_fade_type("fade_in", delta=1)
     assert fade.fade_in.type == "ease_out_cubic"
-    controls.post_fx.cycle_fade_type("fade_in", forward=False)
+    controls.post_fx.step_fade_type("fade_in", delta=-1)
     assert fade.fade_in.type == "smoothstep"
 
 
 def test_post_fx_highlight_rolloff_mode_off_keeps_section_expanded() -> None:
     controls = _make_controls()
-    controls.session.post_fx.highlight_rolloff.mode = "composite"
+    controls.session.post_fx.highlight_rolloff.mode = "per_layer"
 
-    controls.post_fx.cycle_highlight_rolloff_mode(forward=True)
+    controls.post_fx.step_highlight_rolloff_mode(forward=False)
 
     assert controls.session.post_fx.highlight_rolloff.mode == "off"
 
@@ -4163,30 +4163,29 @@ def test_project_resolution_set_directly_applies_live() -> None:
     apply.assert_called_once_with((1080, 1920))
 
 
-def test_settings_cycle_preview_quality() -> None:
+def test_settings_step_preview_quality() -> None:
     controls = _make_controls(("layer_1",))
     assert controls.cfg.editor.preview_quality == DEFAULT_EDITOR_PREVIEW_QUALITY
     _expand_settings_preview(controls)
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_PREVIEW_QUALITY)
 
+    # Right raises quality and stops at output.
     _press_focused(controls, _keydown(pygame.K_RIGHT))
-    assert controls.cfg.editor.preview_quality == "balanced"
-
-    _press_focused(controls, _keydown(pygame.K_RIGHT))
-    assert controls.cfg.editor.preview_quality == "performance"
-
-    _press_focused(controls, _keydown(pygame.K_RIGHT))
-    assert controls.cfg.editor.preview_quality == "ultra-performance"
-
+    assert controls.cfg.editor.preview_quality == "output"
     _press_focused(controls, _keydown(pygame.K_RIGHT))
     assert controls.cfg.editor.preview_quality == "output"
 
-    _press_focused(controls, _keydown(pygame.K_RIGHT))
-    assert controls.cfg.editor.preview_quality == "full-quality"
-
-    _press_focused(controls, _keydown(pygame.K_LEFT))
-    assert controls.cfg.editor.preview_quality == "output"
+    # Left lowers quality and stops at ultra-performance.
+    for expected in (
+        "full-quality",
+        "balanced",
+        "performance",
+        "ultra-performance",
+        "ultra-performance",
+    ):
+        _press_focused(controls, _keydown(pygame.K_LEFT))
+        assert controls.cfg.editor.preview_quality == expected
 
 
 def test_settings_preview_quality_change_does_not_mark_project_config_dirty() -> None:
@@ -4299,7 +4298,7 @@ def test_settings_residual_latency_writes_user_config_without_dirty(
     assert loaded.editor.residual_latency_ms == controls.cfg.editor.residual_latency_ms
 
 
-def test_settings_cycle_column_sides(tmp_path: Path) -> None:
+def test_settings_step_column_sides(tmp_path: Path) -> None:
     controls = _make_controls(("layer_1",))
     user_path = tmp_path / "user.yaml"
     controls.cfg.user_config_path = user_path
@@ -4310,13 +4309,13 @@ def test_settings_cycle_column_sides(tmp_path: Path) -> None:
     assert controls.cfg.editor.help_side == DEFAULT_HELP_SIDE == "right"
     assert not controls.config_dirty
 
-    controls.settings.cycle_navigator_side(forward=True)
-    assert controls.cfg.editor.navigator_side == "right"
-    controls.settings.cycle_navigator_side(forward=True)
+    controls.settings.step_navigator_side(forward=False)
     assert controls.cfg.editor.navigator_side == "left"
-    controls.settings.cycle_navigator_side(forward=False)
+    controls.settings.step_navigator_side(forward=True)
     assert controls.cfg.editor.navigator_side == "right"
-    controls.settings.cycle_help_side(forward=False)
+    controls.settings.step_navigator_side(forward=True)
+    assert controls.cfg.editor.navigator_side == "right"
+    controls.settings.step_help_side(forward=False)
     assert controls.cfg.editor.help_side == "left"
     view = controls.build_view_state(paused=False).settings
     assert view.navigator_side == "right"
@@ -4450,7 +4449,7 @@ def test_preset_duration_ctrl_step_is_ten_seconds() -> None:
     assert controls.session.layers["layer_1"].preset_duration == 41.0
 
 
-def test_hard_cut_enabled_cycles_and_hides_child_rows() -> None:
+def test_hard_cut_enabled_steps_and_hides_child_rows() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.layers["layer_1"].preset_switching = "on"
     controls.session.layers["layer_1"].preset_switching_trigger = "projectm"
@@ -4464,11 +4463,15 @@ def test_hard_cut_enabled_cycles_and_hides_child_rows() -> None:
     assert controls.session.layers["layer_1"].hard_cut_enabled is True
 
     press_layer_row(controls, enabled, _keydown(pygame.K_RIGHT))
+    assert controls.session.layers["layer_1"].hard_cut_enabled is True
+    assert switched == []
+
+    press_layer_row(controls, enabled, _keydown(pygame.K_LEFT))
     assert controls.session.layers["layer_1"].hard_cut_enabled is False
     assert switched == ["layer_1"]
     assert RowKind.TRACK_HARD_CUT_DURATION not in _inspector_kinds(controls, "layer_1")
 
-    press_layer_row(controls, enabled, _keydown(pygame.K_LEFT))
+    press_layer_row(controls, enabled, _keydown(pygame.K_RIGHT))
     assert controls.session.layers["layer_1"].hard_cut_enabled is True
     assert RowKind.TRACK_HARD_CUT_DURATION in _inspector_kinds(controls, "layer_1")
 
@@ -4704,7 +4707,7 @@ def test_drop_song_marker_does_not_select_or_steal_focus() -> None:
     assert controls.focus_descriptor == prior_focus
 
 
-def test_song_marker_left_right_cycles_type() -> None:
+def test_song_marker_left_right_steps_type() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.timeline.panel_open = True
     markers = controls.session.song_markers
@@ -4730,9 +4733,9 @@ def test_song_marker_left_right_cycles_type() -> None:
     assert _press_focused(controls, _keydown(pygame.K_RIGHT)) is True
     assert markers.markers[0].marker_type == "diminuendo"
     assert _press_focused(controls, _keydown(pygame.K_RIGHT)) is True
-    assert markers.markers[0].marker_type == "standard"
-    assert _press_focused(controls, _keydown(pygame.K_LEFT)) is True
     assert markers.markers[0].marker_type == "diminuendo"
+    assert _press_focused(controls, _keydown(pygame.K_LEFT)) is True
+    assert markers.markers[0].marker_type == "crescendo"
 
 
 def test_song_marker_type_cycle_toasts_orphan_begin() -> None:
@@ -5053,7 +5056,7 @@ def test_drop_song_marker_snaps_to_bar() -> None:
     assert controls.session.song_markers.times == [0.0]
 
 
-def test_placement_snap_row_cycles() -> None:
+def test_placement_snap_row_steps() -> None:
     controls = _make_controls(timeline_enabled=True)
     controls.session.timeline.panel_open = True
     _focus_inspector_kind(controls, RowKind.TIMELINE_PLACEMENT_SNAP)
@@ -5064,15 +5067,16 @@ def test_placement_snap_row_cycles() -> None:
     assert _press_focused(controls, _keydown(pygame.K_RIGHT)) is True
     assert controls.session.timeline.placement_snap == "bar"
     assert _press_focused(controls, _keydown(pygame.K_RIGHT)) is True
-    assert controls.session.timeline.placement_snap == "off"
-    assert _press_focused(controls, _keydown(pygame.K_LEFT)) is True
     assert controls.session.timeline.placement_snap == "bar"
     view = controls.build_view_state(paused=False)
     assert "bar" in _row_text(view, row)
+    for _ in range(3):
+        assert _press_focused(controls, _keydown(pygame.K_LEFT)) is True
+    assert controls.session.timeline.placement_snap == "off"
 
 
 
-def test_preset_switching_trigger_cycles() -> None:
+def test_preset_switching_trigger_steps() -> None:
     from tests.support.viz import make_controls, keydown
     import pygame
     from cleave.viz.row_kinds import RowDescriptor, RowKind
@@ -5093,11 +5097,13 @@ def test_preset_switching_trigger_cycles() -> None:
     press_layer_row(controls, RowDescriptor(RowKind.TRACK_PRESET_SWITCHING_TRIGGER, slot="layer_1"), keydown(pygame.K_RIGHT))
     assert layer.preset_switching_trigger == "timeline"
     press_layer_row(controls, RowDescriptor(RowKind.TRACK_PRESET_SWITCHING_TRIGGER, slot="layer_1"), keydown(pygame.K_RIGHT))
+    assert layer.preset_switching_trigger == "timeline"
+    for _ in range(3):
+        press_layer_row(controls, RowDescriptor(RowKind.TRACK_PRESET_SWITCHING_TRIGGER, slot="layer_1"), keydown(pygame.K_LEFT))
     assert layer.preset_switching_trigger == "off"
     assert layer.preset_switching == "off"
-    press_layer_row(controls, RowDescriptor(RowKind.TRACK_PRESET_SWITCHING_TRIGGER, slot="layer_1"), keydown(pygame.K_RIGHT))
-    assert layer.preset_switching_trigger == "timer"
-    assert layer.preset_switching == "on"
+    press_layer_row(controls, RowDescriptor(RowKind.TRACK_PRESET_SWITCHING_TRIGGER, slot="layer_1"), keydown(pygame.K_LEFT))
+    assert layer.preset_switching_trigger == "off"
 
 
 def test_timeline_trigger_hides_duration_row() -> None:
@@ -5185,7 +5191,7 @@ def test_cycle_preset_switching_trigger_toasts_when_list_nonempty() -> None:
     layer.preset_list = ["a.milk"]
     noted: list[str] = []
     controls.show_notification = noted.append  # type: ignore[method-assign]
-    controls.layer_mutations.cycle_preset_switching_trigger("layer_1", forward=True)
+    controls.layer_mutations.step_preset_switching_trigger("layer_1", delta=1)
     assert layer.preset_switching_trigger != "timer"
     assert noted == ["Layer 1: Preset list may need adjusting"]
 
@@ -5201,6 +5207,6 @@ def test_cycle_preset_switching_trigger_skips_list_toast_for_timeline_disabled()
     controls.session.timeline.enabled = False
     noted: list[str] = []
     controls.show_notification = noted.append  # type: ignore[method-assign]
-    controls.layer_mutations.cycle_preset_switching_trigger("layer_1", forward=True)
+    controls.layer_mutations.step_preset_switching_trigger("layer_1", delta=1)
     assert layer.preset_switching_trigger == "timeline"
     assert noted == [f"Layer 1: {NOTIFICATION_TIMELINE_TRIGGER_DISABLED_TEXT}"]

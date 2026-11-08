@@ -9,7 +9,7 @@ from pathlib import Path
 from cleave.preset_playlist import milk_files_in_dir, scan_preset_playlist
 from cleave.viz.layer import StemLayer
 from cleave.viz.live_layer_bindings import LiveLayerBindings
-from cleave.viz.modal import FormField, FormFieldKind, FormSpec, ModalHost
+from cleave.viz.modal import FormField, FormSpec, ModalHost
 from cleave.viz.preset_list_populate import (
     needed_preset_count,
     on_segment_populate_count,
@@ -183,7 +183,6 @@ class PresetListController:
                     FormField(
                         "source",
                         "from",
-                        FormFieldKind.RADIO,
                         tuple(label for label, _mode in sources),
                     ),
                 ),

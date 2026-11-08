@@ -9,10 +9,15 @@ import pygame
 from cleave.viz.commands import command_by_id, command_context
 from cleave.viz.inspector import InspectorRow, build_inspector_rows
 from cleave.viz.row_hotkeys import handle_row_hotkey, node_control_descriptor
+from cleave.choice import ChoiceKind, choice_kind
+from cleave.viz.choice_list import ChoiceListState
 from cleave.viz.row_spec import (
     REPEAT_ROW_KINDS,
     apply_field_action,
+    apply_field_choice,
     apply_field_horizontal,
+    row_spec,
+    section_lock_blocks_mutation,
 )
 from cleave.viz.shell_focus import ShellFocusState, ShellRegion
 
@@ -104,8 +109,36 @@ class InspectorControls:
             command_id = focused if focused in row.command_ids else row.command_ids[0]
             run_inspector_command(self._controls, command_id)
             return
-        if row.descriptor is not None:
-            apply_field_action(self._controls, row.descriptor)
+        if row.descriptor is None:
+            return
+        if apply_field_action(self._controls, row.descriptor):
+            return
+        self.open_choice(row)
+
+    def open_choice(self, row: InspectorRow) -> None:
+        """Focus a combo row and open its list. Other rows only take focus."""
+        desc = row.descriptor
+        if desc is None:
+            return
+        self.focus_row(row)
+        choice = row_spec(desc.kind).choice
+        if choice is None or section_lock_blocks_mutation(self._controls.session, desc):
+            return
+        view = self._view()
+        labels = choice.labels()
+        if choice_kind(len(labels)) is not ChoiceKind.COMBO:
+            return
+        start = choice.index(view, desc)
+        self._controls.inline_edit.begin_choice(
+            ChoiceListState(
+                target=desc,
+                options=labels,
+                start=start,
+                on_pick=lambda index: apply_field_choice(
+                    self._controls, desc, index - start
+                ),
+            )
+        )
 
     def _horizontal(
         self,

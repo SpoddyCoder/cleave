@@ -5,7 +5,7 @@ from __future__ import annotations
 from unittest.mock import patch
 
 from cleave.viz.fonts import (
-    cycle_overlay_font,
+    step_overlay_font,
     overlay_font_display,
 )
 
@@ -66,28 +66,28 @@ def test_overlay_system_fonts_filters_non_latin(get_fonts, sys_font) -> None:
     "cleave.viz.fonts.overlay_system_fonts",
     return_value=("alpha", "bravo", "charlie"),
 )
-def test_cycle_overlay_font_forward(_mock_fonts) -> None:
-    assert cycle_overlay_font("bravo", forward=True) == "charlie"
-    assert cycle_overlay_font("charlie", forward=True) == "alpha"
+def test_step_overlay_font_forward(_mock_fonts) -> None:
+    assert step_overlay_font("bravo", delta=1) == "charlie"
+    assert step_overlay_font("charlie", delta=1) == "charlie"
 
 
 @patch(
     "cleave.viz.fonts.overlay_system_fonts",
     return_value=("alpha", "bravo", "charlie"),
 )
-def test_cycle_overlay_font_backward(_mock_fonts) -> None:
-    assert cycle_overlay_font("bravo", forward=False) == "alpha"
-    assert cycle_overlay_font("alpha", forward=False) == "charlie"
+def test_step_overlay_font_backward(_mock_fonts) -> None:
+    assert step_overlay_font("bravo", delta=-1) == "alpha"
+    assert step_overlay_font("alpha", delta=-1) == "alpha"
 
 
 @patch(
     "cleave.viz.fonts.overlay_system_fonts",
     return_value=("alpha", "bravo", "charlie"),
 )
-def test_cycle_overlay_font_unknown_starts_at_first(_mock_fonts) -> None:
-    assert cycle_overlay_font("missing", forward=True) == "bravo"
+def test_step_overlay_font_unknown_starts_at_first(_mock_fonts) -> None:
+    assert step_overlay_font("missing", delta=1) == "bravo"
 
 
 @patch("cleave.viz.fonts.overlay_system_fonts", return_value=())
-def test_cycle_overlay_font_empty_list_keeps_current(_mock_fonts) -> None:
-    assert cycle_overlay_font("monospace", forward=True) == "monospace"
+def test_step_overlay_font_empty_list_keeps_current(_mock_fonts) -> None:
+    assert step_overlay_font("monospace", delta=1) == "monospace"

@@ -22,6 +22,9 @@ from cleave.viz.row_spec import FitStrategy, RowPresentStyle, RowSpec
 from cleave.viz.row_specs.common import lock_text, on_off_text
 from cleave.viz.tuning_view_state import TuningViewState
 
+from cleave.config_schema.render.overlays import RENDER_OVERLAY_ANIMATION_TYPES, RENDER_OVERLAY_POSITIONS, RENDER_OVERLAY_SLIDE_DIRECTIONS
+from cleave.viz.fonts import overlay_system_fonts
+from cleave.viz.row_specs.common import bool_choice, options_choice
 if TYPE_CHECKING:
     from cleave.viz.controls import TuningControls
 
@@ -175,7 +178,7 @@ def _apply_overlay_card_position(
     forward: bool,
     _large: bool,
 ) -> None:
-    _overlay_card_controls(controls, desc).cycle_position(forward=forward)
+    _overlay_card_controls(controls, desc).step_position(delta=1 if forward else -1)
 
 def _apply_overlay_card_title_font_size(
     controls: TuningControls,
@@ -196,7 +199,7 @@ def _apply_overlay_card_title_font(
     forward: bool,
     _large: bool,
 ) -> None:
-    _overlay_card_controls(controls, desc).cycle_title_font(forward=forward)
+    _overlay_card_controls(controls, desc).step_title_font(delta=1 if forward else -1)
 
 def _apply_overlay_card_title_margin_bottom(
     controls: TuningControls,
@@ -281,7 +284,7 @@ def _apply_overlay_card_body_font(
     forward: bool,
     _large: bool,
 ) -> None:
-    _overlay_card_controls(controls, desc).cycle_body_font(forward=forward)
+    _overlay_card_controls(controls, desc).step_body_font(delta=1 if forward else -1)
 
 def _apply_overlay_card_body_text_action(
     controls: TuningControls,
@@ -378,7 +381,7 @@ def _apply_overlay_card_animation_type(
     forward: bool,
     _large: bool,
 ) -> None:
-    _overlay_card_controls(controls, desc).cycle_animation_type(forward=forward)
+    _overlay_card_controls(controls, desc).step_animation_type(delta=1 if forward else -1)
 
 def _apply_overlay_card_slide_direction(
     controls: TuningControls,
@@ -386,7 +389,7 @@ def _apply_overlay_card_slide_direction(
     forward: bool,
     _large: bool,
 ) -> None:
-    _overlay_card_controls(controls, desc).cycle_slide_direction(forward=forward)
+    _overlay_card_controls(controls, desc).step_slide_direction(delta=1 if forward else -1)
 
 def _toggle_overlays_enabled(
     controls: TuningControls, _desc: RowDescriptor
@@ -485,6 +488,31 @@ def _visibility_overlays(
     )
     return (any_enabled, block.solo)
 
+def _jump_overlay_card_animation_type(
+    controls: TuningControls, desc: RowDescriptor, delta: int
+) -> None:
+    _overlay_card_controls(controls, desc).step_animation_type(delta=delta)
+
+def _jump_overlay_card_slide_direction(
+    controls: TuningControls, desc: RowDescriptor, delta: int
+) -> None:
+    _overlay_card_controls(controls, desc).step_slide_direction(delta=delta)
+
+def _jump_overlay_card_position(
+    controls: TuningControls, desc: RowDescriptor, delta: int
+) -> None:
+    _overlay_card_controls(controls, desc).step_position(delta=delta)
+
+def _jump_overlay_card_title_font(
+    controls: TuningControls, desc: RowDescriptor, delta: int
+) -> None:
+    _overlay_card_controls(controls, desc).step_title_font(delta=delta)
+
+def _jump_overlay_card_body_font(
+    controls: TuningControls, desc: RowDescriptor, delta: int
+) -> None:
+    _overlay_card_controls(controls, desc).step_body_font(delta=delta)
+
 SPECS: dict[RowKind, RowSpec] = {
     RowKind.OVERLAYS_HEADER: RowSpec(
         affordance=RowAffordance.HEADING,
@@ -505,6 +533,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_overlays_enabled,
         apply_horizontal=_apply_overlays_enabled,
+        choice=bool_choice(lambda s, d: _visibility_overlays(s, d)[0]),
         help_title="Overlay enabled",
         help_description=("Turns the opening and closing cards on or off together.",),
         blocked_by_section_lock=True,
@@ -515,6 +544,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_overlays_solo,
         apply_horizontal=_apply_overlays_solo,
+        choice=bool_choice(lambda s, _d: s.overlays.solo),
         help_title="Overlay solo",
         help_description=("Shows the credits cards on their own.",),
         blocked_by_section_lock=False,
@@ -525,6 +555,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_overlays_locked,
         apply_horizontal=_apply_overlays_locked,
+        choice=bool_choice(lambda s, _d: s.overlays.locked, lock_text),
         help_title="Overlay lock",
         help_description=("Locked overlay settings cannot be edited.",),
         blocked_by_section_lock=False,
@@ -550,6 +581,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_overlay_card_enabled,
         apply_horizontal=_apply_overlay_card_enabled,
+        choice=bool_choice(lambda s, d: _overlay_card_block(s, d).runtime.enabled),
         help_title="Card enabled",
         help_description=("Turns this credits card on or off.",),
         parent_group="overlay",
@@ -572,8 +604,9 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_overlay_card_animation_type,
         apply_horizontal=_apply_overlay_card_animation_type,
+        choice=options_choice(RENDER_OVERLAY_ANIMATION_TYPES, lambda s, d: _overlay_card_block(s, d).runtime.animation.type, jump=_jump_overlay_card_animation_type),
         help_title="Animation type",
-        help_entries=(("Left/Right", "cycle type"),),
+        help_entries=(("Left/Right", "choose type"),),
         help_description=("How this credits card enters and leaves the screen.",),
         help_mode_entries=RENDER_OVERLAY_ANIMATION_TYPE_HELP_ENTRIES,
         repeatable=True,
@@ -585,8 +618,9 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_overlay_card_slide_direction,
         apply_horizontal=_apply_overlay_card_slide_direction,
+        choice=options_choice(RENDER_OVERLAY_SLIDE_DIRECTIONS, lambda s, d: _overlay_card_block(s, d).runtime.animation.slide_direction, jump=_jump_overlay_card_slide_direction),
         help_title="Slide direction",
-        help_entries=(("Left/Right", "cycle direction"),),
+        help_entries=(("Left/Right", "choose direction"),),
         help_description=(
             "Edge this credits card travels from on entrance (reverse on exit).",
         ),
@@ -600,6 +634,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_overlay_card_position,
         apply_horizontal=_apply_overlay_card_position,
+        choice=options_choice(RENDER_OVERLAY_POSITIONS, lambda s, d: _overlay_card_block(s, d).runtime.position, jump=_jump_overlay_card_position),
         help_title="Position",
         help_description=(
             "Screen corner where this credits card appears.",
@@ -633,6 +668,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_overlay_card_title_font,
         apply_horizontal=_apply_overlay_card_title_font,
+        choice=options_choice(overlay_system_fonts, lambda s, d: _overlay_card_block(s, d).runtime.title_font, jump=_jump_overlay_card_title_font),
         fit_strategy=FitStrategy.NONE,
         help_title="Title font",
         help_description=("Font used for this credits card title.",),
@@ -718,6 +754,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_overlay_card_body_font,
         apply_horizontal=_apply_overlay_card_body_font,
+        choice=options_choice(overlay_system_fonts, lambda s, d: _overlay_card_block(s, d).runtime.body_font, jump=_jump_overlay_card_body_font),
         fit_strategy=FitStrategy.NONE,
         help_title="Body font",
         help_description=("Font used for this credits card body.",),

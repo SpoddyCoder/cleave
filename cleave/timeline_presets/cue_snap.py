@@ -9,9 +9,9 @@ TimelinePresetCueSnap = Literal["beats", "bars", "none"]
 DEFAULT_TIMELINE_PRESET_CUE_SNAP: TimelinePresetCueSnap = "none"
 
 TIMELINE_PRESET_CUE_SNAP_OPTIONS: tuple[TimelinePresetCueSnap, ...] = (
+    "none",
     "beats",
     "bars",
-    "none",
 )
 
 

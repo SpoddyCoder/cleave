@@ -7,11 +7,11 @@ from typing import Protocol
 from cleave.viz.text_edit import caret_index_for_line_column, caret_line_column
 from cleave.viz.modal import (
     BUTTON_ROW_KINDS,
-    FormFieldKind,
     FormRowView,
     ModalLabeledLine,
     ModalViewState,
 )
+from cleave.viz.choice_layout import choice_width
 from cleave.viz.text_fit import TextSizer, wrap_text_to_width
 from cleave.viz.theme import tuning_ui_metrics, ui_px
 
@@ -21,10 +21,6 @@ MESSAGE_MAX_SCREEN_FRACTION = 0.5
 PANEL_MIN_SCREEN_FRACTION = 0.2
 
 TEXT_BUTTON_LABELS = ("Confirm", "Cancel")
-FORM_STEP_ARROW_LEFT = "<"
-FORM_STEP_ARROW_RIGHT = ">"
-FORM_RADIO_ON = "(*) "
-FORM_RADIO_OFF = "( ) "
 EDITING_HINT = "Press Enter to confirm or ESC to cancel"
 CARET_WIDTH = 2
 
@@ -56,10 +52,6 @@ def form_row_pad_y() -> int:
 
 def form_label_gap() -> int:
     return ui_px(24)
-
-
-def form_segment_pad_x() -> int:
-    return ui_px(8)
 
 
 class TextMeasure(TextSizer, Protocol):
@@ -135,25 +127,13 @@ def measure_button_row(
     return sum(widths) + gaps, button_height(measure)
 
 
-def form_row_height(row: FormRowView, line_h: int, line_gap: int) -> int:
-    lines = len(row.options) if row.kind is FormFieldKind.RADIO else 1
-    return lines_block_height(lines, line_h, line_gap) + form_row_pad_y() * 2
-
-
-def form_segment_widths(measure: TextMeasure, row: FormRowView) -> tuple[int, ...]:
-    return tuple(
-        measure.size(option)[0] + form_segment_pad_x() * 2 for option in row.options
-    )
+def form_row_height(line_h: int) -> int:
+    return line_h + form_row_pad_y() * 2
 
 
 def form_control_width(measure: TextMeasure, row: FormRowView) -> int:
-    """Width of a row's control. A stepper fits its widest option, so it holds still."""
-    if row.kind is FormFieldKind.SEGMENT:
-        return sum(form_segment_widths(measure, row))
-    if row.kind is FormFieldKind.RADIO:
-        return max(measure.size(FORM_RADIO_ON + o)[0] for o in row.options)
-    arrows = measure.size(f" {FORM_STEP_ARROW_LEFT} {FORM_STEP_ARROW_RIGHT} ")[0]
-    return max(measure.size(o)[0] for o in row.options) + arrows
+    """Width of a row's segments or combo: it fits the widest option."""
+    return choice_width(measure, row.options)
 
 
 def measure_form(
@@ -169,7 +149,7 @@ def measure_form(
     for row in state.form_rows:
         row_w = measure.size(row.label)[0] + form_label_gap()
         width = max(width, row_w + form_control_width(measure, row))
-        height += form_row_height(row, line_h, line_gap)
+        height += form_row_height(line_h)
     if state.form_info is not None:
         width = max(width, measure.size(state.form_info)[0])
         height += line_gap + line_h

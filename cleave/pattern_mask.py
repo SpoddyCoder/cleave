@@ -64,16 +64,6 @@ def pattern_mask_invert_display(invert: bool) -> str:
     return "on" if invert else "off"
 
 
-def cycle_pattern_mask_invert(value: bool, *, forward: bool) -> bool:
-    options = (False, True)
-    try:
-        index = options.index(bool(value))
-    except ValueError:
-        index = 0
-    delta = 1 if forward else -1
-    return options[(index + delta) % len(options)]
-
-
 def pattern_mask_feather_half_width(feather_pct: int) -> float:
     """Tent half-width: 0.5 at 0% (no overlap) to 1.0 at 100% (current soft)."""
     pct = max(0, min(100, int(feather_pct)))

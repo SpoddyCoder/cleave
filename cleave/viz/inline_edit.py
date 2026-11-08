@@ -1,4 +1,5 @@
-"""Inline editing of a value in place: a text field or a colour picker.
+"""Inline editing of a value in place: a text field, a colour picker, or the
+open list of a combo.
 
 The target is an inspector ``RowDescriptor`` or another hashable key, such as
 a transport bar field.
@@ -14,6 +15,13 @@ from dataclasses import dataclass
 
 import pygame
 
+from cleave.viz.choice_list import (
+    ChoiceListKey,
+    ChoiceListState,
+    ChoiceListView,
+    choice_list_view,
+    handle_choice_list_key,
+)
 from cleave.viz.key_repeat import KeyRepeatController
 from cleave.viz.row_kinds import RowDescriptor
 from cleave.viz.text_edit import (
@@ -76,11 +84,20 @@ class InlineEditController:
         self._on_stop_text_input = on_stop_text_input
         self._text: InlineTextState | None = None
         self._colour: ColourEditState | None = None
+        self._choice: ChoiceListState | None = None
         self._key_repeat = KeyRepeatController()
 
     @property
     def active(self) -> bool:
-        return self._text is not None or self._colour is not None
+        return (
+            self._text is not None
+            or self._colour is not None
+            or self._choice is not None
+        )
+
+    @property
+    def choice_view(self) -> ChoiceListView | None:
+        return choice_list_view(self._choice)
 
     @property
     def text_target(self) -> Hashable | None:
@@ -125,6 +142,22 @@ class InlineEditController:
         self.finish()
         self._colour = ColourEditState(descriptor, target, target.current)
 
+    def begin_choice(self, state: ChoiceListState) -> None:
+        """Open a combo's list. A pick applies at once; Esc keeps the value."""
+        self.finish()
+        self._choice = state
+
+    def hover_choice(self, index: int) -> None:
+        if self._choice is not None:
+            self._choice.hover(index)
+
+    def pick_choice(self, index: int) -> None:
+        choice = self._choice
+        if choice is None:
+            return
+        self._choice = None
+        choice.pick(index)
+
     def set_colour(self, value: Rgb | None) -> None:
         """Apply a picked colour live. Esc restores the one from when it opened."""
         state = self._colour
@@ -137,8 +170,10 @@ class InlineEditController:
         """Keep the edit: commit valid text, leave a colour as picked.
 
         Clicking away is not an error. Text that fails validation is dropped.
+        An open list closes with its value unchanged.
         """
         self._colour = None
+        self._choice = None
         state = self._text
         if state is None:
             return
@@ -148,6 +183,7 @@ class InlineEditController:
             state.on_commit(state.draft)
 
     def cancel(self) -> None:
+        self._choice = None
         colour = self._colour
         if colour is not None:
             self._colour = None
@@ -160,6 +196,12 @@ class InlineEditController:
         """Consume every key while an edit is active."""
         if not self.active:
             return False
+        choice = self._choice
+        if choice is not None:
+            outcome = handle_choice_list_key(choice, event.key)
+            if outcome in (ChoiceListKey.PICKED, ChoiceListKey.CLOSED):
+                self._choice = None
+            return True
         if event.key == pygame.K_ESCAPE:
             self.cancel()
             return True

@@ -7,7 +7,8 @@ from typing import TYPE_CHECKING, Any
 
 from cleave.viz.row_hotkeys import node_header_descriptor
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
-from cleave.viz.row_spec import RowSpec, row_spec
+from cleave.choice import ChoiceKind
+from cleave.viz.row_spec import RowSpec, row_choice_kind, row_spec
 from cleave.viz.shell_focus import CycleStop, ShellFocusState, ShellRegion
 
 if TYPE_CHECKING:
@@ -336,7 +337,10 @@ def timeline_strip_section(
 def _value_step_section(row_kind: RowKind) -> HelpSection:
     behavior = row_spec(row_kind)
     if behavior.help_entries is not None:
-        return HelpSection(behavior.help_title or "Edit", behavior.help_entries)
+        entries = behavior.help_entries
+        if row_choice_kind(row_kind) is ChoiceKind.COMBO:
+            entries = (*entries, ("Enter", "open the list"))
+        return HelpSection(behavior.help_title or "Edit", entries)
     if row_kind == RowKind.TRACK_EFFECT:
         entries = (
             ("Left/Right", "adjust depth"),

@@ -15,7 +15,6 @@ from cleave.timeline import (
 )
 from cleave.viz.modal import (
     FormField,
-    FormFieldKind,
     FormSpec,
     FormValues,
     ModalHost,
@@ -124,14 +123,12 @@ class TimelineCutController:
                     FormField(
                         "cut",
                         "cut type",
-                        FormFieldKind.SEGMENT,
                         _CUT_OPTIONS,
                         self._last_values["cut"],
                     ),
                     FormField(
                         "scope",
                         "applies to",
-                        FormFieldKind.SEGMENT,
                         _SCOPE_LABELS,
                         self._last_values["scope"],
                     ),

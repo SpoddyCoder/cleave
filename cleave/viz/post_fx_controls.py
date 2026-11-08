@@ -21,6 +21,7 @@ from cleave.config_schema.render import (
     clamp_visual_limiter_release,
     clamp_visual_limiter_threshold,
 )
+from cleave.choice import step_choice
 from cleave.viz.post_fx_bindings import PostFxBindings
 from cleave.viz.session import FadeSideRuntime, TuningSession
 
@@ -71,17 +72,9 @@ class PostFxControls:
         window.end = clamp_fade_seconds(value)
         window.start = clamp_fade_out_start(window.start, end=window.end)
 
-    def cycle_fade_type(self, side: str, *, forward: bool) -> None:
-        curves = FADE_CURVES
+    def step_fade_type(self, side: str, *, delta: int) -> None:
         window = self._fade_side(side)
-        try:
-            index = curves.index(window.type)
-        except ValueError:
-            index = 0
-        if forward:
-            window.type = curves[(index + 1) % len(curves)]
-        else:
-            window.type = curves[(index - 1) % len(curves)]
+        window.type = step_choice(FADE_CURVES, window.type, delta)
 
     def _fade_side(self, side: str) -> FadeSideRuntime:
         fade = self.session.post_fx.fade
@@ -125,18 +118,12 @@ class PostFxControls:
             clamp_highlight_rolloff_desaturation_pct(desaturation_pct)
         )
 
-    def cycle_highlight_rolloff_mode(self, *, forward: bool) -> None:
-        modes = HIGHLIGHT_ROLLOFF_APPLY_MODES
+    def step_highlight_rolloff_mode(self, *, forward: bool) -> None:
         hr = self.session.post_fx.highlight_rolloff
         old_mode = hr.mode
-        try:
-            index = modes.index(hr.mode)
-        except ValueError:
-            index = 0
-        if forward:
-            hr.mode = modes[(index + 1) % len(modes)]
-        else:
-            hr.mode = modes[(index - 1) % len(modes)]
+        hr.mode = step_choice(
+            HIGHLIGHT_ROLLOFF_APPLY_MODES, old_mode, 1 if forward else -1
+        )
         if hr.mode != old_mode and self._bindings is not None:
             paused = (
                 self._bindings.is_paused()
@@ -148,35 +135,21 @@ class PostFxControls:
                     old_mode, hr.mode
                 )
 
-    def cycle_highlight_rolloff_curve(self, *, forward: bool) -> None:
-        curves = HIGHLIGHT_ROLLOFF_CURVES
+    def step_highlight_rolloff_curve(self, *, forward: bool) -> None:
         hr = self.session.post_fx.highlight_rolloff
-        try:
-            index = curves.index(hr.curve)
-        except ValueError:
-            index = 0
-        if forward:
-            hr.curve = curves[(index + 1) % len(curves)]
-        else:
-            hr.curve = curves[(index - 1) % len(curves)]
+        hr.curve = step_choice(
+            HIGHLIGHT_ROLLOFF_CURVES, hr.curve, 1 if forward else -1
+        )
 
     def set_chroma_boost_amount_pct(self, amount_pct: int) -> None:
         self.session.post_fx.chroma_boost.amount_pct = (
             clamp_chroma_boost_amount_pct(amount_pct)
         )
 
-    def cycle_chroma_boost_mode(self, *, forward: bool) -> None:
-        modes = CHROMA_BOOST_APPLY_MODES
+    def step_chroma_boost_mode(self, *, forward: bool) -> None:
         cb = self.session.post_fx.chroma_boost
         old_mode = cb.mode
-        try:
-            index = modes.index(cb.mode)
-        except ValueError:
-            index = 0
-        if forward:
-            cb.mode = modes[(index + 1) % len(modes)]
-        else:
-            cb.mode = modes[(index - 1) % len(modes)]
+        cb.mode = step_choice(CHROMA_BOOST_APPLY_MODES, old_mode, 1 if forward else -1)
         if cb.mode != old_mode and self._bindings is not None:
             paused = (
                 self._bindings.is_paused()
@@ -186,17 +159,11 @@ class PostFxControls:
             if paused and self._bindings.on_chroma_boost_apply_mode_change:
                 self._bindings.on_chroma_boost_apply_mode_change(old_mode, cb.mode)
 
-    def cycle_chroma_boost_variant(self, *, forward: bool) -> None:
-        variants = CHROMA_BOOST_VARIANTS
+    def step_chroma_boost_variant(self, *, forward: bool) -> None:
         cb = self.session.post_fx.chroma_boost
-        try:
-            index = variants.index(cb.variant)
-        except ValueError:
-            index = 0
-        if forward:
-            cb.variant = variants[(index + 1) % len(variants)]
-        else:
-            cb.variant = variants[(index - 1) % len(variants)]
+        cb.variant = step_choice(
+            CHROMA_BOOST_VARIANTS, cb.variant, 1 if forward else -1
+        )
 
     def set_limiter_enabled(self, enabled: bool) -> None:
         lim = self.session.post_fx.limiter

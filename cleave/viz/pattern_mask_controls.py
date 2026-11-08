@@ -11,7 +11,7 @@ from cleave.config_schema.render import (
     clamp_pattern_mask_feather_pct,
     clamp_pattern_mask_transition,
 )
-from cleave.pattern_mask import cycle_pattern_mask_invert
+from cleave.choice import step_choice
 from cleave.viz.session import TuningSession
 
 
@@ -38,19 +38,12 @@ class PatternMaskControls:
             transition
         )
 
-    def cycle_invert(self, *, forward: bool) -> None:
-        pm = self.session.pattern_mask
-        pm.invert = cycle_pattern_mask_invert(pm.invert, forward=forward)
+    def step_invert(self, *, forward: bool) -> None:
+        self.session.pattern_mask.invert = forward
 
-    def cycle_type(self, *, forward: bool) -> None:
-        options = PATTERN_MASK_TYPES
+    def step_type(self, *, delta: int) -> None:
         pm = self.session.pattern_mask
-        try:
-            index = options.index(pm.type)
-        except ValueError:
-            index = 0
-        delta = 1 if forward else -1
-        pm.type = options[(index + delta) % len(options)]
+        pm.type = step_choice(PATTERN_MASK_TYPES, pm.type, delta)
 
     def set_type(self, mask_type: PatternMaskType) -> None:
         if mask_type not in PATTERN_MASK_TYPES:
