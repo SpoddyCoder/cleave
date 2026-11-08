@@ -85,6 +85,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- Dragging or moving a preset in the Preset List carries the selection highlight with it, as layer reordering does, instead of leaving it on the old position.
 - Every song marker row takes the mouse, not just the first, and its delete icon highlights on hover and asks to delete that marker.
 - Bloom and chromatic aberration look the same in a reduced-size live preview as in the render, instead of growing larger as the preview gets smaller.
 - A top menu dropdown no longer shows a second line a few pixels above its top border the first time it opens.

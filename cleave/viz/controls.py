@@ -648,15 +648,16 @@ class TuningControls:
             timeline.focus_row = row_count - 1
 
     def _focus_preset_list_item(self, slot: str, index: int) -> None:
-        self._apply_focus_cursor(
-            MainFocus(
-                RowDescriptor(
-                    RowKind.TRACK_PRESET_LIST_ITEM,
-                    slot=slot,
-                    preset_index=index,
-                )
-            )
+        """Keep the inspector selection on a preset row as it moves."""
+        descriptor = RowDescriptor(
+            RowKind.TRACK_PRESET_LIST_ITEM,
+            slot=slot,
+            preset_index=index,
         )
+        self._apply_focus_cursor(MainFocus(descriptor))
+        focus = self.shell_focus
+        focus.inspector_cursor = descriptor
+        focus.inspector_command_id = None
 
     def _focus_song_marker(self, marker_index: int | None) -> None:
         focus = self.shell_focus

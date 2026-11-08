@@ -3433,6 +3433,31 @@ def test_move_mode_colors_preset_list_item() -> None:
     assert _row_value_color(view, sibling) != MOVE_MODE
 
 
+def test_preset_list_move_keeps_inspector_selection_on_moved_row() -> None:
+    controls = _make_controls(("layer_1",))
+    layer = controls.session.layers["layer_1"]
+    layer.preset_switching = "on"
+    layer.preset_switching_trigger = "timer"
+    layer.preset_list = [
+        "/tmp/presets/a.milk",
+        "/tmp/presets/b.milk",
+        "/tmp/presets/c.milk",
+    ]
+    first = RowDescriptor(
+        RowKind.TRACK_PRESET_LIST_ITEM, slot="layer_1", preset_index=0
+    )
+    controls.shell_focus.inspector_cursor = first
+    controls.preset_list.enter_move_mode("layer_1", 0)
+
+    controls.preset_list.move_item_to(2)
+
+    assert layer.preset_list[2] == "/tmp/presets/a.milk"
+    assert controls.shell_focus.inspector_cursor == RowDescriptor(
+        RowKind.TRACK_PRESET_LIST_ITEM, slot="layer_1", preset_index=2
+    )
+    assert controls.shell_focus.inspector_command_id is None
+
+
 def test_preset_list_enter_auditions_item_and_resumes() -> None:
     controls = _make_controls(("layer_1",))
     auditioned: list[tuple[str, int]] = []
