@@ -188,8 +188,8 @@ def test_menus_list_taxonomy_ids_once() -> None:
     assert _row_ids(menus[3]) == [
         *_PROJECT_PAGE_IDS,
         None,
-        "project.separate",
         "project.render",
+        "project.separate",
         None,
         "project.backup",
         "project.restore",

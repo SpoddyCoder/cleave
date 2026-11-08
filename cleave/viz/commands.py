@@ -695,8 +695,8 @@ def build_menus(
                 (
                     *_PROJECT_PAGES,
                     SEPARATOR,
-                    _SEPARATE,
                     _RENDER,
+                    _SEPARATE,
                     SEPARATOR,
                     _BACKUP,
                     _RESTORE,

@@ -24,7 +24,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
-- The Project menu lists its pages as Resolution, Render, Compositor, then ProjectM. Separate stems... is renamed Re-separate stems... (still disabled; use `cleave separate`).
+- The Project menu lists its pages as Resolution, Render, Compositor, then ProjectM. Render project... sits above Separate stems..., which is renamed Re-separate stems... (still disabled; use `cleave separate`).
 - The navigator holds only the parts of the picture: Overlay, Post-FX, Pattern Mask, Timeline, and Layers. Settings and Project pages open from their menus into the inspector (Ctrl+, opens Settings > Preview). The menu bar is File, Edit (Undo, Redo), View (Fullscreen, timeline strip, preset curation mode), Project, Settings, and Help (Help, About). The Layers and Timeline menus are gone; add and delete layer and the timeline actions are buttons on their inspector pages.
 - Settings has two pages. Preview holds preview quality, residual latency, and Measure latency, replacing Editor Window and Latency Compensation. Navigator side and help side move to UI.
 - Project > Compositor > hdr is labelled hdr compositing, and its help says the rendered video is 8-bit either way.
