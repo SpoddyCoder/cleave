@@ -59,6 +59,9 @@ from cleave.viz.theme import (
     HOVER,
     HOVER_BG_ALPHA,
     LABEL,
+    NUDGE_HOVER_BG,
+    NUDGE_HOVER_BG_ALPHA,
+    NUDGE_HOVER_FG,
     MUTED,
     PLAYHEAD,
     PLAYHEAD_FLASH,
@@ -721,23 +724,34 @@ class StripHit:
     target: StripTarget | None = None
 
 
+# Corner buttons sit this far below the top of the badge row.
+TRANSPORT_BUTTON_DROP_PX: int = 2
+REC_BUTTON_TEXT: str = "REC"
+
+
 def transport_button_rects(
     *,
     padding: int,
     layer_num_width: int,
-    stem_abbrev_width: int,
+    icon_size: int,
+    rec_text_width: int,
+    text_gap: int,
+    pad_x: int,
     corner_h: int,
     gap: int,
 ) -> tuple[tuple[int, int, int, int], tuple[int, int, int, int]]:
     """Play and record button rects in the corner above the row labels.
 
-    Play sits over the layer number column and record over the stem
-    abbreviation, the column that lights when a row is armed. Rects are in
-    upload coordinates (top of the badge row is y=0).
+    Play sits over the layer number column. Record starts at the stem
+    abbreviation, the column that lights when a row is armed, and holds the
+    record glyph plus ``REC``. Rects are in upload coordinates (top of the
+    badge row is y=0).
     """
+    y = TRANSPORT_BUTTON_DROP_PX
     h = max(1, corner_h - gap)
-    play = (padding, 0, layer_num_width, h)
-    record = (padding + layer_num_width, 0, stem_abbrev_width, h)
+    play = (padding, y, layer_num_width, h)
+    record_w = pad_x * 2 + icon_size + text_gap + rec_text_width
+    record = (padding + layer_num_width, y, record_w, h)
     return play, record
 
 
@@ -956,13 +970,22 @@ class TimelineOverlay:
     def _transport_rects(
         self, layout: _TimelineLayout
     ) -> tuple[tuple[int, int, int, int], tuple[int, int, int, int]]:
+        metrics = timeline_ui_metrics()
         return transport_button_rects(
             padding=self._padding,
             layer_num_width=layout.layer_num_width,
-            stem_abbrev_width=layout.stem_abbrev_width,
+            icon_size=self._transport_icon_size(layout),
+            rec_text_width=self._font_get().size(REC_BUTTON_TEXT)[0],
+            text_gap=metrics.rec_badge_gap // 2,
+            pad_x=metrics.rec_badge_gap // 2,
             corner_h=layout.badge_reserve + layout.bar_top,
-            gap=timeline_ui_metrics().rec_badge_gap,
+            gap=metrics.rec_badge_gap,
         )
+
+    @staticmethod
+    def _transport_icon_size(layout: _TimelineLayout) -> int:
+        """Glyph size: as tall as a row's level bar."""
+        return max(1, layout.row_h - 2 * timeline_ui_metrics().bar_vertical_inset)
 
     def _draw_transport_buttons(
         self,
@@ -980,27 +1003,50 @@ class TimelineOverlay:
             record_color = ARMED_BG
         else:
             record_color = VALUE
+        rec_text_color = VALUE
+        play_color = VALUE
+        # Shell hover: nudge wash behind, nudge foreground on glyph and text.
+        if state.hover_button == "play":
+            blit_tint(surface, play_rect, NUDGE_HOVER_BG, alpha=NUDGE_HOVER_BG_ALPHA)
+            play_color = NUDGE_HOVER_FG
+        if state.hover_button == "record":
+            blit_tint(
+                surface, record_rect, NUDGE_HOVER_BG, alpha=NUDGE_HOVER_BG_ALPHA
+            )
+            record_color = rec_text_color = NUDGE_HOVER_FG
+
+        icon_font = material_font(self._transport_icon_size(layout))
         # Same state convention as the shell readout: the glyph shows the mode.
         play_glyph = PAUSE_GLYPH if state.paused else PLAY_GLYPH
-        for target, glyph, color, rect in (
-            ("play", play_glyph, VALUE, play_rect),
-            ("record", RECORD_GLYPH, record_color, record_rect),
-        ):
-            if state.hover_button == target:
-                blit_tint(surface, rect, HOVER, alpha=HOVER_BG_ALPHA)
-            x, y, w, h = rect
-            font = material_font(max(1, min(w, h)))
-            glyph_surf = font.render(glyph, True, color)
-            surface.blit(
-                glyph_surf,
-                (
-                    x + (w - glyph_surf.get_width()) // 2,
-                    y + (h - glyph_surf.get_height()) // 2,
-                ),
-            )
+        play_surf = icon_font.render(play_glyph, True, play_color)
+        px, py, pw, ph = play_rect
+        surface.blit(
+            play_surf,
+            (
+                px + (pw - play_surf.get_width()) // 2,
+                py + (ph - play_surf.get_height()) // 2,
+            ),
+        )
+
+        metrics = timeline_ui_metrics()
+        rx, ry, _rw, rh = record_rect
+        record_surf = icon_font.render(RECORD_GLYPH, True, record_color)
+        glyph_x = rx + metrics.rec_badge_gap // 2
+        surface.blit(record_surf, (glyph_x, ry + (rh - record_surf.get_height()) // 2))
+        text_surf = self._font_get().render(REC_BUTTON_TEXT, True, rec_text_color)
+        surface.blit(
+            text_surf,
+            (
+                glyph_x
+                + self._transport_icon_size(layout)
+                + metrics.rec_badge_gap // 2,
+                ry + (rh - text_surf.get_height()) // 2,
+            ),
+        )
         left = play_rect[0]
         right = record_rect[0] + record_rect[2]
-        return (left, 0, right - left, max(play_rect[3], record_rect[3]))
+        bottom = max(play_rect[1] + play_rect[3], record_rect[1] + record_rect[3])
+        return (left, 0, right - left, bottom)
 
     def time_at_x(self, x: float) -> float | None:
         """Song time under screen *x*, clamped to the bar. None before a compose."""
