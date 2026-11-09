@@ -49,6 +49,7 @@ class TimelineStaticSignature:
     armed_slots: frozenset[str]
     recording: bool
     submenu_focused: bool
+    hover_label_row: int | None
     record_start_sec: float | None
     record_slot_start_sec: tuple[tuple[str, float], ...]
     record_baseline: tuple[tuple[str, float], ...]
@@ -86,6 +87,7 @@ class TimelinePanelCache:
     last_live_signature: tuple | None = None
     last_playhead_rect: tuple[int, int, int, int] | None = None
     last_badge_rect: tuple[int, int, int, int] | None = None
+    last_transport_rect: tuple[int, int, int, int] | None = None
     last_flash_rects: tuple[tuple[int, int, int, int], ...] = ()
     last_glyph_rects: tuple[tuple[int, int, int, int], ...] = ()
 
@@ -152,6 +154,7 @@ def timeline_static_signature(
         armed_slots=frozenset(state.armed_slots),
         recording=state.recording,
         submenu_focused=state.submenu_focused,
+        hover_label_row=state.hover_label_row,
         record_start_sec=state.record_start_sec,
         record_slot_start_sec=tuple(sorted(state.record_slot_start_sec.items())),
         record_baseline=tuple(sorted(state.record_baseline.items())),

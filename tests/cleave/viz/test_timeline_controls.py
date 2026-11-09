@@ -135,6 +135,37 @@ def test_a_toggles_arm_on_focused_stem() -> None:
     assert session.timeline.arm_flash_start_ms["layer_2"] >= before
 
 
+def test_toggle_arm_row_focuses_and_arms_that_row() -> None:
+    controls, session, _, _, _, _ = _make_timeline_controls(focus_row=0)
+    controls.toggle_arm_row(1)
+    assert session.timeline.focus_row == 1
+    assert session.timeline.armed_slots == {"layer_2"}
+    controls.toggle_arm_row(1)
+    assert session.timeline.armed_slots == set()
+
+
+def test_mouse_record_and_arm_blocked_when_locked() -> None:
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        armed_slots={"layer_1"},
+    )
+    session.timeline.locked = True
+    controls.toggle_record()
+    controls.toggle_arm_row(1)
+    assert session.timeline.recording is False
+    assert session.timeline.armed_slots == {"layer_1"}
+    assert session.timeline.focus_row == 1
+
+
+def test_toggle_record_starts_and_stops_like_r() -> None:
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        armed_slots={"layer_1"},
+    )
+    controls.toggle_record()
+    assert session.timeline.recording is True
+    controls.toggle_record()
+    assert session.timeline.recording is False
+
+
 def test_left_right_step_cues_when_not_recording() -> None:
     lanes = {
         "layer_1": _lane(False, (4.0, True), (10.0, False), (16.0, True)),

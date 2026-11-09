@@ -1269,6 +1269,10 @@ class ShellHost:
         # Host active covers the click before the top layer has drawn the modal.
         if event.type == pygame.WINDOWFOCUSLOST:
             self._cancel_strip_pointer()
+            self._clear_strip_hover()
+            return
+        if event.type == pygame.WINDOWLEAVE:
+            self._clear_strip_hover()
             return
         if self._modal_has_pointer():
             self._process_modal_event(event)
@@ -1280,7 +1284,7 @@ class ShellHost:
             y = float(event.pos[1])
             self._track_splitter_motion(x, y)
             if self._strip_pointer is not None:
-                self._strip_pointer.motion(x)
+                self._strip_pointer.motion(x, y)
             return
         if event.type in (pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP):
             button = mouse_button(event)
@@ -1332,10 +1336,15 @@ class ShellHost:
         if self._strip_pointer is not None:
             self._strip_pointer.cancel()
 
+    def _clear_strip_hover(self) -> None:
+        if self._strip_pointer is not None:
+            self._strip_pointer.clear_hover()
+
     def _process_modal_event(self, event: pygame.event.Event) -> None:
         """Forward the pointer to ImGui. The shell takes no region or splitter."""
         self._cancel_splitter_drag()
         self._cancel_strip_pointer()
+        self._clear_strip_hover()
         self._controls.disarm_value_nudge()
         imgui_host = self.imgui
         if event.type == pygame.MOUSEMOTION:

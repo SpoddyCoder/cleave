@@ -1529,6 +1529,16 @@ def test_hit_at_maps_ruler_rows_prefix_and_gaps() -> None:
 
     prefix = overlay.hit_at(px + 10, py + rows[0][2] + 1)
     assert prefix is not None and prefix.row == 0 and prefix.t_sec is None
+    assert prefix.target == "label"
+    eye = overlay.hit_at(px + bar_left - 2, py + rows[0][2] + 1)
+    assert eye is not None and eye.row == 0 and eye.target is None
+    assert ruler.target is None
+
+    corner_y = py - 2
+    play = overlay.hit_at(px + 9, corner_y)
+    record = overlay.hit_at(px + 8 + overlay._layer_num_width + 2, corner_y)
+    assert play is not None and play.target == "play" and play.row is None
+    assert record is not None and record.target == "record"
 
     gap_y = py + rows[0][2] + rows[0][4] + 1
     assert overlay.hit_at(mid_x, gap_y) is None

@@ -790,7 +790,7 @@ def test_strip_pointer_gets_press_drag_and_release_in_timeline_rect() -> None:
 
         assert controls.shell_focus.region is ShellRegion.TIMELINE
         pointer.press.assert_called_once_with(float(pos[0]), float(pos[1]))
-        pointer.motion.assert_called_with(float(pos[0] + 30))
+        pointer.motion.assert_called_with(float(pos[0] + 30), float(pos[1]))
         pointer.release.assert_called_once()
 
 

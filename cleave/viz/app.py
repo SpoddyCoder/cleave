@@ -489,6 +489,7 @@ def _tick_frame_live_overlay(
             ),
             bar_times=signals.downbeat_times if signals is not None else (),
             beat_times=signals.beat_times if signals is not None else (),
+            paused=runtime.playback.paused,
         )
 
     if timeline_state is not None:

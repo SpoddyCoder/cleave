@@ -24,7 +24,13 @@ from cleave.timeline import (
     opening_cue,
     stem_abbreviation,
 )
-from cleave.viz.material_icons import visibility_icon_slot_width
+from cleave.viz.material_icons import (
+    PAUSE_GLYPH,
+    PLAY_GLYPH,
+    RECORD_GLYPH,
+    material_font,
+    visibility_icon_slot_width,
+)
 from cleave.viz.overlay_primitives import (
     ComposedPanel,
     clip_rect_to_bounds,
@@ -50,7 +56,10 @@ from cleave.viz.theme import (
     BAR_GRID,
     FOCUS_BORDER_ALPHA,
     HIGHLIGHT,
+    HOVER,
+    HOVER_BG_ALPHA,
     LABEL,
+    MUTED,
     PLAYHEAD,
     PLAYHEAD_FLASH,
     REC_BG,
@@ -126,6 +135,11 @@ class TimelineViewState:
     override_slots: set[str] = field(default_factory=set)
     armed_slots: set[str] = field(default_factory=set)
     recording: bool = False
+    paused: bool = True
+    locked: bool = False
+    # Pointer hover: a row label (static chrome) or a corner button (live).
+    hover_label_row: int | None = None
+    hover_button: str | None = None
     record_start_sec: float | None = None
     record_slot_start_sec: dict[str, float] = field(default_factory=dict)
     record_baseline: dict[str, float] = field(default_factory=dict)
@@ -688,17 +702,53 @@ def x_to_time(x: float, bar_left: int, bar_width: int, duration_sec: float) -> f
 CUE_HIT_PX: int = 4
 
 
+StripTarget = Literal["play", "record", "label"]
+
+
 @dataclass(frozen=True)
 class StripHit:
     """What a screen point lands on in the strip.
 
     ``row`` is None for the ruler. ``t_sec`` is None outside the bar span
     (row labels and icons). ``cue_tolerance_sec`` is ``CUE_HIT_PX`` in song time.
+    ``target`` names a control: the corner ``"play"`` / ``"record"`` buttons,
+    or a row's ``"label"`` (layer number and stem abbreviation).
     """
 
     row: int | None
     t_sec: float | None
     cue_tolerance_sec: float
+    target: StripTarget | None = None
+
+
+def transport_button_rects(
+    *,
+    padding: int,
+    layer_num_width: int,
+    stem_abbrev_width: int,
+    corner_h: int,
+    gap: int,
+) -> tuple[tuple[int, int, int, int], tuple[int, int, int, int]]:
+    """Play and record button rects in the corner above the row labels.
+
+    Play sits over the layer number column and record over the stem
+    abbreviation, the column that lights when a row is armed. Rects are in
+    upload coordinates (top of the badge row is y=0).
+    """
+    h = max(1, corner_h - gap)
+    play = (padding, 0, layer_num_width, h)
+    record = (padding + layer_num_width, 0, stem_abbrev_width, h)
+    return play, record
+
+
+def transport_live_signature(state: TimelineViewState, ticks_ms: int) -> tuple:
+    return (
+        state.paused,
+        state.locked,
+        state.hover_button,
+        bool(state.armed_slots),
+        rec_flash_visible(ticks_ms) if state.recording else None,
+    )
 
 
 def playhead_x(
@@ -763,6 +813,7 @@ def timeline_live_signature(
         rec_flash,
         playhead_flash_bright(ticks_ms),
         flash_sig,
+        transport_live_signature(state, ticks_ms),
     )
 
 
@@ -879,12 +930,77 @@ class TimelineOverlay:
             else None
         )
         if -layout.badge_reserve <= local_y < layout.bar_top:
+            upload_y = local_y + layout.badge_reserve
+            for target, rect in zip(
+                ("play", "record"), self._transport_rects(layout), strict=True
+            ):
+                if pygame.Rect(rect).collidepoint(local_x, upload_y):
+                    return StripHit(
+                        row=None, t_sec=None, cue_tolerance_sec=tolerance, target=target
+                    )
             return StripHit(row=None, t_sec=t_sec, cue_tolerance_sec=tolerance)
+        label_left = self._padding
+        label_right = label_left + layout.layer_num_width + layout.stem_abbrev_width
+        on_label = label_left <= local_x < label_right
         for display_i in range(layout.row_count):
             row_y = self._row_y(display_i, layout.row_h)
             if row_y <= local_y < row_y + layout.row_h:
-                return StripHit(row=display_i, t_sec=t_sec, cue_tolerance_sec=tolerance)
+                return StripHit(
+                    row=display_i,
+                    t_sec=t_sec,
+                    cue_tolerance_sec=tolerance,
+                    target="label" if on_label else None,
+                )
         return None
+
+    def _transport_rects(
+        self, layout: _TimelineLayout
+    ) -> tuple[tuple[int, int, int, int], tuple[int, int, int, int]]:
+        return transport_button_rects(
+            padding=self._padding,
+            layer_num_width=layout.layer_num_width,
+            stem_abbrev_width=layout.stem_abbrev_width,
+            corner_h=layout.badge_reserve + layout.bar_top,
+            gap=timeline_ui_metrics().rec_badge_gap,
+        )
+
+    def _draw_transport_buttons(
+        self,
+        surface: pygame.Surface,
+        state: TimelineViewState,
+        layout: _TimelineLayout,
+    ) -> tuple[int, int, int, int]:
+        """Play/pause and record glyphs in the corner (upload coordinates)."""
+        play_rect, record_rect = self._transport_rects(layout)
+        if state.recording:
+            record_color = REC_BG if rec_flash_visible() else MUTED
+        elif state.locked:
+            record_color = MUTED
+        elif state.armed_slots:
+            record_color = ARMED_BG
+        else:
+            record_color = VALUE
+        # Same state convention as the shell readout: the glyph shows the mode.
+        play_glyph = PAUSE_GLYPH if state.paused else PLAY_GLYPH
+        for target, glyph, color, rect in (
+            ("play", play_glyph, VALUE, play_rect),
+            ("record", RECORD_GLYPH, record_color, record_rect),
+        ):
+            if state.hover_button == target:
+                blit_tint(surface, rect, HOVER, alpha=HOVER_BG_ALPHA)
+            x, y, w, h = rect
+            font = material_font(max(1, min(w, h)))
+            glyph_surf = font.render(glyph, True, color)
+            surface.blit(
+                glyph_surf,
+                (
+                    x + (w - glyph_surf.get_width()) // 2,
+                    y + (h - glyph_surf.get_height()) // 2,
+                ),
+            )
+        left = play_rect[0]
+        right = record_rect[0] + record_rect[2]
+        return (left, 0, right - left, max(play_rect[3], record_rect[3]))
 
     def time_at_x(self, x: float) -> float | None:
         """Song time under screen *x*, clamped to the bar. None before a compose."""
@@ -1015,6 +1131,18 @@ class TimelineOverlay:
 
             if focused:
                 blit_tint(panel, row_rect, HIGHLIGHT, alpha=SELECTED_WASH_ALPHA)
+            if state.hover_label_row == row_index:
+                blit_tint(
+                    panel,
+                    (
+                        layer_num_x,
+                        row_y,
+                        layout.layer_num_width + layout.stem_abbrev_width,
+                        row_h,
+                    ),
+                    HOVER,
+                    alpha=HOVER_BG_ALPHA,
+                )
 
             abbrev_rect = pygame.Rect(
                 stem_abbrev_x, row_y, layout.stem_abbrev_width, row_h
@@ -1023,6 +1151,8 @@ class TimelineOverlay:
 
             if focused or armed:
                 label_color = HIGHLIGHT
+            elif state.hover_label_row == row_index:
+                label_color = VALUE
             else:
                 label_color = LABEL
             num_surf = font.render(layer_num_prefix(layer_num), True, label_color)
@@ -1535,6 +1665,7 @@ class TimelineOverlay:
             y_offset=badge_top,
         )
         cache.last_badge_rect = badge_rect
+        cache.last_transport_rect = self._draw_transport_buttons(upload, state, layout)
 
         flash_dirty: list[tuple[int, int, int, int]] = []
         for row_index in self._live_flash_row_indices(state):
@@ -1703,6 +1834,7 @@ class TimelineOverlay:
                 cache.last_playhead_rect,
                 prev_badge,
                 cache.last_badge_rect,
+                cache.last_transport_rect,
             ):
                 if rect is not None:
                     dirty_rects.append(rect)

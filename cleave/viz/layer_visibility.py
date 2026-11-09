@@ -311,6 +311,7 @@ def build_timeline_view_state(
     strip_focused: bool = False,
     bar_times: Sequence[float] = (),
     beat_times: Sequence[float] = (),
+    paused: bool = True,
 ) -> TimelineViewState:
     tl = session.timeline
     prune_expired_arm_flashes(tl.arm_flash_start_ms)
@@ -345,6 +346,18 @@ def build_timeline_view_state(
         override_slots=set(tl.override_slots),
         armed_slots=set(tl.armed_slots),
         recording=tl.recording,
+        paused=paused,
+        locked=tl.locked,
+        hover_label_row=(
+            tl.strip_hover[1]
+            if tl.strip_hover is not None and tl.strip_hover[0] == "label"
+            else None
+        ),
+        hover_button=(
+            tl.strip_hover[0]
+            if tl.strip_hover is not None and tl.strip_hover[1] is None
+            else None
+        ),
         record_start_sec=tl.record_start_sec,
         record_slot_start_sec=dict(tl.record_slot_start_sec),
         record_baseline=dict(tl.record_baseline),

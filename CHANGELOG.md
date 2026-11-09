@@ -24,6 +24,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - File > New project (Ctrl+N) asks for an audio file, and File > Open project (Ctrl+O) asks for a project. Both switch the live session without quitting. A project with unsaved changes asks before leaving.
 - The transport bar takes the mouse. Click PLAYING / PAUSED to play or pause. Drag the current time or BAR sideways to scrub by a second or a bar, or double-click either to type a time (M:SS or seconds) or a bar number. Each highlights on hover.
 - The timeline strip takes the mouse. Click the time scale to move the playhead there, and drag along it to scrub. Click a row to select it, or on or near a cue to select that cue, without moving the playhead. Double-click a row to move the playhead there; hold the second click and drag to scrub. While recording, a click or drag fills the skipped range like a keyboard seek.
+- Play/pause and record buttons sit in the timeline strip's top-left corner, above the row labels. They do what Space and R do. Both are white, and the record button turns red when a row is armed and blinks while recording. Buttons and row labels highlight on hover. Double-click a row's number or stem label to arm or disarm it, as A does. This also works mid-take to punch a row in or out. While the timeline is locked, record and arm are blocked, as they are from the keyboard.
 
 ### Changed
 

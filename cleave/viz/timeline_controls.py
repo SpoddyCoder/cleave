@@ -142,10 +142,7 @@ class TimelineControls:
                 return True
 
         if event.key == pygame.K_r:
-            if self.session.timeline.recording:
-                self._stop_record()
-            else:
-                self._start_record()
+            self.toggle_record()
             return True
 
         if event.key == pygame.K_SPACE and mod_ctrl(event.mod):
@@ -156,20 +153,7 @@ class TimelineControls:
             return True
 
         if event.key == pygame.K_SPACE:
-            if self.session.timeline.recording and not self.playback.paused:
-                self._stop_record_and_pause()
-                return True
-            was_paused = self.playback.paused
-            toggle_pause(self.playback, self.duration_sec)
-            tl = self.session.timeline
-            if was_paused:
-                tl.preview_active = False
-                tl.monitor = {}
-            else:
-                t_sec = current_sec(self.playback, self.duration_sec)
-                tl.monitor = snapshot_monitor_from_output(self.session, t_sec)
-                tl.preview_active = True
-            self._refresh_visibility()
+            self.toggle_transport()
             return True
 
         if event.key in (pygame.K_LEFT, pygame.K_RIGHT):
@@ -231,7 +215,7 @@ class TimelineControls:
             return True
 
         if event.key == pygame.K_a:
-            self._toggle_arm()
+            self._toggle_arm(self._focused_slot())
             return True
 
         if event.key == pygame.K_COMMA:
@@ -351,6 +335,41 @@ class TimelineControls:
         select_cue(self.session, slot, nearest)
         return True
 
+    def toggle_transport(self) -> None:
+        """Play or pause (Space). Pausing while recording stops the take first."""
+        if self.session.timeline.recording and not self.playback.paused:
+            self._stop_record_and_pause()
+            return
+        was_paused = self.playback.paused
+        toggle_pause(self.playback, self.duration_sec)
+        tl = self.session.timeline
+        if was_paused:
+            tl.preview_active = False
+            tl.monitor = {}
+        else:
+            t_sec = current_sec(self.playback, self.duration_sec)
+            tl.monitor = snapshot_monitor_from_output(self.session, t_sec)
+            tl.preview_active = True
+        self._refresh_visibility()
+
+    def toggle_record(self) -> None:
+        """Start or stop recording armed rows (R). Blocked while locked."""
+        if self.session.timeline.locked:
+            return
+        if self.session.timeline.recording:
+            self._stop_record()
+        else:
+            self._start_record()
+
+    def toggle_arm_row(self, row: int) -> None:
+        """Focus *row* and toggle its arm, as A does. Blocked while locked."""
+        self.focus_row(row)
+        if self.session.timeline.locked:
+            return
+        slot = self._slot_for_layer_index(row)
+        if slot is not None:
+            self._toggle_arm(slot)
+
     def _notify(self, message: str) -> None:
         if self._on_notification is not None:
             self._on_notification(message)
@@ -416,8 +435,7 @@ class TimelineControls:
         current: CutType = cue.cut if cue.cut in CUT_TYPES else "none"
         set_cue_cut(self.session, slot, _next_option(CUT_TYPES, current))
 
-    def _toggle_arm(self) -> None:
-        slot = self._focused_slot()
+    def _toggle_arm(self, slot: str) -> None:
         tl = self.session.timeline
         armed = tl.armed_slots
         if slot in armed:
