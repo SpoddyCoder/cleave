@@ -157,6 +157,12 @@ def song_bound_xs(
     return tuple(xs)
 
 
+def ruler_tick_top(height: int) -> int:
+    """Y of the top of the major ticks on a ruler *height* pixels tall."""
+    bottom = max(0, height - 1 - RULER_BOTTOM_GAP_PX)
+    return max(0, bottom - max(2, height // 2))
+
+
 def ruler_font(strip_font_size: int) -> pygame.font.Font:
     return overlay_font(max(1, int(round(strip_font_size * RULER_FONT_RATIO))))
 

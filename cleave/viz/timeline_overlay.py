@@ -44,7 +44,7 @@ from cleave.viz.timeline_panel_cache import (
     timeline_static_signature,
     timeline_upload_signature,
 )
-from cleave.viz.timeline_ruler import render_time_ruler, song_bound_xs
+from cleave.viz.timeline_ruler import render_time_ruler, ruler_tick_top, song_bound_xs
 from cleave.viz.theme import (
     ARMED_BG,
     BAR_GRID,
@@ -1374,10 +1374,16 @@ class TimelineOverlay:
             min(layout.bar_left + layout.bar_width - 1, playhead_px),
         )
         x = playhead_left - max(1, timeline_ui_metrics().playhead_width)
-        y = y_offset + layout.bar_top
+        y = self._playhead_top_y(layout, y_offset=y_offset)
         w = max(1, timeline_ui_metrics().playhead_width) * 2 + 1
-        h = layout.bar_bottom - layout.bar_top
+        h = y_offset + layout.bar_bottom - y
         return (x, y, w, h)
+
+    @staticmethod
+    def _playhead_top_y(layout: _TimelineLayout, *, y_offset: int) -> int:
+        """The playhead rises through the ruler to the top of its major ticks."""
+        ruler_top = y_offset - layout.badge_reserve
+        return ruler_top + ruler_tick_top(layout.badge_reserve + layout.bar_top)
 
     def _draw_playhead(
         self,
@@ -1391,7 +1397,7 @@ class TimelineOverlay:
             layout.bar_left,
             min(layout.bar_left + layout.bar_width - 1, playhead_px),
         )
-        y0 = y_offset + layout.bar_top
+        y0 = self._playhead_top_y(layout, y_offset=y_offset)
         y1 = y_offset + layout.bar_bottom - 1
         pygame.draw.line(
             surface,
@@ -1489,6 +1495,14 @@ class TimelineOverlay:
                 cache.last_playhead_rect,
                 panel_y_offset=panel_y_offset,
             )
+            # The strip rises through the ruler, whose baseline sits on the
+            # panel's top padding; put the ruler back over the restored panel.
+            if self._ruler is not None:
+                px, py, pw, ph = cache.last_playhead_rect
+                ruler_h = self._ruler.get_height()
+                if py < ruler_h:
+                    clip_h = min(ph, ruler_h - py)
+                    upload.blit(self._ruler, (px, py), (px, py, pw, clip_h))
 
         playhead_rect = self._draw_playhead(
             upload,

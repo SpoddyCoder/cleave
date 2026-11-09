@@ -1431,7 +1431,8 @@ def test_compose_panel_draws_time_scale_above_first_row() -> None:
     from cleave.viz.timeline_overlay import timeline_band_height_px
 
     overlay = TimelineOverlay()
-    state = _view_state()
+    # Keep the playhead off the zero tick it would cover.
+    state = _view_state(position_sec=50.0)
     band_h = timeline_band_height_px(len(state.layer_z_order))
     band = (0, 720 - band_h, 1280, band_h)
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
@@ -1451,6 +1452,56 @@ def test_compose_panel_draws_time_scale_above_first_row() -> None:
     assert tuple(surface.get_at((end_x, baseline_y)))[:3] == MUTED
     for y in (baseline_y + 1, first_row_y + 1, last_row_bottom):
         assert tuple(surface.get_at((end_x, y)))[:3] == SONG_BOUND
+
+
+def test_playhead_rises_to_ruler_major_tick_top() -> None:
+    pygame.init()
+    from cleave.viz.timeline_overlay import playhead_x, timeline_band_height_px
+    from cleave.viz.timeline_ruler import ruler_tick_top
+
+    overlay = TimelineOverlay()
+    state = _view_state(position_sec=50.0)
+    band_h = timeline_band_height_px(len(state.layer_z_order))
+    band = (0, 720 - band_h, 1280, band_h)
+    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    overlay.draw(surface, state, timeline_rect=band)
+    bar_left, bar_width, _eye = overlay.bar_layout
+    panel = overlay.panel_rect
+    assert panel is not None
+    x = playhead_x(state.position_sec, bar_left, bar_width, state.duration_sec)
+    first_row_y = panel[1] + timeline_ui_metrics().padding
+    ruler_h = first_row_y - band[1]
+    tick_top_y = band[1] + ruler_tick_top(ruler_h)
+    colour = tuple(surface.get_at((x, tick_top_y)))[:3]
+    # Same colour as the line through row one, whichever blink phase drew it.
+    assert colour == tuple(surface.get_at((x, first_row_y + 1)))[:3]
+    assert tuple(surface.get_at((x, tick_top_y - 1)))[:3] != colour
+
+
+def test_moving_playhead_keeps_ruler_baseline() -> None:
+    pygame.init()
+    from cleave.viz.timeline_overlay import playhead_x, timeline_band_height_px
+
+    state = _view_state(position_sec=50.0)
+    band_h = timeline_band_height_px(len(state.layer_z_order))
+    band = (0, 720 - band_h, 1280, band_h)
+    moved = TimelineOverlay()
+    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    moved.draw(surface, state, timeline_rect=band)
+    old_x = playhead_x(50.0, *moved.bar_layout[:2], state.duration_sec)
+    state.position_sec = 60.0
+    surface.fill((0, 0, 0, 0))
+    moved.draw(surface, state, timeline_rect=band)
+
+    fresh = TimelineOverlay()
+    expected = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    fresh.draw(expected, state, timeline_rect=band)
+
+    panel = moved.panel_rect
+    assert panel is not None
+    # Every ruler pixel the old strip covered, baseline included, is back.
+    for y in range(band[1], panel[1] + timeline_ui_metrics().padding):
+        assert surface.get_at((old_x, y)) == expected.get_at((old_x, y)), y
 
 
 def test_hit_at_maps_ruler_rows_prefix_and_gaps() -> None:
