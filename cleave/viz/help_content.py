@@ -311,14 +311,16 @@ def timeline_strip_section(
 
     if recording:
         entries.append(("Left/Right", "skip 10s, fills range"))
-        entries.append(("Click / Drag", "seek / scrub, fills range"))
+        entries.append(("Click/Drag ruler", "seek / scrub, fills range"))
+        entries.append(("Dbl-click row", "seek, fills range"))
     else:
         entries.extend(
             (
                 ("Left/Right", "previous / next cue"),
                 ("Enter", "seek to cue"),
-                ("Click", "select cue, else seek"),
-                ("Drag", "scrub playhead"),
+                ("Click row", "select row / cue"),
+                ("Dbl-click row", "seek, hold to scrub"),
+                ("Click/Drag ruler", "seek / scrub"),
             )
         )
 

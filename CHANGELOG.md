@@ -23,7 +23,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Settings > Preview > preview quality has an output setting that renders the live preview at the full project resolution, to check how it will look in the render.
 - File > New project (Ctrl+N) asks for an audio file, and File > Open project (Ctrl+O) asks for a project. Both switch the live session without quitting. A project with unsaved changes asks before leaving.
 - The transport bar takes the mouse. Click PLAYING / PAUSED to play or pause. Drag the current time or BAR sideways to scrub by a second or a bar, or double-click either to type a time (M:SS or seconds) or a bar number. Each highlights on hover.
-- The timeline strip takes the mouse. Click a row to select it; click on or near a cue to select that cue, or anywhere else in the row or on the time scale to move the playhead there. Drag to scrub. While recording, a click or drag fills the skipped range like a keyboard seek.
+- The timeline strip takes the mouse. Click the time scale to move the playhead there, and drag along it to scrub. Click a row to select it, or on or near a cue to select that cue, without moving the playhead. Double-click a row to move the playhead there; hold the second click and drag to scrub. While recording, a click or drag fills the skipped range like a keyboard seek.
 
 ### Changed
 

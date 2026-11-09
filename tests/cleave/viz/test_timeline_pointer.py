@@ -50,11 +50,37 @@ def test_press_on_cue_selects_and_does_not_scrub() -> None:
     assert not pointer.scrubbing
 
 
-def test_press_on_bar_seeks_and_scrubs_once_per_tick() -> None:
+class _Clock:
+    def __init__(self) -> None:
+        self.now = 100.0
+
+    def __call__(self) -> float:
+        return self.now
+
+
+def test_single_press_on_bar_selects_without_seeking() -> None:
     actions = _Actions()
     pointer = TimelinePointer(_Geometry(StripHit(0, 5.0, 0.2)), actions, _session())
-    pointer.press(0, 0)
-    assert actions.calls[-1] == ("seek", 5.0)
+    assert pointer.press(0, 0) is True
+    assert actions.calls == [("focus", 0), ("select", "layer_1", 5.0, 0.2)]
+    assert not pointer.scrubbing
+    pointer.motion(100)
+    pointer.tick()
+    assert all(call[0] != "seek" for call in actions.calls)
+
+
+def test_double_click_on_row_seeks_and_held_drag_scrubs() -> None:
+    clock = _Clock()
+    actions = _Actions(cue_hit=True)
+    pointer = TimelinePointer(
+        _Geometry(StripHit(0, 5.0, 0.2)), actions, _session(), clock=clock
+    )
+    pointer.press(10, 10)
+    pointer.release()
+    clock.now += 0.2
+    actions.calls.clear()
+    pointer.press(12, 11)
+    assert actions.calls == [("focus", 0), ("seek", 5.0)]
     assert pointer.scrubbing
     actions.calls.clear()
     pointer.motion(100)
@@ -66,9 +92,52 @@ def test_press_on_bar_seeks_and_scrubs_once_per_tick() -> None:
     pointer.release()
     assert actions.calls[-1] == ("seek", 15.0)
     assert not pointer.scrubbing
+
+
+def test_slow_far_or_other_row_second_press_is_not_a_double_click() -> None:
+    clock = _Clock()
+    geometry = _Geometry(StripHit(0, 5.0, 0.2))
+    actions = _Actions()
+    pointer = TimelinePointer(geometry, actions, _session(), clock=clock)
+
+    pointer.press(10, 10)
+    clock.now += 0.5
+    pointer.press(10, 10)
+    pointer.press(30, 10)
+    geometry.hit = StripHit(1, 5.0, 0.2)
+    pointer.press(30, 10)
+    assert all(call[0] != "seek" for call in actions.calls)
+
+
+def test_triple_click_does_not_seek_twice() -> None:
+    clock = _Clock()
+    actions = _Actions()
+    pointer = TimelinePointer(
+        _Geometry(StripHit(0, 5.0, 0.2)), actions, _session(), clock=clock
+    )
+    for _ in range(3):
+        pointer.press(10, 10)
+        pointer.release()
+        clock.now += 0.1
+    assert [call for call in actions.calls if call[0] == "seek"] == [("seek", 5.0)]
+
+
+def test_ruler_press_drags_and_scrubs_once_per_tick() -> None:
+    actions = _Actions()
+    pointer = TimelinePointer(_Geometry(StripHit(None, 5.0, 0.2)), actions, _session())
+    pointer.press(0, 0)
+    assert actions.calls == [("seek", 5.0)]
+    assert pointer.scrubbing
+    actions.calls.clear()
+    pointer.motion(100)
+    pointer.motion(120)
+    pointer.tick()
+    pointer.tick()
+    assert actions.calls == [("seek", 12.0)]
+    pointer.release()
     pointer.motion(200)
     pointer.tick()
-    assert actions.calls[-1] == ("seek", 15.0)
+    assert actions.calls == [("seek", 12.0)]
 
 
 def test_press_on_ruler_seeks_without_focusing_a_row() -> None:
@@ -97,7 +166,7 @@ def test_press_miss_does_nothing() -> None:
 def test_cancel_and_closed_strip_drop_pending_scrub() -> None:
     actions = _Actions()
     session = _session()
-    pointer = TimelinePointer(_Geometry(StripHit(0, 5.0, 0.2)), actions, session)
+    pointer = TimelinePointer(_Geometry(StripHit(None, 5.0, 0.2)), actions, session)
     pointer.press(0, 0)
     pointer.motion(100)
     pointer.cancel()
