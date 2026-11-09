@@ -56,8 +56,6 @@ from cleave.viz.theme import (
     BAR_GRID,
     FOCUS_BORDER_ALPHA,
     HIGHLIGHT,
-    HOVER,
-    HOVER_BG_ALPHA,
     LABEL,
     NUDGE_HOVER_BG,
     NUDGE_HOVER_BG_ALPHA,
@@ -1186,8 +1184,8 @@ class TimelineOverlay:
                         layout.layer_num_width + layout.stem_abbrev_width,
                         row_h,
                     ),
-                    HOVER,
-                    alpha=HOVER_BG_ALPHA,
+                    NUDGE_HOVER_BG,
+                    alpha=NUDGE_HOVER_BG_ALPHA,
                 )
 
             abbrev_rect = pygame.Rect(
@@ -1195,10 +1193,11 @@ class TimelineOverlay:
             )
             # Armed abbrev background and recording monitor flash are live-patched.
 
-            if focused or armed:
+            # Shell hover: nudge wash behind, nudge foreground on the label.
+            if state.hover_label_row == row_index:
+                label_color = NUDGE_HOVER_FG
+            elif focused or armed:
                 label_color = HIGHLIGHT
-            elif state.hover_label_row == row_index:
-                label_color = VALUE
             else:
                 label_color = LABEL
             num_surf = font.render(layer_num_prefix(layer_num), True, label_color)
