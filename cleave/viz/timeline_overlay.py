@@ -725,6 +725,15 @@ class StripHit:
 # Corner buttons sit this far below the top of the badge row.
 TRANSPORT_BUTTON_DROP_PX: int = 2
 REC_BUTTON_TEXT: str = "REC"
+# The flashing red REC fill stops this far short of its badge's top and bottom.
+REC_FILL_INSET_Y_PX: int = 2
+
+
+def rec_fill_rect(rect: tuple[int, int, int, int]) -> tuple[int, int, int, int]:
+    """*rect* inset top and bottom by ``REC_FILL_INSET_Y_PX``."""
+    x, y, w, h = rect
+    inset = min(REC_FILL_INSET_Y_PX, max(0, (h - 1) // 2))
+    return (x, y + inset, w, h - inset * 2)
 
 
 def transport_button_rects(
@@ -992,7 +1001,7 @@ class TimelineOverlay:
             # Flash in step with the REC badge: red fill with white glyph and
             # text, then a red glyph on no fill.
             if rec_flash_visible():
-                pygame.draw.rect(surface, REC_BG, record_rect)
+                pygame.draw.rect(surface, REC_BG, rec_fill_rect(record_rect))
                 record_color = VALUE
             else:
                 record_color = REC_BG
@@ -1610,7 +1619,9 @@ class TimelineOverlay:
             rec_x = layout.bar_left + layout.bar_width
             rec_w = max(1, layout.panel_w - rec_x)
             if rec_flash_visible():
-                pygame.draw.rect(surface, REC_BG, (rec_x, badge_y, rec_w, badge_h))
+                pygame.draw.rect(
+                    surface, REC_BG, rec_fill_rect((rec_x, badge_y, rec_w, badge_h))
+                )
             surface.blit(
                 rec_surf,
                 (rec_x + (rec_w - rec_surf.get_width()) // 2, badge_y + pad_y),
