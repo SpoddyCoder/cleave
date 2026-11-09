@@ -582,8 +582,12 @@ class TimelineControls:
         if not should_accept_toggle(self._last_toggle_t.get(slot), t_sec):
             return
 
-        current_on = armed_recording_level(self.session, slot, t_sec) > LEVEL_EPS
         snapped = self._snap_placement(t_sec)
+        # A press snapped ahead of the playhead still flips the pending state.
+        pending_t = max(t_sec, snapped)
+        current_on = (
+            armed_recording_level(self.session, slot, pending_t) > LEVEL_EPS
+        )
         tl.record_buffer.setdefault(slot, []).append(
             SlotCue(t=snapped, level=0.0 if current_on else 1.0)
         )
@@ -599,8 +603,8 @@ class TimelineControls:
         if not should_accept_toggle(self._last_toggle_t.get(slot), t_sec):
             return
 
-        level = armed_recording_level(self.session, slot, t_sec)
         snapped = self._snap_placement(t_sec)
+        level = armed_recording_level(self.session, slot, max(t_sec, snapped))
         tl.record_buffer.setdefault(slot, []).append(
             SlotCue(t=snapped, level=level, anchor=True)
         )

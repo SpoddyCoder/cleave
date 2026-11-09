@@ -708,12 +708,26 @@ def snap_placement_time(
     beat_times: Sequence[float] = (),
     bar_times: Sequence[float] = (),
 ) -> float:
-    """Snap authoring time for ``timeline.placement_snap`` mode."""
+    """Snap authoring time for ``timeline.placement_snap`` mode.
+
+    Snap applies only within the detected grid, widened by half its median
+    interval at each end. Intro and outro time outside it places freely.
+    """
     if mode == "beat":
-        return snap_time_to_grid(t, beat_times)
+        return _snap_time_within_grid(t, beat_times)
     if mode == "bar":
-        return snap_time_to_grid(t, bar_times)
+        return _snap_time_within_grid(t, bar_times)
     return float(t)
+
+
+def _snap_time_within_grid(t: float, grid: Sequence[float]) -> float:
+    if not grid:
+        return float(t)
+    points = np.asarray(grid, dtype=np.float64)
+    margin = _median_beat_interval(points) / 2.0
+    if t < float(points[0]) - margin or t > float(points[-1]) + margin:
+        return float(t)
+    return snap_time_to_grid(t, grid)
 
 
 def shift_bars_by_beats(

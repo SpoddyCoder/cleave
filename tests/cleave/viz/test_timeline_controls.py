@@ -896,6 +896,61 @@ def test_record_stop_snaps_punch_end() -> None:
     ]
 
 
+def test_record_toggle_snapped_ahead_flips_pending_state() -> None:
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        armed_slots={"layer_1"},
+        position_sec=0.0,
+        bar_times=(0.0, 4.0, 8.0),
+    )
+    session.timeline.placement_snap = "bar"
+    session.layers["layer_1"].enabled = True
+    controls.handle_keydown(keydown(pygame.K_r))
+    controls.playback.player.seek(2.5)
+    controls.handle_keydown(keydown(pygame.K_1))
+    controls.playback.player.seek(3.0)
+    controls.handle_keydown(keydown(pygame.K_1))
+    assert session.timeline.record_buffer["layer_1"] == [
+        SlotCue(t=4.0, level=0.0),
+        SlotCue(t=4.0, level=1.0),
+    ]
+
+
+def test_record_toggle_in_intro_before_grid_places_freely() -> None:
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        armed_slots={"layer_1"},
+        position_sec=1.0,
+        bar_times=(20.0, 24.0, 28.0),
+    )
+    session.timeline.placement_snap = "bar"
+    session.layers["layer_1"].enabled = True
+    controls.handle_keydown(keydown(pygame.K_r))
+    assert session.timeline.record_start_sec == 1.0
+    controls.playback.player.seek(3.0)
+    controls.handle_keydown(keydown(pygame.K_1))
+    controls.playback.player.seek(6.0)
+    controls.handle_keydown(keydown(pygame.K_1))
+    assert session.timeline.record_buffer["layer_1"] == [
+        SlotCue(t=3.0, level=0.0),
+        SlotCue(t=6.0, level=1.0),
+    ]
+
+
+def test_record_past_last_bar_places_and_punches_freely() -> None:
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        armed_slots={"layer_1"},
+        position_sec=30.0,
+        bar_times=(0.0, 4.0, 8.0),
+    )
+    session.timeline.placement_snap = "bar"
+    session.layers["layer_1"].enabled = True
+    controls.handle_keydown(keydown(pygame.K_r))
+    controls.playback.player.seek(32.0)
+    controls.handle_keydown(keydown(pygame.K_1))
+    controls.playback.player.seek(35.0)
+    controls.handle_keydown(keydown(pygame.K_r))
+    assert session.timeline.lanes["layer_1"].cues[0] == SlotCue(t=32.0, level=0.0)
+
+
 def test_record_placement_snap_off_keeps_audible_times() -> None:
     controls, session, _, _, _, _ = _make_timeline_controls(
         armed_slots={"layer_1"},

@@ -60,6 +60,22 @@ def test_snap_placement_time_modes() -> None:
     assert snap_placement_time(0.6, "beat", beat_times=(), bar_times=bars) == 0.6
 
 
+def test_snap_placement_time_free_outside_grid() -> None:
+    beats = (10.0, 11.0, 12.0, 13.0)
+    bars = (10.0, 14.0, 18.0)
+    # Intro before the grid (minus half an interval) places freely.
+    assert snap_placement_time(2.0, "beat", beat_times=beats) == 2.0
+    assert snap_placement_time(9.4, "beat", beat_times=beats) == 9.4
+    assert snap_placement_time(9.6, "beat", beat_times=beats) == 10.0
+    assert snap_placement_time(7.9, "bar", bar_times=bars) == 7.9
+    assert snap_placement_time(8.1, "bar", bar_times=bars) == 10.0
+    # Outro past the grid (plus half an interval) places freely.
+    assert snap_placement_time(13.4, "beat", beat_times=beats) == 13.0
+    assert snap_placement_time(13.6, "beat", beat_times=beats) == 13.6
+    assert snap_placement_time(19.9, "bar", bar_times=bars) == 18.0
+    assert snap_placement_time(20.1, "bar", bar_times=bars) == 20.1
+
+
 def test_snap_empty_cues_noop() -> None:
     lane = _lane(True)
     assert snap_lane_to_beats(lane, (0.0, 1.0, 2.0)).cues == []

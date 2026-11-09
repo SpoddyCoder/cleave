@@ -94,6 +94,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- Placement snap no longer blocks timeline recording before the first bar or beat, or rewrites it after the last: intro and outro time outside the beat grid places freely, and every layer-key press flips the layer even when it snaps ahead to the next beat or bar.
 - Opening a project from File > Open no longer shrinks the visualiser into one corner with a black gap beside it.
 - Timeline on sections no longer draw a 1px line below the bar (or past its right end), so the strip sits centred.
 - Menu dropdown labels sit centred in their highlight, and the menu-bar letter underline sits two pixels under the letter at every UI scale.
