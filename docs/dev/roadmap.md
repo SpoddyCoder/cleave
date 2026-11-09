@@ -142,6 +142,32 @@ Core v1 is shipped: shader composite, five patterns (strips, bars, radial, check
 - Layer order control (visible stack order vs mix special-case).
 - Radial mix-in-center option.
 
+### Mixed membership
+
+Let some layers join the pattern mask while others stay as normal overlays on top of (or under) the masked region. Each layer gets a "mask member" flag; members composite as one group, and non-members keep blend mode, opacity, and fades. This also gives Pattern Mask navigator children, so it is no longer the one root without sub-rows. Two ways to surface it, same model underneath:
+
+- **Under Pattern Mask:** one child row per layer, in z-order, with a member toggle (and possibly a share weight or fixed order).
+- **Under Layers:** the masked group becomes an entry in the layer stack, with its own Compositing rows.
+
+Timeline preset generation:
+
+- Retire `timeline.preset.mode` (`layers` / `pattern_mask`). Generate reads membership: members go to the pattern-mask arranger (short sections, swaps, recasts), non-members to the layers arranger (longer arcs, fades).
+- The two arrangers share one conductor and one overall visible-layer budget, so crescendos do not stack a full mask plus every overlay, and quiet passages do not go empty.
+- Cue semantics differ by membership: members are effectively on/off with `MaskTransition` wipes (cue blend is forced to `black-key`), overlays keep level, blend, and hard/soft fades. The cue inspector rows follow membership, so membership joins the structure signature.
+- Changing membership after Generate leaves cues shaped for the other arranger; a toast could suggest regenerating.
+
+Compositing wrinkles:
+
+- **Group position in z-order** is the main design decision: lowest member, forced contiguous members, or the group as its own stack entry. Non-contiguous members are otherwise ambiguous.
+- Two-pass composite: masked compositor into an intermediate FBO, then `GlCompositor` blends the group with the overlays. One extra full-res target and pass; `LayerCompositeRequest` gains a group concept. Live and offline share it through `LayerFramePipeline.composite`.
+- Everything that counts layers must count members only: density ("segments per active layer"), `active_slots`, weight and texture array sizing, transition peek/commit, and `_pattern_mask_live_slots` render culling.
+- Edge cases: zero members (mask is a no-op; show the row disabled), one member (full frame), solo on an overlay while the group is masked.
+- Greying of per-layer Compositing rows becomes per member (structure signature plus a `test_structure_signature_invalidates_on_*` test).
+- Persistence: new per-layer field through `persisted_session_payload`; `TimelineHistory` pattern-mask snapshot includes membership. Default every layer to member so existing projects render unchanged.
+- Hard composite (feather 0%) still ignores blend, hue, and flash inside the group only; help text must say so.
+
+Open questions: where the group sits in the stack; whether membership is timeline-automatable (start static per project); whether the group gets its own opacity and fades.
+
 ### Polish
 
 - Tie Settings preview quality to mask generation resolution (full for `full-quality`, scaled for `balanced` / `performance` / `ultra-performance`; offline render stays full-res).
