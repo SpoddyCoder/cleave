@@ -94,6 +94,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- The project now saves the bar phase and the show bar grid setting, so they no longer reset to +0 and off when it reopens.
+- Placement snap to bars follows the bar phase, so cues and song markers land on the bar lines the strip draws and timeline generation uses.
 - Placement snap no longer blocks timeline recording before the first bar or beat, or rewrites it after the last: intro and outro time outside the beat grid places freely, and every layer-key press flips the layer even when it snaps ahead to the next beat or bar.
 - Opening a project from File > Open no longer shrinks the visualiser into one corner with a black gap beside it.
 - Timeline on sections no longer draw a 1px line below the bar (or past its right end), so the strip sits centred.

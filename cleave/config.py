@@ -135,7 +135,9 @@ from cleave.config_schema.timeline import (
     DEFAULT_TIMELINE_SOFT_FADE_IN,
     DEFAULT_TIMELINE_SOFT_FADE_OUT,
     DEFAULT_TIMELINE_LOCKED,
+    DEFAULT_TIMELINE_BAR_PHASE,
     DEFAULT_TIMELINE_PLACEMENT_SNAP,
+    DEFAULT_TIMELINE_SHOW_BAR_GRID,
     TimelinePlacementSnap,
     parse_timeline_section,
 )
@@ -399,6 +401,8 @@ class TimelineConfig:
     locked: bool = DEFAULT_TIMELINE_LOCKED
     cuts: TimelineCutsConfig = field(default_factory=TimelineCutsConfig)
     placement_snap: TimelinePlacementSnap = DEFAULT_TIMELINE_PLACEMENT_SNAP
+    bar_phase: int = DEFAULT_TIMELINE_BAR_PHASE
+    show_bar_grid: bool = DEFAULT_TIMELINE_SHOW_BAR_GRID
     preset: TimelinePresetConfig = field(default_factory=TimelinePresetConfig)
 
 

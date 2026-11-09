@@ -52,6 +52,7 @@ class SongMarkerController:
             self.session.timeline.placement_snap,
             beat_times=self._beat_times,
             bar_times=self._bar_times,
+            bar_phase=self.session.timeline.bar_phase_offset,
         )
         markers = self.session.song_markers
         prior_selected_time: float | None = None

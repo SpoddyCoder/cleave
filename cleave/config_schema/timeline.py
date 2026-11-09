@@ -77,6 +77,10 @@ TIMELINE_PLACEMENT_SNAP_OPTIONS: tuple[TimelinePlacementSnap, ...] = (
 )
 DEFAULT_TIMELINE_PLACEMENT_SNAP: TimelinePlacementSnap = "beat"
 
+TIMELINE_BAR_PHASE_BEATS = 4
+DEFAULT_TIMELINE_BAR_PHASE = 0
+DEFAULT_TIMELINE_SHOW_BAR_GRID = False
+
 
 def step_timeline_placement_snap(
     value: str, *, forward: bool
@@ -99,6 +103,16 @@ def parse_timeline_placement_snap(raw: Any, label: str) -> TimelinePlacementSnap
         allowed = ", ".join(TIMELINE_PLACEMENT_SNAP_OPTIONS)
         raise ValueError(f"{label} must be one of: {allowed}")
     return value  # type: ignore[return-value]
+
+
+def parse_timeline_bar_phase(raw: Any, label: str) -> int:
+    if isinstance(raw, bool) or not isinstance(raw, int):
+        raise ValueError(f"{label} must be an integer")
+    if not 0 <= raw < TIMELINE_BAR_PHASE_BEATS:
+        raise ValueError(
+            f"{label} must be between 0 and {TIMELINE_BAR_PHASE_BEATS - 1}"
+        )
+    return raw
 
 
 def parse_timeline_preset_character(raw: Any, label: str) -> str:
@@ -279,6 +293,13 @@ def parse_timeline_section(data: dict[str, Any], ctx: ParseCtx) -> Any | None:
         timeline_map.get("placement_snap", DEFAULT_TIMELINE_PLACEMENT_SNAP),
         "timeline.placement_snap",
     )
+    bar_phase = parse_timeline_bar_phase(
+        timeline_map.get("bar_phase", DEFAULT_TIMELINE_BAR_PHASE),
+        "timeline.bar_phase",
+    )
+    show_bar_grid = bool(
+        timeline_map.get("show_bar_grid", DEFAULT_TIMELINE_SHOW_BAR_GRID)
+    )
     cuts_raw = timeline_map.get("cuts")
     if cuts_raw is None:
         cuts = TimelineCutsConfig()
@@ -307,6 +328,8 @@ def parse_timeline_section(data: dict[str, Any], ctx: ParseCtx) -> Any | None:
             locked=locked,
             cuts=cuts,
             placement_snap=placement_snap,
+            bar_phase=bar_phase,
+            show_bar_grid=show_bar_grid,
             preset=preset,
         )
     lanes_map = as_mapping(lanes_raw, "timeline.lanes")
@@ -387,6 +410,8 @@ def parse_timeline_section(data: dict[str, Any], ctx: ParseCtx) -> Any | None:
         locked=locked,
         cuts=cuts,
         placement_snap=placement_snap,
+        bar_phase=bar_phase,
+        show_bar_grid=show_bar_grid,
         preset=preset,
     )
 
@@ -406,6 +431,8 @@ def persist_timeline(ctx: PersistCtx) -> dict[str, Any]:
         "enabled": runtime.enabled,
         "locked": runtime.locked,
         "placement_snap": runtime.placement_snap,
+        "bar_phase": runtime.bar_phase_offset,
+        "show_bar_grid": runtime.show_bar_grid,
         "cuts": {
             "hard": _persist_timeline_fade_group(runtime.hard_cut_fades),
             "soft": _persist_timeline_fade_group(runtime.soft_cut_fades),

@@ -65,7 +65,9 @@ from cleave.config_schema.timeline import (
     DEFAULT_TIMELINE_SOFT_FADE_IN,
     DEFAULT_TIMELINE_SOFT_FADE_OUT,
     DEFAULT_TIMELINE_LOCKED,
+    DEFAULT_TIMELINE_BAR_PHASE,
     DEFAULT_TIMELINE_PLACEMENT_SNAP,
+    DEFAULT_TIMELINE_SHOW_BAR_GRID,
 )
 from cleave.preset_curation import PresetCurationIndex
 from cleave.viz.session import FadeRuntime
@@ -285,8 +287,8 @@ def default_soft_timeline_fade_group_block() -> TimelineFadeGroupBlock:
 @dataclass
 class TimelineBlock:
     enabled: bool = DEFAULT_TIMELINE_ENABLED
-    bar_phase_offset: int = 0
-    show_bar_grid: bool = False
+    bar_phase_offset: int = DEFAULT_TIMELINE_BAR_PHASE
+    show_bar_grid: bool = DEFAULT_TIMELINE_SHOW_BAR_GRID
     placement_snap: str = DEFAULT_TIMELINE_PLACEMENT_SNAP
     timeline_preset_kind: str = DEFAULT_TIMELINE_PRESET_KIND
     timeline_preset_density: TimelinePresetDensity = DEFAULT_TIMELINE_PRESET_DENSITY

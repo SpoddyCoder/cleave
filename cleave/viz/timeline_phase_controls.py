@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 
+from cleave.config_schema.timeline import TIMELINE_BAR_PHASE_BEATS
 from cleave.timeline import empty_lane, shift_lane_cues_by_beats
 from cleave.viz.session import TuningSession
 
@@ -41,7 +42,7 @@ class TimelinePhaseController:
                 self._beat_times,
                 delta,
             )
-        tl.bar_phase_offset = (tl.bar_phase_offset + delta) % 4
+        tl.bar_phase_offset = (tl.bar_phase_offset + delta) % TIMELINE_BAR_PHASE_BEATS
         self._notify(f"Bar phase +{tl.bar_phase_offset}")
 
     def _notify(self, message: str) -> None:

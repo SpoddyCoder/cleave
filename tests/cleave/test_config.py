@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+from dataclasses import replace
 import io
 from pathlib import Path
 
@@ -88,7 +89,11 @@ from cleave.config_schema.render import (
 )
 from cleave.config_schema.timeline import parse_timeline_section, persist_timeline
 from cleave.user_config import EditorSettings
-from cleave.viz.session import TuningSession, post_fx_runtime_from_cfg
+from cleave.viz.session import (
+    TuningSession,
+    post_fx_runtime_from_cfg,
+    timeline_runtime_from_cfg,
+)
 from cleave.paths import default_preset_root, default_texture_paths, repo_root
 from cleave.stems import STEM_NAMES
 from cleave.timeline import SlotCue, TimelineLane
@@ -1353,6 +1358,8 @@ def test_persist_timeline_placement_snap_round_trip() -> None:
         timeline=TimelineRuntime(
             enabled=True,
             placement_snap="bar",
+            bar_phase_offset=3,
+            show_bar_grid=True,
         ),
     )
     cfg = CleaveConfig(
@@ -1365,12 +1372,19 @@ def test_persist_timeline_placement_snap_round_trip() -> None:
     )
     payload = persist_timeline(PersistCtx(cfg=cfg, session=session, cfg_dir=None))
     assert payload["placement_snap"] == "bar"
+    assert payload["bar_phase"] == 3
+    assert payload["show_bar_grid"] is True
     round_trip = parse_timeline_section(
         {"timeline": payload},
         _timeline_parse_ctx(),
     )
     assert round_trip is not None
     assert round_trip.placement_snap == "bar"
+    assert round_trip.bar_phase == 3
+    assert round_trip.show_bar_grid is True
+    runtime = timeline_runtime_from_cfg(replace(cfg, timeline=round_trip))
+    assert runtime.bar_phase_offset == 3
+    assert runtime.show_bar_grid is True
 
 
 def test_persist_post_fx_limiter_round_trip() -> None:
@@ -1516,6 +1530,15 @@ def test_parse_timeline_preset_defaults() -> None:
     assert timeline.preset.repopulate == "no"
     assert timeline.preset.conductor is False
     assert timeline.preset.mode == "layers"
+
+
+@pytest.mark.parametrize("raw", [4, -1, "1", True])
+def test_parse_timeline_rejects_invalid_bar_phase(raw: object) -> None:
+    with pytest.raises(ValueError, match="bar_phase"):
+        parse_timeline_section(
+            {"timeline": {"bar_phase": raw}},
+            _timeline_parse_ctx(),
+        )
 
 
 def test_parse_timeline_rejects_invalid_placement_snap() -> None:
@@ -2007,8 +2030,6 @@ _UI_ONLY_LITERAL_DEFAULTS = frozenset(
         ("TimelineRuntime", "focus_row"),
         ("TimelineRuntime", "recording"),
         ("TimelineRuntime", "preview_active"),
-        ("TimelineRuntime", "bar_phase_offset"),
-        ("TimelineRuntime", "show_bar_grid"),
         ("SettingsRuntime", "editor_mode"),
         ("LayerRuntime", "switching_paused"),
         ("TuningSession", "overlay_solo"),
@@ -2023,8 +2044,6 @@ _UI_ONLY_LITERAL_DEFAULTS = frozenset(
         ("TrackBlock", "visible"),
         ("OverlaysBlock", "solo"),
         ("PostFxBlock", "solo"),
-        ("TimelineBlock", "bar_phase_offset"),
-        ("TimelineBlock", "show_bar_grid"),
         ("SettingsBlock", "editor_mode"),
         ("TuningViewState", "persistent_notification_elapsed_sec"),
         ("TuningViewState", "notification_remaining_sec"),

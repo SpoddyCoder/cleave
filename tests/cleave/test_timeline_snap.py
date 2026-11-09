@@ -60,6 +60,22 @@ def test_snap_placement_time_modes() -> None:
     assert snap_placement_time(0.6, "beat", beat_times=(), bar_times=bars) == 0.6
 
 
+def test_snap_placement_time_bar_uses_phase() -> None:
+    beats = tuple(float(b) for b in range(12))
+    bars = (0.0, 4.0, 8.0)
+    # +1 phase moves the bar grid to 1, 5, 9.
+    assert snap_placement_time(
+        4.4, "bar", beat_times=beats, bar_times=bars, bar_phase=1
+    ) == 5.0
+    assert snap_placement_time(
+        4.4, "bar", beat_times=beats, bar_times=bars, bar_phase=0
+    ) == 4.0
+    # Phase does not affect beat snap.
+    assert snap_placement_time(
+        4.4, "beat", beat_times=beats, bar_times=bars, bar_phase=1
+    ) == 4.0
+
+
 def test_snap_placement_time_free_outside_grid() -> None:
     beats = (10.0, 11.0, 12.0, 13.0)
     bars = (10.0, 14.0, 18.0)

@@ -74,7 +74,9 @@ from cleave.config_schema.timeline import (
     DEFAULT_TIMELINE_SOFT_FADE_IN,
     DEFAULT_TIMELINE_SOFT_FADE_OUT,
     DEFAULT_TIMELINE_LOCKED,
+    DEFAULT_TIMELINE_BAR_PHASE,
     DEFAULT_TIMELINE_PLACEMENT_SNAP,
+    DEFAULT_TIMELINE_SHOW_BAR_GRID,
     TimelinePlacementSnap,
 )
 from cleave.stems import StemSource
@@ -343,8 +345,8 @@ class TimelineRuntime:
     arm_flash_start_ms: dict[str, int] = field(default_factory=dict)
     selected_cue_t: dict[str, float] = field(default_factory=dict)
     selected_cue_flash_start_ms: int | None = None
-    bar_phase_offset: int = 0
-    show_bar_grid: bool = False
+    bar_phase_offset: int = DEFAULT_TIMELINE_BAR_PHASE
+    show_bar_grid: bool = DEFAULT_TIMELINE_SHOW_BAR_GRID
     placement_snap: TimelinePlacementSnap = DEFAULT_TIMELINE_PLACEMENT_SNAP
     timeline_preset_kind: str = DEFAULT_TIMELINE_PRESET_KIND
     timeline_preset_density: TimelinePresetDensity = DEFAULT_TIMELINE_PRESET_DENSITY
@@ -640,6 +642,10 @@ def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
         if timeline is None
         else timeline.placement_snap
     )
+    bar_phase = DEFAULT_TIMELINE_BAR_PHASE if timeline is None else timeline.bar_phase
+    show_bar_grid = (
+        DEFAULT_TIMELINE_SHOW_BAR_GRID if timeline is None else timeline.show_bar_grid
+    )
     preset = None if timeline is None else timeline.preset
     preset_kind = (
         DEFAULT_TIMELINE_PRESET_KIND if preset is None else preset.character
@@ -684,6 +690,8 @@ def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
             lanes=lanes,
             panel_open=enabled,
             placement_snap=placement_snap,
+            bar_phase_offset=bar_phase,
+            show_bar_grid=show_bar_grid,
             timeline_preset_kind=preset_kind,
             timeline_preset_density=preset_density,
             timeline_preset_cue_snap=preset_cue_snap,
@@ -699,6 +707,8 @@ def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
         lanes=lanes,
         panel_open=enabled,
         placement_snap=placement_snap,
+        bar_phase_offset=bar_phase,
+        show_bar_grid=show_bar_grid,
         timeline_preset_kind=preset_kind,
         timeline_preset_density=preset_density,
         timeline_preset_cue_snap=preset_cue_snap,

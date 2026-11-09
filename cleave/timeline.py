@@ -707,8 +707,12 @@ def snap_placement_time(
     *,
     beat_times: Sequence[float] = (),
     bar_times: Sequence[float] = (),
+    bar_phase: int = 0,
 ) -> float:
     """Snap authoring time for ``timeline.placement_snap`` mode.
+
+    Bar snap uses ``bar_times`` shifted by ``bar_phase`` beats, the same grid
+    the strip draws and timeline generation uses.
 
     Snap applies only within the detected grid, widened by half its median
     interval at each end. Intro and outro time outside it places freely.
@@ -716,7 +720,12 @@ def snap_placement_time(
     if mode == "beat":
         return _snap_time_within_grid(t, beat_times)
     if mode == "bar":
-        return _snap_time_within_grid(t, bar_times)
+        grid = (
+            shift_bars_by_beats(bar_times, beat_times, bar_phase)
+            if bar_phase
+            else bar_times
+        )
+        return _snap_time_within_grid(t, grid)
     return float(t)
 
 

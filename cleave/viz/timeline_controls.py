@@ -107,6 +107,7 @@ class TimelineControls:
             self.session.timeline.placement_snap,
             beat_times=self._beat_times,
             bar_times=self._bar_times,
+            bar_phase=self.session.timeline.bar_phase_offset,
         )
 
     def handle_keydown(self, event: pygame.event.Event) -> bool:
