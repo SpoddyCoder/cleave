@@ -1441,4 +1441,7 @@ def test_compose_panel_draws_time_scale_above_first_row() -> None:
     assert panel is not None
     first_row_y = panel[1] + timeline_ui_metrics().padding
     # Zero-second major tick sits at the bar's left edge, just above row one.
-    assert tuple(surface.get_at((bar_left, first_row_y - 2)))[:3] == MUTED
+    from cleave.viz.timeline_ruler import RULER_BOTTOM_GAP_PX
+
+    baseline_y = first_row_y - 1 - RULER_BOTTOM_GAP_PX
+    assert tuple(surface.get_at((bar_left, baseline_y - 1)))[:3] == MUTED

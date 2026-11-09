@@ -15,7 +15,8 @@ import pygame
 from cleave.viz.overlay_primitives import overlay_font
 from cleave.viz.theme import BAR_GRID, MUTED
 
-# (major, minor) step pairs in seconds, fine to coarse.
+# (major, minor) step pairs in seconds, fine to coarse. From 10s up, labelled
+# marks land on whole tens of seconds.
 _STEPS: tuple[tuple[float, float], ...] = (
     (0.1, 0.05),
     (0.2, 0.1),
@@ -24,7 +25,7 @@ _STEPS: tuple[tuple[float, float], ...] = (
     (2.0, 1.0),
     (5.0, 1.0),
     (10.0, 2.0),
-    (15.0, 5.0),
+    (20.0, 5.0),
     (30.0, 10.0),
     (60.0, 15.0),
     (120.0, 30.0),
@@ -36,6 +37,10 @@ _STEPS: tuple[tuple[float, float], ...] = (
 )
 MIN_MINOR_TICK_PX: int = 5
 LABEL_TICK_GAP_PX: int = 3
+# Labelled marks keep this many label widths (plus gaps) apart.
+LABEL_SPACING_RATIO: float = 1.5
+# Baseline sits this far above the ruler's bottom edge (the first row).
+RULER_BOTTOM_GAP_PX: int = 4
 # Ruler font relative to the strip font.
 RULER_FONT_RATIO: float = 0.8
 
@@ -147,13 +152,13 @@ def render_time_ruler(
         view_start_sec=view_start_sec,
         view_end_sec=view_end_sec,
         bar_width=bar_width,
-        min_label_px=label_w + LABEL_TICK_GAP_PX * 4,
+        min_label_px=int((label_w + LABEL_TICK_GAP_PX * 4) * LABEL_SPACING_RATIO),
     )
     if ticks is None:
         return None
 
     surface = pygame.Surface((width, height), pygame.SRCALPHA)
-    bottom = height - 1
+    bottom = max(0, height - 1 - RULER_BOTTOM_GAP_PX)
     bar_right = bar_left + bar_width
     major_h = max(2, height // 2)
     minor_h = max(1, height // 5)

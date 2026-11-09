@@ -6,6 +6,7 @@ import pygame
 
 from cleave.viz.theme import MUTED
 from cleave.viz.timeline_ruler import (
+    RULER_BOTTOM_GAP_PX,
     format_ruler_time,
     render_time_ruler,
     ruler_ticks,
@@ -25,10 +26,11 @@ def test_ruler_ticks_picks_step_wide_enough_for_labels() -> None:
         view_start_sec=0.0, view_end_sec=240.0, bar_width=1200, min_label_px=60
     )
     assert ticks is not None
-    # 5 px/s: 10s steps are 50px (too tight), 15s steps are 75px.
-    assert ticks.major_step == 15.0
+    # 5 px/s: 10s steps are 50px (too tight), 20s steps are 100px.
+    assert ticks.major_step == 20.0
     assert ticks.major[0] == 0.0
     assert ticks.major[-1] == 240.0
+    assert all(t % 10 == 0 for t in ticks.major)
     assert ticks.minor_step == 5.0
     assert 5.0 in ticks.minor
     assert not set(ticks.minor) & set(ticks.major)
@@ -81,6 +83,6 @@ def test_render_time_ruler_draws_major_tick_at_bar_left() -> None:
     )
     assert surface is not None
     assert surface.get_size() == (800, 24)
-    assert tuple(surface.get_at((50, 20)))[:3] == MUTED
+    assert tuple(surface.get_at((50, 24 - 1 - RULER_BOTTOM_GAP_PX)))[:3] == MUTED
     # Nothing left of the bar.
     assert surface.get_at((10, 20)).a == 0
