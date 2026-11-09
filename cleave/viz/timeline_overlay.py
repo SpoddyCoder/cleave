@@ -993,21 +993,28 @@ class TimelineOverlay:
     ) -> tuple[int, int, int, int]:
         """Play/pause and record glyphs in the corner (upload coordinates)."""
         play_rect, record_rect = self._transport_rects(layout)
+        rec_text_color = VALUE
         if state.recording:
-            record_color = REC_BG if rec_flash_visible() else MUTED
+            # Flash in step with the REC badge: red fill with white glyph and
+            # text, then a red glyph on no fill.
+            if rec_flash_visible():
+                pygame.draw.rect(surface, REC_BG, record_rect)
+                record_color = VALUE
+            else:
+                record_color = REC_BG
         elif state.locked:
             record_color = MUTED
         elif state.armed_slots:
             record_color = ARMED_BG
         else:
             record_color = VALUE
-        rec_text_color = VALUE
         play_color = VALUE
         # Shell hover: nudge wash behind, nudge foreground on glyph and text.
         if state.hover_button == "play":
             blit_tint(surface, play_rect, NUDGE_HOVER_BG, alpha=NUDGE_HOVER_BG_ALPHA)
             play_color = NUDGE_HOVER_FG
-        if state.hover_button == "record":
+        # Recording wins over hover, so a click on record flashes at once.
+        if state.hover_button == "record" and not state.recording:
             blit_tint(
                 surface, record_rect, NUDGE_HOVER_BG, alpha=NUDGE_HOVER_BG_ALPHA
             )
