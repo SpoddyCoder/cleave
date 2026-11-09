@@ -1424,3 +1424,21 @@ def test_row_height_constant_across_layer_counts() -> None:
             + row_count * expected_row_h
             + max(0, row_count - 1) * timeline_ui_metrics().row_gap
         )
+
+def test_compose_panel_draws_time_scale_above_first_row() -> None:
+    pygame.init()
+    from cleave.viz.theme import MUTED
+    from cleave.viz.timeline_overlay import timeline_band_height_px
+
+    overlay = TimelineOverlay()
+    state = _view_state()
+    band_h = timeline_band_height_px(len(state.layer_z_order))
+    band = (0, 720 - band_h, 1280, band_h)
+    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    overlay.draw(surface, state, timeline_rect=band)
+    bar_left, _bar_width, _eye = overlay.bar_layout
+    panel = overlay.panel_rect
+    assert panel is not None
+    first_row_y = panel[1] + timeline_ui_metrics().padding
+    # Zero-second major tick sits at the bar's left edge, just above row one.
+    assert tuple(surface.get_at((bar_left, first_row_y - 2)))[:3] == MUTED

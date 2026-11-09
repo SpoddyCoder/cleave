@@ -44,6 +44,7 @@ from cleave.viz.timeline_panel_cache import (
     timeline_static_signature,
     timeline_upload_signature,
 )
+from cleave.viz.timeline_ruler import render_time_ruler
 from cleave.viz.theme import (
     ARMED_BG,
     BAR_GRID,
@@ -781,6 +782,7 @@ class TimelineOverlay:
         self._cache = TimelinePanelCache()
         self._visibility = 1.0
         self._upload_scratch: pygame.Surface | None = None
+        self._ruler: pygame.Surface | None = None
         self._blit_src: tuple[int, int] = (0, 0)
 
     @property
@@ -1349,6 +1351,23 @@ class TimelineOverlay:
         right = max(r[0] + r[2] for r in rects)
         return (left, badge_y, right - left, badge_h)
 
+    def _build_ruler(
+        self,
+        state: TimelineViewState,
+        layout: _TimelineLayout,
+    ) -> pygame.Surface | None:
+        """Time scale over the badge row and the strip's top padding."""
+        # The whole song is the visible window until the strip zooms.
+        return render_time_ruler(
+            width=layout.panel_w,
+            height=layout.badge_reserve + layout.bar_top,
+            bar_left=layout.bar_left,
+            bar_width=layout.bar_width,
+            view_start_sec=0.0,
+            view_end_sec=state.duration_sec,
+            strip_font_size=self._font_size,
+        )
+
     def _ensure_upload_scratch(
         self,
         upload_w: int,
@@ -1406,6 +1425,9 @@ class TimelineOverlay:
                 cache.last_badge_rect,
                 panel_y_offset=panel_y_offset,
             )
+            if self._ruler is not None:
+                bx, by, bw, bh = cache.last_badge_rect
+                upload.blit(self._ruler, (bx, by), (bx, by, bw, bh))
 
         badge_rect = self._draw_header_badges_on_surface(
             upload,
@@ -1486,6 +1508,7 @@ class TimelineOverlay:
             incremental = True
         else:
             static_panel = self._build_static_panel(state, layout)
+            self._ruler = self._build_ruler(state, layout)
             cache.panel = static_panel
             cache.static_signature = static_sig
             cache.panel_size = (panel_w, panel_h)
@@ -1501,6 +1524,8 @@ class TimelineOverlay:
         upload = self._ensure_upload_scratch(upload_w, upload_h)
         upload.fill((0, 0, 0, 0))
         upload.blit(static_panel, (0, layout.badge_reserve))
+        if self._ruler is not None:
+            upload.blit(self._ruler, (0, 0))
 
         playhead_px = playhead_x(
             state.position_sec,

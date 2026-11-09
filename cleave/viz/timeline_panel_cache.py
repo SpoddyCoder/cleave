@@ -193,7 +193,7 @@ def timeline_upload_signature(
 def timeline_badge_reserve_px(
     *, font_size: int | None = None, padding: int | None = None
 ) -> int:
-    """Height added above the strip for the badge row (cue readout, REC).
+    """Height added above the strip for the badge row (time scale, REC).
 
     The badge row sits at the top of the band and takes the place of the
     strip's top padding, so only the part taller than that padding is added.
