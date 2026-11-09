@@ -44,13 +44,14 @@ from cleave.viz.timeline_panel_cache import (
     timeline_static_signature,
     timeline_upload_signature,
 )
-from cleave.viz.timeline_ruler import render_time_ruler
+from cleave.viz.timeline_ruler import render_time_ruler, song_bound_xs
 from cleave.viz.theme import (
     ARMED_BG,
     BAR_GRID,
     FOCUS_BORDER_ALPHA,
     HIGHLIGHT,
     LABEL,
+    MUTED,
     PLAYHEAD,
     PLAYHEAD_FLASH,
     REC_BG,
@@ -1023,6 +1024,22 @@ class TimelineOverlay:
             if focused:
                 _draw_focus_outline(panel, row_rect)
 
+        # Song start and end marks continue the ruler's down through every row.
+        for bound_x in song_bound_xs(
+            duration_sec=state.duration_sec,
+            bar_left=bar_left,
+            bar_width=bar_width,
+            view_start_sec=0.0,
+            view_end_sec=state.duration_sec,
+        ):
+            pygame.draw.line(
+                panel,
+                MUTED,
+                (bound_x, 0),
+                (bound_x, layout.bar_bottom - 1),
+                1,
+            )
+
         for marker_i, marker_t in enumerate(state.song_marker_times):
             marker_x = time_to_x(marker_t, bar_left, bar_width, state.duration_sec)
             selected = marker_i == state.selected_song_marker_index
@@ -1365,6 +1382,7 @@ class TimelineOverlay:
             bar_width=layout.bar_width,
             view_start_sec=0.0,
             view_end_sec=state.duration_sec,
+            duration_sec=state.duration_sec,
             strip_font_size=self._font_size,
         )
 

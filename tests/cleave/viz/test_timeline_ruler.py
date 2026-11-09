@@ -10,6 +10,7 @@ from cleave.viz.timeline_ruler import (
     format_ruler_time,
     render_time_ruler,
     ruler_ticks,
+    song_bound_xs,
     view_time_to_x,
 )
 
@@ -79,6 +80,7 @@ def test_render_time_ruler_draws_major_tick_at_bar_left() -> None:
         bar_width=700,
         view_start_sec=0.0,
         view_end_sec=180.0,
+        duration_sec=180.0,
         strip_font_size=14,
     )
     assert surface is not None
@@ -86,3 +88,14 @@ def test_render_time_ruler_draws_major_tick_at_bar_left() -> None:
     assert tuple(surface.get_at((50, 24 - 1 - RULER_BOTTOM_GAP_PX)))[:3] == MUTED
     # Nothing left of the bar.
     assert surface.get_at((10, 20)).a == 0
+    # Song start and end marks reach the bottom edge, below the baseline.
+    assert tuple(surface.get_at((50, 23)))[:3] == MUTED
+    assert tuple(surface.get_at((749, 23)))[:3] == MUTED
+    assert surface.get_at((400, 23)).a == 0
+
+
+def test_song_bound_xs_skips_bounds_outside_window() -> None:
+    kw = dict(duration_sec=200.0, bar_left=0, bar_width=1000)
+    assert song_bound_xs(view_start_sec=0.0, view_end_sec=200.0, **kw) == (0, 999)
+    assert song_bound_xs(view_start_sec=50.0, view_end_sec=100.0, **kw) == ()
+    assert song_bound_xs(view_start_sec=150.0, view_end_sec=250.0, **kw) == (500,)

@@ -40,7 +40,7 @@ LABEL_TICK_GAP_PX: int = 3
 # Labelled marks keep this many label widths (plus gaps) apart.
 LABEL_SPACING_RATIO: float = 1.5
 # Baseline sits this far above the ruler's bottom edge (the first row).
-RULER_BOTTOM_GAP_PX: int = 4
+RULER_BOTTOM_GAP_PX: int = 8
 # Ruler font relative to the strip font.
 RULER_FONT_RATIO: float = 0.8
 
@@ -128,6 +128,35 @@ def ruler_ticks(
     )
 
 
+def song_bound_xs(
+    *,
+    duration_sec: float,
+    bar_left: int,
+    bar_width: int,
+    view_start_sec: float,
+    view_end_sec: float,
+) -> tuple[int, ...]:
+    """X of the song's start and end marks that fall inside the visible window.
+
+    These marks run from the ruler down through every layer row.
+    """
+    if duration_sec <= 0 or bar_width <= 0:
+        return ()
+    bar_right = bar_left + bar_width - 1
+    xs: list[int] = []
+    for t in (0.0, duration_sec):
+        if view_start_sec <= t <= view_end_sec:
+            x = view_time_to_x(
+                t,
+                bar_left=bar_left,
+                bar_width=bar_width,
+                view_start_sec=view_start_sec,
+                view_end_sec=view_end_sec,
+            )
+            xs.append(min(x, bar_right))
+    return tuple(xs)
+
+
 def ruler_font(strip_font_size: int) -> pygame.font.Font:
     return overlay_font(max(1, int(round(strip_font_size * RULER_FONT_RATIO))))
 
@@ -140,9 +169,14 @@ def render_time_ruler(
     bar_width: int,
     view_start_sec: float,
     view_end_sec: float,
+    duration_sec: float,
     strip_font_size: int,
 ) -> pygame.Surface | None:
-    """Transparent ruler surface *width* x *height*; ticks rise from the bottom edge."""
+    """Transparent ruler surface *width* x *height*; ticks rise from the baseline.
+
+    Song start and end marks run on past the baseline to the bottom edge, where
+    the strip's rows continue them.
+    """
     if width <= 0 or height <= 0:
         return None
     font = ruler_font(strip_font_size)
@@ -189,6 +223,14 @@ def render_time_ruler(
     for t in ticks.major:
         x = min(x_of(t), bar_right - 1)
         pygame.draw.line(surface, MUTED, (x, bottom - major_h), (x, bottom), 1)
+    for x in song_bound_xs(
+        duration_sec=duration_sec,
+        bar_left=bar_left,
+        bar_width=bar_width,
+        view_start_sec=view_start_sec,
+        view_end_sec=view_end_sec,
+    ):
+        pygame.draw.line(surface, MUTED, (x, bottom - major_h), (x, height - 1), 1)
     for label_x, label in labels:
         label_y = max(0, bottom - 1 - label.get_height())
         surface.blit(label, (label_x, label_y))
