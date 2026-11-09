@@ -13,7 +13,7 @@ from dataclasses import dataclass
 import pygame
 
 from cleave.viz.overlay_primitives import overlay_font
-from cleave.viz.theme import BAR_GRID, MUTED
+from cleave.viz.theme import BAR_GRID, MUTED, SONG_BOUND
 
 # (major, minor) step pairs in seconds, fine to coarse. From 10s up, labelled
 # marks land on whole tens of seconds.
@@ -230,7 +230,9 @@ def render_time_ruler(
         view_start_sec=view_start_sec,
         view_end_sec=view_end_sec,
     ):
-        pygame.draw.line(surface, MUTED, (x, bottom - major_h), (x, height - 1), 1)
+        pygame.draw.line(surface, MUTED, (x, bottom - major_h), (x, bottom), 1)
+        if bottom + 1 < height:
+            pygame.draw.line(surface, SONG_BOUND, (x, bottom + 1), (x, height - 1), 1)
     for label_x, label in labels:
         label_y = max(0, bottom - 1 - label.get_height())
         surface.blit(label, (label_x, label_y))

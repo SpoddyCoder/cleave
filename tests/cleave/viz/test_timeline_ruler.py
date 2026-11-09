@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pygame
 
-from cleave.viz.theme import MUTED
+from cleave.viz.theme import MUTED, SONG_BOUND
 from cleave.viz.timeline_ruler import (
     RULER_BOTTOM_GAP_PX,
     format_ruler_time,
@@ -89,8 +89,8 @@ def test_render_time_ruler_draws_major_tick_at_bar_left() -> None:
     # Nothing left of the bar.
     assert surface.get_at((10, 20)).a == 0
     # Song start and end marks reach the bottom edge, below the baseline.
-    assert tuple(surface.get_at((50, 23)))[:3] == MUTED
-    assert tuple(surface.get_at((749, 23)))[:3] == MUTED
+    assert tuple(surface.get_at((50, 23)))[:3] == SONG_BOUND
+    assert tuple(surface.get_at((749, 23)))[:3] == SONG_BOUND
     assert surface.get_at((400, 23)).a == 0
 
 

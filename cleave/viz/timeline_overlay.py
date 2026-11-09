@@ -51,11 +51,11 @@ from cleave.viz.theme import (
     FOCUS_BORDER_ALPHA,
     HIGHLIGHT,
     LABEL,
-    MUTED,
     PLAYHEAD,
     PLAYHEAD_FLASH,
     REC_BG,
     SELECTED_WASH_ALPHA,
+    SONG_BOUND,
     SONG_MARKER,
     SONG_MARKER_SELECTED,
     TIMELINE_BAR_ON,
@@ -1034,7 +1034,7 @@ class TimelineOverlay:
         ):
             pygame.draw.line(
                 panel,
-                MUTED,
+                SONG_BOUND,
                 (bound_x, 0),
                 (bound_x, layout.bar_bottom - 1),
                 1,

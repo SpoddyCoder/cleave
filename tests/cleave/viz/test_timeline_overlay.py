@@ -1427,7 +1427,7 @@ def test_row_height_constant_across_layer_counts() -> None:
 
 def test_compose_panel_draws_time_scale_above_first_row() -> None:
     pygame.init()
-    from cleave.viz.theme import MUTED
+    from cleave.viz.theme import MUTED, SONG_BOUND
     from cleave.viz.timeline_overlay import timeline_band_height_px
 
     overlay = TimelineOverlay()
@@ -1448,5 +1448,6 @@ def test_compose_panel_draws_time_scale_above_first_row() -> None:
     # The song end mark runs from the ruler to the bottom of the last row.
     end_x = bar_left + _bar_width - 1
     last_row_bottom = panel[1] + panel[3] - timeline_ui_metrics().padding - 1
-    for y in (baseline_y, first_row_y + 1, last_row_bottom):
-        assert tuple(surface.get_at((end_x, y)))[:3] == MUTED
+    assert tuple(surface.get_at((end_x, baseline_y)))[:3] == MUTED
+    for y in (baseline_y + 1, first_row_y + 1, last_row_bottom):
+        assert tuple(surface.get_at((end_x, y)))[:3] == SONG_BOUND

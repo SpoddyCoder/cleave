@@ -10,7 +10,7 @@ Typography roles for the live tuning overlay:
 Accent colors for modes and icons (not label/value roles):
   HIGHLIGHT, ERROR_NOTIFICATION, NOTIFICATION_ON_FILL, MOVE_MODE, LOCK_ICON,
   PRESET_ICON, PRESET_FILE_ICON,
-  TIMELINE_BAR_ON, BAR_GRID, PLAYHEAD, PLAYHEAD_FLASH, SONG_MARKER, SONG_MARKER_SELECTED
+  TIMELINE_BAR_ON, BAR_GRID, SONG_BOUND, PLAYHEAD, PLAYHEAD_FLASH, SONG_MARKER, SONG_MARKER_SELECTED
 
 Buttons (fills, not text roles):
   BUTTON_BG, BUTTON_HOVER_BG, BUTTON_ACTIVE_BG, BUTTON_BORDER - every panel button,
@@ -240,6 +240,8 @@ FOCUS_BORDER_ALPHA: int = 140
 REC_BG: tuple[int, int, int] = (220, 0, 0)
 TIMELINE_BAR_ON: tuple[int, int, int] = (200, 225, 255)
 BAR_GRID: tuple[int, int, int] = (70, 95, 130)
+# Song start and end lines below the ruler, through the timeline rows.
+SONG_BOUND: tuple[int, int, int] = (58, 66, 84)
 PLAYHEAD: tuple[int, int, int] = (90, 50, 130)
 PLAYHEAD_FLASH: tuple[int, int, int] = (220, 170, 255)
 SONG_MARKER: tuple[int, int, int] = (220, 40, 40)
