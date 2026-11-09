@@ -607,6 +607,14 @@ class LayerFramePipeline:
             compositor.composite(request)
 
     @staticmethod
-    def destroy(layers: list[StemLayer]) -> None:
+    def destroy(layers: list[StemLayer], compositor: GlCompositor) -> None:
+        """Destroy every layer and drop its FBO from *compositor*.
+
+        The live compositor outlives the session, so a stale FBO left in its
+        stack would shadow the next session's layer of the same slot.
+        """
         for layer in layers:
+            if layer.projectm_playlist is not None:
+                layer.projectm_playlist.destroy()
             layer.pm.destroy()
+            compositor.remove_layer_fbo(layer.slot)

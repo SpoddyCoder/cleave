@@ -842,7 +842,7 @@ class VisualizerApp:
             window.release_imgui()
             if rt is not None:
                 persist_editor_settings(rt.seed.cfg)
-                LayerFramePipeline.destroy(rt.layers)
+                LayerFramePipeline.destroy(rt.layers, rt.compositor)
                 rt.post_process.destroy()
                 rt.masked_compositor.release()
                 rt.mix_player.stop()

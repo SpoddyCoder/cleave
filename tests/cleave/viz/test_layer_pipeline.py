@@ -75,6 +75,23 @@ def test_destroy_single_tears_down_gl_and_updates_collections() -> None:
     compositor.remove_layer_fbo.assert_called_once_with("layer_5")
 
 
+def test_destroy_drops_every_layer_fbo_from_the_compositor() -> None:
+    first = _stem_layer("layer_1")
+    second = _stem_layer("layer_2")
+    second.projectm_playlist = MagicMock()
+    compositor = MagicMock()
+
+    LayerFramePipeline.destroy([first, second], compositor)
+
+    first.pm.destroy.assert_called_once()
+    second.pm.destroy.assert_called_once()
+    second.projectm_playlist.destroy.assert_called_once()
+    assert [c.args for c in compositor.remove_layer_fbo.call_args_list] == [
+        ("layer_1",),
+        ("layer_2",),
+    ]
+
+
 def test_resize_layer_updates_projectm_and_compositor() -> None:
     layer = _stem_layer("layer_1")
     compositor = MagicMock()

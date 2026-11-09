@@ -359,7 +359,7 @@ def render(
 
     finally:
         if runtime is not None:
-            LayerFramePipeline.destroy(runtime.layers)
+            LayerFramePipeline.destroy(runtime.layers, runtime.compositor)
             runtime.compositor.destroy()
             runtime.post_process.destroy()
             runtime.masked_compositor.release()
