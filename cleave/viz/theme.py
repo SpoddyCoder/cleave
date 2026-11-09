@@ -134,7 +134,6 @@ class TimelineUiMetrics:
     bar_vertical_inset: int
     playhead_width: int
     rec_badge_gap: int
-    rec_badge_pad_x: int
     rec_badge_pad_y: int
 
 
@@ -174,7 +173,6 @@ def timeline_ui_metrics(*, scale: float | None = None) -> TimelineUiMetrics:
         bar_vertical_inset=scale_px(3, scale=scale),
         playhead_width=scale_px(2, scale=scale),
         rec_badge_gap=scale_px(4, scale=scale),
-        rec_badge_pad_x=scale_px(8, scale=scale),
         rec_badge_pad_y=scale_px(4, scale=scale),
     )
 

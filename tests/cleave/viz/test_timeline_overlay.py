@@ -868,13 +868,20 @@ def test_header_badge_rect_is_above_panel() -> None:
     _, panel_y, _, _ = panel
     _, header_y, _, header_h = header
     first_row_y = panel_y + overlay.row_layout[0][2]
-    # Just above the first layer row, inside the strip's top padding.
-    assert header_y + header_h == first_row_y - timeline_ui_metrics().rec_badge_gap
-    assert header_y + header_h > panel_y
+    from cleave.viz.timeline_overlay import TRANSPORT_BUTTON_DROP_PX
     from cleave.viz.timeline_panel_cache import timeline_badge_reserve_px
 
-    # Top of the band: no padding above the badge row.
-    assert header_y == panel_y - timeline_badge_reserve_px()
+    drop = TRANSPORT_BUTTON_DROP_PX
+    # Just above the first layer row, inside the strip's top padding.
+    assert (
+        header_y + header_h
+        == first_row_y - timeline_ui_metrics().rec_badge_gap + drop
+    )
+    assert header_y + header_h > panel_y
+    # Level with the corner buttons, the same drop below the band top.
+    assert header_y == panel_y - timeline_badge_reserve_px() + drop
+    _, record = overlay._transport_rects(overlay._hit_layout)
+    assert record[1] == drop
 
 
 def test_header_badge_shows_only_while_recording() -> None:
@@ -889,8 +896,20 @@ def test_header_badge_shows_only_while_recording() -> None:
     rec = overlay.header_badge_rect
     panel = overlay.panel_rect
     assert rec is not None and panel is not None
-    # REC sits flush with the strip's right edge.
+    # REC runs from the ruler's right end to the strip's right edge.
     assert rec[0] + rec[2] == panel[0] + panel[2]
+    bar_left, bar_width, _ = overlay.bar_layout
+    assert rec[0] == panel[0] + bar_left + bar_width
+
+
+def test_record_button_ends_at_ruler_start() -> None:
+    pygame.init()
+    overlay = TimelineOverlay()
+    surface = pygame.Surface((800, 400), pygame.SRCALPHA)
+    _draw(overlay, surface, _view_state(position_sec=0.0))
+    _, record = overlay._transport_rects(overlay._hit_layout)
+    bar_left, _, _ = overlay.bar_layout
+    assert record[0] + record[2] == bar_left
 
 
 def test_upscale_expands_bar_width_not_row_height() -> None:

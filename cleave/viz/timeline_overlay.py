@@ -731,25 +731,23 @@ def transport_button_rects(
     *,
     padding: int,
     layer_num_width: int,
-    icon_size: int,
-    rec_text_width: int,
-    text_gap: int,
-    pad_x: int,
+    bar_left: int,
     corner_h: int,
     gap: int,
 ) -> tuple[tuple[int, int, int, int], tuple[int, int, int, int]]:
     """Play and record button rects in the corner above the row labels.
 
     Play sits over the layer number column. Record starts at the stem
-    abbreviation, the column that lights when a row is armed, and holds the
-    record glyph plus ``REC``. Rects are in upload coordinates (top of the
-    badge row is y=0).
+    abbreviation, the column that lights when a row is armed, and runs to
+    the start of the ruler, over the monitor eye. It holds the record glyph
+    plus ``REC``. Rects are in upload coordinates (top of the badge row is
+    y=0).
     """
     y = TRANSPORT_BUTTON_DROP_PX
     h = max(1, corner_h - gap)
     play = (padding, y, layer_num_width, h)
-    record_w = pad_x * 2 + icon_size + text_gap + rec_text_width
-    record = (padding + layer_num_width, y, record_w, h)
+    record_x = padding + layer_num_width
+    record = (record_x, y, max(1, bar_left - record_x), h)
     return play, record
 
 
@@ -968,16 +966,12 @@ class TimelineOverlay:
     def _transport_rects(
         self, layout: _TimelineLayout
     ) -> tuple[tuple[int, int, int, int], tuple[int, int, int, int]]:
-        metrics = timeline_ui_metrics()
         return transport_button_rects(
             padding=self._padding,
             layer_num_width=layout.layer_num_width,
-            icon_size=self._transport_icon_size(layout),
-            rec_text_width=self._font_get().size(REC_BUTTON_TEXT)[0],
-            text_gap=metrics.rec_badge_gap // 2,
-            pad_x=metrics.rec_badge_gap // 2,
+            bar_left=layout.bar_left,
             corner_h=layout.badge_reserve + layout.bar_top,
-            gap=metrics.rec_badge_gap,
+            gap=timeline_ui_metrics().rec_badge_gap,
         )
 
     @staticmethod
@@ -1033,18 +1027,19 @@ class TimelineOverlay:
             ),
         )
 
-        metrics = timeline_ui_metrics()
-        rx, ry, _rw, rh = record_rect
+        # Glyph and REC centred as one group in the record button.
+        rx, ry, rw, rh = record_rect
+        icon_size = self._transport_icon_size(layout)
+        text_gap = timeline_ui_metrics().rec_badge_gap // 2
         record_surf = icon_font.render(RECORD_GLYPH, True, record_color)
-        glyph_x = rx + metrics.rec_badge_gap // 2
-        surface.blit(record_surf, (glyph_x, ry + (rh - record_surf.get_height()) // 2))
         text_surf = self._font_get().render(REC_BUTTON_TEXT, True, rec_text_color)
+        group_w = icon_size + text_gap + text_surf.get_width()
+        glyph_x = rx + (rw - group_w) // 2
+        surface.blit(record_surf, (glyph_x, ry + (rh - record_surf.get_height()) // 2))
         surface.blit(
             text_surf,
             (
-                glyph_x
-                + self._transport_icon_size(layout)
-                + metrics.rec_badge_gap // 2,
+                glyph_x + icon_size + text_gap,
                 ry + (rh - text_surf.get_height()) // 2,
             ),
         )
@@ -1594,26 +1589,32 @@ class TimelineOverlay:
         self,
         surface: pygame.Surface,
         font: pygame.font.Font,
-        panel_w: int,
+        layout: _TimelineLayout,
         recording: bool,
         *,
         y_offset: int = 0,
     ) -> tuple[int, int, int, int] | None:
-        """REC badge on the right, above the strip."""
+        """REC badge on the right, above the strip.
+
+        It starts where the ruler ends and runs to the strip's right edge,
+        over the committed-level icon column; the text is centred.
+        """
         metrics = timeline_ui_metrics()
-        pad_x = metrics.rec_badge_pad_x
         pad_y = metrics.rec_badge_pad_y
         badge_y = y_offset
         badge_h = font.get_height() + pad_y * 2
         rects: list[tuple[int, int, int, int]] = []
 
         if recording:
-            rec_surf = font.render("REC", True, VALUE)
-            rec_w = rec_surf.get_width() + pad_x * 2
-            rec_x = panel_w - rec_w
+            rec_surf = font.render(REC_BUTTON_TEXT, True, VALUE)
+            rec_x = layout.bar_left + layout.bar_width
+            rec_w = max(1, layout.panel_w - rec_x)
             if rec_flash_visible():
                 pygame.draw.rect(surface, REC_BG, (rec_x, badge_y, rec_w, badge_h))
-            surface.blit(rec_surf, (rec_x + pad_x, badge_y + pad_y))
+            surface.blit(
+                rec_surf,
+                (rec_x + (rec_w - rec_surf.get_width()) // 2, badge_y + pad_y),
+            )
             rects.append((rec_x, badge_y, rec_w, badge_h))
 
         if not rects:
@@ -1686,6 +1687,9 @@ class TimelineOverlay:
                     clip_h = min(ph, ruler_h - py)
                     upload.blit(self._ruler, (px, py), (px, py, pw, clip_h))
 
+        # Corner buttons before the playhead, so a red record fill that ends
+        # at the ruler never covers the playhead at the song start.
+        cache.last_transport_rect = self._draw_transport_buttons(upload, state, layout)
         playhead_rect = self._draw_playhead(
             upload,
             layout,
@@ -1694,9 +1698,9 @@ class TimelineOverlay:
         )
         cache.last_playhead_rect = playhead_rect
 
-        # The badge row starts at the top of the band, over the strip's top
-        # padding, and ends ``rec_badge_gap`` above the first layer row.
-        badge_top = 0
+        # The REC badge sits level with the corner buttons, the same drop
+        # below the top of the band, over the strip's top padding.
+        badge_top = TRANSPORT_BUTTON_DROP_PX
         if incremental and cache.last_badge_rect is not None:
             upload.fill((0, 0, 0, 0), cache.last_badge_rect)
             self._restore_upload_rect_from_static(
@@ -1712,12 +1716,11 @@ class TimelineOverlay:
         badge_rect = self._draw_header_badges_on_surface(
             upload,
             font,
-            layout.panel_w,
+            layout,
             state.recording,
             y_offset=badge_top,
         )
         cache.last_badge_rect = badge_rect
-        cache.last_transport_rect = self._draw_transport_buttons(upload, state, layout)
 
         flash_dirty: list[tuple[int, int, int, int]] = []
         for row_index in self._live_flash_row_indices(state):
