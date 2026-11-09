@@ -771,3 +771,49 @@ def test_nav_splitter_under_one_pixel_does_not_persist() -> None:
             host.process_event(_button(pygame.MOUSEBUTTONUP, (x + 40, y)))
         host._controls.settings.set_navigator_height.assert_not_called()
         assert host._splitter is None
+
+
+def test_strip_pointer_gets_press_drag_and_release_in_timeline_rect() -> None:
+    controls = _make_controls(("layer_1", "layer_2"))
+    controls.session.timeline.panel_open = True
+    pointer = MagicMock()
+    with _host() as host:
+        host._controls = controls
+        host._strip_pointer = pointer
+        layout = _open_strip_layout()
+        host.set_layout(layout)
+        pos = _rect_center(layout.timeline)
+
+        _click(host, pos)
+        host.process_event(_motion((pos[0] + 30, pos[1])))
+        host.process_event(_button(pygame.MOUSEBUTTONUP, pos))
+
+        assert controls.shell_focus.region is ShellRegion.TIMELINE
+        pointer.press.assert_called_once_with(float(pos[0]), float(pos[1]))
+        pointer.motion.assert_called_with(float(pos[0] + 30))
+        pointer.release.assert_called_once()
+
+
+def test_strip_pointer_ignores_clicks_outside_strip_or_when_closed() -> None:
+    controls = _make_controls(("layer_1", "layer_2"))
+    controls.session.timeline.panel_open = True
+    pointer = MagicMock()
+    with _host() as host:
+        host._controls = controls
+        host._strip_pointer = pointer
+        layout = _open_strip_layout()
+        host.set_layout(layout)
+
+        _click(host, _rect_center(layout.navigator))
+        controls.session.timeline.panel_open = False
+        _click(host, _rect_center(layout.timeline))
+
+        pointer.press.assert_not_called()
+
+
+def test_strip_pointer_cancels_when_window_loses_focus() -> None:
+    pointer = MagicMock()
+    with _host() as host:
+        host._strip_pointer = pointer
+        host.process_event(pygame.event.Event(pygame.WINDOWFOCUSLOST))
+        pointer.cancel.assert_called_once()

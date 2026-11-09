@@ -42,6 +42,7 @@ from cleave.viz.overlay_draw import OverlayDrawer
 from cleave.viz.loading import LoadingWindow, open_loading_window
 from cleave.viz.theme import set_ui_scale_percent
 from cleave.viz.timeline_controls import TimelineControls
+from cleave.viz.timeline_pointer import TimelinePointer
 from cleave.viz.shell_layout import ShellLayout
 from cleave.viz.timeline_overlay import (
     TimelineOverlay,
@@ -686,11 +687,17 @@ class VisualizerApp:
             from cleave.viz.top_layer import InfoPanelSurface
 
             assert window.imgui is not None
+            strip_pointer = TimelinePointer(
+                rt.timeline_overlay,
+                rt.timeline_controls,
+                rt.seed.session,
+            )
             shell = ShellHost(
                 window.imgui,
                 rt.menu_bar,
                 rt.controls,
                 menu_bar_height_px(),
+                strip_pointer=strip_pointer,
             )
             self._shell = shell
             rt.shell_host = shell
@@ -804,6 +811,7 @@ class VisualizerApp:
                 self._overlay_dt = clock.tick() / 1000.0
                 rt.controls.tick(self._overlay_dt)
                 rt.timeline_controls.tick(self._overlay_dt)
+                strip_pointer.tick()
                 rt.modal_host.tick(self._overlay_dt)
 
                 if window.apply_pending_resize():

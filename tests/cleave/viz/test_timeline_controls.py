@@ -1719,3 +1719,57 @@ def test_cue_edit_keys_refused_when_recording() -> None:
     assert session.timeline.lanes["layer_1"].cues[0].role is None
     assert session.timeline.lanes["layer_1"].cues[0].cut is None
     assert session.timeline.lanes["layer_1"].cues[0].level == 1.0
+
+def test_seek_to_passes_delta_from_playhead() -> None:
+    controls, _, _, _, seeks, _ = _make_timeline_controls(position_sec=10.0)
+    controls.seek_to(25.0)
+    controls.seek_to(10.0)
+    controls.seek_to(500.0)
+    assert seeks == [15.0, 110.0]
+
+
+def test_seek_to_during_record_fills_like_seek_step() -> None:
+    controls, session, visibility_calls, _, seeks, _ = _make_timeline_controls(
+        armed_slots={"layer_1"},
+        position_sec=20.0,
+    )
+    session.layers["layer_1"].enabled = True
+    controls.handle_keydown(keydown(pygame.K_r))
+    active_before_seek = armed_recording_level(session, "layer_1", 20.0)
+
+    controls.seek_to(10.0)
+
+    assert seeks == [-10.0]
+    assert session.timeline.record_start_sec == 10.0
+    assert armed_recording_level(session, "layer_1", 15.0) == active_before_seek
+    assert visibility_calls
+
+
+def test_select_cue_near_picks_nearest_within_tolerance() -> None:
+    lanes = {"layer_1": _lane(False, (4.0, True), (10.0, False))}
+    controls, session, _, _, _, _ = _make_timeline_controls(lanes=lanes)
+
+    assert controls.select_cue_near("layer_1", 9.8, 0.5) is True
+    assert session.timeline.selected_cue_t["layer_1"] == 10.0
+    assert controls.select_cue_near("layer_1", 7.0, 0.5) is False
+    assert session.timeline.selected_cue_t["layer_1"] == 10.0
+
+
+def test_select_cue_near_allowed_when_locked_blocked_when_recording() -> None:
+    lanes = {"layer_1": _lane(False, (4.0, True))}
+    controls, session, _, _, _, _ = _make_timeline_controls(lanes=lanes)
+    session.timeline.locked = True
+    assert controls.select_cue_near("layer_1", 4.1, 0.5) is True
+
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        lanes=lanes, armed_slots={"layer_1"}, recording=True
+    )
+    assert controls.select_cue_near("layer_1", 4.0, 0.5) is False
+
+
+def test_focus_row_clamps_to_layer_count() -> None:
+    controls, session, _, _, _, _ = _make_timeline_controls()
+    controls.focus_row(99)
+    assert session.timeline.focus_row == len(session.layer_z_order) - 1
+    controls.focus_row(-3)
+    assert session.timeline.focus_row == 0

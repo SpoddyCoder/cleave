@@ -1451,3 +1451,42 @@ def test_compose_panel_draws_time_scale_above_first_row() -> None:
     assert tuple(surface.get_at((end_x, baseline_y)))[:3] == MUTED
     for y in (baseline_y + 1, first_row_y + 1, last_row_bottom):
         assert tuple(surface.get_at((end_x, y)))[:3] == SONG_BOUND
+
+
+def test_hit_at_maps_ruler_rows_prefix_and_gaps() -> None:
+    from cleave.viz.timeline_overlay import time_to_x, x_to_time
+
+    pygame.init()
+    overlay = TimelineOverlay(padding=8, row_gap=4)
+    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    assert overlay.hit_at(10, 700) is None
+    _draw(overlay, surface, _view_state(duration_sec=100.0))
+
+    px, py, _, _ = overlay.panel_rect
+    bar_left, bar_width, _ = overlay.bar_layout
+    rows = overlay.row_layout
+    mid_x = px + bar_left + bar_width // 2
+
+    ruler = overlay.hit_at(mid_x, py + 2)
+    assert ruler is not None and ruler.row is None
+    assert ruler.t_sec == pytest.approx(50.0, abs=0.2)
+
+    for row_index, _, row_y, _, row_h, _ in rows:
+        hit = overlay.hit_at(mid_x, py + row_y + row_h // 2)
+        assert hit is not None and hit.row == row_index
+        assert hit.cue_tolerance_sec == pytest.approx(4 * 100.0 / bar_width)
+
+    prefix = overlay.hit_at(px + 10, py + rows[0][2] + 1)
+    assert prefix is not None and prefix.row == 0 and prefix.t_sec is None
+
+    gap_y = py + rows[0][2] + rows[0][4] + 1
+    assert overlay.hit_at(mid_x, gap_y) is None
+
+    assert overlay.hit_at(px + bar_left, py + rows[0][2] + 1).t_sec == 0.0
+    assert overlay.time_at_x(px + bar_left + bar_width + 50) == 100.0
+    assert overlay.time_at_x(px - 50) == 0.0
+
+    for t in (0.0, 12.5, 63.0, 100.0):
+        x = time_to_x(t, bar_left, bar_width, 100.0)
+        back = x_to_time(x, bar_left, bar_width, 100.0)
+        assert abs(time_to_x(back, bar_left, bar_width, 100.0) - x) <= 1

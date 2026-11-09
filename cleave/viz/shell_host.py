@@ -29,6 +29,7 @@ from cleave.viz.inspector_controls import (
     inspector_command_locked,
 )
 from cleave.viz.menu_bar import MenuBarState, menus_for_session
+from cleave.viz.timeline_pointer import TimelinePointer
 from cleave.viz.material_icons import (
     LOCK_GLYPH,
     LOCK_OPEN_GLYPH,
@@ -1167,10 +1168,13 @@ class ShellHost:
         menu_state: MenuBarState,
         controls: Any,
         bar_height: int,
+        *,
+        strip_pointer: TimelinePointer | None = None,
     ) -> None:
         self.imgui = imgui_host
         self._menu_state = menu_state
         self._controls = controls
+        self._strip_pointer = strip_pointer
         self._menu_bar_height_px = bar_height
         self._dropdown_span: tuple[float, float] | None = None
         # Top label under the pointer last frame. Hover opens on entry only, so
@@ -1263,6 +1267,9 @@ class ShellHost:
     def process_event(self, event: pygame.event.Event) -> None:
         """Mouse motion, buttons, and wheel only. Keys stay out of ImGui."""
         # Host active covers the click before the top layer has drawn the modal.
+        if event.type == pygame.WINDOWFOCUSLOST:
+            self._cancel_strip_pointer()
+            return
         if self._modal_has_pointer():
             self._process_modal_event(event)
             return
@@ -1272,6 +1279,8 @@ class ShellHost:
             x = float(event.pos[0])
             y = float(event.pos[1])
             self._track_splitter_motion(x, y)
+            if self._strip_pointer is not None:
+                self._strip_pointer.motion(x)
             return
         if event.type in (pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP):
             button = mouse_button(event)
@@ -1292,6 +1301,7 @@ class ShellHost:
                     return
                 if button == 0 and not captured:
                     self._assign_shell_region(x, y)
+                    self._press_strip(x, y)
                 imgui_host.press_button(button)
             elif button == 0 and self._splitter is not None:
                 self._end_splitter_drag(event.pos)
@@ -1299,15 +1309,33 @@ class ShellHost:
             elif not imgui_host.button_held(button):
                 return
             else:
+                if button == 0 and self._strip_pointer is not None:
+                    self._strip_pointer.release()
                 imgui_host.release_button(button)
             imgui_host.process_mouse_event(event)
             return
         if event.type == pygame.MOUSEWHEEL:
             imgui_host.process_mouse_event(event)
 
+    def _press_strip(self, x: float, y: float) -> None:
+        """Left press on the open strip: focus a row, select a cue, or seek."""
+        pointer = self._strip_pointer
+        layout = self._layout
+        if pointer is None or layout is None:
+            return
+        if not self._controls.session.timeline.panel_open:
+            return
+        if layout.timeline[3] > 0 and _rect_contains(layout.timeline, x, y):
+            pointer.press(x, y)
+
+    def _cancel_strip_pointer(self) -> None:
+        if self._strip_pointer is not None:
+            self._strip_pointer.cancel()
+
     def _process_modal_event(self, event: pygame.event.Event) -> None:
         """Forward the pointer to ImGui. The shell takes no region or splitter."""
         self._cancel_splitter_drag()
+        self._cancel_strip_pointer()
         self._controls.disarm_value_nudge()
         imgui_host = self.imgui
         if event.type == pygame.MOUSEMOTION:

@@ -13,6 +13,8 @@ from cleave.timeline import (
     LEVEL_EPS,
     SlotCue,
     canonicalize,
+    empty_lane,
+    navigable_cue_times,
     should_accept_toggle,
     snap_placement_time,
 )
@@ -30,6 +32,7 @@ from cleave.viz.timeline_cue_edits import (
     cue_edits_allowed,
     cue_selection_allowed,
     nudge_cue_level,
+    select_cue,
     selected_cue,
     set_cue_blend,
     set_cue_cut,
@@ -322,6 +325,30 @@ class TimelineControls:
             self._on_focus_row(nxt)
             return
         self.session.timeline.focus_row = nxt
+
+    def focus_row(self, row: int) -> None:
+        """Put the strip lane on *row* (clamped), as a pointer click does."""
+        count = len(self.session.layer_z_order)
+        if count <= 0:
+            return
+        row = max(0, min(count - 1, row))
+        if self._on_focus_row is not None:
+            self._on_focus_row(row)
+            return
+        self.session.timeline.focus_row = row
+
+    def select_cue_near(self, slot: str, t_sec: float, tolerance_sec: float) -> bool:
+        """Select the cue on *slot* nearest *t_sec* within *tolerance_sec*."""
+        if not cue_selection_allowed(self.session):
+            return False
+        times = navigable_cue_times(self.session.timeline.lanes.get(slot) or empty_lane())
+        if not times:
+            return False
+        nearest = min(times, key=lambda t: abs(t - t_sec))
+        if abs(nearest - t_sec) > tolerance_sec:
+            return False
+        select_cue(self.session, slot, nearest)
+        return True
 
     def _notify(self, message: str) -> None:
         if self._on_notification is not None:
@@ -616,6 +643,17 @@ class TimelineControls:
             delta_sec = SEEK_SHORT
         if not forward:
             delta_sec = -delta_sec
+        self._seek_by(delta_sec)
+
+    def seek_to(self, t_sec: float) -> None:
+        """Move the playhead to *t_sec*; recording fills the skipped range."""
+        target = max(0.0, min(self.duration_sec, t_sec))
+        delta_sec = target - current_sec(self.playback, self.duration_sec)
+        if abs(delta_sec) < 1e-6:
+            return
+        self._seek_by(delta_sec)
+
+    def _seek_by(self, delta_sec: float) -> None:
         if self.session.timeline.recording:
             old_t = current_sec(self.playback, self.duration_sec)
             new_t = max(0.0, min(self.duration_sec, old_t + delta_sec))

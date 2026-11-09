@@ -676,6 +676,31 @@ def time_to_x(t_sec: float, bar_left: int, bar_width: int, duration_sec: float) 
     return bar_left + int(ratio * bar_width)
 
 
+def x_to_time(x: float, bar_left: int, bar_width: int, duration_sec: float) -> float:
+    """Inverse of ``time_to_x``, clamped to the song."""
+    if duration_sec <= 0 or bar_width <= 0:
+        return 0.0
+    ratio = max(0.0, min(1.0, (x - bar_left) / bar_width))
+    return ratio * duration_sec
+
+
+# Pointer slack around a cue tick, in pixels.
+CUE_HIT_PX: int = 4
+
+
+@dataclass(frozen=True)
+class StripHit:
+    """What a screen point lands on in the strip.
+
+    ``row`` is None for the ruler. ``t_sec`` is None outside the bar span
+    (row labels and icons). ``cue_tolerance_sec`` is ``CUE_HIT_PX`` in song time.
+    """
+
+    row: int | None
+    t_sec: float | None
+    cue_tolerance_sec: float
+
+
 def playhead_x(
     position_sec: float,
     bar_left: int,
@@ -785,6 +810,8 @@ class TimelineOverlay:
         self._upload_scratch: pygame.Surface | None = None
         self._ruler: pygame.Surface | None = None
         self._blit_src: tuple[int, int] = (0, 0)
+        self._hit_layout: _TimelineLayout | None = None
+        self._hit_duration_sec: float = 0.0
 
     @property
     def _font_size(self) -> int:
@@ -831,6 +858,45 @@ class TimelineOverlay:
     def row_layout(self) -> list[tuple[int, int, int, int, str, int]]:
         """Last draw layout: ``(row_index, x, y, w, h, stem)`` in panel coordinates."""
         return list(self._row_layout)
+
+    def hit_at(self, x: float, y: float) -> StripHit | None:
+        """Ruler or layer row under a screen point, from the last compose."""
+        layout = self._hit_layout
+        if layout is None:
+            return None
+        local_x = x - layout.panel_x
+        local_y = y - layout.panel_y
+        if not 0 <= local_x < layout.panel_w:
+            return None
+        if layout.bar_width > 0 and self._hit_duration_sec > 0:
+            tolerance = CUE_HIT_PX * self._hit_duration_sec / layout.bar_width
+        else:
+            tolerance = 0.0
+        in_bar = layout.bar_left <= local_x < layout.bar_left + layout.bar_width
+        t_sec = (
+            x_to_time(local_x, layout.bar_left, layout.bar_width, self._hit_duration_sec)
+            if in_bar
+            else None
+        )
+        if -layout.badge_reserve <= local_y < layout.bar_top:
+            return StripHit(row=None, t_sec=t_sec, cue_tolerance_sec=tolerance)
+        for display_i in range(layout.row_count):
+            row_y = self._row_y(display_i, layout.row_h)
+            if row_y <= local_y < row_y + layout.row_h:
+                return StripHit(row=display_i, t_sec=t_sec, cue_tolerance_sec=tolerance)
+        return None
+
+    def time_at_x(self, x: float) -> float | None:
+        """Song time under screen *x*, clamped to the bar. None before a compose."""
+        layout = self._hit_layout
+        if layout is None:
+            return None
+        return x_to_time(
+            x - layout.panel_x,
+            layout.bar_left,
+            layout.bar_width,
+            self._hit_duration_sec,
+        )
 
     def _compute_layout(
         self,
@@ -1493,6 +1559,7 @@ class TimelineOverlay:
         self._visibility = visibility
         self._panel_rect = None
         self._header_badge_rect = None
+        self._hit_layout = None
         if visibility <= 0.01:
             return None
 
@@ -1573,6 +1640,8 @@ class TimelineOverlay:
         if screen_bounds is None:
             return None
 
+        self._hit_layout = layout
+        self._hit_duration_sec = state.duration_sec
         sx, sy, sw, sh = screen_bounds
         panel_screen_y = layout.panel_y
         self._panel_rect = clip_rect_to_bounds(
