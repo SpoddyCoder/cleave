@@ -454,15 +454,15 @@ def test_pattern_mask_seed_row_only_for_plasma() -> None:
     for mask_type in ("strips", "bars", "radial", "checker"):
         session.pattern_mask.type = mask_type
         view = builder.build(paused=False)
-        page = _inspector_kinds(view, "pattern_mask")
-        assert RowKind.PATTERN_MASK_FEATHER in page
+        page = _inspector_kinds(view, "pattern_mask.pattern")
+        assert RowKind.PATTERN_MASK_DENSITY in page
         assert RowKind.PATTERN_MASK_SEED not in page
 
     session.pattern_mask.type = "plasma"
     view_plasma = builder.build(paused=False)
-    plasma = _inspector_kinds(view_plasma, "pattern_mask")
+    plasma = _inspector_kinds(view_plasma, "pattern_mask.pattern")
     assert RowKind.PATTERN_MASK_SEED in plasma
-    assert RowKind.PATTERN_MASK_FEATHER in plasma
+    assert RowKind.PATTERN_MASK_DENSITY in plasma
 
 
 def test_structure_signature_invalidates_on_hard_cut_fades_enabled() -> None:

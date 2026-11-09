@@ -142,11 +142,25 @@ def test_card_pages_open_with_their_own_enabled_row(card: str) -> None:
 
 def test_pattern_mask_page_opens_with_its_switches() -> None:
     rows = build_inspector_rows(_view_state(), "pattern_mask")
-    assert tuple(row.descriptor.kind for row in rows[:3]) == (
+    assert tuple(row.descriptor.kind for row in rows) == (
         RowKind.PATTERN_MASK_ENABLED,
         RowKind.PATTERN_MASK_LOCKED,
-        RowKind.PATTERN_MASK_TYPE,
     )
+
+
+def test_pattern_mask_child_pages_split_the_settings() -> None:
+    state = _view_state()
+    state.pattern_mask.type = "plasma"
+    assert _kinds(build_inspector_rows(state, "pattern_mask.pattern")) == [
+        RowKind.PATTERN_MASK_TYPE,
+        RowKind.PATTERN_MASK_DENSITY,
+        RowKind.PATTERN_MASK_INVERT,
+        RowKind.PATTERN_MASK_SEED,
+    ]
+    assert _kinds(build_inspector_rows(state, "pattern_mask.edges")) == [
+        RowKind.PATTERN_MASK_FEATHER,
+        RowKind.PATTERN_MASK_TRANSITION,
+    ]
 
 
 @pytest.mark.parametrize(
@@ -246,11 +260,11 @@ def test_conditional_rows_follow_predicates() -> None:
     state = _view_state()
     assert state.pattern_mask.type != "plasma"
     assert RowKind.PATTERN_MASK_SEED not in _kinds(
-        build_inspector_rows(state, "pattern_mask")
+        build_inspector_rows(state, "pattern_mask.pattern")
     )
     state.pattern_mask.type = "plasma"
     assert RowKind.PATTERN_MASK_SEED in _kinds(
-        build_inspector_rows(state, "pattern_mask")
+        build_inspector_rows(state, "pattern_mask.pattern")
     )
 
     card = _kinds(build_inspector_rows(state, "overlay.opening_card"))
@@ -350,7 +364,7 @@ def test_locked_blocks_still_build() -> None:
 
     density = next(
         row.descriptor
-        for row in build_inspector_rows(state, "pattern_mask")
+        for row in build_inspector_rows(state, "pattern_mask.pattern")
         if row.descriptor.kind is RowKind.PATTERN_MASK_DENSITY
     )
     assert inspector_field_colors(state, density) == (LOCKED, LOCKED)

@@ -431,18 +431,41 @@ PATTERN_MASK_PLASMA_SEED = ConditionalRowsDef(
     ),
 )
 
-PATTERN_MASK_SECTION = SectionDef(
-    header_kind=RowKind.PATTERN_MASK_HEADER,
+PATTERN_MASK_PATTERN_SECTION = SectionDef(
+    header_kind=RowKind.PATTERN_MASK_PATTERN_HEADER,
+    context="global",
+    children=(
+        SectionNode(leaf_kind=RowKind.PATTERN_MASK_TYPE),
+        SectionNode(leaf_kind=RowKind.PATTERN_MASK_DENSITY),
+        SectionNode(leaf_kind=RowKind.PATTERN_MASK_INVERT),
+        SectionNode(conditional=PATTERN_MASK_PLASMA_SEED),
+    ),
+)
+
+PATTERN_MASK_EDGES_SECTION = SectionDef(
+    header_kind=RowKind.PATTERN_MASK_EDGES_HEADER,
+    context="global",
+    children=(
+        SectionNode(leaf_kind=RowKind.PATTERN_MASK_FEATHER),
+        SectionNode(leaf_kind=RowKind.PATTERN_MASK_TRANSITION),
+    ),
+)
+
+PATTERN_MASK_PAGE_SECTION = SectionDef(
+    header_kind=None,
     context="global",
     children=(
         SectionNode(leaf_kind=RowKind.PATTERN_MASK_ENABLED),
         SectionNode(leaf_kind=RowKind.PATTERN_MASK_LOCKED),
-        SectionNode(leaf_kind=RowKind.PATTERN_MASK_TYPE),
-        SectionNode(leaf_kind=RowKind.PATTERN_MASK_DENSITY),
-        SectionNode(leaf_kind=RowKind.PATTERN_MASK_FEATHER),
-        SectionNode(leaf_kind=RowKind.PATTERN_MASK_INVERT),
-        SectionNode(leaf_kind=RowKind.PATTERN_MASK_TRANSITION),
-        SectionNode(conditional=PATTERN_MASK_PLASMA_SEED),
+    ),
+)
+
+PATTERN_MASK_SECTION = SectionDef(
+    header_kind=RowKind.PATTERN_MASK_HEADER,
+    context="global",
+    children=(
+        SectionNode(subsection=PATTERN_MASK_PATTERN_SECTION),
+        SectionNode(subsection=PATTERN_MASK_EDGES_SECTION),
     ),
 )
 
@@ -781,7 +804,9 @@ POST_FX_SECTION_KINDS = kinds_in_section(POST_FX_SECTION) | kinds_in_section(
     POST_FX_PAGE_SECTION
 )
 POST_FX_LIMITER_KINDS = kinds_in_section(POST_FX_LIMITER_SECTION)
-PATTERN_MASK_SECTION_KINDS = kinds_in_section(PATTERN_MASK_SECTION)
+PATTERN_MASK_SECTION_KINDS = kinds_in_section(
+    PATTERN_MASK_SECTION
+) | kinds_in_section(PATTERN_MASK_PAGE_SECTION)
 TRACK_COMPOSITING_SECTION_KINDS = kinds_in_section(TRACK_COMPOSITING_SECTION)
 TIMELINE_SECTION_KINDS = frozenset(
     {

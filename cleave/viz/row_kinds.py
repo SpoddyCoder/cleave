@@ -103,6 +103,8 @@ class RowKind(Enum):
     POST_FX_LIMITER_RATIO = auto()
     POST_FX_LIMITER_RELEASE = auto()
     PATTERN_MASK_HEADER = auto()
+    PATTERN_MASK_PATTERN_HEADER = auto()
+    PATTERN_MASK_EDGES_HEADER = auto()
     PATTERN_MASK_ENABLED = auto()
     PATTERN_MASK_LOCKED = auto()
     PATTERN_MASK_TYPE = auto()

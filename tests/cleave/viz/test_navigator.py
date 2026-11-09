@@ -117,7 +117,7 @@ def test_top_level_order_and_labels() -> None:
     assert tuple(node.expandable for node in top) == (
         True,
         True,
-        False,
+        True,
         True,
         True,
     )
@@ -138,6 +138,8 @@ def test_full_tree_order_and_labels() -> None:
         "Chroma Boost",
         "Visual Limiter",
         "Pattern Mask",
+        "Pattern",
+        "Edges & Motion",
         "Timeline",
         "Beat / Bar Grid",
         "Cue Fades",

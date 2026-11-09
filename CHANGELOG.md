@@ -26,6 +26,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- Pattern Mask opens in the navigator like Post-FX and Timeline. Its page keeps the on/off and lock switches; type, density, invert, and seed move to a Pattern child page, and feather and transition to Edges & Motion.
 - Selecting a timeline strip row opens it in the inspector, titled like `Timeline > 1  Drums`, the way a navigator row opens its page. The selected cue's time, opacity, cut, blend, and role show there instead of above the strip, and can be edited there: Left/Right on time selects the previous or next cue and Enter seeks to it. The heading says whether it is a start cue (turns the layer on) or an end cue (turns it off). An end cue shows only time and cut, and with no cue selected the page shows no cue rows.
 - The selected timeline row uses the same quiet highlight wash and outline as navigator and inspector rows.
 - Editor text and spacing are 20% larger at the default 100% UI scale.

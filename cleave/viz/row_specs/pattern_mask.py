@@ -183,6 +183,29 @@ SPECS: dict[RowKind, RowSpec] = {
         ),
         toggle_enabled=_toggle_pattern_mask_enabled,
     ),
+    RowKind.PATTERN_MASK_PATTERN_HEADER: RowSpec(
+        affordance=RowAffordance.HEADING,
+        panel_label="pattern",
+        present_style=RowPresentStyle.HEADING,
+        fit_strategy=FitStrategy.NONE,
+        help_title="Pattern",
+        help_description=(
+            "Geometry that splits the frame between visible layers.",
+        ),
+        parent_group="pattern_mask",
+    ),
+    RowKind.PATTERN_MASK_EDGES_HEADER: RowSpec(
+        affordance=RowAffordance.HEADING,
+        panel_label="edges & motion",
+        present_style=RowPresentStyle.HEADING,
+        fit_strategy=FitStrategy.NONE,
+        help_title="Edges & motion",
+        help_description=(
+            "How soft territory edges are, and how long the layout morphs",
+            "when layers toggle.",
+        ),
+        parent_group="pattern_mask",
+    ),
     RowKind.PATTERN_MASK_ENABLED: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
         panel_label="enabled",

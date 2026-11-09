@@ -53,6 +53,8 @@ _NODE_HEADER_KINDS: dict[str, RowKind] = {
     "post_fx.chroma_boost": RowKind.POST_FX_CHROMA_BOOST_HEADER,
     "post_fx.limiter": RowKind.POST_FX_LIMITER_HEADER,
     "pattern_mask": RowKind.PATTERN_MASK_HEADER,
+    "pattern_mask.pattern": RowKind.PATTERN_MASK_PATTERN_HEADER,
+    "pattern_mask.edges": RowKind.PATTERN_MASK_EDGES_HEADER,
     "timeline": RowKind.TIMELINE_HEADER,
     "timeline.grid": RowKind.TIMELINE_BEAT_BAR_GRID_HEADER,
     "timeline.cue_fades": RowKind.TIMELINE_CUTS_HEADER,

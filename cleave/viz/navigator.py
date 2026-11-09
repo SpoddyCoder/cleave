@@ -86,7 +86,7 @@ class NavNode:
 _TOP_LEVEL: tuple[NavNode, ...] = (
     NavNode("overlay", "Overlay", 0, None, expandable=True),
     NavNode("post_fx", "Post-FX", 0, None, expandable=True),
-    NavNode("pattern_mask", "Pattern Mask", 0, None),
+    NavNode("pattern_mask", "Pattern Mask", 0, None, expandable=True),
     NavNode("timeline", "Timeline", 0, None, expandable=True),
     NavNode("layers", "Layers", 0, None, expandable=True),
 )
@@ -101,6 +101,10 @@ _STATIC_CHILDREN: dict[str, tuple[tuple[str, str], ...]] = {
         ("post_fx.highlight_rolloff", "Highlight Rolloff"),
         ("post_fx.chroma_boost", "Chroma Boost"),
         ("post_fx.limiter", "Visual Limiter"),
+    ),
+    "pattern_mask": (
+        ("pattern_mask.pattern", "Pattern"),
+        ("pattern_mask.edges", "Edges & Motion"),
     ),
     "timeline": (
         ("timeline.grid", "Beat / Bar Grid"),
