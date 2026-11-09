@@ -13,6 +13,7 @@ import numpy as np
 from pygame._sdl2 import AUDIO_F32, AudioDevice, get_audio_device_names
 
 from cleave.stems import StemSource
+from cleave.viz.sdl_audio import pause_device_without_gil
 from cleave.viz.transport_clock import TransportClock
 
 if TYPE_CHECKING:
@@ -441,8 +442,16 @@ class MixPlayer:
             self._next_click_index += 1
 
     def _fill_output_buffer(self, out: np.ndarray) -> None:
-        """Fill *out* from mix/stem PCM, mix beat clicks, and advance transport."""
+        """Fill *out* from mix/stem PCM, mix beat clicks, and advance transport.
+
+        While paused, write silence and leave the read position alone. The
+        device keeps running: pausing it from the main thread can deadlock
+        against this callback (see ``sdl_audio``).
+        """
         with self._lock:
+            if self._clock.paused:
+                out.fill(0.0)
+                return
             read_index = self._read_index
             click_only = self._click_only
             solo_source = None if click_only else self._solo_source
@@ -549,15 +558,22 @@ class MixPlayer:
     def stop(self) -> None:
         if self._device is None:
             return
-        self._device.close()
+        device = self._device
         self._device = None
+        # Stop the callback with the GIL released first; closing while it
+        # waits for the GIL would deadlock.
+        if not pause_device_without_gil(device) and os.environ.get(
+            AUDIO_DEBUG_ENV, ""
+        ).strip():
+            print("audio: SDL not found for a GIL-free pause", file=sys.stderr)
+        device.close()
         self._callback = None
 
     def pause(self, on: bool) -> None:
+        """Pause or resume transport. The device keeps running; the callback
+        writes silence while paused."""
         with self._lock:
             self._clock.set_paused(on)
-        if self._device is not None:
-            self._device.pause(1 if on else 0)
 
     def seek(self, position_sec: float) -> None:
         frame = int(max(0.0, position_sec) * self._sample_rate)

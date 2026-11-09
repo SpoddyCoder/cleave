@@ -95,6 +95,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- The editor no longer freezes now and then when you pause, resume, close it, or switch projects. A freeze ignored Ctrl+C and needed `kill -9`. Pausing now keeps the audio device running and plays silence, and closing stops the audio callback safely first.
 - The project now saves the bar phase and the show bar grid setting, so they no longer reset to +0 and off when it reopens.
 - Placement snap to bars follows the bar phase, so cues and song markers land on the bar lines the strip draws and timeline generation uses.
 - Placement snap no longer blocks timeline recording before the first bar or beat, or rewrites it after the last: intro and outro time outside the beat grid places freely, and every layer-key press flips the layer even when it snaps ahead to the next beat or bar.

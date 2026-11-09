@@ -289,12 +289,11 @@ def test_mix_player_click_only_advances_transport_without_audible_mix() -> None:
     mix = np.full(FREQUENCY_HZ * 4, 0.8, dtype=np.float32)
     player = MixPlayer(mix, FREQUENCY_HZ, chunksize=256)
     player.set_click_only(True)
-    player.pause(True)
     player.seek(0.0)
     out = np.zeros(512, dtype=np.float32)
     player._fill_output_buffer(out)
     assert player._read_index == 256
-    assert player.file_position_sec() == pytest.approx(256 / FREQUENCY_HZ)
+    assert player.file_position_sec() == pytest.approx(256 / FREQUENCY_HZ, abs=1e-3)
 
 
 def test_mix_player_click_carries_across_chunk_boundary() -> None:
@@ -385,3 +384,57 @@ def test_audio_debug_lines_include_devices_and_levels() -> None:
     assert "[1] HDMI" in text
     assert "chosen=HDMI" in text
     assert "peak=0.000000" in text
+
+
+def test_paused_callback_writes_silence_and_holds_position() -> None:
+    mix = np.full(FREQUENCY_HZ * 4, 0.8, dtype=np.float32)
+    player = MixPlayer(mix, FREQUENCY_HZ, chunksize=256)
+    player.seek(1.0)
+    player.pause(True)
+    out = np.full(512, 0.5, dtype=np.float32)
+    player._fill_output_buffer(out)
+    assert not out.any()
+    assert player._read_index == FREQUENCY_HZ
+    assert player.file_position_sec() == pytest.approx(1.0)
+
+    player.pause(False)
+    player._fill_output_buffer(out)
+    assert out.all()
+    assert player._read_index == FREQUENCY_HZ + 256
+
+
+class _FakeDevice:
+    def __init__(self, calls: list[str]) -> None:
+        self.calls = calls
+        self.deviceid = 7
+
+    def pause(self, on: int) -> None:
+        self.calls.append(f"pause({on})")
+
+    def close(self) -> None:
+        self.calls.append("close")
+
+
+def test_pause_never_touches_the_device() -> None:
+    calls: list[str] = []
+    player = MixPlayer(np.zeros(8, dtype=np.float32))
+    player._device = _FakeDevice(calls)
+    player.pause(True)
+    player.pause(False)
+    assert calls == []
+
+
+def test_stop_pauses_without_gil_before_close(monkeypatch) -> None:
+    import cleave.viz.mix_player as mix_player
+
+    calls: list[str] = []
+    monkeypatch.setattr(
+        mix_player,
+        "pause_device_without_gil",
+        lambda device: calls.append(f"gil_free_pause({device.deviceid})") or True,
+    )
+    player = MixPlayer(np.zeros(8, dtype=np.float32))
+    player._device = _FakeDevice(calls)
+    player.stop()
+    assert calls == ["gil_free_pause(7)", "close"]
+    assert player._device is None
