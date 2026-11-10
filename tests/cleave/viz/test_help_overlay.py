@@ -258,7 +258,7 @@ def test_help_follows_navigator_render_node() -> None:
     )
     description = _description_section(overlays)
     assert description is not None
-    assert description.title == "Credits overlays"
+    assert description.title == "Credits Overlays"
     keyboard = dict(_keyboard_section(overlays).entries)
     assert keyboard["E"] == "enable/disable"
     assert keyboard["S"] == "always on"
@@ -320,7 +320,7 @@ def test_inspector_command_rows_use_layer_management_help() -> None:
     )
     delete_description = _description_section(delete)
     assert delete_description is not None
-    assert delete_description.title == "Delete layer"
+    assert delete_description.title == "Delete Layer"
     assert "Opacity" not in _help_text(delete)
 
 
@@ -436,7 +436,7 @@ def test_preset_file_help_includes_add_shortcut_when_switching_on() -> None:
 def test_blend_mode_help_lists_modes() -> None:
     description = _description_section(sections_for(RowKind.TRACK_BLEND))
     assert description is not None
-    assert description.title == "Blend mode"
+    assert description.title == "Blend Mode"
     assert description.lines == (
         "How this layer is composited onto the layers below it.",
         "Ignored while Pattern Mask is enabled.",
@@ -449,7 +449,7 @@ def test_switching_page_help_is_description_only() -> None:
     sections = sections_for(RowKind.TRACK_PRESET_SWITCHING)
     description = _description_section(sections)
     assert description is not None
-    assert description.title == "Preset switching"
+    assert description.title == "Preset Switching"
     assert description.lines == (
         "Automatic preset list advances for this layer.",
     )
@@ -462,7 +462,7 @@ def test_timeline_presets_help_lists_characters() -> None:
     sections = sections_for(RowKind.TIMELINE_GENERATE)
     description = _description_section(sections)
     assert description is not None
-    assert description.title == "Generate timeline"
+    assert description.title == "Generate Timeline"
     assert description.lines == (
         "Build a new timeline from character, density, snaps, cuts, re-populate, conductor, and mode.",
         "Replaces the current cues.",
@@ -487,7 +487,7 @@ def test_timeline_reset_help_lists_choices() -> None:
     sections = sections_for(RowKind.TIMELINE_RESET)
     description = _description_section(sections)
     assert description is not None
-    assert description.title == "Reset timeline"
+    assert description.title == "Reset Timeline"
     assert description.entries == TIMELINE_RESET_HELP_ENTRIES
     assert [name for name, _ in description.entries] == ["Layers off", "Layers on"]
     keyboard = _keyboard_section(sections)
@@ -498,7 +498,7 @@ def test_timeline_reset_help_lists_choices() -> None:
 def test_preview_quality_help_lists_modes() -> None:
     description = _description_section(sections_for(RowKind.SETTINGS_PREVIEW_QUALITY))
     assert description is not None
-    assert description.title == "Preview quality"
+    assert description.title == "Preview Quality"
     assert "live view only" in " ".join(description.lines)
     assert description.entries == EDITOR_PREVIEW_QUALITY_HELP_ENTRIES
 
@@ -514,7 +514,7 @@ def test_preset_list_help() -> None:
     sections = sections_for(RowKind.TRACK_PRESET_LIST)
     description = _description_section(sections)
     assert description is not None
-    assert description.title == "preset list"
+    assert description.title == "Preset List"
     assert description.lines == (
         "Ordered presets used for automatic switching on this layer.",
         "Reorder, delete, or add the currently playing preset.",
@@ -528,7 +528,7 @@ def test_preset_list_entry_help() -> None:
     description = _description_section(sections)
     keyboard = _keyboard_section(sections)
     assert description is not None
-    assert description.title == "preset list entry"
+    assert description.title == "Preset List Entry"
     assert description.lines == (
         "Preset in this layer's switching list.",
         "Enter auditions this preset and pauses switching.",
@@ -568,7 +568,7 @@ def test_preset_list_add_and_resume_switching_help() -> None:
     resume_description = _description_section(resume_sections)
     resume_keyboard = _keyboard_section(resume_sections)
     assert resume_description is not None
-    assert resume_description.title == "Resume switching"
+    assert resume_description.title == "Resume Switching"
     assert resume_description.lines == (
         "End manual browsing of presets and resume preset switching.",
     )
@@ -1090,3 +1090,16 @@ def test_help_description_lines_are_whole_sentences() -> None:
         for line in lines or ():
             assert re.search(r"[.!?:)]$", line), (name, line)
             assert not re.search(r"[.!?] +[A-Z]", line), (name, line)
+
+
+def test_help_titles_are_capital_case() -> None:
+    import re
+
+    from cleave.effects.registry import EFFECT_IDS, effect_help_title
+    from cleave.viz.row_spec import ROW_SPECS
+
+    titles = [spec.help_title for spec in ROW_SPECS.values() if spec.help_title]
+    titles += [effect_help_title(effect_id) for effect_id in EFFECT_IDS]
+    for title in titles:
+        for word in re.findall(r"[A-Za-z][A-Za-z']*", title):
+            assert word[0].isupper(), title

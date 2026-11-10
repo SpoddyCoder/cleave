@@ -471,7 +471,7 @@ SPECS: dict[RowKind, RowSpec] = {
         apply_horizontal=_apply_track_enabled,
         choice=bool_choice(lambda s, d: _track_block(s, d).runtime.enabled),
         inert=lambda state, _desc: state.timeline.enabled,
-        help_title="Layer enabled",
+        help_title="Layer Enabled",
         help_description=(
             "Shows or hides this layer.",
             "While the timeline is on, it controls layer visibility instead.",
@@ -486,7 +486,7 @@ SPECS: dict[RowKind, RowSpec] = {
         format_value=_format_track_solo,
         apply_horizontal=_apply_track_solo,
         choice=bool_choice(lambda s, d: s.solo_slot == d.slot),
-        help_title="Layer solo",
+        help_title="Layer Solo",
         help_description=("Shows this layer on its own.",),
         parent_group="track",
         blocked_by_section_lock=False,
@@ -498,7 +498,7 @@ SPECS: dict[RowKind, RowSpec] = {
         format_value=_format_track_locked,
         apply_horizontal=_apply_track_locked,
         choice=bool_choice(lambda s, d: _track_block(s, d).runtime.locked, lock_text),
-        help_title="Layer lock",
+        help_title="Layer Lock",
         help_description=("Locked layer settings cannot be edited.",),
         parent_group="track",
         blocked_by_section_lock=False,
@@ -570,7 +570,7 @@ SPECS: dict[RowKind, RowSpec] = {
         panel_label="preset switching",
         present_style=RowPresentStyle.HEADING,
         fit_strategy=FitStrategy.NONE,
-        help_title="Preset switching",
+        help_title="Preset Switching",
         help_description=(
             "Automatic preset list advances for this layer.",
         ),
@@ -583,7 +583,7 @@ SPECS: dict[RowKind, RowSpec] = {
         apply_horizontal=noop_horizontal,
         apply_action=_apply_preset_switching_resume_action,
         fit_strategy=FitStrategy.NONE,
-        help_title="Resume switching",
+        help_title="Resume Switching",
         help_description=(
             "End manual browsing of presets and resume preset switching.",
         ),
@@ -614,7 +614,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.HEADING,
         format_value=_format_track_preset_list_count,
         fit_strategy=FitStrategy.NONE,
-        help_title="preset list",
+        help_title="Preset List",
         help_description=(
             "Ordered presets used for automatic switching on this layer.",
             "Reorder, delete, or add the currently playing preset.",
@@ -630,7 +630,7 @@ SPECS: dict[RowKind, RowSpec] = {
         format_markers=_format_track_preset_list_item_markers,
         apply_action=_apply_preset_list_item_action,
         fit_strategy=FitStrategy.NONE,
-        help_title="preset list entry",
+        help_title="Preset List Entry",
         help_description=(
             "Preset in this layer's switching list.",
             "Enter auditions this preset and pauses switching.",
@@ -666,7 +666,7 @@ SPECS: dict[RowKind, RowSpec] = {
         apply_horizontal=noop_horizontal,
         apply_action=_apply_preset_list_populate_action,
         fit_strategy=FitStrategy.NONE,
-        help_title="Populate presets",
+        help_title="Populate Presets",
         help_entries=(("Enter", "open directory selection modal"),),
         help_description=(
             "Replace the entire preset list with ones chosen from a directory.",
@@ -680,7 +680,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_track_preset_duration,
         apply_horizontal=_apply_track_preset_duration,
-        help_title="Preset duration",
+        help_title="Preset Duration",
         help_entries=(("Left/Right", "step value"),),
         help_description=(
             "Seconds between timer advances, and projectM preset duration.",
@@ -694,7 +694,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_track_soft_cut_duration,
         apply_horizontal=_apply_track_soft_cut_duration,
-        help_title="Soft cut",
+        help_title="Soft Cut",
         help_entries=(("Left/Right", "step value"),),
         help_description=(
             "Duration of the crossfade when projectM blends between presets.",
@@ -708,7 +708,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_track_easter_egg,
         apply_horizontal=_apply_track_easter_egg,
-        help_title="Easter egg",
+        help_title="Easter Egg",
         help_entries=(
             ("Left/Right", "step value"),
             ("PgUp/PgDn", "large step"),
@@ -726,7 +726,7 @@ SPECS: dict[RowKind, RowSpec] = {
         format_value=_format_track_preset_start_clean,
         apply_horizontal=_apply_track_preset_start_clean,
         choice=bool_choice(lambda s, d: _track_block(s, d).runtime.preset_start_clean, preset_start_clean_display),
-        help_title="Start clean",
+        help_title="Start Clean",
         help_entries=(("Left/Right", "yes / no"),),
         help_description=(
             "When enabled, each new preset starts with a blank canvas instead of inheriting the previous frame.",
@@ -741,7 +741,7 @@ SPECS: dict[RowKind, RowSpec] = {
         format_value=_format_track_hard_cut_enabled,
         apply_horizontal=_apply_track_hard_cut_enabled,
         choice=bool_choice(lambda s, d: _track_block(s, d).runtime.hard_cut_enabled, hard_cut_enabled_display),
-        help_title="Hard cut",
+        help_title="Hard Cut",
         help_entries=(("Left/Right", "enabled / disabled"),),
         help_description=(
             "Whether projectM can switch presets instantly on strong beats (bypassing soft cut).",
@@ -755,7 +755,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_track_hard_cut_duration,
         apply_horizontal=_apply_track_hard_cut_duration,
-        help_title="Hard cut min",
+        help_title="Hard Cut Min",
         help_entries=(("Left/Right", "step value"),),
         help_description=(
             "Time window after a hard cut before another can fire.",
@@ -769,7 +769,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_track_hard_cut_sensitivity,
         apply_horizontal=_apply_track_hard_cut_sensitivity,
-        help_title="Hard cut sens",
+        help_title="Hard Cut Sens",
         help_entries=(("Left/Right", "step value"),),
         help_description=(
             "Beat energy threshold required to trigger a hard cut.",
@@ -801,7 +801,7 @@ SPECS: dict[RowKind, RowSpec] = {
         format_value=_format_track_blend,
         apply_horizontal=_apply_track_blend,
         choice=options_choice(BLEND_MODES, lambda s, d: _track_block(s, d).runtime.blend_mode, jump=_jump_track_blend),
-        help_title="Blend mode",
+        help_title="Blend Mode",
         help_description=(
             "How this layer is composited onto the layers below it.",
             "Ignored while Pattern Mask is enabled.",
@@ -830,7 +830,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_track_beat,
         apply_horizontal=_apply_track_beat,
-        help_title="Beat sensitivity",
+        help_title="Beat Sensitivity",
         help_description=(
             "Beat sensitivity multiplier for this layer.",
             "Higher values make the visuals more reactive.",
@@ -900,7 +900,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.FULL_LINE,
         apply_action=_apply_layer_delete_action,
         fit_strategy=FitStrategy.NONE,
-        help_title="Delete layer",
+        help_title="Delete Layer",
         help_description=(
             "Remove this layer permanently.",
             "At least one layer must remain.",

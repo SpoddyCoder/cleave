@@ -169,7 +169,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_project_milkdrop_beat,
         apply_horizontal=_apply_project_milkdrop_beat,
-        help_title="Default beat sensitivity",
+        help_title="Default Beat Sensitivity",
         help_entries=(
             ("Left/Right", "adjust (0.1)"),
             ("PgUp/PgDn", "large step (0.5)"),
@@ -203,7 +203,7 @@ SPECS: dict[RowKind, RowSpec] = {
         format_value=_format_project_compositor_hdr,
         apply_horizontal=_apply_project_compositor_hdr,
         choice=bool_choice(lambda s, _d: s.project.compositor_hdr),
-        help_title="HDR compositing",
+        help_title="HDR Compositing",
         help_entries=(("Left/Right", "off / on"),),
         help_description=(
             "16-bit float compositing when on; 8-bit when off.",
@@ -235,7 +235,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_project_resolution_width,
         apply_horizontal=_apply_project_resolution_width,
-        help_title="Resolution width",
+        help_title="Resolution Width",
         help_entries=(
             ("Left/Right", f"adjust width ({RESOLUTION_STEP} px)"),
             ("PgUp/PgDn", f"large step ({RESOLUTION_STEP_LARGE} px)"),
@@ -254,7 +254,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_project_resolution_height,
         apply_horizontal=_apply_project_resolution_height,
-        help_title="Resolution height",
+        help_title="Resolution Height",
         help_entries=(
             ("Left/Right", f"adjust height ({RESOLUTION_STEP} px)"),
             ("PgUp/PgDn", f"large step ({RESOLUTION_STEP_LARGE} px)"),
@@ -285,7 +285,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.PATH_ICON,
         format_value=_format_project_render_output,
         fit_strategy=FitStrategy.PATH,
-        help_title="Render output",
+        help_title="Render Output",
         help_entries=(("Left/Right", "not editable"),),
         help_description=(
             "Default MP4 path in this project's renders directory.",
@@ -300,7 +300,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_project_render_fps,
         apply_horizontal=_apply_project_render_fps,
-        help_title="Render fps",
+        help_title="Render FPS",
         help_entries=(
             ("Left/Right", f"adjust fps ({RENDER_FPS_STEP})"),
             ("PgUp/PgDn", f"large step ({RENDER_FPS_STEP_LARGE})"),
@@ -317,7 +317,7 @@ SPECS: dict[RowKind, RowSpec] = {
         format_value=_format_project_render_quality,
         apply_horizontal=_apply_project_render_quality,
         choice=options_choice(PROJECT_RENDER_QUALITIES, lambda s, _d: s.project.quality),
-        help_title="Render quality",
+        help_title="Render Quality",
         help_entries=(("Left/Right", "choose mode"),),
         help_description=("Encode and layer-resolution trade-off for this render.",),
         help_mode_entries=PROJECT_RENDER_QUALITY_HELP_ENTRIES,
@@ -331,7 +331,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_project_render_start,
         apply_horizontal=_apply_project_render_start,
-        help_title="Render start",
+        help_title="Render Start",
         help_entries=(
             ("Left/Right", "adjust start (1s)"),
             ("PgUp/PgDn", "large step (10s)"),
@@ -347,7 +347,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_project_render_end,
         apply_horizontal=_apply_project_render_end,
-        help_title="Render end",
+        help_title="Render End",
         help_entries=(
             ("Left/Right", "adjust end (1s)"),
             ("PgUp/PgDn", "large step (10s)"),

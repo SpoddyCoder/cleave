@@ -364,7 +364,7 @@ SPECS: dict[RowKind, RowSpec] = {
         format_value=_format_post_fx_enabled,
         apply_horizontal=_apply_post_fx_enabled,
         choice=bool_choice(lambda s, _d: s.post_fx.enabled),
-        help_title="Post FX enabled",
+        help_title="Post FX Enabled",
         help_description=(
             "Turns fade, highlight rolloff, and chroma boost on or off.",
             "The visual limiter has its own switch.",
@@ -378,7 +378,7 @@ SPECS: dict[RowKind, RowSpec] = {
         format_value=_format_post_fx_locked,
         apply_horizontal=_apply_post_fx_locked,
         choice=bool_choice(lambda s, _d: s.post_fx.locked, lock_text),
-        help_title="Post FX lock",
+        help_title="Post FX Lock",
         help_description=("Locked Post FX settings cannot be edited.",),
         blocked_by_section_lock=False,
     ),
@@ -398,7 +398,7 @@ SPECS: dict[RowKind, RowSpec] = {
         panel_label="fade in",
         present_style=RowPresentStyle.HEADING,
         fit_strategy=FitStrategy.NONE,
-        help_title="Fade in",
+        help_title="Fade In",
         help_description=(
             "Offsets from the start of the song.",
             "The picture rises from start to end.",
@@ -451,7 +451,7 @@ SPECS: dict[RowKind, RowSpec] = {
         panel_label="fade out",
         present_style=RowPresentStyle.HEADING,
         fit_strategy=FitStrategy.NONE,
-        help_title="Fade out",
+        help_title="Fade Out",
         help_description=(
             "Offsets counted backward from the end of the song.",
             "The picture falls from start to end.",
@@ -508,7 +508,7 @@ SPECS: dict[RowKind, RowSpec] = {
         panel_label="highlight rolloff",
         present_style=RowPresentStyle.HEADING,
         fit_strategy=FitStrategy.NONE,
-        help_title="Highlight rolloff",
+        help_title="Highlight Rolloff",
         help_description=(
             "Compresses bright hotspots during layer compositing.",
             "Prevents stacked black-key layers from washing out to white.",
@@ -627,7 +627,7 @@ SPECS: dict[RowKind, RowSpec] = {
         panel_label="chroma boost",
         present_style=RowPresentStyle.HEADING,
         fit_strategy=FitStrategy.NONE,
-        help_title="Chroma boost",
+        help_title="Chroma Boost",
         help_description=(
             "Boosts saturation or vibrance around Rec.709 luma.",
             "Useful after highlight compression to restore perceived color.",
@@ -682,7 +682,7 @@ SPECS: dict[RowKind, RowSpec] = {
         panel_label="visual limiter",
         present_style=RowPresentStyle.HEADING,
         fit_strategy=FitStrategy.NONE,
-        help_title="Visual limiter",
+        help_title="Visual Limiter",
         help_description=(
             "Ducks stacked layers from composite busyness.",
             "Works with the timeline off.",
@@ -699,7 +699,7 @@ SPECS: dict[RowKind, RowSpec] = {
         format_value=_format_post_fx_limiter_enabled,
         apply_horizontal=_apply_post_fx_limiter_enabled,
         choice=bool_choice(lambda s, _d: s.post_fx.limiter.enabled),
-        help_title="Visual limiter enabled",
+        help_title="Visual Limiter Enabled",
         help_entries=(("Left/Right", "off / on"),),
         help_description=(
             "When off, the limiter is idle and remaining knobs hide.",
@@ -714,7 +714,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_post_fx_limiter_threshold,
         apply_horizontal=_apply_post_fx_limiter_threshold,
-        help_title="Visual limiter threshold",
+        help_title="Visual Limiter Threshold",
         help_entries=(
             ("Left", "decrease threshold"),
             ("Right", "increase threshold"),
@@ -732,7 +732,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_post_fx_limiter_ratio,
         apply_horizontal=_apply_post_fx_limiter_ratio,
-        help_title="Visual limiter ratio",
+        help_title="Visual Limiter Ratio",
         help_entries=(
             ("Left", "decrease ratio"),
             ("Right", "increase ratio"),
@@ -751,7 +751,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_post_fx_limiter_release,
         apply_horizontal=_apply_post_fx_limiter_release,
-        help_title="Visual limiter release",
+        help_title="Visual Limiter Release",
         help_entries=(
             ("Left", "decrease release"),
             ("Right", "increase release"),

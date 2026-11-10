@@ -111,7 +111,7 @@ SPECS: dict[RowKind, RowSpec] = {
         format_value=_format_settings_preview_quality,
         apply_horizontal=_apply_settings_preview_quality,
         choice=options_choice(EDITOR_PREVIEW_QUALITIES, lambda s, _d: s.settings.preview_quality, jump=_jump_settings_preview_quality),
-        help_title="Preview quality",
+        help_title="Preview Quality",
         help_entries=(("Left/Right", "choose mode"),),
         help_description=(
             "Trade-off between visual quality and CPU/GPU load.",
@@ -144,7 +144,7 @@ SPECS: dict[RowKind, RowSpec] = {
         format_value=_format_settings_navigator_side,
         apply_horizontal=_apply_settings_navigator_side,
         choice=options_choice(COLUMN_SIDES, lambda s, _d: s.settings.navigator_side),
-        help_title="Navigator side",
+        help_title="Navigator Side",
         help_entries=(("Left/Right", "choose side"),),
         help_description=(
             "Side of the window for the navigator and inspector.",
@@ -161,7 +161,7 @@ SPECS: dict[RowKind, RowSpec] = {
         format_value=_format_settings_help_side,
         apply_horizontal=_apply_settings_help_side,
         choice=options_choice(COLUMN_SIDES, lambda s, _d: s.settings.help_side),
-        help_title="Help side",
+        help_title="Help Side",
         help_entries=(("Left/Right", "choose side"),),
         help_description=(
             "Side of the window for the help column.",
@@ -189,7 +189,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_settings_ui_notification_display,
         apply_horizontal=_apply_settings_ui_notification_display,
-        help_title="Notification time",
+        help_title="Notification Time",
         help_entries=(
             ("Left/Right", "adjust how long toasts stay visible"),
             ("PgUp/PgDn", "large step"),
@@ -210,7 +210,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_settings_ui_scale,
         apply_horizontal=_apply_settings_ui_scale,
-        help_title="UI scale",
+        help_title="UI Scale",
         help_entries=(
             ("Left/Right", "adjust scale (10%)"),
             ("PgUp/PgDn", "large step (50%)"),
@@ -230,7 +230,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_settings_ui_navigator_height,
         apply_horizontal=_apply_settings_ui_navigator_height,
-        help_title="Navigator height",
+        help_title="Navigator Height",
         help_entries=(
             ("Left/Right", "adjust height (10 px)"),
             ("PgUp/PgDn", "large step (50 px)"),
@@ -252,7 +252,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_settings_residual_latency_ms,
         apply_horizontal=_apply_settings_residual_latency_ms,
-        help_title="Residual latency",
+        help_title="Residual Latency",
         help_entries=(
             ("Left/Right", "adjust latency (10 ms)"),
             ("PgUp/PgDn", "large step (50 ms)"),

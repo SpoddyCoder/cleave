@@ -174,7 +174,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.HEADING,
         fit_strategy=FitStrategy.NONE,
         visibility_icon=_visibility_pattern_mask,
-        help_title="Pattern mask",
+        help_title="Pattern Mask",
         help_description=(
             "Spatial territories for visible layers during composite.",
             "Feather 0% assigns each pixel to one layer; 100% blends at edges.",
@@ -198,7 +198,7 @@ SPECS: dict[RowKind, RowSpec] = {
         panel_label="edges & motion",
         present_style=RowPresentStyle.HEADING,
         fit_strategy=FitStrategy.NONE,
-        help_title="Edges & motion",
+        help_title="Edges & Motion",
         help_description=(
             "How soft territory edges are, and how long the layout morphs when layers toggle.",
         ),
@@ -211,7 +211,7 @@ SPECS: dict[RowKind, RowSpec] = {
         format_value=_format_pattern_mask_enabled,
         apply_horizontal=_apply_pattern_mask_enabled,
         choice=bool_choice(lambda s, _d: s.pattern_mask.enabled),
-        help_title="Pattern mask enabled",
+        help_title="Pattern Mask Enabled",
         help_description=(
             "When on, the mask replaces each layer's Compositing rows.",
         ),
@@ -224,7 +224,7 @@ SPECS: dict[RowKind, RowSpec] = {
         format_value=_format_pattern_mask_locked,
         apply_horizontal=_apply_pattern_mask_locked,
         choice=bool_choice(lambda s, _d: s.pattern_mask.locked, lock_text),
-        help_title="Pattern mask lock",
+        help_title="Pattern Mask Lock",
         help_description=("Locked pattern mask settings cannot be edited.",),
         blocked_by_section_lock=False,
     ),

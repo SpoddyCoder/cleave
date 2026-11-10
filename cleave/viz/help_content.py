@@ -451,7 +451,7 @@ def sections_for(
         )
     elif row_kind == RowKind.LAYER_MANAGEMENT_DELETE:
         primary = HelpSection(
-            behavior.help_title or "Delete layer",
+            behavior.help_title or "Delete Layer",
             (("Enter/Delete", "delete layer"),),
         )
     elif behavior.affordance in _ENTER_AFFORDANCES:
