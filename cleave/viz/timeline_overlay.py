@@ -64,13 +64,13 @@ from cleave.viz.theme import (
     PLAYHEAD,
     PLAYHEAD_FLASH,
     REC_BG,
-    SCROLLBAR_THUMB,
-    SCROLLBAR_TRACK,
     SELECTED_WASH_ALPHA,
     SONG_BOUND,
     SONG_MARKER,
     SONG_MARKER_SELECTED,
     TIMELINE_BAR_ON,
+    TIMELINE_SCROLL_RAIL,
+    TIMELINE_SCROLL_THUMB,
     VALUE,
     timeline_panel_height_px,
     timeline_ui_metrics,
@@ -1460,12 +1460,23 @@ class TimelineOverlay:
         state: TimelineViewState,
         layout: _TimelineLayout,
     ) -> None:
-        """Track under the rows; the thumb is the visible share of the song."""
+        """Rail under the rows; the pill thumb is the visible share of the song.
+
+        A thin rail and a rounded neutral thumb keep it from reading as a
+        level bar. The whole song in view draws the rail alone.
+        """
         track_x, track_y, track_w, track_h = layout.scrollbar_rect
         if track_w <= 0 or track_h <= 0:
             return
         view_start, view_end = view_window(state)
-        pygame.draw.rect(panel, SCROLLBAR_TRACK, layout.scrollbar_rect)
+        rail_h = max(1, track_h // 3)
+        pygame.draw.rect(
+            panel,
+            TIMELINE_SCROLL_RAIL,
+            (track_x, track_y + (track_h - rail_h) // 2, track_w, rail_h),
+        )
+        if view_end - view_start >= state.duration_sec:
+            return
         thumb_x, thumb_w = scrollbar_thumb_span(
             track_w,
             view_start,
@@ -1474,7 +1485,10 @@ class TimelineOverlay:
             min_thumb=timeline_ui_metrics().scrollbar_min_thumb,
         )
         pygame.draw.rect(
-            panel, SCROLLBAR_THUMB, (track_x + thumb_x, track_y, thumb_w, track_h)
+            panel,
+            TIMELINE_SCROLL_THUMB,
+            (track_x + thumb_x, track_y, thumb_w, track_h),
+            border_radius=track_h // 2,
         )
 
     def _draw_role_glyphs(

@@ -37,8 +37,8 @@ def test_timeline_ui_metrics_default_scale() -> None:
 
 
 def test_timeline_panel_height_px_scales_with_ui_scale() -> None:
-    assert timeline_panel_height_px(4, scale=1.0) == 105
-    assert timeline_panel_height_px(4, scale=1.2) == 127
+    assert timeline_panel_height_px(4, scale=1.0) == 106
+    assert timeline_panel_height_px(4, scale=1.2) == 129
 
 
 def test_timeline_ui_metrics_row_height_scales() -> None:

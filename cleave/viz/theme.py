@@ -182,7 +182,7 @@ def timeline_ui_metrics(*, scale: float | None = None) -> TimelineUiMetrics:
         playhead_width=scale_px(2, scale=scale),
         rec_badge_gap=scale_px(4, scale=scale),
         rec_badge_pad_y=scale_px(4, scale=scale),
-        scrollbar_height=scale_px(6, scale=scale),
+        scrollbar_height=scale_px(8, scale=scale),
         scrollbar_gap=scale_px(3, scale=scale),
         scrollbar_min_thumb=scale_px(12, scale=scale),
     )
@@ -260,5 +260,9 @@ SONG_MARKER_SELECTED: tuple[int, int, int] = (255, 170, 40)
 BORDER_WIDTH: int = 2
 SCROLLBAR_TRACK: tuple[int, int, int] = DISABLED
 SCROLLBAR_THUMB: tuple[int, int, int] = TIMELINE_BAR_ON
+# Timeline strip scrollbar: a faint rail and a neutral pill, so it does not
+# read as a layer row's level bar.
+TIMELINE_SCROLL_RAIL: tuple[int, int, int] = SONG_BOUND
+TIMELINE_SCROLL_THUMB: tuple[int, int, int] = MUTED
 
 FADE_DURATION_SEC: float = 2.0

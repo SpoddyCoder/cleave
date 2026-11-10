@@ -1619,7 +1619,7 @@ def test_scrollbar_thumb_span_tracks_the_window() -> None:
 
 
 def test_scrollbar_hits_thumb_and_track_under_the_rows() -> None:
-    from cleave.viz.theme import SCROLLBAR_THUMB, SCROLLBAR_TRACK
+    from cleave.viz.theme import TIMELINE_SCROLL_RAIL, TIMELINE_SCROLL_THUMB
 
     pygame.init()
     overlay = TimelineOverlay()
@@ -1639,8 +1639,8 @@ def test_scrollbar_hits_thumb_and_track_under_the_rows() -> None:
     assert track is not None and track.target == "scroll_track"
     assert track.t_sec == pytest.approx(10.0, abs=0.2)
     assert overlay.hit_at(px + 4, bar_y) is None
-    assert tuple(surface.get_at((thumb_x, bar_y)))[:3] == SCROLLBAR_THUMB
-    assert tuple(surface.get_at((track_x, bar_y)))[:3] == SCROLLBAR_TRACK
+    assert tuple(surface.get_at((thumb_x, bar_y)))[:3] == TIMELINE_SCROLL_THUMB
+    assert tuple(surface.get_at((track_x, bar_y)))[:3] == TIMELINE_SCROLL_RAIL
     # 80 hidden seconds over the thumb's free travel.
     travel = bar_width - round(bar_width * 0.2)
     assert overlay.scrollbar_sec_per_px() == pytest.approx(80.0 / travel, rel=0.01)
@@ -1652,6 +1652,17 @@ def test_scrollbar_cannot_move_at_full_zoom() -> None:
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
     _draw(overlay, surface, _view_state(duration_sec=100.0))
     assert overlay.scrollbar_sec_per_px() == 0.0
+    # Only the rail shows: no thumb to mistake for a full level bar.
+    from cleave.viz.theme import TIMELINE_SCROLL_RAIL
+
+    px, py, _, ph = overlay.panel_rect
+    bar_left, bar_width, _ = overlay.bar_layout
+    metrics = timeline_ui_metrics()
+    mid_y = py + ph - metrics.padding - metrics.scrollbar_height // 2 - 1
+    top_y = py + ph - metrics.padding - metrics.scrollbar_height
+    mid_x = px + bar_left + bar_width // 2
+    assert tuple(surface.get_at((mid_x, mid_y)))[:3] == TIMELINE_SCROLL_RAIL
+    assert tuple(surface.get_at((mid_x, top_y)))[:3] != TIMELINE_SCROLL_RAIL
 
 
 def test_playhead_and_cues_outside_the_window_are_not_drawn() -> None:
