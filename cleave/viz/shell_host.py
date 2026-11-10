@@ -29,6 +29,7 @@ from cleave.viz.inspector_controls import (
     inspector_command_locked,
 )
 from cleave.viz.menu_bar import MenuBarState, menus_for_session
+from cleave.viz.pointer_cursor import PointerShape, request_pointer
 from cleave.viz.timeline_pointer import TimelinePointer
 from cleave.viz.material_icons import (
     LOCK_GLYPH,
@@ -965,15 +966,20 @@ def _draw_transport_notice(
     return chip
 
 
-def _transport_notice_clicked(chip: tuple[float, float, float, float]) -> bool:
-    """True when this frame's left click landed on the toast chip."""
-    if not bool(imgui.get_io().mouse_clicked[0]):
-        return False
+def _transport_notice_hovered(chip: tuple[float, float, float, float]) -> bool:
+    """True when the pointer is on the toast chip."""
     if not bool(imgui.is_window_hovered()):
         return False
     x, y, width, height = chip
     pos = imgui.get_io().mouse_pos
     return x <= pos.x < x + width and y <= pos.y < y + height
+
+
+def _transport_notice_clicked(chip: tuple[float, float, float, float]) -> bool:
+    """True when this frame's left click landed on the toast chip."""
+    if not bool(imgui.get_io().mouse_clicked[0]):
+        return False
+    return _transport_notice_hovered(chip)
 
 
 def _stroke_h_rule(
@@ -1108,15 +1114,26 @@ def _button_text_role(enabled: bool, locked: bool) -> tuple[int, int, int]:
     return VALUE if enabled else DISABLED
 
 
+def _hand_on_hover() -> None:
+    """Ask for the hand pointer while the item just drawn is hovered."""
+    if imgui.is_item_hovered():
+        request_pointer(PointerShape.HAND)
+
+
 def _draw_button(
-    label: str, *, text_role: tuple[int, int, int], selected: bool
+    label: str, *, text_role: tuple[int, int, int], selected: bool, enabled: bool
 ) -> bool:
-    """A bordered panel button. Returns whether it was clicked."""
+    """A bordered panel button. Returns whether it was clicked.
+
+    A button that is not *enabled* keeps the arrow pointer.
+    """
     imgui.push_style_color(imgui.Col_.border, rgba(BUTTON_BORDER))
     imgui.push_style_color(imgui.Col_.text, rgba(text_role))
     imgui.push_style_var(imgui.StyleVar_.frame_border_size, 1.0)
     try:
         clicked = imgui.button(label)
+        if enabled:
+            _hand_on_hover()
     finally:
         imgui.pop_style_var()
         imgui.pop_style_color(2)
@@ -1209,7 +1226,6 @@ class ShellHost:
         self._navigator_height: int | None = None
         self._splitter: str | None = None
         self._splitter_down = (0.0, 0.0)
-        self._resize_cursor = pygame.SYSTEM_CURSOR_ARROW
         self.transport_notice_clicked = False
         self.top_layer = TopLayer()
 
@@ -1414,7 +1430,6 @@ class ShellHost:
             return False
         self._splitter = which
         self._splitter_down = (float(pos[0]), float(pos[1]))
-        self._set_resize_cursor(which)
         return True
 
     def _end_splitter_drag(self, pos: tuple[float, float]) -> None:
@@ -1446,34 +1461,56 @@ class ShellHost:
             self._insp_width = None
             self._help_width = None
         self._splitter = None
-        # Layout catches up after this event. Keep the resize cursor until
-        # the next motion, which tests the updated boundaries.
-        self._set_resize_cursor(which)
 
     def _cancel_splitter_drag(self) -> None:
         self._splitter = None
         self._navigator_height = None
-        self._set_resize_cursor(None)
 
     def _track_splitter_motion(self, x: float, y: float) -> None:
         if self._splitter is not None:
             self._assign_splitter_request(self._splitter, (x, y))
-            self._set_resize_cursor(self._splitter)
-            return
-        self._set_resize_cursor(self._splitter_at(x, y))
 
-    def _set_resize_cursor(self, which: str | None) -> None:
-        """Arrow for None, up-down for ``nav``, left-right for a column."""
-        if which is None:
-            cursor = pygame.SYSTEM_CURSOR_ARROW
-        elif which == "nav":
-            cursor = pygame.SYSTEM_CURSOR_SIZENS
-        else:
-            cursor = pygame.SYSTEM_CURSOR_SIZEWE
-        if cursor == self._resize_cursor:
+    def _request_gesture_pointer(self) -> None:
+        """Pointer for the strip, a live drag, and the splitters.
+
+        Called after the shell windows, so these win over a widget's request.
+        A modal or top-layer surface under the pointer keeps its own.
+        """
+        mouse = imgui.get_mouse_pos()
+        if self._modal_has_pointer() or self.top_layer.captures_pointer(
+            float(mouse.x), float(mouse.y)
+        ):
             return
-        pygame.mouse.set_cursor(cursor)
-        self._resize_cursor = cursor
+        shape = self._strip_pointer_shape()
+        if self._row_drag is not None:
+            shape = PointerShape.MOVE
+        elif self._value_drag_crossed and imgui.is_mouse_down(0):
+            shape = PointerShape.RESIZE_EW
+        splitter = self._splitter
+        if splitter is None and not imgui.is_mouse_down(0):
+            splitter = self._splitter_at(float(mouse.x), float(mouse.y))
+        if splitter is not None:
+            shape = (
+                PointerShape.RESIZE_NS
+                if splitter == "nav"
+                else PointerShape.RESIZE_EW
+            )
+        if shape is not None:
+            request_pointer(shape)
+
+    def _strip_pointer_shape(self) -> PointerShape | None:
+        """Hand over a strip button or label, left-right over the ruler or a scrub."""
+        pointer = self._strip_pointer
+        if pointer is None:
+            return None
+        timeline = self._controls.session.timeline
+        if not timeline.panel_open:
+            return None
+        if pointer.scrubbing or pointer.over_ruler:
+            return PointerShape.RESIZE_EW
+        if pointer.hover_pressable:
+            return PointerShape.HAND
+        return None
 
     def draw_windows(
         self,
@@ -1507,6 +1544,7 @@ class ShellHost:
             in_bar = 0.0 <= mouse.y < float(self._menu_bar_height_px)
             if not in_bar:
                 menu_state.blur()
+        self._request_gesture_pointer()
         self._release_value_drag()
         self._release_nudge_swallow()
         return rule_y
@@ -1759,8 +1797,11 @@ class ShellHost:
         line = None if notice is None else transport_notice(notice)
         if line is not None:
             chip = _draw_transport_notice(line)
-            if line.timed and chip is not None and _transport_notice_clicked(chip):
-                self.transport_notice_clicked = True
+            if line.timed and chip is not None:
+                if _transport_notice_hovered(chip):
+                    request_pointer(PointerShape.HAND)
+                if _transport_notice_clicked(chip):
+                    self.transport_notice_clicked = True
         origin = imgui.get_window_pos()
         size = imgui.get_window_size()
         _stroke_h_rule(
@@ -1806,6 +1847,12 @@ class ShellHost:
         self._paint_transport_text(
             part, rgba(part.color), hovered=hovered or active
         )
+        if hovered or active:
+            request_pointer(
+                PointerShape.HAND
+                if field is TransportField.PLAY
+                else PointerShape.RESIZE_EW
+            )
         if field is TransportField.PLAY:
             if pressed:
                 transport.toggle_pause()
@@ -1890,6 +1937,7 @@ class ShellHost:
                             0,
                             imgui.ImVec2(width, 0.0),
                         )
+                        _hand_on_hover()
                     finally:
                         if row_bright:
                             imgui.pop_style_color()
@@ -1977,6 +2025,7 @@ class ShellHost:
                     ),
                 )
                 color = rgba(NUDGE_HOVER_FG)
+                request_pointer(PointerShape.HAND)
             glyph = navigator_toggle_glyph(toggle)
             draw.add_text(
                 imgui.ImVec2(
@@ -2257,6 +2306,9 @@ class ShellHost:
                 imgui.get_color_u32(rgba(NUDGE_HOVER_BG, NUDGE_HOVER_BG_ALPHA / 255.0)),
             )
             color = rgba(NUDGE_HOVER_FG)
+            request_pointer(PointerShape.MOVE)
+        if blocked and hovered:
+            request_pointer(PointerShape.NOT_ALLOWED)
         glyph_width = imgui.calc_text_size(glyph).x
         draw.add_text(
             imgui.ImVec2(
@@ -2381,6 +2433,7 @@ class ShellHost:
         """A text field with a caret. *text_y* defaults to the field's top."""
         if imgui.is_mouse_hovering_rect(field_min, field_max):
             self._inline_field_hovered = True
+            request_pointer(PointerShape.TEXT)
         pad = imgui.get_style().frame_padding.x
         width = field_max.x - field_min.x
         draw = imgui.get_window_draw_list()
@@ -2434,7 +2487,10 @@ class ShellHost:
         draw.add_rect(swatch_min, swatch_max, imgui.get_color_u32(rgba(BUTTON_BORDER)))
         if not imgui.is_mouse_hovering_rect(swatch_min, swatch_max):
             return False
-        if clicked and not section_lock_blocks_mutation(state, desc):
+        locked = section_lock_blocks_mutation(state, desc)
+        if not locked and imgui.is_window_hovered():
+            request_pointer(PointerShape.HAND)
+        if clicked and not locked:
             self._controls.inspector.focus_row(row)
             self._controls.inline_edit.begin_colour(desc, target)
             self._picker_pos = imgui.ImVec2(swatch_min.x, swatch_max.y)
@@ -2460,9 +2516,12 @@ class ShellHost:
                     tuple(int(round(channel * 255.0)) for channel in picked)
                 )
             done = imgui.button("Done")
+            _hand_on_hover()
             if edit.target.optional:
                 imgui.same_line()
-                if imgui.button("None"):
+                cleared = imgui.button("None")
+                _hand_on_hover()
+                if cleared:
                     inline.set_colour(None)
                     done = True
             hovered = imgui.is_window_hovered(
@@ -2531,6 +2590,7 @@ class ShellHost:
                     ),
                 )
                 color = rgba(NUDGE_HOVER_FG)
+                request_pointer(PointerShape.HAND)
             draw.add_text(
                 imgui.ImVec2(
                     rect.min_x + space * 0.5,
@@ -2593,6 +2653,7 @@ class ShellHost:
         elif hit is not None and not hold.armed:
             hover_forward = hit.forward
         if hover_forward is not None:
+            request_pointer(PointerShape.HAND)
             self._paint_nudge_hover(
                 forward_rect if hover_forward else back_rect,
                 parts,
@@ -2834,6 +2895,7 @@ class ShellHost:
                     inspector_command_locked(self._controls, command_id),
                 ),
                 selected=selected,
+                enabled=enabled,
             )
             if selected:
                 self._insp_follow.follow((focus.selected_id, command_id))

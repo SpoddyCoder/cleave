@@ -57,6 +57,11 @@ BASE_UI_FONT_SIZE: int = 14
 BASE_UI_SCALE: float = 1.44
 # ImGui style and shell pixel values at 100% UI scale.
 SHELL_UI_SCALE: float = 1.2
+# Edge of the square mouse pointer image at 100% UI scale. The arrow fills
+# most of it.
+POINTER_BASE_PX: int = 24
+# White outline around the pointer at 100% UI scale.
+POINTER_OUTLINE_PX: float = 1.5
 BASE_TIMELINE_ROW_HEIGHT: int = 25
 # The timeline strip is this fraction of the UI scale at every scale.
 TIMELINE_SCALE: float = 0.8

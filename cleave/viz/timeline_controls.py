@@ -183,25 +183,9 @@ class TimelineControls:
                         )
                 return True
 
-            if tl.recording:
-                slot = self._slot_for_layer_index(_LAYER_KEY_INDEX[event.key])
-                if slot is not None:
-                    self._toggle_armed_layer_at(
-                        slot, current_sec(self.playback, self.duration_sec)
-                    )
-                return True
-
             slot = self._slot_for_layer_index(_LAYER_KEY_INDEX[event.key])
-            if slot is None:
-                return True
-
-            if self.playback.paused:
-                self._toggle_paused_stem_visibility(slot)
-                return True
-
-            if slot in tl.override_slots:
-                tl.override_visible[slot] = not tl.override_visible.get(slot, True)
-                self._refresh_visibility()
+            if slot is not None:
+                self._toggle_slot_visibility(slot)
             return True
 
         if event.key == pygame.K_RETURN and mod_shift(event.mod):
@@ -369,6 +353,39 @@ class TimelineControls:
         slot = self._slot_for_layer_index(row)
         if slot is not None:
             self._toggle_arm(slot)
+
+    def toggle_row_visibility(self, row: int) -> None:
+        """Focus *row* and toggle its visibility, as its number key does."""
+        self.focus_row(row)
+        slot = self._slot_for_layer_index(row)
+        if slot is not None:
+            self._toggle_slot_visibility(slot)
+
+    def row_visibility_toggleable(self, row: int) -> bool:
+        """Whether ``toggle_row_visibility`` would change *row* right now.
+
+        True while paused, for an armed row while recording, and for a row
+        with a visibility override. Plain playback leaves the row alone.
+        """
+        slot = self._slot_for_layer_index(row)
+        if slot is None:
+            return False
+        tl = self.session.timeline
+        if tl.recording:
+            return slot in tl.armed_slots and slot in tl.record_baseline
+        return bool(self.playback.paused) or slot in tl.override_slots
+
+    def _toggle_slot_visibility(self, slot: str) -> None:
+        tl = self.session.timeline
+        if tl.recording:
+            self._toggle_armed_layer_at(
+                slot, current_sec(self.playback, self.duration_sec)
+            )
+        elif self.playback.paused:
+            self._toggle_paused_stem_visibility(slot)
+        elif slot in tl.override_slots:
+            tl.override_visible[slot] = not tl.override_visible.get(slot, True)
+            self._refresh_visibility()
 
     def _notify(self, message: str) -> None:
         if self._on_notification is not None:

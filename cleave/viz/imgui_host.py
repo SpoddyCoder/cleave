@@ -34,6 +34,7 @@ from cleave.gl_state import restore_gl_state, save_gl_state
 from cleave.viz.imgui_theme import apply_imgui_style_scale, apply_imgui_theme
 from cleave.viz.overlay_primitives import overlay_font_path
 from cleave.viz.navigator import TWISTY_EXPANDED
+from cleave.viz.pointer_cursor import PointerCursors, requested_pointer
 from cleave.viz.theme import shell_scale, tuning_ui_metrics, ui_scale_generation
 
 RENDERER_CLASS = ProgrammablePipelineRenderer
@@ -341,6 +342,7 @@ class ImGuiHost:
         self._ui_scale_generation = ui_scale_generation()
         # ImFontConfig is copied, but the glyph-range buffers must outlive Build.
         self._glyph_ranges: tuple[Any, ...] = ()
+        self.pointer = PointerCursors()
 
     @classmethod
     def create(cls) -> ImGuiHost:
@@ -427,6 +429,7 @@ class ImGuiHost:
 
     def end_frame(self) -> None:
         imgui.render()
+        self.pointer.apply(requested_pointer())
         self._render_draw_data()
 
     def discard_input(self) -> None:

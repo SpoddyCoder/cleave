@@ -22,6 +22,7 @@ class _Geometry:
 class _Actions:
     def __init__(self, *, cue_hit: bool = False) -> None:
         self.cue_hit = cue_hit
+        self.eye_usable = True
         self.calls: list[tuple] = []
 
     def focus_row(self, row: int) -> None:
@@ -43,11 +44,17 @@ class _Actions:
     def toggle_arm_row(self, row: int) -> None:
         self.calls.append(("arm", row))
 
+    def toggle_row_visibility(self, row: int) -> None:
+        self.calls.append(("visibility", row))
+
+    def row_visibility_toggleable(self, row: int) -> bool:
+        return self.eye_usable
+
 
 def _session(panel_open: bool = True):
     return SimpleNamespace(
         layer_z_order=["layer_1", "layer_2"],
-        timeline=SimpleNamespace(panel_open=panel_open),
+        timeline=SimpleNamespace(panel_open=panel_open, strip_hover=None),
     )
 
 
@@ -217,6 +224,19 @@ def test_label_click_focuses_and_double_click_arms() -> None:
     assert actions.calls[-1] == ("focus", 1)
 
 
+def test_eye_click_toggles_row_visibility() -> None:
+    clock = _Clock()
+    actions = _Actions()
+    pointer = TimelinePointer(
+        _Geometry(StripHit(1, None, 0.2, target="eye")), actions, _session(), clock=clock
+    )
+    pointer.press(10, 10)
+    clock.now += 0.1
+    pointer.press(10, 10)
+    assert actions.calls == [("visibility", 1), ("visibility", 1)]
+    assert not pointer.scrubbing
+
+
 def test_label_then_bar_press_is_not_a_double_click() -> None:
     clock = _Clock()
     geometry = _Geometry(StripHit(0, None, 0.2, target="label"))
@@ -245,3 +265,35 @@ def test_hover_tracks_controls_and_clears() -> None:
     pointer.motion(5, 5)
     pointer.clear_hover()
     assert session.timeline.strip_hover is None
+
+
+def test_over_ruler_is_the_time_scale_clear_of_the_corner_buttons() -> None:
+    geometry = _Geometry(StripHit(None, 5.0, 0.2))
+    pointer = TimelinePointer(geometry, _Actions(), _session())
+    assert pointer.over_ruler is False
+    pointer.motion(5, 5)
+    assert pointer.over_ruler is True
+    geometry.hit = StripHit(None, None, 0.2, target="play")
+    pointer.motion(5, 5)
+    assert pointer.over_ruler is False
+    geometry.hit = StripHit(0, 5.0, 0.2)
+    pointer.motion(5, 5)
+    assert pointer.over_ruler is False
+    geometry.hit = StripHit(None, 5.0, 0.2)
+    pointer.motion(5, 5)
+    pointer.clear_hover()
+    assert pointer.over_ruler is False
+
+
+def test_hovered_eye_is_pressable_only_while_its_toggle_would_act() -> None:
+    geometry = _Geometry(StripHit(1, None, 0.2, target="eye"))
+    actions = _Actions()
+    pointer = TimelinePointer(geometry, actions, _session())
+    assert pointer.hover_pressable is False
+    pointer.motion(5, 5)
+    assert pointer.hover_pressable is True
+    actions.eye_usable = False
+    assert pointer.hover_pressable is False
+    geometry.hit = StripHit(1, None, 0.2, target="label")
+    pointer.motion(5, 5)
+    assert pointer.hover_pressable is True

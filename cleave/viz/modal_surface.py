@@ -13,6 +13,7 @@ from imgui_bundle import imgui
 from cleave.choice import ChoiceKind
 from cleave.viz.choice_widgets import draw_choice_list, draw_combo, draw_segments
 from cleave.viz.imgui_theme import rgba
+from cleave.viz.pointer_cursor import PointerShape, request_pointer
 from cleave.viz.text_edit import caret_line_column
 from cleave.viz.modal import (
     BUTTON_ROW_KINDS,
@@ -893,6 +894,8 @@ class ModalSurface:
             self._record_text(panel, x, y, clicked)
             return
         hit = _index_at(self.option_rects, x, y)
+        if hit is not None:
+            request_pointer(PointerShape.HAND)
         if clicked and hit is not None:
             self.intent = ModalPointerIntent(
                 ModalPointerKind.ACTIVATE_OPTION, index=hit
@@ -924,6 +927,10 @@ class ModalSurface:
         field = self.text_field_rect
         in_field = field is not None and _contains(field, x, y)
         button = _index_at(self.text_button_rects, x, y)
+        if in_field:
+            request_pointer(PointerShape.TEXT)
+        elif button is not None:
+            request_pointer(PointerShape.HAND)
         if clicked and in_field:
             self.intent = ModalPointerIntent(
                 ModalPointerKind.FOCUS_TEXT_FIELD,

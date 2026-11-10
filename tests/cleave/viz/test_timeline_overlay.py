@@ -1550,7 +1550,7 @@ def test_hit_at_maps_ruler_rows_prefix_and_gaps() -> None:
     assert prefix is not None and prefix.row == 0 and prefix.t_sec is None
     assert prefix.target == "label"
     eye = overlay.hit_at(px + bar_left - 2, py + rows[0][2] + 1)
-    assert eye is not None and eye.row == 0 and eye.target is None
+    assert eye is not None and eye.row == 0 and eye.target == "eye"
     assert ruler.target is None
 
     corner_y = py - 2

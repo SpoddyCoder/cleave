@@ -4,7 +4,8 @@ The corner buttons above the row labels play/pause and record. A press on
 the ruler seeks and a held drag scrubs. A press on a layer row focuses it
 and selects a nearby cue without moving the playhead; a double-click on a
 row seeks, and holding the second press scrubs. A double-click on a row's
-label (layer number and stem) arms it.
+label (layer number and stem) arms it, and a press on its monitor eye
+toggles the layer's visibility as its number key does.
 
 The strip is a pygame texture, so hits come from the overlay's last compose
 (``TimelineOverlay.hit_at``). Every action goes through ``TimelineControls``,
@@ -44,6 +45,10 @@ class StripActions(Protocol):
 
     def toggle_arm_row(self, row: int) -> None: ...
 
+    def toggle_row_visibility(self, row: int) -> None: ...
+
+    def row_visibility_toggleable(self, row: int) -> bool: ...
+
 
 class TimelinePointer:
     """Left-button press, drag, and release on the open strip."""
@@ -61,6 +66,7 @@ class TimelinePointer:
         self._session = session
         self._clock = clock
         self._scrubbing = False
+        self._over_ruler = False
         self._pending_t: float | None = None
         # Last row press: (time, x, y, row, target), for double-click detection.
         self._last_row_press: (
@@ -70,6 +76,26 @@ class TimelinePointer:
     @property
     def scrubbing(self) -> bool:
         return self._scrubbing
+
+    @property
+    def over_ruler(self) -> bool:
+        """True while the pointer rests on the time scale, clear of the buttons."""
+        return self._over_ruler
+
+    @property
+    def hover_pressable(self) -> bool:
+        """True while the hovered control would act on a press.
+
+        Read each frame: an eye stops acting when playback starts, with no
+        mouse motion.
+        """
+        hover = self._session.timeline.strip_hover
+        if hover is None:
+            return False
+        target, row = hover
+        if target == "eye" and row is not None:
+            return self._actions.row_visibility_toggleable(row)
+        return True
 
     def press(self, x: float, y: float) -> bool:
         """Handle a left press. False when the point misses the ruler and rows."""
@@ -86,6 +112,10 @@ class TimelinePointer:
                 self._actions.toggle_record()
             elif hit.t_sec is not None:
                 self._start_scrub(hit.t_sec)
+            return True
+        if hit.target == "eye":
+            self._last_row_press = None
+            self._actions.toggle_row_visibility(hit.row)
             return True
         now = self._clock()
         double = self._is_double_click(now, x, y, hit.row, hit.target)
@@ -148,9 +178,16 @@ class TimelinePointer:
         hit = self._geometry.hit_at(x, y)
         hover = (hit.target, hit.row) if hit is not None and hit.target else None
         self._session.timeline.strip_hover = hover
+        self._over_ruler = (
+            hit is not None
+            and hit.row is None
+            and hit.target is None
+            and hit.t_sec is not None
+        )
 
     def clear_hover(self) -> None:
         self._session.timeline.strip_hover = None
+        self._over_ruler = False
 
     def cancel(self) -> None:
         """Stop a scrub without applying a pending target."""

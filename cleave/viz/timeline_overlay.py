@@ -703,7 +703,7 @@ def x_to_time(x: float, bar_left: int, bar_width: int, duration_sec: float) -> f
 CUE_HIT_PX: int = 4
 
 
-StripTarget = Literal["play", "record", "label"]
+StripTarget = Literal["play", "record", "label", "eye"]
 
 
 @dataclass(frozen=True)
@@ -713,7 +713,8 @@ class StripHit:
     ``row`` is None for the ruler. ``t_sec`` is None outside the bar span
     (row labels and icons). ``cue_tolerance_sec`` is ``CUE_HIT_PX`` in song time.
     ``target`` names a control: the corner ``"play"`` / ``"record"`` buttons,
-    or a row's ``"label"`` (layer number and stem abbreviation).
+    a row's ``"label"`` (layer number and stem abbreviation), or its monitor
+    ``"eye"`` (the visibility icon after the label).
     """
 
     row: int | None
@@ -961,6 +962,8 @@ class TimelineOverlay:
         label_left = self._padding
         label_right = label_left + layout.layer_num_width + layout.stem_abbrev_width
         on_label = label_left <= local_x < label_right
+        eye_right = label_right + visibility_icon_slot_width(layout.row_h)
+        on_eye = label_right <= local_x < eye_right
         for display_i in range(layout.row_count):
             row_y = self._row_y(display_i, layout.row_h)
             if row_y <= local_y < row_y + layout.row_h:
@@ -968,7 +971,7 @@ class TimelineOverlay:
                     row=display_i,
                     t_sec=t_sec,
                     cue_tolerance_sec=tolerance,
-                    target="label" if on_label else None,
+                    target="label" if on_label else "eye" if on_eye else None,
                 )
         return None
 

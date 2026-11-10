@@ -589,11 +589,9 @@ def test_navigator_click_does_not_set_shell_region() -> None:
         assert layout is not None
         nav_x, nav_y, nav_w, nav_h = layout.navigator
         navigator = (nav_x + nav_w - 1, nav_y + nav_h // 2)
-        with patch("cleave.viz.shell_host.pygame.mouse.set_cursor") as set_cursor:
-            host.process_event(_button(navigator))
-            assert host.imgui.queued_buttons == [(0, True)]
-            assert host._splitter is None
-            set_cursor.assert_not_called()
+        host.process_event(_button(navigator))
+        assert host.imgui.queued_buttons == [(0, True)]
+        assert host._splitter is None
         host._controls.set_shell_region.assert_not_called()
 
 
@@ -978,7 +976,10 @@ def test_inspector_button_inline_field_and_colour_picker_draw() -> None:
                 host._draw_inline_field(InlineTextView("#ffffff", 3, True, error))
             drawn.append(
                 shell_host._draw_button(
-                    "Go##button", text_role=shell_host.VALUE, selected=True
+                    "Go##button",
+                    text_role=shell_host.VALUE,
+                    selected=True,
+                    enabled=True,
                 )
             )
             host._draw_colour_picker()

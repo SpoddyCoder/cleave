@@ -19,6 +19,7 @@ from cleave.config_schema.editor import (
 from cleave.viz.focus_nav import TimelineFocus
 from cleave.viz.imgui_host import ImGuiHost
 from cleave.viz.menu_bar import MenuBarState
+from cleave.viz.pointer_cursor import PointerShape, requested_pointer
 from cleave.viz.shell_focus import CycleStop, ShellRegion
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.row_spec import apply_field_horizontal, row_spec
@@ -377,6 +378,16 @@ def _host() -> Iterator[ShellHost]:
         host.imgui.destroy()
 
 
+def _gesture_pointer(host: ShellHost) -> PointerShape:
+    """The pointer the shell asks for at the last mouse position."""
+    host.imgui.begin_frame(1.0 / 60.0)
+    try:
+        host._request_gesture_pointer()
+        return requested_pointer()
+    finally:
+        host.imgui.end_frame()
+
+
 def _motion(pos: tuple[int, int]) -> pygame.event.Event:
     return pygame.event.Event(
         pygame.MOUSEMOTION, pos=pos, rel=(0, 0), buttons=(0, 0, 0)
@@ -398,70 +409,68 @@ def _stack_edge(host: ShellHost) -> int:
 def test_splitter_drag_updates_session_widths_without_imgui_buttons() -> None:
     with _host() as host:
         edge = _stack_edge(host)
-        with patch("cleave.viz.shell_host.pygame.mouse.set_cursor") as set_cursor:
-            host.process_event(_motion((edge, 100)))
-            set_cursor.assert_called_with(pygame.SYSTEM_CURSOR_SIZEWE)
-            host.process_event(_button(pygame.MOUSEBUTTONDOWN, (edge, 100)))
-            host.process_event(_button(pygame.MOUSEBUTTONUP, (edge, 100)))
-            assert host.insp_width is None
-            assert host._splitter is None
-            host.process_event(_button(pygame.MOUSEBUTTONDOWN, (edge, 100)))
-            assert host.imgui.queued_buttons == []
-            assert not host.imgui.button_held(0)
-            assert host.insp_width is None
-            assert host.help_width is None
-            assert host._value_drag_accum == 0.0
-            assert host._value_drag_crossed is False
+        host.process_event(_motion((edge, 100)))
+        assert _gesture_pointer(host) is PointerShape.RESIZE_EW
+        host.process_event(_button(pygame.MOUSEBUTTONDOWN, (edge, 100)))
+        host.process_event(_button(pygame.MOUSEBUTTONUP, (edge, 100)))
+        assert host.insp_width is None
+        assert host._splitter is None
+        host.process_event(_button(pygame.MOUSEBUTTONDOWN, (edge, 100)))
+        assert host.imgui.queued_buttons == []
+        assert not host.imgui.button_held(0)
+        assert host.insp_width is None
+        assert host.help_width is None
+        assert host._value_drag_accum == 0.0
+        assert host._value_drag_crossed is False
 
-            host.process_event(_motion((700, 100)))
-            assert host.insp_width == 700
-            assert host.imgui.queued_buttons == []
-            insp_request = host.insp_width
-            host.process_event(_button(pygame.MOUSEBUTTONUP, (700, 120)))
-            assert host.insp_width is None
-            assert host.help_width is None
-            assert host._splitter is None
-            assert host.imgui.queued_buttons == []
+        host.process_event(_motion((700, 100)))
+        assert host.insp_width == 700
+        assert host.imgui.queued_buttons == []
+        insp_request = host.insp_width
+        host.process_event(_button(pygame.MOUSEBUTTONUP, (700, 120)))
+        assert host.insp_width is None
+        assert host.help_width is None
+        assert host._splitter is None
+        assert host.imgui.queued_buttons == []
 
-            narrow = ShellLayout.compute(
-                320,
-                200,
-                23,
-                23,
-                0,
-                insp_width=insp_request,
-            )
-            assert insp_request == 700
-            assert narrow.visualiser[2] >= 1
-            assert narrow.navigator[2] >= MIN_COLUMN_WIDTH
-            assert narrow.inspector[2] == narrow.navigator[2]
-            assert narrow.navigator[2] < insp_request
+        narrow = ShellLayout.compute(
+            320,
+            200,
+            23,
+            23,
+            0,
+            insp_width=insp_request,
+        )
+        assert insp_request == 700
+        assert narrow.visualiser[2] >= 1
+        assert narrow.navigator[2] >= MIN_COLUMN_WIDTH
+        assert narrow.inspector[2] == narrow.navigator[2]
+        assert narrow.navigator[2] < insp_request
 
-            restored = ShellLayout.compute(
-                1280,
-                720,
-                23,
-                23,
-                0,
-                insp_width=insp_request,
-            )
-            assert restored.navigator[2] == insp_request
-            assert restored.inspector[2] == insp_request
+        restored = ShellLayout.compute(
+            1280,
+            720,
+            23,
+            23,
+            0,
+            insp_width=insp_request,
+        )
+        assert restored.navigator[2] == insp_request
+        assert restored.inspector[2] == insp_request
 
-            host.process_event(_motion((100, 400)))
-            set_cursor.assert_called_with(pygame.SYSTEM_CURSOR_ARROW)
+        host.process_event(_motion((100, 400)))
+        assert _gesture_pointer(host) is PointerShape.ARROW
 
 
 def test_splitter_drag_release_persists_requested_widths() -> None:
     with _host() as host:
         edge = _stack_edge(host)
         pointer_x = 2000
-        with patch("cleave.viz.shell_host.pygame.mouse.set_cursor"):
-            host.process_event(_button(pygame.MOUSEBUTTONDOWN, (edge, 100)))
-            host.process_event(_motion((pointer_x, 100)))
-            assert host.insp_width == pointer_x
-            request = host.insp_width
-            host.process_event(_button(pygame.MOUSEBUTTONUP, (pointer_x, 120)))
+        host.process_event(_button(pygame.MOUSEBUTTONDOWN, (edge, 100)))
+        host.process_event(_motion((pointer_x, 100)))
+        assert host.insp_width == pointer_x
+        request = host.insp_width
+        host.process_event(_button(pygame.MOUSEBUTTONUP, (pointer_x, 120)))
         fitted = ShellLayout.compute(
             1280,
             720,
@@ -483,10 +492,9 @@ def test_splitter_drag_release_persists_the_other_columns_live_width() -> None:
     with _host() as host:
         host._help_width = 360
         edge = _stack_edge(host)
-        with patch("cleave.viz.shell_host.pygame.mouse.set_cursor"):
-            host.process_event(_button(pygame.MOUSEBUTTONDOWN, (edge, 100)))
-            host.process_event(_motion((700, 100)))
-            host.process_event(_button(pygame.MOUSEBUTTONUP, (700, 100)))
+        host.process_event(_button(pygame.MOUSEBUTTONDOWN, (edge, 100)))
+        host.process_event(_motion((700, 100)))
+        host.process_event(_button(pygame.MOUSEBUTTONUP, (700, 100)))
         host._controls.settings.set_shell_column_widths.assert_called_once_with(
             700, 360
         )
@@ -498,9 +506,8 @@ def test_splitter_mouseup_under_one_pixel_does_not_persist() -> None:
     with _host() as host:
         host._help_width = 360
         edge = _stack_edge(host)
-        with patch("cleave.viz.shell_host.pygame.mouse.set_cursor"):
-            host.process_event(_button(pygame.MOUSEBUTTONDOWN, (edge, 100)))
-            host.process_event(_button(pygame.MOUSEBUTTONUP, (edge, 140)))
+        host.process_event(_button(pygame.MOUSEBUTTONDOWN, (edge, 100)))
+        host.process_event(_button(pygame.MOUSEBUTTONUP, (edge, 140)))
         host._controls.settings.set_shell_column_widths.assert_not_called()
         assert host.insp_width is None
         assert host.help_width == 360
@@ -514,12 +521,11 @@ def test_help_splitter_drag_persists_requested_width() -> None:
         )
         host.set_layout(layout)
         edge = layout.help[0]
-        with patch("cleave.viz.shell_host.pygame.mouse.set_cursor"):
-            host.process_event(_button(pygame.MOUSEBUTTONDOWN, (edge, 100)))
-            host.process_event(_motion((edge - 40, 100)))
-            assert host.help_width == DEFAULT_HELP_WIDTH + 40
-            assert host.insp_width is None
-            host.process_event(_button(pygame.MOUSEBUTTONUP, (edge - 40, 100)))
+        host.process_event(_button(pygame.MOUSEBUTTONDOWN, (edge, 100)))
+        host.process_event(_motion((edge - 40, 100)))
+        assert host.help_width == DEFAULT_HELP_WIDTH + 40
+        assert host.insp_width is None
+        host.process_event(_button(pygame.MOUSEBUTTONUP, (edge - 40, 100)))
         host._controls.settings.set_shell_column_widths.assert_called_once_with(
             DEFAULT_INSPECTOR_WIDTH,
             DEFAULT_HELP_WIDTH + 40,
@@ -536,9 +542,8 @@ def test_help_splitter_under_one_pixel_does_not_persist() -> None:
         )
         host.set_layout(layout)
         edge = layout.help[0]
-        with patch("cleave.viz.shell_host.pygame.mouse.set_cursor"):
-            host.process_event(_button(pygame.MOUSEBUTTONDOWN, (edge, 100)))
-            host.process_event(_button(pygame.MOUSEBUTTONUP, (edge, 140)))
+        host.process_event(_button(pygame.MOUSEBUTTONDOWN, (edge, 100)))
+        host.process_event(_button(pygame.MOUSEBUTTONUP, (edge, 140)))
         host._controls.settings.set_shell_column_widths.assert_not_called()
         assert host.help_width is None
         assert host._splitter is None
@@ -610,8 +615,7 @@ def test_chrome_contains_open_help_column() -> None:
 
 def test_clicks_outside_a_splitter_still_reach_imgui() -> None:
     with _host() as host:
-        with patch("cleave.viz.shell_host.pygame.mouse.set_cursor"):
-            host.process_event(_button(pygame.MOUSEBUTTONDOWN, (100, 100)))
+        host.process_event(_button(pygame.MOUSEBUTTONDOWN, (100, 100)))
         assert host.imgui.queued_buttons == [(0, True)]
         assert host.insp_width is None
 
@@ -748,15 +752,14 @@ def test_nav_splitter_drag_sets_and_persists_navigator_height() -> None:
     with _host() as host:
         x, y = _nav_boundary(host)
         top = host.layout.navigator[1]
-        with patch("cleave.viz.shell_host.pygame.mouse.set_cursor") as set_cursor:
-            host.process_event(_motion((x, y)))
-            set_cursor.assert_called_with(pygame.SYSTEM_CURSOR_SIZENS)
-            host.process_event(_button(pygame.MOUSEBUTTONDOWN, (x, y)))
-            assert host.imgui.queued_buttons == []
-            host.process_event(_motion((x + 30, top + 300)))
-            assert host.navigator_height == 300
-            assert host.insp_width is None
-            host.process_event(_button(pygame.MOUSEBUTTONUP, (x + 30, top + 300)))
+        host.process_event(_motion((x, y)))
+        assert _gesture_pointer(host) is PointerShape.RESIZE_NS
+        host.process_event(_button(pygame.MOUSEBUTTONDOWN, (x, y)))
+        assert host.imgui.queued_buttons == []
+        host.process_event(_motion((x + 30, top + 300)))
+        assert host.navigator_height == 300
+        assert host.insp_width is None
+        host.process_event(_button(pygame.MOUSEBUTTONUP, (x + 30, top + 300)))
         host._controls.settings.set_navigator_height.assert_called_once_with(300)
         host._controls.settings.set_shell_column_widths.assert_not_called()
         assert host.navigator_height is None
@@ -766,9 +769,8 @@ def test_nav_splitter_drag_sets_and_persists_navigator_height() -> None:
 def test_nav_splitter_under_one_pixel_does_not_persist() -> None:
     with _host() as host:
         x, y = _nav_boundary(host)
-        with patch("cleave.viz.shell_host.pygame.mouse.set_cursor"):
-            host.process_event(_button(pygame.MOUSEBUTTONDOWN, (x, y)))
-            host.process_event(_button(pygame.MOUSEBUTTONUP, (x + 40, y)))
+        host.process_event(_button(pygame.MOUSEBUTTONDOWN, (x, y)))
+        host.process_event(_button(pygame.MOUSEBUTTONUP, (x + 40, y)))
         host._controls.settings.set_navigator_height.assert_not_called()
         assert host._splitter is None
 
@@ -817,3 +819,44 @@ def test_strip_pointer_cancels_when_window_loses_focus() -> None:
         host._strip_pointer = pointer
         host.process_event(pygame.event.Event(pygame.WINDOWFOCUSLOST))
         pointer.cancel.assert_called_once()
+
+
+def _strip_host(host: ShellHost, *, hover=None, over_ruler=False, scrubbing=False):
+    host._strip_pointer = SimpleNamespace(
+        over_ruler=over_ruler,
+        scrubbing=scrubbing,
+        hover_pressable=hover is not None and hover != ("eye", 3),
+    )
+    host._controls.session = SimpleNamespace(
+        timeline=SimpleNamespace(panel_open=True, strip_hover=hover)
+    )
+    return host
+
+
+def test_strip_buttons_ask_for_the_hand_and_the_ruler_for_left_right() -> None:
+    with _host() as host:
+        host.imgui.process_mouse_event(_motion((640, 400)))
+        _strip_host(host)
+        assert _gesture_pointer(host) is PointerShape.ARROW
+        _strip_host(host, hover=("record", None))
+        assert _gesture_pointer(host) is PointerShape.HAND
+        _strip_host(host, hover=("label", 1))
+        assert _gesture_pointer(host) is PointerShape.HAND
+        _strip_host(host, hover=("eye", 3))
+        assert _gesture_pointer(host) is PointerShape.ARROW
+        _strip_host(host, over_ruler=True)
+        assert _gesture_pointer(host) is PointerShape.RESIZE_EW
+        _strip_host(host, hover=("eye", 0), scrubbing=True)
+        assert _gesture_pointer(host) is PointerShape.RESIZE_EW
+        host._controls.session.timeline.panel_open = False
+        assert _gesture_pointer(host) is PointerShape.ARROW
+
+
+def test_modal_keeps_the_splitter_and_strip_pointers_away() -> None:
+    with _host() as host:
+        edge = _stack_edge(host)
+        host.imgui.process_mouse_event(_motion((edge, 100)))
+        _strip_host(host, hover=("play", None))
+        assert _gesture_pointer(host) is PointerShape.RESIZE_EW
+        host._controls.modal_host = SimpleNamespace(active=True)
+        assert _gesture_pointer(host) is PointerShape.ARROW

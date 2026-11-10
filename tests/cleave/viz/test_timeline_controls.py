@@ -294,6 +294,22 @@ def test_num_keys_toggle_monitor_when_paused() -> None:
     assert visibility_calls == [True, True]
 
 
+def test_toggle_row_visibility_matches_num_key_when_paused() -> None:
+    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
+        position_sec=3.0, focus_row=0
+    )
+    session.layers["layer_2"].enabled = True
+
+    controls.handle_keydown(keydown(pygame.K_SPACE))
+    assert session.timeline.monitor["layer_2"] is True
+    controls.toggle_row_visibility(1)
+    assert session.timeline.focus_row == 1
+    assert session.timeline.monitor["layer_2"] is False
+    controls.toggle_row_visibility(1)
+    assert session.timeline.monitor["layer_2"] is True
+    assert visibility_calls == [True, True, True]
+
+
 def test_num_key_5_toggles_fifth_layer_when_paused() -> None:
     slots = tuple(f"layer_{i}" for i in range(1, 6))
     controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
@@ -1859,3 +1875,16 @@ def test_focus_row_clamps_to_layer_count() -> None:
     assert session.timeline.focus_row == len(session.layer_z_order) - 1
     controls.focus_row(-3)
     assert session.timeline.focus_row == 0
+
+
+def test_row_visibility_toggleable_only_when_the_eye_would_act() -> None:
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        lanes={"layer_1": _lane(True)},
+    )
+    assert controls.row_visibility_toggleable(0) is False
+    assert controls.row_visibility_toggleable(99) is False
+    session.timeline.override_slots = {"layer_1"}
+    assert controls.row_visibility_toggleable(0) is True
+    session.timeline.override_slots = set()
+    controls.handle_keydown(keydown(pygame.K_SPACE))
+    assert controls.row_visibility_toggleable(0) is True

@@ -23,6 +23,7 @@ from cleave.viz.choice_layout import (
 )
 from cleave.viz.choice_list import CHOICE_LIST_MAX_VISIBLE, ChoiceListView
 from cleave.viz.imgui_theme import rgba
+from cleave.viz.pointer_cursor import PointerShape, request_pointer
 from cleave.viz.text_fit import TextSizer
 from cleave.viz.theme import (
     BORDER_WIDTH,
@@ -108,6 +109,7 @@ def draw_segments(
             _fill(draw, rect, BUTTON_PRIMARY_BG if enabled else BUTTON_BG)
         elif enabled and hover and rect_contains(rect, mx, my):
             _fill(draw, rect, BUTTON_HOVER_BG)
+            request_pointer(PointerShape.HAND)
         _border(draw, rect)
         role = DISABLED if not enabled else (VALUE if is_chosen else MUTED)
         _centred_text(draw, measure, rect, labels[index], role)
@@ -127,7 +129,10 @@ def draw_combo(
     """A framed value with a caret at its right edge."""
     x, y, w, h = rect
     mx, my = _mouse()
-    lit = open_ or (enabled and hover and rect_contains(rect, mx, my))
+    hovered = enabled and hover and rect_contains(rect, mx, my)
+    if hovered:
+        request_pointer(PointerShape.HAND)
+    lit = open_ or hovered
     _fill(draw, rect, BUTTON_HOVER_BG if lit else BUTTON_BG)
     _border(draw, rect)
     role = VALUE if enabled else DISABLED

@@ -249,6 +249,12 @@ def _imgui():
     return imgui_mod
 
 
+def _request_hand() -> None:
+    from cleave.viz.pointer_cursor import PointerShape, request_pointer
+
+    request_pointer(PointerShape.HAND)
+
+
 @functools.cache
 def _window_flags() -> int:
     imgui = _imgui()
@@ -705,6 +711,8 @@ class FilePickerSurface:
                 rows_list.append((index, y, _outset((left, y, row_w, line_h))))
             rows = tuple(rows_list)
             hover_chip, hover_row = _pointer_hover(chips, rows)
+            if hover_chip is not None:
+                _request_hand()
             self._paint_rows(
                 imgui.get_window_draw_list(),
                 view,
