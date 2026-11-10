@@ -207,7 +207,8 @@ SPECS: dict[RowKind, RowSpec] = {
         help_entries=(("Left/Right", "off / on"),),
         help_description=(
             "16-bit float compositing when on; 8-bit when off.",
-            "Applies to the live view and the render. The rendered video is 8-bit either way.",
+            "Applies to the live view and the render.",
+            "The rendered video is 8-bit either way.",
             "The HDR display shoulder in frame finish follows this flag.",
             "Changing it resizes compositor attachments immediately.",
         ),
@@ -273,8 +274,7 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="Render",
         help_description=(
-            "Choose frame rate, quality, and a time range,",
-            "then render this project to MP4 at the project resolution.",
+            "Choose frame rate, quality, and a time range, then render this project to MP4 at the project resolution.",
         ),
         is_pinned=True,
         parent_group="project",

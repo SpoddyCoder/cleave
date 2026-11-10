@@ -729,8 +729,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Start clean",
         help_entries=(("Left/Right", "yes / no"),),
         help_description=(
-            "When enabled, each new preset starts with a blank canvas",
-            "instead of inheriting the previous frame.",
+            "When enabled, each new preset starts with a blank canvas instead of inheriting the previous frame.",
         ),
         repeatable=True,
         parent_group="track",
@@ -745,8 +744,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Hard cut",
         help_entries=(("Left/Right", "enabled / disabled"),),
         help_description=(
-            "Whether projectM can switch presets instantly on strong beats",
-            "(bypassing soft cut).",
+            "Whether projectM can switch presets instantly on strong beats (bypassing soft cut).",
         ),
         repeatable=True,
         parent_group="track",
@@ -790,8 +788,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Stem",
         help_entries=(("Left/Right", "choose stem source"),),
         help_description=(
-            "Audio stem fed to libprojectM for this layer's beat detection",
-            "and waveform display.",
+            "Audio stem fed to libprojectM for this layer's beat detection and waveform display.",
             "Effects reset when the stem changes.",
         ),
         repeatable=True,

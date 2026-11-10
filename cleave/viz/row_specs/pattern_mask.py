@@ -178,8 +178,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_description=(
             "Spatial territories for visible layers during composite.",
             "Feather 0% assigns each pixel to one layer; 100% blends at edges.",
-            "Replaces layer compositing, so each layer's Compositing rows",
-            "(blend mode, opacity) are greyed out and ignored.",
+            "Replaces layer compositing, so each layer's Compositing rows (blend mode, opacity) are greyed out and ignored.",
         ),
         toggle_enabled=_toggle_pattern_mask_enabled,
     ),
@@ -201,8 +200,7 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="Edges & motion",
         help_description=(
-            "How soft territory edges are, and how long the layout morphs",
-            "when layers toggle.",
+            "How soft territory edges are, and how long the layout morphs when layers toggle.",
         ),
         parent_group="pattern_mask",
     ),

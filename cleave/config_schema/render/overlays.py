@@ -56,12 +56,12 @@ RENDER_OVERLAY_ANIMATION_TYPES: tuple[RenderOverlayAnimationType, ...] = (
 RENDER_OVERLAY_ANIMATION_TYPE_HELP_ENTRIES: tuple[
     tuple[RenderOverlayAnimationType, str], ...
 ] = (
-    ("fade", "Smooth fade in and out"),
-    ("slide", "Panel slides in from an edge"),
-    ("slide-fade", "Slide plus fade"),
-    ("cascade", "Staggered slide of panel elements"),
-    ("wipe", "Directional wipe reveal in place"),
-    ("cascade-wipe", "Staggered wipe of panel elements"),
+    ("fade", "smooth fade in and out."),
+    ("slide", "panel slides in from an edge."),
+    ("slide-fade", "slide plus fade."),
+    ("cascade", "staggered slide of panel elements."),
+    ("wipe", "directional wipe reveal in place."),
+    ("cascade-wipe", "staggered wipe of panel elements."),
 )
 
 DEFAULT_RENDER_OVERLAY_ANIMATION_TYPE: RenderOverlayAnimationType = "fade"
@@ -78,10 +78,10 @@ RENDER_OVERLAY_SLIDE_DIRECTIONS: tuple[RenderOverlaySlideDirection, ...] = (
 RENDER_OVERLAY_SLIDE_DIRECTION_HELP_ENTRIES: tuple[
     tuple[RenderOverlaySlideDirection, str], ...
 ] = (
-    ("left", "Enter from the left"),
-    ("right", "Enter from the right"),
-    ("top", "Enter from the top"),
-    ("bottom", "Enter from the bottom"),
+    ("left", "enter from the left."),
+    ("right", "enter from the right."),
+    ("top", "enter from the top."),
+    ("bottom", "enter from the bottom."),
 )
 
 DEFAULT_RENDER_OVERLAY_SLIDE_DIRECTION: RenderOverlaySlideDirection = "left"

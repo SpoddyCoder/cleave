@@ -217,8 +217,7 @@ SPECS: dict[RowKind, RowSpec] = {
         ),
         help_description=(
             "Size of all editor text and the spacing around it.",
-            "Covers the menu, navigator, inspector, help, transport,",
-            "notifications, dialogs, and the timeline strip.",
+            "Covers the menu, navigator, inspector, help, transport, notifications, dialogs, and the timeline strip.",
             "Overlay cards in the visualiser keep their own font sizes.",
         ),
         is_pinned=True,
@@ -259,8 +258,7 @@ SPECS: dict[RowKind, RowSpec] = {
             ("PgUp/PgDn", "large step (50 ms)"),
         ),
         help_description=(
-            "Compensates for unmeasurable input/output lag for live monitoring",
-            "and timeline cue/song marker placement.",
+            "Compensates for unmeasurable input/output lag for live monitoring and timeline cue/song marker placement.",
             "Use this to correct for bluetooth/wireless latency.",
             "Affects new timeline cue & song marker placements only.",
             "Already saved markers and cues do not move when you change this.",

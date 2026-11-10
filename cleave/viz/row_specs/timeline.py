@@ -603,8 +603,8 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Generate timeline",
         help_entries=(("Enter", "open generate dialog"),),
         help_description=(
-            "Build a new timeline from character, density, snaps, cuts,",
-            "re-populate, conductor, and mode. Replaces the current cues.",
+            "Build a new timeline from character, density, snaps, cuts, re-populate, conductor, and mode.",
+            "Replaces the current cues.",
             "Crescendo song markers build crescendos.",
             "The dialog remembers its values in the project.",
         ),
@@ -620,8 +620,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Set cut type",
         help_entries=(("Enter", "open set cut type dialog"),),
         help_description=(
-            "Set hard, soft, or no cut on all cues, on song marker cues,",
-            "or on all cues except song markers.",
+            "Set hard, soft, or no cut on all cues, on song marker cues, or on all cues except song markers.",
         ),
         blocked_by_section_lock=True,
     ),
@@ -634,8 +633,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Reset timeline",
         help_entries=(("Enter", "open reset dialog"),),
         help_description=(
-            "Clear all timeline cues and set every layer",
-            "on or off for the whole track.",
+            "Clear all timeline cues and set every layer on or off for the whole track.",
         ),
         help_mode_entries=TIMELINE_RESET_HELP_ENTRIES,
         blocked_by_section_lock=True,
@@ -696,7 +694,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Placement snap",
         help_entries=(("Left/Right", "choose off / beat / bar"),),
         help_description=(
-            "Applies when placing song markers and timeline cues",
+            "Applies when placing song markers and timeline cues.",
             "Snap to the nearest beat or bar.",
             "Switch off when the beat detection is not accurate.",
         ),
@@ -711,8 +709,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Snap cues",
         help_entries=(("Enter", "open snap dialog"),),
         help_description=(
-            "Snap timeline cues to the nearest beat or bar,",
-            "or pull cues within proximity onto song markers.",
+            "Snap timeline cues to the nearest beat or bar, or pull cues within proximity onto song markers.",
         ),
         blocked_by_section_lock=True,
     ),
@@ -889,13 +886,13 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Song marker",
         help_entries=(
             ("Enter", "seek to marker"),
-            ("Left / Right", "choose marker type"),
+            ("Left/Right", "choose marker type"),
             ("Delete", "confirm remove"),
         ),
         help_description=(
-            "A song marker time and type. Crescendo markers build",
-            "crescendos on timeline preset apply. Enter or a click seeks;",
-            "Left/Right or the list chooses type; the bin deletes.",
+            "A song marker time and type.",
+            "Crescendo markers build crescendos on timeline preset apply.",
+            "Enter or a click seeks; Left/Right or the list chooses type; the bin deletes.",
         ),
         blocked_by_section_lock=True,
     ),
@@ -934,7 +931,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Cue opacity",
         help_entries=(
             ("Left/Right", "1% step"),
-            ("PageUp/PageDown", "10% step"),
+            ("PgUp/PgDn", "10% step"),
         ),
         help_description=(
             "Timeline opacity from this cue on, multiplied into the layer's.",
@@ -972,7 +969,8 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Cue blend",
         help_entries=(("Left/Right", "choose blend mode"),),
         help_description=(
-            "Blend mode from this cue on. Layer keeps the layer's own blend.",
+            "Blend mode from this cue on.",
+            "Layer keeps the layer's own blend.",
             "Start cues only.",
         ),
     ),

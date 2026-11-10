@@ -63,7 +63,7 @@ _TOP_LEVEL_NAV_ENTRY = (
 _SEEK_AND_QUIT_ENTRIES: tuple[HelpEntry, ...] = (
     ("Shift + Left/Right", "skip 2s"),
     ("Ctrl + Left/Right", "skip 30s"),
-    ("ESC", "hide UI"),
+    ("Esc", "hide UI"),
     ("Ctrl + Q", "quit"),
 )
 
@@ -577,7 +577,7 @@ def help_sections_for_stop(
         layer_count=layer_count,
     )
     if stop is CycleStop.NAVIGATOR:
-        return (_NAVIGATOR_SECTION, *row_sections)
+        return (*row_sections, _NAVIGATOR_SECTION)
     return row_sections
 
 

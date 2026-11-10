@@ -464,8 +464,8 @@ def test_timeline_presets_help_lists_characters() -> None:
     assert description is not None
     assert description.title == "Generate timeline"
     assert description.lines == (
-        "Build a new timeline from character, density, snaps, cuts,",
-        "re-populate, conductor, and mode. Replaces the current cues.",
+        "Build a new timeline from character, density, snaps, cuts, re-populate, conductor, and mode.",
+        "Replaces the current cues.",
         "Crescendo song markers build crescendos.",
         "The dialog remembers its values in the project.",
     )
@@ -661,8 +661,10 @@ def test_compositing_header_and_opacity_help() -> None:
         "Ignored while Pattern Mask is enabled.",
     )
     assert mask is not None
-    assert "Replaces layer compositing, so each layer's Compositing rows" in mask.lines
-    assert "(blend mode, opacity) are greyed out and ignored." in mask.lines
+    assert (
+        "Replaces layer compositing, so each layer's Compositing rows "
+        "(blend mode, opacity) are greyed out and ignored."
+    ) in mask.lines
 
 
 def test_cleave_effects_help() -> None:
@@ -863,7 +865,7 @@ def test_each_stop_has_its_own_shortcut_section() -> None:
     )
     assert menu[0].title == "Navigation / Global"
     assert "Ctrl + S" in dict(menu[0].entries)
-    assert navigator[0].title == "Navigator"
+    assert navigator[-1].title == "Navigator"
     assert "Ctrl + S" not in _help_text(navigator)
     assert any(
         isinstance(section, HelpSection)
@@ -875,7 +877,7 @@ def test_each_stop_has_its_own_shortcut_section() -> None:
     assert "Ctrl + Q" not in _help_text(inspector)
     assert timeline[0].title == "Timeline"
     assert "Ctrl + Q" not in _help_text(timeline)
-    assert {menu[0].title, navigator[0].title, inspector[0].title, timeline[0].title} == {
+    assert {menu[0].title, navigator[-1].title, inspector[0].title, timeline[0].title} == {
         "Navigation / Global",
         "Navigator",
         "Opacity",
@@ -1073,3 +1075,18 @@ def test_help_column_draws_the_subject_stop() -> None:
         del lists, help_list, colors
     finally:
         host.imgui.destroy()
+
+
+def test_help_description_lines_are_whole_sentences() -> None:
+    """Each line is one sentence: the column wraps words; a full stop starts a line."""
+    import re
+
+    from cleave.effects.registry import EFFECT_IDS, effect_help_description
+    from cleave.viz.row_spec import ROW_SPECS
+
+    sources = [(kind.name, spec.help_description) for kind, spec in ROW_SPECS.items()]
+    sources += [(effect_id, effect_help_description(effect_id)) for effect_id in EFFECT_IDS]
+    for name, lines in sources:
+        for line in lines or ():
+            assert re.search(r"[.!?:)]$", line), (name, line)
+            assert not re.search(r"[.!?] +[A-Z]", line), (name, line)
