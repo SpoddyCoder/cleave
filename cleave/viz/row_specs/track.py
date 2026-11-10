@@ -470,6 +470,7 @@ SPECS: dict[RowKind, RowSpec] = {
         format_value=_format_track_enabled,
         apply_horizontal=_apply_track_enabled,
         choice=bool_choice(lambda s, d: _track_block(s, d).runtime.enabled),
+        inert=lambda state, _desc: state.timeline.enabled,
         help_title="Layer enabled",
         help_description=(
             "Shows or hides this layer.",

@@ -129,6 +129,16 @@ class RowSpec:
     # False while the row has nothing to edit (a cue row with no cue): it
     # draws disabled, without arrows. Its mutators must no-op then too.
     available: Callable[[TuningViewState, RowDescriptor], bool] | None = None
+    # True while a change is refused for a reason other than the section
+    # lock (the timeline owns layer visibility). The row draws as usual and
+    # its mutator explains itself; the pointer stays an arrow over it.
+    inert: Callable[[TuningViewState, RowDescriptor], bool] | None = None
+
+
+def row_inert(state: object, desc: RowDescriptor) -> bool:
+    """Whether a change to *desc* would be refused now (``RowSpec.inert``)."""
+    inert = ROW_SPECS[desc.kind].inert
+    return inert is not None and bool(inert(state, desc))
 
 
 def row_available(state: object, desc: RowDescriptor) -> bool:

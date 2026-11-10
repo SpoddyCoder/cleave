@@ -382,6 +382,13 @@ def test_layer_lock_and_visibility_badges() -> None:
         },
         solo_slot="layer_3",
     )
+    # The timeline owns layer visibility while it is on: a press is refused.
+    assert session.timeline.enabled is True
+    nodes = {node.id: node for node in build_navigator(session, {"layers"})}
+    assert nodes[layer_node_id("layer_2")].toggles[0] == NavToggle(
+        TOGGLE_ENABLED, False, inert=True
+    )
+    session.timeline.enabled = False
     nodes = {node.id: node for node in build_navigator(session, {"layers"})}
 
     assert nodes[layer_node_id("layer_1")].toggles == (

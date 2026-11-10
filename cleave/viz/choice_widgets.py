@@ -95,11 +95,13 @@ def draw_segments(
     height: int,
     enabled: bool = True,
     hover: bool = True,
+    hand: bool = True,
 ) -> tuple[Rect, ...]:
     """One box per option, the chosen one filled. Returns their rects.
 
     ``hover`` lights the box under the pointer; pass False while something
-    else, such as an open list, owns the pointer.
+    else, such as an open list, owns the pointer. Pass ``hand`` False while
+    a click would be refused, so the pointer stays an arrow.
     """
     rects = segment_rects(measure, labels, x=x, y=y, height=height)
     mx, my = _mouse()
@@ -109,7 +111,8 @@ def draw_segments(
             _fill(draw, rect, BUTTON_PRIMARY_BG if enabled else BUTTON_BG)
         elif enabled and hover and rect_contains(rect, mx, my):
             _fill(draw, rect, BUTTON_HOVER_BG)
-            request_pointer(PointerShape.HAND)
+            if hand:
+                request_pointer(PointerShape.HAND)
         _border(draw, rect)
         role = DISABLED if not enabled else (VALUE if is_chosen else MUTED)
         _centred_text(draw, measure, rect, labels[index], role)
@@ -125,12 +128,16 @@ def draw_combo(
     open_: bool,
     enabled: bool = True,
     hover: bool = True,
+    hand: bool = True,
 ) -> None:
-    """A framed value with a caret at its right edge."""
+    """A framed value with a caret at its right edge.
+
+    Pass ``hand`` False while a click would be refused.
+    """
     x, y, w, h = rect
     mx, my = _mouse()
     hovered = enabled and hover and rect_contains(rect, mx, my)
-    if hovered:
+    if hovered and hand:
         request_pointer(PointerShape.HAND)
     lit = open_ or hovered
     _fill(draw, rect, BUTTON_HOVER_BG if lit else BUTTON_BG)

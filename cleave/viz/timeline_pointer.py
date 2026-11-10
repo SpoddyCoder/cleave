@@ -47,7 +47,7 @@ class StripActions(Protocol):
 
     def toggle_row_visibility(self, row: int) -> None: ...
 
-    def row_visibility_toggleable(self, row: int) -> bool: ...
+    def strip_target_pressable(self, target: str, row: int | None) -> bool: ...
 
 
 class TimelinePointer:
@@ -86,16 +86,14 @@ class TimelinePointer:
     def hover_pressable(self) -> bool:
         """True while the hovered control would act on a press.
 
-        Read each frame: an eye stops acting when playback starts, with no
-        mouse motion.
+        Read each frame: an eye stops acting when playback starts, and
+        record when the timeline locks, with no mouse motion.
         """
         hover = self._session.timeline.strip_hover
         if hover is None:
             return False
         target, row = hover
-        if target == "eye" and row is not None:
-            return self._actions.row_visibility_toggleable(row)
-        return True
+        return self._actions.strip_target_pressable(target, row)
 
     def press(self, x: float, y: float) -> bool:
         """Handle a left press. False when the point misses the ruler and rows."""

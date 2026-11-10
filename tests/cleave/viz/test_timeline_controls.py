@@ -1888,3 +1888,21 @@ def test_row_visibility_toggleable_only_when_the_eye_would_act() -> None:
     session.timeline.override_slots = set()
     controls.handle_keydown(keydown(pygame.K_SPACE))
     assert controls.row_visibility_toggleable(0) is True
+
+
+def test_strip_target_pressable_follows_lock_and_armed_rows() -> None:
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        lanes={"layer_1": _lane(True)},
+    )
+    tl = session.timeline
+    assert controls.strip_target_pressable("play", None) is True
+    assert controls.strip_target_pressable("record", None) is False
+    assert controls.strip_target_pressable("label", 0) is True
+    assert controls.strip_target_pressable("label", 99) is False
+    assert controls.strip_target_pressable("eye", 0) is False
+    tl.armed_slots = {"layer_1"}
+    assert controls.strip_target_pressable("record", None) is True
+    tl.locked = True
+    assert controls.strip_target_pressable("record", None) is False
+    assert controls.strip_target_pressable("label", 0) is False
+    assert controls.strip_target_pressable("play", None) is True

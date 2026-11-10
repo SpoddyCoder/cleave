@@ -181,6 +181,8 @@ def test_navigator_toggle_presentation() -> None:
     assert navigator_toggle_color(locked) == LOCK_ICON
     assert navigator_toggle_color(unlocked) == MUTED
     assert navigator_toggle_tooltip(off) == "Off: click to turn on"
+    inert = NavToggle(TOGGLE_ENABLED, True, inert=True)
+    assert navigator_toggle_tooltip(inert) == "Timeline controls layer visibility"
     assert navigator_toggle_tooltip(blocked) == "Locked: unlock to change"
 
 
@@ -404,3 +406,18 @@ def test_path_icon_color_dims_with_row() -> None:
     assert path_icon_color(PRESET_ICON, VALUE) == PRESET_ICON
     assert path_icon_color(PRESET_ICON, DISABLED) == DISABLED
     assert path_icon_color(PRESET_ICON, LOCKED) == LOCKED
+
+
+def test_layer_enabled_row_is_inert_while_the_timeline_is_on() -> None:
+    from types import SimpleNamespace
+
+    from cleave.viz.row_kinds import RowDescriptor, RowKind
+    from cleave.viz.row_spec import row_inert
+
+    enabled = RowDescriptor(RowKind.TRACK_ENABLED, slot="layer_1")
+    solo = RowDescriptor(RowKind.TRACK_SOLO, slot="layer_1")
+    on = SimpleNamespace(timeline=SimpleNamespace(enabled=True))
+    off = SimpleNamespace(timeline=SimpleNamespace(enabled=False))
+    assert row_inert(on, enabled) is True
+    assert row_inert(off, enabled) is False
+    assert row_inert(on, solo) is False

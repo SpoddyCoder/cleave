@@ -47,8 +47,8 @@ class _Actions:
     def toggle_row_visibility(self, row: int) -> None:
         self.calls.append(("visibility", row))
 
-    def row_visibility_toggleable(self, row: int) -> bool:
-        return self.eye_usable
+    def strip_target_pressable(self, target: str, row: int | None) -> bool:
+        return target != "eye" or self.eye_usable
 
 
 def _session(panel_open: bool = True):

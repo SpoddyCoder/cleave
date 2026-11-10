@@ -74,6 +74,7 @@ from cleave.viz.row_spec import (
     format_row_position,
     format_row_value,
     row_available,
+    row_inert,
     row_is_two_line,
     row_label,
     row_spec,
@@ -307,6 +308,8 @@ def navigator_toggle_tooltip(toggle: NavToggle) -> str:
         return "Layer limit reached" if toggle.blocked else "Add layer"
     if toggle.blocked:
         return "Locked: unlock to change"
+    if toggle.inert:
+        return "Timeline controls layer visibility"
     if toggle.id == TOGGLE_LOCK:
         return "Locked: click to unlock" if toggle.active else "Unlocked: click to lock"
     if toggle.id == TOGGLE_SOLO:
@@ -2025,7 +2028,8 @@ class ShellHost:
                     ),
                 )
                 color = rgba(NUDGE_HOVER_FG)
-                request_pointer(PointerShape.HAND)
+                if not toggle.inert:
+                    request_pointer(PointerShape.HAND)
             glyph = navigator_toggle_glyph(toggle)
             draw.add_text(
                 imgui.ImVec2(
@@ -2232,6 +2236,7 @@ class ShellHost:
                         repeatable=spec.repeatable,
                         activated=activated,
                         two_line=two_line,
+                        hand=not row_inert(state, desc),
                     )
             if spec.nav_buttons and list_item:
                 self._handle_nav_buttons(
@@ -2616,10 +2621,12 @@ class ShellHost:
         repeatable: bool,
         activated: bool,
         two_line: bool,
+        hand: bool,
     ) -> None:
         """Hover and press the painted side arrows. The value string is not a hit.
 
-        On a two-line row the arrows cover the first line only.
+        On a two-line row the arrows cover the first line only. *hand* is
+        False while a step would be refused, so the pointer stays an arrow.
         """
         if len(parts) != 3:
             return
@@ -2653,7 +2660,8 @@ class ShellHost:
         elif hit is not None and not hold.armed:
             hover_forward = hit.forward
         if hover_forward is not None:
-            request_pointer(PointerShape.HAND)
+            if hand:
+                request_pointer(PointerShape.HAND)
             self._paint_nudge_hover(
                 forward_rect if hover_forward else back_rect,
                 parts,
@@ -2760,6 +2768,7 @@ class ShellHost:
         list_view = inline.choice_view
         open_here = list_view is not None and list_view.target == desc
         hover = list_view is None and not self._nudge_input_blocked()
+        hand = not row_inert(state, desc)
         self._choice_rects[desc] = rect
         if open_here and activated:
             # A press anywhere on the open row closes its list. Swallow it so
@@ -2779,6 +2788,7 @@ class ShellHost:
                 height=rect[3],
                 enabled=enabled,
                 hover=hover,
+                hand=hand,
             )
             mouse = imgui.get_mouse_pos()
             hit = rect_index_at(rects, mouse.x, mouse.y)
@@ -2795,6 +2805,7 @@ class ShellHost:
                 open_=open_here,
                 enabled=enabled,
                 hover=hover,
+                hand=hand,
             )
             mouse = imgui.get_mouse_pos()
             if not activated or not enabled or not hover:

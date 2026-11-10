@@ -59,12 +59,15 @@ class NavToggle:
 
     ``id`` is ``TOGGLE_ENABLED``, ``TOGGLE_SOLO``, ``TOGGLE_LOCK``, or
     ``TOGGLE_ADD``. ``active`` is on, soloed, or locked. ``blocked`` is true
-    while the section lock refuses the toggle, or Add has no room.
+    while the section lock refuses the toggle, or Add has no room. ``inert``
+    is true while a press is refused for another reason (the timeline owns
+    layer visibility): the icon draws as usual and the pointer stays an arrow.
     """
 
     id: str
     active: bool
     blocked: bool = False
+    inert: bool = False
 
 
 @dataclass(frozen=True)
@@ -368,7 +371,12 @@ def _layer_node(session: TuningSession, slot: str, *, expandable: bool) -> NavNo
 def _layer_toggles(session: TuningSession, slot: str) -> tuple[NavToggle, ...]:
     layer = session.layers[slot]
     return (
-        NavToggle(TOGGLE_ENABLED, layer.enabled, layer.locked),
+        NavToggle(
+            TOGGLE_ENABLED,
+            layer.enabled,
+            layer.locked,
+            inert=session.timeline.enabled,
+        ),
         NavToggle(TOGGLE_SOLO, session.solo_slot == slot),
         NavToggle(TOGGLE_LOCK, layer.locked),
     )

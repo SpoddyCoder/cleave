@@ -361,6 +361,26 @@ class TimelineControls:
         if slot is not None:
             self._toggle_slot_visibility(slot)
 
+    def strip_target_pressable(self, target: str, row: int | None) -> bool:
+        """Whether a press on a strip control would act right now.
+
+        Play always does. Record needs the timeline unlocked and an armed
+        row, or a take to stop. A row label arms on double-click unless the
+        timeline is locked. An eye follows ``row_visibility_toggleable``.
+        """
+        tl = self.session.timeline
+        if target == "play":
+            return True
+        if target == "record":
+            return not tl.locked and (tl.recording or bool(tl.armed_slots))
+        if row is None or self._slot_for_layer_index(row) is None:
+            return False
+        if target == "label":
+            return not tl.locked
+        if target == "eye":
+            return self.row_visibility_toggleable(row)
+        return False
+
     def row_visibility_toggleable(self, row: int) -> bool:
         """Whether ``toggle_row_visibility`` would change *row* right now.
 

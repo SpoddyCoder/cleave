@@ -63,6 +63,7 @@ Cleave draws its own OS cursors (`pointer_cursor.py`): black with a white outlin
 
 - Arrow: the default, and anything that only selects (navigator and inspector rows, menus, list rows), plus disabled controls.
 - Hand: a press acts now. Buttons, icon toggles, twisties, stepper arrows, segments and combos, colour swatches, the play/pause label, a clickable toast, file picker shortcuts, and the strip's play, REC, eye, and row label.
+- Hand means the press would act right now, not only that the control is unlocked. A control that refuses for another reason keeps the arrow: `RowSpec.inert` for an inspector row, `NavToggle.inert` for a navigator icon, and `TimelineControls.strip_target_pressable` for the strip (the layer enabled switch while the timeline is on, REC with no armed row or a locked timeline, an eye during plain playback).
 - Text: an editable text field.
 - Resize EW / NS: column splitters and the navigator boundary, a value being dragged sideways, the transport time and bar, and the strip's time scale or a live scrub.
 - Move: a reorder handle, and a row being dragged. Not allowed: a blocked reorder handle.
