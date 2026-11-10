@@ -30,7 +30,7 @@ from cleave.viz.inspector_controls import (
 )
 from cleave.viz.menu_bar import MenuBarState, menus_for_session
 from cleave.viz.pointer_cursor import PointerShape, request_pointer
-from cleave.viz.timeline_pointer import TimelinePointer
+from cleave.viz.timeline_pointer import MIDDLE_BUTTON, TimelinePointer
 from cleave.viz.material_icons import (
     LOCK_GLYPH,
     LOCK_OPEN_GLYPH,
@@ -1325,6 +1325,8 @@ class ShellHost:
                 if button == 0 and not captured:
                     self._assign_shell_region(x, y)
                     self._press_strip(x, y)
+                elif button == MIDDLE_BUTTON and not captured:
+                    self._press_strip(x, y, button)
                 imgui_host.press_button(button)
             elif button == 0 and self._splitter is not None:
                 self._end_splitter_drag(event.pos)
@@ -1332,24 +1334,47 @@ class ShellHost:
             elif not imgui_host.button_held(button):
                 return
             else:
-                if button == 0 and self._strip_pointer is not None:
+                if button in (0, MIDDLE_BUTTON) and self._strip_pointer is not None:
                     self._strip_pointer.release()
                 imgui_host.release_button(button)
             imgui_host.process_mouse_event(event)
             return
         if event.type == pygame.MOUSEWHEEL:
-            imgui_host.process_mouse_event(event)
+            if not self._wheel_strip(event):
+                imgui_host.process_mouse_event(event)
 
-    def _press_strip(self, x: float, y: float) -> None:
-        """Left press on the open strip: focus a row, select a cue, or seek."""
+    def _strip_under(self, x: float, y: float) -> TimelinePointer | None:
+        """The strip pointer when (*x*, *y*) is on the open strip."""
         pointer = self._strip_pointer
         layout = self._layout
         if pointer is None or layout is None:
-            return
+            return None
         if not self._controls.session.timeline.panel_open:
-            return
+            return None
         if layout.timeline[3] > 0 and _rect_contains(layout.timeline, x, y):
-            pointer.press(x, y)
+            return pointer
+        return None
+
+    def _press_strip(self, x: float, y: float, button: int = 0) -> None:
+        """Press on the open strip: focus a row, select a cue, seek, or pan."""
+        pointer = self._strip_under(x, y)
+        if pointer is not None:
+            pointer.press(x, y, button)
+
+    def _wheel_strip(self, event: pygame.event.Event) -> bool:
+        """Wheel over the open strip zooms or pans it. False leaves it to ImGui."""
+        pos = self.imgui.mouse_pos
+        if pos is None:
+            return False
+        x, y = pos
+        if self.top_layer.captures_pointer(x, y):
+            return False
+        pointer = self._strip_under(x, y)
+        if pointer is None:
+            return False
+        shift = bool(pygame.key.get_mods() & pygame.KMOD_SHIFT)
+        pointer.wheel(x, float(event.x), float(event.y), shift=shift)
+        return True
 
     def _cancel_strip_pointer(self) -> None:
         if self._strip_pointer is not None:
@@ -1509,7 +1534,9 @@ class ShellHost:
         timeline = self._controls.session.timeline
         if not timeline.panel_open:
             return None
-        if pointer.scrubbing or pointer.over_ruler:
+        if pointer.panning:
+            return PointerShape.MOVE
+        if pointer.scrubbing or pointer.over_ruler or pointer.scrollbar_active:
             return PointerShape.RESIZE_EW
         if pointer.hover_pressable:
             return PointerShape.HAND

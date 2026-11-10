@@ -140,6 +140,9 @@ class TimelineUiMetrics:
     playhead_width: int
     rec_badge_gap: int
     rec_badge_pad_y: int
+    scrollbar_height: int
+    scrollbar_gap: int
+    scrollbar_min_thumb: int
 
 
 def tuning_ui_metrics(
@@ -179,6 +182,9 @@ def timeline_ui_metrics(*, scale: float | None = None) -> TimelineUiMetrics:
         playhead_width=scale_px(2, scale=scale),
         rec_badge_gap=scale_px(4, scale=scale),
         rec_badge_pad_y=scale_px(4, scale=scale),
+        scrollbar_height=scale_px(6, scale=scale),
+        scrollbar_gap=scale_px(3, scale=scale),
+        scrollbar_min_thumb=scale_px(12, scale=scale),
     )
 
 
@@ -187,11 +193,12 @@ def timeline_panel_height_px(
     *,
     scale: float | None = None,
 ) -> int:
-    """Scaled bottom timeline strip height in pixels."""
+    """Scaled bottom timeline strip height in pixels: rows, then the scrollbar."""
     if row_count <= 0:
         return 0
     m = timeline_ui_metrics(scale=scale)
-    return m.padding * 2 + row_count * m.row_height + max(0, row_count - 1) * m.row_gap
+    rows_h = row_count * m.row_height + max(0, row_count - 1) * m.row_gap
+    return m.padding * 2 + rows_h + m.scrollbar_gap + m.scrollbar_height
 
 
 BACKGROUND: tuple[int, int, int] = (0, 0, 0)

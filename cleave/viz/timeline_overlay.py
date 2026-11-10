@@ -64,6 +64,8 @@ from cleave.viz.theme import (
     PLAYHEAD,
     PLAYHEAD_FLASH,
     REC_BG,
+    SCROLLBAR_THUMB,
+    SCROLLBAR_TRACK,
     SELECTED_WASH_ALPHA,
     SONG_BOUND,
     SONG_MARKER,
@@ -157,6 +159,16 @@ class TimelineViewState:
     soft_cut_fades: TimelineFadeGroup = field(default_factory=TimelineFadeGroup)
     selected_cue_t: dict[str, float] = field(default_factory=dict)
     selected_cue_flash_start_ms: int | None = None
+    # Visible time window mapped onto the bar. An end of None is the song end.
+    view_start_sec: float = 0.0
+    view_end_sec: float | None = None
+
+
+def view_window(state: TimelineViewState) -> tuple[float, float]:
+    """Visible ``(start, end)`` in song seconds."""
+    if state.view_end_sec is None:
+        return (0.0, state.duration_sec)
+    return (state.view_start_sec, state.view_end_sec)
 
 
 def cue_times_for_stem(
@@ -405,11 +417,12 @@ def _draw_level_bar(
     breakpoints: list[tuple[float, float]],
     bar_left: int,
     bar_width: int,
-    duration_sec: float,
+    view_start_sec: float,
+    view_end_sec: float,
     bar_rect: pygame.Rect,
 ) -> None:
     pygame.draw.rect(panel, OFF_SEGMENT_COLOR, bar_rect)
-    if duration_sec <= 0.0 or len(breakpoints) < 2:
+    if view_end_sec <= view_start_sec or len(breakpoints) < 2:
         return
     # Polygon fills include their vertices; Rect.bottom/right are exclusive.
     bottom = bar_rect.bottom - 1
@@ -417,10 +430,20 @@ def _draw_level_bar(
     for index in range(len(breakpoints) - 1):
         t0, level0 = breakpoints[index]
         t1, level1 = breakpoints[index + 1]
-        if t1 <= t0:
+        if t1 <= t0 or t1 <= view_start_sec or t0 >= view_end_sec:
             continue
-        x0 = time_to_x(t0, bar_left, bar_width, duration_sec)
-        x1 = min(time_to_x(t1, bar_left, bar_width, duration_sec), right)
+        # Cut a segment that crosses a window edge at that edge.
+        slope = (level1 - level0) / (t1 - t0)
+        if t1 > view_end_sec:
+            level1 = level0 + slope * (view_end_sec - t0)
+            t1 = view_end_sec
+        if t0 < view_start_sec:
+            level0 = level0 + slope * (view_start_sec - t0)
+            t0 = view_start_sec
+        x0 = time_to_x(t0, bar_left, bar_width, view_start_sec, view_end_sec)
+        x1 = min(
+            time_to_x(t1, bar_left, bar_width, view_start_sec, view_end_sec), right
+        )
         if x1 <= x0:
             continue
         if level0 <= LEVEL_EPS and level1 <= LEVEL_EPS:
@@ -684,37 +707,84 @@ def _glyph_lane_for_cue(
     return _lane_for_view(state, slot), inherit
 
 
-def time_to_x(t_sec: float, bar_left: int, bar_width: int, duration_sec: float) -> int:
-    if duration_sec <= 0:
+def time_to_x(
+    t_sec: float,
+    bar_left: int,
+    bar_width: int,
+    view_start_sec: float,
+    view_end_sec: float,
+) -> int:
+    """X of *t_sec* with the visible window mapped onto the bar, clamped to it."""
+    span = view_end_sec - view_start_sec
+    if span <= 0:
         return bar_left
-    ratio = max(0.0, min(1.0, t_sec / duration_sec))
+    ratio = max(0.0, min(1.0, (t_sec - view_start_sec) / span))
     return bar_left + int(ratio * bar_width)
 
 
-def x_to_time(x: float, bar_left: int, bar_width: int, duration_sec: float) -> float:
-    """Inverse of ``time_to_x``, clamped to the song."""
-    if duration_sec <= 0 or bar_width <= 0:
-        return 0.0
+def x_to_time(
+    x: float,
+    bar_left: int,
+    bar_width: int,
+    view_start_sec: float,
+    view_end_sec: float,
+) -> float:
+    """Inverse of ``time_to_x``, clamped to the visible window."""
+    span = view_end_sec - view_start_sec
+    if span <= 0 or bar_width <= 0:
+        return view_start_sec
     ratio = max(0.0, min(1.0, (x - bar_left) / bar_width))
-    return ratio * duration_sec
+    return view_start_sec + ratio * span
+
+
+def time_in_view(t_sec: float, view_start_sec: float, view_end_sec: float) -> bool:
+    return view_start_sec <= t_sec <= view_end_sec
+
+
+def scrollbar_thumb_span(
+    track_w: int,
+    view_start_sec: float,
+    view_end_sec: float,
+    duration_sec: float,
+    *,
+    min_thumb: int,
+) -> tuple[int, int]:
+    """Thumb ``(offset, width)`` along a track *track_w* pixels wide.
+
+    The width is the visible share of the song, never under *min_thumb*. The
+    offset runs the thumb's free travel as the window runs the song.
+    """
+    track_w = max(0, track_w)
+    span = view_end_sec - view_start_sec
+    if duration_sec <= 0 or span <= 0 or span >= duration_sec:
+        return (0, track_w)
+    thumb_w = max(min(min_thumb, track_w), int(round(track_w * span / duration_sec)))
+    thumb_w = min(thumb_w, track_w)
+    travel = track_w - thumb_w
+    offset = int(round(travel * view_start_sec / (duration_sec - span)))
+    return (max(0, min(travel, offset)), thumb_w)
 
 
 # Pointer slack around a cue tick, in pixels.
 CUE_HIT_PX: int = 4
 
 
-StripTarget = Literal["play", "record", "label", "eye"]
+StripTarget = Literal[
+    "play", "record", "label", "eye", "scroll_thumb", "scroll_track"
+]
 
 
 @dataclass(frozen=True)
 class StripHit:
     """What a screen point lands on in the strip.
 
-    ``row`` is None for the ruler. ``t_sec`` is None outside the bar span
-    (row labels and icons). ``cue_tolerance_sec`` is ``CUE_HIT_PX`` in song time.
-    ``target`` names a control: the corner ``"play"`` / ``"record"`` buttons,
-    a row's ``"label"`` (layer number and stem abbreviation), or its monitor
-    ``"eye"`` (the visibility icon after the label).
+    ``row`` is None for the ruler and the scrollbar. ``t_sec`` is None outside
+    the bar span (row labels and icons). ``cue_tolerance_sec`` is
+    ``CUE_HIT_PX`` in song time. ``target`` names a control: the corner
+    ``"play"`` / ``"record"`` buttons, a row's ``"label"`` (layer number and
+    stem abbreviation), its monitor ``"eye"`` (the visibility icon after the
+    label), or the scrollbar's ``"scroll_thumb"`` / ``"scroll_track"``. On the
+    scrollbar ``t_sec`` is the song time at that point along the track.
     """
 
     row: int | None
@@ -775,9 +845,10 @@ def playhead_x(
     position_sec: float,
     bar_left: int,
     bar_width: int,
-    duration_sec: float,
+    view_start_sec: float,
+    view_end_sec: float,
 ) -> int:
-    return time_to_x(position_sec, bar_left, bar_width, duration_sec)
+    return time_to_x(position_sec, bar_left, bar_width, view_start_sec, view_end_sec)
 
 
 def layer_num_prefix(layer_num: int) -> str:
@@ -813,7 +884,7 @@ def row_prefix_width(
 def timeline_live_signature(
     state: TimelineViewState,
     *,
-    playhead_px: int,
+    playhead_px: int | None,
     bar_left: int,
     bar_width: int,
     row_count: int,
@@ -854,6 +925,8 @@ class _TimelineLayout:
     badge_reserve: int
     bar_top: int
     bar_bottom: int
+    # Scrollbar track under the rows, in panel coordinates.
+    scrollbar_rect: tuple[int, int, int, int]
 
 
 class TimelineOverlay:
@@ -883,6 +956,7 @@ class TimelineOverlay:
         self._blit_src: tuple[int, int] = (0, 0)
         self._hit_layout: _TimelineLayout | None = None
         self._hit_duration_sec: float = 0.0
+        self._hit_view: tuple[float, float] = (0.0, 0.0)
 
     @property
     def _font_size(self) -> int:
@@ -939,13 +1013,13 @@ class TimelineOverlay:
         local_y = y - layout.panel_y
         if not 0 <= local_x < layout.panel_w:
             return None
-        if layout.bar_width > 0 and self._hit_duration_sec > 0:
-            tolerance = CUE_HIT_PX * self._hit_duration_sec / layout.bar_width
-        else:
-            tolerance = 0.0
+        view_start, view_end = self._hit_view
+        tolerance = CUE_HIT_PX * self.view_sec_per_px()
         in_bar = layout.bar_left <= local_x < layout.bar_left + layout.bar_width
         t_sec = (
-            x_to_time(local_x, layout.bar_left, layout.bar_width, self._hit_duration_sec)
+            x_to_time(
+                local_x, layout.bar_left, layout.bar_width, view_start, view_end
+            )
             if in_bar
             else None
         )
@@ -959,6 +1033,17 @@ class TimelineOverlay:
                         row=None, t_sec=None, cue_tolerance_sec=tolerance, target=target
                     )
             return StripHit(row=None, t_sec=t_sec, cue_tolerance_sec=tolerance)
+        # The scrollbar takes the gap above it and the padding below, so the
+        # thin track is an easy target.
+        if in_bar and layout.bar_bottom <= local_y < layout.panel_h:
+            thumb_x, thumb_w = self._thumb_span(layout)
+            on_thumb = thumb_x <= local_x - layout.bar_left < thumb_x + thumb_w
+            return StripHit(
+                row=None,
+                t_sec=self.scrollbar_time_at_x(x),
+                cue_tolerance_sec=tolerance,
+                target="scroll_thumb" if on_thumb else "scroll_track",
+            )
         label_left = self._padding
         label_right = label_left + layout.layer_num_width + layout.stem_abbrev_width
         on_label = label_left <= local_x < label_right
@@ -1069,7 +1154,51 @@ class TimelineOverlay:
             x - layout.panel_x,
             layout.bar_left,
             layout.bar_width,
+            *self._hit_view,
+        )
+
+    def view_sec_per_px(self) -> float:
+        """Song seconds one bar pixel spans in the visible window. 0 before a compose."""
+        layout = self._hit_layout
+        if layout is None or layout.bar_width <= 0:
+            return 0.0
+        view_start, view_end = self._hit_view
+        return max(0.0, view_end - view_start) / layout.bar_width
+
+    def scrollbar_time_at_x(self, x: float) -> float | None:
+        """Song time at screen *x* along the scrollbar track (the whole song)."""
+        layout = self._hit_layout
+        if layout is None:
+            return None
+        return x_to_time(
+            x - layout.panel_x,
+            layout.bar_left,
+            layout.bar_width,
+            0.0,
             self._hit_duration_sec,
+        )
+
+    def scrollbar_sec_per_px(self) -> float:
+        """Seconds the window start moves per pixel of thumb travel. 0 when it cannot move."""
+        layout = self._hit_layout
+        if layout is None:
+            return 0.0
+        view_start, view_end = self._hit_view
+        _thumb_x, thumb_w = self._thumb_span(layout)
+        travel = layout.bar_width - thumb_w
+        hidden = self._hit_duration_sec - (view_end - view_start)
+        if travel <= 0 or hidden <= 0:
+            return 0.0
+        return hidden / travel
+
+    def _thumb_span(self, layout: _TimelineLayout) -> tuple[int, int]:
+        view_start, view_end = self._hit_view
+        return scrollbar_thumb_span(
+            layout.scrollbar_rect[2],
+            view_start,
+            view_end,
+            self._hit_duration_sec,
+            min_thumb=timeline_ui_metrics().scrollbar_min_thumb,
         )
 
     def _compute_layout(
@@ -1112,6 +1241,12 @@ class TimelineOverlay:
         timeline_eye_x = panel_w - self._padding - eye_slot_w
         bar_top = self._padding
         bar_bottom = self._padding + row_count * row_h + (row_count - 1) * self._row_gap
+        scrollbar_rect = (
+            bar_left,
+            bar_bottom + metrics.scrollbar_gap,
+            bar_width,
+            metrics.scrollbar_height,
+        )
 
         self._layer_num_width = layer_num_width
         self._stem_abbrev_width = stem_abbrev_width
@@ -1133,6 +1268,7 @@ class TimelineOverlay:
             badge_reserve=badge_reserve,
             bar_top=bar_top,
             bar_bottom=bar_bottom,
+            scrollbar_rect=scrollbar_rect,
         )
 
     def _build_static_panel(
@@ -1148,13 +1284,17 @@ class TimelineOverlay:
         bar_width = layout.bar_width
         timeline_eye_x = layout.timeline_eye_x
 
+        view_start, view_end = view_window(state)
+
         panel = overlay_panel_surface((panel_w, panel_h))
         font = self._font_get()
         self._row_layout = []
 
         if state.show_bar_grid and state.bar_grid_times:
             for t in state.bar_grid_times:
-                grid_x = time_to_x(t, bar_left, bar_width, state.duration_sec)
+                if not time_in_view(t, view_start, view_end):
+                    continue
+                grid_x = time_to_x(t, bar_left, bar_width, view_start, view_end)
                 pygame.draw.line(
                     panel,
                     BAR_GRID,
@@ -1244,7 +1384,8 @@ class TimelineOverlay:
                 breakpoints=bar_level_breakpoints_for_row(state, slot),
                 bar_left=bar_left,
                 bar_width=bar_width,
-                duration_sec=state.duration_sec,
+                view_start_sec=view_start,
+                view_end_sec=view_end,
                 bar_rect=bar_rect,
             )
 
@@ -1257,7 +1398,9 @@ class TimelineOverlay:
                 else None
             )
             for cue in row_cues:
-                tick_x = time_to_x(cue.t, bar_left, bar_width, state.duration_sec)
+                if not time_in_view(cue.t, view_start, view_end):
+                    continue
+                tick_x = time_to_x(cue.t, bar_left, bar_width, view_start, view_end)
                 selected = selected_t is not None and cue.t == selected_t
                 if selected:
                     pygame.draw.line(
@@ -1284,8 +1427,8 @@ class TimelineOverlay:
             duration_sec=state.duration_sec,
             bar_left=bar_left,
             bar_width=bar_width,
-            view_start_sec=0.0,
-            view_end_sec=state.duration_sec,
+            view_start_sec=view_start,
+            view_end_sec=view_end,
         ):
             pygame.draw.line(
                 panel,
@@ -1296,7 +1439,9 @@ class TimelineOverlay:
             )
 
         for marker_i, marker_t in enumerate(state.song_marker_times):
-            marker_x = time_to_x(marker_t, bar_left, bar_width, state.duration_sec)
+            if not time_in_view(marker_t, view_start, view_end):
+                continue
+            marker_x = time_to_x(marker_t, bar_left, bar_width, view_start, view_end)
             selected = marker_i == state.selected_song_marker_index
             pygame.draw.line(
                 panel,
@@ -1306,7 +1451,31 @@ class TimelineOverlay:
                 4 if selected else 2,
             )
 
+        self._draw_scrollbar(panel, state, layout)
         return panel
+
+    def _draw_scrollbar(
+        self,
+        panel: pygame.Surface,
+        state: TimelineViewState,
+        layout: _TimelineLayout,
+    ) -> None:
+        """Track under the rows; the thumb is the visible share of the song."""
+        track_x, track_y, track_w, track_h = layout.scrollbar_rect
+        if track_w <= 0 or track_h <= 0:
+            return
+        view_start, view_end = view_window(state)
+        pygame.draw.rect(panel, SCROLLBAR_TRACK, layout.scrollbar_rect)
+        thumb_x, thumb_w = scrollbar_thumb_span(
+            track_w,
+            view_start,
+            view_end,
+            state.duration_sec,
+            min_thumb=timeline_ui_metrics().scrollbar_min_thumb,
+        )
+        pygame.draw.rect(
+            panel, SCROLLBAR_THUMB, (track_x + thumb_x, track_y, thumb_w, track_h)
+        )
 
     def _draw_role_glyphs(
         self,
@@ -1320,6 +1489,7 @@ class TimelineOverlay:
         bold_font = self._bold_font_get()
         dirty: list[tuple[int, int, int, int]] = []
         row_h = layout.row_h
+        view_start, view_end = view_window(state)
         for display_i, slot in enumerate(state.layer_z_order):
             row_y = self._row_y(display_i, row_h)
             bar_rect = pygame.Rect(
@@ -1331,6 +1501,8 @@ class TimelineOverlay:
             for cue in bar_cues_for_row(state, slot):
                 if cue.role is None or cue.level <= LEVEL_EPS:
                     continue
+                if not time_in_view(cue.t, view_start, view_end):
+                    continue
                 letter = _ROLE_GLYPH.get(cue.role)
                 if letter is None:
                     continue
@@ -1340,7 +1512,7 @@ class TimelineOverlay:
                     previous_level=previous, cue_level=cue.level
                 )
                 tick_x = time_to_x(
-                    cue.t, layout.bar_left, layout.bar_width, state.duration_sec
+                    cue.t, layout.bar_left, layout.bar_width, view_start, view_end
                 )
                 glyph_w, glyph_h = bold_font.size(letter)
                 glyph_x, glyph_y = role_glyph_anchor(
@@ -1457,11 +1629,14 @@ class TimelineOverlay:
         selected_t = (
             state.selected_cue_t.get(slot) if row_index == state.focus_row else None
         )
-        if selected_t is not None and selected_cue_flash_active(
-            state.selected_cue_flash_start_ms
+        view_start, view_end = view_window(state)
+        if (
+            selected_t is not None
+            and time_in_view(selected_t, view_start, view_end)
+            and selected_cue_flash_active(state.selected_cue_flash_start_ms)
         ):
             tick_x = time_to_x(
-                selected_t, layout.bar_left, layout.bar_width, state.duration_sec
+                selected_t, layout.bar_left, layout.bar_width, view_start, view_end
             )
             half_w = SELECTED_CUE_FLASH_TICK_WIDTH // 2 + 1
             tick_rect = (
@@ -1578,10 +1753,13 @@ class TimelineOverlay:
         self,
         surface: pygame.Surface,
         layout: _TimelineLayout,
-        playhead_px: int,
+        playhead_px: int | None,
         *,
         y_offset: int,
-    ) -> tuple[int, int, int, int]:
+    ) -> tuple[int, int, int, int] | None:
+        """Draw the playhead. None when it is outside the visible window."""
+        if playhead_px is None:
+            return None
         playhead_left = max(
             layout.bar_left,
             min(layout.bar_left + layout.bar_width - 1, playhead_px),
@@ -1643,14 +1821,14 @@ class TimelineOverlay:
         layout: _TimelineLayout,
     ) -> pygame.Surface | None:
         """Time scale over the badge row and the strip's top padding."""
-        # The whole song is the visible window until the strip zooms.
+        view_start, view_end = view_window(state)
         return render_time_ruler(
             width=layout.panel_w,
             height=layout.badge_reserve + layout.bar_top,
             bar_left=layout.bar_left,
             bar_width=layout.bar_width,
-            view_start_sec=0.0,
-            view_end_sec=state.duration_sec,
+            view_start_sec=view_start,
+            view_end_sec=view_end,
             duration_sec=state.duration_sec,
             strip_font_size=self._font_size,
         )
@@ -1678,7 +1856,7 @@ class TimelineOverlay:
         state: TimelineViewState,
         layout: _TimelineLayout,
         *,
-        playhead_px: int,
+        playhead_px: int | None,
         incremental: bool,
     ) -> list[tuple[int, int, int, int]]:
         cache = self._cache
@@ -1826,11 +2004,17 @@ class TimelineOverlay:
         if self._ruler is not None:
             upload.blit(self._ruler, (0, 0))
 
-        playhead_px = playhead_x(
-            state.position_sec,
-            layout.bar_left,
-            layout.bar_width,
-            state.duration_sec,
+        view_start, view_end = view_window(state)
+        playhead_px = (
+            playhead_x(
+                state.position_sec,
+                layout.bar_left,
+                layout.bar_width,
+                view_start,
+                view_end,
+            )
+            if time_in_view(state.position_sec, view_start, view_end)
+            else None
         )
         prev_playhead = cache.last_playhead_rect
         prev_badge = cache.last_badge_rect
@@ -1856,6 +2040,7 @@ class TimelineOverlay:
 
         self._hit_layout = layout
         self._hit_duration_sec = state.duration_sec
+        self._hit_view = (view_start, view_end)
         sx, sy, sw, sh = screen_bounds
         panel_screen_y = layout.panel_y
         self._panel_rect = clip_rect_to_bounds(

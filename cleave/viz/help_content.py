@@ -323,6 +323,13 @@ def timeline_strip_section(
                 ("Click/Drag ruler", "seek / scrub"),
             )
         )
+    entries.extend(
+        (
+            ("Wheel", "zoom in / out"),
+            ("Shift + Wheel", "scroll left / right"),
+            ("Drag row / scrollbar", "scroll when zoomed"),
+        )
+    )
 
     if not recording:
         entries.extend(

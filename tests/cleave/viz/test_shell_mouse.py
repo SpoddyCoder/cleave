@@ -791,7 +791,7 @@ def test_strip_pointer_gets_press_drag_and_release_in_timeline_rect() -> None:
         host.process_event(_button(pygame.MOUSEBUTTONUP, pos))
 
         assert controls.shell_focus.region is ShellRegion.TIMELINE
-        pointer.press.assert_called_once_with(float(pos[0]), float(pos[1]))
+        pointer.press.assert_called_once_with(float(pos[0]), float(pos[1]), 0)
         pointer.motion.assert_called_with(float(pos[0] + 30), float(pos[1]))
         pointer.release.assert_called_once()
 
@@ -813,6 +813,58 @@ def test_strip_pointer_ignores_clicks_outside_strip_or_when_closed() -> None:
         pointer.press.assert_not_called()
 
 
+def test_wheel_over_the_open_strip_zooms_it_and_skips_imgui() -> None:
+    controls = _make_controls(("layer_1", "layer_2"))
+    controls.session.timeline.panel_open = True
+    pointer = MagicMock()
+    with _host() as host:
+        host._controls = controls
+        host._strip_pointer = pointer
+        layout = _open_strip_layout()
+        host.set_layout(layout)
+        wheel = pygame.event.Event(pygame.MOUSEWHEEL, x=0, y=1)
+
+        pos = _rect_center(layout.navigator)
+        host.process_event(_motion(pos))
+        host.process_event(wheel)
+        pointer.wheel.assert_not_called()
+        assert host.imgui._wheel_y == 1.0
+
+        pos = _rect_center(layout.timeline)
+        host.process_event(_motion(pos))
+        host.process_event(wheel)
+        pointer.wheel.assert_called_once_with(float(pos[0]), 0.0, 1.0, shift=False)
+        assert host.imgui._wheel_y == 1.0
+
+
+def test_middle_press_on_the_strip_pans_without_taking_the_region() -> None:
+    controls = _make_controls(("layer_1", "layer_2"))
+    controls.session.timeline.panel_open = True
+    pointer = MagicMock()
+    with _host() as host:
+        host._controls = controls
+        host._strip_pointer = pointer
+        layout = _open_strip_layout()
+        host.set_layout(layout)
+        pos = _rect_center(layout.timeline)
+        region = controls.shell_focus.region
+
+        host.process_event(_button(pygame.MOUSEBUTTONDOWN, pos, button=2))
+        host.process_event(_button(pygame.MOUSEBUTTONUP, pos, button=2))
+
+        pointer.press.assert_called_once_with(float(pos[0]), float(pos[1]), 2)
+        pointer.release.assert_called_once()
+        assert controls.shell_focus.region is region
+
+
+def test_strip_pan_asks_for_move_and_the_scrollbar_for_left_right() -> None:
+    with _host() as host:
+        _strip_host(host, panning=True)
+        assert _gesture_pointer(host) is PointerShape.MOVE
+        _strip_host(host, scrollbar_active=True)
+        assert _gesture_pointer(host) is PointerShape.RESIZE_EW
+
+
 def test_strip_pointer_cancels_when_window_loses_focus() -> None:
     pointer = MagicMock()
     with _host() as host:
@@ -821,10 +873,20 @@ def test_strip_pointer_cancels_when_window_loses_focus() -> None:
         pointer.cancel.assert_called_once()
 
 
-def _strip_host(host: ShellHost, *, hover=None, over_ruler=False, scrubbing=False):
+def _strip_host(
+    host: ShellHost,
+    *,
+    hover=None,
+    over_ruler=False,
+    scrubbing=False,
+    panning=False,
+    scrollbar_active=False,
+):
     host._strip_pointer = SimpleNamespace(
         over_ruler=over_ruler,
         scrubbing=scrubbing,
+        panning=panning,
+        scrollbar_active=scrollbar_active,
         hover_pressable=hover is not None and hover != ("eye", 3),
     )
     host._controls.session = SimpleNamespace(

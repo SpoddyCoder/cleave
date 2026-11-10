@@ -9,6 +9,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 
+- The timeline strip zooms. Scroll the mouse wheel over the strip to zoom in or out around the time under the pointer, down to a one second window. When zoomed, drag a row sideways (or middle-drag anywhere on the time scale or rows) to move along the song, or use Shift + wheel. A scrollbar under the rows shows how much of the song is visible: drag its thumb, or click the track to jump there. During playback the view pages forward when the playhead reaches the right edge, and a seek while paused brings the playhead back into view. The strip is slightly taller to fit the scrollbar.
 - The timeline strip shows a time scale above its top row, with labelled minute and second marks spaced to fit the strip width. Faint lines at the song start and end run down through every row.
 - The preset directory row shows a folder icon, and the preset, preset list entries, and render output rows show a file icon.
 - Drag a preset list entry by the handle in front of its name to reorder it. Esc during the drag puts it back.

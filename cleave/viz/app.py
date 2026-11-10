@@ -478,6 +478,9 @@ def _tick_frame_live_overlay(
     timeline_state = None
     if timeline_strip_visible:
         signals = runtime.seed.signals
+        tl.strip_view.follow_playhead(
+            t_sec, runtime.seed.duration_sec, paused=runtime.playback.paused
+        )
         timeline_state = build_timeline_view_state(
             runtime.seed.session,
             t_sec,

@@ -687,16 +687,16 @@ def test_playhead_x_at_known_position() -> None:
     bar_left = 40
     bar_width = 200
     duration = 100.0
-    assert playhead_x(0.0, bar_left, bar_width, duration) == bar_left
-    assert playhead_x(50.0, bar_left, bar_width, duration) == bar_left + 100
-    assert playhead_x(100.0, bar_left, bar_width, duration) == bar_left + bar_width
+    assert playhead_x(0.0, bar_left, bar_width, 0.0, duration) == bar_left
+    assert playhead_x(50.0, bar_left, bar_width, 0.0, duration) == bar_left + 100
+    assert playhead_x(100.0, bar_left, bar_width, 0.0, duration) == bar_left + bar_width
 
 
 def test_time_to_x_clamps_out_of_range() -> None:
     bar_left = 10
     bar_width = 90
-    assert time_to_x(-5.0, bar_left, bar_width, 60.0) == bar_left
-    assert time_to_x(120.0, bar_left, bar_width, 60.0) == bar_left + bar_width
+    assert time_to_x(-5.0, bar_left, bar_width, 0.0, 60.0) == bar_left
+    assert time_to_x(120.0, bar_left, bar_width, 0.0, 60.0) == bar_left + bar_width
 
 
 def test_draw_does_not_crash() -> None:
@@ -798,8 +798,8 @@ def test_song_markers_drawn_on_static_panel() -> None:
     assert overlay.bar_layout is not None
     bar_left, bar_width, _ = overlay.bar_layout
     mid_y = static.get_height() // 2
-    x_unselected = time_to_x(25.0, bar_left, bar_width, 100.0)
-    x_selected = time_to_x(75.0, bar_left, bar_width, 100.0)
+    x_unselected = time_to_x(25.0, bar_left, bar_width, 0.0, 100.0)
+    x_selected = time_to_x(75.0, bar_left, bar_width, 0.0, 100.0)
     assert static.get_at((x_unselected, mid_y))[:3] == SONG_MARKER
     assert static.get_at((x_selected, mid_y))[:3] == SONG_MARKER_SELECTED
 
@@ -1111,7 +1111,7 @@ def test_selected_cue_highlight_drawn_on_static_panel() -> None:
     assert static is not None
     assert overlay.bar_layout is not None
     bar_left, bar_width, _ = overlay.bar_layout
-    tick_x = time_to_x(25.0, bar_left, bar_width, 100.0)
+    tick_x = time_to_x(25.0, bar_left, bar_width, 0.0, 100.0)
     row_h = overlay.row_layout[0][4]
     padding = overlay._padding
     # Settled selected tick: full-height HIGHLIGHT, thinner than flash width.
@@ -1164,7 +1164,7 @@ def test_selected_cue_marker_only_on_focused_track() -> None:
         assert static is not None
         assert overlay.bar_layout is not None
         bar_left, bar_width, _ = overlay.bar_layout
-        tick_x = time_to_x(cue_t, bar_left, bar_width, 100.0)
+        tick_x = time_to_x(cue_t, bar_left, bar_width, 0.0, 100.0)
         row_h = overlay.row_layout[row_index][4]
         y = overlay._padding + row_index * (row_h + overlay._row_gap) + row_h // 2
         return static.get_at((tick_x, y))[:3]
@@ -1246,7 +1246,7 @@ def test_selected_cue_flash_live_patches_yellow(monkeypatch) -> None:
     upload = composed.upload_surface
     assert overlay.bar_layout is not None
     bar_left, bar_width, _ = overlay.bar_layout
-    tick_x = time_to_x(25.0, bar_left, bar_width, 100.0)
+    tick_x = time_to_x(25.0, bar_left, bar_width, 0.0, 100.0)
     from cleave.viz.timeline_panel_cache import timeline_badge_reserve_px
 
     y = timeline_badge_reserve_px() + overlay._padding + overlay.row_layout[0][4] // 2
@@ -1385,7 +1385,7 @@ def test_role_glyph_xor_drawn_late_on_upload_not_static() -> None:
     upload = composed.upload_surface
     assert overlay.bar_layout is not None
     bar_left, bar_width, _ = overlay.bar_layout
-    tick_x = time_to_x(25.0, bar_left, bar_width, 100.0)
+    tick_x = time_to_x(25.0, bar_left, bar_width, 0.0, 100.0)
     row_h = overlay.row_layout[0][4]
     row_y = overlay._padding
     bar_rect = pygame.Rect(
@@ -1442,6 +1442,8 @@ def test_row_height_constant_across_layer_counts() -> None:
             timeline_ui_metrics().padding * 2
             + row_count * expected_row_h
             + max(0, row_count - 1) * timeline_ui_metrics().row_gap
+            + timeline_ui_metrics().scrollbar_gap
+            + timeline_ui_metrics().scrollbar_height
         )
 
 def test_compose_panel_draws_time_scale_above_first_row() -> None:
@@ -1467,7 +1469,15 @@ def test_compose_panel_draws_time_scale_above_first_row() -> None:
     assert tuple(surface.get_at((bar_left, baseline_y - 1)))[:3] == MUTED
     # The song end mark runs from the ruler to the bottom of the last row.
     end_x = bar_left + _bar_width - 1
-    last_row_bottom = panel[1] + panel[3] - timeline_ui_metrics().padding - 1
+    metrics = timeline_ui_metrics()
+    last_row_bottom = (
+        panel[1]
+        + panel[3]
+        - metrics.padding
+        - metrics.scrollbar_height
+        - metrics.scrollbar_gap
+        - 1
+    )
     assert tuple(surface.get_at((end_x, baseline_y)))[:3] == MUTED
     for y in (baseline_y + 1, first_row_y + 1, last_row_bottom):
         assert tuple(surface.get_at((end_x, y)))[:3] == SONG_BOUND
@@ -1487,7 +1497,7 @@ def test_playhead_rises_to_ruler_major_tick_top() -> None:
     bar_left, bar_width, _eye = overlay.bar_layout
     panel = overlay.panel_rect
     assert panel is not None
-    x = playhead_x(state.position_sec, bar_left, bar_width, state.duration_sec)
+    x = playhead_x(state.position_sec, bar_left, bar_width, 0.0, state.duration_sec)
     first_row_y = panel[1] + timeline_ui_metrics().padding
     ruler_h = first_row_y - band[1]
     tick_top_y = band[1] + ruler_tick_top(ruler_h)
@@ -1507,7 +1517,7 @@ def test_moving_playhead_keeps_ruler_baseline() -> None:
     moved = TimelineOverlay()
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
     moved.draw(surface, state, timeline_rect=band)
-    old_x = playhead_x(50.0, *moved.bar_layout[:2], state.duration_sec)
+    old_x = playhead_x(50.0, *moved.bar_layout[:2], 0.0, state.duration_sec)
     state.position_sec = 60.0
     surface.fill((0, 0, 0, 0))
     moved.draw(surface, state, timeline_rect=band)
@@ -1567,6 +1577,131 @@ def test_hit_at_maps_ruler_rows_prefix_and_gaps() -> None:
     assert overlay.time_at_x(px - 50) == 0.0
 
     for t in (0.0, 12.5, 63.0, 100.0):
-        x = time_to_x(t, bar_left, bar_width, 100.0)
-        back = x_to_time(x, bar_left, bar_width, 100.0)
-        assert abs(time_to_x(back, bar_left, bar_width, 100.0) - x) <= 1
+        x = time_to_x(t, bar_left, bar_width, 0.0, 100.0)
+        back = x_to_time(x, bar_left, bar_width, 0.0, 100.0)
+        assert abs(time_to_x(back, bar_left, bar_width, 0.0, 100.0) - x) <= 1
+
+
+def _zoomed(state: TimelineViewState, start: float, end: float) -> TimelineViewState:
+    from dataclasses import replace
+
+    return replace(state, view_start_sec=start, view_end_sec=end)
+
+
+def test_zoomed_hit_at_maps_the_window_and_tightens_cue_tolerance() -> None:
+    pygame.init()
+    overlay = TimelineOverlay(padding=8, row_gap=4)
+    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    _draw(overlay, surface, _zoomed(_view_state(duration_sec=100.0), 40.0, 60.0))
+
+    px, py, _, _ = overlay.panel_rect
+    bar_left, bar_width, _ = overlay.bar_layout
+    row_y = py + overlay.row_layout[0][2] + 2
+    hit = overlay.hit_at(px + bar_left + bar_width // 2, row_y)
+    assert hit is not None and hit.row == 0
+    assert hit.t_sec == pytest.approx(50.0, abs=0.1)
+    assert hit.cue_tolerance_sec == pytest.approx(4 * 20.0 / bar_width)
+    assert overlay.view_sec_per_px() == pytest.approx(20.0 / bar_width)
+    assert overlay.time_at_x(px - 50) == 40.0
+    assert overlay.time_at_x(px + bar_left + bar_width + 50) == 60.0
+
+
+def test_scrollbar_thumb_span_tracks_the_window() -> None:
+    from cleave.viz.timeline_overlay import scrollbar_thumb_span
+
+    assert scrollbar_thumb_span(1000, 0.0, 100.0, 100.0, min_thumb=12) == (0, 1000)
+    assert scrollbar_thumb_span(1000, 40.0, 60.0, 100.0, min_thumb=12) == (400, 200)
+    assert scrollbar_thumb_span(1000, 80.0, 100.0, 100.0, min_thumb=12) == (800, 200)
+    # A tiny window keeps a grabbable thumb that still reaches both ends.
+    assert scrollbar_thumb_span(1000, 0.0, 0.1, 100.0, min_thumb=12) == (0, 12)
+    assert scrollbar_thumb_span(1000, 99.9, 100.0, 100.0, min_thumb=12) == (988, 12)
+    assert scrollbar_thumb_span(0, 0.0, 10.0, 100.0, min_thumb=12) == (0, 0)
+
+
+def test_scrollbar_hits_thumb_and_track_under_the_rows() -> None:
+    from cleave.viz.theme import SCROLLBAR_THUMB, SCROLLBAR_TRACK
+
+    pygame.init()
+    overlay = TimelineOverlay()
+    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    _draw(overlay, surface, _zoomed(_view_state(duration_sec=100.0), 40.0, 60.0))
+
+    px, py, _, ph = overlay.panel_rect
+    bar_left, bar_width, _ = overlay.bar_layout
+    metrics = timeline_ui_metrics()
+    bar_y = py + ph - metrics.padding - metrics.scrollbar_height // 2 - 1
+    thumb_x = px + bar_left + bar_width // 2
+    track_x = px + bar_left + bar_width // 10
+
+    thumb = overlay.hit_at(thumb_x, bar_y)
+    assert thumb is not None and thumb.target == "scroll_thumb" and thumb.row is None
+    track = overlay.hit_at(track_x, bar_y)
+    assert track is not None and track.target == "scroll_track"
+    assert track.t_sec == pytest.approx(10.0, abs=0.2)
+    assert overlay.hit_at(px + 4, bar_y) is None
+    assert tuple(surface.get_at((thumb_x, bar_y)))[:3] == SCROLLBAR_THUMB
+    assert tuple(surface.get_at((track_x, bar_y)))[:3] == SCROLLBAR_TRACK
+    # 80 hidden seconds over the thumb's free travel.
+    travel = bar_width - round(bar_width * 0.2)
+    assert overlay.scrollbar_sec_per_px() == pytest.approx(80.0 / travel, rel=0.01)
+
+
+def test_scrollbar_cannot_move_at_full_zoom() -> None:
+    pygame.init()
+    overlay = TimelineOverlay()
+    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    _draw(overlay, surface, _view_state(duration_sec=100.0))
+    assert overlay.scrollbar_sec_per_px() == 0.0
+
+
+def test_playhead_and_cues_outside_the_window_are_not_drawn() -> None:
+    from cleave.viz.theme import PLAYHEAD, PLAYHEAD_FLASH
+    from cleave.viz.timeline_overlay import OFF_SEGMENT_COLOR
+
+    pygame.init()
+    overlay = TimelineOverlay()
+    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    lanes = {"layer_1": TimelineLane(baseline=1.0, cues=[SlotCue(t=10.0, level=0.0)])}
+    state = _view_state(duration_sec=100.0, position_sec=10.0, lanes=lanes)
+    _draw(overlay, surface, _zoomed(state, 40.0, 60.0))
+
+    px, py, _, _ = overlay.panel_rect
+    bar_left, bar_width, _ = overlay.bar_layout
+    _, _, row_y, _, row_h, _ = overlay.row_layout[0]
+    y = py + row_y + row_h // 2
+    row = {
+        tuple(surface.get_at((px + bar_left + dx, y)))[:3] for dx in range(bar_width)
+    }
+    # The cue at 10s switched the layer off, so the window shows one flat bar.
+    assert row == {OFF_SEGMENT_COLOR}
+    assert PLAYHEAD not in row and PLAYHEAD_FLASH not in row
+    assert overlay._cache.last_playhead_rect is None
+
+
+def test_zoomed_level_bar_cuts_segments_at_the_window_edges() -> None:
+    from cleave.viz.theme import TIMELINE_BAR_ON
+    from cleave.viz.timeline_overlay import OFF_SEGMENT_COLOR
+
+    pygame.init()
+    overlay = TimelineOverlay()
+    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    lanes = {
+        "layer_1": TimelineLane(
+            baseline=0.0,
+            cues=[SlotCue(t=10.0, level=1.0), SlotCue(t=50.0, level=0.0)],
+        )
+    }
+    state = _view_state(duration_sec=100.0, position_sec=0.0, lanes=lanes)
+    _draw(overlay, surface, _zoomed(state, 40.0, 60.0))
+
+    px, py, _, _ = overlay.panel_rect
+    bar_left, bar_width, _ = overlay.bar_layout
+    _, _, row_y, _, row_h, _ = overlay.row_layout[0]
+    y = py + row_y + row_h // 2
+    # On from before the window to its middle, then off.
+    assert tuple(surface.get_at((px + bar_left + 2, y)))[:3] == TIMELINE_BAR_ON
+    assert tuple(surface.get_at((px + bar_left + bar_width // 4, y)))[:3] == TIMELINE_BAR_ON
+    assert (
+        tuple(surface.get_at((px + bar_left + 3 * bar_width // 4, y)))[:3]
+        == OFF_SEGMENT_COLOR
+    )

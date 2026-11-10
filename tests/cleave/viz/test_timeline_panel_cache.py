@@ -387,3 +387,14 @@ def test_upload_signature_pairs_static_and_live() -> None:
     assert sig.content_hash == (static, live)
     plan = upload_plan_for_signature(sig, sig)
     assert plan.mode == "skip"
+
+
+def test_static_signature_changes_with_the_view_window() -> None:
+    from dataclasses import replace
+
+    state = _view_state(position_sec=5.0)
+    whole = _static_sig(state)
+    zoomed = _static_sig(replace(state, view_start_sec=10.0, view_end_sec=30.0))
+    panned = _static_sig(replace(state, view_start_sec=20.0, view_end_sec=40.0))
+    assert whole != zoomed
+    assert zoomed != panned
