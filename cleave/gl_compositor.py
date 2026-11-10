@@ -32,6 +32,7 @@ from OpenGL.GL import (
     GL_DEPTH_ATTACHMENT,
     GL_DEPTH_COMPONENT24,
     GL_DEPTH_TEST,
+    GL_DRAW_FRAMEBUFFER,
     GL_FRAMEBUFFER,
     GL_FRAMEBUFFER_COMPLETE,
     GL_FUNC_ADD,
@@ -42,7 +43,9 @@ from OpenGL.GL import (
     GL_QUADS,
     GL_RGBA,
     GL_RGBA8,
+    GL_READ_FRAMEBUFFER,
     GL_RENDERBUFFER,
+    GL_SCISSOR_TEST,
     GL_SRC_ALPHA,
     GL_SRC_COLOR,
     GL_TEXTURE0,
@@ -62,6 +65,7 @@ from OpenGL.GL import (
     glBindTexture,
     glBlendEquation,
     glBlendFunc,
+    glBlitFramebuffer,
     glClear,
     glClearColor,
     glColor4f,
@@ -81,6 +85,7 @@ from OpenGL.GL import (
     glLoadIdentity,
     glMatrixMode,
     glOrtho,
+    glReadBuffer,
     glReadPixels,
     glRenderbufferStorage,
     glTexCoord2f,
@@ -125,6 +130,26 @@ def _overlay_surface_rgba(surface: pygame.Surface) -> bytes:
 def _overlay_subimage_y(dest_y: int, active_h: int, capacity_h: int) -> int:
     """Map top-left *dest_y* to glTexSubImage2D's bottom-origin row."""
     return capacity_h - dest_y - active_h
+
+
+def _blit_color(
+    src_fbo: int, src_w: int, src_h: int, dst_fbo: int, dst_w: int, dst_h: int
+) -> None:
+    """Scale the colour of *src_fbo* into *dst_fbo*; no-op without a source."""
+    if not src_fbo or src_w <= 0 or src_h <= 0:
+        return
+    # glBlitFramebuffer honours the scissor test; a prior pass may leave it on.
+    scissor = bool(glIsEnabled(GL_SCISSOR_TEST))
+    glDisable(GL_SCISSOR_TEST)
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, src_fbo)
+    glReadBuffer(GL_COLOR_ATTACHMENT0)
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, dst_fbo)
+    glBlitFramebuffer(
+        0, 0, src_w, src_h, 0, 0, dst_w, dst_h, GL_COLOR_BUFFER_BIT, GL_LINEAR
+    )
+    glBindFramebuffer(GL_FRAMEBUFFER, 0)
+    if scissor:
+        glEnable(GL_SCISSOR_TEST)
 
 
 @dataclass
@@ -499,41 +524,50 @@ class GlCompositor:
         width: int,
         height: int,
     ) -> None:
-        """Reallocate *layer* FBO and rolloff/chroma sources; keep compositor fields."""
-        enabled = layer.enabled
-        opacity = layer.opacity
-        blend_mode = layer.blend_mode
-        flash_alpha = layer.flash_alpha
-        bloom_strength = layer.bloom_strength
-        hue_rgb = layer.hue_rgb
-        hue_mix = layer.hue_mix
-        grit_strength = layer.grit_strength
-        aberration_px = layer.aberration_px
-        name = layer.name
+        """Reallocate *layer* FBO and rolloff/chroma sources; keep compositor fields.
 
-        layer.destroy()
+        The old pixels are scaled into the new buffers, so a paused frame (which
+        projectM does not redraw) keeps its picture through a resize.
+        """
+        name = layer.name
         fbo_id, texture_id, depth_rbo_id = self._allocate_layer_framebuffer(
             name, width, height
         )
-
+        _blit_color(layer.fbo_id, layer.width, layer.height, fbo_id, width, height)
+        layer.destroy()
         layer.width = width
         layer.height = height
         layer.fbo_id = fbo_id
         layer.texture_id = texture_id
         layer.depth_rbo_id = depth_rbo_id
-        layer.enabled = enabled
-        layer.opacity = opacity
-        layer.blend_mode = blend_mode
-        layer.flash_alpha = flash_alpha
-        layer.bloom_strength = bloom_strength
-        layer.hue_rgb = hue_rgb
-        layer.hue_mix = hue_mix
-        layer.grit_strength = grit_strength
-        layer.aberration_px = aberration_px
-        self._destroy_rolloff_source(name)
-        self._destroy_chroma_source(name)
-        self._ensure_rolloff_source(name, width, height)
-        self._ensure_chroma_source(name, width, height)
+        self._rolloff_sources[name] = self._resized_source(
+            self._rolloff_sources.get(name), f"{name}_rolloff_source", width, height
+        )
+        self._chroma_sources[name] = self._resized_source(
+            self._chroma_sources.get(name), f"{name}_chroma_source", width, height
+        )
+
+    def _resized_source(
+        self,
+        old: _RolloffSourceSlot | None,
+        label: str,
+        width: int,
+        height: int,
+    ) -> _RolloffSourceSlot:
+        """A *width* x *height* source slot holding *old*'s pixels, scaled."""
+        fbo_id, texture_id, depth_rbo_id = self._allocate_layer_framebuffer(
+            label, width, height
+        )
+        if old is not None:
+            _blit_color(old.fbo_id, old.width, old.height, fbo_id, width, height)
+            old.destroy()
+        return _RolloffSourceSlot(
+            texture_id=texture_id,
+            fbo_id=fbo_id,
+            depth_rbo_id=depth_rbo_id,
+            width=width,
+            height=height,
+        )
 
     def resize_layer_fbo(self, name: str, width: int, height: int) -> None:
         """Resize an existing layer FBO, preserving compositor state fields."""

@@ -259,10 +259,21 @@ def test_resize_layer_fbo_reallocates_and_preserves_state() -> None:
     fbo.aberration_px = 2.5
     fbo.blend_mode = "add"
     compositor._layers = [fbo]
+    old_rolloff = MagicMock(fbo_id=5, width=1280, height=720)
+    compositor._rolloff_sources = {"layer_1": old_rolloff}
+    compositor._chroma_sources = {}
 
-    compositor.resize_layer_fbo("layer_1", 640, 360)
+    with patch("cleave.gl_compositor._blit_color") as blit:
+        compositor.resize_layer_fbo("layer_1", 640, 360)
 
     fbo.destroy.assert_called_once()
+    old_rolloff.destroy.assert_called_once()
+    assert blit.call_args_list == [
+        ((1, 1280, 720, 11, 640, 360),),
+        ((5, 1280, 720, 11, 640, 360),),
+    ]
+    assert compositor._rolloff_sources["layer_1"].width == 640
+    assert compositor._chroma_sources["layer_1"].height == 360
     assert compositor._allocate_layer_framebuffer.call_args_list == [
         (("layer_1", 640, 360),),
         (("layer_1_rolloff_source", 640, 360),),
