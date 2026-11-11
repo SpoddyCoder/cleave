@@ -44,6 +44,7 @@ from cleave.viz.shell_host import (
     navigator_twisty,
     path_icon_color,
     path_row_icon,
+    scroll_clip_span,
     selectable_wash,
     selection_after_nav_collapse,
 )
@@ -421,3 +422,12 @@ def test_layer_enabled_row_is_inert_while_the_timeline_is_on() -> None:
     assert row_inert(on, enabled) is True
     assert row_inert(off, enabled) is False
     assert row_inert(on, solo) is False
+
+
+def test_scroll_clip_span_insets_by_window_padding() -> None:
+    assert scroll_clip_span(100.0, 300.0, 8.0) == (108.0, 392.0)
+
+
+def test_scroll_clip_span_never_inverts() -> None:
+    top, bottom = scroll_clip_span(0.0, 10.0, 8.0)
+    assert bottom == top == 8.0

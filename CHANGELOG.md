@@ -100,6 +100,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- When the navigator, inspector, or help column has more rows than fit, the rows stop short of the panel border at the top and bottom instead of running into it.
 - While recording, the timeline strip no longer draws a false fade ramp. Turning a row on or off no longer flashes one for a frame, and a row that is on from the song start no longer ramps up from the start until recording stops.
 - Help text wraps whole sentences to the column width instead of breaking mid-sentence, with one sentence per line. Navigator help lists the page description and its keys first, with the navigator keys last, key names are spelled the same way throughout (Left/Right, PgUp/PgDn, Esc), and every help heading is in Capital Case.
 - Help text uses short, plain sentences close to Simplified Technical English, and drops detail that the panel already shows. The global keys list Undo/Redo, timeline strip (T), help (H), and full screen (F11), and Alt shortcuts name the real menu letters (F, E, V, P, S, H).

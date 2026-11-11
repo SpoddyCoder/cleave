@@ -564,6 +564,36 @@ def shell_window_flags(base: int, *, scrollable: bool) -> int:
     return flags & ~hidden
 
 
+def scroll_clip_span(window_y: float, window_h: float, pad_y: float) -> tuple[float, float]:
+    """Top and bottom clip edges for a scrollable panel's content.
+
+    Dear ImGui clips window content at the border, so rows that overflow run
+    into it. Insetting by the window padding keeps the same gap at the top
+    and bottom edges that an unscrolled list has.
+    """
+    top = window_y + pad_y
+    bottom = max(top, window_y + window_h - pad_y)
+    return top, bottom
+
+
+def _draw_padded_scroll_body(body: Callable[[], None]) -> None:
+    """Draw *body* clipped inside the window padding, top and bottom."""
+    pos = imgui.get_window_pos()
+    size = imgui.get_window_size()
+    top, bottom = scroll_clip_span(
+        float(pos.y), float(size.y), float(imgui.get_style().window_padding.y)
+    )
+    imgui.push_clip_rect(
+        imgui.ImVec2(float(pos.x), top),
+        imgui.ImVec2(float(pos.x + size.x), bottom),
+        True,
+    )
+    try:
+        body()
+    finally:
+        imgui.pop_clip_rect()
+
+
 def _rect_contains(rect: tuple[int, int, int, int], x: float, y: float) -> bool:
     rx, ry, rw, rh = rect
     return rw > 0 and rh > 0 and rx <= x < rx + rw and ry <= y < ry + rh
@@ -1840,7 +1870,10 @@ class ShellHost:
                 shell_window_flags(_SHELL_FLAGS, scrollable=scrollable),
             )
             try:
-                body()
+                if scrollable:
+                    _draw_padded_scroll_body(body)
+                else:
+                    body()
             finally:
                 imgui.end()
         finally:
