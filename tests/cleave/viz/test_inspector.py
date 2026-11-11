@@ -487,8 +487,19 @@ def test_buttons_sit_at_page_bottom_under_one_divider(node_id: str) -> None:
     rows = build_inspector_rows(state, node_id)
     first_command = next(i for i, row in enumerate(rows) if row.command_ids)
     assert rows[first_command - 1].divider
-    assert sum(row.divider for row in rows) == 1
+    assert not rows[first_command - 2].divider
     assert all(row.command_ids and row.depth == 0 for row in rows[first_command:])
+
+
+def test_cue_fades_divider_sits_between_hard_and_soft_cuts() -> None:
+    rows = build_inspector_rows(_layer_view(("layer_1",)), "timeline.cue_fades")
+    soft = next(
+        i
+        for i, row in enumerate(rows)
+        if row.descriptor is not None and row.descriptor.kind == RowKind.TIMELINE_SOFT_CUTS
+    )
+    assert rows[soft - 1].divider
+    assert sum(row.divider for row in rows) == 2
 
 
 def test_paused_switching_button_moves_below_preset_fields() -> None:

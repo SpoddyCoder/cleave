@@ -272,6 +272,8 @@ def _append_nodes(
             )
         elif child.commands is not None:
             rows.append(_command_row(child.commands, depth, child.status))
+        elif child.divider:
+            rows.append(DIVIDER_ROW)
         elif child.subsection is not None:
             _append_subsection(rows, child.subsection, state, depth, slot)
         elif child.conditional is not None:

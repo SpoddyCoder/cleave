@@ -36,10 +36,11 @@ class ConditionalRowsDef:
 
 @dataclass(frozen=True)
 class SectionNode:
-    """Tree node: leaf row, headed subsection, conditional group, or buttons.
+    """Tree node: leaf row, headed subsection, conditional group, buttons, or divider.
 
     ``commands`` is one row of buttons, as ids in the command registry.
     ``status`` is a line of text at the start of that row.
+    ``divider`` is a thin rule between rows.
     """
 
     leaf_kind: RowKind | None = None
@@ -47,9 +48,10 @@ class SectionNode:
     conditional: ConditionalRowsDef | None = None
     commands: tuple[str, ...] | None = None
     status: str | None = None
+    divider: bool = False
 
     def __post_init__(self) -> None:
-        set_count = sum(
+        set_count = self.divider + sum(
             x is not None
             for x in (self.leaf_kind, self.subsection, self.conditional, self.commands)
         )
@@ -744,6 +746,7 @@ TIMELINE_CUTS_SECTION = SectionDef(
     children=(
         SectionNode(leaf_kind=RowKind.TIMELINE_HARD_CUTS),
         SectionNode(conditional=TIMELINE_HARD_CUTS_ACTIVE),
+        SectionNode(divider=True),
         SectionNode(leaf_kind=RowKind.TIMELINE_SOFT_CUTS),
         SectionNode(conditional=TIMELINE_SOFT_CUTS_ACTIVE),
         SectionNode(commands=("timeline.set_cut_type",)),

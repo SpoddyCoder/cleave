@@ -30,6 +30,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- The cue fades inspector has a divider between the hard cuts and soft cuts settings.
 - When the inspector shows a new page, its title row flashes with the same accent swipe as a warning toast, to draw the eye to it. The bar fills the panel width. A title too long for the column waits, scrolls at a reading pace to its last words, pauses, then snaps back to its start as the bar slides off. Turn it off with Settings > UI > highlight new page; the choice is kept as an editor preference.
 - The mouse pointer is larger, black with a white outline so it shows over any visual, and follows Settings > UI > UI scale. It changes shape over the editor's controls: a hand on buttons, icons, segments, dropdowns, and the timeline strip's play, REC, eye, and row labels; a text bar on text fields; left-right arrows on column boundaries, draggable transport values, and the timeline's time scale; and a four-way arrow on reorder handles.
 - Pattern Mask opens in the navigator like Post-FX and Timeline. Its page keeps the on/off and lock switches; type, density, invert, and seed move to a Pattern child page, and feather and transition to Edges & Motion.
