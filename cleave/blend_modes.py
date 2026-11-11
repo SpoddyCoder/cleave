@@ -29,13 +29,13 @@ BLEND_MODES: tuple[BlendMode, ...] = (
 )
 
 BLEND_MODE_HELP_ENTRIES: tuple[tuple[BlendMode, str], ...] = (
-    ("black-key", "Milkdrop black is transparent; brightness sets blend weight."),
-    ("add", "additive highlights, suited to drums."),
-    ("multiply", "multiply destination color by source."),
-    ("screen", "lighten destination with source."),
-    ("subtract", "subtract source from destination."),
-    ("difference", "absolute difference between layers."),
-    ("exclusion", "soft difference blend."),
-    ("max", "per-channel maximum of source and destination."),
-    ("pure-add", "add source without alpha weighting."),
+    ("black-key", "black is transparent; brighter areas show more."),
+    ("add", "adds brightness; good for drums."),
+    ("multiply", "darkens; multiplies the colours below."),
+    ("screen", "lightens; the opposite of multiply."),
+    ("subtract", "subtracts this layer from the layers below."),
+    ("difference", "shows the difference between the layers."),
+    ("exclusion", "a softer, lower-contrast difference."),
+    ("max", "keeps the brighter value of each colour channel."),
+    ("pure-add", "adds this layer at full strength; ignores transparency."),
 )

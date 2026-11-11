@@ -565,8 +565,8 @@ SPECS: dict[RowKind, RowSpec] = {
         visibility_icon=_visibility_timeline,
         help_title="Timeline",
         help_description=(
-            "Layer visibility automation.",
-            "When enabled, standard layer visibility is disabled.",
+            "Shows and hides the layers at set times in the song.",
+            "When it is on, the layer on/off switches do not apply.",
         ),
         toggle_enabled=_toggle_timeline_enabled,
     ),
@@ -579,7 +579,7 @@ SPECS: dict[RowKind, RowSpec] = {
         choice=bool_choice(lambda s, _d: s.timeline.enabled),
         help_title="Timeline Enabled",
         help_description=(
-            "When on, the timeline drives layer visibility and its strip opens.",
+            "When on, the timeline shows and hides the layers, and the timeline strip opens.",
         ),
         blocked_by_section_lock=True,
     ),
@@ -591,7 +591,7 @@ SPECS: dict[RowKind, RowSpec] = {
         apply_horizontal=_apply_timeline_locked,
         choice=bool_choice(lambda s, _d: s.timeline.locked, lock_text),
         help_title="Timeline Lock",
-        help_description=("Locked timeline settings cannot be edited.",),
+        help_description=("When locked, you cannot change the timeline settings.",),
         blocked_by_section_lock=False,
     ),
     RowKind.TIMELINE_GENERATE: RowSpec(
@@ -603,10 +603,10 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Generate Timeline",
         help_entries=(("Enter", "open generate dialog"),),
         help_description=(
-            "Build a new timeline from character, density, snaps, cuts, re-populate, conductor, and mode.",
-            "Replaces the current cues.",
-            "Crescendo song markers build crescendos.",
-            "The dialog remembers its values in the project.",
+            "Makes a new timeline from the settings in a dialog.",
+            "This replaces the current cues.",
+            "Each crescendo song marker gets a crescendo.",
+            "The project keeps the dialog settings.",
         ),
         help_mode_entries=TIMELINE_PRESET_HELP_ENTRIES,
         blocked_by_section_lock=True,
@@ -620,7 +620,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Set Cut Type",
         help_entries=(("Enter", "open set cut type dialog"),),
         help_description=(
-            "Set hard, soft, or no cut on all cues, on song marker cues, or on all cues except song markers.",
+            "Sets the cut type of many cues at once.",
         ),
         blocked_by_section_lock=True,
     ),
@@ -633,7 +633,8 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Reset Timeline",
         help_entries=(("Enter", "open reset dialog"),),
         help_description=(
-            "Clear all timeline cues and set every layer on or off for the whole track.",
+            "Removes all cues.",
+            "Every layer then stays on, or stays off, for the whole song.",
         ),
         help_mode_entries=TIMELINE_RESET_HELP_ENTRIES,
         blocked_by_section_lock=True,
@@ -645,7 +646,7 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="Beat / Bar Grid",
         help_description=(
-            "AI beat detection powered by Beat This!",
+            "Beats and bars that Beat This! finds in the song.",
         ),
     ),
     RowKind.TIMELINE_BAR_PHASE: RowSpec(
@@ -656,12 +657,11 @@ SPECS: dict[RowKind, RowSpec] = {
         apply_horizontal=_apply_timeline_bar_phase,
         help_title="Bar Phase",
         help_entries=(
-            ("Left", "shift cues -1 beat"),
-            ("Right", "shift cues +1 beat"),
+            ("Left/Right", "move grid and cues -1 / +1 beat"),
         ),
         help_description=(
-            "Nudge all timeline cues by one beat.",
-            "Tip: re-apply snap to song markers after adjusting this."
+            "Moves the bar grid and all cues by one beat.",
+            "After you change it, snap the cues to the song markers again."
         ),
         repeatable=True,
         blocked_by_section_lock=True,
@@ -675,12 +675,11 @@ SPECS: dict[RowKind, RowSpec] = {
         choice=bool_choice(lambda s, _d: s.timeline.show_bar_grid, _bar_grid_display),
         help_title="Bar Grid",
         help_entries=(
-            ("Left", "hide detected bar lines"),
-            ("Right", "show detected bar lines"),
+            ("Left/Right", "hide / show"),
         ),
         help_description=(
-            "Show Beat This! bar detection points on the timeline strip.",
-            "Gaps mean missing detection (no rhythm/drums).",
+            "Shows the detected bars on the timeline strip.",
+            "A gap means that no beat was found there, for example with no drums.",
         ),
         blocked_by_section_lock=True,
     ),
@@ -694,9 +693,8 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Placement Snap",
         help_entries=(("Left/Right", "choose off / beat / bar"),),
         help_description=(
-            "Applies when placing song markers and timeline cues.",
-            "Snap to the nearest beat or bar.",
-            "Switch off when the beat detection is not accurate.",
+            "Moves new song markers and cues to the nearest beat or bar.",
+            "Set it to off if the beat detection is wrong.",
         ),
         blocked_by_section_lock=True,
     ),
@@ -709,7 +707,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Snap Cues",
         help_entries=(("Enter", "open snap dialog"),),
         help_description=(
-            "Snap timeline cues to the nearest beat or bar, or pull cues within proximity onto song markers.",
+            "Moves cues to the nearest beat or bar, or onto nearby song markers.",
         ),
         blocked_by_section_lock=True,
     ),
@@ -720,7 +718,7 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="Cue Fades",
         help_description=(
-            "Opacity fade in and out for timeline cue edges by cut type.",
+            "Fade times at the cues, for each cut type.",
         ),
     ),
     RowKind.TIMELINE_HARD_CUTS: RowSpec(
@@ -733,7 +731,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Hard Cuts",
         help_entries=(("Left/Right", "enabled / disabled"),),
         help_description=(
-            "Fade edges on cues with cut set to hard.",
+            "When on, the layer fades at cues with a hard cut.",
         ),
         repeatable=True,
         blocked_by_section_lock=True,
@@ -746,8 +744,7 @@ SPECS: dict[RowKind, RowSpec] = {
         apply_horizontal=_apply_timeline_hard_cut_fade_in,
         help_title="Hard Cut Fade In",
         help_entries=(
-            ("Left", "decrease fade in"),
-            ("Right", "increase fade in"),
+            ("Left/Right", "decrease / increase"),
         ),
         help_description=(
             "The fade-in starts this many seconds before a hard-cut cue.",
@@ -763,8 +760,7 @@ SPECS: dict[RowKind, RowSpec] = {
         apply_horizontal=_apply_timeline_hard_cut_fade_out,
         help_title="Hard Cut Fade Out",
         help_entries=(
-            ("Left", "decrease fade out"),
-            ("Right", "increase fade out"),
+            ("Left/Right", "decrease / increase"),
         ),
         help_description=(
             "The fade-out starts this many seconds after a hard-cut cue.",
@@ -782,8 +778,8 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Hard Cut Shift For Crossfade",
         help_entries=(("Left/Right", "off / on"),),
         help_description=(
-            "Center hard-cut fade ramps on the cue time instead of aligning to an edge.",
-            "Produces a crossfade effect between layers.",
+            "Puts the middle of each fade on the cue, not its start or end.",
+            "This gives a crossfade between the layers.",
         ),
         repeatable=True,
         blocked_by_section_lock=True,
@@ -798,7 +794,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Soft Cuts",
         help_entries=(("Left/Right", "enabled / disabled"),),
         help_description=(
-            "Fade edges on cues with cut set to soft.",
+            "When on, the layer fades at cues with a soft cut.",
         ),
         repeatable=True,
         blocked_by_section_lock=True,
@@ -811,8 +807,7 @@ SPECS: dict[RowKind, RowSpec] = {
         apply_horizontal=_apply_timeline_soft_cut_fade_in,
         help_title="Soft Cut Fade In",
         help_entries=(
-            ("Left", "decrease fade in"),
-            ("Right", "increase fade in"),
+            ("Left/Right", "decrease / increase"),
         ),
         help_description=(
             "The fade-in starts this many seconds before a soft-cut cue.",
@@ -828,8 +823,7 @@ SPECS: dict[RowKind, RowSpec] = {
         apply_horizontal=_apply_timeline_soft_cut_fade_out,
         help_title="Soft Cut Fade Out",
         help_entries=(
-            ("Left", "decrease fade out"),
-            ("Right", "increase fade out"),
+            ("Left/Right", "decrease / increase"),
         ),
         help_description=(
             "The fade-out starts this many seconds after a soft-cut cue.",
@@ -847,8 +841,8 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Soft Cut Shift For Crossfade",
         help_entries=(("Left/Right", "off / on"),),
         help_description=(
-            "Center soft-cut fade ramps on the cue time instead of aligning to an edge.",
-            "Produces a crossfade effect between layers.",
+            "Puts the middle of each fade on the cue, not its start or end.",
+            "This gives a crossfade between the layers.",
         ),
         repeatable=True,
         blocked_by_section_lock=True,
@@ -861,8 +855,8 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="Song Markers",
         help_description=(
-            "Manual song markers for major transitions.",
-            "Ctrl+Enter drops a marker at the playhead.",
+            "Markers that you put at the main changes in the song.",
+            "Press Ctrl+Enter to add a marker at the playhead.",
         ),
     ),
     RowKind.SONG_MARKER_ITEM: RowSpec(
@@ -887,12 +881,11 @@ SPECS: dict[RowKind, RowSpec] = {
         help_entries=(
             ("Enter", "seek to marker"),
             ("Left/Right", "choose marker type"),
-            ("Delete", "confirm remove"),
+            ("Delete", "remove marker"),
         ),
         help_description=(
-            "A song marker time and type.",
-            "Crescendo markers build crescendos on timeline preset apply.",
-            "Enter or a click seeks; Left/Right or the list chooses type; the bin deletes.",
+            "The time and type of a song marker.",
+            "Generate Timeline makes a crescendo at each crescendo marker.",
         ),
         blocked_by_section_lock=True,
     ),
@@ -918,8 +911,9 @@ SPECS: dict[RowKind, RowSpec] = {
             ("Enter", "seek to cue"),
         ),
         help_description=(
-            "Time of the cue selected on this timeline row.",
-            "A start cue turns the layer on; an end cue turns it off.",
+            "Time of the selected cue on this row.",
+            "A start cue turns the layer on.",
+            "An end cue turns it off.",
         ),
     ),
     RowKind.TIMELINE_CUE_OPACITY: _cue_spec(
@@ -934,7 +928,8 @@ SPECS: dict[RowKind, RowSpec] = {
             ("PgUp/PgDn", "10% step"),
         ),
         help_description=(
-            "Timeline opacity from this cue on, multiplied into the layer's.",
+            "Layer opacity from this cue on.",
+            "It multiplies the opacity of the layer.",
             "Start cues only.",
         ),
     ),
@@ -951,8 +946,8 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Cue Cut",
         help_entries=(("Left/Right", "choose none / hard / soft"),),
         help_description=(
-            "How the layer fades at this cue: none, a hard cut, or a soft cut.",
-            "Fade lengths are on Timeline > Cue Fades.",
+            "How the layer fades at this cue.",
+            "Set the fade times in Timeline > Cue Fades.",
         ),
     ),
     RowKind.TIMELINE_CUE_BLEND: _cue_spec(
@@ -970,7 +965,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_entries=(("Left/Right", "choose blend mode"),),
         help_description=(
             "Blend mode from this cue on.",
-            "Layer keeps the layer's own blend.",
+            "The Layer option uses the blend mode of the layer.",
             "Start cues only.",
         ),
     ),
@@ -988,7 +983,8 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Cue Role",
         help_entries=(("Left/Right", "choose role"),),
         help_description=(
-            "Role from this cue on: bed, pulse, lead, or accent.",
+            "The role of the layer from this cue on.",
+            "The visual limiter uses the role.",
             "Start cues only.",
         ),
     ),

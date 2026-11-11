@@ -35,14 +35,14 @@ EDITOR_PREVIEW_QUALITIES: tuple[EditorPreviewQuality, ...] = (
 EDITOR_PREVIEW_QUALITY_HELP_ENTRIES: tuple[
     tuple[EditorPreviewQuality, str], ...
 ] = (
-    ("ultra-performance", "lowest preview resolution for heaviest load reduction."),
-    ("performance", "more aggressive downscale from top."),
-    ("balanced", "top layer full size; lower layers step down."),
+    ("ultra-performance", "smallest layers, lowest load."),
+    ("performance", "smaller layers than balanced."),
+    ("balanced", "top layer at full size; lower layers smaller."),
     (
         "full-quality",
-        "every layer at the size it is shown, up to the project resolution.",
+        "each layer at the size shown, up to the project resolution.",
     ),
-    ("output", "every layer at the project resolution, to check true output."),
+    ("output", "each layer at the project resolution, to check the real output."),
 )
 
 DEFAULT_EDITOR_PREVIEW_QUALITY: EditorPreviewQuality = "full-quality"

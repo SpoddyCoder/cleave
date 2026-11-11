@@ -28,10 +28,10 @@ CUE_ROLE_MARKER_LETTER: dict[CueRole, str] = {
 }
 
 CUE_ROLE_HELP_BLURB: dict[CueRole, str] = {
-    "bed": "calm dark foundation",
-    "pulse": "beat-reactive mid-ground",
-    "lead": "busy bright hero",
-    "accent": "short bright hits",
+    "bed": "calm, dark background",
+    "pulse": "reacts to the beat, middle depth",
+    "lead": "busy, bright main visual",
+    "accent": "short, bright hits",
 }
 
 CUE_ROLE_MARKER_HELP_ENTRIES: tuple[tuple[str, str], ...] = tuple(

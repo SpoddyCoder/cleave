@@ -56,12 +56,12 @@ RENDER_OVERLAY_ANIMATION_TYPES: tuple[RenderOverlayAnimationType, ...] = (
 RENDER_OVERLAY_ANIMATION_TYPE_HELP_ENTRIES: tuple[
     tuple[RenderOverlayAnimationType, str], ...
 ] = (
-    ("fade", "smooth fade in and out."),
-    ("slide", "panel slides in from an edge."),
-    ("slide-fade", "slide plus fade."),
-    ("cascade", "staggered slide of panel elements."),
-    ("wipe", "directional wipe reveal in place."),
-    ("cascade-wipe", "staggered wipe of panel elements."),
+    ("fade", "fades in and out."),
+    ("slide", "slides in from an edge."),
+    ("slide-fade", "slides and fades."),
+    ("cascade", "each part of the card slides in after the one before."),
+    ("wipe", "a wipe shows the card in place."),
+    ("cascade-wipe", "each part of the card wipes in after the one before."),
 )
 
 DEFAULT_RENDER_OVERLAY_ANIMATION_TYPE: RenderOverlayAnimationType = "fade"

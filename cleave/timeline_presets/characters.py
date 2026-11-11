@@ -140,10 +140,10 @@ _CHARACTER_DISPLAY: dict[str, str] = {
 }
 
 CHARACTER_HELP_ENTRIES: tuple[tuple[str, str], ...] = (
-    ("Breathing", "sparse singles and rare duos; no tutti stacks."),
-    ("Dialogue", "call/response and antiphony between layers."),
-    ("Arc", "builds to one short climax flash, then breathes and resolves."),
-    ("Pulse", "rotates solo layers with sparse duo accents."),
+    ("Breathing", "mostly one layer, sometimes two, never all."),
+    ("Dialogue", "the layers answer each other."),
+    ("Arc", "builds to one short climax, then calms down."),
+    ("Pulse", "one layer at a time, with some short pairs."),
 )
 
 

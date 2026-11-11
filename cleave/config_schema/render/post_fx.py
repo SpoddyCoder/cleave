@@ -28,10 +28,10 @@ FADE_CURVES: tuple[FadeCurve, ...] = (
 )
 
 FADE_CURVE_HELP_ENTRIES: tuple[tuple[FadeCurve, str], ...] = (
-    ("linear", "constant rate from start to end."),
-    ("smoothstep", "smooth S-curve."),
-    ("ease_out_cubic", "fast start, cubic settle."),
-    ("ease_out_expo", "fast start, exponential settle."),
+    ("linear", "the same speed from start to end."),
+    ("smoothstep", "starts and ends slowly."),
+    ("ease_out_cubic", "starts fast, then slows down."),
+    ("ease_out_expo", "starts faster, then slows down more."),
 )
 
 DEFAULT_FADE_IN_START = 0.0
@@ -51,9 +51,9 @@ HIGHLIGHT_ROLLOFF_APPLY_MODES: tuple[HighlightRolloffApplyMode, ...] = (
 HIGHLIGHT_ROLLOFF_APPLY_MODE_HELP_ENTRIES: tuple[
     tuple[HighlightRolloffApplyMode, str], ...
 ] = (
-    ("off", "disabled."),
-    ("per_layer", "on each active layer before compositing."),
-    ("composite", "after all layers are stacked (default)."),
+    ("off", "no effect."),
+    ("per_layer", "on each layer, before the layers are combined."),
+    ("composite", "once, after the layers are combined (default)."),
 )
 
 DEFAULT_HIGHLIGHT_ROLLOFF_APPLY_MODE: HighlightRolloffApplyMode = "composite"
@@ -67,9 +67,9 @@ HIGHLIGHT_ROLLOFF_CURVES: tuple[HighlightRolloffCurve, ...] = (
 )
 
 HIGHLIGHT_ROLLOFF_CURVE_HELP_ENTRIES: tuple[tuple[HighlightRolloffCurve, str], ...] = (
-    ("rolloff", "Reinhard-style filmic compression."),
-    ("smoothstep", "gradual S-curve toward the ceiling."),
-    ("aces_fit", "ACES tone-map fit scaled to the ceiling."),
+    ("rolloff", "smooth, film-like rolloff."),
+    ("smoothstep", "gradual S-curve up to the ceiling."),
+    ("aces_fit", "ACES film tone curve, scaled to the ceiling."),
 )
 
 DEFAULT_HIGHLIGHT_ROLLOFF_CURVE: HighlightRolloffCurve = "rolloff"
@@ -91,9 +91,9 @@ CHROMA_BOOST_APPLY_MODES: tuple[ChromaBoostApplyMode, ...] = (
 CHROMA_BOOST_APPLY_MODE_HELP_ENTRIES: tuple[
     tuple[ChromaBoostApplyMode, str], ...
 ] = (
-    ("off", "disabled."),
-    ("per_layer", "on each active layer before compositing."),
-    ("composite", "after all layers are stacked."),
+    ("off", "no effect."),
+    ("per_layer", "on each layer, before the layers are combined."),
+    ("composite", "once, after the layers are combined."),
 )
 
 DEFAULT_CHROMA_BOOST_APPLY_MODE: ChromaBoostApplyMode = "off"
@@ -106,8 +106,8 @@ CHROMA_BOOST_VARIANTS: tuple[ChromaBoostVariant, ...] = (
 )
 
 CHROMA_BOOST_VARIANT_HELP_ENTRIES: tuple[tuple[ChromaBoostVariant, str], ...] = (
-    ("saturation", "uniform chroma boost around Rec.709 luma."),
-    ("vibrance", "boosts muted colors more; spares already-saturated pixels."),
+    ("saturation", "boosts all colours by the same amount."),
+    ("vibrance", "boosts dull colours more than strong colours."),
 )
 
 DEFAULT_CHROMA_BOOST_VARIANT: ChromaBoostVariant = "vibrance"

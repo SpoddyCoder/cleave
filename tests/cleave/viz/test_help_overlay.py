@@ -76,22 +76,20 @@ def _assert_shell_navigation(entries: dict[str, str]) -> None:
     for name in ("Menu", "Navigator", "Inspector", "Timeline"):
         assert name in cycle
     assert "Help" not in cycle
-    assert "Timeline only while the strip is open" in cycle
+    assert "(when the strip is open)" in cycle
     move = entries["Up/Down"]
-    assert "navigator nodes" in move
-    assert "inspector fields and group headers" in move
-    assert "timeline lanes" in move
+    assert move == "move in the active region"
     joined = " ".join(entries.values()).lower()
     assert "move row" not in joined
     assert "one tree" not in joined
     assert "walk" not in joined
-    assert "expand/collapse navigator" in entries["Left/Right"]
-    assert "step an inspector value" in entries["Left/Right"]
-    assert entries["Ctrl + Up/Down"] == "previous / next top-level navigator node"
+    assert "open/close a navigator node" in entries["Left/Right"]
+    assert "change an inspector value" in entries["Left/Right"]
+    assert entries["Ctrl + Up/Down"] == "previous / next top-level node"
     assert entries["F10 / Alt"] == "focus menu bar"
     assert (
         entries["Alt + underlined letter"]
-        == "open that menu (F, P, L, R, T, S, H)"
+        == "open that menu (F, E, V, P, S, H)"
     )
 
 
@@ -129,8 +127,8 @@ def test_curation_layer_section_omits_add_delete_and_expand() -> None:
     assert "delete layer" not in actions
     assert "expand/collapse" not in actions
     nav = dict(navigation_section(preset_curation=True).entries)
-    assert "expand/collapse navigator" in nav["Left/Right"]
-    assert "step an inspector value" in nav["Left/Right"]
+    assert "open/close a navigator node" in nav["Left/Right"]
+    assert "change an inspector value" in nav["Left/Right"]
     assert "Ctrl + L" not in nav
     preset = dict(
         _keyboard_section(
@@ -154,7 +152,7 @@ def _help_text(sections: tuple[object, ...]) -> str:
 def test_layer_section_jump_and_add_layer() -> None:
     section = layer_section(timeline_enabled=True, layer_count=4)
     entries = dict(section.entries)
-    assert entries["M"] == "move z-order"
+    assert entries["M"] == "change layer order"
     assert entries["L"] == "lock/unlock layer"
     assert entries["S"] == "solo layer"
     assert entries["Delete"] == "delete layer"
@@ -189,8 +187,8 @@ def test_navigation_left_right_expands_navigator() -> None:
     normal = dict(navigation_section().entries)
     curation = dict(navigation_section(preset_curation=True).entries)
     assert normal["Left/Right"] == curation["Left/Right"]
-    assert "expand/collapse navigator" in normal["Left/Right"]
-    assert "step an inspector value" in normal["Left/Right"]
+    assert "open/close a navigator node" in normal["Left/Right"]
+    assert "change an inspector value" in normal["Left/Right"]
     assert "Ctrl + L" not in normal
     assert "1-4" not in normal
     assert "jump to layer" not in normal.values()
@@ -239,8 +237,8 @@ def test_help_follows_navigator_layer() -> None:
         )
     )
     assert nav["Up/Down"] == "move across nodes"
-    assert nav["Left/Right"] == "expand/collapse"
-    assert nav["Ctrl + Up/Down"] == "previous / next top-level navigator node"
+    assert nav["Left/Right"] == "open/close"
+    assert nav["Ctrl + Up/Down"] == "previous / next top-level node"
     assert "Ctrl + L" not in nav
     assert "Ctrl + S" not in nav
     assert "1-6" not in nav
@@ -374,16 +372,15 @@ def test_preset_dir_help_titles() -> None:
     assert description is not None
     assert description.title == "Preset Directory"
     assert description.lines == (
-        "Directory from which presets are browsed for this layer.",
-        "Up and down arrows open the parent or first child directory.",
-        "They dim when there is no directory to move to.",
-        "Double-click also opens the first child directory.",
+        "The directory that contains the presets for this layer.",
+        "Click the up arrow to open the parent directory.",
+        "Click the down arrow, or double-click, to open the first subdirectory.",
     )
     assert keyboard.title == KEYBOARD_CONTROLS_SECTION_TITLE
     entries = dict(keyboard.entries)
-    assert entries["Left/Right"] == "next/previous"
-    assert entries["Enter"] == "open folder"
-    assert entries["Backspace"] == "parent"
+    assert entries["Left/Right"] == "next/previous directory"
+    assert entries["Enter"] == "open directory"
+    assert entries["Backspace"] == "parent directory"
     assert "Shift + +" not in entries
 
 
@@ -403,24 +400,24 @@ def test_preset_file_help_titles() -> None:
     assert description is not None
     assert description.title == "Milkdrop Preset File"
     assert description.lines == (
-        "Currently active Milkdrop preset for this layer.",
-        "[F/B/U] indicates favourited/blacklisted/user-defined.",
-        "[R:X] indicates the chosen role.",
+        "The Milkdrop preset that this layer shows.",
+        "[F], [B], and [U] mark a favourite, blacklisted, or user preset.",
+        "[R:X] shows the preset role:",
     )
     assert description.entries == CUE_ROLE_MARKER_HELP_ENTRIES
     assert dict(description.entries) == {
-        "[R:B]": "bed (calm dark foundation)",
-        "[R:P]": "pulse (beat-reactive mid-ground)",
-        "[R:L]": "lead (busy bright hero)",
-        "[R:A]": "accent (short bright hits)",
+        "[R:B]": "bed (calm, dark background)",
+        "[R:P]": "pulse (reacts to the beat, middle depth)",
+        "[R:L]": "lead (busy, bright main visual)",
+        "[R:A]": "accent (short, bright hits)",
     }
     entries = dict(keyboard.entries)
     assert entries["Left/Right"] == "next/previous preset"
-    assert entries["PgUp/PgDn"] == "next/previous large step"
+    assert entries["PgUp/PgDn"] == "next/previous, large step"
     assert entries["F"] == "favourite preset"
     assert entries["B"] == "blacklist preset"
-    assert entries["C"] == "cast preset (bed/pulse/lead/accent)"
-    assert entries["R"] == "remove favourite / restore blacklist / remove cast"
+    assert entries["C"] == "set preset role (bed/pulse/lead/accent)"
+    assert entries["R"] == "undo favourite, blacklist, or role"
     assert "Shift + +" not in entries
 
 
@@ -438,8 +435,8 @@ def test_blend_mode_help_lists_modes() -> None:
     assert description is not None
     assert description.title == "Blend Mode"
     assert description.lines == (
-        "How this layer is composited onto the layers below it.",
-        "Ignored while Pattern Mask is enabled.",
+        "How this layer mixes with the layers below it.",
+        "Pattern Mask replaces this when it is on.",
     )
     assert description.entries == BLEND_MODE_HELP_ENTRIES
     assert [mode for mode, _ in description.entries] == list(BLEND_MODES)
@@ -451,7 +448,7 @@ def test_switching_page_help_is_description_only() -> None:
     assert description is not None
     assert description.title == "Preset Switching"
     assert description.lines == (
-        "Automatic preset list advances for this layer.",
+        "Changes the preset of this layer automatically, from a list.",
     )
     assert not description.entries
     assert len(sections) == 1
@@ -464,10 +461,10 @@ def test_timeline_presets_help_lists_characters() -> None:
     assert description is not None
     assert description.title == "Generate Timeline"
     assert description.lines == (
-        "Build a new timeline from character, density, snaps, cuts, re-populate, conductor, and mode.",
-        "Replaces the current cues.",
-        "Crescendo song markers build crescendos.",
-        "The dialog remembers its values in the project.",
+        "Makes a new timeline from the settings in a dialog.",
+        "This replaces the current cues.",
+        "Each crescendo song marker gets a crescendo.",
+        "The project keeps the dialog settings.",
     )
     assert description.entries == TIMELINE_PRESET_HELP_ENTRIES
     assert [name for name, _ in description.entries] == [
@@ -499,7 +496,7 @@ def test_preview_quality_help_lists_modes() -> None:
     description = _description_section(sections_for(RowKind.SETTINGS_PREVIEW_QUALITY))
     assert description is not None
     assert description.title == "Preview Quality"
-    assert "live view only" in " ".join(description.lines)
+    assert "It does not change the render." in " ".join(description.lines)
     assert description.entries == EDITOR_PREVIEW_QUALITY_HELP_ENTRIES
 
 
@@ -516,8 +513,7 @@ def test_preset_list_help() -> None:
     assert description is not None
     assert description.title == "Preset List"
     assert description.lines == (
-        "Ordered presets used for automatic switching on this layer.",
-        "Reorder, delete, or add the currently playing preset.",
+        "The presets that this layer switches through, in order.",
     )
     assert not description.entries
     assert len(sections) == 1
@@ -530,24 +526,23 @@ def test_preset_list_entry_help() -> None:
     assert description is not None
     assert description.title == "Preset List Entry"
     assert description.lines == (
-        "Preset in this layer's switching list.",
-        "Enter auditions this preset and pauses switching.",
-        "[F/B] indicates favourited/blacklisted.",
-        "[R:X] indicates the chosen role.",
+        "A preset in the switching list of this layer.",
+        "[F] and [B] mark a favourite or blacklisted preset.",
+        "[R:X] shows the preset role:",
     )
     assert description.entries == CUE_ROLE_MARKER_HELP_ENTRIES
     assert "Delete" not in " ".join(description.lines)
     assert keyboard.title == KEYBOARD_CONTROLS_SECTION_TITLE
     entries = dict(keyboard.entries)
     assert entries == {
-        "Enter": "audition preset and pause switching",
+        "Enter": "play this preset and pause switching",
         "M": "reorder in list",
         "Drag handle": "reorder with the mouse",
         "Delete": "remove preset",
         "F": "favourite preset",
         "B": "blacklist preset",
-        "C": "cast preset (bed/pulse/lead/accent)",
-        "R": "remove favourite / restore blacklist / remove cast",
+        "C": "set preset role (bed/pulse/lead/accent)",
+        "R": "undo favourite, blacklist, or role",
     }
 
 
@@ -557,10 +552,10 @@ def test_preset_list_add_and_resume_switching_help() -> None:
     add_keyboard = _keyboard_section(add_sections)
     assert add_description is not None
     assert add_description.lines == (
-        "Add the layer's currently playing or browsed preset to the end of the list.",
-        "While switching is paused, that is the browsed preset.",
-        "Copies the preset file into the project presets folder.",
-        "P on any row in the layer is the same action.",
+        "Adds the current preset to the end of the list.",
+        "When switching is paused, this is the preset that you browsed to.",
+        "Cleave copies the preset file into the project.",
+        "Press P on any row of the layer to do the same.",
     )
     assert dict(add_keyboard.entries) == {"Enter": "add current preset"}
 
@@ -570,7 +565,7 @@ def test_preset_list_add_and_resume_switching_help() -> None:
     assert resume_description is not None
     assert resume_description.title == "Resume Switching"
     assert resume_description.lines == (
-        "End manual browsing of presets and resume preset switching.",
+        "Stops manual browsing and starts automatic switching again.",
     )
     assert dict(resume_keyboard.entries) == {"Enter": "resume switching"}
 
@@ -581,10 +576,10 @@ def test_preset_list_populate_help() -> None:
     keyboard = _keyboard_section(sections)
     assert description is not None
     assert description.lines == (
-        "Replace the entire preset list with ones chosen from a directory.",
+        "Replaces the full list with the presets from a directory.",
     )
     assert dict(keyboard.entries) == {
-        "Enter": "open directory selection modal",
+        "Enter": "choose a directory",
     }
 
 
@@ -594,7 +589,7 @@ def test_highlight_rolloff_mode_help_lists_modes() -> None:
     )
     assert description is not None
     assert description.title == "Mode"
-    assert description.lines == ("Where highlight rolloff is applied.",)
+    assert description.lines == ("Where the rolloff applies.",)
     assert description.entries == HIGHLIGHT_ROLLOFF_APPLY_MODE_HELP_ENTRIES
     assert [mode for mode, _ in description.entries] == list(
         HIGHLIGHT_ROLLOFF_APPLY_MODES
@@ -607,7 +602,7 @@ def test_highlight_rolloff_curve_help_lists_curves() -> None:
     )
     assert description is not None
     assert description.title == "Curve"
-    assert description.lines == ("Shoulder curve used above the soft knee.",)
+    assert description.lines == ("The shape of the rolloff above the threshold.",)
     assert description.entries == HIGHLIGHT_ROLLOFF_CURVE_HELP_ENTRIES
     assert [curve for curve, _ in description.entries] == list(HIGHLIGHT_ROLLOFF_CURVES)
 
@@ -618,20 +613,20 @@ def test_highlight_rolloff_header_help() -> None:
     )
     assert description is not None
     assert description.lines[0] == (
-        "Compresses bright hotspots during layer compositing."
+        "Makes very bright areas less bright when the layers are combined."
     )
 
 
 def test_post_fx_header_help() -> None:
     description = _description_section(sections_for(RowKind.POST_FX_HEADER))
     assert description is not None
-    assert "applied during final compositing" in description.lines[0]
+    assert "on the final picture" in description.lines[0]
 
 
 def test_timeline_help_mentions_visibility_handoff() -> None:
     description = _description_section(sections_for(RowKind.TIMELINE_HEADER))
     assert description is not None
-    assert any("standard layer visibility is disabled" in line for line in description.lines)
+    assert any("layer on/off switches do not apply" in line for line in description.lines)
 
 
 def test_stem_row_help() -> None:
@@ -642,7 +637,7 @@ def test_stem_row_help() -> None:
     assert description.title == "Stem"
     assert section.title == KEYBOARD_CONTROLS_SECTION_TITLE
     assert dict(section.entries)["Left/Right"] == "choose stem source"
-    assert "Effects reset when the stem changes." in description.lines
+    assert "When you change the stem, the Cleave Effects of the layer reset." in description.lines
 
 
 def test_compositing_header_and_opacity_help() -> None:
@@ -652,19 +647,17 @@ def test_compositing_header_and_opacity_help() -> None:
     assert header is not None
     assert header.title == "Compositing"
     assert header.lines == (
-        "Blend mode and opacity for this layer.",
-        "Greyed out and ignored while Pattern Mask is enabled.",
+        "How this layer mixes with the layers below it.",
+        "Pattern Mask replaces these settings when it is on.",
     )
     assert opacity is not None
     assert opacity.lines == (
-        "Opacity of this layer.",
-        "Ignored while Pattern Mask is enabled.",
+        "How visible this layer is.",
+        "0% hides it.",
+        "Pattern Mask replaces this when it is on.",
     )
     assert mask is not None
-    assert (
-        "Replaces layer compositing, so each layer's Compositing rows "
-        "(blend mode, opacity) are greyed out and ignored."
-    ) in mask.lines
+    assert "This replaces the Compositing settings of each layer." in mask.lines
 
 
 def test_cleave_effects_help() -> None:
@@ -678,7 +671,7 @@ def test_effect_row_help_uses_registry_description() -> None:
     description = _description_section(sections)
     assert description is not None
     assert description.title == "Pulse"
-    assert "Opacity follows the audio driver signal." in description.lines
+    assert "Layer opacity follows the audio driver." in description.lines
 
 
 def test_timeline_help_has_no_solo() -> None:
@@ -741,7 +734,7 @@ def test_layer_management_delete_help() -> None:
     assert entries["Enter/Delete"] == "delete layer"
     assert "" not in entries
     assert description is not None
-    assert "At least one layer must remain." in description.lines
+    assert "You cannot delete the last layer." in description.lines
 
 
 def test_navigable_row_kinds_have_help_sections() -> None:
@@ -822,7 +815,7 @@ def test_settings_preview_quality_description_separated_from_keyboard() -> None:
         "Enter": "open the list",
     }
     assert description is not None
-    assert "live view only" in " ".join(description.lines)
+    assert "It does not change the render." in " ".join(description.lines)
 
 
 def test_timeline_stop_help_is_the_strip_only() -> None:
@@ -911,7 +904,7 @@ def test_curation_navigation_omits_disabled_global_hotkeys() -> None:
     assert vis_keys["Ctrl + N"] == "new project"
     assert vis_keys["Ctrl + O"] == "open project"
     assert "Ctrl + S" in vis_keys
-    assert vis_keys["Ctrl + Enter"] == "place song marker"
+    assert vis_keys["Ctrl + Enter"] == "add song marker"
     assert vis_keys["Ctrl + R"] == "render"
     assert vis_keys["Ctrl + ,"] == "open Settings > Preview"
     assert "Ctrl + ," not in keys
@@ -926,7 +919,7 @@ def test_timeline_strip_help_paused() -> None:
     keys = [key for key, _ in section.entries]
     assert keys.index("Shift + Enter") + 1 == keys.index("1-4")
     entries = dict(section.entries)
-    assert entries["A"] == "toggle arm track"
+    assert entries["A"] == "arm / disarm row for recording"
     assert entries["1-4"] == "toggle layer visibility"
     assert entries["Shift + Enter"] == "toggle override"
     assert "Ctrl + Enter" not in entries

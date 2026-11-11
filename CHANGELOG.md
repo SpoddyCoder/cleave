@@ -99,6 +99,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 ### Fixed
 
 - Help text wraps whole sentences to the column width instead of breaking mid-sentence, with one sentence per line. Navigator help lists the page description and its keys first, with the navigator keys last, key names are spelled the same way throughout (Left/Right, PgUp/PgDn, Esc), and every help heading is in Capital Case.
+- Help text uses short, plain sentences close to Simplified Technical English, and drops detail that the panel already shows. The global keys list Undo/Redo, timeline strip (T), help (H), and full screen (F11), and Alt shortcuts name the real menu letters (F, E, V, P, S, H).
 - Resizing a side column while paused no longer turns the visualiser black. The paused frame now scales to the new size.
 - The REC badge on the right of the timeline strip no longer overlaps the end of the time scale. It starts where the scale ends.
 - The editor no longer freezes now and then when you pause, resume, close it, or switch projects. A freeze ignored Ctrl+C and needed `kill -9`. Pausing now keeps the audio device running and plays silence, and closing stops the audio callback safely first.

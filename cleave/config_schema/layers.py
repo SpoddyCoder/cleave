@@ -30,19 +30,19 @@ PRESET_SWITCHING_TRIGGER_HELP_ENTRIES: tuple[
 ] = (
     (
         "off",
-        "keeps the current browse preset; no automatic switching.",
+        "no automatic switching; the current preset stays.",
     ),
     (
         "timer",
-        "advance by playhead / duration.",
+        "next preset after each Preset Duration.",
     ),
     (
         "projectm",
-        "feed the list to libprojectM for its own timing and hard cuts.",
+        "projectM plays the list with its own timing and hard cuts.",
     ),
     (
         "timeline",
-        "advance on each timeline on-transition (requires the timeline).",
+        "next preset at each timeline start cue; needs the timeline on.",
     ),
 )
 DEFAULT_PRESET_SWITCHING: PresetSwitchingMode = "off"

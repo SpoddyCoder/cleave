@@ -27,9 +27,9 @@ PROJECT_RENDER_QUALITIES: tuple[ProjectRenderQuality, ...] = (
 )
 
 PROJECT_RENDER_QUALITY_HELP_ENTRIES: tuple[tuple[str, str], ...] = (
-    ("normal", "full resolution; default encode preset."),
-    ("high", "full resolution; slower encode for best quality."),
-    ("viz", "preview-quality layer scale (faster, matches live preview)."),
+    ("normal", "full resolution, standard encode."),
+    ("high", "full resolution, slower encode, best quality."),
+    ("viz", "preview layer sizes; faster, and looks like the live preview."),
 )
 
 DEFAULT_PROJECT_RENDER_QUALITY: ProjectRenderQuality = "normal"

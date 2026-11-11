@@ -45,25 +45,26 @@ KEYBOARD_CONTROLS_SECTION_TITLE = "Keyboard Controls"
 
 _REGION_MOVE_ENTRY = (
     "Up/Down",
-    "in the active region: navigator nodes, inspector fields and group headers, or timeline lanes",
+    "move in the active region",
 )
 _NAVIGATOR_EXPAND_ENTRY = (
     "Left/Right",
-    "expand/collapse navigator, or step an inspector value",
+    "open/close a navigator node, or change an inspector value",
 )
 _REGION_CYCLE_ENTRY = (
     "Tab / Shift+Tab",
-    "cycle Menu, Navigator, Inspector, and Timeline; "
-    "Timeline only while the strip is open",
+    "move between Menu, Navigator, Inspector, and Timeline (when the strip is open)",
 )
 _TOP_LEVEL_NAV_ENTRY = (
     "Ctrl + Up/Down",
-    "previous / next top-level navigator node",
+    "previous / next top-level node",
 )
 _SEEK_AND_QUIT_ENTRIES: tuple[HelpEntry, ...] = (
     ("Shift + Left/Right", "skip 2s"),
     ("Ctrl + Left/Right", "skip 30s"),
     ("Esc", "hide UI"),
+    ("H", "show / hide help"),
+    ("F11", "full screen"),
     ("Ctrl + Q", "quit"),
 )
 
@@ -78,9 +79,11 @@ NAVIGATION_SECTION = HelpSection(
         ("Ctrl + N", "new project"),
         ("Ctrl + O", "open project"),
         ("Ctrl + S", "save"),
-        ("Ctrl + Enter", "place song marker"),
+        ("Ctrl + Z / Ctrl + Y", "undo / redo"),
+        ("T", "show / hide timeline strip"),
+        ("Ctrl + Enter", "add song marker"),
         ("F10 / Alt", "focus menu bar"),
-        ("Alt + underlined letter", "open that menu (F, P, L, R, T, S, H)"),
+        ("Alt + underlined letter", "open that menu (F, E, V, P, S, H)"),
         ("Ctrl + R", "render"),
         ("Ctrl + ,", "open Settings > Preview"),
     ),
@@ -95,7 +98,7 @@ _CURATION_NAVIGATION_SECTION = HelpSection(
         _TOP_LEVEL_NAV_ENTRY,
         *_SEEK_AND_QUIT_ENTRIES,
         ("F10 / Alt", "focus menu bar"),
-        ("Alt + underlined letter", "open that menu (F, P, L, R, T, S, H)"),
+        ("Alt + underlined letter", "open that menu (F, E, V, P, S, H)"),
     ),
 )
 
@@ -110,15 +113,15 @@ _NAVIGATOR_SECTION = HelpSection(
     "Navigator",
     (
         ("Up/Down", "move across nodes"),
-        ("Left/Right", "expand/collapse"),
-        ("Ctrl + Up/Down", "previous / next top-level navigator node"),
+        ("Left/Right", "open/close"),
+        ("Ctrl + Up/Down", "previous / next top-level node"),
     ),
 )
 
 
 _LAYER_SECTION_BASE: tuple[tuple[str, str], ...] = (
-    ("M", "move z-order"),
-    ("Drag handle", "move z-order with the mouse"),
+    ("M", "change layer order"),
+    ("Drag handle", "change layer order with the mouse"),
     ("L", "lock/unlock layer"),
     ("S", "solo layer"),
     ("Delete", "delete layer"),
@@ -181,24 +184,24 @@ _EDIT_SECTION = HelpSection(
 _PRESET_DIR_SECTION = HelpSection(
     "Edit",
     (
-        ("Left/Right", "next/previous"),
-        ("Enter", "open folder"),
-        ("Backspace", "parent"),
+        ("Left/Right", "next/previous directory"),
+        ("Enter", "open directory"),
+        ("Backspace", "parent directory"),
     ),
 )
 
 _PRESET_CURATION_SHORTCUTS = (
     ("F", "favourite preset"),
     ("B", "blacklist preset"),
-    ("C", "cast preset (bed/pulse/lead/accent)"),
-    ("R", "remove favourite / restore blacklist / remove cast"),
+    ("C", "set preset role (bed/pulse/lead/accent)"),
+    ("R", "undo favourite, blacklist, or role"),
 )
 
 _PRESET_SECTION = HelpSection(
     "Edit",
     (
         ("Left/Right", "next/previous preset"),
-        ("PgUp/PgDn", "next/previous large step"),
+        ("PgUp/PgDn", "next/previous, large step"),
         *_PRESET_CURATION_SHORTCUTS,
     ),
 )
@@ -208,7 +211,7 @@ _USER_PRESET_ADD_SHORTCUT = ("P", "add current preset to switching list")
 _PRESET_LIST_ITEM_SECTION = HelpSection(
     "Edit",
     (
-        ("Enter", "audition preset and pause switching"),
+        ("Enter", "play this preset and pause switching"),
         ("M", "reorder in list"),
         ("Drag handle", "reorder with the mouse"),
         ("Delete", "remove preset"),
@@ -288,7 +291,7 @@ def timeline_strip_section(
     layer_count: int = 4,
 ) -> HelpSection:
     layer_keys = _layer_key_range_label(layer_count)
-    entries: list[tuple[str, str]] = [("A", "toggle arm track")]
+    entries: list[tuple[str, str]] = [("A", "arm / disarm row for recording")]
 
     if not recording:
         entries.append(("Shift + Enter", "toggle override"))
