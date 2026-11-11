@@ -976,10 +976,10 @@ def _draw_transport_notice(
 def _draw_inspector_title(title: str, elapsed_sec: float) -> None:
     """Inspector page title, with the toast's accent swipe behind it.
 
-    The bar spans the panel inside its border and is one text row tall. A
-    title wider than the column waits, scrolls to its last words, pauses,
-    then snaps back to its start, cut at the right edge, as the bar slides
-    off.
+    The bar spans the panel, inset at each end by the gap above it, and is
+    one text row tall. A title wider than the column waits, scrolls to its
+    last words, pauses, then snaps back to its start, cut at the right edge,
+    as the bar slides off.
     """
     start = imgui.get_cursor_screen_pos()
     avail = max(0.0, imgui.get_content_region_avail().x)
@@ -990,11 +990,14 @@ def _draw_inspector_title(title: str, elapsed_sec: float) -> None:
     win_pos = imgui.get_window_pos()
     win_size = imgui.get_window_size()
     border = _PANEL_BORDER_PX
-    bar_x0 = win_pos.x + border
-    bar_x1 = win_pos.x + win_size.x - border
     pad_y = style.item_spacing.y * 0.5
     bar_y0 = start.y - pad_y
     bar_y1 = start.y + line_h + pad_y
+    # The blank gap above the bar, inside the panel border, repeats at the
+    # bar's left and right ends.
+    inset = border + max(0.0, style.window_padding.y - pad_y - border)
+    bar_x0 = win_pos.x + inset
+    bar_x1 = win_pos.x + win_size.x - inset
     overflow = text_w - avail
     scroll_sec = attention_scroll_sec(overflow, imgui.calc_text_size(" ").x)
     attention = notification_attention(
