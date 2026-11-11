@@ -6,7 +6,7 @@ import math
 import time
 from typing import NamedTuple
 
-from cleave.easing import ease_out_cubic
+from cleave.easing import ease_out_cubic, smoothstep
 
 NOTIFICATION_ATTENTION_SWIPE_IN_SEC = 0.25
 NOTIFICATION_ATTENTION_HOLD_SEC = 1.0
@@ -17,6 +17,16 @@ NOTIFICATION_ATTENTION_DURATION_SEC = (
     + NOTIFICATION_ATTENTION_HOLD_SEC
     + NOTIFICATION_ATTENTION_SWIPE_OUT_SEC
 )
+
+
+# A title too wide for its row scrolls to its end while the attention bar is
+# up: it waits once the bar has swiped in, scrolls at a reading pace, pauses
+# on the last words, and snaps back to the start when the bar slides off. The
+# bar holds for as long as that takes.
+ATTENTION_SCROLL_LEAD_SEC = 0.75
+ATTENTION_SCROLL_CHARS_PER_SEC = 12.0
+ATTENTION_SCROLL_MIN_SEC = 0.75
+ATTENTION_SCROLL_END_PAUSE_SEC = 1.25
 
 
 class NotificationAttention(NamedTuple):
@@ -45,11 +55,13 @@ class PanelNotificationActive(NamedTuple):
     elapsed_sec: float
 
 
-def notification_attention(elapsed_sec: float) -> NotificationAttention:
+def notification_attention(
+    elapsed_sec: float, *, hold_sec: float = NOTIFICATION_ATTENTION_HOLD_SEC
+) -> NotificationAttention:
     """Return swipe/hold visuals for *elapsed_sec* since the notification appeared."""
     t = max(0.0, elapsed_sec)
     swipe_in = NOTIFICATION_ATTENTION_SWIPE_IN_SEC
-    hold = NOTIFICATION_ATTENTION_HOLD_SEC
+    hold = hold_sec
     swipe_out = NOTIFICATION_ATTENTION_SWIPE_OUT_SEC
 
     if t < swipe_in:
@@ -85,11 +97,61 @@ def notification_attention(elapsed_sec: float) -> NotificationAttention:
     )
 
 
+def attention_scroll_sec(overflow_px: float, char_px: float) -> float:
+    """Seconds to scroll *overflow_px* at reading pace; 0 when the text fits."""
+    if overflow_px <= 0.0:
+        return 0.0
+    chars = overflow_px / max(1.0, char_px)
+    return max(ATTENTION_SCROLL_MIN_SEC, chars / ATTENTION_SCROLL_CHARS_PER_SEC)
+
+
+def attention_scroll_hold_sec(scroll_sec: float) -> float:
+    """Bar hold that fits the lead, a *scroll_sec* scroll, and the end pause."""
+    if scroll_sec <= 0.0:
+        return NOTIFICATION_ATTENTION_HOLD_SEC
+    return ATTENTION_SCROLL_LEAD_SEC + scroll_sec + ATTENTION_SCROLL_END_PAUSE_SEC
+
+
+def attention_scroll_offset(
+    elapsed_sec: float, overflow_px: float, scroll_sec: float
+) -> float:
+    """Leftward text offset in pixels, *elapsed_sec* into the attention swipe.
+
+    *overflow_px* is how far the text runs past its row, and *scroll_sec*
+    comes from :func:`attention_scroll_sec`. The offset is 0 before the scroll
+    starts and from the start of the swipe out on.
+    """
+    if overflow_px <= 0.0 or scroll_sec <= 0.0:
+        return 0.0
+    swipe_in = NOTIFICATION_ATTENTION_SWIPE_IN_SEC
+    swipe_out_at = swipe_in + attention_scroll_hold_sec(scroll_sec)
+    t = elapsed_sec - swipe_in - ATTENTION_SCROLL_LEAD_SEC
+    if t <= 0.0 or elapsed_sec >= swipe_out_at:
+        return 0.0
+    return overflow_px * smoothstep(min(1.0, t / scroll_sec))
+
+
 def notification_attention_bucket(elapsed_sec: float) -> tuple[str, int, bool, bool]:
     """Quantized attention signature for panel cache invalidation during swipes."""
     visual = notification_attention(elapsed_sec)
     fill_q = int(round(max(0.0, min(1.0, visual.fill_progress)) * 32.0))
     return visual.phase, fill_q, visual.fill_from_left, visual.text_on_fill
+
+
+class AttentionClock:
+    """Seconds since *key* last changed, for an attention swipe on new content."""
+
+    def __init__(self) -> None:
+        self._key: object = None
+        self._since = 0.0
+
+    def elapsed(self, key: object, now: float | None = None) -> float:
+        if now is None:
+            now = time.monotonic()
+        if key != self._key:
+            self._key = key
+            self._since = now
+        return max(0.0, now - self._since)
 
 
 class PanelNotificationHost:

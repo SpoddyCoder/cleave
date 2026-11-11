@@ -75,6 +75,12 @@ class SettingsControls:
     def step_help_side(self, *, forward: bool) -> None:
         self._step_column_side("help_side", forward=forward)
 
+    def set_highlight_new_page(self, on: bool) -> None:
+        if self.cfg.editor.highlight_new_page == on:
+            return
+        self.cfg.editor = replace(self.cfg.editor, highlight_new_page=on)
+        persist_editor_settings(self.cfg)
+
     def _step_column_side(self, field: str, *, forward: bool) -> None:
         current = getattr(self.cfg.editor, field)
         new_side = step_choice(COLUMN_SIDES, current, 1 if forward else -1)

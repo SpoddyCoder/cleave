@@ -70,6 +70,8 @@ ColumnSide = Literal["left", "right"]
 COLUMN_SIDES: tuple[ColumnSide, ...] = ("left", "right")
 DEFAULT_NAVIGATOR_SIDE: ColumnSide = "left"
 DEFAULT_HELP_SIDE: ColumnSide = "right"
+# Flash the inspector title (and scroll a long one) when a new page opens.
+DEFAULT_HIGHLIGHT_NEW_PAGE = True
 
 
 def clamp_beat_sensitivity(value: float) -> float:
@@ -120,6 +122,12 @@ def _parse_editor_preview_quality(
     if value not in EDITOR_PREVIEW_QUALITIES:
         allowed = ", ".join(f"'{mode}'" for mode in EDITOR_PREVIEW_QUALITIES)
         raise ValueError(f"{label} must be one of: {allowed}")
+    return value
+
+
+def _parse_bool(value: Any, _ctx: ParseCtx, label: str) -> bool:
+    if not isinstance(value, bool):
+        raise ValueError(f"{label} must be true or false")
     return value
 
 
@@ -201,6 +209,12 @@ EDITOR_FIELDS: tuple[FieldDescriptor, ...] = (
         lambda raw, ctx, label: _parse_column_side(raw, ctx, label),
         dump_scalar,
     ),
+    FieldDescriptor(
+        "highlight_new_page",
+        DEFAULT_HIGHLIGHT_NEW_PAGE,
+        _parse_bool,
+        dump_scalar,
+    ),
 )
 
 
@@ -222,6 +236,7 @@ def parse_editor_section(data: dict[str, Any]) -> Any:
         ui_scale=parsed["ui_scale"],
         navigator_side=parsed["navigator_side"],
         help_side=parsed["help_side"],
+        highlight_new_page=parsed["highlight_new_page"],
     )
 
 
@@ -236,6 +251,7 @@ def dump_editor_section(editor: Any) -> dict[str, Any]:
         "ui_scale": editor.ui_scale,
         "navigator_side": editor.navigator_side,
         "help_side": editor.help_side,
+        "highlight_new_page": editor.highlight_new_page,
     }
     ctx = PersistCtx(cfg=None, session=None)
     return dump_fields(EDITOR_FIELDS, values, ctx)
@@ -258,4 +274,5 @@ def editor_config_from_settings(editor: Any | None = None) -> Any:
         ui_scale=editor.ui_scale,
         navigator_side=editor.navigator_side,
         help_side=editor.help_side,
+        highlight_new_page=editor.highlight_new_page,
     )

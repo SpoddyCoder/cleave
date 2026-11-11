@@ -137,6 +137,7 @@ SETTINGS_UI_SECTION = SectionDef(
     children=(
         SectionNode(leaf_kind=RowKind.SETTINGS_UI_SCALE),
         SectionNode(leaf_kind=RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY),
+        SectionNode(leaf_kind=RowKind.SETTINGS_UI_HIGHLIGHT_NEW_PAGE),
         SectionNode(leaf_kind=RowKind.SETTINGS_UI_NAVIGATOR_HEIGHT),
         SectionNode(leaf_kind=RowKind.SETTINGS_NAVIGATOR_SIDE),
         SectionNode(leaf_kind=RowKind.SETTINGS_HELP_SIDE),

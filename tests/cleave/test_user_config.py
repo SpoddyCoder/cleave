@@ -407,3 +407,31 @@ def test_output_preview_quality_round_trips(tmp_path: Path) -> None:
     persist_editor_settings(cfg)
 
     assert load_user_config(user_path).editor.preview_quality == "output"
+
+
+def test_highlight_new_page_defaults_on_round_trips_and_rejects_non_bool(
+    tmp_path: Path,
+) -> None:
+    from cleave.config_schema.editor import DEFAULT_HIGHLIGHT_NEW_PAGE
+
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        yaml.safe_dump({"editor": {"preview_quality": "balanced"}}, sort_keys=False),
+        encoding="utf-8",
+    )
+    assert load_user_config(config_path).editor.highlight_new_page is True
+    assert DEFAULT_HIGHLIGHT_NEW_PAGE is True
+
+    write_user_config(
+        replace(default_editor_settings(), highlight_new_page=False), config_path
+    )
+    saved = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    assert saved["editor"]["highlight_new_page"] is False
+    assert load_user_config(config_path).editor.highlight_new_page is False
+
+    config_path.write_text(
+        yaml.safe_dump({"editor": {"highlight_new_page": "yes"}}, sort_keys=False),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="editor.highlight_new_page must be true or false"):
+        load_user_config(config_path)

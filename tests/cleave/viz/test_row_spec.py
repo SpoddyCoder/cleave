@@ -188,6 +188,7 @@ def test_row_is_pinned() -> None:
     assert row_is_pinned(RowKind.SETTINGS_UI_HEADER) is True
     assert row_is_pinned(RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY) is True
     assert row_is_pinned(RowKind.SETTINGS_UI_NAVIGATOR_HEIGHT) is True
+    assert row_is_pinned(RowKind.SETTINGS_UI_HIGHLIGHT_NEW_PAGE) is True
     assert row_is_pinned(RowKind.TRACK_HEADER) is False
     assert row_is_pinned(RowKind.OVERLAYS_HEADER) is False
 

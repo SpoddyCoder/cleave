@@ -57,7 +57,11 @@ from cleave.viz.navigator import (
     timeline_row_title,
 )
 from cleave.viz.panel_notification import (
+    AttentionClock,
     PanelNotificationActive,
+    attention_scroll_hold_sec,
+    attention_scroll_offset,
+    attention_scroll_sec,
     notification_attention,
 )
 from cleave.viz.playback import format_mmss
@@ -969,6 +973,68 @@ def _draw_transport_notice(
     return chip
 
 
+def _draw_inspector_title(title: str, elapsed_sec: float) -> None:
+    """Inspector page title, with the toast's accent swipe behind it.
+
+    The bar spans the panel inside its border and is one text row tall. A
+    title wider than the column waits, scrolls to its last words, pauses,
+    then snaps back to its start, cut at the right edge, as the bar slides
+    off.
+    """
+    start = imgui.get_cursor_screen_pos()
+    avail = max(0.0, imgui.get_content_region_avail().x)
+    line_h = imgui.get_text_line_height()
+    style = imgui.get_style()
+    text_w = imgui.calc_text_size(title).x
+    imgui.dummy(imgui.ImVec2(avail, line_h))
+    win_pos = imgui.get_window_pos()
+    win_size = imgui.get_window_size()
+    border = _PANEL_BORDER_PX
+    bar_x0 = win_pos.x + border
+    bar_x1 = win_pos.x + win_size.x - border
+    pad_y = style.item_spacing.y * 0.5
+    bar_y0 = start.y - pad_y
+    bar_y1 = start.y + line_h + pad_y
+    overflow = text_w - avail
+    scroll_sec = attention_scroll_sec(overflow, imgui.calc_text_size(" ").x)
+    attention = notification_attention(
+        elapsed_sec, hold_sec=attention_scroll_hold_sec(scroll_sec)
+    )
+    draw = imgui.get_window_draw_list()
+    color = _packed(VALUE)
+    fill = _notice_fill(
+        bar_x1 - bar_x0, attention.fill_progress, from_left=attention.fill_from_left
+    )
+    if fill is not None:
+        fill_x, fill_w = fill
+        draw.push_clip_rect(
+            imgui.ImVec2(win_pos.x, win_pos.y),
+            imgui.ImVec2(win_pos.x + win_size.x, win_pos.y + win_size.y),
+            False,
+        )
+        try:
+            draw.add_rect_filled(
+                imgui.ImVec2(bar_x0 + fill_x, bar_y0),
+                imgui.ImVec2(bar_x0 + fill_x + fill_w, bar_y1),
+                _packed(HIGHLIGHT),
+            )
+        finally:
+            draw.pop_clip_rect()
+        mid = start.x + min(text_w, avail) * 0.5
+        if attention.text_on_fill and bar_x0 + fill_x <= mid < bar_x0 + fill_x + fill_w:
+            color = _packed(NOTIFICATION_ON_FILL)
+    offset = attention_scroll_offset(elapsed_sec, overflow, scroll_sec)
+    draw.push_clip_rect(
+        imgui.ImVec2(start.x, bar_y0),
+        imgui.ImVec2(start.x + avail, bar_y1),
+        True,
+    )
+    try:
+        draw.add_text(imgui.ImVec2(start.x - offset, start.y), color, title)
+    finally:
+        draw.pop_clip_rect()
+
+
 def _transport_notice_hovered(chip: tuple[float, float, float, float]) -> bool:
     """True when the pointer is on the toast chip."""
     if not bool(imgui.is_window_hovered()):
@@ -1205,6 +1271,9 @@ class ShellHost:
         self._nav_measured_rows = 0
         self._nav_follow = ScrollFollow()
         self._insp_follow = ScrollFollow()
+        # Swipes the toast's accent bar under the inspector title when the
+        # selection changes.
+        self._title_attention = AttentionClock()
         self._layout: ShellLayout | None = None
         self._value_drag_accum = 0.0
         self._value_drag_crossed = False
@@ -2107,7 +2176,13 @@ class ShellHost:
             if row_slot is None
             else timeline_row_title(self._controls.session, row_slot)
         )
-        imgui.text(title)
+        # With the highlight off, the title draws as if its swipe has ended.
+        elapsed = (
+            self._title_attention.elapsed(focus.selected_id)
+            if self._controls.cfg.editor.highlight_new_page
+            else math.inf
+        )
+        _draw_inspector_title(title, elapsed)
         _draw_inspector_divider()
         self._choice_rects = {}
         # Selectables grow by half the item spacing above and below, so this

@@ -181,3 +181,68 @@ def test_settled_display_covers_remaining_after_attention() -> None:
     remaining = DEFAULT_NOTIFICATION_DISPLAY_SEC - NOTIFICATION_ATTENTION_DURATION_SEC
     assert active.remaining_sec == pytest.approx(remaining)
     assert notification_attention(active.elapsed_sec).fill_progress == 0.0
+
+
+def test_attention_scroll_offset_waits_scrolls_pauses_and_snaps_back() -> None:
+    from cleave.viz.panel_notification import (
+        ATTENTION_SCROLL_END_PAUSE_SEC,
+        ATTENTION_SCROLL_LEAD_SEC,
+        attention_scroll_hold_sec,
+        attention_scroll_offset,
+        attention_scroll_sec,
+    )
+
+    scroll = attention_scroll_sec(40.0, 8.0)
+    assert scroll > 0.0
+    start = NOTIFICATION_ATTENTION_SWIPE_IN_SEC + ATTENTION_SCROLL_LEAD_SEC
+    assert attention_scroll_offset(0.0, 40.0, scroll) == 0.0
+    assert attention_scroll_offset(start, 40.0, scroll) == 0.0
+    mid = attention_scroll_offset(start + scroll * 0.5, 40.0, scroll)
+    assert 0.0 < mid < 40.0
+    assert attention_scroll_offset(start + scroll, 40.0, scroll) == 40.0
+    swipe_out_at = NOTIFICATION_ATTENTION_SWIPE_IN_SEC + attention_scroll_hold_sec(scroll)
+    assert swipe_out_at == pytest.approx(start + scroll + ATTENTION_SCROLL_END_PAUSE_SEC)
+    assert attention_scroll_offset(swipe_out_at - 0.01, 40.0, scroll) == 40.0
+    assert attention_scroll_offset(swipe_out_at, 40.0, scroll) == 0.0
+
+
+def test_attention_scroll_sec_scales_with_overflow() -> None:
+    from cleave.viz.panel_notification import (
+        ATTENTION_SCROLL_CHARS_PER_SEC,
+        ATTENTION_SCROLL_MIN_SEC,
+        attention_scroll_sec,
+    )
+
+    assert attention_scroll_sec(0.0, 8.0) == 0.0
+    assert attention_scroll_sec(8.0, 8.0) == ATTENTION_SCROLL_MIN_SEC
+    assert attention_scroll_sec(8.0 * 60, 8.0) == pytest.approx(
+        60 / ATTENTION_SCROLL_CHARS_PER_SEC
+    )
+
+
+def test_attention_scroll_hold_defaults_when_text_fits() -> None:
+    from cleave.viz.panel_notification import (
+        attention_scroll_hold_sec,
+        attention_scroll_offset,
+    )
+
+    assert attention_scroll_hold_sec(0.0) == NOTIFICATION_ATTENTION_HOLD_SEC
+    assert attention_scroll_offset(0.6, 0.0, 0.0) == 0.0
+    assert attention_scroll_offset(0.6, -12.0, 1.0) == 0.0
+
+
+def test_notification_attention_custom_hold() -> None:
+    hold = 3.0
+    t = NOTIFICATION_ATTENTION_SWIPE_IN_SEC + 2.5
+    assert notification_attention(t, hold_sec=hold).phase == "hold"
+    assert notification_attention(t).phase == "settled"
+
+
+def test_attention_clock_restarts_on_new_key() -> None:
+    from cleave.viz.panel_notification import AttentionClock
+
+    clock = AttentionClock()
+    assert clock.elapsed("a", now=5.0) == 0.0
+    assert clock.elapsed("a", now=6.5) == 1.5
+    assert clock.elapsed("b", now=7.0) == 0.0
+    assert clock.elapsed("b", now=7.25) == 0.25

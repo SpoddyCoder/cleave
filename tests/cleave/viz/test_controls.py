@@ -5311,3 +5311,21 @@ def test_cycle_preset_switching_trigger_skips_list_toast_for_timeline_disabled()
     controls.layer_mutations.step_preset_switching_trigger("layer_1", delta=1)
     assert layer.preset_switching_trigger == "timeline"
     assert noted == [f"Layer 1: {NOTIFICATION_TIMELINE_TRIGGER_DISABLED_TEXT}"]
+
+
+def test_settings_highlight_new_page_toggles_and_writes_user_config(
+    tmp_path: Path,
+) -> None:
+    user_path = tmp_path / "config.yaml"
+    controls = _make_controls(("layer_1",))
+    controls.cfg.user_config_path = user_path
+    assert controls.cfg.editor.highlight_new_page is True
+    _expand_settings_ui(controls)
+    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_HIGHLIGHT_NEW_PAGE)
+    _press_focused(controls, _keydown(pygame.K_LEFT))
+    assert controls.cfg.editor.highlight_new_page is False
+    assert not controls.config_dirty
+    assert load_user_config(user_path).editor.highlight_new_page is False
+    _press_focused(controls, _keydown(pygame.K_RIGHT))
+    assert controls.cfg.editor.highlight_new_page is True
+    assert load_user_config(user_path).editor.highlight_new_page is True

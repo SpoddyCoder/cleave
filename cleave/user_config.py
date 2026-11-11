@@ -18,6 +18,7 @@ from cleave.config_schema.editor import (
     DEFAULT_UI_SCALE,
     DEFAULT_INSPECTOR_WIDTH,
     DEFAULT_HELP_SIDE,
+    DEFAULT_HIGHLIGHT_NEW_PAGE,
     DEFAULT_NAVIGATOR_SIDE,
     DEFAULT_EDITOR_PREVIEW_QUALITY,
     DEFAULT_NOTIFICATION_DISPLAY_SEC,
@@ -67,6 +68,7 @@ class EditorSettings:
     ui_scale: int = DEFAULT_UI_SCALE
     navigator_side: ColumnSide = DEFAULT_NAVIGATOR_SIDE
     help_side: ColumnSide = DEFAULT_HELP_SIDE
+    highlight_new_page: bool = DEFAULT_HIGHLIGHT_NEW_PAGE
 
 
 @dataclass(frozen=True)
@@ -88,6 +90,7 @@ def default_editor_settings() -> EditorSettings:
         ui_scale=DEFAULT_UI_SCALE,
         navigator_side=DEFAULT_NAVIGATOR_SIDE,
         help_side=DEFAULT_HELP_SIDE,
+        highlight_new_page=DEFAULT_HIGHLIGHT_NEW_PAGE,
     )
 
 
@@ -167,6 +170,7 @@ def editor_settings_from_config(cfg: EditorConfig) -> EditorSettings:
         ui_scale=cfg.ui_scale,
         navigator_side=cfg.navigator_side,
         help_side=cfg.help_side,
+        highlight_new_page=cfg.highlight_new_page,
     )
 
 

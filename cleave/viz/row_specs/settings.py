@@ -15,7 +15,7 @@ from cleave.viz.row_spec import FitStrategy, RowPresentStyle, RowSpec
 from cleave.viz.tuning_view_state import TuningViewState
 
 from cleave.config_schema.editor import COLUMN_SIDES, EDITOR_PREVIEW_QUALITIES
-from cleave.viz.row_specs.common import options_choice
+from cleave.viz.row_specs.common import bool_choice, on_off_text, options_choice
 if TYPE_CHECKING:
     from cleave.viz.controls import TuningControls
 
@@ -77,6 +77,16 @@ def _apply_settings_ui_notification_display(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, large: bool,
 ) -> None:
     controls.settings.adjust_notification_display_sec(forward=forward, large=large)
+
+def _format_settings_ui_highlight_new_page(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return on_off_text(state.settings.highlight_new_page)
+
+def _apply_settings_ui_highlight_new_page(
+    controls: TuningControls, _desc: RowDescriptor, forward: bool, _large: bool,
+) -> None:
+    controls.settings.set_highlight_new_page(forward)
 
 def _apply_settings_ui_scale(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, large: bool,
@@ -202,6 +212,23 @@ SPECS: dict[RowKind, RowSpec] = {
         ),
         is_pinned=True,
         repeatable=True,
+        parent_group="settings_ui",
+    ),
+    RowKind.SETTINGS_UI_HIGHLIGHT_NEW_PAGE: RowSpec(
+        affordance=RowAffordance.VALUE_STEP,
+        panel_label="highlight new page",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_settings_ui_highlight_new_page,
+        apply_horizontal=_apply_settings_ui_highlight_new_page,
+        choice=bool_choice(lambda s, _d: s.settings.highlight_new_page),
+        help_title="Highlight New Page",
+        help_entries=(("Left/Right", "off / on"),),
+        help_description=(
+            "When on, the inspector title flashes when a new page opens.",
+            "A title too long for the column scrolls to its end, then back.",
+            "When off, the title stays still.",
+        ),
+        is_pinned=True,
         parent_group="settings_ui",
     ),
     RowKind.SETTINGS_UI_SCALE: RowSpec(

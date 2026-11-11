@@ -14,6 +14,7 @@ from cleave.config_schema.editor import (
     DEFAULT_EDITOR_PREVIEW_QUALITY,
     DEFAULT_RESIDUAL_LATENCY_MS,
     DEFAULT_HELP_SIDE,
+    DEFAULT_HIGHLIGHT_NEW_PAGE,
     DEFAULT_NAVIGATOR_HEIGHT,
     DEFAULT_UI_SCALE,
     DEFAULT_NAVIGATOR_SIDE,
@@ -344,6 +345,7 @@ class SettingsBlock:
     preview_quality: str = DEFAULT_EDITOR_PREVIEW_QUALITY
     navigator_side: str = DEFAULT_NAVIGATOR_SIDE
     help_side: str = DEFAULT_HELP_SIDE
+    highlight_new_page: bool = DEFAULT_HIGHLIGHT_NEW_PAGE
     notification_display_sec: int = DEFAULT_NOTIFICATION_DISPLAY_SEC
     navigator_height: int = DEFAULT_NAVIGATOR_HEIGHT
     ui_scale: int = DEFAULT_UI_SCALE
@@ -1011,6 +1013,7 @@ class TuningViewStateBuilder:
                 preview_quality=self._config_save.cfg.editor.preview_quality,
                 navigator_side=self._config_save.cfg.editor.navigator_side,
                 help_side=self._config_save.cfg.editor.help_side,
+                highlight_new_page=self._config_save.cfg.editor.highlight_new_page,
                 notification_display_sec=(
                     self._config_save.cfg.editor.notification_display_sec
                 ),
