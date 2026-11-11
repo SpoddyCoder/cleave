@@ -41,6 +41,7 @@ from cleave.viz.shell_host import (
     navigator_toggle_tooltip,
     navigator_toggle_x,
     navigator_tree_lines,
+    strip_label_tooltip,
     navigator_twisty,
     path_icon_color,
     path_row_icon,
@@ -185,6 +186,16 @@ def test_navigator_toggle_presentation() -> None:
     inert = NavToggle(TOGGLE_ENABLED, True, inert=True)
     assert navigator_toggle_tooltip(inert) == "Timeline controls layer visibility"
     assert navigator_toggle_tooltip(blocked) == "Locked: unlock to change"
+
+
+def test_strip_label_tooltip_names_double_click_arm() -> None:
+    assert strip_label_tooltip(armed=False, locked=False) == (
+        "Double-click to arm for recording"
+    )
+    assert strip_label_tooltip(armed=True, locked=False) == "Double-click to disarm"
+    assert strip_label_tooltip(armed=False, locked=True) == (
+        "Locked: unlock the timeline to arm"
+    )
 
 
 def test_navigator_toggles_sit_in_fixed_columns() -> None:

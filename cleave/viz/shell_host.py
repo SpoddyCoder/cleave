@@ -321,6 +321,13 @@ def navigator_toggle_tooltip(toggle: NavToggle) -> str:
     return "On: click to turn off" if toggle.active else "Off: click to turn on"
 
 
+def strip_label_tooltip(*, armed: bool, locked: bool) -> str:
+    """Hover text for a strip row label: double-click arms or disarms it."""
+    if locked:
+        return "Locked: unlock the timeline to arm"
+    return "Double-click to disarm" if armed else "Double-click to arm for recording"
+
+
 def navigator_toggle_x(
     toggle_id: str, right_x: float, button_width: float, gap: float
 ) -> float:
@@ -1627,6 +1634,31 @@ class ShellHost:
             )
         if shape is not None:
             request_pointer(shape)
+        if splitter is None and self._row_drag is None:
+            self._show_strip_tooltip()
+
+    def _show_strip_tooltip(self) -> None:
+        """Tell the user a row label arms on double-click."""
+        pointer = self._strip_pointer
+        if pointer is None or pointer.scrubbing or pointer.panning:
+            return
+        if imgui.is_any_mouse_down():
+            return
+        session = self._controls.session
+        timeline = session.timeline
+        hover = timeline.strip_hover
+        if not timeline.panel_open or hover is None:
+            return
+        target, row = hover
+        z_order = session.layer_z_order
+        if target != "label" or row is None or not 0 <= row < len(z_order):
+            return
+        imgui.set_tooltip(
+            strip_label_tooltip(
+                armed=z_order[row] in timeline.armed_slots,
+                locked=timeline.locked,
+            )
+        )
 
     def _strip_pointer_shape(self) -> PointerShape | None:
         """Hand over a strip button or label, left-right over the ruler or a scrub."""
