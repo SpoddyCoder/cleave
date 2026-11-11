@@ -761,6 +761,7 @@ def test_armed_recording_bar_blends_committed_and_live() -> None:
         (0.0, 0.0),
         (10.0, 0.0),
         (10.0, 1.0),
+        (12.0, 1.0),
         (12.0, 0.0),
         (30.0, 0.0),
         (30.0, 1.0),
