@@ -229,20 +229,22 @@ def clip_breakpoints(
     start: float,
     end: float,
 ) -> list[tuple[float, float]]:
-    """Clip a breakpoint polyline to ``[start, end]``, interpolating at the edges."""
+    """Clip a breakpoint polyline to ``[start, end]``, interpolating at the edges.
+
+    A step exactly at ``start`` or ``end`` is kept as its own vertical pair,
+    so the segment next to it stays flat instead of ramping across the clip.
+    """
     if end <= start or not breakpoints:
         return []
     clipped: list[tuple[float, float]] = [
-        (start, level_at_breakpoints(breakpoints, start))
+        (float(t), float(level))
+        for t, level in breakpoints
+        if start <= t <= end
     ]
-    for t, level in breakpoints:
-        if start < t < end:
-            clipped.append((float(t), float(level)))
-    end_level = level_at_breakpoints(breakpoints, end)
+    if not clipped or clipped[0][0] > start:
+        clipped.insert(0, (start, level_at_breakpoints(breakpoints, start)))
     if clipped[-1][0] < end:
-        clipped.append((end, end_level))
-    elif not levels_equal(clipped[-1][1], end_level):
-        clipped[-1] = (end, end_level)
+        clipped.append((end, level_at_breakpoints(breakpoints, end)))
     return clipped
 
 

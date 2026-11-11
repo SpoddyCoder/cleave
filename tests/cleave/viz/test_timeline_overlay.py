@@ -628,6 +628,20 @@ def test_clip_breakpoints_interpolates_at_edges() -> None:
     assert any(abs(t - 10.0) < 1e-9 for t, _ in clipped)
 
 
+def test_clip_breakpoints_keeps_step_at_end_vertical() -> None:
+    """A step exactly at the clip end must not ramp the segment before it."""
+    bps = [(0.0, 0.0), (10.0, 0.0), (10.0, 1.0)]
+    clipped = clip_breakpoints(bps, 5.0, 10.0)
+    assert clipped == [(5.0, 0.0), (10.0, 0.0), (10.0, 1.0)]
+
+
+def test_clip_breakpoints_keeps_step_at_start_vertical() -> None:
+    """A step exactly at the clip start must not ramp the segment after it."""
+    bps = [(0.0, 0.0), (0.0, 1.0), (50.0, 1.0)]
+    clipped = clip_breakpoints(bps, 0.0, 30.0)
+    assert clipped == [(0.0, 0.0), (0.0, 1.0), (30.0, 1.0)]
+
+
 def test_partial_level_bar_shorter_than_full() -> None:
     """Partial level yields a shorter filled height than level 1.0."""
     import pygame as _pygame
