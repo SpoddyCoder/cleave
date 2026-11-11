@@ -339,8 +339,6 @@ class TimelineRuntime:
     record_start_sec: float | None = None
     record_slot_start_sec: dict[str, float] = field(default_factory=dict)
     record_high_water_mark: float | None = None
-    preview_active: bool = False
-    monitor: dict[str, bool] = field(default_factory=dict)
     override_slots: set[str] = field(default_factory=set)
     override_visible: dict[str, bool] = field(default_factory=dict)
     arm_flash_start_ms: dict[str, int] = field(default_factory=dict)

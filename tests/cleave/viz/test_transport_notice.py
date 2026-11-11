@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, patch
 import pygame
 from imgui_bundle import imgui
 
+from cleave.viz.context_menu import ContextMenuState
 from cleave.viz.commands import CommandContext
 from cleave.viz.inline_edit import InlineEditController
 from cleave.viz.menu_bar import MenuBarState
@@ -53,6 +54,7 @@ def _host() -> Iterator[object]:
         build_view_state=lambda **_kwargs: None,
         set_shell_region=MagicMock(),
         inline_edit=InlineEditController(),
+        context_menu=ContextMenuState(),
         transport=MagicMock(),
     )
     menu = MenuBarState()

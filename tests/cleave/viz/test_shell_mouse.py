@@ -12,6 +12,7 @@ import pygame
 import pytest
 from imgui_bundle import imgui
 
+from cleave.viz.context_menu import ContextMenuItem, ContextMenuState
 from cleave.config_schema.editor import (
     DEFAULT_HELP_WIDTH,
     DEFAULT_INSPECTOR_WIDTH,
@@ -362,6 +363,7 @@ def _host() -> Iterator[ShellHost]:
         ),
         set_shell_region=MagicMock(),
         disarm_value_nudge=MagicMock(),
+        context_menu=ContextMenuState(),
     )
     with patch("cleave.viz.imgui_host._gl_context_current", return_value=False):
         imgui_host = ImGuiHost.create()
@@ -890,7 +892,8 @@ def _strip_host(
         hover_pressable=hover is not None and hover != ("eye", 3),
     )
     host._controls.session = SimpleNamespace(
-        timeline=SimpleNamespace(panel_open=True, strip_hover=hover)
+        layer_z_order=(),
+        timeline=SimpleNamespace(panel_open=True, strip_hover=hover),
     )
     return host
 
@@ -922,3 +925,72 @@ def test_modal_keeps_the_splitter_and_strip_pointers_away() -> None:
         assert _gesture_pointer(host) is PointerShape.RESIZE_EW
         host._controls.modal_host = SimpleNamespace(active=True)
         assert _gesture_pointer(host) is PointerShape.ARROW
+
+
+def test_right_click_on_a_strip_row_opens_its_menu_and_outside_click_closes() -> None:
+    controls = _make_controls(("layer_1", "layer_2"))
+    controls.session.timeline.panel_open = True
+    pointer = MagicMock()
+    pointer.context_row_at.return_value = 1
+    pointer.row_menu.return_value = lambda: (
+        ContextMenuItem("x", "Item", lambda: None),
+    )
+    with _host() as host:
+        host._controls = controls
+        host._strip_pointer = pointer
+        layout = _open_strip_layout()
+        host.set_layout(layout)
+        pos = _rect_center(layout.timeline)
+
+        host.process_event(_button(pygame.MOUSEBUTTONDOWN, pos, button=3))
+        host.process_event(_button(pygame.MOUSEBUTTONUP, pos, button=3))
+
+        assert controls.shell_focus.region is ShellRegion.TIMELINE
+        pointer.row_menu.assert_called_once_with(1)
+        pointer.press.assert_not_called()
+        assert controls.context_menu.is_open
+        assert controls.context_menu.anchor == (float(pos[0]), float(pos[1]))
+
+        _click(host, pos)
+        assert not controls.context_menu.is_open
+        pointer.press.assert_not_called()
+
+
+def test_right_click_off_a_strip_row_opens_nothing() -> None:
+    controls = _make_controls(("layer_1", "layer_2"))
+    controls.session.timeline.panel_open = True
+    pointer = MagicMock()
+    pointer.context_row_at.return_value = None
+    with _host() as host:
+        host._controls = controls
+        host._strip_pointer = pointer
+        layout = _open_strip_layout()
+        host.set_layout(layout)
+        host.process_event(
+            _button(pygame.MOUSEBUTTONDOWN, _rect_center(layout.navigator), button=3)
+        )
+        host.process_event(
+            _button(pygame.MOUSEBUTTONDOWN, _rect_center(layout.timeline), button=3)
+        )
+        pointer.row_menu.assert_not_called()
+        assert not controls.context_menu.is_open
+
+
+def test_focus_context_menu_opens_at_the_focused_strip_row() -> None:
+    controls = _make_controls(("layer_1", "layer_2"))
+    controls.session.timeline.panel_open = True
+    controls.session.timeline.focus_row = 1
+    pointer = MagicMock()
+    pointer.row_menu_anchor.return_value = (10.0, 40.0)
+    pointer.row_menu.return_value = lambda: (
+        ContextMenuItem("x", "Item", lambda: None),
+    )
+    with _host() as host:
+        host._controls = controls
+        host._strip_pointer = pointer
+        assert host.open_focus_context_menu() is False
+        controls.set_shell_region(ShellRegion.TIMELINE)
+        assert host.open_focus_context_menu() is True
+        pointer.row_menu.assert_called_once_with(1)
+        assert controls.context_menu.anchor == (10.0, 40.0)
+        assert controls.context_menu.highlight == 0

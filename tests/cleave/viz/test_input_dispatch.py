@@ -836,3 +836,26 @@ def test_ctrl_down_from_timeline_moves_to_navigator() -> None:
     assert controls.shell_focus.selected_id == "post_fx"
     assert runtime.seed.session.timeline.panel_open is True
     assert runtime.seed.session.timeline.focus_row == 0
+
+def test_shift_f10_and_menu_key_open_the_focus_context_menu() -> None:
+    runtime = _make_runtime()
+    runtime.shell_host = MagicMock()
+    assert dispatch_keydown(keydown(pygame.K_F10, mod=pygame.KMOD_SHIFT), runtime)
+    assert dispatch_keydown(keydown(pygame.K_MENU), runtime)
+    assert runtime.shell_host.open_focus_context_menu.call_count == 2
+    assert runtime.menu_bar.focused is False
+
+
+def test_open_context_menu_takes_every_key_first() -> None:
+    from cleave.viz.context_menu import ContextMenuItem
+
+    runtime = _make_runtime()
+    ran: list[str] = []
+    menu = runtime.controls.context_menu
+    menu.open(lambda: (ContextMenuItem("x", "X", lambda: ran.append("x")),), (0, 0))
+    assert dispatch_keydown(keydown(pygame.K_h), runtime) is True
+    assert runtime.seed.session.help_visible is False
+    assert dispatch_keydown(keydown(pygame.K_DOWN), runtime) is True
+    assert dispatch_keydown(keydown(pygame.K_RETURN), runtime) is True
+    assert ran == ["x"]
+    assert not menu.is_open

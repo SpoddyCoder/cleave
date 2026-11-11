@@ -463,3 +463,39 @@ def test_scrub_holds_the_view_until_release_or_cancel() -> None:
     pointer.press(500, 2)
     pointer.cancel()
     assert not view.held
+
+
+class _MenuGeometry(_Geometry):
+    def row_label_rect(self, row: int) -> tuple[int, int, int, int] | None:
+        return (10, 200 + row * 20, 40, 18) if row < 2 else None
+
+
+class _MenuActions(_Actions):
+    def row_slot(self, row: int) -> str | None:
+        return ("layer_1", "layer_2")[row] if 0 <= row < 2 else None
+
+
+def test_context_row_at_needs_a_layer_row() -> None:
+    actions = _MenuActions()
+    session = _session()
+    assert TimelinePointer(
+        _MenuGeometry(StripHit(1, 5.0, 0.2, target="eye")), actions, session
+    ).context_row_at(0, 0) == 1
+    assert TimelinePointer(
+        _MenuGeometry(StripHit(None, 5.0, 0.2)), actions, session
+    ).context_row_at(0, 0) is None
+    assert TimelinePointer(
+        _MenuGeometry(StripHit(5, 5.0, 0.2)), actions, session
+    ).context_row_at(0, 0) is None
+    assert TimelinePointer(_MenuGeometry(None), actions, session).context_row_at(
+        0, 0
+    ) is None
+
+
+def test_row_menu_focuses_the_row_and_anchors_under_its_label() -> None:
+    actions = _MenuActions()
+    pointer = TimelinePointer(_MenuGeometry(None), actions, _session())
+    assert callable(pointer.row_menu(1))
+    assert actions.calls == [("focus", 1)]
+    assert pointer.row_menu_anchor(1) == (10.0, 238.0)
+    assert pointer.row_menu_anchor(4) is None

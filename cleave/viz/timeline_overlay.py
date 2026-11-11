@@ -1062,6 +1062,18 @@ class TimelineOverlay:
                 )
         return None
 
+    def row_label_rect(self, row: int) -> tuple[int, int, int, int] | None:
+        """Screen rect of *row*'s label (number and stem), from the last compose."""
+        layout = self._hit_layout
+        if layout is None or not 0 <= row < layout.row_count:
+            return None
+        return (
+            layout.panel_x + self._padding,
+            layout.panel_y + self._row_y(row, layout.row_h),
+            layout.layer_num_width + layout.stem_abbrev_width,
+            layout.row_h,
+        )
+
     def _transport_rects(
         self, layout: _TimelineLayout
     ) -> tuple[tuple[int, int, int, int], tuple[int, int, int, int]]:

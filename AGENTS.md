@@ -25,6 +25,7 @@ Do not glob `**/*.py`, grep the repo root, spawn an explore subagent, or read `d
 - Effect: `cleave/effects/registry.py`, `handlers.py`, handler module
 - Timeline generate: `cleave/timeline_presets/`
 - Timeline strip UI: `cleave/viz/timeline_overlay.py` (not `RowLayout`)
+- Context menu: `cleave/viz/context_menu.py` (state), `menu_rows.py` (draw), provider modules (`timeline_context_menu.py`)
 - Runtime / window: `cleave/viz/app.py`, `bootstrap.py`, `loading.py`
 - CLI / IO: `cleave/cli.py`, `paths.py`, `stems.py`, `separate.py`
 

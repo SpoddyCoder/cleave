@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 import pygame
 import pytest
 
+from cleave.viz.context_menu import ContextMenuState
 from cleave.viz.inline_edit import InlineEditController
 from cleave.viz.commands import (
     MENUS,
@@ -1316,6 +1317,7 @@ def _shell_controls() -> SimpleNamespace:
         disarm_value_nudge=MagicMock(),
         begin_value_nudge=MagicMock(),
         inline_edit=InlineEditController(),
+        context_menu=ContextMenuState(),
         transport=MagicMock(),
     )
 

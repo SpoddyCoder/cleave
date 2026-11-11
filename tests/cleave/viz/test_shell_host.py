@@ -41,6 +41,7 @@ from cleave.viz.shell_host import (
     navigator_toggle_tooltip,
     navigator_toggle_x,
     navigator_tree_lines,
+    strip_eye_tooltip,
     strip_label_tooltip,
     navigator_twisty,
     path_icon_color,
@@ -190,11 +191,28 @@ def test_navigator_toggle_presentation() -> None:
 
 def test_strip_label_tooltip_names_double_click_arm() -> None:
     assert strip_label_tooltip(armed=False, locked=False) == (
-        "Double-click to arm for recording"
+        "Double-click to arm for recording, right-click for options"
     )
-    assert strip_label_tooltip(armed=True, locked=False) == "Double-click to disarm"
+    assert strip_label_tooltip(armed=True, locked=False) == (
+        "Double-click to disarm, right-click for options"
+    )
     assert strip_label_tooltip(armed=False, locked=True) == (
-        "Locked: unlock the timeline to arm"
+        "Locked: unlock the timeline to arm, right-click for options"
+    )
+
+
+def test_strip_eye_tooltip_explains_overrides() -> None:
+    assert strip_eye_tooltip(overridden=False, recording=False, armed=False) == (
+        "Right-click to override visibility"
+    )
+    assert strip_eye_tooltip(overridden=True, recording=False, armed=False) == (
+        "Override: click to show / hide, right-click to release"
+    )
+    assert strip_eye_tooltip(overridden=True, recording=True, armed=True) == (
+        "Click to record show / hide"
+    )
+    assert strip_eye_tooltip(overridden=False, recording=True, armed=False) == (
+        "Arm this row to record show / hide"
     )
 
 
@@ -342,7 +360,8 @@ def test_inspector_selectable_id_changes_with_effect_and_preset() -> None:
 def test_scrollable_shell_flags_drop_only_the_scroll_bits() -> None:
     from imgui_bundle import imgui
 
-    from cleave.viz.shell_host import _POPUP_FLAGS, _SHELL_FLAGS, shell_window_flags
+    from cleave.viz.menu_rows import POPUP_FLAGS
+    from cleave.viz.shell_host import _SHELL_FLAGS, shell_window_flags
 
     no_scrollbar = int(imgui.WindowFlags_.no_scrollbar)
     no_scroll_with_mouse = int(imgui.WindowFlags_.no_scroll_with_mouse)
@@ -366,8 +385,8 @@ def test_scrollable_shell_flags_drop_only_the_scroll_bits() -> None:
     assert scrolling & scroll_off == 0
     assert scrolling & kept == kept
     assert scrolling == _SHELL_FLAGS & ~scroll_off
-    assert _POPUP_FLAGS & no_scrollbar == no_scrollbar
-    assert _POPUP_FLAGS & int(imgui.WindowFlags_.no_nav) == int(
+    assert POPUP_FLAGS & no_scrollbar == no_scrollbar
+    assert POPUP_FLAGS & int(imgui.WindowFlags_.no_nav) == int(
         imgui.WindowFlags_.no_nav
     )
 

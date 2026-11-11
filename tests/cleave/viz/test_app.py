@@ -101,6 +101,7 @@ def _minimal_runtime(
     )
     controls = MagicMock()
     controls.inline_edit.handle_keydown.return_value = False
+    controls.context_menu.handle_keydown.return_value = False
     controls.inline_edit.handle_keyup.return_value = False
     controls.inline_edit.handle_text_input.return_value = False
     controls.build_view_state.return_value = MagicMock()
@@ -245,6 +246,7 @@ def _heavy_init_side_effect(
         on_progress("Building layers...")
     controls = MagicMock()
     controls.inline_edit.handle_keydown.return_value = False
+    controls.context_menu.handle_keydown.return_value = False
     controls.inline_edit.handle_keyup.return_value = False
     controls.inline_edit.handle_text_input.return_value = False
     controls.build_view_state.return_value = MagicMock()
@@ -368,6 +370,7 @@ def test_run_pygame_quit_clean_exits_via_try_quit(
     )
     controls = MagicMock()
     controls.inline_edit.handle_keydown.return_value = False
+    controls.context_menu.handle_keydown.return_value = False
     controls.inline_edit.handle_keyup.return_value = False
     controls.inline_edit.handle_text_input.return_value = False
     _silence_tap_sync(controls)
@@ -495,6 +498,7 @@ def test_run_pending_switch_returns_target_and_keeps_compositor(
     )
     controls = MagicMock()
     controls.inline_edit.handle_keydown.return_value = False
+    controls.context_menu.handle_keydown.return_value = False
     controls.inline_edit.handle_keyup.return_value = False
     controls.inline_edit.handle_text_input.return_value = False
     _silence_tap_sync(controls)
@@ -553,6 +557,7 @@ def test_run_ctrl_q_clean_exits(
     )
     controls = MagicMock()
     controls.inline_edit.handle_keydown.return_value = False
+    controls.context_menu.handle_keydown.return_value = False
     controls.inline_edit.handle_keyup.return_value = False
     controls.inline_edit.handle_text_input.return_value = False
     _silence_tap_sync(controls)
@@ -626,6 +631,7 @@ def test_run_pygame_quit_dirty_stays_open(
     )
     controls = MagicMock()
     controls.inline_edit.handle_keydown.return_value = False
+    controls.context_menu.handle_keydown.return_value = False
     controls.inline_edit.handle_keyup.return_value = False
     controls.inline_edit.handle_text_input.return_value = False
     _silence_tap_sync(controls)
@@ -692,6 +698,7 @@ def test_run_main_loop_stays_open_without_quit_event(
     )
     controls = MagicMock()
     controls.inline_edit.handle_keydown.return_value = False
+    controls.context_menu.handle_keydown.return_value = False
     controls.inline_edit.handle_keyup.return_value = False
     controls.inline_edit.handle_text_input.return_value = False
     _silence_tap_sync(controls)
@@ -795,6 +802,7 @@ def test_run_holds_content_and_overlay_while_project_render_busy(
     )
     controls = MagicMock()
     controls.inline_edit.handle_keydown.return_value = False
+    controls.context_menu.handle_keydown.return_value = False
     controls.inline_edit.handle_keyup.return_value = False
     controls.inline_edit.handle_text_input.return_value = False
     _silence_tap_sync(controls)

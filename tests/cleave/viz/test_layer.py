@@ -23,7 +23,6 @@ from cleave.viz.layer_visibility import (
     build_timeline_view_state,
     committed_level_outside_punch,
     effective_layer_enabled,
-    snapshot_monitor_from_output,
     timeline_committed_level,
     timeline_defaults,
     timeline_level_multiplier,
@@ -165,19 +164,6 @@ def test_effective_layer_enabled_override_when_paused() -> None:
     session.timeline.override_slots = {"layer_2"}
     session.timeline.override_visible = {"layer_2": True}
     assert effective_layer_enabled(session, "layer_2", 0.0) is True
-
-
-def test_effective_layer_enabled_override_ignored_when_preview_active() -> None:
-    session = _session(
-        layer_enabled={"layer_1": True, "layer_2": True, "layer_3": True, "layer_4": True},
-        timeline_enabled=True,
-        lanes={"layer_2": _lane(False)},
-    )
-    session.timeline.preview_active = True
-    session.timeline.monitor = {"layer_2": False}
-    session.timeline.override_slots = {"layer_2"}
-    session.timeline.override_visible = {"layer_2": True}
-    assert effective_layer_enabled(session, "layer_2", 0.0) is False
 
 
 def test_effective_layer_enabled_multiple_override_slots() -> None:
@@ -443,28 +429,6 @@ def test_apply_layer_visibility_override_stays_abrupt_with_fades() -> None:
     assert layers_by_slot["layer_1"].timeline_level == pytest.approx(1.0)
 
 
-def test_apply_layer_visibility_preview_stays_abrupt_with_fades() -> None:
-    session = _session(
-        layer_enabled={"layer_1": True, "layer_2": True, "layer_3": True, "layer_4": True},
-        timeline_enabled=True,
-        lanes={"layer_1": _lane(False, (10.0, True), (20.0, False), cut="soft")},
-    )
-    session.timeline.soft_cut_fades.enabled = True
-    session.timeline.soft_cut_fades.fade_in = 2.0
-    session.timeline.preview_active = True
-    session.timeline.monitor = {
-        "layer_1": False,
-        "layer_2": True,
-        "layer_3": True,
-        "layer_4": True,
-    }
-    layers_by_slot = {slot: _stem_layer(slot) for slot in DEFAULT_LAYER_SLOTS}
-
-    apply_layer_visibility(session, layers_by_slot, 9.0)
-    assert layers_by_slot["layer_1"].fbo.enabled is False
-    assert layers_by_slot["layer_1"].timeline_level == pytest.approx(1.0)
-
-
 def test_apply_effect_modifiers_scales_opacity_by_timeline_level() -> None:
     session = _session(
         layer_enabled={"layer_1": True, "layer_2": True, "layer_3": True, "layer_4": True},
@@ -564,25 +528,6 @@ def test_header_toggle_blocked_when_timeline_enabled() -> None:
     assert controls.session.layers["layer_1"].enabled is True
     view = controls.build_view_state(paused=False)
     assert view.notification_message == "Timeline controls layer visibility"
-
-
-def test_effective_layer_enabled_preview_active_uses_monitor() -> None:
-    session = _session(
-        layer_enabled={"layer_1": True, "layer_2": True, "layer_3": True, "layer_4": True},
-        timeline_enabled=True,
-        lanes={"layer_1": _lane(False), "layer_2": _lane(True)},
-    )
-    session.timeline.preview_active = True
-    session.timeline.monitor = {
-        "layer_1": True,
-        "layer_2": False,
-        "layer_3": True,
-        "layer_4": False,
-    }
-    assert effective_layer_enabled(session, "layer_1", 0.0) is True
-    assert effective_layer_enabled(session, "layer_2", 0.0) is False
-    assert effective_layer_enabled(session, "layer_3", 0.0) is True
-    assert effective_layer_enabled(session, "layer_4", 0.0) is False
 
 
 def test_build_record_punch_cues_writes_baseline_only_when_it_differs() -> None:
@@ -704,43 +649,6 @@ def test_build_timeline_view_state_populates_visibility_playing() -> None:
     assert state.timeline_level["layer_1"] == 0.0
     assert state.timeline_level["layer_2"] == 1.0
     assert state.override_slots == {"layer_2"}
-
-
-def test_build_timeline_view_state_monitor_preview_active() -> None:
-    session = _session(
-        layer_enabled={"layer_1": True, "layer_2": True, "layer_3": True, "layer_4": True},
-        timeline_enabled=True,
-        lanes={"layer_1": _lane(False), "layer_2": _lane(True)},
-    )
-    session.timeline.preview_active = True
-    session.timeline.monitor = {
-        "layer_1": True,
-        "layer_2": False,
-        "layer_3": True,
-        "layer_4": False,
-    }
-    state = build_timeline_view_state(session, position_sec=0.0, duration_sec=60.0)
-    assert state.monitor_visible == session.timeline.monitor
-    assert state.timeline_level["layer_1"] == 0.0
-    assert state.timeline_level["layer_2"] == 1.0
-
-
-def test_snapshot_monitor_from_output_populates_from_committed() -> None:
-    session = _session(
-        layer_enabled={"layer_1": False, "layer_2": True, "layer_3": True, "layer_4": False},
-        timeline_enabled=True,
-        lanes={
-            "layer_1": _lane(False, (2.0, True)),
-            "layer_3": _lane(True, (2.0, False)),
-        },
-    )
-    monitor = snapshot_monitor_from_output(session, 2.5)
-    assert monitor == {
-        "layer_1": True,
-        "layer_2": True,
-        "layer_3": False,
-        "layer_4": False,
-    }
 
 
 def test_armed_recording_bar_blends_committed_and_live() -> None:

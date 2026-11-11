@@ -452,8 +452,6 @@ class TimelinePresetController:
         tl.armed_slots.clear()
         tl.override_slots.clear()
         tl.override_visible.clear()
-        tl.preview_active = False
-        tl.monitor.clear()
         tl.arm_flash_start_ms.clear()
 
     def _notify(self, message: str) -> None:

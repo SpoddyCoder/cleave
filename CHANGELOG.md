@@ -9,7 +9,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 
-- Hovering a layer's label on the timeline strip shows a tooltip: double-click it to arm (or disarm) the layer for recording.
+- Hovering a layer's label on the timeline strip shows a tooltip: double-click it to arm (or disarm) the layer for recording, or right-click it for options. Hovering a row's eye says what a click does there and how to override.
+- Right-click a timeline strip row for its options: show or hide the layer, override its visibility, release all overrides, and arm it for recording. Shift+F10 or the Menu key opens the same menu for the focused row; arrows, Enter, and Esc drive it. Options that can't be used right now are greyed out, and hovering one says why. Each option lists its keyboard shortcut.
 - The timeline strip zooms. Scroll the mouse wheel over the strip to zoom in or out around the time under the pointer, down to a one second window. When zoomed, drag a row sideways (or middle-drag anywhere on the time scale or rows) to move along the song, or use Shift + wheel. A scrollbar under the rows shows how much of the song is visible: drag its thumb, or click the track to jump there. During playback the view pages forward when the playhead reaches the right edge, and a seek while paused brings the playhead back into view. The strip is slightly taller to fit the scrollbar.
 - The timeline strip shows a time scale above its top row, with labelled minute and second marks spaced to fit the strip width. Faint lines at the song start and end run down through every row.
 - The preset directory row shows a folder icon, and the preset, preset list entries, and render output rows show a file icon.
@@ -27,10 +28,11 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - The transport bar takes the mouse. Click PLAYING / PAUSED to play or pause. Drag the current time or BAR sideways to scrub by a second or a bar, or double-click either to type a time (M:SS or seconds) or a bar number. Each highlights on hover.
 - The timeline strip takes the mouse. Click the time scale to move the playhead there, and drag along it to scrub. Click a row to select it, or on or near a cue to select that cue, without moving the playhead. Double-click a row to move the playhead there; hold the second click and drag to scrub. While recording, a click or drag fills the skipped range like a keyboard seek.
 - Play/pause and record buttons sit in the timeline strip's top-left corner, above the row labels. They do what Space and R do. Record is labelled REC, and the label is part of the button. Both are white, and record turns red when a row is armed. While recording, the record button flashes red in step with the REC badge, even under the mouse, so a click shows at once. Otherwise buttons and row labels turn yellow on a wash on hover, like other editor buttons. Double-click a row's number or stem label to arm or disarm it, as A does. This also works mid-take to punch a row in or out. While the timeline is locked, record and arm are blocked, as they are from the keyboard.
-- Click a timeline row's eye icon, next to its stem label, to show or hide that layer, as its number key does. While paused it toggles the preview.
+- Click a timeline row's eye icon, next to its stem label, to show or hide that layer, as its number key does. It acts on an overridden (yellow) row, or on an armed row while recording.
 
 ### Changed
 
+- Timeline visibility overrides are switched on and off only from a row's right-click menu or Shift+Enter, and an overridden row's eye turns yellow. Showing or hiding a layer by hand (eye click or number key) works only on an overridden row, or an armed row while recording, so it no longer starts an override by itself. Starting an override keeps the layer as it looks at that moment and leaves other rows alone.
 - Inspector pages divide their settings into groups with thin rules: hard and soft cuts on the cue fades page, hard cut and start clean on the preset switching page, beat sensitivity on the Milkdrop preset page, start and end on the render page, panel layout on the UI page, and position, background and border, and the title and body text on the opening and closing card pages.
 - When the inspector shows a new page, its title row flashes with the same accent swipe as a warning toast, to draw the eye to it. The bar fills the panel width. A title too long for the column waits, scrolls at a reading pace to its last words, pauses, then snaps back to its start as the bar slides off. Turn it off with Settings > UI > highlight new page; the choice is kept as an editor preference.
 - The mouse pointer is larger, black with a white outline so it shows over any visual, and follows Settings > UI > UI scale. It changes shape over the editor's controls: a hand on buttons, icons, segments, dropdowns, and the timeline strip's play, REC, eye, and row labels; a text bar on text fields; left-right arrows on column boundaries, draggable transport values, and the timeline's time scale; and a four-way arrow on reorder handles.
@@ -144,6 +146,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Removed
 
+- The timeline's paused preview. Pausing no longer takes a snapshot that number keys toggle until playback resumes; override a row instead.
 - Settings > Editor Window > upscale, display size, and visualiser width and height. The window size comes from the window itself, and the preview resolution from Project > Render.
 - Settings > UI width mode, max width, and min width rows, and their `ui_width_mode`, `ui_width`, and `ui_min_width` keys in the user config. The shell layout no longer used them.
 - The current time badge above the timeline strip. The transport bar shows the time. REC still shows there while recording.

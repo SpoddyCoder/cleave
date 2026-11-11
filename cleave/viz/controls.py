@@ -20,6 +20,7 @@ from cleave.viz.preset_curation_controls import PresetCurationController
 from cleave.viz.preset_list_controls import PresetListController
 from cleave.viz.key_repeat import KeyRepeatController
 from cleave.viz.value_nudge import ValueNudgeHold
+from cleave.viz.context_menu import ContextMenuState
 from cleave.viz.inline_edit import InlineEditController
 from cleave.viz.modal import ModalHost
 from cleave.viz.panel_notification import (
@@ -128,6 +129,7 @@ class TuningControls:
             self._modal_host.stop_text_input,
         )
 
+        self.context_menu = ContextMenuState()
         self.shell_focus = ShellFocusState()
         self._focus_cursor: FocusCursor = MainFocus(
             RowDescriptor(RowKind.TIMELINE_HEADER)

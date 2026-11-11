@@ -293,13 +293,18 @@ def timeline_strip_section(
     layer_keys = _layer_key_range_label(layer_count)
     entries: list[tuple[str, str]] = [("A", "arm / disarm row for recording")]
 
+    entries.append(("Right-click row", "row options"))
+    entries.append(("Shift + F10 / Menu", "row options for the focused row"))
+
     if not recording:
-        entries.append(("Shift + Enter", "toggle override"))
-        if paused or override_active:
-            entries.append((layer_keys, "toggle layer visibility"))
+        entries.append(("Shift + Enter", "override row visibility on / off"))
+        if override_active:
+            entries.append((layer_keys, "show / hide an overridden layer"))
+            entries.append(("Click eye", "show / hide an overridden layer"))
 
     if recording:
-        entries.append((layer_keys, "toggle layer visibility"))
+        entries.append((layer_keys, "show / hide an armed layer"))
+        entries.append(("Click eye", "show / hide an armed layer"))
         entries.append((f"Ctrl + {layer_keys}", "drop cue (keep level)"))
 
     if recording:

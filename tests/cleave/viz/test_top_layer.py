@@ -13,6 +13,7 @@ import pygame
 import pytest
 from imgui_bundle import imgui
 
+from cleave.viz.context_menu import ContextMenuState
 from cleave.viz.inline_edit import InlineEditController
 from cleave.viz.commands import CommandContext
 from cleave.viz.imgui_theme import IMGUI_COLOR_ROLES, apply_imgui_theme, rgba
@@ -93,6 +94,7 @@ def _host() -> Iterator[object]:
         set_shell_region=MagicMock(),
         disarm_value_nudge=MagicMock(),
         inline_edit=InlineEditController(),
+        context_menu=ContextMenuState(),
         transport=MagicMock(),
     )
     overlay = _Overlay()

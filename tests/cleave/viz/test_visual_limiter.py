@@ -385,7 +385,6 @@ def test_collect_hot_layers_unset_role_is_pulse() -> None:
         lambda session: setattr(session, "solo_slot", "layer_1"),
         lambda session: setattr(session.settings, "editor_mode", "preset_curation"),
         lambda session: setattr(session.timeline, "recording", True),
-        lambda session: setattr(session.timeline, "preview_active", True),
     ],
 )
 def test_visual_limiter_idle_for_exclusions(mutate) -> None:

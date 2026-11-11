@@ -5,7 +5,9 @@ the ruler seeks and a held drag scrubs. A press on a layer row focuses it
 and selects a nearby cue without moving the playhead; a double-click on a
 row seeks, and holding the second press scrubs. A double-click on a row's
 label (layer number and stem) arms it, and a press on its monitor eye
-toggles the layer's visibility as its number key does.
+toggles the layer's visibility as its number key does (an overridden row,
+or an armed row while recording). A right-click on a row focuses it and
+returns that row's context menu (``timeline_context_menu``).
 
 The wheel zooms the visible window about the time under the pointer, and
 Shift+wheel or a sideways wheel pans it. While zoomed, a left drag on a row
@@ -22,7 +24,9 @@ from __future__ import annotations
 import time
 from typing import Callable, Literal, Protocol
 
+from cleave.viz.context_menu import ContextMenuProvider
 from cleave.viz.session import TuningSession
+from cleave.viz.timeline_context_menu import TimelineRowMenuActions, timeline_row_menu
 from cleave.viz.timeline_overlay import StripHit, StripTarget
 from cleave.viz.timeline_view import (
     WHEEL_PAN_FRACTION,
@@ -38,6 +42,7 @@ DOUBLE_CLICK_PX: float = 6.0
 PAN_DRAG_PX: float = 4.0
 # ImGui button indices, as ``imgui_host.mouse_button`` returns them.
 LEFT_BUTTON: int = 0
+RIGHT_BUTTON: int = 1
 MIDDLE_BUTTON: int = 2
 _SCROLLBAR_TARGETS = ("scroll_thumb", "scroll_track")
 
@@ -51,8 +56,10 @@ class StripGeometry(Protocol):
 
     def scrollbar_sec_per_px(self) -> float: ...
 
+    def row_label_rect(self, row: int) -> tuple[int, int, int, int] | None: ...
 
-class StripActions(Protocol):
+
+class StripActions(TimelineRowMenuActions, Protocol):
     duration_sec: float
 
     def focus_row(self, row: int) -> None: ...
@@ -140,6 +147,29 @@ class TimelinePointer:
             return False
         target, row = hover
         return self._actions.strip_target_pressable(target, row)
+
+    def context_row_at(self, x: float, y: float) -> int | None:
+        """Layer row under a screen point, for a right-click menu, or None."""
+        hit = self._geometry.hit_at(x, y)
+        if hit is None or hit.row is None:
+            return None
+        if self._actions.row_slot(hit.row) is None:
+            return None
+        return hit.row
+
+    def row_menu(self, row: int) -> ContextMenuProvider:
+        """Focus *row* and return its context menu."""
+        self._last_row_press = None
+        self._actions.focus_row(row)
+        return timeline_row_menu(self._actions, self._session, row)
+
+    def row_menu_anchor(self, row: int) -> tuple[float, float] | None:
+        """Screen point under *row*'s label, where a keyboard-opened menu hangs."""
+        rect = self._geometry.row_label_rect(row)
+        if rect is None:
+            return None
+        x, y, _w, h = rect
+        return (float(x), float(y + h))
 
     def press(self, x: float, y: float, button: int = LEFT_BUTTON) -> bool:
         """Handle a left or middle press. False when the point misses the strip."""

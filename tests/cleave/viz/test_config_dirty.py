@@ -609,11 +609,11 @@ def _mutate_timeline_recording_start(controls: TuningControls) -> None:
     assert session.timeline.recording is True
 
 
-def _mutate_timeline_preview_pause(controls: TuningControls) -> None:
+def _mutate_timeline_override(controls: TuningControls) -> None:
     del controls
     timeline_controls, session, _, _, _, _ = _make_timeline_controls()
-    timeline_controls.handle_keydown(keydown(pygame.K_SPACE))
-    assert session.timeline.preview_active is True
+    timeline_controls.toggle_override("layer_1")
+    assert session.timeline.override_slots == {"layer_1"}
 
 
 _SESSION_ONLY_MUTATIONS: list[tuple[str, Callable[[TuningControls], None], tuple[str, ...]]] = [
@@ -629,7 +629,7 @@ _SESSION_ONLY_MUTATIONS: list[tuple[str, Callable[[TuningControls], None], tuple
     ("focus_navigation", _mutate_focus_navigation, ("layer_1",)),
     ("timeline.armed", _mutate_timeline_arm, ("layer_1",)),
     ("timeline.recording", _mutate_timeline_recording_start, ("layer_1",)),
-    ("timeline.preview", _mutate_timeline_preview_pause, ("layer_1",)),
+    ("timeline.override", _mutate_timeline_override, ("layer_1",)),
 ]
 
 

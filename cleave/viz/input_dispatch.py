@@ -368,6 +368,25 @@ def _dismiss_timed_notification(
     return True
 
 
+def is_context_menu_key(event: pygame.event.Event) -> bool:
+    """Shift+F10 or the Menu key: open the focused item's context menu."""
+    if event.key == pygame.K_MENU:
+        return True
+    return event.key == pygame.K_F10 and mod_shift(event.mod)
+
+
+def _open_focus_context_menu(
+    event: pygame.event.Event, runtime: LiveVisualizerRuntime
+) -> bool:
+    if not is_context_menu_key(event):
+        return False
+    open_menu = getattr(runtime.shell_host, "open_focus_context_menu", None)
+    if open_menu is None:
+        return False
+    open_menu()
+    return True
+
+
 def dispatch_keydown(event: pygame.event.Event, runtime: LiveVisualizerRuntime) -> bool:
     """Handle a key-down event. Return False when the app should quit."""
     if event.type != pygame.KEYDOWN:
@@ -377,7 +396,15 @@ def dispatch_keydown(event: pygame.event.Event, runtime: LiveVisualizerRuntime) 
         runtime.menu_bar.cancel_alt_tap()
         return runtime.controls.handle_modal_keydown(event)
 
+    if runtime.controls.context_menu.handle_keydown(event):
+        runtime.menu_bar.cancel_alt_tap()
+        return True
+
     if runtime.controls.inline_edit.handle_keydown(event):
+        runtime.menu_bar.cancel_alt_tap()
+        return True
+
+    if _open_focus_context_menu(event, runtime):
         runtime.menu_bar.cancel_alt_tap()
         return True
 

@@ -25,7 +25,6 @@ from cleave.viz.layer_visibility import (
     armed_recording_level,
     build_record_punch_cues,
     effective_layer_enabled,
-    snapshot_monitor_from_output,
 )
 from cleave.viz.playback import PlaybackState, current_sec, seek, toggle_pause
 from cleave.viz.timeline_cue_edits import (
@@ -190,7 +189,7 @@ class TimelineControls:
 
         if event.key == pygame.K_RETURN and mod_shift(event.mod):
             if not self.session.timeline.recording:
-                self._toggle_override_focused_row()
+                self.toggle_override(self._focused_slot())
             return True
 
         if event.key == pygame.K_RETURN:
@@ -324,16 +323,7 @@ class TimelineControls:
         if self.session.timeline.recording and not self.playback.paused:
             self._stop_record_and_pause()
             return
-        was_paused = self.playback.paused
         toggle_pause(self.playback, self.duration_sec)
-        tl = self.session.timeline
-        if was_paused:
-            tl.preview_active = False
-            tl.monitor = {}
-        else:
-            t_sec = current_sec(self.playback, self.duration_sec)
-            tl.monitor = snapshot_monitor_from_output(self.session, t_sec)
-            tl.preview_active = True
         self._refresh_visibility()
 
     def toggle_record(self) -> None:
@@ -376,7 +366,7 @@ class TimelineControls:
         if row is None or self._slot_for_layer_index(row) is None:
             return False
         if target == "label":
-            return not tl.locked
+            return self.row_arm_available(row)
         if target == "eye":
             return self.row_visibility_toggleable(row)
         return False
@@ -384,8 +374,8 @@ class TimelineControls:
     def row_visibility_toggleable(self, row: int) -> bool:
         """Whether ``toggle_row_visibility`` would change *row* right now.
 
-        True while paused, for an armed row while recording, and for a row
-        with a visibility override. Plain playback leaves the row alone.
+        True for an armed row while recording, and for a row with a
+        visibility override otherwise.
         """
         slot = self._slot_for_layer_index(row)
         if slot is None:
@@ -393,7 +383,55 @@ class TimelineControls:
         tl = self.session.timeline
         if tl.recording:
             return slot in tl.armed_slots and slot in tl.record_baseline
-        return bool(self.playback.paused) or slot in tl.override_slots
+        return slot in tl.override_slots
+
+    def row_arm_available(self, row: int) -> bool:
+        """Whether ``toggle_arm_row`` would arm or disarm *row* right now."""
+        if self.session.timeline.locked:
+            return False
+        return self._slot_for_layer_index(row) is not None
+
+    def row_slot(self, row: int) -> str | None:
+        """The layer slot drawn on strip *row*, or None past the last layer."""
+        return self._slot_for_layer_index(row)
+
+    def row_visible(self, row: int) -> bool:
+        """Whether *row*'s layer shows at the playhead right now."""
+        slot = self._slot_for_layer_index(row)
+        if slot is None:
+            return False
+        return effective_layer_enabled(
+            self.session, slot, current_sec(self.playback, self.duration_sec)
+        )
+
+    def toggle_override(self, slot: str) -> None:
+        """Start or release a visibility override on *slot* (Shift+Enter).
+
+        Starting holds the layer as it shows now; releasing hands it back to
+        the timeline. Blocked while recording.
+        """
+        tl = self.session.timeline
+        if tl.recording:
+            return
+        if slot in tl.override_slots:
+            tl.override_slots.discard(slot)
+            tl.override_visible.pop(slot, None)
+        else:
+            t_sec = current_sec(self.playback, self.duration_sec)
+            tl.override_visible[slot] = effective_layer_enabled(
+                self.session, slot, t_sec
+            )
+            tl.override_slots.add(slot)
+        self._refresh_visibility()
+
+    def release_all_overrides(self) -> None:
+        """Hand every overridden row back to the timeline."""
+        tl = self.session.timeline
+        if not tl.override_slots:
+            return
+        tl.override_slots.clear()
+        tl.override_visible.clear()
+        self._refresh_visibility()
 
     def _toggle_slot_visibility(self, slot: str) -> None:
         tl = self.session.timeline
@@ -401,8 +439,6 @@ class TimelineControls:
             self._toggle_armed_layer_at(
                 slot, current_sec(self.playback, self.duration_sec)
             )
-        elif self.playback.paused:
-            self._toggle_paused_stem_visibility(slot)
         elif slot in tl.override_slots:
             tl.override_visible[slot] = not tl.override_visible.get(slot, True)
             self._refresh_visibility()
@@ -546,9 +582,6 @@ class TimelineControls:
         }
         tl.record_slot_start_sec = {stem: snapped for stem in tl.armed_slots}
 
-        tl.preview_active = False
-        tl.monitor = {}
-
         if self.playback.paused:
             toggle_pause(self.playback, self.duration_sec)
 
@@ -590,9 +623,6 @@ class TimelineControls:
             self._on_visibility_change()
 
     def _stop_record_and_pause(self) -> None:
-        tl = self.session.timeline
-        tl.preview_active = False
-        tl.monitor = {}
         self._stop_record()
         if not self.playback.paused:
             toggle_pause(self.playback, self.duration_sec)
@@ -600,36 +630,6 @@ class TimelineControls:
     def _refresh_visibility(self) -> None:
         if self._on_visibility_change is not None:
             self._on_visibility_change()
-
-    def _toggle_override_focused_row(self) -> None:
-        slot = self._focused_slot()
-        tl = self.session.timeline
-        if slot in tl.override_slots:
-            tl.override_slots.discard(slot)
-            tl.override_visible.pop(slot, None)
-        else:
-            t_sec = current_sec(self.playback, self.duration_sec)
-            tl.override_visible[slot] = effective_layer_enabled(
-                self.session, slot, t_sec
-            )
-            tl.preview_active = False
-            tl.monitor = {}
-            tl.override_slots.add(slot)
-        self._refresh_visibility()
-
-    def _toggle_paused_stem_visibility(self, slot: str) -> None:
-        tl = self.session.timeline
-        if tl.preview_active:
-            tl.monitor[slot] = not tl.monitor[slot]
-        elif slot in tl.override_slots:
-            tl.override_visible[slot] = not tl.override_visible.get(slot, True)
-        else:
-            t_sec = current_sec(self.playback, self.duration_sec)
-            tl.override_visible[slot] = not effective_layer_enabled(
-                self.session, slot, t_sec
-            )
-            tl.override_slots.add(slot)
-        self._refresh_visibility()
 
     def _toggle_armed_layer_at(self, slot: str, t_sec: float) -> None:
         tl = self.session.timeline

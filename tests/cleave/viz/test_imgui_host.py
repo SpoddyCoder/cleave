@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 import pygame
 import pytest
 
+from cleave.viz.context_menu import ContextMenuState
 from cleave.viz.commands import CommandContext
 from cleave.viz.menu_bar import MenuBarState
 
@@ -25,6 +26,7 @@ def _open_shell(menu: MenuBarState):
     from cleave.viz.shell_host import ShellHost, menu_bar_height_px
 
     controls = SimpleNamespace(
+        context_menu=ContextMenuState(),
         session=SimpleNamespace(layer_z_order=()),
         disarm_value_nudge=MagicMock(),
     )

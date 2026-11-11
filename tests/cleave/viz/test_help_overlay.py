@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+from cleave.viz.context_menu import ContextMenuState
 from cleave.blend_modes import BLEND_MODE_HELP_ENTRIES, BLEND_MODES
 from cleave.cue_roles import CUE_ROLE_MARKER_HELP_ENTRIES
 from cleave.config_schema.editor import EDITOR_PREVIEW_QUALITY_HELP_ENTRIES
@@ -331,10 +332,11 @@ def test_timeline_strip_help_keeps_lane_keys_when_layer_selected() -> None:
         ),
         timeline_submenu_focused=True,
         paused=True,
+        timeline_override_active=True,
         layer_count=4,
     )
     entries = dict(_keyboard_section(sections).entries)
-    assert entries["1-4"] == "toggle layer visibility"
+    assert entries["1-4"] == "show / hide an overridden layer"
     assert "jump to layer" not in entries.values()
     assert "Ctrl + L" not in entries
 
@@ -916,12 +918,13 @@ def test_timeline_strip_help_paused() -> None:
     section = timeline_strip_section(
         paused=True, recording=False, override_active=False, layer_count=4
     )
-    keys = [key for key, _ in section.entries]
-    assert keys.index("Shift + Enter") + 1 == keys.index("1-4")
     entries = dict(section.entries)
     assert entries["A"] == "arm / disarm row for recording"
-    assert entries["1-4"] == "toggle layer visibility"
-    assert entries["Shift + Enter"] == "toggle override"
+    assert "1-4" not in entries
+    assert "Click eye" not in entries
+    assert entries["Right-click row"] == "row options"
+    assert entries["Shift + F10 / Menu"] == "row options for the focused row"
+    assert entries["Shift + Enter"] == "override row visibility on / off"
     assert "Ctrl + Enter" not in entries
     assert entries["Space"] == "play"
     assert entries["Ctrl + Space / R"] == "start record"
@@ -939,10 +942,10 @@ def test_timeline_strip_help_paused() -> None:
 def test_timeline_strip_help_single_layer() -> None:
     entries = dict(
         timeline_strip_section(
-            paused=True, recording=False, override_active=False, layer_count=1
+            paused=True, recording=False, override_active=True, layer_count=1
         ).entries
     )
-    assert entries["1"] == "toggle layer visibility"
+    assert entries["1"] == "show / hide an overridden layer"
     assert "1-4" not in entries
 
 
@@ -963,7 +966,8 @@ def test_timeline_strip_help_playing_with_override() -> None:
             paused=False, recording=False, override_active=True, layer_count=6
         ).entries
     )
-    assert entries["1-6"] == "toggle layer visibility"
+    assert entries["1-6"] == "show / hide an overridden layer"
+    assert entries["Click eye"] == "show / hide an overridden layer"
 
 
 def test_timeline_strip_help_recording_while_playing() -> None:
@@ -973,7 +977,8 @@ def test_timeline_strip_help_recording_while_playing() -> None:
         ).entries
     )
     assert "Ctrl + Enter" not in entries
-    assert entries["1-4"] == "toggle layer visibility"
+    assert entries["1-4"] == "show / hide an armed layer"
+    assert entries["Click eye"] == "show / hide an armed layer"
     assert entries["Ctrl + 1-4"] == "drop cue (keep level)"
     assert "Shift + Enter" not in entries
     assert entries["Left/Right"] == "skip 10s, fills range"
@@ -1026,6 +1031,7 @@ def test_help_column_draws_the_subject_stop() -> None:
             tracks={},
         ),
         inline_edit=InlineEditController(),
+        context_menu=ContextMenuState(),
         transport=MagicMock(),
     )
     with patch.object(imgui_host, "_gl_context_current", return_value=False):

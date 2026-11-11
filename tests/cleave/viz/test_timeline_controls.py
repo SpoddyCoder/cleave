@@ -231,10 +231,8 @@ def test_space_toggles_pause_when_locked() -> None:
     assert playback.paused is False
     controls.handle_keydown(keydown(pygame.K_SPACE))
     assert playback.paused is True
-    assert session.timeline.preview_active is True
     controls.handle_keydown(keydown(pygame.K_SPACE))
     assert playback.paused is False
-    assert session.timeline.preview_active is False
 
 
 def test_ctrl_space_blocked_when_locked() -> None:
@@ -248,98 +246,129 @@ def test_ctrl_space_blocked_when_locked() -> None:
     assert controls.playback.paused is False
 
 
-def test_pause_snapshots_monitor_and_sets_preview_active() -> None:
-    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
+def test_pause_leaves_visibility_to_the_timeline() -> None:
+    controls, session, _, _, _, _ = _make_timeline_controls(
         position_sec=5.0,
         lanes={"layer_1": _lane(False)},
     )
-    session.layers["layer_1"].enabled = True
 
     controls.handle_keydown(keydown(pygame.K_SPACE))
-    assert session.timeline.preview_active is True
-    assert session.timeline.monitor == {
-        "layer_1": False,
-        "layer_2": True,
-        "layer_3": True,
-        "layer_4": True,
-    }
-    assert visibility_calls == [True]
+    assert controls.playback.paused is True
+    assert effective_layer_enabled(session, "layer_1", 5.0) is False
+    assert session.timeline.override_slots == set()
 
 
-def test_resume_clears_preview() -> None:
-    controls, session, visibility_calls, _, _, _ = _make_timeline_controls()
-    session.timeline.preview_active = True
-    session.timeline.monitor = {"layer_1": False}
-    controls.playback.paused = True
-
-    controls.handle_keydown(keydown(pygame.K_SPACE))
-    assert session.timeline.preview_active is False
-    assert session.timeline.monitor == {}
-    assert visibility_calls == [True]
-
-
-def test_num_keys_toggle_monitor_when_paused() -> None:
+def test_num_keys_ignored_when_paused_not_in_override() -> None:
     controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
         position_sec=3.0,
     )
-    session.layers["layer_1"].enabled = True
-
-    controls.handle_keydown(keydown(pygame.K_SPACE))
-    assert session.timeline.monitor["layer_1"] is True
+    controls.playback.paused = True
 
     controls.handle_keydown(keydown(pygame.K_1))
-    assert session.timeline.monitor["layer_1"] is False
-    assert session.timeline.lanes == {slot: empty_lane() for slot in session.layer_z_order}
-    assert session.timeline.record_buffer == {}
-    assert visibility_calls == [True, True]
+    controls.toggle_row_visibility(1)
+    assert session.timeline.override_slots == set()
+    assert session.timeline.override_visible == {}
+    assert visibility_calls == []
 
 
-def test_toggle_row_visibility_matches_num_key_when_paused() -> None:
+def test_toggle_row_visibility_flips_override_when_paused() -> None:
     controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
         position_sec=3.0, focus_row=0
     )
-    session.layers["layer_2"].enabled = True
+    controls.playback.paused = True
+    session.timeline.override_slots = {"layer_2"}
+    session.timeline.override_visible = {"layer_2": True}
 
-    controls.handle_keydown(keydown(pygame.K_SPACE))
-    assert session.timeline.monitor["layer_2"] is True
     controls.toggle_row_visibility(1)
     assert session.timeline.focus_row == 1
-    assert session.timeline.monitor["layer_2"] is False
+    assert session.timeline.override_visible["layer_2"] is False
     controls.toggle_row_visibility(1)
-    assert session.timeline.monitor["layer_2"] is True
-    assert visibility_calls == [True, True, True]
+    assert session.timeline.override_visible["layer_2"] is True
+    assert visibility_calls == [True, True]
 
 
-def test_num_key_5_toggles_fifth_layer_when_paused() -> None:
+def test_num_key_5_toggles_fifth_layer_override() -> None:
     slots = tuple(f"layer_{i}" for i in range(1, 6))
     controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
         slots=slots,
         position_sec=3.0,
     )
-    controls.playback.paused = True
-    session.timeline.preview_active = True
-    session.timeline.monitor = {slot: True for slot in slots}
+    session.timeline.override_slots = {"layer_4", "layer_5"}
+    session.timeline.override_visible = {"layer_4": True, "layer_5": True}
 
     controls.handle_keydown(keydown(pygame.K_5))
-    assert session.timeline.monitor["layer_5"] is False
-    assert session.timeline.monitor["layer_4"] is True
+    assert session.timeline.override_visible == {"layer_4": True, "layer_5": False}
     assert visibility_calls == [True]
 
 
 def test_num_keys_beyond_layer_count_are_noop() -> None:
     controls, session, visibility_calls, _, _, _ = _make_timeline_controls()
-    controls.playback.paused = True
-    session.timeline.preview_active = True
-    session.timeline.monitor = {slot: True for slot in DEFAULT_LAYER_SLOTS}
+    session.timeline.override_slots = set(DEFAULT_LAYER_SLOTS)
+    session.timeline.override_visible = {slot: True for slot in DEFAULT_LAYER_SLOTS}
 
     controls.handle_keydown(keydown(pygame.K_5))
-    assert session.timeline.monitor == {
-        "layer_1": True,
-        "layer_2": True,
-        "layer_3": True,
-        "layer_4": True,
+    assert session.timeline.override_visible == {
+        slot: True for slot in DEFAULT_LAYER_SLOTS
     }
     assert visibility_calls == []
+
+
+def test_row_visibility_toggleable_only_for_override_or_armed_take() -> None:
+    controls, session, _, _, _, _ = _make_timeline_controls(armed_slots={"layer_1"})
+    controls.playback.paused = True
+    assert controls.row_visibility_toggleable(0) is False
+    session.timeline.override_slots = {"layer_2"}
+    assert controls.row_visibility_toggleable(1) is True
+    assert controls.row_visibility_toggleable(7) is False
+
+    controls.handle_keydown(keydown(pygame.K_r))
+    assert controls.row_visibility_toggleable(0) is True
+    assert controls.row_visibility_toggleable(1) is False
+
+
+def test_toggle_override_holds_current_visibility_and_releases() -> None:
+    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
+        lanes={"layer_2": _lane(False)},
+    )
+    session.timeline.override_slots = {"layer_1"}
+    session.timeline.override_visible = {"layer_1": False}
+
+    controls.toggle_override("layer_2")
+    assert session.timeline.override_slots == {"layer_1", "layer_2"}
+    assert session.timeline.override_visible == {"layer_1": False, "layer_2": False}
+    controls.toggle_override("layer_2")
+    assert session.timeline.override_slots == {"layer_1"}
+    assert session.timeline.override_visible == {"layer_1": False}
+    assert visibility_calls == [True, True]
+
+
+def test_toggle_override_blocked_while_recording() -> None:
+    controls, session, _, _, _, _ = _make_timeline_controls(armed_slots={"layer_1"})
+    controls.handle_keydown(keydown(pygame.K_r))
+
+    controls.toggle_override("layer_2")
+    assert session.timeline.override_slots == set()
+
+
+def test_release_all_overrides() -> None:
+    controls, session, visibility_calls, _, _, _ = _make_timeline_controls()
+    controls.release_all_overrides()
+    assert visibility_calls == []
+
+    session.timeline.override_slots = {"layer_1", "layer_3"}
+    session.timeline.override_visible = {"layer_1": False, "layer_3": True}
+    controls.release_all_overrides()
+    assert session.timeline.override_slots == set()
+    assert session.timeline.override_visible == {}
+    assert visibility_calls == [True]
+
+
+def test_row_arm_available_follows_lock() -> None:
+    controls, session, _, _, _, _ = _make_timeline_controls()
+    assert controls.row_arm_available(0) is True
+    assert controls.row_arm_available(7) is False
+    session.timeline.locked = True
+    assert controls.row_arm_available(0) is False
 
 
 def test_num_keys_ignored_when_playing_not_in_override() -> None:
@@ -347,8 +376,6 @@ def test_num_keys_ignored_when_playing_not_in_override() -> None:
     session.layers["layer_1"].enabled = True
 
     controls.handle_keydown(keydown(pygame.K_1))
-    assert session.timeline.preview_active is False
-    assert session.timeline.monitor == {}
     assert session.timeline.lanes == {slot: empty_lane() for slot in session.layer_z_order}
     assert session.timeline.override_slots == set()
     assert visibility_calls == []
@@ -366,20 +393,19 @@ def test_num_keys_toggle_override_visible_when_playing() -> None:
     assert visibility_calls == [True]
 
 
-def test_record_from_pause_stores_wysiwyg_baseline_when_monitor_differs() -> None:
+def test_record_from_pause_stores_override_baseline() -> None:
     controls, session, _, _, _, _ = _make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=7.0,
     )
-    session.layers["layer_1"].enabled = True
+    controls.playback.paused = True
+    session.timeline.override_slots = {"layer_1"}
+    session.timeline.override_visible = {"layer_1": True}
 
-    controls.handle_keydown(keydown(pygame.K_SPACE))
     controls.handle_keydown(keydown(pygame.K_1))
     controls.handle_keydown(keydown(pygame.K_r))
 
     assert session.timeline.recording is True
-    assert session.timeline.preview_active is False
-    assert session.timeline.monitor == {}
     assert session.timeline.record_buffer == {}
     assert session.timeline.record_baseline == {"layer_1": 0.0}
 
@@ -433,25 +459,6 @@ def test_shift_enter_override_when_paused() -> None:
     controls.handle_keydown(keydown(pygame.K_RETURN, mod=pygame.KMOD_SHIFT))
     assert session.timeline.override_slots == {"layer_2"}
     assert session.timeline.override_visible == {"layer_2": False}
-    assert session.timeline.preview_active is False
-    assert session.timeline.monitor == {}
-    assert visibility_calls == [True]
-
-
-def test_shift_enter_override_clears_preview_when_paused() -> None:
-    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
-        focus_row=1,
-        lanes={"layer_2": _lane(False)},
-    )
-    controls.playback.paused = True
-    session.timeline.preview_active = True
-    session.timeline.monitor = {"layer_2": True}
-
-    controls.handle_keydown(keydown(pygame.K_RETURN, mod=pygame.KMOD_SHIFT))
-    assert session.timeline.preview_active is False
-    assert session.timeline.monitor == {}
-    assert session.timeline.override_slots == {"layer_2"}
-    assert session.timeline.override_visible == {"layer_2": True}
     assert visibility_calls == [True]
 
 
@@ -1251,8 +1258,6 @@ def test_ctrl_space_stops_record_and_pauses() -> None:
 
     assert session.timeline.recording is False
     assert controls.playback.paused is True
-    assert session.timeline.preview_active is False
-    assert session.timeline.monitor == {}
     assert visibility_calls == [True, True, True]
 
 
@@ -1268,7 +1273,6 @@ def test_ctrl_space_stop_stays_paused_if_already_paused() -> None:
     controls.handle_keydown(keydown(pygame.K_SPACE, mod=pygame.KMOD_CTRL))
     assert session.timeline.recording is False
     assert controls.playback.paused is True
-    assert session.timeline.preview_active is False
 
 
 def test_space_resumes_when_recording_and_paused() -> None:
@@ -1300,8 +1304,6 @@ def test_space_stops_record_and_pauses_while_playing() -> None:
 
     assert session.timeline.recording is False
     assert controls.playback.paused is True
-    assert session.timeline.preview_active is False
-    assert session.timeline.monitor == {}
     assert visibility_calls == [True, True, True]
 
 
@@ -1887,7 +1889,7 @@ def test_row_visibility_toggleable_only_when_the_eye_would_act() -> None:
     assert controls.row_visibility_toggleable(0) is True
     session.timeline.override_slots = set()
     controls.handle_keydown(keydown(pygame.K_SPACE))
-    assert controls.row_visibility_toggleable(0) is True
+    assert controls.row_visibility_toggleable(0) is False
 
 
 def test_strip_target_pressable_follows_lock_and_armed_rows() -> None:

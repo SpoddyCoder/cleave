@@ -83,16 +83,6 @@ def timeline_committed_level(
     )
 
 
-def snapshot_monitor_from_output(
-    session: TuningSession,
-    t_sec: float,
-) -> dict[str, bool]:
-    return {
-        slot: effective_layer_enabled(session, slot, t_sec)
-        for slot in session.layer_z_order
-    }
-
-
 def armed_recording_defaults(session: TuningSession) -> dict[str, float]:
     defaults = timeline_defaults(session)
     defaults.update(session.timeline.record_baseline)
@@ -205,8 +195,6 @@ def effective_layer_enabled(
         if slot in tl.override_slots:
             return tl.override_visible.get(slot, True)
         return timeline_committed_level(session, slot, t_sec) > LEVEL_EPS
-    if tl.preview_active:
-        return tl.monitor[slot]
     if slot in tl.override_slots:
         return tl.override_visible.get(slot, True)
     return timeline_committed_level(session, slot, t_sec) > LEVEL_EPS
@@ -230,7 +218,7 @@ def timeline_levels_apply(frame: LimiterFrameState, slot: str) -> bool:
     tl = frame.timeline
     if not tl.enabled:
         return False
-    if tl.recording or tl.preview_active:
+    if tl.recording:
         return False
     if slot in tl.override_slots:
         return False

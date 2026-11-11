@@ -145,7 +145,7 @@ def visual_limiter_active(frame: LimiterFrameState) -> bool:
     if not frame.limiter.enabled:
         return False
     tl = frame.timeline
-    if tl.recording or tl.preview_active:
+    if tl.recording:
         return False
     return True
 

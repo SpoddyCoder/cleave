@@ -52,7 +52,6 @@ def _discard_timeline_slot(session: TuningSession, slot: str) -> None:
     timeline.override_slots.discard(slot)
     timeline.record_baseline.pop(slot, None)
     timeline.record_slot_start_sec.pop(slot, None)
-    timeline.monitor.pop(slot, None)
     timeline.override_visible.pop(slot, None)
     timeline.arm_flash_start_ms.pop(slot, None)
     timeline.selected_cue_t.pop(slot, None)

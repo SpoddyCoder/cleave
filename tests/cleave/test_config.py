@@ -2029,7 +2029,6 @@ _UI_ONLY_LITERAL_DEFAULTS = frozenset(
         ("TimelineRuntime", "panel_open"),
         ("TimelineRuntime", "focus_row"),
         ("TimelineRuntime", "recording"),
-        ("TimelineRuntime", "preview_active"),
         ("SettingsRuntime", "editor_mode"),
         ("LayerRuntime", "switching_paused"),
         ("TuningSession", "overlay_solo"),

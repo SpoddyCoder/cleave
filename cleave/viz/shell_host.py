@@ -29,8 +29,15 @@ from cleave.viz.inspector_controls import (
     inspector_command_locked,
 )
 from cleave.viz.menu_bar import MenuBarState, menus_for_session
+from cleave.viz.menu_rows import (
+    POPUP_FLAGS,
+    ContextMenuSurface,
+    MenuRowView,
+    draw_menu_rows,
+    opaque_highlight_fill,
+)
 from cleave.viz.pointer_cursor import PointerShape, request_pointer
-from cleave.viz.timeline_pointer import MIDDLE_BUTTON, TimelinePointer
+from cleave.viz.timeline_pointer import MIDDLE_BUTTON, RIGHT_BUTTON, TimelinePointer
 from cleave.viz.material_icons import (
     LOCK_GLYPH,
     LOCK_OPEN_GLYPH,
@@ -154,7 +161,6 @@ from cleave.viz.transport_controls import TransportField
 # Dear ImGui's default FramePadding.y is 3, which leaves both rows cramped.
 _MENU_BAR_FRAME_PADDING_Y = 8.0
 # Extra space between the menu-bar rule and the first popup row.
-_MENU_POPUP_TOP_PAD_PX = 4.0
 _INSPECTOR_INDENT = 16.0
 # Extra space above and below each inspector row, so a focused row's outline
 # clears its segments, combo box, or buttons.
@@ -324,8 +330,23 @@ def navigator_toggle_tooltip(toggle: NavToggle) -> str:
 def strip_label_tooltip(*, armed: bool, locked: bool) -> str:
     """Hover text for a strip row label: double-click arms or disarms it."""
     if locked:
-        return "Locked: unlock the timeline to arm"
-    return "Double-click to disarm" if armed else "Double-click to arm for recording"
+        action = "Locked: unlock the timeline to arm"
+    elif armed:
+        action = "Double-click to disarm"
+    else:
+        action = "Double-click to arm for recording"
+    return f"{action}, right-click for options"
+
+
+def strip_eye_tooltip(*, overridden: bool, recording: bool, armed: bool) -> str:
+    """Hover text for a strip row's monitor eye."""
+    if recording:
+        if armed:
+            return "Click to record show / hide"
+        return "Arm this row to record show / hide"
+    if overridden:
+        return "Override: click to show / hide, right-click to release"
+    return "Right-click to override visibility"
 
 
 def navigator_toggle_x(
@@ -524,16 +545,6 @@ def _menu_bar_frame_padding() -> Iterator[None]:
         imgui.pop_style_var()
 
 
-_POPUP_FLAGS = (
-    int(imgui.WindowFlags_.no_title_bar)
-    | int(imgui.WindowFlags_.no_resize)
-    | int(imgui.WindowFlags_.no_move)
-    | int(imgui.WindowFlags_.no_scrollbar)
-    | int(imgui.WindowFlags_.always_auto_resize)
-    | int(imgui.WindowFlags_.no_saved_settings)
-    | int(imgui.WindowFlags_.no_focus_on_appearing)
-    | int(imgui.WindowFlags_.no_nav)
-)
 _SHELL_FLAGS = (
     int(imgui.WindowFlags_.no_title_bar)
     | int(imgui.WindowFlags_.no_resize)
@@ -1270,21 +1281,6 @@ def _selected_header_wash(selected: bool, *, inspector: bool = False) -> Iterato
             imgui.pop_style_color(3)
 
 
-@contextmanager
-def _opaque_highlight_fill(active: bool) -> Iterator[None]:
-    """Push an opaque highlight header fill for an open menu title or row."""
-    if active:
-        fill = rgba(HIGHLIGHT, 1.0)
-        imgui.push_style_color(imgui.Col_.header, fill)
-        imgui.push_style_color(imgui.Col_.header_hovered, fill)
-        imgui.push_style_color(imgui.Col_.header_active, fill)
-    try:
-        yield
-    finally:
-        if active:
-            imgui.pop_style_color(3)
-
-
 class ShellHost:
     """ImGui shell drawn through an ``ImGuiHost`` on the current GL context."""
 
@@ -1340,6 +1336,7 @@ class ShellHost:
         self._splitter_down = (0.0, 0.0)
         self.transport_notice_clicked = False
         self.top_layer = TopLayer()
+        self._context_surface = ContextMenuSurface(lambda: self._controls.context_menu)
 
     @property
     def menu_bar_height_px(self) -> int:
@@ -1398,6 +1395,7 @@ class ShellHost:
         if event.type == pygame.WINDOWFOCUSLOST:
             self._cancel_strip_pointer()
             self._clear_strip_hover()
+            self._controls.context_menu.close()
             return
         if event.type == pygame.WINDOWLEAVE:
             self._clear_strip_hover()
@@ -1423,6 +1421,18 @@ class ShellHost:
                 x = float(event.pos[0])
                 y = float(event.pos[1])
                 captured = self.top_layer.captures_pointer(x, y)
+                context_menu = self._controls.context_menu
+                if context_menu.is_open and not captured:
+                    # A press outside an open menu only closes it. A
+                    # right-click goes on to open the menu under it.
+                    context_menu.close()
+                    if button != RIGHT_BUTTON:
+                        return
+                if button == RIGHT_BUTTON:
+                    if not captured:
+                        self._assign_shell_region(x, y)
+                        self._open_context_menu(x, y)
+                    return
                 # Swallow the left button so ImGui does not activate a row
                 # or start a value drag. A top-layer hit keeps the click.
                 if (
@@ -1451,6 +1461,31 @@ class ShellHost:
         if event.type == pygame.MOUSEWHEEL:
             if not self._wheel_strip(event):
                 imgui_host.process_mouse_event(event)
+
+    def _open_context_menu(self, x: float, y: float) -> None:
+        """Open the menu for whatever sits under (*x*, *y*), if it has one."""
+        pointer = self._strip_under(x, y)
+        if pointer is None:
+            return
+        row = pointer.context_row_at(x, y)
+        if row is None:
+            return
+        self._cancel_strip_pointer()
+        self._menu_state.blur()
+        self._controls.context_menu.open(pointer.row_menu(row), (x, y))
+
+    def open_focus_context_menu(self) -> bool:
+        """Open the focused item's menu (Shift+F10, Menu key). False when it has none."""
+        pointer = self._strip_pointer
+        if pointer is None or not self._strip_has_scope():
+            return False
+        row = self._controls.session.timeline.focus_row
+        anchor = pointer.row_menu_anchor(row)
+        if anchor is None:
+            return False
+        self._menu_state.blur()
+        self._controls.context_menu.open(pointer.row_menu(row), anchor, keyboard=True)
+        return self._controls.context_menu.is_open
 
     def _strip_under(self, x: float, y: float) -> TimelinePointer | None:
         """The strip pointer when (*x*, *y*) is on the open strip."""
@@ -1618,6 +1653,9 @@ class ShellHost:
             float(mouse.x), float(mouse.y)
         ):
             return
+        if self._controls.context_menu.is_open:
+            # A press outside the open menu only closes it.
+            return
         shape = self._strip_pointer_shape()
         if self._row_drag is not None:
             shape = PointerShape.MOVE
@@ -1638,7 +1676,7 @@ class ShellHost:
             self._show_strip_tooltip()
 
     def _show_strip_tooltip(self) -> None:
-        """Tell the user a row label arms on double-click."""
+        """Say what a row label or eye does on click, and that right-click has more."""
         pointer = self._strip_pointer
         if pointer is None or pointer.scrubbing or pointer.panning:
             return
@@ -1650,15 +1688,26 @@ class ShellHost:
         if not timeline.panel_open or hover is None:
             return
         target, row = hover
-        z_order = session.layer_z_order
-        if target != "label" or row is None or not 0 <= row < len(z_order):
+        if target not in ("label", "eye") or row is None:
             return
-        imgui.set_tooltip(
-            strip_label_tooltip(
-                armed=z_order[row] in timeline.armed_slots,
+        z_order = session.layer_z_order
+        if not 0 <= row < len(z_order):
+            return
+        slot = z_order[row]
+        if target == "label":
+            text = strip_label_tooltip(
+                armed=slot in timeline.armed_slots,
                 locked=timeline.locked,
             )
-        )
+        elif target == "eye":
+            text = strip_eye_tooltip(
+                overridden=slot in timeline.override_slots,
+                recording=bool(timeline.recording),
+                armed=slot in timeline.armed_slots,
+            )
+        else:
+            return
+        imgui.set_tooltip(text)
 
     def _strip_pointer_shape(self) -> PointerShape | None:
         """Hand over a strip button or label, left-right over the ruler or a scrub."""
@@ -1708,6 +1757,8 @@ class ShellHost:
             in_bar = 0.0 <= mouse.y < float(self._menu_bar_height_px)
             if not in_bar:
                 menu_state.blur()
+        if self._controls.context_menu.is_open:
+            self.top_layer.push(self._context_surface)
         self._request_gesture_pointer()
         self._release_value_drag()
         self._release_nudge_swallow()
@@ -2882,7 +2933,11 @@ class ShellHost:
         )
 
     def _nudge_input_blocked(self) -> bool:
-        return self._modal_has_pointer() or self._choice_list_open()
+        return (
+            self._modal_has_pointer()
+            or self._choice_list_open()
+            or self._controls.context_menu.is_open
+        )
 
     def _choice_list_open(self) -> bool:
         inline = getattr(self._controls, "inline_edit", None)
@@ -3109,7 +3164,7 @@ class ShellHost:
                     width = imgui.calc_text_size(menu.label).x + pad_x * 2.0
                     # Open title stays opaque highlight, including under the
                     # pointer. Idle hover is the theme header wash.
-                    with _opaque_highlight_fill(active):
+                    with opaque_highlight_fill(active):
                         if active:
                             imgui.push_style_color(
                                 imgui.Col_.text, rgba(BACKGROUND)
@@ -3166,7 +3221,7 @@ class ShellHost:
         # so the popup covers them. Chrome is raised after this window. Do not
         # focus it: FocusWindow clears the menu-bar button's ActiveId, and a
         # later click on another top label never completes.
-        visible, _open = imgui.begin("##cleave-menu", None, _POPUP_FLAGS)
+        visible, _open = imgui.begin("##cleave-menu", None, POPUP_FLAGS)
         try:
             if not visible:
                 return False
@@ -3185,91 +3240,23 @@ class ShellHost:
         menu_index: int,
         menu: Any,
     ) -> bool:
-        hit = False
-        style = imgui.get_style()
-        pad_x = style.frame_padding.x
-        check_w = imgui.calc_text_size("✓").x
-        gap = max(imgui.calc_text_size("  ").x, ui_chrome_px(16.0))
-        label_w = 0.0
-        shortcut_w = 0.0
-        for item in menu.items:
-            if isinstance(item, MenuSeparator):
-                continue
-            label_w = max(label_w, imgui.calc_text_size(item.label).x)
-            if item.shortcut:
-                shortcut_w = max(shortcut_w, imgui.calc_text_size(item.shortcut).x)
-        row_w = pad_x * 2.0 + check_w + gap + label_w + gap + shortcut_w + pad_x
-        draw_list = imgui.get_window_draw_list()
-        # Whole pixels: text snaps down to a pixel, so a fractional row top
-        # leaves the label off-centre in its fill.
-        imgui.set_cursor_pos_y(
-            imgui.get_cursor_pos_y() + round(ui_chrome_px(_MENU_POPUP_TOP_PAD_PX))
+        rows = tuple(
+            None
+            if isinstance(item, MenuSeparator)
+            else command_row_view(item, command_ctx)
+            for item in menu.items
         )
-        for item_index, item in enumerate(menu.items):
-            if isinstance(item, MenuSeparator):
-                imgui.separator()
-                continue
-            enabled = bool(item.enabled(command_ctx))
-            highlighted = menu_state.item_index == item_index
-            pos = imgui.get_cursor_screen_pos()
-            # Disabled skips the hover wash. The keyboard row stays selectable
-            # so its opaque fill still paints.
-            flags = int(
-                imgui.SelectableFlags_.disabled
-                if not enabled and not highlighted
-                else imgui.SelectableFlags_.none
-            )
-            with _opaque_highlight_fill(highlighted):
-                clicked, _selected = imgui.selectable(
-                    f"##{item.id}",
-                    highlighted,
-                    flags,
-                    imgui.ImVec2(row_w, 0.0),
-                )
-            if highlighted:
-                ink = rgba(BACKGROUND)
-                label_color = check_color = shortcut_color = ink
-            else:
-                label_color = _row_color(item, command_ctx, enabled)
-                check_color = rgba(VALUE)
-                shortcut_color = rgba(MUTED)
-            # Selectable anchors the label at the cursor and pads the highlight
-            # with half of ItemSpacing on each side. Frame padding would push
-            # the label down so the fill sits high, flush with the next row.
-            text_y = pos.y
-            text_x = pos.x + pad_x
-            if (
-                item.kind == "check"
-                and item.checked is not None
-                and item.checked(command_ctx)
-            ):
-                draw_list.add_text(
-                    imgui.ImVec2(text_x, text_y),
-                    imgui.get_color_u32(check_color),
-                    "✓",
-                )
-            draw_list.add_text(
-                imgui.ImVec2(text_x + check_w + gap, text_y),
-                imgui.get_color_u32(label_color),
-                item.label,
-            )
-            if item.shortcut:
-                shortcut_width = imgui.calc_text_size(item.shortcut).x
-                draw_list.add_text(
-                    imgui.ImVec2(pos.x + row_w - pad_x - shortcut_width, text_y),
-                    imgui.get_color_u32(shortcut_color),
-                    item.shortcut,
-                )
-            if clicked:
-                hit = True
-                menu_state.click_item(
-                    menu_index,
-                    item_index,
-                    menus,
-                    command_ctx,
-                    self._controls,
-                )
-        return hit
+        result = draw_menu_rows(rows, menu_state.item_index)
+        if result.clicked is None:
+            return False
+        menu_state.click_item(
+            menu_index,
+            result.clicked,
+            menus,
+            command_ctx,
+            self._controls,
+        )
+        return True
 
 
 def draw_shell_frame(
@@ -3306,9 +3293,17 @@ def _mouse_in_current_window() -> bool:
     )
 
 
-def _row_color(command: Command, ctx: CommandContext, enabled: bool) -> imgui.ImVec4:
-    if not enabled:
-        return rgba(DISABLED)
-    if command.label_role is not None:
-        return rgba(command.label_role(ctx))
-    return rgba(VALUE)
+def command_row_view(command: Command, ctx: CommandContext) -> MenuRowView:
+    """A menu-bar command as a drawn menu row."""
+    return MenuRowView(
+        id=command.id,
+        label=command.label,
+        enabled=bool(command.enabled(ctx)),
+        checked=(
+            command.kind == "check"
+            and command.checked is not None
+            and bool(command.checked(ctx))
+        ),
+        shortcut=command.shortcut,
+        color=command.label_role(ctx) if command.label_role is not None else VALUE,
+    )
