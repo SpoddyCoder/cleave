@@ -252,9 +252,9 @@ def test_card_page_has_headings_and_card_identity() -> None:
         RowKind.OVERLAY_CARD_BODY_TEXT,
     ):
         assert kind in _kinds(rows)
-    assert all(row.descriptor.card == "opening_card" for row in rows)
+    assert all(row.descriptor.card == "opening_card" for row in rows if not row.divider)
     closing = build_inspector_rows(state, "overlay.closing_card")
-    assert all(row.descriptor.card == "closing_card" for row in closing)
+    assert all(row.descriptor.card == "closing_card" for row in closing if not row.divider)
 
 
 def test_conditional_rows_follow_predicates() -> None:
@@ -352,7 +352,7 @@ def test_locked_blocks_still_build() -> None:
     position = next(
         row.descriptor
         for row in build_inspector_rows(state, "overlay.opening_card")
-        if row.descriptor.kind is RowKind.OVERLAY_CARD_POSITION
+        if not row.divider and row.descriptor.kind is RowKind.OVERLAY_CARD_POSITION
     )
     assert inspector_field_colors(state, position) == (LOCKED, LOCKED)
 

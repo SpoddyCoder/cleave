@@ -140,6 +140,7 @@ SETTINGS_UI_SECTION = SectionDef(
         SectionNode(leaf_kind=RowKind.SETTINGS_UI_SCALE),
         SectionNode(leaf_kind=RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY),
         SectionNode(leaf_kind=RowKind.SETTINGS_UI_HIGHLIGHT_NEW_PAGE),
+        SectionNode(divider=True),
         SectionNode(leaf_kind=RowKind.SETTINGS_UI_NAVIGATOR_HEIGHT),
         SectionNode(leaf_kind=RowKind.SETTINGS_NAVIGATOR_SIDE),
         SectionNode(leaf_kind=RowKind.SETTINGS_HELP_SIDE),
@@ -178,6 +179,7 @@ PROJECT_RENDER_SECTION = SectionDef(
         SectionNode(leaf_kind=RowKind.PROJECT_RENDER_OUTPUT),
         SectionNode(leaf_kind=RowKind.PROJECT_RENDER_FPS),
         SectionNode(leaf_kind=RowKind.PROJECT_RENDER_QUALITY),
+        SectionNode(divider=True),
         SectionNode(leaf_kind=RowKind.PROJECT_RENDER_START),
         SectionNode(leaf_kind=RowKind.PROJECT_RENDER_END),
         SectionNode(commands=("project.render",)),
@@ -273,13 +275,16 @@ def _build_overlay_card_section(card: str) -> SectionDef:
         children=(
             SectionNode(leaf_kind=RowKind.OVERLAY_CARD_ENABLED),
             SectionNode(subsection=animation_section),
+            SectionNode(divider=True),
             SectionNode(leaf_kind=RowKind.OVERLAY_CARD_POSITION),
             SectionNode(leaf_kind=RowKind.OVERLAY_CARD_OPACITY),
+            SectionNode(divider=True),
             SectionNode(leaf_kind=RowKind.OVERLAY_CARD_BACKGROUND_COLOUR),
             SectionNode(leaf_kind=RowKind.OVERLAY_CARD_BACKGROUND_MARGIN),
             SectionNode(leaf_kind=RowKind.OVERLAY_CARD_BACKGROUND_PADDING),
             SectionNode(leaf_kind=RowKind.OVERLAY_CARD_BORDER_WIDTH),
             SectionNode(leaf_kind=RowKind.OVERLAY_CARD_BORDER_COLOUR),
+            SectionNode(divider=True),
             SectionNode(subsection=title_section),
             SectionNode(subsection=body_section),
         ),
@@ -544,6 +549,7 @@ PRESET_SWITCHING_PROJECTM_TRIGGER = ConditionalRowsDef(
     children=(
         SectionNode(leaf_kind=RowKind.TRACK_EASTER_EGG),
         SectionNode(leaf_kind=RowKind.TRACK_SOFT_CUT_DURATION),
+        SectionNode(divider=True),
         SectionNode(leaf_kind=RowKind.TRACK_HARD_CUT_ENABLED),
         SectionNode(conditional=HARD_CUT_ENABLED),
     ),
@@ -566,6 +572,7 @@ PRESET_SWITCHING_ACTIVE = ConditionalRowsDef(
     children=(
         SectionNode(conditional=PRESET_SWITCHING_USES_DURATION),
         SectionNode(conditional=PRESET_SWITCHING_PROJECTM_TRIGGER),
+        SectionNode(divider=True),
         SectionNode(leaf_kind=RowKind.TRACK_PRESET_START_CLEAN),
     ),
 )
@@ -584,6 +591,7 @@ TRACK_MILKDROP_PRESET_SECTION = SectionDef(
     children=(
         SectionNode(leaf_kind=RowKind.TRACK_PRESET_DIR),
         SectionNode(leaf_kind=RowKind.TRACK_PRESET),
+        SectionNode(divider=True),
         SectionNode(leaf_kind=RowKind.TRACK_BEAT),
         SectionNode(conditional=PRESET_SWITCHING_ADD_TO_LIST),
         SectionNode(conditional=PRESET_SWITCHING_PAUSED),

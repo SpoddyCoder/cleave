@@ -862,7 +862,7 @@ def test_overlay_cards_share_kinds_and_isolate_runtime() -> None:
         row.descriptor.card
         for node_id in ("overlay.opening_card", "overlay.closing_card")
         for row in build_inspector_rows(view, node_id)
-        if row.descriptor.kind is RowKind.OVERLAY_CARD_POSITION
+        if not row.divider and row.descriptor.kind is RowKind.OVERLAY_CARD_POSITION
     }
     assert cards == {"opening_card", "closing_card"}
 
