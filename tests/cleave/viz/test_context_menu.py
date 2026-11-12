@@ -9,8 +9,14 @@ from cleave.viz.context_menu import (
     ContextMenuEntry,
     ContextMenuItem,
     ContextMenuState,
+    ContextSubmenu,
 )
-from cleave.viz.menu_rows import clamp_menu_origin, context_menu_row_views
+from cleave.viz.menu_rows import (
+    SUBMENU_MARK,
+    clamp_menu_origin,
+    context_menu_row_views,
+    submenu_origin,
+)
 from tests.support.viz import keydown
 
 
@@ -125,3 +131,89 @@ def test_clamp_menu_origin_flips_at_the_edges() -> None:
     assert clamp_menu_origin((700, 500), (200, 150), display) == (500, 350)
     assert clamp_menu_origin((100, 500), (200, 700), display) == (100, 0.0)
     assert clamp_menu_origin((150, 100), (900, 150), display) == (0.0, 100)
+
+
+def _sub_menu(ran: list[str], *, sub_enabled: bool = True) -> tuple[ContextMenuEntry, ...]:
+    return (
+        ContextMenuItem("a", "Alpha", lambda: ran.append("a")),
+        ContextSubmenu(
+            "s",
+            "Pick",
+            (
+                ContextMenuItem("s.1", "One", lambda: ran.append("1")),
+                ContextMenuItem("s.2", "Two", lambda: ran.append("2"), checked=True),
+                CONTEXT_SEPARATOR,
+                ContextMenuItem("s.3", "Three", lambda: ran.append("3")),
+            ),
+            enabled=sub_enabled,
+            shortcut="P",
+        ),
+    )
+
+
+def test_right_opens_a_submenu_on_its_checked_item_and_left_closes_it() -> None:
+    ran: list[str] = []
+    state = ContextMenuState()
+    state.open(lambda: _sub_menu(ran), (0, 0), keyboard=True)
+    state.handle_keydown(keydown(pygame.K_RIGHT))
+    assert state.submenu is None
+    state.handle_keydown(keydown(pygame.K_DOWN))
+    assert state.highlight == 1
+    state.handle_keydown(keydown(pygame.K_RIGHT))
+    assert (state.submenu, state.sub_highlight) == (1, 1)
+    state.handle_keydown(keydown(pygame.K_DOWN))
+    assert state.sub_highlight == 3
+    state.handle_keydown(keydown(pygame.K_DOWN))
+    assert state.sub_highlight == 0
+    state.handle_keydown(keydown(pygame.K_LEFT))
+    assert state.submenu is None and state.is_open and state.highlight == 1
+    state.handle_keydown(keydown(pygame.K_RETURN))
+    assert state.submenu == 1
+    state.handle_keydown(keydown(pygame.K_ESCAPE))
+    assert state.submenu is None and state.is_open
+    state.handle_keydown(keydown(pygame.K_RETURN))
+    state.handle_keydown(keydown(pygame.K_RETURN))
+    assert ran == ["2"]
+    assert not state.is_open
+
+
+def test_hover_opens_a_submenu_and_a_plain_row_closes_it() -> None:
+    ran: list[str] = []
+    state = ContextMenuState()
+    state.open(lambda: _sub_menu(ran), (0, 0))
+    state.hover(1)
+    assert (state.submenu, state.sub_highlight) == (1, None)
+    state.hover(None)
+    assert state.submenu == 1
+    state.hover_submenu(3)
+    assert state.sub_highlight == 3 and state.highlight == 1
+    state.hover_submenu(2)
+    assert state.sub_highlight is None
+    state.hover(0)
+    assert state.submenu is None
+    assert state.activate(1) is True
+    assert state.submenu == 1 and state.is_open
+    assert state.activate_submenu(2) is False
+    assert state.activate_submenu(0) is True
+    assert ran == ["1"] and not state.is_open
+
+
+def test_disabled_submenu_does_not_open() -> None:
+    state = ContextMenuState()
+    state.open(lambda: _sub_menu([], sub_enabled=False), (0, 0))
+    state.hover(1)
+    assert state.submenu is None and state.highlight is None
+    assert state.activate(1) is False
+
+
+def test_submenu_rows_carry_the_mark_flag() -> None:
+    views = context_menu_row_views(_sub_menu([]))
+    assert views[1] is not None and views[1].submenu is True
+    assert views[1].shortcut == "P"
+    assert SUBMENU_MARK == "▸"
+
+
+def test_submenu_opens_beside_its_row_and_flips_left_at_the_edge() -> None:
+    assert submenu_origin((100, 50, 120, 20), (80, 60), (800, 600)) == (220.0, 50.0)
+    assert submenu_origin((650, 50, 120, 20), (80, 60), (800, 600)) == (570.0, 50.0)
+    assert submenu_origin((100, 580, 120, 20), (80, 60), (800, 600)) == (220.0, 540.0)

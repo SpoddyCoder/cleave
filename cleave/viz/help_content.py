@@ -115,6 +115,8 @@ _NAVIGATOR_SECTION = HelpSection(
         ("Up/Down", "move across nodes"),
         ("Left/Right", "open/close"),
         ("Ctrl + Up/Down", "previous / next top-level node"),
+        ("Right-click row", "row options"),
+        ("Shift + F10 / Menu", "options for the selected row"),
     ),
 )
 
@@ -293,7 +295,7 @@ def timeline_strip_section(
     layer_keys = _layer_key_range_label(layer_count)
     entries: list[tuple[str, str]] = [("A", "arm / disarm row for recording")]
 
-    entries.append(("Right-click row", "row options"))
+    entries.append(("Right-click row", "row options; on a cue, cue options too"))
     entries.append(("Shift + F10 / Menu", "row options for the focused row"))
 
     if not recording:

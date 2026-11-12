@@ -475,21 +475,38 @@ class _MenuActions(_Actions):
         return ("layer_1", "layer_2")[row] if 0 <= row < 2 else None
 
 
-def test_context_row_at_needs_a_layer_row() -> None:
+def test_context_menu_at_needs_a_layer_row() -> None:
     actions = _MenuActions()
     session = _session()
     assert TimelinePointer(
-        _MenuGeometry(StripHit(1, 5.0, 0.2, target="eye")), actions, session
-    ).context_row_at(0, 0) == 1
-    assert TimelinePointer(
         _MenuGeometry(StripHit(None, 5.0, 0.2)), actions, session
-    ).context_row_at(0, 0) is None
+    ).context_menu_at(0, 0) is None
     assert TimelinePointer(
         _MenuGeometry(StripHit(5, 5.0, 0.2)), actions, session
-    ).context_row_at(0, 0) is None
-    assert TimelinePointer(_MenuGeometry(None), actions, session).context_row_at(
+    ).context_menu_at(0, 0) is None
+    assert TimelinePointer(_MenuGeometry(None), actions, session).context_menu_at(
         0, 0
     ) is None
+    assert actions.calls == []
+
+
+def test_context_menu_at_focuses_the_row_and_selects_a_nearby_cue() -> None:
+    actions = _MenuActions(cue_hit=True)
+    session = _session()
+    provider = TimelinePointer(
+        _MenuGeometry(StripHit(1, 5.0, 0.2)), actions, session
+    ).context_menu_at(0, 0)
+    assert callable(provider)
+    assert actions.calls == [("focus", 1), ("select", "layer_2", 5.0, 0.2)]
+
+
+def test_context_menu_at_on_a_label_selects_no_cue() -> None:
+    actions = _MenuActions(cue_hit=True)
+    provider = TimelinePointer(
+        _MenuGeometry(StripHit(0, None, 0.2, target="label")), actions, _session()
+    ).context_menu_at(0, 0)
+    assert callable(provider)
+    assert actions.calls == [("focus", 0)]
 
 
 def test_row_menu_focuses_the_row_and_anchors_under_its_label() -> None:

@@ -931,8 +931,7 @@ def test_right_click_on_a_strip_row_opens_its_menu_and_outside_click_closes() ->
     controls = _make_controls(("layer_1", "layer_2"))
     controls.session.timeline.panel_open = True
     pointer = MagicMock()
-    pointer.context_row_at.return_value = 1
-    pointer.row_menu.return_value = lambda: (
+    pointer.context_menu_at.return_value = lambda: (
         ContextMenuItem("x", "Item", lambda: None),
     )
     with _host() as host:
@@ -946,7 +945,9 @@ def test_right_click_on_a_strip_row_opens_its_menu_and_outside_click_closes() ->
         host.process_event(_button(pygame.MOUSEBUTTONUP, pos, button=3))
 
         assert controls.shell_focus.region is ShellRegion.TIMELINE
-        pointer.row_menu.assert_called_once_with(1)
+        pointer.context_menu_at.assert_called_once_with(
+            float(pos[0]), float(pos[1])
+        )
         pointer.press.assert_not_called()
         assert controls.context_menu.is_open
         assert controls.context_menu.anchor == (float(pos[0]), float(pos[1]))
@@ -960,7 +961,7 @@ def test_right_click_off_a_strip_row_opens_nothing() -> None:
     controls = _make_controls(("layer_1", "layer_2"))
     controls.session.timeline.panel_open = True
     pointer = MagicMock()
-    pointer.context_row_at.return_value = None
+    pointer.context_menu_at.return_value = None
     with _host() as host:
         host._controls = controls
         host._strip_pointer = pointer
@@ -972,7 +973,6 @@ def test_right_click_off_a_strip_row_opens_nothing() -> None:
         host.process_event(
             _button(pygame.MOUSEBUTTONDOWN, _rect_center(layout.timeline), button=3)
         )
-        pointer.row_menu.assert_not_called()
         assert not controls.context_menu.is_open
 
 
@@ -993,4 +993,41 @@ def test_focus_context_menu_opens_at_the_focused_strip_row() -> None:
         assert host.open_focus_context_menu() is True
         pointer.row_menu.assert_called_once_with(1)
         assert controls.context_menu.anchor == (10.0, 40.0)
+        assert controls.context_menu.highlight == 0
+
+
+def test_right_click_on_a_navigator_row_selects_it_and_opens_its_menu() -> None:
+    controls = _make_controls(("layer_1", "layer_2"))
+    with _host() as host:
+        host._controls = controls
+        layout = _open_strip_layout()
+        host.set_layout(layout)
+        x, y, w, _h = layout.navigator
+        host._nav_row_rects = {"layer:layer_2": (x, y + 10, w, 15)}
+        pos = (x + w // 2, y + 15)
+
+        host.process_event(_button(pygame.MOUSEBUTTONDOWN, pos, button=3))
+
+        assert controls.shell_focus.selected_id == "layer:layer_2"
+        assert controls.shell_focus.region is ShellRegion.NAVIGATOR
+        assert controls.context_menu.is_open
+        assert controls.context_menu.highlight is None
+
+        controls.context_menu.close()
+        host.process_event(
+            _button(pygame.MOUSEBUTTONDOWN, (x + w // 2, y + 2), button=3)
+        )
+        assert not controls.context_menu.is_open
+        assert controls.shell_focus.selected_id == "layer:layer_2"
+
+
+def test_focus_context_menu_opens_under_the_selected_navigator_row() -> None:
+    controls = _make_controls(("layer_1", "layer_2"))
+    with _host() as host:
+        host._controls = controls
+        controls.navigator.select("layer:layer_1")
+        assert host.open_focus_context_menu() is False
+        host._nav_row_rects = {"layer:layer_1": (4, 60, 200, 20)}
+        assert host.open_focus_context_menu() is True
+        assert controls.context_menu.anchor == (4.0, 80.0)
         assert controls.context_menu.highlight == 0

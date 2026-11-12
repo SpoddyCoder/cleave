@@ -336,7 +336,7 @@ def _layer_children(
         node = _layer_node(session, slot, expandable=not curation)
         nodes.append(node)
         if not curation and node.id in expanded:
-            nodes.extend(_layer_page_nodes(session, slot))
+            nodes.extend(layer_page_nodes(session, slot))
     return tuple(nodes)
 
 
@@ -388,7 +388,8 @@ def _layer_page_visible(session: TuningSession, slot: str, page: str) -> bool:
     return True
 
 
-def _layer_page_nodes(session: TuningSession, slot: str) -> tuple[NavNode, ...]:
+def layer_page_nodes(session: TuningSession, slot: str) -> tuple[NavNode, ...]:
+    """Page rows under *slot*, as the navigator shows them while it is open."""
     return tuple(
         NavNode(
             id=layer_page_node_id(slot, page),

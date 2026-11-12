@@ -7,7 +7,8 @@ row seeks, and holding the second press scrubs. A double-click on a row's
 label (layer number and stem) arms it, and a press on its monitor eye
 toggles the layer's visibility as its number key does (an overridden row,
 or an armed row while recording). A right-click on a row focuses it and
-returns that row's context menu (``timeline_context_menu``).
+returns that row's context menu (``timeline_context_menu``), selecting a
+cue under the pointer first so the menu can edit it.
 
 The wheel zooms the visible window about the time under the pointer, and
 Shift+wheel or a sideways wheel pans it. While zoomed, a left drag on a row
@@ -148,17 +149,27 @@ class TimelinePointer:
         target, row = hover
         return self._actions.strip_target_pressable(target, row)
 
-    def context_row_at(self, x: float, y: float) -> int | None:
-        """Layer row under a screen point, for a right-click menu, or None."""
+    def context_menu_at(self, x: float, y: float) -> ContextMenuProvider | None:
+        """Focus the layer row under a screen point and return its menu, or None.
+
+        A cue near the point is selected first, and the menu opens with its
+        items. Elsewhere on the row the menu has only the row's items.
+        """
         hit = self._geometry.hit_at(x, y)
         if hit is None or hit.row is None:
             return None
-        if self._actions.row_slot(hit.row) is None:
+        slot = self._actions.row_slot(hit.row)
+        if slot is None:
             return None
-        return hit.row
+        self._last_row_press = None
+        self._actions.focus_row(hit.row)
+        on_cue = hit.t_sec is not None and self._actions.select_cue_near(
+            slot, hit.t_sec, hit.cue_tolerance_sec
+        )
+        return timeline_row_menu(self._actions, self._session, hit.row, cue=on_cue)
 
     def row_menu(self, row: int) -> ContextMenuProvider:
-        """Focus *row* and return its context menu."""
+        """Focus *row* and return its menu, with its selected cue's items."""
         self._last_row_press = None
         self._actions.focus_row(row)
         return timeline_row_menu(self._actions, self._session, row)

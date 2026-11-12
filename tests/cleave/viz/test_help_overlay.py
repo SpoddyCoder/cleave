@@ -922,7 +922,7 @@ def test_timeline_strip_help_paused() -> None:
     assert entries["A"] == "arm / disarm row for recording"
     assert "1-4" not in entries
     assert "Click eye" not in entries
-    assert entries["Right-click row"] == "row options"
+    assert entries["Right-click row"] == "row options; on a cue, cue options too"
     assert entries["Shift + F10 / Menu"] == "row options for the focused row"
     assert entries["Shift + Enter"] == "override row visibility on / off"
     assert "Ctrl + Enter" not in entries

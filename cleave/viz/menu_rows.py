@@ -14,7 +14,11 @@ from dataclasses import dataclass
 
 from imgui_bundle import imgui
 
-from cleave.viz.context_menu import ContextMenuItem, ContextMenuState
+from cleave.viz.context_menu import (
+    ContextMenuItem,
+    ContextMenuState,
+    ContextSubmenu,
+)
 from cleave.viz.imgui_theme import rgba
 from cleave.viz.theme import BACKGROUND, DISABLED, HIGHLIGHT, MUTED, VALUE, ui_chrome_px
 
@@ -22,6 +26,8 @@ Rect = tuple[int, int, int, int]
 
 MENU_POPUP_TOP_PAD_PX = 4.0
 CHECK_MARK = "✓"
+# The ImGui atlas carries this for the navigator twisty.
+SUBMENU_MARK = "▸"
 POPUP_FLAGS = (
     int(imgui.WindowFlags_.no_title_bar)
     | int(imgui.WindowFlags_.no_resize)
@@ -34,6 +40,7 @@ POPUP_FLAGS = (
 )
 
 _CONTEXT_WINDOW = "##cleave-context-menu"
+_SUBMENU_WINDOW = "##cleave-context-submenu"
 
 
 @dataclass(frozen=True)
@@ -46,14 +53,19 @@ class MenuRowView:
     checked: bool = False
     shortcut: str | None = None
     color: tuple[int, int, int] = VALUE
+    submenu: bool = False
 
 
 @dataclass(frozen=True)
 class MenuRowsResult:
-    """Row index clicked this frame, and the row under the pointer."""
+    """Row index clicked this frame, the row under the pointer, and row rects.
+
+    ``rects`` has one screen rect per row, None for a separator.
+    """
 
     clicked: int | None = None
     hovered: int | None = None
+    rects: tuple[Rect | None, ...] = ()
 
 
 @contextmanager
@@ -82,13 +94,17 @@ def draw_menu_rows(
     gap = max(imgui.calc_text_size("  ").x, ui_chrome_px(16.0))
     label_w = 0.0
     shortcut_w = 0.0
+    any_submenu = False
     for row in rows:
         if row is None:
             continue
         label_w = max(label_w, imgui.calc_text_size(row.label).x)
         if row.shortcut:
             shortcut_w = max(shortcut_w, imgui.calc_text_size(row.shortcut).x)
-    row_w = pad_x * 2.0 + check_w + gap + label_w + gap + shortcut_w + pad_x
+        any_submenu = any_submenu or row.submenu
+    mark_w = imgui.calc_text_size(SUBMENU_MARK).x if any_submenu else 0.0
+    arrow_w = gap * 0.5 + mark_w if any_submenu else 0.0
+    row_w = pad_x * 2.0 + check_w + gap + label_w + gap + shortcut_w + arrow_w + pad_x
     draw_list = imgui.get_window_draw_list()
     # Whole pixels: text snaps down to a pixel, so a fractional row top
     # leaves the label off-centre in its fill.
@@ -97,9 +113,11 @@ def draw_menu_rows(
     )
     clicked: int | None = None
     hovered: int | None = None
+    rects: list[Rect | None] = []
     for index, row in enumerate(rows):
         if row is None:
             imgui.separator()
+            rects.append(None)
             continue
         is_highlighted = highlighted == index
         pos = imgui.get_cursor_screen_pos()
@@ -117,6 +135,16 @@ def draw_menu_rows(
                 flags,
                 imgui.ImVec2(row_w, 0.0),
             )
+        rect_min = imgui.get_item_rect_min()
+        rect_max = imgui.get_item_rect_max()
+        rects.append(
+            (
+                int(rect_min.x),
+                int(rect_min.y),
+                int(rect_max.x - rect_min.x),
+                int(rect_max.y - rect_min.y),
+            )
+        )
         if imgui.is_item_hovered(int(imgui.HoveredFlags_.allow_when_disabled)):
             hovered = index
         if is_highlighted:
@@ -145,13 +173,21 @@ def draw_menu_rows(
         if row.shortcut:
             shortcut_width = imgui.calc_text_size(row.shortcut).x
             draw_list.add_text(
-                imgui.ImVec2(pos.x + row_w - pad_x - shortcut_width, text_y),
+                imgui.ImVec2(
+                    pos.x + row_w - pad_x - arrow_w - shortcut_width, text_y
+                ),
                 imgui.get_color_u32(shortcut_color),
                 row.shortcut,
             )
+        if row.submenu:
+            draw_list.add_text(
+                imgui.ImVec2(pos.x + row_w - pad_x - mark_w, text_y),
+                imgui.get_color_u32(label_color),
+                SUBMENU_MARK,
+            )
         if pressed and row.enabled:
             clicked = index
-    return MenuRowsResult(clicked=clicked, hovered=hovered)
+    return MenuRowsResult(clicked=clicked, hovered=hovered, rects=tuple(rects))
 
 
 def context_menu_row_views(
@@ -160,6 +196,17 @@ def context_menu_row_views(
     """Rows for a context menu's entries; separators become None."""
     views: list[MenuRowView | None] = []
     for entry in entries:
+        if isinstance(entry, ContextSubmenu):
+            views.append(
+                MenuRowView(
+                    id=entry.id,
+                    label=entry.label,
+                    enabled=entry.enabled,
+                    shortcut=entry.shortcut,
+                    submenu=True,
+                )
+            )
+            continue
         if not isinstance(entry, ContextMenuItem):
             views.append(None)
             continue
@@ -173,6 +220,13 @@ def context_menu_row_views(
             )
         )
     return tuple(views)
+
+
+def entry_hint(entry: object) -> str | None:
+    """Tooltip text for a row: why it is disabled, or what it needs."""
+    if isinstance(entry, (ContextMenuItem, ContextSubmenu)):
+        return entry.hint
+    return None
 
 
 def clamp_menu_origin(
@@ -197,6 +251,30 @@ def clamp_menu_origin(
     return (x, y)
 
 
+def submenu_origin(
+    parent: Rect,
+    size: tuple[float, float],
+    display: tuple[float, float],
+    *,
+    top_pad: float = 0.0,
+) -> tuple[float, float]:
+    """Top-left for a submenu of *size* beside the *parent* row.
+
+    It opens to the right of the row, its first row level with it, and to
+    the left when the right side has no room. It slides up to stay inside.
+    """
+    px, py, pw, _ph = parent
+    width, height = size
+    display_w, display_h = display
+    x = float(px + pw)
+    if x + width > display_w:
+        x = px - width if px - width >= 0 else max(0.0, display_w - width)
+    y = float(py) - top_pad
+    if y + height > display_h:
+        y = max(0.0, display_h - height)
+    return (x, max(0.0, y))
+
+
 class ContextMenuSurface:
     """The open context menu as a top-layer window at its anchor.
 
@@ -212,6 +290,11 @@ class ContextMenuSurface:
         self._state = state
         self._size: tuple[float, float] = (0.0, 0.0)
         self._last_hovered: int | None = None
+        self.row_rects: tuple[Rect | None, ...] = ()
+
+    @property
+    def state(self) -> ContextMenuState:
+        return self._state()
 
     def draw(self) -> Rect:
         state = self._state()
@@ -237,6 +320,7 @@ class ContextMenuSurface:
             result = draw_menu_rows(context_menu_row_views(entries), state.highlight)
         finally:
             imgui.end()
+        self.row_rects = result.rects
         if result.hovered != self._last_hovered:
             # Only a move onto a new row takes the highlight, so a resting
             # pointer does not fight the arrow keys.
@@ -244,9 +328,69 @@ class ContextMenuSurface:
             if result.hovered is not None:
                 state.hover(result.hovered)
         if result.hovered is not None:
-            entry = entries[result.hovered]
-            if isinstance(entry, ContextMenuItem) and entry.hint:
-                imgui.set_tooltip(entry.hint)
+            hint = entry_hint(entries[result.hovered])
+            if hint:
+                imgui.set_tooltip(hint)
         if result.clicked is not None:
             state.activate(result.clicked)
+        return rect
+
+
+class ContextSubmenuSurface:
+    """The open submenu of a context menu, beside its parent row.
+
+    Push it right after its ``ContextMenuSurface`` every frame the menu is
+    open; it draws nothing while no submenu is open.
+    """
+
+    modal = False
+
+    def __init__(self, parent: ContextMenuSurface) -> None:
+        self._parent = parent
+        self._size: tuple[float, float] = (0.0, 0.0)
+        self._last_hovered: int | None = None
+
+    def draw(self) -> Rect:
+        state = self._parent.state
+        sub = state.submenu_items()
+        index = state.submenu
+        rects = self._parent.row_rects
+        if not sub or index is None or not 0 <= index < len(rects):
+            self._last_hovered = None
+            return (0, 0, 0, 0)
+        parent_rect = rects[index]
+        if parent_rect is None:
+            return (0, 0, 0, 0)
+        display = imgui.get_io().display_size
+        x, y = submenu_origin(
+            parent_rect,
+            self._size,
+            (float(display.x), float(display.y)),
+            top_pad=round(ui_chrome_px(MENU_POPUP_TOP_PAD_PX)),
+        )
+        imgui.set_next_window_pos(imgui.ImVec2(x, y), imgui.Cond_.always)
+        visible, _open = imgui.begin(_SUBMENU_WINDOW, None, POPUP_FLAGS)
+        try:
+            imgui.internal.bring_window_to_display_front(
+                imgui.internal.find_window_by_name(_SUBMENU_WINDOW)
+            )
+            pos = imgui.get_window_pos()
+            size = imgui.get_window_size()
+            self._size = (float(size.x), float(size.y))
+            rect = (int(pos.x), int(pos.y), max(0, int(size.x)), max(0, int(size.y)))
+            if not visible:
+                return rect
+            result = draw_menu_rows(context_menu_row_views(sub), state.sub_highlight)
+        finally:
+            imgui.end()
+        if result.hovered != self._last_hovered:
+            self._last_hovered = result.hovered
+            if result.hovered is not None:
+                state.hover_submenu(result.hovered)
+        if result.hovered is not None:
+            hint = entry_hint(sub[result.hovered])
+            if hint:
+                imgui.set_tooltip(hint)
+        if result.clicked is not None:
+            state.activate_submenu(result.clicked)
         return rect

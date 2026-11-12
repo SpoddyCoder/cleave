@@ -2,7 +2,9 @@
 
 Show or hide the layer, override its visibility, release every override,
 and arm it for recording. Each item calls the same ``TimelineControls``
-path as its key, and a disabled item says why in its hint.
+path as its key, and a disabled item says why in its hint. With a cue
+selected on the row, the menu opens with that cue's items
+(``cue_context_menu``).
 """
 
 from __future__ import annotations
@@ -15,6 +17,7 @@ from cleave.viz.context_menu import (
     ContextMenuItem,
     ContextMenuProvider,
 )
+from cleave.viz.cue_context_menu import cue_menu_entries
 from cleave.viz.session import TuningSession
 
 # Layer number keys reach the first eight rows.
@@ -38,16 +41,23 @@ class TimelineRowMenuActions(Protocol):
 
     def toggle_arm_row(self, row: int) -> None: ...
 
+    def seek_to(self, t_sec: float) -> None: ...
+
 
 def timeline_row_menu(
     actions: TimelineRowMenuActions,
     session: TuningSession,
     row: int,
+    *,
+    cue: bool = True,
 ) -> ContextMenuProvider:
-    """Provider for *row*'s menu; empty once the row has no layer."""
+    """Provider for *row*'s menu; empty once the row has no layer.
+
+    *cue* False leaves out the selected cue's items.
+    """
 
     def entries() -> tuple[ContextMenuEntry, ...]:
-        return timeline_row_menu_entries(actions, session, row)
+        return timeline_row_menu_entries(actions, session, row, cue=cue)
 
     return entries
 
@@ -56,6 +66,8 @@ def timeline_row_menu_entries(
     actions: TimelineRowMenuActions,
     session: TuningSession,
     row: int,
+    *,
+    cue: bool = True,
 ) -> tuple[ContextMenuEntry, ...]:
     slot = actions.row_slot(row)
     if slot is None:
@@ -116,7 +128,10 @@ def timeline_row_menu_entries(
         hint=None if can_arm else "Unlock the timeline to arm",
     )
 
+    cue_entries = cue_menu_entries(session, slot, actions.seek_to) if cue else ()
     return (
+        *cue_entries,
+        *((CONTEXT_SEPARATOR,) if cue_entries else ()),
         visibility,
         CONTEXT_SEPARATOR,
         override,

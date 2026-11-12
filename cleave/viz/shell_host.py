@@ -32,11 +32,14 @@ from cleave.viz.menu_bar import MenuBarState, menus_for_session
 from cleave.viz.menu_rows import (
     POPUP_FLAGS,
     ContextMenuSurface,
+    ContextSubmenuSurface,
     MenuRowView,
     draw_menu_rows,
     opaque_highlight_fill,
 )
 from cleave.viz.pointer_cursor import PointerShape, request_pointer
+from cleave.viz.context_menu import ContextMenuProvider
+from cleave.viz.navigator_context_menu import navigator_node_menu
 from cleave.viz.timeline_pointer import MIDDLE_BUTTON, RIGHT_BUTTON, TimelinePointer
 from cleave.viz.material_icons import (
     LOCK_GLYPH,
@@ -1337,6 +1340,9 @@ class ShellHost:
         self.transport_notice_clicked = False
         self.top_layer = TopLayer()
         self._context_surface = ContextMenuSurface(lambda: self._controls.context_menu)
+        # Navigator row rects from the last draw, for right-click and Shift+F10.
+        self._nav_row_rects: dict[str, tuple[int, int, int, int]] = {}
+        self._context_submenu_surface = ContextSubmenuSurface(self._context_surface)
 
     @property
     def menu_bar_height_px(self) -> int:
@@ -1464,28 +1470,69 @@ class ShellHost:
 
     def _open_context_menu(self, x: float, y: float) -> None:
         """Open the menu for whatever sits under (*x*, *y*), if it has one."""
-        pointer = self._strip_under(x, y)
-        if pointer is None:
+        provider = self._context_menu_at(x, y)
+        if provider is None:
             return
-        row = pointer.context_row_at(x, y)
-        if row is None:
-            return
-        self._cancel_strip_pointer()
         self._menu_state.blur()
-        self._controls.context_menu.open(pointer.row_menu(row), (x, y))
+        self._controls.context_menu.open(provider, (x, y))
+
+    def _context_menu_at(self, x: float, y: float) -> ContextMenuProvider | None:
+        pointer = self._strip_under(x, y)
+        if pointer is not None:
+            provider = pointer.context_menu_at(x, y)
+            if provider is not None:
+                self._cancel_strip_pointer()
+            return provider
+        layout = self._layout
+        if layout is None or not _rect_contains(layout.navigator, x, y):
+            return None
+        node_id = self._nav_row_at(x, y)
+        if node_id is None:
+            return None
+        self._controls.navigator.select(node_id)
+        return self._nav_menu(node_id)
 
     def open_focus_context_menu(self) -> bool:
         """Open the focused item's menu (Shift+F10, Menu key). False when it has none."""
-        pointer = self._strip_pointer
-        if pointer is None or not self._strip_has_scope():
+        found = self._focus_context_menu()
+        if found is None:
             return False
-        row = self._controls.session.timeline.focus_row
-        anchor = pointer.row_menu_anchor(row)
-        if anchor is None:
-            return False
+        provider, anchor = found
         self._menu_state.blur()
-        self._controls.context_menu.open(pointer.row_menu(row), anchor, keyboard=True)
+        self._controls.context_menu.open(provider, anchor, keyboard=True)
         return self._controls.context_menu.is_open
+
+    def _focus_context_menu(
+        self,
+    ) -> tuple[ContextMenuProvider, tuple[float, float]] | None:
+        region = self._controls.shell_focus.region
+        if region is ShellRegion.TIMELINE:
+            pointer = self._strip_pointer
+            if pointer is None or not self._strip_has_scope():
+                return None
+            row = self._controls.session.timeline.focus_row
+            anchor = pointer.row_menu_anchor(row)
+            if anchor is None:
+                return None
+            return pointer.row_menu(row), anchor
+        if region is ShellRegion.NAVIGATOR:
+            node_id = self._controls.shell_focus.selected_id
+            rect = self._nav_row_rects.get(node_id)
+            if rect is None:
+                return None
+            x, y, _w, h = rect
+            return self._nav_menu(node_id), (float(x), float(y + h))
+        return None
+
+    def _nav_menu(self, node_id: str) -> ContextMenuProvider:
+        return navigator_node_menu(self._controls, node_id, self._toggle_nav_expanded)
+
+    def _nav_row_at(self, x: float, y: float) -> str | None:
+        """Navigator row under a screen point, from the last draw."""
+        for node_id, rect in self._nav_row_rects.items():
+            if _rect_contains(rect, x, y):
+                return node_id
+        return None
 
     def _strip_under(self, x: float, y: float) -> TimelinePointer | None:
         """The strip pointer when (*x*, *y*) is on the open strip."""
@@ -1759,6 +1806,7 @@ class ShellHost:
                 menu_state.blur()
         if self._controls.context_menu.is_open:
             self.top_layer.push(self._context_surface)
+            self.top_layer.push(self._context_submenu_surface)
         self._request_gesture_pointer()
         self._release_value_drag()
         self._release_nudge_swallow()
@@ -2119,6 +2167,7 @@ class ShellHost:
         imgui.push_style_color(imgui.Col_.text, rgba(LABEL))
         try:
             nodes = self._visible_nav_nodes()
+            self._nav_row_rects = {}
             for node, rails in zip(nodes, navigator_tree_rails(nodes)):
                 self._draw_nav_node(node, rails)
         finally:
@@ -2180,6 +2229,7 @@ class ShellHost:
                         imgui.SelectableFlags_.allow_overlap if overlap else 0,
                     )
                     span = (imgui.get_item_rect_min().y, imgui.get_item_rect_max().y)
+                    self._record_nav_row_rect(node.id, left_x)
                     if ring:
                         _draw_item_focus_ring()
                     if selected:
@@ -2206,6 +2256,22 @@ class ShellHost:
         finally:
             if indent:
                 imgui.unindent(indent)
+
+    def _record_nav_row_rect(self, node_id: str, left_x: float) -> None:
+        """Remember the row just drawn, from the column edge, clipped to the window."""
+        rect_min = imgui.get_item_rect_min()
+        rect_max = imgui.get_item_rect_max()
+        window_y = imgui.get_window_pos().y
+        top = max(rect_min.y, window_y)
+        bottom = min(rect_max.y, window_y + imgui.get_window_height())
+        if bottom <= top:
+            return
+        self._nav_row_rects[node_id] = (
+            int(left_x),
+            int(top),
+            int(rect_max.x - left_x),
+            int(bottom - top),
+        )
 
     def _draw_nav_toggles(self, node: NavNode) -> None:
         """Icon buttons at the right of the row just drawn.
