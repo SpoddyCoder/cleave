@@ -217,3 +217,13 @@ def test_submenu_opens_beside_its_row_and_flips_left_at_the_edge() -> None:
     assert submenu_origin((100, 50, 120, 20), (80, 60), (800, 600)) == (220.0, 50.0)
     assert submenu_origin((650, 50, 120, 20), (80, 60), (800, 600)) == (570.0, 50.0)
     assert submenu_origin((100, 580, 120, 20), (80, 60), (800, 600)) == (220.0, 540.0)
+
+
+def test_each_open_bumps_the_generation() -> None:
+    state = ContextMenuState()
+    start = state.generation
+    state.open(lambda: _menu([]), (0, 0))
+    state.hover(0)
+    assert state.generation == start + 1
+    state.open(lambda: _menu([]), (5, 5))
+    assert state.generation == start + 2

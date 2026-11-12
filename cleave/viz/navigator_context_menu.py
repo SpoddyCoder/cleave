@@ -1,7 +1,8 @@
 """Right-click menu for a navigator row.
 
-Open the page in the inspector, expand or collapse it, and flip the row's
-on/off, solo, and lock icons. A layer row adds a page jump, move up and
+Expand or collapse the row, and flip its on/off, solo, and lock icons.
+The right-click has already selected the row, so its page shows in the
+inspector. A layer row adds a page jump, move up and
 down, and add and delete layer. Each item calls the same path as its icon
 or key, and a disabled item says why in its hint.
 """
@@ -75,7 +76,7 @@ def navigator_node_menu_entries(
     if node is None:
         return ()
     groups: list[tuple[ContextMenuEntry, ...]] = [
-        _open_items(controls, node, toggle_expanded),
+        _tree_items(controls, node, toggle_expanded),
         _toggle_items(controls, node),
     ]
     if _is_layer_row(controls, node):
@@ -83,23 +84,12 @@ def navigator_node_menu_entries(
     return _join(groups)
 
 
-def _open_items(
+def _tree_items(
     controls: TuningControls,
     node: NavNode,
     toggle_expanded: Callable[[str], None],
 ) -> tuple[ContextMenuEntry, ...]:
-    def open_page() -> None:
-        controls.navigator.select(node.id)
-        controls.navigator.activate()
-
-    items: list[ContextMenuEntry] = [
-        ContextMenuItem(
-            id="navigator.open",
-            label="Open in inspector",
-            run=open_page,
-            shortcut="Enter",
-        )
-    ]
+    items: list[ContextMenuEntry] = []
     if node.expandable:
         expanded = node.id in controls.shell_focus.nav_expanded
         items.append(

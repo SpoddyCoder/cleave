@@ -8,6 +8,7 @@ colour on rows that cannot run. Callers resolve their own items into
 
 from __future__ import annotations
 
+import math
 from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -275,20 +276,88 @@ def submenu_origin(
     return (x, max(0.0, y))
 
 
+# Where a window measures its rows before it is shown. Not transparent:
+# ImGui skips every item in a window begun with style alpha 0.
+_MEASURE_POS = (-100000.0, -100000.0)
+
+Origin = Callable[[tuple[float, float], tuple[float, float]], tuple[float, float]]
+
+
+class _FittedWindow:
+    """A menu window sized and placed from the rows it drew last frame.
+
+    The size must be known before ``begin``: ImGui draws a window's
+    background and sets its clip rect there, so a window moved inside it
+    keeps them at the old spot. ImGui's own auto-fit size also trails new
+    rows by a frame or two once a window has been closed. So each frame
+    measures the rows it drew (the cursor extent plus window padding), and
+    the next frame sets that size and the origin that fits it. The first
+    frame for a new *key* has no measure yet and draws off-screen.
+    """
+
+    def __init__(self, name: str) -> None:
+        self.name = name
+        self._fit: tuple[object, tuple[float, float]] | None = None
+
+    def forget(self) -> None:
+        self._fit = None
+
+    @contextmanager
+    def begin(
+        self, key: object, origin: Origin
+    ) -> Iterator[tuple[bool, bool, Rect]]:
+        """Open the window; yield (visible, measuring, rect). Close it after."""
+        fit = self._fit[1] if self._fit is not None and self._fit[0] == key else None
+        measuring = fit is None
+        if measuring:
+            imgui.set_next_window_pos(imgui.ImVec2(*_MEASURE_POS), imgui.Cond_.always)
+        else:
+            assert fit is not None
+            display = imgui.get_io().display_size
+            x, y = origin(fit, (float(display.x), float(display.y)))
+            imgui.set_next_window_size(imgui.ImVec2(*fit), imgui.Cond_.always)
+            imgui.set_next_window_pos(imgui.ImVec2(x, y), imgui.Cond_.always)
+        visible, _open = imgui.begin(self.name, None, POPUP_FLAGS)
+        try:
+            imgui.internal.bring_window_to_display_front(
+                imgui.internal.find_window_by_name(self.name)
+            )
+            pos = imgui.get_window_pos()
+            size = imgui.get_window_size()
+            rect = (int(pos.x), int(pos.y), max(0, int(size.x)), max(0, int(size.y)))
+            yield visible, measuring, rect
+            if visible:
+                self._fit = (key, _drawn_window_size())
+        finally:
+            imgui.end()
+
+
+def _drawn_window_size() -> tuple[float, float]:
+    """Size that fits what the current window has drawn so far, as ImGui fits it."""
+    dc = imgui.internal.get_current_window().dc
+    padding = imgui.get_style().window_padding
+    return (
+        float(math.ceil(dc.cursor_max_pos.x - dc.cursor_start_pos.x + padding.x * 2.0)),
+        float(math.ceil(dc.cursor_max_pos.y - dc.cursor_start_pos.y + padding.y * 2.0)),
+    )
+
+
 class ContextMenuSurface:
     """The open context menu as a top-layer window at its anchor.
 
     Non-modal: the top layer records its rect, so the shell under it does
     not take the pointer. A click on an enabled row runs it; hovering a row
     with a hint shows the hint as a tooltip. Keep one instance and push it
-    each frame the menu is open, so it remembers its size for edge clamping.
+    each frame the menu is open. A newly opened menu draws one frame
+    off-screen to measure its rows, then shows at the spot that fits them
+    (``_FittedWindow``).
     """
 
     modal = False
 
     def __init__(self, state: Callable[[], ContextMenuState]) -> None:
         self._state = state
-        self._size: tuple[float, float] = (0.0, 0.0)
+        self._window = _FittedWindow(_CONTEXT_WINDOW)
         self._last_hovered: int | None = None
         self.row_rects: tuple[Rect | None, ...] = ()
 
@@ -300,27 +369,20 @@ class ContextMenuSurface:
         state = self._state()
         entries = state.items()
         if not entries:
+            self._window.forget()
             return (0, 0, 0, 0)
-        display = imgui.get_io().display_size
-        x, y = clamp_menu_origin(
-            state.anchor, self._size, (float(display.x), float(display.y))
-        )
-        imgui.set_next_window_pos(imgui.ImVec2(x, y), imgui.Cond_.always)
-        visible, _open = imgui.begin(_CONTEXT_WINDOW, None, POPUP_FLAGS)
-        try:
-            imgui.internal.bring_window_to_display_front(
-                imgui.internal.find_window_by_name(_CONTEXT_WINDOW)
-            )
-            pos = imgui.get_window_pos()
-            size = imgui.get_window_size()
-            self._size = (float(size.x), float(size.y))
-            rect = (int(pos.x), int(pos.y), max(0, int(size.x)), max(0, int(size.y)))
+        anchor = state.anchor
+        with self._window.begin(
+            state.generation,
+            lambda size, display: clamp_menu_origin(anchor, size, display),
+        ) as (visible, measuring, rect):
             if not visible:
                 return rect
             result = draw_menu_rows(context_menu_row_views(entries), state.highlight)
-        finally:
-            imgui.end()
         self.row_rects = result.rects
+        if measuring:
+            self._last_hovered = None
+            return rect
         if result.hovered != self._last_hovered:
             # Only a move onto a new row takes the highlight, so a resting
             # pointer does not fight the arrow keys.
@@ -340,14 +402,15 @@ class ContextSubmenuSurface:
     """The open submenu of a context menu, beside its parent row.
 
     Push it right after its ``ContextMenuSurface`` every frame the menu is
-    open; it draws nothing while no submenu is open.
+    open; it draws nothing while no submenu is open. Like the menu, a newly
+    opened submenu draws one frame off-screen to measure itself.
     """
 
     modal = False
 
     def __init__(self, parent: ContextMenuSurface) -> None:
         self._parent = parent
-        self._size: tuple[float, float] = (0.0, 0.0)
+        self._window = _FittedWindow(_SUBMENU_WINDOW)
         self._last_hovered: int | None = None
 
     def draw(self) -> Rect:
@@ -357,32 +420,24 @@ class ContextSubmenuSurface:
         rects = self._parent.row_rects
         if not sub or index is None or not 0 <= index < len(rects):
             self._last_hovered = None
+            self._window.forget()
             return (0, 0, 0, 0)
         parent_rect = rects[index]
         if parent_rect is None:
             return (0, 0, 0, 0)
-        display = imgui.get_io().display_size
-        x, y = submenu_origin(
-            parent_rect,
-            self._size,
-            (float(display.x), float(display.y)),
-            top_pad=round(ui_chrome_px(MENU_POPUP_TOP_PAD_PX)),
-        )
-        imgui.set_next_window_pos(imgui.ImVec2(x, y), imgui.Cond_.always)
-        visible, _open = imgui.begin(_SUBMENU_WINDOW, None, POPUP_FLAGS)
-        try:
-            imgui.internal.bring_window_to_display_front(
-                imgui.internal.find_window_by_name(_SUBMENU_WINDOW)
-            )
-            pos = imgui.get_window_pos()
-            size = imgui.get_window_size()
-            self._size = (float(size.x), float(size.y))
-            rect = (int(pos.x), int(pos.y), max(0, int(size.x)), max(0, int(size.y)))
+        top_pad = round(ui_chrome_px(MENU_POPUP_TOP_PAD_PX))
+        with self._window.begin(
+            (state.generation, index),
+            lambda size, display: submenu_origin(
+                parent_rect, size, display, top_pad=top_pad
+            ),
+        ) as (visible, measuring, rect):
             if not visible:
                 return rect
             result = draw_menu_rows(context_menu_row_views(sub), state.sub_highlight)
-        finally:
-            imgui.end()
+        if measuring:
+            self._last_hovered = None
+            return rect
         if result.hovered != self._last_hovered:
             self._last_hovered = result.hovered
             if result.hovered is not None:

@@ -7,7 +7,6 @@ from cleave.viz.navigator_context_menu import (
     navigator_node_menu,
     navigator_node_menu_entries,
 )
-from cleave.viz.shell_focus import ShellRegion
 from tests.cleave.viz.test_controls import _make_controls, _make_controls_with_manager
 
 
@@ -20,12 +19,11 @@ def _entries(controls, node_id: str, toggled: list[str] | None = None):
     }
 
 
-def test_root_row_offers_open_expand_and_its_icons() -> None:
+def test_root_row_offers_expand_and_its_icons() -> None:
     controls = _make_controls(("layer_1",))
     toggled: list[str] = []
     items = _entries(controls, "post_fx", toggled)
     assert list(items) == [
-        "navigator.open",
         "navigator.expand",
         "navigator.toggle.enabled",
         "navigator.toggle.lock",
@@ -47,13 +45,6 @@ def test_lock_greys_out_the_enabled_item() -> None:
     enabled = _entries(controls, "post_fx")["navigator.toggle.enabled"]
     assert enabled.enabled is False
     assert enabled.hint == "Locked: unlock to change"
-
-
-def test_open_item_enters_the_inspector() -> None:
-    controls = _make_controls(("layer_1",))
-    _entries(controls, "timeline")["navigator.open"].run()
-    assert controls.shell_focus.selected_id == "timeline"
-    assert controls.shell_focus.region is ShellRegion.INSPECTOR
 
 
 def test_layer_row_has_pages_solo_move_and_delete() -> None:

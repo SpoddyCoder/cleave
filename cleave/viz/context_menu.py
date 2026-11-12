@@ -98,6 +98,8 @@ class ContextMenuState:
         self.highlight: int | None = None
         self.submenu: int | None = None
         self.sub_highlight: int | None = None
+        # Counts opens, so a surface can tell a new menu from the last one.
+        self.generation = 0
 
     @property
     def is_open(self) -> bool:
@@ -121,6 +123,7 @@ class ContextMenuState:
         """
         self._provider = provider
         self._anchor = (float(anchor[0]), float(anchor[1]))
+        self.generation += 1
         self.highlight = None
         self._close_submenu()
         if keyboard:
