@@ -966,7 +966,11 @@ def test_navigator_focus_ring_only_while_that_region_is_active() -> None:
     try:
         host.imgui.display_size = (1280, 720)
         height = shell_host.menu_bar_height_px()
-        host.set_layout(ShellLayout.compute(1280, 720, height, height, 0))
+        # Tall enough for all three rows: the navigator clips rows that
+        # overflow its padding, and a missing child row has no LABEL ink.
+        host.set_layout(
+            ShellLayout.compute(1280, 720, height, height, 0, nav_content_h=200)
+        )
         host.process_event(_motion(4))
         host._draw_inspector = lambda _state: None
         with (
