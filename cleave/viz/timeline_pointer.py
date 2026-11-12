@@ -8,7 +8,9 @@ label (layer number and stem) arms it, and a press on its monitor eye
 toggles the layer's visibility as its number key does (an overridden row,
 or an armed row while recording). A right-click on a row focuses it and
 returns that row's context menu (``timeline_context_menu``), selecting a
-cue under the pointer first so the menu can edit it.
+cue under the pointer first so the menu can edit it. Away from a cue, and
+on the ruler, the menu opens with the clicked time's items
+(``timeline_time_menu``).
 
 The wheel zooms the visible window about the time under the pointer, and
 Shift+wheel or a sideways wheel pans it. While zoomed, a left drag on a row
@@ -25,7 +27,7 @@ from __future__ import annotations
 import time
 from typing import Callable, Literal, Protocol
 
-from cleave.viz.context_menu import ContextMenuProvider
+from cleave.viz.context_menu import ContextMenuEntry, ContextMenuProvider
 from cleave.viz.session import TuningSession
 from cleave.viz.timeline_context_menu import TimelineRowMenuActions, timeline_row_menu
 from cleave.viz.timeline_overlay import StripHit, StripTarget
@@ -80,6 +82,12 @@ class StripActions(TimelineRowMenuActions, Protocol):
     def strip_target_pressable(self, target: str, row: int | None) -> bool: ...
 
 
+class StripTimeMenu(Protocol):
+    def entries(
+        self, t_sec: float, tolerance_sec: float, *, commands: bool
+    ) -> tuple[ContextMenuEntry, ...]: ...
+
+
 class TimelinePointer:
     """Press, drag, release, and wheel on the open strip."""
 
@@ -89,11 +97,13 @@ class TimelinePointer:
         actions: StripActions,
         session: TuningSession,
         *,
+        time_menu: StripTimeMenu | None = None,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self._geometry = geometry
         self._actions = actions
         self._session = session
+        self._time_menu = time_menu
         self._clock = clock
         self._scrubbing = False
         self._over_ruler = False
@@ -150,14 +160,27 @@ class TimelinePointer:
         return self._actions.strip_target_pressable(target, row)
 
     def context_menu_at(self, x: float, y: float) -> ContextMenuProvider | None:
-        """Focus the layer row under a screen point and return its menu, or None.
+        """Return the menu for a screen point on the strip, or None.
 
-        A cue near the point is selected first, and the menu opens with its
-        items. Elsewhere on the row the menu has only the row's items.
+        On the ruler, the clicked time's items and the timeline commands. On
+        a layer row the row is focused first. A cue near the point is
+        selected and the menu opens with its items; elsewhere in the bar the
+        menu opens with the clicked time's items.
         """
         hit = self._geometry.hit_at(x, y)
-        if hit is None or hit.row is None:
+        if hit is None:
             return None
+        time_menu = self._time_menu
+        if hit.row is None:
+            if hit.target is not None or hit.t_sec is None or time_menu is None:
+                return None
+            t_sec = hit.t_sec
+            tolerance = hit.cue_tolerance_sec
+
+            def ruler_entries() -> tuple[ContextMenuEntry, ...]:
+                return time_menu.entries(t_sec, tolerance, commands=True)
+
+            return ruler_entries
         slot = self._actions.row_slot(hit.row)
         if slot is None:
             return None
@@ -166,7 +189,21 @@ class TimelinePointer:
         on_cue = hit.t_sec is not None and self._actions.select_cue_near(
             slot, hit.t_sec, hit.cue_tolerance_sec
         )
-        return timeline_row_menu(self._actions, self._session, hit.row, cue=on_cue)
+        time_entries: Callable[[], tuple[ContextMenuEntry, ...]] | None = None
+        if not on_cue and hit.t_sec is not None and time_menu is not None:
+            row_t = hit.t_sec
+            row_tolerance = hit.cue_tolerance_sec
+            time_entries = lambda: time_menu.entries(  # noqa: E731
+                row_t, row_tolerance, commands=False
+            )
+
+        return timeline_row_menu(
+            self._actions,
+            self._session,
+            hit.row,
+            cue=on_cue,
+            time_entries=time_entries,
+        )
 
     def row_menu(self, row: int) -> ContextMenuProvider:
         """Focus *row* and return its menu, with its selected cue's items."""

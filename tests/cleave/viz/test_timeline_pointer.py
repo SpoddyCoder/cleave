@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from cleave.viz.context_menu import CONTEXT_SEPARATOR, ContextMenuItem
 from cleave.viz.timeline_overlay import StripHit
 from cleave.viz.timeline_pointer import MIDDLE_BUTTON, TimelinePointer
 from cleave.viz.timeline_view import StripView
@@ -516,3 +517,89 @@ def test_row_menu_focuses_the_row_and_anchors_under_its_label() -> None:
     assert actions.calls == [("focus", 1)]
     assert pointer.row_menu_anchor(1) == (10.0, 238.0)
     assert pointer.row_menu_anchor(4) is None
+
+
+class _TimeMenu:
+    def __init__(self) -> None:
+        self.calls: list[tuple] = []
+
+    def entries(self, t_sec: float, tolerance_sec: float, *, commands: bool):
+        self.calls.append((t_sec, tolerance_sec, commands))
+        return (
+            ContextMenuItem(id="time.seek", label="Seek here", run=lambda: None),
+        )
+
+
+def _row_slot_actions(**kwargs) -> _MenuActions:
+    actions = _MenuActions(**kwargs)
+    # The row menu reads these; the pointer tests only check entry order.
+    actions.row_visible = lambda row: True  # type: ignore[attr-defined]
+    actions.row_visibility_toggleable = lambda row: True  # type: ignore[attr-defined]
+    actions.row_arm_available = lambda row: True  # type: ignore[attr-defined]
+    actions.toggle_override = lambda slot: None  # type: ignore[attr-defined]
+    actions.release_all_overrides = lambda: None  # type: ignore[attr-defined]
+    return actions
+
+
+def _menu_session():
+    session = _session()
+    session.timeline.recording = False
+    session.timeline.override_slots = set()
+    session.timeline.armed_slots = set()
+    return session
+
+
+def test_ruler_right_click_opens_time_and_command_items() -> None:
+    time_menu = _TimeMenu()
+    actions = _MenuActions()
+    provider = TimelinePointer(
+        _MenuGeometry(StripHit(None, 5.0, 0.2)),
+        actions,
+        _session(),
+        time_menu=time_menu,
+    ).context_menu_at(0, 0)
+    assert provider is not None
+    assert [entry.id for entry in provider()] == ["time.seek"]
+    assert time_menu.calls == [(5.0, 0.2, True)]
+    assert actions.calls == []
+
+
+def test_ruler_buttons_and_scrollbar_have_no_menu() -> None:
+    for target in ("play", "record", "scroll_thumb", "scroll_track"):
+        t_sec = 5.0 if target.startswith("scroll") else None
+        hit = StripHit(None, t_sec, 0.2, target=target)
+        assert TimelinePointer(
+            _MenuGeometry(hit), _MenuActions(), _session(), time_menu=_TimeMenu()
+        ).context_menu_at(0, 0) is None
+
+
+def test_row_away_from_a_cue_leads_with_time_items() -> None:
+    time_menu = _TimeMenu()
+    provider = TimelinePointer(
+        _MenuGeometry(StripHit(0, 5.0, 0.2)),
+        _row_slot_actions(),
+        _menu_session(),
+        time_menu=time_menu,
+    ).context_menu_at(0, 0)
+    assert provider is not None
+    entries = provider()
+    assert entries[0].id == "time.seek"
+    assert entries[1] is CONTEXT_SEPARATOR
+    assert entries[2].id == "timeline.row.visibility"
+    assert time_menu.calls == [(5.0, 0.2, False)]
+
+
+def test_row_on_a_cue_has_no_time_items() -> None:
+    time_menu = _TimeMenu()
+    provider = TimelinePointer(
+        _MenuGeometry(StripHit(0, None, 0.2, target="label")),
+        _row_slot_actions(cue_hit=True),
+        _menu_session(),
+        time_menu=time_menu,
+    ).context_menu_at(0, 0)
+    assert provider is not None
+    assert all(
+        entry is CONTEXT_SEPARATOR or entry.id.startswith("timeline.row")
+        for entry in provider()
+    )
+    assert time_menu.calls == []

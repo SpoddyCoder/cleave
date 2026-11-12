@@ -111,3 +111,17 @@ def test_history_is_bounded() -> None:
     while history.undo() is not None:
         undone += 1
     assert undone == 20
+
+
+def test_undo_and_redo_labels_name_the_command() -> None:
+    session = _session()
+    history = TimelineHistory(session)
+    assert history.undo_label is None
+    assert history.redo_label is None
+    with history.recording("Generate timeline"):
+        session.timeline.lanes["layer_1"] = _lane(2.0)
+    assert history.undo_label == "Generate timeline"
+    assert history.redo_label is None
+    history.undo()
+    assert history.undo_label is None
+    assert history.redo_label == "Generate timeline"

@@ -67,6 +67,16 @@ class TimelineHistory:
     def can_redo(self) -> bool:
         return bool(self._redo) and self._matches(self._redo[-1].before)
 
+    @property
+    def undo_label(self) -> str | None:
+        """Label of the command Undo would reverse, or None when it cannot."""
+        return self._undo[-1].label if self.can_undo else None
+
+    @property
+    def redo_label(self) -> str | None:
+        """Label of the command Redo would repeat, or None when it cannot."""
+        return self._redo[-1].label if self.can_redo else None
+
     def undo(self) -> str | None:
         """Restore the state before the last command. Returns its label."""
         if not self.can_undo:

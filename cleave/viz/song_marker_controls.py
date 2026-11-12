@@ -45,10 +45,14 @@ class SongMarkerController:
 
     def drop(self) -> None:
         """Drop or replace a song marker at the playhead (session until Save)."""
+        self.drop_at(current_sec(self._playback, self._duration_sec))
+
+    def drop_at(self, t_sec: float) -> None:
+        """Drop or replace a song marker at *t_sec*, snapped as placement snaps."""
         if self.session.timeline.recording:
             return
         t = snap_placement_time(
-            current_sec(self._playback, self._duration_sec),
+            max(0.0, min(self._duration_sec, t_sec)),
             self.session.timeline.placement_snap,
             beat_times=self._beat_times,
             bar_times=self._bar_times,
@@ -99,6 +103,16 @@ class SongMarkerController:
             )
         else:
             self._on_notification(f"Song marker {format_marker_time(t)}")
+
+    def marker_near(self, t_sec: float, tolerance_sec: float) -> int | None:
+        """Index of the marker nearest *t_sec* within *tolerance_sec*, or None."""
+        markers = self.session.song_markers.markers
+        if not markers:
+            return None
+        index = min(range(len(markers)), key=lambda i: abs(markers[i].time - t_sec))
+        if abs(markers[index].time - t_sec) > tolerance_sec:
+            return None
+        return index
 
     def prompt_delete(self, index: int) -> None:
         markers = self.session.song_markers

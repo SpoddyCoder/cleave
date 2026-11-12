@@ -43,6 +43,7 @@ from cleave.viz.loading import LoadingWindow, open_loading_window
 from cleave.viz.theme import set_ui_scale_percent
 from cleave.viz.timeline_controls import TimelineControls
 from cleave.viz.timeline_pointer import TimelinePointer
+from cleave.viz.timeline_time_menu import TimelineTimeMenu
 from cleave.viz.shell_layout import ShellLayout
 from cleave.viz.timeline_overlay import (
     TimelineOverlay,
@@ -695,6 +696,7 @@ class VisualizerApp:
                 rt.timeline_overlay,
                 rt.timeline_controls,
                 rt.seed.session,
+                time_menu=TimelineTimeMenu(rt.controls, rt.timeline_controls),
             )
             shell = ShellHost(
                 window.imgui,

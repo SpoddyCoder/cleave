@@ -318,6 +318,10 @@ class TimelineControls:
         select_cue(self.session, slot, nearest)
         return True
 
+    @property
+    def paused(self) -> bool:
+        return bool(self.playback.paused)
+
     def toggle_transport(self) -> None:
         """Play or pause (Space). Pausing while recording stops the take first."""
         if self.session.timeline.recording and not self.playback.paused:

@@ -1,6 +1,6 @@
 # Context menus plan
 
-Right-click menus are in place for timeline strip rows, timeline cues, and navigator rows, with one level of submenu. This plan lists what is left. How the framework works: [live-tuning-ui](../../../.claude/rules/live-tuning-ui.md) (Context menus).
+Right-click menus are in place for timeline strip rows, timeline cues, the ruler and empty strip area, and navigator rows, with one level of submenu. This plan lists what is left. How the framework works: [live-tuning-ui](../../../.claude/rules/live-tuning-ui.md) (Context menus).
 
 Related: [editor-first](../../../AGENTS.md), [todos.md](../todos.md).
 
@@ -12,24 +12,13 @@ Related: [editor-first](../../../AGENTS.md), [todos.md](../todos.md).
 - Timeline strip row: show / hide, override visibility, release all overrides, arm ([timeline_context_menu.py](../../../cleave/viz/timeline_context_menu.py)).
 - Timeline cue: right-click selects the cue; Go to cue, and Cut / Blend / Role submenus ([cue_context_menu.py](../../../cleave/viz/cue_context_menu.py)).
 - Navigator row: expand / collapse, on/off, solo, lock, Add layer; layer rows add Go to page, Move up / down, and Delete layer ([navigator_context_menu.py](../../../cleave/viz/navigator_context_menu.py)).
+- Empty strip area and ruler: Seek here, Play from here, Drop song marker here, and Delete marker when one is under the pointer ([timeline_time_menu.py](../../../cleave/viz/timeline_time_menu.py)). The ruler adds Undo / Redo (named from `TimelineHistory.undo_label`) and Generate, Snap cues, Snap cues to markers, Set cut type, and Reset timeline. A row away from any cue leads with the time items.
+- `command_menu_item` in [commands.py](../../../cleave/viz/commands.py): a context menu item from a menu-bar `Command`, sharing its label, shortcut, and enabled state.
 - Shift+F10 / Menu key opens the focused item's menu in the Timeline and Navigator regions (`ShellHost._focus_context_menu`).
 
 ---
 
 ## Next: high value
-
-### Empty strip area and ruler
-
-Right-click on the ruler, or on a row away from any cue, has no time-based items yet. Add a menu (or a group above the row items) with:
-
-- Seek here, Play from here (`TimelineControls.seek_to`, `toggle_transport`).
-- Drop song marker here (`SongMarkerController.drop` at the clicked time; it drops at the playhead today, so it needs a time argument).
-- Undo / Redo with the history label (`TimelineHistory.can_undo`, `undo`, `redo`; menu-bar commands `_UNDO`, `_REDO`).
-- Generate..., Snap to markers, Set cut type..., Reset timeline... (existing `Command`s in [commands.py](../../../cleave/viz/commands.py)).
-
-A right-click on a song marker on the ruler: Delete marker (`SongMarkerController.prompt_delete`), Snap cues to markers. Needs a ruler marker hit in `TimelineOverlay.hit_at`.
-
-`TimelinePointer.context_menu_at` returns None for the ruler today; extend it there.
 
 ### Preset list items
 
@@ -59,10 +48,10 @@ A fallback menu so right-click never does nothing: Fullscreen, Show timeline str
 
 ## Framework follow-ups
 
-- `ContextMenuItem.from_command(command, ctx)`: one adapter so menu items built from menu-bar `Command`s share label, shortcut, and enabled state. Several items above are commands; avoid redefining them by hand.
 - Navigator layer menu: Arm for recording and Override visibility, the same items as the strip row menu. Needs the strip's `TimelineControls` reachable from the navigator provider (it is wired in `wiring.py`, not on `TuningControls`).
 - Delete cue: no cue-delete action exists. Add one in [timeline_cue_edits.py](../../../cleave/viz/timeline_cue_edits.py) (with a key) before adding it to the cue menu.
 - Cue edits from the menu (and the cue keys) are not undoable. Decide whether single cue edits should record through `TimelineHistory`.
 - Submenu x sits about 4px over the parent menu's right edge; it anchors on the row rect, not the window rect. Anchor on the parent window's right edge.
 - Navigator child pages with no twisty and no icons (Post-FX > Fade, a layer's Compositing page) have no menu, so right-click does nothing there. They pick up items once Reset to default or page-level commands exist.
+- Song markers have no hit target of their own: Delete marker shows when a right-click lands within cue tolerance of one, and a cue at the same spot wins. Revisit if markers get their own ruler glyph.
 - Check the menus on the Windows freeze: the Menu key, high DPI, and UI scale 200%.

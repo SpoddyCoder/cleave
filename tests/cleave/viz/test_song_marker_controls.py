@@ -120,3 +120,30 @@ def test_drop_snaps_to_beat() -> None:
     controller._playback.player.seek(11.0)
     controller.drop()
     assert session.song_markers.times == [10.0]
+
+
+def test_drop_at_places_at_the_given_time_not_the_playhead() -> None:
+    controller, session, _modal = _make_controller(beat_times=(10.0, 20.0, 30.0))
+    session.song_markers.markers = [SongMarker(time=50.0)]
+    session.song_markers.selected_index = 0
+    session.timeline.placement_snap = "beat"
+    controller._playback.player.seek(5.0)
+    controller.drop_at(19.0)
+    assert session.song_markers.times == [20.0, 50.0]
+    assert session.song_markers.selected_index == 1
+
+
+def test_drop_at_refused_while_recording() -> None:
+    controller, session, _modal = _make_controller()
+    session.timeline.recording = True
+    controller.drop_at(15.0)
+    assert session.song_markers.times == []
+
+
+def test_marker_near_finds_the_closest_within_tolerance() -> None:
+    controller, session, _modal = _make_controller()
+    assert controller.marker_near(10.0, 1.0) is None
+    session.song_markers.markers = [SongMarker(time=10.0), SongMarker(time=12.0)]
+    assert controller.marker_near(11.8, 0.5) == 1
+    assert controller.marker_near(10.3, 0.5) == 0
+    assert controller.marker_near(11.0, 0.5) is None

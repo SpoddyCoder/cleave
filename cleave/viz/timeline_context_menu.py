@@ -4,11 +4,13 @@ Show or hide the layer, override its visibility, release every override,
 and arm it for recording. Each item calls the same ``TimelineControls``
 path as its key, and a disabled item says why in its hint. With a cue
 selected on the row, the menu opens with that cue's items
-(``cue_context_menu``).
+(``cue_context_menu``). A right-click away from any cue opens with the
+clicked time's items instead (``timeline_time_menu``).
 """
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Protocol
 
 from cleave.viz.context_menu import (
@@ -50,14 +52,18 @@ def timeline_row_menu(
     row: int,
     *,
     cue: bool = True,
+    time_entries: Callable[[], tuple[ContextMenuEntry, ...]] | None = None,
 ) -> ContextMenuProvider:
     """Provider for *row*'s menu; empty once the row has no layer.
 
-    *cue* False leaves out the selected cue's items.
+    *cue* False leaves out the selected cue's items. *time_entries* go
+    first, above the row's own items.
     """
 
     def entries() -> tuple[ContextMenuEntry, ...]:
-        return timeline_row_menu_entries(actions, session, row, cue=cue)
+        return timeline_row_menu_entries(
+            actions, session, row, cue=cue, time_entries=time_entries
+        )
 
     return entries
 
@@ -68,6 +74,7 @@ def timeline_row_menu_entries(
     row: int,
     *,
     cue: bool = True,
+    time_entries: Callable[[], tuple[ContextMenuEntry, ...]] | None = None,
 ) -> tuple[ContextMenuEntry, ...]:
     slot = actions.row_slot(row)
     if slot is None:
@@ -129,9 +136,10 @@ def timeline_row_menu_entries(
     )
 
     cue_entries = cue_menu_entries(session, slot, actions.seek_to) if cue else ()
+    lead = (*cue_entries, *(time_entries() if time_entries is not None else ()))
     return (
-        *cue_entries,
-        *((CONTEXT_SEPARATOR,) if cue_entries else ()),
+        *lead,
+        *((CONTEXT_SEPARATOR,) if lead else ()),
         visibility,
         CONTEXT_SEPARATOR,
         override,

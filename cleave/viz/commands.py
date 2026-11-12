@@ -16,6 +16,7 @@ import pygame
 
 from cleave.config_schema.layers import MAX_LAYER_COUNT
 from cleave.viz.config_pages import CONFIG_PAGES, ConfigPage
+from cleave.viz.context_menu import ContextMenuItem
 from cleave.viz.editor_mode_controls import is_preset_curation_mode
 from cleave.viz.key_repeat import mod_ctrl
 from cleave.viz.navigator import layer_node_id, layer_slot_of
@@ -136,6 +137,33 @@ def command_context(controls: Any) -> CommandContext:
         help_visible=bool(session.help_visible),
         # Command fakes without window controls read as windowed.
         fullscreen=bool(getattr(getattr(controls, "window", None), "fullscreen", False)),
+    )
+
+
+def command_menu_item(
+    command: Command,
+    controls: Any,
+    *,
+    item_id: str | None = None,
+    label: str | None = None,
+    enabled: bool = True,
+    disabled_hint: str | None = None,
+) -> ContextMenuItem:
+    """Context menu row for *command*: its label, shortcut, enabled state, and check.
+
+    *enabled* False also disables it, for a reason the command does not know.
+    *disabled_hint* says why when the row is disabled.
+    """
+    ctx = command_context(controls)
+    live = enabled and bool(command.enabled(ctx))
+    return ContextMenuItem(
+        id=item_id or command.id,
+        label=label or command.label,
+        run=lambda: command.run(controls),
+        enabled=live,
+        checked=None if command.checked is None else bool(command.checked(ctx)),
+        shortcut=command.shortcut,
+        hint=None if live else disabled_hint,
     )
 
 

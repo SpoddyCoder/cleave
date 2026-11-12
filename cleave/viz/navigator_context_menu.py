@@ -12,7 +12,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
-from cleave.viz.commands import command_by_id, command_context
+from cleave.viz.commands import command_by_id, command_menu_item
 from cleave.viz.context_menu import (
     CONTEXT_SEPARATOR,
     ContextMenuEntry,
@@ -159,15 +159,13 @@ def _toggle_hint(toggle: NavToggle) -> str | None:
 
 
 def _add_item(controls: TuningControls, *, blocked: bool) -> ContextMenuItem:
-    command = command_by_id("layers.add")
-    enabled = not blocked and bool(command.enabled(command_context(controls)))
-    return ContextMenuItem(
-        id="navigator.layer.add",
+    return command_menu_item(
+        command_by_id("layers.add"),
+        controls,
+        item_id="navigator.layer.add",
         label="Add layer",
-        run=lambda: command.run(controls),
-        enabled=enabled,
-        shortcut=command.shortcut,
-        hint=None if enabled else "Layer limit reached",
+        enabled=not blocked,
+        disabled_hint="Layer limit reached",
     )
 
 
