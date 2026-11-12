@@ -19,6 +19,7 @@ from cleave.viz.context_menu import (
     ContextMenuItem,
     ContextMenuProvider,
     ContextSubmenu,
+    join_groups,
 )
 from cleave.viz.editor_mode_controls import is_preset_curation_mode
 from cleave.viz.navigator import (
@@ -81,7 +82,7 @@ def navigator_node_menu_entries(
     ]
     if _is_layer_row(controls, node):
         groups.append(_layer_items(controls, node))
-    return _join(groups)
+    return join_groups(groups)
 
 
 def _tree_items(
@@ -220,14 +221,3 @@ def _layer_items(
             hint=None if can_remove else "Must have at least 1 layer",
         ),
     )
-
-
-def _join(groups: list[tuple[ContextMenuEntry, ...]]) -> tuple[ContextMenuEntry, ...]:
-    entries: list[ContextMenuEntry] = []
-    for group in groups:
-        if not group:
-            continue
-        if entries:
-            entries.append(CONTEXT_SEPARATOR)
-        entries.extend(group)
-    return tuple(entries)

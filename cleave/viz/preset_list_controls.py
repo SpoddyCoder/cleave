@@ -113,6 +113,19 @@ class PresetListController:
         if self._on_focus_preset_item is not None:
             self._on_focus_preset_item(slot, target)
 
+    def move_item(self, slot: str, index: int, delta: int) -> None:
+        """Move one item by *delta* places, outside move mode; out-of-range is ignored."""
+        presets = self.session.layers[slot].preset_list
+        target = index + delta
+        if not 0 <= index < len(presets) or not 0 <= target < len(presets):
+            return
+        if target == index:
+            return
+        presets.insert(target, presets.pop(index))
+        self.refresh_switching(slot)
+        if self._on_focus_preset_item is not None:
+            self._on_focus_preset_item(slot, target)
+
     def confirm_move_mode(self) -> None:
         if self.move_mode_preset is None:
             return

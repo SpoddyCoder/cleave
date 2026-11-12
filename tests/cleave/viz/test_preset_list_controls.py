@@ -152,6 +152,27 @@ def test_move_item_to_without_move_mode_is_noop() -> None:
         assert session.layers["layer_1"].preset_list == [a, b]
 
 
+def test_move_item_steps_once_and_focuses() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp) / "presets"
+        _write(root / "pack" / "demo.milk", "milk")
+        focused: list[tuple[str, int]] = []
+        a, b, c = (str(root / f"{name}.milk") for name in "abc")
+        controller, session, _modal = _make_controller(
+            preset_root=root,
+            preset_list=[a, b, c],
+            on_focus_preset_item=lambda slot, index: focused.append((slot, index)),
+        )
+        controller.move_item("layer_1", 0, 1)
+        assert session.layers["layer_1"].preset_list == [b, a, c]
+        controller.move_item("layer_1", 0, -1)
+        controller.move_item("layer_1", 2, 1)
+        controller.move_item("layer_1", 5, -1)
+        assert session.layers["layer_1"].preset_list == [b, a, c]
+        assert controller.move_mode_preset is None
+        assert focused == [("layer_1", 1)]
+
+
 def test_cancel_move_mode_restores_original_order() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp) / "presets"

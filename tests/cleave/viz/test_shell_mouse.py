@@ -19,6 +19,7 @@ from cleave.config_schema.editor import (
 )
 from cleave.viz.focus_nav import TimelineFocus
 from cleave.viz.imgui_host import ImGuiHost
+from cleave.viz.inspector import InspectorRow
 from cleave.viz.menu_bar import MenuBarState
 from cleave.viz.pointer_cursor import PointerShape, requested_pointer
 from cleave.viz.shell_focus import CycleStop, ShellRegion
@@ -1031,3 +1032,54 @@ def test_focus_context_menu_opens_under_the_selected_navigator_row() -> None:
         assert host.open_focus_context_menu() is True
         assert controls.context_menu.anchor == (4.0, 80.0)
         assert controls.context_menu.highlight == 0
+
+
+def _preset_item_row(index: int) -> InspectorRow:
+    return InspectorRow(
+        descriptor=RowDescriptor(
+            RowKind.TRACK_PRESET_LIST_ITEM, slot="layer_1", preset_index=index
+        ),
+        is_heading=False,
+        depth=0,
+        navigable=True,
+    )
+
+
+def test_right_click_on_a_preset_list_row_focuses_it_and_opens_its_menu() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.layers["layer_1"].preset_list = ["/tmp/a.milk", "/tmp/b.milk"]
+    with _host() as host:
+        host._controls = controls
+        layout = _open_strip_layout()
+        host.set_layout(layout)
+        x, y, w, _h = layout.inspector
+        row = _preset_item_row(1)
+        host._insp_row_rects = {row.descriptor: ((x, y + 10, w, 15), row)}
+
+        host.process_event(
+            _button(pygame.MOUSEBUTTONDOWN, (x + w // 2, y + 15), button=3)
+        )
+
+        assert controls.shell_focus.region is ShellRegion.INSPECTOR
+        assert controls.shell_focus.inspector_cursor == row.descriptor
+        assert controls.context_menu.is_open
+
+        controls.context_menu.close()
+        host.process_event(
+            _button(pygame.MOUSEBUTTONDOWN, (x + w // 2, y + 2), button=3)
+        )
+        assert not controls.context_menu.is_open
+
+
+def test_focus_context_menu_opens_under_the_focused_preset_list_row() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.layers["layer_1"].preset_list = ["/tmp/a.milk"]
+    with _host() as host:
+        host._controls = controls
+        row = _preset_item_row(0)
+        controls.set_shell_region(ShellRegion.INSPECTOR)
+        controls.shell_focus.inspector_cursor = row.descriptor
+        assert host.open_focus_context_menu() is False
+        host._insp_row_rects = {row.descriptor: ((4, 300, 200, 20), row)}
+        assert host.open_focus_context_menu() is True
+        assert controls.context_menu.anchor == (4.0, 320.0)

@@ -23,7 +23,7 @@ from cleave.viz.help_column import draw_help_column
 from cleave.viz.help_content import help_section_kwargs, help_sections_for_stop
 from cleave.viz.imgui_host import ImGuiHost, PAUSE_GLYPH, PLAY_GLYPH, mouse_button
 from cleave.viz.imgui_theme import rgba
-from cleave.viz.inspector import build_inspector_rows
+from cleave.viz.inspector import InspectorRow, build_inspector_rows
 from cleave.viz.inspector_controls import (
     inspector_command_enabled,
     inspector_command_locked,
@@ -40,6 +40,7 @@ from cleave.viz.menu_rows import (
 from cleave.viz.pointer_cursor import PointerShape, request_pointer
 from cleave.viz.context_menu import ContextMenuProvider
 from cleave.viz.navigator_context_menu import navigator_node_menu
+from cleave.viz.preset_context_menu import PRESET_MENU_KINDS, preset_row_menu
 from cleave.viz.timeline_pointer import MIDDLE_BUTTON, RIGHT_BUTTON, TimelinePointer
 from cleave.viz.material_icons import (
     LOCK_GLYPH,
@@ -1219,6 +1220,18 @@ def _draw_item_focus_ring() -> None:
     )
 
 
+def _drawn_row_rect(left_x: float) -> tuple[int, int, int, int] | None:
+    """The item just drawn, from *left_x*, clipped to its window. None when hidden."""
+    rect_min = imgui.get_item_rect_min()
+    rect_max = imgui.get_item_rect_max()
+    window_y = imgui.get_window_pos().y
+    top = max(rect_min.y, window_y)
+    bottom = min(rect_max.y, window_y + imgui.get_window_height())
+    if bottom <= top:
+        return None
+    return (int(left_x), int(top), int(rect_max.x - left_x), int(bottom - top))
+
+
 def selectable_wash(*, inspector: bool) -> tuple[imgui.ImVec4, imgui.ImVec4]:
     """Header fill for a selected navigator row or a focused inspector row.
 
@@ -1342,6 +1355,10 @@ class ShellHost:
         self._context_surface = ContextMenuSurface(lambda: self._controls.context_menu)
         # Navigator row rects from the last draw, for right-click and Shift+F10.
         self._nav_row_rects: dict[str, tuple[int, int, int, int]] = {}
+        # Inspector rows with a descriptor from the last draw, the same way.
+        self._insp_row_rects: dict[
+            RowDescriptor, tuple[tuple[int, int, int, int], InspectorRow]
+        ] = {}
         self._context_submenu_surface = ContextSubmenuSurface(self._context_surface)
 
     @property
@@ -1484,6 +1501,8 @@ class ShellHost:
                 self._cancel_strip_pointer()
             return provider
         layout = self._layout
+        if layout is not None and _rect_contains(layout.inspector, x, y):
+            return self._inspector_menu_at(x, y)
         if layout is None or not _rect_contains(layout.navigator, x, y):
             return None
         node_id = self._nav_row_at(x, y)
@@ -1522,6 +1541,30 @@ class ShellHost:
                 return None
             x, y, _w, h = rect
             return self._nav_menu(node_id), (float(x), float(y + h))
+        if region is ShellRegion.INSPECTOR:
+            desc = self._controls.shell_focus.inspector_cursor
+            found = self._insp_row_rects.get(desc) if desc is not None else None
+            provider = self._inspector_menu(desc) if desc is not None else None
+            if found is None or provider is None:
+                return None
+            (x, y, _w, h), _row = found
+            return provider, (float(x), float(y + h))
+        return None
+
+    def _inspector_menu_at(self, x: float, y: float) -> ContextMenuProvider | None:
+        """The menu for the inspector row under (*x*, *y*); the row takes focus."""
+        for desc, (rect, row) in self._insp_row_rects.items():
+            if not _rect_contains(rect, x, y):
+                continue
+            provider = self._inspector_menu(desc)
+            if provider is not None:
+                self._controls.inspector.focus_row(row)
+            return provider
+        return None
+
+    def _inspector_menu(self, desc: RowDescriptor) -> ContextMenuProvider | None:
+        if desc.kind in PRESET_MENU_KINDS:
+            return preset_row_menu(self._controls, desc)
         return None
 
     def _nav_menu(self, node_id: str) -> ContextMenuProvider:
@@ -2258,20 +2301,10 @@ class ShellHost:
                 imgui.unindent(indent)
 
     def _record_nav_row_rect(self, node_id: str, left_x: float) -> None:
-        """Remember the row just drawn, from the column edge, clipped to the window."""
-        rect_min = imgui.get_item_rect_min()
-        rect_max = imgui.get_item_rect_max()
-        window_y = imgui.get_window_pos().y
-        top = max(rect_min.y, window_y)
-        bottom = min(rect_max.y, window_y + imgui.get_window_height())
-        if bottom <= top:
-            return
-        self._nav_row_rects[node_id] = (
-            int(left_x),
-            int(top),
-            int(rect_max.x - left_x),
-            int(bottom - top),
-        )
+        """Remember the row just drawn, for right-click and Shift+F10."""
+        rect = _drawn_row_rect(left_x)
+        if rect is not None:
+            self._nav_row_rects[node_id] = rect
 
     def _draw_nav_toggles(self, node: NavNode) -> None:
         """Icon buttons at the right of the row just drawn.
@@ -2379,6 +2412,7 @@ class ShellHost:
                 spacing.x, spacing.y + 2.0 * ui_chrome_px(_INSPECTOR_ROW_PAD_Y)
             ),
         )
+        self._insp_row_rects = {}
         try:
             for row in build_inspector_rows(state, focus.selected_id):
                 if row.divider:
@@ -2430,6 +2464,9 @@ class ShellHost:
                         imgui.get_item_rect_min().y,
                         imgui.get_item_rect_max().y,
                     )
+                    rect = _drawn_row_rect(text_x)
+                    if rect is not None:
+                        self._insp_row_rects[desc] = (rect, row)
                     # Item flags are only valid while this selectable is current.
                     # Release clears the active id inside the widget, so the
                     # frame the button comes up is deactivated, not active.

@@ -57,6 +57,21 @@ class ContextSubmenu:
 ContextMenuEntry = ContextMenuItem | ContextSubmenu | ContextMenuSeparator
 ContextMenuProvider = Callable[[], tuple[ContextMenuEntry, ...]]
 
+
+def join_groups(
+    groups: list[tuple[ContextMenuEntry, ...]],
+) -> tuple[ContextMenuEntry, ...]:
+    """The non-empty *groups* in order, with a separator between each."""
+    entries: list[ContextMenuEntry] = []
+    for group in groups:
+        if not group:
+            continue
+        if entries:
+            entries.append(CONTEXT_SEPARATOR)
+        entries.extend(group)
+    return tuple(entries)
+
+
 _ACTIVATE_KEYS = frozenset({pygame.K_RETURN, pygame.K_KP_ENTER, pygame.K_SPACE})
 
 

@@ -100,6 +100,10 @@ class PresetCurationController:
             return
         self._prompt_restore_choice(slot, src, memberships)
 
+    def can_restore(self, src: Path) -> bool:
+        """True when *src* is a favourite, cast, or blacklisted (what Restore undoes)."""
+        return bool(self._restore_memberships(src))
+
     def _restore_memberships(self, src: Path) -> list[_RestoreMembership]:
         under_fav = _path_under(src, favourites_root(self._preset_root))
         under_bl = _path_under(src, blacklist_root(self._preset_root))

@@ -1,6 +1,6 @@
 # Context menus plan
 
-Right-click menus are in place for timeline strip rows, timeline cues, the ruler and empty strip area, and navigator rows, with one level of submenu. This plan lists what is left. How the framework works: [live-tuning-ui](../../../.claude/rules/live-tuning-ui.md) (Context menus).
+Right-click menus are in place for timeline strip rows, timeline cues, the ruler and empty strip area, navigator rows, and inspector preset rows, with one level of submenu. This plan lists what is left. How the framework works: [live-tuning-ui](../../../.claude/rules/live-tuning-ui.md) (Context menus).
 
 Related: [editor-first](../../../AGENTS.md), [todos.md](../todos.md).
 
@@ -14,23 +14,9 @@ Related: [editor-first](../../../AGENTS.md), [todos.md](../todos.md).
 - Navigator row: expand / collapse, on/off, solo, lock, Add layer; layer rows add Go to page, Move up / down, and Delete layer ([navigator_context_menu.py](../../../cleave/viz/navigator_context_menu.py)).
 - Empty strip area and ruler: Seek here, Play from here, Drop song marker here, and Delete marker when one is under the pointer ([timeline_time_menu.py](../../../cleave/viz/timeline_time_menu.py)). The ruler adds Undo / Redo (named from `TimelineHistory.undo_label`) and Generate, Snap cues, Snap cues to markers, Set cut type, and Reset timeline. A row away from any cue leads with the time items.
 - `command_menu_item` in [commands.py](../../../cleave/viz/commands.py): a context menu item from a menu-bar `Command`, sharing its label, shortcut, and enabled state.
-- Shift+F10 / Menu key opens the focused item's menu in the Timeline and Navigator regions (`ShellHost._focus_context_menu`).
-
----
-
-## Next: high value
-
-### Preset list items
-
-A list of files is where users right-click by reflex. On a `TRACK_PRESET_LIST_ITEM` row in the inspector:
-
-- Audition (`PresetListController.audition`).
-- Move up / Move down (`move_item_to`), Remove from list... (`prompt_delete`).
-- Add current preset (`add_current`), Populate... (`prompt_populate`).
-
-Curation (Favourite, Cast as role, Blacklist, Restore in [preset_curation_controls.py](../../../cleave/viz/preset_curation_controls.py)) fits here and on the current-preset row; it is hard to find outside curation mode today.
-
-This is the first inspector menu: it needs inspector row rects recorded while drawing (as `_nav_row_rects` does for the navigator), a hit in `ShellHost._context_menu_at`, and the `ShellRegion.INSPECTOR` branch in `_focus_context_menu`.
+- Preset rows: a preset list entry offers Audition, Move up / down, Remove from list..., Add current preset, Populate..., and a Curate submenu (Favourite, Blacklist, Cast as role, Restore); the current preset row offers Add to preset list and Curate ([preset_context_menu.py](../../../cleave/viz/preset_context_menu.py)).
+- Inspector plumbing: `ShellHost` records inspector row rects by descriptor while drawing, and `_inspector_menu` maps a row kind to its provider. A right-click focuses the row first.
+- Shift+F10 / Menu key opens the focused item's menu in the Timeline, Navigator, and Inspector regions (`ShellHost._focus_context_menu`).
 
 ---
 
@@ -38,7 +24,7 @@ This is the first inspector menu: it needs inspector row rects recorded while dr
 
 ### Reset to default on value rows
 
-Desktop apps put this on every slider and choice. It needs a per-row default lookup from `cleave/config_schema/`, which viz rows do not expose. Build it once on `RowSpec` (a `default` reader next to `choice`), then one inspector provider covers every numeric and choice row. Copy value / Paste value can follow.
+Desktop apps put this on every slider and choice. It needs a per-row default lookup from `cleave/config_schema/`, which viz rows do not expose. Build it once on `RowSpec` (a `default` reader next to `choice`), then one inspector provider covers every numeric and choice row; hook it into `ShellHost._inspector_menu`. Copy value / Paste value can follow.
 
 ### Visualiser canvas
 
