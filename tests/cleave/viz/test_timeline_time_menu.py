@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from cleave.song_markers import SongMarker
 from cleave.timeline import SlotCue, TimelineLane
-from cleave.viz.context_menu import ContextMenuItem
+from cleave.viz.context_menu import ContextMenuItem, ContextSubmenu
 from cleave.viz.timeline_time_menu import TimelineTimeMenu
 from tests.cleave.viz.test_controls import _make_controls
 
@@ -52,11 +52,64 @@ def test_play_from_here_does_not_pause_a_playing_song() -> None:
     assert transport.calls == [("seek", 12.0)]
 
 
-def test_a_marker_under_the_pointer_adds_delete() -> None:
+def _marker_entries(controls, *, commands: bool = False):
+    return TimelineTimeMenu(controls, _Transport()).entries(
+        12.0, 0.5, commands=commands, marker_index=0
+    )
+
+
+def test_marker_items_replace_the_time_items() -> None:
+    controls = _make_controls()
+    controls.session.song_markers.markers = [SongMarker(time=12.2, marker_type="begin")]
+    transport = _Transport()
+    entries = TimelineTimeMenu(controls, transport).entries(
+        12.0, 0.5, commands=False, marker_index=0
+    )
+    ids = [getattr(entry, "id", None) for entry in entries]
+    assert ids == [
+        "timeline.marker.seek",
+        "timeline.marker.play",
+        None,
+        "timeline.marker.type",
+        "timeline.marker.delete",
+    ]
+    entries[0].run()
+    entries[1].run()
+    assert transport.calls == [("seek", 12.2), ("seek", 12.2), ("transport",)]
+    assert entries[4].label == "Delete marker 00:12.20..."
+    assert entries[4].shortcut == "Delete"
+
+
+def test_marker_type_submenu_checks_and_sets_the_type() -> None:
+    controls = _make_controls()
+    controls.session.song_markers.markers = [
+        SongMarker(time=12.2),
+        SongMarker(time=30.0, marker_type="crescendo"),
+    ]
+    submenu = _marker_entries(controls)[3]
+    assert isinstance(submenu, ContextSubmenu)
+    checked = [item.id for item in submenu.items if getattr(item, "checked", False)]
+    assert checked == ["timeline.marker.type.standard"]
+    begin = next(i for i in submenu.items if i.id == "timeline.marker.type.begin")
+    begin.run()
+    assert controls.session.song_markers.markers[0].marker_type == "begin"
+
+
+def test_recording_disables_marker_edits_but_not_seeking() -> None:
     controls = _make_controls()
     controls.session.song_markers.markers = [SongMarker(time=12.2)]
-    item = _items(TimelineTimeMenu(controls, _Transport()))["timeline.time.delete_marker"]
-    assert item.label == "Delete marker 00:12.20..."
+    controls.session.timeline.recording = True
+    entries = _marker_entries(controls)
+    assert entries[0].enabled is True
+    assert entries[3].enabled is False
+    assert entries[4].enabled is False
+    assert entries[4].hint == "Stop recording to edit markers"
+
+
+def test_a_gone_marker_falls_back_to_the_time_items() -> None:
+    controls = _make_controls()
+    ids = [getattr(e, "id", None) for e in _marker_entries(controls)]
+    assert ids[0] == "timeline.time.seek"
 
 
 def test_recording_blocks_marker_drop() -> None:

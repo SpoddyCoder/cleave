@@ -120,6 +120,7 @@ def _view_state(
     bar_grid_times: tuple[float, ...] = (),
     song_marker_times: tuple[float, ...] = (),
     selected_song_marker_index: int | None = None,
+    song_marker_flash_start_ms: int | None = None,
     hard_cut_fades_enabled: bool = False,
     hard_cut_fade_in: float = 2.0,
     hard_cut_fade_out: float = 2.0,
@@ -185,6 +186,7 @@ def _view_state(
         bar_grid_times=bar_grid_times,
         song_marker_times=song_marker_times,
         selected_song_marker_index=selected_song_marker_index,
+        song_marker_flash_start_ms=song_marker_flash_start_ms,
         hard_cut_fades=TimelineFadeGroup(
             enabled=hard_cut_fades_enabled,
             fade_in=hard_cut_fade_in,
@@ -793,7 +795,22 @@ def test_static_panel_has_no_border() -> None:
     assert panel.get_at(edge)[:3] != BORDER_COLOR
 
 
-def test_song_markers_drawn_on_static_panel() -> None:
+def _marker_upload(
+    overlay: TimelineOverlay, state: TimelineViewState
+) -> tuple[pygame.Surface, int, int, int]:
+    """Compose *state*; return the upload, bar left/width, and ruler tick-top y."""
+    from cleave.viz.timeline_panel_cache import timeline_badge_reserve_px
+    from cleave.viz.timeline_ruler import ruler_tick_top
+
+    composed = overlay.compose_panel(state, viewport_width=1280, viewport_height=720)
+    assert composed is not None
+    assert overlay.bar_layout is not None
+    bar_left, bar_width, _ = overlay.bar_layout
+    tick_top = ruler_tick_top(timeline_badge_reserve_px() + overlay._padding)
+    return composed.upload_surface, bar_left, bar_width, tick_top
+
+
+def test_song_markers_rise_through_ruler_and_rows() -> None:
     pygame.init()
     overlay = TimelineOverlay()
     state = _view_state(
@@ -801,21 +818,77 @@ def test_song_markers_drawn_on_static_panel() -> None:
         song_marker_times=(25.0, 75.0),
         selected_song_marker_index=1,
     )
-    composed = overlay.compose_panel(
-        state,
-        viewport_width=1280,
-        viewport_height=720,
-    )
-    assert composed is not None
+    upload, bar_left, bar_width, tick_top = _marker_upload(overlay, state)
+    from cleave.viz.timeline_panel_cache import timeline_badge_reserve_px
+
+    row_y = timeline_badge_reserve_px() + overlay._padding + overlay.row_layout[0][4] // 2
+    x_plain = time_to_x(25.0, bar_left, bar_width, 0.0, 100.0)
+    x_selected = time_to_x(75.0, bar_left, bar_width, 0.0, 100.0)
+    for y in (tick_top + 1, row_y):
+        assert upload.get_at((x_plain, y))[:3] == SONG_MARKER
+        assert upload.get_at((x_selected, y))[:3] == SONG_MARKER_SELECTED
+    assert upload.get_at((x_plain, tick_top - 1))[:3] != SONG_MARKER
+    # Plain is SONG_MARKER_WIDTH wide; the selected one is wider.
+    assert upload.get_at((x_plain + 1, row_y))[:3] == SONG_MARKER
+    assert upload.get_at((x_plain + 2, row_y))[:3] != SONG_MARKER
+    assert upload.get_at((x_selected + 2, row_y))[:3] == SONG_MARKER_SELECTED
+    # Markers are drawn live, so the static panel has none.
     static = overlay._cache.panel
     assert static is not None
-    assert overlay.bar_layout is not None
+    static_y = overlay._padding + overlay.row_layout[0][4] // 2
+    assert static.get_at((x_plain, static_y))[:3] != SONG_MARKER
+
+
+def test_selected_song_marker_flashes_and_dirties_its_column(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pygame.init()
+    overlay = TimelineOverlay()
+    start = 10_000
+    monkeypatch.setattr(pygame.time, "get_ticks", lambda: start)
+    state = _view_state(
+        duration_sec=100.0,
+        song_marker_times=(40.0,),
+        selected_song_marker_index=0,
+        song_marker_flash_start_ms=start,
+    )
+    upload, bar_left, bar_width, tick_top = _marker_upload(overlay, state)
+    x = time_to_x(40.0, bar_left, bar_width, 0.0, 100.0)
+    half = SELECTED_CUE_FLASH_TICK_WIDTH // 2
+    assert upload.get_at((x + half, tick_top + 1))[:3] == SELECTED_CUE_FLASH_YELLOW
+    assert any(
+        rx <= x < rx + rw and ry <= tick_top + 1 < ry + rh
+        for rx, ry, rw, rh in overlay._cache.last_flash_rects
+    )
+
+    monkeypatch.setattr(
+        pygame.time, "get_ticks", lambda: start + SELECTED_CUE_FLASH_HALF_MS
+    )
+    upload, *_ = _marker_upload(overlay, state)
+    assert upload.get_at((x, tick_top + 1))[:3] == SELECTED_CUE_FLASH_RED
+
+    monkeypatch.setattr(
+        pygame.time, "get_ticks", lambda: start + SELECTED_CUE_FLASH_DURATION_MS
+    )
+    upload, *_ = _marker_upload(overlay, state)
+    assert upload.get_at((x, tick_top + 1))[:3] == SONG_MARKER_SELECTED
+    assert upload.get_at((x + half, tick_top + 1))[:3] != SONG_MARKER_SELECTED
+
+
+def test_hit_at_reports_song_marker_on_ruler_and_rows() -> None:
+    pygame.init()
+    overlay = TimelineOverlay()
+    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    _draw(overlay, surface, _view_state(duration_sec=100.0, song_marker_times=(30.0,)))
+    px, py, _, _ = overlay.panel_rect
     bar_left, bar_width, _ = overlay.bar_layout
-    mid_y = static.get_height() // 2
-    x_unselected = time_to_x(25.0, bar_left, bar_width, 0.0, 100.0)
-    x_selected = time_to_x(75.0, bar_left, bar_width, 0.0, 100.0)
-    assert static.get_at((x_unselected, mid_y))[:3] == SONG_MARKER
-    assert static.get_at((x_selected, mid_y))[:3] == SONG_MARKER_SELECTED
+    x = px + time_to_x(30.0, bar_left, bar_width, 0.0, 100.0)
+    row_y = py + overlay.row_layout[0][2] + 1
+
+    assert overlay.hit_at(x, py - 2).marker_index == 0
+    assert overlay.hit_at(x + 2, row_y).marker_index == 0
+    assert overlay.hit_at(x + 40, row_y).marker_index is None
+    assert overlay.hit_at(px + 10, row_y).marker_index is None
 
 
 def test_draw_when_disabled() -> None:

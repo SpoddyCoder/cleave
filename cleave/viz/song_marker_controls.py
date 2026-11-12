@@ -4,7 +4,16 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 
-from cleave.song_markers import format_marker_time, place_marker
+import pygame
+
+from cleave.song_markers import (
+    SongMarker,
+    SongMarkerType,
+    format_marker_time,
+    marker_index_near,
+    place_marker,
+    song_marker_gesture_warning,
+)
 from cleave.timeline import snap_placement_time
 from cleave.viz.modal import ModalHost
 from cleave.viz.playback import PlaybackState, current_sec
@@ -41,7 +50,30 @@ class SongMarkerController:
             descriptor.kind == RowKind.SONG_MARKER_ITEM
             and descriptor.marker_index is not None
         ):
-            self.session.song_markers.selected_index = descriptor.marker_index
+            self.select(descriptor.marker_index)
+
+    def select(self, index: int) -> None:
+        """Select marker *index* and start its strip flash when it changes."""
+        markers = self.session.song_markers
+        if index < 0 or index >= len(markers.markers):
+            return
+        if markers.selected_index == index:
+            return
+        markers.selected_index = index
+        markers.selected_flash_start_ms = pygame.time.get_ticks()
+
+    def set_type(self, index: int, marker_type: SongMarkerType) -> None:
+        """Give marker *index* *marker_type*, warning when the gesture is malformed."""
+        markers = self.session.song_markers
+        if index < 0 or index >= len(markers.markers):
+            return
+        current = markers.markers[index]
+        if marker_type == current.marker_type:
+            return
+        markers.markers[index] = SongMarker(current.time, marker_type)
+        warning = song_marker_gesture_warning(markers.markers, index)
+        if warning is not None and self._on_notification is not None:
+            self._on_notification(warning)
 
     def drop(self) -> None:
         """Drop or replace a song marker at the playhead (session until Save)."""
@@ -106,13 +138,7 @@ class SongMarkerController:
 
     def marker_near(self, t_sec: float, tolerance_sec: float) -> int | None:
         """Index of the marker nearest *t_sec* within *tolerance_sec*, or None."""
-        markers = self.session.song_markers.markers
-        if not markers:
-            return None
-        index = min(range(len(markers)), key=lambda i: abs(markers[i].time - t_sec))
-        if abs(markers[index].time - t_sec) > tolerance_sec:
-            return None
-        return index
+        return marker_index_near(self.session.song_markers.times, t_sec, tolerance_sec)
 
     def prompt_delete(self, index: int) -> None:
         markers = self.session.song_markers
@@ -131,6 +157,7 @@ class SongMarkerController:
         if index < 0 or index >= len(markers.markers):
             return
         removed = markers.markers.pop(index)
+        markers.selected_flash_start_ms = None
         if not markers.markers:
             markers.selected_index = None
         elif markers.selected_index is None:

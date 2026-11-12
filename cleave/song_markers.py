@@ -90,6 +90,18 @@ def nearest_index(times: Sequence[float], t: float) -> int:
     return best_i
 
 
+def marker_index_near(
+    times: Sequence[float], t: float, tolerance: float
+) -> int | None:
+    """Index of the marker nearest ``t`` within ``tolerance``, or None."""
+    if not times:
+        return None
+    index = nearest_index(times, t)
+    if abs(times[index] - t) > tolerance:
+        return None
+    return index
+
+
 def place_marker(
     markers: Sequence[SongMarker],
     t: float,

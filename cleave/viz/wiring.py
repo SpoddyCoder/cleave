@@ -278,6 +278,10 @@ def make_timeline_controls(
         if tuning_controls is not None:
             tuning_controls.set_timeline_focus_row(row)
 
+    def on_select_song_marker(index: int) -> None:
+        if tuning_controls is not None:
+            tuning_controls.select_song_marker(index)
+
     def on_seek(delta_sec: float) -> None:
         seek(playback, delta_sec, duration_sec)
         LayerFramePipeline.flush_pcm(layers)
@@ -301,6 +305,7 @@ def make_timeline_controls(
         on_close=on_close,
         on_exit_submenu=on_exit_submenu,
         on_focus_row=on_focus_row,
+        on_select_song_marker=on_select_song_marker,
         on_seek=on_seek,
         on_notification=on_notification,
         beat_times=list(signals.beat_times) if signals is not None else (),

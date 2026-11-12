@@ -147,3 +147,28 @@ def test_marker_near_finds_the_closest_within_tolerance() -> None:
     assert controller.marker_near(11.8, 0.5) == 1
     assert controller.marker_near(10.3, 0.5) == 0
     assert controller.marker_near(11.0, 0.5) is None
+
+
+def test_select_starts_the_flash_only_on_a_change(monkeypatch) -> None:
+    controller, session, _modal = _make_controller()
+    session.song_markers.markers = [SongMarker(10.0), SongMarker(20.0)]
+    monkeypatch.setattr(pygame.time, "get_ticks", lambda: 5000)
+    controller.select(1)
+    assert session.song_markers.selected_index == 1
+    assert session.song_markers.selected_flash_start_ms == 5000
+    monkeypatch.setattr(pygame.time, "get_ticks", lambda: 9000)
+    controller.select(1)
+    assert session.song_markers.selected_flash_start_ms == 5000
+    controller.select(7)
+    assert session.song_markers.selected_index == 1
+
+
+def test_set_type_changes_the_type_and_warns() -> None:
+    notes: list[str] = []
+    controller, session, _modal = _make_controller(on_notification=notes.append)
+    session.song_markers.markers = [SongMarker(10.0)]
+    controller.set_type(0, "begin")
+    assert session.song_markers.markers[0] == SongMarker(10.0, "begin")
+    assert notes == ["begin has no crescendo/diminuendo after it"]
+    controller.set_type(0, "begin")
+    assert len(notes) == 1

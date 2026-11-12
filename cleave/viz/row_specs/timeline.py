@@ -16,12 +16,10 @@ from cleave.config_schema.timeline import (
 from cleave.song_markers import (
     DEFAULT_SONG_MARKER_TYPE,
     SONG_MARKER_TYPES,
-    SongMarker,
     SongMarkerType,
     step_song_marker_type,
     format_marker_time,
     parse_song_marker_type,
-    song_marker_gesture_warning,
 )
 from cleave.timeline_presets import (
     TIMELINE_PRESET_HELP_ENTRIES,
@@ -261,18 +259,12 @@ def _set_song_marker_type(
     step: Callable[[SongMarkerType], SongMarkerType],
 ) -> None:
     assert desc.marker_index is not None
-    markers = controls.session.song_markers
+    markers = controls.session.song_markers.markers
     index = desc.marker_index
-    if index < 0 or index >= len(markers.markers):
+    if index < 0 or index >= len(markers):
         return
-    current = markers.markers[index]
-    next_type = step(parse_song_marker_type(current.marker_type))
-    if next_type == current.marker_type:
-        return
-    markers.markers[index] = SongMarker(current.time, next_type)
-    warning = song_marker_gesture_warning(markers.markers, index)
-    if warning is not None:
-        controls.show_notification(warning)
+    current = parse_song_marker_type(markers[index].marker_type)
+    controls.song_markers.set_type(index, step(current))
 
 def _apply_song_marker_type(
     controls: TuningControls,

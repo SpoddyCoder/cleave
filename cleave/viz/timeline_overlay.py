@@ -10,6 +10,7 @@ from typing import Literal
 import pygame
 
 from cleave.cue_roles import CueRole
+from cleave.song_markers import marker_index_near
 from cleave.stems import StemSource
 from cleave.timeline import (
     LEVEL_EPS,
@@ -122,6 +123,10 @@ SELECTED_CUE_FLASH_RED: tuple[int, int, int] = ARMED_BG
 # Clear half the flash tick plus 1px so glyphs sit beside the thick marker.
 ROLE_GLYPH_TICK_GAP: int = SELECTED_CUE_FLASH_TICK_WIDTH // 2 + 1
 ROLE_GLYPH_BOTTOM_PAD: int = 1
+# Song markers span the ruler and every row. The selected one flashes like a
+# selected cue (SELECTED_CUE_FLASH_TICK_WIDTH), then settles at its own width.
+SONG_MARKER_WIDTH: int = 3
+SONG_MARKER_SELECTED_WIDTH: int = 5
 
 
 @dataclass
@@ -155,6 +160,7 @@ class TimelineViewState:
     bar_grid_times: tuple[float, ...] = ()
     song_marker_times: tuple[float, ...] = ()
     selected_song_marker_index: int | None = None
+    song_marker_flash_start_ms: int | None = None
     hard_cut_fades: TimelineFadeGroup = field(default_factory=TimelineFadeGroup)
     soft_cut_fades: TimelineFadeGroup = field(default_factory=TimelineFadeGroup)
     selected_cue_t: dict[str, float] = field(default_factory=dict)
@@ -787,12 +793,15 @@ class StripHit:
     stem abbreviation), its monitor ``"eye"`` (the visibility icon after the
     label), or the scrollbar's ``"scroll_thumb"`` / ``"scroll_track"``. On the
     scrollbar ``t_sec`` is the song time at that point along the track.
+    ``marker_index`` is the song marker within ``CUE_HIT_PX`` of the point on
+    the ruler or in a row's bar, or None.
     """
 
     row: int | None
     t_sec: float | None
     cue_tolerance_sec: float
     target: StripTarget | None = None
+    marker_index: int | None = None
 
 
 # Corner buttons sit this far below the top of the badge row.
@@ -959,6 +968,7 @@ class TimelineOverlay:
         self._hit_layout: _TimelineLayout | None = None
         self._hit_duration_sec: float = 0.0
         self._hit_view: tuple[float, float] = (0.0, 0.0)
+        self._hit_markers: tuple[float, ...] = ()
 
     @property
     def _font_size(self) -> int:
@@ -1025,6 +1035,11 @@ class TimelineOverlay:
             if in_bar
             else None
         )
+        marker_index = (
+            marker_index_near(self._hit_markers, t_sec, tolerance)
+            if t_sec is not None
+            else None
+        )
         if -layout.badge_reserve <= local_y < layout.bar_top:
             upload_y = local_y + layout.badge_reserve
             for target, rect in zip(
@@ -1034,7 +1049,12 @@ class TimelineOverlay:
                     return StripHit(
                         row=None, t_sec=None, cue_tolerance_sec=tolerance, target=target
                     )
-            return StripHit(row=None, t_sec=t_sec, cue_tolerance_sec=tolerance)
+            return StripHit(
+                row=None,
+                t_sec=t_sec,
+                cue_tolerance_sec=tolerance,
+                marker_index=marker_index,
+            )
         # The scrollbar takes the gap above it and the padding below, so the
         # thin track is an easy target.
         if in_bar and layout.bar_bottom <= local_y < layout.panel_h:
@@ -1059,6 +1079,7 @@ class TimelineOverlay:
                     t_sec=t_sec,
                     cue_tolerance_sec=tolerance,
                     target="label" if on_label else "eye" if on_eye else None,
+                    marker_index=marker_index,
                 )
         return None
 
@@ -1452,19 +1473,6 @@ class TimelineOverlay:
                 1,
             )
 
-        for marker_i, marker_t in enumerate(state.song_marker_times):
-            if not time_in_view(marker_t, view_start, view_end):
-                continue
-            marker_x = time_to_x(marker_t, bar_left, bar_width, view_start, view_end)
-            selected = marker_i == state.selected_song_marker_index
-            pygame.draw.line(
-                panel,
-                SONG_MARKER_SELECTED if selected else SONG_MARKER,
-                (marker_x, layout.bar_top),
-                (marker_x, layout.bar_bottom - 1),
-                4 if selected else 2,
-            )
-
         self._draw_scrollbar(panel, state, layout)
         return panel
 
@@ -1681,12 +1689,6 @@ class TimelineOverlay:
                 tick_rect[3],
             )
             if tick_rect[2] > 0:
-                self._restore_upload_rect_from_static(
-                    upload,
-                    static_panel,
-                    tick_rect,
-                    panel_y_offset=panel_y_offset,
-                )
                 pygame.draw.line(
                     upload,
                     selected_cue_tick_color(state.selected_cue_flash_start_ms),
@@ -1752,7 +1754,70 @@ class TimelineOverlay:
                     ),
                 )
             )
+        if (
+            state.selected_song_marker_index is not None
+            and selected_cue_flash_active(state.song_marker_flash_start_ms)
+        ):
+            parts.append(
+                (
+                    "song_marker",
+                    state.selected_song_marker_index,
+                    selected_cue_flash_bright(state.song_marker_flash_start_ms),
+                )
+            )
         return tuple(parts)
+
+    def _draw_song_markers(
+        self,
+        upload: pygame.Surface,
+        state: TimelineViewState,
+        layout: _TimelineLayout,
+        *,
+        y_offset: int,
+    ) -> tuple[int, int, int, int] | None:
+        """Draw song markers through the ruler and rows.
+
+        Returns the selected marker's column while it flashes, so the upload
+        repaints it each blink and once more when it settles; else None.
+        """
+        view_start, view_end = view_window(state)
+        y0 = self._playhead_top_y(layout, y_offset=y_offset)
+        y1 = y_offset + layout.bar_bottom - 1
+        bar_right = layout.bar_left + layout.bar_width - 1
+        flash_rect: tuple[int, int, int, int] | None = None
+        selected_index = state.selected_song_marker_index
+        selected_x: int | None = None
+        for marker_i, marker_t in enumerate(state.song_marker_times):
+            if not time_in_view(marker_t, view_start, view_end):
+                continue
+            marker_x = min(
+                bar_right,
+                time_to_x(
+                    marker_t, layout.bar_left, layout.bar_width, view_start, view_end
+                ),
+            )
+            if marker_i == selected_index:
+                selected_x = marker_x
+                continue
+            pygame.draw.line(
+                upload, SONG_MARKER, (marker_x, y0), (marker_x, y1), SONG_MARKER_WIDTH
+            )
+        # The selected marker draws last so a neighbour never covers it.
+        if selected_x is not None:
+            flash_start = state.song_marker_flash_start_ms
+            if selected_cue_flash_active(flash_start):
+                color = selected_cue_tick_color(flash_start)
+                width = SELECTED_CUE_FLASH_TICK_WIDTH
+                half_w = width // 2 + 1
+                left = max(layout.bar_left, selected_x - half_w)
+                right = min(bar_right + 1, selected_x + half_w + 1)
+                if right > left:
+                    flash_rect = (left, y0, right - left, y1 - y0 + 1)
+            else:
+                color = SONG_MARKER_SELECTED
+                width = SONG_MARKER_SELECTED_WIDTH
+            pygame.draw.line(upload, color, (selected_x, y0), (selected_x, y1), width)
+        return flash_rect
 
     def _playhead_strip_rect(
         self,
@@ -1907,6 +1972,12 @@ class TimelineOverlay:
                     clip_h = min(ph, ruler_h - py)
                     upload.blit(self._ruler, (px, py), (px, py, pw, clip_h))
 
+        # Markers after the playhead restore (which repaints that column from
+        # the static panel) and before the playhead, which stays on top.
+        marker_flash_rect = self._draw_song_markers(
+            upload, state, layout, y_offset=panel_y_offset
+        )
+
         # Corner buttons before the playhead, so a red record fill that ends
         # at the ruler never covers the playhead at the song start.
         cache.last_transport_rect = self._draw_transport_buttons(upload, state, layout)
@@ -1943,6 +2014,8 @@ class TimelineOverlay:
         cache.last_badge_rect = badge_rect
 
         flash_dirty: list[tuple[int, int, int, int]] = []
+        if marker_flash_rect is not None:
+            flash_dirty.append(marker_flash_rect)
         for row_index in self._live_flash_row_indices(state):
             flash_dirty.extend(
                 self._draw_row_live_flash(
@@ -2069,6 +2142,7 @@ class TimelineOverlay:
         self._hit_layout = layout
         self._hit_duration_sec = state.duration_sec
         self._hit_view = (view_start, view_end)
+        self._hit_markers = state.song_marker_times
         sx, sy, sw, sh = screen_bounds
         panel_screen_y = layout.panel_y
         self._panel_rect = clip_rect_to_bounds(

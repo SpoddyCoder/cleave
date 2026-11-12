@@ -26,8 +26,7 @@ from cleave.viz.editor_mode_controls import (
     is_preset_curation_mode,
     layer_compositing_active,
 )
-from cleave.viz.focus_nav import FocusCursor, MainFocus, TimelineFocus
-from cleave.viz.row_kinds import RowKind
+from cleave.viz.focus_nav import FocusCursor, TimelineFocus
 from cleave.viz.session import TimelineFadeGroupRuntime, TuningSession
 from cleave.viz.timeline_overlay import (
     TimelineViewState,
@@ -38,16 +37,6 @@ from cleave.viz.timeline_overlay import (
 if TYPE_CHECKING:
     from cleave.viz.layer import StemLayer
     from cleave.viz.visual_limiter import LimiterFrameState
-
-
-def focused_song_marker_index(focus_cursor: FocusCursor | None) -> int | None:
-    """Strip highlight index only while a song-marker list row has main focus."""
-    if not isinstance(focus_cursor, MainFocus):
-        return None
-    desc = focus_cursor.descriptor
-    if desc.kind != RowKind.SONG_MARKER_ITEM:
-        return None
-    return desc.marker_index
 
 
 def _lane_for_slot(session: TuningSession, slot: str) -> TimelineLane:
@@ -297,6 +286,7 @@ def build_timeline_view_state(
     *,
     focus_cursor: FocusCursor | None = None,
     strip_focused: bool = False,
+    song_marker_page_open: bool = False,
     bar_times: Sequence[float] = (),
     beat_times: Sequence[float] = (),
     paused: bool = True,
@@ -306,6 +296,11 @@ def build_timeline_view_state(
     tl.selected_cue_flash_start_ms = prune_expired_selected_cue_flash(
         tl.selected_cue_flash_start_ms
     )
+    markers = session.song_markers
+    markers.selected_flash_start_ms = prune_expired_selected_cue_flash(
+        markers.selected_flash_start_ms
+    )
+    selected_marker = markers.selected_index if song_marker_page_open else None
     submenu_focused = strip_focused
     focus_row = tl.focus_row
     if strip_focused and isinstance(focus_cursor, TimelineFocus):
@@ -362,7 +357,10 @@ def build_timeline_view_state(
             bar_times, beat_times, tl.bar_phase_offset
         ),
         song_marker_times=tuple(session.song_markers.times),
-        selected_song_marker_index=focused_song_marker_index(focus_cursor),
+        selected_song_marker_index=selected_marker,
+        song_marker_flash_start_ms=(
+            markers.selected_flash_start_ms if selected_marker is not None else None
+        ),
         hard_cut_fades=_as_fade_group(tl.hard_cut_fades),
         soft_cut_fades=_as_fade_group(tl.soft_cut_fades),
         selected_cue_t=dict(tl.selected_cue_t),

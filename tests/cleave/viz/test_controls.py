@@ -5329,3 +5329,17 @@ def test_settings_highlight_new_page_toggles_and_writes_user_config(
     _press_focused(controls, _keydown(pygame.K_RIGHT))
     assert controls.cfg.editor.highlight_new_page is True
     assert load_user_config(user_path).editor.highlight_new_page is True
+
+
+def test_select_song_marker_opens_its_row_on_the_song_markers_page() -> None:
+    controls = _make_controls()
+    controls.session.song_markers.markers = [SongMarker(10.0), SongMarker(20.0)]
+    controls.select_song_marker(1)
+    focus = controls.shell_focus
+    assert focus.selected_id == "timeline.song_markers"
+    assert focus.region is ShellRegion.INSPECTOR
+    assert focus.inspector_cursor == RowDescriptor(
+        RowKind.SONG_MARKER_ITEM, marker_index=1
+    )
+    assert controls.session.song_markers.selected_index == 1
+    assert controls.session.song_markers.selected_flash_start_ms is not None

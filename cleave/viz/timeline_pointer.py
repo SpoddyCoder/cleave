@@ -3,14 +3,17 @@
 The corner buttons above the row labels play/pause and record. A press on
 the ruler seeks and a held drag scrubs. A press on a layer row focuses it
 and selects a nearby cue without moving the playhead; a double-click on a
-row seeks, and holding the second press scrubs. A double-click on a row's
+row seeks, and holding the second press scrubs. A press on a song marker
+selects it and shows it on the Song Markers page: on the ruler it also seeks
+to the marker, and on a row a nearby cue wins. A double-click on a row's
 label (layer number and stem) arms it, and a press on its monitor eye
 toggles the layer's visibility as its number key does (an overridden row,
 or an armed row while recording). A right-click on a row focuses it and
 returns that row's context menu (``timeline_context_menu``), selecting a
 cue under the pointer first so the menu can edit it. Away from a cue, and
 on the ruler, the menu opens with the clicked time's items
-(``timeline_time_menu``).
+(``timeline_time_menu``), or a song marker's items when one is under the
+pointer, selected first.
 
 The wheel zooms the visible window about the time under the pointer, and
 Shift+wheel or a sideways wheel pans it. While zoomed, a left drag on a row
@@ -67,6 +70,8 @@ class StripActions(TimelineRowMenuActions, Protocol):
 
     def focus_row(self, row: int) -> None: ...
 
+    def select_song_marker(self, index: int) -> None: ...
+
     def select_cue_near(self, slot: str, t_sec: float, tolerance_sec: float) -> bool: ...
 
     def seek_to(self, t_sec: float) -> None: ...
@@ -84,7 +89,12 @@ class StripActions(TimelineRowMenuActions, Protocol):
 
 class StripTimeMenu(Protocol):
     def entries(
-        self, t_sec: float, tolerance_sec: float, *, commands: bool
+        self,
+        t_sec: float,
+        tolerance_sec: float,
+        *,
+        commands: bool,
+        marker_index: int | None = None,
     ) -> tuple[ContextMenuEntry, ...]: ...
 
 
@@ -165,7 +175,8 @@ class TimelinePointer:
         On the ruler, the clicked time's items and the timeline commands. On
         a layer row the row is focused first. A cue near the point is
         selected and the menu opens with its items; elsewhere in the bar the
-        menu opens with the clicked time's items.
+        menu opens with the clicked time's items. A song marker under the
+        point (and no cue) is selected, and its items replace the time items.
         """
         hit = self._geometry.hit_at(x, y)
         if hit is None:
@@ -176,9 +187,14 @@ class TimelinePointer:
                 return None
             t_sec = hit.t_sec
             tolerance = hit.cue_tolerance_sec
+            marker_index = hit.marker_index
+            if marker_index is not None:
+                self._actions.select_song_marker(marker_index)
 
             def ruler_entries() -> tuple[ContextMenuEntry, ...]:
-                return time_menu.entries(t_sec, tolerance, commands=True)
+                return time_menu.entries(
+                    t_sec, tolerance, commands=True, marker_index=marker_index
+                )
 
             return ruler_entries
         slot = self._actions.row_slot(hit.row)
@@ -193,8 +209,11 @@ class TimelinePointer:
         if not on_cue and hit.t_sec is not None and time_menu is not None:
             row_t = hit.t_sec
             row_tolerance = hit.cue_tolerance_sec
+            row_marker = hit.marker_index
+            if row_marker is not None:
+                self._actions.select_song_marker(row_marker)
             time_entries = lambda: time_menu.entries(  # noqa: E731
-                row_t, row_tolerance, commands=False
+                row_t, row_tolerance, commands=False, marker_index=row_marker
             )
 
         return timeline_row_menu(
@@ -243,6 +262,11 @@ class TimelinePointer:
                 if hit.target == "scroll_track" and hit.t_sec is not None:
                     self._view.centre_on(hit.t_sec, self._actions.duration_sec)
                 self._begin_thumb_drag(x)
+            elif hit.marker_index is not None:
+                marker_t = self._marker_time(hit.marker_index)
+                self._actions.select_song_marker(hit.marker_index)
+                if marker_t is not None:
+                    self._start_scrub(marker_t)
             elif hit.t_sec is not None:
                 self._start_scrub(hit.t_sec)
             return True
@@ -270,11 +294,18 @@ class TimelinePointer:
             return True
         self._last_row_press = (now, x, y, hit.row, hit.target)
         z_order = self._session.layer_z_order
-        if hit.row < len(z_order):
-            self._actions.select_cue_near(z_order[hit.row], hit.t_sec, hit.cue_tolerance_sec)
+        on_cue = hit.row < len(z_order) and self._actions.select_cue_near(
+            z_order[hit.row], hit.t_sec, hit.cue_tolerance_sec
+        )
+        if not on_cue and hit.marker_index is not None:
+            self._actions.select_song_marker(hit.marker_index)
         if self._view.zoomed:
             self._pan_pending_x = x
         return True
+
+    def _marker_time(self, index: int) -> float | None:
+        markers = self._session.song_markers.markers
+        return markers[index].time if 0 <= index < len(markers) else None
 
     def _begin_pan(self, x: float) -> None:
         """Hold the time under *x* under the pointer. Nothing to pan at full zoom."""

@@ -162,7 +162,7 @@ class TuningControls:
             bar_times,
             playback,
             duration_sec,
-            on_notification=self.show_notification,
+            on_notification=lambda message: self.show_notification(message),
             on_focus_marker=self._focus_song_marker,
         )
         self._config_save = ConfigSaveController(
@@ -678,6 +678,16 @@ class TuningControls:
         focus = self.shell_focus
         focus.inspector_cursor = descriptor
         focus.inspector_command_id = None
+
+    def select_song_marker(self, index: int) -> None:
+        """Select song marker *index* and show it on the Song Markers page."""
+        if not 0 <= index < len(self.session.song_markers.markers):
+            return
+        self.navigator.select("timeline.song_markers")
+        if self.shell_focus.selected_id != "timeline.song_markers":
+            return
+        self.song_markers.select(index)
+        self._focus_song_marker(index)
 
     def _focus_song_marker(self, marker_index: int | None) -> None:
         focus = self.shell_focus

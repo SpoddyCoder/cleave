@@ -384,6 +384,8 @@ class SongMarkerRuntime:
 
     markers: list[SongMarker] = field(default_factory=list)
     selected_index: int | None = None
+    # Ticks when the selection last changed; the strip flashes it for a while.
+    selected_flash_start_ms: int | None = None
 
     @property
     def times(self) -> list[float]:

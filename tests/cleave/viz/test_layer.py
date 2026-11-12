@@ -852,27 +852,40 @@ def test_build_timeline_view_state_empty_signals_empty_bar_grid() -> None:
 
 
 def test_build_timeline_view_state_includes_song_markers() -> None:
-    from cleave.viz.focus_nav import MainFocus
-
     session = _session(
         layer_enabled={"layer_1": True, "layer_2": True, "layer_3": True, "layer_4": True},
         timeline_enabled=True,
     )
     session.song_markers.times = [12.5, 64.0]
     session.song_markers.selected_index = 1
-    # Sticky session selected_index alone must not highlight the strip.
+    # The selection highlights the strip only while the Song Markers page is open.
     state = build_timeline_view_state(session, position_sec=0.0, duration_sec=60.0)
     assert state.song_marker_times == (12.5, 64.0)
     assert state.selected_song_marker_index is None
 
-    focus = MainFocus(RowDescriptor(RowKind.SONG_MARKER_ITEM, marker_index=1))
-    state_focused = build_timeline_view_state(
+    state_open = build_timeline_view_state(
         session,
         position_sec=0.0,
         duration_sec=60.0,
-        focus_cursor=focus,
+        song_marker_page_open=True,
     )
-    assert state_focused.selected_song_marker_index == 1
+    assert state_open.selected_song_marker_index == 1
+
+
+def test_build_timeline_view_state_carries_song_marker_flash() -> None:
+    session = _session(
+        layer_enabled={"layer_1": True, "layer_2": True, "layer_3": True, "layer_4": True},
+        timeline_enabled=True,
+    )
+    session.song_markers.times = [12.5]
+    session.song_markers.selected_index = 0
+    session.song_markers.selected_flash_start_ms = pygame.time.get_ticks()
+    state = build_timeline_view_state(
+        session, position_sec=0.0, duration_sec=60.0, song_marker_page_open=True
+    )
+    assert state.song_marker_flash_start_ms is not None
+    closed = build_timeline_view_state(session, position_sec=0.0, duration_sec=60.0)
+    assert closed.song_marker_flash_start_ms is None
 
 
 def test_timeline_strip_lane_highlight_follows_region_not_cursor() -> None:
@@ -900,32 +913,6 @@ def test_timeline_strip_lane_highlight_follows_region_not_cursor() -> None:
     )
     assert focused.submenu_focused is True
     assert focused.focus_row == 1
-
-
-def test_build_timeline_view_state_song_marker_highlight_requires_marker_focus() -> None:
-    session = _session(
-        layer_enabled={"layer_1": True, "layer_2": True, "layer_3": True, "layer_4": True},
-        timeline_enabled=True,
-    )
-    session.song_markers.times = [12.5, 64.0]
-    session.song_markers.selected_index = 0
-
-    other_main = MainFocus(RowDescriptor(RowKind.SONG_MARKERS_HEADER))
-    assert (
-        build_timeline_view_state(
-            session, position_sec=0.0, duration_sec=60.0, focus_cursor=other_main
-        ).selected_song_marker_index
-        is None
-    )
-    assert (
-        build_timeline_view_state(
-            session,
-            position_sec=0.0,
-            duration_sec=60.0,
-            focus_cursor=TimelineFocus(0),
-        ).selected_song_marker_index
-        is None
-    )
 
 
 def test_build_timeline_view_state_default_song_markers_empty() -> None:

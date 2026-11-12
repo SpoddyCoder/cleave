@@ -491,6 +491,9 @@ def _tick_frame_live_overlay(
                 runtime.controls.shell_focus.region is ShellRegion.TIMELINE
                 and tl.panel_open
             ),
+            song_marker_page_open=(
+                runtime.controls.shell_focus.selected_id == "timeline.song_markers"
+            ),
             bar_times=signals.downbeat_times if signals is not None else (),
             beat_times=signals.beat_times if signals is not None else (),
             paused=runtime.playback.paused,

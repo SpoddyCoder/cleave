@@ -81,6 +81,7 @@ class TimelineControls:
         on_close: Callable[[], None] | None = None,
         on_exit_submenu: Callable[[], None] | None = None,
         on_focus_row: Callable[[int], None] | None = None,
+        on_select_song_marker: Callable[[int], None] | None = None,
         on_seek: Callable[[float], None] | None = None,
         on_notification: Callable[[str], None] | None = None,
         beat_times: Sequence[float] = (),
@@ -95,6 +96,7 @@ class TimelineControls:
         self._on_close = on_close
         self._on_exit_submenu = on_exit_submenu
         self._on_focus_row = on_focus_row
+        self._on_select_song_marker = on_select_song_marker
         self._on_seek = on_seek
         self._on_notification = on_notification
         self._last_toggle_t: dict[str, float] = {}
@@ -304,6 +306,15 @@ class TimelineControls:
             self._on_focus_row(row)
             return
         self.session.timeline.focus_row = row
+
+    def select_song_marker(self, index: int) -> None:
+        """Select song marker *index* and show it on the Song Markers page."""
+        if self._on_select_song_marker is not None:
+            self._on_select_song_marker(index)
+            return
+        markers = self.session.song_markers
+        if 0 <= index < len(markers.markers):
+            markers.selected_index = index
 
     def select_cue_near(self, slot: str, t_sec: float, tolerance_sec: float) -> bool:
         """Select the cue on *slot* nearest *t_sec* within *tolerance_sec*."""

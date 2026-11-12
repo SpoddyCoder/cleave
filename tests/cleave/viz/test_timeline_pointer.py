@@ -40,6 +40,9 @@ class _Actions:
     def focus_row(self, row: int) -> None:
         self.calls.append(("focus", row))
 
+    def select_song_marker(self, index: int) -> None:
+        self.calls.append(("marker", index))
+
     def select_cue_near(self, slot: str, t_sec: float, tolerance_sec: float) -> bool:
         self.calls.append(("select", slot, t_sec, tolerance_sec))
         return self.cue_hit
@@ -66,6 +69,7 @@ class _Actions:
 def _session(panel_open: bool = True, view: StripView | None = None):
     return SimpleNamespace(
         layer_z_order=["layer_1", "layer_2"],
+        song_markers=SimpleNamespace(markers=[SimpleNamespace(time=30.0)]),
         timeline=SimpleNamespace(
             panel_open=panel_open,
             strip_hover=None,
@@ -523,8 +527,15 @@ class _TimeMenu:
     def __init__(self) -> None:
         self.calls: list[tuple] = []
 
-    def entries(self, t_sec: float, tolerance_sec: float, *, commands: bool):
-        self.calls.append((t_sec, tolerance_sec, commands))
+    def entries(
+        self,
+        t_sec: float,
+        tolerance_sec: float,
+        *,
+        commands: bool,
+        marker_index: int | None = None,
+    ):
+        self.calls.append((t_sec, tolerance_sec, commands, marker_index))
         return (
             ContextMenuItem(id="time.seek", label="Seek here", run=lambda: None),
         )
@@ -560,7 +571,7 @@ def test_ruler_right_click_opens_time_and_command_items() -> None:
     ).context_menu_at(0, 0)
     assert provider is not None
     assert [entry.id for entry in provider()] == ["time.seek"]
-    assert time_menu.calls == [(5.0, 0.2, True)]
+    assert time_menu.calls == [(5.0, 0.2, True, None)]
     assert actions.calls == []
 
 
@@ -586,7 +597,7 @@ def test_row_away_from_a_cue_leads_with_time_items() -> None:
     assert entries[0].id == "time.seek"
     assert entries[1] is CONTEXT_SEPARATOR
     assert entries[2].id == "timeline.row.visibility"
-    assert time_menu.calls == [(5.0, 0.2, False)]
+    assert time_menu.calls == [(5.0, 0.2, False, None)]
 
 
 def test_row_on_a_cue_has_no_time_items() -> None:
@@ -603,3 +614,64 @@ def test_row_on_a_cue_has_no_time_items() -> None:
         for entry in provider()
     )
     assert time_menu.calls == []
+
+
+def test_ruler_press_on_a_marker_selects_it_and_seeks_to_it() -> None:
+    actions = _Actions()
+    pointer = TimelinePointer(
+        _Geometry(StripHit(None, 30.2, 0.4, marker_index=0)), actions, _session()
+    )
+    assert pointer.press(0, 0) is True
+    assert actions.calls == [("marker", 0), ("seek", 30.0)]
+    assert pointer.scrubbing
+
+
+def test_row_press_on_a_cue_keeps_the_cue_over_a_marker() -> None:
+    actions = _Actions(cue_hit=True)
+    pointer = TimelinePointer(
+        _Geometry(StripHit(0, 30.0, 0.2, marker_index=0)), actions, _session()
+    )
+    pointer.press(0, 0)
+    assert ("marker", 0) not in actions.calls
+
+
+def test_row_press_on_a_marker_away_from_cues_selects_it() -> None:
+    actions = _Actions()
+    pointer = TimelinePointer(
+        _Geometry(StripHit(0, 30.0, 0.2, marker_index=0)), actions, _session()
+    )
+    pointer.press(0, 0)
+    assert actions.calls == [
+        ("focus", 0),
+        ("select", "layer_1", 30.0, 0.2),
+        ("marker", 0),
+    ]
+    assert not pointer.scrubbing
+
+
+def test_right_click_on_a_marker_selects_it_and_asks_for_its_items() -> None:
+    time_menu = _TimeMenu()
+    actions = _MenuActions()
+    provider = TimelinePointer(
+        _MenuGeometry(StripHit(None, 30.0, 0.2, marker_index=0)),
+        actions,
+        _session(),
+        time_menu=time_menu,
+    ).context_menu_at(0, 0)
+    assert provider is not None
+    provider()
+    assert actions.calls == [("marker", 0)]
+    assert time_menu.calls == [(30.0, 0.2, True, 0)]
+
+    row_menu = _TimeMenu()
+    row_actions = _row_slot_actions()
+    provider = TimelinePointer(
+        _MenuGeometry(StripHit(0, 30.0, 0.2, marker_index=0)),
+        row_actions,
+        _menu_session(),
+        time_menu=row_menu,
+    ).context_menu_at(0, 0)
+    assert provider is not None
+    provider()
+    assert ("marker", 0) in row_actions.calls
+    assert row_menu.calls == [(30.0, 0.2, False, 0)]
