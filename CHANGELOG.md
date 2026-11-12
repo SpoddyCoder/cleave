@@ -153,6 +153,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Removed
 
+- The marker count beside Song Markers in the navigator.
 - The timeline's paused preview. Pausing no longer takes a snapshot that number keys toggle until playback resumes; override a row instead.
 - Settings > Editor Window > upscale, display size, and visualiser width and height. The window size comes from the window itself, and the preview resolution from Project > Render.
 - Settings > UI width mode, max width, and min width rows, and their `ui_width_mode`, `ui_width`, and `ui_min_width` keys in the user config. The shell layout no longer used them.

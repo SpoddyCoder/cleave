@@ -188,7 +188,7 @@ def test_node_id_helpers() -> None:
     assert ancestor_ids("settings") == set()
 
 
-def test_song_markers_badge_is_marker_count() -> None:
+def test_song_markers_has_no_badge() -> None:
     session = _session()
     markers = next(
         node
@@ -197,11 +197,11 @@ def test_song_markers_badge_is_marker_count() -> None:
     )
     assert markers.parent_id == "timeline"
     assert markers.depth == 1
-    assert markers.badge == "0"
+    assert markers.badge is None
 
     session.song_markers.times = [1.0, 4.5, 9.0]
     nodes = {node.id: node for node in build_navigator(session, {"timeline"})}
-    assert nodes["timeline.song_markers"].badge == "3"
+    assert nodes["timeline.song_markers"].badge is None
 
 
 def test_preset_curation_keeps_only_layers() -> None:

@@ -216,8 +216,7 @@ def build_navigator(
     *expanded* defaults to ``DEFAULT_EXPANDED_IDS``. A node's children are
     included only while its id is in *expanded*. Preset curation omits every
     root except Layers, and keeps one childless layer for the
-    curation focus slot. Song Markers carries the marker count as its badge,
-    including ``"0"``.
+    curation focus slot.
     """
     if expanded is None:
         expanded = DEFAULT_EXPANDED_IDS
@@ -298,18 +297,12 @@ def _static_children(session: TuningSession, parent_id: str) -> tuple[NavNode, .
             id=node_id,
             label=label,
             depth=1,
-            badge=_static_child_badge(session, node_id),
+            badge=None,
             parent_id=parent_id,
             toggles=_static_child_toggles(session, node_id),
         )
         for node_id, label in _STATIC_CHILDREN.get(parent_id, ())
     )
-
-
-def _static_child_badge(session: TuningSession, node_id: str) -> str | None:
-    if node_id == "timeline.song_markers":
-        return str(len(session.song_markers.times))
-    return None
 
 
 def _static_child_toggles(
