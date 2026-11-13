@@ -22,6 +22,7 @@ from cleave.gl_compositor import GlCompositor
 from cleave.layer_composite import LayerCompositeRequest
 from cleave.gl_masked_compositor import GlMaskedCompositor
 from cleave.gl_post_process import GlPostProcess
+from cleave.preset_library import PresetLibrary
 from cleave.preset_playlist import PresetPlaylist
 from cleave.signals import Signals
 from cleave.pcm_io import load_mix_pcm
@@ -84,6 +85,7 @@ class VisualizerSeed:
     signals: Signals | None
     effect_runtime: EffectRuntime
     preset_root: Path
+    library: PresetLibrary
     playlists: dict[str, PresetPlaylist] = field(default_factory=dict)
 
 
@@ -131,6 +133,7 @@ def build_runtime_base(
     project_dir: Path,
     audio_path: Path,
     playlists: dict[str, PresetPlaylist],
+    library: PresetLibrary,
 ) -> VisualizerSeed:
     pcm_bank = load_stem_pcm(project_dir)
     session = session_from_cfg(cfg, playlists)
@@ -149,6 +152,7 @@ def build_runtime_base(
         signals=load_stem_signals(project_dir),
         effect_runtime=EffectRuntime(),
         preset_root=cfg.paths.preset_root,
+        library=library,
         playlists=playlists,
     )
 
@@ -274,6 +278,7 @@ def init_gl_resources_heavy(
             seed.project_dir, seed.cfg.paths.texture_paths
         ),
         post_process=post_process,
+        catalog=seed.library,
     )
     controls = make_tuning_controls(
         session=seed.session,
@@ -293,6 +298,7 @@ def init_gl_resources_heavy(
         compositor=compositor,
         post_process=post_process,
         masked_compositor=masked_compositor,
+        library=seed.library,
     )
     timeline_controls = make_timeline_controls(
         session=seed.session,

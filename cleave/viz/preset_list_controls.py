@@ -6,11 +6,13 @@ import shutil
 from collections.abc import Callable
 from pathlib import Path
 
-from cleave.preset_playlist import milk_files_in_dir, scan_preset_playlist
+from cleave.preset_library import UNFILTERED_CATALOG, PresetCatalog
+from cleave.preset_playlist import scan_preset_playlist
 from cleave.viz.layer import StemLayer
 from cleave.viz.live_layer_bindings import LiveLayerBindings
 from cleave.viz.modal import FormField, FormSpec, ModalHost
 from cleave.viz.preset_list_populate import (
+    browse_pool,
     needed_preset_count,
     on_segment_populate_count,
     populate_from_cue_marker_roles,
@@ -47,9 +49,11 @@ class PresetListController:
         get_active_config_path: Callable[[], Path | None] | None = None,
         on_focus_preset_item: Callable[[str, int], None] | None = None,
         layers_by_slot: dict[str, StemLayer] | None = None,
+        catalog: PresetCatalog = UNFILTERED_CATALOG,
     ) -> None:
         self.session = session
         self.preset_root = preset_root
+        self._catalog = catalog
         self.project_dir = project_dir
         self.duration_sec = duration_sec
         self._modal = modal_host
@@ -159,7 +163,7 @@ class PresetListController:
             self.session,
             mode=self.session.timeline.timeline_preset_repopulate,
             project_dir=self.project_dir,
-            preset_root=self.preset_root,
+            catalog=self._catalog,
         )
         if self._layer_bindings is None:
             return
@@ -183,7 +187,7 @@ class PresetListController:
                 preset_duration=layer.preset_duration,
                 trigger=layer.preset_switching_trigger,
             )
-            available = len(milk_files_in_dir(layer.playlist.current_dir))
+            available = len(browse_pool(layer.playlist))
             populate_count = min(needed, available)
         noun = "1 preset" if populate_count == 1 else f"{populate_count} presets"
         sources.append(("Current Directory (random)", "directory_random"))
@@ -239,7 +243,7 @@ class PresetListController:
                     self.session,
                     slot,
                     project_dir=self.project_dir,
-                    preset_root=self.preset_root,
+                    catalog=self._catalog,
                 )
             if self._layer_bindings is not None:
                 self._layer_bindings.on_preset_switching_change(slot)
@@ -268,7 +272,9 @@ class PresetListController:
         layer = self.session.layers[slot]
         if index < 0 or index >= len(layer.preset_list):
             return
-        playlist = scan_preset_playlist(Path(layer.preset_list[index]))
+        playlist = scan_preset_playlist(
+            Path(layer.preset_list[index]), catalog=layer.playlist.catalog
+        )
         layer.playlist = playlist
         if self._layer_bindings is not None:
             self._layer_bindings.on_preset_change(slot, playlist)

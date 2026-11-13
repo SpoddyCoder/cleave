@@ -45,19 +45,14 @@ This will separate the track into its component stems (bass, drums, vocals, othe
 
 ### Preset Curation
 
-The editor has a preset curation mode for sorting presets into folders.
+The editor has a preset curation mode for marking up your presets.
 `Settings` > `Switch to Preset Curation`. While focused on a preset **file** row:
-* `f` - **copy** the preset into `favourites/` (original stays in the pack).
-* `c` - **copy** the preset into a cast role directory.
-* `b` - **move** the preset into `blacklist/` (permanently removed from pack).
-* Browse curated folders in the editor like any other pack folder.
-* Subdirectories inside `favourites/` or `blacklist/` appear as destination choices in the confirm modal, so you can categorise however you like:
-```
-favourites/a-tier/
-favourites/b-tier/
-favourites/lots-of-black/
-favourites/full-colour-wash/
-```
+* `f` - favourite or unfavourite the preset.
+* `c` - cast the preset into a role (bed, pulse, lead, accent).
+* `b` - blacklist the preset. It is hidden from folder browsing, populate, and random picks.
+* `r` - remove the preset from favourites, its role, or the blacklist.
+* Curation never moves, copies, or deletes preset files. It is stored in `cleave.db` in the data directory, keyed by each preset's contents, so it follows a preset if you rename or move it.
+* Left/Right on the top-level directory row steps through the **Favourites**, **Role**, and **Blacklisted** collections as well as your preset folders.
 
 ### Timeline
 

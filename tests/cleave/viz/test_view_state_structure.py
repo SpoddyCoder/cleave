@@ -549,8 +549,12 @@ def test_builder_appends_curation_markers_without_structure_change() -> None:
     controls = _make_controls(("layer_1",))
     session = controls.session
     config_save = controls._config_save
-    index = controls._view_state._curation_index
+    library = controls.library
     layer = session.layers["layer_1"]
+    current = layer.playlist.current
+    assert current is not None
+    current.parent.mkdir(parents=True, exist_ok=True)
+    current.write_text("current milk", encoding="utf-8")
     user_path = Path("/tmp/projects/my-track/user.milk")
     user_path.parent.mkdir(parents=True, exist_ok=True)
     user_path.write_text("milk", encoding="utf-8")
@@ -565,11 +569,9 @@ def test_builder_appends_curation_markers_without_structure_change() -> None:
     assert block_before.preset_markers == ""
     assert block_before.preset_list_labels == ["user.milk"]
 
-    current_name = layer.playlist.current.name
-    assert current_name is not None
-    index.mark_favourite(current_name)
-    index.mark_favourite(user_path.name)
-    index.mark_blacklisted(user_path.name)
+    library.set_favourite(current, True)
+    library.set_favourite(user_path, True)
+    library.set_blacklisted(user_path, True)
 
     sig_after = view_state_structure_signature(
         session, config_save)
@@ -588,11 +590,13 @@ def test_builder_appends_user_defined_marker_on_track_preset() -> None:
     controls = _make_controls(("layer_1", "layer_2"))
     session = controls.session
     config_save = controls._config_save
-    index = controls._view_state._curation_index
+    library = controls.library
     layer_1 = session.layers["layer_1"]
     layer_2 = session.layers["layer_2"]
     current = layer_1.playlist.current
     assert current is not None
+    current.parent.mkdir(parents=True, exist_ok=True)
+    current.write_text("milk", encoding="utf-8")
     current_name = current.name
     assert current_name is not None
 
@@ -609,7 +613,7 @@ def test_builder_appends_user_defined_marker_on_track_preset() -> None:
     assert view_u.tracks["layer_1"].preset_markers == "[U]"
     assert view_u.tracks["layer_2"].preset_list_labels == [current_name]
 
-    index.mark_favourite(current_name)
+    library.set_favourite(current, True)
     sig_after = view_state_structure_signature(
         session, config_save)
     assert sig_before == sig_after
@@ -650,8 +654,7 @@ def test_builder_caches_preset_list_base_labels(monkeypatch) -> None:
     assert view_second.tracks["layer_1"].preset_list_labels == ["user.milk"]
     assert calls == [1]
 
-    index = controls._view_state._curation_index
-    index.mark_favourite(user_path.name)
+    controls.library.set_favourite(user_path, True)
     view_marked = controls.build_view_state(paused=False)
     assert view_marked.tracks["layer_1"].preset_list_labels == ["user.milk"]
     assert view_marked.tracks["layer_1"].preset_list_markers == ["[F]"]
@@ -750,3 +753,29 @@ def test_structure_signature_invalidates_on_selected_cue_kind() -> None:
     tl.selected_cue_t["layer_1"] = 20.0
     end = view_state_structure_signature(session, config_save)
     assert len({none, start, end}) == 3
+
+
+def test_preset_position_counts_within_browsed_collection(tmp_path: Path) -> None:
+    from cleave.preset_playlist import playlist_at_collection
+
+    controls = _make_controls(("layer_1",))
+    library = controls.library
+    pack = tmp_path / "pack"
+    pack.mkdir()
+    for name in ("a", "b", "c"):
+        (pack / f"{name}.milk").write_text(name, encoding="utf-8")
+    library.index(tmp_path)
+    fav = (pack / "b.milk").resolve()
+    library.set_favourite(fav, True)
+    library.set_role(fav, "pulse")
+    library.set_blacklisted((pack / "c.milk").resolve(), True)
+    layer = controls.session.layers["layer_1"]
+
+    for collection in ("favourites", "pulse", "blacklisted"):
+        layer.playlist = playlist_at_collection(
+            collection, current_dir=pack, catalog=library
+        )
+        layer.auto_preset_path = layer.playlist.current
+        controls._view_state._structure = None
+        block = controls.build_view_state(paused=False).tracks["layer_1"]
+        assert block.preset_position == "1/1", collection

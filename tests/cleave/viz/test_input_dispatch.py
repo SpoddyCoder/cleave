@@ -7,6 +7,7 @@ from unittest.mock import MagicMock
 
 import pygame
 
+from cleave.preset_library import PresetLibrary
 from cleave.config_schema.layers import DEFAULT_LAYER_SLOTS
 from tests.support.config import TEST_LAYER_STEMS
 from cleave.stems import STEM_NAMES
@@ -84,6 +85,7 @@ def _make_runtime(
         signals=None,
         effect_runtime=MagicMock(),
         preset_root=preset_root,
+        library=PresetLibrary.in_memory(),
         playlists={},
     )
     playback = stub_playback_state()

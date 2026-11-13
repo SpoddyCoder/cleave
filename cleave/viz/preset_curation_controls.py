@@ -1,424 +1,177 @@
-"""Preset favourites and blacklist modal orchestration for live tuning."""
+"""Preset favourite, blacklist, and cue-role curation for live tuning.
+
+Curation flips flags in the preset library; preset files are never touched.
+"""
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Literal
 
 from cleave.cue_roles import CUE_ROLES, CueRole
-from cleave.preset_curation import (
-    PresetCurationIndex,
-    blacklist_root,
-    copy_to_favourites,
-    copy_to_role,
-    curated_milk_src,
-    delete_favourite_milk,
-    delete_role_milk,
-    favourites_root,
-    list_destination_subdirs,
-    list_restore_destination_subdirs,
-    move_to_blacklist,
-    relocate_curated_milk,
-    resolve_blacklist_origin_dir,
-    restore_from_blacklist,
-    rewrite_user_preset_paths,
-    roles_root,
-    scrub_user_preset_paths,
-)
+from cleave.preset_library import PresetLibrary
 from cleave.viz.live_layer_bindings import LiveLayerBindings
 from cleave.viz.modal import ModalHost, ModalOption
 from cleave.viz.session import TuningSession
 
-_ROOT_DEST_LABEL = "(Root)"
 _CANCEL_LABEL = "Cancel"
+_NO_ROLE_LABEL = "None"
+
+NOTIFICATION_FAVOURITED_TEXT = "Favourited"
+NOTIFICATION_UNFAVOURITED_TEXT = "Removed from favourites"
 
 _RestoreKind = Literal["favourite", "blacklist", "role"]
-_RestoreMembership = tuple[_RestoreKind, CueRole | None]
-
-
-def _path_under(path: Path, root: Path) -> bool:
-    try:
-        path.resolve().relative_to(root.resolve())
-    except ValueError:
-        return False
-    return True
 
 
 class PresetCurationController:
-    """Confirm and route favourite/blacklist actions from the tuning panel."""
+    """Route favourite / blacklist / cast / remove actions from the tuning panel."""
 
     def __init__(
         self,
         session: TuningSession,
-        preset_root: Path,
         modal_host: ModalHost,
         layer_bindings: LiveLayerBindings | None,
-        index: PresetCurationIndex,
+        library: PresetLibrary,
+        *,
+        on_notification: Callable[[str], None] | None = None,
     ) -> None:
         self.session = session
-        self._preset_root = preset_root
         self._modal = modal_host
         self._layer_bindings = layer_bindings
-        self._index = index
+        self._library = library
+        self._on_notification = on_notification
+
+    def is_favourite(self, src: Path) -> bool:
+        return self._library.is_favourite(src)
+
+    def is_blacklisted(self, src: Path) -> bool:
+        return self._library.is_blacklisted(src)
+
+    def toggle_favourite(self, src: Path) -> None:
+        """Favourite or unfavourite *src* at once (hotkey **f**)."""
+        on = not self._library.is_favourite(src)
+        self._library.set_favourite(src, on)
+        self._refresh_collections()
+        if self._on_notification is not None:
+            self._on_notification(
+                NOTIFICATION_FAVOURITED_TEXT if on else NOTIFICATION_UNFAVOURITED_TEXT
+            )
+
+    def prompt_blacklist(self, slot: str, src: Path) -> None:
+        """Confirm, then hide *src* from browsing and picks (hotkey **b**)."""
+        if self._library.is_blacklisted(src):
+            return
+        self._lock_preset(slot)
+        self._modal.prompt_confirm(
+            f"Blacklist preset: {src.name}?",
+            "Blacklist",
+            lambda: self._confirm_blacklist(slot, src),
+            lambda: self._unlock_preset(slot),
+        )
 
     def prompt_cast(self, slot: str, src: Path) -> None:
-        """Copy or move a preset into a role pool (hotkey **c**)."""
-        relocating = src.name in self._index.roles
+        """Choose the cue role for *src*, or None (hotkey **c**)."""
+        current = self._library.role_of(src)
         self._lock_preset(slot)
-        message = (
-            f"Move cast: {src.name}?"
-            if relocating
-            else f"Cast preset: {src.name}?"
-        )
         dismiss = lambda: self._unlock_preset(slot)
         options: list[ModalOption] = [
             ModalOption(
-                role,
-                lambda r=role: self._confirm_cast(
-                    slot, src, r, relocating=relocating
-                ),
+                f"{role} (current)" if role == current else role,
+                lambda r=role: self._confirm_cast(slot, src, r),
             )
             for role in CUE_ROLES
         ]
-        options.append(ModalOption(_CANCEL_LABEL, dismiss))
-        self._modal.prompt_choice(message, options, on_dismiss=dismiss)
-
-    def prompt_restore(self, slot: str, src: Path) -> None:
-        """Remove from favourites / cast, or restore a blacklisted preset (hotkey **r**)."""
-        memberships = self._restore_memberships(src)
-        if not memberships:
-            return
-        if len(memberships) == 1:
-            kind, role = memberships[0]
-            if kind == "favourite":
-                self._prompt_remove_favourite(slot, src)
-            elif kind == "blacklist":
-                self._prompt_restore_blacklist(slot, src)
-            else:
-                assert role is not None
-                self._prompt_remove_cast(slot, src, role)
-            return
-        self._prompt_restore_choice(slot, src, memberships)
-
-    def can_restore(self, src: Path) -> bool:
-        """True when *src* is a favourite, cast, or blacklisted (what Restore undoes)."""
-        return bool(self._restore_memberships(src))
-
-    def _restore_memberships(self, src: Path) -> list[_RestoreMembership]:
-        under_fav = _path_under(src, favourites_root(self._preset_root))
-        under_bl = _path_under(src, blacklist_root(self._preset_root))
-        memberships: list[_RestoreMembership] = []
-        if under_fav or src.name in self._index.favourites:
-            memberships.append(("favourite", None))
-        if under_bl or src.name in self._index.blacklist:
-            memberships.append(("blacklist", None))
-        for role in CUE_ROLES:
-            if role in self._roles_for_src(src):
-                memberships.append(("role", role))
-        return memberships
-
-    def _roles_for_src(self, src: Path) -> set[CueRole]:
-        roles = set(self._index.roles.get(src.name, ()))
-        root = roles_root(self._preset_root)
-        if not _path_under(src, root):
-            return roles
-        try:
-            rel = src.resolve().relative_to(root.resolve())
-        except ValueError:
-            return roles
-        head = rel.parts[0] if rel.parts else ""
-        for role in CUE_ROLES:
-            if head == role:
-                roles.add(role)
-                break
-        return roles
-
-    def _prompt_restore_choice(
-        self,
-        slot: str,
-        src: Path,
-        memberships: list[_RestoreMembership],
-    ) -> None:
-        self._lock_preset(slot)
-        dismiss = lambda: self._unlock_preset(slot)
-        options: list[ModalOption] = []
-        for kind, role in memberships:
-            if kind == "favourite":
-                options.append(
-                    ModalOption(
-                        "Favourites",
-                        lambda: self._confirm_remove_favourite(slot, src),
-                    )
+        if current is not None:
+            options.append(
+                ModalOption(
+                    _NO_ROLE_LABEL, lambda: self._confirm_cast(slot, src, None)
                 )
-            elif kind == "blacklist":
-                options.append(
-                    ModalOption(
-                        "Blacklist",
-                        lambda: self._confirm_restore_blacklist(slot, src),
-                    )
-                )
-            else:
-                assert role is not None
-                options.append(
-                    ModalOption(
-                        f"Cast ({role})",
-                        lambda r=role: self._confirm_remove_cast(slot, src, r),
-                    )
-                )
+            )
         options.append(ModalOption(_CANCEL_LABEL, dismiss))
         self._modal.prompt_choice(
-            f"Remove from: {src.name}?",
-            options,
-            on_dismiss=dismiss,
+            f"Cast preset: {src.name}?", options, on_dismiss=dismiss
         )
 
-    def prompt_favourite(self, slot: str, src: Path) -> None:
-        relocating = src.name in self._index.favourites
-        self._lock_preset(slot)
-        message = (
-            f"Move favourite preset: {src.name}?"
-            if relocating
-            else f"Favourite preset: {src.name}?"
-        )
-        root = favourites_root(self._preset_root)
-        subdirs = list_destination_subdirs(root)
-        if not subdirs:
-            self._modal.prompt_confirm(
-                message,
-                "Favourite",
-                lambda: self._confirm_favourite(
-                    slot, src, root, relocating=relocating
-                ),
-                lambda: self._unlock_preset(slot),
-            )
+    def can_restore(self, src: Path) -> bool:
+        """True when *src* is favourited, cast, or blacklisted (what Remove undoes)."""
+        return bool(self._memberships(src))
+
+    def prompt_restore(self, slot: str, src: Path) -> None:
+        """Remove *src* from favourites, its role, or the blacklist (hotkey **r**)."""
+        memberships = self._memberships(src)
+        if not memberships:
             return
-
-        dismiss = lambda: self._unlock_preset(slot)
-        options: list[ModalOption] = [
-            ModalOption(
-                _ROOT_DEST_LABEL,
-                lambda: self._confirm_favourite(
-                    slot, src, root, relocating=relocating
-                ),
-            ),
-        ]
-        for name in subdirs:
-            dest_dir = root / name
-            options.append(
-                ModalOption(
-                    name,
-                    lambda dest=dest_dir: self._confirm_favourite(
-                        slot, src, dest, relocating=relocating
-                    ),
-                )
-            )
-        options.append(ModalOption(_CANCEL_LABEL, dismiss))
-        self._modal.prompt_choice(message, options, on_dismiss=dismiss)
-
-    def prompt_blacklist(
-        self,
-        slot: str,
-        src: Path,
-        *,
-        from_user_preset: bool,
-        user_preset_index: int | None,
-    ) -> None:
-        del user_preset_index  # reserved for hotkey wiring in a later todo
-        relocating = src.name in self._index.blacklist
         self._lock_preset(slot)
-        message = (
-            f"Move blacklist preset: {src.name}?"
-            if relocating
-            else f"Blacklist preset: {src.name}?"
-        )
-        root = blacklist_root(self._preset_root)
-        subdirs = list_destination_subdirs(root)
-        if not subdirs:
-            self._modal.prompt_confirm(
-                message,
-                "Blacklist",
-                lambda: self._confirm_blacklist(
-                    slot,
-                    src,
-                    root,
-                    from_user_preset=from_user_preset,
-                    relocating=relocating,
-                ),
-                lambda: self._unlock_preset(slot),
-            )
-            return
-
         dismiss = lambda: self._unlock_preset(slot)
-        options: list[ModalOption] = [
+        options = [
             ModalOption(
-                _ROOT_DEST_LABEL,
-                lambda: self._confirm_blacklist(
-                    slot,
-                    src,
-                    root,
-                    from_user_preset=from_user_preset,
-                    relocating=relocating,
-                ),
-            ),
+                self._membership_label(kind, src),
+                lambda k=kind: self._confirm_remove(slot, src, k),
+            )
+            for kind in memberships
         ]
-        for name in subdirs:
-            dest_dir = root / name
-            options.append(
-                ModalOption(
-                    name,
-                    lambda dest=dest_dir: self._confirm_blacklist(
-                        slot,
-                        src,
-                        dest,
-                        from_user_preset=from_user_preset,
-                        relocating=relocating,
-                    ),
-                )
-            )
         options.append(ModalOption(_CANCEL_LABEL, dismiss))
-        self._modal.prompt_choice(message, options, on_dismiss=dismiss)
+        self._modal.prompt_choice(
+            f"Remove from: {src.name}?", options, on_dismiss=dismiss
+        )
 
-    def _confirm_cast(
-        self,
-        slot: str,
-        src: Path,
-        role: CueRole,
-        *,
-        relocating: bool,
-    ) -> None:
+    def _memberships(self, src: Path) -> list[_RestoreKind]:
+        kinds: list[_RestoreKind] = []
+        if self._library.is_favourite(src):
+            kinds.append("favourite")
+        if self._library.is_blacklisted(src):
+            kinds.append("blacklist")
+        if self._library.role_of(src) is not None:
+            kinds.append("role")
+        return kinds
+
+    def _membership_label(self, kind: _RestoreKind, src: Path) -> str:
+        if kind == "favourite":
+            return "Favourites"
+        if kind == "blacklist":
+            return "Blacklist"
+        return f"Cast ({self._library.role_of(src)})"
+
+    def _confirm_blacklist(self, slot: str, src: Path) -> None:
         try:
-            if relocating:
-                old_roles = set(self._index.roles.get(src.name, ()))
-                dest = copy_to_role(src, self._preset_root, role)
-                self._index.mark_role(dest.name, role)
-                for old_role in old_roles:
-                    if old_role == role:
-                        continue
-                    deleted = delete_role_milk(self._preset_root, src, old_role)
-                    if deleted is not None:
-                        self._index.unmark_role(deleted.name, old_role)
-                        self._rewrite_paths_after_relocate(
-                            deleted.resolve(), dest.resolve()
-                        )
-            else:
-                dest = copy_to_role(src, self._preset_root, role)
-                self._index.mark_role(dest.name, role)
-            self._rebuild_timeline_role_rotations()
-        finally:
-            self._unlock_preset(slot)
-
-    def _confirm_favourite(
-        self,
-        slot: str,
-        src: Path,
-        dest_dir: Path,
-        *,
-        relocating: bool,
-    ) -> None:
-        try:
-            if relocating:
-                curated = curated_milk_src(favourites_root(self._preset_root), src)
-                if curated is None:
-                    return
-                old = curated.resolve()
-                new = relocate_curated_milk(
-                    curated, dest_dir, with_textures=True
-                ).resolve()
-                if old != new:
-                    self._rewrite_paths_after_relocate(old, new)
-            else:
-                self._index.mark_favourite(copy_to_favourites(src, dest_dir).name)
-        finally:
-            self._unlock_preset(slot)
-
-    def _confirm_blacklist(
-        self,
-        slot: str,
-        src: Path,
-        dest_dir: Path,
-        *,
-        from_user_preset: bool,
-        relocating: bool,
-    ) -> None:
-        try:
-            if relocating:
-                curated = curated_milk_src(blacklist_root(self._preset_root), src)
-                if curated is None:
-                    return
-                old = curated.resolve()
-                new = relocate_curated_milk(curated, dest_dir).resolve()
-                if old != new:
-                    self._rewrite_paths_after_relocate(old, new)
-                return
-
-            self._index.mark_blacklisted(
-                move_to_blacklist(src, dest_dir, self._preset_root).name
-            )
+            self._library.set_blacklisted(src, True)
             playlist = self.session.layers[slot].playlist
-            if not from_user_preset or (
-                playlist.current is not None
-                and playlist.current.resolve() == src.resolve()
-            ):
-                if playlist.remove_preset(src):
-                    if self._layer_bindings is not None:
-                        self._layer_bindings.on_preset_change(slot, playlist)
-            affected = scrub_user_preset_paths(self.session.layers, src)
-            if self._layer_bindings is not None:
-                for affected_slot in affected:
-                    self._layer_bindings.on_preset_switching_change(affected_slot)
+            if playlist.collection is None and playlist.remove_preset(src):
+                if self._layer_bindings is not None:
+                    self._layer_bindings.on_preset_change(slot, playlist)
+            self._refresh_collections()
         finally:
             self._unlock_preset(slot)
 
-    def _prompt_remove_favourite(self, slot: str, src: Path) -> None:
-        self._lock_preset(slot)
-        self._modal.prompt_confirm(
-            f"Remove favourite: {src.name}?",
-            "Remove favourite",
-            lambda: self._confirm_remove_favourite(slot, src),
-            lambda: self._unlock_preset(slot),
-            destructive=True,
-        )
-
-    def _confirm_remove_favourite(self, slot: str, src: Path) -> None:
+    def _confirm_cast(self, slot: str, src: Path, role: CueRole | None) -> None:
         try:
-            deleted = delete_favourite_milk(self._preset_root, src)
-            if deleted is not None:
-                self._index.unmark_favourite(deleted.name)
-                self._scrub_deleted_preset(deleted)
-        finally:
-            self._unlock_preset(slot)
-
-    def _prompt_remove_cast(self, slot: str, src: Path, role: CueRole) -> None:
-        self._lock_preset(slot)
-        self._modal.prompt_confirm(
-            f"Remove cast ({role})?",
-            "Remove cast",
-            lambda: self._confirm_remove_cast(slot, src, role),
-            lambda: self._unlock_preset(slot),
-            destructive=True,
-        )
-
-    def _confirm_remove_cast(self, slot: str, src: Path, role: CueRole) -> None:
-        try:
-            deleted = delete_role_milk(self._preset_root, src, role)
-            if deleted is not None:
-                self._index.unmark_role(deleted.name, role)
-                self._scrub_deleted_preset(deleted)
+            self._library.set_role(src, role)
+            self._refresh_collections()
             self._rebuild_timeline_role_rotations()
         finally:
             self._unlock_preset(slot)
 
-    def _scrub_deleted_preset(self, removed: Path) -> None:
-        """Drop ``removed`` from layer playlists and user preset lists."""
+    def _confirm_remove(self, slot: str, src: Path, kind: _RestoreKind) -> None:
+        try:
+            if kind == "favourite":
+                self._library.set_favourite(src, False)
+            elif kind == "blacklist":
+                self._library.set_blacklisted(src, False)
+            else:
+                self._library.set_role(src, None)
+            self._refresh_collections()
+            if kind == "role":
+                self._rebuild_timeline_role_rotations()
+        finally:
+            self._unlock_preset(slot)
+
+    def _refresh_collections(self) -> None:
+        """Re-read membership for layers browsing a collection."""
         for layer_slot, layer in self.session.layers.items():
-            playlist = layer.playlist
-            if playlist.remove_preset(removed):
+            if layer.playlist.refresh_collection():
                 if self._layer_bindings is not None:
-                    self._layer_bindings.on_preset_change(layer_slot, playlist)
-        affected = scrub_user_preset_paths(self.session.layers, removed)
-        if self._layer_bindings is not None:
-            for affected_slot in affected:
-                self._layer_bindings.on_preset_switching_change(affected_slot)
+                    self._layer_bindings.on_preset_change(layer_slot, layer.playlist)
 
     def _rebuild_timeline_role_rotations(self) -> None:
         if self._layer_bindings is None:
@@ -426,81 +179,6 @@ class PresetCurationController:
         for layer_slot, layer in self.session.layers.items():
             if layer.preset_switching == "on":
                 self._layer_bindings.on_preset_switching_change(layer_slot)
-
-    def _prompt_restore_blacklist(self, slot: str, src: Path) -> None:
-        self._lock_preset(slot)
-        self._modal.prompt_confirm(
-            f"Restore blacklisted preset: {src.name}?",
-            "Restore preset",
-            lambda: self._confirm_restore_blacklist(slot, src),
-            lambda: self._unlock_preset(slot),
-        )
-
-    def _confirm_restore_blacklist(self, slot: str, src: Path) -> None:
-        curated = curated_milk_src(blacklist_root(self._preset_root), src)
-        if curated is None:
-            self._unlock_preset(slot)
-            return
-        origin_dir = resolve_blacklist_origin_dir(self._preset_root, curated)
-        if origin_dir is not None:
-            try:
-                restore_from_blacklist(curated, origin_dir)
-                self._index.unmark_blacklisted(curated.name)
-                self._scrub_deleted_preset(curated)
-            finally:
-                self._unlock_preset(slot)
-            return
-        self._prompt_restore_dest_choice(slot, curated)
-
-    def _prompt_restore_dest_choice(self, slot: str, curated: Path) -> None:
-        message = f"Restore blacklisted preset: {curated.name}?"
-        subdirs = list_restore_destination_subdirs(self._preset_root)
-        dismiss = lambda: self._unlock_preset(slot)
-        options: list[ModalOption] = [
-            ModalOption(
-                _ROOT_DEST_LABEL,
-                lambda: self._finish_restore_blacklist(
-                    slot, curated, self._preset_root
-                ),
-            ),
-        ]
-        for name in subdirs:
-            dest_dir = self._preset_root / name
-            options.append(
-                ModalOption(
-                    name,
-                    lambda dest=dest_dir: self._finish_restore_blacklist(
-                        slot, curated, dest
-                    ),
-                )
-            )
-        options.append(ModalOption(_CANCEL_LABEL, dismiss))
-        self._modal.prompt_choice(message, options, on_dismiss=dismiss)
-
-    def _finish_restore_blacklist(
-        self,
-        slot: str,
-        curated: Path,
-        dest_dir: Path,
-    ) -> None:
-        try:
-            restore_from_blacklist(curated, dest_dir)
-            self._index.unmark_blacklisted(curated.name)
-            self._scrub_deleted_preset(curated)
-        finally:
-            self._unlock_preset(slot)
-
-    def _rewrite_paths_after_relocate(self, old: Path, new: Path) -> None:
-        for layer_slot, layer in self.session.layers.items():
-            playlist = layer.playlist
-            if any(path.resolve() == old for path in playlist.paths):
-                if playlist.remove_preset(old):
-                    if self._layer_bindings is not None:
-                        self._layer_bindings.on_preset_change(layer_slot, playlist)
-        affected = rewrite_user_preset_paths(self.session.layers, old, new)
-        if self._layer_bindings is not None:
-            for affected_slot in affected:
-                self._layer_bindings.on_preset_switching_change(affected_slot)
 
     def _lock_preset(self, slot: str) -> None:
         if self._layer_bindings is not None:

@@ -29,6 +29,7 @@ from cleave.config_schema.project_resolution import (
 )
 from cleave.ffmpeg import ffmpeg_executable
 from cleave.paths import default_project_config, resolve_project
+from cleave.preset_library import PresetLibrary
 from cleave.preset_playlist import scan_all_layers
 from cleave.project import load_manifest, manifest_path, mix_path
 from cleave.separate import project_stems_complete, signals_complete
@@ -222,7 +223,9 @@ def render(
 
     audio_path = mix_path(project)
     playlists = scan_all_layers(cfg)
-    seed = build_runtime_base(cfg, project, audio_path, playlists)
+    seed = build_runtime_base(
+        cfg, project, audio_path, playlists, PresetLibrary.in_memory()
+    )
     missing_anchor = missing_preset_anchor_notification(
         {slot: layer.playlist.current for slot, layer in seed.session.layers.items()}
     )

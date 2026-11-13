@@ -65,7 +65,8 @@ def continue_launch(
     picker-driven attempt returns to the picker on the same window.
     """
     from cleave.config import load_config
-    from cleave.paths import resource_dir
+    from cleave.paths import library_db_path, resource_dir
+    from cleave.preset_library import PresetLibrary, PresetLibraryError
     from cleave.preset_playlist import scan_all_layers
     from cleave.projectm import ProjectMLibraryError
     from cleave.viz.app import VisualizerApp, build_runtime_base
@@ -78,10 +79,25 @@ def continue_launch(
     try:
         cleanup_unreferenced_user_presets(project_dir)
         cfg = load_config(config_path, resource_dir())
-        playlists = scan_all_layers(cfg)
-        runtime = build_runtime_base(cfg, project_dir, audio_path, playlists)
+        library = PresetLibrary.open(library_db_path())
+        if not library.index(
+            cfg.paths.preset_root,
+            lambda done, total: window.update(
+                "Indexing presets", done / total if total else None
+            ),
+        ):
+            return None
+        playlists = scan_all_layers(cfg, catalog=library)
+        runtime = build_runtime_base(
+            cfg, project_dir, audio_path, playlists, library
+        )
         return VisualizerApp(runtime).run(window)
-    except (ProjectMLibraryError, FileNotFoundError, ValueError) as exc:
+    except (
+        ProjectMLibraryError,
+        PresetLibraryError,
+        FileNotFoundError,
+        ValueError,
+    ) as exc:
         window.update(f"error: {exc}")
         raise LaunchError(str(exc)) from exc
 

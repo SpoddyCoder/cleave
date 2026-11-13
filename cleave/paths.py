@@ -133,6 +133,11 @@ def default_preset_root() -> Path:
     return (data_dir() / "presets").resolve()
 
 
+def library_db_path() -> Path:
+    """Return the preset library database (curation state) under :func:`data_dir`."""
+    return (data_dir() / "cleave.db").resolve()
+
+
 def model_cache_dir() -> Path:
     """Return the torch-hub weight cache under :func:`data_dir`.
 

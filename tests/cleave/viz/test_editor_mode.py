@@ -150,7 +150,7 @@ def test_curation_allowlisted_keys_still_work() -> None:
     mock_curation = MagicMock()
     controls._preset_curation = mock_curation
     press_layer_row(controls, RowDescriptor(RowKind.TRACK_PRESET, slot="layer_1"), keydown(pygame.K_f))
-    mock_curation.prompt_favourite.assert_called_once()
+    mock_curation.toggle_favourite.assert_called_once()
     press_layer_row(controls, RowDescriptor(RowKind.TRACK_PRESET, slot="layer_1"), keydown(pygame.K_c))
     mock_curation.prompt_cast.assert_called_once()
 
@@ -177,7 +177,7 @@ def test_curation_ignores_layer_lock() -> None:
     mock_curation = MagicMock()
     controls._preset_curation = mock_curation
     press_layer_row(controls, preset, keydown(pygame.K_f))
-    mock_curation.prompt_favourite.assert_called_once()
+    mock_curation.toggle_favourite.assert_called_once()
 
 
 def test_dirty_enter_modal_cancel_stays_visualizer() -> None:

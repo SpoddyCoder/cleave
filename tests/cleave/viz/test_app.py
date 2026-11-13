@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, call, patch
 import pygame
 import pytest
 
+from cleave.preset_library import PresetLibrary
 from cleave.config import EditorConfig
 from cleave.config_schema.editor import (
     DEFAULT_INSPECTOR_WIDTH,
@@ -121,6 +122,7 @@ def _minimal_runtime(
         signals=None,
         effect_runtime=MagicMock(),
         preset_root=MagicMock(),
+        library=PresetLibrary.in_memory(),
         playlists={},
     )
     seed.cfg.editor = EditorConfig()
@@ -163,6 +165,7 @@ def _run_seed(
         signals=None,
         effect_runtime=MagicMock(),
         preset_root=MagicMock(),
+        library=PresetLibrary.in_memory(),
         playlists={},
     )
 

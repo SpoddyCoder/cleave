@@ -137,7 +137,7 @@ def test_curation_layer_section_omits_add_delete_and_expand() -> None:
         ).entries
     )
     assert preset["Left/Right"] == "next/previous preset"
-    assert preset["F"] == "favourite preset"
+    assert preset["F"] == "favourite / unfavourite preset"
 
 
 def _help_text(sections: tuple[object, ...]) -> str:
@@ -416,10 +416,10 @@ def test_preset_file_help_titles() -> None:
     entries = dict(keyboard.entries)
     assert entries["Left/Right"] == "next/previous preset"
     assert entries["PgUp/PgDn"] == "next/previous, large step"
-    assert entries["F"] == "favourite preset"
-    assert entries["B"] == "blacklist preset"
+    assert entries["F"] == "favourite / unfavourite preset"
+    assert entries["B"] == "blacklist preset (hidden from browsing)"
     assert entries["C"] == "set preset role (bed/pulse/lead/accent)"
-    assert entries["R"] == "undo favourite, blacklist, or role"
+    assert entries["R"] == "remove favourite, blacklist, or role"
     assert "Shift + +" not in entries
 
 
@@ -541,10 +541,10 @@ def test_preset_list_entry_help() -> None:
         "M": "reorder in list",
         "Drag handle": "reorder with the mouse",
         "Delete": "remove preset",
-        "F": "favourite preset",
-        "B": "blacklist preset",
+        "F": "favourite / unfavourite preset",
+        "B": "blacklist preset (hidden from browsing)",
         "C": "set preset role (bed/pulse/lead/accent)",
-        "R": "undo favourite, blacklist, or role",
+        "R": "remove favourite, blacklist, or role",
     }
 
 

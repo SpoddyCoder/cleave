@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from cleave.config import CleaveConfig, load_config, missing_preset_anchor_notification
+from cleave.preset_library import UNFILTERED_CATALOG, PresetCatalog
 from cleave.preset_playlist import PresetPlaylist, scan_all_layers
 from cleave.project import load_manifest
 from cleave.viz.config_save import ConfigSaveController
@@ -130,6 +131,7 @@ class EditorModeController:
         project_dir: Path | None = None,
         layer_bindings: LiveLayerBindings | None = None,
         layer_manager: LayerManager | None = None,
+        catalog: PresetCatalog = UNFILTERED_CATALOG,
         on_mode_changed: Callable[[], None] | None = None,
         on_notification: Callable[[str], None] | None = None,
     ) -> None:
@@ -140,6 +142,7 @@ class EditorModeController:
         self._project_dir = project_dir
         self._layer_bindings = layer_bindings
         self._layer_manager = layer_manager
+        self._catalog = catalog
         self._on_mode_changed = on_mode_changed
         self._on_notification = on_notification
         self._enter_curation_after_save = False
@@ -235,7 +238,7 @@ class EditorModeController:
             return
         fresh_cfg = load_config(active_path, self._project_dir)
         _replace_cfg(self.cfg, fresh_cfg)
-        playlists = scan_all_layers(self.cfg)
+        playlists = scan_all_layers(self.cfg, catalog=self._catalog)
         fresh_session = session_from_cfg(self.cfg, playlists)
         _merge_session_state(
             self.session,

@@ -16,6 +16,7 @@ from cleave.stems import STEM_SOURCES
 from cleave.gl_compositor import GlCompositor
 from cleave.gl_masked_compositor import GlMaskedCompositor
 from cleave.gl_post_process import GlPostProcess
+from cleave.preset_library import UNFILTERED_CATALOG, PresetCatalog, PresetLibrary
 from cleave.preset_playlist import PresetPlaylist, scan_single_layer
 from cleave.signals import Signals
 from cleave.viz.controls import TuningControls
@@ -72,8 +73,10 @@ class LayerManager:
         projectm_fps: int,
         texture_paths: list[Path],
         post_process: GlPostProcess | None = None,
+        catalog: PresetCatalog = UNFILTERED_CATALOG,
     ) -> None:
         self.cfg = cfg
+        self.catalog = catalog
         self.post_process = post_process
         self.session = session
         self.compositor = compositor
@@ -93,7 +96,9 @@ class LayerManager:
 
     def add_layer(self) -> str:
         slot = next_layer_slot(self.session.layer_z_order)
-        playlist = scan_single_layer(slot, self.preset_root, self.project_dir)
+        playlist = scan_single_layer(
+            slot, self.preset_root, self.project_dir, catalog=self.catalog
+        )
         runtime = new_layer_runtime(
             slot,
             playlist,
@@ -169,6 +174,7 @@ def make_tuning_controls(
     compositor: GlCompositor | None = None,
     post_process: GlPostProcess | None = None,
     masked_compositor: GlMaskedCompositor | None = None,
+    library: PresetLibrary | None = None,
 ) -> TuningControls:
     ctx = LiveLayerBindingContext(
         session=session,
@@ -211,6 +217,7 @@ def make_tuning_controls(
         "signals": signals,
         "on_save_config": factory.on_save_config,
         "launch_config_path": cfg.config_path,
+        "library": library,
     }
     if modal_host is not None:
         kwargs["modal_host"] = modal_host

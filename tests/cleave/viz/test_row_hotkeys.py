@@ -307,7 +307,7 @@ def test_curation_shell_allowlist() -> None:
 
     for key in (pygame.K_f, pygame.K_b, pygame.K_c, pygame.K_r):
         assert dispatch_keydown(keydown(key), runtime) is True
-    mock_curation.prompt_favourite.assert_called_once_with("layer_1", current)
+    mock_curation.toggle_favourite.assert_called_once_with(current)
     mock_curation.prompt_blacklist.assert_called_once()
     mock_curation.prompt_cast.assert_called_once_with("layer_1", current)
     mock_curation.prompt_restore.assert_called_once_with("layer_1", current)

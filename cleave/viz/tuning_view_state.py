@@ -70,7 +70,7 @@ from cleave.config_schema.timeline import (
     DEFAULT_TIMELINE_PLACEMENT_SNAP,
     DEFAULT_TIMELINE_SHOW_BAR_GRID,
 )
-from cleave.preset_curation import PresetCurationIndex
+from cleave.preset_library import PresetLibrary
 from cleave.viz.session import FadeRuntime
 from cleave.preset_playlist import (
     PresetPlaylist,
@@ -462,6 +462,7 @@ def view_state_structure_signature(
             "preset_list": path_list_identity(layer.preset_list),
             "playlist": {
                 "current_dir": str(playlist.current_dir),
+                "collection": playlist.collection,
                 "paths": path_list_identity(
                     [str(path) for path in playlist.paths]
                 ),
@@ -576,7 +577,7 @@ class TuningViewStateBuilder:
         playback: PlaybackState,
         duration_sec: float,
         preset_root,
-        curation_index: PresetCurationIndex,
+        library: PresetLibrary,
         *,
         get_focus_cursor: Callable[[], FocusCursor],
         get_move_mode_slot: Callable[[], str | None],
@@ -590,7 +591,7 @@ class TuningViewStateBuilder:
         self.playback = playback
         self.duration_sec = duration_sec
         self.preset_root = preset_root
-        self._curation_index = curation_index
+        self._library = library
         self._get_focus_cursor = get_focus_cursor
         self._get_move_mode_slot = get_move_mode_slot
         self._get_move_mode_preset = get_move_mode_preset
@@ -601,7 +602,7 @@ class TuningViewStateBuilder:
         self._auto_display_cache: dict[Path, PresetPlaylist] = {}
         self._preset_list_label_cache: dict[tuple[str, ...], list[str]] = {}
         self._preset_list_marker_cache: dict[
-            tuple[tuple[str, ...], str], list[str]
+            tuple[tuple[str, ...], int], list[str]
         ] = {}
         self._user_basenames_cache: dict[tuple[tuple[str, ...], ...], set[str]] = {}
         self._structure: _ViewStateStructure | None = None
@@ -643,13 +644,14 @@ class TuningViewStateBuilder:
     def _display_playlist(self, layer: LayerRuntime) -> PresetPlaylist:
         """Playlist for dir/file rows: playing auto-switch preset when set."""
         auto = layer.auto_preset_path
-        if auto is None:
+        if auto is None or auto == layer.playlist.current:
+            # Browsing (folder or collection): count within what is browsed.
             return layer.playlist
         cached = self._auto_display_cache.get(auto)
         if cached is not None:
             return cached
         try:
-            playlist = scan_preset_playlist(auto)
+            playlist = scan_preset_playlist(auto, catalog=layer.playlist.catalog)
         except (OSError, ValueError):
             return layer.playlist
         self._auto_display_cache[auto] = playlist
@@ -660,8 +662,10 @@ class TuningViewStateBuilder:
     ) -> str:
         if playlist.current is None:
             return ""
-        name = playlist.current.name
-        return self._curation_index.marker(name, user=name in user_names).strip()
+        current = playlist.current
+        return self._library.marker(
+            current, user=current.name in user_names
+        ).strip()
 
     def _preset_list_labels(self, paths: list[str]) -> list[str]:
         paths_key = tuple(paths)
@@ -672,11 +676,11 @@ class TuningViewStateBuilder:
         return labels
 
     def _preset_list_markers(self, paths: list[str]) -> list[str]:
-        key = (tuple(paths), self._curation_index.curation_stamp)
+        key = (tuple(paths), self._library.revision)
         markers = self._preset_list_marker_cache.get(key)
         if markers is None:
             markers = [
-                self._curation_index.marker(Path(path).name).strip()
+                self._library.marker(Path(path)).strip()
                 for path in paths
             ]
             self._preset_list_marker_cache[key] = markers

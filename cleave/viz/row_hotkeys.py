@@ -246,14 +246,9 @@ def _hotkey_for_descriptor(
             if src is None or not src.is_file():
                 return True
             if event.key == pygame.K_f:
-                controls.preset_curation.prompt_favourite(slot, src)
+                controls.preset_curation.toggle_favourite(src)
             elif event.key == pygame.K_b:
-                controls.preset_curation.prompt_blacklist(
-                    slot,
-                    src,
-                    from_user_preset=(kind == RowKind.TRACK_PRESET_LIST_ITEM),
-                    user_preset_index=desc.preset_index,
-                )
+                controls.preset_curation.prompt_blacklist(slot, src)
             elif event.key == pygame.K_c:
                 controls.preset_curation.prompt_cast(slot, src)
             else:

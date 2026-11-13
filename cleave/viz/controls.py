@@ -10,7 +10,7 @@ import pygame
 
 from cleave.config import CleaveConfig
 from cleave.signals import Signals
-from cleave.preset_curation import PresetCurationIndex
+from cleave.preset_library import PresetLibrary
 from cleave.viz.config_save import ConfigSaveController
 from cleave.viz.layer_lifecycle_controls import LayerLifecycleController
 from cleave.viz.layer_mutations import LayerMutations
@@ -115,10 +115,12 @@ class TuningControls:
         beat_times: Sequence[float] = (),
         bar_times: Sequence[float] = (),
         signals: Signals | None = None,
+        library: PresetLibrary | None = None,
     ) -> None:
         self.session = session
         self.cfg = cfg
         self.preset_root = preset_root
+        self.library = library if library is not None else PresetLibrary.in_memory()
         self.project_dir = project_dir
         self.playback = playback
         self.duration_sec = duration_sec
@@ -197,14 +199,14 @@ class TuningControls:
             get_active_config_path=lambda: self._config_save.active_config_path,
             on_focus_preset_item=self._focus_preset_list_item,
             layers_by_slot=layers_by_slot,
+            catalog=self.library,
         )
-        curation_index = PresetCurationIndex.build(preset_root)
         self._preset_curation = PresetCurationController(
             session,
-            preset_root,
             self._modal_host,
             layer_bindings,
-            curation_index,
+            self.library,
+            on_notification=self.show_notification,
         )
         self.timeline_history = TimelineHistory(
             session,
@@ -244,7 +246,7 @@ class TuningControls:
             playback,
             duration_sec,
             preset_root,
-            curation_index,
+            self.library,
             get_focus_cursor=lambda: self.focus_cursor,
             get_move_mode_slot=lambda: self.layer_lifecycle.move_mode_slot,
             get_move_mode_preset=lambda: self.preset_list.move_mode_preset,
@@ -310,6 +312,7 @@ class TuningControls:
             project_dir=project_dir,
             layer_bindings=layer_bindings,
             layer_manager=layer_manager,
+            catalog=self.library,
             on_mode_changed=self._on_editor_mode_changed,
             on_notification=self.show_notification,
         )

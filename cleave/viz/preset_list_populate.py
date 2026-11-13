@@ -8,8 +8,9 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Literal
 
-from cleave.cue_roles import CueRole, role_pool_paths
-from cleave.preset_playlist import milk_files_in_dir
+from cleave.cue_roles import CueRole
+from cleave.preset_library import PresetCatalog
+from cleave.preset_playlist import PresetPlaylist, milk_files_in_dir
 from cleave.timeline import (
     TimelineFadeGroup,
     empty_lane,
@@ -86,6 +87,13 @@ def _copy_into_user_presets(
     return out
 
 
+def browse_pool(playlist: PresetPlaylist) -> tuple[Path, ...]:
+    """Presets the layer is browsing (folder or collection), blacklist excluded."""
+    if playlist.collection is not None:
+        return playlist.catalog.collection_paths(playlist.collection)
+    return playlist.catalog.visible(milk_files_in_dir(playlist.current_dir))
+
+
 def _pick_random(pool: Sequence[Path], rng: random.Random) -> Path | None:
     if not pool:
         return None
@@ -101,7 +109,7 @@ def populate_from_directory(
     order: DirectoryOrder = "random",
     rng: random.Random | None = None,
 ) -> list[str]:
-    """Replace ``preset_list`` with copies from the layer browse directory.
+    """Replace ``preset_list`` with copies from the layer's browse folder or collection.
 
     Timeline trigger: one pick per on-segment (from lane cues if any).
     Other triggers: ``*.milk`` in the browse dir (``max_count`` limits the
@@ -111,8 +119,7 @@ def populate_from_directory(
     sorted directory order (cycling when more picks than files).
     """
     layer = session.layers[slot]
-    browse_dir = layer.playlist.current_dir
-    pool = list(milk_files_in_dir(browse_dir))
+    pool = list(browse_pool(layer.playlist))
     if not pool:
         layer.preset_list = []
         return []
@@ -142,7 +149,7 @@ def populate_from_cue_marker_roles(
     slot: str,
     *,
     project_dir: Path,
-    preset_root: Path,
+    catalog: PresetCatalog,
     default_role: CueRole = DEFAULT_POPULATE_ROLE,
     rng: random.Random | None = None,
 ) -> list[str]:
@@ -155,7 +162,7 @@ def populate_from_cue_marker_roles(
     sources: list[Path] = []
     for role in roles:
         effective = role if role is not None else default_role
-        pool = list(role_pool_paths(preset_root, effective))
+        pool = list(catalog.collection_paths(effective))
         pick = _pick_random(pool, rng)
         if pick is not None:
             sources.append(pick)
@@ -168,7 +175,7 @@ def repopulate_preset_lists(
     *,
     mode: str,
     project_dir: Path,
-    preset_root: Path,
+    catalog: PresetCatalog,
     rng: random.Random | None = None,
 ) -> None:
     """Repopulate layers with timeline-trigger switching after a preset apply.
@@ -189,7 +196,7 @@ def repopulate_preset_lists(
                 session,
                 slot,
                 project_dir=project_dir,
-                preset_root=preset_root,
+                catalog=catalog,
                 rng=rng,
             )
         elif mode == "directory sequential":

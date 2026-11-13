@@ -4573,7 +4573,7 @@ def _focus_user_preset_item_row(
     return desc, path
 
 
-def test_f_on_preset_file_prompts_favourite() -> None:
+def test_f_on_preset_file_toggles_favourite() -> None:
     controls = _make_controls(("layer_1",))
     current = _focus_preset_file_row(controls)
     mock_curation = MagicMock()
@@ -4582,7 +4582,7 @@ def test_f_on_preset_file_prompts_favourite() -> None:
     preset = RowDescriptor(RowKind.TRACK_PRESET, slot="layer_1")
     assert press_layer_row(controls, preset, _keydown(pygame.K_f)) is True
 
-    mock_curation.prompt_favourite.assert_called_once_with("layer_1", current)
+    mock_curation.toggle_favourite.assert_called_once_with(current)
 
 
 def test_c_on_preset_file_prompts_cast() -> None:
@@ -4606,15 +4606,10 @@ def test_b_on_preset_file_prompts_blacklist() -> None:
     preset = RowDescriptor(RowKind.TRACK_PRESET, slot="layer_1")
     assert press_layer_row(controls, preset, _keydown(pygame.K_b)) is True
 
-    mock_curation.prompt_blacklist.assert_called_once_with(
-        "layer_1",
-        current,
-        from_user_preset=False,
-        user_preset_index=None,
-    )
+    mock_curation.prompt_blacklist.assert_called_once_with("layer_1", current)
 
 
-def test_f_on_user_preset_item_prompts_favourite() -> None:
+def test_f_on_user_preset_item_toggles_favourite() -> None:
     controls = _make_controls(("layer_1",))
     desc, path = _focus_user_preset_item_row(controls)
     mock_curation = MagicMock()
@@ -4622,7 +4617,7 @@ def test_f_on_user_preset_item_prompts_favourite() -> None:
 
     assert press_layer_row(controls, desc, _keydown(pygame.K_f)) is True
 
-    mock_curation.prompt_favourite.assert_called_once_with("layer_1", path)
+    mock_curation.toggle_favourite.assert_called_once_with(path)
 
 
 def test_b_on_user_preset_item_prompts_blacklist() -> None:
@@ -4633,12 +4628,7 @@ def test_b_on_user_preset_item_prompts_blacklist() -> None:
 
     assert press_layer_row(controls, desc, _keydown(pygame.K_b)) is True
 
-    mock_curation.prompt_blacklist.assert_called_once_with(
-        "layer_1",
-        path,
-        from_user_preset=True,
-        user_preset_index=desc.preset_index,
-    )
+    mock_curation.prompt_blacklist.assert_called_once_with("layer_1", path)
 
 
 def test_f_b_not_on_preset_dir() -> None:
@@ -4650,7 +4640,7 @@ def test_f_b_not_on_preset_dir() -> None:
 
     press_layer_row(controls, RowDescriptor(RowKind.TRACK_PRESET_DIR, slot="layer_1"), _keydown(pygame.K_f))
     press_layer_row(controls, RowDescriptor(RowKind.TRACK_PRESET_DIR, slot="layer_1"), _keydown(pygame.K_b))
-    mock_curation.prompt_favourite.assert_not_called()
+    mock_curation.toggle_favourite.assert_not_called()
     mock_curation.prompt_blacklist.assert_not_called()
 
 
@@ -4664,7 +4654,7 @@ def test_f_b_blocked_when_layer_locked() -> None:
     preset = RowDescriptor(RowKind.TRACK_PRESET, slot="layer_1")
     assert press_layer_row(controls, preset, _keydown(pygame.K_f)) is True
     assert press_layer_row(controls, preset, _keydown(pygame.K_b)) is True
-    mock_curation.prompt_favourite.assert_not_called()
+    mock_curation.toggle_favourite.assert_not_called()
     mock_curation.prompt_blacklist.assert_not_called()
 
 
@@ -4678,7 +4668,7 @@ def test_f_b_allowed_in_projectm_mode() -> None:
     preset = RowDescriptor(RowKind.TRACK_PRESET, slot="layer_1")
     assert press_layer_row(controls, preset, _keydown(pygame.K_f)) is True
 
-    mock_curation.prompt_favourite.assert_called_once_with("layer_1", current)
+    mock_curation.toggle_favourite.assert_called_once_with(current)
 
 
 def test_c_on_preset_file_in_curation_mode_prompts_cast() -> None:
@@ -4702,7 +4692,7 @@ def test_f_b_ignored_on_non_preset_rows() -> None:
 
     _press_focused(controls, _keydown(pygame.K_f))
     _press_focused(controls, _keydown(pygame.K_b))
-    mock_curation.prompt_favourite.assert_not_called()
+    mock_curation.toggle_favourite.assert_not_called()
     mock_curation.prompt_blacklist.assert_not_called()
 
 

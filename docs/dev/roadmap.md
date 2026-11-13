@@ -38,8 +38,8 @@ From [plans-completed/improved-timeline-presets.md](plans-completed/improved-tim
 - Stop three dense presets from lighting at once under black-key (or any) blend.
 - Make `preset_switching: timeline` content-aware instead of a shuffled bag.
 - Know which presets can sit at low opacity as a bed without looking inert (needs a motion floor, not a brightness average).
-- Reuse curation (`favourites/`) rather than asking users to tag files.
-- Fill `preset_root/roles/<role>/` pools from fingerprints instead of hand curation; extend the generative arranger with automatic blend/role assignment on Apply.
+- Reuse curation (library favourites) rather than asking users to tag files.
+- Fill the library's role collections from fingerprints instead of hand curation; extend the generative arranger with automatic blend/role assignment on Apply.
 
 ### Design sketch
 

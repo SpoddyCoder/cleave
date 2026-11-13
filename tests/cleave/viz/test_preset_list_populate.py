@@ -6,6 +6,7 @@ import random
 from pathlib import Path
 from unittest.mock import patch
 
+from cleave.preset_library import UNFILTERED_CATALOG, PresetLibrary
 from cleave.preset_playlist import PresetPlaylist
 from cleave.timeline import SlotCue, TimelineLane
 from cleave.viz.preset_list_populate import (
@@ -210,10 +211,14 @@ def test_populate_from_cue_marker_roles(tmp_path: Path) -> None:
             SlotCue(t=3.0, level=1.0, role="lead"),
         ),
     )
+    library = PresetLibrary.in_memory()
+    pack = tmp_path / "presets" / "role_pack"
+    pack.mkdir(parents=True)
     for role in ("pulse", "lead"):
-        role_dir = tmp_path / "presets" / "roles" / role
-        role_dir.mkdir(parents=True)
-        (role_dir / f"{role}.milk").write_text("MILK")
+        (pack / f"{role}.milk").write_text(f"MILK {role}")
+    library.index(tmp_path / "presets")
+    for role in ("pulse", "lead"):
+        library.set_role(pack / f"{role}.milk", role)
     with patch(
         "cleave.viz.preset_list_populate.copy_with_dedup",
         side_effect=lambda dest, src: dest / src.name,
@@ -222,7 +227,7 @@ def test_populate_from_cue_marker_roles(tmp_path: Path) -> None:
             session,
             "layer_1",
             project_dir=tmp_path,
-            preset_root=tmp_path / "presets",
+            catalog=library,
             rng=random.Random(0),
         )
     assert [Path(path).name for path in out] == ["pulse.milk", "lead.milk"]
@@ -235,9 +240,12 @@ def test_repopulate_preset_lists_cue_roles(tmp_path: Path) -> None:
         timeline_enabled=True,
         cues=(SlotCue(t=1.0, level=1.0, role="accent"),),
     )
-    role_dir = tmp_path / "presets" / "roles" / "accent"
-    role_dir.mkdir(parents=True)
-    (role_dir / "accent.milk").write_text("MILK")
+    library = PresetLibrary.in_memory()
+    pack = tmp_path / "presets" / "role_pack"
+    pack.mkdir(parents=True)
+    (pack / "accent.milk").write_text("MILK")
+    library.index(tmp_path / "presets")
+    library.set_role(pack / "accent.milk", "accent")
     with patch(
         "cleave.viz.preset_list_populate.copy_with_dedup",
         side_effect=lambda dest, src: dest / src.name,
@@ -246,7 +254,7 @@ def test_repopulate_preset_lists_cue_roles(tmp_path: Path) -> None:
             session,
             mode="cue roles",
             project_dir=tmp_path,
-            preset_root=tmp_path / "presets",
+            catalog=library,
             rng=random.Random(0),
         )
     assert Path(session.layers["layer_1"].preset_list[0]).name == "accent.milk"
@@ -260,7 +268,7 @@ def test_repopulate_preset_lists_no_is_noop(tmp_path: Path) -> None:
         session,
         mode="no",
         project_dir=tmp_path,
-        preset_root=tmp_path / "presets",
+        catalog=UNFILTERED_CATALOG,
         rng=random.Random(0),
     )
     assert session.layers["layer_1"].preset_list == []
@@ -275,7 +283,7 @@ def test_repopulate_skips_layers_with_switching_off(tmp_path: Path) -> None:
         session,
         mode="directory random",
         project_dir=tmp_path,
-        preset_root=tmp_path / "presets",
+        catalog=UNFILTERED_CATALOG,
         rng=random.Random(0),
     )
     assert session.layers["layer_1"].preset_list == []
@@ -289,7 +297,7 @@ def test_repopulate_skips_non_timeline_trigger(tmp_path: Path) -> None:
         session,
         mode="directory random",
         project_dir=tmp_path,
-        preset_root=tmp_path / "presets",
+        catalog=UNFILTERED_CATALOG,
         rng=random.Random(0),
     )
     assert session.layers["layer_1"].preset_list == []

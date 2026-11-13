@@ -8,7 +8,6 @@ key, and a disabled item says why in its hint.
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from cleave.viz.context_menu import (
@@ -166,23 +165,18 @@ def _curate_submenu(
         hint = "Preset file not found"
     else:
         hint = None
-    from_list = desc.kind is RowKind.TRACK_PRESET_LIST_ITEM
 
     def act(run_with_src) -> None:
         if src is not None:
             run_with_src(src)
 
-    def blacklist(path: Path) -> None:
-        curation.prompt_blacklist(
-            slot,
-            path,
-            from_user_preset=from_list,
-            user_preset_index=desc.preset_index if from_list else None,
-        )
-
     restore_hint = hint
     if restore_hint is None and src is not None and not curation.can_restore(src):
         restore_hint = "Not favourited, cast, or blacklisted"
+    blacklist_hint = hint
+    if blacklist_hint is None and src is not None and curation.is_blacklisted(src):
+        blacklist_hint = "Already blacklisted"
+    favourited = hint is None and src is not None and curation.is_favourite(src)
 
     def item(
         item_id: str, label: str, key: str, run_with_src, item_hint: str | None
@@ -202,12 +196,18 @@ def _curate_submenu(
         items=(
             item(
                 "favourite",
-                "Favourite...",
+                "Unfavourite" if favourited else "Favourite",
                 "F",
-                lambda path: curation.prompt_favourite(slot, path),
+                curation.toggle_favourite,
                 hint,
             ),
-            item("blacklist", "Blacklist...", "B", blacklist, hint),
+            item(
+                "blacklist",
+                "Blacklist...",
+                "B",
+                lambda path: curation.prompt_blacklist(slot, path),
+                blacklist_hint,
+            ),
             item(
                 "cast",
                 "Cast as role...",
@@ -217,7 +217,7 @@ def _curate_submenu(
             ),
             item(
                 "restore",
-                "Restore...",
+                "Remove from...",
                 "R",
                 lambda path: curation.prompt_restore(slot, path),
                 restore_hint,
