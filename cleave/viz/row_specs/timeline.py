@@ -605,11 +605,11 @@ SPECS: dict[RowKind, RowSpec] = {
     ),
     RowKind.TIMELINE_SET_CUT_TYPE: RowSpec(
         affordance=RowAffordance.COMMAND,
-        panel_label="Set cut type...",
+        panel_label="Set cut type on cues...",
         present_style=RowPresentStyle.FULL_LINE,
         apply_action=_apply_timeline_set_cut_type,
         fit_strategy=FitStrategy.NONE,
-        help_title="Set Cut Type",
+        help_title="Set Cut Type On Cues",
         help_entries=(("Enter", "open set cut type dialog"),),
         help_description=(
             "Sets the cut type of many cues at once.",

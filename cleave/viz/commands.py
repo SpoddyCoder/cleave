@@ -578,7 +578,7 @@ _SNAP_TO_MARKERS = Command(
 )
 _SET_CUT_TYPE = Command(
     id="timeline.set_cut_type",
-    label="Set cut type...",
+    label="Set cut type on cues...",
     kind="command",
     enabled=_timeline_actions_enabled,
     run=_when_enabled(_timeline_actions_enabled, _run_set_cut_type),

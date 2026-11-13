@@ -118,7 +118,7 @@ class TimelineCutController:
             return
         self._modal.prompt_form(
             FormSpec(
-                title="Set cut type",
+                title="Set cut type on cues",
                 fields=(
                     FormField(
                         "cut",

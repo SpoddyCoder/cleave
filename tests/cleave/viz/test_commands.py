@@ -909,7 +909,7 @@ def test_inspector_only_timeline_actions_are_not_menu_commands() -> None:
         "Generate timeline...",
         "Reset timeline...",
         "Snap cues...",
-        "Set cut type...",
+        "Set cut type on cues...",
         "Snap cues to markers...",
     ):
         assert label not in labels

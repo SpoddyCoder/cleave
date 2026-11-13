@@ -2518,7 +2518,7 @@ def test_set_cut_type_opens_one_form_with_a_live_count() -> None:
     modal_view = controls.modal_host.view_state()
     assert modal_view is not None
     assert modal_view.kind == ModalKind.FORM
-    assert modal_view.message == "Set cut type"
+    assert modal_view.message == "Set cut type on cues"
     assert [row.label for row in modal_view.form_rows] == ["cut type", "applies to"]
     assert modal_view.form_rows[0].options == ("hard", "soft", "none")
     assert modal_view.form_info == "Changes 2 of 2 cues."
