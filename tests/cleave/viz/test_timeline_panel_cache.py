@@ -358,7 +358,7 @@ def test_upload_plan_partial_when_position_moves() -> None:
 
 def test_timeline_panel_max_dimensions_uses_max_layer_count() -> None:
     pygame.init()
-    w, h = timeline_panel_max_dimensions(1280)
+    w, h = timeline_panel_max_dimensions(1280, 720)
     overlay = TimelineOverlay()
     max_rows = _view_state(
         layer_z_order=[f"layer_{i}" for i in range(1, MAX_LAYER_COUNT + 1)],
@@ -398,3 +398,28 @@ def test_static_signature_changes_with_the_view_window() -> None:
     panned = _static_sig(replace(state, view_start_sec=20.0, view_end_sec=40.0))
     assert whole != zoomed
     assert zoomed != panned
+
+
+def test_taller_band_grows_rows_and_keeps_icons_nominal() -> None:
+    pygame.init()
+    overlay = TimelineOverlay()
+    state = _view_state(
+        layer_z_order=["layer_1", "layer_2"],
+        defaults={"layer_1": True, "layer_2": True},
+    )
+    fit = overlay.compose_panel(state, viewport_width=1280, viewport_height=720)
+    assert fit is not None
+    fit_layout = overlay._hit_layout
+    tall = overlay.compose_panel(
+        state,
+        viewport_width=1280,
+        viewport_height=720,
+        timeline_rect=(0, 320, 1280, 400),
+    )
+    assert tall is not None
+    layout = overlay._hit_layout
+    assert layout.row_h > fit_layout.row_h
+    assert layout.icon_h == fit_layout.row_h
+    assert layout.eye_slot_w == fit_layout.eye_slot_w
+    assert layout.panel_y + layout.panel_h == 720
+    assert layout.panel_y - layout.badge_reserve >= 320

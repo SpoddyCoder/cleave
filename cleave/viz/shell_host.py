@@ -41,6 +41,7 @@ from cleave.viz.pointer_cursor import PointerShape, request_pointer
 from cleave.viz.context_menu import ContextMenuProvider
 from cleave.viz.navigator_context_menu import navigator_node_menu
 from cleave.viz.preset_context_menu import PRESET_MENU_KINDS, preset_row_menu
+from cleave.viz.timeline_overlay import timeline_band_height_px
 from cleave.viz.timeline_pointer import MIDDLE_BUTTON, RIGHT_BUTTON, TimelinePointer
 from cleave.viz.material_icons import (
     LOCK_GLYPH,
@@ -103,8 +104,10 @@ from cleave.viz.shell_focus import (
 )
 from cleave.viz.shell_layout import (
     ShellLayout,
+    clamp_timeline_band_height,
     splitter_hit,
     splitter_request_height,
+    splitter_request_timeline_height,
     splitter_request_width,
 )
 from cleave.viz.text_fit import fit_path_or_name_to_width, fit_text_to_width
@@ -1344,12 +1347,16 @@ class ShellHost:
         # hold still as the number changes. The shell font is monospace.
         self._stepper_chars: dict[tuple[RowKind, int], int] = {}
         # Live drag requests. A drag that moves at least 1px persists the stack,
-        # help, or navigator height, then clears these.
+        # help, navigator, or timeline height, then clears these.
         self._insp_width: int | None = None
         self._help_width: int | None = None
         self._navigator_height: int | None = None
+        self._timeline_height: int | None = None
         self._splitter: str | None = None
         self._splitter_down = (0.0, 0.0)
+        # Pointer distance below the timeline's top edge at the press, so the
+        # edge does not jump to the pointer when the drag starts.
+        self._timeline_grab_dy = 0.0
         self.transport_notice_clicked = False
         self.top_layer = TopLayer()
         self._context_surface = ContextMenuSurface(lambda: self._controls.context_menu)
@@ -1411,6 +1418,11 @@ class ShellHost:
     def navigator_height(self) -> int | None:
         """Navigator height requested by an in-progress splitter drag."""
         return self._navigator_height
+
+    @property
+    def timeline_height(self) -> int | None:
+        """Timeline band height requested by an in-progress splitter drag."""
+        return self._timeline_height
 
     def process_event(self, event: pygame.event.Event) -> None:
         """Mouse motion, buttons, and wheel only. Keys stay out of ImGui."""
@@ -1680,6 +1692,11 @@ class ShellHost:
         if which == "nav":
             self._navigator_height = splitter_request_height(layout, pointer[1])
             return
+        if which == "timeline":
+            self._timeline_height = splitter_request_timeline_height(
+                layout, pointer[1] - self._timeline_grab_dy
+            )
+            return
         width = splitter_request_width(layout, which, pointer[0])
         if which == "help":
             self._help_width = width
@@ -1692,14 +1709,27 @@ class ShellHost:
             return False
         self._splitter = which
         self._splitter_down = (float(pos[0]), float(pos[1]))
+        layout = self._layout
+        self._timeline_grab_dy = (
+            float(pos[1]) - float(layout.timeline[1])
+            if which == "timeline" and layout is not None
+            else 0.0
+        )
         return True
 
     def _end_splitter_drag(self, pos: tuple[float, float]) -> None:
         which = self._splitter
         pointer = (float(pos[0]), float(pos[1]))
-        axis = 1 if which == "nav" else 0
+        axis = 1 if which in ("nav", "timeline") else 0
         moved = abs(pointer[axis] - self._splitter_down[axis]) >= 1.0
-        if which == "nav" and moved:
+        if which == "timeline" and moved:
+            self._assign_splitter_request(which, pointer)
+            if self._timeline_height is not None:
+                self._controls.settings.set_timeline_height(
+                    self._drawn_timeline_height(self._timeline_height)
+                )
+            self._timeline_height = None
+        elif which == "nav" and moved:
             self._assign_splitter_request(which, pointer)
             if self._navigator_height is not None:
                 self._controls.settings.set_navigator_height(
@@ -1724,9 +1754,24 @@ class ShellHost:
             self._help_width = None
         self._splitter = None
 
+    def _drawn_timeline_height(self, requested: int) -> int:
+        """Saved timeline height for *requested*: 0 at the fit, else the clamp."""
+        layout = self._layout
+        if layout is None:
+            return requested
+        rows = len(self._controls.session.layer_z_order)
+        fit_h = timeline_band_height_px(rows)
+        top_h = layout.menu[3] + layout.transport[3]
+        display_h = layout.timeline[1] + layout.timeline[3]
+        height = clamp_timeline_band_height(
+            requested, fit_h, display_h=display_h, top_h=top_h
+        )
+        return 0 if height <= fit_h else height
+
     def _cancel_splitter_drag(self) -> None:
         self._splitter = None
         self._navigator_height = None
+        self._timeline_height = None
 
     def _track_splitter_motion(self, x: float, y: float) -> None:
         if self._splitter is not None:
@@ -1757,7 +1802,7 @@ class ShellHost:
         if splitter is not None:
             shape = (
                 PointerShape.RESIZE_NS
-                if splitter == "nav"
+                if splitter in ("nav", "timeline")
                 else PointerShape.RESIZE_EW
             )
         if shape is not None:

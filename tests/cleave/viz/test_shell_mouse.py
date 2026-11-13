@@ -361,7 +361,9 @@ def _host() -> Iterator[ShellHost]:
         settings=SimpleNamespace(
             set_shell_column_widths=MagicMock(),
             set_navigator_height=MagicMock(),
+            set_timeline_height=MagicMock(),
         ),
+        session=SimpleNamespace(layer_z_order=["layer_1", "layer_2"]),
         set_shell_region=MagicMock(),
         disarm_value_nudge=MagicMock(),
         context_menu=ContextMenuState(),
@@ -776,6 +778,32 @@ def test_nav_splitter_under_one_pixel_does_not_persist() -> None:
         host.process_event(_button(pygame.MOUSEBUTTONUP, (x + 40, y)))
         host._controls.settings.set_navigator_height.assert_not_called()
         assert host._splitter is None
+
+
+def test_timeline_splitter_drag_sets_and_persists_band_height() -> None:
+    with _host() as host:
+        host.set_layout(_open_strip_layout())
+        top = host.layout.timeline[1]
+        host.process_event(_motion((640, top + 4)))
+        assert _gesture_pointer(host) is PointerShape.RESIZE_NS
+        host.process_event(_button(pygame.MOUSEBUTTONDOWN, (640, top + 4)))
+        assert host.imgui.queued_buttons == []
+        host.process_event(_motion((640, 420)))
+        assert host.timeline_height == 304
+        host.process_event(_button(pygame.MOUSEBUTTONUP, (640, 420)))
+        host._controls.settings.set_timeline_height.assert_called_once_with(304)
+        host._controls.settings.set_navigator_height.assert_not_called()
+        assert host.timeline_height is None
+        assert host._splitter is None
+
+
+def test_timeline_splitter_below_the_fit_saves_fit_to_rows() -> None:
+    with _host() as host:
+        host.set_layout(_open_strip_layout())
+        top = host.layout.timeline[1]
+        host.process_event(_button(pygame.MOUSEBUTTONDOWN, (640, top + 4)))
+        host.process_event(_button(pygame.MOUSEBUTTONUP, (640, 715)))
+        host._controls.settings.set_timeline_height.assert_called_once_with(0)
 
 
 def test_strip_pointer_gets_press_drag_and_release_in_timeline_rect() -> None:

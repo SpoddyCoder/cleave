@@ -44,7 +44,7 @@ from cleave.viz.theme import set_ui_scale_percent
 from cleave.viz.timeline_controls import TimelineControls
 from cleave.viz.timeline_pointer import TimelinePointer
 from cleave.viz.timeline_time_menu import TimelineTimeMenu
-from cleave.viz.shell_layout import ShellLayout
+from cleave.viz.shell_layout import ShellLayout, clamp_timeline_band_height
 from cleave.viz.timeline_overlay import (
     TimelineOverlay,
     playback_bar_text,
@@ -528,14 +528,22 @@ class VisualizerApp:
         menu_h = int(shell.menu_bar_height_px) if shell is not None else 0
         transport_h = menu_bar_height_px() if shell is not None else 0
         timeline_h = 0
+        display_w, display_h = runtime.overlay_surface.get_size()
         tl = runtime.seed.session.timeline
         if not runtime.controls.tap_sync.showing_progress and _timeline_strip_visible(
             tl
         ):
-            timeline_h = timeline_band_height_px(
-                len(runtime.seed.session.layer_z_order)
+            requested_tl = runtime.seed.cfg.editor.timeline_height
+            if shell is not None:
+                live_tl = getattr(shell, "timeline_height", None)
+                if live_tl is not None:
+                    requested_tl = live_tl
+            timeline_h = clamp_timeline_band_height(
+                requested_tl,
+                timeline_band_height_px(len(runtime.seed.session.layer_z_order)),
+                display_h=display_h,
+                top_h=menu_h + transport_h,
             )
-        display_w, display_h = runtime.overlay_surface.get_size()
         editor = runtime.seed.cfg.editor
         insp_width = editor.inspector_width
         help_width: int | None = None

@@ -11,6 +11,7 @@ from cleave.config_schema.editor import (
     EDITOR_PREVIEW_QUALITIES,
     clamp_residual_latency_ms,
     clamp_navigator_height,
+    clamp_timeline_height,
     clamp_ui_scale,
     clamp_shell_column_width,
     clamp_notification_display_sec,
@@ -128,6 +129,12 @@ class SettingsControls:
     def set_navigator_height(self, height: int) -> None:
         self.cfg.editor = replace(
             self.cfg.editor, navigator_height=clamp_navigator_height(height)
+        )
+        persist_editor_settings(self.cfg)
+
+    def set_timeline_height(self, height: int) -> None:
+        self.cfg.editor = replace(
+            self.cfg.editor, timeline_height=clamp_timeline_height(height)
         )
         persist_editor_settings(self.cfg)
 

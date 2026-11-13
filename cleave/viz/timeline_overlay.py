@@ -927,6 +927,9 @@ class _TimelineLayout:
     panel_y: int
     row_count: int
     row_h: int
+    # Eye and transport glyph line height: the nominal row, centred in a
+    # taller row when the band is dragged taller.
+    icon_h: int
     bar_left: int
     bar_width: int
     eye_slot_w: int
@@ -1069,7 +1072,7 @@ class TimelineOverlay:
         label_left = self._padding
         label_right = label_left + layout.layer_num_width + layout.stem_abbrev_width
         on_label = label_left <= local_x < label_right
-        eye_right = label_right + visibility_icon_slot_width(layout.row_h)
+        eye_right = label_right + layout.eye_slot_w
         on_eye = label_right <= local_x < eye_right
         for display_i in range(layout.row_count):
             row_y = self._row_y(display_i, layout.row_h)
@@ -1109,7 +1112,7 @@ class TimelineOverlay:
     @staticmethod
     def _transport_icon_size(layout: _TimelineLayout) -> int:
         """Glyph size: as tall as a row's level bar."""
-        return max(1, layout.row_h - 2 * timeline_ui_metrics().bar_vertical_inset)
+        return max(1, layout.icon_h - 2 * timeline_ui_metrics().bar_vertical_inset)
 
     def _draw_transport_buttons(
         self,
@@ -1249,28 +1252,34 @@ class TimelineOverlay:
             return None
 
         metrics = timeline_ui_metrics()
-        row_h = metrics.row_height
-        panel_h = timeline_panel_height_px(row_count)
+        icon_h = metrics.row_height
         # The shell's timeline band is the container; the strip fills its width.
+        # With no band the strip sits at the viewport bottom at its fit height.
+        fills_band = timeline_rect is not None
         if timeline_rect is None:
             timeline_rect = (0, 0, viewport_width, viewport_height)
         band_x, band_y, band_w, band_h = timeline_rect
         if band_w <= 0 or band_h <= 0:
             return None
-        panel_w = band_w
-        panel_x = band_x
-        panel_y = band_y + band_h - panel_h
         badge_reserve = timeline_badge_reserve_px(
             font_size=self._font_size, padding=self._padding
         )
+        # Rows share any band height past the nominal fit.
+        fit_h = timeline_panel_height_px(row_count)
+        spare = band_h - badge_reserve - fit_h if fills_band else 0
+        row_h = icon_h + max(0, spare) // row_count
+        panel_h = fit_h + (row_h - icon_h) * row_count
+        panel_w = band_w
+        panel_x = band_x
+        panel_y = band_y + band_h - panel_h
 
         font = self._font_get()
         num_sample = font.render(layer_num_prefix(max(row_count, 1)), True, LABEL)
         abbrev_sample = font.render(stem_abbrev_label("drums"), True, LABEL)
         layer_num_width = num_sample.get_width()
         stem_abbrev_width = abbrev_sample.get_width()
-        eye_slot_w = visibility_icon_slot_width(row_h)
-        prefix_width = row_prefix_width(layer_num_width, stem_abbrev_width, row_h)
+        eye_slot_w = visibility_icon_slot_width(icon_h)
+        prefix_width = row_prefix_width(layer_num_width, stem_abbrev_width, icon_h)
         bar_left = self._padding + prefix_width
         bar_width = max(1, panel_w - self._padding * 2 - prefix_width - eye_slot_w)
         timeline_eye_x = panel_w - self._padding - eye_slot_w
@@ -1294,6 +1303,7 @@ class TimelineOverlay:
             panel_y=panel_y,
             row_count=row_count,
             row_h=row_h,
+            icon_h=icon_h,
             bar_left=bar_left,
             bar_width=bar_width,
             eye_slot_w=eye_slot_w,
@@ -1343,6 +1353,7 @@ class TimelineOverlay:
             slot = state.layer_z_order[row_index]
             stem_source = state.slot_stems.get(slot, slot)
             row_y = self._padding + display_i * (row_h + self._row_gap)
+            icon_y = row_y + (row_h - layout.icon_h) // 2
             row_rect = pygame.Rect(self._padding, row_y, panel_w - self._padding * 2, row_h)
             bar_rect = pygame.Rect(
                 bar_left,
@@ -1406,13 +1417,13 @@ class TimelineOverlay:
                 monitor_icon = render_visibility_icon(
                     enabled=monitor_enabled,
                     override=monitor_override,
-                    line_height=row_h,
+                    line_height=layout.icon_h,
                 )
-                panel.blit(monitor_icon, (monitor_eye_x, row_y))
+                panel.blit(monitor_icon, (monitor_eye_x, icon_y))
             timeline_icon = _render_committed_level_icon(
-                timeline_level, line_height=row_h
+                timeline_level, line_height=layout.icon_h
             )
-            panel.blit(timeline_icon, (timeline_eye_x, row_y))
+            panel.blit(timeline_icon, (timeline_eye_x, icon_y))
 
             _draw_level_bar(
                 panel,
@@ -1612,7 +1623,8 @@ class TimelineOverlay:
         armed = slot in state.armed_slots
         stem_abbrev_x = self._padding + layout.layer_num_width
         monitor_eye_x = stem_abbrev_x + layout.stem_abbrev_width
-        eye_slot_w = visibility_icon_slot_width(row_h)
+        eye_slot_w = layout.eye_slot_w
+        icon_y = upload_y + (row_h - layout.icon_h) // 2
         dirty: list[tuple[int, int, int, int]] = []
 
         abbrev_rect = (stem_abbrev_x, upload_y, layout.stem_abbrev_width, row_h)
@@ -1657,9 +1669,9 @@ class TimelineOverlay:
         monitor_icon = render_visibility_icon(
             enabled=monitor_enabled,
             override=monitor_override,
-            line_height=row_h,
+            line_height=layout.icon_h,
         )
-        upload.blit(monitor_icon, (monitor_eye_x, upload_y))
+        upload.blit(monitor_icon, (monitor_eye_x, icon_y))
         dirty.append(monitor_rect)
 
         selected_t = (
@@ -2160,7 +2172,7 @@ class TimelineOverlay:
                 viewport_height,
             )
 
-        capacity = timeline_panel_max_dimensions(viewport_width)
+        capacity = timeline_panel_max_dimensions(viewport_width, viewport_height)
         live_sig = timeline_live_signature(
             state,
             playhead_px=playhead_px,

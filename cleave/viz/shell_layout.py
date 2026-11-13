@@ -6,6 +6,8 @@ per frame and shared by the shell host, overlay placement, and the compositor.
 The navigator and the inspector share one side column. The navigator is the
 top of that column. It fits its rows until the user drags the boundary, then
 keeps that height. The inspector is the remainder.
+The timeline band spans the window bottom. It fits its rows until the user
+drags its top edge, then keeps that height (never shorter than the fit).
 Help is its own full-height column. Each column chooses left or right. When
 they share a side, help sits at the window edge and the navigator column
 stays against the visualiser.
@@ -32,6 +34,10 @@ INSPECTOR_WIDTH = DEFAULT_INSPECTOR_WIDTH
 _NAV_ROW_FRAME_PAD_Y = 8.0
 # Hit-rects ``splitter`` role. Centered on each column boundary.
 SPLITTER_HIT_PX = 6
+# The timeline's top-edge zone: this many pixels tall, starting this far
+# below the band's top edge.
+TIMELINE_SPLITTER_HIT_PX = 3
+TIMELINE_SPLITTER_OFFSET_PX = 3
 
 
 def navigator_row_px() -> int:
@@ -176,6 +182,29 @@ def _stack_heights(
     return (nav_h, columns_h - nav_h)
 
 
+def clamp_timeline_band_height(
+    requested: int,
+    fit_h: int,
+    *,
+    display_h: int,
+    top_h: int,
+) -> int:
+    """Timeline band height for a *requested* drag or saved height.
+
+    The band is never shorter than *fit_h*, its rows at their nominal height.
+    It grows to *requested* while the columns above keep two navigator rows
+    under the *top_h* of menu and transport. 0 or less is the fit.
+    """
+    fit_h = max(0, int(fit_h))
+    if fit_h <= 0:
+        return 0
+    requested = int(requested)
+    if requested <= fit_h:
+        return fit_h
+    max_h = int(display_h) - int(top_h) - navigator_row_px() * 2
+    return max(fit_h, min(requested, max_h))
+
+
 def splitter_hit(
     layout: ShellLayout,
     x: float,
@@ -183,7 +212,7 @@ def splitter_hit(
     *,
     hit_px: float = SPLITTER_HIT_PX,
 ) -> str | None:
-    """``insp``, ``help``, or ``nav`` when (*x*, *y*) is in that hit zone.
+    """``insp``, ``help``, ``nav``, or ``timeline`` at (*x*, *y*).
 
     Each zone is *hit_px* across, centered on its boundary. ``insp`` and
     ``help`` are vertical boundaries only as tall as the column band. ``insp``
@@ -191,27 +220,54 @@ def splitter_hit(
     positive width. The stack zone exists only when the stack has positive
     width. ``nav`` is the horizontal navigator/inspector boundary, only as
     wide as the stack, and exists only when the inspector has positive
-    height. The nearest boundary wins. The hit-rects role is ``splitter``.
+    height. ``timeline`` is the top edge of the timeline band, as wide as
+    the window, and exists only when the band is open. Its zone is
+    ``TIMELINE_SPLITTER_HIT_PX`` tall, starting ``TIMELINE_SPLITTER_OFFSET_PX``
+    below the edge. The nearest boundary wins. The hit-rects role is
+    ``splitter``.
     """
-    top = layout.visualiser[1]
-    height = layout.visualiser[3]
-    if height <= 0 or hit_px <= 0 or y < top or y >= top + height:
+    if hit_px <= 0:
         return None
     half = hit_px / 2.0
-    zones: list[tuple[str, float, float]] = []
+    zones: list[tuple[str, float, float, float, float]] = []
+    tl_x, tl_y, tl_w, tl_h = layout.timeline
+    if tl_h > 0 and tl_x <= x < tl_x + tl_w:
+        lo = float(TIMELINE_SPLITTER_OFFSET_PX)
+        zones.append(
+            ("timeline", float(tl_y), y, lo, lo + TIMELINE_SPLITTER_HIT_PX)
+        )
+    top = layout.visualiser[1]
+    height = layout.visualiser[3]
+    if height <= 0 or y < top or y >= top + height:
+        return _nearest_zone(zones)
     stack_x, _stack_y, stack_w, _nav_h = layout.navigator
     if stack_w > 0:
         zones.append(
-            ("insp", _inner_edge(layout.navigator, layout.navigator_side), x)
+            (
+                "insp",
+                _inner_edge(layout.navigator, layout.navigator_side),
+                x,
+                -half,
+                half,
+            )
         )
         if layout.inspector[3] > 0 and stack_x <= x < stack_x + stack_w:
-            zones.append(("nav", float(layout.inspector[1]), y))
+            zones.append(("nav", float(layout.inspector[1]), y, -half, half))
     if layout.help[2] > 0:
-        zones.append(("help", _inner_edge(layout.help, layout.help_side), x))
+        zones.append(
+            ("help", _inner_edge(layout.help, layout.help_side), x, -half, half)
+        )
+    return _nearest_zone(zones)
+
+
+def _nearest_zone(
+    zones: list[tuple[str, float, float, float, float]],
+) -> str | None:
+    """Nearest zone whose coord is in ``[edge + lo, edge + hi)``."""
     best: str | None = None
     best_dist: float | None = None
-    for name, edge, coord in zones:
-        if (edge - half) <= coord < (edge + half):
+    for name, edge, coord, lo, hi in zones:
+        if (edge + lo) <= coord < (edge + hi):
             dist = abs(coord - edge)
             if best_dist is None or dist < best_dist:
                 best = name
@@ -252,6 +308,12 @@ def splitter_request_width(layout: ShellLayout, which: str, pointer_x: float) ->
 def splitter_request_height(layout: ShellLayout, pointer_y: float) -> int:
     """Unclamped navigator height *pointer_y* is asking for (``nav`` splitter)."""
     return max(0, int(round(pointer_y - float(layout.navigator[1]))))
+
+
+def splitter_request_timeline_height(layout: ShellLayout, pointer_y: float) -> int:
+    """Unclamped timeline band height *pointer_y* is asking for (``timeline``)."""
+    bottom = layout.timeline[1] + layout.timeline[3]
+    return max(0, int(round(float(bottom) - pointer_y)))
 
 
 @dataclass(frozen=True)

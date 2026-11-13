@@ -8,9 +8,11 @@ from cleave.viz.shell_layout import (
     INSPECTOR_WIDTH,
     MIN_COLUMN_WIDTH,
     ShellLayout,
+    clamp_timeline_band_height,
     navigator_row_px,
     splitter_hit,
     splitter_request_height,
+    splitter_request_timeline_height,
     splitter_request_width,
 )
 
@@ -561,3 +563,36 @@ def test_minimum_window_keeps_every_column_and_both_stack_panes() -> None:
             assert layout.inspector[3] >= row
     finally:
         set_ui_scale_percent(100)
+
+
+def test_timeline_splitter_hit_is_the_band_top_edge() -> None:
+    layout = ShellLayout.compute(1280, 720, 23, 23, 120)
+    top = layout.timeline[1]
+    assert splitter_hit(layout, 640, top + 3) == "timeline"
+    assert splitter_hit(layout, 640, top + 5) == "timeline"
+    assert splitter_hit(layout, 640, top + 2) is None
+    assert splitter_hit(layout, 640, top + 6) is None
+    assert splitter_hit(layout, 640, top) is None
+
+
+def test_closed_timeline_has_no_splitter() -> None:
+    layout = ShellLayout.compute(1280, 720, 23, 23, 0)
+    assert splitter_hit(layout, 640, 719) is None
+
+
+def test_timeline_splitter_request_height_is_from_the_band_bottom() -> None:
+    layout = ShellLayout.compute(1280, 720, 23, 23, 120)
+    assert splitter_request_timeline_height(layout, 420.0) == 300
+    assert splitter_request_timeline_height(layout, 800.0) == 0
+
+
+def test_timeline_band_height_clamps_between_fit_and_two_rows_of_columns() -> None:
+    row = navigator_row_px()
+    assert clamp_timeline_band_height(0, 120, display_h=720, top_h=46) == 120
+    assert clamp_timeline_band_height(80, 120, display_h=720, top_h=46) == 120
+    assert clamp_timeline_band_height(300, 120, display_h=720, top_h=46) == 300
+    assert (
+        clamp_timeline_band_height(5000, 120, display_h=720, top_h=46)
+        == 720 - 46 - row * 2
+    )
+    assert clamp_timeline_band_height(300, 0, display_h=720, top_h=46) == 0

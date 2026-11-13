@@ -15,6 +15,7 @@ from cleave.paths import WINDOWS_APP_FOLDER, XDG_APP_FOLDER
 from cleave.config_schema.editor import (
     DEFAULT_HELP_WIDTH,
     DEFAULT_NAVIGATOR_HEIGHT,
+    DEFAULT_TIMELINE_HEIGHT,
     DEFAULT_UI_SCALE,
     DEFAULT_INSPECTOR_WIDTH,
     DEFAULT_HELP_SIDE,
@@ -65,6 +66,7 @@ class EditorSettings:
     inspector_width: int = DEFAULT_INSPECTOR_WIDTH
     help_width: int = DEFAULT_HELP_WIDTH
     navigator_height: int = DEFAULT_NAVIGATOR_HEIGHT
+    timeline_height: int = DEFAULT_TIMELINE_HEIGHT
     ui_scale: int = DEFAULT_UI_SCALE
     navigator_side: ColumnSide = DEFAULT_NAVIGATOR_SIDE
     help_side: ColumnSide = DEFAULT_HELP_SIDE
@@ -87,6 +89,7 @@ def default_editor_settings() -> EditorSettings:
         inspector_width=DEFAULT_INSPECTOR_WIDTH,
         help_width=DEFAULT_HELP_WIDTH,
         navigator_height=DEFAULT_NAVIGATOR_HEIGHT,
+        timeline_height=DEFAULT_TIMELINE_HEIGHT,
         ui_scale=DEFAULT_UI_SCALE,
         navigator_side=DEFAULT_NAVIGATOR_SIDE,
         help_side=DEFAULT_HELP_SIDE,
@@ -167,6 +170,7 @@ def editor_settings_from_config(cfg: EditorConfig) -> EditorSettings:
         inspector_width=cfg.inspector_width,
         help_width=cfg.help_width,
         navigator_height=cfg.navigator_height,
+        timeline_height=cfg.timeline_height,
         ui_scale=cfg.ui_scale,
         navigator_side=cfg.navigator_side,
         help_side=cfg.help_side,

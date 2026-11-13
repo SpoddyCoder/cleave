@@ -57,6 +57,8 @@ DEFAULT_INSPECTOR_WIDTH = 495
 DEFAULT_HELP_WIDTH = 320
 # Navigator height in the shared stack. 0 fits the navigator to its rows.
 DEFAULT_NAVIGATOR_HEIGHT = 0
+# Timeline band height. 0 fits the band to its rows.
+DEFAULT_TIMELINE_HEIGHT = 0
 # Editor chrome scale in percent: text plus the spacing around it.
 DEFAULT_UI_SCALE = 100
 UI_SCALE_MIN = 80
@@ -83,6 +85,10 @@ def clamp_shell_column_width(value: int | float) -> int:
 
 
 def clamp_navigator_height(value: int | float) -> int:
+    return max(0, int(round(value)))
+
+
+def clamp_timeline_height(value: int | float) -> int:
     return max(0, int(round(value)))
 
 
@@ -190,6 +196,14 @@ EDITOR_FIELDS: tuple[FieldDescriptor, ...] = (
         lambda value, _ctx: clamp_navigator_height(value),
     ),
     FieldDescriptor(
+        "timeline_height",
+        DEFAULT_TIMELINE_HEIGHT,
+        lambda raw, ctx, label: clamp_timeline_height(
+            int(require_non_negative_number(raw, label, as_int=True))
+        ),
+        lambda value, _ctx: clamp_timeline_height(value),
+    ),
+    FieldDescriptor(
         "ui_scale",
         DEFAULT_UI_SCALE,
         lambda raw, ctx, label: clamp_ui_scale(
@@ -233,6 +247,7 @@ def parse_editor_section(data: dict[str, Any]) -> Any:
         inspector_width=parsed["inspector_width"],
         help_width=parsed["help_width"],
         navigator_height=parsed["navigator_height"],
+        timeline_height=parsed["timeline_height"],
         ui_scale=parsed["ui_scale"],
         navigator_side=parsed["navigator_side"],
         help_side=parsed["help_side"],
@@ -248,6 +263,7 @@ def dump_editor_section(editor: Any) -> dict[str, Any]:
         "inspector_width": editor.inspector_width,
         "help_width": editor.help_width,
         "navigator_height": editor.navigator_height,
+        "timeline_height": editor.timeline_height,
         "ui_scale": editor.ui_scale,
         "navigator_side": editor.navigator_side,
         "help_side": editor.help_side,
@@ -271,6 +287,7 @@ def editor_config_from_settings(editor: Any | None = None) -> Any:
         inspector_width=editor.inspector_width,
         help_width=editor.help_width,
         navigator_height=editor.navigator_height,
+        timeline_height=editor.timeline_height,
         ui_scale=editor.ui_scale,
         navigator_side=editor.navigator_side,
         help_side=editor.help_side,

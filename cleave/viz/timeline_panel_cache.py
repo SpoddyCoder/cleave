@@ -214,8 +214,9 @@ def timeline_badge_reserve_px(
     return max(0, badge_h + metrics.rec_badge_gap - padding)
 
 
-def timeline_panel_max_dimensions(viewport_w: int) -> tuple[int, int]:
+def timeline_panel_max_dimensions(viewport_w: int, viewport_h: int) -> tuple[int, int]:
+    """Upload capacity: the full eight-row fit, or the viewport for a taller band."""
     panel_w = max(1, viewport_w)
     panel_h = timeline_panel_height_px(MAX_LAYER_COUNT)
     badge_reserve = timeline_badge_reserve_px()
-    return panel_w, panel_h + badge_reserve
+    return panel_w, max(panel_h + badge_reserve, viewport_h)
