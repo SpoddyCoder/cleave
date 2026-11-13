@@ -576,17 +576,6 @@ def test_disabled_post_fx_can_expand_sub_rows() -> None:
     page = _page_kinds(view, "post_fx.fade")
     assert RowKind.POST_FX_FADE_IN_START in page
 
-
-def test_disabled_timeline_can_open_panel() -> None:
-    controls = _make_controls(("layer_1",))
-    assert controls.session.timeline.enabled is False
-    assert controls.session.timeline.panel_open is False
-    command_by_id("view.timeline_strip").run(controls)
-    assert controls.session.timeline.enabled is False
-    assert controls.session.timeline.panel_open is True
-    assert controls.shell_focus.region is ShellRegion.TIMELINE
-    assert isinstance(controls.focus_cursor, TimelineFocus)
-
 def test_beat_sensitivity_clamps() -> None:
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
@@ -2989,68 +2978,6 @@ def test_timeline_enabled_change_callback() -> None:
     assert events == [False, True]
 
 
-def test_t_opens_timeline_panel_when_enabled() -> None:
-    controls = _make_controls(("layer_1", "layer_2", "layer_3", "layer_4"))
-    controls.session.timeline.enabled = True
-    controls.session.timeline.focus_row = 2
-    assert controls.session.timeline.panel_open is False
-
-    command_by_id("view.timeline_strip").run(controls)
-    assert controls.session.timeline.panel_open is True
-    assert controls.shell_focus.region is ShellRegion.TIMELINE
-    assert controls.focus_cursor == TimelineFocus(2)
-    assert controls.session.timeline.focus_row == 2
-
-
-def test_t_closes_timeline_panel_without_moving_a_main_cursor() -> None:
-    controls = _make_controls(timeline_enabled=True)
-    controls.session.timeline.panel_open = True
-    controls.focus_descriptor = RowDescriptor(RowKind.OVERLAYS_HEADER)
-    command_by_id("view.timeline_strip").run(controls)
-    assert controls.session.timeline.panel_open is False
-    assert not isinstance(controls.focus_cursor, TimelineFocus)
-    assert controls.focus_descriptor.kind == RowKind.OVERLAYS_HEADER
-
-
-def test_t_from_timeline_region_closes_onto_navigator() -> None:
-    controls = _make_controls(timeline_enabled=True)
-    controls.session.timeline.focus_row = 1
-    command_by_id("view.timeline_strip").run(controls)
-    assert controls.shell_focus.region is ShellRegion.TIMELINE
-    assert controls.focus_cursor == TimelineFocus(1)
-    command_by_id("view.timeline_strip").run(controls)
-    assert controls.session.timeline.panel_open is False
-    assert controls.shell_focus.region is ShellRegion.NAVIGATOR
-    assert isinstance(controls.focus_cursor, MainFocus)
-    assert controls.focus_descriptor.kind == RowKind.TIMELINE_HEADER
-    assert controls.session.timeline.focus_row == 1
-
-
-def test_t_opens_timeline_panel_when_disabled() -> None:
-    controls = _make_controls(("layer_1", "layer_2", "layer_3", "layer_4"))
-    controls.session.timeline.enabled = False
-    controls.session.timeline.focus_row = 2
-    assert controls.session.timeline.panel_open is False
-
-    command_by_id("view.timeline_strip").run(controls)
-    assert controls.session.timeline.enabled is False
-    assert controls.session.timeline.panel_open is True
-    assert controls.shell_focus.region is ShellRegion.TIMELINE
-    assert controls.focus_cursor == TimelineFocus(2)
-    assert controls.session.timeline.focus_row == 2
-
-
-def test_t_ignored_during_move_mode() -> None:
-    controls = _make_controls(("layer_1",))
-    controls.session.timeline.enabled = True
-    controls.focus_descriptor = RowDescriptor(RowKind.TRACK_HEADER, slot="layer_1")
-    press_layer_row(controls, RowDescriptor(RowKind.TRACK_HEADER, slot="layer_1"), _keydown(_MOVE_MODE_KEY))
-    assert controls.layer_lifecycle.move_mode_slot == "layer_1"
-
-    _press_focused(controls, _keydown(pygame.K_t))
-    assert controls.session.timeline.panel_open is False
-
-
 
 def test_space_toggles_pause_from_any_focus() -> None:
     controls = _make_controls(("layer_1",))
@@ -4789,7 +4716,6 @@ def test_drop_song_marker_does_not_select_or_steal_focus() -> None:
     assert markers.times == [15.0]
     assert markers.markers == [SongMarker(15.0, "standard")]
     assert markers.selected_index is None
-    assert controls.session.timeline.panel_open is True
     assert controls.focus_descriptor == prior_focus
 
 

@@ -115,7 +115,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - When the navigator, inspector, or help column has more rows than fit, the rows stop short of the panel border at the top and bottom instead of running into it.
 - While recording, the timeline strip no longer draws a false fade ramp. Turning a row on or off no longer flashes one for a frame, and a row that is on from the song start no longer ramps up from the start until recording stops.
 - Help text wraps whole sentences to the column width instead of breaking mid-sentence, with one sentence per line. Navigator help lists the page description and its keys first, with the navigator keys last, key names are spelled the same way throughout (Left/Right, PgUp/PgDn, Esc), and every help heading is in Capital Case.
-- Help text uses short, plain sentences close to Simplified Technical English, and drops detail that the panel already shows. The global keys list Undo/Redo, timeline strip (T), help (H), and full screen (F11), and Alt shortcuts name the real menu letters (F, E, V, P, S, H).
+- Help text uses short, plain sentences close to Simplified Technical English, and drops detail that the panel already shows. The global keys list Undo/Redo, help (H), and full screen (F11), and Alt shortcuts name the real menu letters (F, E, V, P, S, H).
 - Resizing a side column while paused no longer turns the visualiser black. The paused frame now scales to the new size.
 - The REC badge on the right of the timeline strip no longer overlaps the end of the time scale. It starts where the scale ends.
 - The editor no longer freezes now and then when you pause, resume, close it, or switch projects. A freeze ignored Ctrl+C and needed `kill -9`. Pausing now keeps the audio device running and plays silence, and closing stops the audio callback safely first.
@@ -156,6 +156,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 ### Removed
 
 - The marker count beside Song Markers in the navigator.
+- View > Show timeline strip and its `T` shortcut. The strip shows when the timeline is on and hides when it is off. Esc in the strip now returns focus to the navigator and leaves the strip open, and dropping a song marker no longer opens the strip.
 - The timeline's paused preview. Pausing no longer takes a snapshot that number keys toggle until playback resumes; override a row instead.
 - Settings > Editor Window > upscale, display size, and visualiser width and height. The window size comes from the window itself, and the preview resolution from Project > Render.
 - Settings > UI width mode, max width, and min width rows, and their `ui_width_mode`, `ui_width`, and `ui_min_width` keys in the user config. The shell layout no longer used them.

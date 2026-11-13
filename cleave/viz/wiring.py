@@ -264,12 +264,6 @@ def make_timeline_controls(
             update=False,
         )
 
-    def on_close() -> None:
-        if tuning_controls is not None:
-            tuning_controls.close_timeline_panel()
-        else:
-            session.timeline.panel_open = False
-
     def on_exit_submenu() -> None:
         if tuning_controls is not None:
             tuning_controls.exit_timeline_submenu()
@@ -302,7 +296,6 @@ def make_timeline_controls(
         playback,
         duration_sec,
         on_visibility_change=on_visibility_change,
-        on_close=on_close,
         on_exit_submenu=on_exit_submenu,
         on_focus_row=on_focus_row,
         on_select_song_marker=on_select_song_marker,

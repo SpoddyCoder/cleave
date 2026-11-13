@@ -80,7 +80,6 @@ NAVIGATION_SECTION = HelpSection(
         ("Ctrl + O", "open project"),
         ("Ctrl + S", "save"),
         ("Ctrl + Z / Ctrl + Y", "undo / redo"),
-        ("T", "show / hide timeline strip"),
         ("Ctrl + Enter", "add song marker"),
         ("F10 / Alt", "focus menu bar"),
         ("Alt + underlined letter", "open that menu (F, E, V, P, S, H)"),

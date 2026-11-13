@@ -78,7 +78,6 @@ class TimelineControls:
         duration_sec: float,
         *,
         on_visibility_change: Callable[[], None] | None = None,
-        on_close: Callable[[], None] | None = None,
         on_exit_submenu: Callable[[], None] | None = None,
         on_focus_row: Callable[[int], None] | None = None,
         on_select_song_marker: Callable[[int], None] | None = None,
@@ -93,7 +92,6 @@ class TimelineControls:
         self._beat_times = tuple(beat_times)
         self._bar_times = tuple(bar_times)
         self._on_visibility_change = on_visibility_change
-        self._on_close = on_close
         self._on_exit_submenu = on_exit_submenu
         self._on_focus_row = on_focus_row
         self._on_select_song_marker = on_select_song_marker
@@ -114,7 +112,7 @@ class TimelineControls:
     def handle_keydown(self, event: pygame.event.Event) -> bool:
         if event.key == pygame.K_ESCAPE:
             if not self.session.timeline.recording:
-                self._close_panel()
+                self._exit_submenu()
             return True
 
         if event.key in (pygame.K_UP, pygame.K_DOWN):
@@ -270,9 +268,9 @@ class TimelineControls:
         """Stop an in-progress timeline take without closing the panel."""
         self._stop_record()
 
-    def _close_panel(self) -> None:
-        if self._on_close is not None:
-            self._on_close()
+    def _exit_submenu(self) -> None:
+        if self._on_exit_submenu is not None:
+            self._on_exit_submenu()
 
     def _step_focus_row(self, delta: int) -> None:
         """Move the strip lane within ``layer_z_order``. Does not wrap."""

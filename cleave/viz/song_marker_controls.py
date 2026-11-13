@@ -101,7 +101,6 @@ class SongMarkerController:
             markers.markers, t
         )
         markers.markers = list(new_markers)
-        self.session.timeline.panel_open = True
         # Never activate the newly placed marker; keep prior selection by time.
         if prior_selected_time is None:
             if markers.selected_index is not None and (

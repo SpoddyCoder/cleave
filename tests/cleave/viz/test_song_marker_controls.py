@@ -62,7 +62,6 @@ def test_drop_inserts_without_selecting() -> None:
     markers = session.song_markers
     assert markers.times == [15.0]
     assert markers.selected_index is None
-    assert session.timeline.panel_open is True
     assert notes == ["Song marker 00:15.00"]
 
 

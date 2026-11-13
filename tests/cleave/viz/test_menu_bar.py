@@ -884,10 +884,10 @@ def test_open_menu_ink_matches_the_mock() -> None:
         host.process_event(_motion(4))
         host._draw_navigator = lambda: None
         host._draw_inspector = lambda _state: None
-        ctx = CommandContext(timeline_panel_open=True)
+        ctx = CommandContext(fullscreen=True)
         _paint_shell(host, menu, ctx, frames=1)
         menu.open_menu(view_index, MENUS)
-        menu.item_index = 0
+        menu.item_index = 2
         lists = _paint_shell(host, menu, ctx)
         content = _content_lists(lists)
         names = [draw_list._owner_name for draw_list in content]
@@ -905,7 +905,7 @@ def test_open_menu_ink_matches_the_mock() -> None:
         idle_title = _draw_list_has_color(bar, _color_u32(LABEL))
         check_on_current = _ink_on_fill(popup, _color_u32(VALUE), gold)
         shortcut_on_current = _ink_on_fill(popup, _color_u32(MUTED), gold)
-        menu.item_index = 1
+        menu.item_index = 0
         lists = _paint_shell(host, menu, ctx)
         content = _content_lists(lists)
         names = [draw_list._owner_name for draw_list in content]

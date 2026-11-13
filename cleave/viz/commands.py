@@ -37,7 +37,6 @@ _RESOLVED_SHORTCUT_IDS = frozenset(
         "view.fullscreen",
         "page.settings.preview",
         "layers.add",
-        "view.timeline_strip",
         "edit.undo",
         "edit.redo",
     }
@@ -57,7 +56,6 @@ class CommandContext:
     can_remove_layer: bool = False
     selected_layer_locked: bool = False
     timeline_scope: bool = False
-    timeline_panel_open: bool = False
     timeline_recording: bool = False
     timeline_locked: bool = False
     timeline_can_undo: bool = False
@@ -129,7 +127,6 @@ def command_context(controls: Any) -> CommandContext:
             and bool(session.layers[selected_slot].locked)
         ),
         timeline_scope=timeline_scope,
-        timeline_panel_open=bool(timeline.panel_open),
         timeline_recording=bool(timeline.recording),
         timeline_locked=bool(timeline.locked),
         timeline_can_undo=controls.timeline_history.can_undo,
@@ -313,27 +310,10 @@ def _run_delete(controls: Any) -> None:
     controls.layer_lifecycle.prompt_delete(slot)
 
 
-def _show_strip_enabled(ctx: CommandContext) -> bool:
-    return (
-        not is_preset_curation_mode(ctx.editor_mode) and not ctx.timeline_recording
-    )
-
-
-def _show_strip_checked(ctx: CommandContext) -> bool:
-    return ctx.timeline_panel_open
-
-
 def _timeline_actions_enabled(ctx: CommandContext) -> bool:
     return (
         not is_preset_curation_mode(ctx.editor_mode) and not ctx.timeline_locked
     )
-
-
-def _run_show_strip(controls: Any) -> None:
-    if controls.session.timeline.panel_open:
-        controls.close_timeline_panel()
-    else:
-        controls.open_timeline_panel(enter_submenu=True)
 
 
 def _run_generate(controls: Any) -> None:
@@ -535,15 +515,6 @@ _CURATION = Command(
     checked=_curation_checked,
 )
 
-_SHOW_STRIP = Command(
-    id="view.timeline_strip",
-    label="Show timeline strip",
-    kind="check",
-    shortcut="T",
-    enabled=_show_strip_enabled,
-    run=_when_enabled(_show_strip_enabled, _run_show_strip),
-    checked=_show_strip_checked,
-)
 _GENERATE = Command(
     id="timeline.generate",
     label="Generate timeline...",
@@ -643,7 +614,6 @@ _SHORTCUT_KEYS: dict[str, tuple[int, bool]] = {
     "Ctrl+Y": (pygame.K_y, True),
     "Ctrl+Z": (pygame.K_z, True),
     "Ctrl+,": (pygame.K_COMMA, True),
-    "T": (pygame.K_t, False),
     "H": (pygame.K_h, False),
     "F11": (pygame.K_F11, False),
     "1": (pygame.K_1, False),
@@ -717,7 +687,7 @@ def build_menus(
         (
             Menu("File", (_NEW, _OPEN, _SAVE, SEPARATOR, _QUIT)),
             Menu("Edit", (_UNDO, _REDO)),
-            Menu("View", (_FULLSCREEN, _SHOW_STRIP, SEPARATOR, _CURATION)),
+            Menu("View", (_FULLSCREEN, SEPARATOR, _CURATION)),
             Menu(
                 "Project",
                 (

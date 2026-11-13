@@ -56,7 +56,6 @@ _STATIC_IDS = (
     "edit.undo",
     "edit.redo",
     "view.fullscreen",
-    "view.timeline_strip",
     "view.preset_curation",
     *_PROJECT_PAGE_IDS,
     "project.separate",
@@ -181,7 +180,6 @@ def test_menus_list_taxonomy_ids_once() -> None:
     assert _row_ids(menus[1]) == ["edit.undo", "edit.redo"]
     assert _row_ids(menus[2]) == [
         "view.fullscreen",
-        "view.timeline_strip",
         None,
         "view.preset_curation",
     ]
@@ -252,7 +250,6 @@ def test_later_shortcuts_stay_on_rows_but_do_not_resolve() -> None:
     assert command_by_id("file.new", menus).shortcut == "Ctrl+N"
     assert command_by_id("file.open", menus).shortcut == "Ctrl+O"
     assert command_by_id("layers.add", menus).shortcut == "Ctrl+L"
-    assert command_by_id("view.timeline_strip", menus).shortcut == "T"
     editor = command_for_shortcut(pygame.K_COMMA, pygame.KMOD_CTRL)
     assert editor is not None
     assert editor.id == "page.settings.preview"
@@ -265,11 +262,7 @@ def test_later_shortcuts_stay_on_rows_but_do_not_resolve() -> None:
     assert layer not in tuple(iter_commands(menus))
     assert command_for_shortcut(pygame.K_n, pygame.KMOD_CTRL).id == "file.new"
     assert command_for_shortcut(pygame.K_o, pygame.KMOD_CTRL).id == "file.open"
-    assert command_for_shortcut(pygame.K_t, 0).id == "view.timeline_strip"
-    assert (
-        command_for_shortcut(pygame.K_t, 0, timeline_scope=True).id
-        == "view.timeline_strip"
-    )
+    assert command_for_shortcut(pygame.K_t, 0) is None
     assert command_for_shortcut(pygame.K_COMMA, pygame.KMOD_CTRL).id == "page.settings.preview"
     assert command_for_shortcut(pygame.K_1, 0) is None
     assert command_for_shortcut(pygame.K_s, pygame.KMOD_CTRL).id == "file.save"
@@ -706,54 +699,7 @@ def test_add_selects_new_layer_and_delete_selects_neighbour() -> None:
     assert controls.shell_focus.region is ShellRegion.INSPECTOR
 
 
-def test_show_strip_toggles_panel_and_is_disabled_while_recording_or_curating() -> None:
-    show = command_by_id("view.timeline_strip")
-    assert show.kind == "check"
-    assert show.label == "Show timeline strip"
-    assert show.shortcut == "T"
-    assert command_for_shortcut(pygame.K_t, 0) is show
-    assert command_for_shortcut(pygame.K_t, 0, timeline_scope=True) is show
-    assert command_for_shortcut(pygame.K_r, 0) is None
-    assert command_for_shortcut(pygame.K_r, pygame.KMOD_CTRL).id == "project.render"
-    assert [command.id for command in iter_commands(MENUS) if command.shortcut == "T"] == [
-        "view.timeline_strip"
-    ]
 
-    assert show.checked(CommandContext(timeline_panel_open=False)) is False
-    assert show.checked(CommandContext(timeline_panel_open=True)) is True
-    assert show.enabled(CommandContext()) is True
-    assert show.enabled(CommandContext(timeline_recording=True)) is False
-    assert show.enabled(CommandContext(editor_mode="preset_curation")) is False
-
-    closed = _make_controls(("layer_1",))
-    assert command_context(closed).timeline_panel_open is False
-    assert show.checked(command_context(closed)) is False
-    show.run(closed)
-    assert closed.session.timeline.panel_open is True
-    assert closed.shell_focus.region is ShellRegion.TIMELINE
-    assert isinstance(closed.focus_cursor, TimelineFocus)
-    assert command_context(closed).timeline_scope is True
-    assert command_context(closed).timeline_panel_open is True
-    assert show.checked(command_context(closed)) is True
-    show.run(closed)
-    assert closed.session.timeline.panel_open is False
-    assert closed.shell_focus.region is ShellRegion.NAVIGATOR
-    assert isinstance(closed.focus_cursor, MainFocus)
-    assert command_context(closed).timeline_scope is False
-
-    recording = _make_controls(("layer_1",))
-    recording.session.timeline.recording = True
-    recording.session.timeline.panel_open = True
-    assert command_context(recording).timeline_recording is True
-    assert show.enabled(command_context(recording)) is False
-    show.run(recording)
-    assert recording.session.timeline.panel_open is True
-    assert not isinstance(recording.focus_cursor, TimelineFocus)
-
-    curated = _make_controls(("layer_1",))
-    curated.session.settings.editor_mode = "preset_curation"
-    show.run(curated)
-    assert curated.session.timeline.panel_open is False
 
 
 def test_undo_is_disabled_with_no_history_and_run_is_a_noop() -> None:

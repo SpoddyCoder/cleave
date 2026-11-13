@@ -121,7 +121,6 @@ def _make_runtime(
         session,
         playback,
         120.0,
-        on_close=runtime.controls.close_timeline_panel,
         on_exit_submenu=runtime.controls.exit_timeline_submenu,
         on_focus_row=runtime.controls.set_timeline_focus_row,
     )
@@ -248,13 +247,13 @@ def test_esc_while_recording_stops_take_panel_stays_open() -> None:
     assert isinstance(runtime.controls.focus_cursor, TimelineFocus)
 
 
-def test_second_esc_after_stop_closes_submenu_panel() -> None:
+def test_second_esc_after_stop_leaves_submenu_and_keeps_strip() -> None:
     runtime = _make_runtime(recording=True)
     dispatch_keydown(keydown(pygame.K_ESCAPE), runtime)
     assert runtime.seed.session.timeline.recording is False
 
     assert dispatch_keydown(keydown(pygame.K_ESCAPE), runtime) is True
-    assert runtime.seed.session.timeline.panel_open is False
+    assert runtime.seed.session.timeline.panel_open is True
     assert runtime.controls.shell_focus.region is ShellRegion.NAVIGATOR
     assert isinstance(runtime.controls.focus_cursor, MainFocus)
     assert (
@@ -271,13 +270,6 @@ def test_second_esc_after_stop_requests_overlay_hide_on_main() -> None:
 
     assert dispatch_keydown(keydown(pygame.K_ESCAPE), runtime) is True
     assert runtime.seed.session.timeline.panel_open is True
-
-
-def test_t_while_recording_is_noop() -> None:
-    runtime = _make_runtime(recording=True)
-    assert dispatch_keydown(keydown(pygame.K_t), runtime) is True
-    assert runtime.seed.session.timeline.panel_open is True
-    assert isinstance(runtime.controls.focus_cursor, TimelineFocus)
 
 
 def test_submenu_routing_up_down_to_tuning_enter_to_timeline() -> None:

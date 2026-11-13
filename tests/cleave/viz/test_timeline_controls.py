@@ -100,7 +100,7 @@ def _make_timeline_controls(
     playback.player.seek(position_sec)
 
     visibility_calls: list[bool] = []
-    close_calls: list[bool] = []
+    exit_calls: list[bool] = []
     seeks: list[float] = []
     notifications: list[str] = []
 
@@ -109,16 +109,13 @@ def _make_timeline_controls(
         playback,
         120.0,
         on_visibility_change=lambda: visibility_calls.append(True),
-        on_close=lambda: (
-            close_calls.append(True),
-            setattr(tl, "panel_open", False),
-        ),
+        on_exit_submenu=lambda: exit_calls.append(True),
         on_seek=lambda delta: seeks.append(delta),
         on_notification=notifications.append,
         beat_times=beat_times,
         bar_times=bar_times,
     )
-    return controls, session, visibility_calls, close_calls, seeks, notifications
+    return controls, session, visibility_calls, exit_calls, seeks, notifications
 
 
 def test_a_toggles_arm_on_focused_stem() -> None:
@@ -186,29 +183,23 @@ def test_left_right_step_cues_when_not_recording() -> None:
     assert session.timeline.selected_cue_t["layer_1"] == 10.0
 
 
-def test_esc_closes_panel_and_strip_t_does_not() -> None:
-    controls, session, _, close_calls, _, _ = _make_timeline_controls()
+def test_esc_exits_submenu_and_keeps_strip_open() -> None:
+    controls, session, _, exit_calls, _, _ = _make_timeline_controls()
 
     controls.handle_keydown(keydown(pygame.K_ESCAPE))
-    assert close_calls == [True]
-    assert session.timeline.panel_open is False
-
-    session.timeline.panel_open = True
-    controls.handle_keydown(keydown(pygame.K_t))
-    assert close_calls == [True]
+    assert exit_calls == [True]
     assert session.timeline.panel_open is True
 
 
-def test_esc_and_t_while_recording_do_not_close_panel() -> None:
-    controls, session, _, close_calls, _, _ = _make_timeline_controls(
+def test_esc_while_recording_does_not_exit_submenu() -> None:
+    controls, session, _, exit_calls, _, _ = _make_timeline_controls(
         recording=True,
     )
     session.timeline.armed_slots = {"layer_1"}
     session.timeline.record_start_sec = 0.0
 
     controls.handle_keydown(keydown(pygame.K_ESCAPE))
-    controls.handle_keydown(keydown(pygame.K_t))
-    assert close_calls == []
+    assert exit_calls == []
     assert session.timeline.panel_open is True
 
 
