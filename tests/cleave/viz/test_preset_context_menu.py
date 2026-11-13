@@ -50,14 +50,52 @@ def test_list_item_menu_lists_its_items_in_order() -> None:
             "preset.remove",
             "preset.add_current",
             "preset.populate",
-            "preset.curate",
+            "preset.favourite",
+            "preset.blacklist",
+            "preset.role",
         ]
         assert all(entry.enabled for entry in items.values())
-        curate = items["preset.curate"]
-        assert [item.shortcut for item in curate.items] == ["F", "B", "C", "R"]
-        restore = curate.items[3]
-        assert restore.enabled is False
-        assert restore.hint == "Not favourited, cast, or blacklisted"
+        assert [items[i].shortcut for i in ("preset.favourite", "preset.blacklist", "preset.role")] == ["F", "B", "C"]
+        assert items["preset.favourite"].label == "Favourite"
+        assert items["preset.blacklist"].label == "Blacklist..."
+        role = items["preset.role"]
+        assert [item.label for item in role.items] == [
+            "Bed", "Pulse", "Lead", "Accent", "None",
+        ]
+        assert [item.checked for item in role.items] == [
+            False, False, False, False, True,
+        ]
+
+
+def test_curation_items_undo_themselves() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        controls, (a, _b, _c) = _controls_with_list(tmp)
+        library = controls.library
+        desc = _item_desc(0)
+
+        _entries(controls, desc)["preset.favourite"].run()
+        assert library.is_favourite(Path(a))
+        items = _entries(controls, desc)
+        assert items["preset.favourite"].label == "Unfavourite"
+        items["preset.favourite"].run()
+        assert not library.is_favourite(Path(a))
+
+        library.set_blacklisted(Path(a), True)
+        items = _entries(controls, desc)
+        assert items["preset.blacklist"].label == "Unblacklist"
+        items["preset.blacklist"].run()
+        assert not library.is_blacklisted(Path(a))
+        assert not controls.modal_host.active
+
+        role = _entries(controls, desc)["preset.role"]
+        role.items[2].run()
+        assert library.role_of(Path(a)) == "lead"
+        role = _entries(controls, desc)["preset.role"]
+        assert [item.checked for item in role.items] == [
+            False, False, True, False, False,
+        ]
+        role.items[4].run()
+        assert library.role_of(Path(a)) is None
 
 
 def test_move_items_reorder_and_stop_at_the_ends() -> None:
@@ -89,7 +127,9 @@ def test_lock_disables_edits_but_not_audition() -> None:
         ):
             assert items[item_id].enabled is False, item_id
             assert items[item_id].hint == "Locked: unlock to change"
-        assert not any(item.enabled for item in items["preset.curate"].items)
+        for item_id in ("preset.favourite", "preset.blacklist", "preset.role"):
+            assert items[item_id].enabled is False, item_id
+            assert items[item_id].hint == "Locked: unlock to change"
 
 
 def test_add_current_needs_switching_on() -> None:
@@ -112,7 +152,12 @@ def test_current_preset_row_offers_add_and_curate() -> None:
     controls = _make_controls(("layer_1",))
     desc = RowDescriptor(RowKind.TRACK_PRESET, slot="layer_1")
     items = _entries(controls, desc)
-    assert list(items) == ["preset.add_current", "preset.curate"]
+    assert list(items) == [
+        "preset.add_current",
+        "preset.favourite",
+        "preset.blacklist",
+        "preset.role",
+    ]
     assert items["preset.add_current"].label == "Add to preset list"
 
 

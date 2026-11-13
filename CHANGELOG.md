@@ -16,7 +16,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Right-click the timeline strip's time scale, or a row away from any cue, for options at that time: seek there, play from there, or drop a song marker there. A right-click on a song marker selects it and offers its own options instead: seek to it, play from it, set its type from a submenu that ticks the current one, or delete it. The time scale menu also has Undo and Redo, naming what they would undo, plus Generate timeline, Snap cues, Snap cues to markers, Set cut type on cues, and Reset timeline.
 - Click a song marker on the timeline strip, on the time scale or a row, to select it and show it on the Song Markers page, where the arrows move between markers and Delete removes one. A click on the time scale also moves the playhead to the marker; on a row, a cue under the pointer is selected first.
 - Right-click a navigator row to select it and see its options: expand or collapse it, and turn it on or off, solo it, or lock it as its icons do. A layer row also jumps straight to any of its pages, moves up or down, and adds or deletes a layer. Shift+F10 or the Menu key opens the same menu for the selected row.
-- Right-click a preset list entry to select it and see its options: audition it, move it up or down, remove it, add the current preset, or populate the list. A Curate submenu favourites, blacklists, casts, or removes the preset from those, the same as F, B, C, and R. The layer's current preset row offers Add to preset list and Curate. Shift+F10 or the Menu key opens the same menu for the selected row.
+- Right-click a preset list entry to select it and see its options: audition it, move it up or down, remove it, add the current preset, or populate the list. Favourite (or Unfavourite), Blacklist (or Unblacklist), and a Role submenu that ticks the current role curate the preset, the same as F, B, and C. The layer's current preset row offers Add to preset list and the same curation items. Shift+F10 or the Menu key opens the same menu for the selected row.
 - Context menus can hold submenus, opened by hovering, clicking, Right, or Enter; Left or Esc closes one.
 - The timeline strip zooms. Scroll the mouse wheel over the strip to zoom in or out around the time under the pointer, down to a one second window. When zoomed, drag a row sideways (or middle-drag anywhere on the time scale or rows) to move along the song, or use Shift + wheel. A scrollbar under the rows shows how much of the song is visible: drag its thumb, or click the track to jump there. During playback the view pages forward when the playhead reaches the right edge, and a seek while paused brings the playhead back into view. The strip is slightly taller to fit the scrollbar.
 - The timeline strip shows a time scale above its top row, with labelled minute and second marks spaced to fit the strip width. Faint lines at the song start and end run down through every row.
@@ -40,7 +40,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 ### Changed
 
 - Preset curation no longer moves, copies, or deletes preset files. Favourites, blacklist, and cue roles are kept in `cleave.db` in the data directory, keyed by each preset's contents, so they follow a preset that is renamed or moved and match its copies in project preset lists. The first launch after an update shows "Indexing presets" while it reads the preset folder.
-- F favourites or unfavourites the preset at once, with no dialog. C picks a role, or None to clear it. R (Remove from...) clears a favourite, blacklist, or role without asking where to put the file.
+- Each curation key undoes itself. F favourites or unfavourites the preset at once, with no dialog. B blacklists after a confirm, or unblacklists at once. C picks a role, or None to clear it.
 - Blacklisted presets are hidden from folder browsing, populate, and random layer picks, but stay in any preset list that already uses them.
 - Left/Right on a top-level preset directory row also steps through Favourites, Role: bed, Role: pulse, Role: lead, Role: accent, and Blacklisted, which list matching presets from every folder. Cue-role populate draws from the role collections.
 - Entering Preset Curation mode selects the first layer and focuses its preset row, so you can start browsing presets straight away.
@@ -159,6 +159,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Removed
 
+- R (Remove from...) in preset curation. F, B, and C undo their own changes.
 - The `favourites/`, `blacklist/`, and `roles/<role>/` folders under the preset root are no longer used, and existing ones are treated as ordinary preset folders. Favourite and blacklist destination subfolders and `.origin` restore files are gone.
 - The marker count beside Song Markers in the navigator.
 - View > Show timeline strip and its `T` shortcut. The strip shows when the timeline is on and hides when it is off. Esc in the strip now returns focus to the navigator and leaves the strip open, and dropping a song marker no longer opens the strip.

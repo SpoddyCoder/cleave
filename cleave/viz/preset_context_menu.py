@@ -1,14 +1,19 @@
 """Right-click menu for a preset row in the inspector.
 
 A preset list entry offers Audition, Move up and down, Remove, Add current
-preset, Populate, and a Curate submenu. The layer's current preset row
-offers Add to preset list and Curate. Each item calls the same path as its
-key, and a disabled item says why in its hint.
+preset, Populate, then Favourite, Blacklist, and a Role submenu. The layer's
+current preset row offers Add to preset list and the same curation items.
+Each item calls the same path as its key, and a disabled item says why in
+its hint.
 """
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from pathlib import Path
 from typing import TYPE_CHECKING
+
+from cleave.cue_roles import CUE_ROLES, CueRole
 
 from cleave.viz.context_menu import (
     ContextMenuEntry,
@@ -54,14 +59,14 @@ def preset_row_menu_entries(
                 (_audition_item(controls, slot, index),),
                 _list_edit_items(controls, desc, slot, index),
                 _list_fill_items(controls, desc, slot),
-                (_curate_submenu(controls, desc, slot),),
+                _curate_items(controls, desc, slot),
             ]
         )
     if desc.kind is RowKind.TRACK_PRESET:
         return join_groups(
             [
                 (_add_item(controls, desc, slot, label="Add to preset list"),),
-                (_curate_submenu(controls, desc, slot),),
+                _curate_items(controls, desc, slot),
             ]
         )
     return ()
@@ -154,9 +159,10 @@ def _fill_hint(controls: TuningControls, desc: RowDescriptor) -> str | None:
     return None
 
 
-def _curate_submenu(
+def _curate_items(
     controls: TuningControls, desc: RowDescriptor, slot: str
-) -> ContextSubmenu:
+) -> tuple[ContextMenuEntry, ...]:
+    """Favourite, Blacklist, and Role; each one undoes itself."""
     curation = controls.preset_curation
     src = controls.preset_list.resolve_file_path(slot, desc.kind, desc)
     if section_lock_blocks_mutation(controls.session, desc):
@@ -165,62 +171,49 @@ def _curate_submenu(
         hint = "Preset file not found"
     else:
         hint = None
+    ready = hint is None and src is not None
+    favourited = ready and curation.is_favourite(src)
+    blacklisted = ready and curation.is_blacklisted(src)
+    role = curation.role_of(src) if ready else None
 
-    def act(run_with_src) -> None:
+    def act(run_with_src: Callable[[Path], None]) -> None:
         if src is not None:
             run_with_src(src)
 
-    restore_hint = hint
-    if restore_hint is None and src is not None and not curation.can_restore(src):
-        restore_hint = "Not favourited, cast, or blacklisted"
-    blacklist_hint = hint
-    if blacklist_hint is None and src is not None and curation.is_blacklisted(src):
-        blacklist_hint = "Already blacklisted"
-    favourited = hint is None and src is not None and curation.is_favourite(src)
-
-    def item(
-        item_id: str, label: str, key: str, run_with_src, item_hint: str | None
-    ) -> ContextMenuItem:
-        return ContextMenuItem(
-            id=f"preset.curate.{item_id}",
-            label=label,
-            run=lambda: act(run_with_src),
-            enabled=item_hint is None,
-            shortcut=key,
-            hint=item_hint,
-        )
-
-    return ContextSubmenu(
-        id="preset.curate",
-        label="Curate",
-        items=(
-            item(
-                "favourite",
-                "Unfavourite" if favourited else "Favourite",
-                "F",
-                curation.toggle_favourite,
-                hint,
+    role_options: tuple[CueRole | None, ...] = (*CUE_ROLES, None)
+    return (
+        ContextMenuItem(
+            id="preset.favourite",
+            label="Unfavourite" if favourited else "Favourite",
+            run=lambda: act(curation.toggle_favourite),
+            enabled=ready,
+            shortcut="F",
+            hint=hint,
+        ),
+        ContextMenuItem(
+            id="preset.blacklist",
+            label="Unblacklist" if blacklisted else "Blacklist...",
+            run=lambda: act(lambda path: curation.toggle_blacklist(slot, path)),
+            enabled=ready,
+            shortcut="B",
+            hint=hint,
+        ),
+        ContextSubmenu(
+            id="preset.role",
+            label="Role",
+            items=tuple(
+                ContextMenuItem(
+                    id=f"preset.role.{option if option is not None else 'none'}",
+                    label="None" if option is None else option.capitalize(),
+                    run=lambda option=option: act(
+                        lambda path: curation.set_role(path, option)
+                    ),
+                    checked=option == role,
+                )
+                for option in role_options
             ),
-            item(
-                "blacklist",
-                "Blacklist...",
-                "B",
-                lambda path: curation.prompt_blacklist(slot, path),
-                blacklist_hint,
-            ),
-            item(
-                "cast",
-                "Cast as role...",
-                "C",
-                lambda path: curation.prompt_cast(slot, path),
-                hint,
-            ),
-            item(
-                "restore",
-                "Remove from...",
-                "R",
-                lambda path: curation.prompt_restore(slot, path),
-                restore_hint,
-            ),
+            enabled=ready,
+            shortcut="C",
+            hint=hint,
         ),
     )

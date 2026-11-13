@@ -143,26 +143,23 @@ def test_cast_sets_role_and_none_clears_it(tmp_path: Path) -> None:
     assert library.role_of(src) is None
 
 
-def test_restore_lists_memberships_and_clears_choice(tmp_path: Path) -> None:
+def test_toggle_blacklist_confirms_on_and_clears_at_once(tmp_path: Path) -> None:
     src = tmp_path / "pack" / "demo.milk"
     _write(src, "milk")
-    controller, _session, modal, library = _make_controller(tmp_path)
-    assert not controller.can_restore(src)
-    library.set_favourite(src, True)
-    library.set_blacklisted(src, True)
-    library.set_role(src, "lead")
+    notes: list[str] = []
+    controller, _session, modal, library = _make_controller(
+        tmp_path, notifications=notes
+    )
 
-    controller.prompt_restore("layer_1", src)
-    view = modal.view_state()
-    assert view is not None
-    assert view.message == "Remove from: demo.milk?"
-    assert view.options == ("Favourites", "Blacklist", "Cast (lead)", "Cancel")
-    modal.handle_keydown(keydown(pygame.K_DOWN))
+    controller.toggle_blacklist("layer_1", src)
+    assert modal.view_state() is not None
     modal.handle_keydown(keydown(pygame.K_RETURN))
+    assert library.is_blacklisted(src)
 
-    assert library.is_favourite(src)
+    controller.toggle_blacklist("layer_1", src)
+    assert modal.view_state() is None
     assert not library.is_blacklisted(src)
-    assert library.role_of(src) == "lead"
+    assert notes == ["Removed from blacklist"]
 
 
 def test_unfavourite_refreshes_layer_browsing_favourites(tmp_path: Path) -> None:

@@ -193,9 +193,8 @@ _PRESET_DIR_SECTION = HelpSection(
 
 _PRESET_CURATION_SHORTCUTS = (
     ("F", "favourite / unfavourite preset"),
-    ("B", "blacklist preset (hidden from browsing)"),
-    ("C", "set preset role (bed/pulse/lead/accent)"),
-    ("R", "remove favourite, blacklist, or role"),
+    ("B", "blacklist / unblacklist preset"),
+    ("C", "set preset role (bed/pulse/lead/accent/none)"),
 )
 
 _PRESET_SECTION = HelpSection(

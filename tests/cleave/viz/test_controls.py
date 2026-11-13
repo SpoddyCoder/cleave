@@ -4606,7 +4606,7 @@ def test_b_on_preset_file_prompts_blacklist() -> None:
     preset = RowDescriptor(RowKind.TRACK_PRESET, slot="layer_1")
     assert press_layer_row(controls, preset, _keydown(pygame.K_b)) is True
 
-    mock_curation.prompt_blacklist.assert_called_once_with("layer_1", current)
+    mock_curation.toggle_blacklist.assert_called_once_with("layer_1", current)
 
 
 def test_f_on_user_preset_item_toggles_favourite() -> None:
@@ -4628,7 +4628,7 @@ def test_b_on_user_preset_item_prompts_blacklist() -> None:
 
     assert press_layer_row(controls, desc, _keydown(pygame.K_b)) is True
 
-    mock_curation.prompt_blacklist.assert_called_once_with("layer_1", path)
+    mock_curation.toggle_blacklist.assert_called_once_with("layer_1", path)
 
 
 def test_f_b_not_on_preset_dir() -> None:
@@ -4641,7 +4641,7 @@ def test_f_b_not_on_preset_dir() -> None:
     press_layer_row(controls, RowDescriptor(RowKind.TRACK_PRESET_DIR, slot="layer_1"), _keydown(pygame.K_f))
     press_layer_row(controls, RowDescriptor(RowKind.TRACK_PRESET_DIR, slot="layer_1"), _keydown(pygame.K_b))
     mock_curation.toggle_favourite.assert_not_called()
-    mock_curation.prompt_blacklist.assert_not_called()
+    mock_curation.toggle_blacklist.assert_not_called()
 
 
 def test_f_b_blocked_when_layer_locked() -> None:
@@ -4655,7 +4655,7 @@ def test_f_b_blocked_when_layer_locked() -> None:
     assert press_layer_row(controls, preset, _keydown(pygame.K_f)) is True
     assert press_layer_row(controls, preset, _keydown(pygame.K_b)) is True
     mock_curation.toggle_favourite.assert_not_called()
-    mock_curation.prompt_blacklist.assert_not_called()
+    mock_curation.toggle_blacklist.assert_not_called()
 
 
 def test_f_b_allowed_in_projectm_mode() -> None:
@@ -4693,7 +4693,7 @@ def test_f_b_ignored_on_non_preset_rows() -> None:
     _press_focused(controls, _keydown(pygame.K_f))
     _press_focused(controls, _keydown(pygame.K_b))
     mock_curation.toggle_favourite.assert_not_called()
-    mock_curation.prompt_blacklist.assert_not_called()
+    mock_curation.toggle_blacklist.assert_not_called()
 
 
 def test_drop_song_marker_does_not_select_or_steal_focus() -> None:
