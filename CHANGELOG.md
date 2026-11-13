@@ -39,6 +39,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- Entering Preset Curation mode selects the first layer and focuses its preset row, so you can start browsing presets straight away.
 - Song markers on the timeline strip are thicker, rise up through the time scale like the playhead, and flash when selected, as cues do. The selected marker shows on the strip while the Song Markers page is open.
 - Timeline visibility overrides are switched on and off only from a row's right-click menu or Shift+Enter, and an overridden row's eye turns yellow. Showing or hiding a layer by hand (eye click or number key) works only on an overridden row, or an armed row while recording, so it no longer starts an override by itself. Starting an override keeps the layer as it looks at that moment and leaves other rows alone.
 - Inspector pages divide their settings into groups with thin rules: hard and soft cuts on the cue fades page, hard cut and start clean on the preset switching page, beat sensitivity on the Milkdrop preset page, start and end on the render page, panel layout on the UI page, and position, background and border, and the title and body text on the opening and closing card pages.

@@ -14,7 +14,11 @@ from cleave.preset_curation import PresetCurationIndex
 from cleave.viz.config_save import ConfigSaveController
 from cleave.viz.layer_lifecycle_controls import LayerLifecycleController
 from cleave.viz.layer_mutations import LayerMutations
-from cleave.viz.editor_mode_controls import EditorModeController, is_preset_curation_mode
+from cleave.viz.editor_mode_controls import (
+    EditorModeController,
+    curation_focus_slot,
+    is_preset_curation_mode,
+)
 from cleave.viz.post_fx import sync_live_compositor_format
 from cleave.viz.preset_curation_controls import PresetCurationController
 from cleave.viz.preset_list_controls import PresetListController
@@ -558,6 +562,21 @@ class TuningControls:
         if isinstance(self.focus_cursor, TimelineFocus):
             self.exit_timeline_submenu()
         self._normalize_focus_cursor()
+        self._focus_curation_preset()
+
+    def _focus_curation_preset(self) -> None:
+        """Open the curation layer with its Preset row focused, ready to browse."""
+        slot = curation_focus_slot(self.session)
+        if slot is None:
+            return
+        self.navigator.select(layer_node_id(slot))
+        if self.shell_focus.selected_id != layer_node_id(slot):
+            return
+        descriptor = RowDescriptor(RowKind.TRACK_PRESET, slot=slot)
+        self.set_shell_region(ShellRegion.INSPECTOR)
+        self._apply_focus_cursor(MainFocus(descriptor))
+        self.shell_focus.inspector_cursor = descriptor
+        self.shell_focus.inspector_command_id = None
 
     def _sync_live_compositor_format(self) -> None:
         if self._compositor is None or self._post_process is None:

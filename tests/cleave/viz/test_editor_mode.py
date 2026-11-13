@@ -75,6 +75,22 @@ def test_enter_curation_confirms_via_modal() -> None:
     assert controls.session.settings.editor_mode == "preset_curation"
 
 
+def test_enter_curation_focuses_first_layer_preset_row() -> None:
+    from cleave.viz.navigator import layer_node_id
+    from cleave.viz.shell_focus import ShellRegion
+
+    controls = _make_controls(("layer_1", "layer_2"))
+    controls.navigator.select("overlay")
+    _choose_editor_mode_option(controls, "OK")
+
+    preset = RowDescriptor(RowKind.TRACK_PRESET, slot="layer_1")
+    focus = controls.shell_focus
+    assert focus.selected_id == layer_node_id("layer_1")
+    assert focus.region is ShellRegion.INSPECTOR
+    assert focus.inspector_cursor == preset
+    assert controls.focus_cursor == MainFocus(preset)
+
+
 def test_editor_mode_change_syncs_compositor_format() -> None:
     from cleave.gl_color_format import RGBA8, RGBA16F
 
