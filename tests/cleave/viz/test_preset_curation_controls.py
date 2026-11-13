@@ -162,7 +162,7 @@ def test_toggle_blacklist_confirms_on_and_clears_at_once(tmp_path: Path) -> None
     assert notes == ["Removed from blacklist"]
 
 
-def test_unfavourite_refreshes_layer_browsing_favourites(tmp_path: Path) -> None:
+def test_curating_in_a_collection_keeps_the_current_preset(tmp_path: Path) -> None:
     a = tmp_path / "pack" / "a.milk"
     b = tmp_path / "pack" / "b.milk"
     _write(a, "a")
@@ -183,7 +183,39 @@ def test_unfavourite_refreshes_layer_browsing_favourites(tmp_path: Path) -> None
     assert layer.playlist.current == a.resolve()
 
     controller.toggle_favourite(a)
+    assert layer.playlist.paths == (a.resolve(), b.resolve())
+    assert layer.playlist.current == a.resolve()
+    assert preset_changes == []
 
-    assert layer.playlist.paths == (b.resolve(),)
-    assert layer.playlist.current == b.resolve()
-    assert preset_changes == ["layer_1"]
+    controller.toggle_favourite(b)
+    assert layer.playlist.paths == (a.resolve(),)
+
+    layer.playlist.step_sibling(1, preset_root=tmp_path)
+    layer.playlist.step_sibling(-1, preset_root=tmp_path)
+    assert layer.playlist.collection == "favourites"
+    assert layer.playlist.paths == ()
+
+
+def test_clearing_one_flag_keeps_the_other(tmp_path: Path) -> None:
+    a = tmp_path / "pack" / "a.milk"
+    b = tmp_path / "pack" / "b.milk"
+    _write(a, "a")
+    _write(b, "b")
+    for collection, clear in (("favourites", "favourite"), ("blacklisted", "blacklist")):
+        controller, session, _modal, library = _make_controller(tmp_path)
+        for path in (a, b):
+            library.set_favourite(path, True)
+            library.set_blacklisted(path, True)
+        layer = session.layers["layer_1"]
+        layer.playlist = playlist_at_collection(
+            collection, current_dir=tmp_path / "pack", catalog=library
+        )
+
+        if clear == "favourite":
+            controller.toggle_favourite(a)
+            assert (library.is_favourite(a), library.is_blacklisted(a)) == (False, True)
+        else:
+            controller.toggle_blacklist("layer_1", a)
+            assert (library.is_favourite(a), library.is_blacklisted(a)) == (True, False)
+        assert layer.playlist.current == a.resolve(), collection
+        assert library.is_favourite(b) and library.is_blacklisted(b)

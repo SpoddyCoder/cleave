@@ -352,14 +352,19 @@ class PresetPlaylist:
         return True
 
     def refresh_collection(self) -> bool:
-        """Re-read a collection's members; keep the current preset when still listed.
+        """Re-read a collection's members; the current preset stays selected.
 
-        Returns True when the current preset changed. No-op for folder browsing.
+        A current preset that just left the collection stays listed until the
+        collection is entered again, so curating it never jumps the layer to a
+        different preset. Returns True when the current preset changed. No-op
+        for folder browsing.
         """
         if self.collection is None:
             return False
         before = self.current
         paths = self.catalog.collection_paths(self.collection)
+        if before is not None and before not in paths and before.is_file():
+            paths = tuple(sorted((*paths, before)))
         if before is not None and before in paths:
             index = paths.index(before)
         elif paths:
