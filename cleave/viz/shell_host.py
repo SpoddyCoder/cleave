@@ -1915,6 +1915,10 @@ class ShellHost:
                 1, int(round(imgui.get_frame_height()))
             )
             rule_y, anchors, menus = self._draw_bar(menu_state)
+        if menu_state.dropdown_open:
+            # Opening a context menu blurs the bar, so both open together
+            # only when the bar just opened. The dropdown wins.
+            self._controls.context_menu.close()
         if self._layout is not None:
             self._draw_shell(menu_state, readout, notice)
         popup_hovered = False

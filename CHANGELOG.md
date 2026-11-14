@@ -129,6 +129,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- Opening a menu-bar menu closes an open right-click menu, so the two never show at once.
 - projectM warnings and errors (such as a preset whose per-pixel code fails to compile) name the layer they came from, as in "Layer 2: projectM: …". The missing preset anchor warning names panel layer numbers instead of internal slot names, and "Populated N presets" and "Added preset" name their layer.
 - When the navigator, inspector, or help column has more rows than fit, the rows stop short of the panel border at the top and bottom instead of running into it.
 - The timeline strip's top edge is easy to grab for a resize: the up-down pointer covers the border line and a few pixels either side, and the time scale's scrub starts at the top of its tick marks instead of the top of the band.
