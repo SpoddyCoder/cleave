@@ -69,7 +69,7 @@ from cleave.viz.theme import (
     SONG_BOUND,
     SONG_MARKER,
     SONG_MARKER_SELECTED,
-    TIMELINE_BAR_ON,
+    TIMELINE_TRACK_COLORS,
     TIMELINE_SCROLL_RAIL,
     TIMELINE_SCROLL_THUMB,
     VALUE,
@@ -79,11 +79,9 @@ from cleave.viz.theme import (
 from cleave.viz.ui_tint import blit_tint
 
 OFF_SEGMENT_COLOR: tuple[int, int, int] = (40, 40, 40)
-# Dim end of the level-bar colour ramp (quarter beds stay readable).
-_BAR_LEVEL_DIM: tuple[int, int, int] = tuple(
-    int(round(OFF_SEGMENT_COLOR[i] + (TIMELINE_BAR_ON[i] - OFF_SEGMENT_COLOR[i]) * 0.4))
-    for i in range(3)
-)
+# Dim end of the level-bar colour ramp sits this far from off toward the
+# track colour (quarter beds stay readable).
+_BAR_LEVEL_DIM_MIX: float = 0.4
 _ROLE_GLYPH: dict[CueRole, str] = {
     "bed": "B",
     "pulse": "P",
@@ -413,6 +411,11 @@ def _lerp_rgb(
     )
 
 
+def track_color(row_index: int) -> tuple[int, int, int]:
+    """On-section colour of the timeline track at *row_index*."""
+    return TIMELINE_TRACK_COLORS[row_index % len(TIMELINE_TRACK_COLORS)]
+
+
 def bar_level_y(bar_rect: pygame.Rect, level: float) -> int:
     """Y of the top of a bottom-filled level within ``bar_rect``."""
     filled = max(0.0, min(1.0, float(level))) * bar_rect.h
@@ -428,10 +431,12 @@ def _draw_level_bar(
     view_start_sec: float,
     view_end_sec: float,
     bar_rect: pygame.Rect,
+    on_color: tuple[int, int, int],
 ) -> None:
     pygame.draw.rect(panel, OFF_SEGMENT_COLOR, bar_rect)
     if view_end_sec <= view_start_sec or len(breakpoints) < 2:
         return
+    dim_color = _lerp_rgb(OFF_SEGMENT_COLOR, on_color, _BAR_LEVEL_DIM_MIX)
     # Polygon fills include their vertices; Rect.bottom/right are exclusive.
     bottom = bar_rect.bottom - 1
     right = bar_rect.right - 1
@@ -459,7 +464,7 @@ def _draw_level_bar(
         y0 = min(bar_level_y(bar_rect, level0), bottom)
         y1 = min(bar_level_y(bar_rect, level1), bottom)
         mean_level = 0.5 * (level0 + level1)
-        color = _lerp_rgb(_BAR_LEVEL_DIM, TIMELINE_BAR_ON, mean_level)
+        color = _lerp_rgb(dim_color, on_color, mean_level)
         pygame.draw.polygon(
             panel,
             color,
@@ -1438,6 +1443,7 @@ class TimelineOverlay:
                 view_start_sec=view_start,
                 view_end_sec=view_end,
                 bar_rect=bar_rect,
+                on_color=track_color(row_index),
             )
 
             row_cues = bar_cues_for_row(state, slot)

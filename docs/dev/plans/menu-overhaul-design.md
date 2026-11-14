@@ -68,7 +68,7 @@ Mock CSS variables are appearance targets. Draw with the existing constants in [
 | `--lock-icon` | `LOCK_ICON` |
 | `--highlight` | `HIGHLIGHT` |
 | `--dirty` | `CONFIG_DIRTY` |
-| `--bar-on` | `TIMELINE_BAR_ON` |
+| `--bar-on` | `TIMELINE_TRACK_COLORS` (one per track) |
 | `--bar-grid` | `BAR_GRID` |
 | `--playhead` | `PLAYHEAD` |
 | `--marker` | `SONG_MARKER` |

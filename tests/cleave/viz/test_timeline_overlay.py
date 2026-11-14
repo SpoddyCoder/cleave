@@ -1802,8 +1802,7 @@ def test_playhead_and_cues_outside_the_window_are_not_drawn() -> None:
 
 
 def test_zoomed_level_bar_cuts_segments_at_the_window_edges() -> None:
-    from cleave.viz.theme import TIMELINE_BAR_ON
-    from cleave.viz.timeline_overlay import OFF_SEGMENT_COLOR
+    from cleave.viz.timeline_overlay import OFF_SEGMENT_COLOR, track_color
 
     pygame.init()
     overlay = TimelineOverlay()
@@ -1822,9 +1821,16 @@ def test_zoomed_level_bar_cuts_segments_at_the_window_edges() -> None:
     _, _, row_y, _, row_h, _ = overlay.row_layout[0]
     y = py + row_y + row_h // 2
     # On from before the window to its middle, then off.
-    assert tuple(surface.get_at((px + bar_left + 2, y)))[:3] == TIMELINE_BAR_ON
-    assert tuple(surface.get_at((px + bar_left + bar_width // 4, y)))[:3] == TIMELINE_BAR_ON
+    assert tuple(surface.get_at((px + bar_left + 2, y)))[:3] == track_color(0)
+    assert tuple(surface.get_at((px + bar_left + bar_width // 4, y)))[:3] == track_color(0)
     assert (
         tuple(surface.get_at((px + bar_left + 3 * bar_width // 4, y)))[:3]
         == OFF_SEGMENT_COLOR
     )
+
+
+def test_each_track_has_its_own_on_colour() -> None:
+    from cleave.viz.timeline_overlay import track_color
+
+    colors = [track_color(index) for index in range(8)]
+    assert len(set(colors)) == 8

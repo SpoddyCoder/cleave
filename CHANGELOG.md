@@ -47,6 +47,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- Each timeline strip track draws its on sections in its own colour: sky, lavender, amber, mint, pink, coral, lime, and aqua for layers 1 to 8.
 - The selected navigator row's label and twisty draw in yellow, matching the focused row in the inspector, timeline strip, and dialogs.
 - Progress bars on the loading screen and in progress dialogs fill in the notification yellow, with a thicker white border and a wider gap around the fill. The text above them is 50% larger.
 - The Generate timeline dialog groups its settings under three headings, in the order they apply: Arrangement (mode, character, density, conductor), Cue timing and cuts (snap to grid, snap to song markers, cut type), and Preset lists (refill preset lists). Character is hidden in pattern mask mode, which does not use it.

@@ -10,7 +10,7 @@ Typography roles for the live tuning overlay:
 Accent colors for modes and icons (not label/value roles):
   HIGHLIGHT, ERROR_NOTIFICATION, NOTIFICATION_ON_FILL, MOVE_MODE, LOCK_ICON,
   PRESET_ICON, PRESET_FILE_ICON,
-  TIMELINE_BAR_ON, BAR_GRID, SONG_BOUND, PLAYHEAD, PLAYHEAD_FLASH, SONG_MARKER, SONG_MARKER_SELECTED
+  TIMELINE_TRACK_COLORS, BAR_GRID, SONG_BOUND, PLAYHEAD, PLAYHEAD_FLASH, SONG_MARKER, SONG_MARKER_SELECTED
 
 Buttons (fills, not text roles):
   BUTTON_BG, BUTTON_HOVER_BG, BUTTON_ACTIVE_BG, BUTTON_BORDER - every panel button,
@@ -251,7 +251,17 @@ PANEL_FOCUS_BORDER_ALPHA: int = 140
 # (the shade is lifted above HIGHLIGHT at FOCUS_WASH_ALPHA over BACKGROUND).
 ROW_FOCUS_BORDER: tuple[int, int, int] = (64, 59, 33)
 REC_BG: tuple[int, int, int] = (220, 0, 0)
-TIMELINE_BAR_ON: tuple[int, int, int] = (200, 225, 255)
+# On-section fill of each timeline track's level bar, one per layer (max 8).
+TIMELINE_TRACK_COLORS: tuple[tuple[int, int, int], ...] = (
+    (127, 209, 255),  # sky
+    (183, 166, 255),  # lavender
+    (255, 210, 127),  # amber
+    (156, 240, 176),  # mint
+    (246, 166, 200),  # pink
+    (255, 163, 143),  # coral
+    (212, 238, 138),  # lime
+    (128, 232, 216),  # aqua
+)
 BAR_GRID: tuple[int, int, int] = (70, 95, 130)
 # Song start and end lines below the ruler, through the timeline rows.
 SONG_BOUND: tuple[int, int, int] = (58, 66, 84)
@@ -267,7 +277,7 @@ PROGRESS_BAR_FILL_GAP: int = 2
 # Text above a progress bar draws this much larger than the shell font.
 PROGRESS_LABEL_FONT_SCALE: float = 1.5
 SCROLLBAR_TRACK: tuple[int, int, int] = DISABLED
-SCROLLBAR_THUMB: tuple[int, int, int] = TIMELINE_BAR_ON
+SCROLLBAR_THUMB: tuple[int, int, int] = (200, 225, 255)
 # Timeline strip scrollbar: a faint rail and a neutral pill, so it does not
 # read as a layer row's level bar.
 TIMELINE_SCROLL_RAIL: tuple[int, int, int] = SONG_BOUND
