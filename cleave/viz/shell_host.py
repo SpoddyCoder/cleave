@@ -21,7 +21,11 @@ from cleave.viz.drag_reorder import DRAG_LAYER, DRAG_PRESET, RowDragGesture
 from cleave.viz.config_pages import config_page_title, is_config_page
 from cleave.viz.frame_rate import format_fps_value
 from cleave.viz.help_column import draw_help_column
-from cleave.viz.help_content import help_section_kwargs, help_sections_for_stop
+from cleave.viz.help_content import (
+    help_section_kwargs,
+    help_sections_for_stop,
+    modal_help_content,
+)
 from cleave.viz.imgui_host import ImGuiHost, PAUSE_GLYPH, PLAY_GLYPH, mouse_button
 from cleave.viz.imgui_theme import rgba
 from cleave.viz.inspector import InspectorRow, build_inspector_rows
@@ -554,6 +558,7 @@ def _menu_bar_frame_padding() -> Iterator[None]:
         imgui.pop_style_var()
 
 
+_HELP_WINDOW = "##shell-help"
 _SHELL_FLAGS = (
     int(imgui.WindowFlags_.no_title_bar)
     | int(imgui.WindowFlags_.no_resize)
@@ -2144,8 +2149,13 @@ class ShellHost:
     ) -> None:
         if rect[2] <= 0 or rect[3] <= 0:
             return
+        modal_host = getattr(self._controls, "modal_host", None)
+        modal_help = () if modal_host is None else modal_host.help_sections()
 
         def body() -> None:
+            if modal_help:
+                draw_help_column(modal_help_content(modal_help))
+                return
             if state is None:
                 return
             stop = self._cycle_stop(menu_state)
@@ -2157,14 +2167,18 @@ class ShellHost:
                 )
             )
 
+        panel = _overlap_panel(rect, overlap)
         self._draw_fixed_window(
-            "##shell-help",
-            _overlap_panel(rect, overlap),
+            _HELP_WINDOW,
+            panel,
             active=False,
             idle_border=NAVIGATOR_BORDER,
             body=body,
             scrollable=True,
         )
+        if modal_help:
+            # A form's help stays bright above the scrim, under the modal.
+            self.top_layer.lift(_HELP_WINDOW, panel)
 
     def _draw_transport(
         self,

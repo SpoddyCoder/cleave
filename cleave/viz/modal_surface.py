@@ -534,13 +534,22 @@ class ModalSurface:
     ``intent`` is the pointer result of the last ``draw`` (one, or None).
     ``panel_rect``, ``option_rects``, ``text_button_rects``, and
     ``text_field_rect`` are that frame's hit targets, in screen pixels.
+    ``passthrough`` returns rects, read at draw time, where a press does not
+    cancel.
     """
 
     modal = True
 
-    def __init__(self, view: ModalViewState, measure: TextMeasure) -> None:
+    def __init__(
+        self,
+        view: ModalViewState,
+        measure: TextMeasure,
+        *,
+        passthrough: Callable[[], tuple[Rect, ...]] = tuple,
+    ) -> None:
         self.view = view
         self.measure = measure
+        self._passthrough = passthrough
         self.intent: ModalPointerIntent | None = None
         self.panel_rect: Rect | None = None
         self.option_rects: tuple[Rect, ...] = ()
@@ -841,6 +850,8 @@ class ModalSurface:
         pos = io.mouse_pos
         x, y = float(pos.x), float(pos.y)
         clicked = bool(io.mouse_clicked[0])
+        if any(_contains(rect, x, y) for rect in self._passthrough()):
+            return
         if self.view.kind == ModalKind.TEXT:
             self._record_text(panel, x, y, clicked)
             return

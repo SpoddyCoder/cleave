@@ -51,6 +51,8 @@ class FormField:
     """One parameter of a form. ``value`` is an index into ``options``.
 
     Up to three options show as segments, more as a combo (``choice_kind``).
+    ``help`` and ``option_help`` (one line per option, or empty) fill the help
+    column while the field is focused.
     """
 
     id: str
@@ -58,6 +60,8 @@ class FormField:
     options: tuple[str, ...]
     value: int = 0
     visible: Callable[[FormValues], bool] | None = None
+    help: tuple[str, ...] = ()
+    option_help: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -66,6 +70,7 @@ class FormSpec:
 
     ``info`` is a line of feedback on the draft values, such as a count of the
     cues a command would change. It runs when a value changes, not every frame.
+    ``help`` describes the whole dialog in the help column.
     """
 
     title: str
@@ -76,6 +81,20 @@ class FormSpec:
     body: str | None = None
     info: Callable[[FormValues], str | None] | None = None
     destructive: bool = False
+    help: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class ModalHelpSection:
+    """One help column section for an open form: a title, lines, and entries."""
+
+    title: str
+    lines: tuple[str, ...] = ()
+    entries: tuple[tuple[str, str], ...] = ()
+
+
+def _help_title(label: str) -> str:
+    return " ".join(word[:1].upper() + word[1:] for word in label.split())
 
 
 @dataclass(frozen=True)
@@ -541,6 +560,50 @@ class ModalHost:
 
     def close_form_choice(self) -> None:
         self._form_choice = None
+
+    def help_sections(self) -> tuple[ModalHelpSection, ...]:
+        """Help for the open form: the focused field, then the dialog and its
+        keys. Empty when no form is open or it has no help.
+        """
+        state = self._form_state
+        if state is None or self._request is None:
+            return ()
+        spec = state.spec
+        fields = state.visible_fields()
+        if not spec.help and not any(
+            field.help or field.option_help for field in fields
+        ):
+            return ()
+        row = state.field_index
+        sections: list[ModalHelpSection] = []
+        if row is not None and 0 <= row < len(fields):
+            field = fields[row]
+            if field.help or field.option_help:
+                sections.append(
+                    ModalHelpSection(
+                        _help_title(field.label),
+                        field.help,
+                        tuple(zip(field.options, field.option_help)),
+                    )
+                )
+        confirm = spec.confirm_label.lower()
+        sections.append(
+            ModalHelpSection(
+                _help_title(spec.title.rstrip("?")),
+                spec.help,
+                (
+                    ("Up/Down", "move between settings"),
+                    ("Left/Right", "change the setting"),
+                    ("Space", "open the setting's list"),
+                    (
+                        "Enter",
+                        "press the focused button" if spec.destructive else confirm,
+                    ),
+                    ("Esc", "cancel"),
+                ),
+            )
+        )
+        return tuple(sections)
 
     def focus_form_row(self, row: int) -> None:
         state = self._form_state

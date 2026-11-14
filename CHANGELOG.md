@@ -9,6 +9,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 
+- The Generate timeline and Reset timeline dialogs explain themselves in the help column. It stays bright while the dialog is open and describes the highlighted setting, with what each of its choices does, plus the dialog's keys. Scroll the help column with the mouse wheel without closing the dialog.
 - Settings > UI has a tooltips switch to turn hover tooltips on or off. Tooltips are on by default, and the choice is remembered between sessions.
 - Drag the top edge of the timeline strip to make it taller; the layer rows grow to fill it. It can't shrink below its rows, and the height is remembered between sessions. Drag back down past the rows to return it to its fitted height.
 - Hovering a layer's label on the timeline strip shows a tooltip: double-click it to arm (or disarm) the layer for recording, or right-click it for options. Hovering a row's eye says what a click does there and how to override.

@@ -1,5 +1,8 @@
 """Windows drawn above the shell: a modal scrim, then each pushed surface.
 
+A lifted shell window (the help column while a form shows its help) is raised
+between the scrim and the surfaces.
+
 ``draw`` records the rects it submitted. Hit testing reads that record on
 the next frame. ``empty`` is this frame's push list, not the record.
 """
@@ -138,11 +141,24 @@ class TopLayer:
 
     def __init__(self) -> None:
         self._pending: list[TopLayerSurface] = []
+        self._lifts: list[tuple[str, Rect]] = []
         self._rects: list[Rect] = []
         self._modal = False
 
     def push(self, surface: TopLayerSurface) -> None:
         self._pending.append(surface)
+
+    def lift(self, window_name: str, rect: Rect) -> None:
+        """Keep an already drawn shell window above this frame's scrim.
+
+        A modal still sits above it. The window stays bright and takes the
+        pointer, so it scrolls; a press in it does not cancel the modal.
+        """
+        self._lifts.append((window_name, rect))
+
+    def lifted_rects(self) -> tuple[Rect, ...]:
+        """Rects lifted this frame. Surfaces read it while ``draw`` runs."""
+        return tuple(rect for _name, rect in self._lifts)
 
     @property
     def empty(self) -> bool:
@@ -172,9 +188,12 @@ class TopLayer:
         try:
             if modal:
                 rects.append(_draw_scrim())
+                for name, _rect in self._lifts:
+                    _raise(name)
             for surface in pending:
                 rects.append(surface.draw())
         finally:
             self._rects = rects
             self._modal = modal
             self._pending.clear()
+            self._lifts.clear()

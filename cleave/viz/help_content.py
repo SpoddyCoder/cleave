@@ -12,6 +12,7 @@ from cleave.viz.row_spec import RowSpec, row_choice_kind, row_spec
 from cleave.viz.shell_focus import CycleStop, ShellFocusState, ShellRegion
 
 if TYPE_CHECKING:
+    from cleave.viz.modal import ModalHelpSection
     from cleave.viz.tuning_view_state import TuningViewState
 
 HelpEntry = tuple[str, str]
@@ -40,6 +41,18 @@ def description_section(
 
 
 HelpContent = HelpSection | DescriptionSection
+
+
+def modal_help_content(
+    sections: tuple[ModalHelpSection, ...],
+) -> tuple[HelpContent, ...]:
+    """Help column sections for an open form's ``ModalHost.help_sections``."""
+    return tuple(
+        description_section(
+            section.title, lines=section.lines, mode_entries=section.entries
+        )
+        for section in sections
+    )
 
 KEYBOARD_CONTROLS_SECTION_TITLE = "Keyboard Controls"
 

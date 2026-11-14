@@ -745,7 +745,9 @@ class VisualizerApp:
                     modal_view = rt.modal_host.view_state()
                     if modal_view is not None:
                         modal_surface = ModalSurface(
-                            modal_view, ImGuiTextMeasure()
+                            modal_view,
+                            ImGuiTextMeasure(),
+                            passthrough=shell.top_layer.lifted_rects,
                         )
                         shell.top_layer.push(modal_surface)
                 elif rt.controls.project_switch.active:

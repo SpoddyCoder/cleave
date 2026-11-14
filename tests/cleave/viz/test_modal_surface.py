@@ -987,3 +987,81 @@ def test_inspector_button_inline_field_and_colour_picker_draw() -> None:
     assert drawn
     assert inline.colour_edit is not None
     assert applied == []
+
+
+def _help_host_form(modal: ModalHost) -> None:
+    modal.prompt_form(
+        FormSpec(
+            title="Generate timeline",
+            fields=(
+                FormField("a", "first", ("x", "y"), help=("First help.",)),
+                FormField("b", "second", ("x", "y"), help=("Second help.",)),
+            ),
+            confirm_label="Go",
+            on_confirm=lambda _values: None,
+            help=("Dialog help.",),
+        )
+    )
+
+
+def test_form_help_lifts_the_help_column_above_the_scrim() -> None:
+    with _host() as host:
+        height = host.menu_bar_height_px
+        host.set_layout(
+            ShellLayout.compute(1280, 720, height, height, 0, help_width=300)
+        )
+        help_rect = host.layout.help
+        assert help_rect[2] > 0
+        modal = host._controls.modal_host
+        _help_host_form(modal)
+
+        def surface() -> ModalSurface:
+            return ModalSurface(
+                modal.view_state(),
+                ImGuiTextMeasure(),
+                passthrough=host.top_layer.lifted_rects,
+            )
+
+        first = surface()
+        _idle(host, first)
+        names = _content_names()
+        assert (
+            names.index("##top-scrim")
+            < names.index("##shell-help")
+            < names.index("##modal")
+        ), names
+        del names
+
+        # A press in the help column does not cancel the dialog.
+        lifted = surface()
+        _pointer(host, lifted, _center(help_rect), click=True)
+        assert lifted.intent is None
+
+    with _host() as host:
+        modal = host._controls.modal_host
+        _help_host_form(modal)
+        idle = ModalSurface(modal.view_state(), ImGuiTextMeasure())
+        _idle(host, idle)
+        rows = [
+            hit.rect
+            for hit in idle._form_hits
+            if hit.kind is ModalPointerKind.FOCUS_FORM_ROW
+        ]
+        # Hover alone leaves the help on the focused row.
+        hovered = ModalSurface(modal.view_state(), ImGuiTextMeasure())
+        _pointer(host, hovered, _center(rows[1]), click=False)
+        apply_modal_pointer(modal, hovered.intent)
+        assert modal.help_sections()[0].lines == ("First help.",)
+
+
+def test_dialog_without_help_keeps_the_help_column_under_the_scrim() -> None:
+    with _host() as host:
+        height = host.menu_bar_height_px
+        host.set_layout(
+            ShellLayout.compute(1280, 720, height, height, 0, help_width=300)
+        )
+        _idle(host, ModalSurface(_yes_no(), ImGuiTextMeasure()))
+        names = _content_names()
+        assert names.index("##shell-help") < names.index("##top-scrim"), names
+        del names
+        assert host.top_layer.lifted_rects() == ()

@@ -139,11 +139,15 @@ _CHARACTER_DISPLAY: dict[str, str] = {
     "pulse": "pulse",
 }
 
-CHARACTER_HELP_ENTRIES: tuple[tuple[str, str], ...] = (
-    ("Breathing", "mostly one layer, sometimes two, never all."),
-    ("Dialogue", "the layers answer each other."),
-    ("Arc", "builds to one short climax, then calms down."),
-    ("Pulse", "one layer at a time, with some short pairs."),
+CHARACTER_HELP: dict[str, str] = {
+    "breathing": "mostly one layer, sometimes two, never all.",
+    "dialogue": "the layers answer each other.",
+    "arc": "builds to one short climax, then calms down.",
+    "pulse": "one layer at a time, with some short pairs.",
+}
+
+CHARACTER_HELP_ENTRIES: tuple[tuple[str, str], ...] = tuple(
+    (kind.capitalize(), text) for kind, text in CHARACTER_HELP.items()
 )
 
 

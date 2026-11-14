@@ -271,3 +271,72 @@ def test_pointer_opens_hovers_and_picks_from_the_list() -> None:
     view = modal.view_state()
     assert view.form_choice is None
     assert view.form_rows[1].value == 0
+
+
+def _help_form(modal: ModalHost, *, destructive: bool = False) -> None:
+    modal.prompt_form(
+        FormSpec(
+            title="Generate timeline",
+            fields=(
+                FormField(
+                    "mode",
+                    "cue snap",
+                    ("none", "bars"),
+                    help=("Moves cues.",),
+                    option_help=("keep them.", "to bars."),
+                ),
+                FormField("plain", "plain", ("a", "b")),
+            ),
+            confirm_label="Generate",
+            on_confirm=lambda _values: None,
+            help=("Makes a timeline.",),
+            destructive=destructive,
+        )
+    )
+
+
+def test_help_sections_follow_the_focused_field() -> None:
+    modal = ModalHost()
+    _help_form(modal)
+    field, dialog = modal.help_sections()
+    assert field.title == "Cue Snap"
+    assert field.lines == ("Moves cues.",)
+    assert field.entries == (("none", "keep them."), ("bars", "to bars."))
+    assert dialog.title == "Generate Timeline"
+    assert dialog.lines == ("Makes a timeline.",)
+    assert ("Enter", "generate") in dialog.entries
+
+    # A field with no help shows only the dialog.
+    modal.handle_keydown(keydown(pygame.K_DOWN))
+    assert [section.title for section in modal.help_sections()] == [
+        "Generate Timeline"
+    ]
+
+
+def test_help_sections_follow_a_clicked_row() -> None:
+    modal = ModalHost()
+    _help_form(modal)
+    modal.focus_form_row(1)
+    assert [section.title for section in modal.help_sections()] == [
+        "Generate Timeline"
+    ]
+    apply_modal_pointer(
+        modal, ModalPointerIntent(ModalPointerKind.FOCUS_FORM_ROW, index=0)
+    )
+    assert modal.help_sections()[0].title == "Cue Snap"
+
+
+def test_destructive_help_names_the_focused_button() -> None:
+    modal = ModalHost()
+    _help_form(modal, destructive=True)
+    (dialog,) = modal.help_sections()
+    assert ("Enter", "press the focused button") in dialog.entries
+
+
+def test_help_sections_are_empty_without_help_or_form() -> None:
+    modal = ModalHost()
+    assert modal.help_sections() == ()
+    _form(modal, [])
+    assert modal.help_sections() == ()
+    modal.prompt_confirm("Sure?", "Go", lambda: None)
+    assert modal.help_sections() == ()

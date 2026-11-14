@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import random
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 
 from cleave.signals import Signals
 from cleave.timeline import (
@@ -22,6 +22,7 @@ from cleave.timeline_presets import (
     compose_pattern_mask_timeline,
 )
 from cleave.timeline_presets.characters import (
+    CHARACTER_HELP,
     TIMELINE_PRESET_KIND_OPTIONS,
     timeline_preset_kind_display,
 )
@@ -78,18 +79,93 @@ _KIND_BUILDERS = {
 }
 
 
+_GENERATE_HELP = (
+    "Makes a new timeline from these settings.",
+    "This replaces the current cues.",
+    "In layers mode, each crescendo song marker gets a crescendo.",
+    "The project keeps these settings.",
+)
+_CHARACTER_HELP = ("The shape of the arrangement: which layers play together, and when.",)
+_DENSITY_HELP = (
+    "How many layers tend to play at once.",
+    "Sparse favours solos; dense keeps more of the stack on.",
+)
+_CUE_SNAP_HELP = ("Moves every generated cue onto the beat or bar grid.",)
+_CUE_SNAP_OPTION_HELP = {
+    "none": "keep the generated cue times.",
+    "beats": "move each cue to the nearest beat.",
+    "bars": "move each cue to the nearest bar.",
+}
+_SONG_MARKER_SNAP_HELP = (
+    "Moves the closest cue on each layer onto each song marker,",
+    "when it is no further away than this.",
+    "none leaves the cues where they are.",
+)
+_TIMELINE_CUTS_HELP = (
+    "The cut type each generated cue gets.",
+    "The timeline's cue fades set the fade for each type.",
+)
+_TIMELINE_CUTS_OPTION_HELP = {
+    "by marker": "hard cuts on song markers, soft cuts elsewhere.",
+    "all soft": "every cue is a soft cut.",
+    "all hard": "every cue is a hard cut.",
+    "none": "keep the cut each cue was made with.",
+}
+_REPOPULATE_HELP = (
+    "Refills the preset list of each layer whose preset switching is on",
+    "with the timeline trigger.",
+)
+_REPOPULATE_OPTION_HELP = {
+    "no": "keep the preset lists.",
+    "cue roles": "one preset per on-cue, picked for that cue's role.",
+    "directory random": "fill from the layer's preset directory, shuffled.",
+    "directory sequential": "fill from the layer's preset directory, in order.",
+}
+_CONDUCTOR_HELP = (
+    "Uses the stems' audio to choose which layers lead each phrase",
+    "and how bright each one is.",
+    "In layers mode, standard song markers also get an accent.",
+    "Needs analysed signals; without them it is skipped.",
+)
+_CONDUCTOR_OPTION_HELP = {
+    False: "levels come from the character alone.",
+    True: "levels follow the music.",
+}
+_MODE_HELP = ("How the layers are staged.",)
+_MODE_OPTION_HELP = {
+    "layers": "cues turn whole layers on and off, shaped by the character.",
+    "pattern_mask": (
+        "short sections swap layers through the pattern mask; "
+        "turns the mask on with strips. Ignores the character."
+    ),
+}
+_RESET_HELP = ("Removes every cue on the timeline.",)
+_RESET_LAYERS_HELP = ("What every layer does for the whole song after the reset.",)
+_RESET_LAYERS_OPTION_HELP = (
+    "every layer stays off.",
+    "every layer stays on.",
+)
+
+
 def _choice_field(
     field_id: str,
     label: str,
     options: Sequence[object],
     current: object,
     display: Callable[..., str],
+    *,
+    help: tuple[str, ...] = (),
+    option_help: Mapping[object, str] | None = None,
 ) -> FormField:
     return FormField(
         field_id,
         label,
         tuple(display(option) for option in options),
         options.index(current),
+        help=help,
+        option_help=()
+        if option_help is None
+        else tuple(option_help[option] for option in options),
     )
 
 
@@ -135,6 +211,8 @@ class TimelinePresetController:
                         TIMELINE_PRESET_KIND_OPTIONS,
                         tl.timeline_preset_kind,
                         timeline_preset_kind_display,
+                        help=_CHARACTER_HELP,
+                        option_help=CHARACTER_HELP,
                     ),
                     _choice_field(
                         "density",
@@ -142,6 +220,7 @@ class TimelinePresetController:
                         TIMELINE_PRESET_DENSITY_OPTIONS,
                         tl.timeline_preset_density,
                         timeline_preset_density_display,
+                        help=_DENSITY_HELP,
                     ),
                     _choice_field(
                         "cue_snap",
@@ -149,6 +228,8 @@ class TimelinePresetController:
                         TIMELINE_PRESET_CUE_SNAP_OPTIONS,
                         tl.timeline_preset_cue_snap,
                         timeline_preset_cue_snap_display,
+                        help=_CUE_SNAP_HELP,
+                        option_help=_CUE_SNAP_OPTION_HELP,
                     ),
                     _choice_field(
                         "song_marker_snap",
@@ -156,6 +237,7 @@ class TimelinePresetController:
                         TIMELINE_PRESET_SONG_MARKER_SNAP_OPTIONS,
                         tl.timeline_preset_song_marker_snap,
                         timeline_preset_song_marker_snap_display,
+                        help=_SONG_MARKER_SNAP_HELP,
                     ),
                     _choice_field(
                         "timeline_cuts",
@@ -163,6 +245,8 @@ class TimelinePresetController:
                         TIMELINE_PRESET_TIMELINE_CUTS_OPTIONS,
                         tl.timeline_preset_timeline_cuts,
                         timeline_preset_timeline_cuts_display,
+                        help=_TIMELINE_CUTS_HELP,
+                        option_help=_TIMELINE_CUTS_OPTION_HELP,
                     ),
                     _choice_field(
                         "repopulate",
@@ -170,6 +254,8 @@ class TimelinePresetController:
                         TIMELINE_PRESET_REPOPULATE_OPTIONS,
                         tl.timeline_preset_repopulate,
                         timeline_preset_repopulate_display,
+                        help=_REPOPULATE_HELP,
+                        option_help=_REPOPULATE_OPTION_HELP,
                     ),
                     _choice_field(
                         "conductor",
@@ -177,6 +263,8 @@ class TimelinePresetController:
                         _CONDUCTOR_OPTIONS,
                         tl.timeline_preset_conductor,
                         timeline_preset_conductor_display,
+                        help=_CONDUCTOR_HELP,
+                        option_help=_CONDUCTOR_OPTION_HELP,
                     ),
                     _choice_field(
                         "mode",
@@ -184,6 +272,8 @@ class TimelinePresetController:
                         TIMELINE_PRESET_MODE_OPTIONS,
                         tl.timeline_preset_mode,
                         timeline_preset_mode_display,
+                        help=_MODE_HELP,
+                        option_help=_MODE_OPTION_HELP,
                     ),
                 ),
                 confirm_label="Generate",
@@ -191,6 +281,7 @@ class TimelinePresetController:
                     values, duration_sec
                 ),
                 info=lambda _values: self._generate_info(),
+                help=_GENERATE_HELP,
             )
         )
 
@@ -237,11 +328,14 @@ class TimelinePresetController:
                         "layers",
                         "layers after reset",
                         _RESET_LAYER_OPTIONS,
+                        help=_RESET_LAYERS_HELP,
+                        option_help=_RESET_LAYERS_OPTION_HELP,
                     ),
                 ),
                 confirm_label="Reset timeline",
                 on_confirm=self._confirm_reset,
                 destructive=True,
+                help=_RESET_HELP,
             )
         )
 
