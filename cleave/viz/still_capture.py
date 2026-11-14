@@ -1,11 +1,10 @@
-"""Grab Still: save the composited preview frame as a PNG at project resolution.
+"""Grab Still: save the composited preview frame as a PNG.
 
-The live preview is fitted to the window and its quality tier can shrink
-lower layers, so a request runs the live pipeline at ``output`` quality
-(``VisualiserResolutionSync.set_quality_override``) for a few frames, reads
-the content framebuffer, and puts the setting back. The saved setting never
-changes. Files go to ``<project>/captures/`` named for the project, the song
-playhead when the still was asked for, and the next free id.
+The still is the live content framebuffer as it stands, at the preview's
+current size; nothing is resized, so every layer keeps its state. A request
+is read by the live loop once the next frame is composited. Files go to
+``<project>/captures/`` named for the project, the song playhead when the
+still was asked for, and the next free id.
 """
 
 from __future__ import annotations
@@ -19,12 +18,8 @@ import pygame
 from OpenGL.error import Error as GLError
 
 from cleave.viz.modal import ModalHost, ModalLabeledLine
-from cleave.viz.visualiser_resolution import VisualiserResolutionSync
 
 CAPTURES_DIRNAME = "captures"
-# Frames rendered at the capture size before the read, so the resized
-# projectM and post-FX buffers hold a settled frame.
-STILL_WARMUP_FRAMES = 3
 
 _FAILED_MESSAGE = "Grab still failed"
 
@@ -66,7 +61,6 @@ class StillCaptureController:
 
     def __init__(
         self,
-        resolution: VisualiserResolutionSync,
         modal_host: ModalHost,
         *,
         project_dir: Path | None,
@@ -75,14 +69,13 @@ class StillCaptureController:
         on_notification: Callable[[str], None],
         write_png: Callable[[Path, bytes, int, int], None] = write_rgba_png,
     ) -> None:
-        self._resolution = resolution
         self._modal = modal_host
         self._project_dir = project_dir
         self._slug = project_slug
         self._playhead_sec = playhead_sec
         self._notify = on_notification
         self._write_png = write_png
-        self._frames_left = 0
+        self._pending = False
         self._t_sec = 0.0
 
     @property
@@ -92,28 +85,23 @@ class StillCaptureController:
 
     @property
     def busy(self) -> bool:
-        return self._frames_left > 0
+        return self._pending
 
     def request(self) -> None:
         if self.busy or not self.available:
             return
         self._t_sec = self._playhead_sec()
-        self._frames_left = STILL_WARMUP_FRAMES
-        self._resolution.set_quality_override("output")
+        self._pending = True
 
     def after_frame(self, source: ContentFrameSource) -> None:
-        if not self.busy:
+        if not self._pending:
             return
-        self._frames_left -= 1
-        if self._frames_left > 0:
-            return
+        self._pending = False
         try:
             path = self._save(source)
         except (OSError, pygame.error, GLError) as exc:
-            self._resolution.set_quality_override(None)
             self._prompt_error(str(exc))
             return
-        self._resolution.set_quality_override(None)
         self._notify(f"Saved {CAPTURES_DIRNAME}/{path.name}")
 
     def _save(self, source: ContentFrameSource) -> Path:

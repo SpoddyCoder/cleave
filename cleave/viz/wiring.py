@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
-from cleave.config import CleaveConfig, EditorPreviewQuality
+from cleave.config import CleaveConfig
 from cleave.config_schema.layers import (
     MAX_LAYER_COUNT,
     MIN_LAYER_COUNT,
@@ -87,11 +87,6 @@ class LayerManager:
         self.project_dir = project_dir
         self.projectm_fps = projectm_fps
         self.texture_paths = texture_paths
-        # Live preview quality: the setting, or a capture's temporary override
-        # (``VisualiserResolutionSync.preview_quality``, set by the assembly).
-        self.preview_quality: Callable[[], EditorPreviewQuality] = (
-            lambda: self.cfg.editor.preview_quality
-        )
 
     def can_add(self) -> bool:
         return len(self.session.layer_z_order) < MAX_LAYER_COUNT
@@ -112,7 +107,7 @@ class LayerManager:
         )
         z_index = len(self.session.layer_z_order)
         width, height = preview_layer_size(
-            self.preview_quality(),
+            self.cfg.editor.preview_quality,
             z_index,
             (self.compositor.content_width, self.compositor.content_height),
         )
@@ -136,7 +131,7 @@ class LayerManager:
 
     def apply_preview_resolutions(self) -> None:
         resized = LayerFramePipeline.apply_preview_resolutions(
-            self.preview_quality(),
+            self.cfg,
             self.session,
             self.layers_by_slot,
             self.compositor,
@@ -228,10 +223,6 @@ def make_tuning_controls(
         kwargs["modal_host"] = modal_host
 
     controls = TuningControls(**kwargs)
-    if layer_manager is not None:
-        layer_manager.preview_quality = (
-            lambda: controls.visualiser_resolution.preview_quality
-        )
     controls.project_switch = ProjectSwitchController(
         controls.config_save,
         controls.modal_host,

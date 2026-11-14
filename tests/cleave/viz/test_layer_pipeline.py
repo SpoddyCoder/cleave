@@ -104,12 +104,14 @@ def test_resize_layer_updates_projectm_and_compositor() -> None:
 
 def test_apply_preview_resolutions_resizes_when_size_changes() -> None:
     layer = _stem_layer("layer_1")
+    base_cfg = make_test_cfg(("layer_1",))
+    cfg = replace(base_cfg, editor=replace(base_cfg.editor, preview_quality="performance"))
     session = _session(("layer_1",))
     compositor = _sized_compositor(1280, 720)
     preview_w, preview_h = preview_layer_size("performance", 0, (1280, 720))
 
     LayerFramePipeline.apply_preview_resolutions(
-        "performance", session, {"layer_1": layer}, compositor
+        cfg, session, {"layer_1": layer}, compositor
     )
 
     layer.pm.set_window_size.assert_called_once_with(preview_w, preview_h)
@@ -117,13 +119,15 @@ def test_apply_preview_resolutions_resizes_when_size_changes() -> None:
 
 
 def test_apply_preview_resolutions_skips_when_unchanged() -> None:
+    base_cfg = make_test_cfg(("layer_1",))
+    cfg = replace(base_cfg, editor=replace(base_cfg.editor, preview_quality="performance"))
     session = _session(("layer_1",))
     preview_w, preview_h = preview_layer_size("performance", 0, (1280, 720))
     layer = _stem_layer("layer_1", width=preview_w, height=preview_h)
     compositor = _sized_compositor(1280, 720)
 
     LayerFramePipeline.apply_preview_resolutions(
-        "performance", session, {"layer_1": layer}, compositor
+        cfg, session, {"layer_1": layer}, compositor
     )
 
     layer.pm.set_window_size.assert_not_called()
@@ -264,7 +268,7 @@ def test_build_preview_resolutions_true_builds_at_preview_size(
     assert build_single.call_args.kwargs["width"] == preview_w
     assert build_single.call_args.kwargs["height"] == preview_h
     apply_preview_resolutions.assert_called_once_with(
-        "performance", session, {slot: stem_layer}, compositor
+        cfg, session, {slot: stem_layer}, compositor
     )
 
 

@@ -6,7 +6,7 @@ from pathlib import Path
 
 from collections.abc import Callable
 
-from cleave.config import CleaveConfig, EditorPreviewQuality
+from cleave.config import CleaveConfig
 from cleave.milk_textures import project_texture_search_paths
 from cleave.effects.runtime import EffectRuntime
 from cleave.gl_compositor import GlCompositor
@@ -231,17 +231,17 @@ class LayerFramePipeline:
 
     @staticmethod
     def apply_preview_resolutions(
-        preview_quality: EditorPreviewQuality,
+        cfg: CleaveConfig,
         session: TuningSession,
         layers_by_slot: dict[str, StemLayer],
         compositor: GlCompositor,
     ) -> bool:
-        """Resize layers to their *preview_quality* sizes. True when any layer changed.
+        """Resize layers to their preview sizes. True when any layer changed.
 
         The base is the compositor's live content size.
         """
         base = (compositor.content_width, compositor.content_height)
-        sizes = preview_sizes_for_session(preview_quality, session, base)
+        sizes = preview_sizes_for_session(cfg, session, base)
         resized = False
         for slot, (width, height) in sizes.items():
             layer = layers_by_slot[slot]
@@ -375,7 +375,7 @@ class LayerFramePipeline:
         layers_by_slot = {layer.slot: layer for layer in runtimes}
         if preview_resolutions:
             LayerFramePipeline.apply_preview_resolutions(
-                cfg.editor.preview_quality, session, layers_by_slot, compositor
+                cfg, session, layers_by_slot, compositor
             )
         return runtimes, layers_by_slot
 

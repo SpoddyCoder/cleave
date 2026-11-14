@@ -89,32 +89,3 @@ def test_project_resolution_change_applies() -> None:
     sync.tick(0.0)
     sync.tick(SETTLE)
     apply.assert_called_once_with((1600, 900))
-
-
-def test_quality_override_applies_at_once_and_clears_back() -> None:
-    sync, apply, _session = _sync()
-    sync.note_draw_rect((0, 0, 1600, 900))
-    sync.tick(0.0)
-    apply.reset_mock()
-
-    sync.set_quality_override("output")
-    assert sync.preview_quality == "output"
-    apply.assert_called_once_with((3840, 2160))
-    assert sync.applied_size == (3840, 2160)
-    sync.tick(SETTLE)
-    apply.assert_called_once()
-
-    sync.set_quality_override(None)
-    assert sync.preview_quality == "full-quality"
-    assert apply.call_args.args == ((1600, 900),)
-    sync.tick(SETTLE)
-    assert apply.call_count == 2
-
-
-def test_quality_override_applies_even_when_content_size_is_unchanged() -> None:
-    sync, apply, _session = _sync(project=(1600, 900))
-    sync.note_draw_rect((0, 0, 1600, 900))
-    sync.tick(0.0)
-    apply.reset_mock()
-    sync.set_quality_override("output")
-    apply.assert_called_once_with((1600, 900))

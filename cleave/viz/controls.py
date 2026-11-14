@@ -280,7 +280,6 @@ class TuningControls:
             ),
         )
         self.still_capture = StillCaptureController(
-            self.visualiser_resolution,
             self._modal_host,
             project_dir=project_dir,
             project_slug=cfg.project_slug,
