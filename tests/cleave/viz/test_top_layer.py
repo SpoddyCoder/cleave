@@ -84,6 +84,7 @@ def _host() -> Iterator[object]:
     from cleave.viz.shell_host import ShellHost, menu_bar_height_px
 
     controls = SimpleNamespace(
+        cfg=SimpleNamespace(project_slug="song"),
         session=SimpleNamespace(
             layer_z_order=(),
             help_visible=False,

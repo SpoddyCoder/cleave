@@ -93,6 +93,7 @@ def _host() -> Iterator[object]:
             timeline=SimpleNamespace(panel_open=False),
         ),
         shell_focus=SimpleNamespace(region=ShellRegion.NAVIGATOR),
+        cfg=SimpleNamespace(project_slug="song"),
         build_view_state=lambda **_kwargs: None,
         set_shell_region=MagicMock(),
         modal_host=ModalHost(),

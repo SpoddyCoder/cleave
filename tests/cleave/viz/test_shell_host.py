@@ -34,6 +34,7 @@ from cleave.viz.shell_host import (
     marker_token_spans,
     drag_handle_lead,
     inspector_selectable_id,
+    menu_bar_project_label,
     inspector_title,
     navigator_height_for_rows,
     navigator_lock_mark,
@@ -465,3 +466,7 @@ def test_marker_token_spans_follow_the_fitted_text() -> None:
         (8, 10, "[R:B]"),
     ]
     assert marker_token_spans("[F] [L]", "[F") == [(0, 2, "[F]")]
+
+
+def test_menu_bar_project_label_names_project() -> None:
+    assert menu_bar_project_label("my-song") == ("Project: ", "my-song")

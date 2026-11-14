@@ -1340,6 +1340,7 @@ def _shell_controls() -> SimpleNamespace:
         inline_edit=InlineEditController(),
         context_menu=ContextMenuState(),
         transport=MagicMock(),
+        cfg=SimpleNamespace(project_slug="song"),
     )
 
 

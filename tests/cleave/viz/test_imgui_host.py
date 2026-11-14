@@ -29,6 +29,7 @@ def _open_shell(menu: MenuBarState):
         context_menu=ContextMenuState(),
         session=SimpleNamespace(layer_z_order=()),
         disarm_value_nudge=MagicMock(),
+        cfg=SimpleNamespace(project_slug="song"),
     )
     return ShellHost(
         ImGuiHost.create(),

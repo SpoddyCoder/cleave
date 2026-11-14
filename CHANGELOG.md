@@ -28,6 +28,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - The timeline strip shows a time scale above its top row, with labelled minute and second marks spaced to fit the strip width. Faint lines at the song start and end run down through every row.
 - The preset directory row shows a folder icon, and the preset, preset list entries, and render output rows show a file icon.
 - Drag a preset list entry by the handle in front of its name to reorder it. Esc during the drag puts it back.
+- The right end of the menu bar shows the open project's name, after a "Project:" label.
 - Drag a layer by the handle in front of its name in the navigator to change its z-order. Locked layers can't be dragged.
 - View > Fullscreen (F11) switches the editor to borderless fullscreen and back.
 - The editor window remembers its size and whether it was maximised, and opens centred. A saved size bigger than the screen opens maximised.

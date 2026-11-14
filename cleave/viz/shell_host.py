@@ -538,6 +538,11 @@ def menu_bar_height_px() -> int:
     return max(1, int(round(font_size + _menu_bar_pad_y() * 2.0)))
 
 
+def menu_bar_project_label(project_slug: str) -> tuple[str, str]:
+    """Prefix and name at the right end of the menu bar."""
+    return "Project: ", project_slug
+
+
 def _menu_bar_pad_y() -> float:
     """Menu bar frame padding in whole pixels, so its labels and underlines stay on the pixel grid."""
     return float(round(ui_chrome_px(_MENU_BAR_FRAME_PADDING_Y)))
@@ -3398,6 +3403,7 @@ class ShellHost:
                         )
                         if active:
                             imgui.pop_style_color()
+                    label_y = _selectable_label_origin()[1]
                     _draw_mnemonic_underline(
                         menu.label, BACKGROUND if active else LABEL
                     )
@@ -3412,6 +3418,8 @@ class ShellHost:
                         menu_state.hover_top(index, menus)
                     if imgui.is_item_hovered():
                         hovered_now = index
+                if menus:
+                    self._draw_bar_project_label(label_y)
         finally:
             if bar_open:
                 imgui.end_main_menu_bar()
@@ -3419,6 +3427,36 @@ class ShellHost:
             imgui.pop_style_var()
             imgui.pop_style_color()
         return rule_y, anchors, menus
+
+    def _draw_bar_project_label(self, label_y: float) -> None:
+        """Right-aligned project name on the menu titles' text line.
+
+        Painted on the bar's draw list, not laid out as an item, so the menu
+        bar's horizontal layout cannot shift or wrap it. Dropped when it would
+        overlap the last menu title.
+        """
+        prefix, name = menu_bar_project_label(self._controls.cfg.project_slug)
+        style = imgui.get_style()
+        left = imgui.get_item_rect_max().x + style.frame_padding.x
+        # Same inset as the transport bar's FPS readout below it.
+        right = (
+            imgui.get_window_pos().x
+            + imgui.get_window_width()
+            - style.window_padding.x
+        )
+        prefix_w = imgui.calc_text_size(prefix).x
+        x = right - prefix_w - imgui.calc_text_size(name).x
+        if x < left:
+            return
+        draw = imgui.get_window_draw_list()
+        draw.add_text(
+            imgui.ImVec2(x, label_y), imgui.get_color_u32(rgba(LABEL)), prefix
+        )
+        draw.add_text(
+            imgui.ImVec2(x + prefix_w, label_y),
+            imgui.get_color_u32(rgba(VALUE)),
+            name,
+        )
 
     def _draw_dropdown(
         self,
