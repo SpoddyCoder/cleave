@@ -140,7 +140,6 @@ from cleave.viz.theme import (
     PRESET_FILE_ICON,
     PRESET_ICON,
     ROW_FOCUS_BORDER,
-    SELECTED_WASH_ALPHA,
     TRANSPORT_RULE,
     VALUE,
     tuning_ui_metrics,
@@ -1277,14 +1276,13 @@ def _drawn_row_rect(left_x: float) -> tuple[int, int, int, int] | None:
     return (int(left_x), int(top), int(rect_max.x - left_x), int(bottom - top))
 
 
-def selectable_wash(*, inspector: bool) -> tuple[imgui.ImVec4, imgui.ImVec4]:
+def selectable_wash() -> tuple[imgui.ImVec4, imgui.ImVec4]:
     """Header fill for a selected navigator row or a focused inspector row.
 
     Both values are that fill, pushed on the header slots so the row keeps it
     under the pointer. Unselected hover stays the theme table.
     """
-    alpha = (FOCUS_WASH_ALPHA if inspector else SELECTED_WASH_ALPHA) / 255.0
-    fill = rgba(HIGHLIGHT, alpha)
+    fill = rgba(HIGHLIGHT, FOCUS_WASH_ALPHA / 255.0)
     return fill, fill
 
 
@@ -1324,14 +1322,13 @@ def _draw_button(
 
 
 @contextmanager
-def _selected_header_wash(selected: bool, *, inspector: bool = False) -> Iterator[None]:
-    """Push a selected-row header fill, then pop.
+def _selected_header_wash(selected: bool) -> Iterator[None]:
+    """Push the focus wash on a selected navigator or inspector row, then pop.
 
-    Navigator selection uses the selected wash. Inspector focus uses the focus
-    wash. Hover on an unselected row is the theme table, not a second push.
+    Hover on an unselected row is the theme table, not a second push.
     """
     if selected:
-        hovered, active = selectable_wash(inspector=inspector)
+        hovered, active = selectable_wash()
         imgui.push_style_color(imgui.Col_.header, hovered)
         imgui.push_style_color(imgui.Col_.header_hovered, hovered)
         imgui.push_style_color(imgui.Col_.header_active, active)
@@ -2544,7 +2541,7 @@ class ShellHost:
             lead = _drag_lead() if spec.drag_reorder else ""
             imgui.push_style_color(imgui.Col_.text, rgba(label_color))
             try:
-                with _selected_header_wash(selected, inspector=True):
+                with _selected_header_wash(selected):
                     text_x = imgui.get_cursor_screen_pos().x
                     clicked, _selected = imgui.selectable(
                         f"{lead}{label}{inspector_selectable_id(desc)}",

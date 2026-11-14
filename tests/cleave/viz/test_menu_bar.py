@@ -938,10 +938,10 @@ def test_navigator_focus_ring_only_while_that_region_is_active() -> None:
     from cleave.viz.shell_layout import ShellLayout
     from cleave.viz.theme import (
         FOCUS_ROW_BG_ALPHA,
+        FOCUS_WASH_ALPHA,
         HIGHLIGHT,
         LABEL,
         LOCK_ICON,
-        SELECTED_WASH_ALPHA,
         VALUE,
     )
 
@@ -990,7 +990,7 @@ def test_navigator_focus_ring_only_while_that_region_is_active() -> None:
             names = [draw_list._owner_name for draw_list in content]
             nav = content[names.index("##shell-navigator")]
             colors = {int(vtx.col) for vtx in nav.vtx_buffer}
-            wash = _color_u32_alpha(HIGHLIGHT, SELECTED_WASH_ALPHA / 255.0)
+            wash = _color_u32_alpha(HIGHLIGHT, FOCUS_WASH_ALPHA / 255.0)
             old_wash = _color_u32_alpha(HIGHLIGHT, FOCUS_ROW_BG_ALPHA / 255.0)
             has_wash = wash in colors
             has_old = old_wash in colors

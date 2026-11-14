@@ -55,17 +55,17 @@ from cleave.viz.timeline_ruler import render_time_ruler, ruler_tick_top, song_bo
 from cleave.viz.theme import (
     ARMED_BG,
     BAR_GRID,
+    FOCUS_WASH_ALPHA,
     HIGHLIGHT,
     LABEL,
+    MUTED,
     NUDGE_HOVER_BG,
     NUDGE_HOVER_BG_ALPHA,
     NUDGE_HOVER_FG,
-    MUTED,
     PLAYHEAD,
     PLAYHEAD_FLASH,
     REC_BG,
     ROW_FOCUS_BORDER,
-    SELECTED_WASH_ALPHA,
     SONG_BOUND,
     SONG_MARKER,
     SONG_MARKER_SELECTED,
@@ -1379,7 +1379,7 @@ class TimelineOverlay:
             monitor_eye_x = stem_abbrev_x + layout.stem_abbrev_width
 
             if focused:
-                blit_tint(panel, row_rect, HIGHLIGHT, alpha=SELECTED_WASH_ALPHA)
+                blit_tint(panel, row_rect, HIGHLIGHT, alpha=FOCUS_WASH_ALPHA)
             if state.hover_label_row == row_index:
                 blit_tint(
                     panel,

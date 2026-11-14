@@ -241,14 +241,14 @@ HOVER_BG_ALPHA: int = 36
 NUDGE_HOVER_FG: tuple[int, int, int] = HIGHLIGHT
 NUDGE_HOVER_BG: tuple[int, int, int] = HOVER
 NUDGE_HOVER_BG_ALPHA: int = 72
-# Selected-navigator highlight wash (highlight at 0.16).
+# Menu and timeline selection wash (highlight at 0.16).
 SELECTED_WASH_ALPHA: int = 41
-# Focused-inspector-row highlight wash (highlight at 0.10).
+# Selected navigator row and focused inspector or dialog row wash (highlight at 0.10).
 FOCUS_WASH_ALPHA: int = 26
 # Outline of the active panel (highlight at 0.55).
 PANEL_FOCUS_BORDER_ALPHA: int = 140
 # Opaque outline of the focused row: a shade over the row wash
-# (HIGHLIGHT at SELECTED_WASH_ALPHA over BACKGROUND is about (41, 38, 21)).
+# (the shade is lifted above HIGHLIGHT at FOCUS_WASH_ALPHA over BACKGROUND).
 ROW_FOCUS_BORDER: tuple[int, int, int] = (64, 59, 33)
 REC_BG: tuple[int, int, int] = (220, 0, 0)
 TIMELINE_BAR_ON: tuple[int, int, int] = (200, 225, 255)

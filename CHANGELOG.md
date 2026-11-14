@@ -45,6 +45,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 ### Changed
 
 - The outline of the focused row in the navigator, inspector, timeline strip, dialogs, and file picker is now a dim gold just above the row's highlight, much quieter than the active panel's outline.
+- The selected navigator row and the selected timeline row use the same fainter highlight as a focused inspector row or dialog option, so the row outline reads the same everywhere.
 - File picker rows and shortcuts highlight with the same padding as dialog rows, so the highlight no longer hugs the text.
 - The help column leaves a blank line between a section's text and its key table.
 - The file picker works like the navigator: hovering a row or shortcut only washes it, and a click or the arrow keys choose the row, which stays lit while the pointer moves away. Before, the highlight followed the pointer, so moving to the buttons left nothing marked. Shortcuts draw in white like the listing, with the current one in the accent colour.

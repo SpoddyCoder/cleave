@@ -62,7 +62,6 @@ from cleave.viz.theme import (
     LOCK_ICON,
     LOCKED,
     MUTED,
-    SELECTED_WASH_ALPHA,
 )
 from tests.cleave.viz.test_controls import _make_controls
 
@@ -100,27 +99,17 @@ def _wash_channels(color) -> tuple[float, float, float, float]:
     return (color.x, color.y, color.z, color.w)
 
 
-def test_selectable_wash_splits_navigator_and_inspector() -> None:
-    navigator = (
-        HIGHLIGHT[0] / 255.0,
-        HIGHLIGHT[1] / 255.0,
-        HIGHLIGHT[2] / 255.0,
-        SELECTED_WASH_ALPHA / 255.0,
-    )
-    inspector = (
+def test_selectable_wash_is_the_focus_wash() -> None:
+    wash = (
         HIGHLIGHT[0] / 255.0,
         HIGHLIGHT[1] / 255.0,
         HIGHLIGHT[2] / 255.0,
         FOCUS_WASH_ALPHA / 255.0,
     )
 
-    hovered, active = selectable_wash(inspector=False)
-    assert _wash_channels(hovered) == pytest.approx(navigator)
-    assert _wash_channels(active) == pytest.approx(navigator)
-
-    hovered, active = selectable_wash(inspector=True)
-    assert _wash_channels(hovered) == pytest.approx(inspector)
-    assert _wash_channels(active) == pytest.approx(inspector)
+    hovered, active = selectable_wash()
+    assert _wash_channels(hovered) == pytest.approx(wash)
+    assert _wash_channels(active) == pytest.approx(wash)
 
 
 def test_layer_breadcrumb_uses_navigator_label() -> None:
