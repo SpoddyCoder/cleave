@@ -11,7 +11,13 @@ import pygame
 
 from cleave.open_target import OpenTarget
 from cleave.viz.config_save import ConfigSaveController
-from cleave.viz.file_picker import FilePicker, PickerAction, PickerMode, PickerViewState
+from cleave.viz.file_picker import (
+    CANCEL_LABEL,
+    FilePicker,
+    PickerAction,
+    PickerMode,
+    PickerViewState,
+)
 from cleave.viz.file_picker_host import picker_action_for
 from cleave.viz.file_picker_surface import PickerPointerIntent, apply_picker_pointer
 from cleave.viz.key_repeat import KeyRepeatController
@@ -100,12 +106,11 @@ class ProjectSwitchController:
         if picker is None:
             return
         accepted = apply_picker_pointer(picker, intent)
+        if picker.cancelled:
+            self.cancel()
+            return
         if accepted is not None:
             self._finish_accept(accepted)
-
-    def note_pointer_motion(self, event: pygame.event.Event) -> None:
-        if self._picker is not None:
-            self._picker.note_pointer_motion(event)
 
     def take_accepted(self) -> OpenTarget | None:
         """Return the accepted target once. The pending switch is separate."""
@@ -119,7 +124,7 @@ class ProjectSwitchController:
         self._config_save.clear_pending_switch()
         self._accepted = None
         self._repeat.disarm()
-        self._picker = FilePicker(mode=mode)
+        self._picker = FilePicker(mode=mode, cancel_label=CANCEL_LABEL)
 
     def _finish_accept(self, target: OpenTarget) -> None:
         self._accepted = target

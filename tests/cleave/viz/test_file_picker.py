@@ -326,46 +326,17 @@ def test_accept_plain_directory_enters_it(tmp_path: Path) -> None:
 
 def test_cancel_sets_flag(tmp_path: Path) -> None:
     picker = FilePicker(current=tmp_path)
-    picker.suppress_keyboard_highlight()
     picker.handle(PickerAction.CANCEL)
     assert picker.cancelled
-    assert picker.keyboard_highlight is False
 
 
-def test_keyboard_highlight_starts_visible(tmp_path: Path) -> None:
-    picker = FilePicker(current=tmp_path)
-    assert picker.keyboard_highlight is True
-    assert picker.view_state().keyboard_highlight is True
-
-
-def test_key_moves_show_the_keyboard_highlight(tmp_path: Path) -> None:
-    _wav(tmp_path, "song.wav")
-    actions = (
-        PickerAction.MOVE_DOWN,
-        PickerAction.MOVE_UP,
-        PickerAction.PAGE_DOWN,
-        PickerAction.PAGE_UP,
-        PickerAction.TOGGLE_FOCUS,
-        PickerAction.PARENT,
-        PickerAction.ENTER,
-        PickerAction.ACCEPT,
-    )
-    for action in actions:
-        picker = FilePicker(current=tmp_path)
-        picker.suppress_keyboard_highlight()
-        picker.handle(action)
-        assert picker.keyboard_highlight is True
-
-
-def test_pointer_actions_leave_the_keyboard_highlight_hidden(tmp_path: Path) -> None:
+def test_select_row_moves_the_selection_without_opening(tmp_path: Path) -> None:
     _wav(tmp_path, "song.wav")
     picker = FilePicker(current=tmp_path)
-    picker.suppress_keyboard_highlight()
     picker.select_row(1)
     assert picker.selected_index == 1
-    assert picker.keyboard_highlight is False
-    picker.open_row()
-    assert picker.keyboard_highlight is False
+    assert picker.current == tmp_path
+    assert not picker.cancelled
 
 
 def test_move_clamps_to_listing(tmp_path: Path) -> None:

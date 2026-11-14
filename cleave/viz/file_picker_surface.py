@@ -16,6 +16,7 @@ from typing import Any
 
 from cleave.open_target import OpenTarget
 from cleave.viz.file_picker import (
+    OPEN_LABEL,
     FilePicker,
     PickerFocus,
     PickerRow,
@@ -36,6 +37,8 @@ from cleave.viz.theme import (
     FOCUS_BORDER_ALPHA,
     FOCUS_WASH_ALPHA,
     HIGHLIGHT,
+    HOVER,
+    HOVER_BG_ALPHA,
     LABEL,
     PRESET_ICON,
     SCROLLBAR_THUMB,
@@ -60,6 +63,7 @@ _SHORTCUT_SEPARATOR = "   "
 _SHORTCUT_HIGHLIGHT_PAD = 4
 _WASH_ALPHA = FOCUS_WASH_ALPHA / 255.0
 _FOCUS_BORDER_ALPHA = FOCUS_BORDER_ALPHA / 255.0
+_HOVER_ALPHA = HOVER_BG_ALPHA / 255.0
 _FOCUS_BORDER_THICKNESS = 1.0
 _HIGHLIGHT_PAD = 2
 
@@ -70,21 +74,16 @@ class PickerPointerKind(Enum):
     SELECT_ROW = "select-row"
     OPEN_ROW = "open-row"
     GOTO_SHORTCUT = "goto-shortcut"
-    SUPPRESS_KEYBOARD_HIGHLIGHT = "suppress-keyboard-highlight"
+    OPEN_SELECTED = "open-selected"
+    CANCEL = "cancel"
 
 
 @dataclass(frozen=True)
 class PickerPointerIntent:
-    """``index`` is a listing row or a shortcut.
-
-    ``pointer_over_item`` hides the keyboard highlight. Hover with no click,
-    and a wheel over the scrolling list, use
-    :attr:`PickerPointerKind.SUPPRESS_KEYBOARD_HIGHLIGHT`.
-    """
+    """``index`` is a listing row or a shortcut. Hover records no intent."""
 
     kind: PickerPointerKind
     index: int | None = None
-    pointer_over_item: bool = False
 
 
 class _CallableSizer:
@@ -109,6 +108,12 @@ def visible_row_range(
     start = min(row_count, max(0, int(scroll_y // row_stride)))
     end = min(row_count, int((scroll_y + view_height - 1e-3) // row_stride) + 1)
     return start, max(start, end)
+
+
+def picker_list_height(row_count: int, row_stride: int, room: int) -> int:
+    """Height of the listing: its rows (at least one), capped at *room*."""
+    rows_h = max(1, row_count) * row_stride
+    return max(1, min(rows_h, room))
 
 
 def wheel_scroll_px(wheel: float, row_stride: int) -> float:
@@ -208,14 +213,10 @@ def apply_picker_pointer(
     """Map one recorded intent onto ``FilePicker``. ``None`` does nothing.
 
     Returns an open target when the intent opens an audio file or a project.
-    A pointer over a row or shortcut hides the keyboard highlight.
     """
     if intent is None:
         return None
     kind = intent.kind
-    if kind is PickerPointerKind.SUPPRESS_KEYBOARD_HIGHLIGHT:
-        picker.enter_pointer_modality()
-        return None
     if kind is PickerPointerKind.SELECT_ROW:
         if intent.index is not None:
             picker.select_row(intent.index)
@@ -224,8 +225,12 @@ def apply_picker_pointer(
         if intent.index is not None:
             picker.select_row(intent.index)
         return picker.open_row()
+    if kind is PickerPointerKind.OPEN_SELECTED:
+        return picker.open_row()
+    if kind is PickerPointerKind.CANCEL:
+        picker.cancel()
+        return None
     if kind is PickerPointerKind.GOTO_SHORTCUT:
-        picker.enter_pointer_modality()
         if intent.index is not None:
             picker.goto_shortcut(intent.index)
         return None
@@ -357,17 +362,16 @@ def _push_list_highlight_clip(draw: Any) -> None:
     )
 
 
-def _highlight_visible(
-    keyboard: bool,
-    hovered: bool,
-    pointer_over_item: bool,
-    keyboard_highlight: bool,
-) -> bool:
-    """The row or chip under the pointer, or the keyboard selection."""
-    if keyboard_highlight:
-        return keyboard
-    return hovered or (
-        keyboard and keyboard_highlight and not pointer_over_item
+def _hover_wash(draw: Any, rect: Rect) -> None:
+    """The pointer wash on a row or chip that is not selected, as in the navigator."""
+    x, y, width, height = rect
+    if width <= 0 or height <= 0:
+        return
+    imgui = _imgui()
+    draw.add_rect_filled(
+        imgui.ImVec2(float(x), float(y)),
+        imgui.ImVec2(float(x + width), float(y + height)),
+        _packed(HOVER, _HOVER_ALPHA),
     )
 
 
@@ -437,6 +441,42 @@ def _pointer_hover(
     return None, None
 
 
+def _button_row_size(measure, labels: tuple[str, ...]) -> tuple[int, int]:
+    from cleave.viz.modal_layout import measure_button_row
+
+    return measure_button_row(measure, labels)
+
+
+def _paint_buttons(
+    draw: Any, measure, labels: tuple[str, ...], *, x: int, y: int
+) -> tuple[Rect, ...]:
+    """Modal-style buttons, left to right from *x*: the first is primary.
+
+    The pointer's button takes the focus outline. Keys drive the listing, so
+    no button holds keyboard focus.
+    """
+    from cleave.viz.modal import ButtonRole
+    from cleave.viz.modal_layout import button_gap, button_height, button_widths
+    from cleave.viz.modal_surface import draw_modal_button
+
+    pos = _imgui().get_io().mouse_pos
+    height = button_height(measure)
+    rects: list[Rect] = []
+    for index, width in enumerate(button_widths(measure, labels)):
+        rect = (x, y, width, height)
+        draw_modal_button(
+            draw,
+            rect,
+            labels[index],
+            ButtonRole.PRIMARY if index == 0 else ButtonRole.PLAIN,
+            measure,
+            focused=_contains(rect, float(pos.x), float(pos.y)),
+        )
+        rects.append(rect)
+        x += width + button_gap()
+    return tuple(rects)
+
+
 def _raise_window() -> None:
     imgui = _imgui()
     imgui.internal.bring_window_to_display_front(
@@ -470,8 +510,9 @@ class FilePickerSurface:
 
     ``intent`` is the pointer result of the last draw.
 
-    ``panel_rect``, ``row_rects``, and ``chip_rects`` are that frame's hit
-    targets, in screen pixels. ``row_indices`` and ``chip_indices`` match them.
+    ``panel_rect``, ``row_rects``, ``chip_rects``, and ``button_rects`` (Open,
+    then Quit or Cancel) are that frame's hit targets, in screen pixels.
+    ``row_indices`` and ``chip_indices`` match them.
     """
 
     modal = True
@@ -484,7 +525,7 @@ class FilePickerSurface:
         self.row_indices: tuple[int, ...] = ()
         self.chip_rects: tuple[Rect, ...] = ()
         self.chip_indices: tuple[int, ...] = ()
-        self._wheeled = False
+        self.button_rects: tuple[Rect, ...] = ()
 
     def draw(self) -> Rect:
         self.intent = None
@@ -493,7 +534,7 @@ class FilePickerSurface:
         self.row_indices = ()
         self.chip_rects = ()
         self.chip_indices = ()
-        self._wheeled = False
+        self.button_rects = ()
 
         imgui = _imgui()
         display = imgui.get_io().display_size
@@ -571,8 +612,15 @@ class FilePickerSurface:
 
         footer = legend_rows(view.legend, content_w, text_width)
         footer_lines = len(footer) + (1 if view.status else 0)
-        list_bottom = oy + panel_h - pad_y - (footer_lines + 1) * step
-        list_h = max(1, list_bottom - list_top)
+        footer_top = oy + panel_h - pad_y - footer_lines * step
+        labels = (OPEN_LABEL, view.cancel_label)
+        buttons_w, buttons_h = _button_row_size(measure, labels)
+        buttons_gap = step // 2
+        # The buttons follow the last row. A long listing scrolls inside the
+        # room left above them, so they never leave the panel.
+        room = footer_top - step - buttons_h - buttons_gap - list_top
+        list_h = picker_list_height(len(view.rows), step, room)
+        buttons_y = list_top + list_h + buttons_gap
         chips = _chip_hits(
             view, content_x, chip_y, content_w, line_h, text_width
         )
@@ -599,7 +647,7 @@ class FilePickerSurface:
         )
         self._paint_chips(draw, view, chip_y, chips, hover_chip, hover_row)
 
-        footer_y = oy + panel_h - pad_y - footer_lines * step
+        footer_y = footer_top
         for row in footer:
             self._paint_legend_row(
                 draw, measure, row, content_x, footer_y, text_width
@@ -613,6 +661,13 @@ class FilePickerSurface:
                 fit_text_to_width(measure, view.status, content_w),
                 ERROR_NOTIFICATION,
             )
+        self.button_rects = _paint_buttons(
+            draw,
+            measure,
+            labels,
+            x=content_x + content_w - buttons_w,
+            y=buttons_y,
+        )
 
     def _paint_chips(
         self,
@@ -623,23 +678,17 @@ class FilePickerSurface:
         hover_chip: int | None,
         hover_row: int | None,
     ) -> None:
-        pointer_over_item = hover_chip is not None or hover_row is not None
-        if view.keyboard_highlight:
-            hover_chip = None
-            hover_row = None
-            pointer_over_item = False
+        del hover_row
         rects: list[Rect] = []
         indices: list[int] = []
         for index, text, screen_x, hit in chips:
             selected = shortcut_is_selected(view, index)
             current = shortcut_is_current(view, index)
-            hovered = hover_chip == index
-            lit = _highlight_visible(
-                selected, hovered, pointer_over_item, view.keyboard_highlight
-            )
-            if lit:
+            if selected:
                 _highlight(draw, hit)
-            color = HIGHLIGHT if lit or current else LABEL
+            elif hover_chip == index:
+                _hover_wash(draw, hit)
+            color = HIGHLIGHT if selected or current else LABEL
             _text(draw, screen_x, y, text, color)
             rects.append(hit)
             indices.append(index)
@@ -739,12 +788,9 @@ class FilePickerSurface:
         storage = imgui.get_state_storage()
         loc_id = imgui.get_id("##scroll-loc")
         sel_id = imgui.get_id("##scroll-sel")
-        key_id = imgui.get_id("##scroll-key")
         loc_key = int(imgui.get_id(view.location)) & 0x7FFFFFFF
         prev_loc = storage.get_int(loc_id, -1)
         prev_sel = storage.get_int(sel_id, -1)
-        prev_keys = storage.get_bool(key_id, False)
-        keys = view.keyboard_highlight and view.focus is PickerFocus.LIST
         scroll_y = float(imgui.get_scroll_y())
         max_scroll = max(0.0, len(view.rows) * step - view_h)
         wheel = float(imgui.get_io().mouse_wheel)
@@ -763,7 +809,7 @@ class FilePickerSurface:
             )
         elif moved or (
             view.focus is PickerFocus.LIST
-            and (prev_sel != view.selected_index or (keys and not prev_keys))
+            and prev_sel != view.selected_index
         ):
             scroll_y = scroll_to_reveal(
                 scroll_y,
@@ -780,8 +826,6 @@ class FilePickerSurface:
             window.scroll = imgui.ImVec2(float(window.scroll.x), float(scroll_y))
         storage.set_int(loc_id, loc_key)
         storage.set_int(sel_id, view.selected_index)
-        storage.set_bool(key_id, keys)
-        self._wheeled = wheeled
         return scroll_y
 
     def _paint_rows(
@@ -795,29 +839,25 @@ class FilePickerSurface:
         hover_chip: int | None,
         hover_row: int | None,
     ) -> None:
-        pointer_over_item = hover_chip is not None or hover_row is not None
-        if view.keyboard_highlight:
-            hover_chip = None
-            hover_row = None
-            pointer_over_item = False
+        del hover_chip
         rects: list[Rect] = []
         indices: list[int] = []
         for index, y, rect in rows:
             row = view.rows[index]
-            selected = (
-                index == view.selected_index and view.focus is PickerFocus.LIST
-            )
-            hovered = hover_row == index
-            lit = _highlight_visible(
-                selected, hovered, pointer_over_item, view.keyboard_highlight
-            )
-            if lit:
+            selected = index == view.selected_index
+            if selected or hover_row == index:
                 _push_list_highlight_clip(draw)
                 try:
-                    _highlight(draw, rect)
+                    if not selected:
+                        _hover_wash(draw, rect)
+                    elif view.focus is PickerFocus.LIST:
+                        _highlight(draw, rect)
+                    else:
+                        # The shortcuts hold the keys; the row stays chosen.
+                        _wash(draw, rect)
                 finally:
                     draw.pop_clip_rect()
-            color = HIGHLIGHT if lit else _row_color(row)
+            color = HIGHLIGHT if selected else _row_color(row)
             _text(
                 draw,
                 content_x,
@@ -859,33 +899,27 @@ class FilePickerSurface:
         double = bool(imgui.is_mouse_double_clicked(0))
         row_at = _index_at(self.row_rects, x, y)
         chip_at = _index_at(self.chip_rects, x, y)
-        on_item = row_at is not None or chip_at is not None
+        button_at = _index_at(self.button_rects, x, y)
+        if button_at is not None:
+            _request_hand()
+            if clicked:
+                self.intent = PickerPointerIntent(
+                    PickerPointerKind.OPEN_SELECTED
+                    if button_at == 0
+                    else PickerPointerKind.CANCEL
+                )
+            return
         if double and row_at is not None:
             self.intent = PickerPointerIntent(
-                PickerPointerKind.OPEN_ROW,
-                index=self.row_indices[row_at],
-                pointer_over_item=True,
+                PickerPointerKind.OPEN_ROW, index=self.row_indices[row_at]
             )
             return
         if clicked and row_at is not None:
             self.intent = PickerPointerIntent(
-                PickerPointerKind.SELECT_ROW,
-                index=self.row_indices[row_at],
-                pointer_over_item=True,
+                PickerPointerKind.SELECT_ROW, index=self.row_indices[row_at]
             )
             return
         if clicked and chip_at is not None:
             self.intent = PickerPointerIntent(
-                PickerPointerKind.GOTO_SHORTCUT,
-                index=self.chip_indices[chip_at],
-                pointer_over_item=True,
+                PickerPointerKind.GOTO_SHORTCUT, index=self.chip_indices[chip_at]
             )
-            return
-        if self._wheeled:
-            self.intent = PickerPointerIntent(
-                PickerPointerKind.SUPPRESS_KEYBOARD_HIGHLIGHT,
-                pointer_over_item=on_item,
-            )
-            return
-        if on_item:
-            return

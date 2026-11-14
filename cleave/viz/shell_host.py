@@ -1678,9 +1678,6 @@ class ShellHost:
             modal_host = getattr(self._controls, "modal_host", None)
             if modal_host is not None and modal_host.active:
                 modal_host.note_pointer_motion(event)
-            project_switch = getattr(self._controls, "project_switch", None)
-            if project_switch is not None:
-                project_switch.note_pointer_motion(event)
             return
         if event.type in (pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP):
             button = mouse_button(event)

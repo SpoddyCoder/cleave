@@ -354,7 +354,7 @@ _BUTTON_FILLS: dict[ButtonRole, _Role] = {
 }
 
 
-def _draw_button(
+def draw_modal_button(
     draw: imgui.ImDrawList,
     rect: Rect,
     label: str,
@@ -478,7 +478,7 @@ def _draw_button_row(
     rects: list[Rect] = []
     for index, label in enumerate(view.options):
         rect = (x, y, widths[index], height)
-        _draw_button(
+        draw_modal_button(
             draw,
             rect,
             label,
@@ -514,7 +514,7 @@ def _draw_text_buttons(
         # The caret stays put while editing. The button under the pointer
         # still takes the hover highlight; only a click leaves the field.
         pointer_hover = view.editing and _pointer_inside(rect)
-        _draw_button(
+        draw_modal_button(
             draw,
             rect,
             label,

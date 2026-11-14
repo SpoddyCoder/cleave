@@ -125,6 +125,26 @@ def test_pointer_accept_stores_the_same_target(tmp_path: Path, monkeypatch) -> N
     assert target.kind is OpenTargetKind.PROJECT
 
 
+
+def test_editor_picker_says_cancel_and_its_button_closes_it(
+    tmp_path: Path, monkeypatch
+) -> None:
+    _use_data(monkeypatch, tmp_path)
+    controls = make_controls()
+    session = controls.session
+    switch = controls.project_switch
+    switch.prompt_open()
+    view = switch.view_state()
+    assert view is not None
+    assert view.cancel_label == "Cancel"
+    assert view.legend[-1] == ("Esc", "cancel")
+    switch.apply_pointer(PickerPointerIntent(PickerPointerKind.CANCEL))
+    assert not switch.active
+    assert switch.take_accepted() is None
+    assert controls.consume_pending_switch() is False
+    assert controls.pending_exit is False
+    assert controls.session is session
+
 def test_esc_and_cancel_keep_the_session(tmp_path: Path, monkeypatch) -> None:
     _use_data(monkeypatch, tmp_path)
     controls = make_controls()
