@@ -24,6 +24,7 @@ from cleave.viz.file_picker import (
     PickerViewState,
 )
 from cleave.viz.material_icons import FOLDER_GLYPH
+from cleave.viz.modal_layout import form_row_height, form_row_pad_y
 from cleave.viz.scroll_follow import clamp_scroll, scroll_to_reveal
 from cleave.viz.text_fit import (
     fit_path_label_to_width,
@@ -64,7 +65,8 @@ _SHORTCUT_HIGHLIGHT_PAD = 4
 _WASH_ALPHA = FOCUS_WASH_ALPHA / 255.0
 _HOVER_ALPHA = HOVER_BG_ALPHA / 255.0
 _FOCUS_BORDER_THICKNESS = 1.0
-_HIGHLIGHT_PAD = 2
+# Sideways outset of a row or chip highlight, as on a dialog form row.
+_HIGHLIGHT_PAD = 3
 
 
 class PickerPointerKind(Enum):
@@ -374,10 +376,16 @@ def _hover_wash(draw: Any, rect: Rect) -> None:
     )
 
 
-def _outset(rect: Rect, pad: int = _HIGHLIGHT_PAD) -> Rect:
-    """Grow *rect* by *pad* on every side."""
+def _outset(rect: Rect) -> Rect:
+    """Grow a line of text into its highlight, padded as a dialog form row."""
     x, y, width, height = rect
-    return (x - pad, y - pad, width + 2 * pad, height + 2 * pad)
+    pad_y = form_row_pad_y()
+    return (
+        x - _HIGHLIGHT_PAD,
+        y - pad_y,
+        width + 2 * _HIGHLIGHT_PAD,
+        height + 2 * pad_y,
+    )
 
 
 def _chip_hits(
@@ -403,24 +411,6 @@ def _chip_hits(
             )
         )
         hits.append((index, text, screen_x, hit))
-    return tuple(hits)
-
-
-def _row_hits(
-    content_x: int,
-    list_top: int,
-    content_w: int,
-    line_h: int,
-    step: int,
-    start: int,
-    end: int,
-) -> tuple[tuple[int, int, Rect], ...]:
-    """``(row index, text y, hit rect)`` for the visible window."""
-    hits: list[tuple[int, int, Rect]] = []
-    y = list_top
-    for index in range(start, end):
-        hits.append((index, y, _outset((content_x, y, content_w, line_h))))
-        y += step
     return tuple(hits)
 
 
@@ -603,8 +593,9 @@ class FilePickerSurface:
             _text(draw, content_x, y, fit_text_to_width(measure, line, content_w), LABEL)
             y += step
 
-        chip_y = y
-        y += step * 2
+        # Room for the chip highlight's top padding under the title.
+        chip_y = y + form_row_pad_y()
+        y = chip_y + step * 2
         location_y = y
         y += step
         list_top = y
@@ -618,7 +609,8 @@ class FilePickerSurface:
         # The buttons follow the last row. A long listing scrolls inside the
         # room left above them, so they never leave the panel.
         room = footer_top - step - buttons_h - buttons_gap - list_top
-        list_h = picker_list_height(len(view.rows), step, room)
+        row_step = form_row_height(line_h)
+        list_h = picker_list_height(len(view.rows), row_step, room)
         buttons_y = list_top + list_h + buttons_gap
         chips = _chip_hits(
             view, content_x, chip_y, content_w, line_h, text_width
@@ -640,7 +632,7 @@ class FilePickerSurface:
             content_w,
             list_h,
             line_h,
-            step,
+            row_step,
             metrics.scrollbar_width,
             chips,
         )
@@ -755,8 +747,10 @@ class FilePickerSurface:
             left = int(origin.x)
             rows_list: list[tuple[int, int, Rect]] = []
             for index in range(start, end):
-                y = int(round(float(origin.y) + index * step - scroll_y))
-                rows_list.append((index, y, _outset((left, y, row_w, line_h))))
+                top = int(round(float(origin.y) + index * step - scroll_y))
+                text_y = top + form_row_pad_y()
+                rect = _outset((left, text_y, row_w, line_h))
+                rows_list.append((index, text_y, rect))
             rows = tuple(rows_list)
             hover_chip, hover_row = _pointer_hover(chips, rows)
             if hover_chip is not None:
