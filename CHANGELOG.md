@@ -47,6 +47,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- The Generate timeline dialog groups its settings under three headings, in the order they apply: Arrangement (mode, character, density, conductor), Cue timing and cuts (snap to grid, snap to song markers, cut type), and Preset lists (refill preset lists). Character is hidden in pattern mask mode, which does not use it. The yellow count of cues it will replace sits under the title, as "(replaces n cues on the timeline)".
 - Hovering a row in a menu-bar dropdown (New Project, Open Project, and so on) now moves the yellow highlight onto it, the same as a context menu row. A disabled row clears the highlight.
 - The outline of the focused row in the navigator, inspector, timeline strip, dialogs, and file picker is now a dim gold just above the row's highlight, much quieter than the active panel's outline.
 - The selected navigator row and the selected timeline row use the same fainter highlight as a focused inspector row or dialog option, so the row outline reads the same everywhere.

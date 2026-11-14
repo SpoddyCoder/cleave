@@ -53,6 +53,20 @@ def form_label_gap() -> int:
     return ui_px(24)
 
 
+def form_section_indent() -> int:
+    return ui_px(16)
+
+
+def form_section_gap() -> int:
+    """Space above every section heading but the first."""
+    return ui_px(8)
+
+
+def form_heading_height(line_h: int, *, first: bool) -> int:
+    """Height of a section heading, with the gap above it after the first."""
+    return form_row_height(line_h) + (0 if first else form_section_gap())
+
+
 class TextMeasure(TextSizer, Protocol):
     """Text size plus line height. A pygame font satisfies this."""
 
@@ -131,11 +145,15 @@ def measure_form(
     line_h = measure.get_linesize()
     width = 0
     height = 0
-    for row in state.form_rows:
-        row_w = measure.size(row.label)[0] + form_label_gap()
+    for index, row in enumerate(state.form_rows):
+        if row.heading is not None:
+            width = max(width, measure.size(row.heading)[0])
+            height += form_heading_height(line_h, first=index == 0)
+        indent = form_section_indent() if row.indented else 0
+        row_w = indent + measure.size(row.label)[0] + form_label_gap()
         width = max(width, row_w + form_control_width(measure, row))
         height += form_row_height(line_h)
-    if state.form_info is not None:
+    if state.form_info is not None and not state.form_info_under_title:
         width = max(width, measure.size(state.form_info)[0])
         height += line_gap + line_h
     return width, height
@@ -168,6 +186,13 @@ def measure_panel(
         body_w = max((measure.size(line)[0] for line in lines), default=0)
         content_w = max(content_w, body_w)
         content_h += len(lines) * line_h + max(0, len(lines) - 1) * line_gap
+
+    title_info = state.form_info if state.form_info_under_title else None
+    if title_info is not None:
+        if has_message:
+            content_h += line_gap
+        content_w = max(content_w, measure.size(title_info)[0])
+        content_h += line_h
 
     if has_labeled:
         if has_message:

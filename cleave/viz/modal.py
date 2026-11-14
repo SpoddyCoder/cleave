@@ -52,7 +52,8 @@ class FormField:
 
     Up to three options show as segments, more as a combo (``choice_kind``).
     ``help`` and ``option_help`` (one line per option, or empty) fill the help
-    column while the field is focused.
+    column while the field is focused. ``section`` groups the field under a
+    heading; consecutive fields with the same section share one heading.
     """
 
     id: str
@@ -62,6 +63,7 @@ class FormField:
     visible: Callable[[FormValues], bool] | None = None
     help: tuple[str, ...] = ()
     option_help: tuple[str, ...] = ()
+    section: str | None = None
 
 
 @dataclass(frozen=True)
@@ -70,6 +72,8 @@ class FormSpec:
 
     ``info`` is a line of feedback on the draft values, such as a count of the
     cues a command would change. It runs when a value changes, not every frame.
+    It draws under the fields, or under the title when ``info_under_title`` is
+    set (for a line that does not follow the fields).
     ``help`` describes the whole dialog in the help column.
     """
 
@@ -80,6 +84,7 @@ class FormSpec:
     on_cancel: Callable[[], None] | None = None
     body: str | None = None
     info: Callable[[FormValues], str | None] | None = None
+    info_under_title: bool = False
     destructive: bool = False
     help: tuple[str, ...] = ()
 
@@ -99,11 +104,17 @@ def _help_title(label: str) -> str:
 
 @dataclass(frozen=True)
 class FormRowView:
+    """One field row. ``heading`` is a section heading drawn above the row;
+    ``indented`` rows sit under a heading.
+    """
+
     label: str
     kind: ChoiceKind
     options: tuple[str, ...]
     value: int
     focused: bool
+    heading: str | None = None
+    indented: bool = False
 
 
 @dataclass
@@ -123,6 +134,26 @@ class FormState:
     def refresh_info(self) -> None:
         info = self.spec.info
         self.info = None if info is None else info(self.values)
+
+
+def _form_row_views(form: FormState) -> tuple[FormRowView, ...]:
+    rows: list[FormRowView] = []
+    previous: str | None = None
+    for index, field in enumerate(form.visible_fields()):
+        section = field.section
+        rows.append(
+            FormRowView(
+                field.label,
+                choice_kind(len(field.options)),
+                field.options,
+                form.values[field.id],
+                index == form.field_index,
+                heading=section if section is not None and section != previous else None,
+                indented=section is not None,
+            )
+        )
+        previous = section
+    return tuple(rows)
 
 
 class TextFocusRegion(Enum):
@@ -208,6 +239,7 @@ class ModalViewState:
     option_roles: tuple[ButtonRole, ...] = ()
     form_rows: tuple[FormRowView, ...] = ()
     form_info: str | None = None
+    form_info_under_title: bool = False
     form_buttons_focused: bool = False
     # The open combo list of a form row; ``target`` is the row index.
     form_choice: ChoiceListView | None = None
@@ -274,16 +306,7 @@ class ModalHost:
         form = self._form_state
         form_rows: tuple[FormRowView, ...] = ()
         if form is not None:
-            form_rows = tuple(
-                FormRowView(
-                    field.label,
-                    choice_kind(len(field.options)),
-                    field.options,
-                    form.values[field.id],
-                    index == form.field_index,
-                )
-                for index, field in enumerate(form.visible_fields())
-            )
+            form_rows = _form_row_views(form)
         return ModalViewState(
             kind=self._request.kind,
             message=self._request.message,
@@ -295,6 +318,7 @@ class ModalHost:
             option_roles=tuple(option.role for option in self._request.options),
             form_rows=form_rows,
             form_info=None if form is None else form.info,
+            form_info_under_title=form is not None and form.spec.info_under_title,
             form_buttons_focused=form is not None and form.field_index is None,
             form_choice=choice_list_view(self._form_choice),
         )

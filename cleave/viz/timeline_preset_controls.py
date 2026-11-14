@@ -70,6 +70,11 @@ _RESET_TITLE = "Reset timeline?"
 _CONDUCTOR_OPTIONS = (False, True)
 _RESET_LAYER_OPTIONS = ("off", "on")
 _PATTERN_MASK_TRANSITION_SEC = 1.0
+# Generate dialog sections: what the arrangement is, then how its cues are
+# tidied, then what happens to the layers' preset lists.
+_ARRANGEMENT_SECTION = "Arrangement"
+_CUES_SECTION = "Cue timing and cuts"
+_PRESETS_SECTION = "Preset lists"
 
 _KIND_BUILDERS = {
     "breathing": (build_breathing_cues, "Applied Breathing timeline preset"),
@@ -82,6 +87,9 @@ _KIND_BUILDERS = {
 _GENERATE_HELP = (
     "Makes a new timeline from these settings.",
     "This replaces the current cues.",
+    "Arrangement decides which layers play when.",
+    "Cue timing and cuts then tidy every generated cue.",
+    "Preset lists can then be refilled to match.",
     "In layers mode, each crescendo song marker gets a crescendo.",
     "The project keeps these settings.",
 )
@@ -136,7 +144,7 @@ _MODE_OPTION_HELP = {
     "layers": "cues turn whole layers on and off, shaped by the character.",
     "pattern_mask": (
         "short sections swap layers through the pattern mask; "
-        "turns the mask on with strips. Ignores the character."
+        "turns the mask on with strips. It has no character."
     ),
 }
 _RESET_HELP = ("Removes every cue on the timeline.",)
@@ -156,6 +164,8 @@ def _choice_field(
     *,
     help: tuple[str, ...] = (),
     option_help: Mapping[object, str] | None = None,
+    section: str | None = None,
+    visible: Callable[[FormValues], bool] | None = None,
 ) -> FormField:
     return FormField(
         field_id,
@@ -166,7 +176,14 @@ def _choice_field(
         option_help=()
         if option_help is None
         else tuple(option_help[option] for option in options),
+        section=section,
+        visible=visible,
     )
+
+
+def _layers_mode(values: FormValues) -> bool:
+    """Character only shapes layers mode; pattern mask ignores it."""
+    return TIMELINE_PRESET_MODE_OPTIONS[values["mode"]] == "layers"
 
 
 def _cues_label(count: int) -> str:
@@ -206,6 +223,16 @@ class TimelinePresetController:
                 title=_GENERATE_TITLE,
                 fields=(
                     _choice_field(
+                        "mode",
+                        "mode",
+                        TIMELINE_PRESET_MODE_OPTIONS,
+                        tl.timeline_preset_mode,
+                        timeline_preset_mode_display,
+                        help=_MODE_HELP,
+                        option_help=_MODE_OPTION_HELP,
+                        section=_ARRANGEMENT_SECTION,
+                    ),
+                    _choice_field(
                         "character",
                         "character",
                         TIMELINE_PRESET_KIND_OPTIONS,
@@ -213,6 +240,8 @@ class TimelinePresetController:
                         timeline_preset_kind_display,
                         help=_CHARACTER_HELP,
                         option_help=CHARACTER_HELP,
+                        section=_ARRANGEMENT_SECTION,
+                        visible=_layers_mode,
                     ),
                     _choice_field(
                         "density",
@@ -221,41 +250,7 @@ class TimelinePresetController:
                         tl.timeline_preset_density,
                         timeline_preset_density_display,
                         help=_DENSITY_HELP,
-                    ),
-                    _choice_field(
-                        "cue_snap",
-                        "cue snap",
-                        TIMELINE_PRESET_CUE_SNAP_OPTIONS,
-                        tl.timeline_preset_cue_snap,
-                        timeline_preset_cue_snap_display,
-                        help=_CUE_SNAP_HELP,
-                        option_help=_CUE_SNAP_OPTION_HELP,
-                    ),
-                    _choice_field(
-                        "song_marker_snap",
-                        "song marker snap",
-                        TIMELINE_PRESET_SONG_MARKER_SNAP_OPTIONS,
-                        tl.timeline_preset_song_marker_snap,
-                        timeline_preset_song_marker_snap_display,
-                        help=_SONG_MARKER_SNAP_HELP,
-                    ),
-                    _choice_field(
-                        "timeline_cuts",
-                        "timeline cuts",
-                        TIMELINE_PRESET_TIMELINE_CUTS_OPTIONS,
-                        tl.timeline_preset_timeline_cuts,
-                        timeline_preset_timeline_cuts_display,
-                        help=_TIMELINE_CUTS_HELP,
-                        option_help=_TIMELINE_CUTS_OPTION_HELP,
-                    ),
-                    _choice_field(
-                        "repopulate",
-                        "re-populate preset lists",
-                        TIMELINE_PRESET_REPOPULATE_OPTIONS,
-                        tl.timeline_preset_repopulate,
-                        timeline_preset_repopulate_display,
-                        help=_REPOPULATE_HELP,
-                        option_help=_REPOPULATE_OPTION_HELP,
+                        section=_ARRANGEMENT_SECTION,
                     ),
                     _choice_field(
                         "conductor",
@@ -265,15 +260,46 @@ class TimelinePresetController:
                         timeline_preset_conductor_display,
                         help=_CONDUCTOR_HELP,
                         option_help=_CONDUCTOR_OPTION_HELP,
+                        section=_ARRANGEMENT_SECTION,
                     ),
                     _choice_field(
-                        "mode",
-                        "mode",
-                        TIMELINE_PRESET_MODE_OPTIONS,
-                        tl.timeline_preset_mode,
-                        timeline_preset_mode_display,
-                        help=_MODE_HELP,
-                        option_help=_MODE_OPTION_HELP,
+                        "cue_snap",
+                        "snap to grid",
+                        TIMELINE_PRESET_CUE_SNAP_OPTIONS,
+                        tl.timeline_preset_cue_snap,
+                        timeline_preset_cue_snap_display,
+                        help=_CUE_SNAP_HELP,
+                        option_help=_CUE_SNAP_OPTION_HELP,
+                        section=_CUES_SECTION,
+                    ),
+                    _choice_field(
+                        "song_marker_snap",
+                        "snap to song markers",
+                        TIMELINE_PRESET_SONG_MARKER_SNAP_OPTIONS,
+                        tl.timeline_preset_song_marker_snap,
+                        timeline_preset_song_marker_snap_display,
+                        help=_SONG_MARKER_SNAP_HELP,
+                        section=_CUES_SECTION,
+                    ),
+                    _choice_field(
+                        "timeline_cuts",
+                        "cut type",
+                        TIMELINE_PRESET_TIMELINE_CUTS_OPTIONS,
+                        tl.timeline_preset_timeline_cuts,
+                        timeline_preset_timeline_cuts_display,
+                        help=_TIMELINE_CUTS_HELP,
+                        option_help=_TIMELINE_CUTS_OPTION_HELP,
+                        section=_CUES_SECTION,
+                    ),
+                    _choice_field(
+                        "repopulate",
+                        "refill preset lists",
+                        TIMELINE_PRESET_REPOPULATE_OPTIONS,
+                        tl.timeline_preset_repopulate,
+                        timeline_preset_repopulate_display,
+                        help=_REPOPULATE_HELP,
+                        option_help=_REPOPULATE_OPTION_HELP,
+                        section=_PRESETS_SECTION,
                     ),
                 ),
                 confirm_label="Generate",
@@ -281,6 +307,7 @@ class TimelinePresetController:
                     values, duration_sec
                 ),
                 info=lambda _values: self._generate_info(),
+                info_under_title=True,
                 help=_GENERATE_HELP,
             )
         )
@@ -289,7 +316,7 @@ class TimelinePresetController:
         count = self._cue_count()
         if count == 0:
             return None
-        return f"Replaces {_cues_label(count)} on the timeline."
+        return f"(replaces {_cues_label(count)} on the timeline)"
 
     def _cue_count(self) -> int:
         return sum(len(lane.cues) for lane in self.session.timeline.lanes.values())

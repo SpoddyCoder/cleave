@@ -1757,15 +1757,51 @@ def test_generate_opens_a_form_seeded_from_the_session() -> None:
     assert [
         (row.label, row.options[row.value]) for row in modal_view.form_rows
     ] == [
+        ("mode", "layers"),
         ("character", "arc"),
         ("density", "normal"),
-        ("cue snap", "none"),
-        ("song marker snap", "none"),
-        ("timeline cuts", "by marker"),
-        ("re-populate preset lists", "no"),
         ("conductor", "on"),
-        ("mode", "layers"),
+        ("snap to grid", "none"),
+        ("snap to song markers", "none"),
+        ("cut type", "by marker"),
+        ("refill preset lists", "no"),
     ]
+    assert [row.heading for row in modal_view.form_rows] == [
+        "Arrangement",
+        None,
+        None,
+        None,
+        "Cue timing and cuts",
+        None,
+        None,
+        "Preset lists",
+    ]
+    assert all(row.indented for row in modal_view.form_rows)
+
+
+def test_generate_names_the_cues_it_replaces_under_the_title() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.timeline.lanes["layer_1"] = TimelineLane(
+        baseline=0.0, cues=[SlotCue(t=1.0, level=1.0)]
+    )
+    _focus_timeline_presets(controls)
+    _press_focused(controls, _keydown(pygame.K_RETURN))
+    modal_view = controls.modal_host.view_state()
+    assert modal_view is not None
+    assert modal_view.form_info == "(replaces 1 cue on the timeline)"
+    assert modal_view.form_info_under_title
+
+
+def test_generate_hides_character_in_pattern_mask_mode() -> None:
+    controls = _make_controls(("layer_1", "layer_2"))
+    _focus_timeline_presets(controls)
+    _press_focused(controls, _keydown(pygame.K_RETURN))
+    _set_form_field(controls, "mode", "pattern mask")
+    modal_view = controls.modal_host.view_state()
+    assert modal_view is not None
+    labels = [row.label for row in modal_view.form_rows]
+    assert "character" not in labels
+    assert modal_view.form_rows[0].heading == "Arrangement"
 
 
 def test_generate_writes_values_only_on_confirm() -> None:
@@ -1777,16 +1813,16 @@ def test_generate_writes_values_only_on_confirm() -> None:
     tl = controls.session.timeline
     _focus_timeline_presets(controls)
     _press_focused(controls, _keydown(pygame.K_RETURN))
-    _set_form_field(controls, "cue snap", "beats")
-    _set_form_field(controls, "timeline cuts", "all soft")
+    _set_form_field(controls, "snap to grid", "beats")
+    _set_form_field(controls, "cut type", "all soft")
     assert tl.timeline_preset_cue_snap == "none"
     _choose_modal_option(controls, "Cancel")
     assert tl.timeline_preset_cue_snap == "none"
     assert tl.timeline_preset_timeline_cuts == "by marker"
 
     _press_focused(controls, _keydown(pygame.K_RETURN))
-    _set_form_field(controls, "cue snap", "beats")
-    _set_form_field(controls, "timeline cuts", "all soft")
+    _set_form_field(controls, "snap to grid", "beats")
+    _set_form_field(controls, "cut type", "all soft")
     _choose_modal_option(controls, "Generate")
     assert tl.timeline_preset_cue_snap == "beats"
     assert tl.timeline_preset_timeline_cuts == "all soft"

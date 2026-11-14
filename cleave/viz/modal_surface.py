@@ -34,8 +34,10 @@ from cleave.viz.modal_layout import (
     caret_index_at_point,
     focus_highlight_rect,
     form_control_width,
+    form_heading_height,
     form_row_height,
     form_row_pad_y,
+    form_section_indent,
     lines_block_height,
     measure_button_row,
     measure_panel,
@@ -62,6 +64,7 @@ from cleave.viz.theme import (
     FOCUS_WASH_ALPHA,
     HIGHLIGHT,
     LABEL,
+    MUTED,
     ROW_FOCUS_BORDER,
     VALUE,
     tuning_ui_metrics,
@@ -436,14 +439,20 @@ def _draw_form_rows(
     left = ox + panel_pad_x()
     right = ox + panel_w - panel_pad_x()
     for index, row in enumerate(view.form_rows):
+        if row.heading is not None:
+            heading_h = form_heading_height(line_h, first=index == 0)
+            heading_y = y + heading_h - form_row_height(line_h) + form_row_pad_y()
+            _text(draw, left, heading_y, row.heading, MUTED)
+            y += heading_h
         height = form_row_height(line_h)
-        rect = (left, y, right - left, height)
+        row_left = left + (form_section_indent() if row.indented else 0)
+        rect = (row_left, y, right - row_left, height)
         hits.append(_FormHit(rect, ModalPointerKind.FOCUS_FORM_ROW, index))
         if row.focused:
             # A 2px gap between the outline and the label / control.
             _highlight_option(draw, _outset(rect, _HIGHLIGHT_PAD + 1, pad_y=0))
         text_y = y + form_row_pad_y()
-        _text(draw, left, text_y, row.label, HIGHLIGHT if row.focused else LABEL)
+        _text(draw, row_left, text_y, row.label, HIGHLIGHT if row.focused else LABEL)
         width = form_control_width(measure, row)
         control = (right - width, text_y, width, line_h)
         controls[index] = control
@@ -690,6 +699,12 @@ class ModalSurface:
                 line_h,
                 line_gap,
             )
+        title_info = view.form_info if view.form_info_under_title else None
+        if title_info is not None:
+            if has_message:
+                y += line_gap
+            _text(draw, x, y, title_info, HIGHLIGHT)
+            y += line_h
         if has_labeled:
             if has_message:
                 y += line_h + line_gap
@@ -720,7 +735,7 @@ class ModalSurface:
                 line_h=line_h,
                 line_gap=line_gap,
             )
-            if view.form_info is not None:
+            if view.form_info is not None and title_info is None:
                 y += line_gap
                 _text(draw, x, y, view.form_info, HIGHLIGHT)
                 y += line_h

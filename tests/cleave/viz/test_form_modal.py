@@ -14,6 +14,7 @@ from cleave.viz.modal import (
 )
 from cleave.viz.modal_layout import (
     form_control_width,
+    form_heading_height,
     form_row_height,
     measure_panel,
 )
@@ -191,6 +192,73 @@ def test_panel_grows_with_conditional_rows() -> None:
     view = modal.view_state()
     tall = measure_panel(_Measure(), view, line_gap=2, screen_w=1920)
     assert tall[1] == short[1] + form_row_height(16)
+
+
+def _sectioned_form(modal: ModalHost, *, sections: bool) -> None:
+    def section(name: str) -> str | None:
+        return name if sections else None
+
+    modal.prompt_form(
+        FormSpec(
+            title="Sections",
+            fields=(
+                FormField("a", "a", ("x", "y"), section=section("First")),
+                FormField("b", "b", ("x", "y"), section=section("First")),
+                FormField("c", "c", ("x", "y"), section=section("Second")),
+            ),
+            confirm_label="Go",
+            on_confirm=lambda _values: None,
+        )
+    )
+
+
+def test_sections_head_their_first_row_and_indent_rows() -> None:
+    modal = ModalHost()
+    _sectioned_form(modal, sections=True)
+    rows = modal.view_state().form_rows
+    assert [row.heading for row in rows] == ["First", None, "Second"]
+    assert all(row.indented for row in rows)
+
+
+def test_section_headings_add_height_but_not_focus_stops() -> None:
+    plain_modal = ModalHost()
+    _sectioned_form(plain_modal, sections=False)
+    plain = measure_panel(
+        _Measure(), plain_modal.view_state(), line_gap=2, screen_w=1920
+    )
+    modal = ModalHost()
+    _sectioned_form(modal, sections=True)
+    sectioned = measure_panel(_Measure(), modal.view_state(), line_gap=2, screen_w=1920)
+    assert sectioned[1] == plain[1] + form_heading_height(
+        16, first=True
+    ) + form_heading_height(16, first=False)
+    modal.handle_keydown(keydown(pygame.K_DOWN))
+    assert modal.view_state().form_rows[1].focused
+
+
+def _info_form(modal: ModalHost, *, under_title: bool) -> None:
+    modal.prompt_form(
+        FormSpec(
+            title="Info",
+            fields=(FormField("a", "a", ("x", "y")),),
+            confirm_label="Go",
+            on_confirm=lambda _values: None,
+            info=lambda _values: "a fairly long line of information text",
+            info_under_title=under_title,
+        )
+    )
+
+
+def test_info_under_title_keeps_the_panel_height() -> None:
+    below = ModalHost()
+    _info_form(below, under_title=False)
+    above = ModalHost()
+    _info_form(above, under_title=True)
+    assert above.view_state().form_info_under_title
+    assert not below.view_state().form_info_under_title
+    assert measure_panel(
+        _Measure(), above.view_state(), line_gap=2, screen_w=1920
+    ) == measure_panel(_Measure(), below.view_state(), line_gap=2, screen_w=1920)
 
 
 def _combo_form(modal: ModalHost, confirmed: list[FormValues]) -> None:
