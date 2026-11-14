@@ -46,13 +46,13 @@ from cleave.viz.material_icons import (
     FOLDER_GLYPH,
 )
 from cleave.viz.theme import (
-    FOCUS_BORDER_ALPHA,
     FOCUS_WASH_ALPHA,
     HIGHLIGHT,
     HOVER,
     HOVER_BG_ALPHA,
     LABEL,
     PRESET_ICON,
+    ROW_FOCUS_BORDER,
     VALUE,
     tuning_ui_metrics,
 )
@@ -322,7 +322,7 @@ def _hover() -> int:
 def _wash_and_border() -> tuple[int, int]:
     return (
         _pack(HIGHLIGHT, FOCUS_WASH_ALPHA / 255.0),
-        _pack(HIGHLIGHT, FOCUS_BORDER_ALPHA / 255.0),
+        _pack(ROW_FOCUS_BORDER),
     )
 
 

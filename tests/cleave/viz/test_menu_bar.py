@@ -515,7 +515,12 @@ def test_open_menu_paints_over_the_focus_ring() -> None:
     from cleave.viz import imgui_host, shell_host
     from cleave.viz.shell_host import draw_shell_frame
     from cleave.viz.shell_layout import ShellLayout
-    from cleave.viz.theme import BORDER_COLOR, FOCUS_BORDER_ALPHA, HIGHLIGHT
+    from cleave.viz.theme import (
+        BORDER_COLOR,
+        HIGHLIGHT,
+        PANEL_FOCUS_BORDER_ALPHA,
+        ROW_FOCUS_BORDER,
+    )
 
     overlay = _Overlay()
     overlay.visibility = 1.0
@@ -548,10 +553,11 @@ def test_open_menu_paints_over_the_focus_ring() -> None:
         strip_names = [draw_list._owner_name for draw_list in strip_content]
         strip_foreground = _assert_chrome_last(strip_lists)
         gold = _color_u32(HIGHLIGHT)
-        ring = _color_u32_alpha(HIGHLIGHT, FOCUS_BORDER_ALPHA / 255.0)
+        panel_ring = _color_u32_alpha(HIGHLIGHT, PANEL_FOCUS_BORDER_ALPHA / 255.0)
+        ring = _color_u32(ROW_FOCUS_BORDER)
         white = _color_u32(BORDER_COLOR)
         strip_on_border = _draw_list_has_color(
-            strip_content[strip_names.index("##shell-focus-border")], ring
+            strip_content[strip_names.index("##shell-focus-border")], panel_ring
         )
         strip_on_foreground = any(
             _draw_list_has_color(draw_list, gold) for draw_list in strip_foreground

@@ -59,10 +59,10 @@ from cleave.viz.theme import (
     BUTTON_DANGER_BG,
     BUTTON_PRIMARY_BG,
     DISABLED,
-    FOCUS_BORDER_ALPHA,
     FOCUS_WASH_ALPHA,
     HIGHLIGHT,
     LABEL,
+    ROW_FOCUS_BORDER,
     VALUE,
     tuning_ui_metrics,
 )
@@ -82,7 +82,6 @@ _MODAL_FLAGS = (
     | int(imgui.WindowFlags_.no_scrollbar)
 )
 _WASH_ALPHA = FOCUS_WASH_ALPHA / 255.0
-_FOCUS_BORDER_ALPHA = FOCUS_BORDER_ALPHA / 255.0
 _FOCUS_BORDER_THICKNESS = 1.0
 _HIGHLIGHT_PAD = 2
 
@@ -231,14 +230,14 @@ def _wash(draw: imgui.ImDrawList, rect: Rect) -> None:
 
 
 def _focus_border(draw: imgui.ImDrawList, rect: Rect) -> None:
-    """1px highlight outline, matching a focused navigator or inspector row."""
+    """1px row focus outline, matching a focused navigator or inspector row."""
     x, y, width, height = rect
     if width <= 0 or height <= 0:
         return
     draw.add_rect(
         imgui.ImVec2(float(x), float(y)),
         imgui.ImVec2(float(x + width), float(y + height)),
-        _packed(HIGHLIGHT, _FOCUS_BORDER_ALPHA),
+        _packed(ROW_FOCUS_BORDER),
         0.0,
         0,
         _FOCUS_BORDER_THICKNESS,

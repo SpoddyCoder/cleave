@@ -55,7 +55,6 @@ from cleave.viz.timeline_ruler import render_time_ruler, ruler_tick_top, song_bo
 from cleave.viz.theme import (
     ARMED_BG,
     BAR_GRID,
-    FOCUS_BORDER_ALPHA,
     HIGHLIGHT,
     LABEL,
     NUDGE_HOVER_BG,
@@ -65,6 +64,7 @@ from cleave.viz.theme import (
     PLAYHEAD,
     PLAYHEAD_FLASH,
     REC_BG,
+    ROW_FOCUS_BORDER,
     SELECTED_WASH_ALPHA,
     SONG_BOUND,
     SONG_MARKER,
@@ -390,14 +390,14 @@ def bar_tick_times_for_row(state: TimelineViewState, slot: str) -> list[float]:
 
 
 def _draw_focus_outline(surface: pygame.Surface, rect: pygame.Rect) -> None:
-    """1px highlight outline at the shell's focus alpha, as on inspector rows."""
+    """1px row focus outline, as on inspector rows."""
     for edge in (
         pygame.Rect(rect.x, rect.y, rect.w, 1),
         pygame.Rect(rect.x, rect.bottom - 1, rect.w, 1),
         pygame.Rect(rect.x, rect.y + 1, 1, rect.h - 2),
         pygame.Rect(rect.right - 1, rect.y + 1, 1, rect.h - 2),
     ):
-        blit_tint(surface, edge, HIGHLIGHT, alpha=FOCUS_BORDER_ALPHA)
+        surface.fill(ROW_FOCUS_BORDER, edge)
 
 
 def _lerp_rgb(

@@ -122,7 +122,6 @@ from cleave.viz.theme import (
     BACKGROUND,
     DISABLED,
     ERROR_NOTIFICATION,
-    FOCUS_BORDER_ALPHA,
     FOCUS_WASH_ALPHA,
     HIGHLIGHT,
     INSPECTOR_DIVIDER,
@@ -137,8 +136,10 @@ from cleave.viz.theme import (
     NUDGE_HOVER_BG,
     NUDGE_HOVER_BG_ALPHA,
     NUDGE_HOVER_FG,
+    PANEL_FOCUS_BORDER_ALPHA,
     PRESET_FILE_ICON,
     PRESET_ICON,
+    ROW_FOCUS_BORDER,
     SELECTED_WASH_ALPHA,
     TRANSPORT_RULE,
     VALUE,
@@ -1183,9 +1184,9 @@ def _draw_inspector_divider() -> None:
     imgui.dummy(imgui.ImVec2(0.0, height))
 
 
-def _focus_border_rgba() -> imgui.ImVec4:
-    """Highlight colour at the quieter focus-outline alpha."""
-    return rgba(HIGHLIGHT, FOCUS_BORDER_ALPHA / 255.0)
+def _panel_focus_border_rgba() -> imgui.ImVec4:
+    """Highlight colour at the quieter panel focus-outline alpha."""
+    return rgba(HIGHLIGHT, PANEL_FOCUS_BORDER_ALPHA / 255.0)
 
 
 def _fill_rect_border(rect: tuple[int, int, int, int], color_rgba: imgui.ImVec4) -> None:
@@ -1254,7 +1255,7 @@ def _draw_item_focus_ring() -> None:
     rect_max = imgui.get_item_rect_max()
     if rect_max.x <= rect_min.x or rect_max.y <= rect_min.y:
         return
-    color = imgui.get_color_u32(_focus_border_rgba())
+    color = imgui.get_color_u32(rgba(ROW_FOCUS_BORDER))
     imgui.get_window_draw_list().add_rect(
         rect_min,
         rect_max,
@@ -2073,14 +2074,14 @@ class ShellHost:
                 # drawn here, sharing the rule under the columns above it.
                 _draw_panel_border(
                     _overlap_panel(layout.timeline, overlap),
-                    _focus_border_rgba()
+                    _panel_focus_border_rgba()
                     if stop is CycleStop.TIMELINE
                     else rgba(NAVIGATOR_BORDER),
                 )
             if stop is CycleStop.NAVIGATOR:
-                _draw_panel_border(navigator, _focus_border_rgba())
+                _draw_panel_border(navigator, _panel_focus_border_rgba())
             elif stop is CycleStop.INSPECTOR:
-                _draw_panel_border(inspector, _focus_border_rgba())
+                _draw_panel_border(inspector, _panel_focus_border_rgba())
         finally:
             style.window_min_size = imgui.ImVec2(saved_min_x, saved_min_y)
         inline = self._controls.inline_edit
@@ -2119,7 +2120,7 @@ class ShellHost:
             _PANEL_BORDER_PX if border is not None else 0.0,
         )
         if border is not None:
-            alpha = FOCUS_BORDER_ALPHA / 255.0 if active else 1.0
+            alpha = PANEL_FOCUS_BORDER_ALPHA / 255.0 if active else 1.0
             imgui.push_style_color(imgui.Col_.border, rgba(border, alpha))
         try:
             _visible, _opened = imgui.begin(

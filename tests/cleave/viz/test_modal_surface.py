@@ -50,10 +50,10 @@ from cleave.viz.shell_focus import ShellRegion
 from cleave.viz.shell_layout import ShellLayout
 from cleave.viz.theme import (
     DISABLED,
-    FOCUS_BORDER_ALPHA,
     FOCUS_WASH_ALPHA,
     HIGHLIGHT,
     LABEL,
+    ROW_FOCUS_BORDER,
     VALUE,
     tuning_ui_metrics,
 )
@@ -335,7 +335,7 @@ def test_kind_renders_with_idle_mouse(view: ModalViewState) -> None:
         assert abs(surface.panel_rect[1] - (screen_h - expected[1]) // 2) <= 1
         colors = _color_counts()
         wash = _pack(HIGHLIGHT, FOCUS_WASH_ALPHA / 255.0)
-        border = _pack(HIGHLIGHT, FOCUS_BORDER_ALPHA / 255.0)
+        border = _pack(ROW_FOCUS_BORDER)
         assert colors.get(_pack(LABEL), 0) > 0
         if view.kind == ModalKind.TEXT:
             assert colors.get(_pack(DISABLED), 0) == 4 * (
@@ -816,7 +816,7 @@ def test_text_button_colours_follow_focus() -> None:
         _idle(host, surface)
         colors = _color_counts()
         wash = _pack(HIGHLIGHT, FOCUS_WASH_ALPHA / 255.0)
-        border = _pack(HIGHLIGHT, FOCUS_BORDER_ALPHA / 255.0)
+        border = _pack(ROW_FOCUS_BORDER)
         assert colors.get(_pack(DISABLED), 0) == 4 * sum(
             _glyphs(label) for label in TEXT_BUTTON_LABELS
         )
@@ -850,7 +850,7 @@ def test_hover_text_button_while_editing_keeps_the_caret() -> None:
         assert surface.intent is None
         colors = _color_counts()
         wash = _pack(HIGHLIGHT, FOCUS_WASH_ALPHA / 255.0)
-        border = _pack(HIGHLIGHT, FOCUS_BORDER_ALPHA / 255.0)
+        border = _pack(ROW_FOCUS_BORDER)
         assert colors.get(border, 0) > 0
         assert colors.get(_pack(HIGHLIGHT), 0) == 4
         assert colors.get(_pack(DISABLED), 0) == 4 * (
