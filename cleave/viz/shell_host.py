@@ -27,7 +27,7 @@ from cleave.viz.help_content import (
     modal_help_content,
 )
 from cleave.viz.imgui_host import ImGuiHost, PAUSE_GLYPH, PLAY_GLYPH, mouse_button
-from cleave.viz.imgui_theme import rgba
+from cleave.viz.imgui_theme import padded_row_spacing_y, padded_rows, rgba
 from cleave.viz.inspector import InspectorRow, build_inspector_rows
 from cleave.viz.inspector_controls import (
     inspector_command_enabled,
@@ -176,9 +176,6 @@ from cleave.viz.transport_controls import TransportField
 _MENU_BAR_FRAME_PADDING_Y = 8.0
 # Extra space between the menu-bar rule and the first popup row.
 _INSPECTOR_INDENT = 16.0
-# Extra space above and below each inspector row, so a focused row's outline
-# clears its segments, combo box, or buttons. Navigator rows share it.
-_ROW_PAD_Y = 2.0
 # Height of an inspector divider, as a fraction of the text line.
 _INSPECTOR_DIVIDER_LINES = 0.5
 _NAV_LOCK_MARK = "[lock]"
@@ -1326,31 +1323,6 @@ def _draw_button(
     return clicked
 
 
-def _padded_row_spacing_y() -> float:
-    """Item spacing between navigator and inspector rows.
-
-    Selectables grow by half the item spacing above and below, so this adds
-    _ROW_PAD_Y to each side of every row's highlight. Whole pixels keep the
-    measured navigator height the same from frame to frame.
-    """
-    return float(
-        round(imgui.get_style().item_spacing.y + 2.0 * ui_chrome_px(_ROW_PAD_Y))
-    )
-
-
-@contextmanager
-def _padded_rows() -> Iterator[None]:
-    """Push the padded row spacing for a navigator or inspector list, then pop."""
-    imgui.push_style_var(
-        imgui.StyleVar_.item_spacing,
-        imgui.ImVec2(imgui.get_style().item_spacing.x, _padded_row_spacing_y()),
-    )
-    try:
-        yield
-    finally:
-        imgui.pop_style_var()
-
-
 @contextmanager
 def _selected_header_wash(selected: bool, *, inspector: bool = False) -> Iterator[None]:
     """Push a selected-row header fill, then pop.
@@ -1458,7 +1430,7 @@ class ShellHost:
             len(self._visible_nav_nodes()),
             chrome_px=2.0 * float(style.window_padding.y)
             + float(style.window_border_size),
-            spacing_px=_padded_row_spacing_y(),
+            spacing_px=padded_row_spacing_y(),
         )
 
     def _visible_nav_nodes(self) -> tuple[NavNode, ...]:
@@ -2339,7 +2311,7 @@ class ShellHost:
     def _draw_navigator(self) -> None:
         imgui.push_style_color(imgui.Col_.text, rgba(LABEL))
         try:
-            with _padded_rows():
+            with padded_rows():
                 nodes = self._visible_nav_nodes()
                 self._nav_row_rects = {}
                 for node, rails in zip(nodes, navigator_tree_rails(nodes)):
@@ -2535,7 +2507,7 @@ class ShellHost:
         _draw_inspector_divider()
         self._choice_rects = {}
         self._insp_row_rects = {}
-        with _padded_rows():
+        with padded_rows():
             for row in build_inspector_rows(state, focus.selected_id):
                 if row.divider:
                     _draw_inspector_divider()

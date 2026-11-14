@@ -20,7 +20,7 @@ from cleave.viz.context_menu import (
     ContextMenuState,
     ContextSubmenu,
 )
-from cleave.viz.imgui_theme import rgba
+from cleave.viz.imgui_theme import padded_row_spacing_y, padded_rows, rgba
 from cleave.viz.tooltips import show_tooltip
 from cleave.viz.theme import BACKGROUND, DISABLED, HIGHLIGHT, MUTED, VALUE, ui_chrome_px
 
@@ -30,6 +30,33 @@ MENU_POPUP_TOP_PAD_PX = 4.0
 CHECK_MARK = "✓"
 # The ImGui atlas carries this for the navigator twisty.
 SUBMENU_MARK = "▸"
+
+
+def _highlight_overhang_y(spacing_y: float) -> tuple[float, float]:
+    """How far a selectable's highlight reaches above and below its text box.
+
+    Dear ImGui gives the top trunc(spacing / 2) and the bottom the rest.
+    """
+    above = float(math.trunc(spacing_y * 0.5))
+    return above, spacing_y - above
+
+
+def _row_pad_extra_y() -> tuple[float, float]:
+    """Pixels the padded row spacing adds to a highlight, above and below."""
+    base_above, base_below = _highlight_overhang_y(imgui.get_style().item_spacing.y)
+    above, below = _highlight_overhang_y(padded_row_spacing_y())
+    return above - base_above, below - base_below
+
+
+def menu_popup_top_pad() -> int:
+    """Whole pixels from the popup's padding to its first row.
+
+    Includes the row padding, so the first highlight keeps its gap from the
+    top edge.
+    """
+    return round(ui_chrome_px(MENU_POPUP_TOP_PAD_PX)) + int(_row_pad_extra_y()[0])
+
+
 POPUP_FLAGS = (
     int(imgui.WindowFlags_.no_title_bar)
     | int(imgui.WindowFlags_.no_resize)
@@ -107,88 +134,99 @@ def draw_menu_rows(
     mark_w = imgui.calc_text_size(SUBMENU_MARK).x if any_submenu else 0.0
     arrow_w = gap * 0.5 + mark_w if any_submenu else 0.0
     row_w = pad_x * 2.0 + check_w + gap + label_w + gap + shortcut_w + arrow_w + pad_x
-    draw_list = imgui.get_window_draw_list()
     # Whole pixels: text snaps down to a pixel, so a fractional row top
     # leaves the label off-centre in its fill.
-    imgui.set_cursor_pos_y(
-        imgui.get_cursor_pos_y() + round(ui_chrome_px(MENU_POPUP_TOP_PAD_PX))
-    )
-    clicked: int | None = None
-    hovered: int | None = None
-    rects: list[Rect | None] = []
-    for index, row in enumerate(rows):
-        if row is None:
-            imgui.separator()
-            rects.append(None)
-            continue
-        is_highlighted = highlighted == index
-        pos = imgui.get_cursor_screen_pos()
-        # Disabled skips the hover wash. The keyboard row stays selectable
-        # so its opaque fill still paints.
-        flags = int(
-            imgui.SelectableFlags_.disabled
-            if not row.enabled and not is_highlighted
-            else imgui.SelectableFlags_.none
-        )
-        with opaque_highlight_fill(is_highlighted):
-            pressed, _selected = imgui.selectable(
-                f"##{row.id}",
-                is_highlighted,
-                flags,
-                imgui.ImVec2(row_w, 0.0),
+    imgui.set_cursor_pos_y(imgui.get_cursor_pos_y() + menu_popup_top_pad())
+    # Separators and the popup's bottom edge take back how much further
+    # each padded highlight reaches over and under its text, so only the
+    # row highlights grow.
+    above, below = _row_pad_extra_y()
+    with padded_rows():
+        draw_list = imgui.get_window_draw_list()
+        clicked: int | None = None
+        hovered: int | None = None
+        rects: list[Rect | None] = []
+        for index, row in enumerate(rows):
+            if row is None:
+                imgui.set_cursor_pos_y(imgui.get_cursor_pos_y() - below)
+                imgui.separator()
+                imgui.set_cursor_pos_y(imgui.get_cursor_pos_y() - above)
+                rects.append(None)
+                continue
+            is_highlighted = highlighted == index
+            pos = imgui.get_cursor_screen_pos()
+            # Disabled skips the hover wash. The keyboard row stays selectable
+            # so its opaque fill still paints.
+            flags = int(
+                imgui.SelectableFlags_.disabled
+                if not row.enabled and not is_highlighted
+                else imgui.SelectableFlags_.none
             )
-        rect_min = imgui.get_item_rect_min()
-        rect_max = imgui.get_item_rect_max()
-        rects.append(
-            (
-                int(rect_min.x),
-                int(rect_min.y),
-                int(rect_max.x - rect_min.x),
-                int(rect_max.y - rect_min.y),
+            with opaque_highlight_fill(is_highlighted):
+                pressed, _selected = imgui.selectable(
+                    f"##{row.id}",
+                    is_highlighted,
+                    flags,
+                    imgui.ImVec2(row_w, 0.0),
+                )
+            rect_min = imgui.get_item_rect_min()
+            rect_max = imgui.get_item_rect_max()
+            rects.append(
+                (
+                    int(rect_min.x),
+                    int(rect_min.y),
+                    int(rect_max.x - rect_min.x),
+                    int(rect_max.y - rect_min.y),
+                )
             )
-        )
-        if imgui.is_item_hovered(int(imgui.HoveredFlags_.allow_when_disabled)):
-            hovered = index
-        if is_highlighted:
-            ink = rgba(BACKGROUND)
-            label_color = check_color = shortcut_color = ink
-        else:
-            label_color = rgba(row.color if row.enabled else DISABLED)
-            check_color = rgba(VALUE if row.enabled else DISABLED)
-            shortcut_color = rgba(MUTED)
-        # Selectable anchors the label at the cursor and pads the highlight
-        # with half of ItemSpacing on each side. Frame padding would push
-        # the label down so the fill sits high, flush with the next row.
-        text_y = pos.y
-        text_x = pos.x + pad_x
-        if row.checked:
+            if imgui.is_item_hovered(int(imgui.HoveredFlags_.allow_when_disabled)):
+                hovered = index
+            if is_highlighted:
+                ink = rgba(BACKGROUND)
+                label_color = check_color = shortcut_color = ink
+            else:
+                label_color = rgba(row.color if row.enabled else DISABLED)
+                check_color = rgba(VALUE if row.enabled else DISABLED)
+                shortcut_color = rgba(MUTED)
+            # Selectable anchors the label at the cursor and pads the highlight
+            # with half of ItemSpacing on each side. Frame padding would push
+            # the label down so the fill sits high, flush with the next row.
+            text_y = pos.y
+            text_x = pos.x + pad_x
+            if row.checked:
+                draw_list.add_text(
+                    imgui.ImVec2(text_x, text_y),
+                    imgui.get_color_u32(check_color),
+                    CHECK_MARK,
+                )
             draw_list.add_text(
-                imgui.ImVec2(text_x, text_y),
-                imgui.get_color_u32(check_color),
-                CHECK_MARK,
-            )
-        draw_list.add_text(
-            imgui.ImVec2(text_x + check_w + gap, text_y),
-            imgui.get_color_u32(label_color),
-            row.label,
-        )
-        if row.shortcut:
-            shortcut_width = imgui.calc_text_size(row.shortcut).x
-            draw_list.add_text(
-                imgui.ImVec2(
-                    pos.x + row_w - pad_x - arrow_w - shortcut_width, text_y
-                ),
-                imgui.get_color_u32(shortcut_color),
-                row.shortcut,
-            )
-        if row.submenu:
-            draw_list.add_text(
-                imgui.ImVec2(pos.x + row_w - pad_x - mark_w, text_y),
+                imgui.ImVec2(text_x + check_w + gap, text_y),
                 imgui.get_color_u32(label_color),
-                SUBMENU_MARK,
+                row.label,
             )
-        if pressed and row.enabled:
-            clicked = index
+            if row.shortcut:
+                shortcut_width = imgui.calc_text_size(row.shortcut).x
+                draw_list.add_text(
+                    imgui.ImVec2(
+                        pos.x + row_w - pad_x - arrow_w - shortcut_width, text_y
+                    ),
+                    imgui.get_color_u32(shortcut_color),
+                    row.shortcut,
+                )
+            if row.submenu:
+                draw_list.add_text(
+                    imgui.ImVec2(pos.x + row_w - pad_x - mark_w, text_y),
+                    imgui.get_color_u32(label_color),
+                    SUBMENU_MARK,
+                )
+            if pressed and row.enabled:
+                clicked = index
+        # The popup fits the cursor extent, which stops at the last row's text
+        # box. Reach past it by the padding the last highlight gained.
+        imgui.set_cursor_pos_y(
+            imgui.get_cursor_pos_y() - imgui.get_style().item_spacing.y + below
+        )
+        imgui.dummy(imgui.ImVec2(0.0, 0.0))
     return MenuRowsResult(clicked=clicked, hovered=hovered, rects=tuple(rects))
 
 
@@ -426,7 +464,7 @@ class ContextSubmenuSurface:
         parent_rect = rects[index]
         if parent_rect is None:
             return (0, 0, 0, 0)
-        top_pad = round(ui_chrome_px(MENU_POPUP_TOP_PAD_PX))
+        top_pad = menu_popup_top_pad()
         with self._window.begin(
             (state.generation, index),
             lambda size, display: submenu_origin(

@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import math
+from collections.abc import Iterator
+from contextlib import contextmanager
+
 from imgui_bundle import imgui
 
 from cleave.viz.theme import (
@@ -19,6 +23,7 @@ from cleave.viz.theme import (
     SELECTED_WASH_ALPHA,
     TRANSPORT_RULE,
     VALUE,
+    ui_chrome_px,
 )
 
 _HIGHLIGHT_WASH = FOCUS_ROW_BG_ALPHA / 255.0
@@ -84,6 +89,37 @@ _STYLE_SIZE_FIELDS = (
     "display_safe_area_padding",
     "mouse_cursor_scale",
 )
+
+
+# Extra space above and below each navigator, inspector, and menu row's
+# highlight, so it clears the text and a focused row's outline clears its
+# segments, combo box, or buttons.
+ROW_PAD_Y = 2.0
+
+
+def padded_row_spacing_y() -> float:
+    """Item spacing between padded rows.
+
+    Selectables grow by half the item spacing above and below, so this adds
+    ROW_PAD_Y to each side of every row's highlight. Whole pixels keep the
+    measured navigator height the same from frame to frame, and an even count
+    splits evenly above and below, so the text stays centred in its fill.
+    """
+    spacing = imgui.get_style().item_spacing.y + 2.0 * ui_chrome_px(ROW_PAD_Y)
+    return 2.0 * math.floor(spacing * 0.5 + 0.5)
+
+
+@contextmanager
+def padded_rows() -> Iterator[None]:
+    """Push the padded row spacing for a list of rows, then pop."""
+    imgui.push_style_var(
+        imgui.StyleVar_.item_spacing,
+        imgui.ImVec2(imgui.get_style().item_spacing.x, padded_row_spacing_y()),
+    )
+    try:
+        yield
+    finally:
+        imgui.pop_style_var()
 
 
 def apply_imgui_style_scale(factor: float) -> None:
