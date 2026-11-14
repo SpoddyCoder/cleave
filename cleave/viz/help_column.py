@@ -41,6 +41,8 @@ def draw_help_column(sections: tuple[HelpContent, ...]) -> None:
         if isinstance(section, DescriptionSection):
             for line in section.lines:
                 _draw_wrapped(line, VALUE, wrap_x)
+            if section.lines and section.entries:
+                imgui.dummy(imgui.ImVec2(0.0, imgui.get_text_line_height()))
         for key, description in section.entries:
             _draw_key_value(key, description, start_x, key_w, gap, wrap_x)
 

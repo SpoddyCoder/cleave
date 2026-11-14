@@ -44,6 +44,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- The help column leaves a blank line between a section's text and its key table.
 - The file picker works like the navigator: hovering a row or shortcut only washes it, and a click or the arrow keys choose the row, which stays lit while the pointer moves away. Before, the highlight followed the pointer, so moving to the buttons left nothing marked. Shortcuts draw in white like the listing, with the current one in the accent colour.
 - A folder opened in the file picker selects its first entry instead of the `..` row. An empty folder still selects `..`, and going back up selects the folder you came from.
 - The editor mode switch, the save prompt before entering preset curation, the cast preset dialog, and the render complete and render failed dialogs use the same right-aligned buttons as other dialogs. The mode switch confirms with Switch, the save prompt offers Save, Don't save, and Cancel, and cast preset fills the current role's button and starts on it.
