@@ -15,6 +15,7 @@ from typing import Any
 import pygame
 from imgui_bundle import imgui
 
+from cleave.preset_library import marker_tooltip
 from cleave.viz.commands import Command, CommandContext, MenuSeparator, command_by_id
 from cleave.viz.drag_reorder import DRAG_LAYER, DRAG_PRESET, RowDragGesture
 from cleave.viz.config_pages import config_page_title, is_config_page
@@ -834,6 +835,39 @@ def _draw_path_value(
     )
 
 
+def marker_token_spans(markers: str, fitted: str) -> list[tuple[int, int, str]]:
+    """``(start, end, token)`` of each marker token visible in *fitted*.
+
+    *fitted* is *markers* cut to width; a cut token keeps its full text so
+    its tooltip still names it.
+    """
+    spans: list[tuple[int, int, str]] = []
+    start = 0
+    for token in markers.split(" "):
+        if start >= len(fitted):
+            break
+        if token:
+            spans.append((start, min(start + len(token), len(fitted)), token))
+        start += len(token) + 1
+    return spans
+
+
+def _marker_tooltip_at(markers: str, fitted: str, x: float, y: float) -> None:
+    """Tooltip for the marker token under the mouse, on a row the mouse is over."""
+    height = imgui.get_text_line_height()
+    for start, end, token in marker_token_spans(markers, fitted):
+        token_x = x + imgui.calc_text_size(fitted[:start]).x
+        token_end = x + imgui.calc_text_size(fitted[:end]).x
+        if not imgui.is_mouse_hovering_rect(
+            imgui.ImVec2(token_x, y), imgui.ImVec2(token_end, y + height)
+        ):
+            continue
+        text = marker_tooltip(token)
+        if text is not None:
+            imgui.set_tooltip(text)
+        return
+
+
 def _draw_two_line_row_text(
     label: str,
     markers: str,
@@ -872,6 +906,8 @@ def _draw_two_line_row_text(
             imgui.get_color_u32(label_color),
             fitted,
         )
+        if imgui.is_item_hovered():
+            _marker_tooltip_at(markers, fitted, marker_x, origin_y)
     _draw_path_value(
         origin_x + lead_x,
         origin_y + imgui.get_text_line_height(),

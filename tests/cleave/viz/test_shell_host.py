@@ -31,6 +31,7 @@ from cleave.viz.row_hotkeys import activate_header_toggle
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.session import LayerRuntime, TuningSession
 from cleave.viz.shell_host import (
+    marker_token_spans,
     drag_handle_lead,
     inspector_selectable_id,
     inspector_title,
@@ -461,3 +462,15 @@ def test_scroll_clip_span_insets_by_window_padding() -> None:
 def test_scroll_clip_span_never_inverts() -> None:
     top, bottom = scroll_clip_span(0.0, 10.0, 8.0)
     assert bottom == top == 8.0
+
+
+def test_marker_token_spans_follow_the_fitted_text() -> None:
+    assert marker_token_spans("[FU] [R:B]", "[FU] [R:B]") == [
+        (0, 4, "[FU]"),
+        (5, 10, "[R:B]"),
+    ]
+    assert marker_token_spans("[FU] [R:B]", "[FU] [R") == [
+        (0, 4, "[FU]"),
+        (5, 7, "[R:B]"),
+    ]
+    assert marker_token_spans("[FU] [R:B]", "[F") == [(0, 2, "[FU]")]

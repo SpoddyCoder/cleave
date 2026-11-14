@@ -12,7 +12,12 @@ from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import Literal, Protocol
 
-from cleave.cue_roles import CUE_ROLE_MARKER_LETTER, CueRole
+from cleave.cue_roles import (
+    CUE_ROLE_HELP_BLURB,
+    CUE_ROLE_MARKER_LETTER,
+    CUE_ROLES,
+    CueRole,
+)
 
 SCHEMA_VERSION = 1
 
@@ -37,6 +42,33 @@ COLLECTION_LABEL: dict[PresetCollection, str] = {
 }
 
 ProgressCallback = Callable[[int, int], bool]
+
+_MARKER_FLAG_MEANING: dict[str, str] = {
+    "F": "Favourite",
+    "B": "Blacklisted",
+    "U": "In a preset list",
+}
+
+
+def marker_tooltip(token: str) -> str | None:
+    """Hover text for one marker token from ``PresetLibrary.marker``.
+
+    ``"[FU]"`` names each flag on its own line; ``"[R:B]"`` names the role.
+    Unknown tokens give None.
+    """
+    if not (token.startswith("[") and token.endswith("]")):
+        return None
+    body = token[1:-1]
+    if body.startswith("R:"):
+        letter = body[2:]
+        for role in CUE_ROLES:
+            if CUE_ROLE_MARKER_LETTER[role] == letter:
+                return f"Role: {role} ({CUE_ROLE_HELP_BLURB[role]})"
+        return None
+    meanings = [_MARKER_FLAG_MEANING.get(letter) for letter in body]
+    if not meanings or None in meanings:
+        return None
+    return "\n".join(f"{letter}: {meaning}" for letter, meaning in zip(body, meanings))
 
 _SCHEMA = """
 CREATE TABLE files (

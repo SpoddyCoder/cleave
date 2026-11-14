@@ -9,7 +9,12 @@ from pathlib import Path
 import pytest
 
 from cleave import preset_library
-from cleave.preset_library import PresetLibrary, PresetLibraryError, preset_hash
+from cleave.preset_library import (
+    PresetLibrary,
+    PresetLibraryError,
+    marker_tooltip,
+    preset_hash,
+)
 from cleave.preset_playlist import playlist_at_collection, playlist_at_dir
 
 
@@ -181,3 +186,12 @@ def test_enter_collection_jumps_from_a_nested_folder(tmp_path: Path) -> None:
     assert playlist.enter_collection("bed")
     assert playlist.collection == "bed"
     assert playlist.paths == ()
+
+
+def test_marker_tooltip_names_flags_and_roles() -> None:
+    assert marker_tooltip("[FU]") == "F: Favourite\nU: In a preset list"
+    assert marker_tooltip("[B]") == "B: Blacklisted"
+    assert marker_tooltip("[R:B]") == "Role: bed (calm, dark background)"
+    assert marker_tooltip("[R:Z]") is None
+    assert marker_tooltip("[X]") is None
+    assert marker_tooltip("FU") is None
