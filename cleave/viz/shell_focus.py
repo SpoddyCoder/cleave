@@ -1,7 +1,7 @@
 """Shell focus model: region, Tab cycle, and escape.
 
-``ShellRegion`` is where keyboard scope sits: navigator, inspector, or the
-timeline strip. ``CycleStop`` is the Tab ring. The menu bar stays
+``ShellRegion`` is where keyboard scope sits: navigator, inspector, the
+preview, or the timeline strip. ``CycleStop`` is the Tab ring. The menu bar stays
 ``menu_bar.focused`` and is not a region. Help is a column, not a stop.
 ``next_region`` skips Timeline when the strip is closed.
 """
@@ -29,6 +29,7 @@ class ShellRegion(Enum):
 
     NAVIGATOR = auto()
     INSPECTOR = auto()
+    PREVIEW = auto()
     TIMELINE = auto()
 
 
@@ -38,6 +39,7 @@ class CycleStop(Enum):
     MENU = auto()
     NAVIGATOR = auto()
     INSPECTOR = auto()
+    PREVIEW = auto()
     TIMELINE = auto()
 
 
@@ -59,7 +61,12 @@ class ShellFocusState:
 
 def cycle_stops(*, strip_open: bool) -> tuple[CycleStop, ...]:
     """Tab order. Timeline is included only while the strip is open."""
-    stops = [CycleStop.MENU, CycleStop.NAVIGATOR, CycleStop.INSPECTOR]
+    stops = [
+        CycleStop.MENU,
+        CycleStop.NAVIGATOR,
+        CycleStop.INSPECTOR,
+        CycleStop.PREVIEW,
+    ]
     if strip_open:
         stops.append(CycleStop.TIMELINE)
     return tuple(stops)
@@ -73,12 +80,12 @@ def next_region(
 ) -> CycleStop:
     """Move *delta* steps around the Tab cycle.
 
-    Order is Menu, Navigator, Inspector, Timeline. Timeline is skipped when
-    *strip_open* is false. A closed strip treats a Timeline current stop as
-    Inspector before *delta* is applied. *delta* of 0 returns that stop.
+    Order is Menu, Navigator, Inspector, Preview, Timeline. Timeline is
+    skipped when *strip_open* is false. A closed strip treats a Timeline
+    current stop as Preview before *delta* is applied. *delta* of 0 returns that stop.
     """
     if not strip_open and current is CycleStop.TIMELINE:
-        current = CycleStop.INSPECTOR
+        current = CycleStop.PREVIEW
     if delta == 0:
         return current
     stops = cycle_stops(strip_open=strip_open)
@@ -102,6 +109,8 @@ def cycle_stop_for_focus(
         return CycleStop.TIMELINE
     if region is ShellRegion.INSPECTOR:
         return CycleStop.INSPECTOR
+    if region is ShellRegion.PREVIEW:
+        return CycleStop.PREVIEW
     return CycleStop.NAVIGATOR
 
 
@@ -229,10 +238,10 @@ def _nearest_layer_id(
 def escape_region(region: ShellRegion) -> ShellRegion:
     """Escape target for *region*.
 
-    Inspector returns to the navigator. The navigator stays on the navigator;
+    Inspector and Preview return to the navigator. The navigator stays on the navigator;
     the navigator hides the UI itself. Timeline stays on Timeline; the strip
     closes through timeline controls.
     """
-    if region is ShellRegion.INSPECTOR:
+    if region in (ShellRegion.INSPECTOR, ShellRegion.PREVIEW):
         return ShellRegion.NAVIGATOR
     return region

@@ -1611,6 +1611,12 @@ class ShellHost:
                 return None
             (x, y, _w, h), _row = found
             return provider, (float(x), float(y + h))
+        if region is ShellRegion.PREVIEW:
+            layout = self._layout
+            if layout is None or self._preview_menu is None:
+                return None
+            x, y, _w, _h = layout.visualiser
+            return self._preview_menu, (float(x), float(y))
         return None
 
     def _inspector_menu_at(self, x: float, y: float) -> ContextMenuProvider | None:
@@ -1707,10 +1713,10 @@ class ShellHost:
             imgui_host.process_mouse_event(event)
 
     def _assign_shell_region(self, x: float, y: float) -> None:
-        """Left click chooses navigator, inspector, or the open strip.
+        """A click chooses navigator, inspector, the preview, or the open strip.
 
-        Menu, transport, help, and the visualiser leave the region alone. A
-        miss when no layout is stored does nothing. The strip stays open.
+        Menu, transport, and help leave the region alone. A miss when no
+        layout is stored does nothing. The strip stays open.
         """
         layout = self._layout
         if layout is None:
@@ -1723,6 +1729,9 @@ class ShellHost:
             return
         if layout.timeline[3] > 0 and _rect_contains(layout.timeline, x, y):
             self._controls.set_shell_region(ShellRegion.TIMELINE)
+            return
+        if _rect_contains(layout.visualiser, x, y):
+            self._controls.set_shell_region(ShellRegion.PREVIEW)
 
     def _splitter_at(self, x: float, y: float) -> str | None:
         layout = self._layout
@@ -2093,6 +2102,11 @@ class ShellHost:
                 _draw_panel_border(navigator, _panel_focus_border_rgba())
             elif stop is CycleStop.INSPECTOR:
                 _draw_panel_border(inspector, _panel_focus_border_rgba())
+            elif stop is CycleStop.PREVIEW:
+                _draw_panel_border(
+                    _overlap_panel(layout.visualiser, overlap),
+                    _panel_focus_border_rgba(),
+                )
         finally:
             style.window_min_size = imgui.ImVec2(saved_min_x, saved_min_y)
         inline = self._controls.inline_edit

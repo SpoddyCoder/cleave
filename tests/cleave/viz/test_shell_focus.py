@@ -18,12 +18,14 @@ _STRIP = (
     CycleStop.MENU,
     CycleStop.NAVIGATOR,
     CycleStop.INSPECTOR,
+    CycleStop.PREVIEW,
     CycleStop.TIMELINE,
 )
 _CLOSED = (
     CycleStop.MENU,
     CycleStop.NAVIGATOR,
     CycleStop.INSPECTOR,
+    CycleStop.PREVIEW,
 )
 
 
@@ -40,21 +42,21 @@ def _assert_cycle(stops: tuple[CycleStop, ...], *, strip_open: bool) -> None:
 
 
 def test_tab_cycle_with_strip_open() -> None:
-    assert len(_STRIP) == 4
+    assert len(_STRIP) == 5
     _assert_cycle(_STRIP, strip_open=True)
 
 
 def test_tab_cycle_with_strip_closed_skips_timeline() -> None:
-    assert len(_CLOSED) == 3
+    assert len(_CLOSED) == 4
     _assert_cycle(_CLOSED, strip_open=False)
     assert next_region(CycleStop.TIMELINE, strip_open=False, delta=1) is CycleStop.MENU
     assert (
         next_region(CycleStop.TIMELINE, strip_open=False, delta=-1)
-        is CycleStop.NAVIGATOR
+        is CycleStop.INSPECTOR
     )
     assert (
         next_region(CycleStop.TIMELINE, strip_open=False, delta=0)
-        is CycleStop.INSPECTOR
+        is CycleStop.PREVIEW
     )
 
 
@@ -80,11 +82,13 @@ def test_escape_region() -> None:
     assert [region.name for region in ShellRegion] == [
         "NAVIGATOR",
         "INSPECTOR",
+        "PREVIEW",
         "TIMELINE",
     ]
     assert not hasattr(ShellRegion, "PANEL")
     assert escape_region(ShellRegion.NAVIGATOR) is ShellRegion.NAVIGATOR
     assert escape_region(ShellRegion.INSPECTOR) is ShellRegion.NAVIGATOR
+    assert escape_region(ShellRegion.PREVIEW) is ShellRegion.NAVIGATOR
     assert escape_region(ShellRegion.TIMELINE) is ShellRegion.TIMELINE
 
 

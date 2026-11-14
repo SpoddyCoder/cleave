@@ -1105,3 +1105,13 @@ def test_help_titles_are_capital_case() -> None:
     for title in titles:
         for word in re.findall(r"[A-Za-z][A-Za-z']*", title):
             assert word[0].isupper(), title
+
+
+def test_preview_stop_lists_its_menu_and_keys() -> None:
+    focus = RowDescriptor(RowKind.TRACK_OPACITY, slot="drums")
+    shell = ShellFocusState(region=ShellRegion.PREVIEW, selected_id="layer:drums")
+    sections = help_sections(focus, shell_focus=shell)
+    assert [section.title for section in sections] == ["Preview"]
+    entries = dict(sections[0].entries)
+    assert entries["Shift + F10 / Menu"] == "preview options"
+    assert entries["Esc"] == "back to the navigator"

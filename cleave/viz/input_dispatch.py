@@ -15,6 +15,7 @@ from cleave.viz.shell_focus import (
     CycleStop,
     ShellRegion,
     cycle_stop_for_focus,
+    escape_region,
     next_region,
 )
 from cleave.viz.timeline_controls import TimelineControls
@@ -255,11 +256,14 @@ def _commit_cycle_stop(runtime: LiveVisualizerRuntime, stop: CycleStop) -> None:
         if _strip_open(runtime):
             controls.set_shell_region(ShellRegion.TIMELINE)
         return
-    controls.set_shell_region(
-        ShellRegion.INSPECTOR
-        if stop is CycleStop.INSPECTOR
-        else ShellRegion.NAVIGATOR
-    )
+    controls.set_shell_region(_STOP_REGIONS[stop])
+
+
+_STOP_REGIONS: dict[CycleStop, ShellRegion] = {
+    CycleStop.NAVIGATOR: ShellRegion.NAVIGATOR,
+    CycleStop.INSPECTOR: ShellRegion.INSPECTOR,
+    CycleStop.PREVIEW: ShellRegion.PREVIEW,
+}
 
 
 def _handle_region_cycle(
@@ -296,6 +300,8 @@ def _handle_ctrl_section_nav(
 def _region_keydown(event: pygame.event.Event, runtime: LiveVisualizerRuntime) -> bool | None:
     """Navigator, inspector, and timeline own arrows, Enter, Esc, and PageUp/PageDown.
 
+    Preview takes only Esc, back to the navigator.
+
     Timeline returns None so ``key_handler_for_runtime`` runs timeline controls.
     None means the key is unowned and should fall through.
     """
@@ -314,6 +320,9 @@ def _region_keydown(event: pygame.event.Event, runtime: LiveVisualizerRuntime) -
         if runtime.controls.inspector.handle_keydown(event):
             return True
         return None
+    if region is ShellRegion.PREVIEW and event.key == pygame.K_ESCAPE:
+        runtime.controls.set_shell_region(escape_region(region))
+        return True
     return None
 
 

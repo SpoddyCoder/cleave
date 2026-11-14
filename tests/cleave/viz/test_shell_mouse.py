@@ -714,7 +714,7 @@ def test_click_in_help_leaves_the_region() -> None:
         assert host.imgui.queued_buttons == [(0, True)]
 
 
-def test_click_in_visualiser_or_menu_does_not_change_region() -> None:
+def test_click_in_visualiser_focuses_the_preview() -> None:
     controls = _make_controls(("layer_1", "layer_2"))
     controls.open_timeline_panel(enter_submenu=True)
     with _host() as host:
@@ -723,8 +723,17 @@ def test_click_in_visualiser_or_menu_does_not_change_region() -> None:
         host.set_layout(layout)
 
         _click(host, _rect_center(layout.visualiser))
-        assert controls.shell_focus.region is ShellRegion.TIMELINE
+        assert controls.shell_focus.region is ShellRegion.PREVIEW
         assert controls.session.timeline.panel_open is True
+
+
+def test_click_in_menu_or_transport_does_not_change_region() -> None:
+    controls = _make_controls(("layer_1", "layer_2"))
+    controls.open_timeline_panel(enter_submenu=True)
+    with _host() as host:
+        host._controls = controls
+        layout = _open_strip_layout()
+        host.set_layout(layout)
 
         _click(host, _rect_center(layout.menu))
         assert controls.shell_focus.region is ShellRegion.TIMELINE

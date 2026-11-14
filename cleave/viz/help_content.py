@@ -66,7 +66,7 @@ _NAVIGATOR_EXPAND_ENTRY = (
 )
 _REGION_CYCLE_ENTRY = (
     "Tab / Shift+Tab",
-    "move between Menu, Navigator, Inspector, and Timeline (when the strip is open)",
+    "move between Menu, Navigator, Inspector, Preview, and Timeline (when the strip is open)",
 )
 _TOP_LEVEL_NAV_ENTRY = (
     "Ctrl + Up/Down",
@@ -121,6 +121,17 @@ def navigation_section(*, preset_curation: bool = False) -> HelpSection:
     if preset_curation:
         return _CURATION_NAVIGATION_SECTION
     return NAVIGATION_SECTION
+
+
+PREVIEW_SECTION = HelpSection(
+    "Preview",
+    (
+        ("Shift + F10 / Menu", "preview options"),
+        ("Right-click", "preview options"),
+        ("Space", "play / pause"),
+        ("Esc", "back to the navigator"),
+    ),
+)
 
 
 _NAVIGATOR_SECTION = HelpSection(
@@ -517,6 +528,8 @@ def help_stop_for_shell(
         return CycleStop.INSPECTOR
     if shell_focus.region is ShellRegion.INSPECTOR:
         return CycleStop.INSPECTOR
+    if shell_focus.region is ShellRegion.PREVIEW:
+        return CycleStop.PREVIEW
     return CycleStop.NAVIGATOR
 
 
@@ -582,6 +595,8 @@ def help_sections_for_stop(
     """Help for one Tab stop."""
     if stop is CycleStop.MENU:
         return (navigation_section(preset_curation=preset_curation),)
+    if stop is CycleStop.PREVIEW:
+        return (PREVIEW_SECTION,)
     if stop is CycleStop.TIMELINE:
         return (
             timeline_strip_section(

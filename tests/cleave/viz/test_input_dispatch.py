@@ -592,6 +592,8 @@ def test_tab_cycle_when_strip_open() -> None:
     assert controls.shell_focus.region is ShellRegion.INSPECTOR
     assert runtime.menu_bar.focused is False
     assert dispatch_keydown(keydown(pygame.K_TAB), runtime) is True
+    assert controls.shell_focus.region is ShellRegion.PREVIEW
+    assert dispatch_keydown(keydown(pygame.K_TAB), runtime) is True
     assert isinstance(controls.focus_cursor, TimelineFocus)
     assert dispatch_keydown(keydown(pygame.K_TAB), runtime) is True
     assert runtime.menu_bar.focused is True
@@ -629,13 +631,13 @@ def test_inspector_esc_returns_to_navigator() -> None:
 def test_tab_cycle_skips_timeline_when_strip_closed() -> None:
     runtime = _make_runtime(submenu_focused=False, panel_open=False)
     controls = runtime.controls
-    controls.shell_focus.region = ShellRegion.INSPECTOR
+    controls.shell_focus.region = ShellRegion.PREVIEW
     assert dispatch_keydown(keydown(pygame.K_TAB), runtime) is True
     assert runtime.menu_bar.focused is True
     assert not isinstance(controls.focus_cursor, TimelineFocus)
     assert dispatch_keydown(keydown(pygame.K_TAB, mod=pygame.KMOD_SHIFT), runtime) is True
     assert runtime.menu_bar.focused is False
-    assert controls.shell_focus.region is ShellRegion.INSPECTOR
+    assert controls.shell_focus.region is ShellRegion.PREVIEW
 
 
 def test_ctrl_up_down_cycles_visible_top_level_ids() -> None:
@@ -752,6 +754,8 @@ def test_inspector_arrows_step_value_while_strip_is_open() -> None:
     assert session.timeline.selected_cue_t == cues
 
     assert dispatch_keydown(keydown(pygame.K_TAB), runtime) is True
+    assert controls.shell_focus.region is ShellRegion.PREVIEW
+    assert dispatch_keydown(keydown(pygame.K_TAB), runtime) is True
     assert controls.shell_focus.region is ShellRegion.TIMELINE
     assert controls.focus_cursor == TimelineFocus(0)
     assert dispatch_keydown(keydown(pygame.K_RIGHT), runtime) is True
@@ -785,6 +789,8 @@ def test_tab_cycle_skips_help_when_the_column_is_open() -> None:
     assert dispatch_keydown(keydown(pygame.K_TAB), runtime) is True
     assert controls.shell_focus.region is ShellRegion.INSPECTOR
     assert dispatch_keydown(keydown(pygame.K_TAB), runtime) is True
+    assert controls.shell_focus.region is ShellRegion.PREVIEW
+    assert dispatch_keydown(keydown(pygame.K_TAB), runtime) is True
     assert controls.shell_focus.region is ShellRegion.TIMELINE
     assert isinstance(controls.focus_cursor, TimelineFocus)
     assert runtime.seed.session.help_visible is True
@@ -798,13 +804,13 @@ def test_tab_cycle_skips_help_when_the_column_is_open() -> None:
 def test_tab_cycle_skips_help_and_a_closed_strip() -> None:
     runtime = _make_runtime(submenu_focused=False, panel_open=False, help_visible=True)
     controls = runtime.controls
-    controls.shell_focus.region = ShellRegion.INSPECTOR
+    controls.shell_focus.region = ShellRegion.PREVIEW
     assert dispatch_keydown(keydown(pygame.K_TAB), runtime) is True
     assert runtime.menu_bar.focused is True
-    assert controls.shell_focus.region is ShellRegion.INSPECTOR
+    assert controls.shell_focus.region is ShellRegion.PREVIEW
     assert dispatch_keydown(keydown(pygame.K_TAB, mod=pygame.KMOD_SHIFT), runtime) is True
     assert runtime.menu_bar.focused is False
-    assert controls.shell_focus.region is ShellRegion.INSPECTOR
+    assert controls.shell_focus.region is ShellRegion.PREVIEW
     assert runtime.seed.session.help_visible is True
 
 
@@ -853,3 +859,11 @@ def test_open_context_menu_takes_every_key_first() -> None:
     assert dispatch_keydown(keydown(pygame.K_RETURN), runtime) is True
     assert ran == ["x"]
     assert not menu.is_open
+
+
+def test_preview_esc_returns_to_the_navigator() -> None:
+    runtime = _make_runtime(submenu_focused=False, panel_open=False)
+    controls = runtime.controls
+    controls.set_shell_region(ShellRegion.PREVIEW)
+    assert dispatch_keydown(keydown(pygame.K_ESCAPE), runtime) is True
+    assert controls.shell_focus.region is ShellRegion.NAVIGATOR
