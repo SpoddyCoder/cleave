@@ -47,6 +47,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- The selected navigator row's label and twisty draw in yellow, matching the focused row in the inspector, timeline strip, and dialogs.
 - Progress bars on the loading screen and in progress dialogs fill in the notification yellow, with a thicker white border and a wider gap around the fill. The text above them is 50% larger.
 - The Generate timeline dialog groups its settings under three headings, in the order they apply: Arrangement (mode, character, density, conductor), Cue timing and cuts (snap to grid, snap to song markers, cut type), and Preset lists (refill preset lists). Character is hidden in pattern mask mode, which does not use it.
 - Dialogs that count the cues they will change show that count in yellow under the title, in brackets: Generate timeline "(replaces n cues on the timeline)", Snap cues "(moves n of m cues)", Set cut type on cues "(changes n of m cues)", and Reset timeline "(removes n cues)".

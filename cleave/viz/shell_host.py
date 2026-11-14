@@ -68,7 +68,7 @@ from cleave.viz.navigator import (
     NavNode,
     NavToggle,
     build_navigator,
-    navigator_row_bright,
+    navigator_row_text_color,
     navigator_tree_rails,
     timeline_row_slot_of,
     timeline_row_title,
@@ -2371,9 +2371,12 @@ class ShellHost:
                 twisty = navigator_twisty(node, focus.nav_expanded)
                 if twisty is not None:
                     width = imgui.calc_text_size(twisty).x
-                    row_bright = navigator_row_bright(node)
+                    twisty_color = navigator_row_text_color(
+                        node, selected=selected, moving=False
+                    )
+                    row_bright = twisty_color != LABEL
                     if row_bright:
-                        imgui.push_style_color(imgui.Col_.text, rgba(VALUE))
+                        imgui.push_style_color(imgui.Col_.text, rgba(twisty_color))
                     try:
                         twisty_clicked, _selected = imgui.selectable(
                             f"{twisty}##nav-twisty-{node.id}",
@@ -2391,11 +2394,12 @@ class ShellHost:
                     and node.slot is not None
                     and node.slot == self._controls.layer_lifecycle.move_mode_slot
                 )
-                bright = moving or selected or navigator_row_bright(node)
+                text_color = navigator_row_text_color(
+                    node, selected=selected, moving=moving
+                )
+                bright = text_color != LABEL
                 if bright:
-                    imgui.push_style_color(
-                        imgui.Col_.text, rgba(MOVE_MODE if moving else VALUE)
-                    )
+                    imgui.push_style_color(imgui.Col_.text, rgba(text_color))
                 try:
                     text_pos = imgui.get_cursor_screen_pos()
                     lead = _drag_lead() if node.draggable else ""
