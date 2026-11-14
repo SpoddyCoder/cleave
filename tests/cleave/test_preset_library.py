@@ -95,7 +95,7 @@ def test_collection_dedupes_by_hash_and_stays_under_root(tmp_path: Path) -> None
     library.set_favourite(outside, True)
 
     assert library.collection_paths("favourites") == (first.resolve(),)
-    assert library.marker(outside, user=True) == " [FU]"
+    assert library.marker(outside, in_preset_list=True) == " [F] [L]"
 
 
 def test_visible_drops_blacklisted(tmp_path: Path) -> None:
@@ -189,9 +189,11 @@ def test_enter_collection_jumps_from_a_nested_folder(tmp_path: Path) -> None:
 
 
 def test_marker_tooltip_names_flags_and_roles() -> None:
-    assert marker_tooltip("[FU]") == "F: Favourite\nU: In a preset list"
-    assert marker_tooltip("[B]") == "B: Blacklisted"
+    assert marker_tooltip("[F]") == "Favourite"
+    assert marker_tooltip("[B]") == "Blacklisted"
+    assert marker_tooltip("[L]") == "In the preset list"
+    assert marker_tooltip("[FB]") is None
     assert marker_tooltip("[R:B]") == "Role: bed (calm, dark background)"
     assert marker_tooltip("[R:Z]") is None
     assert marker_tooltip("[X]") is None
-    assert marker_tooltip("FU") is None
+    assert marker_tooltip("F") is None

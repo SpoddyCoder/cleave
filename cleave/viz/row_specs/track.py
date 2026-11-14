@@ -13,6 +13,7 @@ from cleave.config_schema.layers import (
     preset_switching_trigger_display,
 )
 from cleave.cue_roles import CUE_ROLE_MARKER_HELP_ENTRIES
+from cleave.preset_library import PRESET_FLAG_MARKERS
 from cleave.stems import stem_control_label
 from cleave.viz.commands import command_by_id
 from cleave.viz.material_icons import ARROW_DOWNWARD_GLYPH, ARROW_UPWARD_GLYPH
@@ -277,6 +278,20 @@ def _format_track_preset_position(
     state: TuningViewState, desc: RowDescriptor
 ) -> str:
     return _track_block(state, desc).preset_position
+
+_PRESET_MARKER_HELP_TEXT: dict[str, str] = {
+    "[F]": "favourite",
+    "[B]": "blacklisted",
+    "[L]": "in this layer's preset list (not in preset curation)",
+}
+_PRESET_MARKER_HELP_ENTRIES: tuple[tuple[str, str], ...] = (
+    *((token, _PRESET_MARKER_HELP_TEXT[token]) for token, _ in PRESET_FLAG_MARKERS),
+    *CUE_ROLE_MARKER_HELP_ENTRIES,
+)
+_PRESET_LIST_MARKER_HELP_ENTRIES: tuple[tuple[str, str], ...] = tuple(
+    entry for entry in _PRESET_MARKER_HELP_ENTRIES if entry[0] != "[L]"
+)
+
 
 def _format_track_preset_markers(
     state: TuningViewState, desc: RowDescriptor
@@ -557,10 +572,9 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Milkdrop Preset File",
         help_description=(
             "The Milkdrop preset that this layer shows.",
-            "[F], [B], and [U] mark a favourite, blacklisted, or user preset.",
-            "[R:X] shows the preset role:",
+            "Markers after the name (hover one to see it):",
         ),
-        help_mode_entries=CUE_ROLE_MARKER_HELP_ENTRIES,
+        help_mode_entries=_PRESET_MARKER_HELP_ENTRIES,
         repeatable=True,
         parent_group="track",
     ),
@@ -629,10 +643,9 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Preset List Entry",
         help_description=(
             "A preset in the switching list of this layer.",
-            "[F] and [B] mark a favourite or blacklisted preset.",
-            "[R:X] shows the preset role:",
+            "Markers after the name (hover one to see it):",
         ),
-        help_mode_entries=CUE_ROLE_MARKER_HELP_ENTRIES,
+        help_mode_entries=_PRESET_LIST_MARKER_HELP_ENTRIES,
         can_enter_move_mode=True,
         drag_reorder=True,
         parent_group="track",

@@ -581,12 +581,12 @@ def test_builder_appends_curation_markers_without_structure_change() -> None:
     block_after = view_after.tracks["layer_1"]
     assert block_after.preset_label == "preset-0.milk"
     assert block_after.preset_markers == "[F]"
-    # User-preset rows never append U; F/B only in single-bracket form.
+    # List entries never show [L]: they are in the list by definition.
     assert block_after.preset_list_labels == ["user.milk"]
-    assert block_after.preset_list_markers == ["[FB]"]
+    assert block_after.preset_list_markers == ["[F] [B]"]
 
 
-def test_builder_appends_user_defined_marker_on_track_preset() -> None:
+def test_builder_marks_current_preset_in_this_layers_preset_list() -> None:
     controls = _make_controls(("layer_1", "layer_2"))
     session = controls.session
     config_save = controls._config_save
@@ -598,31 +598,32 @@ def test_builder_appends_user_defined_marker_on_track_preset() -> None:
     current.parent.mkdir(parents=True, exist_ok=True)
     current.write_text("milk", encoding="utf-8")
     current_name = current.name
-    assert current_name is not None
 
-    # Basename listed on another layer still marks TRACK_PRESET with U.
-    other_path = Path("/tmp/projects/my-track") / current_name
-    other_path.parent.mkdir(parents=True, exist_ok=True)
-    other_path.write_text("milk", encoding="utf-8")
-    layer_2.preset_list = [str(other_path)]
+    listed = Path("/tmp/projects/my-track") / current_name
+    listed.parent.mkdir(parents=True, exist_ok=True)
+    listed.write_text("milk", encoding="utf-8")
 
-    sig_before = view_state_structure_signature(
-        session, config_save)
-    view_u = controls.build_view_state(paused=False)
-    assert view_u.tracks["layer_1"].preset_label == current_name
-    assert view_u.tracks["layer_1"].preset_markers == "[U]"
-    assert view_u.tracks["layer_2"].preset_list_labels == [current_name]
+    # Listed on another layer only: no [L] here.
+    layer_2.preset_list = [str(listed)]
+    view = controls.build_view_state(paused=False)
+    assert view.tracks["layer_1"].preset_markers == ""
+    assert view.tracks["layer_2"].preset_list_markers == [""]
+
+    layer_1.preset_list = [str(listed)]
+    sig_before = view_state_structure_signature(session, config_save)
+    view = controls.build_view_state(paused=False)
+    assert view.tracks["layer_1"].preset_label == current_name
+    assert view.tracks["layer_1"].preset_markers == "[L]"
 
     library.set_favourite(current, True)
-    sig_after = view_state_structure_signature(
-        session, config_save)
-    assert sig_before == sig_after
+    assert view_state_structure_signature(session, config_save) == sig_before
+    view = controls.build_view_state(paused=False)
+    assert view.tracks["layer_1"].preset_markers == "[F] [L]"
+    assert view.tracks["layer_1"].preset_list_markers == ["[F]"]
 
-    view_fu = controls.build_view_state(paused=False)
-    assert view_fu.tracks["layer_1"].preset_label == current_name
-    assert view_fu.tracks["layer_1"].preset_markers == "[FU]"
-    assert view_fu.tracks["layer_2"].preset_list_labels == [current_name]
-    assert view_fu.tracks["layer_2"].preset_list_markers == ["[F]"]
+    session.settings.editor_mode = "preset_curation"
+    view = controls.build_view_state(paused=False)
+    assert view.tracks["layer_1"].preset_markers == "[F]"
 
 
 def test_builder_caches_preset_list_base_labels(monkeypatch) -> None:

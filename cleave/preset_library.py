@@ -43,32 +43,29 @@ COLLECTION_LABEL: dict[PresetCollection, str] = {
 
 ProgressCallback = Callable[[int, int], bool]
 
-_MARKER_FLAG_MEANING: dict[str, str] = {
-    "F": "Favourite",
-    "B": "Blacklisted",
-    "U": "In a preset list",
-}
+PRESET_FLAG_MARKERS: tuple[tuple[str, str], ...] = (
+    ("[F]", "Favourite"),
+    ("[B]", "Blacklisted"),
+    ("[L]", "In the preset list"),
+)
+
+_MARKER_MEANING: dict[str, str] = dict(PRESET_FLAG_MARKERS)
 
 
 def marker_tooltip(token: str) -> str | None:
     """Hover text for one marker token from ``PresetLibrary.marker``.
 
-    ``"[FU]"`` names each flag on its own line; ``"[R:B]"`` names the role.
-    Unknown tokens give None.
+    ``"[F]"``, ``"[B]"``, and ``"[L]"`` name their flag; ``"[R:B]"`` names the
+    role. Unknown tokens give None.
     """
-    if not (token.startswith("[") and token.endswith("]")):
-        return None
-    body = token[1:-1]
-    if body.startswith("R:"):
-        letter = body[2:]
-        for role in CUE_ROLES:
-            if CUE_ROLE_MARKER_LETTER[role] == letter:
-                return f"Role: {role} ({CUE_ROLE_HELP_BLURB[role]})"
-        return None
-    meanings = [_MARKER_FLAG_MEANING.get(letter) for letter in body]
-    if not meanings or None in meanings:
-        return None
-    return "\n".join(f"{letter}: {meaning}" for letter, meaning in zip(body, meanings))
+    meaning = _MARKER_MEANING.get(token)
+    if meaning is not None:
+        return meaning
+    for role in CUE_ROLES:
+        if token == f"[R:{CUE_ROLE_MARKER_LETTER[role]}]":
+            return f"Role: {role} ({CUE_ROLE_HELP_BLURB[role]})"
+    return None
+
 
 _SCHEMA = """
 CREATE TABLE files (
@@ -372,19 +369,19 @@ class PresetLibrary:
             return tuple(paths)
         return tuple(p for p in paths if self.hash_of(p) not in self._blacklist)
 
-    def marker(self, path: Path, *, user: bool = False) -> str:
-        """Panel marker such as ``" [FU] [R:B]"``; empty when uncurated."""
+    def marker(self, path: Path, *, in_preset_list: bool = False) -> str:
+        """Panel marker such as ``" [F] [L] [R:B]"``; empty when uncurated.
+
+        *in_preset_list* adds ``[L]``: the layer's preset list holds this preset.
+        """
         digest = self.hash_of(path)
-        letters = ""
-        if digest is not None and digest in self._favourites:
-            letters += "F"
-        if digest is not None and digest in self._blacklist:
-            letters += "B"
-        if user:
-            letters += "U"
         parts: list[str] = []
-        if letters:
-            parts.append(f"[{letters}]")
+        if digest is not None and digest in self._favourites:
+            parts.append("[F]")
+        if digest is not None and digest in self._blacklist:
+            parts.append("[B]")
+        if in_preset_list:
+            parts.append("[L]")
         role = self._roles.get(digest) if digest is not None else None
         if role is not None:
             parts.append(f"[R:{CUE_ROLE_MARKER_LETTER[role]}]")

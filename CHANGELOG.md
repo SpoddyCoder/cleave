@@ -18,7 +18,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Right-click a navigator row to select it and see its options: expand or collapse it, and turn it on or off, solo it, or lock it as its icons do. A layer row also jumps straight to any of its pages, moves up or down, and adds or deletes a layer. Shift+F10 or the Menu key opens the same menu for the selected row.
 - Right-click a preset list entry to select it and see its options: audition it, move it up or down, remove it, add the current preset, or populate the list. Favourite (or Unfavourite), Blacklist (or Unblacklist), and a Role submenu that ticks the current role curate the preset, the same as F, B, and C. The layer's current preset row offers Add to preset list and the same curation items. Shift+F10 or the Menu key opens the same menu for the selected row.
 - Right-click a layer's preset directory row for Jump to directory, a submenu that goes straight to Favourites, a role collection, or Blacklisted, ticking the one you are in.
-- Hover a preset's [F] / [B] / [U] marker or its [R:x] role marker in the inspector to see what it means: favourite, blacklisted, in a preset list, or which role.
+- Hover a preset's [F], [B], [L], or [R:x] marker in the inspector to see what it means: favourite, blacklisted, in the preset list, or which role.
 - Context menus can hold submenus, opened by hovering, clicking, Right, or Enter; Left or Esc closes one.
 - The timeline strip zooms. Scroll the mouse wheel over the strip to zoom in or out around the time under the pointer, down to a one second window. When zoomed, drag a row sideways (or middle-drag anywhere on the time scale or rows) to move along the song, or use Shift + wheel. A scrollbar under the rows shows how much of the song is visible: drag its thumb, or click the track to jump there. During playback the view pages forward when the playhead reaches the right edge, and a seek while paused brings the playhead back into view. The strip is slightly taller to fit the scrollbar.
 - The timeline strip shows a time scale above its top row, with labelled minute and second marks spaced to fit the strip width. Faint lines at the song start and end run down through every row.
@@ -41,6 +41,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- Preset markers are separate brackets: [F] [B] [L] [R:x], not a combined [FBU]. The preset list marker is now [L] (was [U]) and shows on a layer's current preset only when that layer's own preset list holds it, never in preset curation.
 - Preset curation no longer moves, copies, or deletes preset files. Favourites, blacklist, and cue roles are kept in `cleave.db` in the data directory, keyed by each preset's contents, so they follow a preset that is renamed or moved and match its copies in project preset lists. The first launch after an update shows "Indexing presets" while it reads the preset folder.
 - Each curation key undoes itself. F favourites or unfavourites the preset at once, with no dialog. B blacklists after a confirm, or unblacklists at once. C picks a role, or None to clear it.
 - Blacklisted presets are hidden from folder browsing, populate, and random layer picks, but stay in any preset list that already uses them.

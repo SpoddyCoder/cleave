@@ -465,12 +465,14 @@ def test_scroll_clip_span_never_inverts() -> None:
 
 
 def test_marker_token_spans_follow_the_fitted_text() -> None:
-    assert marker_token_spans("[FU] [R:B]", "[FU] [R:B]") == [
-        (0, 4, "[FU]"),
-        (5, 10, "[R:B]"),
+    assert marker_token_spans("[F] [L] [R:B]", "[F] [L] [R:B]") == [
+        (0, 3, "[F]"),
+        (4, 7, "[L]"),
+        (8, 13, "[R:B]"),
     ]
-    assert marker_token_spans("[FU] [R:B]", "[FU] [R") == [
-        (0, 4, "[FU]"),
-        (5, 7, "[R:B]"),
+    assert marker_token_spans("[F] [L] [R:B]", "[F] [L] [R") == [
+        (0, 3, "[F]"),
+        (4, 7, "[L]"),
+        (8, 10, "[R:B]"),
     ]
-    assert marker_token_spans("[FU] [R:B]", "[F") == [(0, 2, "[FU]")]
+    assert marker_token_spans("[F] [L]", "[F") == [(0, 2, "[F]")]

@@ -403,11 +403,12 @@ def test_preset_file_help_titles() -> None:
     assert description.title == "Milkdrop Preset File"
     assert description.lines == (
         "The Milkdrop preset that this layer shows.",
-        "[F], [B], and [U] mark a favourite, blacklisted, or user preset.",
-        "[R:X] shows the preset role:",
+        "Markers after the name (hover one to see it):",
     )
-    assert description.entries == CUE_ROLE_MARKER_HELP_ENTRIES
     assert dict(description.entries) == {
+        "[F]": "favourite",
+        "[B]": "blacklisted",
+        "[L]": "in this layer's preset list (not in preset curation)",
         "[R:B]": "bed (calm, dark background)",
         "[R:P]": "pulse (reacts to the beat, middle depth)",
         "[R:L]": "lead (busy, bright main visual)",
@@ -529,10 +530,13 @@ def test_preset_list_entry_help() -> None:
     assert description.title == "Preset List Entry"
     assert description.lines == (
         "A preset in the switching list of this layer.",
-        "[F] and [B] mark a favourite or blacklisted preset.",
-        "[R:X] shows the preset role:",
+        "Markers after the name (hover one to see it):",
     )
-    assert description.entries == CUE_ROLE_MARKER_HELP_ENTRIES
+    assert description.entries == (
+        ("[F]", "favourite"),
+        ("[B]", "blacklisted"),
+        *CUE_ROLE_MARKER_HELP_ENTRIES,
+    )
     assert "Delete" not in " ".join(description.lines)
     assert keyboard.title == KEYBOARD_CONTROLS_SECTION_TITLE
     entries = dict(keyboard.entries)

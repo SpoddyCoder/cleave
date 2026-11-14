@@ -112,6 +112,7 @@ from cleave.timeline_presets.timeline_cuts import (
     TimelinePresetTimelineCuts,
 )
 from cleave.viz.config_save import ConfigSaveController
+from cleave.viz.editor_mode_controls import is_preset_curation_mode
 from cleave.viz.playback import PlaybackState, current_sec
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.session import (
@@ -604,7 +605,7 @@ class TuningViewStateBuilder:
         self._preset_list_marker_cache: dict[
             tuple[tuple[str, ...], int], list[str]
         ] = {}
-        self._user_basenames_cache: dict[tuple[tuple[str, ...], ...], set[str]] = {}
+        self._list_basenames_cache: dict[tuple[str, ...], frozenset[str]] = {}
         self._structure: _ViewStateStructure | None = None
 
     def _sync_auto_preset_paths(self) -> None:
@@ -623,22 +624,13 @@ class TuningViewStateBuilder:
             runtime.auto_preset_path = stem.auto_preset_path
             runtime.switching_paused = stem.switching_paused
 
-    def _preset_list_paths_key(self) -> tuple[tuple[str, ...], ...]:
-        return tuple(
-            tuple(self.session.layers[slot].preset_list)
-            for slot in self.session.layer_z_order
-        )
-
-    def _user_preset_basenames(self) -> set[str]:
-        key = self._preset_list_paths_key()
-        cached = self._user_basenames_cache.get(key)
-        if cached is not None:
-            return cached
-        names: set[str] = set()
-        for slot in self.session.layer_z_order:
-            for path in self.session.layers[slot].preset_list:
-                names.add(Path(path).name)
-        self._user_basenames_cache[key] = names
+    def _preset_list_basenames(self, layer: LayerRuntime) -> frozenset[str]:
+        """File names in *layer*'s preset list; list entries may be project copies."""
+        key = tuple(layer.preset_list)
+        names = self._list_basenames_cache.get(key)
+        if names is None:
+            names = frozenset(Path(path).name for path in key)
+            self._list_basenames_cache[key] = names
         return names
 
     def _display_playlist(self, layer: LayerRuntime) -> PresetPlaylist:
@@ -657,15 +649,16 @@ class TuningViewStateBuilder:
         self._auto_display_cache[auto] = playlist
         return playlist
 
-    def _preset_markers(
-        self, playlist: PresetPlaylist, *, user_names: set[str]
-    ) -> str:
-        if playlist.current is None:
-            return ""
+    def _preset_markers(self, layer: LayerRuntime, playlist: PresetPlaylist) -> str:
+        """Markers for the current preset row; ``[L]`` is never shown in curation."""
         current = playlist.current
-        return self._library.marker(
-            current, user=current.name in user_names
-        ).strip()
+        if current is None:
+            return ""
+        in_list = (
+            not is_preset_curation_mode(self.session.settings.editor_mode)
+            and current.name in self._preset_list_basenames(layer)
+        )
+        return self._library.marker(current, in_preset_list=in_list).strip()
 
     def _preset_list_labels(self, paths: list[str]) -> list[str]:
         paths_key = tuple(paths)
@@ -726,7 +719,6 @@ class TuningViewStateBuilder:
         self,
         *,
         signature: str,
-        user_names: set[str],
     ) -> _ViewStateStructure:
         layer_z_order = tuple(self.session.layer_z_order)
         tracks: dict[str, TrackBlock] = {}
@@ -748,9 +740,7 @@ class TuningViewStateBuilder:
                 preset_dir_can_go_down=directory.can_go_down,
                 preset_label=preset_filename_display(display),
                 preset_position=preset_position_display(display),
-                preset_markers=self._preset_markers(
-                    display, user_names=user_names
-                ),
+                preset_markers=self._preset_markers(layer, display),
                 preset_empty=not display.paths,
                 visible=layer.enabled,
                 preset_list_labels=self._preset_list_labels(list(layer.preset_list)),
@@ -858,7 +848,6 @@ class TuningViewStateBuilder:
         structure: _ViewStateStructure,
         *,
         position_sec: float,
-        user_names: set[str],
     ) -> dict[str, TrackBlock]:
         from cleave.viz.layer_visibility import effective_layer_enabled
 
@@ -873,9 +862,7 @@ class TuningViewStateBuilder:
                 visible=visible,
                 preset_label=preset_filename_display(display),
                 preset_position=preset_position_display(display),
-                preset_markers=self._preset_markers(
-                    display, user_names=user_names
-                ),
+                preset_markers=self._preset_markers(layer, display),
                 preset_list_labels=self._preset_list_labels(list(layer.preset_list)),
                 preset_list_markers=self._preset_list_markers(list(layer.preset_list)),
             )
@@ -899,7 +886,6 @@ class TuningViewStateBuilder:
         notification_elapsed_sec = notification.elapsed_sec
         persistent_notification_message = notification.persistent_message
         persistent_notification_elapsed_sec = notification.persistent_elapsed_sec
-        user_names = self._user_preset_basenames()
         signature = view_state_structure_signature(
             self.session,
             self._config_save,
@@ -907,12 +893,11 @@ class TuningViewStateBuilder:
         if self._structure is None or self._structure.signature != signature:
             self._structure = self._build_structure(
                 signature=signature,
-                user_names=user_names,
             )
         structure = self._structure
 
         tracks = self._patch_tracks(
-            structure, position_sec=position_sec, user_names=user_names
+            structure, position_sec=position_sec
         )
 
         ro = self.session.overlays
