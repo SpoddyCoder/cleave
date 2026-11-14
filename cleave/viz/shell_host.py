@@ -1350,11 +1350,13 @@ class ShellHost:
         bar_height: int,
         *,
         strip_pointer: TimelinePointer | None = None,
+        preview_menu: ContextMenuProvider | None = None,
     ) -> None:
         self.imgui = imgui_host
         self._menu_state = menu_state
         self._controls = controls
         self._strip_pointer = strip_pointer
+        self._preview_menu = preview_menu
         self._menu_bar_height_px = bar_height
         self._dropdown_span: tuple[float, float] | None = None
         # One fitted window per top menu, so a hover onto the next title
@@ -1561,6 +1563,8 @@ class ShellHost:
         layout = self._layout
         if layout is not None and _rect_contains(layout.inspector, x, y):
             return self._inspector_menu_at(x, y)
+        if layout is not None and _rect_contains(layout.visualiser, x, y):
+            return self._preview_menu
         if layout is None or not _rect_contains(layout.navigator, x, y):
             return None
         node_id = self._nav_row_at(x, y)

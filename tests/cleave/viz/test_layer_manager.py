@@ -189,7 +189,10 @@ def test_apply_visualiser_resolution_resizes_content_and_layers(
 
     compositor.set_content_size.assert_called_once_with(1280, 720)
     mock_apply_preview.assert_called_once_with(
-        manager.cfg, manager.session, manager.layers_by_slot, compositor
+        manager.cfg.editor.preview_quality,
+        manager.session,
+        manager.layers_by_slot,
+        compositor,
     )
     post_process.release_sized_buffers.assert_called()
 

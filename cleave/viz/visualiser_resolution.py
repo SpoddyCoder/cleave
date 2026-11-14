@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from cleave.config import CleaveConfig
+from cleave.config import CleaveConfig, EditorPreviewQuality
 from cleave.viz.layer_preview_resolution import (
     live_content_size,
     session_project_size,
@@ -26,6 +26,10 @@ class VisualiserResolutionSync:
 
     The first draw size is applied at once; later changes wait for
     ``VISUALISER_RESOLUTION_SETTLE_SEC`` of quiet.
+
+    ``set_quality_override`` runs the live pipeline at another quality (a
+    still capture uses ``output``) without touching the saved setting, and
+    applies at once.
     """
 
     def __init__(
@@ -39,6 +43,7 @@ class VisualiserResolutionSync:
         self._on_apply = on_apply
         self._draw_size: tuple[int, int] | None = None
         self._draw_size_seen = False
+        self._quality_override: EditorPreviewQuality | None = None
         self._applied = self.target_size()
         self._settle_sec: float | None = None
         self._pending: tuple[int, int] | None = None
@@ -51,11 +56,33 @@ class VisualiserResolutionSync:
         """Record the visualiser rect for this frame (None: no shell)."""
         self._draw_size = None if rect is None else (int(rect[2]), int(rect[3]))
 
+    @property
+    def preview_quality(self) -> EditorPreviewQuality:
+        """The override while one is set, else the saved setting."""
+        if self._quality_override is not None:
+            return self._quality_override
+        return self.cfg.editor.preview_quality
+
+    def set_quality_override(self, quality: EditorPreviewQuality | None) -> None:
+        """Run at *quality* (None: the setting again), reallocating at once.
+
+        Layer sizes follow the quality even when the content size does not
+        change, so this always applies.
+        """
+        if quality == self._quality_override:
+            return
+        self._quality_override = quality
+        size = self.target_size()
+        self._pending = size
+        self._settle_sec = None
+        self._applied = size
+        self._on_apply(size)
+
     def target_size(self) -> tuple[int, int]:
         return live_content_size(
             session_project_size(self.session),
             self._draw_size,
-            self.cfg.editor.preview_quality,
+            self.preview_quality,
         )
 
     def tick(self, dt_sec: float) -> None:

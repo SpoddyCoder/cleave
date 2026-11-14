@@ -74,6 +74,7 @@ from cleave.viz.row_spec import section_lock_blocks_mutation
 from cleave.viz.session import TuningSession
 from cleave.viz.tuning_view_state import TuningViewState, TuningViewStateBuilder
 from cleave.viz.visualiser_resolution import VisualiserResolutionSync
+from cleave.viz.still_capture import StillCaptureController
 
 if TYPE_CHECKING:
     from cleave.gl_compositor import GlCompositor
@@ -277,6 +278,14 @@ class TuningControls:
             on_apply=lambda size: self.layer_lifecycle.apply_visualiser_resolution(
                 size
             ),
+        )
+        self.still_capture = StillCaptureController(
+            self.visualiser_resolution,
+            self._modal_host,
+            project_dir=project_dir,
+            project_slug=cfg.project_slug,
+            playhead_sec=lambda: current_sec(self.playback, self.duration_sec),
+            on_notification=self.show_notification,
         )
         self.project_render = ProjectRenderController(
             session,

@@ -134,7 +134,7 @@ def _toggle_items(
         if label_key is None or descriptor is None:
             continue
         label, key = label_key
-        hint = _toggle_hint(toggle)
+        hint = navigator_toggle_hint(toggle)
         items.append(
             ContextMenuItem(
                 id=f"navigator.toggle.{toggle.id}",
@@ -151,7 +151,7 @@ def _toggle_items(
     return tuple(items)
 
 
-def _toggle_hint(toggle: NavToggle) -> str | None:
+def navigator_toggle_hint(toggle: NavToggle) -> str | None:
     if toggle.blocked:
         return "Locked: unlock to change"
     if toggle.inert:

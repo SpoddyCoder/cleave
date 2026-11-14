@@ -98,6 +98,7 @@ NAVIGATION_SECTION = HelpSection(
         ("Alt + underlined letter", "open that menu (F, E, V, P, S, H)"),
         ("Ctrl + R", "render"),
         ("Ctrl + ,", "open Settings > Preview"),
+        ("Right-click preview", "play, solo, on/off, quality, grab still"),
     ),
 )
 
@@ -111,6 +112,7 @@ _CURATION_NAVIGATION_SECTION = HelpSection(
         *_SEEK_AND_QUIT_ENTRIES,
         ("F10 / Alt", "focus menu bar"),
         ("Alt + underlined letter", "open that menu (F, E, V, P, S, H)"),
+        ("Right-click preview", "play, quality, grab still"),
     ),
 )
 

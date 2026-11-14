@@ -125,12 +125,11 @@ def render_layer_size(
 
 
 def preview_sizes_for_session(
-    cfg: CleaveConfig,
+    preview_quality: EditorPreviewQuality,
     session: TuningSession,
     base: tuple[int, int],
 ) -> dict[str, tuple[int, int]]:
     """Layer sizes for the live content size *base*, keyed by slot."""
-    preview_quality = cfg.editor.preview_quality
     return {
         slot: preview_layer_size(preview_quality, z_index, base)
         for z_index, slot in enumerate(session.layer_z_order)

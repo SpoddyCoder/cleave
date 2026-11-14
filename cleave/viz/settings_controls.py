@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import replace
 
-from cleave.config import CleaveConfig
+from cleave.config import CleaveConfig, EditorPreviewQuality
 from cleave.config_schema.editor import (
     COLUMN_SIDES,
     EDITOR_PREVIEW_QUALITIES,
@@ -69,6 +69,12 @@ class SettingsControls:
         if new_mode == current:
             return
         self.cfg.editor = replace(self.cfg.editor, preview_quality=new_mode)
+        persist_editor_settings(self.cfg)
+
+    def set_preview_quality(self, mode: EditorPreviewQuality) -> None:
+        if mode == self.cfg.editor.preview_quality:
+            return
+        self.cfg.editor = replace(self.cfg.editor, preview_quality=mode)
         persist_editor_settings(self.cfg)
 
     def step_navigator_side(self, *, forward: bool) -> None:

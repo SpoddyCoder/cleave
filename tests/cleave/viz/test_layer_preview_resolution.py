@@ -153,9 +153,8 @@ def test_full_quality_returns_base_size() -> None:
 
 
 def test_preview_sizes_for_session_keys_slots_with_z_order_indices() -> None:
-    cfg = _cfg(preview_quality="balanced")
     session = _session(("layer_2", "layer_1"))
-    sizes = preview_sizes_for_session(cfg, session, BASE)
+    sizes = preview_sizes_for_session("balanced", session, BASE)
 
     assert set(sizes) == {"layer_2", "layer_1"}
     assert sizes["layer_2"] == preview_layer_size("balanced", 0, BASE)
@@ -163,18 +162,16 @@ def test_preview_sizes_for_session_keys_slots_with_z_order_indices() -> None:
 
 
 def test_preview_sizes_for_session_scale_from_passed_base() -> None:
-    cfg = _cfg(preview_quality="full-quality")
     session = _session(("layer_1",), size=(1080, 1920))
-    assert preview_sizes_for_session(cfg, session, (540, 960))["layer_1"] == (
+    assert preview_sizes_for_session("full-quality", session, (540, 960))["layer_1"] == (
         540,
         960,
     )
 
 
-def test_preview_sizes_for_session_follows_cfg_preview_quality() -> None:
-    cfg = replace(_cfg(), editor=_editor("performance"))
+def test_preview_sizes_for_session_follows_preview_quality() -> None:
     session = _session(("layer_1",))
-    sizes = preview_sizes_for_session(cfg, session, (1280, 720))
+    sizes = preview_sizes_for_session("performance", session, (1280, 720))
     assert sizes["layer_1"] == (960, 540)
 
 

@@ -702,6 +702,7 @@ class VisualizerApp:
                 apply_modal_pointer,
                 text_field_wrap,
             )
+            from cleave.viz.preview_context_menu import preview_menu
             from cleave.viz.shell_host import (
                 ShellHost,
                 TransportReadout,
@@ -724,6 +725,7 @@ class VisualizerApp:
                 rt.controls,
                 menu_bar_height_px(),
                 strip_pointer=strip_pointer,
+                preview_menu=preview_menu(rt.controls, rt.timeline_controls),
             )
             self._shell = shell
             rt.shell_host = shell
@@ -864,6 +866,7 @@ class VisualizerApp:
                         dt_sec=self._overlay_dt,
                         layout=layout,
                     )
+                    rt.controls.still_capture.after_frame(rt.compositor)
 
                 display_fps[0] = frame_rate.display_fps
                 draw_ui()

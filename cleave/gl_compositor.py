@@ -956,6 +956,22 @@ class GlCompositor:
         ]
         return b"".join(reversed(rows))
 
+    def read_content_rgba(self) -> tuple[bytes, int, int]:
+        """Read the composited content FBO, top row first, with its size."""
+        self._ensure_init()
+        width = self.content_width
+        height = self.content_height
+        self._bind_content_fbo()
+        try:
+            raw = glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE)
+        finally:
+            glBindFramebuffer(GL_FRAMEBUFFER, 0)
+        row_stride = width * 4
+        rows = [
+            raw[row * row_stride : (row + 1) * row_stride] for row in range(height)
+        ]
+        return b"".join(reversed(rows)), width, height
+
     def _overlay_slot_state(self, slot: OverlayTextureSlot) -> _OverlaySlotState:
         state = self._overlay_slots.get(slot)
         if state is None:
