@@ -74,6 +74,8 @@ DEFAULT_NAVIGATOR_SIDE: ColumnSide = "left"
 DEFAULT_HELP_SIDE: ColumnSide = "right"
 # Flash the inspector title (and scroll a long one) when a new page opens.
 DEFAULT_HIGHLIGHT_NEW_PAGE = True
+# Show hover tooltips in the editor chrome.
+DEFAULT_SHOW_TOOLTIPS = True
 
 
 def clamp_beat_sensitivity(value: float) -> float:
@@ -229,6 +231,12 @@ EDITOR_FIELDS: tuple[FieldDescriptor, ...] = (
         _parse_bool,
         dump_scalar,
     ),
+    FieldDescriptor(
+        "show_tooltips",
+        DEFAULT_SHOW_TOOLTIPS,
+        _parse_bool,
+        dump_scalar,
+    ),
 )
 
 
@@ -252,6 +260,7 @@ def parse_editor_section(data: dict[str, Any]) -> Any:
         navigator_side=parsed["navigator_side"],
         help_side=parsed["help_side"],
         highlight_new_page=parsed["highlight_new_page"],
+        show_tooltips=parsed["show_tooltips"],
     )
 
 
@@ -268,6 +277,7 @@ def dump_editor_section(editor: Any) -> dict[str, Any]:
         "navigator_side": editor.navigator_side,
         "help_side": editor.help_side,
         "highlight_new_page": editor.highlight_new_page,
+        "show_tooltips": editor.show_tooltips,
     }
     ctx = PersistCtx(cfg=None, session=None)
     return dump_fields(EDITOR_FIELDS, values, ctx)
@@ -292,4 +302,5 @@ def editor_config_from_settings(editor: Any | None = None) -> Any:
         navigator_side=editor.navigator_side,
         help_side=editor.help_side,
         highlight_new_page=editor.highlight_new_page,
+        show_tooltips=editor.show_tooltips,
     )

@@ -189,6 +189,7 @@ def test_settings_pages() -> None:
         RowKind.SETTINGS_UI_SCALE,
         RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY,
         RowKind.SETTINGS_UI_HIGHLIGHT_NEW_PAGE,
+        RowKind.SETTINGS_UI_SHOW_TOOLTIPS,
         RowKind.SETTINGS_UI_NAVIGATOR_HEIGHT,
         RowKind.SETTINGS_NAVIGATOR_SIDE,
         RowKind.SETTINGS_HELP_SIDE,

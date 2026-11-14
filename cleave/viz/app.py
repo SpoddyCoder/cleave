@@ -42,6 +42,7 @@ from cleave.viz.modal import ModalHost
 from cleave.viz.overlay_draw import OverlayDrawer
 from cleave.viz.loading import LoadingWindow, open_loading_window
 from cleave.viz.theme import set_ui_scale_percent
+from cleave.viz.tooltips import set_tooltips_enabled
 from cleave.viz.timeline_controls import TimelineControls
 from cleave.viz.timeline_pointer import TimelinePointer
 from cleave.viz.timeline_time_menu import TimelineTimeMenu
@@ -658,6 +659,7 @@ class VisualizerApp:
             window = open_loading_window()
         pygame.display.set_caption(seed.window_title)
         set_ui_scale_percent(seed.cfg.editor.ui_scale)
+        set_tooltips_enabled(seed.cfg.editor.show_tooltips)
         clock = pygame.time.Clock()
 
         rt: LiveVisualizerRuntime | None = None

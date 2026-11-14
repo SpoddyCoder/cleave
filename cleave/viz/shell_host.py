@@ -154,6 +154,7 @@ from cleave.viz.value_nudge import (
     selectable_text_y,
     value_parts,
 )
+from cleave.viz.tooltips import show_tooltip
 from cleave.viz.top_layer import TopLayer
 from cleave.choice import ChoiceKind, choice_kind
 from cleave.viz.choice_layout import (
@@ -864,7 +865,7 @@ def _marker_tooltip_at(markers: str, fitted: str, x: float, y: float) -> None:
             continue
         text = marker_tooltip(token)
         if text is not None:
-            imgui.set_tooltip(text)
+            show_tooltip(text)
         return
 
 
@@ -1875,7 +1876,7 @@ class ShellHost:
             )
         else:
             return
-        imgui.set_tooltip(text)
+        show_tooltip(text)
 
     def _strip_pointer_shape(self) -> PointerShape | None:
         """Hand over a strip button or label, left-right over the ruler or a scrub."""
@@ -2432,7 +2433,7 @@ class ShellHost:
                 glyph,
             )
             if hovered:
-                imgui.set_tooltip(navigator_toggle_tooltip(toggle))
+                show_tooltip(navigator_toggle_tooltip(toggle))
             if pressed:
                 self._controls.navigator.select(node.id)
                 if toggle.blocked:
@@ -2726,7 +2727,7 @@ class ShellHost:
             glyph,
         )
         if hovered and not held:
-            imgui.set_tooltip("Locked: unlock to reorder" if blocked else "Drag to reorder")
+            show_tooltip("Locked: unlock to reorder" if blocked else "Drag to reorder")
         return activated and not blocked
 
     def _preset_row_drag(
@@ -2862,7 +2863,7 @@ class ShellHost:
             )
         draw.pop_clip_rect()
         if view.error is not None:
-            imgui.set_tooltip(view.error)
+            show_tooltip(view.error)
 
     def _handle_colour_swatch(
         self,

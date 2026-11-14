@@ -5247,6 +5247,32 @@ def test_settings_highlight_new_page_toggles_and_writes_user_config(
     assert load_user_config(user_path).editor.highlight_new_page is True
 
 
+
+def test_settings_show_tooltips_toggles_gate_and_writes_user_config(
+    tmp_path: Path,
+) -> None:
+    from cleave.viz.tooltips import set_tooltips_enabled, tooltips_enabled
+
+    user_path = tmp_path / "config.yaml"
+    controls = _make_controls(("layer_1",))
+    controls.cfg.user_config_path = user_path
+    assert controls.cfg.editor.show_tooltips is True
+    _expand_settings_ui(controls)
+    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_SHOW_TOOLTIPS)
+    try:
+        _press_focused(controls, _keydown(pygame.K_LEFT))
+        assert controls.cfg.editor.show_tooltips is False
+        assert tooltips_enabled() is False
+        assert not controls.config_dirty
+        assert load_user_config(user_path).editor.show_tooltips is False
+        _press_focused(controls, _keydown(pygame.K_RIGHT))
+        assert controls.cfg.editor.show_tooltips is True
+        assert tooltips_enabled() is True
+        assert load_user_config(user_path).editor.show_tooltips is True
+    finally:
+        set_tooltips_enabled(True)
+
+
 def test_select_song_marker_opens_its_row_on_the_song_markers_page() -> None:
     controls = _make_controls()
     controls.session.song_markers.markers = [SongMarker(10.0), SongMarker(20.0)]

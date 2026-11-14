@@ -163,6 +163,7 @@ class RowKind(Enum):
     SETTINGS_UI_SCALE = auto()
     SETTINGS_UI_NAVIGATOR_HEIGHT = auto()
     SETTINGS_UI_HIGHLIGHT_NEW_PAGE = auto()
+    SETTINGS_UI_SHOW_TOOLTIPS = auto()
     SETTINGS_RESIDUAL_LATENCY_MS = auto()
 
 

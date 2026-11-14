@@ -88,6 +88,16 @@ def _apply_settings_ui_highlight_new_page(
 ) -> None:
     controls.settings.set_highlight_new_page(forward)
 
+def _format_settings_ui_show_tooltips(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return on_off_text(state.settings.show_tooltips)
+
+def _apply_settings_ui_show_tooltips(
+    controls: TuningControls, _desc: RowDescriptor, forward: bool, _large: bool,
+) -> None:
+    controls.settings.set_show_tooltips(forward)
+
 def _apply_settings_ui_scale(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, large: bool,
 ) -> None:
@@ -227,6 +237,23 @@ SPECS: dict[RowKind, RowSpec] = {
             "When on, the inspector title flashes when a new page opens.",
             "A title too long for the column scrolls to its end, then back.",
             "When off, the title stays still.",
+        ),
+        is_pinned=True,
+        parent_group="settings_ui",
+    ),
+    RowKind.SETTINGS_UI_SHOW_TOOLTIPS: RowSpec(
+        affordance=RowAffordance.VALUE_STEP,
+        panel_label="tooltips",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_settings_ui_show_tooltips,
+        apply_horizontal=_apply_settings_ui_show_tooltips,
+        choice=bool_choice(lambda s, _d: s.settings.show_tooltips),
+        help_title="Tooltips",
+        help_entries=(("Left/Right", "off / on"),),
+        help_description=(
+            "When on, hovering an icon or strip label shows a short tip.",
+            "A greyed-out menu item says why it is unavailable.",
+            "When off, no tooltips appear.",
         ),
         is_pinned=True,
         parent_group="settings_ui",

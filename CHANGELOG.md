@@ -9,6 +9,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 
+- Settings > UI has a tooltips switch to turn hover tooltips on or off. Tooltips are on by default, and the choice is remembered between sessions.
 - Drag the top edge of the timeline strip to make it taller; the layer rows grow to fill it. It can't shrink below its rows, and the height is remembered between sessions. Drag back down past the rows to return it to its fitted height.
 - Hovering a layer's label on the timeline strip shows a tooltip: double-click it to arm (or disarm) the layer for recording, or right-click it for options. Hovering a row's eye says what a click does there and how to override.
 - Right-click a timeline strip row for its options: show or hide the layer, override its visibility, release all overrides, and arm it for recording. Shift+F10 or the Menu key opens the same menu for the focused row; arrows, Enter, and Esc drive it. Options that can't be used right now are greyed out, and hovering one says why. Each option lists its keyboard shortcut.

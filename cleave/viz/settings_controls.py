@@ -21,6 +21,7 @@ from cleave.choice import step_choice
 from cleave.viz.session import TuningSession
 from cleave.viz.shell_layout import navigator_row_px
 from cleave.viz.theme import set_ui_scale_percent
+from cleave.viz.tooltips import set_tooltips_enabled
 
 class SettingsControls:
     """Mutations for settings rows."""
@@ -80,6 +81,13 @@ class SettingsControls:
         if self.cfg.editor.highlight_new_page == on:
             return
         self.cfg.editor = replace(self.cfg.editor, highlight_new_page=on)
+        persist_editor_settings(self.cfg)
+
+    def set_show_tooltips(self, on: bool) -> None:
+        if self.cfg.editor.show_tooltips == on:
+            return
+        self.cfg.editor = replace(self.cfg.editor, show_tooltips=on)
+        set_tooltips_enabled(on)
         persist_editor_settings(self.cfg)
 
     def _step_column_side(self, field: str, *, forward: bool) -> None:

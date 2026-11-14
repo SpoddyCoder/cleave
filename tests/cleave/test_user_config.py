@@ -435,3 +435,29 @@ def test_highlight_new_page_defaults_on_round_trips_and_rejects_non_bool(
     )
     with pytest.raises(ValueError, match="editor.highlight_new_page must be true or false"):
         load_user_config(config_path)
+
+
+def test_show_tooltips_defaults_on_round_trips_and_rejects_non_bool(
+    tmp_path: Path,
+) -> None:
+    from cleave.config_schema.editor import DEFAULT_SHOW_TOOLTIPS
+
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        yaml.safe_dump({"editor": {"preview_quality": "balanced"}}, sort_keys=False),
+        encoding="utf-8",
+    )
+    assert load_user_config(config_path).editor.show_tooltips is True
+    assert DEFAULT_SHOW_TOOLTIPS is True
+
+    write_user_config(replace(default_editor_settings(), show_tooltips=False), config_path)
+    saved = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    assert saved["editor"]["show_tooltips"] is False
+    assert load_user_config(config_path).editor.show_tooltips is False
+
+    config_path.write_text(
+        yaml.safe_dump({"editor": {"show_tooltips": "yes"}}, sort_keys=False),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="editor.show_tooltips must be true or false"):
+        load_user_config(config_path)

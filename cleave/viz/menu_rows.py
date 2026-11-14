@@ -21,6 +21,7 @@ from cleave.viz.context_menu import (
     ContextSubmenu,
 )
 from cleave.viz.imgui_theme import rgba
+from cleave.viz.tooltips import show_tooltip
 from cleave.viz.theme import BACKGROUND, DISABLED, HIGHLIGHT, MUTED, VALUE, ui_chrome_px
 
 Rect = tuple[int, int, int, int]
@@ -392,7 +393,7 @@ class ContextMenuSurface:
         if result.hovered is not None:
             hint = entry_hint(entries[result.hovered])
             if hint:
-                imgui.set_tooltip(hint)
+                show_tooltip(hint)
         if result.clicked is not None:
             state.activate(result.clicked)
         return rect
@@ -445,7 +446,7 @@ class ContextSubmenuSurface:
         if result.hovered is not None:
             hint = entry_hint(sub[result.hovered])
             if hint:
-                imgui.set_tooltip(hint)
+                show_tooltip(hint)
         if result.clicked is not None:
             state.activate_submenu(result.clicked)
         return rect

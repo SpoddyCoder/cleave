@@ -20,6 +20,7 @@ from cleave.config_schema.editor import (
     DEFAULT_INSPECTOR_WIDTH,
     DEFAULT_HELP_SIDE,
     DEFAULT_HIGHLIGHT_NEW_PAGE,
+    DEFAULT_SHOW_TOOLTIPS,
     DEFAULT_NAVIGATOR_SIDE,
     DEFAULT_EDITOR_PREVIEW_QUALITY,
     DEFAULT_NOTIFICATION_DISPLAY_SEC,
@@ -71,6 +72,7 @@ class EditorSettings:
     navigator_side: ColumnSide = DEFAULT_NAVIGATOR_SIDE
     help_side: ColumnSide = DEFAULT_HELP_SIDE
     highlight_new_page: bool = DEFAULT_HIGHLIGHT_NEW_PAGE
+    show_tooltips: bool = DEFAULT_SHOW_TOOLTIPS
 
 
 @dataclass(frozen=True)
@@ -94,6 +96,7 @@ def default_editor_settings() -> EditorSettings:
         navigator_side=DEFAULT_NAVIGATOR_SIDE,
         help_side=DEFAULT_HELP_SIDE,
         highlight_new_page=DEFAULT_HIGHLIGHT_NEW_PAGE,
+        show_tooltips=DEFAULT_SHOW_TOOLTIPS,
     )
 
 
@@ -175,6 +178,7 @@ def editor_settings_from_config(cfg: EditorConfig) -> EditorSettings:
         navigator_side=cfg.navigator_side,
         help_side=cfg.help_side,
         highlight_new_page=cfg.highlight_new_page,
+        show_tooltips=cfg.show_tooltips,
     )
 
 
