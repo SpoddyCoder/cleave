@@ -688,7 +688,7 @@ class FilePickerSurface:
                 _highlight(draw, hit)
             elif hover_chip == index:
                 _hover_wash(draw, hit)
-            color = HIGHLIGHT if selected or current else LABEL
+            color = HIGHLIGHT if selected or current else VALUE
             _text(draw, screen_x, y, text, color)
             rects.append(hit)
             indices.append(index)

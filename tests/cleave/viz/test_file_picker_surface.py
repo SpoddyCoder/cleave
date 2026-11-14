@@ -51,6 +51,7 @@ from cleave.viz.theme import (
     HIGHLIGHT,
     HOVER,
     HOVER_BG_ALPHA,
+    LABEL,
     PRESET_ICON,
     VALUE,
     tuning_ui_metrics,
@@ -484,6 +485,26 @@ def test_selection_stays_lit_wherever_the_pointer_goes(tmp_path: Path) -> None:
             assert _vertices_near(border, y=float(selected[1])) > 0
             assert _vertices_near(wash, y=float(moved.row_rects[0][1])) == 0
 
+
+
+def test_shortcuts_draw_in_the_value_colour(tmp_path: Path) -> None:
+    picker = FilePicker(current=tmp_path)
+    surface = FilePickerSurface(picker.view_state())
+
+    with _host() as host:
+        _frame(host, surface)
+        chip = surface.chip_rects[_shortcut_slot(surface, picker, "Home")]
+        value_on_chip = _vertices_near(_pack(VALUE), y=float(chip[1]), slack=40.0)
+        label_on_chip = sum(
+            1
+            for draw_list in _picker_draw_lists()
+            for index in range(draw_list.vtx_buffer.size())
+            if int(draw_list.vtx_buffer[index].col) == _pack(LABEL)
+            and chip[1] <= float(draw_list.vtx_buffer[index].pos.y) <= chip[1] + chip[3]
+        )
+
+    assert value_on_chip > 0
+    assert label_on_chip == 0
 
 def test_keyboard_row_draws_the_focus_outline(tmp_path: Path) -> None:
     (tmp_path / "song.wav").write_bytes(b"RIFF")
