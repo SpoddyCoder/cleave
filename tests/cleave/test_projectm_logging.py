@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+from collections import deque
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from cleave.projectm import (
     PROJECTM_LOG_LEVEL_DEBUG,
+    ProjectM,
     PROJECTM_LOG_LEVEL_ERROR,
     PROJECTM_LOG_LEVEL_WARN,
     _handle_log_message,
@@ -85,3 +88,44 @@ def test_handle_log_message_debug_stderr_only_with_env(monkeypatch: pytest.Monke
         _handle_log_message("debug line", PROJECTM_LOG_LEVEL_DEBUG)
     print_mock.assert_called_once()
     assert drain_log_messages() == []
+
+
+def _bare_projectm() -> ProjectM:
+    pm = ProjectM.__new__(ProjectM)
+    pm._log_queue = deque()
+    return pm
+
+
+def test_owning_logs_routes_messages_to_instance() -> None:
+    pm = _bare_projectm()
+    with pm.owning_logs():
+        _handle_log_message("[PerPixelContext] syntax error", PROJECTM_LOG_LEVEL_ERROR)
+    _handle_log_message("unowned", PROJECTM_LOG_LEVEL_WARN)
+    assert pm.drain_log_messages() == ["[PerPixelContext] syntax error"]
+    assert drain_log_messages() == ["unowned"]
+
+
+def test_drain_projectm_log_notifications_prefixes_layer_number() -> None:
+    pm_a = _bare_projectm()
+    pm_b = _bare_projectm()
+    layers = [
+        SimpleNamespace(slot="layer_1", pm=pm_a),
+        SimpleNamespace(slot="layer_2", pm=pm_b),
+    ]
+    with pm_b.owning_logs():
+        _handle_log_message("shader failed", PROJECTM_LOG_LEVEL_ERROR)
+    with pm_a.owning_logs():
+        _handle_log_message("shader failed", PROJECTM_LOG_LEVEL_ERROR)
+    notify = MagicMock()
+    tracker = ProjectMLogNotifyTracker()
+
+    drain_projectm_log_notifications(
+        layers,
+        layer_z_order=["layer_2", "layer_1"],
+        on_notification=notify,
+        log_notify_tracker=tracker,
+    )
+
+    assert notify.call_count == 2
+    notify.assert_any_call(f"Layer 2: {PROJECTM_LOG_NOTIFICATION_PREFIX}shader failed")
+    notify.assert_any_call(f"Layer 1: {PROJECTM_LOG_NOTIFICATION_PREFIX}shader failed")

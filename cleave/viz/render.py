@@ -227,7 +227,8 @@ def render(
         cfg, project, audio_path, playlists, PresetLibrary.in_memory()
     )
     missing_anchor = missing_preset_anchor_notification(
-        {slot: layer.playlist.current for slot, layer in seed.session.layers.items()}
+        {slot: layer.playlist.current for slot, layer in seed.session.layers.items()},
+        seed.session.layer_z_order,
     )
     if missing_anchor is not None:
         print(f"warning: {missing_anchor}", file=sys.stderr)

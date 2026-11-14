@@ -7,7 +7,8 @@ import os
 import subprocess
 import sys
 from collections import deque
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from ctypes import (
     CFUNCTYPE,
     POINTER,
@@ -40,6 +41,7 @@ PROJECTM_STEREO = 2
 _lib: ctypes.CDLL | None = None
 _log_callback: CFUNCTYPE | None = None
 _log_message_queue: deque[str] = deque()
+_log_owner: ProjectM | None = None
 
 PROJECTM_LOG_LEVEL_DEBUG = 2
 PROJECTM_LOG_LEVEL_WARN = 4
@@ -330,13 +332,14 @@ def _handle_log_message(message: str, level: int) -> None:
     if not stripped:
         return
     if level >= PROJECTM_LOG_LEVEL_WARN:
-        _log_message_queue.append(stripped)
+        queue = _log_owner._log_queue if _log_owner is not None else _log_message_queue
+        queue.append(stripped)
     if os.environ.get("CLEAVE_PROJECTM_LOG") == "1":
         print(stripped, file=sys.stderr)
 
 
 def drain_log_messages() -> list[str]:
-    """Pop queued Warning+ libprojectM log lines (FIFO)."""
+    """Pop queued Warning+ libprojectM log lines no instance call claimed (FIFO)."""
     messages = list(_log_message_queue)
     _log_message_queue.clear()
     return messages
@@ -407,6 +410,7 @@ class ProjectM:
         self._beat_sensitivity = DEFAULT_BEAT_SENSITIVITY
         self._pcm_channels = 1
         self._failure_queue: deque[PresetLoadFailure] = deque()
+        self._log_queue: deque[str] = deque()
         self._switch_failed_callback: PresetSwitchFailedEvent | None = None
         self.set_preset_switch_failed_handler(self._enqueue_preset_failure)
 
@@ -419,6 +423,23 @@ class ProjectM:
             _get_lib().projectm_destroy(self._handle)
             self._handle = c_void_p()
 
+    @contextmanager
+    def owning_logs(self) -> Iterator[None]:
+        """Route libprojectM log lines emitted during this call to this instance."""
+        global _log_owner
+        previous = _log_owner
+        _log_owner = self
+        try:
+            yield
+        finally:
+            _log_owner = previous
+
+    def drain_log_messages(self) -> list[str]:
+        """Pop Warning+ log lines emitted while this instance was in a libprojectM call."""
+        messages = list(self._log_queue)
+        self._log_queue.clear()
+        return messages
+
     def __enter__(self) -> ProjectM:
         return self
 
@@ -426,13 +447,15 @@ class ProjectM:
         self.destroy()
 
     def set_window_size(self, width: int, height: int) -> None:
-        _get_lib().projectm_set_window_size(
-            self._handle, c_size_t(width), c_size_t(height)
-        )
+        with self.owning_logs():
+            _get_lib().projectm_set_window_size(
+                self._handle, c_size_t(width), c_size_t(height)
+            )
 
     def load_preset(self, path: Path | str, smooth: bool = False) -> None:
         encoded = os.fspath(path).encode("utf-8")
-        _get_lib().projectm_load_preset_file(self._handle, encoded, smooth)
+        with self.owning_logs():
+            _get_lib().projectm_load_preset_file(self._handle, encoded, smooth)
 
     def lock_preset(self, locked: bool = True) -> None:
         _get_lib().projectm_set_preset_locked(self._handle, locked)
@@ -442,12 +465,13 @@ class ProjectM:
         self._texture_path_storage = encoded
         if encoded:
             arr = (c_char_p * len(encoded))(*encoded)
-            _get_lib().projectm_set_texture_search_paths(
-                self._handle, arr, c_size_t(len(encoded))
-            )
+            count = len(encoded)
         else:
+            arr = POINTER(c_char_p)()
+            count = 0
+        with self.owning_logs():
             _get_lib().projectm_set_texture_search_paths(
-                self._handle, POINTER(c_char_p)(), c_size_t(0)
+                self._handle, arr, c_size_t(count)
             )
 
     def feed_pcm(self, samples: np.ndarray, *, channels: int = 1) -> None:
@@ -493,9 +517,10 @@ class ProjectM:
         self.feed_pcm(np.zeros(n, dtype=np.float32), channels=channels)
 
     def render_to_fbo(self, fbo_id: int) -> None:
-        _get_lib().projectm_opengl_render_frame_fbo(
-            self._handle, c_uint32(fbo_id)
-        )
+        with self.owning_logs():
+            _get_lib().projectm_opengl_render_frame_fbo(
+                self._handle, c_uint32(fbo_id)
+            )
 
     def set_beat_sensitivity(self, val: float) -> None:
         sensitivity = clamp_beat_sensitivity(val)

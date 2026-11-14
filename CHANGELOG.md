@@ -116,6 +116,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- projectM warnings and errors (such as a preset whose per-pixel code fails to compile) name the layer they came from, as in "Layer 2: projectM: …". The missing preset anchor warning names panel layer numbers instead of internal slot names, and "Populated N presets" and "Added preset" name their layer.
 - When the navigator, inspector, or help column has more rows than fit, the rows stop short of the panel border at the top and bottom instead of running into it.
 - While recording, the timeline strip no longer draws a false fade ramp. Turning a row on or off no longer flashes one for a frame, and a row that is on from the song start no longer ramps up from the start until recording stops.
 - Help text wraps whole sentences to the column width instead of breaking mid-sentence, with one sentence per line. Navigator help lists the page description and its keys first, with the navigator keys last, key names are spelled the same way throughout (Left/Right, PgUp/PgDn, Esc), and every help heading is in Capital Case.

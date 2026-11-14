@@ -7,6 +7,7 @@ import os
 import subprocess
 import sys
 from collections.abc import Callable
+from contextlib import nullcontext
 from ctypes import CFUNCTYPE, POINTER, c_bool, c_char_p, c_int, c_uint32, c_void_p
 from pathlib import Path
 
@@ -358,13 +359,18 @@ class ProjectMPlaylist:
                 self._handle, self._switch_failed_callback, c_void_p()
             )
 
+    def _owning_logs(self):
+        """Attribute preset-load log lines to the connected ProjectM instance."""
+        return self._pm.owning_logs() if self._pm is not None else nullcontext()
+
     def play_next(self, *, hard_cut: bool = False) -> int:
         lib = _get_lib()
         if not hasattr(lib, "projectm_playlist_play_next"):
             return 0
-        return int(
-            lib.projectm_playlist_play_next(self._handle, c_bool(hard_cut))
-        )
+        with self._owning_logs():
+            return int(
+                lib.projectm_playlist_play_next(self._handle, c_bool(hard_cut))
+            )
 
     def get_retry_count(self) -> int:
         lib = _get_lib()
@@ -467,11 +473,12 @@ class ProjectMPlaylist:
         lib = _get_lib()
         if not hasattr(lib, "projectm_playlist_set_position"):
             return 0
-        return int(
-            lib.projectm_playlist_set_position(
-                self._handle, c_uint32(index), c_bool(hard_cut)
+        with self._owning_logs():
+            return int(
+                lib.projectm_playlist_set_position(
+                    self._handle, c_uint32(index), c_bool(hard_cut)
+                )
             )
-        )
 
     def item(self, index: int) -> Path | None:
         lib = _get_lib()

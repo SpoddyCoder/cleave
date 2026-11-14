@@ -458,6 +458,8 @@ class LayerFramePipeline:
             skip_notify_tracker=session.preset_skip_notify_tracker,
         )
         drain_projectm_log_notifications(
+            layers,
+            layer_z_order=session.layer_z_order,
             on_notification=notify,
             log_notify_tracker=session.projectm_log_notify_tracker,
         )

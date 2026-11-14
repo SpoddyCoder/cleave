@@ -258,7 +258,8 @@ class EditorModeController:
             {
                 slot: layer.playlist.current
                 for slot, layer in self.session.layers.items()
-            }
+            },
+            self.session.layer_z_order,
         )
         if missing_anchor is not None and self._on_notification is not None:
             self._on_notification(missing_anchor)

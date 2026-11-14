@@ -26,25 +26,40 @@ class PresetSkipNotifyTracker:
 
 @dataclass
 class ProjectMLogNotifyTracker:
-    seen_messages: set[str] = field(default_factory=set)
+    """Messages already toasted, keyed by layer slot (``None`` when unattributed)."""
+
+    seen_messages: set[tuple[str | None, str]] = field(default_factory=set)
 
 
 def drain_projectm_log_notifications(
+    layers: Sequence[StemLayer] = (),
     *,
+    layer_z_order: Sequence[str] = (),
     on_notification: Callable[[str], None] | None = None,
     log_notify_tracker: ProjectMLogNotifyTracker | None = None,
 ) -> None:
-    """Drain queued Warning+ libprojectM logs; toast once per unique message per session."""
+    """Drain queued Warning+ libprojectM logs; toast once per layer and message per session.
+
+    Lines emitted inside a layer's libprojectM call carry that layer's panel number.
+    """
     tracker = (
         log_notify_tracker
         if log_notify_tracker is not None
         else ProjectMLogNotifyTracker()
     )
-    for message in drain_log_messages():
-        if message in tracker.seen_messages:
+    pending: list[tuple[str | None, str]] = [
+        (None, message) for message in drain_log_messages()
+    ]
+    for layer in layers:
+        pending.extend((layer.slot, message) for message in layer.pm.drain_log_messages())
+    for slot, message in pending:
+        key = (slot, message)
+        if key in tracker.seen_messages:
             continue
-        tracker.seen_messages.add(message)
+        tracker.seen_messages.add(key)
         formatted = f"{PROJECTM_LOG_NOTIFICATION_PREFIX}{message}"
+        if slot is not None and slot in layer_z_order:
+            formatted = layer_notification(layer_z_order, slot, formatted)
         if on_notification is not None:
             on_notification(formatted)
         else:

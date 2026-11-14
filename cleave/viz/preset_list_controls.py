@@ -259,7 +259,13 @@ class PresetListController:
                         )
                     )
                 else:
-                    self._on_notification(f"Populated {count} presets")
+                    self._on_notification(
+                        layer_notification(
+                            self.session.layer_z_order,
+                            slot,
+                            f"Populated {count} presets",
+                        )
+                    )
         finally:
             self._unlock_preset_after_modal(slot)
 
@@ -294,7 +300,13 @@ class PresetListController:
         if self._layer_bindings is not None:
             self._layer_bindings.on_preset_switching_change(slot)
         if self._on_notification is not None:
-            self._on_notification(f"Added preset: {src_path.name}")
+            self._on_notification(
+                layer_notification(
+                    self.session.layer_z_order,
+                    slot,
+                    f"Added preset: {src_path.name}",
+                )
+            )
 
     def prompt_delete(self, slot: str, index: int) -> None:
         layer = self.session.layers[slot]

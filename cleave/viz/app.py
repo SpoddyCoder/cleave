@@ -315,7 +315,8 @@ def init_gl_resources_heavy(
     )
 
     missing_anchor = missing_preset_anchor_notification(
-        {slot: layer.playlist.current for slot, layer in seed.session.layers.items()}
+        {slot: layer.playlist.current for slot, layer in seed.session.layers.items()},
+        seed.session.layer_z_order,
     )
     if missing_anchor is not None:
         controls.show_notification(missing_anchor)

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, TextIO
@@ -526,14 +526,19 @@ def missing_preset_anchors(
 
 def missing_preset_anchor_notification(
     preset_by_slot: Mapping[str, Path | None],
+    layer_z_order: Sequence[str],
 ) -> str | None:
-    """Short panel/stderr message when one or more layer preset anchors are missing."""
+    """Short panel/stderr message naming the panel layers whose preset anchor is missing."""
     missing = missing_preset_anchors(preset_by_slot)
     if not missing:
         return None
-    slots = ", ".join(name for name, _ in missing)
-    noun = "anchor" if len(missing) == 1 else "anchors"
-    return f"Missing preset {noun}: {slots}"
+    numbers = sorted(
+        layer_z_order.index(slot) + 1 for slot, _ in missing if slot in layer_z_order
+    )
+    if len(numbers) == 1:
+        return f"Layer {numbers[0]}: missing preset anchor"
+    joined = ", ".join(str(n) for n in numbers)
+    return f"Layers {joined}: missing preset anchors"
 
 
 def _validate_presets(layers: dict[str, LayerConfig]) -> None:

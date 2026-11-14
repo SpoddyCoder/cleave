@@ -1211,9 +1211,10 @@ def test_load_config_missing_preset_file(tmp_path: Path) -> None:
     cfg = load_config(project_root=project_dir)
     assert not cfg.layers["layer_1"].preset.exists()
     assert missing_preset_anchor_notification(
-        {slot: layer.preset for slot, layer in cfg.layers.items()}
+        {slot: layer.preset for slot, layer in cfg.layers.items()},
+        cfg.layer_z_order,
     ) == (
-        "Missing preset anchor: layer_1"
+        f"Layer {cfg.layer_z_order.index('layer_1') + 1}: missing preset anchor"
     )
 
 
@@ -1229,9 +1230,12 @@ def test_missing_preset_anchor_notification_plural(tmp_path: Path) -> None:
         ("layer_1", layers["layer_1"].preset),
         ("layer_2", layers["layer_2"].preset),
     ]
-    assert missing_preset_anchor_notification(paths) == (
-        "Missing preset anchors: layer_1, layer_2"
+    assert missing_preset_anchor_notification(paths, ["layer_2", "layer_1"]) == (
+        "Layers 1, 2: missing preset anchors"
     )
+    assert missing_preset_anchor_notification(
+        paths, ["layer_3", "layer_2", "layer_4", "layer_1"]
+    ) == ("Layers 2, 4: missing preset anchors")
 
 
 def test_parse_timeline_defaults_enabled_true() -> None:
