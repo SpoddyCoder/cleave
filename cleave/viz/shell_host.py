@@ -185,6 +185,8 @@ _NAV_LOCK_MARK = "[lock]"
 # Fixed columns, so a row without solo keeps its icons under the rows that have it.
 _NAV_TOGGLE_COLUMNS = (TOGGLE_ENABLED, TOGGLE_SOLO, TOGGLE_LOCK)
 _TRANSPORT_GAP = 16.0
+# Extra room around a transport part's hover fill, beyond its half space.
+_TRANSPORT_HOVER_PAD = 4.0
 # Border pushed onto navigator and inspector windows.
 _PANEL_BORDER_PX = 1.0
 # One Left/Right step per this many pixels of sideways drag.
@@ -2215,12 +2217,14 @@ class ShellHost:
         )
 
     def _draw_transport_part(self, part: TransportPart) -> None:
-        """One transport part, with half a space each side for the hover fill.
+        """One transport part, padded each side for the hover fill.
 
         Play and pause toggle on click. The time and the bar step while
         dragged sideways and open a text field on double-click.
         """
-        space = imgui.calc_text_size(" ").x
+        space = imgui.calc_text_size(" ").x + 2.0 * ui_chrome_px(
+            _TRANSPORT_HOVER_PAD
+        )
         line = imgui.get_text_line_height()
         text_w = imgui.calc_text_size(part.label).x
         field = part.field
@@ -2282,18 +2286,25 @@ class ShellHost:
         rect_min = imgui.get_item_rect_min()
         rect_max = imgui.get_item_rect_max()
         draw = imgui.get_window_draw_list()
+        pad = ui_chrome_px(_TRANSPORT_HOVER_PAD)
         if hovered:
+            # The fill grows past the line into the bar's own padding.
+            origin = imgui.get_window_pos()
+            size = imgui.get_window_size()
+            draw.push_clip_rect(
+                origin, imgui.ImVec2(origin.x + size.x, origin.y + size.y - 1.0)
+            )
             draw.add_rect_filled(
-                rect_min,
-                rect_max,
+                imgui.ImVec2(rect_min.x, rect_min.y - pad),
+                imgui.ImVec2(rect_max.x, rect_max.y + pad),
                 imgui.get_color_u32(
                     rgba(NUDGE_HOVER_BG, NUDGE_HOVER_BG_ALPHA / 255.0)
                 ),
             )
+            draw.pop_clip_rect()
             color = rgba(NUDGE_HOVER_FG)
-        space = imgui.calc_text_size(" ").x
         u32 = imgui.get_color_u32(color)
-        x = rect_min.x + space * 0.5
+        x = rect_min.x + imgui.calc_text_size(" ").x * 0.5 + pad
         if part.icon:
             drop = _icon_drop_to_text(part.icon[0])
             draw.add_text(imgui.ImVec2(x, rect_min.y + drop), u32, part.icon)
