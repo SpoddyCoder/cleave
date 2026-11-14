@@ -7,7 +7,8 @@ The shell decides which events reach this host. Keyboard stays in
 from __future__ import annotations
 
 import os
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from typing import Any
 
 import pygame
@@ -35,7 +36,12 @@ from cleave.viz.imgui_theme import apply_imgui_style_scale, apply_imgui_theme
 from cleave.viz.overlay_primitives import overlay_font_path
 from cleave.viz.navigator import TWISTY_EXPANDED
 from cleave.viz.pointer_cursor import PointerCursors, requested_pointer
-from cleave.viz.theme import shell_scale, tuning_ui_metrics, ui_scale_generation
+from cleave.viz.theme import (
+    PROGRESS_LABEL_FONT_SCALE,
+    shell_scale,
+    tuning_ui_metrics,
+    ui_scale_generation,
+)
 
 RENDERER_CLASS = ProgrammablePipelineRenderer
 
@@ -264,7 +270,28 @@ def _load_shell_fonts() -> tuple[Any, ...]:
     )
     io.font_default = font
     icon_config, icon_ranges = _merge_icon_glyphs(io.fonts, font_size)
+    # Second atlas font, after the icon merge so the merge targets the default.
+    io.fonts.add_font_from_file_ttf(
+        str(overlay_font_path()),
+        font_size * PROGRESS_LABEL_FONT_SCALE,
+        None,
+        text_ranges,
+    )
     return (text_ranges, icon_config, icon_ranges)
+
+
+@contextmanager
+def progress_label_font() -> Iterator[None]:
+    """Make the larger progress-label font current. Valid only inside a frame."""
+    fonts = imgui.get_io().fonts.fonts
+    if len(fonts) < 2:
+        yield
+        return
+    imgui.push_font(fonts[1])
+    try:
+        yield
+    finally:
+        imgui.pop_font()
 
 
 def _ensure_font_atlas() -> None:

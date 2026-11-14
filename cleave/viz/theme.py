@@ -261,6 +261,11 @@ SONG_MARKER: tuple[int, int, int] = (220, 40, 40)
 SONG_MARKER_SELECTED: tuple[int, int, int] = (255, 170, 40)
 
 BORDER_WIDTH: int = 2
+# Progress bars: a thicker white border and a gap before the HIGHLIGHT fill.
+PROGRESS_BAR_BORDER_WIDTH: int = 2 * BORDER_WIDTH
+PROGRESS_BAR_FILL_GAP: int = 2
+# Text above a progress bar draws this much larger than the shell font.
+PROGRESS_LABEL_FONT_SCALE: float = 1.5
 SCROLLBAR_TRACK: tuple[int, int, int] = DISABLED
 SCROLLBAR_THUMB: tuple[int, int, int] = TIMELINE_BAR_ON
 # Timeline strip scrollbar: a faint rail and a neutral pill, so it does not

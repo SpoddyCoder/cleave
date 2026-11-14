@@ -14,7 +14,6 @@ from imgui_bundle import imgui
 from cleave.viz.imgui_theme import rgba
 from cleave.viz.loading import (
     LoadingWindow,
-    clamp_loading_fraction,
     draw_loading_content,
     loading_bar_width,
     loading_content_layout,
@@ -22,15 +21,16 @@ from cleave.viz.loading import (
     present_frame,
 )
 from cleave.viz.modal_surface import ImGuiTextMeasure
-from cleave.viz.theme import BACKGROUND, BORDER_WIDTH, LABEL, VALUE
+from cleave.viz.progress_bar import clamp_fraction, progress_bar_inset
+from cleave.viz.theme import BACKGROUND, HIGHLIGHT, LABEL, VALUE
 
 
 def test_clamp_loading_fraction() -> None:
-    assert clamp_loading_fraction(0.0) == 0.0
-    assert clamp_loading_fraction(1.0) == 1.0
-    assert clamp_loading_fraction(0.25) == 0.25
-    assert clamp_loading_fraction(-0.5) == 0.0
-    assert clamp_loading_fraction(1.5) == 1.0
+    assert clamp_fraction(0.0) == 0.0
+    assert clamp_fraction(1.0) == 1.0
+    assert clamp_fraction(0.25) == 0.25
+    assert clamp_fraction(-0.5) == 0.0
+    assert clamp_fraction(1.5) == 1.0
 
 
 def test_message_only_layout_is_centered() -> None:
@@ -70,18 +70,19 @@ def test_bar_below_text_when_fraction_set() -> None:
         line_gap=8,
         bar_gap=16,
         bar_width=400,
-        bar_height=12,
+        bar_height=20,
     )
-    stack_h = 40 + 8 + 16 + 16 + 12
+    stack_h = 40 + 8 + 16 + 16 + 20
     top = (720 - stack_h) // 2
     bar_y = top + 40 + 8 + 16 + 16
     bar_x = (1280 - 400) // 2
-    assert layout.bar_rect == (bar_x, bar_y, 400, 12)
-    inner_w = 400 - 2 * BORDER_WIDTH
-    inner_h = 12 - 2 * BORDER_WIDTH
+    assert layout.bar_rect == (bar_x, bar_y, 400, 20)
+    inset = progress_bar_inset()
+    inner_w = 400 - 2 * inset
+    inner_h = 20 - 2 * inset
     assert layout.fill_rect == (
-        bar_x + BORDER_WIDTH,
-        bar_y + BORDER_WIDTH,
+        bar_x + inset,
+        bar_y + inset,
         int(round(inner_w * 0.5)),
         inner_h,
     )
@@ -89,7 +90,7 @@ def test_bar_below_text_when_fraction_set() -> None:
 
 def test_zero_fraction_has_track_without_fill() -> None:
     layout = loading_content_layout(
-        640, 360, (100, 20), fraction=0.0, bar_width=200, bar_height=12
+        640, 360, (100, 20), fraction=0.0, bar_width=200, bar_height=20
     )
     assert layout.bar_rect is not None
     assert layout.fill_rect is None
@@ -97,25 +98,25 @@ def test_zero_fraction_has_track_without_fill() -> None:
 
 def test_full_fraction_fill_matches_inner_width() -> None:
     layout = loading_content_layout(
-        640, 360, (100, 20), fraction=1.0, bar_width=200, bar_height=12
+        640, 360, (100, 20), fraction=1.0, bar_width=200, bar_height=20
     )
     assert layout.bar_rect is not None
     assert layout.fill_rect is not None
     _x, _y, bar_w, bar_h = layout.bar_rect
     _fx, _fy, fill_w, fill_h = layout.fill_rect
-    assert fill_w == bar_w - 2 * BORDER_WIDTH
-    assert fill_h == bar_h - 2 * BORDER_WIDTH
+    assert fill_w == bar_w - 2 * progress_bar_inset()
+    assert fill_h == bar_h - 2 * progress_bar_inset()
 
 
 def test_out_of_range_fraction_clamps_fill() -> None:
     over = loading_content_layout(
-        640, 360, (100, 20), fraction=2.0, bar_width=200, bar_height=12
+        640, 360, (100, 20), fraction=2.0, bar_width=200, bar_height=20
     )
     full = loading_content_layout(
-        640, 360, (100, 20), fraction=1.0, bar_width=200, bar_height=12
+        640, 360, (100, 20), fraction=1.0, bar_width=200, bar_height=20
     )
     under = loading_content_layout(
-        640, 360, (100, 20), fraction=-1.0, bar_width=200, bar_height=12
+        640, 360, (100, 20), fraction=-1.0, bar_width=200, bar_height=20
     )
     assert over.fill_rect == full.fill_rect
     assert under.fill_rect is None
@@ -244,7 +245,7 @@ def test_loading_content_bar_fraction_and_detail() -> None:
         half, quads, _colors = _draw_frame(host, message, fraction=0.5)
         assert half.fill_rect is not None
         _fx, _fy, fill_w, _fh = half.fill_rect
-        value = _pack(VALUE)
+        value = _pack(HIGHLIGHT)
         fills = [quad for quad in quads if quad[4] == value and abs(quad[2] - fill_w) <= 1.0]
         assert fills, quads
 
@@ -258,13 +259,13 @@ def test_loading_content_bar_fraction_and_detail() -> None:
             if abs(quad[2] - bar_w) <= 1.0 and abs(quad[3] - bar_h) <= 1.0
         ]
         assert tracks, quads
-        inner_top = bar_y + BORDER_WIDTH
-        inner_bottom = bar_y + bar_h - BORDER_WIDTH
+        inner_top = bar_y + progress_bar_inset()
+        inner_bottom = bar_y + bar_h - progress_bar_inset()
         fills = [
             quad
             for quad in quads
             if quad[4] == value
-            and quad[0] >= bar_x + BORDER_WIDTH - 1
+            and quad[0] >= bar_x + progress_bar_inset() - 1
             and inner_top - 1 <= quad[1]
             and quad[1] + quad[3] <= inner_bottom + 1
             and quad[2] > 1.0

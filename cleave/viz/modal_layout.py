@@ -11,6 +11,7 @@ from cleave.viz.modal import (
     ModalViewState,
 )
 from cleave.viz.choice_layout import choice_width
+from cleave.viz.progress_bar import progress_bar_height
 from cleave.viz.text_fit import TextSizer, wrap_text_to_width
 from cleave.viz.theme import tuning_ui_metrics, ui_px
 
@@ -31,10 +32,6 @@ def panel_pad_x() -> int:
 
 def panel_pad_y() -> int:
     return tuning_ui_metrics().modal_panel_pad_y
-
-
-def bar_height() -> int:
-    return ui_px(10)
 
 
 def button_gap() -> int:
@@ -202,7 +199,7 @@ def measure_panel(
     if has_bar:
         if has_message or has_labeled:
             content_h += line_h + line_gap
-        content_h += bar_height()
+        content_h += progress_bar_height()
 
     if state.form_rows or state.form_info is not None:
         if has_message:

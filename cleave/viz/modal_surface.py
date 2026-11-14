@@ -12,8 +12,10 @@ from imgui_bundle import imgui
 
 from cleave.choice import ChoiceKind
 from cleave.viz.choice_widgets import draw_choice_list, draw_combo, draw_segments
+from cleave.viz.imgui_host import progress_label_font
 from cleave.viz.imgui_theme import rgba
 from cleave.viz.pointer_cursor import PointerShape, request_pointer
+from cleave.viz.progress_bar import draw_progress_bar, progress_bar_height
 from cleave.viz.text_edit import caret_line_column
 from cleave.viz.modal import (
     ButtonRole,
@@ -28,7 +30,6 @@ from cleave.viz.modal_layout import (
     CARET_WIDTH,
     TEXT_BUTTON_LABELS,
     TextMeasure,
-    bar_height,
     button_gap,
     button_widths,
     caret_index_at_point,
@@ -314,34 +315,6 @@ def _draw_labeled(
     return y
 
 
-def _draw_bar(
-    draw: imgui.ImDrawList, x: int, y: int, width: int, fraction: float
-) -> None:
-    if width <= 0:
-        return
-    frac = max(0.0, min(1.0, fraction))
-    inner_w = width - 2 * BORDER_WIDTH
-    inner_h = bar_height() - 2 * BORDER_WIDTH
-    fill_w = min(inner_w, int(round(inner_w * frac)))
-    if fill_w > 0 and inner_h > 0:
-        draw.add_rect_filled(
-            imgui.ImVec2(float(x + BORDER_WIDTH), float(y + BORDER_WIDTH)),
-            imgui.ImVec2(
-                float(x + BORDER_WIDTH + fill_w),
-                float(y + BORDER_WIDTH + inner_h),
-            ),
-            _packed(VALUE),
-        )
-    draw.add_rect(
-        imgui.ImVec2(float(x), float(y)),
-        imgui.ImVec2(float(x + width), float(y + bar_height())),
-        _packed(BORDER_COLOR),
-        0.0,
-        0,
-        float(BORDER_WIDTH),
-    )
-
-
 def _button_focused(view: ModalViewState, index: int, rect: Rect) -> bool:
     """A form's fields hold focus until Tab reaches the buttons. Hover still shows."""
     if view.kind is ModalKind.FORM and not view.form_buttons_focused:
@@ -569,6 +542,12 @@ class ModalSurface:
         self._text_field_hit: _TextFieldHit | None = None
 
     def draw(self) -> Rect:
+        if self.view.kind == ModalKind.PROGRESS:
+            with progress_label_font():
+                return self._draw_panel()
+        return self._draw_panel()
+
+    def _draw_panel(self) -> Rect:
         self.intent = None
         self.panel_rect = None
         self.option_rects = ()
@@ -713,14 +692,13 @@ class ModalSurface:
         if has_bar:
             if has_message or has_labeled:
                 y += line_h + line_gap
-            _draw_bar(
+            bar_h = progress_bar_height()
+            draw_progress_bar(
                 draw,
-                x,
-                y,
-                panel_w - panel_pad_x() * 2,
+                (x, y, panel_w - panel_pad_x() * 2, bar_h),
                 view.progress_fraction or 0.0,
             )
-            y += bar_height()
+            y += bar_h
         if view.form_rows or view.form_info is not None:
             if has_message:
                 y += line_h

@@ -14,6 +14,7 @@ from imgui_bundle import imgui
 from cleave.viz.context_menu import ContextMenuState
 from cleave.viz.inline_edit import InlineEditController
 from cleave.viz.commands import CommandContext
+from cleave.viz.imgui_host import progress_label_font
 from cleave.viz.imgui_theme import rgba
 from cleave.viz.menu_bar import MenuBarState
 from cleave.viz.text_edit import caret_line_column
@@ -327,6 +328,20 @@ def test_kind_renders_with_idle_mouse(view: ModalViewState) -> None:
                 screen_w=screen_w,
                 screen_h=screen_h,
             )
+        elif view.kind == ModalKind.PROGRESS:
+            base = measure_panel(
+                surface.measure, view, line_gap=line_gap, screen_w=screen_w
+            )
+            host.imgui.begin_frame(1.0 / 60.0)
+            try:
+                with progress_label_font():
+                    expected = measure_panel(
+                        surface.measure, view, line_gap=line_gap, screen_w=screen_w
+                    )
+            finally:
+                host.imgui.end_frame()
+            _idle(host, surface)
+            assert expected[1] > base[1]
         else:
             expected = measure_panel(
                 surface.measure, view, line_gap=line_gap, screen_w=screen_w
@@ -350,7 +365,7 @@ def test_kind_renders_with_idle_mouse(view: ModalViewState) -> None:
                 _glyphs(view.message or "")
                 + sum(_glyphs(line.prefix()) for line in view.labeled_lines)
             )
-            assert _pack(HIGHLIGHT) not in colors
+            assert colors.get(_pack(HIGHLIGHT), 0) == 4
             assert wash not in colors
             assert border not in colors
         else:

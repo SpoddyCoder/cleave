@@ -33,11 +33,15 @@ from cleave.config_schema.window import (
 )
 from cleave.gl_color_format import RGBA8
 from cleave.gl_compositor import GlCompositor
+from cleave.viz.progress_bar import (
+    clamp_fraction,
+    draw_progress_bar,
+    progress_bar_height,
+    progress_fill_rect,
+)
 from cleave.viz.text_fit import TextSizer, fit_text_to_width
 from cleave.viz.theme import (
     BACKGROUND,
-    BORDER_COLOR,
-    BORDER_WIDTH,
     LABEL,
     VALUE,
     set_ui_scale_percent,
@@ -95,7 +99,6 @@ def _scrim_flags() -> int:
 _BAR_WIDTH_FRACTION = 0.4
 _TEXT_MAX_WIDTH_FRACTION = 0.8
 # Base px at 100% UI scale; read through ui_px at layout time.
-_BAR_HEIGHT_BASE = 10
 _LINE_GAP_BASE = 8
 _BAR_GAP_BASE = 16
 _LOADING_WINDOW = "##loading"
@@ -115,10 +118,6 @@ class LoadingContentLayout:
     fill_rect: tuple[int, int, int, int] | None
 
 
-def clamp_loading_fraction(fraction: float) -> float:
-    return max(0.0, min(1.0, float(fraction)))
-
-
 def loading_bar_width(display_width: int) -> int:
     return max(1, int(round(display_width * _BAR_WIDTH_FRACTION)))
 
@@ -134,7 +133,6 @@ def loading_content_layout(
     bar_gap: int | None = None,
     bar_width: int | None = None,
     bar_height: int | None = None,
-    border_width: int = BORDER_WIDTH,
 ) -> LoadingContentLayout:
     """Vertically stack message, detail, and bar; center the block in the viewport."""
     if line_gap is None:
@@ -142,7 +140,7 @@ def loading_content_layout(
     if bar_gap is None:
         bar_gap = ui_px(_BAR_GAP_BASE)
     if bar_height is None:
-        bar_height = ui_px(_BAR_HEIGHT_BASE)
+        bar_height = progress_bar_height()
     message_w, message_h = message_size
     stack_h = message_h
     if detail_size is not None:
@@ -168,17 +166,7 @@ def loading_content_layout(
         width = loading_bar_width(display_width) if bar_width is None else bar_width
         bar_x = (display_width - width) // 2
         bar_rect = (bar_x, y, width, bar_height)
-        inner_w = width - 2 * border_width
-        inner_h = bar_height - 2 * border_width
-        if inner_w > 0 and inner_h > 0:
-            fill_w = min(inner_w, int(round(inner_w * clamp_loading_fraction(fraction))))
-            if fill_w > 0:
-                fill_rect = (
-                    bar_x + border_width,
-                    y + border_width,
-                    fill_w,
-                    inner_h,
-                )
+        fill_rect = progress_fill_rect(bar_rect, clamp_fraction(fraction))
 
     return LoadingContentLayout(
         message_xy=message_xy,
@@ -232,35 +220,6 @@ def _text(
     draw.add_text(imgui.ImVec2(float(x), float(y)), _packed(role), text)
 
 
-def _draw_loading_bar(
-    draw: imgui.ImDrawList,
-    bar_rect: tuple[int, int, int, int],
-    fill_rect: tuple[int, int, int, int] | None,
-) -> None:
-    imgui = _imgui()
-    x, y, width, height = bar_rect
-    draw.add_rect_filled(
-        imgui.ImVec2(float(x), float(y)),
-        imgui.ImVec2(float(x + width), float(y + height)),
-        _packed(BACKGROUND),
-    )
-    if fill_rect is not None:
-        fill_x, fill_y, fill_w, fill_h = fill_rect
-        draw.add_rect_filled(
-            imgui.ImVec2(float(fill_x), float(fill_y)),
-            imgui.ImVec2(float(fill_x + fill_w), float(fill_y + fill_h)),
-            _packed(VALUE),
-        )
-    draw.add_rect(
-        imgui.ImVec2(float(x), float(y)),
-        imgui.ImVec2(float(x + width), float(y + height)),
-        _packed(BORDER_COLOR),
-        0.0,
-        0,
-        float(BORDER_WIDTH),
-    )
-
-
 def _draw_scrim() -> None:
     imgui = _imgui()
     display = imgui.get_io().display_size
@@ -298,6 +257,19 @@ def draw_loading_content(
     detail: str | None = None,
 ) -> None:
     """Draw the centred loading block into the current ImGui frame."""
+    from cleave.viz.imgui_host import progress_label_font
+
+    with progress_label_font():
+        _draw_loading_block(message, display_width, display_height, fraction, detail)
+
+
+def _draw_loading_block(
+    message: str,
+    display_width: int,
+    display_height: int,
+    fraction: float | None,
+    detail: str | None,
+) -> None:
     imgui = _imgui()
     measure = _ImGuiTextSize()
     message_size = measure.size(message) if message else (0, 0)
@@ -335,7 +307,9 @@ def draw_loading_content(
         if fitted and layout.detail_xy is not None:
             _text(draw, layout.detail_xy[0], layout.detail_xy[1], fitted, LABEL)
         if layout.bar_rect is not None:
-            _draw_loading_bar(draw, layout.bar_rect, layout.fill_rect)
+            draw_progress_bar(
+                draw, layout.bar_rect, fraction or 0.0, background=BACKGROUND
+            )
     finally:
         if begun:
             imgui.end()
