@@ -324,6 +324,23 @@ def test_accept_plain_directory_enters_it(tmp_path: Path) -> None:
     assert picker.current == plain
 
 
+
+def test_a_listing_selects_its_first_entry_not_the_parent(tmp_path: Path) -> None:
+    (tmp_path / "album").mkdir()
+    _wav(tmp_path, "song.wav")
+    picker = FilePicker(current=tmp_path)
+    assert picker.selected_row is not None
+    assert picker.selected_row.label == "album"
+
+    picker.navigate_to(tmp_path / "album")
+    assert picker.selected_index == 0
+    assert picker.selected_row is not None
+    assert picker.selected_row.kind is PickerRowKind.PARENT
+
+    picker.go_parent()
+    assert picker.selected_row is not None
+    assert picker.selected_row.label == "album"
+
 def test_cancel_sets_flag(tmp_path: Path) -> None:
     picker = FilePicker(current=tmp_path)
     picker.handle(PickerAction.CANCEL)

@@ -256,6 +256,17 @@ def _drive_rows() -> tuple[PickerRow, ...]:
     )
 
 
+def _first_entry_index(rows: tuple[PickerRow, ...]) -> int:
+    """The first folder, project, file, or drive: not ``..`` or a note.
+
+    An empty folder has only ``..``, so that stays selected.
+    """
+    for index, row in enumerate(rows):
+        if row.kind not in (PickerRowKind.PARENT, PickerRowKind.NOTE):
+            return index
+    return 0
+
+
 @dataclass
 class FilePicker:
     """Browse the filesystem and return an audio file or project path.
@@ -312,7 +323,7 @@ class FilePicker:
             )
         self._rows = rows
         self._truncated = truncated
-        self.selected_index = 0
+        self.selected_index = _first_entry_index(rows)
         if keep is not None:
             for index, row in enumerate(rows):
                 if row.target == keep:

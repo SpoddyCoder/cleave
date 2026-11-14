@@ -174,6 +174,9 @@ def test_arrow_repeat_does_not_accept(tmp_path: Path, monkeypatch) -> None:
     controls = make_controls()
     switch = controls.project_switch
     switch.prompt_open()
+    # Up to "..", so Enter goes to the parent folder instead of opening album.
+    switch.handle_keydown(keydown(pygame.K_UP))
+    switch.handle_keyup(_keyup(pygame.K_UP))
     switch.handle_keydown(keydown(pygame.K_RETURN))
     assert switch.active
     assert not switch.key_repeat_armed

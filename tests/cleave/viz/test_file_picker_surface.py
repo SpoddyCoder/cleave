@@ -386,6 +386,7 @@ def _shortcut_slot(surface: FilePickerSurface, picker: FilePicker, label: str) -
 def test_row_highlight_outline_is_not_clipped(tmp_path: Path) -> None:
     (tmp_path / "song.wav").write_bytes(b"RIFF")
     picker = FilePicker(current=tmp_path)
+    picker.select_row(0)
     surface = FilePickerSurface(picker.view_state())
 
     with _host() as host:
@@ -407,6 +408,7 @@ def test_row_highlight_outline_is_not_clipped(tmp_path: Path) -> None:
 def test_hover_washes_a_row_and_the_selection_stays(tmp_path: Path) -> None:
     (tmp_path / "song.wav").write_bytes(b"RIFF")
     picker = FilePicker(current=tmp_path)
+    picker.select_row(0)
     surface = FilePickerSurface(picker.view_state())
 
     with _host() as host:
@@ -441,6 +443,7 @@ def test_hover_washes_a_shortcut_and_the_row_stays_selected(
 ) -> None:
     (tmp_path / "song.wav").write_bytes(b"RIFF")
     picker = FilePicker(current=tmp_path)
+    picker.select_row(0)
     surface = FilePickerSurface(picker.view_state())
 
     with _host() as host:
@@ -733,7 +736,7 @@ def test_wheel_over_a_long_list_scrolls(tmp_path: Path) -> None:
 
     assert surface.row_indices[0] > 0
     assert surface.intent is None
-    assert picker.selected_index == 0
+    assert picker.selected_index == 1
     assert picker.focus is PickerFocus.LIST
 
 
@@ -771,7 +774,7 @@ def test_scrollbar_track_click_scrolls(tmp_path: Path) -> None:
         _frame(host, surface)
 
     assert surface.row_indices[0] > 0
-    assert picker.selected_index == 0
+    assert picker.selected_index == 1
 
 
 def test_a_new_directory_opens_at_the_top(tmp_path: Path) -> None:
