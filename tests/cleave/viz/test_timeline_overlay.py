@@ -1663,10 +1663,35 @@ def test_hit_at_maps_ruler_rows_prefix_and_gaps() -> None:
     assert overlay.time_at_x(px + bar_left + bar_width + 50) == 100.0
     assert overlay.time_at_x(px - 50) == 0.0
 
+
     for t in (0.0, 12.5, 63.0, 100.0):
         x = time_to_x(t, bar_left, bar_width, 0.0, 100.0)
         back = x_to_time(x, bar_left, bar_width, 0.0, 100.0)
         assert abs(time_to_x(back, bar_left, bar_width, 0.0, 100.0) - x) <= 1
+
+def test_ruler_hit_starts_at_major_tick_top() -> None:
+    from cleave.viz.timeline_panel_cache import timeline_badge_reserve_px
+    from cleave.viz.timeline_ruler import ruler_tick_top
+
+    pygame.init()
+    overlay = TimelineOverlay()
+    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    _draw(overlay, surface, _view_state(duration_sec=100.0))
+    px, py, _, _ = overlay.panel_rect
+    bar_left, bar_width, _ = overlay.bar_layout
+    mid_x = px + bar_left + bar_width // 2
+    reserve = timeline_badge_reserve_px()
+    ruler_top = py - reserve
+    tick_top = ruler_top + ruler_tick_top(reserve + overlay._padding)
+    hit = overlay.hit_at(mid_x, tick_top)
+    assert hit is not None and hit.row is None and hit.t_sec is not None
+    # Time labels and the band's top edge belong to nothing, so the resize
+    # splitter there is not shadowed by the scrub.
+    assert overlay.hit_at(mid_x, tick_top - 1) is None
+    assert overlay.hit_at(mid_x, ruler_top) is None
+    # The corner buttons keep their full height.
+    play = overlay.hit_at(px + overlay._padding + 1, ruler_top + 4)
+    assert play is not None and play.target == "play"
 
 
 def _zoomed(state: TimelineViewState, start: float, end: float) -> TimelineViewState:

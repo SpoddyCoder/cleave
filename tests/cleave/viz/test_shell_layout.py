@@ -568,11 +568,13 @@ def test_minimum_window_keeps_every_column_and_both_stack_panes() -> None:
 def test_timeline_splitter_hit_is_the_band_top_edge() -> None:
     layout = ShellLayout.compute(1280, 720, 23, 23, 120)
     top = layout.timeline[1]
-    assert splitter_hit(layout, 640, top + 3) == "timeline"
-    assert splitter_hit(layout, 640, top + 5) == "timeline"
-    assert splitter_hit(layout, 640, top + 2) is None
-    assert splitter_hit(layout, 640, top + 6) is None
-    assert splitter_hit(layout, 640, top) is None
+    # The border rule draws on the pixel above the band's top edge.
+    assert splitter_hit(layout, 640, top - 1) == "timeline"
+    assert splitter_hit(layout, 640, top - 3) == "timeline"
+    assert splitter_hit(layout, 640, top) == "timeline"
+    assert splitter_hit(layout, 640, top + 2) == "timeline"
+    assert splitter_hit(layout, 640, top - 4) is None
+    assert splitter_hit(layout, 640, top + 3) is None
 
 
 def test_closed_timeline_has_no_splitter() -> None:

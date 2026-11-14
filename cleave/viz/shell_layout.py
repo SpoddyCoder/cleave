@@ -32,12 +32,8 @@ INSPECTOR_WIDTH = DEFAULT_INSPECTOR_WIDTH
 # Same extra frame padding as the menu bar, so an unmeasured navigator is one
 # text row tall and can be measured on the next frame.
 _NAV_ROW_FRAME_PAD_Y = 8.0
-# Hit-rects ``splitter`` role. Centered on each column boundary.
+# Hit-rects ``splitter`` role. Centered on each boundary.
 SPLITTER_HIT_PX = 6
-# The timeline's top-edge zone: this many pixels tall, starting this far
-# below the band's top edge.
-TIMELINE_SPLITTER_HIT_PX = 3
-TIMELINE_SPLITTER_OFFSET_PX = 3
 
 
 def navigator_row_px() -> int:
@@ -221,9 +217,9 @@ def splitter_hit(
     width. ``nav`` is the horizontal navigator/inspector boundary, only as
     wide as the stack, and exists only when the inspector has positive
     height. ``timeline`` is the top edge of the timeline band, as wide as
-    the window, and exists only when the band is open. Its zone is
-    ``TIMELINE_SPLITTER_HIT_PX`` tall, starting ``TIMELINE_SPLITTER_OFFSET_PX``
-    below the edge. The nearest boundary wins. The hit-rects role is
+    the window, and exists only when the band is open. The band's border
+    rule sits on the pixel above its top edge, inside the zone. The nearest
+    boundary wins. The hit-rects role is
     ``splitter``.
     """
     if hit_px <= 0:
@@ -232,10 +228,7 @@ def splitter_hit(
     zones: list[tuple[str, float, float, float, float]] = []
     tl_x, tl_y, tl_w, tl_h = layout.timeline
     if tl_h > 0 and tl_x <= x < tl_x + tl_w:
-        lo = float(TIMELINE_SPLITTER_OFFSET_PX)
-        zones.append(
-            ("timeline", float(tl_y), y, lo, lo + TIMELINE_SPLITTER_HIT_PX)
-        )
+        zones.append(("timeline", float(tl_y), y, -half, half))
     top = layout.visualiser[1]
     height = layout.visualiser[3]
     if height <= 0 or y < top or y >= top + height:
