@@ -1363,6 +1363,10 @@ class ShellHost:
         # Top label under the pointer last frame. Hover opens on entry only, so
         # a click that closes a menu is not undone while the pointer stays put.
         self._bar_hover_index: int | None = None
+        # Dropdown row under the pointer last frame. Only a move onto a new
+        # row takes the highlight, so a resting pointer does not fight the
+        # arrow keys.
+        self._dropdown_hover_index: int | None = None
         # Drawn navigator list height, applied on the next frame. 0 until measured.
         self._nav_content_height_px = 0
         self._nav_measured_rows = 0
@@ -3423,7 +3427,9 @@ class ShellHost:
         ) as (visible, measuring, rect):
             if not visible:
                 return False
-            hit = self._draw_rows(menu_state, command_ctx, menus, index, menu)
+            hit = self._draw_rows(
+                menu_state, command_ctx, menus, index, menu, measuring=measuring
+            )
             if measuring:
                 return False
             x, _y, width, _height = rect
@@ -3437,6 +3443,8 @@ class ShellHost:
         menus: tuple[Any, ...],
         menu_index: int,
         menu: Any,
+        *,
+        measuring: bool,
     ) -> bool:
         rows = tuple(
             None
@@ -3445,6 +3453,15 @@ class ShellHost:
             for item in menu.items
         )
         result = draw_menu_rows(rows, menu_state.item_index)
+        if measuring:
+            self._dropdown_hover_index = None
+        elif result.hovered != self._dropdown_hover_index:
+            self._dropdown_hover_index = result.hovered
+            if result.hovered is not None:
+                row = rows[result.hovered]
+                menu_state.hover_item(
+                    result.hovered if row is not None and row.enabled else None
+                )
         if result.clicked is None:
             return False
         menu_state.click_item(

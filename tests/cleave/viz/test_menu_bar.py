@@ -203,6 +203,19 @@ def test_hover_top_opens_and_never_closes() -> None:
     assert not state.dropdown_open
 
 
+def test_hover_item_moves_the_highlight_and_none_clears_it() -> None:
+    menus = _menus([])
+    state = MenuBarState()
+    state.hover_item(2)
+    assert state.item_index == 0
+    state.click_top(0, menus)
+    state.hover_item(2)
+    assert state.highlighted_command(menus) is menus[0].items[2]
+    state.hover_item(None)
+    assert state.item_index == -1
+    assert state.highlighted_command(menus) is None
+
+
 def test_arrow_after_click_top_selects_an_end_command() -> None:
     runs: list[tuple[str, bool]] = []
     menus = _menus(runs)
@@ -646,8 +659,8 @@ def test_menu_underline_and_popup_row_are_snug() -> None:
     assert top_gap == pytest.approx(expected_top, abs=1.0)
 
 
-def _row_fill(draw_list: object, y: float) -> int | None:
-    """Packed colour of the row-sized translucent quad covering *y*."""
+def _row_fill(draw_list: object, y: float, *, opaque: bool = False) -> int | None:
+    """Packed colour of the row-sized translucent (or *opaque*) quad covering *y*."""
     buf = draw_list.vtx_buffer
     idx = draw_list.idx_buffer
     found: int | None = None
@@ -655,7 +668,7 @@ def _row_fill(draw_list: object, y: float) -> int | None:
         ids = [int(idx[i + k]) for k in range(4)]
         color = int(buf[ids[0]].col)
         alpha = (color >> 24) & 255
-        if alpha == 0 or alpha == 255:
+        if alpha == 0 or (alpha == 255) != opaque:
             continue
         xs = [float(buf[j].pos.x) for j in ids]
         ys = [float(buf[j].pos.y) for j in ids]
@@ -666,16 +679,15 @@ def _row_fill(draw_list: object, y: float) -> int | None:
     return found
 
 
-def test_popup_hover_matches_inspector_and_navigator() -> None:
-    """Popup mouse-hover packs the same wash as an unselected panel row.
+def test_popup_hover_takes_the_opaque_highlight() -> None:
+    """Popup mouse-hover moves the opaque highlight, like a context menu.
 
-    That wash is the theme header hover. The gold selection wash is only for
-    a selected navigator row, and the opaque highlight is only the keyboard row.
+    Unselected panel rows keep the theme header hover wash.
     """
     from cleave.viz import imgui_host, shell_host
     from cleave.viz.shell_focus import ShellFocusState
     from cleave.viz.shell_layout import ShellLayout
-    from cleave.viz.theme import HIGHLIGHT, HOVER, HOVER_BG_ALPHA, SELECTED_WASH_ALPHA
+    from cleave.viz.theme import HIGHLIGHT, HOVER, HOVER_BG_ALPHA
 
     overlay = _Overlay()
     overlay.visibility = 1.0
@@ -741,15 +753,15 @@ def test_popup_hover_matches_inspector_and_navigator() -> None:
         )
         lists = _paint_shell(host, menu, CommandContext(), frames=2)
         popup = next(item for item in lists if item._owner_name == "##cleave-menu")
-        popup_fill = _row_fill(popup, popup_y)
+        popup_fill = _row_fill(popup, popup_y, opaque=True)
         theme_hover = _color_u32_alpha(HOVER, HOVER_BG_ALPHA / 255.0)
-        selection = _color_u32_alpha(HIGHLIGHT, SELECTED_WASH_ALPHA / 255.0)
+        opaque = _color_u32_alpha(HIGHLIGHT, 1.0)
     finally:
         host.imgui.destroy()
     assert nav_fill == theme_hover
     assert inspector_fill == theme_hover
-    assert popup_fill == nav_fill == inspector_fill
-    assert popup_fill != selection
+    assert popup_fill == opaque
+    assert menu.item_index >= 0
 
 
 def _underline_gap(draw_list: object, ink: int) -> float:

@@ -224,6 +224,16 @@ class MenuBarState:
         self.click_top(index, menus)
         self._opened_by_hover = True
 
+    def hover_item(self, item_index: int | None) -> None:
+        """Highlight the dropdown row the pointer just moved onto.
+
+        None (a disabled row, a separator, or off the rows) clears the
+        highlight, like a context menu.
+        """
+        if not self.dropdown_open:
+            return
+        self.item_index = -1 if item_index is None else item_index
+
     def click_item(
         self,
         menu_index: int,

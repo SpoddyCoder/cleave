@@ -44,6 +44,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- Hovering a row in a menu-bar dropdown (New Project, Open Project, and so on) now moves the yellow highlight onto it, the same as a context menu row. A disabled row clears the highlight.
 - The outline of the focused row in the navigator, inspector, timeline strip, dialogs, and file picker is now a dim gold just above the row's highlight, much quieter than the active panel's outline.
 - The selected navigator row and the selected timeline row use the same fainter highlight as a focused inspector row or dialog option, so the row outline reads the same everywhere.
 - File picker rows and shortcuts highlight with the same padding as dialog rows, so the highlight no longer hugs the text.
