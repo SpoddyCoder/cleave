@@ -1338,3 +1338,58 @@ def _motion(y: int) -> pygame.event.Event:
         rel=(0, 0),
         buttons=(0, 0, 0),
     )
+
+
+def test_switching_menus_never_shows_the_last_menus_size() -> None:
+    """A hover onto the next title shows its dropdown at its own size.
+
+    A menu's first open measures off-screen; a menu seen before shows at its
+    own size on the first frame back.
+    """
+    from imgui_bundle import imgui
+
+    from cleave.viz import imgui_host, shell_host
+    from cleave.viz.shell_layout import ShellLayout
+
+    overlay = _Overlay()
+    overlay.visibility = 1.0
+    menu = MenuBarState()
+    controls = _shell_controls()
+    controls.build_view_state = lambda **_kwargs: None
+    controls.focus_cursor = None
+    controls.shell_focus = SimpleNamespace(region=ShellRegion.NAVIGATOR)
+    file_index = next(i for i, item in enumerate(MENUS) if item.label == "File")
+    view_index = next(i for i, item in enumerate(MENUS) if item.label == "View")
+    with patch.object(imgui_host, "_gl_context_current", return_value=False):
+        host = _open_shell(overlay, menu, controls)
+
+    def popup() -> tuple[tuple[float, float], tuple[float, float]]:
+        window = imgui.internal.find_window_by_name("##cleave-menu")
+        return (window.pos.x, window.pos.y), (window.size.x, window.size.y)
+
+    try:
+        host.imgui.display_size = (1280, 720)
+        height = shell_host.menu_bar_height_px()
+        host.set_layout(ShellLayout.compute(1280, 720, height, height, 0))
+        host.process_event(_motion(4))
+        host._draw_navigator = lambda: None
+        host._draw_inspector = lambda _state: None
+        ctx = CommandContext()
+        _paint_shell(host, menu, ctx, frames=1)
+        menu.open_menu(file_index, MENUS)
+        _paint_shell(host, menu, ctx, frames=3)
+        _file_pos, file_size = popup()
+        menu.open_menu(view_index, MENUS)
+        _paint_shell(host, menu, ctx, frames=1)
+        first_view_pos, _ = popup()
+        _paint_shell(host, menu, ctx, frames=2)
+        _view_pos, view_size = popup()
+        menu.open_menu(file_index, MENUS)
+        _paint_shell(host, menu, ctx, frames=1)
+        back_pos, back_size = popup()
+    finally:
+        host.imgui.destroy()
+    assert file_size != view_size
+    assert first_view_pos[0] < 0 and first_view_pos[1] < 0
+    assert back_pos[0] >= 0 and back_pos[1] >= 0
+    assert back_size == file_size

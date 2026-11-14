@@ -8,7 +8,7 @@ Related: [editor-first](../../../AGENTS.md), [todos.md](../todos.md).
 
 ## Shipped
 
-- Framework: `ContextMenuState` and `ContextSubmenu` in [context_menu.py](../../../cleave/viz/context_menu.py); `ContextMenuSurface`, `ContextSubmenuSurface`, and `_FittedWindow` in [menu_rows.py](../../../cleave/viz/menu_rows.py). A new menu draws one frame off-screen to measure its rows, then opens at its final size and edge-clamped spot.
+- Framework: `ContextMenuState` and `ContextSubmenu` in [context_menu.py](../../../cleave/viz/context_menu.py); `ContextMenuSurface`, `ContextSubmenuSurface`, and `FittedWindow` in [menu_rows.py](../../../cleave/viz/menu_rows.py). A new menu draws one frame off-screen to measure its rows, then opens at its final size and edge-clamped spot.
 - Timeline strip row: show / hide, override visibility, release all overrides, arm ([timeline_context_menu.py](../../../cleave/viz/timeline_context_menu.py)).
 - Timeline cue: right-click selects the cue; Go to cue, and Cut / Blend / Role submenus ([cue_context_menu.py](../../../cleave/viz/cue_context_menu.py)).
 - Navigator row: expand / collapse, on/off, solo, lock, Add layer; layer rows add Go to page, Move up / down, and Delete layer ([navigator_context_menu.py](../../../cleave/viz/navigator_context_menu.py)).

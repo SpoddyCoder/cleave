@@ -35,9 +35,9 @@ from cleave.viz.inspector_controls import (
 )
 from cleave.viz.menu_bar import MenuBarState, menus_for_session
 from cleave.viz.menu_rows import (
-    POPUP_FLAGS,
     ContextMenuSurface,
     ContextSubmenuSurface,
+    FittedWindow,
     MenuRowView,
     draw_menu_rows,
     opaque_highlight_fill,
@@ -1357,6 +1357,9 @@ class ShellHost:
         self._strip_pointer = strip_pointer
         self._menu_bar_height_px = bar_height
         self._dropdown_span: tuple[float, float] | None = None
+        # One fitted window per top menu, so a hover onto the next title
+        # shows its dropdown at its own size, not the last menu's for a frame.
+        self._dropdown_window = FittedWindow("##cleave-menu", remember_keys=True)
         # Top label under the pointer last frame. Hover opens on entry only, so
         # a click that closes a menu is not undone while the pointer stays put.
         self._bar_hover_index: int | None = None
@@ -3410,23 +3413,22 @@ class ShellHost:
             origin_y = float(self._menu_bar_height_px) - 1.0
         else:
             origin_x, origin_y = anchor
-        imgui.set_next_window_pos(
-            imgui.ImVec2(origin_x, origin_y), imgui.Cond_.always
-        )
-        # Begun after the shell panels, and those panels do not raise themselves,
-        # so the popup covers them. Chrome is raised after this window. Do not
-        # focus it: FocusWindow clears the menu-bar button's ActiveId, and a
-        # later click on another top label never completes.
-        visible, _open = imgui.begin("##cleave-menu", None, POPUP_FLAGS)
-        try:
+        # Begun after the shell panels and raised over them; chrome is raised
+        # after this window. Do not focus it: FocusWindow clears the menu-bar
+        # button's ActiveId, and a later click on another top label never
+        # completes. A menu's first open measures off-screen for one frame.
+        with self._dropdown_window.begin(
+            (index, menu.label),
+            lambda _size, _display: (origin_x, origin_y),
+        ) as (visible, measuring, rect):
             if not visible:
                 return False
-            pos = imgui.get_window_pos()
-            self._dropdown_span = (pos.x, pos.x + imgui.get_window_width())
             hit = self._draw_rows(menu_state, command_ctx, menus, index, menu)
+            if measuring:
+                return False
+            x, _y, width, _height = rect
+            self._dropdown_span = (float(x), float(x + width))
             return hit or _mouse_in_current_window()
-        finally:
-            imgui.end()
 
     def _draw_rows(
         self,

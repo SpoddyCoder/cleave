@@ -330,7 +330,7 @@ _MEASURE_POS = (-100000.0, -100000.0)
 Origin = Callable[[tuple[float, float], tuple[float, float]], tuple[float, float]]
 
 
-class _FittedWindow:
+class FittedWindow:
     """A menu window sized and placed from the rows it drew last frame.
 
     The size must be known before ``begin``: ImGui draws a window's
@@ -340,21 +340,26 @@ class _FittedWindow:
     measures the rows it drew (the cursor extent plus window padding), and
     the next frame sets that size and the origin that fits it. The first
     frame for a new *key* has no measure yet and draws off-screen.
+
+    With ``remember_keys`` every key keeps its last measure, so switching
+    back to a key shows at its size at once. Use it when keys are a small
+    fixed set, like the menu-bar menus.
     """
 
-    def __init__(self, name: str) -> None:
+    def __init__(self, name: str, *, remember_keys: bool = False) -> None:
         self.name = name
-        self._fit: tuple[object, tuple[float, float]] | None = None
+        self._remember_keys = remember_keys
+        self._fits: dict[object, tuple[float, float]] = {}
 
     def forget(self) -> None:
-        self._fit = None
+        self._fits = {}
 
     @contextmanager
     def begin(
         self, key: object, origin: Origin
     ) -> Iterator[tuple[bool, bool, Rect]]:
         """Open the window; yield (visible, measuring, rect). Close it after."""
-        fit = self._fit[1] if self._fit is not None and self._fit[0] == key else None
+        fit = self._fits.get(key)
         measuring = fit is None
         if measuring:
             imgui.set_next_window_pos(imgui.ImVec2(*_MEASURE_POS), imgui.Cond_.always)
@@ -374,7 +379,10 @@ class _FittedWindow:
             rect = (int(pos.x), int(pos.y), max(0, int(size.x)), max(0, int(size.y)))
             yield visible, measuring, rect
             if visible:
-                self._fit = (key, _drawn_window_size())
+                if self._remember_keys:
+                    self._fits[key] = _drawn_window_size()
+                else:
+                    self._fits = {key: _drawn_window_size()}
         finally:
             imgui.end()
 
@@ -397,14 +405,14 @@ class ContextMenuSurface:
     with a hint shows the hint as a tooltip. Keep one instance and push it
     each frame the menu is open. A newly opened menu draws one frame
     off-screen to measure its rows, then shows at the spot that fits them
-    (``_FittedWindow``).
+    (``FittedWindow``).
     """
 
     modal = False
 
     def __init__(self, state: Callable[[], ContextMenuState]) -> None:
         self._state = state
-        self._window = _FittedWindow(_CONTEXT_WINDOW)
+        self._window = FittedWindow(_CONTEXT_WINDOW)
         self._last_hovered: int | None = None
         self.row_rects: tuple[Rect | None, ...] = ()
 
@@ -457,7 +465,7 @@ class ContextSubmenuSurface:
 
     def __init__(self, parent: ContextMenuSurface) -> None:
         self._parent = parent
-        self._window = _FittedWindow(_SUBMENU_WINDOW)
+        self._window = FittedWindow(_SUBMENU_WINDOW)
         self._last_hovered: int | None = None
 
     def draw(self) -> Rect:

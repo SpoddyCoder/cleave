@@ -129,6 +129,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- Moving from one menu bar title to another no longer flashes the new dropdown at the previous menu's size before it fits its own items.
 - Opening a menu-bar menu closes an open right-click menu, so the two never show at once.
 - projectM warnings and errors (such as a preset whose per-pixel code fails to compile) name the layer they came from, as in "Layer 2: projectM: …". The missing preset anchor warning names panel layer numbers instead of internal slot names, and "Populated N presets" and "Added preset" name their layer.
 - When the navigator, inspector, or help column has more rows than fit, the rows stop short of the panel border at the top and bottom instead of running into it.
