@@ -141,7 +141,7 @@ def measure_form(
     *,
     line_gap: int,
 ) -> tuple[int, int]:
-    """Width and height of the field rows and the info line."""
+    """Width and height of the field rows."""
     line_h = measure.get_linesize()
     width = 0
     height = 0
@@ -153,9 +153,6 @@ def measure_form(
         row_w = indent + measure.size(row.label)[0] + form_label_gap()
         width = max(width, row_w + form_control_width(measure, row))
         height += form_row_height(line_h)
-    if state.form_info is not None and not state.form_info_under_title:
-        width = max(width, measure.size(state.form_info)[0])
-        height += line_gap + line_h
     return width, height
 
 
@@ -187,11 +184,10 @@ def measure_panel(
         content_w = max(content_w, body_w)
         content_h += len(lines) * line_h + max(0, len(lines) - 1) * line_gap
 
-    title_info = state.form_info if state.form_info_under_title else None
-    if title_info is not None:
+    if state.form_info is not None:
         if has_message:
             content_h += line_gap
-        content_w = max(content_w, measure.size(title_info)[0])
+        content_w = max(content_w, measure.size(state.form_info)[0])
         content_h += line_h
 
     if has_labeled:

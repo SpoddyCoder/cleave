@@ -699,11 +699,10 @@ class ModalSurface:
                 line_h,
                 line_gap,
             )
-        title_info = view.form_info if view.form_info_under_title else None
-        if title_info is not None:
+        if view.form_info is not None:
             if has_message:
                 y += line_gap
-            _text(draw, x, y, title_info, HIGHLIGHT)
+            _text(draw, x, y, view.form_info, HIGHLIGHT)
             y += line_h
         if has_labeled:
             if has_message:
@@ -735,10 +734,6 @@ class ModalSurface:
                 line_h=line_h,
                 line_gap=line_gap,
             )
-            if view.form_info is not None and title_info is None:
-                y += line_gap
-                _text(draw, x, y, view.form_info, HIGHLIGHT)
-                y += line_h
         if view.options:
             if has_message or has_labeled or has_bar:
                 y += line_h + line_gap

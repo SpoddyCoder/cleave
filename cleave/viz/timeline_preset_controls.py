@@ -307,7 +307,6 @@ class TimelinePresetController:
                     values, duration_sec
                 ),
                 info=lambda _values: self._generate_info(),
-                info_under_title=True,
                 help=_GENERATE_HELP,
             )
         )
@@ -349,7 +348,7 @@ class TimelinePresetController:
         self._modal.prompt_form(
             FormSpec(
                 title=_RESET_TITLE,
-                body=f"Removes {_cues_label(count)}.",
+                info=lambda _values: f"(removes {_cues_label(count)})",
                 fields=(
                     FormField(
                         "layers",

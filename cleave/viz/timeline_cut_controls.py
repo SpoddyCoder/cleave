@@ -171,7 +171,7 @@ class TimelineCutController:
             song_marker_times=self.session.song_markers.times,
             scope=_SCOPE_OPTIONS[values["scope"]],
         )
-        return f"Changes {changed} of {total} cues."
+        return f"(changes {changed} of {total} cues)"
 
     def _confirm(self, values: FormValues) -> None:
         self._last_values = values

@@ -236,29 +236,28 @@ def test_section_headings_add_height_but_not_focus_stops() -> None:
     assert modal.view_state().form_rows[1].focused
 
 
-def _info_form(modal: ModalHost, *, under_title: bool) -> None:
+def _info_form(modal: ModalHost, *, info: str | None) -> None:
     modal.prompt_form(
         FormSpec(
             title="Info",
             fields=(FormField("a", "a", ("x", "y")),),
             confirm_label="Go",
             on_confirm=lambda _values: None,
-            info=lambda _values: "a fairly long line of information text",
-            info_under_title=under_title,
+            info=lambda _values: info,
         )
     )
 
 
-def test_info_under_title_keeps_the_panel_height() -> None:
-    below = ModalHost()
-    _info_form(below, under_title=False)
-    above = ModalHost()
-    _info_form(above, under_title=True)
-    assert above.view_state().form_info_under_title
-    assert not below.view_state().form_info_under_title
-    assert measure_panel(
-        _Measure(), above.view_state(), line_gap=2, screen_w=1920
-    ) == measure_panel(_Measure(), below.view_state(), line_gap=2, screen_w=1920)
+def test_info_adds_one_line_under_the_title() -> None:
+    plain = ModalHost()
+    _info_form(plain, info=None)
+    with_info = ModalHost()
+    _info_form(with_info, info="(moves 1 of 1 cues)")
+    plain_h = measure_panel(_Measure(), plain.view_state(), line_gap=2, screen_w=1920)[1]
+    info_h = measure_panel(
+        _Measure(), with_info.view_state(), line_gap=2, screen_w=1920
+    )[1]
+    assert info_h == plain_h + 2 + 16
 
 
 def _combo_form(modal: ModalHost, confirmed: list[FormValues]) -> None:

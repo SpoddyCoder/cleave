@@ -1789,7 +1789,6 @@ def test_generate_names_the_cues_it_replaces_under_the_title() -> None:
     modal_view = controls.modal_host.view_state()
     assert modal_view is not None
     assert modal_view.form_info == "(replaces 1 cue on the timeline)"
-    assert modal_view.form_info_under_title
 
 
 def test_generate_hides_character_in_pattern_mask_mode() -> None:
@@ -2004,6 +2003,8 @@ def test_timeline_reset_enter_opens_choice_modal() -> None:
     assert modal_view.option_roles[0] is ButtonRole.DANGER
     assert modal_view.focus_index == 1
     assert "reset" in modal_view.message.lower()
+    assert modal_view.body is None
+    assert modal_view.form_info == "(removes 0 cues)"
 
 
 def test_timeline_reset_all_off() -> None:
@@ -2195,7 +2196,7 @@ def test_timeline_snap_cues_opens_a_form() -> None:
     assert modal_view.message == "Snap cues"
     assert [row.label for row in modal_view.form_rows] == ["snap to"]
     assert modal_view.form_rows[0].options == ("beats", "bars")
-    assert modal_view.form_info == "Moves 1 of 1 cues."
+    assert modal_view.form_info == "(moves 1 of 1 cues)"
 
 
 def test_timeline_snap_beats_mutates_cues() -> None:
@@ -2410,7 +2411,7 @@ def test_snap_to_markers_opens_one_form_with_proximity_and_layers() -> None:
     assert layers.options[layers.value] == "All Layers"
     assert "Closest Wins" in layers.options
     assert "Layer 1" in layers.options
-    assert modal_view.form_info == "Moves 1 of 1 cues."
+    assert modal_view.form_info == "(moves 1 of 1 cues)"
 
 
 def test_snap_form_hides_marker_fields_for_beats() -> None:
@@ -2546,9 +2547,9 @@ def test_set_cut_type_opens_one_form_with_a_live_count() -> None:
     assert modal_view.message == "Set cut type on cues"
     assert [row.label for row in modal_view.form_rows] == ["cut type", "applies to"]
     assert modal_view.form_rows[0].options == ("hard", "soft", "none")
-    assert modal_view.form_info == "Changes 2 of 2 cues."
+    assert modal_view.form_info == "(changes 2 of 2 cues)"
     _set_form_field(controls, "applies to", "markers only")
-    assert controls.modal_host.view_state().form_info == "Changes 1 of 2 cues."
+    assert controls.modal_host.view_state().form_info == "(changes 1 of 2 cues)"
     assert controls.session.timeline.lanes == before
 
 

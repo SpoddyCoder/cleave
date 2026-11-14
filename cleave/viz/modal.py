@@ -72,8 +72,7 @@ class FormSpec:
 
     ``info`` is a line of feedback on the draft values, such as a count of the
     cues a command would change. It runs when a value changes, not every frame.
-    It draws under the fields, or under the title when ``info_under_title`` is
-    set (for a line that does not follow the fields).
+    It draws in brackets under the title, in lower case.
     ``help`` describes the whole dialog in the help column.
     """
 
@@ -84,7 +83,6 @@ class FormSpec:
     on_cancel: Callable[[], None] | None = None
     body: str | None = None
     info: Callable[[FormValues], str | None] | None = None
-    info_under_title: bool = False
     destructive: bool = False
     help: tuple[str, ...] = ()
 
@@ -239,7 +237,6 @@ class ModalViewState:
     option_roles: tuple[ButtonRole, ...] = ()
     form_rows: tuple[FormRowView, ...] = ()
     form_info: str | None = None
-    form_info_under_title: bool = False
     form_buttons_focused: bool = False
     # The open combo list of a form row; ``target`` is the row index.
     form_choice: ChoiceListView | None = None
@@ -318,7 +315,6 @@ class ModalHost:
             option_roles=tuple(option.role for option in self._request.options),
             form_rows=form_rows,
             form_info=None if form is None else form.info,
-            form_info_under_title=form is not None and form.spec.info_under_title,
             form_buttons_focused=form is not None and form.field_index is None,
             form_choice=choice_list_view(self._form_choice),
         )

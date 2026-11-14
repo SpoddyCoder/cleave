@@ -243,7 +243,7 @@ class TimelineSnapController:
                 slots=slots,
                 mode=mode,
             )
-            return f"Moves {moved} of {total} cues."
+            return f"(moves {moved} of {total} cues)"
         grid = self._bar_times if target == _TARGET_BARS else self._beat_times
         if not grid:
             return None
@@ -251,7 +251,7 @@ class TimelineSnapController:
         for lane in tl.lanes.values():
             snapped = {cue.t for cue in snap_lane_to_beats(lane, grid).cues}
             moved += sum(1 for cue in lane.cues if cue.t not in snapped)
-        return f"Moves {moved} of {total} cues."
+        return f"(moves {moved} of {total} cues)"
 
     def _snap_song_markers(
         self,
