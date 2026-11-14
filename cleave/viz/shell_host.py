@@ -177,8 +177,8 @@ _MENU_BAR_FRAME_PADDING_Y = 8.0
 # Extra space between the menu-bar rule and the first popup row.
 _INSPECTOR_INDENT = 16.0
 # Extra space above and below each inspector row, so a focused row's outline
-# clears its segments, combo box, or buttons.
-_INSPECTOR_ROW_PAD_Y = 2.0
+# clears its segments, combo box, or buttons. Navigator rows share it.
+_ROW_PAD_Y = 2.0
 # Height of an inspector divider, as a fraction of the text line.
 _INSPECTOR_DIVIDER_LINES = 0.5
 _NAV_LOCK_MARK = "[lock]"
@@ -1326,6 +1326,31 @@ def _draw_button(
     return clicked
 
 
+def _padded_row_spacing_y() -> float:
+    """Item spacing between navigator and inspector rows.
+
+    Selectables grow by half the item spacing above and below, so this adds
+    _ROW_PAD_Y to each side of every row's highlight. Whole pixels keep the
+    measured navigator height the same from frame to frame.
+    """
+    return float(
+        round(imgui.get_style().item_spacing.y + 2.0 * ui_chrome_px(_ROW_PAD_Y))
+    )
+
+
+@contextmanager
+def _padded_rows() -> Iterator[None]:
+    """Push the padded row spacing for a navigator or inspector list, then pop."""
+    imgui.push_style_var(
+        imgui.StyleVar_.item_spacing,
+        imgui.ImVec2(imgui.get_style().item_spacing.x, _padded_row_spacing_y()),
+    )
+    try:
+        yield
+    finally:
+        imgui.pop_style_var()
+
+
 @contextmanager
 def _selected_header_wash(selected: bool, *, inspector: bool = False) -> Iterator[None]:
     """Push a selected-row header fill, then pop.
@@ -1433,7 +1458,7 @@ class ShellHost:
             len(self._visible_nav_nodes()),
             chrome_px=2.0 * float(style.window_padding.y)
             + float(style.window_border_size),
-            spacing_px=float(style.item_spacing.y),
+            spacing_px=_padded_row_spacing_y(),
         )
 
     def _visible_nav_nodes(self) -> tuple[NavNode, ...]:
@@ -2314,15 +2339,16 @@ class ShellHost:
     def _draw_navigator(self) -> None:
         imgui.push_style_color(imgui.Col_.text, rgba(LABEL))
         try:
-            nodes = self._visible_nav_nodes()
-            self._nav_row_rects = {}
-            for node, rails in zip(nodes, navigator_tree_rails(nodes)):
-                self._draw_nav_node(node, rails)
+            with _padded_rows():
+                nodes = self._visible_nav_nodes()
+                self._nav_row_rects = {}
+                for node, rails in zip(nodes, navigator_tree_rails(nodes)):
+                    self._draw_nav_node(node, rails)
+                self._nav_content_height_px = _navigator_content_height_px()
         finally:
             imgui.pop_style_color()
         self._finish_row_drag(DRAG_LAYER)
         self._nav_measured_rows = len(nodes)
-        self._nav_content_height_px = _navigator_content_height_px()
 
     def _draw_nav_node(self, node: NavNode, rails: tuple[bool, ...]) -> None:
         focus = self._controls.shell_focus
@@ -2508,24 +2534,13 @@ class ShellHost:
         _draw_inspector_title(title, elapsed)
         _draw_inspector_divider()
         self._choice_rects = {}
-        # Selectables grow by half the item spacing above and below, so this
-        # adds _INSPECTOR_ROW_PAD_Y to each side of every row's highlight.
-        spacing = imgui.get_style().item_spacing
-        imgui.push_style_var(
-            imgui.StyleVar_.item_spacing,
-            imgui.ImVec2(
-                spacing.x, spacing.y + 2.0 * ui_chrome_px(_INSPECTOR_ROW_PAD_Y)
-            ),
-        )
         self._insp_row_rects = {}
-        try:
+        with _padded_rows():
             for row in build_inspector_rows(state, focus.selected_id):
                 if row.divider:
                     _draw_inspector_divider()
                     continue
                 self._draw_inspector_row(state, row)
-        finally:
-            imgui.pop_style_var()
         self._finish_row_drag(DRAG_PRESET)
         self._draw_colour_picker()
         self._draw_choice_list()
