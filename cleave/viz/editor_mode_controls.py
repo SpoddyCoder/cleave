@@ -12,7 +12,7 @@ from cleave.preset_playlist import PresetPlaylist, scan_all_layers
 from cleave.project import load_manifest
 from cleave.viz.config_save import ConfigSaveController
 from cleave.viz.live_layer_bindings import LiveLayerBindings
-from cleave.viz.modal import ModalHost, ModalOption
+from cleave.viz.modal import ButtonRole, ModalHost, ModalOption
 from cleave.viz.session import EditorMode, TuningSession, session_from_cfg
 
 if TYPE_CHECKING:
@@ -154,23 +154,21 @@ class EditorModeController:
             on_confirm = self.request_exit_to_visualizer
         else:
             on_confirm = self.request_enter_curation
-        self._modal.prompt_choice(
-            editor_mode_switch_prompt(current),
-            [
-                ModalOption("OK", on_confirm),
-                ModalOption("Cancel", lambda: None),
-            ],
+        self._modal.prompt_confirm(
+            editor_mode_switch_prompt(current), "Switch", on_confirm
         )
 
     def request_enter_curation(self) -> None:
         if is_preset_curation_mode(self.session.settings.editor_mode):
             return
         if self._config_save.config_dirty:
-            self._modal.prompt_choice(
+            self._modal.prompt_buttons(
                 _ENTER_CURATION_DIRTY_MESSAGE,
                 [
-                    ModalOption("Save", self._enter_curation_via_save),
-                    ModalOption("Discard changes", self._enter_curation_via_discard),
+                    ModalOption(
+                        "Save", self._enter_curation_via_save, ButtonRole.PRIMARY
+                    ),
+                    ModalOption("Don't save", self._enter_curation_via_discard),
                     ModalOption("Cancel", self._cancel_enter_curation),
                 ],
                 on_dismiss=self._cancel_enter_curation,

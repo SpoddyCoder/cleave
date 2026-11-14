@@ -66,11 +66,11 @@ def test_enter_curation_confirms_via_modal() -> None:
     _prompt_editor_mode(controls)
     view = controls.modal_host.view_state()
     assert view is not None
-    assert view.kind == ModalKind.CHOICE
+    assert view.kind == ModalKind.CONFIRM
     assert view.message == "Switch the editor to Preset Curation mode?"
-    assert list(view.options) == ["OK", "Cancel"]
+    assert list(view.options) == ["Switch", "Cancel"]
     assert view.focus_index == 0
-    _choose_editor_mode_option(controls, "OK")
+    _choose_editor_mode_option(controls, "Switch")
     assert not controls.modal_host.active
     assert controls.session.settings.editor_mode == "preset_curation"
 
@@ -81,7 +81,7 @@ def test_enter_curation_focuses_first_layer_preset_row() -> None:
 
     controls = _make_controls(("layer_1", "layer_2"))
     controls.navigator.select("overlay")
-    _choose_editor_mode_option(controls, "OK")
+    _choose_editor_mode_option(controls, "Switch")
 
     preset = RowDescriptor(RowKind.TRACK_PRESET, slot="layer_1")
     focus = controls.shell_focus
@@ -125,7 +125,7 @@ def test_enter_curation_defaults_full_mix_and_disables_rotation() -> None:
     controls.editor_mode._layer_bindings = mock_bindings
     controls._layer_bindings = mock_bindings
 
-    _choose_editor_mode_option(controls, "OK")
+    _choose_editor_mode_option(controls, "Switch")
 
     assert not controls.modal_host.active
     assert controls.session.settings.editor_mode == "preset_curation"
@@ -183,11 +183,11 @@ def test_curation_ignores_layer_lock() -> None:
 def test_dirty_enter_modal_cancel_stays_visualizer() -> None:
     controls = _make_controls(("layer_1",))
     _mutate_dirty(controls)
-    _choose_editor_mode_option(controls, "OK")
+    _choose_editor_mode_option(controls, "Switch")
     assert controls.modal_host.active
     view = controls.modal_host.view_state()
-    assert view.kind == ModalKind.CHOICE
-    assert list(view.options) == ["Save", "Discard changes", "Cancel"]
+    assert view.kind == ModalKind.CONFIRM
+    assert list(view.options) == ["Save", "Don't save", "Cancel"]
 
     controls.handle_keydown(keydown(pygame.K_ESCAPE))
     assert not controls.modal_host.active
@@ -228,8 +228,8 @@ def test_exit_curation_reloads_and_clears_dirty() -> None:
         view = controls.modal_host.view_state()
         assert view is not None
         assert view.message == "Switch the editor to Visual Editor mode?"
-        assert list(view.options) == ["OK", "Cancel"]
-        _choose_editor_mode_option(controls, "OK")
+        assert list(view.options) == ["Switch", "Cancel"]
+        _choose_editor_mode_option(controls, "Switch")
         assert not controls.modal_host.active
 
     assert controls.session.settings.editor_mode == "visualizer"

@@ -11,7 +11,7 @@ from cleave.config_schema.project_render import (
     default_project_render_path,
     resolved_project_render_end_sec,
 )
-from cleave.viz.modal import ModalHost, ModalLabeledLine, ModalOption
+from cleave.viz.modal import ModalHost, ModalLabeledLine
 from cleave.viz.playback import PlaybackState, toggle_pause
 from cleave.viz.project_render_job import (
     ProjectRenderSpec,
@@ -25,7 +25,6 @@ _CONFIRM_TITLE = "Render the project?"
 _PROGRESS_MESSAGE = "Rendering project..."
 _SUCCESS_MESSAGE = "Render complete"
 _FAILED_MESSAGE = "Render failed"
-_OK_LABEL = "OK"
 
 
 def project_render_output_path(
@@ -227,9 +226,9 @@ class ProjectRenderController:
 
     def _prompt_success(self, output_path: Path) -> None:
         label = project_render_output_label(output_path)
-        self._modal.prompt_choice(
+        self._modal.prompt_notice(
             _SUCCESS_MESSAGE,
-            [ModalOption(_OK_LABEL, self._restore_playback)],
+            self._restore_playback,
             labeled_lines=(ModalLabeledLine("output", label),),
         )
 
@@ -237,8 +236,8 @@ class ProjectRenderController:
         line = " ".join(detail.split())
         if len(line) > 96:
             line = line[:95] + "..."
-        self._modal.prompt_choice(
+        self._modal.prompt_notice(
             _FAILED_MESSAGE,
-            [ModalOption(_OK_LABEL, self._restore_playback)],
+            self._restore_playback,
             labeled_lines=(ModalLabeledLine("error", line or "unknown error"),),
         )

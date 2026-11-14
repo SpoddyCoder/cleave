@@ -41,6 +41,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- The editor mode switch, the save prompt before entering preset curation, and the render complete and render failed dialogs use the same right-aligned buttons as other dialogs. The mode switch confirms with Switch, and the save prompt offers Save, Don't save, and Cancel.
 - Preset markers are separate brackets: [F] [B] [L] [R:x], not a combined [FBU]. The preset list marker is now [L] (was [U]) and shows on a layer's current preset only when that layer's own preset list holds it, never in preset curation.
 - Preset curation no longer moves, copies, or deletes preset files. Favourites, blacklist, and cue roles are kept in `cleave.db` in the data directory, keyed by each preset's contents, so they follow a preset that is renamed or moved and match its copies in project preset lists. The first launch after an update shows "Indexing presets" while it reads the preset folder.
 - Each curation key undoes itself. F favourites or unfavourites the preset at once, with no dialog. B blacklists after a confirm, or unblacklists at once. C picks a role, or None to clear it.

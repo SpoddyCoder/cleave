@@ -454,7 +454,7 @@ def test_render_confirm_shows_progress_then_success(
     assert controls.project_render.busy is False
     done = controls.modal_host.view_state()
     assert done is not None
-    assert done.kind == ModalKind.CHOICE
+    assert done.kind == ModalKind.CONFIRM
     assert done.message == "Render complete"
     assert done.options == ("OK",)
     assert done.labeled_lines == (
@@ -480,7 +480,7 @@ def test_render_confirm_failure_shows_error_modal(
     controls.tick(0.016)
     view = controls.modal_host.view_state()
     assert view is not None
-    assert view.kind == ModalKind.CHOICE
+    assert view.kind == ModalKind.CONFIRM
     assert view.message == "Render failed"
     assert view.labeled_lines == (
         ModalLabeledLine("error", "ffmpeg exited with status 1"),

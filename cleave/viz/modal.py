@@ -330,23 +330,67 @@ class ModalHost:
             if on_cancel is not None:
                 on_cancel()
 
+        self.prompt_buttons(
+            message,
+            [
+                ModalOption(
+                    confirm_label,
+                    on_confirm,
+                    ButtonRole.DANGER if destructive else ButtonRole.PRIMARY,
+                ),
+                ModalOption("Cancel", on_cancel_action),
+            ],
+            on_dismiss=on_cancel,
+            initial_focus_index=1 if destructive else 0,
+            labeled_lines=labeled_lines,
+            body=body,
+        )
+
+    def prompt_buttons(
+        self,
+        message: str,
+        options: list[ModalOption],
+        on_dismiss: Callable[[], None] | None = None,
+        *,
+        initial_focus_index: int = 0,
+        labeled_lines: Sequence[ModalLabeledLine] = (),
+        body: str | None = None,
+    ) -> None:
+        """Ask with a right-aligned row of buttons, one per option.
+
+        Give at most one option a PRIMARY or DANGER role. Esc runs
+        ``on_dismiss``.
+        """
         self.prompt(
             ModalRequest(
                 kind=ModalKind.CONFIRM,
                 message=message,
-                options=[
-                    ModalOption(
-                        confirm_label,
-                        on_confirm,
-                        ButtonRole.DANGER if destructive else ButtonRole.PRIMARY,
-                    ),
-                    ModalOption("Cancel", on_cancel_action),
-                ],
-                on_dismiss=on_cancel,
-                initial_focus_index=1 if destructive else 0,
+                options=options,
+                on_dismiss=on_dismiss,
+                initial_focus_index=initial_focus_index,
                 labeled_lines=tuple(labeled_lines),
                 body=body,
             )
+        )
+
+    def prompt_notice(
+        self,
+        message: str,
+        on_close: Callable[[], None] | None = None,
+        *,
+        labeled_lines: Sequence[ModalLabeledLine] = (),
+    ) -> None:
+        """Tell the user something, with one OK button. Esc also closes it."""
+
+        def close() -> None:
+            if on_close is not None:
+                on_close()
+
+        self.prompt_buttons(
+            message,
+            [ModalOption("OK", close, ButtonRole.PRIMARY)],
+            on_dismiss=on_close,
+            labeled_lines=labeled_lines,
         )
 
     def prompt_choice(

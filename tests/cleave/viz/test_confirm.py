@@ -4,7 +4,12 @@ from __future__ import annotations
 
 import pygame
 
-from cleave.viz.modal import ModalHost, ModalOption
+from cleave.viz.modal import (
+    BUTTON_ROW_KINDS,
+    ButtonRole,
+    ModalHost,
+    ModalOption,
+)
 
 
 def _keydown(key: int) -> pygame.event.Event:
@@ -136,3 +141,34 @@ def test_prompt_choice_omitted_initial_focus_stays_zero() -> None:
     view = modal.view_state()
     assert view is not None
     assert view.focus_index == 0
+
+
+def test_prompt_buttons_draws_as_button_row() -> None:
+    modal = ModalHost()
+    modal.prompt_buttons(
+        "Save?",
+        [
+            ModalOption("Save", lambda: None, ButtonRole.PRIMARY),
+            ModalOption("Cancel", lambda: None),
+        ],
+    )
+    view = modal.view_state()
+    assert view is not None
+    assert view.kind in BUTTON_ROW_KINDS
+    assert view.option_roles == (ButtonRole.PRIMARY, ButtonRole.PLAIN)
+
+
+def test_prompt_notice_ok_and_escape_both_close() -> None:
+    closed: list[str] = []
+    modal = ModalHost()
+    modal.prompt_notice("Done", lambda: closed.append("x"))
+    view = modal.view_state()
+    assert view is not None
+    assert view.kind in BUTTON_ROW_KINDS
+    assert view.options == ("OK",)
+    modal.handle_keydown(_keydown(pygame.K_RETURN))
+    assert closed == ["x"] and not modal.active
+
+    modal.prompt_notice("Done", lambda: closed.append("y"))
+    modal.handle_keydown(_keydown(pygame.K_ESCAPE))
+    assert closed == ["x", "y"] and not modal.active
