@@ -32,6 +32,37 @@ _TARGET_BARS = "bars"
 _TARGET_SONG_MARKERS = "song markers"
 _DEFAULT_PROXIMITY = 5.0
 
+_SNAP_HELP = (
+    "Moves the cues already on the timeline.",
+    "Cues that land on the same time merge.",
+)
+_TARGET_HELP = ("Where the cues move to.",)
+_TARGET_OPTION_HELP = {
+    _TARGET_BEATS: "every cue moves to the nearest beat.",
+    _TARGET_BARS: "every cue moves to the nearest bar.",
+    _TARGET_SONG_MARKERS: "cues near a song marker move onto it.",
+}
+_PROXIMITY_HELP = (
+    "How far from a song marker a cue can be and still move onto it.",
+    "Cues further away stay where they are.",
+)
+_SCOPE_HELP = ("Which layers' cues move onto the song markers.",)
+_SCOPE_OPTION_HELP = {
+    SONG_MARKER_SNAP_SCOPE_CLOSEST_WINS: (
+        "one cue per marker: the closest on any layer."
+    ),
+    SONG_MARKER_SNAP_SCOPE_EACH_LAYER: (
+        "on each layer, the closest cue moves onto each marker."
+    ),
+}
+
+
+def _scope_option_help(scope: str, layer_z_order: Sequence[str]) -> str:
+    text = _SCOPE_OPTION_HELP.get(scope)
+    if text is not None:
+        return text
+    return f"only layer {layer_z_order.index(scope) + 1}'s closest cue moves."
+
 
 def song_marker_snap_scope_options(layer_z_order: Sequence[str]) -> tuple[str, ...]:
     return tuple(layer_z_order) + (
@@ -158,6 +189,10 @@ class TimelineSnapController:
                         "snap to",
                         target_options,
                         target_options.index(target),
+                        help=_TARGET_HELP,
+                        option_help=tuple(
+                            _TARGET_OPTION_HELP[option] for option in target_options
+                        ),
                     ),
                     FormField(
                         "proximity",
@@ -168,6 +203,7 @@ class TimelineSnapController:
                         ),
                         SONG_MARKER_SNAP_PROXIMITY_OPTIONS.index(self._last_proximity),
                         on_song_markers,
+                        help=_PROXIMITY_HELP,
                     ),
                     FormField(
                         "scope",
@@ -178,11 +214,17 @@ class TimelineSnapController:
                         ),
                         scopes.index(scope),
                         on_song_markers,
+                        help=_SCOPE_HELP,
+                        option_help=tuple(
+                            _scope_option_help(option, layer_z_order)
+                            for option in scopes
+                        ),
                     ),
                 ),
                 confirm_label="Snap cues",
                 on_confirm=confirm,
                 info=lambda values: self._move_info(*resolved(values)),
+                help=_SNAP_HELP,
             )
         )
 

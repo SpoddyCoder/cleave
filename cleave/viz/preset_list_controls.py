@@ -177,10 +177,17 @@ class PresetListController:
         if self._layer_bindings is not None:
             self._layer_bindings.lock_preset_for_modal(slot)
         layer = self.session.layers[slot]
-        sources: list[tuple[str, str]] = []
+        sources: list[tuple[str, str, str]] = []
         if layer.preset_switching_trigger == "timeline":
             populate_count = on_segment_populate_count(self.session, slot)
-            sources.append(("Using Cue Marker Roles (random)", "cue_roles"))
+            sources.append(
+                (
+                    "Using Cue Marker Roles (random)",
+                    "cue_roles",
+                    "one preset for each time the layer turns on, picked at "
+                    "random from presets with that cue's role.",
+                )
+            )
         else:
             needed = needed_preset_count(
                 song_duration_sec=self.duration_sec,
@@ -190,8 +197,20 @@ class PresetListController:
             available = len(browse_pool(layer.playlist))
             populate_count = min(needed, available)
         noun = "1 preset" if populate_count == 1 else f"{populate_count} presets"
-        sources.append(("Current Directory (random)", "directory_random"))
-        sources.append(("Current Directory (sequential)", "directory_sequential"))
+        sources.append(
+            (
+                "Current Directory (random)",
+                "directory_random",
+                "presets from the layer's preset directory, shuffled.",
+            )
+        )
+        sources.append(
+            (
+                "Current Directory (sequential)",
+                "directory_sequential",
+                "presets from the layer's preset directory, in directory order.",
+            )
+        )
         self._modal.prompt_form(
             FormSpec(
                 title="Populate preset list",
@@ -200,7 +219,9 @@ class PresetListController:
                     FormField(
                         "source",
                         "from",
-                        tuple(label for label, _mode in sources),
+                        tuple(label for label, _mode, _help in sources),
+                        help=("Where the presets come from.",),
+                        option_help=tuple(help for _label, _mode, help in sources),
                     ),
                 ),
                 confirm_label="Populate",
@@ -208,6 +229,10 @@ class PresetListController:
                     slot, sources[values["source"]][1]
                 ),
                 on_cancel=lambda: self._unlock_preset_after_modal(slot),
+                help=(
+                    "Replaces the layer's whole preset list.",
+                    "The layer's preset switching then works through the new list.",
+                ),
             )
         )
 

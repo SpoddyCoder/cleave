@@ -29,6 +29,23 @@ _SCOPE_OPTIONS: tuple[ApplyCutScope, ...] = ("all", "except_markers", "markers_o
 _SCOPE_LABELS = ("all cues", "except markers", "markers only")
 _DEFAULT_CUT_INDEX = 1
 
+_SET_CUT_HELP = (
+    "Sets the cut type of many cues at once.",
+    "The timeline's cue fades set the fade for each type.",
+)
+_CUT_HELP = ("The cut type the cues get.",)
+_CUT_OPTION_HELP = (
+    "the cue fades with the hard cut fades.",
+    "the cue fades with the soft cut fades.",
+    "no cut type: the layer steps on or off with no fade.",
+)
+_SCOPE_HELP = ("Which cues change.",)
+_SCOPE_OPTION_HELP = (
+    "every cue on every layer.",
+    "every cue except those on a song marker.",
+    "only cues on a song marker.",
+)
+
 
 def _applied_prefix(cut: CutType) -> str:
     if cut == "none":
@@ -125,17 +142,22 @@ class TimelineCutController:
                         "cut type",
                         _CUT_OPTIONS,
                         self._last_values["cut"],
+                        help=_CUT_HELP,
+                        option_help=_CUT_OPTION_HELP,
                     ),
                     FormField(
                         "scope",
                         "applies to",
                         _SCOPE_LABELS,
                         self._last_values["scope"],
+                        help=_SCOPE_HELP,
+                        option_help=_SCOPE_OPTION_HELP,
                     ),
                 ),
                 confirm_label="Set cut type",
                 on_confirm=self._confirm,
                 info=self._change_info,
+                help=_SET_CUT_HELP,
             )
         )
 
