@@ -634,11 +634,10 @@ def test_menu_underline_and_popup_row_are_snug() -> None:
         row_gap_above, row_gap_below = _popup_row_ink_gaps(popup, ink, fill)
         top_gap = _popup_first_row_gap(popup, fill)
         style = imgui.get_style()
-        expected_top = (
-            float(style.window_border_size)
-            + float(style.window_padding.y)
-            - float(int(style.item_spacing.y * 0.5))
-            + 4.0
+        # The same gap as under the last row: the padding less the unpadded
+        # highlight overhang below.
+        expected_top = float(style.window_padding.y) - (
+            float(style.item_spacing.y) - float(int(style.item_spacing.y * 0.5))
         )
     finally:
         host.imgui.destroy()

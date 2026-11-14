@@ -26,7 +26,6 @@ from cleave.viz.theme import BACKGROUND, DISABLED, HIGHLIGHT, MUTED, VALUE, ui_c
 
 Rect = tuple[int, int, int, int]
 
-MENU_POPUP_TOP_PAD_PX = 4.0
 CHECK_MARK = "✓"
 # The ImGui atlas carries this for the navigator twisty.
 SUBMENU_MARK = "▸"
@@ -48,13 +47,22 @@ def _row_pad_extra_y() -> tuple[float, float]:
     return above - base_above, below - base_below
 
 
-def menu_popup_top_pad() -> int:
-    """Whole pixels from the popup's padding to its first row.
+def menu_popup_edge_gap() -> float:
+    """Gap between a popup's edge and its first or last row highlight.
 
-    Includes the row padding, so the first highlight keeps its gap from the
-    top edge.
+    The last highlight reaches past its text box by its unpadded overhang
+    below, so the popup keeps that much of its window padding under it.
     """
-    return round(ui_chrome_px(MENU_POPUP_TOP_PAD_PX)) + int(_row_pad_extra_y()[0])
+    _above, below = _highlight_overhang_y(imgui.get_style().item_spacing.y)
+    return float(imgui.get_style().window_padding.y) - below
+
+
+def _menu_popup_top_shift() -> int:
+    """Whole pixels to move the first row, so the top gap matches the bottom."""
+    above, _below = _highlight_overhang_y(padded_row_spacing_y())
+    return round(
+        menu_popup_edge_gap() - float(imgui.get_style().window_padding.y) + above
+    )
 
 
 POPUP_FLAGS = (
@@ -136,7 +144,7 @@ def draw_menu_rows(
     row_w = pad_x * 2.0 + check_w + gap + label_w + gap + shortcut_w + arrow_w + pad_x
     # Whole pixels: text snaps down to a pixel, so a fractional row top
     # leaves the label off-centre in its fill.
-    imgui.set_cursor_pos_y(imgui.get_cursor_pos_y() + menu_popup_top_pad())
+    imgui.set_cursor_pos_y(imgui.get_cursor_pos_y() + _menu_popup_top_shift())
     # Separators and the popup's bottom edge take back how much further
     # each padded highlight reaches over and under its text, so only the
     # row highlights grow.
@@ -464,7 +472,7 @@ class ContextSubmenuSurface:
         parent_rect = rects[index]
         if parent_rect is None:
             return (0, 0, 0, 0)
-        top_pad = menu_popup_top_pad()
+        top_pad = menu_popup_edge_gap()
         with self._window.begin(
             (state.generation, index),
             lambda size, display: submenu_origin(

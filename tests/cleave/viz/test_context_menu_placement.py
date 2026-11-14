@@ -54,6 +54,7 @@ def _frames() -> Iterator[tuple[ContextMenuState, object]]:
             host.end_frame()
         return rects
 
+    run.menu = menu  # type: ignore[attr-defined]
     try:
         yield state, run
     finally:
@@ -97,3 +98,30 @@ def test_submenu_opens_on_screen_without_moving() -> None:
         assert len(subs) == 3
         assert subs[0] == subs[-1]
         assert _on_screen(subs[0])
+
+
+def _edge_gaps(window: Rect, rows: tuple[Rect | None, ...]) -> tuple[int, int]:
+    drawn = [row for row in rows if row is not None]
+    _x, y, _w, h = window
+    return drawn[0][1] - y, y + h - (drawn[-1][1] + drawn[-1][3])
+
+
+def test_menu_top_gap_matches_its_bottom_gap() -> None:
+    with _frames() as (state, run):
+        state.open(lambda: _BIG, (100, 100))
+        menu_rect, _sub = run(4)[-1]
+        top, bottom = _edge_gaps(menu_rect, run.menu.row_rects)
+        assert top == bottom
+
+
+def test_submenu_first_row_is_level_with_its_parent_row() -> None:
+    picks = ContextSubmenu("p", "Pick", _items("p", 3))
+    with _frames() as (state, run):
+        state.open(lambda: (*_SMALL, picks), (100, 100))
+        run(2)
+        state.hover(2)
+        menu_rect, sub_rect = run(4)[-1]
+        parent = run.menu.row_rects[2]
+        assert parent is not None
+        sub_top = sub_rect[1] + _edge_gaps(menu_rect, run.menu.row_rects)[0]
+        assert sub_top == parent[1]

@@ -154,7 +154,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - The file picker row highlight keeps its left border, and its top border on the first row.
 - The open file picker shows a scrollbar when the directory list is long, and the mouse wheel scrolls that list.
 - The transport bar, navigator, and inspector share one horizontal rule where they meet. The focused outline draws above that shared rule.
-- The first command in a menu popup sits 4px below the rule under the menu bar.
+- Menu and context menu popups leave the same gap above their first command as below their last, and a submenu's first row lines up with the row that opened it.
 - Inspector values and their side arrows sit on the same line as the row label.
 - Hovering a side arrow on an inspector value centers the highlight on the arrow character.
 - Page Up raises stepped values and Page Down lowers them.
