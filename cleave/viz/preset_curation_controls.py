@@ -10,7 +10,7 @@ from pathlib import Path
 from cleave.cue_roles import CUE_ROLES, CueRole
 from cleave.preset_library import PresetLibrary
 from cleave.viz.live_layer_bindings import LiveLayerBindings
-from cleave.viz.modal import ModalHost, ModalOption
+from cleave.viz.modal import ButtonRole, ModalHost, ModalLabeledLine, ModalOption
 from cleave.viz.session import TuningSession
 
 _CANCEL_LABEL = "Cancel"
@@ -83,14 +83,18 @@ class PresetCurationController:
         )
 
     def prompt_cast(self, slot: str, src: Path) -> None:
-        """Choose the cue role for *src*, or None (hotkey **c**)."""
+        """Choose the cue role for *src*, or None (hotkey **c**).
+
+        One button per role. The current role is filled and starts focused.
+        """
         current = self._library.role_of(src)
         self._lock_preset(slot)
         dismiss = lambda: self._unlock_preset(slot)
         options: list[ModalOption] = [
             ModalOption(
-                f"{role} (current)" if role == current else role,
+                role,
                 lambda r=role: self._confirm_cast(slot, src, r),
+                ButtonRole.PRIMARY if role == current else ButtonRole.PLAIN,
             )
             for role in CUE_ROLES
         ]
@@ -101,8 +105,18 @@ class PresetCurationController:
                 )
             )
         options.append(ModalOption(_CANCEL_LABEL, dismiss))
-        self._modal.prompt_choice(
-            f"Cast preset: {src.name}?", options, on_dismiss=dismiss
+        self._modal.prompt_buttons(
+            f"Cast preset: {src.name}?",
+            options,
+            on_dismiss=dismiss,
+            initial_focus_index=(
+                0 if current is None else CUE_ROLES.index(current)
+            ),
+            labeled_lines=(
+                ModalLabeledLine(
+                    "role", _NO_ROLE_LABEL if current is None else current
+                ),
+            ),
         )
 
     def _confirm_blacklist(self, slot: str, src: Path) -> None:

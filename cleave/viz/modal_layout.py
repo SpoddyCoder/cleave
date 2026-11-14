@@ -6,7 +6,6 @@ from typing import Protocol
 
 from cleave.viz.text_edit import caret_index_for_line_column, caret_line_column
 from cleave.viz.modal import (
-    BUTTON_ROW_KINDS,
     FormRowView,
     ModalLabeledLine,
     ModalViewState,
@@ -95,20 +94,6 @@ def measure_labeled_lines(
     count = len(lines)
     total_h = count * line_h + max(0, count - 1) * line_gap
     return max(widths), total_h
-
-
-def measure_options(
-    measure: TextMeasure,
-    labels: tuple[str, ...],
-    *,
-    line_gap: int,
-) -> tuple[int, int]:
-    line_h = measure.get_linesize()
-    widths = [measure.size(option_text(label))[0] for label in labels]
-    total_w = max(widths) if widths else 0
-    count = len(labels)
-    total_h = count * line_h + max(0, count - 1) * line_gap
-    return total_w, total_h
 
 
 def button_widths(measure: TextMeasure, labels: tuple[str, ...]) -> tuple[int, ...]:
@@ -208,12 +193,7 @@ def measure_panel(
     if state.options:
         if has_message or has_labeled or has_bar:
             content_h += line_h + line_gap
-        if state.kind in BUTTON_ROW_KINDS:
-            options_w, options_h = measure_button_row(measure, state.options)
-        else:
-            options_w, options_h = measure_options(
-                measure, state.options, line_gap=line_gap
-            )
+        options_w, options_h = measure_button_row(measure, state.options)
         content_w = max(content_w, options_w)
         content_h += options_h
 

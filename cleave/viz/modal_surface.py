@@ -16,7 +16,6 @@ from cleave.viz.imgui_theme import rgba
 from cleave.viz.pointer_cursor import PointerShape, request_pointer
 from cleave.viz.text_edit import caret_line_column
 from cleave.viz.modal import (
-    BUTTON_ROW_KINDS,
     ButtonRole,
     FormRowView,
     ModalHost,
@@ -39,7 +38,6 @@ from cleave.viz.modal_layout import (
     form_row_pad_y,
     lines_block_height,
     measure_button_row,
-    measure_options,
     measure_panel,
     measure_text_panel,
     message_lines,
@@ -340,40 +338,6 @@ def _draw_bar(
         0,
         float(BORDER_WIDTH),
     )
-
-
-def _draw_options(
-    draw: imgui.ImDrawList,
-    view: ModalViewState,
-    measure: TextMeasure,
-    *,
-    ox: int,
-    oy: int,
-    panel_w: int,
-    y: int,
-    line_h: int,
-    line_gap: int,
-) -> tuple[Rect, ...]:
-    labels = view.options
-    options_w, _ = measure_options(measure, labels, line_gap=line_gap)
-    content_w = panel_w - panel_pad_x() * 2
-    option_x = ox + panel_pad_x() + max(0, (content_w - options_w) // 2)
-    rects: list[Rect] = []
-    for index, label in enumerate(labels):
-        focused = index == view.focus_index
-        hx, hy, hw, hh = focus_highlight_rect(
-            measure, panel_width=panel_w, y=y - oy, line_h=line_h
-        )
-        rect = _outset((ox + hx, oy + hy, hw, hh))
-        if focused:
-            _highlight_option(draw, rect)
-        text = option_text(label)
-        text_w = measure.size(text)[0]
-        text_x = option_x + max(0, (options_w - text_w) // 2)
-        _text(draw, text_x, y, text, HIGHLIGHT if focused else VALUE)
-        rects.append(rect)
-        y += line_h + line_gap
-    return tuple(rects)
 
 
 def _button_focused(view: ModalViewState, index: int, rect: Rect) -> bool:
@@ -755,21 +719,8 @@ class ModalSurface:
         if view.options:
             if has_message or has_labeled or has_bar:
                 y += line_h + line_gap
-            if view.kind in BUTTON_ROW_KINDS:
-                self.option_rects = _draw_button_row(
-                    draw, view, measure, ox=ox, panel_w=panel_w, y=y
-                )
-                return
-            self.option_rects = _draw_options(
-                draw,
-                view,
-                measure,
-                ox=ox,
-                oy=oy,
-                panel_w=panel_w,
-                y=y,
-                line_h=line_h,
-                line_gap=line_gap,
+            self.option_rects = _draw_button_row(
+                draw, view, measure, ox=ox, panel_w=panel_w, y=y
             )
 
     def _draw_text(

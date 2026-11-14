@@ -18,7 +18,6 @@ from cleave.viz.imgui_theme import rgba
 from cleave.viz.menu_bar import MenuBarState
 from cleave.viz.text_edit import caret_line_column
 from cleave.viz.modal import (
-    BUTTON_ROW_KINDS,
     ButtonRole,
     FormField,
     FormSpec,
@@ -232,12 +231,13 @@ def _yes_no() -> ModalViewState:
     )
 
 
-def _choice() -> ModalViewState:
+def _three_buttons() -> ModalViewState:
     return ModalViewState(
-        kind=ModalKind.CHOICE,
+        kind=ModalKind.CONFIRM,
         message="Pick a layer",
         options=("Drums", "Bass", "Other"),
         focus_index=0,
+        option_roles=(ButtonRole.PLAIN,) * 3,
     )
 
 
@@ -303,8 +303,8 @@ def test_modal_draws_after_shell_and_scrim() -> None:
 
 @pytest.mark.parametrize(
     "view",
-    [_yes_no(), _choice(), _unsaved(), _progress(), _text()],
-    ids=["yes_no", "choice", "unsaved_quit", "progress", "text"],
+    [_yes_no(), _three_buttons(), _unsaved(), _progress(), _text()],
+    ids=["yes_no", "three_buttons", "unsaved_quit", "progress", "text"],
 )
 def test_kind_renders_with_idle_mouse(view: ModalViewState) -> None:
     with _host() as host:
@@ -353,13 +353,8 @@ def test_kind_renders_with_idle_mouse(view: ModalViewState) -> None:
             assert wash not in colors
             assert border not in colors
         else:
-            focused = view.options[view.focus_index]
-            if view.kind in BUTTON_ROW_KINDS:
-                assert _pack(HIGHLIGHT) not in colors
-                assert wash not in colors
-            else:
-                assert colors.get(_pack(HIGHLIGHT), 0) == 4 * _glyphs(focused)
-                assert colors.get(wash, 0) == 4
+            assert _pack(HIGHLIGHT) not in colors
+            assert wash not in colors
             assert colors.get(border, 0) > 0
             assert colors.get(_pack(VALUE), 0) > 0
         if view.kind == ModalKind.TEXT:
@@ -375,7 +370,7 @@ def test_kind_renders_with_idle_mouse(view: ModalViewState) -> None:
 
 def test_click_option_activates_that_index() -> None:
     with _host() as host:
-        surface = ModalSurface(_choice(), ImGuiTextMeasure())
+        surface = ModalSurface(_three_buttons(), ImGuiTextMeasure())
         _idle(host, surface)
         assert len(surface.option_rects) == 3
         _pointer(host, surface, _center(surface.option_rects[2]), click=True)
@@ -387,7 +382,7 @@ def test_click_option_activates_that_index() -> None:
 def test_click_option_runs_action_once_after_the_frame() -> None:
     ran: list[str] = []
     modal = ModalHost()
-    modal.prompt_choice(
+    modal.prompt_buttons(
         "Pick a layer",
         [
             ModalOption("Drums", lambda: ran.append("drums")),
@@ -410,7 +405,7 @@ def test_click_option_runs_action_once_after_the_frame() -> None:
 
 def test_hover_option_records_that_index() -> None:
     with _host() as host:
-        surface = ModalSurface(_choice(), ImGuiTextMeasure())
+        surface = ModalSurface(_three_buttons(), ImGuiTextMeasure())
         _idle(host, surface)
         _pointer(host, surface, _center(surface.option_rects[1]), click=False)
         assert surface.intent == ModalPointerIntent(
@@ -420,8 +415,8 @@ def test_hover_option_records_that_index() -> None:
 
 @pytest.mark.parametrize(
     "view",
-    [_yes_no(), _choice(), _unsaved(), _text()],
-    ids=["yes_no", "choice", "unsaved_quit", "text"],
+    [_yes_no(), _three_buttons(), _unsaved(), _text()],
+    ids=["yes_no", "three_buttons", "unsaved_quit", "text"],
 )
 def test_click_outside_cancels(view: ModalViewState) -> None:
     with _host() as host:
@@ -613,7 +608,7 @@ def test_modal_host_active_routes_navigator_click_before_draw() -> None:
 
 def test_right_click_does_not_activate_or_cancel() -> None:
     with _host() as host:
-        surface = ModalSurface(_choice(), ImGuiTextMeasure())
+        surface = ModalSurface(_three_buttons(), ImGuiTextMeasure())
         _idle(host, surface)
         option = _center(surface.option_rects[1])
         host.process_event(_motion(option))

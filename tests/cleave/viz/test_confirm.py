@@ -5,9 +5,9 @@ from __future__ import annotations
 import pygame
 
 from cleave.viz.modal import (
-    BUTTON_ROW_KINDS,
     ButtonRole,
     ModalHost,
+    ModalKind,
     ModalOption,
 )
 
@@ -87,9 +87,9 @@ def test_unsaved_quit_consumes_keys_while_active() -> None:
     assert modal.active
 
 
-def test_prompt_choice_initial_focus_index() -> None:
+def test_prompt_buttons_initial_focus_index() -> None:
     modal = ModalHost()
-    modal.prompt_choice(
+    modal.prompt_buttons(
         "Pick one",
         [
             ModalOption("a", lambda: None),
@@ -104,9 +104,9 @@ def test_prompt_choice_initial_focus_index() -> None:
     assert view.focus_index == 2
 
 
-def test_prompt_choice_initial_focus_index_out_of_range_defaults_to_zero() -> None:
+def test_prompt_buttons_initial_focus_index_out_of_range_defaults_to_zero() -> None:
     modal = ModalHost()
-    modal.prompt_choice(
+    modal.prompt_buttons(
         "Pick one",
         [
             ModalOption("a", lambda: None),
@@ -118,7 +118,7 @@ def test_prompt_choice_initial_focus_index_out_of_range_defaults_to_zero() -> No
     assert view is not None
     assert view.focus_index == 0
 
-    modal.prompt_choice(
+    modal.prompt_buttons(
         "Pick one",
         [
             ModalOption("a", lambda: None),
@@ -129,9 +129,9 @@ def test_prompt_choice_initial_focus_index_out_of_range_defaults_to_zero() -> No
     assert modal.view_state().focus_index == 0
 
 
-def test_prompt_choice_omitted_initial_focus_stays_zero() -> None:
+def test_prompt_buttons_omitted_initial_focus_stays_zero() -> None:
     modal = ModalHost()
-    modal.prompt_choice(
+    modal.prompt_buttons(
         "Pick one",
         [
             ModalOption("a", lambda: None),
@@ -143,7 +143,7 @@ def test_prompt_choice_omitted_initial_focus_stays_zero() -> None:
     assert view.focus_index == 0
 
 
-def test_prompt_buttons_draws_as_button_row() -> None:
+def test_prompt_buttons_marks_roles() -> None:
     modal = ModalHost()
     modal.prompt_buttons(
         "Save?",
@@ -154,7 +154,7 @@ def test_prompt_buttons_draws_as_button_row() -> None:
     )
     view = modal.view_state()
     assert view is not None
-    assert view.kind in BUTTON_ROW_KINDS
+    assert view.kind == ModalKind.CONFIRM
     assert view.option_roles == (ButtonRole.PRIMARY, ButtonRole.PLAIN)
 
 
@@ -164,7 +164,7 @@ def test_prompt_notice_ok_and_escape_both_close() -> None:
     modal.prompt_notice("Done", lambda: closed.append("x"))
     view = modal.view_state()
     assert view is not None
-    assert view.kind in BUTTON_ROW_KINDS
+    assert view.kind == ModalKind.CONFIRM
     assert view.options == ("OK",)
     modal.handle_keydown(_keydown(pygame.K_RETURN))
     assert closed == ["x"] and not modal.active

@@ -919,7 +919,7 @@ def test_reenter_edit_resets_caret_blink() -> None:
 
 
 def _choice(modal: ModalHost, picked: list[int]) -> None:
-    modal.prompt_choice(
+    modal.prompt_buttons(
         "Pick",
         [
             ModalOption("A", lambda: picked.append(0)),
@@ -956,9 +956,9 @@ def test_hover_option_matches_arrow_focus() -> None:
     assert pointed.view_state().focus_index == 2
 
 
-def test_choice_arrows_ignore_stationary_pointer_hover() -> None:
+def test_button_arrows_ignore_stationary_pointer_hover() -> None:
     modal = ModalHost()
-    modal.prompt_choice(
+    modal.prompt_buttons(
         "Pick",
         [
             ModalOption("A", lambda: None),
@@ -1216,9 +1216,9 @@ def test_text_pointer_methods_noop_on_yes_no() -> None:
     assert modal.view_state() == before
 
 
-def test_prompt_choice_renders_n_options() -> None:
+def test_prompt_buttons_renders_n_options() -> None:
     modal = ModalHost()
-    modal.prompt_choice(
+    modal.prompt_buttons(
         "Favourite preset: demo.milk?",
         [
             ModalOption("(root)", lambda: None),
@@ -1229,13 +1229,13 @@ def test_prompt_choice_renders_n_options() -> None:
     )
     view = modal.view_state()
     assert view is not None
-    assert view.kind == ModalKind.CHOICE
+    assert view.kind == ModalKind.CONFIRM
     assert view.options == ("(root)", "keepers", "wip", "Cancel")
 
 
-def test_prompt_choice_up_down_and_left_right_cycle_options() -> None:
+def test_prompt_buttons_up_down_and_left_right_cycle_options() -> None:
     modal = ModalHost()
-    modal.prompt_choice(
+    modal.prompt_buttons(
         "Blacklist preset: demo.milk?",
         [
             ModalOption("(root)", lambda: None),
@@ -1335,10 +1335,10 @@ def test_prompt_progress_has_bar_and_ignores_keys() -> None:
     assert modal.view_state().progress_fraction == 0.8
 
 
-def test_prompt_choice_passes_labeled_lines() -> None:
+def test_prompt_buttons_passes_labeled_lines() -> None:
     modal = ModalHost()
     labeled = (ModalLabeledLine("output", "renders/song.mp4"),)
-    modal.prompt_choice(
+    modal.prompt_buttons(
         "Render complete",
         [ModalOption("OK", lambda: None)],
         labeled_lines=labeled,

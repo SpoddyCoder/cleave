@@ -31,7 +31,6 @@ class ModalKind(Enum):
     CONFIRM = "confirm"
     FORM = "form"
     UNSAVED_QUIT = "unsaved_quit"
-    CHOICE = "choice"
     PROGRESS = "progress"
     TEXT = "text"
 
@@ -42,11 +41,6 @@ class ButtonRole(Enum):
     PLAIN = "plain"
     PRIMARY = "primary"
     DANGER = "danger"
-
-
-BUTTON_ROW_KINDS = frozenset(
-    {ModalKind.CONFIRM, ModalKind.FORM, ModalKind.UNSAVED_QUIT}
-)
 
 
 FormValues = dict[str, int]
@@ -391,26 +385,6 @@ class ModalHost:
             [ModalOption("OK", close, ButtonRole.PRIMARY)],
             on_dismiss=on_close,
             labeled_lines=labeled_lines,
-        )
-
-    def prompt_choice(
-        self,
-        message: str,
-        options: list[ModalOption],
-        on_dismiss: Callable[[], None] | None = None,
-        *,
-        initial_focus_index: int = 0,
-        labeled_lines: Sequence[ModalLabeledLine] = (),
-    ) -> None:
-        self.prompt(
-            ModalRequest(
-                kind=ModalKind.CHOICE,
-                message=message,
-                options=options,
-                on_dismiss=on_dismiss,
-                initial_focus_index=initial_focus_index,
-                labeled_lines=tuple(labeled_lines),
-            )
         )
 
     def prompt_progress(

@@ -8,7 +8,12 @@ import pygame
 
 from cleave.preset_library import PresetLibrary
 from cleave.preset_playlist import playlist_at_collection, playlist_at_dir
-from cleave.viz.modal import ModalHost
+from cleave.viz.modal import (
+    ButtonRole,
+    ModalHost,
+    ModalKind,
+    ModalLabeledLine,
+)
 from cleave.viz.preset_curation_controls import PresetCurationController
 from cleave.viz.session import LayerRuntime, TuningSession
 from tests.support.viz import keydown, noop_layer_bindings
@@ -129,19 +134,28 @@ def test_cast_sets_role_and_none_clears_it(tmp_path: Path) -> None:
     controller.prompt_cast("layer_1", src)
     view = modal.view_state()
     assert view is not None
-    assert view.options == (
-        "bed (current)",
-        "pulse",
-        "lead",
-        "accent",
-        "None",
-        "Cancel",
-    )
+    assert view.kind == ModalKind.CONFIRM
+    assert view.options == ("bed", "pulse", "lead", "accent", "None", "Cancel")
+    assert view.option_roles[0] is ButtonRole.PRIMARY
+    assert view.labeled_lines == (ModalLabeledLine("role", "bed"),)
     for _ in range(4):
-        modal.handle_keydown(keydown(pygame.K_DOWN))
+        modal.handle_keydown(keydown(pygame.K_RIGHT))
     modal.handle_keydown(keydown(pygame.K_RETURN))
     assert library.role_of(src) is None
 
+
+
+def test_cast_starts_on_the_current_role(tmp_path: Path) -> None:
+    src = tmp_path / "pack" / "demo.milk"
+    _write(src, "milk")
+    controller, _session, modal, library = _make_controller(tmp_path)
+    library.set_role(src, "lead")
+
+    controller.prompt_cast("layer_1", src)
+    view = modal.view_state()
+    assert view is not None
+    assert view.focus_index == 2
+    assert view.option_roles[2] is ButtonRole.PRIMARY
 
 def test_toggle_blacklist_confirms_on_and_clears_at_once(tmp_path: Path) -> None:
     src = tmp_path / "pack" / "demo.milk"
