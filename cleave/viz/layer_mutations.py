@@ -13,6 +13,7 @@ from cleave.config_schema.layers import (
     preset_switching_mode_for_trigger,
 )
 from cleave.stems import STEM_SOURCES
+from cleave.preset_library import PresetCollection
 from cleave.preset_playlist import is_top_level_browse_dir
 from cleave.choice import step_choice
 from cleave.viz.live_layer_bindings import LiveLayerBindings
@@ -88,6 +89,10 @@ class LayerMutations:
             # so Backspace still works after diving into the new pack.
             if is_top_level_browse_dir(playlist.current_dir, self.preset_root):
                 layer.browse_floor = playlist.current_dir.resolve()
+            self._publish_browse_preset(slot)
+
+    def jump_to_collection(self, slot: str, collection: PresetCollection) -> None:
+        if self.session.layers[slot].playlist.enter_collection(collection):
             self._publish_browse_preset(slot)
 
     def enter_directory(self, slot: str) -> None:

@@ -1,6 +1,7 @@
 """Right-click menu for a preset row in the inspector.
 
-A preset list entry offers Audition, Move up and down, Remove, Add current
+The directory row offers a Jump to directory submenu of the library
+collections (favourites, roles, blacklisted). A preset list entry offers Audition, Move up and down, Remove, Add current
 preset, Populate, then Favourite, Blacklist, and a Role submenu. The layer's
 current preset row offers Add to preset list and the same curation items.
 Each item calls the same path as its key, and a disabled item says why in
@@ -14,6 +15,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from cleave.cue_roles import CUE_ROLES, CueRole
+from cleave.preset_library import COLLECTION_LABEL
 
 from cleave.viz.context_menu import (
     ContextMenuEntry,
@@ -28,7 +30,9 @@ from cleave.viz.row_spec import section_lock_blocks_mutation
 if TYPE_CHECKING:
     from cleave.viz.controls import TuningControls
 
-PRESET_MENU_KINDS = frozenset({RowKind.TRACK_PRESET, RowKind.TRACK_PRESET_LIST_ITEM})
+PRESET_MENU_KINDS = frozenset(
+    {RowKind.TRACK_PRESET_DIR, RowKind.TRACK_PRESET, RowKind.TRACK_PRESET_LIST_ITEM}
+)
 
 _LOCK_HINT = "Locked: unlock to change"
 _NO_PROJECT_HINT = "No project open"
@@ -62,6 +66,8 @@ def preset_row_menu_entries(
                 _curate_items(controls, desc, slot),
             ]
         )
+    if desc.kind is RowKind.TRACK_PRESET_DIR:
+        return _jump_items(controls, desc, slot)
     if desc.kind is RowKind.TRACK_PRESET:
         return join_groups(
             [
@@ -70,6 +76,37 @@ def preset_row_menu_entries(
             ]
         )
     return ()
+
+
+def _jump_items(
+    controls: TuningControls, desc: RowDescriptor, slot: str
+) -> tuple[ContextMenuEntry, ...]:
+    """Jump to directory: a submenu of the library collections."""
+    playlist = controls.session.layers[slot].playlist
+    collections = playlist.catalog.collections()
+    if not collections:
+        return ()
+    locked = section_lock_blocks_mutation(controls.session, desc)
+    mutations = controls.layer_mutations
+    return (
+        ContextSubmenu(
+            id="preset.jump",
+            label="Jump to directory",
+            items=tuple(
+                ContextMenuItem(
+                    id=f"preset.jump.{collection}",
+                    label=COLLECTION_LABEL[collection],
+                    run=lambda collection=collection: mutations.jump_to_collection(
+                        slot, collection
+                    ),
+                    checked=playlist.collection == collection,
+                )
+                for collection in collections
+            ),
+            enabled=not locked,
+            hint=_LOCK_HINT if locked else None,
+        ),
+    )
 
 
 def _audition_item(controls: TuningControls, slot: str, index: int) -> ContextMenuItem:

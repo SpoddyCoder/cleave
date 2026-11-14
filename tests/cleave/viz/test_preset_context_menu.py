@@ -5,6 +5,7 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
+from cleave.preset_library import UNFILTERED_CATALOG
 from cleave.viz.context_menu import ContextMenuItem, ContextSubmenu
 from cleave.viz.preset_context_menu import preset_row_menu, preset_row_menu_entries
 from cleave.viz.row_kinds import RowDescriptor, RowKind
@@ -168,3 +169,58 @@ def test_menu_is_empty_once_the_row_is_gone() -> None:
         assert provider()
         controls.session.layers["layer_1"].preset_list.pop()
         assert provider() == ()
+
+
+def _dir_desc() -> RowDescriptor:
+    return RowDescriptor(RowKind.TRACK_PRESET_DIR, slot="layer_1")
+
+
+def _controls_with_library(tmp: str):
+    controls, paths = _controls_with_list(tmp)
+    controls.session.layers["layer_1"].playlist.catalog = controls.library
+    return controls, paths
+
+
+def test_directory_row_has_no_menu_without_collections() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        controls, _paths = _controls_with_list(tmp)
+        controls.session.layers["layer_1"].playlist.catalog = UNFILTERED_CATALOG
+        assert preset_row_menu_entries(controls, _dir_desc()) == ()
+
+
+def test_directory_row_jumps_to_a_collection() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        controls, _paths = _controls_with_library(tmp)
+        items = _entries(controls, _dir_desc())
+        assert list(items) == ["preset.jump"]
+        jump = items["preset.jump"]
+        assert jump.label == "Jump to directory"
+        assert [item.label for item in jump.items] == [
+            "Favourites",
+            "Role: bed",
+            "Role: pulse",
+            "Role: lead",
+            "Role: accent",
+            "Blacklisted",
+        ]
+        assert not any(item.checked for item in jump.items)
+
+        jump.items[0].run()
+        playlist = controls.session.layers["layer_1"].playlist
+        assert playlist.collection == "favourites"
+        jump = _entries(controls, _dir_desc())["preset.jump"]
+        assert [item.checked for item in jump.items] == [
+            True, False, False, False, False, False,
+        ]
+
+        jump.items[-1].run()
+        assert playlist.collection == "blacklisted"
+
+
+def test_directory_jump_is_disabled_when_locked() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        controls, _paths = _controls_with_library(tmp)
+        controls.session.layers["layer_1"].locked = True
+        jump = _entries(controls, _dir_desc())["preset.jump"]
+        assert not jump.enabled
+        assert jump.hint == "Locked: unlock to change"

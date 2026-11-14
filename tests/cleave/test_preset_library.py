@@ -162,3 +162,22 @@ def test_collection_playlist_from_unfiltered_catalog_is_empty(tmp_path: Path) ->
         "favourites", current_dir=tmp_path, catalog=PresetLibrary.in_memory()
     )
     assert playlist.paths == ()
+
+
+def test_enter_collection_jumps_from_a_nested_folder(tmp_path: Path) -> None:
+    root = tmp_path / "presets"
+    fav = _write(root / "alpha" / "deep" / "fav.milk", "fav")
+    library = PresetLibrary.in_memory()
+    library.index(root)
+    library.set_favourite(fav, True)
+    playlist = playlist_at_dir(root / "alpha" / "deep", catalog=library)
+
+    assert playlist.enter_collection("favourites")
+    assert playlist.collection == "favourites"
+    assert playlist.current == fav.resolve()
+    assert playlist.current_dir == (root / "alpha" / "deep").resolve()
+    assert not playlist.enter_collection("favourites")
+
+    assert playlist.enter_collection("bed")
+    assert playlist.collection == "bed"
+    assert playlist.paths == ()

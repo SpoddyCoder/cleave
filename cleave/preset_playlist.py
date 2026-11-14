@@ -399,6 +399,17 @@ class PresetPlaylist:
         self._apply(self._playlist_for(siblings[new_idx]))
         return True
 
+    def enter_collection(self, collection: PresetCollection) -> bool:
+        """Browse *collection*; the folder being left is kept for exit."""
+        if self.collection == collection:
+            return False
+        self._apply(
+            playlist_at_collection(
+                collection, current_dir=self.current_dir, catalog=self.catalog
+            )
+        )
+        return True
+
     def enter_child(self, preset_root: Path) -> bool:
         if self.collection is not None:
             return False
