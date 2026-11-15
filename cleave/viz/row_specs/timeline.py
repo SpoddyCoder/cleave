@@ -25,9 +25,9 @@ from cleave.timeline_presets import (
     TIMELINE_PRESET_HELP_ENTRIES,
     TIMELINE_RESET_HELP_ENTRIES,
 )
-from cleave.blend_modes import BLEND_MODES, BlendMode
+from cleave.blend_modes import BLEND_MODE_HELP_ENTRIES, BLEND_MODES, BlendMode
 from cleave.choice import choice_index
-from cleave.cue_roles import CUE_ROLES, CueRole
+from cleave.cue_roles import CUE_ROLE_HELP_BLURB, CUE_ROLES, CueRole
 from cleave.cut_types import CUT_TYPES, CutType
 from cleave.timeline import ClipEdge, TimelineClip
 from cleave.viz.commands import command_by_id
@@ -530,6 +530,7 @@ def _clip_spec(
     help_title: str,
     help_entries: tuple[tuple[str, str], ...],
     help_description: tuple[str, ...],
+    help_mode_entries: tuple[tuple[str, str], ...] | None = None,
     choice: RowChoice | None = None,
     apply_action: Callable[[TuningControls, RowDescriptor], None] | None = None,
     repeatable: bool = False,
@@ -549,6 +550,7 @@ def _clip_spec(
         help_title=help_title,
         help_entries=help_entries,
         help_description=help_description,
+        help_mode_entries=help_mode_entries,
         blocked_by_section_lock=blocked_by_section_lock,
     )
 
@@ -942,8 +944,10 @@ SPECS: dict[RowKind, RowSpec] = {
             ("PgUp/PgDn", "10% step"),
         ),
         help_description=(
-            "Layer opacity for this clip.",
+            "How visible the layer is for this clip.",
             "It multiplies the opacity of the layer.",
+            "0% hides it.",
+            "Pattern Mask replaces this when it is on.",
         ),
     ),
     RowKind.TIMELINE_CLIP_BLEND: _clip_spec(
@@ -960,8 +964,13 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Clip Blend",
         help_entries=(("Left/Right", "choose blend mode"),),
         help_description=(
-            "Blend mode for this clip.",
+            "How the layer mixes with the layers below it for this clip.",
             "The Layer option uses the blend mode of the layer.",
+            "Pattern Mask replaces this when it is on.",
+        ),
+        help_mode_entries=(
+            ("layer", "uses the blend mode of the layer."),
+            *BLEND_MODE_HELP_ENTRIES,
         ),
     ),
     RowKind.TIMELINE_CLIP_ROLE: _clip_spec(
@@ -980,6 +989,10 @@ SPECS: dict[RowKind, RowSpec] = {
         help_description=(
             "The role of the layer for this clip.",
             "The visual limiter uses the role.",
+        ),
+        help_mode_entries=(
+            ("none", "no role."),
+            *((role, f"{CUE_ROLE_HELP_BLURB[role]}.") for role in CUE_ROLES),
         ),
     ),
     RowKind.TIMELINE_CLIP_CUT_IN: _clip_spec(
