@@ -74,6 +74,18 @@ def test_arm_item_arms_the_row() -> None:
     assert session.timeline.armed_slots == {"layer_3"}
 
 
+def test_solo_item_solos_the_row_and_shows_the_check() -> None:
+    controls, session, _, _, _, _ = _make_timeline_controls()
+    solo = _items(controls, session, 2)["timeline.row.solo"]
+    assert solo.checked is False
+    solo.run()
+    assert session.solo_slot == "layer_3"
+    assert _items(controls, session, 2)["timeline.row.solo"].checked is True
+    assert _items(controls, session, 0)["timeline.row.solo"].checked is False
+    _items(controls, session, 2)["timeline.row.solo"].run()
+    assert session.solo_slot is None
+
+
 def test_row_past_the_last_layer_has_no_menu() -> None:
     controls, session, _, _, _, _ = _make_timeline_controls()
     assert timeline_row_menu(controls, session, 9)() == ()

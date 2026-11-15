@@ -32,6 +32,8 @@ from cleave.viz.material_icons import (
     PAUSE_GLYPH,
     PLAY_GLYPH,
     RECORD_GLYPH,
+    REPLAY_GLYPH,
+    SOLO_GLYPH,
     material_font,
     visibility_icon_slot_width,
 )
@@ -46,7 +48,10 @@ from cleave.viz.overlay_upload import (
     dirty_rects_for_clip_rect,
     upload_plan_for_signature,
 )
-from cleave.viz.row_present_renderers import render_visibility_icon
+from cleave.viz.row_present_renderers import (
+    render_header_toggle,
+    render_visibility_icon,
+)
 from cleave.viz.timeline_panel_cache import (
     TimelinePanelCache,
     timeline_badge_reserve_px,
@@ -58,6 +63,7 @@ from cleave.viz.timeline_ruler import render_time_ruler, ruler_tick_top, song_bo
 from cleave.viz.theme import (
     ARMED_BG,
     BAR_GRID,
+    DISABLED,
     FOCUS_WASH_ALPHA,
     HIGHLIGHT,
     LABEL,
@@ -65,6 +71,8 @@ from cleave.viz.theme import (
     NUDGE_HOVER_BG,
     NUDGE_HOVER_BG_ALPHA,
     NUDGE_HOVER_FG,
+    OVERRIDE_BG,
+    OVERRIDE_GLYPH,
     PLAYHEAD,
     PLAYHEAD_FLASH,
     REC_BG,
@@ -72,6 +80,7 @@ from cleave.viz.theme import (
     SONG_BOUND,
     SONG_MARKER,
     SONG_MARKER_SELECTED,
+    SOLO_BG,
     TIMELINE_TRACK_COLORS,
     TIMELINE_SCROLL_RAIL,
     TIMELINE_SCROLL_THUMB,
@@ -142,15 +151,16 @@ class TimelineViewState:
     duration_sec: float
     focus_row: int  # 0..N-1, index into layer_z_order (0 = bottom stem)
     monitor_visible: dict[str, bool]
-    timeline_level: dict[str, float]
     slot_stems: dict[str, StemSource] = field(default_factory=dict)
     override_slots: set[str] = field(default_factory=set)
+    solo_slot: str | None = None
     armed_slots: set[str] = field(default_factory=set)
     recording: bool = False
     paused: bool = True
     locked: bool = False
-    # Pointer hover: a row label (static chrome) or a corner button (live).
-    hover_label_row: int | None = None
+    # Pointer hover: a row's label or header button as (target, row), drawn
+    # in static chrome, or a corner button (live).
+    hover_row_target: tuple[str, int] | None = None
     hover_button: str | None = None
     record_start_sec: float | None = None
     record_slot_start_sec: dict[str, float] = field(default_factory=dict)
@@ -509,19 +519,6 @@ def _draw_level_bar(
         )
 
 
-def _render_committed_level_icon(level: float, *, line_height: int) -> pygame.Surface:
-    """Far-right committed eye: full at 1.0, dimmed when partial, DISABLED at 0."""
-    if level <= LEVEL_EPS:
-        return render_visibility_icon(enabled=False, line_height=line_height)
-    icon = render_visibility_icon(enabled=True, line_height=line_height)
-    if level >= 1.0 - LEVEL_EPS:
-        return icon
-    faded = icon.copy()
-    alpha = max(1, min(255, int(round(level * 255))))
-    faded.fill((255, 255, 255, alpha), special_flags=pygame.BLEND_RGBA_MULT)
-    return faded
-
-
 def rec_flash_visible(ticks_ms: int | None = None) -> bool:
     if ticks_ms is None:
         ticks_ms = pygame.time.get_ticks()
@@ -569,7 +566,7 @@ def prune_expired_selected_clip_flash(
     return flash_start_ms
 
 
-def arm_abbrev_flash_active(
+def arm_flash_active(
     flash_starts: dict[str, int],
     slot: str,
     ticks_ms: int | None = None,
@@ -582,12 +579,12 @@ def arm_abbrev_flash_active(
     return ticks_ms - start_ms < ARM_FLASH_DURATION_MS
 
 
-def arm_abbrev_flash_visible(
+def arm_flash_visible(
     flash_starts: dict[str, int],
     slot: str,
     ticks_ms: int | None = None,
 ) -> bool:
-    if not arm_abbrev_flash_active(flash_starts, slot, ticks_ms=ticks_ms):
+    if not arm_flash_active(flash_starts, slot, ticks_ms=ticks_ms):
         return False
     if ticks_ms is None:
         ticks_ms = pygame.time.get_ticks()
@@ -632,7 +629,7 @@ def selected_clip_flash_color(
     return SELECTED_CLIP_COLOR
 
 
-def armed_abbrev_bg_visible(
+def arm_button_lit(
     *,
     armed: bool,
     recording: bool,
@@ -640,8 +637,8 @@ def armed_abbrev_bg_visible(
     slot: str,
     ticks_ms: int | None = None,
 ) -> bool:
-    if arm_abbrev_flash_active(flash_starts, slot, ticks_ms=ticks_ms):
-        return arm_abbrev_flash_visible(flash_starts, slot, ticks_ms=ticks_ms)
+    if arm_flash_active(flash_starts, slot, ticks_ms=ticks_ms):
+        return arm_flash_visible(flash_starts, slot, ticks_ms=ticks_ms)
     return armed and (not recording or rec_flash_visible(ticks_ms))
 
 
@@ -822,8 +819,52 @@ CLIP_EDGE_HIT_PX: int = 5
 
 
 StripTarget = Literal[
-    "play", "record", "label", "eye", "scroll_thumb", "scroll_track"
+    "play",
+    "record",
+    "label",
+    "arm",
+    "solo",
+    "eye",
+    "release",
+    "scroll_thumb",
+    "scroll_track",
 ]
+
+# A row's header buttons after its label, left to right, each one
+# ``visibility_icon_slot_width`` wide: arm for recording, solo, the live
+# visibility eye, and back to timeline (shown only while overridden).
+ROW_HEADER_BUTTONS: tuple[StripTarget, ...] = ("arm", "solo", "eye", "release")
+ROW_HEADER_TARGETS: frozenset[str] = frozenset(("label", *ROW_HEADER_BUTTONS))
+
+
+def header_button_x(
+    target: StripTarget,
+    *,
+    padding: int,
+    label_width: int,
+    slot_w: int,
+) -> int:
+    """Left edge of header button *target* in panel coordinates."""
+    return padding + label_width + ROW_HEADER_BUTTONS.index(target) * slot_w
+
+
+def row_header_target_at(
+    local_x: float,
+    *,
+    padding: int,
+    label_width: int,
+    slot_w: int,
+) -> StripTarget | None:
+    """The label or header button under panel *local_x*, or None past them."""
+    if padding <= local_x < padding + label_width:
+        return "label"
+    offset = local_x - padding - label_width
+    if offset < 0 or slot_w <= 0:
+        return None
+    index = int(offset // slot_w)
+    if index < len(ROW_HEADER_BUTTONS):
+        return ROW_HEADER_BUTTONS[index]
+    return None
 
 
 @dataclass(frozen=True)
@@ -831,11 +872,12 @@ class StripHit:
     """What a screen point lands on in the strip.
 
     ``row`` is None for the ruler and the scrollbar. ``t_sec`` is None outside
-    the bar span (row labels and icons). ``tolerance_sec`` is
+    the bar span (row labels and buttons). ``tolerance_sec`` is
     ``STRIP_HIT_PX`` in song time. ``target`` names a control: the corner
     ``"play"`` / ``"record"`` buttons, a row's ``"label"`` (layer number and
-    stem abbreviation), its monitor ``"eye"`` (the visibility icon after the
-    label), or the scrollbar's ``"scroll_thumb"`` / ``"scroll_track"``. On the
+    stem abbreviation), one of its ``ROW_HEADER_BUTTONS`` (``"arm"``,
+    ``"solo"``, ``"eye"``, ``"release"``), or the scrollbar's
+    ``"scroll_thumb"`` / ``"scroll_track"``. On the
     scrollbar ``t_sec`` is the song time at that point along the track.
     ``marker_index`` is the song marker within ``STRIP_HIT_PX`` of the point on
     the ruler or in a row's bar, or None. ``clip_start`` is the start of the
@@ -912,23 +954,22 @@ def rec_fill_rect(rect: tuple[int, int, int, int]) -> tuple[int, int, int, int]:
 def transport_button_rects(
     *,
     padding: int,
-    layer_num_width: int,
+    label_width: int,
     bar_left: int,
     corner_h: int,
     gap: int,
 ) -> tuple[tuple[int, int, int, int], tuple[int, int, int, int]]:
-    """Play and record button rects in the corner above the row labels.
+    """Play and record button rects in the corner above the row headers.
 
-    Play sits over the layer number column. Record starts at the stem
-    abbreviation, the column that lights when a row is armed, and runs to
-    the start of the ruler, over the monitor eye. It holds the record glyph
-    plus ``REC``. Rects are in upload coordinates (top of the badge row is
-    y=0).
+    Play sits over the row labels (layer number and stem). Record starts at
+    the arm buttons and runs to the start of the ruler, over the other row
+    buttons. It holds the record glyph plus ``REC``. Rects are in upload
+    coordinates (top of the badge row is y=0).
     """
     y = TRANSPORT_BUTTON_DROP_PX
     h = max(1, corner_h - gap)
-    play = (padding, y, layer_num_width, h)
-    record_x = padding + layer_num_width
+    play = (padding, y, label_width, h)
+    record_x = padding + label_width
     record = (record_x, y, max(1, bar_left - record_x), h)
     return play, record
 
@@ -978,9 +1019,9 @@ def row_prefix_width(
     stem_abbrev_width: int,
     row_height: int,
 ) -> int:
-    """Width of the row label prefix (num, abbrev, monitor eye slot)."""
-    eye_slot_w = visibility_icon_slot_width(row_height)
-    return layer_num_width + stem_abbrev_width + eye_slot_w
+    """Width of a row's header: number, stem, and its ``ROW_HEADER_BUTTONS``."""
+    slot_w = visibility_icon_slot_width(row_height)
+    return layer_num_width + stem_abbrev_width + slot_w * len(ROW_HEADER_BUTTONS)
 
 
 def timeline_live_signature(
@@ -1018,13 +1059,13 @@ class _TimelineLayout:
     panel_y: int
     row_count: int
     row_h: int
-    # Eye and transport glyph line height: the nominal row, centred in a
-    # taller row when the band is dragged taller.
+    # Header button and transport glyph line height: the nominal row, centred
+    # in a taller row when the band is dragged taller.
     icon_h: int
     bar_left: int
     bar_width: int
-    eye_slot_w: int
-    timeline_eye_x: int
+    # Width of each of a row's ROW_HEADER_BUTTONS.
+    slot_w: int
     layer_num_width: int
     stem_abbrev_width: int
     badge_reserve: int
@@ -1103,8 +1144,8 @@ class TimelineOverlay:
         return self._header_badge_rect
 
     @property
-    def bar_layout(self) -> tuple[int, int, int] | None:
-        """Last draw bar metrics: ``(bar_left, bar_width, eye_slot_w)`` in panel coordinates."""
+    def bar_layout(self) -> tuple[int, int] | None:
+        """Last draw bar metrics: ``(bar_left, bar_width)`` in panel coordinates."""
         return self._bar_layout
 
     @property
@@ -1167,11 +1208,12 @@ class TimelineOverlay:
                 tolerance_sec=tolerance,
                 target="scroll_thumb" if on_thumb else "scroll_track",
             )
-        label_left = self._padding
-        label_right = label_left + layout.layer_num_width + layout.stem_abbrev_width
-        on_label = label_left <= local_x < label_right
-        eye_right = label_right + layout.eye_slot_w
-        on_eye = label_right <= local_x < eye_right
+        header_target = row_header_target_at(
+            local_x,
+            padding=self._padding,
+            label_width=layout.layer_num_width + layout.stem_abbrev_width,
+            slot_w=layout.slot_w,
+        )
         for display_i in range(layout.row_count):
             row_y = self._row_y(display_i, layout.row_h)
             if row_y <= local_y < row_y + layout.row_h:
@@ -1191,7 +1233,7 @@ class TimelineOverlay:
                     row=display_i,
                     t_sec=t_sec,
                     tolerance_sec=tolerance,
-                    target="label" if on_label else "eye" if on_eye else None,
+                    target=header_target,
                     marker_index=marker_index,
                     clip_start=None if clip_hit is None else clip_hit[0],
                     clip_edge=None if clip_hit is None else clip_hit[1],
@@ -1215,7 +1257,7 @@ class TimelineOverlay:
     ) -> tuple[tuple[int, int, int, int], tuple[int, int, int, int]]:
         return transport_button_rects(
             padding=self._padding,
-            layer_num_width=layout.layer_num_width,
+            label_width=layout.layer_num_width + layout.stem_abbrev_width,
             bar_left=layout.bar_left,
             corner_h=layout.badge_reserve + layout.bar_top,
             gap=timeline_ui_metrics().rec_badge_gap,
@@ -1390,11 +1432,10 @@ class TimelineOverlay:
         abbrev_sample = font.render(stem_abbrev_label("drums"), True, LABEL)
         layer_num_width = num_sample.get_width()
         stem_abbrev_width = abbrev_sample.get_width()
-        eye_slot_w = visibility_icon_slot_width(icon_h)
+        slot_w = visibility_icon_slot_width(icon_h)
         prefix_width = row_prefix_width(layer_num_width, stem_abbrev_width, icon_h)
         bar_left = self._padding + prefix_width
-        bar_width = max(1, panel_w - self._padding * 2 - prefix_width - eye_slot_w)
-        timeline_eye_x = panel_w - self._padding - eye_slot_w
+        bar_width = max(1, panel_w - self._padding * 2 - prefix_width)
         bar_top = self._padding
         bar_bottom = self._padding + row_count * row_h + (row_count - 1) * self._row_gap
         scrollbar_rect = (
@@ -1406,7 +1447,7 @@ class TimelineOverlay:
 
         self._layer_num_width = layer_num_width
         self._stem_abbrev_width = stem_abbrev_width
-        self._bar_layout = (bar_left, bar_width, eye_slot_w)
+        self._bar_layout = (bar_left, bar_width)
 
         return _TimelineLayout(
             panel_w=panel_w,
@@ -1418,8 +1459,7 @@ class TimelineOverlay:
             icon_h=icon_h,
             bar_left=bar_left,
             bar_width=bar_width,
-            eye_slot_w=eye_slot_w,
-            timeline_eye_x=timeline_eye_x,
+            slot_w=slot_w,
             layer_num_width=layer_num_width,
             stem_abbrev_width=stem_abbrev_width,
             badge_reserve=badge_reserve,
@@ -1439,7 +1479,6 @@ class TimelineOverlay:
         row_h = layout.row_h
         bar_left = layout.bar_left
         bar_width = layout.bar_width
-        timeline_eye_x = layout.timeline_eye_x
 
         view_start, view_end = view_window(state)
 
@@ -1483,30 +1522,25 @@ class TimelineOverlay:
             layer_num = row_index + 1
             layer_num_x = self._padding
             stem_abbrev_x = layer_num_x + layout.layer_num_width
-            monitor_eye_x = stem_abbrev_x + layout.stem_abbrev_width
+            hover_target = (
+                state.hover_row_target[0]
+                if state.hover_row_target is not None
+                and state.hover_row_target[1] == row_index
+                else None
+            )
 
             if focused:
                 blit_tint(panel, row_rect, HIGHLIGHT, alpha=FOCUS_WASH_ALPHA)
-            if state.hover_label_row == row_index:
+            if hover_target is not None:
                 blit_tint(
                     panel,
-                    (
-                        layer_num_x,
-                        row_y,
-                        layout.layer_num_width + layout.stem_abbrev_width,
-                        row_h,
-                    ),
+                    self._header_target_rect(layout, hover_target, row_y),
                     NUDGE_HOVER_BG,
                     alpha=NUDGE_HOVER_BG_ALPHA,
                 )
 
-            abbrev_rect = pygame.Rect(
-                stem_abbrev_x, row_y, layout.stem_abbrev_width, row_h
-            )
-            # Armed abbrev background and recording monitor flash are live-patched.
-
             # Shell hover: nudge wash behind, nudge foreground on the label.
-            if state.hover_label_row == row_index:
+            if hover_target == "label":
                 label_color = NUDGE_HOVER_FG
             elif focused or armed:
                 label_color = HIGHLIGHT
@@ -1519,23 +1553,48 @@ class TimelineOverlay:
             panel.blit(num_surf, (layer_num_x, num_y))
             panel.blit(abbrev_surf, (stem_abbrev_x, abbrev_y))
 
-            monitor_enabled = state.monitor_visible.get(slot, True)
-            timeline_level = float(state.timeline_level.get(slot, 1.0))
-            monitor_override = (
-                slot in state.override_slots
-                and not (state.recording and armed)
+            # The lit arm button and the recording eye are live-patched.
+            panel.blit(
+                render_header_toggle(
+                    RECORD_GLYPH,
+                    color=self._header_rest_color(
+                        hover_target == "arm", blocked=state.locked
+                    ),
+                    line_height=layout.icon_h,
+                ),
+                (self._header_button_x(layout, "arm"), icon_y),
+            )
+            solo = state.solo_slot == slot
+            panel.blit(
+                render_header_toggle(
+                    SOLO_GLYPH,
+                    color=VALUE if solo else self._header_rest_color(
+                        hover_target == "solo"
+                    ),
+                    bg=SOLO_BG if solo else None,
+                    line_height=layout.icon_h,
+                ),
+                (self._header_button_x(layout, "solo"), icon_y),
             )
             if not (state.recording and armed):
-                monitor_icon = render_visibility_icon(
-                    enabled=monitor_enabled,
-                    override=monitor_override,
-                    line_height=layout.icon_h,
+                panel.blit(
+                    render_visibility_icon(
+                        enabled=state.monitor_visible.get(slot, True),
+                        override=slot in state.override_slots,
+                        line_height=layout.icon_h,
+                    ),
+                    (self._header_button_x(layout, "eye"), icon_y),
                 )
-                panel.blit(monitor_icon, (monitor_eye_x, icon_y))
-            timeline_icon = _render_committed_level_icon(
-                timeline_level, line_height=layout.icon_h
-            )
-            panel.blit(timeline_icon, (timeline_eye_x, icon_y))
+            if slot in state.override_slots:
+                panel.blit(
+                    render_header_toggle(
+                        REPLAY_GLYPH,
+                        color=OVERRIDE_GLYPH,
+                        bg=OVERRIDE_BG,
+                        line_height=layout.icon_h,
+                    ),
+                    (self._header_button_x(layout, "release"), icon_y),
+                )
 
             _draw_level_bar(
                 panel,
@@ -1729,6 +1788,37 @@ class TimelineOverlay:
                     dirty.append(touched)
         return dirty
 
+    def _header_button_x(self, layout: _TimelineLayout, target: StripTarget) -> int:
+        return header_button_x(
+            target,
+            padding=self._padding,
+            label_width=layout.layer_num_width + layout.stem_abbrev_width,
+            slot_w=layout.slot_w,
+        )
+
+    def _header_target_rect(
+        self, layout: _TimelineLayout, target: str, row_y: int
+    ) -> tuple[int, int, int, int]:
+        """Panel rect of a row's label or header button *target*."""
+        if target == "label":
+            return (
+                self._padding,
+                row_y,
+                layout.layer_num_width + layout.stem_abbrev_width,
+                layout.row_h,
+            )
+        x = self._header_button_x(layout, target)  # type: ignore[arg-type]
+        return (x, row_y, layout.slot_w, layout.row_h)
+
+    @staticmethod
+    def _header_rest_color(
+        hovered: bool, *, blocked: bool = False
+    ) -> tuple[int, int, int]:
+        """An unlit header button: muted, nudge on hover, disabled when blocked."""
+        if blocked:
+            return DISABLED
+        return NUDGE_HOVER_FG if hovered else MUTED
+
     def _row_y(self, display_i: int, row_h: int) -> int:
         return self._padding + display_i * (row_h + self._row_gap)
 
@@ -1770,40 +1860,37 @@ class TimelineOverlay:
         row_y = self._row_y(row_index, row_h)
         upload_y = panel_y_offset + row_y
         armed = slot in state.armed_slots
-        stem_abbrev_x = self._padding + layout.layer_num_width
-        monitor_eye_x = stem_abbrev_x + layout.stem_abbrev_width
-        eye_slot_w = layout.eye_slot_w
+        arm_x = self._header_button_x(layout, "arm")
+        monitor_eye_x = self._header_button_x(layout, "eye")
+        slot_w = layout.slot_w
         icon_y = upload_y + (row_h - layout.icon_h) // 2
         dirty: list[tuple[int, int, int, int]] = []
 
-        abbrev_rect = (stem_abbrev_x, upload_y, layout.stem_abbrev_width, row_h)
+        arm_rect = (arm_x, upload_y, slot_w, row_h)
         self._restore_upload_rect_from_static(
             upload,
             static_panel,
-            abbrev_rect,
+            arm_rect,
             panel_y_offset=panel_y_offset,
         )
-        if armed_abbrev_bg_visible(
+        if arm_button_lit(
             armed=armed,
             recording=state.recording,
             flash_starts=state.arm_flash_start_ms,
             slot=slot,
         ):
-            armed_surf = pygame.Surface(
-                (layout.stem_abbrev_width, row_h), pygame.SRCALPHA
-            )
+            armed_surf = pygame.Surface((slot_w, row_h), pygame.SRCALPHA)
             armed_surf.fill((*ARMED_BG, ARMED_BG_ALPHA))
-            upload.blit(armed_surf, (stem_abbrev_x, upload_y))
-            # Red fill is live-patched over the static glyph; redraw so it stays readable.
-            stem_source = state.slot_stems.get(slot, slot)
-            abbrev_surf = self._font_get().render(
-                stem_abbrev_label(stem_source), True, HIGHLIGHT
+            upload.blit(armed_surf, (arm_x, upload_y))
+            upload.blit(
+                render_header_toggle(
+                    RECORD_GLYPH, color=VALUE, line_height=layout.icon_h
+                ),
+                (arm_x, icon_y),
             )
-            abbrev_y = upload_y + max(0, (row_h - abbrev_surf.get_height()) // 2)
-            upload.blit(abbrev_surf, (stem_abbrev_x, abbrev_y))
-        dirty.append(abbrev_rect)
+        dirty.append(arm_rect)
 
-        monitor_rect = (monitor_eye_x, upload_y, eye_slot_w, row_h)
+        monitor_rect = (monitor_eye_x, upload_y, slot_w, row_h)
         self._restore_upload_rect_from_static(
             upload,
             static_panel,
@@ -1868,7 +1955,7 @@ class TimelineOverlay:
         cue_flash = selected_clip_flash_active(state.selected_clip_flash_start_ms)
         for row_index, slot in enumerate(state.layer_z_order):
             armed = slot in state.armed_slots
-            if arm_abbrev_flash_active(state.arm_flash_start_ms, slot):
+            if arm_flash_active(state.arm_flash_start_ms, slot):
                 indices.append(row_index)
             elif state.recording and armed:
                 indices.append(row_index)
@@ -1895,7 +1982,7 @@ class TimelineOverlay:
             parts.append(
                 (
                     slot,
-                    armed_abbrev_bg_visible(
+                    arm_button_lit(
                         armed=armed,
                         recording=state.recording,
                         flash_starts=state.arm_flash_start_ms,

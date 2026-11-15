@@ -605,7 +605,6 @@ def test_build_timeline_view_state_armed_recording_monitor_ignores_committed() -
 
     state = build_timeline_view_state(session, position_sec=11.5, duration_sec=60.0)
     assert state.monitor_visible["layer_1"] is True
-    assert state.timeline_level["layer_1"] == 0.0
 
 
 def test_effective_layer_enabled_recording_armed_vs_unarmed() -> None:
@@ -646,9 +645,11 @@ def test_build_timeline_view_state_populates_visibility_playing() -> None:
     state = build_timeline_view_state(session, position_sec=5.0, duration_sec=60.0)
     assert state.monitor_visible["layer_1"] is False
     assert state.monitor_visible["layer_2"] is True
-    assert state.timeline_level["layer_1"] == 0.0
-    assert state.timeline_level["layer_2"] == 1.0
     assert state.override_slots == {"layer_2"}
+    assert state.solo_slot is None
+    session.solo_slot = "layer_3"
+    state = build_timeline_view_state(session, position_sec=5.0, duration_sec=60.0)
+    assert state.solo_slot == "layer_3"
 
 
 def test_armed_recording_bar_blends_committed_and_live() -> None:

@@ -30,6 +30,7 @@ from cleave.viz.focus_nav import FocusCursor, TimelineFocus
 from cleave.viz.session import TimelineFadeGroupRuntime, TuningSession
 from cleave.viz.timeline_overlay import (
     TimelineViewState,
+    ROW_HEADER_TARGETS,
     prune_expired_arm_flashes,
     prune_expired_selected_clip_flash,
 )
@@ -299,10 +300,6 @@ def build_timeline_view_state(
         slot: effective_layer_enabled(session, slot, position_sec)
         for slot in session.layer_z_order
     }
-    timeline_level = {
-        slot: timeline_committed_level(session, slot, position_sec)
-        for slot in session.layer_z_order
-    }
     view_start_sec, view_end_sec = tl.strip_view.window(duration_sec)
     return TimelineViewState(
         layer_z_order=list(session.layer_z_order),
@@ -315,16 +312,18 @@ def build_timeline_view_state(
         duration_sec=duration_sec,
         focus_row=focus_row,
         monitor_visible=monitor_visible,
-        timeline_level=timeline_level,
+        solo_slot=session.solo_slot,
         slot_stems={slot: session.layers[slot].stem for slot in session.layer_z_order},
         override_slots=set(tl.override_slots),
         armed_slots=set(tl.armed_slots),
         recording=tl.recording,
         paused=paused,
         locked=tl.locked,
-        hover_label_row=(
-            tl.strip_hover[1]
-            if tl.strip_hover is not None and tl.strip_hover[0] == "label"
+        hover_row_target=(
+            (tl.strip_hover[0], tl.strip_hover[1])
+            if tl.strip_hover is not None
+            and tl.strip_hover[1] is not None
+            and tl.strip_hover[0] in ROW_HEADER_TARGETS
             else None
         ),
         hover_button=(

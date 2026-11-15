@@ -339,26 +339,34 @@ def navigator_toggle_tooltip(toggle: NavToggle) -> str:
     return "On: click to turn off" if toggle.active else "Off: click to turn on"
 
 
-def strip_label_tooltip(*, armed: bool, locked: bool) -> str:
-    """Hover text for a strip row label: double-click arms or disarms it."""
+def strip_arm_tooltip(*, armed: bool, locked: bool) -> str:
+    """Hover text for a strip row's arm button."""
     if locked:
-        action = "Locked: unlock the timeline to arm"
-    elif armed:
-        action = "Double-click to disarm"
-    else:
-        action = "Double-click to arm for recording"
-    return f"{action}, right-click for options"
+        return "Locked: unlock the timeline to arm"
+    return "Disarm" if armed else "Arm for recording"
+
+
+def strip_solo_tooltip(*, solo: bool) -> str:
+    """Hover text for a strip row's solo button."""
+    return "End solo" if solo else "Solo this layer"
 
 
 def strip_eye_tooltip(*, overridden: bool, recording: bool, armed: bool) -> str:
-    """Hover text for a strip row's monitor eye."""
+    """Hover text for a strip row's live visibility eye."""
     if recording:
         if armed:
             return "Click to record show / hide"
         return "Arm this row to record show / hide"
     if overridden:
-        return "Override: click to show / hide, right-click to release"
-    return "Right-click to override visibility"
+        return "Override: click to show / hide"
+    return "Show / hide, taking over from the timeline"
+
+
+def strip_release_tooltip(*, recording: bool) -> str:
+    """Hover text for a strip row's back-to-timeline button."""
+    if recording:
+        return "Stop recording to hand back to the timeline"
+    return "Back to timeline"
 
 
 def navigator_toggle_x(
@@ -1922,7 +1930,7 @@ class ShellHost:
             self._show_strip_tooltip()
 
     def _show_strip_tooltip(self) -> None:
-        """Say what a row label or eye does on click, and that right-click has more."""
+        """Say what a row header button does on click."""
         pointer = self._strip_pointer
         if pointer is None or pointer.scrubbing or pointer.panning:
             return
@@ -1934,17 +1942,23 @@ class ShellHost:
         if not timeline.panel_open or hover is None:
             return
         target, row = hover
-        if target not in ("label", "eye") or row is None:
+        if target not in ("arm", "solo", "eye", "release") or row is None:
             return
         z_order = session.layer_z_order
         if not 0 <= row < len(z_order):
             return
         slot = z_order[row]
-        if target == "label":
-            text = strip_label_tooltip(
+        if target == "arm":
+            text = strip_arm_tooltip(
                 armed=slot in timeline.armed_slots,
                 locked=timeline.locked,
             )
+        elif target == "solo":
+            text = strip_solo_tooltip(solo=session.solo_slot == slot)
+        elif target == "release":
+            if slot not in timeline.override_slots:
+                return
+            text = strip_release_tooltip(recording=bool(timeline.recording))
         elif target == "eye":
             text = strip_eye_tooltip(
                 overridden=slot in timeline.override_slots,
@@ -1956,7 +1970,7 @@ class ShellHost:
         show_tooltip(text)
 
     def _strip_pointer_shape(self) -> PointerShape | None:
-        """Hand over a strip button or label, left-right over the ruler, a scrub, or a clip edge, move over a clip."""
+        """Hand over a strip button, left-right over the ruler, a scrub, or a clip edge, move over a clip."""
         pointer = self._strip_pointer
         if pointer is None:
             return None

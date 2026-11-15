@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
+from pathlib import Path
 
 import pygame
 
@@ -20,6 +21,7 @@ from cleave.timeline import (
 )
 from cleave.viz.controls import SEEK_LONG, SEEK_SHORT, SEEK_TINY
 from cleave.viz.session import TuningSession
+from cleave.viz.layer_mutations import LayerMutations
 from cleave.viz.key_repeat import (
     KeyRepeatController,
     delete_key_pressed,
@@ -90,8 +92,20 @@ class TimelineControls:
         beat_times: Sequence[float] = (),
         bar_times: Sequence[float] = (),
         clip_editor: ClipEditor | None = None,
+        layer_mutations: LayerMutations | None = None,
     ) -> None:
         self.session = session
+        self.layer_mutations = (
+            layer_mutations
+            if layer_mutations is not None
+            else LayerMutations(
+                session,
+                preset_root=Path(),
+                duration_sec=duration_sec,
+                get_layer_bindings=lambda: None,
+                on_notification=lambda message: self._notify(message),
+            )
+        )
         self.clip_editor = (
             clip_editor
             if clip_editor is not None
@@ -402,12 +416,33 @@ class TimelineControls:
         if slot is not None:
             self._toggle_slot_visibility(slot)
 
+    def toggle_row_solo(self, row: int) -> None:
+        """Focus *row* and solo its layer, or end the solo if it has it."""
+        self.focus_row(row)
+        slot = self._slot_for_layer_index(row)
+        if slot is None:
+            return
+        if self.session.solo_slot == slot:
+            self.layer_mutations.exit_solo(slot)
+        else:
+            self.layer_mutations.enter_solo(slot)
+
+    def release_row_override(self, row: int) -> None:
+        """Focus *row* and hand it back to the timeline if it is overridden."""
+        self.focus_row(row)
+        if self.row_override_releasable(row):
+            slot = self._slot_for_layer_index(row)
+            assert slot is not None
+            self.toggle_override(slot)
+
     def strip_target_pressable(self, target: str, row: int | None) -> bool:
         """Whether a press on a strip control would act right now.
 
         Play always does. Record needs the timeline unlocked and an armed
-        row, or a take to stop. A row label arms on double-click unless the
-        timeline is locked. An eye follows ``row_visibility_toggleable``.
+        row, or a take to stop. A row's arm button follows
+        ``row_arm_available``, its solo button always acts, its eye follows
+        ``row_visibility_toggleable``, and its back-to-timeline button
+        ``row_override_releasable``. A row label only selects.
         """
         tl = self.session.timeline
         if target == "play":
@@ -416,17 +451,21 @@ class TimelineControls:
             return not tl.locked and (tl.recording or bool(tl.armed_slots))
         if row is None or self._slot_for_layer_index(row) is None:
             return False
-        if target == "label":
+        if target == "arm":
             return self.row_arm_available(row)
+        if target == "solo":
+            return True
         if target == "eye":
             return self.row_visibility_toggleable(row)
+        if target == "release":
+            return self.row_override_releasable(row)
         return False
 
     def row_visibility_toggleable(self, row: int) -> bool:
         """Whether ``toggle_row_visibility`` would change *row* right now.
 
-        True for an armed row while recording, and for a row with a
-        visibility override otherwise.
+        Always outside a take: a row the timeline drives takes an override.
+        While recording, only an armed row.
         """
         slot = self._slot_for_layer_index(row)
         if slot is None:
@@ -434,7 +473,18 @@ class TimelineControls:
         tl = self.session.timeline
         if tl.recording:
             return slot in tl.armed_slots and slot in tl.record_baseline
-        return slot in tl.override_slots
+        return True
+
+    def row_override_releasable(self, row: int) -> bool:
+        """Whether *row* has an override to hand back, outside a take."""
+        slot = self._slot_for_layer_index(row)
+        tl = self.session.timeline
+        return slot is not None and not tl.recording and slot in tl.override_slots
+
+    def row_solo(self, row: int) -> bool:
+        """Whether *row*'s layer is the soloed one."""
+        slot = self._slot_for_layer_index(row)
+        return slot is not None and self.session.solo_slot == slot
 
     def row_arm_available(self, row: int) -> bool:
         """Whether ``toggle_arm_row`` would arm or disarm *row* right now."""
@@ -490,7 +540,10 @@ class TimelineControls:
             self._toggle_armed_layer_at(
                 slot, current_sec(self.playback, self.duration_sec)
             )
-        elif slot in tl.override_slots:
+        else:
+            # A row the timeline drives takes an override, then flips.
+            if slot not in tl.override_slots:
+                self.toggle_override(slot)
             tl.override_visible[slot] = not tl.override_visible.get(slot, True)
             self._refresh_visibility()
 

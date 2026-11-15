@@ -181,6 +181,23 @@ def inspector_field_colors(
     return label, row_value_color_for(state, desc)
 
 
+def render_header_toggle(
+    glyph: str,
+    *,
+    color: tuple[int, int, int],
+    line_height: int,
+    bg: tuple[int, int, int] | None = None,
+) -> pygame.Surface:
+    """A timeline row header button: *glyph* centred in an eye-wide slot, on *bg* when lit."""
+    glyph_surf = render_glyph(glyph, color=color, line_height=line_height)
+    slot_w = visibility_icon_slot_width(line_height)
+    surf = pygame.Surface((slot_w, line_height), pygame.SRCALPHA)
+    if bg is not None:
+        pygame.draw.rect(surf, bg, (0, 0, slot_w, line_height))
+    surf.blit(glyph_surf, ((slot_w - glyph_surf.get_width()) // 2, 0))
+    return surf
+
+
 def render_visibility_icon(
     *,
     enabled: bool,

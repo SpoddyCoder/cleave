@@ -1,7 +1,7 @@
 """Right-click menu for a timeline strip row.
 
-Override the row's visibility, release every override, and arm it for
-recording. Each item calls the same ``TimelineControls``
+Override the row's visibility, release every override, arm it for
+recording, and solo its layer. Each item calls the same ``TimelineControls``
 path as its key, and a disabled item says why in its hint. With a clip
 selected on the row, the menu opens with that clip's items
 (``clip_context_menu``). A right-click in a gap opens with Add clip here and
@@ -30,6 +30,10 @@ class TimelineRowMenuActions(Protocol):
     def row_slot(self, row: int) -> str | None: ...
 
     def row_arm_available(self, row: int) -> bool: ...
+
+    def row_solo(self, row: int) -> bool: ...
+
+    def toggle_row_solo(self, row: int) -> None: ...
 
     def toggle_override(self, slot: str) -> None: ...
 
@@ -130,6 +134,12 @@ def timeline_row_menu_entries(
         shortcut="A",
         hint=None if can_arm else "Unlock the timeline to arm",
     )
+    solo = ContextMenuItem(
+        id="timeline.row.solo",
+        label="Solo layer",
+        run=lambda: actions.toggle_row_solo(row),
+        checked=actions.row_solo(row),
+    )
 
     clip_entries = (
         clip_menu_entries(
@@ -162,4 +172,5 @@ def timeline_row_menu_entries(
         release_all,
         CONTEXT_SEPARATOR,
         arm,
+        solo,
     )

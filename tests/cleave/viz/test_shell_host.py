@@ -43,8 +43,10 @@ from cleave.viz.shell_host import (
     navigator_toggle_tooltip,
     navigator_toggle_x,
     navigator_tree_lines,
+    strip_arm_tooltip,
     strip_eye_tooltip,
-    strip_label_tooltip,
+    strip_release_tooltip,
+    strip_solo_tooltip,
     navigator_twisty,
     path_icon_color,
     path_row_icon,
@@ -180,30 +182,35 @@ def test_navigator_toggle_presentation() -> None:
     assert navigator_toggle_tooltip(blocked) == "Locked: unlock to change"
 
 
-def test_strip_label_tooltip_names_double_click_arm() -> None:
-    assert strip_label_tooltip(armed=False, locked=False) == (
-        "Double-click to arm for recording, right-click for options"
+def test_strip_arm_and_solo_tooltips() -> None:
+    assert strip_arm_tooltip(armed=False, locked=False) == "Arm for recording"
+    assert strip_arm_tooltip(armed=True, locked=False) == "Disarm"
+    assert strip_arm_tooltip(armed=False, locked=True) == (
+        "Locked: unlock the timeline to arm"
     )
-    assert strip_label_tooltip(armed=True, locked=False) == (
-        "Double-click to disarm, right-click for options"
-    )
-    assert strip_label_tooltip(armed=False, locked=True) == (
-        "Locked: unlock the timeline to arm, right-click for options"
-    )
+    assert strip_solo_tooltip(solo=False) == "Solo this layer"
+    assert strip_solo_tooltip(solo=True) == "End solo"
 
 
 def test_strip_eye_tooltip_explains_overrides() -> None:
     assert strip_eye_tooltip(overridden=False, recording=False, armed=False) == (
-        "Right-click to override visibility"
+        "Show / hide, taking over from the timeline"
     )
     assert strip_eye_tooltip(overridden=True, recording=False, armed=False) == (
-        "Override: click to show / hide, right-click to release"
+        "Override: click to show / hide"
     )
     assert strip_eye_tooltip(overridden=True, recording=True, armed=True) == (
         "Click to record show / hide"
     )
     assert strip_eye_tooltip(overridden=False, recording=True, armed=False) == (
         "Arm this row to record show / hide"
+    )
+
+
+def test_strip_release_tooltip() -> None:
+    assert strip_release_tooltip(recording=False) == "Back to timeline"
+    assert strip_release_tooltip(recording=True) == (
+        "Stop recording to hand back to the timeline"
     )
 
 

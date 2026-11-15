@@ -42,6 +42,7 @@ from cleave.viz.timeline_overlay import (
     ARM_FLASH_HALF_MS,
     PLAYHEAD_FLASH_MS,
     ROLE_GLYPH_BOTTOM_PAD,
+    ROW_HEADER_BUTTONS,
     ROLE_GLYPH_TICK_GAP,
     SELECTED_CLIP_COLOR,
     SELECTED_CLIP_FLASH_DURATION_MS,
@@ -53,10 +54,12 @@ from cleave.viz.timeline_overlay import (
     SELECTED_CLIP_OUTLINE_WIDTH,
     TimelineOverlay,
     TimelineViewState,
-    arm_abbrev_flash_active,
+    arm_flash_active,
+    header_button_x,
+    row_header_target_at,
     blit_role_glyph_xor,
-    arm_abbrev_flash_visible,
-    armed_abbrev_bg_visible,
+    arm_flash_visible,
+    arm_button_lit,
     bar_level_breakpoints_for_row,
     bar_tick_times_for_row,
     cue_times_for_stem,
@@ -115,8 +118,8 @@ def _view_state(
     enabled: bool = True,
     layer_z_order: list[str] | None = None,
     monitor_visible: dict[str, bool] | None = None,
-    timeline_level: dict[str, float] | None = None,
     override_slots: set[str] | None = None,
+    solo_slot: str | None = None,
     arm_flash_start_ms: dict[str, int] | None = None,
     show_bar_grid: bool = False,
     bar_grid_times: tuple[float, ...] = (),
@@ -144,8 +147,8 @@ def _view_state(
             defaults or {slot: 1.0 for slot in (layer_z_order or list(DEFAULT_LAYER_SLOTS))}
         ).items()
     }
-    if timeline_level is None:
-        timeline_level = {
+    if monitor_visible is None:
+        monitor_visible = {
             stem: float(
                 lane_level_at(
                     lane_map.get(stem) or TimelineLane(baseline=None, cues=[]),
@@ -153,15 +156,8 @@ def _view_state(
                     inherit=float(_as_level(default_map[stem])),
                 )
             )
+            > LEVEL_EPS
             for stem in order
-        }
-    else:
-        timeline_level = {
-            slot: float(_as_level(level)) for slot, level in timeline_level.items()
-        }
-    if monitor_visible is None:
-        monitor_visible = {
-            stem: timeline_level[stem] > LEVEL_EPS for stem in order
         }
     return TimelineViewState(
         layer_z_order=order,
@@ -175,8 +171,8 @@ def _view_state(
         duration_sec=duration_sec,
         focus_row=focus_row,
         monitor_visible=monitor_visible,
-        timeline_level=timeline_level,
         override_slots=set(override_slots or ()),
+        solo_slot=solo_slot,
         armed_slots=set(armed_slots or ()),
         recording=recording,
         record_start_sec=record_start_sec,
@@ -218,14 +214,32 @@ def _draw(
     overlay.draw(surface, state)
 
 
-def test_row_prefix_width_includes_monitor_eye_slot() -> None:
+def test_row_prefix_width_includes_header_buttons() -> None:
     pygame.init()
     font = overlay_font(timeline_ui_metrics().font_size)
     layer_num_w = font.render(layer_num_prefix(4), True, (255, 255, 255)).get_width()
     abbrev_w = font.render(stem_abbrev_label("drums"), True, (255, 255, 255)).get_width()
     row_h = 20
-    eye_slot_w = visibility_icon_slot_width(row_h)
-    assert row_prefix_width(layer_num_w, abbrev_w, row_h) == layer_num_w + abbrev_w + eye_slot_w
+    slot_w = visibility_icon_slot_width(row_h)
+    assert row_prefix_width(layer_num_w, abbrev_w, row_h) == (
+        layer_num_w + abbrev_w + slot_w * len(ROW_HEADER_BUTTONS)
+    )
+
+
+def test_row_header_target_at_maps_each_column() -> None:
+    padding, label_w, slot_w = 8, 40, 20
+    def at(x: float):
+        return row_header_target_at(x, padding=padding, label_width=label_w, slot_w=slot_w)
+    assert at(padding - 1) is None
+    assert at(padding) == "label"
+    assert at(padding + label_w - 1) == "label"
+    for index, target in enumerate(ROW_HEADER_BUTTONS):
+        left = padding + label_w + index * slot_w
+        assert at(left) == target
+        assert at(left + slot_w - 1) == target
+        assert header_button_x(target, padding=padding, label_width=label_w, slot_w=slot_w) == left
+    assert at(padding + label_w + slot_w * len(ROW_HEADER_BUTTONS)) is None
+    assert ROW_HEADER_BUTTONS == ("arm", "solo", "eye", "release")
 
 
 def test_layer_num_width_probe_scales_with_eight_layers() -> None:
@@ -241,7 +255,7 @@ def test_layer_num_width_probe_scales_with_eight_layers() -> None:
     assert overlay._layer_num_width == expected
 
 
-def test_dual_eye_positions_monitor_left_committed_right() -> None:
+def test_bar_runs_from_header_buttons_to_right_padding() -> None:
     pygame.init()
     padding = 8
     overlay = TimelineOverlay(padding=padding)
@@ -253,18 +267,13 @@ def test_dual_eye_positions_monitor_left_committed_right() -> None:
     assert panel is not None
     assert bar_layout is not None
     panel_w = panel[2]
-    bar_left, bar_width, eye_slot_w = bar_layout
-
-    monitor_eye_x = padding + overlay._layer_num_width + overlay._stem_abbrev_width
-    committed_eye_x = panel_w - padding - eye_slot_w
+    bar_left, bar_width = bar_layout
     row_h = overlay.row_layout[0][4]
 
     assert bar_left == padding + row_prefix_width(
         overlay._layer_num_width, overlay._stem_abbrev_width, row_h
     )
-    assert bar_width == panel_w - padding * 2 - (bar_left - padding) - eye_slot_w
-    assert committed_eye_x > monitor_eye_x + eye_slot_w
-    assert committed_eye_x + eye_slot_w <= panel_w - padding
+    assert bar_left + bar_width == panel_w - padding
 
 
 def test_armed_bg_matches_solo_bg() -> None:
@@ -303,19 +312,19 @@ def test_playhead_flash_alternates_color() -> None:
     assert playhead_color(half) == PLAYHEAD
 
 
-def test_arm_abbrev_flash_visible_blinks_twice() -> None:
+def test_arm_flash_visible_blinks_twice() -> None:
     start = 1000
     flash = {"layer_1": start}
-    assert arm_abbrev_flash_active(flash, "layer_1", ticks_ms=start) is True
-    assert arm_abbrev_flash_visible(flash, "layer_1", ticks_ms=start) is True
-    assert arm_abbrev_flash_visible(flash, "layer_1", ticks_ms=start + ARM_FLASH_HALF_MS - 1) is True
-    assert arm_abbrev_flash_visible(flash, "layer_1", ticks_ms=start + ARM_FLASH_HALF_MS) is False
-    assert arm_abbrev_flash_visible(flash, "layer_1", ticks_ms=start + ARM_FLASH_HALF_MS * 2) is True
-    assert arm_abbrev_flash_visible(flash, "layer_1", ticks_ms=start + ARM_FLASH_HALF_MS * 3) is False
-    assert arm_abbrev_flash_active(
+    assert arm_flash_active(flash, "layer_1", ticks_ms=start) is True
+    assert arm_flash_visible(flash, "layer_1", ticks_ms=start) is True
+    assert arm_flash_visible(flash, "layer_1", ticks_ms=start + ARM_FLASH_HALF_MS - 1) is True
+    assert arm_flash_visible(flash, "layer_1", ticks_ms=start + ARM_FLASH_HALF_MS) is False
+    assert arm_flash_visible(flash, "layer_1", ticks_ms=start + ARM_FLASH_HALF_MS * 2) is True
+    assert arm_flash_visible(flash, "layer_1", ticks_ms=start + ARM_FLASH_HALF_MS * 3) is False
+    assert arm_flash_active(
         flash, "layer_1", ticks_ms=start + ARM_FLASH_DURATION_MS - 1
     ) is True
-    assert arm_abbrev_flash_active(
+    assert arm_flash_active(
         flash, "layer_1", ticks_ms=start + ARM_FLASH_DURATION_MS
     ) is False
 
@@ -328,18 +337,18 @@ def test_prune_expired_arm_flashes() -> None:
     assert flash == {}
 
 
-def test_armed_abbrev_bg_visible_prefers_arm_flash_over_steady_armed() -> None:
+def test_arm_button_lit_prefers_arm_flash_over_steady_armed() -> None:
     start = 5000
     flash = {"layer_1": start}
     off_tick = start + ARM_FLASH_HALF_MS
-    assert armed_abbrev_bg_visible(
+    assert arm_button_lit(
         armed=True,
         recording=False,
         flash_starts=flash,
         slot="layer_1",
         ticks_ms=off_tick,
     ) is False
-    assert armed_abbrev_bg_visible(
+    assert arm_button_lit(
         armed=True,
         recording=False,
         flash_starts={},
@@ -348,7 +357,7 @@ def test_armed_abbrev_bg_visible_prefers_arm_flash_over_steady_armed() -> None:
     ) is True
 
 
-def test_disarm_flash_draws_armed_abbrev_bg_on_phase(monkeypatch) -> None:
+def test_disarm_flash_lights_the_arm_button_on_phase(monkeypatch) -> None:
     start = 5000
     monkeypatch.setattr("pygame.time.get_ticks", lambda: start + 10)
     pygame.init()
@@ -363,12 +372,12 @@ def test_disarm_flash_draws_armed_abbrev_bg_on_phase(monkeypatch) -> None:
 
     bass_layout = next(row for row in overlay.row_layout if row[5] == "layer_2")
     _, _, row_y, _, row_h, _ = bass_layout
-    flash_on = _abbrev_bg_pixel(surface, overlay, row_y, row_h)
+    flash_on = _arm_bg_pixel(surface, overlay, row_y, row_h)
 
     monkeypatch.setattr("pygame.time.get_ticks", lambda: start + ARM_FLASH_HALF_MS + 10)
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
     _draw(overlay, surface, state)
-    flash_off = _abbrev_bg_pixel(surface, overlay, row_y, row_h)
+    flash_off = _arm_bg_pixel(surface, overlay, row_y, row_h)
 
     assert flash_on[0] > flash_off[0] + 40
     assert flash_on[0] > 150
@@ -396,7 +405,7 @@ def test_armed_recording_monitor_eye_flashes_when_focused(monkeypatch) -> None:
     panel = overlay.panel_rect
     assert panel is not None
     panel_x, panel_y, _, _ = panel
-    monitor_eye_x = overlay._padding + overlay._layer_num_width + overlay._stem_abbrev_width
+    monitor_eye_x = _header_x(overlay, "eye")
     sample = (panel_x + monitor_eye_x + 1, panel_y + row_y + row_h // 2)
     flash_on = surface_on.get_at(sample)[:3]
     flash_off = surface_off.get_at(sample)[:3]
@@ -421,7 +430,7 @@ def test_armed_recording_monitor_eye_uses_override_bg_when_flash_on(monkeypatch)
     panel = overlay.panel_rect
     assert panel is not None
     panel_x, panel_y, _, _ = panel
-    monitor_eye_x = overlay._padding + overlay._layer_num_width + overlay._stem_abbrev_width
+    monitor_eye_x = _header_x(overlay, "eye")
     assert surface.get_at((panel_x + monitor_eye_x + 1, panel_y + row_y + row_h // 2))[:3] == OVERRIDE_BG
 
 
@@ -440,21 +449,42 @@ def test_armed_recording_monitor_eye_hides_override_bg_when_flash_off(monkeypatc
     panel = overlay.panel_rect
     assert panel is not None
     panel_x, panel_y, _, _ = panel
-    monitor_eye_x = overlay._padding + overlay._layer_num_width + overlay._stem_abbrev_width
+    monitor_eye_x = _header_x(overlay, "eye")
     assert surface.get_at((panel_x + monitor_eye_x + 1, panel_y + row_y + row_h // 2))[:3] != OVERRIDE_BG
 
 
-def _abbrev_bg_pixel(surface: pygame.Surface, overlay: TimelineOverlay, row_y: int, row_h: int) -> tuple[int, ...]:
+def _header_x(overlay: TimelineOverlay, target: str) -> int:
+    layout = overlay._hit_layout
+    assert layout is not None
+    return header_button_x(
+        target,
+        padding=overlay._padding,
+        label_width=overlay._layer_num_width + overlay._stem_abbrev_width,
+        slot_w=layout.slot_w,
+    )
+
+
+def _header_bg_pixel(
+    surface: pygame.Surface,
+    overlay: TimelineOverlay,
+    target: str,
+    row_y: int,
+    row_h: int,
+) -> tuple[int, ...]:
+    """A pixel at the left edge of a header button, clear of its glyph."""
     panel = overlay.panel_rect
     assert panel is not None
     panel_x, panel_y, _, _ = panel
-    abbrev_x = overlay._padding + overlay._layer_num_width
-    sample_x = panel_x + abbrev_x + overlay._stem_abbrev_width - 2
+    sample_x = panel_x + _header_x(overlay, target) + 1
     sample_y = panel_y + row_y + row_h // 2
     return surface.get_at((sample_x, sample_y))[:3]
 
 
-def test_armed_recording_abbrev_flashes_with_rec(monkeypatch) -> None:
+def _arm_bg_pixel(surface: pygame.Surface, overlay: TimelineOverlay, row_y: int, row_h: int) -> tuple[int, ...]:
+    return _header_bg_pixel(surface, overlay, "arm", row_y, row_h)
+
+
+def test_armed_recording_arm_button_flashes_with_rec(monkeypatch) -> None:
     monkeypatch.setattr(
         "cleave.viz.timeline_overlay.rec_flash_visible", lambda ticks_ms=None: True
     )
@@ -466,20 +496,20 @@ def test_armed_recording_abbrev_flashes_with_rec(monkeypatch) -> None:
 
     bass_layout = next(row for row in overlay.row_layout if row[5] == "layer_2")
     _, _, row_y, _, row_h, _ = bass_layout
-    flash_on = _abbrev_bg_pixel(surface, overlay, row_y, row_h)
+    flash_on = _arm_bg_pixel(surface, overlay, row_y, row_h)
 
     monkeypatch.setattr(
         "cleave.viz.timeline_overlay.rec_flash_visible", lambda ticks_ms=None: False
     )
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
     _draw(overlay, surface, state)
-    flash_off = _abbrev_bg_pixel(surface, overlay, row_y, row_h)
+    flash_off = _arm_bg_pixel(surface, overlay, row_y, row_h)
 
     assert flash_on[0] > flash_off[0] + 40
     assert flash_on[0] > 150
 
 
-def test_armed_not_recording_abbrev_always_red() -> None:
+def test_armed_not_recording_arm_button_always_red() -> None:
     pygame.init()
     overlay = TimelineOverlay()
     armed_state = _view_state(armed_slots={"layer_2"}, recording=False, focus_row=0)
@@ -488,16 +518,16 @@ def test_armed_not_recording_abbrev_always_red() -> None:
 
     bass_layout = next(row for row in overlay.row_layout if row[5] == "layer_2")
     _, _, row_y, _, row_h, _ = bass_layout
-    armed_color = _abbrev_bg_pixel(surface, overlay, row_y, row_h)
+    armed_color = _arm_bg_pixel(surface, overlay, row_y, row_h)
 
     _draw(overlay, surface, _view_state(armed_slots=set(), recording=False, focus_row=0))
-    unarmed_color = _abbrev_bg_pixel(surface, overlay, row_y, row_h)
+    unarmed_color = _arm_bg_pixel(surface, overlay, row_y, row_h)
 
     assert armed_color[0] > unarmed_color[0] + 40
     assert armed_color[0] > 150
 
 
-def test_armed_abbrev_letter_uses_highlight() -> None:
+def test_armed_stem_label_uses_highlight() -> None:
     pygame.init()
     overlay = TimelineOverlay()
     state = _view_state(armed_slots={"layer_2"}, recording=False, focus_row=0)
@@ -532,7 +562,7 @@ def test_unarmed_recording_monitor_eye_not_override_bg() -> None:
     panel = overlay.panel_rect
     assert panel is not None
     panel_x, panel_y, _, _ = panel
-    monitor_eye_x = overlay._padding + overlay._layer_num_width + overlay._stem_abbrev_width
+    monitor_eye_x = _header_x(overlay, "eye")
     assert surface.get_at((panel_x + monitor_eye_x + 1, panel_y + row_y + row_h // 2))[:3] != OVERRIDE_BG
 
 
@@ -564,7 +594,7 @@ def test_override_armed_recording_monitor_eye_flashes(monkeypatch) -> None:
     panel = overlay.panel_rect
     assert panel is not None
     panel_x, panel_y, _, _ = panel
-    monitor_eye_x = overlay._padding + overlay._layer_num_width + overlay._stem_abbrev_width
+    monitor_eye_x = _header_x(overlay, "eye")
     sample = (panel_x + monitor_eye_x + 1, panel_y + row_y + row_h // 2)
     flash_on = surface_on.get_at(sample)[:3]
     flash_off = surface_off.get_at(sample)[:3]
@@ -572,6 +602,30 @@ def test_override_armed_recording_monitor_eye_flashes(monkeypatch) -> None:
     assert flash_on == OVERRIDE_BG
     assert flash_off != OVERRIDE_BG
     assert flash_on != flash_off
+
+
+def test_override_row_shows_back_to_timeline_button() -> None:
+    pygame.init()
+    overlay = TimelineOverlay()
+    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    _draw(overlay, surface, _view_state(override_slots={"layer_2"}, focus_row=0))
+    rows = {row[5]: row for row in overlay.row_layout}
+    _, _, row_y, _, row_h, _ = rows["layer_2"]
+    assert _header_bg_pixel(surface, overlay, "release", row_y, row_h) == OVERRIDE_BG
+    _, _, row_y, _, row_h, _ = rows["layer_1"]
+    assert _header_bg_pixel(surface, overlay, "release", row_y, row_h) != OVERRIDE_BG
+
+
+def test_solo_row_lights_its_solo_button() -> None:
+    pygame.init()
+    overlay = TimelineOverlay()
+    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    _draw(overlay, surface, _view_state(solo_slot="layer_2", focus_row=0))
+    rows = {row[5]: row for row in overlay.row_layout}
+    _, _, row_y, _, row_h, _ = rows["layer_2"]
+    assert _header_bg_pixel(surface, overlay, "solo", row_y, row_h) == SOLO_BG
+    _, _, row_y, _, row_h, _ = rows["layer_1"]
+    assert _header_bg_pixel(surface, overlay, "solo", row_y, row_h) != SOLO_BG
 
 
 def test_override_slots_use_override_bg_on_monitor_eye() -> None:
@@ -586,7 +640,7 @@ def test_override_slots_use_override_bg_on_monitor_eye() -> None:
     panel = overlay.panel_rect
     assert panel is not None
     panel_x, panel_y, _, _ = panel
-    monitor_eye_x = overlay._padding + overlay._layer_num_width + overlay._stem_abbrev_width
+    monitor_eye_x = _header_x(overlay, "eye")
     assert surface.get_at((panel_x + monitor_eye_x + 1, panel_y + row_y + row_h // 2))[:3] == OVERRIDE_BG
 
 
@@ -608,7 +662,7 @@ def test_recording_baseline_does_not_draw_cue_tick() -> None:
     assert bar_tick_times_for_row(state, "layer_1") == []
 
 
-def test_draw_dual_eye_state_does_not_crash() -> None:
+def test_draw_override_and_take_state_does_not_crash() -> None:
     pygame.init()
     overlay = TimelineOverlay()
     state = _view_state(
@@ -618,7 +672,6 @@ def test_draw_dual_eye_state_does_not_crash() -> None:
         armed_slots={"layer_2"},
         recording=True,
         monitor_visible={"layer_1": True, "layer_2": False, "layer_3": True, "layer_4": True},
-        timeline_level={"layer_1": 0.0, "layer_2": 1.0, "layer_3": 1.0, "layer_4": 1.0},
         override_slots={"layer_1"},
     )
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
@@ -811,7 +864,7 @@ def _marker_upload(
     composed = overlay.compose_panel(state, viewport_width=1280, viewport_height=720)
     assert composed is not None
     assert overlay.bar_layout is not None
-    bar_left, bar_width, _ = overlay.bar_layout
+    bar_left, bar_width = overlay.bar_layout
     tick_top = ruler_tick_top(timeline_badge_reserve_px() + overlay._padding)
     return composed.upload_surface, bar_left, bar_width, tick_top
 
@@ -887,7 +940,7 @@ def test_hit_at_reports_song_marker_on_ruler_and_rows() -> None:
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
     _draw(overlay, surface, _view_state(duration_sec=100.0, song_marker_times=(30.0,)))
     px, py, _, _ = overlay.panel_rect
-    bar_left, bar_width, _ = overlay.bar_layout
+    bar_left, bar_width = overlay.bar_layout
     x = px + time_to_x(30.0, bar_left, bar_width, 0.0, 100.0)
     row_y = py + overlay.row_layout[0][2] + 1
 
@@ -991,7 +1044,7 @@ def test_header_badge_shows_only_while_recording() -> None:
     assert rec is not None and panel is not None
     # REC runs from the ruler's right end to the strip's right edge.
     assert rec[0] + rec[2] == panel[0] + panel[2]
-    bar_left, bar_width, _ = overlay.bar_layout
+    bar_left, bar_width = overlay.bar_layout
     assert rec[0] == panel[0] + bar_left + bar_width
 
 
@@ -1001,7 +1054,7 @@ def test_record_button_ends_at_ruler_start() -> None:
     surface = pygame.Surface((800, 400), pygame.SRCALPHA)
     _draw(overlay, surface, _view_state(position_sec=0.0))
     _, record = overlay._transport_rects(overlay._hit_layout)
-    bar_left, _, _ = overlay.bar_layout
+    bar_left, _ = overlay.bar_layout
     assert record[0] + record[2] == bar_left
 
 
@@ -1014,7 +1067,7 @@ def test_upscale_expands_bar_width_not_row_height() -> None:
     _draw(overlay, baseline_surface, state)
     baseline_panel = overlay.panel_rect
     baseline_row_h = overlay.row_layout[0][4]
-    _, baseline_bar_width, _ = overlay.bar_layout
+    _, baseline_bar_width = overlay.bar_layout
     assert baseline_panel is not None
     assert overlay.bar_layout is not None
 
@@ -1022,7 +1075,7 @@ def test_upscale_expands_bar_width_not_row_height() -> None:
     _draw(overlay, upscaled_surface, state)
     upscaled_panel = overlay.panel_rect
     upscaled_row_h = overlay.row_layout[0][4]
-    _, upscaled_bar_width, _ = overlay.bar_layout
+    _, upscaled_bar_width = overlay.bar_layout
     assert upscaled_panel is not None
     assert overlay.bar_layout is not None
 
@@ -1198,7 +1251,7 @@ def _clip_strip(overlay: TimelineOverlay, **kwargs):
     static = overlay._cache.panel
     assert static is not None
     assert overlay.bar_layout is not None
-    bar_left, bar_width, _ = overlay.bar_layout
+    bar_left, bar_width = overlay.bar_layout
     start_x = time_to_x(25.0, bar_left, bar_width, 0.0, 100.0)
     end_x = time_to_x(75.0, bar_left, bar_width, 0.0, 100.0)
     row_h = overlay.row_layout[0][4]
@@ -1276,7 +1329,7 @@ def test_selected_clip_outline_only_on_focused_track() -> None:
         static = overlay._cache.panel
         assert static is not None
         assert overlay.bar_layout is not None
-        bar_left, bar_width, _ = overlay.bar_layout
+        bar_left, bar_width = overlay.bar_layout
         tick_x = time_to_x(cue_t, bar_left, bar_width, 0.0, 100.0)
         row_h = overlay.row_layout[row_index][4]
         y = overlay._padding + row_index * (row_h + overlay._row_gap) + row_h // 2
@@ -1358,7 +1411,7 @@ def test_selected_clip_flash_live_patches_yellow(monkeypatch) -> None:
     assert composed is not None
     upload = composed.upload_surface
     assert overlay.bar_layout is not None
-    bar_left, bar_width, _ = overlay.bar_layout
+    bar_left, bar_width = overlay.bar_layout
     tick_x = time_to_x(25.0, bar_left, bar_width, 0.0, 100.0)
     from cleave.viz.timeline_panel_cache import timeline_badge_reserve_px
 
@@ -1504,7 +1557,7 @@ def test_role_glyph_xor_drawn_late_on_upload_not_static() -> None:
     assert static is not None
     upload = composed.upload_surface
     assert overlay.bar_layout is not None
-    bar_left, bar_width, _ = overlay.bar_layout
+    bar_left, bar_width = overlay.bar_layout
     tick_x = time_to_x(25.0, bar_left, bar_width, 0.0, 100.0)
     row_h = overlay.row_layout[0][4]
     row_y = overlay._padding
@@ -1578,7 +1631,7 @@ def test_compose_panel_draws_time_scale_above_first_row() -> None:
     band = (0, 720 - band_h, 1280, band_h)
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
     overlay.draw(surface, state, timeline_rect=band)
-    bar_left, _bar_width, _eye = overlay.bar_layout
+    bar_left, _bar_width = overlay.bar_layout
     panel = overlay.panel_rect
     assert panel is not None
     first_row_y = panel[1] + timeline_ui_metrics().padding
@@ -1614,7 +1667,7 @@ def test_playhead_rises_to_ruler_major_tick_top() -> None:
     band = (0, 720 - band_h, 1280, band_h)
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
     overlay.draw(surface, state, timeline_rect=band)
-    bar_left, bar_width, _eye = overlay.bar_layout
+    bar_left, bar_width = overlay.bar_layout
     panel = overlay.panel_rect
     assert panel is not None
     x = playhead_x(state.position_sec, bar_left, bar_width, 0.0, state.duration_sec)
@@ -1637,7 +1690,7 @@ def test_moving_playhead_keeps_ruler_baseline() -> None:
     moved = TimelineOverlay()
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
     moved.draw(surface, state, timeline_rect=band)
-    old_x = playhead_x(50.0, *moved.bar_layout[:2], 0.0, state.duration_sec)
+    old_x = playhead_x(50.0, *moved.bar_layout, 0.0, state.duration_sec)
     state.position_sec = 60.0
     surface.fill((0, 0, 0, 0))
     moved.draw(surface, state, timeline_rect=band)
@@ -1663,7 +1716,7 @@ def test_hit_at_maps_ruler_rows_prefix_and_gaps() -> None:
     _draw(overlay, surface, _view_state(duration_sec=100.0))
 
     px, py, _, _ = overlay.panel_rect
-    bar_left, bar_width, _ = overlay.bar_layout
+    bar_left, bar_width = overlay.bar_layout
     rows = overlay.row_layout
     mid_x = px + bar_left + bar_width // 2
 
@@ -1679,13 +1732,17 @@ def test_hit_at_maps_ruler_rows_prefix_and_gaps() -> None:
     prefix = overlay.hit_at(px + 10, py + rows[0][2] + 1)
     assert prefix is not None and prefix.row == 0 and prefix.t_sec is None
     assert prefix.target == "label"
-    eye = overlay.hit_at(px + bar_left - 2, py + rows[0][2] + 1)
-    assert eye is not None and eye.row == 0 and eye.target == "eye"
+    for target in ("arm", "solo", "eye", "release"):
+        hit = overlay.hit_at(px + _header_x(overlay, target) + 1, py + rows[0][2] + 1)
+        assert hit is not None and hit.row == 0 and hit.target == target
+        assert hit.t_sec is None
     assert ruler.target is None
 
     corner_y = py - 2
     play = overlay.hit_at(px + 9, corner_y)
-    record = overlay.hit_at(px + 8 + overlay._layer_num_width + 2, corner_y)
+    record = overlay.hit_at(
+        px + 8 + overlay._layer_num_width + overlay._stem_abbrev_width + 2, corner_y
+    )
     assert play is not None and play.target == "play" and play.row is None
     assert record is not None and record.target == "record"
 
@@ -1711,7 +1768,7 @@ def test_ruler_hit_starts_at_major_tick_top() -> None:
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
     _draw(overlay, surface, _view_state(duration_sec=100.0))
     px, py, _, _ = overlay.panel_rect
-    bar_left, bar_width, _ = overlay.bar_layout
+    bar_left, bar_width = overlay.bar_layout
     mid_x = px + bar_left + bar_width // 2
     reserve = timeline_badge_reserve_px()
     ruler_top = py - reserve
@@ -1740,7 +1797,7 @@ def test_zoomed_hit_at_maps_the_window_and_tightens_cue_tolerance() -> None:
     _draw(overlay, surface, _zoomed(_view_state(duration_sec=100.0), 40.0, 60.0))
 
     px, py, _, _ = overlay.panel_rect
-    bar_left, bar_width, _ = overlay.bar_layout
+    bar_left, bar_width = overlay.bar_layout
     row_y = py + overlay.row_layout[0][2] + 2
     hit = overlay.hit_at(px + bar_left + bar_width // 2, row_y)
     assert hit is not None and hit.row == 0
@@ -1772,7 +1829,7 @@ def test_scrollbar_hits_thumb_and_track_under_the_rows() -> None:
     _draw(overlay, surface, _zoomed(_view_state(duration_sec=100.0), 40.0, 60.0))
 
     px, py, _, ph = overlay.panel_rect
-    bar_left, bar_width, _ = overlay.bar_layout
+    bar_left, bar_width = overlay.bar_layout
     metrics = timeline_ui_metrics()
     bar_y = py + ph - metrics.padding - metrics.scrollbar_height // 2 - 1
     thumb_x = px + bar_left + bar_width // 2
@@ -1801,7 +1858,7 @@ def test_scrollbar_cannot_move_at_full_zoom() -> None:
     from cleave.viz.theme import TIMELINE_SCROLL_RAIL
 
     px, py, _, ph = overlay.panel_rect
-    bar_left, bar_width, _ = overlay.bar_layout
+    bar_left, bar_width = overlay.bar_layout
     metrics = timeline_ui_metrics()
     mid_y = py + ph - metrics.padding - metrics.scrollbar_height // 2 - 1
     top_y = py + ph - metrics.padding - metrics.scrollbar_height
@@ -1822,7 +1879,7 @@ def test_playhead_and_cues_outside_the_window_are_not_drawn() -> None:
     _draw(overlay, surface, _zoomed(state, 40.0, 60.0))
 
     px, py, _, _ = overlay.panel_rect
-    bar_left, bar_width, _ = overlay.bar_layout
+    bar_left, bar_width = overlay.bar_layout
     _, _, row_y, _, row_h, _ = overlay.row_layout[0]
     y = py + row_y + row_h // 2
     row = {
@@ -1850,7 +1907,7 @@ def test_zoomed_level_bar_cuts_segments_at_the_window_edges() -> None:
     _draw(overlay, surface, _zoomed(state, 40.0, 60.0))
 
     px, py, _, _ = overlay.panel_rect
-    bar_left, bar_width, _ = overlay.bar_layout
+    bar_left, bar_width = overlay.bar_layout
     _, _, row_y, _, row_h, _ = overlay.row_layout[0]
     y = py + row_y + row_h // 2
     # On from before the window to its middle, then off.
@@ -1948,7 +2005,7 @@ def test_hit_at_reports_the_clip_and_edge_under_a_row_point() -> None:
     )
     _draw(overlay, surface, state)
     px, py, _, _ = overlay.panel_rect
-    bar_left, bar_width, _ = overlay.bar_layout
+    bar_left, bar_width = overlay.bar_layout
     rows = overlay.row_layout
 
     def hit(t_sec: float, row: int = 0, dx: int = 0):

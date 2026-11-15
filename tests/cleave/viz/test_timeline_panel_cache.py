@@ -420,6 +420,6 @@ def test_taller_band_grows_rows_and_keeps_icons_nominal() -> None:
     layout = overlay._hit_layout
     assert layout.row_h > fit_layout.row_h
     assert layout.icon_h == fit_layout.row_h
-    assert layout.eye_slot_w == fit_layout.eye_slot_w
+    assert layout.slot_w == fit_layout.slot_w
     assert layout.panel_y + layout.panel_h == 720
     assert layout.panel_y - layout.badge_reserve >= 320

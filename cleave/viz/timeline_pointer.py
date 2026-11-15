@@ -1,4 +1,4 @@
-"""Mouse gestures on the timeline strip: transport, arm, select, seek, scrub, zoom.
+"""Mouse gestures on the timeline strip: transport, row buttons, select, seek, scrub, zoom.
 
 The corner buttons above the row labels play/pause and record. A press on
 the ruler seeks and a held drag scrubs. A press on a layer row focuses it
@@ -11,10 +11,11 @@ double-click in a gap adds a clip there (``TimelineControls.add_clip_at``);
 on a clip, or while clips cannot be edited, it seeks, and holding the second
 press scrubs. A press on a song marker selects it and shows it on the Song
 Markers page: on the ruler it also seeks to the marker, and on a row a
-clip under the pointer wins. A double-click on a row's
-label (layer number and stem) arms it, and a press on its monitor eye
-toggles the layer's visibility as its number key does (an overridden row,
-or an armed row while recording). A right-click on a row focuses it and
+clip under the pointer wins. A press on a row's label (layer number and
+stem) focuses it. Its header buttons act on one press: arm toggles arming,
+solo solos the layer, the eye toggles visibility as the number key does
+(taking the row over from the timeline, or recording an armed row during a
+take), and back to timeline releases an override. A right-click on a row focuses it and
 returns that row's context menu (``timeline_context_menu``), selecting a
 clip under the pointer first so the menu can edit it. In a gap the row
 menu leads with Add clip here; there, and on the ruler, the menu has the
@@ -43,7 +44,7 @@ from cleave.viz.context_menu import ContextMenuEntry, ContextMenuProvider
 from cleave.viz.session import TuningSession
 from cleave.viz.timeline_clip_edits import clip_edits_allowed
 from cleave.viz.timeline_context_menu import TimelineRowMenuActions, timeline_row_menu
-from cleave.viz.timeline_overlay import StripHit, StripTarget
+from cleave.viz.timeline_overlay import ROW_HEADER_BUTTONS, StripHit, StripTarget
 from cleave.viz.timeline_view import (
     WHEEL_PAN_FRACTION,
     WHEEL_ZOOM_FACTOR,
@@ -61,6 +62,7 @@ LEFT_BUTTON: int = 0
 RIGHT_BUTTON: int = 1
 MIDDLE_BUTTON: int = 2
 _SCROLLBAR_TARGETS = ("scroll_thumb", "scroll_track")
+_ROW_BUTTON_TARGETS = frozenset(ROW_HEADER_BUTTONS)
 
 
 class StripGeometry(Protocol):
@@ -93,6 +95,10 @@ class StripActions(TimelineRowMenuActions, Protocol):
     def toggle_arm_row(self, row: int) -> None: ...
 
     def toggle_row_visibility(self, row: int) -> None: ...
+
+    def toggle_row_solo(self, row: int) -> None: ...
+
+    def release_row_override(self, row: int) -> None: ...
 
     def strip_target_pressable(self, target: str, row: int | None) -> bool: ...
 
@@ -305,20 +311,16 @@ class TimelinePointer:
             elif hit.t_sec is not None:
                 self._start_scrub(hit.t_sec)
             return True
-        if hit.target == "eye":
+        if hit.target in _ROW_BUTTON_TARGETS:
             self._last_row_press = None
-            self._actions.toggle_row_visibility(hit.row)
+            self._press_row_button(hit.target, hit.row)
+            return True
+        if hit.target == "label":
+            self._last_row_press = None
+            self._actions.focus_row(hit.row)
             return True
         now = self._clock()
         double = self._is_double_click(now, x, y, hit.row, hit.target)
-        if hit.target == "label":
-            if double:
-                self._last_row_press = None
-                self._actions.toggle_arm_row(hit.row)
-            else:
-                self._actions.focus_row(hit.row)
-                self._last_row_press = (now, x, y, hit.row, hit.target)
-            return True
         self._actions.focus_row(hit.row)
         if hit.t_sec is None:
             self._last_row_press = None
@@ -398,6 +400,16 @@ class TimelinePointer:
             view.pan_by(pan_notches * WHEEL_PAN_FRACTION * (end - start), duration)
         if dy and not shift:
             view.zoom_at(anchor, WHEEL_ZOOM_FACTOR**dy, duration)
+
+    def _press_row_button(self, target: str, row: int) -> None:
+        if target == "arm":
+            self._actions.toggle_arm_row(row)
+        elif target == "solo":
+            self._actions.toggle_row_solo(row)
+        elif target == "eye":
+            self._actions.toggle_row_visibility(row)
+        elif target == "release":
+            self._actions.release_row_override(row)
 
     def _is_double_click(
         self, now: float, x: float, y: float, row: int, target: StripTarget | None

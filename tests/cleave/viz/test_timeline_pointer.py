@@ -65,6 +65,12 @@ class _Actions:
     def toggle_row_visibility(self, row: int) -> None:
         self.calls.append(("visibility", row))
 
+    def toggle_row_solo(self, row: int) -> None:
+        self.calls.append(("solo", row))
+
+    def release_row_override(self, row: int) -> None:
+        self.calls.append(("release", row))
+
     def strip_target_pressable(self, target: str, row: int | None) -> bool:
         return target != "eye" or self.eye_usable
 
@@ -275,20 +281,30 @@ def test_corner_buttons_toggle_transport_and_record() -> None:
     assert not pointer.scrubbing
 
 
-def test_label_click_focuses_and_double_click_arms() -> None:
+def test_label_click_only_focuses_and_double_click_does_not_arm() -> None:
     clock = _Clock()
     actions = _Actions()
     pointer = TimelinePointer(
         _Geometry(StripHit(1, None, 0.2, target="label")), actions, _session(), clock=clock
     )
     pointer.press(10, 10)
-    assert actions.calls == [("focus", 1)]
     clock.now += 0.2
     pointer.press(11, 10)
-    assert actions.calls == [("focus", 1), ("arm", 1)]
-    clock.now += 0.1
-    pointer.press(11, 10)
-    assert actions.calls[-1] == ("focus", 1)
+    assert actions.calls == [("focus", 1), ("focus", 1)]
+
+
+@pytest.mark.parametrize(
+    ("target", "call"),
+    [("arm", "arm"), ("solo", "solo"), ("eye", "visibility"), ("release", "release")],
+)
+def test_header_button_acts_on_one_press(target: str, call: str) -> None:
+    actions = _Actions()
+    pointer = TimelinePointer(
+        _Geometry(StripHit(1, None, 0.2, target=target)), actions, _session()
+    )
+    assert pointer.press(10, 10) is True
+    assert actions.calls == [(call, 1)]
+    assert not pointer.scrubbing
 
 
 def test_eye_click_toggles_row_visibility() -> None:
@@ -521,6 +537,9 @@ class _MenuGeometry(_Geometry):
 class _MenuActions(_Actions):
     def row_slot(self, row: int) -> str | None:
         return ("layer_1", "layer_2")[row] if 0 <= row < 2 else None
+
+    def row_solo(self, row: int) -> bool:
+        return False
 
 
 def test_context_menu_at_needs_a_layer_row() -> None:

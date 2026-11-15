@@ -43,13 +43,13 @@ class TimelineStaticSignature:
     duration_sec: float
     focus_row: int
     monitor_visible: tuple[tuple[str, bool], ...]
-    timeline_level: tuple[tuple[str, float], ...]
+    solo_slot: str | None
     slot_stems: tuple[tuple[str, str], ...]
     override_slots: frozenset[str]
     armed_slots: frozenset[str]
     recording: bool
     submenu_focused: bool
-    hover_label_row: int | None
+    hover_row_target: tuple[str, int] | None
     record_start_sec: float | None
     record_slot_start_sec: tuple[tuple[str, float], ...]
     record_baseline: tuple[tuple[str, float], ...]
@@ -152,13 +152,13 @@ def timeline_static_signature(
         duration_sec=state.duration_sec,
         focus_row=state.focus_row,
         monitor_visible=tuple(sorted(state.monitor_visible.items())),
-        timeline_level=tuple(sorted(state.timeline_level.items())),
+        solo_slot=state.solo_slot,
         slot_stems=tuple(sorted((k, str(v)) for k, v in state.slot_stems.items())),
         override_slots=frozenset(state.override_slots),
         armed_slots=frozenset(state.armed_slots),
         recording=state.recording,
         submenu_focused=state.submenu_focused,
-        hover_label_row=state.hover_label_row,
+        hover_row_target=state.hover_row_target,
         record_start_sec=state.record_start_sec,
         record_slot_start_sec=tuple(sorted(state.record_slot_start_sec.items())),
         record_baseline=tuple(sorted(state.record_baseline.items())),
