@@ -1526,18 +1526,19 @@ class TimelineOverlay:
 
             if focused:
                 blit_tint(panel, row_rect, HIGHLIGHT, alpha=FOCUS_WASH_ALPHA)
-            if hover_target is not None:
+            # Shell hover washes a header button that is drawn: not the label
+            # (it only selects) or the empty back-to-timeline slot.
+            if hover_target in ("arm", "solo", "eye") or (
+                hover_target == "release" and slot in state.override_slots
+            ):
                 blit_tint(
                     panel,
-                    self._header_target_rect(layout, hover_target, row_y),
+                    self._header_button_rect(layout, hover_target, row_y),
                     NUDGE_HOVER_BG,
                     alpha=NUDGE_HOVER_BG_ALPHA,
                 )
 
-            # Shell hover: nudge wash behind, nudge foreground on the label.
-            if hover_target == "label":
-                label_color = NUDGE_HOVER_FG
-            elif focused or armed:
+            if focused or armed:
                 label_color = HIGHLIGHT
             else:
                 label_color = LABEL
@@ -1791,18 +1792,11 @@ class TimelineOverlay:
             slot_w=layout.slot_w,
         )
 
-    def _header_target_rect(
-        self, layout: _TimelineLayout, target: str, row_y: int
+    def _header_button_rect(
+        self, layout: _TimelineLayout, target: StripTarget, row_y: int
     ) -> tuple[int, int, int, int]:
-        """Panel rect of a row's label or header button *target*."""
-        if target == "label":
-            return (
-                self._padding,
-                row_y,
-                layout.layer_num_width + layout.stem_abbrev_width,
-                layout.row_h,
-            )
-        x = self._header_button_x(layout, target)  # type: ignore[arg-type]
+        """Panel rect of a row's header button *target*."""
+        x = self._header_button_x(layout, target)
         return (x, row_y, layout.slot_w, layout.row_h)
 
     @staticmethod

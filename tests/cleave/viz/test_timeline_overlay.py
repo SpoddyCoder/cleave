@@ -120,6 +120,7 @@ def _view_state(
     monitor_visible: dict[str, bool] | None = None,
     override_slots: set[str] | None = None,
     solo_slot: str | None = None,
+    hover_row_target: tuple[str, int] | None = None,
     arm_flash_start_ms: dict[str, int] | None = None,
     show_bar_grid: bool = False,
     bar_grid_times: tuple[float, ...] = (),
@@ -173,6 +174,7 @@ def _view_state(
         monitor_visible=monitor_visible,
         override_slots=set(override_slots or ()),
         solo_slot=solo_slot,
+        hover_row_target=hover_row_target,
         armed_slots=set(armed_slots or ()),
         recording=recording,
         record_start_sec=record_start_sec,
@@ -614,6 +616,45 @@ def test_override_row_shows_back_to_timeline_button() -> None:
     assert _header_bg_pixel(surface, overlay, "release", row_y, row_h) == OVERRIDE_BG
     _, _, row_y, _, row_h, _ = rows["layer_1"]
     assert _header_bg_pixel(surface, overlay, "release", row_y, row_h) != OVERRIDE_BG
+
+
+def _header_snapshot(state: TimelineViewState) -> tuple[pygame.Surface, TimelineOverlay]:
+    overlay = TimelineOverlay()
+    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    _draw(overlay, surface, state)
+    return surface, overlay
+
+
+def _row_header_pixels(surface: pygame.Surface, overlay: TimelineOverlay, row: int) -> list:
+    panel = overlay.panel_rect
+    assert panel is not None
+    _, _, row_y, _, row_h, _ = overlay.row_layout[row]
+    bar_left, _ = overlay.bar_layout
+    y = panel[1] + row_y + row_h // 2
+    return [surface.get_at((panel[0] + x, y)) for x in range(overlay._padding, bar_left)]
+
+
+def test_hovered_label_and_empty_release_slot_draw_no_wash() -> None:
+    pygame.init()
+    plain, overlay = _header_snapshot(_view_state(focus_row=1))
+    for target in ("label", "release"):
+        hovered, _ = _header_snapshot(
+            _view_state(focus_row=1, hover_row_target=(target, 0))
+        )
+        assert _row_header_pixels(hovered, overlay, 0) == _row_header_pixels(plain, overlay, 0)
+
+
+def test_hovered_buttons_draw_a_wash() -> None:
+    pygame.init()
+    plain, overlay = _header_snapshot(_view_state(focus_row=1))
+    _, _, row_y, _, row_h, _ = overlay.row_layout[0]
+    for target in ("arm", "solo", "eye"):
+        hovered, _ = _header_snapshot(
+            _view_state(focus_row=1, hover_row_target=(target, 0))
+        )
+        assert _header_bg_pixel(hovered, overlay, target, row_y, row_h) != (
+            _header_bg_pixel(plain, overlay, target, row_y, row_h)
+        )
 
 
 def test_solo_row_lights_its_solo_button() -> None:
