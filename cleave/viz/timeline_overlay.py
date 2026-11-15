@@ -940,7 +940,7 @@ def clip_hit_at_x(
 # Corner buttons sit this far below the top of the badge row.
 TRANSPORT_BUTTON_DROP_PX: int = 2
 REC_BUTTON_TEXT: str = "REC"
-# The flashing red REC fill stops this far short of its badge's top and bottom.
+# The flashing red REC fill stops this far short of the button's top and bottom.
 REC_FILL_INSET_Y_PX: int = 2
 
 
@@ -1090,7 +1090,6 @@ class TimelineOverlay:
         self._padding_override = padding
         self._row_gap_override = row_gap
         self._panel_rect: tuple[int, int, int, int] | None = None
-        self._header_badge_rect: tuple[int, int, int, int] | None = None
         self._layer_num_width: int = 0
         self._stem_abbrev_width: int = 0
         self._bar_layout: tuple[int, int, int] | None = None
@@ -1138,10 +1137,6 @@ class TimelineOverlay:
     @property
     def panel_rect(self) -> tuple[int, int, int, int] | None:
         return self._panel_rect
-
-    @property
-    def header_badge_rect(self) -> tuple[int, int, int, int] | None:
-        return self._header_badge_rect
 
     @property
     def bar_layout(self) -> tuple[int, int] | None:
@@ -1278,8 +1273,8 @@ class TimelineOverlay:
         play_rect, record_rect = self._transport_rects(layout)
         rec_text_color = VALUE
         if state.recording:
-            # Flash in step with the REC badge: red fill with white glyph and
-            # text, then a red glyph on no fill.
+            # Flash: red fill with white glyph and text, then a red glyph on
+            # no fill.
             if rec_flash_visible():
                 pygame.draw.rect(surface, REC_BG, rec_fill_rect(record_rect))
                 record_color = VALUE
@@ -2119,46 +2114,6 @@ class TimelineOverlay:
         )
         return self._playhead_strip_rect(layout, playhead_px, y_offset=y_offset)
 
-    def _draw_header_badges_on_surface(
-        self,
-        surface: pygame.Surface,
-        font: pygame.font.Font,
-        layout: _TimelineLayout,
-        recording: bool,
-        *,
-        y_offset: int = 0,
-    ) -> tuple[int, int, int, int] | None:
-        """REC badge on the right, above the strip.
-
-        It starts where the ruler ends and runs to the strip's right edge,
-        over the committed-level icon column; the text is centred.
-        """
-        metrics = timeline_ui_metrics()
-        pad_y = metrics.rec_badge_pad_y
-        badge_y = y_offset
-        badge_h = font.get_height() + pad_y * 2
-        rects: list[tuple[int, int, int, int]] = []
-
-        if recording:
-            rec_surf = font.render(REC_BUTTON_TEXT, True, VALUE)
-            rec_x = layout.bar_left + layout.bar_width
-            rec_w = max(1, layout.panel_w - rec_x)
-            if rec_flash_visible():
-                pygame.draw.rect(
-                    surface, REC_BG, rec_fill_rect((rec_x, badge_y, rec_w, badge_h))
-                )
-            surface.blit(
-                rec_surf,
-                (rec_x + (rec_w - rec_surf.get_width()) // 2, badge_y + pad_y),
-            )
-            rects.append((rec_x, badge_y, rec_w, badge_h))
-
-        if not rects:
-            return None
-        left = min(r[0] for r in rects)
-        right = max(r[0] + r[2] for r in rects)
-        return (left, badge_y, right - left, badge_h)
-
     def _build_ruler(
         self,
         state: TimelineViewState,
@@ -2205,7 +2160,6 @@ class TimelineOverlay:
     ) -> list[tuple[int, int, int, int]]:
         cache = self._cache
         panel_y_offset = layout.badge_reserve
-        font = self._font_get()
 
         if incremental and cache.last_playhead_rect is not None:
             self._restore_upload_rect_from_static(
@@ -2239,30 +2193,6 @@ class TimelineOverlay:
             y_offset=panel_y_offset,
         )
         cache.last_playhead_rect = playhead_rect
-
-        # The REC badge sits level with the corner buttons, the same drop
-        # below the top of the band, over the strip's top padding.
-        badge_top = TRANSPORT_BUTTON_DROP_PX
-        if incremental and cache.last_badge_rect is not None:
-            upload.fill((0, 0, 0, 0), cache.last_badge_rect)
-            self._restore_upload_rect_from_static(
-                upload,
-                static_panel,
-                cache.last_badge_rect,
-                panel_y_offset=panel_y_offset,
-            )
-            if self._ruler is not None:
-                bx, by, bw, bh = cache.last_badge_rect
-                upload.blit(self._ruler, (bx, by), (bx, by, bw, bh))
-
-        badge_rect = self._draw_header_badges_on_surface(
-            upload,
-            font,
-            layout,
-            state.recording,
-            y_offset=badge_top,
-        )
-        cache.last_badge_rect = badge_rect
 
         flash_dirty: list[tuple[int, int, int, int]] = []
         if marker_flash_rect is not None:
@@ -2302,7 +2232,6 @@ class TimelineOverlay:
     ) -> ComposedPanel | None:
         self._visibility = visibility
         self._panel_rect = None
-        self._header_badge_rect = None
         self._hit_layout = None
         if visibility <= 0.01:
             return None
@@ -2342,7 +2271,6 @@ class TimelineOverlay:
             cache.static_signature = static_sig
             cache.panel_size = (panel_w, panel_h)
             cache.last_playhead_rect = None
-            cache.last_badge_rect = None
             cache.last_flash_rects = ()
             cache.last_glyph_rects = ()
             cache.last_live_signature = None
@@ -2369,7 +2297,6 @@ class TimelineOverlay:
             else None
         )
         prev_playhead = cache.last_playhead_rect
-        prev_badge = cache.last_badge_rect
         prev_flash = cache.last_flash_rects
         prev_glyphs = cache.last_glyph_rects
         flash_dirty = self._patch_live_overlay(
@@ -2404,15 +2331,6 @@ class TimelineOverlay:
             viewport_width,
             viewport_height,
         )
-        badge_screen_y = panel_screen_y - layout.badge_reserve
-        badge_local = cache.last_badge_rect
-        if badge_local is not None:
-            bx, by, bw, bh = badge_local
-            self._header_badge_rect = clip_rect_to_bounds(
-                (layout.panel_x + bx, badge_screen_y + by, bw, bh),
-                viewport_width,
-                viewport_height,
-            )
 
         capacity = timeline_panel_max_dimensions(viewport_width, viewport_height)
         live_sig = timeline_live_signature(
@@ -2442,8 +2360,6 @@ class TimelineOverlay:
                 *cache.last_glyph_rects,
                 prev_playhead,
                 cache.last_playhead_rect,
-                prev_badge,
-                cache.last_badge_rect,
                 cache.last_transport_rect,
             ):
                 if rect is not None:
@@ -2492,7 +2408,6 @@ class TimelineOverlay:
         )
         if composed is None:
             self._panel_rect = None
-            self._header_badge_rect = None
             self._bar_layout = None
             self._row_layout = []
             return

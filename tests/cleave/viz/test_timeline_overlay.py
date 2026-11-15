@@ -821,7 +821,6 @@ def test_compose_panel_occupies_timeline_band() -> None:
     assert pw == viewport_w
     assert ph == timeline_panel_height_px(row_count)
     assert py == viewport_h - ph
-    assert overlay.header_badge_rect is None
 
 
 def test_compose_panel_fills_band_width_inside_container() -> None:
@@ -1000,52 +999,15 @@ def test_focus_row_index_matches_stem() -> None:
     assert overlay.panel_rect is not None
 
 
-def test_header_badge_rect_is_above_panel() -> None:
+def test_corner_buttons_drop_below_the_band_top() -> None:
     pygame.init()
     overlay = TimelineOverlay()
-    state = _view_state(position_sec=30.0, recording=True)
     surface = pygame.Surface((800, 400), pygame.SRCALPHA)
-    _draw(overlay, surface, state)
-
-    panel = overlay.panel_rect
-    header = overlay.header_badge_rect
-    assert panel is not None
-    assert header is not None
-    _, panel_y, _, _ = panel
-    _, header_y, _, header_h = header
-    first_row_y = panel_y + overlay.row_layout[0][2]
+    _draw(overlay, surface, _view_state(position_sec=30.0, recording=True))
     from cleave.viz.timeline_overlay import TRANSPORT_BUTTON_DROP_PX
-    from cleave.viz.timeline_panel_cache import timeline_badge_reserve_px
 
-    drop = TRANSPORT_BUTTON_DROP_PX
-    # Just above the first layer row, inside the strip's top padding.
-    assert (
-        header_y + header_h
-        == first_row_y - timeline_ui_metrics().rec_badge_gap + drop
-    )
-    assert header_y + header_h > panel_y
-    # Level with the corner buttons, the same drop below the band top.
-    assert header_y == panel_y - timeline_badge_reserve_px() + drop
-    _, record = overlay._transport_rects(overlay._hit_layout)
-    assert record[1] == drop
-
-
-def test_header_badge_shows_only_while_recording() -> None:
-    pygame.init()
-    overlay = TimelineOverlay()
-    surface = pygame.Surface((800, 400), pygame.SRCALPHA)
-
-    _draw(overlay, surface, _view_state(position_sec=0.0, recording=False))
-    assert overlay.header_badge_rect is None
-
-    _draw(overlay, surface, _view_state(position_sec=0.0, recording=True))
-    rec = overlay.header_badge_rect
-    panel = overlay.panel_rect
-    assert rec is not None and panel is not None
-    # REC runs from the ruler's right end to the strip's right edge.
-    assert rec[0] + rec[2] == panel[0] + panel[2]
-    bar_left, bar_width = overlay.bar_layout
-    assert rec[0] == panel[0] + bar_left + bar_width
+    play, record = overlay._transport_rects(overlay._hit_layout)
+    assert play[1] == record[1] == TRANSPORT_BUTTON_DROP_PX
 
 
 def test_record_button_ends_at_ruler_start() -> None:
@@ -1182,8 +1144,6 @@ def test_draw_with_selected_clip_and_role_does_not_crash() -> None:
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
     _draw(overlay, surface, state)
     assert overlay.panel_rect is not None
-    # The selected cue shows in the inspector; only REC uses the badge row.
-    assert overlay.header_badge_rect is None
 
 
 def test_role_glyph_not_drawn_on_off_cue() -> None:

@@ -90,7 +90,6 @@ class TimelinePanelCache:
     gpu: OverlayGpuState = field(default_factory=OverlayGpuState)
     last_live_signature: tuple | None = None
     last_playhead_rect: tuple[int, int, int, int] | None = None
-    last_badge_rect: tuple[int, int, int, int] | None = None
     last_transport_rect: tuple[int, int, int, int] | None = None
     last_flash_rects: tuple[tuple[int, int, int, int], ...] = ()
     last_glyph_rects: tuple[tuple[int, int, int, int], ...] = ()
