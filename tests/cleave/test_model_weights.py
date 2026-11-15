@@ -91,12 +91,15 @@ def test_beat_this_final0_spec() -> None:
     assert spec.label == "Beat This final0"
     assert spec.size_hint == "~78 MB"
     assert spec.files[0].filename == "beat_this-final0.ckpt"
-    mirror, upstream = spec.files[0].urls
+    mirror, upstream, fallback = spec.files[0].urls
     assert mirror == (
         "https://github.com/SpoddyCoder/cleave-resources/releases/download/"
         "beat-this-final0-v1/beat_this-final0.ckpt"
     )
+    assert upstream.startswith("https://cloud.cp.jku.at/")
     assert upstream.endswith("/final0.ckpt")
+    assert fallback.startswith("https://huggingface.co/rtikw/localmusic-assets/")
+    assert fallback.endswith("/beat_this-final0.ckpt")
     assert spec.files[0].hash_prefix is not None
     assert len(spec.files[0].hash_prefix) == 64
 
@@ -126,7 +129,7 @@ def test_failed_url_falls_back_to_next(
     hub.download_url_to_file = fake_download
 
     assert ensure_weight_files(spec, cache_dir=cache) is True
-    assert [url for url, _ in calls] == list(spec.files[0].urls)
+    assert [url for url, _ in calls] == list(spec.files[0].urls[:2])
     assert all(prefix == spec.files[0].hash_prefix for _, prefix in calls)
     assert missing_weight_files(spec, cache) == ()
 

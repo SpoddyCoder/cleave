@@ -30,15 +30,36 @@ _DEMUCS_ROOT_URL = "https://dl.fbaipublicfiles.com/demucs/"
 _BEAT_THIS_CHECKPOINT_URL = (
     "https://cloud.cp.jku.at/public.php/dav/files/7ik4RrBKTS273gp"
 )
-# Cleave's own copy of the MIT-licensed Beat This weights, tried before the
-# upstream share (its brute-force guard can block shared IPs such as CI
-# runners). Pinned by SHA-256 so either source yields the same file.
-_BEAT_THIS_MIRROR_URL = (
-    "https://github.com/SpoddyCoder/cleave-resources/releases/download/"
-    "beat-this-final0-v1"
-)
-_BEAT_THIS_SHA256 = {
-    "final0": "8c328b45f59d8dd3dff219253ff6a8d6482be57d0133a29140e2febbf8eb8331",
+
+
+@dataclass(frozen=True)
+class _PinnedCheckpoint:
+    """SHA-256 for a Beat This checkpoint, plus mirrors around the upstream URL.
+
+    *before* are tried ahead of the upstream share (its brute-force guard can
+    block shared IPs such as CI runners); *after* are last resorts. The hash
+    pin means every source has to yield the same file.
+    """
+
+    sha256: str
+    before: tuple[str, ...]
+    after: tuple[str, ...]
+
+
+_BEAT_THIS_PINNED = {
+    "final0": _PinnedCheckpoint(
+        sha256="8c328b45f59d8dd3dff219253ff6a8d6482be57d0133a29140e2febbf8eb8331",
+        # Cleave's own copy of the MIT-licensed weights.
+        before=(
+            "https://github.com/SpoddyCoder/cleave-resources/releases/download/"
+            "beat-this-final0-v1/beat_this-final0.ckpt",
+        ),
+        # Third-party Hugging Face copy, byte-identical when checked.
+        after=(
+            "https://huggingface.co/rtikw/localmusic-assets/resolve/main/"
+            "analysis/beat_this-final0.ckpt",
+        ),
+    ),
 }
 _HUB_HASH_REGEX = re.compile(r"-([a-f0-9]*)\.")
 _PROGRESS_MIN_INTERVAL_SEC = 0.1
@@ -101,16 +122,19 @@ def beat_this_weight_spec(checkpoint: str = BEAT_THIS_CHECKPOINT) -> WeightSpec:
     """Beat This hub file ``beat_this-<checkpoint>.ckpt`` (``final0`` by default)."""
     filename = f"beat_this-{checkpoint}.ckpt"
     upstream = f"{_BEAT_THIS_CHECKPOINT_URL}/{checkpoint}.ckpt"
-    sha256 = _BEAT_THIS_SHA256.get(checkpoint)
-    urls = (
-        (upstream,)
-        if sha256 is None
-        else (f"{_BEAT_THIS_MIRROR_URL}/{filename}", upstream)
-    )
+    pin = _BEAT_THIS_PINNED.get(checkpoint)
+    if pin is None:
+        item = WeightFile(filename=filename, urls=(upstream,), hash_prefix=None)
+    else:
+        item = WeightFile(
+            filename=filename,
+            urls=(*pin.before, upstream, *pin.after),
+            hash_prefix=pin.sha256,
+        )
     return WeightSpec(
         label=f"Beat This {checkpoint}",
         size_hint=f"~{_BEAT_THIS_CHECKPOINT_MB} MB",
-        files=(WeightFile(filename=filename, urls=urls, hash_prefix=sha256),),
+        files=(item,),
     )
 
 
