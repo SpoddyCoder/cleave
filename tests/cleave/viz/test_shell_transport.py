@@ -96,7 +96,7 @@ def test_transport_notice_uses_the_persistent_error_when_no_warning() -> None:
 
 def test_panel_border_overlap_shares_one_row() -> None:
     assert panel_border_overlap_px(1.0) == 1
-    assert panel_border_overlap_px(2.0) == 1
+    assert panel_border_overlap_px(2.0) == 2
     assert panel_border_overlap_px(0.0) == 0
 
 

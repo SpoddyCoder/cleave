@@ -48,6 +48,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- The dividing lines around the shell panels (navigator, inspector, help, timeline strip, preview focus outline) and the menu and transport rules are twice as thick, with crisp 2px edges.
 - Each timeline strip track draws its on sections in its own colour: sky, lavender, amber, mint, pink, coral, lime, and aqua for layers 1 to 8.
 - The selected navigator row's label and twisty draw in yellow, matching the focused row in the inspector, timeline strip, and dialogs.
 - Progress bars on the loading screen and in progress dialogs fill in the notification yellow, with a thicker white border and a wider gap around the fill. The text above them is 50% larger.

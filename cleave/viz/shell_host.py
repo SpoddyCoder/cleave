@@ -184,7 +184,7 @@ _TRANSPORT_GAP = 16.0
 # Extra room around a transport part's hover fill, beyond its half space.
 _TRANSPORT_HOVER_PAD = 4.0
 # Border pushed onto navigator and inspector windows.
-_PANEL_BORDER_PX = 1.0
+_PANEL_BORDER_PX = 2.0
 # One Left/Right step per this many pixels of sideways drag.
 _VALUE_DRAG_THRESHOLD_PX = 10.0
 
@@ -970,14 +970,13 @@ def inspector_row_stepped(state: object, desc: RowDescriptor) -> bool:
 def panel_border_overlap_px(border_size: float) -> int:
     """Pixels to pull a panel up so its top border shares the rule above.
 
-    ``AddRect`` centers a window border half a pixel inside the rect. The
-    transport rule fills the bar's last pixel, and a panel stacked below
-    starts on that shared edge, so the two strokes sit one pixel apart.
-    One pixel of overlap puts them on the same row.
+    The transport rule fills the bar's last *border_size* rows, and a panel
+    border fills its first *border_size* rows, so overlapping by the border
+    width puts the two strokes on the same rows.
     """
     if border_size <= 0.0:
         return 0
-    return 1
+    return max(1, int(round(border_size)))
 
 
 def transport_content_pad_y(window_height: float, line_height: float) -> float:
@@ -1160,8 +1159,11 @@ def _stroke_h_rule(
     x1: float,
     y: float,
     rgb: tuple[int, int, int],
+    thickness: float = 1.0,
 ) -> None:
-    """Opaque 1px rule on pixel row *y* of the current window.
+    """Opaque rule ending on pixel row *y* of the current window.
+
+    *thickness* rows are filled, from ``y - thickness + 1`` down to *y*.
 
     A stroked line is anti-aliased, so an opaque fill shows through it. A
     filled rectangle is not. The menu rule is drawn on the chrome window,
@@ -1172,7 +1174,7 @@ def _stroke_h_rule(
         return
     color = imgui.get_color_u32(rgba(rgb))
     imgui.get_window_draw_list().add_rect_filled(
-        imgui.ImVec2(x0, y),
+        imgui.ImVec2(x0, y + 1.0 - thickness),
         imgui.ImVec2(x1, y + 1.0),
         color,
     )
@@ -1193,23 +1195,24 @@ def _panel_focus_border_rgba() -> imgui.ImVec4:
 
 
 def _fill_rect_border(rect: tuple[int, int, int, int], color_rgba: imgui.ImVec4) -> None:
-    """1px outline around *rect* on the current window.
+    """Outline of the panel border width around *rect* on the current window.
 
     A stroked border is anti-aliased, so the solid rule underneath shows
     through it. Filled edges cover that rule. The focus outline uses the
     quieter focus alpha, so the rule tints the shared edge.
     """
     x, y, w, h = rect
-    if w <= 1 or h <= 1:
+    if w <= 2 * _PANEL_BORDER_PX or h <= 2 * _PANEL_BORDER_PX:
         return
     color = imgui.get_color_u32(color_rgba)
     draw = imgui.get_window_draw_list()
     x0, y0 = float(x), float(y)
     x1, y1 = x0 + float(w), y0 + float(h)
-    draw.add_rect_filled(imgui.ImVec2(x0, y0), imgui.ImVec2(x1, y0 + 1.0), color)
-    draw.add_rect_filled(imgui.ImVec2(x0, y1 - 1.0), imgui.ImVec2(x1, y1), color)
-    draw.add_rect_filled(imgui.ImVec2(x0, y0), imgui.ImVec2(x0 + 1.0, y1), color)
-    draw.add_rect_filled(imgui.ImVec2(x1 - 1.0, y0), imgui.ImVec2(x1, y1), color)
+    t = _PANEL_BORDER_PX
+    draw.add_rect_filled(imgui.ImVec2(x0, y0), imgui.ImVec2(x1, y0 + t), color)
+    draw.add_rect_filled(imgui.ImVec2(x0, y1 - t), imgui.ImVec2(x1, y1), color)
+    draw.add_rect_filled(imgui.ImVec2(x0, y0), imgui.ImVec2(x0 + t, y1), color)
+    draw.add_rect_filled(imgui.ImVec2(x1 - t, y0), imgui.ImVec2(x1, y1), color)
 
 
 def _draw_panel_border(
@@ -2035,11 +2038,15 @@ class ShellHost:
                 draw.push_clip_rect(imgui.ImVec2(0.0, 0.0), display, False)
                 try:
                     if rule_y is not None:
-                        _stroke_h_rule(0.0, display.x, rule_y, TRANSPORT_RULE)
+                        _stroke_h_rule(
+                            0.0, display.x, rule_y, TRANSPORT_RULE, _PANEL_BORDER_PX
+                        )
                         span = self._dropdown_span
                         if span is not None:
                             # The popup's top border sits on this row.
-                            _stroke_h_rule(span[0], span[1], rule_y, BORDER_COLOR)
+                            _stroke_h_rule(
+                                span[0], span[1], rule_y, BORDER_COLOR, _PANEL_BORDER_PX
+                            )
                 finally:
                     draw.pop_clip_rect()
             finally:
@@ -2197,8 +2204,10 @@ class ShellHost:
             _PANEL_BORDER_PX if border is not None else 0.0,
         )
         if border is not None:
+            # ImGui centres a thick window border on a half pixel, which
+            # blurs it; hide that stroke and fill the edges instead.
             alpha = PANEL_FOCUS_BORDER_ALPHA / 255.0 if active else 1.0
-            imgui.push_style_color(imgui.Col_.border, rgba(border, alpha))
+            imgui.push_style_color(imgui.Col_.border, rgba(border, 0.0))
         try:
             _visible, _opened = imgui.begin(
                 title,
@@ -2210,6 +2219,17 @@ class ShellHost:
                     _draw_padded_scroll_body(body)
                 else:
                     body()
+                if border is not None:
+                    draw = imgui.get_window_draw_list()
+                    draw.push_clip_rect(
+                        imgui.ImVec2(float(x), float(y)),
+                        imgui.ImVec2(float(x + w), float(y + h)),
+                        False,
+                    )
+                    try:
+                        _fill_rect_border(rect, rgba(border, alpha))
+                    finally:
+                        draw.pop_clip_rect()
             finally:
                 imgui.end()
         finally:
@@ -2289,6 +2309,7 @@ class ShellHost:
             origin.x + size.x,
             origin.y + size.y - 1.0,
             TRANSPORT_RULE,
+            _PANEL_BORDER_PX,
         )
 
     def _draw_transport_part(self, part: TransportPart) -> None:
