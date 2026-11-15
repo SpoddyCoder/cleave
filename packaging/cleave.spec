@@ -111,12 +111,28 @@ ANALYSIS_EXCLUDES = (
 )
 
 
+# imgui_bundle ships demo packages that need optional deps (PyGLM, cv2) and
+# call exit() on import when those are missing, which aborts collect_all.
+# Cleave uses imgui, its OpenGL backend, and the bundled assets only.
+IMGUI_BUNDLE_SKIP = ("demos_python", "demos_cpp", "demos_assets", "doc")
+
+
+def _collect_kwargs(name: str) -> dict:
+    if name != "imgui_bundle":
+        return {}
+    skipped = tuple(f"imgui_bundle.{part}" for part in IMGUI_BUNDLE_SKIP)
+    return {
+        "filter_submodules": lambda mod: not mod.startswith(skipped),
+        "exclude_datas": [f"{part}/**" for part in IMGUI_BUNDLE_SKIP],
+    }
+
+
 def _collect_packages(names: tuple[str, ...]):
     datas: list = []
     binaries: list = []
     hidden: list = []
     for name in names:
-        pkg_datas, pkg_binaries, pkg_hidden = collect_all(name)
+        pkg_datas, pkg_binaries, pkg_hidden = collect_all(name, **_collect_kwargs(name))
         datas += pkg_datas
         binaries += pkg_binaries
         hidden += list(pkg_hidden)
