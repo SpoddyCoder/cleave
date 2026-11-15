@@ -621,5 +621,5 @@ def open_loading_window() -> LoadingWindow:
     if geometry.maximised:
         _maximise()
         window.maximised = True
-    window.update("Loading...")
+    window.update("")
     return window

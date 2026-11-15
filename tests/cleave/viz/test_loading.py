@@ -424,7 +424,7 @@ def test_open_loading_window_uses_default_window_geometry(
     assert window.imgui is host
     mock_draw.assert_called_once()
     assert mock_draw.call_args.args[0] is window
-    assert mock_draw.call_args.args[1].message == "Loading..."
+    assert mock_draw.call_args.args[1].message == ""
     assert mock_draw.call_args.args[1].fraction is None
     assert mock_draw.call_args.args[1].detail is None
     assert mock_draw.call_args.kwargs["scrim"] is False
