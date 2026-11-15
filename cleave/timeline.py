@@ -626,6 +626,44 @@ def update_lane_cue(
     )
 
 
+def remove_lane_cue(lane: TimelineLane, cue_t: float) -> TimelineLane:
+    """Remove the cue at ``cue_t``; canonicalize.
+
+    The synthetic opening cue (an on ``baseline`` with no cue at ``0.0``) is
+    removed by turning the baseline off. Neighbours that the removal makes
+    redundant drop out too.
+    """
+    if cue_t == 0.0 and opening_baseline_editable(lane):
+        return TimelineLane(baseline=0.0, cues=canonicalize(0.0, list(lane.cues)))
+    kept = [cue for cue in lane.cues if cue.t != cue_t]
+    return TimelineLane(baseline=lane.baseline, cues=canonicalize(lane.baseline, kept))
+
+
+def lane_last_on_level(lane: TimelineLane, t_sec: float) -> float:
+    """The on level a new on cue at ``t_sec`` should take.
+
+    The latest on cue at or before ``t_sec``, else an on ``baseline``, else
+    the first on cue after it, else full.
+    """
+    level: float | None = (
+        float(lane.baseline)
+        if lane.baseline is not None and float(lane.baseline) > LEVEL_EPS
+        else None
+    )
+    for cue in lane.cues:
+        if cue.t > t_sec:
+            break
+        if float(cue.level) > LEVEL_EPS:
+            level = float(cue.level)
+    if level is not None:
+        return level
+    later = next(
+        (float(cue.level) for cue in lane.cues if float(cue.level) > LEVEL_EPS),
+        None,
+    )
+    return later if later is not None else 1.0
+
+
 def should_accept_toggle(last_toggle_t: float | None, t_sec: float) -> bool:
     if last_toggle_t is None:
         return True

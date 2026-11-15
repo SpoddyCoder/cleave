@@ -1,8 +1,9 @@
 """Context menu section for a timeline row's selected cue.
 
-Go to the cue, and set its cut, blend, and role from submenus. Each choice
-calls the same ``CueEditor`` method as the strip's cue keys and the
-inspector's cue rows. A start cue (on) takes all three; an end cue (off)
+Go to the cue, set its cut, blend, and role from submenus, and delete it.
+Each choice calls the same ``CueEditor`` method as the strip's cue keys and
+the inspector's cue rows. ``add_cue_entry`` is the row's item for adding a
+cue at a clicked time away from any cue. A start cue (on) takes all three; an end cue (off)
 takes only a cut.
 """
 
@@ -94,6 +95,32 @@ def cue_menu_entries(
             shortcut="O",
             hint=blend_role_hint,
         ),
+        ContextMenuItem(
+            id="timeline.cue.delete",
+            label="Delete cue",
+            run=lambda: editor.delete_selected(slot),
+            enabled=editable,
+            shortcut="Delete",
+            hint=edit_hint,
+        ),
+    )
+
+
+def add_cue_entry(
+    editor: CueEditor,
+    slot: str,
+    t_sec: float,
+    add_cue_at: Callable[[str, float], None],
+) -> ContextMenuItem:
+    """Item that adds a cue on *slot* at *t_sec*, as a double-click there does."""
+    edit_hint = _edit_hint(editor.session)
+    return ContextMenuItem(
+        id="timeline.cue.add",
+        label="Add cue here",
+        run=lambda: add_cue_at(slot, t_sec),
+        enabled=edit_hint is None,
+        shortcut="Double-click",
+        hint=edit_hint,
     )
 
 

@@ -353,7 +353,7 @@ def timeline_strip_section(
                 ("Left/Right", "previous / next cue"),
                 ("Enter", "seek to cue"),
                 ("Click row", "select row / cue"),
-                ("Dbl-click row", "seek, hold to scrub"),
+                ("Dbl-click row", "add cue; on a cue, seek"),
                 ("Click/Drag ruler", "seek / scrub"),
             )
         )
@@ -373,6 +373,7 @@ def timeline_strip_section(
                 ("B", "cycle cue blend"),
                 ("C", "cycle cue cut type"),
                 ("O", "cycle cue role"),
+                ("Delete", "delete cue"),
             )
         )
 

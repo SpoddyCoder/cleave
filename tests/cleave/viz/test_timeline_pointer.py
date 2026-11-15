@@ -50,6 +50,9 @@ class _Actions:
     def seek_to(self, t_sec: float) -> None:
         self.calls.append(("seek", t_sec))
 
+    def add_cue_at(self, slot: str, t_sec: float) -> None:
+        self.calls.append(("add", slot, t_sec))
+
     def toggle_transport(self) -> None:
         self.calls.append(("transport",))
 
@@ -72,6 +75,8 @@ def _session(panel_open: bool = True, view: StripView | None = None):
         song_markers=SimpleNamespace(markers=[SimpleNamespace(time=30.0)]),
         timeline=SimpleNamespace(
             panel_open=panel_open,
+            locked=False,
+            recording=False,
             strip_hover=None,
             strip_view=view if view is not None else StripView(),
         ),
@@ -120,7 +125,11 @@ def test_double_click_on_row_seeks_and_held_drag_scrubs() -> None:
     clock.now += 0.2
     actions.calls.clear()
     pointer.press(12, 11)
-    assert actions.calls == [("focus", 0), ("seek", 5.0)]
+    assert actions.calls == [
+        ("focus", 0),
+        ("select", "layer_1", 5.0, 0.2),
+        ("seek", 5.0),
+    ]
     assert pointer.scrubbing
     actions.calls.clear()
     pointer.motion(100, 0)
@@ -149,7 +158,39 @@ def test_slow_far_or_other_row_second_press_is_not_a_double_click() -> None:
     assert all(call[0] != "seek" for call in actions.calls)
 
 
-def test_triple_click_does_not_seek_twice() -> None:
+def test_double_click_away_from_a_cue_adds_one() -> None:
+    clock = _Clock()
+    actions = _Actions()
+    pointer = TimelinePointer(
+        _Geometry(StripHit(1, 5.0, 0.2)), actions, _session(), clock=clock
+    )
+    pointer.press(10, 10)
+    pointer.release()
+    clock.now += 0.2
+    pointer.press(12, 11)
+    assert actions.calls[-1] == ("add", "layer_2", 5.0)
+    assert all(call[0] != "seek" for call in actions.calls)
+    assert not pointer.scrubbing
+
+
+@pytest.mark.parametrize("field", ["locked", "recording"])
+def test_double_click_seeks_where_cues_cannot_be_edited(field: str) -> None:
+    clock = _Clock()
+    actions = _Actions()
+    session = _session()
+    setattr(session.timeline, field, True)
+    pointer = TimelinePointer(
+        _Geometry(StripHit(0, 5.0, 0.2)), actions, session, clock=clock
+    )
+    pointer.press(10, 10)
+    pointer.release()
+    clock.now += 0.2
+    pointer.press(12, 11)
+    assert actions.calls[-1] == ("seek", 5.0)
+    assert all(call[0] != "add" for call in actions.calls)
+
+
+def test_triple_click_does_not_add_twice() -> None:
     clock = _Clock()
     actions = _Actions()
     pointer = TimelinePointer(
@@ -159,7 +200,9 @@ def test_triple_click_does_not_seek_twice() -> None:
         pointer.press(10, 10)
         pointer.release()
         clock.now += 0.1
-    assert [call for call in actions.calls if call[0] == "seek"] == [("seek", 5.0)]
+    assert [call for call in actions.calls if call[0] == "add"] == [
+        ("add", "layer_1", 5.0)
+    ]
 
 
 def test_ruler_press_drags_and_scrubs_once_per_tick() -> None:
@@ -549,6 +592,7 @@ def _row_slot_actions(**kwargs) -> _MenuActions:
     actions.row_arm_available = lambda row: True  # type: ignore[attr-defined]
     actions.toggle_override = lambda slot: None  # type: ignore[attr-defined]
     actions.release_all_overrides = lambda: None  # type: ignore[attr-defined]
+    actions.cue_editor = SimpleNamespace(session=_menu_session())  # type: ignore[attr-defined]
     return actions
 
 
@@ -594,9 +638,11 @@ def test_row_away_from_a_cue_leads_with_time_items() -> None:
     ).context_menu_at(0, 0)
     assert provider is not None
     entries = provider()
-    assert entries[0].id == "time.seek"
+    assert entries[0].id == "timeline.cue.add"
     assert entries[1] is CONTEXT_SEPARATOR
-    assert entries[2].id == "timeline.row.visibility"
+    assert entries[2].id == "time.seek"
+    assert entries[3] is CONTEXT_SEPARATOR
+    assert entries[4].id == "timeline.row.visibility"
     assert time_menu.calls == [(5.0, 0.2, False, None)]
 
 

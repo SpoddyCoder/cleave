@@ -9,6 +9,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 
+- Add a cue on the timeline strip by double-clicking a row away from any cue, or with Add cue here from the row's right-click menu. The cue snaps to a beat or bar when the Timeline page's placement snap is set to beat or bar, and goes exactly where you clicked when it is off. It flips the layer at that point: where it is off, the cue turns it on at its last on level; where it is on, the cue turns it off. Delete removes the selected cue, as does Delete cue in the cue's right-click menu, and the next cue is selected. Both can be undone.
 - A "Welcome to Cleave" step on first launch gathers every one-time download in one place, each named with what it is for: the Milkdrop presets, the Demucs stem separation model, and the BeatThis! beat detection model, all ticked, plus the optional Demucs HQ model. Each download shows its own status and progress, Cancel stops partway, and any that fail are listed with Retry. Anything skipped still downloads when it is first needed. The step comes back on later launches only while presets are missing.
 - Settings > Welcome to Cleave... opens the welcome step in the editor at any time, listing only the downloads still missing, so you can grab anything you skipped. Its Skip button reads Cancel there. Playback pauses while it is open and resumes when it closes.
 - On Windows with an NVIDIA driver that supports CUDA 13 (580.88 or newer), the Welcome to Cleave step offers the CUDA Toolkit (about 1.8 GB, off by default) for much faster stem separation. It downloads into your local app data, so it needs no admin rights and works with both the installer and the zip. Downloaded before your first split, it is used straight away; otherwise restart Cleave.
@@ -52,6 +53,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- A double-click on a timeline strip row away from any cue now adds a cue instead of seeking. A double-click on a cue still seeks, as does one while the timeline is locked or recording; the time scale seeks as before.
 - Edit > Undo and Redo now cover hand edits to cues, not only the timeline commands: changing a cue's level, cut, blend, or role, and each recorded take. Holding `,` or `.` to nudge a level undoes as one step, and undo brings back the cue that was selected. Before, any hand edit turned Undo off.
 - Startup dialogs (the welcome step and the "Could not open that file" error) use the same dialogs as the editor, with buttons you can click, instead of keyboard-only text panels.
 - The dividing lines around the shell panels (navigator, inspector, help, timeline strip, preview focus outline) and the menu and transport rules are twice as thick, with crisp 2px edges.

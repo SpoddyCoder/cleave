@@ -1936,3 +1936,82 @@ def test_a_recorded_take_undoes_as_one_step() -> None:
 
     assert controls.cue_editor.history.undo() == "Record take"
     assert session.timeline.lanes["layer_1"] == before
+
+
+def test_add_cue_flips_the_lane_and_selects_the_new_cue() -> None:
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        lanes={
+            "layer_1": TimelineLane(
+                baseline=0.0,
+                cues=[SlotCue(t=2.0, level=0.6), SlotCue(t=4.0, level=0.0)],
+            )
+        },
+    )
+    controls.add_cue_at("layer_1", 6.0)
+    assert session.timeline.lanes["layer_1"].cues[-1] == SlotCue(t=6.0, level=0.6)
+    assert session.timeline.selected_cue_t["layer_1"] == 6.0
+
+    controls.add_cue_at("layer_1", 3.0)
+    assert SlotCue(t=3.0, level=0.0) in session.timeline.lanes["layer_1"].cues
+
+
+def test_add_cue_snaps_to_bars_and_can_be_undone() -> None:
+    controls, session, _, _, _, notifications = _make_timeline_controls(
+        lanes={"layer_1": _lane(False)},
+        beat_times=(0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0),
+        bar_times=(0.0, 4.0, 8.0),
+    )
+    session.timeline.placement_snap = "bar"
+    controls.add_cue_at("layer_1", 3.7)
+    assert [cue.t for cue in session.timeline.lanes["layer_1"].cues] == [4.0]
+
+    controls.add_cue_at("layer_1", 4.2)
+    assert notifications == ["A cue is already there"]
+
+    assert controls.cue_editor.history.undo() == "Add cue"
+    assert session.timeline.lanes["layer_1"].cues == []
+
+
+def test_add_cue_is_blocked_while_locked() -> None:
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        lanes={"layer_1": _lane(False)},
+    )
+    session.timeline.locked = True
+    controls.add_cue_at("layer_1", 3.0)
+    assert session.timeline.lanes["layer_1"].cues == []
+
+
+def test_delete_removes_the_selected_cue_and_selects_the_next() -> None:
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        lanes={"layer_1": _lane(False, (2.0, True), (4.0, False), (6.0, True))},
+    )
+    session.timeline.selected_cue_t["layer_1"] = 2.0
+    controls.handle_keydown(keydown(pygame.K_DELETE))
+    # Removing the 2 s rise leaves the 4 s off redundant, so it drops out too.
+    assert [cue.t for cue in session.timeline.lanes["layer_1"].cues] == [6.0]
+    assert session.timeline.selected_cue_t["layer_1"] == 6.0
+
+    controls.handle_keydown(keydown(pygame.K_DELETE))
+    assert session.timeline.lanes["layer_1"].cues == []
+    assert "layer_1" not in session.timeline.selected_cue_t
+
+    history = controls.cue_editor.history
+    assert history.undo() == "Delete cue"
+    assert session.timeline.selected_cue_t["layer_1"] == 6.0
+    assert history.undo() == "Delete cue"
+    assert [cue.t for cue in session.timeline.lanes["layer_1"].cues] == [
+        2.0,
+        4.0,
+        6.0,
+    ]
+    assert session.timeline.selected_cue_t["layer_1"] == 2.0
+
+
+def test_delete_is_blocked_while_locked() -> None:
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        lanes={"layer_1": _lane(False, (2.0, True))},
+    )
+    session.timeline.selected_cue_t["layer_1"] = 2.0
+    session.timeline.locked = True
+    controls.handle_keydown(keydown(pygame.K_DELETE))
+    assert [cue.t for cue in session.timeline.lanes["layer_1"].cues] == [2.0]

@@ -4,8 +4,8 @@ Show or hide the layer, override its visibility, release every override,
 and arm it for recording. Each item calls the same ``TimelineControls``
 path as its key, and a disabled item says why in its hint. With a cue
 selected on the row, the menu opens with that cue's items
-(``cue_context_menu``). A right-click away from any cue opens with the
-clicked time's items instead (``timeline_time_menu``).
+(``cue_context_menu``). A right-click away from any cue opens with Add cue
+here and the clicked time's items instead (``timeline_time_menu``).
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from cleave.viz.context_menu import (
     ContextMenuItem,
     ContextMenuProvider,
 )
-from cleave.viz.cue_context_menu import cue_menu_entries
+from cleave.viz.cue_context_menu import add_cue_entry, cue_menu_entries
 from cleave.viz.session import TuningSession
 from cleave.viz.timeline_cue_edits import CueEditor
 
@@ -49,6 +49,8 @@ class TimelineRowMenuActions(Protocol):
 
     def seek_to(self, t_sec: float) -> None: ...
 
+    def add_cue_at(self, slot: str, t_sec: float) -> None: ...
+
 
 def timeline_row_menu(
     actions: TimelineRowMenuActions,
@@ -57,16 +59,23 @@ def timeline_row_menu(
     *,
     cue: bool = True,
     time_entries: Callable[[], tuple[ContextMenuEntry, ...]] | None = None,
+    add_cue_t: float | None = None,
 ) -> ContextMenuProvider:
     """Provider for *row*'s menu; empty once the row has no layer.
 
-    *cue* False leaves out the selected cue's items. *time_entries* go
-    first, above the row's own items.
+    *cue* False leaves out the selected cue's items. *add_cue_t* leads with
+    Add cue here at that time. *time_entries* follow, above the row's own
+    items.
     """
 
     def entries() -> tuple[ContextMenuEntry, ...]:
         return timeline_row_menu_entries(
-            actions, session, row, cue=cue, time_entries=time_entries
+            actions,
+            session,
+            row,
+            cue=cue,
+            time_entries=time_entries,
+            add_cue_t=add_cue_t,
         )
 
     return entries
@@ -79,6 +88,7 @@ def timeline_row_menu_entries(
     *,
     cue: bool = True,
     time_entries: Callable[[], tuple[ContextMenuEntry, ...]] | None = None,
+    add_cue_t: float | None = None,
 ) -> tuple[ContextMenuEntry, ...]:
     slot = actions.row_slot(row)
     if slot is None:
@@ -140,7 +150,18 @@ def timeline_row_menu_entries(
     )
 
     cue_entries = cue_menu_entries(actions.cue_editor, slot, actions.seek_to) if cue else ()
-    lead = (*cue_entries, *(time_entries() if time_entries is not None else ()))
+    add_entries: tuple[ContextMenuEntry, ...] = ()
+    if add_cue_t is not None:
+        add_entries = (
+            add_cue_entry(actions.cue_editor, slot, add_cue_t, actions.add_cue_at),
+        )
+    timed = time_entries() if time_entries is not None else ()
+    lead = (
+        *cue_entries,
+        *add_entries,
+        *((CONTEXT_SEPARATOR,) if add_entries and timed else ()),
+        *timed,
+    )
     return (
         *lead,
         *((CONTEXT_SEPARATOR,) if lead else ()),

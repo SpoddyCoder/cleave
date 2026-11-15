@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pygame
 
-from cleave.timeline import TimelineLane
+from cleave.timeline import SlotCue, TimelineLane
 from cleave.viz.context_menu import ContextMenuItem, ContextSubmenu
 from cleave.viz.timeline_context_menu import timeline_row_menu, timeline_row_menu_entries
 from tests.cleave.viz.test_timeline_controls import _make_timeline_controls
@@ -120,11 +120,12 @@ def test_selected_on_cue_leads_with_go_to_and_cut_blend_role() -> None:
     controls, session, _, _, seeks, _ = _cue_controls()
     session.timeline.selected_cue_t["layer_1"] = 4.0
     entries = timeline_row_menu_entries(controls, session, 0)
-    assert [getattr(entry, "id", None) for entry in entries[:5]] == [
+    assert [getattr(entry, "id", None) for entry in entries[:6]] == [
         "timeline.cue.go_to",
         "timeline.cue.cut",
         "timeline.cue.blend",
         "timeline.cue.role",
+        "timeline.cue.delete",
         None,
     ]
     by_id = _entries_by_id(controls, session, 0)
@@ -169,7 +170,12 @@ def test_locked_timeline_greys_out_cue_edits_but_keeps_go_to() -> None:
     session.timeline.locked = True
     by_id = _entries_by_id(controls, session, 0)
     assert by_id["timeline.cue.go_to"].enabled is True
-    for key in ("timeline.cue.cut", "timeline.cue.blend", "timeline.cue.role"):
+    for key in (
+        "timeline.cue.cut",
+        "timeline.cue.blend",
+        "timeline.cue.role",
+        "timeline.cue.delete",
+    ):
         assert by_id[key].enabled is False
         assert by_id[key].hint == "Unlock the timeline to edit cues"
 
@@ -178,3 +184,33 @@ def test_cue_false_leaves_out_the_cue_items() -> None:
     controls, session, _, _, _, _ = _cue_controls()
     session.timeline.selected_cue_t["layer_1"] = 4.0
     assert "timeline.cue.go_to" not in _entries_by_id(controls, session, 0, cue=False)
+
+
+def test_delete_cue_item_deletes_the_selected_cue() -> None:
+    controls, session, _, _, _, _ = _cue_controls()
+    session.timeline.selected_cue_t["layer_1"] = 10.0
+    item = _entries_by_id(controls, session, 0)["timeline.cue.delete"]
+    assert (item.label, item.shortcut) == ("Delete cue", "Delete")
+    item.run()
+    assert [cue.t for cue in session.timeline.lanes["layer_1"].cues] == [4.0]
+
+
+def test_add_cue_here_item_adds_a_cue_at_the_clicked_time() -> None:
+    controls, session, _, _, _, _ = _cue_controls()
+    entries = timeline_row_menu_entries(controls, session, 0, add_cue_t=7.0)
+    item = entries[0]
+    assert (item.id, item.label, item.shortcut) == (
+        "timeline.cue.add",
+        "Add cue here",
+        "Double-click",
+    )
+    item.run()
+    assert SlotCue(t=7.0, level=0.0) in session.timeline.lanes["layer_1"].cues
+
+
+def test_add_cue_here_is_greyed_out_while_recording() -> None:
+    controls, session, _, _, _, _ = _cue_controls()
+    session.timeline.recording = True
+    item = _entries_by_id(controls, session, 0, add_cue_t=7.0)["timeline.cue.add"]
+    assert item.enabled is False
+    assert item.hint == "Stop recording to edit cues"

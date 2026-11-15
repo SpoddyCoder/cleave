@@ -16,6 +16,7 @@ from cleave.timeline import (
     empty_lane,
     lane_blend_at,
     lane_role_at,
+    lane_last_on_level,
     lane_level_at,
     lane_level_breakpoints,
     lane_level_envelope,
@@ -23,6 +24,7 @@ from cleave.timeline import (
     lane_on_transition_cues,
     lane_on_transition_trigger_times,
     punch_lane,
+    remove_lane_cue,
     set_lane_cue,
     shift_lane_cues_by_beats,
     should_accept_toggle,
@@ -975,3 +977,53 @@ def test_boolean_parity_zero_one_lane_levels() -> None:
     assert lane_level_at(lane, 10.0, inherit=1.0) == 1.0
     assert lane_level_at(lane, 5.0, inherit=1.0) <= LEVEL_EPS
     assert lane_level_at(lane, 10.0, inherit=1.0) > LEVEL_EPS
+
+
+def test_remove_lane_cue_drops_a_stored_cue() -> None:
+    lane = TimelineLane(
+        baseline=0.0,
+        cues=[SlotCue(t=2.0, level=1.0), SlotCue(t=5.0, level=0.0)],
+    )
+    assert remove_lane_cue(lane, 5.0).cues == [SlotCue(t=2.0, level=1.0)]
+
+
+def test_remove_lane_cue_drops_neighbours_it_makes_redundant() -> None:
+    lane = TimelineLane(
+        baseline=0.0,
+        cues=[
+            SlotCue(t=2.0, level=1.0),
+            SlotCue(t=5.0, level=0.0),
+            SlotCue(t=8.0, level=1.0),
+        ],
+    )
+    assert remove_lane_cue(lane, 5.0).cues == [SlotCue(t=2.0, level=1.0)]
+
+
+def test_remove_lane_cue_turns_an_opening_baseline_off() -> None:
+    lane = TimelineLane(baseline=0.6, cues=[SlotCue(t=4.0, level=0.0)])
+    removed = remove_lane_cue(lane, 0.0)
+    assert removed.baseline == 0.0
+    assert removed.cues == []
+
+
+def test_lane_last_on_level_reads_the_latest_on_cue_before() -> None:
+    lane = TimelineLane(
+        baseline=0.0,
+        cues=[
+            SlotCue(t=2.0, level=0.6),
+            SlotCue(t=4.0, level=0.0),
+            SlotCue(t=8.0, level=0.3),
+        ],
+    )
+    assert lane_last_on_level(lane, 5.0) == 0.6
+    assert lane_last_on_level(lane, 9.0) == 0.3
+
+
+def test_lane_last_on_level_falls_back_to_baseline_then_later_then_full() -> None:
+    assert lane_last_on_level(
+        TimelineLane(baseline=0.4, cues=[SlotCue(t=2.0, level=0.0)]), 3.0
+    ) == 0.4
+    assert lane_last_on_level(
+        TimelineLane(baseline=0.0, cues=[SlotCue(t=6.0, level=0.7)]), 3.0
+    ) == 0.7
+    assert lane_last_on_level(empty_lane(), 3.0) == 1.0

@@ -20,7 +20,12 @@ from cleave.timeline import (
 )
 from cleave.viz.controls import SEEK_LONG, SEEK_SHORT, SEEK_TINY
 from cleave.viz.session import TuningSession
-from cleave.viz.key_repeat import KeyRepeatController, mod_ctrl, mod_shift
+from cleave.viz.key_repeat import (
+    KeyRepeatController,
+    delete_key_pressed,
+    mod_ctrl,
+    mod_shift,
+)
 from cleave.viz.layer_visibility import (
     armed_recording_level,
     build_record_punch_cues,
@@ -245,6 +250,10 @@ class TimelineControls:
             self._cycle_selected_cue_cut()
             return True
 
+        if delete_key_pressed(event):
+            self.cue_editor.delete_selected(self._focused_slot())
+            return True
+
         return True
 
     def handle_keyup(self, event: pygame.event.Event) -> None:
@@ -330,6 +339,14 @@ class TimelineControls:
             return False
         select_cue(self.session, slot, nearest)
         return True
+
+    def add_cue_at(self, slot: str, t_sec: float) -> None:
+        """Add a cue on *slot* at *t_sec*, snapped, that flips the lane there."""
+        if not cue_edits_allowed(self.session):
+            return
+        snapped = self._snap_placement(t_sec)
+        if not self.cue_editor.add_cue(slot, snapped):
+            self._notify("A cue is already there")
 
     @property
     def paused(self) -> bool:

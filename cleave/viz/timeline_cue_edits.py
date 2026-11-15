@@ -15,14 +15,19 @@ from cleave.cue_roles import CueRole
 from cleave.cut_types import CutType
 from cleave.timeline import (
     LEVEL_EDIT_MIN,
+    LEVEL_EPS,
     LEVEL_STEP_LARGE,
     LEVEL_STEP_SMALL,
     SlotCue,
     cue_at_time,
     cue_editable_for_blend_role,
     empty_lane,
+    lane_last_on_level,
+    lane_level_at,
     levels_equal,
     navigable_cue_times,
+    remove_lane_cue,
+    set_lane_cue,
     update_lane_cue,
 )
 from cleave.viz.session import TuningSession
@@ -94,6 +99,52 @@ class CueEditor:
     def __init__(self, session: TuningSession, history: TimelineHistory) -> None:
         self.session = session
         self.history = history
+
+    def add_cue(self, slot: str, t_sec: float) -> bool:
+        """Add a cue at *t_sec* that flips the lane, and select it.
+
+        Where the lane is off the cue turns it on at the lane's last on level;
+        where it is on, the cue turns it off. False when edits are blocked or
+        a cue already sits at *t_sec*.
+        """
+        session = self.session
+        if not cue_edits_allowed(session):
+            return False
+        tl = session.timeline
+        lane = tl.lanes.get(slot) or empty_lane()
+        if cue_at_time(lane, t_sec) is not None:
+            return False
+        # A lane with no baseline inherits the layer's enabled switch.
+        inherit = 1.0 if session.layers[slot].enabled else 0.0
+        on = lane_level_at(lane, t_sec, inherit=inherit) > LEVEL_EPS
+        level = 0.0 if on else lane_last_on_level(lane, t_sec)
+        with self.history.recording("Add cue"):
+            tl.lanes[slot] = set_lane_cue(lane, t_sec, level)
+            select_cue(session, slot, t_sec)
+        return True
+
+    def delete_selected(self, slot: str) -> None:
+        """Delete *slot*'s selected cue, then select the next one, else the previous."""
+        session = self.session
+        if not cue_edits_allowed(session):
+            return
+        cue = selected_cue(session, slot)
+        if cue is None:
+            return
+        tl = session.timeline
+        lane = tl.lanes.get(slot) or empty_lane()
+        with self.history.recording("Delete cue"):
+            updated = remove_lane_cue(lane, cue.t)
+            tl.lanes[slot] = updated
+            times = navigable_cue_times(updated)
+            pick = next((t for t in times if t > cue.t), None)
+            if pick is None:
+                pick = next((t for t in reversed(times) if t < cue.t), None)
+            if pick is None:
+                tl.selected_cue_t.pop(slot, None)
+                tl.selected_cue_flash_start_ms = None
+            else:
+                select_cue(session, slot, pick)
 
     def nudge_level(self, slot: str, *, forward: bool, large: bool) -> None:
         """Step an on cue's opacity by 1% (10% when *large*), clamped to its range."""
