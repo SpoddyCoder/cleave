@@ -30,6 +30,12 @@ from cleave.config_schema.editor import (
     dump_editor_section,
     parse_editor_section,
 )
+from cleave.config_schema.first_run import (
+    FIRST_RUN_SECTION_KEY,
+    FirstRunState,
+    dump_first_run_section,
+    parse_first_run_section,
+)
 from cleave.config_schema.window import (
     WINDOW_SECTION_KEY,
     WindowGeometry,
@@ -235,4 +241,29 @@ def persist_window_geometry(
     resolved = (path or user_config_path()).resolve()
     _write_user_config_section(
         resolved, WINDOW_SECTION_KEY, dump_window_section(geometry)
+    )
+
+
+def saved_first_run_state(path: Path | None = None) -> FirstRunState:
+    """The saved first-run state. A missing or unreadable user config gives the default."""
+    resolved = (path or user_config_path()).resolve()
+    try:
+        if not resolved.is_file():
+            return FirstRunState()
+        with resolved.open(encoding="utf-8") as fh:
+            data = yaml.safe_load(fh)
+        if not isinstance(data, dict):
+            return FirstRunState()
+        return parse_first_run_section(data)
+    except (OSError, ValueError, yaml.YAMLError):
+        return FirstRunState()
+
+
+def persist_first_run_state(
+    state: FirstRunState, path: Path | None = None
+) -> None:
+    """Write only the ``first_run:`` section of the user config."""
+    resolved = (path or user_config_path()).resolve()
+    _write_user_config_section(
+        resolved, FIRST_RUN_SECTION_KEY, dump_first_run_section(state)
     )

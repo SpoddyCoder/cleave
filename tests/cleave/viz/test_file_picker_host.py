@@ -164,27 +164,28 @@ def test_mouse_events_reach_imgui(tmp_path: Path) -> None:
     assert window.imgui.process_mouse_event.call_count == 2
 
 
-def test_show_picker_error_any_key_returns_true(tmp_path: Path) -> None:
+def test_show_picker_error_ok_returns_true() -> None:
     window = _mock_window()
-    batches = [[], [_keydown(pygame.K_SPACE)]]
+    window.imgui = None
+    batches = [[], [_keydown(pygame.K_RETURN)]]
 
     with (
-        patch("pygame.event.get", side_effect=lambda: batches.pop(0)),
-        patch("cleave.viz.file_picker_host.present_frame") as present,
+        patch("pygame.event.get", side_effect=lambda: batches.pop(0) if batches else []),
+        patch("cleave.viz.loading_modal.present_frame") as present,
     ):
         assert show_picker_error(window, "demucs blew up") is True
     present.assert_called()
-    assert present.call_args.kwargs["scrim"] is True
     assert not window.quit_requested
 
 
 def test_show_picker_error_quit_returns_false() -> None:
     window = _mock_window()
+    window.imgui = None
     batches = [[pygame.event.Event(pygame.QUIT)]]
 
     with (
-        patch("pygame.event.get", side_effect=lambda: batches.pop(0)),
-        patch("cleave.viz.file_picker_host.present_frame"),
+        patch("pygame.event.get", side_effect=lambda: batches.pop(0) if batches else []),
+        patch("cleave.viz.loading_modal.present_frame"),
     ):
         assert show_picker_error(window, "boom") is False
     assert window.quit_requested

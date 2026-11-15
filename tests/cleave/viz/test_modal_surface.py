@@ -1081,3 +1081,41 @@ def test_dialog_without_help_keeps_the_help_column_under_the_scrim() -> None:
         assert names.index("##shell-help") < names.index("##top-scrim"), names
         del names
         assert host.top_layer.lifted_rects() == ()
+
+
+def _cancellable_progress() -> tuple[ModalHost, list[bool]]:
+    cancelled: list[bool] = []
+    modal = ModalHost()
+    modal.prompt_progress(
+        "Downloading...",
+        labeled_lines=(ModalLabeledLine("Demucs htdemucs", "Downloading 42%"),),
+        fraction=0.42,
+        on_cancel=lambda: cancelled.append(True),
+    )
+    return modal, cancelled
+
+
+def test_progress_cancel_button_click_runs_cancel() -> None:
+    modal, cancelled = _cancellable_progress()
+    view = modal.view_state()
+    assert view is not None
+    with _host() as host:
+        surface = ModalSurface(view, ImGuiTextMeasure())
+        _idle(host, surface)
+        assert len(surface.option_rects) == 1
+        _pointer(host, surface, _center(surface.option_rects[0]), click=True)
+        apply_modal_pointer(modal, surface.intent)
+    assert cancelled == [True]
+    assert not modal.active
+
+
+def test_click_outside_cancellable_progress_records_nothing() -> None:
+    modal, _cancelled = _cancellable_progress()
+    view = modal.view_state()
+    assert view is not None
+    with _host() as host:
+        surface = ModalSurface(view, ImGuiTextMeasure())
+        _idle(host, surface)
+        assert surface.panel_rect is not None
+        _pointer(host, surface, _above(surface.panel_rect), click=True)
+        assert surface.intent is None

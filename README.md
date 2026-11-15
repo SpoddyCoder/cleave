@@ -33,7 +33,7 @@ Linux:
 ./cleave.py play ~/music/mysong.mp3
 ```
 
-This will separate the track into its component stems (bass, drums, vocals, other), perform audio analysis, then open the editor. First run downloads model weights and shows progress in the loading window.
+This will separate the track into its component stems (bass, drums, vocals, other), perform audio analysis, then open the editor. On first launch, the Welcome to Cleave step offers the presets and model weights in one go and shows each download's progress. Anything you skip downloads when it is first needed.
 
 ## Using the Editor
 
@@ -176,7 +176,7 @@ Cleave creates a project directory for each song, storing stems, configs and ren
 
 Override the data root with `CLEAVE_DATA` on any OS.
 
-To add starter packs yourself (instead of the first-launch download), clone them into those folders:
+To add starter packs yourself (instead of the welcome step's download), clone them into those folders:
 
 Windows:
 ```

@@ -828,7 +828,8 @@ class ModalSurface:
         )
 
     def _record_pointer(self, panel: Rect) -> None:
-        if self.view.kind == ModalKind.PROGRESS:
+        progress = self.view.kind == ModalKind.PROGRESS
+        if progress and not self.view.options:
             return
         if self.view.form_choice is not None:
             # The open list takes the pointer; see _draw_form_choice.
@@ -852,7 +853,7 @@ class ModalSurface:
             return
         if clicked and self._record_form_click(x, y):
             return
-        if clicked and not _contains(panel, x, y):
+        if clicked and not progress and not _contains(panel, x, y):
             self.intent = ModalPointerIntent(ModalPointerKind.CANCEL)
             return
         if hit is not None:

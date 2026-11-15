@@ -81,6 +81,7 @@ class FormSpec:
     confirm_label: str
     on_confirm: Callable[[FormValues], None]
     on_cancel: Callable[[], None] | None = None
+    cancel_label: str = "Cancel"
     body: str | None = None
     info: Callable[[FormValues], str | None] | None = None
     destructive: bool = False
@@ -412,6 +413,7 @@ class ModalHost:
         on_close: Callable[[], None] | None = None,
         *,
         labeled_lines: Sequence[ModalLabeledLine] = (),
+        body: str | None = None,
     ) -> None:
         """Tell the user something, with one OK button. Esc also closes it."""
 
@@ -424,6 +426,7 @@ class ModalHost:
             [ModalOption("OK", close, ButtonRole.PRIMARY)],
             on_dismiss=on_close,
             labeled_lines=labeled_lines,
+            body=body,
         )
 
     def prompt_progress(
@@ -432,21 +435,37 @@ class ModalHost:
         *,
         labeled_lines: Sequence[ModalLabeledLine] = (),
         fraction: float = 0.0,
+        on_cancel: Callable[[], None] | None = None,
     ) -> None:
+        """Show a progress bar. With *on_cancel*, a Cancel button (and Esc) runs it."""
+        options = [] if on_cancel is None else [ModalOption("Cancel", on_cancel)]
         self.prompt(
             ModalRequest(
                 kind=ModalKind.PROGRESS,
                 message=message,
-                options=[],
+                options=options,
+                on_dismiss=on_cancel,
                 labeled_lines=tuple(labeled_lines),
                 progress_fraction=max(0.0, min(1.0, float(fraction))),
             )
         )
 
-    def update_progress(self, fraction: float) -> None:
-        if self._request is None or self._request.kind != ModalKind.PROGRESS:
+    def update_progress(
+        self,
+        fraction: float,
+        *,
+        message: str | None = None,
+        labeled_lines: Sequence[ModalLabeledLine] | None = None,
+    ) -> None:
+        """Move the bar. *message* and *labeled_lines* replace the text when given."""
+        request = self._request
+        if request is None or request.kind != ModalKind.PROGRESS:
             return
-        self._request.progress_fraction = max(0.0, min(1.0, float(fraction)))
+        request.progress_fraction = max(0.0, min(1.0, float(fraction)))
+        if message is not None:
+            request.message = message
+        if labeled_lines is not None:
+            request.labeled_lines = tuple(labeled_lines)
 
     def prompt_text(
         self,
@@ -511,7 +530,7 @@ class ModalHost:
                 message=spec.title,
                 options=[
                     ModalOption(spec.confirm_label, confirm, role),
-                    ModalOption("Cancel", cancel),
+                    ModalOption(spec.cancel_label, cancel),
                 ],
                 on_dismiss=spec.on_cancel,
                 initial_focus_index=1 if spec.destructive else 0,
@@ -733,9 +752,11 @@ class ModalHost:
         self._activate_focused()
 
     def cancel(self) -> None:
-        """Same as Esc. PROGRESS ignores it."""
+        """Same as Esc. A PROGRESS modal without a Cancel button ignores it."""
         request = self._request
-        if request is None or request.kind == ModalKind.PROGRESS:
+        if request is None:
+            return
+        if request.kind == ModalKind.PROGRESS and not request.options:
             return
         if request.kind == ModalKind.TEXT:
             state = self._text_state
@@ -804,7 +825,7 @@ class ModalHost:
 
         request = self._request
         assert request is not None
-        if request.kind == ModalKind.PROGRESS:
+        if request.kind == ModalKind.PROGRESS and not request.options:
             return True
         if request.kind == ModalKind.TEXT:
             return self._handle_text_keydown(event)
@@ -957,7 +978,7 @@ class ModalHost:
 
     def _option_count(self) -> int:
         request = self._request
-        if request is None or request.kind in (ModalKind.PROGRESS, ModalKind.TEXT):
+        if request is None or request.kind == ModalKind.TEXT:
             return 0
         return len(request.options)
 

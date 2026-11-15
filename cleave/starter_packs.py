@@ -1,6 +1,6 @@
 """First-run Milkdrop preset and texture pack downloads into ``data_dir``.
 
-Offer path lives in the editor. This module is pygame-free: fetch zipballs,
+The editor offers them in the welcome step (``cleave.first_run``). This module is pygame-free: fetch zipballs,
 extract the GitHub top-level folder, and move it into place. Failed fetches
 raise :class:`StarterPackError`.
 """
@@ -28,22 +28,18 @@ StarterPackProgress = Callable[[str, float | None], None]
 
 _GITHUB_OWNER = "projectM-visualizer"
 _ZIP_BRANCH = "master"
-_SIZE_HINT_MB = 60
+STARTER_PACKS_SIZE_MB = 60
 _USER_AGENT = "Cleave"
 _DOWNLOAD_TIMEOUT_S = 300
 _CHUNK_SIZE = 64 * 1024
 _PROGRESS_MIN_INTERVAL_SEC = 0.1
 _PROGRESS_MIN_DELTA = 0.01
 _EXTRACT_PULSE_EVERY = 100
-_DOWNLOAD_MESSAGE = f"Downloading starter packs (~{_SIZE_HINT_MB} MB)..."
+_DOWNLOAD_MESSAGE = f"Downloading starter packs (~{STARTER_PACKS_SIZE_MB} MB)..."
 
 
 class StarterPackError(RuntimeError):
     """Starter pack download or extraction failed."""
-
-
-class StarterPackCancelled(Exception):
-    """Caller aborted the download (window closed)."""
 
 
 @dataclass(frozen=True)
@@ -115,8 +111,6 @@ def download_starter_packs(
         for pack in pending:
             _download_one_pack(pack, aggregator)
             aggregator.finish_file()
-    except StarterPackCancelled:
-        raise
     except StarterPackError:
         raise
     except (

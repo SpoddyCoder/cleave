@@ -72,6 +72,9 @@ _PROGRESS_MIN_INTERVAL_SEC = 0.1
 _PROGRESS_MIN_DELTA = 0.01
 
 BEAT_THIS_CHECKPOINT = "final0"
+# Demucs bags Cleave separates with: default and High Quality (``-hq``).
+DEMUCS_MODEL = "htdemucs"
+DEMUCS_HQ_MODEL = "htdemucs_ft"
 
 
 class WeightDownloadError(RuntimeError):
@@ -96,8 +99,12 @@ class WeightSpec:
     """User-facing label plus the hub files that must exist before load."""
 
     label: str
-    size_hint: str
+    size_mb: int
     files: tuple[WeightFile, ...]
+
+    @property
+    def size_hint(self) -> str:
+        return f"~{self.size_mb} MB"
 
 
 def hub_checkpoints_dir(cache_dir: Path | None = None) -> Path:
@@ -139,7 +146,7 @@ def beat_this_weight_spec(checkpoint: str = BEAT_THIS_CHECKPOINT) -> WeightSpec:
         )
     return WeightSpec(
         label=f"Beat This {checkpoint}",
-        size_hint=f"~{_BEAT_THIS_CHECKPOINT_MB} MB",
+        size_mb=_BEAT_THIS_CHECKPOINT_MB,
         files=(item,),
     )
 
@@ -186,7 +193,7 @@ def demucs_weight_spec(model: str) -> WeightSpec:
     size_mb = _DEMUCS_CHECKPOINT_MB * len(files)
     return WeightSpec(
         label=f"Demucs {model}",
-        size_hint=f"~{size_mb} MB",
+        size_mb=size_mb,
         files=tuple(files),
     )
 

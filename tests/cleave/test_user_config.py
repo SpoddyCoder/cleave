@@ -461,3 +461,35 @@ def test_show_tooltips_defaults_on_round_trips_and_rejects_non_bool(
     )
     with pytest.raises(ValueError, match="editor.show_tooltips must be true or false"):
         load_user_config(config_path)
+
+
+def test_first_run_state_defaults_when_missing_or_unreadable(tmp_path: Path) -> None:
+    from cleave.config_schema.first_run import FirstRunState
+    from cleave.user_config import saved_first_run_state
+
+    assert saved_first_run_state(tmp_path / "missing.yaml") == FirstRunState()
+    broken = tmp_path / "broken.yaml"
+    broken.write_text("first_run: {welcome_done: maybe}\n", encoding="utf-8")
+    assert saved_first_run_state(broken) == FirstRunState()
+
+
+def test_first_run_state_round_trip_keeps_other_sections(tmp_path: Path) -> None:
+    from cleave.config_schema.first_run import FirstRunState
+    from cleave.config_schema.window import WindowGeometry
+    from cleave.user_config import (
+        persist_first_run_state,
+        persist_window_geometry,
+        saved_first_run_state,
+        saved_window_geometry,
+    )
+
+    config_path = tmp_path / "config.yaml"
+    write_user_config(replace(default_editor_settings(), ui_scale=150), config_path)
+    persist_window_geometry(WindowGeometry(width=1600, height=900), config_path)
+    persist_first_run_state(FirstRunState(welcome_done=True), config_path)
+
+    assert saved_first_run_state(config_path) == FirstRunState(welcome_done=True)
+    assert saved_window_geometry(config_path).width == 1600
+    assert load_user_config(config_path).editor.ui_scale == 150
+    write_user_config(default_editor_settings(), config_path)
+    assert saved_first_run_state(config_path).welcome_done is True

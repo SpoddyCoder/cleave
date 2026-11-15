@@ -21,7 +21,12 @@ from cleave.paths import (
     project_slug,
     resolve_project,
 )
-from cleave.model_weights import demucs_weight_spec, ensure_weight_files
+from cleave.model_weights import (
+    DEMUCS_HQ_MODEL,
+    DEMUCS_MODEL,
+    demucs_weight_spec,
+    ensure_weight_files,
+)
 from cleave.project import load_manifest, manifest_path, mix_path, write_manifest
 from cleave.signals import SIGNALS_VERSION
 
@@ -568,7 +573,7 @@ def _run_demucs(
     else:
         slug = project_slug(audio_path)
 
-    model = "htdemucs_ft" if high_quality else "htdemucs"
+    model = DEMUCS_HQ_MODEL if high_quality else DEMUCS_MODEL
 
     project_dir.mkdir(parents=True, exist_ok=True)
     (project_dir / "renders").mkdir(exist_ok=True)

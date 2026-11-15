@@ -9,6 +9,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 
+- A "Welcome to Cleave" step on first launch gathers every one-time download in one place: the Milkdrop presets and textures, the Demucs stem separation model, and the Beat This beat detection model, all ticked, plus the optional High Quality Demucs model. Each download shows its own status and progress, Cancel stops partway, and any that fail are listed with Retry. Anything skipped still downloads when it is first needed. The step comes back on later launches only while presets are missing.
 - The Generate timeline, Reset timeline, Snap cues, Set cut type on cues, and Populate preset list dialogs explain themselves in the help column. It stays bright while the dialog is open and describes the highlighted setting, with what each of its choices does, plus the dialog's keys. Scroll the help column with the mouse wheel without closing the dialog.
 - Settings > UI has a tooltips switch to turn hover tooltips on or off. Tooltips are on by default, and the choice is remembered between sessions.
 - Drag the top edge of the timeline strip to make it taller; the layer rows grow to fill it. It can't shrink below its rows, and the height is remembered between sessions. Drag back down past the rows to return it to its fitted height.
@@ -48,6 +49,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- Startup dialogs (the welcome step and the "Could not open that file" error) use the same dialogs as the editor, with buttons you can click, instead of keyboard-only text panels.
 - The dividing lines around the shell panels (navigator, inspector, help, timeline strip, preview focus outline) and the menu and transport rules are twice as thick, with crisp 2px edges.
 - Each timeline strip track draws its on sections in its own colour: sky, lavender, amber, mint, pink, coral, lime, and aqua for layers 1 to 8.
 - The selected navigator row's label and twisty draw in yellow, matching the focused row in the inspector, timeline strip, and dialogs.

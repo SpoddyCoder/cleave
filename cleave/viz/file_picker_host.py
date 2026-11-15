@@ -1,7 +1,7 @@
 """Run the file picker on an already-open loading window.
 
 Keys stay on this host. Mouse, buttons, and wheel go to the loading window's
-ImGui host before each frame. The error panel draws on the info panel.
+ImGui host before each frame.
 """
 
 from __future__ import annotations
@@ -10,7 +10,6 @@ import pygame
 
 from cleave.open_target import OpenTarget
 from cleave.viz.file_picker import FilePicker, PickerAction, PickerMode
-from cleave.viz.info_panel import InfoPanelViewState
 from cleave.viz.key_repeat import KeyRepeatController, mod_ctrl
 from cleave.viz.loading import LoadingWindow, present_frame
 
@@ -22,7 +21,6 @@ _MOUSE_EVENTS = (
     pygame.MOUSEBUTTONUP,
     pygame.MOUSEWHEEL,
 )
-_ERROR_FOOTER = "Press any key to choose another file"
 
 
 def picker_action_for(key: int, mod: int) -> PickerAction | None:
@@ -55,16 +53,6 @@ def _feed_mouse(window: LoadingWindow, event: pygame.event.Event) -> None:
     if host is None:
         return
     host.process_mouse_event(event)
-
-
-def _present_info(window: LoadingWindow, state: InfoPanelViewState, dt: float) -> None:
-    """Draw one info panel inside the loading frame. The scrim is already there."""
-    from cleave.viz.top_layer import InfoPanelSurface
-
-    def draw() -> None:
-        InfoPanelSurface(state).draw()
-
-    present_frame(window, draw, scrim=True, dt=dt)
 
 
 def run_file_picker(
@@ -140,21 +128,7 @@ def _repeat_action(picker: FilePicker, key: int, mod: int) -> None:
 
 
 def show_picker_error(window: LoadingWindow, message: str) -> bool:
-    """Show *message* and wait for a key. False when the user closed the window."""
-    clock = pygame.time.Clock()
-    state = InfoPanelViewState(
-        title_lines=("Could not open that file",),
-        body_lines=tuple(message.splitlines() or ("unknown error",)),
-        footer_line=_ERROR_FOOTER,
-    )
+    """Show *message* in an OK dialog. False when the user closed the window."""
+    from cleave.viz.loading_modal import show_notice
 
-    while True:
-        for event in pygame.event.get():
-            window.note_event(event)
-            if event.type == pygame.QUIT:
-                window.quit_requested = True
-                return False
-            if event.type == pygame.KEYDOWN:
-                return True
-        dt_sec = clock.tick(_TICK_FPS) / 1000.0
-        _present_info(window, state, dt_sec)
+    return show_notice(window, "Could not open that file", message)

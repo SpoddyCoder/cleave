@@ -236,15 +236,17 @@ def cmd_play(args: argparse.Namespace) -> None:
         window.close()
         return
 
+    from cleave.first_run import first_run_items, needed_items, welcome_needed
     from cleave.paths import ensure_data_dirs
-    from cleave.starter_packs import starter_packs_needed
+    from cleave.user_config import saved_first_run_state
 
     ensure_data_dirs()
 
-    if starter_packs_needed():
-        from cleave.viz.starter_pack_host import run_starter_pack_prompt
+    needed = needed_items(first_run_items())
+    if welcome_needed(needed, saved_first_run_state()):
+        from cleave.viz.welcome_host import run_welcome
 
-        run_starter_pack_prompt(window)
+        run_welcome(window, needed)
         if window.quit_requested:
             window.close()
             return
