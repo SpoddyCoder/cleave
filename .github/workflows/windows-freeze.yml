@@ -147,7 +147,8 @@ jobs:
           separate = subprocess.run(
               [str(exe), "separate", str(wav)],
               capture_output=True,
-              text=True,
+              encoding="utf-8",
+              errors="replace",
               check=False,
           )
           print(separate.stdout)

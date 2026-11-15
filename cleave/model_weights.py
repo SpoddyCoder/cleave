@@ -30,6 +30,16 @@ _DEMUCS_ROOT_URL = "https://dl.fbaipublicfiles.com/demucs/"
 _BEAT_THIS_CHECKPOINT_URL = (
     "https://cloud.cp.jku.at/public.php/dav/files/7ik4RrBKTS273gp"
 )
+# Cleave's own copy of the MIT-licensed Beat This weights, tried before the
+# upstream share (its brute-force guard can block shared IPs such as CI
+# runners). Pinned by SHA-256 so either source yields the same file.
+_BEAT_THIS_MIRROR_URL = (
+    "https://github.com/SpoddyCoder/cleave-resources/releases/download/"
+    "beat-this-final0-v1"
+)
+_BEAT_THIS_SHA256 = {
+    "final0": "8c328b45f59d8dd3dff219253ff6a8d6482be57d0133a29140e2febbf8eb8331",
+}
 _HUB_HASH_REGEX = re.compile(r"-([a-f0-9]*)\.")
 _PROGRESS_MIN_INTERVAL_SEC = 0.1
 _PROGRESS_MIN_DELTA = 0.01
@@ -43,10 +53,15 @@ class WeightDownloadError(RuntimeError):
 
 @dataclass(frozen=True)
 class WeightFile:
-    """One torch-hub checkpoint: cache filename and download URL."""
+    """One torch-hub checkpoint: cache filename, download URLs, and hash.
+
+    *urls* are tried in order until one downloads. *hash_prefix* is the
+    SHA-256 prefix torch hub checks, or None to skip the check.
+    """
 
     filename: str
-    url: str
+    urls: tuple[str, ...]
+    hash_prefix: str | None
 
 
 @dataclass(frozen=True)
@@ -85,11 +100,17 @@ def download_failed_message(spec: WeightSpec) -> str:
 def beat_this_weight_spec(checkpoint: str = BEAT_THIS_CHECKPOINT) -> WeightSpec:
     """Beat This hub file ``beat_this-<checkpoint>.ckpt`` (``final0`` by default)."""
     filename = f"beat_this-{checkpoint}.ckpt"
-    url = f"{_BEAT_THIS_CHECKPOINT_URL}/{checkpoint}.ckpt"
+    upstream = f"{_BEAT_THIS_CHECKPOINT_URL}/{checkpoint}.ckpt"
+    sha256 = _BEAT_THIS_SHA256.get(checkpoint)
+    urls = (
+        (upstream,)
+        if sha256 is None
+        else (f"{_BEAT_THIS_MIRROR_URL}/{filename}", upstream)
+    )
     return WeightSpec(
         label=f"Beat This {checkpoint}",
         size_hint=f"~{_BEAT_THIS_CHECKPOINT_MB} MB",
-        files=(WeightFile(filename=filename, url=url),),
+        files=(WeightFile(filename=filename, urls=urls, hash_prefix=sha256),),
     )
 
 
@@ -122,7 +143,14 @@ def demucs_weight_spec(model: str) -> WeightSpec:
             raise ValueError(
                 f"Demucs model {model!r} references missing signature {sig!r}"
             ) from exc
-        files.append(WeightFile(filename=url.rsplit("/", 1)[-1], url=url))
+        filename = url.rsplit("/", 1)[-1]
+        files.append(
+            WeightFile(
+                filename=filename,
+                urls=(url,),
+                hash_prefix=_hub_hash_prefix(filename),
+            )
+        )
     if not files:
         raise ValueError(f"Demucs model {model!r} has no checkpoint files")
     size_mb = _DEMUCS_CHECKPOINT_MB * len(files)
@@ -176,23 +204,40 @@ def ensure_weight_files(
     start = download_start_message(spec)
     _report(on_progress, start, None)
     aggregator = _DownloadProgress(len(missing), on_progress, start)
-    try:
-        with _intercept_hub_tqdm(
-            aggregator.on_bytes, show_console=on_progress is None
-        ):
-            for item in missing:
-                download_url_to_file(
-                    item.url,
-                    str(dest_dir / item.filename),
-                    hash_prefix=_hub_hash_prefix(item.filename),
-                    progress=True,
-                )
-                aggregator.finish_file()
-    except (URLError, TimeoutError, ConnectionError, ssl.SSLError) as exc:
-        raise WeightDownloadError(download_failed_message(spec)) from exc
+    failures = (URLError, TimeoutError, ConnectionError, ssl.SSLError, RuntimeError)
+    with _intercept_hub_tqdm(aggregator.on_bytes, show_console=on_progress is None):
+        for item in missing:
+            _download_first_working(
+                download_url_to_file, item, dest_dir / item.filename, spec, failures
+            )
+            aggregator.finish_file()
 
     _report(on_progress, download_done_message(spec), None)
     return True
+
+
+def _download_first_working(
+    download_url_to_file: Callable[..., None],
+    item: WeightFile,
+    dest: Path,
+    spec: WeightSpec,
+    failures: tuple[type[Exception], ...],
+) -> None:
+    """Fetch *item* from the first URL that works.
+
+    Torch hub raises RuntimeError on a hash mismatch, so a bad copy falls
+    through to the next URL like a network failure.
+    """
+    failure: Exception | None = None
+    for url in item.urls:
+        try:
+            download_url_to_file(
+                url, str(dest), hash_prefix=item.hash_prefix, progress=True
+            )
+            return
+        except failures as exc:
+            failure = exc
+    raise WeightDownloadError(download_failed_message(spec)) from failure
 
 
 def _checkpoint_present(path: Path) -> bool:

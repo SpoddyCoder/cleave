@@ -69,7 +69,9 @@ def test_demucs_htdemucs_spec_matches_installed_repo() -> None:
     assert spec.size_hint == "~80 MB"
     assert len(spec.files) == 1
     assert spec.files[0].filename == "955717e8-8726e21a.th"
-    assert spec.files[0].url.endswith("hybrid_transformer/955717e8-8726e21a.th")
+    assert len(spec.files[0].urls) == 1
+    assert spec.files[0].urls[0].endswith("hybrid_transformer/955717e8-8726e21a.th")
+    assert spec.files[0].hash_prefix == "8726e21a"
 
 
 def test_demucs_htdemucs_ft_spec_is_four_file_bag() -> None:
@@ -89,7 +91,44 @@ def test_beat_this_final0_spec() -> None:
     assert spec.label == "Beat This final0"
     assert spec.size_hint == "~78 MB"
     assert spec.files[0].filename == "beat_this-final0.ckpt"
-    assert spec.files[0].url.endswith("/final0.ckpt")
+    mirror, upstream = spec.files[0].urls
+    assert mirror == (
+        "https://github.com/SpoddyCoder/cleave-resources/releases/download/"
+        "beat-this-final0-v1/beat_this-final0.ckpt"
+    )
+    assert upstream.endswith("/final0.ckpt")
+    assert spec.files[0].hash_prefix is not None
+    assert len(spec.files[0].hash_prefix) == 64
+
+
+def test_beat_this_unknown_checkpoint_uses_upstream_only() -> None:
+    spec = beat_this_weight_spec("small0")
+    assert len(spec.files[0].urls) == 1
+    assert spec.files[0].urls[0].endswith("/small0.ckpt")
+    assert spec.files[0].hash_prefix is None
+
+
+def test_failed_url_falls_back_to_next(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    spec = beat_this_weight_spec()
+    cache = tmp_path / "models"
+    hub = _install_fake_torch(monkeypatch)
+    calls: list[tuple[str, object]] = []
+
+    def fake_download(url: str, dst: str, **kwargs: object) -> None:
+        calls.append((url, kwargs.get("hash_prefix")))
+        if len(calls) == 1:
+            raise RuntimeError("invalid hash value")
+        Path(dst).write_bytes(b"ckpt")
+
+    hub.download_url_to_file = fake_download
+
+    assert ensure_weight_files(spec, cache_dir=cache) is True
+    assert [url for url, _ in calls] == list(spec.files[0].urls)
+    assert all(prefix == spec.files[0].hash_prefix for _, prefix in calls)
+    assert missing_weight_files(spec, cache) == ()
 
 
 def test_download_messages_name_model_and_one_time_data_dir() -> None:
