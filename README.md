@@ -99,7 +99,7 @@ The build is unsigned. If SmartScreen warns on the setup exe or the zip, choose 
 
 ### CUDA (NVIDIA GPU)
 
-Stem separation on CPU is slow. The installer can download CUDA files from PyTorch (about 2 GB) for much faster splitting when it detects an NVIDIA GPU (driver 580.88 or newer). Default answer is No. Skip or fail leaves CPU split working fine. Silent setup does not download CUDA unless you pass `/CUDA=1`. The zip stays CPU-only.
+Stem separation on CPU is slow. When your NVIDIA driver supports CUDA 13 (driver 580.88 or newer), the Welcome to Cleave step offers a CUDA Toolkit download from PyTorch (about 1.8 GB) for much faster splitting. It is off by default; tick it on first launch, or later from Settings > Welcome to Cleave.... It goes into `%LOCALAPPDATA%\Cleave\cuda`, so the installer and the zip both stay CPU-only and work the same. Skip or fail leaves CPU split working fine.
 
 ---
 

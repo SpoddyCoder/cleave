@@ -10,7 +10,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 ### Added
 
 - A "Welcome to Cleave" step on first launch gathers every one-time download in one place, each named with what it is for: the Milkdrop presets, the Demucs stem separation model, and the BeatThis! beat detection model, all ticked, plus the optional Demucs HQ model. Each download shows its own status and progress, Cancel stops partway, and any that fail are listed with Retry. Anything skipped still downloads when it is first needed. The step comes back on later launches only while presets are missing.
-- Settings > Welcome to Cleave... opens the welcome step in the editor at any time, listing only the downloads still missing, so you can grab anything you skipped. Playback pauses while it is open and resumes when it closes.
+- Settings > Welcome to Cleave... opens the welcome step in the editor at any time, listing only the downloads still missing, so you can grab anything you skipped. Its Skip button reads Cancel there. Playback pauses while it is open and resumes when it closes.
+- On Windows with an NVIDIA driver that supports CUDA 13 (580.88 or newer), the Welcome to Cleave step offers the CUDA Toolkit (about 1.8 GB, off by default) for much faster stem separation. It downloads into your local app data, so it needs no admin rights and works with both the installer and the zip. Downloaded before your first split, it is used straight away; otherwise restart Cleave.
 - The Generate timeline, Reset timeline, Snap cues, Set cut type on cues, and Populate preset list dialogs explain themselves in the help column. It stays bright while the dialog is open and describes the highlighted setting, with what each of its choices does, plus the dialog's keys. Scroll the help column with the mouse wheel without closing the dialog.
 - Settings > UI has a tooltips switch to turn hover tooltips on or off. Tooltips are on by default, and the choice is remembered between sessions.
 - Drag the top edge of the timeline strip to make it taller; the layer rows grow to fill it. It can't shrink below its rows, and the height is remembered between sessions. Drag back down past the rows to return it to its fitted height.
@@ -143,7 +144,6 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
-- Reinstalling or upgrading Cleave on Windows without the CUDA toolkit no longer leaves files from an earlier CUDA install mixed in with the CPU build, which could break stem splitting.
 - The Windows editor no longer crashes with an OpenGL "invalid operation" error just after it opens, or when the window or preview size changes.
 - The first separate no longer fails when the Beat This model host refuses the download. Cleave fetches the beat-tracking weights from its own GitHub release first, checks them against a fixed hash, and falls back to the original host. The Demucs stem-split weights also come from Cleave's release first, with Meta's server as the fallback.
 - The help column no longer lists Esc as "hide UI", which did nothing; Esc now leaves Play Full Screen.
@@ -194,6 +194,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Removed
 
+- The Windows installer's CUDA toolkit page and its `/CUDA=1` switch. The CUDA Toolkit download is in the Welcome to Cleave step instead.
 - R (Remove from...) in preset curation. F, B, and C undo their own changes.
 - The `favourites/`, `blacklist/`, and `roles/<role>/` folders under the preset root are no longer used, and existing ones are treated as ordinary preset folders. Favourite and blacklist destination subfolders and `.origin` restore files are gone.
 - The marker count beside Song Markers in the navigator.

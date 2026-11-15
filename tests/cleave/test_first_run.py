@@ -107,3 +107,30 @@ def test_run_downloads_cancel_stops_the_rest() -> None:
     ]
     assert result.cancelled
     assert later == []
+
+
+def test_download_note_replaces_done() -> None:
+    item = _item(FirstRunItemId.CUDA, download=lambda _progress: "restart")
+    result = run_downloads((item,), lambda *_a: None)
+    assert result.results[0].outcome is ItemOutcome.DONE
+    assert result.results[0].note == "restart"
+
+
+def test_cuda_item_only_when_supported(monkeypatch: pytest.MonkeyPatch) -> None:
+    import cleave.cuda_extra as cuda_extra
+    from cleave.first_run import first_run_items
+
+    monkeypatch.setattr(cuda_extra, "cuda_extra_supported", lambda: False)
+    assert FirstRunItemId.CUDA not in {item.id for item in first_run_items()}
+
+    monkeypatch.setattr(cuda_extra, "cuda_extra_supported", lambda: True)
+    monkeypatch.setattr(cuda_extra, "cuda_extra_installed", lambda: False)
+    items = {item.id: item for item in first_run_items()}
+    cuda = items[FirstRunItemId.CUDA]
+    assert cuda.default_on is False
+    assert cuda.needed()
+    assert list(items)[-1] is FirstRunItemId.CUDA
+
+    monkeypatch.setattr(cuda_extra, "cuda_extra_installed", lambda: True)
+    items = {item.id: item for item in first_run_items()}
+    assert not items[FirstRunItemId.CUDA].needed()

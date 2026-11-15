@@ -283,3 +283,22 @@ def test_editor_leaves_paused_playback_paused(persist: MagicMock) -> None:
     controls.host.handle_keydown(_keydown(pygame.K_RETURN))
     assert controls.playback.paused
     controls.transport.toggle_pause.assert_not_called()
+
+
+def _buttons(host: ModalHost) -> tuple[str, ...]:
+    view = host.view_state()
+    assert view is not None
+    return view.options
+
+
+def test_startup_form_offers_skip(persist: MagicMock) -> None:
+    _flow, host = _start((_item(FirstRunItemId.PRESETS, lambda _p: None),))
+    assert _buttons(host) == ("Download", "Skip")
+
+
+def test_editor_form_offers_cancel(persist: MagicMock) -> None:
+    controls = _editor_controls(paused=True)
+    item = _item(FirstRunItemId.PRESETS, lambda _p: None)
+    with patch("cleave.first_run.first_run_items", return_value=(item,)):
+        TuningControls.prompt_welcome(controls)
+    assert _buttons(controls.host) == ("Download", "Cancel")

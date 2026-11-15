@@ -44,7 +44,7 @@ from cleave.viz.project_switch import ProjectSwitchController
 from cleave.viz.song_marker_controls import SongMarkerController
 from cleave.viz.tap_sync_controls import TapSyncControls, TapSyncUiSnapshot
 from cleave.viz.transport_controls import TransportControls
-from cleave.viz.welcome_host import WelcomeFlow
+from cleave.viz.welcome_host import CANCEL_LABEL, WelcomeFlow
 from cleave.viz.window_controls import WindowControls
 from cleave.viz.timeline_phase_controls import TimelinePhaseController
 from cleave.viz.timeline_history import TimelineHistory
@@ -461,7 +461,11 @@ class TuningControls:
             if resume and self.playback.paused:
                 self.transport.toggle_pause()
 
-        self.welcome.start(needed_items(first_run_items()), on_close=restore)
+        self.welcome.start(
+            needed_items(first_run_items()),
+            on_close=restore,
+            cancel_label=CANCEL_LABEL,
+        )
 
     def prompt_save_config(self) -> None:
         if self.session.solo_slot is not None:

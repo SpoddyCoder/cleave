@@ -149,6 +149,20 @@ def model_cache_dir() -> Path:
     return path
 
 
+def cuda_extra_root() -> Path:
+    """Return the parent of the downloaded CUDA torch overlay.
+
+    ``CLEAVE_DATA`` overrides on every OS (``<data>/cuda``). Otherwise Windows
+    uses ``%LOCALAPPDATA%/Cleave/cuda``: several GB of DLLs belong in local app
+    data, not in Documents or the roaming profile.
+    """
+    if not os.environ.get("CLEAVE_DATA") and sys.platform == "win32":
+        local = os.environ.get("LOCALAPPDATA")
+        if local:
+            return (Path(local) / WINDOWS_APP_FOLDER / "cuda").resolve()
+    return (data_dir() / "cuda").resolve()
+
+
 def ensure_data_dirs() -> None:
     """Create the user data directory tree if any parts are missing."""
     root = data_dir()

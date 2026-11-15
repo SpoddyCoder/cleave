@@ -16,19 +16,15 @@ The Windows product is one `cleave.exe`: CPU stem split in the zip and installer
 
 ## Remaining work
 
-1. **Phase 3.3.3 NVIDIA-box proof** of the optional CUDA installer download. Wizard, download, verify, and unpack already ship in the `v0.2.0` installer ([packaging/windows/cleave.iss](../../packaging/windows/cleave.iss)). This phase is not marked Done until that proof. Mechanics: [windows-freeze.md](windows-freeze.md) (CUDA extra).
+1. **Phase 3.3.3 NVIDIA-box proof** of the optional CUDA download in the Welcome to Cleave step ([cleave/cuda_extra.py](../../cleave/cuda_extra.py)). This phase is not marked Done until that proof. Mechanics: [windows-freeze.md](windows-freeze.md) (CUDA extra).
 2. **Phase 4** Linux and macOS binaries (same product as Windows: CPU `separate` plus play/render).
-3. **Later** (do not block 3.3.3 or Phase 4): Nuitka freeze ([roadmap.md](roadmap.md)); in-window CUDA fetch after a skipped installer prompt; in-app version string; hosted preset/texture packs; code signing; crash/log upload, delta updates, stores.
+3. **Later** (do not block 3.3.3 or Phase 4): Nuitka freeze ([roadmap.md](roadmap.md)); in-app version string; hosted preset/texture packs; code signing; crash/log upload, delta updates, stores.
 
 ### Phase 3.3.3 (CUDA extra)
 
-One setup exe. The CPU onedir is always installed. CUDA torch is not baked in. Cleave does not build or host a CUDA payload. The portable zip stays CPU-only.
+One setup exe and one zip, both CPU-only. CUDA torch is not baked in, and the installer does not offer it. Cleave does not build or host a CUDA payload.
 
-When the wizard detects an NVIDIA GPU, it asks Yes/No (default No) with this copy. The size is a hardcoded estimate (2 GB), not a live network sum:
-
-NVIDIA graphics card detected - do you wish to download the CUDA toolkit for faster stem splitting? (2 GB)
-
-Do not show that question when NVIDIA is not detected. Silent and very silent installs skip the page. Yes, or silent `/CUDA=1`, fetches pinned PyTorch cu130 wheels from download.pytorch.org into `{app}\_internal`. No, download failure, or no opt-in: finish the install; stem split stays on CPU. CI does not download the wheels. Driver 580.88 or newer.
+The editor's Welcome to Cleave step (first launch, and Settings > Welcome to Cleave...) lists a CUDA Toolkit download, off by default, when the NVIDIA driver supports CUDA 13 (driver 580.88 or newer) and it is not downloaded yet. It fetches pinned PyTorch cu130 wheels from download.pytorch.org into local app data, not the install folder, so no admin rights are needed. Skip or failure leaves stem split on CPU. CI does not download the wheels.
 
 ### Phase 4 - Linux and macOS binaries
 

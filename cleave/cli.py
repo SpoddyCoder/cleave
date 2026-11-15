@@ -567,6 +567,9 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> None:
     global _parent_console_attached
     _parent_console_attached = attach_parent_console()
+    from cleave.cuda_extra import activate_cuda_extra
+
+    activate_cuda_extra()
     try:
         parser = build_parser()
         parser.error = _parser_error  # type: ignore[method-assign]

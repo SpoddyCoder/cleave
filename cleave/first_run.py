@@ -1,7 +1,8 @@
 """First-run downloads gathered for the editor's welcome step.
 
-Milkdrop starter packs and the Demucs and Beat This weights, each as one
-:class:`FirstRunItem`. No viz and no torch at import: checking what is missing
+Milkdrop starter packs, the Demucs and Beat This weights, and (on the frozen
+Windows build with a new enough NVIDIA driver) the CUDA torch overlay, each as
+one :class:`FirstRunItem`. No viz and no torch at import: checking what is missing
 only reads the data dir and the hub cache. The editor presents the step
 (``cleave.viz.welcome_host``); split-time downloads stay as the fallback for
 anything the user skipped.
@@ -20,6 +21,9 @@ if TYPE_CHECKING:
     from cleave.model_weights import WeightSpec
 
 DownloadProgress = Callable[[str, float | None], None]
+# A download may return a note shown in place of "Done" (for example, a
+# restart is needed before it takes effect).
+DownloadFn = Callable[[DownloadProgress], str | None]
 
 
 class FirstRunCancelled(Exception):
@@ -31,6 +35,7 @@ class FirstRunItemId(Enum):
     DEMUCS = "demucs"
     DEMUCS_HQ = "demucs_hq"
     BEAT_THIS = "beat_this"
+    CUDA = "cuda"
 
 
 @dataclass(frozen=True)
@@ -41,7 +46,7 @@ class FirstRunItem:
     Cleave uses it for. ``default_on`` items are ticked in the step, and only
     they bring the step back while ``welcome_done`` is unset. ``needed`` and
     ``download`` do the work; ``download`` raises the module's own error type
-    on failure.
+    on failure and may return a note to show in place of "Done".
     """
 
     id: FirstRunItemId
@@ -50,7 +55,7 @@ class FirstRunItem:
     size_mb: int
     default_on: bool
     needed: Callable[[], bool]
-    download: Callable[[DownloadProgress], None]
+    download: DownloadFn
 
     @property
     def size_hint(self) -> str:
@@ -68,6 +73,7 @@ class ItemResult:
     item: FirstRunItem
     outcome: ItemOutcome
     error: str | None = None
+    note: str | None = None
 
 
 @dataclass(frozen=True)
@@ -133,6 +139,28 @@ def _weight_item(
     )
 
 
+def _cuda_item() -> FirstRunItem | None:
+    """Offered only on the frozen Windows build with a CUDA 13 NVIDIA driver."""
+    from cleave.cuda_extra import (
+        CUDA_EXTRA_SIZE_MB,
+        cuda_extra_installed,
+        cuda_extra_supported,
+        download_cuda_extra,
+    )
+
+    if not cuda_extra_supported():
+        return None
+    return FirstRunItem(
+        id=FirstRunItemId.CUDA,
+        name="CUDA Toolkit",
+        purpose="much faster stem separation on your NVIDIA graphics card",
+        size_mb=CUDA_EXTRA_SIZE_MB,
+        default_on=False,
+        needed=lambda: not cuda_extra_installed(),
+        download=download_cuda_extra,
+    )
+
+
 def first_run_items() -> tuple[FirstRunItem, ...]:
     """Every download the welcome step can offer, in download order."""
     from cleave.model_weights import (
@@ -165,6 +193,7 @@ def first_run_items() -> tuple[FirstRunItem, ...]:
             purpose="beat detection AI model by the IoCP",
             default_on=True,
         ),
+        _cuda_item(),
     )
     return tuple(item for item in candidates if item is not None)
 
@@ -188,10 +217,11 @@ def welcome_needed(
 
 
 def download_error_types() -> tuple[type[Exception], ...]:
+    from cleave.cuda_extra import CudaExtraError
     from cleave.model_weights import WeightDownloadError
     from cleave.starter_packs import StarterPackError
 
-    return (StarterPackError, WeightDownloadError)
+    return (StarterPackError, WeightDownloadError, CudaExtraError)
 
 
 def run_downloads(
@@ -214,7 +244,9 @@ def run_downloads(
 
     for index, item in enumerate(items):
         try:
-            item.download(lambda message, fraction: on_progress(item, message, fraction))
+            note = item.download(
+                lambda message, fraction: on_progress(item, message, fraction)
+            )
         except FirstRunCancelled:
             for rest in items[index:]:
                 report(ItemResult(rest, ItemOutcome.CANCELLED))
@@ -222,5 +254,5 @@ def run_downloads(
         except errors as exc:
             report(ItemResult(item, ItemOutcome.FAILED, str(exc) or type(exc).__name__))
             continue
-        report(ItemResult(item, ItemOutcome.DONE))
+        report(ItemResult(item, ItemOutcome.DONE, note=note))
     return FirstRunResult(tuple(results))

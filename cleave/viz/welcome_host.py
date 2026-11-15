@@ -48,6 +48,8 @@ _WELCOME_BODY = (
     "Anything you skip downloads when it is first needed."
 )
 _SECTION = "Downloads"
+SKIP_LABEL = "Skip"
+CANCEL_LABEL = "Cancel"
 _OFF_ON = ("Off", "On")
 _FAILED_TITLE = "Some downloads failed"
 _FAILED_BODY = "Check your internet connection, then try again."
@@ -101,7 +103,7 @@ class _DownloadView:
 
     def finish(self, result: ItemResult) -> None:
         if result.outcome is ItemOutcome.DONE:
-            self.status[result.item.id] = _DONE
+            self.status[result.item.id] = result.note or _DONE
         elif result.outcome is ItemOutcome.FAILED:
             self.status[result.item.id] = _FAILED
         else:
@@ -195,11 +197,13 @@ class WelcomeFlow:
         items: tuple[FirstRunItem, ...],
         *,
         on_close: Callable[[], None] | None = None,
+        cancel_label: str = SKIP_LABEL,
     ) -> None:
         """Offer *items* (already filtered to the missing ones).
 
         *on_close* runs once when the step closes, including the notice shown
-        when nothing is missing.
+        when nothing is missing. *cancel_label* names the form's dismiss
+        button: Skip at startup, Cancel when opened from the editor.
         """
         if self._active:
             return
@@ -208,7 +212,7 @@ class WelcomeFlow:
             return
         self._active = True
         self._on_close = on_close
-        self._prompt_choose(items)
+        self._prompt_choose(items, cancel_label)
 
     def tick(self) -> None:
         worker = self._worker
@@ -246,7 +250,9 @@ class WelcomeFlow:
         if self._host.active:
             self._host.dismiss()
 
-    def _prompt_choose(self, items: tuple[FirstRunItem, ...]) -> None:
+    def _prompt_choose(
+        self, items: tuple[FirstRunItem, ...], cancel_label: str
+    ) -> None:
         def selected(values: FormValues) -> tuple[FirstRunItem, ...]:
             return tuple(item for item in items if values.get(item.id.value) == 1)
 
@@ -278,7 +284,7 @@ class WelcomeFlow:
                 ),
                 confirm_label="Download",
                 on_confirm=confirm,
-                cancel_label="Skip",
+                cancel_label=cancel_label,
                 on_cancel=self._complete,
                 info=info,
                 help=(_WELCOME_BODY,),
