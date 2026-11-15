@@ -261,6 +261,7 @@ def _progress() -> ModalViewState:
         focus_index=0,
         labeled_lines=(ModalLabeledLine("Stem", "drums"),),
         progress_fraction=0.5,
+        large_text=True,
     )
 
 
@@ -1091,6 +1092,7 @@ def _cancellable_progress() -> tuple[ModalHost, list[bool]]:
         labeled_lines=(ModalLabeledLine("Demucs htdemucs", "Downloading 42%"),),
         fraction=0.42,
         on_cancel=lambda: cancelled.append(True),
+        large_text=False,
     )
     return modal, cancelled
 
@@ -1119,3 +1121,22 @@ def test_click_outside_cancellable_progress_records_nothing() -> None:
         assert surface.panel_rect is not None
         _pointer(host, surface, _above(surface.panel_rect), click=True)
         assert surface.intent is None
+
+
+def test_progress_without_large_text_uses_body_font() -> None:
+    modal, _cancelled = _cancellable_progress()
+    view = modal.view_state()
+    assert view is not None
+    assert view.large_text is False
+    with _host() as host:
+        surface = ModalSurface(view, ImGuiTextMeasure())
+        _idle(host, surface)
+        screen_w, _screen_h = host.imgui.display_size
+        expected = measure_panel(
+            surface.measure,
+            view,
+            line_gap=tuning_ui_metrics().line_gap,
+            screen_w=screen_w,
+        )
+        assert surface.panel_rect is not None
+        assert surface.panel_rect[2:] == expected

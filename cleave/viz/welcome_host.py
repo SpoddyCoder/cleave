@@ -40,7 +40,8 @@ _WELCOME_BODY = (
 _SECTION = "Downloads"
 _OFF_ON = ("Off", "On")
 _FAILED_TITLE = "Some downloads failed"
-_FAILED_BODY = "A network connection is required the first time."
+_FAILED_BODY = "Check your internet connection, then try again."
+_DOWNLOAD_FAILED = "Download failed"
 _CANCELLING = "Cancelling..."
 
 _WAITING = "Waiting"
@@ -48,6 +49,10 @@ _DOWNLOADING = "Downloading"
 _DONE = "Done"
 _FAILED = "Failed"
 _CANCELLED = "Cancelled"
+
+
+def _downloading_message(item: FirstRunItem) -> str:
+    return f"Downloading {item.name}..."
 
 
 def _choose(
@@ -73,10 +78,10 @@ def _choose(
             fields=tuple(
                 FormField(
                     id=item.id.value,
-                    label=f"{item.label} ({item.size_hint})",
+                    label=f"{item.name} - {item.purpose} ({item.size_hint})",
                     options=_OFF_ON,
                     value=1 if item.default_on else 0,
-                    help=(item.help,),
+                    help=(f"{item.name}: {item.purpose}.",),
                     section=_SECTION,
                 )
                 for item in items
@@ -103,7 +108,7 @@ class _DownloadView:
 
     def lines(self) -> tuple[ModalLabeledLine, ...]:
         return tuple(
-            ModalLabeledLine(item.label, self.status[item.id]) for item in self.items
+            ModalLabeledLine(item.name, self.status[item.id]) for item in self.items
         )
 
     def progress(self, item: FirstRunItem, fraction: float | None) -> None:
@@ -137,7 +142,10 @@ def _download(
     def cancel() -> None:
         cancelled[0] = True
         host.prompt_progress(
-            _CANCELLING, labeled_lines=view.lines(), fraction=view.fraction
+            _CANCELLING,
+            labeled_lines=view.lines(),
+            fraction=view.fraction,
+            large_text=False,
         )
 
     def frame(message: str | None = None) -> None:
@@ -147,7 +155,7 @@ def _download(
     def on_progress(item: FirstRunItem, _message: str, fraction: float | None) -> None:
         if not cancelled[0]:
             view.progress(item, fraction)
-            frame(f"Downloading {item.label}...")
+            frame(_downloading_message(item))
         else:
             frame()
         if cancelled[0] or window.quit_requested:
@@ -158,9 +166,10 @@ def _download(
         frame()
 
     host.prompt_progress(
-        f"Downloading {items[0].label}...",
+        _downloading_message(items[0]),
         labeled_lines=view.lines(),
         on_cancel=cancel,
+        large_text=False,
     )
     result = run_downloads(items, on_progress, on_result)
     host.dismiss()
@@ -185,7 +194,7 @@ def _ask_retry(
             ModalOption("Continue", lambda: None),
         ],
         labeled_lines=tuple(
-            ModalLabeledLine(r.item.label, r.error or _FAILED) for r in failed
+            ModalLabeledLine(r.item.name, _DOWNLOAD_FAILED) for r in failed
         ),
         body=_FAILED_BODY,
     )

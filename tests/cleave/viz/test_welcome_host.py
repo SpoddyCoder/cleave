@@ -30,10 +30,10 @@ def _item(
 ) -> FirstRunItem:
     return FirstRunItem(
         id=item_id,
-        label=item_id.value,
+        name=item_id.value,
+        purpose="",
         size_mb=10,
         default_on=default_on,
-        help="",
         needed=lambda: True,
         download=download,
     )

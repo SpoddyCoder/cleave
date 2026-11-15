@@ -542,7 +542,7 @@ class ModalSurface:
         self._text_field_hit: _TextFieldHit | None = None
 
     def draw(self) -> Rect:
-        if self.view.kind == ModalKind.PROGRESS:
+        if self.view.kind == ModalKind.PROGRESS and self.view.large_text:
             with progress_label_font():
                 return self._draw_panel()
         return self._draw_panel()

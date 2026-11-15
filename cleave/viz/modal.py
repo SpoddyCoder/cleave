@@ -215,6 +215,8 @@ class ModalRequest:
     labeled_lines: tuple[ModalLabeledLine, ...] = ()
     progress_fraction: float | None = None
     body: str | None = None
+    # PROGRESS only: draw the text in the larger progress-label font.
+    large_text: bool = False
 
 
 @dataclass(frozen=True)
@@ -225,6 +227,7 @@ class ModalViewState:
     focus_index: int
     labeled_lines: tuple[ModalLabeledLine, ...] = ()
     progress_fraction: float | None = None
+    large_text: bool = False
     cta: str | None = None
     draft: str | None = None
     single_line: bool = False
@@ -312,6 +315,7 @@ class ModalHost:
             focus_index=self._focus_index,
             labeled_lines=self._request.labeled_lines,
             progress_fraction=self._request.progress_fraction,
+            large_text=self._request.large_text,
             body=self._request.body,
             option_roles=tuple(option.role for option in self._request.options),
             form_rows=form_rows,
@@ -436,8 +440,13 @@ class ModalHost:
         labeled_lines: Sequence[ModalLabeledLine] = (),
         fraction: float = 0.0,
         on_cancel: Callable[[], None] | None = None,
+        large_text: bool = True,
     ) -> None:
-        """Show a progress bar. With *on_cancel*, a Cancel button (and Esc) runs it."""
+        """Show a progress bar. With *on_cancel*, a Cancel button (and Esc) runs it.
+
+        *large_text* draws the message and lines in the larger progress-label
+        font; a dialog with several status lines passes False for body text.
+        """
         options = [] if on_cancel is None else [ModalOption("Cancel", on_cancel)]
         self.prompt(
             ModalRequest(
@@ -447,6 +456,7 @@ class ModalHost:
                 on_dismiss=on_cancel,
                 labeled_lines=tuple(labeled_lines),
                 progress_fraction=max(0.0, min(1.0, float(fraction))),
+                large_text=large_text,
             )
         )
 

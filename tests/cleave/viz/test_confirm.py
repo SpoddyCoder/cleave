@@ -230,3 +230,11 @@ def test_form_cancel_label() -> None:
         )
     )
     assert modal.view_state().options == ("Go", "Skip")
+
+
+def test_progress_large_text_defaults_on() -> None:
+    modal = ModalHost()
+    modal.prompt_progress("Rendering...")
+    assert modal.view_state().large_text is True
+    modal.prompt_progress("Downloading...", large_text=False)
+    assert modal.view_state().large_text is False

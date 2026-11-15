@@ -28,10 +28,10 @@ def _item(
 ) -> FirstRunItem:
     return FirstRunItem(
         id=item_id,
-        label=item_id.value,
+        name=item_id.value,
+        purpose="",
         size_mb=10,
         default_on=default_on,
-        help="",
         needed=lambda: needed,
         download=download,
     )
@@ -77,7 +77,7 @@ def test_run_downloads_continues_past_a_failure() -> None:
         _item(FirstRunItemId.DEMUCS, download=fail),
         _item(FirstRunItemId.BEAT_THIS, download=ok),
     )
-    result = run_downloads(items, lambda item, _m, f: seen.append((item.label, f)))
+    result = run_downloads(items, lambda item, _m, f: seen.append((item.name, f)))
 
     assert [r.outcome for r in result.results] == [ItemOutcome.FAILED, ItemOutcome.DONE]
     assert result.failed[0].error == "no network"

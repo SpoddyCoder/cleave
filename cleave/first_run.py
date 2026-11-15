@@ -37,16 +37,18 @@ class FirstRunItemId(Enum):
 class FirstRunItem:
     """One download in the welcome step.
 
-    ``default_on`` items are ticked in the step, and only they bring the step
-    back while ``welcome_done`` is unset. ``needed`` and ``download`` do the
-    work; ``download`` raises the module's own error type on failure.
+    ``name`` and ``purpose`` are user-facing: what the download is, and what
+    Cleave uses it for. ``default_on`` items are ticked in the step, and only
+    they bring the step back while ``welcome_done`` is unset. ``needed`` and
+    ``download`` do the work; ``download`` raises the module's own error type
+    on failure.
     """
 
     id: FirstRunItemId
-    label: str
+    name: str
+    purpose: str
     size_mb: int
     default_on: bool
-    help: str
     needed: Callable[[], bool]
     download: Callable[[DownloadProgress], None]
 
@@ -90,10 +92,10 @@ def _presets_item() -> FirstRunItem:
 
     return FirstRunItem(
         id=FirstRunItemId.PRESETS,
-        label="Milkdrop presets and textures",
+        name="Milkdrop Presets",
+        purpose="standard projectM preset and texture packs",
         size_mb=STARTER_PACKS_SIZE_MB,
         default_on=True,
-        help="The projectM starter packs. Cleave needs presets to show visuals.",
         needed=starter_packs_needed,
         download=download_starter_packs,
     )
@@ -103,8 +105,9 @@ def _weight_item(
     item_id: FirstRunItemId,
     spec_factory: Callable[[], WeightSpec],
     *,
+    name: str,
+    purpose: str,
     default_on: bool,
-    help: str,
 ) -> FirstRunItem | None:
     from cleave.model_weights import ensure_weight_files, missing_weight_files
 
@@ -121,10 +124,10 @@ def _weight_item(
 
     return FirstRunItem(
         id=item_id,
-        label=spec.label,
+        name=name,
+        purpose=purpose,
         size_mb=spec.size_mb,
         default_on=default_on,
-        help=help,
         needed=needed,
         download=download,
     )
@@ -144,20 +147,23 @@ def first_run_items() -> tuple[FirstRunItem, ...]:
         _weight_item(
             FirstRunItemId.DEMUCS,
             lambda: demucs_weight_spec(DEMUCS_MODEL),
+            name="Demucs",
+            purpose="stem separation AI model by Meta",
             default_on=True,
-            help="Stem separation model used when you open an audio file.",
-        ),
-        _weight_item(
-            FirstRunItemId.BEAT_THIS,
-            beat_this_weight_spec,
-            default_on=True,
-            help="Beat and downbeat detection for the bar grid and timeline.",
         ),
         _weight_item(
             FirstRunItemId.DEMUCS_HQ,
             lambda: demucs_weight_spec(DEMUCS_HQ_MODEL),
+            name="Demucs HQ",
+            purpose="higher quality but slower stem separation",
             default_on=False,
-            help="High Quality separation model (slower). Optional.",
+        ),
+        _weight_item(
+            FirstRunItemId.BEAT_THIS,
+            beat_this_weight_spec,
+            name="BeatThis!",
+            purpose="beat detection AI model by the IoCP",
+            default_on=True,
         ),
     )
     return tuple(item for item in candidates if item is not None)
