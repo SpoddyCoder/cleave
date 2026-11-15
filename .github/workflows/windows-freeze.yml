@@ -143,10 +143,15 @@ jobs:
           if not exe.is_file():
               raise SystemExit(f"missing {exe}")
 
+          # Capture: a windowed exe gets no stdio unless the parent passes pipes.
           separate = subprocess.run(
               [str(exe), "separate", str(wav)],
+              capture_output=True,
+              text=True,
               check=False,
           )
+          print(separate.stdout)
+          print(separate.stderr, file=sys.stderr)
           if separate.returncode != 0:
               raise SystemExit(f"separate exited {separate.returncode}")
 
