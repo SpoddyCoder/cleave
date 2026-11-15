@@ -14,6 +14,8 @@ from cleave.timeline import (
     SlotCue,
     canonicalize,
     clip_at,
+    empty_lane,
+    lane_last_on_level,
     should_accept_toggle,
 )
 from cleave.viz.controls import SEEK_LONG, SEEK_SHORT, SEEK_TINY
@@ -28,6 +30,7 @@ from cleave.viz.layer_visibility import (
     armed_recording_level,
     build_record_punch_cues,
     effective_layer_enabled,
+    timeline_committed_level,
 )
 from cleave.viz.playback import PlaybackState, current_sec, seek, toggle_pause
 from cleave.viz.timeline_clip_edits import (
@@ -563,6 +566,19 @@ class TimelineControls:
         else:
             self.clip_editor.set_cut_in(slot, choice)
 
+    def _record_on_level(self, slot: str, t_sec: float) -> float:
+        """Level a take starts at for a row that is showing at *t_sec*.
+
+        The lane's own level there, or its last on level when the row shows
+        only by an override.
+        """
+        committed = timeline_committed_level(self.session, slot, t_sec)
+        if committed > LEVEL_EPS:
+            return committed
+        return lane_last_on_level(
+            self.session.timeline.lanes.get(slot) or empty_lane(), t_sec
+        )
+
     def _toggle_arm(self, slot: str) -> None:
         tl = self.session.timeline
         armed = tl.armed_slots
@@ -575,7 +591,7 @@ class TimelineControls:
             if tl.recording:
                 t_sec = current_sec(self.playback, self.duration_sec)
                 tl.record_baseline[slot] = (
-                    1.0
+                    self._record_on_level(slot, t_sec)
                     if effective_layer_enabled(self.session, slot, t_sec)
                     else 0.0
                 )
@@ -630,7 +646,7 @@ class TimelineControls:
         snapped = self._snap_placement(t_sec)
         tl.record_baseline = {
             stem: (
-                1.0
+                self._record_on_level(stem, t_sec)
                 if effective_layer_enabled(self.session, stem, t_sec)
                 else 0.0
             )
@@ -704,8 +720,12 @@ class TimelineControls:
         current_on = (
             armed_recording_level(self.session, slot, pending_t) > LEVEL_EPS
         )
+        # Turning on takes the lane's authored level, not full.
+        on_level = lane_last_on_level(
+            tl.lanes.get(slot) or empty_lane(), snapped
+        )
         tl.record_buffer.setdefault(slot, []).append(
-            SlotCue(t=snapped, level=0.0 if current_on else 1.0)
+            SlotCue(t=snapped, level=0.0 if current_on else on_level)
         )
         self._last_toggle_t[slot] = t_sec
 

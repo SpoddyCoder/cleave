@@ -2091,3 +2091,60 @@ def test_delete_is_blocked_while_locked() -> None:
     session.timeline.locked = True
     controls.handle_keydown(keydown(pygame.K_DELETE))
     assert [cue.t for cue in session.timeline.lanes["layer_1"].cues] == [2.0]
+
+
+def test_record_over_a_partial_lane_keeps_its_level() -> None:
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        armed_slots={"layer_1"},
+        position_sec=10.0,
+        lanes={"layer_1": TimelineLane(baseline=0.6, cues=[])},
+    )
+    controls.handle_keydown(keydown(pygame.K_r))
+    assert session.timeline.record_baseline == {"layer_1": 0.6}
+
+    controls.playback.player.seek(12.0)
+    controls.handle_keydown(keydown(pygame.K_1))
+    controls.playback.player.seek(14.0)
+    controls.handle_keydown(keydown(pygame.K_1))
+    assert armed_recording_level(session, "layer_1", 14.5) == 0.6
+    controls.playback.player.seek(20.0)
+    controls.handle_keydown(keydown(pygame.K_r))
+
+    # The rise writes 60%, and the spans around the punches stay as they were.
+    assert session.timeline.lanes["layer_1"] == TimelineLane(
+        baseline=0.6,
+        cues=[SlotCue(t=12.0, level=0.0), SlotCue(t=14.0, level=0.6)],
+    )
+
+
+def test_record_rise_on_an_off_lane_takes_its_last_on_level() -> None:
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        armed_slots={"layer_1"},
+        position_sec=10.0,
+        lanes={"layer_1": _lane(False, (2.0, 0.6), (5.0, False))},
+    )
+    controls.handle_keydown(keydown(pygame.K_r))
+    assert session.timeline.record_baseline == {"layer_1": 0.0}
+    controls.playback.player.seek(12.0)
+    controls.handle_keydown(keydown(pygame.K_1))
+    controls.playback.player.seek(15.0)
+    controls.handle_keydown(keydown(pygame.K_r))
+
+    assert session.timeline.lanes["layer_1"].cues == [
+        SlotCue(t=2.0, level=0.6),
+        SlotCue(t=5.0, level=0.0),
+        SlotCue(t=12.0, level=0.6),
+        SlotCue(t=15.0, level=0.0),
+    ]
+
+
+def test_arming_mid_take_starts_from_the_lane_level() -> None:
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        armed_slots={"layer_1"},
+        position_sec=10.0,
+        focus_row=1,
+        lanes={"layer_2": TimelineLane(baseline=0.4, cues=[])},
+    )
+    controls.handle_keydown(keydown(pygame.K_r))
+    controls.handle_keydown(keydown(pygame.K_a))
+    assert session.timeline.record_baseline["layer_2"] == 0.4
