@@ -114,7 +114,7 @@ def timeline_band_height_px(row_count: int) -> int:
 
 ARMED_BG_ALPHA: int = 220
 CUE_TICK_ALPHA: int = 120
-CUE_TICK_WIDTH: int = 1
+CUE_TICK_WIDTH: int = 2
 # Outline around the selected clip; thicker while the selection flash runs.
 SELECTED_CLIP_OUTLINE_WIDTH: int = 2
 SELECTED_CLIP_FLASH_OUTLINE_WIDTH: int = 3

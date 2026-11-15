@@ -40,6 +40,7 @@ from cleave.viz.theme import (
 from cleave.viz.timeline_overlay import (
     ARM_FLASH_DURATION_MS,
     ARM_FLASH_HALF_MS,
+    CLIP_HANDLE_WIDTH,
     PLAYHEAD_FLASH_MS,
     ROLE_GLYPH_BOTTOM_PAD,
     ROW_HEADER_BUTTONS,
@@ -1287,7 +1288,7 @@ def test_hovered_clip_draws_edge_handles_only_where_clips_can_be_edited() -> Non
 
     def edge_rgb(**kwargs) -> tuple[int, int, int]:
         _, static, start_x, _end_x, top, row_h = _clip_strip(TimelineOverlay(), **kwargs)
-        return static.get_at((start_x + 1, top + row_h // 2))[:3]
+        return static.get_at((start_x + CLIP_HANDLE_WIDTH - 1, top + row_h // 2))[:3]
 
     plain = edge_rgb()
     assert edge_rgb(hover_clip=(0, 25.0, None)) == LABEL != plain
