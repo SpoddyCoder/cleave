@@ -54,6 +54,21 @@ jobs:
       - name: PyInstaller onedir
         run: pyinstaller packaging/cleave.spec
 
+      - name: Check SQLite is bundled
+        shell: python
+        run: |
+          from pathlib import Path
+
+          dist = Path("dist") / "cleave"
+          missing = [
+              pattern
+              for pattern in ("_sqlite3*.pyd", "sqlite3.dll")
+              if not any(dist.rglob(pattern))
+          ]
+          if missing:
+              raise SystemExit(f"preset library needs SQLite; missing from {dist}: {missing}")
+          print("sqlite ok")
+
       - name: Stage sidecars
         run: python scripts/windows_stage_freeze.py --dist dist/cleave
 
