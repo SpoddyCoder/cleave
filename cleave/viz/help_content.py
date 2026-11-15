@@ -75,9 +75,9 @@ _TOP_LEVEL_NAV_ENTRY = (
 _SEEK_AND_QUIT_ENTRIES: tuple[HelpEntry, ...] = (
     ("Shift + Left/Right", "skip 2s"),
     ("Ctrl + Left/Right", "skip 30s"),
-    ("Esc", "hide UI"),
     ("H", "show / hide help"),
-    ("F11", "full screen"),
+    ("Ctrl + F", "play full screen (Esc returns)"),
+    ("F11", "full screen editor"),
     ("Ctrl + Q", "quit"),
 )
 

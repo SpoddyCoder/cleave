@@ -48,7 +48,11 @@ def _stub_shell_draw(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
 
-def _silence_tap_sync(controls: MagicMock) -> None:
+def _quiet_live_controls(controls: MagicMock) -> None:
+    from cleave.viz.window_controls import WindowControls
+
+    # A MagicMock play_fullscreen is truthy and would hide the shell.
+    controls.window = WindowControls()
     controls.tap_sync.active = False
     controls.tap_sync.showing_progress = False
     controls.tap_sync.progress_view.return_value = None
@@ -106,7 +110,7 @@ def _minimal_runtime(
     controls.inline_edit.handle_keyup.return_value = False
     controls.inline_edit.handle_text_input.return_value = False
     controls.build_view_state.return_value = MagicMock()
-    _silence_tap_sync(controls)
+    _quiet_live_controls(controls)
     controls.project_render.busy = False
     modal_host = ModalHost()
     seed = VisualizerSeed(
@@ -253,7 +257,7 @@ def _heavy_init_side_effect(
     controls.inline_edit.handle_keyup.return_value = False
     controls.inline_edit.handle_text_input.return_value = False
     controls.build_view_state.return_value = MagicMock()
-    _silence_tap_sync(controls)
+    _quiet_live_controls(controls)
     controls.tick = MagicMock()
     controls.key_repeat_armed = False
     controls.value_nudge_armed = False
@@ -376,7 +380,7 @@ def test_run_pygame_quit_clean_exits_via_try_quit(
     controls.context_menu.handle_keydown.return_value = False
     controls.inline_edit.handle_keyup.return_value = False
     controls.inline_edit.handle_text_input.return_value = False
-    _silence_tap_sync(controls)
+    _quiet_live_controls(controls)
     controls.try_quit.return_value = True
     controls.consume_pending_exit.return_value = False
     controls.tick = MagicMock()
@@ -504,7 +508,7 @@ def test_run_pending_switch_returns_target_and_keeps_compositor(
     controls.context_menu.handle_keydown.return_value = False
     controls.inline_edit.handle_keyup.return_value = False
     controls.inline_edit.handle_text_input.return_value = False
-    _silence_tap_sync(controls)
+    _quiet_live_controls(controls)
     controls.consume_pending_exit.return_value = False
     controls.consume_pending_switch.return_value = True
     controls.project_switch.take_accepted.return_value = target
@@ -563,7 +567,7 @@ def test_run_ctrl_q_clean_exits(
     controls.context_menu.handle_keydown.return_value = False
     controls.inline_edit.handle_keyup.return_value = False
     controls.inline_edit.handle_text_input.return_value = False
-    _silence_tap_sync(controls)
+    _quiet_live_controls(controls)
     controls.pending_exit = False
     controls.consume_pending_exit.return_value = False
     controls.tick = MagicMock()
@@ -637,7 +641,7 @@ def test_run_pygame_quit_dirty_stays_open(
     controls.context_menu.handle_keydown.return_value = False
     controls.inline_edit.handle_keyup.return_value = False
     controls.inline_edit.handle_text_input.return_value = False
-    _silence_tap_sync(controls)
+    _quiet_live_controls(controls)
     controls.try_quit.return_value = False
     controls.consume_pending_exit.return_value = False
     controls.tick = MagicMock()
@@ -704,7 +708,7 @@ def test_run_main_loop_stays_open_without_quit_event(
     controls.context_menu.handle_keydown.return_value = False
     controls.inline_edit.handle_keyup.return_value = False
     controls.inline_edit.handle_text_input.return_value = False
-    _silence_tap_sync(controls)
+    _quiet_live_controls(controls)
     controls.try_quit.return_value = True
     controls.consume_pending_exit.return_value = False
     controls.tick = MagicMock()
@@ -808,7 +812,7 @@ def test_run_holds_content_and_overlay_while_project_render_busy(
     controls.context_menu.handle_keydown.return_value = False
     controls.inline_edit.handle_keyup.return_value = False
     controls.inline_edit.handle_text_input.return_value = False
-    _silence_tap_sync(controls)
+    _quiet_live_controls(controls)
     controls.try_quit.return_value = True
     controls.consume_pending_exit.return_value = False
     controls.tick = MagicMock()
@@ -1262,3 +1266,72 @@ def test_tick_frame_draws_open_timeline_immediately(
     mock_draw_timeline.assert_called_once()
     assert mock_draw_timeline.call_args.kwargs["visibility"] == 1.0
     assert runtime.seed.session.timeline.panel_open is True
+
+class _FakeWindow:
+    def __init__(self, fullscreen: bool = False) -> None:
+        self.fullscreen = fullscreen
+        self.toggles = 0
+
+    def toggle_fullscreen(self) -> None:
+        self.fullscreen = not self.fullscreen
+        self.toggles += 1
+
+
+@patch("cleave.viz.app.pygame")
+def test_play_full_screen_takes_the_window_fullscreen_and_restores_it(
+    _mock_pygame: MagicMock,
+) -> None:
+    from cleave.viz.app import _apply_window_requests
+    from cleave.viz.window_controls import WindowControls
+
+    controls = WindowControls()
+    window = _FakeWindow()
+    controls.request_play_fullscreen(True)
+    _apply_window_requests(controls, window, prompt_open=False)
+    assert controls.play_fullscreen is True
+    assert window.fullscreen is True
+    assert controls.fullscreen is True
+
+    controls.request_play_fullscreen(False)
+    _apply_window_requests(controls, window, prompt_open=False)
+    assert controls.play_fullscreen is False
+    assert window.fullscreen is False
+    assert window.toggles == 2
+
+
+@patch("cleave.viz.app.pygame")
+def test_play_full_screen_leaves_full_screen_editor_on(_mock_pygame: MagicMock) -> None:
+    from cleave.viz.app import _apply_window_requests
+    from cleave.viz.window_controls import WindowControls
+
+    controls = WindowControls()
+    window = _FakeWindow(fullscreen=True)
+    controls.request_play_fullscreen(True)
+    _apply_window_requests(controls, window, prompt_open=False)
+    controls.request_play_fullscreen(False)
+    _apply_window_requests(controls, window, prompt_open=False)
+    assert window.toggles == 0
+    assert window.fullscreen is True
+
+
+@patch("cleave.viz.app.pygame")
+def test_a_prompt_returns_from_play_full_screen(_mock_pygame: MagicMock) -> None:
+    from cleave.viz.app import _apply_window_requests
+    from cleave.viz.window_controls import WindowControls
+
+    controls = WindowControls()
+    window = _FakeWindow()
+    controls.request_play_fullscreen(True)
+    _apply_window_requests(controls, window, prompt_open=False)
+    _apply_window_requests(controls, window, prompt_open=True)
+    assert controls.play_fullscreen is False
+    assert window.fullscreen is False
+
+
+def test_play_pointer_hides_after_idle() -> None:
+    from cleave.viz.window_controls import PLAY_POINTER_IDLE_SEC, WindowControls
+
+    controls = WindowControls()
+    controls.note_pointer_motion(10.0)
+    assert controls.play_pointer_visible(10.0) is True
+    assert controls.play_pointer_visible(10.0 + PLAY_POINTER_IDLE_SEC) is False

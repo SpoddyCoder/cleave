@@ -38,7 +38,8 @@ def test_menu_lists_the_agreed_items_in_order(tmp_path: Path) -> None:
         "preview.enabled.pattern_mask",
         "preview.quality",
         "preview.grab_still",
-        "view.fullscreen",
+        "view.play_fullscreen",
+        "view.fullscreen_editor",
     ]
 
 
@@ -107,7 +108,8 @@ def test_curation_leaves_out_solo_and_block_items(tmp_path: Path) -> None:
         "preview.transport",
         "preview.quality",
         "preview.grab_still",
-        "view.fullscreen",
+        "view.play_fullscreen",
+        "view.fullscreen_editor",
     ]
 
 

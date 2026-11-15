@@ -34,7 +34,8 @@ _RESOLVED_SHORTCUT_IDS = frozenset(
         "file.quit",
         "project.render",
         "help.overlay",
-        "view.fullscreen",
+        "view.fullscreen_editor",
+        "view.play_fullscreen",
         "page.settings.preview",
         "layers.add",
         "edit.undo",
@@ -590,18 +591,32 @@ _HELP_OVERLAY = Command(
     checked=_help_checked,
 )
 
-def _toggle_fullscreen(controls: Any) -> None:
+def _toggle_fullscreen_editor(controls: Any) -> None:
     controls.window.request_fullscreen_toggle()
 
 
-_FULLSCREEN = Command(
-    id="view.fullscreen",
-    label="Fullscreen",
+def _play_fullscreen(controls: Any) -> None:
+    controls.context_menu.close()
+    controls.window.request_play_fullscreen(True)
+
+
+_FULLSCREEN_EDITOR = Command(
+    id="view.fullscreen_editor",
+    label="Full Screen Editor",
     kind="check",
     shortcut="F11",
     enabled=_enabled,
-    run=_toggle_fullscreen,
+    run=_toggle_fullscreen_editor,
     checked=_fullscreen_checked,
+)
+
+_PLAY_FULLSCREEN = Command(
+    id="view.play_fullscreen",
+    label="Play Full Screen",
+    kind="command",
+    shortcut="Ctrl+F",
+    enabled=_enabled,
+    run=_play_fullscreen,
 )
 
 _SHORTCUT_KEYS: dict[str, tuple[int, bool]] = {
@@ -614,6 +629,7 @@ _SHORTCUT_KEYS: dict[str, tuple[int, bool]] = {
     "Ctrl+Y": (pygame.K_y, True),
     "Ctrl+Z": (pygame.K_z, True),
     "Ctrl+,": (pygame.K_COMMA, True),
+    "Ctrl+F": (pygame.K_f, True),
     "H": (pygame.K_h, False),
     "F11": (pygame.K_F11, False),
     "1": (pygame.K_1, False),
@@ -687,7 +703,7 @@ def build_menus(
         (
             Menu("File", (_NEW, _OPEN, _SAVE, SEPARATOR, _QUIT)),
             Menu("Edit", (_UNDO, _REDO)),
-            Menu("View", (_FULLSCREEN, SEPARATOR, _CURATION)),
+            Menu("View", (_PLAY_FULLSCREEN, _FULLSCREEN_EDITOR, SEPARATOR, _CURATION)),
             Menu(
                 "Project",
                 (
@@ -767,7 +783,8 @@ def command_for_shortcut(
 ) -> Command | None:
     """Resolved shortcut, or None.
 
-    New, open, save, quit, render, the help overlay, fullscreen, undo, redo,
+    New, open, save, quit, render, the help overlay, Play Full Screen, Full Screen Editor,
+    undo, redo,
     show-timeline-strip, and Settings > Preview (Ctrl+,) resolve from menu
     rows. Add-layer resolves from its inspector button. Layer jumps
     (``1``–``8``) resolve from commands that are not menu rows, and stay

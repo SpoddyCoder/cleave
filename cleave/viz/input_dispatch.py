@@ -396,6 +396,35 @@ def _open_focus_context_menu(
     return True
 
 
+def _play_fullscreen_keydown(
+    event: pygame.event.Event, runtime: LiveVisualizerRuntime
+) -> bool:
+    """Keys while Play Full Screen shows only the visualiser.
+
+    Esc and Ctrl+F leave, Space plays or pauses, the seek keys seek, and
+    Ctrl+Q quits. Every other key does nothing. Returns False to quit now.
+    """
+    window = runtime.controls.window
+    if event.key == pygame.K_ESCAPE or (
+        event.key == pygame.K_f and mod_ctrl(event.mod)
+    ):
+        window.request_play_fullscreen(False)
+        return True
+    if event.key == pygame.K_SPACE:
+        timeline_controls = runtime.timeline_controls
+        if timeline_controls is not None:
+            timeline_controls.toggle_transport()
+        else:
+            runtime.controls.transport.toggle_pause()
+        return True
+    if _try_handle_global_seek(event, runtime):
+        return True
+    if event.key == pygame.K_q and mod_ctrl(event.mod):
+        shortcut_result = _run_command_shortcut(event, runtime)
+        return shortcut_result is not False
+    return True
+
+
 def dispatch_keydown(event: pygame.event.Event, runtime: LiveVisualizerRuntime) -> bool:
     """Handle a key-down event. Return False when the app should quit."""
     if event.type != pygame.KEYDOWN:
@@ -404,6 +433,10 @@ def dispatch_keydown(event: pygame.event.Event, runtime: LiveVisualizerRuntime) 
     if runtime.modal_host.active:
         runtime.menu_bar.cancel_alt_tap()
         return runtime.controls.handle_modal_keydown(event)
+
+    if runtime.controls.window.play_fullscreen:
+        runtime.menu_bar.cancel_alt_tap()
+        return _play_fullscreen_keydown(event, runtime)
 
     if runtime.controls.context_menu.handle_keydown(event):
         runtime.menu_bar.cancel_alt_tap()

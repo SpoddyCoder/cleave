@@ -264,7 +264,7 @@ def test_second_esc_after_stop_leaves_submenu_and_keeps_strip() -> None:
     )
 
 
-def test_second_esc_after_stop_requests_overlay_hide_on_main() -> None:
+def test_second_esc_after_stop_keeps_strip_open_on_main() -> None:
     runtime = _make_runtime(submenu_focused=False, panel_open=True, recording=True)
     runtime.controls.shell_focus.region = ShellRegion.NAVIGATOR
     dispatch_keydown(keydown(pygame.K_ESCAPE), runtime)
@@ -867,3 +867,51 @@ def test_preview_esc_returns_to_the_navigator() -> None:
     controls.set_shell_region(ShellRegion.PREVIEW)
     assert dispatch_keydown(keydown(pygame.K_ESCAPE), runtime) is True
     assert controls.shell_focus.region is ShellRegion.NAVIGATOR
+
+
+def _playing_full_screen(runtime: LiveVisualizerRuntime) -> None:
+    runtime.controls.window.request_play_fullscreen(True)
+    assert runtime.controls.window.consume_play_fullscreen() is True
+    runtime.controls.window.play_fullscreen = True
+
+
+def test_ctrl_f_requests_play_full_screen() -> None:
+    runtime = _make_runtime(submenu_focused=False)
+    assert dispatch_keydown(keydown(pygame.K_f, mod=pygame.KMOD_CTRL), runtime) is True
+    assert runtime.controls.window.consume_play_fullscreen() is True
+
+
+def test_esc_and_ctrl_f_leave_play_full_screen() -> None:
+    for event in (keydown(pygame.K_ESCAPE), keydown(pygame.K_f, mod=pygame.KMOD_CTRL)):
+        runtime = _make_runtime(submenu_focused=False)
+        _playing_full_screen(runtime)
+        assert dispatch_keydown(event, runtime) is True
+        assert runtime.controls.window.consume_play_fullscreen() is False
+
+
+def test_play_full_screen_keeps_space_and_seek_and_swallows_the_rest() -> None:
+    runtime = _make_runtime(submenu_focused=False)
+    _playing_full_screen(runtime)
+    paused = runtime.playback.paused
+    assert dispatch_keydown(keydown(pygame.K_SPACE), runtime) is True
+    assert runtime.playback.paused is not paused
+
+    player = runtime.playback.player
+    player.seek(40.0)
+    dispatch_keydown(keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL), runtime)
+    assert player.file_position_sec() == 40.0 + SEEK_LONG
+
+    help_visible = runtime.seed.session.help_visible
+    region = runtime.controls.shell_focus.region
+    for key in (pygame.K_h, pygame.K_TAB, pygame.K_F11, pygame.K_DOWN):
+        assert dispatch_keydown(keydown(key), runtime) is True
+    assert runtime.seed.session.help_visible is help_visible
+    assert runtime.controls.shell_focus.region is region
+    assert runtime.controls.window.consume_fullscreen_toggle() is False
+    assert runtime.controls.window.play_fullscreen is True
+
+
+def test_ctrl_q_quits_from_play_full_screen() -> None:
+    runtime = _make_runtime(submenu_focused=False)
+    _playing_full_screen(runtime)
+    assert dispatch_keydown(keydown(pygame.K_q, mod=pygame.KMOD_CTRL), runtime) is False

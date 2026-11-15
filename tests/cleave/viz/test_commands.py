@@ -55,7 +55,8 @@ _STATIC_IDS = (
     "file.quit",
     "edit.undo",
     "edit.redo",
-    "view.fullscreen",
+    "view.play_fullscreen",
+    "view.fullscreen_editor",
     "view.preset_curation",
     *_PROJECT_PAGE_IDS,
     "project.separate",
@@ -179,7 +180,8 @@ def test_menus_list_taxonomy_ids_once() -> None:
     ]
     assert _row_ids(menus[1]) == ["edit.undo", "edit.redo"]
     assert _row_ids(menus[2]) == [
-        "view.fullscreen",
+        "view.play_fullscreen",
+        "view.fullscreen_editor",
         None,
         "view.preset_curation",
     ]
@@ -269,7 +271,9 @@ def test_later_shortcuts_stay_on_rows_but_do_not_resolve() -> None:
     assert command_for_shortcut(pygame.K_q, pygame.KMOD_CTRL).id == "file.quit"
     assert command_for_shortcut(pygame.K_h, 0).id == "help.overlay"
     assert command_for_shortcut(pygame.K_h, pygame.KMOD_CTRL) is None
-    assert command_for_shortcut(pygame.K_F11, 0).id == "view.fullscreen"
+    assert command_for_shortcut(pygame.K_F11, 0).id == "view.fullscreen_editor"
+    assert command_for_shortcut(pygame.K_f, pygame.KMOD_CTRL).id == "view.play_fullscreen"
+    assert command_for_shortcut(pygame.K_f, 0) is None
 
 
 def test_disabled_items_stay_disabled() -> None:
@@ -424,11 +428,11 @@ def test_wired_run_calls_controllers() -> None:
     assert help_item.checked(command_context(controls)) is False
 
 
-def test_fullscreen_command_requests_toggle_and_reads_window_state() -> None:
+def test_fullscreen_editor_command_requests_toggle_and_reads_window_state() -> None:
     menus = _menus()
     controls = _make_controls(("layer_1",))
-    item = command_by_id("view.fullscreen", menus)
-    assert item.label == "Fullscreen"
+    item = command_by_id("view.fullscreen_editor", menus)
+    assert item.label == "Full Screen Editor"
     assert item.kind == "check"
     assert item.shortcut == "F11"
     assert item.checked is not None
@@ -440,6 +444,18 @@ def test_fullscreen_command_requests_toggle_and_reads_window_state() -> None:
 
     controls.window.fullscreen = True
     assert item.checked(command_context(controls)) is True
+
+
+def test_play_fullscreen_command_requests_entering_play_full_screen() -> None:
+    controls = _make_controls(("layer_1",))
+    item = command_by_id("view.play_fullscreen", _menus())
+    assert item.label == "Play Full Screen"
+    assert item.kind == "command"
+    assert item.shortcut == "Ctrl+F"
+
+    item.run(controls)
+    assert controls.window.consume_play_fullscreen() is True
+    assert controls.window.consume_play_fullscreen() is None
 
 
 def test_request_quit_clean_sets_pending_exit() -> None:

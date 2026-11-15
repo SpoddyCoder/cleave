@@ -1,7 +1,7 @@
 """Right-click menu for the preview (the visualiser rect).
 
 Play or pause, solo a layer, switch Overlay, Post-FX, and Pattern Mask on
-or off, pick the preview quality, grab a still, and go fullscreen. The
+or off, pick the preview quality, grab a still, Play Full Screen, and Full Screen Editor. The
 solo and on/off items read the navigator's own icons, so their checks,
 locks, and hints match it; each item calls the same path as its icon or
 key.
@@ -69,7 +69,10 @@ def preview_menu_entries(
             (_transport_item(transport),),
             _view_items(controls, nodes),
             (_quality_submenu(controls), _still_item(controls)),
-            (command_menu_item(command_by_id("view.fullscreen"), controls),),
+            (
+                command_menu_item(command_by_id("view.play_fullscreen"), controls),
+                command_menu_item(command_by_id("view.fullscreen_editor"), controls),
+            ),
         ]
     )
 
