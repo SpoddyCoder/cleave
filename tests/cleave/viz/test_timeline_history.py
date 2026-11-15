@@ -1,4 +1,4 @@
-"""Undo and redo of bulk timeline commands."""
+"""Undo and redo of timeline edits."""
 
 from __future__ import annotations
 
@@ -16,7 +16,9 @@ def _lane(*times: float) -> TimelineLane:
 
 def _session() -> SimpleNamespace:
     return SimpleNamespace(
-        timeline=SimpleNamespace(lanes={"layer_1": _lane(1.0)}, enabled=True),
+        timeline=SimpleNamespace(
+            lanes={"layer_1": _lane(1.0)}, enabled=True, selected_cue_t={}
+        ),
         layers={"layer_1": SimpleNamespace(preset_list=["a.milk"])},
         pattern_mask=SimpleNamespace(
             enabled=False, type="stripes", feather_pct=5, transition=2.0
@@ -125,3 +127,101 @@ def test_undo_and_redo_labels_name_the_command() -> None:
     history.undo()
     assert history.undo_label is None
     assert history.redo_label == "Generate timeline"
+
+
+class _Clock:
+    def __init__(self) -> None:
+        self.now = 0.0
+
+    def __call__(self) -> float:
+        return self.now
+
+
+def test_edits_with_one_merge_key_fold_into_one_entry() -> None:
+    session = _session()
+    clock = _Clock()
+    history = TimelineHistory(session, clock=clock)
+    for t in (2.0, 3.0, 4.0):
+        clock.now += 0.2
+        with history.recording("Cue level", merge_key=("level", "layer_1", 1.0)):
+            session.timeline.lanes["layer_1"] = _lane(t)
+    assert history.undo() == "Cue level"
+    assert session.timeline.lanes["layer_1"].cues[0].t == 1.0
+    assert history.can_undo is False
+
+
+def test_edits_past_the_merge_window_stay_separate() -> None:
+    session = _session()
+    clock = _Clock()
+    history = TimelineHistory(session, clock=clock)
+    key = ("level", "layer_1", 1.0)
+    with history.recording("Cue level", merge_key=key):
+        session.timeline.lanes["layer_1"] = _lane(2.0)
+    clock.now += 5.0
+    with history.recording("Cue level", merge_key=key):
+        session.timeline.lanes["layer_1"] = _lane(3.0)
+    history.undo()
+    assert session.timeline.lanes["layer_1"].cues[0].t == 2.0
+
+
+def test_a_different_merge_key_starts_a_new_entry() -> None:
+    session = _session()
+    history = TimelineHistory(session, clock=_Clock())
+    with history.recording("Cue level", merge_key=("level", "layer_1", 1.0)):
+        session.timeline.lanes["layer_1"] = _lane(2.0)
+    with history.recording("Cue cut", merge_key=("cut", "layer_1", 1.0)):
+        session.timeline.lanes["layer_1"] = _lane(3.0)
+    assert history.undo() == "Cue cut"
+    assert history.undo() == "Cue level"
+
+
+def test_an_edit_outside_the_history_breaks_a_merge() -> None:
+    session = _session()
+    history = TimelineHistory(session, clock=_Clock())
+    key = ("level", "layer_1", 1.0)
+    with history.recording("Cue level", merge_key=key):
+        session.timeline.lanes["layer_1"] = _lane(2.0)
+    session.timeline.lanes["layer_1"] = _lane(5.0)
+    with history.recording("Cue level", merge_key=key):
+        session.timeline.lanes["layer_1"] = _lane(6.0)
+    assert history.undo() == "Cue level"
+    assert session.timeline.lanes["layer_1"].cues[0].t == 5.0
+    assert history.can_undo is False
+
+
+def test_begin_and_commit_span_frames_and_block_undo_meanwhile() -> None:
+    session = _session()
+    history = TimelineHistory(session)
+    with history.recording("Snap cues"):
+        session.timeline.lanes["layer_1"] = _lane(2.0)
+    history.begin("Record take")
+    session.timeline.lanes["layer_1"] = _lane(3.0)
+    assert history.pending is True
+    assert history.can_undo is False
+    history.commit()
+    assert history.undo() == "Record take"
+    assert session.timeline.lanes["layer_1"].cues[0].t == 2.0
+
+
+def test_cancel_drops_the_pending_edit() -> None:
+    session = _session()
+    history = TimelineHistory(session)
+    history.begin("Move cue")
+    history.cancel()
+    assert history.pending is False
+    assert history.can_undo is False
+
+
+def test_undo_restores_the_selection_but_selection_alone_is_no_edit() -> None:
+    session = _session()
+    history = TimelineHistory(session)
+    session.timeline.selected_cue_t = {"layer_1": 1.0}
+    with history.recording("Move cue"):
+        session.timeline.lanes["layer_1"] = _lane(2.0)
+        session.timeline.selected_cue_t = {"layer_1": 2.0}
+    with history.recording("Select"):
+        session.timeline.selected_cue_t = {}
+    assert history.undo() == "Move cue"
+    assert session.timeline.selected_cue_t == {"layer_1": 1.0}
+    assert history.redo() == "Move cue"
+    assert session.timeline.selected_cue_t == {"layer_1": 2.0}

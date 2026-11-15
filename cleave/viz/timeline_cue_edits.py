@@ -1,8 +1,9 @@
-"""Selected-cue edits shared by the timeline strip and the inspector.
+"""Cue selection and cue edits shared by the strip, inspector, and menus.
 
-Each function acts on one layer's selected cue in the session. The strip
-calls them for its focused row; the inspector calls them for the row page's
-slot.
+Selection helpers are plain functions on the session. Every cue edit goes
+through ``CueEditor``, which records it in ``TimelineHistory`` so it can be
+undone. The strip calls it for its focused row; the inspector for the row
+page's slot; the cue context menu for the row it opened on.
 """
 
 from __future__ import annotations
@@ -25,6 +26,7 @@ from cleave.timeline import (
     update_lane_cue,
 )
 from cleave.viz.session import TuningSession
+from cleave.viz.timeline_history import TimelineHistory
 
 
 def cue_selection_allowed(session: TuningSession) -> bool:
@@ -83,80 +85,86 @@ def step_cue_selection(
     select_cue(session, slot, times[index])
 
 
-def nudge_cue_level(
-    session: TuningSession, slot: str, *, forward: bool, large: bool
-) -> None:
-    """Step an on cue's opacity by 1% (10% when *large*), clamped to its range."""
-    if not cue_edits_allowed(session):
-        return
-    cue = selected_cue(session, slot)
-    if cue is None or not cue_editable_for_blend_role(cue):
-        return
-    # Integer percent math matches the layer opacity fader (1% / 10%).
-    step_pct = int(round((LEVEL_STEP_LARGE if large else LEVEL_STEP_SMALL) * 100.0))
-    min_pct = int(round(LEVEL_EDIT_MIN * 100.0))
-    pct = int(round(float(cue.level) * 100.0))
-    new_pct = max(min_pct, min(100, pct + (step_pct if forward else -step_pct)))
-    new_level = new_pct / 100.0
-    if levels_equal(new_level, cue.level):
-        return
-    _update_cue(session, slot, cue, level=new_level)
-
-
-def set_cue_cut(session: TuningSession, slot: str, cut: CutType) -> None:
-    """Set the selected cue's cut. Off cues take a cut too."""
-    if not cue_edits_allowed(session):
-        return
-    cue = selected_cue(session, slot)
-    if cue is None or cue.cut == cut:
-        return
-    _update_cue(session, slot, cue, cut=cut)
-
-
-def set_cue_blend(session: TuningSession, slot: str, blend: BlendMode | None) -> None:
-    """Set an on cue's blend mode; None inherits the layer's."""
-    if not cue_edits_allowed(session):
-        return
-    cue = selected_cue(session, slot)
-    if cue is None or not cue_editable_for_blend_role(cue) or cue.blend == blend:
-        return
-    _update_cue(session, slot, cue, blend=blend)
-
-
-def set_cue_role(session: TuningSession, slot: str, role: CueRole | None) -> None:
-    """Set an on cue's role, or clear it with None."""
-    if not cue_edits_allowed(session):
-        return
-    cue = selected_cue(session, slot)
-    if cue is None or not cue_editable_for_blend_role(cue) or cue.role == role:
-        return
-    _update_cue(session, slot, cue, role=role)
-
-
 _KEEP = object()
 
 
-def _update_cue(
-    session: TuningSession,
-    slot: str,
-    cue: SlotCue,
-    *,
-    level: float | None = None,
-    cut: object = _KEEP,
-    blend: object = _KEEP,
-    role: object = _KEEP,
-) -> None:
-    tl = session.timeline
-    lane = tl.lanes.get(slot) or empty_lane()
-    updated = update_lane_cue(
-        lane,
-        cue.t,
-        blend=cue.blend if blend is _KEEP else blend,
-        role=cue.role if role is _KEEP else role,
-        level=level,
-        cut=cue.cut if cut is _KEEP else cut,
-    )
-    tl.lanes[slot] = updated
-    if cue.t not in navigable_cue_times(updated):
-        tl.selected_cue_t.pop(slot, None)
-        tl.selected_cue_flash_start_ms = None
+class CueEditor:
+    """Edits to one layer's selected cue, each recorded for undo."""
+
+    def __init__(self, session: TuningSession, history: TimelineHistory) -> None:
+        self.session = session
+        self.history = history
+
+    def nudge_level(self, slot: str, *, forward: bool, large: bool) -> None:
+        """Step an on cue's opacity by 1% (10% when *large*), clamped to its range."""
+        if not cue_edits_allowed(self.session):
+            return
+        cue = selected_cue(self.session, slot)
+        if cue is None or not cue_editable_for_blend_role(cue):
+            return
+        # Integer percent math matches the layer opacity fader (1% / 10%).
+        step_pct = int(
+            round((LEVEL_STEP_LARGE if large else LEVEL_STEP_SMALL) * 100.0)
+        )
+        min_pct = int(round(LEVEL_EDIT_MIN * 100.0))
+        pct = int(round(float(cue.level) * 100.0))
+        new_pct = max(min_pct, min(100, pct + (step_pct if forward else -step_pct)))
+        new_level = new_pct / 100.0
+        if levels_equal(new_level, cue.level):
+            return
+        self._update(slot, cue, "Cue level", "level", level=new_level)
+
+    def set_cut(self, slot: str, cut: CutType) -> None:
+        """Set the selected cue's cut. Off cues take a cut too."""
+        if not cue_edits_allowed(self.session):
+            return
+        cue = selected_cue(self.session, slot)
+        if cue is None or cue.cut == cut:
+            return
+        self._update(slot, cue, "Cue cut", "cut", cut=cut)
+
+    def set_blend(self, slot: str, blend: BlendMode | None) -> None:
+        """Set an on cue's blend mode; None inherits the layer's."""
+        if not cue_edits_allowed(self.session):
+            return
+        cue = selected_cue(self.session, slot)
+        if cue is None or not cue_editable_for_blend_role(cue) or cue.blend == blend:
+            return
+        self._update(slot, cue, "Cue blend", "blend", blend=blend)
+
+    def set_role(self, slot: str, role: CueRole | None) -> None:
+        """Set an on cue's role, or clear it with None."""
+        if not cue_edits_allowed(self.session):
+            return
+        cue = selected_cue(self.session, slot)
+        if cue is None or not cue_editable_for_blend_role(cue) or cue.role == role:
+            return
+        self._update(slot, cue, "Cue role", "role", role=role)
+
+    def _update(
+        self,
+        slot: str,
+        cue: SlotCue,
+        label: str,
+        kind: str,
+        *,
+        level: float | None = None,
+        cut: object = _KEEP,
+        blend: object = _KEEP,
+        role: object = _KEEP,
+    ) -> None:
+        tl = self.session.timeline
+        with self.history.recording(label, merge_key=(kind, slot, cue.t)):
+            lane = tl.lanes.get(slot) or empty_lane()
+            updated = update_lane_cue(
+                lane,
+                cue.t,
+                blend=cue.blend if blend is _KEEP else blend,
+                role=cue.role if role is _KEEP else role,
+                level=level,
+                cut=cue.cut if cut is _KEEP else cut,
+            )
+            tl.lanes[slot] = updated
+            if cue.t not in navigable_cue_times(updated):
+                tl.selected_cue_t.pop(slot, None)
+                tl.selected_cue_flash_start_ms = None

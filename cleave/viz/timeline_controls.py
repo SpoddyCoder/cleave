@@ -28,16 +28,14 @@ from cleave.viz.layer_visibility import (
 )
 from cleave.viz.playback import PlaybackState, current_sec, seek, toggle_pause
 from cleave.viz.timeline_cue_edits import (
+    CueEditor,
     cue_edits_allowed,
     cue_selection_allowed,
-    nudge_cue_level,
     select_cue,
     selected_cue,
-    set_cue_blend,
-    set_cue_cut,
-    set_cue_role,
     step_cue_selection,
 )
+from cleave.viz.timeline_history import TimelineHistory
 
 def _next_option(options: tuple, current: object) -> object:
     """Option after *current*, wrapping; the first when *current* is not listed."""
@@ -85,8 +83,14 @@ class TimelineControls:
         on_notification: Callable[[str], None] | None = None,
         beat_times: Sequence[float] = (),
         bar_times: Sequence[float] = (),
+        cue_editor: CueEditor | None = None,
     ) -> None:
         self.session = session
+        self.cue_editor = (
+            cue_editor
+            if cue_editor is not None
+            else CueEditor(session, TimelineHistory(session))
+        )
         self.playback = playback
         self.duration_sec = duration_sec
         self._beat_times = tuple(beat_times)
@@ -495,7 +499,7 @@ class TimelineControls:
 
     def _nudge_selected_cue_level(self, *, forward: bool, large: bool) -> None:
         """Adjust selected on-cue timeline opacity (multiplies into layer opacity)."""
-        nudge_cue_level(self.session, self._focused_slot(), forward=forward, large=large)
+        self.cue_editor.nudge_level(self._focused_slot(), forward=forward, large=large)
 
     def _cycle_selected_cue_blend(self) -> None:
         slot = self._focused_slot()
@@ -503,7 +507,7 @@ class TimelineControls:
         if cue is None:
             return
         options: tuple[BlendMode | None, ...] = (None, *BLEND_MODES)
-        set_cue_blend(self.session, slot, _next_option(options, cue.blend))
+        self.cue_editor.set_blend(slot, _next_option(options, cue.blend))
 
     def _cycle_selected_cue_role(self) -> None:
         slot = self._focused_slot()
@@ -511,7 +515,7 @@ class TimelineControls:
         if cue is None:
             return
         options: tuple[CueRole | None, ...] = (None, *CUE_ROLES)
-        set_cue_role(self.session, slot, _next_option(options, cue.role))
+        self.cue_editor.set_role(slot, _next_option(options, cue.role))
 
     def _cycle_selected_cue_cut(self) -> None:
         slot = self._focused_slot()
@@ -519,7 +523,7 @@ class TimelineControls:
         if cue is None:
             return
         current: CutType = cue.cut if cue.cut in CUT_TYPES else "none"
-        set_cue_cut(self.session, slot, _next_option(CUT_TYPES, current))
+        self.cue_editor.set_cut(slot, _next_option(CUT_TYPES, current))
 
     def _toggle_arm(self, slot: str) -> None:
         tl = self.session.timeline
@@ -573,6 +577,7 @@ class TimelineControls:
             tl.record_slot_start_sec = {}
             tl.record_high_water_mark = None
             self._last_toggle_t = {}
+            self.cue_editor.history.commit()
 
         if self._on_visibility_change is not None:
             self._on_visibility_change()
@@ -598,6 +603,8 @@ class TimelineControls:
         if self.playback.paused:
             toggle_pause(self.playback, self.duration_sec)
 
+        # The take records as one undo step, from these lanes to the stop.
+        self.cue_editor.history.begin("Record take")
         tl.recording = True
         tl.record_start_sec = snapped
         tl.record_buffer = {}
@@ -615,6 +622,7 @@ class TimelineControls:
             tl.record_baseline = {}
             tl.record_slot_start_sec = {}
             tl.record_high_water_mark = None
+            self.cue_editor.history.commit()
             return
 
         record_stop = self._snap_placement(
@@ -631,6 +639,7 @@ class TimelineControls:
         tl.record_slot_start_sec = {}
         tl.record_high_water_mark = None
         self._last_toggle_t = {}
+        self.cue_editor.history.commit()
 
         if self._on_visibility_change is not None:
             self._on_visibility_change()

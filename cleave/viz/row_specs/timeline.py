@@ -33,12 +33,9 @@ from cleave.timeline import SlotCue, cue_editable_for_blend_role
 from cleave.viz.commands import command_by_id
 from cleave.viz.playback import current_sec, format_mmss
 from cleave.viz.timeline_cue_edits import (
+    CueEditor,
     cue_selection_allowed,
-    nudge_cue_level,
     selected_cue,
-    set_cue_blend,
-    set_cue_cut,
-    set_cue_role,
     step_cue_selection,
 )
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
@@ -59,7 +56,6 @@ from cleave.config_schema.timeline import TIMELINE_PLACEMENT_SNAP_OPTIONS
 from cleave.viz.row_specs.common import bool_choice, options_choice
 if TYPE_CHECKING:
     from cleave.viz.controls import TuningControls
-    from cleave.viz.session import TuningSession
 
 T = TypeVar("T")
 
@@ -426,7 +422,7 @@ def _apply_cue_opacity(
     controls: TuningControls, desc: RowDescriptor, forward: bool, large: bool
 ) -> None:
     assert desc.slot is not None
-    nudge_cue_level(controls.session, desc.slot, forward=forward, large=large)
+    controls.cue_editor.nudge_level(desc.slot, forward=forward, large=large)
 
 
 def _cut_value(cue: SlotCue | None) -> CutType:
@@ -479,7 +475,7 @@ def _format_cue_role(state: TuningViewState, desc: RowDescriptor) -> str:
 def _cue_option_rows(
     options: Sequence[T],
     value: Callable[[SlotCue | None], T],
-    write: Callable[[TuningSession, str, T], None],
+    write: Callable[[CueEditor, str, T], None],
 ) -> tuple[FieldMutator, ChoiceJump]:
     """Left/Right and a list pick for one cue field, clamped at the ends."""
 
@@ -490,7 +486,7 @@ def _cue_option_rows(
             return
         index = choice_index(options, value(cue)) + delta
         write(
-            controls.session,
+            controls.cue_editor,
             desc.slot,
             options[max(0, min(len(options) - 1, index))],
         )
@@ -503,16 +499,18 @@ def _cue_option_rows(
     return horizontal, move
 
 
-_apply_cue_cut, _jump_cue_cut = _cue_option_rows(CUT_TYPES, _cut_value, set_cue_cut)
+_apply_cue_cut, _jump_cue_cut = _cue_option_rows(
+    CUT_TYPES, _cut_value, CueEditor.set_cut
+)
 _apply_cue_blend, _jump_cue_blend = _cue_option_rows(
     _BLEND_OPTIONS,
     lambda cue: None if cue is None else cue.blend,
-    set_cue_blend,
+    CueEditor.set_blend,
 )
 _apply_cue_role, _jump_cue_role = _cue_option_rows(
     _ROLE_OPTIONS,
     lambda cue: None if cue is None else cue.role,
-    set_cue_role,
+    CueEditor.set_role,
 )
 
 

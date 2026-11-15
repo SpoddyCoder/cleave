@@ -21,12 +21,16 @@ from cleave.viz.context_menu import (
 )
 from cleave.viz.cue_context_menu import cue_menu_entries
 from cleave.viz.session import TuningSession
+from cleave.viz.timeline_cue_edits import CueEditor
 
 # Layer number keys reach the first eight rows.
 _LAYER_KEY_ROWS = 8
 
 
 class TimelineRowMenuActions(Protocol):
+    @property
+    def cue_editor(self) -> CueEditor: ...
+
     def row_slot(self, row: int) -> str | None: ...
 
     def row_visible(self, row: int) -> bool: ...
@@ -135,7 +139,7 @@ def timeline_row_menu_entries(
         hint=None if can_arm else "Unlock the timeline to arm",
     )
 
-    cue_entries = cue_menu_entries(session, slot, actions.seek_to) if cue else ()
+    cue_entries = cue_menu_entries(actions.cue_editor, slot, actions.seek_to) if cue else ()
     lead = (*cue_entries, *(time_entries() if time_entries is not None else ()))
     return (
         *lead,

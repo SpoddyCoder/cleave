@@ -52,6 +52,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- Edit > Undo and Redo now cover hand edits to cues, not only the timeline commands: changing a cue's level, cut, blend, or role, and each recorded take. Holding `,` or `.` to nudge a level undoes as one step, and undo brings back the cue that was selected. Before, any hand edit turned Undo off.
 - Startup dialogs (the welcome step and the "Could not open that file" error) use the same dialogs as the editor, with buttons you can click, instead of keyboard-only text panels.
 - The dividing lines around the shell panels (navigator, inspector, help, timeline strip, preview focus outline) and the menu and transport rules are twice as thick, with crisp 2px edges.
 - Each timeline strip track draws its on sections in its own colour: sky, lavender, amber, mint, pink, coral, lime, and aqua for layers 1 to 8.

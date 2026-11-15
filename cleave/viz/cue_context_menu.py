@@ -1,8 +1,8 @@
 """Context menu section for a timeline row's selected cue.
 
 Go to the cue, and set its cut, blend, and role from submenus. Each choice
-calls the same ``timeline_cue_edits`` function as the strip's cue keys and
-the inspector's cue rows. A start cue (on) takes all three; an end cue (off)
+calls the same ``CueEditor`` method as the strip's cue keys and the
+inspector's cue rows. A start cue (on) takes all three; an end cue (off)
 takes only a cut.
 """
 
@@ -18,11 +18,9 @@ from cleave.timeline import SlotCue, cue_editable_for_blend_role
 from cleave.viz.context_menu import ContextMenuEntry, ContextMenuItem, ContextSubmenu
 from cleave.viz.session import TuningSession
 from cleave.viz.timeline_cue_edits import (
+    CueEditor,
     cue_edits_allowed,
     selected_cue,
-    set_cue_blend,
-    set_cue_cut,
-    set_cue_role,
 )
 
 _BLEND_OPTIONS: tuple[BlendMode | None, ...] = (None, *BLEND_MODES)
@@ -33,11 +31,12 @@ T = TypeVar("T")
 
 
 def cue_menu_entries(
-    session: TuningSession,
+    editor: CueEditor,
     slot: str,
     seek_to: Callable[[float], None],
 ) -> tuple[ContextMenuEntry, ...]:
     """Items for *slot*'s selected cue, or () when it has none."""
+    session = editor.session
     cue = selected_cue(session, slot)
     if cue is None:
         return ()
@@ -61,7 +60,7 @@ def cue_menu_entries(
                 CUT_TYPES,
                 _cut_value(cue),
                 _cut_label,
-                lambda cut: set_cue_cut(session, slot, cut),
+                lambda cut: editor.set_cut(slot, cut),
             ),
             enabled=editable,
             shortcut="C",
@@ -75,7 +74,7 @@ def cue_menu_entries(
                 _BLEND_OPTIONS,
                 cue.blend,
                 _blend_label,
-                lambda blend: set_cue_blend(session, slot, blend),
+                lambda blend: editor.set_blend(slot, blend),
             ),
             enabled=editable and on_cue,
             shortcut="B",
@@ -89,7 +88,7 @@ def cue_menu_entries(
                 _ROLE_OPTIONS,
                 cue.role,
                 _role_label,
-                lambda role: set_cue_role(session, slot, role),
+                lambda role: editor.set_role(slot, role),
             ),
             enabled=editable and on_cue,
             shortcut="O",

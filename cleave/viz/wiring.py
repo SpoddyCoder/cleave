@@ -310,4 +310,5 @@ def make_timeline_controls(
         on_notification=on_notification,
         beat_times=list(signals.beat_times) if signals is not None else (),
         bar_times=list(signals.downbeat_times) if signals is not None else (),
+        cue_editor=tuning_controls.cue_editor if tuning_controls is not None else None,
     )

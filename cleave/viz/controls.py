@@ -48,6 +48,7 @@ from cleave.viz.welcome_host import CANCEL_LABEL, WelcomeFlow
 from cleave.viz.window_controls import WindowControls
 from cleave.viz.timeline_phase_controls import TimelinePhaseController
 from cleave.viz.timeline_history import TimelineHistory
+from cleave.viz.timeline_cue_edits import CueEditor
 from cleave.viz.timeline_preset_controls import TimelinePresetController
 from cleave.viz.timeline_cut_controls import TimelineCutController
 from cleave.viz.timeline_snap_controls import TimelineSnapController
@@ -214,6 +215,7 @@ class TuningControls:
             session,
             on_preset_list_change=self.preset_list.refresh_switching,
         )
+        self.cue_editor = CueEditor(session, self.timeline_history)
         self._timeline_presets = TimelinePresetController(
             session,
             self._modal_host,

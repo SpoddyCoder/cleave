@@ -1899,3 +1899,40 @@ def test_strip_target_pressable_follows_lock_and_armed_rows() -> None:
     assert controls.strip_target_pressable("record", None) is False
     assert controls.strip_target_pressable("label", 0) is False
     assert controls.strip_target_pressable("play", None) is True
+
+
+def test_a_cue_level_nudge_can_be_undone() -> None:
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        lanes={
+            "layer_1": TimelineLane(
+                baseline=0.0, cues=[SlotCue(t=2.0, level=0.5)]
+            )
+        },
+    )
+    session.timeline.selected_cue_t["layer_1"] = 2.0
+    controls.handle_keydown(keydown(pygame.K_PERIOD))
+    controls.handle_keydown(keydown(pygame.K_PERIOD))
+    assert session.timeline.lanes["layer_1"].cues[0].level == 0.52
+
+    history = controls.cue_editor.history
+    assert history.undo() == "Cue level"
+    assert session.timeline.lanes["layer_1"].cues[0].level == 0.5
+    assert history.can_undo is False
+
+
+def test_a_recorded_take_undoes_as_one_step() -> None:
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        armed_slots={"layer_1"},
+        position_sec=5.0,
+        lanes={"layer_1": _lane(True)},
+    )
+    session.layers["layer_1"].enabled = True
+    before = copy_lane(session.timeline.lanes["layer_1"])
+
+    controls.handle_keydown(keydown(pygame.K_r))
+    controls.handle_keydown(keydown(pygame.K_1, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(keydown(pygame.K_r))
+    assert session.timeline.lanes["layer_1"] != before
+
+    assert controls.cue_editor.history.undo() == "Record take"
+    assert session.timeline.lanes["layer_1"] == before
