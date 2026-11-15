@@ -91,6 +91,11 @@ class VisualizerSeed:
     playlists: dict[str, PresetPlaylist] = field(default_factory=dict)
 
 
+def window_caption(title: str, *, dirty: bool) -> str:
+    """Window caption; a trailing ``*`` marks unsaved project changes."""
+    return f"{title}*" if dirty else title
+
+
 @dataclass
 class VisualizerCore:
     """GL-initialized state shared by live and offline render paths."""
@@ -691,7 +696,8 @@ class VisualizerApp:
         seed = self._runtime
         if window is None:
             window = open_loading_window()
-        pygame.display.set_caption(seed.window_title)
+        caption = window_caption(seed.window_title, dirty=False)
+        pygame.display.set_caption(caption)
         set_ui_scale_percent(seed.cfg.editor.ui_scale)
         set_tooltips_enabled(seed.cfg.editor.show_tooltips)
         clock = pygame.time.Clock()
@@ -892,6 +898,12 @@ class VisualizerApp:
                 rt.timeline_controls.tick(self._overlay_dt)
                 strip_pointer.tick()
                 rt.modal_host.tick(self._overlay_dt)
+                next_caption = window_caption(
+                    seed.window_title, dirty=rt.controls.config_dirty
+                )
+                if next_caption != caption:
+                    caption = next_caption
+                    pygame.display.set_caption(caption)
 
                 if window.apply_pending_resize():
                     rt.overlay_surface = window.overlay_surface

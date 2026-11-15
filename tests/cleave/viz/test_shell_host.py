@@ -469,4 +469,8 @@ def test_marker_token_spans_follow_the_fitted_text() -> None:
 
 
 def test_menu_bar_project_label_names_project() -> None:
-    assert menu_bar_project_label("my-song") == ("Project: ", "my-song")
+    assert menu_bar_project_label("my-song", False) == ("Project: ", "my-song")
+
+
+def test_menu_bar_project_label_marks_unsaved_changes() -> None:
+    assert menu_bar_project_label("my-song", True) == ("Project: ", "my-song*")

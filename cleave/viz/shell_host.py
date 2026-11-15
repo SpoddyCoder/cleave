@@ -538,9 +538,9 @@ def menu_bar_height_px() -> int:
     return max(1, int(round(font_size + _menu_bar_pad_y() * 2.0)))
 
 
-def menu_bar_project_label(project_slug: str) -> tuple[str, str]:
-    """Prefix and name at the right end of the menu bar."""
-    return "Project: ", project_slug
+def menu_bar_project_label(project_slug: str, dirty: bool) -> tuple[str, str]:
+    """Prefix and name at the right end of the menu bar; ``*`` marks unsaved changes."""
+    return "Project: ", f"{project_slug}*" if dirty else project_slug
 
 
 def _menu_bar_pad_y() -> float:
@@ -3507,7 +3507,9 @@ class ShellHost:
         bar's horizontal layout cannot shift or wrap it. Dropped when it would
         overlap the last menu title.
         """
-        prefix, name = menu_bar_project_label(self._controls.cfg.project_slug)
+        prefix, name = menu_bar_project_label(
+            self._controls.cfg.project_slug, self._controls.config_dirty
+        )
         style = imgui.get_style()
         left = imgui.get_item_rect_max().x + style.frame_padding.x
         # Same inset as the transport bar's FPS readout below it.

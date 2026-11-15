@@ -25,6 +25,7 @@ from cleave.viz.app import (
     _timeline_strip_visible,
     init_gl_resources_cheap,
     init_gl_resources_render,
+    window_caption,
 )
 from cleave.viz.focus_nav import MainFocus, TimelineFocus
 from cleave.viz.shell_focus import ShellRegion
@@ -1326,3 +1327,8 @@ def test_a_prompt_returns_from_play_full_screen(_mock_pygame: MagicMock) -> None
     _apply_window_requests(controls, window, prompt_open=True)
     assert controls.play_fullscreen is False
     assert window.fullscreen is False
+
+
+def test_window_caption_marks_unsaved_changes() -> None:
+    assert window_caption("Cleave - song", dirty=False) == "Cleave - song"
+    assert window_caption("Cleave - song", dirty=True) == "Cleave - song*"
