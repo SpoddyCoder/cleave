@@ -282,6 +282,7 @@ Installer (Inno Setup 6.4+; `DownloadTemporaryFile` and `GetSHA256OfFile`). [pac
 - Unpack with `tar.exe -xf` into a temp staging dir, then replace `{app}\_internal\torch`, `torchaudio`, `torchcodec`, plus torch `functorch` / `torchgen` / matching `*.dist-info`. PowerShell `Expand-Archive` is the fallback if `tar.exe` is missing. CPU dirs are moved aside first and restored if the swap fails.
 - `/CUDA=1` opts in even in `/SILENT` or `/VERYSILENT`, and even when no NVIDIA GPU is detected (the user asked explicitly). The GUI prompt stays NVIDIA-only. CI smoke uses `/VERYSILENT /TASKS=` without `/CUDA=1` and must not download.
 - No, download/hash/unpack failure, or no opt-in: continue. GUI `MsgBox` warn; silent logs only. Do not fail the install. CPU `separate` stays available.
+- Reinstall or upgrade over an existing `{app}`: `[InstallDelete]` removes `_internal\torch`, `functorch`, `torchgen`, `torchaudio`, `torchcodec`, and their `*.dist-info` dirs before `[Files]` copies the CPU tree. Without this, a CUDA install upgraded with No would keep CUDA-only DLLs (`torch_cuda.dll`, cuDNN, ...) beside CPU torch. To add CUDA after a CPU install, run the setup exe again and pick Yes.
 - Uninstall removes `{app}` (including the replaced packages). No extra uninstall step.
 
 Runtime: `torch.cuda.is_available()` in [cleave/separate.py](../../cleave/separate.py) picks CUDA when the replaced packages work; otherwise CPU. Missing extra is a slower split, not `STEM_SPLIT_MISSING_FROZEN`.

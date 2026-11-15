@@ -142,6 +142,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- Reinstalling or upgrading Cleave on Windows without the CUDA toolkit no longer leaves files from an earlier CUDA install mixed in with the CPU build, which could break stem splitting.
 - The Windows editor no longer crashes with an OpenGL "invalid operation" error just after it opens, or when the window or preview size changes.
 - The first separate no longer fails when the Beat This model host refuses the download. Cleave fetches the beat-tracking weights from its own GitHub release first, checks them against a fixed hash, and falls back to the original host. The Demucs stem-split weights also come from Cleave's release first, with Meta's server as the fallback.
 - The help column no longer lists Esc as "hide UI", which did nothing; Esc now leaves Play Full Screen.

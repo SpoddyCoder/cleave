@@ -45,6 +45,19 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 Name: "addtopath"; Description: "Add Cleave to the PATH"; GroupDescription: "PATH"; Flags: unchecked
 
+[InstallDelete]
+; An earlier install may have the CUDA extra. [Files] overwrites matching CPU
+; files but leaves CUDA-only DLLs and +cu130 dist-info behind, so clear the
+; packages the extra replaces before the CPU tree is copied.
+Type: filesandordirs; Name: "{app}\_internal\torch"
+Type: filesandordirs; Name: "{app}\_internal\functorch"
+Type: filesandordirs; Name: "{app}\_internal\torchgen"
+Type: filesandordirs; Name: "{app}\_internal\torchaudio"
+Type: filesandordirs; Name: "{app}\_internal\torchcodec"
+Type: filesandordirs; Name: "{app}\_internal\torch-*.dist-info"
+Type: filesandordirs; Name: "{app}\_internal\torchaudio-*.dist-info"
+Type: filesandordirs; Name: "{app}\_internal\torchcodec-*.dist-info"
+
 [Files]
 Source: "{#DistDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
