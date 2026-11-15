@@ -44,6 +44,7 @@ from cleave.viz.project_switch import ProjectSwitchController
 from cleave.viz.song_marker_controls import SongMarkerController
 from cleave.viz.tap_sync_controls import TapSyncControls, TapSyncUiSnapshot
 from cleave.viz.transport_controls import TransportControls
+from cleave.viz.welcome_host import WelcomeFlow
 from cleave.viz.window_controls import WindowControls
 from cleave.viz.timeline_phase_controls import TimelinePhaseController
 from cleave.viz.timeline_history import TimelineHistory
@@ -294,6 +295,7 @@ class TuningControls:
             playback=playback,
             project_dir=project_dir,
         )
+        self.welcome = WelcomeFlow(self._modal_host)
         self.layer_mutations = LayerMutations(
             session,
             preset_root=preset_root,
@@ -429,6 +431,7 @@ class TuningControls:
     def try_quit(self) -> bool:
         if self.project_render.busy:
             self.project_render.abort()
+        self.welcome.abort()
         return self._config_save.try_quit()
 
     def request_quit(self) -> None:
@@ -440,6 +443,25 @@ class TuningControls:
         """
         if self.try_quit():
             self._config_save.mark_pending_exit()
+
+    def prompt_welcome(self) -> None:
+        """Open the Welcome to Cleave step for whatever is still missing.
+
+        Playback pauses while the step is open and resumes when it closes.
+        """
+        from cleave.first_run import first_run_items, needed_items
+
+        if self.welcome.active:
+            return
+        resume = not self.playback.paused
+        if resume:
+            self.transport.toggle_pause()
+
+        def restore() -> None:
+            if resume and self.playback.paused:
+                self.transport.toggle_pause()
+
+        self.welcome.start(needed_items(first_run_items()), on_close=restore)
 
     def prompt_save_config(self) -> None:
         if self.session.solo_slot is not None:
@@ -513,6 +535,7 @@ class TuningControls:
         self.visualiser_resolution.tick(dt_sec)
         self._notification_host.clear_expired()
         self.project_render.tick()
+        self.welcome.tick()
 
     def build_view_state(
         self,

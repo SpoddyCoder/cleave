@@ -65,6 +65,7 @@ _STATIC_IDS = (
     "project.restore",
     *_SETTINGS_PAGE_IDS,
     "settings.measure_latency",
+    "settings.welcome",
     "help.overlay",
     "help.about",
 )
@@ -141,6 +142,7 @@ def _fake_controls(
         project_render=SimpleNamespace(busy=render_busy, prompt=MagicMock()),
         prompt_save_config=MagicMock(),
         request_quit=MagicMock(),
+        prompt_welcome=MagicMock(),
         editor_mode=SimpleNamespace(prompt_change_editor_mode=MagicMock()),
         tap_sync=SimpleNamespace(prompt_start=MagicMock()),
         shell_focus=SimpleNamespace(
@@ -198,6 +200,8 @@ def test_menus_list_taxonomy_ids_once() -> None:
         *_SETTINGS_PAGE_IDS,
         None,
         "settings.measure_latency",
+        None,
+        "settings.welcome",
     ]
     assert _row_ids(menus[5]) == ["help.overlay", None, "help.about"]
     ids = [command.id for command in iter_commands(menus)]
@@ -399,10 +403,12 @@ def test_wired_run_calls_controllers() -> None:
     command_by_id("project.render", menus).run(controls)
     command_by_id("view.preset_curation", menus).run(controls)
     command_by_id("settings.measure_latency", menus).run(controls)
+    command_by_id("settings.welcome", menus).run(controls)
     controls.prompt_save_config.assert_called_once_with()
     controls.request_quit.assert_called_once_with()
     controls.project_render.prompt.assert_called_once_with()
     controls.editor_mode.prompt_change_editor_mode.assert_called_once_with()
+    controls.prompt_welcome.assert_called_once_with()
     controls.tap_sync.prompt_start.assert_called_once_with()
 
     curation = command_by_id("view.preset_curation", menus)

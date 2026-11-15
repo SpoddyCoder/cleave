@@ -252,6 +252,10 @@ def _run_measure_latency(controls: Any) -> None:
     controls.tap_sync.prompt_start()
 
 
+def _run_welcome(controls: Any) -> None:
+    controls.prompt_welcome()
+
+
 def _help_checked(ctx: CommandContext) -> bool:
     return ctx.help_visible
 
@@ -581,6 +585,14 @@ _MEASURE_LATENCY = Command(
     run=_run_measure_latency,
 )
 
+_WELCOME = Command(
+    id="settings.welcome",
+    label="Welcome to Cleave...",
+    kind="command",
+    enabled=_enabled,
+    run=_run_welcome,
+)
+
 _HELP_OVERLAY = Command(
     id="help.overlay",
     label="Help",
@@ -716,7 +728,10 @@ def build_menus(
                     _RESTORE,
                 ),
             ),
-            Menu("Settings", (*_SETTINGS_PAGES, SEPARATOR, _MEASURE_LATENCY)),
+            Menu(
+                "Settings",
+                (*_SETTINGS_PAGES, SEPARATOR, _MEASURE_LATENCY, SEPARATOR, _WELCOME),
+            ),
             Menu("Help", (_HELP_OVERLAY, SEPARATOR, _ABOUT)),
         ),
         tuple(layer_slots),

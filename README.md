@@ -33,7 +33,7 @@ Linux:
 ./cleave.py play ~/music/mysong.mp3
 ```
 
-This will separate the track into its component stems (bass, drums, vocals, other), perform audio analysis, then open the editor. On first launch, the Welcome to Cleave step offers the presets and model weights in one go and shows each download's progress. Anything you skip downloads when it is first needed.
+This will separate the track into its component stems (bass, drums, vocals, other), perform audio analysis, then open the editor. On first launch, the Welcome to Cleave step offers the presets and model weights in one go and shows each download's progress. Anything you skip downloads when it is first needed. To get one later, choose Settings > Welcome to Cleave... in the editor.
 
 ## Using the Editor
 
