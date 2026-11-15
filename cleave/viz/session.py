@@ -83,7 +83,7 @@ from cleave.stems import StemSource
 from cleave.preset_playlist import PresetPlaylist, preset_browse_floor
 from cleave.projectm_health import PresetSkipNotifyTracker, ProjectMLogNotifyTracker
 from cleave.song_markers import SongMarker
-from cleave.timeline import SlotCue, TimelineLane, copy_lane, empty_lane
+from cleave.timeline import ClipEdge, SlotCue, TimelineLane, copy_lane, empty_lane
 from cleave.viz.timeline_view import StripView
 from cleave.blend_modes import BlendMode
 from cleave.timeline_presets.characters import DEFAULT_TIMELINE_PRESET_KIND
@@ -347,6 +347,9 @@ class TimelineRuntime:
     # Strip control under the mouse: (target, row). Row is None for the
     # corner buttons. Not persisted.
     strip_hover: tuple[str, int | None] | None = None
+    # Clip under the mouse: (row, clip start, edge or None for the body).
+    # Not persisted.
+    strip_hover_clip: tuple[int, float, ClipEdge | None] | None = None
     # Visible time window of the strip (zoom and pan). Not persisted.
     strip_view: StripView = field(default_factory=StripView)
     bar_phase_offset: int = DEFAULT_TIMELINE_BAR_PHASE

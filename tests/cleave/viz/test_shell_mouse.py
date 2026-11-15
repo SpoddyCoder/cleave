@@ -921,8 +921,10 @@ def _strip_host(
     scrubbing=False,
     panning=False,
     scrollbar_active=False,
+    clip_gesture=None,
 ):
     host._strip_pointer = SimpleNamespace(
+        clip_gesture=clip_gesture,
         over_ruler=over_ruler,
         scrubbing=scrubbing,
         panning=panning,
@@ -953,6 +955,15 @@ def test_strip_buttons_ask_for_the_hand_and_the_ruler_for_left_right() -> None:
         assert _gesture_pointer(host) is PointerShape.RESIZE_EW
         host._controls.session.timeline.panel_open = False
         assert _gesture_pointer(host) is PointerShape.ARROW
+
+
+def test_strip_clips_ask_for_move_on_a_body_and_left_right_on_an_edge() -> None:
+    with _host() as host:
+        host.imgui.process_mouse_event(_motion((640, 400)))
+        _strip_host(host, clip_gesture="move")
+        assert _gesture_pointer(host) is PointerShape.MOVE
+        _strip_host(host, clip_gesture="trim")
+        assert _gesture_pointer(host) is PointerShape.RESIZE_EW
 
 
 def test_modal_keeps_the_splitter_and_strip_pointers_away() -> None:

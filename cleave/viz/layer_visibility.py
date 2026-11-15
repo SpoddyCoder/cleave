@@ -355,6 +355,7 @@ def build_timeline_view_state(
         soft_cut_fades=_as_fade_group(tl.soft_cut_fades),
         selected_clip_t=dict(tl.selected_clip_t),
         selected_clip_flash_start_ms=tl.selected_clip_flash_start_ms,
+        hover_clip=tl.strip_hover_clip,
         view_start_sec=view_start_sec,
         view_end_sec=view_end_sec,
     )

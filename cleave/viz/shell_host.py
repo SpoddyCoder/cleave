@@ -1956,7 +1956,7 @@ class ShellHost:
         show_tooltip(text)
 
     def _strip_pointer_shape(self) -> PointerShape | None:
-        """Hand over a strip button or label, left-right over the ruler or a scrub."""
+        """Hand over a strip button or label, left-right over the ruler, a scrub, or a clip edge, move over a clip."""
         pointer = self._strip_pointer
         if pointer is None:
             return None
@@ -1967,6 +1967,12 @@ class ShellHost:
             return PointerShape.MOVE
         if pointer.scrubbing or pointer.over_ruler or pointer.scrollbar_active:
             return PointerShape.RESIZE_EW
+        # A clip body moves and a clip edge trims, where clips can be edited.
+        clip_gesture = pointer.clip_gesture
+        if clip_gesture == "trim":
+            return PointerShape.RESIZE_EW
+        if clip_gesture == "move":
+            return PointerShape.MOVE
         if pointer.hover_pressable:
             return PointerShape.HAND
         return None

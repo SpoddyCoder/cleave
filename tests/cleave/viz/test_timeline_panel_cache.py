@@ -298,7 +298,7 @@ def test_live_signature_changes_on_playhead_flash() -> None:
 
 def test_live_signature_changes_on_selected_clip_flash_phase(monkeypatch) -> None:
     pygame.init()
-    from cleave.viz.timeline_overlay import SELECTED_CUE_FLASH_HALF_MS
+    from cleave.viz.timeline_overlay import SELECTED_CLIP_FLASH_HALF_MS
 
     overlay = TimelineOverlay()
     start = 10_000
@@ -311,7 +311,7 @@ def test_live_signature_changes_on_selected_clip_flash_phase(monkeypatch) -> Non
     monkeypatch.setattr(pygame.time, "get_ticks", lambda: start)
     bright = overlay._live_flash_signature(state)
     monkeypatch.setattr(
-        pygame.time, "get_ticks", lambda: start + SELECTED_CUE_FLASH_HALF_MS
+        pygame.time, "get_ticks", lambda: start + SELECTED_CLIP_FLASH_HALF_MS
     )
     alt = overlay._live_flash_signature(state)
     assert bright

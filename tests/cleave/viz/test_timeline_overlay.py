@@ -23,6 +23,7 @@ from cleave.viz.overlay_primitives import overlay_font
 from cleave.viz.row_present_renderers import render_visibility_icon
 from cleave.viz.theme import (
     ARMED_BG,
+    LABEL,
     DISABLED,
     HIGHLIGHT,
     OVERRIDE_BG,
@@ -42,13 +43,14 @@ from cleave.viz.timeline_overlay import (
     PLAYHEAD_FLASH_MS,
     ROLE_GLYPH_BOTTOM_PAD,
     ROLE_GLYPH_TICK_GAP,
-    SELECTED_CUE_COLOR,
-    SELECTED_CUE_FLASH_DURATION_MS,
-    SELECTED_CUE_FLASH_HALF_MS,
-    SELECTED_CUE_FLASH_RED,
-    SELECTED_CUE_FLASH_TICK_WIDTH,
-    SELECTED_CUE_FLASH_YELLOW,
-    SELECTED_CUE_TICK_WIDTH,
+    SELECTED_CLIP_COLOR,
+    SELECTED_CLIP_FLASH_DURATION_MS,
+    SELECTED_CLIP_FLASH_HALF_MS,
+    SELECTED_CLIP_FLASH_RED,
+    SELECTED_CLIP_FLASH_OUTLINE_WIDTH,
+    SELECTED_CLIP_FLASH_TICK_WIDTH,
+    SELECTED_CLIP_FLASH_YELLOW,
+    SELECTED_CLIP_OUTLINE_WIDTH,
     TimelineOverlay,
     TimelineViewState,
     arm_abbrev_flash_active,
@@ -71,7 +73,7 @@ from cleave.viz.timeline_overlay import (
     row_prefix_width,
     selected_clip_flash_active,
     selected_clip_flash_bright,
-    selected_cue_tick_color,
+    selected_clip_flash_color,
     stem_abbrev_label,
     stem_label_text,
     time_to_x,
@@ -130,6 +132,8 @@ def _view_state(
     soft_cut_fade_out: float = 2.0,
     soft_cut_crossfade: bool = False,
     selected_clip_t: dict[str, float] | None = None,
+    hover_clip: tuple[int, float, str | None] | None = None,
+    locked: bool = False,
     selected_clip_flash_start_ms: int | None = None,
 ) -> TimelineViewState:
     order = list(layer_z_order or list(DEFAULT_LAYER_SLOTS))
@@ -201,6 +205,8 @@ def _view_state(
         ),
         selected_clip_t=dict(selected_clip_t or ()),
         selected_clip_flash_start_ms=selected_clip_flash_start_ms,
+        hover_clip=hover_clip,
+        locked=locked,
     )
 
 
@@ -854,21 +860,21 @@ def test_selected_song_marker_flashes_and_dirties_its_column(
     )
     upload, bar_left, bar_width, tick_top = _marker_upload(overlay, state)
     x = time_to_x(40.0, bar_left, bar_width, 0.0, 100.0)
-    half = SELECTED_CUE_FLASH_TICK_WIDTH // 2
-    assert upload.get_at((x + half, tick_top + 1))[:3] == SELECTED_CUE_FLASH_YELLOW
+    half = SELECTED_CLIP_FLASH_TICK_WIDTH // 2
+    assert upload.get_at((x + half, tick_top + 1))[:3] == SELECTED_CLIP_FLASH_YELLOW
     assert any(
         rx <= x < rx + rw and ry <= tick_top + 1 < ry + rh
         for rx, ry, rw, rh in overlay._cache.last_flash_rects
     )
 
     monkeypatch.setattr(
-        pygame.time, "get_ticks", lambda: start + SELECTED_CUE_FLASH_HALF_MS
+        pygame.time, "get_ticks", lambda: start + SELECTED_CLIP_FLASH_HALF_MS
     )
     upload, *_ = _marker_upload(overlay, state)
-    assert upload.get_at((x, tick_top + 1))[:3] == SELECTED_CUE_FLASH_RED
+    assert upload.get_at((x, tick_top + 1))[:3] == SELECTED_CLIP_FLASH_RED
 
     monkeypatch.setattr(
-        pygame.time, "get_ticks", lambda: start + SELECTED_CUE_FLASH_DURATION_MS
+        pygame.time, "get_ticks", lambda: start + SELECTED_CLIP_FLASH_DURATION_MS
     )
     upload, *_ = _marker_upload(overlay, state)
     assert upload.get_at((x, tick_top + 1))[:3] == SONG_MARKER_SELECTED
@@ -1172,52 +1178,72 @@ def test_bar_cues_include_synthetic_opening_baseline() -> None:
     assert [cue.t for cue in cues] == [0.0, 10.0, 20.0]
 
 
-def test_selected_cue_highlight_drawn_on_static_panel() -> None:
-    pygame.init()
-    overlay = TimelineOverlay()
+def _clip_strip(overlay: TimelineOverlay, **kwargs):
+    """Compose one row with a clip from 25 s to 75 s; return the static panel and its geometry."""
     state = _view_state(
         layer_z_order=["layer_1"],
         defaults={"layer_1": 1.0},
         lanes={
             "layer_1": TimelineLane(
                 baseline=0.0,
-                cues=[SlotCue(t=25.0, level=1.0)],
+                cues=[SlotCue(t=25.0, level=1.0), SlotCue(t=75.0, level=0.0)],
             )
         },
         duration_sec=100.0,
         focus_row=0,
-        selected_clip_t={"layer_1": 25.0},
+        **kwargs,
     )
-    composed = overlay.compose_panel(
-        state,
-        viewport_width=1280,
-        viewport_height=720,
-    )
+    composed = overlay.compose_panel(state, viewport_width=1280, viewport_height=720)
     assert composed is not None
     static = overlay._cache.panel
     assert static is not None
     assert overlay.bar_layout is not None
     bar_left, bar_width, _ = overlay.bar_layout
-    tick_x = time_to_x(25.0, bar_left, bar_width, 0.0, 100.0)
+    start_x = time_to_x(25.0, bar_left, bar_width, 0.0, 100.0)
+    end_x = time_to_x(75.0, bar_left, bar_width, 0.0, 100.0)
     row_h = overlay.row_layout[0][4]
-    padding = overlay._padding
-    # Settled selected tick: full-height HIGHLIGHT, thinner than flash width.
-    assert SELECTED_CUE_COLOR == HIGHLIGHT
-    assert SELECTED_CUE_TICK_WIDTH < SELECTED_CUE_FLASH_TICK_WIDTH
-    assert static.get_at((tick_x, padding + 1))[:3] == SELECTED_CUE_COLOR
-    assert static.get_at((tick_x, padding + row_h // 2))[:3] == SELECTED_CUE_COLOR
-    # Thicker than a 1px tick: neighbours within SELECTED_CUE_TICK_WIDTH stay selected.
-    half = SELECTED_CUE_TICK_WIDTH // 2
-    assert static.get_at((tick_x - half, padding + row_h // 2))[:3] == SELECTED_CUE_COLOR
-    assert static.get_at((tick_x + half, padding + row_h // 2))[:3] == SELECTED_CUE_COLOR
-    # Settled width does not reach flash thickness.
-    flash_half = SELECTED_CUE_FLASH_TICK_WIDTH // 2
-    assert static.get_at((tick_x - flash_half, padding + row_h // 2))[:3] != SELECTED_CUE_COLOR
-    assert static.get_at((tick_x + flash_half, padding + row_h // 2))[:3] != SELECTED_CUE_COLOR
+    return composed, static, start_x, end_x, overlay._padding, row_h
 
 
-def test_selected_cue_marker_only_on_focused_track() -> None:
-    """Remembered selections stay in selected_clip_t; only focus_row draws the marker."""
+def test_selected_clip_outline_drawn_on_static_panel() -> None:
+    pygame.init()
+    overlay = TimelineOverlay()
+    _, static, start_x, end_x, top, row_h = _clip_strip(
+        overlay, selected_clip_t={"layer_1": 25.0}
+    )
+    mid_x = (start_x + end_x) // 2
+    mid_y = top + row_h // 2
+    assert SELECTED_CLIP_COLOR == HIGHLIGHT
+    # The outline runs along the top and bottom of the clip, and down each edge.
+    assert static.get_at((mid_x, top))[:3] == SELECTED_CLIP_COLOR
+    assert static.get_at((mid_x, top + row_h - 1))[:3] == SELECTED_CLIP_COLOR
+    assert static.get_at((start_x, mid_y))[:3] == SELECTED_CLIP_COLOR
+    assert static.get_at((end_x - 1, mid_y))[:3] == SELECTED_CLIP_COLOR
+    # It stays on the clip: not inside it, and not past its edges.
+    assert static.get_at((mid_x, mid_y))[:3] != SELECTED_CLIP_COLOR
+    assert static.get_at((start_x - 2, mid_y))[:3] != SELECTED_CLIP_COLOR
+    assert static.get_at((end_x + 2, mid_y))[:3] != SELECTED_CLIP_COLOR
+    assert static.get_at((mid_x, top + SELECTED_CLIP_OUTLINE_WIDTH))[:3] != (
+        SELECTED_CLIP_COLOR
+    )
+
+
+def test_hovered_clip_draws_edge_handles_only_where_clips_can_be_edited() -> None:
+    pygame.init()
+
+    def edge_rgb(**kwargs) -> tuple[int, int, int]:
+        _, static, start_x, _end_x, top, row_h = _clip_strip(TimelineOverlay(), **kwargs)
+        return static.get_at((start_x + 1, top + row_h // 2))[:3]
+
+    plain = edge_rgb()
+    assert edge_rgb(hover_clip=(0, 25.0, None)) == LABEL != plain
+    # A hover on another row, or on a locked timeline, draws no handles.
+    assert edge_rgb(hover_clip=(1, 25.0, None)) == plain
+    assert edge_rgb(hover_clip=(0, 25.0, None), locked=True) == plain
+
+
+def test_selected_clip_outline_only_on_focused_track() -> None:
+    """Remembered selections stay in selected_clip_t; only focus_row draws the outline."""
     pygame.init()
     overlay = TimelineOverlay()
     lanes = {
@@ -1257,16 +1283,16 @@ def test_selected_cue_marker_only_on_focused_track() -> None:
         return static.get_at((tick_x, y))[:3]
 
     assert _compose(0) is not None
-    assert _tick_rgb(25.0, 0) == SELECTED_CUE_COLOR
-    assert _tick_rgb(50.0, 1) != SELECTED_CUE_COLOR
+    assert _tick_rgb(25.0, 0) == SELECTED_CLIP_COLOR
+    assert _tick_rgb(50.0, 1) != SELECTED_CLIP_COLOR
 
     assert _compose(1) is not None
-    assert _tick_rgb(25.0, 0) != SELECTED_CUE_COLOR
-    assert _tick_rgb(50.0, 1) == SELECTED_CUE_COLOR
+    assert _tick_rgb(25.0, 0) != SELECTED_CLIP_COLOR
+    assert _tick_rgb(50.0, 1) == SELECTED_CLIP_COLOR
 
     assert _compose(0) is not None
-    assert _tick_rgb(25.0, 0) == SELECTED_CUE_COLOR
-    assert _tick_rgb(50.0, 1) != SELECTED_CUE_COLOR
+    assert _tick_rgb(25.0, 0) == SELECTED_CLIP_COLOR
+    assert _tick_rgb(50.0, 1) != SELECTED_CLIP_COLOR
 
 
 def test_prune_expired_selected_clip_flash() -> None:
@@ -1274,13 +1300,13 @@ def test_prune_expired_selected_clip_flash() -> None:
     assert prune_expired_selected_clip_flash(1000, ticks_ms=1000) == 1000
     assert (
         prune_expired_selected_clip_flash(
-            1000, ticks_ms=1000 + SELECTED_CUE_FLASH_DURATION_MS - 1
+            1000, ticks_ms=1000 + SELECTED_CLIP_FLASH_DURATION_MS - 1
         )
         == 1000
     )
     assert (
         prune_expired_selected_clip_flash(
-            1000, ticks_ms=1000 + SELECTED_CUE_FLASH_DURATION_MS
+            1000, ticks_ms=1000 + SELECTED_CLIP_FLASH_DURATION_MS
         )
         is None
     )
@@ -1290,18 +1316,18 @@ def test_selected_clip_flash_blink_colors() -> None:
     start = 1000
     assert selected_clip_flash_active(start, ticks_ms=start)
     assert selected_clip_flash_bright(start, ticks_ms=start)
-    assert selected_cue_tick_color(start, ticks_ms=start) == SELECTED_CUE_FLASH_YELLOW
-    assert SELECTED_CUE_FLASH_YELLOW == HIGHLIGHT
-    assert SELECTED_CUE_COLOR == HIGHLIGHT
-    assert SELECTED_CUE_FLASH_RED == ARMED_BG
-    alt_t = start + SELECTED_CUE_FLASH_HALF_MS
+    assert selected_clip_flash_color(start, ticks_ms=start) == SELECTED_CLIP_FLASH_YELLOW
+    assert SELECTED_CLIP_FLASH_YELLOW == HIGHLIGHT
+    assert SELECTED_CLIP_COLOR == HIGHLIGHT
+    assert SELECTED_CLIP_FLASH_RED == ARMED_BG
+    alt_t = start + SELECTED_CLIP_FLASH_HALF_MS
     assert selected_clip_flash_active(start, ticks_ms=alt_t)
     assert not selected_clip_flash_bright(start, ticks_ms=alt_t)
-    assert selected_cue_tick_color(start, ticks_ms=alt_t) == SELECTED_CUE_FLASH_RED
-    expired = start + SELECTED_CUE_FLASH_DURATION_MS
+    assert selected_clip_flash_color(start, ticks_ms=alt_t) == SELECTED_CLIP_FLASH_RED
+    expired = start + SELECTED_CLIP_FLASH_DURATION_MS
     assert not selected_clip_flash_active(start, ticks_ms=expired)
     assert not selected_clip_flash_bright(start, ticks_ms=expired)
-    assert selected_cue_tick_color(start, ticks_ms=expired) == SELECTED_CUE_COLOR
+    assert selected_clip_flash_color(start, ticks_ms=expired) == SELECTED_CLIP_COLOR
 
 
 def test_selected_clip_flash_live_patches_yellow(monkeypatch) -> None:
@@ -1322,7 +1348,7 @@ def test_selected_clip_flash_live_patches_yellow(monkeypatch) -> None:
         selected_clip_t={"layer_1": 25.0},
         selected_clip_flash_start_ms=start,
     )
-    # Yellow half of the blink: thick live-patch over the thinner settled static tick.
+    # Yellow half of the blink: a thicker outline live-patched over the settled one.
     monkeypatch.setattr(pygame.time, "get_ticks", lambda: start)
     composed = overlay.compose_panel(
         state,
@@ -1336,16 +1362,23 @@ def test_selected_clip_flash_live_patches_yellow(monkeypatch) -> None:
     tick_x = time_to_x(25.0, bar_left, bar_width, 0.0, 100.0)
     from cleave.viz.timeline_panel_cache import timeline_badge_reserve_px
 
-    y = timeline_badge_reserve_px() + overlay._padding + overlay.row_layout[0][4] // 2
-    assert upload.get_at((tick_x, y))[:3] == SELECTED_CUE_FLASH_YELLOW
-    flash_half = SELECTED_CUE_FLASH_TICK_WIDTH // 2
-    assert upload.get_at((tick_x - flash_half, y))[:3] == SELECTED_CUE_FLASH_YELLOW
-    assert upload.get_at((tick_x + flash_half, y))[:3] == SELECTED_CUE_FLASH_YELLOW
+    row_h = overlay.row_layout[0][4]
+    top = timeline_badge_reserve_px() + overlay._padding
+    mid_x = tick_x + 40
+    inner = SELECTED_CLIP_FLASH_OUTLINE_WIDTH - 1
+    assert upload.get_at((mid_x, top + inner))[:3] == SELECTED_CLIP_FLASH_YELLOW
+    assert upload.get_at((mid_x, top + row_h - 1 - inner))[:3] == (
+        SELECTED_CLIP_FLASH_YELLOW
+    )
     static = overlay._cache.panel
     assert static is not None
-    static_y = overlay._padding + overlay.row_layout[0][4] // 2
-    assert static.get_at((tick_x, static_y))[:3] == SELECTED_CUE_COLOR
-    assert static.get_at((tick_x - flash_half, static_y))[:3] != SELECTED_CUE_COLOR
+    assert static.get_at((mid_x, overlay._padding))[:3] == SELECTED_CLIP_COLOR
+    # The settled outline is thinner than the flash.
+    assert static.get_at((mid_x, overlay._padding + inner))[:3] != SELECTED_CLIP_COLOR
+    assert any(
+        rx <= mid_x < rx + rw and ry <= top < ry + rh
+        for rx, ry, rw, rh in overlay._cache.last_flash_rects
+    )
 
 
 def test_blit_role_glyph_xor_inverts_destination_rgb() -> None:
@@ -1418,7 +1451,7 @@ def test_role_glyph_anchor_bottom_and_side_offset() -> None:
     assert right_y == left_y == bar_rect.bottom - glyph_h - ROLE_GLYPH_BOTTOM_PAD
     assert right_y + glyph_h <= bar_rect.bottom
     assert right_y >= bar_rect.top
-    assert ROLE_GLYPH_TICK_GAP >= SELECTED_CUE_FLASH_TICK_WIDTH // 2
+    assert ROLE_GLYPH_TICK_GAP >= SELECTED_CLIP_FLASH_TICK_WIDTH // 2
 
 
 def test_role_glyph_anchor_clamps_inside_bar() -> None:
@@ -1641,7 +1674,7 @@ def test_hit_at_maps_ruler_rows_prefix_and_gaps() -> None:
     for row_index, _, row_y, _, row_h, _ in rows:
         hit = overlay.hit_at(mid_x, py + row_y + row_h // 2)
         assert hit is not None and hit.row == row_index
-        assert hit.cue_tolerance_sec == pytest.approx(4 * 100.0 / bar_width)
+        assert hit.tolerance_sec == pytest.approx(4 * 100.0 / bar_width)
 
     prefix = overlay.hit_at(px + 10, py + rows[0][2] + 1)
     assert prefix is not None and prefix.row == 0 and prefix.t_sec is None
@@ -1712,7 +1745,7 @@ def test_zoomed_hit_at_maps_the_window_and_tightens_cue_tolerance() -> None:
     hit = overlay.hit_at(px + bar_left + bar_width // 2, row_y)
     assert hit is not None and hit.row == 0
     assert hit.t_sec == pytest.approx(50.0, abs=0.1)
-    assert hit.cue_tolerance_sec == pytest.approx(4 * 20.0 / bar_width)
+    assert hit.tolerance_sec == pytest.approx(4 * 20.0 / bar_width)
     assert overlay.view_sec_per_px() == pytest.approx(20.0 / bar_width)
     assert overlay.time_at_x(px - 50) == 40.0
     assert overlay.time_at_x(px + bar_left + bar_width + 50) == 60.0
@@ -1834,3 +1867,101 @@ def test_each_track_has_its_own_on_colour() -> None:
 
     colors = [track_color(index) for index in range(8)]
     assert len(set(colors)) == 8
+
+
+def _hit_clips() -> list:
+    from cleave.timeline import lane_clips
+
+    lane = TimelineLane(
+        baseline=0.0,
+        cues=[
+            SlotCue(t=20.0, level=1.0),
+            SlotCue(t=40.0, level=0.5),
+            SlotCue(t=60.0, level=0.0),
+            SlotCue(t=80.0, level=1.0),
+            SlotCue(t=80.4, level=0.0),
+        ],
+    )
+    return lane_clips(lane, inherit=0.0, duration_sec=100.0)
+
+
+def _clip_hit(x: float):
+    from cleave.viz.timeline_overlay import clip_hit_at_x
+
+    # One pixel per tenth of a second: bar pixel = 100 + t * 10.
+    return clip_hit_at_x(
+        _hit_clips(),
+        x,
+        bar_left=100,
+        bar_width=1000,
+        view_start_sec=0.0,
+        view_end_sec=100.0,
+    )
+
+
+def test_clip_hit_edge_wins_over_body_at_the_threshold() -> None:
+    from cleave.viz.timeline_overlay import CLIP_EDGE_HIT_PX
+
+    start_x = 100 + 200
+    assert _clip_hit(start_x) == (20.0, "start")
+    assert _clip_hit(start_x + CLIP_EDGE_HIT_PX) == (20.0, "start")
+    assert _clip_hit(start_x + CLIP_EDGE_HIT_PX + 1) == (20.0, None)
+    # An edge is reachable from just outside the clip; beyond that is a gap.
+    assert _clip_hit(start_x - CLIP_EDGE_HIT_PX) == (20.0, "start")
+    assert _clip_hit(start_x - CLIP_EDGE_HIT_PX - 1) is None
+    end_x = 100 + 600
+    assert _clip_hit(end_x - 1) == (40.0, "end")
+    assert _clip_hit(end_x + CLIP_EDGE_HIT_PX) == (40.0, "end")
+
+
+def test_clip_hit_butted_boundary_is_the_earlier_clips_end() -> None:
+    boundary_x = 100 + 400
+    assert _clip_hit(boundary_x) == (20.0, "end")
+    assert _clip_hit(boundary_x - 3) == (20.0, "end")
+    assert _clip_hit(boundary_x + 3) == (20.0, "end")
+    assert _clip_hit(boundary_x + 30) == (40.0, None)
+
+
+def test_clip_hit_keeps_the_body_of_a_narrow_clip_grabbable() -> None:
+    # The clip at 80 s is four pixels wide.
+    assert _clip_hit(100 + 800) == (80.0, "start")
+    assert _clip_hit(100 + 802) == (80.0, None)
+    assert _clip_hit(100 + 804) == (80.0, "end")
+
+
+def test_hit_at_reports_the_clip_and_edge_under_a_row_point() -> None:
+    from cleave.viz.timeline_overlay import time_to_x
+
+    pygame.init()
+    overlay = TimelineOverlay(padding=8, row_gap=4)
+    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    state = _view_state(
+        duration_sec=100.0,
+        layer_z_order=["layer_1", "layer_2"],
+        defaults={"layer_1": 0.0, "layer_2": 0.0},
+        lanes={
+            "layer_1": TimelineLane(
+                baseline=0.0,
+                cues=[SlotCue(t=20.0, level=1.0), SlotCue(t=60.0, level=0.0)],
+            )
+        },
+    )
+    _draw(overlay, surface, state)
+    px, py, _, _ = overlay.panel_rect
+    bar_left, bar_width, _ = overlay.bar_layout
+    rows = overlay.row_layout
+
+    def hit(t_sec: float, row: int = 0, dx: int = 0):
+        x = px + time_to_x(t_sec, bar_left, bar_width, 0.0, 100.0) + dx
+        return overlay.hit_at(x, py + rows[row][2] + rows[row][4] // 2)
+
+    body = hit(40.0)
+    assert (body.clip_start, body.clip_edge) == (20.0, None)
+    assert (hit(20.0).clip_start, hit(20.0).clip_edge) == (20.0, "start")
+    assert (hit(60.0, dx=-2).clip_start, hit(60.0, dx=-2).clip_edge) == (20.0, "end")
+    gap = hit(80.0)
+    assert (gap.clip_start, gap.clip_edge) == (None, None)
+    other_row = hit(40.0, row=1)
+    assert (other_row.clip_start, other_row.clip_edge) == (None, None)
+    # The ruler and the row label name no clip.
+    assert overlay.hit_at(px + 10, py + rows[0][2] + 1).clip_start is None

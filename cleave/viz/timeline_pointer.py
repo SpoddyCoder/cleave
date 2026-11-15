@@ -2,7 +2,11 @@
 
 The corner buttons above the row labels play/pause and record. A press on
 the ruler seeks and a held drag scrubs. A press on a layer row focuses it
-and selects the clip under the pointer without moving the playhead. A
+and selects the clip under the pointer without moving the playhead. A held
+press on a clip that moves past ``PAN_DRAG_PX`` drags it: the body moves the
+clip at its length, an edge trims it, and an edge two clips share rolls the
+boundary (``ClipEditor.begin_drag`` / ``update_drag``). Release keeps the
+result as one undo step; Esc puts the clip back. A
 double-click in a gap adds a clip there (``TimelineControls.add_clip_at``);
 on a clip, or while clips cannot be edited, it seeks, and holding the second
 press scrubs. A press on a song marker selects it and shows it on the Song
@@ -18,8 +22,9 @@ clicked time's items (``timeline_time_menu``), or a song marker's items
 when one is under the pointer, selected first.
 
 The wheel zooms the visible window about the time under the pointer, and
-Shift+wheel or a sideways wheel pans it. While zoomed, a left drag on a row
-or a middle drag on the ruler or a row pans, and the scrollbar under the rows
+Shift+wheel or a sideways wheel pans it. While zoomed, a left drag on a gap
+in a row (or on a clip while clips cannot be edited) or a middle drag on the
+ruler or a row pans, and the scrollbar under the rows
 drags the window along the song (a press on its track centres it there).
 
 The strip is a pygame texture, so hits come from the overlay's last compose
@@ -31,6 +36,8 @@ from __future__ import annotations
 
 import time
 from typing import Callable, Literal, Protocol
+
+from cleave.timeline import ClipEdge
 
 from cleave.viz.context_menu import ContextMenuEntry, ContextMenuProvider
 from cleave.viz.session import TuningSession
@@ -122,13 +129,17 @@ class TimelinePointer:
         self._over_ruler = False
         self._over_scrollbar = False
         self._pending_t: float | None = None
-        # Held drag that moves the window: a pan, or the scrollbar thumb.
-        self._drag: Literal["pan", "thumb"] | None = None
+        # Held drag: a pan or the scrollbar thumb move the window; "clip"
+        # moves or trims the selected clip through the clip editor.
+        self._drag: Literal["pan", "thumb", "clip"] | None = None
         self._drag_x = 0.0
         self._drag_start_sec = 0.0
         self._drag_sec_per_px = 0.0
         # X of a held row press that has not yet moved far enough to pan.
         self._pan_pending_x: float | None = None
+        # Held press on a clip that has not yet moved far enough to drag:
+        # (x, slot, edge or None for the body).
+        self._clip_pending: tuple[float, str, ClipEdge | None] | None = None
         # Last row press: (time, x, y, row, target), for double-click detection.
         self._last_row_press: (
             tuple[float, float, float, int, StripTarget | None] | None
@@ -142,6 +153,24 @@ class TimelinePointer:
     def panning(self) -> bool:
         """True while a drag on the ruler or rows moves the window."""
         return self._drag == "pan"
+
+    @property
+    def clip_gesture(self) -> Literal["move", "trim"] | None:
+        """What a drag is doing to a clip, or what a press here would start.
+
+        None away from clips and wherever clips cannot be edited.
+        """
+        if self._drag == "clip":
+            editor = self._actions.clip_editor
+            if not editor.dragging:
+                return None
+            return "move" if editor.drag_edge is None else "trim"
+        if self._drag is not None or self._scrubbing:
+            return None
+        hover = self._session.timeline.strip_hover_clip
+        if hover is None or not clip_edits_allowed(self._session):
+            return None
+        return "move" if hover[2] is None else "trim"
 
     @property
     def scrollbar_active(self) -> bool:
@@ -189,7 +218,7 @@ class TimelinePointer:
             if hit.target is not None or hit.t_sec is None or time_menu is None:
                 return None
             t_sec = hit.t_sec
-            tolerance = hit.cue_tolerance_sec
+            tolerance = hit.tolerance_sec
             marker_index = hit.marker_index
             if marker_index is not None:
                 self._actions.select_song_marker(marker_index)
@@ -212,7 +241,7 @@ class TimelinePointer:
         time_entries: Callable[[], tuple[ContextMenuEntry, ...]] | None = None
         if not on_clip and hit.t_sec is not None and time_menu is not None:
             row_t = hit.t_sec
-            row_tolerance = hit.cue_tolerance_sec
+            row_tolerance = hit.tolerance_sec
             row_marker = hit.marker_index
             if row_marker is not None:
                 self._actions.select_song_marker(row_marker)
@@ -295,9 +324,10 @@ class TimelinePointer:
             return True
         z_order = self._session.layer_z_order
         slot = z_order[hit.row] if hit.row < len(z_order) else None
-        on_clip = slot is not None and self._actions.select_clip_at(
-            slot, hit.t_sec
-        )
+        # An edge can be hit from just outside its clip, so select by the
+        # clip the hit names.
+        clip_t = hit.clip_start if hit.clip_start is not None else hit.t_sec
+        on_clip = slot is not None and self._actions.select_clip_at(slot, clip_t)
         if double:
             self._last_row_press = None
             # In a gap a double-click adds a clip; on a clip, or where clips
@@ -310,7 +340,9 @@ class TimelinePointer:
         self._last_row_press = (now, x, y, hit.row, hit.target)
         if not on_clip and hit.marker_index is not None:
             self._actions.select_song_marker(hit.marker_index)
-        if self._view.zoomed:
+        if on_clip and slot is not None and clip_edits_allowed(self._session):
+            self._clip_pending = (x, slot, hit.clip_edge)
+        elif self._view.zoomed:
             self._pan_pending_x = x
         return True
 
@@ -396,6 +428,22 @@ class TimelinePointer:
         if pending_x is not None and abs(x - pending_x) >= PAN_DRAG_PX:
             self._last_row_press = None
             self._begin_pan(pending_x)
+        clip_pending = self._clip_pending
+        if clip_pending is not None and abs(x - clip_pending[0]) >= PAN_DRAG_PX:
+            self._last_row_press = None
+            self._clip_pending = None
+            press_x, slot, edge = clip_pending
+            grab_t = self._geometry.time_at_x(press_x)
+            if grab_t is not None and self._actions.clip_editor.begin_drag(
+                slot, edge, grab_t
+            ):
+                self._drag = "clip"
+                self._view.held = True
+        if self._drag == "clip":
+            t_sec = self._geometry.time_at_x(x)
+            if t_sec is not None:
+                self._actions.clip_editor.update_drag(t_sec)
+            return
         if self._drag is not None:
             self._drag_to(x)
             return
@@ -404,6 +452,9 @@ class TimelinePointer:
     def release(self) -> None:
         if self._scrubbing:
             self.tick()
+        if self._drag == "clip":
+            self._actions.clip_editor.end_drag()
+            self._drag = None
         self.cancel()
 
     def _update_hover(self, x: float, y: float) -> None:
@@ -414,7 +465,16 @@ class TimelinePointer:
             if hit is not None and hit.target and not self._over_scrollbar
             else None
         )
-        self._session.timeline.strip_hover = hover
+        timeline = self._session.timeline
+        timeline.strip_hover = hover
+        timeline.strip_hover_clip = (
+            (hit.row, hit.clip_start, hit.clip_edge)
+            if hit is not None
+            and hit.row is not None
+            and hit.target is None
+            and hit.clip_start is not None
+            else None
+        )
         self._over_ruler = (
             hit is not None
             and hit.row is None
@@ -424,15 +484,22 @@ class TimelinePointer:
 
     def clear_hover(self) -> None:
         self._session.timeline.strip_hover = None
+        self._session.timeline.strip_hover_clip = None
         self._over_ruler = False
         self._over_scrollbar = False
 
     def cancel(self) -> None:
-        """Stop a scrub or drag without applying a pending scrub target."""
+        """Stop a scrub or drag without applying a pending scrub target.
+
+        A clip being dragged goes back where the drag began.
+        """
+        if self._drag == "clip":
+            self._actions.clip_editor.cancel_drag()
         self._scrubbing = False
         self._pending_t = None
         self._drag = None
         self._pan_pending_x = None
+        self._clip_pending = None
         self._view.held = False
 
     def tick(self) -> None:

@@ -14,10 +14,13 @@ from cleave.song_markers import marker_index_near
 from cleave.stems import StemSource
 from cleave.timeline import (
     LEVEL_EPS,
+    ClipEdge,
     SlotCue,
+    TimelineClip,
     TimelineFadeGroup,
     TimelineLane,
     empty_lane,
+    lane_clips,
     lane_level_at,
     lane_level_breakpoints,
     lane_tick_times,
@@ -103,26 +106,29 @@ def timeline_band_height_px(row_count: int) -> int:
 ARMED_BG_ALPHA: int = 220
 CUE_TICK_ALPHA: int = 120
 CUE_TICK_WIDTH: int = 1
-# Settled selected tick (thinner than flash; still thicker than a normal cue tick).
-SELECTED_CUE_TICK_WIDTH: int = 3
-# Thick width while the selection flash is active.
-SELECTED_CUE_FLASH_TICK_WIDTH: int = 7
+# Outline around the selected clip; thicker while the selection flash runs.
+SELECTED_CLIP_OUTLINE_WIDTH: int = 2
+SELECTED_CLIP_FLASH_OUTLINE_WIDTH: int = 3
+# Trim handles at the edges of the hovered or selected clip.
+CLIP_HANDLE_WIDTH: int = 3
+# Thick width of a selected song marker while its flash is active.
+SELECTED_CLIP_FLASH_TICK_WIDTH: int = 7
 REC_FLASH_MS: int = 500
 PLAYHEAD_FLASH_MS: int = 400
 ARM_FLASH_HALF_MS: int = 150
 ARM_FLASH_DURATION_MS: int = ARM_FLASH_HALF_MS * 4
-# Selected-cue flash: same blink cadence as arm flash, held for 3s.
-SELECTED_CUE_FLASH_HALF_MS: int = ARM_FLASH_HALF_MS
-SELECTED_CUE_FLASH_DURATION_MS: int = 3000
-# Settled selected tick (HIGHLIGHT yellow); flash pulses yellow/red at flash width.
-SELECTED_CUE_COLOR: tuple[int, int, int] = HIGHLIGHT
-SELECTED_CUE_FLASH_YELLOW: tuple[int, int, int] = HIGHLIGHT
-SELECTED_CUE_FLASH_RED: tuple[int, int, int] = ARMED_BG
+# Selected-clip flash: same blink cadence as arm flash, held for 3s.
+SELECTED_CLIP_FLASH_HALF_MS: int = ARM_FLASH_HALF_MS
+SELECTED_CLIP_FLASH_DURATION_MS: int = 3000
+# Settled selected outline (HIGHLIGHT yellow); the flash pulses yellow/red.
+SELECTED_CLIP_COLOR: tuple[int, int, int] = HIGHLIGHT
+SELECTED_CLIP_FLASH_YELLOW: tuple[int, int, int] = HIGHLIGHT
+SELECTED_CLIP_FLASH_RED: tuple[int, int, int] = ARMED_BG
 # Clear half the flash tick plus 1px so glyphs sit beside the thick marker.
-ROLE_GLYPH_TICK_GAP: int = SELECTED_CUE_FLASH_TICK_WIDTH // 2 + 1
+ROLE_GLYPH_TICK_GAP: int = SELECTED_CLIP_FLASH_TICK_WIDTH // 2 + 1
 ROLE_GLYPH_BOTTOM_PAD: int = 1
 # Song markers span the ruler and every row. The selected one flashes like a
-# selected cue (SELECTED_CUE_FLASH_TICK_WIDTH), then settles at its own width.
+# selected cue (SELECTED_CLIP_FLASH_TICK_WIDTH), then settles at its own width.
 SONG_MARKER_WIDTH: int = 3
 SONG_MARKER_SELECTED_WIDTH: int = 5
 
@@ -163,6 +169,8 @@ class TimelineViewState:
     soft_cut_fades: TimelineFadeGroup = field(default_factory=TimelineFadeGroup)
     selected_clip_t: dict[str, float] = field(default_factory=dict)
     selected_clip_flash_start_ms: int | None = None
+    # Clip under the pointer: (row, clip start, edge or None for the body).
+    hover_clip: tuple[int, float, ClipEdge | None] | None = None
     # Visible time window mapped onto the bar. An end of None is the song end.
     view_start_sec: float = 0.0
     view_end_sec: float | None = None
@@ -340,6 +348,35 @@ def bar_level_breakpoints_for_row(
             result, clip_breakpoints(committed, effective_end, duration)
         )
     return result
+
+
+def row_clips_for_view(state: TimelineViewState, slot: str) -> list[TimelineClip]:
+    """The committed clips of one timeline row."""
+    return lane_clips(
+        _lane_for_view(state, slot),
+        inherit=_inherit_for_view(state, slot),
+        duration_sec=state.duration_sec,
+    )
+
+
+def clip_bar_span(
+    clip: TimelineClip,
+    *,
+    bar_left: int,
+    bar_width: int,
+    view_start_sec: float,
+    view_end_sec: float,
+) -> tuple[int, int] | None:
+    """Pixel ``(left, right)`` of the clip's visible part, or None out of view."""
+    if clip.end <= view_start_sec or clip.start >= view_end_sec:
+        return None
+    left = time_to_x(
+        max(clip.start, view_start_sec), bar_left, bar_width, view_start_sec, view_end_sec
+    )
+    right = time_to_x(
+        min(clip.end, view_end_sec), bar_left, bar_width, view_start_sec, view_end_sec
+    )
+    return (left, max(left + 1, right))
 
 
 def bar_cues_for_row(state: TimelineViewState, slot: str) -> list[SlotCue]:
@@ -527,7 +564,7 @@ def prune_expired_selected_clip_flash(
         return None
     if ticks_ms is None:
         ticks_ms = pygame.time.get_ticks()
-    if ticks_ms - flash_start_ms >= SELECTED_CUE_FLASH_DURATION_MS:
+    if ticks_ms - flash_start_ms >= SELECTED_CLIP_FLASH_DURATION_MS:
         return None
     return flash_start_ms
 
@@ -567,7 +604,7 @@ def selected_clip_flash_active(
         return False
     if ticks_ms is None:
         ticks_ms = pygame.time.get_ticks()
-    return ticks_ms - flash_start_ms < SELECTED_CUE_FLASH_DURATION_MS
+    return ticks_ms - flash_start_ms < SELECTED_CLIP_FLASH_DURATION_MS
 
 
 def selected_clip_flash_bright(
@@ -581,18 +618,18 @@ def selected_clip_flash_bright(
         ticks_ms = pygame.time.get_ticks()
     assert flash_start_ms is not None
     elapsed = ticks_ms - flash_start_ms
-    return (elapsed // SELECTED_CUE_FLASH_HALF_MS) % 2 == 0
+    return (elapsed // SELECTED_CLIP_FLASH_HALF_MS) % 2 == 0
 
 
-def selected_cue_tick_color(
+def selected_clip_flash_color(
     flash_start_ms: int | None,
     ticks_ms: int | None = None,
 ) -> tuple[int, int, int]:
     if selected_clip_flash_bright(flash_start_ms, ticks_ms=ticks_ms):
-        return SELECTED_CUE_FLASH_YELLOW
+        return SELECTED_CLIP_FLASH_YELLOW
     if selected_clip_flash_active(flash_start_ms, ticks_ms=ticks_ms):
-        return SELECTED_CUE_FLASH_RED
-    return SELECTED_CUE_COLOR
+        return SELECTED_CLIP_FLASH_RED
+    return SELECTED_CLIP_COLOR
 
 
 def armed_abbrev_bg_visible(
@@ -778,8 +815,10 @@ def scrollbar_thumb_span(
     return (max(0, min(travel, offset)), thumb_w)
 
 
-# Pointer slack around a cue tick, in pixels.
-CUE_HIT_PX: int = 4
+# Pointer slack around a song marker, in pixels.
+STRIP_HIT_PX: int = 4
+# A clip edge takes the pointer within this many pixels, ahead of the body.
+CLIP_EDGE_HIT_PX: int = 5
 
 
 StripTarget = Literal[
@@ -792,21 +831,68 @@ class StripHit:
     """What a screen point lands on in the strip.
 
     ``row`` is None for the ruler and the scrollbar. ``t_sec`` is None outside
-    the bar span (row labels and icons). ``cue_tolerance_sec`` is
-    ``CUE_HIT_PX`` in song time. ``target`` names a control: the corner
+    the bar span (row labels and icons). ``tolerance_sec`` is
+    ``STRIP_HIT_PX`` in song time. ``target`` names a control: the corner
     ``"play"`` / ``"record"`` buttons, a row's ``"label"`` (layer number and
     stem abbreviation), its monitor ``"eye"`` (the visibility icon after the
     label), or the scrollbar's ``"scroll_thumb"`` / ``"scroll_track"``. On the
     scrollbar ``t_sec`` is the song time at that point along the track.
-    ``marker_index`` is the song marker within ``CUE_HIT_PX`` of the point on
-    the ruler or in a row's bar, or None.
+    ``marker_index`` is the song marker within ``STRIP_HIT_PX`` of the point on
+    the ruler or in a row's bar, or None. ``clip_start`` is the start of the
+    row's clip under the point, and ``clip_edge`` names the edge within
+    ``CLIP_EDGE_HIT_PX`` of it (an edge wins over the body, and a boundary
+    two clips share is the earlier clip's end).
     """
 
     row: int | None
     t_sec: float | None
-    cue_tolerance_sec: float
+    tolerance_sec: float
     target: StripTarget | None = None
     marker_index: int | None = None
+    clip_start: float | None = None
+    clip_edge: ClipEdge | None = None
+
+
+def clip_hit_at_x(
+    clips: Sequence[TimelineClip],
+    x: float,
+    *,
+    bar_left: int,
+    bar_width: int,
+    view_start_sec: float,
+    view_end_sec: float,
+) -> tuple[float, ClipEdge | None] | None:
+    """The clip under bar pixel *x* as ``(clip start, edge)``, or None in a gap.
+
+    The nearest edge within ``CLIP_EDGE_HIT_PX`` wins over a body; the edge
+    zone never takes more than a third of a narrow clip, so its body stays
+    grabbable. Where two clips butt, the shared boundary is the earlier
+    clip's end.
+    """
+    best: tuple[float, int, float, ClipEdge] | None = None
+    body: float | None = None
+    for order, clip in enumerate(clips):
+        if clip.end < view_start_sec or clip.start > view_end_sec:
+            continue
+        start_x = time_to_x(clip.start, bar_left, bar_width, view_start_sec, view_end_sec)
+        end_x = time_to_x(clip.end, bar_left, bar_width, view_start_sec, view_end_sec)
+        zone = min(float(CLIP_EDGE_HIT_PX), max(1.0, (end_x - start_x) / 3.0))
+        for edge, edge_x, edge_t in (
+            ("end", end_x, clip.end),
+            ("start", start_x, clip.start),
+        ):
+            if not time_in_view(edge_t, view_start_sec, view_end_sec):
+                continue
+            distance = abs(x - edge_x)
+            # Earlier clips sort first, and an end before a start, on a tie.
+            rank = (distance, order * 2 + (0 if edge == "end" else 1))
+            if distance <= zone and (best is None or rank < (best[0], best[1])):
+                best = (distance, rank[1], clip.start, edge)
+        if start_x <= x < end_x:
+            body = clip.start
+    if best is not None:
+        return (best[2], best[3])
+    return None if body is None else (body, None)
 
 
 # Corner buttons sit this far below the top of the badge row.
@@ -977,6 +1063,8 @@ class TimelineOverlay:
         self._hit_duration_sec: float = 0.0
         self._hit_view: tuple[float, float] = (0.0, 0.0)
         self._hit_markers: tuple[float, ...] = ()
+        # Each row's clips at the last compose, by display row.
+        self._hit_clips: tuple[tuple[TimelineClip, ...], ...] = ()
 
     @property
     def _font_size(self) -> int:
@@ -1034,7 +1122,7 @@ class TimelineOverlay:
         if not 0 <= local_x < layout.panel_w:
             return None
         view_start, view_end = self._hit_view
-        tolerance = CUE_HIT_PX * self.view_sec_per_px()
+        tolerance = STRIP_HIT_PX * self.view_sec_per_px()
         in_bar = layout.bar_left <= local_x < layout.bar_left + layout.bar_width
         t_sec = (
             x_to_time(
@@ -1055,7 +1143,7 @@ class TimelineOverlay:
             ):
                 if pygame.Rect(rect).collidepoint(local_x, upload_y):
                     return StripHit(
-                        row=None, t_sec=None, cue_tolerance_sec=tolerance, target=target
+                        row=None, t_sec=None, tolerance_sec=tolerance, target=target
                     )
             # The time scale starts at its major ticks; the labels above them
             # and the band's top edge stay clear for the resize splitter.
@@ -1065,7 +1153,7 @@ class TimelineOverlay:
             return StripHit(
                 row=None,
                 t_sec=t_sec,
-                cue_tolerance_sec=tolerance,
+                tolerance_sec=tolerance,
                 marker_index=marker_index,
             )
         # The scrollbar takes the gap above it and the padding below, so the
@@ -1076,7 +1164,7 @@ class TimelineOverlay:
             return StripHit(
                 row=None,
                 t_sec=self.scrollbar_time_at_x(x),
-                cue_tolerance_sec=tolerance,
+                tolerance_sec=tolerance,
                 target="scroll_thumb" if on_thumb else "scroll_track",
             )
         label_left = self._padding
@@ -1087,12 +1175,26 @@ class TimelineOverlay:
         for display_i in range(layout.row_count):
             row_y = self._row_y(display_i, layout.row_h)
             if row_y <= local_y < row_y + layout.row_h:
+                clip_hit = (
+                    clip_hit_at_x(
+                        self._hit_clips[display_i],
+                        local_x,
+                        bar_left=layout.bar_left,
+                        bar_width=layout.bar_width,
+                        view_start_sec=view_start,
+                        view_end_sec=view_end,
+                    )
+                    if in_bar and display_i < len(self._hit_clips)
+                    else None
+                )
                 return StripHit(
                     row=display_i,
                     t_sec=t_sec,
-                    cue_tolerance_sec=tolerance,
+                    tolerance_sec=tolerance,
                     target="label" if on_label else "eye" if on_eye else None,
                     marker_index=marker_index,
+                    clip_start=None if clip_hit is None else clip_hit[0],
+                    clip_edge=None if clip_hit is None else clip_hit[1],
                 )
         return None
 
@@ -1446,34 +1548,70 @@ class TimelineOverlay:
                 on_color=track_color(row_index),
             )
 
-            row_cues = bar_cues_for_row(state, slot)
-            # Per-slot selection memory stays in selected_clip_t; only the focused
-            # row draws the selected marker (settled yellow / flash / badge).
-            selected_t = (
-                state.selected_clip_t.get(slot)
-                if row_index == state.focus_row
-                else None
-            )
-            for cue in row_cues:
+            # Cue ticks mark every clip boundary, so butted clips show a divider.
+            for cue in bar_cues_for_row(state, slot):
                 if not time_in_view(cue.t, view_start, view_end):
                     continue
                 tick_x = time_to_x(cue.t, bar_left, bar_width, view_start, view_end)
-                selected = selected_t is not None and cue.t == selected_t
+                pygame.draw.line(
+                    panel,
+                    (*LABEL, CUE_TICK_ALPHA),
+                    (tick_x, bar_rect.y),
+                    (tick_x, bar_rect.bottom - 1),
+                    CUE_TICK_WIDTH,
+                )
+
+            # Per-slot selection memory stays in selected_clip_t; only the
+            # focused row outlines its selected clip.
+            row_clips = row_clips_for_view(state, slot)
+            selected_t = (
+                state.selected_clip_t.get(slot)
+                if row_index == state.focus_row and not state.recording
+                else None
+            )
+            hover_t = (
+                state.hover_clip[1]
+                if state.hover_clip is not None and state.hover_clip[0] == row_index
+                else None
+            )
+            editable = not state.locked and not state.recording
+            for clip in row_clips:
+                selected = selected_t is not None and clip.start == selected_t
+                hovered = hover_t is not None and clip.start == hover_t
+                if not selected and not (hovered and editable):
+                    continue
+                span = clip_bar_span(
+                    clip,
+                    bar_left=bar_left,
+                    bar_width=bar_width,
+                    view_start_sec=view_start,
+                    view_end_sec=view_end,
+                )
+                if span is None:
+                    continue
+                left, right = span
+                if editable:
+                    for edge_t, handle_x in (
+                        (clip.start, left),
+                        (clip.end, right - CLIP_HANDLE_WIDTH),
+                    ):
+                        if time_in_view(edge_t, view_start, view_end):
+                            pygame.draw.rect(
+                                panel,
+                                SELECTED_CLIP_COLOR if selected else LABEL,
+                                pygame.Rect(
+                                    max(left, handle_x),
+                                    row_y,
+                                    min(CLIP_HANDLE_WIDTH, right - left),
+                                    row_h,
+                                ),
+                            )
                 if selected:
-                    pygame.draw.line(
+                    pygame.draw.rect(
                         panel,
-                        SELECTED_CUE_COLOR,
-                        (tick_x, row_y),
-                        (tick_x, row_y + row_h - 1),
-                        SELECTED_CUE_TICK_WIDTH,
-                    )
-                else:
-                    pygame.draw.line(
-                        panel,
-                        (*LABEL, CUE_TICK_ALPHA),
-                        (tick_x, bar_rect.y),
-                        (tick_x, bar_rect.bottom - 1),
-                        CUE_TICK_WIDTH,
+                        SELECTED_CLIP_COLOR,
+                        pygame.Rect(left, row_y, right - left, row_h),
+                        SELECTED_CLIP_OUTLINE_WIDTH,
                     )
 
             if focused:
@@ -1686,40 +1824,43 @@ class TimelineOverlay:
         dirty.append(monitor_rect)
 
         selected_t = (
-            state.selected_clip_t.get(slot) if row_index == state.focus_row else None
+            state.selected_clip_t.get(slot)
+            if row_index == state.focus_row and not state.recording
+            else None
         )
         view_start, view_end = view_window(state)
-        if (
-            selected_t is not None
-            and time_in_view(selected_t, view_start, view_end)
-            and selected_clip_flash_active(state.selected_clip_flash_start_ms)
+        if selected_t is not None and selected_clip_flash_active(
+            state.selected_clip_flash_start_ms
         ):
-            tick_x = time_to_x(
-                selected_t, layout.bar_left, layout.bar_width, view_start, view_end
+            clip = next(
+                (
+                    clip
+                    for clip in row_clips_for_view(state, slot)
+                    if clip.start == selected_t
+                ),
+                None,
             )
-            half_w = SELECTED_CUE_FLASH_TICK_WIDTH // 2 + 1
-            tick_rect = (
-                max(layout.bar_left, tick_x - half_w),
-                upload_y,
-                min(layout.bar_width, half_w * 2 + 1),
-                row_h,
-            )
-            # Clamp width if tick sits near the bar edge.
-            tick_rect = (
-                tick_rect[0],
-                tick_rect[1],
-                min(tick_rect[2], layout.bar_left + layout.bar_width - tick_rect[0]),
-                tick_rect[3],
-            )
-            if tick_rect[2] > 0:
-                pygame.draw.line(
-                    upload,
-                    selected_cue_tick_color(state.selected_clip_flash_start_ms),
-                    (tick_x, upload_y),
-                    (tick_x, upload_y + row_h - 1),
-                    SELECTED_CUE_FLASH_TICK_WIDTH,
+            span = (
+                clip_bar_span(
+                    clip,
+                    bar_left=layout.bar_left,
+                    bar_width=layout.bar_width,
+                    view_start_sec=view_start,
+                    view_end_sec=view_end,
                 )
-                dirty.append(tick_rect)
+                if clip is not None
+                else None
+            )
+            if span is not None:
+                left, right = span
+                clip_rect = (left, upload_y, right - left, row_h)
+                pygame.draw.rect(
+                    upload,
+                    selected_clip_flash_color(state.selected_clip_flash_start_ms),
+                    pygame.Rect(clip_rect),
+                    SELECTED_CLIP_FLASH_OUTLINE_WIDTH,
+                )
+                dirty.append(clip_rect)
         return dirty
 
     def _live_flash_row_indices(self, state: TimelineViewState) -> tuple[int, ...]:
@@ -1829,8 +1970,8 @@ class TimelineOverlay:
         if selected_x is not None:
             flash_start = state.song_marker_flash_start_ms
             if selected_clip_flash_active(flash_start):
-                color = selected_cue_tick_color(flash_start)
-                width = SELECTED_CUE_FLASH_TICK_WIDTH
+                color = selected_clip_flash_color(flash_start)
+                width = SELECTED_CLIP_FLASH_TICK_WIDTH
                 half_w = width // 2 + 1
                 left = max(layout.bar_left, selected_x - half_w)
                 right = min(bar_right + 1, selected_x + half_w + 1)
@@ -2166,6 +2307,9 @@ class TimelineOverlay:
         self._hit_duration_sec = state.duration_sec
         self._hit_view = (view_start, view_end)
         self._hit_markers = state.song_marker_times
+        self._hit_clips = tuple(
+            tuple(row_clips_for_view(state, slot)) for slot in state.layer_z_order
+        )
         sx, sy, sw, sh = screen_bounds
         panel_screen_y = layout.panel_y
         self._panel_rect = clip_rect_to_bounds(

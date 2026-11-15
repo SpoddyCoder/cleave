@@ -75,6 +75,8 @@ class TimelineStaticSignature:
     soft_cut_fade_out: float
     soft_cut_crossfade: bool
     selected_clip_t: tuple[tuple[str, float], ...]
+    hover_clip: tuple[int, float, str | None] | None
+    locked: bool
     view_start_sec: float
     view_end_sec: float | None
     ui_scale_generation: int
@@ -179,6 +181,8 @@ def timeline_static_signature(
         soft_cut_fade_out=state.soft_cut_fades.fade_out,
         soft_cut_crossfade=state.soft_cut_fades.crossfade,
         selected_clip_t=tuple(sorted(state.selected_clip_t.items())),
+        hover_clip=state.hover_clip,
+        locked=state.locked,
         view_start_sec=state.view_start_sec,
         view_end_sec=state.view_end_sec,
         ui_scale_generation=ui_scale_generation(),

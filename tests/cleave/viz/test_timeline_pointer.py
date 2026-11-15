@@ -721,3 +721,227 @@ def test_right_click_on_a_marker_selects_it_and_asks_for_its_items() -> None:
     provider()
     assert ("marker", 0) in row_actions.calls
     assert row_menu.calls == [(30.0, 0.2, False, 0)]
+
+
+# Clip drags, through real ``TimelineControls`` and its ``ClipEditor``.
+
+
+def _drag_setup(
+    cues: list[tuple[float, float]],
+    hit: StripHit,
+    *,
+    view: StripView | None = None,
+    **kwargs,
+):
+    """A pointer over layer_1's lane. Geometry maps ten pixels to a second."""
+    from cleave.timeline import SlotCue, TimelineLane
+    from tests.cleave.viz.test_timeline_controls import _make_timeline_controls
+
+    lane = TimelineLane(baseline=0.0, cues=[SlotCue(t=t, level=lv) for t, lv in cues])
+    controls, session, *_ = _make_timeline_controls(lanes={"layer_1": lane}, **kwargs)
+    if view is not None:
+        session.timeline.strip_view = view
+    geometry = _Geometry(hit)
+    pointer = TimelinePointer(geometry, controls, session)
+    return pointer, controls, session, geometry
+
+
+def _spans(controls) -> list[tuple[float, float]]:
+    return [(clip.start, clip.end) for clip in controls.clip_editor.clips("layer_1")]
+
+
+_ONE_CLIP = [(20.0, 1.0), (30.0, 0.0)]
+
+
+def test_dragging_a_clip_body_moves_it_as_one_undo_step() -> None:
+    pointer, controls, session, _ = _drag_setup(
+        _ONE_CLIP, StripHit(0, 24.0, 0.2, clip_start=20.0)
+    )
+    pointer.press(240, 0)
+    assert session.timeline.selected_clip_t["layer_1"] == 20.0
+    # A small wobble is still a click.
+    pointer.motion(242, 0)
+    assert _spans(controls) == [(20.0, 30.0)]
+    assert controls.clip_editor.dragging is False
+
+    pointer.motion(290, 0)
+    assert _spans(controls) == [(25.0, 35.0)]
+    assert pointer.clip_gesture == "move"
+    assert session.timeline.strip_view.held is True
+    pointer.motion(340, 0)
+    assert _spans(controls) == [(30.0, 40.0)]
+    assert session.timeline.selected_clip_t["layer_1"] == 30.0
+    history = controls.clip_editor.history
+    assert history.can_undo is False  # still pending
+
+    pointer.release()
+    assert session.timeline.strip_view.held is False
+    assert history.undo() == "Move clip"
+    assert _spans(controls) == [(20.0, 30.0)]
+    assert session.timeline.selected_clip_t["layer_1"] == 20.0
+    assert history.can_undo is False
+
+
+def test_a_dragged_clip_stops_at_its_neighbours() -> None:
+    pointer, controls, _, _ = _drag_setup(
+        [(5.0, 1.0), (10.0, 0.0), (20.0, 0.5), (30.0, 0.0), (50.0, 1.0), (60.0, 0.0)],
+        StripHit(0, 24.0, 0.2, clip_start=20.0),
+    )
+    pointer.press(240, 0)
+    pointer.motion(0, 0)
+    assert _spans(controls) == [(5.0, 10.0), (10.0, 20.0), (50.0, 60.0)]
+    pointer.motion(900, 0)
+    assert _spans(controls) == [(5.0, 10.0), (40.0, 50.0), (50.0, 60.0)]
+    pointer.release()
+    assert [clip.level for clip in controls.clip_editor.clips("layer_1")] == [
+        1.0,
+        0.5,
+        1.0,
+    ]
+
+
+def test_a_dragged_clip_snaps_to_the_grid() -> None:
+    pointer, controls, session, _ = _drag_setup(
+        _ONE_CLIP,
+        StripHit(0, 24.0, 0.2, clip_start=20.0),
+        beat_times=tuple(float(t) for t in range(0, 120, 4)),
+        bar_times=tuple(float(t) for t in range(0, 120, 16)),
+    )
+    session.timeline.placement_snap = "beat"
+    pointer.press(240, 0)
+    # The pointer is 4 s into the clip, so the start lands near 41.3 s.
+    pointer.motion(453, 0)
+    assert _spans(controls) == [(40.0, 50.0)]
+    pointer.release()
+
+
+def test_dragging_a_clip_edge_trims_it() -> None:
+    pointer, controls, _, geometry = _drag_setup(
+        _ONE_CLIP, StripHit(0, 30.2, 0.2, clip_start=20.0, clip_edge="end")
+    )
+    # The end edge can be pressed from just outside the clip.
+    pointer.press(302, 0)
+    pointer.motion(350, 0)
+    assert _spans(controls) == [(20.0, 35.0)]
+    assert pointer.clip_gesture == "trim"
+    # It keeps a minimum length.
+    pointer.motion(0, 0)
+    assert _spans(controls) == [(20.0, pytest.approx(20.1))]
+    pointer.motion(260, 0)
+    pointer.release()
+    assert _spans(controls) == [(20.0, 26.0)]
+    assert controls.clip_editor.history.undo_label == "Trim clip"
+
+    geometry.hit = StripHit(0, 20.0, 0.2, clip_start=20.0, clip_edge="start")
+    pointer.press(200, 0)
+    pointer.motion(150, 0)
+    pointer.release()
+    assert _spans(controls) == [(15.0, 26.0)]
+    assert controls.session.timeline.selected_clip_t["layer_1"] == 15.0
+
+
+def test_dragging_a_butted_edge_rolls_the_boundary() -> None:
+    pointer, controls, _, _ = _drag_setup(
+        [(10.0, 1.0), (20.0, 0.5), (30.0, 0.0)],
+        StripHit(0, 20.0, 0.2, clip_start=10.0, clip_edge="end"),
+    )
+    pointer.press(200, 0)
+    pointer.motion(250, 0)
+    assert _spans(controls) == [(10.0, 25.0), (25.0, 30.0)]
+    # Neither clip can be rolled away.
+    pointer.motion(900, 0)
+    assert _spans(controls) == [(10.0, pytest.approx(29.9)), (pytest.approx(29.9), 30.0)]
+    pointer.release()
+
+
+def test_esc_during_a_drag_restores_the_clip() -> None:
+    import pygame
+
+    from tests.support.viz import keydown
+
+    pointer, controls, session, _ = _drag_setup(
+        _ONE_CLIP, StripHit(0, 24.0, 0.2, clip_start=20.0)
+    )
+    before = session.timeline.lanes["layer_1"]
+    pointer.press(240, 0)
+    pointer.motion(400, 0)
+    assert _spans(controls) == [(36.0, 46.0)]
+
+    exits_before = session.timeline.panel_open
+    controls.handle_keydown(keydown(pygame.K_ESCAPE))
+    assert session.timeline.lanes["layer_1"] == before
+    assert session.timeline.selected_clip_t["layer_1"] == 20.0
+    assert session.timeline.panel_open is exits_before
+    # The rest of the gesture does nothing, and nothing is recorded.
+    pointer.motion(500, 0)
+    pointer.release()
+    assert session.timeline.lanes["layer_1"] == before
+    assert controls.clip_editor.history.can_undo is False
+
+
+def test_cancel_during_a_drag_restores_the_clip() -> None:
+    pointer, controls, session, _ = _drag_setup(
+        _ONE_CLIP, StripHit(0, 24.0, 0.2, clip_start=20.0)
+    )
+    before = session.timeline.lanes["layer_1"]
+    pointer.press(240, 0)
+    pointer.motion(400, 0)
+    pointer.cancel()
+    assert session.timeline.lanes["layer_1"] == before
+    assert controls.clip_editor.dragging is False
+
+
+@pytest.mark.parametrize("blocked", ["locked", "recording"])
+def test_a_clip_does_not_drag_where_clips_cannot_be_edited(blocked: str) -> None:
+    pointer, controls, session, _ = _drag_setup(
+        _ONE_CLIP, StripHit(0, 24.0, 0.2, clip_start=20.0)
+    )
+    setattr(session.timeline, blocked, True)
+    pointer.press(240, 0)
+    pointer.motion(400, 0)
+    pointer.release()
+    assert _spans(controls) == [(20.0, 30.0)]
+    assert pointer.clip_gesture is None
+
+
+def test_zoomed_drag_on_a_clip_moves_it_and_on_a_gap_pans() -> None:
+    view = StripView(start_sec=10.0, span_sec=40.0)
+    pointer, controls, session, geometry = _drag_setup(
+        _ONE_CLIP, StripHit(0, 24.0, 0.2, clip_start=20.0), view=view
+    )
+    pointer.press(240, 0)
+    pointer.motion(290, 0)
+    assert _spans(controls) == [(25.0, 35.0)]
+    assert not pointer.panning
+    pointer.release()
+    assert session.timeline.strip_view.start_sec == 10.0
+
+    geometry.hit = StripHit(0, 45.0, 0.2)
+    pointer.press(450, 0)
+    pointer.motion(400, 0)
+    assert pointer.panning
+    assert session.timeline.strip_view.start_sec == pytest.approx(15.0)
+    assert _spans(controls) == [(25.0, 35.0)]
+    pointer.release()
+
+
+def test_hover_reports_the_clip_gesture() -> None:
+    pointer, _controls, session, geometry = _drag_setup(
+        _ONE_CLIP, StripHit(0, 24.0, 0.2, clip_start=20.0)
+    )
+    pointer.motion(240, 0)
+    assert session.timeline.strip_hover_clip == (0, 20.0, None)
+    assert pointer.clip_gesture == "move"
+    geometry.hit = StripHit(0, 30.0, 0.2, clip_start=20.0, clip_edge="end")
+    pointer.motion(300, 0)
+    assert session.timeline.strip_hover_clip == (0, 20.0, "end")
+    assert pointer.clip_gesture == "trim"
+    session.timeline.locked = True
+    assert pointer.clip_gesture is None
+    session.timeline.locked = False
+    geometry.hit = StripHit(0, 50.0, 0.2)
+    pointer.motion(500, 0)
+    assert session.timeline.strip_hover_clip is None
+    assert pointer.clip_gesture is None
+    pointer.clear_hover()
+    assert session.timeline.strip_hover_clip is None
