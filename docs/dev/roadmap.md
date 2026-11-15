@@ -7,21 +7,19 @@ Aspirational ideas. Not scheduled; revisit when the core workflow feels solid.
 
 Phase 2 Windows MVP ships PyInstaller ([structured-releases.md](structured-releases.md)). Revisit Nuitka after a working Windows zip exists, for possible faster startup and a tighter native binary. Same onedir layout, sidecars, and data dirs; not a reason to reopen the Phase 2 freezer choice.
 
-## Undo feature
+## Edit: Undo and Copy / Paste
 
-Session undo/redo for timeline and config edits.
+Undo and Redo today (`Ctrl+Z` / `Ctrl+Y`, `TimelineHistory`) cover only Generate timeline, Reset timeline, Snap cues, and Set cut type on cues, and turn off after any hand edit to a cue. Extend the Edit menu to a general session history:
+
+- Undo / Redo for inspector value edits, cue edits, layer add / delete / reorder, preset list changes, and song markers, with menu labels naming what each step undoes.
+- Copy / Cut / Paste for cues (single and multi-select), layer settings between layers, and single values (the inspector context menu's Copy value / Paste value).
+- Reset to default on value rows, which needs a per-row default reader on `RowSpec` from `cleave/config_schema/`.
 
 ## AI-assisted visual authoring
 
 Let agents create and refine visualisations from Cleave's existing data (signals, markers, timeline generators, layer YAML) instead of hand-editing every cue. Headless tool layer first; MCP for IDE users; optional in-editor prompt later for frozen Windows (editor-first, same mutations as the panel).
 
 Plan: [plans/ai-integration-proposal.md](plans/ai-integration-proposal.md).
-
-## Menu and panel overhaul
-
-Move from one expandable tuning tree to an in-window Dear ImGui shell: menu bar, object navigator, and property inspector. Keep the timeline strip as its own region. Keyboard scopes first, then the mouse gestures in the design.
-
-Plan: [plans/menu-overhaul-and-mouse-support-plan.md](plans/menu-overhaul-and-mouse-support-plan.md).
 
 ## Timeline richer cue types
 
