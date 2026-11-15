@@ -99,14 +99,21 @@ def timeline_row_menu_entries(
     recording = bool(tl.recording)
     overridden = slot in tl.override_slots
 
+    armed = slot in tl.armed_slots
+    if recording:
+        override_hint: str | None = "Stop recording to change overrides"
+    elif armed:
+        override_hint = "Disarm this row to override it"
+    else:
+        override_hint = None
     override = ContextMenuItem(
         id="timeline.row.override",
         label="Override visibility",
         run=lambda: actions.toggle_override(slot),
-        enabled=not recording,
+        enabled=override_hint is None,
         checked=overridden,
         shortcut="Shift+Enter",
-        hint="Stop recording to change overrides" if recording else None,
+        hint=override_hint,
     )
 
     any_override = bool(tl.override_slots)

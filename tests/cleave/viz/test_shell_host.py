@@ -199,6 +199,9 @@ def test_strip_eye_tooltip_explains_overrides() -> None:
     assert strip_eye_tooltip(overridden=True, recording=False, armed=False) == (
         "Override: click to show / hide"
     )
+    assert strip_eye_tooltip(overridden=False, recording=False, armed=True) == (
+        "Armed: press REC to record show / hide"
+    )
     assert strip_eye_tooltip(overridden=True, recording=True, armed=True) == (
         "Click to record show / hide"
     )

@@ -312,7 +312,8 @@ def test_num_keys_beyond_layer_count_are_noop() -> None:
 def test_row_visibility_toggleable_outside_a_take() -> None:
     controls, session, _, _, _, _ = _make_timeline_controls(armed_slots={"layer_1"})
     controls.playback.paused = True
-    assert controls.row_visibility_toggleable(0) is True
+    assert controls.row_visibility_toggleable(0) is False
+    assert controls.row_visibility_toggleable(2) is True
     session.timeline.override_slots = {"layer_2"}
     assert controls.row_visibility_toggleable(1) is True
     assert controls.row_visibility_toggleable(7) is False
@@ -389,21 +390,20 @@ def test_num_keys_toggle_override_visible_when_playing() -> None:
     assert visibility_calls == [True]
 
 
-def test_record_from_pause_stores_override_baseline() -> None:
+def test_number_key_on_an_armed_row_waits_for_the_take() -> None:
     controls, session, _, _, _, _ = _make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=7.0,
     )
     controls.playback.paused = True
-    session.timeline.override_slots = {"layer_1"}
-    session.timeline.override_visible = {"layer_1": True}
 
     controls.handle_keydown(keydown(pygame.K_1))
+    assert session.timeline.override_slots == set()
     controls.handle_keydown(keydown(pygame.K_r))
 
     assert session.timeline.recording is True
     assert session.timeline.record_buffer == {}
-    assert session.timeline.record_baseline == {"layer_1": 0.0}
+    assert session.timeline.record_baseline == {"layer_1": 1.0}
 
 
 def test_record_preserves_override() -> None:
@@ -1898,6 +1898,28 @@ def test_release_row_override_hands_the_row_back() -> None:
     assert session.timeline.override_visible == {}
     controls.release_row_override(0)
     assert session.timeline.override_slots == set()
+
+
+def test_arming_releases_an_override_and_an_armed_row_cannot_take_one() -> None:
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        lanes={"layer_1": _lane(True)},
+    )
+    tl = session.timeline
+    controls.toggle_row_visibility(0)
+    assert tl.override_slots == {"layer_1"}
+
+    controls.toggle_arm_row(0)
+    assert tl.armed_slots == {"layer_1"}
+    assert tl.override_slots == set()
+    assert tl.override_visible == {}
+
+    assert controls.row_visibility_toggleable(0) is False
+    assert controls.strip_target_pressable("eye", 0) is False
+    controls.toggle_row_visibility(0)
+    controls.handle_keydown(keydown(pygame.K_1))
+    controls.toggle_override("layer_1")
+    assert tl.override_slots == set()
+    assert tl.override_visible == {}
 
 
 def test_toggle_row_solo_enters_and_exits_solo() -> None:

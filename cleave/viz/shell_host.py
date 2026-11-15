@@ -357,6 +357,8 @@ def strip_eye_tooltip(*, overridden: bool, recording: bool, armed: bool) -> str:
         if armed:
             return "Click to record show / hide"
         return "Arm this row to record show / hide"
+    if armed:
+        return "Armed: press REC to record show / hide"
     if overridden:
         return "Override: click to show / hide"
     return "Show / hide, taking over from the timeline"

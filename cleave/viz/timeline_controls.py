@@ -464,8 +464,9 @@ class TimelineControls:
     def row_visibility_toggleable(self, row: int) -> bool:
         """Whether ``toggle_row_visibility`` would change *row* right now.
 
-        Always outside a take: a row the timeline drives takes an override.
-        While recording, only an armed row.
+        Outside a take, any unarmed row: a row the timeline drives takes an
+        override. An armed row waits for the take. While recording, only an
+        armed row.
         """
         slot = self._slot_for_layer_index(row)
         if slot is None:
@@ -473,7 +474,7 @@ class TimelineControls:
         tl = self.session.timeline
         if tl.recording:
             return slot in tl.armed_slots and slot in tl.record_baseline
-        return True
+        return slot not in tl.armed_slots
 
     def row_override_releasable(self, row: int) -> bool:
         """Whether *row* has an override to hand back, outside a take."""
@@ -509,7 +510,8 @@ class TimelineControls:
         """Start or release a visibility override on *slot* (Shift+Enter).
 
         Starting holds the layer as it shows now; releasing hands it back to
-        the timeline. Blocked while recording.
+        the timeline. Blocked while recording, and an armed row cannot start
+        one.
         """
         tl = self.session.timeline
         if tl.recording:
@@ -517,6 +519,8 @@ class TimelineControls:
         if slot in tl.override_slots:
             tl.override_slots.discard(slot)
             tl.override_visible.pop(slot, None)
+        elif slot in tl.armed_slots:
+            return
         else:
             t_sec = current_sec(self.playback, self.duration_sec)
             tl.override_visible[slot] = effective_layer_enabled(
@@ -540,7 +544,7 @@ class TimelineControls:
             self._toggle_armed_layer_at(
                 slot, current_sec(self.playback, self.duration_sec)
             )
-        else:
+        elif slot not in tl.armed_slots:
             # A row the timeline drives takes an override, then flips.
             if slot not in tl.override_slots:
                 self.toggle_override(slot)
@@ -641,6 +645,11 @@ class TimelineControls:
                 self._commit_recording_slot(slot)
         else:
             armed.add(slot)
+            # Arming hands an overridden row back to the timeline.
+            if slot in tl.override_slots:
+                tl.override_slots.discard(slot)
+                tl.override_visible.pop(slot, None)
+                self._refresh_visibility()
             if tl.recording:
                 t_sec = current_sec(self.playback, self.duration_sec)
                 tl.record_baseline[slot] = (

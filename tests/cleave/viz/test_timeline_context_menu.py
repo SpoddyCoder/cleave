@@ -60,6 +60,14 @@ def test_recording_blocks_overrides() -> None:
     assert armed["timeline.row.arm"].checked is True
 
 
+def test_armed_row_greys_out_override() -> None:
+    controls, session, _, _, _, _ = _make_timeline_controls(armed_slots={"layer_2"})
+    override = _items(controls, session, 1)["timeline.row.override"]
+    assert override.enabled is False
+    assert override.hint == "Disarm this row to override it"
+    assert _items(controls, session, 0)["timeline.row.override"].enabled is True
+
+
 def test_locked_timeline_greys_out_arm() -> None:
     controls, session, _, _, _, _ = _make_timeline_controls()
     session.timeline.locked = True
