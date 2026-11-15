@@ -1,7 +1,7 @@
 """Right-click menu for a timeline strip row.
 
-Show or hide the layer, override its visibility, release every override,
-and arm it for recording. Each item calls the same ``TimelineControls``
+Override the row's visibility, release every override, and arm it for
+recording. Each item calls the same ``TimelineControls``
 path as its key, and a disabled item says why in its hint. With a clip
 selected on the row, the menu opens with that clip's items
 (``clip_context_menu``). A right-click in a gap opens with Add clip here and
@@ -23,23 +23,13 @@ from cleave.viz.clip_context_menu import add_clip_entry, clip_menu_entries
 from cleave.viz.session import TuningSession
 from cleave.viz.timeline_clip_edits import ClipEditor
 
-# Layer number keys reach the first eight rows.
-_LAYER_KEY_ROWS = 8
-
-
 class TimelineRowMenuActions(Protocol):
     @property
     def clip_editor(self) -> ClipEditor: ...
 
     def row_slot(self, row: int) -> str | None: ...
 
-    def row_visible(self, row: int) -> bool: ...
-
-    def row_visibility_toggleable(self, row: int) -> bool: ...
-
     def row_arm_available(self, row: int) -> bool: ...
-
-    def toggle_row_visibility(self, row: int) -> None: ...
 
     def toggle_override(self, slot: str) -> None: ...
 
@@ -64,11 +54,13 @@ def timeline_row_menu(
     clip: bool = True,
     time_entries: Callable[[], tuple[ContextMenuEntry, ...]] | None = None,
     add_clip_t: float | None = None,
+    split_t: float | None = None,
 ) -> ContextMenuProvider:
     """Provider for *row*'s menu; empty once the row has no layer.
 
-    *clip* False leaves out the selected clip's items. *add_clip_t* leads with
-    Add clip here at that time. *time_entries* follow, above the row's own
+    *clip* False leaves out the selected clip's items; *split_t* is the
+    right-clicked time its Split here splits at. *add_clip_t* leads with Add
+    clip here at that time. *time_entries* follow, above the row's own
     items.
     """
 
@@ -80,6 +72,7 @@ def timeline_row_menu(
             clip=clip,
             time_entries=time_entries,
             add_clip_t=add_clip_t,
+            split_t=split_t,
         )
 
     return entries
@@ -93,6 +86,7 @@ def timeline_row_menu_entries(
     clip: bool = True,
     time_entries: Callable[[], tuple[ContextMenuEntry, ...]] | None = None,
     add_clip_t: float | None = None,
+    split_t: float | None = None,
 ) -> tuple[ContextMenuEntry, ...]:
     slot = actions.row_slot(row)
     if slot is None:
@@ -100,22 +94,6 @@ def timeline_row_menu_entries(
     tl = session.timeline
     recording = bool(tl.recording)
     overridden = slot in tl.override_slots
-
-    toggleable = actions.row_visibility_toggleable(row)
-    if toggleable:
-        visibility_hint = None
-    elif recording:
-        visibility_hint = "Arm this row to record show / hide"
-    else:
-        visibility_hint = "Turn on Override visibility to show or hide by hand"
-    visibility = ContextMenuItem(
-        id="timeline.row.visibility",
-        label="Hide layer" if actions.row_visible(row) else "Show layer",
-        run=lambda: actions.toggle_row_visibility(row),
-        enabled=toggleable,
-        shortcut=str(row + 1) if row < _LAYER_KEY_ROWS else None,
-        hint=visibility_hint,
-    )
 
     override = ContextMenuItem(
         id="timeline.row.override",
@@ -160,6 +138,7 @@ def timeline_row_menu_entries(
             actions.seek_to,
             actions.playhead_sec,
             actions.split_at_playhead,
+            split_t,
         )
         if clip
         else ()
@@ -179,8 +158,6 @@ def timeline_row_menu_entries(
     return (
         *lead,
         *((CONTEXT_SEPARATOR,) if lead else ()),
-        visibility,
-        CONTEXT_SEPARATOR,
         override,
         release_all,
         CONTEXT_SEPARATOR,

@@ -22,11 +22,7 @@ def _items(controls, session, row: int) -> dict[str, ContextMenuItem]:
 def test_plain_row_offers_override_and_arm() -> None:
     controls, session, _, _, _, _ = _make_timeline_controls()
     items = _items(controls, session, 1)
-    visibility = items["timeline.row.visibility"]
-    assert visibility.label == "Hide layer"
-    assert visibility.enabled is False
-    assert visibility.shortcut == "2"
-    assert visibility.hint == "Turn on Override visibility to show or hide by hand"
+    assert "timeline.row.visibility" not in items
     override = items["timeline.row.override"]
     assert (override.enabled, override.checked, override.shortcut) == (
         True,
@@ -40,40 +36,28 @@ def test_plain_row_offers_override_and_arm() -> None:
     assert (arm.enabled, arm.checked, arm.shortcut) == (True, False, "A")
 
 
-def test_override_item_starts_and_releases_and_show_hide_follows() -> None:
+def test_override_item_starts_and_releases() -> None:
     controls, session, _, _, _, _ = _make_timeline_controls(
         lanes={"layer_2": TimelineLane(baseline=0.0, cues=[])},
     )
-    items = _items(controls, session, 1)
-    assert items["timeline.row.visibility"].label == "Show layer"
-    items["timeline.row.override"].run()
+    _items(controls, session, 1)["timeline.row.override"].run()
     assert session.timeline.override_slots == {"layer_2"}
 
     items = _items(controls, session, 1)
     assert items["timeline.row.override"].checked is True
     assert items["timeline.row.release_overrides"].enabled is True
-    visibility = items["timeline.row.visibility"]
-    assert visibility.enabled is True and visibility.hint is None
-    visibility.run()
-    assert session.timeline.override_visible == {"layer_2": True}
-    assert _items(controls, session, 1)["timeline.row.visibility"].label == (
-        "Hide layer"
-    )
 
     _items(controls, session, 0)["timeline.row.release_overrides"].run()
     assert session.timeline.override_slots == set()
 
 
-def test_recording_blocks_overrides_and_allows_armed_show_hide() -> None:
+def test_recording_blocks_overrides() -> None:
     controls, session, _, _, _, _ = _make_timeline_controls(armed_slots={"layer_1"})
     controls.handle_keydown(keydown(pygame.K_r))
     armed = _items(controls, session, 0)
-    assert armed["timeline.row.visibility"].enabled is True
     assert armed["timeline.row.override"].enabled is False
     assert armed["timeline.row.override"].hint == "Stop recording to change overrides"
     assert armed["timeline.row.arm"].checked is True
-    other = _items(controls, session, 1)
-    assert other["timeline.row.visibility"].hint == "Arm this row to record show / hide"
 
 
 def test_locked_timeline_greys_out_arm() -> None:
@@ -113,23 +97,24 @@ def _entries_by_id(controls, session, row: int, **kwargs):
 def test_no_selected_clip_means_no_clip_items() -> None:
     controls, session, _, _, _, _ = _clip_controls()
     entries = timeline_row_menu_entries(controls, session, 0)
-    assert entries[0].id == "timeline.row.visibility"
+    assert entries[0].id == "timeline.row.override"
 
 
-def test_selected_clip_leads_with_go_to_cuts_blend_role_split_delete() -> None:
+def test_selected_clip_leads_with_go_to_splits_cuts_role_delete() -> None:
     controls, session, _, _, seeks, _ = _clip_controls()
     session.timeline.selected_clip_t["layer_1"] = 4.0
     entries = timeline_row_menu_entries(controls, session, 0)
     assert [getattr(entry, "id", None) for entry in entries[:8]] == [
         "timeline.clip.go_to",
+        "timeline.clip.split",
+        "timeline.clip.split_here",
         "timeline.clip.cut_in",
         "timeline.clip.cut_out",
-        "timeline.clip.blend",
         "timeline.clip.role",
-        "timeline.clip.split",
         "timeline.clip.delete",
         None,
     ]
+    assert "timeline.clip.blend" not in _entries_by_id(controls, session, 0)
     by_id = _entries_by_id(controls, session, 0)
     cut_in = by_id["timeline.clip.cut_in"]
     assert cut_in.enabled and cut_in.shortcut == "C"
@@ -140,8 +125,6 @@ def test_selected_clip_leads_with_go_to_cuts_blend_role_split_delete() -> None:
     ]
     cut_out = by_id["timeline.clip.cut_out"]
     assert cut_out.enabled and cut_out.shortcut == "Shift+C"
-    blend = by_id["timeline.clip.blend"]
-    assert blend.items[0].label == "Layer blend" and blend.items[0].checked
     role = by_id["timeline.clip.role"]
     assert [item.label for item in role.items] == [
         "None", "Bed", "Pulse", "Lead", "Accent"
@@ -149,10 +132,9 @@ def test_selected_clip_leads_with_go_to_cuts_blend_role_split_delete() -> None:
 
     cut_in.items[1].run()
     cut_out.items[2].run()
-    blend.items[2].run()
     role.items[3].run()
     start, end = session.timeline.lanes["layer_1"].cues
-    assert (start.cut, start.blend, start.role) == ("hard", "add", "lead")
+    assert (start.cut, start.role) == ("hard", "lead")
     assert end.cut == "soft"
     assert _entries_by_id(controls, session, 0)["timeline.clip.cut_in"].items[1].checked
 
@@ -196,6 +178,24 @@ def test_split_item_needs_the_playhead_inside_the_clip() -> None:
     assert session.timeline.selected_clip_t["layer_1"] == 6.0
 
 
+def test_split_here_splits_at_the_right_clicked_time() -> None:
+    controls, session, _, _, _, _ = _clip_controls()
+    session.timeline.selected_clip_t["layer_1"] = 4.0
+    keyboard = _entries_by_id(controls, session, 0)["timeline.clip.split_here"]
+    assert keyboard.enabled is False
+    assert keyboard.hint == "Right-click inside the clip to split there"
+
+    edge = _entries_by_id(controls, session, 0, split_t=4.0)["timeline.clip.split_here"]
+    assert edge.enabled is False
+    assert edge.hint == "Too close to the clip's edge"
+
+    item = _entries_by_id(controls, session, 0, split_t=7.0)["timeline.clip.split_here"]
+    assert item.enabled is True
+    item.run()
+    assert [cue.t for cue in session.timeline.lanes["layer_1"].cues] == [4.0, 7.0, 10.0]
+    assert session.timeline.selected_clip_t["layer_1"] == 7.0
+
+
 def test_locked_timeline_greys_out_clip_edits_but_keeps_go_to() -> None:
     controls, session, _, _, _, _ = _clip_controls()
     session.timeline.selected_clip_t["layer_1"] = 4.0
@@ -205,9 +205,9 @@ def test_locked_timeline_greys_out_clip_edits_but_keeps_go_to() -> None:
     for key in (
         "timeline.clip.cut_in",
         "timeline.clip.cut_out",
-        "timeline.clip.blend",
         "timeline.clip.role",
         "timeline.clip.split",
+        "timeline.clip.split_here",
         "timeline.clip.delete",
     ):
         assert by_id[key].enabled is False

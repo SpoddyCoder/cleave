@@ -587,8 +587,6 @@ class _TimeMenu:
 def _row_slot_actions(**kwargs) -> _MenuActions:
     actions = _MenuActions(**kwargs)
     # The row menu reads these; the pointer tests only check entry order.
-    actions.row_visible = lambda row: True  # type: ignore[attr-defined]
-    actions.row_visibility_toggleable = lambda row: True  # type: ignore[attr-defined]
     actions.row_arm_available = lambda row: True  # type: ignore[attr-defined]
     actions.toggle_override = lambda slot: None  # type: ignore[attr-defined]
     actions.release_all_overrides = lambda: None  # type: ignore[attr-defined]
@@ -642,7 +640,7 @@ def test_row_gap_leads_with_time_items() -> None:
     assert entries[1] is CONTEXT_SEPARATOR
     assert entries[2].id == "time.seek"
     assert entries[3] is CONTEXT_SEPARATOR
-    assert entries[4].id == "timeline.row.visibility"
+    assert entries[4].id == "timeline.row.override"
     assert time_menu.calls == [(5.0, 0.2, False, None)]
 
 

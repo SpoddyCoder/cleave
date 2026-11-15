@@ -256,6 +256,7 @@ class TimelinePointer:
             clip=on_clip,
             time_entries=time_entries,
             add_clip_t=add_clip_t,
+            split_t=hit.t_sec if on_clip else None,
         )
 
     def row_menu(self, row: int) -> ContextMenuProvider:

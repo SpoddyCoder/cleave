@@ -1,9 +1,9 @@
 """Context menu section for a timeline row's selected clip.
 
-Go to the clip's start, set its cut in, cut out, blend, and role from
-submenus, split it at the playhead, and delete it. Each choice calls the
-same ``ClipEditor`` method as the strip's clip keys and the inspector's clip
-rows. ``add_clip_entry`` is the row's item for adding a clip at a clicked
+Go to the clip's start, split it at the playhead or at the right-clicked
+time, set its cut in, cut out, and role from submenus, and delete it. Each
+choice calls the same ``ClipEditor`` method as the strip's clip keys and the
+inspector's clip rows. Blend is left to the inspector. ``add_clip_entry`` is the row's item for adding a clip at a clicked
 time in a gap. Cut out needs an end cue of the clip's own, so it is disabled
 on a clip that butts the next one or runs to the song end.
 """
@@ -13,7 +13,6 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TypeVar
 
-from cleave.blend_modes import BLEND_MODES, BlendMode
 from cleave.cue_roles import CUE_ROLES, CueRole
 from cleave.cut_types import CUT_TYPES, CutType
 from cleave.timeline import MIN_CLIP_SEC
@@ -25,7 +24,6 @@ from cleave.viz.timeline_clip_edits import (
     cut_out_unavailable_hint,
 )
 
-_BLEND_OPTIONS: tuple[BlendMode | None, ...] = (None, *BLEND_MODES)
 _ROLE_OPTIONS: tuple[CueRole | None, ...] = (None, *CUE_ROLES)
 
 T = TypeVar("T")
@@ -37,8 +35,13 @@ def clip_menu_entries(
     seek_to: Callable[[float], None],
     playhead_sec: Callable[[], float],
     split_at_playhead: Callable[[], None],
+    split_t: float | None = None,
 ) -> tuple[ContextMenuEntry, ...]:
-    """Items for *slot*'s selected clip, or () when it has none."""
+    """Items for *slot*'s selected clip, or () when it has none.
+
+    *split_t* is the right-clicked time Split here splits at; None (a menu
+    opened from the keyboard) lists it disabled.
+    """
     session = editor.session
     clip = editor.selected(slot)
     if clip is None:
@@ -49,10 +52,18 @@ def clip_menu_entries(
     if editable and not clip.has_end_cue:
         cut_out_hint = cut_out_unavailable_hint(clip)
     playhead = playhead_sec()
-    can_split = clip.start + MIN_CLIP_SEC <= playhead <= clip.end - MIN_CLIP_SEC
+    can_split = _inside(clip.start, clip.end, playhead)
     split_hint = edit_hint
     if editable and not can_split:
         split_hint = "Move the playhead inside this clip"
+    can_split_here = split_t is not None and _inside(clip.start, clip.end, split_t)
+    split_here_hint = edit_hint
+    if editable and not can_split_here:
+        split_here_hint = (
+            "Right-click inside the clip to split there"
+            if split_t is None
+            else "Too close to the clip's edge"
+        )
     start = clip.start
     return (
         ContextMenuItem(
@@ -60,6 +71,21 @@ def clip_menu_entries(
             label="Go to clip start",
             run=lambda: seek_to(start),
             shortcut="Enter",
+        ),
+        ContextMenuItem(
+            id="timeline.clip.split",
+            label="Split at playhead",
+            run=split_at_playhead,
+            enabled=editable and can_split,
+            shortcut="Ctrl+K",
+            hint=split_hint,
+        ),
+        ContextMenuItem(
+            id="timeline.clip.split_here",
+            label="Split here",
+            run=lambda: editor.split_at(slot, split_t) if split_t is not None else None,
+            enabled=editable and can_split_here,
+            hint=split_here_hint,
         ),
         ContextSubmenu(
             id="timeline.clip.cut_in",
@@ -90,20 +116,6 @@ def clip_menu_entries(
             hint=cut_out_hint,
         ),
         ContextSubmenu(
-            id="timeline.clip.blend",
-            label="Blend",
-            items=_options(
-                "timeline.clip.blend",
-                _BLEND_OPTIONS,
-                clip.blend,
-                _blend_label,
-                lambda blend: editor.set_blend(slot, blend),
-            ),
-            enabled=editable,
-            shortcut="B",
-            hint=edit_hint,
-        ),
-        ContextSubmenu(
             id="timeline.clip.role",
             label="Role",
             items=_options(
@@ -116,14 +128,6 @@ def clip_menu_entries(
             enabled=editable,
             shortcut="O",
             hint=edit_hint,
-        ),
-        ContextMenuItem(
-            id="timeline.clip.split",
-            label="Split at playhead",
-            run=split_at_playhead,
-            enabled=editable and can_split,
-            shortcut="Ctrl+K",
-            hint=split_hint,
         ),
         ContextMenuItem(
             id="timeline.clip.delete",
@@ -152,6 +156,11 @@ def add_clip_entry(
         shortcut="Double-click",
         hint=edit_hint,
     )
+
+
+def _inside(start: float, end: float, t_sec: float) -> bool:
+    # A split leaves both parts at least MIN_CLIP_SEC long (ClipEditor.split_at).
+    return start + MIN_CLIP_SEC <= t_sec <= end - MIN_CLIP_SEC
 
 
 def _edit_hint(session: TuningSession) -> str | None:
@@ -186,11 +195,6 @@ def _cut_value(cut: CutType | None) -> CutType:
 
 def _cut_label(cut: CutType) -> str:
     return cut.capitalize()
-
-
-def _blend_label(blend: BlendMode | None) -> str:
-    # No clip blend holds the layer's own blend mode.
-    return "Layer blend" if blend is None else blend
 
 
 def _role_label(role: CueRole | None) -> str:
