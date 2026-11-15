@@ -664,6 +664,419 @@ def lane_last_on_level(lane: TimelineLane, t_sec: float) -> float:
     return later if later is not None else 1.0
 
 
+MIN_CLIP_SEC = 0.1
+ClipEdge = Literal["start", "end"]
+
+
+@dataclass(frozen=True)
+class TimelineClip:
+    """One visible span of a lane: an on cue up to the next cue or the song end.
+
+    ``cut_in`` is the start cue's cut. ``cut_out`` is the cut of the off cue
+    that ends the clip, and stays ``None`` without one (``has_end_cue``
+    False): the clip butts the next one (``butts_next``) or runs to the song
+    end. ``recast`` and ``anchor`` are the start cue's flags.
+    """
+
+    start: float
+    end: float
+    level: float
+    blend: BlendMode | None = None
+    role: CueRole | None = None
+    cut_in: CutType | None = None
+    cut_out: CutType | None = None
+    butts_next: bool = False
+    has_end_cue: bool = False
+    recast: bool = False
+    anchor: bool = False
+
+
+def fold_lane_baseline(lane: TimelineLane, inherit: float) -> TimelineLane:
+    """Freeze ``inherit`` into an explicit baseline when the lane has none."""
+    if lane.baseline is not None:
+        return copy_lane(lane)
+    return TimelineLane(baseline=inherit, cues=canonicalize(inherit, lane.cues))
+
+
+def lane_clips(
+    lane: TimelineLane,
+    *,
+    inherit: float,
+    duration_sec: float,
+) -> list[TimelineClip]:
+    """The lane's clips in time order; every span outside them is off.
+
+    An opening period that is on (by ``baseline``, or ``inherit`` when the
+    baseline is None) is a clip from ``0.0``. The last clip ends at
+    ``duration_sec``. An on cue right after another on cue starts a new clip
+    that butts the one before.
+    """
+    if duration_sec <= 0.0:
+        return []
+    opening = float(inherit if lane.baseline is None else lane.baseline)
+    points = [cue for cue in lane.cues if cue.t < duration_sec]
+    if opening > LEVEL_EPS and not (points and points[0].t <= 0.0):
+        points.insert(0, SlotCue(t=0.0, level=opening))
+    clips: list[TimelineClip] = []
+    for index, cue in enumerate(points):
+        if float(cue.level) <= LEVEL_EPS:
+            continue
+        following = points[index + 1] if index + 1 < len(points) else None
+        butts_next = following is not None and float(following.level) > LEVEL_EPS
+        has_end_cue = following is not None and not butts_next
+        clips.append(
+            TimelineClip(
+                start=cue.t,
+                end=duration_sec if following is None else following.t,
+                level=float(cue.level),
+                blend=cue.blend,
+                role=cue.role,
+                cut_in=cue.cut,
+                cut_out=following.cut if has_end_cue else None,
+                butts_next=butts_next,
+                has_end_cue=has_end_cue,
+                recast=cue.recast,
+                anchor=cue.anchor,
+            )
+        )
+    return clips
+
+
+def clip_at(clips: Sequence[TimelineClip], t_sec: float) -> TimelineClip | None:
+    """The clip covering ``t_sec`` (start inclusive, end exclusive)."""
+    return next((clip for clip in clips if clip.start <= t_sec < clip.end), None)
+
+
+def clip_starting_at(
+    clips: Sequence[TimelineClip], start: float
+) -> TimelineClip | None:
+    return next((clip for clip in clips if clip.start == start), None)
+
+
+def _clip_neighbours(
+    clips: Sequence[TimelineClip], clip: TimelineClip
+) -> tuple[TimelineClip | None, TimelineClip | None]:
+    previous = next(
+        (other for other in reversed(clips) if other.start < clip.start), None
+    )
+    following = next((other for other in clips if other.start > clip.start), None)
+    return previous, following
+
+
+def clip_move_bounds(
+    clips: Sequence[TimelineClip],
+    clip: TimelineClip,
+    duration_sec: float,
+) -> tuple[float, float]:
+    """Earliest and latest start for ``clip`` moved at its length between its neighbours."""
+    previous, following = _clip_neighbours(clips, clip)
+    low = 0.0 if previous is None else previous.end
+    limit = duration_sec if following is None else following.start
+    high = limit - (clip.end - clip.start)
+    return (low, max(low, high))
+
+
+def clip_trim_bounds(
+    clips: Sequence[TimelineClip],
+    clip: TimelineClip,
+    edge: ClipEdge,
+    min_len: float,
+    duration_sec: float,
+) -> tuple[float, float]:
+    """Range one edge of ``clip`` may move in, leaving each clip ``min_len``.
+
+    An edge shared with a butted neighbour rolls, so the neighbour keeps
+    ``min_len`` too. A free edge stops at the neighbour or the song bounds.
+    A clip already shorter than ``min_len`` keeps its edge where it is.
+    """
+    previous, following = _clip_neighbours(clips, clip)
+    if edge == "start":
+        current = clip.start
+        if previous is None:
+            low = 0.0
+        elif previous.end == clip.start:
+            low = previous.start + min_len
+        else:
+            low = previous.end
+        high = clip.end - min_len
+    else:
+        current = clip.end
+        low = clip.start + min_len
+        if following is None:
+            high = duration_sec
+        elif clip.butts_next:
+            high = following.end - min_len
+        else:
+            high = following.start
+    low = min(low, current)
+    high = max(high, current)
+    return (low, high)
+
+
+def _explicit_cues(lane: TimelineLane, inherit: float) -> list[SlotCue]:
+    """The lane's cues over an off baseline, with an on opening as a cue at ``0.0``."""
+    folded = fold_lane_baseline(lane, inherit)
+    cues = list(folded.cues)
+    opening = float(folded.baseline or 0.0)
+    if opening > LEVEL_EPS and not any(cue.t == 0.0 for cue in cues):
+        cues.insert(0, SlotCue(t=0.0, level=opening))
+    return cues
+
+
+def _lane_from_cues(cues: Sequence[SlotCue], duration_sec: float) -> TimelineLane:
+    """Canonical lane over an off baseline that keeps butted clips apart.
+
+    An on cue that matches the on state before it would merge into it, so it
+    becomes an ``anchor`` (the same preset carries on). Cues at or past the
+    song end are dropped.
+    """
+    ordered = sorted(
+        (cue for cue in cues if cue.t < duration_sec), key=lambda cue: cue.t
+    )
+    kept: list[SlotCue] = []
+    level = 0.0
+    blend: BlendMode | None = None
+    for cue in ordered:
+        if (
+            float(cue.level) > LEVEL_EPS
+            and level > LEVEL_EPS
+            and levels_equal(cue.level, level)
+            and cue.blend == blend
+            and not cue.recast
+        ):
+            cue = replace(cue, anchor=True)
+        kept.append(cue)
+        level = float(cue.level)
+        blend = cue.blend if level > LEVEL_EPS else None
+    return TimelineLane(baseline=0.0, cues=canonicalize(0.0, kept))
+
+
+def _without(cues: Sequence[SlotCue], *times: float) -> list[SlotCue]:
+    return [cue for cue in cues if cue.t not in times]
+
+
+def _level_before(cues: Sequence[SlotCue], t_sec: float) -> float:
+    level = 0.0
+    for cue in cues:
+        if cue.t >= t_sec:
+            break
+        level = float(cue.level)
+    return level
+
+
+def _stored_clip(
+    lane: TimelineLane,
+    clip: TimelineClip,
+    inherit: float,
+    duration_sec: float,
+) -> TimelineClip | None:
+    """The lane's current clip at ``clip.start``, or None when it is gone."""
+    return clip_starting_at(
+        lane_clips(lane, inherit=inherit, duration_sec=duration_sec), clip.start
+    )
+
+
+def add_clip(
+    lane: TimelineLane,
+    start: float,
+    end: float,
+    level: float,
+    *,
+    inherit: float,
+    duration_sec: float,
+    blend: BlendMode | None = None,
+    role: CueRole | None = None,
+    cut_in: CutType | None = None,
+    cut_out: CutType | None = None,
+    recast: bool = False,
+    anchor: bool = False,
+) -> TimelineLane:
+    """Add a clip over the off span ``[start, end)``.
+
+    Writes an on cue at ``start`` and, unless the span runs into the next
+    clip or the song end, an off cue at ``end`` carrying ``cut_out``.
+    """
+    cues = _explicit_cues(lane, inherit)
+    on_cue = SlotCue(
+        t=start,
+        level=clamp_level(level),
+        blend=blend,
+        role=role,
+        cut=cut_in,
+        anchor=anchor,
+        recast=recast,
+    )
+    at_end = next((cue for cue in cues if cue.t == end), None)
+    kept = [cue for cue in cues if not (start <= cue.t < end)]
+    if at_end is None or float(at_end.level) <= LEVEL_EPS:
+        kept = _without(kept, end)
+        kept.append(SlotCue(t=end, level=0.0, cut=cut_out))
+    return _lane_from_cues([*kept, on_cue], duration_sec)
+
+
+def remove_clip(
+    lane: TimelineLane,
+    clip: TimelineClip,
+    *,
+    inherit: float,
+    duration_sec: float,
+) -> TimelineLane:
+    """Turn the clip's span off.
+
+    Its start cue becomes an off cue, or goes when the span before it is
+    already off. A butted next clip keeps its start cue.
+    """
+    cues = _explicit_cues(lane, inherit)
+    kept = _without(cues, clip.start)
+    if _level_before(cues, clip.start) > LEVEL_EPS:
+        kept.append(SlotCue(t=clip.start, level=0.0))
+    return _lane_from_cues(kept, duration_sec)
+
+
+def move_clip(
+    lane: TimelineLane,
+    clip: TimelineClip,
+    new_start: float,
+    *,
+    inherit: float,
+    duration_sec: float,
+) -> TimelineLane:
+    """Move the clip to ``new_start`` at its length, keeping every property.
+
+    The start is clamped between the neighbours (``clip_move_bounds``). The
+    span it leaves turns off.
+    """
+    clips = lane_clips(lane, inherit=inherit, duration_sec=duration_sec)
+    stored = clip_starting_at(clips, clip.start)
+    if stored is None:
+        return copy_lane(lane)
+    low, high = clip_move_bounds(clips, stored, duration_sec)
+    start = max(low, min(high, new_start))
+    removed = remove_clip(lane, stored, inherit=inherit, duration_sec=duration_sec)
+    return add_clip(
+        removed,
+        start,
+        start + (stored.end - stored.start),
+        stored.level,
+        inherit=0.0,
+        duration_sec=duration_sec,
+        blend=stored.blend,
+        role=stored.role,
+        cut_in=stored.cut_in,
+        cut_out=stored.cut_out,
+        recast=stored.recast,
+        anchor=stored.anchor,
+    )
+
+
+def trim_clip(
+    lane: TimelineLane,
+    clip: TimelineClip,
+    edge: ClipEdge,
+    t_sec: float,
+    *,
+    inherit: float,
+    duration_sec: float,
+    min_len: float = MIN_CLIP_SEC,
+) -> TimelineLane:
+    """Move one edge of the clip to ``t_sec``, clamped by ``clip_trim_bounds``.
+
+    An edge shared with a butted neighbour moves the shared cue, so both
+    clips change (a roll). An end trimmed out to the song end drops its off
+    cue; a clip that ran to the song end gains one when trimmed back.
+    """
+    clips = lane_clips(lane, inherit=inherit, duration_sec=duration_sec)
+    stored = clip_starting_at(clips, clip.start)
+    if stored is None:
+        return copy_lane(lane)
+    low, high = clip_trim_bounds(clips, stored, edge, min_len, duration_sec)
+    target = max(low, min(high, t_sec))
+    cues = _explicit_cues(lane, inherit)
+    old_t = stored.start if edge == "start" else stored.end
+    moving = next((cue for cue in cues if cue.t == old_t), None)
+    if moving is None:
+        # The clip ran to the song end, so its end has no cue yet.
+        moving = SlotCue(t=old_t, level=0.0)
+    landing = next((cue for cue in cues if cue.t == target), None)
+    kept = _without(cues, old_t, target)
+    if (
+        float(moving.level) <= LEVEL_EPS
+        and landing is not None
+        and float(landing.level) > LEVEL_EPS
+    ):
+        # The off cue reached the next clip's start: the clips now butt.
+        kept.append(landing)
+    else:
+        kept.append(replace(moving, t=target))
+    return _lane_from_cues(kept, duration_sec)
+
+
+def split_clip(
+    lane: TimelineLane,
+    clip: TimelineClip,
+    t_sec: float,
+    *,
+    inherit: float,
+    duration_sec: float,
+    min_len: float = MIN_CLIP_SEC,
+) -> TimelineLane:
+    """Split the clip in two at ``t_sec`` with the same look and no preset switch.
+
+    Unchanged when either part would be shorter than ``min_len``.
+    """
+    stored = _stored_clip(lane, clip, inherit, duration_sec)
+    if (
+        stored is None
+        or t_sec < stored.start + min_len
+        or t_sec > stored.end - min_len
+    ):
+        return copy_lane(lane)
+    cues = _explicit_cues(lane, inherit)
+    cues.append(
+        SlotCue(
+            t=t_sec,
+            level=stored.level,
+            blend=stored.blend,
+            role=stored.role,
+            anchor=True,
+        )
+    )
+    return _lane_from_cues(cues, duration_sec)
+
+
+def update_clip(
+    lane: TimelineLane,
+    clip: TimelineClip,
+    *,
+    inherit: float,
+) -> TimelineLane:
+    """Write ``clip``'s level, blend, role, and cuts to the clip at ``clip.start``.
+
+    Level, blend, role, and cut-in go on the start cue (``update_lane_cue``).
+    Cut-out goes on the off cue at ``clip.end``; a clip without one
+    (``has_end_cue`` False) ignores it.
+    """
+    updated = update_lane_cue(
+        fold_lane_baseline(lane, inherit),
+        clip.start,
+        blend=clip.blend,
+        role=clip.role,
+        level=clip.level,
+        cut=clip.cut_in,
+    )
+    if not clip.has_end_cue:
+        return updated
+    return TimelineLane(
+        baseline=updated.baseline,
+        cues=[
+            replace(cue, cut=clip.cut_out)
+            if cue.t == clip.end and float(cue.level) <= LEVEL_EPS
+            else cue
+            for cue in updated.cues
+        ],
+    )
+
+
 def should_accept_toggle(last_toggle_t: float | None, t_sec: float) -> bool:
     if last_toggle_t is None:
         return True

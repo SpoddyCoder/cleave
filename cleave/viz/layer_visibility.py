@@ -10,9 +10,9 @@ from cleave.timeline import (
     SlotCue,
     TimelineFadeGroup,
     TimelineLane,
-    canonicalize,
     copy_lane,
     empty_lane,
+    fold_lane_baseline,
     lane_blend_at,
     lane_level_at,
     lane_level_breakpoints,
@@ -112,18 +112,6 @@ def committed_level_outside_punch(
     )
 
 
-def _fold_lane_baseline(session: TuningSession, slot: str) -> TimelineLane:
-    """Freeze inherit into an explicit baseline when the lane was still untouched."""
-    lane = _lane_for_slot(session, slot)
-    if lane.baseline is not None:
-        return TimelineLane(baseline=lane.baseline, cues=list(lane.cues))
-    baseline = _inherit_for_slot(session, slot)
-    return TimelineLane(
-        baseline=baseline,
-        cues=canonicalize(baseline, lane.cues),
-    )
-
-
 def _punch_cues_for_slot(
     session: TuningSession,
     slot: str,
@@ -157,7 +145,9 @@ def build_record_punch_cues(
         if slot not in tl.record_baseline:
             continue
         slot_start = tl.record_slot_start_sec.get(slot, record_start)
-        lane = _fold_lane_baseline(session, slot)
+        lane = fold_lane_baseline(
+            _lane_for_slot(session, slot), _inherit_for_slot(session, slot)
+        )
         new_cues = _punch_cues_for_slot(session, slot, slot_start, record_stop)
         tl.lanes[slot] = punch_lane(lane, slot_start, record_stop, new_cues)
 

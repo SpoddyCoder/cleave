@@ -2,18 +2,34 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 
 from cleave.config_schema.layers import DEFAULT_LAYER_SLOTS
 from cleave.easing import smoothstep
 from cleave.timeline import (
     LEVEL_EPS,
+    MIN_CLIP_SEC,
     RECORD_DEBOUNCE_SEC,
     SlotCue,
+    TimelineClip,
     TimelineFadeGroup,
     TimelineLane,
+    add_clip,
     canonicalize,
+    clip_at,
+    clip_move_bounds,
+    clip_starting_at,
+    clip_trim_bounds,
     empty_lane,
+    fold_lane_baseline,
+    lane_clips,
+    move_clip,
+    remove_clip,
+    split_clip,
+    trim_clip,
+    update_clip,
     lane_blend_at,
     lane_role_at,
     lane_last_on_level,
@@ -1027,3 +1043,360 @@ def test_lane_last_on_level_falls_back_to_baseline_then_later_then_full() -> Non
         TimelineLane(baseline=0.0, cues=[SlotCue(t=6.0, level=0.7)]), 3.0
     ) == 0.7
     assert lane_last_on_level(empty_lane(), 3.0) == 1.0
+
+
+# Clips: an on cue up to the next cue or the song end.
+
+_DUR = 100.0
+
+
+def _clips(lane: TimelineLane, *, inherit: float = 0.0) -> list[TimelineClip]:
+    return lane_clips(lane, inherit=inherit, duration_sec=_DUR)
+
+
+def _spans(lane: TimelineLane, *, inherit: float = 0.0) -> list[tuple[float, float]]:
+    return [(clip.start, clip.end) for clip in _clips(lane, inherit=inherit)]
+
+
+def _clip_lane(*cues: SlotCue, baseline: float | None = 0.0) -> TimelineLane:
+    return TimelineLane(baseline=baseline, cues=list(cues))
+
+
+def test_lane_clips_pairs_on_and_off_cues() -> None:
+    lane = _clip_lane(
+        SlotCue(t=10.0, level=0.6, blend="add", role="lead", cut="hard"),
+        SlotCue(t=20.0, level=0.0, cut="soft"),
+    )
+    assert _clips(lane) == [
+        TimelineClip(
+            start=10.0,
+            end=20.0,
+            level=0.6,
+            blend="add",
+            role="lead",
+            cut_in="hard",
+            cut_out="soft",
+            has_end_cue=True,
+        )
+    ]
+
+
+def test_lane_clips_opening_baseline_is_a_clip_from_zero() -> None:
+    lane = _clip_lane(SlotCue(t=8.0, level=0.0), baseline=0.5)
+    clips = _clips(lane)
+    assert [(c.start, c.end, c.level) for c in clips] == [(0.0, 8.0, 0.5)]
+
+
+def test_lane_clips_inherit_stands_in_for_a_missing_baseline() -> None:
+    lane = _clip_lane(SlotCue(t=8.0, level=0.0), baseline=None)
+    assert _spans(lane, inherit=1.0) == [(0.0, 8.0)]
+    assert _spans(_clip_lane(baseline=None), inherit=1.0) == [(0.0, _DUR)]
+    assert _spans(_clip_lane(baseline=None), inherit=0.0) == []
+
+
+def test_lane_clips_last_clip_runs_to_the_song_end() -> None:
+    clip = _clips(_clip_lane(SlotCue(t=90.0, level=1.0)))[0]
+    assert (clip.end, clip.butts_next, clip.has_end_cue) == (_DUR, False, False)
+
+
+def test_lane_clips_butted_clips_and_recast() -> None:
+    lane = _clip_lane(
+        SlotCue(t=10.0, level=1.0),
+        SlotCue(t=20.0, level=0.5),
+        SlotCue(t=30.0, level=0.5, recast=True),
+        SlotCue(t=40.0, level=0.5, anchor=True),
+        SlotCue(t=50.0, level=0.0),
+    )
+    clips = _clips(lane)
+    assert [(c.start, c.end) for c in clips] == [
+        (10.0, 20.0),
+        (20.0, 30.0),
+        (30.0, 40.0),
+        (40.0, 50.0),
+    ]
+    assert [c.butts_next for c in clips] == [True, True, True, False]
+    assert [c.recast for c in clips] == [False, False, True, False]
+    assert [c.anchor for c in clips] == [False, False, False, True]
+    assert clips[0].cut_out is None and not clips[0].has_end_cue
+
+
+def test_lane_clips_ignores_cues_past_the_song_end() -> None:
+    lane = _clip_lane(SlotCue(t=90.0, level=1.0), SlotCue(t=120.0, level=0.0))
+    assert _spans(lane) == [(90.0, _DUR)]
+
+
+def test_clip_at_is_start_inclusive_end_exclusive() -> None:
+    clips = _clips(_clip_lane(SlotCue(t=10.0, level=1.0), SlotCue(t=20.0, level=0.0)))
+    assert clip_at(clips, 10.0) is clips[0]
+    assert clip_at(clips, 19.9) is clips[0]
+    assert clip_at(clips, 20.0) is None
+    assert clip_starting_at(clips, 10.0) is clips[0]
+    assert clip_starting_at(clips, 11.0) is None
+
+
+def test_add_clip_writes_on_and_off_cues() -> None:
+    added = add_clip(_clip_lane(), 10.0, 20.0, 0.6, inherit=0.0, duration_sec=_DUR)
+    assert added.cues == [SlotCue(t=10.0, level=0.6), SlotCue(t=20.0, level=0.0)]
+
+
+def test_add_clip_running_into_the_next_clip_butts_it() -> None:
+    lane = _clip_lane(SlotCue(t=20.0, level=0.5), SlotCue(t=30.0, level=0.0))
+    added = add_clip(lane, 10.0, 20.0, 1.0, inherit=0.0, duration_sec=_DUR)
+    assert _spans(added) == [(10.0, 20.0), (20.0, 30.0)]
+    assert _clips(added)[0].butts_next
+
+
+def test_add_clip_keeps_a_matching_neighbour_apart() -> None:
+    lane = _clip_lane(SlotCue(t=20.0, level=1.0), SlotCue(t=30.0, level=0.0))
+    added = add_clip(lane, 10.0, 20.0, 1.0, inherit=0.0, duration_sec=_DUR)
+    assert _spans(added) == [(10.0, 20.0), (20.0, 30.0)]
+    assert _clips(added)[1].anchor
+
+
+def test_add_clip_to_the_song_end_writes_no_off_cue() -> None:
+    added = add_clip(_clip_lane(), 90.0, _DUR, 1.0, inherit=0.0, duration_sec=_DUR)
+    assert added.cues == [SlotCue(t=90.0, level=1.0)]
+
+
+def test_add_clip_folds_an_inherited_opening() -> None:
+    lane = _clip_lane(SlotCue(t=5.0, level=0.0), baseline=None)
+    added = add_clip(lane, 10.0, 20.0, 1.0, inherit=1.0, duration_sec=_DUR)
+    assert _spans(added, inherit=0.0) == [(0.0, 5.0), (10.0, 20.0)]
+
+
+def test_remove_clip_drops_both_cues_in_a_gap() -> None:
+    lane = _clip_lane(SlotCue(t=10.0, level=1.0), SlotCue(t=20.0, level=0.0))
+    removed = remove_clip(lane, _clips(lane)[0], inherit=0.0, duration_sec=_DUR)
+    assert removed.cues == []
+
+
+def test_remove_clip_after_a_butted_clip_leaves_an_off_cue() -> None:
+    lane = _clip_lane(
+        SlotCue(t=10.0, level=1.0),
+        SlotCue(t=20.0, level=0.5),
+        SlotCue(t=30.0, level=0.0),
+    )
+    removed = remove_clip(lane, _clips(lane)[1], inherit=0.0, duration_sec=_DUR)
+    assert removed.cues == [SlotCue(t=10.0, level=1.0), SlotCue(t=20.0, level=0.0)]
+
+
+def test_remove_clip_keeps_a_butted_next_clip() -> None:
+    lane = _clip_lane(
+        SlotCue(t=10.0, level=1.0),
+        SlotCue(t=20.0, level=0.5, role="lead"),
+        SlotCue(t=30.0, level=0.0),
+    )
+    removed = remove_clip(lane, _clips(lane)[0], inherit=0.0, duration_sec=_DUR)
+    assert removed.cues == [
+        SlotCue(t=20.0, level=0.5, role="lead"),
+        SlotCue(t=30.0, level=0.0),
+    ]
+
+
+def test_remove_clip_turns_an_opening_baseline_off() -> None:
+    lane = _clip_lane(SlotCue(t=8.0, level=0.0), baseline=1.0)
+    removed = remove_clip(lane, _clips(lane)[0], inherit=0.0, duration_sec=_DUR)
+    assert _spans(removed) == []
+    assert removed.baseline == 0.0
+
+
+def test_move_clip_keeps_length_and_properties() -> None:
+    lane = _clip_lane(
+        SlotCue(t=10.0, level=0.6, blend="add", role="lead", cut="hard"),
+        SlotCue(t=20.0, level=0.0, cut="soft"),
+    )
+    moved = move_clip(lane, _clips(lane)[0], 40.0, inherit=0.0, duration_sec=_DUR)
+    assert moved.cues == [
+        SlotCue(t=40.0, level=0.6, blend="add", role="lead", cut="hard"),
+        SlotCue(t=50.0, level=0.0, cut="soft"),
+    ]
+
+
+def test_move_clip_stops_at_its_neighbours() -> None:
+    lane = _clip_lane(
+        SlotCue(t=10.0, level=1.0),
+        SlotCue(t=20.0, level=0.0),
+        SlotCue(t=30.0, level=0.5),
+        SlotCue(t=40.0, level=0.0),
+        SlotCue(t=60.0, level=1.0),
+        SlotCue(t=70.0, level=0.0),
+    )
+    middle = _clips(lane)[1]
+    assert clip_move_bounds(_clips(lane), middle, _DUR) == (20.0, 50.0)
+    left = move_clip(lane, middle, 0.0, inherit=0.0, duration_sec=_DUR)
+    assert _spans(left) == [(10.0, 20.0), (20.0, 30.0), (60.0, 70.0)]
+    right = move_clip(lane, middle, 99.0, inherit=0.0, duration_sec=_DUR)
+    assert _spans(right) == [(10.0, 20.0), (50.0, 60.0), (60.0, 70.0)]
+    assert [c.level for c in _clips(right)] == [1.0, 0.5, 1.0]
+
+
+def test_move_clip_away_from_a_butted_neighbour_opens_a_gap() -> None:
+    lane = _clip_lane(
+        SlotCue(t=10.0, level=1.0),
+        SlotCue(t=20.0, level=0.5),
+        SlotCue(t=30.0, level=0.0),
+    )
+    moved = move_clip(lane, _clips(lane)[1], 50.0, inherit=0.0, duration_sec=_DUR)
+    assert _spans(moved) == [(10.0, 20.0), (50.0, 60.0)]
+
+
+def test_move_clip_to_and_from_the_song_end() -> None:
+    lane = _clip_lane(SlotCue(t=90.0, level=1.0))
+    moved = move_clip(lane, _clips(lane)[0], 50.0, inherit=0.0, duration_sec=_DUR)
+    assert moved.cues == [SlotCue(t=50.0, level=1.0), SlotCue(t=60.0, level=0.0)]
+    back = move_clip(moved, _clips(moved)[0], 95.0, inherit=0.0, duration_sec=_DUR)
+    assert back.cues == [SlotCue(t=90.0, level=1.0)]
+
+
+def test_trim_clip_moves_a_free_edge() -> None:
+    lane = _clip_lane(SlotCue(t=10.0, level=1.0, cut="hard"), SlotCue(t=20.0, level=0.0, cut="soft"))
+    clip = _clips(lane)[0]
+    start = trim_clip(lane, clip, "start", 12.0, inherit=0.0, duration_sec=_DUR)
+    assert start.cues == [
+        SlotCue(t=12.0, level=1.0, cut="hard"),
+        SlotCue(t=20.0, level=0.0, cut="soft"),
+    ]
+    end = trim_clip(lane, clip, "end", 25.0, inherit=0.0, duration_sec=_DUR)
+    assert end.cues == [
+        SlotCue(t=10.0, level=1.0, cut="hard"),
+        SlotCue(t=25.0, level=0.0, cut="soft"),
+    ]
+
+
+def test_trim_clip_keeps_a_minimum_length() -> None:
+    lane = _clip_lane(SlotCue(t=10.0, level=1.0), SlotCue(t=20.0, level=0.0))
+    clip = _clips(lane)[0]
+    trimmed = trim_clip(lane, clip, "end", 0.0, inherit=0.0, duration_sec=_DUR)
+    assert _spans(trimmed) == [(10.0, 10.0 + MIN_CLIP_SEC)]
+    trimmed = trim_clip(lane, clip, "start", 99.0, inherit=0.0, duration_sec=_DUR)
+    assert _spans(trimmed) == [(20.0 - MIN_CLIP_SEC, 20.0)]
+
+
+def test_trim_clip_rolls_a_butted_edge() -> None:
+    lane = _clip_lane(
+        SlotCue(t=10.0, level=1.0),
+        SlotCue(t=20.0, level=0.5, role="lead"),
+        SlotCue(t=30.0, level=0.0),
+    )
+    first, second = _clips(lane)
+    rolled = trim_clip(lane, first, "end", 24.0, inherit=0.0, duration_sec=_DUR)
+    assert _spans(rolled) == [(10.0, 24.0), (24.0, 30.0)]
+    assert _clips(rolled)[1].role == "lead"
+    rolled = trim_clip(lane, second, "start", 15.0, inherit=0.0, duration_sec=_DUR)
+    assert _spans(rolled) == [(10.0, 15.0), (15.0, 30.0)]
+    assert clip_trim_bounds(_clips(lane), first, "end", 1.0, _DUR) == (11.0, 29.0)
+    assert clip_trim_bounds(_clips(lane), second, "start", 1.0, _DUR) == (11.0, 29.0)
+
+
+def test_trim_clip_end_onto_the_next_clip_butts_it() -> None:
+    lane = _clip_lane(
+        SlotCue(t=10.0, level=1.0),
+        SlotCue(t=20.0, level=0.0),
+        SlotCue(t=30.0, level=1.0),
+        SlotCue(t=40.0, level=0.0),
+    )
+    trimmed = trim_clip(
+        lane, _clips(lane)[0], "end", 35.0, inherit=0.0, duration_sec=_DUR
+    )
+    assert _spans(trimmed) == [(10.0, 30.0), (30.0, 40.0)]
+    assert _clips(trimmed)[0].butts_next
+
+
+def test_trim_clip_start_onto_the_previous_clip_butts_it() -> None:
+    lane = _clip_lane(
+        SlotCue(t=10.0, level=1.0),
+        SlotCue(t=20.0, level=0.0),
+        SlotCue(t=30.0, level=0.5),
+        SlotCue(t=40.0, level=0.0),
+    )
+    trimmed = trim_clip(
+        lane, _clips(lane)[1], "start", 5.0, inherit=0.0, duration_sec=_DUR
+    )
+    assert _spans(trimmed) == [(10.0, 20.0), (20.0, 40.0)]
+
+
+def test_trim_clip_end_at_the_song_end() -> None:
+    lane = _clip_lane(SlotCue(t=80.0, level=1.0))
+    inward = trim_clip(lane, _clips(lane)[0], "end", 90.0, inherit=0.0, duration_sec=_DUR)
+    assert inward.cues == [SlotCue(t=80.0, level=1.0), SlotCue(t=90.0, level=0.0)]
+    outward = trim_clip(
+        inward, _clips(inward)[0], "end", 500.0, inherit=0.0, duration_sec=_DUR
+    )
+    assert outward.cues == [SlotCue(t=80.0, level=1.0)]
+
+
+def test_trim_clip_start_of_an_opening_baseline() -> None:
+    lane = _clip_lane(SlotCue(t=8.0, level=0.0), baseline=1.0)
+    trimmed = trim_clip(lane, _clips(lane)[0], "start", 3.0, inherit=0.0, duration_sec=_DUR)
+    assert _spans(trimmed) == [(3.0, 8.0)]
+
+
+def test_split_clip_adds_an_anchor_with_the_same_look() -> None:
+    lane = _clip_lane(
+        SlotCue(t=10.0, level=0.6, blend="add", role="lead", cut="hard"),
+        SlotCue(t=20.0, level=0.0, cut="soft"),
+    )
+    split = split_clip(lane, _clips(lane)[0], 14.0, inherit=0.0, duration_sec=_DUR)
+    first, second = _clips(split)
+    assert (first.start, first.end, second.start, second.end) == (10.0, 14.0, 14.0, 20.0)
+    assert (second.level, second.blend, second.role) == (0.6, "add", "lead")
+    assert second.anchor and not second.recast and second.cut_in is None
+    assert second.cut_out == "soft" and first.cut_in == "hard"
+    assert lane_on_transition_trigger_times(
+        split, hard_cut_fades=_OFF, soft_cut_fades=_OFF
+    ) == [10.0]
+
+
+def test_split_clip_needs_room_on_both_sides() -> None:
+    lane = _clip_lane(SlotCue(t=10.0, level=1.0), SlotCue(t=20.0, level=0.0))
+    clip = _clips(lane)[0]
+    for t in (10.0, 10.05, 19.99, 20.0, 50.0):
+        assert split_clip(lane, clip, t, inherit=0.0, duration_sec=_DUR) == lane
+
+
+def test_update_clip_writes_start_cue_and_cut_out() -> None:
+    lane = _clip_lane(SlotCue(t=10.0, level=1.0), SlotCue(t=20.0, level=0.0))
+    clip = replace(
+        _clips(lane)[0],
+        level=0.4,
+        blend="add",
+        role="bed",
+        cut_in="soft",
+        cut_out="hard",
+    )
+    updated = update_clip(lane, clip, inherit=0.0)
+    assert updated.cues == [
+        SlotCue(t=10.0, level=0.4, blend="add", role="bed", cut="soft"),
+        SlotCue(t=20.0, level=0.0, cut="hard"),
+    ]
+
+
+def test_update_clip_ignores_cut_out_without_an_end_cue() -> None:
+    lane = _clip_lane(SlotCue(t=10.0, level=1.0), SlotCue(t=20.0, level=0.5, cut="soft"))
+    clip = replace(_clips(lane)[0], cut_out="hard")
+    assert update_clip(lane, clip, inherit=0.0) == lane
+
+
+def test_update_clip_level_merges_into_a_matching_neighbour() -> None:
+    lane = _clip_lane(
+        SlotCue(t=10.0, level=1.0),
+        SlotCue(t=20.0, level=0.5),
+        SlotCue(t=30.0, level=0.0),
+    )
+    clip = replace(_clips(lane)[1], level=1.0)
+    assert _spans(update_clip(lane, clip, inherit=0.0)) == [(10.0, 30.0)]
+
+
+def test_update_clip_level_on_an_opening_baseline_stays_a_baseline() -> None:
+    lane = _clip_lane(SlotCue(t=8.0, level=0.0), baseline=None)
+    clip = replace(_clips(lane, inherit=1.0)[0], level=0.5)
+    updated = update_clip(lane, clip, inherit=1.0)
+    assert updated.baseline == 0.5
+    assert updated.cues == [SlotCue(t=8.0, level=0.0)]
+
+
+def test_fold_lane_baseline_freezes_inherit() -> None:
+    lane = _clip_lane(SlotCue(t=5.0, level=1.0), baseline=None)
+    assert fold_lane_baseline(lane, 1.0) == TimelineLane(baseline=1.0, cues=[])
+    explicit = _clip_lane(SlotCue(t=5.0, level=1.0), baseline=0.0)
+    assert fold_lane_baseline(explicit, 1.0) == explicit
