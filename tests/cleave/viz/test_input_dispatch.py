@@ -915,3 +915,17 @@ def test_ctrl_q_quits_from_play_full_screen() -> None:
     runtime = _make_runtime(submenu_focused=False)
     _playing_full_screen(runtime)
     assert dispatch_keydown(keydown(pygame.K_q, mod=pygame.KMOD_CTRL), runtime) is False
+
+
+def test_open_menu_takes_esc_before_play_full_screen() -> None:
+    from cleave.viz.context_menu import ContextMenuItem
+
+    runtime = _make_runtime(submenu_focused=False)
+    _playing_full_screen(runtime)
+    menu = runtime.controls.context_menu
+    menu.open(lambda: (ContextMenuItem(id="x", label="X", run=lambda: None),), (0, 0))
+    assert dispatch_keydown(keydown(pygame.K_ESCAPE), runtime) is True
+    assert menu.is_open is False
+    assert runtime.controls.window.consume_play_fullscreen() is None
+    assert dispatch_keydown(keydown(pygame.K_ESCAPE), runtime) is True
+    assert runtime.controls.window.consume_play_fullscreen() is False

@@ -1356,12 +1356,14 @@ class ShellHost:
         *,
         strip_pointer: TimelinePointer | None = None,
         preview_menu: ContextMenuProvider | None = None,
+        play_menu: ContextMenuProvider | None = None,
     ) -> None:
         self.imgui = imgui_host
         self._menu_state = menu_state
         self._controls = controls
         self._strip_pointer = strip_pointer
         self._preview_menu = preview_menu
+        self._play_menu = play_menu
         self._menu_bar_height_px = bar_height
         self._dropdown_span: tuple[float, float] | None = None
         # One fitted window per top menu, so a hover onto the next title
@@ -1549,6 +1551,51 @@ class ShellHost:
         if event.type == pygame.MOUSEWHEEL:
             if not self._wheel_strip(event):
                 imgui_host.process_mouse_event(event)
+
+    def process_play_event(self, event: pygame.event.Event) -> None:
+        """Mouse while Play Full Screen shows only the visualiser.
+
+        A right-click opens the play menu; a press outside an open menu
+        closes it. Nothing else under the pointer acts.
+        """
+        context_menu = self._controls.context_menu
+        if event.type == pygame.WINDOWFOCUSLOST:
+            context_menu.close()
+            return
+        imgui_host = self.imgui
+        if event.type == pygame.MOUSEMOTION:
+            imgui_host.process_mouse_event(event)
+            return
+        if event.type not in (pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP):
+            return
+        button = mouse_button(event)
+        if button is None:
+            return
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            x = float(event.pos[0])
+            y = float(event.pos[1])
+            if self.top_layer.captures_pointer(x, y):
+                imgui_host.press_button(button)
+                imgui_host.process_mouse_event(event)
+                return
+            context_menu.close()
+            if button == RIGHT_BUTTON and self._play_menu is not None:
+                context_menu.open(self._play_menu, (x, y))
+            return
+        if imgui_host.button_held(button):
+            imgui_host.release_button(button)
+            imgui_host.process_mouse_event(event)
+
+    def draw_play_frame(self, dt: float) -> None:
+        """One ImGui frame for Play Full Screen: only an open context menu."""
+        self.imgui.begin_frame(dt)
+        try:
+            if self._controls.context_menu.is_open:
+                self.top_layer.push(self._context_surface)
+                self.top_layer.push(self._context_submenu_surface)
+            self.top_layer.draw()
+        finally:
+            self.imgui.end_frame()
 
     def _open_context_menu(self, x: float, y: float) -> None:
         """Open the menu for whatever sits under (*x*, *y*), if it has one."""

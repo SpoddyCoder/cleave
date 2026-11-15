@@ -77,6 +77,25 @@ def preview_menu_entries(
     )
 
 
+def play_fullscreen_menu(
+    controls: TuningControls, transport: PreviewTransport
+) -> ContextMenuProvider:
+    """Right-click menu while Play Full Screen shows only the visualiser."""
+
+    def entries() -> tuple[ContextMenuEntry, ...]:
+        return (
+            _transport_item(transport),
+            ContextMenuItem(
+                id="play_fullscreen.exit",
+                label="Exit Full Screen",
+                run=lambda: controls.window.request_play_fullscreen(False),
+                shortcut="Esc",
+            ),
+        )
+
+    return entries
+
+
 def _transport_item(transport: PreviewTransport) -> ContextMenuItem:
     return ContextMenuItem(
         id="preview.transport",

@@ -2,10 +2,6 @@
 
 from __future__ import annotations
 
-# Seconds without mouse motion before Play Full Screen hides the pointer.
-PLAY_POINTER_IDLE_SEC = 1.5
-
-
 class WindowControls:
     """Full Screen Editor and Play Full Screen requests and state.
 
@@ -25,7 +21,6 @@ class WindowControls:
         self.play_restores_window = False
         self._toggle_requested = False
         self._play_request: bool | None = None
-        self._last_pointer_motion_sec: float | None = None
 
     def request_fullscreen_toggle(self) -> None:
         self._toggle_requested = True
@@ -48,11 +43,3 @@ class WindowControls:
         if request is None or request == self.play_fullscreen:
             return None
         return request
-
-    def note_pointer_motion(self, now_sec: float) -> None:
-        self._last_pointer_motion_sec = now_sec
-
-    def play_pointer_visible(self, now_sec: float) -> bool:
-        """While playing full screen, the pointer shows only just after it moves."""
-        last = self._last_pointer_motion_sec
-        return last is not None and now_sec - last < PLAY_POINTER_IDLE_SEC

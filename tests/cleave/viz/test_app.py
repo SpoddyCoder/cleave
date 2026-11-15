@@ -1326,12 +1326,3 @@ def test_a_prompt_returns_from_play_full_screen(_mock_pygame: MagicMock) -> None
     _apply_window_requests(controls, window, prompt_open=True)
     assert controls.play_fullscreen is False
     assert window.fullscreen is False
-
-
-def test_play_pointer_hides_after_idle() -> None:
-    from cleave.viz.window_controls import PLAY_POINTER_IDLE_SEC, WindowControls
-
-    controls = WindowControls()
-    controls.note_pointer_motion(10.0)
-    assert controls.play_pointer_visible(10.0) is True
-    assert controls.play_pointer_visible(10.0 + PLAY_POINTER_IDLE_SEC) is False

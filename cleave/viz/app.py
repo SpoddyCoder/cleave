@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import dataclasses
-import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -393,8 +392,7 @@ def _apply_window_requests(
     """Carry out Full Screen Editor and Play Full Screen on the GL window.
 
     A modal, the project picker, or any other prompt while playing full
-    screen returns to the editor so it can be answered. The pointer hides
-    while it rests over Play Full Screen.
+    screen returns to the editor so it can be answered.
     """
     if controls.consume_fullscreen_toggle() and not controls.play_fullscreen:
         window.toggle_fullscreen()
@@ -406,17 +404,13 @@ def _apply_window_requests(
         if controls.play_restores_window:
             window.toggle_fullscreen()
         controls.play_fullscreen = True
-        controls.note_pointer_motion(time.monotonic())
     elif change is False:
         if controls.play_restores_window and window.fullscreen:
             window.toggle_fullscreen()
         controls.play_restores_window = False
         controls.play_fullscreen = False
     controls.fullscreen = window.fullscreen
-    pygame.mouse.set_visible(
-        not controls.play_fullscreen
-        or controls.play_pointer_visible(time.monotonic())
-    )
+
 
 
 def _live_overlay_ui_active(*, timeline_strip_visible: bool) -> bool:
@@ -742,7 +736,10 @@ class VisualizerApp:
                 apply_modal_pointer,
                 text_field_wrap,
             )
-            from cleave.viz.preview_context_menu import preview_menu
+            from cleave.viz.preview_context_menu import (
+                play_fullscreen_menu,
+                preview_menu,
+            )
             from cleave.viz.shell_host import (
                 ShellHost,
                 TransportReadout,
@@ -766,6 +763,7 @@ class VisualizerApp:
                 menu_bar_height_px(),
                 strip_pointer=strip_pointer,
                 preview_menu=preview_menu(rt.controls, rt.timeline_controls),
+                play_menu=play_fullscreen_menu(rt.controls, rt.timeline_controls),
             )
             self._shell = shell
             rt.shell_host = shell
@@ -775,9 +773,8 @@ class VisualizerApp:
             def draw_ui() -> None:
                 assert shell is not None
                 if rt.controls.window.play_fullscreen:
-                    # Only the visualiser shows: an empty ImGui frame.
-                    shell.imgui.begin_frame(self._overlay_dt)
-                    shell.imgui.end_frame()
+                    # Only the visualiser shows, plus an open right-click menu.
+                    shell.draw_play_frame(self._overlay_dt)
                     return
                 notice = rt.controls.notification_active()
                 if rt.controls.tap_sync.showing_progress:
@@ -860,10 +857,7 @@ class VisualizerApp:
                     window.note_event(event)
                     dispatch_window_event(event, rt)
                     if rt.controls.window.play_fullscreen:
-                        if event.type == pygame.MOUSEMOTION:
-                            rt.controls.window.note_pointer_motion(
-                                time.monotonic()
-                            )
+                        shell.process_play_event(event)
                     else:
                         shell.process_event(event)
                     if event.type == pygame.QUIT:
@@ -930,10 +924,6 @@ class VisualizerApp:
             return switch_target
 
         finally:
-            try:
-                pygame.mouse.set_visible(True)
-            except pygame.error:
-                pass
             if rt is not None:
                 rt.compositor.set_present_rect(None)
             self._shell = None

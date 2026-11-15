@@ -402,7 +402,8 @@ def _play_fullscreen_keydown(
     """Keys while Play Full Screen shows only the visualiser.
 
     Esc and Ctrl+F leave, Space plays or pauses, the seek keys seek, and
-    Ctrl+Q quits. Every other key does nothing. Returns False to quit now.
+    Ctrl+Q quits. An open right-click menu takes keys first. Every other key
+    does nothing. Returns False to quit now.
     """
     window = runtime.controls.window
     if event.key == pygame.K_ESCAPE or (
@@ -434,13 +435,13 @@ def dispatch_keydown(event: pygame.event.Event, runtime: LiveVisualizerRuntime) 
         runtime.menu_bar.cancel_alt_tap()
         return runtime.controls.handle_modal_keydown(event)
 
-    if runtime.controls.window.play_fullscreen:
-        runtime.menu_bar.cancel_alt_tap()
-        return _play_fullscreen_keydown(event, runtime)
-
     if runtime.controls.context_menu.handle_keydown(event):
         runtime.menu_bar.cancel_alt_tap()
         return True
+
+    if runtime.controls.window.play_fullscreen:
+        runtime.menu_bar.cancel_alt_tap()
+        return _play_fullscreen_keydown(event, runtime)
 
     if runtime.controls.inline_edit.handle_keydown(event):
         runtime.menu_bar.cancel_alt_tap()

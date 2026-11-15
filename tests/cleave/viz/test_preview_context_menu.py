@@ -6,7 +6,11 @@ from pathlib import Path
 
 from cleave.config_schema.editor import EDITOR_PREVIEW_QUALITIES
 from cleave.viz.context_menu import ContextMenuItem, ContextSubmenu
-from cleave.viz.preview_context_menu import preview_menu, preview_menu_entries
+from cleave.viz.preview_context_menu import (
+    play_fullscreen_menu,
+    preview_menu,
+    preview_menu_entries,
+)
 from tests.cleave.viz.test_controls import _make_controls
 
 
@@ -127,3 +131,23 @@ def test_grab_still_needs_a_project_folder_and_greys_out_while_busy(
     item = _entries(controls)["preview.grab_still"]
     assert item.enabled is False
     assert item.hint == "Capturing a still"
+
+
+def test_play_fullscreen_menu_plays_pauses_and_exits() -> None:
+    controls = _make_controls(("layer_1",))
+    transport = _Transport(paused=False)
+    items = play_fullscreen_menu(controls, transport)()
+    assert [item.id for item in items] == [
+        "preview.transport",
+        "play_fullscreen.exit",
+    ]
+    transport_item, exit_item = items
+    assert transport_item.label == "Pause"
+    assert exit_item.label == "Exit Full Screen"
+    assert exit_item.shortcut == "Esc"
+
+    transport_item.run()
+    assert transport.paused is True
+    controls.window.play_fullscreen = True
+    exit_item.run()
+    assert controls.window.consume_play_fullscreen() is False

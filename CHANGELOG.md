@@ -31,7 +31,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - The right end of the menu bar shows the open project's name, after a "Project:" label.
 - Drag a layer by the handle in front of its name in the navigator to change its z-order. Locked layers can't be dragged.
 - View > Full Screen Editor (F11) switches the editor to borderless fullscreen and back.
-- View > Play Full Screen (Ctrl+F), also on the preview's right-click menu, shows only the visualiser across the whole display, with no menus, panels, or timeline, so you can watch the show as it will look. Space plays or pauses and the seek keys still work; the pointer hides when the mouse rests. Esc (or Ctrl+F) returns to the editor as it was. A dialog that needs an answer brings the editor back.
+- View > Play Full Screen (Ctrl+F), also on the preview's right-click menu, shows only the visualiser across the whole display, with no menus, panels, or timeline, so you can watch the show as it will look. Space plays or pauses and the seek keys still work. Esc (or Ctrl+F) returns to the editor as it was, or right-click for Play/Pause and Exit Full Screen. A dialog that needs an answer brings the editor back.
 - The editor window remembers its size and whether it was maximised, and opens centred. A saved size bigger than the screen opens maximised.
 - The editor window has a minimum size, so the menu bar, columns, and timeline strip can't collapse. It grows with the UI scale.
 - Resize the editor window by dragging its edges or corners, or maximise it. The menu bar, columns, timeline strip, and visualiser follow the new size, and a project switch keeps it.
