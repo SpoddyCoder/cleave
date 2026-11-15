@@ -56,6 +56,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- Clicking the start row of a clip in the inspector, or pressing Enter on it, no longer moves the playhead. Enter on the timeline strip still seeks to the selected clip's start.
 - The inspector's help for clip opacity, blend, and role now gives as much detail as the layer menu. Blend lists each mode with what it does, role lists each role, and opacity and blend note that Pattern Mask replaces them when it is on.
 - A double-click in a gap on a timeline strip row now adds a clip instead of seeking. A double-click on a clip still seeks, as does one while the timeline is locked or recording; the time scale seeks as before.
 - Edit > Undo and Redo now cover hand edits to clips, not only the timeline commands: adding, deleting, splitting, or trimming a clip, changing its opacity, cuts, blend, or role, and each recorded take. Holding `,` or `.` to nudge the opacity undoes as one step, and undo brings back the clip that was selected. Before, any hand edit turned Undo off.

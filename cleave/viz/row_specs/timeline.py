@@ -32,7 +32,7 @@ from cleave.cut_types import CUT_TYPES, CutType
 from cleave.timeline import ClipEdge, TimelineClip
 from cleave.viz.commands import command_by_id
 from cleave.viz.playback import format_mmss
-from cleave.viz.timeline_clip_edits import ClipEditor, clip_selection_allowed
+from cleave.viz.timeline_clip_edits import ClipEditor
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
 from cleave.viz.material_icons import DELETE_GLYPH
 from cleave.viz.row_spec import (
@@ -401,13 +401,6 @@ def _clip_trim_row(edge: ClipEdge) -> FieldMutator:
         controls.clip_editor.trim_step(desc.slot, edge, forward=forward, large=large)
 
     return horizontal
-
-
-def _seek_to_clip(controls: TuningControls, desc: RowDescriptor) -> None:
-    assert desc.slot is not None
-    clip = controls.clip_editor.selected(desc.slot)
-    if clip is not None and clip_selection_allowed(controls.session):
-        controls.seek_to(clip.start)
 
 
 def _format_clip_opacity(state: TuningViewState, desc: RowDescriptor) -> str:
@@ -901,13 +894,11 @@ SPECS: dict[RowKind, RowSpec] = {
         _format_clip_start,
         _clip_trim_row("start"),
         _clip_edits_available,
-        apply_action=_seek_to_clip,
         repeatable=True,
         help_title="Clip Start",
         help_entries=(
             ("Left/Right", "trim by one snap step"),
             ("PgUp/PgDn", "trim by one bar"),
-            ("Enter", "seek to clip start"),
         ),
         help_description=(
             "Where the layer turns on.",
