@@ -48,7 +48,7 @@ from cleave.viz.welcome_host import CANCEL_LABEL, WelcomeFlow
 from cleave.viz.window_controls import WindowControls
 from cleave.viz.timeline_phase_controls import TimelinePhaseController
 from cleave.viz.timeline_history import TimelineHistory
-from cleave.viz.timeline_cue_edits import CueEditor
+from cleave.viz.timeline_clip_edits import ClipEditor
 from cleave.viz.timeline_preset_controls import TimelinePresetController
 from cleave.viz.timeline_cut_controls import TimelineCutController
 from cleave.viz.timeline_snap_controls import TimelineSnapController
@@ -215,7 +215,13 @@ class TuningControls:
             session,
             on_preset_list_change=self.preset_list.refresh_switching,
         )
-        self.cue_editor = CueEditor(session, self.timeline_history)
+        self.clip_editor = ClipEditor(
+            session,
+            self.timeline_history,
+            duration_sec=duration_sec,
+            beat_times=beat_times,
+            bar_times=bar_times,
+        )
         self._timeline_presets = TimelinePresetController(
             session,
             self._modal_host,
@@ -575,9 +581,9 @@ class TuningControls:
         if isinstance(cursor, TimelineFocus):
             tl = self.session.timeline
             if cursor.row != tl.focus_row:
-                # Drop in-progress cue flash so returning to a remembered
+                # Drop in-progress clip flash so returning to a remembered
                 # selection shows the settled tick, not a restart blink.
-                tl.selected_cue_flash_start_ms = None
+                tl.selected_clip_flash_start_ms = None
             tl.focus_row = cursor.row
             self._select_timeline_row_page(cursor.row)
             return

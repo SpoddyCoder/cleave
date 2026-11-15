@@ -2,18 +2,18 @@
 
 The corner buttons above the row labels play/pause and record. A press on
 the ruler seeks and a held drag scrubs. A press on a layer row focuses it
-and selects a nearby cue without moving the playhead. A double-click away
-from any cue adds one there (``TimelineControls.add_cue_at``); on a cue, or
-while cues cannot be edited, it seeks, and holding the second press
-scrubs. A press on a song marker selects it and shows it on the Song
+and selects the clip under the pointer without moving the playhead. A
+double-click in a gap adds a clip there (``TimelineControls.add_clip_at``);
+on a clip, or while clips cannot be edited, it seeks, and holding the second
+press scrubs. A press on a song marker selects it and shows it on the Song
 Markers page: on the ruler it also seeks to the marker, and on a row a
-nearby cue wins. A double-click on a row's
+clip under the pointer wins. A double-click on a row's
 label (layer number and stem) arms it, and a press on its monitor eye
 toggles the layer's visibility as its number key does (an overridden row,
 or an armed row while recording). A right-click on a row focuses it and
 returns that row's context menu (``timeline_context_menu``), selecting a
-cue under the pointer first so the menu can edit it. Away from a cue the
-row menu leads with Add cue here; there, and on the ruler, the menu has the
+clip under the pointer first so the menu can edit it. In a gap the row
+menu leads with Add clip here; there, and on the ruler, the menu has the
 clicked time's items (``timeline_time_menu``), or a song marker's items
 when one is under the pointer, selected first.
 
@@ -34,7 +34,7 @@ from typing import Callable, Literal, Protocol
 
 from cleave.viz.context_menu import ContextMenuEntry, ContextMenuProvider
 from cleave.viz.session import TuningSession
-from cleave.viz.timeline_cue_edits import cue_edits_allowed
+from cleave.viz.timeline_clip_edits import clip_edits_allowed
 from cleave.viz.timeline_context_menu import TimelineRowMenuActions, timeline_row_menu
 from cleave.viz.timeline_overlay import StripHit, StripTarget
 from cleave.viz.timeline_view import (
@@ -75,7 +75,7 @@ class StripActions(TimelineRowMenuActions, Protocol):
 
     def select_song_marker(self, index: int) -> None: ...
 
-    def select_cue_near(self, slot: str, t_sec: float, tolerance_sec: float) -> bool: ...
+    def select_clip_at(self, slot: str, t_sec: float) -> bool: ...
 
     def seek_to(self, t_sec: float) -> None: ...
 
@@ -176,10 +176,10 @@ class TimelinePointer:
         """Return the menu for a screen point on the strip, or None.
 
         On the ruler, the clicked time's items and the timeline commands. On
-        a layer row the row is focused first. A cue near the point is
-        selected and the menu opens with its items; elsewhere in the bar the
-        menu opens with the clicked time's items. A song marker under the
-        point (and no cue) is selected, and its items replace the time items.
+        a layer row the row is focused first. A clip under the point is
+        selected and the menu opens with its items; in a gap the menu opens
+        with the clicked time's items. A song marker under the point (and no
+        clip) is selected, and its items replace the time items.
         """
         hit = self._geometry.hit_at(x, y)
         if hit is None:
@@ -205,12 +205,12 @@ class TimelinePointer:
             return None
         self._last_row_press = None
         self._actions.focus_row(hit.row)
-        on_cue = hit.t_sec is not None and self._actions.select_cue_near(
-            slot, hit.t_sec, hit.cue_tolerance_sec
+        on_clip = hit.t_sec is not None and self._actions.select_clip_at(
+            slot, hit.t_sec
         )
-        add_cue_t = hit.t_sec if not on_cue else None
+        add_clip_t = hit.t_sec if not on_clip else None
         time_entries: Callable[[], tuple[ContextMenuEntry, ...]] | None = None
-        if not on_cue and hit.t_sec is not None and time_menu is not None:
+        if not on_clip and hit.t_sec is not None and time_menu is not None:
             row_t = hit.t_sec
             row_tolerance = hit.cue_tolerance_sec
             row_marker = hit.marker_index
@@ -224,13 +224,13 @@ class TimelinePointer:
             self._actions,
             self._session,
             hit.row,
-            cue=on_cue,
+            clip=on_clip,
             time_entries=time_entries,
-            add_cue_t=add_cue_t,
+            add_clip_t=add_clip_t,
         )
 
     def row_menu(self, row: int) -> ContextMenuProvider:
-        """Focus *row* and return its menu, with its selected cue's items."""
+        """Focus *row* and return its menu, with its selected clip's items."""
         self._last_row_press = None
         self._actions.focus_row(row)
         return timeline_row_menu(self._actions, self._session, row)
@@ -295,20 +295,20 @@ class TimelinePointer:
             return True
         z_order = self._session.layer_z_order
         slot = z_order[hit.row] if hit.row < len(z_order) else None
-        on_cue = slot is not None and self._actions.select_cue_near(
-            slot, hit.t_sec, hit.cue_tolerance_sec
+        on_clip = slot is not None and self._actions.select_clip_at(
+            slot, hit.t_sec
         )
         if double:
             self._last_row_press = None
-            # Away from a cue a double-click adds one; on a cue, or where cues
+            # In a gap a double-click adds a clip; on a clip, or where clips
             # cannot be edited, it seeks.
-            if slot is not None and not on_cue and cue_edits_allowed(self._session):
-                self._actions.add_cue_at(slot, hit.t_sec)
+            if slot is not None and not on_clip and clip_edits_allowed(self._session):
+                self._actions.add_clip_at(slot, hit.t_sec)
             else:
                 self._start_scrub(hit.t_sec)
             return True
         self._last_row_press = (now, x, y, hit.row, hit.target)
-        if not on_cue and hit.marker_index is not None:
+        if not on_clip and hit.marker_index is not None:
             self._actions.select_song_marker(hit.marker_index)
         if self._view.zoomed:
             self._pan_pending_x = x

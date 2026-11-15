@@ -161,8 +161,8 @@ class TimelineViewState:
     song_marker_flash_start_ms: int | None = None
     hard_cut_fades: TimelineFadeGroup = field(default_factory=TimelineFadeGroup)
     soft_cut_fades: TimelineFadeGroup = field(default_factory=TimelineFadeGroup)
-    selected_cue_t: dict[str, float] = field(default_factory=dict)
-    selected_cue_flash_start_ms: int | None = None
+    selected_clip_t: dict[str, float] = field(default_factory=dict)
+    selected_clip_flash_start_ms: int | None = None
     # Visible time window mapped onto the bar. An end of None is the song end.
     view_start_sec: float = 0.0
     view_end_sec: float | None = None
@@ -519,7 +519,7 @@ def prune_expired_arm_flashes(
         flash_starts.pop(slot, None)
 
 
-def prune_expired_selected_cue_flash(
+def prune_expired_selected_clip_flash(
     flash_start_ms: int | None,
     ticks_ms: int | None = None,
 ) -> int | None:
@@ -559,7 +559,7 @@ def arm_abbrev_flash_visible(
     return (elapsed // ARM_FLASH_HALF_MS) % 2 == 0
 
 
-def selected_cue_flash_active(
+def selected_clip_flash_active(
     flash_start_ms: int | None,
     ticks_ms: int | None = None,
 ) -> bool:
@@ -570,12 +570,12 @@ def selected_cue_flash_active(
     return ticks_ms - flash_start_ms < SELECTED_CUE_FLASH_DURATION_MS
 
 
-def selected_cue_flash_bright(
+def selected_clip_flash_bright(
     flash_start_ms: int | None,
     ticks_ms: int | None = None,
 ) -> bool:
     """True on the yellow (HIGHLIGHT) half of the selected-cue blink cycle."""
-    if not selected_cue_flash_active(flash_start_ms, ticks_ms=ticks_ms):
+    if not selected_clip_flash_active(flash_start_ms, ticks_ms=ticks_ms):
         return False
     if ticks_ms is None:
         ticks_ms = pygame.time.get_ticks()
@@ -588,9 +588,9 @@ def selected_cue_tick_color(
     flash_start_ms: int | None,
     ticks_ms: int | None = None,
 ) -> tuple[int, int, int]:
-    if selected_cue_flash_bright(flash_start_ms, ticks_ms=ticks_ms):
+    if selected_clip_flash_bright(flash_start_ms, ticks_ms=ticks_ms):
         return SELECTED_CUE_FLASH_YELLOW
-    if selected_cue_flash_active(flash_start_ms, ticks_ms=ticks_ms):
+    if selected_clip_flash_active(flash_start_ms, ticks_ms=ticks_ms):
         return SELECTED_CUE_FLASH_RED
     return SELECTED_CUE_COLOR
 
@@ -1447,10 +1447,10 @@ class TimelineOverlay:
             )
 
             row_cues = bar_cues_for_row(state, slot)
-            # Per-slot selection memory stays in selected_cue_t; only the focused
+            # Per-slot selection memory stays in selected_clip_t; only the focused
             # row draws the selected marker (settled yellow / flash / badge).
             selected_t = (
-                state.selected_cue_t.get(slot)
+                state.selected_clip_t.get(slot)
                 if row_index == state.focus_row
                 else None
             )
@@ -1686,13 +1686,13 @@ class TimelineOverlay:
         dirty.append(monitor_rect)
 
         selected_t = (
-            state.selected_cue_t.get(slot) if row_index == state.focus_row else None
+            state.selected_clip_t.get(slot) if row_index == state.focus_row else None
         )
         view_start, view_end = view_window(state)
         if (
             selected_t is not None
             and time_in_view(selected_t, view_start, view_end)
-            and selected_cue_flash_active(state.selected_cue_flash_start_ms)
+            and selected_clip_flash_active(state.selected_clip_flash_start_ms)
         ):
             tick_x = time_to_x(
                 selected_t, layout.bar_left, layout.bar_width, view_start, view_end
@@ -1714,7 +1714,7 @@ class TimelineOverlay:
             if tick_rect[2] > 0:
                 pygame.draw.line(
                     upload,
-                    selected_cue_tick_color(state.selected_cue_flash_start_ms),
+                    selected_cue_tick_color(state.selected_clip_flash_start_ms),
                     (tick_x, upload_y),
                     (tick_x, upload_y + row_h - 1),
                     SELECTED_CUE_FLASH_TICK_WIDTH,
@@ -1724,7 +1724,7 @@ class TimelineOverlay:
 
     def _live_flash_row_indices(self, state: TimelineViewState) -> tuple[int, ...]:
         indices: list[int] = []
-        cue_flash = selected_cue_flash_active(state.selected_cue_flash_start_ms)
+        cue_flash = selected_clip_flash_active(state.selected_clip_flash_start_ms)
         for row_index, slot in enumerate(state.layer_z_order):
             armed = slot in state.armed_slots
             if arm_abbrev_flash_active(state.arm_flash_start_ms, slot):
@@ -1736,7 +1736,7 @@ class TimelineOverlay:
             elif (
                 cue_flash
                 and row_index == state.focus_row
-                and slot in state.selected_cue_t
+                and slot in state.selected_clip_t
             ):
                 indices.append(row_index)
         return tuple(indices)
@@ -1744,8 +1744,8 @@ class TimelineOverlay:
     def _live_flash_signature(self, state: TimelineViewState) -> tuple:
         parts: list[tuple] = []
         cue_flash_bright = (
-            selected_cue_flash_bright(state.selected_cue_flash_start_ms)
-            if selected_cue_flash_active(state.selected_cue_flash_start_ms)
+            selected_clip_flash_bright(state.selected_clip_flash_start_ms)
+            if selected_clip_flash_active(state.selected_clip_flash_start_ms)
             else None
         )
         for row_index in self._live_flash_row_indices(state):
@@ -1765,27 +1765,27 @@ class TimelineOverlay:
                         or (state.recording and armed and rec_flash_visible())
                     ),
                     (
-                        state.selected_cue_t.get(slot)
+                        state.selected_clip_t.get(slot)
                         if cue_flash_bright is not None
                         and row_index == state.focus_row
                         else None
                     ),
                     (
                         cue_flash_bright
-                        if row_index == state.focus_row and slot in state.selected_cue_t
+                        if row_index == state.focus_row and slot in state.selected_clip_t
                         else None
                     ),
                 )
             )
         if (
             state.selected_song_marker_index is not None
-            and selected_cue_flash_active(state.song_marker_flash_start_ms)
+            and selected_clip_flash_active(state.song_marker_flash_start_ms)
         ):
             parts.append(
                 (
                     "song_marker",
                     state.selected_song_marker_index,
-                    selected_cue_flash_bright(state.song_marker_flash_start_ms),
+                    selected_clip_flash_bright(state.song_marker_flash_start_ms),
                 )
             )
         return tuple(parts)
@@ -1828,7 +1828,7 @@ class TimelineOverlay:
         # The selected marker draws last so a neighbour never covers it.
         if selected_x is not None:
             flash_start = state.song_marker_flash_start_ms
-            if selected_cue_flash_active(flash_start):
+            if selected_clip_flash_active(flash_start):
                 color = selected_cue_tick_color(flash_start)
                 width = SELECTED_CUE_FLASH_TICK_WIDTH
                 half_w = width // 2 + 1

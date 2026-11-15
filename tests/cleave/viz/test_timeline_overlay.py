@@ -63,14 +63,14 @@ from cleave.viz.timeline_overlay import (
     playhead_flash_bright,
     playhead_x,
     prune_expired_arm_flashes,
-    prune_expired_selected_cue_flash,
+    prune_expired_selected_clip_flash,
     rec_flash_visible,
     role_glyph_anchor,
     role_glyph_previous_level,
     role_glyph_side,
     row_prefix_width,
-    selected_cue_flash_active,
-    selected_cue_flash_bright,
+    selected_clip_flash_active,
+    selected_clip_flash_bright,
     selected_cue_tick_color,
     stem_abbrev_label,
     stem_label_text,
@@ -129,8 +129,8 @@ def _view_state(
     soft_cut_fade_in: float = 2.0,
     soft_cut_fade_out: float = 2.0,
     soft_cut_crossfade: bool = False,
-    selected_cue_t: dict[str, float] | None = None,
-    selected_cue_flash_start_ms: int | None = None,
+    selected_clip_t: dict[str, float] | None = None,
+    selected_clip_flash_start_ms: int | None = None,
 ) -> TimelineViewState:
     order = list(layer_z_order or list(DEFAULT_LAYER_SLOTS))
     lane_map = dict(lanes or {})
@@ -199,8 +199,8 @@ def _view_state(
             fade_out=soft_cut_fade_out,
             crossfade=soft_cut_crossfade,
         ),
-        selected_cue_t=dict(selected_cue_t or ()),
-        selected_cue_flash_start_ms=selected_cue_flash_start_ms,
+        selected_clip_t=dict(selected_clip_t or ()),
+        selected_clip_flash_start_ms=selected_clip_flash_start_ms,
     )
 
 
@@ -1118,7 +1118,7 @@ def test_draw_with_selected_cue_and_role_does_not_crash() -> None:
         position_sec=12.0,
         focus_row=0,
         submenu_focused=True,
-        selected_cue_t={"layer_1": 10.0},
+        selected_clip_t={"layer_1": 10.0},
     )
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
     _draw(overlay, surface, state)
@@ -1186,7 +1186,7 @@ def test_selected_cue_highlight_drawn_on_static_panel() -> None:
         },
         duration_sec=100.0,
         focus_row=0,
-        selected_cue_t={"layer_1": 25.0},
+        selected_clip_t={"layer_1": 25.0},
     )
     composed = overlay.compose_panel(
         state,
@@ -1217,7 +1217,7 @@ def test_selected_cue_highlight_drawn_on_static_panel() -> None:
 
 
 def test_selected_cue_marker_only_on_focused_track() -> None:
-    """Remembered selections stay in selected_cue_t; only focus_row draws the marker."""
+    """Remembered selections stay in selected_clip_t; only focus_row draws the marker."""
     pygame.init()
     overlay = TimelineOverlay()
     lanes = {
@@ -1236,7 +1236,7 @@ def test_selected_cue_marker_only_on_focused_track() -> None:
         defaults={"layer_1": 1.0, "layer_2": 1.0},
         lanes=lanes,
         duration_sec=100.0,
-        selected_cue_t=selected,
+        selected_clip_t=selected,
     )
 
     def _compose(focus_row: int):
@@ -1269,42 +1269,42 @@ def test_selected_cue_marker_only_on_focused_track() -> None:
     assert _tick_rgb(50.0, 1) != SELECTED_CUE_COLOR
 
 
-def test_prune_expired_selected_cue_flash() -> None:
-    assert prune_expired_selected_cue_flash(None, ticks_ms=0) is None
-    assert prune_expired_selected_cue_flash(1000, ticks_ms=1000) == 1000
+def test_prune_expired_selected_clip_flash() -> None:
+    assert prune_expired_selected_clip_flash(None, ticks_ms=0) is None
+    assert prune_expired_selected_clip_flash(1000, ticks_ms=1000) == 1000
     assert (
-        prune_expired_selected_cue_flash(
+        prune_expired_selected_clip_flash(
             1000, ticks_ms=1000 + SELECTED_CUE_FLASH_DURATION_MS - 1
         )
         == 1000
     )
     assert (
-        prune_expired_selected_cue_flash(
+        prune_expired_selected_clip_flash(
             1000, ticks_ms=1000 + SELECTED_CUE_FLASH_DURATION_MS
         )
         is None
     )
 
 
-def test_selected_cue_flash_blink_colors() -> None:
+def test_selected_clip_flash_blink_colors() -> None:
     start = 1000
-    assert selected_cue_flash_active(start, ticks_ms=start)
-    assert selected_cue_flash_bright(start, ticks_ms=start)
+    assert selected_clip_flash_active(start, ticks_ms=start)
+    assert selected_clip_flash_bright(start, ticks_ms=start)
     assert selected_cue_tick_color(start, ticks_ms=start) == SELECTED_CUE_FLASH_YELLOW
     assert SELECTED_CUE_FLASH_YELLOW == HIGHLIGHT
     assert SELECTED_CUE_COLOR == HIGHLIGHT
     assert SELECTED_CUE_FLASH_RED == ARMED_BG
     alt_t = start + SELECTED_CUE_FLASH_HALF_MS
-    assert selected_cue_flash_active(start, ticks_ms=alt_t)
-    assert not selected_cue_flash_bright(start, ticks_ms=alt_t)
+    assert selected_clip_flash_active(start, ticks_ms=alt_t)
+    assert not selected_clip_flash_bright(start, ticks_ms=alt_t)
     assert selected_cue_tick_color(start, ticks_ms=alt_t) == SELECTED_CUE_FLASH_RED
     expired = start + SELECTED_CUE_FLASH_DURATION_MS
-    assert not selected_cue_flash_active(start, ticks_ms=expired)
-    assert not selected_cue_flash_bright(start, ticks_ms=expired)
+    assert not selected_clip_flash_active(start, ticks_ms=expired)
+    assert not selected_clip_flash_bright(start, ticks_ms=expired)
     assert selected_cue_tick_color(start, ticks_ms=expired) == SELECTED_CUE_COLOR
 
 
-def test_selected_cue_flash_live_patches_yellow(monkeypatch) -> None:
+def test_selected_clip_flash_live_patches_yellow(monkeypatch) -> None:
     pygame.init()
     overlay = TimelineOverlay()
     start = 5000
@@ -1319,8 +1319,8 @@ def test_selected_cue_flash_live_patches_yellow(monkeypatch) -> None:
         },
         duration_sec=100.0,
         focus_row=0,
-        selected_cue_t={"layer_1": 25.0},
-        selected_cue_flash_start_ms=start,
+        selected_clip_t={"layer_1": 25.0},
+        selected_clip_flash_start_ms=start,
     )
     # Yellow half of the blink: thick live-patch over the thinner settled static tick.
     monkeypatch.setattr(pygame.time, "get_ticks", lambda: start)

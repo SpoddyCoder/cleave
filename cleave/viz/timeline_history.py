@@ -1,13 +1,13 @@
 """Undo and redo for timeline edits.
 
 Each entry holds the timeline before and after one edit: a bulk command, a
-hand edit to a cue, or a recorded take. Undo runs only while the timeline
+hand edit to a clip, or a recorded take. Undo runs only while the timeline
 still matches what that edit left behind, so a change made outside the
 history is never thrown away. Layer changes count, since lanes are keyed by
 slot.
 
 Edits that share a merge key and follow each other closely fold into one
-entry, so a held nudge key or a whole drag undoes as one step. The cue
+entry, so a held nudge key or a whole drag undoes as one step. The clip
 selection is restored with the lanes but does not count as a change.
 """
 
@@ -32,7 +32,7 @@ class _Snapshot:
     preset_lists: dict[str, list[str]]
     pattern_mask: tuple[bool, str, int, float]
     # Restored with the rest, but never counts as a change.
-    selected_cue_t: dict[str, float]
+    selected_clip_t: dict[str, float]
 
     def same_content(self, other: _Snapshot) -> bool:
         return (
@@ -203,7 +203,7 @@ class TimelineHistory:
                 for slot, layer in session.layers.items()
             },
             pattern_mask=(mask.enabled, mask.type, mask.feather_pct, mask.transition),
-            selected_cue_t=dict(session.timeline.selected_cue_t),
+            selected_clip_t=dict(session.timeline.selected_clip_t),
         )
 
     def _restore(self, snapshot: _Snapshot) -> None:
@@ -212,7 +212,7 @@ class TimelineHistory:
             slot: copy_lane(lane) for slot, lane in snapshot.lanes.items()
         }
         session.timeline.enabled = snapshot.timeline_enabled
-        session.timeline.selected_cue_t = dict(snapshot.selected_cue_t)
+        session.timeline.selected_clip_t = dict(snapshot.selected_clip_t)
         mask = session.pattern_mask
         mask.enabled, mask.type, mask.feather_pct, mask.transition = (
             snapshot.pattern_mask

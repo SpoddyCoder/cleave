@@ -163,24 +163,24 @@ def test_toggle_record_starts_and_stops_like_r() -> None:
     assert session.timeline.recording is False
 
 
-def test_left_right_step_cues_when_not_recording() -> None:
+def test_left_right_step_clips_when_not_recording() -> None:
     lanes = {
-        "layer_1": _lane(False, (4.0, True), (10.0, False), (16.0, True)),
+        "layer_1": _lane(False, (4.0, True), (10.0, False), (16.0, True), (20.0, False)),
     }
     controls, session, _, _, seeks, _ = _make_timeline_controls(
         lanes=lanes,
-        position_sec=9.0,
+        position_sec=2.0,
     )
 
     controls.handle_keydown(keydown(pygame.K_RIGHT))
-    assert session.timeline.selected_cue_t["layer_1"] == 10.0
+    assert session.timeline.selected_clip_t["layer_1"] == 4.0
     assert seeks == []
 
     controls.handle_keydown(keydown(pygame.K_RIGHT))
-    assert session.timeline.selected_cue_t["layer_1"] == 16.0
+    assert session.timeline.selected_clip_t["layer_1"] == 16.0
 
     controls.handle_keydown(keydown(pygame.K_LEFT))
-    assert session.timeline.selected_cue_t["layer_1"] == 10.0
+    assert session.timeline.selected_clip_t["layer_1"] == 4.0
 
 
 def test_esc_exits_submenu_and_keeps_strip_open() -> None:
@@ -521,32 +521,32 @@ def test_arrow_first_press_picks_by_direction_from_playhead() -> None:
         position_sec=9.0,
     )
     controls.handle_keydown(keydown(pygame.K_LEFT))
-    assert session.timeline.selected_cue_t["layer_1"] == 4.0
+    assert session.timeline.selected_clip_t["layer_1"] == 4.0
 
     controls, session, _, _, _, _ = _make_timeline_controls(
         lanes=lanes,
         position_sec=9.0,
     )
     controls.handle_keydown(keydown(pygame.K_RIGHT))
-    assert session.timeline.selected_cue_t["layer_1"] == 10.0
+    assert session.timeline.selected_clip_t["layer_1"] == 16.0
 
 
-def test_arrows_step_cues_when_locked() -> None:
+def test_arrows_step_clips_when_locked() -> None:
     lanes = {
         "layer_1": _lane(False, (4.0, True), (10.0, False), (16.0, True)),
     }
     controls, session, _, _, _, _ = _make_timeline_controls(
         lanes=lanes,
-        position_sec=9.0,
+        position_sec=2.0,
     )
     session.timeline.locked = True
     controls.handle_keydown(keydown(pygame.K_RIGHT))
-    assert session.timeline.selected_cue_t["layer_1"] == 10.0
+    assert session.timeline.selected_clip_t["layer_1"] == 4.0
     controls.handle_keydown(keydown(pygame.K_RIGHT))
-    assert session.timeline.selected_cue_t["layer_1"] == 16.0
+    assert session.timeline.selected_clip_t["layer_1"] == 16.0
 
 
-def test_enter_seeks_to_selected_cue() -> None:
+def test_enter_seeks_to_selected_clip_start() -> None:
     lanes = {
         "layer_1": _lane(False, (4.0, True), (10.0, False), (16.0, True)),
     }
@@ -555,9 +555,9 @@ def test_enter_seeks_to_selected_cue() -> None:
         position_sec=9.0,
     )
     controls.handle_keydown(keydown(pygame.K_RIGHT))
-    assert session.timeline.selected_cue_t["layer_1"] == 10.0
+    assert session.timeline.selected_clip_t["layer_1"] == 16.0
     controls.handle_keydown(keydown(pygame.K_RETURN))
-    assert seeks == [1.0]
+    assert seeks == [7.0]
 
 
 def test_enter_does_not_seek_while_recording() -> None:
@@ -570,7 +570,7 @@ def test_enter_does_not_seek_while_recording() -> None:
         armed_slots={"layer_1"},
         recording=True,
     )
-    session.timeline.selected_cue_t["layer_1"] = 10.0
+    session.timeline.selected_clip_t["layer_1"] = 10.0
     controls.handle_keydown(keydown(pygame.K_RETURN))
     assert seeks == []
 
@@ -1337,7 +1337,7 @@ def test_recorded_timeline_bar_unchanged_after_disable_layer_toggle_reenable() -
     assert expected[0][0] == 0.0
 
 
-def test_arrows_select_opening_baseline_cue() -> None:
+def test_arrows_select_opening_baseline_clip() -> None:
     lanes = {
         "layer_1": TimelineLane(
             baseline=0.5,
@@ -1355,15 +1355,22 @@ def test_arrows_select_opening_baseline_cue() -> None:
         position_sec=0.0,
     )
     controls.handle_keydown(keydown(pygame.K_RIGHT))
-    assert session.timeline.selected_cue_t["layer_1"] == 0.0
+    assert session.timeline.selected_clip_t["layer_1"] == 0.0
     controls.handle_keydown(keydown(pygame.K_RIGHT))
-    assert session.timeline.selected_cue_t["layer_1"] == 10.0
+    assert session.timeline.selected_clip_t["layer_1"] == 20.0
+    controls.handle_keydown(keydown(pygame.K_LEFT))
+    assert session.timeline.selected_clip_t["layer_1"] == 0.0
+
+
+def test_arrows_select_the_clip_of_an_inherited_lane() -> None:
+    # No baseline: the lane inherits the layer's enabled switch.
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        lanes={"layer_1": TimelineLane(baseline=None, cues=[])},
+    )
     controls.handle_keydown(keydown(pygame.K_RIGHT))
-    assert session.timeline.selected_cue_t["layer_1"] == 20.0
-    controls.handle_keydown(keydown(pygame.K_LEFT))
-    assert session.timeline.selected_cue_t["layer_1"] == 10.0
-    controls.handle_keydown(keydown(pygame.K_LEFT))
-    assert session.timeline.selected_cue_t["layer_1"] == 0.0
+    assert session.timeline.selected_clip_t["layer_1"] == 0.0
+    session.layers["layer_1"].enabled = False
+    assert controls.clip_editor.selected("layer_1") is None
 
 
 def test_o_casts_opening_baseline_materializing_cue_at_zero() -> None:
@@ -1386,47 +1393,43 @@ def test_o_casts_opening_baseline_materializing_cue_at_zero() -> None:
         position_sec=0.0,
     )
     controls.handle_keydown(keydown(pygame.K_RIGHT))
-    assert session.timeline.selected_cue_t["layer_1"] == 0.0
+    assert session.timeline.selected_clip_t["layer_1"] == 0.0
     controls.handle_keydown(keydown(pygame.K_o))
     lane = session.timeline.lanes["layer_1"]
     assert lane.baseline == 0.0
     assert lane.cues[0] == SlotCue(t=0.0, level=0.5, role=CUE_ROLES[0])
-    assert session.timeline.selected_cue_t["layer_1"] == 0.0
+    assert session.timeline.selected_clip_t["layer_1"] == 0.0
 
 
-def test_arrows_select_then_step_cues() -> None:
-    # All cues navigable, including the off at 10.
+def test_arrows_select_then_step_clips() -> None:
+    # The off cue at 10 ends the first clip; it is not a stop of its own.
     lanes = {
         "layer_1": _lane(False, (4.0, True), (10.0, False), (16.0, True)),
     }
     controls, session, _, _, _, _ = _make_timeline_controls(
         lanes=lanes,
-        position_sec=9.0,
+        position_sec=2.0,
     )
-    assert session.timeline.selected_cue_t == {}
-    assert session.timeline.selected_cue_flash_start_ms is None
+    assert session.timeline.selected_clip_t == {}
+    assert session.timeline.selected_clip_flash_start_ms is None
 
     before = pygame.time.get_ticks()
     controls.handle_keydown(keydown(pygame.K_RIGHT))
-    # First cue at or after playhead 9 is the off at 10.
-    assert session.timeline.selected_cue_t["layer_1"] == 10.0
-    first_flash = session.timeline.selected_cue_flash_start_ms
+    assert session.timeline.selected_clip_t["layer_1"] == 4.0
+    first_flash = session.timeline.selected_clip_flash_start_ms
     assert first_flash is not None and first_flash >= before
 
     controls.handle_keydown(keydown(pygame.K_RIGHT))
-    assert session.timeline.selected_cue_t["layer_1"] == 16.0
-    second_flash = session.timeline.selected_cue_flash_start_ms
+    assert session.timeline.selected_clip_t["layer_1"] == 16.0
+    second_flash = session.timeline.selected_clip_flash_start_ms
     assert second_flash is not None and second_flash >= first_flash
 
     controls.handle_keydown(keydown(pygame.K_LEFT))
-    assert session.timeline.selected_cue_t["layer_1"] == 10.0
-
+    assert session.timeline.selected_clip_t["layer_1"] == 4.0
+    at_start_flash = session.timeline.selected_clip_flash_start_ms
     controls.handle_keydown(keydown(pygame.K_LEFT))
-    assert session.timeline.selected_cue_t["layer_1"] == 4.0
-    at_start_flash = session.timeline.selected_cue_flash_start_ms
-    controls.handle_keydown(keydown(pygame.K_LEFT))
-    assert session.timeline.selected_cue_t["layer_1"] == 4.0
-    assert session.timeline.selected_cue_flash_start_ms == at_start_flash
+    assert session.timeline.selected_clip_t["layer_1"] == 4.0
+    assert session.timeline.selected_clip_flash_start_ms == at_start_flash
 
 
 def test_arrows_keep_mid_on_level_changes() -> None:
@@ -1448,12 +1451,12 @@ def test_arrows_keep_mid_on_level_changes() -> None:
         position_sec=5.0,
     )
     controls.handle_keydown(keydown(pygame.K_LEFT))
-    assert session.timeline.selected_cue_t["layer_1"] == 4.0
+    assert session.timeline.selected_clip_t["layer_1"] == 4.0
     controls.handle_keydown(keydown(pygame.K_RIGHT))
-    assert session.timeline.selected_cue_t["layer_1"] == 10.0
+    assert session.timeline.selected_clip_t["layer_1"] == 10.0
 
 
-def test_comma_period_steps_through_off_selection() -> None:
+def test_arrows_step_from_a_selection_that_names_no_clip() -> None:
     lanes = {
         "layer_1": _lane(False, (4.0, True), (10.0, False), (16.0, True)),
     }
@@ -1461,14 +1464,15 @@ def test_comma_period_steps_through_off_selection() -> None:
         lanes=lanes,
         position_sec=9.0,
     )
-    session.timeline.selected_cue_t["layer_1"] = 10.0
+    # 10 is the first clip's end, so the step starts again from the playhead.
+    session.timeline.selected_clip_t["layer_1"] = 10.0
     controls.handle_keydown(keydown(pygame.K_RIGHT))
-    assert session.timeline.selected_cue_t["layer_1"] == 16.0
+    assert session.timeline.selected_clip_t["layer_1"] == 16.0
     controls.handle_keydown(keydown(pygame.K_LEFT))
-    assert session.timeline.selected_cue_t["layer_1"] == 10.0
+    assert session.timeline.selected_clip_t["layer_1"] == 4.0
 
 
-def test_cue_selection_memory_is_per_track() -> None:
+def test_clip_selection_memory_is_per_track() -> None:
     lanes = {
         "layer_1": _lane(False, (4.0, True), (10.0, False), (16.0, True)),
         "layer_2": _lane(False, (8.0, True), (16.0, False)),
@@ -1479,21 +1483,21 @@ def test_cue_selection_memory_is_per_track() -> None:
         position_sec=5.0,
     )
     controls.handle_keydown(keydown(pygame.K_LEFT))
-    assert session.timeline.selected_cue_t["layer_1"] == 4.0
+    assert session.timeline.selected_clip_t["layer_1"] == 4.0
 
     session.timeline.focus_row = 1
     controls.handle_keydown(keydown(pygame.K_RIGHT))
-    assert session.timeline.selected_cue_t["layer_2"] == 8.0
-    assert session.timeline.selected_cue_t["layer_1"] == 4.0
+    assert session.timeline.selected_clip_t["layer_2"] == 8.0
+    assert session.timeline.selected_clip_t["layer_1"] == 4.0
 
     session.timeline.focus_row = 0
-    assert session.timeline.selected_cue_t["layer_1"] == 4.0
+    assert session.timeline.selected_clip_t["layer_1"] == 4.0
     controls.handle_keydown(keydown(pygame.K_RIGHT))
-    assert session.timeline.selected_cue_t["layer_1"] == 10.0
-    assert session.timeline.selected_cue_t["layer_2"] == 8.0
+    assert session.timeline.selected_clip_t["layer_1"] == 16.0
+    assert session.timeline.selected_clip_t["layer_2"] == 8.0
 
 
-def test_b_cycles_selected_cue_blend_including_none() -> None:
+def test_b_cycles_selected_clip_blend_including_none() -> None:
     from cleave.blend_modes import BLEND_MODES
 
     lanes = {
@@ -1523,7 +1527,7 @@ def test_b_cycles_selected_cue_blend_including_none() -> None:
     assert cue.blend is None
 
 
-def test_o_cycles_selected_cue_role_including_none() -> None:
+def test_o_cycles_selected_clip_role_including_none() -> None:
     from cleave.cue_roles import CUE_ROLES
 
     lanes = {
@@ -1550,9 +1554,7 @@ def test_o_cycles_selected_cue_role_including_none() -> None:
     assert session.timeline.lanes["layer_1"].cues[0].role is None
 
 
-def test_b_and_o_noop_on_off_cue_c_cycles_cut() -> None:
-    from cleave.blend_modes import BLEND_MODES
-    from cleave.cue_roles import CUE_ROLES
+def test_c_and_shift_c_cycle_cut_in_and_cut_out() -> None:
     from cleave.cut_types import CUT_TYPES
 
     lanes = {
@@ -1562,31 +1564,29 @@ def test_b_and_o_noop_on_off_cue_c_cycles_cut() -> None:
         lanes=lanes,
         position_sec=10.0,
     )
-    session.timeline.selected_cue_t["layer_1"] = 10.0
-    off_before = session.timeline.lanes["layer_1"].cues[1]
-    assert off_before.level == 0.0
-    assert off_before.cut is None
-    controls.handle_keydown(keydown(pygame.K_b))
-    controls.handle_keydown(keydown(pygame.K_o))
-    off_after = session.timeline.lanes["layer_1"].cues[1]
-    assert off_after.blend is None
-    assert off_after.role is None
-    assert off_after.cut is None
+    session.timeline.selected_clip_t["layer_1"] = 5.0
+    controls.handle_keydown(keydown(pygame.K_c, mod=pygame.KMOD_SHIFT))
+    start, end = session.timeline.lanes["layer_1"].cues
+    assert (start.cut, end.cut) == (None, CUT_TYPES[1])  # cut out: none -> hard
     controls.handle_keydown(keydown(pygame.K_c))
-    off_cut = session.timeline.lanes["layer_1"].cues[1]
-    assert off_cut.cut == CUT_TYPES[1]  # none -> hard
-    assert session.timeline.selected_cue_t["layer_1"] == 10.0
-    # On cue at 5 still editable when selected.
-    session.timeline.selected_cue_t["layer_1"] = 5.0
-    controls.handle_keydown(keydown(pygame.K_b))
-    controls.handle_keydown(keydown(pygame.K_o))
-    on_cue = session.timeline.lanes["layer_1"].cues[0]
-    assert on_cue.blend == BLEND_MODES[0]
-    assert on_cue.role == CUE_ROLES[0]
+    controls.handle_keydown(keydown(pygame.K_c))
+    start, end = session.timeline.lanes["layer_1"].cues
+    assert (start.cut, end.cut) == (CUT_TYPES[2], CUT_TYPES[1])
+    assert session.timeline.selected_clip_t["layer_1"] == 5.0
 
 
-def test_cycling_off_cue_cut_changes_fall_triangle() -> None:
-    """Off-cue cut owns the fall edge; cycling c reshapes the envelope."""
+def test_shift_c_does_nothing_on_a_clip_with_no_end_cue() -> None:
+    lanes = {"layer_1": _lane(False, (5.0, 1.0), (10.0, 0.5))}
+    controls, session, _, _, _, _ = _make_timeline_controls(lanes=lanes)
+    before = copy_lane(session.timeline.lanes["layer_1"])
+    for start in (5.0, 10.0):  # butts the next clip; runs to the song end
+        session.timeline.selected_clip_t["layer_1"] = start
+        controls.handle_keydown(keydown(pygame.K_c, mod=pygame.KMOD_SHIFT))
+    assert session.timeline.lanes["layer_1"] == before
+
+
+def test_cycling_cut_out_changes_fall_triangle() -> None:
+    """Cut out owns the fall edge; cycling Shift+C reshapes the envelope."""
     hard = TimelineFadeGroup(enabled=True, fade_in=2.0, fade_out=2.0)
     soft = TimelineFadeGroup(enabled=True, fade_in=4.0, fade_out=4.0)
     lanes = {
@@ -1605,7 +1605,7 @@ def test_cycling_off_cue_cut_changes_fall_triangle() -> None:
         lanes=lanes,
         position_sec=10.0,
     )
-    session.timeline.selected_cue_t["layer_1"] = 10.0
+    session.timeline.selected_clip_t["layer_1"] = 5.0
 
     def _fall_end(lane: TimelineLane) -> float | None:
         bps = lane_level_breakpoints(
@@ -1621,15 +1621,15 @@ def test_cycling_off_cue_cut_changes_fall_triangle() -> None:
         return None
 
     assert _fall_end(session.timeline.lanes["layer_1"]) == 10.0  # hard step
-    controls.handle_keydown(keydown(pygame.K_c))  # none -> hard
+    controls.handle_keydown(keydown(pygame.K_c, mod=pygame.KMOD_SHIFT))  # none -> hard
     assert session.timeline.lanes["layer_1"].cues[1].cut == "hard"
     assert _fall_end(session.timeline.lanes["layer_1"]) == 12.0
-    controls.handle_keydown(keydown(pygame.K_c))  # hard -> soft
+    controls.handle_keydown(keydown(pygame.K_c, mod=pygame.KMOD_SHIFT))  # hard -> soft
     assert session.timeline.lanes["layer_1"].cues[1].cut == "soft"
     assert _fall_end(session.timeline.lanes["layer_1"]) == 14.0
 
 
-def test_c_cycles_selected_cue_cut() -> None:
+def test_c_cycles_selected_clip_cut_in() -> None:
     from cleave.cut_types import CUT_TYPES
 
     lanes = {
@@ -1657,7 +1657,7 @@ def test_c_cycles_selected_cue_cut() -> None:
     assert CUT_TYPES == ("none", "hard", "soft")
 
 
-def test_comma_period_nudge_selected_cue_opacity() -> None:
+def test_comma_period_nudge_selected_clip_opacity() -> None:
     lanes = {
         "layer_1": TimelineLane(
             baseline=0.0,
@@ -1672,7 +1672,7 @@ def test_comma_period_nudge_selected_cue_opacity() -> None:
         position_sec=5.0,
     )
     controls.handle_keydown(keydown(pygame.K_RIGHT))
-    assert session.timeline.selected_cue_t["layer_1"] == 5.0
+    assert session.timeline.selected_clip_t["layer_1"] == 5.0
 
     controls.handle_keydown(keydown(pygame.K_COMMA))
     assert session.timeline.lanes["layer_1"].cues[0].level == 0.99
@@ -1740,10 +1740,10 @@ def test_nudge_cue_opacity_floors_at_ten_percent() -> None:
         position_sec=5.0,
     )
     controls.handle_keydown(keydown(pygame.K_RIGHT))
-    assert session.timeline.selected_cue_t["layer_1"] == 5.0
+    assert session.timeline.selected_clip_t["layer_1"] == 5.0
     controls.handle_keydown(keydown(pygame.K_COMMA, mod=pygame.KMOD_CTRL))
     assert session.timeline.lanes["layer_1"].cues[0].level == 0.10
-    assert session.timeline.selected_cue_t["layer_1"] == 5.0
+    assert session.timeline.selected_clip_t["layer_1"] == 5.0
     controls.handle_keydown(keydown(pygame.K_COMMA))
     assert session.timeline.lanes["layer_1"].cues[0].level == 0.10
 
@@ -1766,10 +1766,10 @@ def test_nudge_opening_baseline_opacity() -> None:
         position_sec=0.0,
     )
     controls.handle_keydown(keydown(pygame.K_RIGHT))
-    assert session.timeline.selected_cue_t["layer_1"] == 0.0
+    assert session.timeline.selected_clip_t["layer_1"] == 0.0
     controls.handle_keydown(keydown(pygame.K_PERIOD))
     assert session.timeline.lanes["layer_1"].baseline == 0.51
-    assert session.timeline.selected_cue_t["layer_1"] == 0.0
+    assert session.timeline.selected_clip_t["layer_1"] == 0.0
     assert not any(cue.t == 0.0 for cue in session.timeline.lanes["layer_1"].cues)
 
 
@@ -1783,7 +1783,7 @@ def test_cue_edit_keys_refused_when_locked() -> None:
     )
     session.timeline.locked = True
     controls.handle_keydown(keydown(pygame.K_RIGHT))
-    assert session.timeline.selected_cue_t["layer_1"] == 5.0
+    assert session.timeline.selected_clip_t["layer_1"] == 5.0
     controls.handle_keydown(keydown(pygame.K_b))
     controls.handle_keydown(keydown(pygame.K_o))
     controls.handle_keydown(keydown(pygame.K_c))
@@ -1805,7 +1805,7 @@ def test_cue_edit_keys_refused_when_recording() -> None:
         recording=True,
     )
     controls.handle_keydown(keydown(pygame.K_PERIOD))
-    assert session.timeline.selected_cue_t == {}
+    assert session.timeline.selected_clip_t == {}
     controls.handle_keydown(keydown(pygame.K_b))
     controls.handle_keydown(keydown(pygame.K_o))
     controls.handle_keydown(keydown(pygame.K_c))
@@ -1840,26 +1840,27 @@ def test_seek_to_during_record_fills_like_seek_step() -> None:
     assert visibility_calls
 
 
-def test_select_cue_near_picks_nearest_within_tolerance() -> None:
+def test_select_clip_at_picks_the_clip_under_the_time() -> None:
     lanes = {"layer_1": _lane(False, (4.0, True), (10.0, False))}
     controls, session, _, _, _, _ = _make_timeline_controls(lanes=lanes)
 
-    assert controls.select_cue_near("layer_1", 9.8, 0.5) is True
-    assert session.timeline.selected_cue_t["layer_1"] == 10.0
-    assert controls.select_cue_near("layer_1", 7.0, 0.5) is False
-    assert session.timeline.selected_cue_t["layer_1"] == 10.0
+    assert controls.select_clip_at("layer_1", 9.8) is True
+    assert session.timeline.selected_clip_t["layer_1"] == 4.0
+    assert controls.select_clip_at("layer_1", 10.0) is False
+    assert controls.select_clip_at("layer_1", 2.0) is False
+    assert session.timeline.selected_clip_t["layer_1"] == 4.0
 
 
-def test_select_cue_near_allowed_when_locked_blocked_when_recording() -> None:
+def test_select_clip_at_allowed_when_locked_blocked_when_recording() -> None:
     lanes = {"layer_1": _lane(False, (4.0, True))}
     controls, session, _, _, _, _ = _make_timeline_controls(lanes=lanes)
     session.timeline.locked = True
-    assert controls.select_cue_near("layer_1", 4.1, 0.5) is True
+    assert controls.select_clip_at("layer_1", 4.1) is True
 
     controls, session, _, _, _, _ = _make_timeline_controls(
         lanes=lanes, armed_slots={"layer_1"}, recording=True
     )
-    assert controls.select_cue_near("layer_1", 4.0, 0.5) is False
+    assert controls.select_clip_at("layer_1", 4.0) is False
 
 
 def test_focus_row_clamps_to_layer_count() -> None:
@@ -1901,7 +1902,7 @@ def test_strip_target_pressable_follows_lock_and_armed_rows() -> None:
     assert controls.strip_target_pressable("play", None) is True
 
 
-def test_a_cue_level_nudge_can_be_undone() -> None:
+def test_a_clip_level_nudge_can_be_undone() -> None:
     controls, session, _, _, _, _ = _make_timeline_controls(
         lanes={
             "layer_1": TimelineLane(
@@ -1909,13 +1910,13 @@ def test_a_cue_level_nudge_can_be_undone() -> None:
             )
         },
     )
-    session.timeline.selected_cue_t["layer_1"] = 2.0
+    session.timeline.selected_clip_t["layer_1"] = 2.0
     controls.handle_keydown(keydown(pygame.K_PERIOD))
     controls.handle_keydown(keydown(pygame.K_PERIOD))
     assert session.timeline.lanes["layer_1"].cues[0].level == 0.52
 
-    history = controls.cue_editor.history
-    assert history.undo() == "Cue level"
+    history = controls.clip_editor.history
+    assert history.undo() == "Clip level"
     assert session.timeline.lanes["layer_1"].cues[0].level == 0.5
     assert history.can_undo is False
 
@@ -1934,12 +1935,12 @@ def test_a_recorded_take_undoes_as_one_step() -> None:
     controls.handle_keydown(keydown(pygame.K_r))
     assert session.timeline.lanes["layer_1"] != before
 
-    assert controls.cue_editor.history.undo() == "Record take"
+    assert controls.clip_editor.history.undo() == "Record take"
     assert session.timeline.lanes["layer_1"] == before
 
 
-def test_add_cue_flips_the_lane_and_selects_the_new_cue() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls(
+def test_add_clip_fills_a_gap_and_selects_the_new_clip() -> None:
+    controls, session, _, _, _, notifications = _make_timeline_controls(
         lanes={
             "layer_1": TimelineLane(
                 baseline=0.0,
@@ -1947,71 +1948,146 @@ def test_add_cue_flips_the_lane_and_selects_the_new_cue() -> None:
             )
         },
     )
-    controls.add_cue_at("layer_1", 6.0)
-    assert session.timeline.lanes["layer_1"].cues[-1] == SlotCue(t=6.0, level=0.6)
-    assert session.timeline.selected_cue_t["layer_1"] == 6.0
+    controls.add_clip_at("layer_1", 6.0)
+    # The lane's last on level, and two seconds long with no bar grid.
+    assert session.timeline.lanes["layer_1"].cues[2:] == [
+        SlotCue(t=6.0, level=0.6),
+        SlotCue(t=8.0, level=0.0),
+    ]
+    assert session.timeline.selected_clip_t["layer_1"] == 6.0
 
-    controls.add_cue_at("layer_1", 3.0)
-    assert SlotCue(t=3.0, level=0.0) in session.timeline.lanes["layer_1"].cues
+    controls.add_clip_at("layer_1", 3.0)
+    assert notifications == ["No room for a clip there"]
+    assert len(session.timeline.lanes["layer_1"].cues) == 4
 
 
-def test_add_cue_snaps_to_bars_and_can_be_undone() -> None:
-    controls, session, _, _, _, notifications = _make_timeline_controls(
+def test_add_clip_stops_at_the_next_clip() -> None:
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        lanes={"layer_1": _lane(False, (5.0, 0.5), (9.0, False))},
+    )
+    controls.add_clip_at("layer_1", 4.0)
+    clips = controls.clip_editor.clips("layer_1")
+    assert [(clip.start, clip.end) for clip in clips] == [(4.0, 5.0), (5.0, 9.0)]
+    assert clips[0].butts_next
+
+
+def test_add_clip_snaps_to_bars_and_can_be_undone() -> None:
+    controls, session, _, _, _, _ = _make_timeline_controls(
         lanes={"layer_1": _lane(False)},
         beat_times=(0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0),
         bar_times=(0.0, 4.0, 8.0),
     )
     session.timeline.placement_snap = "bar"
-    controls.add_cue_at("layer_1", 3.7)
-    assert [cue.t for cue in session.timeline.lanes["layer_1"].cues] == [4.0]
+    controls.add_clip_at("layer_1", 3.7)
+    # One bar long.
+    assert [cue.t for cue in session.timeline.lanes["layer_1"].cues] == [4.0, 8.0]
 
-    controls.add_cue_at("layer_1", 4.2)
-    assert notifications == ["A cue is already there"]
+    # A snap back into the clip before starts the new clip where that one ends.
+    controls.add_clip_at("layer_1", 9.0)
+    assert [cue.t for cue in session.timeline.lanes["layer_1"].cues] == [
+        4.0,
+        8.0,
+        12.0,
+    ]
+    assert session.timeline.selected_clip_t["layer_1"] == 8.0
 
-    assert controls.cue_editor.history.undo() == "Add cue"
+    history = controls.clip_editor.history
+    assert history.undo() == "Add clip"
+    assert history.undo() == "Add clip"
     assert session.timeline.lanes["layer_1"].cues == []
 
 
-def test_add_cue_is_blocked_while_locked() -> None:
+def test_add_clip_is_blocked_while_locked() -> None:
     controls, session, _, _, _, _ = _make_timeline_controls(
         lanes={"layer_1": _lane(False)},
     )
     session.timeline.locked = True
-    controls.add_cue_at("layer_1", 3.0)
+    controls.add_clip_at("layer_1", 3.0)
     assert session.timeline.lanes["layer_1"].cues == []
 
 
-def test_delete_removes_the_selected_cue_and_selects_the_next() -> None:
+def test_delete_turns_the_selected_clip_off_and_selects_the_next() -> None:
     controls, session, _, _, _, _ = _make_timeline_controls(
         lanes={"layer_1": _lane(False, (2.0, True), (4.0, False), (6.0, True))},
     )
-    session.timeline.selected_cue_t["layer_1"] = 2.0
+    session.timeline.selected_clip_t["layer_1"] = 2.0
     controls.handle_keydown(keydown(pygame.K_DELETE))
-    # Removing the 2 s rise leaves the 4 s off redundant, so it drops out too.
     assert [cue.t for cue in session.timeline.lanes["layer_1"].cues] == [6.0]
-    assert session.timeline.selected_cue_t["layer_1"] == 6.0
+    assert session.timeline.selected_clip_t["layer_1"] == 6.0
 
     controls.handle_keydown(keydown(pygame.K_DELETE))
     assert session.timeline.lanes["layer_1"].cues == []
-    assert "layer_1" not in session.timeline.selected_cue_t
+    assert "layer_1" not in session.timeline.selected_clip_t
 
-    history = controls.cue_editor.history
-    assert history.undo() == "Delete cue"
-    assert session.timeline.selected_cue_t["layer_1"] == 6.0
-    assert history.undo() == "Delete cue"
+    history = controls.clip_editor.history
+    assert history.undo() == "Delete clip"
+    assert session.timeline.selected_clip_t["layer_1"] == 6.0
+    assert history.undo() == "Delete clip"
     assert [cue.t for cue in session.timeline.lanes["layer_1"].cues] == [
         2.0,
         4.0,
         6.0,
     ]
-    assert session.timeline.selected_cue_t["layer_1"] == 2.0
+    assert session.timeline.selected_clip_t["layer_1"] == 2.0
+
+
+def test_delete_of_a_butted_clip_leaves_its_neighbours() -> None:
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        lanes={"layer_1": _lane(False, (2.0, 1.0), (4.0, 0.5), (6.0, 1.0), (8.0, 0.0))},
+    )
+    session.timeline.selected_clip_t["layer_1"] = 4.0
+    controls.handle_keydown(keydown(pygame.K_DELETE))
+    clips = controls.clip_editor.clips("layer_1")
+    assert [(clip.start, clip.end) for clip in clips] == [(2.0, 4.0), (6.0, 8.0)]
+    assert session.timeline.selected_clip_t["layer_1"] == 6.0
+
+
+def test_ctrl_k_splits_the_clip_under_the_playhead() -> None:
+    controls, session, _, _, _, notifications = _make_timeline_controls(
+        lanes={
+            "layer_1": TimelineLane(
+                baseline=0.0,
+                cues=[
+                    SlotCue(t=2.0, level=0.6, blend="add", role="lead"),
+                    SlotCue(t=8.0, level=0.0),
+                ],
+            )
+        },
+        position_sec=5.0,
+    )
+    controls.handle_keydown(keydown(pygame.K_k, mod=pygame.KMOD_CTRL))
+    assert session.timeline.lanes["layer_1"].cues == [
+        SlotCue(t=2.0, level=0.6, blend="add", role="lead"),
+        SlotCue(t=5.0, level=0.6, blend="add", role="lead", anchor=True),
+        SlotCue(t=8.0, level=0.0),
+    ]
+    assert session.timeline.selected_clip_t["layer_1"] == 5.0
+    assert controls.clip_editor.history.undo() == "Split clip"
+    assert len(session.timeline.lanes["layer_1"].cues) == 2
+
+    # A plain K does nothing, and a split needs a clip under the playhead.
+    controls.handle_keydown(keydown(pygame.K_k))
+    assert len(session.timeline.lanes["layer_1"].cues) == 2
+    controls.playback.player.seek(20.0)
+    controls.handle_keydown(keydown(pygame.K_k, mod=pygame.KMOD_CTRL))
+    assert notifications == ["No clip to split at the playhead"]
+
+
+def test_ctrl_k_is_blocked_while_locked() -> None:
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        lanes={"layer_1": _lane(False, (2.0, True), (8.0, False))},
+        position_sec=5.0,
+    )
+    session.timeline.locked = True
+    controls.handle_keydown(keydown(pygame.K_k, mod=pygame.KMOD_CTRL))
+    assert len(session.timeline.lanes["layer_1"].cues) == 2
 
 
 def test_delete_is_blocked_while_locked() -> None:
     controls, session, _, _, _, _ = _make_timeline_controls(
         lanes={"layer_1": _lane(False, (2.0, True))},
     )
-    session.timeline.selected_cue_t["layer_1"] = 2.0
+    session.timeline.selected_clip_t["layer_1"] = 2.0
     session.timeline.locked = True
     controls.handle_keydown(keydown(pygame.K_DELETE))
     assert [cue.t for cue in session.timeline.lanes["layer_1"].cues] == [2.0]

@@ -31,7 +31,7 @@ from cleave.viz.session import TimelineFadeGroupRuntime, TuningSession
 from cleave.viz.timeline_overlay import (
     TimelineViewState,
     prune_expired_arm_flashes,
-    prune_expired_selected_cue_flash,
+    prune_expired_selected_clip_flash,
 )
 
 if TYPE_CHECKING:
@@ -283,11 +283,11 @@ def build_timeline_view_state(
 ) -> TimelineViewState:
     tl = session.timeline
     prune_expired_arm_flashes(tl.arm_flash_start_ms)
-    tl.selected_cue_flash_start_ms = prune_expired_selected_cue_flash(
-        tl.selected_cue_flash_start_ms
+    tl.selected_clip_flash_start_ms = prune_expired_selected_clip_flash(
+        tl.selected_clip_flash_start_ms
     )
     markers = session.song_markers
-    markers.selected_flash_start_ms = prune_expired_selected_cue_flash(
+    markers.selected_flash_start_ms = prune_expired_selected_clip_flash(
         markers.selected_flash_start_ms
     )
     selected_marker = markers.selected_index if song_marker_page_open else None
@@ -353,8 +353,8 @@ def build_timeline_view_state(
         ),
         hard_cut_fades=_as_fade_group(tl.hard_cut_fades),
         soft_cut_fades=_as_fade_group(tl.soft_cut_fades),
-        selected_cue_t=dict(tl.selected_cue_t),
-        selected_cue_flash_start_ms=tl.selected_cue_flash_start_ms,
+        selected_clip_t=dict(tl.selected_clip_t),
+        selected_clip_flash_start_ms=tl.selected_clip_flash_start_ms,
         view_start_sec=view_start_sec,
         view_end_sec=view_end_sec,
     )

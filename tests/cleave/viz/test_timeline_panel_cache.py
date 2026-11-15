@@ -127,17 +127,17 @@ def test_static_signature_changes_on_selected_song_marker_index() -> None:
     assert _static_sig(first) != _static_sig(second)
 
 
-def test_static_signature_changes_on_selected_cue_t() -> None:
+def test_static_signature_changes_on_selected_clip_t() -> None:
     none_selected = _view_state(
         lanes={"layer_1": _lane(True, (10.0, False), (20.0, True))},
     )
     first = _view_state(
         lanes={"layer_1": _lane(True, (10.0, False), (20.0, True))},
-        selected_cue_t={"layer_1": 10.0},
+        selected_clip_t={"layer_1": 10.0},
     )
     second = _view_state(
         lanes={"layer_1": _lane(True, (10.0, False), (20.0, True))},
-        selected_cue_t={"layer_1": 20.0},
+        selected_clip_t={"layer_1": 20.0},
     )
     assert _static_sig(none_selected) != _static_sig(first)
     assert _static_sig(first) != _static_sig(second)
@@ -296,7 +296,7 @@ def test_live_signature_changes_on_playhead_flash() -> None:
     assert bright != dim
 
 
-def test_live_signature_changes_on_selected_cue_flash_phase(monkeypatch) -> None:
+def test_live_signature_changes_on_selected_clip_flash_phase(monkeypatch) -> None:
     pygame.init()
     from cleave.viz.timeline_overlay import SELECTED_CUE_FLASH_HALF_MS
 
@@ -304,8 +304,8 @@ def test_live_signature_changes_on_selected_cue_flash_phase(monkeypatch) -> None
     start = 10_000
     state = _view_state(
         position_sec=10.0,
-        selected_cue_t={"layer_1": 10.0},
-        selected_cue_flash_start_ms=start,
+        selected_clip_t={"layer_1": 10.0},
+        selected_clip_flash_start_ms=start,
         lanes={"layer_1": _lane(True, (10.0, False))},
     )
     monkeypatch.setattr(pygame.time, "get_ticks", lambda: start)

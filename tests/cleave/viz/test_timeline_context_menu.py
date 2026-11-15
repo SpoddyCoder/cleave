@@ -95,11 +95,11 @@ def test_row_past_the_last_layer_has_no_menu() -> None:
     assert timeline_row_menu(controls, session, 9)() == ()
 
 
-def _cue_controls(**kwargs):
+def _clip_controls(*, position_sec: float = 1.0, **kwargs):
     from tests.cleave.viz.test_timeline_controls import _lane
 
     lanes = {"layer_1": _lane(False, (4.0, True), (10.0, False))}
-    return _make_timeline_controls(lanes=lanes, position_sec=1.0, **kwargs)
+    return _make_timeline_controls(lanes=lanes, position_sec=position_sec, **kwargs)
 
 
 def _entries_by_id(controls, session, row: int, **kwargs):
@@ -110,107 +110,149 @@ def _entries_by_id(controls, session, row: int, **kwargs):
     }
 
 
-def test_no_selected_cue_means_no_cue_items() -> None:
-    controls, session, _, _, _, _ = _cue_controls()
+def test_no_selected_clip_means_no_clip_items() -> None:
+    controls, session, _, _, _, _ = _clip_controls()
     entries = timeline_row_menu_entries(controls, session, 0)
     assert entries[0].id == "timeline.row.visibility"
 
 
-def test_selected_on_cue_leads_with_go_to_and_cut_blend_role() -> None:
-    controls, session, _, _, seeks, _ = _cue_controls()
-    session.timeline.selected_cue_t["layer_1"] = 4.0
+def test_selected_clip_leads_with_go_to_cuts_blend_role_split_delete() -> None:
+    controls, session, _, _, seeks, _ = _clip_controls()
+    session.timeline.selected_clip_t["layer_1"] = 4.0
     entries = timeline_row_menu_entries(controls, session, 0)
-    assert [getattr(entry, "id", None) for entry in entries[:6]] == [
-        "timeline.cue.go_to",
-        "timeline.cue.cut",
-        "timeline.cue.blend",
-        "timeline.cue.role",
-        "timeline.cue.delete",
+    assert [getattr(entry, "id", None) for entry in entries[:8]] == [
+        "timeline.clip.go_to",
+        "timeline.clip.cut_in",
+        "timeline.clip.cut_out",
+        "timeline.clip.blend",
+        "timeline.clip.role",
+        "timeline.clip.split",
+        "timeline.clip.delete",
         None,
     ]
     by_id = _entries_by_id(controls, session, 0)
-    cut = by_id["timeline.cue.cut"]
-    assert cut.enabled and cut.shortcut == "C"
-    assert [(item.label, item.checked) for item in cut.items] == [
+    cut_in = by_id["timeline.clip.cut_in"]
+    assert cut_in.enabled and cut_in.shortcut == "C"
+    assert [(item.label, item.checked) for item in cut_in.items] == [
         ("None", True),
         ("Hard", False),
         ("Soft", False),
     ]
-    blend = by_id["timeline.cue.blend"]
+    cut_out = by_id["timeline.clip.cut_out"]
+    assert cut_out.enabled and cut_out.shortcut == "Shift+C"
+    blend = by_id["timeline.clip.blend"]
     assert blend.items[0].label == "Layer blend" and blend.items[0].checked
-    role = by_id["timeline.cue.role"]
+    role = by_id["timeline.clip.role"]
     assert [item.label for item in role.items] == [
         "None", "Bed", "Pulse", "Lead", "Accent"
     ]
 
-    cut.items[1].run()
+    cut_in.items[1].run()
+    cut_out.items[2].run()
     blend.items[2].run()
     role.items[3].run()
-    cue = session.timeline.lanes["layer_1"].cues[0]
-    assert (cue.cut, cue.blend, cue.role) == ("hard", "add", "lead")
-    assert _entries_by_id(controls, session, 0)["timeline.cue.cut"].items[1].checked
+    start, end = session.timeline.lanes["layer_1"].cues
+    assert (start.cut, start.blend, start.role) == ("hard", "add", "lead")
+    assert end.cut == "soft"
+    assert _entries_by_id(controls, session, 0)["timeline.clip.cut_in"].items[1].checked
 
-    by_id["timeline.cue.go_to"].run()
+    by_id["timeline.clip.go_to"].run()
     assert seeks and abs(sum(seeks) - 3.0) < 1e-6
 
 
-def test_end_cue_takes_only_a_cut() -> None:
-    controls, session, _, _, _, _ = _cue_controls()
-    session.timeline.selected_cue_t["layer_1"] = 10.0
-    by_id = _entries_by_id(controls, session, 0)
-    assert by_id["timeline.cue.cut"].enabled is True
-    for key in ("timeline.cue.blend", "timeline.cue.role"):
-        assert by_id[key].enabled is False
-        assert by_id[key].hint == "An end cue takes only a cut"
+def test_cut_out_is_greyed_out_on_a_butted_clip_and_at_the_song_end() -> None:
+    from tests.cleave.viz.test_timeline_controls import _lane
+
+    lanes = {
+        "layer_1": _lane(False, (4.0, 1.0), (10.0, 0.5)),
+    }
+    controls, session, _, _, _, _ = _make_timeline_controls(lanes=lanes)
+    session.timeline.selected_clip_t["layer_1"] = 4.0
+    butted = _entries_by_id(controls, session, 0)["timeline.clip.cut_out"]
+    assert butted.enabled is False
+    assert butted.hint == "Butts the next clip; set its Cut in"
+    session.timeline.selected_clip_t["layer_1"] = 10.0
+    last = _entries_by_id(controls, session, 0)["timeline.clip.cut_out"]
+    assert last.enabled is False
+    assert last.hint == "Runs to the song end"
 
 
-def test_locked_timeline_greys_out_cue_edits_but_keeps_go_to() -> None:
-    controls, session, _, _, _, _ = _cue_controls()
-    session.timeline.selected_cue_t["layer_1"] = 4.0
+def test_split_item_needs_the_playhead_inside_the_clip() -> None:
+    controls, session, _, _, _, _ = _clip_controls()
+    session.timeline.selected_clip_t["layer_1"] = 4.0
+    split = _entries_by_id(controls, session, 0)["timeline.clip.split"]
+    assert split.enabled is False
+    assert split.hint == "Move the playhead inside this clip"
+    assert split.shortcut == "Ctrl+K"
+
+    controls, session, _, _, _, _ = _clip_controls(position_sec=6.0)
+    session.timeline.selected_clip_t["layer_1"] = 4.0
+    split = _entries_by_id(controls, session, 0)["timeline.clip.split"]
+    assert split.enabled is True
+    split.run()
+    cues = session.timeline.lanes["layer_1"].cues
+    assert [cue.t for cue in cues] == [4.0, 6.0, 10.0]
+    assert cues[1].anchor
+    assert session.timeline.selected_clip_t["layer_1"] == 6.0
+
+
+def test_locked_timeline_greys_out_clip_edits_but_keeps_go_to() -> None:
+    controls, session, _, _, _, _ = _clip_controls()
+    session.timeline.selected_clip_t["layer_1"] = 4.0
     session.timeline.locked = True
     by_id = _entries_by_id(controls, session, 0)
-    assert by_id["timeline.cue.go_to"].enabled is True
+    assert by_id["timeline.clip.go_to"].enabled is True
     for key in (
-        "timeline.cue.cut",
-        "timeline.cue.blend",
-        "timeline.cue.role",
-        "timeline.cue.delete",
+        "timeline.clip.cut_in",
+        "timeline.clip.cut_out",
+        "timeline.clip.blend",
+        "timeline.clip.role",
+        "timeline.clip.split",
+        "timeline.clip.delete",
     ):
         assert by_id[key].enabled is False
-        assert by_id[key].hint == "Unlock the timeline to edit cues"
+        assert by_id[key].hint == "Unlock the timeline to edit clips"
 
 
-def test_cue_false_leaves_out_the_cue_items() -> None:
-    controls, session, _, _, _, _ = _cue_controls()
-    session.timeline.selected_cue_t["layer_1"] = 4.0
-    assert "timeline.cue.go_to" not in _entries_by_id(controls, session, 0, cue=False)
+def test_clip_false_leaves_out_the_clip_items() -> None:
+    controls, session, _, _, _, _ = _clip_controls()
+    session.timeline.selected_clip_t["layer_1"] = 4.0
+    assert "timeline.clip.go_to" not in _entries_by_id(
+        controls, session, 0, clip=False
+    )
 
 
-def test_delete_cue_item_deletes_the_selected_cue() -> None:
-    controls, session, _, _, _, _ = _cue_controls()
-    session.timeline.selected_cue_t["layer_1"] = 10.0
-    item = _entries_by_id(controls, session, 0)["timeline.cue.delete"]
-    assert (item.label, item.shortcut) == ("Delete cue", "Delete")
+def test_delete_clip_item_turns_the_selected_clip_off() -> None:
+    controls, session, _, _, _, _ = _clip_controls()
+    session.timeline.selected_clip_t["layer_1"] = 4.0
+    item = _entries_by_id(controls, session, 0)["timeline.clip.delete"]
+    assert (item.label, item.shortcut) == ("Delete clip", "Delete")
     item.run()
-    assert [cue.t for cue in session.timeline.lanes["layer_1"].cues] == [4.0]
+    assert session.timeline.lanes["layer_1"].cues == []
+    assert "layer_1" not in session.timeline.selected_clip_t
 
 
-def test_add_cue_here_item_adds_a_cue_at_the_clicked_time() -> None:
-    controls, session, _, _, _, _ = _cue_controls()
-    entries = timeline_row_menu_entries(controls, session, 0, add_cue_t=7.0)
+def test_add_clip_here_item_adds_a_clip_at_the_clicked_time() -> None:
+    controls, session, _, _, _, _ = _clip_controls()
+    entries = timeline_row_menu_entries(controls, session, 0, add_clip_t=20.0)
     item = entries[0]
     assert (item.id, item.label, item.shortcut) == (
-        "timeline.cue.add",
-        "Add cue here",
+        "timeline.clip.add",
+        "Add clip here",
         "Double-click",
     )
     item.run()
-    assert SlotCue(t=7.0, level=0.0) in session.timeline.lanes["layer_1"].cues
+    # With no bar grid a new clip is two seconds long.
+    assert session.timeline.lanes["layer_1"].cues[2:] == [
+        SlotCue(t=20.0, level=1.0),
+        SlotCue(t=22.0, level=0.0),
+    ]
+    assert session.timeline.selected_clip_t["layer_1"] == 20.0
 
 
-def test_add_cue_here_is_greyed_out_while_recording() -> None:
-    controls, session, _, _, _, _ = _cue_controls()
+def test_add_clip_here_is_greyed_out_while_recording() -> None:
+    controls, session, _, _, _, _ = _clip_controls()
     session.timeline.recording = True
-    item = _entries_by_id(controls, session, 0, add_cue_t=7.0)["timeline.cue.add"]
+    item = _entries_by_id(controls, session, 0, add_clip_t=20.0)["timeline.clip.add"]
     assert item.enabled is False
-    assert item.hint == "Stop recording to edit cues"
+    assert item.hint == "Stop recording to edit clips"

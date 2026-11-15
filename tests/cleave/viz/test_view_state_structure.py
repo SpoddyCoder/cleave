@@ -737,7 +737,7 @@ def test_session_mutation_visible_on_next_view_state() -> None:
     assert second.tracks["layer_1"].runtime.opacity_pct == 22
 
 
-def test_structure_signature_invalidates_on_selected_cue_kind() -> None:
+def test_structure_signature_invalidates_on_selected_clip() -> None:
     from cleave.timeline import SlotCue, TimelineLane
 
     controls = _make_controls(("layer_1",))
@@ -749,11 +749,12 @@ def test_structure_signature_invalidates_on_selected_cue_kind() -> None:
         cues=[SlotCue(t=10.0, level=1.0), SlotCue(t=20.0, level=0.0)],
     )
     none = view_state_structure_signature(session, config_save)
-    tl.selected_cue_t["layer_1"] = 10.0
-    start = view_state_structure_signature(session, config_save)
-    tl.selected_cue_t["layer_1"] = 20.0
-    end = view_state_structure_signature(session, config_save)
-    assert len({none, start, end}) == 3
+    tl.selected_clip_t["layer_1"] = 10.0
+    selected = view_state_structure_signature(session, config_save)
+    assert selected != none
+    # A selection that names no clip shows no clip rows.
+    tl.selected_clip_t["layer_1"] = 20.0
+    assert view_state_structure_signature(session, config_save) == none
 
 
 def test_preset_position_counts_within_browsed_collection(tmp_path: Path) -> None:

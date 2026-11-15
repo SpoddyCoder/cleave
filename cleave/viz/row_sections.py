@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal
 
 from cleave.effects.registry import effect_roster
-from cleave.timeline import cue_editable_for_blend_role
 from cleave.viz.editor_mode_controls import is_preset_curation_mode
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 
@@ -636,64 +635,37 @@ TRACK_SECTION = SectionDef(
     ),
 )
 
-def _timeline_cue_selected(state: TuningViewState, desc: RowDescriptor) -> bool:
-    return desc.slot is not None and desc.slot in state.timeline.selected_cues
+def _timeline_clip_selected(state: TuningViewState, desc: RowDescriptor) -> bool:
+    return desc.slot is not None and desc.slot in state.timeline.selected_clips
 
 
-def _timeline_start_cue_selected(
-    state: TuningViewState, desc: RowDescriptor
-) -> bool:
-    if desc.slot is None:
-        return False
-    cue = state.timeline.selected_cues.get(desc.slot)
-    return cue is not None and cue_editable_for_blend_role(cue)
-
-
-TIMELINE_CUE_SELECTED = ConditionalRowsDef(
-    name="timeline_cue_selected",
-    predicate=_timeline_cue_selected,
-    children=(SectionNode(leaf_kind=RowKind.TIMELINE_CUE_TIME),),
-)
-
-TIMELINE_START_CUE_LEVEL = ConditionalRowsDef(
-    name="timeline_start_cue_selected",
-    predicate=_timeline_start_cue_selected,
-    children=(SectionNode(leaf_kind=RowKind.TIMELINE_CUE_OPACITY),),
-)
-
-TIMELINE_CUE_CUT = ConditionalRowsDef(
-    name="timeline_cue_selected",
-    predicate=_timeline_cue_selected,
-    children=(SectionNode(leaf_kind=RowKind.TIMELINE_CUE_CUT),),
-)
-
-TIMELINE_START_CUE_LOOK = ConditionalRowsDef(
-    name="timeline_start_cue_selected",
-    predicate=_timeline_start_cue_selected,
+TIMELINE_CLIP_SELECTED = ConditionalRowsDef(
+    name="timeline_clip_selected",
+    predicate=_timeline_clip_selected,
     children=(
-        SectionNode(leaf_kind=RowKind.TIMELINE_CUE_BLEND),
-        SectionNode(leaf_kind=RowKind.TIMELINE_CUE_ROLE),
+        SectionNode(leaf_kind=RowKind.TIMELINE_CLIP_START),
+        SectionNode(leaf_kind=RowKind.TIMELINE_CLIP_END),
+        SectionNode(leaf_kind=RowKind.TIMELINE_CLIP_OPACITY),
+        SectionNode(leaf_kind=RowKind.TIMELINE_CLIP_BLEND),
+        SectionNode(leaf_kind=RowKind.TIMELINE_CLIP_ROLE),
+        SectionNode(leaf_kind=RowKind.TIMELINE_CLIP_CUT_IN),
+        SectionNode(leaf_kind=RowKind.TIMELINE_CLIP_CUT_OUT),
     ),
 )
 
-# The heading names the cue (start, end, or none selected). An end cue only
-# turns the layer off, so it has no opacity, blend, or role.
-TIMELINE_CUE_SECTION = SectionDef(
-    header_kind=RowKind.TIMELINE_CUE_HEADER,
+# The heading names the selected clip's span, or says none is selected. Cut
+# out stays listed and draws disabled on a clip with no end cue of its own.
+TIMELINE_CLIP_SECTION = SectionDef(
+    header_kind=RowKind.TIMELINE_CLIP_HEADER,
     context="per_slot",
-    children=(
-        SectionNode(conditional=TIMELINE_CUE_SELECTED),
-        SectionNode(conditional=TIMELINE_START_CUE_LEVEL),
-        SectionNode(conditional=TIMELINE_CUE_CUT),
-        SectionNode(conditional=TIMELINE_START_CUE_LOOK),
-    ),
+    children=(SectionNode(conditional=TIMELINE_CLIP_SELECTED),),
 )
 
 # Page of one timeline strip row, shown while that row is selected.
 TIMELINE_ROW_SECTION = SectionDef(
     header_kind=None,
     context="per_slot",
-    children=(SectionNode(subsection=TIMELINE_CUE_SECTION),),
+    children=(SectionNode(subsection=TIMELINE_CLIP_SECTION),),
 )
 
 SONG_MARKERS_SECTION = SectionDef(
@@ -845,12 +817,14 @@ TIMELINE_SECTION_KINDS = frozenset(
         RowKind.TIMELINE_SOFT_CUT_FADE_OUT,
         RowKind.TIMELINE_SOFT_CUT_CROSSFADE,
         RowKind.TIMELINE_SET_CUT_TYPE,
-        RowKind.TIMELINE_CUE_HEADER,
-        RowKind.TIMELINE_CUE_TIME,
-        RowKind.TIMELINE_CUE_OPACITY,
-        RowKind.TIMELINE_CUE_CUT,
-        RowKind.TIMELINE_CUE_BLEND,
-        RowKind.TIMELINE_CUE_ROLE,
+        RowKind.TIMELINE_CLIP_HEADER,
+        RowKind.TIMELINE_CLIP_START,
+        RowKind.TIMELINE_CLIP_END,
+        RowKind.TIMELINE_CLIP_OPACITY,
+        RowKind.TIMELINE_CLIP_BLEND,
+        RowKind.TIMELINE_CLIP_ROLE,
+        RowKind.TIMELINE_CLIP_CUT_IN,
+        RowKind.TIMELINE_CLIP_CUT_OUT,
     }
 )
 

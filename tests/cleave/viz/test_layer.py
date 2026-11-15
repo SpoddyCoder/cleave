@@ -925,16 +925,16 @@ def test_build_timeline_view_state_default_song_markers_empty() -> None:
     assert state.selected_song_marker_index is None
 
 
-def test_build_timeline_view_state_includes_selected_cue_t() -> None:
+def test_build_timeline_view_state_includes_selected_clip_t() -> None:
     session = _session(
         layer_enabled={"layer_1": True, "layer_2": True, "layer_3": True, "layer_4": True},
         timeline_enabled=True,
     )
-    session.timeline.selected_cue_t = {"layer_1": 12.5}
+    session.timeline.selected_clip_t = {"layer_1": 12.5}
     flash_start = pygame.time.get_ticks()
-    session.timeline.selected_cue_flash_start_ms = flash_start
+    session.timeline.selected_clip_flash_start_ms = flash_start
     state = build_timeline_view_state(session, position_sec=0.0, duration_sec=60.0)
-    assert state.selected_cue_t == {"layer_1": 12.5}
-    assert state.selected_cue_flash_start_ms == flash_start
-    state.selected_cue_t["layer_1"] = 99.0
-    assert session.timeline.selected_cue_t == {"layer_1": 12.5}
+    assert state.selected_clip_t == {"layer_1": 12.5}
+    assert state.selected_clip_flash_start_ms == flash_start
+    state.selected_clip_t["layer_1"] = 99.0
+    assert session.timeline.selected_clip_t == {"layer_1": 12.5}

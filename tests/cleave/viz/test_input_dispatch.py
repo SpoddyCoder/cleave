@@ -730,9 +730,9 @@ def test_inspector_arrows_step_value_while_strip_is_open() -> None:
     session = runtime.seed.session
     session.timeline.lanes["layer_1"] = TimelineLane(
         baseline=None,
-        cues=[SlotCue(4.0, 1.0), SlotCue(10.0, 0.0)],
+        cues=[SlotCue(4.0, 1.0), SlotCue(10.0, 0.5)],
     )
-    session.timeline.selected_cue_t["layer_1"] = 4.0
+    session.timeline.selected_clip_t["layer_1"] = 4.0
     session.layers["layer_1"].opacity_pct = 50
     controls = runtime.controls
     controls.shell_focus.selected_id = layer_page_node_id("layer_1", "compositing")
@@ -748,10 +748,10 @@ def test_inspector_arrows_step_value_while_strip_is_open() -> None:
     assert isinstance(controls.focus_cursor, MainFocus)
     assert session.timeline.panel_open is True
     assert session.timeline.focus_row == 0
-    cues = dict(session.timeline.selected_cue_t)
+    cues = dict(session.timeline.selected_clip_t)
     assert dispatch_keydown(keydown(pygame.K_RIGHT), runtime) is True
     assert session.layers["layer_1"].opacity_pct == 51
-    assert session.timeline.selected_cue_t == cues
+    assert session.timeline.selected_clip_t == cues
 
     assert dispatch_keydown(keydown(pygame.K_TAB), runtime) is True
     assert controls.shell_focus.region is ShellRegion.PREVIEW
@@ -759,7 +759,7 @@ def test_inspector_arrows_step_value_while_strip_is_open() -> None:
     assert controls.shell_focus.region is ShellRegion.TIMELINE
     assert controls.focus_cursor == TimelineFocus(0)
     assert dispatch_keydown(keydown(pygame.K_RIGHT), runtime) is True
-    assert session.timeline.selected_cue_t["layer_1"] == 10.0
+    assert session.timeline.selected_clip_t["layer_1"] == 10.0
     assert session.layers["layer_1"].opacity_pct == 51
 
 

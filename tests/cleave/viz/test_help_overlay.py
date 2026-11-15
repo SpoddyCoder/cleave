@@ -925,19 +925,19 @@ def test_timeline_strip_help_paused() -> None:
     assert entries["A"] == "arm / disarm row for recording"
     assert "1-4" not in entries
     assert "Click eye" not in entries
-    assert entries["Right-click row"] == "row options; on a cue, cue options too"
+    assert entries["Right-click row"] == "row options; on a clip, clip options too"
     assert entries["Shift + F10 / Menu"] == "row options for the focused row"
     assert entries["Shift + Enter"] == "override row visibility on / off"
     assert "Ctrl + Enter" not in entries
     assert entries["Space"] == "play"
     assert entries["Ctrl + Space / R"] == "start record"
-    assert entries["B"] == "cycle cue blend"
-    assert entries["C"] == "cycle cue cut type"
-    assert entries["O"] == "cycle cue role"
-    assert entries["Left/Right"] == "previous / next cue"
-    assert entries["Enter"] == "seek to cue"
-    assert entries[", / ."] == "nudge cue opacity -/+ 1%"
-    assert entries["Ctrl + , / ."] == "nudge cue opacity -/+ 10%"
+    assert entries["B"] == "cycle clip blend"
+    assert entries["C / Shift + C"] == "cycle clip cut in / cut out"
+    assert entries["O"] == "cycle clip role"
+    assert entries["Left/Right"] == "previous / next clip"
+    assert entries["Enter"] == "seek to clip start"
+    assert entries[", / ."] == "nudge clip opacity -/+ 1%"
+    assert entries["Ctrl + , / ."] == "nudge clip opacity -/+ 10%"
     keys = [key for key, _ in section.entries]
     assert keys.index("Ctrl + Space / R") + 1 == keys.index("Space")
 

@@ -13,10 +13,8 @@ from cleave.timeline import (
     LEVEL_EPS,
     SlotCue,
     canonicalize,
-    empty_lane,
-    navigable_cue_times,
+    clip_at,
     should_accept_toggle,
-    snap_placement_time,
 )
 from cleave.viz.controls import SEEK_LONG, SEEK_SHORT, SEEK_TINY
 from cleave.viz.session import TuningSession
@@ -32,13 +30,13 @@ from cleave.viz.layer_visibility import (
     effective_layer_enabled,
 )
 from cleave.viz.playback import PlaybackState, current_sec, seek, toggle_pause
-from cleave.viz.timeline_cue_edits import (
-    CueEditor,
-    cue_edits_allowed,
-    cue_selection_allowed,
-    select_cue,
-    selected_cue,
-    step_cue_selection,
+from cleave.viz.timeline_clip_edits import (
+    ClipEditor,
+    clip_edits_allowed,
+    clip_selection_allowed,
+    select_clip,
+    snap_for_session,
+    step_clip_selection,
 )
 from cleave.viz.timeline_history import TimelineHistory
 
@@ -88,13 +86,19 @@ class TimelineControls:
         on_notification: Callable[[str], None] | None = None,
         beat_times: Sequence[float] = (),
         bar_times: Sequence[float] = (),
-        cue_editor: CueEditor | None = None,
+        clip_editor: ClipEditor | None = None,
     ) -> None:
         self.session = session
-        self.cue_editor = (
-            cue_editor
-            if cue_editor is not None
-            else CueEditor(session, TimelineHistory(session))
+        self.clip_editor = (
+            clip_editor
+            if clip_editor is not None
+            else ClipEditor(
+                session,
+                TimelineHistory(session),
+                duration_sec=duration_sec,
+                beat_times=beat_times,
+                bar_times=bar_times,
+            )
         )
         self.playback = playback
         self.duration_sec = duration_sec
@@ -110,17 +114,16 @@ class TimelineControls:
         self._key_repeat = KeyRepeatController()
 
     def _snap_placement(self, t_sec: float) -> float:
-        return snap_placement_time(
-            t_sec,
-            self.session.timeline.placement_snap,
-            beat_times=self._beat_times,
-            bar_times=self._bar_times,
-            bar_phase=self.session.timeline.bar_phase_offset,
+        return snap_for_session(
+            self.session, t_sec, self._beat_times, self._bar_times
         )
 
     def handle_keydown(self, event: pygame.event.Event) -> bool:
         if event.key == pygame.K_ESCAPE:
-            if not self.session.timeline.recording:
+            if self.clip_editor.dragging:
+                # Esc during a drag puts the clip back and stays on the strip.
+                self.clip_editor.cancel_drag()
+            elif not self.session.timeline.recording:
                 self._exit_submenu()
             return True
 
@@ -138,9 +141,9 @@ class TimelineControls:
             return True
 
         if self.session.timeline.locked:
-            # Locked: strip stays viewable; Left/Right select cues, Enter seeks
-            # to the selected cue, and Space still toggles transport. Cue/record
-            # mutations stay blocked.
+            # Locked: strip stays viewable; Left/Right select clips, Enter seeks
+            # to the selected clip, and Space still toggles transport. Clip and
+            # record mutations stay blocked.
             locked_allowed = event.key in (pygame.K_LEFT, pygame.K_RIGHT)
             if event.key == pygame.K_RETURN and not mod_shift(event.mod):
                 locked_allowed = True
@@ -169,12 +172,12 @@ class TimelineControls:
             if self.session.timeline.recording:
                 self.seek_step(forward)
             else:
-                self._step_selected_cue(forward=forward)
+                self._step_selected_clip(forward=forward)
                 self._key_repeat.on_keydown(
                     event.key,
                     event.mod,
                     accel=False,
-                    on_repeat=lambda key, _mod: self._step_selected_cue(
+                    on_repeat=lambda key, _mod: self._step_selected_clip(
                         forward=key == pygame.K_RIGHT
                     ),
                 )
@@ -203,7 +206,7 @@ class TimelineControls:
 
         if event.key == pygame.K_RETURN:
             if not self.session.timeline.recording:
-                self._seek_to_selected_cue()
+                self._seek_to_selected_clip()
             return True
 
         if event.key == pygame.K_a:
@@ -211,47 +214,51 @@ class TimelineControls:
             return True
 
         if event.key == pygame.K_COMMA:
-            self._nudge_selected_cue_level(
+            self._nudge_selected_clip_level(
                 forward=False, large=mod_ctrl(event.mod)
             )
-            if self._cue_edits_allowed():
+            if self._clip_edits_allowed():
                 self._key_repeat.on_keydown(
                     event.key,
                     event.mod,
-                    on_repeat=lambda key, mod: self._nudge_selected_cue_level(
+                    on_repeat=lambda key, mod: self._nudge_selected_clip_level(
                         forward=False, large=mod_ctrl(mod)
                     ),
                 )
             return True
 
         if event.key == pygame.K_PERIOD:
-            self._nudge_selected_cue_level(
+            self._nudge_selected_clip_level(
                 forward=True, large=mod_ctrl(event.mod)
             )
-            if self._cue_edits_allowed():
+            if self._clip_edits_allowed():
                 self._key_repeat.on_keydown(
                     event.key,
                     event.mod,
-                    on_repeat=lambda key, mod: self._nudge_selected_cue_level(
+                    on_repeat=lambda key, mod: self._nudge_selected_clip_level(
                         forward=True, large=mod_ctrl(mod)
                     ),
                 )
             return True
 
         if event.key == pygame.K_b:
-            self._cycle_selected_cue_blend()
+            self._cycle_selected_clip_blend()
             return True
 
         if event.key == pygame.K_o:
-            self._cycle_selected_cue_role()
+            self._cycle_selected_clip_role()
             return True
 
         if event.key == pygame.K_c:
-            self._cycle_selected_cue_cut()
+            self._cycle_selected_clip_cut(out=mod_shift(event.mod))
+            return True
+
+        if event.key == pygame.K_k and mod_ctrl(event.mod):
+            self.split_at_playhead()
             return True
 
         if delete_key_pressed(event):
-            self.cue_editor.delete_selected(self._focused_slot())
+            self.clip_editor.delete_selected(self._focused_slot())
             return True
 
         return True
@@ -327,26 +334,33 @@ class TimelineControls:
         if 0 <= index < len(markers.markers):
             markers.selected_index = index
 
-    def select_cue_near(self, slot: str, t_sec: float, tolerance_sec: float) -> bool:
-        """Select the cue on *slot* nearest *t_sec* within *tolerance_sec*."""
-        if not cue_selection_allowed(self.session):
+    def select_clip_at(self, slot: str, t_sec: float) -> bool:
+        """Select the clip on *slot* that covers *t_sec*. False when none does."""
+        if not clip_selection_allowed(self.session):
             return False
-        times = navigable_cue_times(self.session.timeline.lanes.get(slot) or empty_lane())
-        if not times:
+        clip = clip_at(self.clip_editor.clips(slot), t_sec)
+        if clip is None:
             return False
-        nearest = min(times, key=lambda t: abs(t - t_sec))
-        if abs(nearest - t_sec) > tolerance_sec:
-            return False
-        select_cue(self.session, slot, nearest)
+        select_clip(self.session, slot, clip.start)
         return True
 
-    def add_cue_at(self, slot: str, t_sec: float) -> None:
-        """Add a cue on *slot* at *t_sec*, snapped, that flips the lane there."""
-        if not cue_edits_allowed(self.session):
+    def add_clip_at(self, slot: str, t_sec: float) -> None:
+        """Add a clip on *slot* from *t_sec*, snapped, and select it."""
+        if not clip_edits_allowed(self.session):
             return
-        snapped = self._snap_placement(t_sec)
-        if not self.cue_editor.add_cue(slot, snapped):
-            self._notify("A cue is already there")
+        if not self.clip_editor.add_clip_at(slot, t_sec):
+            self._notify("No room for a clip there")
+
+    def playhead_sec(self) -> float:
+        return current_sec(self.playback, self.duration_sec)
+
+    def split_at_playhead(self) -> None:
+        """Split the focused row's clip under the playhead in two (Ctrl+K)."""
+        if not clip_edits_allowed(self.session):
+            return
+        playhead = current_sec(self.playback, self.duration_sec)
+        if not self.clip_editor.split_at(self._focused_slot(), playhead):
+            self._notify("No clip to split at the playhead")
 
     @property
     def paused(self) -> bool:
@@ -490,57 +504,64 @@ class TimelineControls:
     def _focused_slot(self) -> str:
         return self.session.layer_z_order[self.session.timeline.focus_row]
 
-    def _cue_edits_allowed(self) -> bool:
-        return cue_edits_allowed(self.session)
+    def _clip_edits_allowed(self) -> bool:
+        return clip_edits_allowed(self.session)
 
-    def _step_selected_cue(self, *, forward: bool) -> None:
-        step_cue_selection(
+    def _step_selected_clip(self, *, forward: bool) -> None:
+        step_clip_selection(
             self.session,
             self._focused_slot(),
             forward=forward,
             playhead_sec=current_sec(self.playback, self.duration_sec),
+            duration_sec=self.duration_sec,
         )
 
-    def _seek_to_selected_cue(self) -> None:
-        if not cue_selection_allowed(self.session):
+    def _seek_to_selected_clip(self) -> None:
+        if not clip_selection_allowed(self.session):
             return
-        target = self.session.timeline.selected_cue_t.get(self._focused_slot())
-        if target is None:
+        clip = self.clip_editor.selected(self._focused_slot())
+        if clip is None:
             return
         current = current_sec(self.playback, self.duration_sec)
-        delta = target - current
+        delta = clip.start - current
         if self._on_seek is not None:
             self._on_seek(delta)
         else:
             seek(self.playback, delta, self.duration_sec)
 
-    def _nudge_selected_cue_level(self, *, forward: bool, large: bool) -> None:
-        """Adjust selected on-cue timeline opacity (multiplies into layer opacity)."""
-        self.cue_editor.nudge_level(self._focused_slot(), forward=forward, large=large)
+    def _nudge_selected_clip_level(self, *, forward: bool, large: bool) -> None:
+        """Adjust the selected clip's opacity (multiplies into layer opacity)."""
+        self.clip_editor.nudge_level(self._focused_slot(), forward=forward, large=large)
 
-    def _cycle_selected_cue_blend(self) -> None:
+    def _cycle_selected_clip_blend(self) -> None:
         slot = self._focused_slot()
-        cue = selected_cue(self.session, slot)
-        if cue is None:
+        clip = self.clip_editor.selected(slot)
+        if clip is None:
             return
         options: tuple[BlendMode | None, ...] = (None, *BLEND_MODES)
-        self.cue_editor.set_blend(slot, _next_option(options, cue.blend))
+        self.clip_editor.set_blend(slot, _next_option(options, clip.blend))
 
-    def _cycle_selected_cue_role(self) -> None:
+    def _cycle_selected_clip_role(self) -> None:
         slot = self._focused_slot()
-        cue = selected_cue(self.session, slot)
-        if cue is None:
+        clip = self.clip_editor.selected(slot)
+        if clip is None:
             return
         options: tuple[CueRole | None, ...] = (None, *CUE_ROLES)
-        self.cue_editor.set_role(slot, _next_option(options, cue.role))
+        self.clip_editor.set_role(slot, _next_option(options, clip.role))
 
-    def _cycle_selected_cue_cut(self) -> None:
+    def _cycle_selected_clip_cut(self, *, out: bool) -> None:
+        """Cycle the selected clip's cut in, or its cut out when *out*."""
         slot = self._focused_slot()
-        cue = selected_cue(self.session, slot)
-        if cue is None:
+        clip = self.clip_editor.selected(slot)
+        if clip is None:
             return
-        current: CutType = cue.cut if cue.cut in CUT_TYPES else "none"
-        self.cue_editor.set_cut(slot, _next_option(CUT_TYPES, current))
+        cut = clip.cut_out if out else clip.cut_in
+        current: CutType = cut if cut in CUT_TYPES else "none"
+        choice = _next_option(CUT_TYPES, current)
+        if out:
+            self.clip_editor.set_cut_out(slot, choice)
+        else:
+            self.clip_editor.set_cut_in(slot, choice)
 
     def _toggle_arm(self, slot: str) -> None:
         tl = self.session.timeline
@@ -594,7 +615,7 @@ class TimelineControls:
             tl.record_slot_start_sec = {}
             tl.record_high_water_mark = None
             self._last_toggle_t = {}
-            self.cue_editor.history.commit()
+            self.clip_editor.history.commit()
 
         if self._on_visibility_change is not None:
             self._on_visibility_change()
@@ -621,7 +642,7 @@ class TimelineControls:
             toggle_pause(self.playback, self.duration_sec)
 
         # The take records as one undo step, from these lanes to the stop.
-        self.cue_editor.history.begin("Record take")
+        self.clip_editor.history.begin("Record take")
         tl.recording = True
         tl.record_start_sec = snapped
         tl.record_buffer = {}
@@ -639,7 +660,7 @@ class TimelineControls:
             tl.record_baseline = {}
             tl.record_slot_start_sec = {}
             tl.record_high_water_mark = None
-            self.cue_editor.history.commit()
+            self.clip_editor.history.commit()
             return
 
         record_stop = self._snap_placement(
@@ -656,7 +677,7 @@ class TimelineControls:
         tl.record_slot_start_sec = {}
         tl.record_high_water_mark = None
         self._last_toggle_t = {}
-        self.cue_editor.history.commit()
+        self.clip_editor.history.commit()
 
         if self._on_visibility_change is not None:
             self._on_visibility_change()

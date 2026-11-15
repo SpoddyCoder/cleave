@@ -17,8 +17,8 @@ None.
 In priority order. The ImGui shell refactor is done; its plans, design page, and stills are in [plans-completed/](plans-completed/) (`menu-overhaul-*`, `action-buttons-and-dialogs-plan.md`, `context-menus-plan.md`).
 
 1. **Timeline clips.** Edit the strip in clips, the way video editors show a track's visible spans, in place of separate on and off cues. Plan: [plans/timeline-clips-plan.md](plans/timeline-clips-plan.md), stages A to D.
-   - Done: hand cue edits and recorded takes record in `TimelineHistory` (undo with merging), and cues can be added and deleted from the strip. Stage B reworks the add and delete for clips.
-   - Next: Stage A, the clip model in `cleave/timeline.py`.
+   - Done: Stage A (the clip model in `cleave/timeline.py`) and Stage B (clip selection, `ClipEditor`, the inspector clip page, menus, and keys; edits record in `TimelineHistory`).
+   - Next: Stage C, dragging clips on the strip (move, trim, roll) and the clip outline.
    - Stage D folds in "Record still writes 0/1" below.
 2. **Performance review and remediations.** Profile the editor at large and maximised window sizes and fix what grows with window area. Start from [plans/large-window-performance-plan.md](plans/large-window-performance-plan.md): the timeline strip's full-width CPU redraw every frame is measured, and the rest needs profiling on Windows. Include the PyInstaller freeze smoke test of the shell (menus, context menus, Menu key, high DPI, UI scale 200%).
 

@@ -342,8 +342,8 @@ class TimelineRuntime:
     override_slots: set[str] = field(default_factory=set)
     override_visible: dict[str, bool] = field(default_factory=dict)
     arm_flash_start_ms: dict[str, int] = field(default_factory=dict)
-    selected_cue_t: dict[str, float] = field(default_factory=dict)
-    selected_cue_flash_start_ms: int | None = None
+    selected_clip_t: dict[str, float] = field(default_factory=dict)
+    selected_clip_flash_start_ms: int | None = None
     # Strip control under the mouse: (target, row). Row is None for the
     # corner buttons. Not persisted.
     strip_hover: tuple[str, int | None] | None = None

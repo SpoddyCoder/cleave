@@ -7,7 +7,7 @@ import pytest
 from cleave.effects.registry import effect_roster
 from cleave.viz.focus_nav import MainFocus
 from cleave.viz.inspector import build_inspector_rows
-from cleave.timeline import SlotCue
+from cleave.timeline import TimelineClip
 from cleave.viz.navigator import (
     LAYER_PAGE_MILKDROP_PRESET,
     layer_node_id,
@@ -519,17 +519,19 @@ def test_paused_switching_button_moves_below_preset_fields() -> None:
 
 
 
-_CUE_KINDS = [
-    RowKind.TIMELINE_CUE_TIME,
-    RowKind.TIMELINE_CUE_OPACITY,
-    RowKind.TIMELINE_CUE_CUT,
-    RowKind.TIMELINE_CUE_BLEND,
-    RowKind.TIMELINE_CUE_ROLE,
+_CLIP_KINDS = [
+    RowKind.TIMELINE_CLIP_START,
+    RowKind.TIMELINE_CLIP_END,
+    RowKind.TIMELINE_CLIP_OPACITY,
+    RowKind.TIMELINE_CLIP_BLEND,
+    RowKind.TIMELINE_CLIP_ROLE,
+    RowKind.TIMELINE_CLIP_CUT_IN,
+    RowKind.TIMELINE_CLIP_CUT_OUT,
 ]
 
 
-def _cue_page(state: TuningViewState, slot: str) -> tuple[str, list[RowKind], list[str]]:
-    """Heading label, shown cue row kinds, and their values."""
+def _clip_page(state: TuningViewState, slot: str) -> tuple[str, list[RowKind], list[str]]:
+    """Heading label, shown clip row kinds, and their values."""
     rows = build_inspector_rows(state, timeline_row_node_id(slot))
     heading = next(row.descriptor for row in rows if row.is_heading)
     kinds = _kinds(rows)
@@ -537,49 +539,63 @@ def _cue_page(state: TuningViewState, slot: str) -> tuple[str, list[RowKind], li
     return row_label(state, heading), kinds, values
 
 
-def _cue_view() -> TuningViewState:
+def _clip_view() -> TuningViewState:
     state = _layer_view(("layer_1", "layer_2", "layer_3"))
     state.timeline = TimelineBlock(
-        selected_cues={
-            "layer_1": SlotCue(t=65.0, level=0.25, blend="add", role="lead", cut="soft"),
-            "layer_2": SlotCue(t=5.0, level=0.0, cut="hard"),
+        selected_clips={
+            "layer_1": TimelineClip(
+                start=65.0,
+                end=80.5,
+                level=0.25,
+                blend="add",
+                role="lead",
+                cut_in="soft",
+                cut_out="hard",
+                has_end_cue=True,
+            ),
+            "layer_2": TimelineClip(start=5.0, end=9.0, level=1.0, butts_next=True),
         }
     )
     return state
 
 
-def test_timeline_row_page_hides_cue_rows_with_no_cue_selected() -> None:
-    assert _cue_page(_cue_view(), "layer_3") == ("no cue selected", [], [])
+def test_timeline_row_page_hides_clip_rows_with_no_clip_selected() -> None:
+    assert _clip_page(_clip_view(), "layer_3") == ("no clip selected", [], [])
 
 
-def test_timeline_row_page_shows_every_field_of_a_start_cue() -> None:
-    state = _cue_view()
-    assert _cue_page(state, "layer_1") == (
-        "start cue",
-        _CUE_KINDS,
-        ["01:05", "25%", "soft", "add", "lead"],
+def test_timeline_row_page_shows_every_field_of_a_clip() -> None:
+    state = _clip_view()
+    assert _clip_page(state, "layer_1") == (
+        "clip 01:05-01:20",
+        _CLIP_KINDS,
+        ["01:05.00", "01:20.50", "25%", "add", "lead", "soft", "hard"],
     )
     rows = build_inspector_rows(state, timeline_row_node_id("layer_1"))
     assert all(row.descriptor.slot == "layer_1" for row in rows)
     assert all(row.navigable for row in rows if not row.is_heading)
     _label, value = inspector_field_colors(
-        state, RowDescriptor(RowKind.TIMELINE_CUE_TIME, slot="layer_1")
+        state, RowDescriptor(RowKind.TIMELINE_CLIP_START, slot="layer_1")
     )
     assert value == VALUE
 
 
-def test_timeline_row_page_shows_time_and_cut_of_an_end_cue() -> None:
-    assert _cue_page(_cue_view(), "layer_2") == (
-        "end cue",
-        [RowKind.TIMELINE_CUE_TIME, RowKind.TIMELINE_CUE_CUT],
-        ["00:05", "hard"],
+def test_timeline_clip_cut_out_is_unavailable_on_a_butted_clip() -> None:
+    state = _clip_view()
+    assert _clip_page(state, "layer_2")[1] == _CLIP_KINDS
+    butted = RowDescriptor(RowKind.TIMELINE_CLIP_CUT_OUT, slot="layer_2")
+    assert row_available(state, butted) is False
+    assert row_available(
+        state, RowDescriptor(RowKind.TIMELINE_CLIP_CUT_IN, slot="layer_2")
+    )
+    assert row_available(
+        state, RowDescriptor(RowKind.TIMELINE_CLIP_CUT_OUT, slot="layer_1")
     )
 
 
-def test_timeline_cue_rows_are_unavailable_while_recording() -> None:
-    state = _cue_view()
+def test_timeline_clip_rows_are_unavailable_while_recording() -> None:
+    state = _clip_view()
     state.timeline_recording = True
-    desc = RowDescriptor(RowKind.TIMELINE_CUE_OPACITY, slot="layer_1")
+    desc = RowDescriptor(RowKind.TIMELINE_CLIP_OPACITY, slot="layer_1")
     assert row_available(state, desc) is False
     _label, value = inspector_field_colors(state, desc)
     assert value == DISABLED

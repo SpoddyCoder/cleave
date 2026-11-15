@@ -55,7 +55,7 @@ def _discard_timeline_slot(session: TuningSession, slot: str) -> None:
     timeline.record_slot_start_sec.pop(slot, None)
     timeline.override_visible.pop(slot, None)
     timeline.arm_flash_start_ms.pop(slot, None)
-    timeline.selected_cue_t.pop(slot, None)
+    timeline.selected_clip_t.pop(slot, None)
     timeline.record_buffer.pop(slot, None)
 
 
@@ -310,5 +310,5 @@ def make_timeline_controls(
         on_notification=on_notification,
         beat_times=list(signals.beat_times) if signals is not None else (),
         bar_times=list(signals.downbeat_times) if signals is not None else (),
-        cue_editor=tuning_controls.cue_editor if tuning_controls is not None else None,
+        clip_editor=tuning_controls.clip_editor if tuning_controls is not None else None,
     )

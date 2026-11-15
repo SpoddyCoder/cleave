@@ -29,15 +29,10 @@ from cleave.blend_modes import BLEND_MODES, BlendMode
 from cleave.choice import choice_index
 from cleave.cue_roles import CUE_ROLES, CueRole
 from cleave.cut_types import CUT_TYPES, CutType
-from cleave.timeline import SlotCue, cue_editable_for_blend_role
+from cleave.timeline import ClipEdge, TimelineClip
 from cleave.viz.commands import command_by_id
-from cleave.viz.playback import current_sec, format_mmss
-from cleave.viz.timeline_cue_edits import (
-    CueEditor,
-    cue_selection_allowed,
-    selected_cue,
-    step_cue_selection,
-)
+from cleave.viz.playback import format_mmss
+from cleave.viz.timeline_clip_edits import ClipEditor, clip_selection_allowed
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
 from cleave.viz.material_icons import DELETE_GLYPH
 from cleave.viz.row_spec import (
@@ -359,74 +354,78 @@ def _apply_timeline_locked(
         controls.toggle_timeline_locked()
 
 
-def _selected_cue(state: TuningViewState, desc: RowDescriptor) -> SlotCue | None:
+def _selected_clip(state: TuningViewState, desc: RowDescriptor) -> TimelineClip | None:
     if desc.slot is None:
         return None
-    return state.timeline.selected_cues.get(desc.slot)
+    return state.timeline.selected_clips.get(desc.slot)
 
 
-def _selected_on_cue(state: TuningViewState, desc: RowDescriptor) -> SlotCue | None:
-    cue = _selected_cue(state, desc)
-    if cue is None or not cue_editable_for_blend_role(cue):
-        return None
-    return cue
-
-
-def _cue_edits_available(state: TuningViewState, _desc: RowDescriptor) -> bool:
-    # Cue rows only show for a selected cue that has the field; recording
-    # pauses cue selection and edits.
+def _clip_edits_available(state: TuningViewState, _desc: RowDescriptor) -> bool:
+    # Clip rows only show for a selected clip; recording pauses clip
+    # selection and edits.
     return not state.timeline_recording
 
 
-def _format_cue_heading(state: TuningViewState, desc: RowDescriptor) -> str:
-    """Start cues turn the layer on and carry its look; end cues turn it off."""
-    cue = _selected_cue(state, desc)
-    if cue is None:
-        return "no cue selected"
-    return "start cue" if cue_editable_for_blend_role(cue) else "end cue"
-
-
-def _format_cue_time(state: TuningViewState, desc: RowDescriptor) -> str:
-    cue = _selected_cue(state, desc)
-    return "none" if cue is None else format_mmss(cue.t)
-
-
-def _apply_cue_time(
-    controls: TuningControls, desc: RowDescriptor, forward: bool, _large: bool
-) -> None:
-    """Left/Right select the previous or next cue on the row."""
-    assert desc.slot is not None
-    step_cue_selection(
-        controls.session,
-        desc.slot,
-        forward=forward,
-        playhead_sec=current_sec(controls.playback, controls.duration_sec),
+def _clip_cut_out_available(state: TuningViewState, desc: RowDescriptor) -> bool:
+    """Cut out needs an end cue of the clip's own: a gap after it."""
+    clip = _selected_clip(state, desc)
+    return (
+        clip is not None and clip.has_end_cue and _clip_edits_available(state, desc)
     )
 
 
-def _seek_to_cue(controls: TuningControls, desc: RowDescriptor) -> None:
+def _format_clip_heading(state: TuningViewState, desc: RowDescriptor) -> str:
+    clip = _selected_clip(state, desc)
+    if clip is None:
+        return "no clip selected"
+    return f"clip {format_mmss(clip.start)}-{format_mmss(clip.end)}"
+
+
+def _format_clip_start(state: TuningViewState, desc: RowDescriptor) -> str:
+    clip = _selected_clip(state, desc)
+    return "-" if clip is None else format_marker_time(clip.start)
+
+
+def _format_clip_end(state: TuningViewState, desc: RowDescriptor) -> str:
+    clip = _selected_clip(state, desc)
+    return "-" if clip is None else format_marker_time(clip.end)
+
+
+def _clip_trim_row(edge: ClipEdge) -> FieldMutator:
+    """Left/Right move one edge by a snap step; the large step is one bar."""
+
+    def horizontal(
+        controls: TuningControls, desc: RowDescriptor, forward: bool, large: bool
+    ) -> None:
+        assert desc.slot is not None
+        controls.clip_editor.trim_step(desc.slot, edge, forward=forward, large=large)
+
+    return horizontal
+
+
+def _seek_to_clip(controls: TuningControls, desc: RowDescriptor) -> None:
     assert desc.slot is not None
-    cue = selected_cue(controls.session, desc.slot)
-    if cue is not None and cue_selection_allowed(controls.session):
-        controls.seek_to(cue.t)
+    clip = controls.clip_editor.selected(desc.slot)
+    if clip is not None and clip_selection_allowed(controls.session):
+        controls.seek_to(clip.start)
 
 
-def _format_cue_opacity(state: TuningViewState, desc: RowDescriptor) -> str:
-    cue = _selected_on_cue(state, desc)
-    if cue is None:
+def _format_clip_opacity(state: TuningViewState, desc: RowDescriptor) -> str:
+    clip = _selected_clip(state, desc)
+    if clip is None:
         return "-"
-    return f"{int(round(float(cue.level) * 100.0))}%"
+    return f"{int(round(float(clip.level) * 100.0))}%"
 
 
-def _apply_cue_opacity(
+def _apply_clip_opacity(
     controls: TuningControls, desc: RowDescriptor, forward: bool, large: bool
 ) -> None:
     assert desc.slot is not None
-    controls.cue_editor.nudge_level(desc.slot, forward=forward, large=large)
+    controls.clip_editor.nudge_level(desc.slot, forward=forward, large=large)
 
 
-def _cut_value(cue: SlotCue | None) -> CutType:
-    return cue.cut if cue is not None and cue.cut in CUT_TYPES else "none"
+def _cut_value(cut: CutType | None) -> CutType:
+    return cut if cut in CUT_TYPES else "none"
 
 
 _BLEND_OPTIONS: tuple[BlendMode | None, ...] = (None, *BLEND_MODES)
@@ -434,7 +433,7 @@ _ROLE_OPTIONS: tuple[CueRole | None, ...] = (None, *CUE_ROLES)
 
 
 def _blend_display(blend: BlendMode | None) -> str:
-    # No cue blend holds the layer's own blend mode.
+    # No clip blend holds the layer's own blend mode.
     return "layer" if blend is None else blend
 
 
@@ -442,51 +441,57 @@ def _role_display(role: CueRole | None) -> str:
     return "none" if role is None else role
 
 
-def _cue_cut_value(state: TuningViewState, desc: RowDescriptor) -> CutType:
-    return _cut_value(_selected_cue(state, desc))
+def _clip_cut_in(clip: TimelineClip | None) -> CutType:
+    return _cut_value(None if clip is None else clip.cut_in)
 
 
-def _cue_blend_value(state: TuningViewState, desc: RowDescriptor) -> BlendMode | None:
-    cue = _selected_on_cue(state, desc)
-    return None if cue is None else cue.blend
+def _clip_cut_out(clip: TimelineClip | None) -> CutType:
+    return _cut_value(None if clip is None else clip.cut_out)
 
 
-def _cue_role_value(state: TuningViewState, desc: RowDescriptor) -> CueRole | None:
-    cue = _selected_on_cue(state, desc)
-    return None if cue is None else cue.role
+def _clip_blend(clip: TimelineClip | None) -> BlendMode | None:
+    return None if clip is None else clip.blend
 
 
-def _format_cue_cut(state: TuningViewState, desc: RowDescriptor) -> str:
-    return "-" if _selected_cue(state, desc) is None else _cue_cut_value(state, desc)
+def _clip_role(clip: TimelineClip | None) -> CueRole | None:
+    return None if clip is None else clip.role
 
 
-def _format_cue_blend(state: TuningViewState, desc: RowDescriptor) -> str:
-    if _selected_on_cue(state, desc) is None:
-        return "-"
-    return _blend_display(_cue_blend_value(state, desc))
+def _clip_field(
+    read: Callable[[TimelineClip | None], T],
+) -> Callable[[TuningViewState, RowDescriptor], T]:
+    def value(state: TuningViewState, desc: RowDescriptor) -> T:
+        return read(_selected_clip(state, desc))
+
+    return value
 
 
-def _format_cue_role(state: TuningViewState, desc: RowDescriptor) -> str:
-    if _selected_on_cue(state, desc) is None:
-        return "-"
-    return _role_display(_cue_role_value(state, desc))
+def _clip_field_text(
+    read: Callable[[TimelineClip | None], T],
+    display: Callable[[T], str] = str,
+) -> Callable[[TuningViewState, RowDescriptor], str]:
+    def text(state: TuningViewState, desc: RowDescriptor) -> str:
+        clip = _selected_clip(state, desc)
+        return "-" if clip is None else display(read(clip))
+
+    return text
 
 
-def _cue_option_rows(
+def _clip_option_rows(
     options: Sequence[T],
-    value: Callable[[SlotCue | None], T],
-    write: Callable[[CueEditor, str, T], None],
+    read: Callable[[TimelineClip | None], T],
+    write: Callable[[ClipEditor, str, T], None],
 ) -> tuple[FieldMutator, ChoiceJump]:
-    """Left/Right and a list pick for one cue field, clamped at the ends."""
+    """Left/Right and a list pick for one clip field, clamped at the ends."""
 
     def move(controls: TuningControls, desc: RowDescriptor, delta: int) -> None:
         assert desc.slot is not None
-        cue = selected_cue(controls.session, desc.slot)
-        if cue is None:
+        clip = controls.clip_editor.selected(desc.slot)
+        if clip is None:
             return
-        index = choice_index(options, value(cue)) + delta
+        index = choice_index(options, read(clip)) + delta
         write(
-            controls.cue_editor,
+            controls.clip_editor,
             desc.slot,
             options[max(0, min(len(options) - 1, index))],
         )
@@ -499,22 +504,24 @@ def _cue_option_rows(
     return horizontal, move
 
 
-_apply_cue_cut, _jump_cue_cut = _cue_option_rows(
-    CUT_TYPES, _cut_value, CueEditor.set_cut
+# Lambdas keep the editor calls on its public methods.
+_apply_clip_cut_in, _jump_clip_cut_in = _clip_option_rows(
+    CUT_TYPES, _clip_cut_in, lambda editor, slot, cut: editor.set_cut_in(slot, cut)
 )
-_apply_cue_blend, _jump_cue_blend = _cue_option_rows(
+_apply_clip_cut_out, _jump_clip_cut_out = _clip_option_rows(
+    CUT_TYPES, _clip_cut_out, lambda editor, slot, cut: editor.set_cut_out(slot, cut)
+)
+_apply_clip_blend, _jump_clip_blend = _clip_option_rows(
     _BLEND_OPTIONS,
-    lambda cue: None if cue is None else cue.blend,
-    CueEditor.set_blend,
+    _clip_blend,
+    lambda editor, slot, blend: editor.set_blend(slot, blend),
 )
-_apply_cue_role, _jump_cue_role = _cue_option_rows(
-    _ROLE_OPTIONS,
-    lambda cue: None if cue is None else cue.role,
-    CueEditor.set_role,
+_apply_clip_role, _jump_clip_role = _clip_option_rows(
+    _ROLE_OPTIONS, _clip_role, lambda editor, slot, role: editor.set_role(slot, role)
 )
 
 
-def _cue_spec(
+def _clip_spec(
     label: str,
     format_value: Callable[[TuningViewState, RowDescriptor], str],
     apply_horizontal: FieldMutator,
@@ -528,7 +535,7 @@ def _cue_spec(
     repeatable: bool = False,
     blocked_by_section_lock: bool = True,
 ) -> RowSpec:
-    """One field of the selected strip cue. Edits match the strip's cue keys."""
+    """One field of the selected strip clip. Edits match the strip's clip keys."""
     return RowSpec(
         affordance=RowAffordance.VALUE_STEP,
         panel_label=label,
@@ -879,103 +886,136 @@ SPECS: dict[RowKind, RowSpec] = {
         ),
         blocked_by_section_lock=True,
     ),
-    RowKind.TIMELINE_CUE_HEADER: RowSpec(
+    RowKind.TIMELINE_CLIP_HEADER: RowSpec(
         affordance=RowAffordance.HEADING,
-        panel_label="selected cue",
+        panel_label="selected clip",
         present_style=RowPresentStyle.HEADING,
-        format_label=_format_cue_heading,
+        format_label=_format_clip_heading,
         fit_strategy=FitStrategy.NONE,
         navigable=False,
     ),
-    RowKind.TIMELINE_CUE_TIME: _cue_spec(
-        "time",
-        _format_cue_time,
-        _apply_cue_time,
-        _cue_edits_available,
-        apply_action=_seek_to_cue,
-        # Selecting and seeking stay open on a locked timeline, as on the strip.
-        blocked_by_section_lock=False,
-        help_title="Selected Cue",
+    RowKind.TIMELINE_CLIP_START: _clip_spec(
+        "start",
+        _format_clip_start,
+        _clip_trim_row("start"),
+        _clip_edits_available,
+        apply_action=_seek_to_clip,
+        repeatable=True,
+        help_title="Clip Start",
         help_entries=(
-            ("Left/Right", "select previous / next cue"),
-            ("Enter", "seek to cue"),
+            ("Left/Right", "trim by one snap step"),
+            ("PgUp/PgDn", "trim by one bar"),
+            ("Enter", "seek to clip start"),
         ),
         help_description=(
-            "Time of the selected cue on this row.",
-            "A start cue turns the layer on.",
-            "An end cue turns it off.",
+            "Where the layer turns on.",
+            "It stops at the clip before, or rolls the boundary when the clips butt.",
+            "The step follows the placement snap.",
         ),
     ),
-    RowKind.TIMELINE_CUE_OPACITY: _cue_spec(
-        "opacity",
-        _format_cue_opacity,
-        _apply_cue_opacity,
-        _cue_edits_available,
+    RowKind.TIMELINE_CLIP_END: _clip_spec(
+        "end",
+        _format_clip_end,
+        _clip_trim_row("end"),
+        _clip_edits_available,
         repeatable=True,
-        help_title="Cue Opacity",
+        help_title="Clip End",
+        help_entries=(
+            ("Left/Right", "trim by one snap step"),
+            ("PgUp/PgDn", "trim by one bar"),
+        ),
+        help_description=(
+            "Where the layer turns off, or the next clip takes over.",
+            "It stops at the next clip, or rolls the boundary when the clips butt.",
+            "The step follows the placement snap.",
+        ),
+    ),
+    RowKind.TIMELINE_CLIP_OPACITY: _clip_spec(
+        "opacity",
+        _format_clip_opacity,
+        _apply_clip_opacity,
+        _clip_edits_available,
+        repeatable=True,
+        help_title="Clip Opacity",
         help_entries=(
             ("Left/Right", "1% step"),
             ("PgUp/PgDn", "10% step"),
         ),
         help_description=(
-            "Layer opacity from this cue on.",
+            "Layer opacity for this clip.",
             "It multiplies the opacity of the layer.",
-            "Start cues only.",
         ),
     ),
-    RowKind.TIMELINE_CUE_CUT: _cue_spec(
-        "cut",
-        _format_cue_cut,
-        _apply_cue_cut,
-        _cue_edits_available,
+    RowKind.TIMELINE_CLIP_BLEND: _clip_spec(
+        "blend",
+        _clip_field_text(_clip_blend, _blend_display),
+        _apply_clip_blend,
+        _clip_edits_available,
+        choice=options_choice(
+            _BLEND_OPTIONS,
+            _clip_field(_clip_blend),
+            _blend_display,
+            jump=_jump_clip_blend,
+        ),
+        help_title="Clip Blend",
+        help_entries=(("Left/Right", "choose blend mode"),),
+        help_description=(
+            "Blend mode for this clip.",
+            "The Layer option uses the blend mode of the layer.",
+        ),
+    ),
+    RowKind.TIMELINE_CLIP_ROLE: _clip_spec(
+        "role",
+        _clip_field_text(_clip_role, _role_display),
+        _apply_clip_role,
+        _clip_edits_available,
+        choice=options_choice(
+            _ROLE_OPTIONS,
+            _clip_field(_clip_role),
+            _role_display,
+            jump=_jump_clip_role,
+        ),
+        help_title="Clip Role",
+        help_entries=(("Left/Right", "choose role"),),
+        help_description=(
+            "The role of the layer for this clip.",
+            "The visual limiter uses the role.",
+        ),
+    ),
+    RowKind.TIMELINE_CLIP_CUT_IN: _clip_spec(
+        "cut in",
+        _clip_field_text(_clip_cut_in),
+        _apply_clip_cut_in,
+        _clip_edits_available,
         choice=options_choice(
             CUT_TYPES,
-            _cue_cut_value,
-            jump=_jump_cue_cut,
+            _clip_field(_clip_cut_in),
+            jump=_jump_clip_cut_in,
         ),
-        help_title="Cue Cut",
+        help_title="Clip Cut In",
         help_entries=(("Left/Right", "choose none / hard / soft"),),
         help_description=(
-            "How the layer fades at this cue.",
+            "How the layer fades in at the start of this clip.",
             "Set the fade times in Timeline > Cue Fades.",
         ),
     ),
-    RowKind.TIMELINE_CUE_BLEND: _cue_spec(
-        "blend",
-        _format_cue_blend,
-        _apply_cue_blend,
-        _cue_edits_available,
+    RowKind.TIMELINE_CLIP_CUT_OUT: _clip_spec(
+        "cut out",
+        _clip_field_text(_clip_cut_out),
+        _apply_clip_cut_out,
+        _clip_cut_out_available,
         choice=options_choice(
-            _BLEND_OPTIONS,
-            _cue_blend_value,
-            _blend_display,
-            jump=_jump_cue_blend,
+            CUT_TYPES,
+            _clip_field(_clip_cut_out),
+            jump=_jump_clip_cut_out,
         ),
-        help_title="Cue Blend",
-        help_entries=(("Left/Right", "choose blend mode"),),
+        help_title="Clip Cut Out",
+        help_entries=(("Left/Right", "choose none / hard / soft"),),
         help_description=(
-            "Blend mode from this cue on.",
-            "The Layer option uses the blend mode of the layer.",
-            "Start cues only.",
-        ),
-    ),
-    RowKind.TIMELINE_CUE_ROLE: _cue_spec(
-        "role",
-        _format_cue_role,
-        _apply_cue_role,
-        _cue_edits_available,
-        choice=options_choice(
-            _ROLE_OPTIONS,
-            _cue_role_value,
-            _role_display,
-            jump=_jump_cue_role,
-        ),
-        help_title="Cue Role",
-        help_entries=(("Left/Right", "choose role"),),
-        help_description=(
-            "The role of the layer from this cue on.",
-            "The visual limiter uses the role.",
-            "Start cues only.",
+            "How the layer fades out at the end of this clip.",
+            "Unavailable when the clip butts the next one (set that clip's Cut in) "
+            "or runs to the song end.",
+            "Set the fade times in Timeline > Cue Fades.",
         ),
     ),
 }

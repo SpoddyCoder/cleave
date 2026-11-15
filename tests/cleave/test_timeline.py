@@ -40,8 +40,6 @@ from cleave.timeline import (
     lane_on_transition_cues,
     lane_on_transition_trigger_times,
     punch_lane,
-    remove_lane_cue,
-    set_lane_cue,
     shift_lane_cues_by_beats,
     should_accept_toggle,
     snap_lane_to_beats,
@@ -273,10 +271,9 @@ def test_canonicalize_preserves_cut_on_off_cues() -> None:
     assert cues == [SlotCue(t=1.0, level=0.0, cut="soft")]
 
 
-def test_cue_editable_and_navigable_times() -> None:
+def test_cue_editable_and_opening_baseline() -> None:
     from cleave.timeline import (
         cue_editable_for_blend_role,
-        navigable_cue_times,
         opening_baseline_editable,
         opening_cue,
     )
@@ -288,21 +285,18 @@ def test_cue_editable_and_navigable_times() -> None:
     assert cue_editable_for_blend_role(mid)
     assert not cue_editable_for_blend_role(off)
     lane = TimelineLane(baseline=0.0, cues=[on, mid, off])
-    assert navigable_cue_times(lane) == [1.0, 2.0, 3.0]
     assert not opening_baseline_editable(lane)
     assert opening_cue(lane) is None
 
     opening_on = TimelineLane(baseline=0.5, cues=[SlotCue(t=10.0, level=0.0)])
     assert opening_baseline_editable(opening_on)
     assert opening_cue(opening_on) == SlotCue(t=0.0, level=0.5)
-    assert navigable_cue_times(opening_on) == [0.0, 10.0]
 
     already_at_zero = TimelineLane(
         baseline=0.0,
         cues=[SlotCue(t=0.0, level=0.5), SlotCue(t=10.0, level=0.0)],
     )
     assert not opening_baseline_editable(already_at_zero)
-    assert navigable_cue_times(already_at_zero) == [0.0, 10.0]
 
 
 def test_update_lane_cue_materializes_opening_baseline() -> None:
@@ -512,12 +506,6 @@ def test_strip_lane_range_removes_cues_in_range() -> None:
     lane = _lane(1.0, (1.0, 0.0), (5.0, 1.0), (8.0, 0.0))
     result = strip_lane_range(lane, 4.0, 6.0)
     assert result.cues == [SlotCue(t=1.0, level=0.0)]
-
-
-def test_set_lane_cue_replaces_at_t() -> None:
-    lane = _lane(1.0, (5.0, 0.0))
-    result = set_lane_cue(lane, 5.0, 1.0)
-    assert result.cues == []
 
 
 def test_should_accept_toggle_debounces() -> None:
@@ -993,33 +981,6 @@ def test_boolean_parity_zero_one_lane_levels() -> None:
     assert lane_level_at(lane, 10.0, inherit=1.0) == 1.0
     assert lane_level_at(lane, 5.0, inherit=1.0) <= LEVEL_EPS
     assert lane_level_at(lane, 10.0, inherit=1.0) > LEVEL_EPS
-
-
-def test_remove_lane_cue_drops_a_stored_cue() -> None:
-    lane = TimelineLane(
-        baseline=0.0,
-        cues=[SlotCue(t=2.0, level=1.0), SlotCue(t=5.0, level=0.0)],
-    )
-    assert remove_lane_cue(lane, 5.0).cues == [SlotCue(t=2.0, level=1.0)]
-
-
-def test_remove_lane_cue_drops_neighbours_it_makes_redundant() -> None:
-    lane = TimelineLane(
-        baseline=0.0,
-        cues=[
-            SlotCue(t=2.0, level=1.0),
-            SlotCue(t=5.0, level=0.0),
-            SlotCue(t=8.0, level=1.0),
-        ],
-    )
-    assert remove_lane_cue(lane, 5.0).cues == [SlotCue(t=2.0, level=1.0)]
-
-
-def test_remove_lane_cue_turns_an_opening_baseline_off() -> None:
-    lane = TimelineLane(baseline=0.6, cues=[SlotCue(t=4.0, level=0.0)])
-    removed = remove_lane_cue(lane, 0.0)
-    assert removed.baseline == 0.0
-    assert removed.cues == []
 
 
 def test_lane_last_on_level_reads_the_latest_on_cue_before() -> None:

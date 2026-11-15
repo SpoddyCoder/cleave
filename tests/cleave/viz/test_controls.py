@@ -777,52 +777,67 @@ def test_timeline_row_selection_opens_its_inspector_page() -> None:
     assert controls.shell_focus.selected_id == "timeline"
 
 
-def test_timeline_row_page_shows_the_selected_cue() -> None:
+def test_timeline_row_page_shows_the_selected_clip() -> None:
     controls = _make_controls(("layer_1",))
     tl = controls.session.timeline
     tl.lanes["layer_1"] = TimelineLane(
-        baseline=0.0, cues=[SlotCue(t=10.0, level=1.0, cut="soft")]
+        baseline=0.0,
+        cues=[SlotCue(t=10.0, level=1.0, cut="soft"), SlotCue(t=20.0, level=0.0)],
     )
-    tl.selected_cue_t["layer_1"] = 10.0
+    tl.selected_clip_t["layer_1"] = 10.0
     view = controls.build_view_state(paused=False)
-    assert view.timeline.selected_cues == {"layer_1": tl.lanes["layer_1"].cues[0]}
-    tl.selected_cue_t["layer_1"] = 99.0
+    clip = view.timeline.selected_clips["layer_1"]
+    assert (clip.start, clip.end, clip.cut_in) == (10.0, 20.0, "soft")
+    tl.selected_clip_t["layer_1"] = 99.0
     view = controls.build_view_state(paused=False)
-    assert view.timeline.selected_cues == {}
+    assert view.timeline.selected_clips == {}
 
 
-def test_timeline_row_page_edits_the_selected_cue() -> None:
+def test_timeline_row_page_edits_the_selected_clip() -> None:
     controls = _make_controls(("layer_1", "layer_2"))
     tl = controls.session.timeline
     tl.lanes["layer_2"] = TimelineLane(
         baseline=0.0,
         cues=[SlotCue(t=10.0, level=0.5), SlotCue(t=20.0, level=0.0)],
     )
+    tl.selected_clip_t["layer_2"] = 10.0
 
     def desc(kind: RowKind) -> RowDescriptor:
         return RowDescriptor(kind, slot="layer_2")
 
-    assert apply_field_horizontal(controls, desc(RowKind.TIMELINE_CUE_TIME), True, False)
-    assert tl.selected_cue_t["layer_2"] == 10.0
-    apply_field_horizontal(controls, desc(RowKind.TIMELINE_CUE_OPACITY), True, True)
-    assert tl.lanes["layer_2"].cues[0].level == pytest.approx(0.6)
-    apply_field_choice(controls, desc(RowKind.TIMELINE_CUE_CUT), 2)
-    assert tl.lanes["layer_2"].cues[0].cut == "soft"
+    def cues() -> list[SlotCue]:
+        return tl.lanes["layer_2"].cues
+
+    apply_field_horizontal(controls, desc(RowKind.TIMELINE_CLIP_OPACITY), True, True)
+    assert cues()[0].level == pytest.approx(0.6)
+    apply_field_choice(controls, desc(RowKind.TIMELINE_CLIP_CUT_IN), 2)
+    assert cues()[0].cut == "soft"
     # Clamps at the end of the list instead of wrapping.
-    apply_field_choice(controls, desc(RowKind.TIMELINE_CUE_CUT), 1)
-    assert tl.lanes["layer_2"].cues[0].cut == "soft"
-    apply_field_choice(controls, desc(RowKind.TIMELINE_CUE_BLEND), 2)
-    assert tl.lanes["layer_2"].cues[0].blend == "add"
-    apply_field_horizontal(controls, desc(RowKind.TIMELINE_CUE_ROLE), True, False)
-    assert tl.lanes["layer_2"].cues[0].role == "bed"
-    assert "layer_1" not in tl.selected_cue_t
+    apply_field_choice(controls, desc(RowKind.TIMELINE_CLIP_CUT_IN), 1)
+    assert cues()[0].cut == "soft"
+    apply_field_choice(controls, desc(RowKind.TIMELINE_CLIP_CUT_OUT), 1)
+    assert cues()[1].cut == "hard"
+    apply_field_choice(controls, desc(RowKind.TIMELINE_CLIP_BLEND), 2)
+    assert cues()[0].blend == "add"
+    apply_field_horizontal(controls, desc(RowKind.TIMELINE_CLIP_ROLE), True, False)
+    assert cues()[0].role == "bed"
+    assert "layer_1" not in tl.selected_clip_t
+
+    # With no snap grid, Start and End trim in tenths of a second.
+    apply_field_horizontal(controls, desc(RowKind.TIMELINE_CLIP_END), True, False)
+    assert cues()[1].t == pytest.approx(20.1)
+    apply_field_horizontal(controls, desc(RowKind.TIMELINE_CLIP_START), False, False)
+    assert cues()[0].t == pytest.approx(9.9)
+    # The selection follows the clip's new start.
+    assert tl.selected_clip_t["layer_2"] == pytest.approx(9.9)
 
     tl.locked = True
     assert not apply_field_horizontal(
-        controls, desc(RowKind.TIMELINE_CUE_OPACITY), True, False
+        controls, desc(RowKind.TIMELINE_CLIP_OPACITY), True, False
     )
-    assert apply_field_horizontal(controls, desc(RowKind.TIMELINE_CUE_TIME), True, False)
-    assert tl.selected_cue_t["layer_2"] == 20.0
+    assert not apply_field_horizontal(
+        controls, desc(RowKind.TIMELINE_CLIP_START), True, False
+    )
 
 
 def test_esc_in_move_mode_does_not_request_overlay_hide() -> None:
@@ -3035,24 +3050,24 @@ def test_space_toggles_pause_from_any_focus() -> None:
 
 
 
-def test_timeline_focus_change_clears_selected_cue_flash() -> None:
+def test_timeline_focus_change_clears_selected_clip_flash() -> None:
     controls = _make_controls(("layer_1", "layer_2"), timeline_enabled=True)
     controls.session.timeline.panel_open = True
     controls.focus_cursor = TimelineFocus(0)
-    controls.session.timeline.selected_cue_t = {"layer_1": 10.0, "layer_2": 20.0}
-    controls.session.timeline.selected_cue_flash_start_ms = 1234
+    controls.session.timeline.selected_clip_t = {"layer_1": 10.0, "layer_2": 20.0}
+    controls.session.timeline.selected_clip_flash_start_ms = 1234
 
     controls.focus_cursor = TimelineFocus(1)
     assert controls.session.timeline.focus_row == 1
-    assert controls.session.timeline.selected_cue_t == {
+    assert controls.session.timeline.selected_clip_t == {
         "layer_1": 10.0,
         "layer_2": 20.0,
     }
-    assert controls.session.timeline.selected_cue_flash_start_ms is None
+    assert controls.session.timeline.selected_clip_flash_start_ms is None
 
-    controls.session.timeline.selected_cue_flash_start_ms = 5678
+    controls.session.timeline.selected_clip_flash_start_ms = 5678
     controls.focus_cursor = TimelineFocus(1)
-    assert controls.session.timeline.selected_cue_flash_start_ms == 5678
+    assert controls.session.timeline.selected_clip_flash_start_ms == 5678
 
 
 

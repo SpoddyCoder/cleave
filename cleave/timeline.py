@@ -108,28 +108,6 @@ def opening_cue(lane: TimelineLane) -> SlotCue | None:
     return SlotCue(t=0.0, level=float(lane.baseline))
 
 
-def cue_at_time(lane: TimelineLane, cue_t: float) -> SlotCue | None:
-    """Stored cue at ``cue_t``, or the synthetic opening cue when ``cue_t`` is 0."""
-    for cue in lane.cues:
-        if cue.t == cue_t:
-            return cue
-    if cue_t == 0.0:
-        return opening_cue(lane)
-    return None
-
-
-def navigable_cue_times(lane: TimelineLane) -> list[float]:
-    """Cue times eligible for ``,`` / ``.`` selection.
-
-    All stored cues are navigable (including offs). Includes ``0.0`` when the
-    opening period is on via baseline only.
-    """
-    times = [cue.t for cue in lane.cues]
-    if opening_baseline_editable(lane):
-        times.insert(0, 0.0)
-    return times
-
-
 def canonicalize(
     baseline: float | None,
     cues: Sequence[SlotCue],
@@ -544,27 +522,6 @@ def strip_lane_range(
     )
 
 
-def set_lane_cue(
-    lane: TimelineLane,
-    t: float,
-    level: float,
-) -> TimelineLane:
-    """Set or replace the transition at ``t``; canonicalize.
-
-    Replacing an existing cue keeps its ``blend``, ``role``, and ``cut``.
-    """
-    others = [cue for cue in lane.cues if cue.t != t]
-    existing = next((cue for cue in lane.cues if cue.t == t), None)
-    if existing is not None:
-        new_cue = replace(existing, level=level)
-    else:
-        new_cue = SlotCue(t=t, level=level)
-    return TimelineLane(
-        baseline=lane.baseline,
-        cues=canonicalize(lane.baseline, others + [new_cue]),
-    )
-
-
 def update_lane_cue(
     lane: TimelineLane,
     cue_t: float,
@@ -624,19 +581,6 @@ def update_lane_cue(
         baseline=lane.baseline,
         cues=canonicalize(lane.baseline, updated),
     )
-
-
-def remove_lane_cue(lane: TimelineLane, cue_t: float) -> TimelineLane:
-    """Remove the cue at ``cue_t``; canonicalize.
-
-    The synthetic opening cue (an on ``baseline`` with no cue at ``0.0``) is
-    removed by turning the baseline off. Neighbours that the removal makes
-    redundant drop out too.
-    """
-    if cue_t == 0.0 and opening_baseline_editable(lane):
-        return TimelineLane(baseline=0.0, cues=canonicalize(0.0, list(lane.cues)))
-    kept = [cue for cue in lane.cues if cue.t != cue_t]
-    return TimelineLane(baseline=lane.baseline, cues=canonicalize(lane.baseline, kept))
 
 
 def lane_last_on_level(lane: TimelineLane, t_sec: float) -> float:

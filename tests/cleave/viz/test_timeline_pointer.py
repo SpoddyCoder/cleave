@@ -32,8 +32,8 @@ class _Geometry:
 class _Actions:
     duration_sec = 100.0
 
-    def __init__(self, *, cue_hit: bool = False) -> None:
-        self.cue_hit = cue_hit
+    def __init__(self, *, clip_hit: bool = False) -> None:
+        self.clip_hit = clip_hit
         self.eye_usable = True
         self.calls: list[tuple] = []
 
@@ -43,14 +43,14 @@ class _Actions:
     def select_song_marker(self, index: int) -> None:
         self.calls.append(("marker", index))
 
-    def select_cue_near(self, slot: str, t_sec: float, tolerance_sec: float) -> bool:
-        self.calls.append(("select", slot, t_sec, tolerance_sec))
-        return self.cue_hit
+    def select_clip_at(self, slot: str, t_sec: float) -> bool:
+        self.calls.append(("select", slot, t_sec))
+        return self.clip_hit
 
     def seek_to(self, t_sec: float) -> None:
         self.calls.append(("seek", t_sec))
 
-    def add_cue_at(self, slot: str, t_sec: float) -> None:
+    def add_clip_at(self, slot: str, t_sec: float) -> None:
         self.calls.append(("add", slot, t_sec))
 
     def toggle_transport(self) -> None:
@@ -87,11 +87,11 @@ def _zoomed_view() -> StripView:
     return StripView(start_sec=40.0, span_sec=20.0)
 
 
-def test_press_on_cue_selects_and_does_not_scrub() -> None:
-    actions = _Actions(cue_hit=True)
+def test_press_on_clip_selects_and_does_not_scrub() -> None:
+    actions = _Actions(clip_hit=True)
     pointer = TimelinePointer(_Geometry(StripHit(1, 5.0, 0.2)), actions, _session())
     assert pointer.press(0, 0) is True
-    assert actions.calls == [("focus", 1), ("select", "layer_2", 5.0, 0.2)]
+    assert actions.calls == [("focus", 1), ("select", "layer_2", 5.0)]
     assert not pointer.scrubbing
 
 
@@ -107,7 +107,7 @@ def test_single_press_on_bar_selects_without_seeking() -> None:
     actions = _Actions()
     pointer = TimelinePointer(_Geometry(StripHit(0, 5.0, 0.2)), actions, _session())
     assert pointer.press(0, 0) is True
-    assert actions.calls == [("focus", 0), ("select", "layer_1", 5.0, 0.2)]
+    assert actions.calls == [("focus", 0), ("select", "layer_1", 5.0)]
     assert not pointer.scrubbing
     pointer.motion(100, 0)
     pointer.tick()
@@ -116,7 +116,7 @@ def test_single_press_on_bar_selects_without_seeking() -> None:
 
 def test_double_click_on_row_seeks_and_held_drag_scrubs() -> None:
     clock = _Clock()
-    actions = _Actions(cue_hit=True)
+    actions = _Actions(clip_hit=True)
     pointer = TimelinePointer(
         _Geometry(StripHit(0, 5.0, 0.2)), actions, _session(), clock=clock
     )
@@ -127,7 +127,7 @@ def test_double_click_on_row_seeks_and_held_drag_scrubs() -> None:
     pointer.press(12, 11)
     assert actions.calls == [
         ("focus", 0),
-        ("select", "layer_1", 5.0, 0.2),
+        ("select", "layer_1", 5.0),
         ("seek", 5.0),
     ]
     assert pointer.scrubbing
@@ -158,7 +158,7 @@ def test_slow_far_or_other_row_second_press_is_not_a_double_click() -> None:
     assert all(call[0] != "seek" for call in actions.calls)
 
 
-def test_double_click_away_from_a_cue_adds_one() -> None:
+def test_double_click_in_a_gap_adds_a_clip() -> None:
     clock = _Clock()
     actions = _Actions()
     pointer = TimelinePointer(
@@ -174,7 +174,7 @@ def test_double_click_away_from_a_cue_adds_one() -> None:
 
 
 @pytest.mark.parametrize("field", ["locked", "recording"])
-def test_double_click_seeks_where_cues_cannot_be_edited(field: str) -> None:
+def test_double_click_seeks_where_clips_cannot_be_edited(field: str) -> None:
     clock = _Clock()
     actions = _Actions()
     session = _session()
@@ -538,18 +538,18 @@ def test_context_menu_at_needs_a_layer_row() -> None:
     assert actions.calls == []
 
 
-def test_context_menu_at_focuses_the_row_and_selects_a_nearby_cue() -> None:
-    actions = _MenuActions(cue_hit=True)
+def test_context_menu_at_focuses_the_row_and_selects_a_clip_under_the_pointer() -> None:
+    actions = _MenuActions(clip_hit=True)
     session = _session()
     provider = TimelinePointer(
         _MenuGeometry(StripHit(1, 5.0, 0.2)), actions, session
     ).context_menu_at(0, 0)
     assert callable(provider)
-    assert actions.calls == [("focus", 1), ("select", "layer_2", 5.0, 0.2)]
+    assert actions.calls == [("focus", 1), ("select", "layer_2", 5.0)]
 
 
-def test_context_menu_at_on_a_label_selects_no_cue() -> None:
-    actions = _MenuActions(cue_hit=True)
+def test_context_menu_at_on_a_label_selects_no_clip() -> None:
+    actions = _MenuActions(clip_hit=True)
     provider = TimelinePointer(
         _MenuGeometry(StripHit(0, None, 0.2, target="label")), actions, _session()
     ).context_menu_at(0, 0)
@@ -592,7 +592,7 @@ def _row_slot_actions(**kwargs) -> _MenuActions:
     actions.row_arm_available = lambda row: True  # type: ignore[attr-defined]
     actions.toggle_override = lambda slot: None  # type: ignore[attr-defined]
     actions.release_all_overrides = lambda: None  # type: ignore[attr-defined]
-    actions.cue_editor = SimpleNamespace(session=_menu_session())  # type: ignore[attr-defined]
+    actions.clip_editor = SimpleNamespace(session=_menu_session())  # type: ignore[attr-defined]
     return actions
 
 
@@ -628,7 +628,7 @@ def test_ruler_buttons_and_scrollbar_have_no_menu() -> None:
         ).context_menu_at(0, 0) is None
 
 
-def test_row_away_from_a_cue_leads_with_time_items() -> None:
+def test_row_gap_leads_with_time_items() -> None:
     time_menu = _TimeMenu()
     provider = TimelinePointer(
         _MenuGeometry(StripHit(0, 5.0, 0.2)),
@@ -638,7 +638,7 @@ def test_row_away_from_a_cue_leads_with_time_items() -> None:
     ).context_menu_at(0, 0)
     assert provider is not None
     entries = provider()
-    assert entries[0].id == "timeline.cue.add"
+    assert entries[0].id == "timeline.clip.add"
     assert entries[1] is CONTEXT_SEPARATOR
     assert entries[2].id == "time.seek"
     assert entries[3] is CONTEXT_SEPARATOR
@@ -650,7 +650,7 @@ def test_row_on_a_cue_has_no_time_items() -> None:
     time_menu = _TimeMenu()
     provider = TimelinePointer(
         _MenuGeometry(StripHit(0, None, 0.2, target="label")),
-        _row_slot_actions(cue_hit=True),
+        _row_slot_actions(clip_hit=True),
         _menu_session(),
         time_menu=time_menu,
     ).context_menu_at(0, 0)
@@ -672,8 +672,8 @@ def test_ruler_press_on_a_marker_selects_it_and_seeks_to_it() -> None:
     assert pointer.scrubbing
 
 
-def test_row_press_on_a_cue_keeps_the_cue_over_a_marker() -> None:
-    actions = _Actions(cue_hit=True)
+def test_row_press_on_a_clip_keeps_the_clip_over_a_marker() -> None:
+    actions = _Actions(clip_hit=True)
     pointer = TimelinePointer(
         _Geometry(StripHit(0, 30.0, 0.2, marker_index=0)), actions, _session()
     )
@@ -681,7 +681,7 @@ def test_row_press_on_a_cue_keeps_the_cue_over_a_marker() -> None:
     assert ("marker", 0) not in actions.calls
 
 
-def test_row_press_on_a_marker_away_from_cues_selects_it() -> None:
+def test_row_press_on_a_marker_in_a_gap_selects_it() -> None:
     actions = _Actions()
     pointer = TimelinePointer(
         _Geometry(StripHit(0, 30.0, 0.2, marker_index=0)), actions, _session()
@@ -689,7 +689,7 @@ def test_row_press_on_a_marker_away_from_cues_selects_it() -> None:
     pointer.press(0, 0)
     assert actions.calls == [
         ("focus", 0),
-        ("select", "layer_1", 30.0, 0.2),
+        ("select", "layer_1", 30.0),
         ("marker", 0),
     ]
     assert not pointer.scrubbing

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from pathlib import Path
@@ -73,6 +74,7 @@ from cleave.config_schema.timeline import (
 )
 from cleave.preset_library import PresetLibrary
 from cleave.viz.session import FadeRuntime
+from cleave.viz.timeline_clip_edits import selected_clip
 from cleave.preset_playlist import (
     PresetPlaylist,
     preset_filename_display,
@@ -102,12 +104,7 @@ from cleave.timeline_presets.song_marker_snap import (
     DEFAULT_TIMELINE_PRESET_SONG_MARKER_SNAP,
     TimelinePresetSongMarkerSnap,
 )
-from cleave.timeline import (
-    SlotCue,
-    cue_at_time,
-    cue_editable_for_blend_role,
-    empty_lane,
-)
+from cleave.timeline import TimelineClip
 from cleave.timeline_presets.timeline_cuts import (
     DEFAULT_TIMELINE_PRESET_TIMELINE_CUTS,
     TimelinePresetTimelineCuts,
@@ -316,29 +313,20 @@ class TimelineBlock:
     locked: bool = DEFAULT_TIMELINE_LOCKED
     song_marker_times: tuple[float, ...] = ()
     song_marker_types: tuple[str, ...] = ()
-    # Selected strip cue per slot, for the timeline row inspector page.
-    selected_cues: dict[str, SlotCue] = field(default_factory=dict)
+    # Selected strip clip per slot, for the timeline row inspector page.
+    selected_clips: dict[str, TimelineClip] = field(default_factory=dict)
 
 
-def timeline_cue_kind(cue: SlotCue | None) -> str:
-    """``start`` for a cue that turns the layer on, ``end`` for one that turns it off."""
-    if cue is None:
-        return "none"
-    return "start" if cue_editable_for_blend_role(cue) else "end"
-
-
-def selected_timeline_cues(session: TuningSession) -> dict[str, SlotCue]:
-    """Each layer's selected strip cue, when that cue still exists."""
-    tl = session.timeline
-    cues: dict[str, SlotCue] = {}
+def selected_timeline_clips(
+    session: TuningSession, duration_sec: float
+) -> dict[str, TimelineClip]:
+    """Each layer's selected strip clip, when that clip still exists."""
+    clips: dict[str, TimelineClip] = {}
     for slot in session.layer_z_order:
-        cue_t = tl.selected_cue_t.get(slot)
-        if cue_t is None:
-            continue
-        cue = cue_at_time(tl.lanes.get(slot) or empty_lane(), cue_t)
-        if cue is not None:
-            cues[slot] = cue
-    return cues
+        clip = selected_clip(session, slot, duration_sec)
+        if clip is not None:
+            clips[slot] = clip
+    return clips
 
 
 @dataclass
@@ -446,6 +434,8 @@ class TuningViewState:
 def view_state_structure_signature(
     session: TuningSession,
     config_save: ConfigSaveController,
+    *,
+    duration_sec: float = math.inf,
 ) -> str:
     layers: dict[str, object] = {}
     for slot in session.layer_z_order:
@@ -514,11 +504,10 @@ def view_state_structure_signature(
             "song_marker_count": len(session.song_markers.times),
             "hard_cut_fades_enabled": tl.hard_cut_fades.enabled,
             "soft_cut_fades_enabled": tl.soft_cut_fades.enabled,
-            # Start or end cue per slot gates the timeline row page's cue rows.
-            "selected_cue_kinds": {
-                slot: timeline_cue_kind(cue)
-                for slot, cue in selected_timeline_cues(session).items()
-            },
+            # A selected clip gates the timeline row page's clip rows.
+            "selected_clip_slots": sorted(
+                selected_timeline_clips(session, duration_sec)
+            ),
         },
     }
     return json.dumps(payload, sort_keys=True, separators=(",", ":"))
@@ -831,7 +820,9 @@ class TuningViewStateBuilder:
             song_marker_types=tuple(
                 m.marker_type for m in self.session.song_markers.markers
             ),
-            selected_cues=selected_timeline_cues(self.session),
+            selected_clips=selected_timeline_clips(
+                self.session, self.duration_sec
+            ),
         )
         return _ViewStateStructure(
             signature=signature,
@@ -891,6 +882,7 @@ class TuningViewStateBuilder:
         signature = view_state_structure_signature(
             self.session,
             self._config_save,
+            duration_sec=self.duration_sec,
         )
         if self._structure is None or self._structure.signature != signature:
             self._structure = self._build_structure(
@@ -996,7 +988,9 @@ class TuningViewStateBuilder:
                 song_marker_types=tuple(
                     m.marker_type for m in self.session.song_markers.markers
                 ),
-                selected_cues=selected_timeline_cues(self.session),
+                selected_clips=selected_timeline_clips(
+                    self.session, self.duration_sec
+                ),
             ),
             settings=replace(
                 structure.settings,

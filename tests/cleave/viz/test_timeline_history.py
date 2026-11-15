@@ -17,7 +17,7 @@ def _lane(*times: float) -> TimelineLane:
 def _session() -> SimpleNamespace:
     return SimpleNamespace(
         timeline=SimpleNamespace(
-            lanes={"layer_1": _lane(1.0)}, enabled=True, selected_cue_t={}
+            lanes={"layer_1": _lane(1.0)}, enabled=True, selected_clip_t={}
         ),
         layers={"layer_1": SimpleNamespace(preset_list=["a.milk"])},
         pattern_mask=SimpleNamespace(
@@ -215,13 +215,13 @@ def test_cancel_drops_the_pending_edit() -> None:
 def test_undo_restores_the_selection_but_selection_alone_is_no_edit() -> None:
     session = _session()
     history = TimelineHistory(session)
-    session.timeline.selected_cue_t = {"layer_1": 1.0}
+    session.timeline.selected_clip_t = {"layer_1": 1.0}
     with history.recording("Move cue"):
         session.timeline.lanes["layer_1"] = _lane(2.0)
-        session.timeline.selected_cue_t = {"layer_1": 2.0}
+        session.timeline.selected_clip_t = {"layer_1": 2.0}
     with history.recording("Select"):
-        session.timeline.selected_cue_t = {}
+        session.timeline.selected_clip_t = {}
     assert history.undo() == "Move cue"
-    assert session.timeline.selected_cue_t == {"layer_1": 1.0}
+    assert session.timeline.selected_clip_t == {"layer_1": 1.0}
     assert history.redo() == "Move cue"
-    assert session.timeline.selected_cue_t == {"layer_1": 2.0}
+    assert session.timeline.selected_clip_t == {"layer_1": 2.0}

@@ -319,7 +319,7 @@ def timeline_strip_section(
     layer_keys = _layer_key_range_label(layer_count)
     entries: list[tuple[str, str]] = [("A", "arm / disarm row for recording")]
 
-    entries.append(("Right-click row", "row options; on a cue, cue options too"))
+    entries.append(("Right-click row", "row options; on a clip, clip options too"))
     entries.append(("Shift + F10 / Menu", "row options for the focused row"))
 
     if not recording:
@@ -350,10 +350,10 @@ def timeline_strip_section(
     else:
         entries.extend(
             (
-                ("Left/Right", "previous / next cue"),
-                ("Enter", "seek to cue"),
-                ("Click row", "select row / cue"),
-                ("Dbl-click row", "add cue; on a cue, seek"),
+                ("Left/Right", "previous / next clip"),
+                ("Enter", "seek to clip start"),
+                ("Click row", "select row / clip"),
+                ("Dbl-click row", "add clip; on a clip, seek"),
                 ("Click/Drag ruler", "seek / scrub"),
             )
         )
@@ -368,12 +368,13 @@ def timeline_strip_section(
     if not recording:
         entries.extend(
             (
-                (", / .", "nudge cue opacity -/+ 1%"),
-                ("Ctrl + , / .", "nudge cue opacity -/+ 10%"),
-                ("B", "cycle cue blend"),
-                ("C", "cycle cue cut type"),
-                ("O", "cycle cue role"),
-                ("Delete", "delete cue"),
+                (", / .", "nudge clip opacity -/+ 1%"),
+                ("Ctrl + , / .", "nudge clip opacity -/+ 10%"),
+                ("B", "cycle clip blend"),
+                ("O", "cycle clip role"),
+                ("C / Shift + C", "cycle clip cut in / cut out"),
+                ("Ctrl + K", "split clip at playhead"),
+                ("Delete", "delete clip"),
             )
         )
 
