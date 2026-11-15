@@ -545,7 +545,7 @@ class GlPostProcess:
             )
             raw = grid_buffers.fbo.read(components=1, alignment=1, dtype="f4")
         finally:
-            restore_gl_state(saved)
+            restore_gl_state(saved, self._ctx)
             _prepare_fixed_function_gl()
 
         grid = np.frombuffer(raw, dtype=np.float32).reshape((grid_height, grid_width))
@@ -615,7 +615,7 @@ class GlPostProcess:
             self._composite_prog["hdr"].value = self._color_format is RGBA16F
             self._quad_vao_for(self._composite_prog).render(moderngl.TRIANGLE_STRIP)
         finally:
-            restore_gl_state(saved)
+            restore_gl_state(saved, self._ctx)
             _prepare_fixed_function_gl()
 
         return texture_id
@@ -658,7 +658,7 @@ class GlPostProcess:
                 },
             )
         finally:
-            restore_gl_state(saved)
+            restore_gl_state(saved, self._ctx)
             _prepare_fixed_function_gl()
 
         return texture_id
@@ -684,7 +684,7 @@ class GlPostProcess:
             dest_fbo = self._dest_fbo_for(dest_texture_id, width, height)
             self._draw_quad(self._copy_prog, dest_fbo, texture=src)
         finally:
-            restore_gl_state(saved)
+            restore_gl_state(saved, self._ctx)
             _prepare_fixed_function_gl()
 
     def apply_highlight_rolloff(
@@ -736,7 +736,7 @@ class GlPostProcess:
                 },
             )
         finally:
-            restore_gl_state(saved)
+            restore_gl_state(saved, self._ctx)
             _prepare_fixed_function_gl()
 
         return texture_id
@@ -780,7 +780,7 @@ class GlPostProcess:
                 },
             )
         finally:
-            restore_gl_state(saved)
+            restore_gl_state(saved, self._ctx)
             _prepare_fixed_function_gl()
 
         return texture_id

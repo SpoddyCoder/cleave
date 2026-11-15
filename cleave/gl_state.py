@@ -118,10 +118,29 @@ def save_gl_state() -> SavedGlState:
     )
 
 
+def forget_moderngl_framebuffer(ctx: moderngl.Context) -> None:
+    """Point *ctx*'s bound-framebuffer record at the screen.
+
+    moderngl remembers the framebuffer it last used and re-binds it whenever it
+    creates a framebuffer. Releasing that framebuffer, or deleting a GL
+    framebuffer it wraps, does not clear the record, so the next creation binds
+    a deleted name: GL_INVALID_OPERATION on Windows drivers (Mesa allows it).
+    The record only matters inside a draw batch, so clear it when one ends.
+    """
+    screen = ctx.screen
+    if screen is None:
+        return
+    ctx.fbo = screen
+    ctx.mglo.fbo = screen.mglo
+
+
 def restore_gl_state(
     state: SavedGlState,
     ctx: moderngl.Context | None = None,
 ) -> None:
+    """Restore *state*. With *ctx*, also clear moderngl's framebuffer record."""
+    if ctx is not None:
+        forget_moderngl_framebuffer(ctx)
     glBindFramebuffer(GL_FRAMEBUFFER, state.framebuffer)
     glBindFramebuffer(GL_READ_FRAMEBUFFER, state.read_framebuffer)
     glReadBuffer(state.read_buffer)
