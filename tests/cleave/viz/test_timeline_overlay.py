@@ -1108,7 +1108,7 @@ def test_bar_without_high_water_mark_behaves_as_before() -> None:
     assert _bar_visible_at(state, slot, 30.0) is True
 
 
-def test_draw_with_selected_cue_and_role_does_not_crash() -> None:
+def test_draw_with_selected_clip_and_role_does_not_crash() -> None:
     pygame.init()
     overlay = TimelineOverlay()
     state = _view_state(
