@@ -25,6 +25,12 @@ WeightProgress = Callable[[str, float | None], None]
 _DEMUCS_CHECKPOINT_MB = 80
 _BEAT_THIS_CHECKPOINT_MB = 78
 _DEMUCS_ROOT_URL = "https://dl.fbaipublicfiles.com/demucs/"
+# Cleave's own copy of the MIT-licensed Demucs weights, tried before Meta's
+# server. Files keep their upstream names, whose hash prefix torch hub checks.
+_DEMUCS_MIRROR_URL = (
+    "https://github.com/SpoddyCoder/cleave-resources/releases/download/"
+    "demucs-hybrid-transformer-v1"
+)
 # Matches ``beat_this.inference.CHECKPOINT_URL`` (beat_this 1.1.0); do not import
 # that module here (it pulls torch).
 _BEAT_THIS_CHECKPOINT_URL = (
@@ -171,7 +177,7 @@ def demucs_weight_spec(model: str) -> WeightSpec:
         files.append(
             WeightFile(
                 filename=filename,
-                urls=(url,),
+                urls=(f"{_DEMUCS_MIRROR_URL}/{filename}", url),
                 hash_prefix=_hub_hash_prefix(filename),
             )
         )

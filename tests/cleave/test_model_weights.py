@@ -69,8 +69,13 @@ def test_demucs_htdemucs_spec_matches_installed_repo() -> None:
     assert spec.size_hint == "~80 MB"
     assert len(spec.files) == 1
     assert spec.files[0].filename == "955717e8-8726e21a.th"
-    assert len(spec.files[0].urls) == 1
-    assert spec.files[0].urls[0].endswith("hybrid_transformer/955717e8-8726e21a.th")
+    mirror, upstream = spec.files[0].urls
+    assert mirror == (
+        "https://github.com/SpoddyCoder/cleave-resources/releases/download/"
+        "demucs-hybrid-transformer-v1/955717e8-8726e21a.th"
+    )
+    assert upstream.startswith("https://dl.fbaipublicfiles.com/demucs/")
+    assert upstream.endswith("hybrid_transformer/955717e8-8726e21a.th")
     assert spec.files[0].hash_prefix == "8726e21a"
 
 

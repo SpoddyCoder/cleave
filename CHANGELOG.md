@@ -140,7 +140,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
-- The first separate no longer fails when the Beat This model host refuses the download. Cleave fetches the beat-tracking weights from its own GitHub release first, checks them against a fixed hash, and falls back to the original host.
+- The first separate no longer fails when the Beat This model host refuses the download. Cleave fetches the beat-tracking weights from its own GitHub release first, checks them against a fixed hash, and falls back to the original host. The Demucs stem-split weights also come from Cleave's release first, with Meta's server as the fallback.
 - The help column no longer lists Esc as "hide UI", which did nothing; Esc now leaves Play Full Screen.
 - Moving from one menu bar title to another no longer flashes the new dropdown at the previous menu's size before it fits its own items.
 - Opening a menu-bar menu closes an open right-click menu, so the two never show at once.
