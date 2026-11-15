@@ -1342,6 +1342,7 @@ def _shell_controls() -> SimpleNamespace:
         context_menu=ContextMenuState(),
         transport=MagicMock(),
         cfg=SimpleNamespace(project_slug="song"),
+        config_dirty=False,
     )
 
 

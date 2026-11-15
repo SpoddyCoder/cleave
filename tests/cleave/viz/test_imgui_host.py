@@ -30,6 +30,7 @@ def _open_shell(menu: MenuBarState):
         session=SimpleNamespace(layer_z_order=()),
         disarm_value_nudge=MagicMock(),
         cfg=SimpleNamespace(project_slug="song"),
+        config_dirty=False,
     )
     return ShellHost(
         ImGuiHost.create(),

@@ -1017,6 +1017,7 @@ def test_help_column_draws_the_subject_stop() -> None:
     menu.focused = True
     controls = SimpleNamespace(
         cfg=SimpleNamespace(project_slug="song"),
+        config_dirty=False,
         session=SimpleNamespace(
             layer_z_order=(),
             help_visible=True,

@@ -85,6 +85,7 @@ def _host() -> Iterator[object]:
 
     controls = SimpleNamespace(
         cfg=SimpleNamespace(project_slug="song"),
+        config_dirty=False,
         session=SimpleNamespace(
             layer_z_order=(),
             help_visible=False,
