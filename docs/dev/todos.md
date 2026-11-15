@@ -8,6 +8,8 @@ Must-do items for Cleave. Everything else is iterative enhancements or listed in
 
 Outstanding bugs and issues.
 
+- **First-run setup modals skip the new UI framework.** The startup modals (for example "No Milkdrop presets found") are keyboard-only and use the old styling. Rebuild them on the ImGui shell: mouse enabled, with the shared modal styles and action buttons.
+
 ---
 
 ## Backlog
@@ -22,6 +24,7 @@ In priority order. The ImGui shell refactor is done; its plans, design page, and
    - Decide how single cue edits record in `TimelineHistory`. Today any hand edit turns undo off.
    - Fold in "Record still writes 0/1" below.
 3. **Performance review and remediations.** Profile the editor at large and maximised window sizes and fix what grows with window area. Start from [plans/large-window-performance-plan.md](plans/large-window-performance-plan.md): the timeline strip's full-width CPU redraw every frame is measured, and the rest needs profiling on Windows. Include the PyInstaller freeze smoke test of the shell (menus, context menus, Menu key, high DPI, UI scale 200%).
+4. **"Welcome to Cleave" first-time setup.** Collect every first-run download (Demucs and Beat This model weights, Milkdrop presets) into one welcome step instead of separate prompts. Show each download's named status and progress in the window, and report failures in the same step.
 
 ---
 
