@@ -1437,6 +1437,24 @@ def test_arrows_select_then_step_clips() -> None:
     assert session.timeline.selected_clip_flash_start_ms == at_start_flash
 
 
+def test_new_clip_selection_bumps_title_swipe_serial() -> None:
+    lanes = {
+        "layer_1": _lane(False, (4.0, True), (10.0, False), (16.0, True)),
+    }
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        lanes=lanes,
+        position_sec=2.0,
+    )
+    tl = session.timeline
+    assert tl.selected_clip_serial == 0
+    controls.handle_keydown(keydown(pygame.K_RIGHT))
+    controls.handle_keydown(keydown(pygame.K_RIGHT))
+    assert tl.selected_clip_serial == 2
+    # Stepping past the last clip keeps the selection, so no new swipe.
+    controls.handle_keydown(keydown(pygame.K_RIGHT))
+    assert tl.selected_clip_serial == 2
+
+
 def test_arrows_keep_mid_on_level_changes() -> None:
     lanes = {
         "layer_1": TimelineLane(

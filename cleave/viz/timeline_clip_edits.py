@@ -127,12 +127,13 @@ def selected_clip(
 
 
 def select_clip(session: TuningSession, slot: str, start: float) -> None:
-    """Select the clip starting at *start* on *slot* and start its flash."""
+    """Select the clip at *start* on *slot*; start its flash and title swipe."""
     tl = session.timeline
     if tl.selected_clip_t.get(slot) == start:
         return
     tl.selected_clip_t[slot] = start
     tl.selected_clip_flash_start_ms = pygame.time.get_ticks()
+    tl.selected_clip_serial += 1
 
 
 def deselect_clip(session: TuningSession, slot: str) -> None:

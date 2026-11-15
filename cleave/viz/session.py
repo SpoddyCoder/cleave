@@ -344,6 +344,9 @@ class TimelineRuntime:
     arm_flash_start_ms: dict[str, int] = field(default_factory=dict)
     selected_clip_t: dict[str, float] = field(default_factory=dict)
     selected_clip_flash_start_ms: int | None = None
+    # Bumped on each new clip selection so the inspector title swipes. Not
+    # persisted.
+    selected_clip_serial: int = 0
     # Strip control under the mouse: (target, row). Row is None for the
     # corner buttons. Not persisted.
     strip_hover: tuple[str, int | None] | None = None

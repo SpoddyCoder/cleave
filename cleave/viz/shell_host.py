@@ -2622,9 +2622,14 @@ class ShellHost:
             if row_slot is None
             else timeline_row_title(self._controls.session, row_slot)
         )
+        # A new clip on the same strip row is new content, so it swipes too.
+        clip_serial = self._controls.session.timeline.selected_clip_serial
+        attention_key = (
+            focus.selected_id if row_slot is None else (focus.selected_id, clip_serial)
+        )
         # With the highlight off, the title draws as if its swipe has ended.
         elapsed = (
-            self._title_attention.elapsed(focus.selected_id)
+            self._title_attention.elapsed(attention_key)
             if self._controls.cfg.editor.highlight_new_page
             else math.inf
         )
