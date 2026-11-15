@@ -126,9 +126,9 @@ REC_FLASH_MS: int = 500
 PLAYHEAD_FLASH_MS: int = 400
 ARM_FLASH_HALF_MS: int = 150
 ARM_FLASH_DURATION_MS: int = ARM_FLASH_HALF_MS * 4
-# Selected-clip flash: same blink cadence as arm flash, held for 3s.
+# Selected-clip flash: same blink cadence as arm flash, two flashes.
 SELECTED_CLIP_FLASH_HALF_MS: int = ARM_FLASH_HALF_MS
-SELECTED_CLIP_FLASH_DURATION_MS: int = 3000
+SELECTED_CLIP_FLASH_DURATION_MS: int = SELECTED_CLIP_FLASH_HALF_MS * 4
 # Settled selected outline (HIGHLIGHT yellow); the flash pulses yellow/red.
 SELECTED_CLIP_COLOR: tuple[int, int, int] = HIGHLIGHT
 SELECTED_CLIP_FLASH_YELLOW: tuple[int, int, int] = HIGHLIGHT
