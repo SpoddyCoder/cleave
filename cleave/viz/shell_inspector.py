@@ -304,13 +304,21 @@ def inspector_row_stepped(state: object, desc: RowDescriptor) -> bool:
     )
 
 
+def _divider_height() -> float:
+    return imgui.get_text_line_height() * _INSPECTOR_DIVIDER_LINES
+
+
+def _divider_rule_y(top_y: float) -> float:
+    """Pixel row of the rule in a divider whose space starts at *top_y*."""
+    return float(int(top_y + _divider_height() * 0.5))
+
+
 def _draw_inspector_divider() -> None:
     """Thin rule across the inspector, shorter than a row; takes no input."""
-    height = imgui.get_text_line_height() * _INSPECTOR_DIVIDER_LINES
     origin = imgui.get_cursor_screen_pos()
     x1 = origin.x + imgui.get_content_region_avail().x
-    stroke_h_rule(origin.x, x1, float(int(origin.y + height * 0.5)), INSPECTOR_DIVIDER)
-    imgui.dummy(imgui.ImVec2(0.0, height))
+    stroke_h_rule(origin.x, x1, _divider_rule_y(origin.y), INSPECTOR_DIVIDER)
+    imgui.dummy(imgui.ImVec2(0.0, _divider_height()))
 
 
 def _button_text_role(
@@ -433,9 +441,14 @@ class InspectorPanel:
             if self._ctx.controls.cfg.editor.highlight_new_page
             else math.inf
         )
+        # The title line takes one text line, then the divider's space starts.
+        title_y = imgui.get_cursor_screen_pos().y
         pressed = draw_inspector_title(
             title,
             elapsed,
+            _divider_rule_y(
+                title_y + imgui.get_text_line_height() + imgui.get_style().item_spacing.y
+            ),
             page_status_marks(self._page_status),
             self._page_history_buttons(frame.command_ctx),
         )

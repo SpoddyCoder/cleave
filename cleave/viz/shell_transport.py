@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 from imgui_bundle import imgui
@@ -140,9 +141,16 @@ def transport_notice(active: PanelNotificationActive) -> TransportNotice | None:
     return None
 
 
-def transport_content_pad_y(window_height: float, line_height: float) -> float:
-    """Vertical padding that centers one text line inside the transport bar."""
-    return max(0.0, (float(window_height) - float(line_height)) * 0.5)
+def transport_content_pad_y(
+    window_height: float, line_height: float, rule_px: float
+) -> float:
+    """Top padding that centres one text line between the bar's top and its rule.
+
+    The bottom rule fills the bar's last *rule_px* rows, so the line centres
+    in the rows above it, on a whole pixel.
+    """
+    spare = float(window_height) - float(rule_px) - float(line_height)
+    return float(max(0, math.floor(spare * 0.5)))
 
 
 def _draw_transport_notice(

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Callable, Collection, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -124,14 +125,17 @@ class TitleButton:
 def draw_inspector_title(
     title: str,
     elapsed_sec: float,
+    rule_y: float,
     marks: Sequence[tuple[str, tuple[int, int, int], str]] = (),
     buttons: Sequence[TitleButton] = (),
 ) -> str | None:
     """Inspector page title, with the toast's accent swipe behind it.
 
     *marks* (coloured icons with a tooltip) and then *buttons* sit flush
-    right on the title line. The bar starts inset from the panel edge by the
-    gap above it and is one text row tall. It and the title stop a space short
+    right on the title line. The bar is one padded row tall and centres
+    between the panel's top border and the divider rule on pixel row
+    *rule_y*, so the title and its icons do too. It starts inset from the
+    panel edge by the gap above it. It and the title stop a space short
     of the icons. A title wider than its room waits, scrolls to its last
     words, pauses, then snaps back to its start, cut at its right edge, as
     the bar slides off. Returns the id of a pressed, enabled button.
@@ -139,7 +143,6 @@ def draw_inspector_title(
     start = imgui.get_cursor_screen_pos()
     avail = max(0.0, imgui.get_content_region_avail().x)
     line_h = imgui.get_text_line_height()
-    style = imgui.get_style()
     space_w = imgui.calc_text_size(" ").x
     title_room, slot_xs = inspector_title_cluster(
         avail, len(marks) + len(buttons), row_band_side(), icon_gap(), space_w
@@ -148,14 +151,17 @@ def draw_inspector_title(
     imgui.dummy(imgui.ImVec2(title_room, line_h))
     win_pos = imgui.get_window_pos()
     win_size = imgui.get_window_size()
-    border = PANEL_BORDER_PX
     # The bar is a row's highlight band, so the title's icons match the rows'.
-    band = row_band(start.y)
+    # An odd spare pixel goes below it.
+    free_y = win_pos.y + PANEL_BORDER_PX
+    side = row_band_side()
+    bar_top = free_y + max(0.0, math.floor((rule_y - free_y - side) * 0.5))
+    text_y = bar_top + (side - line_h) * 0.5
+    band = row_band(text_y)
     bar_y0, bar_y1 = band
     # The blank gap above the bar, inside the panel border, repeats at the
     # bar's left end.
-    inset = border + max(0.0, style.window_padding.y - (start.y - bar_y0) - border)
-    bar_x0 = win_pos.x + inset
+    bar_x0 = win_pos.x + (bar_y0 - win_pos.y)
     bar_x1 = start.x + title_room + space_w * 0.5
     overflow = title_w - title_room
     scroll_sec = attention_scroll_sec(overflow, space_w)
@@ -192,7 +198,7 @@ def draw_inspector_title(
         True,
     )
     try:
-        draw.add_text(imgui.ImVec2(start.x - offset, start.y), color, title)
+        draw.add_text(imgui.ImVec2(start.x - offset, text_y), color, title)
     finally:
         draw.pop_clip_rect()
     for index, ((glyph, role, tooltip), slot_x) in enumerate(zip(marks, slot_xs)):

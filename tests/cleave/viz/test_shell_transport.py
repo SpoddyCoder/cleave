@@ -100,6 +100,8 @@ def test_panel_border_overlap_shares_one_row() -> None:
     assert panel_border_overlap_px(0.0) == 0
 
 
-def test_transport_content_pad_centers_one_line() -> None:
-    assert transport_content_pad_y(23.0, 17.0) == 3.0
-    assert transport_content_pad_y(10.0, 17.0) == 0.0
+def test_transport_content_pad_centers_one_line_above_the_rule() -> None:
+    assert transport_content_pad_y(23.0, 17.0, 0.0) == 3.0
+    assert transport_content_pad_y(25.0, 17.0, 2.0) == 3.0
+    assert transport_content_pad_y(24.0, 17.0, 2.0) == 2.0
+    assert transport_content_pad_y(10.0, 17.0, 2.0) == 0.0

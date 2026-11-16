@@ -165,6 +165,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- The transport bar's play state, clock, and bar centre between the menu rule and the rule below, the navigator rows centre between its top and bottom borders, and the inspector title line, with its icons and Back and Forward arrows, centres between the panel's top border and the rule below it. Each sat a pixel or so off.
 - The inspector's title line, with its breadcrumb and Back and Forward arrows, stays at the top of the panel while a long page scrolls, and the scrollbar runs beside the rows only.
 - The editor no longer slows down as layers gain preset list entries. It was rechecking for unsaved changes several times a frame, reading the disk for every preset each time; it now checks once a frame without touching the disk.
 - Icon buttons now share one size and alignment everywhere. Their hover and lit squares fill the row's highlight band, with the icon centred: the navigator's arrows and on, solo, lock, and add icons, the inspector title's arrows, row icons, reorder handles, stepper arrows, the transport bar, and the timeline strip's row buttons. Solo and lock no longer light a smaller square than the arrow beside them.

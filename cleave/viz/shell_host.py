@@ -575,7 +575,7 @@ class ShellHost:
         overlap = panel_border_overlap_px(PANEL_BORDER_PX)
         try:
             pad_y = transport_content_pad_y(
-                layout.transport[3], imgui.get_text_line_height()
+                layout.transport[3], imgui.get_text_line_height(), PANEL_BORDER_PX
             )
             imgui.push_style_var(
                 imgui.StyleVar_.window_padding,

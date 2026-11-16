@@ -245,7 +245,9 @@ def _navigator_content_height_px() -> int:
     """Outer height of the navigator list just drawn in the current window.
 
     The cursor sits one item-spacing past the last row. Adding the bottom
-    padding and border matches the window size that fits the rows. Scroll is
+    padding matches the window size that fits the rows. The top border sits
+    inside the top padding, so the bottom border sits inside the bottom
+    padding too and the rows centre between the two. Scroll is
     already included in the cursor, so a clipped list still reports its full
     height for the next frame.
     """
@@ -255,11 +257,7 @@ def _navigator_content_height_px() -> int:
     content_bottom = cursor_y - spacing_y
     if content_bottom < 0.0:
         content_bottom = cursor_y
-    outer = (
-        content_bottom
-        + float(style.window_padding.y)
-        + float(style.window_border_size)
-    )
+    outer = content_bottom + float(style.window_padding.y)
     return max(1, int(round(outer)))
 
 
@@ -311,7 +309,7 @@ def navigator_height_for_rows(
 
     The window is sized a frame after the rows change, so the tree is
     resized from the last measurement to avoid one frame of overflow, which
-    draws a scrollbar. *chrome_px* is the window padding top and bottom plus border and
+    draws a scrollbar. *chrome_px* is the window padding top and bottom and
     *spacing_px* the gap between rows. Rows are uniform.
     """
     if measured_px <= 0 or measured_rows <= 0 or rows == measured_rows:
@@ -413,8 +411,7 @@ class NavigatorPanel:
             self._content_height_px,
             self._measured_rows,
             len(self.visible_nodes()),
-            chrome_px=2.0 * float(style.window_padding.y)
-            + float(style.window_border_size),
+            chrome_px=2.0 * float(style.window_padding.y),
             spacing_px=padded_row_spacing_y(),
         )
 
