@@ -4,6 +4,7 @@ Typography roles for the live tuning overlay:
   LABEL    — light blue text for row labels and prefixes
   VALUE    — white text for values and state indicators (default)
   DISABLED — dimmed text when a row or control is inactive
+  DISABLED_MUTED — an unchosen option on a control whose page is switched off
   MUTED    — muted blue-grey text (#9ba6bc)
   LOCKED   — tinted text for locked sub-rows that cannot be edited
 
@@ -16,6 +17,7 @@ Buttons (fills, not text roles):
   BUTTON_BG, BUTTON_HOVER_BG, BUTTON_ACTIVE_BG, BUTTON_BORDER - every panel button,
     segment, combo box, and open combo list
   BUTTON_PRIMARY_BG - the confirm button of a dialog, and a selected segment
+  BUTTON_PRIMARY_DIMMED_BG - a selected segment on a row whose page is switched off
   BUTTON_DANGER_BG - the confirm button of a destructive dialog
   NAV_ON_BG, SOLO_BG, NAV_LOCK_BG - lit navigator on, solo, and lock icons
     (NAV_LOCK_GLYPH is the dark lock icon on its amber fill)
@@ -216,6 +218,7 @@ LABEL: tuple[int, int, int] = (170, 210, 255)
 HOVER: tuple[int, int, int] = (170, 210, 255)
 VALUE: tuple[int, int, int] = (255, 255, 255)
 DISABLED: tuple[int, int, int] = (140, 140, 140)
+DISABLED_MUTED: tuple[int, int, int] = (100, 104, 112)
 MUTED: tuple[int, int, int] = (155, 166, 188)
 HIGHLIGHT: tuple[int, int, int] = (255, 235, 130)
 ERROR_NOTIFICATION: tuple[int, int, int] = (255, 140, 140)
@@ -238,6 +241,7 @@ BUTTON_HOVER_BG: tuple[int, int, int] = (64, 72, 88)
 BUTTON_ACTIVE_BG: tuple[int, int, int] = (80, 90, 110)
 BUTTON_BORDER: tuple[int, int, int] = (85, 95, 115)
 BUTTON_PRIMARY_BG: tuple[int, int, int] = (45, 85, 150)
+BUTTON_PRIMARY_DIMMED_BG: tuple[int, int, int] = (62, 72, 92)
 BUTTON_DANGER_BG: tuple[int, int, int] = SOLO_BG
 OVERRIDE_GLYPH: tuple[int, int, int] = (0, 0, 0)
 OVERRIDE_GLYPH_OFF: tuple[int, int, int] = DISABLED

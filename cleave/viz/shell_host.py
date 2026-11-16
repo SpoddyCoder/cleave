@@ -70,6 +70,7 @@ from cleave.viz.navigator import (
     build_navigator,
     navigator_row_text_color,
     navigator_tree_rails,
+    page_switched_off,
     timeline_row_slot_of,
     timeline_row_title,
 )
@@ -476,6 +477,9 @@ def selection_after_nav_collapse(
     ):
         return selected_id
     return toggled_id
+
+
+PAGE_OFF_SUFFIX = " (disabled)"
 
 
 def inspector_title(nodes: Sequence[NavNode], selected_id: str) -> str:
@@ -1332,11 +1336,16 @@ def selectable_wash() -> tuple[imgui.ImVec4, imgui.ImVec4]:
     return fill, fill
 
 
-def _button_text_role(enabled: bool, locked: bool) -> tuple[int, int, int]:
-    """Button label colour. A section lock reads as locked, not as disabled."""
+def _button_text_role(
+    enabled: bool, locked: bool, *, page_off: bool
+) -> tuple[int, int, int]:
+    """Button label colour. A section lock reads as locked, not as disabled.
+
+    A button on a switched-off page still runs, but greys like its rows.
+    """
     if locked:
         return LOCKED
-    return VALUE if enabled else DISABLED
+    return VALUE if enabled and not page_off else DISABLED
 
 
 def _hand_on_hover() -> None:
@@ -1438,6 +1447,8 @@ class ShellHost:
         # This frame's segment or combo rect for each choice row; an open list
         # hangs from its row's rect.
         self._choice_rects: dict[RowDescriptor, tuple[int, int, int, int]] = {}
+        # The inspector page's on/off switch, or a parent's, is off.
+        self._page_off = False
         self._choice_list_rows: tuple[tuple[int, int, int, int], ...] = ()
         # Widest value each stepped row has shown, in characters, so its arrows
         # hold still as the number changes. The shell font is monospace.
@@ -2666,6 +2677,9 @@ class ShellHost:
             if row_slot is None
             else timeline_row_title(self._controls.session, row_slot)
         )
+        self._page_off = page_switched_off(self._controls.session, focus.selected_id)
+        if self._page_off:
+            title += PAGE_OFF_SUFFIX
         # A new clip on the same strip row is new content, so it swipes too.
         clip_serial = self._controls.session.timeline.selected_clip_serial
         attention_key = (
@@ -2766,6 +2780,7 @@ class ShellHost:
                     labels,
                     value,
                     enabled=stepped,
+                    dimmed=value_color == DISABLED,
                     activated=activated,
                     after_label=label if list_item else None,
                 )
@@ -3328,6 +3343,7 @@ class ShellHost:
         value: str,
         *,
         enabled: bool,
+        dimmed: bool,
         activated: bool,
         after_label: str | None = None,
     ) -> None:
@@ -3381,6 +3397,7 @@ class ShellHost:
                 y=rect[1],
                 height=rect[3],
                 enabled=enabled,
+                dimmed=dimmed,
                 hover=hover,
                 hand=hand,
             )
@@ -3398,6 +3415,7 @@ class ShellHost:
                 rect=rect,
                 open_=open_here,
                 enabled=enabled,
+                dimmed=dimmed,
                 hover=hover,
                 hand=hand,
             )
@@ -3498,6 +3516,7 @@ class ShellHost:
                 text_role=_button_text_role(
                     enabled,
                     inspector_command_locked(self._controls, command_id),
+                    page_off=self._page_off,
                 ),
                 selected=selected,
                 enabled=enabled,

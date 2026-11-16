@@ -26,8 +26,10 @@ from cleave.viz.navigator import (
     navigator_row_bright,
     navigator_row_text_color,
     navigator_tree_rails,
+    page_switched_off,
     parent_id_of,
     root_id,
+    timeline_row_node_id,
     visible_top_level_ids,
 )
 from cleave.viz.session import LayerRuntime, TuningSession
@@ -529,3 +531,29 @@ def test_layer_rows_are_draggable_unless_locked() -> None:
     assert rows["layer_1"].drag_blocked is False
     assert rows["layer_2"].drag_blocked is True
     assert not any(node.draggable for node in nodes if node.parent_id != "layers")
+
+
+def test_page_switched_off_follows_its_own_and_parent_switches() -> None:
+    session = TuningSession(
+        layer_z_order=["layer_1"],
+        layers={"layer_1": _layer("drums", enabled=False)},
+    )
+    compositing = layer_page_node_id("layer_1", "compositing")
+    # The timeline owns layer visibility, so the layer's switch does not count.
+    assert page_switched_off(session, compositing) is False
+    session.timeline.enabled = False
+    assert page_switched_off(session, layer_node_id("layer_1")) is True
+    assert page_switched_off(session, compositing) is True
+    assert page_switched_off(session, timeline_row_node_id("layer_1")) is True
+    assert page_switched_off(session, "timeline.grid") is True
+
+    assert page_switched_off(session, "post_fx.fade") is False
+    session.post_fx.enabled = False
+    assert page_switched_off(session, "post_fx") is True
+    assert page_switched_off(session, "post_fx.fade") is True
+
+    session.overlays.opening_card.enabled = False
+    assert page_switched_off(session, "overlay") is False
+    assert page_switched_off(session, "overlay.opening_card") is True
+    assert page_switched_off(session, "overlay.closing_card") is False
+    assert page_switched_off(session, "settings.ui") is False

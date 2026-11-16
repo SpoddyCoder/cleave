@@ -236,6 +236,24 @@ def build_navigator(
     return tuple(nodes)
 
 
+def page_switched_off(session: TuningSession, node_id: str) -> bool:
+    """True when *node_id* or a parent that owns it has its on/off icon off.
+
+    A timeline row page follows Timeline. An inert switch (layer visibility
+    while the timeline owns it) does not count, and config pages have none.
+    """
+    if timeline_row_slot_of(node_id) is not None:
+        return not session.timeline.enabled
+    chain = {node_id} | ancestor_ids(node_id)
+    nodes = build_navigator(session, chain)
+    return any(
+        toggle.id == TOGGLE_ENABLED and not toggle.active and not toggle.inert
+        for node in nodes
+        if node.id in chain
+        for toggle in node.toggles
+    )
+
+
 def navigator_row_bright(node: NavNode) -> bool:
     """True for rows drawn in the value colour: roots and the layer rows."""
     return node.depth == 0 or node.parent_id == "layers"

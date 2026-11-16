@@ -118,6 +118,8 @@ def row_value_color_for(
             or overlays.closing_card.runtime.enabled
         ):
             return DISABLED
+        if desc.card is not None and not getattr(overlays, desc.card).runtime.enabled:
+            return DISABLED
 
     if (
         kind in POST_FX_SECTION_KINDS

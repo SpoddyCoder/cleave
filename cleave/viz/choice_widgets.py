@@ -31,7 +31,9 @@ from cleave.viz.theme import (
     BUTTON_BORDER,
     BUTTON_HOVER_BG,
     BUTTON_PRIMARY_BG,
+    BUTTON_PRIMARY_DIMMED_BG,
     DISABLED,
+    DISABLED_MUTED,
     MUTED,
     VALUE,
 )
@@ -94,6 +96,7 @@ def draw_segments(
     y: int,
     height: int,
     enabled: bool = True,
+    dimmed: bool = False,
     hover: bool = True,
     hand: bool = True,
 ) -> tuple[Rect, ...]:
@@ -101,22 +104,44 @@ def draw_segments(
 
     ``hover`` lights the box under the pointer; pass False while something
     else, such as an open list, owns the pointer. Pass ``hand`` False while
-    a click would be refused, so the pointer stays an arrow.
+    a click would be refused, so the pointer stays an arrow. ``dimmed`` greys
+    a control that still edits, on a page that is switched off.
     """
     rects = segment_rects(measure, labels, x=x, y=y, height=height)
     mx, my = _mouse()
     for index, rect in enumerate(rects):
         is_chosen = index == chosen
         if is_chosen:
-            _fill(draw, rect, BUTTON_PRIMARY_BG if enabled else BUTTON_BG)
+            _fill(draw, rect, _chosen_fill(enabled=enabled, dimmed=dimmed))
         elif enabled and hover and rect_contains(rect, mx, my):
             _fill(draw, rect, BUTTON_HOVER_BG)
             if hand:
                 request_pointer(PointerShape.HAND)
         _border(draw, rect)
-        role = DISABLED if not enabled else (VALUE if is_chosen else MUTED)
-        _centred_text(draw, measure, rect, labels[index], role)
+        _centred_text(
+            draw,
+            measure,
+            rect,
+            labels[index],
+            _segment_text_role(is_chosen, enabled=enabled, dimmed=dimmed),
+        )
     return rects
+
+
+def _chosen_fill(*, enabled: bool, dimmed: bool) -> tuple[int, int, int]:
+    if not enabled:
+        return BUTTON_BG
+    return BUTTON_PRIMARY_DIMMED_BG if dimmed else BUTTON_PRIMARY_BG
+
+
+def _segment_text_role(
+    chosen: bool, *, enabled: bool, dimmed: bool
+) -> tuple[int, int, int]:
+    if not enabled:
+        return DISABLED
+    if dimmed:
+        return DISABLED if chosen else DISABLED_MUTED
+    return VALUE if chosen else MUTED
 
 
 def draw_combo(
@@ -127,12 +152,14 @@ def draw_combo(
     rect: Rect,
     open_: bool,
     enabled: bool = True,
+    dimmed: bool = False,
     hover: bool = True,
     hand: bool = True,
 ) -> None:
     """A framed value with a caret at its right edge.
 
-    Pass ``hand`` False while a click would be refused.
+    Pass ``hand`` False while a click would be refused. ``dimmed`` greys a
+    combo that still edits, on a page that is switched off.
     """
     x, y, w, h = rect
     mx, my = _mouse()
@@ -142,12 +169,12 @@ def draw_combo(
     lit = open_ or hovered
     _fill(draw, rect, BUTTON_HOVER_BG if lit else BUTTON_BG)
     _border(draw, rect)
-    role = VALUE if enabled else DISABLED
+    role = VALUE if enabled and not dimmed else DISABLED
     th = measure.size(text)[1]
     text_y = y + (h - th) // 2
     draw.add_text(_vec(x + combo_pad_x(), text_y), _u32(role), text)
     caret_w = measure.size(COMBO_CARET)[0]
-    caret_role = MUTED if enabled else DISABLED
+    caret_role = DISABLED_MUTED if dimmed else (MUTED if enabled else DISABLED)
     draw.add_text(
         _vec(x + w - combo_pad_x() - caret_w, text_y), _u32(caret_role), COMBO_CARET
     )
