@@ -60,6 +60,8 @@ Suggested order: H4 (tiny), H1, H2, H3, then H5. H2 alone is expected to be the 
 
 ### H2. "Unsaved changes" is recomputed four to six times a frame, hitting the disk
 
+**Status.** Done. `config_dirty` is compared once per frame after `ConfigSaveController.tick()`; quit, project switch and the curation mode change call `compute_config_dirty()`. Paths go through the cached `config_relative_path` in [cleave/paths.py](cleave/paths.py). The inspector command rows use the frame's `CommandContext`. Benchmark, four layers, frame mean before and after: 8.2 to 5.4 ms at 0 entries, 21.8 to 5.8 ms at 20, 6.9 ms at 100. The display can trail an edit by one frame.
+
 **Finding.** `ConfigSaveController.config_dirty` ([cleave/viz/config_save.py](cleave/viz/config_save.py)) has no cache. Every read rebuilds the whole persisted payload (`persisted_session_payload`), serialises it to JSON and compares strings. Inside that, `persist_layers` calls `_to_cfg_relative` ([cleave/config_schema/layers.py](cleave/config_schema/layers.py)) for every preset list entry, which runs `Path.resolve()` on the path and on the config directory: `lstat` calls on the filesystem, every time.
 
 It is read on every frame from:

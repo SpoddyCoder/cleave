@@ -726,3 +726,48 @@ def test_commit_save_flushes_render_to_project_yaml(tmp_path: Path) -> None:
     assert manifest.resolution.height == 720
     assert manifest.render is not None
     assert manifest.render.fps == 24
+
+
+def test_config_dirty_builds_payload_once_per_frame() -> None:
+    controls = _make_controls()
+    save = controls._config_save
+    controls.tick(1.0 / 60.0)
+    with patch.object(
+        save, "_persisted_signature", wraps=save._persisted_signature
+    ) as signature:
+        for _ in range(5):
+            assert not controls.config_dirty
+        assert signature.call_count == 1
+        controls.tick(1.0 / 60.0)
+        assert not controls.config_dirty
+        assert signature.call_count == 2
+
+
+def test_config_dirty_sees_edit_after_next_tick() -> None:
+    controls = _make_controls()
+    controls.tick(1.0 / 60.0)
+    assert not controls.config_dirty
+    _mutate_stem_opacity(controls)
+    controls.tick(1.0 / 60.0)
+    assert controls.config_dirty
+
+
+def test_quit_in_same_frame_as_edit_sees_dirty() -> None:
+    controls = _make_controls()
+    save = controls._config_save
+    controls.tick(1.0 / 60.0)
+    assert not controls.config_dirty
+    _mutate_stem_opacity(controls)
+    assert save.compute_config_dirty()
+    assert not save.try_quit()
+    assert controls.modal_host.active
+
+
+def test_save_in_same_frame_as_edit_clears_dirty() -> None:
+    controls = _make_controls()
+    controls.tick(1.0 / 60.0)
+    _mutate_stem_opacity(controls)
+    assert controls._config_save.compute_config_dirty()
+    assert controls.config_dirty
+    _save_now(controls)
+    assert not controls.config_dirty

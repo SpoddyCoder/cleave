@@ -161,7 +161,7 @@ class EditorModeController:
     def request_enter_curation(self) -> None:
         if is_preset_curation_mode(self.session.settings.editor_mode):
             return
-        if self._config_save.config_dirty:
+        if self._config_save.compute_config_dirty():
             self._modal.prompt_buttons(
                 _ENTER_CURATION_DIRTY_MESSAGE,
                 [

@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from cleave.config import CleaveConfig
+from cleave.paths import config_relative_path
 from cleave.preset_library import (
     COLLECTION_LABEL,
     UNFILTERED_CATALOG,
@@ -257,7 +258,7 @@ class PresetPlaylist:
                 False,
                 False,
             )
-        rel = to_config_relative(self.current_dir, preset_root).rstrip("/") + "/"
+        rel = config_relative_path(self.current_dir, preset_root).rstrip("/") + "/"
         can_go_up, can_go_down = directory_tree_moves(
             self.current_dir, preset_root, browse_floor=browse_floor
         )
@@ -443,8 +444,8 @@ class PresetPlaylist:
     def config_preset_path(self, preset_root: Path) -> str:
         """Persisted anchor: the real preset file, never the collection."""
         if self.current is not None:
-            return to_config_relative(self.current, preset_root)
-        rel = to_config_relative(self.current_dir, preset_root)
+            return config_relative_path(self.current, preset_root)
+        rel = config_relative_path(self.current_dir, preset_root)
         return rel if rel.endswith("/") else f"{rel}/"
 
 
@@ -515,19 +516,6 @@ def preset_position_display(playlist: PresetPlaylist) -> str:
     if playlist.current is None:
         return "0/0"
     return f"{playlist.index + 1}/{len(playlist.paths)}"
-
-
-def to_config_relative(path: Path, preset_root: Path) -> str:
-    """Preset path relative to preset_root, using forward slashes.
-
-    Paths outside preset_root (project preset copies) are absolute so they
-    round-trip through config load.
-    """
-    resolved = path.resolve()
-    try:
-        return resolved.relative_to(preset_root.resolve()).as_posix()
-    except ValueError:
-        return resolved.as_posix()
 
 
 def scan_all_layers(

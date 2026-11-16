@@ -11,6 +11,7 @@ import pytest
 
 from cleave.config import VIZ_CONFIG_FILENAME
 from cleave.paths import (
+    config_relative_path,
     data_dir,
     default_preset_root,
     default_project_config,
@@ -278,3 +279,29 @@ def test_resolve_project_rejects_invalid_slug(
 
     with pytest.raises(ValueError, match="invalid project slug"):
         resolve_project("bad/slug")
+
+
+def test_config_relative_path_inside_and_outside_base(tmp_path: Path) -> None:
+    base = tmp_path / "presets"
+    assert config_relative_path(base / "bass" / "a.milk", base) == "bass/a.milk"
+    outside = tmp_path / "elsewhere" / "b.milk"
+    assert config_relative_path(outside, base) == outside.resolve().as_posix()
+
+
+def test_config_relative_path_resolves_an_absolute_path_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    base = tmp_path / "presets"
+    path = base / "drums" / "c.milk"
+    calls: list[Path] = []
+    real_resolve = Path.resolve
+
+    def counting_resolve(self: Path, strict: bool = False) -> Path:
+        calls.append(self)
+        return real_resolve(self, strict=strict)
+
+    monkeypatch.setattr(Path, "resolve", counting_resolve)
+    first = config_relative_path(path, base)
+    resolved_once = len(calls)
+    assert config_relative_path(path, base) == first == "drums/c.milk"
+    assert len(calls) == resolved_once

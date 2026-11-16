@@ -547,6 +547,7 @@ class TuningControls:
         if not pygame.mouse.get_pressed()[0] or self._modal_host.active:
             self.value_nudge.release()
         self._key_repeat.tick(dt_sec)
+        self._config_save.tick()
         self.page_history.observe(self.shell_focus.selected_id, dt_sec)
         self.inline_edit.tick(dt_sec)
         self.project_switch.tick(dt_sec)

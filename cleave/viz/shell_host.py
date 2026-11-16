@@ -16,7 +16,13 @@ import pygame
 from imgui_bundle import imgui
 
 from cleave.preset_library import marker_tooltip
-from cleave.viz.commands import Command, CommandContext, MenuSeparator, command_by_id
+from cleave.viz.commands import (
+    Command,
+    CommandContext,
+    MenuSeparator,
+    command_by_id,
+    command_context,
+)
 from cleave.viz.drag_reorder import DRAG_LAYER, DRAG_PRESET, RowDragGesture
 from cleave.viz.config_pages import config_page_title, is_config_page
 from cleave.viz.frame_rate import format_fps_value
@@ -1699,6 +1705,7 @@ class ShellHost:
         self._choice_rects: dict[RowDescriptor, tuple[int, int, int, int]] = {}
         # The inspector page's off and locked owners, read each frame.
         self._page_status = PageStatus()
+        self._frame_command_ctx: CommandContext | None = None
         self._choice_list_rows: tuple[tuple[int, int, int, int], ...] = ()
         # Widest value each stepped row has shown, in characters, so its arrows
         # hold still as the number changes. The shell font is monospace.
@@ -2334,6 +2341,7 @@ class ShellHost:
         The caller owns the ImGui frame and the fade. Returns the menu-rule
         row, or None when the bar did not open.
         """
+        self._frame_command_ctx = command_ctx
         if self._nudge_input_blocked():
             self._controls.disarm_value_nudge()
         with _menu_bar_frame_padding():
@@ -3774,6 +3782,8 @@ class ShellHost:
     def _draw_command_row(self, row: Any) -> None:
         """One row of buttons. A click focuses that button, then runs it."""
         focus = self._controls.shell_focus
+        # One context for the frame; a row drawn outside a frame builds its own.
+        ctx = self._frame_command_ctx or command_context(self._controls)
         if row.status is not None:
             imgui.align_text_to_frame_padding()
             imgui.text(row.status)
@@ -3782,7 +3792,7 @@ class ShellHost:
             if index:
                 imgui.same_line()
             command = command_by_id(command_id)
-            enabled = inspector_command_enabled(self._controls, command_id)
+            enabled = inspector_command_enabled(ctx, command_id)
             selected = (
                 focus.region is ShellRegion.INSPECTOR
                 and focus.inspector_command_id == command_id
@@ -3791,7 +3801,7 @@ class ShellHost:
                 f"{command.label}##cmd-{command_id}",
                 text_role=_button_text_role(
                     enabled,
-                    inspector_command_locked(self._controls, command_id)
+                    inspector_command_locked(ctx, command_id)
                     or self._page_status.locked_by is not None,
                     page_off=self._page_status.off_by is not None,
                 ),

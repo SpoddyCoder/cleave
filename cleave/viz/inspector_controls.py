@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import pygame
 
-from cleave.viz.commands import command_by_id, command_context
+from cleave.viz.commands import CommandContext, command_by_id, command_context
 from cleave.viz.inspector import InspectorRow, build_inspector_rows
 from cleave.viz.row_hotkeys import handle_row_hotkey, node_control_descriptor
 from cleave.choice import ChoiceKind
@@ -209,17 +209,15 @@ def _cursor_index(rows: tuple[InspectorRow, ...], focus: ShellFocusState) -> int
     return None
 
 
-def inspector_command_enabled(controls: TuningControls, command_id: str) -> bool:
-    command = command_by_id(command_id)
-    return bool(command.enabled(command_context(controls)))
+def inspector_command_enabled(ctx: CommandContext, command_id: str) -> bool:
+    return bool(command_by_id(command_id).enabled(ctx))
 
 
-def inspector_command_locked(controls: TuningControls, command_id: str) -> bool:
-    command = command_by_id(command_id)
-    return bool(command.locked(command_context(controls)))
+def inspector_command_locked(ctx: CommandContext, command_id: str) -> bool:
+    return bool(command_by_id(command_id).locked(ctx))
 
 
 def run_inspector_command(controls: TuningControls, command_id: str) -> None:
-    if not inspector_command_enabled(controls, command_id):
+    if not inspector_command_enabled(command_context(controls), command_id):
         return
     command_by_id(command_id).run(controls)

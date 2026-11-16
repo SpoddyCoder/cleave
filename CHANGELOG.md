@@ -165,6 +165,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- The editor no longer slows down as layers gain preset list entries. It was rechecking for unsaved changes several times a frame, reading the disk for every preset each time; it now checks once a frame without touching the disk.
 - Icon buttons now share one size and alignment everywhere. Their hover and lit squares fill the row's highlight band, with the icon centred: the navigator's arrows and on, solo, lock, and add icons, the inspector title's arrows, row icons, reorder handles, stepper arrows, the transport bar, and the timeline strip's row buttons. Solo and lock no longer light a smaller square than the arrow beside them.
 - The expand arrow on a navigator row is as wide as the row's on, solo, and lock icons, and washes with the same square under the pointer. Sub-rows indent by one icon so each arrow sits under its parent's name. A row's name starts right after its arrow, and a layer's drag handle sits right after the arrow with no extra space either side. The layer's number is part of its drag handle: it lights with the handle under the pointer, and dragging it reorders the layer.
 - Startup no longer flashes a "Loading..." message before the open dialog appears; the window opens blank.

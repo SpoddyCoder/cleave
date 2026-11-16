@@ -36,6 +36,12 @@ class ConfigSaveController:
     milkdrop beat sensitivity, compositor hdr, and render width/height/fps
     are project-scoped (``project.yaml``) and participate in dirty via
     separate baselines; they flush on successful Save, not on each edit.
+
+    ``config_dirty`` is what the window shows. Once the frame loop calls
+    ``tick``, it is worked out on the first read after each tick and reused
+    until the next, so it can trail an edit by a frame. Anything that acts
+    on the answer (quit, project switch, mode change) calls
+    ``compute_config_dirty``, which always compares the live session.
     """
 
     def __init__(
@@ -67,6 +73,8 @@ class ConfigSaveController:
         self._saved_resolution_height = session.project.resolution.height
         self._saved_render_fps = session.project.render.fps
         self._pending = PendingAction.NONE
+        self._frame_cache_on = False
+        self._frame_dirty: bool | None = None
         self._on_commit_save: list[Callable[[], None]] = []
 
     def add_on_commit_save(self, callback: Callable[[], None]) -> None:
@@ -81,8 +89,25 @@ class ConfigSaveController:
             return self._active_config_path
         return self.cfg.config_path
 
+    def tick(self) -> None:
+        """Start a frame: the next ``config_dirty`` read compares again."""
+        self._frame_cache_on = True
+        self._frame_dirty = None
+
     @property
     def config_dirty(self) -> bool:
+        if self._frame_cache_on and self._frame_dirty is not None:
+            return self._frame_dirty
+        return self.compute_config_dirty()
+
+    def compute_config_dirty(self) -> bool:
+        """Compare the live session with the saved baselines, right now."""
+        dirty = self._differs_from_saved()
+        if self._frame_cache_on:
+            self._frame_dirty = dirty
+        return dirty
+
+    def _differs_from_saved(self) -> bool:
         return (
             self._persisted_signature() != self._saved_signature
             or tuple(self.session.song_markers.markers) != self._saved_song_markers
@@ -107,6 +132,7 @@ class ConfigSaveController:
         self._saved_resolution_width = self.session.project.resolution.width
         self._saved_resolution_height = self.session.project.resolution.height
         self._saved_render_fps = self.session.project.render.fps
+        self._frame_dirty = None
 
     def _flush_song_markers(self) -> None:
         if self._project_dir is None:
@@ -196,7 +222,7 @@ class ConfigSaveController:
         """Handle a quit request. Return True when the app should exit now."""
         if self._pending is PendingAction.EXIT:
             return True
-        if not self.config_dirty:
+        if not self.compute_config_dirty():
             return True
         if not self._unsaved_prompt_active():
             self._modal.prompt_unsaved_quit(
@@ -220,7 +246,7 @@ class ConfigSaveController:
             return False
         if self._pending is PendingAction.SWITCH:
             return True
-        if not self.config_dirty:
+        if not self.compute_config_dirty():
             self._pending = PendingAction.SWITCH
             return True
         self._modal.prompt_unsaved_quit(

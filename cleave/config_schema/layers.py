@@ -14,6 +14,7 @@ from cleave.config_schema.editor import clamp_beat_sensitivity
 from cleave.config_schema.validators import parse_blend_mode
 from cleave.effects.constants import clamp_effect_pct
 from cleave.effects.registry import validate_effect_entry
+from cleave.paths import config_relative_path
 from cleave.stems import STEM_SOURCES, StemSource
 
 PresetSwitchingMode = Literal["off", "on"]
@@ -186,14 +187,6 @@ def resolve_user_preset(preset: str | Path, cfg_dir: Path) -> Path:
     if path.is_absolute():
         return path.resolve()
     return (cfg_dir / path).resolve()
-
-
-def _to_cfg_relative(path: Path, cfg_dir: Path) -> str:
-    resolved = path.resolve()
-    try:
-        return resolved.relative_to(cfg_dir.resolve()).as_posix()
-    except ValueError:
-        return resolved.as_posix()
 
 
 def _parse_preset_switching_list(
@@ -448,7 +441,7 @@ def persist_layers(ctx: PersistCtx) -> dict[str, dict[str, Any]]:
                 ]
             else:
                 layer_out["preset_switching_list"] = [
-                    _to_cfg_relative(path, ctx.cfg_dir)
+                    config_relative_path(path, ctx.cfg_dir)
                     for path in preset_switching_list
                 ]
         layers_out[slot] = layer_out

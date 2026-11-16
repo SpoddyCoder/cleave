@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import sys
+from functools import lru_cache
 from pathlib import Path
 
 # Repo root when running from a checkout (`cleave/` package lives here).
@@ -265,3 +266,34 @@ def default_project_config(project: Path) -> Path:
     from cleave.config import VIZ_CONFIG_FILENAME
 
     return project / VIZ_CONFIG_FILENAME
+
+
+def config_relative_path(path: Path, base: Path) -> str:
+    """``path`` relative to ``base`` with forward slashes, for a config file.
+
+    A path outside ``base`` stays absolute so it round-trips through config
+    load. Absolute inputs are resolved once per process and remembered: the
+    dirty check asks for every preset path on every frame, and resolving
+    touches the filesystem. A symlink changed while the editor runs is not
+    seen for a path already asked for.
+    """
+    if path.is_absolute() and base.is_absolute():
+        return _cached_relative_path(path, base)
+    return _relative_path(path.resolve(), base.resolve())
+
+
+def _relative_path(resolved: Path, resolved_base: Path) -> str:
+    try:
+        return resolved.relative_to(resolved_base).as_posix()
+    except ValueError:
+        return resolved.as_posix()
+
+
+@lru_cache(maxsize=256)
+def _resolved_base(base: Path) -> Path:
+    return base.resolve()
+
+
+@lru_cache(maxsize=32768)
+def _cached_relative_path(path: Path, base: Path) -> str:
+    return _relative_path(path.resolve(), _resolved_base(base))
