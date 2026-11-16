@@ -509,13 +509,22 @@ class LayerFramePipeline:
             and compositor is not None
         )
 
+        rendered = [
+            layer for layer in layers if _slot_should_render(layer, live_by_slot)
+        ]
         if not paused:
-            for layer in layers:
-                if _slot_should_render(layer, live_by_slot):
-                    _render_layer_fbo(layer, layer.pm)
+            # projectM draws every layer before any post pass, so the passes
+            # run back to back in one GL state batch. Layers are independent
+            # textures, so the order between them does not change the result.
+            for layer in rendered:
+                _render_layer_fbo(layer, layer.pm)
+        with post_process.batch():
+            for layer in rendered:
+                if not paused:
                     _apply_layer_bloom(layer, post_process, output_width)
                     _apply_layer_grit(layer, post_process, output_width)
-                    if per_layer_rolloff:
+                if per_layer_rolloff:
+                    if not paused:
                         compositor.copy_layer_to_rolloff_source(
                             post_process,
                             layer.slot,
@@ -523,10 +532,11 @@ class LayerFramePipeline:
                             layer.fbo.width,
                             layer.fbo.height,
                         )
-                        _apply_layer_highlight_rolloff(
-                            layer, post_process, compositor, hr
-                        )
-                    if per_layer_chroma:
+                    _apply_layer_highlight_rolloff(
+                        layer, post_process, compositor, hr
+                    )
+                if per_layer_chroma:
+                    if not paused:
                         compositor.copy_layer_to_chroma_source(
                             post_process,
                             layer.slot,
@@ -534,22 +544,7 @@ class LayerFramePipeline:
                             layer.fbo.width,
                             layer.fbo.height,
                         )
-                        _apply_layer_chroma_boost(
-                            layer, post_process, compositor, cb
-                        )
-        else:
-            if per_layer_rolloff:
-                for layer in layers:
-                    if _slot_should_render(layer, live_by_slot):
-                        _apply_layer_highlight_rolloff(
-                            layer, post_process, compositor, hr
-                        )
-            if per_layer_chroma:
-                for layer in layers:
-                    if _slot_should_render(layer, live_by_slot):
-                        _apply_layer_chroma_boost(
-                            layer, post_process, compositor, cb
-                        )
+                    _apply_layer_chroma_boost(layer, post_process, compositor, cb)
 
     @staticmethod
     def composite(

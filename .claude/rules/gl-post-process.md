@@ -52,5 +52,6 @@ When enabled (project.yaml `compositor.hdr`, default on), compositor FBOs use `G
 ## New GPU pass
 
 - Draw via `_draw_quad` (`_ensure_moderngl_draw_state()`; compositor fixed-function state can block shader output).
-- Wrap in `save_gl_state` / `restore_gl_state` from `cleave/gl_state.py`, then `_prepare_fixed_function_gl()`.
+- Wrap the pass body in `with self._gl_pass():`. Alone, it saves and restores GL state (`cleave/gl_state.py`), then calls `_prepare_fixed_function_gl()`. Inside `GlPostProcess.batch()` it defers to the batch, which saves once and restores at the end. Run only GlPostProcess passes, or GL code that sets all its own state, inside a batch: projectM and the fixed-function compositor stay outside.
+- The limiter's luma grid reads back a frame late through a pixel buffer (`queue_luma_grid`). Do not add a synchronous `read()` on the frame path.
 - Confirm pixels change in a GPU probe or `*_gl_integration.py`; mocks miss silent no-ops.

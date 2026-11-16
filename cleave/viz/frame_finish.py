@@ -186,48 +186,51 @@ def finish_content_frame(
 
     compositor = core.compositor
     editor_mode = session.settings.editor_mode
-    if hdr_display_shoulder_active(session.project.compositor_hdr, editor_mode):
-        apply_hdr_display_shoulder(
-            core.post_process,
-            compositor.content_texture_id,
-            compositor.content_width,
-            compositor.content_height,
-        )
-
-    observe_frame_busyness(core, t_sec, LimiterFrameState.from_session(session))
-
     pp = session.post_fx
-    sections_on = render_sections_active(session.settings.editor_mode)
-    hr = pp.highlight_rolloff
-    if (
-        sections_on
-        and highlight_rolloff_active(pp, solo=post_fx_solo)
-        and hr.mode == "composite"
-    ):
-        core.post_process.apply_highlight_rolloff(
-            compositor.content_texture_id,
-            compositor.content_width,
-            compositor.content_height,
-            hr.threshold_pct / 100.0,
-            hr.ceiling_pct / 100.0,
-            hr.strength_pct / 100.0,
-            hr.softness_pct / 100.0,
-            hr.desaturation_pct / 100.0,
-            highlight_rolloff_curve_index(hr.curve),
-        )
-    cb = pp.chroma_boost
-    if (
-        sections_on
-        and chroma_boost_active(pp, solo=post_fx_solo)
-        and cb.mode == "composite"
-    ):
-        core.post_process.apply_chroma_boost(
-            compositor.content_texture_id,
-            compositor.content_width,
-            compositor.content_height,
-            cb.amount_pct,
-            chroma_boost_variant_index(cb.variant),
-        )
+    sections_on = render_sections_active(editor_mode)
+    # The shoulder, the limiter sample, rolloff and chroma boost are all
+    # GlPostProcess passes in a row: one GL state save covers them.
+    with core.post_process.batch():
+        if hdr_display_shoulder_active(session.project.compositor_hdr, editor_mode):
+            apply_hdr_display_shoulder(
+                core.post_process,
+                compositor.content_texture_id,
+                compositor.content_width,
+                compositor.content_height,
+            )
+
+        observe_frame_busyness(core, t_sec, LimiterFrameState.from_session(session))
+
+        hr = pp.highlight_rolloff
+        if (
+            sections_on
+            and highlight_rolloff_active(pp, solo=post_fx_solo)
+            and hr.mode == "composite"
+        ):
+            core.post_process.apply_highlight_rolloff(
+                compositor.content_texture_id,
+                compositor.content_width,
+                compositor.content_height,
+                hr.threshold_pct / 100.0,
+                hr.ceiling_pct / 100.0,
+                hr.strength_pct / 100.0,
+                hr.softness_pct / 100.0,
+                hr.desaturation_pct / 100.0,
+                highlight_rolloff_curve_index(hr.curve),
+            )
+        cb = pp.chroma_boost
+        if (
+            sections_on
+            and chroma_boost_active(pp, solo=post_fx_solo)
+            and cb.mode == "composite"
+        ):
+            core.post_process.apply_chroma_boost(
+                compositor.content_texture_id,
+                compositor.content_width,
+                compositor.content_height,
+                cb.amount_pct,
+                chroma_boost_variant_index(cb.variant),
+            )
     frame_fade_alpha = live_frame_fade_alpha(
         t_sec,
         duration_sec,

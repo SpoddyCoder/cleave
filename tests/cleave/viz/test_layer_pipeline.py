@@ -508,3 +508,70 @@ def test_layer_bloom_and_aberration_scale_to_output_pixels() -> None:
     _apply_layer_grit(layer, post, 960)
     assert post.apply_bloom.call_args.kwargs["blur_radius"] == BLOOM_BLUR_RADIUS
     assert post.apply_grit.call_args.args[4] == 4.0
+
+
+def test_render_frame_draws_every_layer_then_runs_post_passes_in_one_batch() -> None:
+    slots = ("layer_1", "layer_2")
+    layers = [_stem_layer(slot) for slot in slots]
+    for index, layer in enumerate(layers):
+        layer.fbo.enabled = True
+        layer.fbo.texture_id = 11 + index
+        layer.fbo.bloom_strength = 0.5
+    session = _session(slots)
+    session.post_fx = default_post_fx_runtime(enabled=True)
+    events: list[str] = []
+    post_process = MagicMock()
+    post_process.batch.return_value.__enter__.side_effect = lambda: events.append(
+        "batch"
+    )
+    post_process.batch.return_value.__exit__.side_effect = lambda *a: events.append(
+        "end"
+    )
+    post_process.apply_bloom.side_effect = lambda tex, *a, **k: events.append(
+        f"bloom {tex}"
+    )
+    pcm_bank = MagicMock()
+    pcm_bank.slice_pcm.return_value = b""
+    pcm_bank.channels.return_value = 2
+    effect_runtime = MagicMock()
+    effect_runtime.modifiers.return_value = {
+        slot: MagicMock(
+            opacity=1.0, flash_alpha=0.0, bloom_strength=0.5, hue_rgb=(1, 1, 1),
+            hue_mix=0.0, grit_strength=0.0, aberration_px=0.0,
+        )
+        for slot in slots
+    }
+
+    with (
+        patch(
+            "cleave.viz.layer_pipeline._render_layer_fbo",
+            side_effect=lambda layer, _pm: events.append(f"draw {layer.slot}"),
+        ),
+        patch(
+            "cleave.viz.layer_pipeline.pcm_max_samples_per_channel",
+            return_value=2048,
+        ),
+    ):
+        LayerFramePipeline.render_frame(
+            session,
+            layers,
+            {layer.slot: layer for layer in layers},
+            pcm_bank,
+            512,
+            post_process,
+            effect_runtime,
+            None,
+            1.0,
+            paused=False,
+            pm_time_sec=1.0,
+            compositor=MagicMock(),
+        )
+
+    assert events == [
+        "draw layer_1",
+        "draw layer_2",
+        "batch",
+        "bloom 11",
+        "bloom 12",
+        "end",
+    ]

@@ -2,12 +2,19 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 
 import moderngl
 import numpy as np
 from cleave.gl_color_format import RGBA8, RGBA16F, GlColorFormat
-from cleave.gl_state import restore_gl_state, save_gl_state
+from cleave.gl_state import (
+    SavedGlState,
+    forget_moderngl_framebuffer,
+    restore_gl_state,
+    save_gl_state,
+)
 from OpenGL.GL import (
     GL_BLEND,
     GL_DEPTH_TEST,
@@ -275,8 +282,12 @@ def _prepare_fixed_function_gl() -> None:
 class _LumaGridBuffers:
     tex: moderngl.Texture
     fbo: moderngl.Framebuffer
+    readback: moderngl.Buffer
+    grid_width: int
+    grid_height: int
 
     def release(self) -> None:
+        self.readback.release()
         self.fbo.release()
         self.tex.release()
 
@@ -315,6 +326,9 @@ class GlPostProcess:
         self._chroma_boost_prog: moderngl.Program | None = None
         self._luma_downsample_prog: moderngl.Program | None = None
         self._luma_grid_buffers: dict[tuple[int, int], _LumaGridBuffers] = {}
+        self._queued_luma_grid: _LumaGridBuffers | None = None
+        self._batch_depth = 0
+        self._batch_saved: SavedGlState | None = None
         self._buffers: dict[tuple[int, int], _PingPongBuffers] = {}
         self._external_textures: dict[tuple[int, int, int], moderngl.Texture] = {}
         self._dest_fbos: dict[tuple[int, int, int], moderngl.Framebuffer] = {}
@@ -337,6 +351,10 @@ class GlPostProcess:
         the new sizes are rebuilt on the next draw.
         """
         self._release_format_dependent_buffers()
+        self._release_luma_grid_buffers()
+
+    def _release_luma_grid_buffers(self) -> None:
+        self._queued_luma_grid = None
         for buffers in self._luma_grid_buffers.values():
             buffers.release()
         self._luma_grid_buffers.clear()
@@ -396,6 +414,50 @@ class GlPostProcess:
             ).tobytes()
         )
 
+    @contextmanager
+    def batch(self) -> Iterator[None]:
+        """Save GL state once around a run of consecutive passes.
+
+        Each pass outside a batch saves and restores the shared GL state, about
+        16 queries a time. Inside a batch, the first pass saves, later passes
+        skip it, and the batch restores once at the end. A batch with no pass
+        touches no GL state. Only GlPostProcess passes and GL code that sets
+        its own state may run inside one: a pass leaves its framebuffer,
+        viewport and blend state behind for the next pass to overwrite.
+        """
+        if self._batch_depth > 0:
+            yield
+            return
+        self._batch_depth = 1
+        try:
+            yield
+        finally:
+            self._batch_depth = 0
+            saved = self._batch_saved
+            self._batch_saved = None
+            if saved is not None:
+                restore_gl_state(saved, self._ctx)
+                _prepare_fixed_function_gl()
+
+    @contextmanager
+    def _gl_pass(self) -> Iterator[None]:
+        """Wrap one pass: save and restore GL state, or defer to the batch."""
+        if self._batch_depth > 0:
+            if self._batch_saved is None:
+                self._batch_saved = save_gl_state()
+            try:
+                yield
+            finally:
+                if self._ctx is not None:
+                    forget_moderngl_framebuffer(self._ctx)
+            return
+        saved = save_gl_state()
+        try:
+            yield
+        finally:
+            restore_gl_state(saved, self._ctx)
+            _prepare_fixed_function_gl()
+
     def _ensure_init(self) -> None:
         if self._ctx is None:
             self.init()
@@ -418,7 +480,14 @@ class GlPostProcess:
         tex.repeat_x = False
         tex.repeat_y = False
         fbo = self._ctx.framebuffer(color_attachments=[tex])
-        buffers = _LumaGridBuffers(tex=tex, fbo=fbo)
+        readback = self._ctx.buffer(reserve=grid_width * grid_height * 4)
+        buffers = _LumaGridBuffers(
+            tex=tex,
+            fbo=fbo,
+            readback=readback,
+            grid_width=grid_width,
+            grid_height=grid_height,
+        )
         self._luma_grid_buffers[key] = buffers
         return buffers
 
@@ -516,7 +585,7 @@ class GlPostProcess:
                 program[name].value = value
         self._quad_vao_for(program).render(moderngl.TRIANGLE_STRIP)
 
-    def read_luma_grid(
+    def queue_luma_grid(
         self,
         texture_id: int,
         width: int,
@@ -524,17 +593,25 @@ class GlPostProcess:
         *,
         grid_width: int = 32,
         grid_height: int = 18,
-    ) -> np.ndarray:
-        """Downsample *texture_id* to a luma grid via one GPU pass and readback."""
-        empty = np.zeros((grid_height, grid_width), dtype=np.float32)
+    ) -> np.ndarray | None:
+        """Queue a luma grid of *texture_id*; return the one queued last call.
+
+        One GPU pass downsamples the texture, and the grid is copied into a
+        pixel buffer without waiting for the GPU. The next call reads that
+        buffer, a frame later, when the copy has long finished, so the CPU
+        never stalls on the frame in flight. Returns None when nothing was
+        queued (the first call, after `drop_queued_luma_grid`, or after the
+        buffers were freed).
+        """
         if texture_id == 0 or width <= 0 or height <= 0:
-            return empty
+            self.drop_queued_luma_grid()
+            return None
 
         self._ensure_init()
         assert self._luma_downsample_prog is not None
 
-        saved = save_gl_state()
-        try:
+        previous = self._take_queued_luma_grid()
+        with self._gl_pass():
             src = self._external_layer_texture(texture_id, width, height)
             grid_buffers = self._ensure_luma_grid_buffers(grid_width, grid_height)
             self._draw_quad(
@@ -543,13 +620,24 @@ class GlPostProcess:
                 texture=src,
                 extra_uniforms={"hdr": self._color_format is RGBA16F},
             )
-            raw = grid_buffers.fbo.read(components=1, alignment=1, dtype="f4")
-        finally:
-            restore_gl_state(saved, self._ctx)
-            _prepare_fixed_function_gl()
+            grid_buffers.fbo.read_into(
+                grid_buffers.readback, components=1, alignment=1, dtype="f4"
+            )
+        self._queued_luma_grid = grid_buffers
+        return previous
 
-        grid = np.frombuffer(raw, dtype=np.float32).reshape((grid_height, grid_width))
-        return np.array(grid, dtype=np.float32)
+    def drop_queued_luma_grid(self) -> None:
+        """Forget the queued grid, so the next `queue_luma_grid` returns None."""
+        self._queued_luma_grid = None
+
+    def _take_queued_luma_grid(self) -> np.ndarray | None:
+        queued = self._queued_luma_grid
+        if queued is None:
+            return None
+        self._queued_luma_grid = None
+        raw = queued.readback.read()
+        grid = np.frombuffer(raw, dtype=np.float32)
+        return grid.reshape((queued.grid_height, queued.grid_width)).copy()
 
     def apply_bloom(
         self,
@@ -571,8 +659,7 @@ class GlPostProcess:
         assert self._copy_prog is not None
         assert self._composite_prog is not None
 
-        saved = save_gl_state()
-        try:
+        with self._gl_pass():
             src = self._external_layer_texture(texture_id, width, height)
 
             buffers = self._ensure_buffers(width, height)
@@ -614,9 +701,6 @@ class GlPostProcess:
             self._composite_prog["strength"].value = strength * intensity_scale
             self._composite_prog["hdr"].value = self._color_format is RGBA16F
             self._quad_vao_for(self._composite_prog).render(moderngl.TRIANGLE_STRIP)
-        finally:
-            restore_gl_state(saved, self._ctx)
-            _prepare_fixed_function_gl()
 
         return texture_id
 
@@ -636,8 +720,7 @@ class GlPostProcess:
         assert self._ctx is not None
         assert self._grit_prog is not None
 
-        saved = save_gl_state()
-        try:
+        with self._gl_pass():
             src = self._external_layer_texture(texture_id, width, height)
             buffers = self._ensure_buffers(width, height)
             self._draw_quad(
@@ -657,9 +740,6 @@ class GlPostProcess:
                     "hdr": self._color_format is RGBA16F,
                 },
             )
-        finally:
-            restore_gl_state(saved, self._ctx)
-            _prepare_fixed_function_gl()
 
         return texture_id
 
@@ -678,14 +758,10 @@ class GlPostProcess:
         assert self._ctx is not None
         assert self._copy_prog is not None
 
-        saved = save_gl_state()
-        try:
+        with self._gl_pass():
             src = self._external_layer_texture(source_texture_id, width, height)
             dest_fbo = self._dest_fbo_for(dest_texture_id, width, height)
             self._draw_quad(self._copy_prog, dest_fbo, texture=src)
-        finally:
-            restore_gl_state(saved, self._ctx)
-            _prepare_fixed_function_gl()
 
     def apply_highlight_rolloff(
         self,
@@ -710,8 +786,7 @@ class GlPostProcess:
         assert self._copy_prog is not None
         assert self._highlight_rolloff_prog is not None
 
-        saved = save_gl_state()
-        try:
+        with self._gl_pass():
             sample_id = texture_id if source_texture_id is None else source_texture_id
             src = self._external_layer_texture(sample_id, width, height)
             buffers = self._ensure_buffers(width, height)
@@ -735,9 +810,6 @@ class GlPostProcess:
                     "hdr": self._color_format is RGBA16F,
                 },
             )
-        finally:
-            restore_gl_state(saved, self._ctx)
-            _prepare_fixed_function_gl()
 
         return texture_id
 
@@ -760,8 +832,7 @@ class GlPostProcess:
         assert self._copy_prog is not None
         assert self._chroma_boost_prog is not None
 
-        saved = save_gl_state()
-        try:
+        with self._gl_pass():
             sample_id = texture_id if source_texture_id is None else source_texture_id
             src = self._external_layer_texture(sample_id, width, height)
             buffers = self._ensure_buffers(width, height)
@@ -779,16 +850,11 @@ class GlPostProcess:
                     "hdr": self._color_format is RGBA16F,
                 },
             )
-        finally:
-            restore_gl_state(saved, self._ctx)
-            _prepare_fixed_function_gl()
 
         return texture_id
 
     def destroy(self) -> None:
-        for buffers in self._luma_grid_buffers.values():
-            buffers.release()
-        self._luma_grid_buffers.clear()
+        self._release_luma_grid_buffers()
         self._release_format_dependent_buffers()
         for vao in self._quad_vaos.values():
             vao.release()

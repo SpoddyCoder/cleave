@@ -320,15 +320,19 @@ def update_limiter_state(
     distribute_gain(state, hot, target_gain)
 
 
-def read_luma_grid(
+def queue_luma_grid(
     compositor: GlCompositor,
     post_process: GlPostProcess,
     *,
     grid_width: int = GRID_WIDTH,
     grid_height: int = GRID_HEIGHT,
-) -> np.ndarray:
-    """Downsampled display-referred luma grid from the content FBO."""
-    return post_process.read_luma_grid(
+) -> np.ndarray | None:
+    """Queue this frame's luma grid of the content FBO; return last frame's.
+
+    The readback lands a frame late so the CPU never waits for the GPU. The
+    limiter already acts on the next frame, so it now trails by one more.
+    """
+    return post_process.queue_luma_grid(
         compositor.content_texture_id,
         compositor.content_width,
         compositor.content_height,
@@ -374,8 +378,13 @@ def observe_frame_busyness(
     *,
     blank_visualizers: bool = False,
 ) -> None:
-    """Sample content FBO and update limiter state for the next frame."""
+    """Sample content FBO and update limiter state for the next frame.
+
+    Updates from the grid queued on the previous frame. A seek or a gap in
+    sampling drops the queued grid, so content from before it never counts.
+    """
     if blank_visualizers or not visual_limiter_active(frame):
+        core.post_process.drop_queued_luma_grid()
         return
     state = core.visual_limiter
     if not isinstance(state, VisualLimiterState):
@@ -386,8 +395,11 @@ def observe_frame_busyness(
         return
     if width <= 0 or height <= 0:
         return
-    reset_if_seek(state, t_sec)
-    luma_grid = read_luma_grid(core.compositor, core.post_process)
+    if reset_if_seek(state, t_sec):
+        core.post_process.drop_queued_luma_grid()
+    luma_grid = queue_luma_grid(core.compositor, core.post_process)
+    if luma_grid is None:
+        return
     mean_luma, mean_abs_delta = metrics_from_grid(state, luma_grid)
     hot = collect_hot_layers(frame, core.layers_by_slot, t_sec)
     update_limiter_state(

@@ -33,8 +33,9 @@ from cleave.viz.visual_limiter import (
     distribute_gain,
     layer_gain_from_target,
     metrics_from_grid,
+    observe_frame_busyness,
     priority_weight,
-    read_luma_grid,
+    queue_luma_grid,
     role_rank,
     reset_if_seek,
     target_bus_gain,
@@ -439,15 +440,15 @@ def test_update_limiter_state_uses_session_params() -> None:
     assert state.gain_for("layer_1") < 1.0
 
 
-def test_read_luma_grid_delegates_to_post_process() -> None:
+def test_queue_luma_grid_delegates_to_post_process() -> None:
     compositor = MagicMock(content_texture_id=9, content_width=1280, content_height=720)
     post_process = MagicMock()
     expected = np.full((GRID_HEIGHT, GRID_WIDTH), 0.42, dtype=np.float32)
-    post_process.read_luma_grid.return_value = expected
+    post_process.queue_luma_grid.return_value = expected
 
-    grid = read_luma_grid(compositor, post_process)
+    grid = queue_luma_grid(compositor, post_process)
 
-    post_process.read_luma_grid.assert_called_once_with(
+    post_process.queue_luma_grid.assert_called_once_with(
         9,
         1280,
         720,
@@ -455,6 +456,54 @@ def test_read_luma_grid_delegates_to_post_process() -> None:
         grid_height=GRID_HEIGHT,
     )
     assert grid is expected
+
+
+def _busyness_core(session: TuningSession, grids: list[np.ndarray | None]) -> MagicMock:
+    core = MagicMock()
+    core.visual_limiter = VisualLimiterState()
+    core.compositor = MagicMock(content_texture_id=9, content_width=64, content_height=36)
+    core.post_process.queue_luma_grid.side_effect = grids
+    core.layers_by_slot = {"layer_1": _stem("layer_1")}
+    return core
+
+
+def test_observe_frame_busyness_skips_until_a_grid_arrives() -> None:
+    session = _session(timeline_enabled=False)
+    frame = LimiterFrameState.from_session(session)
+    bright = np.full((GRID_HEIGHT, GRID_WIDTH), 0.9, dtype=np.float32)
+    core = _busyness_core(session, [None, bright])
+
+    observe_frame_busyness(core, 1.0, frame)
+    assert core.visual_limiter.prev_luma is None
+    assert core.visual_limiter.controller_t_sec is None
+
+    observe_frame_busyness(core, 1.02, frame)
+    assert core.visual_limiter.prev_luma is not None
+    assert core.visual_limiter.controller_t_sec == pytest.approx(1.02)
+
+
+def test_observe_frame_busyness_drops_queued_grid_on_seek() -> None:
+    session = _session(timeline_enabled=False)
+    frame = LimiterFrameState.from_session(session)
+    grid = np.full((GRID_HEIGHT, GRID_WIDTH), 0.5, dtype=np.float32)
+    core = _busyness_core(session, [grid, grid])
+
+    observe_frame_busyness(core, 1.0, frame)
+    core.post_process.drop_queued_luma_grid.assert_not_called()
+
+    observe_frame_busyness(core, 30.0, frame)
+    core.post_process.drop_queued_luma_grid.assert_called_once()
+
+
+def test_observe_frame_busyness_drops_queued_grid_while_inactive() -> None:
+    session = _session(timeline_enabled=False)
+    session.post_fx.limiter.enabled = False
+    core = _busyness_core(session, [])
+
+    observe_frame_busyness(core, 1.0, LimiterFrameState.from_session(session))
+
+    core.post_process.drop_queued_luma_grid.assert_called_once()
+    core.post_process.queue_luma_grid.assert_not_called()
 
 
 def test_metrics_from_grid_tracks_mean_and_delta() -> None:

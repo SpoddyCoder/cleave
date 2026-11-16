@@ -289,23 +289,30 @@ def _mock_gl_post_process_ctx() -> tuple[MagicMock, list[_ReadOnlyProgramVao]]:
     return ctx, vaos
 
 
-def test_read_luma_grid_returns_zeros_without_gpu() -> None:
+def test_queue_luma_grid_returns_none_without_gpu() -> None:
     post = GlPostProcess()
-    grid = post.read_luma_grid(0, 0, 0, grid_width=4, grid_height=3)
-    assert grid.shape == (3, 4)
-    assert np.all(grid == 0.0)
+    assert post.queue_luma_grid(0, 0, 0, grid_width=4, grid_height=3) is None
 
 
-def test_read_luma_grid_draws_once_and_reads_fbo() -> None:
+def _luma_grid_buffers(grid_w: int, grid_h: int, readback_bytes: bytes) -> SimpleNamespace:
+    grid_fbo = MagicMock(name="grid_fbo")
+    readback = MagicMock(name="readback")
+    readback.read.return_value = readback_bytes
+    return SimpleNamespace(
+        tex=MagicMock(name="grid_tex"),
+        fbo=grid_fbo,
+        readback=readback,
+        grid_width=grid_w,
+        grid_height=grid_h,
+    )
+
+
+def test_queue_luma_grid_returns_previous_frame_without_reading_fbo() -> None:
     ctx, _vaos = _mock_gl_post_process_ctx()
     post = GlPostProcess()
     grid_w, grid_h = 8, 6
     expected = np.linspace(0.0, 1.0, grid_w * grid_h, dtype=np.float32)
-    grid_fbo = MagicMock(name="grid_fbo")
-    grid_fbo.use = MagicMock()
-    grid_fbo.read.return_value = expected.tobytes()
-    grid_tex = MagicMock(name="grid_tex")
-    grid_buffers = SimpleNamespace(tex=grid_tex, fbo=grid_fbo)
+    grid_buffers = _luma_grid_buffers(grid_w, grid_h, expected.tobytes())
 
     with patch("cleave.gl_post_process.moderngl.create_context", return_value=ctx):
         with patch("cleave.gl_post_process.save_gl_state", return_value=MagicMock()):
@@ -319,30 +326,57 @@ def test_read_luma_grid_draws_once_and_reads_fbo() -> None:
                         return_value=grid_buffers,
                     ):
                         with patch.object(post, "_draw_quad") as mock_draw:
-                            grid = post.read_luma_grid(
-                                texture_id=7,
-                                width=64,
-                                height=36,
-                                grid_width=grid_w,
-                                grid_height=grid_h,
+                            first = post.queue_luma_grid(
+                                7, 64, 36, grid_width=grid_w, grid_height=grid_h
+                            )
+                            second = post.queue_luma_grid(
+                                7, 64, 36, grid_width=grid_w, grid_height=grid_h
                             )
 
-    assert mock_draw.call_count == 1
+    assert first is None
+    assert second is not None
+    assert second.shape == (grid_h, grid_w)
+    assert second.ravel() == pytest.approx(expected)
+    assert mock_draw.call_count == 2
     assert mock_draw.call_args.kwargs["extra_uniforms"]["hdr"] is False
-    grid_fbo.read.assert_called_once_with(components=1, alignment=1, dtype="f4")
-    assert grid.shape == (grid_h, grid_w)
-    assert grid.ravel() == pytest.approx(expected)
-    restore.assert_called_once()
-    prepare.assert_called_once()
+    grid_buffers.fbo.read.assert_not_called()
+    grid_buffers.fbo.read_into.assert_called_with(
+        grid_buffers.readback, components=1, alignment=1, dtype="f4"
+    )
+    grid_buffers.readback.read.assert_called_once()
+    assert restore.call_count == 2
+    assert prepare.call_count == 2
 
 
-def test_read_luma_grid_sets_hdr_uniform_for_rgba16f() -> None:
+def test_drop_queued_luma_grid_makes_next_queue_return_none() -> None:
+    ctx, _vaos = _mock_gl_post_process_ctx()
+    post = GlPostProcess()
+    grid_buffers = _luma_grid_buffers(2, 2, np.zeros(4, dtype=np.float32).tobytes())
+
+    with patch("cleave.gl_post_process.moderngl.create_context", return_value=ctx):
+        with patch("cleave.gl_post_process.save_gl_state", return_value=MagicMock()):
+            with patch("cleave.gl_post_process.restore_gl_state"):
+                with patch("cleave.gl_post_process._prepare_fixed_function_gl"):
+                    with patch.object(
+                        post,
+                        "_ensure_luma_grid_buffers",
+                        return_value=grid_buffers,
+                    ):
+                        with patch.object(post, "_draw_quad"):
+                            post.queue_luma_grid(7, 64, 36, grid_width=2, grid_height=2)
+                            post.drop_queued_luma_grid()
+                            after_drop = post.queue_luma_grid(
+                                7, 64, 36, grid_width=2, grid_height=2
+                            )
+
+    assert after_drop is None
+    grid_buffers.readback.read.assert_not_called()
+
+
+def test_queue_luma_grid_sets_hdr_uniform_for_rgba16f() -> None:
     ctx, _vaos = _mock_gl_post_process_ctx()
     post = GlPostProcess(color_format=RGBA16F)
-    grid_fbo = MagicMock(name="grid_fbo")
-    grid_fbo.use = MagicMock()
-    grid_fbo.read.return_value = np.zeros(4, dtype=np.float32).tobytes()
-    grid_buffers = SimpleNamespace(tex=MagicMock(), fbo=grid_fbo)
+    grid_buffers = _luma_grid_buffers(2, 2, np.zeros(4, dtype=np.float32).tobytes())
 
     with patch("cleave.gl_post_process.moderngl.create_context", return_value=ctx):
         with patch("cleave.gl_post_process.save_gl_state", return_value=MagicMock()):
@@ -354,9 +388,77 @@ def test_read_luma_grid_sets_hdr_uniform_for_rgba16f() -> None:
                         return_value=grid_buffers,
                     ):
                         with patch.object(post, "_draw_quad") as mock_draw:
-                            post.read_luma_grid(7, 64, 36, grid_width=2, grid_height=2)
+                            post.queue_luma_grid(7, 64, 36, grid_width=2, grid_height=2)
 
     assert mock_draw.call_args.kwargs["extra_uniforms"]["hdr"] is True
+
+
+def test_batch_saves_and_restores_gl_state_once_for_several_passes() -> None:
+    ctx, _vaos = _mock_gl_post_process_ctx()
+    post = GlPostProcess()
+    saved = MagicMock(name="saved")
+
+    with patch("cleave.gl_post_process.moderngl.create_context", return_value=ctx):
+        with patch("cleave.gl_post_process.save_gl_state", return_value=saved) as save:
+            with patch("cleave.gl_post_process.restore_gl_state") as restore:
+                with patch(
+                    "cleave.gl_post_process._prepare_fixed_function_gl"
+                ) as prepare:
+                    with post.batch():
+                        post.apply_bloom(texture_id=7, width=64, height=64, strength=0.5)
+                        post.apply_grit(7, 64, 64, 0.3, 1.0)
+                        post.copy_texture(7, 8, 64, 64)
+                        with post.batch():
+                            post.apply_chroma_boost(7, 64, 64, 40, 0)
+                        assert restore.call_count == 0
+
+    save.assert_called_once()
+    restore.assert_called_once_with(saved, ctx)
+    prepare.assert_called_once()
+
+
+def test_empty_batch_touches_no_gl_state() -> None:
+    post = GlPostProcess()
+
+    with patch("cleave.gl_post_process.save_gl_state") as save:
+        with patch("cleave.gl_post_process.restore_gl_state") as restore:
+            with post.batch():
+                post.apply_bloom(texture_id=7, width=64, height=64, strength=0.0)
+
+    save.assert_not_called()
+    restore.assert_not_called()
+
+
+def test_pass_after_batch_saves_its_own_state() -> None:
+    ctx, _vaos = _mock_gl_post_process_ctx()
+    post = GlPostProcess()
+
+    with patch("cleave.gl_post_process.moderngl.create_context", return_value=ctx):
+        with patch("cleave.gl_post_process.save_gl_state", return_value=MagicMock()) as save:
+            with patch("cleave.gl_post_process.restore_gl_state") as restore:
+                with patch("cleave.gl_post_process._prepare_fixed_function_gl"):
+                    with post.batch():
+                        post.apply_bloom(texture_id=7, width=64, height=64, strength=0.5)
+                    post.apply_bloom(texture_id=7, width=64, height=64, strength=0.5)
+
+    assert save.call_count == 2
+    assert restore.call_count == 2
+
+
+def test_batch_restores_when_a_pass_raises() -> None:
+    ctx, _vaos = _mock_gl_post_process_ctx()
+    post = GlPostProcess()
+
+    with patch("cleave.gl_post_process.moderngl.create_context", return_value=ctx):
+        with patch("cleave.gl_post_process.save_gl_state", return_value=MagicMock()):
+            with patch("cleave.gl_post_process.restore_gl_state") as restore:
+                with patch("cleave.gl_post_process._prepare_fixed_function_gl"):
+                    with patch.object(post, "_draw_quad", side_effect=RuntimeError):
+                        with pytest.raises(RuntimeError):
+                            with post.batch():
+                                post.apply_grit(7, 64, 64, 0.3, 1.0)
+
+    restore.assert_called_once()
 
 
 def test_apply_bloom_caches_vao_per_program() -> None:

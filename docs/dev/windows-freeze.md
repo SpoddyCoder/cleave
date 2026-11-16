@@ -158,6 +158,12 @@ Two environment variables help when playback is silent or lands on the wrong end
 
 ---
 
+## OpenGL error checking
+
+The frozen build turns off PyOpenGL's `glGetError` check after every GL call ([cleave/gl_error_checking.py](../../cleave/gl_error_checking.py)), which the ImGui renderer pays per draw command. A checkout keeps it on. For a GL bug report from the frozen build, set `CLEAVE_GL_ERROR_CHECKING=1` so a failing call raises where it happens.
+
+---
+
 ## ctypes search (code in 2.1; DLLs in 2.2)
 
 [cleave/projectm.py](../../cleave/projectm.py) and [cleave/projectm_playlist.py](../../cleave/projectm_playlist.py):

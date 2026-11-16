@@ -568,6 +568,9 @@ def main(argv: list[str] | None = None) -> None:
     global _parent_console_attached
     _parent_console_attached = attach_parent_console()
     from cleave.cuda_extra import activate_cuda_extra
+    from cleave.gl_error_checking import configure_gl_error_checking
+
+    configure_gl_error_checking()
 
     activate_cuda_extra()
     try:
