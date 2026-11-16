@@ -135,16 +135,21 @@ def _assert_in_view(rings: list[tuple[float, float, float, float]]) -> None:
 
 
 def _window_scroll(host: ShellHost, panel_name: str) -> list[float]:
-    """Record the scroll of the window *panel_name* draws into, once per frame."""
+    """Record the scroll of the window *panel_name* draws its rows into.
+
+    The navigator's rows scroll its own window; the inspector's scroll a child
+    under the title, so the scroll is read from inside a row draw.
+    """
     seen: list[float] = []
     panel = getattr(host, panel_name)
-    real = panel.draw
+    method = "draw_row" if panel_name == "inspector" else "draw"
+    real = getattr(panel, method)
 
     def spy(*args) -> None:
         real(*args)
         seen.append(float(imgui.get_scroll_y()))
 
-    panel.draw = spy
+    setattr(panel, method, spy)
     return seen
 
 
@@ -187,6 +192,25 @@ def test_inspector_scrolls_to_keep_the_focused_row_in_view() -> None:
         assert scroll[-1] > 0.0
 
 
+def test_inspector_title_stays_put_while_its_rows_scroll() -> None:
+    controls = _long_preset_page()
+    with _shell(controls) as host:
+        rows = _window_scroll(host, "inspector")
+        title: list[float] = []
+        real = host.inspector.draw
+
+        def spy(*args) -> None:
+            real(*args)
+            title.append(float(imgui.get_scroll_y()))
+
+        host.inspector.draw = spy
+        _focused_rows(host)
+        controls.inspector.handle_keydown(keydown(pygame.K_UP))
+        _focused_rows(host)
+        assert rows[-1] > 0.0
+        assert set(title) == {0.0}
+
+
 def test_inspector_wraps_back_to_the_top_row() -> None:
     controls = _long_preset_page()
     with _shell(controls) as host:
@@ -205,14 +229,14 @@ def test_wheel_scroll_is_not_pulled_back_while_focus_stays() -> None:
     with _shell(controls) as host:
         _focused_rows(host)
         scroll: list[float] = []
-        real = host.inspector.draw
+        real = host.inspector.draw_row
 
-        def wheel_then_draw(state) -> None:
+        def wheel_then_draw(*args) -> None:
             if not scroll:
                 imgui.set_scroll_y(300.0)
-            real(state)
+            real(*args)
             scroll.append(float(imgui.get_scroll_y()))
 
-        host.inspector.draw = wheel_then_draw
+        host.inspector.draw_row = wheel_then_draw
         _focused_rows(host, frames=3)
         assert scroll[-1] == 300.0

@@ -606,7 +606,6 @@ class ShellHost:
                 active=stop is CycleStop.INSPECTOR,
                 idle_border=NAVIGATOR_BORDER,
                 body=lambda: self.inspector.draw(frame),
-                scrollable=True,
             )
             self._draw_help(
                 layout.help,

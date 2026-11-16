@@ -14,7 +14,7 @@ from cleave.viz.choice_widgets import ChoiceTone
 from cleave.viz.commands import command_by_id, command_context, CommandContext
 from cleave.viz.drag_reorder import DRAG_PRESET
 from cleave.viz.imgui_icon_button import glyph_drop
-from cleave.viz.imgui_theme import padded_rows, rgba
+from cleave.viz.imgui_theme import padded_row_spacing_y, padded_rows, rgba
 from cleave.viz.inspector import build_inspector_rows, InspectorRow
 from cleave.viz.inspector_controls import (
     inspector_command_enabled,
@@ -63,6 +63,7 @@ from cleave.viz.shell_inspector_title import (
     TitleButton,
 )
 from cleave.viz.shell_widgets import (
+    PANEL_BORDER_PX,
     drag_handle_lead,
     draw_aligned_parts,
     draw_button,
@@ -100,6 +101,7 @@ if TYPE_CHECKING:
 
 # Indent per nesting level of an inspector row.
 _INSPECTOR_INDENT = 16.0
+_INSPECTOR_ROWS = "##inspector-rows"
 # Height of an inspector divider, as a fraction of the text line.
 _INSPECTOR_DIVIDER_LINES = 0.5
 
@@ -358,6 +360,34 @@ class _RowItem:
     span: tuple[float, float]
 
 
+def _begin_inspector_rows() -> None:
+    """Open the scrolling child that holds the inspector rows.
+
+    The child spans the panel inside its border and pads its sides by the
+    rest of the panel's padding, so rows, their washes, and the scrollbar sit
+    where they would in the panel itself. A selectable's rect reaches half the
+    row spacing above and below its line, so the child starts that much
+    higher and pads its top and bottom by it, and the first and last rows
+    keep their whole wash.
+    """
+    half = 0.5 * padded_row_spacing_y()
+    border = PANEL_BORDER_PX
+    pad_x = max(0.0, imgui.get_style().window_padding.x - border)
+    win_x = imgui.get_window_pos().x
+    width = imgui.get_window_width() - 2.0 * border
+    cursor = imgui.get_cursor_screen_pos()
+    imgui.set_cursor_screen_pos(imgui.ImVec2(win_x + border, cursor.y - half))
+    imgui.push_style_var(imgui.StyleVar_.window_padding, imgui.ImVec2(pad_x, half))
+    try:
+        imgui.begin_child(
+            _INSPECTOR_ROWS,
+            imgui.ImVec2(width, 0.0),
+            imgui.ChildFlags_.always_use_window_padding,
+        )
+    finally:
+        imgui.pop_style_var()
+
+
 class InspectorPanel:
     """The inspector page: title line, value rows, and command buttons."""
 
@@ -416,13 +446,19 @@ class InspectorPanel:
         _draw_inspector_divider()
         self.values.choice_rects = {}
         self.row_rects = {}
-        with padded_rows():
-            for row in build_inspector_rows(state, focus.selected_id):
-                if row.divider:
-                    _draw_inspector_divider()
-                    continue
-                self.draw_row(state, row)
-        self._row_drag.finish(DRAG_PRESET)
+        # Only the rows scroll, so the title line stays in view and the
+        # scrollbar spans the rows alone.
+        _begin_inspector_rows()
+        try:
+            with padded_rows():
+                for row in build_inspector_rows(state, focus.selected_id):
+                    if row.divider:
+                        _draw_inspector_divider()
+                        continue
+                    self.draw_row(state, row)
+            self._row_drag.finish(DRAG_PRESET)
+        finally:
+            imgui.end_child()
         self.values.draw_colour_picker()
         self.values.draw_choice_list_window()
 
