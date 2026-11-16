@@ -7,7 +7,9 @@ import pygame
 from cleave.config_schema.layers import MAX_LAYER_COUNT
 from cleave.timeline import SlotCue, TimelineLane, canonicalize
 from cleave.viz.overlay_upload import upload_plan_for_signature
-from cleave.viz.timeline_overlay import TimelineOverlay, TimelineViewState, timeline_live_signature
+from cleave.viz.timeline_overlay import TimelineOverlay
+from cleave.viz.timeline_strip_live import live_flash_signature, timeline_live_signature
+from cleave.viz.timeline_strip_state import TimelineViewState
 from cleave.viz.timeline_panel_cache import (
     timeline_panel_max_dimensions,
     timeline_static_signature,
@@ -298,7 +300,7 @@ def test_live_signature_changes_on_playhead_flash() -> None:
 
 def test_live_signature_changes_on_selected_clip_flash_phase(monkeypatch) -> None:
     pygame.init()
-    from cleave.viz.timeline_overlay import SELECTED_CLIP_FLASH_HALF_MS
+    from cleave.viz.timeline_strip_flash import SELECTED_CLIP_FLASH_HALF_MS
 
     overlay = TimelineOverlay()
     start = 10_000
@@ -309,11 +311,11 @@ def test_live_signature_changes_on_selected_clip_flash_phase(monkeypatch) -> Non
         lanes={"layer_1": _lane(True, (10.0, False))},
     )
     monkeypatch.setattr(pygame.time, "get_ticks", lambda: start)
-    bright = overlay._live_flash_signature(state)
+    bright = live_flash_signature(state)
     monkeypatch.setattr(
         pygame.time, "get_ticks", lambda: start + SELECTED_CLIP_FLASH_HALF_MS
     )
-    alt = overlay._live_flash_signature(state)
+    alt = live_flash_signature(state)
     assert bright
     assert bright != alt
 
@@ -409,7 +411,7 @@ def test_taller_band_grows_rows_and_keeps_icons_nominal() -> None:
     )
     fit = overlay.compose_panel(state, viewport_width=1280, viewport_height=720)
     assert fit is not None
-    fit_layout = overlay._hit_layout
+    fit_layout = overlay.layout
     tall = overlay.compose_panel(
         state,
         viewport_width=1280,
@@ -417,7 +419,7 @@ def test_taller_band_grows_rows_and_keeps_icons_nominal() -> None:
         timeline_rect=(0, 320, 1280, 400),
     )
     assert tall is not None
-    layout = overlay._hit_layout
+    layout = overlay.layout
     assert layout.row_h > fit_layout.row_h
     assert layout.icon_h == fit_layout.row_h
     assert layout.slot_w == fit_layout.slot_w

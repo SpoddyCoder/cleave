@@ -18,7 +18,7 @@ from cleave.viz.theme import (
 )
 
 if TYPE_CHECKING:
-    from cleave.viz.timeline_overlay import TimelineViewState
+    from cleave.viz.timeline_strip_state import TimelineViewState
 
 
 @dataclass(frozen=True)

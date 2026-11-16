@@ -38,52 +38,61 @@ from cleave.viz.theme import (
     SONG_MARKER_SELECTED,
     timeline_ui_metrics,
 )
-from cleave.viz.timeline_overlay import (
+from cleave.viz.timeline_overlay import TimelineOverlay
+from cleave.viz.timeline_strip_flash import (
+    REC_FLASH_MS,
     ARM_FLASH_DURATION_MS,
     ARM_FLASH_HALF_MS,
-    CLIP_HANDLE_WIDTH,
     PLAYHEAD_FLASH_MS,
-    ROLE_GLYPH_BOTTOM_PAD,
-    ROW_HEADER_BUTTONS,
-    ROLE_GLYPH_TICK_GAP,
     SELECTED_CLIP_COLOR,
     SELECTED_CLIP_FLASH_DURATION_MS,
     SELECTED_CLIP_FLASH_HALF_MS,
     SELECTED_CLIP_FLASH_RED,
-    SELECTED_CLIP_FLASH_OUTLINE_WIDTH,
-    SELECTED_CLIP_FLASH_TICK_WIDTH,
     SELECTED_CLIP_FLASH_YELLOW,
-    SELECTED_CLIP_OUTLINE_WIDTH,
-    TimelineOverlay,
-    TimelineViewState,
-    arm_flash_active,
-    header_button_x,
-    header_buttons_width,
-    row_header_target_at,
-    blit_role_glyph_xor,
-    arm_flash_visible,
     arm_button_lit,
-    bar_level_breakpoints_for_row,
-    bar_tick_times_for_row,
-    cue_times_for_stem,
-    layer_num_prefix,
+    arm_flash_active,
+    arm_flash_visible,
     playhead_color,
     playhead_flash_bright,
-    playhead_x,
     prune_expired_arm_flashes,
     prune_expired_selected_clip_flash,
     rec_flash_visible,
-    role_glyph_anchor,
-    role_glyph_previous_level,
-    role_glyph_side,
-    row_prefix_width,
     selected_clip_flash_active,
     selected_clip_flash_bright,
     selected_clip_flash_color,
+)
+from cleave.viz.timeline_strip_layout import (
+    ROW_HEADER_BUTTONS,
+    header_button_x,
+    header_buttons_width,
+    layer_num_prefix,
+    playhead_x,
+    row_header_target_at,
+    row_prefix_width,
     stem_abbrev_label,
     stem_label_text,
     time_to_x,
+)
+from cleave.viz.timeline_strip_live import (
+    ROLE_GLYPH_BOTTOM_PAD,
+    ROLE_GLYPH_TICK_GAP,
+    SELECTED_CLIP_FLASH_OUTLINE_WIDTH,
+    SELECTED_CLIP_FLASH_TICK_WIDTH,
+    blit_role_glyph_xor,
+    role_glyph_anchor,
+    role_glyph_previous_level,
+    role_glyph_side,
+)
+from cleave.viz.timeline_strip_state import (
+    TimelineViewState,
+    bar_level_breakpoints_for_row,
+    bar_tick_times_for_row,
     clip_breakpoints,
+    cue_times_for_stem,
+)
+from cleave.viz.timeline_strip_static import (
+    CLIP_HANDLE_WIDTH,
+    SELECTED_CLIP_OUTLINE_WIDTH,
 )
 
 
@@ -392,20 +401,23 @@ def test_disarm_flash_lights_the_arm_button_on_phase(monkeypatch) -> None:
     assert flash_on[0] > 150
 
 
+def _set_rec_flash(monkeypatch, visible: bool) -> None:
+    """Pin the clock to the lit or dark half of the REC blink."""
+    monkeypatch.setattr(
+        "pygame.time.get_ticks", lambda: 0 if visible else REC_FLASH_MS
+    )
+
+
 def test_armed_recording_monitor_eye_flashes_when_focused(monkeypatch) -> None:
     pygame.init()
     overlay = TimelineOverlay()
     state = _view_state(armed_slots={"layer_2"}, recording=True, focus_row=1, submenu_focused=True)
 
-    monkeypatch.setattr(
-        "cleave.viz.timeline_overlay.rec_flash_visible", lambda ticks_ms=None: True
-    )
+    _set_rec_flash(monkeypatch, True)
     surface_on = pygame.Surface((1280, 720), pygame.SRCALPHA)
     _draw(overlay, surface_on, state)
 
-    monkeypatch.setattr(
-        "cleave.viz.timeline_overlay.rec_flash_visible", lambda ticks_ms=None: False
-    )
+    _set_rec_flash(monkeypatch, False)
     surface_off = pygame.Surface((1280, 720), pygame.SRCALPHA)
     _draw(overlay, surface_off, state)
 
@@ -423,9 +435,7 @@ def test_armed_recording_monitor_eye_flashes_when_focused(monkeypatch) -> None:
 
 
 def test_armed_recording_monitor_eye_uses_override_bg_when_flash_on(monkeypatch) -> None:
-    monkeypatch.setattr(
-        "cleave.viz.timeline_overlay.rec_flash_visible", lambda ticks_ms=None: True
-    )
+    _set_rec_flash(monkeypatch, True)
     pygame.init()
     overlay = TimelineOverlay()
     state = _view_state(armed_slots={"layer_2"}, recording=True, focus_row=1, submenu_focused=True)
@@ -441,9 +451,7 @@ def test_armed_recording_monitor_eye_uses_override_bg_when_flash_on(monkeypatch)
 
 
 def test_armed_recording_monitor_eye_hides_override_bg_when_flash_off(monkeypatch) -> None:
-    monkeypatch.setattr(
-        "cleave.viz.timeline_overlay.rec_flash_visible", lambda ticks_ms=None: False
-    )
+    _set_rec_flash(monkeypatch, False)
     pygame.init()
     overlay = TimelineOverlay()
     state = _view_state(armed_slots={"layer_2"}, recording=True, focus_row=1, submenu_focused=True)
@@ -459,7 +467,7 @@ def test_armed_recording_monitor_eye_hides_override_bg_when_flash_off(monkeypatc
 
 
 def _header_x(overlay: TimelineOverlay, target: str) -> int:
-    layout = overlay._hit_layout
+    layout = overlay.layout
     assert layout is not None
     return header_button_x(
         target,
@@ -480,7 +488,7 @@ def _header_bg_pixel(
     panel = overlay.panel_rect
     assert panel is not None
     panel_x, panel_y, _, _ = panel
-    layout = overlay._hit_layout
+    layout = overlay.layout
     assert layout is not None
     sample_x = panel_x + _header_x(overlay, target) + 1
     sample_y = panel_y + row_y + (row_h - layout.slot_w) // 2 + 1
@@ -492,9 +500,7 @@ def _arm_bg_pixel(surface: pygame.Surface, overlay: TimelineOverlay, row_y: int,
 
 
 def test_armed_recording_arm_button_flashes_with_rec(monkeypatch) -> None:
-    monkeypatch.setattr(
-        "cleave.viz.timeline_overlay.rec_flash_visible", lambda ticks_ms=None: True
-    )
+    _set_rec_flash(monkeypatch, True)
     pygame.init()
     overlay = TimelineOverlay()
     state = _view_state(armed_slots={"layer_2"}, recording=True, focus_row=0, submenu_focused=True)
@@ -505,9 +511,7 @@ def test_armed_recording_arm_button_flashes_with_rec(monkeypatch) -> None:
     _, _, row_y, _, row_h, _ = bass_layout
     flash_on = _arm_bg_pixel(surface, overlay, row_y, row_h)
 
-    monkeypatch.setattr(
-        "cleave.viz.timeline_overlay.rec_flash_visible", lambda ticks_ms=None: False
-    )
+    _set_rec_flash(monkeypatch, False)
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
     _draw(overlay, surface, state)
     flash_off = _arm_bg_pixel(surface, overlay, row_y, row_h)
@@ -583,15 +587,11 @@ def test_override_armed_recording_monitor_eye_flashes(monkeypatch) -> None:
         submenu_focused=True,
     )
 
-    monkeypatch.setattr(
-        "cleave.viz.timeline_overlay.rec_flash_visible", lambda ticks_ms=None: True
-    )
+    _set_rec_flash(monkeypatch, True)
     surface_on = pygame.Surface((1280, 720), pygame.SRCALPHA)
     _draw(overlay, surface_on, state)
 
-    monkeypatch.setattr(
-        "cleave.viz.timeline_overlay.rec_flash_visible", lambda ticks_ms=None: False
-    )
+    _set_rec_flash(monkeypatch, False)
     surface_off = pygame.Surface((1280, 720), pygame.SRCALPHA)
     _draw(overlay, surface_off, state)
 
@@ -749,7 +749,7 @@ def test_partial_level_bar_shorter_than_full() -> None:
     """Partial level yields a shorter filled height than level 1.0."""
     import pygame as _pygame
 
-    from cleave.viz.timeline_overlay import bar_level_y
+    from cleave.viz.timeline_strip_static import bar_level_y
 
     bar_rect = _pygame.Rect(0, 0, 100, 20)
     assert bar_level_y(bar_rect, 0.25) > bar_level_y(bar_rect, 1.0)
@@ -841,7 +841,7 @@ def test_draw_does_not_crash() -> None:
 def test_compose_panel_occupies_timeline_band() -> None:
     pygame.init()
     from cleave.viz.theme import timeline_panel_height_px
-    from cleave.viz.timeline_overlay import timeline_band_height_px
+    from cleave.viz.timeline_strip_layout import timeline_band_height_px
 
     overlay = TimelineOverlay()
     state = _view_state()
@@ -867,7 +867,7 @@ def test_compose_panel_occupies_timeline_band() -> None:
 
 def test_compose_panel_fills_band_width_inside_container() -> None:
     pygame.init()
-    from cleave.viz.timeline_overlay import timeline_band_height_px
+    from cleave.viz.timeline_strip_layout import timeline_band_height_px
 
     overlay = TimelineOverlay()
     state = _view_state()
@@ -1046,9 +1046,9 @@ def test_corner_buttons_drop_below_the_band_top() -> None:
     overlay = TimelineOverlay()
     surface = pygame.Surface((800, 400), pygame.SRCALPHA)
     _draw(overlay, surface, _view_state(position_sec=30.0, recording=True))
-    from cleave.viz.timeline_overlay import TRANSPORT_BUTTON_DROP_PX
+    from cleave.viz.timeline_strip_layout import TRANSPORT_BUTTON_DROP_PX
 
-    play, record = overlay._transport_rects(overlay._hit_layout)
+    play, record = overlay.layout.transport_rects()
     assert play[1] == record[1] == TRANSPORT_BUTTON_DROP_PX
 
 
@@ -1057,7 +1057,7 @@ def test_record_button_ends_at_ruler_start() -> None:
     overlay = TimelineOverlay()
     surface = pygame.Surface((800, 400), pygame.SRCALPHA)
     _draw(overlay, surface, _view_state(position_sec=0.0))
-    _, record = overlay._transport_rects(overlay._hit_layout)
+    _, record = overlay.layout.transport_rects()
     bar_left, _ = overlay.bar_layout
     assert record[0] + record[2] == bar_left
 
@@ -1095,7 +1095,7 @@ def _bar_level_at(
     t: float,
 ) -> float:
     """Return the strip level for a slot at time t from breakpoints."""
-    from cleave.viz.timeline_overlay import level_at_breakpoints
+    from cleave.viz.timeline_strip_state import level_at_breakpoints
 
     bps = bar_level_breakpoints_for_row(state, slot)
     return level_at_breakpoints(bps, t)
@@ -1215,7 +1215,7 @@ def test_role_glyph_not_drawn_on_off_cue() -> None:
 
 
 def test_bar_cues_include_synthetic_opening_baseline() -> None:
-    from cleave.viz.timeline_overlay import bar_cues_for_row
+    from cleave.viz.timeline_strip_state import bar_cues_for_row
 
     state = _view_state(
         layer_z_order=["layer_1"],
@@ -1624,7 +1624,7 @@ def test_row_height_constant_across_layer_counts() -> None:
 def test_compose_panel_draws_time_scale_above_first_row() -> None:
     pygame.init()
     from cleave.viz.theme import MUTED, SONG_BOUND
-    from cleave.viz.timeline_overlay import timeline_band_height_px
+    from cleave.viz.timeline_strip_layout import timeline_band_height_px
 
     overlay = TimelineOverlay()
     # Keep the playhead off the zero tick it would cover.
@@ -1660,7 +1660,7 @@ def test_compose_panel_draws_time_scale_above_first_row() -> None:
 
 def test_playhead_rises_to_ruler_major_tick_top() -> None:
     pygame.init()
-    from cleave.viz.timeline_overlay import playhead_x, timeline_band_height_px
+    from cleave.viz.timeline_strip_layout import playhead_x, timeline_band_height_px
     from cleave.viz.timeline_ruler import ruler_tick_top
 
     overlay = TimelineOverlay()
@@ -1684,7 +1684,7 @@ def test_playhead_rises_to_ruler_major_tick_top() -> None:
 
 def test_moving_playhead_keeps_ruler_baseline() -> None:
     pygame.init()
-    from cleave.viz.timeline_overlay import playhead_x, timeline_band_height_px
+    from cleave.viz.timeline_strip_layout import playhead_x, timeline_band_height_px
 
     state = _view_state(position_sec=50.0)
     band_h = timeline_band_height_px(len(state.layer_z_order))
@@ -1709,7 +1709,7 @@ def test_moving_playhead_keeps_ruler_baseline() -> None:
 
 
 def test_hit_at_maps_ruler_rows_prefix_and_gaps() -> None:
-    from cleave.viz.timeline_overlay import time_to_x, x_to_time
+    from cleave.viz.timeline_strip_layout import time_to_x, x_to_time
 
     pygame.init()
     overlay = TimelineOverlay(padding=8, row_gap=4)
@@ -1811,7 +1811,7 @@ def test_zoomed_hit_at_maps_the_window_and_tightens_cue_tolerance() -> None:
 
 
 def test_scrollbar_thumb_span_tracks_the_window() -> None:
-    from cleave.viz.timeline_overlay import scrollbar_thumb_span
+    from cleave.viz.timeline_strip_layout import scrollbar_thumb_span
 
     assert scrollbar_thumb_span(1000, 0.0, 100.0, 100.0, min_thumb=12) == (0, 1000)
     assert scrollbar_thumb_span(1000, 40.0, 60.0, 100.0, min_thumb=12) == (400, 200)
@@ -1871,7 +1871,7 @@ def test_scrollbar_cannot_move_at_full_zoom() -> None:
 
 def test_playhead_and_cues_outside_the_window_are_not_drawn() -> None:
     from cleave.viz.theme import PLAYHEAD, PLAYHEAD_FLASH
-    from cleave.viz.timeline_overlay import OFF_SEGMENT_COLOR
+    from cleave.viz.timeline_strip_static import OFF_SEGMENT_COLOR
 
     pygame.init()
     overlay = TimelineOverlay()
@@ -1894,7 +1894,7 @@ def test_playhead_and_cues_outside_the_window_are_not_drawn() -> None:
 
 
 def test_zoomed_level_bar_cuts_segments_at_the_window_edges() -> None:
-    from cleave.viz.timeline_overlay import OFF_SEGMENT_COLOR, track_color
+    from cleave.viz.timeline_strip_static import OFF_SEGMENT_COLOR, track_color
 
     pygame.init()
     overlay = TimelineOverlay()
@@ -1922,7 +1922,7 @@ def test_zoomed_level_bar_cuts_segments_at_the_window_edges() -> None:
 
 
 def test_each_track_has_its_own_on_colour() -> None:
-    from cleave.viz.timeline_overlay import track_color
+    from cleave.viz.timeline_strip_static import track_color
 
     colors = [track_color(index) for index in range(8)]
     assert len(set(colors)) == 8
@@ -1945,7 +1945,7 @@ def _hit_clips() -> list:
 
 
 def _clip_hit(x: float):
-    from cleave.viz.timeline_overlay import clip_hit_at_x
+    from cleave.viz.timeline_strip_hit import clip_hit_at_x
 
     # One pixel per tenth of a second: bar pixel = 100 + t * 10.
     return clip_hit_at_x(
@@ -1959,7 +1959,7 @@ def _clip_hit(x: float):
 
 
 def test_clip_hit_edge_wins_over_body_at_the_threshold() -> None:
-    from cleave.viz.timeline_overlay import CLIP_EDGE_HIT_PX
+    from cleave.viz.timeline_strip_hit import CLIP_EDGE_HIT_PX
 
     start_x = 100 + 200
     assert _clip_hit(start_x) == (20.0, "start")
@@ -1989,7 +1989,7 @@ def test_clip_hit_keeps_the_body_of_a_narrow_clip_grabbable() -> None:
 
 
 def test_hit_at_reports_the_clip_and_edge_under_a_row_point() -> None:
-    from cleave.viz.timeline_overlay import time_to_x
+    from cleave.viz.timeline_strip_layout import time_to_x
 
     pygame.init()
     overlay = TimelineOverlay(padding=8, row_gap=4)
@@ -2027,7 +2027,7 @@ def test_hit_at_reports_the_clip_and_edge_under_a_row_point() -> None:
 
 
 def _compose_bytes(overlay: TimelineOverlay, state: TimelineViewState) -> bytes:
-    from cleave.viz.timeline_overlay import timeline_band_height_px
+    from cleave.viz.timeline_strip_layout import timeline_band_height_px
 
     band_h = timeline_band_height_px(len(state.layer_z_order))
     composed = overlay.compose_panel(
@@ -2097,13 +2097,11 @@ def test_unchanged_frame_skips_fill_and_live_patch(monkeypatch) -> None:
 
     calls: list[str] = []
     monkeypatch.setattr(
-        overlay,
-        "_compose_static_layers",
+        "cleave.viz.timeline_strip_static.StaticLayers.lay",
         lambda *a, **k: calls.append("compose"),
     )
     monkeypatch.setattr(
-        overlay,
-        "_patch_live_overlay",
+        "cleave.viz.timeline_overlay.patch_live_overlay",
         lambda *a, **k: calls.append("patch") or [],
     )
     _compose_bytes(overlay, state)

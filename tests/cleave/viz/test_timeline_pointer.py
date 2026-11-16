@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import pytest
 
 from cleave.viz.context_menu import CONTEXT_SEPARATOR, ContextMenuItem
-from cleave.viz.timeline_overlay import StripHit
+from cleave.viz.timeline_strip_hit import StripHit
 from cleave.viz.timeline_pointer import MIDDLE_BUTTON, TimelinePointer
 from cleave.viz.timeline_view import StripView
 

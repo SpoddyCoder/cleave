@@ -10,7 +10,8 @@ from cleave.viz.overlay_upload import (
     OverlayUploadCoordinator,
     present_overlay,
 )
-from cleave.viz.timeline_overlay import TimelineOverlay, TimelineViewState
+from cleave.viz.timeline_overlay import TimelineOverlay
+from cleave.viz.timeline_strip_state import TimelineViewState
 
 _TIMELINE_UPLOAD_COORDINATOR = OverlayUploadCoordinator()
 _NO_PROFILER = OverlayProfiler(enabled=False)

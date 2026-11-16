@@ -44,7 +44,8 @@ from cleave.viz.context_menu import ContextMenuEntry, ContextMenuProvider
 from cleave.viz.session import TuningSession
 from cleave.viz.timeline_clip_edits import clip_edits_allowed
 from cleave.viz.timeline_context_menu import TimelineRowMenuActions, timeline_row_menu
-from cleave.viz.timeline_overlay import ROW_HEADER_BUTTONS, StripHit, StripTarget
+from cleave.viz.timeline_strip_hit import StripHit
+from cleave.viz.timeline_strip_layout import ROW_HEADER_BUTTONS, StripTarget
 from cleave.viz.timeline_view import (
     WHEEL_PAN_FRACTION,
     WHEEL_ZOOM_FACTOR,

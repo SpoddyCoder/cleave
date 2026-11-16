@@ -28,12 +28,12 @@ from cleave.viz.editor_mode_controls import (
 )
 from cleave.viz.focus_nav import FocusCursor, TimelineFocus
 from cleave.viz.session import TimelineFadeGroupRuntime, TuningSession
-from cleave.viz.timeline_overlay import (
-    TimelineViewState,
-    ROW_HEADER_TARGETS,
+from cleave.viz.timeline_strip_flash import (
     prune_expired_arm_flashes,
     prune_expired_selected_clip_flash,
 )
+from cleave.viz.timeline_strip_layout import ROW_HEADER_TARGETS
+from cleave.viz.timeline_strip_state import TimelineViewState
 
 if TYPE_CHECKING:
     from cleave.viz.layer import StemLayer

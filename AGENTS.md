@@ -25,7 +25,7 @@ Do not glob `**/*.py`, grep the repo root, spawn an explore subagent, or read `d
 - Frame / GPU: `cleave/viz/layer_pipeline.py`, `frame_finish.py`, `cleave/gl_*.py`, `layer_composite.py`
 - Effect: `cleave/effects/registry.py`, `handlers.py`, handler module
 - Timeline generate: `cleave/timeline_presets/`
-- Timeline strip UI: `cleave/viz/timeline_overlay.py` (not `RowLayout`)
+- Timeline strip UI: `cleave/viz/timeline_overlay.py` (compose and caches), then `timeline_strip_state.py` (view state, per-row data), `timeline_strip_layout.py` (geometry, row header buttons), `timeline_strip_static.py` (cached panel), `timeline_strip_live.py` (playhead, flashes, transport, role glyphs), `timeline_strip_flash.py` (blink timing), `timeline_strip_hit.py` (hit testing)
 - Context menu: `cleave/viz/context_menu.py` (state), `menu_rows.py` (draw), provider modules (`timeline_context_menu.py`)
 - Runtime / window: `cleave/viz/app.py` (runtime, setup, teardown), `live_frame_loop.py` (per-frame loop), `shell_prompts.py` (modal, picker, tap sync on the top layer), `bootstrap.py`, `loading.py`
 - CLI / IO: `cleave/cli.py`, `paths.py`, `stems.py`, `separate.py`

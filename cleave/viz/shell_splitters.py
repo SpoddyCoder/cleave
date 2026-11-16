@@ -10,7 +10,7 @@ from cleave.viz.shell_layout import (
     splitter_request_timeline_height,
     splitter_request_width,
 )
-from cleave.viz.timeline_overlay import timeline_band_height_px
+from cleave.viz.timeline_strip_layout import timeline_band_height_px
 
 
 class SplitterDrag:

@@ -1314,7 +1314,7 @@ def test_ctrl_space_without_armed_stems_notifies() -> None:
 
 def test_recorded_timeline_bar_unchanged_after_disable_layer_toggle_reenable() -> None:
     from cleave.viz.layer_visibility import build_timeline_view_state
-    from cleave.viz.timeline_overlay import bar_level_breakpoints_for_row
+    from cleave.viz.timeline_strip_state import bar_level_breakpoints_for_row
 
     controls, session, _, _, _, _ = _make_timeline_controls(
         armed_slots={"layer_1"},

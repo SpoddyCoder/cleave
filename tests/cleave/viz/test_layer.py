@@ -28,7 +28,7 @@ from cleave.viz.layer_visibility import (
     timeline_level_multiplier,
 )
 from cleave.viz.layer_pipeline import apply_effect_modifiers
-from cleave.viz.timeline_overlay import (
+from cleave.viz.timeline_strip_state import (
     bar_level_breakpoints_for_row,
     bar_tick_times_for_row,
     cue_times_for_stem,

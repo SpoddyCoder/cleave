@@ -45,7 +45,8 @@ from cleave.viz.theme import set_ui_scale_percent
 from cleave.viz.tooltips import set_tooltips_enabled
 from cleave.viz.timeline_controls import TimelineControls
 from cleave.viz.shell_layout import ShellLayout, clamp_timeline_band_height
-from cleave.viz.timeline_overlay import TimelineOverlay, timeline_band_height_px
+from cleave.viz.timeline_overlay import TimelineOverlay
+from cleave.viz.timeline_strip_layout import timeline_band_height_px
 from cleave.viz.playback import PlaybackState, init_playback
 from cleave.viz.projectm_frame_clock import ProjectMFrameClock
 from cleave.viz.frame_finish import OverlaysPanelCache, finish_content_frame

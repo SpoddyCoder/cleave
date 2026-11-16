@@ -539,7 +539,7 @@ def test_minimum_window_keeps_every_column_and_both_stack_panes() -> None:
     from cleave.config_schema.window import window_minimum_size
     from cleave.viz.shell_menu_bar import menu_bar_height_px
     from cleave.viz.theme import set_ui_scale_percent
-    from cleave.viz.timeline_overlay import timeline_band_height_px
+    from cleave.viz.timeline_strip_layout import timeline_band_height_px
 
     try:
         for percent in (100, 200):

@@ -29,7 +29,7 @@ from cleave.viz.shell_layout import ShellLayout
 from cleave.viz.shell_menu_bar import menu_bar_height_px
 from cleave.viz.shell_prompts import ShellPrompts
 from cleave.viz.shell_transport import TransportReadout
-from cleave.viz.timeline_overlay import playback_bar_text
+from cleave.viz.timeline_strip_state import playback_bar_text
 from cleave.viz.timeline_pointer import TimelinePointer
 from cleave.viz.timeline_time_menu import TimelineTimeMenu
 from cleave.viz.window_controls import WindowControls

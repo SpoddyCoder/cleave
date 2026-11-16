@@ -10,7 +10,7 @@ from cleave.gl_compositor import OverlayTextureSlot
 from cleave.viz.overlay_draw import OverlayDrawer
 from cleave.viz.overlay_primitives import ComposedPanel
 from cleave.viz.overlay_upload import OverlayGpuState, UploadPlan, UploadSignature
-from cleave.viz.timeline_overlay import TimelineViewState
+from cleave.viz.timeline_strip_state import TimelineViewState
 from tests.support.compositor_mock import recording_compositor
 
 
