@@ -56,7 +56,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
-- When a page's on/off switch is off, or a parent's is (for example a layer, Post-FX, or Timeline), the inspector title ends in "(disabled)", and its choice segments, combo boxes, and buttons grey out like its value rows. They still edit. An overlay card's rows also grey out while that card is off.
+- When a page's on/off switch is off, or a parent's is (for example a layer, Post-FX, or Timeline), the inspector title ends in a grey power icon, and its choice segments, combo boxes, and buttons grey out like its value rows. They still edit. When the page or a parent is locked, the title ends in a red lock icon and those controls turn red like locked rows. Hover either icon to see why and which switch or lock to change. An overlay card's rows also grey out while that card is off.
 - Clicking the start row of a clip in the inspector, or pressing Enter on it, no longer moves the playhead. Enter on the timeline strip still seeks to the selected clip's start.
 - The inspector's help for clip opacity, blend, and role now gives as much detail as the layer menu. Blend lists each mode with what it does, role lists each role, and opacity and blend note that Pattern Mask replaces them when it is on.
 - A double-click in a gap on a timeline strip row now adds a clip instead of seeking. A double-click on a clip still seeks, as does one while the timeline is locked or recording; the time scale seeks as before.

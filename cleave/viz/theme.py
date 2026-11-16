@@ -7,6 +7,7 @@ Typography roles for the live tuning overlay:
   DISABLED_MUTED — an unchosen option on a control whose page is switched off
   MUTED    — muted blue-grey text (#9ba6bc)
   LOCKED   — tinted text for locked sub-rows that cannot be edited
+  LOCKED_MUTED — an unchosen option on a locked control
 
 Accent colors for modes and icons (not label/value roles):
   HIGHLIGHT, ERROR_NOTIFICATION, NOTIFICATION_ON_FILL, MOVE_MODE, LOCK_ICON,
@@ -18,6 +19,7 @@ Buttons (fills, not text roles):
     segment, combo box, and open combo list
   BUTTON_PRIMARY_BG - the confirm button of a dialog, and a selected segment
   BUTTON_PRIMARY_DIMMED_BG - a selected segment on a row whose page is switched off
+    or locked
   BUTTON_DANGER_BG - the confirm button of a destructive dialog
   NAV_ON_BG, SOLO_BG, NAV_LOCK_BG - lit navigator on, solo, and lock icons
     (NAV_LOCK_GLYPH is the dark lock icon on its amber fill)
@@ -229,6 +231,7 @@ PRESET_FILE_ICON: tuple[int, int, int] = (255, 250, 235)
 MOVE_MODE: tuple[int, int, int] = (60, 120, 255)
 LOCK_ICON: tuple[int, int, int] = (235, 90, 90)
 LOCKED: tuple[int, int, int] = (235, 150, 150)
+LOCKED_MUTED: tuple[int, int, int] = (170, 110, 110)
 SOLO_BG: tuple[int, int, int] = (200, 40, 40)
 OVERRIDE_BG: tuple[int, int, int] = (255, 200, 60)
 NAV_ON_BG: tuple[int, int, int] = (40, 140, 75)

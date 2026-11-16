@@ -236,22 +236,56 @@ def build_navigator(
     return tuple(nodes)
 
 
-def page_switched_off(session: TuningSession, node_id: str) -> bool:
-    """True when *node_id* or a parent that owns it has its on/off icon off.
+@dataclass(frozen=True)
+class PageStatus:
+    """Why an inspector page has no effect or refuses edits.
+
+    ``off_by`` and ``locked_by`` name the nearest page, the page itself or a
+    parent that owns it, whose on/off switch is off or that is locked.
+    """
+
+    off_by: str | None = None
+    locked_by: str | None = None
+
+
+def page_status(session: TuningSession, node_id: str) -> PageStatus:
+    """Off and locked owners for the inspector page *node_id*.
 
     A timeline row page follows Timeline. An inert switch (layer visibility
     while the timeline owns it) does not count, and config pages have none.
     """
     if timeline_row_slot_of(node_id) is not None:
-        return not session.timeline.enabled
-    chain = {node_id} | ancestor_ids(node_id)
-    nodes = build_navigator(session, chain)
-    return any(
-        toggle.id == TOGGLE_ENABLED and not toggle.active and not toggle.inert
-        for node in nodes
-        if node.id in chain
-        for toggle in node.toggles
-    )
+        timeline = session.timeline
+        return PageStatus(
+            off_by=None if timeline.enabled else "Timeline",
+            locked_by="Timeline" if timeline.locked else None,
+        )
+    chain = [node_id]
+    parent = parent_id_of(node_id)
+    while parent is not None:
+        chain.append(parent)
+        parent = parent_id_of(parent)
+    by_id = {node.id: node for node in build_navigator(session, set(chain))}
+    off_by: str | None = None
+    locked_by: str | None = None
+    for chain_id in chain:
+        node = by_id.get(chain_id)
+        if node is None:
+            continue
+        name = " ".join(node.label.split())
+        toggles = {toggle.id: toggle for toggle in node.toggles}
+        switch = toggles.get(TOGGLE_ENABLED)
+        if (
+            off_by is None
+            and switch is not None
+            and not switch.active
+            and not switch.inert
+        ):
+            off_by = name
+        lock = toggles.get(TOGGLE_LOCK)
+        if locked_by is None and (node.locked or (lock is not None and lock.active)):
+            locked_by = name
+    return PageStatus(off_by=off_by, locked_by=locked_by)
 
 
 def navigator_row_bright(node: NavNode) -> bool:

@@ -26,7 +26,8 @@ from cleave.viz.navigator import (
     navigator_row_bright,
     navigator_row_text_color,
     navigator_tree_rails,
-    page_switched_off,
+    PageStatus,
+    page_status,
     parent_id_of,
     root_id,
     timeline_row_node_id,
@@ -533,27 +534,36 @@ def test_layer_rows_are_draggable_unless_locked() -> None:
     assert not any(node.draggable for node in nodes if node.parent_id != "layers")
 
 
-def test_page_switched_off_follows_its_own_and_parent_switches() -> None:
+def test_page_status_names_the_nearest_off_and_locked_owner() -> None:
     session = TuningSession(
         layer_z_order=["layer_1"],
-        layers={"layer_1": _layer("drums", enabled=False)},
+        layers={"layer_1": _layer("drums", enabled=False, locked=True)},
     )
     compositing = layer_page_node_id("layer_1", "compositing")
+    layer_name = " ".join(build_navigator(session)[-1].label.split())
     # The timeline owns layer visibility, so the layer's switch does not count.
-    assert page_switched_off(session, compositing) is False
+    assert page_status(session, compositing) == PageStatus(locked_by=layer_name)
     session.timeline.enabled = False
-    assert page_switched_off(session, layer_node_id("layer_1")) is True
-    assert page_switched_off(session, compositing) is True
-    assert page_switched_off(session, timeline_row_node_id("layer_1")) is True
-    assert page_switched_off(session, "timeline.grid") is True
+    assert page_status(session, layer_node_id("layer_1")) == PageStatus(
+        off_by=layer_name, locked_by=layer_name
+    )
+    assert page_status(session, compositing).off_by == layer_name
+    assert page_status(session, timeline_row_node_id("layer_1")) == PageStatus(
+        off_by="Timeline"
+    )
+    assert page_status(session, "timeline.grid").off_by == "Timeline"
 
-    assert page_switched_off(session, "post_fx.fade") is False
+    assert page_status(session, "post_fx.fade") == PageStatus()
     session.post_fx.enabled = False
-    assert page_switched_off(session, "post_fx") is True
-    assert page_switched_off(session, "post_fx.fade") is True
+    session.post_fx.locked = True
+    assert page_status(session, "post_fx.fade") == PageStatus(
+        off_by="Post-FX", locked_by="Post-FX"
+    )
 
     session.overlays.opening_card.enabled = False
-    assert page_switched_off(session, "overlay") is False
-    assert page_switched_off(session, "overlay.opening_card") is True
-    assert page_switched_off(session, "overlay.closing_card") is False
-    assert page_switched_off(session, "settings.ui") is False
+    assert page_status(session, "overlay").off_by is None
+    assert page_status(session, "overlay.opening_card").off_by == "Opening Card"
+    assert page_status(session, "overlay.closing_card") == PageStatus()
+    session.overlays.locked = True
+    assert page_status(session, "overlay.closing_card").locked_by == "Overlay"
+    assert page_status(session, "settings.ui") == PageStatus()

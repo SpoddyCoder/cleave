@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from cleave.preset_playlist import PresetPlaylist
+from cleave.viz.choice_widgets import ChoiceTone
 from cleave.stems import StemSource
 from cleave.viz.material_icons import (
     LOCK_GLYPH,
@@ -22,6 +23,7 @@ from cleave.viz.navigator import (
     TWISTY_COLLAPSED,
     TWISTY_EXPANDED,
     NavToggle,
+    PageStatus,
     build_navigator,
     ancestor_ids,
     layer_node_id,
@@ -31,6 +33,8 @@ from cleave.viz.row_hotkeys import activate_header_toggle
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.session import LayerRuntime, TuningSession
 from cleave.viz.shell_host import (
+    choice_tone,
+    page_status_marks,
     marker_token_spans,
     drag_handle_lead,
     inspector_selectable_id,
@@ -495,3 +499,20 @@ def test_menu_bar_project_label_names_project() -> None:
 
 def test_menu_bar_project_label_marks_unsaved_changes() -> None:
     assert menu_bar_project_label("my-song", True) == ("Project: ", "my-song*")
+
+
+def test_page_status_marks_show_off_then_lock_with_tooltips() -> None:
+    assert page_status_marks(PageStatus()) == ()
+    marks = page_status_marks(PageStatus(off_by="Post-FX", locked_by="Post-FX"))
+    assert [(glyph, role) for glyph, role, _tip in marks] == [
+        (POWER_GLYPH, DISABLED),
+        (LOCK_GLYPH, LOCKED),
+    ]
+    assert marks[0][2].startswith("Off:") and "Post-FX" in marks[0][2]
+    assert marks[1][2].startswith("Locked:") and "Post-FX" in marks[1][2]
+
+
+def test_choice_tone_follows_row_value_colour() -> None:
+    assert choice_tone(VALUE) is ChoiceTone.NORMAL
+    assert choice_tone(DISABLED) is ChoiceTone.OFF
+    assert choice_tone(LOCKED) is ChoiceTone.LOCKED

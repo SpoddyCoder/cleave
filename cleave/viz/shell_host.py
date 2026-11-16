@@ -70,7 +70,8 @@ from cleave.viz.navigator import (
     build_navigator,
     navigator_row_text_color,
     navigator_tree_rails,
-    page_switched_off,
+    PageStatus,
+    page_status,
     timeline_row_slot_of,
     timeline_row_title,
 )
@@ -172,7 +173,12 @@ from cleave.viz.choice_layout import (
     rect_contains,
     rect_index_at,
 )
-from cleave.viz.choice_widgets import draw_choice_list, draw_combo, draw_segments
+from cleave.viz.choice_widgets import (
+    ChoiceTone,
+    draw_choice_list,
+    draw_combo,
+    draw_segments,
+)
 from cleave.viz.transport_controls import TransportField
 
 # Vertical padding for the menu bar and the transport bar, which shares its height.
@@ -479,7 +485,37 @@ def selection_after_nav_collapse(
     return toggled_id
 
 
-PAGE_OFF_SUFFIX = " (disabled)"
+def page_status_marks(
+    status: PageStatus,
+) -> tuple[tuple[str, tuple[int, int, int], str], ...]:
+    """Icons after the inspector title, as ``(glyph, colour, tooltip)``."""
+    marks: list[tuple[str, tuple[int, int, int], str]] = []
+    if status.off_by is not None:
+        marks.append(
+            (
+                POWER_GLYPH,
+                DISABLED,
+                f"Off: these settings have no effect until {status.off_by} is turned on",
+            )
+        )
+    if status.locked_by is not None:
+        marks.append(
+            (
+                LOCK_GLYPH,
+                LOCKED,
+                f"Locked: unlock {status.locked_by} to change these settings",
+            )
+        )
+    return tuple(marks)
+
+
+def choice_tone(value_color: tuple[int, int, int]) -> ChoiceTone:
+    """Choice control tone that matches a row drawn in *value_color*."""
+    if value_color == LOCKED:
+        return ChoiceTone.LOCKED
+    if value_color == DISABLED:
+        return ChoiceTone.OFF
+    return ChoiceTone.NORMAL
 
 
 def inspector_title(nodes: Sequence[NavNode], selected_id: str) -> str:
@@ -1115,19 +1151,28 @@ def _draw_transport_notice(
     return chip
 
 
-def _draw_inspector_title(title: str, elapsed_sec: float) -> None:
+def _draw_inspector_title(
+    title: str,
+    elapsed_sec: float,
+    marks: Sequence[tuple[str, tuple[int, int, int], str]] = (),
+) -> None:
     """Inspector page title, with the toast's accent swipe behind it.
 
     The bar spans the panel, inset at each end by the gap above it, and is
     one text row tall. A title wider than the column waits, scrolls to its
     last words, pauses, then snaps back to its start, cut at the right edge,
-    as the bar slides off.
+    as the bar slides off. *marks* follow the title as coloured icons, each
+    with its tooltip on hover.
     """
     start = imgui.get_cursor_screen_pos()
     avail = max(0.0, imgui.get_content_region_avail().x)
     line_h = imgui.get_text_line_height()
     style = imgui.get_style()
-    text_w = imgui.calc_text_size(title).x
+    space_w = imgui.calc_text_size(" ").x
+    title_w = imgui.calc_text_size(title).x
+    text_w = title_w + sum(
+        space_w + imgui.calc_text_size(glyph).x for glyph, _role, _tip in marks
+    )
     imgui.dummy(imgui.ImVec2(avail, line_h))
     win_pos = imgui.get_window_pos()
     win_size = imgui.get_window_size()
@@ -1147,6 +1192,7 @@ def _draw_inspector_title(title: str, elapsed_sec: float) -> None:
     )
     draw = imgui.get_window_draw_list()
     color = _packed(VALUE)
+    on_fill = False
     fill = _notice_fill(
         bar_x1 - bar_x0, attention.fill_progress, from_left=attention.fill_from_left
     )
@@ -1168,6 +1214,7 @@ def _draw_inspector_title(title: str, elapsed_sec: float) -> None:
         mid = start.x + min(text_w, avail) * 0.5
         if attention.text_on_fill and bar_x0 + fill_x <= mid < bar_x0 + fill_x + fill_w:
             color = _packed(NOTIFICATION_ON_FILL)
+            on_fill = True
     offset = attention_scroll_offset(elapsed_sec, overflow, scroll_sec)
     draw.push_clip_rect(
         imgui.ImVec2(start.x, bar_y0),
@@ -1176,6 +1223,23 @@ def _draw_inspector_title(title: str, elapsed_sec: float) -> None:
     )
     try:
         draw.add_text(imgui.ImVec2(start.x - offset, start.y), color, title)
+        x = start.x - offset + title_w
+        for glyph, role, tooltip in marks:
+            x += space_w
+            glyph_w = imgui.calc_text_size(glyph).x
+            draw.add_text(
+                imgui.ImVec2(x, start.y + _icon_drop_to_text(glyph)),
+                color if on_fill else _packed(role),
+                glyph,
+            )
+            left = max(x, start.x)
+            right = min(x + glyph_w, start.x + avail)
+            hovered = left < right and imgui.is_mouse_hovering_rect(
+                imgui.ImVec2(left, start.y), imgui.ImVec2(right, start.y + line_h)
+            )
+            if hovered and imgui.is_window_hovered():
+                show_tooltip(tooltip)
+            x += glyph_w
     finally:
         draw.pop_clip_rect()
 
@@ -1447,8 +1511,8 @@ class ShellHost:
         # This frame's segment or combo rect for each choice row; an open list
         # hangs from its row's rect.
         self._choice_rects: dict[RowDescriptor, tuple[int, int, int, int]] = {}
-        # The inspector page's on/off switch, or a parent's, is off.
-        self._page_off = False
+        # The inspector page's off and locked owners, read each frame.
+        self._page_status = PageStatus()
         self._choice_list_rows: tuple[tuple[int, int, int, int], ...] = ()
         # Widest value each stepped row has shown, in characters, so its arrows
         # hold still as the number changes. The shell font is monospace.
@@ -2677,9 +2741,7 @@ class ShellHost:
             if row_slot is None
             else timeline_row_title(self._controls.session, row_slot)
         )
-        self._page_off = page_switched_off(self._controls.session, focus.selected_id)
-        if self._page_off:
-            title += PAGE_OFF_SUFFIX
+        self._page_status = page_status(self._controls.session, focus.selected_id)
         # A new clip on the same strip row is new content, so it swipes too.
         clip_serial = self._controls.session.timeline.selected_clip_serial
         attention_key = (
@@ -2691,7 +2753,7 @@ class ShellHost:
             if self._controls.cfg.editor.highlight_new_page
             else math.inf
         )
-        _draw_inspector_title(title, elapsed)
+        _draw_inspector_title(title, elapsed, page_status_marks(self._page_status))
         _draw_inspector_divider()
         self._choice_rects = {}
         self._insp_row_rects = {}
@@ -2780,7 +2842,7 @@ class ShellHost:
                     labels,
                     value,
                     enabled=stepped,
-                    dimmed=value_color == DISABLED,
+                    tone=choice_tone(value_color),
                     activated=activated,
                     after_label=label if list_item else None,
                 )
@@ -3343,7 +3405,7 @@ class ShellHost:
         value: str,
         *,
         enabled: bool,
-        dimmed: bool,
+        tone: ChoiceTone,
         activated: bool,
         after_label: str | None = None,
     ) -> None:
@@ -3397,7 +3459,7 @@ class ShellHost:
                 y=rect[1],
                 height=rect[3],
                 enabled=enabled,
-                dimmed=dimmed,
+                tone=tone,
                 hover=hover,
                 hand=hand,
             )
@@ -3415,7 +3477,7 @@ class ShellHost:
                 rect=rect,
                 open_=open_here,
                 enabled=enabled,
-                dimmed=dimmed,
+                tone=tone,
                 hover=hover,
                 hand=hand,
             )
@@ -3515,8 +3577,9 @@ class ShellHost:
                 f"{command.label}##cmd-{command_id}",
                 text_role=_button_text_role(
                     enabled,
-                    inspector_command_locked(self._controls, command_id),
-                    page_off=self._page_off,
+                    inspector_command_locked(self._controls, command_id)
+                    or self._page_status.locked_by is not None,
+                    page_off=self._page_status.off_by is not None,
                 ),
                 selected=selected,
                 enabled=enabled,

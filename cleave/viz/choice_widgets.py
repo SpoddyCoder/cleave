@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from enum import Enum, auto
 
 from imgui_bundle import imgui
 
@@ -34,6 +35,8 @@ from cleave.viz.theme import (
     BUTTON_PRIMARY_DIMMED_BG,
     DISABLED,
     DISABLED_MUTED,
+    LOCKED,
+    LOCKED_MUTED,
     MUTED,
     VALUE,
 )
@@ -48,6 +51,18 @@ _LIST_WINDOW_FLAGS = (
     | int(imgui.WindowFlags_.no_scrollbar)
 )
 _CHOSEN_MARK = "✓ "
+
+
+class ChoiceTone(Enum):
+    """How a choice control reads beside its row.
+
+    ``OFF`` greys a control that still edits, on a page that is switched off.
+    ``LOCKED`` tints it like a locked row's value.
+    """
+
+    NORMAL = auto()
+    OFF = auto()
+    LOCKED = auto()
 _UNCHOSEN_MARK = "  "
 
 
@@ -96,7 +111,7 @@ def draw_segments(
     y: int,
     height: int,
     enabled: bool = True,
-    dimmed: bool = False,
+    tone: ChoiceTone = ChoiceTone.NORMAL,
     hover: bool = True,
     hand: bool = True,
 ) -> tuple[Rect, ...]:
@@ -104,15 +119,15 @@ def draw_segments(
 
     ``hover`` lights the box under the pointer; pass False while something
     else, such as an open list, owns the pointer. Pass ``hand`` False while
-    a click would be refused, so the pointer stays an arrow. ``dimmed`` greys
-    a control that still edits, on a page that is switched off.
+    a click would be refused, so the pointer stays an arrow. *tone* greys or
+    tints the control to match its row.
     """
     rects = segment_rects(measure, labels, x=x, y=y, height=height)
     mx, my = _mouse()
     for index, rect in enumerate(rects):
         is_chosen = index == chosen
         if is_chosen:
-            _fill(draw, rect, _chosen_fill(enabled=enabled, dimmed=dimmed))
+            _fill(draw, rect, _chosen_fill(enabled=enabled, tone=tone))
         elif enabled and hover and rect_contains(rect, mx, my):
             _fill(draw, rect, BUTTON_HOVER_BG)
             if hand:
@@ -123,25 +138,39 @@ def draw_segments(
             measure,
             rect,
             labels[index],
-            _segment_text_role(is_chosen, enabled=enabled, dimmed=dimmed),
+            _segment_text_role(is_chosen, enabled=enabled, tone=tone),
         )
     return rects
 
 
-def _chosen_fill(*, enabled: bool, dimmed: bool) -> tuple[int, int, int]:
-    if not enabled:
-        return BUTTON_BG
-    return BUTTON_PRIMARY_DIMMED_BG if dimmed else BUTTON_PRIMARY_BG
+def _chosen_fill(*, enabled: bool, tone: ChoiceTone) -> tuple[int, int, int]:
+    if tone is ChoiceTone.NORMAL:
+        return BUTTON_PRIMARY_BG if enabled else BUTTON_BG
+    return BUTTON_PRIMARY_DIMMED_BG
 
 
 def _segment_text_role(
-    chosen: bool, *, enabled: bool, dimmed: bool
+    chosen: bool, *, enabled: bool, tone: ChoiceTone
 ) -> tuple[int, int, int]:
+    """Chosen and unchosen option text. A lock tints even a refused control."""
+    if tone is ChoiceTone.LOCKED:
+        return LOCKED if chosen else LOCKED_MUTED
     if not enabled:
         return DISABLED
-    if dimmed:
+    if tone is ChoiceTone.OFF:
         return DISABLED if chosen else DISABLED_MUTED
     return VALUE if chosen else MUTED
+
+
+def _combo_text_roles(
+    *, enabled: bool, tone: ChoiceTone
+) -> tuple[tuple[int, int, int], tuple[int, int, int]]:
+    """Value and caret colours of a combo."""
+    if tone is ChoiceTone.LOCKED:
+        return LOCKED, LOCKED_MUTED
+    if tone is ChoiceTone.OFF:
+        return DISABLED, DISABLED_MUTED
+    return (VALUE, MUTED) if enabled else (DISABLED, DISABLED)
 
 
 def draw_combo(
@@ -152,14 +181,14 @@ def draw_combo(
     rect: Rect,
     open_: bool,
     enabled: bool = True,
-    dimmed: bool = False,
+    tone: ChoiceTone = ChoiceTone.NORMAL,
     hover: bool = True,
     hand: bool = True,
 ) -> None:
     """A framed value with a caret at its right edge.
 
-    Pass ``hand`` False while a click would be refused. ``dimmed`` greys a
-    combo that still edits, on a page that is switched off.
+    Pass ``hand`` False while a click would be refused. *tone* greys or
+    tints the combo to match its row.
     """
     x, y, w, h = rect
     mx, my = _mouse()
@@ -169,12 +198,11 @@ def draw_combo(
     lit = open_ or hovered
     _fill(draw, rect, BUTTON_HOVER_BG if lit else BUTTON_BG)
     _border(draw, rect)
-    role = VALUE if enabled and not dimmed else DISABLED
+    role, caret_role = _combo_text_roles(enabled=enabled, tone=tone)
     th = measure.size(text)[1]
     text_y = y + (h - th) // 2
     draw.add_text(_vec(x + combo_pad_x(), text_y), _u32(role), text)
     caret_w = measure.size(COMBO_CARET)[0]
-    caret_role = DISABLED_MUTED if dimmed else (MUTED if enabled else DISABLED)
     draw.add_text(
         _vec(x + w - combo_pad_x() - caret_w, text_y), _u32(caret_role), COMBO_CARET
     )
