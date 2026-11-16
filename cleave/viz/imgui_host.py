@@ -186,7 +186,9 @@ def _select_renderer_class() -> type[ProgrammablePipelineRenderer] | type[_Headl
 def _merge_icon_glyphs(fonts: Any, size_pixels: float) -> tuple[Any, list[int]]:
     """Merge the shell's icons into the font just added. Not the whole icon font."""
     from cleave.viz.material_icons import (
+        ARROW_BACK_GLYPH,
         ARROW_DOWNWARD_GLYPH,
+        ARROW_FORWARD_GLYPH,
         ARROW_UPWARD_GLYPH,
         FILE_GLYPH,
         FOLDER_GLYPH,
@@ -209,6 +211,8 @@ def _merge_icon_glyphs(fonts: Any, size_pixels: float) -> tuple[Any, list[int]]:
         FILE_GLYPH,
         ARROW_UPWARD_GLYPH,
         ARROW_DOWNWARD_GLYPH,
+        ARROW_BACK_GLYPH,
+        ARROW_FORWARD_GLYPH,
         LOCK_GLYPH,
         LOCK_OPEN_GLYPH,
         ADD_GLYPH,

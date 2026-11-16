@@ -239,6 +239,16 @@ def build_navigator(
     return tuple(nodes)
 
 
+def all_navigator_ids(session: TuningSession) -> frozenset[str]:
+    """Every navigator id that would show with all of its ancestors open."""
+    expanded: set[str] = set(DEFAULT_EXPANDED_IDS)
+    while True:
+        ids = {node.id for node in build_navigator(session, expanded)}
+        if ids <= expanded:
+            return frozenset(ids)
+        expanded |= ids
+
+
 @dataclass(frozen=True)
 class PageStatus:
     """Why an inspector page has no effect or refuses edits.

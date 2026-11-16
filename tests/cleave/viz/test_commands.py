@@ -54,6 +54,8 @@ _STATIC_IDS = (
     "file.quit",
     "edit.undo",
     "edit.redo",
+    "view.page_back",
+    "view.page_forward",
     "view.play_fullscreen",
     "view.fullscreen_editor",
     "view.preset_curation",
@@ -88,6 +90,8 @@ _DISABLED_IDS = (
     "project.restore",
     "edit.undo",
     "edit.redo",
+    "view.page_back",
+    "view.page_forward",
     "layers.add",
     "layers.delete",
 )
@@ -155,7 +159,14 @@ def _fake_controls(
             add=MagicMock(),
             prompt_delete=MagicMock(),
         ),
-        navigator=SimpleNamespace(select=MagicMock(), activate=MagicMock()),
+        navigator=SimpleNamespace(
+            select=MagicMock(),
+            activate=MagicMock(),
+            can_go_back=lambda: False,
+            can_go_forward=lambda: False,
+            go_back=MagicMock(),
+            go_forward=MagicMock(),
+        ),
         cfg=SimpleNamespace(
             editor=SimpleNamespace(),
         ),
@@ -181,6 +192,9 @@ def test_menus_list_taxonomy_ids_once() -> None:
     ]
     assert _row_ids(menus[1]) == ["edit.undo", "edit.redo"]
     assert _row_ids(menus[2]) == [
+        "view.page_back",
+        "view.page_forward",
+        None,
         "view.play_fullscreen",
         "view.fullscreen_editor",
         None,
@@ -926,3 +940,37 @@ def test_inspector_only_timeline_actions_are_not_menu_commands() -> None:
         controls, RowDescriptor(RowKind.SONG_MARKER_ITEM)
     )
     controls.seek_to.assert_not_called()
+
+
+def test_alt_arrows_resolve_to_page_back_and_forward_only_with_alt() -> None:
+    menus = _menus()
+    back = command_for_shortcut(pygame.K_LEFT, pygame.KMOD_ALT, menus)
+    forward = command_for_shortcut(pygame.K_RIGHT, pygame.KMOD_LALT, menus)
+    assert back is not None and back.id == "view.page_back"
+    assert forward is not None and forward.id == "view.page_forward"
+    assert command_for_shortcut(pygame.K_LEFT, 0, menus) is None
+    assert command_for_shortcut(pygame.K_LEFT, pygame.KMOD_CTRL, menus) is None
+    assert (
+        command_for_shortcut(pygame.K_s, pygame.KMOD_CTRL | pygame.KMOD_ALT, menus)
+        is None
+    )
+
+
+def test_page_back_and_forward_follow_the_history() -> None:
+    menus = _menus()
+    controls = _make_controls(("layer_1",))
+    back = command_by_id("view.page_back", menus)
+    forward = command_by_id("view.page_forward", menus)
+    assert back.enabled(command_context(controls)) is False
+    history = controls.page_history
+    for page_id in ("overlay", "post_fx"):
+        controls.shell_focus.selected_id = page_id
+        history.observe(page_id, 0.0)
+        history.observe(page_id, 5.0)
+    assert back.enabled(command_context(controls)) is True
+    assert forward.enabled(command_context(controls)) is False
+    back.run(controls)
+    assert controls.shell_focus.selected_id == "overlay"
+    assert forward.enabled(command_context(controls)) is True
+    forward.run(controls)
+    assert controls.shell_focus.selected_id == "post_fx"

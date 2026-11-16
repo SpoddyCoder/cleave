@@ -18,7 +18,7 @@ from cleave.config_schema.layers import MAX_LAYER_COUNT
 from cleave.viz.config_pages import CONFIG_PAGES, ConfigPage
 from cleave.viz.context_menu import ContextMenuItem
 from cleave.viz.editor_mode_controls import is_preset_curation_mode
-from cleave.viz.key_repeat import mod_ctrl
+from cleave.viz.key_repeat import mod_alt, mod_ctrl
 from cleave.viz.navigator import layer_node_id, layer_slot_of
 from cleave.viz.shell_focus import ShellRegion
 from cleave.viz.theme import CONFIG_DIRTY, VALUE
@@ -40,6 +40,8 @@ _RESOLVED_SHORTCUT_IDS = frozenset(
         "layers.add",
         "edit.undo",
         "edit.redo",
+        "view.page_back",
+        "view.page_forward",
     }
 )
 
@@ -63,6 +65,8 @@ class CommandContext:
     timeline_can_redo: bool = False
     help_visible: bool = False
     fullscreen: bool = False
+    can_page_back: bool = False
+    can_page_forward: bool = False
 
 
 def _disabled(_ctx: CommandContext) -> bool:
@@ -135,6 +139,8 @@ def command_context(controls: Any) -> CommandContext:
         help_visible=bool(session.help_visible),
         # Command fakes without window controls read as windowed.
         fullscreen=bool(getattr(getattr(controls, "window", None), "fullscreen", False)),
+        can_page_back=controls.navigator.can_go_back(),
+        can_page_forward=controls.navigator.can_go_forward(),
     )
 
 
@@ -641,27 +647,64 @@ _PLAY_FULLSCREEN = Command(
     run=_play_fullscreen,
 )
 
-_SHORTCUT_KEYS: dict[str, tuple[int, bool]] = {
-    "Ctrl+N": (pygame.K_n, True),
-    "Ctrl+O": (pygame.K_o, True),
-    "Ctrl+S": (pygame.K_s, True),
-    "Ctrl+Q": (pygame.K_q, True),
-    "Ctrl+L": (pygame.K_l, True),
-    "Ctrl+R": (pygame.K_r, True),
-    "Ctrl+Y": (pygame.K_y, True),
-    "Ctrl+Z": (pygame.K_z, True),
-    "Ctrl+,": (pygame.K_COMMA, True),
-    "Ctrl+F": (pygame.K_f, True),
-    "H": (pygame.K_h, False),
-    "F11": (pygame.K_F11, False),
-    "1": (pygame.K_1, False),
-    "2": (pygame.K_2, False),
-    "3": (pygame.K_3, False),
-    "4": (pygame.K_4, False),
-    "5": (pygame.K_5, False),
-    "6": (pygame.K_6, False),
-    "7": (pygame.K_7, False),
-    "8": (pygame.K_8, False),
+def _can_page_back(ctx: CommandContext) -> bool:
+    return ctx.can_page_back
+
+
+def _can_page_forward(ctx: CommandContext) -> bool:
+    return ctx.can_page_forward
+
+
+def _page_back(controls: Any) -> None:
+    controls.navigator.go_back()
+
+
+def _page_forward(controls: Any) -> None:
+    controls.navigator.go_forward()
+
+
+_PAGE_BACK = Command(
+    id="view.page_back",
+    label="Back",
+    kind="command",
+    shortcut="Alt+Left",
+    enabled=_can_page_back,
+    run=_page_back,
+)
+
+_PAGE_FORWARD = Command(
+    id="view.page_forward",
+    label="Forward",
+    kind="command",
+    shortcut="Alt+Right",
+    enabled=_can_page_forward,
+    run=_page_forward,
+)
+
+# Shortcut text to ``(key, ctrl, alt)``.
+_SHORTCUT_KEYS: dict[str, tuple[int, bool, bool]] = {
+    "Ctrl+N": (pygame.K_n, True, False),
+    "Ctrl+O": (pygame.K_o, True, False),
+    "Ctrl+S": (pygame.K_s, True, False),
+    "Ctrl+Q": (pygame.K_q, True, False),
+    "Ctrl+L": (pygame.K_l, True, False),
+    "Ctrl+R": (pygame.K_r, True, False),
+    "Ctrl+Y": (pygame.K_y, True, False),
+    "Ctrl+Z": (pygame.K_z, True, False),
+    "Ctrl+,": (pygame.K_COMMA, True, False),
+    "Ctrl+F": (pygame.K_f, True, False),
+    "H": (pygame.K_h, False, False),
+    "F11": (pygame.K_F11, False, False),
+    "1": (pygame.K_1, False, False),
+    "2": (pygame.K_2, False, False),
+    "3": (pygame.K_3, False, False),
+    "4": (pygame.K_4, False, False),
+    "5": (pygame.K_5, False, False),
+    "6": (pygame.K_6, False, False),
+    "7": (pygame.K_7, False, False),
+    "8": (pygame.K_8, False, False),
+    "Alt+Left": (pygame.K_LEFT, False, True),
+    "Alt+Right": (pygame.K_RIGHT, False, True),
 }
 
 
@@ -725,7 +768,18 @@ def build_menus(
         (
             Menu("File", (_NEW, _OPEN, _SAVE, SEPARATOR, _QUIT)),
             Menu("Edit", (_UNDO, _REDO)),
-            Menu("View", (_PLAY_FULLSCREEN, _FULLSCREEN_EDITOR, SEPARATOR, _CURATION)),
+            Menu(
+                "View",
+                (
+                    _PAGE_BACK,
+                    _PAGE_FORWARD,
+                    SEPARATOR,
+                    _PLAY_FULLSCREEN,
+                    _FULLSCREEN_EDITOR,
+                    SEPARATOR,
+                    _CURATION,
+                ),
+            ),
             Menu(
                 "Project",
                 (
@@ -808,7 +862,8 @@ def command_for_shortcut(
 ) -> Command | None:
     """Resolved shortcut, or None.
 
-    New, open, save, quit, render, the help overlay, Play Full Screen, Full Screen Editor,
+    New, open, save, quit, render, the help overlay, Back, Forward, Play Full
+    Screen, Full Screen Editor,
     undo, redo,
     show-timeline-strip, and Settings > Preview (Ctrl+,) resolve from menu
     rows. Add-layer resolves from its inspector button. Layer jumps
@@ -818,6 +873,7 @@ def command_for_shortcut(
     """
     source = MENUS if menus is None else menus
     ctrl = mod_ctrl(mod)
+    alt = mod_alt(mod)
     for command in _shortcut_commands(source):
         if not _shortcut_resolves(command, timeline_scope=timeline_scope):
             continue
@@ -826,7 +882,7 @@ def command_for_shortcut(
         mapped = _SHORTCUT_KEYS.get(command.shortcut)
         if mapped is None:
             continue
-        want_key, want_ctrl = mapped
-        if key == want_key and ctrl == want_ctrl:
+        want_key, want_ctrl, want_alt = mapped
+        if key == want_key and ctrl == want_ctrl and alt == want_alt:
             return command
     return None

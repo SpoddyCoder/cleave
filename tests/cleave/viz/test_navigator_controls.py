@@ -201,3 +201,68 @@ def test_switching_off_moves_selection_off_the_preset_list_page() -> None:
     layer.preset_switching_trigger = "off"
     controls.navigator.reconcile()
     assert focus.selected_id == layer_node_id("layer_1")
+
+
+def _visit(controls, page_id: str) -> None:
+    controls.shell_focus.selected_id = page_id
+    controls.page_history.observe(page_id, 0.0)
+    controls.page_history.observe(page_id, 5.0)
+
+
+def test_back_selects_the_previous_page_and_opens_its_ancestors() -> None:
+    controls = _make_controls(("layer_1",))
+    focus = controls.shell_focus
+    page = layer_page_node_id("layer_1", "compositing")
+    _visit(controls, "layers")
+    _visit(controls, page)
+    _visit(controls, "post_fx")
+    focus.nav_expanded = set()
+    assert controls.navigator.can_go_back()
+    assert not controls.navigator.can_go_forward()
+    controls.navigator.go_back()
+    assert focus.selected_id == page
+    assert {"layers", layer_node_id("layer_1")} <= focus.nav_expanded
+    assert focus.region is ShellRegion.NAVIGATOR
+    assert controls.navigator.can_go_forward()
+    controls.navigator.go_forward()
+    assert focus.selected_id == "post_fx"
+
+
+def test_back_in_the_inspector_keeps_focus_and_moves_the_cursor() -> None:
+    controls = _make_controls(("layer_1",))
+    focus = controls.shell_focus
+    _visit(controls, "overlay")
+    controls.navigator.open_page("project.projectm")
+    _visit(controls, "project.projectm")
+    assert focus.region is ShellRegion.INSPECTOR
+    controls.navigator.go_back()
+    assert focus.selected_id == "overlay"
+    assert focus.region is ShellRegion.INSPECTOR
+    assert focus.inspector_cursor == RowDescriptor(RowKind.OVERLAYS_ENABLED)
+
+
+def test_back_skips_a_page_whose_layer_was_removed() -> None:
+    controls = _make_controls(("layer_1", "layer_2"))
+    _visit(controls, "overlay")
+    _visit(controls, layer_node_id("layer_2"))
+    _visit(controls, "post_fx")
+    controls.session.layer_z_order.remove("layer_2")
+    del controls.session.layers["layer_2"]
+    controls.navigator.go_back()
+    assert controls.shell_focus.selected_id == "overlay"
+
+
+def test_back_from_the_strip_to_a_navigator_page_leaves_the_strip() -> None:
+    controls = _make_controls(("layer_1", "layer_2"))
+    controls.open_timeline_panel()
+    _visit(controls, "overlay")
+    controls.set_shell_region(ShellRegion.TIMELINE)
+    controls.set_timeline_focus_row(1)
+    _visit(controls, controls.shell_focus.selected_id)
+    assert controls.shell_focus.selected_id == "timeline.row:layer_2"
+    controls.navigator.go_back()
+    assert controls.shell_focus.selected_id == "overlay"
+    assert controls.shell_focus.region is ShellRegion.NAVIGATOR
+    controls.navigator.go_forward()
+    assert controls.shell_focus.selected_id == "timeline.row:layer_2"
+    assert controls.session.timeline.focus_row == 1

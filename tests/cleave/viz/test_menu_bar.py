@@ -904,7 +904,7 @@ def test_open_menu_ink_matches_the_mock() -> None:
         ctx = CommandContext(fullscreen=True)
         _paint_shell(host, menu, ctx, frames=1)
         menu.open_menu(view_index, MENUS)
-        menu.item_index = 3
+        menu.item_index = 6
         lists = _paint_shell(host, menu, ctx)
         content = _content_lists(lists)
         names = [draw_list._owner_name for draw_list in content]
@@ -923,7 +923,7 @@ def test_open_menu_ink_matches_the_mock() -> None:
         check_on_current = _ink_on_fill(popup, _color_u32(VALUE), gold)
         shortcut_on_current = _ink_on_fill(popup, _color_u32(MUTED), gold)
         # Full Screen Editor: check, label, and shortcut.
-        menu.item_index = 1
+        menu.item_index = 4
         lists = _paint_shell(host, menu, ctx)
         content = _content_lists(lists)
         names = [draw_list._owner_name for draw_list in content]

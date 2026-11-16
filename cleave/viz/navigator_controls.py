@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 import pygame
@@ -10,6 +11,7 @@ from cleave.viz.config_pages import available_config_page_ids
 from cleave.viz.inspector import InspectorRow, build_inspector_rows
 from cleave.viz.navigator import (
     NavNode,
+    all_navigator_ids,
     ancestor_ids,
     build_navigator,
     root_id,
@@ -131,6 +133,64 @@ class NavigatorControls:
         focus.selected_id = page_id
         self._controls.set_shell_region(ShellRegion.NAVIGATOR)
         self._enter_inspector(page_id)
+
+    def page_filter(self) -> Callable[[str], bool]:
+        """Test for a page id that history may still show.
+
+        Config pages follow the editor mode, a strip row page needs its layer
+        and the open strip, and a navigator page needs its node to exist once
+        its ancestors open.
+        """
+        shown = set(self._pages()) | all_navigator_ids(self._controls.session)
+        return shown.__contains__
+
+    def can_go_back(self) -> bool:
+        return self._controls.page_history.peek_back(self.page_filter()) is not None
+
+    def can_go_forward(self) -> bool:
+        history = self._controls.page_history
+        return history.peek_forward(self.page_filter()) is not None
+
+    def go_back(self) -> None:
+        """Show the previous page in the history."""
+        page_id = self._controls.page_history.back(self.page_filter())
+        if page_id is not None:
+            self._show_history_page(page_id)
+
+    def go_forward(self) -> None:
+        """Show the next page in the history."""
+        page_id = self._controls.page_history.forward(self.page_filter())
+        if page_id is not None:
+            self._show_history_page(page_id)
+
+    def _show_history_page(self, page_id: str) -> None:
+        """Select *page_id* and keep the focus region where it is.
+
+        The inspector cursor moves to the page's first row, or focus returns
+        to the navigator when the page has none. A strip row page moves the
+        strip lane with it; any other page takes focus off the strip.
+        """
+        controls = self._controls
+        focus = controls.shell_focus
+        focus.nav_expanded |= ancestor_ids(page_id)
+        slot = timeline_row_slot_of(page_id)
+        if slot is not None:
+            focus.selected_id = page_id
+            controls.set_timeline_focus_row(
+                controls.session.layer_z_order.index(slot)
+            )
+        else:
+            if focus.region is ShellRegion.TIMELINE:
+                controls.set_shell_region(ShellRegion.NAVIGATOR)
+            focus.selected_id = page_id
+        if focus.region is not ShellRegion.INSPECTOR:
+            return
+        rows = build_inspector_rows(self._view(), page_id)
+        first = next((row for row in rows if row.navigable), None)
+        if first is None:
+            controls.set_shell_region(ShellRegion.NAVIGATOR)
+            return
+        _set_inspector_cursor(focus, first)
 
     def _enter_inspector(self, node_id: str) -> None:
         focus = self._controls.shell_focus

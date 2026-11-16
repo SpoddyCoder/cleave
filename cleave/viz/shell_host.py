@@ -10,7 +10,7 @@ import math
 from collections.abc import Callable, Collection, Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pygame
 from imgui_bundle import imgui
@@ -49,6 +49,8 @@ from cleave.viz.preset_context_menu import PRESET_MENU_KINDS, preset_row_menu
 from cleave.viz.timeline_overlay import timeline_band_height_px
 from cleave.viz.timeline_pointer import MIDDLE_BUTTON, RIGHT_BUTTON, TimelinePointer
 from cleave.viz.material_icons import (
+    ARROW_BACK_GLYPH,
+    ARROW_FORWARD_GLYPH,
     LOCK_GLYPH,
     LOCK_OPEN_GLYPH,
     ADD_GLYPH,
@@ -67,6 +69,7 @@ from cleave.viz.navigator import (
     TWISTY_EXPANDED,
     NavNode,
     NavToggle,
+    ancestor_ids,
     build_navigator,
     navigator_row_text_color,
     navigator_tree_rails,
@@ -181,6 +184,9 @@ from cleave.viz.choice_widgets import (
 )
 from cleave.viz.transport_controls import TransportField
 
+if TYPE_CHECKING:
+    from cleave.viz.session import TuningSession
+
 # Vertical padding for the menu bar and the transport bar, which shares its height.
 # Dear ImGui's default FramePadding.y is 3, which leaves both rows cramped.
 _MENU_BAR_FRAME_PADDING_Y = 8.0
@@ -188,7 +194,12 @@ _MENU_BAR_FRAME_PADDING_Y = 8.0
 _INSPECTOR_INDENT = 16.0
 # Height of an inspector divider, as a fraction of the text line.
 _INSPECTOR_DIVIDER_LINES = 0.5
+
 _NAV_LOCK_MARK = "[lock]"
+# pygame numbers the mouse back (X1) and forward (X2) side buttons 6 and 7.
+_PAGE_HISTORY_BUTTONS = {6: -1, 7: 1}
+_TITLE_BACK = "back"
+_TITLE_FORWARD = "forward"
 # Fixed columns, so a row without solo keeps its icons under the rows that have it.
 _NAV_TOGGLE_COLUMNS = (TOGGLE_ENABLED, TOGGLE_SOLO, TOGGLE_LOCK)
 _TRANSPORT_GAP = 16.0
@@ -579,6 +590,39 @@ def inspector_title(nodes: Sequence[NavNode], selected_id: str) -> str:
         labels.insert(0, parent.label)
         parent = by_id.get(parent.parent_id)
     return " > ".join(labels)
+
+
+def page_title(session: TuningSession, expanded: Collection[str], page_id: str) -> str:
+    """Breadcrumb for any inspector page, opening its ancestors to name them."""
+    slot = timeline_row_slot_of(page_id)
+    if slot is not None:
+        return timeline_row_title(session, slot)
+    nodes = build_navigator(session, set(expanded) | ancestor_ids(page_id))
+    return inspector_title(nodes, page_id)
+
+
+def page_history_tooltip(
+    target_title: str | None, *, forward: bool
+) -> str:
+    """Tooltip for the inspector's Back or Forward arrow."""
+    if target_title is None:
+        return "No later page" if forward else "No earlier page"
+    if forward:
+        return f"Forward to {target_title} (Alt+Right)"
+    return f"Back to {target_title} (Alt+Left)"
+
+
+def inspector_title_cluster(
+    avail: float, slot_count: int, slot_w: float, gap_w: float
+) -> tuple[float, tuple[float, ...]]:
+    """Title width and the x of each icon slot at the title line's right.
+
+    Slots sit flush right, one *slot_w* each, in order. The title and its
+    accent bar stop *gap_w* before the first slot.
+    """
+    cluster_x = max(0.0, avail - slot_count * slot_w)
+    title_w = max(0.0, cluster_x - gap_w)
+    return title_w, tuple(cluster_x + index * slot_w for index in range(slot_count))
 
 
 def inspector_selectable_id(desc: RowDescriptor) -> str:
@@ -1290,29 +1334,42 @@ def _draw_transport_notice(
     return chip
 
 
+@dataclass(frozen=True)
+class TitleButton:
+    """An icon button on the inspector title line."""
+
+    id: str
+    glyph: str
+    enabled: bool
+    tooltip: Callable[[], str]
+
+
 def _draw_inspector_title(
     title: str,
     elapsed_sec: float,
     marks: Sequence[tuple[str, tuple[int, int, int], str]] = (),
-) -> None:
+    buttons: Sequence[TitleButton] = (),
+) -> str | None:
     """Inspector page title, with the toast's accent swipe behind it.
 
-    The bar spans the panel, inset at each end by the gap above it, and is
-    one text row tall. A title wider than the column waits, scrolls to its
-    last words, pauses, then snaps back to its start, cut at the right edge,
-    as the bar slides off. *marks* follow the title as coloured icons, each
-    with its tooltip on hover.
+    *marks* (coloured icons with a tooltip) and then *buttons* sit flush
+    right on the title line. The bar starts inset from the panel edge by the
+    gap above it and is one text row tall. It and the title stop a space short
+    of the icons. A title wider than its room waits, scrolls to its last
+    words, pauses, then snaps back to its start, cut at its right edge, as
+    the bar slides off. Returns the id of a pressed, enabled button.
     """
     start = imgui.get_cursor_screen_pos()
     avail = max(0.0, imgui.get_content_region_avail().x)
     line_h = imgui.get_text_line_height()
     style = imgui.get_style()
     space_w = imgui.calc_text_size(" ").x
-    title_w = imgui.calc_text_size(title).x
-    text_w = title_w + sum(
-        space_w + imgui.calc_text_size(glyph).x for glyph, _role, _tip in marks
+    slot_w = _nav_toggle_size()
+    title_room, slot_xs = inspector_title_cluster(
+        avail, len(marks) + len(buttons), slot_w, space_w
     )
-    imgui.dummy(imgui.ImVec2(avail, line_h))
+    title_w = imgui.calc_text_size(title).x
+    imgui.dummy(imgui.ImVec2(title_room, line_h))
     win_pos = imgui.get_window_pos()
     win_size = imgui.get_window_size()
     border = _PANEL_BORDER_PX
@@ -1320,18 +1377,17 @@ def _draw_inspector_title(
     bar_y0 = start.y - pad_y
     bar_y1 = start.y + line_h + pad_y
     # The blank gap above the bar, inside the panel border, repeats at the
-    # bar's left and right ends.
+    # bar's left end.
     inset = border + max(0.0, style.window_padding.y - pad_y - border)
     bar_x0 = win_pos.x + inset
-    bar_x1 = win_pos.x + win_size.x - inset
-    overflow = text_w - avail
-    scroll_sec = attention_scroll_sec(overflow, imgui.calc_text_size(" ").x)
+    bar_x1 = start.x + title_room + space_w * 0.5
+    overflow = title_w - title_room
+    scroll_sec = attention_scroll_sec(overflow, space_w)
     attention = notification_attention(
         elapsed_sec, hold_sec=attention_scroll_hold_sec(scroll_sec)
     )
     draw = imgui.get_window_draw_list()
     color = _packed(VALUE)
-    on_fill = False
     fill = _notice_fill(
         bar_x1 - bar_x0, attention.fill_progress, from_left=attention.fill_from_left
     )
@@ -1350,37 +1406,72 @@ def _draw_inspector_title(
             )
         finally:
             draw.pop_clip_rect()
-        mid = start.x + min(text_w, avail) * 0.5
+        mid = start.x + min(title_w, title_room) * 0.5
         if attention.text_on_fill and bar_x0 + fill_x <= mid < bar_x0 + fill_x + fill_w:
             color = _packed(NOTIFICATION_ON_FILL)
-            on_fill = True
     offset = attention_scroll_offset(elapsed_sec, overflow, scroll_sec)
     draw.push_clip_rect(
         imgui.ImVec2(start.x, bar_y0),
-        imgui.ImVec2(start.x + avail, bar_y1),
+        imgui.ImVec2(start.x + title_room, bar_y1),
         True,
     )
     try:
         draw.add_text(imgui.ImVec2(start.x - offset, start.y), color, title)
-        x = start.x - offset + title_w
-        for glyph, role, tooltip in marks:
-            x += space_w
-            glyph_w = imgui.calc_text_size(glyph).x
-            draw.add_text(
-                imgui.ImVec2(x, start.y + _icon_drop_to_text(glyph)),
-                color if on_fill else _packed(role),
-                glyph,
-            )
-            left = max(x, start.x)
-            right = min(x + glyph_w, start.x + avail)
-            hovered = left < right and imgui.is_mouse_hovering_rect(
-                imgui.ImVec2(left, start.y), imgui.ImVec2(right, start.y + line_h)
-            )
-            if hovered and imgui.is_window_hovered():
-                show_tooltip(tooltip)
-            x += glyph_w
     finally:
         draw.pop_clip_rect()
+    for (glyph, role, tooltip), slot_x in zip(marks, slot_xs):
+        x = start.x + slot_x
+        draw.add_text(
+            imgui.ImVec2(x + space_w * 0.5, start.y + _icon_drop_to_text(glyph)),
+            _packed(role),
+            glyph,
+        )
+        hovered = imgui.is_mouse_hovering_rect(
+            imgui.ImVec2(x, start.y), imgui.ImVec2(x + slot_w, start.y + line_h)
+        )
+        if hovered and imgui.is_window_hovered():
+            show_tooltip(tooltip)
+    return _draw_title_buttons(buttons, start, slot_xs[len(marks) :], slot_w)
+
+
+def _draw_title_buttons(
+    buttons: Sequence[TitleButton],
+    start: imgui.ImVec2,
+    slot_xs: Sequence[float],
+    slot_w: float,
+) -> str | None:
+    """Arrow buttons on the title line, like navigator toggles. A disabled
+    button has no hover fill and keeps the arrow pointer."""
+    line_h = imgui.get_text_line_height()
+    space_w = imgui.calc_text_size(" ").x
+    window_x = imgui.get_window_pos().x - imgui.get_scroll_x()
+    draw = imgui.get_window_draw_list()
+    pressed_id: str | None = None
+    for button, slot_x in zip(buttons, slot_xs):
+        imgui.same_line(start.x + slot_x - window_x)
+        pressed = imgui.invisible_button(
+            f"##inspector-title-{button.id}", imgui.ImVec2(slot_w, line_h)
+        )
+        rect_min = imgui.get_item_rect_min()
+        hovered = imgui.is_item_hovered()
+        color = VALUE if button.enabled else DISABLED
+        if hovered and button.enabled:
+            _draw_nav_icon_hover(*_nav_icon_square(rect_min.x, rect_min.y))
+            color = NUDGE_HOVER_FG
+            request_pointer(PointerShape.HAND)
+        draw.add_text(
+            imgui.ImVec2(
+                rect_min.x + space_w * 0.5,
+                rect_min.y + _icon_drop_to_text(button.glyph),
+            ),
+            _packed(color),
+            button.glyph,
+        )
+        if hovered:
+            show_tooltip(button.tooltip())
+        if pressed and button.enabled:
+            pressed_id = button.id
+    return pressed_id
 
 
 def _transport_notice_hovered(chip: tuple[float, float, float, float]) -> bool:
@@ -1762,6 +1853,8 @@ class ShellHost:
                 self._strip_pointer.motion(x, y)
             return
         if event.type in (pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP):
+            if self._page_history_button(event):
+                return
             button = mouse_button(event)
             if button is None:
                 return
@@ -1810,6 +1903,27 @@ class ShellHost:
         if event.type == pygame.MOUSEWHEEL:
             if not self._wheel_strip(event):
                 imgui_host.process_mouse_event(event)
+
+    def _page_history_button(self, event: pygame.event.Event) -> bool:
+        """Mouse back and forward buttons step the page history on press.
+
+        A press while a context menu is open only closes the menu.
+        """
+        step = _PAGE_HISTORY_BUTTONS.get(getattr(event, "button", 0))
+        if step is None:
+            return False
+        if event.type != pygame.MOUSEBUTTONDOWN:
+            return True
+        context_menu = self._controls.context_menu
+        if context_menu.is_open:
+            context_menu.close()
+            return True
+        navigator = self._controls.navigator
+        if step < 0:
+            navigator.go_back()
+        else:
+            navigator.go_forward()
+        return True
 
     def process_play_event(self, event: pygame.event.Event) -> None:
         """Mouse while Play Full Screen shows only the visualiser.
@@ -2908,7 +3022,16 @@ class ShellHost:
             if self._controls.cfg.editor.highlight_new_page
             else math.inf
         )
-        _draw_inspector_title(title, elapsed, page_status_marks(self._page_status))
+        pressed = _draw_inspector_title(
+            title,
+            elapsed,
+            page_status_marks(self._page_status),
+            self._page_history_buttons(),
+        )
+        if pressed == _TITLE_BACK:
+            self._controls.navigator.go_back()
+        elif pressed == _TITLE_FORWARD:
+            self._controls.navigator.go_forward()
         _draw_inspector_divider()
         self._choice_rects = {}
         self._insp_row_rects = {}
@@ -2921,6 +3044,38 @@ class ShellHost:
         self._finish_row_drag(DRAG_PRESET)
         self._draw_colour_picker()
         self._draw_choice_list()
+
+    def _page_history_buttons(self) -> tuple[TitleButton, TitleButton]:
+        """Back and Forward arrows for the inspector title line."""
+        controls = self._controls
+        can_show = controls.navigator.page_filter()
+        history = controls.page_history
+        back_id = history.peek_back(can_show)
+        forward_id = history.peek_forward(can_show)
+        session = controls.session
+        expanded = controls.shell_focus.nav_expanded
+
+        def tooltip(page_id: str | None, *, forward: bool) -> Callable[[], str]:
+            def text() -> str:
+                title = None if page_id is None else page_title(session, expanded, page_id)
+                return page_history_tooltip(title, forward=forward)
+
+            return text
+
+        return (
+            TitleButton(
+                _TITLE_BACK,
+                ARROW_BACK_GLYPH,
+                back_id is not None,
+                tooltip(back_id, forward=False),
+            ),
+            TitleButton(
+                _TITLE_FORWARD,
+                ARROW_FORWARD_GLYPH,
+                forward_id is not None,
+                tooltip(forward_id, forward=True),
+            ),
+        )
 
     def _draw_inspector_row(self, state: Any, row: Any) -> None:
         focus = self._controls.shell_focus

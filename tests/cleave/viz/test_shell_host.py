@@ -40,6 +40,9 @@ from cleave.viz.shell_host import (
     inspector_selectable_id,
     menu_bar_project_label,
     inspector_title,
+    inspector_title_cluster,
+    page_history_tooltip,
+    page_title,
     navigator_height_for_rows,
     navigator_lock_mark,
     navigator_toggle_color,
@@ -584,3 +587,34 @@ def test_button_only_label_click_only_selects() -> None:
 def test_a_label_click_on_a_leaf_only_selects() -> None:
     outcome = _label_click("click-expand", expanded=False, clicked=True, expandable=False)
     assert outcome.select and not outcome.toggle
+
+
+def test_inspector_title_cluster_keeps_the_title_off_the_icons() -> None:
+    title_w, slots = inspector_title_cluster(200.0, 4, 20.0, 8.0)
+    assert slots == (120.0, 140.0, 160.0, 180.0)
+    assert title_w == 112.0
+    title_w, slots = inspector_title_cluster(30.0, 2, 20.0, 8.0)
+    assert title_w == 0.0
+    assert slots == (0.0, 20.0)
+
+
+def test_page_history_tooltips_name_the_target_and_key() -> None:
+    assert (
+        page_history_tooltip("Post-FX", forward=False)
+        == "Back to Post-FX (Alt+Left)"
+    )
+    assert (
+        page_history_tooltip("Post-FX", forward=True)
+        == "Forward to Post-FX (Alt+Right)"
+    )
+    assert page_history_tooltip(None, forward=False) == "No earlier page"
+    assert page_history_tooltip(None, forward=True) == "No later page"
+
+
+def test_page_title_names_a_page_under_a_closed_parent() -> None:
+    session = _session()
+    page = layer_page_node_id("layer_1", "compositing")
+    assert page_title(session, set(), page).endswith("> Compositing")
+    assert page_title(session, set(), "settings.ui") == inspector_title(
+        build_navigator(session), "settings.ui"
+    )

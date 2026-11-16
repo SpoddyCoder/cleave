@@ -66,6 +66,7 @@ from cleave.viz.navigator import (
     timeline_row_slot_of,
 )
 from cleave.viz.navigator_controls import NavigatorControls
+from cleave.viz.page_history import PageHistory
 from cleave.viz.shell_focus import (
     ShellFocusState,
     ShellRegion,
@@ -140,6 +141,7 @@ class TuningControls:
 
         self.context_menu = ContextMenuState()
         self.shell_focus = ShellFocusState()
+        self.page_history = PageHistory()
         self._focus_cursor: FocusCursor = MainFocus(
             RowDescriptor(RowKind.TIMELINE_HEADER)
         )
@@ -545,6 +547,7 @@ class TuningControls:
         if not pygame.mouse.get_pressed()[0] or self._modal_host.active:
             self.value_nudge.release()
         self._key_repeat.tick(dt_sec)
+        self.page_history.observe(self.shell_focus.selected_id, dt_sec)
         self.inline_edit.tick(dt_sec)
         self.project_switch.tick(dt_sec)
         self.value_nudge.tick(dt_sec)
