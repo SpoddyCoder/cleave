@@ -604,36 +604,45 @@ def _draw_nav_icon_hover(square_min: imgui.ImVec2, square_max: imgui.ImVec2) -> 
     )
 
 
-def _draw_nav_twisty(node: NavNode, twisty: str, selected: bool) -> bool:
-    """Disclosure button at the left of a navigator row. Returns whether pressed.
+def _draw_nav_twisty(
+    node: NavNode,
+    twisty: str,
+    selected: bool,
+    x: float,
+    label_min_x: float,
+    span: tuple[float, float],
+) -> bool:
+    """Disclosure button in the column at *x*, drawn after the row's label.
 
     It is one toggle column wide and washes like a toggle under the pointer.
-    The cell is a selectable so a selected row's wash runs under it; its own
-    hover slot is cleared so only the square fill marks the pointer.
+    The label selectable allows overlap, so the press reaches this button. A
+    selected row's wash is filled under the column from where a selectable's
+    highlight would start up to *label_min_x*, so the row reads as one band.
+    Returns whether it was pressed.
     """
-    origin = imgui.get_cursor_screen_pos()
     width = _nav_toggle_size()
-    clear = imgui.ImVec4(0.0, 0.0, 0.0, 0.0)
-    if not selected:
-        imgui.push_style_color(imgui.Col_.header_hovered, clear)
-        imgui.push_style_color(imgui.Col_.header_active, clear)
-    try:
-        pressed, _selected = imgui.selectable(
-            f"##nav-twisty-{node.id}", selected, 0, imgui.ImVec2(width, 0.0)
-        )
-    finally:
-        if not selected:
-            imgui.pop_style_color(2)
+    window_x = imgui.get_window_pos().x - imgui.get_scroll_x()
+    imgui.same_line(x - window_x)
+    pressed = imgui.invisible_button(
+        f"##nav-twisty-{node.id}", imgui.ImVec2(width, imgui.get_text_line_height())
+    )
+    origin = imgui.get_item_rect_min()
     hovered = imgui.is_item_hovered()
+    draw = imgui.get_window_draw_list()
+    if selected:
+        wash_left = x - math.floor(imgui.get_style().item_spacing.x * 0.5)
+        draw.add_rect_filled(
+            imgui.ImVec2(wash_left, span[0]),
+            imgui.ImVec2(label_min_x, span[1]),
+            imgui.get_color_u32(selectable_wash()[0]),
+        )
     color = rgba(navigator_row_text_color(node, selected=selected, moving=False))
     if hovered:
         _draw_nav_icon_hover(*_nav_icon_square(origin.x, origin.y))
         color = rgba(NUDGE_HOVER_FG)
         request_pointer(PointerShape.HAND)
     glyph_x = origin.x + math.floor((width - imgui.calc_text_size(twisty).x) * 0.5)
-    imgui.get_window_draw_list().add_text(
-        imgui.ImVec2(glyph_x, origin.y), imgui.get_color_u32(color), twisty
-    )
+    draw.add_text(imgui.ImVec2(glyph_x, origin.y), imgui.get_color_u32(color), twisty)
     return pressed
 
 
@@ -823,6 +832,15 @@ def _drag_lead() -> str:
         imgui.calc_text_size(" ").x,
     )
     return " " * count
+
+
+def _nav_drag_lead() -> str:
+    """Label prefix for a navigator drag handle: the glyph, with no extra space."""
+    space = imgui.calc_text_size(" ").x
+    if space <= 0:
+        return ""
+    glyph = imgui.calc_text_size(DRAG_INDICATOR_GLYPH).x
+    return " " * max(1, math.ceil(glyph / space))
 
 
 def _draw_mnemonic_underline(label: str, color: tuple[int, int, int]) -> None:
@@ -2622,18 +2640,13 @@ class ShellHost:
                 and focus.region is ShellRegion.NAVIGATOR
                 and not self._menu_state.focused
             )
-            twisty_clicked = False
+            twisty = navigator_twisty(node, focus.nav_expanded)
+            row_x = imgui.get_cursor_screen_pos().x
+            if twisty is not None:
+                # The label starts right after the twisty's column, with no
+                # item gap. The twisty draws over that column once the row is done.
+                imgui.set_cursor_pos_x(imgui.get_cursor_pos_x() + _nav_toggle_size())
             with _selected_header_wash(selected):
-                twisty = navigator_twisty(node, focus.nav_expanded)
-                if twisty is not None:
-                    twisty_clicked = _draw_nav_twisty(node, twisty, selected)
-                    imgui.same_line()
-                else:
-                    # A leaf's label lines up with its parent's, which sits
-                    # one icon column plus the item gap past the twisty.
-                    imgui.set_cursor_pos_x(
-                        imgui.get_cursor_pos_x() + imgui.get_style().item_spacing.x
-                    )
                 moving = (
                     node.draggable
                     and node.slot is not None
@@ -2647,13 +2660,16 @@ class ShellHost:
                     imgui.push_style_color(imgui.Col_.text, rgba(text_color))
                 try:
                     text_pos = imgui.get_cursor_screen_pos()
-                    lead = _drag_lead() if node.draggable else ""
-                    overlap = bool(node.toggles) or node.draggable
+                    lead = _nav_drag_lead() if node.draggable else ""
+                    overlap = (
+                        bool(node.toggles) or node.draggable or twisty is not None
+                    )
                     clicked, _selected = imgui.selectable(
                         f"{lead}{node.label}##nav-{node.id}",
                         selected,
                         imgui.SelectableFlags_.allow_overlap if overlap else 0,
                     )
+                    label_min_x = imgui.get_item_rect_min().x
                     span = (imgui.get_item_rect_min().y, imgui.get_item_rect_max().y)
                     self._record_nav_row_rect(node.id, left_x)
                     if ring:
@@ -2673,6 +2689,9 @@ class ShellHost:
                 self._draw_nav_toggles(node)
             if node.draggable:
                 self._layer_row_drag(node, text_pos.x, span)
+            twisty_clicked = twisty is not None and _draw_nav_twisty(
+                node, twisty, selected, row_x, label_min_x, span
+            )
             if twisty_clicked:
                 self._toggle_nav_expanded(node.id)
             elif clicked:
@@ -2989,14 +3008,16 @@ class ShellHost:
             if indent:
                 imgui.unindent(indent)
 
-    def _draw_drag_handle(self, item_id: str, x: float, *, blocked: bool) -> bool:
+    def _draw_drag_handle(
+        self, item_id: str, x: float, *, blocked: bool, lead: str
+    ) -> bool:
         """Leading reorder handle on the row just drawn, with its left edge at *x*.
 
         The row selectable allows overlap, so the press reaches this button.
         True on the press that starts a drag; a blocked handle never starts one.
         """
         glyph = DRAG_INDICATOR_GLYPH
-        width = imgui.calc_text_size(_drag_lead()).x
+        width = imgui.calc_text_size(lead).x
         window_x = imgui.get_window_pos().x - imgui.get_scroll_x()
         imgui.same_line(x - window_x)
         imgui.invisible_button(
@@ -3046,7 +3067,7 @@ class ShellHost:
         if slot is None or index is None:
             return
         if self._draw_drag_handle(
-            f"##drag-preset-{slot}-{index}", x, blocked=blocked
+            f"##drag-preset-{slot}-{index}", x, blocked=blocked, lead=_drag_lead()
         ):
             self._begin_row_drag(DRAG_PRESET, slot, index)
             self._controls.inspector.focus_row(row)
@@ -3063,7 +3084,10 @@ class ShellHost:
             return
         index = order.index(slot)
         if self._draw_drag_handle(
-            f"##drag-layer-{slot}", x, blocked=node.drag_blocked
+            f"##drag-layer-{slot}",
+            x,
+            blocked=node.drag_blocked,
+            lead=_nav_drag_lead(),
         ):
             self._begin_row_drag(DRAG_LAYER, slot, index)
             self._controls.navigator.select(node.id)
