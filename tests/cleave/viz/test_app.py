@@ -1179,11 +1179,19 @@ def test_tick_frame_insets_panels_by_full_menu_bar_height(
     compositor = recording_compositor()
     runtime = _minimal_runtime(compositor)
     app = VisualizerApp(runtime)
-    shell = SimpleNamespace(menu_bar_height_px=23, set_layout=MagicMock())
+    shell = SimpleNamespace(
+        menu_bar_height_px=23,
+        set_layout=MagicMock(),
+        insp_width=None,
+        help_width=None,
+        navigator_height=None,
+        timeline_height=None,
+        nav_content_height_px=0,
+    )
     app._shell = shell
     app.tick_frame(1.0, paused=True, draw_overlay=True, n_pcm=735)
 
-    from cleave.viz.shell_host import menu_bar_height_px
+    from cleave.viz.shell_menu_bar import menu_bar_height_px
     from cleave.viz.shell_layout import ShellLayout
 
     display_w, display_h = runtime.overlay_surface.get_size()

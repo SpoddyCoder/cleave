@@ -521,7 +521,7 @@ def test_nav_splitter_request_height_is_from_the_navigator_top() -> None:
 
 def test_shell_row_heights_grow_with_ui_scale() -> None:
     from cleave.config_schema.editor import DEFAULT_UI_SCALE
-    from cleave.viz.shell_host import menu_bar_height_px
+    from cleave.viz.shell_menu_bar import menu_bar_height_px
     from cleave.viz.theme import set_ui_scale_percent
 
     row, bar = navigator_row_px(), menu_bar_height_px()
@@ -537,7 +537,7 @@ def test_shell_row_heights_grow_with_ui_scale() -> None:
 
 def test_minimum_window_keeps_every_column_and_both_stack_panes() -> None:
     from cleave.config_schema.window import window_minimum_size
-    from cleave.viz.shell_host import menu_bar_height_px
+    from cleave.viz.shell_menu_bar import menu_bar_height_px
     from cleave.viz.theme import set_ui_scale_percent
     from cleave.viz.timeline_overlay import timeline_band_height_px
 

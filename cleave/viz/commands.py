@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Literal
 
 import pygame
 
@@ -22,6 +22,9 @@ from cleave.viz.key_repeat import mod_alt, mod_ctrl
 from cleave.viz.navigator import layer_node_id, layer_slot_of
 from cleave.viz.shell_focus import ShellRegion
 from cleave.viz.theme import CONFIG_DIRTY, VALUE
+
+if TYPE_CHECKING:
+    from cleave.viz.controls import TuningControls
 
 CommandKind = Literal["command", "jump", "check"]
 LabelRole = tuple[int, int, int]
@@ -78,7 +81,7 @@ def _enabled(_ctx: CommandContext) -> bool:
     return True
 
 
-def _noop(_controls: Any) -> None:
+def _noop(_controls: TuningControls) -> None:
     return None
 
 
@@ -89,7 +92,7 @@ class Command:
     kind: CommandKind
     shortcut: str | None = None
     enabled: Callable[[CommandContext], bool] = _enabled
-    run: Callable[[Any], None] = _noop
+    run: Callable[[TuningControls], None] = _noop
     checked: Callable[[CommandContext], bool] | None = None
     label_role: Callable[[CommandContext], LabelRole] | None = None
     locked: Callable[[CommandContext], bool] = _disabled
@@ -109,7 +112,7 @@ class Menu:
     items: tuple[MenuItem, ...]
 
 
-def command_context(controls: Any) -> CommandContext:
+def command_context(controls: TuningControls) -> CommandContext:
     """Read the fields menu predicates need from tuning controls."""
     session = controls.session
     selected_slot = layer_slot_of(controls.shell_focus.selected_id)
@@ -148,7 +151,7 @@ def command_context(controls: Any) -> CommandContext:
 
 def command_menu_item(
     command: Command,
-    controls: Any,
+    controls: TuningControls,
     *,
     item_id: str | None = None,
     label: str | None = None,
@@ -196,9 +199,9 @@ def _later(
 
 def _when_enabled(
     enabled: Callable[[CommandContext], bool],
-    action: Callable[[Any], None],
-) -> Callable[[Any], None]:
-    def run(controls: Any) -> None:
+    action: Callable[[TuningControls], None],
+) -> Callable[[TuningControls], None]:
+    def run(controls: TuningControls) -> None:
         if not enabled(command_context(controls)):
             return
         action(controls)
@@ -214,11 +217,11 @@ def _project_switch_enabled(ctx: CommandContext) -> bool:
     )
 
 
-def _run_new(controls: Any) -> None:
+def _run_new(controls: TuningControls) -> None:
     controls.project_switch.prompt_new()
 
 
-def _run_open(controls: Any) -> None:
+def _run_open(controls: TuningControls) -> None:
     controls.project_switch.prompt_open()
 
 
@@ -236,15 +239,15 @@ def _render_enabled(ctx: CommandContext) -> bool:
     return not is_preset_curation_mode(ctx.editor_mode) and not ctx.render_busy
 
 
-def _run_save(controls: Any) -> None:
+def _run_save(controls: TuningControls) -> None:
     controls.prompt_save_config()
 
 
-def _run_quit(controls: Any) -> None:
+def _run_quit(controls: TuningControls) -> None:
     controls.request_quit()
 
 
-def _run_render(controls: Any) -> None:
+def _run_render(controls: TuningControls) -> None:
     controls.project_render.prompt()
 
 
@@ -252,19 +255,19 @@ def _curation_checked(ctx: CommandContext) -> bool:
     return is_preset_curation_mode(ctx.editor_mode)
 
 
-def _run_curation(controls: Any) -> None:
+def _run_curation(controls: TuningControls) -> None:
     controls.editor_mode.prompt_change_editor_mode()
 
 
-def _run_measure_latency(controls: Any) -> None:
+def _run_measure_latency(controls: TuningControls) -> None:
     controls.tap_sync.prompt_start()
 
 
-def _run_download_packages(controls: Any) -> None:
+def _run_download_packages(controls: TuningControls) -> None:
     controls.prompt_welcome()
 
 
-def _run_about(controls: Any) -> None:
+def _run_about(controls: TuningControls) -> None:
     controls.prompt_about()
 
 
@@ -300,27 +303,27 @@ def _timeline_locked(ctx: CommandContext) -> bool:
     return ctx.timeline_locked
 
 
-def _selected_slot(controls: Any) -> str:
+def _selected_slot(controls: TuningControls) -> str:
     return command_context(controls).selected_slot
 
 
-def _run_add_current_preset(controls: Any) -> None:
+def _run_add_current_preset(controls: TuningControls) -> None:
     controls.preset_list.add_current(_selected_slot(controls))
 
 
-def _run_populate_presets(controls: Any) -> None:
+def _run_populate_presets(controls: TuningControls) -> None:
     controls.preset_list.prompt_populate(_selected_slot(controls))
 
 
-def _run_resume_switching(controls: Any) -> None:
+def _run_resume_switching(controls: TuningControls) -> None:
     controls.preset_list.resume(_selected_slot(controls))
 
 
-def _run_add(controls: Any) -> None:
+def _run_add(controls: TuningControls) -> None:
     controls.layer_lifecycle.add()
 
 
-def _run_delete(controls: Any) -> None:
+def _run_delete(controls: TuningControls) -> None:
     slot = command_context(controls).selected_slot
     if slot is None:
         return
@@ -333,23 +336,23 @@ def _timeline_actions_enabled(ctx: CommandContext) -> bool:
     )
 
 
-def _run_generate(controls: Any) -> None:
+def _run_generate(controls: TuningControls) -> None:
     controls.prompt_generate_timeline()
 
 
-def _run_reset_timeline(controls: Any) -> None:
+def _run_reset_timeline(controls: TuningControls) -> None:
     controls.prompt_reset_timeline()
 
 
-def _run_snap_cues(controls: Any) -> None:
+def _run_snap_cues(controls: TuningControls) -> None:
     controls.prompt_snap_cues()
 
 
-def _run_snap_to_markers(controls: Any) -> None:
+def _run_snap_to_markers(controls: TuningControls) -> None:
     controls.prompt_snap_cues_to_song_markers()
 
 
-def _run_set_cut_type(controls: Any) -> None:
+def _run_set_cut_type(controls: TuningControls) -> None:
     controls.prompt_set_cut_type()
 
 
@@ -369,18 +372,18 @@ def _redo_enabled(ctx: CommandContext) -> bool:
     )
 
 
-def _run_undo(controls: Any) -> None:
+def _run_undo(controls: TuningControls) -> None:
     controls.undo_timeline()
 
 
-def _run_redo(controls: Any) -> None:
+def _run_redo(controls: TuningControls) -> None:
     controls.redo_timeline()
 
 
-def _run_open_page(page_id: str) -> Callable[[Any], None]:
+def _run_open_page(page_id: str) -> Callable[[TuningControls], None]:
     """Show a Settings or Project page in the inspector."""
 
-    def run(controls: Any) -> None:
+    def run(controls: TuningControls) -> None:
         controls.navigator.open_page(page_id)
 
     return run
@@ -414,17 +417,17 @@ def _page_commands(menu: str) -> tuple[Command, ...]:
     return tuple(_page_command(page) for page in CONFIG_PAGES if page.menu == menu)
 
 
-def _run_focus_node(node_id: str) -> Callable[[Any], None]:
+def _run_focus_node(node_id: str) -> Callable[[TuningControls], None]:
     """Select a navigator node and focus its inspector."""
 
-    def run(controls: Any) -> None:
+    def run(controls: TuningControls) -> None:
         controls.navigator.select(node_id)
         controls.navigator.activate()
 
     return run
 
 
-def _toggle_help(controls: Any) -> None:
+def _toggle_help(controls: TuningControls) -> None:
     session = controls.session
     if not session.help_visible:
         session.help_visible = True
@@ -621,11 +624,11 @@ _HELP_OVERLAY = Command(
     checked=_help_checked,
 )
 
-def _toggle_fullscreen_editor(controls: Any) -> None:
+def _toggle_fullscreen_editor(controls: TuningControls) -> None:
     controls.window.request_fullscreen_toggle()
 
 
-def _play_fullscreen(controls: Any) -> None:
+def _play_fullscreen(controls: TuningControls) -> None:
     controls.context_menu.close()
     controls.window.request_play_fullscreen(True)
 
@@ -657,11 +660,11 @@ def _can_page_forward(ctx: CommandContext) -> bool:
     return ctx.page_forward_id is not None
 
 
-def _page_back(controls: Any) -> None:
+def _page_back(controls: TuningControls) -> None:
     controls.navigator.go_back()
 
 
-def _page_forward(controls: Any) -> None:
+def _page_forward(controls: TuningControls) -> None:
     controls.navigator.go_forward()
 
 

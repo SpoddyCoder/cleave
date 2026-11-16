@@ -8,7 +8,7 @@ from contextlib import contextmanager
 import pygame
 
 from cleave.viz.row_kinds import RowDescriptor, RowKind
-from cleave.viz.shell_host import ShellHost
+from cleave.viz.shell_inspector import InspectorPanel
 from cleave.viz.value_nudge import centre_pad
 from tests.cleave.viz.test_modal_surface import _button, _center, _draw, _host, _motion
 from tests.support.viz import keydown, make_controls
@@ -23,8 +23,8 @@ def _inspector(page_id: str) -> Iterator[tuple[object, object]]:
     controls = make_controls(("layer_1",))
     controls.navigator.open_page(page_id)
     with _host() as host:
-        host._controls = controls
-        host._draw_inspector = lambda state: ShellHost._draw_inspector(host, state)
+        host.context.controls = controls
+        host.inspector.draw = lambda state: InspectorPanel.draw(host.inspector, state)
         yield host, controls
 
 
@@ -45,19 +45,19 @@ def _frame(host: object, pos: tuple[int, int], *, click: bool = False) -> None:
 def test_a_long_list_draws_as_a_combo_and_a_click_opens_it() -> None:
     with _inspector("settings.preview") as (host, controls):
         _frame(host, (0, 0))
-        combo = host._choice_rects[_QUALITY]
+        combo = host.inspector.values.choice_rects[_QUALITY]
         _frame(host, _center(combo), click=True)
         view = controls.inline_edit.choice_view
         assert view is not None and view.target == _QUALITY
         assert view.options[view.chosen] == "full-quality"
-        assert len(host._choice_list_rows) == 5
+        assert len(host.inspector.values.choice_list_rows) == 5
 
 
 def test_a_row_click_in_the_open_list_picks_that_option() -> None:
     with _inspector("settings.preview") as (host, controls):
         _frame(host, (0, 0))
-        _frame(host, _center(host._choice_rects[_QUALITY]), click=True)
-        _frame(host, _center(host._choice_list_rows[1]), click=True)
+        _frame(host, _center(host.inspector.values.choice_rects[_QUALITY]), click=True)
+        _frame(host, _center(host.inspector.values.choice_list_rows[1]), click=True)
         assert controls.inline_edit.choice_view is None
         assert controls.cfg.editor.preview_quality == "performance"
 
@@ -65,7 +65,7 @@ def test_a_row_click_in_the_open_list_picks_that_option() -> None:
 def test_a_click_outside_the_list_closes_it_and_keeps_the_value() -> None:
     with _inspector("settings.preview") as (host, controls):
         _frame(host, (0, 0))
-        _frame(host, _center(host._choice_rects[_QUALITY]), click=True)
+        _frame(host, _center(host.inspector.values.choice_rects[_QUALITY]), click=True)
         _frame(host, (1200, 700), click=True)
         assert controls.inline_edit.choice_view is None
         assert controls.cfg.editor.preview_quality == "full-quality"
@@ -74,7 +74,7 @@ def test_a_click_outside_the_list_closes_it_and_keeps_the_value() -> None:
 def test_a_short_list_draws_as_segments_and_a_click_chooses() -> None:
     with _inspector("settings.ui") as (host, controls):
         _frame(host, (0, 0))
-        x, y, w, h = host._choice_rects[_NAV_SIDE]
+        x, y, w, h = host.inspector.values.choice_rects[_NAV_SIDE]
         assert controls.cfg.editor.navigator_side == "left"
         _frame(host, (x + w - 4, y + h // 2), click=True)
         assert controls.cfg.editor.navigator_side == "right"
@@ -141,14 +141,14 @@ def test_centre_pad_fixes_the_width() -> None:
 def test_a_stepper_keeps_the_widest_width_it_has_shown() -> None:
     with _inspector("settings.preview") as (host, _controls):
         kind = RowKind.SETTINGS_RESIDUAL_LATENCY_MS
-        assert host._fixed_width_value(kind, "100 ms") == "100 ms"
-        assert host._fixed_width_value(kind, "5 ms") == " 5 ms "
+        assert host.inspector.values.fixed_width_value(kind, "100 ms") == "100 ms"
+        assert host.inspector.values.fixed_width_value(kind, "5 ms") == " 5 ms "
 
 
 def test_a_second_click_on_the_open_combo_closes_it() -> None:
     with _inspector("settings.preview") as (host, controls):
         _frame(host, (0, 0))
-        combo = _center(host._choice_rects[_QUALITY])
+        combo = _center(host.inspector.values.choice_rects[_QUALITY])
         _frame(host, combo, click=True)
         assert controls.inline_edit.choice_view is not None
         _frame(host, combo, click=True)
@@ -160,8 +160,8 @@ def test_a_second_click_on_the_open_combo_closes_it() -> None:
 def test_a_click_on_the_open_row_label_closes_the_list() -> None:
     with _inspector("settings.preview") as (host, controls):
         _frame(host, (0, 0))
-        x, y, _w, h = host._choice_rects[_QUALITY]
-        _frame(host, _center(host._choice_rects[_QUALITY]), click=True)
+        x, y, _w, h = host.inspector.values.choice_rects[_QUALITY]
+        _frame(host, _center(host.inspector.values.choice_rects[_QUALITY]), click=True)
         _frame(host, (x - 40, y + h // 2), click=True)
         _frame(host, (x - 40, y + h // 2))
         assert controls.inline_edit.choice_view is None
@@ -215,7 +215,7 @@ def test_navigator_expand_draws_as_a_combo_with_three_options() -> None:
     expand = RowDescriptor(RowKind.SETTINGS_NAVIGATOR_EXPAND_CLICK)
     with _inspector("settings.ui") as (host, controls):
         _frame(host, (0, 0))
-        _frame(host, _center(host._choice_rects[expand]), click=True)
+        _frame(host, _center(host.inspector.values.choice_rects[expand]), click=True)
         view = controls.inline_edit.choice_view
         assert view is not None and view.target == expand
-        assert len(host._choice_list_rows) == 3
+        assert len(host.inspector.values.choice_list_rows) == 3

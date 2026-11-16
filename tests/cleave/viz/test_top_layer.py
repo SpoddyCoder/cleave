@@ -13,6 +13,7 @@ import pygame
 import pytest
 from imgui_bundle import imgui
 
+from cleave.viz.modal import ModalHost
 from cleave.viz.context_menu import ContextMenuState
 from cleave.viz.inline_edit import InlineEditController
 from cleave.viz.commands import CommandContext
@@ -81,7 +82,8 @@ def _content_names() -> list[str]:
 def _host() -> Iterator[object]:
     from cleave.viz import imgui_host
     from cleave.viz.imgui_host import ImGuiHost
-    from cleave.viz.shell_host import ShellHost, menu_bar_height_px
+    from cleave.viz.shell_host import ShellHost
+    from cleave.viz.shell_menu_bar import menu_bar_height_px
 
     controls = SimpleNamespace(
         cfg=SimpleNamespace(project_slug="song"),
@@ -97,6 +99,7 @@ def _host() -> Iterator[object]:
         disarm_value_nudge=MagicMock(),
         inline_edit=InlineEditController(),
         context_menu=ContextMenuState(),
+        modal_host=ModalHost(),
         transport=MagicMock(),
     )
     overlay = _Overlay()
@@ -111,9 +114,9 @@ def _host() -> Iterator[object]:
     host.imgui.display_size = (1280, 720)
     height = host.menu_bar_height_px
     host.set_layout(ShellLayout.compute(1280, 720, height, height, 0))
-    host._draw_navigator = lambda _frame: None
-    host._visible_nav_nodes = lambda: ()
-    host._draw_inspector = lambda _state: None
+    host.navigator.draw = lambda _frame: None
+    host.navigator.visible_nodes = lambda: ()
+    host.inspector.draw = lambda _state: None
     try:
         yield host
     finally:
@@ -123,7 +126,7 @@ def _host() -> Iterator[object]:
 def _draw(host: object) -> None:
     from cleave.viz.shell_host import draw_shell_frame
 
-    draw_shell_frame(host, host._menu_state, CommandContext(), 1.0 / 60.0)
+    draw_shell_frame(host, host.context.menu_state, CommandContext(), 1.0 / 60.0)
 
 
 def _button(pos: tuple[int, int]) -> pygame.event.Event:
@@ -180,14 +183,14 @@ def test_modal_click_skips_region_and_splitter_and_reaches_imgui() -> None:
         with patch("cleave.viz.shell_host.pygame.mouse.set_cursor") as set_cursor:
             host.process_event(_button(inside))
             assert host.imgui.queued_buttons == [(0, True)]
-            assert host._splitter is None
+            assert host.splitters.active is None
             host.top_layer.push(modal)
             _draw(host)
             host.process_event(_button(navigator))
             assert host.imgui.queued_buttons == [(0, True)]
-            assert host._splitter is None
+            assert host.splitters.active is None
             set_cursor.assert_not_called()
-        host._controls.set_shell_region.assert_not_called()
+        host.context.controls.set_shell_region.assert_not_called()
 
 
 def test_chrome_contains_recorded_top_layer_rect() -> None:
@@ -220,6 +223,15 @@ def test_apply_imgui_theme_uses_the_role_table() -> None:
 
 _IMGUI_DRAW_MODULES = (
     "shell_host.py",
+    "shell_widgets.py",
+    "shell_windows.py",
+    "shell_menu_bar.py",
+    "shell_transport.py",
+    "shell_navigator.py",
+    "shell_inspector.py",
+    "shell_inspector_title.py",
+    "shell_inspector_values.py",
+    "shell_strip.py",
     "modal_surface.py",
     "help_column.py",
     "file_picker_surface.py",

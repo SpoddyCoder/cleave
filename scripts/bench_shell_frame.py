@@ -80,12 +80,9 @@ def main(argv: list[str] | None = None) -> int:
     from cleave.viz.menu_bar import MenuBarState
     from cleave.viz.navigator import layer_node_id
     from cleave.viz.overlay_profiler import OverlayProfiler
-    from cleave.viz.shell_host import (
-        ShellHost,
-        TransportReadout,
-        draw_shell_frame,
-        menu_bar_height_px,
-    )
+    from cleave.viz.shell_host import ShellHost, draw_shell_frame
+    from cleave.viz.shell_menu_bar import menu_bar_height_px
+    from cleave.viz.shell_transport import TransportReadout
     from cleave.viz.shell_layout import ShellLayout
     from tests.support.viz import make_controls, make_playlist
 

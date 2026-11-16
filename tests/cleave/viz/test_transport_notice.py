@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, patch
 import pygame
 from imgui_bundle import imgui
 
+from cleave.viz.modal import ModalHost
 from cleave.viz.context_menu import ContextMenuState
 from cleave.viz.commands import CommandContext
 from cleave.viz.inline_edit import InlineEditController
@@ -42,7 +43,8 @@ def _content_names() -> list[str]:
 def _host() -> Iterator[object]:
     from cleave.viz import imgui_host
     from cleave.viz.imgui_host import ImGuiHost
-    from cleave.viz.shell_host import ShellHost, menu_bar_height_px
+    from cleave.viz.shell_host import ShellHost
+    from cleave.viz.shell_menu_bar import menu_bar_height_px
 
     controls = SimpleNamespace(
         cfg=SimpleNamespace(project_slug="song"),
@@ -57,6 +59,7 @@ def _host() -> Iterator[object]:
         set_shell_region=MagicMock(),
         inline_edit=InlineEditController(),
         context_menu=ContextMenuState(),
+        modal_host=ModalHost(),
         transport=MagicMock(),
     )
     menu = MenuBarState()
@@ -70,9 +73,9 @@ def _host() -> Iterator[object]:
     host.imgui.display_size = (1280, 720)
     height = host.menu_bar_height_px
     host.set_layout(ShellLayout.compute(1280, 720, height, height, 0))
-    host._draw_navigator = lambda _frame: None
-    host._visible_nav_nodes = lambda: ()
-    host._draw_inspector = lambda _state: None
+    host.navigator.draw = lambda _frame: None
+    host.navigator.visible_nodes = lambda: ()
+    host.inspector.draw = lambda _state: None
     try:
         yield host
     finally:
@@ -98,7 +101,7 @@ def _draw(host: object, notice: PanelNotificationActive) -> None:
 
     draw_shell_frame(
         host,
-        host._menu_state,
+        host.context.menu_state,
         CommandContext(),
         1.0 / 60.0,
         notice=notice,

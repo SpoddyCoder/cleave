@@ -9,7 +9,7 @@ from __future__ import annotations
 import math
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from cleave.viz.choice_layout import STEPPER_BACK, STEPPER_FORWARD
 from cleave.viz.key_repeat import RepeatClock
@@ -19,6 +19,8 @@ from cleave.viz.theme import DISABLED
 
 if TYPE_CHECKING:
     from imgui_bundle import imgui
+
+    from cleave.viz.controls import TuningControls
 
 def value_parts(
     value: str, color: imgui.ImVec4, *, stepped: bool
@@ -159,7 +161,7 @@ class ValueNudgeHold:
     row click and the drag stay suppressed, and ``tick`` does not step.
     """
 
-    def __init__(self, controls: Any) -> None:
+    def __init__(self, controls: TuningControls) -> None:
         self._controls = controls
         self._desc: RowDescriptor | None = None
         self._forward = False

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+from cleave.viz.modal import ModalHost
 from cleave.viz.context_menu import ContextMenuState
 from cleave.blend_modes import BLEND_MODE_HELP_ENTRIES, BLEND_MODES
 from cleave.cue_roles import CUE_ROLE_MARKER_HELP_ENTRIES
@@ -1008,7 +1009,8 @@ def test_help_column_draws_the_subject_stop() -> None:
     from cleave.viz import imgui_host
     from cleave.viz.commands import CommandContext
     from cleave.viz.menu_bar import MenuBarState
-    from cleave.viz.shell_host import draw_shell_frame, menu_bar_height_px
+    from cleave.viz.shell_host import draw_shell_frame
+    from cleave.viz.shell_menu_bar import menu_bar_height_px
     from cleave.viz.shell_layout import ShellLayout
     from cleave.viz.theme import HIGHLIGHT, LABEL
 
@@ -1037,6 +1039,7 @@ def test_help_column_draws_the_subject_stop() -> None:
         ),
         inline_edit=InlineEditController(),
         context_menu=ContextMenuState(),
+        modal_host=ModalHost(),
         transport=MagicMock(),
     )
     with patch.object(imgui_host, "_gl_context_current", return_value=False):
@@ -1055,9 +1058,9 @@ def test_help_column_draws_the_subject_stop() -> None:
         host.set_layout(
             ShellLayout.compute(1280, 720, height, height, 0, help_width=320)
         )
-        host._draw_navigator = lambda _frame: None
-        host._visible_nav_nodes = lambda: ()
-        host._draw_inspector = lambda _state: None
+        host.navigator.draw = lambda _frame: None
+        host.navigator.visible_nodes = lambda: ()
+        host.inspector.draw = lambda _state: None
         draw_shell_frame(host, menu, CommandContext(), 1.0 / 60.0)
         draw_shell_frame(host, menu, CommandContext(), 1.0 / 60.0)
         lists = list(imgui.get_draw_data().cmd_lists)

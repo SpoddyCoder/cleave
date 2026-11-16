@@ -12,6 +12,8 @@ import pygame
 import pytest
 from imgui_bundle import imgui
 
+from cleave.viz.inline_edit import InlineEditController
+from cleave.viz.modal import ModalHost
 from cleave.viz.context_menu import ContextMenuItem, ContextMenuState
 from cleave.config_schema.editor import (
     DEFAULT_HELP_WIDTH,
@@ -25,14 +27,13 @@ from cleave.viz.pointer_cursor import PointerShape, requested_pointer
 from cleave.viz.shell_focus import CycleStop, ShellRegion
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.row_spec import apply_field_horizontal, row_spec
-from cleave.viz.shell_host import (
-    _VALUE_DRAG_THRESHOLD_PX,
-    ShellHost,
-    apply_value_drag,
+from cleave.viz.shell_host import ShellHost
+from cleave.viz.shell_inspector import (
     inspector_row_click_outcome,
     inspector_row_stepped,
-    value_drag_steps,
 )
+from cleave.viz.shell_inspector_values import apply_value_drag
+from cleave.viz.shell_widgets import VALUE_DRAG_THRESHOLD_PX, value_drag_steps
 from cleave.viz.value_nudge import value_parts
 from cleave.viz.shell_layout import (
     MIN_COLUMN_WIDTH,
@@ -60,7 +61,7 @@ def test_value_drag_steps_direction_count_and_remainder() -> None:
 
 
 def test_drag_delta_matches_one_horizontal_step() -> None:
-    threshold = _VALUE_DRAG_THRESHOLD_PX
+    threshold = VALUE_DRAG_THRESHOLD_PX
     dragged = _make_controls(("layer_1",))
     keyed = _make_controls(("layer_1",))
 
@@ -106,7 +107,7 @@ def test_locked_drag_does_not_change_the_value() -> None:
     before = _opacity(controls)
 
     remaining, crossed = apply_value_drag(
-        controls, _OPACITY, _VALUE_DRAG_THRESHOLD_PX * 2 + 5.0, 0.0
+        controls, _OPACITY, VALUE_DRAG_THRESHOLD_PX * 2 + 5.0, 0.0
     )
 
     assert crossed is True
@@ -268,7 +269,7 @@ def _preset_switching_trigger(controls) -> str:
     ],
 )
 def test_off_value_drag_matches_one_horizontal_step(desc, seed, read) -> None:
-    threshold = _VALUE_DRAG_THRESHOLD_PX
+    threshold = VALUE_DRAG_THRESHOLD_PX
     dragged = _make_controls(("layer_1",))
     keyed = _make_controls(("layer_1",))
     seed(dragged)
@@ -296,7 +297,7 @@ def test_locked_placement_snap_drag_consumes_steps() -> None:
     desc = RowDescriptor(RowKind.TIMELINE_PLACEMENT_SNAP)
 
     remaining, crossed = apply_value_drag(
-        controls, desc, _VALUE_DRAG_THRESHOLD_PX * 2 + 5.0, 0.0
+        controls, desc, VALUE_DRAG_THRESHOLD_PX * 2 + 5.0, 0.0
     )
 
     assert crossed is True
@@ -367,6 +368,8 @@ def _host() -> Iterator[ShellHost]:
         set_shell_region=MagicMock(),
         disarm_value_nudge=MagicMock(),
         context_menu=ContextMenuState(),
+        modal_host=ModalHost(),
+        inline_edit=InlineEditController(),
     )
     with patch("cleave.viz.imgui_host._gl_context_current", return_value=False):
         imgui_host = ImGuiHost.create()
@@ -419,14 +422,14 @@ def test_splitter_drag_updates_session_widths_without_imgui_buttons() -> None:
         host.process_event(_button(pygame.MOUSEBUTTONDOWN, (edge, 100)))
         host.process_event(_button(pygame.MOUSEBUTTONUP, (edge, 100)))
         assert host.insp_width is None
-        assert host._splitter is None
+        assert host.splitters.active is None
         host.process_event(_button(pygame.MOUSEBUTTONDOWN, (edge, 100)))
         assert host.imgui.queued_buttons == []
         assert not host.imgui.button_held(0)
         assert host.insp_width is None
         assert host.help_width is None
-        assert host._value_drag_accum == 0.0
-        assert host._value_drag_crossed is False
+        assert host.inspector.values.value_drag_accum == 0.0
+        assert host.inspector.values.value_drag_crossed is False
 
         host.process_event(_motion((700, 100)))
         assert host.insp_width == 700
@@ -435,7 +438,7 @@ def test_splitter_drag_updates_session_widths_without_imgui_buttons() -> None:
         host.process_event(_button(pygame.MOUSEBUTTONUP, (700, 120)))
         assert host.insp_width is None
         assert host.help_width is None
-        assert host._splitter is None
+        assert host.splitters.active is None
         assert host.imgui.queued_buttons == []
 
         narrow = ShellLayout.compute(
@@ -485,7 +488,7 @@ def test_splitter_drag_release_persists_requested_widths() -> None:
             insp_width=request,
         )
         assert fitted.inspector[2] != request
-        host._controls.settings.set_shell_column_widths.assert_called_once_with(
+        host.context.controls.settings.set_shell_column_widths.assert_called_once_with(
             request,
             DEFAULT_HELP_WIDTH,
         )
@@ -495,12 +498,12 @@ def test_splitter_drag_release_persists_requested_widths() -> None:
 
 def test_splitter_drag_release_persists_the_other_columns_live_width() -> None:
     with _host() as host:
-        host._help_width = 360
+        host.splitters.help_width = 360
         edge = _stack_edge(host)
         host.process_event(_button(pygame.MOUSEBUTTONDOWN, (edge, 100)))
         host.process_event(_motion((700, 100)))
         host.process_event(_button(pygame.MOUSEBUTTONUP, (700, 100)))
-        host._controls.settings.set_shell_column_widths.assert_called_once_with(
+        host.context.controls.settings.set_shell_column_widths.assert_called_once_with(
             700, 360
         )
         assert host.insp_width is None
@@ -509,14 +512,14 @@ def test_splitter_drag_release_persists_the_other_columns_live_width() -> None:
 
 def test_splitter_mouseup_under_one_pixel_does_not_persist() -> None:
     with _host() as host:
-        host._help_width = 360
+        host.splitters.help_width = 360
         edge = _stack_edge(host)
         host.process_event(_button(pygame.MOUSEBUTTONDOWN, (edge, 100)))
         host.process_event(_button(pygame.MOUSEBUTTONUP, (edge, 140)))
-        host._controls.settings.set_shell_column_widths.assert_not_called()
+        host.context.controls.settings.set_shell_column_widths.assert_not_called()
         assert host.insp_width is None
         assert host.help_width == 360
-        assert host._splitter is None
+        assert host.splitters.active is None
 
 
 def test_help_splitter_drag_persists_requested_width() -> None:
@@ -531,13 +534,13 @@ def test_help_splitter_drag_persists_requested_width() -> None:
         assert host.help_width == DEFAULT_HELP_WIDTH + 40
         assert host.insp_width is None
         host.process_event(_button(pygame.MOUSEBUTTONUP, (edge - 40, 100)))
-        host._controls.settings.set_shell_column_widths.assert_called_once_with(
+        host.context.controls.settings.set_shell_column_widths.assert_called_once_with(
             DEFAULT_INSPECTOR_WIDTH,
             DEFAULT_HELP_WIDTH + 40,
         )
         assert host.help_width is None
         assert host.insp_width is None
-        assert host._splitter is None
+        assert host.splitters.active is None
 
 
 def test_help_splitter_under_one_pixel_does_not_persist() -> None:
@@ -549,9 +552,9 @@ def test_help_splitter_under_one_pixel_does_not_persist() -> None:
         edge = layout.help[0]
         host.process_event(_button(pygame.MOUSEBUTTONDOWN, (edge, 100)))
         host.process_event(_button(pygame.MOUSEBUTTONUP, (edge, 140)))
-        host._controls.settings.set_shell_column_widths.assert_not_called()
+        host.context.controls.settings.set_shell_column_widths.assert_not_called()
         assert host.help_width is None
-        assert host._splitter is None
+        assert host.splitters.active is None
 
 
 def test_cycle_stop_stays_on_timeline_while_help_is_open() -> None:
@@ -560,7 +563,7 @@ def test_cycle_stop_stays_on_timeline_while_help_is_open() -> None:
     controls.session.timeline.panel_open = True
     controls.set_shell_region(ShellRegion.TIMELINE)
     with _host() as host:
-        host._controls = controls
+        host.context.controls = controls
         menu = MenuBarState()
         assert host._cycle_stop(menu) is CycleStop.TIMELINE
 
@@ -572,7 +575,7 @@ def test_navigator_content_height_is_measured_for_the_next_frame() -> None:
 
     controls = _make_controls(("layer_1",))
     with _host() as host:
-        host._controls = controls
+        host.context.controls = controls
         host.imgui.display_size = (1280, 720)
         assert host.nav_content_height_px == 0
         draw_shell_frame(
@@ -592,7 +595,7 @@ def test_navigator_height_follows_rows_opened_before_the_next_draw() -> None:
 
     controls = _make_controls(("layer_1",))
     with _host() as host:
-        host._controls = controls
+        host.context.controls = controls
         host.imgui.display_size = (1280, 720)
         controls.shell_focus.nav_expanded.clear()
         draw_shell_frame(host, MenuBarState(), command_context(controls), 1 / 60)
@@ -653,7 +656,7 @@ def test_click_in_timeline_rect_sets_timeline_region() -> None:
     controls.session.timeline.panel_open = True
     controls.session.timeline.focus_row = 1
     with _host() as host:
-        host._controls = controls
+        host.context.controls = controls
         layout = _open_strip_layout()
         host.set_layout(layout)
 
@@ -669,7 +672,7 @@ def test_click_in_navigator_sets_navigator_and_keeps_strip_open() -> None:
     controls = _make_controls(("layer_1", "layer_2"))
     controls.open_timeline_panel(enter_submenu=True)
     with _host() as host:
-        host._controls = controls
+        host.context.controls = controls
         layout = _open_strip_layout()
         host.set_layout(layout)
 
@@ -683,7 +686,7 @@ def test_click_in_inspector_sets_inspector_and_keeps_strip_open() -> None:
     controls = _make_controls(("layer_1", "layer_2"))
     controls.open_timeline_panel(enter_submenu=True)
     with _host() as host:
-        host._controls = controls
+        host.context.controls = controls
         layout = _open_strip_layout()
         host.set_layout(layout)
 
@@ -699,7 +702,7 @@ def test_click_in_help_leaves_the_region() -> None:
     controls.set_timeline_focus_row(1)
     controls.session.help_visible = True
     with _host() as host:
-        host._controls = controls
+        host.context.controls = controls
         layout = ShellLayout.compute(
             1280, 720, 23, 23, 80, help_width=DEFAULT_HELP_WIDTH
         )
@@ -718,7 +721,7 @@ def test_click_in_visualiser_focuses_the_preview() -> None:
     controls = _make_controls(("layer_1", "layer_2"))
     controls.open_timeline_panel(enter_submenu=True)
     with _host() as host:
-        host._controls = controls
+        host.context.controls = controls
         layout = _open_strip_layout()
         host.set_layout(layout)
 
@@ -731,7 +734,7 @@ def test_click_in_menu_or_transport_does_not_change_region() -> None:
     controls = _make_controls(("layer_1", "layer_2"))
     controls.open_timeline_panel(enter_submenu=True)
     with _host() as host:
-        host._controls = controls
+        host.context.controls = controls
         layout = _open_strip_layout()
         host.set_layout(layout)
 
@@ -774,10 +777,10 @@ def test_nav_splitter_drag_sets_and_persists_navigator_height() -> None:
         assert host.navigator_height == 300
         assert host.insp_width is None
         host.process_event(_button(pygame.MOUSEBUTTONUP, (x + 30, top + 300)))
-        host._controls.settings.set_navigator_height.assert_called_once_with(300)
-        host._controls.settings.set_shell_column_widths.assert_not_called()
+        host.context.controls.settings.set_navigator_height.assert_called_once_with(300)
+        host.context.controls.settings.set_shell_column_widths.assert_not_called()
         assert host.navigator_height is None
-        assert host._splitter is None
+        assert host.splitters.active is None
 
 
 def test_nav_splitter_under_one_pixel_does_not_persist() -> None:
@@ -785,8 +788,8 @@ def test_nav_splitter_under_one_pixel_does_not_persist() -> None:
         x, y = _nav_boundary(host)
         host.process_event(_button(pygame.MOUSEBUTTONDOWN, (x, y)))
         host.process_event(_button(pygame.MOUSEBUTTONUP, (x + 40, y)))
-        host._controls.settings.set_navigator_height.assert_not_called()
-        assert host._splitter is None
+        host.context.controls.settings.set_navigator_height.assert_not_called()
+        assert host.splitters.active is None
 
 
 def test_timeline_splitter_drag_sets_and_persists_band_height() -> None:
@@ -800,10 +803,10 @@ def test_timeline_splitter_drag_sets_and_persists_band_height() -> None:
         host.process_event(_motion((640, 420)))
         assert host.timeline_height == 300
         host.process_event(_button(pygame.MOUSEBUTTONUP, (640, 420)))
-        host._controls.settings.set_timeline_height.assert_called_once_with(300)
-        host._controls.settings.set_navigator_height.assert_not_called()
+        host.context.controls.settings.set_timeline_height.assert_called_once_with(300)
+        host.context.controls.settings.set_navigator_height.assert_not_called()
         assert host.timeline_height is None
-        assert host._splitter is None
+        assert host.splitters.active is None
 
 
 def test_timeline_splitter_below_the_fit_saves_fit_to_rows() -> None:
@@ -812,7 +815,7 @@ def test_timeline_splitter_below_the_fit_saves_fit_to_rows() -> None:
         top = host.layout.timeline[1]
         host.process_event(_button(pygame.MOUSEBUTTONDOWN, (640, top)))
         host.process_event(_button(pygame.MOUSEBUTTONUP, (640, 715)))
-        host._controls.settings.set_timeline_height.assert_called_once_with(0)
+        host.context.controls.settings.set_timeline_height.assert_called_once_with(0)
 
 
 def test_strip_pointer_gets_press_drag_and_release_in_timeline_rect() -> None:
@@ -820,8 +823,8 @@ def test_strip_pointer_gets_press_drag_and_release_in_timeline_rect() -> None:
     controls.session.timeline.panel_open = True
     pointer = MagicMock()
     with _host() as host:
-        host._controls = controls
-        host._strip_pointer = pointer
+        host.context.controls = controls
+        host.strip.pointer = pointer
         layout = _open_strip_layout()
         host.set_layout(layout)
         pos = _rect_center(layout.timeline)
@@ -841,8 +844,8 @@ def test_strip_pointer_ignores_clicks_outside_strip_or_when_closed() -> None:
     controls.session.timeline.panel_open = True
     pointer = MagicMock()
     with _host() as host:
-        host._controls = controls
-        host._strip_pointer = pointer
+        host.context.controls = controls
+        host.strip.pointer = pointer
         layout = _open_strip_layout()
         host.set_layout(layout)
 
@@ -858,8 +861,8 @@ def test_wheel_over_the_open_strip_zooms_it_and_skips_imgui() -> None:
     controls.session.timeline.panel_open = True
     pointer = MagicMock()
     with _host() as host:
-        host._controls = controls
-        host._strip_pointer = pointer
+        host.context.controls = controls
+        host.strip.pointer = pointer
         layout = _open_strip_layout()
         host.set_layout(layout)
         wheel = pygame.event.Event(pygame.MOUSEWHEEL, x=0, y=1)
@@ -882,8 +885,8 @@ def test_middle_press_on_the_strip_pans_without_taking_the_region() -> None:
     controls.session.timeline.panel_open = True
     pointer = MagicMock()
     with _host() as host:
-        host._controls = controls
-        host._strip_pointer = pointer
+        host.context.controls = controls
+        host.strip.pointer = pointer
         layout = _open_strip_layout()
         host.set_layout(layout)
         pos = _rect_center(layout.timeline)
@@ -908,7 +911,7 @@ def test_strip_pan_asks_for_move_and_the_scrollbar_for_left_right() -> None:
 def test_strip_pointer_cancels_when_window_loses_focus() -> None:
     pointer = MagicMock()
     with _host() as host:
-        host._strip_pointer = pointer
+        host.strip.pointer = pointer
         host.process_event(pygame.event.Event(pygame.WINDOWFOCUSLOST))
         pointer.cancel.assert_called_once()
 
@@ -923,7 +926,7 @@ def _strip_host(
     scrollbar_active=False,
     clip_gesture=None,
 ):
-    host._strip_pointer = SimpleNamespace(
+    host.strip.pointer = SimpleNamespace(
         clip_gesture=clip_gesture,
         over_ruler=over_ruler,
         scrubbing=scrubbing,
@@ -931,7 +934,7 @@ def _strip_host(
         scrollbar_active=scrollbar_active,
         hover_pressable=hover is not None and hover != ("eye", 3),
     )
-    host._controls.session = SimpleNamespace(
+    host.context.controls.session = SimpleNamespace(
         layer_z_order=(),
         timeline=SimpleNamespace(panel_open=True, strip_hover=hover),
     )
@@ -953,7 +956,7 @@ def test_strip_buttons_ask_for_the_hand_and_the_ruler_for_left_right() -> None:
         assert _gesture_pointer(host) is PointerShape.RESIZE_EW
         _strip_host(host, hover=("eye", 0), scrubbing=True)
         assert _gesture_pointer(host) is PointerShape.RESIZE_EW
-        host._controls.session.timeline.panel_open = False
+        host.context.controls.session.timeline.panel_open = False
         assert _gesture_pointer(host) is PointerShape.ARROW
 
 
@@ -972,7 +975,7 @@ def test_modal_keeps_the_splitter_and_strip_pointers_away() -> None:
         host.imgui.process_mouse_event(_motion((edge, 100)))
         _strip_host(host, hover=("play", None))
         assert _gesture_pointer(host) is PointerShape.RESIZE_EW
-        host._controls.modal_host = SimpleNamespace(active=True)
+        host.context.controls.modal_host = SimpleNamespace(active=True)
         assert _gesture_pointer(host) is PointerShape.ARROW
 
 
@@ -984,8 +987,8 @@ def test_right_click_on_a_strip_row_opens_its_menu_and_outside_click_closes() ->
         ContextMenuItem("x", "Item", lambda: None),
     )
     with _host() as host:
-        host._controls = controls
-        host._strip_pointer = pointer
+        host.context.controls = controls
+        host.strip.pointer = pointer
         layout = _open_strip_layout()
         host.set_layout(layout)
         pos = _rect_center(layout.timeline)
@@ -1012,8 +1015,8 @@ def test_right_click_off_a_strip_row_opens_nothing() -> None:
     pointer = MagicMock()
     pointer.context_menu_at.return_value = None
     with _host() as host:
-        host._controls = controls
-        host._strip_pointer = pointer
+        host.context.controls = controls
+        host.strip.pointer = pointer
         layout = _open_strip_layout()
         host.set_layout(layout)
         host.process_event(
@@ -1035,8 +1038,8 @@ def test_focus_context_menu_opens_at_the_focused_strip_row() -> None:
         ContextMenuItem("x", "Item", lambda: None),
     )
     with _host() as host:
-        host._controls = controls
-        host._strip_pointer = pointer
+        host.context.controls = controls
+        host.strip.pointer = pointer
         assert host.open_focus_context_menu() is False
         controls.set_shell_region(ShellRegion.TIMELINE)
         assert host.open_focus_context_menu() is True
@@ -1048,11 +1051,11 @@ def test_focus_context_menu_opens_at_the_focused_strip_row() -> None:
 def test_right_click_on_a_navigator_row_selects_it_and_opens_its_menu() -> None:
     controls = _make_controls(("layer_1", "layer_2"))
     with _host() as host:
-        host._controls = controls
+        host.context.controls = controls
         layout = _open_strip_layout()
         host.set_layout(layout)
         x, y, w, _h = layout.navigator
-        host._nav_row_rects = {"layer:layer_2": (x, y + 10, w, 15)}
+        host.navigator.row_rects = {"layer:layer_2": (x, y + 10, w, 15)}
         pos = (x + w // 2, y + 15)
 
         host.process_event(_button(pygame.MOUSEBUTTONDOWN, pos, button=3))
@@ -1073,10 +1076,10 @@ def test_right_click_on_a_navigator_row_selects_it_and_opens_its_menu() -> None:
 def test_focus_context_menu_opens_under_the_selected_navigator_row() -> None:
     controls = _make_controls(("layer_1", "layer_2"))
     with _host() as host:
-        host._controls = controls
+        host.context.controls = controls
         controls.navigator.select("layer:layer_1")
         assert host.open_focus_context_menu() is False
-        host._nav_row_rects = {"layer:layer_1": (4, 60, 200, 20)}
+        host.navigator.row_rects = {"layer:layer_1": (4, 60, 200, 20)}
         assert host.open_focus_context_menu() is True
         assert controls.context_menu.anchor == (4.0, 80.0)
         assert controls.context_menu.highlight == 0
@@ -1097,12 +1100,12 @@ def test_right_click_on_a_preset_list_row_focuses_it_and_opens_its_menu() -> Non
     controls = _make_controls(("layer_1",))
     controls.session.layers["layer_1"].preset_list = ["/tmp/a.milk", "/tmp/b.milk"]
     with _host() as host:
-        host._controls = controls
+        host.context.controls = controls
         layout = _open_strip_layout()
         host.set_layout(layout)
         x, y, w, _h = layout.inspector
         row = _preset_item_row(1)
-        host._insp_row_rects = {row.descriptor: ((x, y + 10, w, 15), row)}
+        host.inspector.row_rects = {row.descriptor: ((x, y + 10, w, 15), row)}
 
         host.process_event(
             _button(pygame.MOUSEBUTTONDOWN, (x + w // 2, y + 15), button=3)
@@ -1123,18 +1126,23 @@ def test_focus_context_menu_opens_under_the_focused_preset_list_row() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.layers["layer_1"].preset_list = ["/tmp/a.milk"]
     with _host() as host:
-        host._controls = controls
+        host.context.controls = controls
         row = _preset_item_row(0)
         controls.set_shell_region(ShellRegion.INSPECTOR)
         controls.shell_focus.inspector_cursor = row.descriptor
         assert host.open_focus_context_menu() is False
-        host._insp_row_rects = {row.descriptor: ((4, 300, 200, 20), row)}
+        host.inspector.row_rects = {row.descriptor: ((4, 300, 200, 20), row)}
         assert host.open_focus_context_menu() is True
         assert controls.context_menu.anchor == (4.0, 320.0)
 
 
 def test_one_frame_builds_the_navigator_once_for_every_panel(monkeypatch) -> None:
-    from cleave.viz import navigator, navigator_controls, shell_host
+    from cleave.viz import (
+        navigator,
+        navigator_controls,
+        shell_inspector_title,
+        shell_navigator,
+    )
     from cleave.viz.commands import command_context
     from cleave.viz.shell_host import draw_shell_frame
 
@@ -1145,12 +1153,17 @@ def test_one_frame_builds_the_navigator_once_for_every_panel(monkeypatch) -> Non
         builds.append(expanded is navigator._EVERY_ID)
         return real(session, expanded)
 
-    for module in (navigator, navigator_controls, shell_host):
+    for module in (
+        navigator,
+        navigator_controls,
+        shell_inspector_title,
+        shell_navigator,
+    ):
         monkeypatch.setattr(module, "build_navigator", counted)
 
     controls = _make_controls(("layer_1", "layer_2"))
     with _host() as host:
-        host._controls = controls
+        host.context.controls = controls
         host.imgui.display_size = (1280, 720)
         draw_shell_frame(host, MenuBarState(), command_context(controls), 1 / 60)
         builds.clear()

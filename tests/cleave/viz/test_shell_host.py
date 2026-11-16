@@ -33,17 +33,22 @@ from cleave.viz.navigator import (
 from cleave.viz.row_hotkeys import activate_header_toggle
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.session import LayerRuntime, TuningSession
-from cleave.viz.shell_host import (
+from cleave.viz.shell_inspector import (
     choice_tone,
-    page_status_marks,
     marker_token_spans,
-    drag_handle_lead,
     inspector_selectable_id,
-    menu_bar_project_label,
+    path_icon_color,
+    path_row_icon,
+)
+from cleave.viz.shell_inspector_title import (
+    page_status_marks,
     inspector_title,
     inspector_title_cluster,
     page_history_tooltip,
     page_title,
+)
+from cleave.viz.shell_menu_bar import menu_bar_project_label
+from cleave.viz.shell_navigator import (
     navigator_height_for_rows,
     navigator_lock_mark,
     navigator_toggle_color,
@@ -52,19 +57,19 @@ from cleave.viz.shell_host import (
     navigator_toggle_tooltip,
     navigator_toggle_xs,
     navigator_tree_lines,
+    nav_handle_text,
+    navigator_twisty,
+    navigator_label_click,
+    selection_after_nav_collapse,
+)
+from cleave.viz.shell_strip import (
     strip_arm_tooltip,
     strip_eye_tooltip,
     strip_release_tooltip,
     strip_solo_tooltip,
-    nav_handle_text,
-    navigator_twisty,
-    path_icon_color,
-    path_row_icon,
-    scroll_clip_span,
-    selectable_wash,
-    navigator_label_click,
-    selection_after_nav_collapse,
 )
+from cleave.viz.shell_widgets import drag_handle_lead, selectable_wash
+from cleave.viz.shell_windows import scroll_clip_span
 from cleave.viz.material_icons import FILE_GLYPH, FOLDER_GLYPH
 from cleave.viz.theme import (
     DISABLED,
@@ -397,7 +402,7 @@ def test_scrollable_shell_flags_drop_only_the_scroll_bits() -> None:
     from imgui_bundle import imgui
 
     from cleave.viz.menu_rows import POPUP_FLAGS
-    from cleave.viz.shell_host import _SHELL_FLAGS, shell_window_flags
+    from cleave.viz.shell_windows import SHELL_FLAGS, shell_window_flags
 
     no_scrollbar = int(imgui.WindowFlags_.no_scrollbar)
     no_scroll_with_mouse = int(imgui.WindowFlags_.no_scroll_with_mouse)
@@ -412,15 +417,15 @@ def test_scrollable_shell_flags_drop_only_the_scroll_bits() -> None:
         | int(imgui.WindowFlags_.no_nav)
     )
 
-    fixed = shell_window_flags(_SHELL_FLAGS, scrollable=False)
-    scrolling = shell_window_flags(_SHELL_FLAGS, scrollable=True)
+    fixed = shell_window_flags(SHELL_FLAGS, scrollable=False)
+    scrolling = shell_window_flags(SHELL_FLAGS, scrollable=True)
 
-    assert fixed == _SHELL_FLAGS
+    assert fixed == SHELL_FLAGS
     assert fixed & scroll_off == scroll_off
     assert fixed & kept == kept
     assert scrolling & scroll_off == 0
     assert scrolling & kept == kept
-    assert scrolling == _SHELL_FLAGS & ~scroll_off
+    assert scrolling == SHELL_FLAGS & ~scroll_off
     assert POPUP_FLAGS & no_scrollbar == no_scrollbar
     assert POPUP_FLAGS & int(imgui.WindowFlags_.no_nav) == int(
         imgui.WindowFlags_.no_nav

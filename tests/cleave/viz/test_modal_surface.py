@@ -85,7 +85,8 @@ def _content_names() -> list[str]:
 def _host() -> Iterator[object]:
     from cleave.viz import imgui_host
     from cleave.viz.imgui_host import ImGuiHost
-    from cleave.viz.shell_host import ShellHost, menu_bar_height_px
+    from cleave.viz.shell_host import ShellHost
+    from cleave.viz.shell_menu_bar import menu_bar_height_px
 
     controls = SimpleNamespace(
         session=SimpleNamespace(
@@ -114,9 +115,9 @@ def _host() -> Iterator[object]:
     host.imgui.display_size = (1280, 720)
     height = host.menu_bar_height_px
     host.set_layout(ShellLayout.compute(1280, 720, height, height, 0))
-    host._draw_navigator = lambda _frame: None
-    host._visible_nav_nodes = lambda: ()
-    host._draw_inspector = lambda _state: None
+    host.navigator.draw = lambda _frame: None
+    host.navigator.visible_nodes = lambda: ()
+    host.inspector.draw = lambda _state: None
     try:
         yield host
     finally:
@@ -131,7 +132,7 @@ def _host() -> Iterator[object]:
 def _draw(host: object) -> None:
     from cleave.viz.shell_host import draw_shell_frame
 
-    draw_shell_frame(host, host._menu_state, CommandContext(), 1.0 / 60.0)
+    draw_shell_frame(host, host.context.menu_state, CommandContext(), 1.0 / 60.0)
 
 
 def _motion(pos: tuple[int, int]) -> pygame.event.Event:
@@ -607,14 +608,14 @@ def test_navigator_click_does_not_set_shell_region() -> None:
         navigator = (nav_x + nav_w - 1, nav_y + nav_h // 2)
         host.process_event(_button(navigator))
         assert host.imgui.queued_buttons == [(0, True)]
-        assert host._splitter is None
-        host._controls.set_shell_region.assert_not_called()
+        assert host.splitters.active is None
+        host.context.controls.set_shell_region.assert_not_called()
 
 
 def test_modal_host_active_routes_navigator_click_before_draw() -> None:
     with _host() as host:
-        host._controls.modal_host.prompt_confirm("Save?", "Confirm", on_confirm=lambda: None)
-        assert host._controls.modal_host.active
+        host.context.controls.modal_host.prompt_confirm("Save?", "Confirm", on_confirm=lambda: None)
+        assert host.context.controls.modal_host.active
         assert not host.top_layer.modal_active
         layout = host.layout
         assert layout is not None
@@ -622,7 +623,7 @@ def test_modal_host_active_routes_navigator_click_before_draw() -> None:
         navigator = (nav_x + nav_w - 1, nav_y + nav_h // 2)
         host.process_event(_button(navigator))
         assert host.imgui.queued_buttons == [(0, True)]
-        host._controls.set_shell_region.assert_not_called()
+        host.context.controls.set_shell_region.assert_not_called()
 
 
 def test_right_click_does_not_activate_or_cancel() -> None:
@@ -973,7 +974,7 @@ def test_form_combo_click_opens_its_list_and_a_row_click_picks() -> None:
 def test_inspector_button_inline_field_and_colour_picker_draw() -> None:
     from imgui_bundle import imgui
 
-    from cleave.viz import shell_host
+    from cleave.viz import shell_widgets, theme
     from cleave.viz.inline_edit import ColourTarget, InlineEditController, InlineTextView
     from cleave.viz.row_kinds import RowDescriptor, RowKind
 
@@ -984,23 +985,23 @@ def test_inspector_button_inline_field_and_colour_picker_draw() -> None:
     drawn: list[bool] = []
 
     with _host() as host:
-        host._controls.inline_edit = inline
+        host.context.controls.inline_edit = inline
 
         def draw_inspector(_state: object) -> None:
             imgui.selectable("label##row", False)
             for error in (None, "bad value"):
-                host._draw_inline_field(InlineTextView("#ffffff", 3, True, error))
+                host.inspector.draw_inline_field(InlineTextView("#ffffff", 3, True, error))
             drawn.append(
-                shell_host._draw_button(
+                shell_widgets.draw_button(
                     "Go##button",
-                    text_role=shell_host.VALUE,
+                    text_role=theme.VALUE,
                     selected=True,
                     enabled=True,
                 )
             )
-            host._draw_colour_picker()
+            host.inspector.values.draw_colour_picker()
 
-        host._draw_inspector = draw_inspector
+        host.inspector.draw = draw_inspector
         _draw(host)
         _draw(host)
     assert drawn
@@ -1031,7 +1032,7 @@ def test_form_help_lifts_the_help_column_above_the_scrim() -> None:
         )
         help_rect = host.layout.help
         assert help_rect[2] > 0
-        modal = host._controls.modal_host
+        modal = host.context.controls.modal_host
         _help_host_form(modal)
 
         def surface() -> ModalSurface:
@@ -1057,7 +1058,7 @@ def test_form_help_lifts_the_help_column_above_the_scrim() -> None:
         assert lifted.intent is None
 
     with _host() as host:
-        modal = host._controls.modal_host
+        modal = host.context.controls.modal_host
         _help_host_form(modal)
         idle = ModalSurface(modal.view_state(), ImGuiTextMeasure())
         _idle(host, idle)

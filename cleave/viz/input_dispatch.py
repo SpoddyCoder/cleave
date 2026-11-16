@@ -387,10 +387,9 @@ def _open_focus_context_menu(
 ) -> bool:
     if not is_context_menu_key(event):
         return False
-    open_menu = getattr(runtime.shell_host, "open_focus_context_menu", None)
-    if open_menu is None:
+    if runtime.shell_host is None:
         return False
-    open_menu()
+    runtime.shell_host.open_focus_context_menu()
     return True
 
 

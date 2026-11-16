@@ -9,7 +9,7 @@ from unittest.mock import patch
 import pygame
 from imgui_bundle import imgui
 
-from cleave.viz import imgui_host, shell_host
+from cleave.viz import imgui_host, shell_inspector, shell_navigator, shell_widgets
 from cleave.viz.commands import CommandContext
 from cleave.viz.imgui_host import ImGuiHost
 from cleave.viz.menu_bar import MenuBarState
@@ -21,7 +21,8 @@ from cleave.viz.navigator import (
 )
 from cleave.viz.scroll_follow import clamp_scroll, reveal_span, scroll_to_reveal
 from cleave.viz.shell_focus import ShellRegion
-from cleave.viz.shell_host import ShellHost, draw_shell_frame, menu_bar_height_px
+from cleave.viz.shell_host import ShellHost, draw_shell_frame
+from cleave.viz.shell_menu_bar import menu_bar_height_px
 from cleave.viz.shell_layout import ShellLayout
 from tests.cleave.viz.test_controls import _keydown, _make_controls
 
@@ -87,7 +88,7 @@ def _shell(controls) -> Iterator[ShellHost]:
 def _focused_rows(host: ShellHost, frames: int = 2) -> list[tuple[float, float, float, float]]:
     """Draw *frames* shell frames. Each focus ring drawn is (top, bottom, window top, window bottom)."""
     rings: list[tuple[float, float, float, float]] = []
-    real_ring = shell_host._draw_item_focus_ring
+    real_ring = shell_widgets.draw_item_focus_ring
 
     def ring() -> None:
         real_ring()
@@ -101,7 +102,11 @@ def _focused_rows(host: ShellHost, frames: int = 2) -> list[tuple[float, float, 
             )
         )
 
-    with patch.object(shell_host, "_draw_item_focus_ring", ring):
+    with (
+        patch.object(shell_navigator, "draw_item_focus_ring", ring),
+        patch.object(shell_inspector, "draw_item_focus_ring", ring),
+        patch.object(shell_widgets, "draw_item_focus_ring", ring),
+    ):
         for _ in range(frames):
             rings.clear()
             height = host.menu_bar_height_px
@@ -115,7 +120,7 @@ def _focused_rows(host: ShellHost, frames: int = 2) -> list[tuple[float, float, 
                     nav_content_h=host.nav_content_height_px or None,
                 )
             )
-            draw_shell_frame(host, host._menu_state, CommandContext(), 1.0 / 60.0)
+            draw_shell_frame(host, host.context.menu_state, CommandContext(), 1.0 / 60.0)
     return list(rings)
 
 
@@ -125,16 +130,17 @@ def _assert_in_view(rings: list[tuple[float, float, float, float]]) -> None:
     assert window_top <= top and bottom <= window_bottom
 
 
-def _window_scroll(host: ShellHost, draw_name: str) -> list[float]:
-    """Record the scroll of the window *draw_name* draws into, once per frame."""
+def _window_scroll(host: ShellHost, panel_name: str) -> list[float]:
+    """Record the scroll of the window *panel_name* draws into, once per frame."""
     seen: list[float] = []
-    real = getattr(host, draw_name)
+    panel = getattr(host, panel_name)
+    real = panel.draw
 
     def spy(*args) -> None:
         real(*args)
         seen.append(float(imgui.get_scroll_y()))
 
-    setattr(host, draw_name, spy)
+    panel.draw = spy
     return seen
 
 
@@ -158,7 +164,7 @@ def test_navigator_scrolls_to_keep_the_selected_row_in_view() -> None:
     }
     controls.set_shell_region(ShellRegion.NAVIGATOR)
     with _shell(controls) as host:
-        scroll = _window_scroll(host, "_draw_navigator")
+        scroll = _window_scroll(host, "navigator")
         _focused_rows(host)
         for _ in range(60):
             controls.navigator.handle_keydown(_keydown(pygame.K_DOWN))
@@ -169,7 +175,7 @@ def test_navigator_scrolls_to_keep_the_selected_row_in_view() -> None:
 def test_inspector_scrolls_to_keep_the_focused_row_in_view() -> None:
     controls = _long_preset_page()
     with _shell(controls) as host:
-        scroll = _window_scroll(host, "_draw_inspector")
+        scroll = _window_scroll(host, "inspector")
         _focused_rows(host)
         for _ in range(70):
             controls.inspector.handle_keydown(_keydown(pygame.K_DOWN))
@@ -180,7 +186,7 @@ def test_inspector_scrolls_to_keep_the_focused_row_in_view() -> None:
 def test_inspector_wraps_back_to_the_top_row() -> None:
     controls = _long_preset_page()
     with _shell(controls) as host:
-        scroll = _window_scroll(host, "_draw_inspector")
+        scroll = _window_scroll(host, "inspector")
         _focused_rows(host)
         controls.inspector.handle_keydown(_keydown(pygame.K_UP))
         _focused_rows(host)
@@ -195,7 +201,7 @@ def test_wheel_scroll_is_not_pulled_back_while_focus_stays() -> None:
     with _shell(controls) as host:
         _focused_rows(host)
         scroll: list[float] = []
-        real = host._draw_inspector
+        real = host.inspector.draw
 
         def wheel_then_draw(state) -> None:
             if not scroll:
@@ -203,6 +209,6 @@ def test_wheel_scroll_is_not_pulled_back_while_focus_stays() -> None:
             real(state)
             scroll.append(float(imgui.get_scroll_y()))
 
-        host._draw_inspector = wheel_then_draw
+        host.inspector.draw = wheel_then_draw
         _focused_rows(host, frames=3)
         assert scroll[-1] == 300.0

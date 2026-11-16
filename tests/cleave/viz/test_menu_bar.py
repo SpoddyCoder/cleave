@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 import pygame
 import pytest
 
+from cleave.viz.modal import ModalHost
 from cleave.viz.context_menu import ContextMenuState
 from cleave.viz.inline_edit import InlineEditController
 from cleave.viz.commands import (
@@ -256,7 +257,8 @@ def _at(pos: tuple[int, int], kind: int) -> pygame.event.Event:
 
 def _open_shell(overlay: _Overlay, menu: MenuBarState, controls: object | None = None):
     from cleave.viz.imgui_host import ImGuiHost
-    from cleave.viz.shell_host import ShellHost, menu_bar_height_px
+    from cleave.viz.shell_host import ShellHost
+    from cleave.viz.shell_menu_bar import menu_bar_height_px
 
     if controls is None:
         controls = _shell_controls()
@@ -280,7 +282,7 @@ def test_mouse_switches_and_closes_an_open_top_menu() -> None:
     with patch.object(imgui_host, "_gl_context_current", return_value=False):
         host = _open_shell(overlay, menu)
     anchors: dict[int, tuple[float, float]] = {}
-    draw_bar = host._draw_bar
+    draw_bar = host.menu_bar.draw_bar
 
     def remember(state: MenuBarState, ctx: CommandContext):
         rule_y, found, menus = draw_bar(state, ctx)
@@ -288,7 +290,7 @@ def test_mouse_switches_and_closes_an_open_top_menu() -> None:
         anchors.update(found)
         return rule_y, found, menus
 
-    host._draw_bar = remember
+    host.menu_bar.draw_bar = remember
     host.imgui.display_size = (1280, 720)
 
     def draw() -> None:
@@ -335,7 +337,7 @@ def test_shell_host_imports_without_a_context() -> None:
 def test_menu_bar_height_px_needs_no_gl_context() -> None:
     from imgui_bundle import imgui
 
-    from cleave.viz.shell_host import menu_bar_height_px
+    from cleave.viz.shell_menu_bar import menu_bar_height_px
     from cleave.viz.theme import tuning_ui_metrics, ui_chrome_px
 
     assert imgui.get_current_context() is None
@@ -468,7 +470,7 @@ def test_open_menu_paints_over_the_transport_rule() -> None:
     """
     from imgui_bundle import imgui
 
-    from cleave.viz import imgui_host, shell_host
+    from cleave.viz import imgui_host, shell_menu_bar
     from cleave.viz.shell_host import draw_shell_frame
     from cleave.viz.shell_layout import ShellLayout
     from cleave.viz.theme import TRANSPORT_RULE
@@ -484,12 +486,12 @@ def test_open_menu_paints_over_the_transport_rule() -> None:
         host = _open_shell(overlay, menu, controls)
     try:
         host.imgui.display_size = (1280, 720)
-        height = shell_host.menu_bar_height_px()
+        height = shell_menu_bar.menu_bar_height_px()
         host.set_layout(ShellLayout.compute(1280, 720, height, height, 0))
         host.process_event(_motion(4))
-        host._draw_navigator = lambda _frame: None
-        host._visible_nav_nodes = lambda: ()
-        host._draw_inspector = lambda _state: None
+        host.navigator.draw = lambda _frame: None
+        host.navigator.visible_nodes = lambda: ()
+        host.inspector.draw = lambda _state: None
         # The font atlas is built on the first frame. Open the menu after that.
         draw_shell_frame(host, menu, CommandContext(), 1.0 / 60.0)
         menu.open_menu(0, MENUS)
@@ -526,7 +528,7 @@ def test_open_menu_paints_over_the_focus_ring() -> None:
     """The row highlight stays on its panel, under a later menu popup."""
     from imgui_bundle import imgui
 
-    from cleave.viz import imgui_host, shell_host
+    from cleave.viz import imgui_host, shell_menu_bar, shell_widgets
     from cleave.viz.shell_host import draw_shell_frame
     from cleave.viz.shell_layout import ShellLayout
     from cleave.viz.theme import (
@@ -547,7 +549,7 @@ def test_open_menu_paints_over_the_focus_ring() -> None:
         host = _open_shell(overlay, menu, controls)
     try:
         host.imgui.display_size = (1280, 720)
-        height = shell_host.menu_bar_height_px()
+        height = shell_menu_bar.menu_bar_height_px()
         host.set_layout(ShellLayout.compute(1280, 720, height, height, 80))
         host.process_event(_motion(4))
         controls.session.timeline = SimpleNamespace(panel_open=True)
@@ -555,12 +557,12 @@ def test_open_menu_paints_over_the_focus_ring() -> None:
 
         def draw_focused_row(_frame: object) -> None:
             imgui.selectable("Focused##row", True)
-            shell_host._draw_item_focus_ring()
+            shell_widgets.draw_item_focus_ring()
 
-        host._draw_navigator = draw_focused_row
+        host.navigator.draw = draw_focused_row
 
-        host._visible_nav_nodes = lambda: ()
-        host._draw_inspector = lambda _state: None
+        host.navigator.visible_nodes = lambda: ()
+        host.inspector.draw = lambda _state: None
         # The font atlas is built on the first frame. The strip border shares
         # the panel border window, under the menu popup; an open menu takes focus.
         draw_shell_frame(host, menu, CommandContext(), 1.0 / 60.0)
@@ -687,7 +689,7 @@ def test_popup_hover_takes_the_opaque_highlight() -> None:
 
     Unselected panel rows keep the theme header hover wash.
     """
-    from cleave.viz import imgui_host, shell_host
+    from cleave.viz import imgui_host, shell_menu_bar
     from cleave.viz.shell_focus import ShellFocusState
     from cleave.viz.shell_layout import ShellLayout
     from cleave.viz.theme import HIGHLIGHT, HOVER, HOVER_BG_ALPHA
@@ -719,11 +721,11 @@ def test_popup_hover_takes_the_opaque_highlight() -> None:
     with patch.object(imgui_host, "_gl_context_current", return_value=False):
         host = _open_shell(overlay, menu, controls)
     host.imgui.display_size = (1280, 720)
-    host._draw_navigator = draw_nav
-    host._visible_nav_nodes = lambda: ()
-    host._draw_inspector = draw_inspector
+    host.navigator.draw = draw_nav
+    host.navigator.visible_nodes = lambda: ()
+    host.inspector.draw = draw_inspector
     try:
-        height = shell_host.menu_bar_height_px()
+        height = shell_menu_bar.menu_bar_height_px()
         host.set_layout(ShellLayout.compute(1280, 720, height, height, 280))
         host.process_event(_motion(8))
         _paint_shell(host, menu, CommandContext(), frames=1)
@@ -897,15 +899,15 @@ def test_open_menu_ink_matches_the_mock() -> None:
     with patch.object(imgui_host, "_gl_context_current", return_value=False):
         host = _open_shell(overlay, menu, controls)
     try:
-        from cleave.viz import shell_host
+        from cleave.viz import imgui_host, shell_menu_bar
 
         host.imgui.display_size = (1280, 720)
-        height = shell_host.menu_bar_height_px()
+        height = shell_menu_bar.menu_bar_height_px()
         host.set_layout(ShellLayout.compute(1280, 720, height, height, 0))
         host.process_event(_motion(4))
-        host._draw_navigator = lambda _frame: None
-        host._visible_nav_nodes = lambda: ()
-        host._draw_inspector = lambda _state: None
+        host.navigator.draw = lambda _frame: None
+        host.navigator.visible_nodes = lambda: ()
+        host.inspector.draw = lambda _state: None
         ctx = CommandContext(fullscreen=True)
         _paint_shell(host, menu, ctx, frames=1)
         menu.open_menu(view_index, MENUS)
@@ -950,7 +952,7 @@ def test_open_menu_ink_matches_the_mock() -> None:
 
 
 def test_navigator_focus_ring_only_while_that_region_is_active() -> None:
-    from cleave.viz import imgui_host, shell_host
+    from cleave.viz import imgui_host, shell_menu_bar, shell_navigator, shell_widgets
     from cleave.viz.navigator import NavNode
     from cleave.viz.shell_focus import ShellFocusState
     from cleave.viz.shell_layout import ShellLayout
@@ -978,7 +980,7 @@ def test_navigator_focus_ring_only_while_that_region_is_active() -> None:
     controls.shell_focus = focus
     controls.navigator = SimpleNamespace(select=lambda *_args, **_kwargs: None)
     rings: list[bool] = []
-    real_ring = shell_host._draw_item_focus_ring
+    real_ring = shell_widgets.draw_item_focus_ring
 
     def spy_ring() -> None:
         rings.append(True)
@@ -988,17 +990,17 @@ def test_navigator_focus_ring_only_while_that_region_is_active() -> None:
         host = _open_shell(overlay, menu, controls)
     try:
         host.imgui.display_size = (1280, 720)
-        height = shell_host.menu_bar_height_px()
+        height = shell_menu_bar.menu_bar_height_px()
         # Tall enough for all three rows: the navigator clips rows that
         # overflow its padding, and a missing child row has no LABEL ink.
         host.set_layout(
             ShellLayout.compute(1280, 720, height, height, 0, nav_content_h=200)
         )
         host.process_event(_motion(4))
-        host._draw_inspector = lambda _state: None
+        host.inspector.draw = lambda _state: None
         with (
-            patch.object(shell_host, "_draw_item_focus_ring", spy_ring),
-            patch.object(shell_host, "build_navigator", return_value=nodes),
+            patch.object(shell_navigator, "draw_item_focus_ring", spy_ring),
+            patch.object(shell_navigator, "build_navigator", return_value=nodes),
         ):
             _paint_shell(host, menu, CommandContext(), frames=1)
             rings.clear()
@@ -1040,7 +1042,7 @@ def test_navigator_focus_ring_only_while_that_region_is_active() -> None:
 def test_focused_inspector_label_is_highlight() -> None:
     from imgui_bundle import imgui
 
-    from cleave.viz import imgui_host, shell_host
+    from cleave.viz import imgui_host, shell_host, shell_menu_bar
     from cleave.viz.focus_nav import MainFocus
     from cleave.viz.inspector import build_inspector_rows
     from cleave.viz.row_kinds import RowDescriptor, RowKind
@@ -1096,22 +1098,22 @@ def test_focused_inspector_label_is_highlight() -> None:
         host = _open_shell(overlay, menu, controls)
     try:
         host.imgui.display_size = (1280, 720)
-        height = shell_host.menu_bar_height_px()
+        height = shell_menu_bar.menu_bar_height_px()
         host.set_layout(ShellLayout.compute(1280, 720, height, height, 280))
         host.process_event(_motion(4))
-        host._draw_navigator = lambda _frame: None
-        host._visible_nav_nodes = lambda: ()
+        host.navigator.draw = lambda _frame: None
+        host.navigator.visible_nodes = lambda: ()
         seen: dict[str, list] = {}
 
         def draw_inspector(_state) -> None:
             start = len(text_pushes)
-            host._draw_inspector_row(view, group)
+            host.inspector.draw_row(view, group)
             seen["group"] = list(text_pushes[start:])
             start = len(text_pushes)
-            host._draw_inspector_row(view, field)
+            host.inspector.draw_row(view, field)
             seen["field"] = list(text_pushes[start:])
 
-        host._draw_inspector = draw_inspector
+        host.inspector.draw = draw_inspector
         with patch.object(shell_host.imgui, "push_style_color", spy_push):
             _paint_shell(host, menu, CommandContext(), frames=1)
             lists = _paint_shell(host, menu, CommandContext(), frames=1)
@@ -1162,7 +1164,7 @@ def test_focused_inspector_label_is_highlight() -> None:
 
 
 def test_preset_row_draws_two_lines_and_fits_the_filename() -> None:
-    from cleave.viz import imgui_host, shell_host
+    from cleave.viz import imgui_host, shell_host, shell_menu_bar
     from cleave.viz.inspector import InspectorRow
     from cleave.viz.row_kinds import RowDescriptor, RowKind
     from cleave.viz.shell_focus import ShellFocusState
@@ -1204,29 +1206,29 @@ def test_preset_row_draws_two_lines_and_fits_the_filename() -> None:
         host = _open_shell(overlay, menu, controls)
     try:
         host.imgui.display_size = (1280, 720)
-        height = shell_host.menu_bar_height_px()
+        height = shell_menu_bar.menu_bar_height_px()
         host.set_layout(ShellLayout.compute(1280, 720, height, height, 280))
         host.process_event(_motion(4))
-        host._draw_navigator = lambda _frame: None
-        host._visible_nav_nodes = lambda: ()
+        host.navigator.draw = lambda _frame: None
+        host.navigator.visible_nodes = lambda: ()
 
         def draw_inspector(_state) -> None:
             imgui = shell_host.imgui
             top = imgui.get_cursor_pos().y
-            host._draw_inspector_row(view, preset)
+            host.inspector.draw_row(view, preset)
             middle = imgui.get_cursor_pos().y
-            host._draw_inspector_row(view, stem)
+            host.inspector.draw_row(view, stem)
             heights["preset"] = middle - top
             heights["stem"] = imgui.get_cursor_pos().y - middle
             # The stem row ends on its full-width selectable; the list item
             # ends on its narrow leading drag handle.
             heights["right"] = imgui.get_item_rect_max().x
             before_item = imgui.get_cursor_pos().y
-            host._draw_inspector_row(view, item)
+            host.inspector.draw_row(view, item)
             heights["item"] = imgui.get_cursor_pos().y - before_item
             heights["line"] = imgui.get_text_line_height()
 
-        host._draw_inspector = draw_inspector
+        host.inspector.draw = draw_inspector
         _paint_shell(host, menu, CommandContext(), frames=1)
         lists = _paint_shell(host, menu, CommandContext(), frames=1)
         content = _content_lists(lists)
@@ -1256,7 +1258,12 @@ def test_directory_nav_button_press_skips_the_row_action(
     expected_parent_calls: int,
     expected_child_calls: int,
 ) -> None:
-    from cleave.viz import imgui_host, shell_host
+    from cleave.viz import (
+        imgui_host,
+        shell_host,
+        shell_inspector_values,
+        shell_menu_bar,
+    )
     from cleave.viz.inspector import InspectorRow
     from cleave.viz.row_kinds import RowDescriptor, RowKind
     from cleave.viz.shell_focus import ShellFocusState
@@ -1289,7 +1296,7 @@ def test_directory_nav_button_press_skips_the_row_action(
     overlay.visibility = 1.0
     menu = MenuBarState()
     rects: list = []
-    real_rects = shell_host.row_icon_boxes
+    real_rects = shell_inspector_values.row_icon_boxes
 
     def spy_rects(*args, **kwargs):
         rects[:] = real_rects(*args, **kwargs)
@@ -1299,13 +1306,13 @@ def test_directory_nav_button_press_skips_the_row_action(
         host = _open_shell(overlay, menu, controls)
     try:
         host.imgui.display_size = (1280, 720)
-        height = shell_host.menu_bar_height_px()
+        height = shell_menu_bar.menu_bar_height_px()
         host.set_layout(ShellLayout.compute(1280, 720, height, height, 280))
         host.process_event(_motion(4))
-        host._draw_navigator = lambda _frame: None
-        host._visible_nav_nodes = lambda: ()
-        host._draw_inspector = lambda _state: host._draw_inspector_row(view, row)
-        with patch.object(shell_host, "row_icon_boxes", spy_rects):
+        host.navigator.draw = lambda _frame: None
+        host.navigator.visible_nodes = lambda: ()
+        host.inspector.draw = lambda _state: host.inspector.draw_row(view, row)
+        with patch.object(shell_inspector_values, "row_icon_boxes", spy_rects):
             _paint_shell(host, menu, CommandContext(), frames=1)
             tx, ty, tw, th = rects[index]
             pointer = shell_host.imgui.ImVec2(
@@ -1348,6 +1355,7 @@ def _shell_controls() -> SimpleNamespace:
         begin_value_nudge=MagicMock(),
         inline_edit=InlineEditController(),
         context_menu=ContextMenuState(),
+        modal_host=ModalHost(),
         transport=MagicMock(),
         cfg=SimpleNamespace(project_slug="song"),
         config_dirty=False,
@@ -1371,7 +1379,7 @@ def test_switching_menus_never_shows_the_last_menus_size() -> None:
     """
     from imgui_bundle import imgui
 
-    from cleave.viz import imgui_host, shell_host
+    from cleave.viz import imgui_host, shell_menu_bar
     from cleave.viz.shell_layout import ShellLayout
 
     overlay = _Overlay()
@@ -1392,12 +1400,12 @@ def test_switching_menus_never_shows_the_last_menus_size() -> None:
 
     try:
         host.imgui.display_size = (1280, 720)
-        height = shell_host.menu_bar_height_px()
+        height = shell_menu_bar.menu_bar_height_px()
         host.set_layout(ShellLayout.compute(1280, 720, height, height, 0))
         host.process_event(_motion(4))
-        host._draw_navigator = lambda _frame: None
-        host._visible_nav_nodes = lambda: ()
-        host._draw_inspector = lambda _state: None
+        host.navigator.draw = lambda _frame: None
+        host.navigator.visible_nodes = lambda: ()
+        host.inspector.draw = lambda _state: None
         ctx = CommandContext()
         _paint_shell(host, menu, ctx, frames=1)
         menu.open_menu(file_index, MENUS)

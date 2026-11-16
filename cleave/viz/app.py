@@ -6,6 +6,7 @@ import dataclasses
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pygame
 
@@ -70,6 +71,9 @@ from cleave.viz.user_presets import cleanup_unreferenced_user_presets
 from cleave.viz.visual_limiter import VisualLimiterState, apply_visual_limiter_gains
 from cleave.viz.wiring import LayerManager, make_timeline_controls, make_tuning_controls
 
+if TYPE_CHECKING:
+    from cleave.viz.shell_host import ShellHost
+
 
 @dataclass
 class VisualizerSeed:
@@ -127,7 +131,7 @@ class LiveVisualizerRuntime(VisualizerCore):
     )
     overlay_profiler: OverlayProfiler = field(default_factory=OverlayProfiler.from_env)
     menu_bar: MenuBarState = field(default_factory=MenuBarState)
-    shell_host: object | None = None
+    shell_host: ShellHost | None = None
 
 
 @dataclass
@@ -569,10 +573,10 @@ class VisualizerApp:
         self._overlay_dt = 0.0
         self._was_paused: bool | None = None
         self._pm_clock = ProjectMFrameClock()
-        self._shell = None
+        self._shell: ShellHost | None = None
 
     def _live_shell_layout(self, runtime: LiveVisualizerRuntime) -> ShellLayout:
-        from cleave.viz.shell_host import menu_bar_height_px
+        from cleave.viz.shell_menu_bar import menu_bar_height_px
 
         shell = self._shell
         menu_h = int(shell.menu_bar_height_px) if shell is not None else 0
@@ -585,9 +589,8 @@ class VisualizerApp:
         ):
             requested_tl = runtime.seed.cfg.editor.timeline_height
             if shell is not None:
-                live_tl = getattr(shell, "timeline_height", None)
-                if live_tl is not None:
-                    requested_tl = live_tl
+                if shell.timeline_height is not None:
+                    requested_tl = shell.timeline_height
             timeline_h = clamp_timeline_band_height(
                 requested_tl,
                 timeline_band_height_px(len(runtime.seed.session.layer_z_order)),
@@ -602,17 +605,13 @@ class VisualizerApp:
         nav_content_h: int | None = None
         navigator_height = editor.navigator_height
         if shell is not None:
-            live_nav = getattr(shell, "navigator_height", None)
-            if live_nav is not None:
-                navigator_height = live_nav
-            live_insp = getattr(shell, "insp_width", None)
-            if live_insp is not None:
-                insp_width = live_insp
-            if help_width is not None:
-                live_help = getattr(shell, "help_width", None)
-                if live_help is not None:
-                    help_width = live_help
-            measured = int(getattr(shell, "nav_content_height_px", 0) or 0)
+            if shell.navigator_height is not None:
+                navigator_height = shell.navigator_height
+            if shell.insp_width is not None:
+                insp_width = shell.insp_width
+            if help_width is not None and shell.help_width is not None:
+                help_width = shell.help_width
+            measured = shell.nav_content_height_px
             if measured > 0:
                 nav_content_h = measured
         return ShellLayout.compute(
@@ -753,12 +752,9 @@ class VisualizerApp:
                 play_fullscreen_menu,
                 preview_menu,
             )
-            from cleave.viz.shell_host import (
-                ShellHost,
-                TransportReadout,
-                draw_shell_frame,
-                menu_bar_height_px,
-            )
+            from cleave.viz.shell_host import ShellHost, draw_shell_frame
+            from cleave.viz.shell_menu_bar import menu_bar_height_px
+            from cleave.viz.shell_transport import TransportReadout
             from cleave.viz.tap_sync_controls import tap_sync_info_panel
             from cleave.viz.top_layer import InfoPanelSurface
 

@@ -5,7 +5,7 @@ No ImGui and no GL. The shell host only draws what this records.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pygame
 
@@ -18,6 +18,9 @@ from cleave.viz.commands import (
     MenuSeparator,
     build_menus,
 )
+
+if TYPE_CHECKING:
+    from cleave.viz.controls import TuningControls
 
 _NAV_KEYS = frozenset(
     {
@@ -138,7 +141,7 @@ class MenuBarState:
         key: int,
         menus: tuple[Menu, ...] | list[Menu],
         ctx: CommandContext,
-        controls: Any,
+        controls: TuningControls,
     ) -> bool:
         """Consume arrows, Enter, and Esc while the bar is focused.
 
@@ -240,7 +243,7 @@ class MenuBarState:
         item_index: int,
         menus: tuple[Menu, ...] | list[Menu],
         ctx: CommandContext,
-        controls: Any,
+        controls: TuningControls,
     ) -> None:
         """Highlight the row. Enabled rows use the same close-then-run path as Enter."""
         if not menus:
@@ -289,7 +292,7 @@ class MenuBarState:
         self,
         menus: tuple[Menu, ...] | list[Menu],
         ctx: CommandContext,
-        controls: Any,
+        controls: TuningControls,
     ) -> None:
         command = self.highlighted_command(menus)
         if command is None or not command.enabled(ctx):

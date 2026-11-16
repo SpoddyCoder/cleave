@@ -3,15 +3,15 @@
 from __future__ import annotations
 
 from cleave.viz.panel_notification import PanelNotificationActive
-from cleave.viz.shell_host import (
+from cleave.viz.shell_transport import (
     TransportPart,
     TransportReadout,
-    panel_border_overlap_px,
     transport_content_pad_y,
     transport_fps_text,
     transport_notice,
     transport_parts,
 )
+from cleave.viz.shell_windows import panel_border_overlap_px
 from cleave.viz.theme import ERROR_NOTIFICATION, HIGHLIGHT, VALUE
 from cleave.viz.transport_controls import TransportField
 
