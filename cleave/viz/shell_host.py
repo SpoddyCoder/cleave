@@ -534,9 +534,14 @@ def _nav_toggle_size() -> float:
     return imgui.calc_text_size(POWER_GLYPH).x + imgui.calc_text_size(" ").x
 
 
+def _nav_toggle_fill_side() -> float:
+    """Side of a toggle's square fill: its column, inset 1px on every edge."""
+    return _nav_toggle_size() - 2.0
+
+
 def _nav_toggle_overhang() -> float:
-    """How far a toggle's square hover fill reaches above or below its row."""
-    return max(0.0, (_nav_toggle_size() - imgui.get_text_line_height()) * 0.5)
+    """How far a toggle's square fill reaches above or below its row."""
+    return max(0.0, (_nav_toggle_fill_side() - imgui.get_text_line_height()) * 0.5)
 
 
 def navigator_height_for_rows(
@@ -2588,10 +2593,10 @@ class ShellHost:
             hovered = imgui.is_item_hovered()
             color = rgba(navigator_toggle_color(toggle))
             mid_y = rect_min.y + line * 0.5
-            square_min = imgui.ImVec2(rect_min.x, mid_y - button_width * 0.5)
-            square_max = imgui.ImVec2(
-                rect_min.x + button_width, mid_y + button_width * 0.5
-            )
+            half = _nav_toggle_fill_side() * 0.5
+            mid_x = rect_min.x + button_width * 0.5
+            square_min = imgui.ImVec2(mid_x - half, mid_y - half)
+            square_max = imgui.ImVec2(mid_x + half, mid_y + half)
             fill = navigator_toggle_fill(toggle)
             if fill is not None:
                 # A blocked toggle keeps its state readable at half strength.
