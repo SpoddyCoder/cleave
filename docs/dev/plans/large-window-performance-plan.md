@@ -48,6 +48,8 @@ A maximised OpenGL window that isn't exclusive fullscreen usually goes through t
 
 ### Phase 1: In-window frame timer
 
+Done as H1 of [docs/dev/plans/architecture-performance-review.md](docs/dev/plans/architecture-performance-review.md).
+
 Measure before optimising anything except the timeline fix.
 
 - Extend `OverlayProfiler` ([cleave/viz/overlay_profiler.py](cleave/viz/overlay_profiler.py)) into a whole-frame timer. Today it times only the overlay `upload` and `overlay_present`.

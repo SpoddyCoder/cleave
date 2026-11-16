@@ -1,4 +1,4 @@
-"""Tests for live overlay draw profiling."""
+"""Tests for the live editor's frame timer."""
 
 from __future__ import annotations
 
@@ -7,259 +7,163 @@ from unittest.mock import patch
 import pytest
 
 from cleave.viz.overlay_profiler import (
-    OverlayDrawCounters,
-    OverlayFrameSample,
+    SECTION_LABELS,
+    FrameReport,
     OverlayProfiler,
-    _format_sample_line,
+    UploadCounts,
+    report_rows,
 )
 from cleave.viz.overlay_upload import UploadPlan
+
+_CLOCK = "cleave.viz.overlay_profiler.time.perf_counter"
+
+
+def _plan(mode: str) -> UploadPlan:
+    return UploadPlan(
+        mode=mode,  # type: ignore[arg-type]
+        dirty_rects=(),
+        active_size=(100, 50),
+        screen_rect=(0, 0, 100, 50),
+    )
 
 
 def test_from_env_disabled_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("CLEAVE_OVERLAY_PROFILE", raising=False)
+    monkeypatch.delenv("CLEAVE_OVERLAY_PROFILE_INTERVAL", raising=False)
     profiler = OverlayProfiler.from_env()
     assert profiler.enabled is False
-    assert profiler.emit_interval_frames == 30
+    assert profiler.window_frames == 30
 
 
-def test_from_env_enabled_prints_banner(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    monkeypatch.setenv("CLEAVE_OVERLAY_PROFILE", "1")
-    profiler = OverlayProfiler.from_env()
-    assert profiler.enabled is True
-    assert "overlay profiler: on" in capsys.readouterr().out
-
-
-def test_from_env_custom_interval(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_from_env_enabled_with_custom_window(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CLEAVE_OVERLAY_PROFILE", "1")
     monkeypatch.setenv("CLEAVE_OVERLAY_PROFILE_INTERVAL", "120")
     profiler = OverlayProfiler.from_env()
-    assert profiler.emit_interval_frames == 120
+    assert profiler.enabled is True
+    assert profiler.window_frames == 120
 
 
-def _sample(**overrides: object) -> OverlayFrameSample:
-    defaults = {
-        "upload_ms": 0.0,
-        "overlay_present_ms": 0.0,
-        "surface_builds": 0,
-        "font_renders": 0,
-        "row_cache_hits": 0,
-        "row_cache_misses": 0,
-        "upload_skipped": 0,
-        "upload_partial": 0,
-        "upload_full": 0,
-        "upload_partial_rects": 0,
-        "texture_reallocs": 0,
-        "skipped": False,
-    }
-    defaults.update(overrides)
-    return OverlayFrameSample(**defaults)  # type: ignore[arg-type]
-
-
-def test_format_sample_line_full() -> None:
-    sample = _sample(
-        upload_ms=0.3,
-        overlay_present_ms=0.05,
-        surface_builds=18,
-        font_renders=42,
-        row_cache_hits=10,
-        row_cache_misses=2,
-    )
-    assert (
-        _format_sample_line(sample)
-        == "overlay: surf=18 font=42 rcache=10/2 up=0.3ms"
-    )
-
-
-def test_format_sample_line_skip() -> None:
-    sample = _sample(skipped=True)
-    assert _format_sample_line(sample) == "overlay: skip"
-
-
-def test_format_sample_line_upload_skip_suffix() -> None:
-    sample = _sample(
-        upload_ms=0.0,
-        surface_builds=0,
-        font_renders=2,
-        row_cache_hits=0,
-        row_cache_misses=1,
-        upload_skipped=1,
-    )
-    assert (
-        _format_sample_line(sample)
-        == "overlay: surf=0 font=2 rcache=0/1 up=0.0ms uskip=1"
-    )
-
-
-def test_format_sample_line_upload_partial_suffix() -> None:
-    sample = _sample(
-        upload_ms=0.1,
-        upload_partial=1,
-        upload_partial_rects=2,
-    )
-    assert (
-        _format_sample_line(sample)
-        == "overlay: surf=0 font=0 rcache=0/0 up=0.1ms upart=1/2"
-    )
-
-
-def test_note_upload_plan_increments_skip_partial_full() -> None:
-    profiler = OverlayProfiler(enabled=True, emit_interval_frames=999)
-    profiler.note_upload_plan(
-        UploadPlan(
-            mode="skip",
-            dirty_rects=(),
-            active_size=(100, 50),
-            screen_rect=(0, 0, 100, 50),
-        )
-    )
-    profiler.note_upload_plan(
-        UploadPlan(
-            mode="partial",
-            dirty_rects=((0, 0, 50, 10), (0, 10, 50, 10)),
-            active_size=(100, 50),
-            screen_rect=(0, 0, 100, 50),
-        )
-    )
-    profiler.note_upload_plan(
-        UploadPlan(
-            mode="full",
-            dirty_rects=((0, 0, 100, 50),),
-            active_size=(100, 50),
-            screen_rect=(0, 0, 100, 50),
-        )
-    )
-
-    sample = profiler.finish_frame()
-
-    assert sample is not None
-    assert sample.upload_skipped == 1
-    assert sample.upload_partial == 1
-    assert sample.upload_partial_rects == 2
-    assert sample.upload_full == 1
-
-
-def test_finish_frame_includes_upload_fields(capsys: pytest.CaptureFixture[str]) -> None:
-    profiler = OverlayProfiler(enabled=True, emit_interval_frames=1)
-    profiler._section_ms["upload"] = 0.0
-    profiler._counters.font_renders = 2
-    profiler._counters.row_cache_misses = 1
-    profiler.note_upload_plan(
-        UploadPlan(
-            mode="skip",
-            dirty_rects=(),
-            active_size=(100, 50),
-            screen_rect=(0, 0, 100, 50),
-        )
-    )
-
-    sample = profiler.finish_frame()
-
-    assert sample is not None
-    assert sample.upload_skipped == 1
-    assert capsys.readouterr().out.strip() == (
-        "overlay: surf=0 font=2 rcache=0/1 up=0.0ms uskip=1"
-    )
-
-
-def test_finish_frame_prints_compact_line(capsys: pytest.CaptureFixture[str]) -> None:
-    profiler = OverlayProfiler(enabled=True, emit_interval_frames=1)
-    profiler._section_ms["upload"] = 0.3
-    profiler._section_ms["overlay_present"] = 0.05
-    profiler._counters.surface_builds = 18
-    profiler._counters.font_renders = 42
-
-    sample = profiler.finish_frame()
-
-    assert sample is not None
-    assert sample.upload_ms == pytest.approx(0.3)
-    assert sample.overlay_present_ms == pytest.approx(0.05)
-    assert sample.surface_builds == 18
-    assert sample.font_renders == 42
-    assert capsys.readouterr().out.strip() == (
-        "overlay: surf=18 font=42 rcache=0/0 up=0.3ms"
-    )
-
-
-def test_finish_frame_disabled_returns_none() -> None:
-    profiler = OverlayProfiler(enabled=False)
-    assert profiler.finish_frame() is None
-
-
-def test_counter_increments() -> None:
+def test_unknown_section_raises() -> None:
     profiler = OverlayProfiler(enabled=True)
-    counters = profiler.counters()
-    counters.surface_builds += 3
-    counters.font_renders += 7
-
-    sample = profiler.finish_frame()
-
-    assert sample is not None
-    assert sample.surface_builds == 3
-    assert sample.font_renders == 7
-
-
-def test_time_section_accumulates() -> None:
-    profiler = OverlayProfiler(enabled=True, emit_interval_frames=999)
-    with patch(
-        "cleave.viz.overlay_profiler.time.perf_counter",
-        side_effect=[0.0, 0.001, 0.001, 0.003],
-    ):
-        with profiler.time_section("upload"):
-            pass
-        with profiler.time_section("upload"):
-            pass
-
-    sample = profiler.finish_frame()
-
-    assert sample is not None
-    assert sample.upload_ms == pytest.approx(3.0)
-
-
-def test_time_section_unknown_name_raises() -> None:
-    profiler = OverlayProfiler(enabled=True)
-    with pytest.raises(ValueError, match="unknown overlay profiler section"):
+    with pytest.raises(ValueError, match="unknown frame timer section"):
         with profiler.time_section("not_a_section"):
             pass
 
 
-def test_note_skipped_frame(capsys: pytest.CaptureFixture[str]) -> None:
-    profiler = OverlayProfiler(enabled=True, emit_interval_frames=1)
-    profiler.note_skipped_frame()
+def test_report_averages_sections_over_the_window() -> None:
+    profiler = OverlayProfiler(enabled=True, window_frames=2)
+    # Boundary at 0, then two 10 ms frames, each with 2 ms of events.
+    ticks = [0.0, 0.001, 0.003, 0.010, 0.011, 0.013, 0.020]
+    with patch(_CLOCK, side_effect=ticks):
+        profiler.end_frame()
+        for _ in range(2):
+            with profiler.time_section("events"):
+                pass
+            profiler.end_frame()
 
-    sample = profiler.finish_frame()
+    report = profiler.report
+    assert report is not None
+    assert report.frames == 2
+    assert report.frame_ms == pytest.approx(10.0)
+    assert report.fps == pytest.approx(100.0)
+    assert dict(report.sections)["events"] == pytest.approx(2.0)
+    assert report.other_ms == pytest.approx(8.0)
+    assert [name for name, _ms in report.sections] == list(SECTION_LABELS)
 
-    assert sample is not None
-    assert sample.skipped is True
-    assert capsys.readouterr().out.strip() == "overlay: skip"
+
+def test_nested_section_time_is_not_counted_twice() -> None:
+    profiler = OverlayProfiler(enabled=True, window_frames=1)
+    # build opens at 1 ms, render runs 2..5 ms, build closes at 6 ms.
+    ticks = [0.0, 0.001, 0.002, 0.005, 0.006, 0.010]
+    with patch(_CLOCK, side_effect=ticks):
+        profiler.end_frame()
+        with profiler.time_section("ui_build"):
+            with profiler.time_section("ui_render"):
+                pass
+        profiler.end_frame()
+
+    assert profiler.report is not None
+    sections = dict(profiler.report.sections)
+    assert sections["ui_build"] == pytest.approx(2.0)
+    assert sections["ui_render"] == pytest.approx(3.0)
+    assert profiler.report.other_ms == pytest.approx(5.0)
 
 
-def test_toggle_enables_and_emits_next_frame(capsys: pytest.CaptureFixture[str]) -> None:
-    profiler = OverlayProfiler(enabled=False, emit_interval_frames=30)
+def test_sections_before_the_first_boundary_are_dropped() -> None:
+    profiler = OverlayProfiler(enabled=True, window_frames=1)
+    with patch(_CLOCK, side_effect=[0.0, 0.004, 0.005, 0.010]):
+        with profiler.time_section("flip"):
+            pass
+        profiler.end_frame()
+        profiler.end_frame()
+
+    assert profiler.report is not None
+    assert dict(profiler.report.sections)["flip"] == 0.0
+
+
+def test_disabled_profiler_reports_nothing() -> None:
+    profiler = OverlayProfiler(enabled=False, window_frames=1)
+    with profiler.time_section("events"):
+        pass
+    profiler.note_upload_plan(_plan("full"))
+    profiler.end_frame()
+    profiler.end_frame()
+    assert profiler.report is None
+
+
+def test_upload_counts_cover_the_window() -> None:
+    profiler = OverlayProfiler(enabled=True, window_frames=1)
+    profiler.end_frame()
+    profiler.note_upload_plan(_plan("skip"))
+    profiler.note_upload_plan(_plan("skip"))
+    profiler.note_upload_plan(_plan("partial"))
+    profiler.note_upload_plan(_plan("full"))
+    profiler.note_texture_reallocs(0)
+    profiler.note_texture_reallocs(2)
+    profiler.note_projectm_fps(45)
+    profiler.end_frame()
+
+    assert profiler.report is not None
+    assert profiler.report.uploads == UploadCounts(
+        skipped=2, partial=1, full=1, texture_reallocs=2
+    )
+    assert profiler.report.pm_fps == 45
+
+    profiler.end_frame()
+    assert profiler.report.uploads == UploadCounts()
+
+
+def test_toggle_clears_the_report() -> None:
+    profiler = OverlayProfiler(enabled=True, window_frames=1)
+    profiler.end_frame()
+    profiler.end_frame()
+    assert profiler.report is not None
+
+    profiler.toggle()
+    assert profiler.enabled is False
+    assert profiler.report is None
+
     profiler.toggle()
     assert profiler.enabled is True
-    assert profiler.last_line == "overlay: …"
-    banner = capsys.readouterr().out
-    assert "overlay profiler: on" in banner
-
-    profiler.note_skipped_frame()
-    sample = profiler.finish_frame()
-    assert sample is not None
-    assert sample.skipped is True
-    out = capsys.readouterr().out.strip()
-    assert out == "overlay: skip"
-    assert profiler.last_line == "overlay: skip"
+    assert profiler.report is None
 
 
-def test_toggle_disables_and_clears_state() -> None:
-    profiler = OverlayProfiler(enabled=True)
-    profiler.counters().surface_builds = 5
-    profiler.note_skipped_frame()
+def test_report_rows_pending() -> None:
+    assert report_rows(None) == [("Frame", "measuring")]
 
-    profiler.toggle()
 
-    assert profiler.enabled is False
-    assert profiler.last_line is None
-    assert profiler.finish_frame() is None
-    assert profiler.counters() == OverlayDrawCounters()
+def test_report_rows_list_every_section_then_other() -> None:
+    report = FrameReport(
+        frames=30,
+        frame_ms=10.0,
+        sections=tuple((name, 1.0) for name in SECTION_LABELS),
+        uploads=UploadCounts(skipped=28, partial=2, texture_reallocs=1),
+        pm_fps=60,
+    )
+    rows = report_rows(report)
+
+    assert rows[0] == ("Frame", "10.00 ms  100 fps")
+    assert [label for label, _value in rows[1:10]] == list(SECTION_LABELS.values())
+    assert rows[10] == ("Other", "1.00 ms")
+    assert rows[11] == ("Strip uploads / 30", "skip 28  part 2  full 0  realloc 1")
+    assert rows[12] == ("projectM target", "60 fps")

@@ -451,42 +451,47 @@ def tick_frame_core(
         )
 
     on_panel_notification = None
+    profiler = _NO_PROFILER
     if isinstance(runtime, LiveVisualizerRuntime):
         on_panel_notification = runtime.controls.show_notification
+        profiler = runtime.overlay_profiler
 
     if blank_visualizers:
-        runtime.compositor.composite(
-            LayerCompositeRequest(
-                target_fbo_id=runtime.compositor.content_fbo_id,
-                layers=(),
-                color_format=runtime.compositor.color_format,
+        with profiler.time_section("composite"):
+            runtime.compositor.composite(
+                LayerCompositeRequest(
+                    target_fbo_id=runtime.compositor.content_fbo_id,
+                    layers=(),
+                    color_format=runtime.compositor.color_format,
+                )
             )
-        )
     else:
-        LayerFramePipeline.render_frame(
-            runtime.seed.session,
-            runtime.layers,
-            runtime.layers_by_slot,
-            runtime.seed.pcm_bank,
-            n_pcm,
-            runtime.post_process,
-            runtime.seed.effect_runtime,
-            runtime.seed.signals,
-            t_sec,
-            paused=paused,
-            pm_time_sec=pm_time_sec,
-            compositor=runtime.compositor,
-            masked_compositor=runtime.masked_compositor,
-            on_panel_notification=on_panel_notification,
-        )
+        with profiler.time_section("layers"):
+            LayerFramePipeline.render_frame(
+                runtime.seed.session,
+                runtime.layers,
+                runtime.layers_by_slot,
+                runtime.seed.pcm_bank,
+                n_pcm,
+                runtime.post_process,
+                runtime.seed.effect_runtime,
+                runtime.seed.signals,
+                t_sec,
+                paused=paused,
+                pm_time_sec=pm_time_sec,
+                compositor=runtime.compositor,
+                masked_compositor=runtime.masked_compositor,
+                on_panel_notification=on_panel_notification,
+            )
 
-        LayerFramePipeline.composite(
-            runtime.compositor,
-            runtime.layers_by_slot,
-            runtime.seed.session,
-            masked_compositor=runtime.masked_compositor,
-            song_time_sec=t_sec,
-        )
+        with profiler.time_section("composite"):
+            LayerFramePipeline.composite(
+                runtime.compositor,
+                runtime.layers_by_slot,
+                runtime.seed.session,
+                masked_compositor=runtime.masked_compositor,
+                song_time_sec=t_sec,
+            )
     return was_paused
 
 
@@ -498,13 +503,14 @@ def _tick_frame_live_overlay(
 ) -> None:
     profiler = runtime.overlay_profiler
 
-    finish_content_frame(
-        runtime,
-        t_sec,
-        post_fx_solo=runtime.seed.session.post_fx_solo,
-        overlay_solo=runtime.seed.session.overlay_solo,
-        panel_cache=runtime.overlays_panel_cache,
-    )
+    with profiler.time_section("composite"):
+        finish_content_frame(
+            runtime,
+            t_sec,
+            post_fx_solo=runtime.seed.session.post_fx_solo,
+            overlay_solo=runtime.seed.session.overlay_solo,
+            panel_cache=runtime.overlays_panel_cache,
+        )
 
     tap_sync_progress = runtime.controls.tap_sync.showing_progress
     tl = runtime.seed.session.timeline
@@ -515,32 +521,32 @@ def _tick_frame_live_overlay(
     )
 
     if not _live_overlay_ui_active(timeline_strip_visible=timeline_strip_visible):
-        profiler.note_skipped_frame()
-        profiler.finish_frame()
         return
 
     timeline_state = None
     if timeline_strip_visible:
-        signals = runtime.seed.signals
-        tl.strip_view.follow_playhead(
-            t_sec, runtime.seed.duration_sec, paused=runtime.playback.paused
-        )
-        timeline_state = build_timeline_view_state(
-            runtime.seed.session,
-            t_sec,
-            runtime.seed.duration_sec,
-            focus_cursor=runtime.controls.focus_cursor,
-            strip_focused=(
-                runtime.controls.shell_focus.region is ShellRegion.TIMELINE
-                and tl.panel_open
-            ),
-            song_marker_page_open=(
-                runtime.controls.shell_focus.selected_id == "timeline.song_markers"
-            ),
-            bar_times=signals.downbeat_times if signals is not None else (),
-            beat_times=signals.beat_times if signals is not None else (),
-            paused=runtime.playback.paused,
-        )
+        with profiler.time_section("strip_compose"):
+            signals = runtime.seed.signals
+            tl.strip_view.follow_playhead(
+                t_sec, runtime.seed.duration_sec, paused=runtime.playback.paused
+            )
+            timeline_state = build_timeline_view_state(
+                runtime.seed.session,
+                t_sec,
+                runtime.seed.duration_sec,
+                focus_cursor=runtime.controls.focus_cursor,
+                strip_focused=(
+                    runtime.controls.shell_focus.region is ShellRegion.TIMELINE
+                    and tl.panel_open
+                ),
+                song_marker_page_open=(
+                    runtime.controls.shell_focus.selected_id
+                    == "timeline.song_markers"
+                ),
+                bar_times=signals.downbeat_times if signals is not None else (),
+                beat_times=signals.beat_times if signals is not None else (),
+                paused=runtime.playback.paused,
+            )
 
     if timeline_state is not None:
         OverlayDrawer.draw_timeline(
@@ -553,7 +559,8 @@ def _tick_frame_live_overlay(
             timeline_rect=layout.timeline,
         )
 
-    profiler.finish_frame()
+
+_NO_PROFILER = OverlayProfiler(enabled=False)
 
 
 class VisualizerApp:
@@ -770,6 +777,7 @@ class VisualizerApp:
                 strip_pointer=strip_pointer,
                 preview_menu=preview_menu(rt.controls, rt.timeline_controls),
                 play_menu=play_fullscreen_menu(rt.controls, rt.timeline_controls),
+                profiler=rt.overlay_profiler,
             )
             self._shell = shell
             rt.shell_host = shell
@@ -857,35 +865,39 @@ class VisualizerApp:
             frame_rate = FrameRateMeter()
             pm_fps_governor = ProjectMFpsGovernor(nominal_fps=LIVE_PROJECTM_FPS)
             measured_fps: float | None = None
+            profiler = rt.overlay_profiler
             while running:
                 frame_rate.begin_frame()
-                for event in pygame.event.get():
-                    window.note_event(event)
-                    dispatch_window_event(event, rt)
-                    if rt.controls.window.play_fullscreen:
-                        shell.process_play_event(event)
-                    else:
-                        shell.process_event(event)
-                    if event.type == pygame.QUIT:
-                        if rt.controls.try_quit():
-                            running = False
-                    elif event.type == pygame.KEYDOWN:
-                        if dispatch_keydown(event, rt) is False:
-                            running = False
-                    elif event.type == pygame.KEYUP:
-                        dispatch_keyup(event, rt)
-                    elif event.type == pygame.TEXTINPUT:
-                        if not rt.controls.inline_edit.handle_text_input(event.text):
-                            rt.modal_host.handle_text_input(event.text)
+                with profiler.time_section("events"):
+                    for event in pygame.event.get():
+                        window.note_event(event)
+                        dispatch_window_event(event, rt)
+                        if rt.controls.window.play_fullscreen:
+                            shell.process_play_event(event)
+                        else:
+                            shell.process_event(event)
+                        if event.type == pygame.QUIT:
+                            if rt.controls.try_quit():
+                                running = False
+                        elif event.type == pygame.KEYDOWN:
+                            if dispatch_keydown(event, rt) is False:
+                                running = False
+                        elif event.type == pygame.KEYUP:
+                            dispatch_keyup(event, rt)
+                        elif event.type == pygame.TEXTINPUT:
+                            if not rt.controls.inline_edit.handle_text_input(
+                                event.text
+                            ):
+                                rt.modal_host.handle_text_input(event.text)
 
-                _apply_window_requests(
-                    rt.controls.window,
-                    window,
-                    prompt_open=(
-                        rt.modal_host.active or rt.controls.project_switch.active
-                    ),
-                )
-                window.sync_minimum_size()
+                    _apply_window_requests(
+                        rt.controls.window,
+                        window,
+                        prompt_open=(
+                            rt.modal_host.active or rt.controls.project_switch.active
+                        ),
+                    )
+                    window.sync_minimum_size()
 
                 if rt.controls.consume_pending_exit():
                     running = False
@@ -894,23 +906,25 @@ class VisualizerApp:
                     running = False
 
                 self._overlay_dt = clock.tick() / 1000.0
-                rt.controls.tick(self._overlay_dt)
-                rt.timeline_controls.tick(self._overlay_dt)
-                strip_pointer.tick()
-                rt.modal_host.tick(self._overlay_dt)
-                next_caption = window_caption(
-                    seed.window_title, dirty=rt.controls.config_dirty
-                )
-                if next_caption != caption:
-                    caption = next_caption
-                    pygame.display.set_caption(caption)
+                with profiler.time_section("tick"):
+                    rt.controls.tick(self._overlay_dt)
+                    rt.timeline_controls.tick(self._overlay_dt)
+                    strip_pointer.tick()
+                    rt.modal_host.tick(self._overlay_dt)
+                    next_caption = window_caption(
+                        seed.window_title, dirty=rt.controls.config_dirty
+                    )
+                    if next_caption != caption:
+                        caption = next_caption
+                        pygame.display.set_caption(caption)
 
                 if window.apply_pending_resize():
                     rt.overlay_surface = window.overlay_surface
                 t_sec = current_sec(rt.playback, rt.seed.duration_sec)
                 layout = self._begin_live_frame(rt)
                 if rt.controls.project_render.busy:
-                    rt.compositor.present_content()
+                    with profiler.time_section("composite"):
+                        rt.compositor.present_content()
                     _tick_frame_live_overlay(
                         rt,
                         t_sec,
@@ -919,7 +933,7 @@ class VisualizerApp:
                 else:
                     pm_fps_governor.observe(measured_fps)
                     pm_fps_governor.apply_if_changed(rt.layers)
-                    rt.overlay_profiler.note_projectm_fps(pm_fps_governor.target_fps)
+                    profiler.note_projectm_fps(pm_fps_governor.target_fps)
                     self.tick_frame(
                         t_sec,
                         paused=rt.playback.paused,
@@ -930,8 +944,11 @@ class VisualizerApp:
                     rt.controls.still_capture.after_frame(rt.compositor)
 
                 display_fps[0] = frame_rate.display_fps
-                draw_ui()
-                pygame.display.flip()
+                with profiler.time_section("ui_build"):
+                    draw_ui()
+                with profiler.time_section("flip"):
+                    pygame.display.flip()
+                profiler.end_frame()
                 measured_fps = frame_rate.end_frame()
             return switch_target
 

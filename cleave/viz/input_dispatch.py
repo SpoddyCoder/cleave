@@ -180,9 +180,7 @@ def _handle_global_keydown(
     if event.key == pygame.K_F3:
         runtime.overlay_profiler.toggle()
         state = "on" if runtime.overlay_profiler.enabled else "off"
-        runtime.controls.show_notification(
-            f"Overlay profiler {state} (see terminal; stats on panel when open)"
-        )
+        runtime.controls.show_notification(f"Frame timer {state}")
         return True
 
     tl = runtime.seed.session.timeline

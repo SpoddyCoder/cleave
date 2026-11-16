@@ -46,6 +46,8 @@ Suggested order: H4 (tiny), H1, H2, H3, then H5. H2 alone is expected to be the 
 
 ### H1. Frame timer and a checked-in benchmark
 
+**Status.** Done. Sections are Events, Controller ticks, Layer render (projectM plus per-layer effects), Composite and post-FX, Strip compose, Strip upload, ImGui build, ImGui render and Flip, with the untimed rest shown as Other. Benchmark: `/home/fernpa/anaconda3/envs/cleave/bin/python scripts/bench_shell_frame.py --layers 4 --preset-list 20`.
+
 **Finding.** There is no way to see where a frame goes in the running editor. `OverlayProfiler` ([cleave/viz/overlay_profiler.py](cleave/viz/overlay_profiler.py)) times only the strip upload and present, and prints to stdout, which the frozen Windows build cannot show. Every perf item below was found with throwaway scripts.
 
 **Change.**

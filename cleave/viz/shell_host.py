@@ -66,6 +66,8 @@ from cleave.viz.menu_rows import (
     opaque_highlight_fill,
 )
 from cleave.viz.pointer_cursor import PointerShape, request_pointer
+from cleave.viz.overlay_profiler import OverlayProfiler
+from cleave.viz.profiler_panel import draw_profiler_panel
 from cleave.viz.context_menu import ContextMenuProvider
 from cleave.viz.navigator_context_menu import navigator_node_menu
 from cleave.viz.preset_context_menu import PRESET_MENU_KINDS, preset_row_menu
@@ -1651,8 +1653,12 @@ class ShellHost:
         strip_pointer: TimelinePointer | None = None,
         preview_menu: ContextMenuProvider | None = None,
         play_menu: ContextMenuProvider | None = None,
+        profiler: OverlayProfiler | None = None,
     ) -> None:
         self.imgui = imgui_host
+        self._profiler = (
+            profiler if profiler is not None else OverlayProfiler(enabled=False)
+        )
         self._menu_state = menu_state
         self._controls = controls
         self._strip_pointer = strip_pointer
@@ -1916,7 +1922,21 @@ class ShellHost:
                 self.top_layer.push(self._context_surface)
                 self.top_layer.push(self._context_submenu_surface)
             self.top_layer.draw()
+            self.draw_profiler_panel((0, 0))
         finally:
+            self.end_imgui_frame()
+
+    def draw_profiler_panel(self, origin: tuple[int, int] | None = None) -> None:
+        """Draw the frame timer while it is on, at *origin* or the visualiser."""
+        if not self._profiler.enabled:
+            return
+        if origin is None:
+            layout = self._layout
+            origin = (0, 0) if layout is None else layout.visualiser[:2]
+        draw_profiler_panel(self._profiler.report, origin)
+
+    def end_imgui_frame(self) -> None:
+        with self._profiler.time_section("ui_render"):
             self.imgui.end_frame()
 
     def _open_context_menu(self, x: float, y: float) -> None:
@@ -3971,8 +3991,9 @@ def draw_shell_frame(
         )
         shell.draw_chrome(menu_state, rule_y)
         shell.top_layer.draw()
+        shell.draw_profiler_panel()
     finally:
-        shell.imgui.end_frame()
+        shell.end_imgui_frame()
 
 
 def _mouse_in_current_window() -> bool:

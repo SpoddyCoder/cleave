@@ -1,8 +1,11 @@
-"""Per-frame overlay draw profiling for the live editor.
+"""Whole-frame timer for the live editor.
 
-Enable at runtime with **F3** (toggle) or start enabled via
-``CLEAVE_OVERLAY_PROFILE=1``. Results print to the terminal stdout every
-``CLEAVE_OVERLAY_PROFILE_INTERVAL`` frames (default 30).
+**F3** toggles it, and ``CLEAVE_OVERLAY_PROFILE=1`` starts with it on. Section
+times are averaged over ``CLEAVE_OVERLAY_PROFILE_INTERVAL`` frames (default 30)
+and shown in a panel over the visualiser (``profiler_panel.py``).
+
+Sections nest: a section's time excludes the sections timed inside it, so the
+rows add up to the frame, with the untimed remainder reported as Other.
 """
 
 from __future__ import annotations
@@ -15,117 +18,93 @@ from typing import Iterator
 
 from cleave.viz.overlay_upload import UploadPlan
 
-_DEFAULT_EMIT_INTERVAL = 30
+_DEFAULT_WINDOW_FRAMES = 30
 
-_SECTION_NAMES = frozenset({"upload", "overlay_present"})
+# Section name to panel label, in frame order.
+SECTION_LABELS: dict[str, str] = {
+    "events": "Events",
+    "tick": "Controller ticks",
+    "layers": "Layer render",
+    "composite": "Composite, post-FX",
+    "strip_compose": "Strip compose",
+    "strip_upload": "Strip upload",
+    "ui_build": "ImGui build",
+    "ui_render": "ImGui render",
+    "flip": "Flip",
+}
 
 
-@dataclass
-class OverlayDrawCounters:
-    surface_builds: int = 0
-    font_renders: int = 0
-    row_cache_hits: int = 0
-    row_cache_misses: int = 0
-    upload_skipped: int = 0
-    upload_partial: int = 0
-    upload_full: int = 0
-    upload_partial_rects: int = 0
+@dataclass(frozen=True)
+class UploadCounts:
+    """Timeline strip texture uploads over one averaging window."""
+
+    skipped: int = 0
+    partial: int = 0
+    full: int = 0
     texture_reallocs: int = 0
 
 
-@dataclass
-class OverlayFrameSample:
-    upload_ms: float
-    overlay_present_ms: float
-    surface_builds: int
-    font_renders: int
-    row_cache_hits: int
-    row_cache_misses: int
-    upload_skipped: int
-    upload_partial: int
-    upload_full: int
-    upload_partial_rects: int
-    texture_reallocs: int
-    skipped: bool
+@dataclass(frozen=True)
+class FrameReport:
+    """Averages over one window of frames. Times are milliseconds per frame."""
+
+    frames: int
+    frame_ms: float
+    sections: tuple[tuple[str, float], ...]
+    uploads: UploadCounts = UploadCounts()
     pm_fps: int | None = None
 
+    @property
+    def other_ms(self) -> float:
+        """Frame time no section covers."""
+        return max(0.0, self.frame_ms - sum(ms for _name, ms in self.sections))
 
-def _upload_stats_suffix(sample: OverlayFrameSample) -> str:
-    if not (
-        sample.upload_skipped
-        or sample.upload_partial
-        or sample.upload_full
-        or sample.texture_reallocs
-    ):
-        return ""
-    parts: list[str] = []
-    if sample.upload_skipped:
-        parts.append(f"uskip={sample.upload_skipped}")
-    if sample.upload_partial:
-        rect_suffix = (
-            f"/{sample.upload_partial_rects}"
-            if sample.upload_partial_rects
-            else ""
-        )
-        parts.append(f"upart={sample.upload_partial}{rect_suffix}")
-    if sample.upload_full:
-        parts.append(f"ufull={sample.upload_full}")
-    if sample.texture_reallocs:
-        parts.append(f"urealloc={sample.texture_reallocs}")
-    return " " + " ".join(parts)
+    @property
+    def fps(self) -> float:
+        return 1000.0 / self.frame_ms if self.frame_ms > 0.0 else 0.0
 
 
-def _format_sample_line(sample: OverlayFrameSample) -> str:
-    if sample.skipped:
-        return "overlay: skip"
-    line = (
-        f"overlay: surf={sample.surface_builds}"
-        f" font={sample.font_renders}"
-        f" rcache={sample.row_cache_hits}/{sample.row_cache_misses}"
-        f" up={sample.upload_ms:.1f}ms"
-        f"{_upload_stats_suffix(sample)}"
+def report_rows(report: FrameReport | None) -> list[tuple[str, str]]:
+    """Panel rows as ``(label, value)``; a pending first window says so."""
+    if report is None:
+        return [("Frame", "measuring")]
+    rows = [("Frame", f"{report.frame_ms:.2f} ms  {report.fps:.0f} fps")]
+    for name, ms in report.sections:
+        rows.append((SECTION_LABELS[name], f"{ms:.2f} ms"))
+    rows.append(("Other", f"{report.other_ms:.2f} ms"))
+    uploads = report.uploads
+    upload_text = (
+        f"skip {uploads.skipped}  part {uploads.partial}  full {uploads.full}"
     )
-    if sample.pm_fps is not None:
-        line += f" pm={sample.pm_fps}"
-    return line
+    if uploads.texture_reallocs:
+        upload_text += f"  realloc {uploads.texture_reallocs}"
+    rows.append((f"Strip uploads / {report.frames}", upload_text))
+    if report.pm_fps is not None:
+        rows.append(("projectM target", f"{report.pm_fps} fps"))
+    return rows
 
 
 @dataclass
 class OverlayProfiler:
     enabled: bool
-    emit_interval_frames: int = _DEFAULT_EMIT_INTERVAL
+    window_frames: int = _DEFAULT_WINDOW_FRAMES
+    report: FrameReport | None = field(default=None, init=False)
     _section_ms: dict[str, float] = field(default_factory=dict, init=False, repr=False)
-    _counters: OverlayDrawCounters = field(
-        default_factory=OverlayDrawCounters, init=False, repr=False
-    )
-    _skipped: bool = field(default=False, init=False, repr=False)
+    # Time spent in child sections, one entry per open section.
+    _open: list[float] = field(default_factory=list, init=False, repr=False)
+    _frames: int = field(default=0, init=False, repr=False)
+    _window_start: float | None = field(default=None, init=False, repr=False)
+    _uploads: dict[str, int] = field(default_factory=dict, init=False, repr=False)
     _pm_fps: int | None = field(default=None, init=False, repr=False)
-    _frames_since_emit: int = field(default=0, init=False, repr=False)
-    _emit_next_frame: bool = field(default=False, init=False, repr=False)
-    last_line: str | None = field(default=None, init=False, repr=False)
 
     @classmethod
     def from_env(cls) -> OverlayProfiler:
         enabled = os.environ.get("CLEAVE_OVERLAY_PROFILE", "") == "1"
-        interval = _DEFAULT_EMIT_INTERVAL
-        raw_interval = os.environ.get("CLEAVE_OVERLAY_PROFILE_INTERVAL")
-        if raw_interval is not None:
-            interval = int(raw_interval)
-        profiler = cls(enabled=enabled, emit_interval_frames=interval)
-        if enabled:
-            profiler._emit_next_frame = True
-            print(
-                f"overlay profiler: on (logging to terminal every "
-                f"{interval} frames)",
-                flush=True,
-            )
-        return profiler
-
-    def counters(self) -> OverlayDrawCounters:
-        return self._counters
-
-    def note_skipped_frame(self) -> None:
-        self._skipped = True
+        window = _DEFAULT_WINDOW_FRAMES
+        raw_window = os.environ.get("CLEAVE_OVERLAY_PROFILE_INTERVAL")
+        if raw_window is not None:
+            window = max(1, int(raw_window))
+        return cls(enabled=enabled, window_frames=window)
 
     def note_projectm_fps(self, target: int) -> None:
         self._pm_fps = target
@@ -133,82 +112,70 @@ class OverlayProfiler:
     def note_upload_plan(self, plan: UploadPlan) -> None:
         if not self.enabled:
             return
-        if plan.mode == "skip":
-            self._counters.upload_skipped += 1
-        elif plan.mode == "partial":
-            self._counters.upload_partial += 1
-            self._counters.upload_partial_rects += len(plan.dirty_rects)
-        elif plan.mode == "full":
-            self._counters.upload_full += 1
+        key = {"skip": "skipped", "partial": "partial", "full": "full"}.get(plan.mode)
+        if key is not None:
+            self._uploads[key] = self._uploads.get(key, 0) + 1
+
+    def note_texture_reallocs(self, count: int) -> None:
+        if self.enabled and count:
+            self._uploads["texture_reallocs"] = (
+                self._uploads.get("texture_reallocs", 0) + count
+            )
 
     @contextmanager
     def time_section(self, name: str) -> Iterator[None]:
-        if name not in _SECTION_NAMES:
-            raise ValueError(f"unknown overlay profiler section: {name!r}")
+        if name not in SECTION_LABELS:
+            raise ValueError(f"unknown frame timer section: {name!r}")
         if not self.enabled:
             yield
             return
         start = time.perf_counter()
+        self._open.append(0.0)
         try:
             yield
         finally:
             elapsed_ms = (time.perf_counter() - start) * 1000.0
-            self._section_ms[name] = self._section_ms.get(name, 0.0) + elapsed_ms
+            inner_ms = self._open.pop()
+            self._section_ms[name] = (
+                self._section_ms.get(name, 0.0) + elapsed_ms - inner_ms
+            )
+            if self._open:
+                self._open[-1] += elapsed_ms
 
-    def finish_frame(self) -> OverlayFrameSample | None:
+    def end_frame(self) -> None:
+        """Mark a frame boundary. Call once per frame, after the flip."""
         if not self.enabled:
-            self._reset_frame()
-            return None
-
-        sample = OverlayFrameSample(
-            upload_ms=self._section_ms.get("upload", 0.0),
-            overlay_present_ms=self._section_ms.get("overlay_present", 0.0),
-            surface_builds=self._counters.surface_builds,
-            font_renders=self._counters.font_renders,
-            row_cache_hits=self._counters.row_cache_hits,
-            row_cache_misses=self._counters.row_cache_misses,
-            upload_skipped=self._counters.upload_skipped,
-            upload_partial=self._counters.upload_partial,
-            upload_full=self._counters.upload_full,
-            upload_partial_rects=self._counters.upload_partial_rects,
-            texture_reallocs=self._counters.texture_reallocs,
-            skipped=self._skipped,
+            return
+        now = time.perf_counter()
+        if self._window_start is None:
+            # First boundary since it was switched on: sections so far are a
+            # partial frame.
+            self._reset_window(now)
+            return
+        self._frames += 1
+        if self._frames < self.window_frames:
+            return
+        frames = self._frames
+        self.report = FrameReport(
+            frames=frames,
+            frame_ms=(now - self._window_start) * 1000.0 / frames,
+            sections=tuple(
+                (name, self._section_ms.get(name, 0.0) / frames)
+                for name in SECTION_LABELS
+            ),
+            uploads=UploadCounts(**self._uploads),
             pm_fps=self._pm_fps,
         )
-
-        line = _format_sample_line(sample)
-        self.last_line = line
-
-        self._frames_since_emit += 1
-        should_emit = self._emit_next_frame or (
-            self._frames_since_emit >= self.emit_interval_frames
-        )
-        if should_emit:
-            print(line, flush=True)
-            self._frames_since_emit = 0
-            self._emit_next_frame = False
-
-        self._reset_frame()
-        return sample
+        self._reset_window(now)
 
     def toggle(self) -> None:
         self.enabled = not self.enabled
-        if self.enabled:
-            self._frames_since_emit = 0
-            self._emit_next_frame = True
-            self.last_line = "overlay: …"
-            print(
-                f"overlay profiler: on (logging to terminal every "
-                f"{self.emit_interval_frames} frames)",
-                flush=True,
-            )
-        else:
-            self.last_line = None
-            self._reset_frame()
-            print("overlay profiler: off", flush=True)
+        self.report = None
+        self._open.clear()
+        self._reset_window(None)
 
-    def _reset_frame(self) -> None:
+    def _reset_window(self, start: float | None) -> None:
+        self._window_start = start
+        self._frames = 0
         self._section_ms.clear()
-        self._counters = OverlayDrawCounters()
-        self._skipped = False
-        self._pm_fps = None
+        self._uploads.clear()
