@@ -167,3 +167,22 @@ def test_report_rows_list_every_section_then_other() -> None:
     assert rows[10] == ("Other", "1.00 ms")
     assert rows[11] == ("Strip uploads / 30", "skip 28  part 2  full 0  realloc 1")
     assert rows[12] == ("projectM target", "60 fps")
+
+
+def test_toggle_inside_an_open_section_does_not_break_it() -> None:
+    """F3 is read inside the events section, so it toggles mid-section."""
+    profiler = OverlayProfiler(enabled=True)
+    with profiler.time_section("events"):
+        profiler.toggle()
+    assert not profiler.enabled
+    profiler.toggle()
+    with profiler.time_section("tick"):
+        with profiler.time_section("events"):
+            profiler.toggle()
+            profiler.toggle()
+    with profiler.time_section("events"):
+        pass
+    profiler.end_frame()
+    with profiler.time_section("events"):
+        pass
+    profiler.end_frame()

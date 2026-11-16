@@ -96,6 +96,9 @@ class OverlayProfiler:
     _window_start: float | None = field(default=None, init=False, repr=False)
     _uploads: dict[str, int] = field(default_factory=dict, init=False, repr=False)
     _pm_fps: int | None = field(default=None, init=False, repr=False)
+    # Bumped by toggle, so a section open across a toggle (F3 is read inside
+    # the events section) drops its time instead of popping a cleared stack.
+    _generation: int = field(default=0, init=False, repr=False)
 
     @classmethod
     def from_env(cls) -> OverlayProfiler:
@@ -130,17 +133,22 @@ class OverlayProfiler:
             yield
             return
         start = time.perf_counter()
+        generation = self._generation
         self._open.append(0.0)
         try:
             yield
         finally:
-            elapsed_ms = (time.perf_counter() - start) * 1000.0
-            inner_ms = self._open.pop()
-            self._section_ms[name] = (
-                self._section_ms.get(name, 0.0) + elapsed_ms - inner_ms
-            )
-            if self._open:
-                self._open[-1] += elapsed_ms
+            if self.enabled and generation == self._generation:
+                self._close_section(name, start)
+
+    def _close_section(self, name: str, start: float) -> None:
+        elapsed_ms = (time.perf_counter() - start) * 1000.0
+        inner_ms = self._open.pop()
+        self._section_ms[name] = (
+            self._section_ms.get(name, 0.0) + elapsed_ms - inner_ms
+        )
+        if self._open:
+            self._open[-1] += elapsed_ms
 
     def end_frame(self) -> None:
         """Mark a frame boundary. Call once per frame, after the flip."""
@@ -170,6 +178,7 @@ class OverlayProfiler:
 
     def toggle(self) -> None:
         self.enabled = not self.enabled
+        self._generation += 1
         self.report = None
         self._open.clear()
         self._reset_window(None)
