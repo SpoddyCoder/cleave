@@ -116,6 +116,8 @@ Keep `build_navigator` as the single pure builder. Event handlers that run outsi
 
 ### H4. `save_gl_state` records the wrong texture binding
 
+**Status.** Done. `save_gl_state` queries `GL_TEXTURE_BINDING_2D`. [tests/cleave/test_gl_state_gl_integration.py](tests/cleave/test_gl_state_gl_integration.py) binds a known texture, saves, binds another, restores and checks the binding; it fails on the old query. The GL integration tests pass. The live editor on Windows has not been checked yet.
+
 **Finding.** In [cleave/gl_state.py](cleave/gl_state.py), `save_gl_state` sets `texture_binding=_gl_int(GL_TEXTURE_2D)`. `GL_TEXTURE_2D` queried through `glGetIntegerv` returns whether 2D texturing is enabled (0 or 1), not the bound texture. `restore_gl_state` then calls `glBindTexture(GL_TEXTURE_2D, state.texture_binding)`, so after every post-FX pass, masked composite and ImGui render the active unit is bound to texture name 0 or 1 instead of what was bound before.
 
 It appears harmless today because the compositor binds its own textures before each draw, but it is a real state leak in the one module whose job is to prevent them, and the rule in `.claude/rules/gl-post-process.md` tells every new pass to rely on it.
