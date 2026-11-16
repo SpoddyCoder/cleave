@@ -213,6 +213,8 @@ class TimelinePresetController:
         self._signals = signals
         self._on_notification = on_notification
         self._on_repopulate = on_repopulate
+        # Reset's last "layers after reset" choice, for this session.
+        self._last_reset_layers = 0
 
     def prompt(self, duration_sec: float) -> None:
         tl = self.session.timeline
@@ -354,6 +356,7 @@ class TimelinePresetController:
                         "layers",
                         "layers after reset",
                         _RESET_LAYER_OPTIONS,
+                        self._last_reset_layers,
                         help=_RESET_LAYERS_HELP,
                         option_help=_RESET_LAYERS_OPTION_HELP,
                     ),
@@ -540,6 +543,7 @@ class TimelinePresetController:
             )
 
     def _confirm_reset(self, values: FormValues) -> None:
+        self._last_reset_layers = values["layers"]
         with self._history.recording("Reset timeline"):
             self._reset(all_on=values["layers"] == 1)
 

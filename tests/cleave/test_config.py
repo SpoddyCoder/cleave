@@ -29,7 +29,6 @@ from cleave.config import (
     TimelineConfig,
     TimelineFadeGroupConfig,
     TimelineCutsConfig,
-    TimelinePresetConfig,
     VisualLimiterConfig,
     EditorConfig,
     clamp_beat_sensitivity,
@@ -1247,7 +1246,6 @@ def test_parse_timeline_defaults_enabled_true() -> None:
     assert timeline.locked is False
     assert timeline.cuts == TimelineCutsConfig()
     assert timeline.placement_snap == "beat"
-    assert timeline.preset == TimelinePresetConfig()
 
 
 def test_parse_timeline_reads_cuts() -> None:
@@ -1438,21 +1436,13 @@ def test_persist_post_fx_limiter_round_trip() -> None:
     assert not hasattr(ignored, "limiter")
 
 
-def test_persist_timeline_preset_round_trip() -> None:
+def test_persist_timeline_leaves_generate_choices_out() -> None:
+    """Generate timeline choices last for the session; the project keeps none."""
     from cleave.viz.session import TimelineRuntime
 
     session = TuningSession(
         layer_z_order=list(DEFAULT_LAYER_SLOTS),
-        timeline=TimelineRuntime(
-            enabled=True,
-            timeline_preset_kind="arc",
-            timeline_preset_density="very dense",
-            timeline_preset_cue_snap="bars",
-            timeline_preset_song_marker_snap=2.0,
-            timeline_preset_timeline_cuts="all hard",
-            timeline_preset_repopulate="cue roles",
-            timeline_preset_conductor=True,
-        ),
+        timeline=TimelineRuntime(enabled=True, timeline_preset_kind="arc"),
     )
     cfg = CleaveConfig(
         paths=PathsConfig(preset_root=Path("/tmp"), texture_paths=()),
@@ -1463,77 +1453,15 @@ def test_persist_timeline_preset_round_trip() -> None:
         layer_z_order=list(DEFAULT_LAYER_SLOTS),
     )
     payload = persist_timeline(PersistCtx(cfg=cfg, session=session, cfg_dir=None))
-    assert payload["preset"] == {
-        "character": "arc",
-        "density": "very dense",
-        "cue_snap": "bars",
-        "song_marker_snap": 2.0,
-        "timeline_cuts": "all hard",
-        "repopulate": "cue roles",
-        "conductor": True,
-        "mode": "layers",
-    }
-    round_trip = parse_timeline_section(
-        {"timeline": payload},
-        _timeline_parse_ctx(),
-    )
-    assert round_trip is not None
-    assert round_trip.preset == TimelinePresetConfig(
-        character="arc",
-        density="very dense",
-        cue_snap="bars",
-        song_marker_snap=2.0,
-        timeline_cuts="all hard",
-        repopulate="cue roles",
-        conductor=True,
-    )
+    assert "preset" not in payload
 
 
-def test_parse_timeline_reads_preset() -> None:
+def test_parse_timeline_ignores_a_saved_preset_block() -> None:
     timeline = parse_timeline_section(
-        {
-            "timeline": {
-                "preset": {
-                    "character": "pulse",
-                    "density": "sparse",
-                    "cue_snap": "beats",
-                    "song_marker_snap": 1.0,
-                    "timeline_cuts": "none",
-                    "repopulate": "directory sequential",
-                    "conductor": True,
-                    "mode": "pattern_mask",
-                }
-            }
-        },
+        {"timeline": {"preset": {"character": "pulse", "density": "sparse"}}},
         _timeline_parse_ctx(),
     )
-    assert timeline is not None
-    assert timeline.preset == TimelinePresetConfig(
-        character="pulse",
-        density="sparse",
-        cue_snap="beats",
-        song_marker_snap=1.0,
-        timeline_cuts="none",
-        repopulate="directory sequential",
-        conductor=True,
-        mode="pattern_mask",
-    )
-
-
-def test_parse_timeline_preset_defaults() -> None:
-    timeline = parse_timeline_section(
-        {"timeline": {"preset": {"character": "dialogue"}}},
-        _timeline_parse_ctx(),
-    )
-    assert timeline is not None
-    assert timeline.preset.character == "dialogue"
-    assert timeline.preset.density == "normal"
-    assert timeline.preset.cue_snap == "none"
-    assert timeline.preset.song_marker_snap is None
-    assert timeline.preset.timeline_cuts == "by marker"
-    assert timeline.preset.repopulate == "no"
-    assert timeline.preset.conductor is False
-    assert timeline.preset.mode == "layers"
+    assert timeline == TimelineConfig(enabled=True, lanes={})
 
 
 @pytest.mark.parametrize("raw", [4, -1, "1", True])
@@ -1553,68 +1481,12 @@ def test_parse_timeline_rejects_invalid_placement_snap() -> None:
         )
 
 
-def test_parse_timeline_rejects_invalid_preset_character() -> None:
-    with pytest.raises(ValueError, match="character"):
-        parse_timeline_section(
-            {"timeline": {"preset": {"character": "waltz"}}},
-            _timeline_parse_ctx(),
-        )
 
 
-def test_parse_timeline_rejects_invalid_preset_density() -> None:
-    with pytest.raises(ValueError, match="density"):
-        parse_timeline_section(
-            {"timeline": {"preset": {"density": "extreme"}}},
-            _timeline_parse_ctx(),
-        )
 
 
-def test_parse_timeline_rejects_invalid_preset_cue_snap() -> None:
-    with pytest.raises(ValueError, match="cue_snap"):
-        parse_timeline_section(
-            {"timeline": {"preset": {"cue_snap": "onsets"}}},
-            _timeline_parse_ctx(),
-        )
 
 
-def test_parse_timeline_rejects_invalid_preset_song_marker_snap() -> None:
-    with pytest.raises(ValueError, match="song_marker_snap"):
-        parse_timeline_section(
-            {"timeline": {"preset": {"song_marker_snap": 3.0}}},
-            _timeline_parse_ctx(),
-        )
-
-
-def test_parse_timeline_rejects_invalid_preset_timeline_cuts() -> None:
-    with pytest.raises(ValueError, match="timeline_cuts"):
-        parse_timeline_section(
-            {"timeline": {"preset": {"timeline_cuts": "mixed"}}},
-            _timeline_parse_ctx(),
-        )
-
-
-def test_parse_timeline_rejects_invalid_preset_repopulate() -> None:
-    with pytest.raises(ValueError, match="repopulate"):
-        parse_timeline_section(
-            {"timeline": {"preset": {"repopulate": "on"}}},
-            _timeline_parse_ctx(),
-        )
-
-
-def test_parse_timeline_rejects_invalid_preset_conductor() -> None:
-    with pytest.raises(ValueError, match="conductor"):
-        parse_timeline_section(
-            {"timeline": {"preset": {"conductor": "on"}}},
-            _timeline_parse_ctx(),
-        )
-
-
-def test_parse_timeline_rejects_invalid_preset_mode() -> None:
-    with pytest.raises(ValueError, match="mode"):
-        parse_timeline_section(
-            {"timeline": {"preset": {"mode": "dual"}}},
-            _timeline_parse_ctx(),
-        )
 
 
 def test_parse_timeline_reads_locked() -> None:

@@ -74,34 +74,8 @@ from cleave.preset_playlist import (
     preset_position_display,
     scan_preset_playlist,
 )
-from cleave.timeline_presets.characters import DEFAULT_TIMELINE_PRESET_KIND
-from cleave.timeline_presets.conductor import DEFAULT_TIMELINE_PRESET_CONDUCTOR
-from cleave.timeline_presets.mode import (
-    DEFAULT_TIMELINE_PRESET_MODE,
-    TimelinePresetMode,
-)
 from cleave.viz.panel_notification import PanelNotificationActive
-from cleave.timeline_presets.cue_snap import (
-    DEFAULT_TIMELINE_PRESET_CUE_SNAP,
-    TimelinePresetCueSnap,
-)
-from cleave.timeline_presets.density import (
-    DEFAULT_TIMELINE_PRESET_DENSITY,
-    TimelinePresetDensity,
-)
-from cleave.timeline_presets.repopulate import (
-    DEFAULT_TIMELINE_PRESET_REPOPULATE,
-    TimelinePresetRepopulate,
-)
-from cleave.timeline_presets.song_marker_snap import (
-    DEFAULT_TIMELINE_PRESET_SONG_MARKER_SNAP,
-    TimelinePresetSongMarkerSnap,
-)
 from cleave.timeline import TimelineClip
-from cleave.timeline_presets.timeline_cuts import (
-    DEFAULT_TIMELINE_PRESET_TIMELINE_CUTS,
-    TimelinePresetTimelineCuts,
-)
 from cleave.viz.config_save import ConfigSaveController
 from cleave.viz.editor_mode_controls import is_preset_curation_mode
 from cleave.viz.playback import PlaybackState, current_sec
@@ -283,20 +257,6 @@ class TimelineBlock:
     bar_phase_offset: int = DEFAULT_TIMELINE_BAR_PHASE
     show_bar_grid: bool = DEFAULT_TIMELINE_SHOW_BAR_GRID
     placement_snap: str = DEFAULT_TIMELINE_PLACEMENT_SNAP
-    timeline_preset_kind: str = DEFAULT_TIMELINE_PRESET_KIND
-    timeline_preset_density: TimelinePresetDensity = DEFAULT_TIMELINE_PRESET_DENSITY
-    timeline_preset_cue_snap: TimelinePresetCueSnap = DEFAULT_TIMELINE_PRESET_CUE_SNAP
-    timeline_preset_song_marker_snap: TimelinePresetSongMarkerSnap = (
-        DEFAULT_TIMELINE_PRESET_SONG_MARKER_SNAP
-    )
-    timeline_preset_timeline_cuts: TimelinePresetTimelineCuts = (
-        DEFAULT_TIMELINE_PRESET_TIMELINE_CUTS
-    )
-    timeline_preset_repopulate: TimelinePresetRepopulate = (
-        DEFAULT_TIMELINE_PRESET_REPOPULATE
-    )
-    timeline_preset_conductor: bool = DEFAULT_TIMELINE_PRESET_CONDUCTOR
-    timeline_preset_mode: TimelinePresetMode = DEFAULT_TIMELINE_PRESET_MODE
     hard_cut_fades: TimelineFadeGroupBlock = field(
         default_factory=default_hard_timeline_fade_group_block
     )
@@ -758,14 +718,6 @@ class TuningViewStateBuilder:
             bar_phase_offset=tl.bar_phase_offset,
             show_bar_grid=tl.show_bar_grid,
             placement_snap=tl.placement_snap,
-            timeline_preset_kind=tl.timeline_preset_kind,
-            timeline_preset_density=tl.timeline_preset_density,
-            timeline_preset_cue_snap=tl.timeline_preset_cue_snap,
-            timeline_preset_song_marker_snap=tl.timeline_preset_song_marker_snap,
-            timeline_preset_timeline_cuts=tl.timeline_preset_timeline_cuts,
-            timeline_preset_repopulate=tl.timeline_preset_repopulate,
-            timeline_preset_conductor=tl.timeline_preset_conductor,
-            timeline_preset_mode=tl.timeline_preset_mode,
             hard_cut_fades=TimelineFadeGroupBlock(
                 enabled=tl.hard_cut_fades.enabled,
                 fade_in=tl.hard_cut_fades.fade_in,
@@ -925,14 +877,6 @@ class TuningViewStateBuilder:
                 bar_phase_offset=tl.bar_phase_offset,
                 show_bar_grid=tl.show_bar_grid,
                 placement_snap=tl.placement_snap,
-                timeline_preset_kind=tl.timeline_preset_kind,
-                timeline_preset_density=tl.timeline_preset_density,
-                timeline_preset_cue_snap=tl.timeline_preset_cue_snap,
-                timeline_preset_song_marker_snap=tl.timeline_preset_song_marker_snap,
-                timeline_preset_timeline_cuts=tl.timeline_preset_timeline_cuts,
-                timeline_preset_repopulate=tl.timeline_preset_repopulate,
-                timeline_preset_conductor=tl.timeline_preset_conductor,
-                timeline_preset_mode=tl.timeline_preset_mode,
                 hard_cut_fades=TimelineFadeGroupBlock(
                     enabled=tl.hard_cut_fades.enabled,
                     fade_in=tl.hard_cut_fades.fade_in,

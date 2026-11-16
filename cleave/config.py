@@ -147,32 +147,6 @@ from cleave.config_schema.timeline import (
     parse_timeline_section,
 )
 from cleave.timeline import TimelineLane
-from cleave.timeline_presets.characters import DEFAULT_TIMELINE_PRESET_KIND
-from cleave.timeline_presets.conductor import DEFAULT_TIMELINE_PRESET_CONDUCTOR
-from cleave.timeline_presets.mode import (
-    DEFAULT_TIMELINE_PRESET_MODE,
-    TimelinePresetMode,
-)
-from cleave.timeline_presets.cue_snap import (
-    DEFAULT_TIMELINE_PRESET_CUE_SNAP,
-    TimelinePresetCueSnap,
-)
-from cleave.timeline_presets.density import (
-    DEFAULT_TIMELINE_PRESET_DENSITY,
-    TimelinePresetDensity,
-)
-from cleave.timeline_presets.repopulate import (
-    DEFAULT_TIMELINE_PRESET_REPOPULATE,
-    TimelinePresetRepopulate,
-)
-from cleave.timeline_presets.song_marker_snap import (
-    DEFAULT_TIMELINE_PRESET_SONG_MARKER_SNAP,
-    TimelinePresetSongMarkerSnap,
-)
-from cleave.timeline_presets.timeline_cuts import (
-    DEFAULT_TIMELINE_PRESET_TIMELINE_CUTS,
-    TimelinePresetTimelineCuts,
-)
 
 VIZ_CONFIG_FILENAME = "cleave-viz.yaml"
 
@@ -387,21 +361,6 @@ class TimelineCutsConfig:
     )
 
 
-@dataclass(frozen=True)
-class TimelinePresetConfig:
-    """Staged character / density / post-process / conductor for Apply."""
-
-    character: str = DEFAULT_TIMELINE_PRESET_KIND
-    density: TimelinePresetDensity = DEFAULT_TIMELINE_PRESET_DENSITY
-    cue_snap: TimelinePresetCueSnap = DEFAULT_TIMELINE_PRESET_CUE_SNAP
-    song_marker_snap: TimelinePresetSongMarkerSnap = (
-        DEFAULT_TIMELINE_PRESET_SONG_MARKER_SNAP
-    )
-    timeline_cuts: TimelinePresetTimelineCuts = DEFAULT_TIMELINE_PRESET_TIMELINE_CUTS
-    repopulate: TimelinePresetRepopulate = DEFAULT_TIMELINE_PRESET_REPOPULATE
-    conductor: bool = DEFAULT_TIMELINE_PRESET_CONDUCTOR
-    mode: TimelinePresetMode = DEFAULT_TIMELINE_PRESET_MODE
-
 
 @dataclass(frozen=True)
 class TimelineConfig:
@@ -412,7 +371,6 @@ class TimelineConfig:
     placement_snap: TimelinePlacementSnap = DEFAULT_TIMELINE_PLACEMENT_SNAP
     bar_phase: int = DEFAULT_TIMELINE_BAR_PHASE
     show_bar_grid: bool = DEFAULT_TIMELINE_SHOW_BAR_GRID
-    preset: TimelinePresetConfig = field(default_factory=TimelinePresetConfig)
 
 
 @dataclass

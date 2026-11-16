@@ -2042,6 +2042,20 @@ def test_timeline_reset_all_off() -> None:
     assert view.notification_message == "Reset timeline: all layers off"
 
 
+def test_timeline_reset_opens_on_the_last_layers_choice() -> None:
+    controls = _make_controls(("layer_1", "layer_2"))
+    _focus_timeline_reset(controls)
+    _press_focused(controls, _keydown(pygame.K_RETURN))
+    first = controls.modal_host.view_state().form_rows[0]
+    other = next(o for i, o in enumerate(first.options) if i != first.value)
+    _set_form_field(controls, "layers after reset", other)
+    _choose_modal_option(controls, "Reset timeline")
+    _focus_timeline_reset(controls)
+    _press_focused(controls, _keydown(pygame.K_RETURN))
+    row = controls.modal_host.view_state().form_rows[0]
+    assert row.options[row.value] == other
+
+
 def test_timeline_reset_all_on() -> None:
     controls = _make_controls(("layer_1", "layer_2"))
     controls.session.timeline.lanes = {

@@ -54,6 +54,8 @@ class PresetListController:
         self.session = session
         self.preset_root = preset_root
         self._catalog = catalog
+        # Populate's last source, by mode, for this session.
+        self._last_populate_mode: str | None = None
         self.project_dir = project_dir
         self.duration_sec = duration_sec
         self._modal = modal_host
@@ -220,12 +222,20 @@ class PresetListController:
                         "source",
                         "from",
                         tuple(label for label, _mode, _help in sources),
+                        next(
+                            (
+                                index
+                                for index, (_label, mode, _help) in enumerate(sources)
+                                if mode == self._last_populate_mode
+                            ),
+                            0,
+                        ),
                         help=("Where the presets come from.",),
                         option_help=tuple(help for _label, _mode, help in sources),
                     ),
                 ),
                 confirm_label="Populate",
-                on_confirm=lambda values: self.confirm_populate(
+                on_confirm=lambda values: self._confirm_populate_source(
                     slot, sources[values["source"]][1]
                 ),
                 on_cancel=lambda: self._unlock_preset_after_modal(slot),
@@ -235,6 +245,10 @@ class PresetListController:
                 ),
             )
         )
+
+    def _confirm_populate_source(self, slot: str, mode: str) -> None:
+        self._last_populate_mode = mode
+        self.confirm_populate(slot, mode)
 
     def confirm_populate(self, slot: str, mode: str) -> None:
         try:

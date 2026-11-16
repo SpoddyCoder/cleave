@@ -447,3 +447,19 @@ def test_audition_pauses_switching_and_resume_clears_it() -> None:
         controller.resume("layer_1")
         assert stem.switching_paused is False
         assert len(seen) == 1
+
+
+def test_prompt_populate_opens_on_the_last_source() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp) / "presets"
+        _write(root / "pack" / "demo.milk", "milk")
+        controller, session, modal = _make_controller(preset_root=root)
+        session.layers["layer_1"].preset_switching_trigger = "timer"
+        controller.prompt_populate("layer_1")
+        modal.set_form_value(0, 1)
+        modal.activate_option(0)
+        session.layers["layer_1"].preset_switching_trigger = "timeline"
+        session.timeline.enabled = False
+        controller.prompt_populate("layer_1")
+        row = modal.view_state().form_rows[0]
+        assert row.options[row.value] == "Current Directory (sequential)"

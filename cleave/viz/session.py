@@ -658,37 +658,6 @@ def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
     show_bar_grid = (
         DEFAULT_TIMELINE_SHOW_BAR_GRID if timeline is None else timeline.show_bar_grid
     )
-    preset = None if timeline is None else timeline.preset
-    preset_kind = (
-        DEFAULT_TIMELINE_PRESET_KIND if preset is None else preset.character
-    )
-    preset_density = (
-        DEFAULT_TIMELINE_PRESET_DENSITY if preset is None else preset.density
-    )
-    preset_cue_snap = (
-        DEFAULT_TIMELINE_PRESET_CUE_SNAP if preset is None else preset.cue_snap
-    )
-    preset_song_marker_snap = (
-        DEFAULT_TIMELINE_PRESET_SONG_MARKER_SNAP
-        if preset is None
-        else preset.song_marker_snap
-    )
-    preset_timeline_cuts = (
-        DEFAULT_TIMELINE_PRESET_TIMELINE_CUTS
-        if preset is None
-        else preset.timeline_cuts
-    )
-    preset_repopulate = (
-        DEFAULT_TIMELINE_PRESET_REPOPULATE
-        if preset is None
-        else preset.repopulate
-    )
-    preset_conductor = (
-        DEFAULT_TIMELINE_PRESET_CONDUCTOR if preset is None else preset.conductor
-    )
-    preset_mode = (
-        DEFAULT_TIMELINE_PRESET_MODE if preset is None else preset.mode
-    )
     lanes: dict[str, TimelineLane] = {}
     for slot in cfg.layer_z_order:
         if slot in source_lanes:
@@ -704,14 +673,6 @@ def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
             placement_snap=placement_snap,
             bar_phase_offset=bar_phase,
             show_bar_grid=show_bar_grid,
-            timeline_preset_kind=preset_kind,
-            timeline_preset_density=preset_density,
-            timeline_preset_cue_snap=preset_cue_snap,
-            timeline_preset_song_marker_snap=preset_song_marker_snap,
-            timeline_preset_timeline_cuts=preset_timeline_cuts,
-            timeline_preset_repopulate=preset_repopulate,
-            timeline_preset_conductor=preset_conductor,
-            timeline_preset_mode=preset_mode,
         )
     return TimelineRuntime(
         enabled=enabled,
@@ -721,14 +682,6 @@ def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
         placement_snap=placement_snap,
         bar_phase_offset=bar_phase,
         show_bar_grid=show_bar_grid,
-        timeline_preset_kind=preset_kind,
-        timeline_preset_density=preset_density,
-        timeline_preset_cue_snap=preset_cue_snap,
-        timeline_preset_song_marker_snap=preset_song_marker_snap,
-        timeline_preset_timeline_cuts=preset_timeline_cuts,
-        timeline_preset_repopulate=preset_repopulate,
-        timeline_preset_conductor=preset_conductor,
-        timeline_preset_mode=preset_mode,
         hard_cut_fades=_fade_group_runtime_from_cfg(cuts.hard),
         soft_cut_fades=_fade_group_runtime_from_cfg(cuts.soft),
     )
