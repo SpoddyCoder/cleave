@@ -106,7 +106,7 @@ Leave `docs/dev/todos.md` items that are still open. Strike or remove only work 
 
 ### Completed plans
 
-Live design plans sit in `docs/dev/plans/`. Living references never move out of `docs/dev/`: `structured-releases.md`, `windows-freeze.md`, `roadmap.md`, `todos.md`, `architecture-review.md`, `projectm-api-coverage.md`.
+Live design plans sit in `docs/dev/plans/`. Living references never move out of `docs/dev/`: `structured-releases.md`, `windows-freeze.md`, `roadmap.md`, `todos.md`, `projectm-api-coverage.md`.
 
 Move a plan to `docs/dev/plans-completed/` only when remaining work is shipped **or** explicitly parked in `todos.md` / `roadmap.md`. Mixed plans: extract shipped slices to `plans-completed/`; leave outstanding slices in `plans/`.
 
