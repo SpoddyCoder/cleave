@@ -55,7 +55,11 @@ Text and colour properties are `VALUE_TEXT` and `VALUE_COLOUR` rows. They edit i
 
 ## Icon buttons
 
-Every icon or arrow a press acts on goes through one button: geometry in `icon_button.py` (`icon_box`, `text_box`, `icon_columns`, `icon_row`, `glyph_x`, `icon_gap`), ImGui drawing and input in `imgui_icon_button.py` (`icon_button`, `box_button`, `paint_box`, `paint_wash`). A box is as tall as its row's highlight band (`imgui_theme.row_band` / `row_band_side`; a selectable's item rect is already that band), an icon's box is square, neighbours sit `icon_gap()` apart, and the glyph is centred. Callers pass the glyph, colours, fill, and enabled / inert state; never size, pad, or offset a box or glyph per site. The pygame strip builds its header surfaces from the same geometry.
+Every icon or arrow a press acts on goes through one button: geometry in `icon_button.py` (`icon_box`, `text_box`, `icon_columns`, `icon_row`, `glyph_x`, `icon_gap`), ImGui drawing and input in `imgui_icon_button.py` (`icon_button`, `box_button`, `paint_box`, `paint_wash`, `paint_hover`; the strip uses `ui_tint.blit_hover`). A box is as tall as its row's highlight band (`imgui_theme.row_band` / `row_band_side`; a selectable's item rect is already that band), an icon's box is square, neighbours sit `icon_gap()` apart, and the glyph is centred. Callers pass the glyph, colours, fill, and enabled / inert state; never size, pad, or offset a box or glyph per site. The pygame strip builds its header surfaces from the same geometry.
+
+## Framed buttons
+
+Every framed button, segment, combo box, and dialog button paints through `button_paint.py`: `button_look(ButtonTone, ButtonState)` gives the gradient, border, and glow from the `BUTTON_*` roles, and `paint_button` draws it. Panel buttons use `shell_widgets.draw_button`, dialog buttons `modal_surface.draw_modal_button`, and choice controls `choice_widgets.py`. Do not fill a button rect by hand.
 
 ## Typography
 

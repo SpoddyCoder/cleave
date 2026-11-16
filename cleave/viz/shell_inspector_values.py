@@ -37,7 +37,7 @@ from cleave.viz.row_spec import (
 )
 from cleave.viz.shell_context import ShellContext
 from cleave.viz.shell_widgets import (
-    hand_on_hover,
+    draw_button,
     ImguiTextSizer,
     row_text_y,
     selectable_label_origin,
@@ -197,12 +197,10 @@ class ValueControls:
                 inline.set_colour(
                     tuple(int(round(channel * 255.0)) for channel in picked)
                 )
-            done = imgui.button("Done")
-            hand_on_hover()
+            done = draw_button("Done")
             if edit.target.optional:
                 imgui.same_line()
-                cleared = imgui.button("None")
-                hand_on_hover()
+                cleared = draw_button("None")
                 if cleared:
                     inline.set_colour(None)
                     done = True

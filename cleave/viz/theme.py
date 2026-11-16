@@ -14,13 +14,23 @@ Accent colors for modes and icons (not label/value roles):
   PRESET_ICON, PRESET_FILE_ICON,
   TIMELINE_TRACK_COLORS, BAR_GRID, SONG_BOUND, PLAYHEAD, PLAYHEAD_FLASH, SONG_MARKER, SONG_MARKER_SELECTED
 
-Buttons (fills, not text roles):
-  BUTTON_BG, BUTTON_HOVER_BG, BUTTON_ACTIVE_BG, BUTTON_BORDER - every panel button,
-    segment, combo box, and open combo list
-  BUTTON_PRIMARY_BG - the confirm button of a dialog, and a selected segment
+Buttons (fills, not text roles). Each tone has a rest fill, a lit hover fill
+and border, and a pressed fill; button_paint.button_look() turns them into a
+vertical gradient, border, and (primary and danger) an outer glow:
+  BUTTON_BG, BUTTON_BORDER - every plain panel button, segment, and combo box at rest
+  BUTTON_HOVER_BG, BUTTON_HOVER_BORDER, BUTTON_ACTIVE_BG - a plain button, unchosen
+    segment, or combo under the pointer (electric violet), and held down
+  BUTTON_PRIMARY_BG (+ _HOVER_BG, _HOVER_BORDER, _ACTIVE_BG) - the confirm button of
+    a dialog, and a selected segment
   BUTTON_PRIMARY_DIMMED_BG - a selected segment on a row whose page is switched off
     or locked
-  BUTTON_DANGER_BG - the confirm button of a destructive dialog
+  BUTTON_DANGER_BG (+ _HOVER_BG, _HOVER_BORDER, _ACTIVE_BG) - the confirm button of
+    a destructive dialog
+  BUTTON_SHEEN, BUTTON_SHADE - how far the top lightens and the bottom darkens
+  BUTTON_GLOW_ALPHA - the outer glow around a lit primary or danger button
+  CHOICE_LIST_BG, CHOICE_LIST_BORDER, CHOICE_LIST_TEXT - the open combo list: deep
+    ink with a violet edge and soft white options; its highlighted row is the plain
+    hover gradient with a HIGHLIGHT bar, and the chosen tick is HIGHLIGHT
   NAV_ON_BG, SOLO_BG, NAV_LOCK_BG - lit navigator on, solo, and lock icons
     (NAV_LOCK_GLYPH is the dark lock icon on its amber fill)
 
@@ -30,9 +40,10 @@ Shell rules (not text roles):
   NAVIGATOR_TREE_LINE — connector lines between navigator rows
   INSPECTOR_DIVIDER — thin rule under the inspector title and above its buttons
   HOVER - translucent label wash for pointer hover
-  NUDGE_HOVER_FG - foreground for the side arrows on an adjustable inspector value
-  NUDGE_HOVER_BG - background for the side arrows on an adjustable inspector value
-  NUDGE_HOVER_BG_ALPHA - wash alpha for those arrows (stronger than HOVER_BG_ALPHA)
+  ICON_HOVER_FG - glyph of an icon or text button under the pointer (HIGHLIGHT)
+  ICON_HOVER_BG, ICON_HOVER_BG_ALPHA - violet wash behind it, complementary to the
+    yellow glyph; ICON_HOVER_EDGE is its opaque 1px outline
+  ICON_LIT_HOVER_LIFT - how far a lit icon's own fill brightens under the pointer
 
 Layout scale:
   BASE_UI_SCALE (1.44) is the editor chrome at 100%. The Settings > UI > UI scale
@@ -238,19 +249,34 @@ NAV_LOCK_GLYPH: tuple[int, int, int] = (0, 0, 0)
 CONFIG_DIRTY: tuple[int, int, int] = (255, 255, 0)
 ARMED_BG: tuple[int, int, int] = SOLO_BG
 BUTTON_BG: tuple[int, int, int] = (48, 54, 66)
-BUTTON_HOVER_BG: tuple[int, int, int] = (64, 72, 88)
-BUTTON_ACTIVE_BG: tuple[int, int, int] = (80, 90, 110)
 BUTTON_BORDER: tuple[int, int, int] = (85, 95, 115)
+BUTTON_HOVER_BG: tuple[int, int, int] = (84, 62, 168)
+BUTTON_HOVER_BORDER: tuple[int, int, int] = (170, 140, 255)
+BUTTON_ACTIVE_BG: tuple[int, int, int] = (52, 36, 112)
 BUTTON_PRIMARY_BG: tuple[int, int, int] = (45, 85, 150)
+BUTTON_PRIMARY_HOVER_BG: tuple[int, int, int] = (58, 120, 215)
+BUTTON_PRIMARY_HOVER_BORDER: tuple[int, int, int] = (150, 205, 255)
+BUTTON_PRIMARY_ACTIVE_BG: tuple[int, int, int] = (32, 64, 120)
 BUTTON_PRIMARY_DIMMED_BG: tuple[int, int, int] = (62, 72, 92)
 BUTTON_DANGER_BG: tuple[int, int, int] = SOLO_BG
+BUTTON_DANGER_HOVER_BG: tuple[int, int, int] = (238, 58, 52)
+BUTTON_DANGER_HOVER_BORDER: tuple[int, int, int] = (255, 175, 155)
+BUTTON_DANGER_ACTIVE_BG: tuple[int, int, int] = (150, 26, 26)
+BUTTON_SHEEN: float = 0.14
+BUTTON_SHADE: float = 0.22
+BUTTON_GLOW_ALPHA: float = 0.32
+CHOICE_LIST_BG: tuple[int, int, int] = (20, 18, 34)
+CHOICE_LIST_BORDER: tuple[int, int, int] = (112, 88, 210)
+CHOICE_LIST_TEXT: tuple[int, int, int] = (205, 212, 228)
 OVERRIDE_GLYPH: tuple[int, int, int] = (0, 0, 0)
 OVERRIDE_GLYPH_OFF: tuple[int, int, int] = DISABLED
 FOCUS_ROW_BG_ALPHA: int = 130
 HOVER_BG_ALPHA: int = 36
-NUDGE_HOVER_FG: tuple[int, int, int] = HIGHLIGHT
-NUDGE_HOVER_BG: tuple[int, int, int] = HOVER
-NUDGE_HOVER_BG_ALPHA: int = 72
+ICON_HOVER_FG: tuple[int, int, int] = HIGHLIGHT
+ICON_HOVER_BG: tuple[int, int, int] = (128, 84, 255)
+ICON_HOVER_BG_ALPHA: int = 120
+ICON_HOVER_EDGE: tuple[int, int, int] = (122, 92, 220)
+ICON_LIT_HOVER_LIFT: float = 0.25
 # Menu and timeline selection wash (highlight at 0.16).
 SELECTED_WASH_ALPHA: int = 41
 # Selected navigator row and focused inspector or dialog row wash (highlight at 0.10).

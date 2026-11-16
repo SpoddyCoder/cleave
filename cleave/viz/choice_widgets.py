@@ -26,6 +26,12 @@ from cleave.viz.choice_layout import (
     segment_rects,
     stepper_arrow_rects,
 )
+from cleave.viz.button_paint import (
+    ButtonState,
+    ButtonTone,
+    button_look,
+    paint_button,
+)
 from cleave.viz.choice_list import CHOICE_LIST_MAX_VISIBLE, ChoiceListView
 from cleave.viz.icon_button import text_box
 from cleave.viz.imgui_icon_button import paint_box
@@ -34,12 +40,12 @@ from cleave.viz.pointer_cursor import PointerShape, request_pointer
 from cleave.viz.text_fit import TextSizer
 from cleave.viz.theme import (
     BORDER_WIDTH,
-    BUTTON_BG,
-    BUTTON_BORDER,
-    BUTTON_HOVER_BG,
-    BUTTON_PRIMARY_BG,
     BUTTON_PRIMARY_DIMMED_BG,
+    CHOICE_LIST_BG,
+    CHOICE_LIST_BORDER,
+    CHOICE_LIST_TEXT,
     DISABLED,
+    HIGHLIGHT,
     DISABLED_MUTED,
     LOCKED,
     LOCKED_MUTED,
@@ -57,6 +63,8 @@ _LIST_WINDOW_FLAGS = (
     | int(imgui.WindowFlags_.no_scrollbar)
 )
 _CHOSEN_MARK = "✓ "
+# Width of the HIGHLIGHT bar on the open list's highlighted row.
+_LIST_ACCENT_PX = 3
 
 
 class ChoiceTone(Enum):
@@ -69,7 +77,6 @@ class ChoiceTone(Enum):
     NORMAL = auto()
     OFF = auto()
     LOCKED = auto()
-_UNCHOSEN_MARK = "  "
 
 
 def _u32(role: tuple[int, int, int], alpha: float = 1.0) -> int:
@@ -85,14 +92,11 @@ def _mouse() -> tuple[float, float]:
     return float(pos.x), float(pos.y)
 
 
-def _fill(draw: imgui.ImDrawList, rect: Rect, role: tuple[int, int, int]) -> None:
-    x, y, w, h = rect
-    draw.add_rect_filled(_vec(x, y), _vec(x + w, y + h), _u32(role))
-
-
-def _border(draw: imgui.ImDrawList, rect: Rect) -> None:
-    x, y, w, h = rect
-    draw.add_rect(_vec(x, y), _vec(x + w, y + h), _u32(BUTTON_BORDER))
+def _pointer_state(rect: Rect, mx: float, my: float) -> ButtonState:
+    """HOVER under the pointer, PRESSED while the left button is down there."""
+    if not rect_contains(rect, mx, my):
+        return ButtonState.REST
+    return ButtonState.PRESSED if imgui.is_mouse_down(0) else ButtonState.HOVER
 
 
 def _centred_text(
@@ -130,29 +134,37 @@ def draw_segments(
     """
     rects = segment_rects(measure, labels, x=x, y=y, height=height)
     mx, my = _mouse()
+    states = [ButtonState.REST] * len(rects)
     for index, rect in enumerate(rects):
-        is_chosen = index == chosen
-        if is_chosen:
-            _fill(draw, rect, _chosen_fill(enabled=enabled, tone=tone))
-        elif enabled and hover and rect_contains(rect, mx, my):
-            _fill(draw, rect, BUTTON_HOVER_BG)
-            if hand:
+        if index != chosen and enabled and hover:
+            states[index] = _pointer_state(rect, mx, my)
+            if states[index] is not ButtonState.REST and hand:
                 request_pointer(PointerShape.HAND)
-        _border(draw, rect)
-        _centred_text(
-            draw,
-            measure,
-            rect,
-            labels[index],
-            _segment_text_role(is_chosen, enabled=enabled, tone=tone),
-        )
+        if index == chosen:
+            chosen_tone, fill = _chosen_look(enabled=enabled, tone=tone)
+            paint_button(draw, rect, chosen_tone, ButtonState.REST, fill=fill)
+        else:
+            paint_button(draw, rect, ButtonTone.PLAIN, states[index])
+    for index, rect in enumerate(rects):
+        state = states[index]
+        if state is not ButtonState.REST:
+            # Neighbours share edges, so the lit border goes over theirs.
+            rx, ry, rw, rh = rect
+            border = button_look(ButtonTone.PLAIN, state).border
+            draw.add_rect(_vec(rx, ry), _vec(rx + rw, ry + rh), _u32(border))
+        role = _segment_text_role(index == chosen, enabled=enabled, tone=tone)
+        lit_role = VALUE if state is not ButtonState.REST else role
+        _centred_text(draw, measure, rect, labels[index], lit_role)
     return rects
 
 
-def _chosen_fill(*, enabled: bool, tone: ChoiceTone) -> tuple[int, int, int]:
+def _chosen_look(
+    *, enabled: bool, tone: ChoiceTone
+) -> tuple[ButtonTone, tuple[int, int, int] | None]:
+    """Tone and fill override of the chosen segment."""
     if tone is ChoiceTone.NORMAL:
-        return BUTTON_PRIMARY_BG if enabled else BUTTON_BG
-    return BUTTON_PRIMARY_DIMMED_BG
+        return (ButtonTone.PRIMARY, None) if enabled else (ButtonTone.PLAIN, None)
+    return ButtonTone.PLAIN, BUTTON_PRIMARY_DIMMED_BG
 
 
 def _segment_text_role(
@@ -201,10 +213,16 @@ def draw_combo(
     hovered = enabled and hover and rect_contains(rect, mx, my)
     if hovered and hand:
         request_pointer(PointerShape.HAND)
-    lit = open_ or hovered
-    _fill(draw, rect, BUTTON_HOVER_BG if lit else BUTTON_BG)
-    _border(draw, rect)
+    if hovered and imgui.is_mouse_down(0):
+        state = ButtonState.PRESSED
+    elif open_ or hovered:
+        state = ButtonState.HOVER
+    else:
+        state = ButtonState.REST
+    paint_button(draw, rect, ButtonTone.PLAIN, state)
     role, caret_role = _combo_text_roles(enabled=enabled, tone=tone)
+    if state is not ButtonState.REST:
+        role, caret_role = VALUE, HIGHLIGHT
     th = measure.size(text)[1]
     text_y = y + (h - th) // 2
     draw.add_text(_vec(x + combo_pad_x(), text_y), _u32(role), text)
@@ -344,8 +362,8 @@ def draw_choice_list(
     imgui.set_next_window_size(_vec(width, height), imgui.Cond_.always)
     imgui.push_style_var(imgui.StyleVar_.window_padding, _vec(0, 0))
     imgui.push_style_var(imgui.StyleVar_.window_border_size, float(BORDER_WIDTH))
-    imgui.push_style_color(imgui.Col_.window_bg, rgba(BUTTON_BG))
-    imgui.push_style_color(imgui.Col_.border, rgba(BUTTON_BORDER))
+    imgui.push_style_color(imgui.Col_.window_bg, rgba(CHOICE_LIST_BG))
+    imgui.push_style_color(imgui.Col_.border, rgba(CHOICE_LIST_BORDER))
     try:
         imgui.begin(window_name, None, _LIST_WINDOW_FLAGS)
         try:
@@ -412,15 +430,32 @@ def _draw_list_rows(
     inside = imgui.is_window_hovered()
     hovered = rect_index_at(rects, mx, my) if inside else None
     for index, rect in enumerate(rects):
-        if index == view.highlighted:
-            _fill(draw, rect, BUTTON_HOVER_BG)
-        mark = _CHOSEN_MARK if index == view.chosen else _UNCHOSEN_MARK
-        rx, ry, _rw, rh = rect
+        rx, ry, rw, rh = rect
+        lit = index == view.highlighted
+        if lit:
+            look = button_look(ButtonTone.PLAIN, ButtonState.HOVER)
+            draw.add_rect_filled_multi_color(
+                _vec(rx, ry),
+                _vec(rx + rw, ry + rh),
+                _u32(look.top),
+                _u32(look.top),
+                _u32(look.bottom),
+                _u32(look.bottom),
+            )
+            draw.add_rect_filled(
+                _vec(rx, ry), _vec(rx + _LIST_ACCENT_PX, ry + rh), _u32(HIGHLIGHT)
+            )
+        chosen = index == view.chosen
         th = measure.size(view.options[index])[1]
+        text_x = rx + combo_pad_x()
+        text_y = ry + (rh - th) // 2
+        if chosen:
+            draw.add_text(_vec(text_x, text_y), _u32(HIGHLIGHT), _CHOSEN_MARK)
+        mark_w = measure.size(_CHOSEN_MARK)[0]
         draw.add_text(
-            _vec(rx + combo_pad_x(), ry + (rh - th) // 2),
-            _u32(VALUE),
-            f"{mark}{view.options[index]}",
+            _vec(text_x + mark_w, text_y),
+            _u32(VALUE if lit or chosen else CHOICE_LIST_TEXT),
+            view.options[index],
         )
     picked = hovered if imgui.is_mouse_clicked(0) and not just_opened else None
     # A resting pointer leaves a highlight moved by key alone.

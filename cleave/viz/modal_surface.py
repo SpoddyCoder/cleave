@@ -11,6 +11,7 @@ from typing import Iterator
 from imgui_bundle import imgui
 
 from cleave.choice import ChoiceKind
+from cleave.viz.button_paint import ButtonState, ButtonTone, paint_button
 from cleave.viz.choice_widgets import (
     draw_choice_list,
     draw_combo,
@@ -62,10 +63,6 @@ from cleave.viz.modal_layout import (
 from cleave.viz.theme import (
     BORDER_COLOR,
     BORDER_WIDTH,
-    BUTTON_BG,
-    BUTTON_BORDER,
-    BUTTON_DANGER_BG,
-    BUTTON_PRIMARY_BG,
     DISABLED,
     FOCUS_WASH_ALPHA,
     HIGHLIGHT,
@@ -330,10 +327,10 @@ def _button_focused(view: ModalViewState, index: int, rect: Rect) -> bool:
     return index == view.focus_index
 
 
-_BUTTON_FILLS: dict[ButtonRole, _Role] = {
-    ButtonRole.PLAIN: BUTTON_BG,
-    ButtonRole.PRIMARY: BUTTON_PRIMARY_BG,
-    ButtonRole.DANGER: BUTTON_DANGER_BG,
+_BUTTON_TONES: dict[ButtonRole, ButtonTone] = {
+    ButtonRole.PLAIN: ButtonTone.PLAIN,
+    ButtonRole.PRIMARY: ButtonTone.PRIMARY,
+    ButtonRole.DANGER: ButtonTone.DANGER,
 }
 
 
@@ -347,19 +344,21 @@ def draw_modal_button(
     focused: bool,
     text_role: _Role = VALUE,
 ) -> None:
-    """The modal button: role fill, border, centred label, focus outline."""
+    """The modal button in its role's tone, lit while *focused*, sunk while pressed.
+
+    Focus follows the pointer, so a focused button is the one hovered or
+    reached by key; it lights like any hovered shell button.
+    """
     x, y, w, h = rect
-    top_left = imgui.ImVec2(float(x), float(y))
-    bottom_right = imgui.ImVec2(float(x + w), float(y + h))
-    border = role is ButtonRole.PLAIN
-    fill = _BUTTON_FILLS[role]
-    draw.add_rect_filled(top_left, bottom_right, _packed(fill))
-    draw.add_rect(top_left, bottom_right, _packed(BUTTON_BORDER if border else fill))
+    state = ButtonState.REST
+    if focused:
+        held = _pointer_inside(rect) and imgui.is_mouse_down(0)
+        state = ButtonState.PRESSED if held else ButtonState.HOVER
+    paint_button(draw, rect, _BUTTON_TONES[role], state)
     text = option_text(label)
     text_w, text_h = measure.size(text)
-    _text(draw, x + (w - text_w) // 2, y + (h - text_h) // 2, text, text_role)
-    if focused:
-        _focus_border(draw, _outset(rect))
+    lit_text = VALUE if state is not ButtonState.REST else text_role
+    _text(draw, x + (w - text_w) // 2, y + (h - text_h) // 2, text, lit_text)
 
 
 @dataclass(frozen=True)

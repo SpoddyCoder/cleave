@@ -15,9 +15,15 @@ from dataclasses import dataclass
 from imgui_bundle import imgui
 
 from cleave.viz.icon_button import Band, FRect, glyph_x, icon_box, ink_origin
-from cleave.viz.imgui_theme import rgba
+from cleave.viz.imgui_theme import brighten, lighten, rgba
 from cleave.viz.pointer_cursor import PointerShape, request_pointer
-from cleave.viz.theme import NUDGE_HOVER_BG, NUDGE_HOVER_BG_ALPHA, NUDGE_HOVER_FG
+from cleave.viz.theme import (
+    ICON_HOVER_BG,
+    ICON_HOVER_BG_ALPHA,
+    ICON_HOVER_EDGE,
+    ICON_HOVER_FG,
+    ICON_LIT_HOVER_LIFT,
+)
 from cleave.viz.tooltips import show_tooltip
 
 
@@ -69,17 +75,24 @@ def paint_box(
     fill_alpha: float = 1.0,
     icon: bool = True,
 ) -> None:
-    """Paint one button: its fill, the hover wash, then *text* centred.
+    """Paint one button: its fill or the hover wash, then *text* centred.
 
-    A hovered button with no fill draws its text in the hover colour. With
+    A hovered button with no fill takes the violet hover wash and outline and
+    draws its text in the hover yellow. A hovered lit button brightens its own
+    fill and outlines it in a paler shade, keeping its glyph colour. With
     *icon*, a single glyph centres by its ink, so its own padding never shifts
     it; text centres on its line, to stay level with the text beside it.
     """
     if fill is not None:
-        paint_wash(box, fill, fill_alpha)
-    if hovered:
-        paint_wash(box)
-    text_color = NUDGE_HOVER_FG if hovered and fill is None else color
+        if hovered:
+            lit = brighten(fill, ICON_LIT_HOVER_LIFT)
+            paint_wash(box, lit, fill_alpha)
+            paint_edge(box, lighten(lit, 0.45))
+        else:
+            paint_wash(box, fill, fill_alpha)
+    elif hovered:
+        paint_hover(box)
+    text_color = ICON_HOVER_FG if hovered and fill is None else color
     if icon and len(text) == 1:
         x, y = ink_origin(box, glyph_ink(text))
     else:
@@ -89,8 +102,8 @@ def paint_box(
 
 def paint_wash(
     box: FRect,
-    color: tuple[int, int, int] = NUDGE_HOVER_BG,
-    alpha: float = NUDGE_HOVER_BG_ALPHA / 255.0,
+    color: tuple[int, int, int] = ICON_HOVER_BG,
+    alpha: float = ICON_HOVER_BG_ALPHA / 255.0,
 ) -> None:
     """Fill *box*: the hover wash by default, or a lit button's colour.
 
@@ -108,6 +121,31 @@ def paint_wash(
             imgui.ImVec2(x, y),
             imgui.ImVec2(x + w, y + h),
             imgui.get_color_u32(rgba(color, alpha)),
+        )
+    finally:
+        draw.pop_clip_rect()
+
+
+def paint_hover(box: FRect) -> None:
+    """The hover look of an unlit icon or text button: violet wash and outline."""
+    paint_wash(box)
+    paint_edge(box, ICON_HOVER_EDGE)
+
+
+def paint_edge(box: FRect, color: tuple[int, int, int]) -> None:
+    """A 1px outline just inside *box*, clipped only by the window."""
+    draw = imgui.get_window_draw_list()
+    x, y, w, h = box
+    win_pos = imgui.get_window_pos()
+    win_size = imgui.get_window_size()
+    draw.push_clip_rect(
+        win_pos, imgui.ImVec2(win_pos.x + win_size.x, win_pos.y + win_size.y), False
+    )
+    try:
+        draw.add_rect(
+            imgui.ImVec2(x, y),
+            imgui.ImVec2(x + w, y + h),
+            imgui.get_color_u32(rgba(color)),
         )
     finally:
         draw.pop_clip_rect()

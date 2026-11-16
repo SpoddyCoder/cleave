@@ -27,9 +27,7 @@ from cleave.viz.row_present_renderers import (
 from cleave.viz.theme import (
     ARMED_BG,
     MUTED,
-    NUDGE_HOVER_BG,
-    NUDGE_HOVER_BG_ALPHA,
-    NUDGE_HOVER_FG,
+    ICON_HOVER_FG,
     REC_BG,
     SONG_MARKER,
     SONG_MARKER_SELECTED,
@@ -61,7 +59,7 @@ from cleave.viz.timeline_strip_state import (
     view_window,
 )
 from cleave.viz.timeline_strip_static import StaticLayers
-from cleave.viz.ui_tint import blit_tint
+from cleave.viz.ui_tint import blit_hover
 
 Rect = tuple[int, int, int, int]
 
@@ -388,14 +386,14 @@ def _draw_transport_buttons(
     else:
         record_color = VALUE
     play_color = VALUE
-    # Shell hover: nudge wash behind, nudge foreground on glyph and text.
+    # Shell hover: violet wash behind, hover yellow on glyph and text.
     if state.hover_button == "play":
-        blit_tint(surface, play_rect, NUDGE_HOVER_BG, alpha=NUDGE_HOVER_BG_ALPHA)
-        play_color = NUDGE_HOVER_FG
+        blit_hover(surface, play_rect)
+        play_color = ICON_HOVER_FG
     # Recording wins over hover, so a click on record flashes at once.
     if state.hover_button == "record" and not state.recording:
-        blit_tint(surface, record_rect, NUDGE_HOVER_BG, alpha=NUDGE_HOVER_BG_ALPHA)
-        record_color = rec_text_color = NUDGE_HOVER_FG
+        blit_hover(surface, record_rect)
+        record_color = rec_text_color = ICON_HOVER_FG
 
     icon_size = layout.transport_icon_size()
     icon_font = material_font(icon_size)

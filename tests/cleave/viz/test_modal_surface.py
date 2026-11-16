@@ -13,6 +13,7 @@ from imgui_bundle import imgui
 
 from cleave.viz.context_menu import ContextMenuState
 from cleave.viz.inline_edit import InlineEditController
+from cleave.viz.button_paint import ButtonState, ButtonTone, button_look
 from cleave.viz.commands import CommandContext
 from cleave.viz.imgui_host import progress_label_font
 from cleave.viz.imgui_theme import rgba
@@ -111,6 +112,16 @@ def _glyphs(text: str) -> int:
 
 def _pack(role: tuple[int, int, int], alpha: float = 1.0) -> int:
     return int(imgui.get_color_u32(rgba(role, alpha)))
+
+
+def _lit_buttons(colors: dict[int, int]) -> int:
+    """Vertices in any button tone's lit border: a focused or hovered button."""
+    borders = {
+        _pack(button_look(tone, state).border)
+        for tone in ButtonTone
+        for state in (ButtonState.HOVER, ButtonState.PRESSED)
+    }
+    return sum(colors.get(border, 0) for border in borders)
 
 
 def _color_counts() -> dict[int, int]:
@@ -312,7 +323,7 @@ def test_kind_renders_with_idle_mouse(view: ModalViewState) -> None:
         else:
             assert _pack(HIGHLIGHT) not in colors
             assert wash not in colors
-            assert colors.get(border, 0) > 0
+            assert _lit_buttons(colors) > 0
             assert colors.get(_pack(VALUE), 0) > 0
         if view.kind == ModalKind.TEXT:
             assert surface.text_field_rect is not None
@@ -779,6 +790,7 @@ def test_text_button_colours_follow_focus() -> None:
         )
         assert colors.get(wash, 0) == 4
         assert border not in colors
+        assert _lit_buttons(colors) == 0
         assert _pack(HIGHLIGHT) not in colors
         _pointer(host, surface, rect_center(surface.text_field_rect), click=False)
         assert surface.intent == ModalPointerIntent(ModalPointerKind.HOVER_TEXT_FIELD)
@@ -788,7 +800,7 @@ def test_text_button_colours_follow_focus() -> None:
         colors = _color_counts()
         assert _pack(DISABLED) not in colors
         assert _pack(HIGHLIGHT) not in colors
-        assert colors.get(border, 0) > 0
+        assert _lit_buttons(colors) > 0
         _pointer(host, surface, rect_center(surface.text_button_rects[1]), click=False)
         assert surface.intent == ModalPointerIntent(
             ModalPointerKind.HOVER_TEXT_BUTTON, index=1
@@ -807,8 +819,7 @@ def test_hover_text_button_while_editing_keeps_the_caret() -> None:
         assert surface.intent is None
         colors = _color_counts()
         wash = _pack(HIGHLIGHT, FOCUS_WASH_ALPHA / 255.0)
-        border = _pack(ROW_FOCUS_BORDER)
-        assert colors.get(border, 0) > 0
+        assert _lit_buttons(colors) > 0
         assert colors.get(_pack(HIGHLIGHT), 0) == 4
         assert colors.get(_pack(DISABLED), 0) == 4 * (
             _glyphs(EDITING_HINT) + _glyphs(TEXT_BUTTON_LABELS[1])

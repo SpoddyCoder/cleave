@@ -4,7 +4,12 @@ from __future__ import annotations
 
 import pygame
 
-from cleave.viz.theme import FOCUS_ROW_BG_ALPHA
+from cleave.viz.theme import (
+    FOCUS_ROW_BG_ALPHA,
+    ICON_HOVER_BG,
+    ICON_HOVER_BG_ALPHA,
+    ICON_HOVER_EDGE,
+)
 
 
 def composite_row_background(
@@ -74,3 +79,13 @@ def blit_tint(
     tint = pygame.Surface((w, h), pygame.SRCALPHA)
     tint.fill((*color, alpha))
     surface.blit(tint, (x, y))
+
+
+def blit_hover(
+    surface: pygame.Surface, rect: tuple[int, int, int, int] | pygame.Rect
+) -> None:
+    """The shell's icon hover on the strip: violet wash and its 1px outline."""
+    blit_tint(surface, rect, ICON_HOVER_BG, alpha=ICON_HOVER_BG_ALPHA)
+    r = pygame.Rect(rect)
+    if r.w > 0 and r.h > 0:
+        pygame.draw.rect(surface, ICON_HOVER_EDGE, r, 1)

@@ -23,9 +23,7 @@ from cleave.viz.theme import (
     HIGHLIGHT,
     LABEL,
     MUTED,
-    NUDGE_HOVER_BG,
-    NUDGE_HOVER_BG_ALPHA,
-    NUDGE_HOVER_FG,
+    ICON_HOVER_FG,
     OVERRIDE_BG,
     OVERRIDE_GLYPH,
     ROW_FOCUS_BORDER,
@@ -56,7 +54,7 @@ from cleave.viz.timeline_strip_state import (
     row_clips_for_view,
     view_window,
 )
-from cleave.viz.ui_tint import blit_tint
+from cleave.viz.ui_tint import blit_hover, blit_tint
 
 OFF_SEGMENT_COLOR: tuple[int, int, int] = (40, 40, 40)
 # Dim end of the level-bar colour ramp sits this far from off toward the
@@ -162,7 +160,7 @@ def header_rest_color(hovered: bool, *, blocked: bool = False) -> tuple[int, int
     """An unlit header button: muted, nudge on hover, disabled when blocked."""
     if blocked:
         return DISABLED
-    return NUDGE_HOVER_FG if hovered else MUTED
+    return ICON_HOVER_FG if hovered else MUTED
 
 
 def build_static_panel(
@@ -228,12 +226,7 @@ def build_static_panel(
         if hover_target in ("arm", "solo", "eye") or (
             hover_target == "release" and slot in state.override_slots
         ):
-            blit_tint(
-                panel,
-                layout.header_button_rect(hover_target, row_y),
-                NUDGE_HOVER_BG,
-                alpha=NUDGE_HOVER_BG_ALPHA,
-            )
+            blit_hover(panel, layout.header_button_rect(hover_target, row_y))
 
         if focused or armed:
             label_color = HIGHLIGHT

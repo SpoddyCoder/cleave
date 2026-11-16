@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 from imgui_bundle import imgui
 
+from cleave.viz.button_paint import ButtonState, ButtonTone, paint_button
 from cleave.viz.drag_reorder import DRAG_PRESET, RowDragGesture
 from cleave.viz.icon_button import text_box
 from cleave.viz.imgui_icon_button import box_button, paint_box
@@ -18,7 +19,6 @@ from cleave.viz.pointer_cursor import PointerShape, request_pointer
 from cleave.viz.shell_context import ShellContext
 from cleave.viz.theme import (
     BACKGROUND,
-    BUTTON_BORDER,
     ERROR_NOTIFICATION,
     FOCUS_WASH_ALPHA,
     HIGHLIGHT,
@@ -231,22 +231,37 @@ def hand_on_hover() -> None:
 
 
 def draw_button(
-    label: str, *, text_role: tuple[int, int, int], selected: bool, enabled: bool
+    label: str,
+    *,
+    text_role: tuple[int, int, int] = VALUE,
+    selected: bool = False,
+    enabled: bool = True,
 ) -> bool:
-    """A bordered panel button. Returns whether it was clicked.
+    """A framed panel button at the cursor. Returns whether it was clicked.
 
-    A button that is not *enabled* keeps the arrow pointer.
+    Painted by ``button_paint``: it lights violet under the pointer and sinks
+    while held. A button that is not *enabled* stays at rest and keeps the
+    arrow pointer. Text after ``##`` is the id only.
     """
-    imgui.push_style_color(imgui.Col_.border, rgba(BUTTON_BORDER))
-    imgui.push_style_color(imgui.Col_.text, rgba(text_role))
-    imgui.push_style_var(imgui.StyleVar_.frame_border_size, 1.0)
-    try:
-        clicked = imgui.button(label)
-        if enabled:
-            hand_on_hover()
-    finally:
-        imgui.pop_style_var()
-        imgui.pop_style_color(2)
+    text = label.split("##", 1)[0]
+    pad = imgui.get_style().frame_padding
+    text_size = imgui.calc_text_size(text)
+    size = imgui.ImVec2(text_size.x + pad.x * 2.0, text_size.y + pad.y * 2.0)
+    clicked = imgui.invisible_button(label, size)
+    if enabled:
+        hand_on_hover()
+    rect_min = imgui.get_item_rect_min()
+    state = ButtonState.REST
+    if enabled and imgui.is_item_active():
+        state = ButtonState.PRESSED
+    elif enabled and imgui.is_item_hovered():
+        state = ButtonState.HOVER
+    draw = imgui.get_window_draw_list()
+    paint_button(draw, (rect_min.x, rect_min.y, size.x, size.y), ButtonTone.PLAIN, state)
+    role = VALUE if state is not ButtonState.REST else text_role
+    draw.add_text(
+        imgui.ImVec2(rect_min.x + pad.x, rect_min.y + pad.y), packed_color(role), text
+    )
     if selected:
         draw_item_focus_ring()
     return clicked

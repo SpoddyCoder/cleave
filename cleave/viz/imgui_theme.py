@@ -58,6 +58,24 @@ IMGUI_COLOR_ROLES: dict[imgui.Col_, tuple[tuple[int, int, int], float]] = {
 }
 
 
+def lighten(rgb: tuple[int, int, int], amount: float) -> tuple[int, int, int]:
+    """Move *rgb* toward white by *amount* (0..1)."""
+    r, g, b = (round(c + (255 - c) * amount) for c in rgb)
+    return r, g, b
+
+
+def brighten(rgb: tuple[int, int, int], amount: float) -> tuple[int, int, int]:
+    """Scale *rgb* up by *amount* (0..1), keeping its hue and saturation."""
+    r, g, b = (min(255, round(c * (1.0 + amount))) for c in rgb)
+    return r, g, b
+
+
+def darken(rgb: tuple[int, int, int], amount: float) -> tuple[int, int, int]:
+    """Move *rgb* toward black by *amount* (0..1)."""
+    r, g, b = (round(c * (1.0 - amount)) for c in rgb)
+    return r, g, b
+
+
 def rgba(rgb: tuple[int, int, int], alpha: float = 1.0) -> imgui.ImVec4:
     return imgui.ImVec4(rgb[0] / 255.0, rgb[1] / 255.0, rgb[2] / 255.0, alpha)
 

@@ -10,7 +10,7 @@ from imgui_bundle import imgui
 from cleave.viz.frame_rate import format_fps_value
 from cleave.viz.icon_button import glyph_x, text_box
 from cleave.viz.imgui_host import PAUSE_GLYPH, PLAY_GLYPH
-from cleave.viz.imgui_icon_button import box_button, glyph_drop, paint_wash, text_top
+from cleave.viz.imgui_icon_button import box_button, glyph_drop, paint_hover, text_top
 from cleave.viz.imgui_theme import rgba, row_band
 from cleave.viz.panel_notification import (
     notification_attention,
@@ -32,7 +32,7 @@ from cleave.viz.theme import (
     ERROR_NOTIFICATION,
     HIGHLIGHT,
     NOTIFICATION_ON_FILL,
-    NUDGE_HOVER_FG,
+    ICON_HOVER_FG,
     TRANSPORT_RULE,
     ui_chrome_px,
     VALUE,
@@ -331,8 +331,8 @@ class TransportBar:
         """The part's icon and text, centred in *box*, on the wash when hovered."""
         color = part.color
         if hovered:
-            paint_wash(box)
-            color = NUDGE_HOVER_FG
+            paint_hover(box)
+            color = ICON_HOVER_FG
         draw = imgui.get_window_draw_list()
         u32 = imgui.get_color_u32(rgba(color))
         x = glyph_x(box, imgui.calc_text_size(part.label).x)
