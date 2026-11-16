@@ -1282,7 +1282,7 @@ def test_directory_nav_button_press_skips_the_row_action(
     overlay.visibility = 1.0
     menu = MenuBarState()
     rects: list = []
-    real_rects = shell_host.nav_button_rects
+    real_rects = shell_host.row_icon_boxes
 
     def spy_rects(*args, **kwargs):
         rects[:] = real_rects(*args, **kwargs)
@@ -1297,12 +1297,12 @@ def test_directory_nav_button_press_skips_the_row_action(
         host.process_event(_motion(4))
         host._draw_navigator = lambda: None
         host._draw_inspector = lambda _state: host._draw_inspector_row(view, row)
-        with patch.object(shell_host, "nav_button_rects", spy_rects):
+        with patch.object(shell_host, "row_icon_boxes", spy_rects):
             _paint_shell(host, menu, CommandContext(), frames=1)
-            target = rects[index]
+            tx, ty, tw, th = rects[index]
             pointer = shell_host.imgui.ImVec2(
-                (target.min_x + target.max_x) * 0.5,
-                (target.min_y + target.max_y) * 0.5,
+                tx + tw * 0.5,
+                ty + th * 0.5,
             )
             with (
                 patch.object(shell_host.imgui, "get_mouse_pos", return_value=pointer),

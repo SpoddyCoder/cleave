@@ -125,13 +125,12 @@ def _suffix_icon_width(line_height: int, glyph: str) -> int:
     return font.size(glyph)[0]
 
 
-def visibility_icon_pad_x() -> int:
-    return tuning_ui_metrics().visibility_icon_pad_x
-
-
 def visibility_icon_slot_width(line_height: int) -> int:
-    """Fixed eye slot width (glyph plus horizontal pad for solo background)."""
-    return _suffix_icon_width(line_height, VISIBILITY_GLYPH) + visibility_icon_pad_x() * 2
+    """Side of an icon button's square box on a row *line_height* tall.
+
+    The same rule as ``icon_button``: the box is as tall as its row, and square.
+    """
+    return line_height
 
 
 def visibility_icon_prefix_width(line_height: int) -> int:

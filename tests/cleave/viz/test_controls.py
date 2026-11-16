@@ -4049,7 +4049,7 @@ def test_solo_visibility_icon_same_width_as_normal() -> None:
     soloed = render_visibility_icon(enabled=True, solo=True, line_height=line_h)
     normal = render_visibility_icon(enabled=True, solo=False, line_height=line_h)
     assert soloed.get_width() == normal.get_width()
-    assert soloed.get_at((1, line_h // 2))[:3] == SOLO_BG
+    assert soloed.get_at((1, 1))[:3] == SOLO_BG
 
 
 def test_try_quit_clean_session_returns_true_immediately() -> None:

@@ -27,7 +27,30 @@ from cleave.viz.help_content import (
     modal_help_content,
 )
 from cleave.viz.imgui_host import ImGuiHost, PAUSE_GLYPH, PLAY_GLYPH, mouse_button
-from cleave.viz.imgui_theme import padded_row_spacing_y, padded_rows, rgba
+from cleave.viz.icon_button import (
+    box_index_at,
+    glyph_x,
+    icon_box,
+    icon_columns,
+    icon_gap,
+    icon_row,
+    text_box,
+)
+from cleave.viz.imgui_icon_button import (
+    box_button,
+    glyph_drop,
+    icon_button,
+    paint_box,
+    paint_wash,
+    text_top,
+)
+from cleave.viz.imgui_theme import (
+    padded_row_spacing_y,
+    padded_rows,
+    rgba,
+    row_band,
+    row_band_side,
+)
 from cleave.viz.inspector import InspectorRow, build_inspector_rows
 from cleave.viz.inspector_controls import (
     inspector_command_enabled,
@@ -141,8 +164,6 @@ from cleave.viz.theme import (
     NAVIGATOR_BORDER,
     NAVIGATOR_TREE_LINE,
     NOTIFICATION_ON_FILL,
-    NUDGE_HOVER_BG,
-    NUDGE_HOVER_BG_ALPHA,
     NUDGE_HOVER_FG,
     PANEL_FOCUS_BORDER_ALPHA,
     PRESET_FILE_ICON,
@@ -156,8 +177,6 @@ from cleave.viz.theme import (
 )
 from cleave.viz.value_nudge import (
     NudgeRect,
-    nav_button_hit_at,
-    nav_button_rects,
     nudge_arrow_rects,
     nudge_cluster_origin_x,
     nudge_hit_at,
@@ -200,13 +219,9 @@ _NAV_LOCK_MARK = "[lock]"
 _PAGE_HISTORY_BUTTONS = {6: -1, 7: 1}
 _TITLE_BACK = "back"
 _TITLE_FORWARD = "forward"
-# Pixels the title arrows' hover square reaches past the highlight band.
-_TITLE_BUTTON_HOVER_OUTSET = 0.0
 # Fixed columns, so a row without solo keeps its icons under the rows that have it.
 _NAV_TOGGLE_COLUMNS = (TOGGLE_ENABLED, TOGGLE_SOLO, TOGGLE_LOCK)
 _TRANSPORT_GAP = 16.0
-# Extra room around a transport part's hover fill, beyond its half space.
-_TRANSPORT_HOVER_PAD = 4.0
 # Border pushed onto navigator and inspector windows.
 _PANEL_BORDER_PX = 2.0
 # One Left/Right step per this many pixels of sideways drag.
@@ -404,13 +419,15 @@ def strip_release_tooltip(*, recording: bool) -> str:
     return "Back to timeline"
 
 
-def navigator_toggle_x(
-    toggle_id: str, right_x: float, button_width: float, gap: float
-) -> float:
-    """Left edge of a toggle's column, counted back from *right_x*."""
-    column = TOGGLE_LOCK if toggle_id == TOGGLE_ADD else toggle_id
-    columns_right = len(_NAV_TOGGLE_COLUMNS) - _NAV_TOGGLE_COLUMNS.index(column)
-    return right_x - columns_right * button_width - (columns_right - 1) * gap
+def navigator_toggle_xs(right_x: float, side: float, gap: float) -> dict[str, float]:
+    """Left edge of each toggle's column, ending flush at *right_x*.
+
+    Columns are fixed, so a row without solo keeps its icons under the rows
+    that have it. Add shares the lock column.
+    """
+    xs = dict(zip(_NAV_TOGGLE_COLUMNS, icon_columns(right_x, len(_NAV_TOGGLE_COLUMNS), side, gap)))
+    xs[TOGGLE_ADD] = xs[TOGGLE_LOCK]
+    return xs
 
 
 def navigator_tree_lines(
@@ -615,16 +632,25 @@ def page_history_tooltip(
 
 
 def inspector_title_cluster(
-    avail: float, slot_count: int, slot_w: float, gap_w: float
+    avail: float, slot_count: int, side: float, gap: float, title_gap: float
 ) -> tuple[float, tuple[float, ...]]:
-    """Title width and the x of each icon slot at the title line's right.
+    """Title width and the x of each icon box at the title line's right.
 
-    Slots sit flush right, one *slot_w* each, in order. The title and its
-    accent bar stop *gap_w* before the first slot.
+    Boxes sit flush right, in order, *gap* apart. The title and its accent
+    bar stop *title_gap* before the first box.
     """
-    cluster_x = max(0.0, avail - slot_count * slot_w)
-    title_w = max(0.0, cluster_x - gap_w)
-    return title_w, tuple(cluster_x + index * slot_w for index in range(slot_count))
+    cluster_w = slot_count * side + max(0, slot_count - 1) * gap
+    slots = icon_columns(max(avail, cluster_w), slot_count, side, gap)
+    cluster_x = slots[0] if slots else avail
+    return max(0.0, cluster_x - title_gap), slots
+
+
+def row_icon_boxes(
+    start_x: float, band: tuple[float, float], count: int
+) -> tuple[tuple[float, float, float, float], ...]:
+    """Square boxes for a row's icon buttons, left to right from *start_x*."""
+    side = band[1] - band[0]
+    return tuple(icon_box(x, band) for x in icon_row(start_x, count, side, icon_gap()))
 
 
 def inspector_selectable_id(desc: RowDescriptor) -> str:
@@ -662,58 +688,9 @@ def _navigator_content_height_px() -> int:
     return max(1, int(round(outer)))
 
 
-def _nav_toggle_size() -> float:
-    """Side of a navigator toggle's square hover fill: the icon plus a space."""
-    return imgui.calc_text_size(POWER_GLYPH).x + imgui.calc_text_size(" ").x
-
-
-def _nav_toggle_fill_side() -> float:
-    """Side of a toggle's square fill: its column, inset 1px on every edge."""
-    return _nav_toggle_size() - 2.0
-
-
 def _nav_indent() -> float:
-    """Navigator indent per level: one toggle column, on whole pixels."""
-    return float(round(_nav_toggle_size()))
-
-
-def _nav_icon_square(left_x: float, top_y: float) -> tuple[imgui.ImVec2, imgui.ImVec2]:
-    """Square fill of a navigator icon column whose top-left is given."""
-    half = _nav_toggle_fill_side() * 0.5
-    mid_x = left_x + _nav_toggle_size() * 0.5
-    mid_y = top_y + imgui.get_text_line_height() * 0.5
-    return (
-        imgui.ImVec2(mid_x - half, mid_y - half),
-        imgui.ImVec2(mid_x + half, mid_y + half),
-    )
-
-
-def title_button_square(
-    slot_x: float,
-    slot_w: float,
-    band_y0: float,
-    band_y1: float,
-    outset: float = 0.0,
-) -> tuple[float, float, float, float]:
-    """Hover square of a title line arrow as ``(x0, y0, x1, y1)``.
-
-    The title's highlight band, grown by *outset* on every side, sets the
-    top and bottom; the width matches, centred on the icon slot.
-    """
-    y0 = band_y0 - outset
-    y1 = band_y1 + outset
-    side = y1 - y0
-    x0 = float(round(slot_x + (slot_w - side) * 0.5))
-    return x0, y0, x0 + side, y1
-
-
-def _draw_nav_icon_hover(square_min: imgui.ImVec2, square_max: imgui.ImVec2) -> None:
-    """Hover wash on a navigator icon: the twisty or a row toggle."""
-    imgui.get_window_draw_list().add_rect_filled(
-        square_min,
-        square_max,
-        imgui.get_color_u32(rgba(NUDGE_HOVER_BG, NUDGE_HOVER_BG_ALPHA / 255.0)),
-    )
+    """Navigator indent per level: one icon column, on whole pixels."""
+    return float(round(row_band_side()))
 
 
 def _draw_nav_twisty(
@@ -722,45 +699,29 @@ def _draw_nav_twisty(
     selected: bool,
     x: float,
     label_min_x: float,
-    span: tuple[float, float],
+    band: tuple[float, float],
 ) -> bool:
     """Disclosure button in the column at *x*, drawn after the row's label.
 
-    It is one toggle column wide and washes like a toggle under the pointer.
     The label selectable allows overlap, so the press reaches this button. A
     selected row's wash is filled under the column from where a selectable's
     highlight would start up to *label_min_x*, so the row reads as one band.
     Returns whether it was pressed.
     """
-    width = _nav_toggle_size()
-    window_x = imgui.get_window_pos().x - imgui.get_scroll_x()
-    imgui.same_line(x - window_x)
-    pressed = imgui.invisible_button(
-        f"##nav-twisty-{node.id}", imgui.ImVec2(width, imgui.get_text_line_height())
-    )
-    origin = imgui.get_item_rect_min()
-    hovered = imgui.is_item_hovered()
-    draw = imgui.get_window_draw_list()
     if selected:
         wash_left = x - math.floor(imgui.get_style().item_spacing.x * 0.5)
-        draw.add_rect_filled(
-            imgui.ImVec2(wash_left, span[0]),
-            imgui.ImVec2(label_min_x, span[1]),
+        imgui.get_window_draw_list().add_rect_filled(
+            imgui.ImVec2(wash_left, band[0]),
+            imgui.ImVec2(label_min_x, band[1]),
             imgui.get_color_u32(selectable_wash()[0]),
         )
-    color = rgba(navigator_row_text_color(node, selected=selected, moving=False))
-    if hovered:
-        _draw_nav_icon_hover(*_nav_icon_square(origin.x, origin.y))
-        color = rgba(NUDGE_HOVER_FG)
-        request_pointer(PointerShape.HAND)
-    glyph_x = origin.x + math.floor((width - imgui.calc_text_size(twisty).x) * 0.5)
-    draw.add_text(imgui.ImVec2(glyph_x, origin.y), imgui.get_color_u32(color), twisty)
-    return pressed
-
-
-def _nav_toggle_overhang() -> float:
-    """How far a toggle's square fill reaches above or below its row."""
-    return max(0.0, (_nav_toggle_fill_side() - imgui.get_text_line_height()) * 0.5)
+    return icon_button(
+        f"##nav-twisty-{node.id}",
+        twisty,
+        x,
+        band,
+        color=navigator_row_text_color(node, selected=selected, moving=False),
+    ).pressed
 
 
 def navigator_height_for_rows(
@@ -1003,7 +964,7 @@ def _draw_nav_tree_lines(
     rect_min = imgui.get_item_rect_min()
     rect_max = imgui.get_item_rect_max()
     line = imgui.get_text_line_height()
-    first_stem_x = math.floor(left_x + _nav_toggle_size() * 0.5)
+    first_stem_x = math.floor(left_x + _nav_indent() * 0.5)
     mid_y = math.floor(_selectable_text_y(rect_min.y) + line * 0.5) + 0.5
     elbow_right_x = row_x - math.floor(imgui.get_style().item_spacing.x * 0.5)
     color = imgui.get_color_u32(rgba(NAVIGATOR_TREE_LINE))
@@ -1077,14 +1038,6 @@ class _ImguiTextSizer:
         return math.ceil(measured.x), math.ceil(measured.y)
 
 
-def _icon_drop_to_text(glyph: str) -> float:
-    """Pixels to lower a merged icon so it centers on the capitals beside it."""
-    font = imgui.get_font()
-    icon = font.find_glyph(ord(glyph))
-    cap = font.find_glyph(ord("A"))
-    return float(round(((cap.y0 + cap.y1) - (icon.y0 + icon.y1)) * 0.5))
-
-
 def path_row_icon(kind: RowKind) -> tuple[str, tuple[int, int, int]] | None:
     """Folder or file glyph, with its accent, in front of a path row's value."""
     spec = row_spec(kind)
@@ -1115,7 +1068,7 @@ def _draw_path_value(
     if icon is not None:
         glyph, accent = icon
         draw.add_text(
-            imgui.ImVec2(x, y + _icon_drop_to_text(glyph)),
+            imgui.ImVec2(x, y + glyph_drop(glyph)),
             imgui.get_color_u32(rgba(path_icon_color(accent, value_color))),
             glyph,
         )
@@ -1385,21 +1338,20 @@ def _draw_inspector_title(
     line_h = imgui.get_text_line_height()
     style = imgui.get_style()
     space_w = imgui.calc_text_size(" ").x
-    slot_w = _nav_toggle_size()
     title_room, slot_xs = inspector_title_cluster(
-        avail, len(marks) + len(buttons), slot_w, space_w
+        avail, len(marks) + len(buttons), row_band_side(), icon_gap(), space_w
     )
     title_w = imgui.calc_text_size(title).x
     imgui.dummy(imgui.ImVec2(title_room, line_h))
     win_pos = imgui.get_window_pos()
     win_size = imgui.get_window_size()
     border = _PANEL_BORDER_PX
-    pad_y = style.item_spacing.y * 0.5
-    bar_y0 = start.y - pad_y
-    bar_y1 = start.y + line_h + pad_y
+    # The bar is a row's highlight band, so the title's icons match the rows'.
+    band = row_band(start.y)
+    bar_y0, bar_y1 = band
     # The blank gap above the bar, inside the panel border, repeats at the
     # bar's left end.
-    inset = border + max(0.0, style.window_padding.y - pad_y - border)
+    inset = border + max(0.0, style.window_padding.y - (start.y - bar_y0) - border)
     bar_x0 = win_pos.x + inset
     bar_x1 = start.x + title_room + space_w * 0.5
     overflow = title_w - title_room
@@ -1440,76 +1392,33 @@ def _draw_inspector_title(
         draw.add_text(imgui.ImVec2(start.x - offset, start.y), color, title)
     finally:
         draw.pop_clip_rect()
-    for (glyph, role, tooltip), slot_x in zip(marks, slot_xs):
-        x = start.x + slot_x
-        draw.add_text(
-            imgui.ImVec2(x + space_w * 0.5, start.y + _icon_drop_to_text(glyph)),
-            _packed(role),
-            glyph,
-        )
-        hovered = imgui.is_mouse_hovering_rect(
-            imgui.ImVec2(x, start.y), imgui.ImVec2(x + slot_w, start.y + line_h)
-        )
-        if hovered and imgui.is_window_hovered():
-            show_tooltip(tooltip)
-    return _draw_title_buttons(
-        buttons, start, slot_xs[len(marks) :], slot_w, (bar_y0, bar_y1)
-    )
+    for index, ((glyph, role, tooltip), slot_x) in enumerate(zip(marks, slot_xs)):
+        box = icon_box(start.x + slot_x, band)
+        # A mark only reports: it shows its tooltip and takes no press.
+        box_button(f"##inspector-mark-{index}", box, enabled=False, tooltip=tooltip)
+        paint_box(box, glyph, color=role)
+    return _draw_title_buttons(buttons, start, slot_xs[len(marks) :], band)
 
 
 def _draw_title_buttons(
     buttons: Sequence[TitleButton],
     start: imgui.ImVec2,
     slot_xs: Sequence[float],
-    slot_w: float,
     band: tuple[float, float],
 ) -> str | None:
     """Arrow buttons on the title line, like navigator toggles. A disabled
     button has no hover fill and keeps the arrow pointer."""
-    line_h = imgui.get_text_line_height()
-    space_w = imgui.calc_text_size(" ").x
-    window_x = imgui.get_window_pos().x - imgui.get_scroll_x()
-    draw = imgui.get_window_draw_list()
     pressed_id: str | None = None
     for button, slot_x in zip(buttons, slot_xs):
-        imgui.same_line(start.x + slot_x - window_x)
-        pressed = imgui.invisible_button(
-            f"##inspector-title-{button.id}", imgui.ImVec2(slot_w, line_h)
-        )
-        rect_min = imgui.get_item_rect_min()
-        hovered = imgui.is_item_hovered()
-        color = VALUE if button.enabled else DISABLED
-        if hovered and button.enabled:
-            x0, y0, x1, y1 = title_button_square(
-                rect_min.x,
-                slot_w,
-                *band,
-                outset=float(round(ui_chrome_px(_TITLE_BUTTON_HOVER_OUTSET))),
-            )
-            # Unclipped like the highlight band, which runs into the padding.
-            win_pos = imgui.get_window_pos()
-            win_size = imgui.get_window_size()
-            draw.push_clip_rect(
-                win_pos,
-                imgui.ImVec2(win_pos.x + win_size.x, win_pos.y + win_size.y),
-                False,
-            )
-            try:
-                _draw_nav_icon_hover(imgui.ImVec2(x0, y0), imgui.ImVec2(x1, y1))
-            finally:
-                draw.pop_clip_rect()
-            color = NUDGE_HOVER_FG
-            request_pointer(PointerShape.HAND)
-        draw.add_text(
-            imgui.ImVec2(
-                rect_min.x + space_w * 0.5,
-                rect_min.y + _icon_drop_to_text(button.glyph),
-            ),
-            _packed(color),
+        pressed = icon_button(
+            f"##inspector-title-{button.id}",
             button.glyph,
-        )
-        if hovered:
-            show_tooltip(button.tooltip())
+            start.x + slot_x,
+            band,
+            color=VALUE if button.enabled else DISABLED,
+            enabled=button.enabled,
+            tooltip=button.tooltip,
+        ).pressed
         if pressed and button.enabled:
             pressed_id = button.id
     return pressed_id
@@ -1832,8 +1741,7 @@ class ShellHost:
             self._nav_measured_rows,
             len(self._visible_nav_nodes()),
             chrome_px=2.0 * float(style.window_padding.y)
-            + float(style.window_border_size)
-            + _nav_toggle_overhang(),
+            + float(style.window_border_size),
             spacing_px=padded_row_spacing_y(),
         )
 
@@ -2736,14 +2644,12 @@ class ShellHost:
         )
 
     def _draw_transport_part(self, part: TransportPart) -> None:
-        """One transport part, padded each side for the hover fill.
+        """One transport part, a space wider than its text for the hover fill.
 
         Play and pause toggle on click. The time and the bar step while
         dragged sideways and open a text field on double-click.
         """
-        space = imgui.calc_text_size(" ").x + 2.0 * ui_chrome_px(
-            _TRANSPORT_HOVER_PAD
-        )
+        space = imgui.calc_text_size(" ").x
         line = imgui.get_text_line_height()
         text_w = imgui.calc_text_size(part.label).x
         field = part.field
@@ -2758,84 +2664,65 @@ class ShellHost:
                     imgui.get_item_rect_min(), imgui.get_item_rect_max(), view
                 )
             return
+        imgui.dummy(imgui.ImVec2(text_w + space, line))
+        origin = imgui.get_item_rect_min()
+        box = text_box(origin.x, text_w, space, row_band(origin.y))
         if field is None or self._nudge_input_blocked():
-            imgui.dummy(imgui.ImVec2(text_w + space, line))
-            self._paint_transport_text(part, rgba(part.color), hovered=False)
+            self._paint_transport_text(part, box, hovered=False)
             return
+        pointer = (
+            PointerShape.HAND if field is TransportField.PLAY else PointerShape.RESIZE_EW
+        )
+        state = box_button(f"##transport-{field.value}", box, pointer=pointer)
+        self._paint_transport_text(part, box, hovered=state.hovered or state.held)
+        if state.held:
+            request_pointer(pointer)
         transport = self._controls.transport
-        pressed = imgui.invisible_button(
-            f"##transport-{field.value}", imgui.ImVec2(text_w + space, line)
-        )
-        hovered = imgui.is_item_hovered()
-        active = imgui.is_item_active()
-        activated = imgui.is_item_activated()
-        released = imgui.is_item_deactivated()
-        self._paint_transport_text(
-            part, rgba(part.color), hovered=hovered or active
-        )
-        if hovered or active:
-            request_pointer(
-                PointerShape.HAND
-                if field is TransportField.PLAY
-                else PointerShape.RESIZE_EW
-            )
         if field is TransportField.PLAY:
-            if pressed:
+            if state.pressed:
                 transport.toggle_pause()
             return
-        if activated:
+        if state.activated:
             self._transport_drag_accum = 0.0
             transport.begin_drag(field)
-        if active:
+        if state.held:
             steps, self._transport_drag_accum = value_drag_steps(
                 self._transport_drag_accum + float(imgui.get_io().mouse_delta.x),
                 _VALUE_DRAG_THRESHOLD_PX,
             )
             transport.drag_step(field, steps)
-        if released:
+        if state.released:
             transport.end_drag()
-        if hovered and imgui.is_mouse_double_clicked(0):
+        if state.hovered and imgui.is_mouse_double_clicked(0):
             transport.end_drag()
             transport.begin_entry(field)
             self._inline_began = True
 
     def _paint_transport_text(
-        self, part: TransportPart, color: imgui.ImVec4, *, hovered: bool
+        self,
+        part: TransportPart,
+        box: tuple[float, float, float, float],
+        *,
+        hovered: bool,
     ) -> None:
-        rect_min = imgui.get_item_rect_min()
-        rect_max = imgui.get_item_rect_max()
-        draw = imgui.get_window_draw_list()
-        pad = ui_chrome_px(_TRANSPORT_HOVER_PAD)
+        """The part's icon and text, centred in *box*, on the wash when hovered."""
+        color = part.color
         if hovered:
-            # The fill grows past the line into the bar's own padding.
-            origin = imgui.get_window_pos()
-            size = imgui.get_window_size()
-            draw.push_clip_rect(
-                origin, imgui.ImVec2(origin.x + size.x, origin.y + size.y - 1.0)
-            )
-            draw.add_rect_filled(
-                imgui.ImVec2(rect_min.x, rect_min.y - pad),
-                imgui.ImVec2(rect_max.x, rect_max.y + pad),
-                imgui.get_color_u32(
-                    rgba(NUDGE_HOVER_BG, NUDGE_HOVER_BG_ALPHA / 255.0)
-                ),
-            )
-            draw.pop_clip_rect()
-            color = rgba(NUDGE_HOVER_FG)
-        u32 = imgui.get_color_u32(color)
-        x = rect_min.x + imgui.calc_text_size(" ").x * 0.5 + pad
+            paint_wash(box)
+            color = NUDGE_HOVER_FG
+        draw = imgui.get_window_draw_list()
+        u32 = imgui.get_color_u32(rgba(color))
+        x = glyph_x(box, imgui.calc_text_size(part.label).x)
+        y = text_top(box)
         if part.icon:
-            drop = _icon_drop_to_text(part.icon[0])
-            draw.add_text(imgui.ImVec2(x, rect_min.y + drop), u32, part.icon)
+            draw.add_text(imgui.ImVec2(x, y + glyph_drop(part.icon[0])), u32, part.icon)
             x += imgui.calc_text_size(f"{part.icon} ").x
-        draw.add_text(imgui.ImVec2(x, rect_min.y), u32, part.text)
+        draw.add_text(imgui.ImVec2(x, y), u32, part.text)
 
     def _draw_navigator(self) -> None:
         imgui.push_style_color(imgui.Col_.text, rgba(LABEL))
         try:
             with padded_rows():
-                # Room above the first row for its toggles' square hover fill.
-                imgui.set_cursor_pos_y(imgui.get_cursor_pos_y() + _nav_toggle_overhang())
                 nodes = self._visible_nav_nodes()
                 self._nav_row_rects = {}
                 for node, rails in zip(nodes, navigator_tree_rails(nodes)):
@@ -2866,7 +2753,7 @@ class ShellHost:
             if twisty is not None:
                 # The label starts right after the twisty's column, with no
                 # item gap. The twisty draws over that column once the row is done.
-                imgui.set_cursor_pos_x(imgui.get_cursor_pos_x() + _nav_toggle_size())
+                imgui.set_cursor_pos_x(imgui.get_cursor_pos_x() + _nav_indent())
             with _selected_header_wash(selected):
                 moving = (
                     node.draggable
@@ -2901,6 +2788,7 @@ class ShellHost:
                     )
                     label_min_x = imgui.get_item_rect_min().x
                     span = (imgui.get_item_rect_min().y, imgui.get_item_rect_max().y)
+                    row_right_x = imgui.get_item_rect_max().x
                     self._record_nav_row_rect(node.id, left_x)
                     if ring:
                         _draw_item_focus_ring()
@@ -2916,7 +2804,7 @@ class ShellHost:
             if node.badge:
                 _draw_item_suffix(node.badge, rgba(LABEL))
             if node.toggles:
-                self._draw_nav_toggles(node)
+                self._draw_nav_toggles(node, row_right_x, span)
             if node.draggable:
                 self._layer_row_drag(node, text_pos.x, span, text_color)
             twisty_clicked = twisty is not None and _draw_nav_twisty(
@@ -2960,7 +2848,9 @@ class ShellHost:
         if rect is not None:
             self._nav_row_rects[node_id] = rect
 
-    def _draw_nav_toggles(self, node: NavNode) -> None:
+    def _draw_nav_toggles(
+        self, node: NavNode, row_right_x: float, band: tuple[float, float]
+    ) -> None:
         """Icon buttons at the right of the row just drawn.
 
         The row selectable allows overlap, so a press here reaches the button
@@ -2970,48 +2860,25 @@ class ShellHost:
         descriptor = node_control_descriptor(node.id)
         if descriptor is None and not node.toggles:
             return
-        style = imgui.get_style()
-        space = imgui.calc_text_size(" ").x
-        button_width = _nav_toggle_size()
-        line = imgui.get_text_line_height()
-        right_x = imgui.get_item_rect_max().x - style.frame_padding.x
-        window_x = imgui.get_window_pos().x - imgui.get_scroll_x()
-        draw = imgui.get_window_draw_list()
+        xs = navigator_toggle_xs(
+            row_right_x - imgui.get_style().frame_padding.x,
+            row_band_side(),
+            icon_gap(),
+        )
         for toggle in node.toggles:
-            x = navigator_toggle_x(toggle.id, right_x, button_width, space * 0.5)
-            imgui.same_line(x - window_x)
-            pressed = imgui.invisible_button(
+            pressed = icon_button(
                 f"##nav-toggle-{node.id}-{toggle.id}",
-                imgui.ImVec2(button_width, line),
-            )
-            rect_min = imgui.get_item_rect_min()
-            hovered = imgui.is_item_hovered()
-            color = rgba(navigator_toggle_color(toggle))
-            square_min, square_max = _nav_icon_square(rect_min.x, rect_min.y)
-            fill = navigator_toggle_fill(toggle)
-            if fill is not None:
+                navigator_toggle_glyph(toggle),
+                xs[toggle.id],
+                band,
+                color=navigator_toggle_color(toggle),
+                fill=navigator_toggle_fill(toggle),
                 # A blocked toggle keeps its state readable at half strength.
-                alpha = 0.5 if toggle.blocked else 1.0
-                draw.add_rect_filled(
-                    square_min, square_max, imgui.get_color_u32(rgba(fill, alpha))
-                )
-            if hovered and not toggle.blocked:
-                _draw_nav_icon_hover(square_min, square_max)
-                if fill is None:
-                    color = rgba(NUDGE_HOVER_FG)
-                if not toggle.inert:
-                    request_pointer(PointerShape.HAND)
-            glyph = navigator_toggle_glyph(toggle)
-            draw.add_text(
-                imgui.ImVec2(
-                    rect_min.x + space * 0.5,
-                    rect_min.y + _icon_drop_to_text(glyph),
-                ),
-                imgui.get_color_u32(color),
-                glyph,
-            )
-            if hovered:
-                show_tooltip(navigator_toggle_tooltip(toggle))
+                fill_alpha=0.5 if toggle.blocked else 1.0,
+                enabled=not toggle.blocked,
+                inert=toggle.inert,
+                tooltip=lambda toggle=toggle: navigator_toggle_tooltip(toggle),
+            ).pressed
             if pressed:
                 self._controls.navigator.select(node.id)
                 if toggle.blocked:
@@ -3305,6 +3172,7 @@ class ShellHost:
         self,
         item_id: str,
         x: float,
+        band: tuple[float, float],
         *,
         blocked: bool,
         lead: str,
@@ -3319,52 +3187,28 @@ class ShellHost:
         the press reaches this button. True on the press that starts a drag; a
         blocked handle never starts one.
         """
-        glyph = DRAG_INDICATOR_GLYPH
         glyph_column = imgui.calc_text_size(lead).x
-        width = glyph_column + imgui.calc_text_size(_space_lead(text)).x
-        window_x = imgui.get_window_pos().x - imgui.get_scroll_x()
-        imgui.same_line(x - window_x)
-        imgui.invisible_button(
-            item_id, imgui.ImVec2(width, imgui.get_text_line_height())
+        text_w = imgui.calc_text_size(_space_lead(text)).x
+        box = text_box(x, glyph_column + text_w, 0.0, band)
+        state = box_button(
+            item_id,
+            box,
+            pointer=PointerShape.NOT_ALLOWED if blocked else PointerShape.MOVE,
         )
-        activated = imgui.is_item_activated()
-        hovered = imgui.is_item_hovered()
-        held = imgui.is_item_active()
-        rect_min = imgui.get_item_rect_min()
-        draw = imgui.get_window_draw_list()
-        color = rgba(MUTED)
-        label_color = rgba(text_color)
-        if blocked:
-            color = rgba(LOCKED)
-        elif hovered or held:
-            draw.add_rect_filled(
-                rect_min,
-                imgui.get_item_rect_max(),
-                imgui.get_color_u32(rgba(NUDGE_HOVER_BG, NUDGE_HOVER_BG_ALPHA / 255.0)),
-            )
-            color = rgba(NUDGE_HOVER_FG)
-            label_color = color
-            request_pointer(PointerShape.MOVE)
-        if blocked and hovered:
-            request_pointer(PointerShape.NOT_ALLOWED)
-        glyph_width = imgui.calc_text_size(glyph).x
-        draw.add_text(
-            imgui.ImVec2(
-                rect_min.x + (glyph_column - glyph_width) * 0.5,
-                rect_min.y + _icon_drop_to_text(glyph),
-            ),
-            imgui.get_color_u32(color),
-            glyph,
+        lit = not blocked and (state.hovered or state.held)
+        glyph_box = (box[0], box[1], glyph_column, box[3])
+        paint_box(
+            glyph_box,
+            DRAG_INDICATOR_GLYPH,
+            color=LOCKED if blocked else MUTED,
+            hovered=lit,
         )
         if text:
-            draw.add_text(
-                imgui.ImVec2(rect_min.x + glyph_column, rect_min.y),
-                imgui.get_color_u32(label_color),
-                text,
-            )
-        if hovered and not held:
+            label_box = (box[0] + glyph_column, box[1], text_w, box[3])
+            paint_box(label_box, text, color=text_color, hovered=lit, icon=False)
+        if state.hovered and not state.held:
             show_tooltip("Locked: unlock to reorder" if blocked else "Drag to reorder")
-        return activated and not blocked
+        return state.activated and not blocked
 
     def _preset_row_drag(
         self,
@@ -3379,7 +3223,11 @@ class ShellHost:
         if slot is None or index is None:
             return
         if self._draw_drag_handle(
-            f"##drag-preset-{slot}-{index}", x, blocked=blocked, lead=_drag_lead()
+            f"##drag-preset-{slot}-{index}",
+            x,
+            span,
+            blocked=blocked,
+            lead=_drag_lead(),
         ):
             self._begin_row_drag(DRAG_PRESET, slot, index)
             self._controls.inspector.focus_row(row)
@@ -3402,6 +3250,7 @@ class ShellHost:
         if self._draw_drag_handle(
             f"##drag-layer-{slot}",
             x,
+            span,
             blocked=node.drag_blocked,
             lead=_nav_drag_lead(),
             text=nav_handle_text(node),
@@ -3605,52 +3454,37 @@ class ShellHost:
         A press on a dimmed button is swallowed. Otherwise a double-click on
         it would reach the row and open a child directory.
         """
-        origin_x, text_y = _selectable_label_origin()
+        origin_x, _text_y = _selectable_label_origin()
         rect_min = imgui.get_item_rect_min()
         rect_max = imgui.get_item_rect_max()
         line = imgui.get_text_line_height()
-        space = imgui.calc_text_size(" ").x
-        widths = [imgui.calc_text_size(button.glyph).x for button in buttons]
+        band = (rect_min.y, rect_max.y - line if two_line else rect_max.y)
+        side = band[1] - band[0]
+        gap = icon_gap()
         if label is None:
             start_x = (
                 rect_max.x
                 - imgui.get_style().frame_padding.x
-                - sum(width + space for width in widths)
+                - len(buttons) * (side + gap)
+                + gap
             )
         else:
             start_x = origin_x + imgui.calc_text_size(f"{label} ").x
-        rects = nav_button_rects(
-            start_x,
-            rect_min.y,
-            rect_max.y - line if two_line else rect_max.y,
-            widths,
-            gap=space,
-        )
+        boxes = row_icon_boxes(start_x, band, len(buttons))
         blocked = not stepped or self._nudge_input_blocked()
         mouse = imgui.get_mouse_pos()
-        hit = None if blocked else nav_button_hit_at(mouse.x, mouse.y, rects)
+        hit = None if blocked else box_index_at(boxes, mouse.x, mouse.y)
         hold_armed = self._controls.value_nudge.armed
         available = [button.available(state, desc) for button in buttons]
-        draw = imgui.get_window_draw_list()
-        for index, (button, rect) in enumerate(zip(buttons, rects)):
-            color = value_color if available[index] else rgba(DISABLED)
-            if index == hit and available[index] and not hold_armed:
-                draw.add_rect_filled(
-                    imgui.ImVec2(rect.min_x, rect.min_y),
-                    imgui.ImVec2(rect.max_x, rect.max_y),
-                    imgui.get_color_u32(
-                        rgba(NUDGE_HOVER_BG, NUDGE_HOVER_BG_ALPHA / 255.0)
-                    ),
-                )
-                color = rgba(NUDGE_HOVER_FG)
+        for index, (button, box) in enumerate(zip(buttons, boxes)):
+            lit = index == hit and available[index] and not hold_armed
+            if lit:
                 request_pointer(PointerShape.HAND)
-            draw.add_text(
-                imgui.ImVec2(
-                    rect.min_x + space * 0.5,
-                    text_y + _icon_drop_to_text(button.glyph),
-                ),
-                imgui.get_color_u32(color),
+            paint_box(
+                box,
                 button.glyph,
+                color=value_color if available[index] else DISABLED,
+                hovered=lit,
             )
         if not activated or hit is None:
             return
@@ -3733,11 +3567,8 @@ class ShellHost:
         forward: bool,
     ) -> None:
         paint_stepper_hover(
-            imgui.get_window_draw_list(),
-            _ImguiTextSizer(),
             (rect.min_x, rect.min_y, rect.max_x - rect.min_x, rect.max_y - rect.min_y),
             forward=forward,
-            text_y=_selectable_text_y(rect.min_y),
         )
 
     def _nudge_input_blocked(self) -> bool:

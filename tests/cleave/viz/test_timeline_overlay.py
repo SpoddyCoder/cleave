@@ -18,6 +18,7 @@ from cleave.timeline import (
     lane_level_segments,
     stem_abbreviation,
 )
+from cleave.viz.icon_button import icon_gap
 from cleave.viz.material_icons import visibility_icon_slot_width
 from cleave.viz.overlay_primitives import overlay_font
 from cleave.viz.row_present_renderers import render_visibility_icon
@@ -57,6 +58,7 @@ from cleave.viz.timeline_overlay import (
     TimelineViewState,
     arm_flash_active,
     header_button_x,
+    header_buttons_width,
     row_header_target_at,
     blit_role_glyph_xor,
     arm_flash_visible,
@@ -224,8 +226,9 @@ def test_row_prefix_width_includes_header_buttons() -> None:
     abbrev_w = font.render(stem_abbrev_label("drums"), True, (255, 255, 255)).get_width()
     row_h = 20
     slot_w = visibility_icon_slot_width(row_h)
+    assert slot_w == row_h
     assert row_prefix_width(layer_num_w, abbrev_w, row_h) == (
-        layer_num_w + abbrev_w + slot_w * len(ROW_HEADER_BUTTONS)
+        layer_num_w + abbrev_w + header_buttons_width(slot_w)
     )
 
 
@@ -236,12 +239,15 @@ def test_row_header_target_at_maps_each_column() -> None:
     assert at(padding - 1) is None
     assert at(padding) == "label"
     assert at(padding + label_w - 1) == "label"
+    gap = int(icon_gap())
     for index, target in enumerate(ROW_HEADER_BUTTONS):
-        left = padding + label_w + index * slot_w
+        left = padding + label_w + index * (slot_w + gap)
         assert at(left) == target
         assert at(left + slot_w - 1) == target
         assert header_button_x(target, padding=padding, label_width=label_w, slot_w=slot_w) == left
-    assert at(padding + label_w + slot_w * len(ROW_HEADER_BUTTONS)) is None
+        if gap and index < len(ROW_HEADER_BUTTONS) - 1:
+            assert at(left + slot_w) is None
+    assert at(padding + label_w + header_buttons_width(slot_w)) is None
     assert ROW_HEADER_BUTTONS == ("arm", "solo", "eye", "release")
 
 
@@ -288,8 +294,8 @@ def test_override_visibility_icon_glyph_colors() -> None:
     line_h = 20
     enabled = render_visibility_icon(enabled=True, override=True, line_height=line_h)
     disabled = render_visibility_icon(enabled=False, override=True, line_height=line_h)
-    assert enabled.get_at((1, line_h // 2))[:3] == OVERRIDE_BG
-    assert disabled.get_at((1, line_h // 2))[:3] == OVERRIDE_BG
+    assert enabled.get_at((1, 1))[:3] == OVERRIDE_BG
+    assert disabled.get_at((1, 1))[:3] == OVERRIDE_BG
     glyph_x = enabled.get_width() // 2
     assert enabled.get_at((glyph_x, line_h // 2))[:3] == OVERRIDE_GLYPH
     assert disabled.get_at((glyph_x, line_h // 2))[:3] == OVERRIDE_GLYPH_OFF
@@ -408,10 +414,8 @@ def test_armed_recording_monitor_eye_flashes_when_focused(monkeypatch) -> None:
     panel = overlay.panel_rect
     assert panel is not None
     panel_x, panel_y, _, _ = panel
-    monitor_eye_x = _header_x(overlay, "eye")
-    sample = (panel_x + monitor_eye_x + 1, panel_y + row_y + row_h // 2)
-    flash_on = surface_on.get_at(sample)[:3]
-    flash_off = surface_off.get_at(sample)[:3]
+    flash_on = _header_bg_pixel(surface_on, overlay, "eye", row_y, row_h)
+    flash_off = _header_bg_pixel(surface_off, overlay, "eye", row_y, row_h)
 
     assert flash_on == OVERRIDE_BG
     assert flash_off != OVERRIDE_BG
@@ -433,8 +437,7 @@ def test_armed_recording_monitor_eye_uses_override_bg_when_flash_on(monkeypatch)
     panel = overlay.panel_rect
     assert panel is not None
     panel_x, panel_y, _, _ = panel
-    monitor_eye_x = _header_x(overlay, "eye")
-    assert surface.get_at((panel_x + monitor_eye_x + 1, panel_y + row_y + row_h // 2))[:3] == OVERRIDE_BG
+    assert _header_bg_pixel(surface, overlay, "eye", row_y, row_h) == OVERRIDE_BG
 
 
 def test_armed_recording_monitor_eye_hides_override_bg_when_flash_off(monkeypatch) -> None:
@@ -452,8 +455,7 @@ def test_armed_recording_monitor_eye_hides_override_bg_when_flash_off(monkeypatc
     panel = overlay.panel_rect
     assert panel is not None
     panel_x, panel_y, _, _ = panel
-    monitor_eye_x = _header_x(overlay, "eye")
-    assert surface.get_at((panel_x + monitor_eye_x + 1, panel_y + row_y + row_h // 2))[:3] != OVERRIDE_BG
+    assert _header_bg_pixel(surface, overlay, "eye", row_y, row_h) != OVERRIDE_BG
 
 
 def _header_x(overlay: TimelineOverlay, target: str) -> int:
@@ -474,12 +476,14 @@ def _header_bg_pixel(
     row_y: int,
     row_h: int,
 ) -> tuple[int, ...]:
-    """A pixel at the left edge of a header button, clear of its glyph."""
+    """A pixel at the top-left corner of a header button's box, clear of its glyph."""
     panel = overlay.panel_rect
     assert panel is not None
     panel_x, panel_y, _, _ = panel
+    layout = overlay._hit_layout
+    assert layout is not None
     sample_x = panel_x + _header_x(overlay, target) + 1
-    sample_y = panel_y + row_y + row_h // 2
+    sample_y = panel_y + row_y + (row_h - layout.slot_w) // 2 + 1
     return surface.get_at((sample_x, sample_y))[:3]
 
 
@@ -565,8 +569,7 @@ def test_unarmed_recording_monitor_eye_not_override_bg() -> None:
     panel = overlay.panel_rect
     assert panel is not None
     panel_x, panel_y, _, _ = panel
-    monitor_eye_x = _header_x(overlay, "eye")
-    assert surface.get_at((panel_x + monitor_eye_x + 1, panel_y + row_y + row_h // 2))[:3] != OVERRIDE_BG
+    assert _header_bg_pixel(surface, overlay, "eye", row_y, row_h) != OVERRIDE_BG
 
 
 def test_override_armed_recording_monitor_eye_flashes(monkeypatch) -> None:
@@ -597,10 +600,8 @@ def test_override_armed_recording_monitor_eye_flashes(monkeypatch) -> None:
     panel = overlay.panel_rect
     assert panel is not None
     panel_x, panel_y, _, _ = panel
-    monitor_eye_x = _header_x(overlay, "eye")
-    sample = (panel_x + monitor_eye_x + 1, panel_y + row_y + row_h // 2)
-    flash_on = surface_on.get_at(sample)[:3]
-    flash_off = surface_off.get_at(sample)[:3]
+    flash_on = _header_bg_pixel(surface_on, overlay, "eye", row_y, row_h)
+    flash_off = _header_bg_pixel(surface_off, overlay, "eye", row_y, row_h)
 
     assert flash_on == OVERRIDE_BG
     assert flash_off != OVERRIDE_BG
@@ -682,8 +683,7 @@ def test_override_slots_use_override_bg_on_monitor_eye() -> None:
     panel = overlay.panel_rect
     assert panel is not None
     panel_x, panel_y, _, _ = panel
-    monitor_eye_x = _header_x(overlay, "eye")
-    assert surface.get_at((panel_x + monitor_eye_x + 1, panel_y + row_y + row_h // 2))[:3] == OVERRIDE_BG
+    assert _header_bg_pixel(surface, overlay, "eye", row_y, row_h) == OVERRIDE_BG
 
 
 def test_recording_baseline_does_not_draw_cue_tick() -> None:

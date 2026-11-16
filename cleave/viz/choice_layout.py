@@ -81,20 +81,6 @@ def stepper_arrow_rects(measure: TextSizer, rect: Rect) -> tuple[Rect, Rect]:
     return (x, y, back, h), (x + w - forward, y, forward, h)
 
 
-def stepper_hover_rect(
-    arrow: FRect, *, forward: bool, arrow_width: float, space_width: float
-) -> FRect:
-    """Hover wash for a stepper arrow, centred on the arrow character.
-
-    ``arrow`` covers the painted glyph, including its gap space. The wash keeps
-    that width and height and shifts by half the space, so the character sits
-    in the middle of it.
-    """
-    x, y, w, h = arrow
-    centre = x + (space_width if forward else 0.0) + arrow_width * 0.5
-    return centre - w * 0.5, y, w, h
-
-
 def choice_list_rects(
     *, x: int, y: int, width: int, line_h: int, count: int
 ) -> tuple[Rect, ...]:

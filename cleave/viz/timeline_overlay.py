@@ -28,6 +28,7 @@ from cleave.timeline import (
     opening_cue,
     stem_abbreviation,
 )
+from cleave.viz.icon_button import icon_gap, icon_row
 from cleave.viz.material_icons import (
     PAUSE_GLYPH,
     PLAY_GLYPH,
@@ -830,11 +831,17 @@ StripTarget = Literal[
     "scroll_track",
 ]
 
-# A row's header buttons after its label, left to right, each one
-# ``visibility_icon_slot_width`` wide: arm for recording, solo, the live
+# A row's header buttons after its label, left to right, each a square icon
+# box (``icon_button``) one nominal row tall: arm for recording, solo, the live
 # visibility eye, and back to timeline (shown only while overridden).
 ROW_HEADER_BUTTONS: tuple[StripTarget, ...] = ("arm", "solo", "eye", "release")
 ROW_HEADER_TARGETS: frozenset[str] = frozenset(("label", *ROW_HEADER_BUTTONS))
+
+
+def header_buttons_width(slot_w: int) -> int:
+    """Width of a row's header buttons, with the icon gap between them."""
+    count = len(ROW_HEADER_BUTTONS)
+    return count * slot_w + (count - 1) * int(icon_gap())
 
 
 def header_button_x(
@@ -845,7 +852,8 @@ def header_button_x(
     slot_w: int,
 ) -> int:
     """Left edge of header button *target* in panel coordinates."""
-    return padding + label_width + ROW_HEADER_BUTTONS.index(target) * slot_w
+    xs = icon_row(padding + label_width, len(ROW_HEADER_BUTTONS), slot_w, int(icon_gap()))
+    return int(xs[ROW_HEADER_BUTTONS.index(target)])
 
 
 def row_header_target_at(
@@ -855,15 +863,18 @@ def row_header_target_at(
     label_width: int,
     slot_w: int,
 ) -> StripTarget | None:
-    """The label or header button under panel *local_x*, or None past them."""
+    """The label or header button under panel *local_x*, or None past them.
+
+    The gap between two buttons hits neither.
+    """
     if padding <= local_x < padding + label_width:
         return "label"
-    offset = local_x - padding - label_width
-    if offset < 0 or slot_w <= 0:
-        return None
-    index = int(offset // slot_w)
-    if index < len(ROW_HEADER_BUTTONS):
-        return ROW_HEADER_BUTTONS[index]
+    for target in ROW_HEADER_BUTTONS:
+        left = header_button_x(
+            target, padding=padding, label_width=label_width, slot_w=slot_w
+        )
+        if left <= local_x < left + slot_w:
+            return target
     return None
 
 
@@ -1020,8 +1031,11 @@ def row_prefix_width(
     row_height: int,
 ) -> int:
     """Width of a row's header: number, stem, and its ``ROW_HEADER_BUTTONS``."""
-    slot_w = visibility_icon_slot_width(row_height)
-    return layer_num_width + stem_abbrev_width + slot_w * len(ROW_HEADER_BUTTONS)
+    return (
+        layer_num_width
+        + stem_abbrev_width
+        + header_buttons_width(visibility_icon_slot_width(row_height))
+    )
 
 
 def timeline_live_signature(
@@ -1795,9 +1809,11 @@ class TimelineOverlay:
     def _header_button_rect(
         self, layout: _TimelineLayout, target: StripTarget, row_y: int
     ) -> tuple[int, int, int, int]:
-        """Panel rect of a row's header button *target*."""
+        """Panel rect of a row's header button *target*: its square icon box,
+        centred in the row, so the hover wash matches a lit button."""
         x = self._header_button_x(layout, target)
-        return (x, row_y, layout.slot_w, layout.row_h)
+        icon_y = row_y + (layout.row_h - layout.icon_h) // 2
+        return (x, icon_y, layout.slot_w, layout.slot_w)
 
     @staticmethod
     def _header_rest_color(
@@ -1868,9 +1884,10 @@ class TimelineOverlay:
             flash_starts=state.arm_flash_start_ms,
             slot=slot,
         ):
-            armed_surf = pygame.Surface((slot_w, row_h), pygame.SRCALPHA)
+            # The same square box as every header button's fill and hover.
+            armed_surf = pygame.Surface((slot_w, slot_w), pygame.SRCALPHA)
             armed_surf.fill((*ARMED_BG, ARMED_BG_ALPHA))
-            upload.blit(armed_surf, (arm_x, upload_y))
+            upload.blit(armed_surf, (arm_x, icon_y))
             upload.blit(
                 render_header_toggle(
                     RECORD_GLYPH, color=VALUE, line_height=layout.icon_h

@@ -17,6 +17,7 @@ from cleave.viz.material_icons import (
     SOLO_GLYPH,
 )
 from cleave.viz.navigator import (
+    TOGGLE_ADD,
     TOGGLE_ENABLED,
     TOGGLE_LOCK,
     TOGGLE_SOLO,
@@ -43,14 +44,13 @@ from cleave.viz.shell_host import (
     inspector_title_cluster,
     page_history_tooltip,
     page_title,
-    title_button_square,
     navigator_height_for_rows,
     navigator_lock_mark,
     navigator_toggle_color,
     navigator_toggle_fill,
     navigator_toggle_glyph,
     navigator_toggle_tooltip,
-    navigator_toggle_x,
+    navigator_toggle_xs,
     navigator_tree_lines,
     strip_arm_tooltip,
     strip_eye_tooltip,
@@ -239,9 +239,11 @@ def test_strip_release_tooltip() -> None:
 
 
 def test_navigator_toggles_sit_in_fixed_columns() -> None:
-    assert navigator_toggle_x(TOGGLE_LOCK, 100.0, 20.0, 2.0) == 80.0
-    assert navigator_toggle_x(TOGGLE_SOLO, 100.0, 20.0, 2.0) == 58.0
-    assert navigator_toggle_x(TOGGLE_ENABLED, 100.0, 20.0, 2.0) == 36.0
+    xs = navigator_toggle_xs(100.0, 20.0, 2.0)
+    assert xs[TOGGLE_LOCK] == 80.0
+    assert xs[TOGGLE_SOLO] == 58.0
+    assert xs[TOGGLE_ENABLED] == 36.0
+    assert xs[TOGGLE_ADD] == xs[TOGGLE_LOCK]
 
 
 def test_header_toggle_changes_the_header_flag() -> None:
@@ -591,12 +593,12 @@ def test_a_label_click_on_a_leaf_only_selects() -> None:
 
 
 def test_inspector_title_cluster_keeps_the_title_off_the_icons() -> None:
-    title_w, slots = inspector_title_cluster(200.0, 4, 20.0, 8.0)
-    assert slots == (120.0, 140.0, 160.0, 180.0)
-    assert title_w == 112.0
-    title_w, slots = inspector_title_cluster(30.0, 2, 20.0, 8.0)
+    title_w, slots = inspector_title_cluster(200.0, 4, 20.0, 2.0, 8.0)
+    assert slots == (114.0, 136.0, 158.0, 180.0)
+    assert title_w == 106.0
+    title_w, slots = inspector_title_cluster(30.0, 2, 20.0, 2.0, 8.0)
     assert title_w == 0.0
-    assert slots == (0.0, 20.0)
+    assert slots == (0.0, 22.0)
 
 
 def test_page_history_tooltips_name_the_target_and_key() -> None:
@@ -618,14 +620,4 @@ def test_page_title_names_a_page_under_a_closed_parent() -> None:
     assert page_title(session, set(), page).endswith("> Compositing")
     assert page_title(session, set(), "settings.ui") == inspector_title(
         build_navigator(session), "settings.ui"
-    )
-
-
-def test_title_button_square_spans_the_highlight_band() -> None:
-    assert title_button_square(100.0, 30.0, 10.0, 34.0) == (103.0, 10.0, 127.0, 34.0)
-    assert title_button_square(100.0, 30.0, 10.0, 34.0, outset=2.0) == (
-        101.0,
-        8.0,
-        129.0,
-        36.0,
     )

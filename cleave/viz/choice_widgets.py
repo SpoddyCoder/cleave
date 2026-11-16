@@ -25,9 +25,10 @@ from cleave.viz.choice_layout import (
     rect_index_at,
     segment_rects,
     stepper_arrow_rects,
-    stepper_hover_rect,
 )
 from cleave.viz.choice_list import CHOICE_LIST_MAX_VISIBLE, ChoiceListView
+from cleave.viz.icon_button import text_box
+from cleave.viz.imgui_icon_button import paint_box
 from cleave.viz.imgui_theme import rgba
 from cleave.viz.pointer_cursor import PointerShape, request_pointer
 from cleave.viz.text_fit import TextSizer
@@ -43,9 +44,6 @@ from cleave.viz.theme import (
     LOCKED,
     LOCKED_MUTED,
     MUTED,
-    NUDGE_HOVER_BG,
-    NUDGE_HOVER_BG_ALPHA,
-    NUDGE_HOVER_FG,
     VALUE,
 )
 
@@ -216,32 +214,27 @@ def draw_combo(
     )
 
 
-def paint_stepper_hover(
-    draw: imgui.ImDrawList,
-    measure: TextSizer,
-    arrow: FRect,
-    *,
-    forward: bool,
-    text_y: float,
-) -> None:
+def paint_stepper_hover(arrow: FRect, *, forward: bool) -> None:
     """Light one stepper arrow: the hover wash, then its glyph in the hover colour.
 
-    The inspector and form dialogs share this, so a stepper looks the same in
-    both. ``text_y`` is the glyph baseline row the caller drew the value on.
+    ``arrow`` covers the painted glyph and its gap space, and is the band
+    tall. The lit box is the arrow character plus a space, centred on the
+    character. The inspector and form dialogs share this, so a stepper looks
+    the same in both.
     """
-    x, y, w, h = stepper_hover_rect(
-        arrow,
-        forward=forward,
-        arrow_width=measure.size(">" if forward else "<")[0],
-        space_width=measure.size(" ")[0],
+    x, y, _w, h = arrow
+    char = ">" if forward else "<"
+    char_w = imgui.calc_text_size(char).x
+    space_w = imgui.calc_text_size(" ").x
+    # The gap space sits before ">" and after "<"; centre the box on the char.
+    left = x + (space_w if forward else 0.0) - space_w * 0.5
+    paint_box(
+        text_box(left, char_w, space_w, (y, y + h)),
+        char,
+        color=DISABLED,
+        hovered=True,
+        icon=False,
     )
-    draw.add_rect_filled(
-        _vec(x, y),
-        _vec(x + w, y + h),
-        _u32(NUDGE_HOVER_BG, NUDGE_HOVER_BG_ALPHA / 255.0),
-    )
-    glyph = STEPPER_FORWARD if forward else STEPPER_BACK
-    draw.add_text(_vec(arrow[0], text_y), _u32(NUDGE_HOVER_FG), glyph)
 
 
 def draw_stepper(
@@ -278,11 +271,7 @@ def draw_stepper(
     if lit is not None:
         request_pointer(PointerShape.HAND)
         paint_stepper_hover(
-            draw,
-            measure,
-            tuple(float(v) for v in (forward if lit else back)),
-            forward=lit,
-            text_y=float(text_y),
+            tuple(float(v) for v in (forward if lit else back)), forward=lit
         )
     return back, forward
 

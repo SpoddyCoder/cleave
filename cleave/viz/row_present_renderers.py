@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import pygame
 
+from cleave.viz.icon_button import glyph_x, icon_box
 from cleave.viz.material_icons import (
     VISIBILITY_GLYPH,
     VISIBILITY_OFF_GLYPH,
-    visibility_icon_pad_x,
     render_glyph,
     visibility_icon_slot_width,
 )
@@ -183,6 +183,22 @@ def inspector_field_colors(
     return label, row_value_color_for(state, desc)
 
 
+def _icon_button_surface(
+    glyph_surf: pygame.Surface, line_height: int, bg: tuple[int, int, int] | None
+) -> pygame.Surface:
+    """A square icon box on a row *line_height* tall, *bg* when lit, glyph centred."""
+    box = icon_box(0, (0, visibility_icon_slot_width(line_height)))
+    side = int(box[2])
+    surf = pygame.Surface((side, side), pygame.SRCALPHA)
+    if bg is not None:
+        surf.fill(bg)
+    surf.blit(
+        glyph_surf,
+        (int(glyph_x(box, glyph_surf.get_width())), (side - glyph_surf.get_height()) // 2),
+    )
+    return surf
+
+
 def render_header_toggle(
     glyph: str,
     *,
@@ -190,14 +206,10 @@ def render_header_toggle(
     line_height: int,
     bg: tuple[int, int, int] | None = None,
 ) -> pygame.Surface:
-    """A timeline row header button: *glyph* centred in an eye-wide slot, on *bg* when lit."""
-    glyph_surf = render_glyph(glyph, color=color, line_height=line_height)
-    slot_w = visibility_icon_slot_width(line_height)
-    surf = pygame.Surface((slot_w, line_height), pygame.SRCALPHA)
-    if bg is not None:
-        pygame.draw.rect(surf, bg, (0, 0, slot_w, line_height))
-    surf.blit(glyph_surf, ((slot_w - glyph_surf.get_width()) // 2, 0))
-    return surf
+    """A timeline row header button: *glyph* centred in its square box, on *bg* when lit."""
+    return _icon_button_surface(
+        render_glyph(glyph, color=color, line_height=line_height), line_height, bg
+    )
 
 
 def render_visibility_icon(
@@ -214,12 +226,7 @@ def render_visibility_icon(
         color = VALUE
     else:
         color = DISABLED
-    glyph_surf = render_glyph(glyph, color=color, line_height=line_height)
-    slot_w = visibility_icon_slot_width(line_height)
-    surf = pygame.Surface((slot_w, line_height), pygame.SRCALPHA)
-    if solo:
-        pygame.draw.rect(surf, SOLO_BG, (0, 0, slot_w, line_height))
-    elif override:
-        pygame.draw.rect(surf, OVERRIDE_BG, (0, 0, slot_w, line_height))
-    surf.blit(glyph_surf, (visibility_icon_pad_x(), 0))
-    return surf
+    bg = SOLO_BG if solo else OVERRIDE_BG if override else None
+    return _icon_button_surface(
+        render_glyph(glyph, color=color, line_height=line_height), line_height, bg
+    )

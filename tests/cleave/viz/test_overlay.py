@@ -35,7 +35,7 @@ def test_solo_visibility_icon_uses_red_background() -> None:
     normal = render_visibility_icon(enabled=True, solo=False, line_height=line_h)
     assert soloed.get_height() == line_h
     assert soloed.get_width() == normal.get_width()
-    assert soloed.get_at((1, line_h // 2))[:3] == SOLO_BG
+    assert soloed.get_at((1, 1))[:3] == SOLO_BG
     assert normal.get_at((normal.get_width() // 2, line_h // 2))[:3] != SOLO_BG
 
 
@@ -44,7 +44,7 @@ def test_solo_visibility_icon_disabled_stem_uses_value_not_disabled() -> None:
     line_h = 17
     disabled = render_visibility_icon(enabled=False, solo=False, line_height=line_h)
     soloed_off = render_visibility_icon(enabled=False, solo=True, line_height=line_h)
-    assert soloed_off.get_at((1, line_h // 2))[:3] == SOLO_BG
+    assert soloed_off.get_at((0, 0))[:3] == SOLO_BG
     assert pygame.mask.from_surface(soloed_off).count() != pygame.mask.from_surface(
         disabled
     ).count()

@@ -6,7 +6,6 @@ from unittest.mock import patch
 
 import pygame
 
-from cleave.viz.choice_layout import stepper_hover_rect
 from cleave.viz.key_repeat import (
     ACCEL_AFTER_SEC,
     FAST_INTERVAL_SEC,
@@ -19,8 +18,6 @@ from cleave.viz.row_spec import apply_field_horizontal, row_spec
 from cleave.viz.value_nudge import (
     NudgeRect,
     ValueNudgeHold,
-    nav_button_hit_at,
-    nav_button_rects,
     nudge_arrow_rects,
     nudge_hit_at,
     nudge_press_skips_row,
@@ -69,51 +66,11 @@ def test_arrow_rects_cover_glyphs_and_not_the_value() -> None:
     assert nudge_hit_at(145.0, 36.0, back, forward) is None
 
 
-def test_nav_button_rects_touch_and_center_each_glyph() -> None:
-    up, down = nav_button_rects(100.0, 20.0, 36.0, (12.0, 14.0), gap=6.0)
-    assert up == NudgeRect(100.0, 20.0, 118.0, 36.0)
-    assert down == NudgeRect(118.0, 20.0, 138.0, 36.0)
-
-
-def test_nav_button_hit_at_finds_the_button_under_the_pointer() -> None:
-    rects = nav_button_rects(100.0, 20.0, 36.0, (12.0, 14.0), gap=6.0)
-    assert nav_button_hit_at(105.0, 28.0, rects) == 0
-    assert nav_button_hit_at(118.0, 28.0, rects) == 1
-    assert nav_button_hit_at(138.0, 28.0, rects) is None
-    assert nav_button_hit_at(105.0, 36.0, rects) is None
-
-
-def test_hover_fill_centers_on_the_arrow_character() -> None:
-    arrow_w = 8.0
-    space_w = 4.0
+def test_value_between_the_arrows_is_not_a_hit() -> None:
     back, forward = nudge_arrow_rects(
-        0.0,
-        20.0,
-        200.0,
-        36.0,
-        (arrow_w + space_w, 30.0, space_w + arrow_w),
-        frame_pad_x=4.0,
+        0.0, 20.0, 200.0, 36.0, (12.0, 30.0, 12.0), frame_pad_x=4.0
     )
-    def frect(rect: NudgeRect) -> tuple[float, float, float, float]:
-        return (rect.min_x, rect.min_y, rect.max_x - rect.min_x, rect.max_y - rect.min_y)
-
-    lx, ly, lw, lh = stepper_hover_rect(
-        frect(back), forward=False, arrow_width=arrow_w, space_width=space_w
-    )
-    rx, ry, rw, rh = stepper_hover_rect(
-        frect(forward), forward=True, arrow_width=arrow_w, space_width=space_w
-    )
-
-    assert lx + lw / 2 == back.min_x + arrow_w / 2
-    assert rx + rw / 2 == forward.min_x + space_w + arrow_w / 2
-    assert lw == back.max_x - back.min_x
-    assert rw == forward.max_x - forward.min_x
-    assert (ly, ly + lh) == (back.min_y, back.max_y)
-    assert (ry, ry + rh) == (forward.min_y, forward.max_y)
-
-    body = nudge_hit_at(
-        (back.max_x + forward.min_x) / 2, 28.0, back, forward
-    )
+    body = nudge_hit_at((back.max_x + forward.min_x) / 2, 28.0, back, forward)
     assert body is None
 
 

@@ -109,6 +109,21 @@ def padded_row_spacing_y() -> float:
     return 2.0 * math.floor(spacing * 0.5 + 0.5)
 
 
+def row_band(text_top_y: float) -> tuple[float, float]:
+    """Top and bottom of the highlight band for a row whose text starts at *text_top_y*.
+
+    The band a padded selectable fills: half the padded row spacing above and
+    below one text line. Every icon button on a row is this tall.
+    """
+    pad = padded_row_spacing_y() * 0.5
+    return text_top_y - pad, text_top_y + imgui.get_text_line_height() + pad
+
+
+def row_band_side() -> float:
+    """Height of a padded row's highlight band, and so the side of its icon boxes."""
+    return imgui.get_text_line_height() + padded_row_spacing_y()
+
+
 @contextmanager
 def padded_rows() -> Iterator[None]:
     """Push the padded row spacing for a list of rows, then pop."""

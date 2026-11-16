@@ -131,7 +131,6 @@ class TuningUiMetrics:
     row_icon_suffix_gap: int
     icon_label_gap: int
     icon_suffix_gap: int
-    visibility_icon_pad_x: int
     modal_panel_pad_x: int
     modal_panel_pad_y: int
 
@@ -168,7 +167,6 @@ def tuning_ui_metrics(
         row_icon_suffix_gap=scale_px(4, scale=scale),
         icon_label_gap=scale_px(4, scale=scale),
         icon_suffix_gap=scale_px(4, scale=scale),
-        visibility_icon_pad_x=scale_px(2, scale=scale),
         modal_panel_pad_x=scale_px(12, scale=scale),
         modal_panel_pad_y=scale_px(10, scale=scale),
     )
