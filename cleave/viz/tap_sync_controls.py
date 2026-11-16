@@ -6,11 +6,14 @@ from collections.abc import Callable
 from dataclasses import dataclass, replace
 
 from cleave.config import CleaveConfig
-from cleave.config_schema.editor import clamp_residual_latency_ms
+from cleave.config_schema.editor import (
+    MAX_RESIDUAL_LATENCY_MS,
+    clamp_residual_latency_ms,
+)
 from cleave.user_config import persist_editor_settings
 from cleave.viz.focus_nav import FocusCursor
 from cleave.viz.info_panel import InfoPanelViewState
-from cleave.viz.modal import ModalHost
+from cleave.viz.modal import FormField, FormSpec, FormValues, ModalHost
 from cleave.viz.shell_focus import ShellRegion
 from cleave.viz.playback import PlaybackState, toggle_pause
 from cleave.viz.tap_sync import (
@@ -30,6 +33,21 @@ _TAP_SYNC_CONFIRM_MESSAGE = (
     "A 140 BPM click track will play: a long low tone, then three short clicks. "
     "Tap Enter on each long low tone until the latency is detected."
 )
+
+_APPLY_TITLE = "Detected latency"
+# Matches the Settings > Preview residual latency row: 10 ms, 50 ms large.
+_LATENCY_STEP_MS = 10
+_LATENCY_LARGE_STEPS = 5
+_LATENCY_HELP = (
+    "Corrects for audio delay that Cleave cannot measure.",
+    "Starts on the measured value. Left/Right move in 10 ms steps.",
+)
+
+
+def latency_options_ms(detected_ms: int) -> tuple[int, ...]:
+    """Every 10 ms from 0 to the maximum, plus the measured value in order."""
+    steps = range(0, MAX_RESIDUAL_LATENCY_MS + 1, _LATENCY_STEP_MS)
+    return tuple(sorted({*steps, clamp_residual_latency_ms(detected_ms)}))
 
 
 @dataclass(frozen=True)
@@ -220,11 +238,31 @@ class TapSyncControls:
         latency_ms = clamp_residual_latency_ms(
             int(round(self._proposed_latency_sec() * 1000.0))
         )
-        self._modal_host.prompt_confirm(
-            f"Detected latency: {latency_ms} ms. Apply?",
-            "Apply",
-            lambda: self._apply_detected_latency(latency_ms),
-            self._dismiss_without_apply,
+        options = latency_options_ms(latency_ms)
+        current_ms = self.cfg.editor.residual_latency_ms
+
+        def apply(values: FormValues) -> None:
+            self._apply_detected_latency(options[values["latency"]])
+
+        self._modal_host.prompt_form(
+            FormSpec(
+                title=_APPLY_TITLE,
+                fields=(
+                    FormField(
+                        "latency",
+                        "residual latency",
+                        tuple(f"{ms} ms" for ms in options),
+                        options.index(latency_ms),
+                        help=_LATENCY_HELP,
+                        stepper=True,
+                        large_step=_LATENCY_LARGE_STEPS,
+                    ),
+                ),
+                confirm_label="Apply",
+                on_confirm=apply,
+                on_cancel=self._dismiss_without_apply,
+                info=lambda _values: f"(now {current_ms} ms)",
+            )
         )
 
     def _apply_detected_latency(self, latency_ms: int) -> None:

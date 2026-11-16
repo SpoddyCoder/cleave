@@ -58,6 +58,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- Measure latency ends in a Detected latency dialog instead of a yes/no question. It starts on the measured value, shows the current setting, and lets you step it by 10 ms (50 ms with PageUp/PageDown) before Apply. Cancel keeps the current setting.
 - When a page's on/off switch is off, or a parent's is (for example a layer, Post-FX, or Timeline), the inspector title ends in a grey power icon, and its choice segments, combo boxes, and buttons grey out like its value rows. They still edit. When the page or a parent is locked, the title ends in a red lock icon and those controls turn red like locked rows. Hover either icon to see why and which switch or lock to change. An overlay card's rows also grey out while that card is off.
 - Clicking the start row of a clip in the inspector, or pressing Enter on it, no longer moves the playhead. Enter on the timeline strip still seeks to the selected clip's start.
 - The inspector's help for clip opacity, blend, and role now gives as much detail as the layer menu. Blend lists each mode with what it does, role lists each role, and opacity and blend note that Pattern Mask replaces them when it is on.

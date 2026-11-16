@@ -13,10 +13,12 @@ from cleave.viz.mix_player import FREQUENCY_HZ, NUM_CHANNELS, MixPlayer
 from cleave.viz.playback import PlaybackState
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.tap_sync import CONSISTENCY_WINDOW, METRONOME_BPM, metronome_accent_times
+from cleave.config_schema.editor import MAX_RESIDUAL_LATENCY_MS
 from cleave.viz.tap_sync_controls import (
     TapSyncControls,
     TapSyncProgressView,
     TapSyncUiSnapshot,
+    latency_options_ms,
     tap_sync_info_panel,
     _TAP_SYNC_CONFIRM_MESSAGE,
 )
@@ -192,7 +194,8 @@ def test_consistent_taps_open_apply_modal_with_mean_latency() -> None:
 
     view = modal.view_state()
     assert view is not None
-    assert view.message == "Detected latency: 200 ms. Apply?"
+    assert view.message == "Detected latency"
+    assert view.form_rows[0].options[view.form_rows[0].value] == "200 ms"
     assert controls.active
     assert controls.awaiting_apply
     assert not controls.showing_progress
@@ -236,7 +239,8 @@ def test_double_tap_same_accent_is_ignored() -> None:
     assert len(controls._taps) == 4
     view = modal.view_state()
     assert view is not None
-    assert view.message == "Detected latency: 200 ms. Apply?"
+    assert view.message == "Detected latency"
+    assert view.form_rows[0].options[view.form_rows[0].value] == "200 ms"
     assert ui_log == ["hide", "restore"]
 
 
@@ -293,8 +297,7 @@ def test_apply_modal_cancel_exits_without_applying() -> None:
         latency_sec=0.2,
         count=4,
     )
-    modal.handle_keydown(keydown(pygame.K_LEFT))
-    modal.handle_keydown(keydown(pygame.K_RETURN))
+    modal.handle_keydown(keydown(pygame.K_ESCAPE))
 
     assert not controls.active
     assert playback.paused
@@ -472,3 +475,26 @@ def test_tap_sync_info_panel_formats_populated_estimate_and_spread() -> None:
         "Spread: 12 ms",
         "Estimate: 205 ms",
     )
+
+
+def test_apply_dialog_steps_from_the_measured_value_before_applying() -> None:
+    controls, playback, modal, notifications, ui_log = _make_controls(duration_sec=8.0)
+    playback.player.seek(0.0)
+    accent_times = _start_calibration(controls, modal, ui_log)
+    _tap_on_accents(controls, playback, accent_times, latency_sec=0.2, count=4)
+    view = modal.view_state()
+    assert view.form_rows[0].stepper is True
+    assert view.form_info == "(now 0 ms)"
+    modal.handle_keydown(keydown(pygame.K_RIGHT))
+    modal.handle_keydown(keydown(pygame.K_PAGEDOWN))
+    modal.handle_keydown(keydown(pygame.K_RETURN))
+    assert controls.cfg.editor.residual_latency_ms == 160
+    assert any("160 ms" in msg for msg in notifications)
+
+
+def test_latency_options_step_by_ten_and_keep_the_measured_value() -> None:
+    options = latency_options_ms(187)
+    assert options[:3] == (0, 10, 20)
+    assert options[options.index(187) - 1 : options.index(187) + 2] == (180, 187, 190)
+    assert options[-1] == MAX_RESIDUAL_LATENCY_MS
+    assert latency_options_ms(200).count(200) == 1
