@@ -13,9 +13,13 @@ from cleave.viz.text_fit import TextSizer
 from cleave.viz.theme import ui_px
 
 Rect = tuple[int, int, int, int]
+# x, y, width, height in unrounded pixels, for rects built from ImGui sizes.
+FRect = tuple[float, float, float, float]
 
 # In the shell glyph ranges (the navigator's open twisty).
 COMBO_CARET = "▾"
+# A stepper's arrows. The space sits between each arrow and the value, and
+# belongs to the arrow's hit area.
 STEPPER_BACK = "< "
 STEPPER_FORWARD = " >"
 
@@ -75,6 +79,20 @@ def stepper_arrow_rects(measure: TextSizer, rect: Rect) -> tuple[Rect, Rect]:
     back = measure.size(STEPPER_BACK)[0]
     forward = measure.size(STEPPER_FORWARD)[0]
     return (x, y, back, h), (x + w - forward, y, forward, h)
+
+
+def stepper_hover_rect(
+    arrow: FRect, *, forward: bool, arrow_width: float, space_width: float
+) -> FRect:
+    """Hover wash for a stepper arrow, centred on the arrow character.
+
+    ``arrow`` covers the painted glyph, including its gap space. The wash keeps
+    that width and height and shifts by half the space, so the character sits
+    in the middle of it.
+    """
+    x, y, w, h = arrow
+    centre = x + (space_width if forward else 0.0) + arrow_width * 0.5
+    return centre - w * 0.5, y, w, h
 
 
 def choice_list_rects(

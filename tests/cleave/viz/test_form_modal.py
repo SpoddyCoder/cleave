@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pygame
 
+from cleave.viz.key_repeat import INITIAL_DELAY_SEC
 from cleave.viz.modal import (
     ButtonRole,
     FormField,
@@ -482,7 +483,7 @@ def test_on_change_runs_with_the_field_id_and_may_adjust_other_values() -> None:
     assert (rows[0].value, rows[1].value) == (10, 10)
     apply_modal_pointer(
         modal,
-        ModalPointerIntent(ModalPointerKind.STEP_FORM_VALUE, index=1, value=1),
+        ModalPointerIntent(ModalPointerKind.PRESS_FORM_STEP, index=1, value=1),
     )
     assert changes == ["low", "high"]
     assert modal.view_state().form_rows[1].value == 11
@@ -499,3 +500,70 @@ def test_help_keys_list_page_step_only_with_a_large_step_and_space_only_with_a_c
     keys = [key for key, _text in modal.help_sections()[-1].entries]
     assert "PgUp/PgDn" not in keys
     assert "Space" not in keys
+
+
+def _held_past_delay(modal: ModalHost) -> None:
+    """Tick past the first repeat delay; fires exactly one repeat."""
+    modal.tick(INITIAL_DELAY_SEC + 0.001)
+
+
+def test_holding_a_step_key_repeats_until_keyup() -> None:
+    modal = ModalHost()
+    _stepper_form(modal)
+    modal.handle_keydown(keydown(pygame.K_RIGHT))
+    assert modal.view_state().form_rows[0].value == 1
+    _held_past_delay(modal)
+    assert modal.view_state().form_rows[0].value == 2
+    assert modal.handle_keyup(pygame.event.Event(pygame.KEYUP, key=pygame.K_RIGHT))
+    _held_past_delay(modal)
+    assert modal.view_state().form_rows[0].value == 2
+
+
+def test_holding_page_up_repeats_the_large_step() -> None:
+    modal = ModalHost()
+    _stepper_form(modal)
+    modal.handle_keydown(keydown(pygame.K_PAGEUP))
+    _held_past_delay(modal)
+    assert modal.view_state().form_rows[0].value == 20
+
+
+def test_another_key_stops_a_held_step() -> None:
+    modal = ModalHost()
+    _stepper_form(modal)
+    modal.handle_keydown(keydown(pygame.K_RIGHT))
+    modal.handle_keydown(keydown(pygame.K_DOWN))
+    _held_past_delay(modal)
+    rows = modal.view_state().form_rows
+    assert (rows[0].value, rows[1].value) == (1, 5)
+
+
+def test_holding_a_stepper_arrow_repeats_until_release() -> None:
+    modal = ModalHost()
+    _stepper_form(modal)
+    apply_modal_pointer(
+        modal,
+        ModalPointerIntent(ModalPointerKind.PRESS_FORM_STEP, index=1, value=1),
+    )
+    view = modal.view_state()
+    assert view.form_rows[1].value == 6
+    assert view.form_step_held == (1, 1)
+    _held_past_delay(modal)
+    assert modal.view_state().form_rows[1].value == 7
+    apply_modal_pointer(
+        modal, ModalPointerIntent(ModalPointerKind.RELEASE_FORM_STEP)
+    )
+    assert modal.view_state().form_step_held is None
+    _held_past_delay(modal)
+    assert modal.view_state().form_rows[1].value == 7
+
+
+def test_closing_the_dialog_drops_a_held_step() -> None:
+    modal = ModalHost()
+    _stepper_form(modal)
+    modal.press_form_step(0, 1)
+    modal.handle_keydown(keydown(pygame.K_ESCAPE))
+    assert modal.view_state() is None
+    _stepper_form(modal)
+    assert modal.view_state().form_step_held is None
+    _held_past_delay(modal)
+    assert modal.view_state().form_rows[0].value == 0

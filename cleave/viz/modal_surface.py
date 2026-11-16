@@ -105,7 +105,8 @@ class ModalPointerKind(Enum):
     ACTIVATE_TEXT_BUTTON = "activate_text_button"
     FOCUS_FORM_ROW = "focus_form_row"
     SET_FORM_VALUE = "set_form_value"
-    STEP_FORM_VALUE = "step_form_value"
+    PRESS_FORM_STEP = "press_form_step"
+    RELEASE_FORM_STEP = "release_form_step"
     OPEN_FORM_CHOICE = "open_form_choice"
     HOVER_FORM_CHOICE = "hover_form_choice"
     PICK_FORM_CHOICE = "pick_form_choice"
@@ -117,7 +118,7 @@ class ModalPointerIntent:
     """One pointer result for the frame.
 
     ``index`` is an option, a text button, or a form row. ``value`` is the form
-    option chosen, the step for ``STEP_FORM_VALUE``, or the list row for
+    option chosen, the step for ``PRESS_FORM_STEP``, or the list row for
     ``HOVER_FORM_CHOICE`` and ``PICK_FORM_CHOICE``.
     """
 
@@ -155,8 +156,10 @@ def apply_modal_pointer(host: ModalHost, intent: ModalPointerIntent | None) -> N
         host.focus_form_row(_intent_index(intent))
     elif kind is ModalPointerKind.SET_FORM_VALUE:
         host.set_form_value(_intent_index(intent), intent.value)
-    elif kind is ModalPointerKind.STEP_FORM_VALUE:
-        host.step_form_value(_intent_index(intent), intent.value)
+    elif kind is ModalPointerKind.PRESS_FORM_STEP:
+        host.press_form_step(_intent_index(intent), intent.value)
+    elif kind is ModalPointerKind.RELEASE_FORM_STEP:
+        host.release_form_step()
     elif kind is ModalPointerKind.OPEN_FORM_CHOICE:
         host.open_form_choice(_intent_index(intent))
     elif kind is ModalPointerKind.HOVER_FORM_CHOICE:
@@ -378,6 +381,7 @@ def _draw_form_control(
     rect: Rect,
     open_: bool,
     hover: bool,
+    held: int | None = None,
 ) -> list[_FormHit]:
     """Segments, a stepper, or a combo that opens the row's list, filling ``rect``."""
     x, y, _w, h = rect
@@ -389,11 +393,12 @@ def _draw_form_control(
             rect=rect,
             at_start=row.value <= 0,
             at_end=row.value >= len(row.options) - 1,
+            held=None if held is None else held > 0,
             hover=hover,
         )
         return [
-            _FormHit(back, ModalPointerKind.STEP_FORM_VALUE, index, -1),
-            _FormHit(forward, ModalPointerKind.STEP_FORM_VALUE, index, 1),
+            _FormHit(back, ModalPointerKind.PRESS_FORM_STEP, index, -1),
+            _FormHit(forward, ModalPointerKind.PRESS_FORM_STEP, index, 1),
         ]
     if row.kind is ChoiceKind.SEGMENT:
         rects = draw_segments(
@@ -428,6 +433,7 @@ def _draw_form_rows(
     hits: list[_FormHit] = []
     controls: dict[int, Rect] = {}
     open_row = None if view.form_choice is None else view.form_choice.target
+    held_row, held_step = view.form_step_held or (None, None)
     left = ox + panel_pad_x()
     right = ox + panel_w - panel_pad_x()
     for index, row in enumerate(view.form_rows):
@@ -455,7 +461,8 @@ def _draw_form_rows(
             index,
             rect=control,
             open_=open_row == index,
-            hover=open_row is None,
+            hover=open_row is None and held_row is None,
+            held=held_step if held_row == index else None,
         )
         hits.extend(parts)
         y += height
@@ -854,6 +861,11 @@ class ModalSurface:
             # The open list takes the pointer; see _draw_form_choice.
             return
         io = imgui.get_io()
+        if self.view.form_step_held is not None:
+            # A held stepper arrow owns the pointer until the button comes up.
+            if not io.mouse_down[0]:
+                self.intent = ModalPointerIntent(ModalPointerKind.RELEASE_FORM_STEP)
+            return
         pos = io.mouse_pos
         x, y = float(pos.x), float(pos.y)
         clicked = bool(io.mouse_clicked[0])

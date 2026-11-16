@@ -14,6 +14,7 @@ from imgui_bundle import imgui
 
 from cleave.viz.choice_layout import (
     COMBO_CARET,
+    FRect,
     STEPPER_BACK,
     STEPPER_FORWARD,
     Rect,
@@ -24,6 +25,7 @@ from cleave.viz.choice_layout import (
     rect_index_at,
     segment_rects,
     stepper_arrow_rects,
+    stepper_hover_rect,
 )
 from cleave.viz.choice_list import CHOICE_LIST_MAX_VISIBLE, ChoiceListView
 from cleave.viz.imgui_theme import rgba
@@ -214,6 +216,34 @@ def draw_combo(
     )
 
 
+def paint_stepper_hover(
+    draw: imgui.ImDrawList,
+    measure: TextSizer,
+    arrow: FRect,
+    *,
+    forward: bool,
+    text_y: float,
+) -> None:
+    """Light one stepper arrow: the hover wash, then its glyph in the hover colour.
+
+    The inspector and form dialogs share this, so a stepper looks the same in
+    both. ``text_y`` is the glyph baseline row the caller drew the value on.
+    """
+    x, y, w, h = stepper_hover_rect(
+        arrow,
+        forward=forward,
+        arrow_width=measure.size(">" if forward else "<")[0],
+        space_width=measure.size(" ")[0],
+    )
+    draw.add_rect_filled(
+        _vec(x, y),
+        _vec(x + w, y + h),
+        _u32(NUDGE_HOVER_BG, NUDGE_HOVER_BG_ALPHA / 255.0),
+    )
+    glyph = STEPPER_FORWARD if forward else STEPPER_BACK
+    draw.add_text(_vec(arrow[0], text_y), _u32(NUDGE_HOVER_FG), glyph)
+
+
 def draw_stepper(
     draw: imgui.ImDrawList,
     measure: TextSizer,
@@ -222,31 +252,38 @@ def draw_stepper(
     rect: Rect,
     at_start: bool,
     at_end: bool,
+    held: bool | None = None,
     hover: bool = True,
 ) -> tuple[Rect, Rect]:
     """``< value >`` with the value centred. Returns the back and forward arrows.
 
-    The arrow under the pointer lights like an inspector stepper's. An arrow at
-    its end of the range draws disabled and keeps the arrow pointer.
+    Drawn like an inspector stepper: dim arrows, and the arrow under the
+    pointer lit. ``held`` names an arrow being held (True for forward), which
+    stays lit while the pointer wanders. An arrow at its end of the range does
+    not light and keeps the arrow pointer.
     """
     back, forward = stepper_arrow_rects(measure, rect)
-    mx, my = _mouse()
+    x, y, w, h = rect
+    text_y = y + (h - measure.size(text)[1]) // 2
     _centred_text(draw, measure, rect, text, VALUE)
-    for arrow, glyph, blocked in (
-        (back, STEPPER_BACK.strip(), at_start),
-        (forward, STEPPER_FORWARD.strip(), at_end),
-    ):
-        lit = hover and not blocked and rect_contains(arrow, mx, my)
-        if lit:
-            x, y, w, h = arrow
-            draw.add_rect_filled(
-                _vec(x, y),
-                _vec(x + w, y + h),
-                _u32(NUDGE_HOVER_BG, NUDGE_HOVER_BG_ALPHA / 255.0),
-            )
-            request_pointer(PointerShape.HAND)
-        role = DISABLED if blocked else (NUDGE_HOVER_FG if lit else MUTED)
-        _centred_text(draw, measure, arrow, glyph, role)
+    draw.add_text(_vec(back[0], text_y), _u32(DISABLED), STEPPER_BACK)
+    draw.add_text(_vec(forward[0], text_y), _u32(DISABLED), STEPPER_FORWARD)
+    mx, my = _mouse()
+    lit: bool | None = held
+    if lit is None and hover:
+        if not at_start and rect_contains(back, mx, my):
+            lit = False
+        elif not at_end and rect_contains(forward, mx, my):
+            lit = True
+    if lit is not None:
+        request_pointer(PointerShape.HAND)
+        paint_stepper_hover(
+            draw,
+            measure,
+            tuple(float(v) for v in (forward if lit else back)),
+            forward=lit,
+            text_y=float(text_y),
+        )
     return back, forward
 
 

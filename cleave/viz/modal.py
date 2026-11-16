@@ -24,7 +24,7 @@ from cleave.viz.text_edit import (
     text_caret_visible,
 )
 from cleave.viz.input_modality import InputModality, PointerMotionTracker
-from cleave.viz.key_repeat import KeyRepeatController, mod_shift
+from cleave.viz.key_repeat import KeyRepeatController, RepeatClock, mod_shift
 
 
 class ModalKind(Enum):
@@ -253,6 +253,17 @@ class ModalViewState:
     form_buttons_focused: bool = False
     # The open combo list of a form row; ``target`` is the row index.
     form_choice: ChoiceListView | None = None
+    # A stepper arrow held down with the pointer: (row, step), step -1 or 1.
+    form_step_held: tuple[int, int] | None = None
+
+
+@dataclass
+class _FormStepHold:
+    """A stepper arrow held with the pointer. ``tick`` repeats its step."""
+
+    row: int
+    delta: int
+    clock: RepeatClock
 
 
 _UNSAVED_QUIT_MESSAGE = "Unsaved changes - save changes before exit?"
@@ -270,6 +281,8 @@ class ModalHost:
         self._text_state: TextModalState | None = None
         self._form_state: FormState | None = None
         self._form_choice: ChoiceListState | None = None
+        self._form_key_repeat = KeyRepeatController()
+        self._form_hold: _FormStepHold | None = None
         self._focus_index = 0
         self._on_start_text_input = on_start_text_input
         self._on_stop_text_input = on_stop_text_input
@@ -331,6 +344,11 @@ class ModalHost:
             form_info=None if form is None else form.info,
             form_buttons_focused=form is not None and form.field_index is None,
             form_choice=choice_list_view(self._form_choice),
+            form_step_held=(
+                None
+                if self._form_hold is None
+                else (self._form_hold.row, self._form_hold.delta)
+            ),
         )
 
     def prompt(self, request: ModalRequest) -> None:
@@ -339,6 +357,7 @@ class ModalHost:
         self._text_state = None
         self._form_state = None
         self._form_choice = None
+        self._stop_form_repeat()
         self._input_modality = InputModality.POINTER
         self._pointer_motion.reset()
         self._focus_index = clamp_modal_focus_index(
@@ -586,6 +605,19 @@ class ModalHost:
         )
         self._after_form_change(state, field.id)
 
+    def press_form_step(self, row: int, delta: int) -> None:
+        """Pointer down on a stepper arrow: step once, then repeat while held."""
+        self.step_form_value(row, delta)
+        self._form_hold = _FormStepHold(row, delta, RepeatClock())
+
+    def release_form_step(self) -> None:
+        """Pointer up after ``press_form_step``."""
+        self._form_hold = None
+
+    def _stop_form_repeat(self) -> None:
+        self._form_hold = None
+        self._form_key_repeat.disarm()
+
     def open_form_choice(self, row: int) -> None:
         """Focus row ``row`` and open its option list, when it is a combo."""
         state = self._form_state
@@ -692,6 +724,8 @@ class ModalHost:
         assert state is not None
         key = event.key
         self.enter_keyboard_modality()
+        # Any key stops a held step; a step key re-arms it below.
+        self._form_key_repeat.disarm()
         choice = self._form_choice
         if choice is not None:
             outcome = handle_choice_list_key(choice, key)
@@ -710,19 +744,31 @@ class ModalHost:
             self._move_form_focus(state, -1 if event.mod & pygame.KMOD_SHIFT else 1)
         elif key in (pygame.K_UP, pygame.K_DOWN):
             self._move_form_focus(state, -1 if key == pygame.K_UP else 1)
-        elif key in (pygame.K_LEFT, pygame.K_RIGHT):
+        elif key in (pygame.K_LEFT, pygame.K_RIGHT) and state.field_index is None:
             delta = -1 if key == pygame.K_LEFT else 1
-            if state.field_index is None:
-                self._focus_index = (self._focus_index + delta) % self._option_count()
-            else:
-                self.step_form_value(state.field_index, delta)
-        elif key in (pygame.K_PAGEUP, pygame.K_PAGEDOWN):
-            if state.field_index is not None:
-                field = state.visible_fields()[state.field_index]
-                step = field.large_step if key == pygame.K_PAGEUP else -field.large_step
-                self.step_form_value(state.field_index, step)
+            self._focus_index = (self._focus_index + delta) % self._option_count()
+        elif key in (pygame.K_LEFT, pygame.K_RIGHT, pygame.K_PAGEUP, pygame.K_PAGEDOWN):
+            if self._step_focused_field(key):
+                self._form_key_repeat.on_keydown(
+                    key,
+                    event.mod,
+                    on_repeat=lambda held, _mod: self._step_focused_field(held),
+                )
         elif key in (pygame.K_RETURN, pygame.K_KP_ENTER):
             self._activate_form(state)
+        return True
+
+    def _step_focused_field(self, key: int) -> bool:
+        """Step the focused field for an arrow or page key. False with no field."""
+        state = self._form_state
+        if state is None or state.field_index is None:
+            return False
+        if key in (pygame.K_LEFT, pygame.K_RIGHT):
+            delta = -1 if key == pygame.K_LEFT else 1
+        else:
+            field = state.visible_fields()[state.field_index]
+            delta = field.large_step if key == pygame.K_PAGEUP else -field.large_step
+        self.step_form_value(state.field_index, delta)
         return True
 
     def _activate_form(self, state: FormState) -> None:
@@ -884,9 +930,12 @@ class ModalHost:
         return True
 
     def handle_keyup(self, event: pygame.event.Event) -> bool:
-        """Return True when a TEXT modal consumed the event."""
+        """Return True when a TEXT or FORM modal consumed the event."""
         if event.type != pygame.KEYUP or self._request is None:
             return False
+        if self._request.kind == ModalKind.FORM:
+            self._form_key_repeat.on_keyup(event.key)
+            return True
         if self._request.kind != ModalKind.TEXT:
             return False
         self._text_key_repeat.on_keyup(event.key)
@@ -894,6 +943,11 @@ class ModalHost:
 
     def tick(self, dt_sec: float) -> None:
         self._text_key_repeat.tick(dt_sec)
+        self._form_key_repeat.tick(dt_sec)
+        hold = self._form_hold
+        if hold is not None:
+            for _ in range(hold.clock.tick(dt_sec)):
+                self.step_form_value(hold.row, hold.delta)
         state = self._text_state
         if state is None or not state.editing:
             return
@@ -1069,6 +1123,7 @@ class ModalHost:
         self._text_state = None
         self._form_state = None
         self._form_choice = None
+        self._stop_form_repeat()
         self._focus_index = 0
         if request is not None and request.on_dismiss is not None:
             request.on_dismiss()
@@ -1082,5 +1137,6 @@ class ModalHost:
         self._request = None
         self._text_state = None
         self._form_state = None
+        self._stop_form_repeat()
         self._focus_index = 0
         request.options[focus_index].action()

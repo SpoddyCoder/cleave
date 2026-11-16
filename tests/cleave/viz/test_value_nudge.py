@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 import pygame
 
+from cleave.viz.choice_layout import stepper_hover_rect
 from cleave.viz.key_repeat import (
     ACCEL_AFTER_SEC,
     FAST_INTERVAL_SEC,
@@ -22,7 +23,6 @@ from cleave.viz.value_nudge import (
     nav_button_rects,
     nudge_arrow_rects,
     nudge_hit_at,
-    nudge_hover_fill_rect,
     nudge_press_skips_row,
     selectable_text_y,
 )
@@ -94,21 +94,22 @@ def test_hover_fill_centers_on_the_arrow_character() -> None:
         (arrow_w + space_w, 30.0, space_w + arrow_w),
         frame_pad_x=4.0,
     )
-    left = nudge_hover_fill_rect(
-        back, forward=False, arrow_width=arrow_w, space_width=space_w
+    def frect(rect: NudgeRect) -> tuple[float, float, float, float]:
+        return (rect.min_x, rect.min_y, rect.max_x - rect.min_x, rect.max_y - rect.min_y)
+
+    lx, ly, lw, lh = stepper_hover_rect(
+        frect(back), forward=False, arrow_width=arrow_w, space_width=space_w
     )
-    right = nudge_hover_fill_rect(
-        forward, forward=True, arrow_width=arrow_w, space_width=space_w
+    rx, ry, rw, rh = stepper_hover_rect(
+        frect(forward), forward=True, arrow_width=arrow_w, space_width=space_w
     )
 
-    assert (left.min_x + left.max_x) / 2 == back.min_x + arrow_w / 2
-    assert (right.min_x + right.max_x) / 2 == (
-        forward.min_x + space_w + arrow_w / 2
-    )
-    assert left.max_x - left.min_x == back.max_x - back.min_x
-    assert right.max_x - right.min_x == forward.max_x - forward.min_x
-    assert (left.min_y, left.max_y) == (back.min_y, back.max_y)
-    assert (right.min_y, right.max_y) == (forward.min_y, forward.max_y)
+    assert lx + lw / 2 == back.min_x + arrow_w / 2
+    assert rx + rw / 2 == forward.min_x + space_w + arrow_w / 2
+    assert lw == back.max_x - back.min_x
+    assert rw == forward.max_x - forward.min_x
+    assert (ly, ly + lh) == (back.min_y, back.max_y)
+    assert (ry, ry + rh) == (forward.min_y, forward.max_y)
 
     body = nudge_hit_at(
         (back.max_x + forward.min_x) / 2, 28.0, back, forward

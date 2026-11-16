@@ -11,6 +11,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from cleave.viz.choice_layout import STEPPER_BACK, STEPPER_FORWARD
 from cleave.viz.key_repeat import RepeatClock
 from cleave.viz.row_kinds import RowDescriptor
 from cleave.viz.row_spec import apply_field_horizontal
@@ -18,10 +19,6 @@ from cleave.viz.theme import DISABLED
 
 if TYPE_CHECKING:
     from imgui_bundle import imgui
-
-NUDGE_BACK_GLYPH = "< "
-NUDGE_FORWARD_GLYPH = " >"
-
 
 def value_parts(
     value: str, color: imgui.ImVec4, *, stepped: bool
@@ -35,9 +32,9 @@ def value_parts(
 
     bracket = rgba(DISABLED)
     return [
-        (NUDGE_BACK_GLYPH, bracket),
+        (STEPPER_BACK, bracket),
         (value, color),
-        (NUDGE_FORWARD_GLYPH, bracket),
+        (STEPPER_FORWARD, bracket),
     ]
 
 
@@ -125,26 +122,6 @@ def nudge_arrow_rects(
     return back, forward
 
 
-def nudge_hover_fill_rect(
-    hit: NudgeRect,
-    *,
-    forward: bool,
-    arrow_width: float,
-    space_width: float,
-) -> NudgeRect:
-    """Hover wash centered on the arrow character.
-
-    The hit rect covers the painted glyph, including the gap space in
-    ``< `` or `` >``. The wash keeps that width and the row's vertical
-    edges, and shifts by half the space so the character sits in the middle.
-    """
-    width = hit.max_x - hit.min_x
-    if forward:
-        char_center = hit.min_x + space_width + arrow_width * 0.5
-    else:
-        char_center = hit.min_x + arrow_width * 0.5
-    min_x = char_center - width * 0.5
-    return NudgeRect(min_x, hit.min_y, min_x + width, hit.max_y)
 
 
 def nav_button_rects(

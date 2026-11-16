@@ -158,7 +158,6 @@ from cleave.viz.value_nudge import (
     nudge_arrow_rects,
     nudge_cluster_origin_x,
     nudge_hit_at,
-    nudge_hover_fill_rect,
     nudge_press_skips_row,
     centre_pad,
     selectable_text_y,
@@ -178,6 +177,7 @@ from cleave.viz.choice_widgets import (
     draw_choice_list,
     draw_combo,
     draw_segments,
+    paint_stepper_hover,
 )
 from cleave.viz.transport_controls import TransportField
 
@@ -3516,7 +3516,6 @@ class ShellHost:
                 request_pointer(PointerShape.HAND)
             self._paint_nudge_hover(
                 forward_rect if hover_forward else back_rect,
-                parts,
                 hover_forward,
             )
         if (
@@ -3535,32 +3534,14 @@ class ShellHost:
     def _paint_nudge_hover(
         self,
         rect: NudgeRect,
-        parts: list[tuple[str, imgui.ImVec4]],
         forward: bool,
     ) -> None:
-        glyph = parts[2][0] if forward else parts[0][0]
-        arrow = ">" if forward else "<"
-        arrow_width = imgui.calc_text_size(arrow).x
-        space_width = imgui.calc_text_size(" ").x
-        fill_rect = nudge_hover_fill_rect(
-            rect,
+        paint_stepper_hover(
+            imgui.get_window_draw_list(),
+            _ImguiTextSizer(),
+            (rect.min_x, rect.min_y, rect.max_x - rect.min_x, rect.max_y - rect.min_y),
             forward=forward,
-            arrow_width=arrow_width,
-            space_width=space_width,
-        )
-        draw = imgui.get_window_draw_list()
-        fill = imgui.get_color_u32(
-            rgba(NUDGE_HOVER_BG, NUDGE_HOVER_BG_ALPHA / 255.0)
-        )
-        draw.add_rect_filled(
-            imgui.ImVec2(fill_rect.min_x, fill_rect.min_y),
-            imgui.ImVec2(fill_rect.max_x, fill_rect.max_y),
-            fill,
-        )
-        draw.add_text(
-            imgui.ImVec2(rect.min_x, _selectable_text_y(rect.min_y)),
-            imgui.get_color_u32(rgba(NUDGE_HOVER_FG)),
-            glyph,
+            text_y=_selectable_text_y(rect.min_y),
         )
 
     def _nudge_input_blocked(self) -> bool:
