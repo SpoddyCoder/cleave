@@ -196,6 +196,8 @@ Target: no module over about 1,000 lines, and `ShellHost` under about 600.
 
 ### M4. One project snapshot for dirty tracking; less hand-copied view state
 
+**Status.** Done. `ConfigSaveController` ([cleave/viz/config_save.py](cleave/viz/config_save.py)) keeps one frozen `ProjectSavedState` (song markers, Milkdrop beat, compositor HDR, resolution width and height, render fps) built by `project_saved_state(session)`, and Save writes it through one `write_project_saved_state`, so a new project setting is a field plus a line in that writer. Each view block has a `from_session` or `from_runtime` constructor, and `TuningViewStateBuilder.build` makes every section block that way each frame; the cached structure now holds only the track blocks, and `invalidate_structure()` replaces the direct reset in `controls.py`. New tests in `tests/cleave/viz/test_config_dirty.py` fail when a `ProjectSavedState` field has no mutator, check each field marks and clears dirty, and check song markers reach `project.yaml`. Benchmark, four layers and 20 entries: ImGui build 3.2 ms before and after.
+
 **Finding.** Two places where adding a field means remembering several unrelated edits:
 
 - `ConfigSaveController` keeps seven `_saved_*` fields for project values outside the session payload (song markers, Milkdrop beat, compositor HDR, resolution width and height, render fps). Each is listed three times: in `__init__`, in `config_dirty`, and in `clear_config_dirty`. A new project setting that misses one of the three silently never marks the project dirty, or never clears.

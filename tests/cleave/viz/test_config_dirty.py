@@ -771,3 +771,83 @@ def test_save_in_same_frame_as_edit_clears_dirty() -> None:
     assert controls.config_dirty
     _save_now(controls)
     assert not controls.config_dirty
+
+
+def _set_song_markers(session) -> None:
+    session.song_markers.times = [12.5]
+
+
+def _set_milkdrop_beat(session) -> None:
+    session.project.milkdrop_beat_sensitivity += 0.5
+
+
+def _set_compositor_hdr(session) -> None:
+    session.project.compositor_hdr = not session.project.compositor_hdr
+
+
+def _set_resolution_width(session) -> None:
+    session.project.resolution.width += 16
+
+
+def _set_resolution_height(session) -> None:
+    session.project.resolution.height += 16
+
+
+def _set_render_fps(session) -> None:
+    session.project.render.fps += 1
+
+
+# One mutator per ProjectSavedState field; the coverage test fails when a
+# field is added without one.
+_PROJECT_SAVED_STATE_MUTATIONS: dict[str, Callable[..., None]] = {
+    "song_markers": _set_song_markers,
+    "milkdrop_beat_sensitivity": _set_milkdrop_beat,
+    "compositor_hdr": _set_compositor_hdr,
+    "resolution_width": _set_resolution_width,
+    "resolution_height": _set_resolution_height,
+    "render_fps": _set_render_fps,
+}
+
+
+def test_every_project_saved_state_field_has_a_dirty_test() -> None:
+    from dataclasses import fields
+
+    from cleave.viz.config_save import ProjectSavedState
+
+    names = {item.name for item in fields(ProjectSavedState)}
+    assert names == set(_PROJECT_SAVED_STATE_MUTATIONS)
+
+
+@pytest.mark.parametrize(
+    "field_name",
+    sorted(_PROJECT_SAVED_STATE_MUTATIONS),
+)
+def test_project_saved_state_field_marks_and_clears_dirty(field_name: str) -> None:
+    controls = _make_controls(("layer_1",))
+    assert not controls.config_dirty
+    _PROJECT_SAVED_STATE_MUTATIONS[field_name](controls.session)
+    assert controls.config_dirty
+    _save_now(controls)
+    assert not controls.config_dirty
+
+
+def test_commit_save_flushes_song_markers_to_project_yaml(tmp_path: Path) -> None:
+    from datetime import datetime, timezone
+
+    from cleave.project import load_manifest, write_manifest
+
+    write_manifest(
+        tmp_path,
+        slug="song",
+        mix_filename="song.wav",
+        original_path=tmp_path / "source.wav",
+        demucs_model="htdemucs",
+        separated_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+    )
+    controls = _make_controls(("layer_1",), project_dir=tmp_path)
+    _set_song_markers(controls.session)
+    assert controls.config_dirty
+    _save_now(controls)
+    assert not controls.config_dirty
+    manifest = load_manifest(tmp_path)
+    assert [marker.time for marker in manifest.song_markers] == [12.5]

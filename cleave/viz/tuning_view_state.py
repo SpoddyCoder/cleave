@@ -67,7 +67,6 @@ from cleave.config_schema.timeline import (
     DEFAULT_TIMELINE_SHOW_BAR_GRID,
 )
 from cleave.preset_library import PresetLibrary
-from cleave.viz.session import FadeRuntime
 from cleave.viz.timeline_clip_edits import selected_clip
 from cleave.preset_playlist import (
     PresetPlaylist,
@@ -82,9 +81,16 @@ from cleave.viz.editor_mode_controls import is_preset_curation_mode
 from cleave.viz.playback import PlaybackState, current_sec
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.session import (
+    ChromaBoostRuntime,
+    FadeRuntime,
+    FadeSideRuntime,
+    HighlightRolloffRuntime,
     LayerRuntime,
     OverlayCardRuntime,
+    PatternMaskRuntime,
+    TimelineFadeGroupRuntime,
     TuningSession,
+    VisualLimiterRuntime,
     default_overlay_card_runtime,
 )
 from cleave.viz.user_presets import (
@@ -93,6 +99,7 @@ from cleave.viz.user_presets import (
 )
 
 if TYPE_CHECKING:
+    from cleave.config import EditorConfig
     from cleave.viz.focus_nav import FocusCursor
     from cleave.viz.layer import StemLayer
 
@@ -140,12 +147,26 @@ class OverlaysBlock:
     solo: bool = False
     locked: bool = _RO_OVERLAYS_DEFAULTS["locked"]
 
+    @classmethod
+    def from_session(cls, session: TuningSession) -> OverlaysBlock:
+        ro = session.overlays
+        return cls(
+            opening_card=OverlayCardBlock(runtime=ro.opening_card),
+            closing_card=OverlayCardBlock(runtime=ro.closing_card),
+            solo=session.overlay_solo,
+            locked=ro.locked,
+        )
+
 
 @dataclass
 class FadeSideBlock:
     start: float = DEFAULT_FADE_IN_START
     end: float = DEFAULT_FADE_IN_END
     type: str = DEFAULT_FADE_CURVE
+
+    @classmethod
+    def from_runtime(cls, side: FadeSideRuntime) -> FadeSideBlock:
+        return cls(start=side.start, end=side.end, type=side.type)
 
 
 def _default_fade_out_side() -> FadeSideBlock:
@@ -161,22 +182,12 @@ class FadeBlock:
     fade_in: FadeSideBlock = field(default_factory=FadeSideBlock)
     fade_out: FadeSideBlock = field(default_factory=_default_fade_out_side)
 
-
-def _fade_block_from_runtime(fade: FadeRuntime) -> FadeBlock:
-    fade_in = fade.fade_in
-    fade_out = fade.fade_out
-    return FadeBlock(
-        fade_in=FadeSideBlock(
-            start=fade_in.start,
-            end=fade_in.end,
-            type=fade_in.type,
-        ),
-        fade_out=FadeSideBlock(
-            start=fade_out.start,
-            end=fade_out.end,
-            type=fade_out.type,
-        ),
-    )
+    @classmethod
+    def from_runtime(cls, fade: FadeRuntime) -> FadeBlock:
+        return cls(
+            fade_in=FadeSideBlock.from_runtime(fade.fade_in),
+            fade_out=FadeSideBlock.from_runtime(fade.fade_out),
+        )
 
 
 @dataclass
@@ -189,12 +200,32 @@ class HighlightRolloffBlock:
     softness_pct: int = DEFAULT_HIGHLIGHT_ROLLOFF_SOFTNESS_PCT
     desaturation_pct: int = DEFAULT_HIGHLIGHT_ROLLOFF_DESATURATION_PCT
 
+    @classmethod
+    def from_runtime(cls, rolloff: HighlightRolloffRuntime) -> HighlightRolloffBlock:
+        return cls(
+            mode=rolloff.mode,
+            curve=rolloff.curve,
+            threshold_pct=rolloff.threshold_pct,
+            ceiling_pct=rolloff.ceiling_pct,
+            strength_pct=rolloff.strength_pct,
+            softness_pct=rolloff.softness_pct,
+            desaturation_pct=rolloff.desaturation_pct,
+        )
+
 
 @dataclass
 class ChromaBoostBlock:
     mode: str = DEFAULT_CHROMA_BOOST_APPLY_MODE
     variant: str = DEFAULT_CHROMA_BOOST_VARIANT
     amount_pct: int = DEFAULT_CHROMA_BOOST_AMOUNT_PCT
+
+    @classmethod
+    def from_runtime(cls, boost: ChromaBoostRuntime) -> ChromaBoostBlock:
+        return cls(
+            mode=boost.mode,
+            variant=boost.variant,
+            amount_pct=boost.amount_pct,
+        )
 
 
 @dataclass
@@ -203,6 +234,15 @@ class VisualLimiterBlock:
     threshold: float = DEFAULT_VISUAL_LIMITER_THRESHOLD
     ratio: float = DEFAULT_VISUAL_LIMITER_RATIO
     release: float = DEFAULT_VISUAL_LIMITER_RELEASE
+
+    @classmethod
+    def from_runtime(cls, limiter: VisualLimiterRuntime) -> VisualLimiterBlock:
+        return cls(
+            enabled=limiter.enabled,
+            threshold=limiter.threshold,
+            ratio=limiter.ratio,
+            release=limiter.release,
+        )
 
 
 @dataclass
@@ -217,6 +257,21 @@ class PostFxBlock:
     solo: bool = False
     locked: bool = _RO_POST_FX_DEFAULTS["locked"]
 
+    @classmethod
+    def from_session(cls, session: TuningSession) -> PostFxBlock:
+        pp = session.post_fx
+        return cls(
+            enabled=pp.enabled,
+            fade=FadeBlock.from_runtime(pp.fade),
+            highlight_rolloff=HighlightRolloffBlock.from_runtime(
+                pp.highlight_rolloff
+            ),
+            chroma_boost=ChromaBoostBlock.from_runtime(pp.chroma_boost),
+            limiter=VisualLimiterBlock.from_runtime(pp.limiter),
+            solo=session.post_fx_solo,
+            locked=pp.locked,
+        )
+
 
 @dataclass
 class PatternMaskBlock:
@@ -229,6 +284,19 @@ class PatternMaskBlock:
     seed: int = _RO_PATTERN_MASK_DEFAULTS["seed"]
     locked: bool = _RO_PATTERN_MASK_DEFAULTS["locked"]
 
+    @classmethod
+    def from_runtime(cls, pm: PatternMaskRuntime) -> PatternMaskBlock:
+        return cls(
+            enabled=pm.enabled,
+            type=pm.type,
+            density=pm.density,
+            feather_pct=pm.feather_pct,
+            invert=pm.invert,
+            transition=pm.transition,
+            seed=pm.seed,
+            locked=pm.locked,
+        )
+
 
 @dataclass
 class TimelineFadeGroupBlock:
@@ -236,6 +304,15 @@ class TimelineFadeGroupBlock:
     fade_in: float = DEFAULT_TIMELINE_SOFT_FADE_IN
     fade_out: float = DEFAULT_TIMELINE_SOFT_FADE_OUT
     crossfade: bool = DEFAULT_TIMELINE_CROSSFADE
+
+    @classmethod
+    def from_runtime(cls, group: TimelineFadeGroupRuntime) -> TimelineFadeGroupBlock:
+        return cls(
+            enabled=group.enabled,
+            fade_in=group.fade_in,
+            fade_out=group.fade_out,
+            crossfade=group.crossfade,
+        )
 
 
 def default_hard_timeline_fade_group_block() -> TimelineFadeGroupBlock:
@@ -270,6 +347,25 @@ class TimelineBlock:
     # Selected strip clip per slot, for the timeline row inspector page.
     selected_clips: dict[str, TimelineClip] = field(default_factory=dict)
 
+    @classmethod
+    def from_session(
+        cls, session: TuningSession, duration_sec: float
+    ) -> TimelineBlock:
+        tl = session.timeline
+        markers = session.song_markers.markers
+        return cls(
+            enabled=tl.enabled,
+            bar_phase_offset=tl.bar_phase_offset,
+            show_bar_grid=tl.show_bar_grid,
+            placement_snap=tl.placement_snap,
+            hard_cut_fades=TimelineFadeGroupBlock.from_runtime(tl.hard_cut_fades),
+            soft_cut_fades=TimelineFadeGroupBlock.from_runtime(tl.soft_cut_fades),
+            locked=tl.locked,
+            song_marker_times=tuple(session.song_markers.times),
+            song_marker_types=tuple(m.marker_type for m in markers),
+            selected_clips=selected_timeline_clips(session, duration_sec),
+        )
+
 
 def selected_timeline_clips(
     session: TuningSession, duration_sec: float
@@ -297,6 +393,24 @@ class SettingsBlock:
     ui_scale: int = DEFAULT_UI_SCALE
     residual_latency_ms: int = DEFAULT_RESIDUAL_LATENCY_MS
 
+    @classmethod
+    def from_session(
+        cls, session: TuningSession, editor: EditorConfig
+    ) -> SettingsBlock:
+        return cls(
+            editor_mode=session.settings.editor_mode,
+            preview_quality=editor.preview_quality,
+            navigator_side=editor.navigator_side,
+            help_side=editor.help_side,
+            navigator_expand_click=editor.navigator_expand_click,
+            highlight_new_page=editor.highlight_new_page,
+            show_tooltips=editor.show_tooltips,
+            notification_display_sec=editor.notification_display_sec,
+            navigator_height=editor.navigator_height,
+            ui_scale=editor.ui_scale,
+            residual_latency_ms=editor.residual_latency_ms,
+        )
+
 
 @dataclass
 class ProjectBlock:
@@ -304,6 +418,16 @@ class ProjectBlock:
     compositor_hdr: bool = DEFAULT_COMPOSITOR_HDR
     width: int = DEFAULT_RESOLUTION_WIDTH
     height: int = DEFAULT_RESOLUTION_HEIGHT
+
+    @classmethod
+    def from_session(cls, session: TuningSession) -> ProjectBlock:
+        project = session.project
+        return cls(
+            milkdrop_beat_sensitivity=project.milkdrop_beat_sensitivity,
+            compositor_hdr=project.compositor_hdr,
+            width=project.resolution.width,
+            height=project.resolution.height,
+        )
 
 
 @dataclass
@@ -478,29 +602,15 @@ def view_state_structure_signature(
 
 @dataclass(frozen=True)
 class _ViewStateStructure:
+    """Track blocks, rebuilt only when the structure signature changes.
+
+    The section blocks are cheap and come from the session every frame
+    (``<Block>.from_session`` / ``from_runtime``).
+    """
+
     signature: str
     layer_z_order: tuple[str, ...]
     tracks: dict[str, TrackBlock]
-    settings: SettingsBlock
-    project: ProjectBlock
-    overlays: OverlaysBlock
-    post_fx: PostFxBlock
-    pattern_mask: PatternMaskBlock
-    timeline: TimelineBlock
-
-
-def _card_block_from_runtime(card: OverlayCardRuntime) -> OverlayCardBlock:
-    return OverlayCardBlock(runtime=card)
-
-
-def _project_block_from_session(session: TuningSession) -> ProjectBlock:
-    resolution = session.project.resolution
-    return ProjectBlock(
-        milkdrop_beat_sensitivity=session.project.milkdrop_beat_sensitivity,
-        compositor_hdr=session.project.compositor_hdr,
-        width=resolution.width,
-        height=resolution.height,
-    )
 
 
 class TuningViewStateBuilder:
@@ -539,6 +649,10 @@ class TuningViewStateBuilder:
         ] = {}
         self._list_basenames_cache: dict[tuple[str, ...], frozenset[str]] = {}
         self._structure: _ViewStateStructure | None = None
+
+    def invalidate_structure(self) -> None:
+        """Rebuild the track blocks on the next ``build``."""
+        self._structure = None
 
     def _sync_auto_preset_paths(self) -> None:
         """Mirror the playing switching preset onto session for panel display."""
@@ -680,88 +794,10 @@ class TuningViewStateBuilder:
                 active_preset_list_index=self._active_preset_list_index(layer),
             )
 
-        ro = self.session.overlays
-        pp = self.session.post_fx
-        pm = self.session.pattern_mask
-        tl = self.session.timeline
-        settings = SettingsBlock(
-            editor_mode=self.session.settings.editor_mode,
-        )
-        project = _project_block_from_session(self.session)
-        overlays = OverlaysBlock(
-            opening_card=_card_block_from_runtime(ro.opening_card),
-            closing_card=_card_block_from_runtime(ro.closing_card),
-            locked=ro.locked,
-        )
-        post_fx = PostFxBlock(
-            enabled=pp.enabled,
-            fade=_fade_block_from_runtime(pp.fade),
-            highlight_rolloff=HighlightRolloffBlock(
-                mode=pp.highlight_rolloff.mode,
-                curve=pp.highlight_rolloff.curve,
-                threshold_pct=pp.highlight_rolloff.threshold_pct,
-                ceiling_pct=pp.highlight_rolloff.ceiling_pct,
-                strength_pct=pp.highlight_rolloff.strength_pct,
-                softness_pct=pp.highlight_rolloff.softness_pct,
-                desaturation_pct=pp.highlight_rolloff.desaturation_pct,
-            ),
-            chroma_boost=ChromaBoostBlock(
-                mode=pp.chroma_boost.mode,
-                variant=pp.chroma_boost.variant,
-                amount_pct=pp.chroma_boost.amount_pct,
-            ),
-            limiter=VisualLimiterBlock(
-                enabled=pp.limiter.enabled,
-                threshold=pp.limiter.threshold,
-                ratio=pp.limiter.ratio,
-                release=pp.limiter.release,
-            ),
-        )
-        pattern_mask = PatternMaskBlock(
-            enabled=pm.enabled,
-            type=pm.type,
-            feather_pct=pm.feather_pct,
-            density=pm.density,
-            invert=pm.invert,
-            transition=pm.transition,
-            seed=pm.seed,
-            locked=pm.locked,
-        )
-        timeline = TimelineBlock(
-            enabled=tl.enabled,
-            bar_phase_offset=tl.bar_phase_offset,
-            show_bar_grid=tl.show_bar_grid,
-            placement_snap=tl.placement_snap,
-            hard_cut_fades=TimelineFadeGroupBlock(
-                enabled=tl.hard_cut_fades.enabled,
-                fade_in=tl.hard_cut_fades.fade_in,
-                fade_out=tl.hard_cut_fades.fade_out,
-                crossfade=tl.hard_cut_fades.crossfade,
-            ),
-            soft_cut_fades=TimelineFadeGroupBlock(
-                enabled=tl.soft_cut_fades.enabled,
-                fade_in=tl.soft_cut_fades.fade_in,
-                fade_out=tl.soft_cut_fades.fade_out,
-                crossfade=tl.soft_cut_fades.crossfade,
-            ),
-            song_marker_times=tuple(self.session.song_markers.times),
-            song_marker_types=tuple(
-                m.marker_type for m in self.session.song_markers.markers
-            ),
-            selected_clips=selected_timeline_clips(
-                self.session, self.duration_sec
-            ),
-        )
         return _ViewStateStructure(
             signature=signature,
             layer_z_order=layer_z_order,
             tracks=tracks,
-            settings=settings,
-            project=project,
-            overlays=overlays,
-            post_fx=post_fx,
-            pattern_mask=pattern_mask,
-            timeline=timeline,
         )
 
     def _patch_tracks(
@@ -822,11 +858,9 @@ class TuningViewStateBuilder:
             structure, position_sec=position_sec
         )
 
-        ro = self.session.overlays
-        pp = self.session.post_fx
-        pm = self.session.pattern_mask
-        tl = self.session.timeline
-        state = TuningViewState(
+        session = self.session
+        tl = session.timeline
+        return TuningViewState(
             layer_z_order=structure.layer_z_order,
             tracks=tracks,
             paused=paused,
@@ -840,100 +874,18 @@ class TuningViewStateBuilder:
             notification_remaining_sec=notification_remaining_sec,
             notification_elapsed_sec=notification_elapsed_sec,
             config_dirty=self._config_save.config_dirty,
-            solo_slot=self.session.solo_slot,
-            solo_active=self.session.solo_slot is not None,
-            overlays=replace(
-                structure.overlays,
-                solo=self.session.overlay_solo,
-                locked=ro.locked,
+            solo_slot=session.solo_slot,
+            solo_active=session.solo_slot is not None,
+            overlays=OverlaysBlock.from_session(session),
+            post_fx=PostFxBlock.from_session(session),
+            pattern_mask=PatternMaskBlock.from_runtime(session.pattern_mask),
+            timeline=TimelineBlock.from_session(session, self.duration_sec),
+            settings=SettingsBlock.from_session(
+                session, self._config_save.cfg.editor
             ),
-            post_fx=replace(
-                structure.post_fx,
-                fade=_fade_block_from_runtime(pp.fade),
-                highlight_rolloff=replace(
-                    structure.post_fx.highlight_rolloff,
-                    mode=pp.highlight_rolloff.mode,
-                    curve=pp.highlight_rolloff.curve,
-                    threshold_pct=pp.highlight_rolloff.threshold_pct,
-                    ceiling_pct=pp.highlight_rolloff.ceiling_pct,
-                    strength_pct=pp.highlight_rolloff.strength_pct,
-                    softness_pct=pp.highlight_rolloff.softness_pct,
-                    desaturation_pct=pp.highlight_rolloff.desaturation_pct,
-                ),
-                chroma_boost=replace(
-                    structure.post_fx.chroma_boost,
-                    mode=pp.chroma_boost.mode,
-                    variant=pp.chroma_boost.variant,
-                    amount_pct=pp.chroma_boost.amount_pct,
-                ),
-                limiter=VisualLimiterBlock(
-                    enabled=pp.limiter.enabled,
-                    threshold=pp.limiter.threshold,
-                    ratio=pp.limiter.ratio,
-                    release=pp.limiter.release,
-                ),
-                solo=self.session.post_fx_solo,
-                locked=pp.locked,
-            ),
-            pattern_mask=replace(
-                structure.pattern_mask,
-                enabled=pm.enabled,
-                type=pm.type,
-                feather_pct=pm.feather_pct,
-                density=pm.density,
-                invert=pm.invert,
-                transition=pm.transition,
-                seed=pm.seed,
-                locked=pm.locked,
-            ),
-            timeline=replace(
-                structure.timeline,
-                bar_phase_offset=tl.bar_phase_offset,
-                show_bar_grid=tl.show_bar_grid,
-                placement_snap=tl.placement_snap,
-                hard_cut_fades=TimelineFadeGroupBlock(
-                    enabled=tl.hard_cut_fades.enabled,
-                    fade_in=tl.hard_cut_fades.fade_in,
-                    fade_out=tl.hard_cut_fades.fade_out,
-                    crossfade=tl.hard_cut_fades.crossfade,
-                ),
-                soft_cut_fades=TimelineFadeGroupBlock(
-                    enabled=tl.soft_cut_fades.enabled,
-                    fade_in=tl.soft_cut_fades.fade_in,
-                    fade_out=tl.soft_cut_fades.fade_out,
-                    crossfade=tl.soft_cut_fades.crossfade,
-                ),
-                locked=tl.locked,
-                song_marker_times=tuple(self.session.song_markers.times),
-                song_marker_types=tuple(
-                    m.marker_type for m in self.session.song_markers.markers
-                ),
-                selected_clips=selected_timeline_clips(
-                    self.session, self.duration_sec
-                ),
-            ),
-            settings=replace(
-                structure.settings,
-                editor_mode=self.session.settings.editor_mode,
-                preview_quality=self._config_save.cfg.editor.preview_quality,
-                navigator_side=self._config_save.cfg.editor.navigator_side,
-                help_side=self._config_save.cfg.editor.help_side,
-                navigator_expand_click=(
-                    self._config_save.cfg.editor.navigator_expand_click
-                ),
-                highlight_new_page=self._config_save.cfg.editor.highlight_new_page,
-                show_tooltips=self._config_save.cfg.editor.show_tooltips,
-                notification_display_sec=(
-                    self._config_save.cfg.editor.notification_display_sec
-                ),
-                navigator_height=self._config_save.cfg.editor.navigator_height,
-                ui_scale=self._config_save.cfg.editor.ui_scale,
-                residual_latency_ms=self._config_save.cfg.editor.residual_latency_ms,
-            ),
-            project=_project_block_from_session(self.session),
+            project=ProjectBlock.from_session(session),
             timeline_recording=tl.recording,
             timeline_override_active=bool(tl.override_slots),
             help_visible=self.session.help_visible,
             fps=fps,
         )
-        return state

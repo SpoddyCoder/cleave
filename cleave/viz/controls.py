@@ -612,7 +612,7 @@ class TuningControls:
 
     def _on_editor_mode_changed(self) -> None:
         self._sync_live_compositor_format()
-        self._view_state._structure = None
+        self._view_state.invalidate_structure()
         if isinstance(self.focus_cursor, TimelineFocus):
             self.exit_timeline_submenu()
         self._normalize_focus_cursor()

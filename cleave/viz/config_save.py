@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import sys
 from collections.abc import Callable
+from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 
@@ -17,6 +18,7 @@ from cleave.project import (
     save_resolution_settings,
     save_song_markers,
 )
+from cleave.song_markers import SongMarker
 from cleave.viz.modal import ModalHost, ModalKind
 from cleave.viz.session import TuningSession
 
@@ -29,13 +31,54 @@ class PendingAction(Enum):
     SWITCH = "switch"
 
 
+@dataclass(frozen=True)
+class ProjectSavedState:
+    """Project values outside the viz YAML that Save writes to ``project.yaml``.
+
+    Dirty tracking compares one of these with the one taken at the last save,
+    so a new project setting needs only a field here and its line in
+    ``write_project_saved_state``.
+    """
+
+    song_markers: tuple[SongMarker, ...]
+    milkdrop_beat_sensitivity: float
+    compositor_hdr: bool
+    resolution_width: int
+    resolution_height: int
+    render_fps: int
+
+
+def project_saved_state(session: TuningSession) -> ProjectSavedState:
+    project = session.project
+    return ProjectSavedState(
+        song_markers=tuple(session.song_markers.markers),
+        milkdrop_beat_sensitivity=project.milkdrop_beat_sensitivity,
+        compositor_hdr=project.compositor_hdr,
+        resolution_width=project.resolution.width,
+        resolution_height=project.resolution.height,
+        render_fps=project.render.fps,
+    )
+
+
+def write_project_saved_state(project_dir: Path, state: ProjectSavedState) -> None:
+    """Write every ``ProjectSavedState`` field to ``project.yaml``."""
+    save_song_markers(project_dir, state.song_markers)
+    save_milkdrop_settings(project_dir, state.milkdrop_beat_sensitivity)
+    save_compositor_settings(project_dir, state.compositor_hdr)
+    save_resolution_settings(
+        project_dir,
+        width=state.resolution_width,
+        height=state.resolution_height,
+    )
+    save_render_settings(project_dir, fps=state.render_fps)
+
+
 class ConfigSaveController:
     """Dirty tracking, immediate Save, and one deferred leave (quit or switch).
 
-    Viz YAML fields use ``persisted_session_payload``. Song markers,
-    milkdrop beat sensitivity, compositor hdr, and render width/height/fps
-    are project-scoped (``project.yaml``) and participate in dirty via
-    separate baselines; they flush on successful Save, not on each edit.
+    Viz YAML fields use ``persisted_session_payload``. Project-scoped
+    values (``project.yaml``) are compared as one ``ProjectSavedState``;
+    they flush on successful Save, not on each edit.
 
     ``config_dirty`` is what the window shows. Once the frame loop calls
     ``tick``, it is worked out on the first read after each tick and reused
@@ -66,12 +109,7 @@ class ConfigSaveController:
         self._move_mode_signature = move_mode_signature
 
         self._saved_signature = self._persisted_signature()
-        self._saved_song_markers = tuple(session.song_markers.markers)
-        self._saved_milkdrop_beat = session.project.milkdrop_beat_sensitivity
-        self._saved_compositor_hdr = session.project.compositor_hdr
-        self._saved_resolution_width = session.project.resolution.width
-        self._saved_resolution_height = session.project.resolution.height
-        self._saved_render_fps = session.project.render.fps
+        self._saved_project = project_saved_state(session)
         self._pending = PendingAction.NONE
         self._frame_cache_on = False
         self._frame_dirty: bool | None = None
@@ -109,72 +147,21 @@ class ConfigSaveController:
 
     def _differs_from_saved(self) -> bool:
         return (
-            self._persisted_signature() != self._saved_signature
-            or tuple(self.session.song_markers.markers) != self._saved_song_markers
-            or (
-                self.session.project.milkdrop_beat_sensitivity
-                != self._saved_milkdrop_beat
-            )
-            or self.session.project.compositor_hdr != self._saved_compositor_hdr
-            or self.session.project.resolution.width != self._saved_resolution_width
-            or (
-                self.session.project.resolution.height
-                != self._saved_resolution_height
-            )
-            or self.session.project.render.fps != self._saved_render_fps
+            project_saved_state(self.session) != self._saved_project
+            or self._persisted_signature() != self._saved_signature
         )
 
     def clear_config_dirty(self) -> None:
         self._saved_signature = self._persisted_signature()
-        self._saved_song_markers = tuple(self.session.song_markers.markers)
-        self._saved_milkdrop_beat = self.session.project.milkdrop_beat_sensitivity
-        self._saved_compositor_hdr = self.session.project.compositor_hdr
-        self._saved_resolution_width = self.session.project.resolution.width
-        self._saved_resolution_height = self.session.project.resolution.height
-        self._saved_render_fps = self.session.project.render.fps
+        self._saved_project = project_saved_state(self.session)
         self._frame_dirty = None
-
-    def _flush_song_markers(self) -> None:
-        if self._project_dir is None:
-            return
-        save_song_markers(self._project_dir, self.session.song_markers.markers)
-
-    def _flush_milkdrop(self) -> None:
-        if self._project_dir is None:
-            return
-        save_milkdrop_settings(
-            self._project_dir, self.session.project.milkdrop_beat_sensitivity
-        )
-
-    def _flush_compositor(self) -> None:
-        if self._project_dir is None:
-            return
-        save_compositor_settings(
-            self._project_dir, self.session.project.compositor_hdr
-        )
-
-    def _flush_resolution(self) -> None:
-        if self._project_dir is None:
-            return
-        resolution = self.session.project.resolution
-        save_resolution_settings(
-            self._project_dir,
-            width=resolution.width,
-            height=resolution.height,
-        )
-
-    def _flush_render(self) -> None:
-        if self._project_dir is None:
-            return
-        save_render_settings(self._project_dir, fps=self.session.project.render.fps)
 
     def _commit_save(self) -> None:
         """Flush project.yaml fields (when available) and clear dirty baselines."""
-        self._flush_song_markers()
-        self._flush_milkdrop()
-        self._flush_compositor()
-        self._flush_resolution()
-        self._flush_render()
+        if self._project_dir is not None:
+            write_project_saved_state(
+                self._project_dir, project_saved_state(self.session)
+            )
         self.clear_config_dirty()
         for callback in self._on_commit_save:
             callback()
