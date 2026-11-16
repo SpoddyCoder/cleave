@@ -36,7 +36,10 @@ from cleave.viz.navigator import (
 from cleave.viz.session import LayerRuntime, TuningSession
 from cleave.viz.theme import HIGHLIGHT, LABEL, MOVE_MODE, VALUE
 from cleave.viz.shell_focus import ShellRegion
-from tests.cleave.viz.test_controls import _keydown, _make_controls
+from tests.support.viz import (
+    keydown,
+    make_controls,
+)
 
 
 def _session() -> TuningSession:
@@ -425,7 +428,7 @@ def test_layer_lock_and_visibility_badges() -> None:
 
 
 def test_select_opens_ancestors_and_closes_nothing() -> None:
-    controls = _make_controls(("layer_1", "layer_2"))
+    controls = make_controls(("layer_1", "layer_2"))
     focus = controls.shell_focus
     nav = controls.navigator
     focus.nav_expanded = {"timeline"}
@@ -445,7 +448,7 @@ def test_select_opens_ancestors_and_closes_nothing() -> None:
 
 
 def test_select_does_not_open_the_selected_node() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     focus = controls.shell_focus
     focus.nav_expanded = set()
 
@@ -456,18 +459,18 @@ def test_select_does_not_open_the_selected_node() -> None:
 
 
 def test_tree_up_down_does_not_wrap() -> None:
-    controls = _make_controls(("layer_1", "layer_2"))
+    controls = make_controls(("layer_1", "layer_2"))
     focus = controls.shell_focus
     nav = controls.navigator
     focus.region = ShellRegion.NAVIGATOR
 
     for _ in range(60):
-        nav.handle_keydown(_keydown(pygame.K_UP))
+        nav.handle_keydown(keydown(pygame.K_UP))
     assert focus.selected_id == "overlay"
 
     seen = [focus.selected_id]
     for _ in range(60):
-        nav.handle_keydown(_keydown(pygame.K_DOWN))
+        nav.handle_keydown(keydown(pygame.K_DOWN))
         if focus.selected_id == seen[-1]:
             break
         seen.append(focus.selected_id)
@@ -476,43 +479,43 @@ def test_tree_up_down_does_not_wrap() -> None:
     assert seen == [node.id for node in build_navigator(controls.session, focus.nav_expanded)]
     last = layer_node_id("layer_2")
     assert seen[-1] == last
-    nav.handle_keydown(_keydown(pygame.K_DOWN))
+    nav.handle_keydown(keydown(pygame.K_DOWN))
     assert focus.selected_id == last
 
 
 def test_left_right_expand_move_collapse_and_parent() -> None:
-    controls = _make_controls(("layer_1", "layer_2"))
+    controls = make_controls(("layer_1", "layer_2"))
     focus = controls.shell_focus
     focus.nav_expanded.clear()
     focus.selected_id = "layers"
     focus.region = ShellRegion.NAVIGATOR
     nav = controls.navigator
 
-    nav.handle_keydown(_keydown(pygame.K_RIGHT))
+    nav.handle_keydown(keydown(pygame.K_RIGHT))
     assert focus.selected_id == "layers"
     assert focus.nav_expanded == {"layers"}
 
-    nav.handle_keydown(_keydown(pygame.K_RIGHT))
+    nav.handle_keydown(keydown(pygame.K_RIGHT))
     assert focus.selected_id == layer_node_id("layer_1")
     assert focus.nav_expanded == {"layers"}
 
-    nav.handle_keydown(_keydown(pygame.K_RIGHT))
+    nav.handle_keydown(keydown(pygame.K_RIGHT))
     assert focus.selected_id == layer_node_id("layer_1")
     assert focus.nav_expanded == {"layers", layer_node_id("layer_1")}
 
-    nav.handle_keydown(_keydown(pygame.K_LEFT))
+    nav.handle_keydown(keydown(pygame.K_LEFT))
     assert focus.selected_id == layer_node_id("layer_1")
     assert layer_node_id("layer_1") not in focus.nav_expanded
 
-    nav.handle_keydown(_keydown(pygame.K_LEFT))
+    nav.handle_keydown(keydown(pygame.K_LEFT))
     assert focus.selected_id == "layers"
     assert "layers" in focus.nav_expanded
 
-    nav.handle_keydown(_keydown(pygame.K_LEFT))
+    nav.handle_keydown(keydown(pygame.K_LEFT))
     assert focus.selected_id == "layers"
     assert "layers" not in focus.nav_expanded
 
-    nav.handle_keydown(_keydown(pygame.K_LEFT))
+    nav.handle_keydown(keydown(pygame.K_LEFT))
     assert focus.selected_id == "layers"
     assert focus.region is ShellRegion.NAVIGATOR
 

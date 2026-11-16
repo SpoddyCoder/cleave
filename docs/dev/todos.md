@@ -16,7 +16,7 @@ None.
 
 In priority order. The ImGui shell refactor is done; its plans, design page, and stills are in [plans-completed/](plans-completed/) (`menu-overhaul-*`, `action-buttons-and-dialogs-plan.md`, `context-menus-plan.md`).
 
-1. **Performance review and remediations.** Profile the editor at large and maximised window sizes and fix what grows with window area. Start from [plans/large-window-performance-plan.md](plans/large-window-performance-plan.md): the timeline strip's full-width CPU redraw every frame is measured, and the rest needs profiling on Windows. Include the PyInstaller freeze smoke test of the shell (menus, context menus, Menu key, high DPI, UI scale 200%).
+1. **Performance review and remediations.** Profile the editor at large and maximised window sizes and fix what grows with window area. The frame timer (F3), the strip's incremental compose and the per-frame fixes from [plans-completed/architecture-performance-review.md](plans-completed/architecture-performance-review.md) are done. What is left: on Windows, record F3 sections at 1920x1080 and maximised 5120x1440 on the same project, then, if `flip()` dominates, add borderless fullscreen and an explicit vsync setting, and if the ImGui build grows with window height, cache fitted row text and skip rows scrolled out of view (phases 3 and 4 of [plans-completed/large-window-performance-plan.md](plans-completed/large-window-performance-plan.md)). Target: the maximised window within about 1-2 fps of 1920x1080. Include the PyInstaller freeze smoke test of the shell (menus, context menus, Menu key, high DPI, UI scale 200%).
 
 ---
 

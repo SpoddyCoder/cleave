@@ -20,7 +20,7 @@ Do not glob `**/*.py`, grep the repo root, spawn an explore subagent, or read `d
 - Panel row: `cleave/viz/row_kinds.py`, `row_specs/<domain>.py` (settings, project, track, overlays, post_fx, pattern_mask, timeline), `row_sections.py`
 - Mutation / input: `cleave/viz/layer_mutations.py`, matching `*_controls.py`, `wiring.py`
 - Shell draw: `cleave/viz/shell_host.py` (layout, mouse events, context menus), then one module per region: `shell_menu_bar.py`, `shell_transport.py`, `shell_navigator.py`, `shell_inspector.py` (rows), `shell_inspector_values.py` (steppers, choices, colour), `shell_inspector_title.py`, `shell_splitters.py`, `shell_strip.py`; shared helpers in `shell_widgets.py` and `shell_windows.py`
-- Draw / type: `row_present_renderers.py`, `overlay_primitives.py`, `theme.py` (not `tuning_panel_draw.py` first)
+- Draw / type: `overlay_primitives.py`, `theme.py`, `imgui_theme.py`; `row_present_renderers.py` holds inspector value colours and the strip visibility icon
 - Live state / YAML: `cleave/viz/session.py`, `cleave/config.py`, `config_schema/<section>.py`, `config_schema/persist.py`
 - Frame / GPU: `cleave/viz/layer_pipeline.py`, `frame_finish.py`, `cleave/gl_*.py`, `layer_composite.py`
 - Effect: `cleave/effects/registry.py`, `handlers.py`, handler module

@@ -25,101 +25,23 @@ from cleave.viz.layer_visibility import armed_recording_level, effective_layer_e
 from cleave.viz.key_repeat import INITIAL_DELAY_SEC, SLOW_INTERVAL_SEC
 from cleave.viz.timeline_controls import TimelineControls
 from tests.support.viz import keydown, make_playlist, stub_playback_state
-
-
-def _as_level(value):
-    if value is None:
-        return None
-    if isinstance(value, bool):
-        return 1.0 if value else 0.0
-    return float(value)
-
-
-def _lane(
-    baseline,
-    *transitions,
-) -> TimelineLane:
-    base = _as_level(baseline)
-    cues = [SlotCue(t=t, level=float(_as_level(level))) for t, level in transitions]
-    return TimelineLane(baseline=base, cues=canonicalize(base, cues))
+from tests.support.timeline import (
+    make_lane,
+    make_timeline_controls,
+)
 
 
 def _preset_lanes() -> dict[str, TimelineLane]:
     return {
-        "layer_1": _lane(True, (8.0, False)),
-        "layer_2": _lane(False, (8.0, True)),
-        "layer_3": _lane(True, (16.0, False)),
-        "layer_4": _lane(False, (16.0, True), (24.0, False)),
+        "layer_1": make_lane(True, (8.0, False)),
+        "layer_2": make_lane(False, (8.0, True)),
+        "layer_3": make_lane(True, (16.0, False)),
+        "layer_4": make_lane(False, (16.0, True), (24.0, False)),
     }
-
-
-def _make_timeline_controls(
-    *,
-    slots: tuple[str, ...] = tuple(DEFAULT_LAYER_SLOTS),
-    lanes: dict[str, TimelineLane] | None = None,
-    focus_row: int = 0,
-    armed_slots: set[str] | None = None,
-    panel_open: bool = True,
-    enabled: bool = True,
-    position_sec: float = 0.0,
-    recording: bool = False,
-    beat_times: tuple[float, ...] = (),
-    bar_times: tuple[float, ...] = (),
-) -> tuple[
-    TimelineControls,
-    TuningSession,
-    list[bool],
-    list[bool],
-    list[float],
-    list[str],
-]:
-    preset_root = Path("/tmp/presets")
-    session = TuningSession(
-        layer_z_order=list(slots),
-        layers={
-            slot: LayerRuntime(
-                playlist=make_playlist(slot),
-                browse_floor=preset_root / slot,
-                stem=TEST_LAYER_STEMS.get(slot, "drums"),
-            )
-            for slot in slots
-        },
-    )
-    tl = session.timeline
-    tl.enabled = enabled
-    tl.panel_open = panel_open
-    tl.lanes = {
-        slot: copy_lane(lanes[slot]) if lanes and slot in lanes else empty_lane()
-        for slot in slots
-    }
-    tl.focus_row = focus_row
-    tl.armed_slots = set(armed_slots or ())
-    tl.recording = recording
-
-    playback = stub_playback_state()
-    playback.player.seek(position_sec)
-
-    visibility_calls: list[bool] = []
-    exit_calls: list[bool] = []
-    seeks: list[float] = []
-    notifications: list[str] = []
-
-    controls = TimelineControls(
-        session,
-        playback,
-        120.0,
-        on_visibility_change=lambda: visibility_calls.append(True),
-        on_exit_submenu=lambda: exit_calls.append(True),
-        on_seek=lambda delta: seeks.append(delta),
-        on_notification=notifications.append,
-        beat_times=beat_times,
-        bar_times=bar_times,
-    )
-    return controls, session, visibility_calls, exit_calls, seeks, notifications
 
 
 def test_a_toggles_arm_on_focused_stem() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls(focus_row=1)
+    controls, session, _, _, _, _ = make_timeline_controls(focus_row=1)
     assert session.timeline.armed_slots == set()
 
     before = pygame.time.get_ticks()
@@ -133,7 +55,7 @@ def test_a_toggles_arm_on_focused_stem() -> None:
 
 
 def test_toggle_arm_row_focuses_and_arms_that_row() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls(focus_row=0)
+    controls, session, _, _, _, _ = make_timeline_controls(focus_row=0)
     controls.toggle_arm_row(1)
     assert session.timeline.focus_row == 1
     assert session.timeline.armed_slots == {"layer_2"}
@@ -142,7 +64,7 @@ def test_toggle_arm_row_focuses_and_arms_that_row() -> None:
 
 
 def test_mouse_record_and_arm_blocked_when_locked() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         armed_slots={"layer_1"},
     )
     session.timeline.locked = True
@@ -154,7 +76,7 @@ def test_mouse_record_and_arm_blocked_when_locked() -> None:
 
 
 def test_toggle_record_starts_and_stops_like_r() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         armed_slots={"layer_1"},
     )
     controls.toggle_record()
@@ -165,9 +87,9 @@ def test_toggle_record_starts_and_stops_like_r() -> None:
 
 def test_left_right_step_clips_when_not_recording() -> None:
     lanes = {
-        "layer_1": _lane(False, (4.0, True), (10.0, False), (16.0, True), (20.0, False)),
+        "layer_1": make_lane(False, (4.0, True), (10.0, False), (16.0, True), (20.0, False)),
     }
-    controls, session, _, _, seeks, _ = _make_timeline_controls(
+    controls, session, _, _, seeks, _ = make_timeline_controls(
         lanes=lanes,
         position_sec=2.0,
     )
@@ -184,7 +106,7 @@ def test_left_right_step_clips_when_not_recording() -> None:
 
 
 def test_esc_exits_submenu_and_keeps_strip_open() -> None:
-    controls, session, _, exit_calls, _, _ = _make_timeline_controls()
+    controls, session, _, exit_calls, _, _ = make_timeline_controls()
 
     controls.handle_keydown(keydown(pygame.K_ESCAPE))
     assert exit_calls == [True]
@@ -192,7 +114,7 @@ def test_esc_exits_submenu_and_keeps_strip_open() -> None:
 
 
 def test_esc_while_recording_does_not_exit_submenu() -> None:
-    controls, session, _, exit_calls, _, _ = _make_timeline_controls(
+    controls, session, _, exit_calls, _, _ = make_timeline_controls(
         recording=True,
     )
     session.timeline.armed_slots = {"layer_1"}
@@ -204,7 +126,7 @@ def test_esc_while_recording_does_not_exit_submenu() -> None:
 
 
 def test_space_toggles_pause() -> None:
-    controls, _, _, _, _, _ = _make_timeline_controls()
+    controls, _, _, _, _, _ = make_timeline_controls()
     playback = controls.playback
 
     assert playback.paused is False
@@ -215,7 +137,7 @@ def test_space_toggles_pause() -> None:
 
 
 def test_space_toggles_pause_when_locked() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls()
+    controls, session, _, _, _, _ = make_timeline_controls()
     session.timeline.locked = True
     playback = controls.playback
 
@@ -227,7 +149,7 @@ def test_space_toggles_pause_when_locked() -> None:
 
 
 def test_ctrl_space_blocked_when_locked() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         armed_slots={"layer_1"},
     )
     session.timeline.locked = True
@@ -238,9 +160,9 @@ def test_ctrl_space_blocked_when_locked() -> None:
 
 
 def test_pause_leaves_visibility_to_the_timeline() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         position_sec=5.0,
-        lanes={"layer_1": _lane(False)},
+        lanes={"layer_1": make_lane(False)},
     )
 
     controls.handle_keydown(keydown(pygame.K_SPACE))
@@ -250,8 +172,8 @@ def test_pause_leaves_visibility_to_the_timeline() -> None:
 
 
 def test_eye_on_a_timeline_row_takes_an_override_and_flips_it() -> None:
-    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
-        lanes={"layer_2": _lane(True)},
+    controls, session, visibility_calls, _, _, _ = make_timeline_controls(
+        lanes={"layer_2": make_lane(True)},
         position_sec=3.0,
     )
     controls.playback.paused = True
@@ -264,11 +186,11 @@ def test_eye_on_a_timeline_row_takes_an_override_and_flips_it() -> None:
 
     controls.toggle_row_visibility(1)
     assert session.timeline.override_visible == {"layer_2": True}
-    assert session.timeline.lanes["layer_2"] == _lane(True)
+    assert session.timeline.lanes["layer_2"] == make_lane(True)
 
 
 def test_toggle_row_visibility_flips_override_when_paused() -> None:
-    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
+    controls, session, visibility_calls, _, _, _ = make_timeline_controls(
         position_sec=3.0, focus_row=0
     )
     controls.playback.paused = True
@@ -285,7 +207,7 @@ def test_toggle_row_visibility_flips_override_when_paused() -> None:
 
 def test_num_key_5_toggles_fifth_layer_override() -> None:
     slots = tuple(f"layer_{i}" for i in range(1, 6))
-    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
+    controls, session, visibility_calls, _, _, _ = make_timeline_controls(
         slots=slots,
         position_sec=3.0,
     )
@@ -298,7 +220,7 @@ def test_num_key_5_toggles_fifth_layer_override() -> None:
 
 
 def test_num_keys_beyond_layer_count_are_noop() -> None:
-    controls, session, visibility_calls, _, _, _ = _make_timeline_controls()
+    controls, session, visibility_calls, _, _, _ = make_timeline_controls()
     session.timeline.override_slots = set(DEFAULT_LAYER_SLOTS)
     session.timeline.override_visible = {slot: True for slot in DEFAULT_LAYER_SLOTS}
 
@@ -310,7 +232,7 @@ def test_num_keys_beyond_layer_count_are_noop() -> None:
 
 
 def test_row_visibility_toggleable_outside_a_take() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls(armed_slots={"layer_1"})
+    controls, session, _, _, _, _ = make_timeline_controls(armed_slots={"layer_1"})
     controls.playback.paused = True
     assert controls.row_visibility_toggleable(0) is False
     assert controls.row_visibility_toggleable(2) is True
@@ -324,8 +246,8 @@ def test_row_visibility_toggleable_outside_a_take() -> None:
 
 
 def test_toggle_override_holds_current_visibility_and_releases() -> None:
-    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
-        lanes={"layer_2": _lane(False)},
+    controls, session, visibility_calls, _, _, _ = make_timeline_controls(
+        lanes={"layer_2": make_lane(False)},
     )
     session.timeline.override_slots = {"layer_1"}
     session.timeline.override_visible = {"layer_1": False}
@@ -340,7 +262,7 @@ def test_toggle_override_holds_current_visibility_and_releases() -> None:
 
 
 def test_toggle_override_blocked_while_recording() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls(armed_slots={"layer_1"})
+    controls, session, _, _, _, _ = make_timeline_controls(armed_slots={"layer_1"})
     controls.handle_keydown(keydown(pygame.K_r))
 
     controls.toggle_override("layer_2")
@@ -348,7 +270,7 @@ def test_toggle_override_blocked_while_recording() -> None:
 
 
 def test_release_all_overrides() -> None:
-    controls, session, visibility_calls, _, _, _ = _make_timeline_controls()
+    controls, session, visibility_calls, _, _, _ = make_timeline_controls()
     controls.release_all_overrides()
     assert visibility_calls == []
 
@@ -361,7 +283,7 @@ def test_release_all_overrides() -> None:
 
 
 def test_row_arm_available_follows_lock() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls()
+    controls, session, _, _, _, _ = make_timeline_controls()
     assert controls.row_arm_available(0) is True
     assert controls.row_arm_available(7) is False
     session.timeline.locked = True
@@ -369,7 +291,7 @@ def test_row_arm_available_follows_lock() -> None:
 
 
 def test_num_keys_take_an_override_without_writing_the_lane() -> None:
-    controls, session, visibility_calls, _, _, _ = _make_timeline_controls()
+    controls, session, visibility_calls, _, _, _ = make_timeline_controls()
     session.layers["layer_1"].enabled = True
 
     controls.handle_keydown(keydown(pygame.K_1))
@@ -379,8 +301,8 @@ def test_num_keys_take_an_override_without_writing_the_lane() -> None:
 
 
 def test_num_keys_toggle_override_visible_when_playing() -> None:
-    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
-        lanes={"layer_1": _lane(True)},
+    controls, session, visibility_calls, _, _, _ = make_timeline_controls(
+        lanes={"layer_1": make_lane(True)},
     )
     session.timeline.override_slots = {"layer_1"}
     session.timeline.override_visible = {"layer_1": True}
@@ -391,7 +313,7 @@ def test_num_keys_toggle_override_visible_when_playing() -> None:
 
 
 def test_number_key_on_an_armed_row_waits_for_the_take() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=7.0,
     )
@@ -407,7 +329,7 @@ def test_number_key_on_an_armed_row_waits_for_the_take() -> None:
 
 
 def test_record_preserves_override() -> None:
-    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
+    controls, session, visibility_calls, _, _, _ = make_timeline_controls(
         armed_slots={"layer_1"},
     )
     session.timeline.override_slots = {"layer_2", "layer_3"}
@@ -422,9 +344,9 @@ def test_record_preserves_override() -> None:
 
 
 def test_shift_enter_override_when_playing() -> None:
-    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
+    controls, session, visibility_calls, _, _, _ = make_timeline_controls(
         focus_row=1,
-        lanes={"layer_2": _lane(False)},
+        lanes={"layer_2": make_lane(False)},
     )
 
     controls.handle_keydown(keydown(pygame.K_RETURN, mod=pygame.KMOD_SHIFT))
@@ -435,7 +357,7 @@ def test_shift_enter_override_when_playing() -> None:
 
 
 def test_shift_enter_clears_override_on_same_focused_row() -> None:
-    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(focus_row=1)
+    controls, session, visibility_calls, _, _, _ = make_timeline_controls(focus_row=1)
     session.timeline.override_slots = {"layer_2"}
     session.timeline.override_visible = {"layer_2": True}
 
@@ -446,9 +368,9 @@ def test_shift_enter_clears_override_on_same_focused_row() -> None:
 
 
 def test_shift_enter_override_when_paused() -> None:
-    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
+    controls, session, visibility_calls, _, _, _ = make_timeline_controls(
         focus_row=1,
-        lanes={"layer_2": _lane(False)},
+        lanes={"layer_2": make_lane(False)},
     )
     controls.playback.paused = True
 
@@ -459,8 +381,8 @@ def test_shift_enter_override_when_paused() -> None:
 
 
 def test_num_keys_toggle_override_when_paused() -> None:
-    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
-        lanes={"layer_1": _lane(True)},
+    controls, session, visibility_calls, _, _, _ = make_timeline_controls(
+        lanes={"layer_1": make_lane(True)},
     )
     controls.playback.paused = True
     session.timeline.override_slots = {"layer_1"}
@@ -472,7 +394,7 @@ def test_num_keys_toggle_override_when_paused() -> None:
 
 
 def test_shift_enter_ignored_when_recording() -> None:
-    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
+    controls, session, visibility_calls, _, _, _ = make_timeline_controls(
         focus_row=1,
         armed_slots={"layer_1"},
     )
@@ -487,7 +409,7 @@ def test_shift_enter_ignored_when_recording() -> None:
 
 
 def test_shift_enter_does_not_set_session_solo_stem() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls(focus_row=1)
+    controls, session, _, _, _, _ = make_timeline_controls(focus_row=1)
 
     controls.handle_keydown(keydown(pygame.K_RETURN, mod=pygame.KMOD_SHIFT))
     assert session.solo_slot is None
@@ -495,9 +417,9 @@ def test_shift_enter_does_not_set_session_solo_stem() -> None:
 
 
 def test_multiple_override_stems() -> None:
-    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
+    controls, session, visibility_calls, _, _, _ = make_timeline_controls(
         focus_row=0,
-        lanes={"layer_1": _lane(False), "layer_2": _lane(False)},
+        lanes={"layer_1": make_lane(False), "layer_2": make_lane(False)},
     )
 
     controls.handle_keydown(keydown(pygame.K_RETURN, mod=pygame.KMOD_SHIFT))
@@ -510,7 +432,7 @@ def test_multiple_override_stems() -> None:
 
 
 def test_shift_enter_does_not_arm_focused_row() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls(focus_row=1)
+    controls, session, _, _, _, _ = make_timeline_controls(focus_row=1)
 
     controls.handle_keydown(keydown(pygame.K_RETURN, mod=pygame.KMOD_SHIFT))
     assert session.timeline.override_slots == {"layer_2"}
@@ -519,16 +441,16 @@ def test_shift_enter_does_not_arm_focused_row() -> None:
 
 def test_arrow_first_press_picks_by_direction_from_playhead() -> None:
     lanes = {
-        "layer_1": _lane(False, (4.0, True), (10.0, False), (16.0, True)),
+        "layer_1": make_lane(False, (4.0, True), (10.0, False), (16.0, True)),
     }
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         lanes=lanes,
         position_sec=9.0,
     )
     controls.handle_keydown(keydown(pygame.K_LEFT))
     assert session.timeline.selected_clip_t["layer_1"] == 4.0
 
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         lanes=lanes,
         position_sec=9.0,
     )
@@ -538,9 +460,9 @@ def test_arrow_first_press_picks_by_direction_from_playhead() -> None:
 
 def test_arrows_step_clips_when_locked() -> None:
     lanes = {
-        "layer_1": _lane(False, (4.0, True), (10.0, False), (16.0, True)),
+        "layer_1": make_lane(False, (4.0, True), (10.0, False), (16.0, True)),
     }
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         lanes=lanes,
         position_sec=2.0,
     )
@@ -553,9 +475,9 @@ def test_arrows_step_clips_when_locked() -> None:
 
 def test_enter_seeks_to_selected_clip_start() -> None:
     lanes = {
-        "layer_1": _lane(False, (4.0, True), (10.0, False), (16.0, True)),
+        "layer_1": make_lane(False, (4.0, True), (10.0, False), (16.0, True)),
     }
-    controls, session, _, _, seeks, _ = _make_timeline_controls(
+    controls, session, _, _, seeks, _ = make_timeline_controls(
         lanes=lanes,
         position_sec=9.0,
     )
@@ -567,9 +489,9 @@ def test_enter_seeks_to_selected_clip_start() -> None:
 
 def test_enter_does_not_seek_while_recording() -> None:
     lanes = {
-        "layer_1": _lane(False, (4.0, True), (10.0, False)),
+        "layer_1": make_lane(False, (4.0, True), (10.0, False)),
     }
-    controls, session, _, _, seeks, _ = _make_timeline_controls(
+    controls, session, _, _, seeks, _ = make_timeline_controls(
         lanes=lanes,
         position_sec=4.0,
         armed_slots={"layer_1"},
@@ -581,7 +503,7 @@ def test_enter_does_not_seek_while_recording() -> None:
 
 
 def test_ctrl_enter_noop_while_recording() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         focus_row=0,
         armed_slots={"layer_1"},
         position_sec=5.0,
@@ -599,7 +521,7 @@ def test_ctrl_enter_noop_while_recording() -> None:
 
 
 def test_r_without_armed_layers_shows_notification() -> None:
-    controls, session, _, _, _, notifications = _make_timeline_controls()
+    controls, session, _, _, _, notifications = make_timeline_controls()
 
     controls.handle_keydown(keydown(pygame.K_r))
     assert notifications == ["Arm at least one layer to record"]
@@ -607,7 +529,7 @@ def test_r_without_armed_layers_shows_notification() -> None:
 
 
 def test_r_starts_recording_and_unpauses() -> None:
-    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
+    controls, session, visibility_calls, _, _, _ = make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=3.0,
     )
@@ -621,7 +543,7 @@ def test_r_starts_recording_and_unpauses() -> None:
 
 
 def test_record_start_stores_baseline_not_buffer() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         armed_slots={"layer_1", "layer_2"},
         position_sec=7.5,
     )
@@ -635,7 +557,7 @@ def test_record_start_stores_baseline_not_buffer() -> None:
 
 def test_arm_during_recording_joins_take_and_accepts_toggle() -> None:
     """Regression: mid-take arm must join record_baseline before number-key toggle."""
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         armed_slots={"layer_1"},
         focus_row=1,
         position_sec=4.0,
@@ -663,7 +585,7 @@ def test_arm_during_recording_joins_take_and_accepts_toggle() -> None:
 
 
 def test_layer_keys_only_affect_armed_stems() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=2.0,
     )
@@ -682,10 +604,10 @@ def test_layer_keys_only_affect_armed_stems() -> None:
 
 
 def test_ctrl_layer_key_drops_anchored_hold_cue() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=5.0,
-        lanes={"layer_1": _lane(True)},
+        lanes={"layer_1": make_lane(True)},
     )
     session.layers["layer_1"].enabled = True
 
@@ -698,7 +620,7 @@ def test_ctrl_layer_key_drops_anchored_hold_cue() -> None:
 
 
 def test_ctrl_layer_key_ignored_when_unarmed() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=5.0,
     )
@@ -712,7 +634,7 @@ def test_ctrl_layer_key_ignored_when_unarmed() -> None:
 
 
 def test_ctrl_layer_key_noop_when_not_recording() -> None:
-    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
+    controls, session, visibility_calls, _, _, _ = make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=5.0,
     )
@@ -725,10 +647,10 @@ def test_ctrl_layer_key_noop_when_not_recording() -> None:
 
 
 def test_stop_record_preserves_anchored_hold_cue() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=5.0,
-        lanes={"layer_1": _lane(True)},
+        lanes={"layer_1": make_lane(True)},
     )
     session.layers["layer_1"].enabled = True
 
@@ -741,7 +663,7 @@ def test_stop_record_preserves_anchored_hold_cue() -> None:
 
 
 def test_numpad_layer_keys_work_while_recording() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=6.0,
     )
@@ -755,7 +677,7 @@ def test_numpad_layer_keys_work_while_recording() -> None:
 
 
 def test_layer_key_debounce_ignores_rapid_press() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=4.0,
     )
@@ -767,10 +689,10 @@ def test_layer_key_debounce_ignores_rapid_press() -> None:
 
 
 def test_disarm_during_recording_commits_slot_and_exits_recording() -> None:
-    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
+    controls, session, visibility_calls, _, _, _ = make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=5.0,
-        lanes={"layer_1": _lane(False)},
+        lanes={"layer_1": make_lane(False)},
     )
     session.layers["layer_1"].enabled = True
 
@@ -789,11 +711,11 @@ def test_disarm_during_recording_commits_slot_and_exits_recording() -> None:
 
 
 def test_disarm_one_slot_keeps_recording_on_remaining_armed() -> None:
-    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
+    controls, session, visibility_calls, _, _, _ = make_timeline_controls(
         armed_slots={"layer_1", "layer_2"},
         focus_row=0,
         position_sec=8.0,
-        lanes={"layer_1": _lane(False), "layer_2": _lane(False)},
+        lanes={"layer_1": make_lane(False), "layer_2": make_lane(False)},
     )
     session.layers["layer_1"].enabled = True
     session.layers["layer_2"].enabled = True
@@ -810,7 +732,7 @@ def test_disarm_one_slot_keeps_recording_on_remaining_armed() -> None:
 
 
 def test_seek_allowed_while_recording() -> None:
-    controls, session, _, _, seeks, _ = _make_timeline_controls(
+    controls, session, _, _, seeks, _ = make_timeline_controls(
         armed_slots={"layer_1"},
     )
 
@@ -826,7 +748,7 @@ def test_seek_allowed_while_recording() -> None:
 
 
 def test_forward_seek_during_record_fills_with_active_state() -> None:
-    controls, session, visibility_calls, _, seeks, _ = _make_timeline_controls(
+    controls, session, visibility_calls, _, seeks, _ = make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=10.0,
     )
@@ -844,7 +766,7 @@ def test_forward_seek_during_record_fills_with_active_state() -> None:
 
 
 def test_backward_seek_during_record_fills_and_expands_punch_start() -> None:
-    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
+    controls, session, visibility_calls, _, _, _ = make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=20.0,
     )
@@ -862,10 +784,10 @@ def test_backward_seek_during_record_fills_and_expands_punch_start() -> None:
 
 
 def test_seek_during_record_active_state_not_overwritten_by_committed_cues() -> None:
-    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
+    controls, session, visibility_calls, _, _, _ = make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=10.0,
-        lanes={"layer_1": _lane(False)},
+        lanes={"layer_1": make_lane(False)},
     )
     session.layers["layer_1"].enabled = True
 
@@ -880,10 +802,10 @@ def test_seek_during_record_active_state_not_overwritten_by_committed_cues() -> 
 
 
 def test_r_stop_punches_cues_and_clears_record_state() -> None:
-    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
+    controls, session, visibility_calls, _, _, _ = make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=10.0,
-        lanes={"layer_2": _lane(True, (5.0, False))},
+        lanes={"layer_2": make_lane(True, (5.0, False))},
     )
     session.layers["layer_1"].enabled = True
 
@@ -895,14 +817,14 @@ def test_r_stop_punches_cues_and_clears_record_state() -> None:
     assert session.timeline.recording is False
     assert session.timeline.record_buffer == {}
     assert session.timeline.record_start_sec is None
-    assert session.timeline.lanes["layer_2"] == _lane(True, (5.0, False))
+    assert session.timeline.lanes["layer_2"] == make_lane(True, (5.0, False))
     lane = session.timeline.lanes["layer_1"]
     assert SlotCue(t=10.0, level=0.0) in lane.cues
     assert visibility_calls[-1] is True
 
 
 def test_record_start_snaps_to_beat() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=0.6,
         beat_times=(0.0, 1.0, 2.0),
@@ -914,7 +836,7 @@ def test_record_start_snaps_to_beat() -> None:
 
 
 def test_record_toggle_snaps_cue_time() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=0.0,
         beat_times=(0.0, 1.0, 2.0),
@@ -929,7 +851,7 @@ def test_record_toggle_snaps_cue_time() -> None:
 
 
 def test_record_stop_snaps_punch_end() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=0.0,
         beat_times=(0.0, 1.0, 2.0, 3.0),
@@ -947,7 +869,7 @@ def test_record_stop_snaps_punch_end() -> None:
 
 
 def test_record_toggle_snapped_ahead_flips_pending_state() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=0.0,
         bar_times=(0.0, 4.0, 8.0),
@@ -966,7 +888,7 @@ def test_record_toggle_snapped_ahead_flips_pending_state() -> None:
 
 
 def test_record_toggle_in_intro_before_grid_places_freely() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=1.0,
         bar_times=(20.0, 24.0, 28.0),
@@ -986,7 +908,7 @@ def test_record_toggle_in_intro_before_grid_places_freely() -> None:
 
 
 def test_record_past_last_bar_places_and_punches_freely() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=30.0,
         bar_times=(0.0, 4.0, 8.0),
@@ -1002,7 +924,7 @@ def test_record_past_last_bar_places_and_punches_freely() -> None:
 
 
 def test_record_placement_snap_off_keeps_audible_times() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=0.6,
         beat_times=(0.0, 1.0, 2.0),
@@ -1017,7 +939,6 @@ def test_record_placement_snap_off_keeps_audible_times() -> None:
     ]
 
 
-
 def _lane_visible(session, slot: str, t: float) -> bool:
     from cleave.timeline import LEVEL_EPS
     from cleave.viz.layer_visibility import timeline_defaults
@@ -1027,10 +948,10 @@ def _lane_visible(session, slot: str, t: float) -> bool:
 
 
 def test_stop_record_restores_committed_after_punch_range() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=10.0,
-        lanes={"layer_1": _lane(False, (30.0, True))},
+        lanes={"layer_1": make_lane(False, (30.0, True))},
     )
 
     controls.handle_keydown(keydown(pygame.K_r))
@@ -1048,10 +969,10 @@ def test_stop_record_restores_committed_after_punch_range() -> None:
 
 
 def test_stop_record_restores_disabled_tail_when_disable_inside_punch() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=10.0,
-        lanes={"layer_1": _lane(True, (15.0, False), (25.0, True))},
+        lanes={"layer_1": make_lane(True, (15.0, False), (25.0, True))},
     )
     session.layers["layer_1"].enabled = True
 
@@ -1071,10 +992,10 @@ def test_stop_record_restores_disabled_tail_when_disable_inside_punch() -> None:
 
 
 def test_stop_record_restores_enabled_tail_when_injecting_disabled_section() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=10.0,
-        lanes={"layer_1": _lane(True, (5.0, True))},
+        lanes={"layer_1": make_lane(True, (5.0, True))},
     )
     session.layers["layer_1"].enabled = False
 
@@ -1091,13 +1012,13 @@ def test_stop_record_restores_enabled_tail_when_injecting_disabled_section() -> 
 
 
 def test_stop_record_preserves_unarmed_cues_in_punch_range() -> None:
-    bass_lane = _lane(True, (12.0, False))
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    bass_lane = make_lane(True, (12.0, False))
+    controls, session, _, _, _, _ = make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=10.0,
         lanes={
             "layer_2": bass_lane,
-            "layer_1": _lane(True, (11.0, True)),
+            "layer_1": make_lane(True, (11.0, True)),
         },
     )
 
@@ -1115,7 +1036,7 @@ def test_stop_record_preserves_unarmed_slots_in_preset_style_cues() -> None:
 
     slots = tuple(DEFAULT_LAYER_SLOTS)
     lanes = _preset_lanes()
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=5.0,
         lanes=lanes,
@@ -1156,7 +1077,7 @@ def test_stop_record_preserves_unarmed_after_breathing_preset() -> None:
 
     slots = list(DEFAULT_LAYER_SLOTS)
     lanes = build_breathing_cues(slots, 60.0, random.Random(42))
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=5.0,
         lanes=lanes,
@@ -1189,12 +1110,12 @@ def test_stop_record_does_not_flip_unarmed_leading_section() -> None:
     """Regression: recording an armed layer must not change an unarmed lane."""
     from cleave.viz.layer_visibility import timeline_committed_level
 
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=5.0,
         lanes={
-            "layer_2": _lane(None, (12.0, True)),
-            "layer_1": _lane(False, (30.0, True)),
+            "layer_2": make_lane(None, (12.0, True)),
+            "layer_1": make_lane(False, (30.0, True)),
         },
     )
     session.layers["layer_2"].enabled = False
@@ -1209,14 +1130,14 @@ def test_stop_record_does_not_flip_unarmed_leading_section() -> None:
     controls.playback.player.seek(12.0)
     controls.handle_keydown(keydown(pygame.K_r))
 
-    assert session.timeline.lanes["layer_2"] == _lane(None, (12.0, True))
+    assert session.timeline.lanes["layer_2"] == make_lane(None, (12.0, True))
 
     after = [timeline_committed_level(session, "layer_2", t) for t in sample]
     assert after == before
 
 
 def test_ctrl_space_starts_record_when_paused() -> None:
-    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
+    controls, session, visibility_calls, _, _, _ = make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=3.0,
     )
@@ -1229,7 +1150,7 @@ def test_ctrl_space_starts_record_when_paused() -> None:
 
 
 def test_ctrl_space_starts_record_when_playing() -> None:
-    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
+    controls, session, visibility_calls, _, _, _ = make_timeline_controls(
         armed_slots={"layer_2"},
         position_sec=2.0,
     )
@@ -1241,7 +1162,7 @@ def test_ctrl_space_starts_record_when_playing() -> None:
 
 
 def test_ctrl_space_stops_record_and_pauses() -> None:
-    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
+    controls, session, visibility_calls, _, _, _ = make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=10.0,
     )
@@ -1258,7 +1179,7 @@ def test_ctrl_space_stops_record_and_pauses() -> None:
 
 
 def test_ctrl_space_stop_stays_paused_if_already_paused() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=8.0,
     )
@@ -1272,7 +1193,7 @@ def test_ctrl_space_stop_stays_paused_if_already_paused() -> None:
 
 
 def test_space_resumes_when_recording_and_paused() -> None:
-    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
+    controls, session, visibility_calls, _, _, _ = make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=8.0,
     )
@@ -1287,7 +1208,7 @@ def test_space_resumes_when_recording_and_paused() -> None:
 
 
 def test_space_stops_record_and_pauses_while_playing() -> None:
-    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
+    controls, session, visibility_calls, _, _, _ = make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=10.0,
     )
@@ -1304,7 +1225,7 @@ def test_space_stops_record_and_pauses_while_playing() -> None:
 
 
 def test_ctrl_space_without_armed_stems_notifies() -> None:
-    controls, session, visibility_calls, _, _, notifications = _make_timeline_controls()
+    controls, session, visibility_calls, _, _, notifications = make_timeline_controls()
 
     controls.handle_keydown(keydown(pygame.K_SPACE, mod=pygame.KMOD_CTRL))
     assert session.timeline.recording is False
@@ -1316,7 +1237,7 @@ def test_recorded_timeline_bar_unchanged_after_disable_layer_toggle_reenable() -
     from cleave.viz.layer_visibility import build_timeline_view_state
     from cleave.viz.timeline_strip_state import bar_level_breakpoints_for_row
 
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=0.0,
     )
@@ -1355,7 +1276,7 @@ def test_arrows_select_opening_baseline_clip() -> None:
             ),
         ),
     }
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         lanes=lanes,
         position_sec=0.0,
     )
@@ -1369,7 +1290,7 @@ def test_arrows_select_opening_baseline_clip() -> None:
 
 def test_arrows_select_the_clip_of_an_inherited_lane() -> None:
     # No baseline: the lane inherits the layer's enabled switch.
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         lanes={"layer_1": TimelineLane(baseline=None, cues=[])},
     )
     controls.handle_keydown(keydown(pygame.K_RIGHT))
@@ -1393,7 +1314,7 @@ def test_o_casts_opening_baseline_materializing_cue_at_zero() -> None:
             ),
         ),
     }
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         lanes=lanes,
         position_sec=0.0,
     )
@@ -1409,9 +1330,9 @@ def test_o_casts_opening_baseline_materializing_cue_at_zero() -> None:
 def test_arrows_select_then_step_clips() -> None:
     # The off cue at 10 ends the first clip; it is not a stop of its own.
     lanes = {
-        "layer_1": _lane(False, (4.0, True), (10.0, False), (16.0, True)),
+        "layer_1": make_lane(False, (4.0, True), (10.0, False), (16.0, True)),
     }
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         lanes=lanes,
         position_sec=2.0,
     )
@@ -1439,9 +1360,9 @@ def test_arrows_select_then_step_clips() -> None:
 
 def test_new_clip_selection_bumps_title_swipe_serial() -> None:
     lanes = {
-        "layer_1": _lane(False, (4.0, True), (10.0, False), (16.0, True)),
+        "layer_1": make_lane(False, (4.0, True), (10.0, False), (16.0, True)),
     }
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         lanes=lanes,
         position_sec=2.0,
     )
@@ -1469,7 +1390,7 @@ def test_arrows_keep_mid_on_level_changes() -> None:
             ),
         ),
     }
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         lanes=lanes,
         position_sec=5.0,
     )
@@ -1481,9 +1402,9 @@ def test_arrows_keep_mid_on_level_changes() -> None:
 
 def test_arrows_step_from_a_selection_that_names_no_clip() -> None:
     lanes = {
-        "layer_1": _lane(False, (4.0, True), (10.0, False), (16.0, True)),
+        "layer_1": make_lane(False, (4.0, True), (10.0, False), (16.0, True)),
     }
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         lanes=lanes,
         position_sec=9.0,
     )
@@ -1497,10 +1418,10 @@ def test_arrows_step_from_a_selection_that_names_no_clip() -> None:
 
 def test_clip_selection_memory_is_per_track() -> None:
     lanes = {
-        "layer_1": _lane(False, (4.0, True), (10.0, False), (16.0, True)),
-        "layer_2": _lane(False, (8.0, True), (16.0, False)),
+        "layer_1": make_lane(False, (4.0, True), (10.0, False), (16.0, True)),
+        "layer_2": make_lane(False, (8.0, True), (16.0, False)),
     }
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         lanes=lanes,
         focus_row=0,
         position_sec=5.0,
@@ -1532,7 +1453,7 @@ def test_b_cycles_selected_clip_blend_including_none() -> None:
             ),
         ),
     }
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         lanes=lanes,
         position_sec=5.0,
     )
@@ -1562,7 +1483,7 @@ def test_o_cycles_selected_clip_role_including_none() -> None:
             ),
         ),
     }
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         lanes=lanes,
         position_sec=5.0,
     )
@@ -1581,9 +1502,9 @@ def test_c_and_shift_c_cycle_cut_in_and_cut_out() -> None:
     from cleave.cut_types import CUT_TYPES
 
     lanes = {
-        "layer_1": _lane(False, (5.0, True), (10.0, False)),
+        "layer_1": make_lane(False, (5.0, True), (10.0, False)),
     }
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         lanes=lanes,
         position_sec=10.0,
     )
@@ -1599,8 +1520,8 @@ def test_c_and_shift_c_cycle_cut_in_and_cut_out() -> None:
 
 
 def test_shift_c_does_nothing_on_a_clip_with_no_end_cue() -> None:
-    lanes = {"layer_1": _lane(False, (5.0, 1.0), (10.0, 0.5))}
-    controls, session, _, _, _, _ = _make_timeline_controls(lanes=lanes)
+    lanes = {"layer_1": make_lane(False, (5.0, 1.0), (10.0, 0.5))}
+    controls, session, _, _, _, _ = make_timeline_controls(lanes=lanes)
     before = copy_lane(session.timeline.lanes["layer_1"])
     for start in (5.0, 10.0):  # butts the next clip; runs to the song end
         session.timeline.selected_clip_t["layer_1"] = start
@@ -1624,7 +1545,7 @@ def test_cycling_cut_out_changes_fall_triangle() -> None:
             ),
         ),
     }
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         lanes=lanes,
         position_sec=10.0,
     )
@@ -1664,7 +1585,7 @@ def test_c_cycles_selected_clip_cut_in() -> None:
             ),
         ),
     }
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         lanes=lanes,
         position_sec=5.0,
     )
@@ -1690,7 +1611,7 @@ def test_comma_period_nudge_selected_clip_opacity() -> None:
             ),
         ),
     }
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         lanes=lanes,
         position_sec=5.0,
     )
@@ -1722,7 +1643,7 @@ def test_opacity_nudge_key_repeat_after_delay() -> None:
             ),
         ),
     }
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         lanes=lanes,
         position_sec=5.0,
     )
@@ -1758,7 +1679,7 @@ def test_nudge_cue_opacity_floors_at_ten_percent() -> None:
             ),
         ),
     }
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         lanes=lanes,
         position_sec=5.0,
     )
@@ -1784,7 +1705,7 @@ def test_nudge_opening_baseline_opacity() -> None:
             ),
         ),
     }
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         lanes=lanes,
         position_sec=0.0,
     )
@@ -1798,9 +1719,9 @@ def test_nudge_opening_baseline_opacity() -> None:
 
 def test_cue_edit_keys_refused_when_locked() -> None:
     lanes = {
-        "layer_1": _lane(False, (5.0, True)),
+        "layer_1": make_lane(False, (5.0, True)),
     }
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         lanes=lanes,
         position_sec=5.0,
     )
@@ -1819,9 +1740,9 @@ def test_cue_edit_keys_refused_when_locked() -> None:
 
 def test_cue_edit_keys_refused_when_recording() -> None:
     lanes = {
-        "layer_1": _lane(False, (5.0, True)),
+        "layer_1": make_lane(False, (5.0, True)),
     }
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         lanes=lanes,
         position_sec=5.0,
         armed_slots={"layer_1"},
@@ -1839,7 +1760,7 @@ def test_cue_edit_keys_refused_when_recording() -> None:
     assert session.timeline.lanes["layer_1"].cues[0].level == 1.0
 
 def test_seek_to_passes_delta_from_playhead() -> None:
-    controls, _, _, _, seeks, _ = _make_timeline_controls(position_sec=10.0)
+    controls, _, _, _, seeks, _ = make_timeline_controls(position_sec=10.0)
     controls.seek_to(25.0)
     controls.seek_to(10.0)
     controls.seek_to(500.0)
@@ -1847,7 +1768,7 @@ def test_seek_to_passes_delta_from_playhead() -> None:
 
 
 def test_seek_to_during_record_fills_like_seek_step() -> None:
-    controls, session, visibility_calls, _, seeks, _ = _make_timeline_controls(
+    controls, session, visibility_calls, _, seeks, _ = make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=20.0,
     )
@@ -1864,8 +1785,8 @@ def test_seek_to_during_record_fills_like_seek_step() -> None:
 
 
 def test_select_clip_at_picks_the_clip_under_the_time() -> None:
-    lanes = {"layer_1": _lane(False, (4.0, True), (10.0, False))}
-    controls, session, _, _, _, _ = _make_timeline_controls(lanes=lanes)
+    lanes = {"layer_1": make_lane(False, (4.0, True), (10.0, False))}
+    controls, session, _, _, _, _ = make_timeline_controls(lanes=lanes)
 
     assert controls.select_clip_at("layer_1", 9.8) is True
     assert session.timeline.selected_clip_t["layer_1"] == 4.0
@@ -1875,19 +1796,19 @@ def test_select_clip_at_picks_the_clip_under_the_time() -> None:
 
 
 def test_select_clip_at_allowed_when_locked_blocked_when_recording() -> None:
-    lanes = {"layer_1": _lane(False, (4.0, True))}
-    controls, session, _, _, _, _ = _make_timeline_controls(lanes=lanes)
+    lanes = {"layer_1": make_lane(False, (4.0, True))}
+    controls, session, _, _, _, _ = make_timeline_controls(lanes=lanes)
     session.timeline.locked = True
     assert controls.select_clip_at("layer_1", 4.1) is True
 
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         lanes=lanes, armed_slots={"layer_1"}, recording=True
     )
     assert controls.select_clip_at("layer_1", 4.0) is False
 
 
 def test_focus_row_clamps_to_layer_count() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls()
+    controls, session, _, _, _, _ = make_timeline_controls()
     controls.focus_row(99)
     assert session.timeline.focus_row == len(session.layer_z_order) - 1
     controls.focus_row(-3)
@@ -1895,8 +1816,8 @@ def test_focus_row_clamps_to_layer_count() -> None:
 
 
 def test_row_visibility_toggleable_only_when_the_eye_would_act() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls(
-        lanes={"layer_1": _lane(True)},
+    controls, session, _, _, _, _ = make_timeline_controls(
+        lanes={"layer_1": make_lane(True)},
     )
     assert controls.row_visibility_toggleable(0) is True
     assert controls.row_visibility_toggleable(99) is False
@@ -1905,8 +1826,8 @@ def test_row_visibility_toggleable_only_when_the_eye_would_act() -> None:
 
 
 def test_release_row_override_hands_the_row_back() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls(
-        lanes={"layer_1": _lane(True)},
+    controls, session, _, _, _, _ = make_timeline_controls(
+        lanes={"layer_1": make_lane(True)},
     )
     assert controls.row_override_releasable(0) is False
     controls.toggle_row_visibility(0)
@@ -1919,8 +1840,8 @@ def test_release_row_override_hands_the_row_back() -> None:
 
 
 def test_arming_releases_an_override_and_an_armed_row_cannot_take_one() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls(
-        lanes={"layer_1": _lane(True)},
+    controls, session, _, _, _, _ = make_timeline_controls(
+        lanes={"layer_1": make_lane(True)},
     )
     tl = session.timeline
     controls.toggle_row_visibility(0)
@@ -1941,7 +1862,7 @@ def test_arming_releases_an_override_and_an_armed_row_cannot_take_one() -> None:
 
 
 def test_toggle_row_solo_enters_and_exits_solo() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls()
+    controls, session, _, _, _, _ = make_timeline_controls()
     controls.toggle_row_solo(1)
     assert session.solo_slot == "layer_2"
     assert controls.row_solo(1) is True
@@ -1955,8 +1876,8 @@ def test_toggle_row_solo_enters_and_exits_solo() -> None:
 
 
 def test_strip_target_pressable_follows_lock_and_armed_rows() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls(
-        lanes={"layer_1": _lane(True)},
+    controls, session, _, _, _, _ = make_timeline_controls(
+        lanes={"layer_1": make_lane(True)},
     )
     tl = session.timeline
     assert controls.strip_target_pressable("play", None) is True
@@ -1983,7 +1904,7 @@ def test_strip_target_pressable_follows_lock_and_armed_rows() -> None:
 
 
 def test_a_clip_level_nudge_can_be_undone() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         lanes={
             "layer_1": TimelineLane(
                 baseline=0.0, cues=[SlotCue(t=2.0, level=0.5)]
@@ -2002,10 +1923,10 @@ def test_a_clip_level_nudge_can_be_undone() -> None:
 
 
 def test_a_recorded_take_undoes_as_one_step() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=5.0,
-        lanes={"layer_1": _lane(True)},
+        lanes={"layer_1": make_lane(True)},
     )
     session.layers["layer_1"].enabled = True
     before = copy_lane(session.timeline.lanes["layer_1"])
@@ -2020,7 +1941,7 @@ def test_a_recorded_take_undoes_as_one_step() -> None:
 
 
 def test_add_clip_fills_a_gap_and_selects_the_new_clip() -> None:
-    controls, session, _, _, _, notifications = _make_timeline_controls(
+    controls, session, _, _, _, notifications = make_timeline_controls(
         lanes={
             "layer_1": TimelineLane(
                 baseline=0.0,
@@ -2042,8 +1963,8 @@ def test_add_clip_fills_a_gap_and_selects_the_new_clip() -> None:
 
 
 def test_add_clip_stops_at_the_next_clip() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls(
-        lanes={"layer_1": _lane(False, (5.0, 0.5), (9.0, False))},
+    controls, session, _, _, _, _ = make_timeline_controls(
+        lanes={"layer_1": make_lane(False, (5.0, 0.5), (9.0, False))},
     )
     controls.add_clip_at("layer_1", 4.0)
     clips = controls.clip_editor.clips("layer_1")
@@ -2052,8 +1973,8 @@ def test_add_clip_stops_at_the_next_clip() -> None:
 
 
 def test_add_clip_snaps_to_bars_and_can_be_undone() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls(
-        lanes={"layer_1": _lane(False)},
+    controls, session, _, _, _, _ = make_timeline_controls(
+        lanes={"layer_1": make_lane(False)},
         beat_times=(0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0),
         bar_times=(0.0, 4.0, 8.0),
     )
@@ -2078,8 +1999,8 @@ def test_add_clip_snaps_to_bars_and_can_be_undone() -> None:
 
 
 def test_add_clip_is_blocked_while_locked() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls(
-        lanes={"layer_1": _lane(False)},
+    controls, session, _, _, _, _ = make_timeline_controls(
+        lanes={"layer_1": make_lane(False)},
     )
     session.timeline.locked = True
     controls.add_clip_at("layer_1", 3.0)
@@ -2087,8 +2008,8 @@ def test_add_clip_is_blocked_while_locked() -> None:
 
 
 def test_delete_turns_the_selected_clip_off_and_selects_the_next() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls(
-        lanes={"layer_1": _lane(False, (2.0, True), (4.0, False), (6.0, True))},
+    controls, session, _, _, _, _ = make_timeline_controls(
+        lanes={"layer_1": make_lane(False, (2.0, True), (4.0, False), (6.0, True))},
     )
     session.timeline.selected_clip_t["layer_1"] = 2.0
     controls.handle_keydown(keydown(pygame.K_DELETE))
@@ -2112,8 +2033,8 @@ def test_delete_turns_the_selected_clip_off_and_selects_the_next() -> None:
 
 
 def test_delete_of_a_butted_clip_leaves_its_neighbours() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls(
-        lanes={"layer_1": _lane(False, (2.0, 1.0), (4.0, 0.5), (6.0, 1.0), (8.0, 0.0))},
+    controls, session, _, _, _, _ = make_timeline_controls(
+        lanes={"layer_1": make_lane(False, (2.0, 1.0), (4.0, 0.5), (6.0, 1.0), (8.0, 0.0))},
     )
     session.timeline.selected_clip_t["layer_1"] = 4.0
     controls.handle_keydown(keydown(pygame.K_DELETE))
@@ -2123,7 +2044,7 @@ def test_delete_of_a_butted_clip_leaves_its_neighbours() -> None:
 
 
 def test_ctrl_k_splits_the_clip_under_the_playhead() -> None:
-    controls, session, _, _, _, notifications = _make_timeline_controls(
+    controls, session, _, _, _, notifications = make_timeline_controls(
         lanes={
             "layer_1": TimelineLane(
                 baseline=0.0,
@@ -2154,8 +2075,8 @@ def test_ctrl_k_splits_the_clip_under_the_playhead() -> None:
 
 
 def test_ctrl_k_is_blocked_while_locked() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls(
-        lanes={"layer_1": _lane(False, (2.0, True), (8.0, False))},
+    controls, session, _, _, _, _ = make_timeline_controls(
+        lanes={"layer_1": make_lane(False, (2.0, True), (8.0, False))},
         position_sec=5.0,
     )
     session.timeline.locked = True
@@ -2164,8 +2085,8 @@ def test_ctrl_k_is_blocked_while_locked() -> None:
 
 
 def test_delete_is_blocked_while_locked() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls(
-        lanes={"layer_1": _lane(False, (2.0, True))},
+    controls, session, _, _, _, _ = make_timeline_controls(
+        lanes={"layer_1": make_lane(False, (2.0, True))},
     )
     session.timeline.selected_clip_t["layer_1"] = 2.0
     session.timeline.locked = True
@@ -2174,7 +2095,7 @@ def test_delete_is_blocked_while_locked() -> None:
 
 
 def test_record_over_a_partial_lane_keeps_its_level() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=10.0,
         lanes={"layer_1": TimelineLane(baseline=0.6, cues=[])},
@@ -2198,10 +2119,10 @@ def test_record_over_a_partial_lane_keeps_its_level() -> None:
 
 
 def test_record_rise_on_an_off_lane_takes_its_last_on_level() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=10.0,
-        lanes={"layer_1": _lane(False, (2.0, 0.6), (5.0, False))},
+        lanes={"layer_1": make_lane(False, (2.0, 0.6), (5.0, False))},
     )
     controls.handle_keydown(keydown(pygame.K_r))
     assert session.timeline.record_baseline == {"layer_1": 0.0}
@@ -2219,7 +2140,7 @@ def test_record_rise_on_an_off_lane_takes_its_last_on_level() -> None:
 
 
 def test_arming_mid_take_starts_from_the_lane_level() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=10.0,
         focus_row=1,

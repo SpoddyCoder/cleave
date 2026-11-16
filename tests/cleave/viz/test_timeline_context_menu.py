@@ -7,8 +7,8 @@ import pygame
 from cleave.timeline import SlotCue, TimelineLane
 from cleave.viz.context_menu import ContextMenuItem, ContextSubmenu
 from cleave.viz.timeline_context_menu import timeline_row_menu, timeline_row_menu_entries
-from tests.cleave.viz.test_timeline_controls import _make_timeline_controls
 from tests.support.viz import keydown
+from tests.support.timeline import make_timeline_controls
 
 
 def _items(controls, session, row: int) -> dict[str, ContextMenuItem]:
@@ -20,7 +20,7 @@ def _items(controls, session, row: int) -> dict[str, ContextMenuItem]:
 
 
 def test_plain_row_offers_override_and_arm() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls()
+    controls, session, _, _, _, _ = make_timeline_controls()
     items = _items(controls, session, 1)
     assert "timeline.row.visibility" not in items
     override = items["timeline.row.override"]
@@ -37,7 +37,7 @@ def test_plain_row_offers_override_and_arm() -> None:
 
 
 def test_override_item_starts_and_releases() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls(
+    controls, session, _, _, _, _ = make_timeline_controls(
         lanes={"layer_2": TimelineLane(baseline=0.0, cues=[])},
     )
     _items(controls, session, 1)["timeline.row.override"].run()
@@ -52,7 +52,7 @@ def test_override_item_starts_and_releases() -> None:
 
 
 def test_recording_blocks_overrides() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls(armed_slots={"layer_1"})
+    controls, session, _, _, _, _ = make_timeline_controls(armed_slots={"layer_1"})
     controls.handle_keydown(keydown(pygame.K_r))
     armed = _items(controls, session, 0)
     assert armed["timeline.row.override"].enabled is False
@@ -61,7 +61,7 @@ def test_recording_blocks_overrides() -> None:
 
 
 def test_armed_row_greys_out_override() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls(armed_slots={"layer_2"})
+    controls, session, _, _, _, _ = make_timeline_controls(armed_slots={"layer_2"})
     override = _items(controls, session, 1)["timeline.row.override"]
     assert override.enabled is False
     assert override.hint == "Disarm this row to override it"
@@ -69,7 +69,7 @@ def test_armed_row_greys_out_override() -> None:
 
 
 def test_locked_timeline_greys_out_arm() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls()
+    controls, session, _, _, _, _ = make_timeline_controls()
     session.timeline.locked = True
     arm = _items(controls, session, 0)["timeline.row.arm"]
     assert arm.enabled is False
@@ -77,13 +77,13 @@ def test_locked_timeline_greys_out_arm() -> None:
 
 
 def test_arm_item_arms_the_row() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls()
+    controls, session, _, _, _, _ = make_timeline_controls()
     _items(controls, session, 2)["timeline.row.arm"].run()
     assert session.timeline.armed_slots == {"layer_3"}
 
 
 def test_solo_item_solos_the_row_and_shows_the_check() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls()
+    controls, session, _, _, _, _ = make_timeline_controls()
     solo = _items(controls, session, 2)["timeline.row.solo"]
     assert solo.checked is False
     solo.run()
@@ -95,15 +95,15 @@ def test_solo_item_solos_the_row_and_shows_the_check() -> None:
 
 
 def test_row_past_the_last_layer_has_no_menu() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls()
+    controls, session, _, _, _, _ = make_timeline_controls()
     assert timeline_row_menu(controls, session, 9)() == ()
 
 
 def _clip_controls(*, position_sec: float = 1.0, **kwargs):
-    from tests.cleave.viz.test_timeline_controls import _lane
+    from tests.support.timeline import make_lane
 
-    lanes = {"layer_1": _lane(False, (4.0, True), (10.0, False))}
-    return _make_timeline_controls(lanes=lanes, position_sec=position_sec, **kwargs)
+    lanes = {"layer_1": make_lane(False, (4.0, True), (10.0, False))}
+    return make_timeline_controls(lanes=lanes, position_sec=position_sec, **kwargs)
 
 
 def _entries_by_id(controls, session, row: int, **kwargs):
@@ -163,12 +163,12 @@ def test_selected_clip_leads_with_go_to_splits_cuts_role_delete() -> None:
 
 
 def test_cut_out_is_greyed_out_on_a_butted_clip_and_at_the_song_end() -> None:
-    from tests.cleave.viz.test_timeline_controls import _lane
+    from tests.support.timeline import make_lane
 
     lanes = {
-        "layer_1": _lane(False, (4.0, 1.0), (10.0, 0.5)),
+        "layer_1": make_lane(False, (4.0, 1.0), (10.0, 0.5)),
     }
-    controls, session, _, _, _, _ = _make_timeline_controls(lanes=lanes)
+    controls, session, _, _, _, _ = make_timeline_controls(lanes=lanes)
     session.timeline.selected_clip_t["layer_1"] = 4.0
     butted = _entries_by_id(controls, session, 0)["timeline.clip.cut_out"]
     assert butted.enabled is False

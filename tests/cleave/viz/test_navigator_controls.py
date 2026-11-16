@@ -6,11 +6,14 @@ from cleave.viz.inspector import build_inspector_rows
 from cleave.viz.navigator import layer_node_id, layer_page_node_id
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.shell_focus import ShellRegion
-from tests.cleave.viz.test_controls import _make_controls, _make_controls_with_manager
+from tests.support.viz import (
+    make_controls,
+    make_controls_with_manager,
+)
 
 
 def test_open_page_shows_a_project_page_without_a_navigator_row() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     focus = controls.shell_focus
     expanded = set(focus.nav_expanded)
     controls.navigator.open_page("project.projectm")
@@ -23,7 +26,7 @@ def test_open_page_shows_a_project_page_without_a_navigator_row() -> None:
 
 
 def test_open_page_survives_reconcile_and_quick_step_leaves_it() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     focus = controls.shell_focus
     controls.navigator.open_page("settings.preview")
     controls.navigator.reconcile()
@@ -38,7 +41,7 @@ def test_open_page_survives_reconcile_and_quick_step_leaves_it() -> None:
 
 
 def test_enter_on_root_page_focuses_its_enabled_row() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     focus = controls.shell_focus
     for node_id, kind in (
         ("overlay", RowKind.OVERLAYS_ENABLED),
@@ -54,7 +57,7 @@ def test_enter_on_root_page_focuses_its_enabled_row() -> None:
 
 
 def test_enter_on_pages_focuses_first_navigable_row() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     focus = controls.shell_focus
     view = controls.build_view_state(paused=controls.playback.paused)
     for node_id in (
@@ -76,7 +79,7 @@ def test_enter_on_pages_focuses_first_navigable_row() -> None:
 
 
 def test_enter_on_layers_opens_inspector() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     controls.navigator.select("layers")
     before = controls.focus_descriptor
     controls.navigator.activate()
@@ -116,7 +119,7 @@ def test_enter_on_layers_opens_inspector() -> None:
 
 
 def test_selecting_nodes_does_not_move_the_leftover_cursor() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     before = controls.focus_descriptor
     for node_id in ("overlay", "layers", layer_node_id("layer_1")):
         controls.navigator.select(node_id)
@@ -125,7 +128,7 @@ def test_selecting_nodes_does_not_move_the_leftover_cursor() -> None:
 
 
 def test_quick_step_stays_on_top_level_ids() -> None:
-    controls = _make_controls(("layer_1", "layer_2"))
+    controls = make_controls(("layer_1", "layer_2"))
     focus = controls.shell_focus
     controls.navigator.select("timeline")
     controls.navigator.quick_step(1)
@@ -137,7 +140,7 @@ def test_quick_step_stays_on_top_level_ids() -> None:
 
 
 def test_quick_step_from_a_child_moves_from_its_root() -> None:
-    controls = _make_controls(("layer_1", "layer_2"))
+    controls = make_controls(("layer_1", "layer_2"))
     focus = controls.shell_focus
     controls.navigator.select("post_fx.limiter")
     controls.navigator.quick_step(1)
@@ -149,7 +152,7 @@ def test_quick_step_from_a_child_moves_from_its_root() -> None:
 
 
 def test_delete_reconciles_to_nearest_layer_sibling() -> None:
-    controls, manager = _make_controls_with_manager(("layer_1", "layer_2", "layer_3"))
+    controls, manager = make_controls_with_manager(("layer_1", "layer_2", "layer_3"))
     controls.navigator.select(layer_node_id("layer_2"))
 
     def remove(slot: str) -> None:
@@ -166,7 +169,7 @@ def test_delete_reconciles_to_nearest_layer_sibling() -> None:
 
 
 def test_delete_from_a_layer_page_lands_on_a_sibling_layer() -> None:
-    controls, manager = _make_controls_with_manager(("layer_1", "layer_2"))
+    controls, manager = make_controls_with_manager(("layer_1", "layer_2"))
     controls.navigator.select(layer_page_node_id("layer_2", "compositing"))
 
     def remove(slot: str) -> None:
@@ -179,7 +182,7 @@ def test_delete_from_a_layer_page_lands_on_a_sibling_layer() -> None:
 
 
 def test_reconcile_opens_the_branch_it_lands_on() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     focus = controls.shell_focus
     controls.navigator.open_page("project.resolution")
     controls.session.settings.editor_mode = "preset_curation"
@@ -189,7 +192,7 @@ def test_reconcile_opens_the_branch_it_lands_on() -> None:
 
 
 def test_switching_off_moves_selection_off_the_preset_list_page() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     focus = controls.shell_focus
     layer = controls.session.layers["layer_1"]
     layer.preset_switching_trigger = "timer"
@@ -210,7 +213,7 @@ def _visit(controls, page_id: str) -> None:
 
 
 def test_back_selects_the_previous_page_and_opens_its_ancestors() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     focus = controls.shell_focus
     page = layer_page_node_id("layer_1", "compositing")
     _visit(controls, "layers")
@@ -228,7 +231,7 @@ def test_back_selects_the_previous_page_and_opens_its_ancestors() -> None:
 
 
 def test_back_in_the_inspector_keeps_focus_and_moves_the_cursor() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     focus = controls.shell_focus
     _visit(controls, "overlay")
     controls.navigator.open_page("project.projectm")
@@ -241,7 +244,7 @@ def test_back_in_the_inspector_keeps_focus_and_moves_the_cursor() -> None:
 
 
 def test_back_skips_a_page_whose_layer_was_removed() -> None:
-    controls = _make_controls(("layer_1", "layer_2"))
+    controls = make_controls(("layer_1", "layer_2"))
     _visit(controls, "overlay")
     _visit(controls, layer_node_id("layer_2"))
     _visit(controls, "post_fx")
@@ -252,7 +255,7 @@ def test_back_skips_a_page_whose_layer_was_removed() -> None:
 
 
 def test_back_from_the_strip_to_a_navigator_page_leaves_the_strip() -> None:
-    controls = _make_controls(("layer_1", "layer_2"))
+    controls = make_controls(("layer_1", "layer_2"))
     controls.open_timeline_panel()
     _visit(controls, "overlay")
     controls.set_shell_region(ShellRegion.TIMELINE)

@@ -23,7 +23,8 @@ from cleave.viz.value_nudge import (
     nudge_press_skips_row,
     selectable_text_y,
 )
-from tests.cleave.viz.test_controls import _make_controls
+from tests.support.viz import make_controls
+
 
 _OPACITY = RowDescriptor(RowKind.TRACK_OPACITY, slot="layer_1")
 _SNAP = RowDescriptor(RowKind.TIMELINE_PLACEMENT_SNAP)
@@ -124,7 +125,7 @@ def test_arrow_press_steps_and_skips_drag_and_activate() -> None:
     assert nudge_press_skips_row(right) is True
     assert nudge_press_skips_row(body) is False
 
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     start = _opacity(controls)
     assert left is not None and right is not None
     apply_field_horizontal(controls, _OPACITY, left.forward, False)
@@ -148,7 +149,7 @@ def _hold_schedule() -> list[float]:
 
 
 def test_hold_matches_key_repeat_then_stops_on_release() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     assert row_spec(_OPACITY.kind).repeatable is True
     start = _opacity(controls)
     apply_field_horizontal(controls, _OPACITY, True, False)
@@ -185,7 +186,7 @@ def test_hold_matches_key_repeat_then_stops_on_release() -> None:
 
 
 def test_non_repeatable_spec_steps_once() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     assert row_spec(_SNAP.kind).repeatable is False
     controls.session.timeline.placement_snap = "off"
     apply_field_horizontal(controls, _SNAP, True, False)
@@ -204,7 +205,7 @@ def test_non_repeatable_spec_steps_once() -> None:
 
 
 def test_key_repeat_and_nudge_disarm_each_other() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     controls.arm_key_repeat(pygame.K_RIGHT, 0, on_repeat=lambda _key, _mod: None)
     assert controls.key_repeat_armed is True
     controls.begin_value_nudge(_OPACITY, True, True)
@@ -219,7 +220,7 @@ def test_key_repeat_and_nudge_disarm_each_other() -> None:
 
 
 def test_tick_releases_when_the_button_is_up_or_a_modal_is_open() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     start = _opacity(controls)
     apply_field_horizontal(controls, _OPACITY, True, False)
     controls.begin_value_nudge(_OPACITY, True, True)

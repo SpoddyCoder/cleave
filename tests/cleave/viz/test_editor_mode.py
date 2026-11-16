@@ -12,8 +12,14 @@ from cleave.viz.focus_nav import MainFocus
 from cleave.viz.modal import ModalKind
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.tuning_view_state import view_state_structure_signature
-from tests.cleave.viz.test_controls import _make_controls, _mutate_dirty
-from tests.support.viz import press_layer_row, keydown, make_playlist, make_test_cfg
+from tests.support.viz import (
+    keydown,
+    make_controls,
+    make_playlist,
+    make_test_cfg,
+    mutate_dirty,
+    press_layer_row,
+)
 
 
 def _prompt_editor_mode(controls) -> None:
@@ -36,7 +42,7 @@ def _choose_editor_mode_option(controls, option_label: str) -> None:
 
 
 def test_structure_signature_invalidates_on_editor_mode() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     session = controls.session
     config_save = controls._config_save
     sig_before = view_state_structure_signature(
@@ -50,7 +56,7 @@ def test_structure_signature_invalidates_on_editor_mode() -> None:
 def test_curation_shows_only_focus_layer() -> None:
     from cleave.viz.layer_visibility import effective_layer_enabled
 
-    controls = _make_controls(("layer_1", "layer_2"))
+    controls = make_controls(("layer_1", "layer_2"))
     session = controls.session
     session.settings.editor_mode = "preset_curation"
     session.timeline.enabled = True
@@ -62,7 +68,7 @@ def test_curation_shows_only_focus_layer() -> None:
 
 
 def test_enter_curation_confirms_via_modal() -> None:
-    controls = _make_controls(("layer_1", "layer_2"))
+    controls = make_controls(("layer_1", "layer_2"))
     _prompt_editor_mode(controls)
     view = controls.modal_host.view_state()
     assert view is not None
@@ -79,7 +85,7 @@ def test_enter_curation_focuses_first_layer_preset_row() -> None:
     from cleave.viz.navigator import layer_node_id
     from cleave.viz.shell_focus import ShellRegion
 
-    controls = _make_controls(("layer_1", "layer_2"))
+    controls = make_controls(("layer_1", "layer_2"))
     controls.navigator.select("overlay")
     _choose_editor_mode_option(controls, "Switch")
 
@@ -94,7 +100,7 @@ def test_enter_curation_focuses_first_layer_preset_row() -> None:
 def test_editor_mode_change_syncs_compositor_format() -> None:
     from cleave.gl_color_format import RGBA8, RGBA16F
 
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     controls.session.project.compositor_hdr = True
     compositor = MagicMock()
     post_process = MagicMock()
@@ -116,7 +122,7 @@ def test_editor_mode_change_syncs_compositor_format() -> None:
 
 def test_enter_curation_defaults_full_mix_and_disables_rotation() -> None:
     """Regression: session projectM rotation must not keep running in curation."""
-    controls = _make_controls(("layer_1", "layer_2"))
+    controls = make_controls(("layer_1", "layer_2"))
     controls.session.solo_slot = "layer_2"
     controls.session.layers["layer_1"].stem = "drums"
     controls.session.layers["layer_1"].preset_switching = "on"
@@ -142,7 +148,7 @@ def test_enter_curation_defaults_full_mix_and_disables_rotation() -> None:
 
 
 def test_curation_allowlisted_keys_still_work() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     controls.session.settings.editor_mode = "preset_curation"
     controls.focus_cursor = MainFocus(
         RowDescriptor(RowKind.TRACK_PRESET, slot="layer_1")
@@ -162,7 +168,7 @@ def test_curation_allowlisted_keys_still_work() -> None:
 def test_curation_ignores_layer_lock() -> None:
     from cleave.viz.row_spec import section_locked
 
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     controls.session.settings.editor_mode = "preset_curation"
     layer = controls.session.layers["layer_1"]
     layer.locked = True
@@ -181,8 +187,8 @@ def test_curation_ignores_layer_lock() -> None:
 
 
 def test_dirty_enter_modal_cancel_stays_visualizer() -> None:
-    controls = _make_controls(("layer_1",))
-    _mutate_dirty(controls)
+    controls = make_controls(("layer_1",))
+    mutate_dirty(controls)
     _choose_editor_mode_option(controls, "Switch")
     assert controls.modal_host.active
     view = controls.modal_host.view_state()
@@ -195,7 +201,7 @@ def test_dirty_enter_modal_cancel_stays_visualizer() -> None:
 
 
 def test_exit_curation_reloads_and_clears_dirty() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     session = controls.session
     session.settings.editor_mode = "preset_curation"
     session.layers["layer_1"].opacity_pct = 12
@@ -237,7 +243,7 @@ def test_exit_curation_reloads_and_clears_dirty() -> None:
 
 
 def test_editor_mode_modal_cancel_keeps_visualizer() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     _prompt_editor_mode(controls)
     assert controls.modal_host.active
     _choose_editor_mode_option(controls, "Cancel")
@@ -246,7 +252,7 @@ def test_editor_mode_modal_cancel_keeps_visualizer() -> None:
 
 
 def test_editor_mode_absent_from_persisted_payload() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     controls.session.settings.editor_mode = "preset_curation"
     payload = persisted_session_payload(controls.cfg, controls.session)
     assert "editor_mode" not in payload

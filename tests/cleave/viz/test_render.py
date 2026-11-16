@@ -23,7 +23,11 @@ from cleave.viz.session import (
     default_overlays_runtime,
     session_from_cfg,
 )
-from tests.support.config import TEST_LAYER_STEMS, default_post_fx_runtime
+from tests.support.config import (
+    TEST_LAYER_STEMS,
+    default_post_fx_runtime,
+    write_minimal_config,
+)
 from cleave.paths import repo_root
 from cleave.config_schema.layers import DEFAULT_LAYER_SLOTS
 from cleave.config_schema.project_resolution import (
@@ -37,6 +41,12 @@ from cleave.project import (
     write_manifest,
 )
 from cleave.separate import project_stems_complete
+from tests.support.overlay_cards import (
+    closing_card_cfg,
+    opening_card_cfg,
+    overlays_cfg,
+)
+
 
 render_mod = importlib.import_module("cleave.viz.render")
 from cleave.viz.frame_finish import resolve_overlay_configs
@@ -47,12 +57,6 @@ from cleave.viz.render import (  # noqa: E402
     _resolve_segment,
     validate_render_project,
 )
-from tests.cleave.viz.test_overlay_cards import (
-    _closing_overlay_cfg,
-    _overlay_cfg,
-    _overlays_cfg,
-)
-from tests.support.config import write_minimal_config
 
 
 def _render_frame_bytes(
@@ -999,15 +1003,15 @@ def test_render_calls_overlay_compositing_when_enabled(
     duration_sec = 2.0
     frame_count = math.ceil(duration_sec * fps)
 
-    overlay_cfg = _overlay_cfg(appear_at=0.0)
+    overlay_cfg = opening_card_cfg(appear_at=0.0)
     base_cfg = load_config(project / VIZ_CONFIG_FILENAME, repo_root())
     mock_load_config.return_value = replace(
         base_cfg,
         render_fps=fps,
         render=RenderConfig(
-            overlays=_overlays_cfg(
+            overlays=overlays_cfg(
                 opening=overlay_cfg,
-                closing=_closing_overlay_cfg(enabled=False),
+                closing=closing_card_cfg(enabled=False),
             ),
             post_fx=None,
         ),
@@ -1080,15 +1084,15 @@ def test_render_skips_overlay_when_disabled(
 ) -> None:
     project = _setup_render_project(tmp_path)
 
-    overlay_cfg = _overlay_cfg(enabled=False)
+    overlay_cfg = opening_card_cfg(enabled=False)
     base_cfg = load_config(project / VIZ_CONFIG_FILENAME, repo_root())
     fps = base_cfg.render_fps
     mock_load_config.return_value = replace(
         base_cfg,
         render=RenderConfig(
-            overlays=_overlays_cfg(
+            overlays=overlays_cfg(
                 opening=overlay_cfg,
-                closing=_closing_overlay_cfg(enabled=False),
+                closing=closing_card_cfg(enabled=False),
             ),
             post_fx=None,
         ),
@@ -1317,7 +1321,7 @@ def test_render_overlay_frame_order_uses_content_dims(
     duration_sec = 2.0
     frame_count = math.ceil(duration_sec * fps)
 
-    overlay_cfg = _overlay_cfg(appear_at=0.0, display_time=30.0)
+    overlay_cfg = opening_card_cfg(appear_at=0.0, display_time=30.0)
     base_cfg = load_config(project / VIZ_CONFIG_FILENAME, repo_root())
     mock_load_config.return_value = replace(
         base_cfg,
@@ -1325,9 +1329,9 @@ def test_render_overlay_frame_order_uses_content_dims(
         resolution_width=render_w,
         resolution_height=render_h,
         render=RenderConfig(
-            overlays=_overlays_cfg(
+            overlays=overlays_cfg(
                 opening=overlay_cfg,
-                closing=_closing_overlay_cfg(enabled=False),
+                closing=closing_card_cfg(enabled=False),
             ),
             post_fx=None,
         ),

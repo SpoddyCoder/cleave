@@ -11,8 +11,10 @@ from cleave.viz.row_sections import (
     OVERLAY_SECTION_KINDS,
 )
 from cleave.viz.tuning_view_state import TrackBlock
-from tests.cleave.viz.test_overlay import _minimal_view_state
-from tests.support.viz import make_track_block
+from tests.support.viz import (
+    make_track_block,
+    minimal_view_state,
+)
 
 
 def _track_block(**overrides: object) -> TrackBlock:
@@ -33,7 +35,7 @@ def _track_block(**overrides: object) -> TrackBlock:
 
 
 def _page_kinds(node_id: str, **overrides: object) -> list[RowKind]:
-    state = _minimal_view_state(tracks={"layer_1": _track_block(**overrides)})
+    state = minimal_view_state(tracks={"layer_1": _track_block(**overrides)})
     return [
         row.descriptor.kind
         for row in build_inspector_rows(state, node_id)
@@ -63,7 +65,7 @@ def test_milkdrop_preset_page_holds_dir_preset_and_beat() -> None:
         RowKind.TRACK_BEAT,
     ]
     rows = build_inspector_rows(
-        _minimal_view_state(tracks={"layer_1": _track_block()}),
+        minimal_view_state(tracks={"layer_1": _track_block()}),
         layer_page_node_id("layer_1", "milkdrop_preset"),
     )
     assert rows[-1].command_ids == ("layers.add_current_preset",)
@@ -71,7 +73,7 @@ def test_milkdrop_preset_page_holds_dir_preset_and_beat() -> None:
 
 def test_add_to_preset_list_hides_while_switching_is_off() -> None:
     rows = build_inspector_rows(
-        _minimal_view_state(
+        minimal_view_state(
             tracks={
                 "layer_1": _track_block(
                     preset_switching="off", preset_switching_trigger="off"

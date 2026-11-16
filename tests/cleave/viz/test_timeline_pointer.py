@@ -752,10 +752,10 @@ def _drag_setup(
 ):
     """A pointer over layer_1's lane. Geometry maps ten pixels to a second."""
     from cleave.timeline import SlotCue, TimelineLane
-    from tests.cleave.viz.test_timeline_controls import _make_timeline_controls
+    from tests.support.timeline import make_timeline_controls
 
     lane = TimelineLane(baseline=0.0, cues=[SlotCue(t=t, level=lv) for t, lv in cues])
-    controls, session, *_ = _make_timeline_controls(lanes={"layer_1": lane}, **kwargs)
+    controls, session, *_ = make_timeline_controls(lanes={"layer_1": lane}, **kwargs)
     if view is not None:
         session.timeline.strip_view = view
     geometry = _Geometry(hit)

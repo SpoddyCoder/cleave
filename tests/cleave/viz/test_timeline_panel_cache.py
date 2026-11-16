@@ -15,7 +15,7 @@ from cleave.viz.timeline_panel_cache import (
     timeline_static_signature,
     timeline_upload_signature,
 )
-from tests.cleave.viz.test_timeline_overlay import _view_state
+from tests.support.timeline import strip_view_state
 
 
 def _static_sig(state: TimelineViewState, *, panel_w: int = 1260, panel_h: int = 120) -> object:
@@ -28,11 +28,11 @@ def _static_sig(state: TimelineViewState, *, panel_w: int = 1260, panel_h: int =
 
 
 def test_static_signature_stable_for_same_state() -> None:
-    state = _view_state()
+    state = strip_view_state()
     assert _static_sig(state) == _static_sig(state)
 
 
-def _as_level(value):
+def as_level(value):
     if value is None:
         return None
     if isinstance(value, bool):
@@ -40,21 +40,21 @@ def _as_level(value):
     return float(value)
 
 
-def _lane(baseline, *transitions) -> TimelineLane:
-    base = _as_level(baseline)
-    cues = [SlotCue(t=t, level=float(_as_level(level))) for t, level in transitions]
+def make_lane(baseline, *transitions) -> TimelineLane:
+    base = as_level(baseline)
+    cues = [SlotCue(t=t, level=float(as_level(level))) for t, level in transitions]
     return TimelineLane(baseline=base, cues=canonicalize(base, cues))
 
 
 def test_static_signature_changes_on_cue_edit() -> None:
-    base = _view_state()
-    edited = _view_state(lanes={"layer_1": _lane(True, (10.0, False))})
+    base = strip_view_state()
+    edited = strip_view_state(lanes={"layer_1": make_lane(True, (10.0, False))})
     assert _static_sig(base) != _static_sig(edited)
 
 
 def test_static_signature_changes_on_layer_add() -> None:
-    four = _view_state()
-    five = _view_state(
+    four = strip_view_state()
+    five = strip_view_state(
         layer_z_order=["layer_1", "layer_2", "layer_3", "layer_4", "layer_5"],
         defaults={f"layer_{i}": 1.0 for i in range(1, 6)},
     )
@@ -62,27 +62,27 @@ def test_static_signature_changes_on_layer_add() -> None:
 
 
 def test_static_signature_changes_on_focus_change() -> None:
-    unfocused = _view_state(submenu_focused=False, focus_row=0)
-    focused = _view_state(submenu_focused=True, focus_row=1)
+    unfocused = strip_view_state(submenu_focused=False, focus_row=0)
+    focused = strip_view_state(submenu_focused=True, focus_row=1)
     assert _static_sig(unfocused) != _static_sig(focused)
 
 
 def test_static_signature_stable_for_playhead_when_not_recording() -> None:
-    paused = _view_state(position_sec=0.0, recording=False)
-    moved = _view_state(position_sec=12.5, recording=False)
+    paused = strip_view_state(position_sec=0.0, recording=False)
+    moved = strip_view_state(position_sec=12.5, recording=False)
     assert _static_sig(paused) == _static_sig(moved)
 
 
 def test_static_signature_changes_on_playhead_while_recording() -> None:
     """Armed bars grow with playhead; static cache must invalidate."""
-    at_start = _view_state(
+    at_start = strip_view_state(
         position_sec=10.0,
         recording=True,
         armed_slots={"layer_1"},
         record_start_sec=10.0,
         record_baseline={"layer_1": 1.0},
     )
-    advanced = _view_state(
+    advanced = strip_view_state(
         position_sec=15.0,
         recording=True,
         armed_slots={"layer_1"},
@@ -93,35 +93,35 @@ def test_static_signature_changes_on_playhead_while_recording() -> None:
 
 
 def test_static_signature_changes_on_show_bar_grid() -> None:
-    hidden = _view_state(show_bar_grid=False, bar_grid_times=(0.0, 4.0))
-    shown = _view_state(show_bar_grid=True, bar_grid_times=(0.0, 4.0))
+    hidden = strip_view_state(show_bar_grid=False, bar_grid_times=(0.0, 4.0))
+    shown = strip_view_state(show_bar_grid=True, bar_grid_times=(0.0, 4.0))
     assert _static_sig(hidden) != _static_sig(shown)
 
 
 def test_static_signature_changes_on_bar_grid_times() -> None:
-    phase0 = _view_state(show_bar_grid=True, bar_grid_times=(0.0, 4.0))
-    phase1 = _view_state(show_bar_grid=True, bar_grid_times=(1.0, 5.0))
+    phase0 = strip_view_state(show_bar_grid=True, bar_grid_times=(0.0, 4.0))
+    phase1 = strip_view_state(show_bar_grid=True, bar_grid_times=(1.0, 5.0))
     assert _static_sig(phase0) != _static_sig(phase1)
 
 
 def test_static_signature_changes_on_song_marker_times() -> None:
-    empty = _view_state(song_marker_times=())
-    with_markers = _view_state(song_marker_times=(10.0, 40.0))
+    empty = strip_view_state(song_marker_times=())
+    with_markers = strip_view_state(song_marker_times=(10.0, 40.0))
     assert _static_sig(empty) != _static_sig(with_markers)
-    moved = _view_state(song_marker_times=(12.0, 40.0))
+    moved = strip_view_state(song_marker_times=(12.0, 40.0))
     assert _static_sig(with_markers) != _static_sig(moved)
 
 
 def test_static_signature_changes_on_selected_song_marker_index() -> None:
-    none_selected = _view_state(
+    none_selected = strip_view_state(
         song_marker_times=(10.0, 40.0),
         selected_song_marker_index=None,
     )
-    first = _view_state(
+    first = strip_view_state(
         song_marker_times=(10.0, 40.0),
         selected_song_marker_index=0,
     )
-    second = _view_state(
+    second = strip_view_state(
         song_marker_times=(10.0, 40.0),
         selected_song_marker_index=1,
     )
@@ -130,15 +130,15 @@ def test_static_signature_changes_on_selected_song_marker_index() -> None:
 
 
 def test_static_signature_changes_on_selected_clip_t() -> None:
-    none_selected = _view_state(
-        lanes={"layer_1": _lane(True, (10.0, False), (20.0, True))},
+    none_selected = strip_view_state(
+        lanes={"layer_1": make_lane(True, (10.0, False), (20.0, True))},
     )
-    first = _view_state(
-        lanes={"layer_1": _lane(True, (10.0, False), (20.0, True))},
+    first = strip_view_state(
+        lanes={"layer_1": make_lane(True, (10.0, False), (20.0, True))},
         selected_clip_t={"layer_1": 10.0},
     )
-    second = _view_state(
-        lanes={"layer_1": _lane(True, (10.0, False), (20.0, True))},
+    second = strip_view_state(
+        lanes={"layer_1": make_lane(True, (10.0, False), (20.0, True))},
         selected_clip_t={"layer_1": 20.0},
     )
     assert _static_sig(none_selected) != _static_sig(first)
@@ -146,7 +146,7 @@ def test_static_signature_changes_on_selected_clip_t() -> None:
 
 
 def test_static_signature_changes_on_cue_blend_and_role() -> None:
-    level_only = _view_state(
+    level_only = strip_view_state(
         lanes={
             "layer_1": TimelineLane(
                 baseline=0.0,
@@ -154,7 +154,7 @@ def test_static_signature_changes_on_cue_blend_and_role() -> None:
             )
         }
     )
-    with_blend = _view_state(
+    with_blend = strip_view_state(
         lanes={
             "layer_1": TimelineLane(
                 baseline=0.0,
@@ -164,7 +164,7 @@ def test_static_signature_changes_on_cue_blend_and_role() -> None:
             )
         }
     )
-    with_role = _view_state(
+    with_role = strip_view_state(
         lanes={
             "layer_1": TimelineLane(
                 baseline=0.0,
@@ -180,7 +180,7 @@ def test_static_signature_changes_on_cue_blend_and_role() -> None:
 
 
 def test_static_signature_changes_on_cue_cut() -> None:
-    none_cut = _view_state(
+    none_cut = strip_view_state(
         lanes={
             "layer_1": TimelineLane(
                 baseline=0.0,
@@ -188,7 +188,7 @@ def test_static_signature_changes_on_cue_cut() -> None:
             )
         }
     )
-    hard_cut = _view_state(
+    hard_cut = strip_view_state(
         lanes={
             "layer_1": TimelineLane(
                 baseline=0.0,
@@ -198,7 +198,7 @@ def test_static_signature_changes_on_cue_cut() -> None:
             )
         }
     )
-    soft_cut = _view_state(
+    soft_cut = strip_view_state(
         lanes={
             "layer_1": TimelineLane(
                 baseline=0.0,
@@ -214,38 +214,38 @@ def test_static_signature_changes_on_cue_cut() -> None:
 
 
 def test_static_signature_changes_on_soft_cut_fades_enabled() -> None:
-    disabled = _view_state(soft_cut_fades_enabled=False)
-    enabled = _view_state(soft_cut_fades_enabled=True)
+    disabled = strip_view_state(soft_cut_fades_enabled=False)
+    enabled = strip_view_state(soft_cut_fades_enabled=True)
     assert _static_sig(disabled) != _static_sig(enabled)
 
 
 def test_static_signature_changes_on_hard_cut_fades_enabled() -> None:
-    disabled = _view_state(hard_cut_fades_enabled=False)
-    enabled = _view_state(hard_cut_fades_enabled=True)
+    disabled = strip_view_state(hard_cut_fades_enabled=False)
+    enabled = strip_view_state(hard_cut_fades_enabled=True)
     assert _static_sig(disabled) != _static_sig(enabled)
 
 
 def test_static_signature_changes_on_soft_cut_fade_in() -> None:
-    short = _view_state(soft_cut_fades_enabled=True, soft_cut_fade_in=2.0)
-    long = _view_state(soft_cut_fades_enabled=True, soft_cut_fade_in=4.0)
+    short = strip_view_state(soft_cut_fades_enabled=True, soft_cut_fade_in=2.0)
+    long = strip_view_state(soft_cut_fades_enabled=True, soft_cut_fade_in=4.0)
     assert _static_sig(short) != _static_sig(long)
 
 
 def test_static_signature_changes_on_hard_cut_fade_out() -> None:
-    short = _view_state(hard_cut_fades_enabled=True, hard_cut_fade_out=2.0)
-    long = _view_state(hard_cut_fades_enabled=True, hard_cut_fade_out=4.0)
+    short = strip_view_state(hard_cut_fades_enabled=True, hard_cut_fade_out=2.0)
+    long = strip_view_state(hard_cut_fades_enabled=True, hard_cut_fade_out=4.0)
     assert _static_sig(short) != _static_sig(long)
 
 
 def test_static_signature_changes_on_hard_cut_crossfade() -> None:
-    edge = _view_state(hard_cut_fades_enabled=True, hard_cut_crossfade=False)
-    centered = _view_state(hard_cut_fades_enabled=True, hard_cut_crossfade=True)
+    edge = strip_view_state(hard_cut_fades_enabled=True, hard_cut_crossfade=False)
+    centered = strip_view_state(hard_cut_fades_enabled=True, hard_cut_crossfade=True)
     assert _static_sig(edge) != _static_sig(centered)
 
 
 def test_static_signature_changes_on_soft_cut_crossfade() -> None:
-    edge = _view_state(soft_cut_fades_enabled=True, soft_cut_crossfade=False)
-    centered = _view_state(soft_cut_fades_enabled=True, soft_cut_crossfade=True)
+    edge = strip_view_state(soft_cut_fades_enabled=True, soft_cut_crossfade=False)
+    centered = strip_view_state(soft_cut_fades_enabled=True, soft_cut_crossfade=True)
     assert _static_sig(edge) != _static_sig(centered)
 
 
@@ -253,7 +253,7 @@ def test_compose_rebuilds_static_panel_when_recording_playhead_moves() -> None:
     pygame.init()
     overlay = TimelineOverlay()
     kwargs = dict(viewport_width=1280, viewport_height=720)
-    first_state = _view_state(
+    first_state = strip_view_state(
         position_sec=10.0,
         recording=True,
         armed_slots={"layer_1"},
@@ -265,7 +265,7 @@ def test_compose_rebuilds_static_panel_when_recording_playhead_moves() -> None:
     cached_panel = overlay._cache.panel
     assert cached_panel is not None
 
-    second_state = _view_state(
+    second_state = strip_view_state(
         position_sec=15.0,
         recording=True,
         armed_slots={"layer_1"},
@@ -279,8 +279,8 @@ def test_compose_rebuilds_static_panel_when_recording_playhead_moves() -> None:
 
 def test_live_signature_ignores_position_at_same_playhead_px() -> None:
     pygame.init()
-    early = _view_state(position_sec=12.0)
-    late = _view_state(position_sec=12.5)
+    early = strip_view_state(position_sec=12.0)
+    late = strip_view_state(position_sec=12.5)
     kwargs = dict(
         playhead_px=100, bar_left=80, bar_width=900, row_count=4, row_h=20, ticks_ms=0
     )
@@ -291,7 +291,7 @@ def test_live_signature_ignores_position_at_same_playhead_px() -> None:
 
 def test_live_signature_changes_on_playhead_flash() -> None:
     pygame.init()
-    state = _view_state(position_sec=10.0)
+    state = strip_view_state(position_sec=10.0)
     kwargs = dict(playhead_px=100, bar_left=80, bar_width=900, row_count=4, row_h=20)
     bright = timeline_live_signature(state, ticks_ms=0, **kwargs)
     dim = timeline_live_signature(state, ticks_ms=400, **kwargs)
@@ -304,11 +304,11 @@ def test_live_signature_changes_on_selected_clip_flash_phase(monkeypatch) -> Non
 
     overlay = TimelineOverlay()
     start = 10_000
-    state = _view_state(
+    state = strip_view_state(
         position_sec=10.0,
         selected_clip_t={"layer_1": 10.0},
         selected_clip_flash_start_ms=start,
-        lanes={"layer_1": _lane(True, (10.0, False))},
+        lanes={"layer_1": make_lane(True, (10.0, False))},
     )
     monkeypatch.setattr(pygame.time, "get_ticks", lambda: start)
     bright = live_flash_signature(state)
@@ -326,7 +326,7 @@ def test_upload_plan_skip_when_paused_and_unchanged(monkeypatch) -> None:
     # of an unchanged paused view stay on one flash phase and skip the upload.
     monkeypatch.setattr(pygame.time, "get_ticks", lambda: 1_000)
     overlay = TimelineOverlay()
-    state = _view_state(position_sec=30.0)
+    state = strip_view_state(position_sec=30.0)
     first = overlay.compose_panel(state, viewport_width=1280, viewport_height=720)
     assert first is not None
 
@@ -344,7 +344,7 @@ def test_upload_plan_partial_when_position_moves() -> None:
     pygame.init()
     overlay = TimelineOverlay()
     kwargs = dict(viewport_width=1280, viewport_height=720)
-    first = overlay.compose_panel(_view_state(position_sec=0.0), **kwargs)
+    first = overlay.compose_panel(strip_view_state(position_sec=0.0), **kwargs)
     assert first is not None
 
     cache = overlay._cache
@@ -352,7 +352,7 @@ def test_upload_plan_partial_when_position_moves() -> None:
     cache.gpu.last_texture_id = 1
     cache.gpu.capacity = first.capacity
 
-    second = overlay.compose_panel(_view_state(position_sec=25.0), **kwargs)
+    second = overlay.compose_panel(strip_view_state(position_sec=25.0), **kwargs)
     assert second is not None
     assert second.upload_plan.mode == "partial"
     assert second.upload_plan.dirty_rects
@@ -362,7 +362,7 @@ def test_timeline_panel_max_dimensions_uses_max_layer_count() -> None:
     pygame.init()
     w, h = timeline_panel_max_dimensions(1280, 720)
     overlay = TimelineOverlay()
-    max_rows = _view_state(
+    max_rows = strip_view_state(
         layer_z_order=[f"layer_{i}" for i in range(1, MAX_LAYER_COUNT + 1)],
         defaults={f"layer_{i}": True for i in range(1, MAX_LAYER_COUNT + 1)},
     )
@@ -373,7 +373,7 @@ def test_timeline_panel_max_dimensions_uses_max_layer_count() -> None:
 
 
 def test_upload_signature_pairs_static_and_live() -> None:
-    state = _view_state(position_sec=5.0)
+    state = strip_view_state(position_sec=5.0)
     static = _static_sig(state)
     live = timeline_live_signature(
         state,
@@ -394,7 +394,7 @@ def test_upload_signature_pairs_static_and_live() -> None:
 def test_static_signature_changes_with_the_view_window() -> None:
     from dataclasses import replace
 
-    state = _view_state(position_sec=5.0)
+    state = strip_view_state(position_sec=5.0)
     whole = _static_sig(state)
     zoomed = _static_sig(replace(state, view_start_sec=10.0, view_end_sec=30.0))
     panned = _static_sig(replace(state, view_start_sec=20.0, view_end_sec=40.0))
@@ -405,7 +405,7 @@ def test_static_signature_changes_with_the_view_window() -> None:
 def test_taller_band_grows_rows_and_keeps_icons_nominal() -> None:
     pygame.init()
     overlay = TimelineOverlay()
-    state = _view_state(
+    state = strip_view_state(
         layer_z_order=["layer_1", "layer_2"],
         defaults={"layer_1": True, "layer_2": True},
     )

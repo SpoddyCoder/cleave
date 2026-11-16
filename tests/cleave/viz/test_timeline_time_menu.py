@@ -6,7 +6,7 @@ from cleave.song_markers import SongMarker
 from cleave.timeline import SlotCue, TimelineLane
 from cleave.viz.context_menu import ContextMenuItem, ContextSubmenu
 from cleave.viz.timeline_time_menu import TimelineTimeMenu
-from tests.cleave.viz.test_controls import _make_controls
+from tests.support.viz import make_controls
 
 
 class _Transport:
@@ -31,7 +31,7 @@ def _items(menu: TimelineTimeMenu, t: float = 12.0, *, commands: bool = True):
 
 
 def test_row_time_items_seek_play_and_drop() -> None:
-    controls = _make_controls()
+    controls = make_controls()
     transport = _Transport()
     items = _items(TimelineTimeMenu(controls, transport), commands=False)
     assert list(items) == [
@@ -48,7 +48,7 @@ def test_row_time_items_seek_play_and_drop() -> None:
 
 def test_play_from_here_does_not_pause_a_playing_song() -> None:
     transport = _Transport(paused=False)
-    _items(TimelineTimeMenu(_make_controls(), transport))["timeline.time.play"].run()
+    _items(TimelineTimeMenu(make_controls(), transport))["timeline.time.play"].run()
     assert transport.calls == [("seek", 12.0)]
 
 
@@ -59,7 +59,7 @@ def _marker_entries(controls, *, commands: bool = False):
 
 
 def test_marker_items_replace_the_time_items() -> None:
-    controls = _make_controls()
+    controls = make_controls()
     controls.session.song_markers.markers = [SongMarker(time=12.2, marker_type="begin")]
     transport = _Transport()
     entries = TimelineTimeMenu(controls, transport).entries(
@@ -81,7 +81,7 @@ def test_marker_items_replace_the_time_items() -> None:
 
 
 def test_marker_type_submenu_checks_and_sets_the_type() -> None:
-    controls = _make_controls()
+    controls = make_controls()
     controls.session.song_markers.markers = [
         SongMarker(time=12.2),
         SongMarker(time=30.0, marker_type="crescendo"),
@@ -96,7 +96,7 @@ def test_marker_type_submenu_checks_and_sets_the_type() -> None:
 
 
 def test_recording_disables_marker_edits_but_not_seeking() -> None:
-    controls = _make_controls()
+    controls = make_controls()
     controls.session.song_markers.markers = [SongMarker(time=12.2)]
     controls.session.timeline.recording = True
     entries = _marker_entries(controls)
@@ -107,13 +107,13 @@ def test_recording_disables_marker_edits_but_not_seeking() -> None:
 
 
 def test_a_gone_marker_falls_back_to_the_time_items() -> None:
-    controls = _make_controls()
+    controls = make_controls()
     ids = [getattr(e, "id", None) for e in _marker_entries(controls)]
     assert ids[0] == "timeline.time.seek"
 
 
 def test_recording_blocks_marker_drop() -> None:
-    controls = _make_controls()
+    controls = make_controls()
     controls.session.timeline.recording = True
     drop = _items(TimelineTimeMenu(controls, _Transport()))["timeline.time.drop_marker"]
     assert drop.enabled is False
@@ -121,7 +121,7 @@ def test_recording_blocks_marker_drop() -> None:
 
 
 def test_ruler_lists_history_and_timeline_commands() -> None:
-    items = _items(TimelineTimeMenu(_make_controls(), _Transport()))
+    items = _items(TimelineTimeMenu(make_controls(), _Transport()))
     for command_id in (
         "edit.undo",
         "edit.redo",
@@ -140,7 +140,7 @@ def test_ruler_lists_history_and_timeline_commands() -> None:
 
 
 def test_undo_label_names_the_last_command() -> None:
-    controls = _make_controls()
+    controls = make_controls()
     with controls.timeline_history.recording("Snap cues"):
         controls.session.timeline.lanes["layer_1"] = TimelineLane(
             baseline=None, cues=[SlotCue(t=3.0, level=1.0)]
@@ -151,7 +151,7 @@ def test_undo_label_names_the_last_command() -> None:
 
 
 def test_locked_timeline_disables_commands_with_a_hint() -> None:
-    controls = _make_controls()
+    controls = make_controls()
     controls.session.timeline.locked = True
     items = _items(TimelineTimeMenu(controls, _Transport()))
     assert items["timeline.generate"].enabled is False

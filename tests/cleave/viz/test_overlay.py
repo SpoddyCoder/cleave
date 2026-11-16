@@ -25,7 +25,11 @@ from cleave.viz.tuning_view_state import (
     TimelineFadeGroupBlock,
     TuningViewState,
 )
-from tests.support.viz import make_overlay_card_block, make_track_block
+from tests.support.viz import (
+    make_overlay_card_block,
+    make_track_block,
+    minimal_view_state,
+)
 
 
 def test_solo_visibility_icon_uses_red_background() -> None:
@@ -50,31 +54,6 @@ def test_solo_visibility_icon_disabled_stem_uses_value_not_disabled() -> None:
     ).count()
 
 
-def _minimal_view_state(**kwargs: object) -> TuningViewState:
-    defaults: dict[str, object] = {
-        "layer_z_order": ("layer_1",),
-        "tracks": {
-            "layer_1": make_track_block(
-                stem="drums",
-                preset_dir_label="dir",
-                preset_label="preset.milk",
-                blend_mode="black-key",
-                opacity_pct=50,
-                beat_sensitivity=1.0,
-                effects={},
-            )
-        },
-        "paused": False,
-        "position_sec": 0.0,
-        "focus_cursor": MainFocus(RowDescriptor(RowKind.OVERLAYS_HEADER)),
-        "move_mode_slot": None,
-        "notification_message": None,
-        "notification_remaining_sec": 0.0,
-    }
-    defaults.update(kwargs)
-    return TuningViewState(**defaults)  # type: ignore[arg-type]
-
-
 def _track(**kwargs: object):
     defaults: dict[str, object] = {
         "stem": "drums",
@@ -90,13 +69,13 @@ def _track(**kwargs: object):
 
 
 def test_locked_stem_row_uses_locked_color() -> None:
-    state = _minimal_view_state(tracks={"layer_1": _track(locked=True)})
+    state = minimal_view_state(tracks={"layer_1": _track(locked=True)})
     stem = RowDescriptor(RowKind.TRACK_STEM, slot="layer_1")
     assert row_value_color_for(state, stem) == LOCKED
 
 
 def test_action_row_value_color() -> None:
-    state = _minimal_view_state(
+    state = minimal_view_state(
         tracks={
             "layer_1": _track(),
             "layer_2": _track(stem="bass"),
@@ -110,13 +89,13 @@ def test_action_row_value_color() -> None:
 
 
 def test_display_row_uses_label_color() -> None:
-    state = _minimal_view_state()
+    state = minimal_view_state()
     desc = RowDescriptor(RowKind.LAYER_MANAGEMENT_COUNT)
     assert row_value_color_for(state, desc) == LABEL
 
 
 def test_preset_list_populate_uses_action_color() -> None:
-    state = _minimal_view_state(
+    state = minimal_view_state(
         tracks={
             "layer_1": _track(
                 preset_switching="on",
@@ -134,7 +113,7 @@ def _inspector_kinds(state, node_id: str) -> list[RowKind]:
 
 
 def test_overlay_inspector_includes_header_and_sub_rows_when_expanded() -> None:
-    state = _minimal_view_state()
+    state = minimal_view_state()
     opening = _inspector_kinds(state, "overlay.opening_card")
     for kind in (
         RowKind.OVERLAY_CARD_ANIMATION_HEADER,
@@ -156,7 +135,7 @@ def test_overlay_inspector_includes_header_and_sub_rows_when_expanded() -> None:
 
 
 def test_overlay_animation_rows_when_expanded() -> None:
-    state = _minimal_view_state(
+    state = minimal_view_state(
         overlays=OverlaysBlock(
             opening_card=make_overlay_card_block(animation_type="slide")
         ),
@@ -169,7 +148,7 @@ def test_overlay_animation_rows_when_expanded() -> None:
 
 
 def test_overlay_animation_hides_slide_direction_for_fade() -> None:
-    state = _minimal_view_state(
+    state = minimal_view_state(
         overlays=OverlaysBlock(
             opening_card=make_overlay_card_block(animation_type="fade")
         ),
@@ -180,7 +159,7 @@ def test_overlay_animation_hides_slide_direction_for_fade() -> None:
 
 
 def test_overlay_title_and_body_font_rows_when_expanded() -> None:
-    state = _minimal_view_state()
+    state = minimal_view_state()
     kinds = _inspector_kinds(state, "overlay.opening_card")
     for kind in (
         RowKind.OVERLAY_CARD_TITLE_FONT_SIZE,
@@ -199,7 +178,7 @@ def test_overlay_title_and_body_font_rows_when_expanded() -> None:
 
 
 def test_overlay_root_has_switches_and_cards_have_settings() -> None:
-    state = _minimal_view_state()
+    state = minimal_view_state()
     opening = _inspector_kinds(state, "overlay.opening_card")
     closing = _inspector_kinds(state, "overlay.closing_card")
     assert RowKind.OVERLAY_CARD_POSITION in opening

@@ -42,7 +42,8 @@ from cleave.viz.shell_layout import (
     clamp_column_widths,
     splitter_hit,
 )
-from tests.cleave.viz.test_controls import _make_controls
+from tests.support.viz import make_controls
+
 
 _OPACITY = RowDescriptor(RowKind.TRACK_OPACITY, slot="layer_1")
 
@@ -62,8 +63,8 @@ def test_value_drag_steps_direction_count_and_remainder() -> None:
 
 def test_drag_delta_matches_one_horizontal_step() -> None:
     threshold = VALUE_DRAG_THRESHOLD_PX
-    dragged = _make_controls(("layer_1",))
-    keyed = _make_controls(("layer_1",))
+    dragged = make_controls(("layer_1",))
+    keyed = make_controls(("layer_1",))
 
     remaining, crossed = apply_value_drag(dragged, _OPACITY, threshold, 0.0)
     apply_field_horizontal(keyed, _OPACITY, True, False)
@@ -72,14 +73,14 @@ def test_drag_delta_matches_one_horizontal_step() -> None:
     assert remaining == 0.0
     assert _opacity(dragged) == _opacity(keyed)
 
-    dragged_back = _make_controls(("layer_1",))
-    keyed_back = _make_controls(("layer_1",))
+    dragged_back = make_controls(("layer_1",))
+    keyed_back = make_controls(("layer_1",))
     apply_value_drag(dragged_back, _OPACITY, -threshold, 0.0)
     apply_field_horizontal(keyed_back, _OPACITY, False, False)
     assert _opacity(dragged_back) == _opacity(keyed_back)
 
-    burst = _make_controls(("layer_1",))
-    keyed_burst = _make_controls(("layer_1",))
+    burst = make_controls(("layer_1",))
+    keyed_burst = make_controls(("layer_1",))
     remaining, crossed = apply_value_drag(
         burst, _OPACITY, threshold * 2 + 5.0, 0.0
     )
@@ -89,7 +90,7 @@ def test_drag_delta_matches_one_horizontal_step() -> None:
     assert remaining == 5.0
     assert _opacity(burst) == _opacity(keyed_burst)
 
-    held = _make_controls(("layer_1",))
+    held = make_controls(("layer_1",))
     before = _opacity(held)
     remaining, crossed = apply_value_drag(held, _OPACITY, threshold - 1.0, 0.0)
     assert crossed is False
@@ -102,7 +103,7 @@ def test_drag_delta_matches_one_horizontal_step() -> None:
 
 
 def test_locked_drag_does_not_change_the_value() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     controls.session.layers["layer_1"].locked = True
     before = _opacity(controls)
 
@@ -150,7 +151,7 @@ def test_off_value_keeps_side_arrows_and_stepped_ignores_the_text() -> None:
         "desc",
     )
 
-    unlocked = _make_controls(("layer_1",))
+    unlocked = make_controls(("layer_1",))
     snap = RowDescriptor(RowKind.TIMELINE_PLACEMENT_SNAP)
     unlocked.session.timeline.placement_snap = "off"
     assert unlocked.session.timeline.locked is False
@@ -270,8 +271,8 @@ def _preset_switching_trigger(controls) -> str:
 )
 def test_off_value_drag_matches_one_horizontal_step(desc, seed, read) -> None:
     threshold = VALUE_DRAG_THRESHOLD_PX
-    dragged = _make_controls(("layer_1",))
-    keyed = _make_controls(("layer_1",))
+    dragged = make_controls(("layer_1",))
+    keyed = make_controls(("layer_1",))
     seed(dragged)
     seed(keyed)
     before = read(dragged)
@@ -291,7 +292,7 @@ def test_off_value_drag_matches_one_horizontal_step(desc, seed, read) -> None:
 
 
 def test_locked_placement_snap_drag_consumes_steps() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     controls.session.timeline.locked = True
     controls.session.timeline.placement_snap = "off"
     desc = RowDescriptor(RowKind.TIMELINE_PLACEMENT_SNAP)
@@ -558,7 +559,7 @@ def test_help_splitter_under_one_pixel_does_not_persist() -> None:
 
 
 def test_cycle_stop_stays_on_timeline_while_help_is_open() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     controls.session.help_visible = True
     controls.session.timeline.panel_open = True
     controls.set_shell_region(ShellRegion.TIMELINE)
@@ -573,7 +574,7 @@ def test_navigator_content_height_is_measured_for_the_next_frame() -> None:
     from cleave.viz.shell_host import draw_shell_frame
     from cleave.viz.shell_layout import navigator_row_px
 
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     with _host() as host:
         host.context.controls = controls
         host.imgui.display_size = (1280, 720)
@@ -593,7 +594,7 @@ def test_navigator_height_follows_rows_opened_before_the_next_draw() -> None:
     from cleave.viz.commands import command_context
     from cleave.viz.shell_host import draw_shell_frame
 
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     with _host() as host:
         host.context.controls = controls
         host.imgui.display_size = (1280, 720)
@@ -652,7 +653,7 @@ def _click(host: ShellHost, pos: tuple[int, int]) -> None:
 
 
 def test_click_in_timeline_rect_sets_timeline_region() -> None:
-    controls = _make_controls(("layer_1", "layer_2"))
+    controls = make_controls(("layer_1", "layer_2"))
     controls.session.timeline.panel_open = True
     controls.session.timeline.focus_row = 1
     with _host() as host:
@@ -669,7 +670,7 @@ def test_click_in_timeline_rect_sets_timeline_region() -> None:
 
 
 def test_click_in_navigator_sets_navigator_and_keeps_strip_open() -> None:
-    controls = _make_controls(("layer_1", "layer_2"))
+    controls = make_controls(("layer_1", "layer_2"))
     controls.open_timeline_panel(enter_submenu=True)
     with _host() as host:
         host.context.controls = controls
@@ -683,7 +684,7 @@ def test_click_in_navigator_sets_navigator_and_keeps_strip_open() -> None:
 
 
 def test_click_in_inspector_sets_inspector_and_keeps_strip_open() -> None:
-    controls = _make_controls(("layer_1", "layer_2"))
+    controls = make_controls(("layer_1", "layer_2"))
     controls.open_timeline_panel(enter_submenu=True)
     with _host() as host:
         host.context.controls = controls
@@ -697,7 +698,7 @@ def test_click_in_inspector_sets_inspector_and_keeps_strip_open() -> None:
 
 
 def test_click_in_help_leaves_the_region() -> None:
-    controls = _make_controls(("layer_1", "layer_2"))
+    controls = make_controls(("layer_1", "layer_2"))
     controls.open_timeline_panel(enter_submenu=True)
     controls.set_timeline_focus_row(1)
     controls.session.help_visible = True
@@ -718,7 +719,7 @@ def test_click_in_help_leaves_the_region() -> None:
 
 
 def test_click_in_visualiser_focuses_the_preview() -> None:
-    controls = _make_controls(("layer_1", "layer_2"))
+    controls = make_controls(("layer_1", "layer_2"))
     controls.open_timeline_panel(enter_submenu=True)
     with _host() as host:
         host.context.controls = controls
@@ -731,7 +732,7 @@ def test_click_in_visualiser_focuses_the_preview() -> None:
 
 
 def test_click_in_menu_or_transport_does_not_change_region() -> None:
-    controls = _make_controls(("layer_1", "layer_2"))
+    controls = make_controls(("layer_1", "layer_2"))
     controls.open_timeline_panel(enter_submenu=True)
     with _host() as host:
         host.context.controls = controls
@@ -819,7 +820,7 @@ def test_timeline_splitter_below_the_fit_saves_fit_to_rows() -> None:
 
 
 def test_strip_pointer_gets_press_drag_and_release_in_timeline_rect() -> None:
-    controls = _make_controls(("layer_1", "layer_2"))
+    controls = make_controls(("layer_1", "layer_2"))
     controls.session.timeline.panel_open = True
     pointer = MagicMock()
     with _host() as host:
@@ -840,7 +841,7 @@ def test_strip_pointer_gets_press_drag_and_release_in_timeline_rect() -> None:
 
 
 def test_strip_pointer_ignores_clicks_outside_strip_or_when_closed() -> None:
-    controls = _make_controls(("layer_1", "layer_2"))
+    controls = make_controls(("layer_1", "layer_2"))
     controls.session.timeline.panel_open = True
     pointer = MagicMock()
     with _host() as host:
@@ -857,7 +858,7 @@ def test_strip_pointer_ignores_clicks_outside_strip_or_when_closed() -> None:
 
 
 def test_wheel_over_the_open_strip_zooms_it_and_skips_imgui() -> None:
-    controls = _make_controls(("layer_1", "layer_2"))
+    controls = make_controls(("layer_1", "layer_2"))
     controls.session.timeline.panel_open = True
     pointer = MagicMock()
     with _host() as host:
@@ -881,7 +882,7 @@ def test_wheel_over_the_open_strip_zooms_it_and_skips_imgui() -> None:
 
 
 def test_middle_press_on_the_strip_pans_without_taking_the_region() -> None:
-    controls = _make_controls(("layer_1", "layer_2"))
+    controls = make_controls(("layer_1", "layer_2"))
     controls.session.timeline.panel_open = True
     pointer = MagicMock()
     with _host() as host:
@@ -980,7 +981,7 @@ def test_modal_keeps_the_splitter_and_strip_pointers_away() -> None:
 
 
 def test_right_click_on_a_strip_row_opens_its_menu_and_outside_click_closes() -> None:
-    controls = _make_controls(("layer_1", "layer_2"))
+    controls = make_controls(("layer_1", "layer_2"))
     controls.session.timeline.panel_open = True
     pointer = MagicMock()
     pointer.context_menu_at.return_value = lambda: (
@@ -1010,7 +1011,7 @@ def test_right_click_on_a_strip_row_opens_its_menu_and_outside_click_closes() ->
 
 
 def test_right_click_off_a_strip_row_opens_nothing() -> None:
-    controls = _make_controls(("layer_1", "layer_2"))
+    controls = make_controls(("layer_1", "layer_2"))
     controls.session.timeline.panel_open = True
     pointer = MagicMock()
     pointer.context_menu_at.return_value = None
@@ -1029,7 +1030,7 @@ def test_right_click_off_a_strip_row_opens_nothing() -> None:
 
 
 def test_focus_context_menu_opens_at_the_focused_strip_row() -> None:
-    controls = _make_controls(("layer_1", "layer_2"))
+    controls = make_controls(("layer_1", "layer_2"))
     controls.session.timeline.panel_open = True
     controls.session.timeline.focus_row = 1
     pointer = MagicMock()
@@ -1049,7 +1050,7 @@ def test_focus_context_menu_opens_at_the_focused_strip_row() -> None:
 
 
 def test_right_click_on_a_navigator_row_selects_it_and_opens_its_menu() -> None:
-    controls = _make_controls(("layer_1", "layer_2"))
+    controls = make_controls(("layer_1", "layer_2"))
     with _host() as host:
         host.context.controls = controls
         layout = _open_strip_layout()
@@ -1074,7 +1075,7 @@ def test_right_click_on_a_navigator_row_selects_it_and_opens_its_menu() -> None:
 
 
 def test_focus_context_menu_opens_under_the_selected_navigator_row() -> None:
-    controls = _make_controls(("layer_1", "layer_2"))
+    controls = make_controls(("layer_1", "layer_2"))
     with _host() as host:
         host.context.controls = controls
         controls.navigator.select("layer:layer_1")
@@ -1097,7 +1098,7 @@ def _preset_item_row(index: int) -> InspectorRow:
 
 
 def test_right_click_on_a_preset_list_row_focuses_it_and_opens_its_menu() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     controls.session.layers["layer_1"].preset_list = ["/tmp/a.milk", "/tmp/b.milk"]
     with _host() as host:
         host.context.controls = controls
@@ -1123,7 +1124,7 @@ def test_right_click_on_a_preset_list_row_focuses_it_and_opens_its_menu() -> Non
 
 
 def test_focus_context_menu_opens_under_the_focused_preset_list_row() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     controls.session.layers["layer_1"].preset_list = ["/tmp/a.milk"]
     with _host() as host:
         host.context.controls = controls
@@ -1161,7 +1162,7 @@ def test_one_frame_builds_the_navigator_once_for_every_panel(monkeypatch) -> Non
     ):
         monkeypatch.setattr(module, "build_navigator", counted)
 
-    controls = _make_controls(("layer_1", "layer_2"))
+    controls = make_controls(("layer_1", "layer_2"))
     with _host() as host:
         host.context.controls = controls
         host.imgui.display_size = (1280, 720)

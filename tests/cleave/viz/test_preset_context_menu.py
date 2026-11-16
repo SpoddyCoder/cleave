@@ -9,7 +9,7 @@ from cleave.preset_library import UNFILTERED_CATALOG
 from cleave.viz.context_menu import ContextMenuItem, ContextSubmenu
 from cleave.viz.preset_context_menu import preset_row_menu, preset_row_menu_entries
 from cleave.viz.row_kinds import RowDescriptor, RowKind
-from tests.cleave.viz.test_controls import _make_controls
+from tests.support.viz import make_controls
 
 
 def _item_desc(index: int) -> RowDescriptor:
@@ -33,7 +33,7 @@ def _controls_with_list(tmp: str, names: tuple[str, ...] = ("a", "b", "c")):
         path = root / f"{name}.milk"
         path.write_text("milk", encoding="utf-8")
         paths.append(str(path))
-    controls = _make_controls(("layer_1",), project_dir=root / "project")
+    controls = make_controls(("layer_1",), project_dir=root / "project")
     layer = controls.session.layers["layer_1"]
     layer.preset_list = list(paths)
     layer.preset_switching = "on"
@@ -150,7 +150,7 @@ def test_remove_prompts_for_confirmation() -> None:
 
 
 def test_current_preset_row_offers_add_and_curate() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     desc = RowDescriptor(RowKind.TRACK_PRESET, slot="layer_1")
     items = _entries(controls, desc)
     assert list(items) == [

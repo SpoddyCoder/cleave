@@ -16,11 +16,13 @@ import cleave.viz.row_hotkeys as row_hotkeys
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.row_spec import apply_field_horizontal
 from cleave.viz.shell_focus import ShellRegion
-from tests.cleave.viz.test_controls import (
-    _make_controls,
-    _make_controls_with_manager,
+from tests.support.viz import (
+    keydown,
+    layer_page_id_for_row,
+    make_controls,
+    make_controls_with_manager,
 )
-from tests.support.viz import keydown, layer_page_id_for_row
+
 
 _LAYER_DELETE = "Delete layer"
 
@@ -96,7 +98,7 @@ def test_node_control_descriptor_resolves_to_the_owner() -> None:
 
 
 def test_hotkeys_on_a_child_page_reach_the_owner() -> None:
-    controls, _manager = _make_controls_with_manager(("layer_1",))
+    controls, _manager = make_controls_with_manager(("layer_1",))
     controls.navigator.select(layer_page_node_id("layer_1", "compositing"))
     assert controls.navigator.handle_hotkey(keydown(pygame.K_l)) is True
     assert controls.session.layers["layer_1"].locked is True
@@ -107,7 +109,7 @@ def test_hotkeys_on_a_child_page_reach_the_owner() -> None:
 
 
 def test_navigator_layer_lock_and_delete_follow_selected_node() -> None:
-    controls, manager = _make_controls_with_manager(("layer_1", "layer_2"))
+    controls, manager = make_controls_with_manager(("layer_1", "layer_2"))
 
     def remove_layer(slot: str) -> None:
         controls.session.layer_z_order.remove(slot)
@@ -134,7 +136,7 @@ def test_navigator_layer_lock_and_delete_follow_selected_node() -> None:
 
 
 def test_inspector_preset_item_delete_and_move_stay_on_the_item() -> None:
-    controls, manager = _make_controls_with_manager(("layer_1",))
+    controls, manager = make_controls_with_manager(("layer_1",))
     layer = controls.session.layers["layer_1"]
     layer.preset_switching = "on"
     layer.preset_switching_trigger = "timer"
@@ -169,7 +171,7 @@ def test_inspector_preset_item_delete_and_move_stay_on_the_item() -> None:
 
 
 def test_inspector_value_row_l_locks_the_page_layer() -> None:
-    controls = _make_controls(("layer_1", "layer_2"))
+    controls = make_controls(("layer_1", "layer_2"))
     opacity = RowDescriptor(RowKind.TRACK_OPACITY, slot="layer_1")
     controls.focus_cursor = MainFocus(RowDescriptor(RowKind.OVERLAYS_HEADER))
     _select_layer(controls, "layer_1", region=ShellRegion.INSPECTOR)
@@ -183,7 +185,7 @@ def test_inspector_value_row_l_locks_the_page_layer() -> None:
 
 
 def test_move_mode_up_reorders_layers_before_navigator_cursor() -> None:
-    controls = _make_controls(("layer_1", "layer_2", "layer_3"))
+    controls = make_controls(("layer_1", "layer_2", "layer_3"))
     _select_layer(controls, "layer_2", region=ShellRegion.NAVIGATOR)
     runtime = _runtime(controls)
     selected = layer_node_id("layer_2")
@@ -208,7 +210,7 @@ def test_move_mode_up_reorders_layers_before_navigator_cursor() -> None:
 
 
 def test_navigator_overlays_l_toggles_overlay_lock() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     controls.shell_focus.region = ShellRegion.NAVIGATOR
     controls.shell_focus.selected_id = "overlay"
     runtime = _runtime(controls)
@@ -225,7 +227,7 @@ def _focus_inspector(controls, slot: str, desc: RowDescriptor) -> None:
 
 
 def test_section_lock_inspector_refuses_edits_and_delete_still_prompts() -> None:
-    controls, _manager = _make_controls_with_manager(("layer_1", "layer_2"))
+    controls, _manager = make_controls_with_manager(("layer_1", "layer_2"))
     layer = controls.session.layers["layer_1"]
     layer.locked = True
     layer.preset_switching_trigger = "timer"
@@ -289,7 +291,7 @@ def test_section_lock_inspector_refuses_edits_and_delete_still_prompts() -> None
 
 
 def test_curation_shell_allowlist() -> None:
-    controls = _make_controls(("layer_1", "layer_2"))
+    controls = make_controls(("layer_1", "layer_2"))
     controls.session.settings.editor_mode = "preset_curation"
     layer = controls.session.layers["layer_1"]
     current = layer.playlist.current
@@ -364,7 +366,7 @@ def test_curation_shell_allowlist() -> None:
 
 
 def test_section_switch_rows_step_their_flags_and_respect_the_lock() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     session = controls.session
     enabled = RowDescriptor(RowKind.POST_FX_ENABLED)
     locked = RowDescriptor(RowKind.POST_FX_LOCKED)
@@ -380,7 +382,7 @@ def test_section_switch_rows_step_their_flags_and_respect_the_lock() -> None:
 
 
 def test_overlay_solo_row_ignores_the_section_lock() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     controls.session.overlays.locked = True
     solo = RowDescriptor(RowKind.OVERLAYS_SOLO)
     assert apply_field_horizontal(controls, solo, True, False) is True
@@ -388,7 +390,7 @@ def test_overlay_solo_row_ignores_the_section_lock() -> None:
 
 
 def test_card_enabled_row_steps_one_card_and_respects_the_lock() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     overlays = controls.session.overlays
     row = RowDescriptor(RowKind.OVERLAY_CARD_ENABLED, card="opening_card")
 
@@ -402,7 +404,7 @@ def test_card_enabled_row_steps_one_card_and_respects_the_lock() -> None:
 
 
 def test_layer_switch_rows_step_their_flags_and_respect_the_lock() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     session = controls.session
     layer = session.layers["layer_1"]
     enabled = RowDescriptor(RowKind.TRACK_ENABLED, slot="layer_1")

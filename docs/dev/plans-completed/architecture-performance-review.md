@@ -222,6 +222,8 @@ Target: no module over about 1,000 lines, and `ShellHost` under about 600.
 
 ### M6. Hygiene: dead code, stale docs, shared test helpers
 
+**Status.** Done. `focus_context.py` is deleted and the typed DI rule names `ShellContext` and `CommandContext`. `AGENTS.md` no longer mentions `tuning_panel_draw.py` and says what `row_present_renderers.py` holds; the shell region list there was already current after H5, and `.claude/rules/live-tuning-ui.md` gains a paragraph naming `ShellHost`, each region class and its module, and `ShellFrame`. The `TuningControls` and `controls.py` docstrings describe the editor controller. The two forwarders in `layer_pipeline.py` are gone; `render_frame` calls `LayerFramePipeline` directly. No test module imports from another: the shared builders are public in `tests/support/viz.py` (`make_controls`, which now takes the timeline, beat, project and signal arguments, plus `make_controls_with_manager`, `mutate_dirty`, `save_now`, `choose_modal_option`, `minimal_view_state`), new `tests/support/timeline.py` (`as_level`, `make_lane`, `make_timeline_controls`, `strip_view_state`), new `tests/support/shell.py` (`headless_shell_host`, `draw_shell`, pointer event builders) and new `tests/support/overlay_cards.py` (card config builders). Duplicate copies of `_keydown`, `_make_playlist`, `_lane` and `_as_level` in the source test modules went with them, as did unused imports in the touched files. Full unit suite: 3,970 passed.
+
 **Finding.**
 
 - [cleave/viz/focus_context.py](cleave/viz/focus_context.py) has no importers. `FocusContext` is still named as the example in `.claude/rules/architecture-principles.md`.

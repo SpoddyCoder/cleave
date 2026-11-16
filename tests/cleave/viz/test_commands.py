@@ -30,13 +30,14 @@ from cleave.viz.session import LayerRuntime
 from cleave.viz.shell_focus import ShellRegion
 from cleave.timeline import SlotCue, TimelineLane
 from cleave.viz.theme import VALUE, CONFIG_DIRTY
-from tests.cleave.viz.test_controls import (
-    _keydown,
-    _make_controls,
-    _make_controls_with_manager,
-    _make_playlist,
-    _mutate_dirty,
+from tests.support.viz import (
+    keydown,
+    make_controls,
+    make_controls_with_manager,
+    make_playlist,
+    mutate_dirty,
 )
+
 
 _SLOTS = (("slot_a", "snare"), ("slot_b", "pad"))
 
@@ -95,7 +96,6 @@ _DISABLED_IDS = (
     "layers.add",
     "layers.delete",
 )
-
 
 
 def _menus():
@@ -307,7 +307,7 @@ def test_disabled_items_stay_disabled() -> None:
 
 def test_editor_shortcut_opens_the_settings_preview_page() -> None:
     menus = _menus()
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     editor = command_for_shortcut(pygame.K_COMMA, pygame.KMOD_CTRL, menus)
     assert editor is not None
     assert editor.id == "page.settings.preview"
@@ -450,7 +450,7 @@ def test_wired_run_calls_controllers() -> None:
 
 def test_fullscreen_editor_command_requests_toggle_and_reads_window_state() -> None:
     menus = _menus()
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     item = command_by_id("view.fullscreen_editor", menus)
     assert item.label == "Full Screen Editor"
     assert item.kind == "check"
@@ -467,7 +467,7 @@ def test_fullscreen_editor_command_requests_toggle_and_reads_window_state() -> N
 
 
 def test_play_fullscreen_command_requests_entering_play_full_screen() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     item = command_by_id("view.play_fullscreen", _menus())
     assert item.label == "Play Full Screen"
     assert item.kind == "command"
@@ -479,7 +479,7 @@ def test_play_fullscreen_command_requests_entering_play_full_screen() -> None:
 
 
 def test_request_quit_clean_sets_pending_exit() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     assert controls.try_quit() is True
     assert controls.consume_pending_exit() is False
 
@@ -490,16 +490,16 @@ def test_request_quit_clean_sets_pending_exit() -> None:
 
 
 def test_request_quit_dirty_opens_unsaved_prompt_without_exiting() -> None:
-    controls = _make_controls(("layer_1",))
-    _mutate_dirty(controls)
+    controls = make_controls(("layer_1",))
+    mutate_dirty(controls)
     controls.request_quit()
     assert controls.pending_exit is False
     modal = controls.modal_host.view_state()
     assert modal is not None
     assert modal.kind == ModalKind.UNSAVED_QUIT
 
-    controls.handle_modal_keydown(_keydown(pygame.K_RIGHT))
-    controls.handle_modal_keydown(_keydown(pygame.K_RETURN))
+    controls.handle_modal_keydown(keydown(pygame.K_RIGHT))
+    controls.handle_modal_keydown(keydown(pygame.K_RETURN))
     assert controls.consume_pending_exit() is True
 
 
@@ -566,7 +566,7 @@ def test_layer_add_and_delete_follow_context_flags() -> None:
 
 
 def test_command_context_reads_live_layer_flags() -> None:
-    controls, manager = _make_controls_with_manager(("layer_1", "layer_2"))
+    controls, manager = make_controls_with_manager(("layer_1", "layer_2"))
     controls.shell_focus.selected_id = "project"
     ctx = command_context(controls)
     assert ctx.selected_slot is None
@@ -594,7 +594,7 @@ def test_command_context_reads_live_layer_flags() -> None:
     assert ctx.can_add_layer is False
     assert ctx.can_remove_layer is False
 
-    plain = _make_controls(("layer_1",))
+    plain = make_controls(("layer_1",))
     plain.shell_focus.selected_id = layer_node_id("layer_1")
     ctx = command_context(plain)
     assert ctx.selected_slot == "layer_1"
@@ -604,7 +604,7 @@ def test_command_context_reads_live_layer_flags() -> None:
 
 def test_menu_and_inspector_share_layer_add_and_delete() -> None:
     menus = _menus()
-    controls, _manager = _make_controls_with_manager(("layer_1", "layer_2"))
+    controls, _manager = make_controls_with_manager(("layer_1", "layer_2"))
     controls.shell_focus.selected_id = layer_node_id("layer_1")
     controls.layer_lifecycle.add = MagicMock()
     controls.layer_lifecycle.prompt_delete = MagicMock()
@@ -647,7 +647,7 @@ def test_menu_and_inspector_share_layer_add_and_delete() -> None:
 
 
 def test_layer_jumps_select_the_layer_inspector() -> None:
-    controls = _make_controls(("layer_1", "layer_2"))
+    controls = make_controls(("layer_1", "layer_2"))
     jump = layer_focus_commands((("layer_2", "pad"),))[0]
     assert jump.enabled(CommandContext()) is True
     assert jump.id == "layers.focus.layer_2"
@@ -675,7 +675,7 @@ def test_ctrl_l_and_layer_digits_follow_timeline_scope() -> None:
         assert command.id == f"layers.focus.layer_{number}"
         assert command.id not in {item.id for item in iter_commands(menus)}
         assert command_for_shortcut(key, 0, menus, timeline_scope=True) is None
-    controls = _make_controls(("layer_1", "layer_2"))
+    controls = make_controls(("layer_1", "layer_2"))
     focused = command_for_shortcut(
         pygame.K_2,
         0,
@@ -696,7 +696,7 @@ def test_ctrl_l_and_layer_digits_follow_timeline_scope() -> None:
 
 
 def test_add_selects_new_layer_and_delete_selects_neighbour() -> None:
-    controls, manager = _make_controls_with_manager(("layer_1", "layer_2"))
+    controls, manager = make_controls_with_manager(("layer_1", "layer_2"))
     controls.shell_focus.selected_id = "layers"
     controls.shell_focus.nav_expanded.discard("layers")
 
@@ -704,7 +704,7 @@ def test_add_selects_new_layer_and_delete_selects_neighbour() -> None:
         slot = "layer_3"
         controls.session.layer_z_order.append(slot)
         controls.session.layers[slot] = LayerRuntime(
-            playlist=_make_playlist(slot),
+            playlist=make_playlist(slot),
             browse_floor=Path("/tmp/presets") / slot,
             stem="bass",
             opacity_pct=50,
@@ -735,20 +735,17 @@ def test_add_selects_new_layer_and_delete_selects_neighbour() -> None:
     assert controls.shell_focus.region is ShellRegion.INSPECTOR
 
 
-
-
-
 def test_undo_is_disabled_with_no_history_and_run_is_a_noop() -> None:
     undo = command_by_id("edit.undo")
     assert undo.enabled(CommandContext()) is False
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     controls.undo_timeline = MagicMock()
     undo.run(controls)
     controls.undo_timeline.assert_not_called()
 
 
 def test_undo_and_redo_follow_a_snap_and_their_shortcuts_resolve() -> None:
-    controls = _make_controls(("layer_1",), beat_times=(0.0, 1.0))
+    controls = make_controls(("layer_1",), beat_times=(0.0, 1.0))
     lanes = controls.session.timeline.lanes
     lanes["layer_1"] = TimelineLane(
         baseline=None, cues=[SlotCue(t=0.4, level=1.0)]
@@ -775,7 +772,7 @@ def test_undo_and_redo_follow_a_snap_and_their_shortcuts_resolve() -> None:
 
 
 def test_left_and_right_move_between_paired_buttons() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     controls.prompt_reset_timeline = MagicMock()
     controls.prompt_generate_timeline = MagicMock()
     view = controls.build_view_state(paused=False)
@@ -801,7 +798,7 @@ def test_left_and_right_move_between_paired_buttons() -> None:
 
 
 def test_timeline_actions_share_run_with_the_inspector() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     controls.prompt_generate_timeline = MagicMock()
     controls.prompt_reset_timeline = MagicMock()
     controls.prompt_snap_cues = MagicMock()
@@ -896,7 +893,7 @@ def test_inspector_only_timeline_actions_are_not_menu_commands() -> None:
     ):
         assert label not in labels
 
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     controls.session.song_markers.times = [10.0, 40.0]
     prompts = (
         ("timeline.set_cut_type", "prompt_set_cut_type"),
@@ -957,7 +954,7 @@ def test_alt_arrows_resolve_to_page_back_and_forward_only_with_alt() -> None:
 
 def test_page_back_and_forward_follow_the_history() -> None:
     menus = _menus()
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     back = command_by_id("view.page_back", menus)
     forward = command_by_id("view.page_forward", menus)
     assert back.enabled(command_context(controls)) is False

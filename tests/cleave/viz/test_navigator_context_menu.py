@@ -7,7 +7,10 @@ from cleave.viz.navigator_context_menu import (
     navigator_node_menu,
     navigator_node_menu_entries,
 )
-from tests.cleave.viz.test_controls import _make_controls, _make_controls_with_manager
+from tests.support.viz import (
+    make_controls,
+    make_controls_with_manager,
+)
 
 
 def _entries(controls, node_id: str, toggled: list[str] | None = None):
@@ -20,7 +23,7 @@ def _entries(controls, node_id: str, toggled: list[str] | None = None):
 
 
 def test_root_row_offers_expand_and_its_icons() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     toggled: list[str] = []
     items = _entries(controls, "post_fx", toggled)
     assert list(items) == [
@@ -40,7 +43,7 @@ def test_root_row_offers_expand_and_its_icons() -> None:
 
 
 def test_lock_greys_out_the_enabled_item() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     _entries(controls, "post_fx")["navigator.toggle.lock"].run()
     enabled = _entries(controls, "post_fx")["navigator.toggle.enabled"]
     assert enabled.enabled is False
@@ -48,7 +51,7 @@ def test_lock_greys_out_the_enabled_item() -> None:
 
 
 def test_layer_row_has_pages_solo_move_and_delete() -> None:
-    controls, _manager = _make_controls_with_manager(("layer_1", "layer_2"))
+    controls, _manager = make_controls_with_manager(("layer_1", "layer_2"))
     items = _entries(controls, "layer:layer_1")
     go_to = items["navigator.go_to"]
     assert [item.label for item in go_to.items] == [
@@ -70,7 +73,7 @@ def test_layer_row_has_pages_solo_move_and_delete() -> None:
 
 
 def test_locked_layer_cannot_move() -> None:
-    controls, _manager = _make_controls_with_manager(("layer_1", "layer_2"))
+    controls, _manager = make_controls_with_manager(("layer_1", "layer_2"))
     controls.toggle_layer_locked("layer_1")
     move = _entries(controls, "layer:layer_1")["navigator.layer.move_down"]
     assert move.enabled is False
@@ -78,6 +81,6 @@ def test_locked_layer_cannot_move() -> None:
 
 
 def test_layers_root_offers_add_and_a_gone_row_has_no_menu() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     assert "navigator.layer.add" in _entries(controls, "layers")
     assert navigator_node_menu(controls, "layer:gone", lambda _id: None)() == ()

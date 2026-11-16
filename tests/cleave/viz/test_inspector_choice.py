@@ -10,8 +10,15 @@ import pygame
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.shell_inspector import InspectorPanel
 from cleave.viz.value_nudge import centre_pad
-from tests.cleave.viz.test_modal_surface import _button, _center, _draw, _host, _motion
 from tests.support.viz import keydown, make_controls
+from tests.support.shell import (
+    draw_shell,
+    headless_shell_host,
+    mouse_down,
+    mouse_motion,
+    rect_center,
+)
+
 
 _QUALITY = RowDescriptor(RowKind.SETTINGS_PREVIEW_QUALITY)
 _NAV_SIDE = RowDescriptor(RowKind.SETTINGS_NAVIGATOR_SIDE)
@@ -22,7 +29,7 @@ def _inspector(page_id: str) -> Iterator[tuple[object, object]]:
     """A shell drawing the real inspector rows of ``page_id``."""
     controls = make_controls(("layer_1",))
     controls.navigator.open_page(page_id)
-    with _host() as host:
+    with headless_shell_host() as host:
         host.context.controls = controls
         host.inspector.draw = lambda state: InspectorPanel.draw(host.inspector, state)
         yield host, controls
@@ -33,20 +40,20 @@ def _release(pos: tuple[int, int]) -> pygame.event.Event:
 
 
 def _frame(host: object, pos: tuple[int, int], *, click: bool = False) -> None:
-    host.process_event(_motion(pos))
+    host.process_event(mouse_motion(pos))
     if click:
-        host.process_event(_button(pos))
-    _draw(host)
+        host.process_event(mouse_down(pos))
+    draw_shell(host)
     if click:
         host.process_event(_release(pos))
-        _draw(host)
+        draw_shell(host)
 
 
 def test_a_long_list_draws_as_a_combo_and_a_click_opens_it() -> None:
     with _inspector("settings.preview") as (host, controls):
         _frame(host, (0, 0))
         combo = host.inspector.values.choice_rects[_QUALITY]
-        _frame(host, _center(combo), click=True)
+        _frame(host, rect_center(combo), click=True)
         view = controls.inline_edit.choice_view
         assert view is not None and view.target == _QUALITY
         assert view.options[view.chosen] == "full-quality"
@@ -56,8 +63,8 @@ def test_a_long_list_draws_as_a_combo_and_a_click_opens_it() -> None:
 def test_a_row_click_in_the_open_list_picks_that_option() -> None:
     with _inspector("settings.preview") as (host, controls):
         _frame(host, (0, 0))
-        _frame(host, _center(host.inspector.values.choice_rects[_QUALITY]), click=True)
-        _frame(host, _center(host.inspector.values.choice_list_rows[1]), click=True)
+        _frame(host, rect_center(host.inspector.values.choice_rects[_QUALITY]), click=True)
+        _frame(host, rect_center(host.inspector.values.choice_list_rows[1]), click=True)
         assert controls.inline_edit.choice_view is None
         assert controls.cfg.editor.preview_quality == "performance"
 
@@ -65,7 +72,7 @@ def test_a_row_click_in_the_open_list_picks_that_option() -> None:
 def test_a_click_outside_the_list_closes_it_and_keeps_the_value() -> None:
     with _inspector("settings.preview") as (host, controls):
         _frame(host, (0, 0))
-        _frame(host, _center(host.inspector.values.choice_rects[_QUALITY]), click=True)
+        _frame(host, rect_center(host.inspector.values.choice_rects[_QUALITY]), click=True)
         _frame(host, (1200, 700), click=True)
         assert controls.inline_edit.choice_view is None
         assert controls.cfg.editor.preview_quality == "full-quality"
@@ -148,7 +155,7 @@ def test_a_stepper_keeps_the_widest_width_it_has_shown() -> None:
 def test_a_second_click_on_the_open_combo_closes_it() -> None:
     with _inspector("settings.preview") as (host, controls):
         _frame(host, (0, 0))
-        combo = _center(host.inspector.values.choice_rects[_QUALITY])
+        combo = rect_center(host.inspector.values.choice_rects[_QUALITY])
         _frame(host, combo, click=True)
         assert controls.inline_edit.choice_view is not None
         _frame(host, combo, click=True)
@@ -161,7 +168,7 @@ def test_a_click_on_the_open_row_label_closes_the_list() -> None:
     with _inspector("settings.preview") as (host, controls):
         _frame(host, (0, 0))
         x, y, _w, h = host.inspector.values.choice_rects[_QUALITY]
-        _frame(host, _center(host.inspector.values.choice_rects[_QUALITY]), click=True)
+        _frame(host, rect_center(host.inspector.values.choice_rects[_QUALITY]), click=True)
         _frame(host, (x - 40, y + h // 2), click=True)
         _frame(host, (x - 40, y + h // 2))
         assert controls.inline_edit.choice_view is None
@@ -182,31 +189,31 @@ def test_a_second_click_on_an_open_dialog_combo_closes_it() -> None:
     )
 
     def frame(host: object, pos: tuple[int, int], *, click: bool = False) -> None:
-        for event in ([_motion(pos), _button(pos)] if click else [_motion(pos)]):
+        for event in ([mouse_motion(pos), mouse_down(pos)] if click else [mouse_motion(pos)]):
             host.process_event(event)
             surface = ModalSurface(modal.view_state(), ImGuiTextMeasure())
             host.top_layer.push(surface)
-            _draw(host)
+            draw_shell(host)
             apply_modal_pointer(modal, surface.intent)
         if click:
             host.process_event(_release(pos))
             surface = ModalSurface(modal.view_state(), ImGuiTextMeasure())
             host.top_layer.push(surface)
-            _draw(host)
+            draw_shell(host)
             apply_modal_pointer(modal, surface.intent)
         frame.surface = surface
 
-    with _host() as host:
+    with headless_shell_host() as host:
         frame(host, (0, 0))
         combo = next(
             hit.rect
             for hit in frame.surface._form_hits
             if hit.kind is ModalPointerKind.OPEN_FORM_CHOICE
         )
-        frame(host, _center(combo), click=True)
+        frame(host, rect_center(combo), click=True)
         assert modal.view_state().form_choice is not None
-        frame(host, _center(combo), click=True)
-        frame(host, _center(combo))
+        frame(host, rect_center(combo), click=True)
+        frame(host, rect_center(combo))
         assert modal.view_state().form_choice is None
         assert modal.view_state().form_rows[0].value == 0
 
@@ -215,7 +222,7 @@ def test_navigator_expand_draws_as_a_combo_with_three_options() -> None:
     expand = RowDescriptor(RowKind.SETTINGS_NAVIGATOR_EXPAND_CLICK)
     with _inspector("settings.ui") as (host, controls):
         _frame(host, (0, 0))
-        _frame(host, _center(host.inspector.values.choice_rects[expand]), click=True)
+        _frame(host, rect_center(host.inspector.values.choice_rects[expand]), click=True)
         view = controls.inline_edit.choice_view
         assert view is not None and view.target == expand
         assert len(host.inspector.values.choice_list_rows) == 3

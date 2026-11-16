@@ -48,7 +48,7 @@ A maximised OpenGL window that isn't exclusive fullscreen usually goes through t
 
 ### Phase 1: In-window frame timer
 
-Done as H1 of [docs/dev/plans/architecture-performance-review.md](docs/dev/plans/architecture-performance-review.md).
+Done as H1 of [docs/dev/plans-completed/architecture-performance-review.md](docs/dev/plans-completed/architecture-performance-review.md).
 
 Measure before optimising anything except the timeline fix.
 
@@ -67,6 +67,8 @@ Measure before optimising anything except the timeline fix.
 
 ### Phase 2: Timeline strip incremental compose
 
+Done as M1 of [docs/dev/plans-completed/architecture-performance-review.md](docs/dev/plans-completed/architecture-performance-review.md).
+
 - In `compose_panel`, clear and blit the full upload surface only when the static panel was rebuilt (`incremental=False`), or when the upload scratch surface was reallocated by `_ensure_upload_scratch`.
 - In incremental mode, keep the upload surface from the last frame. `_patch_live_overlay` already restores the dirty rects.
 - When `live_sig == cache.last_live_signature` (paused, nothing changed), skip patching entirely.
@@ -74,10 +76,14 @@ Measure before optimising anything except the timeline fix.
 
 ### Phase 3: Presentation (only if `flip()` dominates)
 
+Not started. It waits on F3 numbers from a maximised window on Windows; the follow-up is in [docs/dev/todos.md](docs/dev/todos.md).
+
 - Add a borderless fullscreen toggle in the View menu: a frameless window that exactly covers the monitor. On Windows this often lets the driver skip the desktop compositor's copy.
 - Check vsync. Cleave doesn't set a swap interval today (SDL and driver default), so make it explicit and measure both.
 
 ### Phase 4: ImGui row cost (only if the ImGui build time grows with height)
+
+Not started, for the same reason as Phase 3.
 
 - Cache fitted text per row, keyed on text, width and UI scale.
 - Skip building rows that are scrolled out of view in the navigator, inspector and help columns.

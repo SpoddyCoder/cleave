@@ -85,7 +85,7 @@ from cleave.viz.theme import (
     NAV_ON_BG,
     SOLO_BG,
 )
-from tests.cleave.viz.test_controls import _make_controls
+from tests.support.viz import make_controls
 
 
 def _layer(
@@ -165,7 +165,7 @@ def test_child_page_breadcrumbs() -> None:
 
 
 def test_timeline_toggle_opens_and_closes_the_strip() -> None:
-    controls = _make_controls(("layer_1",), timeline_enabled=True)
+    controls = make_controls(("layer_1",), timeline_enabled=True)
     assert controls.session.timeline.panel_open is False
     desc = RowDescriptor(RowKind.TIMELINE_HEADER)
     activate_header_toggle(controls, "enabled", desc)
@@ -252,7 +252,7 @@ def test_navigator_toggles_sit_in_fixed_columns() -> None:
 
 
 def test_header_toggle_changes_the_header_flag() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     post = RowDescriptor(RowKind.POST_FX_HEADER)
     assert controls.session.post_fx.enabled is True
     activate_header_toggle(controls, "enabled", post)

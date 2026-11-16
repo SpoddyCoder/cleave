@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pygame
 
@@ -12,6 +13,7 @@ from cleave.config import CleaveConfig, LayerConfig, PathsConfig, EditorConfig
 from cleave.config_schema.layers import DEFAULT_LAYER_SLOTS
 from tests.support.config import TEST_LAYER_STEMS
 from cleave.preset_playlist import PresetPlaylist
+from cleave.viz.commands import command_by_id
 from cleave.viz.controls import TuningControls
 from cleave.viz.editor_mode_controls import is_preset_curation_mode
 from cleave.viz.focus_nav import MainFocus
@@ -31,13 +33,14 @@ from cleave.viz.shell_focus import ShellRegion
 from cleave.viz.live_layer_bindings import LiveLayerBindings
 from cleave.viz.session import (
     LayerRuntime,
+    TimelineRuntime,
     TuningSession,
     default_overlay_card_runtime,
 )
 from cleave.viz.playback import PlaybackState
 from cleave.viz.overlay_primitives import overlay_font as production_overlay_font
 from cleave.viz.theme import TuningUiMetrics, tuning_ui_metrics
-from cleave.viz.tuning_view_state import OverlayCardBlock, TrackBlock
+from cleave.viz.tuning_view_state import OverlayCardBlock, TrackBlock, TuningViewState
 
 
 def baseline_tuning_ui_metrics() -> TuningUiMetrics:
@@ -207,10 +210,16 @@ def make_test_cfg(
 def make_controls(
     slots: tuple[str, ...] = ("layer_1", "layer_2"),
     *,
+    timeline_enabled: bool = False,
     launch_config_path: Path | None = DEFAULT_ACTIVE_CONFIG,
+    beat_times: tuple[float, ...] = (),
+    bar_times: tuple[float, ...] = (),
+    project_dir: Path | None = None,
+    duration_sec: float = 120.0,
+    signals=None,
 ) -> TuningControls:
     preset_root = Path("/tmp/presets")
-    cfg = make_test_cfg(slots, preset_root=preset_root)
+    cfg = make_test_cfg(slots, preset_root=preset_root, config_path=launch_config_path or DEFAULT_ACTIVE_CONFIG)
     session = TuningSession(
         layer_z_order=list(slots),
         layers={
@@ -222,14 +231,19 @@ def make_controls(
             )
             for slot in slots
         },
+        timeline=TimelineRuntime(enabled=timeline_enabled),
     )
     return TuningControls(
         session,
         cfg,
         preset_root=preset_root,
         playback=stub_playback_state(),
-        duration_sec=120.0,
+        duration_sec=duration_sec,
+        project_dir=project_dir,
         launch_config_path=launch_config_path,
+        beat_times=beat_times,
+        bar_times=bar_times,
+        signals=signals,
     )
 
 
@@ -356,3 +370,79 @@ def press_main_row(controls: TuningControls, event: pygame.event.Event) -> bool:
         if handle_row_hotkey(controls, desc, event):
             return True
     return controls.handle_keydown(event)
+
+
+def mutate_dirty(controls: TuningControls) -> None:
+    controls.session.layers["layer_1"].opacity_pct = 60
+
+
+def make_controls_with_manager(
+    slots: tuple[str, ...] = ("layer_1",),
+    *,
+    can_add: bool = True,
+    can_remove: bool = True,
+    launch_config_path: Path | None = DEFAULT_ACTIVE_CONFIG,
+) -> tuple[TuningControls, MagicMock]:
+    preset_root = Path("/tmp/presets")
+    cfg = make_test_cfg(slots, preset_root=preset_root, config_path=launch_config_path or DEFAULT_ACTIVE_CONFIG)
+    session = TuningSession(
+        layer_z_order=list(slots),
+        layers={
+            slot: LayerRuntime(
+                playlist=make_playlist(slot),
+                browse_floor=preset_root / slot,
+                stem=TEST_LAYER_STEMS.get(slot, "drums"),
+                opacity_pct=50,
+            )
+            for slot in slots
+        },
+    )
+    layer_manager = MagicMock()
+    layer_manager.can_add.return_value = can_add
+    layer_manager.can_remove.return_value = can_remove
+    controls = TuningControls(
+        session,
+        cfg,
+        preset_root=preset_root,
+        playback=stub_playback_state(),
+        duration_sec=120.0,
+        launch_config_path=launch_config_path,
+        layer_manager=layer_manager,
+    )
+    return controls, layer_manager
+
+
+def save_now(controls: TuningControls) -> None:
+    command_by_id("file.save").run(controls)
+    assert not controls.modal_host.active
+
+
+def choose_modal_option(controls: TuningControls, label: str) -> None:
+    modal_view = controls.modal_host.view_state()
+    assert modal_view is not None
+    controls.modal_host.activate_option(modal_view.options.index(label))
+
+
+def minimal_view_state(**kwargs: object) -> TuningViewState:
+    defaults: dict[str, object] = {
+        "layer_z_order": ("layer_1",),
+        "tracks": {
+            "layer_1": make_track_block(
+                stem="drums",
+                preset_dir_label="dir",
+                preset_label="preset.milk",
+                blend_mode="black-key",
+                opacity_pct=50,
+                beat_sensitivity=1.0,
+                effects={},
+            )
+        },
+        "paused": False,
+        "position_sec": 0.0,
+        "focus_cursor": MainFocus(RowDescriptor(RowKind.OVERLAYS_HEADER)),
+        "move_mode_slot": None,
+        "notification_message": None,
+        "notification_remaining_sec": 0.0,
+    }
+    defaults.update(kwargs)
+    return TuningViewState(**defaults)  # type: ignore[arg-type]

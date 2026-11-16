@@ -24,7 +24,11 @@ from cleave.viz.shell_focus import ShellRegion
 from cleave.viz.shell_host import ShellHost, draw_shell_frame
 from cleave.viz.shell_menu_bar import menu_bar_height_px
 from cleave.viz.shell_layout import ShellLayout
-from tests.cleave.viz.test_controls import _keydown, _make_controls
+from tests.support.viz import (
+    keydown,
+    make_controls,
+)
+
 
 _SLOTS = tuple(f"layer_{i}" for i in range(1, 9))
 
@@ -145,7 +149,7 @@ def _window_scroll(host: ShellHost, panel_name: str) -> list[float]:
 
 
 def _long_preset_page():
-    controls = _make_controls(_SLOTS)
+    controls = make_controls(_SLOTS)
     block = controls.session.layers["layer_1"]
     block.preset_switching_trigger = "timer"
     block.preset_list = [f"/tmp/presets/layer_1/preset-{i}.milk" for i in range(60)]
@@ -158,7 +162,7 @@ def _long_preset_page():
 
 
 def test_navigator_scrolls_to_keep_the_selected_row_in_view() -> None:
-    controls = _make_controls(_SLOTS)
+    controls = make_controls(_SLOTS)
     controls.shell_focus.nav_expanded |= set(TOP_LEVEL_IDS) | {
         layer_node_id(slot) for slot in _SLOTS
     }
@@ -167,7 +171,7 @@ def test_navigator_scrolls_to_keep_the_selected_row_in_view() -> None:
         scroll = _window_scroll(host, "navigator")
         _focused_rows(host)
         for _ in range(60):
-            controls.navigator.handle_keydown(_keydown(pygame.K_DOWN))
+            controls.navigator.handle_keydown(keydown(pygame.K_DOWN))
             _assert_in_view(_focused_rows(host))
         assert scroll[-1] > 0.0
 
@@ -178,7 +182,7 @@ def test_inspector_scrolls_to_keep_the_focused_row_in_view() -> None:
         scroll = _window_scroll(host, "inspector")
         _focused_rows(host)
         for _ in range(70):
-            controls.inspector.handle_keydown(_keydown(pygame.K_DOWN))
+            controls.inspector.handle_keydown(keydown(pygame.K_DOWN))
             _assert_in_view(_focused_rows(host))
         assert scroll[-1] > 0.0
 
@@ -188,10 +192,10 @@ def test_inspector_wraps_back_to_the_top_row() -> None:
     with _shell(controls) as host:
         scroll = _window_scroll(host, "inspector")
         _focused_rows(host)
-        controls.inspector.handle_keydown(_keydown(pygame.K_UP))
+        controls.inspector.handle_keydown(keydown(pygame.K_UP))
         _focused_rows(host)
         assert scroll[-1] > 0.0
-        controls.inspector.handle_keydown(_keydown(pygame.K_DOWN))
+        controls.inspector.handle_keydown(keydown(pygame.K_DOWN))
         _assert_in_view(_focused_rows(host))
         assert scroll[-1] == 0.0
 

@@ -61,16 +61,14 @@ from cleave.viz.tuning_view_state import (
     SettingsBlock,
     TimelineFadeGroupBlock,
 )
-from tests.cleave.viz.test_controls import (
-    _keydown,
-    _make_controls,
-    _make_controls_with_manager,
-)
-from tests.cleave.viz.test_overlay import _minimal_view_state
 from tests.support.config import TEST_LAYER_STEMS
 from tests.support.viz import (
+    keydown,
+    make_controls,
+    make_controls_with_manager,
     make_overlay_card_block,
     make_track_block,
+    minimal_view_state,
     noop_layer_bindings,
 )
 
@@ -576,7 +574,7 @@ def test_row_panel_label_settings_header() -> None:
 
 
 def test_format_row_value_settings() -> None:
-    state = _minimal_view_state(
+    state = minimal_view_state(
         settings=SettingsBlock(
             preview_quality="performance",
             navigator_side="right",
@@ -605,12 +603,12 @@ def test_format_row_value_settings() -> None:
         format_row_value(state, RowDescriptor(RowKind.SETTINGS_UI_NAVIGATOR_HEIGHT))
         == "240 px"
     )
-    scaled = _minimal_view_state(settings=SettingsBlock(ui_scale=120))
+    scaled = minimal_view_state(settings=SettingsBlock(ui_scale=120))
     assert (
         format_row_value(scaled, RowDescriptor(RowKind.SETTINGS_UI_SCALE))
         == "120%"
     )
-    fit = _minimal_view_state(settings=SettingsBlock(navigator_height=0))
+    fit = minimal_view_state(settings=SettingsBlock(navigator_height=0))
     assert (
         format_row_value(fit, RowDescriptor(RowKind.SETTINGS_UI_NAVIGATOR_HEIGHT))
         == "fit to rows"
@@ -618,7 +616,7 @@ def test_format_row_value_settings() -> None:
 
 
 def test_format_row_value_track_and_render() -> None:
-    state = _minimal_view_state(
+    state = minimal_view_state(
         tracks={
             "layer_1": make_track_block(
                 stem=TEST_LAYER_STEMS["layer_1"],
@@ -728,7 +726,7 @@ def test_format_row_value_track_and_render() -> None:
 
 
 def test_apply_field_horizontal_display_row_is_not_editable() -> None:
-    controls = _make_controls()
+    controls = make_controls()
     assert (
         apply_field_horizontal(
             controls,
@@ -741,7 +739,7 @@ def test_apply_field_horizontal_display_row_is_not_editable() -> None:
 
 
 def test_apply_field_horizontal_unknown_kind_returns_false() -> None:
-    controls = _make_controls()
+    controls = make_controls()
     assert (
         apply_field_horizontal(
             controls, RowDescriptor(RowKind.LAYER_MANAGEMENT_COUNT), True, False
@@ -751,7 +749,7 @@ def test_apply_field_horizontal_unknown_kind_returns_false() -> None:
 
 
 def test_apply_field_horizontal_cycles_column_sides() -> None:
-    controls = _make_controls()
+    controls = make_controls()
     navigator = RowDescriptor(RowKind.SETTINGS_NAVIGATOR_SIDE)
     help_side = RowDescriptor(RowKind.SETTINGS_HELP_SIDE)
     assert controls.cfg.editor.navigator_side == DEFAULT_NAVIGATOR_SIDE
@@ -770,7 +768,7 @@ def test_apply_field_horizontal_cycles_column_sides() -> None:
 
 
 def test_apply_field_horizontal_steps_preview_quality() -> None:
-    controls = _make_controls()
+    controls = make_controls()
     desc = RowDescriptor(RowKind.SETTINGS_PREVIEW_QUALITY)
     assert controls.cfg.editor.preview_quality == DEFAULT_EDITOR_PREVIEW_QUALITY
 
@@ -782,7 +780,7 @@ def test_apply_field_horizontal_steps_preview_quality() -> None:
 
 
 def test_apply_field_horizontal_preview_quality_calls_preview_resolutions() -> None:
-    controls, layer_manager = _make_controls_with_manager()
+    controls, layer_manager = make_controls_with_manager()
     desc = RowDescriptor(RowKind.SETTINGS_PREVIEW_QUALITY)
 
     apply_field_horizontal(controls, desc, True, False)
@@ -791,7 +789,7 @@ def test_apply_field_horizontal_preview_quality_calls_preview_resolutions() -> N
 
 
 def test_apply_field_horizontal_track_blend() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     desc = RowDescriptor(RowKind.TRACK_BLEND, slot="layer_1")
     before = controls.session.layers["layer_1"].blend_mode
 
@@ -800,7 +798,7 @@ def test_apply_field_horizontal_track_blend() -> None:
 
 
 def test_apply_field_horizontal_overlay_opacity() -> None:
-    controls = _make_controls()
+    controls = make_controls()
     desc = RowDescriptor(RowKind.OVERLAY_CARD_OPACITY, card="opening_card")
     before = controls.session.overlays.opening_card.opacity_pct
 
@@ -809,7 +807,7 @@ def test_apply_field_horizontal_overlay_opacity() -> None:
 
 
 def test_apply_field_horizontal_overlay_background_margin() -> None:
-    controls = _make_controls()
+    controls = make_controls()
     desc = RowDescriptor(
         RowKind.OVERLAY_CARD_BACKGROUND_MARGIN, card="opening_card"
     )
@@ -829,7 +827,7 @@ def test_apply_field_horizontal_overlay_background_margin() -> None:
 
 
 def test_apply_field_horizontal_overlay_background_padding() -> None:
-    controls = _make_controls()
+    controls = make_controls()
     desc = RowDescriptor(
         RowKind.OVERLAY_CARD_BACKGROUND_PADDING, card="opening_card"
     )
@@ -844,7 +842,7 @@ def test_apply_field_horizontal_overlay_background_padding() -> None:
 def test_overlay_cards_share_kinds_and_isolate_runtime() -> None:
     from cleave.viz.inspector import build_inspector_rows
 
-    controls = _make_controls()
+    controls = make_controls()
     view = controls.build_view_state(paused=False)
     opening_desc = RowDescriptor(
         RowKind.OVERLAY_CARD_POSITION, card="opening_card"
@@ -875,7 +873,7 @@ def test_overlay_cards_share_kinds_and_isolate_runtime() -> None:
 
 
 def test_apply_field_horizontal_adjusts_notification_display() -> None:
-    controls = _make_controls()
+    controls = make_controls()
     desc = RowDescriptor(RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY)
     assert (
         controls.cfg.editor.notification_display_sec
@@ -896,7 +894,7 @@ def test_apply_field_horizontal_adjusts_notification_display() -> None:
 
 
 def test_apply_field_horizontal_steps_navigator_height_from_drawn() -> None:
-    controls = _make_controls()
+    controls = make_controls()
     desc = RowDescriptor(RowKind.SETTINGS_UI_NAVIGATOR_HEIGHT)
     row = navigator_row_px()
     band = 600
@@ -920,7 +918,7 @@ def test_apply_field_horizontal_steps_navigator_height_from_drawn() -> None:
 
 
 def test_apply_field_horizontal_steps_ui_scale_and_applies_live() -> None:
-    controls = _make_controls()
+    controls = make_controls()
     desc = RowDescriptor(RowKind.SETTINGS_UI_SCALE)
     generation = ui_scale_generation()
     try:
@@ -943,16 +941,16 @@ def test_apply_field_horizontal_steps_ui_scale_and_applies_live() -> None:
 def test_apply_field_horizontal_via_controls_keydown() -> None:
     from tests.support.viz import press_main_row
 
-    controls = _make_controls()
+    controls = make_controls()
     controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_NAVIGATOR_SIDE)
     before = controls.cfg.editor.navigator_side
 
-    press_main_row(controls, _keydown(pygame.K_RIGHT))
+    press_main_row(controls, keydown(pygame.K_RIGHT))
     assert controls.cfg.editor.navigator_side != before
 
 
 def test_format_row_value_timeline_cuts() -> None:
-    state = _minimal_view_state(
+    state = minimal_view_state(
         timeline=TimelineBlock(
             hard_cut_fades=TimelineFadeGroupBlock(
                 enabled=True, fade_in=1.5, fade_out=2.5, crossfade=True
@@ -998,7 +996,7 @@ def test_resume_switching_row_only_while_paused() -> None:
     assert spec.parent_group == "track"
 
     def kinds(*, paused: bool) -> list[RowKind]:
-        state = _minimal_view_state(
+        state = minimal_view_state(
             tracks={
                 "layer_1": make_track_block(
                     stem=TEST_LAYER_STEMS["layer_1"],
@@ -1035,7 +1033,7 @@ def test_resume_switching_row_only_while_paused() -> None:
 
 
 def test_apply_field_horizontal_track_header_solo_and_expand() -> None:
-    controls = _make_controls(("layer_1", "layer_2"))
+    controls = make_controls(("layer_1", "layer_2"))
     desc = RowDescriptor(RowKind.TRACK_HEADER, slot="layer_1")
 
     assert apply_field_toggle_solo(controls, desc) is True
@@ -1086,7 +1084,7 @@ def test_row_spec_toggle_mutators_match_action_mutator() -> None:
 
 
 def test_format_row_value_path_icon() -> None:
-    state = _minimal_view_state(
+    state = minimal_view_state(
         tracks={
             "layer_1": make_track_block(
                 stem=TEST_LAYER_STEMS["layer_1"],
@@ -1106,7 +1104,7 @@ def test_format_row_value_path_icon() -> None:
 
 
 def test_track_effect_dynamic_label_and_prefix() -> None:
-    state = _minimal_view_state(
+    state = minimal_view_state(
         tracks={
             "layer_1": make_track_block(
                 stem=TEST_LAYER_STEMS["layer_1"],
@@ -1127,7 +1125,7 @@ def test_track_effect_dynamic_label_and_prefix() -> None:
 
 
 def test_apply_field_horizontal_visual_limiter_enabled() -> None:
-    controls = _make_controls()
+    controls = make_controls()
     controls.session.post_fx.limiter.enabled = True
     desc = RowDescriptor(RowKind.POST_FX_LIMITER_ENABLED)
 
@@ -1139,7 +1137,7 @@ def test_apply_field_horizontal_visual_limiter_enabled() -> None:
 
 
 def test_apply_field_horizontal_visual_limiter_header_expands() -> None:
-    controls = _make_controls()
+    controls = make_controls()
     desc = RowDescriptor(RowKind.POST_FX_LIMITER_HEADER)
 
     apply_field_horizontal(controls, desc, True, False)
@@ -1264,7 +1262,7 @@ def test_preset_dir_buttons_follow_the_available_moves() -> None:
 
 
 def test_nav_buttons_move_up_and_down_the_tree() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     controls.layer_mutations = MagicMock()
     desc = RowDescriptor(RowKind.TRACK_PRESET_DIR, slot="layer_1")
 
@@ -1275,7 +1273,7 @@ def test_nav_buttons_move_up_and_down_the_tree() -> None:
 
 
 def test_section_lock_blocks_nav_buttons() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     controls.layer_mutations = MagicMock()
     controls.session.layers["layer_1"].locked = True
     desc = RowDescriptor(RowKind.TRACK_PRESET_DIR, slot="layer_1")
@@ -1325,13 +1323,13 @@ def test_navigator_expand_click_steps_and_writes_user_config(tmp_path) -> None:
     from cleave.user_config import load_user_config
 
     user_path = tmp_path / "config.yaml"
-    controls = _make_controls()
+    controls = make_controls()
     controls.cfg.user_config_path = user_path
     assert controls.cfg.editor.navigator_expand_click == DEFAULT_NAVIGATOR_EXPAND_CLICK
     controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_NAVIGATOR_EXPAND_CLICK)
-    press_main_row(controls, _keydown(pygame.K_RIGHT))
+    press_main_row(controls, keydown(pygame.K_RIGHT))
     assert controls.cfg.editor.navigator_expand_click == "click-toggle"
     assert load_user_config(user_path).editor.navigator_expand_click == "click-toggle"
-    press_main_row(controls, _keydown(pygame.K_RIGHT))
-    press_main_row(controls, _keydown(pygame.K_RIGHT))
+    press_main_row(controls, keydown(pygame.K_RIGHT))
+    press_main_row(controls, keydown(pygame.K_RIGHT))
     assert controls.cfg.editor.navigator_expand_click == "button-only"

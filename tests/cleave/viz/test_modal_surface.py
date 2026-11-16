@@ -58,8 +58,14 @@ from cleave.viz.theme import (
     VALUE,
     tuning_ui_metrics,
 )
-
-Rect = tuple[int, int, int, int]
+from tests.support.shell import (
+    Rect,
+    draw_shell,
+    headless_shell_host,
+    mouse_down,
+    mouse_motion,
+    rect_center,
+)
 
 
 class _Overlay:
@@ -81,70 +87,6 @@ def _content_names() -> list[str]:
     return names
 
 
-@contextmanager
-def _host() -> Iterator[object]:
-    from cleave.viz import imgui_host
-    from cleave.viz.imgui_host import ImGuiHost
-    from cleave.viz.shell_host import ShellHost
-    from cleave.viz.shell_menu_bar import menu_bar_height_px
-
-    controls = SimpleNamespace(
-        session=SimpleNamespace(
-            layer_z_order=(),
-            help_visible=False,
-            timeline=SimpleNamespace(panel_open=False),
-        ),
-        shell_focus=SimpleNamespace(region=ShellRegion.NAVIGATOR),
-        cfg=SimpleNamespace(project_slug="song"),
-        config_dirty=False,
-        build_view_state=lambda **_kwargs: None,
-        set_shell_region=MagicMock(),
-        modal_host=ModalHost(),
-        disarm_value_nudge=MagicMock(),
-        inline_edit=InlineEditController(),
-        context_menu=ContextMenuState(),
-        transport=MagicMock(),
-    )
-    with patch.object(imgui_host, "_gl_context_current", return_value=False):
-        host = ShellHost(
-            ImGuiHost.create(),
-            MenuBarState(),
-            controls,
-            menu_bar_height_px(),
-        )
-    host.imgui.display_size = (1280, 720)
-    height = host.menu_bar_height_px
-    host.set_layout(ShellLayout.compute(1280, 720, height, height, 0))
-    host.navigator.draw = lambda _frame: None
-    host.navigator.visible_nodes = lambda: ()
-    host.inspector.draw = lambda _state: None
-    try:
-        yield host
-    finally:
-        try:
-            # Destroying a context after a single frame breaks the next one.
-            _draw(host)
-            _draw(host)
-        finally:
-            host.imgui.destroy()
-
-
-def _draw(host: object) -> None:
-    from cleave.viz.shell_host import draw_shell_frame
-
-    draw_shell_frame(host, host.context.menu_state, CommandContext(), 1.0 / 60.0)
-
-
-def _motion(pos: tuple[int, int]) -> pygame.event.Event:
-    return pygame.event.Event(
-        pygame.MOUSEMOTION, pos=pos, rel=(0, 0), buttons=(0, 0, 0)
-    )
-
-
-def _button(pos: tuple[int, int]) -> pygame.event.Event:
-    return pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=pos, button=1)
-
-
 def _assert_shell_before(names: list[str], later: str) -> None:
     later_at = names.index(later)
     for name in (
@@ -155,11 +97,6 @@ def _assert_shell_before(names: list[str], later: str) -> None:
         "##shell-chrome",
     ):
         assert names.index(name) < later_at, names
-
-
-def _center(rect: Rect) -> tuple[int, int]:
-    x, y, width, height = rect
-    return (x + width // 2, y + height // 2)
 
 
 def _above(rect: Rect) -> tuple[int, int]:
@@ -213,17 +150,17 @@ def _contains(rect: Rect, x: int, y: int) -> bool:
 
 
 def _idle(host: object, surface: ModalSurface) -> None:
-    host.process_event(_motion((0, 0)))
+    host.process_event(mouse_motion((0, 0)))
     host.top_layer.push(surface)
-    _draw(host)
+    draw_shell(host)
 
 
 def _pointer(host: object, surface: ModalSurface, pos: tuple[int, int], *, click: bool) -> None:
-    host.process_event(_motion(pos))
+    host.process_event(mouse_motion(pos))
     if click:
-        host.process_event(_button(pos))
+        host.process_event(mouse_down(pos))
     host.top_layer.push(surface)
-    _draw(host)
+    draw_shell(host)
 
 
 def _yes_no() -> ModalViewState:
@@ -286,9 +223,9 @@ def _text() -> ModalViewState:
 
 
 def test_modal_draws_after_shell_and_scrim() -> None:
-    with _host() as host:
+    with headless_shell_host() as host:
         host.top_layer.push(ModalSurface(_yes_no(), ImGuiTextMeasure()))
-        _draw(host)
+        draw_shell(host)
         names = _content_names()
         _assert_shell_before(names, "##top-scrim")
         assert names.index("##top-scrim") < names.index("##modal"), names
@@ -313,7 +250,7 @@ def test_modal_draws_after_shell_and_scrim() -> None:
     ids=["yes_no", "three_buttons", "unsaved_quit", "progress", "text"],
 )
 def test_kind_renders_with_idle_mouse(view: ModalViewState) -> None:
-    with _host() as host:
+    with headless_shell_host() as host:
         surface = ModalSurface(view, ImGuiTextMeasure())
         _idle(host, surface)
         names = _content_names()
@@ -389,11 +326,11 @@ def test_kind_renders_with_idle_mouse(view: ModalViewState) -> None:
 
 
 def test_click_option_activates_that_index() -> None:
-    with _host() as host:
+    with headless_shell_host() as host:
         surface = ModalSurface(_three_buttons(), ImGuiTextMeasure())
         _idle(host, surface)
         assert len(surface.option_rects) == 3
-        _pointer(host, surface, _center(surface.option_rects[2]), click=True)
+        _pointer(host, surface, rect_center(surface.option_rects[2]), click=True)
         assert surface.intent == ModalPointerIntent(
             ModalPointerKind.ACTIVATE_OPTION, index=2
         )
@@ -412,10 +349,10 @@ def test_click_option_runs_action_once_after_the_frame() -> None:
     )
     view = modal.view_state()
     assert view is not None
-    with _host() as host:
+    with headless_shell_host() as host:
         surface = ModalSurface(view, ImGuiTextMeasure())
         _idle(host, surface)
-        _pointer(host, surface, _center(surface.option_rects[2]), click=True)
+        _pointer(host, surface, rect_center(surface.option_rects[2]), click=True)
         assert ran == []
         assert modal.active
         apply_modal_pointer(modal, surface.intent)
@@ -424,10 +361,10 @@ def test_click_option_runs_action_once_after_the_frame() -> None:
 
 
 def test_hover_option_records_that_index() -> None:
-    with _host() as host:
+    with headless_shell_host() as host:
         surface = ModalSurface(_three_buttons(), ImGuiTextMeasure())
         _idle(host, surface)
-        _pointer(host, surface, _center(surface.option_rects[1]), click=False)
+        _pointer(host, surface, rect_center(surface.option_rects[1]), click=False)
         assert surface.intent == ModalPointerIntent(
             ModalPointerKind.HOVER_OPTION, index=1
         )
@@ -439,7 +376,7 @@ def test_hover_option_records_that_index() -> None:
     ids=["yes_no", "three_buttons", "unsaved_quit", "text"],
 )
 def test_click_outside_cancels(view: ModalViewState) -> None:
-    with _host() as host:
+    with headless_shell_host() as host:
         surface = ModalSurface(view, ImGuiTextMeasure())
         _idle(host, surface)
         assert surface.panel_rect is not None
@@ -448,7 +385,7 @@ def test_click_outside_cancels(view: ModalViewState) -> None:
 
 
 def test_click_outside_progress_records_nothing() -> None:
-    with _host() as host:
+    with headless_shell_host() as host:
         surface = ModalSurface(_progress(), ImGuiTextMeasure())
         _idle(host, surface)
         assert surface.panel_rect is not None
@@ -458,16 +395,16 @@ def test_click_outside_progress_records_nothing() -> None:
 
 
 def test_click_inside_progress_records_nothing() -> None:
-    with _host() as host:
+    with headless_shell_host() as host:
         surface = ModalSurface(_progress(), ImGuiTextMeasure())
         _idle(host, surface)
         assert surface.panel_rect is not None
-        _pointer(host, surface, _center(surface.panel_rect), click=True)
+        _pointer(host, surface, rect_center(surface.panel_rect), click=True)
         assert surface.intent is None
 
 
 def test_click_inside_miss_records_nothing() -> None:
-    with _host() as host:
+    with headless_shell_host() as host:
         surface = ModalSurface(_yes_no(), ImGuiTextMeasure())
         _idle(host, surface)
         panel = surface.panel_rect
@@ -481,7 +418,7 @@ def test_click_inside_miss_records_nothing() -> None:
 
 def test_click_text_field_places_caret_at_prefix() -> None:
     view = _text()
-    with _host() as host:
+    with headless_shell_host() as host:
         surface = ModalSurface(view, ImGuiTextMeasure())
         _idle(host, surface)
         field = surface.text_field_rect
@@ -515,11 +452,11 @@ def test_click_text_field_places_caret_at_prefix() -> None:
 
 
 def test_click_confirm_activates_text_button() -> None:
-    with _host() as host:
+    with headless_shell_host() as host:
         surface = ModalSurface(_text(), ImGuiTextMeasure())
         _idle(host, surface)
         assert len(surface.text_button_rects) == 2
-        _pointer(host, surface, _center(surface.text_button_rects[0]), click=True)
+        _pointer(host, surface, rect_center(surface.text_button_rects[0]), click=True)
         assert surface.intent == ModalPointerIntent(
             ModalPointerKind.ACTIVATE_TEXT_BUTTON, index=0
         )
@@ -598,22 +535,22 @@ def test_apply_modal_pointer_dispatches_each_kind() -> None:
 
 
 def test_navigator_click_does_not_set_shell_region() -> None:
-    with _host() as host:
+    with headless_shell_host() as host:
         host.top_layer.push(ModalSurface(_yes_no(), ImGuiTextMeasure()))
-        _draw(host)
+        draw_shell(host)
         assert host.top_layer.modal_active
         layout = host.layout
         assert layout is not None
         nav_x, nav_y, nav_w, nav_h = layout.navigator
         navigator = (nav_x + nav_w - 1, nav_y + nav_h // 2)
-        host.process_event(_button(navigator))
+        host.process_event(mouse_down(navigator))
         assert host.imgui.queued_buttons == [(0, True)]
         assert host.splitters.active is None
         host.context.controls.set_shell_region.assert_not_called()
 
 
 def test_modal_host_active_routes_navigator_click_before_draw() -> None:
-    with _host() as host:
+    with headless_shell_host() as host:
         host.context.controls.modal_host.prompt_confirm("Save?", "Confirm", on_confirm=lambda: None)
         assert host.context.controls.modal_host.active
         assert not host.top_layer.modal_active
@@ -621,32 +558,32 @@ def test_modal_host_active_routes_navigator_click_before_draw() -> None:
         assert layout is not None
         nav_x, nav_y, nav_w, nav_h = layout.navigator
         navigator = (nav_x + nav_w - 1, nav_y + nav_h // 2)
-        host.process_event(_button(navigator))
+        host.process_event(mouse_down(navigator))
         assert host.imgui.queued_buttons == [(0, True)]
         host.context.controls.set_shell_region.assert_not_called()
 
 
 def test_right_click_does_not_activate_or_cancel() -> None:
-    with _host() as host:
+    with headless_shell_host() as host:
         surface = ModalSurface(_three_buttons(), ImGuiTextMeasure())
         _idle(host, surface)
-        option = _center(surface.option_rects[1])
-        host.process_event(_motion(option))
+        option = rect_center(surface.option_rects[1])
+        host.process_event(mouse_motion(option))
         host.process_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=option, button=3))
         host.top_layer.push(surface)
-        _draw(host)
+        draw_shell(host)
         assert surface.intent == ModalPointerIntent(
             ModalPointerKind.HOVER_OPTION, index=1
         )
         outside = _above(surface.panel_rect)
         assert surface.panel_rect is not None
         host.process_event(pygame.event.Event(pygame.MOUSEBUTTONUP, pos=option, button=3))
-        host.process_event(_motion(outside))
+        host.process_event(mouse_motion(outside))
         host.process_event(
             pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=outside, button=3)
         )
         host.top_layer.push(surface)
-        _draw(host)
+        draw_shell(host)
         assert surface.intent is None
 
 
@@ -666,7 +603,7 @@ def test_click_scrolled_field_uses_scroll_and_clip() -> None:
         button_index=0,
         caret_visible=True,
     )
-    with _host() as host:
+    with headless_shell_host() as host:
         surface = ModalSurface(view, ImGuiTextMeasure())
         _idle(host, surface)
         field = surface.text_field_rect
@@ -711,7 +648,7 @@ def test_click_multiline_field_uses_visible_window() -> None:
         button_index=0,
         caret_visible=True,
     )
-    with _host() as host:
+    with headless_shell_host() as host:
         surface = ModalSurface(view, ImGuiTextMeasure())
         _idle(host, surface)
         field = surface.text_field_rect
@@ -787,7 +724,7 @@ def test_caret_quad_follows_caret_visible() -> None:
         button_index=0,
         caret_visible=True,
     )
-    with _host() as host:
+    with headless_shell_host() as host:
         surface = ModalSurface(hidden, ImGuiTextMeasure())
         _idle(host, surface)
         field = surface.text_field_rect
@@ -831,7 +768,7 @@ def test_text_button_colours_follow_focus() -> None:
         button_index=0,
         caret_visible=False,
     )
-    with _host() as host:
+    with headless_shell_host() as host:
         surface = ModalSurface(navigating, ImGuiTextMeasure())
         _idle(host, surface)
         colors = _color_counts()
@@ -843,7 +780,7 @@ def test_text_button_colours_follow_focus() -> None:
         assert colors.get(wash, 0) == 4
         assert border not in colors
         assert _pack(HIGHLIGHT) not in colors
-        _pointer(host, surface, _center(surface.text_field_rect), click=False)
+        _pointer(host, surface, rect_center(surface.text_field_rect), click=False)
         assert surface.intent == ModalPointerIntent(ModalPointerKind.HOVER_TEXT_FIELD)
 
         surface = ModalSurface(confirming, ImGuiTextMeasure())
@@ -852,21 +789,21 @@ def test_text_button_colours_follow_focus() -> None:
         assert _pack(DISABLED) not in colors
         assert _pack(HIGHLIGHT) not in colors
         assert colors.get(border, 0) > 0
-        _pointer(host, surface, _center(surface.text_button_rects[1]), click=False)
+        _pointer(host, surface, rect_center(surface.text_button_rects[1]), click=False)
         assert surface.intent == ModalPointerIntent(
             ModalPointerKind.HOVER_TEXT_BUTTON, index=1
         )
-        _pointer(host, surface, _center(surface.text_button_rects[1]), click=True)
+        _pointer(host, surface, rect_center(surface.text_button_rects[1]), click=True)
         assert surface.intent == ModalPointerIntent(
             ModalPointerKind.ACTIVATE_TEXT_BUTTON, index=1
         )
 
 
 def test_hover_text_button_while_editing_keeps_the_caret() -> None:
-    with _host() as host:
+    with headless_shell_host() as host:
         surface = ModalSurface(_text(), ImGuiTextMeasure())
         _idle(host, surface)
-        _pointer(host, surface, _center(surface.text_button_rects[0]), click=False)
+        _pointer(host, surface, rect_center(surface.text_button_rects[0]), click=False)
         assert surface.intent is None
         colors = _color_counts()
         wash = _pack(HIGHLIGHT, FOCUS_WASH_ALPHA / 255.0)
@@ -876,7 +813,7 @@ def test_hover_text_button_while_editing_keeps_the_caret() -> None:
         assert colors.get(_pack(DISABLED), 0) == 4 * (
             _glyphs(EDITING_HINT) + _glyphs(TEXT_BUTTON_LABELS[1])
         )
-        _pointer(host, surface, _center(surface.text_button_rects[0]), click=True)
+        _pointer(host, surface, rect_center(surface.text_button_rects[0]), click=True)
         assert surface.intent == ModalPointerIntent(
             ModalPointerKind.ACTIVATE_TEXT_BUTTON, index=0
         )
@@ -904,7 +841,7 @@ def _form_host_view() -> tuple[ModalHost, list[dict[str, int]]]:
 
 def test_form_draws_and_a_segment_click_sets_the_value() -> None:
     modal, confirmed = _form_host_view()
-    with _host() as host:
+    with headless_shell_host() as host:
         surface = ModalSurface(modal.view_state(), ImGuiTextMeasure())
         _idle(host, surface)
         assert len(surface.option_rects) == 2
@@ -914,7 +851,7 @@ def test_form_draws_and_a_segment_click_sets_the_value() -> None:
             if hit.kind is ModalPointerKind.SET_FORM_VALUE and hit.row == 0
         ]
         assert len(hits) == 2
-        _pointer(host, surface, _center(hits[1].rect), click=True)
+        _pointer(host, surface, rect_center(hits[1].rect), click=True)
         assert surface.intent == ModalPointerIntent(
             ModalPointerKind.SET_FORM_VALUE, index=0, value=1
         )
@@ -923,10 +860,10 @@ def test_form_draws_and_a_segment_click_sets_the_value() -> None:
         assert modal.view_state().form_info == "target 1"
 
     # The harness never releases the button, so a second click needs a new host.
-    with _host() as host:
+    with headless_shell_host() as host:
         surface = ModalSurface(modal.view_state(), ImGuiTextMeasure())
         _idle(host, surface)
-        _pointer(host, surface, _center(surface.option_rects[0]), click=True)
+        _pointer(host, surface, rect_center(surface.option_rects[0]), click=True)
         apply_modal_pointer(modal, surface.intent)
     assert confirmed == [{"target": 1, "step": 0, "source": 0}]
 
@@ -941,7 +878,7 @@ def test_form_combo_click_opens_its_list_and_a_row_click_picks() -> None:
             on_confirm=lambda _values: None,
         )
     )
-    with _host() as host:
+    with headless_shell_host() as host:
         surface = ModalSurface(modal.view_state(), ImGuiTextMeasure())
         _idle(host, surface)
         combo = next(
@@ -949,19 +886,19 @@ def test_form_combo_click_opens_its_list_and_a_row_click_picks() -> None:
             for hit in surface._form_hits
             if hit.kind is ModalPointerKind.OPEN_FORM_CHOICE
         )
-        _pointer(host, surface, _center(combo.rect), click=True)
+        _pointer(host, surface, rect_center(combo.rect), click=True)
         assert surface.intent == ModalPointerIntent(
             ModalPointerKind.OPEN_FORM_CHOICE, index=0
         )
         apply_modal_pointer(modal, surface.intent)
     assert modal.view_state().form_choice is not None
 
-    with _host() as host:
+    with headless_shell_host() as host:
         surface = ModalSurface(modal.view_state(), ImGuiTextMeasure())
         _idle(host, surface)
         assert len(surface.choice_list_rows) == 4
         row = surface.choice_list_rows[2]
-        _pointer(host, surface, _center(row), click=True)
+        _pointer(host, surface, rect_center(row), click=True)
         assert surface.intent == ModalPointerIntent(
             ModalPointerKind.PICK_FORM_CHOICE, value=2
         )
@@ -984,7 +921,7 @@ def test_inspector_button_inline_field_and_colour_picker_draw() -> None:
     inline.begin_colour(row, ColourTarget((10, 20, 30), applied.append, optional=True))
     drawn: list[bool] = []
 
-    with _host() as host:
+    with headless_shell_host() as host:
         host.context.controls.inline_edit = inline
 
         def draw_inspector(_state: object) -> None:
@@ -1002,8 +939,8 @@ def test_inspector_button_inline_field_and_colour_picker_draw() -> None:
             host.inspector.values.draw_colour_picker()
 
         host.inspector.draw = draw_inspector
-        _draw(host)
-        _draw(host)
+        draw_shell(host)
+        draw_shell(host)
     assert drawn
     assert inline.colour_edit is not None
     assert applied == []
@@ -1025,7 +962,7 @@ def _help_host_form(modal: ModalHost) -> None:
 
 
 def test_form_help_lifts_the_help_column_above_the_scrim() -> None:
-    with _host() as host:
+    with headless_shell_host() as host:
         height = host.menu_bar_height_px
         host.set_layout(
             ShellLayout.compute(1280, 720, height, height, 0, help_width=300)
@@ -1054,10 +991,10 @@ def test_form_help_lifts_the_help_column_above_the_scrim() -> None:
 
         # A press in the help column does not cancel the dialog.
         lifted = surface()
-        _pointer(host, lifted, _center(help_rect), click=True)
+        _pointer(host, lifted, rect_center(help_rect), click=True)
         assert lifted.intent is None
 
-    with _host() as host:
+    with headless_shell_host() as host:
         modal = host.context.controls.modal_host
         _help_host_form(modal)
         idle = ModalSurface(modal.view_state(), ImGuiTextMeasure())
@@ -1069,13 +1006,13 @@ def test_form_help_lifts_the_help_column_above_the_scrim() -> None:
         ]
         # Hover alone leaves the help on the focused row.
         hovered = ModalSurface(modal.view_state(), ImGuiTextMeasure())
-        _pointer(host, hovered, _center(rows[1]), click=False)
+        _pointer(host, hovered, rect_center(rows[1]), click=False)
         apply_modal_pointer(modal, hovered.intent)
         assert modal.help_sections()[0].lines == ("First help.",)
 
 
 def test_dialog_without_help_keeps_the_help_column_under_the_scrim() -> None:
-    with _host() as host:
+    with headless_shell_host() as host:
         height = host.menu_bar_height_px
         host.set_layout(
             ShellLayout.compute(1280, 720, height, height, 0, help_width=300)
@@ -1104,11 +1041,11 @@ def test_progress_cancel_button_click_runs_cancel() -> None:
     modal, cancelled = _cancellable_progress()
     view = modal.view_state()
     assert view is not None
-    with _host() as host:
+    with headless_shell_host() as host:
         surface = ModalSurface(view, ImGuiTextMeasure())
         _idle(host, surface)
         assert len(surface.option_rects) == 1
-        _pointer(host, surface, _center(surface.option_rects[0]), click=True)
+        _pointer(host, surface, rect_center(surface.option_rects[0]), click=True)
         apply_modal_pointer(modal, surface.intent)
     assert cancelled == [True]
     assert not modal.active
@@ -1118,7 +1055,7 @@ def test_click_outside_cancellable_progress_records_nothing() -> None:
     modal, _cancelled = _cancellable_progress()
     view = modal.view_state()
     assert view is not None
-    with _host() as host:
+    with headless_shell_host() as host:
         surface = ModalSurface(view, ImGuiTextMeasure())
         _idle(host, surface)
         assert surface.panel_rect is not None
@@ -1131,7 +1068,7 @@ def test_progress_without_large_text_uses_body_font() -> None:
     view = modal.view_state()
     assert view is not None
     assert view.large_text is False
-    with _host() as host:
+    with headless_shell_host() as host:
         surface = ModalSurface(view, ImGuiTextMeasure())
         _idle(host, surface)
         screen_w, _screen_h = host.imgui.display_size

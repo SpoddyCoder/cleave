@@ -194,28 +194,6 @@ def _apply_layer_grit(
     )
 
 
-def _apply_layer_highlight_rolloff(
-    layer: StemLayer,
-    post_process: GlPostProcess,
-    compositor: GlCompositor,
-    hr: HighlightRolloffRuntime,
-) -> None:
-    LayerFramePipeline.apply_layer_highlight_rolloff(
-        layer, post_process, compositor, hr
-    )
-
-
-def _apply_layer_chroma_boost(
-    layer: StemLayer,
-    post_process: GlPostProcess,
-    compositor: GlCompositor,
-    cb: ChromaBoostRuntime,
-) -> None:
-    LayerFramePipeline.apply_layer_chroma_boost(
-        layer, post_process, compositor, cb
-    )
-
-
 class LayerFramePipeline:
     """Per-frame GL path for stem layers."""
 
@@ -532,7 +510,7 @@ class LayerFramePipeline:
                             layer.fbo.width,
                             layer.fbo.height,
                         )
-                    _apply_layer_highlight_rolloff(
+                    LayerFramePipeline.apply_layer_highlight_rolloff(
                         layer, post_process, compositor, hr
                     )
                 if per_layer_chroma:
@@ -544,7 +522,9 @@ class LayerFramePipeline:
                             layer.fbo.width,
                             layer.fbo.height,
                         )
-                    _apply_layer_chroma_boost(layer, post_process, compositor, cb)
+                    LayerFramePipeline.apply_layer_chroma_boost(
+                        layer, post_process, compositor, cb
+                    )
 
     @staticmethod
     def composite(

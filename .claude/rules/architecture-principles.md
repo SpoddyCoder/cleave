@@ -18,7 +18,7 @@ Prefer a cohesive abstraction over bolting onto an existing class when a change 
 - **Dirty tracking is computed.** Mutate session; never reintroduce `mark_config_dirty()`.
 - **Thin feature controllers.** `TuningControls` coordinates focus and input; feature work lives in `*_controls`. `make_tuning_controls` in `wiring.py` only assembles.
 - **Readiness in types.** Prefer `VisualizerSeed` / `VisualizerCore` / live and render runtimes over optional fields plus `assert`.
-- **Typed DI.** Pass small typed contexts (`FocusContext`), not dicts of lambdas or `setattr` by string.
+- **Typed DI.** Pass small typed contexts (`ShellContext`, `CommandContext`), not dicts of lambdas or `setattr` by string.
 - **Public APIs across modules.** No cross-module underscore imports.
 - **One default per setting.** Defaults live in `cleave/config_schema/` submodules. Session and view-state dataclasses import those constants. `tests/cleave/test_config.py` source-scans for this.
 - **Descriptor-driven config.** `editor`, `render.post_fx`, and `render.overlays` use descriptors. `layers` and `timeline` use bespoke parse. Importers use submodule paths; `config_schema/__init__.py` has no re-exports.

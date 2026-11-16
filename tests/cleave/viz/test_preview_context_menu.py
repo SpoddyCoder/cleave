@@ -11,7 +11,7 @@ from cleave.viz.preview_context_menu import (
     preview_menu,
     preview_menu_entries,
 )
-from tests.cleave.viz.test_controls import _make_controls
+from tests.support.viz import make_controls
 
 
 class _Transport:
@@ -33,7 +33,7 @@ def _entries(controls, transport: _Transport | None = None):
 
 
 def test_menu_lists_the_agreed_items_in_order(tmp_path: Path) -> None:
-    controls = _make_controls(("layer_1",), project_dir=tmp_path)
+    controls = make_controls(("layer_1",), project_dir=tmp_path)
     assert list(_entries(controls)) == [
         "preview.transport",
         "preview.solo",
@@ -48,7 +48,7 @@ def test_menu_lists_the_agreed_items_in_order(tmp_path: Path) -> None:
 
 
 def test_transport_label_follows_playback_and_toggles() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     transport = _Transport(paused=True)
     provider = preview_menu(controls, transport)
     item = next(e for e in provider() if getattr(e, "id", "") == "preview.transport")
@@ -61,7 +61,7 @@ def test_transport_label_follows_playback_and_toggles() -> None:
 
 
 def test_solo_submenu_checks_none_then_the_soloed_layer() -> None:
-    controls = _make_controls(("layer_1", "layer_2"))
+    controls = make_controls(("layer_1", "layer_2"))
     solo = _entries(controls)["preview.solo"]
     assert [item.id for item in solo.items] == [
         "preview.solo.none",
@@ -80,7 +80,7 @@ def test_solo_submenu_checks_none_then_the_soloed_layer() -> None:
 
 
 def test_block_item_toggles_enabled_and_greys_out_when_locked() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     item = _entries(controls)["preview.enabled.post_fx"]
     was = controls.session.post_fx.enabled
     assert item.checked is was
@@ -94,7 +94,7 @@ def test_block_item_toggles_enabled_and_greys_out_when_locked() -> None:
 
 
 def test_quality_submenu_checks_the_setting_and_sets_it() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     quality = _entries(controls)["preview.quality"]
     assert [item.label for item in quality.items] == list(EDITOR_PREVIEW_QUALITIES)
     current = controls.cfg.editor.preview_quality
@@ -106,7 +106,7 @@ def test_quality_submenu_checks_the_setting_and_sets_it() -> None:
 
 
 def test_curation_leaves_out_solo_and_block_items(tmp_path: Path) -> None:
-    controls = _make_controls(("layer_1",), project_dir=tmp_path)
+    controls = make_controls(("layer_1",), project_dir=tmp_path)
     controls.session.settings.editor_mode = "preset_curation"
     assert list(_entries(controls)) == [
         "preview.transport",
@@ -120,11 +120,11 @@ def test_curation_leaves_out_solo_and_block_items(tmp_path: Path) -> None:
 def test_grab_still_needs_a_project_folder_and_greys_out_while_busy(
     tmp_path: Path,
 ) -> None:
-    item = _entries(_make_controls(("layer_1",)))["preview.grab_still"]
+    item = _entries(make_controls(("layer_1",)))["preview.grab_still"]
     assert item.enabled is False
     assert item.hint == "No project folder to save into"
 
-    controls = _make_controls(("layer_1",), project_dir=tmp_path)
+    controls = make_controls(("layer_1",), project_dir=tmp_path)
     item = _entries(controls)["preview.grab_still"]
     assert item.enabled is True
     item.run()
@@ -134,7 +134,7 @@ def test_grab_still_needs_a_project_folder_and_greys_out_while_busy(
 
 
 def test_play_fullscreen_menu_plays_pauses_and_exits() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     transport = _Transport(paused=False)
     items = play_fullscreen_menu(controls, transport)()
     assert [item.id for item in items] == [

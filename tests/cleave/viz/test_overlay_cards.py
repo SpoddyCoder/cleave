@@ -43,118 +43,20 @@ from cleave.viz.session import (
     default_overlay_card_runtime,
 )
 from cleave.viz.theme import FADE_DURATION_SEC
-
-
-def _text_block(
-    content: str,
-    *,
-    font: str = "monospace",
-    font_size: int = 10,
-    colour: tuple[int, int, int] = (255, 170, 0),
-    background_colour: tuple[int, int, int] | None = None,
-    margin_bottom: int = 0,
-) -> RenderOverlayTextBlockConfig:
-    return RenderOverlayTextBlockConfig(
-        content=content,
-        font=font,
-        font_size=font_size,
-        colour=colour,
-        background_colour=background_colour,
-        margin_bottom=margin_bottom,
-    )
-
-
-def _overlay_cfg(
-    *,
-    enabled: bool = True,
-    appear_at: float = 10.0,
-    display_time: float = 30.0,
-    animation_type: str = "fade",
-    slide_direction: str = "left",
-    position: str = "bottom-left",
-    margin: int = 10,
-    padding: int = 10,
-    title_font_size: int = 12,
-    body_font_size: int = 10,
-    opacity: float = 1.0,
-    border_width: int = 2,
-    title_background_colour: tuple[int, int, int] | None = None,
-) -> RenderOverlayCardConfig:
-    return RenderOverlayCardConfig(
-        enabled=enabled,
-        title=_text_block(
-            "Title",
-            font_size=title_font_size,
-            background_colour=title_background_colour,
-        ),
-        body=_text_block("Line one\nLine two", font_size=body_font_size),
-        animation=RenderOverlayAnimationConfig(
-            type=animation_type,  # type: ignore[arg-type]
-            slide_direction=slide_direction,  # type: ignore[arg-type]
-            appear_at=appear_at,
-            display_time=display_time,
-        ),
-        position=position,  # type: ignore[arg-type]
-        background=RenderOverlayBackgroundConfig(
-            margin=margin,
-            padding=padding,
-            colour=(34, 51, 68),
-            opacity=opacity,
-            border=RenderOverlayBorderConfig(colour=(200, 100, 50), width=border_width),
-        ),
-    )
-
-
-def _closing_overlay_cfg(
-    *,
-    enabled: bool = True,
-    disappear_at: float = 0.0,
-    display_time: float = 30.0,
-    animation_type: str = "fade",
-    slide_direction: str = "left",
-    position: str = "bottom-left",
-) -> RenderOverlayCardConfig:
-    return RenderOverlayCardConfig(
-        enabled=enabled,
-        title=_text_block("Title"),
-        body=_text_block("Line one\nLine two"),
-        animation=RenderOverlayClosingAnimationConfig(
-            type=animation_type,  # type: ignore[arg-type]
-            slide_direction=slide_direction,  # type: ignore[arg-type]
-            disappear_at=disappear_at,
-            display_time=display_time,
-        ),
-        position=position,  # type: ignore[arg-type]
-        background=RenderOverlayBackgroundConfig(
-            margin=10,
-            padding=10,
-            colour=(34, 51, 68),
-            opacity=1.0,
-            border=RenderOverlayBorderConfig(colour=(200, 100, 50), width=2),
-        ),
-    )
-
-
-def _overlays_cfg(
-    *,
-    opening: RenderOverlayCardConfig | None = None,
-    closing: RenderOverlayCardConfig | None = None,
-    locked: bool = False,
-) -> RenderOverlaysConfig:
-    return RenderOverlaysConfig(
-        opening_card=opening if opening is not None else _overlay_cfg(),
-        closing_card=closing if closing is not None else _closing_overlay_cfg(),
-        locked=locked,
-    )
+from tests.support.overlay_cards import (
+    closing_card_cfg,
+    opening_card_cfg,
+    text_block,
+)
 
 
 def test_overlay_visible_alpha_before_start() -> None:
-    cfg = _overlay_cfg(appear_at=10.0, display_time=30.0)
+    cfg = opening_card_cfg(appear_at=10.0, display_time=30.0)
     assert overlay_visible_alpha(9.9, cfg) == 0.0
 
 
 def test_overlay_visible_alpha_fade_in() -> None:
-    cfg = _overlay_cfg(appear_at=10.0, display_time=30.0)
+    cfg = opening_card_cfg(appear_at=10.0, display_time=30.0)
     fade = FADE_DURATION_SEC
     assert overlay_visible_alpha(10.0, cfg) == 0.0
     assert overlay_visible_alpha(10.0 + fade * 0.5, cfg) == smoothstep(0.5)
@@ -162,12 +64,12 @@ def test_overlay_visible_alpha_fade_in() -> None:
 
 
 def test_overlay_visible_alpha_mid_hold() -> None:
-    cfg = _overlay_cfg(appear_at=10.0, display_time=30.0)
+    cfg = opening_card_cfg(appear_at=10.0, display_time=30.0)
     assert overlay_visible_alpha(25.0, cfg) == 1.0
 
 
 def test_overlay_visible_alpha_fade_out() -> None:
-    cfg = _overlay_cfg(appear_at=10.0, display_time=30.0)
+    cfg = opening_card_cfg(appear_at=10.0, display_time=30.0)
     fade = FADE_DURATION_SEC
     end = 10.0 + 30.0
     assert overlay_visible_alpha(end - fade, cfg) == 1.0
@@ -176,30 +78,30 @@ def test_overlay_visible_alpha_fade_out() -> None:
 
 
 def test_overlay_visible_alpha_after_window() -> None:
-    cfg = _overlay_cfg(appear_at=10.0, display_time=30.0)
+    cfg = opening_card_cfg(appear_at=10.0, display_time=30.0)
     assert overlay_visible_alpha(41.0, cfg) == 0.0
 
 
 def test_overlay_visible_alpha_disabled() -> None:
-    cfg = _overlay_cfg(enabled=False)
+    cfg = opening_card_cfg(enabled=False)
     assert overlay_visible_alpha(25.0, cfg) == 0.0
 
 
 def test_live_overlay_alpha_disabled() -> None:
-    cfg = _overlay_cfg(appear_at=10.0, display_time=30.0)
+    cfg = opening_card_cfg(appear_at=10.0, display_time=30.0)
     assert live_overlay_alpha(25.0, cfg, enabled=False, solo=False) == 0.0
     assert live_overlay_alpha(25.0, cfg, enabled=False, solo=True) == 0.0
 
 
 def test_live_overlay_alpha_solo_always_on() -> None:
-    cfg = _overlay_cfg(appear_at=10.0, display_time=30.0)
+    cfg = opening_card_cfg(appear_at=10.0, display_time=30.0)
     assert live_overlay_alpha(0.0, cfg, enabled=True, solo=True) == 1.0
     assert live_overlay_alpha(9.9, cfg, enabled=True, solo=True) == 1.0
     assert live_overlay_alpha(41.0, cfg, enabled=True, solo=True) == 1.0
 
 
 def test_live_overlay_alpha_timed_window_unchanged() -> None:
-    cfg = _overlay_cfg(appear_at=10.0, display_time=30.0)
+    cfg = opening_card_cfg(appear_at=10.0, display_time=30.0)
     for t_sec in (9.9, 10.0, 15.0, 25.0, 40.0, 41.0):
         assert live_overlay_alpha(t_sec, cfg, enabled=True, solo=False) == overlay_visible_alpha(
             t_sec, cfg
@@ -207,7 +109,7 @@ def test_live_overlay_alpha_timed_window_unchanged() -> None:
 
 
 def test_build_live_overlay_config_overrides_runtime_fields() -> None:
-    base = _overlay_cfg(
+    base = opening_card_cfg(
         enabled=False,
         appear_at=1.0,
         display_time=2.0,
@@ -270,21 +172,21 @@ def test_build_live_overlay_config_overrides_runtime_fields() -> None:
 
 
 def test_card_runtime_from_cfg_reads_title_content() -> None:
-    base = _overlay_cfg()
+    base = opening_card_cfg()
     card = replace(base, title=replace(base.title, content="From YAML"))
     runtime = _card_runtime_from_cfg(card)
     assert runtime.title_content == "From YAML"
 
 
 def test_card_runtime_from_cfg_reads_body_content() -> None:
-    base = _overlay_cfg()
+    base = opening_card_cfg()
     card = replace(base, body=replace(base.body, content="Body from YAML"))
     runtime = _card_runtime_from_cfg(card)
     assert runtime.body_content == "Body from YAML"
 
 
 def test_overlay_card_persist_values_uses_runtime_title_content() -> None:
-    base = _overlay_cfg()
+    base = opening_card_cfg()
     runtime = _card_runtime_from_cfg(base)
     runtime.title_content = "Persisted title"
     values = _overlay_card_persist_values(runtime)
@@ -293,7 +195,7 @@ def test_overlay_card_persist_values_uses_runtime_title_content() -> None:
 
 
 def test_overlay_card_persist_values_uses_runtime_body_content() -> None:
-    base = _overlay_cfg()
+    base = opening_card_cfg()
     runtime = _card_runtime_from_cfg(base)
     runtime.body_content = "Persisted body"
     values = _overlay_card_persist_values(runtime)
@@ -302,7 +204,7 @@ def test_overlay_card_persist_values_uses_runtime_body_content() -> None:
 
 
 def test_card_runtime_from_cfg_reads_colours() -> None:
-    base = _overlay_cfg()
+    base = opening_card_cfg()
     card = replace(
         base,
         title=replace(
@@ -331,7 +233,7 @@ def test_card_runtime_from_cfg_reads_colours() -> None:
 
 
 def test_card_runtime_from_cfg_reads_background_margin_and_padding() -> None:
-    base = _overlay_cfg()
+    base = opening_card_cfg()
     card = replace(
         base,
         background=replace(base.background, margin=15, padding=7),
@@ -342,7 +244,7 @@ def test_card_runtime_from_cfg_reads_background_margin_and_padding() -> None:
 
 
 def test_overlay_card_persist_values_uses_runtime_colours() -> None:
-    base = _overlay_cfg()
+    base = opening_card_cfg()
     runtime = _card_runtime_from_cfg(base)
     runtime.title_colour = (1, 2, 3)
     runtime.title_background_colour = (4, 5, 6)
@@ -364,7 +266,7 @@ def test_overlay_card_persist_values_uses_runtime_colours() -> None:
 
 
 def test_build_live_overlay_config_uses_runtime_colours() -> None:
-    base = _overlay_cfg()
+    base = opening_card_cfg()
     runtime = replace(
         default_overlay_card_runtime(),
         title_colour=(9, 8, 7),
@@ -388,7 +290,7 @@ def test_build_live_overlay_config_uses_runtime_colours() -> None:
 
 
 def test_overlay_card_persist_values_uses_runtime_margin_and_padding() -> None:
-    base = _overlay_cfg(margin=10, padding=10)
+    base = opening_card_cfg(margin=10, padding=10)
     runtime = _card_runtime_from_cfg(base)
     runtime.background_margin = 33
     runtime.background_padding = 9
@@ -411,27 +313,27 @@ def test_build_live_overlay_config_uses_runtime_margin_and_padding() -> None:
 
 
 def test_panel_position_corners() -> None:
-    cfg = _overlay_cfg(margin=20, position="top-left")
+    cfg = opening_card_cfg(margin=20, position="top-left")
     assert panel_position(cfg, 100, 50, 1280, 720) == (20, 20)
 
-    cfg = _overlay_cfg(margin=20, position="top-right")
+    cfg = opening_card_cfg(margin=20, position="top-right")
     assert panel_position(cfg, 100, 50, 1280, 720) == (1160, 20)
 
-    cfg = _overlay_cfg(margin=20, position="bottom-left")
+    cfg = opening_card_cfg(margin=20, position="bottom-left")
     assert panel_position(cfg, 100, 50, 1280, 720) == (20, 650)
 
-    cfg = _overlay_cfg(margin=20, position="bottom-right")
+    cfg = opening_card_cfg(margin=20, position="bottom-right")
     assert panel_position(cfg, 100, 50, 1280, 720) == (1160, 650)
 
 
 def test_panel_position_centre_ignores_margin() -> None:
-    cfg = _overlay_cfg(margin=99, position="centre")
+    cfg = opening_card_cfg(margin=99, position="centre")
     assert panel_position(cfg, 200, 100, 1280, 720) == (540, 310)
 
 
 def test_title_font_size_and_bold() -> None:
     pygame.init()
-    cfg = _overlay_cfg(title_font_size=12, body_font_size=10)
+    cfg = opening_card_cfg(title_font_size=12, body_font_size=10)
     with patch("cleave.viz.overlay_cards.pygame.font.SysFont") as sys_font:
         body_font = MagicMock()
         title_font = MagicMock()
@@ -452,8 +354,8 @@ def test_text_line_backgrounds_are_tight_to_glyphs() -> None:
     pygame.init()
     cfg = RenderOverlayCardConfig(
         enabled=True,
-        title=_text_block("Title", font_size=12, background_colour=(51, 51, 255)),
-        body=_text_block(
+        title=text_block("Title", font_size=12, background_colour=(51, 51, 255)),
+        body=text_block(
             "Line one\nLine two",
             font_size=10,
             background_colour=(255, 51, 51),
@@ -503,8 +405,8 @@ def test_text_line_without_background_skips_tight_rect() -> None:
     pygame.init()
     cfg = RenderOverlayCardConfig(
         enabled=True,
-        title=_text_block("Title", font_size=12, background_colour=(51, 51, 255)),
-        body=_text_block("Line one", font_size=10, background_colour=None),
+        title=text_block("Title", font_size=12, background_colour=(51, 51, 255)),
+        body=text_block("Line one", font_size=10, background_colour=None),
         animation=RenderOverlayAnimationConfig(
             type="fade",
             slide_direction="left",
@@ -543,7 +445,7 @@ def test_text_line_without_background_skips_tight_rect() -> None:
 
 def test_border_alpha_matches_background() -> None:
     pygame.init()
-    cfg = _overlay_cfg(opacity=0.5, border_width=2)
+    cfg = opening_card_cfg(opacity=0.5, border_width=2)
     panel = build_panel_surface(cfg)
     expected_alpha = _background_pixel_alpha(cfg)
 
@@ -571,8 +473,8 @@ def test_border_alpha_matches_background() -> None:
 
 def test_border_grows_outward_not_inward() -> None:
     pygame.init()
-    cfg_no_border = _overlay_cfg(border_width=0)
-    cfg_border = _overlay_cfg(border_width=4)
+    cfg_no_border = opening_card_cfg(border_width=0)
+    cfg_border = opening_card_cfg(border_width=4)
     panel_none = build_panel_surface(cfg_no_border)
     panel_border = build_panel_surface(cfg_border)
     w0, h0 = panel_none.get_size()
@@ -583,7 +485,7 @@ def test_border_grows_outward_not_inward() -> None:
 
 def test_composite_overlay_noop_before_start() -> None:
     compositor = recording_compositor()
-    cfg = _overlay_cfg(appear_at=10.0)
+    cfg = opening_card_cfg(appear_at=10.0)
     composite_overlay(
         compositor, cfg, 5.0, 1280, 720, panel=MagicMock()
     )
@@ -597,7 +499,7 @@ def test_composite_overlay_draws_when_visible() -> None:
     compositor = recording_compositor()
     compositor.upload_overlay_texture.return_value = 99
     compositor.content_width = 1280
-    cfg = _overlay_cfg(appear_at=0.0, display_time=30.0)
+    cfg = opening_card_cfg(appear_at=0.0, display_time=30.0)
     panel = build_panel_surface(cfg)
 
     composite_overlay(compositor, cfg, 15.0, 1280, 720, panel=panel)
@@ -618,7 +520,7 @@ def test_composite_overlay_with_alpha_uses_precomputed_alpha() -> None:
     pygame.init()
     compositor = recording_compositor()
     compositor.upload_overlay_texture.return_value = 42
-    cfg = _overlay_cfg(appear_at=10.0, display_time=30.0)
+    cfg = opening_card_cfg(appear_at=10.0, display_time=30.0)
     panel = build_panel_surface(cfg)
 
     composite_overlay_with_alpha(
@@ -634,7 +536,7 @@ def test_composite_overlay_uses_content_not_display_target() -> None:
     pygame.init()
     compositor = recording_compositor()
     compositor.upload_overlay_texture.return_value = 7
-    cfg = _overlay_cfg(appear_at=0.0, display_time=30.0, position="bottom-right")
+    cfg = opening_card_cfg(appear_at=0.0, display_time=30.0, position="bottom-right")
     panel = build_panel_surface(cfg)
     content_w, content_h = 1280, 720
     compositor.content_width = content_w
@@ -655,7 +557,7 @@ def test_composite_overlay_scales_to_smaller_content() -> None:
     pygame.init()
     compositor = recording_compositor()
     compositor.upload_overlay_texture.return_value = 7
-    cfg = _overlay_cfg(appear_at=0.0, display_time=30.0, position="bottom-right")
+    cfg = opening_card_cfg(appear_at=0.0, display_time=30.0, position="bottom-right")
     panel = build_panel_surface(cfg)
     output_w, output_h = 1920, 1080
     compositor.content_width = 960
@@ -675,13 +577,13 @@ def test_composite_overlay_scales_to_smaller_content() -> None:
 
 
 def test_panel_surface_key_ignores_position() -> None:
-    cfg_a = _overlay_cfg(position="top-left")
-    cfg_b = _overlay_cfg(position="bottom-right")
+    cfg_a = opening_card_cfg(position="top-left")
+    cfg_b = opening_card_cfg(position="bottom-right")
     assert panel_surface_key(cfg_a) == panel_surface_key(cfg_b)
 
 
 def test_slide_animation_offset_mid_entrance() -> None:
-    cfg = _overlay_cfg(animation_type="slide", slide_direction="left", appear_at=0.0)
+    cfg = opening_card_cfg(animation_type="slide", slide_direction="left", appear_at=0.0)
     panel_w, panel_h = 200, 100
     mid = OVERLAY_MOTION_DURATION_SEC * 0.5
     state = overlay_animation_state(mid, cfg, panel_w=panel_w, panel_h=panel_h)
@@ -693,7 +595,7 @@ def test_slide_animation_offset_mid_entrance() -> None:
 
 
 def test_wipe_animation_clip_progress() -> None:
-    cfg = _overlay_cfg(animation_type="wipe", slide_direction="left", appear_at=0.0)
+    cfg = opening_card_cfg(animation_type="wipe", slide_direction="left", appear_at=0.0)
     mid = OVERLAY_MOTION_DURATION_SEC * 0.5
     state = overlay_animation_state(mid, cfg, panel_w=200, panel_h=100)
     expected = ease_out_expo(0.5)
@@ -702,7 +604,7 @@ def test_wipe_animation_clip_progress() -> None:
 
 
 def test_cascade_stagger_phases() -> None:
-    cfg = _overlay_cfg(
+    cfg = opening_card_cfg(
         animation_type="cascade",
         slide_direction="left",
         appear_at=0.0,
@@ -720,7 +622,7 @@ def test_cascade_stagger_phases() -> None:
 
 
 def test_non_fade_visible_alpha_is_binary_window() -> None:
-    cfg = _overlay_cfg(animation_type="slide", appear_at=10.0, display_time=30.0)
+    cfg = opening_card_cfg(animation_type="slide", appear_at=10.0, display_time=30.0)
     assert overlay_visible_alpha(9.9, cfg) == 0.0
     assert overlay_visible_alpha(25.0, cfg) == 1.0
     assert overlay_visible_alpha(41.0, cfg) == 0.0
@@ -736,7 +638,7 @@ def test_closing_card_start_time_relative_to_song_end() -> None:
 
 
 def test_closing_overlay_visible_alpha_window() -> None:
-    cfg = _closing_overlay_cfg(disappear_at=0.0, display_time=30.0)
+    cfg = closing_card_cfg(disappear_at=0.0, display_time=30.0)
     song_duration = 100.0
     # Visible from 70..100
     assert closing_overlay_visible_alpha(69.9, cfg, song_duration) == 0.0
@@ -748,7 +650,7 @@ def test_closing_overlay_visible_alpha_window() -> None:
 
 
 def test_live_overlay_alpha_closing_requires_song_duration() -> None:
-    cfg = _closing_overlay_cfg(disappear_at=0.0, display_time=30.0)
+    cfg = closing_card_cfg(disappear_at=0.0, display_time=30.0)
     assert live_overlay_alpha(85.0, cfg, enabled=True, solo=False) == 0.0
     assert (
         live_overlay_alpha(

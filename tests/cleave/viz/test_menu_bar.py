@@ -1170,9 +1170,9 @@ def test_preset_row_draws_two_lines_and_fits_the_filename() -> None:
     from cleave.viz.shell_focus import ShellFocusState
     from cleave.viz.shell_layout import ShellLayout
     from cleave.viz.theme import VALUE
-    from tests.cleave.viz.test_overlay import _minimal_view_state
+    from tests.support.viz import minimal_view_state
 
-    view = _minimal_view_state()
+    view = minimal_view_state()
     slot = next(iter(view.tracks))
     block = view.tracks[slot]
     block.preset_label = "very long milkdrop preset filename " * 8 + ".milk"
@@ -1268,9 +1268,9 @@ def test_directory_nav_button_press_skips_the_row_action(
     from cleave.viz.row_kinds import RowDescriptor, RowKind
     from cleave.viz.shell_focus import ShellFocusState
     from cleave.viz.shell_layout import ShellLayout
-    from tests.cleave.viz.test_overlay import _minimal_view_state
+    from tests.support.viz import minimal_view_state
 
-    view = _minimal_view_state()
+    view = minimal_view_state()
     slot = next(iter(view.tracks))
     block = view.tracks[slot]
     block.preset_dir_label = "packs/wave/"

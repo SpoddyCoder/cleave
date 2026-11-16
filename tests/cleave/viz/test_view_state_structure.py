@@ -8,11 +8,11 @@ from pathlib import Path
 from cleave.viz.inspector import build_inspector_rows
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.tuning_view_state import view_state_structure_signature
-from tests.cleave.viz.test_controls import _make_controls
+from tests.support.viz import make_controls
 
 
 def test_structure_signature_stable_for_fps_and_focus() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     session = controls.session
     config_save = controls._config_save
     sig_a = view_state_structure_signature(
@@ -27,7 +27,7 @@ def test_structure_signature_stable_for_fps_and_focus() -> None:
 
 
 def test_layer_expand_flags_absent_from_structure_signature() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     sig = view_state_structure_signature(
         controls.session, controls._config_save)
     layer = json.loads(sig)["layers"]["layer_1"]
@@ -42,7 +42,7 @@ def test_layer_expand_flags_absent_from_structure_signature() -> None:
 
 
 def test_structure_signature_invalidates_on_layer_z_order() -> None:
-    controls = _make_controls(("layer_1", "layer_2"))
+    controls = make_controls(("layer_1", "layer_2"))
     session = controls.session
     config_save = controls._config_save
     sig_before = view_state_structure_signature(
@@ -55,7 +55,7 @@ def test_structure_signature_invalidates_on_layer_z_order() -> None:
 
 
 def test_structure_signature_invalidates_on_preset_navigation() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     session = controls.session
     layer = session.layers["layer_1"]
     config_save = controls._config_save
@@ -68,7 +68,7 @@ def test_structure_signature_invalidates_on_preset_navigation() -> None:
 
 
 def test_structure_signature_unchanged_when_notification_shows() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     session = controls.session
     config_save = controls._config_save
     sig_before = view_state_structure_signature(session, config_save)
@@ -85,7 +85,7 @@ def test_structure_signature_unchanged_when_notification_shows() -> None:
 
 
 def test_reused_structure_keeps_focus() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     controls.focus_descriptor = RowDescriptor(RowKind.TRACK_BLEND, slot="layer_1")
     view_a = controls.build_view_state(paused=False, fps=30.0)
     view_b = controls.build_view_state(paused=True, fps=60.0, position_sec=42.0)
@@ -94,7 +94,7 @@ def test_reused_structure_keeps_focus() -> None:
 
 
 def test_builder_patches_highlight_rolloff_curve_without_structure_rebuild() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     builder = controls._view_state
     session = controls.session
     session.post_fx.highlight_rolloff.curve = "rolloff"
@@ -110,7 +110,7 @@ def test_builder_patches_highlight_rolloff_curve_without_structure_rebuild() -> 
 
 
 def test_structure_signature_ignores_timeline_panel_open() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     session = controls.session
     config_save = controls._config_save
     session.timeline.panel_open = False
@@ -131,9 +131,8 @@ def test_structure_signature_ignores_timeline_panel_open() -> None:
         assert flag not in timeline
 
 
-
 def test_structure_signature_invalidates_on_highlight_rolloff_mode() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     session = controls.session
     config_save = controls._config_save
     session.post_fx.highlight_rolloff.mode = "composite"
@@ -146,7 +145,7 @@ def test_structure_signature_invalidates_on_highlight_rolloff_mode() -> None:
 
 
 def test_structure_signature_invalidates_on_animation_type() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     session = controls.session
     config_save = controls._config_save
     session.overlays.opening_card.animation.type = "fade"
@@ -164,7 +163,7 @@ def _inspector_kinds(state, node_id: str) -> list[RowKind]:
 
 
 def test_builder_rebuilds_layout_when_animation_type_changes() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     session = controls.session
     session.overlays.opening_card.animation.type = "fade"
     view_fade = controls.build_view_state(paused=False)
@@ -181,7 +180,7 @@ def test_builder_rebuilds_layout_when_animation_type_changes() -> None:
 
 
 def test_structure_signature_invalidates_on_closing_card_animation_type() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     session = controls.session
     config_save = controls._config_save
     session.overlays.closing_card.animation.type = "fade"
@@ -194,7 +193,7 @@ def test_structure_signature_invalidates_on_closing_card_animation_type() -> Non
 
 
 def test_structure_signature_invalidates_on_chroma_boost_mode() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     session = controls.session
     config_save = controls._config_save
     session.post_fx.chroma_boost.mode = "composite"
@@ -207,7 +206,7 @@ def test_structure_signature_invalidates_on_chroma_boost_mode() -> None:
 
 
 def test_builder_rebuilds_layout_when_highlight_rolloff_mode_changes() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     session = controls.session
     session.post_fx.highlight_rolloff.mode = "composite"
     builder = controls._view_state
@@ -225,9 +224,8 @@ def test_builder_rebuilds_layout_when_highlight_rolloff_mode_changes() -> None:
     )
 
 
-
 def test_structure_signature_invalidates_on_preset_switching_trigger() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     session = controls.session
     config_save = controls._config_save
     session.layers["layer_1"].preset_switching = "on"
@@ -250,7 +248,7 @@ def test_structure_signature_invalidates_on_preset_switching_trigger() -> None:
 
 
 def test_structure_signature_invalidates_on_hard_cut_enabled() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     session = controls.session
     config_save = controls._config_save
     layer = session.layers["layer_1"]
@@ -266,7 +264,7 @@ def test_structure_signature_invalidates_on_hard_cut_enabled() -> None:
 
 
 def test_structure_signature_invalidates_on_switching_paused() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     session = controls.session
     config_save = controls._config_save
     layer = session.layers["layer_1"]
@@ -283,7 +281,7 @@ def test_builder_mirrors_switching_paused_into_inspector() -> None:
 
     from cleave.viz.layer import StemLayer
 
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     session = controls.session
     layer = session.layers["layer_1"]
     layer.preset_switching = "on"
@@ -316,7 +314,7 @@ def test_builder_mirrors_switching_paused_into_inspector() -> None:
 
 
 def test_structure_signature_invalidates_on_auto_preset_path() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     session = controls.session
     config_save = controls._config_save
     layer = session.layers["layer_1"]
@@ -329,7 +327,7 @@ def test_structure_signature_invalidates_on_auto_preset_path() -> None:
 
 
 def test_builder_shows_auto_preset_in_file_row_only() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     session = controls.session
     layer = session.layers["layer_1"]
     layer.preset_switching = "on"
@@ -367,7 +365,7 @@ def test_builder_shows_off_root_auto_preset_without_crashing(
     tmp_path: Path,
 ) -> None:
     """Playing an off-root preset copy must not break directory display."""
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     session = controls.session
     layer = session.layers["layer_1"]
     layer.preset_switching = "on"
@@ -391,7 +389,7 @@ def test_builder_syncs_playing_list_preset_from_projectm_position() -> None:
 
     from cleave.viz.layer import StemLayer
 
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     session = controls.session
     layer = session.layers["layer_1"]
     layer.preset_switching = "on"
@@ -416,11 +414,8 @@ def test_builder_syncs_playing_list_preset_from_projectm_position() -> None:
     assert view.tracks["layer_1"].active_preset_list_index == 1
 
 
-
-
-
 def test_structure_signature_invalidates_on_song_marker_count() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     session = controls.session
     config_save = controls._config_save
     sig_before = view_state_structure_signature(
@@ -431,10 +426,8 @@ def test_structure_signature_invalidates_on_song_marker_count() -> None:
     assert sig_before != sig_after
 
 
-
-
 def test_structure_signature_invalidates_on_pattern_mask_type() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     session = controls.session
     config_save = controls._config_save
     session.pattern_mask.type = "strips"
@@ -447,7 +440,7 @@ def test_structure_signature_invalidates_on_pattern_mask_type() -> None:
 
 
 def test_pattern_mask_seed_row_only_for_plasma() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     session = controls.session
     builder = controls._view_state
 
@@ -466,7 +459,7 @@ def test_pattern_mask_seed_row_only_for_plasma() -> None:
 
 
 def test_structure_signature_invalidates_on_hard_cut_fades_enabled() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     session = controls.session
     config_save = controls._config_save
     session.timeline.hard_cut_fades.enabled = False
@@ -479,7 +472,7 @@ def test_structure_signature_invalidates_on_hard_cut_fades_enabled() -> None:
 
 
 def test_structure_signature_invalidates_on_soft_cut_fades_enabled() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     session = controls.session
     config_save = controls._config_save
     session.timeline.soft_cut_fades.enabled = False
@@ -492,7 +485,7 @@ def test_structure_signature_invalidates_on_soft_cut_fades_enabled() -> None:
 
 
 def test_structure_signature_invalidates_on_visual_limiter_enabled() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     session = controls.session
     config_save = controls._config_save
     session.post_fx.limiter.enabled = True
@@ -505,7 +498,7 @@ def test_structure_signature_invalidates_on_visual_limiter_enabled() -> None:
 
 
 def test_structure_signature_omits_expand_flags() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     sig = view_state_structure_signature(
         controls.session, controls._config_save)
     payload = json.loads(sig)
@@ -531,7 +524,7 @@ def test_structure_signature_omits_expand_flags() -> None:
 def test_song_marker_items_stay_on_the_inspector() -> None:
     from cleave.viz.inspector import build_inspector_rows
 
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     session = controls.session
     session.timeline.panel_open = True
     session.song_markers.times = [8.0, 32.5, 64.0]
@@ -546,7 +539,7 @@ def test_song_marker_items_stay_on_the_inspector() -> None:
     assert [desc.marker_index for desc in items] == [0, 1, 2]
 
 def test_builder_appends_curation_markers_without_structure_change() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     session = controls.session
     config_save = controls._config_save
     library = controls.library
@@ -587,7 +580,7 @@ def test_builder_appends_curation_markers_without_structure_change() -> None:
 
 
 def test_builder_marks_current_preset_in_this_layers_preset_list() -> None:
-    controls = _make_controls(("layer_1", "layer_2"))
+    controls = make_controls(("layer_1", "layer_2"))
     session = controls.session
     config_save = controls._config_save
     library = controls.library
@@ -627,7 +620,7 @@ def test_builder_marks_current_preset_in_this_layers_preset_list() -> None:
 
 
 def test_builder_caches_preset_list_base_labels(monkeypatch) -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     session = controls.session
     layer = session.layers["layer_1"]
     user_path = Path("/tmp/projects/my-track/user.milk")
@@ -663,7 +656,7 @@ def test_builder_caches_preset_list_base_labels(monkeypatch) -> None:
 
 
 def test_structure_signature_invalidates_on_preset_list_change() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     session = controls.session
     config_save = controls._config_save
     layer = session.layers["layer_1"]
@@ -676,7 +669,7 @@ def test_structure_signature_invalidates_on_preset_list_change() -> None:
 
 
 def test_structure_signature_uses_digest_not_full_paths() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     session = controls.session
     layer = session.layers["layer_1"]
     long_path = "/tmp/projects/my-track/very-long-directory-name/preset.milk"
@@ -689,7 +682,7 @@ def test_structure_signature_uses_digest_not_full_paths() -> None:
 
 
 def test_structure_signature_stable_for_long_preset_list() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     session = controls.session
     config_save = controls._config_save
     layer = session.layers["layer_1"]
@@ -702,7 +695,7 @@ def test_structure_signature_stable_for_long_preset_list() -> None:
 
 
 def test_builder_caches_labels_across_idle_builds(monkeypatch) -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     session = controls.session
     layer = session.layers["layer_1"]
     layer.preset_list = [f"/tmp/preset-{i}.milk" for i in range(40)]
@@ -727,7 +720,7 @@ def test_builder_caches_labels_across_idle_builds(monkeypatch) -> None:
 
 
 def test_session_mutation_visible_on_next_view_state() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     runtime = controls.session.layers["layer_1"]
     first = controls.build_view_state(paused=False)
     assert first.tracks["layer_1"].runtime is runtime
@@ -740,7 +733,7 @@ def test_session_mutation_visible_on_next_view_state() -> None:
 def test_structure_signature_invalidates_on_selected_clip() -> None:
     from cleave.timeline import SlotCue, TimelineLane
 
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     session = controls.session
     config_save = controls._config_save
     tl = session.timeline
@@ -760,7 +753,7 @@ def test_structure_signature_invalidates_on_selected_clip() -> None:
 def test_preset_position_counts_within_browsed_collection(tmp_path: Path) -> None:
     from cleave.preset_playlist import playlist_at_collection
 
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     library = controls.library
     pack = tmp_path / "pack"
     pack.mkdir()
@@ -784,7 +777,7 @@ def test_preset_position_counts_within_browsed_collection(tmp_path: Path) -> Non
 
 
 def test_structure_signature_invalidates_on_preset_list_reorder_in_place() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     session = controls.session
     config_save = controls._config_save
     layer = session.layers["layer_1"]
@@ -796,7 +789,7 @@ def test_structure_signature_invalidates_on_preset_list_reorder_in_place() -> No
 
 
 def test_structure_signature_invalidates_on_preset_folder_change() -> None:
-    controls = _make_controls(("layer_1",))
+    controls = make_controls(("layer_1",))
     session = controls.session
     config_save = controls._config_save
     playlist = session.layers["layer_1"].playlist

@@ -1,4 +1,4 @@
-"""Focus-driven live tuning input for the Milkdrop visualizer overlay."""
+"""Editor controller: session, focus, and input routing to the feature controllers."""
 
 from __future__ import annotations
 
@@ -96,7 +96,7 @@ SEEK_LONG = 30
 
 
 class TuningControls:
-    """Keyboard focus machine for the live tuning tree overlay."""
+    """Editor controller: owns the session and focus, and routes input to the ``*_controls`` feature controllers."""
 
     def __init__(
         self,
