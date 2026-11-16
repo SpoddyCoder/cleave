@@ -1827,7 +1827,7 @@ class TimelineOverlay:
     def _row_y(self, display_i: int, row_h: int) -> int:
         return self._padding + display_i * (row_h + self._row_gap)
 
-    def _restore_upload_rect_from_static(
+    def _restore_upload_rect(
         self,
         upload: pygame.Surface,
         static_panel: pygame.Surface,
@@ -1835,20 +1835,30 @@ class TimelineOverlay:
         *,
         panel_y_offset: int,
     ) -> None:
-        x, y, w, h = rect
-        panel_y = y - panel_y_offset
-        if panel_y < 0:
-            # Only the part over the static panel has pixels to restore.
-            h += panel_y
-            y -= panel_y
-            panel_y = 0
-        if panel_y >= static_panel.get_height():
-            return
-        clip_h = min(h, static_panel.get_height() - panel_y)
-        if clip_h <= 0:
-            return
-        source = static_panel.subsurface((x, panel_y, w, clip_h))
-        upload.blit(source, (x, y))
+        """Repaint *rect* exactly as a full compose leaves it before live drawing.
+
+        Same steps as the full compose (clear, static panel, ruler), clipped to
+        the rect, so a pixel restored here matches a full rebuild.
+        """
+        upload.set_clip(rect)
+        upload.fill((0, 0, 0, 0), rect)
+        upload.blit(static_panel, (0, panel_y_offset))
+        if self._ruler is not None:
+            upload.blit(self._ruler, (0, 0))
+        upload.set_clip(None)
+
+    def _compose_static_layers(
+        self,
+        upload: pygame.Surface,
+        static_panel: pygame.Surface,
+        *,
+        panel_y_offset: int,
+    ) -> None:
+        """Clear the upload surface and lay the static panel and ruler on it."""
+        upload.fill((0, 0, 0, 0))
+        upload.blit(static_panel, (0, panel_y_offset))
+        if self._ruler is not None:
+            upload.blit(self._ruler, (0, 0))
 
     def _draw_row_live_flash(
         self,
@@ -1872,7 +1882,7 @@ class TimelineOverlay:
         dirty: list[tuple[int, int, int, int]] = []
 
         arm_rect = (arm_x, upload_y, slot_w, row_h)
-        self._restore_upload_rect_from_static(
+        self._restore_upload_rect(
             upload,
             static_panel,
             arm_rect,
@@ -1897,7 +1907,7 @@ class TimelineOverlay:
         dirty.append(arm_rect)
 
         monitor_rect = (monitor_eye_x, upload_y, slot_w, row_h)
-        self._restore_upload_rect_from_static(
+        self._restore_upload_rect(
             upload,
             static_panel,
             monitor_rect,
@@ -2147,17 +2157,18 @@ class TimelineOverlay:
         self,
         upload_w: int,
         upload_h: int,
-    ) -> pygame.Surface:
+    ) -> tuple[pygame.Surface, bool]:
+        """The upload surface, and whether it was just allocated (and so blank)."""
         scratch = self._upload_scratch
         if (
             scratch is not None
             and scratch.get_width() == upload_w
             and scratch.get_height() == upload_h
         ):
-            return scratch
+            return scratch, False
         scratch = pygame.Surface((upload_w, upload_h), pygame.SRCALPHA)
         self._upload_scratch = scratch
-        return scratch
+        return scratch, True
 
     def _patch_live_overlay(
         self,
@@ -2172,21 +2183,23 @@ class TimelineOverlay:
         cache = self._cache
         panel_y_offset = layout.badge_reserve
 
-        if incremental and cache.last_playhead_rect is not None:
-            self._restore_upload_rect_from_static(
-                upload,
-                static_panel,
+        if incremental:
+            # The upload still holds last frame's live layer. Put back what it
+            # drew before drawing again: the transport tint and role glyphs
+            # (XOR) do not survive being drawn twice.
+            for rect in (
                 cache.last_playhead_rect,
-                panel_y_offset=panel_y_offset,
-            )
-            # The strip rises through the ruler, whose baseline sits on the
-            # panel's top padding; put the ruler back over the restored panel.
-            if self._ruler is not None:
-                px, py, pw, ph = cache.last_playhead_rect
-                ruler_h = self._ruler.get_height()
-                if py < ruler_h:
-                    clip_h = min(ph, ruler_h - py)
-                    upload.blit(self._ruler, (px, py), (px, py, pw, clip_h))
+                cache.last_transport_rect,
+                *cache.last_flash_rects,
+                *cache.last_glyph_rects,
+            ):
+                if rect is not None:
+                    self._restore_upload_rect(
+                        upload,
+                        static_panel,
+                        rect,
+                        panel_y_offset=panel_y_offset,
+                    )
 
         # Markers after the playhead restore (which repaints that column from
         # the static panel) and before the playhead, which stays on top.
@@ -2289,11 +2302,14 @@ class TimelineOverlay:
 
         upload_w = panel_w
         upload_h = panel_h + layout.badge_reserve
-        upload = self._ensure_upload_scratch(upload_w, upload_h)
-        upload.fill((0, 0, 0, 0))
-        upload.blit(static_panel, (0, layout.badge_reserve))
-        if self._ruler is not None:
-            upload.blit(self._ruler, (0, 0))
+        upload, upload_fresh = self._ensure_upload_scratch(upload_w, upload_h)
+        if upload_fresh:
+            incremental = False
+            cache.last_live_signature = None
+        if not incremental:
+            self._compose_static_layers(
+                upload, static_panel, panel_y_offset=layout.badge_reserve
+            )
 
         view_start, view_end = view_window(state)
         playhead_px = (
@@ -2307,17 +2323,30 @@ class TimelineOverlay:
             if time_in_view(state.position_sec, view_start, view_end)
             else None
         )
+        live_sig = timeline_live_signature(
+            state,
+            playhead_px=playhead_px,
+            bar_left=layout.bar_left,
+            bar_width=layout.bar_width,
+            row_count=layout.row_count,
+            row_h=layout.row_h,
+            flash_sig=self._live_flash_signature(state),
+        )
+        live_unchanged = incremental and live_sig == cache.last_live_signature
         prev_playhead = cache.last_playhead_rect
+        prev_transport = cache.last_transport_rect
         prev_flash = cache.last_flash_rects
         prev_glyphs = cache.last_glyph_rects
-        flash_dirty = self._patch_live_overlay(
-            upload,
-            static_panel,
-            state,
-            layout,
-            playhead_px=playhead_px,
-            incremental=incremental,
-        )
+        flash_dirty: list[tuple[int, int, int, int]] = []
+        if not live_unchanged:
+            flash_dirty = self._patch_live_overlay(
+                upload,
+                static_panel,
+                state,
+                layout,
+                playhead_px=playhead_px,
+                incremental=incremental,
+            )
 
         upload_top_y = layout.panel_y - layout.badge_reserve
         screen_bounds = clip_rect_to_bounds(
@@ -2344,20 +2373,11 @@ class TimelineOverlay:
         )
 
         capacity = timeline_panel_max_dimensions(viewport_width, viewport_height)
-        live_sig = timeline_live_signature(
-            state,
-            playhead_px=playhead_px,
-            bar_left=layout.bar_left,
-            bar_width=layout.bar_width,
-            row_count=layout.row_count,
-            row_h=layout.row_h,
-            flash_sig=self._live_flash_signature(state),
-        )
         upload_signature = timeline_upload_signature(static_sig, screen_bounds, live_sig)
 
         src_x = sx - layout.panel_x
         src_y = sy - upload_top_y
-        if incremental and live_sig == cache.last_live_signature:
+        if live_unchanged:
             upload_plan = upload_plan_for_signature(
                 upload_signature,
                 cache.gpu.last_signature,
@@ -2371,6 +2391,7 @@ class TimelineOverlay:
                 *cache.last_glyph_rects,
                 prev_playhead,
                 cache.last_playhead_rect,
+                prev_transport,
                 cache.last_transport_rect,
             ):
                 if rect is not None:

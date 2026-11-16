@@ -2024,3 +2024,91 @@ def test_hit_at_reports_the_clip_and_edge_under_a_row_point() -> None:
     assert (other_row.clip_start, other_row.clip_edge) == (None, None)
     # The ruler and the row label name no clip.
     assert overlay.hit_at(px + 10, py + rows[0][2] + 1).clip_start is None
+
+
+def _compose_bytes(overlay: TimelineOverlay, state: TimelineViewState) -> bytes:
+    from cleave.viz.timeline_overlay import timeline_band_height_px
+
+    band_h = timeline_band_height_px(len(state.layer_z_order))
+    composed = overlay.compose_panel(
+        state,
+        viewport_width=1280,
+        viewport_height=720,
+        timeline_rect=(0, 720 - band_h, 1280, band_h),
+    )
+    assert composed is not None
+    return pygame.image.tobytes(composed.upload_surface, "RGBA")
+
+
+def test_incremental_compose_matches_full_rebuild(monkeypatch) -> None:
+    """Each live change, patched in place, leaves the pixels a fresh compose draws."""
+    pygame.init()
+    ticks = [100_000]
+    monkeypatch.setattr("pygame.time.get_ticks", lambda: ticks[0])
+    slot = DEFAULT_LAYER_SLOTS[0]
+    lanes = {
+        slot: TimelineLane(
+            baseline=None,
+            cues=[
+                SlotCue(t=10.0, level=1.0, role="lead"),
+                SlotCue(t=30.0, level=0.0, role="pulse"),
+            ],
+        )
+    }
+    state = _view_state(
+        lanes=lanes,
+        position_sec=5.0,
+        song_marker_times=(20.0, 40.0),
+        selected_song_marker_index=1,
+        armed_slots={DEFAULT_LAYER_SLOTS[1]},
+    )
+    overlay = TimelineOverlay()
+    _compose_bytes(overlay, state)
+
+    steps = [
+        # The playhead crosses a role glyph, a marker, and the selected marker.
+        dict(position_sec=10.0),
+        dict(position_sec=20.0),
+        dict(position_sec=30.0),
+        dict(position_sec=40.0),
+        dict(hover_button="play"),
+        dict(hover_button="record"),
+        dict(hover_button=None),
+        dict(arm_flash_start_ms={DEFAULT_LAYER_SLOTS[2]: ticks[0]}),
+        dict(arm_flash_start_ms={}),
+        dict(song_marker_flash_start_ms=ticks[0]),
+        dict(song_marker_flash_start_ms=None),
+        dict(paused=False, position_sec=41.0),
+    ]
+    for step in steps:
+        ticks[0] += 1_000
+        for name, value in step.items():
+            setattr(state, name, value)
+        incremental = _compose_bytes(overlay, state)
+        assert incremental == _compose_bytes(TimelineOverlay(), state), step
+
+
+def test_unchanged_frame_skips_fill_and_live_patch(monkeypatch) -> None:
+    pygame.init()
+    monkeypatch.setattr("pygame.time.get_ticks", lambda: 100_000)
+    state = _view_state(position_sec=50.0)
+    overlay = TimelineOverlay()
+    _compose_bytes(overlay, state)
+
+    calls: list[str] = []
+    monkeypatch.setattr(
+        overlay,
+        "_compose_static_layers",
+        lambda *a, **k: calls.append("compose"),
+    )
+    monkeypatch.setattr(
+        overlay,
+        "_patch_live_overlay",
+        lambda *a, **k: calls.append("patch") or [],
+    )
+    _compose_bytes(overlay, state)
+    assert calls == []
+
+    state.position_sec = 51.0
+    _compose_bytes(overlay, state)
+    assert calls == ["patch"]
