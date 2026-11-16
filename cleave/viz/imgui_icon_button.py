@@ -14,7 +14,7 @@ from dataclasses import dataclass
 
 from imgui_bundle import imgui
 
-from cleave.viz.icon_button import Band, FRect, glyph_x, icon_box
+from cleave.viz.icon_button import Band, FRect, glyph_x, icon_box, ink_origin
 from cleave.viz.imgui_theme import rgba
 from cleave.viz.pointer_cursor import PointerShape, request_pointer
 from cleave.viz.theme import NUDGE_HOVER_BG, NUDGE_HOVER_BG_ALPHA, NUDGE_HOVER_FG
@@ -44,6 +44,12 @@ def glyph_drop(glyph: str) -> float:
     return float(round(((cap.y0 + cap.y1) - (icon.y0 + icon.y1)) * 0.5))
 
 
+def glyph_ink(glyph: str) -> FRect:
+    """Painted bounds of *glyph* in the current font, relative to its draw origin."""
+    g = imgui.get_font().find_glyph(ord(glyph))
+    return g.x0, g.y0, g.x1 - g.x0, g.y1 - g.y0
+
+
 def _u32(color: Color) -> int:
     return imgui.get_color_u32(color if isinstance(color, imgui.ImVec4) else rgba(color))
 
@@ -65,20 +71,20 @@ def paint_box(
 ) -> None:
     """Paint one button: its fill, the hover wash, then *text* centred.
 
-    A hovered button with no fill draws its text in the hover colour. *icon*
-    lowers a Material glyph onto the text's capitals; text keeps its line.
+    A hovered button with no fill draws its text in the hover colour. With
+    *icon*, a single glyph centres by its ink, so its own padding never shifts
+    it; text centres on its line, to stay level with the text beside it.
     """
     if fill is not None:
         paint_wash(box, fill, fill_alpha)
     if hovered:
         paint_wash(box)
     text_color = NUDGE_HOVER_FG if hovered and fill is None else color
-    drop = glyph_drop(text[0]) if icon and text else 0.0
-    imgui.get_window_draw_list().add_text(
-        imgui.ImVec2(glyph_x(box, imgui.calc_text_size(text).x), text_top(box) + drop),
-        _u32(text_color),
-        text,
-    )
+    if icon and len(text) == 1:
+        x, y = ink_origin(box, glyph_ink(text))
+    else:
+        x, y = glyph_x(box, imgui.calc_text_size(text).x), text_top(box)
+    imgui.get_window_draw_list().add_text(imgui.ImVec2(x, y), _u32(text_color), text)
 
 
 def paint_wash(

@@ -9,6 +9,7 @@ from cleave.viz.icon_button import (
     icon_box,
     icon_columns,
     icon_row,
+    ink_origin,
     text_box,
 )
 
@@ -44,3 +45,10 @@ def test_box_index_at_finds_the_box_and_skips_the_gap() -> None:
     assert box_index_at(boxes, 30.0, 5.0) is None
     assert box_index_at(boxes, 32.0, 19.0) == 1
     assert box_index_at(boxes, 32.0, 20.0) is None
+
+
+def test_ink_origin_centres_the_painted_bounds_not_the_glyph_cell() -> None:
+    # Ink 10x12 starting 3px right and 1px down from the draw origin.
+    assert ink_origin((100.0, 20.0, 18.0, 18.0), (3.0, 1.0, 10.0, 12.0)) == (101.0, 22.0)
+    # An odd spare pixel goes to the right and bottom margins.
+    assert ink_origin((0.0, 0.0, 17.0, 17.0), (0.0, 0.0, 10.0, 12.0)) == (3.0, 2.0)

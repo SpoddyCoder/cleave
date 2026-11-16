@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+from functools import lru_cache
+
 import pygame
 
-from cleave.viz.icon_button import glyph_x, icon_box
+from cleave.viz.icon_button import icon_box, ink_origin
 from cleave.viz.material_icons import (
     VISIBILITY_GLYPH,
     VISIBILITY_OFF_GLYPH,
-    render_glyph,
+    material_font,
     visibility_icon_slot_width,
 )
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor
@@ -183,19 +185,36 @@ def inspector_field_colors(
     return label, row_value_color_for(state, desc)
 
 
+@lru_cache(maxsize=256)
+def _glyph_ink(glyph: str, size: int) -> tuple[int, int, int, int]:
+    """Painted bounds of *glyph* at font *size*, relative to its draw origin."""
+    rects = pygame.mask.from_surface(
+        material_font(size).render(glyph, True, (255, 255, 255))
+    ).get_bounding_rects()
+    if not rects:
+        return 0, 0, 0, 0
+    ink = rects[0].unionall(rects[1:])
+    return ink.x, ink.y, ink.w, ink.h
+
+
 def _icon_button_surface(
-    glyph_surf: pygame.Surface, line_height: int, bg: tuple[int, int, int] | None
+    glyph: str,
+    color: tuple[int, int, int],
+    line_height: int,
+    bg: tuple[int, int, int] | None,
 ) -> pygame.Surface:
-    """A square icon box on a row *line_height* tall, *bg* when lit, glyph centred."""
+    """A square icon box on a row *line_height* tall, *bg* when lit.
+
+    The glyph is drawn one box tall, so it never overhangs, and its ink is
+    centred in the box (``ink_origin``), the same rule as the shell's buttons.
+    """
     box = icon_box(0, (0, visibility_icon_slot_width(line_height)))
     side = int(box[2])
     surf = pygame.Surface((side, side), pygame.SRCALPHA)
     if bg is not None:
         surf.fill(bg)
-    surf.blit(
-        glyph_surf,
-        (int(glyph_x(box, glyph_surf.get_width())), (side - glyph_surf.get_height()) // 2),
-    )
+    x, y = ink_origin(box, _glyph_ink(glyph, side))
+    surf.blit(material_font(side).render(glyph, True, color), (int(x), int(y)))
     return surf
 
 
@@ -207,9 +226,7 @@ def render_header_toggle(
     bg: tuple[int, int, int] | None = None,
 ) -> pygame.Surface:
     """A timeline row header button: *glyph* centred in its square box, on *bg* when lit."""
-    return _icon_button_surface(
-        render_glyph(glyph, color=color, line_height=line_height), line_height, bg
-    )
+    return _icon_button_surface(glyph, color, line_height, bg)
 
 
 def render_visibility_icon(
@@ -227,6 +244,4 @@ def render_visibility_icon(
     else:
         color = DISABLED
     bg = SOLO_BG if solo else OVERRIDE_BG if override else None
-    return _icon_button_surface(
-        render_glyph(glyph, color=color, line_height=line_height), line_height, bg
-    )
+    return _icon_button_surface(glyph, color, line_height, bg)

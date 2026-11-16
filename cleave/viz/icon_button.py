@@ -10,6 +10,7 @@ Pure geometry, so the ImGui hosts, the pygame strip, and tests share it.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Sequence
 
 from cleave.viz.theme import ui_chrome_px
@@ -48,8 +49,23 @@ def text_box(x: float, text_w: float, space_w: float, band: Band) -> FRect:
 
 
 def glyph_x(box: FRect, glyph_w: float) -> float:
-    """Left of a glyph *glyph_w* wide, centred in *box*, on a whole pixel."""
-    return float(box[0] + round((box[2] - glyph_w) * 0.5))
+    """Left of a glyph *glyph_w* wide, centred in *box*, on a whole pixel.
+
+    An odd spare pixel goes to the right margin, as in ``ink_origin``.
+    """
+    return float(box[0] + math.floor((box[2] - glyph_w) * 0.5))
+
+
+def ink_origin(box: FRect, ink: FRect) -> tuple[float, float]:
+    """Where to draw a glyph so its ink sits centred in *box*.
+
+    *ink* is the painted bounds ``(x, y, w, h)`` relative to the glyph's draw
+    origin, so a glyph's own uneven padding never shifts it. The ink lands on
+    whole pixels; an odd spare pixel goes to the right and bottom margins.
+    """
+    bx, by, bw, bh = box
+    ix, iy, iw, ih = ink
+    return bx + math.floor((bw - iw) * 0.5) - ix, by + math.floor((bh - ih) * 0.5) - iy
 
 
 def icon_columns(
