@@ -126,7 +126,7 @@ def test_reconcile_nav_id_repairs_a_missing_layer() -> None:
 def test_reconcile_keeps_an_open_config_page() -> None:
     ids = TOP_LEVEL_IDS
     assert reconcile_nav_id(ids, "settings.ui", (), pages=("settings.ui",)) == "settings.ui"
-    assert reconcile_nav_id(ids, "project.render", (), pages=("settings.ui",)) == "layers"
+    assert reconcile_nav_id(ids, "project.resolution", (), pages=("settings.ui",)) == "layers"
 
 
 def test_shell_focus_state_defaults() -> None:

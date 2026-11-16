@@ -10,7 +10,7 @@ from cleave.viz.modal import (
     ModalLabeledLine,
     ModalViewState,
 )
-from cleave.viz.choice_layout import choice_width
+from cleave.viz.choice_layout import choice_width, stepper_width
 from cleave.viz.progress_bar import progress_bar_height
 from cleave.viz.text_fit import TextSizer, wrap_text_to_width
 from cleave.viz.theme import tuning_ui_metrics, ui_px
@@ -128,7 +128,9 @@ def form_row_height(line_h: int) -> int:
 
 
 def form_control_width(measure: TextMeasure, row: FormRowView) -> int:
-    """Width of a row's segments or combo: it fits the widest option."""
+    """Width of a row's segments, combo, or stepper: it fits the widest option."""
+    if row.stepper:
+        return stepper_width(measure, row.options)
     return choice_width(measure, row.options)
 
 

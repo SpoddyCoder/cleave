@@ -11,7 +11,12 @@ from typing import Iterator
 from imgui_bundle import imgui
 
 from cleave.choice import ChoiceKind
-from cleave.viz.choice_widgets import draw_choice_list, draw_combo, draw_segments
+from cleave.viz.choice_widgets import (
+    draw_choice_list,
+    draw_combo,
+    draw_segments,
+    draw_stepper,
+)
 from cleave.viz.imgui_host import progress_label_font
 from cleave.viz.imgui_theme import rgba
 from cleave.viz.pointer_cursor import PointerShape, request_pointer
@@ -374,8 +379,22 @@ def _draw_form_control(
     open_: bool,
     hover: bool,
 ) -> list[_FormHit]:
-    """Segments, or a combo that opens the row's list, filling ``rect``."""
+    """Segments, a stepper, or a combo that opens the row's list, filling ``rect``."""
     x, y, _w, h = rect
+    if row.stepper:
+        back, forward = draw_stepper(
+            draw,
+            measure,
+            row.options[row.value],
+            rect=rect,
+            at_start=row.value <= 0,
+            at_end=row.value >= len(row.options) - 1,
+            hover=hover,
+        )
+        return [
+            _FormHit(back, ModalPointerKind.STEP_FORM_VALUE, index, -1),
+            _FormHit(forward, ModalPointerKind.STEP_FORM_VALUE, index, 1),
+        ]
     if row.kind is ChoiceKind.SEGMENT:
         rects = draw_segments(
             draw, measure, row.options, row.value, x=x, y=y, height=h, hover=hover

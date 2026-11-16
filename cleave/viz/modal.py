@@ -51,6 +51,8 @@ class FormField:
     """One parameter of a form. ``value`` is an index into ``options``.
 
     Up to three options show as segments, more as a combo (``choice_kind``).
+    A ``stepper`` field is a number shown as ``< value >`` instead; its options
+    run low to high, and PageUp/PageDown move ``large_step`` options at once.
     ``help`` and ``option_help`` (one line per option, or empty) fill the help
     column while the field is focused. ``section`` groups the field under a
     heading; consecutive fields with the same section share one heading.
@@ -64,6 +66,8 @@ class FormField:
     help: tuple[str, ...] = ()
     option_help: tuple[str, ...] = ()
     section: str | None = None
+    stepper: bool = False
+    large_step: int = 1
 
 
 @dataclass(frozen=True)
@@ -73,6 +77,8 @@ class FormSpec:
     ``info`` is a line of feedback on the draft values, such as a count of the
     cues a command would change. It runs when a value changes, not every frame.
     It draws in brackets under the title, in lower case.
+    ``on_change`` runs after a field changes, with its id, and may adjust
+    other draft values in place, such as keeping a start before an end.
     ``help`` describes the whole dialog in the help column.
     """
 
@@ -86,6 +92,7 @@ class FormSpec:
     info: Callable[[FormValues], str | None] | None = None
     destructive: bool = False
     help: tuple[str, ...] = ()
+    on_change: Callable[[str, FormValues], None] | None = None
 
 
 @dataclass(frozen=True)
@@ -114,6 +121,7 @@ class FormRowView:
     focused: bool
     heading: str | None = None
     indented: bool = False
+    stepper: bool = False
 
 
 @dataclass
@@ -149,6 +157,7 @@ def _form_row_views(form: FormState) -> tuple[FormRowView, ...]:
                 index == form.field_index,
                 heading=section if section is not None and section != previous else None,
                 indented=section is not None,
+                stepper=field.stepper,
             )
         )
         previous = section
@@ -560,7 +569,7 @@ class ModalHost:
         state.field_index = row
         field = fields[row]
         state.values[field.id] = max(0, min(value, len(field.options) - 1))
-        self._after_form_change(state)
+        self._after_form_change(state, field.id)
 
     def step_form_value(self, row: int, delta: int) -> None:
         """Focus row ``row`` and step its option, stopping at either end."""
@@ -575,7 +584,7 @@ class ModalHost:
         state.values[field.id] = step_index(
             state.values[field.id], len(field.options), delta
         )
-        self._after_form_change(state)
+        self._after_form_change(state, field.id)
 
     def open_form_choice(self, row: int) -> None:
         """Focus row ``row`` and open its option list, when it is a combo."""
@@ -587,7 +596,7 @@ class ModalHost:
             return
         state.field_index = row
         field = fields[row]
-        if choice_kind(len(field.options)) is not ChoiceKind.COMBO:
+        if field.stepper or choice_kind(len(field.options)) is not ChoiceKind.COMBO:
             return
         self._form_choice = ChoiceListState(
             target=row,
@@ -636,21 +645,23 @@ class ModalHost:
                     )
                 )
         confirm = spec.confirm_label.lower()
+        keys: list[tuple[str, str]] = [
+            ("Up/Down", "move between settings"),
+            ("Left/Right", "change the setting"),
+        ]
+        if any(field.large_step > 1 for field in fields):
+            keys.append(("PgUp/PgDn", "large step"))
+        if any(
+            not field.stepper and choice_kind(len(field.options)) is ChoiceKind.COMBO
+            for field in fields
+        ):
+            keys.append(("Space", "open the setting's list"))
+        keys.append(
+            ("Enter", "press the focused button" if spec.destructive else confirm)
+        )
+        keys.append(("Esc", "cancel"))
         sections.append(
-            ModalHelpSection(
-                _help_title(spec.title.rstrip("?")),
-                spec.help,
-                (
-                    ("Up/Down", "move between settings"),
-                    ("Left/Right", "change the setting"),
-                    ("Space", "open the setting's list"),
-                    (
-                        "Enter",
-                        "press the focused button" if spec.destructive else confirm,
-                    ),
-                    ("Esc", "cancel"),
-                ),
-            )
+            ModalHelpSection(_help_title(spec.title.rstrip("?")), spec.help, tuple(keys))
         )
         return tuple(sections)
 
@@ -659,7 +670,10 @@ class ModalHost:
         if state is not None and 0 <= row < len(state.visible_fields()):
             state.field_index = row
 
-    def _after_form_change(self, state: FormState) -> None:
+    def _after_form_change(self, state: FormState, field_id: str) -> None:
+        on_change = state.spec.on_change
+        if on_change is not None:
+            on_change(field_id, state.values)
         state.refresh_info()
         visible = len(state.visible_fields())
         if state.field_index is not None and state.field_index >= visible:
@@ -702,6 +716,11 @@ class ModalHost:
                 self._focus_index = (self._focus_index + delta) % self._option_count()
             else:
                 self.step_form_value(state.field_index, delta)
+        elif key in (pygame.K_PAGEUP, pygame.K_PAGEDOWN):
+            if state.field_index is not None:
+                field = state.visible_fields()[state.field_index]
+                step = field.large_step if key == pygame.K_PAGEUP else -field.large_step
+                self.step_form_value(state.field_index, step)
         elif key in (pygame.K_RETURN, pygame.K_KP_ENTER):
             self._activate_form(state)
         return True

@@ -142,12 +142,8 @@ _EXPECTED_REPEAT_ROW_KINDS = frozenset(
         RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY,
         RowKind.SETTINGS_UI_NAVIGATOR_HEIGHT,
         RowKind.SETTINGS_RESIDUAL_LATENCY_MS,
-        RowKind.PROJECT_RENDER_QUALITY,
         RowKind.PROJECT_RESOLUTION_WIDTH,
         RowKind.PROJECT_RESOLUTION_HEIGHT,
-        RowKind.PROJECT_RENDER_FPS,
-        RowKind.PROJECT_RENDER_START,
-        RowKind.PROJECT_RENDER_END,
         RowKind.PROJECT_MILKDROP_BEAT_SENSITIVITY,
         RowKind.PROJECT_COMPOSITOR_HDR,
         RowKind.TIMELINE_BAR_PHASE,
@@ -180,10 +176,10 @@ def test_header_row_kinds() -> None:
 
 
 def test_row_is_pinned() -> None:
-    assert row_is_pinned(RowKind.PROJECT_RENDER_HEADER) is True
+    assert row_is_pinned(RowKind.PROJECT_RESOLUTION_HEADER) is True
     assert row_is_pinned(RowKind.PROJECT_COMPOSITOR_HEADER) is True
     assert row_is_pinned(RowKind.PROJECT_COMPOSITOR_HDR) is True
-    assert row_is_pinned(RowKind.PROJECT_RENDER_QUALITY) is True
+    assert row_is_pinned(RowKind.PROJECT_RESOLUTION_WIDTH) is True
     assert row_is_pinned(RowKind.SETTINGS_PREVIEW_QUALITY) is True
     assert row_is_pinned(RowKind.SETTINGS_PREVIEW_HEADER) is True
     assert row_is_pinned(RowKind.SETTINGS_NAVIGATOR_SIDE) is True
@@ -577,7 +573,6 @@ def test_row_panel_label_settings_header() -> None:
     assert row_panel_label(RowKind.PROJECT_MILKDROP_HEADER) == "ProjectM"
     assert row_panel_label(RowKind.PROJECT_COMPOSITOR_HEADER) == "Compositor"
     assert row_panel_label(RowKind.PROJECT_RESOLUTION_HEADER) == "Resolution"
-    assert row_panel_label(RowKind.PROJECT_RENDER_HEADER) == "Render"
 
 
 def test_format_row_value_settings() -> None:
@@ -1103,10 +1098,6 @@ def test_format_row_value_path_icon() -> None:
                 effects={},
             )
         },
-    )
-    assert (
-        format_row_value(state, RowDescriptor(RowKind.PROJECT_RENDER_OUTPUT))
-        == state.project.output_label
     )
     slot_desc = RowDescriptor(RowKind.TRACK_PRESET_DIR, slot="layer_1")
     assert format_row_value(state, slot_desc) == "presets/wave"

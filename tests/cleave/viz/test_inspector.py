@@ -205,9 +205,10 @@ def test_project_pages() -> None:
     assert _kinds(build_inspector_rows(state, "project.compositor")) == [
         RowKind.PROJECT_COMPOSITOR_HDR
     ]
-    render = build_inspector_rows(state, "project.render")
-    assert _kinds(render)[0] == RowKind.PROJECT_RENDER_OUTPUT
-    assert render[-1].command_ids == ("project.render",)
+    assert _kinds(build_inspector_rows(state, "project.resolution")) == [
+        RowKind.PROJECT_RESOLUTION_WIDTH,
+        RowKind.PROJECT_RESOLUTION_HEIGHT,
+    ]
 
 
 def test_page_header_is_never_a_row() -> None:
@@ -475,7 +476,6 @@ def test_layer_missing_from_view_state_has_no_rows(page: str | None) -> None:
     "node_id",
     (
         "settings.preview",
-        "project.render",
         "timeline",
         "timeline.grid",
         "timeline.cue_fades",

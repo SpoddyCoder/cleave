@@ -1,17 +1,38 @@
-"""Confirm, progress, and completion modals for Render Project."""
+"""Settings, progress, and completion modals for Project > Render....
+
+The Render dialog is the one place to set the render's fps, quality, and
+range. Its fields edit draft values; Render writes them to the session and
+starts the job, and Cancel leaves the session untouched.
+"""
 
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 
 from cleave.config import CleaveConfig
 from cleave.config_schema.project_render import (
     DEFAULT_PROJECT_RENDER_OUTPUT_LABEL,
+    PROJECT_RENDER_QUALITIES,
+    PROJECT_RENDER_QUALITY_HELP_ENTRIES,
+    RENDER_FPS_MAX,
+    RENDER_FPS_MIN,
+    RENDER_FPS_STEP_LARGE,
+    ProjectRenderQuality,
+    clamp_render_fps,
     default_project_render_path,
+    project_render_duration_ceil_sec,
     resolved_project_render_end_sec,
 )
-from cleave.viz.modal import ModalHost, ModalLabeledLine
+from cleave.choice import choice_index
+from cleave.viz.modal import (
+    FormField,
+    FormSpec,
+    FormValues,
+    ModalHost,
+    ModalLabeledLine,
+)
 from cleave.viz.playback import PlaybackState, toggle_pause
 from cleave.viz.project_render_job import (
     ProjectRenderSpec,
@@ -21,7 +42,13 @@ from cleave.viz.project_render_job import (
 )
 from cleave.viz.session import TuningSession
 
-_CONFIRM_TITLE = "Render the project?"
+_FORM_TITLE = "Render project"
+_RANGE_STEP_LARGE_SEC = 10
+_FORM_HELP = (
+    "Renders the project to an MP4 video file in the project's renders directory.",
+    "Fps is saved with the project. Quality, start, and end last until the editor closes.",
+)
+_FPS_OPTIONS = tuple(range(RENDER_FPS_MIN, RENDER_FPS_MAX + 1))
 _PROGRESS_MESSAGE = "Rendering project..."
 _SUCCESS_MESSAGE = "Render complete"
 _FAILED_MESSAGE = "Render failed"
@@ -43,6 +70,38 @@ def project_render_output_path(
         end_sec=end_sec,
         duration_sec=duration_sec,
     )
+
+
+@dataclass(frozen=True)
+class RenderDraft:
+    """Render settings as the dialog's fields hold them."""
+
+    fps: int
+    quality: ProjectRenderQuality
+    start_sec: int
+    end_sec: int
+
+
+def render_draft_from_values(values: FormValues) -> RenderDraft:
+    """Draft from form option indices. Start counts from 0s, end from 1s."""
+    return RenderDraft(
+        fps=_FPS_OPTIONS[values["fps"]],
+        quality=PROJECT_RENDER_QUALITIES[values["quality"]],
+        start_sec=values["start"],
+        end_sec=values["end"] + 1,
+    )
+
+
+def keep_render_range_ordered(field_id: str, values: FormValues) -> None:
+    """Push the other end of the range so start stays before end."""
+    start = values["start"]
+    end_sec = values["end"] + 1
+    if start < end_sec:
+        return
+    if field_id == "start":
+        values["end"] = start
+    else:
+        values["start"] = end_sec - 1
 
 
 def project_render_output_label(path: Path) -> str:
@@ -108,19 +167,62 @@ class ProjectRenderController:
     def prompt(self) -> None:
         if self.busy:
             return
-        output_path = self._resolved_output_path()
-        if output_path is None:
-            output_path = Path(DEFAULT_PROJECT_RENDER_OUTPUT_LABEL)
-        self._modal.prompt_confirm(
-            _CONFIRM_TITLE,
-            "Render",
-            self._confirm,
-            lambda: None,
-            labeled_lines=project_render_labeled_lines(
-                self.session,
-                duration_sec=self.duration_sec,
-                output_path=output_path,
-            ),
+        render = self.session.project.render
+        resolution = self.session.project.resolution
+        ceil = project_render_duration_ceil_sec(self.duration_sec)
+        end_sec = resolved_project_render_end_sec(render.end_sec, self.duration_sec)
+        start_sec = max(0, min(render.start_sec, ceil - 1))
+        end_sec = max(start_sec + 1, min(end_sec, ceil))
+        fps = clamp_render_fps(render.fps)
+        self._modal.prompt_form(
+            FormSpec(
+                title=_FORM_TITLE,
+                fields=(
+                    FormField(
+                        "fps",
+                        "fps",
+                        tuple(str(value) for value in _FPS_OPTIONS),
+                        _FPS_OPTIONS.index(fps),
+                        help=("Frames per second of the rendered video.",),
+                        stepper=True,
+                        large_step=RENDER_FPS_STEP_LARGE,
+                    ),
+                    FormField(
+                        "quality",
+                        "quality",
+                        PROJECT_RENDER_QUALITIES,
+                        choice_index(PROJECT_RENDER_QUALITIES, render.quality),
+                        help=("Speed or quality for the render.",),
+                        option_help=tuple(
+                            text for _mode, text in PROJECT_RENDER_QUALITY_HELP_ENTRIES
+                        ),
+                    ),
+                    FormField(
+                        "start",
+                        "start",
+                        tuple(f"{sec}s" for sec in range(0, ceil)),
+                        start_sec,
+                        help=("Time in the song where the render starts, in seconds.",),
+                        stepper=True,
+                        large_step=_RANGE_STEP_LARGE_SEC,
+                    ),
+                    FormField(
+                        "end",
+                        "end",
+                        tuple(f"{sec}s" for sec in range(1, ceil + 1)),
+                        end_sec - 1,
+                        help=("Time in the song where the render ends, in seconds.",),
+                        stepper=True,
+                        large_step=_RANGE_STEP_LARGE_SEC,
+                    ),
+                ),
+                confirm_label="Render",
+                on_confirm=self._confirm_values,
+                body=f"{resolution.width} x {resolution.height}, from Project > Resolution.",
+                info=self._output_info,
+                help=_FORM_HELP,
+                on_change=keep_render_range_ordered,
+            )
         )
 
     def tick(self) -> None:
@@ -147,6 +249,29 @@ class ProjectRenderController:
         self._restore_playback()
         if self._modal.active:
             self._modal.dismiss()
+
+    def _output_info(self, values: FormValues) -> str:
+        draft = render_draft_from_values(values)
+        if self._project_dir is None:
+            return f"({DEFAULT_PROJECT_RENDER_OUTPUT_LABEL})"
+        path = default_project_render_path(
+            self._project_dir,
+            self.cfg.project_slug,
+            start_sec=draft.start_sec,
+            end_sec=draft.end_sec,
+            duration_sec=self.duration_sec,
+        )
+        return f"({project_render_output_label(path)})"
+
+    def _confirm_values(self, values: FormValues) -> None:
+        draft = render_draft_from_values(values)
+        render = self.session.project.render
+        render.fps = draft.fps
+        render.quality = draft.quality
+        render.start_sec = draft.start_sec
+        ceil = project_render_duration_ceil_sec(self.duration_sec)
+        render.end_sec = None if draft.end_sec >= ceil else draft.end_sec
+        self._confirm()
 
     def _confirm(self) -> None:
         project_dir = self._project_dir

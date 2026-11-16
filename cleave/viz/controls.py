@@ -263,7 +263,6 @@ class TuningControls:
             config_save=self._config_save,
             get_notification=self._notification_host.active,
             layers_by_slot=layers_by_slot,
-            project_dir=project_dir,
         )
         self.overlays = OverlaysControls(session)
         self.post_fx = PostFxControls(
@@ -278,7 +277,6 @@ class TuningControls:
         )
         self.project = ProjectControls(
             session,
-            duration_sec=duration_sec,
             on_compositor_format_changed=self._sync_live_compositor_format,
         )
         self.visualiser_resolution = VisualiserResolutionSync(

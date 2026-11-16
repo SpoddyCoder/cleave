@@ -434,8 +434,8 @@ def test_collapsing_layers_moves_selection_off_a_hidden_child() -> None:
     assert selection_after_nav_collapse(collapsed, child_id, "layers") == "layers"
     assert selection_after_nav_collapse(collapsed, "post_fx", "layers") == "post_fx"
     assert (
-        selection_after_nav_collapse(collapsed, "project.render", "layers")
-        == "project.render"
+        selection_after_nav_collapse(collapsed, "project.resolution", "layers")
+        == "project.resolution"
     )
 
 
@@ -450,12 +450,8 @@ def test_path_row_icon_folder_for_preset_directory() -> None:
     assert path_row_icon(RowKind.TRACK_PRESET_DIR) == (FOLDER_GLYPH, PRESET_ICON)
 
 
-def test_path_row_icon_file_for_presets_and_render_output() -> None:
-    for kind in (
-        RowKind.TRACK_PRESET,
-        RowKind.TRACK_PRESET_LIST_ITEM,
-        RowKind.PROJECT_RENDER_OUTPUT,
-    ):
+def test_path_row_icon_file_for_presets() -> None:
+    for kind in (RowKind.TRACK_PRESET, RowKind.TRACK_PRESET_LIST_ITEM):
         assert path_row_icon(kind) == (FILE_GLYPH, PRESET_FILE_ICON)
 
 

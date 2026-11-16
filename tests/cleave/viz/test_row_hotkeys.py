@@ -92,7 +92,7 @@ def test_node_control_descriptor_resolves_to_the_owner() -> None:
         layer_page_node_id("layer_1", "effects")
     ) == RowDescriptor(RowKind.TRACK_HEADER, slot="layer_1")
     assert row_hotkeys.node_control_descriptor("settings.ui") is None
-    assert row_hotkeys.node_control_descriptor("project.render") is None
+    assert row_hotkeys.node_control_descriptor("project.resolution") is None
 
 
 def test_hotkeys_on_a_child_page_reach_the_owner() -> None:

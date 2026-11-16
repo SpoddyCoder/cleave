@@ -174,20 +174,6 @@ PROJECT_RESOLUTION_SECTION = SectionDef(
     ),
 )
 
-PROJECT_RENDER_SECTION = SectionDef(
-    header_kind=RowKind.PROJECT_RENDER_HEADER,
-    context="global",
-    children=(
-        SectionNode(leaf_kind=RowKind.PROJECT_RENDER_OUTPUT),
-        SectionNode(leaf_kind=RowKind.PROJECT_RENDER_FPS),
-        SectionNode(leaf_kind=RowKind.PROJECT_RENDER_QUALITY),
-        SectionNode(divider=True),
-        SectionNode(leaf_kind=RowKind.PROJECT_RENDER_START),
-        SectionNode(leaf_kind=RowKind.PROJECT_RENDER_END),
-        SectionNode(commands=("project.render",)),
-    ),
-)
-
 
 def _layers_show_add(state: TuningViewState, _desc: RowDescriptor) -> bool:
     return not is_preset_curation_mode(state.settings.editor_mode)

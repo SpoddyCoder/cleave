@@ -1,4 +1,4 @@
-"""Sizes and hit rects for choice controls: segments, combos, and their list.
+"""Sizes and hit rects for choice controls: segments, combos, steppers, and lists.
 
 Pure geometry shared by the inspector and form dialogs. Every control is as
 wide as its widest option, so its parts hold still while the value changes.
@@ -16,6 +16,8 @@ Rect = tuple[int, int, int, int]
 
 # In the shell glyph ranges (the navigator's open twisty).
 COMBO_CARET = "▾"
+STEPPER_BACK = "< "
+STEPPER_FORWARD = " >"
 
 
 def segment_pad_x() -> int:
@@ -59,6 +61,20 @@ def choice_width(
     if choice_kind(len(labels), combo=combo) is ChoiceKind.SEGMENT:
         return sum(segment_widths(measure, labels))
     return combo_width(measure, labels)
+
+
+def stepper_width(measure: TextSizer, labels: Sequence[str]) -> int:
+    """``< value >`` wide enough for the widest option."""
+    widest = max((measure.size(label)[0] for label in labels), default=0)
+    return measure.size(STEPPER_BACK)[0] + widest + measure.size(STEPPER_FORWARD)[0]
+
+
+def stepper_arrow_rects(measure: TextSizer, rect: Rect) -> tuple[Rect, Rect]:
+    """The back and forward arrows at either end of a stepper ``rect``."""
+    x, y, w, h = rect
+    back = measure.size(STEPPER_BACK)[0]
+    forward = measure.size(STEPPER_FORWARD)[0]
+    return (x, y, back, h), (x + w - forward, y, forward, h)
 
 
 def choice_list_rects(

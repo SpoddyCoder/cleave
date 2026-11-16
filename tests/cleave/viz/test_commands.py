@@ -42,7 +42,6 @@ _SLOTS = (("slot_a", "snare"), ("slot_b", "pad"))
 
 _PROJECT_PAGE_IDS = (
     "page.project.resolution",
-    "page.project.render",
     "page.project.compositor",
     "page.project.projectm",
 )

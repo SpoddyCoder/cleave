@@ -10,6 +10,7 @@ from pathlib import Path
 import pygame
 import pytest
 
+from cleave.viz.commands import command_by_id
 from cleave.viz.controls import TuningControls
 from cleave.viz.timeline_controls import TimelineControls
 from cleave.viz.row_kinds import RowDescriptor, RowKind
@@ -403,8 +404,11 @@ def _mutate_resolution_height(controls: TuningControls) -> None:
 
 
 def _mutate_render_fps(controls: TuningControls) -> None:
-    controls.focus_descriptor = RowDescriptor(RowKind.PROJECT_RENDER_FPS)
-    press_main_row(controls, _keydown(pygame.K_RIGHT))
+    """Step fps in the Render dialog and confirm; the job itself may fail."""
+    command_by_id("project.render").run(controls)
+    controls.modal_host.focus_form_row(0)
+    controls.handle_modal_keydown(_keydown(pygame.K_RIGHT))
+    controls.modal_host.activate_option(0)
 
 
 def _mutate_timeline_cues_via_record() -> None:

@@ -1,4 +1,4 @@
-"""Project menu: config path child, Resolution, and Render submenus."""
+"""Project menu: ProjectM, Compositor, and Resolution pages, and the Render dialog."""
 
 from __future__ import annotations
 
@@ -8,38 +8,26 @@ from unittest.mock import patch
 import pygame
 import pytest
 
+# Load the submodule so patch() targets it, not the package's lazy render().
+import cleave.viz.render  # noqa: F401
 from cleave.config_schema.editor import DEFAULT_BEAT_SENSITIVITY
-from cleave.config_schema.project_render import (
-    DEFAULT_PROJECT_RENDER_QUALITY,
-    DEFAULT_RENDER_FPS,
-    default_project_render_path,
-)
+from cleave.config_schema.project_render import DEFAULT_RENDER_FPS
 from cleave.config_schema.project_resolution import (
     DEFAULT_RESOLUTION_HEIGHT,
     DEFAULT_RESOLUTION_WIDTH,
 )
 from cleave.viz.commands import command_by_id
-from cleave.viz.material_icons import FOLDER_GLYPH
 from cleave.viz.modal import ModalKind, ModalLabeledLine
 from cleave.viz.project_render_job import RenderJobStatus
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
-from cleave.viz.row_spec import (
-    RowPresentStyle,
-    format_row_value,
-    row_spec,
-)
-from cleave.viz.theme import PRESET_ICON
-from cleave.viz.tuning_view_state import ProjectBlock, view_state_structure_signature
+from cleave.viz.row_spec import format_row_value, row_spec
+from cleave.viz.tuning_view_state import view_state_structure_signature
 from tests.cleave.viz.test_controls import (
     _choose_modal_option,
-    _desc,
-    _expand_project,
-    _expand_project_render,
     _keydown,
     _make_controls,
 )
-from tests.cleave.viz.test_overlay import _minimal_view_state
-from tests.support.viz import make_track_block, press_main_row
+from tests.support.viz import press_main_row
 
 
 def test_structure_signature_stable_for_render_quality_and_range() -> None:
@@ -150,159 +138,20 @@ def test_milkdrop_beat_sensitivity_keyboard_steps() -> None:
     )
 
 
-def test_project_render_defaults() -> None:
-    controls = _make_controls(("layer_1",), duration_sec=120.0)
-    _expand_project_render(controls)
-    view = controls.build_view_state(paused=False)
-    assert view.project.quality == DEFAULT_PROJECT_RENDER_QUALITY
-    assert view.project.start_sec == 0
-    assert view.project.end_sec == 120
-    assert view.project.width == DEFAULT_RESOLUTION_WIDTH
-    assert view.project.height == DEFAULT_RESOLUTION_HEIGHT
-    assert view.project.fps == DEFAULT_RENDER_FPS
-    assert view.project.output_label.endswith("renders/render.mp4")
-    assert format_row_value(
-        view, RowDescriptor(RowKind.PROJECT_RENDER_OUTPUT)
-    ) == view.project.output_label
-    assert format_row_value(
-        view, RowDescriptor(RowKind.PROJECT_RENDER_QUALITY)
-    ) == "normal"
+def test_resolution_rows_show_defaults() -> None:
+    view = _make_controls(("layer_1",)).build_view_state(paused=False)
     assert format_row_value(
         view, RowDescriptor(RowKind.PROJECT_RESOLUTION_WIDTH)
     ) == str(DEFAULT_RESOLUTION_WIDTH)
     assert format_row_value(
         view, RowDescriptor(RowKind.PROJECT_RESOLUTION_HEIGHT)
     ) == str(DEFAULT_RESOLUTION_HEIGHT)
-    assert format_row_value(
-        view, RowDescriptor(RowKind.PROJECT_RENDER_FPS)
-    ) == str(DEFAULT_RENDER_FPS)
-    assert format_row_value(
-        view, RowDescriptor(RowKind.PROJECT_RENDER_START)
-    ) == "0s"
-    assert format_row_value(
-        view, RowDescriptor(RowKind.PROJECT_RENDER_END)
-    ) == "120s"
-
-
-def test_step_quality_does_not_mark_dirty() -> None:
-    controls = _make_controls(("layer_1",))
-    assert not controls.config_dirty
-    controls.project.step_quality(forward=True)
-    assert controls.session.project.render.quality == "high"
-    controls.project.step_quality(forward=True)
-    assert controls.session.project.render.quality == "viz"
-    controls.project.step_quality(forward=True)
-    assert controls.session.project.render.quality == "viz"
-    controls.project.step_quality(forward=False)
-    assert controls.session.project.render.quality == "high"
-    assert not controls.config_dirty
-
-
-def test_adjust_start_and_end_steps_and_clamps() -> None:
-    controls = _make_controls(("layer_1",), duration_sec=60.0)
-    render = controls.session.project.render
-    assert render.start_sec == 0
-    assert render.end_sec is None
-
-    controls.project.adjust_start(forward=True, large=False)
-    assert render.start_sec == 1
-    controls.project.adjust_start(forward=True, large=True)
-    assert render.start_sec == 11
-
-    controls.project.adjust_end(forward=False, large=False)
-    assert render.end_sec == 59
-    controls.project.adjust_end(forward=False, large=True)
-    assert render.end_sec == 49
-
-    render.start_sec = 48
-    controls.project.adjust_start(forward=True, large=True)
-    assert render.start_sec == 48
-    controls.project.adjust_end(forward=True, large=True)
-    assert render.end_sec == 59
-    controls.project.adjust_end(forward=True, large=False)
-    assert render.end_sec is None
-    assert not controls.config_dirty
-
-
-def test_output_path_uses_project_renders_dir_and_range_suffix(
-    tmp_path: Path,
-) -> None:
-    controls = _make_controls(
-        ("layer_1",), project_dir=tmp_path, duration_sec=60.0
-    )
-    _expand_project_render(controls)
-    view = controls.build_view_state(paused=False)
-    assert view.project.output_label == (tmp_path / "renders" / "render.mp4").as_posix()
-
-    controls.session.project.render.start_sec = 10
-    controls.session.project.render.end_sec = 20
-    view = controls.build_view_state(paused=False)
-    expected = default_project_render_path(
-        tmp_path, "render", start_sec=10, end_sec=20, duration_sec=60.0
-    )
-    assert view.project.output_label == expected.as_posix()
-    assert view.project.output_label.endswith("render_10-20s.mp4")
-
-
-def test_minimal_view_render_labels() -> None:
-    state = _minimal_view_state(
-        project=ProjectBlock(
-            quality="high",
-            start_sec=5,
-            end_sec=40,
-            output_label="renders/demo_5-40s.mp4",
-        ),
-        tracks={
-            "layer_1": make_track_block(
-                stem="drums",
-                preset_dir_label="dir",
-                preset_label="preset.milk",
-                blend_mode="black-key",
-                opacity_pct=50,
-                beat_sensitivity=1.0,
-                effects={},
-            )
-        },
-    )
-    quality = RowDescriptor(RowKind.PROJECT_RENDER_QUALITY)
-    assert format_row_value(state, quality) == "high"
-    width = RowDescriptor(RowKind.PROJECT_RESOLUTION_WIDTH)
-    assert format_row_value(state, width) == str(DEFAULT_RESOLUTION_WIDTH)
-    output = RowDescriptor(RowKind.PROJECT_RENDER_OUTPUT)
-    assert format_row_value(state, output) == "renders/demo_5-40s.mp4"
-
-
-def test_render_output_row_is_read_only() -> None:
-    spec = row_spec(RowKind.PROJECT_RENDER_OUTPUT)
-    assert spec.affordance == RowAffordance.DISPLAY
-    assert spec.apply_horizontal is None
-    assert spec.present_style == RowPresentStyle.PATH_ICON
-    project_spec = row_spec(RowKind.PROJECT_RENDER_HEADER)
-    assert project_spec.panel_label == "Render"
     assert row_spec(RowKind.PROJECT_RESOLUTION_HEADER).panel_label == "Resolution"
 
 
-def test_start_end_keyboard_steps() -> None:
-    controls = _make_controls(("layer_1",), duration_sec=60.0)
-    render = controls.session.project.render
-
-    controls.focus_descriptor = RowDescriptor(RowKind.PROJECT_RENDER_START)
-    press_main_row(controls, _keydown(pygame.K_RIGHT))
-    assert render.start_sec == 1
-    press_main_row(controls, _keydown(pygame.K_PAGEUP))
-    assert render.start_sec == 11
-
-    controls.focus_descriptor = RowDescriptor(RowKind.PROJECT_RENDER_END)
-    press_main_row(controls, _keydown(pygame.K_LEFT))
-    assert render.end_sec == 59
-    press_main_row(controls, _keydown(pygame.K_PAGEDOWN))
-    assert render.end_sec == 49
-
-
-def test_width_height_fps_keyboard_steps() -> None:
+def test_width_height_keyboard_steps() -> None:
     controls = _make_controls(("layer_1",))
     resolution = controls.session.project.resolution
-    render = controls.session.project.render
 
     controls.focus_descriptor = RowDescriptor(RowKind.PROJECT_RESOLUTION_WIDTH)
     press_main_row(controls, _keydown(pygame.K_RIGHT))
@@ -315,14 +164,6 @@ def test_width_height_fps_keyboard_steps() -> None:
     assert resolution.height == DEFAULT_RESOLUTION_HEIGHT - 10
     press_main_row(controls, _keydown(pygame.K_PAGEDOWN))
     assert resolution.height == DEFAULT_RESOLUTION_HEIGHT - 110
-
-    controls.focus_descriptor = RowDescriptor(RowKind.PROJECT_RENDER_FPS)
-    press_main_row(controls, _keydown(pygame.K_RIGHT))
-    assert render.fps == DEFAULT_RENDER_FPS + 1
-    press_main_row(controls, _keydown(pygame.K_PAGEUP))
-    assert render.fps == DEFAULT_RENDER_FPS + 6
-    press_main_row(controls, _keydown(pygame.K_LEFT))
-    assert render.fps == DEFAULT_RENDER_FPS + 5
 
 
 class _ScriptedRenderJob:
@@ -370,7 +211,26 @@ def _wire_fake_job(controls, tmp_path: Path, job: _ScriptedRenderJob) -> Path:
     return snap
 
 
-def test_render_action_enter_opens_yes_cancel_modal() -> None:
+def _form_row(controls, label: str) -> tuple[int, object]:
+    modal_view = controls.modal_host.view_state()
+    assert modal_view is not None
+    for index, row in enumerate(modal_view.form_rows):
+        if row.label == label:
+            return index, row
+    raise AssertionError(f"no form field {label!r}")
+
+
+def _form_value(controls, label: str) -> str:
+    _index, row = _form_row(controls, label)
+    return row.options[row.value]
+
+
+def _focus_form_row(controls, label: str) -> None:
+    index, _row = _form_row(controls, label)
+    controls.modal_host.focus_form_row(index)
+
+
+def test_render_dialog_shows_current_settings() -> None:
     controls = _make_controls(("layer_1",), duration_sec=60.0)
     controls.session.project.render.quality = "high"
     controls.session.project.render.start_sec = 5
@@ -378,18 +238,107 @@ def test_render_action_enter_opens_yes_cancel_modal() -> None:
     _prompt_project_render(controls)
     modal_view = controls.modal_host.view_state()
     assert modal_view is not None
-    assert modal_view.kind == ModalKind.CONFIRM
+    assert modal_view.kind == ModalKind.FORM
+    assert modal_view.message == "Render project"
     assert modal_view.options == ("Render", "Cancel")
-    assert modal_view.message == "Render the project?"
-    assert modal_view.labeled_lines == (
-        ModalLabeledLine("output", "renders/render.mp4"),
-        ModalLabeledLine("width", str(DEFAULT_RESOLUTION_WIDTH)),
-        ModalLabeledLine("height", str(DEFAULT_RESOLUTION_HEIGHT)),
-        ModalLabeledLine("fps", str(DEFAULT_RENDER_FPS)),
-        ModalLabeledLine("quality", "high"),
-        ModalLabeledLine("start", "5s"),
-        ModalLabeledLine("end", "20s"),
+    assert modal_view.body == (
+        f"{DEFAULT_RESOLUTION_WIDTH} x {DEFAULT_RESOLUTION_HEIGHT}, "
+        "from Project > Resolution."
     )
+    assert [row.label for row in modal_view.form_rows] == [
+        "fps",
+        "quality",
+        "start",
+        "end",
+    ]
+    assert [row.stepper for row in modal_view.form_rows] == [True, False, True, True]
+    assert _form_value(controls, "fps") == str(DEFAULT_RENDER_FPS)
+    assert _form_value(controls, "quality") == "high"
+    assert _form_value(controls, "start") == "5s"
+    assert _form_value(controls, "end") == "20s"
+
+
+def test_render_dialog_info_names_the_draft_output(tmp_path: Path) -> None:
+    controls = _make_controls(("layer_1",), project_dir=tmp_path, duration_sec=60.0)
+    _prompt_project_render(controls)
+    assert controls.modal_host.view_state().form_info == "(renders/render.mp4)"
+    _focus_form_row(controls, "start")
+    controls.handle_modal_keydown(_keydown(pygame.K_PAGEUP))
+    assert controls.modal_host.view_state().form_info == "(renders/render_10-60s.mp4)"
+
+
+def test_render_dialog_steps_fps_and_range() -> None:
+    controls = _make_controls(("layer_1",), duration_sec=60.0)
+    _prompt_project_render(controls)
+    _focus_form_row(controls, "fps")
+    controls.handle_modal_keydown(_keydown(pygame.K_RIGHT))
+    assert _form_value(controls, "fps") == str(DEFAULT_RENDER_FPS + 1)
+    controls.handle_modal_keydown(_keydown(pygame.K_PAGEDOWN))
+    assert _form_value(controls, "fps") == str(DEFAULT_RENDER_FPS - 4)
+    _focus_form_row(controls, "end")
+    controls.handle_modal_keydown(_keydown(pygame.K_LEFT))
+    assert _form_value(controls, "end") == "59s"
+    controls.handle_modal_keydown(_keydown(pygame.K_RIGHT))
+    controls.handle_modal_keydown(_keydown(pygame.K_RIGHT))
+    assert _form_value(controls, "end") == "60s"
+
+
+def test_render_dialog_keeps_start_before_end() -> None:
+    controls = _make_controls(("layer_1",), duration_sec=60.0)
+    controls.session.project.render.start_sec = 10
+    controls.session.project.render.end_sec = 15
+    _prompt_project_render(controls)
+    _focus_form_row(controls, "start")
+    controls.handle_modal_keydown(_keydown(pygame.K_PAGEUP))
+    assert _form_value(controls, "start") == "20s"
+    assert _form_value(controls, "end") == "21s"
+    _focus_form_row(controls, "end")
+    for _ in range(25):
+        controls.handle_modal_keydown(_keydown(pygame.K_LEFT))
+    assert _form_value(controls, "end") == "1s"
+    assert _form_value(controls, "start") == "0s"
+
+
+def test_render_dialog_cancel_leaves_session_untouched() -> None:
+    controls = _make_controls(("layer_1",), duration_sec=60.0)
+    render = controls.session.project.render
+    _prompt_project_render(controls)
+    _focus_form_row(controls, "fps")
+    controls.handle_modal_keydown(_keydown(pygame.K_PAGEUP))
+    _focus_form_row(controls, "quality")
+    controls.handle_modal_keydown(_keydown(pygame.K_RIGHT))
+    _choose_modal_option(controls, "Cancel")
+    assert render.fps == DEFAULT_RENDER_FPS
+    assert render.quality == "normal"
+    assert not controls.config_dirty
+
+
+@patch("cleave.viz.render.validate_render_project")
+def test_render_dialog_confirm_writes_settings(mock_validate, tmp_path: Path) -> None:
+    mock_validate.return_value = tmp_path
+    controls = _make_controls(("layer_1",), project_dir=tmp_path, duration_sec=60.0)
+    job = _ScriptedRenderJob()
+    _wire_fake_job(controls, tmp_path, job)
+    render = controls.session.project.render
+    _prompt_project_render(controls)
+    _focus_form_row(controls, "fps")
+    controls.handle_modal_keydown(_keydown(pygame.K_PAGEUP))
+    _focus_form_row(controls, "quality")
+    controls.handle_modal_keydown(_keydown(pygame.K_RIGHT))
+    _focus_form_row(controls, "start")
+    controls.handle_modal_keydown(_keydown(pygame.K_PAGEUP))
+    _choose_modal_option(controls, "Render")
+    assert render.fps == DEFAULT_RENDER_FPS + 5
+    assert render.quality == "high"
+    assert render.start_sec == 10
+    assert render.end_sec is None
+    assert controls.config_dirty
+    assert job.spec is not None
+    assert job.spec.fps == DEFAULT_RENDER_FPS + 5
+    assert job.spec.quality == "high"
+    assert job.spec.start_sec == 10
+    assert job.spec.end_sec == 60
+    assert job.spec.output_path == tmp_path / "renders" / "render_10-60s.mp4"
 
 
 def test_render_action_cancel_does_not_start_job(tmp_path: Path) -> None:

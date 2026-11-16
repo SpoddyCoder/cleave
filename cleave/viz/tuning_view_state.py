@@ -23,14 +23,6 @@ from cleave.config_schema.editor import (
     DEFAULT_NAVIGATOR_SIDE,
     DEFAULT_NOTIFICATION_DISPLAY_SEC,
 )
-from cleave.config_schema.project_render import (
-    DEFAULT_PROJECT_RENDER_OUTPUT_LABEL,
-    DEFAULT_PROJECT_RENDER_QUALITY,
-    DEFAULT_PROJECT_RENDER_START_SEC,
-    DEFAULT_RENDER_FPS,
-    default_project_render_path,
-    resolved_project_render_end_sec,
-)
 from cleave.config_schema.project_resolution import (
     DEFAULT_RESOLUTION_HEIGHT,
     DEFAULT_RESOLUTION_WIDTH,
@@ -349,13 +341,8 @@ class SettingsBlock:
 class ProjectBlock:
     milkdrop_beat_sensitivity: float = DEFAULT_BEAT_SENSITIVITY
     compositor_hdr: bool = DEFAULT_COMPOSITOR_HDR
-    quality: str = DEFAULT_PROJECT_RENDER_QUALITY
-    start_sec: int = DEFAULT_PROJECT_RENDER_START_SEC
-    end_sec: int = DEFAULT_PROJECT_RENDER_START_SEC
     width: int = DEFAULT_RESOLUTION_WIDTH
     height: int = DEFAULT_RESOLUTION_HEIGHT
-    fps: int = DEFAULT_RENDER_FPS
-    output_label: str = DEFAULT_PROJECT_RENDER_OUTPUT_LABEL
 
 
 @dataclass
@@ -532,33 +519,13 @@ def _card_block_from_runtime(card: OverlayCardRuntime) -> OverlayCardBlock:
     return OverlayCardBlock(runtime=card)
 
 
-def _project_block_from_session(
-    session: TuningSession,
-    *,
-    duration_sec: float,
-    project_dir: Path | None,
-    project_slug: str,
-) -> ProjectBlock:
-    render = session.project.render
+def _project_block_from_session(session: TuningSession) -> ProjectBlock:
     resolution = session.project.resolution
-    end_sec = resolved_project_render_end_sec(render.end_sec, duration_sec)
-    root = project_dir if project_dir is not None else Path(".")
     return ProjectBlock(
         milkdrop_beat_sensitivity=session.project.milkdrop_beat_sensitivity,
         compositor_hdr=session.project.compositor_hdr,
-        quality=render.quality,
-        start_sec=render.start_sec,
-        end_sec=end_sec,
         width=resolution.width,
         height=resolution.height,
-        fps=render.fps,
-        output_label=default_project_render_path(
-            root,
-            project_slug,
-            start_sec=render.start_sec,
-            end_sec=end_sec,
-            duration_sec=duration_sec,
-        ).as_posix(),
     )
 
 
@@ -579,7 +546,6 @@ class TuningViewStateBuilder:
         config_save: ConfigSaveController,
         get_notification: Callable[[], PanelNotificationActive],
         layers_by_slot: dict[str, StemLayer] | None = None,
-        project_dir: Path | None = None,
     ) -> None:
         self.session = session
         self.playback = playback
@@ -592,7 +558,6 @@ class TuningViewStateBuilder:
         self._config_save = config_save
         self._get_notification = get_notification
         self._layers_by_slot = layers_by_slot
-        self._project_dir = project_dir
         self._auto_display_cache: dict[Path, PresetPlaylist] = {}
         self._preset_list_label_cache: dict[tuple[str, ...], list[str]] = {}
         self._preset_list_marker_cache: dict[
@@ -748,12 +713,7 @@ class TuningViewStateBuilder:
         settings = SettingsBlock(
             editor_mode=self.session.settings.editor_mode,
         )
-        project = _project_block_from_session(
-            self.session,
-            duration_sec=self.duration_sec,
-            project_dir=self._project_dir,
-            project_slug=self._config_save.cfg.project_slug,
-        )
+        project = _project_block_from_session(self.session)
         overlays = OverlaysBlock(
             opening_card=_card_block_from_runtime(ro.opening_card),
             closing_card=_card_block_from_runtime(ro.closing_card),
@@ -1012,12 +972,7 @@ class TuningViewStateBuilder:
                 ui_scale=self._config_save.cfg.editor.ui_scale,
                 residual_latency_ms=self._config_save.cfg.editor.residual_latency_ms,
             ),
-            project=_project_block_from_session(
-                self.session,
-                duration_sec=self.duration_sec,
-                project_dir=self._project_dir,
-                project_slug=self._config_save.cfg.project_slug,
-            ),
+            project=_project_block_from_session(self.session),
             timeline_recording=tl.recording,
             timeline_override_active=bool(tl.override_slots),
             help_visible=self.session.help_visible,

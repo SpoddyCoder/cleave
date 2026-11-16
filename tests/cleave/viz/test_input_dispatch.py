@@ -548,7 +548,7 @@ def test_ctrl_r_runs_render_bare_r_stays_on_timeline() -> None:
     ) is True
     modal_view = runtime.modal_host.view_state()
     assert modal_view is not None
-    assert modal_view.kind == ModalKind.CONFIRM
+    assert modal_view.kind == ModalKind.FORM
     assert runtime.seed.session.timeline.recording is False
 
     runtime = _make_runtime()

@@ -1,4 +1,4 @@
-"""Draw choice controls with ImGui: segments, a combo box, and its open list.
+"""Draw choice controls with ImGui: segments, a combo box, its open list, and a stepper.
 
 Draw only. Callers turn the returned hit rects and ``ChoiceListPointer`` into
 their own mutations, so the inspector and form dialogs share the look.
@@ -14,6 +14,8 @@ from imgui_bundle import imgui
 
 from cleave.viz.choice_layout import (
     COMBO_CARET,
+    STEPPER_BACK,
+    STEPPER_FORWARD,
     Rect,
     choice_list_pad_y,
     choice_list_rects,
@@ -21,6 +23,7 @@ from cleave.viz.choice_layout import (
     rect_contains,
     rect_index_at,
     segment_rects,
+    stepper_arrow_rects,
 )
 from cleave.viz.choice_list import CHOICE_LIST_MAX_VISIBLE, ChoiceListView
 from cleave.viz.imgui_theme import rgba
@@ -38,6 +41,9 @@ from cleave.viz.theme import (
     LOCKED,
     LOCKED_MUTED,
     MUTED,
+    NUDGE_HOVER_BG,
+    NUDGE_HOVER_BG_ALPHA,
+    NUDGE_HOVER_FG,
     VALUE,
 )
 
@@ -206,6 +212,42 @@ def draw_combo(
     draw.add_text(
         _vec(x + w - combo_pad_x() - caret_w, text_y), _u32(caret_role), COMBO_CARET
     )
+
+
+def draw_stepper(
+    draw: imgui.ImDrawList,
+    measure: TextSizer,
+    text: str,
+    *,
+    rect: Rect,
+    at_start: bool,
+    at_end: bool,
+    hover: bool = True,
+) -> tuple[Rect, Rect]:
+    """``< value >`` with the value centred. Returns the back and forward arrows.
+
+    The arrow under the pointer lights like an inspector stepper's. An arrow at
+    its end of the range draws disabled and keeps the arrow pointer.
+    """
+    back, forward = stepper_arrow_rects(measure, rect)
+    mx, my = _mouse()
+    _centred_text(draw, measure, rect, text, VALUE)
+    for arrow, glyph, blocked in (
+        (back, STEPPER_BACK.strip(), at_start),
+        (forward, STEPPER_FORWARD.strip(), at_end),
+    ):
+        lit = hover and not blocked and rect_contains(arrow, mx, my)
+        if lit:
+            x, y, w, h = arrow
+            draw.add_rect_filled(
+                _vec(x, y),
+                _vec(x + w, y + h),
+                _u32(NUDGE_HOVER_BG, NUDGE_HOVER_BG_ALPHA / 255.0),
+            )
+            request_pointer(PointerShape.HAND)
+        role = DISABLED if blocked else (NUDGE_HOVER_FG if lit else MUTED)
+        _centred_text(draw, measure, arrow, glyph, role)
+    return back, forward
 
 
 @dataclass(frozen=True)

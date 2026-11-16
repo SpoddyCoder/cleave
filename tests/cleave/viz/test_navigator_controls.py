@@ -181,7 +181,7 @@ def test_delete_from_a_layer_page_lands_on_a_sibling_layer() -> None:
 def test_reconcile_opens_the_branch_it_lands_on() -> None:
     controls = _make_controls(("layer_1",))
     focus = controls.shell_focus
-    controls.navigator.open_page("project.render")
+    controls.navigator.open_page("project.resolution")
     controls.session.settings.editor_mode = "preset_curation"
     controls.navigator.reconcile()
     assert focus.selected_id == "layers"

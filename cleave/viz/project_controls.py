@@ -5,21 +5,12 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from cleave.config_schema.editor import clamp_beat_sensitivity
-from cleave.config_schema.project_render import (
-    PROJECT_RENDER_QUALITIES,
-    RENDER_FPS_STEP,
-    RENDER_FPS_STEP_LARGE,
-    clamp_render_fps,
-    project_render_duration_ceil_sec,
-    resolved_project_render_end_sec,
-)
 from cleave.config_schema.project_resolution import (
     RESOLUTION_STEP,
     RESOLUTION_STEP_LARGE,
     clamp_resolution_height,
     clamp_resolution_width,
 )
-from cleave.choice import step_choice
 from cleave.viz.session import TuningSession
 
 _BEAT_SENSITIVITY_STEP = 0.1
@@ -27,17 +18,15 @@ _BEAT_SENSITIVITY_LARGE_STEP = 0.5
 
 
 class ProjectControls:
-    """Mutations for Project header, Milkdrop, Compositor, Resolution, and Render rows."""
+    """Mutations for Project header, Milkdrop, Compositor, and Resolution rows."""
 
     def __init__(
         self,
         session: TuningSession,
         *,
-        duration_sec: float,
         on_compositor_format_changed: Callable[[], None] | None = None,
     ) -> None:
         self.session = session
-        self.duration_sec = duration_sec
         self._on_compositor_format_changed = on_compositor_format_changed
 
     def adjust_milkdrop_beat_sensitivity(self, *, forward: bool, large: bool) -> None:
@@ -56,28 +45,6 @@ class ProjectControls:
         if self._on_compositor_format_changed is not None:
             self._on_compositor_format_changed()
 
-    def step_quality(self, *, forward: bool) -> None:
-        render = self.session.project.render
-        render.quality = step_choice(
-            PROJECT_RENDER_QUALITIES, render.quality, 1 if forward else -1
-        )
-
-    def adjust_start(self, *, forward: bool, large: bool) -> None:
-        step = 10 if large else 1
-        delta = step if forward else -step
-        render = self.session.project.render
-        end = resolved_project_render_end_sec(render.end_sec, self.duration_sec)
-        render.start_sec = max(0, min(render.start_sec + delta, end - 1))
-
-    def adjust_end(self, *, forward: bool, large: bool) -> None:
-        step = 10 if large else 1
-        delta = step if forward else -step
-        render = self.session.project.render
-        current = resolved_project_render_end_sec(render.end_sec, self.duration_sec)
-        ceil = project_render_duration_ceil_sec(self.duration_sec)
-        new_end = max(render.start_sec + 1, min(current + delta, ceil))
-        render.end_sec = None if new_end == ceil else new_end
-
     def adjust_width(self, *, forward: bool, large: bool) -> None:
         step = RESOLUTION_STEP_LARGE if large else RESOLUTION_STEP
         delta = step if forward else -step
@@ -89,9 +56,3 @@ class ProjectControls:
         delta = step if forward else -step
         resolution = self.session.project.resolution
         resolution.height = clamp_resolution_height(resolution.height + delta)
-
-    def adjust_fps(self, *, forward: bool, large: bool) -> None:
-        step = RENDER_FPS_STEP_LARGE if large else RENDER_FPS_STEP
-        delta = step if forward else -step
-        render = self.session.project.render
-        render.fps = clamp_render_fps(render.fps + delta)

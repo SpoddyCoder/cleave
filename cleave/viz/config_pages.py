@@ -22,7 +22,6 @@ CONFIG_PAGES: tuple[ConfigPage, ...] = (
     ConfigPage("settings.preview", "Settings", "Preview"),
     ConfigPage("settings.ui", "Settings", "UI"),
     ConfigPage("project.resolution", "Project", "Resolution"),
-    ConfigPage("project.render", "Project", "Render"),
     ConfigPage("project.compositor", "Project", "Compositor"),
     ConfigPage("project.projectm", "Project", "ProjectM"),
 )

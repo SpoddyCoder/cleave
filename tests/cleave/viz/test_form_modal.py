@@ -407,3 +407,95 @@ def test_help_sections_are_empty_without_help_or_form() -> None:
     assert modal.help_sections() == ()
     modal.prompt_confirm("Sure?", "Go", lambda: None)
     assert modal.help_sections() == ()
+
+
+def _stepper_form(modal: ModalHost, changes: list[str] | None = None) -> None:
+    def on_change(field_id: str, values: FormValues) -> None:
+        if changes is not None:
+            changes.append(field_id)
+        if values["low"] > values["high"]:
+            values["high"] = values["low"]
+
+    modal.prompt_form(
+        FormSpec(
+            title="Range",
+            fields=(
+                FormField(
+                    "low",
+                    "low",
+                    tuple(str(n) for n in range(30)),
+                    0,
+                    help=("Low end.",),
+                    stepper=True,
+                    large_step=10,
+                ),
+                FormField(
+                    "high", "high", tuple(str(n) for n in range(30)), 5, stepper=True
+                ),
+                FormField("mode", "mode", ("a", "b")),
+            ),
+            confirm_label="Go",
+            on_confirm=lambda _values: None,
+            on_change=on_change,
+        )
+    )
+
+
+def test_stepper_rows_report_stepper_and_fit_widest_option() -> None:
+    modal = ModalHost()
+    _stepper_form(modal)
+    rows = modal.view_state().form_rows
+    assert [row.stepper for row in rows] == [True, True, False]
+    first = form_control_width(_Measure(), rows[0])
+    modal.step_form_value(0, 15)
+    assert form_control_width(_Measure(), modal.view_state().form_rows[0]) == first
+
+
+def test_page_keys_move_a_stepper_by_its_large_step_and_clamp() -> None:
+    modal = ModalHost()
+    _stepper_form(modal)
+    modal.handle_keydown(keydown(pygame.K_PAGEUP))
+    assert modal.view_state().form_rows[0].value == 10
+    modal.handle_keydown(keydown(pygame.K_PAGEUP))
+    modal.handle_keydown(keydown(pygame.K_PAGEUP))
+    assert modal.view_state().form_rows[0].value == 29
+    modal.handle_keydown(keydown(pygame.K_PAGEDOWN))
+    assert modal.view_state().form_rows[0].value == 19
+
+
+def test_a_stepper_has_no_list() -> None:
+    modal = ModalHost()
+    _stepper_form(modal)
+    modal.handle_keydown(keydown(pygame.K_SPACE))
+    assert modal.view_state().form_choice is None
+    modal.open_form_choice(0)
+    assert modal.view_state().form_choice is None
+
+
+def test_on_change_runs_with_the_field_id_and_may_adjust_other_values() -> None:
+    modal = ModalHost()
+    changes: list[str] = []
+    _stepper_form(modal, changes)
+    modal.handle_keydown(keydown(pygame.K_PAGEUP))
+    rows = modal.view_state().form_rows
+    assert changes == ["low"]
+    assert (rows[0].value, rows[1].value) == (10, 10)
+    apply_modal_pointer(
+        modal,
+        ModalPointerIntent(ModalPointerKind.STEP_FORM_VALUE, index=1, value=1),
+    )
+    assert changes == ["low", "high"]
+    assert modal.view_state().form_rows[1].value == 11
+
+
+def test_help_keys_list_page_step_only_with_a_large_step_and_space_only_with_a_combo() -> None:
+    modal = ModalHost()
+    _stepper_form(modal)
+    (field, dialog) = modal.help_sections()
+    keys = [key for key, _text in dialog.entries]
+    assert "PgUp/PgDn" in keys
+    assert "Space" not in keys
+    _help_form(modal)
+    keys = [key for key, _text in modal.help_sections()[-1].entries]
+    assert "PgUp/PgDn" not in keys
+    assert "Space" not in keys

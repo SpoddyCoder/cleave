@@ -211,10 +211,6 @@ def _expand_project(controls: TuningControls) -> None:
     return None
 
 
-def _expand_project_render(controls: TuningControls) -> None:
-    return None
-
-
 def _save_now(controls: TuningControls) -> None:
     command_by_id("file.save").run(controls)
     assert not controls.modal_host.active
