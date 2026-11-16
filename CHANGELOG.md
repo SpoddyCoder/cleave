@@ -159,6 +159,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- The expand arrow on a navigator row is as wide as the row's on, solo, and lock icons, and washes with the same square under the pointer. Sub-rows indent by one icon so each arrow sits under its parent's name.
 - Startup no longer flashes a "Loading..." message before the open dialog appears; the window opens blank.
 - The Windows editor no longer crashes with an OpenGL "invalid operation" error just after it opens, or when the window or preview size changes.
 - The first separate no longer fails when the Beat This model host refuses the download. Cleave fetches the beat-tracking weights from its own GitHub release first, checks them against a fixed hash, and falls back to the original host. The Demucs stem-split weights also come from Cleave's release first, with Meta's server as the fallback.

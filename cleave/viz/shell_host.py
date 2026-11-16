@@ -579,6 +579,64 @@ def _nav_toggle_fill_side() -> float:
     return _nav_toggle_size() - 2.0
 
 
+def _nav_indent() -> float:
+    """Navigator indent per level: one toggle column, on whole pixels."""
+    return float(round(_nav_toggle_size()))
+
+
+def _nav_icon_square(left_x: float, top_y: float) -> tuple[imgui.ImVec2, imgui.ImVec2]:
+    """Square fill of a navigator icon column whose top-left is given."""
+    half = _nav_toggle_fill_side() * 0.5
+    mid_x = left_x + _nav_toggle_size() * 0.5
+    mid_y = top_y + imgui.get_text_line_height() * 0.5
+    return (
+        imgui.ImVec2(mid_x - half, mid_y - half),
+        imgui.ImVec2(mid_x + half, mid_y + half),
+    )
+
+
+def _draw_nav_icon_hover(square_min: imgui.ImVec2, square_max: imgui.ImVec2) -> None:
+    """Hover wash on a navigator icon: the twisty or a row toggle."""
+    imgui.get_window_draw_list().add_rect_filled(
+        square_min,
+        square_max,
+        imgui.get_color_u32(rgba(NUDGE_HOVER_BG, NUDGE_HOVER_BG_ALPHA / 255.0)),
+    )
+
+
+def _draw_nav_twisty(node: NavNode, twisty: str, selected: bool) -> bool:
+    """Disclosure button at the left of a navigator row. Returns whether pressed.
+
+    It is one toggle column wide and washes like a toggle under the pointer.
+    The cell is a selectable so a selected row's wash runs under it; its own
+    hover slot is cleared so only the square fill marks the pointer.
+    """
+    origin = imgui.get_cursor_screen_pos()
+    width = _nav_toggle_size()
+    clear = imgui.ImVec4(0.0, 0.0, 0.0, 0.0)
+    if not selected:
+        imgui.push_style_color(imgui.Col_.header_hovered, clear)
+        imgui.push_style_color(imgui.Col_.header_active, clear)
+    try:
+        pressed, _selected = imgui.selectable(
+            f"##nav-twisty-{node.id}", selected, 0, imgui.ImVec2(width, 0.0)
+        )
+    finally:
+        if not selected:
+            imgui.pop_style_color(2)
+    hovered = imgui.is_item_hovered()
+    color = rgba(navigator_row_text_color(node, selected=selected, moving=False))
+    if hovered:
+        _draw_nav_icon_hover(*_nav_icon_square(origin.x, origin.y))
+        color = rgba(NUDGE_HOVER_FG)
+        request_pointer(PointerShape.HAND)
+    glyph_x = origin.x + math.floor((width - imgui.calc_text_size(twisty).x) * 0.5)
+    imgui.get_window_draw_list().add_text(
+        imgui.ImVec2(glyph_x, origin.y), imgui.get_color_u32(color), twisty
+    )
+    return pressed
+
+
 def _nav_toggle_overhang() -> float:
     """How far a toggle's square fill reaches above or below its row."""
     return max(0.0, (_nav_toggle_fill_side() - imgui.get_text_line_height()) * 0.5)
@@ -799,7 +857,7 @@ def _draw_nav_tree_lines(
     rect_min = imgui.get_item_rect_min()
     rect_max = imgui.get_item_rect_max()
     line = imgui.get_text_line_height()
-    first_stem_x = math.floor(left_x + imgui.calc_text_size(TWISTY_EXPANDED).x * 0.5)
+    first_stem_x = math.floor(left_x + _nav_toggle_size() * 0.5)
     mid_y = math.floor(_selectable_text_y(rect_min.y) + line * 0.5) + 0.5
     elbow_right_x = row_x - math.floor(imgui.get_style().item_spacing.x * 0.5)
     color = imgui.get_color_u32(rgba(NAVIGATOR_TREE_LINE))
@@ -807,7 +865,7 @@ def _draw_nav_tree_lines(
     for x1, y1, x2, y2 in navigator_tree_lines(
         rails,
         first_stem_x + 0.5,
-        ui_chrome_px(_INSPECTOR_INDENT),
+        _nav_indent(),
         elbow_right_x,
         rect_min.y,
         mid_y,
@@ -2551,7 +2609,9 @@ class ShellHost:
 
     def _draw_nav_node(self, node: NavNode, rails: tuple[bool, ...]) -> None:
         focus = self._controls.shell_focus
-        indent = node.depth * ui_chrome_px(_INSPECTOR_INDENT)
+        # One icon column per level, so a child's twisty sits under its
+        # parent's label and the stem from the parent's twisty has an arm.
+        indent = node.depth * _nav_indent()
         left_x = imgui.get_cursor_screen_pos().x
         if indent:
             imgui.indent(indent)
@@ -2566,25 +2626,14 @@ class ShellHost:
             with _selected_header_wash(selected):
                 twisty = navigator_twisty(node, focus.nav_expanded)
                 if twisty is not None:
-                    width = imgui.calc_text_size(twisty).x
-                    twisty_color = navigator_row_text_color(
-                        node, selected=selected, moving=False
-                    )
-                    row_bright = twisty_color != LABEL
-                    if row_bright:
-                        imgui.push_style_color(imgui.Col_.text, rgba(twisty_color))
-                    try:
-                        twisty_clicked, _selected = imgui.selectable(
-                            f"{twisty}##nav-twisty-{node.id}",
-                            selected,
-                            0,
-                            imgui.ImVec2(width, 0.0),
-                        )
-                        _hand_on_hover()
-                    finally:
-                        if row_bright:
-                            imgui.pop_style_color()
+                    twisty_clicked = _draw_nav_twisty(node, twisty, selected)
                     imgui.same_line()
+                else:
+                    # A leaf's label lines up with its parent's, which sits
+                    # one icon column plus the item gap past the twisty.
+                    imgui.set_cursor_pos_x(
+                        imgui.get_cursor_pos_x() + imgui.get_style().item_spacing.x
+                    )
                 moving = (
                     node.draggable
                     and node.slot is not None
@@ -2667,11 +2716,7 @@ class ShellHost:
             rect_min = imgui.get_item_rect_min()
             hovered = imgui.is_item_hovered()
             color = rgba(navigator_toggle_color(toggle))
-            mid_y = rect_min.y + line * 0.5
-            half = _nav_toggle_fill_side() * 0.5
-            mid_x = rect_min.x + button_width * 0.5
-            square_min = imgui.ImVec2(mid_x - half, mid_y - half)
-            square_max = imgui.ImVec2(mid_x + half, mid_y + half)
+            square_min, square_max = _nav_icon_square(rect_min.x, rect_min.y)
             fill = navigator_toggle_fill(toggle)
             if fill is not None:
                 # A blocked toggle keeps its state readable at half strength.
@@ -2680,13 +2725,7 @@ class ShellHost:
                     square_min, square_max, imgui.get_color_u32(rgba(fill, alpha))
                 )
             if hovered and not toggle.blocked:
-                draw.add_rect_filled(
-                    square_min,
-                    square_max,
-                    imgui.get_color_u32(
-                        rgba(NUDGE_HOVER_BG, NUDGE_HOVER_BG_ALPHA / 255.0)
-                    ),
-                )
+                _draw_nav_icon_hover(square_min, square_max)
                 if fill is None:
                     color = rgba(NUDGE_HOVER_FG)
                 if not toggle.inert:
