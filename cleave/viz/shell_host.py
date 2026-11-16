@@ -200,6 +200,8 @@ _NAV_LOCK_MARK = "[lock]"
 _PAGE_HISTORY_BUTTONS = {6: -1, 7: 1}
 _TITLE_BACK = "back"
 _TITLE_FORWARD = "forward"
+# Pixels the title arrows' hover square reaches past the highlight band.
+_TITLE_BUTTON_HOVER_OUTSET = 0.0
 # Fixed columns, so a row without solo keeps its icons under the rows that have it.
 _NAV_TOGGLE_COLUMNS = (TOGGLE_ENABLED, TOGGLE_SOLO, TOGGLE_LOCK)
 _TRANSPORT_GAP = 16.0
@@ -684,6 +686,25 @@ def _nav_icon_square(left_x: float, top_y: float) -> tuple[imgui.ImVec2, imgui.I
         imgui.ImVec2(mid_x - half, mid_y - half),
         imgui.ImVec2(mid_x + half, mid_y + half),
     )
+
+
+def title_button_square(
+    slot_x: float,
+    slot_w: float,
+    band_y0: float,
+    band_y1: float,
+    outset: float = 0.0,
+) -> tuple[float, float, float, float]:
+    """Hover square of a title line arrow as ``(x0, y0, x1, y1)``.
+
+    The title's highlight band, grown by *outset* on every side, sets the
+    top and bottom; the width matches, centred on the icon slot.
+    """
+    y0 = band_y0 - outset
+    y1 = band_y1 + outset
+    side = y1 - y0
+    x0 = float(round(slot_x + (slot_w - side) * 0.5))
+    return x0, y0, x0 + side, y1
 
 
 def _draw_nav_icon_hover(square_min: imgui.ImVec2, square_max: imgui.ImVec2) -> None:
@@ -1431,7 +1452,9 @@ def _draw_inspector_title(
         )
         if hovered and imgui.is_window_hovered():
             show_tooltip(tooltip)
-    return _draw_title_buttons(buttons, start, slot_xs[len(marks) :], slot_w)
+    return _draw_title_buttons(
+        buttons, start, slot_xs[len(marks) :], slot_w, (bar_y0, bar_y1)
+    )
 
 
 def _draw_title_buttons(
@@ -1439,6 +1462,7 @@ def _draw_title_buttons(
     start: imgui.ImVec2,
     slot_xs: Sequence[float],
     slot_w: float,
+    band: tuple[float, float],
 ) -> str | None:
     """Arrow buttons on the title line, like navigator toggles. A disabled
     button has no hover fill and keeps the arrow pointer."""
@@ -1456,7 +1480,24 @@ def _draw_title_buttons(
         hovered = imgui.is_item_hovered()
         color = VALUE if button.enabled else DISABLED
         if hovered and button.enabled:
-            _draw_nav_icon_hover(*_nav_icon_square(rect_min.x, rect_min.y))
+            x0, y0, x1, y1 = title_button_square(
+                rect_min.x,
+                slot_w,
+                *band,
+                outset=float(round(ui_chrome_px(_TITLE_BUTTON_HOVER_OUTSET))),
+            )
+            # Unclipped like the highlight band, which runs into the padding.
+            win_pos = imgui.get_window_pos()
+            win_size = imgui.get_window_size()
+            draw.push_clip_rect(
+                win_pos,
+                imgui.ImVec2(win_pos.x + win_size.x, win_pos.y + win_size.y),
+                False,
+            )
+            try:
+                _draw_nav_icon_hover(imgui.ImVec2(x0, y0), imgui.ImVec2(x1, y1))
+            finally:
+                draw.pop_clip_rect()
             color = NUDGE_HOVER_FG
             request_pointer(PointerShape.HAND)
         draw.add_text(

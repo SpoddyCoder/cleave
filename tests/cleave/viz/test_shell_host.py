@@ -43,6 +43,7 @@ from cleave.viz.shell_host import (
     inspector_title_cluster,
     page_history_tooltip,
     page_title,
+    title_button_square,
     navigator_height_for_rows,
     navigator_lock_mark,
     navigator_toggle_color,
@@ -617,4 +618,14 @@ def test_page_title_names_a_page_under_a_closed_parent() -> None:
     assert page_title(session, set(), page).endswith("> Compositing")
     assert page_title(session, set(), "settings.ui") == inspector_title(
         build_navigator(session), "settings.ui"
+    )
+
+
+def test_title_button_square_spans_the_highlight_band() -> None:
+    assert title_button_square(100.0, 30.0, 10.0, 34.0) == (103.0, 10.0, 127.0, 34.0)
+    assert title_button_square(100.0, 30.0, 10.0, 34.0, outset=2.0) == (
+        101.0,
+        8.0,
+        129.0,
+        36.0,
     )
