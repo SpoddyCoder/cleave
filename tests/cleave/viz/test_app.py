@@ -21,8 +21,6 @@ from cleave.viz.app import (
     LiveVisualizerRuntime,
     VisualizerApp,
     VisualizerSeed,
-    _live_overlay_ui_active,
-    _timeline_strip_visible,
     init_gl_resources_cheap,
     init_gl_resources_render,
     window_caption,
@@ -44,7 +42,7 @@ from tests.support.viz import make_test_cfg
 def _stub_shell_draw(monkeypatch: pytest.MonkeyPatch) -> None:
     """Loop tests have no ImGui context. The shell stays drawn in the app."""
     monkeypatch.setattr(
-        "cleave.viz.shell_host.draw_shell_frame",
+        "cleave.viz.live_frame_loop.draw_shell_frame",
         lambda *_args, **_kwargs: None,
     )
 
@@ -287,8 +285,8 @@ def _heavy_init_side_effect(
     )
 
 
-@patch("cleave.viz.app.current_sec", return_value=0.0)
-@patch("cleave.viz.app.pygame")
+@patch("cleave.viz.live_frame_loop.current_sec", return_value=0.0)
+@patch("cleave.viz.live_frame_loop.pygame")
 @patch("cleave.viz.app.init_gl_resources_heavy")
 @patch("cleave.viz.app.init_gl_resources_cheap")
 @patch.object(VisualizerApp, "tick_frame")
@@ -356,8 +354,8 @@ def test_run_boot_order_audio_starts_after_first_frame(
     assert call_order.count("loading_screen") >= 1
 
 
-@patch("cleave.viz.app.current_sec", return_value=0.0)
-@patch("cleave.viz.app.pygame")
+@patch("cleave.viz.live_frame_loop.current_sec", return_value=0.0)
+@patch("cleave.viz.live_frame_loop.pygame")
 @patch("cleave.viz.app.init_gl_resources_heavy")
 @patch("cleave.viz.app.init_gl_resources_cheap")
 @patch.object(VisualizerApp, "tick_frame")
@@ -419,8 +417,8 @@ def test_run_pygame_quit_clean_exits_via_try_quit(
     assert isinstance(app._runtime, LiveVisualizerRuntime)
 
 
-@patch("cleave.viz.app.current_sec", return_value=0.0)
-@patch("cleave.viz.app.pygame")
+@patch("cleave.viz.live_frame_loop.current_sec", return_value=0.0)
+@patch("cleave.viz.live_frame_loop.pygame")
 @patch("cleave.viz.app.init_gl_resources_heavy")
 @patch("cleave.viz.app.init_gl_resources_cheap")
 @patch.object(VisualizerApp, "tick_frame")
@@ -480,8 +478,8 @@ def test_run_carries_out_a_fullscreen_request_on_the_window(
     window.sync_minimum_size.assert_called()
 
 
-@patch("cleave.viz.app.current_sec", return_value=0.0)
-@patch("cleave.viz.app.pygame")
+@patch("cleave.viz.live_frame_loop.current_sec", return_value=0.0)
+@patch("cleave.viz.live_frame_loop.pygame")
 @patch("cleave.viz.app.init_gl_resources_heavy")
 @patch("cleave.viz.app.init_gl_resources_cheap")
 @patch.object(VisualizerApp, "tick_frame")
@@ -543,8 +541,8 @@ def test_run_pending_switch_returns_target_and_keeps_compositor(
     assert window.video_quit is not True
 
 
-@patch("cleave.viz.app.current_sec", return_value=0.0)
-@patch("cleave.viz.app.pygame")
+@patch("cleave.viz.live_frame_loop.current_sec", return_value=0.0)
+@patch("cleave.viz.live_frame_loop.pygame")
 @patch("cleave.viz.app.init_gl_resources_heavy")
 @patch("cleave.viz.app.init_gl_resources_cheap")
 @patch.object(VisualizerApp, "tick_frame")
@@ -617,8 +615,8 @@ def test_run_ctrl_q_clean_exits(
     assert controls.request_quit.call_count == 1
 
 
-@patch("cleave.viz.app.current_sec", return_value=0.0)
-@patch("cleave.viz.app.pygame")
+@patch("cleave.viz.live_frame_loop.current_sec", return_value=0.0)
+@patch("cleave.viz.live_frame_loop.pygame")
 @patch("cleave.viz.app.init_gl_resources_heavy")
 @patch("cleave.viz.app.init_gl_resources_cheap")
 @patch.object(VisualizerApp, "tick_frame")
@@ -684,8 +682,8 @@ def test_run_pygame_quit_dirty_stays_open(
     assert isinstance(app._runtime, LiveVisualizerRuntime)
 
 
-@patch("cleave.viz.app.current_sec", return_value=0.0)
-@patch("cleave.viz.app.pygame")
+@patch("cleave.viz.live_frame_loop.current_sec", return_value=0.0)
+@patch("cleave.viz.live_frame_loop.pygame")
 @patch("cleave.viz.app.init_gl_resources_heavy")
 @patch("cleave.viz.app.init_gl_resources_cheap")
 @patch.object(VisualizerApp, "tick_frame")
@@ -746,8 +744,8 @@ def test_run_main_loop_stays_open_without_quit_event(
     controls.try_quit.assert_not_called()
 
 
-@patch("cleave.viz.app.current_sec", return_value=0.0)
-@patch("cleave.viz.app.pygame")
+@patch("cleave.viz.live_frame_loop.current_sec", return_value=0.0)
+@patch("cleave.viz.live_frame_loop.pygame")
 @patch("cleave.viz.app.init_gl_resources_heavy")
 @patch("cleave.viz.app.init_gl_resources_cheap")
 @patch.object(VisualizerApp, "tick_frame")
@@ -786,9 +784,9 @@ def test_run_keeps_open_window_size_on_project_switch(
     mock_init_cheap.assert_called_once_with(seed, dragged, compositor=loading)
 
 
-@patch("cleave.viz.app._tick_frame_live_overlay")
-@patch("cleave.viz.app.current_sec", return_value=0.0)
-@patch("cleave.viz.app.pygame")
+@patch("cleave.viz.live_frame_loop.draw_live_overlay")
+@patch("cleave.viz.live_frame_loop.current_sec", return_value=0.0)
+@patch("cleave.viz.live_frame_loop.pygame")
 @patch("cleave.viz.app.init_gl_resources_heavy")
 @patch("cleave.viz.app.init_gl_resources_cheap")
 @patch.object(VisualizerApp, "tick_frame")
@@ -1188,7 +1186,7 @@ def test_tick_frame_insets_panels_by_full_menu_bar_height(
         timeline_height=None,
         nav_content_height_px=0,
     )
-    app._shell = shell
+    runtime.shell_host = shell
     app.tick_frame(1.0, paused=True, draw_overlay=True, n_pcm=735)
 
     from cleave.viz.shell_menu_bar import menu_bar_height_px
@@ -1210,20 +1208,6 @@ def test_tick_frame_insets_panels_by_full_menu_bar_height(
     runtime.compositor.set_present_rect.assert_called_with(expected.visualiser)
     shell.set_layout.assert_called_once()
     assert shell.set_layout.call_args.args[0].visualiser == expected.visualiser
-
-
-def test_live_overlay_ui_active_follows_the_open_strip() -> None:
-    assert not _live_overlay_ui_active(timeline_strip_visible=False)
-    assert _live_overlay_ui_active(timeline_strip_visible=True)
-
-
-def test_timeline_strip_visible_while_panel_open() -> None:
-    tl = TuningSession(layer_z_order=[], layers={}).timeline
-    tl.enabled = True
-    tl.panel_open = True
-    assert _timeline_strip_visible(tl) is True
-    tl.panel_open = False
-    assert _timeline_strip_visible(tl) is False
 
 
 @patch("cleave.viz.app.OverlayDrawer.draw_timeline")
@@ -1276,67 +1260,6 @@ def test_tick_frame_draws_open_timeline_immediately(
     mock_draw_timeline.assert_called_once()
     assert mock_draw_timeline.call_args.kwargs["visibility"] == 1.0
     assert runtime.seed.session.timeline.panel_open is True
-
-class _FakeWindow:
-    def __init__(self, fullscreen: bool = False) -> None:
-        self.fullscreen = fullscreen
-        self.toggles = 0
-
-    def toggle_fullscreen(self) -> None:
-        self.fullscreen = not self.fullscreen
-        self.toggles += 1
-
-
-@patch("cleave.viz.app.pygame")
-def test_play_full_screen_takes_the_window_fullscreen_and_restores_it(
-    _mock_pygame: MagicMock,
-) -> None:
-    from cleave.viz.app import _apply_window_requests
-    from cleave.viz.window_controls import WindowControls
-
-    controls = WindowControls()
-    window = _FakeWindow()
-    controls.request_play_fullscreen(True)
-    _apply_window_requests(controls, window, prompt_open=False)
-    assert controls.play_fullscreen is True
-    assert window.fullscreen is True
-    assert controls.fullscreen is True
-
-    controls.request_play_fullscreen(False)
-    _apply_window_requests(controls, window, prompt_open=False)
-    assert controls.play_fullscreen is False
-    assert window.fullscreen is False
-    assert window.toggles == 2
-
-
-@patch("cleave.viz.app.pygame")
-def test_play_full_screen_leaves_full_screen_editor_on(_mock_pygame: MagicMock) -> None:
-    from cleave.viz.app import _apply_window_requests
-    from cleave.viz.window_controls import WindowControls
-
-    controls = WindowControls()
-    window = _FakeWindow(fullscreen=True)
-    controls.request_play_fullscreen(True)
-    _apply_window_requests(controls, window, prompt_open=False)
-    controls.request_play_fullscreen(False)
-    _apply_window_requests(controls, window, prompt_open=False)
-    assert window.toggles == 0
-    assert window.fullscreen is True
-
-
-@patch("cleave.viz.app.pygame")
-def test_a_prompt_returns_from_play_full_screen(_mock_pygame: MagicMock) -> None:
-    from cleave.viz.app import _apply_window_requests
-    from cleave.viz.window_controls import WindowControls
-
-    controls = WindowControls()
-    window = _FakeWindow()
-    controls.request_play_fullscreen(True)
-    _apply_window_requests(controls, window, prompt_open=False)
-    _apply_window_requests(controls, window, prompt_open=True)
-    assert controls.play_fullscreen is False
-    assert window.fullscreen is False
-
 
 def test_window_caption_marks_unsaved_changes() -> None:
     assert window_caption("Cleave - song", dirty=False) == "Cleave - song"

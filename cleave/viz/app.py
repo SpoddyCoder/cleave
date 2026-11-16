@@ -27,13 +27,12 @@ from cleave.preset_library import PresetLibrary
 from cleave.preset_playlist import PresetPlaylist
 from cleave.signals import Signals
 from cleave.pcm_io import load_mix_pcm
-from cleave.stem_pcm import StemPcmBank, load_stem_pcm, LIVE_PROJECTM_FPS, samples_for_dt, samples_per_frame
+from cleave.stem_pcm import StemPcmBank, load_stem_pcm, LIVE_PROJECTM_FPS
 from cleave.open_target import OpenTarget
 from cleave.project import load_manifest
 from cleave.viz.bootstrap import load_stem_signals
-from cleave.viz.commands import command_context
 from cleave.viz.controls import TuningControls
-from cleave.viz.session import TimelineRuntime, TuningSession, session_from_cfg
+from cleave.viz.session import TuningSession, session_from_cfg
 from cleave.viz.mix_player import MixPlayer
 from cleave.viz.layer import StemLayer
 from cleave.viz.layer_pipeline import LayerFramePipeline
@@ -43,28 +42,15 @@ from cleave.viz.modal import ModalHost
 from cleave.viz.overlay_draw import OverlayDrawer
 from cleave.viz.loading import LoadingWindow, open_loading_window
 from cleave.viz.theme import set_ui_scale_percent
-from cleave.viz.window_controls import WindowControls
 from cleave.viz.tooltips import set_tooltips_enabled
 from cleave.viz.timeline_controls import TimelineControls
-from cleave.viz.timeline_pointer import TimelinePointer
-from cleave.viz.timeline_time_menu import TimelineTimeMenu
 from cleave.viz.shell_layout import ShellLayout, clamp_timeline_band_height
-from cleave.viz.timeline_overlay import (
-    TimelineOverlay,
-    playback_bar_text,
-    timeline_band_height_px,
-)
-from cleave.viz.playback import PlaybackState, current_sec, init_playback
+from cleave.viz.timeline_overlay import TimelineOverlay, timeline_band_height_px
+from cleave.viz.playback import PlaybackState, init_playback
 from cleave.viz.projectm_frame_clock import ProjectMFrameClock
 from cleave.viz.frame_finish import OverlaysPanelCache, finish_content_frame
 from cleave.viz.overlay_profiler import OverlayProfiler
-from cleave.viz.frame_rate import FrameRateMeter, ProjectMFpsGovernor
 from cleave.viz.shell_focus import ShellRegion
-from cleave.viz.input_dispatch import (
-    dispatch_keydown,
-    dispatch_keyup,
-    dispatch_window_event,
-)
 from cleave.viz.menu_bar import MenuBarState
 from cleave.milk_textures import project_texture_search_paths
 from cleave.viz.user_presets import cleanup_unreferenced_user_presets
@@ -395,42 +381,6 @@ def init_gl_resources_render(
     )
 
 
-def _apply_window_requests(
-    controls: WindowControls, window: LoadingWindow, *, prompt_open: bool
-) -> None:
-    """Carry out Full Screen Editor and Play Full Screen on the GL window.
-
-    A modal, the project picker, or any other prompt while playing full
-    screen returns to the editor so it can be answered.
-    """
-    if controls.consume_fullscreen_toggle() and not controls.play_fullscreen:
-        window.toggle_fullscreen()
-    if prompt_open and controls.play_fullscreen:
-        controls.request_play_fullscreen(False)
-    change = controls.consume_play_fullscreen()
-    if change is True:
-        controls.play_restores_window = not window.fullscreen
-        if controls.play_restores_window:
-            window.toggle_fullscreen()
-        controls.play_fullscreen = True
-    elif change is False:
-        if controls.play_restores_window and window.fullscreen:
-            window.toggle_fullscreen()
-        controls.play_restores_window = False
-        controls.play_fullscreen = False
-    controls.fullscreen = window.fullscreen
-
-
-
-def _live_overlay_ui_active(*, timeline_strip_visible: bool) -> bool:
-    return timeline_strip_visible
-
-
-def _timeline_strip_visible(tl: TimelineRuntime) -> bool:
-    """Show the strip while it is open."""
-    return tl.panel_open
-
-
 def tick_frame_core(
     runtime: VisualizerCore,
     t_sec: float,
@@ -499,12 +449,13 @@ def tick_frame_core(
     return was_paused
 
 
-def _tick_frame_live_overlay(
+def draw_live_overlay(
     runtime: LiveVisualizerRuntime,
     t_sec: float,
     *,
     layout: ShellLayout,
 ) -> None:
+    """Finish the content frame, then compose and upload the open strip."""
     profiler = runtime.overlay_profiler
 
     with profiler.time_section("composite"):
@@ -518,139 +469,134 @@ def _tick_frame_live_overlay(
 
     tap_sync_progress = runtime.controls.tap_sync.showing_progress
     tl = runtime.seed.session.timeline
-    timeline_strip_visible = (
-        not tap_sync_progress
-        and not runtime.controls.window.play_fullscreen
-        and _timeline_strip_visible(tl)
-    )
-
-    if not _live_overlay_ui_active(timeline_strip_visible=timeline_strip_visible):
+    if (
+        tap_sync_progress
+        or runtime.controls.window.play_fullscreen
+        or not tl.panel_open
+    ):
         return
 
-    timeline_state = None
-    if timeline_strip_visible:
-        with profiler.time_section("strip_compose"):
-            signals = runtime.seed.signals
-            tl.strip_view.follow_playhead(
-                t_sec, runtime.seed.duration_sec, paused=runtime.playback.paused
-            )
-            timeline_state = build_timeline_view_state(
-                runtime.seed.session,
-                t_sec,
-                runtime.seed.duration_sec,
-                focus_cursor=runtime.controls.focus_cursor,
-                strip_focused=(
-                    runtime.controls.shell_focus.region is ShellRegion.TIMELINE
-                    and tl.panel_open
-                ),
-                song_marker_page_open=(
-                    runtime.controls.shell_focus.selected_id
-                    == "timeline.song_markers"
-                ),
-                bar_times=signals.downbeat_times if signals is not None else (),
-                beat_times=signals.beat_times if signals is not None else (),
-                paused=runtime.playback.paused,
-            )
-
-    if timeline_state is not None:
-        OverlayDrawer.draw_timeline(
-            runtime.compositor,
-            runtime.timeline_overlay,
-            runtime.overlay_surface,
-            timeline_state,
-            visibility=1.0,
-            profiler=profiler,
-            timeline_rect=layout.timeline,
+    with profiler.time_section("strip_compose"):
+        signals = runtime.seed.signals
+        tl.strip_view.follow_playhead(
+            t_sec, runtime.seed.duration_sec, paused=runtime.playback.paused
         )
+        timeline_state = build_timeline_view_state(
+            runtime.seed.session,
+            t_sec,
+            runtime.seed.duration_sec,
+            focus_cursor=runtime.controls.focus_cursor,
+            strip_focused=(
+                runtime.controls.shell_focus.region is ShellRegion.TIMELINE
+            ),
+            song_marker_page_open=(
+                runtime.controls.shell_focus.selected_id
+                == "timeline.song_markers"
+            ),
+            bar_times=signals.downbeat_times if signals is not None else (),
+            beat_times=signals.beat_times if signals is not None else (),
+            paused=runtime.playback.paused,
+        )
+
+    OverlayDrawer.draw_timeline(
+        runtime.compositor,
+        runtime.timeline_overlay,
+        runtime.overlay_surface,
+        timeline_state,
+        visibility=1.0,
+        profiler=profiler,
+        timeline_rect=layout.timeline,
+    )
 
 
 _NO_PROFILER = OverlayProfiler(enabled=False)
 
 
+def live_shell_layout(runtime: LiveVisualizerRuntime) -> ShellLayout:
+    """Shell regions for this frame, from editor prefs and the shell's drags."""
+    from cleave.viz.shell_menu_bar import menu_bar_height_px
+
+    shell = runtime.shell_host
+    menu_h = int(shell.menu_bar_height_px) if shell is not None else 0
+    transport_h = menu_bar_height_px() if shell is not None else 0
+    timeline_h = 0
+    display_w, display_h = runtime.overlay_surface.get_size()
+    editor = runtime.seed.cfg.editor
+    if (
+        not runtime.controls.tap_sync.showing_progress
+        and runtime.seed.session.timeline.panel_open
+    ):
+        requested_tl = editor.timeline_height
+        if shell is not None and shell.timeline_height is not None:
+            requested_tl = shell.timeline_height
+        timeline_h = clamp_timeline_band_height(
+            requested_tl,
+            timeline_band_height_px(len(runtime.seed.session.layer_z_order)),
+            display_h=display_h,
+            top_h=menu_h + transport_h,
+        )
+    insp_width = editor.inspector_width
+    help_width: int | None = None
+    if runtime.seed.session.help_visible:
+        help_width = editor.help_width
+    nav_content_h: int | None = None
+    navigator_height = editor.navigator_height
+    if shell is not None:
+        if shell.navigator_height is not None:
+            navigator_height = shell.navigator_height
+        if shell.insp_width is not None:
+            insp_width = shell.insp_width
+        if help_width is not None and shell.help_width is not None:
+            help_width = shell.help_width
+        measured = shell.nav_content_height_px
+        if measured > 0:
+            nav_content_h = measured
+    return ShellLayout.compute(
+        display_w,
+        display_h,
+        menu_h,
+        transport_h,
+        timeline_h,
+        insp_width=insp_width,
+        help_width=help_width,
+        nav_content_h=nav_content_h,
+        navigator_height=navigator_height,
+        navigator_side=editor.navigator_side,
+        help_side=editor.help_side,
+    )
+
+
+def publish_shell_layout(runtime: LiveVisualizerRuntime, layout: ShellLayout) -> None:
+    """Hand the layout to the shell, and the visualiser rect to the compositor."""
+    shell = runtime.shell_host
+    if shell is None:
+        runtime.compositor.set_present_rect(None)
+        runtime.controls.visualiser_resolution.note_draw_rect(None)
+        return
+    shell.set_layout(layout)
+    runtime.controls.settings.note_shell_stack(
+        layout.navigator[3], layout.navigator[3] + layout.inspector[3]
+    )
+    present = layout.visualiser
+    if runtime.controls.window.play_fullscreen:
+        display_w, display_h = runtime.overlay_surface.get_size()
+        present = (0, 0, display_w, display_h)
+    runtime.compositor.set_present_rect(present)
+    runtime.controls.visualiser_resolution.note_draw_rect(present)
+
+
+def begin_live_frame(runtime: LiveVisualizerRuntime) -> ShellLayout:
+    """Compute and publish this frame's shell layout."""
+    layout = live_shell_layout(runtime)
+    publish_shell_layout(runtime, layout)
+    return layout
+
+
 class VisualizerApp:
     def __init__(self, runtime: VisualizerSeed | VisualizerCore) -> None:
         self._runtime = runtime
-        self._overlay_dt = 0.0
         self._was_paused: bool | None = None
         self._pm_clock = ProjectMFrameClock()
-        self._shell: ShellHost | None = None
-
-    def _live_shell_layout(self, runtime: LiveVisualizerRuntime) -> ShellLayout:
-        from cleave.viz.shell_menu_bar import menu_bar_height_px
-
-        shell = self._shell
-        menu_h = int(shell.menu_bar_height_px) if shell is not None else 0
-        transport_h = menu_bar_height_px() if shell is not None else 0
-        timeline_h = 0
-        display_w, display_h = runtime.overlay_surface.get_size()
-        tl = runtime.seed.session.timeline
-        if not runtime.controls.tap_sync.showing_progress and _timeline_strip_visible(
-            tl
-        ):
-            requested_tl = runtime.seed.cfg.editor.timeline_height
-            if shell is not None:
-                if shell.timeline_height is not None:
-                    requested_tl = shell.timeline_height
-            timeline_h = clamp_timeline_band_height(
-                requested_tl,
-                timeline_band_height_px(len(runtime.seed.session.layer_z_order)),
-                display_h=display_h,
-                top_h=menu_h + transport_h,
-            )
-        editor = runtime.seed.cfg.editor
-        insp_width = editor.inspector_width
-        help_width: int | None = None
-        if runtime.seed.session.help_visible:
-            help_width = editor.help_width
-        nav_content_h: int | None = None
-        navigator_height = editor.navigator_height
-        if shell is not None:
-            if shell.navigator_height is not None:
-                navigator_height = shell.navigator_height
-            if shell.insp_width is not None:
-                insp_width = shell.insp_width
-            if help_width is not None and shell.help_width is not None:
-                help_width = shell.help_width
-            measured = shell.nav_content_height_px
-            if measured > 0:
-                nav_content_h = measured
-        return ShellLayout.compute(
-            display_w,
-            display_h,
-            menu_h,
-            transport_h,
-            timeline_h,
-            insp_width=insp_width,
-            help_width=help_width,
-            nav_content_h=nav_content_h,
-            navigator_height=navigator_height,
-            navigator_side=editor.navigator_side,
-            help_side=editor.help_side,
-        )
-
-    def _publish_shell_layout(
-        self, runtime: LiveVisualizerRuntime, layout: ShellLayout
-    ) -> None:
-        shell = self._shell
-        if shell is None:
-            runtime.compositor.set_present_rect(None)
-            runtime.controls.visualiser_resolution.note_draw_rect(None)
-            return
-        shell.set_layout(layout)
-        runtime.controls.settings.note_shell_stack(
-            layout.navigator[3], layout.navigator[3] + layout.inspector[3]
-        )
-        present = layout.visualiser
-        if runtime.controls.window.play_fullscreen:
-            display_w, display_h = runtime.overlay_surface.get_size()
-            present = (0, 0, display_w, display_h)
-        runtime.compositor.set_present_rect(present)
-        runtime.controls.visualiser_resolution.note_draw_rect(present)
-
-    def _begin_live_frame(self, runtime: LiveVisualizerRuntime) -> ShellLayout:
-        layout = self._live_shell_layout(runtime)
-        self._publish_shell_layout(runtime, layout)
-        return layout
 
     def tick_frame(
         self,
@@ -682,13 +628,8 @@ class VisualizerApp:
                     "draw_overlay=True requires LiveVisualizerRuntime"
                 )
             if layout is None:
-                layout = self._live_shell_layout(self._runtime)
-                self._publish_shell_layout(self._runtime, layout)
-            _tick_frame_live_overlay(
-                self._runtime,
-                t_sec,
-                layout=layout,
-            )
+                layout = begin_live_frame(self._runtime)
+            draw_live_overlay(self._runtime, t_sec, layout=layout)
 
     def run(self, window: LoadingWindow | None = None) -> OpenTarget | None:
         """Run one live session on an already-open loading window.
@@ -702,15 +643,11 @@ class VisualizerApp:
         seed = self._runtime
         if window is None:
             window = open_loading_window()
-        caption = window_caption(seed.window_title, dirty=False)
-        pygame.display.set_caption(caption)
+        pygame.display.set_caption(window_caption(seed.window_title, dirty=False))
         set_ui_scale_percent(seed.cfg.editor.ui_scale)
         set_tooltips_enabled(seed.cfg.editor.show_tooltips)
-        clock = pygame.time.Clock()
 
         rt: LiveVisualizerRuntime | None = None
-        shell = None
-        switch_target: OpenTarget | None = None
         try:
             compositor, post_process, masked_compositor, overlay_surface = (
                 init_gl_resources_cheap(
@@ -738,220 +675,20 @@ class VisualizerApp:
             if window.quit_requested:
                 return None
 
-            from imgui_bundle import imgui
+            # The loop module imports ImGui, which offline render never needs.
+            from cleave.viz.live_frame_loop import LiveFrameLoop
 
-            from cleave.viz.file_picker_surface import FilePickerSurface
-            from cleave.viz.modal import ModalKind
-            from cleave.viz.modal_surface import (
-                ImGuiTextMeasure,
-                ModalSurface,
-                apply_modal_pointer,
-                text_field_wrap,
-            )
-            from cleave.viz.preview_context_menu import (
-                play_fullscreen_menu,
-                preview_menu,
-            )
-            from cleave.viz.shell_host import ShellHost, draw_shell_frame
-            from cleave.viz.shell_menu_bar import menu_bar_height_px
-            from cleave.viz.shell_transport import TransportReadout
-            from cleave.viz.tap_sync_controls import tap_sync_info_panel
-            from cleave.viz.top_layer import InfoPanelSurface
-
-            assert window.imgui is not None
-            strip_pointer = TimelinePointer(
-                rt.timeline_overlay,
-                rt.timeline_controls,
-                rt.seed.session,
-                time_menu=TimelineTimeMenu(rt.controls, rt.timeline_controls),
-            )
-            shell = ShellHost(
-                window.imgui,
-                rt.menu_bar,
-                rt.controls,
-                menu_bar_height_px(),
-                strip_pointer=strip_pointer,
-                preview_menu=preview_menu(rt.controls, rt.timeline_controls),
-                play_menu=play_fullscreen_menu(rt.controls, rt.timeline_controls),
-                profiler=rt.overlay_profiler,
-            )
-            self._shell = shell
-            rt.shell_host = shell
-
-            display_fps: list[float | None] = [None]
-
-            def draw_ui() -> None:
-                assert shell is not None
-                if rt.controls.window.play_fullscreen:
-                    # Only the visualiser shows, plus an open right-click menu.
-                    shell.draw_play_frame(self._overlay_dt)
-                    return
-                notice = rt.controls.notification_active()
-                if rt.controls.tap_sync.showing_progress:
-                    progress = rt.controls.tap_sync.progress_view()
-                    if progress is not None:
-                        shell.top_layer.push(
-                            InfoPanelSurface(tap_sync_info_panel(progress))
-                        )
-                modal_surface: ModalSurface | None = None
-                picker_surface: FilePickerSurface | None = None
-                if rt.modal_host.active:
-                    modal_view = rt.modal_host.view_state()
-                    if modal_view is not None:
-                        modal_surface = ModalSurface(
-                            modal_view,
-                            ImGuiTextMeasure(),
-                            passthrough=shell.top_layer.lifted_rects,
-                        )
-                        shell.top_layer.push(modal_surface)
-                elif rt.controls.project_switch.active:
-                    picker_view = rt.controls.project_switch.view_state()
-                    if picker_view is not None:
-                        picker_surface = FilePickerSurface(picker_view)
-                        shell.top_layer.push(picker_surface)
-                position = current_sec(rt.playback, rt.seed.duration_sec)
-                readout = TransportReadout(
-                    paused=rt.playback.paused,
-                    position_sec=position,
-                    duration_sec=rt.seed.duration_sec,
-                    bar_text=playback_bar_text(
-                        position,
-                        ()
-                        if rt.seed.signals is None
-                        else rt.seed.signals.downbeat_times,
-                    ),
-                    fps=display_fps[0],
-                )
-                draw_shell_frame(
-                    shell,
-                    rt.menu_bar,
-                    command_context(rt.controls),
-                    self._overlay_dt,
-                    readout,
-                    notice,
-                )
-                if (
-                    shell.transport_notice_clicked
-                    and not shell.top_layer.modal_active
-                ):
-                    rt.controls.dismiss_notification()
-                if modal_surface is not None and modal_surface.intent is not None:
-                    apply_modal_pointer(rt.modal_host, modal_surface.intent)
-                if picker_surface is not None and picker_surface.intent is not None:
-                    rt.controls.project_switch.apply_pointer(picker_surface.intent)
-                shown = rt.modal_host.view_state()
-                if shown is not None and shown.kind == ModalKind.TEXT:
-                    display_w = max(1, int(imgui.get_io().display_size.x))
-                    rt.modal_host.set_text_field_wrap(text_field_wrap(display_w))
-                else:
-                    rt.modal_host.set_text_field_wrap(None)
-
-            self.tick_frame(
-                0.0,
-                paused=False,
-                n_pcm=samples_per_frame(LIVE_PROJECTM_FPS),
-                dt_sec=0.0,
-                layout=self._begin_live_frame(rt),
-            )
-            draw_ui()
-            pygame.display.flip()
+            loop = LiveFrameLoop(rt, window, self.tick_frame)
+            loop.draw_first_frame()
             rt.mix_player.start()
-
-            running = True
-            frame_rate = FrameRateMeter()
-            pm_fps_governor = ProjectMFpsGovernor(nominal_fps=LIVE_PROJECTM_FPS)
-            measured_fps: float | None = None
-            profiler = rt.overlay_profiler
-            while running:
-                frame_rate.begin_frame()
-                with profiler.time_section("events"):
-                    for event in pygame.event.get():
-                        window.note_event(event)
-                        dispatch_window_event(event, rt)
-                        if rt.controls.window.play_fullscreen:
-                            shell.process_play_event(event)
-                        else:
-                            shell.process_event(event)
-                        if event.type == pygame.QUIT:
-                            if rt.controls.try_quit():
-                                running = False
-                        elif event.type == pygame.KEYDOWN:
-                            if dispatch_keydown(event, rt) is False:
-                                running = False
-                        elif event.type == pygame.KEYUP:
-                            dispatch_keyup(event, rt)
-                        elif event.type == pygame.TEXTINPUT:
-                            if not rt.controls.inline_edit.handle_text_input(
-                                event.text
-                            ):
-                                rt.modal_host.handle_text_input(event.text)
-
-                    _apply_window_requests(
-                        rt.controls.window,
-                        window,
-                        prompt_open=(
-                            rt.modal_host.active or rt.controls.project_switch.active
-                        ),
-                    )
-                    window.sync_minimum_size()
-
-                if rt.controls.consume_pending_exit():
-                    running = False
-                elif rt.controls.consume_pending_switch():
-                    switch_target = rt.controls.project_switch.take_accepted()
-                    running = False
-
-                self._overlay_dt = clock.tick() / 1000.0
-                with profiler.time_section("tick"):
-                    rt.controls.tick(self._overlay_dt)
-                    rt.timeline_controls.tick(self._overlay_dt)
-                    strip_pointer.tick()
-                    rt.modal_host.tick(self._overlay_dt)
-                    next_caption = window_caption(
-                        seed.window_title, dirty=rt.controls.config_dirty
-                    )
-                    if next_caption != caption:
-                        caption = next_caption
-                        pygame.display.set_caption(caption)
-
-                if window.apply_pending_resize():
-                    rt.overlay_surface = window.overlay_surface
-                t_sec = current_sec(rt.playback, rt.seed.duration_sec)
-                layout = self._begin_live_frame(rt)
-                if rt.controls.project_render.busy:
-                    with profiler.time_section("composite"):
-                        rt.compositor.present_content()
-                    _tick_frame_live_overlay(
-                        rt,
-                        t_sec,
-                        layout=layout,
-                    )
-                else:
-                    pm_fps_governor.observe(measured_fps)
-                    pm_fps_governor.apply_if_changed(rt.layers)
-                    profiler.note_projectm_fps(pm_fps_governor.target_fps)
-                    self.tick_frame(
-                        t_sec,
-                        paused=rt.playback.paused,
-                        n_pcm=samples_for_dt(self._overlay_dt),
-                        dt_sec=self._overlay_dt,
-                        layout=layout,
-                    )
-                    rt.controls.still_capture.after_frame(rt.compositor)
-
-                display_fps[0] = frame_rate.display_fps
-                with profiler.time_section("ui_build"):
-                    draw_ui()
-                with profiler.time_section("flip"):
-                    pygame.display.flip()
-                profiler.end_frame()
-                measured_fps = frame_rate.end_frame()
-            return switch_target
+            while loop.running:
+                loop.run_frame()
+            return loop.switch_target
 
         finally:
             if rt is not None:
                 rt.compositor.set_present_rect(None)
-            self._shell = None
+                rt.shell_host = None
             window.release_imgui()
             if rt is not None:
                 persist_editor_settings(rt.seed.cfg)
