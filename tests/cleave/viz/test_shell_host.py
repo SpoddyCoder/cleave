@@ -39,6 +39,7 @@ from cleave.viz.shell_host import (
     navigator_height_for_rows,
     navigator_lock_mark,
     navigator_toggle_color,
+    navigator_toggle_fill,
     navigator_toggle_glyph,
     navigator_toggle_tooltip,
     navigator_toggle_x,
@@ -62,9 +63,12 @@ from cleave.viz.theme import (
     VALUE,
     FOCUS_WASH_ALPHA,
     HIGHLIGHT,
-    LOCK_ICON,
     LOCKED,
     MUTED,
+    NAV_LOCK_BG,
+    NAV_LOCK_GLYPH,
+    NAV_ON_BG,
+    SOLO_BG,
 )
 from tests.cleave.viz.test_controls import _make_controls
 
@@ -173,9 +177,16 @@ def test_navigator_toggle_presentation() -> None:
     assert navigator_toggle_glyph(solo) == SOLO_GLYPH
     assert navigator_toggle_color(on) == VALUE
     assert navigator_toggle_color(off) == MUTED
-    assert navigator_toggle_color(blocked) == LOCKED
-    assert navigator_toggle_color(locked) == LOCK_ICON
+    assert navigator_toggle_color(blocked) == VALUE
+    assert navigator_toggle_color(NavToggle(TOGGLE_ENABLED, False, True)) == LOCKED
+    assert navigator_toggle_color(locked) == NAV_LOCK_GLYPH
     assert navigator_toggle_color(unlocked) == MUTED
+    assert navigator_toggle_fill(on) == NAV_ON_BG
+    assert navigator_toggle_fill(off) is None
+    assert navigator_toggle_fill(blocked) == NAV_ON_BG
+    assert navigator_toggle_fill(solo) == SOLO_BG
+    assert navigator_toggle_fill(locked) == NAV_LOCK_BG
+    assert navigator_toggle_fill(unlocked) is None
     assert navigator_toggle_tooltip(off) == "Off: click to turn on"
     inert = NavToggle(TOGGLE_ENABLED, True, inert=True)
     assert navigator_toggle_tooltip(inert) == "Timeline controls layer visibility"

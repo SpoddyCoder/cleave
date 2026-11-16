@@ -130,6 +130,9 @@ from cleave.viz.theme import (
     LOCKED,
     MOVE_MODE,
     MUTED,
+    NAV_LOCK_BG,
+    NAV_LOCK_GLYPH,
+    NAV_ON_BG,
     NAVIGATOR_BORDER,
     NAVIGATOR_TREE_LINE,
     NOTIFICATION_ON_FILL,
@@ -140,6 +143,7 @@ from cleave.viz.theme import (
     PRESET_FILE_ICON,
     PRESET_ICON,
     ROW_FOCUS_BORDER,
+    SOLO_BG,
     TRANSPORT_RULE,
     VALUE,
     tuning_ui_metrics,
@@ -313,15 +317,24 @@ def navigator_toggle_glyph(toggle: NavToggle) -> str:
     return POWER_GLYPH
 
 
+def navigator_toggle_fill(toggle: NavToggle) -> tuple[int, int, int] | None:
+    """Solid square behind a lit toggle: green on, red solo, amber lock."""
+    if toggle.id == TOGGLE_ADD or not toggle.active:
+        return None
+    if toggle.id == TOGGLE_LOCK:
+        return NAV_LOCK_BG
+    if toggle.id == TOGGLE_SOLO:
+        return SOLO_BG
+    return NAV_ON_BG
+
+
 def navigator_toggle_color(toggle: NavToggle) -> tuple[int, int, int]:
-    """Resting icon color. Muted while inactive, so a lit icon stands out."""
+    """Resting icon color. Muted while inactive; a lit icon sits on its fill."""
     if toggle.id == TOGGLE_ADD:
         return DISABLED if toggle.blocked else VALUE
-    if toggle.blocked:
-        return LOCKED
     if not toggle.active:
-        return MUTED
-    return LOCK_ICON if toggle.id == TOGGLE_LOCK else VALUE
+        return LOCKED if toggle.blocked else MUTED
+    return NAV_LOCK_GLYPH if toggle.id == TOGGLE_LOCK else VALUE
 
 
 def navigator_toggle_tooltip(toggle: NavToggle) -> str:
@@ -2574,16 +2587,28 @@ class ShellHost:
             rect_min = imgui.get_item_rect_min()
             hovered = imgui.is_item_hovered()
             color = rgba(navigator_toggle_color(toggle))
-            if hovered and not toggle.blocked:
-                mid_y = rect_min.y + line * 0.5
+            mid_y = rect_min.y + line * 0.5
+            square_min = imgui.ImVec2(rect_min.x, mid_y - button_width * 0.5)
+            square_max = imgui.ImVec2(
+                rect_min.x + button_width, mid_y + button_width * 0.5
+            )
+            fill = navigator_toggle_fill(toggle)
+            if fill is not None:
+                # A blocked toggle keeps its state readable at half strength.
+                alpha = 0.5 if toggle.blocked else 1.0
                 draw.add_rect_filled(
-                    imgui.ImVec2(rect_min.x, mid_y - button_width * 0.5),
-                    imgui.ImVec2(rect_min.x + button_width, mid_y + button_width * 0.5),
+                    square_min, square_max, imgui.get_color_u32(rgba(fill, alpha))
+                )
+            if hovered and not toggle.blocked:
+                draw.add_rect_filled(
+                    square_min,
+                    square_max,
                     imgui.get_color_u32(
                         rgba(NUDGE_HOVER_BG, NUDGE_HOVER_BG_ALPHA / 255.0)
                     ),
                 )
-                color = rgba(NUDGE_HOVER_FG)
+                if fill is None:
+                    color = rgba(NUDGE_HOVER_FG)
                 if not toggle.inert:
                     request_pointer(PointerShape.HAND)
             glyph = navigator_toggle_glyph(toggle)

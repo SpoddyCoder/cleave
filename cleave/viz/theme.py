@@ -17,6 +17,8 @@ Buttons (fills, not text roles):
     segment, combo box, and open combo list
   BUTTON_PRIMARY_BG - the confirm button of a dialog, and a selected segment
   BUTTON_DANGER_BG - the confirm button of a destructive dialog
+  NAV_ON_BG, SOLO_BG, NAV_LOCK_BG - lit navigator on, solo, and lock icons
+    (NAV_LOCK_GLYPH is the dark lock icon on its amber fill)
 
 Shell rules (not text roles):
   TRANSPORT_RULE — dark rule under the transport bar
@@ -226,6 +228,9 @@ LOCK_ICON: tuple[int, int, int] = (235, 90, 90)
 LOCKED: tuple[int, int, int] = (235, 150, 150)
 SOLO_BG: tuple[int, int, int] = (200, 40, 40)
 OVERRIDE_BG: tuple[int, int, int] = (255, 200, 60)
+NAV_ON_BG: tuple[int, int, int] = (40, 140, 75)
+NAV_LOCK_BG: tuple[int, int, int] = (225, 140, 40)
+NAV_LOCK_GLYPH: tuple[int, int, int] = (0, 0, 0)
 CONFIG_DIRTY: tuple[int, int, int] = (255, 255, 0)
 ARMED_BG: tuple[int, int, int] = SOLO_BG
 BUTTON_BG: tuple[int, int, int] = (48, 54, 66)
