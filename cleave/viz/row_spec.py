@@ -57,6 +57,8 @@ class RowChoice:
 
     ``labels`` are the options as shown, in order; ``index`` is the current one.
     Up to three options draw as segments, more as a combo (``choice_kind``).
+    ``combo`` draws a combo whatever the count, for options too long to sit
+    side by side.
     ``jump`` moves by any number of options in one change. Without it, a pick
     steps through ``apply_horizontal`` one option at a time, which suits rows
     with few options and no costly side effect.
@@ -65,12 +67,16 @@ class RowChoice:
     labels: Callable[[], tuple[str, ...]]
     index: Callable[[TuningViewState, RowDescriptor], int]
     jump: ChoiceJump | None = None
+    combo: bool = False
+
+    def kind(self) -> ChoiceKind:
+        return choice_kind(len(self.labels()), combo=self.combo)
 
 
 def row_choice_kind(kind: RowKind) -> ChoiceKind | None:
     """Segments or combo for a choice row; None for any other row."""
     choice = ROW_SPECS[kind].choice
-    return None if choice is None else choice_kind(len(choice.labels()))
+    return None if choice is None else choice.kind()
 
 
 @dataclass(frozen=True)

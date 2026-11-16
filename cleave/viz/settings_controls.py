@@ -9,6 +9,7 @@ from cleave.config import CleaveConfig, EditorPreviewQuality
 from cleave.config_schema.editor import (
     COLUMN_SIDES,
     EDITOR_PREVIEW_QUALITIES,
+    NAVIGATOR_EXPAND_CLICKS,
     clamp_residual_latency_ms,
     clamp_navigator_height,
     clamp_timeline_height,
@@ -82,6 +83,14 @@ class SettingsControls:
 
     def step_help_side(self, *, forward: bool) -> None:
         self._step_column_side("help_side", forward=forward)
+
+    def step_navigator_expand_click(self, *, forward: bool) -> None:
+        current = self.cfg.editor.navigator_expand_click
+        new_mode = step_choice(NAVIGATOR_EXPAND_CLICKS, current, 1 if forward else -1)
+        if new_mode == current:
+            return
+        self.cfg.editor = replace(self.cfg.editor, navigator_expand_click=new_mode)
+        persist_editor_settings(self.cfg)
 
     def set_highlight_new_page(self, on: bool) -> None:
         if self.cfg.editor.highlight_new_page == on:

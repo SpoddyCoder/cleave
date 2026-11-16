@@ -2,7 +2,7 @@
 
 Every choice clamps at its ends. Ordered lists run low to high, so a forward
 step means more. ``choice_kind`` picks how a choice is shown from its option
-count alone.
+count, unless the choice asks for a combo.
 """
 
 from __future__ import annotations
@@ -22,8 +22,9 @@ class ChoiceKind(Enum):
     COMBO = "combo"
 
 
-def choice_kind(option_count: int) -> ChoiceKind:
-    if option_count <= SEGMENT_MAX_OPTIONS:
+def choice_kind(option_count: int, *, combo: bool = False) -> ChoiceKind:
+    """Segments for a few options, else a combo. *combo* forces a combo."""
+    if not combo and option_count <= SEGMENT_MAX_OPTIONS:
         return ChoiceKind.SEGMENT
     return ChoiceKind.COMBO
 

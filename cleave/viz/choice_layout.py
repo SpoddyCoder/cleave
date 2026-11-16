@@ -53,8 +53,10 @@ def combo_width(measure: TextSizer, labels: Sequence[str]) -> int:
     return widest + caret + combo_pad_x() * 2
 
 
-def choice_width(measure: TextSizer, labels: Sequence[str]) -> int:
-    if choice_kind(len(labels)) is ChoiceKind.SEGMENT:
+def choice_width(
+    measure: TextSizer, labels: Sequence[str], *, combo: bool = False
+) -> int:
+    if choice_kind(len(labels), combo=combo) is ChoiceKind.SEGMENT:
         return sum(segment_widths(measure, labels))
     return combo_width(measure, labels)
 

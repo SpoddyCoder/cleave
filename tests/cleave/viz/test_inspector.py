@@ -192,6 +192,7 @@ def test_settings_pages() -> None:
         RowKind.SETTINGS_UI_SHOW_TOOLTIPS,
         RowKind.SETTINGS_UI_NAVIGATOR_HEIGHT,
         RowKind.SETTINGS_NAVIGATOR_SIDE,
+        RowKind.SETTINGS_NAVIGATOR_EXPAND_CLICK,
         RowKind.SETTINGS_HELP_SIDE,
     ]
 

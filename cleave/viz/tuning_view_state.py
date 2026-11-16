@@ -17,6 +17,7 @@ from cleave.config_schema.editor import (
     DEFAULT_HELP_SIDE,
     DEFAULT_HIGHLIGHT_NEW_PAGE,
     DEFAULT_SHOW_TOOLTIPS,
+    DEFAULT_NAVIGATOR_EXPAND_CLICK,
     DEFAULT_NAVIGATOR_HEIGHT,
     DEFAULT_UI_SCALE,
     DEFAULT_NAVIGATOR_SIDE,
@@ -335,6 +336,7 @@ class SettingsBlock:
     preview_quality: str = DEFAULT_EDITOR_PREVIEW_QUALITY
     navigator_side: str = DEFAULT_NAVIGATOR_SIDE
     help_side: str = DEFAULT_HELP_SIDE
+    navigator_expand_click: str = DEFAULT_NAVIGATOR_EXPAND_CLICK
     highlight_new_page: bool = DEFAULT_HIGHLIGHT_NEW_PAGE
     show_tooltips: bool = DEFAULT_SHOW_TOOLTIPS
     notification_display_sec: int = DEFAULT_NOTIFICATION_DISPLAY_SEC
@@ -998,6 +1000,9 @@ class TuningViewStateBuilder:
                 preview_quality=self._config_save.cfg.editor.preview_quality,
                 navigator_side=self._config_save.cfg.editor.navigator_side,
                 help_side=self._config_save.cfg.editor.help_side,
+                navigator_expand_click=(
+                    self._config_save.cfg.editor.navigator_expand_click
+                ),
                 highlight_new_page=self._config_save.cfg.editor.highlight_new_page,
                 show_tooltips=self._config_save.cfg.editor.show_tooltips,
                 notification_display_sec=(

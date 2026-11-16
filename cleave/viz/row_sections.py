@@ -143,6 +143,8 @@ SETTINGS_UI_SECTION = SectionDef(
         SectionNode(divider=True),
         SectionNode(leaf_kind=RowKind.SETTINGS_UI_NAVIGATOR_HEIGHT),
         SectionNode(leaf_kind=RowKind.SETTINGS_NAVIGATOR_SIDE),
+        SectionNode(leaf_kind=RowKind.SETTINGS_NAVIGATOR_EXPAND_CLICK),
+        SectionNode(divider=True),
         SectionNode(leaf_kind=RowKind.SETTINGS_HELP_SIDE),
     ),
 )

@@ -9,7 +9,7 @@ import pygame
 from cleave.viz.commands import command_by_id, command_context
 from cleave.viz.inspector import InspectorRow, build_inspector_rows
 from cleave.viz.row_hotkeys import handle_row_hotkey, node_control_descriptor
-from cleave.choice import ChoiceKind, choice_kind
+from cleave.choice import ChoiceKind
 from cleave.viz.choice_list import ChoiceListState
 from cleave.viz.row_spec import (
     REPEAT_ROW_KINDS,
@@ -129,7 +129,7 @@ class InspectorControls:
         if not row_available(view, desc):
             return
         labels = choice.labels()
-        if choice_kind(len(labels)) is not ChoiceKind.COMBO:
+        if choice.kind() is not ChoiceKind.COMBO:
             return
         start = choice.index(view, desc)
         self._controls.inline_edit.begin_choice(

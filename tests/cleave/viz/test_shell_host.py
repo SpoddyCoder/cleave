@@ -58,6 +58,7 @@ from cleave.viz.shell_host import (
     path_row_icon,
     scroll_clip_span,
     selectable_wash,
+    navigator_label_click,
     selection_after_nav_collapse,
 )
 from cleave.viz.material_icons import FILE_GLYPH, FOLDER_GLYPH
@@ -529,3 +530,61 @@ def test_choice_tone_follows_row_value_colour() -> None:
     assert choice_tone(VALUE) is ChoiceTone.NORMAL
     assert choice_tone(DISABLED) is ChoiceTone.OFF
     assert choice_tone(LOCKED) is ChoiceTone.LOCKED
+
+
+def _label_click(mode: str, *, expanded: bool, clicked: bool = False,
+                 double_pressed: bool = False, opened_by_click: str | None = None,
+                 swallowing: bool = False, expandable: bool = True):
+    return navigator_label_click(
+        mode,
+        "layers",
+        expandable=expandable,
+        expanded=expanded,
+        clicked=clicked,
+        double_pressed=double_pressed,
+        opened_by_click=opened_by_click,
+        swallowing=swallowing,
+    )
+
+
+def test_click_expand_opens_on_click_and_closes_on_double_click() -> None:
+    opened = _label_click("click-expand", expanded=False, clicked=True)
+    assert opened.select and opened.toggle and opened.opened_by_click == "layers"
+    # A single click on an open row only selects it.
+    stays = _label_click("click-expand", expanded=True, clicked=True)
+    assert stays.select and not stays.toggle
+    # The second press of a double-click closes an open row ...
+    closes = _label_click("click-expand", expanded=True, double_pressed=True)
+    assert closes.toggle and closes.swallow_release
+    # ... and its release does not open it again.
+    release = _label_click("click-expand", expanded=False, clicked=True, swallowing=True)
+    assert release.select and not release.toggle
+
+
+def test_click_expand_double_click_on_a_closed_row_leaves_it_open() -> None:
+    second = _label_click(
+        "click-expand", expanded=True, double_pressed=True, opened_by_click="layers"
+    )
+    assert not second.toggle and not second.swallow_release
+    release = _label_click(
+        "click-expand", expanded=True, clicked=True, opened_by_click="layers"
+    )
+    assert release.select and not release.toggle and release.opened_by_click is None
+
+
+def test_click_toggle_opens_and_closes_on_each_click() -> None:
+    assert _label_click("click-toggle", expanded=False, clicked=True).toggle
+    assert _label_click("click-toggle", expanded=True, clicked=True).toggle
+    assert not _label_click("click-toggle", expanded=True, double_pressed=True).toggle
+
+
+def test_button_only_label_click_only_selects() -> None:
+    for expanded in (False, True):
+        outcome = _label_click("button-only", expanded=expanded, clicked=True)
+        assert outcome.select and not outcome.toggle
+    assert not _label_click("button-only", expanded=True, double_pressed=True).toggle
+
+
+def test_a_label_click_on_a_leaf_only_selects() -> None:
+    outcome = _label_click("click-expand", expanded=False, clicked=True, expandable=False)
+    assert outcome.select and not outcome.toggle

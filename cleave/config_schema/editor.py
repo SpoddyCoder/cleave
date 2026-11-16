@@ -77,6 +77,22 @@ DEFAULT_HIGHLIGHT_NEW_PAGE = True
 # Show hover tooltips in the editor chrome.
 DEFAULT_SHOW_TOOLTIPS = True
 
+# What a click on an expandable navigator row's label does. The twisty
+# button always opens or closes the row with one click.
+NavigatorExpandClick = Literal["click-expand", "click-toggle", "button-only"]
+
+NAVIGATOR_EXPAND_CLICKS: tuple[NavigatorExpandClick, ...] = (
+    "click-expand",
+    "click-toggle",
+    "button-only",
+)
+NAVIGATOR_EXPAND_CLICK_LABELS: dict[NavigatorExpandClick, str] = {
+    "click-expand": "click / dbl-click",
+    "click-toggle": "click",
+    "button-only": "arrow only",
+}
+DEFAULT_NAVIGATOR_EXPAND_CLICK: NavigatorExpandClick = "click-expand"
+
 
 def clamp_beat_sensitivity(value: float) -> float:
     return max(BEAT_SENSITIVITY_MIN, min(BEAT_SENSITIVITY_MAX, float(value)))
@@ -106,6 +122,10 @@ def clamp_ui_scale(value: int | float) -> int:
 
 def ui_scale_label(percent: int) -> str:
     return f"{percent}%"
+
+
+def navigator_expand_click_label(mode: NavigatorExpandClick) -> str:
+    return NAVIGATOR_EXPAND_CLICK_LABELS[mode]
 
 
 def clamp_notification_display_sec(value: int | float) -> int:
@@ -146,6 +166,17 @@ def _parse_column_side(
         raise ValueError(f"{label} must be a string")
     if value not in COLUMN_SIDES:
         allowed = ", ".join(f"'{side}'" for side in COLUMN_SIDES)
+        raise ValueError(f"{label} must be one of: {allowed}")
+    return value
+
+
+def _parse_navigator_expand_click(
+    value: Any, _ctx: ParseCtx, label: str
+) -> NavigatorExpandClick:
+    if not isinstance(value, str):
+        raise ValueError(f"{label} must be a string")
+    if value not in NAVIGATOR_EXPAND_CLICKS:
+        allowed = ", ".join(f"'{mode}'" for mode in NAVIGATOR_EXPAND_CLICKS)
         raise ValueError(f"{label} must be one of: {allowed}")
     return value
 
@@ -226,6 +257,12 @@ EDITOR_FIELDS: tuple[FieldDescriptor, ...] = (
         dump_scalar,
     ),
     FieldDescriptor(
+        "navigator_expand_click",
+        DEFAULT_NAVIGATOR_EXPAND_CLICK,
+        _parse_navigator_expand_click,
+        dump_scalar,
+    ),
+    FieldDescriptor(
         "highlight_new_page",
         DEFAULT_HIGHLIGHT_NEW_PAGE,
         _parse_bool,
@@ -259,6 +296,7 @@ def parse_editor_section(data: dict[str, Any]) -> Any:
         ui_scale=parsed["ui_scale"],
         navigator_side=parsed["navigator_side"],
         help_side=parsed["help_side"],
+        navigator_expand_click=parsed["navigator_expand_click"],
         highlight_new_page=parsed["highlight_new_page"],
         show_tooltips=parsed["show_tooltips"],
     )
@@ -276,6 +314,7 @@ def dump_editor_section(editor: Any) -> dict[str, Any]:
         "ui_scale": editor.ui_scale,
         "navigator_side": editor.navigator_side,
         "help_side": editor.help_side,
+        "navigator_expand_click": editor.navigator_expand_click,
         "highlight_new_page": editor.highlight_new_page,
         "show_tooltips": editor.show_tooltips,
     }
@@ -301,6 +340,7 @@ def editor_config_from_settings(editor: Any | None = None) -> Any:
         ui_scale=editor.ui_scale,
         navigator_side=editor.navigator_side,
         help_side=editor.help_side,
+        navigator_expand_click=editor.navigator_expand_click,
         highlight_new_page=editor.highlight_new_page,
         show_tooltips=editor.show_tooltips,
     )

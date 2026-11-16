@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING
 
 from cleave.config_schema.editor import (
     EDITOR_PREVIEW_QUALITY_HELP_ENTRIES,
+    NAVIGATOR_EXPAND_CLICKS,
+    navigator_expand_click_label,
     navigator_height_label,
     ui_scale_label,
     notification_display_label,
@@ -28,6 +30,11 @@ def _format_settings_navigator_side(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
     return state.settings.navigator_side
+
+def _format_settings_navigator_expand_click(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return navigator_expand_click_label(state.settings.navigator_expand_click)
 
 def _format_settings_help_side(
     state: TuningViewState, _desc: RowDescriptor
@@ -67,6 +74,11 @@ def _apply_settings_navigator_side(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, _large: bool,
 ) -> None:
     controls.settings.step_navigator_side(forward=forward)
+
+def _apply_settings_navigator_expand_click(
+    controls: TuningControls, _desc: RowDescriptor, forward: bool, _large: bool,
+) -> None:
+    controls.settings.step_navigator_expand_click(forward=forward)
 
 def _apply_settings_help_side(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, _large: bool,
@@ -171,6 +183,31 @@ SPECS: dict[RowKind, RowSpec] = {
         help_entries=(("Left/Right", "choose side"),),
         help_description=(
             "Side of the window for the navigator and inspector.",
+        ),
+        is_pinned=True,
+        repeatable=True,
+        parent_group="settings_ui",
+    ),
+    RowKind.SETTINGS_NAVIGATOR_EXPAND_CLICK: RowSpec(
+        affordance=RowAffordance.VALUE_STEP,
+        panel_label="navigator expand",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_settings_navigator_expand_click,
+        apply_horizontal=_apply_settings_navigator_expand_click,
+        choice=options_choice(
+            NAVIGATOR_EXPAND_CLICKS,
+            lambda s, _d: s.settings.navigator_expand_click,
+            navigator_expand_click_label,
+            combo=True,
+        ),
+        help_title="Navigator Expand",
+        help_entries=(("Left/Right", "choose how rows open"),),
+        help_description=(
+            "What a click on a navigator row with pages under it does.",
+            "Click / dbl-click: a click opens the row; a double-click closes it.",
+            "Click: each click opens or closes the row.",
+            "Arrow only: a click selects the row; only its arrow opens or closes it.",
+            "The arrow always opens or closes the row with one click.",
         ),
         is_pinned=True,
         repeatable=True,

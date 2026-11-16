@@ -80,6 +80,7 @@ def _track_lock_state(locked: bool) -> SimpleNamespace:
 
 _EXPECTED_REPEAT_ROW_KINDS = frozenset(
     {
+        RowKind.SETTINGS_NAVIGATOR_EXPAND_CLICK,
         RowKind.TRACK_PRESET_DIR,
         RowKind.TRACK_PRESET,
         RowKind.TRACK_PRESET_SWITCHING_TRIGGER,
@@ -1324,3 +1325,22 @@ def test_two_line_row_splits_value_position_and_markers() -> None:
     assert format_row_value(state, item) == "b.milk"
     assert format_row_position(state, item) == "2/2"
     assert format_row_markers(state, item) == "[B]"
+
+
+def test_navigator_expand_click_steps_and_writes_user_config(tmp_path) -> None:
+    from tests.support.viz import press_main_row
+
+    from cleave.config_schema.editor import DEFAULT_NAVIGATOR_EXPAND_CLICK
+    from cleave.user_config import load_user_config
+
+    user_path = tmp_path / "config.yaml"
+    controls = _make_controls()
+    controls.cfg.user_config_path = user_path
+    assert controls.cfg.editor.navigator_expand_click == DEFAULT_NAVIGATOR_EXPAND_CLICK
+    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_NAVIGATOR_EXPAND_CLICK)
+    press_main_row(controls, _keydown(pygame.K_RIGHT))
+    assert controls.cfg.editor.navigator_expand_click == "click-toggle"
+    assert load_user_config(user_path).editor.navigator_expand_click == "click-toggle"
+    press_main_row(controls, _keydown(pygame.K_RIGHT))
+    press_main_row(controls, _keydown(pygame.K_RIGHT))
+    assert controls.cfg.editor.navigator_expand_click == "button-only"

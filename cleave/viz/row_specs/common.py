@@ -50,6 +50,7 @@ def options_choice(
     display: Callable[[T], str] = str,
     *,
     jump: ChoiceJump | None = None,
+    combo: bool = False,
 ) -> RowChoice:
     """One of ``options`` (a sequence, or a function for a list found at run time)."""
 
@@ -60,4 +61,5 @@ def options_choice(
         labels=lambda: tuple(display(o) for o in resolved()),
         index=lambda state, desc: choice_index(resolved(), value(state, desc)),
         jump=jump,
+        combo=combo,
     )

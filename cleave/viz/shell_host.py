@@ -466,6 +466,53 @@ def apply_value_drag(
     return remaining, True
 
 
+@dataclass(frozen=True)
+class NavLabelClick:
+    """What a press or release on a navigator row's label does.
+
+    ``toggle`` opens or closes the row. ``opened_by_click`` is the row a click
+    just opened, so the double-click it starts does not close it again.
+    ``swallow_release`` skips the release that ends a closing double-click,
+    which would otherwise open the row again.
+    """
+
+    select: bool = False
+    toggle: bool = False
+    opened_by_click: str | None = None
+    swallow_release: bool = False
+
+
+def navigator_label_click(
+    mode: str,
+    node_id: str,
+    *,
+    expandable: bool,
+    expanded: bool,
+    clicked: bool,
+    double_pressed: bool,
+    opened_by_click: str | None,
+    swallowing: bool,
+) -> NavLabelClick:
+    """Outcome of a label click under the ``navigator_expand_click`` *mode*.
+
+    Selectable reports a click on release, but ImGui flags a double-click on
+    the second press, so a closing double-click acts on that press.
+    """
+    if mode == "click-expand" and expandable and double_pressed:
+        if expanded and opened_by_click != node_id:
+            return NavLabelClick(select=True, toggle=True, swallow_release=True)
+        return NavLabelClick(opened_by_click=opened_by_click)
+    if not clicked:
+        return NavLabelClick(opened_by_click=opened_by_click)
+    if swallowing or not expandable or mode == "button-only":
+        return NavLabelClick(select=True)
+    if mode == "click-toggle":
+        return NavLabelClick(select=True, toggle=True)
+    if expanded:
+        return NavLabelClick(select=True)
+    return NavLabelClick(select=True, toggle=True, opened_by_click=node_id)
+
+
 def selection_after_nav_collapse(
     visible_ids: Sequence[str],
     selected_id: str,
@@ -1625,6 +1672,9 @@ class ShellHost:
         self._context_surface = ContextMenuSurface(lambda: self._controls.context_menu)
         # Navigator row rects from the last draw, for right-click and Shift+F10.
         self._nav_row_rects: dict[str, tuple[int, int, int, int]] = {}
+        # Label-click state for ``navigator_label_click``.
+        self._nav_opened_by_click: str | None = None
+        self._nav_swallow_release: str | None = None
         # Inspector rows with a descriptor from the last draw, the same way.
         self._insp_row_rects: dict[
             RowDescriptor, tuple[tuple[int, int, int, int], InspectorRow]
@@ -2691,6 +2741,9 @@ class ShellHost:
                         selected,
                         imgui.SelectableFlags_.allow_overlap if overlap else 0,
                     )
+                    double_pressed = (
+                        imgui.is_item_activated() and imgui.is_mouse_double_clicked(0)
+                    )
                     label_min_x = imgui.get_item_rect_min().x
                     span = (imgui.get_item_rect_min().y, imgui.get_item_rect_max().y)
                     self._record_nav_row_rect(node.id, left_x)
@@ -2715,14 +2768,36 @@ class ShellHost:
                 node, twisty, selected, row_x, label_min_x, span
             )
             if twisty_clicked:
+                self._nav_opened_by_click = None
                 self._toggle_nav_expanded(node.id)
-            elif clicked:
-                self._controls.navigator.select(node.id)
-                if node.expandable:
-                    self._toggle_nav_expanded(node.id)
+            elif clicked or double_pressed:
+                self._nav_label_click(node, clicked, double_pressed)
         finally:
             if indent:
                 imgui.unindent(indent)
+
+    def _nav_label_click(
+        self, node: NavNode, clicked: bool, double_pressed: bool
+    ) -> None:
+        outcome = navigator_label_click(
+            self._controls.cfg.editor.navigator_expand_click,
+            node.id,
+            expandable=node.expandable,
+            expanded=node.id in self._controls.shell_focus.nav_expanded,
+            clicked=clicked,
+            double_pressed=double_pressed,
+            opened_by_click=self._nav_opened_by_click,
+            swallowing=self._nav_swallow_release == node.id,
+        )
+        self._nav_opened_by_click = outcome.opened_by_click
+        if clicked:
+            self._nav_swallow_release = None
+        if outcome.swallow_release:
+            self._nav_swallow_release = node.id
+        if outcome.select:
+            self._controls.navigator.select(node.id)
+        if outcome.toggle:
+            self._toggle_nav_expanded(node.id)
 
     def _record_nav_row_rect(self, node_id: str, left_x: float) -> None:
         """Remember the row just drawn, for right-click and Shift+F10."""
@@ -3534,8 +3609,9 @@ class ShellHost:
         pad_y = max(1, int(round(ui_chrome_px(_CHOICE_PAD_Y))))
         # A combo shows the row's value, which can add to the label (a font's
         # place in the list), so it fits that too.
-        width = choice_width(measure, labels)
-        if choice_kind(len(labels)) is ChoiceKind.COMBO:
+        kind = choice_kind(len(labels), combo=spec.choice.combo)
+        width = choice_width(measure, labels, combo=spec.choice.combo)
+        if kind is ChoiceKind.COMBO:
             width = max(width, combo_width(measure, (value,)))
         if after_label is None:
             left = int(rect_max.x - imgui.get_style().frame_padding.x) - width
@@ -3559,7 +3635,7 @@ class ShellHost:
             self._clear_value_drag()
             self._nudge_swallow = True
             return
-        if choice_kind(len(labels)) is ChoiceKind.SEGMENT:
+        if kind is ChoiceKind.SEGMENT:
             rects = draw_segments(
                 draw,
                 measure,

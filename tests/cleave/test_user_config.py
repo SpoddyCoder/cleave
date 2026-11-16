@@ -493,3 +493,35 @@ def test_first_run_state_round_trip_keeps_other_sections(tmp_path: Path) -> None
     assert load_user_config(config_path).editor.ui_scale == 150
     write_user_config(default_editor_settings(), config_path)
     assert saved_first_run_state(config_path).welcome_done is True
+
+
+def test_navigator_expand_click_defaults_round_trips_and_rejects_unknown(
+    tmp_path: Path,
+) -> None:
+    from cleave.config_schema.editor import DEFAULT_NAVIGATOR_EXPAND_CLICK
+
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        yaml.safe_dump({"editor": {"preview_quality": "balanced"}}, sort_keys=False),
+        encoding="utf-8",
+    )
+    assert DEFAULT_NAVIGATOR_EXPAND_CLICK == "click-expand"
+    assert (
+        load_user_config(config_path).editor.navigator_expand_click
+        == DEFAULT_NAVIGATOR_EXPAND_CLICK
+    )
+
+    write_user_config(
+        replace(default_editor_settings(), navigator_expand_click="button-only"),
+        config_path,
+    )
+    saved = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    assert saved["editor"]["navigator_expand_click"] == "button-only"
+    assert load_user_config(config_path).editor.navigator_expand_click == "button-only"
+
+    config_path.write_text(
+        yaml.safe_dump({"editor": {"navigator_expand_click": "hover"}}, sort_keys=False),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="editor.navigator_expand_click must be one of"):
+        load_user_config(config_path)
