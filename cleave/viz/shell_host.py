@@ -516,6 +516,16 @@ def _navigator_content_height_px() -> int:
     return max(1, int(round(outer)))
 
 
+def _nav_toggle_size() -> float:
+    """Side of a navigator toggle's square hover fill: the icon plus a space."""
+    return imgui.calc_text_size(POWER_GLYPH).x + imgui.calc_text_size(" ").x
+
+
+def _nav_toggle_overhang() -> float:
+    """How far a toggle's square hover fill reaches above or below its row."""
+    return max(0.0, (_nav_toggle_size() - imgui.get_text_line_height()) * 0.5)
+
+
 def navigator_height_for_rows(
     measured_px: int,
     measured_rows: int,
@@ -1455,7 +1465,8 @@ class ShellHost:
             self._nav_measured_rows,
             len(self._visible_nav_nodes()),
             chrome_px=2.0 * float(style.window_padding.y)
-            + float(style.window_border_size),
+            + float(style.window_border_size)
+            + _nav_toggle_overhang(),
             spacing_px=padded_row_spacing_y(),
         )
 
@@ -2433,6 +2444,8 @@ class ShellHost:
         imgui.push_style_color(imgui.Col_.text, rgba(LABEL))
         try:
             with padded_rows():
+                # Room above the first row for its toggles' square hover fill.
+                imgui.set_cursor_pos_y(imgui.get_cursor_pos_y() + _nav_toggle_overhang())
                 nodes = self._visible_nav_nodes()
                 self._nav_row_rects = {}
                 for node, rails in zip(nodes, navigator_tree_rails(nodes)):
@@ -2546,7 +2559,7 @@ class ShellHost:
             return
         style = imgui.get_style()
         space = imgui.calc_text_size(" ").x
-        button_width = imgui.calc_text_size(POWER_GLYPH).x + space
+        button_width = _nav_toggle_size()
         line = imgui.get_text_line_height()
         right_x = imgui.get_item_rect_max().x - style.frame_padding.x
         window_x = imgui.get_window_pos().x - imgui.get_scroll_x()
@@ -2562,9 +2575,10 @@ class ShellHost:
             hovered = imgui.is_item_hovered()
             color = rgba(navigator_toggle_color(toggle))
             if hovered and not toggle.blocked:
+                mid_y = rect_min.y + line * 0.5
                 draw.add_rect_filled(
-                    rect_min,
-                    imgui.get_item_rect_max(),
+                    imgui.ImVec2(rect_min.x, mid_y - button_width * 0.5),
+                    imgui.ImVec2(rect_min.x + button_width, mid_y + button_width * 0.5),
                     imgui.get_color_u32(
                         rgba(NUDGE_HOVER_BG, NUDGE_HOVER_BG_ALPHA / 255.0)
                     ),
