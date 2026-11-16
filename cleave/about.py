@@ -1,10 +1,10 @@
-"""About Cleave text: name, tagline, author, project URL, and version."""
+"""About Cleave text: name, tagline, author, project URL, and version (release tag or dev build)."""
 
 from __future__ import annotations
 
 from datetime import date
 
-from cleave import __version__
+from cleave.build_version import display_version
 
 ABOUT_TITLE = "Cleave"
 ABOUT_TAGLINE = "Stem separated music visualizer powered by ProjectM"
@@ -18,8 +18,10 @@ def about_body(today: date | None = None) -> str:
     return "\n".join(
         (
             ABOUT_TAGLINE,
-            f"Written by {ABOUT_AUTHOR}, {year}",
+            "",
+            f"Created by {ABOUT_AUTHOR}, {year}",
             ABOUT_URL,
-            f"v{__version__}",
+            "",
+            display_version(),
         )
     )

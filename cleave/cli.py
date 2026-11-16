@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from cleave import __version__
+from cleave.build_version import display_version
 from cleave.paths import is_frozen, resolve_project
 from cleave.render_progress import (
     format_render_progress_line,
@@ -392,7 +392,7 @@ def build_parser() -> argparse.ArgumentParser:
         usage="%(prog)s [-h] <command> target",
         formatter_class=_CleaveHelpFormatter,
     )
-    parser.add_argument("--version", action="version", version=f"cleave {__version__}")
+    parser.add_argument("--version", action="version", version=f"cleave {display_version()}")
     subparsers = parser.add_subparsers(
         dest="command", required=True, title="commands"
     )

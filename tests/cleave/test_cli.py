@@ -11,7 +11,7 @@ from unittest.mock import ANY, MagicMock, patch
 
 import pytest
 
-from cleave import __version__
+from cleave.build_version import display_version
 from cleave.cli import (
     COMMANDS,
     _exit_error,
@@ -118,7 +118,7 @@ def test_cli_version_prints_and_exits_zero(
     with pytest.raises(SystemExit) as exc:
         main(["--version"])
     assert exc.value.code == 0
-    assert capsys.readouterr().out.strip() == f"cleave {__version__}"
+    assert capsys.readouterr().out.strip() == f"cleave {display_version()}"
 
 
 def test_no_args_prints_help(capsys: pytest.CaptureFixture[str]) -> None:
@@ -281,7 +281,7 @@ def test_version_does_not_pause_when_frozen(
             main(["--version"])
         assert exc.value.code == 0
     pause_input.assert_not_called()
-    assert capsys.readouterr().out.strip() == f"cleave {__version__}"
+    assert capsys.readouterr().out.strip() == f"cleave {display_version()}"
 
 
 def test_frozen_no_args_opens_the_picker_without_pausing(

@@ -17,6 +17,8 @@ textures/*
 sdlaudio.raw
 
 # python
+# written by scripts/stamp_build_version.py before a freeze
+cleave/_build_version.py
 __pycache__/
 *.pyc
 *.pyo
