@@ -5,7 +5,7 @@ Nodes are data only. This module does not draw or read keyboard state.
 
 from __future__ import annotations
 
-from collections.abc import Collection, Sequence
+from collections.abc import Collection, Iterator, Sequence
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
@@ -239,14 +239,25 @@ def build_navigator(
     return tuple(nodes)
 
 
+class _EveryId(Collection[str]):
+    """An expanded set that holds every id, so one build opens every node."""
+
+    def __contains__(self, item: object) -> bool:
+        return True
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(())
+
+    def __len__(self) -> int:
+        return 0
+
+
+_EVERY_ID = _EveryId()
+
+
 def all_navigator_ids(session: TuningSession) -> frozenset[str]:
     """Every navigator id that would show with all of its ancestors open."""
-    expanded: set[str] = set(DEFAULT_EXPANDED_IDS)
-    while True:
-        ids = {node.id for node in build_navigator(session, expanded)}
-        if ids <= expanded:
-            return frozenset(ids)
-        expanded |= ids
+    return frozenset(node.id for node in build_navigator(session, _EVERY_ID))
 
 
 @dataclass(frozen=True)
@@ -261,11 +272,17 @@ class PageStatus:
     locked_by: str | None = None
 
 
-def page_status(session: TuningSession, node_id: str) -> PageStatus:
+def page_status(
+    session: TuningSession,
+    node_id: str,
+    nodes: Sequence[NavNode] | None = None,
+) -> PageStatus:
     """Off and locked owners for the inspector page *node_id*.
 
     A timeline row page follows Timeline. An inert switch (layer visibility
     while the timeline owns it) does not count, and config pages have none.
+    *nodes* is a navigator already built this frame; it is used when it holds
+    the page, which means it holds the page's parents too.
     """
     if timeline_row_slot_of(node_id) is not None:
         timeline = session.timeline
@@ -278,7 +295,9 @@ def page_status(session: TuningSession, node_id: str) -> PageStatus:
     while parent is not None:
         chain.append(parent)
         parent = parent_id_of(parent)
-    by_id = {node.id: node for node in build_navigator(session, set(chain))}
+    by_id = {} if nodes is None else {node.id: node for node in nodes}
+    if node_id not in by_id:
+        by_id = {node.id: node for node in build_navigator(session, set(chain))}
     off_by: str | None = None
     locked_by: str | None = None
     for chain_id in chain:

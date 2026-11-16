@@ -111,7 +111,8 @@ def _host() -> Iterator[object]:
     host.imgui.display_size = (1280, 720)
     height = host.menu_bar_height_px
     host.set_layout(ShellLayout.compute(1280, 720, height, height, 0))
-    host._draw_navigator = lambda: None
+    host._draw_navigator = lambda _frame: None
+    host._visible_nav_nodes = lambda: ()
     host._draw_inspector = lambda _state: None
     try:
         yield host

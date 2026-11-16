@@ -217,13 +217,12 @@ def test_back_selects_the_previous_page_and_opens_its_ancestors() -> None:
     _visit(controls, page)
     _visit(controls, "post_fx")
     focus.nav_expanded = set()
-    assert controls.navigator.can_go_back()
-    assert not controls.navigator.can_go_forward()
+    assert controls.navigator.history_targets() == (page, None)
     controls.navigator.go_back()
     assert focus.selected_id == page
     assert {"layers", layer_node_id("layer_1")} <= focus.nav_expanded
     assert focus.region is ShellRegion.NAVIGATOR
-    assert controls.navigator.can_go_forward()
+    assert controls.navigator.history_targets()[1] == "post_fx"
     controls.navigator.go_forward()
     assert focus.selected_id == "post_fx"
 

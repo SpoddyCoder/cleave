@@ -213,6 +213,7 @@ from cleave.viz.transport_controls import TransportField
 
 if TYPE_CHECKING:
     from cleave.viz.session import TuningSession
+    from cleave.viz.tuning_view_state import TuningViewState
 
 # Vertical padding for the menu bar and the transport bar, which shares its height.
 # Dear ImGui's default FramePadding.y is 3, which leaves both rows cramped.
@@ -617,6 +618,19 @@ def inspector_title(nodes: Sequence[NavNode], selected_id: str) -> str:
         labels.insert(0, parent.label)
         parent = by_id.get(parent.parent_id)
     return " > ".join(labels)
+
+
+@dataclass(frozen=True)
+class ShellFrame:
+    """What one shell frame draws from, built once so every panel agrees.
+
+    ``nav_nodes`` are the navigator's visible rows. ``command_ctx`` carries
+    the unsaved-changes flag and the page history targets.
+    """
+
+    view_state: TuningViewState
+    nav_nodes: tuple[NavNode, ...]
+    command_ctx: CommandContext
 
 
 def page_title(session: TuningSession, expanded: Collection[str], page_id: str) -> str:
@@ -2348,7 +2362,7 @@ class ShellHost:
             self._menu_bar_height_px = max(
                 1, int(round(imgui.get_frame_height()))
             )
-            rule_y, anchors, menus = self._draw_bar(menu_state)
+            rule_y, anchors, menus = self._draw_bar(menu_state, command_ctx)
         if menu_state.dropdown_open:
             # Opening a context menu blurs the bar, so both open together
             # only when the bar just opened. The dropdown wins.
@@ -2456,6 +2470,11 @@ class ShellHost:
             position_sec=readout.position_sec,
             fps=readout.fps,
         )
+        frame = ShellFrame(
+            view_state=state,
+            nav_nodes=self._visible_nav_nodes(),
+            command_ctx=self._frame_command_ctx or command_context(self._controls),
+        )
         stop = self._cycle_stop(menu_state)
         self._inline_field_hovered = False
         self._inline_began = False
@@ -2490,7 +2509,7 @@ class ShellHost:
                 navigator,
                 active=stop is CycleStop.NAVIGATOR,
                 idle_border=NAVIGATOR_BORDER,
-                body=lambda: self._draw_navigator(),
+                body=lambda: self._draw_navigator(frame),
                 scrollable=True,
             )
             self._draw_fixed_window(
@@ -2498,7 +2517,7 @@ class ShellHost:
                 inspector,
                 active=stop is CycleStop.INSPECTOR,
                 idle_border=NAVIGATOR_BORDER,
-                body=lambda: self._draw_inspector(state),
+                body=lambda: self._draw_inspector(frame),
                 scrollable=True,
             )
             self._draw_help(
@@ -2747,11 +2766,11 @@ class ShellHost:
             x += imgui.calc_text_size(f"{part.icon} ").x
         draw.add_text(imgui.ImVec2(x, y), u32, part.text)
 
-    def _draw_navigator(self) -> None:
+    def _draw_navigator(self, frame: ShellFrame) -> None:
+        nodes = frame.nav_nodes
         imgui.push_style_color(imgui.Col_.text, rgba(LABEL))
         try:
             with padded_rows():
-                nodes = self._visible_nav_nodes()
                 self._nav_row_rects = {}
                 for node, rails in zip(nodes, navigator_tree_rails(nodes)):
                     self._draw_nav_node(node, rails)
@@ -2934,19 +2953,19 @@ class ShellHost:
             node_id,
         )
 
-    def _draw_inspector(self, state: Any) -> None:
+    def _draw_inspector(self, frame: ShellFrame) -> None:
         focus = self._controls.shell_focus
-        nodes = build_navigator(
-            self._controls.session,
-            focus.nav_expanded,
-        )
+        state = frame.view_state
+        nodes = frame.nav_nodes
         row_slot = timeline_row_slot_of(focus.selected_id)
         title = (
             inspector_title(nodes, focus.selected_id)
             if row_slot is None
             else timeline_row_title(self._controls.session, row_slot)
         )
-        self._page_status = page_status(self._controls.session, focus.selected_id)
+        self._page_status = page_status(
+            self._controls.session, focus.selected_id, nodes
+        )
         # A new clip on the same strip row is new content, so it swipes too.
         clip_serial = self._controls.session.timeline.selected_clip_serial
         attention_key = (
@@ -2962,7 +2981,7 @@ class ShellHost:
             title,
             elapsed,
             page_status_marks(self._page_status),
-            self._page_history_buttons(),
+            self._page_history_buttons(frame.command_ctx),
         )
         if pressed == _TITLE_BACK:
             self._controls.navigator.go_back()
@@ -2981,13 +3000,13 @@ class ShellHost:
         self._draw_colour_picker()
         self._draw_choice_list()
 
-    def _page_history_buttons(self) -> tuple[TitleButton, TitleButton]:
+    def _page_history_buttons(
+        self, ctx: CommandContext
+    ) -> tuple[TitleButton, TitleButton]:
         """Back and Forward arrows for the inspector title line."""
         controls = self._controls
-        can_show = controls.navigator.page_filter()
-        history = controls.page_history
-        back_id = history.peek_back(can_show)
-        forward_id = history.peek_forward(can_show)
+        back_id = ctx.page_back_id
+        forward_id = ctx.page_forward_id
         session = controls.session
         expanded = controls.shell_focus.nav_expanded
 
@@ -3816,7 +3835,7 @@ class ShellHost:
                     self._controls.inspector.activate(row)
 
     def _draw_bar(
-        self, menu_state: MenuBarState
+        self, menu_state: MenuBarState, command_ctx: CommandContext
     ) -> tuple[float | None, dict[int, tuple[float, float]], tuple[Any, ...]]:
         menus = menus_for_session(self._controls.session)
         anchors: dict[int, tuple[float, float]] = {}
@@ -3868,7 +3887,7 @@ class ShellHost:
                     if imgui.is_item_hovered():
                         hovered_now = index
                 if menus:
-                    self._draw_bar_project_label(label_y)
+                    self._draw_bar_project_label(label_y, command_ctx.config_dirty)
         finally:
             if bar_open:
                 imgui.end_main_menu_bar()
@@ -3877,7 +3896,7 @@ class ShellHost:
             imgui.pop_style_color()
         return rule_y, anchors, menus
 
-    def _draw_bar_project_label(self, label_y: float) -> None:
+    def _draw_bar_project_label(self, label_y: float, dirty: bool) -> None:
         """Right-aligned project name on the menu titles' text line.
 
         Painted on the bar's draw list, not laid out as an item, so the menu
@@ -3885,7 +3904,7 @@ class ShellHost:
         overlap the last menu title.
         """
         prefix, name = menu_bar_project_label(
-            self._controls.cfg.project_slug, self._controls.config_dirty
+            self._controls.cfg.project_slug, dirty
         )
         style = imgui.get_style()
         left = imgui.get_item_rect_max().x + style.frame_padding.x

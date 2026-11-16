@@ -1055,7 +1055,8 @@ def test_help_column_draws_the_subject_stop() -> None:
         host.set_layout(
             ShellLayout.compute(1280, 720, height, height, 0, help_width=320)
         )
-        host._draw_navigator = lambda: None
+        host._draw_navigator = lambda _frame: None
+        host._visible_nav_nodes = lambda: ()
         host._draw_inspector = lambda _state: None
         draw_shell_frame(host, menu, CommandContext(), 1.0 / 60.0)
         draw_shell_frame(host, menu, CommandContext(), 1.0 / 60.0)

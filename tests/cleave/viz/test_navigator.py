@@ -543,6 +543,15 @@ def test_page_status_names_the_nearest_off_and_locked_owner() -> None:
     layer_name = " ".join(build_navigator(session)[-1].label.split())
     # The timeline owns layer visibility, so the layer's switch does not count.
     assert page_status(session, compositing) == PageStatus(locked_by=layer_name)
+    # A navigator built with the page showing answers without a rebuild; one
+    # that does not hold the page is ignored.
+    opened = build_navigator(session, {"layers", layer_node_id("layer_1")})
+    assert page_status(session, compositing, opened) == PageStatus(
+        locked_by=layer_name
+    )
+    assert page_status(session, compositing, build_navigator(session)) == PageStatus(
+        locked_by=layer_name
+    )
     session.timeline.enabled = False
     assert page_status(session, layer_node_id("layer_1")) == PageStatus(
         off_by=layer_name, locked_by=layer_name

@@ -781,3 +781,27 @@ def test_preset_position_counts_within_browsed_collection(tmp_path: Path) -> Non
         controls._view_state._structure = None
         block = controls.build_view_state(paused=False).tracks["layer_1"]
         assert block.preset_position == "1/1", collection
+
+
+def test_structure_signature_invalidates_on_preset_list_reorder_in_place() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    config_save = controls._config_save
+    layer = session.layers["layer_1"]
+    layer.preset_list = ["/tmp/a.milk", "/tmp/b.milk"]
+    sig_before = view_state_structure_signature(session, config_save)
+    layer.preset_list[:] = ["/tmp/b.milk", "/tmp/a.milk"]
+    sig_after = view_state_structure_signature(session, config_save)
+    assert sig_before != sig_after
+
+
+def test_structure_signature_invalidates_on_preset_folder_change() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    config_save = controls._config_save
+    playlist = session.layers["layer_1"].playlist
+    sig_before = view_state_structure_signature(session, config_save)
+    # Same folder and count, one file renamed on a rescan.
+    playlist.paths = playlist.paths[:-1] + (playlist.current_dir / "renamed.milk",)
+    sig_after = view_state_structure_signature(session, config_save)
+    assert sig_before != sig_after

@@ -54,6 +54,7 @@ def _quiet_live_controls(controls: MagicMock) -> None:
 
     # A MagicMock play_fullscreen is truthy and would hide the shell.
     controls.window = WindowControls()
+    controls.navigator.history_targets.return_value = (None, None)
     controls.tap_sync.active = False
     controls.tap_sync.showing_progress = False
     controls.tap_sync.progress_view.return_value = None

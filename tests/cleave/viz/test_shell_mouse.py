@@ -1131,3 +1131,33 @@ def test_focus_context_menu_opens_under_the_focused_preset_list_row() -> None:
         host._insp_row_rects = {row.descriptor: ((4, 300, 200, 20), row)}
         assert host.open_focus_context_menu() is True
         assert controls.context_menu.anchor == (4.0, 320.0)
+
+
+def test_one_frame_builds_the_navigator_once_for_every_panel(monkeypatch) -> None:
+    from cleave.viz import navigator, navigator_controls, shell_host
+    from cleave.viz.commands import command_context
+    from cleave.viz.shell_host import draw_shell_frame
+
+    builds: list[bool] = []
+    real = navigator.build_navigator
+
+    def counted(session, expanded=None):
+        builds.append(expanded is navigator._EVERY_ID)
+        return real(session, expanded)
+
+    for module in (navigator, navigator_controls, shell_host):
+        monkeypatch.setattr(module, "build_navigator", counted)
+
+    controls = _make_controls(("layer_1", "layer_2"))
+    with _host() as host:
+        host._controls = controls
+        host.imgui.display_size = (1280, 720)
+        draw_shell_frame(host, MenuBarState(), command_context(controls), 1 / 60)
+        builds.clear()
+        ctx = command_context(controls)
+        # One build with every node open, for the page history targets.
+        assert builds == [True]
+        builds.clear()
+        draw_shell_frame(host, MenuBarState(), ctx, 1 / 60)
+        # One build of the visible rows, shared by the navigator and inspector.
+        assert builds == [False]

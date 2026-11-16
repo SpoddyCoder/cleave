@@ -65,8 +65,9 @@ class CommandContext:
     timeline_can_redo: bool = False
     help_visible: bool = False
     fullscreen: bool = False
-    can_page_back: bool = False
-    can_page_forward: bool = False
+    # Pages the history's Back and Forward would show, None where there is none.
+    page_back_id: str | None = None
+    page_forward_id: str | None = None
 
 
 def _disabled(_ctx: CommandContext) -> bool:
@@ -118,6 +119,7 @@ def command_context(controls: Any) -> CommandContext:
         controls.shell_focus.region is ShellRegion.TIMELINE
         or bool(timeline.recording)
     )
+    page_back_id, page_forward_id = controls.navigator.history_targets()
     return CommandContext(
         editor_mode=session.settings.editor_mode,
         solo_slot=session.solo_slot,
@@ -139,8 +141,8 @@ def command_context(controls: Any) -> CommandContext:
         help_visible=bool(session.help_visible),
         # Command fakes without window controls read as windowed.
         fullscreen=bool(getattr(getattr(controls, "window", None), "fullscreen", False)),
-        can_page_back=controls.navigator.can_go_back(),
-        can_page_forward=controls.navigator.can_go_forward(),
+        page_back_id=page_back_id,
+        page_forward_id=page_forward_id,
     )
 
 
@@ -648,11 +650,11 @@ _PLAY_FULLSCREEN = Command(
 )
 
 def _can_page_back(ctx: CommandContext) -> bool:
-    return ctx.can_page_back
+    return ctx.page_back_id is not None
 
 
 def _can_page_forward(ctx: CommandContext) -> bool:
-    return ctx.can_page_forward
+    return ctx.page_forward_id is not None
 
 
 def _page_back(controls: Any) -> None:

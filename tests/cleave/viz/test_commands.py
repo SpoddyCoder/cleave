@@ -162,8 +162,7 @@ def _fake_controls(
         navigator=SimpleNamespace(
             select=MagicMock(),
             activate=MagicMock(),
-            can_go_back=lambda: False,
-            can_go_forward=lambda: False,
+            history_targets=lambda: (None, None),
             go_back=MagicMock(),
             go_forward=MagicMock(),
         ),

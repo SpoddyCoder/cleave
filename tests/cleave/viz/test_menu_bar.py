@@ -282,8 +282,8 @@ def test_mouse_switches_and_closes_an_open_top_menu() -> None:
     anchors: dict[int, tuple[float, float]] = {}
     draw_bar = host._draw_bar
 
-    def remember(state: MenuBarState):
-        rule_y, found, menus = draw_bar(state)
+    def remember(state: MenuBarState, ctx: CommandContext):
+        rule_y, found, menus = draw_bar(state, ctx)
         anchors.clear()
         anchors.update(found)
         return rule_y, found, menus
@@ -487,7 +487,8 @@ def test_open_menu_paints_over_the_transport_rule() -> None:
         height = shell_host.menu_bar_height_px()
         host.set_layout(ShellLayout.compute(1280, 720, height, height, 0))
         host.process_event(_motion(4))
-        host._draw_navigator = lambda: None
+        host._draw_navigator = lambda _frame: None
+        host._visible_nav_nodes = lambda: ()
         host._draw_inspector = lambda _state: None
         # The font atlas is built on the first frame. Open the menu after that.
         draw_shell_frame(host, menu, CommandContext(), 1.0 / 60.0)
@@ -552,11 +553,13 @@ def test_open_menu_paints_over_the_focus_ring() -> None:
         controls.session.timeline = SimpleNamespace(panel_open=True)
         controls.shell_focus.region = ShellRegion.TIMELINE
 
-        def draw_focused_row() -> None:
+        def draw_focused_row(_frame: object) -> None:
             imgui.selectable("Focused##row", True)
             shell_host._draw_item_focus_ring()
 
         host._draw_navigator = draw_focused_row
+
+        host._visible_nav_nodes = lambda: ()
         host._draw_inspector = lambda _state: None
         # The font atlas is built on the first frame. The strip border shares
         # the panel border window, under the menu popup; an open menu takes focus.
@@ -703,7 +706,7 @@ def test_popup_hover_takes_the_opaque_highlight() -> None:
         set_shell_column_widths=lambda *_args, **_kwargs: None
     )
 
-    def draw_nav() -> None:
+    def draw_nav(_frame: object) -> None:
         from imgui_bundle import imgui
 
         imgui.selectable("Nav row", False)
@@ -717,6 +720,7 @@ def test_popup_hover_takes_the_opaque_highlight() -> None:
         host = _open_shell(overlay, menu, controls)
     host.imgui.display_size = (1280, 720)
     host._draw_navigator = draw_nav
+    host._visible_nav_nodes = lambda: ()
     host._draw_inspector = draw_inspector
     try:
         height = shell_host.menu_bar_height_px()
@@ -899,7 +903,8 @@ def test_open_menu_ink_matches_the_mock() -> None:
         height = shell_host.menu_bar_height_px()
         host.set_layout(ShellLayout.compute(1280, 720, height, height, 0))
         host.process_event(_motion(4))
-        host._draw_navigator = lambda: None
+        host._draw_navigator = lambda _frame: None
+        host._visible_nav_nodes = lambda: ()
         host._draw_inspector = lambda _state: None
         ctx = CommandContext(fullscreen=True)
         _paint_shell(host, menu, ctx, frames=1)
@@ -1094,7 +1099,8 @@ def test_focused_inspector_label_is_highlight() -> None:
         height = shell_host.menu_bar_height_px()
         host.set_layout(ShellLayout.compute(1280, 720, height, height, 280))
         host.process_event(_motion(4))
-        host._draw_navigator = lambda: None
+        host._draw_navigator = lambda _frame: None
+        host._visible_nav_nodes = lambda: ()
         seen: dict[str, list] = {}
 
         def draw_inspector(_state) -> None:
@@ -1201,7 +1207,8 @@ def test_preset_row_draws_two_lines_and_fits_the_filename() -> None:
         height = shell_host.menu_bar_height_px()
         host.set_layout(ShellLayout.compute(1280, 720, height, height, 280))
         host.process_event(_motion(4))
-        host._draw_navigator = lambda: None
+        host._draw_navigator = lambda _frame: None
+        host._visible_nav_nodes = lambda: ()
 
         def draw_inspector(_state) -> None:
             imgui = shell_host.imgui
@@ -1295,7 +1302,8 @@ def test_directory_nav_button_press_skips_the_row_action(
         height = shell_host.menu_bar_height_px()
         host.set_layout(ShellLayout.compute(1280, 720, height, height, 280))
         host.process_event(_motion(4))
-        host._draw_navigator = lambda: None
+        host._draw_navigator = lambda _frame: None
+        host._visible_nav_nodes = lambda: ()
         host._draw_inspector = lambda _state: host._draw_inspector_row(view, row)
         with patch.object(shell_host, "row_icon_boxes", spy_rects):
             _paint_shell(host, menu, CommandContext(), frames=1)
@@ -1387,7 +1395,8 @@ def test_switching_menus_never_shows_the_last_menus_size() -> None:
         height = shell_host.menu_bar_height_px()
         host.set_layout(ShellLayout.compute(1280, 720, height, height, 0))
         host.process_event(_motion(4))
-        host._draw_navigator = lambda: None
+        host._draw_navigator = lambda _frame: None
+        host._visible_nav_nodes = lambda: ()
         host._draw_inspector = lambda _state: None
         ctx = CommandContext()
         _paint_shell(host, menu, ctx, frames=1)

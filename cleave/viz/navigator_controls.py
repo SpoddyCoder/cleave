@@ -144,12 +144,11 @@ class NavigatorControls:
         shown = set(self._pages()) | all_navigator_ids(self._controls.session)
         return shown.__contains__
 
-    def can_go_back(self) -> bool:
-        return self._controls.page_history.peek_back(self.page_filter()) is not None
-
-    def can_go_forward(self) -> bool:
+    def history_targets(self) -> tuple[str | None, str | None]:
+        """Pages Back and Forward would show now, None where there is none."""
+        can_show = self.page_filter()
         history = self._controls.page_history
-        return history.peek_forward(self.page_filter()) is not None
+        return history.peek_back(can_show), history.peek_forward(can_show)
 
     def go_back(self) -> None:
         """Show the previous page in the history."""

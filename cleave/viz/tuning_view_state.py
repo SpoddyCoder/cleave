@@ -6,6 +6,7 @@ import json
 import math
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
+from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -380,6 +381,21 @@ class TuningViewState:
             )
 
 
+@lru_cache(maxsize=64)
+def _preset_list_identity(paths: tuple[str, ...]) -> dict[str, int | str]:
+    """Digest of a preset list, kept per list content.
+
+    The key hashes cached string hashes, so an unchanged list costs no digest.
+    """
+    return path_list_identity(paths)
+
+
+@lru_cache(maxsize=64)
+def _playlist_paths_identity(paths: tuple[Path, ...]) -> dict[str, int | str]:
+    """Digest of a preset folder's paths, kept per folder content."""
+    return path_list_identity([str(path) for path in paths])
+
+
 def view_state_structure_signature(
     session: TuningSession,
     config_save: ConfigSaveController,
@@ -401,13 +417,11 @@ def view_state_structure_signature(
             "easter_egg": layer.easter_egg,
             "preset_start_clean": layer.preset_start_clean,
             "effects": sorted(layer.effects.keys()),
-            "preset_list": path_list_identity(layer.preset_list),
+            "preset_list": _preset_list_identity(tuple(layer.preset_list)),
             "playlist": {
                 "current_dir": str(playlist.current_dir),
                 "collection": playlist.collection,
-                "paths": path_list_identity(
-                    [str(path) for path in playlist.paths]
-                ),
+                "paths": _playlist_paths_identity(tuple(playlist.paths)),
                 "index": playlist.index,
             },
             "auto_preset_path": (
