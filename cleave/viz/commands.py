@@ -252,7 +252,7 @@ def _run_measure_latency(controls: Any) -> None:
     controls.tap_sync.prompt_start()
 
 
-def _run_welcome(controls: Any) -> None:
+def _run_download_packages(controls: Any) -> None:
     controls.prompt_welcome()
 
 
@@ -595,12 +595,12 @@ _MEASURE_LATENCY = Command(
     run=_run_measure_latency,
 )
 
-_WELCOME = Command(
-    id="settings.welcome",
-    label="Welcome to Cleave...",
+_DOWNLOAD_PACKAGES = Command(
+    id="settings.download_packages",
+    label="Download Packages...",
     kind="command",
     enabled=_enabled,
-    run=_run_welcome,
+    run=_run_download_packages,
 )
 
 _HELP_OVERLAY = Command(
@@ -740,7 +740,7 @@ def build_menus(
             ),
             Menu(
                 "Settings",
-                (*_SETTINGS_PAGES, SEPARATOR, _MEASURE_LATENCY, SEPARATOR, _WELCOME),
+                (*_SETTINGS_PAGES, SEPARATOR, _MEASURE_LATENCY, SEPARATOR, _DOWNLOAD_PACKAGES),
             ),
             Menu("Help", (_HELP_OVERLAY, SEPARATOR, _ABOUT)),
         ),

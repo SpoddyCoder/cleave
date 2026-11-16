@@ -65,7 +65,7 @@ _STATIC_IDS = (
     "project.restore",
     *_SETTINGS_PAGE_IDS,
     "settings.measure_latency",
-    "settings.welcome",
+    "settings.download_packages",
     "help.overlay",
     "help.about",
 )
@@ -201,7 +201,7 @@ def test_menus_list_taxonomy_ids_once() -> None:
         None,
         "settings.measure_latency",
         None,
-        "settings.welcome",
+        "settings.download_packages",
     ]
     assert _row_ids(menus[5]) == ["help.overlay", None, "help.about"]
     ids = [command.id for command in iter_commands(menus)]
@@ -403,7 +403,7 @@ def test_wired_run_calls_controllers() -> None:
     command_by_id("project.render", menus).run(controls)
     command_by_id("view.preset_curation", menus).run(controls)
     command_by_id("settings.measure_latency", menus).run(controls)
-    command_by_id("settings.welcome", menus).run(controls)
+    command_by_id("settings.download_packages", menus).run(controls)
     command_by_id("help.about", menus).run(controls)
     controls.prompt_save_config.assert_called_once_with()
     controls.request_quit.assert_called_once_with()

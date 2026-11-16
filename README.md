@@ -33,7 +33,7 @@ Linux:
 ./cleave.py play ~/music/mysong.mp3
 ```
 
-This will separate the track into its component stems (bass, drums, vocals, other), perform audio analysis, then open the editor. On first launch, the Welcome to Cleave step offers the presets and model weights in one go and shows each download's progress. Anything you skip downloads when it is first needed. To get one later, choose Settings > Welcome to Cleave... in the editor.
+This will separate the track into its component stems (bass, drums, vocals, other), perform audio analysis, then open the editor. On first launch, the Welcome to Cleave step offers the presets and model weights in one go and shows each download's progress. Anything you skip downloads when it is first needed. To get one later, choose Settings > Download Packages... in the editor.
 
 ## Using the Editor
 
@@ -99,7 +99,7 @@ The build is unsigned. If SmartScreen warns on the setup exe or the zip, choose 
 
 ### CUDA (NVIDIA GPU)
 
-Stem separation on CPU is slow. When your NVIDIA driver supports CUDA 13 (driver 580.88 or newer), the Welcome to Cleave step offers a CUDA Toolkit download from PyTorch (about 1.8 GB) for much faster splitting. It is off by default; tick it on first launch, or later from Settings > Welcome to Cleave.... It goes into `%LOCALAPPDATA%\Cleave\cuda`, so the installer and the zip both stay CPU-only and work the same. Skip or fail leaves CPU split working fine.
+Stem separation on CPU is slow. When your NVIDIA driver supports CUDA 13 (driver 580.88 or newer), the Welcome to Cleave step offers a CUDA Toolkit download from PyTorch (about 1.8 GB) for much faster splitting. It is off by default; tick it on first launch, or later from Settings > Download Packages.... It goes into `%LOCALAPPDATA%\Cleave\cuda`, so the installer and the zip both stay CPU-only and work the same. Skip or fail leaves CPU split working fine.
 
 ---
 

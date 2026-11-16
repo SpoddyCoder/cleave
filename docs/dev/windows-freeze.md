@@ -247,7 +247,7 @@ Manual GPU proof (met): install from the setup exe into Program Files; `cleave.e
 
 ## CUDA extra (Phase 3.3.3)
 
-Product decision: [structured-releases.md](structured-releases.md) 3.3.3. The setup exe and the zip are CPU-only. CUDA torch is an optional download in the editor's Welcome to Cleave step, on first launch and from Settings > Welcome to Cleave.... Cleave does not build or host a CUDA payload. The installer has no CUDA page and no `/CUDA=1`.
+Product decision: [structured-releases.md](structured-releases.md) 3.3.3. The setup exe and the zip are CPU-only. CUDA torch is an optional download in the editor's Welcome to Cleave step, on first launch and from Settings > Download Packages.... Cleave does not build or host a CUDA payload. The installer has no CUDA page and no `/CUDA=1`.
 
 The extra is the PyTorch CUDA wheels in [requirements-torch-cu130.txt](../../requirements-torch-cu130.txt) (cu130), not NVIDIA's developer CUDA Toolkit from nvidia.com. Do not download that Toolkit. User-facing copy still says "CUDA Toolkit". Wheels come from `https://download.pytorch.org/whl/cu130/`. Match the freeze CPython (`cp310`, `win_amd64`).
 
