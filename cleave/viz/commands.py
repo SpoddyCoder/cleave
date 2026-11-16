@@ -256,6 +256,10 @@ def _run_welcome(controls: Any) -> None:
     controls.prompt_welcome()
 
 
+def _run_about(controls: Any) -> None:
+    controls.prompt_about()
+
+
 def _help_checked(ctx: CommandContext) -> bool:
     return ctx.help_visible
 
@@ -458,7 +462,13 @@ _QUIT = Command(
     enabled=_enabled,
     run=_run_quit,
 )
-_ABOUT = _later("help.about", "About Cleave", "command")
+_ABOUT = Command(
+    id="help.about",
+    label="About Cleave",
+    kind="command",
+    enabled=_enabled,
+    run=_run_about,
+)
 
 _SEPARATE = _later("project.separate", "Re-separate stems...", "command")
 _RENDER = Command(

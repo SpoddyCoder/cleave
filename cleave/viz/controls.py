@@ -475,6 +475,12 @@ class TuningControls:
             cancel_label=CANCEL_LABEL,
         )
 
+    def prompt_about(self) -> None:
+        """Open the About Cleave notice."""
+        from cleave.about import ABOUT_TITLE, about_body
+
+        self._modal_host.prompt_notice(ABOUT_TITLE, body=about_body())
+
     def prompt_save_config(self) -> None:
         if self.session.solo_slot is not None:
             return
