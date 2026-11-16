@@ -85,6 +85,9 @@ class NavNode:
     # Leading drag handle that reorders the row; blocked draws it inert.
     draggable: bool = False
     drag_blocked: bool = False
+    # Start of the label that belongs to the drag handle: it washes and
+    # takes the press with the handle (a layer's number).
+    handle_text: str = ""
 
 
 _TOP_LEVEL: tuple[NavNode, ...] = (
@@ -414,9 +417,10 @@ def _layer_node(session: TuningSession, slot: str, *, expandable: bool) -> NavNo
     layer = session.layers[slot]
     index = session.layer_z_order.index(slot)
     curation = is_preset_curation_mode(session.settings.editor_mode)
+    number = str(index + 1)
     return NavNode(
         id=layer_node_id(slot),
-        label=f"{index + 1}  {stem_overlay_header(layer.stem)}",
+        label=f"{number}  {stem_overlay_header(layer.stem)}",
         depth=1,
         badge=_layer_badge(session, slot) if curation else None,
         parent_id="layers",
@@ -426,6 +430,7 @@ def _layer_node(session: TuningSession, slot: str, *, expandable: bool) -> NavNo
         toggles=() if curation else _layer_toggles(session, slot),
         draggable=not curation,
         drag_blocked=layer.locked,
+        handle_text="" if curation else number,
     )
 
 

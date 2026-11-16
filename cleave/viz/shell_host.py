@@ -843,6 +843,22 @@ def _nav_drag_lead() -> str:
     return " " * max(1, math.ceil(glyph / space))
 
 
+def nav_handle_text(node: NavNode) -> str:
+    """The part of a navigator label drawn inside its drag handle."""
+    text = node.handle_text
+    return text if text and node.label.startswith(text) else ""
+
+
+def _space_lead(text: str) -> str:
+    """Spaces at least as wide as *text*, to hold its place in a label."""
+    if not text:
+        return ""
+    space = imgui.calc_text_size(" ").x
+    if space <= 0:
+        return ""
+    return " " * math.ceil(imgui.calc_text_size(text).x / space)
+
+
 def _draw_mnemonic_underline(label: str, color: tuple[int, int, int]) -> None:
     """1px underline two pixels under the ink of a top menu's first letter."""
     letter = label[:1]
@@ -2660,12 +2676,18 @@ class ShellHost:
                     imgui.push_style_color(imgui.Col_.text, rgba(text_color))
                 try:
                     text_pos = imgui.get_cursor_screen_pos()
-                    lead = _nav_drag_lead() if node.draggable else ""
+                    label = node.label
+                    lead = ""
+                    if node.draggable:
+                        handle_text = nav_handle_text(node)
+                        # The handle draws its part of the label itself.
+                        lead = _nav_drag_lead() + _space_lead(handle_text)
+                        label = label[len(handle_text):]
                     overlap = (
                         bool(node.toggles) or node.draggable or twisty is not None
                     )
                     clicked, _selected = imgui.selectable(
-                        f"{lead}{node.label}##nav-{node.id}",
+                        f"{lead}{label}##nav-{node.id}",
                         selected,
                         imgui.SelectableFlags_.allow_overlap if overlap else 0,
                     )
@@ -2688,7 +2710,7 @@ class ShellHost:
             if node.toggles:
                 self._draw_nav_toggles(node)
             if node.draggable:
-                self._layer_row_drag(node, text_pos.x, span)
+                self._layer_row_drag(node, text_pos.x, span, text_color)
             twisty_clicked = twisty is not None and _draw_nav_twisty(
                 node, twisty, selected, row_x, label_min_x, span
             )
@@ -3009,15 +3031,26 @@ class ShellHost:
                 imgui.unindent(indent)
 
     def _draw_drag_handle(
-        self, item_id: str, x: float, *, blocked: bool, lead: str
+        self,
+        item_id: str,
+        x: float,
+        *,
+        blocked: bool,
+        lead: str,
+        text: str = "",
+        text_color: tuple[int, int, int] = LABEL,
     ) -> bool:
         """Leading reorder handle on the row just drawn, with its left edge at *x*.
 
-        The row selectable allows overlap, so the press reaches this button.
-        True on the press that starts a drag; a blocked handle never starts one.
+        The glyph fills the *lead* column. *text*, the start of the row's label,
+        follows it inside the handle, so it washes and takes the press too; it
+        keeps *text_color* until hovered. The row selectable allows overlap, so
+        the press reaches this button. True on the press that starts a drag; a
+        blocked handle never starts one.
         """
         glyph = DRAG_INDICATOR_GLYPH
-        width = imgui.calc_text_size(lead).x
+        glyph_column = imgui.calc_text_size(lead).x
+        width = glyph_column + imgui.calc_text_size(_space_lead(text)).x
         window_x = imgui.get_window_pos().x - imgui.get_scroll_x()
         imgui.same_line(x - window_x)
         imgui.invisible_button(
@@ -3029,6 +3062,7 @@ class ShellHost:
         rect_min = imgui.get_item_rect_min()
         draw = imgui.get_window_draw_list()
         color = rgba(MUTED)
+        label_color = rgba(text_color)
         if blocked:
             color = rgba(LOCKED)
         elif hovered or held:
@@ -3038,18 +3072,25 @@ class ShellHost:
                 imgui.get_color_u32(rgba(NUDGE_HOVER_BG, NUDGE_HOVER_BG_ALPHA / 255.0)),
             )
             color = rgba(NUDGE_HOVER_FG)
+            label_color = color
             request_pointer(PointerShape.MOVE)
         if blocked and hovered:
             request_pointer(PointerShape.NOT_ALLOWED)
         glyph_width = imgui.calc_text_size(glyph).x
         draw.add_text(
             imgui.ImVec2(
-                rect_min.x + (width - glyph_width) * 0.5,
+                rect_min.x + (glyph_column - glyph_width) * 0.5,
                 rect_min.y + _icon_drop_to_text(glyph),
             ),
             imgui.get_color_u32(color),
             glyph,
         )
+        if text:
+            draw.add_text(
+                imgui.ImVec2(rect_min.x + glyph_column, rect_min.y),
+                imgui.get_color_u32(label_color),
+                text,
+            )
         if hovered and not held:
             show_tooltip("Locked: unlock to reorder" if blocked else "Drag to reorder")
         return activated and not blocked
@@ -3076,7 +3117,11 @@ class ShellHost:
             drag.record_span(index, *span)
 
     def _layer_row_drag(
-        self, node: NavNode, x: float, span: tuple[float, float]
+        self,
+        node: NavNode,
+        x: float,
+        span: tuple[float, float],
+        text_color: tuple[int, int, int],
     ) -> None:
         slot = node.slot
         order = self._controls.session.layer_z_order
@@ -3088,6 +3133,8 @@ class ShellHost:
             x,
             blocked=node.drag_blocked,
             lead=_nav_drag_lead(),
+            text=nav_handle_text(node),
+            text_color=text_color,
         ):
             self._begin_row_drag(DRAG_LAYER, slot, index)
             self._controls.navigator.select(node.id)

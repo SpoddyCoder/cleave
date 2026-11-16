@@ -52,6 +52,7 @@ from cleave.viz.shell_host import (
     strip_eye_tooltip,
     strip_release_tooltip,
     strip_solo_tooltip,
+    nav_handle_text,
     navigator_twisty,
     path_icon_color,
     path_row_icon,
@@ -272,6 +273,18 @@ def test_lock_mark_shows_only_in_preset_curation() -> None:
     )
     assert curation.toggles == ()
     assert navigator_lock_mark(replace(curation, locked=True)) == "[lock]"
+
+
+def test_layer_number_belongs_to_the_drag_handle() -> None:
+    nodes = build_navigator(_session(), {"layers"})
+    layers = [node for node in nodes if node.slot is not None]
+
+    assert layers
+    for index, node in enumerate(layers):
+        assert nav_handle_text(node) == str(index + 1)
+        assert node.label.startswith(nav_handle_text(node))
+    root = next(node for node in nodes if node.id == "layers")
+    assert nav_handle_text(root) == ""
 
 
 def test_only_expandable_nodes_show_a_twisty() -> None:
