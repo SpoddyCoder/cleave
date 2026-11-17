@@ -15,16 +15,7 @@ from cleave.viz.imgui_theme import rgba
 from cleave.viz.material_icons import DRAG_INDICATOR_GLYPH
 from cleave.viz.pointer_cursor import PointerShape, request_pointer
 from cleave.viz.shell_context import ShellContext
-from cleave.viz.theme import (
-    BACKGROUND,
-    ERROR_NOTIFICATION,
-    HIGHLIGHT,
-    LABEL,
-    LOCKED,
-    MUTED,
-    ROW_FOCUS_EDGE,
-    VALUE,
-)
+from cleave.viz.theme import palette
 from cleave.viz.tooltips import show_tooltip
 from cleave.viz.value_nudge import nudge_cluster_origin_x, selectable_text_y
 
@@ -188,7 +179,7 @@ def draw_item_focus_ring() -> None:
     rect_max = imgui.get_item_rect_max()
     if rect_max.x <= rect_min.x or rect_max.y <= rect_min.y:
         return
-    color = imgui.get_color_u32(rgba(ROW_FOCUS_EDGE))
+    color = imgui.get_color_u32(rgba(palette().row_focus_edge))
     imgui.get_window_draw_list().add_rect(
         rect_min,
         rect_max,
@@ -220,7 +211,7 @@ def hand_on_hover() -> None:
 def draw_button(
     label: str,
     *,
-    text_role: tuple[int, int, int] = VALUE,
+    text_role: tuple[int, int, int] | None = None,
     selected: bool = False,
     enabled: bool = True,
     off: bool = False,
@@ -248,7 +239,7 @@ def draw_button(
     draw = imgui.get_window_draw_list()
     tone = ButtonTone.OFF if off and state is ButtonState.REST else ButtonTone.PLAIN
     paint_button(draw, (rect_min.x, rect_min.y, size.x, size.y), tone, state)
-    role = VALUE if state is not ButtonState.REST else text_role
+    role = palette().value if state is not ButtonState.REST or text_role is None else text_role
     draw.add_text(
         imgui.ImVec2(rect_min.x + pad.x, rect_min.y + pad.y), packed_color(role), text
     )
@@ -287,21 +278,22 @@ class InlineField:
         pad = imgui.get_style().frame_padding.x
         width = field_max.x - field_min.x
         draw = imgui.get_window_draw_list()
-        draw.add_rect_filled(field_min, field_max, imgui.get_color_u32(rgba(BACKGROUND)))
-        border = ERROR_NOTIFICATION if view.error is not None else HIGHLIGHT
+        draw.add_rect_filled(field_min, field_max, imgui.get_color_u32(rgba(palette().background)))
+        border = palette().error_notification if view.error is not None else palette().highlight
         draw.add_rect(field_min, field_max, imgui.get_color_u32(rgba(border)))
         inner = width - pad * 2
         caret_x = imgui.calc_text_size(view.draft[: view.caret_index]).x
         text_x = field_min.x + pad - max(0.0, caret_x - inner)
         y = field_min.y if text_y is None else text_y
         draw.push_clip_rect(field_min, field_max, True)
-        draw.add_text(imgui.ImVec2(text_x, y), imgui.get_color_u32(rgba(VALUE)), view.draft)
+        text_u32 = imgui.get_color_u32(rgba(palette().value))
+        draw.add_text(imgui.ImVec2(text_x, y), text_u32, view.draft)
         if view.caret_visible:
             line = imgui.get_text_line_height()
             draw.add_line(
                 imgui.ImVec2(text_x + caret_x, y),
                 imgui.ImVec2(text_x + caret_x, y + line),
-                imgui.get_color_u32(rgba(HIGHLIGHT)),
+                imgui.get_color_u32(rgba(palette().highlight)),
             )
         draw.pop_clip_rect()
         if view.error is not None:
@@ -324,7 +316,7 @@ class RowDrag:
         blocked: bool,
         lead: str,
         text: str = "",
-        text_color: tuple[int, int, int] = LABEL,
+        text_color: tuple[int, int, int] | None = None,
     ) -> bool:
         """Leading reorder handle on the row just drawn, with its left edge at *x*.
 
@@ -347,12 +339,18 @@ class RowDrag:
         paint_box(
             glyph_box,
             DRAG_INDICATOR_GLYPH,
-            color=LOCKED if blocked else MUTED,
+            color=palette().locked if blocked else palette().muted,
             hovered=lit,
         )
         if text:
             label_box = (box[0] + glyph_column, box[1], text_w, box[3])
-            paint_box(label_box, text, color=text_color, hovered=lit, icon=False)
+            paint_box(
+                label_box,
+                text,
+                color=palette().label if text_color is None else text_color,
+                hovered=lit,
+                icon=False,
+            )
         if state.hovered and not state.held:
             show_tooltip("Locked: unlock to reorder" if blocked else "Drag to reorder")
         return state.activated and not blocked

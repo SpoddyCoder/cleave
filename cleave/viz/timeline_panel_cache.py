@@ -12,6 +12,7 @@ from cleave.timeline import SlotCue, TimelineLane
 from cleave.viz.overlay_primitives import overlay_font, visibility_bucket
 from cleave.viz.overlay_upload import OverlayGpuState, UploadSignature
 from cleave.viz.theme import (
+    palette_generation,
     timeline_panel_height_px,
     timeline_ui_metrics,
     ui_scale_generation,
@@ -80,6 +81,7 @@ class TimelineStaticSignature:
     view_start_sec: float
     view_end_sec: float | None
     ui_scale_generation: int
+    palette_generation: int
 
 
 @dataclass
@@ -185,6 +187,7 @@ def timeline_static_signature(
         view_start_sec=state.view_start_sec,
         view_end_sec=state.view_end_sec,
         ui_scale_generation=ui_scale_generation(),
+        palette_generation=palette_generation(),
     )
 
 

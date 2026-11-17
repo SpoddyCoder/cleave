@@ -45,18 +45,7 @@ from cleave.viz.material_icons import (
     ARROW_UPWARD_GLYPH,
     FOLDER_GLYPH,
 )
-from cleave.viz.theme import (
-    HOVER,
-    HOVER_BG_ALPHA,
-    LABEL,
-    PRESET_ICON,
-    ROW_FOCUS_EDGE,
-    ROW_FOCUSED_ALPHA,
-    ROW_SELECT_TINT,
-    ROW_SELECTED_ALPHA,
-    VALUE,
-    tuning_ui_metrics,
-)
+from cleave.viz.theme import palette, tuning_ui_metrics
 
 Rect = tuple[int, int, int, int]
 _DISPLAY = (1280, 720)
@@ -196,11 +185,11 @@ def test_location_text_lines_up_with_the_folder_icon(tmp_path: Path) -> None:
         icon = font.find_glyph(ord(FOLDER_GLYPH))
         cap = font.find_glyph(ord("A"))
         lift = location_text_lift()
-        icon_ys = _vertex_ys(_pack(PRESET_ICON))
+        icon_ys = _vertex_ys(_pack(palette().preset_icon))
         icon_top, icon_bottom = min(icon_ys), max(icon_ys)
         path_ys = [
             y
-            for y in _vertex_ys(_pack(VALUE))
+            for y in _vertex_ys(_pack(palette().value))
             if icon_top - 8.0 <= y <= icon_bottom + 8.0
         ]
 
@@ -317,20 +306,20 @@ def _vertices_near(
 
 
 def _hover() -> int:
-    return _pack(HOVER, HOVER_BG_ALPHA / 255.0)
+    return _pack(palette().hover, palette().hover_bg_alpha / 255.0)
 
 
 def _wash_and_border() -> tuple[int, int]:
     """The focused band's left-hand colour (two vertices) and its edge."""
     return (
-        _pack(ROW_SELECT_TINT, ROW_FOCUSED_ALPHA[0]),
-        _pack(ROW_FOCUS_EDGE),
+        _pack(palette().row_select_tint, palette().row_focused_alpha[0]),
+        _pack(palette().row_focus_edge),
     )
 
 
 def _selected_wash() -> int:
     """The selected band's left-hand colour (two vertices)."""
-    return _pack(ROW_SELECT_TINT, ROW_SELECTED_ALPHA[0])
+    return _pack(palette().row_select_tint, palette().row_selected_alpha[0])
 
 
 def _above(panel: Rect) -> tuple[int, int]:
@@ -504,12 +493,12 @@ def test_shortcuts_draw_in_the_value_colour(tmp_path: Path) -> None:
     with _host() as host:
         _frame(host, surface)
         chip = surface.chip_rects[_shortcut_slot(surface, picker, "Home")]
-        value_on_chip = _vertices_near(_pack(VALUE), y=float(chip[1]), slack=40.0)
+        value_on_chip = _vertices_near(_pack(palette().value), y=float(chip[1]), slack=40.0)
         label_on_chip = sum(
             1
             for draw_list in _picker_draw_lists()
             for index in range(draw_list.vtx_buffer.size())
-            if int(draw_list.vtx_buffer[index].col) == _pack(LABEL)
+            if int(draw_list.vtx_buffer[index].col) == _pack(palette().label)
             and chip[1] <= float(draw_list.vtx_buffer[index].pos.y) <= chip[1] + chip[3]
         )
 
@@ -884,7 +873,7 @@ def test_directory_arrow_glyphs_are_in_the_font() -> None:
 
 def test_list_and_shortcuts_sit_on_the_panel_ink(tmp_path: Path) -> None:
     """No black fill inside the picker: its list child shares the surface ink."""
-    from cleave.viz.theme import BACKGROUND, SURFACE_BG
+    from cleave.viz.theme import palette
 
     (tmp_path / "song.wav").write_bytes(b"RIFF")
     picker = FilePicker(current=tmp_path)
@@ -895,7 +884,7 @@ def test_list_and_shortcuts_sit_on_the_panel_ink(tmp_path: Path) -> None:
         chip = surface.chip_rects[0]
         _frame(host, surface, (_motion(_center(chip), rel=(1, 0)),))
         colors = _color_counts()
-        black, ink = _pack(BACKGROUND), _pack(SURFACE_BG)
+        black, ink = _pack(palette().background), _pack(palette().surface_bg)
 
     assert black not in colors
     assert colors.get(ink, 0) >= 8

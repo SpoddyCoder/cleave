@@ -36,7 +36,7 @@ from cleave.viz.shell_navigator import (
     navigator_toggle_glyph,
 )
 from cleave.viz.shell_widgets import packed_color, PANEL_BORDER_PX, swipe_fill
-from cleave.viz.theme import DISABLED, VALUE
+from cleave.viz.theme import palette
 
 if TYPE_CHECKING:
     from cleave.viz.session import TuningSession
@@ -103,7 +103,7 @@ class TitleButton:
     glyph: str
     enabled: bool
     tooltip: Callable[[], str]
-    # None draws the glyph in VALUE, or DISABLED while not enabled.
+    # None draws the glyph in value, or disabled while not enabled.
     color: tuple[int, int, int] | None = None
     fill: tuple[int, int, int] | None = None
     fill_alpha: float = 1.0
@@ -210,7 +210,7 @@ def draw_inspector_title(
         elapsed_sec, hold_sec=attention_scroll_hold_sec(scroll_sec)
     )
     draw = imgui.get_window_draw_list()
-    color = packed_color(VALUE)
+    color = packed_color(palette().value)
     fill = swipe_fill(
         bar_x1 - bar_x0, attention.fill_progress, from_left=attention.fill_from_left
     )
@@ -265,7 +265,7 @@ def _draw_title_buttons(
             button.glyph,
             start.x + slot_x,
             band,
-            color=button.color or (VALUE if button.enabled else DISABLED),
+            color=button.color or (palette().value if button.enabled else palette().disabled),
             fill=button.fill,
             fill_alpha=button.fill_alpha,
             enabled=button.enabled,

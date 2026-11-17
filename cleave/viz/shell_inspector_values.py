@@ -44,13 +44,7 @@ from cleave.viz.shell_widgets import (
     value_drag_steps,
     VALUE_DRAG_THRESHOLD_PX,
 )
-from cleave.viz.theme import (
-    BUTTON_BORDER,
-    DISABLED,
-    tuning_ui_metrics,
-    ui_chrome_px,
-    VALUE,
-)
+from cleave.viz.theme import palette, tuning_ui_metrics, ui_chrome_px
 from cleave.viz.value_nudge import (
     centre_pad,
     nudge_arrow_rects,
@@ -69,7 +63,6 @@ if TYPE_CHECKING:
 _CHOICE_PAD_Y = 1.0
 _SWATCH_ASPECT = 1.6
 _SWATCH_GAP = 6.0
-_PICKER_UNSET = VALUE
 _PICKER_FLAGS = (
     int(imgui.WindowFlags_.no_title_bar)
     | int(imgui.WindowFlags_.no_resize)
@@ -166,7 +159,7 @@ class ValueControls:
             draw.add_rect_filled(
                 swatch_min, swatch_max, imgui.get_color_u32(rgba(target.current))
             )
-        draw.add_rect(swatch_min, swatch_max, imgui.get_color_u32(rgba(BUTTON_BORDER)))
+        draw.add_rect(swatch_min, swatch_max, imgui.get_color_u32(rgba(palette().button_border)))
         if not imgui.is_mouse_hovering_rect(swatch_min, swatch_max):
             return False
         locked = section_lock_blocks_mutation(state, desc)
@@ -187,7 +180,7 @@ class ValueControls:
         imgui.set_next_window_pos(self._picker_pos, imgui.Cond_.always)
         imgui.begin("##colour-picker", None, _PICKER_FLAGS)
         try:
-            value = edit.value if edit.value is not None else _PICKER_UNSET
+            value = edit.value if edit.value is not None else palette().value
             changed, picked = imgui.color_picker3(
                 "##colour",
                 [channel / 255.0 for channel in value],
@@ -261,7 +254,7 @@ class ValueControls:
             paint_box(
                 box,
                 button.glyph,
-                color=value_color if available[index] else DISABLED,
+                color=value_color if available[index] else palette().disabled,
                 hovered=lit,
             )
         if not activated or hit is None:

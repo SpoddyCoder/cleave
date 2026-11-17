@@ -22,7 +22,7 @@ from cleave.viz.loading import (
 )
 from cleave.viz.modal_surface import ImGuiTextMeasure
 from cleave.viz.progress_bar import clamp_fraction, progress_bar_inset
-from cleave.viz.theme import BACKGROUND, HIGHLIGHT, LABEL, VALUE
+from cleave.viz.theme import palette
 
 
 def test_clamp_loading_fraction() -> None:
@@ -245,7 +245,7 @@ def test_loading_content_bar_fraction_and_detail() -> None:
         half, quads, colors = _draw_frame(host, message, fraction=0.5)
         assert half.fill_rect is not None
         # The fill is the lit menu row's marker colour.
-        assert _pack(HIGHLIGHT) in colors
+        assert _pack(palette().highlight) in colors
 
         empty, quads, empty_colors = _draw_frame(host, message, fraction=0.0)
         assert empty.bar_rect is not None
@@ -257,7 +257,7 @@ def test_loading_content_bar_fraction_and_detail() -> None:
             if abs(quad[2] - bar_w) <= 1.0 and abs(quad[3] - bar_h) <= 1.0
         ]
         assert tracks, quads
-        assert _pack(HIGHLIGHT) not in empty_colors
+        assert _pack(palette().highlight) not in empty_colors
 
         missing, quads, _colors = _draw_frame(host, message, fraction=None)
         assert missing.bar_rect is None
@@ -267,9 +267,9 @@ def test_loading_content_bar_fraction_and_detail() -> None:
         _layout, _quads, colors = _draw_frame(
             host, message, detail="Downloading htdemucs"
         )
-        assert _pack(LABEL) in colors
+        assert _pack(palette().label) in colors
         _layout, _quads, colors = _draw_frame(host, message)
-        assert _pack(LABEL) not in colors
+        assert _pack(palette().label) not in colors
     assert not imgui.get_current_context()
 
 
@@ -305,7 +305,7 @@ def test_present_frame_clears_draws_and_flips(
 
     mock_bind.assert_called_once_with(GL_FRAMEBUFFER, 0)
     mock_viewport.assert_called_once_with(0, 0, 640, 360)
-    red, green, blue = BACKGROUND
+    red, green, blue = palette().background
     mock_clear_color.assert_called_once_with(
         red / 255.0, green / 255.0, blue / 255.0, 1.0
     )

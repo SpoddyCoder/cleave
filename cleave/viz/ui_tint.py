@@ -5,11 +5,7 @@ from __future__ import annotations
 import pygame
 
 from cleave.viz.row_paint import RowLook
-from cleave.viz.theme import (
-    ICON_HOVER_BG,
-    ICON_HOVER_BG_ALPHA,
-    ICON_HOVER_EDGE,
-)
+from cleave.viz.theme import palette
 
 
 def blit_tint(
@@ -34,10 +30,10 @@ def blit_hover(
     surface: pygame.Surface, rect: tuple[int, int, int, int] | pygame.Rect
 ) -> None:
     """The shell's icon hover on the strip: violet wash and its 1px outline."""
-    blit_tint(surface, rect, ICON_HOVER_BG, alpha=ICON_HOVER_BG_ALPHA)
+    blit_tint(surface, rect, palette().icon_hover_bg, alpha=palette().icon_hover_bg_alpha)
     r = pygame.Rect(rect)
     if r.w > 0 and r.h > 0:
-        pygame.draw.rect(surface, ICON_HOVER_EDGE, r, 1)
+        pygame.draw.rect(surface, palette().icon_hover_edge, r, 1)
 
 
 def _rgba8(color: tuple[tuple[int, int, int], float]) -> tuple[int, int, int, int]:

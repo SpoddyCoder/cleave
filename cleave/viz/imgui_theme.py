@@ -1,4 +1,4 @@
-"""Theme roles applied to ImGui once per frame."""
+"""Palette roles applied to ImGui once per frame."""
 
 from __future__ import annotations
 
@@ -8,61 +8,41 @@ from contextlib import contextmanager
 
 from imgui_bundle import imgui
 
-from cleave.viz.theme import (
-    BUTTON_ACTIVE_BG,
-    BUTTON_BG,
-    BUTTON_HOVER_BG,
-    BACKGROUND,
-    DISABLED,
-    HOVER,
-    HOVER_BG_ALPHA,
-    MODAL_SCRIM_ALPHA,
-    ROW_FOCUS_EDGE,
-    ROW_SELECT_TINT,
-    ROW_SELECTED_ALPHA,
-    SCROLLBAR_THUMB,
-    SCROLLBAR_THUMB_HOVER,
-    SCROLLBAR_TRACK,
-    SURFACE_BG,
-    SURFACE_EDGE,
-    TRANSPORT_RULE,
-    VALUE,
-    ui_chrome_px,
-)
+from cleave.viz.theme import palette, ui_chrome_px
 
-_SELECTED_WASH = ROW_SELECTED_ALPHA[0]
-_HOVER_WASH = HOVER_BG_ALPHA / 255.0
-# Same black scrim as the pygame modal underlay.
-_SCRIM = MODAL_SCRIM_ALPHA / 255.0
 
-IMGUI_COLOR_ROLES: dict[imgui.Col_, tuple[tuple[int, int, int], float]] = {
-    imgui.Col_.text: (VALUE, 1.0),
-    imgui.Col_.text_disabled: (DISABLED, 1.0),
-    imgui.Col_.window_bg: (BACKGROUND, 1.0),
-    imgui.Col_.child_bg: (BACKGROUND, 1.0),
-    imgui.Col_.popup_bg: (SURFACE_BG, 1.0),
-    imgui.Col_.menu_bar_bg: (BACKGROUND, 1.0),
-    imgui.Col_.border: (SURFACE_EDGE, 1.0),
-    imgui.Col_.header: (ROW_SELECT_TINT, _SELECTED_WASH),
-    imgui.Col_.header_hovered: (HOVER, _HOVER_WASH),
-    imgui.Col_.header_active: (HOVER, _HOVER_WASH),
-    imgui.Col_.button: (BUTTON_BG, 1.0),
-    imgui.Col_.button_hovered: (BUTTON_HOVER_BG, 1.0),
-    imgui.Col_.button_active: (BUTTON_ACTIVE_BG, 1.0),
-    imgui.Col_.frame_bg: (BACKGROUND, 1.0),
-    imgui.Col_.title_bg: (BACKGROUND, 1.0),
-    imgui.Col_.title_bg_active: (BACKGROUND, 1.0),
-    imgui.Col_.title_bg_collapsed: (BACKGROUND, 1.0),
-    imgui.Col_.check_mark: (VALUE, 1.0),
-    imgui.Col_.separator: (TRANSPORT_RULE, 1.0),
-    imgui.Col_.text_selected_bg: (ROW_SELECT_TINT, 0.5),
-    imgui.Col_.nav_highlight: (ROW_FOCUS_EDGE, 1.0),
-    imgui.Col_.scrollbar_bg: (SCROLLBAR_TRACK, 1.0),
-    imgui.Col_.scrollbar_grab: (SCROLLBAR_THUMB, 1.0),
-    imgui.Col_.scrollbar_grab_hovered: (SCROLLBAR_THUMB_HOVER, 1.0),
-    imgui.Col_.scrollbar_grab_active: (SCROLLBAR_THUMB_HOVER, 1.0),
-    imgui.Col_.modal_window_dim_bg: (BACKGROUND, _SCRIM),
-}
+def imgui_color_roles() -> dict[imgui.Col_, tuple[tuple[int, int, int], float]]:
+    """ImGui colour slots from the live palette, each with its alpha."""
+    p = palette()
+    hover_wash = p.hover_bg_alpha / 255.0
+    return {
+        imgui.Col_.text: (p.value, 1.0),
+        imgui.Col_.text_disabled: (p.disabled, 1.0),
+        imgui.Col_.window_bg: (p.background, 1.0),
+        imgui.Col_.child_bg: (p.background, 1.0),
+        imgui.Col_.popup_bg: (p.surface_bg, 1.0),
+        imgui.Col_.menu_bar_bg: (p.background, 1.0),
+        imgui.Col_.border: (p.surface_edge, 1.0),
+        imgui.Col_.header: (p.row_select_tint, p.row_selected_alpha[0]),
+        imgui.Col_.header_hovered: (p.hover, hover_wash),
+        imgui.Col_.header_active: (p.hover, hover_wash),
+        imgui.Col_.button: (p.button_bg, 1.0),
+        imgui.Col_.button_hovered: (p.button_hover_bg, 1.0),
+        imgui.Col_.button_active: (p.button_active_bg, 1.0),
+        imgui.Col_.frame_bg: (p.background, 1.0),
+        imgui.Col_.title_bg: (p.background, 1.0),
+        imgui.Col_.title_bg_active: (p.background, 1.0),
+        imgui.Col_.title_bg_collapsed: (p.background, 1.0),
+        imgui.Col_.check_mark: (p.value, 1.0),
+        imgui.Col_.separator: (p.transport_rule, 1.0),
+        imgui.Col_.text_selected_bg: (p.row_select_tint, 0.5),
+        imgui.Col_.nav_highlight: (p.row_focus_edge, 1.0),
+        imgui.Col_.scrollbar_bg: (p.scrollbar_track, 1.0),
+        imgui.Col_.scrollbar_grab: (p.scrollbar_thumb, 1.0),
+        imgui.Col_.scrollbar_grab_hovered: (p.scrollbar_thumb_hover, 1.0),
+        imgui.Col_.scrollbar_grab_active: (p.scrollbar_thumb_hover, 1.0),
+        imgui.Col_.modal_window_dim_bg: (p.background, p.modal_scrim_alpha / 255.0),
+    }
 
 
 def lighten(rgb: tuple[int, int, int], amount: float) -> tuple[int, int, int]:
@@ -96,9 +76,9 @@ def floating_surface() -> Iterator[None]:
     Menus, context menus, the open choice list, dialogs, the file picker, and
     info panels all float over the shell in this one look.
     """
-    imgui.push_style_color(imgui.Col_.window_bg, rgba(SURFACE_BG))
-    imgui.push_style_color(imgui.Col_.child_bg, rgba(SURFACE_BG))
-    imgui.push_style_color(imgui.Col_.border, rgba(SURFACE_EDGE))
+    imgui.push_style_color(imgui.Col_.window_bg, rgba(palette().surface_bg))
+    imgui.push_style_color(imgui.Col_.child_bg, rgba(palette().surface_bg))
+    imgui.push_style_color(imgui.Col_.border, rgba(palette().surface_edge))
     try:
         yield
     finally:
@@ -194,11 +174,11 @@ def apply_imgui_style_scale(factor: float) -> None:
 
 
 def apply_imgui_theme() -> None:
-    """Write ``IMGUI_COLOR_ROLES`` and the shell's square corners onto the style."""
+    """Write ``imgui_color_roles()`` and the shell's square corners onto the style."""
     style = imgui.get_style()
     style.window_rounding = 0.0
     style.frame_rounding = 0.0
     style.popup_rounding = 0.0
     style.scrollbar_rounding = 0.0
-    for slot, (role, alpha) in IMGUI_COLOR_ROLES.items():
+    for slot, (role, alpha) in imgui_color_roles().items():
         style.set_color_(int(slot), rgba(role, alpha))

@@ -39,19 +39,7 @@ from cleave.viz.imgui_theme import floating_surface, rgba
 from cleave.viz.pointer_cursor import PointerShape, request_pointer
 from cleave.viz.row_paint import RowState, paint_row
 from cleave.viz.text_fit import TextSizer
-from cleave.viz.theme import (
-    BORDER_WIDTH,
-    BUTTON_OFF_CHOSEN_BG,
-    DISABLED,
-    HIGHLIGHT,
-    LOCKED,
-    LOCKED_MUTED,
-    MUTED,
-    OFF_CONTROL_MUTED,
-    OFF_CONTROL_TEXT,
-    SURFACE_TEXT,
-    VALUE,
-)
+from cleave.viz.theme import BORDER_WIDTH, palette
 
 _LIST_WINDOW_FLAGS = (
     int(imgui.WindowFlags_.no_title_bar)
@@ -151,7 +139,7 @@ def draw_segments(
             border = button_look(ButtonTone.PLAIN, state).border
             draw.add_rect(_vec(rx, ry), _vec(rx + rw, ry + rh), _u32(border))
         role = _segment_text_role(index == chosen, enabled=enabled, tone=tone)
-        lit_role = VALUE if state is not ButtonState.REST else role
+        lit_role = palette().value if state is not ButtonState.REST else role
         _centred_text(draw, measure, rect, labels[index], lit_role)
     return rects
 
@@ -171,7 +159,7 @@ def _chosen_look(
 ) -> tuple[ButtonTone, tuple[int, int, int] | None]:
     """Tone and fill override of the chosen segment."""
     if _dimmed(enabled=enabled, tone=tone):
-        return ButtonTone.PLAIN, BUTTON_OFF_CHOSEN_BG
+        return ButtonTone.PLAIN, palette().button_off_chosen_bg
     return ButtonTone.PRIMARY, None
 
 
@@ -180,10 +168,10 @@ def _segment_text_role(
 ) -> tuple[int, int, int]:
     """Chosen and unchosen option text. A lock tints even a refused control."""
     if tone is ChoiceTone.LOCKED:
-        return LOCKED if chosen else LOCKED_MUTED
+        return palette().locked if chosen else palette().locked_muted
     if _dimmed(enabled=enabled, tone=tone):
-        return OFF_CONTROL_TEXT if chosen else OFF_CONTROL_MUTED
-    return VALUE if chosen else MUTED
+        return palette().off_control_text if chosen else palette().off_control_muted
+    return palette().value if chosen else palette().muted
 
 
 def _combo_text_roles(
@@ -191,10 +179,10 @@ def _combo_text_roles(
 ) -> tuple[tuple[int, int, int], tuple[int, int, int]]:
     """Value and caret colours of a combo."""
     if tone is ChoiceTone.LOCKED:
-        return LOCKED, LOCKED_MUTED
+        return palette().locked, palette().locked_muted
     if _dimmed(enabled=enabled, tone=tone):
-        return OFF_CONTROL_TEXT, OFF_CONTROL_MUTED
-    return VALUE, MUTED
+        return palette().off_control_text, palette().off_control_muted
+    return palette().value, palette().muted
 
 
 def draw_combo(
@@ -229,7 +217,7 @@ def draw_combo(
     paint_button(draw, rect, rest_tone if state is ButtonState.REST else ButtonTone.PLAIN, state)
     role, caret_role = _combo_text_roles(enabled=enabled, tone=tone)
     if state is not ButtonState.REST:
-        role, caret_role = VALUE, HIGHLIGHT
+        role, caret_role = palette().value, palette().highlight
     th = measure.size(text)[1]
     text_y = y + (h - th) // 2
     draw.add_text(_vec(x + combo_pad_x(), text_y), _u32(role), text)
@@ -256,7 +244,7 @@ def paint_stepper_hover(arrow: FRect, *, forward: bool) -> None:
     paint_box(
         text_box(left, char_w, space_w, (y, y + h)),
         char,
-        color=DISABLED,
+        color=palette().disabled,
         hovered=True,
         icon=False,
     )
@@ -283,9 +271,9 @@ def draw_stepper(
     back, forward = stepper_arrow_rects(measure, rect)
     x, y, w, h = rect
     text_y = y + (h - measure.size(text)[1]) // 2
-    _centred_text(draw, measure, rect, text, VALUE)
-    draw.add_text(_vec(back[0], text_y), _u32(DISABLED), STEPPER_BACK)
-    draw.add_text(_vec(forward[0], text_y), _u32(DISABLED), STEPPER_FORWARD)
+    _centred_text(draw, measure, rect, text, palette().value)
+    draw.add_text(_vec(back[0], text_y), _u32(palette().disabled), STEPPER_BACK)
+    draw.add_text(_vec(forward[0], text_y), _u32(palette().disabled), STEPPER_FORWARD)
     mx, my = _mouse()
     lit: bool | None = held
     if lit is None and hover:
@@ -460,11 +448,11 @@ def _draw_list_rows(
         text_x = rx + combo_pad_x()
         text_y = ry + (rh - th) // 2
         if chosen:
-            draw.add_text(_vec(text_x, text_y), _u32(HIGHLIGHT), _CHOSEN_MARK)
+            draw.add_text(_vec(text_x, text_y), _u32(palette().highlight), _CHOSEN_MARK)
         mark_w = measure.size(_CHOSEN_MARK)[0]
         draw.add_text(
             _vec(text_x + mark_w, text_y),
-            _u32(VALUE if lit or chosen else SURFACE_TEXT),
+            _u32(palette().value if lit or chosen else palette().surface_text),
             view.options[index],
         )
     picked = hovered if imgui.is_mouse_clicked(0) and not just_opened else None

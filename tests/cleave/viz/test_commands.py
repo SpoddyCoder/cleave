@@ -29,7 +29,7 @@ from cleave.viz.row_spec import apply_field_action, row_spec
 from cleave.viz.session import LayerRuntime
 from cleave.viz.shell_focus import ShellRegion
 from cleave.timeline import SlotCue, TimelineLane
-from cleave.viz.theme import VALUE, CONFIG_DIRTY
+from cleave.viz.theme import palette
 from tests.support.viz import (
     keydown,
     make_controls,
@@ -393,8 +393,8 @@ def test_save_and_render_honor_curation_solo_and_busy() -> None:
     save = command_by_id("file.save", menus)
     render = command_by_id("project.render", menus)
     assert save.label_role is not None
-    assert save.label_role(CommandContext()) == VALUE
-    assert save.label_role(CommandContext(config_dirty=True)) == CONFIG_DIRTY
+    assert save.label_role(CommandContext()) == palette().value
+    assert save.label_role(CommandContext(config_dirty=True)) == palette().config_dirty
     assert save.enabled(CommandContext()) is True
     assert save.enabled(CommandContext(editor_mode="preset_curation")) is False
     assert save.enabled(CommandContext(solo_slot="slot_a")) is False

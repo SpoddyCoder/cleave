@@ -13,7 +13,7 @@ from dataclasses import dataclass
 import pygame
 
 from cleave.viz.overlay_primitives import overlay_font
-from cleave.viz.theme import BAR_GRID, MUTED, SONG_BOUND
+from cleave.viz.theme import palette
 
 # (major, minor) step pairs in seconds, fine to coarse. From 10s up, labelled
 # marks land on whole tens of seconds.
@@ -214,21 +214,21 @@ def render_time_ruler(
 
     labels: list[tuple[int, pygame.Surface]] = []
     for t in ticks.major:
-        label = font.render(format_ruler_time(t, ticks.major_step), True, MUTED)
+        label = font.render(format_ruler_time(t, ticks.major_step), True, palette().muted)
         label_x = min(x_of(t), bar_right - 1) + LABEL_TICK_GAP_PX
         if label_x + label.get_width() <= bar_right:
             labels.append((label_x, label))
 
-    pygame.draw.line(surface, BAR_GRID, (bar_left, bottom), (bar_right - 1, bottom), 1)
+    pygame.draw.line(surface, palette().bar_grid, (bar_left, bottom), (bar_right - 1, bottom), 1)
     for t in ticks.minor:
         x = x_of(t)
         # Minor ticks under a label would read as part of its text.
         if any(lx - 1 <= x <= lx + lab.get_width() for lx, lab in labels):
             continue
-        pygame.draw.line(surface, BAR_GRID, (x, bottom - minor_h), (x, bottom), 1)
+        pygame.draw.line(surface, palette().bar_grid, (x, bottom - minor_h), (x, bottom), 1)
     for t in ticks.major:
         x = min(x_of(t), bar_right - 1)
-        pygame.draw.line(surface, MUTED, (x, bottom - major_h), (x, bottom), 1)
+        pygame.draw.line(surface, palette().muted, (x, bottom - major_h), (x, bottom), 1)
     for x in song_bound_xs(
         duration_sec=duration_sec,
         bar_left=bar_left,
@@ -236,9 +236,9 @@ def render_time_ruler(
         view_start_sec=view_start_sec,
         view_end_sec=view_end_sec,
     ):
-        pygame.draw.line(surface, MUTED, (x, bottom - major_h), (x, bottom), 1)
+        pygame.draw.line(surface, palette().muted, (x, bottom - major_h), (x, bottom), 1)
         if bottom + 1 < height:
-            pygame.draw.line(surface, SONG_BOUND, (x, bottom + 1), (x, height - 1), 1)
+            pygame.draw.line(surface, palette().song_bound, (x, bottom + 1), (x, height - 1), 1)
     for label_x, label in labels:
         label_y = max(0, bottom - 1 - label.get_height())
         surface.blit(label, (label_x, label_y))

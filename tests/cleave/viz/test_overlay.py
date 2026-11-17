@@ -12,13 +12,7 @@ from cleave.viz.row_present_renderers import (
     row_value_color_for,
 )
 from cleave.viz.row_spec import row_panel_label
-from cleave.viz.theme import (
-    VALUE,
-    DISABLED,
-    LABEL,
-    LOCKED,
-    SOLO_BG,
-)
+from cleave.viz.theme import palette
 from cleave.viz.tuning_view_state import (
     OverlaysBlock,
     TimelineBlock,
@@ -39,8 +33,8 @@ def test_solo_visibility_icon_uses_red_background() -> None:
     normal = render_visibility_icon(enabled=True, solo=False, line_height=line_h)
     assert soloed.get_height() == line_h
     assert soloed.get_width() == normal.get_width()
-    assert soloed.get_at((1, 1))[:3] == SOLO_BG
-    assert normal.get_at((normal.get_width() // 2, line_h // 2))[:3] != SOLO_BG
+    assert soloed.get_at((1, 1))[:3] == palette().solo_bg
+    assert normal.get_at((normal.get_width() // 2, line_h // 2))[:3] != palette().solo_bg
 
 
 def test_solo_visibility_icon_disabled_stem_uses_value_not_disabled() -> None:
@@ -48,7 +42,7 @@ def test_solo_visibility_icon_disabled_stem_uses_value_not_disabled() -> None:
     line_h = 17
     disabled = render_visibility_icon(enabled=False, solo=False, line_height=line_h)
     soloed_off = render_visibility_icon(enabled=False, solo=True, line_height=line_h)
-    assert soloed_off.get_at((0, 0))[:3] == SOLO_BG
+    assert soloed_off.get_at((0, 0))[:3] == palette().solo_bg
     assert pygame.mask.from_surface(soloed_off).count() != pygame.mask.from_surface(
         disabled
     ).count()
@@ -71,7 +65,7 @@ def _track(**kwargs: object):
 def test_locked_stem_row_uses_locked_color() -> None:
     state = minimal_view_state(tracks={"layer_1": _track(locked=True)})
     stem = RowDescriptor(RowKind.TRACK_STEM, slot="layer_1")
-    assert row_value_color_for(state, stem) == LOCKED
+    assert row_value_color_for(state, stem) == palette().locked
 
 
 def test_action_row_value_color() -> None:
@@ -84,14 +78,14 @@ def test_action_row_value_color() -> None:
     )
     add_row = RowDescriptor(RowKind.LAYER_MANAGEMENT_DELETE, slot="layer_2")
     delete_row = RowDescriptor(RowKind.LAYER_MANAGEMENT_DELETE, slot="layer_1")
-    assert row_value_color_for(state, add_row) == VALUE
-    assert row_value_color_for(state, delete_row) == VALUE
+    assert row_value_color_for(state, add_row) == palette().value
+    assert row_value_color_for(state, delete_row) == palette().value
 
 
 def test_display_row_uses_label_color() -> None:
     state = minimal_view_state()
     desc = RowDescriptor(RowKind.LAYER_MANAGEMENT_COUNT)
-    assert row_value_color_for(state, desc) == LABEL
+    assert row_value_color_for(state, desc) == palette().label
 
 
 def test_preset_list_populate_uses_action_color() -> None:
@@ -104,7 +98,7 @@ def test_preset_list_populate_uses_action_color() -> None:
         },
     )
     populate_row = RowDescriptor(RowKind.TRACK_PRESET_LIST_POPULATE, slot="layer_1")
-    assert row_value_color_for(state, populate_row) == VALUE
+    assert row_value_color_for(state, populate_row) == palette().value
 
 
 def _inspector_kinds(state, node_id: str) -> list[RowKind]:

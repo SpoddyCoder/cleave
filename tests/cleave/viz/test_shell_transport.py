@@ -12,7 +12,7 @@ from cleave.viz.shell_transport import (
     transport_parts,
 )
 from cleave.viz.shell_windows import panel_border_overlap_px
-from cleave.viz.theme import ERROR_NOTIFICATION, HIGHLIGHT, VALUE
+from cleave.viz.theme import palette
 from cleave.viz.transport_controls import TransportField
 
 
@@ -25,10 +25,10 @@ def test_transport_parts_while_playing() -> None:
         fps=60.0,
     )
     assert transport_parts(readout) == [
-        TransportPart("PLAYING", VALUE, TransportField.PLAY, icon="\u25b6"),
-        TransportPart("01:23", VALUE, TransportField.TIME),
-        TransportPart("/ 04:12", VALUE, gap=False),
-        TransportPart("BAR 34", VALUE, TransportField.BAR),
+        TransportPart("PLAYING", palette().value, TransportField.PLAY, icon="\u25b6"),
+        TransportPart("01:23", palette().value, TransportField.TIME),
+        TransportPart("/ 04:12", palette().value, gap=False),
+        TransportPart("BAR 34", palette().value, TransportField.BAR),
     ]
     assert transport_fps_text(readout) == "60 FPS"
 
@@ -42,10 +42,10 @@ def test_transport_parts_while_paused() -> None:
         fps=None,
     )
     assert transport_parts(readout) == [
-        TransportPart("PAUSED", VALUE, TransportField.PLAY, icon="\u275a\u275a"),
-        TransportPart("00:00", VALUE, TransportField.TIME),
-        TransportPart("/ 00:00", VALUE, gap=False),
-        TransportPart("BAR —", VALUE),
+        TransportPart("PAUSED", palette().value, TransportField.PLAY, icon="\u275a\u275a"),
+        TransportPart("00:00", palette().value, TransportField.TIME),
+        TransportPart("/ 00:00", palette().value, gap=False),
+        TransportPart("BAR —", palette().value),
     ]
     assert transport_fps_text(readout) == "— FPS"
 
@@ -70,7 +70,7 @@ def test_transport_notice_prefers_the_timed_warning() -> None:
     warning = transport_notice(_active(message="Saved", elapsed=0.1))
     assert warning is not None
     assert warning.text == "Saved"
-    assert warning.accent == HIGHLIGHT
+    assert warning.accent == palette().highlight
     assert warning.timed is True
     assert warning.elapsed_sec == 0.1
 
@@ -88,7 +88,7 @@ def test_transport_notice_uses_the_persistent_error_when_no_warning() -> None:
     )
     assert error is not None
     assert error.text == "Missing stem"
-    assert error.accent == ERROR_NOTIFICATION
+    assert error.accent == palette().error_notification
     assert error.timed is False
     assert error.elapsed_sec == 3.0
     assert transport_notice(_active()) is None

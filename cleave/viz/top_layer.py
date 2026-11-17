@@ -15,7 +15,7 @@ from imgui_bundle import imgui
 
 from cleave.viz.imgui_theme import floating_surface, rgba
 from cleave.viz.info_panel import InfoPanelViewState
-from cleave.viz.theme import VALUE
+from cleave.viz.theme import palette
 from cleave.viz.title_bar import paint_title_bar
 
 Rect = tuple[int, int, int, int]
@@ -104,7 +104,7 @@ def _draw_lines(lines: tuple[str, ...], color: tuple[int, int, int]) -> None:
 
 
 def _draw_title(lines: tuple[str, ...]) -> None:
-    """Title lines in VALUE on a title bar across the window, from its top border."""
+    """Title lines in value on a title bar across the window, from its top border."""
     pos = imgui.get_window_pos()
     size = imgui.get_window_size()
     style = imgui.get_style()
@@ -126,7 +126,7 @@ def _draw_title(lines: tuple[str, ...]) -> None:
         )
     finally:
         draw.pop_clip_rect()
-    _draw_lines(lines, VALUE)
+    _draw_lines(lines, palette().value)
     imgui.dummy(imgui.ImVec2(0.0, max(0.0, pad_y - border)))
 
 
@@ -155,11 +155,11 @@ class InfoPanelSurface:
             if view.title_lines and view.body_lines:
                 imgui.spacing()
             if view.body_lines:
-                _draw_lines(view.body_lines, VALUE)
+                _draw_lines(view.body_lines, palette().value)
             if view.footer_line is not None:
                 if view.title_lines or view.body_lines:
                     imgui.spacing()
-                imgui.text_colored(rgba(VALUE), view.footer_line)
+                imgui.text_colored(rgba(palette().value), view.footer_line)
             return _current_rect()
         finally:
             imgui.end()

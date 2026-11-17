@@ -185,7 +185,7 @@ class ModalOption:
 
 @dataclass(frozen=True)
 class ModalLabeledLine:
-    """Setting-style modal body line: LABEL prefix ``label: `` plus VALUE text."""
+    """Setting-style modal body line: label prefix ``label: `` plus value text."""
 
     label: str
     value: str

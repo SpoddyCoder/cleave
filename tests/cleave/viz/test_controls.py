@@ -94,15 +94,7 @@ from cleave.viz.row_spec import (
     row_spec,
 )
 from cleave.viz.commands import command_by_id, command_context
-from cleave.viz.theme import (
-    CONFIG_DIRTY,
-    DISABLED,
-    HIGHLIGHT,
-    LOCKED,
-    MOVE_MODE,
-    SOLO_BG,
-    VALUE,
-)
+from cleave.viz.theme import palette
 from cleave.viz.material_icons import (
     FILE_GLYPH,
     FOLDER_GLYPH,
@@ -558,14 +550,14 @@ def test_save_command_label() -> None:
     command = command_by_id("file.save")
     assert command.label == "Save"
     assert command.enabled(command_context(controls)) is True
-    assert command.label_role(command_context(controls)) == VALUE
+    assert command.label_role(command_context(controls)) == palette().value
 
 
 def test_save_command_label_role_when_dirty() -> None:
     controls = make_controls(("layer_1",))
     mutate_dirty(controls)
     assert controls.config_dirty
-    assert command_by_id("file.save").label_role(command_context(controls)) == CONFIG_DIRTY
+    assert command_by_id("file.save").label_role(command_context(controls)) == palette().config_dirty
 
 
 def test_blend_and_opacity_change_sets_dirty_save_clears() -> None:
@@ -1430,10 +1422,10 @@ def test_overlay_title_collapse_refocuses_from_font_row() -> None:
 def test_track_header_visibility_icon_color() -> None:
     line_height = 17
     enabled = render_glyph(
-        VISIBILITY_GLYPH, color=VALUE, line_height=line_height
+        VISIBILITY_GLYPH, color=palette().value, line_height=line_height
     )
     disabled = render_glyph(
-        VISIBILITY_OFF_GLYPH, color=DISABLED, line_height=line_height
+        VISIBILITY_OFF_GLYPH, color=palette().disabled, line_height=line_height
     )
     assert enabled.get_width() > 0
     assert disabled.get_width() > 0
@@ -2813,10 +2805,10 @@ def test_timeline_header_eye_color_when_disabled() -> None:
     controls = make_controls(timeline_enabled=True)
     view = controls.build_view_state(paused=False)
     header = RowDescriptor(RowKind.TIMELINE_HEADER)
-    assert _row_value_color(view, header) == VALUE
+    assert _row_value_color(view, header) == palette().value
     controls.session.timeline.enabled = False
     view = controls.build_view_state(paused=False)
-    assert _row_value_color(view, header) == DISABLED
+    assert _row_value_color(view, header) == palette().disabled
 
 
 def test_timeline_sub_rows_dim_when_disabled() -> None:
@@ -2846,7 +2838,7 @@ def test_timeline_sub_rows_dim_when_disabled() -> None:
         RowKind.TIMELINE_GENERATE,
         RowKind.TIMELINE_RESET,
     ):
-        assert _row_value_color(view, RowDescriptor(kind)) == DISABLED, kind
+        assert _row_value_color(view, RowDescriptor(kind)) == palette().disabled, kind
 
 
 def test_timeline_enabled_change_callback() -> None:
@@ -3312,8 +3304,8 @@ def test_move_mode_colors_focused_track_header() -> None:
     view = controls.build_view_state(paused=False)
     header_row = RowDescriptor(RowKind.TRACK_HEADER, slot="layer_2")
     child_row = RowDescriptor(RowKind.TRACK_PRESET, slot="layer_2")
-    assert _row_value_color(view, header_row) == MOVE_MODE
-    assert _row_value_color(view, child_row) == MOVE_MODE
+    assert _row_value_color(view, header_row) == palette().move_mode
+    assert _row_value_color(view, child_row) == palette().move_mode
 
 
 def test_move_mode_colors_preset_list_item() -> None:
@@ -3334,8 +3326,8 @@ def test_move_mode_colors_preset_list_item() -> None:
     assert controls.preset_list.move_mode_preset == ("layer_1", 0)
 
     view = controls.build_view_state(paused=False)
-    assert _row_value_color(view, item) == MOVE_MODE
-    assert _row_value_color(view, sibling) != MOVE_MODE
+    assert _row_value_color(view, item) == palette().move_mode
+    assert _row_value_color(view, sibling) != palette().move_mode
 
 
 def test_preset_list_move_keeps_inspector_selection_on_moved_row() -> None:
@@ -3430,14 +3422,14 @@ def test_active_preset_list_item_uses_highlight_color() -> None:
     idle_row = RowDescriptor(
         RowKind.TRACK_PRESET_LIST_ITEM, slot="layer_1", preset_index=0
     )
-    assert _row_value_color(view, active_row) == HIGHLIGHT
-    assert _row_value_color(view, idle_row) == VALUE
+    assert _row_value_color(view, active_row) == palette().highlight
+    assert _row_value_color(view, idle_row) == palette().value
 
     layer.auto_preset_path = a
     view = controls.build_view_state(paused=False)
     assert view.tracks["layer_1"].active_preset_list_index == 0
-    assert _row_value_color(view, active_row) == VALUE
-    assert _row_value_color(view, idle_row) == HIGHLIGHT
+    assert _row_value_color(view, active_row) == palette().value
+    assert _row_value_color(view, idle_row) == palette().highlight
 
 
 def test_first_preset_list_item_highlighted_when_auto_unset() -> None:
@@ -3454,7 +3446,7 @@ def test_first_preset_list_item_highlighted_when_auto_unset() -> None:
     item_row = RowDescriptor(
         RowKind.TRACK_PRESET_LIST_ITEM, slot="layer_1", preset_index=0
     )
-    assert _row_value_color(view, item_row) == HIGHLIGHT
+    assert _row_value_color(view, item_row) == palette().highlight
 
 
 def test_row_value_color_dim_for_focused_empty_preset() -> None:
@@ -3482,7 +3474,7 @@ def test_row_value_color_dim_for_focused_empty_preset() -> None:
         notification_remaining_sec=0.0,
     )
     preset_row = RowDescriptor(RowKind.TRACK_PRESET, slot="layer_1")
-    assert _row_value_color(state, preset_row) == DISABLED
+    assert _row_value_color(state, preset_row) == palette().disabled
 
 
 def test_preset_overlay_shows_directory_and_position() -> None:
@@ -3589,7 +3581,7 @@ def test_overlay_locked_skips_children_in_nav() -> None:
     position_row = RowDescriptor(
         RowKind.OVERLAY_CARD_POSITION, card="opening_card"
     )
-    assert _row_value_color(view, position_row) == LOCKED
+    assert _row_value_color(view, position_row) == palette().locked
     assert RowKind.OVERLAY_CARD_POSITION in _page_kinds(
         view, "overlay.opening_card"
     )
@@ -3602,7 +3594,7 @@ def test_timeline_locked_dims_inspector_children() -> None:
     view = controls.build_view_state(paused=False)
     assert _row_value_color(
         view, RowDescriptor(RowKind.TIMELINE_PLACEMENT_SNAP)
-    ) == LOCKED
+    ) == palette().locked
     assert RowKind.TIMELINE_PLACEMENT_SNAP in _page_kinds(view, "timeline.grid")
 
 
@@ -3711,8 +3703,8 @@ def test_locked_sub_rows_use_locked_color() -> None:
     view = controls.build_view_state(paused=False)
     header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
     preset_dir_row = _row(view, "layer_1", RowKind.TRACK_PRESET_DIR)
-    assert _row_value_color(view, header_row) == VALUE
-    assert _row_value_color(view, preset_dir_row) == LOCKED
+    assert _row_value_color(view, header_row) == palette().value
+    assert _row_value_color(view, preset_dir_row) == palette().locked
 
 
 def test_locked_disabled_layer_sub_rows_prefer_locked_color() -> None:
@@ -3722,8 +3714,8 @@ def test_locked_disabled_layer_sub_rows_prefer_locked_color() -> None:
     view = controls.build_view_state(paused=False)
     header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
     preset_dir_row = _row(view, "layer_1", RowKind.TRACK_PRESET_DIR)
-    assert _row_value_color(view, header_row) == DISABLED
-    assert _row_value_color(view, preset_dir_row) == LOCKED
+    assert _row_value_color(view, header_row) == palette().disabled
+    assert _row_value_color(view, preset_dir_row) == palette().locked
 
 
 def test_locked_not_toggleable_during_move_mode() -> None:
@@ -3795,14 +3787,14 @@ def test_compositing_rows_dim_only_in_pattern_mask_mode() -> None:
         RowKind.TRACK_OPACITY,
     )
     for kind in kinds:
-        assert _row_value_color(view, _row(view, "layer_1", kind)) != DISABLED
+        assert _row_value_color(view, _row(view, "layer_1", kind)) != palette().disabled
 
     controls.session.pattern_mask.enabled = True
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(RowKind.TRACK_BLEND, slot="layer_1")
     view = controls.build_view_state(paused=False)
     for kind in kinds:
-        assert _row_value_color(view, _row(view, "layer_1", kind)) == DISABLED
+        assert _row_value_color(view, _row(view, "layer_1", kind)) == palette().disabled
 
 
 def test_format_mmss() -> None:
@@ -3891,7 +3883,7 @@ def test_solo_visibility_icon_same_width_as_normal() -> None:
     soloed = render_visibility_icon(enabled=True, solo=True, line_height=line_h)
     normal = render_visibility_icon(enabled=True, solo=False, line_height=line_h)
     assert soloed.get_width() == normal.get_width()
-    assert soloed.get_at((1, 1))[:3] == SOLO_BG
+    assert soloed.get_at((1, 1))[:3] == palette().solo_bg
 
 
 def test_try_quit_clean_session_returns_true_immediately() -> None:

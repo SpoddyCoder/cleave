@@ -15,7 +15,7 @@ from cleave.viz.choice_layout import STEPPER_BACK, STEPPER_FORWARD
 from cleave.viz.key_repeat import RepeatClock
 from cleave.viz.row_kinds import RowDescriptor
 from cleave.viz.row_spec import apply_field_horizontal
-from cleave.viz.theme import DISABLED
+from cleave.viz.theme import palette
 
 if TYPE_CHECKING:
     from imgui_bundle import imgui
@@ -32,7 +32,7 @@ def value_parts(
     # Stay off the play-path import graph until a stepped value is drawn.
     from cleave.viz.imgui_theme import rgba
 
-    bracket = rgba(DISABLED)
+    bracket = rgba(palette().disabled)
     return [
         (STEPPER_BACK, bracket),
         (value, color),

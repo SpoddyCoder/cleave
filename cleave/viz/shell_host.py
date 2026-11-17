@@ -59,7 +59,7 @@ from cleave.viz.shell_windows import (
     overlap_panel,
     panel_border_overlap_px,
 )
-from cleave.viz.theme import PANEL_EDGE, PANEL_FOCUS_EDGE
+from cleave.viz.theme import palette
 from cleave.viz.timeline_pointer import MIDDLE_BUTTON, RIGHT_BUTTON, TimelinePointer
 from cleave.viz.top_layer import TopLayer
 
@@ -596,7 +596,7 @@ class ShellHost:
                 "##shell-navigator",
                 navigator,
                 active=stop is CycleStop.NAVIGATOR,
-                idle_border=PANEL_EDGE,
+                idle_border=palette().panel_edge,
                 body=lambda: self.navigator.draw(frame),
                 scrollable=True,
             )
@@ -604,7 +604,7 @@ class ShellHost:
                 "##shell-inspector",
                 inspector,
                 active=stop is CycleStop.INSPECTOR,
-                idle_border=PANEL_EDGE,
+                idle_border=palette().panel_edge,
                 body=lambda: self.inspector.draw(frame),
             )
             self._draw_help(
@@ -618,18 +618,18 @@ class ShellHost:
                 # drawn here, sharing the rule under the columns above it.
                 draw_panel_border(
                     overlap_panel(layout.timeline, overlap),
-                    rgba(PANEL_FOCUS_EDGE)
+                    rgba(palette().panel_focus_edge)
                     if stop is CycleStop.TIMELINE
-                    else rgba(PANEL_EDGE),
+                    else rgba(palette().panel_edge),
                 )
             if stop is CycleStop.NAVIGATOR:
-                draw_panel_border(navigator, rgba(PANEL_FOCUS_EDGE))
+                draw_panel_border(navigator, rgba(palette().panel_focus_edge))
             elif stop is CycleStop.INSPECTOR:
-                draw_panel_border(inspector, rgba(PANEL_FOCUS_EDGE))
+                draw_panel_border(inspector, rgba(palette().panel_focus_edge))
             elif stop is CycleStop.PREVIEW:
                 draw_panel_border(
                     overlap_panel(layout.visualiser, overlap),
-                    rgba(PANEL_FOCUS_EDGE),
+                    rgba(palette().panel_focus_edge),
                 )
             # An open inspector dropdown stays above those outlines.
             raise_open_choice_lists()
@@ -678,7 +678,7 @@ class ShellHost:
             HELP_WINDOW,
             panel,
             active=False,
-            idle_border=PANEL_EDGE,
+            idle_border=palette().panel_edge,
             body=body,
             scrollable=True,
         )

@@ -19,7 +19,7 @@ from cleave.viz.menu_rows import (
 from cleave.viz.shell_context import ShellContext
 from cleave.viz.shell_widgets import selectable_label_origin
 from cleave.viz.row_paint import RowState, row_band
-from cleave.viz.theme import LABEL, tuning_ui_metrics, ui_chrome_px, VALUE
+from cleave.viz.theme import palette, tuning_ui_metrics, ui_chrome_px
 
 if TYPE_CHECKING:
     from cleave.viz.menu_bar import Menu
@@ -104,7 +104,7 @@ def command_row_view(command: Command, ctx: CommandContext) -> MenuRowView:
             and bool(command.checked(ctx))
         ),
         shortcut=command.shortcut,
-        color=command.label_role(ctx) if command.label_role is not None else VALUE,
+        color=command.label_role(ctx) if command.label_role is not None else palette().value,
     )
 
 
@@ -140,7 +140,7 @@ class MenuBarPanel:
     ) -> tuple[float | None, dict[int, tuple[float, float]], tuple[Menu, ...]]:
         menus = menus_for_session(self._ctx.controls.session)
         anchors: dict[int, tuple[float, float]] = {}
-        imgui.push_style_color(imgui.Col_.text, rgba(LABEL))
+        imgui.push_style_color(imgui.Col_.text, rgba(palette().label))
         # The bar's own border is covered by the menu titles. The white rule
         # is drawn later, on top.
         imgui.push_style_var(imgui.StyleVar_.window_border_size, 0.0)
@@ -161,7 +161,7 @@ class MenuBarPanel:
                     # the pointer. Idle hover is the theme's violet wash.
                     with row_band(RowState.LIT if active else None, bar=False) as mark_band:
                         if active:
-                            imgui.push_style_color(imgui.Col_.text, rgba(VALUE))
+                            imgui.push_style_color(imgui.Col_.text, rgba(palette().value))
                         clicked, _selected = imgui.selectable(
                             menu.label,
                             active,
@@ -172,7 +172,8 @@ class MenuBarPanel:
                         if active:
                             imgui.pop_style_color()
                     label_y = selectable_label_origin()[1]
-                    _draw_mnemonic_underline(menu.label, VALUE if active else LABEL)
+                    underline = palette().value if active else palette().label
+                    _draw_mnemonic_underline(menu.label, underline)
                     # The dropdown's top border sits on the rule row. The
                     # title's item rect ends a few pixels above the bar
                     # bottom, so anchoring there doubled the top border
@@ -218,11 +219,11 @@ class MenuBarPanel:
             return
         draw = imgui.get_window_draw_list()
         draw.add_text(
-            imgui.ImVec2(x, label_y), imgui.get_color_u32(rgba(LABEL)), prefix
+            imgui.ImVec2(x, label_y), imgui.get_color_u32(rgba(palette().label)), prefix
         )
         draw.add_text(
             imgui.ImVec2(x + prefix_w, label_y),
-            imgui.get_color_u32(rgba(VALUE)),
+            imgui.get_color_u32(rgba(palette().value)),
             name,
         )
 

@@ -1,6 +1,6 @@
 """Determinate progress bar shared by the loading screen and the progress modal.
 
-A ``SURFACE_EDGE`` border, a background gap, then a solid ``HIGHLIGHT`` fill,
+A ``surface_edge`` border, a background gap, then a solid ``highlight`` fill,
 the colour of a lit menu row's marker bar. Geometry is pure;
 ``draw_progress_bar`` needs a live ImGui frame.
 """
@@ -10,12 +10,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from cleave.viz.theme import (
-    ACCENT_FROM,
-    ACCENT_TO,
-    HIGHLIGHT,
     PROGRESS_BAR_BORDER_WIDTH,
     PROGRESS_BAR_FILL_GAP,
-    SURFACE_EDGE,
+    palette,
     ui_px,
 )
 
@@ -59,9 +56,9 @@ def accent_at(fraction: float) -> tuple[int, int, int]:
     """The accent gradient's colour *fraction* of the way from blue to violet."""
     t = clamp_fraction(fraction)
     return (
-        round(ACCENT_FROM[0] + (ACCENT_TO[0] - ACCENT_FROM[0]) * t),
-        round(ACCENT_FROM[1] + (ACCENT_TO[1] - ACCENT_FROM[1]) * t),
-        round(ACCENT_FROM[2] + (ACCENT_TO[2] - ACCENT_FROM[2]) * t),
+        round(palette().accent_from[0] + (palette().accent_to[0] - palette().accent_from[0]) * t),
+        round(palette().accent_from[1] + (palette().accent_to[1] - palette().accent_from[1]) * t),
+        round(palette().accent_from[2] + (palette().accent_to[2] - palette().accent_from[2]) * t),
     )
 
 
@@ -101,8 +98,8 @@ def draw_progress_bar(
         _fill(draw, bar, _packed(background))
     fill = progress_fill_rect(bar, fraction)
     if fill is not None:
-        _fill(draw, fill, _packed(HIGHLIGHT))
-    border = _packed(SURFACE_EDGE)
+        _fill(draw, fill, _packed(palette().highlight))
+    border = _packed(palette().surface_edge)
     t = min(PROGRESS_BAR_BORDER_WIDTH, width // 2, height // 2)
     _fill(draw, (x, y, width, t), border)
     _fill(draw, (x, y + height - t, width, t), border)

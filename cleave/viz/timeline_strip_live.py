@@ -24,16 +24,7 @@ from cleave.viz.row_present_renderers import (
     render_header_toggle,
     render_visibility_icon,
 )
-from cleave.viz.theme import (
-    ARMED_BG,
-    MUTED,
-    ICON_HOVER_FG,
-    REC_BG,
-    SONG_MARKER,
-    SONG_MARKER_SELECTED,
-    VALUE,
-    timeline_ui_metrics,
-)
+from cleave.viz.theme import palette, timeline_ui_metrics
 from cleave.viz.timeline_panel_cache import TimelinePanelCache
 from cleave.viz.timeline_strip_flash import (
     arm_button_lit,
@@ -370,30 +361,30 @@ def _draw_transport_buttons(
 ) -> Rect:
     """Play/pause and record glyphs in the corner (upload coordinates)."""
     play_rect, record_rect = layout.transport_rects()
-    rec_text_color = VALUE
+    rec_text_color = palette().value
     if state.recording:
         # Flash: red fill with white glyph and text, then a red glyph on
         # no fill.
         if rec_flash_visible():
-            pygame.draw.rect(surface, REC_BG, rec_fill_rect(record_rect))
-            record_color = VALUE
+            pygame.draw.rect(surface, palette().rec_bg, rec_fill_rect(record_rect))
+            record_color = palette().value
         else:
-            record_color = REC_BG
+            record_color = palette().rec_bg
     elif state.locked:
-        record_color = MUTED
+        record_color = palette().muted
     elif state.armed_slots:
-        record_color = ARMED_BG
+        record_color = palette().armed_bg
     else:
-        record_color = VALUE
-    play_color = VALUE
+        record_color = palette().value
+    play_color = palette().value
     # Shell hover: violet wash behind, hover yellow on glyph and text.
     if state.hover_button == "play":
         blit_hover(surface, play_rect)
-        play_color = ICON_HOVER_FG
+        play_color = palette().icon_hover_fg
     # Recording wins over hover, so a click on record flashes at once.
     if state.hover_button == "record" and not state.recording:
         blit_hover(surface, record_rect)
-        record_color = rec_text_color = ICON_HOVER_FG
+        record_color = rec_text_color = palette().icon_hover_fg
 
     icon_size = layout.transport_icon_size()
     icon_font = material_font(icon_size)
@@ -457,10 +448,10 @@ def _draw_row_live_flash(
     ):
         # The same square box as every header button's fill and hover.
         armed_surf = pygame.Surface((slot_w, slot_w), pygame.SRCALPHA)
-        armed_surf.fill((*ARMED_BG, ARMED_BG_ALPHA))
+        armed_surf.fill((*palette().armed_bg, ARMED_BG_ALPHA))
         upload.blit(armed_surf, (arm_x, icon_y))
         upload.blit(
-            render_header_toggle(RECORD_GLYPH, color=VALUE, line_height=layout.icon_h),
+            render_header_toggle(RECORD_GLYPH, color=palette().value, line_height=layout.icon_h),
             (arm_x, icon_y),
         )
     dirty.append(arm_rect)
@@ -541,7 +532,7 @@ def _draw_song_markers(
             selected_x = marker_x
             continue
         pygame.draw.line(
-            upload, SONG_MARKER, (marker_x, y0), (marker_x, y1), SONG_MARKER_WIDTH
+            upload, palette().song_marker, (marker_x, y0), (marker_x, y1), SONG_MARKER_WIDTH
         )
     # The selected marker draws last so a neighbour never covers it.
     if selected_x is not None:
@@ -555,7 +546,7 @@ def _draw_song_markers(
             if right > left:
                 flash_rect = (left, y0, right - left, y1 - y0 + 1)
         else:
-            color = SONG_MARKER_SELECTED
+            color = palette().song_marker_selected
             width = SONG_MARKER_SELECTED_WIDTH
         pygame.draw.line(upload, color, (selected_x, y0), (selected_x, y1), width)
     return flash_rect

@@ -79,18 +79,7 @@ from cleave.viz.shell_widgets import (
     stroke_h_rule,
 )
 from cleave.viz.text_fit import fit_path_or_name_to_width, fit_text_to_width
-from cleave.viz.theme import (
-    DISABLED,
-    INSPECTOR_DIVIDER,
-    LABEL,
-    LOCKED,
-    MUTED,
-    OFF_CONTROL_TEXT,
-    PRESET_FILE_ICON,
-    PRESET_ICON,
-    ui_chrome_px,
-    VALUE,
-)
+from cleave.viz.theme import palette, ui_chrome_px
 from cleave.viz.tooltips import show_tooltip
 from cleave.viz.value_nudge import nudge_cluster_origin_x, value_parts
 
@@ -109,9 +98,9 @@ _INSPECTOR_DIVIDER_LINES = 0.5
 
 def choice_tone(value_color: tuple[int, int, int]) -> ChoiceTone:
     """Choice control tone that matches a row drawn in *value_color*."""
-    if value_color == LOCKED:
+    if value_color == palette().locked:
         return ChoiceTone.LOCKED
-    if value_color == DISABLED:
+    if value_color == palette().disabled:
         return ChoiceTone.OFF
     return ChoiceTone.NORMAL
 
@@ -147,15 +136,15 @@ def path_row_icon(kind: RowKind) -> tuple[str, tuple[int, int, int]] | None:
     if spec.present_style is not RowPresentStyle.PATH_ICON:
         return None
     if spec.affordance is RowAffordance.PATH_DIR:
-        return FOLDER_GLYPH, PRESET_ICON
-    return FILE_GLYPH, PRESET_FILE_ICON
+        return FOLDER_GLYPH, palette().preset_icon
+    return FILE_GLYPH, palette().preset_file_icon
 
 
 def path_icon_color(
     accent: tuple[int, int, int], value_color: tuple[int, int, int]
 ) -> tuple[int, int, int]:
     """Icon accent, or the value color when the row is dimmed or locked."""
-    return value_color if value_color in (DISABLED, LOCKED) else accent
+    return value_color if value_color in (palette().disabled, palette().locked) else accent
 
 
 def _draw_path_value(
@@ -318,7 +307,7 @@ def _draw_inspector_divider() -> None:
     """Thin rule across the inspector, shorter than a row; takes no input."""
     origin = imgui.get_cursor_screen_pos()
     x1 = origin.x + imgui.get_content_region_avail().x
-    stroke_h_rule(origin.x, x1, _divider_rule_y(origin.y), INSPECTOR_DIVIDER)
+    stroke_h_rule(origin.x, x1, _divider_rule_y(origin.y), palette().inspector_divider)
     imgui.dummy(imgui.ImVec2(0.0, _divider_height()))
 
 
@@ -331,8 +320,8 @@ def _button_text_role(
     OFF tone (``_button_off``).
     """
     if locked:
-        return LOCKED
-    return VALUE if enabled and not page_off else OFF_CONTROL_TEXT
+        return palette().locked
+    return palette().value if enabled and not page_off else palette().off_control_text
 
 
 def _button_off(enabled: bool, locked: bool, *, page_off: bool) -> bool:
@@ -540,12 +529,12 @@ class InspectorPanel:
             label = row_label(state, desc)
             if row.is_heading:
                 value = format_row_value(state, desc) if spec.format_value else ""
-                imgui.text_colored(rgba(MUTED), f"{label} {value}".rstrip())
+                imgui.text_colored(rgba(palette().muted), f"{label} {value}".rstrip())
                 return
             selected = _inspector_row_selected(self._ctx.controls.shell_focus, desc)
             label_color, value_color = inspector_field_colors(state, desc)
-            if selected and label_color == LABEL:
-                label_color = VALUE
+            if selected and label_color == palette().label:
+                label_color = palette().value
             look = _RowLook(
                 row=row,
                 desc=desc,

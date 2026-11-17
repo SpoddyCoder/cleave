@@ -10,7 +10,7 @@ import pygame
 from cleave.timeline import TimelineClip, stem_abbreviation
 from cleave.viz.icon_button import icon_gap, icon_row
 from cleave.viz.material_icons import visibility_icon_slot_width
-from cleave.viz.theme import LABEL, timeline_panel_height_px, timeline_ui_metrics
+from cleave.viz.theme import palette, timeline_panel_height_px, timeline_ui_metrics
 from cleave.viz.timeline_panel_cache import timeline_badge_reserve_px
 from cleave.viz.timeline_ruler import ruler_tick_top
 
@@ -384,8 +384,9 @@ def compute_strip_layout(
     panel_h = fit_h + (row_h - icon_h) * row_count
     panel_w = band_w
 
-    layer_num_width = font.render(layer_num_prefix(max(row_count, 1)), True, LABEL).get_width()
-    stem_abbrev_width = font.render(stem_abbrev_label("drums"), True, LABEL).get_width()
+    prefix = layer_num_prefix(max(row_count, 1))
+    layer_num_width = font.render(prefix, True, palette().label).get_width()
+    stem_abbrev_width = font.render(stem_abbrev_label("drums"), True, palette().label).get_width()
     header_buttons = visible_header_buttons(any_override=any_override)
     prefix_width = row_prefix_width(
         layer_num_width, stem_abbrev_width, icon_h, header_buttons, padding=padding

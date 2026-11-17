@@ -27,19 +27,7 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import TYPE_CHECKING
 
-from cleave.viz.theme import (
-    HIGHLIGHT,
-    HOVER,
-    HOVER_BG_ALPHA,
-    ROW_BAR_PX,
-    ROW_FOCUS_EDGE,
-    ROW_FOCUSED_ALPHA,
-    ROW_FOCUSED_BAR,
-    ROW_SELECT_TINT,
-    ROW_SELECTED_ALPHA,
-    ROW_SELECTED_BAR,
-    ui_chrome_px,
-)
+from cleave.viz.theme import ROW_BAR_PX, palette, ui_chrome_px
 
 if TYPE_CHECKING:
     from imgui_bundle import imgui
@@ -71,7 +59,7 @@ class RowLook:
 def row_look(state: RowState, *, bar: bool = True) -> RowLook:
     """Band, edge, and marker bar for a row in *state*. *bar* False drops the bar."""
     if state is RowState.HOVER:
-        wash = (HOVER, HOVER_BG_ALPHA / 255.0)
+        wash = (palette().hover, palette().hover_bg_alpha / 255.0)
         return RowLook(wash, wash)
     if state is RowState.LIT:
         from cleave.viz.button_paint import ButtonState, ButtonTone, button_look
@@ -81,21 +69,21 @@ def row_look(state: RowState, *, bar: bool = True) -> RowLook:
             (lit.top, 1.0),
             (lit.bottom, 1.0),
             vertical=True,
-            bar=HIGHLIGHT if bar else None,
+            bar=palette().highlight if bar else None,
         )
     if state is RowState.SELECTED:
-        left, right = ROW_SELECTED_ALPHA
+        left, right = palette().row_selected_alpha
         return RowLook(
-            (ROW_SELECT_TINT, left),
-            (ROW_SELECT_TINT, right),
-            bar=ROW_SELECTED_BAR if bar else None,
+            (palette().row_select_tint, left),
+            (palette().row_select_tint, right),
+            bar=palette().row_selected_bar if bar else None,
         )
-    left, right = ROW_FOCUSED_ALPHA
+    left, right = palette().row_focused_alpha
     return RowLook(
-        (ROW_SELECT_TINT, left),
-        (ROW_SELECT_TINT, right),
-        edge=ROW_FOCUS_EDGE,
-        bar=ROW_FOCUSED_BAR if bar else None,
+        (palette().row_select_tint, left),
+        (palette().row_select_tint, right),
+        edge=palette().row_focus_edge,
+        bar=palette().row_focused_bar if bar else None,
     )
 
 

@@ -9,10 +9,7 @@ import pygame
 
 from cleave.paths import resource_dir
 from cleave.viz.overlay_upload import UploadPlan, UploadSignature
-from cleave.viz.theme import (
-    BACKGROUND,
-    BACKGROUND_ALPHA,
-)
+from cleave.viz.theme import palette
 
 _FONT_RELATIVE = Path("assets/fonts/DejaVuSansMono.ttf")
 _FONT_BOLD_RELATIVE = Path("assets/fonts/DejaVuSansMono-Bold.ttf")
@@ -95,7 +92,8 @@ def overlay_panel_surface(
 ) -> pygame.Surface:
     """Panel-sized SRCALPHA surface filled with the overlay background."""
     panel = pygame.Surface(size, pygame.SRCALPHA)
-    panel.fill((*BACKGROUND, BACKGROUND_ALPHA if fill_alpha is None else fill_alpha))
+    p = palette()
+    panel.fill((*p.background, p.background_alpha if fill_alpha is None else fill_alpha))
     return panel
 
 

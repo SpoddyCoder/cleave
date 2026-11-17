@@ -28,15 +28,7 @@ from cleave.viz.shell_widgets import (
     value_drag_steps,
     VALUE_DRAG_THRESHOLD_PX,
 )
-from cleave.viz.theme import (
-    ERROR_NOTIFICATION,
-    HIGHLIGHT,
-    NOTIFICATION_ON_FILL,
-    ICON_HOVER_FG,
-    TRANSPORT_RULE,
-    ui_chrome_px,
-    VALUE,
-)
+from cleave.viz.theme import palette, ui_chrome_px
 from cleave.viz.transport_controls import TransportField
 
 _TRANSPORT_GAP = 16.0
@@ -85,12 +77,12 @@ def transport_parts(readout: TransportReadout) -> list[TransportPart]:
     word = "PAUSED" if readout.paused else "PLAYING"
     has_bars = readout.bar_text != "—"
     return [
-        TransportPart(word, VALUE, TransportField.PLAY, icon=icon),
-        TransportPart(format_mmss(readout.position_sec), VALUE, TransportField.TIME),
-        TransportPart(f"/ {format_mmss(readout.duration_sec)}", VALUE, gap=False),
+        TransportPart(word, palette().value, TransportField.PLAY, icon=icon),
+        TransportPart(format_mmss(readout.position_sec), palette().value, TransportField.TIME),
+        TransportPart(f"/ {format_mmss(readout.duration_sec)}", palette().value, gap=False),
         TransportPart(
             f"BAR {readout.bar_text}",
-            VALUE,
+            palette().value,
             TransportField.BAR if has_bars else None,
         ),
     ]
@@ -113,8 +105,8 @@ _TRANSPORT_FIELD_TEMPLATE = {
 class TransportNotice:
     """One warning or error line drawn across the transport bar.
 
-    A timed warning uses ``HIGHLIGHT``. A persistent error uses
-    ``ERROR_NOTIFICATION``. ``timed`` is true when a click should dismiss it.
+    A timed warning uses ``highlight``. A persistent error uses
+    ``error_notification``. ``timed`` is true when a click should dismiss it.
     """
 
     text: str
@@ -130,11 +122,11 @@ def transport_notice(active: PanelNotificationActive) -> TransportNotice | None:
     hidden behind a pinned error. The error returns once the warning clears.
     """
     if active.message is not None:
-        return TransportNotice(active.message, HIGHLIGHT, active.elapsed_sec, True)
+        return TransportNotice(active.message, palette().highlight, active.elapsed_sec, True)
     if active.persistent_message is not None:
         return TransportNotice(
             active.persistent_message,
-            ERROR_NOTIFICATION,
+            palette().error_notification,
             active.persistent_elapsed_sec,
             False,
         )
@@ -199,7 +191,7 @@ def _draw_transport_notice(
             fill_x, fill_w = fill
             mid = text_x + text_size.x * 0.5
             if chip_x + fill_x <= mid < chip_x + fill_x + fill_w:
-                role = NOTIFICATION_ON_FILL
+                role = palette().notification_on_fill
         draw.add_text(imgui.ImVec2(text_x, text_y), packed_color(role), notice.text)
     finally:
         draw.pop_clip_rect()
@@ -247,7 +239,7 @@ class TransportBar:
         avail = imgui.get_window_width()
         pad = imgui.get_style().window_padding.x
         imgui.same_line(max(imgui.get_cursor_pos_x(), avail - width - pad))
-        imgui.text_colored(rgba(VALUE), fps)
+        imgui.text_colored(rgba(palette().value), fps)
         line = None if notice is None else transport_notice(notice)
         if line is not None:
             chip = _draw_transport_notice(line)
@@ -262,7 +254,7 @@ class TransportBar:
             origin.x,
             origin.x + size.x,
             origin.y + size.y - 1.0,
-            TRANSPORT_RULE,
+            palette().transport_rule,
             PANEL_BORDER_PX,
         )
 
@@ -332,7 +324,7 @@ class TransportBar:
         color = part.color
         if hovered:
             paint_hover(box)
-            color = ICON_HOVER_FG
+            color = palette().icon_hover_fg
         draw = imgui.get_window_draw_list()
         u32 = imgui.get_color_u32(rgba(color))
         x = glyph_x(box, imgui.calc_text_size(part.label).x)

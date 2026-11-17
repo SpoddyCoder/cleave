@@ -6,7 +6,7 @@ from imgui_bundle import imgui
 
 from cleave.viz.imgui_theme import rgba
 from cleave.viz.overlay_profiler import FrameReport, report_rows
-from cleave.viz.theme import LABEL, VALUE, ui_px
+from cleave.viz.theme import palette, ui_px
 
 _WINDOW = "##frame-timer"
 _INSET_PX = 8
@@ -39,8 +39,8 @@ def draw_profiler_panel(report: FrameReport | None, origin: tuple[int, int]) -> 
         )
         # The shell font is monospace, so padding lines the columns up.
         for label, value in rows:
-            imgui.text_colored(rgba(LABEL), label.ljust(label_chars))
+            imgui.text_colored(rgba(palette().label), label.ljust(label_chars))
             imgui.same_line()
-            imgui.text_colored(rgba(VALUE), value.rjust(value_chars))
+            imgui.text_colored(rgba(palette().value), value.rjust(value_chars))
     finally:
         imgui.end()

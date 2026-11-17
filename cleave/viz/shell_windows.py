@@ -8,11 +8,7 @@ from imgui_bundle import imgui
 
 from cleave.viz.imgui_theme import rgba
 from cleave.viz.shell_widgets import PANEL_BORDER_PX, stroke_h_rule
-from cleave.viz.theme import (
-    PANEL_FOCUS_EDGE,
-    SURFACE_EDGE,
-    TRANSPORT_RULE,
-)
+from cleave.viz.theme import palette
 
 HELP_WINDOW = "##shell-help"
 SHELL_FLAGS = (
@@ -175,7 +171,7 @@ def draw_fixed_window(
     x, y, w, h = rect
     if w <= 0 or h <= 0:
         return
-    border = PANEL_FOCUS_EDGE if active else idle_border
+    border = palette().panel_focus_edge if active else idle_border
     imgui.set_next_window_pos(
         imgui.ImVec2(float(x), float(y)), imgui.Cond_.always
     )
@@ -246,13 +242,13 @@ def draw_menu_rule(
             try:
                 if rule_y is not None:
                     stroke_h_rule(
-                        0.0, display.x, rule_y, TRANSPORT_RULE, PANEL_BORDER_PX
+                        0.0, display.x, rule_y, palette().transport_rule, PANEL_BORDER_PX
                     )
                     span = dropdown_span
                     if span is not None:
                         # The popup's top border sits on this row.
                         stroke_h_rule(
-                            span[0], span[1], rule_y, SURFACE_EDGE, PANEL_BORDER_PX
+                            span[0], span[1], rule_y, palette().surface_edge, PANEL_BORDER_PX
                         )
             finally:
                 draw.pop_clip_rect()

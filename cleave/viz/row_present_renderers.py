@@ -37,18 +37,7 @@ from cleave.viz.row_sections import (
     TIMELINE_SECTION_KINDS,
     TRACK_COMPOSITING_SECTION_KINDS,
 )
-from cleave.viz.theme import (
-    DISABLED,
-    HIGHLIGHT,
-    LABEL,
-    LOCKED,
-    MOVE_MODE,
-    OVERRIDE_BG,
-    OVERRIDE_GLYPH,
-    OVERRIDE_GLYPH_OFF,
-    SOLO_BG,
-    VALUE,
-)
+from cleave.viz.theme import palette
 from cleave.viz.tuning_view_state import TuningViewState
 
 
@@ -86,18 +75,18 @@ def row_value_color_for(
         and field is not None
         and field.present_style == RowPresentStyle.LABELED_VALUE
     ):
-        return LABEL
+        return palette().label
 
     if kind in SECTION_SWITCH_KINDS:
-        return LOCKED if locked_blocked else VALUE
+        return palette().locked if locked_blocked else palette().value
 
     if kind in TIMELINE_SECTION_KINDS:
         if not state.timeline.enabled or not row_available(state, desc):
-            return DISABLED
+            return palette().disabled
         if affordance != RowAffordance.COMMAND:
             # Cue rows carry a slot, but the layer's live visibility does not
             # dim them.
-            return LOCKED if locked_blocked else VALUE
+            return palette().locked if locked_blocked else palette().value
 
     if affordance == RowAffordance.COMMAND:
         if (
@@ -106,24 +95,24 @@ def row_value_color_for(
             and field.fit_strategy == FitStrategy.PATH
             and state.solo_active
         ):
-            return DISABLED
+            return palette().disabled
         if locked_blocked:
-            return LOCKED
-        return VALUE
+            return palette().locked
+        return palette().value
 
     stem = desc.slot
 
     if kind in OVERLAY_SECTION_KINDS:
         overlays = state.overlays
         if desc.card is not None and not getattr(overlays, desc.card).runtime.enabled:
-            return DISABLED
+            return palette().disabled
 
     if kind in POST_FX_FADE_KINDS and not state.post_fx.fade.enabled:
-        return DISABLED
+        return palette().disabled
 
     if kind in PATTERN_MASK_SECTION_KINDS:
         if not state.pattern_mask.enabled:
-            return DISABLED
+            return palette().disabled
 
     if kind in TRACK_COMPOSITING_SECTION_KINDS:
         editor_mode = state.settings.editor_mode
@@ -134,7 +123,7 @@ def row_value_color_for(
                 state.pattern_mask.enabled,
             )
         ):
-            return DISABLED
+            return palette().disabled
 
     if (
         affordance == RowAffordance.PATH_PRESET
@@ -142,16 +131,16 @@ def row_value_color_for(
         and stem is not None
         and state.tracks[stem].preset_empty
     ):
-        return DISABLED
+        return palette().disabled
 
     if _descriptor_in_move_mode(state, desc):
-        return MOVE_MODE
+        return palette().move_mode
 
     if locked_blocked:
-        return LOCKED
+        return palette().locked
 
     if stem is not None and track_disabled(state, stem):
-        return DISABLED
+        return palette().disabled
 
     if (
         affordance == RowAffordance.PATH_PRESET
@@ -159,20 +148,20 @@ def row_value_color_for(
         and desc.preset_index is not None
         and state.tracks[stem].active_preset_list_index == desc.preset_index
     ):
-        return HIGHLIGHT
+        return palette().highlight
 
-    return VALUE
+    return palette().value
 
 
 def inspector_field_colors(
     state: TuningViewState, desc: RowDescriptor
 ) -> tuple[tuple[int, int, int], tuple[int, int, int]]:
-    """Label and value colors. Locked blocked rows use LOCKED for both."""
+    """Label and value colors. Locked blocked rows use locked for both."""
     if section_lock_blocks_mutation(state, desc):
-        return LOCKED, LOCKED
+        return palette().locked, palette().locked
     spec = row_spec(desc.kind)
     full_line = spec.present_style in (RowPresentStyle.FULL_LINE, RowPresentStyle.LIST_ITEM)
-    label = VALUE if full_line else LABEL
+    label = palette().value if full_line else palette().label
     return label, row_value_color_for(state, desc)
 
 
@@ -229,10 +218,10 @@ def render_visibility_icon(
 ) -> pygame.Surface:
     glyph = VISIBILITY_GLYPH if enabled else VISIBILITY_OFF_GLYPH
     if override:
-        color = OVERRIDE_GLYPH if enabled else OVERRIDE_GLYPH_OFF
+        color = palette().override_glyph if enabled else palette().override_glyph_off
     elif enabled or solo:
-        color = VALUE
+        color = palette().value
     else:
-        color = DISABLED
-    bg = SOLO_BG if solo else OVERRIDE_BG if override else None
+        color = palette().disabled
+    bg = palette().solo_bg if solo else palette().override_bg if override else None
     return _icon_button_surface(glyph, color, line_height, bg)

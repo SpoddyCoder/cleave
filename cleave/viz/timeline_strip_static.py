@@ -16,26 +16,9 @@ from cleave.viz.row_present_renderers import (
     render_header_toggle,
     render_visibility_icon,
 )
-from cleave.viz.theme import (
-    BAR_GRID,
-    DISABLED,
-    HIGHLIGHT,
-    LABEL,
-    MUTED,
-    ICON_HOVER_FG,
-    OVERRIDE_BG,
-    OVERRIDE_GLYPH,
-    SOLO_BG,
-    SONG_BOUND,
-    TIMELINE_SCROLL_RAIL,
-    TIMELINE_SCROLL_THUMB,
-    TIMELINE_TRACK_COLORS,
-    VALUE,
-    timeline_ui_metrics,
-)
+from cleave.viz.theme import palette, timeline_ui_metrics
 from cleave.timeline import LEVEL_EPS
 from cleave.viz.timeline_ruler import render_time_ruler, song_bound_xs
-from cleave.viz.timeline_strip_flash import SELECTED_CLIP_COLOR
 from cleave.viz.timeline_strip_layout import (
     StripLayout,
     clip_bar_span,
@@ -88,7 +71,7 @@ def _lerp_rgb(
 
 def track_color(row_index: int) -> tuple[int, int, int]:
     """On-section colour of the timeline track at *row_index*."""
-    return TIMELINE_TRACK_COLORS[row_index % len(TIMELINE_TRACK_COLORS)]
+    return palette().timeline_track_colors[row_index % len(palette().timeline_track_colors)]
 
 
 def bar_level_y(bar_rect: pygame.Rect, level: float) -> int:
@@ -150,8 +133,8 @@ def _draw_level_bar(
 def header_rest_color(hovered: bool, *, blocked: bool = False) -> tuple[int, int, int]:
     """An unlit header button: muted, nudge on hover, disabled when blocked."""
     if blocked:
-        return DISABLED
-    return ICON_HOVER_FG if hovered else MUTED
+        return palette().disabled
+    return palette().icon_hover_fg if hovered else palette().muted
 
 
 def build_static_panel(
@@ -179,7 +162,7 @@ def build_static_panel(
             grid_x = time_to_x(t, bar_left, bar_width, view_start, view_end)
             pygame.draw.line(
                 panel,
-                BAR_GRID,
+                palette().bar_grid,
                 (grid_x, layout.bar_top),
                 (grid_x, layout.bar_bottom - 1),
                 1,
@@ -220,11 +203,11 @@ def build_static_panel(
             blit_hover(panel, layout.header_button_rect(hover_target, row_y))
 
         if focused:
-            label_color = VALUE
+            label_color = palette().value
         elif armed:
-            label_color = HIGHLIGHT
+            label_color = palette().highlight
         else:
-            label_color = LABEL
+            label_color = palette().label
         num_surf = font.render(layer_num_prefix(layer_num), True, label_color)
         abbrev_surf = font.render(stem_abbrev_label(stem_source), True, label_color)
         num_y = row_y + max(0, (row_h - num_surf.get_height()) // 2)
@@ -247,10 +230,10 @@ def build_static_panel(
         panel.blit(
             render_header_toggle(
                 SOLO_GLYPH,
-                color=VALUE if solo else header_rest_color(
+                color=palette().value if solo else header_rest_color(
                     hover_target == "solo"
                 ),
-                bg=SOLO_BG if solo else None,
+                bg=palette().solo_bg if solo else None,
                 line_height=layout.icon_h,
             ),
             (layout.header_button_x("solo"), icon_y),
@@ -268,8 +251,8 @@ def build_static_panel(
             panel.blit(
                 render_header_toggle(
                     REPLAY_GLYPH,
-                    color=OVERRIDE_GLYPH,
-                    bg=OVERRIDE_BG,
+                    color=palette().override_glyph,
+                    bg=palette().override_bg,
                     line_height=layout.icon_h,
                 ),
                 (layout.header_button_x("release"), icon_y),
@@ -293,7 +276,7 @@ def build_static_panel(
             tick_x = time_to_x(cue.t, bar_left, bar_width, view_start, view_end)
             pygame.draw.line(
                 panel,
-                (*LABEL, CUE_TICK_ALPHA),
+                (*palette().label, CUE_TICK_ALPHA),
                 (tick_x, bar_rect.y),
                 (tick_x, bar_rect.bottom - 1),
                 CUE_TICK_WIDTH,
@@ -336,7 +319,7 @@ def build_static_panel(
                     if time_in_view(edge_t, view_start, view_end):
                         pygame.draw.rect(
                             panel,
-                            SELECTED_CLIP_COLOR if selected else LABEL,
+                            palette().highlight if selected else palette().label,
                             pygame.Rect(
                                 max(left, handle_x),
                                 row_y,
@@ -347,7 +330,7 @@ def build_static_panel(
             if selected:
                 pygame.draw.rect(
                     panel,
-                    SELECTED_CLIP_COLOR,
+                    palette().highlight,
                     pygame.Rect(left, row_y, right - left, row_h),
                     SELECTED_CLIP_OUTLINE_WIDTH,
                 )
@@ -366,7 +349,7 @@ def build_static_panel(
     ):
         pygame.draw.line(
             panel,
-            SONG_BOUND,
+            palette().song_bound,
             (bound_x, 0),
             (bound_x, layout.bar_bottom - 1),
             1,
@@ -413,7 +396,7 @@ def _draw_scrollbar(
     rail_h = max(1, track_h // 3)
     pygame.draw.rect(
         panel,
-        TIMELINE_SCROLL_RAIL,
+        palette().timeline_scroll_rail,
         (track_x, track_y + (track_h - rail_h) // 2, track_w, rail_h),
     )
     if view_end - view_start >= state.duration_sec:
@@ -427,7 +410,7 @@ def _draw_scrollbar(
     )
     pygame.draw.rect(
         panel,
-        TIMELINE_SCROLL_THUMB,
+        palette().timeline_scroll_thumb,
         (track_x + thumb_x, track_y, thumb_w, track_h),
         border_radius=track_h // 2,
     )

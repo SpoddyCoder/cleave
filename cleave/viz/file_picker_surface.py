@@ -36,16 +36,7 @@ from cleave.viz.text_fit import (
     fit_text_to_width,
     wrap_text_to_width,
 )
-from cleave.viz.theme import (
-    BORDER_WIDTH,
-    DISABLED,
-    ERROR_NOTIFICATION,
-    HIGHLIGHT,
-    LABEL,
-    PRESET_ICON,
-    VALUE,
-    tuning_ui_metrics,
-)
+from cleave.viz.theme import BORDER_WIDTH, palette, tuning_ui_metrics
 
 Rect = tuple[int, int, int, int]
 _Role = tuple[int, int, int]
@@ -236,12 +227,12 @@ def apply_picker_pointer(
 
 def _row_color(row: PickerRow) -> _Role:
     if row.kind is PickerRowKind.NOTE:
-        return DISABLED
+        return palette().disabled
     if row.kind in (PickerRowKind.PARENT, PickerRowKind.DRIVE):
-        return LABEL
+        return palette().label
     if row.kind is PickerRowKind.PROJECT:
-        return HIGHLIGHT
-    return VALUE
+        return palette().highlight
+    return palette().value
 
 
 @functools.cache
@@ -552,7 +543,7 @@ class FilePickerSurface:
             float(bar_bottom),
         )
         for line in title_lines:
-            _text(draw, content_x, y, fit_text_to_width(measure, line, content_w), VALUE)
+            _text(draw, content_x, y, fit_text_to_width(measure, line, content_w), palette().value)
             y += step
         y = bar_bottom + line_gap
 
@@ -613,7 +604,7 @@ class FilePickerSurface:
                 content_x,
                 footer_y,
                 fit_text_to_width(measure, view.status, content_w),
-                ERROR_NOTIFICATION,
+                palette().error_notification,
             )
         self.button_rects = _paint_buttons(
             draw,
@@ -642,7 +633,7 @@ class FilePickerSurface:
                 _paint(draw, hit, "FOCUSED")
             elif hover_chip == index:
                 _paint(draw, hit, "HOVER")
-            color = VALUE if selected else HIGHLIGHT if current else VALUE
+            color = palette().highlight if current and not selected else palette().value
             _text(draw, screen_x, y, text, color)
             rects.append(hit)
             indices.append(index)
@@ -659,11 +650,11 @@ class FilePickerSurface:
         content_w: int,
         icon_gap: int,
     ) -> None:
-        _text(draw, x, y, FOLDER_GLYPH, PRESET_ICON)
+        _text(draw, x, y, FOLDER_GLYPH, palette().preset_icon)
         prefix_w = measure.size(FOLDER_GLYPH)[0] + icon_gap
         text_w = max(1, content_w - prefix_w)
         fitted = location_text(location, text_w, lambda text: measure.size(text)[0])
-        _text(draw, x + prefix_w, y + location_text_lift(), fitted, VALUE)
+        _text(draw, x + prefix_w, y + location_text_lift(), fitted, palette().value)
 
     def _paint_list(
         self,
@@ -814,7 +805,7 @@ class FilePickerSurface:
                         _paint(draw, rect, "SELECTED")
                 finally:
                     draw.pop_clip_rect()
-            color = VALUE if selected else _row_color(row)
+            color = palette().value if selected else _row_color(row)
             _text(
                 draw,
                 content_x,
@@ -842,9 +833,9 @@ class FilePickerSurface:
             if index:
                 cursor += gap
             prefix = f"{key}: "
-            _text(draw, cursor, y, prefix, LABEL)
+            _text(draw, cursor, y, prefix, palette().label)
             cursor += measure.size(prefix)[0]
-            _text(draw, cursor, y, label, VALUE)
+            _text(draw, cursor, y, label, palette().value)
             cursor += measure.size(label)[0]
 
     def _record_pointer(self) -> None:

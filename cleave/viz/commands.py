@@ -21,7 +21,7 @@ from cleave.viz.editor_mode_controls import is_preset_curation_mode
 from cleave.viz.key_repeat import mod_alt, mod_ctrl
 from cleave.viz.navigator import layer_node_id, layer_slot_of
 from cleave.viz.shell_focus import ShellRegion
-from cleave.viz.theme import CONFIG_DIRTY, VALUE
+from cleave.viz.theme import palette
 
 if TYPE_CHECKING:
     from cleave.viz.controls import TuningControls
@@ -231,8 +231,8 @@ def _save_enabled(ctx: CommandContext) -> bool:
 
 def _save_label_role(ctx: CommandContext) -> LabelRole:
     if ctx.config_dirty:
-        return CONFIG_DIRTY
-    return VALUE
+        return palette().config_dirty
+    return palette().value
 
 
 def _render_enabled(ctx: CommandContext) -> bool:

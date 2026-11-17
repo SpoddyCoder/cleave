@@ -36,7 +36,7 @@ from cleave.viz.navigator import (
     visible_top_level_ids,
 )
 from cleave.viz.session import LayerRuntime, TuningSession
-from cleave.viz.theme import LABEL, MOVE_MODE, VALUE
+from cleave.viz.theme import palette
 from cleave.viz.shell_focus import ShellRegion
 from tests.support.viz import (
     keydown,
@@ -251,9 +251,9 @@ def test_selected_row_text_is_value_unless_moving() -> None:
     nodes = build_navigator(_two_layers(), {"layers", "post_fx", open_id})
 
     for node in nodes:
-        assert navigator_row_text_color(node, selected=True, moving=False) == VALUE
-        assert navigator_row_text_color(node, selected=True, moving=True) == MOVE_MODE
-        expected = VALUE if navigator_row_bright(node) else LABEL
+        assert navigator_row_text_color(node, selected=True, moving=False) == palette().value
+        assert navigator_row_text_color(node, selected=True, moving=True) == palette().move_mode
+        expected = palette().value if navigator_row_bright(node) else palette().label
         assert navigator_row_text_color(node, selected=False, moving=False) == expected
 
 

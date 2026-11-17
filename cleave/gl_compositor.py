@@ -22,7 +22,7 @@ from cleave.layer_blend import (
     opacity_in_alpha,
 )
 from cleave.layer_composite import LayerCompositeRequest
-from cleave.viz.theme import BACKGROUND
+from cleave.viz.theme import palette
 from OpenGL.GL import (
     GL_BLEND,
     GL_BLEND_EQUATION_RGB,
@@ -922,7 +922,7 @@ class GlCompositor:
         self._ensure_init()
         self._bind_default_framebuffer()
         glDisable(GL_BLEND)
-        red, green, blue = BACKGROUND
+        red, green, blue = palette().background
         glClearColor(red / 255.0, green / 255.0, blue / 255.0, 1.0)
         glClear(GL_COLOR_BUFFER_BIT)
         dest = _present_dest_rect(

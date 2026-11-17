@@ -51,17 +51,7 @@ from cleave.viz.modal_surface import (
 from cleave.viz.shell_focus import ShellRegion
 from cleave.viz.shell_layout import ShellLayout
 from cleave.viz.progress_bar import accent_at
-from cleave.viz.theme import (
-    DISABLED,
-    HIGHLIGHT,
-    LABEL,
-    OFF_CONTROL_TEXT,
-    ROW_FOCUS_EDGE,
-    ROW_FOCUSED_ALPHA,
-    ROW_SELECT_TINT,
-    VALUE,
-    tuning_ui_metrics,
-)
+from cleave.viz.theme import palette, tuning_ui_metrics
 from tests.support.shell import (
     Rect,
     draw_shell,
@@ -305,31 +295,31 @@ def test_kind_renders_with_idle_mouse(view: ModalViewState) -> None:
         assert abs(surface.panel_rect[0] - (screen_w - expected[0]) // 2) <= 1
         assert abs(surface.panel_rect[1] - (screen_h - expected[1]) // 2) <= 1
         colors = _color_counts()
-        wash = _pack(ROW_SELECT_TINT, ROW_FOCUSED_ALPHA[0])
-        border = _pack(ROW_FOCUS_EDGE)
+        wash = _pack(palette().row_select_tint, palette().row_focused_alpha[0])
+        border = _pack(palette().row_focus_edge)
         assert colors.get(_pack(accent_at(0.0)), 0) > 0
         assert colors.get(_pack(accent_at(1.0)), 0) > 0
         if view.kind == ModalKind.TEXT:
-            assert colors.get(_pack(DISABLED), 0) == 4 * _glyphs(EDITING_HINT)
+            assert colors.get(_pack(palette().disabled), 0) == 4 * _glyphs(EDITING_HINT)
             # The buttons rest in the OFF tone while the field holds the keys.
-            assert colors.get(_pack(OFF_CONTROL_TEXT), 0) == 4 * sum(
+            assert colors.get(_pack(palette().off_control_text), 0) == 4 * sum(
                 _glyphs(label) for label in TEXT_BUTTON_LABELS
             )
-            assert colors.get(_pack(HIGHLIGHT), 0) == 4
+            assert colors.get(_pack(palette().highlight), 0) == 4
             assert wash not in colors
             assert border not in colors
         elif view.kind == ModalKind.PROGRESS:
-            assert colors.get(_pack(LABEL), 0) == 4 * sum(
+            assert colors.get(_pack(palette().label), 0) == 4 * sum(
                 _glyphs(line.prefix()) for line in view.labeled_lines
             )
-            assert colors.get(_pack(HIGHLIGHT), 0) == 4
+            assert colors.get(_pack(palette().highlight), 0) == 4
             assert wash not in colors
             assert border not in colors
         else:
-            assert _pack(HIGHLIGHT) not in colors
+            assert _pack(palette().highlight) not in colors
             assert wash not in colors
             assert _lit_buttons(colors) > 0
-            assert colors.get(_pack(VALUE), 0) > 0
+            assert colors.get(_pack(palette().value), 0) > 0
         if view.kind == ModalKind.TEXT:
             assert surface.text_field_rect is not None
             assert len(surface.text_button_rects) == 2
@@ -746,13 +736,13 @@ def test_caret_quad_follows_caret_visible() -> None:
         field = surface.text_field_rect
         assert field is not None
         hidden_elems = _field_clip_elems(field)
-        assert _color_counts().get(_pack(HIGHLIGHT), 0) == 0
+        assert _color_counts().get(_pack(palette().highlight), 0) == 0
         surface = ModalSurface(shown, ImGuiTextMeasure())
         _idle(host, surface)
         field = surface.text_field_rect
         assert field is not None
         assert _field_clip_elems(field) == hidden_elems + 6
-        assert _color_counts().get(_pack(HIGHLIGHT), 0) == 4
+        assert _color_counts().get(_pack(palette().highlight), 0) == 4
 
 
 def test_text_button_colours_follow_focus() -> None:
@@ -788,23 +778,23 @@ def test_text_button_colours_follow_focus() -> None:
         surface = ModalSurface(navigating, ImGuiTextMeasure())
         _idle(host, surface)
         colors = _color_counts()
-        wash = _pack(ROW_SELECT_TINT, ROW_FOCUSED_ALPHA[0])
-        border = _pack(ROW_FOCUS_EDGE)
-        assert colors.get(_pack(OFF_CONTROL_TEXT), 0) == 4 * sum(
+        wash = _pack(palette().row_select_tint, palette().row_focused_alpha[0])
+        border = _pack(palette().row_focus_edge)
+        assert colors.get(_pack(palette().off_control_text), 0) == 4 * sum(
             _glyphs(label) for label in TEXT_BUTTON_LABELS
         )
         assert colors.get(wash, 0) == 2
         assert border in colors
         assert _lit_buttons(colors) == 0
-        assert _pack(HIGHLIGHT) not in colors
+        assert _pack(palette().highlight) not in colors
         _pointer(host, surface, rect_center(surface.text_field_rect), click=False)
         assert surface.intent == ModalPointerIntent(ModalPointerKind.HOVER_TEXT_FIELD)
 
         surface = ModalSurface(confirming, ImGuiTextMeasure())
         _idle(host, surface)
         colors = _color_counts()
-        assert _pack(OFF_CONTROL_TEXT) not in colors
-        assert _pack(HIGHLIGHT) not in colors
+        assert _pack(palette().off_control_text) not in colors
+        assert _pack(palette().highlight) not in colors
         assert _lit_buttons(colors) > 0
         _pointer(host, surface, rect_center(surface.text_button_rects[1]), click=False)
         assert surface.intent == ModalPointerIntent(
@@ -823,11 +813,11 @@ def test_hover_text_button_while_editing_keeps_the_caret() -> None:
         _pointer(host, surface, rect_center(surface.text_button_rects[0]), click=False)
         assert surface.intent is None
         colors = _color_counts()
-        wash = _pack(ROW_SELECT_TINT, ROW_FOCUSED_ALPHA[0])
+        wash = _pack(palette().row_select_tint, palette().row_focused_alpha[0])
         assert _lit_buttons(colors) > 0
-        assert colors.get(_pack(HIGHLIGHT), 0) == 4
-        assert colors.get(_pack(DISABLED), 0) == 4 * _glyphs(EDITING_HINT)
-        assert colors.get(_pack(OFF_CONTROL_TEXT), 0) == 4 * _glyphs(TEXT_BUTTON_LABELS[1])
+        assert colors.get(_pack(palette().highlight), 0) == 4
+        assert colors.get(_pack(palette().disabled), 0) == 4 * _glyphs(EDITING_HINT)
+        assert colors.get(_pack(palette().off_control_text), 0) == 4 * _glyphs(TEXT_BUTTON_LABELS[1])
         _pointer(host, surface, rect_center(surface.text_button_rects[0]), click=True)
         assert surface.intent == ModalPointerIntent(
             ModalPointerKind.ACTIVATE_TEXT_BUTTON, index=0
@@ -946,7 +936,7 @@ def test_inspector_button_inline_field_and_colour_picker_draw() -> None:
             drawn.append(
                 shell_widgets.draw_button(
                     "Go##button",
-                    text_role=theme.VALUE,
+                    text_role=theme.palette().value,
                     selected=True,
                     enabled=True,
                 )

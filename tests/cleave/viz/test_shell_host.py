@@ -71,18 +71,7 @@ from cleave.viz.shell_strip import (
 from cleave.viz.shell_widgets import drag_handle_lead
 from cleave.viz.shell_windows import scroll_clip_span
 from cleave.viz.material_icons import FILE_GLYPH, FOLDER_GLYPH
-from cleave.viz.theme import (
-    DISABLED,
-    PRESET_FILE_ICON,
-    PRESET_ICON,
-    VALUE,
-    LOCKED,
-    MUTED,
-    NAV_LOCK_BG,
-    NAV_LOCK_GLYPH,
-    NAV_ON_BG,
-    SOLO_BG,
-)
+from cleave.viz.theme import palette
 from tests.support.viz import make_controls
 
 
@@ -171,17 +160,17 @@ def test_navigator_toggle_presentation() -> None:
     assert navigator_toggle_glyph(locked) == LOCK_GLYPH
     assert navigator_toggle_glyph(unlocked) == LOCK_OPEN_GLYPH
     assert navigator_toggle_glyph(solo) == SOLO_GLYPH
-    assert navigator_toggle_color(on) == VALUE
-    assert navigator_toggle_color(off) == MUTED
-    assert navigator_toggle_color(blocked) == VALUE
-    assert navigator_toggle_color(NavToggle(TOGGLE_ENABLED, False, True)) == LOCKED
-    assert navigator_toggle_color(locked) == NAV_LOCK_GLYPH
-    assert navigator_toggle_color(unlocked) == MUTED
-    assert navigator_toggle_fill(on) == NAV_ON_BG
+    assert navigator_toggle_color(on) == palette().value
+    assert navigator_toggle_color(off) == palette().muted
+    assert navigator_toggle_color(blocked) == palette().value
+    assert navigator_toggle_color(NavToggle(TOGGLE_ENABLED, False, True)) == palette().locked
+    assert navigator_toggle_color(locked) == palette().nav_lock_glyph
+    assert navigator_toggle_color(unlocked) == palette().muted
+    assert navigator_toggle_fill(on) == palette().nav_on_bg
     assert navigator_toggle_fill(off) is None
-    assert navigator_toggle_fill(blocked) == NAV_ON_BG
-    assert navigator_toggle_fill(solo) == SOLO_BG
-    assert navigator_toggle_fill(locked) == NAV_LOCK_BG
+    assert navigator_toggle_fill(blocked) == palette().nav_on_bg
+    assert navigator_toggle_fill(solo) == palette().solo_bg
+    assert navigator_toggle_fill(locked) == palette().nav_lock_bg
     assert navigator_toggle_fill(unlocked) is None
     assert navigator_toggle_tooltip(off) == "Off: click to turn on"
     inert = NavToggle(TOGGLE_ENABLED, True, inert=True)
@@ -441,12 +430,12 @@ def test_drag_handle_lead_covers_glyph_plus_a_gap() -> None:
 
 
 def test_path_row_icon_folder_for_preset_directory() -> None:
-    assert path_row_icon(RowKind.TRACK_PRESET_DIR) == (FOLDER_GLYPH, PRESET_ICON)
+    assert path_row_icon(RowKind.TRACK_PRESET_DIR) == (FOLDER_GLYPH, palette().preset_icon)
 
 
 def test_path_row_icon_file_for_presets() -> None:
     for kind in (RowKind.TRACK_PRESET, RowKind.TRACK_PRESET_LIST_ITEM):
-        assert path_row_icon(kind) == (FILE_GLYPH, PRESET_FILE_ICON)
+        assert path_row_icon(kind) == (FILE_GLYPH, palette().preset_file_icon)
 
 
 def test_path_row_icon_none_for_other_rows() -> None:
@@ -454,9 +443,9 @@ def test_path_row_icon_none_for_other_rows() -> None:
 
 
 def test_path_icon_color_dims_with_row() -> None:
-    assert path_icon_color(PRESET_ICON, VALUE) == PRESET_ICON
-    assert path_icon_color(PRESET_ICON, DISABLED) == DISABLED
-    assert path_icon_color(PRESET_ICON, LOCKED) == LOCKED
+    assert path_icon_color(palette().preset_icon, palette().value) == palette().preset_icon
+    assert path_icon_color(palette().preset_icon, palette().disabled) == palette().disabled
+    assert path_icon_color(palette().preset_icon, palette().locked) == palette().locked
 
 
 def test_layer_enabled_row_is_inert_while_the_timeline_is_on() -> None:
@@ -515,17 +504,17 @@ def test_page_toggle_buttons_draw_like_navigator_icons() -> None:
         toggles, PageStatus(off_by="Post-FX", locked_by="Post-FX")
     )
     assert (off.id, off.glyph, off.color, off.fill) == (
-        TOGGLE_ENABLED, POWER_GLYPH, MUTED, None
+        TOGGLE_ENABLED, POWER_GLYPH, palette().muted, None
     )
     assert off.enabled and "Post-FX is off" in off.tooltip()
-    assert (lock.id, lock.glyph, lock.fill) == (TOGGLE_LOCK, LOCK_GLYPH, NAV_LOCK_BG)
+    assert (lock.id, lock.glyph, lock.fill) == (TOGGLE_LOCK, LOCK_GLYPH, palette().nav_lock_bg)
     assert lock.enabled and lock.tooltip() == "Post-FX is locked: click to unlock"
 
 
 def test_page_toggle_buttons_show_a_parent_that_is_off_or_locked() -> None:
     card = PageToggle(NavToggle(TOGGLE_ENABLED, True), "overlay.opening_card", "Opening Card")
     (on,) = page_toggle_buttons((card,), PageStatus(off_by="Overlay"))
-    assert on.fill == NAV_ON_BG and on.fill_alpha == 0.5
+    assert on.fill == palette().nav_on_bg and on.fill_alpha == 0.5
     assert "Overlay is turned on" in on.tooltip()
     blocked = PageToggle(
         NavToggle(TOGGLE_ENABLED, True, blocked=True), "overlay.opening_card", "Opening Card"
@@ -542,9 +531,9 @@ def test_page_toggle_buttons_show_a_parent_that_is_off_or_locked() -> None:
 
 
 def test_choice_tone_follows_row_value_colour() -> None:
-    assert choice_tone(VALUE) is ChoiceTone.NORMAL
-    assert choice_tone(DISABLED) is ChoiceTone.OFF
-    assert choice_tone(LOCKED) is ChoiceTone.LOCKED
+    assert choice_tone(palette().value) is ChoiceTone.NORMAL
+    assert choice_tone(palette().disabled) is ChoiceTone.OFF
+    assert choice_tone(palette().locked) is ChoiceTone.LOCKED
 
 
 def _label_click(mode: str, *, expanded: bool, clicked: bool = False,

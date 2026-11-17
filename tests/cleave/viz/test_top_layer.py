@@ -17,7 +17,7 @@ from cleave.viz.modal import ModalHost
 from cleave.viz.context_menu import ContextMenuState
 from cleave.viz.inline_edit import InlineEditController
 from cleave.viz.commands import CommandContext
-from cleave.viz.imgui_theme import IMGUI_COLOR_ROLES, apply_imgui_theme, rgba
+from cleave.viz.imgui_theme import apply_imgui_theme, imgui_color_roles, rgba
 from cleave.viz.menu_bar import MenuBarState
 from cleave.viz.info_panel import InfoPanelViewState
 from cleave.viz.shell_focus import ShellRegion
@@ -212,7 +212,7 @@ def test_apply_imgui_theme_uses_the_role_table() -> None:
             imgui.Col_.separator,
             imgui.Col_.modal_window_dim_bg,
         ):
-            role, alpha = IMGUI_COLOR_ROLES[slot]
+            role, alpha = imgui_color_roles()[slot]
             got = style.color_(slot)
             expect = rgba(role, alpha)
             assert got.x == pytest.approx(expect.x)

@@ -8,7 +8,7 @@ from imgui_bundle import imgui
 
 from cleave.viz.help_content import DescriptionSection, HelpContent
 from cleave.viz.imgui_theme import padded_row_spacing_y, rgba
-from cleave.viz.theme import LABEL, VALUE
+from cleave.viz.theme import palette
 from cleave.viz.title_bar import paint_title_bar
 
 
@@ -43,7 +43,7 @@ def draw_help_column(sections: tuple[HelpContent, ...]) -> None:
         _draw_heading(section.title, wrap_x)
         if isinstance(section, DescriptionSection):
             for line in section.lines:
-                _draw_wrapped(line, VALUE, wrap_x)
+                _draw_wrapped(line, palette().value, wrap_x)
             if section.lines and section.entries:
                 imgui.dummy(imgui.ImVec2(0.0, imgui.get_text_line_height()))
         for key, description in section.entries:
@@ -51,7 +51,7 @@ def draw_help_column(sections: tuple[HelpContent, ...]) -> None:
 
 
 def _draw_heading(text: str, wrap_x: float) -> None:
-    """A section title in VALUE on a title bar the column's full width.
+    """A section title in value on a title bar the column's full width.
 
     The bar is a padded row's height per line and reaches into the window
     padding as far as the window clips its content.
@@ -70,7 +70,7 @@ def _draw_heading(text: str, wrap_x: float) -> None:
         origin.x + width + pad_x,
         origin.y + text_h + pad_y,
     )
-    _draw_wrapped(text, VALUE, wrap_x)
+    _draw_wrapped(text, palette().value, wrap_x)
     imgui.set_cursor_pos_y(imgui.get_cursor_pos_y() + pad_y)
 
 
@@ -89,6 +89,6 @@ def _draw_key_value(
     wrap_x: float,
 ) -> None:
     row_y = imgui.get_cursor_pos().y
-    imgui.text_colored(rgba(LABEL), key)
+    imgui.text_colored(rgba(palette().label), key)
     imgui.set_cursor_pos(imgui.ImVec2(start_x + key_w + gap, row_y))
-    _draw_wrapped(description, VALUE, wrap_x)
+    _draw_wrapped(description, palette().value, wrap_x)

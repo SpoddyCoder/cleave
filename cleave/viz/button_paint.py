@@ -18,26 +18,7 @@ from enum import Enum, auto
 from imgui_bundle import imgui
 
 from cleave.viz.imgui_theme import darken, lighten, rgba
-from cleave.viz.theme import (
-    BUTTON_ACTIVE_BG,
-    BUTTON_BG,
-    BUTTON_BORDER,
-    BUTTON_DANGER_ACTIVE_BG,
-    BUTTON_DANGER_BG,
-    BUTTON_DANGER_HOVER_BG,
-    BUTTON_DANGER_HOVER_BORDER,
-    BUTTON_GLOW_ALPHA,
-    BUTTON_HOVER_BG,
-    BUTTON_HOVER_BORDER,
-    BUTTON_OFF_BG,
-    BUTTON_OFF_BORDER,
-    BUTTON_PRIMARY_ACTIVE_BG,
-    BUTTON_PRIMARY_BG,
-    BUTTON_PRIMARY_HOVER_BG,
-    BUTTON_PRIMARY_HOVER_BORDER,
-    BUTTON_SHADE,
-    BUTTON_SHEEN,
-)
+from cleave.viz.theme import palette
 
 RGB = tuple[int, int, int]
 Rect = tuple[float, float, float, float]
@@ -64,37 +45,33 @@ class ButtonLook:
     glow: RGB | None = None
 
 
-# Rest fill, rest border, hover fill, hover border, pressed fill.
-_TONES: dict[ButtonTone, tuple[RGB, RGB | None, RGB, RGB, RGB]] = {
-    ButtonTone.PLAIN: (
-        BUTTON_BG,
-        BUTTON_BORDER,
-        BUTTON_HOVER_BG,
-        BUTTON_HOVER_BORDER,
-        BUTTON_ACTIVE_BG,
-    ),
-    ButtonTone.OFF: (
-        BUTTON_OFF_BG,
-        BUTTON_OFF_BORDER,
-        BUTTON_HOVER_BG,
-        BUTTON_HOVER_BORDER,
-        BUTTON_ACTIVE_BG,
-    ),
-    ButtonTone.PRIMARY: (
-        BUTTON_PRIMARY_BG,
-        None,
-        BUTTON_PRIMARY_HOVER_BG,
-        BUTTON_PRIMARY_HOVER_BORDER,
-        BUTTON_PRIMARY_ACTIVE_BG,
-    ),
-    ButtonTone.DANGER: (
-        BUTTON_DANGER_BG,
-        None,
-        BUTTON_DANGER_HOVER_BG,
-        BUTTON_DANGER_HOVER_BORDER,
-        BUTTON_DANGER_ACTIVE_BG,
-    ),
-}
+def _tone_colours(tone: ButtonTone) -> tuple[RGB, RGB | None, RGB, RGB, RGB]:
+    """Rest fill, rest border, hover fill, hover border, and pressed fill."""
+    p = palette()
+    if tone is ButtonTone.PRIMARY:
+        return (
+            p.button_primary_bg,
+            None,
+            p.button_primary_hover_bg,
+            p.button_primary_hover_border,
+            p.button_primary_active_bg,
+        )
+    if tone is ButtonTone.DANGER:
+        return (
+            p.button_danger_bg,
+            None,
+            p.button_danger_hover_bg,
+            p.button_danger_hover_border,
+            p.button_danger_active_bg,
+        )
+    off = tone is ButtonTone.OFF
+    return (
+        p.button_off_bg if off else p.button_bg,
+        p.button_off_border if off else p.button_border,
+        p.button_hover_bg,
+        p.button_hover_border,
+        p.button_active_bg,
+    )
 
 
 def button_look(
@@ -105,17 +82,16 @@ def button_look(
     *fill* replaces the rest fill (a dimmed chosen segment); its border is a
     lighter shade of it. A pressed button sinks: the shade moves to the top.
     """
-    rest, rest_border, hover, hover_border, pressed = _TONES[tone]
+    rest, rest_border, hover, hover_border, pressed = _tone_colours(tone)
+    sheen, shade = palette().button_sheen, palette().button_shade
     if state is ButtonState.REST:
         base = rest if fill is None else fill
         border = rest_border if fill is None and rest_border else lighten(base, 0.18)
-        return ButtonLook(
-            lighten(base, BUTTON_SHEEN), darken(base, BUTTON_SHADE * 0.5), border
-        )
+        return ButtonLook(lighten(base, sheen), darken(base, shade * 0.5), border)
     glow = None if tone in (ButtonTone.PLAIN, ButtonTone.OFF) else hover
     if state is ButtonState.PRESSED:
-        return ButtonLook(darken(pressed, BUTTON_SHADE), pressed, hover_border, glow)
-    return ButtonLook(lighten(hover, BUTTON_SHEEN), darken(hover, BUTTON_SHADE), hover_border, glow)
+        return ButtonLook(darken(pressed, shade), pressed, hover_border, glow)
+    return ButtonLook(lighten(hover, sheen), darken(hover, shade), hover_border, glow)
 
 
 def _u32(rgb: RGB, alpha: float = 1.0) -> int:
@@ -128,7 +104,8 @@ def paint_look(draw: imgui.ImDrawList, rect: Rect, look: ButtonLook) -> None:
     if w <= 0 or h <= 0:
         return
     if look.glow is not None:
-        for ring, alpha in ((1.0, BUTTON_GLOW_ALPHA), (2.0, BUTTON_GLOW_ALPHA * 0.45)):
+        glow_alpha = palette().button_glow_alpha
+        for ring, alpha in ((1.0, glow_alpha), (2.0, glow_alpha * 0.45)):
             draw.add_rect(
                 imgui.ImVec2(x - ring, y - ring),
                 imgui.ImVec2(x + w + ring, y + h + ring),

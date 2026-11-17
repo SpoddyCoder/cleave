@@ -56,19 +56,7 @@ from cleave.viz.shell_widgets import (
     RowDrag,
     space_lead,
 )
-from cleave.viz.theme import (
-    DISABLED,
-    LABEL,
-    LOCK_ICON,
-    LOCKED,
-    MUTED,
-    NAV_LOCK_BG,
-    NAV_LOCK_GLYPH,
-    NAV_ON_BG,
-    NAVIGATOR_TREE_LINE,
-    SOLO_BG,
-    VALUE,
-)
+from cleave.viz.theme import palette
 
 _NAV_LOCK_MARK = "[lock]"
 # Fixed columns, so a row without solo keeps its icons under the rows that have it.
@@ -107,19 +95,19 @@ def navigator_toggle_fill(toggle: NavToggle) -> tuple[int, int, int] | None:
     if toggle.id == TOGGLE_ADD or not toggle.active:
         return None
     if toggle.id == TOGGLE_LOCK:
-        return NAV_LOCK_BG
+        return palette().nav_lock_bg
     if toggle.id in (TOGGLE_SOLO, TOGGLE_PREVIEW):
-        return SOLO_BG
-    return NAV_ON_BG
+        return palette().solo_bg
+    return palette().nav_on_bg
 
 
 def navigator_toggle_color(toggle: NavToggle) -> tuple[int, int, int]:
     """Resting icon color. Muted while inactive; a lit icon sits on its fill."""
     if toggle.id == TOGGLE_ADD:
-        return DISABLED if toggle.blocked else VALUE
+        return palette().disabled if toggle.blocked else palette().value
     if not toggle.active:
-        return LOCKED if toggle.blocked else MUTED
-    return NAV_LOCK_GLYPH if toggle.id == TOGGLE_LOCK else VALUE
+        return palette().locked if toggle.blocked else palette().muted
+    return palette().nav_lock_glyph if toggle.id == TOGGLE_LOCK else palette().value
 
 
 def navigator_toggle_tooltip(toggle: NavToggle) -> str:
@@ -354,7 +342,7 @@ def _draw_nav_tree_lines(
     first_stem_x = math.floor(left_x + _nav_indent() * 0.5)
     mid_y = math.floor(row_text_y(rect_min.y) + line * 0.5) + 0.5
     elbow_right_x = row_x - math.floor(imgui.get_style().item_spacing.x * 0.5)
-    color = imgui.get_color_u32(rgba(NAVIGATOR_TREE_LINE))
+    color = imgui.get_color_u32(rgba(palette().navigator_tree_line))
     draw = imgui.get_window_draw_list()
     for x1, y1, x2, y2 in navigator_tree_lines(
         rails,
@@ -376,7 +364,7 @@ def _draw_nav_lock_mark(text_pos: imgui.ImVec2, label: str, mark: str) -> None:
     )
     imgui.get_window_draw_list().add_text(
         origin,
-        imgui.get_color_u32(rgba(LOCK_ICON)),
+        imgui.get_color_u32(rgba(palette().lock_icon)),
         mark,
     )
 
@@ -429,7 +417,7 @@ class NavigatorPanel:
 
     def draw(self, frame: ShellFrame) -> None:
         nodes = frame.nav_nodes
-        imgui.push_style_color(imgui.Col_.text, rgba(LABEL))
+        imgui.push_style_color(imgui.Col_.text, rgba(palette().label))
         try:
             with padded_rows():
                 self.row_rects = {}
@@ -476,7 +464,7 @@ class NavigatorPanel:
                 text_color = navigator_row_text_color(
                     node, selected=selected, moving=moving
                 )
-                bright = text_color != LABEL
+                bright = text_color != palette().label
                 if bright:
                     imgui.push_style_color(imgui.Col_.text, rgba(text_color))
                 try:
@@ -515,7 +503,7 @@ class NavigatorPanel:
             if mark is not None:
                 _draw_nav_lock_mark(text_pos, node.label, mark)
             if node.badge:
-                _draw_item_suffix(node.badge, rgba(LABEL))
+                _draw_item_suffix(node.badge, rgba(palette().label))
             if node.toggles:
                 self._draw_toggles(node, row_right_x, span)
             if node.draggable:

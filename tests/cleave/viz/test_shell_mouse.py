@@ -630,13 +630,13 @@ def test_clicks_outside_a_splitter_still_reach_imgui() -> None:
 
 
 def test_theme_exports_hover_role() -> None:
-    from cleave.viz.theme import HOVER, HOVER_BG_ALPHA
+    from cleave.viz.theme import palette
 
-    assert isinstance(HOVER, tuple)
-    assert len(HOVER) == 3
-    assert all(type(channel) is int for channel in HOVER)
-    assert type(HOVER_BG_ALPHA) is int
-    assert 0 < HOVER_BG_ALPHA <= 255
+    assert isinstance(palette().hover, tuple)
+    assert len(palette().hover) == 3
+    assert all(type(channel) is int for channel in palette().hover)
+    assert type(palette().hover_bg_alpha) is int
+    assert 0 < palette().hover_bg_alpha <= 255
 
 
 def _rect_center(rect: tuple[int, int, int, int]) -> tuple[int, int]:

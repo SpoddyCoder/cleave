@@ -18,7 +18,7 @@ from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.row_present_renderers import inspector_field_colors
 from cleave.viz.row_sections import SECTION_SWITCH_KINDS
 from cleave.viz.row_spec import format_row_value, row_available, row_label
-from cleave.viz.theme import DISABLED, VALUE, LOCKED
+from cleave.viz.theme import palette
 from cleave.viz.tuning_view_state import (
     SettingsBlock,
     TimelineBlock,
@@ -371,21 +371,21 @@ def test_locked_blocks_still_build() -> None:
         for row in build_inspector_rows(state, "overlay.opening_card")
         if not row.divider and row.descriptor.kind is RowKind.OVERLAY_CARD_POSITION
     )
-    assert inspector_field_colors(state, position) == (LOCKED, LOCKED)
+    assert inspector_field_colors(state, position) == (palette().locked, palette().locked)
 
     fade_start = next(
         row.descriptor
         for row in build_inspector_rows(state, "post_fx.fade")
         if row.descriptor.kind is RowKind.POST_FX_FADE_IN_START
     )
-    assert inspector_field_colors(state, fade_start) == (LOCKED, LOCKED)
+    assert inspector_field_colors(state, fade_start) == (palette().locked, palette().locked)
 
     density = next(
         row.descriptor
         for row in build_inspector_rows(state, "pattern_mask.pattern")
         if row.descriptor.kind is RowKind.PATTERN_MASK_DENSITY
     )
-    assert inspector_field_colors(state, density) == (LOCKED, LOCKED)
+    assert inspector_field_colors(state, density) == (palette().locked, palette().locked)
 
 
 def test_layer_page_keeps_direct_rows_and_delete() -> None:
@@ -443,10 +443,10 @@ def test_section_lock_inspector_field_colors() -> None:
     )
     opacity = RowDescriptor(RowKind.TRACK_OPACITY, slot="layer_1")
     delete = RowDescriptor(RowKind.LAYER_MANAGEMENT_DELETE, slot="layer_1")
-    assert inspector_field_colors(state, opacity) == (LOCKED, LOCKED)
+    assert inspector_field_colors(state, opacity) == (palette().locked, palette().locked)
     label, value = inspector_field_colors(state, delete)
-    assert label == VALUE
-    assert value != LOCKED
+    assert label == palette().value
+    assert value != palette().locked
     rows = build_inspector_rows(state, layer_node_id("layer_1"))
     assert any(row.navigable and "layers.delete" in row.command_ids for row in rows)
 
@@ -591,7 +591,7 @@ def test_timeline_row_page_shows_every_field_of_a_clip() -> None:
     _label, value = inspector_field_colors(
         state, RowDescriptor(RowKind.TIMELINE_CLIP_START, slot="layer_1")
     )
-    assert value == VALUE
+    assert value == palette().value
 
 
 def test_timeline_clip_cut_out_is_unavailable_on_a_butted_clip() -> None:
@@ -613,7 +613,7 @@ def test_timeline_clip_rows_are_unavailable_while_recording() -> None:
     desc = RowDescriptor(RowKind.TIMELINE_CLIP_OPACITY, slot="layer_1")
     assert row_available(state, desc) is False
     _label, value = inspector_field_colors(state, desc)
-    assert value == DISABLED
+    assert value == palette().disabled
 
 
 def test_timeline_row_page_for_a_missing_layer_is_empty() -> None:

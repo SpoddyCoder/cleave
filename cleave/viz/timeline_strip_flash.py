@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pygame
 
-from cleave.viz.theme import ARMED_BG, HIGHLIGHT, PLAYHEAD, PLAYHEAD_FLASH
+from cleave.viz.theme import palette
 
 REC_FLASH_MS: int = 500
 PLAYHEAD_FLASH_MS: int = 400
@@ -13,10 +13,6 @@ ARM_FLASH_DURATION_MS: int = ARM_FLASH_HALF_MS * 4
 # Selected-clip flash: same blink cadence as arm flash, two flashes.
 SELECTED_CLIP_FLASH_HALF_MS: int = ARM_FLASH_HALF_MS
 SELECTED_CLIP_FLASH_DURATION_MS: int = SELECTED_CLIP_FLASH_HALF_MS * 4
-# Settled selected outline (HIGHLIGHT yellow); the flash pulses yellow/red.
-SELECTED_CLIP_COLOR: tuple[int, int, int] = HIGHLIGHT
-SELECTED_CLIP_FLASH_YELLOW: tuple[int, int, int] = HIGHLIGHT
-SELECTED_CLIP_FLASH_RED: tuple[int, int, int] = ARMED_BG
 
 
 def rec_flash_visible(ticks_ms: int | None = None) -> bool:
@@ -34,8 +30,8 @@ def playhead_flash_bright(ticks_ms: int | None = None) -> bool:
 
 def playhead_color(ticks_ms: int | None = None) -> tuple[int, int, int]:
     if playhead_flash_bright(ticks_ms):
-        return PLAYHEAD_FLASH
-    return PLAYHEAD
+        return palette().playhead_flash
+    return palette().playhead
 
 
 def prune_expired_arm_flashes(
@@ -108,7 +104,7 @@ def selected_clip_flash_bright(
     flash_start_ms: int | None,
     ticks_ms: int | None = None,
 ) -> bool:
-    """True on the yellow (HIGHLIGHT) half of the selected-cue blink cycle."""
+    """True on the yellow (highlight) half of the selected-cue blink cycle."""
     if not selected_clip_flash_active(flash_start_ms, ticks_ms=ticks_ms):
         return False
     if ticks_ms is None:
@@ -122,11 +118,13 @@ def selected_clip_flash_color(
     flash_start_ms: int | None,
     ticks_ms: int | None = None,
 ) -> tuple[int, int, int]:
+    """Selected clip outline: the highlight once settled; the flash pulses it
+    with the armed red."""
     if selected_clip_flash_bright(flash_start_ms, ticks_ms=ticks_ms):
-        return SELECTED_CLIP_FLASH_YELLOW
+        return palette().highlight
     if selected_clip_flash_active(flash_start_ms, ticks_ms=ticks_ms):
-        return SELECTED_CLIP_FLASH_RED
-    return SELECTED_CLIP_COLOR
+        return palette().armed_bg
+    return palette().highlight
 
 
 def arm_button_lit(

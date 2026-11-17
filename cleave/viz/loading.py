@@ -40,14 +40,7 @@ from cleave.viz.progress_bar import (
     progress_fill_rect,
 )
 from cleave.viz.text_fit import TextSizer, fit_text_to_width
-from cleave.viz.theme import (
-    BACKGROUND,
-    LABEL,
-    VALUE,
-    set_ui_scale_percent,
-    ui_px,
-    ui_scale_percent,
-)
+from cleave.viz.theme import palette, set_ui_scale_percent, ui_px, ui_scale_percent
 from cleave.viz import sdl_window
 
 if TYPE_CHECKING:
@@ -303,12 +296,12 @@ def _draw_loading_block(
         begun = True
         _raise_window(_LOADING_WINDOW)
         draw = imgui.get_window_draw_list()
-        _text(draw, layout.message_xy[0], layout.message_xy[1], message, VALUE)
+        _text(draw, layout.message_xy[0], layout.message_xy[1], message, palette().value)
         if fitted and layout.detail_xy is not None:
-            _text(draw, layout.detail_xy[0], layout.detail_xy[1], fitted, LABEL)
+            _text(draw, layout.detail_xy[0], layout.detail_xy[1], fitted, palette().label)
         if layout.bar_rect is not None:
             draw_progress_bar(
-                draw, layout.bar_rect, fraction or 0.0, background=BACKGROUND
+                draw, layout.bar_rect, fraction or 0.0, background=palette().background
             )
     finally:
         if begun:
@@ -320,7 +313,7 @@ def _draw_loading_block(
 def _clear_display(width: int, height: int) -> None:
     glBindFramebuffer(GL_FRAMEBUFFER, 0)
     glViewport(0, 0, width, height)
-    red, green, blue = BACKGROUND
+    red, green, blue = palette().background
     glClearColor(red / 255.0, green / 255.0, blue / 255.0, 1.0)
     glClear(GL_COLOR_BUFFER_BIT)
 

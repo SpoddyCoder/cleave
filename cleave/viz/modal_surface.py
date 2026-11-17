@@ -63,16 +63,7 @@ from cleave.viz.modal_layout import (
     visible_field_lines,
 )
 from cleave.viz.title_bar import paint_title_bar
-from cleave.viz.theme import (
-    BORDER_WIDTH,
-    DISABLED,
-    HIGHLIGHT,
-    LABEL,
-    MUTED,
-    OFF_CONTROL_TEXT,
-    VALUE,
-    tuning_ui_metrics,
-)
+from cleave.viz.theme import BORDER_WIDTH, palette, tuning_ui_metrics
 
 Rect = tuple[int, int, int, int]
 _Role = tuple[int, int, int]
@@ -285,7 +276,7 @@ def _draw_title_bar(
     *,
     clip_w: int | None = None,
 ) -> int:
-    """A modal's title in VALUE on a title bar across the panel, from its top
+    """A modal's title in value on a title bar across the panel, from its top
     border. *clip_w* cuts the title, not the bar. Returns the bar's bottom."""
     ox, oy, panel_w = panel
     bottom = title_bar_bottom(y, lines_block_height(len(lines), line_h, line_gap))
@@ -297,10 +288,10 @@ def _draw_title_bar(
         float(bottom),
     )
     if clip_w is None:
-        _draw_line_block(draw, x, y, lines, VALUE, line_h, line_gap)
+        _draw_line_block(draw, x, y, lines, palette().value, line_h, line_gap)
     else:
         with _clipped(draw, (x, y, clip_w, bottom - y)):
-            _draw_line_block(draw, x, y, lines, VALUE, line_h, line_gap)
+            _draw_line_block(draw, x, y, lines, palette().value, line_h, line_gap)
     return bottom
 
 
@@ -315,8 +306,8 @@ def _draw_labeled(
 ) -> int:
     for index, line in enumerate(lines):
         prefix = line.prefix()
-        _text(draw, x, y, prefix, LABEL)
-        _text(draw, x + measure.size(prefix)[0], y, line.value, VALUE)
+        _text(draw, x, y, prefix, palette().label)
+        _text(draw, x + measure.size(prefix)[0], y, line.value, palette().value)
         y += line_h
         if index + 1 < len(lines):
             y += line_gap
@@ -363,7 +354,7 @@ def draw_modal_button(
     paint_button(draw, rect, ButtonTone.OFF if resting_off else _BUTTON_TONES[role], state)
     text = option_text(label)
     text_w, text_h = measure.size(text)
-    lit_text = OFF_CONTROL_TEXT if resting_off else VALUE
+    lit_text = palette().off_control_text if resting_off else palette().value
     _text(draw, x + (w - text_w) // 2, y + (h - text_h) // 2, text, lit_text)
 
 
@@ -445,7 +436,7 @@ def _draw_form_rows(
         if row.heading is not None:
             heading_h = form_heading_height(line_h, first=index == 0)
             heading_y = y + heading_h - form_row_height(line_h) + form_row_pad_y()
-            _text(draw, left, heading_y, row.heading, MUTED)
+            _text(draw, left, heading_y, row.heading, palette().muted)
             y += heading_h
         height = form_row_height(line_h)
         row_left = left + (form_section_indent() if row.indented else 0)
@@ -455,7 +446,8 @@ def _draw_form_rows(
             # A 2px gap between the outline and the label / control.
             _highlight_option(draw, _outset(rect, _HIGHLIGHT_PAD + 1, pad_y=0))
         text_y = y + form_row_pad_y()
-        _text(draw, row_left, text_y, row.label, VALUE if row.focused else LABEL)
+        label_rgb = palette().value if row.focused else palette().label
+        _text(draw, row_left, text_y, row.label, label_rgb)
         width = form_control_width(measure, row)
         control = (right - width, text_y, width, line_h)
         controls[index] = control
@@ -707,14 +699,14 @@ class ModalSurface:
                 x,
                 y,
                 message_lines(measure, view.body, screen_w=screen_w),
-                VALUE,
+                palette().value,
                 line_h,
                 line_gap,
             )
         if view.form_info is not None:
             if has_message:
                 y += line_gap
-            _text(draw, x, y, view.form_info, HIGHLIGHT)
+            _text(draw, x, y, view.form_info, palette().highlight)
             y += line_h
         if has_labeled:
             if has_message:
@@ -784,7 +776,7 @@ class ModalSurface:
         for line in cta[1:]:
             y += panel_pad_y()
             with _clipped(draw, (x, y, content_w, line_h)):
-                _text(draw, x, y, line, DISABLED)
+                _text(draw, x, y, line, palette().disabled)
             y += line_h
         y += section_gap
 
@@ -830,7 +822,7 @@ class ModalSurface:
         with _clipped(draw, field_rect):
             line_y = y
             for index, line in enumerate(visible):
-                _text(draw, x - scroll_x, line_y, line, VALUE)
+                _text(draw, x - scroll_x, line_y, line, palette().value)
                 line_y += line_h
                 if index + 1 < len(visible):
                     line_y += line_gap
@@ -848,14 +840,14 @@ class ModalSurface:
                     imgui.ImVec2(
                         float(caret_x + CARET_WIDTH), float(caret_y + line_h)
                     ),
-                    _packed(HIGHLIGHT),
+                    _packed(palette().highlight),
                 )
 
         y += field_h
         if error is not None:
             y += line_gap
             with _clipped(draw, (x, y, content_w, line_h)):
-                _text(draw, x, y, error, HIGHLIGHT)
+                _text(draw, x, y, error, palette().highlight)
             y += line_h
         y += section_gap
         self.text_button_rects = _draw_text_buttons(

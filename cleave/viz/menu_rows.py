@@ -23,7 +23,7 @@ from cleave.viz.context_menu import (
 from cleave.viz.imgui_theme import floating_surface, padded_row_spacing_y, padded_rows, rgba
 from cleave.viz.row_paint import RowState, row_band
 from cleave.viz.tooltips import show_tooltip
-from cleave.viz.theme import DISABLED, HIGHLIGHT, MUTED, SURFACE_TEXT, VALUE, ui_chrome_px
+from cleave.viz.theme import palette, ui_chrome_px
 
 Rect = tuple[int, int, int, int]
 
@@ -83,14 +83,15 @@ _SUBMENU_WINDOW = "##cleave-context-submenu"
 
 @dataclass(frozen=True)
 class MenuRowView:
-    """One drawn row. ``color`` is the label colour when not highlighted."""
+    """One drawn row. ``color`` is the label colour when not highlighted
+    (the palette's value colour when None)."""
 
     id: str
     label: str
     enabled: bool = True
     checked: bool = False
     shortcut: str | None = None
-    color: tuple[int, int, int] = VALUE
+    color: tuple[int, int, int] | None = None
     submenu: bool = False
 
 
@@ -178,13 +179,14 @@ def draw_menu_rows(
                 hovered = index
             if is_highlighted:
                 # Yellow ticks on the lit row, as in the open choice list.
-                label_color = rgba(VALUE if row.enabled else MUTED)
-                check_color = rgba(HIGHLIGHT if row.enabled else MUTED)
-                shortcut_color = rgba(SURFACE_TEXT)
+                label_color = rgba(palette().value if row.enabled else palette().muted)
+                check_color = rgba(palette().highlight if row.enabled else palette().muted)
+                shortcut_color = rgba(palette().surface_text)
             else:
-                label_color = rgba(row.color if row.enabled else DISABLED)
-                check_color = rgba(VALUE if row.enabled else DISABLED)
-                shortcut_color = rgba(MUTED)
+                label_rgb = row.color or palette().value
+                label_color = rgba(label_rgb if row.enabled else palette().disabled)
+                check_color = rgba(palette().value if row.enabled else palette().disabled)
+                shortcut_color = rgba(palette().muted)
             # Selectable anchors the label at the cursor and pads the highlight
             # with half of ItemSpacing on each side. Frame padding would push
             # the label down so the fill sits high, flush with the next row.

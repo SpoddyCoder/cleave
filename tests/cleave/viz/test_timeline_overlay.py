@@ -22,33 +22,15 @@ from cleave.viz.icon_button import icon_gap
 from cleave.viz.material_icons import visibility_icon_slot_width
 from cleave.viz.overlay_primitives import overlay_font
 from cleave.viz.row_present_renderers import render_visibility_icon
-from cleave.viz.theme import (
-    ARMED_BG,
-    LABEL,
-    DISABLED,
-    HIGHLIGHT,
-    OVERRIDE_BG,
-    OVERRIDE_GLYPH,
-    OVERRIDE_GLYPH_OFF,
-    PLAYHEAD,
-    PLAYHEAD_FLASH,
-    SOLO_BG,
-    VALUE,
-    SONG_MARKER,
-    SONG_MARKER_SELECTED,
-    timeline_ui_metrics,
-)
+from cleave.viz.theme import palette, timeline_ui_metrics
 from cleave.viz.timeline_overlay import TimelineOverlay
 from cleave.viz.timeline_strip_flash import (
     REC_FLASH_MS,
     ARM_FLASH_DURATION_MS,
     ARM_FLASH_HALF_MS,
     PLAYHEAD_FLASH_MS,
-    SELECTED_CLIP_COLOR,
     SELECTED_CLIP_FLASH_DURATION_MS,
     SELECTED_CLIP_FLASH_HALF_MS,
-    SELECTED_CLIP_FLASH_RED,
-    SELECTED_CLIP_FLASH_YELLOW,
     arm_button_lit,
     arm_flash_active,
     arm_flash_visible,
@@ -196,7 +178,7 @@ def test_bar_runs_from_header_buttons_to_right_padding() -> None:
 
 
 def test_armed_bg_matches_solo_bg() -> None:
-    assert ARMED_BG == SOLO_BG
+    assert palette().armed_bg == palette().solo_bg
 
 
 def test_override_visibility_icon_glyph_colors() -> None:
@@ -204,12 +186,12 @@ def test_override_visibility_icon_glyph_colors() -> None:
     line_h = 20
     enabled = render_visibility_icon(enabled=True, override=True, line_height=line_h)
     disabled = render_visibility_icon(enabled=False, override=True, line_height=line_h)
-    assert enabled.get_at((1, 1))[:3] == OVERRIDE_BG
-    assert disabled.get_at((1, 1))[:3] == OVERRIDE_BG
+    assert enabled.get_at((1, 1))[:3] == palette().override_bg
+    assert disabled.get_at((1, 1))[:3] == palette().override_bg
     glyph_x = enabled.get_width() // 2
-    assert enabled.get_at((glyph_x, line_h // 2))[:3] == OVERRIDE_GLYPH
-    assert disabled.get_at((glyph_x, line_h // 2))[:3] == OVERRIDE_GLYPH_OFF
-    assert OVERRIDE_GLYPH_OFF == DISABLED
+    assert enabled.get_at((glyph_x, line_h // 2))[:3] == palette().override_glyph
+    assert disabled.get_at((glyph_x, line_h // 2))[:3] == palette().override_glyph_off
+    assert palette().override_glyph_off == palette().disabled
 
 
 def test_rec_flash_visible_alternates_every_500ms() -> None:
@@ -227,8 +209,8 @@ def test_playhead_flash_alternates_color() -> None:
     assert playhead_flash_bright(half) is False
     assert playhead_flash_bright(half * 2 - 1) is False
     assert playhead_flash_bright(half * 2) is True
-    assert playhead_color(0) == PLAYHEAD_FLASH
-    assert playhead_color(half) == PLAYHEAD
+    assert playhead_color(0) == palette().playhead_flash
+    assert playhead_color(half) == palette().playhead
 
 
 def test_arm_flash_visible_blinks_twice() -> None:
@@ -330,8 +312,8 @@ def test_armed_recording_monitor_eye_flashes_when_focused(monkeypatch) -> None:
     flash_on = _header_bg_pixel(surface_on, overlay, "eye", row_y, row_h)
     flash_off = _header_bg_pixel(surface_off, overlay, "eye", row_y, row_h)
 
-    assert flash_on == OVERRIDE_BG
-    assert flash_off != OVERRIDE_BG
+    assert flash_on == palette().override_bg
+    assert flash_off != palette().override_bg
     assert flash_on != flash_off
 
 
@@ -348,7 +330,7 @@ def test_armed_recording_monitor_eye_uses_override_bg_when_flash_on(monkeypatch)
     panel = overlay.panel_rect
     assert panel is not None
     panel_x, panel_y, _, _ = panel
-    assert _header_bg_pixel(surface, overlay, "eye", row_y, row_h) == OVERRIDE_BG
+    assert _header_bg_pixel(surface, overlay, "eye", row_y, row_h) == palette().override_bg
 
 
 def test_armed_recording_monitor_eye_hides_override_bg_when_flash_off(monkeypatch) -> None:
@@ -364,7 +346,7 @@ def test_armed_recording_monitor_eye_hides_override_bg_when_flash_off(monkeypatc
     panel = overlay.panel_rect
     assert panel is not None
     panel_x, panel_y, _, _ = panel
-    assert _header_bg_pixel(surface, overlay, "eye", row_y, row_h) != OVERRIDE_BG
+    assert _header_bg_pixel(surface, overlay, "eye", row_y, row_h) != palette().override_bg
 
 
 def _header_x(overlay: TimelineOverlay, target: str) -> int:
@@ -455,7 +437,7 @@ def test_armed_stem_label_uses_highlight() -> None:
     left = panel_x + abbrev_x
     top = panel_y + row_y
     found_highlight = any(
-        surface.get_at((x, y))[:3] == HIGHLIGHT
+        surface.get_at((x, y))[:3] == palette().highlight
         for y in range(top, top + row_h)
         for x in range(left, left + overlay._stem_abbrev_width)
     )
@@ -474,7 +456,7 @@ def test_unarmed_recording_monitor_eye_not_override_bg() -> None:
     panel = overlay.panel_rect
     assert panel is not None
     panel_x, panel_y, _, _ = panel
-    assert _header_bg_pixel(surface, overlay, "eye", row_y, row_h) != OVERRIDE_BG
+    assert _header_bg_pixel(surface, overlay, "eye", row_y, row_h) != palette().override_bg
 
 
 def test_override_armed_recording_monitor_eye_flashes(monkeypatch) -> None:
@@ -504,8 +486,8 @@ def test_override_armed_recording_monitor_eye_flashes(monkeypatch) -> None:
     flash_on = _header_bg_pixel(surface_on, overlay, "eye", row_y, row_h)
     flash_off = _header_bg_pixel(surface_off, overlay, "eye", row_y, row_h)
 
-    assert flash_on == OVERRIDE_BG
-    assert flash_off != OVERRIDE_BG
+    assert flash_on == palette().override_bg
+    assert flash_off != palette().override_bg
     assert flash_on != flash_off
 
 
@@ -516,9 +498,9 @@ def test_override_row_shows_back_to_timeline_button() -> None:
     _draw(overlay, surface, strip_view_state(override_slots={"layer_2"}, focus_row=0))
     rows = {row[5]: row for row in overlay.row_layout}
     _, _, row_y, _, row_h, _ = rows["layer_2"]
-    assert _header_bg_pixel(surface, overlay, "release", row_y, row_h) == OVERRIDE_BG
+    assert _header_bg_pixel(surface, overlay, "release", row_y, row_h) == palette().override_bg
     _, _, row_y, _, row_h, _ = rows["layer_1"]
-    assert _header_bg_pixel(surface, overlay, "release", row_y, row_h) != OVERRIDE_BG
+    assert _header_bg_pixel(surface, overlay, "release", row_y, row_h) != palette().override_bg
 
 
 def _header_snapshot(state: TimelineViewState) -> tuple[pygame.Surface, TimelineOverlay]:
@@ -567,9 +549,9 @@ def test_solo_row_lights_its_solo_button() -> None:
     _draw(overlay, surface, strip_view_state(solo_slot="layer_2", focus_row=0))
     rows = {row[5]: row for row in overlay.row_layout}
     _, _, row_y, _, row_h, _ = rows["layer_2"]
-    assert _header_bg_pixel(surface, overlay, "solo", row_y, row_h) == SOLO_BG
+    assert _header_bg_pixel(surface, overlay, "solo", row_y, row_h) == palette().solo_bg
     _, _, row_y, _, row_h, _ = rows["layer_1"]
-    assert _header_bg_pixel(surface, overlay, "solo", row_y, row_h) != SOLO_BG
+    assert _header_bg_pixel(surface, overlay, "solo", row_y, row_h) != palette().solo_bg
 
 
 def test_override_slots_use_override_bg_on_monitor_eye() -> None:
@@ -584,7 +566,7 @@ def test_override_slots_use_override_bg_on_monitor_eye() -> None:
     panel = overlay.panel_rect
     assert panel is not None
     panel_x, panel_y, _, _ = panel
-    assert _header_bg_pixel(surface, overlay, "eye", row_y, row_h) == OVERRIDE_BG
+    assert _header_bg_pixel(surface, overlay, "eye", row_y, row_h) == palette().override_bg
 
 
 def test_recording_baseline_does_not_draw_cue_tick() -> None:
@@ -784,16 +766,16 @@ def test_compose_panel_fills_band_width_inside_container() -> None:
 
 def test_static_panel_has_no_border() -> None:
     pygame.init()
-    from cleave.viz.theme import PANEL_EDGE
+    from cleave.viz.theme import palette
 
     overlay = TimelineOverlay()
     surface = pygame.Surface((800, 400), pygame.SRCALPHA)
     _draw(overlay, surface, strip_view_state())
     panel = overlay._cache.panel
     assert panel is not None
-    assert panel.get_at((0, 0))[:3] != PANEL_EDGE
+    assert panel.get_at((0, 0))[:3] != palette().panel_edge
     edge = (panel.get_width() - 1, panel.get_height() // 2)
-    assert panel.get_at(edge)[:3] != PANEL_EDGE
+    assert panel.get_at(edge)[:3] != palette().panel_edge
 
 
 def _marker_upload(
@@ -826,18 +808,18 @@ def test_song_markers_rise_through_ruler_and_rows() -> None:
     x_plain = time_to_x(25.0, bar_left, bar_width, 0.0, 100.0)
     x_selected = time_to_x(75.0, bar_left, bar_width, 0.0, 100.0)
     for y in (tick_top + 1, row_y):
-        assert upload.get_at((x_plain, y))[:3] == SONG_MARKER
-        assert upload.get_at((x_selected, y))[:3] == SONG_MARKER_SELECTED
-    assert upload.get_at((x_plain, tick_top - 1))[:3] != SONG_MARKER
+        assert upload.get_at((x_plain, y))[:3] == palette().song_marker
+        assert upload.get_at((x_selected, y))[:3] == palette().song_marker_selected
+    assert upload.get_at((x_plain, tick_top - 1))[:3] != palette().song_marker
     # Plain is SONG_MARKER_WIDTH wide; the selected one is wider.
-    assert upload.get_at((x_plain + 1, row_y))[:3] == SONG_MARKER
-    assert upload.get_at((x_plain + 2, row_y))[:3] != SONG_MARKER
-    assert upload.get_at((x_selected + 2, row_y))[:3] == SONG_MARKER_SELECTED
+    assert upload.get_at((x_plain + 1, row_y))[:3] == palette().song_marker
+    assert upload.get_at((x_plain + 2, row_y))[:3] != palette().song_marker
+    assert upload.get_at((x_selected + 2, row_y))[:3] == palette().song_marker_selected
     # Markers are drawn live, so the static panel has none.
     static = overlay._cache.panel
     assert static is not None
     static_y = overlay._padding + overlay.row_layout[0][4] // 2
-    assert static.get_at((x_plain, static_y))[:3] != SONG_MARKER
+    assert static.get_at((x_plain, static_y))[:3] != palette().song_marker
 
 
 def test_selected_song_marker_flashes_and_dirties_its_column(
@@ -856,7 +838,7 @@ def test_selected_song_marker_flashes_and_dirties_its_column(
     upload, bar_left, bar_width, tick_top = _marker_upload(overlay, state)
     x = time_to_x(40.0, bar_left, bar_width, 0.0, 100.0)
     half = SELECTED_CLIP_FLASH_TICK_WIDTH // 2
-    assert upload.get_at((x + half, tick_top + 1))[:3] == SELECTED_CLIP_FLASH_YELLOW
+    assert upload.get_at((x + half, tick_top + 1))[:3] == palette().highlight
     assert any(
         rx <= x < rx + rw and ry <= tick_top + 1 < ry + rh
         for rx, ry, rw, rh in overlay._cache.last_flash_rects
@@ -866,14 +848,14 @@ def test_selected_song_marker_flashes_and_dirties_its_column(
         pygame.time, "get_ticks", lambda: start + SELECTED_CLIP_FLASH_HALF_MS
     )
     upload, *_ = _marker_upload(overlay, state)
-    assert upload.get_at((x, tick_top + 1))[:3] == SELECTED_CLIP_FLASH_RED
+    assert upload.get_at((x, tick_top + 1))[:3] == palette().armed_bg
 
     monkeypatch.setattr(
         pygame.time, "get_ticks", lambda: start + SELECTED_CLIP_FLASH_DURATION_MS
     )
     upload, *_ = _marker_upload(overlay, state)
-    assert upload.get_at((x, tick_top + 1))[:3] == SONG_MARKER_SELECTED
-    assert upload.get_at((x + half, tick_top + 1))[:3] != SONG_MARKER_SELECTED
+    assert upload.get_at((x, tick_top + 1))[:3] == palette().song_marker_selected
+    assert upload.get_at((x + half, tick_top + 1))[:3] != palette().song_marker_selected
 
 
 def test_hit_at_reports_song_marker_on_ruler_and_rows() -> None:
@@ -1183,18 +1165,17 @@ def test_selected_clip_outline_drawn_on_static_panel() -> None:
     )
     mid_x = (start_x + end_x) // 2
     mid_y = top + row_h // 2
-    assert SELECTED_CLIP_COLOR == HIGHLIGHT
     # The outline runs along the top and bottom of the clip, and down each edge.
-    assert static.get_at((mid_x, top))[:3] == SELECTED_CLIP_COLOR
-    assert static.get_at((mid_x, top + row_h - 1))[:3] == SELECTED_CLIP_COLOR
-    assert static.get_at((start_x, mid_y))[:3] == SELECTED_CLIP_COLOR
-    assert static.get_at((end_x - 1, mid_y))[:3] == SELECTED_CLIP_COLOR
+    assert static.get_at((mid_x, top))[:3] == palette().highlight
+    assert static.get_at((mid_x, top + row_h - 1))[:3] == palette().highlight
+    assert static.get_at((start_x, mid_y))[:3] == palette().highlight
+    assert static.get_at((end_x - 1, mid_y))[:3] == palette().highlight
     # It stays on the clip: not inside it, and not past its edges.
-    assert static.get_at((mid_x, mid_y))[:3] != SELECTED_CLIP_COLOR
-    assert static.get_at((start_x - 2, mid_y))[:3] != SELECTED_CLIP_COLOR
-    assert static.get_at((end_x + 2, mid_y))[:3] != SELECTED_CLIP_COLOR
+    assert static.get_at((mid_x, mid_y))[:3] != palette().highlight
+    assert static.get_at((start_x - 2, mid_y))[:3] != palette().highlight
+    assert static.get_at((end_x + 2, mid_y))[:3] != palette().highlight
     assert static.get_at((mid_x, top + SELECTED_CLIP_OUTLINE_WIDTH))[:3] != (
-        SELECTED_CLIP_COLOR
+        palette().highlight
     )
 
 
@@ -1206,7 +1187,7 @@ def test_hovered_clip_draws_edge_handles_only_where_clips_can_be_edited() -> Non
         return static.get_at((start_x + CLIP_HANDLE_WIDTH - 1, top + row_h // 2))[:3]
 
     plain = edge_rgb()
-    assert edge_rgb(hover_clip=(0, 25.0, None)) == LABEL != plain
+    assert edge_rgb(hover_clip=(0, 25.0, None)) == palette().label != plain
     # A hover on another row, or on a locked timeline, draws no handles.
     assert edge_rgb(hover_clip=(1, 25.0, None)) == plain
     assert edge_rgb(hover_clip=(0, 25.0, None), locked=True) == plain
@@ -1253,16 +1234,16 @@ def test_selected_clip_outline_only_on_focused_track() -> None:
         return static.get_at((tick_x, y))[:3]
 
     assert _compose(0) is not None
-    assert _tick_rgb(25.0, 0) == SELECTED_CLIP_COLOR
-    assert _tick_rgb(50.0, 1) != SELECTED_CLIP_COLOR
+    assert _tick_rgb(25.0, 0) == palette().highlight
+    assert _tick_rgb(50.0, 1) != palette().highlight
 
     assert _compose(1) is not None
-    assert _tick_rgb(25.0, 0) != SELECTED_CLIP_COLOR
-    assert _tick_rgb(50.0, 1) == SELECTED_CLIP_COLOR
+    assert _tick_rgb(25.0, 0) != palette().highlight
+    assert _tick_rgb(50.0, 1) == palette().highlight
 
     assert _compose(0) is not None
-    assert _tick_rgb(25.0, 0) == SELECTED_CLIP_COLOR
-    assert _tick_rgb(50.0, 1) != SELECTED_CLIP_COLOR
+    assert _tick_rgb(25.0, 0) == palette().highlight
+    assert _tick_rgb(50.0, 1) != palette().highlight
 
 
 def test_prune_expired_selected_clip_flash() -> None:
@@ -1286,18 +1267,15 @@ def test_selected_clip_flash_blink_colors() -> None:
     start = 1000
     assert selected_clip_flash_active(start, ticks_ms=start)
     assert selected_clip_flash_bright(start, ticks_ms=start)
-    assert selected_clip_flash_color(start, ticks_ms=start) == SELECTED_CLIP_FLASH_YELLOW
-    assert SELECTED_CLIP_FLASH_YELLOW == HIGHLIGHT
-    assert SELECTED_CLIP_COLOR == HIGHLIGHT
-    assert SELECTED_CLIP_FLASH_RED == ARMED_BG
+    assert selected_clip_flash_color(start, ticks_ms=start) == palette().highlight
     alt_t = start + SELECTED_CLIP_FLASH_HALF_MS
     assert selected_clip_flash_active(start, ticks_ms=alt_t)
     assert not selected_clip_flash_bright(start, ticks_ms=alt_t)
-    assert selected_clip_flash_color(start, ticks_ms=alt_t) == SELECTED_CLIP_FLASH_RED
+    assert selected_clip_flash_color(start, ticks_ms=alt_t) == palette().armed_bg
     expired = start + SELECTED_CLIP_FLASH_DURATION_MS
     assert not selected_clip_flash_active(start, ticks_ms=expired)
     assert not selected_clip_flash_bright(start, ticks_ms=expired)
-    assert selected_clip_flash_color(start, ticks_ms=expired) == SELECTED_CLIP_COLOR
+    assert selected_clip_flash_color(start, ticks_ms=expired) == palette().highlight
 
 
 def test_selected_clip_flash_live_patches_yellow(monkeypatch) -> None:
@@ -1336,15 +1314,15 @@ def test_selected_clip_flash_live_patches_yellow(monkeypatch) -> None:
     top = timeline_badge_reserve_px() + overlay._padding
     mid_x = tick_x + 40
     inner = SELECTED_CLIP_FLASH_OUTLINE_WIDTH - 1
-    assert upload.get_at((mid_x, top + inner))[:3] == SELECTED_CLIP_FLASH_YELLOW
+    assert upload.get_at((mid_x, top + inner))[:3] == palette().highlight
     assert upload.get_at((mid_x, top + row_h - 1 - inner))[:3] == (
-        SELECTED_CLIP_FLASH_YELLOW
+        palette().highlight
     )
     static = overlay._cache.panel
     assert static is not None
-    assert static.get_at((mid_x, overlay._padding))[:3] == SELECTED_CLIP_COLOR
+    assert static.get_at((mid_x, overlay._padding))[:3] == palette().highlight
     # The settled outline is thinner than the flash.
-    assert static.get_at((mid_x, overlay._padding + inner))[:3] != SELECTED_CLIP_COLOR
+    assert static.get_at((mid_x, overlay._padding + inner))[:3] != palette().highlight
     assert any(
         rx <= mid_x < rx + rw and ry <= top < ry + rh
         for rx, ry, rw, rh in overlay._cache.last_flash_rects
@@ -1538,7 +1516,7 @@ def test_row_height_constant_across_layer_counts() -> None:
 
 def test_compose_panel_draws_time_scale_above_first_row() -> None:
     pygame.init()
-    from cleave.viz.theme import MUTED, SONG_BOUND
+    from cleave.viz.theme import palette
     from cleave.viz.timeline_strip_layout import timeline_band_height_px
 
     overlay = TimelineOverlay()
@@ -1556,7 +1534,7 @@ def test_compose_panel_draws_time_scale_above_first_row() -> None:
     from cleave.viz.timeline_ruler import RULER_BOTTOM_GAP_PX
 
     baseline_y = first_row_y - 1 - RULER_BOTTOM_GAP_PX
-    assert tuple(surface.get_at((bar_left, baseline_y - 1)))[:3] == MUTED
+    assert tuple(surface.get_at((bar_left, baseline_y - 1)))[:3] == palette().muted
     # The song end mark runs from the ruler to the bottom of the last row.
     end_x = bar_left + _bar_width - 1
     metrics = timeline_ui_metrics()
@@ -1568,9 +1546,9 @@ def test_compose_panel_draws_time_scale_above_first_row() -> None:
         - metrics.scrollbar_gap
         - 1
     )
-    assert tuple(surface.get_at((end_x, baseline_y)))[:3] == MUTED
+    assert tuple(surface.get_at((end_x, baseline_y)))[:3] == palette().muted
     for y in (baseline_y + 1, first_row_y + 1, last_row_bottom):
-        assert tuple(surface.get_at((end_x, y)))[:3] == SONG_BOUND
+        assert tuple(surface.get_at((end_x, y)))[:3] == palette().song_bound
 
 
 def test_playhead_rises_to_ruler_major_tick_top() -> None:
@@ -1738,7 +1716,7 @@ def test_scrollbar_thumb_span_tracks_the_window() -> None:
 
 
 def test_scrollbar_hits_thumb_and_track_under_the_rows() -> None:
-    from cleave.viz.theme import TIMELINE_SCROLL_RAIL, TIMELINE_SCROLL_THUMB
+    from cleave.viz.theme import palette
 
     pygame.init()
     overlay = TimelineOverlay()
@@ -1758,8 +1736,8 @@ def test_scrollbar_hits_thumb_and_track_under_the_rows() -> None:
     assert track is not None and track.target == "scroll_track"
     assert track.t_sec == pytest.approx(10.0, abs=0.2)
     assert overlay.hit_at(px + 4, bar_y) is None
-    assert tuple(surface.get_at((thumb_x, bar_y)))[:3] == TIMELINE_SCROLL_THUMB
-    assert tuple(surface.get_at((track_x, bar_y)))[:3] == TIMELINE_SCROLL_RAIL
+    assert tuple(surface.get_at((thumb_x, bar_y)))[:3] == palette().timeline_scroll_thumb
+    assert tuple(surface.get_at((track_x, bar_y)))[:3] == palette().timeline_scroll_rail
     # 80 hidden seconds over the thumb's free travel.
     travel = bar_width - round(bar_width * 0.2)
     assert overlay.scrollbar_sec_per_px() == pytest.approx(80.0 / travel, rel=0.01)
@@ -1772,7 +1750,7 @@ def test_scrollbar_cannot_move_at_full_zoom() -> None:
     _draw(overlay, surface, strip_view_state(duration_sec=100.0))
     assert overlay.scrollbar_sec_per_px() == 0.0
     # Only the rail shows: no thumb to mistake for a full level bar.
-    from cleave.viz.theme import TIMELINE_SCROLL_RAIL
+    from cleave.viz.theme import palette
 
     px, py, _, ph = overlay.panel_rect
     bar_left, bar_width = overlay.bar_layout
@@ -1780,12 +1758,12 @@ def test_scrollbar_cannot_move_at_full_zoom() -> None:
     mid_y = py + ph - metrics.padding - metrics.scrollbar_height // 2 - 1
     top_y = py + ph - metrics.padding - metrics.scrollbar_height
     mid_x = px + bar_left + bar_width // 2
-    assert tuple(surface.get_at((mid_x, mid_y)))[:3] == TIMELINE_SCROLL_RAIL
-    assert tuple(surface.get_at((mid_x, top_y)))[:3] != TIMELINE_SCROLL_RAIL
+    assert tuple(surface.get_at((mid_x, mid_y)))[:3] == palette().timeline_scroll_rail
+    assert tuple(surface.get_at((mid_x, top_y)))[:3] != palette().timeline_scroll_rail
 
 
 def test_playhead_and_cues_outside_the_window_are_not_drawn() -> None:
-    from cleave.viz.theme import PLAYHEAD, PLAYHEAD_FLASH
+    from cleave.viz.theme import palette
     from cleave.viz.timeline_strip_static import OFF_SEGMENT_COLOR
 
     pygame.init()
@@ -1804,7 +1782,7 @@ def test_playhead_and_cues_outside_the_window_are_not_drawn() -> None:
     }
     # The cue at 10s switched the layer off, so the window shows one flat bar.
     assert row == {OFF_SEGMENT_COLOR}
-    assert PLAYHEAD not in row and PLAYHEAD_FLASH not in row
+    assert palette().playhead not in row and palette().playhead_flash not in row
     assert overlay._cache.last_playhead_rect is None
 
 

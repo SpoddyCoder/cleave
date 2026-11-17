@@ -17,13 +17,7 @@ from imgui_bundle import imgui
 from cleave.viz.icon_button import Band, FRect, glyph_x, icon_box, ink_origin
 from cleave.viz.imgui_theme import brighten, lighten, rgba
 from cleave.viz.pointer_cursor import PointerShape, request_pointer
-from cleave.viz.theme import (
-    ICON_HOVER_BG,
-    ICON_HOVER_BG_ALPHA,
-    ICON_HOVER_EDGE,
-    ICON_HOVER_FG,
-    ICON_LIT_HOVER_LIFT,
-)
+from cleave.viz.theme import palette
 from cleave.viz.tooltips import show_tooltip
 
 
@@ -85,14 +79,14 @@ def paint_box(
     """
     if fill is not None:
         if hovered:
-            lit = brighten(fill, ICON_LIT_HOVER_LIFT)
+            lit = brighten(fill, palette().icon_lit_hover_lift)
             paint_wash(box, lit, fill_alpha)
             paint_edge(box, lighten(lit, 0.45))
         else:
             paint_wash(box, fill, fill_alpha)
     elif hovered:
         paint_hover(box)
-    text_color = ICON_HOVER_FG if hovered and fill is None else color
+    text_color = palette().icon_hover_fg if hovered and fill is None else color
     if icon and len(text) == 1:
         x, y = ink_origin(box, glyph_ink(text))
     else:
@@ -102,13 +96,17 @@ def paint_box(
 
 def paint_wash(
     box: FRect,
-    color: tuple[int, int, int] = ICON_HOVER_BG,
-    alpha: float = ICON_HOVER_BG_ALPHA / 255.0,
+    color: tuple[int, int, int] | None = None,
+    alpha: float | None = None,
 ) -> None:
     """Fill *box*: the hover wash by default, or a lit button's colour.
 
     The box may run into the window padding, so only the window clips it.
     """
+    if color is None:
+        color = palette().icon_hover_bg
+    if alpha is None:
+        alpha = palette().icon_hover_bg_alpha / 255.0
     draw = imgui.get_window_draw_list()
     x, y, w, h = box
     win_pos = imgui.get_window_pos()
@@ -129,7 +127,7 @@ def paint_wash(
 def paint_hover(box: FRect) -> None:
     """The hover look of an unlit icon or text button: violet wash and outline."""
     paint_wash(box)
-    paint_edge(box, ICON_HOVER_EDGE)
+    paint_edge(box, palette().icon_hover_edge)
 
 
 def paint_edge(box: FRect, color: tuple[int, int, int]) -> None:
