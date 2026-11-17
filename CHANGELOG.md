@@ -61,6 +61,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- Opening a project spends far less time on "Indexing presets" when the presets have not changed: a 135k preset collection now takes well under a second instead of several.
 - Menu items and buttons that open a dialog before acting end in a single ellipsis character, and ones that act at once have none. File picker titles and the overlay body text dialog no longer end in dots. Add to preset list, Download packages, Full screen editor, Play full screen, and Exit full screen use sentence case like the rest of the menus.
 - Help column section titles and the titles of dialogs, the file picker, and the tap sync panel sit on a full-width bar of the accent gradient, blue into violet, in white, like the inspector page title, so they stand apart from the blue labels below them.
 - The Overlay page's solo switch is now called preview, since it holds the credits cards on screen at any playhead time so you can see your edits. Its navigator icon is now a preview window instead of the solo icon, and its key is V instead of S.

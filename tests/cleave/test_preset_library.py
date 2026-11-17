@@ -197,3 +197,29 @@ def test_marker_tooltip_names_flags_and_roles() -> None:
     assert marker_tooltip("[R:Z]") is None
     assert marker_tooltip("[X]") is None
     assert marker_tooltip("F") is None
+
+
+def test_scan_follows_symlinked_folders_once_under_real_paths(tmp_path: Path) -> None:
+    root = tmp_path / "presets"
+    real = _write(tmp_path / "elsewhere" / "pack" / "a.milk", "a")
+    _write(root / "local" / "b.milk", "b")
+    _write(root / "local" / "notes.txt", "x")
+    (root / "linked").symlink_to(tmp_path / "elsewhere" / "pack", target_is_directory=True)
+    (root / "local" / "loop").symlink_to(root, target_is_directory=True)
+
+    found = sorted(path for path, _, _ in preset_library.scan_milk_files(root))
+
+    assert found == sorted([str(real.resolve()), str((root / "local" / "b.milk").resolve())])
+
+
+def test_favourite_through_symlinked_folder_matches_index(tmp_path: Path) -> None:
+    root = tmp_path / "presets"
+    _write(tmp_path / "elsewhere" / "a.milk", "a")
+    (root).mkdir()
+    (root / "linked").symlink_to(tmp_path / "elsewhere", target_is_directory=True)
+    library = PresetLibrary.in_memory()
+    library.index(root)
+
+    library.set_favourite(root / "linked" / "a.milk", True)
+
+    assert library.is_favourite((tmp_path / "elsewhere" / "a.milk").resolve())

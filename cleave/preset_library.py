@@ -7,6 +7,7 @@ preset's contents. Nothing under the preset tree is moved, copied, or deleted.
 from __future__ import annotations
 
 import hashlib
+import os
 import sqlite3
 from collections.abc import Callable, Iterable
 from pathlib import Path
@@ -122,6 +123,54 @@ def preset_hash(path: Path) -> str:
     return hashlib.blake2b(data, digest_size=16).hexdigest()
 
 
+def _is_milk(name: str) -> bool:
+    """``*.milk`` match with the platform's case rule, as ``Path.glob`` uses."""
+    return os.path.normcase(name).endswith(".milk")
+
+
+def scan_milk_files(root: Path) -> list[tuple[str, int, int]]:
+    """``(resolved path, size, mtime_ns)`` for every ``*.milk`` under ``root``.
+
+    One ``os.scandir`` pass: directory entries carry the stat on Windows, and
+    nothing is resolved except symlinks, so a 100k-file tree walks in well
+    under a second. Symlinked directories are followed once each (like
+    ``Path.rglob``) and reported under their real path, as ``Path.resolve``
+    would.
+    """
+    out: list[tuple[str, int, int]] = []
+    top = os.path.realpath(root)
+    seen_dirs = {top}
+    stack = [top]
+    while stack:
+        current = stack.pop()
+        try:
+            entries = list(os.scandir(current))
+        except OSError:
+            continue
+        for entry in entries:
+            try:
+                if entry.is_dir():
+                    real = (
+                        os.path.realpath(entry.path) if entry.is_symlink() else entry.path
+                    )
+                    if real not in seen_dirs:
+                        seen_dirs.add(real)
+                        stack.append(real)
+                    continue
+                if not _is_milk(entry.name) or not entry.is_file():
+                    continue
+                if entry.is_symlink():
+                    path = os.path.realpath(entry.path)
+                    stat = os.stat(path)
+                else:
+                    path = entry.path
+                    stat = entry.stat()
+            except OSError:
+                continue
+            out.append((path, stat.st_size, stat.st_mtime_ns))
+    return out
+
+
 def _is_under(path: Path, root: Path) -> bool:
     try:
         path.relative_to(root)
@@ -136,7 +185,7 @@ class PresetLibrary:
     def __init__(self, conn: sqlite3.Connection) -> None:
         self._conn = conn
         self._root: Path | None = None
-        self._path_hash: dict[Path, str] = {}
+        self._path_hash: dict[str, str] = {}
         self._alias_hash: dict[Path, str] = {}
         self._favourites: set[str] = set()
         self._blacklist: set[str] = set()
@@ -210,33 +259,29 @@ class PresetLibrary:
             row[0]: (row[1], row[2], row[3])
             for row in self._conn.execute("SELECT path, size, mtime_ns, hash FROM files")
         }
-        found = sorted(p.resolve() for p in root.rglob("*.milk") if p.is_file())
+        found = scan_milk_files(root)
         total = len(found)
-        path_hash: dict[Path, str] = {}
+        path_hash: dict[str, str] = {}
         upserts: list[tuple[str, int, int, str]] = []
-        for done, path in enumerate(found):
-            if on_progress is not None and done % 50 == 0:
+        for done, (key, size, mtime_ns) in enumerate(found):
+            if on_progress is not None and done % 1000 == 0:
                 if not on_progress(done, total):
                     return False
-            key = str(path)
-            try:
-                stat = path.stat()
-            except OSError:
-                continue
             entry = cached.get(key)
-            if entry is not None and entry[0] == stat.st_size and entry[1] == stat.st_mtime_ns:
+            if entry is not None and entry[0] == size and entry[1] == mtime_ns:
                 digest = entry[2]
             else:
                 try:
-                    digest = preset_hash(path)
+                    digest = preset_hash(Path(key))
                 except OSError:
                     continue
-                upserts.append((key, stat.st_size, stat.st_mtime_ns, digest))
-            path_hash[path] = digest
+                upserts.append((key, size, mtime_ns, digest))
+            path_hash[key] = digest
+        prefix = os.path.join(str(root), "")
         stale = [
             (key,)
             for key in cached
-            if _is_under(Path(key), root) and Path(key) not in path_hash
+            if key.startswith(prefix) and key not in path_hash
         ]
         with self._conn:
             self._conn.executemany(
@@ -254,11 +299,11 @@ class PresetLibrary:
 
     def hash_of(self, path: Path) -> str | None:
         """Content hash of ``path``; hashes and caches files outside the index."""
-        digest = self._path_hash.get(path) or self._alias_hash.get(path)
+        digest = self._path_hash.get(str(path)) or self._alias_hash.get(path)
         if digest is not None:
             return digest
         resolved = path.resolve()
-        digest = self._path_hash.get(resolved)
+        digest = self._path_hash.get(str(resolved))
         if digest is not None:
             self._alias_hash[path] = digest
             return digest
@@ -349,11 +394,15 @@ class PresetLibrary:
 
     def collection_paths(self, collection: PresetCollection) -> tuple[Path, ...]:
         """Indexed files in ``collection``, one path per hash, sorted by path."""
+        members = sorted(
+            (Path(key), digest)
+            for key, digest in self._path_hash.items()
+            if self._in_collection(digest, collection)
+        )
         seen: set[str] = set()
         out: list[Path] = []
-        for path in sorted(self._path_hash):
-            digest = self._path_hash[path]
-            if digest in seen or not self._in_collection(digest, collection):
+        for path, digest in members:
+            if digest in seen:
                 continue
             if self._root is not None and not _is_under(path, self._root):
                 continue
