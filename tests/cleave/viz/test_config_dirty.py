@@ -539,7 +539,7 @@ def _mutate_overlay_expanded(controls: TuningControls) -> None:
     _expand_overlay(controls)
 
 
-def _mutate_overlay_solo(controls: TuningControls) -> None:
+def _mutate_overlay_preview(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(RowKind.OVERLAYS_HEADER)
     press_main_row(controls, keydown(pygame.K_s))
@@ -607,7 +607,7 @@ _SESSION_ONLY_MUTATIONS: list[tuple[str, Callable[[TuningControls], None], tuple
     ("solo_slot", _mutate_solo_slot, ("layer_1",)),
     ("timeline.panel_open", _mutate_timeline_panel_open, ("layer_1",)),
     ("overlay.expanded", _mutate_overlay_expanded, ("layer_1",)),
-    ("overlay.solo", _mutate_overlay_solo, ("layer_1",)),
+    ("overlay.preview", _mutate_overlay_preview, ("layer_1",)),
     ("post_fx.expanded", _mutate_post_fx_expanded, ("layer_1",)),
     ("move_mode.swap", _mutate_move_mode_without_confirm, ("layer_1", "layer_2")),
     ("help_visible", _mutate_help_visible, ("layer_1",)),

@@ -391,17 +391,17 @@ def _apply_overlay_card_slide_direction(
 ) -> None:
     _overlay_card_controls(controls, desc).step_slide_direction(delta=1 if forward else -1)
 
-def _toggle_overlays_solo(
+def _toggle_overlays_preview(
     controls: TuningControls, _desc: RowDescriptor
 ) -> None:
-    if controls.session.overlay_solo:
-        controls.overlays.exit_solo()
+    if controls.session.overlay_preview:
+        controls.overlays.exit_preview()
     else:
-        controls.overlays.enter_solo()
+        controls.overlays.enter_preview()
 
 
-def _format_overlays_solo(state: TuningViewState, _desc: RowDescriptor) -> str:
-    return on_off_text(state.overlays.solo)
+def _format_overlays_preview(state: TuningViewState, _desc: RowDescriptor) -> str:
+    return on_off_text(state.overlays.preview)
 
 
 def _format_overlays_locked(
@@ -410,14 +410,14 @@ def _format_overlays_locked(
     return lock_text(state.overlays.locked)
 
 
-def _apply_overlays_solo(
+def _apply_overlays_preview(
     controls: TuningControls,
     desc: RowDescriptor,
     forward: bool,
     _large: bool,
 ) -> None:
-    if controls.session.overlay_solo != forward:
-        _toggle_overlays_solo(controls, desc)
+    if controls.session.overlay_preview != forward:
+        _toggle_overlays_preview(controls, desc)
 
 
 def _apply_overlays_locked(
@@ -461,7 +461,7 @@ def _visibility_overlays(
     any_enabled = (
         block.opening_card.runtime.enabled or block.closing_card.runtime.enabled
     )
-    return (any_enabled, block.solo)
+    return (any_enabled, block.preview)
 
 def _jump_overlay_card_animation_type(
     controls: TuningControls, desc: RowDescriptor, delta: int
@@ -499,17 +499,20 @@ SPECS: dict[RowKind, RowSpec] = {
         help_description=(
             "Credits cards at the start and end of the song.",
         ),
-        toggle_solo=_toggle_overlays_solo,
+        toggle_preview=_toggle_overlays_preview,
     ),
-    RowKind.OVERLAYS_SOLO: RowSpec(
+    RowKind.OVERLAYS_PREVIEW: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
-        panel_label="solo",
+        panel_label="preview",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_overlays_solo,
-        apply_horizontal=_apply_overlays_solo,
-        choice=bool_choice(lambda s, _d: s.overlays.solo),
-        help_title="Overlay Solo",
-        help_description=("Shows the credits cards on their own.",),
+        format_value=_format_overlays_preview,
+        apply_horizontal=_apply_overlays_preview,
+        choice=bool_choice(lambda s, _d: s.overlays.preview),
+        help_title="Overlay Preview",
+        help_description=(
+            "Holds the credits cards on screen at any time, so you can see edits.",
+            "Not saved.",
+        ),
         blocked_by_section_lock=False,
     ),
     RowKind.OVERLAYS_LOCKED: RowSpec(

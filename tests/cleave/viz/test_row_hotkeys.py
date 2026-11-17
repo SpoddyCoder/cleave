@@ -386,12 +386,12 @@ def test_section_switch_rows_step_their_flags_and_respect_the_lock() -> None:
     assert session.pattern_mask.locked is False
 
 
-def test_overlay_solo_row_ignores_the_section_lock() -> None:
+def test_overlay_preview_row_ignores_the_section_lock() -> None:
     controls = make_controls(("layer_1",))
     controls.session.overlays.locked = True
-    solo = RowDescriptor(RowKind.OVERLAYS_SOLO)
-    assert apply_field_horizontal(controls, solo, True, False) is True
-    assert controls.session.overlay_solo is True
+    preview = RowDescriptor(RowKind.OVERLAYS_PREVIEW)
+    assert apply_field_horizontal(controls, preview, True, False) is True
+    assert controls.session.overlay_preview is True
 
 
 def test_card_enabled_row_steps_one_card_and_respects_the_lock() -> None:

@@ -20,6 +20,7 @@ from cleave.viz.navigator import (
     LAYER_PAGE_PRESET_SWITCHING,
     TOGGLE_ENABLED,
     TOGGLE_LOCK,
+    TOGGLE_PREVIEW,
     TOGGLE_SOLO,
     layer_page_of,
     layer_slot_of,
@@ -29,6 +30,7 @@ from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.row_spec import (
     PRESET_FILE_ROW_KINDS,
     apply_field_toggle_enabled,
+    apply_field_toggle_preview,
     apply_field_toggle_solo,
     row_spec,
     row_triggers_layer_delete,
@@ -156,6 +158,9 @@ def activate_header_toggle(
     if toggle_id == TOGGLE_SOLO:
         apply_field_toggle_solo(controls, desc)
         return
+    if toggle_id == TOGGLE_PREVIEW:
+        apply_field_toggle_preview(controls, desc)
+        return
     if toggle_id == TOGGLE_LOCK:
         toggle_header_locked(controls, desc)
 
@@ -243,6 +248,9 @@ def _hotkey_for_descriptor(
 
     if event.key == pygame.K_s and not mod_ctrl(event.mod):
         return apply_field_toggle_solo(controls, desc)
+
+    if event.key == pygame.K_v and not mod_ctrl(event.mod):
+        return apply_field_toggle_preview(controls, desc)
 
     if add_current_preset_key_pressed(event.key, event.mod):
         slot = desc.slot

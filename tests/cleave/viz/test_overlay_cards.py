@@ -89,21 +89,21 @@ def test_overlay_visible_alpha_disabled() -> None:
 
 def test_live_overlay_alpha_disabled() -> None:
     cfg = opening_card_cfg(appear_at=10.0, display_time=30.0)
-    assert live_overlay_alpha(25.0, cfg, enabled=False, solo=False) == 0.0
-    assert live_overlay_alpha(25.0, cfg, enabled=False, solo=True) == 0.0
+    assert live_overlay_alpha(25.0, cfg, enabled=False, preview=False) == 0.0
+    assert live_overlay_alpha(25.0, cfg, enabled=False, preview=True) == 0.0
 
 
-def test_live_overlay_alpha_solo_always_on() -> None:
+def test_live_overlay_alpha_preview_always_on() -> None:
     cfg = opening_card_cfg(appear_at=10.0, display_time=30.0)
-    assert live_overlay_alpha(0.0, cfg, enabled=True, solo=True) == 1.0
-    assert live_overlay_alpha(9.9, cfg, enabled=True, solo=True) == 1.0
-    assert live_overlay_alpha(41.0, cfg, enabled=True, solo=True) == 1.0
+    assert live_overlay_alpha(0.0, cfg, enabled=True, preview=True) == 1.0
+    assert live_overlay_alpha(9.9, cfg, enabled=True, preview=True) == 1.0
+    assert live_overlay_alpha(41.0, cfg, enabled=True, preview=True) == 1.0
 
 
 def test_live_overlay_alpha_timed_window_unchanged() -> None:
     cfg = opening_card_cfg(appear_at=10.0, display_time=30.0)
     for t_sec in (9.9, 10.0, 15.0, 25.0, 40.0, 41.0):
-        assert live_overlay_alpha(t_sec, cfg, enabled=True, solo=False) == overlay_visible_alpha(
+        assert live_overlay_alpha(t_sec, cfg, enabled=True, preview=False) == overlay_visible_alpha(
             t_sec, cfg
         )
 
@@ -651,12 +651,12 @@ def test_closing_overlay_visible_alpha_window() -> None:
 
 def test_live_overlay_alpha_closing_requires_song_duration() -> None:
     cfg = closing_card_cfg(disappear_at=0.0, display_time=30.0)
-    assert live_overlay_alpha(85.0, cfg, enabled=True, solo=False) == 0.0
+    assert live_overlay_alpha(85.0, cfg, enabled=True, preview=False) == 0.0
     assert (
         live_overlay_alpha(
-            85.0, cfg, enabled=True, solo=False, song_duration=100.0
+            85.0, cfg, enabled=True, preview=False, song_duration=100.0
         )
         == 1.0
     )
-    assert live_overlay_alpha(85.0, cfg, enabled=True, solo=True) == 1.0
+    assert live_overlay_alpha(85.0, cfg, enabled=True, preview=True) == 1.0
 

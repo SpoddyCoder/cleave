@@ -243,8 +243,8 @@ def test_header_toggle_changes_the_header_flag() -> None:
     assert controls.session.post_fx.locked is True
 
     overlays = RowDescriptor(RowKind.OVERLAYS_HEADER)
-    activate_header_toggle(controls, "solo", overlays)
-    assert controls.session.overlay_solo is True
+    activate_header_toggle(controls, "preview", overlays)
+    assert controls.session.overlay_preview is True
     card = RowDescriptor(RowKind.OVERLAY_CARD_HEADER, card="opening_card")
     activate_header_toggle(controls, "enabled", card)
     assert controls.session.overlays.opening_card.enabled is False

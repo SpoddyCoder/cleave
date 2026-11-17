@@ -25,6 +25,7 @@ from cleave.viz.material_icons import (
     LOCK_GLYPH,
     LOCK_OPEN_GLYPH,
     POWER_GLYPH,
+    PREVIEW_GLYPH,
     SOLO_GLYPH,
 )
 from cleave.viz.navigator import (
@@ -37,6 +38,7 @@ from cleave.viz.navigator import (
     TOGGLE_ADD,
     TOGGLE_ENABLED,
     TOGGLE_LOCK,
+    TOGGLE_PREVIEW,
     TOGGLE_SOLO,
     TWISTY_COLLAPSED,
     TWISTY_EXPANDED,
@@ -95,16 +97,18 @@ def navigator_toggle_glyph(toggle: NavToggle) -> str:
         return LOCK_GLYPH if toggle.active else LOCK_OPEN_GLYPH
     if toggle.id == TOGGLE_SOLO:
         return SOLO_GLYPH
+    if toggle.id == TOGGLE_PREVIEW:
+        return PREVIEW_GLYPH
     return POWER_GLYPH
 
 
 def navigator_toggle_fill(toggle: NavToggle) -> tuple[int, int, int] | None:
-    """Solid square behind a lit toggle: green on, red solo, amber lock."""
+    """Solid square behind a lit toggle: green on, red solo or preview, amber lock."""
     if toggle.id == TOGGLE_ADD or not toggle.active:
         return None
     if toggle.id == TOGGLE_LOCK:
         return NAV_LOCK_BG
-    if toggle.id == TOGGLE_SOLO:
+    if toggle.id in (TOGGLE_SOLO, TOGGLE_PREVIEW):
         return SOLO_BG
     return NAV_ON_BG
 
@@ -130,6 +134,12 @@ def navigator_toggle_tooltip(toggle: NavToggle) -> str:
         return "Locked: click to unlock" if toggle.active else "Unlocked: click to lock"
     if toggle.id == TOGGLE_SOLO:
         return "Solo: click to end solo" if toggle.active else "Click to solo"
+    if toggle.id == TOGGLE_PREVIEW:
+        return (
+            "Previewing cards: click to end preview"
+            if toggle.active
+            else "Click to preview cards"
+        )
     return "On: click to turn off" if toggle.active else "Off: click to turn on"
 
 
@@ -137,10 +147,12 @@ def navigator_toggle_xs(right_x: float, side: float, gap: float) -> dict[str, fl
     """Left edge of each toggle's column, ending flush at *right_x*.
 
     Columns are fixed, so a row without solo keeps its icons under the rows
-    that have it. Add shares the lock column.
+    that have it. Add shares the lock column, and Overlay's preview the solo
+    column.
     """
     xs = dict(zip(_NAV_TOGGLE_COLUMNS, icon_columns(right_x, len(_NAV_TOGGLE_COLUMNS), side, gap)))
     xs[TOGGLE_ADD] = xs[TOGGLE_LOCK]
+    xs[TOGGLE_PREVIEW] = xs[TOGGLE_SOLO]
     return xs
 
 

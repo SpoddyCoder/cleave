@@ -60,6 +60,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- The Overlay page's solo switch is now called preview, since it holds the credits cards on screen at any playhead time so you can see your edits. Its navigator icon is now a preview window instead of the solo icon, and its key is V instead of S.
 - Fade, Highlight Rolloff, Chroma Boost, and Visual Limiter each have an on/off icon on their Post-FX navigator row and in their page title, and an enabled row at the top of their page. E on those pages turns that effect on or off. Highlight Rolloff and Chroma Boost no longer have an off mode: their mode is per layer or composite, and a project file that sets `mode: off` must use `enabled: false` instead.
 - The Populate preset list dialog's choices are now short enough to sit side by side: **cue roles**, **shuffled**, and **in order**, under **pick**.
 - The timeline strip keeps a margin between the row buttons and the bars, and between the REC button and the time scale, matching the margin left of the layer numbers. The bars start beside the eye while no row is overridden, and move over to make room for the back to timeline button as soon as one is.

@@ -26,6 +26,7 @@ from cleave.viz.navigator import (
     TOGGLE_ADD,
     TOGGLE_ENABLED,
     TOGGLE_LOCK,
+    TOGGLE_PREVIEW,
     TOGGLE_SOLO,
     NavNode,
     NavToggle,
@@ -40,6 +41,7 @@ if TYPE_CHECKING:
 _TOGGLE_ITEMS: dict[str, tuple[str, str]] = {
     TOGGLE_ENABLED: ("Enabled", "E"),
     TOGGLE_SOLO: ("Solo", "S"),
+    TOGGLE_PREVIEW: ("Preview", "V"),
     TOGGLE_LOCK: ("Locked", "L"),
 }
 

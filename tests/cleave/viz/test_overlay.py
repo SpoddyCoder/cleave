@@ -184,6 +184,6 @@ def test_overlay_root_has_switches_and_cards_have_settings() -> None:
     assert RowKind.OVERLAY_CARD_POSITION in opening
     assert RowKind.OVERLAY_CARD_POSITION in closing
     assert _inspector_kinds(state, "overlay") == [
-        RowKind.OVERLAYS_SOLO,
+        RowKind.OVERLAYS_PREVIEW,
         RowKind.OVERLAYS_LOCKED,
     ]

@@ -3574,12 +3574,12 @@ def test_overlay_lock_blocks_e_enable_disable() -> None:
     assert controls.session.overlays.opening_card.enabled is True
 
 
-def test_overlay_lock_allows_solo() -> None:
+def test_overlay_lock_allows_preview() -> None:
     controls = make_controls(("layer_1",))
     controls.session.overlays.locked = True
     controls.focus_descriptor = RowDescriptor(RowKind.OVERLAYS_HEADER)
-    _press_focused(controls, keydown(pygame.K_s))
-    assert controls.session.overlay_solo is True
+    _press_focused(controls, keydown(pygame.K_v))
+    assert controls.session.overlay_preview is True
 
 
 def test_overlay_locked_skips_children_in_nav() -> None:
@@ -3670,13 +3670,13 @@ def test_e_toggles_each_enable_header() -> None:
     assert controls.session.timeline.enabled is True
 
 
-def test_s_toggles_overlays_always_on() -> None:
+def test_v_toggles_overlay_preview() -> None:
     controls = make_controls(("layer_1",))
     controls.focus_descriptor = RowDescriptor(RowKind.OVERLAYS_HEADER)
-    _press_focused(controls, keydown(pygame.K_s))
-    assert controls.session.overlay_solo is True
-    _press_focused(controls, keydown(pygame.K_s))
-    assert controls.session.overlay_solo is False
+    _press_focused(controls, keydown(pygame.K_v))
+    assert controls.session.overlay_preview is True
+    _press_focused(controls, keydown(pygame.K_v))
+    assert controls.session.overlay_preview is False
 
 
 def test_locked_headers_block_e() -> None:

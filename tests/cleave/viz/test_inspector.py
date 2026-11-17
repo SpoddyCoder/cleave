@@ -91,7 +91,7 @@ def test_parents_and_unknown_ids_have_no_rows(node_id: str) -> None:
         (
             "overlay",
             (
-                RowKind.OVERLAYS_SOLO,
+                RowKind.OVERLAYS_PREVIEW,
                 RowKind.OVERLAYS_LOCKED,
             ),
         ),

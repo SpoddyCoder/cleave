@@ -290,7 +290,7 @@ OVERLAY_PAGE_SECTION = SectionDef(
     header_kind=None,
     context="global",
     children=(
-        SectionNode(leaf_kind=RowKind.OVERLAYS_SOLO),
+        SectionNode(leaf_kind=RowKind.OVERLAYS_PREVIEW),
         SectionNode(leaf_kind=RowKind.OVERLAYS_LOCKED),
     ),
 )
@@ -824,7 +824,7 @@ SECTION_SWITCH_KINDS = frozenset(
         RowKind.TRACK_ENABLED,
         RowKind.TRACK_SOLO,
         RowKind.TRACK_LOCKED,
-        RowKind.OVERLAYS_SOLO,
+        RowKind.OVERLAYS_PREVIEW,
         RowKind.OVERLAYS_LOCKED,
         RowKind.OVERLAY_CARD_ENABLED,
         RowKind.POST_FX_LOCKED,

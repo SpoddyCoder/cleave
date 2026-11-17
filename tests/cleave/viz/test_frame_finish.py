@@ -37,7 +37,7 @@ def test_overlay_card_layout_uses_output_size() -> None:
             1.0,
             card_cfg=card_cfg,
             enabled=True,
-            overlay_solo=False,
+            overlay_preview=False,
             panel_cache=None,
             song_duration=60.0,
             output_size=(1080, 1920),
@@ -384,7 +384,7 @@ def test_finish_content_frame_skips_render_sections_in_curation() -> None:
             core,
             1.0,
             core.seed.session,
-            overlay_solo=False,
+            overlay_preview=False,
             panel_cache=None,
             song_duration=core.seed.duration_sec,
         )

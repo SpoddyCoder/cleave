@@ -102,7 +102,7 @@ def _composite_one_overlay_card(
     *,
     card_cfg: RenderOverlayCardConfig,
     enabled: bool,
-    overlay_solo: bool,
+    overlay_preview: bool,
     panel_cache: OverlayPanelCache | None,
     song_duration: float | None,
     output_size: tuple[int, int],
@@ -111,7 +111,7 @@ def _composite_one_overlay_card(
         t_sec,
         card_cfg,
         enabled=enabled,
-        solo=overlay_solo,
+        preview=overlay_preview,
         song_duration=song_duration,
     )
     if alpha <= 0.01:
@@ -127,7 +127,7 @@ def _composite_one_overlay_card(
         output_size[1],
         layers=layers,
         t_sec=t_sec,
-        solo=overlay_solo,
+        preview=overlay_preview,
         song_duration=song_duration,
     )
 
@@ -137,7 +137,7 @@ def _composite_overlay(
     t_sec: float,
     session: TuningSession,
     *,
-    overlay_solo: bool,
+    overlay_preview: bool,
     panel_cache: OverlaysPanelCache | None,
     song_duration: float | None,
 ) -> None:
@@ -153,7 +153,7 @@ def _composite_overlay(
         t_sec,
         card_cfg=opening_cfg,
         enabled=overlays.opening_card.enabled and sections_on,
-        overlay_solo=overlay_solo,
+        overlay_preview=overlay_preview,
         panel_cache=opening_cache,
         song_duration=song_duration,
         output_size=output_size,
@@ -163,7 +163,7 @@ def _composite_overlay(
         t_sec,
         card_cfg=closing_cfg,
         enabled=overlays.closing_card.enabled and sections_on,
-        overlay_solo=overlay_solo,
+        overlay_preview=overlay_preview,
         panel_cache=closing_cache,
         song_duration=song_duration,
         output_size=output_size,
@@ -177,7 +177,7 @@ def finish_content_frame(
     duration_sec: float | None = None,
     session: TuningSession | None = None,
     post_fx_solo: bool = False,
-    overlay_solo: bool = False,
+    overlay_preview: bool = False,
     panel_cache: OverlaysPanelCache | None = None,
 ) -> None:
     """Apply post-FX fade, overlay cards, and present content."""
@@ -243,7 +243,7 @@ def finish_content_frame(
         core,
         t_sec,
         session,
-        overlay_solo=overlay_solo,
+        overlay_preview=overlay_preview,
         panel_cache=panel_cache,
         song_duration=duration_sec,
     )

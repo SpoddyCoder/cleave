@@ -43,7 +43,7 @@ class RowKind(Enum):
     LAYER_MANAGEMENT_ADD = auto()
     LAYER_MANAGEMENT_DELETE = auto()
     OVERLAYS_HEADER = auto()
-    OVERLAYS_SOLO = auto()
+    OVERLAYS_PREVIEW = auto()
     OVERLAYS_LOCKED = auto()
     OVERLAY_CARD_HEADER = auto()
     OVERLAY_CARD_ENABLED = auto()

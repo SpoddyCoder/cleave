@@ -147,7 +147,7 @@ class OverlaysBlock:
             runtime=default_overlay_card_runtime(closing=True)
         )
     )
-    solo: bool = False
+    preview: bool = False
     locked: bool = _RO_OVERLAYS_DEFAULTS["locked"]
 
     @classmethod
@@ -156,7 +156,7 @@ class OverlaysBlock:
         return cls(
             opening_card=OverlayCardBlock(runtime=ro.opening_card),
             closing_card=OverlayCardBlock(runtime=ro.closing_card),
-            solo=session.overlay_solo,
+            preview=session.overlay_preview,
             locked=ro.locked,
         )
 

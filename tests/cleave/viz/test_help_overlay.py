@@ -263,7 +263,8 @@ def test_help_follows_navigator_render_node() -> None:
     assert description.title == "Credits Overlays"
     keyboard = dict(_keyboard_section(overlays).entries)
     assert "E" not in keyboard
-    assert keyboard["S"] == "always on"
+    assert "S" not in keyboard
+    assert keyboard["V"] == "preview cards"
     assert overlays != (navigation_section(),)
 
     post = help_sections(

@@ -31,6 +31,7 @@ TWISTY_COLLAPSED = "▸"
 
 TOGGLE_ENABLED = "enabled"
 TOGGLE_SOLO = "solo"
+TOGGLE_PREVIEW = "preview"
 TOGGLE_LOCK = "lock"
 TOGGLE_ADD = "add"
 
@@ -58,8 +59,9 @@ _LAYER_PAGES: tuple[tuple[str, str], ...] = (
 class NavToggle:
     """One clickable icon on a navigator row.
 
-    ``id`` is ``TOGGLE_ENABLED``, ``TOGGLE_SOLO``, ``TOGGLE_LOCK``, or
-    ``TOGGLE_ADD``. ``active`` is on, soloed, or locked. ``blocked`` is true
+    ``id`` is ``TOGGLE_ENABLED``, ``TOGGLE_SOLO``, ``TOGGLE_PREVIEW``,
+    ``TOGGLE_LOCK``, or ``TOGGLE_ADD``. ``active`` is on, soloed, previewing,
+    or locked. ``blocked`` is true
     while the section lock refuses the toggle, or Add has no room. ``inert``
     is true while a press is refused for another reason (the timeline owns
     layer visibility): the icon draws as usual and the pointer stays an arrow.
@@ -401,7 +403,7 @@ def _root_node(session: TuningSession, node: NavNode) -> NavNode:
         return replace(
             node,
             toggles=(
-                NavToggle(TOGGLE_SOLO, session.overlay_solo),
+                NavToggle(TOGGLE_PREVIEW, session.overlay_preview),
                 NavToggle(TOGGLE_LOCK, overlays.locked),
             ),
         )

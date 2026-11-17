@@ -203,6 +203,7 @@ _CURATION_SHELL_SUPPRESSED = frozenset(
         pygame.K_l,
         pygame.K_m,
         pygame.K_s,
+        pygame.K_v,
         pygame.K_e,
         pygame.K_p,
         pygame.K_DELETE,

@@ -225,13 +225,13 @@ def live_overlay_alpha(
     cfg: RenderOverlayCardConfig,
     *,
     enabled: bool,
-    solo: bool,
+    preview: bool,
     song_duration: float | None = None,
 ) -> float:
     """Visibility multiplier for a live overlay card at *t_sec*."""
     if not enabled:
         return 0.0
-    if solo:
+    if preview:
         return 1.0
     if getattr(cfg.animation, "disappear_at", None) is not None:
         if song_duration is None:
@@ -678,7 +678,7 @@ def composite_overlay_with_alpha(
     panel: pygame.Surface | None = None,
     layers: OverlayLayerSet | None = None,
     t_sec: float | None = None,
-    solo: bool = False,
+    preview: bool = False,
     song_duration: float | None = None,
 ) -> None:
     """Upload and draw the overlay card at *alpha* visibility.
@@ -708,7 +708,7 @@ def composite_overlay_with_alpha(
     panel_h = layers.panel_h
     base_pos = panel_position(cfg, panel_w, panel_h, width, height)
 
-    if solo or t_sec is None:
+    if preview or t_sec is None:
         _upload_and_draw(
             compositor, layers.settled_panel, base_pos, alpha, width, height
         )

@@ -41,7 +41,7 @@ class OverlayCardControls:
                 not overlays.opening_card.enabled
                 and not overlays.closing_card.enabled
             ):
-                self.session.overlay_solo = False
+                self.session.overlay_preview = False
 
     def step_position(self, *, delta: int) -> None:
         card = self._card()
@@ -159,12 +159,12 @@ class OverlaysControls:
         overlays = self.session.overlays
         overlays.locked = not overlays.locked
 
-    def enter_solo(self) -> None:
-        if self.session.overlay_solo:
+    def enter_preview(self) -> None:
+        if self.session.overlay_preview:
             return
-        self.session.overlay_solo = True
+        self.session.overlay_preview = True
 
-    def exit_solo(self) -> None:
-        if not self.session.overlay_solo:
+    def exit_preview(self) -> None:
+        if not self.session.overlay_preview:
             return
-        self.session.overlay_solo = False
+        self.session.overlay_preview = False

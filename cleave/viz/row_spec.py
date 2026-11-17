@@ -124,6 +124,7 @@ class RowSpec:
     is_pinned: bool = False
     toggle_enabled: ActionMutator | None = None
     toggle_solo: ActionMutator | None = None
+    toggle_preview: ActionMutator | None = None
     can_enter_move_mode: bool = False
     # Draws a leading drag handle that reorders the row with the mouse.
     drag_reorder: bool = False
@@ -451,4 +452,15 @@ def apply_field_toggle_solo(
     if spec is None or spec.toggle_solo is None:
         return False
     spec.toggle_solo(controls, desc)
+    return True
+
+
+def apply_field_toggle_preview(
+    controls: TuningControls,
+    desc: RowDescriptor,
+) -> bool:
+    spec = ROW_SPECS.get(desc.kind)
+    if spec is None or spec.toggle_preview is None:
+        return False
+    spec.toggle_preview(controls, desc)
     return True

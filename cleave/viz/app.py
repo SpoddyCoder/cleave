@@ -464,7 +464,7 @@ def draw_live_overlay(
             runtime,
             t_sec,
             post_fx_solo=runtime.seed.session.post_fx_solo,
-            overlay_solo=runtime.seed.session.overlay_solo,
+            overlay_preview=runtime.seed.session.overlay_preview,
             panel_cache=runtime.overlays_panel_cache,
         )
 

@@ -275,7 +275,9 @@ def _heading_section(behavior: RowSpec) -> HelpSection | None:
     if behavior.toggle_enabled is not None:
         entries.append(("E", "enable/disable"))
     if behavior.toggle_solo is not None:
-        entries.append(("S", "always on"))
+        entries.append(("S", "solo"))
+    if behavior.toggle_preview is not None:
+        entries.append(("V", "preview cards"))
     if not entries:
         return None
     return HelpSection(behavior.help_title, tuple(entries))

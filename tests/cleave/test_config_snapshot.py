@@ -1124,17 +1124,17 @@ def test_write_session_snapshot_post_fx_solo_does_not_affect_enabled(
     assert "post_fx_solo" not in yaml.safe_dump(data)
 
 
-def test_write_session_snapshot_overlay_solo_does_not_affect_enabled(
+def test_write_session_snapshot_overlay_preview_does_not_affect_enabled(
     tmp_path: Path,
 ) -> None:
     cfg, session, out_path = _snapshot_fixture(tmp_path)
     session.overlays.opening_card.enabled = False
-    session.overlay_solo = True
+    session.overlay_preview = True
     write_session_snapshot(out_path, cfg=cfg, session=session)
 
     data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
     assert data["render"]["overlays"]["opening-card"]["enabled"] is False
-    assert "overlay_solo" not in yaml.safe_dump(data)
+    assert "overlay_preview" not in yaml.safe_dump(data)
 
 
 def test_write_session_snapshot_overlay_without_cfg_render(tmp_path: Path) -> None:

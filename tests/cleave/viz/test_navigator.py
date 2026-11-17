@@ -14,6 +14,7 @@ from cleave.viz.navigator import (
     SOLO_BADGE,
     TOGGLE_ENABLED,
     TOGGLE_LOCK,
+    TOGGLE_PREVIEW,
     TOGGLE_SOLO,
     NavToggle,
     TOP_LEVEL_IDS,
@@ -340,7 +341,7 @@ def test_root_toggles_follow_session_and_replace_marks() -> None:
     session.overlays.closing_card.enabled = False
     session.pattern_mask.enabled = False
     session.timeline.enabled = False
-    session.overlay_solo = True
+    session.overlay_preview = True
     session.overlays.locked = True
     session.post_fx.locked = True
     session.pattern_mask.locked = True
@@ -348,8 +349,8 @@ def test_root_toggles_follow_session_and_replace_marks() -> None:
     nodes = {node.id: node for node in build_navigator(session)}
 
     overlay = _toggles(nodes["overlay"])
-    assert tuple(overlay) == (TOGGLE_SOLO, TOGGLE_LOCK)
-    assert overlay[TOGGLE_SOLO] == NavToggle(TOGGLE_SOLO, True)
+    assert tuple(overlay) == (TOGGLE_PREVIEW, TOGGLE_LOCK)
+    assert overlay[TOGGLE_PREVIEW] == NavToggle(TOGGLE_PREVIEW, True)
     assert overlay[TOGGLE_LOCK] == NavToggle(TOGGLE_LOCK, True)
     assert _toggles(nodes["post_fx"]) == {TOGGLE_LOCK: NavToggle(TOGGLE_LOCK, True)}
     for node_id in ("pattern_mask", "timeline"):

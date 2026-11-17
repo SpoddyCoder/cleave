@@ -96,7 +96,7 @@ def _merge_session_state(
     target.layers = dict(fresh.layers)
     target.solo_slot = fresh.solo_slot
     target.overlays = fresh.overlays
-    target.overlay_solo = fresh.overlay_solo
+    target.overlay_preview = fresh.overlay_preview
     target.post_fx = fresh.post_fx
     target.post_fx_solo = fresh.post_fx_solo
     target.timeline = fresh.timeline

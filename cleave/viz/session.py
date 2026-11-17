@@ -479,7 +479,7 @@ class TuningSession:
     overlays: OverlaysRuntime = field(
         default_factory=default_overlays_runtime
     )
-    overlay_solo: bool = False
+    overlay_preview: bool = False
     post_fx: PostFxRuntime = field(
         default_factory=default_post_fx_runtime
     )

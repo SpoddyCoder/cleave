@@ -198,6 +198,7 @@ def _merge_icon_glyphs(fonts: Any, size_pixels: float) -> tuple[Any, list[int]]:
         DELETE_GLYPH,
         POWER_GLYPH,
         SOLO_GLYPH,
+        PREVIEW_GLYPH,
         DRAG_INDICATOR_GLYPH,
         font_path,
     )
@@ -219,6 +220,7 @@ def _merge_icon_glyphs(fonts: Any, size_pixels: float) -> tuple[Any, list[int]]:
         DELETE_GLYPH,
         POWER_GLYPH,
         SOLO_GLYPH,
+        PREVIEW_GLYPH,
         DRAG_INDICATOR_GLYPH,
     ):
         ranges.extend((ord(glyph), ord(glyph)))

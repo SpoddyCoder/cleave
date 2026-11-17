@@ -44,7 +44,7 @@ def test_enter_on_root_page_focuses_its_enabled_row() -> None:
     controls = make_controls(("layer_1",))
     focus = controls.shell_focus
     for node_id, kind in (
-        ("overlay", RowKind.OVERLAYS_SOLO),
+        ("overlay", RowKind.OVERLAYS_PREVIEW),
         ("post_fx", RowKind.POST_FX_LOCKED),
         ("pattern_mask", RowKind.PATTERN_MASK_ENABLED),
         ("timeline", RowKind.TIMELINE_ENABLED),
@@ -240,7 +240,7 @@ def test_back_in_the_inspector_keeps_focus_and_moves_the_cursor() -> None:
     controls.navigator.go_back()
     assert focus.selected_id == "overlay"
     assert focus.region is ShellRegion.INSPECTOR
-    assert focus.inspector_cursor == RowDescriptor(RowKind.OVERLAYS_SOLO)
+    assert focus.inspector_cursor == RowDescriptor(RowKind.OVERLAYS_PREVIEW)
 
 
 def test_back_skips_a_page_whose_layer_was_removed() -> None:

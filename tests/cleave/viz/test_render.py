@@ -973,7 +973,7 @@ def test_render_output_must_be_mp4(tmp_path: Path) -> None:
 
 @patch(
     "cleave.viz.frame_finish.live_overlay_alpha",
-    side_effect=lambda *a, enabled=True, solo=False, **k: (1.0 if enabled else 0.0),
+    side_effect=lambda *a, enabled=True, preview=False, **k: (1.0 if enabled else 0.0),
 )
 @patch("cleave.viz.frame_finish.build_overlay_layers")
 @patch("cleave.viz.frame_finish.composite_overlay_with_alpha")
@@ -1056,7 +1056,7 @@ def test_render_calls_overlay_compositing_when_enabled(
         resolution = runtime.seed.session.project.resolution
         assert call.args[3:5] == (resolution.width, resolution.height)
         assert call.kwargs["layers"] is overlay_layers
-        assert call.kwargs["solo"] is False
+        assert call.kwargs["preview"] is False
         assert "t_sec" in call.kwargs
 
 
@@ -1126,7 +1126,7 @@ def test_render_skips_overlay_when_disabled(
 
 @patch(
     "cleave.viz.frame_finish.live_overlay_alpha",
-    side_effect=lambda *a, enabled=True, solo=False, **k: (1.0 if enabled else 0.0),
+    side_effect=lambda *a, enabled=True, preview=False, **k: (1.0 if enabled else 0.0),
 )
 @patch("cleave.viz.frame_finish.composite_overlay_with_alpha")
 @patch.object(render_mod, "pygame")
@@ -1292,7 +1292,7 @@ def test_render_present_content_every_frame(
 
 @patch(
     "cleave.viz.frame_finish.live_overlay_alpha",
-    side_effect=lambda *a, enabled=True, solo=False, **k: (1.0 if enabled else 0.0),
+    side_effect=lambda *a, enabled=True, preview=False, **k: (1.0 if enabled else 0.0),
 )
 @patch("cleave.viz.frame_finish.build_overlay_layers")
 @patch.object(render_mod, "pygame")
