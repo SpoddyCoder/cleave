@@ -13,7 +13,7 @@ from typing import Protocol
 
 from imgui_bundle import imgui
 
-from cleave.viz.imgui_theme import rgba
+from cleave.viz.imgui_theme import floating_surface, rgba
 from cleave.viz.info_panel import InfoPanelViewState
 from cleave.viz.theme import LABEL, VALUE
 
@@ -117,7 +117,8 @@ class InfoPanelSurface:
             imgui.Cond_.always,
             imgui.ImVec2(0.5, 0.5),
         )
-        imgui.begin(_INFO_WINDOW, None, _INFO_FLAGS)
+        with floating_surface():
+            imgui.begin(_INFO_WINDOW, None, _INFO_FLAGS)
         try:
             _raise(_INFO_WINDOW)
             view = self.view

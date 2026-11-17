@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Iterator
-from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
 from imgui_bundle import imgui
@@ -20,12 +18,11 @@ from cleave.viz.shell_context import ShellContext
 from cleave.viz.theme import (
     BACKGROUND,
     ERROR_NOTIFICATION,
-    FOCUS_WASH_ALPHA,
     HIGHLIGHT,
     LABEL,
     LOCKED,
     MUTED,
-    ROW_FOCUS_BORDER,
+    ROW_FOCUS_EDGE,
     VALUE,
 )
 from cleave.viz.tooltips import show_tooltip
@@ -181,7 +178,7 @@ def stroke_h_rule(
 
 
 def draw_item_focus_ring() -> None:
-    """1px highlight outline of the current item on its window.
+    """1px focus edge around the current item (a focused panel button) on its window.
 
     The window list is painted with that panel, so a later menu popup covers
     the outline where they overlap. The foreground list would sit above the
@@ -191,7 +188,7 @@ def draw_item_focus_ring() -> None:
     rect_max = imgui.get_item_rect_max()
     if rect_max.x <= rect_min.x or rect_max.y <= rect_min.y:
         return
-    color = imgui.get_color_u32(rgba(ROW_FOCUS_BORDER))
+    color = imgui.get_color_u32(rgba(ROW_FOCUS_EDGE))
     imgui.get_window_draw_list().add_rect(
         rect_min,
         rect_max,
@@ -214,16 +211,6 @@ def drawn_row_rect(left_x: float) -> tuple[int, int, int, int] | None:
     return (int(left_x), int(top), int(rect_max.x - left_x), int(bottom - top))
 
 
-def selectable_wash() -> tuple[imgui.ImVec4, imgui.ImVec4]:
-    """Header fill for a selected navigator row or a focused inspector row.
-
-    Both values are that fill, pushed on the header slots so the row keeps it
-    under the pointer. Unselected hover stays the theme table.
-    """
-    fill = rgba(HIGHLIGHT, FOCUS_WASH_ALPHA / 255.0)
-    return fill, fill
-
-
 def hand_on_hover() -> None:
     """Ask for the hand pointer while the item just drawn is hovered."""
     if imgui.is_item_hovered():
@@ -236,12 +223,14 @@ def draw_button(
     text_role: tuple[int, int, int] = VALUE,
     selected: bool = False,
     enabled: bool = True,
+    off: bool = False,
 ) -> bool:
     """A framed panel button at the cursor. Returns whether it was clicked.
 
     Painted by ``button_paint``: it lights violet under the pointer and sinks
     while held. A button that is not *enabled* stays at rest and keeps the
-    arrow pointer. Text after ``##`` is the id only.
+    arrow pointer. An *off* button (on a switched-off or locked page, or not
+    enabled) rests in the darker OFF tone. Text after ``##`` is the id only.
     """
     text = label.split("##", 1)[0]
     pad = imgui.get_style().frame_padding
@@ -257,7 +246,8 @@ def draw_button(
     elif enabled and imgui.is_item_hovered():
         state = ButtonState.HOVER
     draw = imgui.get_window_draw_list()
-    paint_button(draw, (rect_min.x, rect_min.y, size.x, size.y), ButtonTone.PLAIN, state)
+    tone = ButtonTone.OFF if off and state is ButtonState.REST else ButtonTone.PLAIN
+    paint_button(draw, (rect_min.x, rect_min.y, size.x, size.y), tone, state)
     role = VALUE if state is not ButtonState.REST else text_role
     draw.add_text(
         imgui.ImVec2(rect_min.x + pad.x, rect_min.y + pad.y), packed_color(role), text
@@ -265,24 +255,6 @@ def draw_button(
     if selected:
         draw_item_focus_ring()
     return clicked
-
-
-@contextmanager
-def selected_header_wash(selected: bool) -> Iterator[None]:
-    """Push the focus wash on a selected navigator or inspector row, then pop.
-
-    Hover on an unselected row is the theme table, not a second push.
-    """
-    if selected:
-        hovered, active = selectable_wash()
-        imgui.push_style_color(imgui.Col_.header, hovered)
-        imgui.push_style_color(imgui.Col_.header_hovered, hovered)
-        imgui.push_style_color(imgui.Col_.header_active, active)
-    try:
-        yield
-    finally:
-        if selected:
-            imgui.pop_style_color(3)
 
 
 class InlineField:

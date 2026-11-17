@@ -15,11 +15,11 @@ from cleave.viz.menu_rows import (
     draw_menu_rows,
     FittedWindow,
     MenuRowView,
-    opaque_highlight_fill,
 )
 from cleave.viz.shell_context import ShellContext
 from cleave.viz.shell_widgets import selectable_label_origin
-from cleave.viz.theme import BACKGROUND, LABEL, tuning_ui_metrics, ui_chrome_px, VALUE
+from cleave.viz.row_paint import RowState, row_band
+from cleave.viz.theme import LABEL, tuning_ui_metrics, ui_chrome_px, VALUE
 
 if TYPE_CHECKING:
     from cleave.viz.menu_bar import Menu
@@ -157,25 +157,22 @@ class MenuBarPanel:
                 for index, menu in enumerate(menus):
                     active = menu_state.focused and menu_state.menu_index == index
                     width = imgui.calc_text_size(menu.label).x + pad_x * 2.0
-                    # Open title stays opaque highlight, including under the
-                    # pointer. Idle hover is the theme header wash.
-                    with opaque_highlight_fill(active):
+                    # The open title is lit (no marker bar), including under
+                    # the pointer. Idle hover is the theme's violet wash.
+                    with row_band(RowState.LIT if active else None, bar=False) as mark_band:
                         if active:
-                            imgui.push_style_color(
-                                imgui.Col_.text, rgba(BACKGROUND)
-                            )
+                            imgui.push_style_color(imgui.Col_.text, rgba(VALUE))
                         clicked, _selected = imgui.selectable(
                             menu.label,
                             active,
                             0,
                             imgui.ImVec2(width, 0.0),
                         )
+                        mark_band(imgui.get_item_rect_min().x)
                         if active:
                             imgui.pop_style_color()
                     label_y = selectable_label_origin()[1]
-                    _draw_mnemonic_underline(
-                        menu.label, BACKGROUND if active else LABEL
-                    )
+                    _draw_mnemonic_underline(menu.label, VALUE if active else LABEL)
                     # The dropdown's top border sits on the rule row. The
                     # title's item rect ends a few pixels above the bar
                     # bottom, so anchoring there doubled the top border

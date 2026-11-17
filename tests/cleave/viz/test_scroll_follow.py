@@ -9,7 +9,7 @@ from unittest.mock import patch
 import pygame
 from imgui_bundle import imgui
 
-from cleave.viz import imgui_host, shell_inspector, shell_navigator, shell_widgets
+from cleave.viz import imgui_host, row_paint, shell_widgets
 from cleave.viz.commands import CommandContext
 from cleave.viz.imgui_host import ImGuiHost
 from cleave.viz.menu_bar import MenuBarState
@@ -19,6 +19,7 @@ from cleave.viz.navigator import (
     layer_node_id,
     layer_page_node_id,
 )
+from cleave.viz.row_paint import RowState
 from cleave.viz.scroll_follow import clamp_scroll, reveal_span, scroll_to_reveal
 from cleave.viz.shell_focus import ShellRegion
 from cleave.viz.shell_host import ShellHost, draw_shell_frame
@@ -90,25 +91,30 @@ def _shell(controls) -> Iterator[ShellHost]:
 
 
 def _focused_rows(host: ShellHost, frames: int = 2) -> list[tuple[float, float, float, float]]:
-    """Draw *frames* shell frames. Each focus ring drawn is (top, bottom, window top, window bottom)."""
+    """Draw *frames* shell frames.
+
+    Each focused row band or focused button ring drawn is (top, bottom,
+    window top, window bottom).
+    """
     rings: list[tuple[float, float, float, float]] = []
+    real_paint = row_paint.paint_row
     real_ring = shell_widgets.draw_item_focus_ring
+
+    def record(top: float, bottom: float) -> None:
+        window_y = float(imgui.get_window_pos().y)
+        rings.append((top, bottom, window_y, window_y + float(imgui.get_window_height())))
+
+    def paint(draw, rect, state, *, bar=True) -> None:
+        real_paint(draw, rect, state, bar=bar)
+        if state is RowState.FOCUSED:
+            record(float(rect[1]), float(rect[1] + rect[3]))
 
     def ring() -> None:
         real_ring()
-        window_y = float(imgui.get_window_pos().y)
-        rings.append(
-            (
-                float(imgui.get_item_rect_min().y),
-                float(imgui.get_item_rect_max().y),
-                window_y,
-                window_y + float(imgui.get_window_height()),
-            )
-        )
+        record(float(imgui.get_item_rect_min().y), float(imgui.get_item_rect_max().y))
 
     with (
-        patch.object(shell_navigator, "draw_item_focus_ring", ring),
-        patch.object(shell_inspector, "draw_item_focus_ring", ring),
+        patch.object(row_paint, "paint_row", paint),
         patch.object(shell_widgets, "draw_item_focus_ring", ring),
     ):
         for _ in range(frames):

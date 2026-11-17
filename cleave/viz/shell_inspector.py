@@ -62,29 +62,28 @@ from cleave.viz.shell_inspector_title import (
     TITLE_FORWARD,
     TitleButton,
 )
+from cleave.viz.row_paint import RowState, row_band
 from cleave.viz.shell_widgets import (
     PANEL_BORDER_PX,
     drag_handle_lead,
     draw_aligned_parts,
     draw_button,
-    draw_item_focus_ring,
     drawn_row_rect,
     ImguiTextSizer,
     InlineField,
     row_text_y,
     RowDrag,
     selectable_label_origin,
-    selected_header_wash,
     stroke_h_rule,
 )
 from cleave.viz.text_fit import fit_path_or_name_to_width, fit_text_to_width
 from cleave.viz.theme import (
     DISABLED,
-    HIGHLIGHT,
     INSPECTOR_DIVIDER,
     LABEL,
     LOCKED,
     MUTED,
+    OFF_CONTROL_TEXT,
     PRESET_FILE_ICON,
     PRESET_ICON,
     ui_chrome_px,
@@ -326,11 +325,17 @@ def _button_text_role(
 ) -> tuple[int, int, int]:
     """Button label colour. A section lock reads as locked, not as disabled.
 
-    A button on a switched-off page still runs, but greys like its rows.
+    A button on a switched-off page still runs, but dims like its rows, on the
+    OFF tone (``_button_off``).
     """
     if locked:
         return LOCKED
-    return VALUE if enabled and not page_off else DISABLED
+    return VALUE if enabled and not page_off else OFF_CONTROL_TEXT
+
+
+def _button_off(enabled: bool, locked: bool, *, page_off: bool) -> bool:
+    """Whether a command button rests in the darker OFF tone."""
+    return locked or page_off or not enabled
 
 
 @dataclass(frozen=True)
@@ -349,6 +354,7 @@ class _RowLook:
     label_color: tuple[int, int, int]
     value_color: tuple[int, int, int]
     selected: bool
+    band_left: float
     two_line: bool
     stepped: bool
 
@@ -510,6 +516,10 @@ class InspectorPanel:
     def draw_row(self, state: TuningViewState, row: InspectorRow) -> None:
         """One inspector row: a button row, a heading, or a label with its value."""
         indent = row.depth * ui_chrome_px(_INSPECTOR_INDENT)
+        # A focused row's band runs the full width, under its indent.
+        band_left = imgui.get_cursor_screen_pos().x - math.floor(
+            imgui.get_style().item_spacing.x * 0.5
+        )
         if indent:
             imgui.indent(indent)
         try:
@@ -526,7 +536,7 @@ class InspectorPanel:
             selected = _inspector_row_selected(self._ctx.controls.shell_focus, desc)
             label_color, value_color = inspector_field_colors(state, desc)
             if selected and label_color == LABEL:
-                label_color = HIGHLIGHT
+                label_color = VALUE
             look = _RowLook(
                 row=row,
                 desc=desc,
@@ -536,6 +546,7 @@ class InspectorPanel:
                 label_color=label_color,
                 value_color=value_color,
                 selected=selected,
+                band_left=band_left,
                 two_line=row_is_two_line(desc.kind),
                 stepped=inspector_row_stepped(state, desc),
             )
@@ -553,7 +564,7 @@ class InspectorPanel:
         row_height = 2.0 * imgui.get_text_line_height() if look.two_line else 0.0
         imgui.push_style_color(imgui.Col_.text, rgba(look.label_color))
         try:
-            with selected_header_wash(look.selected):
+            with row_band(RowState.FOCUSED if look.selected else None) as mark_band:
                 text_x = imgui.get_cursor_screen_pos().x
                 clicked, _selected = imgui.selectable(
                     f"{look.lead}{look.label}{inspector_selectable_id(desc)}",
@@ -561,6 +572,7 @@ class InspectorPanel:
                     imgui.SelectableFlags_.allow_overlap if look.lead else 0,
                     imgui.ImVec2(0.0, row_height),
                 )
+                mark_band(look.band_left)
                 span = (
                     imgui.get_item_rect_min().y,
                     imgui.get_item_rect_max().y,
@@ -580,7 +592,6 @@ class InspectorPanel:
                     span=span,
                 )
                 if look.selected:
-                    draw_item_focus_ring()
                     selected_id = self._ctx.controls.shell_focus.selected_id
                     self._follow.follow((selected_id, desc))
         finally:
@@ -799,16 +810,17 @@ class InspectorPanel:
                 focus.region is ShellRegion.INSPECTOR
                 and focus.inspector_command_id == command_id
             )
+            locked = (
+                inspector_command_locked(ctx, command_id)
+                or self._page_status.locked_by is not None
+            )
+            page_off = self._page_status.off_by is not None
             clicked = draw_button(
                 f"{command.label}##cmd-{command_id}",
-                text_role=_button_text_role(
-                    enabled,
-                    inspector_command_locked(ctx, command_id)
-                    or self._page_status.locked_by is not None,
-                    page_off=self._page_status.off_by is not None,
-                ),
+                text_role=_button_text_role(enabled, locked, page_off=page_off),
                 selected=selected,
                 enabled=enabled,
+                off=_button_off(enabled, locked, page_off=page_off),
             )
             if selected:
                 self._follow.follow((focus.selected_id, command_id))

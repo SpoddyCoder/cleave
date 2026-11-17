@@ -46,13 +46,14 @@ from cleave.viz.material_icons import (
     FOLDER_GLYPH,
 )
 from cleave.viz.theme import (
-    FOCUS_WASH_ALPHA,
-    HIGHLIGHT,
     HOVER,
     HOVER_BG_ALPHA,
     LABEL,
     PRESET_ICON,
-    ROW_FOCUS_BORDER,
+    ROW_FOCUS_EDGE,
+    ROW_FOCUSED_ALPHA,
+    ROW_SELECT_TINT,
+    ROW_SELECTED_ALPHA,
     VALUE,
     tuning_ui_metrics,
 )
@@ -320,10 +321,16 @@ def _hover() -> int:
 
 
 def _wash_and_border() -> tuple[int, int]:
+    """The focused band's left-hand colour (two vertices) and its edge."""
     return (
-        _pack(HIGHLIGHT, FOCUS_WASH_ALPHA / 255.0),
-        _pack(ROW_FOCUS_BORDER),
+        _pack(ROW_SELECT_TINT, ROW_FOCUSED_ALPHA[0]),
+        _pack(ROW_FOCUS_EDGE),
     )
+
+
+def _selected_wash() -> int:
+    """The selected band's left-hand colour (two vertices)."""
+    return _pack(ROW_SELECT_TINT, ROW_SELECTED_ALPHA[0])
 
 
 def _above(panel: Rect) -> tuple[int, int]:
@@ -430,11 +437,11 @@ def test_hover_washes_a_row_and_the_selection_stays(tmp_path: Path) -> None:
 
     assert intent is None
     assert picker.selected_index == 0
-    assert colors.get(wash, 0) == 4
+    assert colors.get(wash, 0) == 2
     assert hovered_hover == 2
     assert hovered_wash == 0
     assert hovered_border == 0
-    assert selected_wash == 2
+    assert selected_wash == 1
     assert selected_border > 0
 
 
@@ -462,7 +469,7 @@ def test_hover_washes_a_shortcut_and_the_row_stays_selected(
     assert picker.current == tmp_path
     assert chip_hover == 2
     assert chip_wash == 0
-    assert row_wash == 2
+    assert row_wash == 1
     assert row_border > 0
 
 
@@ -484,7 +491,7 @@ def test_selection_stays_lit_wherever_the_pointer_goes(tmp_path: Path) -> None:
             moved = FilePickerSurface(picker.view_state())
             _frame(host, moved, (_motion(pos, rel=(1, 0)),), picker=picker)
             selected = moved.row_rects[1]
-            assert _vertices_near(wash, y=float(selected[1])) == 2
+            assert _vertices_near(wash, y=float(selected[1])) == 1
             assert _vertices_near(border, y=float(selected[1])) > 0
             assert _vertices_near(wash, y=float(moved.row_rects[0][1])) == 0
 
@@ -524,8 +531,8 @@ def test_keyboard_row_draws_the_focus_outline(tmp_path: Path) -> None:
         selected_border = _vertices_near(border, y=float(selected[1]))
 
     assert picker.selected_index == 1
-    assert colors.get(wash, 0) == 4
-    assert selected_wash == 2
+    assert colors.get(wash, 0) == 2
+    assert selected_wash == 1
     assert selected_border > 0
 
 
@@ -542,13 +549,13 @@ def test_keyboard_shortcut_draws_the_focus_outline(tmp_path: Path) -> None:
         row = surface.row_rects[0]
         chip_wash = _vertices_near(wash, x=float(chip[0]))
         chip_border = _vertices_near(border, x=float(chip[0]))
-        row_wash = _vertices_near(wash, y=float(row[1]))
+        row_wash = _vertices_near(_selected_wash(), y=float(row[1]))
         row_border = _vertices_near(border, y=float(row[1]))
 
     assert chip_wash == 2
     assert chip_border > 0
-    # The listing keeps its chosen row, without the focus outline.
-    assert row_wash == 2
+    # The listing keeps its chosen row in the selected band, without the edge.
+    assert row_wash == 1
     assert row_border == 0
 
 
@@ -873,3 +880,22 @@ def test_directory_arrow_glyphs_are_in_the_font() -> None:
 
     assert up is not None and up.x1 > up.x0
     assert down is not None and down.x1 > down.x0
+
+
+def test_list_and_shortcuts_sit_on_the_panel_ink(tmp_path: Path) -> None:
+    """No black fill inside the picker: its list child shares the surface ink."""
+    from cleave.viz.theme import BACKGROUND, SURFACE_BG
+
+    (tmp_path / "song.wav").write_bytes(b"RIFF")
+    picker = FilePicker(current=tmp_path)
+    surface = FilePickerSurface(picker.view_state())
+
+    with _host() as host:
+        _frame(host, surface)
+        chip = surface.chip_rects[0]
+        _frame(host, surface, (_motion(_center(chip), rel=(1, 0)),))
+        colors = _color_counts()
+        black, ink = _pack(BACKGROUND), _pack(SURFACE_BG)
+
+    assert black not in colors
+    assert colors.get(ink, 0) >= 8

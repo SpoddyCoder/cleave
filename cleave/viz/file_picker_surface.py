@@ -12,7 +12,7 @@ import functools
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
+from typing import Any, Literal
 
 from cleave.open_target import OpenTarget
 from cleave.viz.file_picker import (
@@ -35,15 +35,9 @@ from cleave.viz.theme import (
     BORDER_WIDTH,
     DISABLED,
     ERROR_NOTIFICATION,
-    FOCUS_WASH_ALPHA,
     HIGHLIGHT,
-    HOVER,
-    HOVER_BG_ALPHA,
     LABEL,
     PRESET_ICON,
-    ROW_FOCUS_BORDER,
-    SCROLLBAR_THUMB,
-    SCROLLBAR_TRACK,
     VALUE,
     tuning_ui_metrics,
 )
@@ -62,9 +56,6 @@ _PROJECT_SUFFIX = "  [project]"
 _DIRECTORY_SUFFIX = "/"
 _SHORTCUT_SEPARATOR = "   "
 _SHORTCUT_HIGHLIGHT_PAD = 4
-_WASH_ALPHA = FOCUS_WASH_ALPHA / 255.0
-_HOVER_ALPHA = HOVER_BG_ALPHA / 255.0
-_FOCUS_BORDER_THICKNESS = 1.0
 # Sideways outset of a row or chip highlight, as on a dialog form row.
 _HIGHLIGHT_PAD = 3
 
@@ -309,38 +300,11 @@ def _text(draw: Any, x: int, y: int, text: str, role: _Role) -> None:
     draw.add_text(imgui.ImVec2(float(x), float(y)), _packed(role), text)
 
 
-def _wash(draw: Any, rect: Rect) -> None:
-    x, y, width, height = rect
-    if width <= 0 or height <= 0:
-        return
-    imgui = _imgui()
-    draw.add_rect_filled(
-        imgui.ImVec2(float(x), float(y)),
-        imgui.ImVec2(float(x + width), float(y + height)),
-        _packed(HIGHLIGHT, _WASH_ALPHA),
-    )
+def _paint(draw: Any, rect: Rect, state: Literal["HOVER", "SELECTED", "FOCUSED"]) -> None:
+    """A row or chip in the shell's row look, named by its ``RowState``."""
+    from cleave.viz.row_paint import RowState, paint_row
 
-
-def _focus_border(draw: Any, rect: Rect) -> None:
-    """1px row focus outline, matching a focused navigator or inspector row."""
-    x, y, width, height = rect
-    if width <= 0 or height <= 0:
-        return
-    imgui = _imgui()
-    draw.add_rect(
-        imgui.ImVec2(float(x), float(y)),
-        imgui.ImVec2(float(x + width), float(y + height)),
-        _packed(ROW_FOCUS_BORDER),
-        0.0,
-        0,
-        _FOCUS_BORDER_THICKNESS,
-    )
-
-
-def _highlight(draw: Any, rect: Rect) -> None:
-    """Wash plus the 1px focus border, for keyboard selection and pointer hover."""
-    _wash(draw, rect)
-    _focus_border(draw, rect)
+    paint_row(draw, rect, RowState[state])
 
 
 def _push_list_highlight_clip(draw: Any) -> None:
@@ -360,19 +324,6 @@ def _push_list_highlight_clip(draw: Any) -> None:
         imgui.ImVec2(float(clip_min.x) - slack, float(clip_min.y) - slack),
         imgui.ImVec2(float(clip_max.x) + slack, float(clip_max.y) + slack),
         False,
-    )
-
-
-def _hover_wash(draw: Any, rect: Rect) -> None:
-    """The pointer wash on a row or chip that is not selected, as in the navigator."""
-    x, y, width, height = rect
-    if width <= 0 or height <= 0:
-        return
-    imgui = _imgui()
-    draw.add_rect_filled(
-        imgui.ImVec2(float(x), float(y)),
-        imgui.ImVec2(float(x + width), float(y + height)),
-        _packed(HOVER, _HOVER_ALPHA),
     )
 
 
@@ -485,15 +436,6 @@ def _list_flags() -> int:
     )
 
 
-def _push_scrollbar_colors() -> int:
-    imgui = _imgui()
-    imgui.push_style_color(imgui.Col_.scrollbar_bg, _packed(SCROLLBAR_TRACK))
-    imgui.push_style_color(imgui.Col_.scrollbar_grab, _packed(SCROLLBAR_THUMB))
-    imgui.push_style_color(imgui.Col_.scrollbar_grab_hovered, _packed(HIGHLIGHT))
-    imgui.push_style_color(imgui.Col_.scrollbar_grab_active, _packed(HIGHLIGHT))
-    return 4
-
-
 class FilePickerSurface:
     """Centred picker window. ``modal`` keeps the top-layer scrim up.
 
@@ -551,7 +493,10 @@ class FilePickerSurface:
                 imgui.StyleVar_.window_border_size, float(BORDER_WIDTH)
             )
             pushed += 1
-            imgui.begin(FILE_PICKER_WINDOW, None, _window_flags())
+            from cleave.viz.imgui_theme import floating_surface
+
+            with floating_surface():
+                imgui.begin(FILE_PICKER_WINDOW, None, _window_flags())
             begun = True
             _raise_window()
             pos = imgui.get_window_pos()
@@ -676,10 +621,10 @@ class FilePickerSurface:
             selected = shortcut_is_selected(view, index)
             current = shortcut_is_current(view, index)
             if selected:
-                _highlight(draw, hit)
+                _paint(draw, hit, "FOCUSED")
             elif hover_chip == index:
-                _hover_wash(draw, hit)
-            color = HIGHLIGHT if selected or current else VALUE
+                _paint(draw, hit, "HOVER")
+            color = VALUE if selected else HIGHLIGHT if current else VALUE
             _text(draw, screen_x, y, text, color)
             rects.append(hit)
             indices.append(index)
@@ -720,7 +665,6 @@ class FilePickerSurface:
         total = len(view.rows)
         imgui.set_cursor_screen_pos(imgui.ImVec2(float(content_x), float(list_top)))
         imgui.set_next_window_content_size(imgui.ImVec2(0.0, float(total * step)))
-        colors = _push_scrollbar_colors()
         imgui.push_style_var(imgui.StyleVar_.window_padding, imgui.ImVec2(0.0, 0.0))
         imgui.push_style_var(imgui.StyleVar_.item_spacing, imgui.ImVec2(0.0, 0.0))
         imgui.push_style_var(imgui.StyleVar_.scrollbar_size, float(scrollbar_width))
@@ -730,13 +674,17 @@ class FilePickerSurface:
         begun = False
         hover_chip: int | None = None
         hover_row: int | None = None
+        from cleave.viz.imgui_theme import floating_surface
+
         try:
-            imgui.begin_child(
-                FILE_PICKER_LIST,
-                imgui.ImVec2(float(content_w), float(list_h)),
-                0,
-                flags,
-            )
+            # The list shares the panel's ink, not the shell's black.
+            with floating_surface():
+                imgui.begin_child(
+                    FILE_PICKER_LIST,
+                    imgui.ImVec2(float(content_w), float(list_h)),
+                    0,
+                    flags,
+                )
             begun = True
             origin = imgui.get_window_pos()
             scroll_y = self._sync_list_scroll(view, step, float(list_h))
@@ -769,8 +717,6 @@ class FilePickerSurface:
             if begun:
                 imgui.end_child()
             imgui.pop_style_var(3)
-            if colors:
-                imgui.pop_style_color(colors)
         return hover_chip, hover_row
 
     def _sync_list_scroll(
@@ -842,15 +788,15 @@ class FilePickerSurface:
                 _push_list_highlight_clip(draw)
                 try:
                     if not selected:
-                        _hover_wash(draw, rect)
+                        _paint(draw, rect, "HOVER")
                     elif view.focus is PickerFocus.LIST:
-                        _highlight(draw, rect)
+                        _paint(draw, rect, "FOCUSED")
                     else:
                         # The shortcuts hold the keys; the row stays chosen.
-                        _wash(draw, rect)
+                        _paint(draw, rect, "SELECTED")
                 finally:
                     draw.pop_clip_rect()
-            color = HIGHLIGHT if selected else _row_color(row)
+            color = VALUE if selected else _row_color(row)
             _text(
                 draw,
                 content_x,

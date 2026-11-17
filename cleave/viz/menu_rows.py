@@ -1,7 +1,7 @@
 """Menu rows shared by the menu-bar dropdown and context menus.
 
 Both draw the same row: a check column, the label, and a right-aligned
-shortcut, with an opaque highlight on the keyboard row and the disabled
+shortcut, with the lit row look on the keyboard row and the disabled
 colour on rows that cannot run. Callers resolve their own items into
 ``MenuRowView`` first.
 """
@@ -20,9 +20,10 @@ from cleave.viz.context_menu import (
     ContextMenuState,
     ContextSubmenu,
 )
-from cleave.viz.imgui_theme import padded_row_spacing_y, padded_rows, rgba
+from cleave.viz.imgui_theme import floating_surface, padded_row_spacing_y, padded_rows, rgba
+from cleave.viz.row_paint import RowState, row_band
 from cleave.viz.tooltips import show_tooltip
-from cleave.viz.theme import BACKGROUND, DISABLED, HIGHLIGHT, MUTED, VALUE, ui_chrome_px
+from cleave.viz.theme import DISABLED, HIGHLIGHT, MUTED, SURFACE_TEXT, VALUE, ui_chrome_px
 
 Rect = tuple[int, int, int, int]
 
@@ -105,21 +106,6 @@ class MenuRowsResult:
     rects: tuple[Rect | None, ...] = ()
 
 
-@contextmanager
-def opaque_highlight_fill(active: bool) -> Iterator[None]:
-    """Push an opaque highlight header fill for an open menu title or row."""
-    if active:
-        fill = rgba(HIGHLIGHT, 1.0)
-        imgui.push_style_color(imgui.Col_.header, fill)
-        imgui.push_style_color(imgui.Col_.header_hovered, fill)
-        imgui.push_style_color(imgui.Col_.header_active, fill)
-    try:
-        yield
-    finally:
-        if active:
-            imgui.pop_style_color(3)
-
-
 def draw_menu_rows(
     rows: Sequence[MenuRowView | None],
     highlighted: int | None,
@@ -164,19 +150,20 @@ def draw_menu_rows(
             is_highlighted = highlighted == index
             pos = imgui.get_cursor_screen_pos()
             # Disabled skips the hover wash. The keyboard row stays selectable
-            # so its opaque fill still paints.
+            # so it still lights.
             flags = int(
                 imgui.SelectableFlags_.disabled
                 if not row.enabled and not is_highlighted
                 else imgui.SelectableFlags_.none
             )
-            with opaque_highlight_fill(is_highlighted):
+            with row_band(RowState.LIT if is_highlighted else None) as mark_band:
                 pressed, _selected = imgui.selectable(
                     f"##{row.id}",
                     is_highlighted,
                     flags,
                     imgui.ImVec2(row_w, 0.0),
                 )
+                mark_band(imgui.get_item_rect_min().x)
             rect_min = imgui.get_item_rect_min()
             rect_max = imgui.get_item_rect_max()
             rects.append(
@@ -190,8 +177,10 @@ def draw_menu_rows(
             if imgui.is_item_hovered(int(imgui.HoveredFlags_.allow_when_disabled)):
                 hovered = index
             if is_highlighted:
-                ink = rgba(BACKGROUND)
-                label_color = check_color = shortcut_color = ink
+                # Yellow ticks on the lit row, as in the open choice list.
+                label_color = rgba(VALUE if row.enabled else MUTED)
+                check_color = rgba(HIGHLIGHT if row.enabled else MUTED)
+                shortcut_color = rgba(SURFACE_TEXT)
             else:
                 label_color = rgba(row.color if row.enabled else DISABLED)
                 check_color = rgba(VALUE if row.enabled else DISABLED)
@@ -369,7 +358,8 @@ class FittedWindow:
             x, y = origin(fit, (float(display.x), float(display.y)))
             imgui.set_next_window_size(imgui.ImVec2(*fit), imgui.Cond_.always)
             imgui.set_next_window_pos(imgui.ImVec2(x, y), imgui.Cond_.always)
-        visible, _open = imgui.begin(self.name, None, POPUP_FLAGS)
+        with floating_surface():
+            visible, _open = imgui.begin(self.name, None, POPUP_FLAGS)
         try:
             imgui.internal.bring_window_to_display_front(
                 imgui.internal.find_window_by_name(self.name)

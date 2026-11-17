@@ -28,8 +28,9 @@ from cleave.viz.panel_notification import (
     attention_scroll_sec,
     notification_attention,
 )
+from cleave.viz.progress_bar import accent_at
 from cleave.viz.shell_widgets import packed_color, PANEL_BORDER_PX, swipe_fill
-from cleave.viz.theme import DISABLED, HIGHLIGHT, LOCKED, NOTIFICATION_ON_FILL, VALUE
+from cleave.viz.theme import DISABLED, LOCKED, VALUE
 
 if TYPE_CHECKING:
     from cleave.viz.session import TuningSession
@@ -181,16 +182,21 @@ def draw_inspector_title(
             False,
         )
         try:
-            draw.add_rect_filled(
+            # The accent gradient spans the whole bar, so the swipe reveals
+            # it rather than stretching it. The title stays white on it.
+            span_w = max(1.0, bar_x1 - bar_x0)
+            left = packed_color(accent_at(fill_x / span_w))
+            right = packed_color(accent_at((fill_x + fill_w) / span_w))
+            draw.add_rect_filled_multi_color(
                 imgui.ImVec2(bar_x0 + fill_x, bar_y0),
                 imgui.ImVec2(bar_x0 + fill_x + fill_w, bar_y1),
-                packed_color(HIGHLIGHT),
+                left,
+                right,
+                right,
+                left,
             )
         finally:
             draw.pop_clip_rect()
-        mid = start.x + min(title_w, title_room) * 0.5
-        if attention.text_on_fill and bar_x0 + fill_x <= mid < bar_x0 + fill_x + fill_w:
-            color = packed_color(NOTIFICATION_ON_FILL)
     offset = attention_scroll_offset(elapsed_sec, overflow, scroll_sec)
     draw.push_clip_rect(
         imgui.ImVec2(start.x, bar_y0),

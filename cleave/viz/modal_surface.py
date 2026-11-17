@@ -19,9 +19,10 @@ from cleave.viz.choice_widgets import (
     draw_stepper,
 )
 from cleave.viz.imgui_host import progress_label_font
-from cleave.viz.imgui_theme import rgba
+from cleave.viz.imgui_theme import floating_surface, rgba
 from cleave.viz.pointer_cursor import PointerShape, request_pointer
 from cleave.viz.progress_bar import draw_progress_bar, progress_bar_height
+from cleave.viz.row_paint import RowState, paint_row
 from cleave.viz.text_edit import caret_line_column
 from cleave.viz.modal import (
     ButtonRole,
@@ -61,14 +62,12 @@ from cleave.viz.modal_layout import (
     visible_field_lines,
 )
 from cleave.viz.theme import (
-    BORDER_COLOR,
     BORDER_WIDTH,
     DISABLED,
-    FOCUS_WASH_ALPHA,
     HIGHLIGHT,
     LABEL,
     MUTED,
-    ROW_FOCUS_BORDER,
+    OFF_CONTROL_TEXT,
     VALUE,
     tuning_ui_metrics,
 )
@@ -87,8 +86,6 @@ _MODAL_FLAGS = (
     | int(imgui.WindowFlags_.no_bring_to_front_on_focus)
     | int(imgui.WindowFlags_.no_scrollbar)
 )
-_WASH_ALPHA = FOCUS_WASH_ALPHA / 255.0
-_FOCUS_BORDER_THICKNESS = 1.0
 _HIGHLIGHT_PAD = 2
 
 
@@ -227,32 +224,6 @@ def _text(draw: imgui.ImDrawList, x: int, y: int, text: str, role: _Role) -> Non
     draw.add_text(imgui.ImVec2(float(x), float(y)), _packed(role), text)
 
 
-def _wash(draw: imgui.ImDrawList, rect: Rect) -> None:
-    x, y, width, height = rect
-    if width <= 0 or height <= 0:
-        return
-    draw.add_rect_filled(
-        imgui.ImVec2(float(x), float(y)),
-        imgui.ImVec2(float(x + width), float(y + height)),
-        _packed(HIGHLIGHT, _WASH_ALPHA),
-    )
-
-
-def _focus_border(draw: imgui.ImDrawList, rect: Rect) -> None:
-    """1px row focus outline, matching a focused navigator or inspector row."""
-    x, y, width, height = rect
-    if width <= 0 or height <= 0:
-        return
-    draw.add_rect(
-        imgui.ImVec2(float(x), float(y)),
-        imgui.ImVec2(float(x + width), float(y + height)),
-        _packed(ROW_FOCUS_BORDER),
-        0.0,
-        0,
-        _FOCUS_BORDER_THICKNESS,
-    )
-
-
 def _outset(rect: Rect, pad: int = _HIGHLIGHT_PAD, *, pad_y: int | None = None) -> Rect:
     """Grow *rect* by *pad* on the sides and *pad_y* (default *pad*) top and bottom."""
     x, y, width, height = rect
@@ -261,8 +232,8 @@ def _outset(rect: Rect, pad: int = _HIGHLIGHT_PAD, *, pad_y: int | None = None) 
 
 
 def _highlight_option(draw: imgui.ImDrawList, rect: Rect) -> None:
-    _wash(draw, rect)
-    _focus_border(draw, rect)
+    """The focused row's look, matching a focused navigator or inspector row."""
+    paint_row(draw, rect, RowState.FOCUSED)
 
 
 def _pointer_inside(rect: Rect) -> bool:
@@ -342,22 +313,25 @@ def draw_modal_button(
     measure: TextMeasure,
     *,
     focused: bool,
-    text_role: _Role = VALUE,
+    off: bool = False,
 ) -> None:
     """The modal button in its role's tone, lit while *focused*, sunk while pressed.
 
     Focus follows the pointer, so a focused button is the one hovered or
-    reached by key; it lights like any hovered shell button.
+    reached by key; it lights like any hovered shell button. An *off* button
+    (the text dialog's buttons while the field holds the keys) rests in the
+    darker OFF tone with dimmed text.
     """
     x, y, w, h = rect
     state = ButtonState.REST
     if focused:
         held = _pointer_inside(rect) and imgui.is_mouse_down(0)
         state = ButtonState.PRESSED if held else ButtonState.HOVER
-    paint_button(draw, rect, _BUTTON_TONES[role], state)
+    resting_off = off and state is ButtonState.REST
+    paint_button(draw, rect, ButtonTone.OFF if resting_off else _BUTTON_TONES[role], state)
     text = option_text(label)
     text_w, text_h = measure.size(text)
-    lit_text = VALUE if state is not ButtonState.REST else text_role
+    lit_text = OFF_CONTROL_TEXT if resting_off else VALUE
     _text(draw, x + (w - text_w) // 2, y + (h - text_h) // 2, text, lit_text)
 
 
@@ -449,7 +423,7 @@ def _draw_form_rows(
             # A 2px gap between the outline and the label / control.
             _highlight_option(draw, _outset(rect, _HIGHLIGHT_PAD + 1, pad_y=0))
         text_y = y + form_row_pad_y()
-        _text(draw, row_left, text_y, row.label, HIGHLIGHT if row.focused else LABEL)
+        _text(draw, row_left, text_y, row.label, VALUE if row.focused else LABEL)
         width = form_control_width(measure, row)
         control = (right - width, text_y, width, line_h)
         controls[index] = control
@@ -527,7 +501,7 @@ def _draw_text_buttons(
             ButtonRole.PRIMARY if index == 0 else ButtonRole.PLAIN,
             measure,
             focused=focused or pointer_hover,
-            text_role=DISABLED if field_focused and not pointer_hover else VALUE,
+            off=field_focused and not pointer_hover,
         )
         rects.append(rect)
         bx += width + button_gap()
@@ -623,7 +597,8 @@ class ModalSurface:
                 imgui.StyleVar_.window_border_size, float(BORDER_WIDTH)
             )
             pushed += 1
-            imgui.begin(_MODAL_WINDOW, None, _MODAL_FLAGS)
+            with floating_surface():
+                imgui.begin(_MODAL_WINDOW, None, _MODAL_FLAGS)
             begun = True
             _raise_modal()
             pos = imgui.get_window_pos()
@@ -809,7 +784,7 @@ class ModalSurface:
             hx, hy, hw, hh = focus_highlight_rect(
                 measure, panel_width=panel_w, y=y - oy, line_h=field_h
             )
-            _wash(draw, (ox + hx, oy + hy, hw, hh))
+            _highlight_option(draw, (ox + hx, oy + hy, hw, hh))
 
         with _clipped(draw, field_rect):
             line_y = y

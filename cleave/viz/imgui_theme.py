@@ -13,21 +13,24 @@ from cleave.viz.theme import (
     BUTTON_BG,
     BUTTON_HOVER_BG,
     BACKGROUND,
-    BORDER_COLOR,
     DISABLED,
-    FOCUS_ROW_BG_ALPHA,
-    HIGHLIGHT,
     HOVER,
     HOVER_BG_ALPHA,
     MODAL_SCRIM_ALPHA,
-    SELECTED_WASH_ALPHA,
+    ROW_FOCUS_EDGE,
+    ROW_SELECT_TINT,
+    ROW_SELECTED_ALPHA,
+    SCROLLBAR_THUMB,
+    SCROLLBAR_THUMB_HOVER,
+    SCROLLBAR_TRACK,
+    SURFACE_BG,
+    SURFACE_EDGE,
     TRANSPORT_RULE,
     VALUE,
     ui_chrome_px,
 )
 
-_HIGHLIGHT_WASH = FOCUS_ROW_BG_ALPHA / 255.0
-_SELECTED_WASH = SELECTED_WASH_ALPHA / 255.0
+_SELECTED_WASH = ROW_SELECTED_ALPHA[0]
 _HOVER_WASH = HOVER_BG_ALPHA / 255.0
 # Same black scrim as the pygame modal underlay.
 _SCRIM = MODAL_SCRIM_ALPHA / 255.0
@@ -37,10 +40,10 @@ IMGUI_COLOR_ROLES: dict[imgui.Col_, tuple[tuple[int, int, int], float]] = {
     imgui.Col_.text_disabled: (DISABLED, 1.0),
     imgui.Col_.window_bg: (BACKGROUND, 1.0),
     imgui.Col_.child_bg: (BACKGROUND, 1.0),
-    imgui.Col_.popup_bg: (BACKGROUND, 1.0),
+    imgui.Col_.popup_bg: (SURFACE_BG, 1.0),
     imgui.Col_.menu_bar_bg: (BACKGROUND, 1.0),
-    imgui.Col_.border: (BORDER_COLOR, 1.0),
-    imgui.Col_.header: (HIGHLIGHT, _SELECTED_WASH),
+    imgui.Col_.border: (SURFACE_EDGE, 1.0),
+    imgui.Col_.header: (ROW_SELECT_TINT, _SELECTED_WASH),
     imgui.Col_.header_hovered: (HOVER, _HOVER_WASH),
     imgui.Col_.header_active: (HOVER, _HOVER_WASH),
     imgui.Col_.button: (BUTTON_BG, 1.0),
@@ -52,8 +55,12 @@ IMGUI_COLOR_ROLES: dict[imgui.Col_, tuple[tuple[int, int, int], float]] = {
     imgui.Col_.title_bg_collapsed: (BACKGROUND, 1.0),
     imgui.Col_.check_mark: (VALUE, 1.0),
     imgui.Col_.separator: (TRANSPORT_RULE, 1.0),
-    imgui.Col_.text_selected_bg: (HIGHLIGHT, _HIGHLIGHT_WASH),
-    imgui.Col_.nav_highlight: (HIGHLIGHT, 1.0),
+    imgui.Col_.text_selected_bg: (ROW_SELECT_TINT, 0.5),
+    imgui.Col_.nav_highlight: (ROW_FOCUS_EDGE, 1.0),
+    imgui.Col_.scrollbar_bg: (SCROLLBAR_TRACK, 1.0),
+    imgui.Col_.scrollbar_grab: (SCROLLBAR_THUMB, 1.0),
+    imgui.Col_.scrollbar_grab_hovered: (SCROLLBAR_THUMB_HOVER, 1.0),
+    imgui.Col_.scrollbar_grab_active: (SCROLLBAR_THUMB_HOVER, 1.0),
     imgui.Col_.modal_window_dim_bg: (BACKGROUND, _SCRIM),
 }
 
@@ -78,6 +85,24 @@ def darken(rgb: tuple[int, int, int], amount: float) -> tuple[int, int, int]:
 
 def rgba(rgb: tuple[int, int, int], alpha: float = 1.0) -> imgui.ImVec4:
     return imgui.ImVec4(rgb[0] / 255.0, rgb[1] / 255.0, rgb[2] / 255.0, alpha)
+
+
+@contextmanager
+def floating_surface() -> Iterator[None]:
+    """Push the floating surface's ink fill and violet edge.
+
+    Wrap a window's ``begin``, and any ``begin_child`` inside it, so a child
+    (the file picker's list) shares the ink rather than the shell's black.
+    Menus, context menus, the open choice list, dialogs, the file picker, and
+    info panels all float over the shell in this one look.
+    """
+    imgui.push_style_color(imgui.Col_.window_bg, rgba(SURFACE_BG))
+    imgui.push_style_color(imgui.Col_.child_bg, rgba(SURFACE_BG))
+    imgui.push_style_color(imgui.Col_.border, rgba(SURFACE_EDGE))
+    try:
+        yield
+    finally:
+        imgui.pop_style_color(3)
 
 
 # Every size ``ImGuiStyle::ScaleAllSizes`` scales, as imgui-bundle attributes.

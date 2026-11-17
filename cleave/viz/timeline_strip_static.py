@@ -19,14 +19,12 @@ from cleave.viz.row_present_renderers import (
 from cleave.viz.theme import (
     BAR_GRID,
     DISABLED,
-    FOCUS_WASH_ALPHA,
     HIGHLIGHT,
     LABEL,
     MUTED,
     ICON_HOVER_FG,
     OVERRIDE_BG,
     OVERRIDE_GLYPH,
-    ROW_FOCUS_BORDER,
     SOLO_BG,
     SONG_BOUND,
     TIMELINE_SCROLL_RAIL,
@@ -54,7 +52,8 @@ from cleave.viz.timeline_strip_state import (
     row_clips_for_view,
     view_window,
 )
-from cleave.viz.ui_tint import blit_hover, blit_tint
+from cleave.viz.row_paint import RowState, row_bar_px, row_look
+from cleave.viz.ui_tint import blit_hover, blit_row_band, draw_row_edge
 
 OFF_SEGMENT_COLOR: tuple[int, int, int] = (40, 40, 40)
 # Dim end of the level-bar colour ramp sits this far from off toward the
@@ -67,19 +66,11 @@ SELECTED_CLIP_OUTLINE_WIDTH: int = 2
 # Trim handles at the edges of the hovered or selected clip.
 CLIP_HANDLE_WIDTH: int = 3
 
+# The focused strip row, as a focused navigator or inspector row.
+_FOCUSED_LOOK = row_look(RowState.FOCUSED)
+
 # One entry per row: (row_index, x, y, w, h, slot) in panel coordinates.
 RowLayoutEntry = tuple[int, int, int, int, int, str]
-
-
-def _draw_focus_outline(surface: pygame.Surface, rect: pygame.Rect) -> None:
-    """1px row focus outline, as on inspector rows."""
-    for edge in (
-        pygame.Rect(rect.x, rect.y, rect.w, 1),
-        pygame.Rect(rect.x, rect.bottom - 1, rect.w, 1),
-        pygame.Rect(rect.x, rect.y + 1, 1, rect.h - 2),
-        pygame.Rect(rect.right - 1, rect.y + 1, 1, rect.h - 2),
-    ):
-        surface.fill(ROW_FOCUS_BORDER, edge)
 
 
 def _lerp_rgb(
@@ -220,7 +211,7 @@ def build_static_panel(
         )
 
         if focused:
-            blit_tint(panel, row_rect, HIGHLIGHT, alpha=FOCUS_WASH_ALPHA)
+            blit_row_band(panel, row_rect, _FOCUSED_LOOK, bar_px=int(row_bar_px()))
         # Shell hover washes a header button that is drawn: not the label
         # (it only selects) or the empty back-to-timeline slot.
         if hover_target in ("arm", "solo", "eye") or (
@@ -228,7 +219,9 @@ def build_static_panel(
         ):
             blit_hover(panel, layout.header_button_rect(hover_target, row_y))
 
-        if focused or armed:
+        if focused:
+            label_color = VALUE
+        elif armed:
             label_color = HIGHLIGHT
         else:
             label_color = LABEL
@@ -360,7 +353,8 @@ def build_static_panel(
                 )
 
         if focused:
-            _draw_focus_outline(panel, row_rect)
+            # The edge goes over the clips, as on inspector rows.
+            draw_row_edge(panel, row_rect, _FOCUSED_LOOK)
 
     # Song start and end marks continue the ruler's down through every row.
     for bound_x in song_bound_xs(

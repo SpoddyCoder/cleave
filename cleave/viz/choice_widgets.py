@@ -35,21 +35,21 @@ from cleave.viz.button_paint import (
 from cleave.viz.choice_list import CHOICE_LIST_MAX_VISIBLE, ChoiceListView
 from cleave.viz.icon_button import text_box
 from cleave.viz.imgui_icon_button import paint_box
-from cleave.viz.imgui_theme import rgba
+from cleave.viz.imgui_theme import floating_surface, rgba
 from cleave.viz.pointer_cursor import PointerShape, request_pointer
+from cleave.viz.row_paint import RowState, paint_row
 from cleave.viz.text_fit import TextSizer
 from cleave.viz.theme import (
     BORDER_WIDTH,
-    BUTTON_PRIMARY_DIMMED_BG,
-    CHOICE_LIST_BG,
-    CHOICE_LIST_BORDER,
-    CHOICE_LIST_TEXT,
+    BUTTON_OFF_CHOSEN_BG,
     DISABLED,
     HIGHLIGHT,
-    DISABLED_MUTED,
     LOCKED,
     LOCKED_MUTED,
     MUTED,
+    OFF_CONTROL_MUTED,
+    OFF_CONTROL_TEXT,
+    SURFACE_TEXT,
     VALUE,
 )
 
@@ -63,8 +63,6 @@ _LIST_WINDOW_FLAGS = (
     | int(imgui.WindowFlags_.no_scrollbar)
 )
 _CHOSEN_MARK = "✓ "
-# Width of the HIGHLIGHT bar on the open list's highlighted row.
-_LIST_ACCENT_PX = 3
 
 
 class ChoiceTone(Enum):
@@ -144,7 +142,7 @@ def draw_segments(
             chosen_tone, fill = _chosen_look(enabled=enabled, tone=tone)
             paint_button(draw, rect, chosen_tone, ButtonState.REST, fill=fill)
         else:
-            paint_button(draw, rect, ButtonTone.PLAIN, states[index])
+            paint_button(draw, rect, _rest_tone(enabled=enabled, tone=tone), states[index])
     for index, rect in enumerate(rects):
         state = states[index]
         if state is not ButtonState.REST:
@@ -158,13 +156,23 @@ def draw_segments(
     return rects
 
 
+def _dimmed(*, enabled: bool, tone: ChoiceTone) -> bool:
+    """A control on a switched-off or locked page, or one that refuses a press."""
+    return not enabled or tone is not ChoiceTone.NORMAL
+
+
+def _rest_tone(*, enabled: bool, tone: ChoiceTone) -> ButtonTone:
+    """Button tone of an unchosen segment or a combo at rest."""
+    return ButtonTone.OFF if _dimmed(enabled=enabled, tone=tone) else ButtonTone.PLAIN
+
+
 def _chosen_look(
     *, enabled: bool, tone: ChoiceTone
 ) -> tuple[ButtonTone, tuple[int, int, int] | None]:
     """Tone and fill override of the chosen segment."""
-    if tone is ChoiceTone.NORMAL:
-        return (ButtonTone.PRIMARY, None) if enabled else (ButtonTone.PLAIN, None)
-    return ButtonTone.PLAIN, BUTTON_PRIMARY_DIMMED_BG
+    if _dimmed(enabled=enabled, tone=tone):
+        return ButtonTone.PLAIN, BUTTON_OFF_CHOSEN_BG
+    return ButtonTone.PRIMARY, None
 
 
 def _segment_text_role(
@@ -173,10 +181,8 @@ def _segment_text_role(
     """Chosen and unchosen option text. A lock tints even a refused control."""
     if tone is ChoiceTone.LOCKED:
         return LOCKED if chosen else LOCKED_MUTED
-    if not enabled:
-        return DISABLED
-    if tone is ChoiceTone.OFF:
-        return DISABLED if chosen else DISABLED_MUTED
+    if _dimmed(enabled=enabled, tone=tone):
+        return OFF_CONTROL_TEXT if chosen else OFF_CONTROL_MUTED
     return VALUE if chosen else MUTED
 
 
@@ -186,9 +192,9 @@ def _combo_text_roles(
     """Value and caret colours of a combo."""
     if tone is ChoiceTone.LOCKED:
         return LOCKED, LOCKED_MUTED
-    if tone is ChoiceTone.OFF:
-        return DISABLED, DISABLED_MUTED
-    return (VALUE, MUTED) if enabled else (DISABLED, DISABLED)
+    if _dimmed(enabled=enabled, tone=tone):
+        return OFF_CONTROL_TEXT, OFF_CONTROL_MUTED
+    return VALUE, MUTED
 
 
 def draw_combo(
@@ -219,7 +225,8 @@ def draw_combo(
         state = ButtonState.HOVER
     else:
         state = ButtonState.REST
-    paint_button(draw, rect, ButtonTone.PLAIN, state)
+    rest_tone = _rest_tone(enabled=enabled, tone=tone)
+    paint_button(draw, rect, rest_tone if state is ButtonState.REST else ButtonTone.PLAIN, state)
     role, caret_role = _combo_text_roles(enabled=enabled, tone=tone)
     if state is not ButtonState.REST:
         role, caret_role = VALUE, HIGHLIGHT
@@ -319,6 +326,22 @@ class _ListMemory:
 _list_memory: dict[str, _ListMemory] = {}
 
 
+def raise_open_choice_lists() -> None:
+    """Bring every list drawn this frame back in front of the shell's windows.
+
+    A list opened from an inspector row draws inside the inspector, before the
+    shell paints its panel focus outlines on a window raised in front of the
+    panels. Call this after those outlines so they do not cross the list.
+    """
+    frame = imgui.get_frame_count()
+    for window_id, memory in _list_memory.items():
+        if memory.drawn_frame != frame:
+            continue
+        window = imgui.internal.find_window_by_name(f"##{window_id}")
+        if window is not None:
+            imgui.internal.bring_window_to_display_front(window)
+
+
 def draw_choice_list(
     window_id: str,
     view: ChoiceListView,
@@ -362,10 +385,9 @@ def draw_choice_list(
     imgui.set_next_window_size(_vec(width, height), imgui.Cond_.always)
     imgui.push_style_var(imgui.StyleVar_.window_padding, _vec(0, 0))
     imgui.push_style_var(imgui.StyleVar_.window_border_size, float(BORDER_WIDTH))
-    imgui.push_style_color(imgui.Col_.window_bg, rgba(CHOICE_LIST_BG))
-    imgui.push_style_color(imgui.Col_.border, rgba(CHOICE_LIST_BORDER))
     try:
-        imgui.begin(window_name, None, _LIST_WINDOW_FLAGS)
+        with floating_surface():
+            imgui.begin(window_name, None, _LIST_WINDOW_FLAGS)
         try:
             imgui.internal.bring_window_to_display_front(
                 imgui.internal.find_window_by_name(window_name)
@@ -379,7 +401,6 @@ def draw_choice_list(
         finally:
             imgui.end()
     finally:
-        imgui.pop_style_color(2)
         imgui.pop_style_var(2)
     clicked = imgui.is_mouse_clicked(0) and not just_opened
     if clicked and result.picked is None and not hovered_window:
@@ -433,18 +454,7 @@ def _draw_list_rows(
         rx, ry, rw, rh = rect
         lit = index == view.highlighted
         if lit:
-            look = button_look(ButtonTone.PLAIN, ButtonState.HOVER)
-            draw.add_rect_filled_multi_color(
-                _vec(rx, ry),
-                _vec(rx + rw, ry + rh),
-                _u32(look.top),
-                _u32(look.top),
-                _u32(look.bottom),
-                _u32(look.bottom),
-            )
-            draw.add_rect_filled(
-                _vec(rx, ry), _vec(rx + _LIST_ACCENT_PX, ry + rh), _u32(HIGHLIGHT)
-            )
+            paint_row(draw, (rx, ry, rw, rh), RowState.LIT)
         chosen = index == view.chosen
         th = measure.size(view.options[index])[1]
         text_x = rx + combo_pad_x()
@@ -454,7 +464,7 @@ def _draw_list_rows(
         mark_w = measure.size(_CHOSEN_MARK)[0]
         draw.add_text(
             _vec(text_x + mark_w, text_y),
-            _u32(VALUE if lit or chosen else CHOICE_LIST_TEXT),
+            _u32(VALUE if lit or chosen else SURFACE_TEXT),
             view.options[index],
         )
     picked = hovered if imgui.is_mouse_clicked(0) and not just_opened else None

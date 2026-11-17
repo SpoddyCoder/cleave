@@ -41,19 +41,17 @@ from cleave.viz.navigator import (
     TWISTY_COLLAPSED,
     TWISTY_EXPANDED,
 )
+from cleave.viz.row_paint import RowState, row_band
 from cleave.viz.row_hotkeys import activate_header_toggle, node_control_descriptor
 from cleave.viz.scroll_follow import ScrollFollow
 from cleave.viz.shell_context import ShellContext, ShellFrame
 from cleave.viz.shell_focus import ShellRegion
 from cleave.viz.shell_widgets import (
     draw_aligned_parts,
-    draw_item_focus_ring,
     drawn_row_rect,
     rect_has_point,
     row_text_y,
     RowDrag,
-    selectable_wash,
-    selected_header_wash,
     space_lead,
 )
 from cleave.viz.theme import (
@@ -271,23 +269,13 @@ def _draw_nav_twisty(
     twisty: str,
     selected: bool,
     x: float,
-    label_min_x: float,
     band: tuple[float, float],
 ) -> bool:
     """Disclosure button in the column at *x*, drawn after the row's label.
 
-    The label selectable allows overlap, so the press reaches this button. A
-    selected row's wash is filled under the column from where a selectable's
-    highlight would start up to *label_min_x*, so the row reads as one band.
+    The label selectable allows overlap, so the press reaches this button.
     Returns whether it was pressed.
     """
-    if selected:
-        wash_left = x - math.floor(imgui.get_style().item_spacing.x * 0.5)
-        imgui.get_window_draw_list().add_rect_filled(
-            imgui.ImVec2(wash_left, band[0]),
-            imgui.ImVec2(label_min_x, band[1]),
-            imgui.get_color_u32(selectable_wash()[0]),
-        )
     return icon_button(
         f"##nav-twisty-{node.id}",
         twisty,
@@ -451,10 +439,15 @@ class NavigatorPanel:
             imgui.indent(indent)
         try:
             selected = node.id == focus.selected_id
-            ring = (
+            focused = (
                 selected
                 and focus.region is ShellRegion.NAVIGATOR
                 and not self._ctx.menu_state.focused
+            )
+            band_state = (
+                RowState.FOCUSED
+                if focused
+                else RowState.SELECTED if selected else None
             )
             twisty = navigator_twisty(node, focus.nav_expanded)
             row_x = imgui.get_cursor_screen_pos().x
@@ -462,7 +455,7 @@ class NavigatorPanel:
                 # The label starts right after the twisty's column, with no
                 # item gap. The twisty draws over that column once the row is done.
                 imgui.set_cursor_pos_x(imgui.get_cursor_pos_x() + _nav_indent())
-            with selected_header_wash(selected):
+            with row_band(band_state) as mark_band:
                 moving = (
                     node.draggable
                     and node.slot is not None
@@ -494,12 +487,12 @@ class NavigatorPanel:
                     double_pressed = (
                         imgui.is_item_activated() and imgui.is_mouse_double_clicked(0)
                     )
-                    label_min_x = imgui.get_item_rect_min().x
+                    # The band spans the whole row, under the tree gutter and
+                    # twisty, from where an unindented row's highlight starts.
+                    mark_band(left_x - math.floor(imgui.get_style().item_spacing.x * 0.5))
                     span = (imgui.get_item_rect_min().y, imgui.get_item_rect_max().y)
                     row_right_x = imgui.get_item_rect_max().x
                     self._record_row_rect(node.id, left_x)
-                    if ring:
-                        draw_item_focus_ring()
                     if selected:
                         self._follow.follow(node.id)
                 finally:
@@ -516,7 +509,7 @@ class NavigatorPanel:
             if node.draggable:
                 self._layer_row_drag(node, text_pos.x, span, text_color)
             twisty_clicked = twisty is not None and _draw_nav_twisty(
-                node, twisty, selected, row_x, label_min_x, span
+                node, twisty, selected, row_x, span
             )
             if twisty_clicked:
                 self._opened_by_click = None

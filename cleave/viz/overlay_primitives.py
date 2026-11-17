@@ -12,8 +12,6 @@ from cleave.viz.overlay_upload import UploadPlan, UploadSignature
 from cleave.viz.theme import (
     BACKGROUND,
     BACKGROUND_ALPHA,
-    BORDER_COLOR,
-    BORDER_WIDTH,
 )
 
 _FONT_RELATIVE = Path("assets/fonts/DejaVuSansMono.ttf")
@@ -99,17 +97,6 @@ def overlay_panel_surface(
     panel = pygame.Surface(size, pygame.SRCALPHA)
     panel.fill((*BACKGROUND, BACKGROUND_ALPHA if fill_alpha is None else fill_alpha))
     return panel
-
-
-def draw_panel_border(surface: pygame.Surface, *, alpha: int = 255) -> None:
-    if alpha < 2 or BORDER_WIDTH <= 0:
-        return
-    pygame.draw.rect(
-        surface,
-        (*BORDER_COLOR, alpha),
-        surface.get_rect(),
-        width=BORDER_WIDTH,
-    )
 
 
 def visibility_bucket(visibility: float) -> int:

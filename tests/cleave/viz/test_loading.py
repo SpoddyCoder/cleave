@@ -21,8 +21,8 @@ from cleave.viz.loading import (
     present_frame,
 )
 from cleave.viz.modal_surface import ImGuiTextMeasure
-from cleave.viz.progress_bar import clamp_fraction, progress_bar_inset
-from cleave.viz.theme import BACKGROUND, HIGHLIGHT, LABEL, VALUE
+from cleave.viz.progress_bar import accent_at, clamp_fraction, progress_bar_inset
+from cleave.viz.theme import ACCENT_FROM, ACCENT_TO, BACKGROUND, LABEL, VALUE
 
 
 def test_clamp_loading_fraction() -> None:
@@ -242,14 +242,14 @@ def _draw_frame(
 def test_loading_content_bar_fraction_and_detail() -> None:
     message = "Loading..."
     with _host() as host:
-        half, quads, _colors = _draw_frame(host, message, fraction=0.5)
+        half, quads, colors = _draw_frame(host, message, fraction=0.5)
         assert half.fill_rect is not None
-        _fx, _fy, fill_w, _fh = half.fill_rect
-        value = _pack(HIGHLIGHT)
-        fills = [quad for quad in quads if quad[4] == value and abs(quad[2] - fill_w) <= 1.0]
-        assert fills, quads
+        # The fill runs from the accent's blue to its midpoint at half way.
+        assert _pack(ACCENT_FROM) in colors
+        assert _pack(accent_at(0.5)) in colors
+        assert _pack(ACCENT_TO) not in colors
 
-        empty, quads, _colors = _draw_frame(host, message, fraction=0.0)
+        empty, quads, empty_colors = _draw_frame(host, message, fraction=0.0)
         assert empty.bar_rect is not None
         assert empty.fill_rect is None
         bar_x, bar_y, bar_w, bar_h = empty.bar_rect
@@ -259,18 +259,7 @@ def test_loading_content_bar_fraction_and_detail() -> None:
             if abs(quad[2] - bar_w) <= 1.0 and abs(quad[3] - bar_h) <= 1.0
         ]
         assert tracks, quads
-        inner_top = bar_y + progress_bar_inset()
-        inner_bottom = bar_y + bar_h - progress_bar_inset()
-        fills = [
-            quad
-            for quad in quads
-            if quad[4] == value
-            and quad[0] >= bar_x + progress_bar_inset() - 1
-            and inner_top - 1 <= quad[1]
-            and quad[1] + quad[3] <= inner_bottom + 1
-            and quad[2] > 1.0
-        ]
-        assert not fills
+        assert _pack(ACCENT_FROM) not in empty_colors
 
         missing, quads, _colors = _draw_frame(host, message, fraction=None)
         assert missing.bar_rect is None

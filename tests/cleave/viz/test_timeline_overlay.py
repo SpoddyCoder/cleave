@@ -763,16 +763,16 @@ def test_compose_panel_fills_band_width_inside_container() -> None:
 
 def test_static_panel_has_no_border() -> None:
     pygame.init()
-    from cleave.viz.theme import BORDER_COLOR
+    from cleave.viz.theme import PANEL_EDGE
 
     overlay = TimelineOverlay()
     surface = pygame.Surface((800, 400), pygame.SRCALPHA)
     _draw(overlay, surface, strip_view_state())
     panel = overlay._cache.panel
     assert panel is not None
-    assert panel.get_at((0, 0))[:3] != BORDER_COLOR
+    assert panel.get_at((0, 0))[:3] != PANEL_EDGE
     edge = (panel.get_width() - 1, panel.get_height() // 2)
-    assert panel.get_at(edge)[:3] != BORDER_COLOR
+    assert panel.get_at(edge)[:3] != PANEL_EDGE
 
 
 def _marker_upload(

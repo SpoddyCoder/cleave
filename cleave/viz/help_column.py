@@ -6,7 +6,7 @@ from imgui_bundle import imgui
 
 from cleave.viz.help_content import DescriptionSection, HelpContent
 from cleave.viz.imgui_theme import rgba
-from cleave.viz.theme import HIGHLIGHT, LABEL, VALUE
+from cleave.viz.theme import HEADING, LABEL, VALUE
 
 
 def help_column_text(sections: tuple[HelpContent, ...]) -> str:
@@ -37,7 +37,7 @@ def draw_help_column(sections: tuple[HelpContent, ...]) -> None:
     for index, section in enumerate(sections):
         if index:
             imgui.dummy(imgui.ImVec2(0.0, imgui.get_text_line_height()))
-        _draw_wrapped(section.title, HIGHLIGHT, wrap_x)
+        _draw_wrapped(section.title, HEADING, wrap_x)
         if isinstance(section, DescriptionSection):
             for line in section.lines:
                 _draw_wrapped(line, VALUE, wrap_x)

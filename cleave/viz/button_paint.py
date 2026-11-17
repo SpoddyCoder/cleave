@@ -4,7 +4,9 @@ One look for panel buttons, dialog buttons, segments, and combo boxes: a
 vertical gradient (a sheen on top, a shade underneath), a 1px border, and for a
 lit primary or danger button a soft outer glow in its own hue. A plain button
 lights electric violet under the pointer; primary and danger brighten in their
-own blue and red. ``button_look`` is pure colour; ``paint_button`` draws it
+own blue and red. OFF is a control on a switched-off or locked page, or one
+that refuses a press: darker and recessed at rest so its text stays readable,
+and lit like a plain button under the pointer. ``button_look`` is pure colour; ``paint_button`` draws it
 with ImGui.
 """
 
@@ -27,6 +29,8 @@ from cleave.viz.theme import (
     BUTTON_GLOW_ALPHA,
     BUTTON_HOVER_BG,
     BUTTON_HOVER_BORDER,
+    BUTTON_OFF_BG,
+    BUTTON_OFF_BORDER,
     BUTTON_PRIMARY_ACTIVE_BG,
     BUTTON_PRIMARY_BG,
     BUTTON_PRIMARY_HOVER_BG,
@@ -43,6 +47,7 @@ class ButtonTone(Enum):
     PLAIN = auto()
     PRIMARY = auto()
     DANGER = auto()
+    OFF = auto()
 
 
 class ButtonState(Enum):
@@ -64,6 +69,13 @@ _TONES: dict[ButtonTone, tuple[RGB, RGB | None, RGB, RGB, RGB]] = {
     ButtonTone.PLAIN: (
         BUTTON_BG,
         BUTTON_BORDER,
+        BUTTON_HOVER_BG,
+        BUTTON_HOVER_BORDER,
+        BUTTON_ACTIVE_BG,
+    ),
+    ButtonTone.OFF: (
+        BUTTON_OFF_BG,
+        BUTTON_OFF_BORDER,
         BUTTON_HOVER_BG,
         BUTTON_HOVER_BORDER,
         BUTTON_ACTIVE_BG,
@@ -100,7 +112,7 @@ def button_look(
         return ButtonLook(
             lighten(base, BUTTON_SHEEN), darken(base, BUTTON_SHADE * 0.5), border
         )
-    glow = None if tone is ButtonTone.PLAIN else hover
+    glow = None if tone in (ButtonTone.PLAIN, ButtonTone.OFF) else hover
     if state is ButtonState.PRESSED:
         return ButtonLook(darken(pressed, BUTTON_SHADE), pressed, hover_border, glow)
     return ButtonLook(lighten(hover, BUTTON_SHEEN), darken(hover, BUTTON_SHADE), hover_border, glow)

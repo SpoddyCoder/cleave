@@ -376,12 +376,14 @@ def _content_lists(lists: list) -> list:
 
 
 def _color_bounds(
-    draw_list: object, color: int
+    draw_list: object, color: int | tuple[int, ...]
 ) -> tuple[float, float, float, float] | None:
+    """Bounds of every vertex in *color*, or in any of several colours."""
+    wanted = {color} if isinstance(color, int) else set(color)
     xs: list[float] = []
     ys: list[float] = []
     for vtx in draw_list.vtx_buffer:
-        if int(vtx.col) != color:
+        if int(vtx.col) not in wanted:
             continue
         xs.append(float(vtx.pos.x))
         ys.append(float(vtx.pos.y))
@@ -390,7 +392,15 @@ def _color_bounds(
     return min(xs), min(ys), max(xs), max(ys)
 
 
-def _ink_runs_on_fill(draw_list: object, ink: int, fill: int) -> int:
+def _lit_fill() -> tuple[int, int]:
+    """Top and bottom of the lit row gradient: an open title or menu row."""
+    from cleave.viz.row_paint import RowState, row_look
+
+    look = row_look(RowState.LIT)
+    return _color_u32(look.start[0]), _color_u32(look.end[0])
+
+
+def _ink_runs_on_fill(draw_list: object, ink: int, fill: int | tuple[int, ...]) -> int:
     """X-separated runs of *ink* strictly inside the *fill* bounds.
 
     Glyphs in one label sit closer together than the menu's check, label,
@@ -416,7 +426,7 @@ def _ink_runs_on_fill(draw_list: object, ink: int, fill: int) -> int:
     return runs
 
 
-def _ink_on_fill(draw_list: object, ink: int, fill: int) -> int:
+def _ink_on_fill(draw_list: object, ink: int, fill: int | tuple[int, ...]) -> int:
     """Vertices of *ink* strictly inside the *fill* bounds."""
     box = _color_bounds(draw_list, fill)
     if box is None:
@@ -532,10 +542,10 @@ def test_open_menu_paints_over_the_focus_ring() -> None:
     from cleave.viz.shell_host import draw_shell_frame
     from cleave.viz.shell_layout import ShellLayout
     from cleave.viz.theme import (
-        BORDER_COLOR,
         HIGHLIGHT,
-        PANEL_FOCUS_BORDER_ALPHA,
-        ROW_FOCUS_BORDER,
+        PANEL_FOCUS_EDGE,
+        ROW_FOCUS_EDGE,
+        SURFACE_EDGE,
     )
 
     overlay = _Overlay()
@@ -571,9 +581,9 @@ def test_open_menu_paints_over_the_focus_ring() -> None:
         strip_names = [draw_list._owner_name for draw_list in strip_content]
         strip_foreground = _assert_chrome_last(strip_lists)
         gold = _color_u32(HIGHLIGHT)
-        panel_ring = _color_u32_alpha(HIGHLIGHT, PANEL_FOCUS_BORDER_ALPHA / 255.0)
-        ring = _color_u32(ROW_FOCUS_BORDER)
-        white = _color_u32(BORDER_COLOR)
+        panel_ring = _color_u32(PANEL_FOCUS_EDGE)
+        ring = _color_u32(ROW_FOCUS_EDGE)
+        white = _color_u32(SURFACE_EDGE)
         strip_on_border = _draw_list_has_color(
             strip_content[strip_names.index("##shell-focus-border")], panel_ring
         )
@@ -598,7 +608,7 @@ def test_open_menu_paints_over_the_focus_ring() -> None:
         chrome_at = names.index("##shell-chrome")
         assert nav_at < popup_at < chrome_at
         ring_on_nav = _draw_list_has_color(content[nav_at], ring)
-        # The current menu row is opaque highlight near the menu bar. The
+        # The current menu row's yellow marker bar is near the menu bar. The
         # navigator ring is lower, on its own list, not copied onto the popup.
         popup_gold = _color_bounds(content[popup_at], gold)
         nav_gold = _color_bounds(content[nav_at], ring)
@@ -629,7 +639,7 @@ def test_menu_underline_and_popup_row_are_snug() -> None:
 
     from cleave.viz import imgui_host
     from cleave.viz.shell_host import draw_shell_frame
-    from cleave.viz.theme import BACKGROUND, HIGHLIGHT
+    from cleave.viz.theme import VALUE
 
     overlay = _Overlay()
     overlay.visibility = 1.0
@@ -646,8 +656,8 @@ def test_menu_underline_and_popup_row_are_snug() -> None:
         by_name = {draw_list._owner_name: draw_list for draw_list in lists}
         bar = by_name["##MainMenuBar"]
         popup = by_name["##cleave-menu"]
-        ink = _color_u32(BACKGROUND)
-        fill = _color_u32(HIGHLIGHT)
+        ink = _color_u32(VALUE)
+        fill = _lit_fill()
         underline_gap = _underline_gap(bar, ink)
         row_gap_above, row_gap_below = _popup_row_ink_gaps(popup, ink, fill)
         top_gap = _popup_first_row_gap(popup, fill)
@@ -684,15 +694,15 @@ def _row_fill(draw_list: object, y: float, *, opaque: bool = False) -> int | Non
     return found
 
 
-def test_popup_hover_takes_the_opaque_highlight() -> None:
-    """Popup mouse-hover moves the opaque highlight, like a context menu.
+def test_popup_hover_takes_the_lit_row() -> None:
+    """Popup mouse-hover moves the lit row, like a context menu.
 
     Unselected panel rows keep the theme header hover wash.
     """
     from cleave.viz import imgui_host, shell_menu_bar
     from cleave.viz.shell_focus import ShellFocusState
     from cleave.viz.shell_layout import ShellLayout
-    from cleave.viz.theme import HIGHLIGHT, HOVER, HOVER_BG_ALPHA
+    from cleave.viz.theme import HOVER, HOVER_BG_ALPHA
 
     overlay = _Overlay()
     overlay.visibility = 1.0
@@ -761,7 +771,7 @@ def test_popup_hover_takes_the_opaque_highlight() -> None:
         popup = next(item for item in lists if item._owner_name == "##cleave-menu")
         popup_fill = _row_fill(popup, popup_y, opaque=True)
         theme_hover = _color_u32_alpha(HOVER, HOVER_BG_ALPHA / 255.0)
-        opaque = _color_u32_alpha(HIGHLIGHT, 1.0)
+        opaque = _lit_fill()[0]
     finally:
         host.imgui.destroy()
     assert nav_fill == theme_hover
@@ -798,18 +808,18 @@ def _underline_gap(draw_list: object, ink: int) -> float:
     return underline_top - word_bottom
 
 
-def _popup_first_row_gap(draw_list: object, fill: int) -> float:
+def _popup_first_row_gap(draw_list: object, fill: tuple[int, ...]) -> float:
     """Pixels from the popup background top to the first row's highlight."""
-    from cleave.viz.theme import BACKGROUND
+    from cleave.viz.theme import SURFACE_BG
 
-    background = _color_bounds(draw_list, _color_u32(BACKGROUND))
+    background = _color_bounds(draw_list, _color_u32(SURFACE_BG))
     box = _color_bounds(draw_list, fill)
     assert background is not None and box is not None
     return box[1] - background[1]
 
 
 def _popup_row_ink_gaps(
-    draw_list: object, ink: int, fill: int
+    draw_list: object, ink: int, fill: tuple[int, ...]
 ) -> tuple[float, float]:
     """Padding from the highlighted row fill to the label's font box.
 
@@ -870,20 +880,20 @@ def _paint_shell(host, menu, ctx, *, frames: int = 2) -> list:
 
 
 def test_open_menu_ink_matches_the_mock() -> None:
-    """Open title and the current row use background ink on opaque highlight.
+    """Open title and the current row are white on the lit gradient.
 
     An unfocused check is action and its shortcut is muted. The transport
-    bar has no highlight readout. The View menu timeline strip row's label,
-    check, and shortcut are background ink while that row is current.
+    bar has no highlight readout. On the current row the check is yellow,
+    the label white, and the shortcut soft white.
     """
     from cleave.viz import imgui_host
     from cleave.viz.shell_layout import ShellLayout
     from cleave.viz.theme import (
         VALUE,
-        BACKGROUND,
         HIGHLIGHT,
         LABEL,
         MUTED,
+        SURFACE_TEXT,
     )
 
     overlay = _Overlay()
@@ -919,23 +929,27 @@ def test_open_menu_ink_matches_the_mock() -> None:
         popup = content[names.index("##cleave-menu")]
         transport = content[names.index("##shell-transport")]
         gold = _color_u32(HIGHLIGHT)
-        ink = _color_u32(BACKGROUND)
-        title_ink = _ink_on_fill(bar, ink, gold)
-        row_ink = _ink_on_fill(popup, ink, gold)
+        ink = _color_u32(VALUE)
+        lit = _lit_fill()
+        title_ink = _ink_on_fill(bar, ink, lit)
+        row_ink = _ink_on_fill(popup, ink, lit)
         scope = _draw_list_has_color(transport, gold)
         unfocused_check = _draw_list_has_color(popup, _color_u32(VALUE))
         unfocused_shortcut = _draw_list_has_color(popup, _color_u32(MUTED))
         unfocused_label = _draw_list_has_color(popup, _color_u32(VALUE))
         idle_title = _draw_list_has_color(bar, _color_u32(LABEL))
-        check_on_current = _ink_on_fill(popup, _color_u32(VALUE), gold)
-        shortcut_on_current = _ink_on_fill(popup, _color_u32(MUTED), gold)
+        shortcut_on_current = _ink_on_fill(popup, _color_u32(MUTED), lit)
         # Full Screen Editor: check, label, and shortcut.
         menu.item_index = 4
         lists = _paint_shell(host, menu, ctx)
         content = _content_lists(lists)
         names = [draw_list._owner_name for draw_list in content]
         popup = content[names.index("##cleave-menu")]
-        current_parts = _ink_runs_on_fill(popup, ink, gold)
+        current_parts = (
+            _ink_runs_on_fill(popup, gold, lit),
+            _ink_runs_on_fill(popup, ink, lit),
+            _ink_runs_on_fill(popup, _color_u32(SURFACE_TEXT), lit),
+        )
         del lists, content
     finally:
         host.imgui.destroy()
@@ -946,22 +960,22 @@ def test_open_menu_ink_matches_the_mock() -> None:
     assert unfocused_shortcut
     assert unfocused_label
     assert idle_title
-    assert check_on_current == 0
     assert shortcut_on_current == 0
-    assert current_parts == 3
+    # Check, label, and shortcut.
+    assert current_parts == (1, 1, 1)
 
 
-def test_navigator_focus_ring_only_while_that_region_is_active() -> None:
-    from cleave.viz import imgui_host, shell_menu_bar, shell_navigator, shell_widgets
+def test_navigator_row_is_focused_only_while_that_region_is_active() -> None:
+    from cleave.viz import imgui_host, row_paint, shell_menu_bar, shell_navigator
+    from cleave.viz.row_paint import RowState
     from cleave.viz.navigator import NavNode
     from cleave.viz.shell_focus import ShellFocusState
     from cleave.viz.shell_layout import ShellLayout
     from cleave.viz.theme import (
-        FOCUS_ROW_BG_ALPHA,
-        FOCUS_WASH_ALPHA,
-        HIGHLIGHT,
         LABEL,
         LOCK_ICON,
+        ROW_FOCUSED_ALPHA,
+        ROW_SELECT_TINT,
         VALUE,
     )
 
@@ -979,12 +993,12 @@ def test_navigator_focus_ring_only_while_that_region_is_active() -> None:
     controls.focus_cursor = None
     controls.shell_focus = focus
     controls.navigator = SimpleNamespace(select=lambda *_args, **_kwargs: None)
-    rings: list[bool] = []
-    real_ring = shell_widgets.draw_item_focus_ring
+    rings: list[RowState] = []
+    real_paint = row_paint.paint_row
 
-    def spy_ring() -> None:
-        rings.append(True)
-        real_ring()
+    def spy_paint(draw, rect, state, *, bar=True) -> None:
+        rings.append(state)
+        real_paint(draw, rect, state, bar=bar)
 
     with patch.object(imgui_host, "_gl_context_current", return_value=False):
         host = _open_shell(overlay, menu, controls)
@@ -999,21 +1013,19 @@ def test_navigator_focus_ring_only_while_that_region_is_active() -> None:
         host.process_event(_motion(4))
         host.inspector.draw = lambda _state: None
         with (
-            patch.object(shell_navigator, "draw_item_focus_ring", spy_ring),
+            patch.object(row_paint, "paint_row", spy_paint),
             patch.object(shell_navigator, "build_navigator", return_value=nodes),
         ):
             _paint_shell(host, menu, CommandContext(), frames=1)
             rings.clear()
             lists = _paint_shell(host, menu, CommandContext(), frames=1)
-            active_rings = len(rings)
+            active_rings = list(rings)
             content = _content_lists(lists)
             names = [draw_list._owner_name for draw_list in content]
             nav = content[names.index("##shell-navigator")]
             colors = {int(vtx.col) for vtx in nav.vtx_buffer}
-            wash = _color_u32_alpha(HIGHLIGHT, FOCUS_WASH_ALPHA / 255.0)
-            old_wash = _color_u32_alpha(HIGHLIGHT, FOCUS_ROW_BG_ALPHA / 255.0)
-            has_wash = wash in colors
-            has_old = old_wash in colors
+            band = _color_u32_alpha(ROW_SELECT_TINT, ROW_FOCUSED_ALPHA[0])
+            has_band = band in colors
             has_value = _color_u32(VALUE) in colors
             has_label = _color_u32(LABEL) in colors
             has_lock = _color_u32(LOCK_ICON) in colors
@@ -1021,25 +1033,27 @@ def test_navigator_focus_ring_only_while_that_region_is_active() -> None:
             focus.region = ShellRegion.INSPECTOR
             rings.clear()
             _paint_shell(host, menu, CommandContext(), frames=1)
-            inspector_rings = len(rings)
+            inspector_rings = list(rings)
             menu.focused = True
             focus.region = ShellRegion.NAVIGATOR
             rings.clear()
             _paint_shell(host, menu, CommandContext(), frames=1)
-            menu_rings = len(rings)
+            # The open menu's title is lit; the navigator row stays selected.
+            menu_rings = [state for state in rings if state is not RowState.LIT]
     finally:
         host.imgui.destroy()
-    assert active_rings == 1
-    assert inspector_rings == 0
-    assert menu_rings == 0
-    assert has_wash
-    assert not has_old
+    # The selected row is focused while the navigator holds the keys, and
+    # only selected otherwise.
+    assert active_rings == [RowState.FOCUSED]
+    assert inspector_rings == [RowState.SELECTED]
+    assert menu_rings == [RowState.SELECTED]
+    assert has_band
     assert has_value
     assert has_label
     assert has_lock
 
 
-def test_focused_inspector_label_is_highlight() -> None:
+def test_focused_inspector_label_is_value() -> None:
     from imgui_bundle import imgui
 
     from cleave.viz import imgui_host, shell_host, shell_menu_bar
@@ -1049,11 +1063,10 @@ def test_focused_inspector_label_is_highlight() -> None:
     from cleave.viz.shell_focus import ShellFocusState
     from cleave.viz.shell_layout import ShellLayout
     from cleave.viz.theme import (
-        FOCUS_ROW_BG_ALPHA,
-        FOCUS_WASH_ALPHA,
-        HIGHLIGHT,
         LABEL,
-        SELECTED_WASH_ALPHA,
+        ROW_FOCUSED_ALPHA,
+        ROW_SELECT_TINT,
+        ROW_SELECTED_ALPHA,
         VALUE,
     )
     from cleave.viz.tuning_view_state import TuningViewState
@@ -1121,17 +1134,15 @@ def test_focused_inspector_label_is_highlight() -> None:
         names = [draw_list._owner_name for draw_list in content]
         inspector = content[names.index("##shell-inspector")]
         colors = {int(vtx.col) for vtx in inspector.vtx_buffer}
-        focus_wash = _color_u32_alpha(HIGHLIGHT, FOCUS_WASH_ALPHA / 255.0)
-        selected_wash = _color_u32_alpha(HIGHLIGHT, SELECTED_WASH_ALPHA / 255.0)
-        old_wash = _color_u32_alpha(HIGHLIGHT, FOCUS_ROW_BG_ALPHA / 255.0)
+        focus_wash = _color_u32_alpha(ROW_SELECT_TINT, ROW_FOCUSED_ALPHA[0])
+        selected_wash = _color_u32_alpha(ROW_SELECT_TINT, ROW_SELECTED_ALPHA[0])
         has_focus_wash = focus_wash in colors
         has_selected_wash = selected_wash in colors
-        has_old_wash = old_wash in colors
         has_value = _color_u32(VALUE) in colors
         highlight = (
-            HIGHLIGHT[0] / 255.0,
-            HIGHLIGHT[1] / 255.0,
-            HIGHLIGHT[2] / 255.0,
+            VALUE[0] / 255.0,
+            VALUE[1] / 255.0,
+            VALUE[2] / 255.0,
             1.0,
         )
         label = (
@@ -1156,7 +1167,6 @@ def test_focused_inspector_label_is_highlight() -> None:
     assert field_push[0] == pytest.approx(highlight)
     assert has_focus_wash
     assert not has_selected_wash
-    assert not has_old_wash
     assert has_value
     assert focused_group_push == []
     assert len(unfocused_field) == 1

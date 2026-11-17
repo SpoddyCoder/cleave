@@ -3,7 +3,7 @@ from cleave.viz.theme import (
     BUTTON_BORDER,
     BUTTON_DANGER_HOVER_BG,
     BUTTON_HOVER_BORDER,
-    BUTTON_PRIMARY_DIMMED_BG,
+    BUTTON_OFF_CHOSEN_BG,
 )
 
 
@@ -41,6 +41,50 @@ def test_only_primary_and_danger_glow() -> None:
 
 
 def test_fill_override_borders_in_its_own_shade() -> None:
-    look = button_look(ButtonTone.PLAIN, ButtonState.REST, fill=BUTTON_PRIMARY_DIMMED_BG)
+    look = button_look(ButtonTone.PLAIN, ButtonState.REST, fill=BUTTON_OFF_CHOSEN_BG)
     assert look.border != BUTTON_BORDER
-    assert _luma(look.border) > _luma(BUTTON_PRIMARY_DIMMED_BG)
+    assert _luma(look.border) > _luma(BUTTON_OFF_CHOSEN_BG)
+
+
+def _contrast(a: tuple[int, int, int], b: tuple[int, int, int]) -> float:
+    def channel(v: int) -> float:
+        c = v / 255.0
+        return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+
+    def lum(rgb: tuple[int, int, int]) -> float:
+        r, g, b = (channel(v) for v in rgb)
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+    hi, lo = sorted((lum(a), lum(b)), reverse=True)
+    return (hi + 0.05) / (lo + 0.05)
+
+
+def test_off_rests_darker_and_lights_like_plain() -> None:
+    off = button_look(ButtonTone.OFF, ButtonState.REST)
+    plain = button_look(ButtonTone.PLAIN, ButtonState.REST)
+    assert _luma(off.top) < _luma(plain.top)
+    assert off.glow is None
+    for state in (ButtonState.HOVER, ButtonState.PRESSED):
+        assert button_look(ButtonTone.OFF, state) == button_look(ButtonTone.PLAIN, state)
+
+
+def test_off_control_text_reads_on_its_fills() -> None:
+    """Dimmed text stays readable over the whole gradient of a dimmed control."""
+    from cleave.viz.theme import (
+        LOCKED,
+        LOCKED_MUTED,
+        OFF_CONTROL_MUTED,
+        OFF_CONTROL_TEXT,
+    )
+
+    off = button_look(ButtonTone.OFF, ButtonState.REST)
+    chosen = button_look(ButtonTone.PLAIN, ButtonState.REST, fill=BUTTON_OFF_CHOSEN_BG)
+    for text, look, floor in (
+        (OFF_CONTROL_TEXT, off, 4.5),
+        (OFF_CONTROL_TEXT, chosen, 3.5),
+        (OFF_CONTROL_MUTED, off, 2.6),
+        (LOCKED, chosen, 3.5),
+        (LOCKED_MUTED, off, 2.5),
+    ):
+        assert _contrast(text, look.top) >= floor
+        assert _contrast(text, look.bottom) >= floor

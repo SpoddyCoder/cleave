@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 from cleave.stems import stem_overlay_header
 from cleave.config_schema.layers import MAX_LAYER_COUNT
 from cleave.viz.editor_mode_controls import curation_focus_slot, is_preset_curation_mode
-from cleave.viz.theme import HIGHLIGHT, LABEL, MOVE_MODE, VALUE
+from cleave.viz.theme import LABEL, MOVE_MODE, VALUE
 
 if TYPE_CHECKING:
     from cleave.viz.session import TuningSession
@@ -330,14 +330,12 @@ def navigator_row_text_color(
 ) -> tuple[int, int, int]:
     """Label colour for a navigator row.
 
-    A layer in move mode wins, then the selected row in ``HIGHLIGHT`` (as a
-    focused inspector row), then roots and layer rows in ``VALUE``.
+    A layer in move mode wins. The selected row, roots, and layer rows are
+    ``VALUE``; the selected row's band sets it apart.
     """
     if moving:
         return MOVE_MODE
-    if selected:
-        return HIGHLIGHT
-    return VALUE if navigator_row_bright(node) else LABEL
+    return VALUE if selected or navigator_row_bright(node) else LABEL
 
 
 def navigator_tree_rails(nodes: Sequence[NavNode]) -> tuple[tuple[bool, ...], ...]:

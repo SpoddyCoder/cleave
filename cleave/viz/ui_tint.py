@@ -1,66 +1,15 @@
-"""Shared focus and accent tint drawing with opaque GL-safe compositing."""
+"""Shared tint, hover, and row band drawing on pygame surfaces (the timeline strip)."""
 
 from __future__ import annotations
 
 import pygame
 
+from cleave.viz.row_paint import RowLook
 from cleave.viz.theme import (
-    FOCUS_ROW_BG_ALPHA,
     ICON_HOVER_BG,
     ICON_HOVER_BG_ALPHA,
     ICON_HOVER_EDGE,
 )
-
-
-def composite_row_background(
-    background: tuple[int, int, int],
-    background_alpha: int,
-    tint: tuple[int, int, int],
-    tint_alpha: int,
-) -> tuple[tuple[int, int, int], int]:
-    """Straight RGBA after compositing *tint* over *background* (Porter-Duff over)."""
-    if tint_alpha < 2:
-        return background, background_alpha
-    if background_alpha < 2:
-        return tint, tint_alpha
-    ba = background_alpha / 255.0
-    ta = tint_alpha / 255.0
-    out_a = ta + ba * (1.0 - ta)
-    if out_a <= 0.0:
-        return background, 0
-    inv_out_a = 1.0 / out_a
-    out_rgb = tuple(
-        int(round((tint[i] * ta + background[i] * ba * (1.0 - ta)) * inv_out_a))
-        for i in range(3)
-    )
-    return out_rgb, int(round(out_a * 255))
-
-
-def draw_opaque_row_background(
-    surface: pygame.Surface,
-    rect: tuple[int, int, int, int] | pygame.Rect,
-    background: tuple[int, int, int],
-    background_alpha: int,
-    tint: tuple[int, int, int] | None = None,
-    *,
-    tint_alpha: int = FOCUS_ROW_BG_ALPHA,
-) -> None:
-    """Draw a row background opaque enough for GL SRC_ALPHA overlay present."""
-    if isinstance(rect, pygame.Rect):
-        x, y, w, h = rect.x, rect.y, rect.w, rect.h
-    else:
-        x, y, w, h = rect
-    if w <= 0 or h <= 0:
-        return
-    if tint is not None and tint_alpha >= 2:
-        rgb, alpha = composite_row_background(
-            background, background_alpha, tint, tint_alpha
-        )
-    else:
-        rgb, alpha = background, background_alpha
-    if alpha < 2:
-        return
-    pygame.draw.rect(surface, (*rgb, alpha), (x, y, w, h))
 
 
 def blit_tint(
@@ -68,7 +17,7 @@ def blit_tint(
     rect: tuple[int, int, int, int] | pygame.Rect,
     color: tuple[int, int, int],
     *,
-    alpha: int = FOCUS_ROW_BG_ALPHA,
+    alpha: int,
 ) -> None:
     if isinstance(rect, pygame.Rect):
         x, y, w, h = rect.x, rect.y, rect.w, rect.h
@@ -89,3 +38,32 @@ def blit_hover(
     r = pygame.Rect(rect)
     if r.w > 0 and r.h > 0:
         pygame.draw.rect(surface, ICON_HOVER_EDGE, r, 1)
+
+
+def _rgba8(color: tuple[tuple[int, int, int], float]) -> tuple[int, int, int, int]:
+    rgb, alpha = color
+    return (*rgb, max(0, min(255, round(alpha * 255))))
+
+
+def blit_row_band(
+    surface: pygame.Surface, rect: pygame.Rect, look: RowLook, *, bar_px: int
+) -> None:
+    """A row look's band and marker bar, as ``row_paint.paint_look`` draws them.
+
+    The edge is left to ``draw_row_edge``, so it can go over the row's content.
+    """
+    if rect.w <= 0 or rect.h <= 0:
+        return
+    ramp = pygame.Surface((2, 1) if not look.vertical else (1, 2), pygame.SRCALPHA)
+    ramp.set_at((0, 0), _rgba8(look.start))
+    ramp.set_at((1, 0) if not look.vertical else (0, 1), _rgba8(look.end))
+    surface.blit(pygame.transform.smoothscale(ramp, rect.size), rect.topleft)
+    if look.bar is not None:
+        surface.fill(look.bar, pygame.Rect(rect.x, rect.y, min(rect.w, bar_px), rect.h))
+
+
+def draw_row_edge(surface: pygame.Surface, rect: pygame.Rect, look: RowLook) -> None:
+    """A row look's 1px edge, if it has one."""
+    if look.edge is None or rect.w <= 0 or rect.h <= 0:
+        return
+    pygame.draw.rect(surface, look.edge, rect, 1)

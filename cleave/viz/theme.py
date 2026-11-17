@@ -1,11 +1,14 @@
 """Shared colors and layout constants for Milkdrop live tuning UI panels.
 
 Typography roles for the live tuning overlay:
-  LABEL    — light blue text for row labels and prefixes
-  VALUE    — white text for values and state indicators (default)
-  DISABLED — dimmed text when a row or control is inactive
-  DISABLED_MUTED — an unchosen option on a control whose page is switched off
-  MUTED    — muted blue-grey text (#9ba6bc)
+  VALUE    — white text for values and state indicators (default), and any
+             text on a selected, focused, or lit row
+  LABEL    — periwinkle text for row labels and prefixes
+  MUTED    — blue-grey text for headings, shortcuts, and unchosen options
+  DISABLED — cool grey text when a row, icon, or value on the black panel is inactive
+  OFF_CONTROL_TEXT — the label, value, or chosen option on a switched-off,
+             refused, or dimmed control (on BUTTON_OFF_BG / BUTTON_OFF_CHOSEN_BG)
+  OFF_CONTROL_MUTED — an unchosen option or combo caret on such a control
   LOCKED   — tinted text for locked sub-rows that cannot be edited
   LOCKED_MUTED — an unchosen option on a locked control
 
@@ -22,24 +25,54 @@ vertical gradient, border, and (primary and danger) an outer glow:
     segment, or combo under the pointer (electric violet), and held down
   BUTTON_PRIMARY_BG (+ _HOVER_BG, _HOVER_BORDER, _ACTIVE_BG) - the confirm button of
     a dialog, and a selected segment
-  BUTTON_PRIMARY_DIMMED_BG - a selected segment on a row whose page is switched off
-    or locked
+  BUTTON_OFF_BG, BUTTON_OFF_BORDER - the OFF tone: a button, segment, or combo on a
+    switched-off or locked page, or one that refuses a press, at rest. Darker and
+    recessed, so OFF_CONTROL_TEXT stays readable on it; it lights like a plain
+    button under the pointer
+  BUTTON_OFF_CHOSEN_BG - the chosen segment of such a control, a dusky blue
   BUTTON_DANGER_BG (+ _HOVER_BG, _HOVER_BORDER, _ACTIVE_BG) - the confirm button of
     a destructive dialog
   BUTTON_SHEEN, BUTTON_SHADE - how far the top lightens and the bottom darkens
   BUTTON_GLOW_ALPHA - the outer glow around a lit primary or danger button
-  CHOICE_LIST_BG, CHOICE_LIST_BORDER, CHOICE_LIST_TEXT - the open combo list: deep
-    ink with a violet edge and soft white options; its highlighted row is the plain
-    hover gradient with a HIGHLIGHT bar, and the chosen tick is HIGHLIGHT
+  The open combo list is a floating surface (below); its highlighted row is the
+    LIT row look and its chosen tick is HIGHLIGHT
   NAV_ON_BG, SOLO_BG, NAV_LOCK_BG - lit navigator on, solo, and lock icons
     (NAV_LOCK_GLYPH is the dark lock icon on its amber fill)
 
+Colour language. Violet is the pointer (button hover, icon hover, row hover, a
+lit menu or list row). Blue is the selection and the keyboard (a selected
+segment, the selected row, the focused row and panel). Yellow (HIGHLIGHT) is a
+signal on top of those: a lit row's marker bar, a chosen tick, a caret, the live
+preset, info lines, and an icon glyph under the pointer. It is never a fill.
+
+Rows (row_paint.row_look turns them into a band, edge, and marker bar):
+  HOVER, HOVER_BG_ALPHA - flat violet wash on a row under the pointer
+  ROW_SELECT_TINT - the blue a selected or focused row fades from, left to right
+  ROW_SELECTED_ALPHA, ROW_SELECTED_BAR - the current navigator page, or a chosen
+    row whose list does not hold the keys
+  ROW_FOCUSED_ALPHA, ROW_FOCUSED_BAR, ROW_FOCUS_EDGE - the row the keys act on
+    (ROW_FOCUS_EDGE also rings a focused panel button)
+  ROW_BAR_PX - marker bar width at shell scale 1.0
+  The LIT look (menu and choice list rows) is the plain button hover gradient
+  with a HIGHLIGHT bar. Text on a selected, focused, or lit row is VALUE.
+
+Floating surfaces (menus, context menus, the open choice list, dialogs, the
+file picker, info panels, tooltips):
+  SURFACE_BG, SURFACE_EDGE - deep ink with a violet edge; SURFACE_TEXT is soft
+    white for unlit choice list options
+  floating_surface() in imgui_theme pushes them onto a window
+
+Accent gradient:
+  ACCENT_FROM, ACCENT_TO - blue into violet, left to right: progress bar fills
+    and the inspector title's new-page swipe
+  HEADING - lavender help column section titles
+
 Shell rules (not text roles):
-  TRANSPORT_RULE — dark rule under the transport bar
-  NAVIGATOR_BORDER — dark border around the navigator when it is not the active region
+  PANEL_EDGE - idle navigator, inspector, and strip outline
+  PANEL_FOCUS_EDGE - outline of the panel that holds the keys
+  TRANSPORT_RULE — rule under the menu bar and transport, and ImGui separators
   NAVIGATOR_TREE_LINE — connector lines between navigator rows
   INSPECTOR_DIVIDER — thin rule under the inspector title and above its buttons
-  HOVER - translucent label wash for pointer hover
   ICON_HOVER_FG - glyph of an icon or text button under the pointer (HIGHLIGHT)
   ICON_HOVER_BG, ICON_HOVER_BG_ALPHA - violet wash behind it, complementary to the
     yellow glyph; ICON_HOVER_EDGE is its opaque 1px outline
@@ -219,18 +252,19 @@ def timeline_panel_height_px(
 BACKGROUND: tuple[int, int, int] = (0, 0, 0)
 BACKGROUND_ALPHA: int = int(1.0 * 255)
 MODAL_SCRIM_ALPHA: int = int(0.55 * 255)
-BORDER_COLOR: tuple[int, int, int] = (255, 255, 255)
-TRANSPORT_RULE: tuple[int, int, int] = (68, 68, 68)
-NAVIGATOR_BORDER: tuple[int, int, int] = (85, 85, 85)
-NAVIGATOR_TREE_LINE: tuple[int, int, int] = (110, 125, 150)
-INSPECTOR_DIVIDER: tuple[int, int, int] = (70, 78, 95)
+TRANSPORT_RULE: tuple[int, int, int] = (52, 58, 74)
+PANEL_EDGE: tuple[int, int, int] = (52, 58, 74)
+PANEL_FOCUS_EDGE: tuple[int, int, int] = (56, 108, 205)
+NAVIGATOR_TREE_LINE: tuple[int, int, int] = (72, 82, 108)
+INSPECTOR_DIVIDER: tuple[int, int, int] = (44, 50, 64)
 
-LABEL: tuple[int, int, int] = (170, 210, 255)
-HOVER: tuple[int, int, int] = (170, 210, 255)
+LABEL: tuple[int, int, int] = (165, 198, 250)
 VALUE: tuple[int, int, int] = (255, 255, 255)
-DISABLED: tuple[int, int, int] = (140, 140, 140)
-DISABLED_MUTED: tuple[int, int, int] = (100, 104, 112)
-MUTED: tuple[int, int, int] = (155, 166, 188)
+DISABLED: tuple[int, int, int] = (124, 130, 148)
+OFF_CONTROL_TEXT: tuple[int, int, int] = (170, 177, 196)
+OFF_CONTROL_MUTED: tuple[int, int, int] = (124, 130, 148)
+MUTED: tuple[int, int, int] = (140, 151, 176)
+HEADING: tuple[int, int, int] = (196, 182, 255)
 HIGHLIGHT: tuple[int, int, int] = (255, 235, 130)
 ERROR_NOTIFICATION: tuple[int, int, int] = (255, 140, 140)
 NOTIFICATION_ON_FILL: tuple[int, int, int] = (0, 0, 0)
@@ -257,7 +291,9 @@ BUTTON_PRIMARY_BG: tuple[int, int, int] = (45, 85, 150)
 BUTTON_PRIMARY_HOVER_BG: tuple[int, int, int] = (58, 120, 215)
 BUTTON_PRIMARY_HOVER_BORDER: tuple[int, int, int] = (150, 205, 255)
 BUTTON_PRIMARY_ACTIVE_BG: tuple[int, int, int] = (32, 64, 120)
-BUTTON_PRIMARY_DIMMED_BG: tuple[int, int, int] = (62, 72, 92)
+BUTTON_OFF_BG: tuple[int, int, int] = (30, 33, 42)
+BUTTON_OFF_BORDER: tuple[int, int, int] = (62, 68, 84)
+BUTTON_OFF_CHOSEN_BG: tuple[int, int, int] = (40, 52, 78)
 BUTTON_DANGER_BG: tuple[int, int, int] = SOLO_BG
 BUTTON_DANGER_HOVER_BG: tuple[int, int, int] = (238, 58, 52)
 BUTTON_DANGER_HOVER_BORDER: tuple[int, int, int] = (255, 175, 155)
@@ -265,27 +301,28 @@ BUTTON_DANGER_ACTIVE_BG: tuple[int, int, int] = (150, 26, 26)
 BUTTON_SHEEN: float = 0.14
 BUTTON_SHADE: float = 0.22
 BUTTON_GLOW_ALPHA: float = 0.32
-CHOICE_LIST_BG: tuple[int, int, int] = (20, 18, 34)
-CHOICE_LIST_BORDER: tuple[int, int, int] = (112, 88, 210)
-CHOICE_LIST_TEXT: tuple[int, int, int] = (205, 212, 228)
+SURFACE_BG: tuple[int, int, int] = (20, 18, 34)
+SURFACE_EDGE: tuple[int, int, int] = (112, 88, 210)
+SURFACE_TEXT: tuple[int, int, int] = (205, 212, 228)
+ACCENT_FROM: tuple[int, int, int] = (58, 120, 215)
+ACCENT_TO: tuple[int, int, int] = (128, 84, 255)
 OVERRIDE_GLYPH: tuple[int, int, int] = (0, 0, 0)
 OVERRIDE_GLYPH_OFF: tuple[int, int, int] = DISABLED
-FOCUS_ROW_BG_ALPHA: int = 130
-HOVER_BG_ALPHA: int = 36
+HOVER: tuple[int, int, int] = (128, 84, 255)
+HOVER_BG_ALPHA: int = 40
+ROW_SELECT_TINT: tuple[int, int, int] = (58, 120, 215)
+# Band alpha at the row's left end, then at its right end.
+ROW_SELECTED_ALPHA: tuple[float, float] = (0.30, 0.06)
+ROW_SELECTED_BAR: tuple[int, int, int] = (58, 120, 215)
+ROW_FOCUSED_ALPHA: tuple[float, float] = (0.50, 0.14)
+ROW_FOCUSED_BAR: tuple[int, int, int] = (124, 184, 255)
+ROW_FOCUS_EDGE: tuple[int, int, int] = (46, 94, 172)
+ROW_BAR_PX: float = 2.5
 ICON_HOVER_FG: tuple[int, int, int] = HIGHLIGHT
 ICON_HOVER_BG: tuple[int, int, int] = (128, 84, 255)
 ICON_HOVER_BG_ALPHA: int = 120
 ICON_HOVER_EDGE: tuple[int, int, int] = (122, 92, 220)
 ICON_LIT_HOVER_LIFT: float = 0.25
-# Menu and timeline selection wash (highlight at 0.16).
-SELECTED_WASH_ALPHA: int = 41
-# Selected navigator row and focused inspector or dialog row wash (highlight at 0.10).
-FOCUS_WASH_ALPHA: int = 26
-# Outline of the active panel (highlight at 0.55).
-PANEL_FOCUS_BORDER_ALPHA: int = 140
-# Opaque outline of the focused row: a shade over the row wash
-# (the shade is lifted above HIGHLIGHT at FOCUS_WASH_ALPHA over BACKGROUND).
-ROW_FOCUS_BORDER: tuple[int, int, int] = (64, 59, 33)
 REC_BG: tuple[int, int, int] = (220, 0, 0)
 # On-section fill of each timeline track's level bar, one per layer (max 8).
 TIMELINE_TRACK_COLORS: tuple[tuple[int, int, int], ...] = (
@@ -307,13 +344,15 @@ SONG_MARKER: tuple[int, int, int] = (220, 40, 40)
 SONG_MARKER_SELECTED: tuple[int, int, int] = (255, 170, 40)
 
 BORDER_WIDTH: int = 2
-# Progress bars: a thicker white border and a gap before the HIGHLIGHT fill.
+# Progress bars: a thick SURFACE_EDGE border and a gap before the accent fill.
 PROGRESS_BAR_BORDER_WIDTH: int = 2 * BORDER_WIDTH
 PROGRESS_BAR_FILL_GAP: int = 2
 # Text above a progress bar draws this much larger than the shell font.
 PROGRESS_LABEL_FONT_SCALE: float = 1.5
-SCROLLBAR_TRACK: tuple[int, int, int] = DISABLED
-SCROLLBAR_THUMB: tuple[int, int, int] = (200, 225, 255)
+# ImGui scrollbars: a slate thumb that lights violet under the pointer.
+SCROLLBAR_TRACK: tuple[int, int, int] = (26, 29, 38)
+SCROLLBAR_THUMB: tuple[int, int, int] = (88, 98, 126)
+SCROLLBAR_THUMB_HOVER: tuple[int, int, int] = BUTTON_HOVER_BORDER
 # Timeline strip scrollbar: a faint rail and a neutral pill, so it does not
 # read as a layer row's level bar.
 TIMELINE_SCROLL_RAIL: tuple[int, int, int] = SONG_BOUND

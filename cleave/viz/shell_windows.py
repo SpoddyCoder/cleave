@@ -9,9 +9,8 @@ from imgui_bundle import imgui
 from cleave.viz.imgui_theme import rgba
 from cleave.viz.shell_widgets import PANEL_BORDER_PX, stroke_h_rule
 from cleave.viz.theme import (
-    BORDER_COLOR,
-    HIGHLIGHT,
-    PANEL_FOCUS_BORDER_ALPHA,
+    PANEL_FOCUS_EDGE,
+    SURFACE_EDGE,
     TRANSPORT_RULE,
 )
 
@@ -109,17 +108,11 @@ def overlap_panel(
     return (x, y - overlap, width, height + overlap)
 
 
-def panel_focus_border_rgba() -> imgui.ImVec4:
-    """Highlight colour at the quieter panel focus-outline alpha."""
-    return rgba(HIGHLIGHT, PANEL_FOCUS_BORDER_ALPHA / 255.0)
-
-
 def fill_rect_border(rect: tuple[int, int, int, int], color_rgba: imgui.ImVec4) -> None:
     """Outline of the panel border width around *rect* on the current window.
 
     A stroked border is anti-aliased, so the solid rule underneath shows
-    through it. Filled edges cover that rule. The focus outline uses the
-    quieter focus alpha, so the rule tints the shared edge.
+    through it. Filled edges cover that rule.
     """
     x, y, w, h = rect
     if w <= 2 * PANEL_BORDER_PX or h <= 2 * PANEL_BORDER_PX:
@@ -182,7 +175,7 @@ def draw_fixed_window(
     x, y, w, h = rect
     if w <= 0 or h <= 0:
         return
-    border = HIGHLIGHT if active else idle_border
+    border = PANEL_FOCUS_EDGE if active else idle_border
     imgui.set_next_window_pos(
         imgui.ImVec2(float(x), float(y)), imgui.Cond_.always
     )
@@ -196,7 +189,6 @@ def draw_fixed_window(
     if border is not None:
         # ImGui centres a thick window border on a half pixel, which
         # blurs it; hide that stroke and fill the edges instead.
-        alpha = PANEL_FOCUS_BORDER_ALPHA / 255.0 if active else 1.0
         imgui.push_style_color(imgui.Col_.border, rgba(border, 0.0))
     try:
         _visible, _opened = imgui.begin(
@@ -217,7 +209,7 @@ def draw_fixed_window(
                     False,
                 )
                 try:
-                    fill_rect_border(rect, rgba(border, alpha))
+                    fill_rect_border(rect, rgba(border))
                 finally:
                     draw.pop_clip_rect()
         finally:
@@ -260,7 +252,7 @@ def draw_menu_rule(
                     if span is not None:
                         # The popup's top border sits on this row.
                         stroke_h_rule(
-                            span[0], span[1], rule_y, BORDER_COLOR, PANEL_BORDER_PX
+                            span[0], span[1], rule_y, SURFACE_EDGE, PANEL_BORDER_PX
                         )
             finally:
                 draw.pop_clip_rect()

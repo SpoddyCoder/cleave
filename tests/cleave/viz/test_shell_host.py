@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import replace
 from pathlib import Path
 
-import pytest
 
 from cleave.preset_playlist import PresetPlaylist
 from cleave.viz.choice_widgets import ChoiceTone
@@ -68,7 +67,7 @@ from cleave.viz.shell_strip import (
     strip_release_tooltip,
     strip_solo_tooltip,
 )
-from cleave.viz.shell_widgets import drag_handle_lead, selectable_wash
+from cleave.viz.shell_widgets import drag_handle_lead
 from cleave.viz.shell_windows import scroll_clip_span
 from cleave.viz.material_icons import FILE_GLYPH, FOLDER_GLYPH
 from cleave.viz.theme import (
@@ -76,8 +75,6 @@ from cleave.viz.theme import (
     PRESET_FILE_ICON,
     PRESET_ICON,
     VALUE,
-    FOCUS_WASH_ALPHA,
-    HIGHLIGHT,
     LOCKED,
     MUTED,
     NAV_LOCK_BG,
@@ -115,23 +112,6 @@ def _session() -> TuningSession:
     )
     session.song_markers.times = [1.0, 4.0]
     return session
-
-
-def _wash_channels(color) -> tuple[float, float, float, float]:
-    return (color.x, color.y, color.z, color.w)
-
-
-def test_selectable_wash_is_the_focus_wash() -> None:
-    wash = (
-        HIGHLIGHT[0] / 255.0,
-        HIGHLIGHT[1] / 255.0,
-        HIGHLIGHT[2] / 255.0,
-        FOCUS_WASH_ALPHA / 255.0,
-    )
-
-    hovered, active = selectable_wash()
-    assert _wash_channels(hovered) == pytest.approx(wash)
-    assert _wash_channels(active) == pytest.approx(wash)
 
 
 def test_layer_breadcrumb_uses_navigator_label() -> None:

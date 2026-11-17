@@ -226,3 +226,19 @@ def test_navigator_expand_draws_as_a_combo_with_three_options() -> None:
         view = controls.inline_edit.choice_view
         assert view is not None and view.target == expand
         assert len(host.inspector.values.choice_list_rows) == 3
+
+
+def test_the_open_list_draws_over_the_panel_focus_outline() -> None:
+    from imgui_bundle import imgui
+
+    from cleave.viz.shell_focus import ShellRegion
+
+    with _inspector("settings.preview") as (host, controls):
+        _frame(host, (0, 0))
+        combo = host.inspector.values.choice_rects[_QUALITY]
+        _frame(host, rect_center(combo), click=True)
+        assert controls.inline_edit.choice_view is not None
+        assert controls.shell_focus.region is ShellRegion.INSPECTOR
+        draw_shell(host)
+        names = [str(draw_list._owner_name) for draw_list in imgui.get_draw_data().cmd_lists]
+    assert names.index("##shell-focus-border") < names.index("##inspector-choice-list")
