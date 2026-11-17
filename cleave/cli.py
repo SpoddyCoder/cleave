@@ -32,7 +32,7 @@ _PLAY_TARGET_HELP = (
 )
 _PROJECT_DIR_HELP = "Cleave project directory (path or slug)"
 COMMANDS = ("separate", "play", "render", "backup", "restore")
-_PAUSE_PROMPT = "Press Enter to close..."
+_PAUSE_PROMPT = "Press Enter to close…"
 _MB_ICONERROR = 0x00000010
 _parent_console_attached = False
 

@@ -1122,7 +1122,7 @@ def test_overlay_body_text_enter_opens_multiline_modal() -> None:
     assert modal is not None
     assert modal.kind == ModalKind.TEXT
     assert modal.single_line is False
-    assert modal.cta == "Change text..."
+    assert modal.cta == "Edit body text"
     assert modal.draft == "Opening body"
     assert modal.editing is True
 

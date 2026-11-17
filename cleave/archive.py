@@ -89,7 +89,7 @@ def backup_project(project_dir: Path, dest: Path, *, force: bool) -> Path:
             raise FileExistsError(f"backup already exists: {output}")
 
     output.parent.mkdir(parents=True, exist_ok=True)
-    print("Backing up project, please wait...", file=sys.stderr)
+    print("Backing up project, please wait…", file=sys.stderr)
     with tarfile.open(output, "w:gz") as tar:
         tar.add(project_dir, arcname=manifest.slug)
     return output.resolve()
@@ -107,13 +107,13 @@ def restore_project(
         raise FileNotFoundError(f"archive not found: {archive}")
 
     with tarfile.open(archive, "r:gz") as tar:
-        print("Reading archive, please wait...", file=sys.stderr)
+        print("Reading archive, please wait…", file=sys.stderr)
         members = tar.getmembers()
         top_level = _archive_top_level_dir(members)
 
         with tempfile.TemporaryDirectory(prefix="cleave-restore-") as tmp:
             extract_root = Path(tmp)
-            print("Unpacking project files, please wait...", file=sys.stderr)
+            print("Unpacking project files, please wait…", file=sys.stderr)
             _safe_extract(tar, extract_root, members)
             extracted = extract_root / top_level
             if not extracted.is_dir():
@@ -146,7 +146,7 @@ def restore_project(
                     raise FileExistsError(f"project already exists: {target}")
                 shutil.rmtree(target)
 
-            print("Restoring project...", file=sys.stderr)
+            print("Restoring project…", file=sys.stderr)
             shutil.move(os.fspath(extracted), os.fspath(target))
 
     return target

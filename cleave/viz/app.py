@@ -243,7 +243,7 @@ def init_gl_resources_heavy(
         if on_progress is not None:
             on_progress(message)
 
-    report("Building layers...")
+    report("Building layers…")
     layers, layers_by_slot = LayerFramePipeline.build(
         seed.cfg,
         compositor,
@@ -659,7 +659,7 @@ class VisualizerApp:
             )
             window.compositor = compositor
             window.overlay_surface = overlay_surface
-            window.update("Loading...")
+            window.update("Loading…")
 
             def on_progress(message: str) -> None:
                 window.update(message)

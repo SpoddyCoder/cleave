@@ -33,7 +33,7 @@ def _spec(tmp_path: Path, *, quality: str = "normal") -> ProjectRenderSpec:
 def test_parse_render_progress_line() -> None:
     assert parse_render_progress_line(format_render_progress_line(0.42)) == 0.42
     assert parse_render_progress_line("CLEAVE_RENDER_PROGRESS 1.0000\n") == 1.0
-    assert parse_render_progress_line("Encoding 10 frames...") is None
+    assert parse_render_progress_line("Encoding 10 frames…") is None
     assert parse_render_progress_line("CLEAVE_RENDER_PROGRESS nope") is None
 
 

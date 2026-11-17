@@ -246,7 +246,7 @@ class ShellHost:
         return True
 
     def process_play_event(self, event: pygame.event.Event) -> None:
-        """Mouse while Play Full Screen shows only the visualiser.
+        """Mouse while Play full screen shows only the visualiser.
 
         A right-click opens the play menu; a press outside an open menu
         closes it. Nothing else under the pointer acts.
@@ -280,7 +280,7 @@ class ShellHost:
             imgui_host.process_mouse_event(event)
 
     def draw_play_frame(self, dt: float) -> None:
-        """One ImGui frame for Play Full Screen: only an open context menu."""
+        """One ImGui frame for Play full screen: only an open context menu."""
         self.imgui.begin_frame(dt)
         try:
             if self.context.controls.context_menu.is_open:

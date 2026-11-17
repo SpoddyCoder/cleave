@@ -116,7 +116,7 @@ def hub_checkpoints_dir(cache_dir: Path | None = None) -> Path:
 def download_start_message(spec: WeightSpec) -> str:
     return (
         f"Downloading {spec.label} ({spec.size_hint}, "
-        "one-time into the data dir)..."
+        "one-time into the data dir)…"
     )
 
 

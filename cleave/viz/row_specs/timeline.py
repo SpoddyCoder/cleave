@@ -588,7 +588,7 @@ SPECS: dict[RowKind, RowSpec] = {
     ),
     RowKind.TIMELINE_GENERATE: RowSpec(
         affordance=RowAffordance.COMMAND,
-        panel_label="Generate timeline...",
+        panel_label="Generate timeline…",
         present_style=RowPresentStyle.FULL_LINE,
         apply_action=_apply_timeline_generate,
         fit_strategy=FitStrategy.NONE,
@@ -605,7 +605,7 @@ SPECS: dict[RowKind, RowSpec] = {
     ),
     RowKind.TIMELINE_SET_CUT_TYPE: RowSpec(
         affordance=RowAffordance.COMMAND,
-        panel_label="Set cut type on cues...",
+        panel_label="Set cut type on cues…",
         present_style=RowPresentStyle.FULL_LINE,
         apply_action=_apply_timeline_set_cut_type,
         fit_strategy=FitStrategy.NONE,
@@ -618,7 +618,7 @@ SPECS: dict[RowKind, RowSpec] = {
     ),
     RowKind.TIMELINE_RESET: RowSpec(
         affordance=RowAffordance.COMMAND,
-        panel_label="Reset timeline...",
+        panel_label="Reset timeline…",
         present_style=RowPresentStyle.FULL_LINE,
         apply_action=_apply_timeline_reset,
         fit_strategy=FitStrategy.NONE,
@@ -692,7 +692,7 @@ SPECS: dict[RowKind, RowSpec] = {
     ),
     RowKind.TIMELINE_SNAP_CUES: RowSpec(
         affordance=RowAffordance.COMMAND,
-        panel_label="Snap cues...",
+        panel_label="Snap cues…",
         present_style=RowPresentStyle.FULL_LINE,
         apply_action=_apply_timeline_snap_cues,
         fit_strategy=FitStrategy.NONE,

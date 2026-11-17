@@ -293,7 +293,7 @@ def _apply_overlay_card_body_text_action(
     card_controls = _overlay_card_controls(controls, desc)
     current_body = _overlay_card_block_session(controls, desc).body_content
     controls.modal_host.prompt_text(
-        cta="Change text...",
+        cta="Edit body text",
         initial=current_body,
         on_confirm=card_controls.set_body_content,
         single_line=False,

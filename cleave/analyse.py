@@ -36,7 +36,7 @@ def _nan_to_null(values: np.ndarray) -> list[float | None]:
     return [None if np.isnan(v) else float(v) for v in values]
 
 
-_ANALYSE_MESSAGE = "Extracting signals..."
+_ANALYSE_MESSAGE = "Extracting signals…"
 
 _ANALYSE_FRAC_DRUMS = 0.0
 _ANALYSE_FRAC_BEATS = 0.05

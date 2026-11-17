@@ -198,7 +198,7 @@ def test_error_pauses_when_frozen_and_owns_console(
         with pytest.raises(SystemExit) as exc:
             main(["definitely-not-a-project-or-file"])
         assert exc.value.code != 0
-    pause_input.assert_called_once_with("Press Enter to close...")
+    pause_input.assert_called_once_with("Press Enter to close…")
 
 
 def test_error_does_not_pause_when_frozen_in_terminal(
@@ -314,7 +314,7 @@ def test_handled_error_pauses_when_frozen_and_owns_console(
         with pytest.raises(SystemExit) as exc:
             main(["play", "missing-project"])
         assert exc.value.code == 1
-    pause_input.assert_called_once_with("Press Enter to close...")
+    pause_input.assert_called_once_with("Press Enter to close…")
     window.update.assert_called()
 
 

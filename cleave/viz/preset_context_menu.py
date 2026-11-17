@@ -147,7 +147,7 @@ def _list_edit_items(
         ),
         ContextMenuItem(
             id="preset.remove",
-            label="Remove from list...",
+            label="Remove from list…",
             run=lambda: preset_list.prompt_delete(slot, index),
             enabled=not locked,
             shortcut="Delete",
@@ -164,7 +164,7 @@ def _list_fill_items(
         _add_item(controls, desc, slot, label="Add current preset"),
         ContextMenuItem(
             id="preset.populate",
-            label="Populate...",
+            label="Populate…",
             run=lambda: controls.preset_list.prompt_populate(slot),
             enabled=hint is None,
             hint=hint,
@@ -229,7 +229,7 @@ def _curate_items(
         ),
         ContextMenuItem(
             id="preset.blacklist",
-            label="Unblacklist" if blacklisted else "Blacklist...",
+            label="Unblacklist" if blacklisted else "Blacklist…",
             run=lambda: act(lambda path: curation.toggle_blacklist(slot, path)),
             enabled=ready,
             shortcut="B",

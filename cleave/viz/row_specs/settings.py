@@ -186,7 +186,7 @@ SPECS: dict[RowKind, RowSpec] = {
             "Preview quality and audio delay correction.",
             "The preview gets its shape from Project > Resolution.",
             "The window sets its size.",
-            "Resize the window, or press F11 for Full Screen Editor.",
+            "Resize the window, or press F11 for Full screen editor.",
             "Ctrl+F plays the show full screen; Esc returns.",
         ),
         is_pinned=True,

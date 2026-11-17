@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 class WindowControls:
-    """Full Screen Editor and Play Full Screen requests and state.
+    """Full screen editor and Play full screen requests and state.
 
     Commands only request a change. The live loop owns the window, consumes
     the request, and mirrors the window state back into ``fullscreen``.
 
-    Full Screen Editor puts the whole editor window in desktop fullscreen.
-    Play Full Screen shows only the visualiser across the display; it puts
+    Full screen editor puts the whole editor window in desktop fullscreen.
+    Play full screen shows only the visualiser across the display; it puts
     the window in desktop fullscreen too, and on leaving it restores the
     window only when it was the one that went fullscreen.
     """
@@ -17,7 +17,7 @@ class WindowControls:
     def __init__(self) -> None:
         self.fullscreen = False
         self.play_fullscreen = False
-        # True when entering Play Full Screen took the window fullscreen.
+        # True when entering Play full screen took the window fullscreen.
         self.play_restores_window = False
         self._toggle_requested = False
         self._play_request: bool | None = None

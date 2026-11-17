@@ -979,10 +979,10 @@ def test_format_row_value_timeline_cuts() -> None:
 def test_preset_list_populate_is_full_line_action() -> None:
     field = row_spec(RowKind.TRACK_PRESET_LIST_POPULATE)
     assert field.present_style == RowPresentStyle.FULL_LINE
-    assert field.panel_label == "Populate..."
+    assert field.panel_label == "Populate…"
     add_field = row_spec(RowKind.TRACK_PRESET_LIST_ADD)
     assert add_field.present_style == RowPresentStyle.FULL_LINE
-    assert add_field.panel_label == "Add To Preset List"
+    assert add_field.panel_label == "Add to preset list"
 
 
 def test_resume_switching_row_only_while_paused() -> None:

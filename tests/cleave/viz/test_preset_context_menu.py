@@ -58,7 +58,7 @@ def test_list_item_menu_lists_its_items_in_order() -> None:
         assert all(entry.enabled for entry in items.values())
         assert [items[i].shortcut for i in ("preset.favourite", "preset.blacklist", "preset.role")] == ["F", "B", "C"]
         assert items["preset.favourite"].label == "Favourite"
-        assert items["preset.blacklist"].label == "Blacklist..."
+        assert items["preset.blacklist"].label == "Blacklist…"
         role = items["preset.role"]
         assert [item.label for item in role.items] == [
             "Bed", "Pulse", "Lead", "Accent", "None",

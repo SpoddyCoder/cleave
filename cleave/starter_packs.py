@@ -35,7 +35,7 @@ _CHUNK_SIZE = 64 * 1024
 _PROGRESS_MIN_INTERVAL_SEC = 0.1
 _PROGRESS_MIN_DELTA = 0.01
 _EXTRACT_PULSE_EVERY = 100
-_DOWNLOAD_MESSAGE = f"Downloading starter packs (~{STARTER_PACKS_SIZE_MB} MB)..."
+_DOWNLOAD_MESSAGE = f"Downloading starter packs (~{STARTER_PACKS_SIZE_MB} MB)…"
 
 
 class StarterPackError(RuntimeError):

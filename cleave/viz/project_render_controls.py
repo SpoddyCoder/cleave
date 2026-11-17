@@ -1,4 +1,4 @@
-"""Settings, progress, and completion modals for Project > Render....
+"""Settings, progress, and completion modals for Project > Render….
 
 The Render dialog is the one place to set the render's fps, quality, and
 range. Its fields edit draft values; Render writes them to the session and
@@ -49,7 +49,7 @@ _FORM_HELP = (
     "Fps is saved with the project. Quality, start, and end last until the editor closes.",
 )
 _FPS_OPTIONS = tuple(range(RENDER_FPS_MIN, RENDER_FPS_MAX + 1))
-_PROGRESS_MESSAGE = "Rendering project..."
+_PROGRESS_MESSAGE = "Rendering project…"
 _SUCCESS_MESSAGE = "Render complete"
 _FAILED_MESSAGE = "Render failed"
 
@@ -360,7 +360,7 @@ class ProjectRenderController:
     def _prompt_error(self, detail: str) -> None:
         line = " ".join(detail.split())
         if len(line) > 96:
-            line = line[:95] + "..."
+            line = line[:95] + "…"
         self._modal.prompt_notice(
             _FAILED_MESSAGE,
             self._restore_playback,

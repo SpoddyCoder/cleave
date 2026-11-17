@@ -240,7 +240,7 @@ def _draw_frame(
 
 
 def test_loading_content_bar_fraction_and_detail() -> None:
-    message = "Loading..."
+    message = "Loading…"
     with _host() as host:
         half, quads, colors = _draw_frame(host, message, fraction=0.5)
         assert half.fill_rect is not None
@@ -352,7 +352,7 @@ def test_present_frame_scrim_precedes_loading_content(
         )
         present_frame(
             window,
-            lambda: draw_loading_content("Loading...", 640, 360),
+            lambda: draw_loading_content("Loading…", 640, 360),
             scrim=False,
         )
         assert "##loading-scrim" not in _content_names()
@@ -360,7 +360,7 @@ def test_present_frame_scrim_precedes_loading_content(
 
         present_frame(
             window,
-            lambda: draw_loading_content("Loading...", 640, 360),
+            lambda: draw_loading_content("Loading…", 640, 360),
             scrim=True,
         )
         names = _content_names()
@@ -468,11 +468,11 @@ def test_loading_window_update_draws_and_returns_true(
         overlay_surface=pygame.Surface((640, 360), pygame.SRCALPHA),
     )
     with patch("cleave.viz.loading.pygame.event.get", return_value=[]):
-        assert window.update("Separating stems...", 0.4, "12 MB of 30 MB") is True
+        assert window.update("Separating stems…", 0.4, "12 MB of 30 MB") is True
     mock_draw.assert_called_once()
     assert mock_draw.call_args.args[0] is window
     drawn = mock_draw.call_args.args[1]
-    assert drawn.message == "Separating stems..."
+    assert drawn.message == "Separating stems…"
     assert drawn.fraction == 0.4
     assert drawn.detail == "12 MB of 30 MB"
     assert mock_draw.call_args.kwargs["scrim"] is False
@@ -495,7 +495,7 @@ def test_loading_window_update_quit_skips_draw(
     quit_event = MagicMock()
     quit_event.type = pygame.QUIT
     with patch("cleave.viz.loading.pygame.event.get", return_value=[quit_event]):
-        assert window.update("Loading...") is False
+        assert window.update("Loading…") is False
     assert window.quit_requested is True
     mock_draw.assert_not_called()
 

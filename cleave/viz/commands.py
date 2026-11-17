@@ -451,7 +451,7 @@ def _toggle_help(controls: TuningControls) -> None:
 
 _NEW = Command(
     id="file.new",
-    label="New project...",
+    label="New project…",
     kind="command",
     shortcut="Ctrl+N",
     enabled=_project_switch_enabled,
@@ -459,7 +459,7 @@ _NEW = Command(
 )
 _OPEN = Command(
     id="file.open",
-    label="Open project...",
+    label="Open project…",
     kind="command",
     shortcut="Ctrl+O",
     enabled=_project_switch_enabled,
@@ -490,17 +490,17 @@ _ABOUT = Command(
     run=_run_about,
 )
 
-_SEPARATE = _later("project.separate", "Re-separate stems...", "command")
+_SEPARATE = _later("project.separate", "Re-separate stems…", "command")
 _RENDER = Command(
     id="project.render",
-    label="Render...",
+    label="Render…",
     kind="command",
     shortcut="Ctrl+R",
     enabled=_render_enabled,
     run=_when_enabled(_render_enabled, _run_render),
 )
-_BACKUP = _later("project.backup", "Backup...", "command")
-_RESTORE = _later("project.restore", "Restore...", "command")
+_BACKUP = _later("project.backup", "Backup…", "command")
+_RESTORE = _later("project.restore", "Restore…", "command")
 
 _ADD = Command(
     id="layers.add",
@@ -512,14 +512,14 @@ _ADD = Command(
 )
 _DELETE = Command(
     id="layers.delete",
-    label="Delete layer...",
+    label="Delete layer…",
     kind="command",
     enabled=_delete_enabled,
     run=_when_enabled(_delete_enabled, _run_delete),
 )
 _ADD_CURRENT_PRESET = Command(
     id="layers.add_current_preset",
-    label="Add To Preset List",
+    label="Add to preset list",
     kind="command",
     enabled=_preset_list_enabled,
     run=_when_enabled(_preset_list_enabled, _run_add_current_preset),
@@ -527,7 +527,7 @@ _ADD_CURRENT_PRESET = Command(
 )
 _POPULATE_PRESETS = Command(
     id="layers.populate_presets",
-    label="Populate...",
+    label="Populate…",
     kind="command",
     enabled=_preset_list_enabled,
     run=_when_enabled(_preset_list_enabled, _run_populate_presets),
@@ -552,7 +552,7 @@ _CURATION = Command(
 
 _GENERATE = Command(
     id="timeline.generate",
-    label="Generate timeline...",
+    label="Generate timeline…",
     kind="command",
     enabled=_timeline_actions_enabled,
     run=_when_enabled(_timeline_actions_enabled, _run_generate),
@@ -560,7 +560,7 @@ _GENERATE = Command(
 )
 _RESET = Command(
     id="timeline.reset",
-    label="Reset timeline...",
+    label="Reset timeline…",
     kind="command",
     enabled=_timeline_actions_enabled,
     run=_when_enabled(_timeline_actions_enabled, _run_reset_timeline),
@@ -568,7 +568,7 @@ _RESET = Command(
 )
 _SNAP = Command(
     id="timeline.snap_cues",
-    label="Snap cues...",
+    label="Snap cues…",
     kind="command",
     enabled=_timeline_actions_enabled,
     run=_when_enabled(_timeline_actions_enabled, _run_snap_cues),
@@ -576,7 +576,7 @@ _SNAP = Command(
 )
 _SNAP_TO_MARKERS = Command(
     id="timeline.snap_to_markers",
-    label="Snap cues to markers...",
+    label="Snap cues to markers…",
     kind="command",
     enabled=_timeline_actions_enabled,
     run=_when_enabled(_timeline_actions_enabled, _run_snap_to_markers),
@@ -584,7 +584,7 @@ _SNAP_TO_MARKERS = Command(
 )
 _SET_CUT_TYPE = Command(
     id="timeline.set_cut_type",
-    label="Set cut type on cues...",
+    label="Set cut type on cues…",
     kind="command",
     enabled=_timeline_actions_enabled,
     run=_when_enabled(_timeline_actions_enabled, _run_set_cut_type),
@@ -609,7 +609,7 @@ _REDO = Command(
 
 _MEASURE_LATENCY = Command(
     id="settings.measure_latency",
-    label="Measure latency...",
+    label="Measure latency…",
     kind="command",
     enabled=_enabled,
     run=_run_measure_latency,
@@ -617,7 +617,7 @@ _MEASURE_LATENCY = Command(
 
 _DOWNLOAD_PACKAGES = Command(
     id="settings.download_packages",
-    label="Download Packages...",
+    label="Download packages…",
     kind="command",
     enabled=_enabled,
     run=_run_download_packages,
@@ -652,7 +652,7 @@ def _play_fullscreen(controls: TuningControls) -> None:
 
 _FULLSCREEN_EDITOR = Command(
     id="view.fullscreen_editor",
-    label="Full Screen Editor",
+    label="Full screen editor",
     kind="check",
     shortcut="F11",
     enabled=_enabled,
@@ -662,7 +662,7 @@ _FULLSCREEN_EDITOR = Command(
 
 _PLAY_FULLSCREEN = Command(
     id="view.play_fullscreen",
-    label="Play Full Screen",
+    label="Play full screen",
     kind="command",
     shortcut="Ctrl+F",
     enabled=_enabled,
@@ -904,8 +904,8 @@ def command_for_shortcut(
 ) -> Command | None:
     """Resolved shortcut, or None.
 
-    New, open, save, quit, render, the help overlay, Back, Forward, Play Full
-    Screen, Full Screen Editor,
+    New, open, save, quit, render, the help overlay, Back, Forward, Play full
+    screen, Full screen editor,
     undo, redo,
     show-timeline-strip, and Settings > Preview (Ctrl+,) resolve from menu
     rows. Add-layer resolves from its inspector button. Layer jumps

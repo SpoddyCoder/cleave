@@ -270,7 +270,7 @@ def _ffmpeg_to_wav(source: Path, dest: Path) -> None:
         ) from exc
 
 
-_PREPARE_MESSAGE = "Preparing audio..."
+_PREPARE_MESSAGE = "Preparing audio…"
 
 
 def _prepare_project_mix(
@@ -379,7 +379,7 @@ def _reraise_torchcodec(exc: BaseException) -> None:
         raise RuntimeError(TORCHCODEC_AUDIO_IO_ERROR) from exc
 
 
-_SEP_MESSAGE = "Separating stems..."
+_SEP_MESSAGE = "Separating stems…"
 _SEP_FRAC_MODEL = 0.05
 _SEP_FRAC_TRACK = 0.10
 _SEP_FRAC_APPLY_END = 0.90
@@ -643,7 +643,7 @@ def run_separate(
             if _needs_audio_prepare(audio_path, project_dir):
                 on_progress(_PREPARE_MESSAGE, None)
             else:
-                on_progress("Separating stems...", None)
+                on_progress("Separating stems…", None)
         _run_demucs(
             audio_path,
             project_dir,
@@ -657,10 +657,10 @@ def run_separate(
 
         source = resolve_beat_detection_stem(project_dir, beat_detection_stem)
         if on_progress is not None:
-            on_progress("Extracting signals...", None)
+            on_progress("Extracting signals…", None)
         else:
             print(
-                "Extracting signals (may take a while on longer tracks)...",
+                "Extracting signals (may take a while on longer tracks)…",
                 flush=True,
             )
         run_analyse(

@@ -216,7 +216,7 @@ def _layer_items(
         _add_item(controls, blocked=False),
         ContextMenuItem(
             id="navigator.layer.delete",
-            label="Delete layer...",
+            label="Delete layer…",
             run=lambda: lifecycle.prompt_delete(slot),
             enabled=can_remove,
             shortcut="Delete",

@@ -54,7 +54,7 @@ _OFF_ON = ("Off", "On")
 _FAILED_TITLE = "Some downloads failed"
 _FAILED_BODY = "Check your internet connection, then try again."
 _DOWNLOAD_FAILED = "Download failed"
-_CANCELLING = "Cancelling..."
+_CANCELLING = "Cancelling…"
 _NOTHING_TITLE = "Everything is downloaded"
 _NOTHING_BODY = "Cleave already has every download on this computer."
 
@@ -69,7 +69,7 @@ _ABORT_JOIN_SEC = 1.0
 
 
 def _downloading_message(item: FirstRunItem) -> str:
-    return f"Downloading {item.name}..."
+    return f"Downloading {item.name}…"
 
 
 def _mark_done() -> None:

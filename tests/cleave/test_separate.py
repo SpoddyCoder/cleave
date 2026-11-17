@@ -319,8 +319,8 @@ def test_run_separate_reports_progress_phases(
         run_separate(audio, on_progress=on_progress)
 
     assert messages == [
-        ("Preparing audio...", None),
-        ("Extracting signals...", None),
+        ("Preparing audio…", None),
+        ("Extracting signals…", None),
     ]
     assert run_demucs.call_args.kwargs["on_progress"] is on_progress
     fake_analyse.run_analyse.assert_called_once()
@@ -363,7 +363,7 @@ def test_write_demucs_stems_reports_progress_phases(
     ):
         _write_demucs_stems(audio, dest_paths, model="htdemucs", on_progress=on_progress)
 
-    msg = "Separating stems..."
+    msg = "Separating stems…"
     fractions = [f for m, f in messages if m == msg]
     assert fractions[0] == 0.0
     assert fractions[-1] == 1.0
@@ -382,14 +382,14 @@ def test_intercept_demucs_tqdm_reports_fraction() -> None:
             reports.append((message, fraction))
 
     items = list(range(10))
-    with _intercept_demucs_tqdm(on_progress, "Working...", 0.2, 0.8):
+    with _intercept_demucs_tqdm(on_progress, "Working…", 0.2, 0.8):
         import tqdm as tqdm_mod
 
         collected = list(tqdm_mod.tqdm(items))
 
     assert collected == items
     assert len(reports) > 0
-    assert all(m == "Working..." for m, _ in reports)
+    assert all(m == "Working…" for m, _ in reports)
     assert reports[0][1] >= 0.2
     assert reports[-1][1] <= 0.8
     assert all(a <= b for (_, a), (_, b) in zip(reports, reports[1:]))
@@ -1116,8 +1116,8 @@ def test_run_separate_preparing_precedes_demucs_on_compressed_input(
     ):
         run_separate(audio, on_progress=on_progress)
 
-    preparing = [i for i, (message, _) in enumerate(messages) if message == "Preparing audio..."]
-    separating = [i for i, (message, _) in enumerate(messages) if message == "Separating stems..."]
+    preparing = [i for i, (message, _) in enumerate(messages) if message == "Preparing audio…"]
+    separating = [i for i, (message, _) in enumerate(messages) if message == "Separating stems…"]
     assert preparing
     assert separating
     assert preparing[0] < separating[0]
@@ -1154,8 +1154,8 @@ def test_run_separate_existing_mix_skips_prepare_status(
     ):
         run_separate("song", force=True, on_progress=on_progress)
 
-    assert messages[0] == "Separating stems..."
-    assert "Preparing audio..." not in messages
+    assert messages[0] == "Separating stems…"
+    assert "Preparing audio…" not in messages
 
 
 def test_resolve_separate_target_rejects_unsupported(

@@ -28,7 +28,7 @@ from cleave.paths import (
     windows_documents_dir,
 )
 
-TITLE = "Open a Cleave project, or select an audio file to create a new project..."
+TITLE = "Open a Cleave project, or select an audio file to create a new project"
 OPEN_LABEL = "Open"
 QUIT_LABEL = "Quit"
 CANCEL_LABEL = "Cancel"
@@ -80,12 +80,12 @@ PICKER_MODE_SPECS: dict[PickerMode, PickerModeSpec] = {
         kinds=frozenset({OpenTargetKind.AUDIO, OpenTargetKind.PROJECT}),
     ),
     PickerMode.OPEN_PROJECT: PickerModeSpec(
-        title="Open a Cleave project...",
+        title="Open a Cleave project",
         start=PickerStart.PROJECTS,
         kinds=frozenset({OpenTargetKind.PROJECT}),
     ),
     PickerMode.NEW_PROJECT: PickerModeSpec(
-        title="Select an audio file to create a new project...",
+        title="Select an audio file to create a new project",
         start=PickerStart.HOME,
         kinds=frozenset({OpenTargetKind.AUDIO}),
     ),
@@ -317,7 +317,7 @@ class FilePicker:
         if truncated:
             rows = rows + (
                 PickerRow(
-                    label=f"... more than {MAX_ROWS} entries, not shown",
+                    label=f"… more than {MAX_ROWS} entries, not shown",
                     kind=PickerRowKind.NOTE,
                 ),
             )

@@ -76,7 +76,7 @@ def test_marker_items_replace_the_time_items() -> None:
     entries[0].run()
     entries[1].run()
     assert transport.calls == [("seek", 12.2), ("seek", 12.2), ("transport",)]
-    assert entries[4].label == "Delete marker 00:12.20..."
+    assert entries[4].label == "Delete marker 00:12.20…"
     assert entries[4].shortcut == "Delete"
 
 

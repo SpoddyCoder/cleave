@@ -1,7 +1,7 @@
 """Right-click menu for the preview (the visualiser rect).
 
 Play or pause, solo a layer, switch Overlay, Post-FX, and Pattern Mask on
-or off, pick the preview quality, grab a still, Play Full Screen, and Full Screen Editor. The
+or off, pick the preview quality, grab a still, Play full screen, and Full screen editor. The
 solo and on/off items read the navigator's own icons, so their checks,
 locks, and hints match it; each item calls the same path as its icon or
 key.
@@ -76,14 +76,14 @@ def preview_menu_entries(
 def play_fullscreen_menu(
     controls: TuningControls, transport: PreviewTransport
 ) -> ContextMenuProvider:
-    """Right-click menu while Play Full Screen shows only the visualiser."""
+    """Right-click menu while Play full screen shows only the visualiser."""
 
     def entries() -> tuple[ContextMenuEntry, ...]:
         return (
             _transport_item(transport),
             ContextMenuItem(
                 id="play_fullscreen.exit",
-                label="Exit Full Screen",
+                label="Exit full screen",
                 run=lambda: controls.window.request_play_fullscreen(False),
                 shortcut="Esc",
             ),

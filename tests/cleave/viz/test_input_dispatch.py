@@ -403,7 +403,7 @@ def test_global_seek_from_move_mode() -> None:
 def test_global_seek_ignored_while_modal_open() -> None:
     runtime = _make_runtime(submenu_focused=False)
     runtime.modal_host.prompt_text(
-        "Change text...",
+        "Edit text",
         "ab",
         on_confirm=lambda _s: None,
     )
@@ -437,7 +437,7 @@ def test_h_does_not_toggle_help_while_text_editing() -> None:
         submenu_focused=False, panel_open=False, help_visible=False
     )
     runtime.modal_host.prompt_text(
-        "Change text...",
+        "Edit text",
         "ab",
         on_confirm=lambda _s: None,
     )
@@ -692,7 +692,7 @@ def test_ctrl_up_down_do_nothing_while_menu_focused() -> None:
 def test_keyup_while_text_editing_disarms_modal_repeat() -> None:
     runtime = _make_runtime(submenu_focused=False, panel_open=False)
     runtime.modal_host.prompt_text(
-        "Change text...",
+        "Edit text",
         "hello",
         on_confirm=lambda _s: None,
     )

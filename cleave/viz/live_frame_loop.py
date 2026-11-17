@@ -53,7 +53,7 @@ class ContentTick(Protocol):
 def apply_window_requests(
     controls: WindowControls, window: LoadingWindow, *, prompt_open: bool
 ) -> None:
-    """Carry out Full Screen Editor and Play Full Screen on the GL window.
+    """Carry out Full screen editor and Play full screen on the GL window.
 
     A modal, the project picker, or any other prompt while playing full
     screen returns to the editor so it can be answered.

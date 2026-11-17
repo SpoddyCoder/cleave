@@ -652,7 +652,7 @@ SPECS: dict[RowKind, RowSpec] = {
     ),
     RowKind.TRACK_PRESET_LIST_ADD: RowSpec(
         affordance=RowAffordance.COMMAND,
-        panel_label="Add To Preset List",
+        panel_label="Add to preset list",
         present_style=RowPresentStyle.FULL_LINE,
         apply_horizontal=noop_horizontal,
         apply_action=_apply_preset_list_add_action,
@@ -669,7 +669,7 @@ SPECS: dict[RowKind, RowSpec] = {
     ),
     RowKind.TRACK_PRESET_LIST_POPULATE: RowSpec(
         affordance=RowAffordance.COMMAND,
-        panel_label="Populate...",
+        panel_label="Populate…",
         present_style=RowPresentStyle.FULL_LINE,
         apply_horizontal=noop_horizontal,
         apply_action=_apply_preset_list_populate_action,
@@ -905,7 +905,7 @@ SPECS: dict[RowKind, RowSpec] = {
     ),
     RowKind.LAYER_MANAGEMENT_DELETE: RowSpec(
         affordance=RowAffordance.COMMAND,
-        panel_label="Delete layer...",
+        panel_label="Delete layer…",
         present_style=RowPresentStyle.FULL_LINE,
         apply_action=_apply_layer_delete_action,
         fit_strategy=FitStrategy.NONE,

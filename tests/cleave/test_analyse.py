@@ -200,7 +200,7 @@ def test_run_analyse_reports_progress_fraction(
 
     run_analyse(project, high_quality=False, on_progress=on_progress)
 
-    msg = "Extracting signals..."
+    msg = "Extracting signals…"
     fracs = [f for m, f in reports if m == msg and f is not None]
     assert len(fracs) >= 2
     assert fracs[0] == 0.0

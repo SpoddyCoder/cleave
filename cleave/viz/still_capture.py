@@ -117,7 +117,7 @@ class StillCaptureController:
     def _prompt_error(self, detail: str) -> None:
         line = " ".join(detail.split())
         if len(line) > 96:
-            line = line[:95] + "..."
+            line = line[:95] + "…"
         self._modal.prompt_notice(
             _FAILED_MESSAGE,
             labeled_lines=(ModalLabeledLine("error", line or "unknown error"),),

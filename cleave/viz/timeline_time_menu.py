@@ -161,7 +161,7 @@ class TimelineTimeMenu:
             ),
             ContextMenuItem(
                 id="timeline.marker.delete",
-                label=f"Delete marker {format_marker_time(marker.time)}...",
+                label=f"Delete marker {format_marker_time(marker.time)}…",
                 run=lambda: markers.prompt_delete(index),
                 enabled=not recording,
                 shortcut="Delete",

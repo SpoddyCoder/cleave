@@ -370,7 +370,7 @@ def test_render_confirm_shows_progress_then_success(
     modal_view = controls.modal_host.view_state()
     assert modal_view is not None
     assert modal_view.kind == ModalKind.PROGRESS
-    assert modal_view.message == "Rendering project..."
+    assert modal_view.message == "Rendering project…"
     assert modal_view.options == ()
     assert modal_view.progress_fraction == 0.0
     assert modal_view.labeled_lines == (

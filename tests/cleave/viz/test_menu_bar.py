@@ -939,7 +939,7 @@ def test_open_menu_ink_matches_the_mock() -> None:
         unfocused_label = _draw_list_has_color(popup, _color_u32(VALUE))
         idle_title = _draw_list_has_color(bar, _color_u32(LABEL))
         shortcut_on_current = _ink_on_fill(popup, _color_u32(MUTED), lit)
-        # Full Screen Editor: check, label, and shortcut.
+        # Full screen editor: check, label, and shortcut.
         menu.item_index = 4
         lists = _paint_shell(host, menu, ctx)
         content = _content_lists(lists)

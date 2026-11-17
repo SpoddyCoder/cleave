@@ -541,7 +541,7 @@ def test_apply_modal_pointer_dispatches_each_kind() -> None:
     assert focused.editing is True
     assert focused.caret_index == 2
 
-    modal.prompt_progress("Rendering...", fraction=0.4)
+    modal.prompt_progress("Rendering…", fraction=0.4)
     apply_modal_pointer(modal, ModalPointerIntent(ModalPointerKind.CANCEL))
     progress = modal.view_state()
     assert modal.active
@@ -1043,7 +1043,7 @@ def _cancellable_progress() -> tuple[ModalHost, list[bool]]:
     cancelled: list[bool] = []
     modal = ModalHost()
     modal.prompt_progress(
-        "Downloading...",
+        "Downloading…",
         labeled_lines=(ModalLabeledLine("Demucs htdemucs", "Downloading 42%"),),
         fraction=0.42,
         on_cancel=lambda: cancelled.append(True),

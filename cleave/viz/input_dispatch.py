@@ -397,7 +397,7 @@ def _open_focus_context_menu(
 def _play_fullscreen_keydown(
     event: pygame.event.Event, runtime: LiveVisualizerRuntime
 ) -> bool:
-    """Keys while Play Full Screen shows only the visualiser.
+    """Keys while Play full screen shows only the visualiser.
 
     Esc and Ctrl+F leave, Space plays or pauses, the seek keys seek, and
     Ctrl+Q quits. An open right-click menu takes keys first. Every other key

@@ -47,8 +47,8 @@ _CHUNK_SIZE = 1024 * 1024
 _PROGRESS_MIN_INTERVAL_SEC = 0.1
 # Share of the bar for the download; unpacking fills the rest.
 _DOWNLOAD_SHARE = 0.9
-_DOWNLOAD_MESSAGE = "Downloading CUDA Toolkit..."
-_UNPACK_MESSAGE = "Unpacking CUDA Toolkit..."
+_DOWNLOAD_MESSAGE = "Downloading CUDA Toolkit…"
+_UNPACK_MESSAGE = "Unpacking CUDA Toolkit…"
 RESTART_NOTE = "Done - restart Cleave to use it"
 
 

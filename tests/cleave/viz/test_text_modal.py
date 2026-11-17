@@ -28,7 +28,7 @@ def _keyup(key: int) -> pygame.event.Event:
 def _open_text(
     modal: ModalHost,
     *,
-    cta: str = "Change text...",
+    cta: str = "Edit text",
     initial: str = "hello",
     single_line: bool = False,
     validate: Callable[[str], str | None] | None = None,
@@ -53,14 +53,14 @@ def _confirm_text(modal: ModalHost) -> None:
 
 def test_prompt_text_open_shows_initial() -> None:
     modal = ModalHost()
-    _open_text(modal, cta="Change text...", initial="hello", single_line=True)
+    _open_text(modal, cta="Edit text", initial="hello", single_line=True)
     view = modal.view_state()
     assert view is not None
     assert view.draft == "hello"
     assert view.editing is True
     assert view.caret_index == len("hello")
     assert view.focus_region == TextFocusRegion.FIELD
-    assert view.cta == "Change text..."
+    assert view.cta == "Edit text"
     assert view.single_line is True
     assert view.message is None
     assert view.options == ()
@@ -1046,7 +1046,7 @@ def test_cancel_matches_escape_for_yes_no_and_text() -> None:
     assert key_cancelled == pointer_cancelled == ["cancel"]
 
     progress = ModalHost()
-    progress.prompt_progress("Rendering...", fraction=0.4)
+    progress.prompt_progress("Rendering…", fraction=0.4)
     before = progress.view_state()
     assert progress.handle_keydown(_keydown(pygame.K_ESCAPE)) is True
     progress.cancel()
@@ -1315,14 +1315,14 @@ def test_prompt_progress_has_bar_and_ignores_keys() -> None:
         ModalLabeledLine("quality", "high"),
     )
     modal.prompt_progress(
-        "Rendering project...",
+        "Rendering project…",
         labeled_lines=labeled,
         fraction=0.25,
     )
     view = modal.view_state()
     assert view is not None
     assert view.kind == ModalKind.PROGRESS
-    assert view.message == "Rendering project..."
+    assert view.message == "Rendering project…"
     assert view.options == ()
     assert view.progress_fraction == 0.25
     assert view.labeled_lines == labeled

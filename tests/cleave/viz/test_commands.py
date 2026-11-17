@@ -228,7 +228,7 @@ def test_menus_list_taxonomy_ids_once() -> None:
     assert set(ids) == set(_STATIC_IDS)
     assert not any(command_id in ids for command_id in _OFF_MENU_IDS)
     assert not any(command_id.startswith("layers.focus.") for command_id in ids)
-    assert "Start render..." not in [command.label for command in iter_commands(menus)]
+    assert "Start render…" not in [command.label for command in iter_commands(menus)]
     assert "Edit timeline" not in [command.label for command in iter_commands(menus)]
     assert [menu.label for menu in MENUS] == [menu.label for menu in menus]
     assert not any(
@@ -334,8 +334,8 @@ def test_new_and_open_are_enabled_outside_blocked_sessions() -> None:
     menus = _menus()
     new = command_by_id("file.new", menus)
     open_project = command_by_id("file.open", menus)
-    assert new.label == "New project..."
-    assert open_project.label == "Open project..."
+    assert new.label == "New project…"
+    assert open_project.label == "Open project…"
     assert new.enabled(CommandContext()) is True
     assert open_project.enabled(CommandContext()) is True
     for blocked in (
@@ -459,7 +459,7 @@ def test_fullscreen_editor_command_requests_toggle_and_reads_window_state() -> N
     menus = _menus()
     controls = make_controls(("layer_1",))
     item = command_by_id("view.fullscreen_editor", menus)
-    assert item.label == "Full Screen Editor"
+    assert item.label == "Full screen editor"
     assert item.kind == "check"
     assert item.shortcut == "F11"
     assert item.checked is not None
@@ -476,7 +476,7 @@ def test_fullscreen_editor_command_requests_toggle_and_reads_window_state() -> N
 def test_play_fullscreen_command_requests_entering_play_full_screen() -> None:
     controls = make_controls(("layer_1",))
     item = command_by_id("view.play_fullscreen", _menus())
-    assert item.label == "Play Full Screen"
+    assert item.label == "Play full screen"
     assert item.kind == "command"
     assert item.shortcut == "Ctrl+F"
 
@@ -892,11 +892,11 @@ def test_inspector_only_timeline_actions_are_not_menu_commands() -> None:
     assert "Apply to Cues" not in labels
     assert "Remove from Cues" not in labels
     for label in (
-        "Generate timeline...",
-        "Reset timeline...",
-        "Snap cues...",
-        "Set cut type on cues...",
-        "Snap cues to markers...",
+        "Generate timeline…",
+        "Reset timeline…",
+        "Snap cues…",
+        "Set cut type on cues…",
+        "Snap cues to markers…",
     ):
         assert label not in labels
 

@@ -317,7 +317,7 @@ def render(
 
         encode_message = (
             f"Encoding {frame_count} frames ({width}x{height} @ {fps} fps) "
-            f"to {output_path.name}..."
+            f"to {output_path.name}…"
         )
         _progress(encode_message)
         if on_progress is not None:

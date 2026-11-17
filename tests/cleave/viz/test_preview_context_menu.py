@@ -141,7 +141,7 @@ def test_play_fullscreen_menu_plays_pauses_and_exits() -> None:
     ]
     transport_item, exit_item = items
     assert transport_item.label == "Pause"
-    assert exit_item.label == "Exit Full Screen"
+    assert exit_item.label == "Exit full screen"
     assert exit_item.shortcut == "Esc"
 
     transport_item.run()

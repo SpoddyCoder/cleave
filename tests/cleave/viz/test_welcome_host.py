@@ -164,7 +164,7 @@ def test_cancel_stops_downloads_and_marks_done(persist: MagicMock) -> None:
     host.handle_keydown(_keydown(pygame.K_RETURN))
     assert started.wait(_WAIT_SEC)
     host.handle_keydown(_keydown(pygame.K_ESCAPE))
-    assert _message(host) == "Cancelling..."
+    assert _message(host) == "Cancelling…"
     release.set()
     _tick_until(flow, lambda: not flow.active)
     assert log == []

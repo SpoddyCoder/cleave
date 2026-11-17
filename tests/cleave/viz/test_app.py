@@ -251,7 +251,7 @@ def _heavy_init_side_effect(
     on_progress=None,
 ) -> LiveVisualizerRuntime:
     if on_progress is not None:
-        on_progress("Building layers...")
+        on_progress("Building layers…")
     controls = MagicMock()
     controls.inline_edit.handle_keydown.return_value = False
     controls.context_menu.handle_keydown.return_value = False

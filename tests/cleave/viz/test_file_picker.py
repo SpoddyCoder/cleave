@@ -73,7 +73,7 @@ def test_open_project_starts_in_projects_dir(data_root: Path) -> None:
     assert picker.current == projects_dir()
     assert projects_dir().is_dir()
     assert picker.selected_shortcut == _shortcut_index(picker, "Projects")
-    assert picker.view_state().title == "Open a Cleave project..."
+    assert picker.view_state().title == "Open a Cleave project"
 
 
 def test_new_project_starts_at_home_without_creating_projects(
@@ -85,7 +85,7 @@ def test_new_project_starts_at_home_without_creating_projects(
     assert picker.current == Path.home()
     assert picker.selected_shortcut == _shortcut_index(picker, "Home")
     assert picker.view_state().title == (
-        "Select an audio file to create a new project..."
+        "Select an audio file to create a new project"
     )
     assert not projects_dir().exists()
 
@@ -456,7 +456,7 @@ def test_up_from_first_row_focuses_shortcuts_and_down_returns(
     assert picker.selected_index == 0
 
     assert picker.view_state().title == (
-        "Open a Cleave project, or select an audio file to create a new project..."
+        "Open a Cleave project, or select an audio file to create a new project"
     )
     picker.handle(PickerAction.MOVE_UP)
     assert picker.focus is PickerFocus.SHORTCUTS

@@ -176,7 +176,7 @@ def test_prompt_notice_ok_and_escape_both_close() -> None:
 
 def test_progress_without_cancel_swallows_keys() -> None:
     modal = ModalHost()
-    modal.prompt_progress("Working...")
+    modal.prompt_progress("Working…")
     assert modal.handle_keydown(_keydown(pygame.K_ESCAPE)) is True
     modal.cancel()
     assert modal.active
@@ -187,7 +187,7 @@ def test_progress_cancel_button_runs_on_escape_and_enter() -> None:
     for key in (pygame.K_ESCAPE, pygame.K_RETURN):
         cancelled: list[bool] = []
         modal = ModalHost()
-        modal.prompt_progress("Working...", on_cancel=lambda: cancelled.append(True))
+        modal.prompt_progress("Working…", on_cancel=lambda: cancelled.append(True))
         assert modal.view_state().options == ("Cancel",)
         modal.handle_keydown(_keydown(key))
         assert cancelled == [True]
@@ -198,16 +198,16 @@ def test_update_progress_replaces_message_and_lines() -> None:
     from cleave.viz.modal import ModalLabeledLine
 
     modal = ModalHost()
-    modal.prompt_progress("One...", labeled_lines=(ModalLabeledLine("A", "Waiting"),))
+    modal.prompt_progress("One…", labeled_lines=(ModalLabeledLine("A", "Waiting"),))
     modal.update_progress(
-        0.5, message="Two...", labeled_lines=(ModalLabeledLine("A", "Done"),)
+        0.5, message="Two…", labeled_lines=(ModalLabeledLine("A", "Done"),)
     )
     view = modal.view_state()
-    assert view.message == "Two..."
+    assert view.message == "Two…"
     assert view.progress_fraction == 0.5
     assert view.labeled_lines == (ModalLabeledLine("A", "Done"),)
     modal.update_progress(0.75)
-    assert modal.view_state().message == "Two..."
+    assert modal.view_state().message == "Two…"
 
 
 def test_prompt_notice_body() -> None:
@@ -234,7 +234,7 @@ def test_form_cancel_label() -> None:
 
 def test_progress_large_text_defaults_on() -> None:
     modal = ModalHost()
-    modal.prompt_progress("Rendering...")
+    modal.prompt_progress("Rendering…")
     assert modal.view_state().large_text is True
-    modal.prompt_progress("Downloading...", large_text=False)
+    modal.prompt_progress("Downloading…", large_text=False)
     assert modal.view_state().large_text is False
