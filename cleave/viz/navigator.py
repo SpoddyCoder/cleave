@@ -272,6 +272,30 @@ class PageStatus:
     locked_by: str | None = None
 
 
+def _page_chain(
+    session: TuningSession,
+    node_id: str,
+    nodes: Sequence[NavNode] | None,
+) -> list[NavNode]:
+    """The page's navigator node, then each parent's, nearest first.
+
+    A timeline row page has no node and follows Timeline. *nodes* is a
+    navigator already built this frame; it is used when it holds the page,
+    which means it holds the page's parents too.
+    """
+    if timeline_row_slot_of(node_id) is not None:
+        node_id = "timeline"
+    chain = [node_id]
+    parent = parent_id_of(node_id)
+    while parent is not None:
+        chain.append(parent)
+        parent = parent_id_of(parent)
+    by_id = {} if nodes is None else {node.id: node for node in nodes}
+    if node_id not in by_id:
+        by_id = {node.id: node for node in build_navigator(session, set(chain))}
+    return [by_id[chain_id] for chain_id in chain if chain_id in by_id]
+
+
 def page_status(
     session: TuningSession,
     node_id: str,
@@ -281,29 +305,10 @@ def page_status(
 
     A timeline row page follows Timeline. An inert switch (layer visibility
     while the timeline owns it) does not count, and config pages have none.
-    *nodes* is a navigator already built this frame; it is used when it holds
-    the page, which means it holds the page's parents too.
     """
-    if timeline_row_slot_of(node_id) is not None:
-        timeline = session.timeline
-        return PageStatus(
-            off_by=None if timeline.enabled else "Timeline",
-            locked_by="Timeline" if timeline.locked else None,
-        )
-    chain = [node_id]
-    parent = parent_id_of(node_id)
-    while parent is not None:
-        chain.append(parent)
-        parent = parent_id_of(parent)
-    by_id = {} if nodes is None else {node.id: node for node in nodes}
-    if node_id not in by_id:
-        by_id = {node.id: node for node in build_navigator(session, set(chain))}
     off_by: str | None = None
     locked_by: str | None = None
-    for chain_id in chain:
-        node = by_id.get(chain_id)
-        if node is None:
-            continue
+    for node in _page_chain(session, node_id, nodes):
         name = " ".join(node.label.split())
         toggles = {toggle.id: toggle for toggle in node.toggles}
         switch = toggles.get(TOGGLE_ENABLED)
@@ -318,6 +323,40 @@ def page_status(
         if locked_by is None and (node.locked or (lock is not None and lock.active)):
             locked_by = name
     return PageStatus(off_by=off_by, locked_by=locked_by)
+
+
+@dataclass(frozen=True)
+class PageToggle:
+    """A navigator on/off or lock icon that acts for an inspector page.
+
+    ``owner_id`` is the nearest node, the page itself or a parent, that
+    carries the icon, and ``owner_label`` its name.
+    """
+
+    toggle: NavToggle
+    owner_id: str
+    owner_label: str
+
+
+def page_toggles(
+    session: TuningSession,
+    node_id: str,
+    nodes: Sequence[NavNode] | None = None,
+) -> tuple[PageToggle, ...]:
+    """The on/off then lock icons that act for the inspector page *node_id*.
+
+    Each comes from the nearest node in the page's chain that has it, so a
+    Post-FX child page acts on Post-FX and a card's on/off acts on the card
+    while its lock is Overlay's. Config pages and preset curation have none.
+    """
+    found: dict[str, PageToggle] = {}
+    for node in _page_chain(session, node_id, nodes):
+        for toggle in node.toggles:
+            if toggle.id in (TOGGLE_ENABLED, TOGGLE_LOCK) and toggle.id not in found:
+                found[toggle.id] = PageToggle(
+                    toggle, node.id, " ".join(node.label.split())
+                )
+    return tuple(found[key] for key in (TOGGLE_ENABLED, TOGGLE_LOCK) if key in found)
 
 
 def navigator_row_bright(node: NavNode) -> bool:

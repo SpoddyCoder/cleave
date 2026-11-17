@@ -24,6 +24,7 @@ from cleave.viz.navigator import (
     TWISTY_EXPANDED,
     NavToggle,
     PageStatus,
+    PageToggle,
     build_navigator,
     ancestor_ids,
     layer_node_id,
@@ -40,11 +41,11 @@ from cleave.viz.shell_inspector import (
     path_row_icon,
 )
 from cleave.viz.shell_inspector_title import (
-    page_status_marks,
     inspector_title,
     inspector_title_cluster,
     page_history_tooltip,
     page_title,
+    page_toggle_buttons,
 )
 from cleave.viz.shell_menu_bar import menu_bar_project_label
 from cleave.viz.shell_navigator import (
@@ -502,15 +503,40 @@ def test_menu_bar_project_label_marks_unsaved_changes() -> None:
     assert menu_bar_project_label("my-song", True) == ("Project: ", "my-song*")
 
 
-def test_page_status_marks_show_off_then_lock_with_tooltips() -> None:
-    assert page_status_marks(PageStatus()) == ()
-    marks = page_status_marks(PageStatus(off_by="Post-FX", locked_by="Post-FX"))
-    assert [(glyph, role) for glyph, role, _tip in marks] == [
-        (POWER_GLYPH, DISABLED),
-        (LOCK_GLYPH, LOCKED),
-    ]
-    assert marks[0][2].startswith("Off:") and "Post-FX" in marks[0][2]
-    assert marks[1][2].startswith("Locked:") and "Post-FX" in marks[1][2]
+def test_page_toggle_buttons_draw_like_navigator_icons() -> None:
+    assert page_toggle_buttons((), PageStatus()) == ()
+    toggles = (
+        PageToggle(NavToggle(TOGGLE_ENABLED, False), "post_fx", "Post-FX"),
+        PageToggle(NavToggle(TOGGLE_LOCK, True), "post_fx", "Post-FX"),
+    )
+    off, lock = page_toggle_buttons(
+        toggles, PageStatus(off_by="Post-FX", locked_by="Post-FX")
+    )
+    assert (off.id, off.glyph, off.color, off.fill) == (
+        TOGGLE_ENABLED, POWER_GLYPH, MUTED, None
+    )
+    assert off.enabled and "Post-FX is off" in off.tooltip()
+    assert (lock.id, lock.glyph, lock.fill) == (TOGGLE_LOCK, LOCK_GLYPH, NAV_LOCK_BG)
+    assert lock.enabled and lock.tooltip() == "Post-FX is locked: click to unlock"
+
+
+def test_page_toggle_buttons_show_a_parent_that_is_off_or_locked() -> None:
+    card = PageToggle(NavToggle(TOGGLE_ENABLED, True), "overlay.opening_card", "Opening Card")
+    (on,) = page_toggle_buttons((card,), PageStatus(off_by="Overlay"))
+    assert on.fill == NAV_ON_BG and on.fill_alpha == 0.5
+    assert "Overlay is turned on" in on.tooltip()
+    blocked = PageToggle(
+        NavToggle(TOGGLE_ENABLED, True, blocked=True), "overlay.opening_card", "Opening Card"
+    )
+    (refused,) = page_toggle_buttons((blocked,), PageStatus(locked_by="Overlay"))
+    assert not refused.enabled
+    assert refused.tooltip() == "Locked: unlock Overlay to change"
+    inert = PageToggle(
+        NavToggle(TOGGLE_ENABLED, True, inert=True), "layer:layer_1", "1 Drums"
+    )
+    (timeline_owned,) = page_toggle_buttons((inert,), PageStatus())
+    assert timeline_owned.inert
+    assert timeline_owned.tooltip() == "Timeline controls layer visibility"
 
 
 def test_choice_tone_follows_row_value_colour() -> None:

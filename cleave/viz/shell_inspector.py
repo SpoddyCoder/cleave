@@ -29,6 +29,7 @@ from cleave.viz.material_icons import (
 )
 from cleave.viz.navigator import (
     page_status,
+    page_toggles,
     PageStatus,
     timeline_row_slot_of,
     timeline_row_title,
@@ -56,13 +57,14 @@ from cleave.viz.shell_inspector_title import (
     draw_inspector_title,
     inspector_title,
     page_history_tooltip,
-    page_status_marks,
     page_title,
+    page_toggle_buttons,
     TITLE_BACK,
     TITLE_FORWARD,
     TitleButton,
 )
 from cleave.viz.row_paint import RowState, row_band
+from cleave.viz.row_hotkeys import activate_header_toggle, node_control_descriptor
 from cleave.viz.shell_widgets import (
     PANEL_BORDER_PX,
     drag_handle_lead,
@@ -433,11 +435,11 @@ class InspectorPanel:
             if row_slot is None
             else timeline_row_title(self._ctx.controls.session, row_slot)
         )
-        self._page_status = page_status(
-            self._ctx.controls.session, focus.selected_id, nodes
-        )
+        session = self._ctx.controls.session
+        self._page_status = page_status(session, focus.selected_id, nodes)
+        toggles = page_toggles(session, focus.selected_id, nodes)
         # A new clip on the same strip row is new content, so it swipes too.
-        clip_serial = self._ctx.controls.session.timeline.selected_clip_serial
+        clip_serial = session.timeline.selected_clip_serial
         attention_key = (
             focus.selected_id if row_slot is None else (focus.selected_id, clip_serial)
         )
@@ -455,10 +457,17 @@ class InspectorPanel:
             _divider_rule_y(
                 title_y + imgui.get_text_line_height() + imgui.get_style().item_spacing.y
             ),
-            page_status_marks(self._page_status),
-            self._page_history_buttons(frame.command_ctx),
+            page_toggle_buttons(toggles, self._page_status)
+            + self._page_history_buttons(frame.command_ctx),
         )
-        if pressed == TITLE_BACK:
+        toggle = next((item for item in toggles if item.toggle.id == pressed), None)
+        if toggle is not None:
+            descriptor = node_control_descriptor(toggle.owner_id)
+            if descriptor is not None:
+                activate_header_toggle(
+                    self._ctx.controls, toggle.toggle.id, descriptor
+                )
+        elif pressed == TITLE_BACK:
             self._ctx.controls.navigator.go_back()
         elif pressed == TITLE_FORWARD:
             self._ctx.controls.navigator.go_forward()

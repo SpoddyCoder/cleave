@@ -1,4 +1,4 @@
-"""The inspector's title line: breadcrumb, accent swipe, marks, and page history arrows."""
+"""The inspector's title line: breadcrumb, accent swipe, page toggles, and page history arrows."""
 
 from __future__ import annotations
 
@@ -10,15 +10,16 @@ from typing import TYPE_CHECKING
 from imgui_bundle import imgui
 
 from cleave.viz.config_pages import config_page_title, is_config_page
-from cleave.viz.icon_button import icon_box, icon_columns, icon_gap
-from cleave.viz.imgui_icon_button import box_button, icon_button, paint_box
+from cleave.viz.icon_button import icon_columns, icon_gap
+from cleave.viz.imgui_icon_button import icon_button
 from cleave.viz.imgui_theme import row_band, row_band_side
-from cleave.viz.material_icons import LOCK_GLYPH, POWER_GLYPH
 from cleave.viz.navigator import (
     ancestor_ids,
     build_navigator,
     NavNode,
     PageStatus,
+    PageToggle,
+    TOGGLE_ENABLED,
     timeline_row_slot_of,
     timeline_row_title,
 )
@@ -29,38 +30,19 @@ from cleave.viz.panel_notification import (
     notification_attention,
 )
 from cleave.viz.progress_bar import accent_at
+from cleave.viz.shell_navigator import (
+    navigator_toggle_color,
+    navigator_toggle_fill,
+    navigator_toggle_glyph,
+)
 from cleave.viz.shell_widgets import packed_color, PANEL_BORDER_PX, swipe_fill
-from cleave.viz.theme import DISABLED, LOCKED, VALUE
+from cleave.viz.theme import DISABLED, VALUE
 
 if TYPE_CHECKING:
     from cleave.viz.session import TuningSession
 
 TITLE_BACK = "back"
 TITLE_FORWARD = "forward"
-
-
-def page_status_marks(
-    status: PageStatus,
-) -> tuple[tuple[str, tuple[int, int, int], str], ...]:
-    """Icons after the inspector title, as ``(glyph, colour, tooltip)``."""
-    marks: list[tuple[str, tuple[int, int, int], str]] = []
-    if status.off_by is not None:
-        marks.append(
-            (
-                POWER_GLYPH,
-                DISABLED,
-                f"Off: these settings have no effect until {status.off_by} is turned on",
-            )
-        )
-    if status.locked_by is not None:
-        marks.append(
-            (
-                LOCK_GLYPH,
-                LOCKED,
-                f"Locked: unlock {status.locked_by} to change these settings",
-            )
-        )
-    return tuple(marks)
 
 
 def inspector_title(nodes: Sequence[NavNode], selected_id: str) -> str:
@@ -121,19 +103,77 @@ class TitleButton:
     glyph: str
     enabled: bool
     tooltip: Callable[[], str]
+    # None draws the glyph in VALUE, or DISABLED while not enabled.
+    color: tuple[int, int, int] | None = None
+    fill: tuple[int, int, int] | None = None
+    fill_alpha: float = 1.0
+    # Refuses a press for a reason other than being disabled; draws as usual.
+    inert: bool = False
+
+
+def page_toggle_tooltip(item: PageToggle, status: PageStatus) -> str:
+    """Hover text for a page's on/off or lock button on the title line."""
+    toggle = item.toggle
+    name = item.owner_label
+    if toggle.blocked:
+        return f"Locked: unlock {status.locked_by or name} to change"
+    if toggle.inert:
+        return "Timeline controls layer visibility"
+    if toggle.id == TOGGLE_ENABLED:
+        if not toggle.active:
+            return f"{name} is off: these settings have no effect. Click to turn on"
+        if status.off_by is not None and status.off_by != name:
+            return (
+                f"{name} is on, but these settings have no effect until "
+                f"{status.off_by} is turned on. Click to turn {name} off"
+            )
+        return f"{name} is on: click to turn off"
+    if toggle.active:
+        return f"{name} is locked: click to unlock"
+    return f"{name} is unlocked: click to lock"
+
+
+def page_toggle_buttons(
+    toggles: Sequence[PageToggle], status: PageStatus
+) -> tuple[TitleButton, ...]:
+    """The page's on/off and lock icons as title buttons, drawn like the
+    navigator's. Each button's id is its toggle id.
+
+    An on switch under a parent that is off draws its fill at half strength.
+    """
+    buttons: list[TitleButton] = []
+    for item in toggles:
+        toggle = item.toggle
+        shadowed = (
+            toggle.id == TOGGLE_ENABLED
+            and toggle.active
+            and status.off_by is not None
+            and status.off_by != item.owner_label
+        )
+        buttons.append(
+            TitleButton(
+                toggle.id,
+                navigator_toggle_glyph(toggle),
+                not toggle.blocked,
+                lambda item=item: page_toggle_tooltip(item, status),
+                color=navigator_toggle_color(toggle),
+                fill=navigator_toggle_fill(toggle),
+                fill_alpha=0.5 if toggle.blocked or shadowed else 1.0,
+                inert=toggle.inert,
+            )
+        )
+    return tuple(buttons)
 
 
 def draw_inspector_title(
     title: str,
     elapsed_sec: float,
     rule_y: float,
-    marks: Sequence[tuple[str, tuple[int, int, int], str]] = (),
     buttons: Sequence[TitleButton] = (),
 ) -> str | None:
     """Inspector page title, with the toast's accent swipe behind it.
 
-    *marks* (coloured icons with a tooltip) and then *buttons* sit flush
-    right on the title line. The bar is one padded row tall and centres
+    *buttons* sit flush right on the title line. The bar is one padded row tall and centres
     between the panel's top border and the divider rule on pixel row
     *rule_y*, so the title and its icons do too. It starts inset from the
     panel edge by the gap above it. It and the title stop a space short
@@ -146,7 +186,7 @@ def draw_inspector_title(
     line_h = imgui.get_text_line_height()
     space_w = imgui.calc_text_size(" ").x
     title_room, slot_xs = inspector_title_cluster(
-        avail, len(marks) + len(buttons), row_band_side(), icon_gap(), space_w
+        avail, len(buttons), row_band_side(), icon_gap(), space_w
     )
     title_w = imgui.calc_text_size(title).x
     imgui.dummy(imgui.ImVec2(title_room, line_h))
@@ -207,12 +247,7 @@ def draw_inspector_title(
         draw.add_text(imgui.ImVec2(start.x - offset, text_y), color, title)
     finally:
         draw.pop_clip_rect()
-    for index, ((glyph, role, tooltip), slot_x) in enumerate(zip(marks, slot_xs)):
-        box = icon_box(start.x + slot_x, band)
-        # A mark only reports: it shows its tooltip and takes no press.
-        box_button(f"##inspector-mark-{index}", box, enabled=False, tooltip=tooltip)
-        paint_box(box, glyph, color=role)
-    return _draw_title_buttons(buttons, start, slot_xs[len(marks) :], band)
+    return _draw_title_buttons(buttons, start, slot_xs, band)
 
 
 def _draw_title_buttons(
@@ -221,7 +256,7 @@ def _draw_title_buttons(
     slot_xs: Sequence[float],
     band: tuple[float, float],
 ) -> str | None:
-    """Arrow buttons on the title line, like navigator toggles. A disabled
+    """Icon buttons on the title line, like navigator toggles. A disabled
     button has no hover fill and keeps the arrow pointer."""
     pressed_id: str | None = None
     for button, slot_x in zip(buttons, slot_xs):
@@ -230,10 +265,13 @@ def _draw_title_buttons(
             button.glyph,
             start.x + slot_x,
             band,
-            color=VALUE if button.enabled else DISABLED,
+            color=button.color or (VALUE if button.enabled else DISABLED),
+            fill=button.fill,
+            fill_alpha=button.fill_alpha,
             enabled=button.enabled,
+            inert=button.inert,
             tooltip=button.tooltip,
         ).pressed
-        if pressed and button.enabled:
+        if pressed and button.enabled and not button.inert:
             pressed_id = button.id
     return pressed_id

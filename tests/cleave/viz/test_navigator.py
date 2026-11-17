@@ -28,6 +28,7 @@ from cleave.viz.navigator import (
     navigator_tree_rails,
     PageStatus,
     page_status,
+    page_toggles,
     parent_id_of,
     root_id,
     timeline_row_node_id,
@@ -579,3 +580,33 @@ def test_page_status_names_the_nearest_off_and_locked_owner() -> None:
     session.overlays.locked = True
     assert page_status(session, "overlay.closing_card").locked_by == "Overlay"
     assert page_status(session, "settings.ui") == PageStatus()
+
+
+def test_page_toggles_come_from_the_nearest_owner() -> None:
+    session = TuningSession(
+        layer_z_order=["layer_1"],
+        layers={"layer_1": _layer("drums", locked=True)},
+    )
+
+    def owners(node_id: str) -> list[tuple[str, str]]:
+        return [(item.toggle.id, item.owner_id) for item in page_toggles(session, node_id)]
+
+    assert owners("post_fx.fade") == [
+        (TOGGLE_ENABLED, "post_fx"),
+        (TOGGLE_LOCK, "post_fx"),
+    ]
+    assert owners("overlay.opening_card") == [
+        (TOGGLE_ENABLED, "overlay.opening_card"),
+        (TOGGLE_LOCK, "overlay"),
+    ]
+    compositing = layer_page_node_id("layer_1", "compositing")
+    layer = layer_node_id("layer_1")
+    assert owners(compositing) == [(TOGGLE_ENABLED, layer), (TOGGLE_LOCK, layer)]
+    lock = page_toggles(session, compositing)[1]
+    assert lock.toggle.active and lock.owner_label.startswith("1")
+    assert owners(timeline_row_node_id("layer_1")) == [
+        (TOGGLE_ENABLED, "timeline"),
+        (TOGGLE_LOCK, "timeline"),
+    ]
+    assert owners("layers") == []
+    assert owners("settings.ui") == []
