@@ -274,7 +274,7 @@ def apply_hdr_display_shoulder(
 
 
 def highlight_rolloff_active(pp: PostFxRuntime, *, solo: bool) -> bool:
-    return pp.enabled and pp.highlight_rolloff.mode != "off" and not solo
+    return pp.enabled and pp.highlight_rolloff.enabled and not solo
 
 
 def chroma_boost_variant_index(variant: str) -> int:
@@ -326,7 +326,7 @@ def apply_chroma_boost_rgba(
 def chroma_boost_active(pp: PostFxRuntime, *, solo: bool) -> bool:
     return (
         pp.enabled
-        and pp.chroma_boost.mode != "off"
+        and pp.chroma_boost.enabled
         and not solo
         and pp.chroma_boost.amount_pct > 0
     )
@@ -340,7 +340,7 @@ def live_frame_fade_alpha(
     enabled: bool,
     solo: bool,
 ) -> float:
-    if not enabled or solo:
+    if not enabled or solo or not fade.enabled:
         return 1.0
     fin = fade.fade_in
     fout = fade.fade_out

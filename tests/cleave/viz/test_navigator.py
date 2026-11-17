@@ -388,6 +388,10 @@ def test_other_pages_have_no_toggles() -> None:
         "post_fx",
         "pattern_mask",
         "timeline",
+        "post_fx.fade",
+        "post_fx.highlight_rolloff",
+        "post_fx.chroma_boost",
+        "post_fx.limiter",
         *(layer_node_id(slot) for slot in session.layer_z_order),
     }
 
@@ -591,10 +595,16 @@ def test_page_toggles_come_from_the_nearest_owner() -> None:
     def owners(node_id: str) -> list[tuple[str, str]]:
         return [(item.toggle.id, item.owner_id) for item in page_toggles(session, node_id)]
 
-    assert owners("post_fx.fade") == [
-        (TOGGLE_ENABLED, "post_fx"),
-        (TOGGLE_LOCK, "post_fx"),
-    ]
+    for child in (
+        "post_fx.fade",
+        "post_fx.highlight_rolloff",
+        "post_fx.chroma_boost",
+        "post_fx.limiter",
+    ):
+        assert owners(child) == [
+            (TOGGLE_ENABLED, child),
+            (TOGGLE_LOCK, "post_fx"),
+        ]
     assert owners("overlay.opening_card") == [
         (TOGGLE_ENABLED, "overlay.opening_card"),
         (TOGGLE_LOCK, "overlay"),
@@ -610,3 +620,17 @@ def test_page_toggles_come_from_the_nearest_owner() -> None:
     ]
     assert owners("layers") == []
     assert owners("settings.ui") == []
+
+
+def test_post_fx_child_toggles_follow_their_switches() -> None:
+    session = _session()
+    session.post_fx.chroma_boost.enabled = True
+    session.post_fx.fade.enabled = False
+    session.post_fx.locked = True
+    nodes = {node.id: node for node in build_navigator(session, {"post_fx"})}
+    assert nodes["post_fx.fade"].toggles == (NavToggle(TOGGLE_ENABLED, False, True),)
+    assert nodes["post_fx.chroma_boost"].toggles == (
+        NavToggle(TOGGLE_ENABLED, True, True),
+    )
+    # The limiter ignores the Post-FX lock.
+    assert nodes["post_fx.limiter"].toggles == (NavToggle(TOGGLE_ENABLED, True),)

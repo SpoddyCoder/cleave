@@ -261,6 +261,7 @@ class RenderOverlaysConfig:
 
 @dataclass(frozen=True)
 class HighlightRolloffConfig:
+    enabled: bool
     mode: HighlightRolloffApplyMode
     curve: HighlightRolloffCurve
     threshold_pct: int
@@ -272,6 +273,7 @@ class HighlightRolloffConfig:
 
 @dataclass(frozen=True)
 class ChromaBoostConfig:
+    enabled: bool
     mode: ChromaBoostApplyMode
     variant: ChromaBoostVariant
     amount_pct: int
@@ -286,6 +288,7 @@ class FadeSideConfig:
 
 @dataclass(frozen=True)
 class FadeConfig:
+    enabled: bool
     fade_in: FadeSideConfig
     fade_out: FadeSideConfig
 

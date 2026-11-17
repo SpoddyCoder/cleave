@@ -8,6 +8,6 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class PostFxBindings:
-    on_highlight_rolloff_apply_mode_change: Callable[[str, str], None] | None = None
-    on_chroma_boost_apply_mode_change: Callable[[str, str], None] | None = None
+    on_highlight_rolloff_per_layer_change: Callable[[bool], None] | None = None
+    on_chroma_boost_per_layer_change: Callable[[bool], None] | None = None
     is_paused: Callable[[], bool] | None = None

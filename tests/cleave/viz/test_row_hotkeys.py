@@ -82,7 +82,7 @@ def test_node_header_descriptor_maps_render_and_layer_ids() -> None:
 
 def test_node_control_descriptor_resolves_to_the_owner() -> None:
     assert row_hotkeys.node_control_descriptor("post_fx.fade") == RowDescriptor(
-        RowKind.POST_FX_HEADER
+        RowKind.POST_FX_FADE_HEADER
     )
     assert row_hotkeys.node_control_descriptor("timeline.grid") == RowDescriptor(
         RowKind.TIMELINE_HEADER
@@ -105,7 +105,12 @@ def test_hotkeys_on_a_child_page_reach_the_owner() -> None:
 
     controls.navigator.select("post_fx.fade")
     assert controls.navigator.handle_hotkey(keydown(pygame.K_e)) is True
-    assert controls.session.post_fx.enabled is False
+    assert controls.session.post_fx.fade.enabled is False
+    assert controls.session.post_fx.enabled is True
+    assert controls.navigator.handle_hotkey(keydown(pygame.K_l)) is True
+    assert controls.session.post_fx.locked is True
+    assert controls.navigator.handle_hotkey(keydown(pygame.K_e)) is True
+    assert controls.session.post_fx.fade.enabled is False
 
 
 def test_navigator_layer_lock_and_delete_follow_selected_node() -> None:

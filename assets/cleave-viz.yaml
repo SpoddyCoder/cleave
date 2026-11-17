@@ -2,6 +2,7 @@ render:
   post_fx:
     enabled: false
     fade:
+      enabled: true
       fade_in:
         start: 0
         end: 15
@@ -11,7 +12,8 @@ render:
         end: 0
         type: smoothstep
     highlight_rolloff:
-      mode: off
+      enabled: false
+      mode: composite
       curve: rolloff
       threshold_pct: 78
       ceiling_pct: 65
@@ -19,7 +21,8 @@ render:
       softness_pct: 40
       desaturation_pct: 30
     chroma_boost:
-      mode: off
+      enabled: false
+      mode: composite
       variant: vibrance
       amount_pct: 25
 

@@ -209,16 +209,16 @@ def test_apply_highlight_rolloff_rgb_matches_scalar_reference() -> None:
 
 def test_chroma_boost_active() -> None:
     pp = default_post_fx_runtime(enabled=True)
-    pp.chroma_boost.mode = "composite"
+    pp.chroma_boost.enabled = True
     pp.chroma_boost.amount_pct = 25
     assert chroma_boost_active(pp, solo=False) is True
     assert chroma_boost_active(pp, solo=True) is False
     pp.enabled = False
     assert chroma_boost_active(pp, solo=False) is False
     pp.enabled = True
-    pp.chroma_boost.mode = "off"
+    pp.chroma_boost.enabled = False
     assert chroma_boost_active(pp, solo=False) is False
-    pp.chroma_boost.mode = "composite"
+    pp.chroma_boost.enabled = True
     pp.chroma_boost.amount_pct = 0
     assert chroma_boost_active(pp, solo=False) is False
 
@@ -250,3 +250,17 @@ def test_effective_hdr_compositing_off_in_preset_curation() -> None:
     assert effective_hdr_compositing(True, "preset_curation") is False
     assert effective_hdr_compositing(False, "visualizer") is False
 
+
+
+def test_child_switches_gate_their_passes() -> None:
+    from cleave.viz.post_fx import highlight_rolloff_active, live_frame_fade_alpha
+
+    pp = default_post_fx_runtime(enabled=True)
+    pp.highlight_rolloff.enabled = True
+    assert highlight_rolloff_active(pp, solo=False) is True
+    pp.highlight_rolloff.enabled = False
+    assert highlight_rolloff_active(pp, solo=False) is False
+
+    assert live_frame_fade_alpha(0.0, 100.0, pp.fade, enabled=True, solo=False) < 1.0
+    pp.fade.enabled = False
+    assert live_frame_fade_alpha(0.0, 100.0, pp.fade, enabled=True, solo=False) == 1.0

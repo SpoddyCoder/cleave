@@ -31,8 +31,10 @@ from cleave.config_schema.project_resolution import (
 from cleave.config_schema.render import (
     DEFAULT_CHROMA_BOOST_AMOUNT_PCT,
     DEFAULT_CHROMA_BOOST_APPLY_MODE,
+    DEFAULT_CHROMA_BOOST_ENABLED,
     DEFAULT_CHROMA_BOOST_VARIANT,
     DEFAULT_FADE_CURVE,
+    DEFAULT_FADE_ENABLED,
     DEFAULT_FADE_IN_END,
     DEFAULT_FADE_IN_START,
     DEFAULT_FADE_OUT_END,
@@ -41,6 +43,7 @@ from cleave.config_schema.render import (
     DEFAULT_HIGHLIGHT_ROLLOFF_CEILING_PCT,
     DEFAULT_HIGHLIGHT_ROLLOFF_CURVE,
     DEFAULT_HIGHLIGHT_ROLLOFF_DESATURATION_PCT,
+    DEFAULT_HIGHLIGHT_ROLLOFF_ENABLED,
     DEFAULT_HIGHLIGHT_ROLLOFF_SOFTNESS_PCT,
     DEFAULT_HIGHLIGHT_ROLLOFF_STRENGTH_PCT,
     DEFAULT_HIGHLIGHT_ROLLOFF_THRESHOLD_PCT,
@@ -179,12 +182,14 @@ def _default_fade_out_side() -> FadeSideBlock:
 
 @dataclass
 class FadeBlock:
+    enabled: bool = DEFAULT_FADE_ENABLED
     fade_in: FadeSideBlock = field(default_factory=FadeSideBlock)
     fade_out: FadeSideBlock = field(default_factory=_default_fade_out_side)
 
     @classmethod
     def from_runtime(cls, fade: FadeRuntime) -> FadeBlock:
         return cls(
+            enabled=fade.enabled,
             fade_in=FadeSideBlock.from_runtime(fade.fade_in),
             fade_out=FadeSideBlock.from_runtime(fade.fade_out),
         )
@@ -192,6 +197,7 @@ class FadeBlock:
 
 @dataclass
 class HighlightRolloffBlock:
+    enabled: bool = DEFAULT_HIGHLIGHT_ROLLOFF_ENABLED
     mode: str = DEFAULT_HIGHLIGHT_ROLLOFF_APPLY_MODE
     curve: str = DEFAULT_HIGHLIGHT_ROLLOFF_CURVE
     threshold_pct: int = DEFAULT_HIGHLIGHT_ROLLOFF_THRESHOLD_PCT
@@ -203,6 +209,7 @@ class HighlightRolloffBlock:
     @classmethod
     def from_runtime(cls, rolloff: HighlightRolloffRuntime) -> HighlightRolloffBlock:
         return cls(
+            enabled=rolloff.enabled,
             mode=rolloff.mode,
             curve=rolloff.curve,
             threshold_pct=rolloff.threshold_pct,
@@ -215,6 +222,7 @@ class HighlightRolloffBlock:
 
 @dataclass
 class ChromaBoostBlock:
+    enabled: bool = DEFAULT_CHROMA_BOOST_ENABLED
     mode: str = DEFAULT_CHROMA_BOOST_APPLY_MODE
     variant: str = DEFAULT_CHROMA_BOOST_VARIANT
     amount_pct: int = DEFAULT_CHROMA_BOOST_AMOUNT_PCT
@@ -222,6 +230,7 @@ class ChromaBoostBlock:
     @classmethod
     def from_runtime(cls, boost: ChromaBoostRuntime) -> ChromaBoostBlock:
         return cls(
+            enabled=boost.enabled,
             mode=boost.mode,
             variant=boost.variant,
             amount_pct=boost.amount_pct,
@@ -578,8 +587,8 @@ def view_state_structure_signature(
         },
         "post_fx": {
             "enabled": pp.enabled,
-            "highlight_rolloff_mode": pp.highlight_rolloff.mode,
-            "chroma_boost_mode": pp.chroma_boost.mode,
+            "highlight_rolloff_enabled": pp.highlight_rolloff.enabled,
+            "chroma_boost_enabled": pp.chroma_boost.enabled,
             "limiter_enabled": pp.limiter.enabled,
         },
         "pattern_mask": {

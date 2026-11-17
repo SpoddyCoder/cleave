@@ -349,6 +349,7 @@ def _expand_post_fx_chroma_boost(controls: TuningControls) -> None:
 
 def _mutate_post_fx_chroma_boost_mode(controls: TuningControls) -> None:
     _expand_post_fx_chroma_boost(controls)
+    controls.session.post_fx.chroma_boost.enabled = True
     controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(RowKind.POST_FX_CHROMA_BOOST_MODE)
     press_main_row(controls, keydown(pygame.K_RIGHT))
@@ -356,7 +357,7 @@ def _mutate_post_fx_chroma_boost_mode(controls: TuningControls) -> None:
 
 def _mutate_post_fx_chroma_boost_variant(controls: TuningControls) -> None:
     _expand_post_fx_chroma_boost(controls)
-    controls.session.post_fx.chroma_boost.mode = "composite"
+    controls.session.post_fx.chroma_boost.enabled = True
     controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(RowKind.POST_FX_CHROMA_BOOST_VARIANT)
     press_main_row(controls, keydown(pygame.K_RIGHT))
@@ -364,7 +365,7 @@ def _mutate_post_fx_chroma_boost_variant(controls: TuningControls) -> None:
 
 def _mutate_post_fx_chroma_boost_amount(controls: TuningControls) -> None:
     _expand_post_fx_chroma_boost(controls)
-    controls.session.post_fx.chroma_boost.mode = "composite"
+    controls.session.post_fx.chroma_boost.enabled = True
     controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(RowKind.POST_FX_CHROMA_BOOST_AMOUNT)
     press_main_row(controls, keydown(pygame.K_RIGHT))

@@ -206,6 +206,7 @@ def default_overlays_runtime() -> OverlaysRuntime:
 
 @dataclass
 class HighlightRolloffRuntime:
+    enabled: bool
     mode: HighlightRolloffApplyMode
     curve: HighlightRolloffCurve
     threshold_pct: int
@@ -221,6 +222,7 @@ def default_highlight_rolloff_runtime() -> HighlightRolloffRuntime:
 
 @dataclass
 class ChromaBoostRuntime:
+    enabled: bool
     mode: str
     variant: str
     amount_pct: int
@@ -239,6 +241,7 @@ class FadeSideRuntime:
 
 @dataclass
 class FadeRuntime:
+    enabled: bool
     fade_in: FadeSideRuntime
     fade_out: FadeSideRuntime
 
@@ -267,6 +270,7 @@ class PostFxRuntime:
 
 def _fade_runtime_from_values(values: dict[str, Any]) -> FadeRuntime:
     return FadeRuntime(
+        enabled=values["enabled"],
         fade_in=FadeSideRuntime(**values["fade_in"]),
         fade_out=FadeSideRuntime(**values["fade_out"]),
     )
@@ -573,6 +577,7 @@ def post_fx_runtime_from_cfg(
             locked=post_fx.locked,
             fade=replace(
                 base.fade,
+                enabled=post_fx.fade.enabled,
                 fade_in=replace(
                     base.fade.fade_in,
                     start=fin.start,
@@ -588,6 +593,7 @@ def post_fx_runtime_from_cfg(
             ),
             highlight_rolloff=replace(
                 default_highlight_rolloff_runtime(),
+                enabled=hr.enabled,
                 mode=hr.mode,
                 curve=hr.curve,
                 threshold_pct=hr.threshold_pct,
@@ -598,6 +604,7 @@ def post_fx_runtime_from_cfg(
             ),
             chroma_boost=replace(
                 default_chroma_boost_runtime(),
+                enabled=cb.enabled,
                 mode=cb.mode,
                 variant=cb.variant,
                 amount_pct=cb.amount_pct,

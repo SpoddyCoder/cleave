@@ -131,14 +131,14 @@ def test_structure_signature_ignores_timeline_panel_open() -> None:
         assert flag not in timeline
 
 
-def test_structure_signature_invalidates_on_highlight_rolloff_mode() -> None:
+def test_structure_signature_invalidates_on_highlight_rolloff_enabled() -> None:
     controls = make_controls(("layer_1",))
     session = controls.session
     config_save = controls._config_save
-    session.post_fx.highlight_rolloff.mode = "composite"
+    session.post_fx.highlight_rolloff.enabled = True
     sig_before = view_state_structure_signature(
         session, config_save)
-    session.post_fx.highlight_rolloff.mode = "off"
+    session.post_fx.highlight_rolloff.enabled = False
     sig_after = view_state_structure_signature(
         session, config_save)
     assert sig_before != sig_after
@@ -192,23 +192,23 @@ def test_structure_signature_invalidates_on_closing_card_animation_type() -> Non
     assert sig_before != sig_after
 
 
-def test_structure_signature_invalidates_on_chroma_boost_mode() -> None:
+def test_structure_signature_invalidates_on_chroma_boost_enabled() -> None:
     controls = make_controls(("layer_1",))
     session = controls.session
     config_save = controls._config_save
-    session.post_fx.chroma_boost.mode = "composite"
+    session.post_fx.chroma_boost.enabled = True
     sig_before = view_state_structure_signature(
         session, config_save)
-    session.post_fx.chroma_boost.mode = "off"
+    session.post_fx.chroma_boost.enabled = False
     sig_after = view_state_structure_signature(
         session, config_save)
     assert sig_before != sig_after
 
 
-def test_builder_rebuilds_layout_when_highlight_rolloff_mode_changes() -> None:
+def test_builder_rebuilds_layout_when_highlight_rolloff_enabled_changes() -> None:
     controls = make_controls(("layer_1",))
     session = controls.session
-    session.post_fx.highlight_rolloff.mode = "composite"
+    session.post_fx.highlight_rolloff.enabled = True
     builder = controls._view_state
 
     view_on = builder.build(paused=False)
@@ -216,7 +216,7 @@ def test_builder_rebuilds_layout_when_highlight_rolloff_mode_changes() -> None:
     assert RowKind.POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD in on_page
     on_structure = builder._structure
 
-    session.post_fx.highlight_rolloff.mode = "off"
+    session.post_fx.highlight_rolloff.enabled = False
     view_off = builder.build(paused=False)
     assert builder._structure is not on_structure
     assert RowKind.POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD not in _inspector_kinds(

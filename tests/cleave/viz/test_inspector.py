@@ -233,7 +233,12 @@ def test_headings_are_static_and_show_their_rows() -> None:
     ]
     assert all(not row.navigable for row in rows if row.is_heading)
     assert all(row.depth == 0 for row in rows if row.is_heading)
-    assert all(row.depth == 1 for row in rows if not row.is_heading)
+    assert rows[0].descriptor.kind == RowKind.POST_FX_FADE_ENABLED
+    assert all(
+        row.depth == 1
+        for row in rows
+        if not row.is_heading and row.descriptor.kind != RowKind.POST_FX_FADE_ENABLED
+    )
     assert RowKind.POST_FX_FADE_IN_START in _kinds(rows)
     assert RowKind.POST_FX_FADE_OUT_TYPE in _kinds(rows)
 
@@ -276,9 +281,16 @@ def test_conditional_rows_follow_predicates() -> None:
     assert RowKind.OVERLAY_CARD_ANIMATION_TYPE in card
     assert RowKind.OVERLAY_CARD_ANIMATION_SLIDE_DIRECTION not in card
 
-    assert state.post_fx.chroma_boost.mode == "off"
+    assert state.post_fx.chroma_boost.enabled is False
     assert _kinds(build_inspector_rows(state, "post_fx.chroma_boost")) == [
-        RowKind.POST_FX_CHROMA_BOOST_MODE
+        RowKind.POST_FX_CHROMA_BOOST_ENABLED
+    ]
+    state.post_fx.chroma_boost.enabled = True
+    assert _kinds(build_inspector_rows(state, "post_fx.chroma_boost")) == [
+        RowKind.POST_FX_CHROMA_BOOST_ENABLED,
+        RowKind.POST_FX_CHROMA_BOOST_MODE,
+        RowKind.POST_FX_CHROMA_BOOST_VARIANT,
+        RowKind.POST_FX_CHROMA_BOOST_AMOUNT,
     ]
 
 

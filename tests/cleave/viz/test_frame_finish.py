@@ -160,6 +160,7 @@ def test_finish_content_frame_applies_chroma_boost_when_active() -> None:
     core = _make_core(hdr=False)
     core.seed.session.post_fx = default_post_fx_runtime(enabled=True)
     cb = core.seed.session.post_fx.chroma_boost
+    cb.enabled = True
     cb.mode = "composite"
     cb.variant = "vibrance"
     cb.amount_pct = 40
@@ -198,7 +199,7 @@ def test_finish_content_frame_call_order_rolloff_chroma_fade_overlay_present() -
     core = _make_core(hdr=False)
     core.seed.session.post_fx = default_post_fx_runtime(enabled=True)
     core.seed.session.post_fx.highlight_rolloff.mode = "composite"
-    core.seed.session.post_fx.chroma_boost.mode = "composite"
+    core.seed.session.post_fx.chroma_boost.enabled = True
     core.seed.session.post_fx.chroma_boost.amount_pct = 25
     call_order: list[str] = []
 

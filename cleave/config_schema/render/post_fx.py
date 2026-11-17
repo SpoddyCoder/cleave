@@ -34,16 +34,18 @@ FADE_CURVE_HELP_ENTRIES: tuple[tuple[FadeCurve, str], ...] = (
     ("ease_out_expo", "starts faster, then slows down more."),
 )
 
+DEFAULT_FADE_ENABLED = True
 DEFAULT_FADE_IN_START = 0.0
 DEFAULT_FADE_IN_END = 30.0
 DEFAULT_FADE_OUT_START = 4.0
 DEFAULT_FADE_OUT_END = 0.0
 DEFAULT_FADE_CURVE: FadeCurve = "smoothstep"
 
-HighlightRolloffApplyMode = Literal["off", "per_layer", "composite"]
+DEFAULT_HIGHLIGHT_ROLLOFF_ENABLED = True
+
+HighlightRolloffApplyMode = Literal["per_layer", "composite"]
 
 HIGHLIGHT_ROLLOFF_APPLY_MODES: tuple[HighlightRolloffApplyMode, ...] = (
-    "off",
     "per_layer",
     "composite",
 )
@@ -51,7 +53,6 @@ HIGHLIGHT_ROLLOFF_APPLY_MODES: tuple[HighlightRolloffApplyMode, ...] = (
 HIGHLIGHT_ROLLOFF_APPLY_MODE_HELP_ENTRIES: tuple[
     tuple[HighlightRolloffApplyMode, str], ...
 ] = (
-    ("off", "no effect."),
     ("per_layer", "on each layer, before the layers are combined."),
     ("composite", "once, after the layers are combined (default)."),
 )
@@ -80,10 +81,11 @@ DEFAULT_HIGHLIGHT_ROLLOFF_STRENGTH_PCT = 70
 DEFAULT_HIGHLIGHT_ROLLOFF_SOFTNESS_PCT = 40
 DEFAULT_HIGHLIGHT_ROLLOFF_DESATURATION_PCT = 30
 
-ChromaBoostApplyMode = Literal["off", "per_layer", "composite"]
+DEFAULT_CHROMA_BOOST_ENABLED = False
+
+ChromaBoostApplyMode = Literal["per_layer", "composite"]
 
 CHROMA_BOOST_APPLY_MODES: tuple[ChromaBoostApplyMode, ...] = (
-    "off",
     "per_layer",
     "composite",
 )
@@ -91,12 +93,11 @@ CHROMA_BOOST_APPLY_MODES: tuple[ChromaBoostApplyMode, ...] = (
 CHROMA_BOOST_APPLY_MODE_HELP_ENTRIES: tuple[
     tuple[ChromaBoostApplyMode, str], ...
 ] = (
-    ("off", "no effect."),
     ("per_layer", "on each layer, before the layers are combined."),
-    ("composite", "once, after the layers are combined."),
+    ("composite", "once, after the layers are combined (default)."),
 )
 
-DEFAULT_CHROMA_BOOST_APPLY_MODE: ChromaBoostApplyMode = "off"
+DEFAULT_CHROMA_BOOST_APPLY_MODE: ChromaBoostApplyMode = "composite"
 
 ChromaBoostVariant = Literal["saturation", "vibrance"]
 
@@ -204,13 +205,21 @@ def clamp_fade_out_start(start: float, *, end: float) -> float:
     return max(clamp_fade_seconds(start), clamp_fade_seconds(end))
 
 
+def _reject_off_mode(value: object, label: str) -> None:
+    # YAML reads a bare ``off`` as False.
+    if value is False or value == "off":
+        section = label.rsplit(".", 1)[0]
+        raise ValueError(
+            f"{label} has no 'off'; set {section}.enabled: false instead"
+        )
+
+
 def _parse_chroma_boost_apply_mode(
     value: object,
     _ctx: ParseCtx,
     label: str = "render.post_fx.chroma_boost.mode",
 ) -> ChromaBoostApplyMode:
-    if value is False:
-        value = "off"
+    _reject_off_mode(value, label)
     if not isinstance(value, str):
         raise ValueError(f"{label} must be a string")
     if value not in CHROMA_BOOST_APPLY_MODES:
@@ -237,8 +246,7 @@ def _parse_highlight_rolloff_apply_mode(
     ctx: ParseCtx,
     label: str = "render.post_fx.highlight_rolloff.mode",
 ) -> HighlightRolloffApplyMode:
-    if value is False:
-        value = "off"
+    _reject_off_mode(value, label)
     if not isinstance(value, str):
         raise ValueError(f"{label} must be a string")
     if value not in HIGHLIGHT_ROLLOFF_APPLY_MODES:
@@ -278,6 +286,7 @@ def _build_highlight_rolloff_config(parsed: dict[str, Any]) -> Any:
 
     threshold_pct = parsed["threshold_pct"]
     return HighlightRolloffConfig(
+        enabled=parsed["enabled"],
         mode=parsed["mode"],
         curve=parsed["curve"],
         threshold_pct=threshold_pct,
@@ -294,13 +303,14 @@ def _build_chroma_boost_config(parsed: dict[str, Any]) -> Any:
     from cleave.config import ChromaBoostConfig
 
     return ChromaBoostConfig(
+        enabled=parsed["enabled"],
         mode=parsed["mode"],
         variant=parsed["variant"],
         amount_pct=parsed["amount_pct"],
     )
 
 
-def _parse_visual_limiter_enabled(raw: Any, _ctx: ParseCtx, _label: str) -> bool:
+def _parse_enabled(raw: Any, _ctx: ParseCtx, _label: str) -> bool:
     return bool(raw)
 
 
@@ -348,7 +358,7 @@ VISUAL_LIMITER_SECTION = SectionDescriptor(
         FieldDescriptor(
             "enabled",
             DEFAULT_VISUAL_LIMITER_ENABLED,
-            _parse_visual_limiter_enabled,
+            _parse_enabled,
             dump_scalar,
         ),
         FieldDescriptor(
@@ -379,6 +389,12 @@ CHROMA_BOOST_SECTION = SectionDescriptor(
     yaml_key="chroma_boost",
     fields=(
         FieldDescriptor(
+            "enabled",
+            DEFAULT_CHROMA_BOOST_ENABLED,
+            _parse_enabled,
+            dump_scalar,
+        ),
+        FieldDescriptor(
             "mode",
             DEFAULT_CHROMA_BOOST_APPLY_MODE,
             _parse_chroma_boost_apply_mode,
@@ -401,6 +417,7 @@ CHROMA_BOOST_SECTION = SectionDescriptor(
     optional=True,
     default_factory=lambda: _build_chroma_boost_config(
         {
+            "enabled": DEFAULT_CHROMA_BOOST_ENABLED,
             "mode": DEFAULT_CHROMA_BOOST_APPLY_MODE,
             "variant": DEFAULT_CHROMA_BOOST_VARIANT,
             "amount_pct": DEFAULT_CHROMA_BOOST_AMOUNT_PCT,
@@ -411,6 +428,12 @@ CHROMA_BOOST_SECTION = SectionDescriptor(
 HIGHLIGHT_ROLLOFF_SECTION = SectionDescriptor(
     yaml_key="highlight_rolloff",
     fields=(
+        FieldDescriptor(
+            "enabled",
+            DEFAULT_HIGHLIGHT_ROLLOFF_ENABLED,
+            _parse_enabled,
+            dump_scalar,
+        ),
         FieldDescriptor(
             "mode",
             DEFAULT_HIGHLIGHT_ROLLOFF_APPLY_MODE,
@@ -468,6 +491,7 @@ HIGHLIGHT_ROLLOFF_SECTION = SectionDescriptor(
     optional=True,
     default_factory=lambda: _build_highlight_rolloff_config(
         {
+            "enabled": DEFAULT_HIGHLIGHT_ROLLOFF_ENABLED,
             "mode": DEFAULT_HIGHLIGHT_ROLLOFF_APPLY_MODE,
             "curve": DEFAULT_HIGHLIGHT_ROLLOFF_CURVE,
             "threshold_pct": DEFAULT_HIGHLIGHT_ROLLOFF_THRESHOLD_PCT,
@@ -551,7 +575,11 @@ FADE_OUT_SECTION = _fade_side_section(
 def _build_fade_config(parsed: dict[str, Any]) -> Any:
     from cleave.config import FadeConfig
 
-    return FadeConfig(fade_in=parsed["fade_in"], fade_out=parsed["fade_out"])
+    return FadeConfig(
+        enabled=parsed["enabled"],
+        fade_in=parsed["fade_in"],
+        fade_out=parsed["fade_out"],
+    )
 
 
 def _default_fade_config() -> Any:
@@ -561,6 +589,7 @@ def _default_fade_config() -> Any:
         raise RuntimeError("fade side sections require default_factory")
     return _build_fade_config(
         {
+            "enabled": DEFAULT_FADE_ENABLED,
             "fade_in": fade_in_factory(),
             "fade_out": fade_out_factory(),
         }
@@ -569,7 +598,16 @@ def _default_fade_config() -> Any:
 
 FADE_SECTION = SectionDescriptor(
     yaml_key="fade",
-    fields=(FADE_IN_SECTION, FADE_OUT_SECTION),
+    fields=(
+        FieldDescriptor(
+            "enabled",
+            DEFAULT_FADE_ENABLED,
+            _parse_enabled,
+            dump_scalar,
+        ),
+        FADE_IN_SECTION,
+        FADE_OUT_SECTION,
+    ),
     build=_build_fade_config,
     optional=True,
     default_factory=_default_fade_config,
@@ -617,6 +655,7 @@ def post_fx_persist_values(ctx: PersistCtx) -> dict[str, Any]:
         "enabled": runtime.enabled,
         "locked": runtime.locked,
         "fade": {
+            "enabled": runtime.fade.enabled,
             "fade_in": {
                 "start": runtime.fade.fade_in.start,
                 "end": runtime.fade.fade_in.end,
@@ -629,6 +668,7 @@ def post_fx_persist_values(ctx: PersistCtx) -> dict[str, Any]:
             },
         },
         "highlight_rolloff": {
+            "enabled": runtime.highlight_rolloff.enabled,
             "mode": runtime.highlight_rolloff.mode,
             "curve": runtime.highlight_rolloff.curve,
             "threshold_pct": runtime.highlight_rolloff.threshold_pct,
@@ -638,6 +678,7 @@ def post_fx_persist_values(ctx: PersistCtx) -> dict[str, Any]:
             "desaturation_pct": runtime.highlight_rolloff.desaturation_pct,
         },
         "chroma_boost": {
+            "enabled": runtime.chroma_boost.enabled,
             "mode": runtime.chroma_boost.mode,
             "variant": runtime.chroma_boost.variant,
             "amount_pct": runtime.chroma_boost.amount_pct,
@@ -653,6 +694,7 @@ def post_fx_persist_values(ctx: PersistCtx) -> dict[str, Any]:
 
 def default_highlight_rolloff_runtime_values() -> dict[str, Any]:
     return {
+        "enabled": DEFAULT_HIGHLIGHT_ROLLOFF_ENABLED,
         "mode": DEFAULT_HIGHLIGHT_ROLLOFF_APPLY_MODE,
         "curve": DEFAULT_HIGHLIGHT_ROLLOFF_CURVE,
         "threshold_pct": DEFAULT_HIGHLIGHT_ROLLOFF_THRESHOLD_PCT,
@@ -665,6 +707,7 @@ def default_highlight_rolloff_runtime_values() -> dict[str, Any]:
 
 def default_chroma_boost_runtime_values() -> dict[str, Any]:
     return {
+        "enabled": DEFAULT_CHROMA_BOOST_ENABLED,
         "mode": DEFAULT_CHROMA_BOOST_APPLY_MODE,
         "variant": DEFAULT_CHROMA_BOOST_VARIANT,
         "amount_pct": DEFAULT_CHROMA_BOOST_AMOUNT_PCT,
@@ -681,6 +724,7 @@ def default_fade_side_runtime_values(start: float, end: float) -> dict[str, Any]
 
 def default_fade_runtime_values() -> dict[str, Any]:
     return {
+        "enabled": DEFAULT_FADE_ENABLED,
         "fade_in": default_fade_side_runtime_values(
             DEFAULT_FADE_IN_START, DEFAULT_FADE_IN_END
         ),

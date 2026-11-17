@@ -88,10 +88,10 @@ class LiveLayerBindingsFactory:
 
     def post_fx_bindings(self) -> PostFxBindings:
         return PostFxBindings(
-            on_highlight_rolloff_apply_mode_change=(
-                self.on_highlight_rolloff_apply_mode_change
+            on_highlight_rolloff_per_layer_change=(
+                self.on_highlight_rolloff_per_layer_change
             ),
-            on_chroma_boost_apply_mode_change=self.on_chroma_boost_apply_mode_change,
+            on_chroma_boost_per_layer_change=self.on_chroma_boost_per_layer_change,
             is_paused=self.is_paused,
         )
 
@@ -201,9 +201,7 @@ class LiveLayerBindingsFactory:
             self._song_time(),
         )
 
-    def on_highlight_rolloff_apply_mode_change(
-        self, old_mode: str, new_mode: str
-    ) -> None:
+    def on_highlight_rolloff_per_layer_change(self, per_layer: bool) -> None:
         ctx = self.ctx
         if ctx.compositor is None or ctx.post_process is None:
             return
@@ -214,7 +212,7 @@ class LiveLayerBindingsFactory:
             if not layer.fbo.enabled:
                 continue
             fbo = layer.fbo
-            if new_mode == "per_layer" and old_mode in ("composite", "off"):
+            if per_layer:
                 ctx.compositor.copy_layer_to_rolloff_source(
                     ctx.post_process,
                     layer.slot,
@@ -225,7 +223,7 @@ class LiveLayerBindingsFactory:
                 LayerFramePipeline.apply_layer_highlight_rolloff(
                     layer, ctx.post_process, ctx.compositor, hr
                 )
-            elif old_mode == "per_layer" and new_mode in ("composite", "off"):
+            else:
                 ctx.compositor.restore_layer_from_rolloff_source(
                     ctx.post_process,
                     layer.slot,
@@ -234,9 +232,7 @@ class LiveLayerBindingsFactory:
                     fbo.height,
                 )
 
-    def on_chroma_boost_apply_mode_change(
-        self, old_mode: str, new_mode: str
-    ) -> None:
+    def on_chroma_boost_per_layer_change(self, per_layer: bool) -> None:
         ctx = self.ctx
         if ctx.compositor is None or ctx.post_process is None:
             return
@@ -247,7 +243,7 @@ class LiveLayerBindingsFactory:
             if not layer.fbo.enabled:
                 continue
             fbo = layer.fbo
-            if new_mode == "per_layer" and old_mode in ("composite", "off"):
+            if per_layer:
                 ctx.compositor.copy_layer_to_chroma_source(
                     ctx.post_process,
                     layer.slot,
@@ -258,7 +254,7 @@ class LiveLayerBindingsFactory:
                 LayerFramePipeline.apply_layer_chroma_boost(
                     layer, ctx.post_process, ctx.compositor, cb
                 )
-            elif old_mode == "per_layer" and new_mode in ("composite", "off"):
+            else:
                 ctx.compositor.restore_layer_from_chroma_source(
                     ctx.post_process,
                     layer.slot,

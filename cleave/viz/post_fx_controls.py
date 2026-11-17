@@ -23,7 +23,16 @@ from cleave.config_schema.render import (
 )
 from cleave.choice import step_choice
 from cleave.viz.post_fx_bindings import PostFxBindings
-from cleave.viz.session import FadeSideRuntime, TuningSession
+from cleave.viz.session import (
+    ChromaBoostRuntime,
+    FadeSideRuntime,
+    HighlightRolloffRuntime,
+    TuningSession,
+)
+
+
+def _per_layer(block: HighlightRolloffRuntime | ChromaBoostRuntime) -> bool:
+    return block.enabled and block.mode == "per_layer"
 
 
 class PostFxControls:
@@ -55,6 +64,45 @@ class PostFxControls:
         if not self.session.post_fx_solo:
             return
         self.session.post_fx_solo = False
+
+    def _paused(self) -> bool:
+        bindings = self._bindings
+        return (
+            bindings is not None
+            and bindings.is_paused is not None
+            and bindings.is_paused()
+        )
+
+    def _sync_highlight_rolloff_per_layer(self, was_per_layer: bool) -> None:
+        now = _per_layer(self.session.post_fx.highlight_rolloff)
+        if now == was_per_layer or not self._paused():
+            return
+        assert self._bindings is not None
+        if self._bindings.on_highlight_rolloff_per_layer_change is not None:
+            self._bindings.on_highlight_rolloff_per_layer_change(now)
+
+    def _sync_chroma_boost_per_layer(self, was_per_layer: bool) -> None:
+        now = _per_layer(self.session.post_fx.chroma_boost)
+        if now == was_per_layer or not self._paused():
+            return
+        assert self._bindings is not None
+        if self._bindings.on_chroma_boost_per_layer_change is not None:
+            self._bindings.on_chroma_boost_per_layer_change(now)
+
+    def set_fade_enabled(self, enabled: bool) -> None:
+        self.session.post_fx.fade.enabled = enabled
+
+    def set_highlight_rolloff_enabled(self, enabled: bool) -> None:
+        hr = self.session.post_fx.highlight_rolloff
+        was_per_layer = _per_layer(hr)
+        hr.enabled = enabled
+        self._sync_highlight_rolloff_per_layer(was_per_layer)
+
+    def set_chroma_boost_enabled(self, enabled: bool) -> None:
+        cb = self.session.post_fx.chroma_boost
+        was_per_layer = _per_layer(cb)
+        cb.enabled = enabled
+        self._sync_chroma_boost_per_layer(was_per_layer)
 
     def set_fade_start(self, side: str, value: float) -> None:
         window = self._fade_side(side)
@@ -120,20 +168,11 @@ class PostFxControls:
 
     def step_highlight_rolloff_mode(self, *, forward: bool) -> None:
         hr = self.session.post_fx.highlight_rolloff
-        old_mode = hr.mode
+        was_per_layer = _per_layer(hr)
         hr.mode = step_choice(
-            HIGHLIGHT_ROLLOFF_APPLY_MODES, old_mode, 1 if forward else -1
+            HIGHLIGHT_ROLLOFF_APPLY_MODES, hr.mode, 1 if forward else -1
         )
-        if hr.mode != old_mode and self._bindings is not None:
-            paused = (
-                self._bindings.is_paused()
-                if self._bindings.is_paused is not None
-                else False
-            )
-            if paused and self._bindings.on_highlight_rolloff_apply_mode_change:
-                self._bindings.on_highlight_rolloff_apply_mode_change(
-                    old_mode, hr.mode
-                )
+        self._sync_highlight_rolloff_per_layer(was_per_layer)
 
     def step_highlight_rolloff_curve(self, *, forward: bool) -> None:
         hr = self.session.post_fx.highlight_rolloff
@@ -148,16 +187,9 @@ class PostFxControls:
 
     def step_chroma_boost_mode(self, *, forward: bool) -> None:
         cb = self.session.post_fx.chroma_boost
-        old_mode = cb.mode
-        cb.mode = step_choice(CHROMA_BOOST_APPLY_MODES, old_mode, 1 if forward else -1)
-        if cb.mode != old_mode and self._bindings is not None:
-            paused = (
-                self._bindings.is_paused()
-                if self._bindings.is_paused is not None
-                else False
-            )
-            if paused and self._bindings.on_chroma_boost_apply_mode_change:
-                self._bindings.on_chroma_boost_apply_mode_change(old_mode, cb.mode)
+        was_per_layer = _per_layer(cb)
+        cb.mode = step_choice(CHROMA_BOOST_APPLY_MODES, cb.mode, 1 if forward else -1)
+        self._sync_chroma_boost_per_layer(was_per_layer)
 
     def step_chroma_boost_variant(self, *, forward: bool) -> None:
         cb = self.session.post_fx.chroma_boost

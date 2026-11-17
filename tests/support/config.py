@@ -24,6 +24,7 @@ from cleave.config_schema.layers import (
 )
 from cleave.config_schema.render import (
     DEFAULT_FADE_CURVE,
+    DEFAULT_FADE_ENABLED,
     DEFAULT_FADE_IN_END,
     DEFAULT_FADE_IN_START,
     DEFAULT_FADE_OUT_END,
@@ -57,6 +58,7 @@ def default_chroma_boost_config() -> ChromaBoostConfig:
 
 def default_fade_config() -> FadeConfig:
     return FadeConfig(
+        enabled=DEFAULT_FADE_ENABLED,
         fade_in=FadeSideConfig(
             start=DEFAULT_FADE_IN_START,
             end=DEFAULT_FADE_IN_END,

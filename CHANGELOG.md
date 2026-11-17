@@ -60,6 +60,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- Fade, Highlight Rolloff, Chroma Boost, and Visual Limiter each have an on/off icon on their Post-FX navigator row and in their page title, and an enabled row at the top of their page. E on those pages turns that effect on or off. Highlight Rolloff and Chroma Boost no longer have an off mode: their mode is per layer or composite, and a project file that sets `mode: off` must use `enabled: false` instead.
 - The Populate preset list dialog's choices are now short enough to sit side by side: **cue roles**, **shuffled**, and **in order**, under **pick**.
 - The timeline strip keeps a margin between the row buttons and the bars, and between the REC button and the time scale, matching the margin left of the layer numbers. The bars start beside the eye while no row is overridden, and move over to make room for the back to timeline button as soon as one is.
 - The on/off and lock icons on the inspector title now always show on a page that has them, not only while the page is off or locked, and a click turns the page's owner on or off or locks and unlocks it, like the navigator's icons. On a child page they act on the parent that owns it, and hovering one names it.

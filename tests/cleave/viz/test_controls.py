@@ -1566,13 +1566,13 @@ def test_post_fx_fade_setters_clamp_and_cycle() -> None:
     assert fade.fade_in.type == "smoothstep"
 
 
-def test_post_fx_highlight_rolloff_mode_off_keeps_section_expanded() -> None:
+def test_post_fx_highlight_rolloff_mode_clamps_at_per_layer() -> None:
     controls = make_controls()
     controls.session.post_fx.highlight_rolloff.mode = "per_layer"
 
     controls.post_fx.step_highlight_rolloff_mode(forward=False)
 
-    assert controls.session.post_fx.highlight_rolloff.mode == "off"
+    assert controls.session.post_fx.highlight_rolloff.mode == "per_layer"
 
 
 def _focus_timeline_presets(controls: TuningControls) -> None:

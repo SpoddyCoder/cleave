@@ -37,11 +37,11 @@ Default title is `Cleave Final Render`. Use the cards for credits, musician name
 
 ## Post-processing
 
-GPU passes after the layer stack (Post-FX in the navigator). A parent `enabled` flag gates every child. The fade section fades the picture in from the song start (start and end in seconds) and out counted back from the song end (start and end in seconds), using a curve (linear, smoothstep, ease out cubic, or ease out expo).
+GPU passes after the layer stack (Post-FX in the navigator). A parent `enabled` flag gates every child, and fade, highlight rolloff, and chroma boost each have their own `enabled` switch (an on/off icon on their navigator row). The fade section fades the picture in from the song start (start and end in seconds) and out counted back from the song end (start and end in seconds), using a curve (linear, smoothstep, ease out cubic, or ease out expo).
 
-**Highlight rolloff** compresses bright peaks. Apply per layer, on the composite (default), or off. Curves: rolloff (Reinhard-style), smoothstep, aces_fit. Threshold, ceiling, strength, softness, and desaturation are percentages.
+**Highlight rolloff** compresses bright peaks. Apply per layer or on the composite (default). On by default. Curves: rolloff (Reinhard-style), smoothstep, aces_fit. Threshold, ceiling, strength, softness, and desaturation are percentages.
 
-**Chroma boost** increases colour. Apply per layer, on the composite, or off (default). Variants: saturation (uniform) or vibrance (boosts muted colours more). Amount is a percentage.
+**Chroma boost** increases colour. Apply per layer or on the composite (default). Off by default. Variants: saturation (uniform) or vibrance (boosts muted colours more). Amount is a percentage.
 
 HDR compositing (`project.yaml` `compositor.hdr`, default on) is separate from these user post-FX knobs.
 

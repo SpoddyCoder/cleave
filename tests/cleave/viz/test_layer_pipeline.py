@@ -406,6 +406,7 @@ def test_render_frame_applies_per_layer_chroma_boost_when_playing() -> None:
     session = _session(("layer_1",))
     session.post_fx = default_post_fx_runtime(enabled=True)
     cb = session.post_fx.chroma_boost
+    cb.enabled = True
     cb.mode = "per_layer"
     cb.amount_pct = 30
     compositor = MagicMock()

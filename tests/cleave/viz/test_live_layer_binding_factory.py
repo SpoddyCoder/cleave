@@ -108,8 +108,8 @@ def test_layer_bindings_and_post_fx_shapes() -> None:
     assert layer_bindings.on_preset_change == factory.on_preset_change
     assert layer_bindings.on_switching_resume == factory.on_switching_resume
     assert layer_bindings.on_seek == factory.on_seek
-    assert post_fx.on_highlight_rolloff_apply_mode_change == (
-        factory.on_highlight_rolloff_apply_mode_change
+    assert post_fx.on_highlight_rolloff_per_layer_change == (
+        factory.on_highlight_rolloff_per_layer_change
     )
     assert post_fx.is_paused == factory.is_paused
 

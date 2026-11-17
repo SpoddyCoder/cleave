@@ -292,6 +292,68 @@ def _apply_post_fx_limiter_release(
     delta = VISUAL_LIMITER_RELEASE_STEP if forward else -VISUAL_LIMITER_RELEASE_STEP
     controls.post_fx.set_limiter_release(round(lim.release + delta, 1))
 
+def _format_post_fx_fade_enabled(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return on_off_text(state.post_fx.fade.enabled)
+
+def _apply_post_fx_fade_enabled(
+    controls: TuningControls, _desc: RowDescriptor, forward: bool, _large: bool,
+) -> None:
+    controls.post_fx.set_fade_enabled(forward)
+
+def _toggle_post_fx_fade_enabled(
+    controls: TuningControls, _desc: RowDescriptor
+) -> None:
+    if controls.session.post_fx.locked:
+        return
+    controls.post_fx.set_fade_enabled(not controls.session.post_fx.fade.enabled)
+
+def _format_post_fx_highlight_rolloff_enabled(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return on_off_text(state.post_fx.highlight_rolloff.enabled)
+
+def _apply_post_fx_highlight_rolloff_enabled(
+    controls: TuningControls, _desc: RowDescriptor, forward: bool, _large: bool,
+) -> None:
+    controls.post_fx.set_highlight_rolloff_enabled(forward)
+
+def _toggle_post_fx_highlight_rolloff_enabled(
+    controls: TuningControls, _desc: RowDescriptor
+) -> None:
+    if controls.session.post_fx.locked:
+        return
+    controls.post_fx.set_highlight_rolloff_enabled(
+        not controls.session.post_fx.highlight_rolloff.enabled
+    )
+
+def _format_post_fx_chroma_boost_enabled(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return on_off_text(state.post_fx.chroma_boost.enabled)
+
+def _apply_post_fx_chroma_boost_enabled(
+    controls: TuningControls, _desc: RowDescriptor, forward: bool, _large: bool,
+) -> None:
+    controls.post_fx.set_chroma_boost_enabled(forward)
+
+def _toggle_post_fx_chroma_boost_enabled(
+    controls: TuningControls, _desc: RowDescriptor
+) -> None:
+    if controls.session.post_fx.locked:
+        return
+    controls.post_fx.set_chroma_boost_enabled(
+        not controls.session.post_fx.chroma_boost.enabled
+    )
+
+def _toggle_post_fx_limiter_enabled(
+    controls: TuningControls, _desc: RowDescriptor
+) -> None:
+    controls.post_fx.set_limiter_enabled(
+        not controls.session.post_fx.limiter.enabled
+    )
+
 def _toggle_post_fx_enabled(
     controls: TuningControls, _desc: RowDescriptor
 ) -> None:
@@ -391,7 +453,20 @@ SPECS: dict[RowKind, RowSpec] = {
         help_description=(
             "Fades the picture in at the start of the song and out at the end.",
         ),
+        help_entries=(("E", "enable/disable"),),
+        toggle_enabled=_toggle_post_fx_fade_enabled,
         parent_group="post_fx",
+    ),
+    RowKind.POST_FX_FADE_ENABLED: RowSpec(
+        affordance=RowAffordance.VALUE_STEP,
+        panel_label="enabled",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_post_fx_fade_enabled,
+        apply_horizontal=_apply_post_fx_fade_enabled,
+        choice=bool_choice(lambda s, _d: s.post_fx.fade.enabled),
+        help_title="Fade Enabled",
+        help_description=("Turns the fade in and fade out on or off.",),
+        parent_group="post_fx_fade",
     ),
     RowKind.POST_FX_FADE_IN_HEADER: RowSpec(
         affordance=RowAffordance.HEADING,
@@ -515,7 +590,20 @@ SPECS: dict[RowKind, RowSpec] = {
             "When HDR Compositing is on, a light rolloff always runs.",
             "These settings add to it.",
         ),
+        help_entries=(("E", "enable/disable"),),
+        toggle_enabled=_toggle_post_fx_highlight_rolloff_enabled,
         parent_group="post_fx",
+    ),
+    RowKind.POST_FX_HIGHLIGHT_ROLLOFF_ENABLED: RowSpec(
+        affordance=RowAffordance.VALUE_STEP,
+        panel_label="enabled",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_post_fx_highlight_rolloff_enabled,
+        apply_horizontal=_apply_post_fx_highlight_rolloff_enabled,
+        choice=bool_choice(lambda s, _d: s.post_fx.highlight_rolloff.enabled),
+        help_title="Highlight Rolloff Enabled",
+        help_description=("Turns the highlight rolloff on or off.",),
+        parent_group="post_fx_highlight_rolloff",
     ),
     RowKind.POST_FX_HIGHLIGHT_ROLLOFF_MODE: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
@@ -630,7 +718,20 @@ SPECS: dict[RowKind, RowSpec] = {
             "Makes colours stronger.",
             "Use it after Highlight Rolloff to bring back colour.",
         ),
+        help_entries=(("E", "enable/disable"),),
+        toggle_enabled=_toggle_post_fx_chroma_boost_enabled,
         parent_group="post_fx",
+    ),
+    RowKind.POST_FX_CHROMA_BOOST_ENABLED: RowSpec(
+        affordance=RowAffordance.VALUE_STEP,
+        panel_label="enabled",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_post_fx_chroma_boost_enabled,
+        apply_horizontal=_apply_post_fx_chroma_boost_enabled,
+        choice=bool_choice(lambda s, _d: s.post_fx.chroma_boost.enabled),
+        help_title="Chroma Boost Enabled",
+        help_description=("Turns the chroma boost on or off.",),
+        parent_group="post_fx_chroma_boost",
     ),
     RowKind.POST_FX_CHROMA_BOOST_MODE: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
@@ -686,6 +787,8 @@ SPECS: dict[RowKind, RowSpec] = {
             "When the timeline is on, cue roles change how much each layer dims.",
             "The Post FX switch and solo do not change it.",
         ),
+        help_entries=(("E", "enable/disable"),),
+        toggle_enabled=_toggle_post_fx_limiter_enabled,
         parent_group="post_fx",
         blocked_by_section_lock=False,
     ),

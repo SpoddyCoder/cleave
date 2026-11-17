@@ -65,6 +65,26 @@ _NODE_CARDS: dict[str, str] = {
     "overlay.closing_card": "closing_card",
 }
 
+# Child pages with their own on/off switch. Their lock stays the parent's.
+_NODES_WITH_OWN_SWITCH = frozenset(
+    {
+        *_NODE_CARDS,
+        "post_fx.fade",
+        "post_fx.highlight_rolloff",
+        "post_fx.chroma_boost",
+        "post_fx.limiter",
+    }
+)
+
+_POST_FX_CHILD_HEADER_KINDS = frozenset(
+    {
+        RowKind.POST_FX_FADE_HEADER,
+        RowKind.POST_FX_HIGHLIGHT_ROLLOFF_HEADER,
+        RowKind.POST_FX_CHROMA_BOOST_HEADER,
+        RowKind.POST_FX_LIMITER_HEADER,
+    }
+)
+
 _LAYER_PAGE_HEADER_KINDS: dict[str, RowKind] = {
     LAYER_PAGE_MILKDROP_PRESET: RowKind.TRACK_MILKDROP_PRESET_HEADER,
     LAYER_PAGE_PRESET_SWITCHING: RowKind.TRACK_PRESET_SWITCHING,
@@ -91,13 +111,14 @@ def node_header_descriptor(node_id: str) -> RowDescriptor | None:
 def node_control_descriptor(node_id: str) -> RowDescriptor | None:
     """Header that owns the navigator icons and E/S/L keys for a page.
 
-    A layer, a card, and a root own their controls. Any other page uses
-    the controls of its parent.
+    A layer, a root, and a child page with its own switch (a card, a Post-FX
+    effect) own their controls. Any other page uses the controls of its
+    parent.
     """
     slot = layer_slot_of(node_id)
     if slot is not None:
         return RowDescriptor(RowKind.TRACK_HEADER, slot=slot)
-    if node_id in _NODE_CARDS:
+    if node_id in _NODES_WITH_OWN_SWITCH:
         return node_header_descriptor(node_id)
     return node_header_descriptor(root_id(node_id))
 
@@ -113,7 +134,7 @@ def toggle_header_locked(controls: TuningControls, desc: RowDescriptor) -> bool:
     if kind in (RowKind.OVERLAYS_HEADER, RowKind.OVERLAY_CARD_HEADER):
         controls.toggle_overlay_locked()
         return True
-    if kind == RowKind.POST_FX_HEADER:
+    if kind == RowKind.POST_FX_HEADER or kind in _POST_FX_CHILD_HEADER_KINDS:
         controls.toggle_post_fx_locked()
         return True
     if kind == RowKind.PATTERN_MASK_HEADER:

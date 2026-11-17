@@ -307,8 +307,9 @@ OVERLAYS_SECTION = SectionDef(
 
 POST_FX_HIGHLIGHT_ROLLOFF_ACTIVE = ConditionalRowsDef(
     name="highlight_rolloff_active",
-    predicate=lambda state, _desc: state.post_fx.highlight_rolloff.mode != "off",
+    predicate=lambda state, _desc: state.post_fx.highlight_rolloff.enabled,
     children=(
+        SectionNode(leaf_kind=RowKind.POST_FX_HIGHLIGHT_ROLLOFF_MODE),
         SectionNode(leaf_kind=RowKind.POST_FX_HIGHLIGHT_ROLLOFF_CURVE),
         SectionNode(leaf_kind=RowKind.POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD),
         SectionNode(leaf_kind=RowKind.POST_FX_HIGHLIGHT_ROLLOFF_CEILING),
@@ -322,15 +323,16 @@ POST_FX_HIGHLIGHT_ROLLOFF_SECTION = SectionDef(
     header_kind=RowKind.POST_FX_HIGHLIGHT_ROLLOFF_HEADER,
     context="global",
     children=(
-        SectionNode(leaf_kind=RowKind.POST_FX_HIGHLIGHT_ROLLOFF_MODE),
+        SectionNode(leaf_kind=RowKind.POST_FX_HIGHLIGHT_ROLLOFF_ENABLED),
         SectionNode(conditional=POST_FX_HIGHLIGHT_ROLLOFF_ACTIVE),
     ),
 )
 
 POST_FX_CHROMA_BOOST_ACTIVE = ConditionalRowsDef(
     name="chroma_boost_active",
-    predicate=lambda state, _desc: state.post_fx.chroma_boost.mode != "off",
+    predicate=lambda state, _desc: state.post_fx.chroma_boost.enabled,
     children=(
+        SectionNode(leaf_kind=RowKind.POST_FX_CHROMA_BOOST_MODE),
         SectionNode(leaf_kind=RowKind.POST_FX_CHROMA_BOOST_VARIANT),
         SectionNode(leaf_kind=RowKind.POST_FX_CHROMA_BOOST_AMOUNT),
     ),
@@ -365,7 +367,7 @@ POST_FX_CHROMA_BOOST_SECTION = SectionDef(
     header_kind=RowKind.POST_FX_CHROMA_BOOST_HEADER,
     context="global",
     children=(
-        SectionNode(leaf_kind=RowKind.POST_FX_CHROMA_BOOST_MODE),
+        SectionNode(leaf_kind=RowKind.POST_FX_CHROMA_BOOST_ENABLED),
         SectionNode(conditional=POST_FX_CHROMA_BOOST_ACTIVE),
     ),
 )
@@ -394,6 +396,7 @@ POST_FX_FADE_SECTION = SectionDef(
     header_kind=RowKind.POST_FX_FADE_HEADER,
     context="global",
     children=(
+        SectionNode(leaf_kind=RowKind.POST_FX_FADE_ENABLED),
         SectionNode(subsection=POST_FX_FADE_IN_SECTION),
         SectionNode(subsection=POST_FX_FADE_OUT_SECTION),
     ),
@@ -777,6 +780,7 @@ POST_FX_SECTION_KINDS = kinds_in_section(POST_FX_SECTION) | kinds_in_section(
     POST_FX_PAGE_SECTION
 )
 POST_FX_LIMITER_KINDS = kinds_in_section(POST_FX_LIMITER_SECTION)
+POST_FX_FADE_KINDS = kinds_in_section(POST_FX_FADE_SECTION)
 PATTERN_MASK_SECTION_KINDS = kinds_in_section(
     PATTERN_MASK_SECTION
 ) | kinds_in_section(PATTERN_MASK_PAGE_SECTION)

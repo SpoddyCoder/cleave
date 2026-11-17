@@ -957,6 +957,7 @@ render:
         post_fx=default_post_fx_config(
             enabled=True,
             fade=FadeConfig(
+                enabled=True,
                 fade_in=FadeSideConfig(start=0.0, end=12.0, type="smoothstep"),
                 fade_out=FadeSideConfig(start=3.0, end=0.0, type="smoothstep"),
             ),
@@ -1024,6 +1025,7 @@ def test_post_fx_runtime_from_cfg_copies_fade() -> None:
 
     post_fx = default_post_fx_config(
         fade=FadeConfig(
+            enabled=False,
             fade_in=FadeSideConfig(start=1.0, end=8.0, type="linear"),
             fade_out=FadeSideConfig(start=6.0, end=2.0, type="ease_out_expo"),
         ),
@@ -1036,6 +1038,7 @@ def test_post_fx_runtime_from_cfg_copies_fade() -> None:
     assert runtime.fade.fade_out.start == 6.0
     assert runtime.fade.fade_out.end == 2.0
     assert runtime.fade.fade_out.type == "ease_out_expo"
+    assert runtime.fade.enabled is False
 
 
 def test_parse_post_fx_highlight_rolloff_defaults() -> None:
@@ -1073,7 +1076,8 @@ render:
     assert render is not None
     assert render.post_fx is not None
     cb = render.post_fx.chroma_boost
-    assert cb.mode == "off"
+    assert cb.enabled is False
+    assert cb.mode == "composite"
     assert cb.variant == "vibrance"
     assert cb.amount_pct == 40
 
@@ -1094,7 +1098,7 @@ render:
     assert render.post_fx.chroma_boost.variant == variant
 
 
-@pytest.mark.parametrize("mode", ("off", "per_layer", "composite"))
+@pytest.mark.parametrize("mode", ("per_layer", "composite"))
 def test_parse_post_fx_chroma_boost_valid_modes(mode: str) -> None:
     data = yaml.safe_load(
         f"""\
@@ -1126,7 +1130,7 @@ render:
     assert render.post_fx.highlight_rolloff.curve == curve
 
 
-@pytest.mark.parametrize("mode", ("off", "per_layer", "composite"))
+@pytest.mark.parametrize("mode", ("per_layer", "composite"))
 def test_parse_post_fx_highlight_rolloff_valid_modes(mode: str) -> None:
     data = yaml.safe_load(
         f"""\
@@ -1166,6 +1170,35 @@ render:
     )
     with pytest.raises(ValueError, match="mode must be one of"):
         parse_render_section(data)
+
+
+@pytest.mark.parametrize("section", ("highlight_rolloff", "chroma_boost"))
+def test_parse_post_fx_mode_off_points_to_enabled(section: str) -> None:
+    data = yaml.safe_load(
+        f"""\
+render:
+  post_fx:
+    {section}:
+      mode: off
+"""
+    )
+    with pytest.raises(ValueError, match=rf"{section}\.enabled: false"):
+        parse_render_section(data)
+
+
+@pytest.mark.parametrize("section", ("fade", "highlight_rolloff", "chroma_boost"))
+def test_parse_post_fx_child_enabled(section: str) -> None:
+    data = yaml.safe_load(
+        f"""\
+render:
+  post_fx:
+    {section}:
+      enabled: false
+"""
+    )
+    render = parse_render_section(data)
+    assert render is not None and render.post_fx is not None
+    assert getattr(render.post_fx, section).enabled is False
 
 
 def test_parse_post_fx_highlight_rolloff_clamps() -> None:

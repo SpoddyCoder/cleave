@@ -454,6 +454,22 @@ def _static_child_toggles(
         return (
             NavToggle(TOGGLE_ENABLED, overlays.closing_card.enabled, overlays.locked),
         )
+    post_fx = session.post_fx
+    if node_id == "post_fx.fade":
+        return (NavToggle(TOGGLE_ENABLED, post_fx.fade.enabled, post_fx.locked),)
+    if node_id == "post_fx.highlight_rolloff":
+        return (
+            NavToggle(
+                TOGGLE_ENABLED, post_fx.highlight_rolloff.enabled, post_fx.locked
+            ),
+        )
+    if node_id == "post_fx.chroma_boost":
+        return (
+            NavToggle(TOGGLE_ENABLED, post_fx.chroma_boost.enabled, post_fx.locked),
+        )
+    if node_id == "post_fx.limiter":
+        # The limiter ignores the Post-FX lock and switch.
+        return (NavToggle(TOGGLE_ENABLED, post_fx.limiter.enabled),)
     return ()
 
 
