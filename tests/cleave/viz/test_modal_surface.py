@@ -51,7 +51,6 @@ from cleave.viz.modal_surface import (
 from cleave.viz.shell_focus import ShellRegion
 from cleave.viz.shell_layout import ShellLayout
 from cleave.viz.theme import (
-    ACCENT_FROM,
     DISABLED,
     HIGHLIGHT,
     LABEL,
@@ -322,7 +321,7 @@ def test_kind_renders_with_idle_mouse(view: ModalViewState) -> None:
                 _glyphs(view.message or "")
                 + sum(_glyphs(line.prefix()) for line in view.labeled_lines)
             )
-            assert colors.get(_pack(ACCENT_FROM), 0) == 2
+            assert colors.get(_pack(HIGHLIGHT), 0) == 4
             assert wash not in colors
             assert border not in colors
         else:

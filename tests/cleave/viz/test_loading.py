@@ -21,8 +21,8 @@ from cleave.viz.loading import (
     present_frame,
 )
 from cleave.viz.modal_surface import ImGuiTextMeasure
-from cleave.viz.progress_bar import accent_at, clamp_fraction, progress_bar_inset
-from cleave.viz.theme import ACCENT_FROM, ACCENT_TO, BACKGROUND, LABEL, VALUE
+from cleave.viz.progress_bar import clamp_fraction, progress_bar_inset
+from cleave.viz.theme import BACKGROUND, HIGHLIGHT, LABEL, VALUE
 
 
 def test_clamp_loading_fraction() -> None:
@@ -244,10 +244,8 @@ def test_loading_content_bar_fraction_and_detail() -> None:
     with _host() as host:
         half, quads, colors = _draw_frame(host, message, fraction=0.5)
         assert half.fill_rect is not None
-        # The fill runs from the accent's blue to its midpoint at half way.
-        assert _pack(ACCENT_FROM) in colors
-        assert _pack(accent_at(0.5)) in colors
-        assert _pack(ACCENT_TO) not in colors
+        # The fill is the lit menu row's marker colour.
+        assert _pack(HIGHLIGHT) in colors
 
         empty, quads, empty_colors = _draw_frame(host, message, fraction=0.0)
         assert empty.bar_rect is not None
@@ -259,7 +257,7 @@ def test_loading_content_bar_fraction_and_detail() -> None:
             if abs(quad[2] - bar_w) <= 1.0 and abs(quad[3] - bar_h) <= 1.0
         ]
         assert tracks, quads
-        assert _pack(ACCENT_FROM) not in empty_colors
+        assert _pack(HIGHLIGHT) not in empty_colors
 
         missing, quads, _colors = _draw_frame(host, message, fraction=None)
         assert missing.bar_rect is None

@@ -1,7 +1,7 @@
 """Determinate progress bar shared by the loading screen and the progress modal.
 
-A ``SURFACE_EDGE`` border, a background gap, then a fill that runs from
-``ACCENT_FROM`` blue toward ``ACCENT_TO`` violet as it grows. Geometry is pure;
+A ``SURFACE_EDGE`` border, a background gap, then a solid ``HIGHLIGHT`` fill,
+the colour of a lit menu row's marker bar. Geometry is pure;
 ``draw_progress_bar`` needs a live ImGui frame.
 """
 
@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 from cleave.viz.theme import (
     ACCENT_FROM,
     ACCENT_TO,
+    HIGHLIGHT,
     PROGRESS_BAR_BORDER_WIDTH,
     PROGRESS_BAR_FILL_GAP,
     SURFACE_EDGE,
@@ -100,18 +101,7 @@ def draw_progress_bar(
         _fill(draw, bar, _packed(background))
     fill = progress_fill_rect(bar, fraction)
     if fill is not None:
-        from imgui_bundle import imgui as imgui_mod
-
-        fx, fy, fw, fh = fill
-        start, end = _packed(ACCENT_FROM), _packed(accent_at(fraction))
-        draw.add_rect_filled_multi_color(
-            imgui_mod.ImVec2(float(fx), float(fy)),
-            imgui_mod.ImVec2(float(fx + fw), float(fy + fh)),
-            start,
-            end,
-            end,
-            start,
-        )
+        _fill(draw, fill, _packed(HIGHLIGHT))
     border = _packed(SURFACE_EDGE)
     t = min(PROGRESS_BAR_BORDER_WIDTH, width // 2, height // 2)
     _fill(draw, (x, y, width, t), border)
