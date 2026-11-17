@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import itertools
+import json
 import os
 import sqlite3
 from collections.abc import Callable, Iterable
@@ -22,7 +23,7 @@ from cleave.cue_roles import (
     CueRole,
 )
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 PresetCollection = Literal["favourites", "bed", "pulse", "lead", "accent", "blacklisted"]
 
@@ -85,7 +86,13 @@ CREATE TABLE roles (
     role TEXT NOT NULL CHECK (role IN ('bed', 'pulse', 'lead', 'accent')),
     name TEXT NOT NULL
 );
+CREATE TABLE index_state (root TEXT PRIMARY KEY, fingerprint TEXT NOT NULL);
 """
+
+_UPGRADES: dict[int, str] = {
+    1: "CREATE TABLE index_state (root TEXT PRIMARY KEY, fingerprint TEXT NOT NULL);",
+}
+"""Script that takes a database from the keyed version to the next one."""
 
 
 class PresetLibraryError(RuntimeError):
@@ -181,6 +188,24 @@ class PresetIndex:
     path_hash: dict[str, str]
 
 
+def index_fingerprint(root: Path) -> str:
+    """Cheap signature of ``root``'s top level: the root and each folder's mtime.
+
+    Adding, removing, or renaming a preset pack (or a file directly in the
+    root) changes it. Changes deeper inside a pack do not; Settings > Rescan
+    presets picks those up.
+    """
+    try:
+        entries = [(".", os.stat(root).st_mtime_ns)]
+        with os.scandir(root) as it:
+            for entry in it:
+                if entry.is_dir():
+                    entries.append((entry.name, entry.stat().st_mtime_ns))
+    except OSError:
+        return "missing"
+    return json.dumps(sorted(entries))
+
+
 def build_index(
     conn: sqlite3.Connection,
     preset_root: Path,
@@ -193,6 +218,7 @@ def build_index(
     False); the table is then untouched.
     """
     root = preset_root.resolve()
+    fingerprint = index_fingerprint(root)
     cached: dict[str, tuple[int, int, str]] = {
         row[0]: (row[1], row[2], row[3])
         for row in conn.execute("SELECT path, size, mtime_ns, hash FROM files")
@@ -227,6 +253,10 @@ def build_index(
             upserts,
         )
         conn.executemany("DELETE FROM files WHERE path = ?", stale)
+        conn.execute(
+            "INSERT OR REPLACE INTO index_state (root, fingerprint) VALUES (?, ?)",
+            (str(root), fingerprint),
+        )
     if on_progress is not None:
         on_progress(total, total)
     return PresetIndex(root=root, path_hash=path_hash)
@@ -288,7 +318,13 @@ class PresetLibrary:
             conn.executescript(_SCHEMA)
             conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
             conn.commit()
-        elif version != SCHEMA_VERSION:
+            version = SCHEMA_VERSION
+        while version in _UPGRADES:
+            conn.executescript(
+                f"BEGIN; {_UPGRADES[version]} PRAGMA user_version = {version + 1}; COMMIT;"
+            )
+            version += 1
+        if version != SCHEMA_VERSION:
             conn.close()
             raise PresetLibraryError(
                 f"preset library {db_path} has schema version {version}, "
@@ -328,6 +364,27 @@ class PresetLibrary:
         if built is None:
             return False
         self.adopt(built)
+        return True
+
+    def load_index(self, preset_root: Path) -> bool:
+        """Use the stored index of ``preset_root`` when its top level is unchanged.
+
+        Returns False, leaving the library as it was, when the root was never
+        indexed or :func:`index_fingerprint` differs; call :meth:`index` then.
+        """
+        root = preset_root.resolve()
+        row = self._conn.execute(
+            "SELECT fingerprint FROM index_state WHERE root = ?", (str(root),)
+        ).fetchone()
+        if row is None or row[0] != index_fingerprint(root):
+            return False
+        prefix = os.path.join(str(root), "")
+        path_hash = {
+            path: digest
+            for path, digest in self._conn.execute("SELECT path, hash FROM files")
+            if path.startswith(prefix)
+        }
+        self.adopt(PresetIndex(root=root, path_hash=path_hash))
         return True
 
     def adopt(self, index: PresetIndex) -> None:

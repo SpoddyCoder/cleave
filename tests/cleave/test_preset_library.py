@@ -223,3 +223,110 @@ def test_favourite_through_symlinked_folder_matches_index(tmp_path: Path) -> Non
     library.set_favourite(root / "linked" / "a.milk", True)
 
     assert library.is_favourite((tmp_path / "elsewhere" / "a.milk").resolve())
+
+
+def _bump_mtime(path: Path) -> None:
+    stat = path.stat()
+    os.utime(path, ns=(stat.st_atime_ns, stat.st_mtime_ns + 1_000_000_000))
+
+
+def test_load_index_reuses_stored_index_without_hashing(
+    tmp_path: Path, monkeypatch
+) -> None:
+    root = tmp_path / "presets"
+    fav = _write(root / "pack" / "fav.milk", "fav")
+    db = tmp_path / "cleave.db"
+    library = PresetLibrary.open(db)
+    library.index(root)
+    library.set_favourite(fav, True)
+    library.close()
+
+    monkeypatch.setattr(preset_library, "scan_milk_files", None)
+    monkeypatch.setattr(preset_library, "preset_hash", None)
+    library = PresetLibrary.open(db)
+
+    assert library.load_index(root)
+    assert library.root == root.resolve()
+    assert library.collection_paths("favourites") == (fav.resolve(),)
+    library.close()
+
+
+def test_load_index_refuses_when_a_pack_is_added_or_removed(tmp_path: Path) -> None:
+    root = tmp_path / "presets"
+    _write(root / "pack" / "a.milk", "a")
+    library = PresetLibrary.in_memory()
+    library.index(root)
+    revision = library.revision
+
+    _write(root / "new pack" / "b.milk", "b")
+    _bump_mtime(root)
+    assert not library.load_index(root)
+    assert library.revision == revision
+
+    library.index(root)
+    assert library.load_index(root)
+
+
+def test_load_index_refuses_when_a_top_level_folder_changes(tmp_path: Path) -> None:
+    root = tmp_path / "presets"
+    _write(root / "pack" / "a.milk", "a")
+    library = PresetLibrary.in_memory()
+    library.index(root)
+
+    _write(root / "pack" / "b.milk", "b")
+    _bump_mtime(root / "pack")
+
+    assert not library.load_index(root)
+
+
+def test_load_index_refuses_a_root_never_indexed(tmp_path: Path) -> None:
+    _write(tmp_path / "one" / "a.milk", "a")
+    _write(tmp_path / "two" / "b.milk", "b")
+    library = PresetLibrary.in_memory()
+    library.index(tmp_path / "one")
+
+    assert not library.load_index(tmp_path / "two")
+    assert library.load_index(tmp_path / "one")
+
+
+def test_cancelled_index_leaves_no_fingerprint(tmp_path: Path) -> None:
+    root = tmp_path / "presets"
+    _write(root / "a.milk", "a")
+    library = PresetLibrary.in_memory()
+
+    assert library.index(root, lambda done, total: False) is False
+    assert not library.load_index(root)
+
+
+def test_open_upgrades_version_1_and_keeps_curation(tmp_path: Path) -> None:
+    db = tmp_path / "cleave.db"
+    conn = sqlite3.connect(db)
+    conn.executescript(
+        """
+        CREATE TABLE files (path TEXT PRIMARY KEY, size INTEGER NOT NULL,
+            mtime_ns INTEGER NOT NULL, hash TEXT NOT NULL);
+        CREATE INDEX files_hash ON files(hash);
+        CREATE TABLE favourites (hash TEXT PRIMARY KEY, name TEXT NOT NULL);
+        CREATE TABLE blacklist (hash TEXT PRIMARY KEY, name TEXT NOT NULL);
+        CREATE TABLE roles (hash TEXT PRIMARY KEY, role TEXT NOT NULL
+            CHECK (role IN ('bed', 'pulse', 'lead', 'accent')), name TEXT NOT NULL);
+        PRAGMA user_version = 1;
+        """
+    )
+    fav = _write(tmp_path / "presets" / "fav.milk", "fav")
+    conn.execute(
+        "INSERT INTO favourites (hash, name) VALUES (?, ?)", (preset_hash(fav), "fav.milk")
+    )
+    conn.commit()
+    conn.close()
+
+    library = PresetLibrary.open(db)
+    assert library.is_favourite(fav)
+    assert not library.load_index(tmp_path / "presets")
+    library.index(tmp_path / "presets")
+    assert library.load_index(tmp_path / "presets")
+    library.close()
+
+    conn = sqlite3.connect(db)
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == preset_library.SCHEMA_VERSION
+    conn.close()

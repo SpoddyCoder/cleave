@@ -20,6 +20,9 @@ __all__ = [
     "render",
 ]
 
+REINDEX_MESSAGE = "New Milkdrop presets found, re-indexing…"
+"""Loading screen status while the preset folder's top level has changed."""
+
 
 def __getattr__(name: str) -> Any:
     if name == "LoadingWindow":
@@ -80,10 +83,10 @@ def continue_launch(
         cleanup_unreferenced_user_presets(project_dir)
         cfg = load_config(config_path, resource_dir())
         library = PresetLibrary.open(library_db_path())
-        if not library.index(
+        if not library.load_index(cfg.paths.preset_root) and not library.index(
             cfg.paths.preset_root,
             lambda done, total: window.update(
-                "Indexing presets", done / total if total else None
+                REINDEX_MESSAGE, done / total if total else None
             ),
         ):
             return None
