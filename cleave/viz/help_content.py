@@ -180,6 +180,8 @@ _INSPECTOR_COMMAND_KINDS = {
     "timeline.snap_to_markers": RowKind.TIMELINE_SNAP_CUES,
     "timeline.set_cut_type": RowKind.TIMELINE_SET_CUT_TYPE,
     "settings.open_crash_log_folder": RowKind.SETTINGS_DEV_TOOLS_OPEN_CRASH_LOG_FOLDER,
+    "settings.open_themes_folder": RowKind.SETTINGS_UI_OPEN_THEMES_FOLDER,
+    "settings.reload_themes": RowKind.SETTINGS_UI_RELOAD_THEMES,
 }
 
 

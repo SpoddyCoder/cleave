@@ -29,6 +29,7 @@ from cleave.signals import Signals
 from cleave.pcm_io import load_mix_pcm
 from cleave.stem_pcm import StemPcmBank, load_stem_pcm, LIVE_PROJECTM_FPS
 from cleave.open_target import OpenTarget
+from cleave.paths import themes_dir
 from cleave.project import load_manifest
 from cleave.viz.bootstrap import load_stem_signals
 from cleave.viz.controls import TuningControls
@@ -42,6 +43,7 @@ from cleave.viz.modal import ModalHost
 from cleave.viz.overlay_draw import OverlayDrawer
 from cleave.viz.loading import LoadingWindow, open_loading_window
 from cleave.viz.theme import palette_for_theme, set_palette, set_ui_scale_percent
+from cleave.viz.user_themes import install_user_themes
 from cleave.viz.tooltips import set_tooltips_enabled
 from cleave.viz.timeline_controls import TimelineControls
 from cleave.viz.shell_layout import ShellLayout, clamp_timeline_band_height
@@ -646,6 +648,7 @@ class VisualizerApp:
             window = open_loading_window()
         pygame.display.set_caption(window_caption(seed.window_title, dirty=False))
         set_ui_scale_percent(seed.cfg.editor.ui_scale)
+        theme_problems = install_user_themes(themes_dir())
         set_palette(palette_for_theme(seed.cfg.editor.theme))
         set_tooltips_enabled(seed.cfg.editor.show_tooltips)
 
@@ -676,6 +679,7 @@ class VisualizerApp:
             self._runtime = rt
             if window.quit_requested:
                 return None
+            rt.controls.theme_files.show_problems(theme_problems)
 
             # The loop module imports ImGui, which offline render never needs.
             from cleave.viz.live_frame_loop import LiveFrameLoop

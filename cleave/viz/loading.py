@@ -33,6 +33,7 @@ from cleave.config_schema.window import (
 )
 from cleave.gl_color_format import RGBA8
 from cleave.gl_compositor import GlCompositor
+from cleave.paths import themes_dir
 from cleave.viz.progress_bar import (
     clamp_fraction,
     draw_progress_bar,
@@ -49,6 +50,7 @@ from cleave.viz.theme import (
     ui_scale_percent,
 )
 from cleave.viz import sdl_window
+from cleave.viz.user_themes import install_user_themes
 
 if TYPE_CHECKING:
     from imgui_bundle import imgui
@@ -607,6 +609,7 @@ def open_loading_window() -> LoadingWindow:
     compositor.init()
     editor = saved_editor_settings()
     set_ui_scale_percent(editor.ui_scale)
+    install_user_themes(themes_dir())
     set_palette(palette_for_theme(editor.theme))
     imgui_host = ImGuiHost.create()
     imgui_host.set_display_size(width, height)

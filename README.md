@@ -1,6 +1,6 @@
 # `Cleave`
 
-[![Version](https://img.shields.io/badge/version-v0.3.0--321%20%28dev%20build%29-orange)](https://github.com/SpoddyCoder/cleave/compare/v0.3.0...ui-refactor) [![Tests](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml/badge.svg)](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml)
+[![Version](https://img.shields.io/badge/version-v0.3.0--322%20%28dev%20build%29-orange)](https://github.com/SpoddyCoder/cleave/compare/v0.3.0...ui-refactor) [![Tests](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml/badge.svg)](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml)
 
 Stem-separated music visualizer. Layer together drums, bass, vocals and other stems - each driving Milkdrop presets to create your own unique visual masterpieces.
 
@@ -139,9 +139,9 @@ export GALLIUM_DRIVER=d3d12
 
 Cleave creates a project directory for each song, storing stems, configs and renders together.
 
-**Windows**: `Documents\Cleave\` (projects, presets, textures). Settings: `%APPDATA%\Cleave\config.yaml`.
+**Windows**: `Documents\Cleave\` (projects, presets, textures, themes). Settings: `%APPDATA%\Cleave\config.yaml`.
 
-**Linux**: `~/.local/share/cleave/` (projects, presets, textures). Settings: `~/.config/cleave/config.yaml`.
+**Linux**: `~/.local/share/cleave/` (projects, presets, textures, themes). Settings: `~/.config/cleave/config.yaml`.
 
 Override the data root with `CLEAVE_DATA` on any OS.
 

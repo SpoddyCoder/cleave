@@ -72,6 +72,9 @@ class SectionDef:
     append_dynamic_children: AppendDynamicChildrenFn | None = None
     card: str | None = None
     trailing_commands: tuple[str, ...] = ()
+    # False: the page's buttons join its last group of rows instead of
+    # sitting under a divider of their own.
+    commands_divider: bool = True
 
 
 def _append_track_effect_rows(
@@ -136,8 +139,6 @@ SETTINGS_UI_SECTION = SectionDef(
     header_kind=RowKind.SETTINGS_UI_HEADER,
     context="global",
     children=(
-        SectionNode(leaf_kind=RowKind.SETTINGS_UI_THEME),
-        SectionNode(leaf_kind=RowKind.SETTINGS_UI_SCALE),
         SectionNode(leaf_kind=RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY),
         SectionNode(leaf_kind=RowKind.SETTINGS_UI_HIGHLIGHT_NEW_PAGE),
         SectionNode(leaf_kind=RowKind.SETTINGS_UI_SHOW_TOOLTIPS),
@@ -147,7 +148,14 @@ SETTINGS_UI_SECTION = SectionDef(
         SectionNode(leaf_kind=RowKind.SETTINGS_NAVIGATOR_EXPAND_CLICK),
         SectionNode(divider=True),
         SectionNode(leaf_kind=RowKind.SETTINGS_HELP_SIDE),
+        SectionNode(divider=True),
+        SectionNode(leaf_kind=RowKind.SETTINGS_UI_SCALE),
+        SectionNode(leaf_kind=RowKind.SETTINGS_UI_THEME),
+        SectionNode(
+            commands=("settings.open_themes_folder", "settings.reload_themes")
+        ),
     ),
+    commands_divider=False,
 )
 
 SETTINGS_DEV_TOOLS_SECTION = SectionDef(

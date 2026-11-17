@@ -280,6 +280,14 @@ def _run_open_crash_log_folder(controls: TuningControls) -> None:
         controls.show_notification(f"Could not open the crash log folder: {exc}")
 
 
+def _run_open_themes_folder(controls: TuningControls) -> None:
+    controls.theme_files.open_folder()
+
+
+def _run_reload_themes(controls: TuningControls) -> None:
+    controls.theme_files.reload()
+
+
 def _run_about(controls: TuningControls) -> None:
     controls.prompt_about()
 
@@ -643,6 +651,22 @@ _OPEN_CRASH_LOG_FOLDER = Command(
     run=_run_open_crash_log_folder,
 )
 
+_OPEN_THEMES_FOLDER = Command(
+    id="settings.open_themes_folder",
+    label="Open themes folder",
+    kind="command",
+    enabled=_enabled,
+    run=_run_open_themes_folder,
+)
+
+_RELOAD_THEMES = Command(
+    id="settings.reload_themes",
+    label="Reload themes",
+    kind="command",
+    enabled=_enabled,
+    run=_run_reload_themes,
+)
+
 _HELP_OVERLAY = Command(
     id="help.overlay",
     label="Help",
@@ -871,6 +895,8 @@ _INSPECTOR_COMMANDS: tuple[Command, ...] = (
     _POPULATE_PRESETS,
     _RESUME_SWITCHING,
     _OPEN_CRASH_LOG_FOLDER,
+    _OPEN_THEMES_FOLDER,
+    _RELOAD_THEMES,
 )
 
 

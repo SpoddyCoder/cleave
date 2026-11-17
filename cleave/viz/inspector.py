@@ -139,7 +139,8 @@ def build_inspector_rows(
     Settings, Project, and an unknown id are empty. A layer or timeline row
     not yet in *state* (added this frame, after the view state was built) is
     empty until the next frame. Button rows go to the bottom of the page in their
-    page order, under a divider when other rows sit above them.
+    page order, under a divider when other rows sit above them, unless the
+    section sets ``commands_divider=False``.
     """
     section = page_section(state, node_id)
     if section is None:
@@ -149,13 +150,15 @@ def build_inspector_rows(
         return ()
     rows: list[InspectorRow] = []
     _append_section_children(rows, section, state, 0, slot)
-    return _commands_last(rows)
+    return _commands_last(rows, divider=section.commands_divider)
 
 
-def _commands_last(rows: list[InspectorRow]) -> tuple[InspectorRow, ...]:
+def _commands_last(
+    rows: list[InspectorRow], *, divider: bool
+) -> tuple[InspectorRow, ...]:
     fields = [row for row in rows if not row.command_ids]
     commands = [replace(row, depth=0) for row in rows if row.command_ids]
-    if fields and commands:
+    if divider and fields and commands:
         return (*fields, DIVIDER_ROW, *commands)
     return (*fields, *commands)
 

@@ -167,13 +167,18 @@ def cuda_extra_root() -> Path:
 def ensure_data_dirs() -> None:
     """Create the user data directory tree if any parts are missing."""
     root = data_dir()
-    for name in ("projects", "presets", "textures", "models"):
+    for name in ("projects", "presets", "textures", "models", "themes"):
         (root / name).mkdir(parents=True, exist_ok=True)
 
 
 def default_texture_paths() -> tuple[Path, ...]:
     """Return the default texture search paths under :func:`data_dir`."""
     return ((data_dir() / "textures").resolve(),)
+
+
+def themes_dir() -> Path:
+    """Return the folder that holds user theme files under :func:`data_dir`."""
+    return (data_dir() / "themes").resolve()
 
 
 def projects_dir() -> Path:

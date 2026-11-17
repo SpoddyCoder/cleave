@@ -184,9 +184,8 @@ def test_settings_pages() -> None:
     ]
     assert preview[-1].command_ids == ("settings.measure_latency",)
     assert preview[-1].depth == 0
-    assert _kinds(build_inspector_rows(state, "settings.ui")) == [
-        RowKind.SETTINGS_UI_THEME,
-        RowKind.SETTINGS_UI_SCALE,
+    ui = build_inspector_rows(state, "settings.ui")
+    assert _kinds(ui) == [
         RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY,
         RowKind.SETTINGS_UI_HIGHLIGHT_NEW_PAGE,
         RowKind.SETTINGS_UI_SHOW_TOOLTIPS,
@@ -194,7 +193,22 @@ def test_settings_pages() -> None:
         RowKind.SETTINGS_NAVIGATOR_SIDE,
         RowKind.SETTINGS_NAVIGATOR_EXPAND_CLICK,
         RowKind.SETTINGS_HELP_SIDE,
+        RowKind.SETTINGS_UI_SCALE,
+        RowKind.SETTINGS_UI_THEME,
     ]
+    # UI scale, Theme, and the theme buttons share the last group: one
+    # divider above UI scale, none between Theme and the buttons.
+    theme = next(
+        i
+        for i, row in enumerate(ui)
+        if not row.divider and row.descriptor.kind is RowKind.SETTINGS_UI_THEME
+    )
+    assert ui[theme - 1].descriptor.kind is RowKind.SETTINGS_UI_SCALE
+    assert ui[theme - 2].divider
+    assert ui[theme + 1].command_ids == (
+        "settings.open_themes_folder",
+        "settings.reload_themes",
+    )
     assert _kinds(build_inspector_rows(state, "settings.dev_tools")) == [
         RowKind.SETTINGS_DEV_TOOLS_CRASH_LOG,
     ]

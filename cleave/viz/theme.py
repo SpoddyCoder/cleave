@@ -5,7 +5,9 @@ below plus its alphas and shading amounts. ``ULTRAVIOLET`` is the built-in
 theme. Draw code reads the live one with ``palette()`` at draw time, never at
 import; ``set_palette()`` switches it and bumps ``palette_generation()`` so
 caches that hold drawn pixels rebuild. Roles are named for what they do, not
-their colour; the descriptions here are Ultraviolet's.
+their colour; the descriptions here are Ultraviolet's. User theme files
+(``user_themes.py``) add palettes after the built-ins through
+``set_user_palettes()``.
 
 Typography roles for the live tuning overlay:
   value    — white text for values and state indicators (default), and any
@@ -490,6 +492,9 @@ BUILTIN_PALETTES: tuple[Palette, ...] = (ULTRAVIOLET,)
 
 _palette: Palette = ULTRAVIOLET
 _palette_generation: int = 0
+# Themes loaded from the user's theme files; the Theme setting lists them
+# after the built-ins.
+_user_palettes: tuple[Palette, ...] = ()
 
 
 def palette() -> Palette:
@@ -506,9 +511,20 @@ def set_palette(value: Palette) -> None:
     _palette_generation += 1
 
 
+def set_user_palettes(values: tuple[Palette, ...]) -> None:
+    """Replace the themes loaded from user theme files."""
+    global _user_palettes
+    _user_palettes = tuple(values)
+
+
+def all_palettes() -> tuple[Palette, ...]:
+    """Built-in themes, then user themes, in the order the Theme setting lists them."""
+    return BUILTIN_PALETTES + _user_palettes
+
+
 def palette_for_theme(theme_id: str) -> Palette:
-    """The built-in palette with *theme_id*, or Ultraviolet for an unknown id."""
-    for candidate in BUILTIN_PALETTES:
+    """The palette with *theme_id*, or Ultraviolet for an unknown id."""
+    for candidate in all_palettes():
         if candidate.id == theme_id:
             return candidate
     return ULTRAVIOLET
@@ -516,7 +532,7 @@ def palette_for_theme(theme_id: str) -> Palette:
 
 def theme_ids() -> tuple[str, ...]:
     """Every theme the Theme setting offers, in order."""
-    return tuple(candidate.id for candidate in BUILTIN_PALETTES)
+    return tuple(candidate.id for candidate in all_palettes())
 
 
 def theme_label(theme_id: str) -> str:

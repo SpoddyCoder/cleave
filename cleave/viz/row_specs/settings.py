@@ -136,6 +136,16 @@ def _apply_settings_dev_tools_open_crash_log_folder(
 ) -> None:
     command_by_id("settings.open_crash_log_folder").run(controls)
 
+def _apply_settings_ui_open_themes_folder(
+    controls: TuningControls, _desc: RowDescriptor
+) -> None:
+    command_by_id("settings.open_themes_folder").run(controls)
+
+def _apply_settings_ui_reload_themes(
+    controls: TuningControls, _desc: RowDescriptor
+) -> None:
+    command_by_id("settings.reload_themes").run(controls)
+
 def _apply_settings_ui_theme(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, _large: bool,
 ) -> None:
@@ -389,9 +399,43 @@ SPECS: dict[RowKind, RowSpec] = {
         help_description=(
             "Colours of the editor's panels, menus, buttons, and text.",
             "It does not change the visualiser or the credits cards.",
+            "Theme files in the themes folder add more; see Reload themes.",
         ),
         is_pinned=True,
         repeatable=True,
+        parent_group="settings_ui",
+    ),
+    RowKind.SETTINGS_UI_OPEN_THEMES_FOLDER: RowSpec(
+        affordance=RowAffordance.COMMAND,
+        panel_label="Open themes folder",
+        present_style=RowPresentStyle.FULL_LINE,
+        apply_action=_apply_settings_ui_open_themes_folder,
+        fit_strategy=FitStrategy.NONE,
+        help_title="Open Themes Folder",
+        help_entries=(("Enter", "open the folder"),),
+        help_description=(
+            "Opens the folder for your own theme files.",
+            "Each .yaml file there is a theme: it starts from a built-in theme"
+            " and changes only the colours it lists.",
+            "See the user guide for the colour names.",
+        ),
+        is_pinned=True,
+        parent_group="settings_ui",
+    ),
+    RowKind.SETTINGS_UI_RELOAD_THEMES: RowSpec(
+        affordance=RowAffordance.COMMAND,
+        panel_label="Reload themes",
+        present_style=RowPresentStyle.FULL_LINE,
+        apply_action=_apply_settings_ui_reload_themes,
+        fit_strategy=FitStrategy.NONE,
+        help_title="Reload Themes",
+        help_entries=(("Enter", "read the theme files again"),),
+        help_description=(
+            "Reads the themes folder again, so a theme file you changed shows"
+            " at once.",
+            "Any mistakes in the files are listed in a message.",
+        ),
+        is_pinned=True,
         parent_group="settings_ui",
     ),
     RowKind.SETTINGS_UI_SCALE: RowSpec(

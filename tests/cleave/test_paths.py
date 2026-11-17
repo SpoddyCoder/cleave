@@ -119,7 +119,7 @@ def test_ensure_data_dirs_creates_tree(
 ) -> None:
     monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
     ensure_data_dirs()
-    for name in ("projects", "presets", "textures", "models"):
+    for name in ("projects", "presets", "textures", "models", "themes"):
         assert (tmp_path / name).is_dir()
 
 
@@ -129,7 +129,7 @@ def test_ensure_data_dirs_idempotent(
     monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
     ensure_data_dirs()
     ensure_data_dirs()
-    for name in ("projects", "presets", "textures", "models"):
+    for name in ("projects", "presets", "textures", "models", "themes"):
         assert (tmp_path / name).is_dir()
 
 
@@ -139,7 +139,7 @@ def test_ensure_data_dirs_partial(
     monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
     (tmp_path / "presets").mkdir()
     ensure_data_dirs()
-    for name in ("projects", "presets", "textures", "models"):
+    for name in ("projects", "presets", "textures", "models", "themes"):
         assert (tmp_path / name).is_dir()
 
 

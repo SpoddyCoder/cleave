@@ -39,6 +39,7 @@ from cleave.viz.pattern_mask_controls import PatternMaskControls
 from cleave.viz.post_fx_bindings import PostFxBindings
 from cleave.viz.post_fx_controls import PostFxControls
 from cleave.viz.settings_controls import SettingsControls
+from cleave.viz.theme_file_controls import ThemeFileControls
 from cleave.viz.project_controls import ProjectControls
 from cleave.viz.project_render_controls import ProjectRenderController
 from cleave.viz.project_switch import ProjectSwitchController
@@ -277,6 +278,11 @@ class TuningControls:
             cfg,
             on_notification=self.show_notification,
             on_notification_display_changed=self._notification_host.set_display_sec,
+        )
+        self.theme_files = ThemeFileControls(
+            cfg,
+            self._modal_host,
+            on_notification=self.show_notification,
         )
         self.project = ProjectControls(
             session,
