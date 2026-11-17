@@ -15,7 +15,8 @@ from imgui_bundle import imgui
 
 from cleave.viz.imgui_theme import floating_surface, rgba
 from cleave.viz.info_panel import InfoPanelViewState
-from cleave.viz.theme import LABEL, VALUE
+from cleave.viz.theme import VALUE
+from cleave.viz.title_bar import paint_title_bar
 
 Rect = tuple[int, int, int, int]
 
@@ -102,6 +103,33 @@ def _draw_lines(lines: tuple[str, ...], color: tuple[int, int, int]) -> None:
         imgui.text_colored(packed, line)
 
 
+def _draw_title(lines: tuple[str, ...]) -> None:
+    """Title lines in VALUE on a title bar across the window, from its top border."""
+    pos = imgui.get_window_pos()
+    size = imgui.get_window_size()
+    style = imgui.get_style()
+    border = style.window_border_size
+    pad_y = style.window_padding.y
+    top = imgui.get_cursor_screen_pos().y
+    text_h = len(lines) * imgui.get_text_line_height() + max(
+        0, len(lines) - 1
+    ) * style.item_spacing.y
+    draw = imgui.get_window_draw_list()
+    draw.push_clip_rect(pos, imgui.ImVec2(pos.x + size.x, pos.y + size.y), False)
+    try:
+        paint_title_bar(
+            draw,
+            pos.x + border,
+            pos.y + border,
+            pos.x + size.x - border,
+            top + text_h + max(0.0, pad_y - border),
+        )
+    finally:
+        draw.pop_clip_rect()
+    _draw_lines(lines, VALUE)
+    imgui.dummy(imgui.ImVec2(0.0, max(0.0, pad_y - border)))
+
+
 class InfoPanelSurface:
     """Centred, auto-sized, non-modal panel. Phase 8 reuses it."""
 
@@ -123,7 +151,7 @@ class InfoPanelSurface:
             _raise(_INFO_WINDOW)
             view = self.view
             if view.title_lines:
-                _draw_lines(view.title_lines, LABEL)
+                _draw_title(view.title_lines)
             if view.title_lines and view.body_lines:
                 imgui.spacing()
             if view.body_lines:

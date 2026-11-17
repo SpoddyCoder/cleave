@@ -65,7 +65,8 @@ file picker, info panels, tooltips):
 Accent gradient:
   ACCENT_FROM, ACCENT_TO - blue into violet, left to right: progress bar fills
     and the inspector title's new-page swipe
-  HEADING - lavender help column section titles
+  Title bars (title_bar.py) fill help column section titles and modal titles
+    with the full accent gradient, the title in VALUE
 
 Shell rules (not text roles):
   PANEL_EDGE - idle navigator, inspector, and strip outline
@@ -264,7 +265,6 @@ DISABLED: tuple[int, int, int] = (124, 130, 148)
 OFF_CONTROL_TEXT: tuple[int, int, int] = (170, 177, 196)
 OFF_CONTROL_MUTED: tuple[int, int, int] = (124, 130, 148)
 MUTED: tuple[int, int, int] = (140, 151, 176)
-HEADING: tuple[int, int, int] = (196, 182, 255)
 HIGHLIGHT: tuple[int, int, int] = (255, 235, 130)
 ERROR_NOTIFICATION: tuple[int, int, int] = (255, 140, 140)
 NOTIFICATION_ON_FILL: tuple[int, int, int] = (0, 0, 0)

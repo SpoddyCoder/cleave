@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import math
+
 from imgui_bundle import imgui
 
 from cleave.viz.help_content import DescriptionSection, HelpContent
-from cleave.viz.imgui_theme import rgba
-from cleave.viz.theme import HEADING, LABEL, VALUE
+from cleave.viz.imgui_theme import padded_row_spacing_y, rgba
+from cleave.viz.theme import LABEL, VALUE
+from cleave.viz.title_bar import paint_title_bar
 
 
 def help_column_text(sections: tuple[HelpContent, ...]) -> str:
@@ -37,7 +40,7 @@ def draw_help_column(sections: tuple[HelpContent, ...]) -> None:
     for index, section in enumerate(sections):
         if index:
             imgui.dummy(imgui.ImVec2(0.0, imgui.get_text_line_height()))
-        _draw_wrapped(section.title, HEADING, wrap_x)
+        _draw_heading(section.title, wrap_x)
         if isinstance(section, DescriptionSection):
             for line in section.lines:
                 _draw_wrapped(line, VALUE, wrap_x)
@@ -45,6 +48,30 @@ def draw_help_column(sections: tuple[HelpContent, ...]) -> None:
                 imgui.dummy(imgui.ImVec2(0.0, imgui.get_text_line_height()))
         for key, description in section.entries:
             _draw_key_value(key, description, start_x, key_w, gap, wrap_x)
+
+
+def _draw_heading(text: str, wrap_x: float) -> None:
+    """A section title in VALUE on a title bar the column's full width.
+
+    The bar is a padded row's height per line and reaches into the window
+    padding as far as the window clips its content.
+    """
+    pad_y = padded_row_spacing_y() * 0.5
+    pad_x = math.floor(imgui.get_style().window_padding.x * 0.5)
+    local = imgui.get_cursor_pos()
+    imgui.set_cursor_pos_y(local.y + pad_y)
+    origin = imgui.get_cursor_screen_pos()
+    width = max(1.0, wrap_x - local.x)
+    text_h = imgui.calc_text_size(text, wrap_width=width).y
+    paint_title_bar(
+        imgui.get_window_draw_list(),
+        origin.x - pad_x,
+        origin.y - pad_y,
+        origin.x + width + pad_x,
+        origin.y + text_h + pad_y,
+    )
+    _draw_wrapped(text, VALUE, wrap_x)
+    imgui.set_cursor_pos_y(imgui.get_cursor_pos_y() + pad_y)
 
 
 def _draw_wrapped(text: str, color: tuple[int, int, int], wrap_x: float) -> None:

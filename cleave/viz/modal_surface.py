@@ -59,8 +59,10 @@ from cleave.viz.modal_layout import (
     text_error_line,
     text_field_lines,
     text_max_field_lines,
+    title_bar_bottom,
     visible_field_lines,
 )
+from cleave.viz.title_bar import paint_title_bar
 from cleave.viz.theme import (
     BORDER_WIDTH,
     DISABLED,
@@ -270,6 +272,36 @@ def _draw_line_block(
         if index + 1 < len(lines):
             y += line_gap
     return y
+
+
+def _draw_title_bar(
+    draw: imgui.ImDrawList,
+    panel: tuple[int, int, int],
+    x: int,
+    y: int,
+    lines: list[str],
+    line_h: int,
+    line_gap: int,
+    *,
+    clip_w: int | None = None,
+) -> int:
+    """A modal's title in VALUE on a title bar across the panel, from its top
+    border. *clip_w* cuts the title, not the bar. Returns the bar's bottom."""
+    ox, oy, panel_w = panel
+    bottom = title_bar_bottom(y, lines_block_height(len(lines), line_h, line_gap))
+    paint_title_bar(
+        draw,
+        float(ox + BORDER_WIDTH),
+        float(oy + BORDER_WIDTH),
+        float(ox + panel_w - BORDER_WIDTH),
+        float(bottom),
+    )
+    if clip_w is None:
+        _draw_line_block(draw, x, y, lines, VALUE, line_h, line_gap)
+    else:
+        with _clipped(draw, (x, y, clip_w, bottom - y)):
+            _draw_line_block(draw, x, y, lines, VALUE, line_h, line_gap)
+    return bottom
 
 
 def _draw_labeled(
@@ -657,18 +689,19 @@ class ModalSurface:
         has_labeled = bool(view.labeled_lines)
         has_bar = view.progress_fraction is not None
         if view.message is not None:
-            y = _draw_line_block(
+            lines = message_lines(measure, view.message, screen_w=screen_w)
+            y = _draw_title_bar(
                 draw,
+                (ox, oy, panel_w),
                 x,
                 y,
-                message_lines(measure, view.message, screen_w=screen_w),
-                LABEL,
+                lines,
                 line_h,
                 line_gap,
             )
         if view.body is not None:
             if view.message is not None:
-                y += line_gap
+                y += panel_pad_y()
             y = _draw_line_block(
                 draw,
                 x,
@@ -738,13 +771,21 @@ class ModalSurface:
         draw = imgui.get_window_draw_list()
 
         cta = text_cta_lines(view)
-        for index, line in enumerate(cta):
-            role = DISABLED if index > 0 else LABEL
+        y = _draw_title_bar(
+            draw,
+            (ox, oy, panel_w),
+            x,
+            y,
+            list(cta[:1]),
+            line_h,
+            line_gap,
+            clip_w=content_w,
+        )
+        for line in cta[1:]:
+            y += panel_pad_y()
             with _clipped(draw, (x, y, content_w, line_h)):
-                _text(draw, x, y, line, role)
+                _text(draw, x, y, line, DISABLED)
             y += line_h
-            if index + 1 < len(cta):
-                y += line_gap
         y += section_gap
 
         draft = view.draft if view.draft is not None else ""

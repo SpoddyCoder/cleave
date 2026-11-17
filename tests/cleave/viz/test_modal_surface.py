@@ -50,6 +50,7 @@ from cleave.viz.modal_surface import (
 )
 from cleave.viz.shell_focus import ShellRegion
 from cleave.viz.shell_layout import ShellLayout
+from cleave.viz.progress_bar import accent_at
 from cleave.viz.theme import (
     DISABLED,
     HIGHLIGHT,
@@ -306,7 +307,8 @@ def test_kind_renders_with_idle_mouse(view: ModalViewState) -> None:
         colors = _color_counts()
         wash = _pack(ROW_SELECT_TINT, ROW_FOCUSED_ALPHA[0])
         border = _pack(ROW_FOCUS_EDGE)
-        assert colors.get(_pack(LABEL), 0) > 0
+        assert colors.get(_pack(accent_at(0.0)), 0) > 0
+        assert colors.get(_pack(accent_at(1.0)), 0) > 0
         if view.kind == ModalKind.TEXT:
             assert colors.get(_pack(DISABLED), 0) == 4 * _glyphs(EDITING_HINT)
             # The buttons rest in the OFF tone while the field holds the keys.
@@ -317,9 +319,8 @@ def test_kind_renders_with_idle_mouse(view: ModalViewState) -> None:
             assert wash not in colors
             assert border not in colors
         elif view.kind == ModalKind.PROGRESS:
-            assert colors.get(_pack(LABEL), 0) == 4 * (
-                _glyphs(view.message or "")
-                + sum(_glyphs(line.prefix()) for line in view.labeled_lines)
+            assert colors.get(_pack(LABEL), 0) == 4 * sum(
+                _glyphs(line.prefix()) for line in view.labeled_lines
             )
             assert colors.get(_pack(HIGHLIGHT), 0) == 4
             assert wash not in colors

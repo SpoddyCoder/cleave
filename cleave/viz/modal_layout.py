@@ -13,7 +13,7 @@ from cleave.viz.modal import (
 from cleave.viz.choice_layout import choice_width, stepper_width
 from cleave.viz.progress_bar import progress_bar_height
 from cleave.viz.text_fit import TextSizer, wrap_text_to_width
-from cleave.viz.theme import tuning_ui_metrics, ui_px
+from cleave.viz.theme import BORDER_WIDTH, tuning_ui_metrics, ui_px
 
 # Message wrap width and text-panel height cap, as a fraction of the viewport.
 MESSAGE_MAX_SCREEN_FRACTION = 0.5
@@ -32,6 +32,27 @@ def panel_pad_x() -> int:
 
 def panel_pad_y() -> int:
     return tuning_ui_metrics().modal_panel_pad_y
+
+
+def title_bar_pad_y() -> int:
+    """Pad under a modal title inside its title bar.
+
+    The bar runs from the panel's top border, so this matches the pad above
+    the title.
+    """
+    return max(0, panel_pad_y() - BORDER_WIDTH)
+
+
+def title_bar_bottom(text_top: int, text_h: int) -> int:
+    """Bottom of the title bar over a title block *text_h* tall at *text_top*."""
+    return text_top + text_h + title_bar_pad_y()
+
+
+def text_cta_height(count: int, line_h: int) -> int:
+    """The text modal's call to action: its title bar, then the editing hint."""
+    if count <= 0:
+        return 0
+    return line_h + title_bar_pad_y() + (count - 1) * (panel_pad_y() + line_h)
 
 
 def button_gap() -> int:
@@ -174,10 +195,11 @@ def measure_panel(
         msg_w = max((measure.size(line)[0] for line in lines), default=0)
         content_w = max(content_w, msg_w)
         content_h += len(lines) * line_h + max(0, len(lines) - 1) * line_gap
+        content_h += title_bar_pad_y()
 
     if state.body is not None:
         if state.message is not None:
-            content_h += line_gap
+            content_h += panel_pad_y()
         lines = message_lines(measure, state.body, screen_w=screen_w)
         body_w = max((measure.size(line)[0] for line in lines), default=0)
         content_w = max(content_w, body_w)
@@ -263,7 +285,7 @@ def text_max_field_lines(
     if screen_h is None:
         return None
     max_panel_h = max(1, int(screen_h * MESSAGE_MAX_SCREEN_FRACTION))
-    cta_h = lines_block_height(cta_line_count, line_h, line_gap)
+    cta_h = text_cta_height(cta_line_count, line_h)
     section_gap = line_h + line_gap
     overhead = panel_pad_y() * 2 + cta_h + section_gap * 2 + line_h
     if has_error:
@@ -319,7 +341,7 @@ def measure_text_panel(
 
     cta_lines = text_cta_lines(state)
     cta_w = max((measure.size(line)[0] for line in cta_lines), default=0)
-    cta_h = lines_block_height(len(cta_lines), line_h, line_gap)
+    cta_h = text_cta_height(len(cta_lines), line_h)
 
     field_lines = text_field_lines(measure, state, screen_w=screen_w)
     field_w = max((measure.size(line)[0] for line in field_lines), default=0)

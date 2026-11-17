@@ -1014,7 +1014,8 @@ def test_help_column_draws_the_subject_stop() -> None:
     from cleave.viz.shell_host import draw_shell_frame
     from cleave.viz.shell_menu_bar import menu_bar_height_px
     from cleave.viz.shell_layout import ShellLayout
-    from cleave.viz.theme import HEADING, LABEL
+    from cleave.viz.progress_bar import accent_at
+    from cleave.viz.theme import LABEL, VALUE
 
     overlay = SimpleNamespace(visibility=1.0, notify_input=lambda: None)
     menu = MenuBarState()
@@ -1080,7 +1081,9 @@ def test_help_column_draws_the_subject_stop() -> None:
                 )
             )
 
-        assert color_u32(HEADING) in colors
+        assert color_u32(accent_at(0.0)) in colors
+        assert color_u32(accent_at(1.0)) in colors
+        assert color_u32(VALUE) in colors
         assert color_u32(LABEL) in colors
         del lists, help_list, colors
     finally:

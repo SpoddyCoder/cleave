@@ -61,6 +61,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- Help column section titles and the titles of dialogs, the file picker, and the tap sync panel sit on a full-width bar of the accent gradient, blue into violet, in white, like the inspector page title, so they stand apart from the blue labels below them.
 - The Overlay page's solo switch is now called preview, since it holds the credits cards on screen at any playhead time so you can see your edits. Its navigator icon is now a preview window instead of the solo icon, and its key is V instead of S.
 - Fade, Highlight Rolloff, Chroma Boost, and Visual Limiter each have an on/off icon on their Post-FX navigator row and in their page title, and an enabled row at the top of their page. E on those pages turns that effect on or off. Highlight Rolloff and Chroma Boost no longer have an off mode: their mode is per layer or composite, and a project file that sets `mode: off` must use `enabled: false` instead.
 - The Populate preset list dialog's choices are now short enough to sit side by side: **cue roles**, **shuffled**, and **in order**, under **pick**.

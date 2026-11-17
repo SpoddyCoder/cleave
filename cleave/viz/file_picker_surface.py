@@ -24,7 +24,12 @@ from cleave.viz.file_picker import (
     PickerViewState,
 )
 from cleave.viz.material_icons import FOLDER_GLYPH
-from cleave.viz.modal_layout import form_row_height, form_row_pad_y
+from cleave.viz.modal_layout import (
+    form_row_height,
+    form_row_pad_y,
+    lines_block_height,
+    title_bar_bottom,
+)
 from cleave.viz.scroll_follow import clamp_scroll, scroll_to_reveal
 from cleave.viz.text_fit import (
     fit_path_label_to_width,
@@ -534,9 +539,22 @@ class FilePickerSurface:
         title_lines = wrap_text_to_width(measure, view.title, content_w) or [
             view.title
         ]
+        from cleave.viz.title_bar import paint_title_bar
+
+        bar_bottom = title_bar_bottom(
+            y, lines_block_height(len(title_lines), line_h, line_gap)
+        )
+        paint_title_bar(
+            draw,
+            float(ox + BORDER_WIDTH),
+            float(oy + BORDER_WIDTH),
+            float(ox + panel_w - BORDER_WIDTH),
+            float(bar_bottom),
+        )
         for line in title_lines:
-            _text(draw, content_x, y, fit_text_to_width(measure, line, content_w), LABEL)
+            _text(draw, content_x, y, fit_text_to_width(measure, line, content_w), VALUE)
             y += step
+        y = bar_bottom + line_gap
 
         # Room for the chip highlight's top padding under the title.
         chip_y = y + form_row_pad_y()
