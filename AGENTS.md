@@ -70,10 +70,8 @@ Include blockers, trade-offs, commands the user needs, and warnings. Scale lengt
 
 ## Versioned releases
 
-`main` is the integration trunk. Tags (`vX.Y.Z`) are frozen snapshots. Process: [docs/dev/structured-releases.md](docs/dev/structured-releases.md). When asked to cut a release, follow the `cut-release` skill ([.claude/skills/cut-release/SKILL.md](.claude/skills/cut-release/SKILL.md)) (prepare changelog, version, and docs; do not commit or tag unless the user asks).
+`main` holds releases only: every commit on `main` is a tagged release (`vX.Y.Z`, including patch cuts such as `v0.3.1`). All work before a release happens on a pre-release branch (for example `ui-refactor`), which merges into `main` only when a release is cut. Process: [docs/dev/structured-releases.md](docs/dev/structured-releases.md). When asked to cut a release, follow the `cut-release` skill ([.claude/skills/cut-release/SKILL.md](.claude/skills/cut-release/SKILL.md)) (prepare changelog, version, and docs; do not commit, merge, or tag unless the user asks).
 
-- Land user-visible work on `main` (short feature branches are fine). Unreleased bullets: "Cleave" above.
-- Do not bump `cleave.__version__`, add a dated `## [X.Y.Z]` section, tag, or GitHub Release unless asked to cut a release. `__version__` is last-shipped until a cut.
-- Do not introduce a long-lived `develop` or `release/*` trunk, GitFlow, or holding features off `main`.
-
-A `release/X.Y` branch is only for a freeze window or a patch of a shipped tag, and only when asked.
+- Commit work to the current pre-release branch. Never commit work straight to `main`; if HEAD is `main` and there is no pre-release branch, ask which branch to create. Unreleased bullets: "Cleave" above.
+- Do not bump `cleave.__version__`, add a dated `## [X.Y.Z]` section, tag, merge into `main`, or create a GitHub Release unless asked to cut a release. `__version__` is last-shipped until a cut.
+- The README version badge moves with every commit. On `main` (and on the cut commit itself) it shows the release, such as `v0.3.0`. On a pre-release branch it shows the dev build the Help > About Cleave dialog reports, minus the hash a commit cannot know about itself, such as `v0.3.0-13 (dev build)`. [scripts/version_badge.py](scripts/version_badge.py) writes it for the commit about to be made; run it immediately before every `git commit` (the [scripts/git-hooks/pre-commit](scripts/git-hooks/pre-commit) hook runs it when `core.hooksPath` is `scripts/git-hooks`). Never hand-edit the badge. `--check` exits 1 if the staged badge is stale.

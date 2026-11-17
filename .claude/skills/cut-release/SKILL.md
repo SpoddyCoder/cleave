@@ -48,7 +48,7 @@ If the user named a version, use it. Otherwise infer from current `__version__` 
 
 State the chosen version in the handoff. Date is today's `YYYY-MM-DD`.
 
-Prefer `main`. If HEAD is not `main`, say so and continue only if the user already waived that.
+Cut on the pre-release branch, not on `main`: `main` only receives the finished cut by merge. If HEAD is `main`, say so and ask which pre-release branch holds the work.
 
 ## 2. Changelog and version
 
@@ -57,8 +57,9 @@ Prefer `main`. If HEAD is not `main`, say so and continue only if the user alrea
 1. Move every Unreleased bullet into a new `## [X.Y.Z] - YYYY-MM-DD` block, keeping `### Added` / `Changed` / `Fixed` / `Removed` that have bullets. Drop empty groups from the dated section.
 2. Keep bullet wording. You may collapse extra blank lines inside a group. Do not add, drop, or rewrite notes during the cut. Do not edit older dated sections.
 3. Set `__version__` in `cleave/__init__.py` to `X.Y.Z`.
-4. Do not edit [LICENSE](../../../LICENSE). It is Apache License 2.0 with Commons Clause and is not versioned per release.
-5. Leave this empty Unreleased block (headings present, no bullets). Omit `### Removed` unless the user asks:
+4. Run `scripts/version_badge.py`. With `vX.Y.Z` not yet tagged, it sets the README badge to the release (`vX.Y.Z`), which is what the cut commit and `main` must show.
+5. Do not edit [LICENSE](../../../LICENSE). It is Apache License 2.0 with Commons Clause and is not versioned per release.
+6. Leave this empty Unreleased block (headings present, no bullets). Omit `### Removed` unless the user asks:
 
 ```markdown
 ## [Unreleased]
@@ -70,7 +71,7 @@ Prefer `main`. If HEAD is not `main`, say so and continue only if the user alrea
 ### Fixed
 ```
 
-6. Update the link refs at the bottom. Keep the existing GitHub org/repo from those lines:
+7. Update the link refs at the bottom. Keep the existing GitHub org/repo from those lines:
 
 ```markdown
 [unreleased]: https://github.com/ORG/REPO/compare/vX.Y.Z...HEAD
@@ -171,9 +172,11 @@ Tune the second line if docs moves or README drift dominated.
 5. After the user reviews and commits, they still need to (do not run these):
 
 ```bash
+git checkout main
+git merge --ff-only <pre-release-branch>
 git tag vX.Y.Z
 git push origin main
 git push origin vX.Y.Z
 ```
 
-Tag the commit that is on `main`. CI ([.github/workflows/release.yml](../../../.github/workflows/release.yml)) checks the tag against `__version__`, creates the GitHub Release from the changelog section, then attaches `cleave-<version>-windows-x64.zip` and `cleave-<version>-windows-x64-setup.exe`. If freeze fails, the source Release still exists and can be retried. Manual GPU proof stays a human checklist in structured-releases; do not treat CI green as compositor proof.
+`main` holds releases only, so it receives the cut by merge and the tag goes on that `main` commit. If `--ff-only` refuses, merge with a merge commit (the pre-commit hook keeps the release badge). Later work starts on a new pre-release branch from `main`. CI ([.github/workflows/release.yml](../../../.github/workflows/release.yml)) checks the tag against `__version__`, creates the GitHub Release from the changelog section, then attaches `cleave-<version>-windows-x64.zip` and `cleave-<version>-windows-x64-setup.exe`. If freeze fails, the source Release still exists and can be retried. Manual GPU proof stays a human checklist in structured-releases; do not treat CI green as compositor proof.

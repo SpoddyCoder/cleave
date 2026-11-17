@@ -1,0 +1,11 @@
+#!/bin/sh
+# Keep the README version badge in step with every commit.
+# Enable once per clone: git config core.hooksPath scripts/git-hooks
+root=$(git rev-parse --show-toplevel) || exit 1
+for py in python3 python; do
+    if command -v "$py" >/dev/null 2>&1; then
+        exec "$py" "$root/scripts/version_badge.py"
+    fi
+done
+echo "pre-commit: no python found; run scripts/version_badge.py yourself" >&2
+exit 1

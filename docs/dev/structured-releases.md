@@ -63,12 +63,18 @@ Decide these once, then reuse.
 
 ---
 
+## Branches
+
+`main` holds releases only. Every commit on `main` is a tagged release (`vX.Y.Z`, patch cuts included). Work before a release lives on a pre-release branch (for example `ui-refactor`), which merges into `main` when the release is cut. The next cycle starts a new pre-release branch from `main`.
+
+The README version badge follows the same split: the release (`v0.3.0`) on `main` and on the cut commit, and the dev build (`v0.3.0-13 (dev build)`) on a pre-release branch, matching Help > About Cleave without the commit hash. [scripts/version_badge.py](../../scripts/version_badge.py) rewrites it for every commit; enable the hook once per clone with `git config core.hooksPath scripts/git-hooks`.
+
 ## Release procedure
 
-1. Move [CHANGELOG.md](../../CHANGELOG.md) `[Unreleased]` notes into a new `## [X.Y.Z] - YYYY-MM-DD` section. Leave `## [Unreleased]` in place (empty until the next cycle). Update the compare links at the bottom.
+1. On the pre-release branch, move [CHANGELOG.md](../../CHANGELOG.md) `[Unreleased]` notes into a new `## [X.Y.Z] - YYYY-MM-DD` section. Leave `## [Unreleased]` in place (empty until the next cycle). Update the compare links at the bottom.
 2. Set `__version__` in [cleave/__init__.py](../../cleave/__init__.py) to `X.Y.Z`.
-3. Commit those changes to `main`.
-4. `git tag vX.Y.Z && git push --tags` (tag the commit that is on `main`).
+3. Commit those changes on the pre-release branch. The badge script sees that `vX.Y.Z` is not tagged yet and writes the release badge.
+4. Merge the pre-release branch into `main`, then `git tag vX.Y.Z` on that `main` commit and push `main` and the tag.
 5. CI ([.github/workflows/release.yml](../../.github/workflows/release.yml)): unit tests via [tests.yml](../../.github/workflows/tests.yml), then `publish` checks that the tag matches `cleave.__version__`, extracts the changelog section, and creates the GitHub Release (source zip/tarball attach automatically). Then `freeze` calls [windows-freeze.yml](../../.github/workflows/windows-freeze.yml) with `release_tag` set to the tag and uploads `cleave-<version>-windows-x64.zip` and `cleave-<version>-windows-x64-setup.exe` onto that Release. If freeze fails, the source Release still exists and can be retried.
 6. Spot-check the archive: unpack, install requirements, run `cleave --version`, confirm presets still come from the README steps.
 
