@@ -22,6 +22,7 @@ This guide walks through everything Cleave can do. You do not need to read it al
 - [Watching your show](#watching-your-show)
 - [Rendering a video](#rendering-a-video)
 - [Settings](#settings)
+  - [Your own colour themes](user-themes.md)
 - [Keyboard shortcuts](#keyboard-shortcuts)
 - [Tips and troubleshooting](#tips-and-troubleshooting)
 
@@ -527,47 +528,11 @@ Cleave shows the render's progress in the window and tells you when it is done. 
 The **Settings** menu holds preferences that apply to every project:
 
 - **Preview:** preview quality, and the audio delay correction.
-- **UI:** the editor's colour theme (and [your own themes](#your-own-colour-themes)), the size of the editor text (UI scale), which side the panels sit on, navigator height, tooltips, how long notifications stay on screen, and more.
+- **UI:** the editor's colour theme (and [your own themes](user-themes.md)), the size of the editor text (UI scale), which side the panels sit on, navigator height, tooltips, how long notifications stay on screen, and more.
 - **Measure latency:** see [The visuals are out of time with the music](#the-visuals-are-out-of-time-with-the-music).
 - **Rescan presets:** re-read the presets folder after adding presets to a pack that was already there, or while Cleave is open.
 - **Download packages:** get downloads you skipped on first launch. Presets downloaded here are rescanned straight away, so they are ready to curate.
 - **Dev Tools:** a crash log, for reporting problems.
-
-### Your own colour themes
-
-You can make your own editor colour themes. Each theme is a small text file in the `themes` folder (see [Where your files live](#where-your-files-live)). Choose **Settings > UI > Open themes folder** to open it.
-
-A theme starts from a built-in theme and changes only the colours you list. Name the file after your theme, such as `midnight.yaml`:
-
-```yaml
-name: Midnight
-base: ultraviolet
-label: "#a0b0ff"
-hover: [128, 84, 255]
-button_bg: "#202040"
-```
-
-- **name** is what the Theme setting shows. Leave it out to use the file name.
-- **base** is the built-in theme to start from. Leave it out to start from Ultraviolet.
-- Every other line sets one colour. Write a colour as `"#rrggbb"` in quotes, or as red, green, and blue from 0 to 255 in square brackets.
-- A few settings are numbers, not colours: those ending in `_alpha` (0 to 255, or two numbers from 0 to 1 for the row bands), and `button_sheen`, `button_shade`, and `icon_lit_hover_lift` (0 to 1).
-- `timeline_track_colors` is a list of up to eight colours, one per timeline row.
-
-Pick your theme in **Settings > UI > Theme**. After editing a file, choose **Settings > UI > Reload themes** to see the change straight away. If a file has a mistake, such as a misspelt colour name or a colour without quotes, Cleave lists it in a message when it starts and when you reload, and uses the base theme's colour instead.
-
-The colour names, grouped by where they show:
-
-| Area | Colour names |
-| --- | --- |
-| Window and panels | `background`, `background_alpha`, `modal_scrim_alpha`, `transport_rule`, `panel_edge`, `panel_focus_edge`, `navigator_tree_line`, `inspector_divider` |
-| Text | `label`, `value`, `disabled`, `off_control_text`, `off_control_muted`, `muted`, `highlight`, `error_notification`, `notification_on_fill` |
-| Icons and modes | `preset_icon`, `preset_file_icon`, `move_mode`, `lock_icon`, `locked`, `locked_muted`, `solo_bg`, `override_bg`, `nav_on_bg`, `nav_lock_bg`, `nav_lock_glyph`, `config_dirty`, `armed_bg`, `override_glyph`, `override_glyph_off`, `rec_bg` |
-| Buttons | `button_bg`, `button_border`, `button_hover_bg`, `button_hover_border`, `button_active_bg`, `button_primary_bg`, `button_primary_hover_bg`, `button_primary_hover_border`, `button_primary_active_bg`, `button_off_bg`, `button_off_border`, `button_off_chosen_bg`, `button_danger_bg`, `button_danger_hover_bg`, `button_danger_hover_border`, `button_danger_active_bg`, `button_sheen`, `button_shade`, `button_glow_alpha` |
-| Menus, dialogs, and progress bars | `surface_bg`, `surface_edge`, `surface_text`, `accent_from`, `accent_to` |
-| Rows | `hover`, `hover_bg_alpha`, `row_select_tint`, `row_selected_alpha`, `row_selected_bar`, `row_focused_alpha`, `row_focused_bar`, `row_focus_edge` |
-| Icon hover | `icon_hover_fg`, `icon_hover_bg`, `icon_hover_bg_alpha`, `icon_hover_edge`, `icon_lit_hover_lift` |
-| Timeline strip | `timeline_track_colors`, `bar_grid`, `song_bound`, `playhead`, `playhead_flash`, `song_marker`, `song_marker_selected`, `timeline_scroll_rail`, `timeline_scroll_thumb` |
-| Scrollbars | `scrollbar_track`, `scrollbar_thumb`, `scrollbar_thumb_hover` |
 
 The **Project** menu holds settings saved with the current song:
 
