@@ -184,7 +184,7 @@ class PresetListController:
             populate_count = on_segment_populate_count(self.session, slot)
             sources.append(
                 (
-                    "Using Cue Marker Roles (random)",
+                    "cue roles",
                     "cue_roles",
                     "one preset for each time the layer turns on, picked at "
                     "random from presets with that cue's role.",
@@ -201,14 +201,14 @@ class PresetListController:
         noun = "1 preset" if populate_count == 1 else f"{populate_count} presets"
         sources.append(
             (
-                "Current Directory (random)",
+                "shuffled",
                 "directory_random",
                 "presets from the layer's preset directory, shuffled.",
             )
         )
         sources.append(
             (
-                "Current Directory (sequential)",
+                "in order",
                 "directory_sequential",
                 "presets from the layer's preset directory, in directory order.",
             )
@@ -220,7 +220,7 @@ class PresetListController:
                 fields=(
                     FormField(
                         "source",
-                        "from",
+                        "pick",
                         tuple(label for label, _mode, _help in sources),
                         next(
                             (
@@ -230,7 +230,7 @@ class PresetListController:
                             ),
                             0,
                         ),
-                        help=("Where the presets come from.",),
+                        help=("How the new presets are picked.",),
                         option_help=tuple(help for _label, _mode, help in sources),
                     ),
                 ),

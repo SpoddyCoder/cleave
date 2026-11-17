@@ -5088,9 +5088,9 @@ def test_populate_modal_options_keyed_by_timeline_trigger() -> None:
     assert view.body == "Replaces the whole list with 1 preset."
     labels = list(view.form_rows[0].options)
     assert labels == [
-        "Using Cue Marker Roles (random)",
-        "Current Directory (random)",
-        "Current Directory (sequential)",
+        "cue roles",
+        "shuffled",
+        "in order",
     ]
 
     controls.modal_host.cancel()
@@ -5102,10 +5102,10 @@ def test_populate_modal_options_keyed_by_timeline_trigger() -> None:
     assert view.body == "Replaces the whole list with 1 preset."
     labels = list(view.form_rows[0].options)
     assert labels == [
-        "Current Directory (random)",
-        "Current Directory (sequential)",
+        "shuffled",
+        "in order",
     ]
-    assert "Using Cue Marker Roles (random)" not in labels
+    assert "cue roles" not in labels
 
 
 def test_step_preset_duration_toasts_when_list_too_short() -> None:
