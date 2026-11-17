@@ -97,14 +97,21 @@ StripTarget = Literal[
 
 # A row's header buttons after its label, left to right, each a square icon
 # box (``icon_button``) one nominal row tall: arm for recording, solo, the live
-# visibility eye, and back to timeline (shown only while overridden).
+# visibility eye, and back to timeline (shown only while overridden). The
+# back-to-timeline column is laid out only while some row is overridden, so the
+# bars start beside the eye otherwise.
 ROW_HEADER_BUTTONS: tuple[StripTarget, ...] = ("arm", "solo", "eye", "release")
 ROW_HEADER_TARGETS: frozenset[str] = frozenset(("label", *ROW_HEADER_BUTTONS))
 
 
-def header_buttons_width(slot_w: int) -> int:
-    """Width of a row's header buttons, with the icon gap between them."""
-    count = len(ROW_HEADER_BUTTONS)
+def visible_header_buttons(*, any_override: bool) -> tuple[StripTarget, ...]:
+    """The header button columns laid out: all, or all but back to timeline."""
+    return ROW_HEADER_BUTTONS if any_override else ROW_HEADER_BUTTONS[:-1]
+
+
+def header_buttons_width(slot_w: int, buttons: tuple[StripTarget, ...]) -> int:
+    """Width of *buttons* in a row's header, with the icon gap between them."""
+    count = len(buttons)
     return count * slot_w + (count - 1) * int(icon_gap())
 
 
@@ -126,14 +133,15 @@ def row_header_target_at(
     padding: int,
     label_width: int,
     slot_w: int,
+    buttons: tuple[StripTarget, ...],
 ) -> StripTarget | None:
-    """The label or header button under panel *local_x*, or None past them.
+    """The label or one of *buttons* under panel *local_x*, or None past them.
 
     The gap between two buttons hits neither.
     """
     if padding <= local_x < padding + label_width:
         return "label"
-    for target in ROW_HEADER_BUTTONS:
+    for target in buttons:
         left = header_button_x(
             target, padding=padding, label_width=label_width, slot_w=slot_w
         )
@@ -178,15 +186,16 @@ def transport_button_rects(
     """Play and record button rects in the corner above the row headers.
 
     Play sits over the row labels (layer number and stem). Record starts at
-    the arm buttons and runs to the start of the ruler, over the other row
-    buttons. It holds the record glyph plus ``REC``. Rects are in upload
-    coordinates (top of the badge row is y=0).
+    the arm buttons and runs over the other row buttons, stopping *padding*
+    short of the ruler like the row buttons stop short of the bars. It holds
+    the record glyph plus ``REC``. Rects are in upload coordinates (top of the
+    badge row is y=0).
     """
     y = TRANSPORT_BUTTON_DROP_PX
     h = max(1, corner_h - gap)
     play = (padding, y, label_width, h)
     record_x = padding + label_width
-    record = (record_x, y, max(1, bar_left - record_x), h)
+    record = (record_x, y, max(1, bar_left - padding - record_x), h)
     return play, record
 
 
@@ -216,12 +225,17 @@ def row_prefix_width(
     layer_num_width: int,
     stem_abbrev_width: int,
     row_height: int,
+    buttons: tuple[StripTarget, ...],
+    *,
+    padding: int,
 ) -> int:
-    """Width of a row's header: number, stem, and its ``ROW_HEADER_BUTTONS``."""
+    """Width of a row's header: number, stem, *buttons*, and a *padding*
+    margin before the bar, matching the margin left of the number."""
     return (
         layer_num_width
         + stem_abbrev_width
-        + header_buttons_width(visibility_icon_slot_width(row_height))
+        + header_buttons_width(visibility_icon_slot_width(row_height), buttons)
+        + padding
     )
 
 
@@ -248,6 +262,8 @@ class StripLayout:
     bar_width: int
     # Width of each of a row's ROW_HEADER_BUTTONS.
     slot_w: int
+    # Header button columns laid out (see ``visible_header_buttons``).
+    header_buttons: tuple[StripTarget, ...]
     layer_num_width: int
     stem_abbrev_width: int
     badge_reserve: int
@@ -340,8 +356,11 @@ def compute_strip_layout(
     viewport_width: int,
     viewport_height: int,
     timeline_rect: tuple[int, int, int, int] | None = None,
+    any_override: bool = False,
 ) -> StripLayout | None:
     """Lay the strip out for *row_count* rows, or None when there is no room.
+
+    The back-to-timeline column is laid out only when *any_override*.
 
     The shell's timeline band is the container and the strip fills its width.
     With no band the strip sits at the viewport bottom at its fit height.
@@ -367,7 +386,10 @@ def compute_strip_layout(
 
     layer_num_width = font.render(layer_num_prefix(max(row_count, 1)), True, LABEL).get_width()
     stem_abbrev_width = font.render(stem_abbrev_label("drums"), True, LABEL).get_width()
-    prefix_width = row_prefix_width(layer_num_width, stem_abbrev_width, icon_h)
+    header_buttons = visible_header_buttons(any_override=any_override)
+    prefix_width = row_prefix_width(
+        layer_num_width, stem_abbrev_width, icon_h, header_buttons, padding=padding
+    )
     bar_left = padding + prefix_width
     bar_width = max(1, panel_w - padding * 2 - prefix_width)
     bar_bottom = padding + row_count * row_h + (row_count - 1) * row_gap
@@ -384,6 +406,7 @@ def compute_strip_layout(
         bar_left=bar_left,
         bar_width=bar_width,
         slot_w=visibility_icon_slot_width(icon_h),
+        header_buttons=header_buttons,
         layer_num_width=layer_num_width,
         stem_abbrev_width=stem_abbrev_width,
         badge_reserve=badge_reserve,

@@ -69,6 +69,7 @@ from cleave.viz.timeline_strip_layout import (
     playhead_x,
     row_header_target_at,
     row_prefix_width,
+    visible_header_buttons,
     stem_abbrev_label,
     stem_label_text,
     time_to_x,
@@ -116,15 +117,23 @@ def test_row_prefix_width_includes_header_buttons() -> None:
     row_h = 20
     slot_w = visibility_icon_slot_width(row_h)
     assert slot_w == row_h
-    assert row_prefix_width(layer_num_w, abbrev_w, row_h) == (
-        layer_num_w + abbrev_w + header_buttons_width(slot_w)
+    buttons = visible_header_buttons(any_override=True)
+    assert row_prefix_width(layer_num_w, abbrev_w, row_h, buttons, padding=8) == (
+        layer_num_w + abbrev_w + header_buttons_width(slot_w, buttons) + 8
     )
+
+
+def test_back_to_timeline_column_only_while_overridden() -> None:
+    assert visible_header_buttons(any_override=True) == ROW_HEADER_BUTTONS
+    assert visible_header_buttons(any_override=False) == ("arm", "solo", "eye")
 
 
 def test_row_header_target_at_maps_each_column() -> None:
     padding, label_w, slot_w = 8, 40, 20
     def at(x: float):
-        return row_header_target_at(x, padding=padding, label_width=label_w, slot_w=slot_w)
+        return row_header_target_at(
+            x, padding=padding, label_width=label_w, slot_w=slot_w, buttons=ROW_HEADER_BUTTONS
+        )
     assert at(padding - 1) is None
     assert at(padding) == "label"
     assert at(padding + label_w - 1) == "label"
@@ -136,7 +145,15 @@ def test_row_header_target_at_maps_each_column() -> None:
         assert header_button_x(target, padding=padding, label_width=label_w, slot_w=slot_w) == left
         if gap and index < len(ROW_HEADER_BUTTONS) - 1:
             assert at(left + slot_w) is None
-    assert at(padding + label_w + header_buttons_width(slot_w)) is None
+    assert at(padding + label_w + header_buttons_width(slot_w, ROW_HEADER_BUTTONS)) is None
+    hidden = row_header_target_at(
+        header_button_x("release", padding=padding, label_width=label_w, slot_w=slot_w),
+        padding=padding,
+        label_width=label_w,
+        slot_w=slot_w,
+        buttons=visible_header_buttons(any_override=False),
+    )
+    assert hidden is None
     assert ROW_HEADER_BUTTONS == ("arm", "solo", "eye", "release")
 
 
@@ -169,7 +186,11 @@ def test_bar_runs_from_header_buttons_to_right_padding() -> None:
     row_h = overlay.row_layout[0][4]
 
     assert bar_left == padding + row_prefix_width(
-        overlay._layer_num_width, overlay._stem_abbrev_width, row_h
+        overlay._layer_num_width,
+        overlay._stem_abbrev_width,
+        row_h,
+        visible_header_buttons(any_override=False),
+        padding=padding,
     )
     assert bar_left + bar_width == panel_w - padding
 
@@ -932,14 +953,28 @@ def test_corner_buttons_drop_below_the_band_top() -> None:
     assert play[1] == record[1] == TRANSPORT_BUTTON_DROP_PX
 
 
-def test_record_button_ends_at_ruler_start() -> None:
+def test_record_button_stops_padding_short_of_ruler() -> None:
     pygame.init()
     overlay = TimelineOverlay()
     surface = pygame.Surface((800, 400), pygame.SRCALPHA)
     _draw(overlay, surface, strip_view_state(position_sec=0.0))
     _, record = overlay.layout.transport_rects()
     bar_left, _ = overlay.bar_layout
-    assert record[0] + record[2] == bar_left
+    assert record[0] + record[2] == bar_left - overlay.layout.padding
+
+
+def test_bars_make_room_for_back_to_timeline_only_while_overridden() -> None:
+    pygame.init()
+    overlay = TimelineOverlay()
+    surface = pygame.Surface((800, 400), pygame.SRCALPHA)
+    _draw(overlay, surface, strip_view_state())
+    layout = overlay.layout
+    eye_right = layout.header_button_x("eye") + layout.slot_w
+    assert layout.bar_left == eye_right + layout.padding
+    _draw(overlay, surface, strip_view_state(override_slots={"layer_1"}))
+    layout = overlay.layout
+    assert layout.bar_left == layout.header_button_x("release") + layout.slot_w + layout.padding
+    assert layout.bar_left > eye_right + layout.padding
 
 
 def test_upscale_expands_bar_width_not_row_height() -> None:
@@ -1595,7 +1630,7 @@ def test_hit_at_maps_ruler_rows_prefix_and_gaps() -> None:
     overlay = TimelineOverlay(padding=8, row_gap=4)
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
     assert overlay.hit_at(10, 700) is None
-    _draw(overlay, surface, strip_view_state(duration_sec=100.0))
+    _draw(overlay, surface, strip_view_state(duration_sec=100.0, override_slots={"layer_1"}))
 
     px, py, _, _ = overlay.panel_rect
     bar_left, bar_width = overlay.bar_layout

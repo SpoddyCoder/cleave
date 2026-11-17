@@ -166,6 +166,7 @@ class StripHitMap:
             padding=layout.padding,
             label_width=layout.label_width,
             slot_w=layout.slot_w,
+            buttons=layout.header_buttons,
         )
         for display_i in range(layout.row_count):
             row_y = layout.row_y(display_i)

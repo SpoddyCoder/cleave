@@ -185,6 +185,7 @@ class TimelineOverlay:
             viewport_width=viewport_width,
             viewport_height=viewport_height,
             timeline_rect=timeline_rect,
+            any_override=bool(state.override_slots),
         )
         if layout is None:
             return None
