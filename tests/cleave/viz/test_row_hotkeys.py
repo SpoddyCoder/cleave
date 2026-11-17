@@ -106,7 +106,6 @@ def test_hotkeys_on_a_child_page_reach_the_owner() -> None:
     controls.navigator.select("post_fx.fade")
     assert controls.navigator.handle_hotkey(keydown(pygame.K_e)) is True
     assert controls.session.post_fx.fade.enabled is False
-    assert controls.session.post_fx.enabled is True
     assert controls.navigator.handle_hotkey(keydown(pygame.K_l)) is True
     assert controls.session.post_fx.locked is True
     assert controls.navigator.handle_hotkey(keydown(pygame.K_e)) is True
@@ -373,17 +372,18 @@ def test_curation_shell_allowlist() -> None:
 def test_section_switch_rows_step_their_flags_and_respect_the_lock() -> None:
     controls = make_controls(("layer_1",))
     session = controls.session
-    enabled = RowDescriptor(RowKind.POST_FX_ENABLED)
-    locked = RowDescriptor(RowKind.POST_FX_LOCKED)
+    enabled = RowDescriptor(RowKind.PATTERN_MASK_ENABLED)
+    locked = RowDescriptor(RowKind.PATTERN_MASK_LOCKED)
+    session.pattern_mask.enabled = True
 
     assert apply_field_horizontal(controls, enabled, False, False) is True
-    assert session.post_fx.enabled is False
+    assert session.pattern_mask.enabled is False
     assert apply_field_horizontal(controls, locked, True, False) is True
-    assert session.post_fx.locked is True
+    assert session.pattern_mask.locked is True
     assert apply_field_horizontal(controls, enabled, True, False) is False
-    assert session.post_fx.enabled is False
+    assert session.pattern_mask.enabled is False
     assert apply_field_horizontal(controls, locked, False, False) is True
-    assert session.post_fx.locked is False
+    assert session.pattern_mask.locked is False
 
 
 def test_overlay_solo_row_ignores_the_section_lock() -> None:

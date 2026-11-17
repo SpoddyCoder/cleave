@@ -235,7 +235,7 @@ def finish_content_frame(
         t_sec,
         duration_sec,
         pp.fade,
-        enabled=pp.enabled and sections_on,
+        enabled=sections_on,
         solo=post_fx_solo,
     )
     core.compositor.apply_frame_fade(frame_fade_alpha)

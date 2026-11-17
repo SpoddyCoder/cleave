@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from dataclasses import replace
 
 from cleave.viz.modal import ModalHost
@@ -260,7 +262,7 @@ def test_help_follows_navigator_render_node() -> None:
     assert description is not None
     assert description.title == "Credits Overlays"
     keyboard = dict(_keyboard_section(overlays).entries)
-    assert keyboard["E"] == "enable/disable"
+    assert "E" not in keyboard
     assert keyboard["S"] == "always on"
     assert overlays != (navigation_section(),)
 
@@ -274,9 +276,8 @@ def test_help_follows_navigator_render_node() -> None:
     post_description = _description_section(post)
     assert post_description is not None
     assert post_description.title == "Post FX"
-    post_keys = dict(_keyboard_section(post).entries)
-    assert post_keys["E"] == "enable/disable"
-    assert "S" not in post_keys
+    with pytest.raises(AssertionError, match="no keyboard help section"):
+        _keyboard_section(post)
     assert "Post-processing effects" in _help_text(post)
 
 

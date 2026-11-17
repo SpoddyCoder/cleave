@@ -290,7 +290,6 @@ OVERLAY_PAGE_SECTION = SectionDef(
     header_kind=None,
     context="global",
     children=(
-        SectionNode(leaf_kind=RowKind.OVERLAYS_ENABLED),
         SectionNode(leaf_kind=RowKind.OVERLAYS_SOLO),
         SectionNode(leaf_kind=RowKind.OVERLAYS_LOCKED),
     ),
@@ -406,7 +405,6 @@ POST_FX_PAGE_SECTION = SectionDef(
     header_kind=None,
     context="global",
     children=(
-        SectionNode(leaf_kind=RowKind.POST_FX_ENABLED),
         SectionNode(leaf_kind=RowKind.POST_FX_LOCKED),
     ),
 )
@@ -779,7 +777,6 @@ OVERLAY_SECTION_KINDS = kinds_in_section(OVERLAYS_SECTION) | kinds_in_section(
 POST_FX_SECTION_KINDS = kinds_in_section(POST_FX_SECTION) | kinds_in_section(
     POST_FX_PAGE_SECTION
 )
-POST_FX_LIMITER_KINDS = kinds_in_section(POST_FX_LIMITER_SECTION)
 POST_FX_FADE_KINDS = kinds_in_section(POST_FX_FADE_SECTION)
 PATTERN_MASK_SECTION_KINDS = kinds_in_section(
     PATTERN_MASK_SECTION
@@ -827,11 +824,9 @@ SECTION_SWITCH_KINDS = frozenset(
         RowKind.TRACK_ENABLED,
         RowKind.TRACK_SOLO,
         RowKind.TRACK_LOCKED,
-        RowKind.OVERLAYS_ENABLED,
         RowKind.OVERLAYS_SOLO,
         RowKind.OVERLAYS_LOCKED,
         RowKind.OVERLAY_CARD_ENABLED,
-        RowKind.POST_FX_ENABLED,
         RowKind.POST_FX_LOCKED,
         RowKind.PATTERN_MASK_ENABLED,
         RowKind.PATTERN_MASK_LOCKED,

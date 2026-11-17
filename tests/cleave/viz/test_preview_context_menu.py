@@ -37,8 +37,6 @@ def test_menu_lists_the_agreed_items_in_order(tmp_path: Path) -> None:
     assert list(_entries(controls)) == [
         "preview.transport",
         "preview.solo",
-        "preview.enabled.overlay",
-        "preview.enabled.post_fx",
         "preview.enabled.pattern_mask",
         "preview.quality",
         "preview.grab_still",
@@ -81,14 +79,14 @@ def test_solo_submenu_checks_none_then_the_soloed_layer() -> None:
 
 def test_block_item_toggles_enabled_and_greys_out_when_locked() -> None:
     controls = make_controls(("layer_1",))
-    item = _entries(controls)["preview.enabled.post_fx"]
-    was = controls.session.post_fx.enabled
+    item = _entries(controls)["preview.enabled.pattern_mask"]
+    was = controls.session.pattern_mask.enabled
     assert item.checked is was
     item.run()
-    assert controls.session.post_fx.enabled is not was
+    assert controls.session.pattern_mask.enabled is not was
 
-    controls.session.post_fx.locked = True
-    item = _entries(controls)["preview.enabled.post_fx"]
+    controls.session.pattern_mask.locked = True
+    item = _entries(controls)["preview.enabled.pattern_mask"]
     assert item.enabled is False
     assert item.hint == "Locked: unlock to change"
 

@@ -25,7 +25,7 @@ def _entries(controls, node_id: str, toggled: list[str] | None = None):
 def test_root_row_offers_expand_and_its_icons() -> None:
     controls = make_controls(("layer_1",))
     toggled: list[str] = []
-    items = _entries(controls, "post_fx", toggled)
+    items = _entries(controls, "pattern_mask", toggled)
     assert list(items) == [
         "navigator.expand",
         "navigator.toggle.enabled",
@@ -33,19 +33,26 @@ def test_root_row_offers_expand_and_its_icons() -> None:
     ]
     assert items["navigator.expand"].label == "Expand"
     items["navigator.expand"].run()
-    assert toggled == ["post_fx"]
+    assert toggled == ["pattern_mask"]
     enabled = items["navigator.toggle.enabled"]
     assert enabled.shortcut == "E"
-    was = controls.session.post_fx.enabled
+    was = controls.session.pattern_mask.enabled
     enabled.run()
-    assert controls.session.post_fx.enabled is not was
-    assert _entries(controls, "post_fx")["navigator.toggle.enabled"].checked is not was
+    assert controls.session.pattern_mask.enabled is not was
+    assert (
+        _entries(controls, "pattern_mask")["navigator.toggle.enabled"].checked
+        is not was
+    )
+    assert list(_entries(controls, "post_fx")) == [
+        "navigator.expand",
+        "navigator.toggle.lock",
+    ]
 
 
 def test_lock_greys_out_the_enabled_item() -> None:
     controls = make_controls(("layer_1",))
-    _entries(controls, "post_fx")["navigator.toggle.lock"].run()
-    enabled = _entries(controls, "post_fx")["navigator.toggle.enabled"]
+    _entries(controls, "pattern_mask")["navigator.toggle.lock"].run()
+    enabled = _entries(controls, "pattern_mask")["navigator.toggle.enabled"]
     assert enabled.enabled is False
     assert enabled.hint == "Locked: unlock to change"
 

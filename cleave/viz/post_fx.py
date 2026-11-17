@@ -274,7 +274,7 @@ def apply_hdr_display_shoulder(
 
 
 def highlight_rolloff_active(pp: PostFxRuntime, *, solo: bool) -> bool:
-    return pp.enabled and pp.highlight_rolloff.enabled and not solo
+    return pp.highlight_rolloff.enabled and not solo
 
 
 def chroma_boost_variant_index(variant: str) -> int:
@@ -325,8 +325,7 @@ def apply_chroma_boost_rgba(
 
 def chroma_boost_active(pp: PostFxRuntime, *, solo: bool) -> bool:
     return (
-        pp.enabled
-        and pp.chroma_boost.enabled
+        pp.chroma_boost.enabled
         and not solo
         and pp.chroma_boost.amount_pct > 0
     )

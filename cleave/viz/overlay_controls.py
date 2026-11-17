@@ -149,13 +149,6 @@ class OverlaysControls:
             return self.closing_card
         raise ValueError(f"unknown overlay card {name!r}")
 
-    def set_enabled(self, enabled: bool) -> None:
-        """Bulk-enable or disable both cards."""
-        self.opening_card.set_enabled(enabled)
-        self.closing_card.set_enabled(enabled)
-        if not enabled:
-            self.session.overlay_solo = False
-
     def set_locked(self, locked: bool) -> None:
         overlays = self.session.overlays
         if overlays.locked == locked:
@@ -165,10 +158,6 @@ class OverlaysControls:
     def toggle_locked(self) -> None:
         overlays = self.session.overlays
         overlays.locked = not overlays.locked
-
-    def any_card_enabled(self) -> bool:
-        overlays = self.session.overlays
-        return overlays.opening_card.enabled or overlays.closing_card.enabled
 
     def enter_solo(self) -> None:
         if self.session.overlay_solo:

@@ -260,7 +260,6 @@ def default_visual_limiter_runtime() -> VisualLimiterRuntime:
 
 @dataclass
 class PostFxRuntime:
-    enabled: bool
     fade: FadeRuntime
     highlight_rolloff: HighlightRolloffRuntime
     chroma_boost: ChromaBoostRuntime = field(default_factory=default_chroma_boost_runtime)
@@ -573,7 +572,6 @@ def post_fx_runtime_from_cfg(
         fout = post_fx.fade.fade_out
         return replace(
             base,
-            enabled=post_fx.enabled,
             locked=post_fx.locked,
             fade=replace(
                 base.fade,

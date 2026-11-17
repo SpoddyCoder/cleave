@@ -117,12 +117,6 @@ def _mutate_preset_switching(controls: TuningControls) -> None:
     press_layer_row(controls, RowDescriptor( RowKind.TRACK_PRESET_SWITCHING_TRIGGER, slot="layer_1" ), keydown(pygame.K_RIGHT))
 
 
-def _mutate_overlay_enabled(controls: TuningControls) -> None:
-    view = controls.build_view_state(paused=False)
-    controls.focus_descriptor = RowDescriptor(RowKind.OVERLAYS_HEADER)
-    press_main_row(controls, keydown(pygame.K_e))
-
-
 def _mutate_overlay_locked(controls: TuningControls) -> None:
     controls.focus_descriptor = RowDescriptor(RowKind.OVERLAYS_HEADER)
     press_main_row(controls, keydown(pygame.K_l))
@@ -258,9 +252,8 @@ def _mutate_overlay_display_time(controls: TuningControls) -> None:
     press_main_row(controls, keydown(pygame.K_RIGHT))
 
 
-def _mutate_post_fx_enabled(controls: TuningControls) -> None:
-    view = controls.build_view_state(paused=False)
-    controls.focus_descriptor = RowDescriptor(RowKind.POST_FX_HEADER)
+def _mutate_post_fx_fade_enabled(controls: TuningControls) -> None:
+    controls.focus_descriptor = RowDescriptor(RowKind.POST_FX_FADE_HEADER)
     press_main_row(controls, keydown(pygame.K_e))
 
 
@@ -436,7 +429,7 @@ _PERSISTED_MUTATIONS: list[
     ("stem.effects", _mutate_stem_effects, ("layer_1",), {}),
     ("stem.preset", _mutate_preset_path, ("layer_1",), {}),
     ("stem.preset_switching", _mutate_preset_switching, ("layer_1",), {}),
-    ("overlay.enabled", _mutate_overlay_enabled, ("layer_1",), {}),
+    ("post_fx.fade.enabled", _mutate_post_fx_fade_enabled, ("layer_1",), {}),
     ("overlay.locked", _mutate_overlay_locked, ("layer_1",), {}),
     ("overlay.position", _mutate_overlay_position, ("layer_1",), {}),
     ("overlay.title_font_size", _mutate_overlay_title_font_size, ("layer_1",), {}),
@@ -451,7 +444,6 @@ _PERSISTED_MUTATIONS: list[
     ("overlay.background_padding", _mutate_overlay_background_padding, ("layer_1",), {}),
     ("overlay.animation.appear_at", _mutate_overlay_start_delay, ("layer_1",), {}),
     ("overlay.animation.display_time", _mutate_overlay_display_time, ("layer_1",), {}),
-    ("post_fx.enabled", _mutate_post_fx_enabled, ("layer_1",), {}),
     ("post_fx.locked", _mutate_post_fx_locked, ("layer_1",), {}),
     ("post_fx.fade.fade_in.end", _mutate_post_fx_fade_in, ("layer_1",), {}),
     ("post_fx.fade.fade_out.start", _mutate_post_fx_fade_out, ("layer_1",), {}),

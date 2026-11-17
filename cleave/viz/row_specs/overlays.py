@@ -391,16 +391,6 @@ def _apply_overlay_card_slide_direction(
 ) -> None:
     _overlay_card_controls(controls, desc).step_slide_direction(delta=1 if forward else -1)
 
-def _toggle_overlays_enabled(
-    controls: TuningControls, _desc: RowDescriptor
-) -> None:
-    if controls.session.overlays.locked:
-        return
-    controls.overlays.set_enabled(
-        not controls.overlays.any_card_enabled()
-    )
-
-
 def _toggle_overlays_solo(
     controls: TuningControls, _desc: RowDescriptor
 ) -> None:
@@ -408,12 +398,6 @@ def _toggle_overlays_solo(
         controls.overlays.exit_solo()
     else:
         controls.overlays.enter_solo()
-
-
-def _format_overlays_enabled(
-    state: TuningViewState, _desc: RowDescriptor
-) -> str:
-    return on_off_text(_visibility_overlays(state, _desc)[0])
 
 
 def _format_overlays_solo(state: TuningViewState, _desc: RowDescriptor) -> str:
@@ -424,15 +408,6 @@ def _format_overlays_locked(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
     return lock_text(state.overlays.locked)
-
-
-def _apply_overlays_enabled(
-    controls: TuningControls,
-    _desc: RowDescriptor,
-    forward: bool,
-    _large: bool,
-) -> None:
-    controls.overlays.set_enabled(forward)
 
 
 def _apply_overlays_solo(
@@ -524,19 +499,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_description=(
             "Credits cards at the start and end of the song.",
         ),
-        toggle_enabled=_toggle_overlays_enabled,
         toggle_solo=_toggle_overlays_solo,
-    ),
-    RowKind.OVERLAYS_ENABLED: RowSpec(
-        affordance=RowAffordance.VALUE_STEP,
-        panel_label="enabled",
-        present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_overlays_enabled,
-        apply_horizontal=_apply_overlays_enabled,
-        choice=bool_choice(lambda s, d: _visibility_overlays(s, d)[0]),
-        help_title="Overlay Enabled",
-        help_description=("Turns both credits cards on or off.",),
-        blocked_by_section_lock=True,
     ),
     RowKind.OVERLAYS_SOLO: RowSpec(
         affordance=RowAffordance.VALUE_STEP,

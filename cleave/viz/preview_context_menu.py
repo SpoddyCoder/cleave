@@ -36,11 +36,7 @@ if TYPE_CHECKING:
     from cleave.viz.controls import TuningControls
 
 # Root nodes with an on/off item, in menu order.
-_BLOCK_ITEMS: tuple[tuple[str, str], ...] = (
-    ("overlay", "Overlays"),
-    ("post_fx", "Post-FX"),
-    ("pattern_mask", "Pattern Mask"),
-)
+_BLOCK_ITEMS: tuple[tuple[str, str], ...] = (("pattern_mask", "Pattern Mask"),)
 
 
 class PreviewTransport(Protocol):

@@ -15,7 +15,6 @@ from cleave.config_schema.descriptors import (
     require_non_negative_number,
 )
 
-DEFAULT_RENDER_POST_FX_ENABLED = True
 DEFAULT_RENDER_POST_FX_LOCKED = False
 
 FadeCurve = Literal["linear", "smoothstep", "ease_out_cubic", "ease_out_expo"]
@@ -615,12 +614,6 @@ FADE_SECTION = SectionDescriptor(
 
 RENDER_POST_FX_FIELDS: tuple[SchemaField, ...] = (
     FieldDescriptor(
-        "enabled",
-        DEFAULT_RENDER_POST_FX_ENABLED,
-        lambda raw, _ctx, _label: bool(raw),
-        dump_scalar,
-    ),
-    FieldDescriptor(
         "locked",
         DEFAULT_RENDER_POST_FX_LOCKED,
         lambda raw, _ctx, _label: bool(raw),
@@ -652,7 +645,6 @@ def parse_render_post_fx_section(post_fx_map: dict[str, Any]) -> Any:
 def post_fx_persist_values(ctx: PersistCtx) -> dict[str, Any]:
     runtime = ctx.session.post_fx
     return {
-        "enabled": runtime.enabled,
         "locked": runtime.locked,
         "fade": {
             "enabled": runtime.fade.enabled,
@@ -736,7 +728,6 @@ def default_fade_runtime_values() -> dict[str, Any]:
 
 def default_render_post_fx_runtime_values() -> dict[str, Any]:
     return {
-        "enabled": DEFAULT_RENDER_POST_FX_ENABLED,
         "fade": default_fade_runtime_values(),
         "highlight_rolloff": default_highlight_rolloff_runtime_values(),
         "chroma_boost": default_chroma_boost_runtime_values(),

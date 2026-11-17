@@ -227,6 +227,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Removed
 
+- Overlay and Post-FX no longer have an on/off switch of their own (navigator icon, page row, E key, or preview menu check). Switch each credits card and each Post-FX effect on or off instead. A project's `render.post_fx.enabled` is ignored.
 - The Windows installer's CUDA toolkit page and its `/CUDA=1` switch. The CUDA Toolkit download is in the Welcome to Cleave step instead.
 - R (Remove from...) in preset curation. F, B, and C undo their own changes.
 - The `favourites/`, `blacklist/`, and `roles/<role>/` folders under the preset root are no longer used, and existing ones are treated as ordinary preset folders. Favourite and blacklist destination subfolders and `.origin` restore files are gone.

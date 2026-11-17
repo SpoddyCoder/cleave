@@ -18,4 +18,4 @@ Open these files; do not search for a parallel serializer or a `RowKind` branch 
 
 **Effect:** `effects/registry.py` + handler module + `handlers.py`. No branch in `effects/runtime.py`. Consume `LayerEffectState`; do not import viz.
 
-**Post-FX / overlay `enabled`:** skip the block on the frame path (`frame_finish.py` / `post_fx.py`), not only dim the panel. Post-FX children check `session.post_fx.enabled`. Overlay cards gate per card.
+**Post-FX / overlay `enabled`:** skip the block on the frame path (`frame_finish.py` / `post_fx.py`), not only dim the panel. Each Post-FX effect and overlay card gates on its own `enabled`.

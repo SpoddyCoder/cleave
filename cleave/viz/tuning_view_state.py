@@ -256,7 +256,6 @@ class VisualLimiterBlock:
 
 @dataclass
 class PostFxBlock:
-    enabled: bool = _RO_POST_FX_DEFAULTS["enabled"]
     fade: FadeBlock = field(default_factory=FadeBlock)
     highlight_rolloff: HighlightRolloffBlock = field(
         default_factory=HighlightRolloffBlock
@@ -270,7 +269,6 @@ class PostFxBlock:
     def from_session(cls, session: TuningSession) -> PostFxBlock:
         pp = session.post_fx
         return cls(
-            enabled=pp.enabled,
             fade=FadeBlock.from_runtime(pp.fade),
             highlight_rolloff=HighlightRolloffBlock.from_runtime(
                 pp.highlight_rolloff
@@ -586,7 +584,6 @@ def view_state_structure_signature(
             },
         },
         "post_fx": {
-            "enabled": pp.enabled,
             "highlight_rolloff_enabled": pp.highlight_rolloff.enabled,
             "chroma_boost_enabled": pp.chroma_boost.enabled,
             "limiter_enabled": pp.limiter.enabled,

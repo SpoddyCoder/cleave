@@ -35,7 +35,7 @@ Shader passes in `cleave/gl_post_process.py` share the pygame GL context with th
 
 ## Runtime gating
 
-`*_active()` helpers in `post_fx.py` must check `render.post_fx.enabled`, child mode/strength, and `post_fx_solo`. Panel dimming is not enough. Test `enabled=False` on the frame path.
+`*_active()` helpers in `post_fx.py` must check the effect's own `enabled`, its strength, and `post_fx_solo`. Panel dimming is not enough. Test `enabled=False` on the frame path.
 
 ## HDR (`compositor.hdr`)
 

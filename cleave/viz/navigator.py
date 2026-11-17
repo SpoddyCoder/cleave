@@ -398,17 +398,17 @@ def navigator_tree_rails(nodes: Sequence[NavNode]) -> tuple[tuple[bool, ...], ..
 def _root_node(session: TuningSession, node: NavNode) -> NavNode:
     if node.id == "overlay":
         overlays = session.overlays
-        enabled = overlays.opening_card.enabled or overlays.closing_card.enabled
         return replace(
             node,
             toggles=(
-                NavToggle(TOGGLE_ENABLED, enabled, overlays.locked),
                 NavToggle(TOGGLE_SOLO, session.overlay_solo),
                 NavToggle(TOGGLE_LOCK, overlays.locked),
             ),
         )
     if node.id == "post_fx":
-        return replace(node, toggles=_block_toggles(session.post_fx))
+        return replace(
+            node, toggles=(NavToggle(TOGGLE_LOCK, session.post_fx.locked),)
+        )
     if node.id == "pattern_mask":
         return replace(node, toggles=_block_toggles(session.pattern_mask))
     if node.id == "timeline":

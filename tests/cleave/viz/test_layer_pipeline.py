@@ -15,6 +15,7 @@ from cleave.viz.layer_preview_resolution import (
 )
 from cleave.viz.session import LayerRuntime, TuningSession
 from tests.support.config import TEST_LAYER_STEMS, default_post_fx_runtime
+from tests.support.config import post_fx_runtime_all_off
 from tests.support.viz import make_test_cfg
 
 
@@ -277,7 +278,7 @@ def test_render_frame_applies_per_layer_highlight_rolloff_when_playing() -> None
     layer.fbo.enabled = True
     layer.fbo.texture_id = 11
     session = _session(("layer_1",))
-    session.post_fx = default_post_fx_runtime(enabled=True)
+    session.post_fx = default_post_fx_runtime()
     hr = session.post_fx.highlight_rolloff
     hr.mode = "per_layer"
     compositor = MagicMock()
@@ -324,7 +325,7 @@ def test_render_frame_skips_per_layer_highlight_rolloff_when_post_fx_disabled() 
     layer.fbo.enabled = True
     layer.fbo.texture_id = 11
     session = _session(("layer_1",))
-    session.post_fx = default_post_fx_runtime(enabled=False)
+    session.post_fx = post_fx_runtime_all_off()
     session.post_fx.highlight_rolloff.mode = "per_layer"
     compositor = MagicMock()
     post_process = MagicMock()
@@ -365,7 +366,7 @@ def test_render_frame_paused_per_layer_uses_frozen_rolloff_source() -> None:
     layer.fbo.enabled = True
     layer.fbo.texture_id = 11
     session = _session(("layer_1",))
-    session.post_fx = default_post_fx_runtime(enabled=True)
+    session.post_fx = default_post_fx_runtime()
     hr = session.post_fx.highlight_rolloff
     hr.mode = "per_layer"
     compositor = MagicMock()
@@ -404,7 +405,7 @@ def test_render_frame_applies_per_layer_chroma_boost_when_playing() -> None:
     layer.fbo.enabled = True
     layer.fbo.texture_id = 11
     session = _session(("layer_1",))
-    session.post_fx = default_post_fx_runtime(enabled=True)
+    session.post_fx = default_post_fx_runtime()
     cb = session.post_fx.chroma_boost
     cb.enabled = True
     cb.mode = "per_layer"
@@ -449,7 +450,7 @@ def test_render_frame_skips_per_layer_chroma_boost_when_amount_zero() -> None:
     layer = _stem_layer("layer_1")
     layer.fbo.enabled = True
     session = _session(("layer_1",))
-    session.post_fx = default_post_fx_runtime(enabled=True)
+    session.post_fx = default_post_fx_runtime()
     cb = session.post_fx.chroma_boost
     cb.mode = "per_layer"
     cb.amount_pct = 0
@@ -519,7 +520,7 @@ def test_render_frame_draws_every_layer_then_runs_post_passes_in_one_batch() -> 
         layer.fbo.texture_id = 11 + index
         layer.fbo.bloom_strength = 0.5
     session = _session(slots)
-    session.post_fx = default_post_fx_runtime(enabled=True)
+    session.post_fx = default_post_fx_runtime()
     events: list[str] = []
     post_process = MagicMock()
     post_process.batch.return_value.__enter__.side_effect = lambda: events.append(

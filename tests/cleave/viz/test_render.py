@@ -26,6 +26,7 @@ from cleave.viz.session import (
 from tests.support.config import (
     TEST_LAYER_STEMS,
     default_post_fx_runtime,
+    post_fx_runtime_all_off,
     write_minimal_config,
 )
 from cleave.paths import repo_root
@@ -71,7 +72,7 @@ def _post_fx_runtime(
     fade_in_end: float,
     fade_out_start: float,
 ) -> PostFxRuntime:
-    base = default_post_fx_runtime(enabled=enabled)
+    base = default_post_fx_runtime() if enabled else post_fx_runtime_all_off()
     return replace(
         base,
         fade=replace(

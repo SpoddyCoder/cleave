@@ -450,38 +450,6 @@ def test_focus_navigation_does_not_walk_a_main_list() -> None:
     assert _press_focused(controls, keydown(pygame.K_LEFT)) is True
     assert controls.focus_cursor == before
 
-def test_disabled_overlay_can_expand_sub_rows() -> None:
-    controls = make_controls(("layer_1",))
-    view = controls.build_view_state(paused=False)
-    header_row = RowDescriptor(RowKind.OVERLAYS_HEADER)
-    controls.focus_descriptor = header_row
-    _press_focused(controls, keydown(pygame.K_e))
-    assert controls.session.overlays.opening_card.enabled is False
-    assert controls.session.overlays.closing_card.enabled is False
-
-    _press_focused(controls, keydown(pygame.K_RIGHT))
-    assert controls.session.overlays.opening_card.enabled is False
-
-    view = controls.build_view_state(paused=False)
-    page = _page_kinds(view, "overlay.opening_card")
-    assert RowKind.OVERLAY_CARD_POSITION in page
-
-
-def test_disabled_post_fx_can_expand_sub_rows() -> None:
-    controls = make_controls(("layer_1",))
-    view = controls.build_view_state(paused=False)
-    header_row = RowDescriptor(RowKind.POST_FX_HEADER)
-    controls.focus_descriptor = header_row
-    _press_focused(controls, keydown(pygame.K_e))
-    assert controls.session.post_fx.enabled is False
-
-    _press_focused(controls, keydown(pygame.K_RIGHT))
-    assert controls.session.post_fx.enabled is False
-
-    view = controls.build_view_state(paused=False)
-    page = _page_kinds(view, "post_fx.fade")
-    assert RowKind.POST_FX_FADE_IN_START in page
-
 def test_beat_sensitivity_clamps() -> None:
     controls = make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
@@ -3674,25 +3642,22 @@ def test_e_toggles_each_enable_header() -> None:
     )
     assert controls.session.layers["layer_1"].enabled is False
 
-    controls.focus_descriptor = _desc(
-        view, RowDescriptor(RowKind.OVERLAYS_HEADER)
-    )
+    controls.focus_descriptor = RowDescriptor(RowKind.OVERLAYS_HEADER)
     assert controls.session.overlays.opening_card.enabled is True
     _press_focused(controls, keydown(pygame.K_e))
-    assert controls.session.overlays.opening_card.enabled is False
-    assert controls.session.overlays.closing_card.enabled is False
+    assert controls.session.overlays.opening_card.enabled is True
+    assert controls.session.overlays.closing_card.enabled is True
 
-    controls.session.overlays.opening_card.enabled = True
     view = controls.build_view_state(paused=False)
     card_row = RowDescriptor(RowKind.OVERLAY_CARD_HEADER, card="opening_card")
     controls.focus_descriptor = _desc(view, card_row)
     _press_focused(controls, keydown(pygame.K_e))
     assert controls.session.overlays.opening_card.enabled is False
 
-    controls.focus_descriptor = RowDescriptor(RowKind.POST_FX_HEADER)
-    assert controls.session.post_fx.enabled is True
+    controls.focus_descriptor = RowDescriptor(RowKind.POST_FX_FADE_HEADER)
+    assert controls.session.post_fx.fade.enabled is True
     _press_focused(controls, keydown(pygame.K_e))
-    assert controls.session.post_fx.enabled is False
+    assert controls.session.post_fx.fade.enabled is False
 
     controls.focus_descriptor = RowDescriptor(RowKind.PATTERN_MASK_HEADER)
     before_mask = controls.session.pattern_mask.enabled
@@ -3719,9 +3684,9 @@ def test_locked_headers_block_e() -> None:
     controls.session.post_fx.locked = True
     controls.session.pattern_mask.locked = True
     controls.session.timeline.locked = True
-    controls.focus_descriptor = RowDescriptor(RowKind.POST_FX_HEADER)
+    controls.focus_descriptor = RowDescriptor(RowKind.POST_FX_FADE_HEADER)
     _press_focused(controls, keydown(pygame.K_e))
-    assert controls.session.post_fx.enabled is True
+    assert controls.session.post_fx.fade.enabled is True
     controls.focus_descriptor = RowDescriptor(RowKind.PATTERN_MASK_HEADER)
     before_mask = controls.session.pattern_mask.enabled
     _press_focused(controls, keydown(pygame.K_e))

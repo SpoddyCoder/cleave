@@ -354,36 +354,8 @@ def _toggle_post_fx_limiter_enabled(
         not controls.session.post_fx.limiter.enabled
     )
 
-def _toggle_post_fx_enabled(
-    controls: TuningControls, _desc: RowDescriptor
-) -> None:
-    if controls.session.post_fx.locked:
-        return
-    enabled = controls.session.post_fx.enabled
-    controls.post_fx.set_enabled(not enabled)
-
-
-def _visibility_post_fx(
-    state: TuningViewState, _desc: RowDescriptor
-) -> tuple[bool, bool]:
-    block = state.post_fx
-    return (block.enabled, block.solo)
-
-def _format_post_fx_enabled(state: TuningViewState, _desc: RowDescriptor) -> str:
-    return on_off_text(state.post_fx.enabled)
-
-
 def _format_post_fx_locked(state: TuningViewState, _desc: RowDescriptor) -> str:
     return lock_text(state.post_fx.locked)
-
-
-def _apply_post_fx_enabled(
-    controls: TuningControls,
-    _desc: RowDescriptor,
-    forward: bool,
-    _large: bool,
-) -> None:
-    controls.post_fx.set_enabled(forward)
 
 
 def _apply_post_fx_locked(
@@ -412,26 +384,11 @@ SPECS: dict[RowKind, RowSpec] = {
         panel_label="Post-FX",
         present_style=RowPresentStyle.HEADING,
         fit_strategy=FitStrategy.NONE,
-        visibility_icon=_visibility_post_fx,
         help_title="Post FX",
         help_description=(
             "Post-processing effects on the final picture.",
+            "Each effect has its own on/off switch.",
         ),
-        toggle_enabled=_toggle_post_fx_enabled,
-    ),
-    RowKind.POST_FX_ENABLED: RowSpec(
-        affordance=RowAffordance.VALUE_STEP,
-        panel_label="enabled",
-        present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_post_fx_enabled,
-        apply_horizontal=_apply_post_fx_enabled,
-        choice=bool_choice(lambda s, _d: s.post_fx.enabled),
-        help_title="Post FX Enabled",
-        help_description=(
-            "Turns fade, highlight rolloff, and chroma boost on or off.",
-            "The visual limiter has its own switch.",
-        ),
-        blocked_by_section_lock=True,
     ),
     RowKind.POST_FX_LOCKED: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
@@ -785,7 +742,7 @@ SPECS: dict[RowKind, RowSpec] = {
             "Makes the layers dimmer when the combined picture is too busy.",
             "It works with or without the timeline.",
             "When the timeline is on, cue roles change how much each layer dims.",
-            "The Post FX switch and solo do not change it.",
+            "Post FX solo and the Post FX lock do not change it.",
         ),
         help_entries=(("E", "enable/disable"),),
         toggle_enabled=_toggle_post_fx_limiter_enabled,
@@ -803,7 +760,6 @@ SPECS: dict[RowKind, RowSpec] = {
         help_entries=(("Left/Right", "off / on"),),
         help_description=(
             "Turns the visual limiter on or off.",
-            "The Post FX switch does not change it.",
         ),
         parent_group="post_fx_limiter",
         blocked_by_section_lock=False,

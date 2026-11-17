@@ -21,6 +21,7 @@ def _load_original_dict(cfg: CleaveConfig) -> dict[str, Any]:
 
 _LEGACY_RENDER_KEYS = ("overlay", "width", "height", "fps")
 _LEGACY_OVERLAY_CARD_KEYS = ("font", "start_delay", "display_time")
+_LEGACY_POST_FX_KEYS = ("enabled",)
 
 
 def _deep_merge_dicts(
@@ -56,6 +57,13 @@ def _snapshot_render(
     orig: dict[str, Any] = dict(orig_render) if isinstance(orig_render, dict) else {}
     for legacy_key in _LEGACY_RENDER_KEYS:
         orig.pop(legacy_key, None)
+    orig_post_fx = orig.get("post_fx")
+    if isinstance(orig_post_fx, dict):
+        orig["post_fx"] = {
+            key: value
+            for key, value in orig_post_fx.items()
+            if key not in _LEGACY_POST_FX_KEYS
+        }
     render_out = _deep_merge_dicts(orig, render_payload)
     _strip_legacy_overlay_card_keys(render_out)
     return render_out

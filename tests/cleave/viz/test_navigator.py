@@ -338,7 +338,6 @@ def test_root_toggles_follow_session_and_replace_marks() -> None:
     session = _session()
     session.overlays.opening_card.enabled = False
     session.overlays.closing_card.enabled = False
-    session.post_fx.enabled = False
     session.pattern_mask.enabled = False
     session.timeline.enabled = False
     session.overlay_solo = True
@@ -349,11 +348,11 @@ def test_root_toggles_follow_session_and_replace_marks() -> None:
     nodes = {node.id: node for node in build_navigator(session)}
 
     overlay = _toggles(nodes["overlay"])
-    assert tuple(overlay) == (TOGGLE_ENABLED, TOGGLE_SOLO, TOGGLE_LOCK)
-    assert overlay[TOGGLE_ENABLED] == NavToggle(TOGGLE_ENABLED, False, True)
+    assert tuple(overlay) == (TOGGLE_SOLO, TOGGLE_LOCK)
     assert overlay[TOGGLE_SOLO] == NavToggle(TOGGLE_SOLO, True)
     assert overlay[TOGGLE_LOCK] == NavToggle(TOGGLE_LOCK, True)
-    for node_id in ("post_fx", "pattern_mask", "timeline"):
+    assert _toggles(nodes["post_fx"]) == {TOGGLE_LOCK: NavToggle(TOGGLE_LOCK, True)}
+    for node_id in ("pattern_mask", "timeline"):
         toggles = _toggles(nodes[node_id])
         assert tuple(toggles) == (TOGGLE_ENABLED, TOGGLE_LOCK)
         assert toggles[TOGGLE_ENABLED] == NavToggle(TOGGLE_ENABLED, False, True)
@@ -571,11 +570,12 @@ def test_page_status_names_the_nearest_off_and_locked_owner() -> None:
     assert page_status(session, "timeline.grid").off_by == "Timeline"
 
     assert page_status(session, "post_fx.fade") == PageStatus()
-    session.post_fx.enabled = False
+    session.post_fx.fade.enabled = False
     session.post_fx.locked = True
     assert page_status(session, "post_fx.fade") == PageStatus(
-        off_by="Post-FX", locked_by="Post-FX"
+        off_by="Fade", locked_by="Post-FX"
     )
+    assert page_status(session, "post_fx").off_by is None
 
     session.overlays.opening_card.enabled = False
     assert page_status(session, "overlay").off_by is None

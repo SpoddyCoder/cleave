@@ -32,7 +32,6 @@ from cleave.viz.row_sections import (
     OVERLAY_SECTION_KINDS,
     PATTERN_MASK_SECTION_KINDS,
     POST_FX_FADE_KINDS,
-    POST_FX_LIMITER_KINDS,
     POST_FX_SECTION_KINDS,
     SECTION_SWITCH_KINDS,
     TIMELINE_SECTION_KINDS,
@@ -116,22 +115,11 @@ def row_value_color_for(
 
     if kind in OVERLAY_SECTION_KINDS:
         overlays = state.overlays
-        if not (
-            overlays.opening_card.runtime.enabled
-            or overlays.closing_card.runtime.enabled
-        ):
-            return DISABLED
         if desc.card is not None and not getattr(overlays, desc.card).runtime.enabled:
             return DISABLED
 
-    if (
-        kind in POST_FX_SECTION_KINDS
-        and kind not in POST_FX_LIMITER_KINDS
-    ):
-        if not state.post_fx.enabled:
-            return DISABLED
-        if kind in POST_FX_FADE_KINDS and not state.post_fx.fade.enabled:
-            return DISABLED
+    if kind in POST_FX_FADE_KINDS and not state.post_fx.fade.enabled:
+        return DISABLED
 
     if kind in PATTERN_MASK_SECTION_KINDS:
         if not state.pattern_mask.enabled:

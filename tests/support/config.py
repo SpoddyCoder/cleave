@@ -74,7 +74,6 @@ def default_fade_config() -> FadeConfig:
 
 def default_post_fx_config(**overrides: object) -> RenderPostFxConfig:
     values: dict[str, object] = {
-        "enabled": True,
         "fade": default_fade_config(),
         "highlight_rolloff": default_highlight_rolloff_config(),
         "chroma_boost": default_chroma_boost_config(),
@@ -88,6 +87,15 @@ def default_post_fx_runtime(**overrides: object) -> PostFxRuntime:
     if not overrides:
         return runtime
     return replace(runtime, **overrides)  # type: ignore[arg-type]
+
+
+def post_fx_runtime_all_off() -> PostFxRuntime:
+    """Post-FX with fade, highlight rolloff, and chroma boost switched off."""
+    runtime = _session_default_post_fx_runtime()
+    runtime.fade.enabled = False
+    runtime.highlight_rolloff.enabled = False
+    runtime.chroma_boost.enabled = False
+    return runtime
 
 
 def slot_for_stem(stem: str) -> str:

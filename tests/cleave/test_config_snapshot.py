@@ -822,7 +822,7 @@ def _snapshot_fixture(tmp_path: Path) -> tuple[CleaveConfig, TuningSession, Path
         user_config_path=root / "user-config.yaml",
         render=RenderConfig(
             overlays=_overlays_cfg(),
-            post_fx=default_post_fx_config(enabled=True),
+            post_fx=default_post_fx_config(),
         ),
     )
     opening = replace(
@@ -847,7 +847,7 @@ def _snapshot_fixture(tmp_path: Path) -> tuple[CleaveConfig, TuningSession, Path
             display_time=40.0,
         ),
     )
-    post_fx_runtime = default_post_fx_runtime(enabled=True)
+    post_fx_runtime = default_post_fx_runtime()
     session = TuningSession(
         layer_z_order=list(DEFAULT_LAYER_SLOTS),
         post_fx=replace(
@@ -943,7 +943,7 @@ def test_write_session_snapshot_persists_post_fx(tmp_path: Path) -> None:
 
     data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
     post_fx = data["render"]["post_fx"]
-    assert post_fx["enabled"] is True
+    assert "enabled" not in post_fx
     assert "fade_in" not in post_fx
     assert "fade_out" not in post_fx
     fade = post_fx["fade"]
@@ -956,7 +956,6 @@ def test_write_session_snapshot_persists_post_fx(tmp_path: Path) -> None:
     round_trip = parse_render_section(data)
     assert round_trip is not None
     assert round_trip.post_fx is not None
-    assert round_trip.post_fx.enabled is True
     assert round_trip.post_fx.fade.fade_in.start == 0.0
     assert round_trip.post_fx.fade.fade_in.end == 12.0
     assert round_trip.post_fx.fade.fade_out.start == 3.0
@@ -1116,12 +1115,12 @@ def test_write_session_snapshot_post_fx_solo_does_not_affect_enabled(
     tmp_path: Path,
 ) -> None:
     cfg, session, out_path = _snapshot_fixture(tmp_path)
-    session.post_fx.enabled = False
+    session.post_fx.fade.enabled = False
     session.post_fx_solo = True
     write_session_snapshot(out_path, cfg=cfg, session=session)
 
     data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
-    assert data["render"]["post_fx"]["enabled"] is False
+    assert data["render"]["post_fx"]["fade"]["enabled"] is False
     assert "post_fx_solo" not in yaml.safe_dump(data)
 
 

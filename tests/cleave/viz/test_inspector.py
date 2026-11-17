@@ -91,12 +91,11 @@ def test_parents_and_unknown_ids_have_no_rows(node_id: str) -> None:
         (
             "overlay",
             (
-                RowKind.OVERLAYS_ENABLED,
                 RowKind.OVERLAYS_SOLO,
                 RowKind.OVERLAYS_LOCKED,
             ),
         ),
-        ("post_fx", (RowKind.POST_FX_ENABLED, RowKind.POST_FX_LOCKED)),
+        ("post_fx", (RowKind.POST_FX_LOCKED,)),
         ("timeline", (RowKind.TIMELINE_ENABLED, RowKind.TIMELINE_LOCKED)),
     ),
 )

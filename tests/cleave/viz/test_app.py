@@ -30,6 +30,7 @@ from cleave.viz.shell_focus import ShellRegion
 from cleave.viz.input_dispatch import key_handler_for_runtime
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from tests.support.config import default_post_fx_runtime
+from tests.support.config import post_fx_runtime_all_off
 from cleave.viz.session import LayerRuntime, TuningSession
 from tests.support.config import default_post_fx_runtime
 from cleave.viz.modal import ModalHost
@@ -95,7 +96,7 @@ def _minimal_runtime(
 ) -> LiveVisualizerRuntime:
     display_w, display_h = display
     session = TuningSession(layer_z_order=[], layers={})
-    post_fx = default_post_fx_runtime(enabled=False)
+    post_fx = post_fx_runtime_all_off()
     session.post_fx = replace(
         post_fx,
         fade=replace(

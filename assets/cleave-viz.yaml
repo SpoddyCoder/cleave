@@ -1,8 +1,7 @@
 render:
   post_fx:
-    enabled: false
     fade:
-      enabled: true
+      enabled: false
       fade_in:
         start: 0
         end: 15

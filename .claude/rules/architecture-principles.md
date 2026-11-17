@@ -25,4 +25,4 @@ Prefer a cohesive abstraction over bolting onto an existing class when a change 
 - **Registry-driven effects.** New effect = registry entry + handler module. No per-effect branches in `cleave/effects/runtime.py`. `cleave/effects/` does not import viz; it consumes `LayerEffectState`.
 - **Shared frame path.** Live and offline call `frame_finish`. Layer composite goes through `LayerFramePipeline.composite`. Wipes are an explicit `MaskTransition`.
 - **projectM time is monotonic.** `ProjectMFrameClock` via `set_frame_time`. Song playhead is for PCM, timeline, and effects only.
-- **`enabled` gates the frame path.** `render.post_fx` children respect the parent `enabled`. Overlay cards each have their own `enabled`.
+- **`enabled` gates the frame path.** Each `render.post_fx` effect and each overlay card has its own `enabled`; there is no block-wide switch.

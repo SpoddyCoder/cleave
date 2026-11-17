@@ -234,19 +234,21 @@ def test_navigator_toggles_sit_in_fixed_columns() -> None:
 
 def test_header_toggle_changes_the_header_flag() -> None:
     controls = make_controls(("layer_1",))
+    fade = RowDescriptor(RowKind.POST_FX_FADE_HEADER)
+    assert controls.session.post_fx.fade.enabled is True
+    activate_header_toggle(controls, "enabled", fade)
+    assert controls.session.post_fx.fade.enabled is False
     post = RowDescriptor(RowKind.POST_FX_HEADER)
-    assert controls.session.post_fx.enabled is True
-    activate_header_toggle(controls, "enabled", post)
-    assert controls.session.post_fx.enabled is False
     activate_header_toggle(controls, "lock", post)
     assert controls.session.post_fx.locked is True
 
     overlays = RowDescriptor(RowKind.OVERLAYS_HEADER)
     activate_header_toggle(controls, "solo", overlays)
     assert controls.session.overlay_solo is True
-    activate_header_toggle(controls, "enabled", overlays)
+    card = RowDescriptor(RowKind.OVERLAY_CARD_HEADER, card="opening_card")
+    activate_header_toggle(controls, "enabled", card)
     assert controls.session.overlays.opening_card.enabled is False
-    assert controls.session.overlays.closing_card.enabled is False
+    assert controls.session.overlays.closing_card.enabled is True
 
 
 def test_lock_mark_shows_only_in_preset_curation() -> None:

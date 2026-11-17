@@ -955,7 +955,6 @@ render:
     assert render == RenderConfig(
         overlays=None,
         post_fx=default_post_fx_config(
-            enabled=True,
             fade=FadeConfig(
                 enabled=True,
                 fade_in=FadeSideConfig(start=0.0, end=12.0, type="smoothstep"),

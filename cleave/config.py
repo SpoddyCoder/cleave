@@ -305,7 +305,6 @@ class VisualLimiterConfig:
 
 @dataclass(frozen=True)
 class RenderPostFxConfig:
-    enabled: bool
     fade: FadeConfig
     highlight_rolloff: HighlightRolloffConfig
     chroma_boost: ChromaBoostConfig

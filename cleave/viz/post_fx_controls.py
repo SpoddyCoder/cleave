@@ -47,14 +47,6 @@ class PostFxControls:
         self.session = session
         self._bindings = bindings
 
-    def set_enabled(self, enabled: bool) -> None:
-        pp = self.session.post_fx
-        if pp.enabled == enabled:
-            return
-        pp.enabled = enabled
-        if not enabled:
-            self.session.post_fx_solo = False
-
     def enter_solo(self) -> None:
         if self.session.post_fx_solo:
             return

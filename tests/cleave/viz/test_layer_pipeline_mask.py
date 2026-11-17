@@ -11,6 +11,7 @@ from cleave.viz.layer import StemLayer
 from cleave.viz.layer_pipeline import LayerFramePipeline
 from cleave.viz.session import LayerRuntime, TuningSession
 from tests.support.config import TEST_LAYER_STEMS, default_post_fx_runtime
+from tests.support.config import post_fx_runtime_all_off
 
 
 def _stem_layer(slot: str, *, enabled: bool = True, opacity: float = 1.0) -> StemLayer:
@@ -256,7 +257,7 @@ def test_render_frame_feeds_pcm_for_live_disabled_slot() -> None:
     session = _session(("layer_1", "layer_2"))
     session.pattern_mask.enabled = True
     session.pattern_mask.transition = 1.0
-    session.post_fx = default_post_fx_runtime(enabled=False)
+    session.post_fx = post_fx_runtime_all_off()
     live = _stem_layer("layer_1")
     departing = _stem_layer("layer_2", enabled=False)
     pcm_bank = MagicMock()
@@ -305,7 +306,7 @@ def test_render_frame_skips_disabled_slot_that_is_not_live() -> None:
     session = _session(("layer_1", "layer_2"))
     session.pattern_mask.enabled = True
     session.pattern_mask.transition = 1.0
-    session.post_fx = default_post_fx_runtime(enabled=False)
+    session.post_fx = post_fx_runtime_all_off()
     live = _stem_layer("layer_1")
     idle = _stem_layer("layer_2", enabled=False)
     pcm_bank = MagicMock()
