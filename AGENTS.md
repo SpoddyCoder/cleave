@@ -12,6 +12,7 @@ Live Milkdrop/libprojectM editor. Windows app is the product; CLI is for checkou
 - Stem PCM stays native mono/stereo for projectM; mix playback is stereo; analysis is mono.
 - Work list: [docs/dev/todos.md](docs/dev/todos.md).
 - User-visible change: same-edit bullet under `## [Unreleased]` in [CHANGELOG.md](CHANGELOG.md) (`### Added` / `Changed` / `Fixed` / `Removed`). Skip refactors, tests, and docs. Do not bump `cleave.__version__` or cut a tag unless asked.
+- User-visible change: in the same edit, update [README.md](README.md) and [docs/user-guide/README.md](docs/user-guide/README.md) wherever they describe what changed, and add a guide section for a new feature. Fix any statement the change makes wrong (menu paths, key names, labels, defaults). Keep the guide in end-user language ([.claude/rules/documentation-style.md](.claude/rules/documentation-style.md)). If a screenshot in `docs/user-guide/images/` no longer matches the UI, say so in your reply; do not launch the editor to retake it unless asked.
 
 ### Locate, then search
 

@@ -125,6 +125,7 @@ Then:
 ### Other docs hygiene
 
 - Changelog bullets that describe current product behaviour should match README (picker, Windows zip/installer, CUDA extra, data dirs). Fix README if it lags; do not invent features.
+- Check the released section against [docs/user-guide/README.md](../../../docs/user-guide/README.md) too: every Added feature has a home in the guide, and no Changed or Removed bullet leaves a stale menu path, key, or label there. Fix the guide if it lags, and list any screenshot in `docs/user-guide/images/` that no longer matches the UI.
 - Do not add a changelog bullet for this cut (docs/refactors/tests stay out per project-context).
 - Do not bump anything in `.claude/rules/` except inbound plan links you broke by `git mv`.
 

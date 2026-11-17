@@ -2,7 +2,7 @@
 
 [![Tests](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml/badge.svg)](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml)
 
-Stem-separated music visualizer. Layer together drums, bass, vocal and other stems - each driving Milkdrop presets to create your own unique visual masterpieces.
+Stem-separated music visualizer. Layer together drums, bass, vocals and other stems - each driving Milkdrop presets to create your own unique visual masterpieces.
 
 The visual editor lets you browse and tune presets in real time - automate preset switching, layer in effects, post processing and more. Render the final output in high definition and high frame rates using FFmpeg.
 
@@ -20,51 +20,20 @@ Cleave is in active development. It is very usable, but may not maintain backwar
 
 ## Getting Started
 
-### Get Some Milkdrop Presets
+1. **Open a song.** On Windows, drop a music file onto `cleave.exe`, or launch Cleave and pick a file in the window. On Linux, run `./cleave.py play ~/music/mysong.mp3`, or `./cleave.py play` to pick a file in the window. Cleave reads wav, mp3, flac, m4a, aac, ogg, aiff, and aif.
+2. **Grab the downloads.** On first launch, the Welcome to Cleave step offers the Milkdrop presets and the AI models Cleave needs, each with its own progress bar. Anything you skip downloads when it is first needed, or later from Settings > Download packages.
+3. **Let Cleave prepare the song.** It splits the song into stems (drums, bass, vocals, other) and finds the beats and bars. The window shows each step's progress. This happens once per song.
+4. **Press `H`.** The help column explains whatever you have highlighted, anywhere in the editor, including inside dialogs.
 
-Cleave needs Milkdrop preset packs to display visualizations. On first launch, when none are present, the editor offers to download starter preset and texture packs (about 60 MB). You can skip this and add packs later; see [Project & Data Locations](#project--data-locations).
+The [User Guide](docs/user-guide/README.md) covers everything else: layers, presets, preset curation, the timeline, credits cards, post-processing, and rendering.
 
-### Open a Track
+![The Cleave editor](docs/user-guide/images/editor-overview.png)
 
-Windows - drop a music file onto `cleave.exe`, or launch it and browse for a file from the editor window. Supported formats are wav, mp3, flac, m4a, aac, ogg, aiff, and aif. Cleave stores a PCM WAV mix in the project.
-
-Linux:
-```bash
-./cleave.py play ~/music/mysong.mp3
-```
-
-This will separate the track into its component stems (bass, drums, vocals, other), perform audio analysis, then open the editor. On first launch, the Welcome to Cleave step offers the presets and model weights in one go and shows each download's progress. Anything you skip downloads when it is first needed. To get one later, choose Settings > Download packages in the editor.
-
-## Using the Editor
-
-* Press `h` at any time to show context-sensitive help and controls.
-  * The help changes as you move around the interface with the arrow keys.
-* If you are using CPU rendering, the editor may run at low frame rates with multiple layers.
-  * Change `Settings` > `Preview` > `preview quality` to help with this.
-  * The final render will still be at full quality and full frame rate.
-
-### Preset Curation
-
-The editor has a preset curation mode for marking up your presets.
-`Settings` > `Switch to Preset Curation`. While focused on a preset **file** row:
-* `f` - favourite or unfavourite the preset.
-* `b` - blacklist or unblacklist the preset. A blacklisted preset is hidden from folder browsing, populate, and random picks.
-* `c` - cast the preset into a role (bed, pulse, lead, accent), or None to clear it.
-* Right-click a preset for the same actions: Favourite / Unfavourite, Blacklist / Unblacklist, and a Role submenu that ticks the current role.
-* Curation never moves, copies, or deletes preset files. It is stored in `cleave.db` in the data directory, keyed by each preset's contents, so it follows a preset if you rename or move it.
-* Left/Right on the top-level directory row steps through the **Favourites**, **Role**, and **Blacklisted** collections as well as your preset folders.
-
-### Timeline
-
-The timeline automates layer visibility, preset choice, opacity and blend over the course of a song. When enabled, the standard layer visibility controls are disabled and the timeline takes over.
-
-**Song Markers** - mark specific points in the song for preset cuts. Press `Ctrl + Enter` to drop a marker. These act as snap points and anchor points for timeline preset generation.
-
-**Beat / Bar Grid** - powered by Beat This!, an AI beat detection library. By default it uses the full-mix stem for analysis. Choose a different stem with the `--beat-detection-stem` switch. You can snap cues to the grid during or after recording.
-
-**Timeline Presets** - generate a complete layered visualisation of a song. For best results, curate presets into Roles and place song markers first. See [docs/user-guide/compositing-and-effects.md](docs/user-guide/compositing-and-effects.md) for details on song marker types (crescendo, diminuendo, etc).
+If the editor runs slowly with several layers, lower Settings > Preview > preview quality. The final render is always full quality and full frame rate.
 
 ## CLI
+
+The editor is the main way to use Cleave. The command line is for scripts, automation, and a few extras.
 
 ```bash
 ./cleave.py --help
@@ -73,10 +42,10 @@ The timeline automates layer visibility, preset choice, opacity and blend over t
 Available commands:
 
 * `play` - open a song in the editor. Accepts a source audio file or project slug/path. Omit the target to browse from the editor window.
-* `separate` - run stem separation without opening the editor.
+* `separate` - run stem separation without opening the editor. Add `-hq` for the slower, higher quality model, or `--force` to split again.
 * `render` - render a project to video. Accepts a project slug or path.
-* `backup` - archive a project directory to a `.cleave-tar.gz` file.
-* `restore` - unpack a `.cleave-tar.gz` archive into `projects/<slug>/`.
+* `backup` - archive a project directory to a `.cleave-tar.gz` file (command line only for now).
+* `restore` - unpack a `.cleave-tar.gz` archive into `projects/<slug>/` (command line only for now).
 
 Use `--help` on any command for more options.
 
@@ -176,7 +145,7 @@ Cleave creates a project directory for each song, storing stems, configs and ren
 
 Override the data root with `CLEAVE_DATA` on any OS.
 
-To add starter packs yourself (instead of the welcome step's download), clone them into those folders:
+To add the starter packs yourself instead of using the Welcome to Cleave download, clone them into those folders:
 
 Windows:
 ```
@@ -207,10 +176,10 @@ There are many thousands of Milkdrop presets available online - these are just a
 A project directory contains:
 * `project.yaml` - metadata, song markers, render settings
 * `cleave-viz.yaml` - layers, timeline, overlays, post-FX (saved from the editor)
-* `signals.json` - audio analysis data used by effects and the timeline conductor
-* The original audio file, plus `stems/`, `renders/`, and `presets/` folders
+* `signals.json` - the beats, bars, and other audio analysis that drive effects and the timeline
+* The original audio file, plus `stems/`, `renders/`, `captures/` (Grab still pictures), and `presets/` (copies of the presets in each layer's preset list)
 
-For compositing, effects, and rendering internals see [docs/user-guide/compositing-and-effects.md](docs/user-guide/compositing-and-effects.md). For the Windows build process see [docs/dev/windows-freeze.md](docs/dev/windows-freeze.md).
+For the Windows build process see [docs/dev/windows-freeze.md](docs/dev/windows-freeze.md).
 
 ---
 

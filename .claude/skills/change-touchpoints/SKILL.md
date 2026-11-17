@@ -19,3 +19,5 @@ Open these files; do not search for a parallel serializer or a `RowKind` branch 
 **Effect:** `effects/registry.py` + handler module + `handlers.py`. No branch in `effects/runtime.py`. Consume `LayerEffectState`; do not import viz.
 
 **Post-FX / overlay `enabled`:** skip the block on the frame path (`frame_finish.py` / `post_fx.py`), not only dim the panel. Each Post-FX effect and overlay card gates on its own `enabled`.
+
+**Docs:** a user-visible change also updates [README.md](../../../README.md) and [docs/user-guide/README.md](../../../docs/user-guide/README.md) in the same edit (rule in `AGENTS.md`, style in `.claude/rules/documentation-style.md`).
