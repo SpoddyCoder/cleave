@@ -1,6 +1,6 @@
 # `Cleave`
 
-[![Version](https://img.shields.io/badge/version-v0.3.0--313%20%28dev%20build%29-orange)](https://github.com/SpoddyCoder/cleave/compare/v0.3.0...ui-refactor) [![Tests](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml/badge.svg)](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml)
+[![Version](https://img.shields.io/badge/version-v0.3.0--314%20%28dev%20build%29-orange)](https://github.com/SpoddyCoder/cleave/compare/v0.3.0...ui-refactor) [![Tests](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml/badge.svg)](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml)
 
 Stem-separated music visualizer. Layer together drums, bass, vocals and other stems - each driving Milkdrop presets to create your own unique visual masterpieces.
 
@@ -205,3 +205,4 @@ for the full text.
 * [NumPy](https://numpy.org/) - numerical arrays for audio and effects
 * [PyYAML](https://pyyaml.org/) - configuration format
 * [soundfile](https://python-soundfile.readthedocs.io/) - WAV I/O
+* [SQLite](https://sqlite.org/) - preset library index and curation state
