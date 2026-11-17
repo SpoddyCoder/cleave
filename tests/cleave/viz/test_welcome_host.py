@@ -262,6 +262,7 @@ def _editor_controls(*, paused: bool) -> SimpleNamespace:
         welcome=WelcomeFlow(host),
         playback=playback,
         transport=SimpleNamespace(toggle_pause=MagicMock(side_effect=toggle)),
+        preset_rescan=SimpleNamespace(start=MagicMock()),
     )
 
 
@@ -283,6 +284,56 @@ def test_editor_leaves_paused_playback_paused(persist: MagicMock) -> None:
     controls.host.handle_keydown(_keydown(pygame.K_RETURN))
     assert controls.playback.paused
     controls.transport.toggle_pause.assert_not_called()
+
+
+def _download_in_editor(
+    controls: SimpleNamespace,
+    item: FirstRunItem,
+    *,
+    until: Callable[[], bool] | None = None,
+) -> None:
+    with patch("cleave.first_run.first_run_items", return_value=(item,)):
+        TuningControls.prompt_welcome(controls)
+    controls.host.handle_keydown(_keydown(pygame.K_RETURN))
+    _tick_until(controls.welcome, until or (lambda: not controls.welcome.active))
+
+
+def test_editor_rescans_presets_after_downloading_them(persist: MagicMock) -> None:
+    controls = _editor_controls(paused=False)
+    _download_in_editor(controls, _item(FirstRunItemId.PRESETS, lambda _p: None))
+
+    assert controls.welcome.downloaded == frozenset({FirstRunItemId.PRESETS})
+    controls.preset_rescan.start.assert_called_once_with()
+    assert not controls.playback.paused
+
+
+def test_editor_skips_rescan_when_presets_were_not_downloaded(
+    persist: MagicMock,
+) -> None:
+    controls = _editor_controls(paused=False)
+    _download_in_editor(controls, _item(FirstRunItemId.DEMUCS, lambda _p: None))
+
+    assert controls.welcome.downloaded == frozenset({FirstRunItemId.DEMUCS})
+    controls.preset_rescan.start.assert_not_called()
+
+
+def test_editor_skips_rescan_when_the_presets_download_fails(
+    persist: MagicMock,
+) -> None:
+    def fail(_progress) -> None:
+        raise WeightDownloadError("offline")
+
+    controls = _editor_controls(paused=False)
+    _download_in_editor(
+        controls,
+        _item(FirstRunItemId.PRESETS, fail),
+        until=lambda: _message(controls.host) == "Some downloads failed",
+    )
+    controls.host.handle_keydown(_keydown(pygame.K_ESCAPE))
+
+    assert not controls.welcome.active
+    assert controls.welcome.downloaded == frozenset()
+    controls.preset_rescan.start.assert_not_called()
 
 
 def _buttons(host: ModalHost) -> tuple[str, ...]:

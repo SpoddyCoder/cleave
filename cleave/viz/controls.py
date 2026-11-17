@@ -465,14 +465,22 @@ class TuningControls:
         """Open the Welcome to Cleave step for whatever is still missing.
 
         Playback pauses while the step is open and resumes when it closes.
+        When the presets were downloaded, Rescan presets runs next.
         """
-        from cleave.first_run import first_run_items, needed_items
+        from cleave.first_run import FirstRunItemId, first_run_items, needed_items
 
         if self.welcome.active:
             return
+        resume = hold_paused(self.playback, self.transport.toggle_pause)
+
+        def closed() -> None:
+            resume()
+            if FirstRunItemId.PRESETS in self.welcome.downloaded:
+                self.preset_rescan.start()
+
         self.welcome.start(
             needed_items(first_run_items()),
-            on_close=hold_paused(self.playback, self.transport.toggle_pause),
+            on_close=closed,
             cancel_label=CANCEL_LABEL,
         )
 

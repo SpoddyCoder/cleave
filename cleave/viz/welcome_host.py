@@ -24,6 +24,7 @@ from cleave.config_schema.first_run import FirstRunState
 from cleave.first_run import (
     FirstRunCancelled,
     FirstRunItem,
+    FirstRunItemId,
     FirstRunResult,
     ItemOutcome,
     ItemResult,
@@ -187,10 +188,19 @@ class WelcomeFlow:
         self._message = ""
         self._cancelling = False
         self._on_close: Callable[[], None] | None = None
+        self._downloaded: set[FirstRunItemId] = set()
 
     @property
     def active(self) -> bool:
         return self._active
+
+    @property
+    def downloaded(self) -> frozenset[FirstRunItemId]:
+        """Items that finished downloading since the last :meth:`start`.
+
+        Still readable from ``on_close``.
+        """
+        return frozenset(self._downloaded)
 
     def start(
         self,
@@ -207,6 +217,7 @@ class WelcomeFlow:
         """
         if self._active:
             return
+        self._downloaded = set()
         if not items:
             self._host.prompt_notice(_NOTHING_TITLE, on_close, body=_NOTHING_BODY)
             return
@@ -318,6 +329,9 @@ class WelcomeFlow:
         )
 
     def _finish_downloads(self, result: FirstRunResult) -> None:
+        self._downloaded.update(
+            r.item.id for r in result.results if r.outcome is ItemOutcome.DONE
+        )
         self._worker = None
         self._view = None
         if self._host.active:
