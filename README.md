@@ -1,6 +1,6 @@
 # `Cleave`
 
-[![Version](https://img.shields.io/badge/version-v0.3.0--323%20%28dev%20build%29-orange)](https://github.com/SpoddyCoder/cleave/compare/v0.3.0...ui-refactor) [![Tests](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml/badge.svg)](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml)
+[![Version](https://img.shields.io/badge/version-v0.3.0--324%20%28dev%20build%29-orange)](https://github.com/SpoddyCoder/cleave/compare/v0.3.0...ui-refactor) [![Tests](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml/badge.svg)](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml)
 
 Stem-separated music visualizer. Layer together drums, bass, vocals and other stems - each driving Milkdrop presets to create your own unique visual masterpieces.
 
@@ -26,8 +26,6 @@ Cleave is in active development. It is very usable, but may not maintain backwar
 4. **Press `H`.** The help column explains whatever you have highlighted, anywhere in the editor, including inside dialogs.
 
 The [User Guide](docs/user-guide/README.md) covers everything else: layers, presets, preset curation, the timeline, credits cards, post-processing, and rendering.
-
-![The Cleave editor](docs/user-guide/images/editor-overview.png)
 
 If the editor runs slowly with several layers, lower Settings > Preview > preview quality. The final render is always full quality and full frame rate.
 
