@@ -79,6 +79,7 @@ def _track_lock_state(locked: bool) -> SimpleNamespace:
 _EXPECTED_REPEAT_ROW_KINDS = frozenset(
     {
         RowKind.SETTINGS_NAVIGATOR_EXPAND_CLICK,
+        RowKind.SETTINGS_UI_THEME,
         RowKind.TRACK_PRESET_DIR,
         RowKind.TRACK_PRESET,
         RowKind.TRACK_PRESET_SWITCHING_TRIGGER,

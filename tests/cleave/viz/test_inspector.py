@@ -185,6 +185,7 @@ def test_settings_pages() -> None:
     assert preview[-1].command_ids == ("settings.measure_latency",)
     assert preview[-1].depth == 0
     assert _kinds(build_inspector_rows(state, "settings.ui")) == [
+        RowKind.SETTINGS_UI_THEME,
         RowKind.SETTINGS_UI_SCALE,
         RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY,
         RowKind.SETTINGS_UI_HIGHLIGHT_NEW_PAGE,

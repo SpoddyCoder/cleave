@@ -63,6 +63,9 @@ DEFAULT_TIMELINE_HEIGHT = 0
 DEFAULT_UI_SCALE = 100
 UI_SCALE_MIN = 80
 UI_SCALE_MAX = 200
+# Colour theme of the editor chrome, by id. The editor resolves it against
+# its themes; an id it does not know shows the default theme.
+DEFAULT_THEME = "ultraviolet"
 # Side columns stay at least this wide once the display can hold every open
 # side column and a 1px visualiser. A narrower window skips the floor.
 MIN_COLUMN_WIDTH = 60
@@ -161,6 +164,12 @@ def _parse_bool(value: Any, _ctx: ParseCtx, label: str) -> bool:
     return value
 
 
+def _parse_theme(value: Any, _ctx: ParseCtx, label: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{label} must be a theme name")
+    return value.strip()
+
+
 def _parse_column_side(
     value: Any, ctx: ParseCtx, label: str
 ) -> ColumnSide:
@@ -239,6 +248,12 @@ EDITOR_FIELDS: tuple[FieldDescriptor, ...] = (
         lambda value, _ctx: clamp_timeline_height(value),
     ),
     FieldDescriptor(
+        "theme",
+        DEFAULT_THEME,
+        _parse_theme,
+        dump_scalar,
+    ),
+    FieldDescriptor(
         "ui_scale",
         DEFAULT_UI_SCALE,
         lambda raw, ctx, label: clamp_ui_scale(
@@ -301,6 +316,7 @@ def parse_editor_section(data: dict[str, Any]) -> Any:
         help_width=parsed["help_width"],
         navigator_height=parsed["navigator_height"],
         timeline_height=parsed["timeline_height"],
+        theme=parsed["theme"],
         ui_scale=parsed["ui_scale"],
         navigator_side=parsed["navigator_side"],
         help_side=parsed["help_side"],
@@ -320,6 +336,7 @@ def dump_editor_section(editor: Any) -> dict[str, Any]:
         "help_width": editor.help_width,
         "navigator_height": editor.navigator_height,
         "timeline_height": editor.timeline_height,
+        "theme": editor.theme,
         "ui_scale": editor.ui_scale,
         "navigator_side": editor.navigator_side,
         "help_side": editor.help_side,
@@ -347,6 +364,7 @@ def editor_config_from_settings(editor: Any | None = None) -> Any:
         help_width=editor.help_width,
         navigator_height=editor.navigator_height,
         timeline_height=editor.timeline_height,
+        theme=editor.theme,
         ui_scale=editor.ui_scale,
         navigator_side=editor.navigator_side,
         help_side=editor.help_side,

@@ -16,6 +16,7 @@ from cleave.config_schema.editor import (
     DEFAULT_HELP_WIDTH,
     DEFAULT_NAVIGATOR_HEIGHT,
     DEFAULT_TIMELINE_HEIGHT,
+    DEFAULT_THEME,
     DEFAULT_UI_SCALE,
     DEFAULT_INSPECTOR_WIDTH,
     DEFAULT_HELP_SIDE,
@@ -77,6 +78,7 @@ class EditorSettings:
     help_width: int = DEFAULT_HELP_WIDTH
     navigator_height: int = DEFAULT_NAVIGATOR_HEIGHT
     timeline_height: int = DEFAULT_TIMELINE_HEIGHT
+    theme: str = DEFAULT_THEME
     ui_scale: int = DEFAULT_UI_SCALE
     navigator_side: ColumnSide = DEFAULT_NAVIGATOR_SIDE
     help_side: ColumnSide = DEFAULT_HELP_SIDE
@@ -103,6 +105,7 @@ def default_editor_settings() -> EditorSettings:
         help_width=DEFAULT_HELP_WIDTH,
         navigator_height=DEFAULT_NAVIGATOR_HEIGHT,
         timeline_height=DEFAULT_TIMELINE_HEIGHT,
+        theme=DEFAULT_THEME,
         ui_scale=DEFAULT_UI_SCALE,
         navigator_side=DEFAULT_NAVIGATOR_SIDE,
         help_side=DEFAULT_HELP_SIDE,
@@ -166,16 +169,16 @@ def load_user_config(path: Path | None = None) -> UserConfig:
     )
 
 
-def saved_ui_scale(path: Path | None = None) -> int:
-    """The saved editor UI scale, for the window before the project config loads.
+def saved_editor_settings(path: Path | None = None) -> EditorSettings:
+    """The saved editor settings, for the window before the project config loads.
 
-    An unreadable user config falls back to the default; the full config load
+    An unreadable user config falls back to the defaults; the full config load
     reports that error in the window.
     """
     try:
-        return load_user_config(path).editor.ui_scale
+        return load_user_config(path).editor
     except (OSError, ValueError, yaml.YAMLError):
-        return DEFAULT_UI_SCALE
+        return default_editor_settings()
 
 
 def editor_settings_from_config(cfg: EditorConfig) -> EditorSettings:
@@ -187,6 +190,7 @@ def editor_settings_from_config(cfg: EditorConfig) -> EditorSettings:
         help_width=cfg.help_width,
         navigator_height=cfg.navigator_height,
         timeline_height=cfg.timeline_height,
+        theme=cfg.theme,
         ui_scale=cfg.ui_scale,
         navigator_side=cfg.navigator_side,
         help_side=cfg.help_side,

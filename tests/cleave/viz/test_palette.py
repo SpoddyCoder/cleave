@@ -118,3 +118,42 @@ def test_no_module_reads_the_palette_at_import() -> None:
         for line in _import_time_reads(ast.parse(path.read_text(encoding="utf-8")).body)
     ]
     assert offenders == []
+
+
+def test_default_theme_is_ultraviolet_and_unknown_ids_fall_back() -> None:
+    from cleave.config_schema.editor import DEFAULT_THEME
+    from cleave.viz.theme import palette_for_theme, theme_ids, theme_label
+
+    assert DEFAULT_THEME == ULTRAVIOLET.id
+    assert theme_ids() == ("ultraviolet",)
+    assert palette_for_theme("ultraviolet") is ULTRAVIOLET
+    assert palette_for_theme("deleted-user-theme") is ULTRAVIOLET
+    assert theme_label("ultraviolet") == "Ultraviolet"
+
+
+def test_theme_row_steps_live_palette_and_writes_user_config(
+    tmp_path: Path, monkeypatch
+) -> None:
+    import pygame
+
+    from cleave import user_config
+    from cleave.viz import theme
+    from cleave.viz.row_kinds import RowDescriptor, RowKind
+    from tests.support.viz import keydown, make_controls, press_main_row
+
+    variant = _variant()
+    monkeypatch.setattr(theme, "BUILTIN_PALETTES", (ULTRAVIOLET, variant))
+    user_path = tmp_path / "config.yaml"
+    controls = make_controls()
+    controls.cfg.user_config_path = user_path
+    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_THEME)
+    with _live(ULTRAVIOLET):
+        press_main_row(controls, keydown(pygame.K_RIGHT))
+        assert controls.cfg.editor.theme == "test"
+        assert palette() is variant
+        assert user_config.load_user_config(user_path).editor.theme == "test"
+        press_main_row(controls, keydown(pygame.K_RIGHT))
+        assert palette() is variant
+        press_main_row(controls, keydown(pygame.K_LEFT))
+        assert controls.cfg.editor.theme == "ultraviolet"
+        assert palette() is ULTRAVIOLET

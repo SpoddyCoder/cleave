@@ -21,7 +21,12 @@ from cleave.user_config import persist_editor_settings
 from cleave.choice import step_choice
 from cleave.viz.session import TuningSession
 from cleave.viz.shell_layout import navigator_row_px
-from cleave.viz.theme import set_ui_scale_percent
+from cleave.viz.theme import (
+    palette_for_theme,
+    set_palette,
+    set_ui_scale_percent,
+    theme_ids,
+)
 from cleave.viz.tooltips import set_tooltips_enabled
 
 class SettingsControls:
@@ -166,6 +171,15 @@ class SettingsControls:
         self.cfg.editor = replace(
             self.cfg.editor, timeline_height=clamp_timeline_height(height)
         )
+        persist_editor_settings(self.cfg)
+
+    def step_theme(self, *, forward: bool) -> None:
+        current = self.cfg.editor.theme
+        new_theme = step_choice(theme_ids(), current, 1 if forward else -1)
+        if new_theme == current:
+            return
+        self.cfg.editor = replace(self.cfg.editor, theme=new_theme)
+        set_palette(palette_for_theme(new_theme))
         persist_editor_settings(self.cfg)
 
     def adjust_ui_scale(self, *, forward: bool, large: bool) -> None:

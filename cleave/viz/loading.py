@@ -40,7 +40,14 @@ from cleave.viz.progress_bar import (
     progress_fill_rect,
 )
 from cleave.viz.text_fit import TextSizer, fit_text_to_width
-from cleave.viz.theme import palette, set_ui_scale_percent, ui_px, ui_scale_percent
+from cleave.viz.theme import (
+    palette,
+    palette_for_theme,
+    set_palette,
+    set_ui_scale_percent,
+    ui_px,
+    ui_scale_percent,
+)
 from cleave.viz import sdl_window
 
 if TYPE_CHECKING:
@@ -581,7 +588,7 @@ def open_loading_window() -> LoadingWindow:
     The window opens centred. A saved maximised state, or a saved size bigger
     than the desktop, opens maximised. Does not import torch.
     """
-    from cleave.user_config import saved_ui_scale, saved_window_geometry
+    from cleave.user_config import saved_editor_settings, saved_window_geometry
     from cleave.viz.imgui_host import ImGuiHost
 
     os.environ.setdefault("SDL_VIDEO_CENTERED", "1")
@@ -598,7 +605,9 @@ def open_loading_window() -> LoadingWindow:
         color_format=RGBA8,
     )
     compositor.init()
-    set_ui_scale_percent(saved_ui_scale())
+    editor = saved_editor_settings()
+    set_ui_scale_percent(editor.ui_scale)
+    set_palette(palette_for_theme(editor.theme))
     imgui_host = ImGuiHost.create()
     imgui_host.set_display_size(width, height)
     overlay_surface = pygame.Surface((width, height), pygame.SRCALPHA)

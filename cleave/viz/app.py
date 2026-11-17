@@ -41,7 +41,7 @@ from cleave.viz.preset_switching import advance_timeline_preset_switching
 from cleave.viz.modal import ModalHost
 from cleave.viz.overlay_draw import OverlayDrawer
 from cleave.viz.loading import LoadingWindow, open_loading_window
-from cleave.viz.theme import set_ui_scale_percent
+from cleave.viz.theme import palette_for_theme, set_palette, set_ui_scale_percent
 from cleave.viz.tooltips import set_tooltips_enabled
 from cleave.viz.timeline_controls import TimelineControls
 from cleave.viz.shell_layout import ShellLayout, clamp_timeline_band_height
@@ -646,6 +646,7 @@ class VisualizerApp:
             window = open_loading_window()
         pygame.display.set_caption(window_caption(seed.window_title, dirty=False))
         set_ui_scale_percent(seed.cfg.editor.ui_scale)
+        set_palette(palette_for_theme(seed.cfg.editor.theme))
         set_tooltips_enabled(seed.cfg.editor.show_tooltips)
 
         rt: LiveVisualizerRuntime | None = None

@@ -506,6 +506,24 @@ def set_palette(value: Palette) -> None:
     _palette_generation += 1
 
 
+def palette_for_theme(theme_id: str) -> Palette:
+    """The built-in palette with *theme_id*, or Ultraviolet for an unknown id."""
+    for candidate in BUILTIN_PALETTES:
+        if candidate.id == theme_id:
+            return candidate
+    return ULTRAVIOLET
+
+
+def theme_ids() -> tuple[str, ...]:
+    """Every theme the Theme setting offers, in order."""
+    return tuple(candidate.id for candidate in BUILTIN_PALETTES)
+
+
+def theme_label(theme_id: str) -> str:
+    """The name the Theme setting shows for *theme_id*."""
+    return palette_for_theme(theme_id).name
+
+
 def palette_generation() -> int:
     """Changes whenever the palette changes, so caches can rebuild."""
     return _palette_generation

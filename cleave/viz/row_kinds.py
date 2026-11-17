@@ -158,6 +158,7 @@ class RowKind(Enum):
     SETTINGS_HELP_SIDE = auto()
     SETTINGS_UI_HEADER = auto()
     SETTINGS_UI_NOTIFICATION_DISPLAY = auto()
+    SETTINGS_UI_THEME = auto()
     SETTINGS_UI_SCALE = auto()
     SETTINGS_UI_NAVIGATOR_HEIGHT = auto()
     SETTINGS_UI_HIGHLIGHT_NEW_PAGE = auto()

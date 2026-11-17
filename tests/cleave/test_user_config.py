@@ -547,3 +547,29 @@ def test_navigator_expand_click_defaults_round_trips_and_rejects_unknown(
     )
     with pytest.raises(ValueError, match="editor.navigator_expand_click must be one of"):
         load_user_config(config_path)
+
+
+def test_theme_defaults_round_trips_and_rejects_blank(tmp_path: Path) -> None:
+    from cleave.config_schema.editor import DEFAULT_THEME
+    from cleave.user_config import saved_editor_settings
+
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        yaml.safe_dump({"editor": {"preview_quality": "balanced"}}, sort_keys=False),
+        encoding="utf-8",
+    )
+    assert load_user_config(config_path).editor.theme == DEFAULT_THEME
+
+    write_user_config(replace(default_editor_settings(), theme="dusk"), config_path)
+    saved = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    assert saved["editor"]["theme"] == "dusk"
+    assert load_user_config(config_path).editor.theme == "dusk"
+    assert saved_editor_settings(config_path).theme == "dusk"
+
+    config_path.write_text(
+        yaml.safe_dump({"editor": {"theme": "  "}}, sort_keys=False),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="editor.theme must be a theme name"):
+        load_user_config(config_path)
+    assert saved_editor_settings(config_path).theme == DEFAULT_THEME

@@ -21,6 +21,7 @@ from cleave.config_schema.editor import (
     DEFAULT_CRASH_LOG,
     DEFAULT_NAVIGATOR_EXPAND_CLICK,
     DEFAULT_NAVIGATOR_HEIGHT,
+    DEFAULT_THEME,
     DEFAULT_UI_SCALE,
     DEFAULT_NAVIGATOR_SIDE,
     DEFAULT_NOTIFICATION_DISPLAY_SEC,
@@ -399,6 +400,7 @@ class SettingsBlock:
     crash_log: bool = DEFAULT_CRASH_LOG
     notification_display_sec: int = DEFAULT_NOTIFICATION_DISPLAY_SEC
     navigator_height: int = DEFAULT_NAVIGATOR_HEIGHT
+    theme: str = DEFAULT_THEME
     ui_scale: int = DEFAULT_UI_SCALE
     residual_latency_ms: int = DEFAULT_RESIDUAL_LATENCY_MS
 
@@ -417,6 +419,7 @@ class SettingsBlock:
             crash_log=editor.crash_log,
             notification_display_sec=editor.notification_display_sec,
             navigator_height=editor.navigator_height,
+            theme=editor.theme,
             ui_scale=editor.ui_scale,
             residual_latency_ms=editor.residual_latency_ms,
         )

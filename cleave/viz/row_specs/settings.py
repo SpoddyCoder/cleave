@@ -16,6 +16,7 @@ from cleave.crash_log import crash_log_active
 from cleave.viz.commands import command_by_id
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
 from cleave.viz.row_spec import FitStrategy, RowPresentStyle, RowSpec
+from cleave.viz.theme import theme_ids, theme_label
 from cleave.viz.tuning_view_state import TuningViewState
 
 from cleave.config_schema.editor import COLUMN_SIDES, EDITOR_PREVIEW_QUALITIES
@@ -47,6 +48,11 @@ def _format_settings_ui_notification_display(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
     return notification_display_label(state.settings.notification_display_sec)
+
+def _format_settings_ui_theme(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return theme_label(state.settings.theme)
 
 def _format_settings_ui_scale(
     state: TuningViewState, _desc: RowDescriptor
@@ -129,6 +135,11 @@ def _apply_settings_dev_tools_open_crash_log_folder(
     controls: TuningControls, _desc: RowDescriptor
 ) -> None:
     command_by_id("settings.open_crash_log_folder").run(controls)
+
+def _apply_settings_ui_theme(
+    controls: TuningControls, _desc: RowDescriptor, forward: bool, _large: bool,
+) -> None:
+    controls.settings.step_theme(forward=forward)
 
 def _apply_settings_ui_scale(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, large: bool,
@@ -360,6 +371,28 @@ SPECS: dict[RowKind, RowSpec] = {
             "Once crash.log passes 1 MB, the next start keeps only its newest part.",
         ),
         is_pinned=True,
+    ),
+    RowKind.SETTINGS_UI_THEME: RowSpec(
+        affordance=RowAffordance.VALUE_STEP,
+        panel_label="theme",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_settings_ui_theme,
+        apply_horizontal=_apply_settings_ui_theme,
+        choice=options_choice(
+            theme_ids,
+            lambda s, _d: s.settings.theme,
+            theme_label,
+            combo=True,
+        ),
+        help_title="Theme",
+        help_entries=(("Left/Right", "choose theme"),),
+        help_description=(
+            "Colours of the editor's panels, menus, buttons, and text.",
+            "It does not change the visualiser or the credits cards.",
+        ),
+        is_pinned=True,
+        repeatable=True,
+        parent_group="settings_ui",
     ),
     RowKind.SETTINGS_UI_SCALE: RowSpec(
         affordance=RowAffordance.VALUE_STEP,

@@ -39,6 +39,7 @@ from cleave.config_schema.editor import (
     DEFAULT_HELP_WIDTH,
     DEFAULT_NAVIGATOR_HEIGHT,
     DEFAULT_TIMELINE_HEIGHT,
+    DEFAULT_THEME,
     DEFAULT_UI_SCALE,
     DEFAULT_INSPECTOR_WIDTH,
     DEFAULT_HELP_SIDE,
@@ -194,6 +195,7 @@ class EditorConfig:
     help_width: int = DEFAULT_HELP_WIDTH
     navigator_height: int = DEFAULT_NAVIGATOR_HEIGHT
     timeline_height: int = DEFAULT_TIMELINE_HEIGHT
+    theme: str = DEFAULT_THEME
     ui_scale: int = DEFAULT_UI_SCALE
     navigator_side: ColumnSide = DEFAULT_NAVIGATOR_SIDE
     help_side: ColumnSide = DEFAULT_HELP_SIDE
