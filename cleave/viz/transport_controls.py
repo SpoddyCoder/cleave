@@ -71,6 +71,21 @@ def parse_bar_text(text: str, bar_count: int) -> int | None:
     return None
 
 
+def hold_paused(
+    playback: PlaybackState, pause_toggle: Callable[[], None]
+) -> Callable[[], None]:
+    """Pause playback; the returned call resumes it if this call paused it."""
+    resume = not playback.paused
+    if resume:
+        pause_toggle()
+
+    def restore() -> None:
+        if resume and playback.paused:
+            pause_toggle()
+
+    return restore
+
+
 class TransportControls:
     """Pause, seek, and bar jumps from the transport bar."""
 

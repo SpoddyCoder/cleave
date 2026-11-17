@@ -22,6 +22,7 @@ from cleave.viz.editor_mode_controls import (
 from cleave.viz.post_fx import sync_live_compositor_format
 from cleave.viz.preset_curation_controls import PresetCurationController
 from cleave.viz.preset_list_controls import PresetListController
+from cleave.viz.preset_rescan_controls import PresetRescanController
 from cleave.viz.key_repeat import KeyRepeatController
 from cleave.viz.value_nudge import ValueNudgeHold
 from cleave.viz.context_menu import ContextMenuState
@@ -43,7 +44,7 @@ from cleave.viz.project_render_controls import ProjectRenderController
 from cleave.viz.project_switch import ProjectSwitchController
 from cleave.viz.song_marker_controls import SongMarkerController
 from cleave.viz.tap_sync_controls import TapSyncControls, TapSyncUiSnapshot
-from cleave.viz.transport_controls import TransportControls
+from cleave.viz.transport_controls import TransportControls, hold_paused
 from cleave.viz.welcome_host import CANCEL_LABEL, WelcomeFlow
 from cleave.viz.window_controls import WindowControls
 from cleave.viz.timeline_phase_controls import TimelinePhaseController
@@ -304,6 +305,13 @@ class TuningControls:
             project_dir=project_dir,
         )
         self.welcome = WelcomeFlow(self._modal_host)
+        self.preset_rescan = PresetRescanController(
+            self.library,
+            preset_root,
+            self._modal_host,
+            hold_playback=lambda: hold_paused(self.playback, self.transport.toggle_pause),
+            on_notification=self.show_notification,
+        )
         self.layer_mutations = LayerMutations(
             session,
             preset_root=preset_root,
@@ -440,6 +448,7 @@ class TuningControls:
         if self.project_render.busy:
             self.project_render.abort()
         self.welcome.abort()
+        self.preset_rescan.abort()
         return self._config_save.try_quit()
 
     def request_quit(self) -> None:
@@ -461,17 +470,9 @@ class TuningControls:
 
         if self.welcome.active:
             return
-        resume = not self.playback.paused
-        if resume:
-            self.transport.toggle_pause()
-
-        def restore() -> None:
-            if resume and self.playback.paused:
-                self.transport.toggle_pause()
-
         self.welcome.start(
             needed_items(first_run_items()),
-            on_close=restore,
+            on_close=hold_paused(self.playback, self.transport.toggle_pause),
             cancel_label=CANCEL_LABEL,
         )
 
@@ -556,6 +557,7 @@ class TuningControls:
         self._notification_host.clear_expired()
         self.project_render.tick()
         self.welcome.tick()
+        self.preset_rescan.tick()
 
     def build_view_state(
         self,

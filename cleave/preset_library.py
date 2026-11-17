@@ -7,9 +7,11 @@ preset's contents. Nothing under the preset tree is moved, copied, or deleted.
 from __future__ import annotations
 
 import hashlib
+import itertools
 import os
 import sqlite3
 from collections.abc import Callable, Iterable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, Protocol
 
@@ -171,6 +173,68 @@ def scan_milk_files(root: Path) -> list[tuple[str, int, int]]:
     return out
 
 
+@dataclass(frozen=True)
+class PresetIndex:
+    """Result of :func:`build_index`: the indexed root and each file's hash."""
+
+    root: Path
+    path_hash: dict[str, str]
+
+
+def build_index(
+    conn: sqlite3.Connection,
+    preset_root: Path,
+    on_progress: ProgressCallback | None = None,
+) -> PresetIndex | None:
+    """Hash every ``*.milk`` under ``preset_root``; rehash only changed files.
+
+    Reads and updates the ``files`` table on *conn*, which may belong to a
+    worker thread. Returns None when ``on_progress`` asks to cancel (returns
+    False); the table is then untouched.
+    """
+    root = preset_root.resolve()
+    cached: dict[str, tuple[int, int, str]] = {
+        row[0]: (row[1], row[2], row[3])
+        for row in conn.execute("SELECT path, size, mtime_ns, hash FROM files")
+    }
+    found = scan_milk_files(root)
+    total = len(found)
+    path_hash: dict[str, str] = {}
+    upserts: list[tuple[str, int, int, str]] = []
+    for done, (key, size, mtime_ns) in enumerate(found):
+        if on_progress is not None and done % 1000 == 0:
+            if not on_progress(done, total):
+                return None
+        entry = cached.get(key)
+        if entry is not None and entry[0] == size and entry[1] == mtime_ns:
+            digest = entry[2]
+        else:
+            try:
+                digest = preset_hash(Path(key))
+            except OSError:
+                continue
+            upserts.append((key, size, mtime_ns, digest))
+        path_hash[key] = digest
+    prefix = os.path.join(str(root), "")
+    stale = [
+        (key,)
+        for key in cached
+        if key.startswith(prefix) and key not in path_hash
+    ]
+    with conn:
+        conn.executemany(
+            "INSERT OR REPLACE INTO files (path, size, mtime_ns, hash) VALUES (?, ?, ?, ?)",
+            upserts,
+        )
+        conn.executemany("DELETE FROM files WHERE path = ?", stale)
+    if on_progress is not None:
+        on_progress(total, total)
+    return PresetIndex(root=root, path_hash=path_hash)
+
+
+_memory_names = itertools.count()
+
+
 def _is_under(path: Path, root: Path) -> bool:
     try:
         path.relative_to(root)
@@ -180,10 +244,15 @@ def _is_under(path: Path, root: Path) -> bool:
 
 
 class PresetLibrary:
-    """Hash index of presets plus favourite / blacklist / role state."""
+    """Hash index of presets plus favourite / blacklist / role state.
 
-    def __init__(self, conn: sqlite3.Connection) -> None:
+    ``database_uri`` opens another connection to the same database, for a
+    worker thread running :func:`build_index`.
+    """
+
+    def __init__(self, conn: sqlite3.Connection, database_uri: str) -> None:
         self._conn = conn
+        self.database_uri = database_uri
         self._root: Path | None = None
         self._path_hash: dict[str, str] = {}
         self._alias_hash: dict[Path, str] = {}
@@ -196,10 +265,11 @@ class PresetLibrary:
     @classmethod
     def in_memory(cls) -> PresetLibrary:
         """Empty, unpersisted library (offline render and tests)."""
-        conn = sqlite3.connect(":memory:")
+        uri = f"file:cleave-presets-{next(_memory_names)}?mode=memory&cache=shared"
+        conn = sqlite3.connect(uri, uri=True)
         conn.executescript(_SCHEMA)
         conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
-        return cls(conn)
+        return cls(conn, uri)
 
     @classmethod
     def open(cls, db_path: Path) -> PresetLibrary:
@@ -224,7 +294,7 @@ class PresetLibrary:
                 f"preset library {db_path} has schema version {version}, "
                 f"expected {SCHEMA_VERSION}; delete it to rebuild"
             )
-        return cls(conn)
+        return cls(conn, f"{db_path.resolve().as_uri()}?mode=rw")
 
     def close(self) -> None:
         self._conn.close()
@@ -250,52 +320,22 @@ class PresetLibrary:
         preset_root: Path,
         on_progress: ProgressCallback | None = None,
     ) -> bool:
-        """Hash every ``*.milk`` under ``preset_root``; rehash only changed files.
+        """Index ``preset_root`` on this connection (see :func:`build_index`).
 
         Returns False when ``on_progress`` asks to cancel (returns False).
         """
-        root = preset_root.resolve()
-        cached: dict[str, tuple[int, int, str]] = {
-            row[0]: (row[1], row[2], row[3])
-            for row in self._conn.execute("SELECT path, size, mtime_ns, hash FROM files")
-        }
-        found = scan_milk_files(root)
-        total = len(found)
-        path_hash: dict[str, str] = {}
-        upserts: list[tuple[str, int, int, str]] = []
-        for done, (key, size, mtime_ns) in enumerate(found):
-            if on_progress is not None and done % 1000 == 0:
-                if not on_progress(done, total):
-                    return False
-            entry = cached.get(key)
-            if entry is not None and entry[0] == size and entry[1] == mtime_ns:
-                digest = entry[2]
-            else:
-                try:
-                    digest = preset_hash(Path(key))
-                except OSError:
-                    continue
-                upserts.append((key, size, mtime_ns, digest))
-            path_hash[key] = digest
-        prefix = os.path.join(str(root), "")
-        stale = [
-            (key,)
-            for key in cached
-            if key.startswith(prefix) and key not in path_hash
-        ]
-        with self._conn:
-            self._conn.executemany(
-                "INSERT OR REPLACE INTO files (path, size, mtime_ns, hash) VALUES (?, ?, ?, ?)",
-                upserts,
-            )
-            self._conn.executemany("DELETE FROM files WHERE path = ?", stale)
-        if on_progress is not None:
-            on_progress(total, total)
-        self._root = root
-        self._path_hash = path_hash
+        built = build_index(self._conn, preset_root, on_progress)
+        if built is None:
+            return False
+        self.adopt(built)
+        return True
+
+    def adopt(self, index: PresetIndex) -> None:
+        """Use *index* (built here or on a worker connection) from now on."""
+        self._root = index.root
+        self._path_hash = index.path_hash
         self._alias_hash = {}
         self.revision += 1
-        return True
 
     def hash_of(self, path: Path) -> str | None:
         """Content hash of ``path``; hashes and caches files outside the index."""

@@ -263,6 +263,10 @@ def _run_measure_latency(controls: TuningControls) -> None:
     controls.tap_sync.prompt_start()
 
 
+def _run_rescan_presets(controls: TuningControls) -> None:
+    controls.preset_rescan.start()
+
+
 def _run_download_packages(controls: TuningControls) -> None:
     controls.prompt_welcome()
 
@@ -615,6 +619,14 @@ _MEASURE_LATENCY = Command(
     run=_run_measure_latency,
 )
 
+_RESCAN_PRESETS = Command(
+    id="settings.rescan_presets",
+    label="Rescan presets",
+    kind="command",
+    enabled=_enabled,
+    run=_run_rescan_presets,
+)
+
 _DOWNLOAD_PACKAGES = Command(
     id="settings.download_packages",
     label="Download packages…",
@@ -832,6 +844,7 @@ def build_menus(
                     SEPARATOR,
                     _MEASURE_LATENCY,
                     SEPARATOR,
+                    _RESCAN_PRESETS,
                     _DOWNLOAD_PACKAGES,
                     SEPARATOR,
                     _DEV_TOOLS_PAGE,

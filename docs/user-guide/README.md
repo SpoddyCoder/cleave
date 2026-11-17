@@ -529,6 +529,7 @@ The **Settings** menu holds preferences that apply to every project:
 - **Preview:** preview quality, and the audio delay correction.
 - **UI:** the size of the editor text (UI scale), which side the panels sit on, navigator height, tooltips, how long notifications stay on screen, and more.
 - **Measure latency:** see [The visuals are out of time with the music](#the-visuals-are-out-of-time-with-the-music).
+- **Rescan presets:** re-read the presets folder after adding presets while Cleave is open.
 - **Download packages:** get downloads you skipped on first launch.
 - **Dev Tools:** a crash log, for reporting problems.
 
@@ -612,6 +613,8 @@ Each song has its own folder under `projects`, holding:
 ### Adding more presets
 
 There are many thousands of Milkdrop presets online. Copy preset folders into the `presets` folder (see above), and texture packs into `textures`. They appear the next time you browse.
+
+If Cleave is open while you add presets, choose **Settings > Rescan presets**. Your favourites, roles, and blacklist then recognise the new presets, and Favourites and the role collections include them. A dialog shows the progress, and Cancel leaves everything as it was.
 
 ### Reporting a crash
 

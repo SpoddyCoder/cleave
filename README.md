@@ -1,6 +1,6 @@
 # `Cleave`
 
-[![Version](https://img.shields.io/badge/version-v0.3.0--315%20%28dev%20build%29-orange)](https://github.com/SpoddyCoder/cleave/compare/v0.3.0...ui-refactor) [![Tests](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml/badge.svg)](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml)
+[![Version](https://img.shields.io/badge/version-v0.3.0--316%20%28dev%20build%29-orange)](https://github.com/SpoddyCoder/cleave/compare/v0.3.0...ui-refactor) [![Tests](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml/badge.svg)](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml)
 
 Stem-separated music visualizer. Layer together drums, bass, vocals and other stems - each driving Milkdrop presets to create your own unique visual masterpieces.
 
@@ -172,6 +172,8 @@ git clone https://github.com/projectM-visualizer/presets-milkdrop-texture-pack
 ```
 
 There are many thousands of Milkdrop presets available online - these are just a few of the best.
+
+If the editor is open while you add presets, choose Settings > Rescan presets so favourites, roles, and the blacklist pick them up.
 
 A project directory contains:
 * `project.yaml` - metadata, song markers, render settings

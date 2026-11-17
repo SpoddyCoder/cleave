@@ -71,6 +71,7 @@ _STATIC_IDS = (
     "project.restore",
     *_SETTINGS_PAGE_IDS,
     "settings.measure_latency",
+    "settings.rescan_presets",
     "settings.download_packages",
     "help.overlay",
     "help.about",
@@ -149,6 +150,7 @@ def _fake_controls(
         prompt_save_config=MagicMock(),
         request_quit=MagicMock(),
         prompt_welcome=MagicMock(),
+        preset_rescan=SimpleNamespace(start=MagicMock()),
         prompt_about=MagicMock(),
         editor_mode=SimpleNamespace(prompt_change_editor_mode=MagicMock()),
         tap_sync=SimpleNamespace(prompt_start=MagicMock()),
@@ -218,6 +220,7 @@ def test_menus_list_taxonomy_ids_once() -> None:
         None,
         "settings.measure_latency",
         None,
+        "settings.rescan_presets",
         "settings.download_packages",
         None,
         "page.settings.dev_tools",
@@ -422,6 +425,7 @@ def test_wired_run_calls_controllers() -> None:
     command_by_id("project.render", menus).run(controls)
     command_by_id("view.preset_curation", menus).run(controls)
     command_by_id("settings.measure_latency", menus).run(controls)
+    command_by_id("settings.rescan_presets", menus).run(controls)
     command_by_id("settings.download_packages", menus).run(controls)
     command_by_id("help.about", menus).run(controls)
     controls.prompt_save_config.assert_called_once_with()
@@ -429,6 +433,7 @@ def test_wired_run_calls_controllers() -> None:
     controls.project_render.prompt.assert_called_once_with()
     controls.editor_mode.prompt_change_editor_mode.assert_called_once_with()
     controls.prompt_welcome.assert_called_once_with()
+    controls.preset_rescan.start.assert_called_once_with()
     controls.prompt_about.assert_called_once_with()
     controls.tap_sync.prompt_start.assert_called_once_with()
 
