@@ -194,6 +194,9 @@ def test_settings_pages() -> None:
         RowKind.SETTINGS_NAVIGATOR_EXPAND_CLICK,
         RowKind.SETTINGS_HELP_SIDE,
     ]
+    assert _kinds(build_inspector_rows(state, "settings.dev_tools")) == [
+        RowKind.SETTINGS_DEV_TOOLS_CRASH_LOG,
+    ]
 
 
 def test_project_pages() -> None:

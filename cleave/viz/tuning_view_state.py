@@ -18,6 +18,7 @@ from cleave.config_schema.editor import (
     DEFAULT_HELP_SIDE,
     DEFAULT_HIGHLIGHT_NEW_PAGE,
     DEFAULT_SHOW_TOOLTIPS,
+    DEFAULT_CRASH_LOG,
     DEFAULT_NAVIGATOR_EXPAND_CLICK,
     DEFAULT_NAVIGATOR_HEIGHT,
     DEFAULT_UI_SCALE,
@@ -395,6 +396,7 @@ class SettingsBlock:
     navigator_expand_click: str = DEFAULT_NAVIGATOR_EXPAND_CLICK
     highlight_new_page: bool = DEFAULT_HIGHLIGHT_NEW_PAGE
     show_tooltips: bool = DEFAULT_SHOW_TOOLTIPS
+    crash_log: bool = DEFAULT_CRASH_LOG
     notification_display_sec: int = DEFAULT_NOTIFICATION_DISPLAY_SEC
     navigator_height: int = DEFAULT_NAVIGATOR_HEIGHT
     ui_scale: int = DEFAULT_UI_SCALE
@@ -412,6 +414,7 @@ class SettingsBlock:
             navigator_expand_click=editor.navigator_expand_click,
             highlight_new_page=editor.highlight_new_page,
             show_tooltips=editor.show_tooltips,
+            crash_log=editor.crash_log,
             notification_display_sec=editor.notification_display_sec,
             navigator_height=editor.navigator_height,
             ui_scale=editor.ui_scale,

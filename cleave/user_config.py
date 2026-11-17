@@ -21,6 +21,7 @@ from cleave.config_schema.editor import (
     DEFAULT_HELP_SIDE,
     DEFAULT_HIGHLIGHT_NEW_PAGE,
     DEFAULT_SHOW_TOOLTIPS,
+    DEFAULT_CRASH_LOG,
     DEFAULT_NAVIGATOR_EXPAND_CLICK,
     NavigatorExpandClick,
     DEFAULT_NAVIGATOR_SIDE,
@@ -82,6 +83,7 @@ class EditorSettings:
     navigator_expand_click: NavigatorExpandClick = DEFAULT_NAVIGATOR_EXPAND_CLICK
     highlight_new_page: bool = DEFAULT_HIGHLIGHT_NEW_PAGE
     show_tooltips: bool = DEFAULT_SHOW_TOOLTIPS
+    crash_log: bool = DEFAULT_CRASH_LOG
 
 
 @dataclass(frozen=True)
@@ -107,6 +109,7 @@ def default_editor_settings() -> EditorSettings:
         navigator_expand_click=DEFAULT_NAVIGATOR_EXPAND_CLICK,
         highlight_new_page=DEFAULT_HIGHLIGHT_NEW_PAGE,
         show_tooltips=DEFAULT_SHOW_TOOLTIPS,
+        crash_log=DEFAULT_CRASH_LOG,
     )
 
 
@@ -190,6 +193,7 @@ def editor_settings_from_config(cfg: EditorConfig) -> EditorSettings:
         navigator_expand_click=cfg.navigator_expand_click,
         highlight_new_page=cfg.highlight_new_page,
         show_tooltips=cfg.show_tooltips,
+        crash_log=cfg.crash_log,
     )
 
 

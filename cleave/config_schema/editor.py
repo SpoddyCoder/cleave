@@ -76,6 +76,8 @@ DEFAULT_HELP_SIDE: ColumnSide = "right"
 DEFAULT_HIGHLIGHT_NEW_PAGE = True
 # Show hover tooltips in the editor chrome.
 DEFAULT_SHOW_TOOLTIPS = True
+# Write Python tracebacks to crash.log on a hard crash. Read at editor start.
+DEFAULT_CRASH_LOG = False
 
 # What a click on an expandable navigator row's label does. The twisty
 # button always opens or closes the row with one click.
@@ -274,6 +276,12 @@ EDITOR_FIELDS: tuple[FieldDescriptor, ...] = (
         _parse_bool,
         dump_scalar,
     ),
+    FieldDescriptor(
+        "crash_log",
+        DEFAULT_CRASH_LOG,
+        _parse_bool,
+        dump_scalar,
+    ),
 )
 
 
@@ -299,6 +307,7 @@ def parse_editor_section(data: dict[str, Any]) -> Any:
         navigator_expand_click=parsed["navigator_expand_click"],
         highlight_new_page=parsed["highlight_new_page"],
         show_tooltips=parsed["show_tooltips"],
+        crash_log=parsed["crash_log"],
     )
 
 
@@ -317,6 +326,7 @@ def dump_editor_section(editor: Any) -> dict[str, Any]:
         "navigator_expand_click": editor.navigator_expand_click,
         "highlight_new_page": editor.highlight_new_page,
         "show_tooltips": editor.show_tooltips,
+        "crash_log": editor.crash_log,
     }
     ctx = PersistCtx(cfg=None, session=None)
     return dump_fields(EDITOR_FIELDS, values, ctx)
@@ -343,4 +353,5 @@ def editor_config_from_settings(editor: Any | None = None) -> Any:
         navigator_expand_click=editor.navigator_expand_click,
         highlight_new_page=editor.highlight_new_page,
         show_tooltips=editor.show_tooltips,
+        crash_log=editor.crash_log,
     )

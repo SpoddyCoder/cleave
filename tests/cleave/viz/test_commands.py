@@ -46,7 +46,11 @@ _PROJECT_PAGE_IDS = (
     "page.project.compositor",
     "page.project.projectm",
 )
-_SETTINGS_PAGE_IDS = ("page.settings.preview", "page.settings.ui")
+_SETTINGS_PAGE_IDS = (
+    "page.settings.preview",
+    "page.settings.ui",
+    "page.settings.dev_tools",
+)
 
 _STATIC_IDS = (
     "file.new",
@@ -209,11 +213,14 @@ def test_menus_list_taxonomy_ids_once() -> None:
         "project.restore",
     ]
     assert _row_ids(menus[4]) == [
-        *_SETTINGS_PAGE_IDS,
+        "page.settings.preview",
+        "page.settings.ui",
         None,
         "settings.measure_latency",
         None,
         "settings.download_packages",
+        None,
+        "page.settings.dev_tools",
     ]
     assert _row_ids(menus[5]) == ["help.overlay", None, "help.about"]
     ids = [command.id for command in iter_commands(menus)]

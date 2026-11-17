@@ -12,6 +12,8 @@ from cleave.config_schema.editor import (
     ui_scale_label,
     notification_display_label,
 )
+from cleave.crash_log import crash_log_active
+from cleave.viz.commands import command_by_id
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
 from cleave.viz.row_spec import FitStrategy, RowPresentStyle, RowSpec
 from cleave.viz.tuning_view_state import TuningViewState
@@ -109,6 +111,24 @@ def _apply_settings_ui_show_tooltips(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, _large: bool,
 ) -> None:
     controls.settings.set_show_tooltips(forward)
+
+def _format_settings_dev_tools_crash_log(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    text = on_off_text(state.settings.crash_log)
+    if state.settings.crash_log != crash_log_active():
+        return f"{text} (next start)"
+    return text
+
+def _apply_settings_dev_tools_crash_log(
+    controls: TuningControls, _desc: RowDescriptor, forward: bool, _large: bool,
+) -> None:
+    controls.settings.set_crash_log(forward)
+
+def _apply_settings_dev_tools_open_crash_log_folder(
+    controls: TuningControls, _desc: RowDescriptor
+) -> None:
+    command_by_id("settings.open_crash_log_folder").run(controls)
 
 def _apply_settings_ui_scale(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, large: bool,
@@ -295,6 +315,51 @@ SPECS: dict[RowKind, RowSpec] = {
         ),
         is_pinned=True,
         parent_group="settings_ui",
+    ),
+    RowKind.SETTINGS_DEV_TOOLS_HEADER: RowSpec(
+        affordance=RowAffordance.HEADING,
+        panel_label="Dev Tools",
+        present_style=RowPresentStyle.HEADING,
+        fit_strategy=FitStrategy.NONE,
+        help_title="Dev Tools",
+        help_description=(
+            "Tools for tracking down problems in Cleave itself.",
+        ),
+        is_pinned=True,
+        parent_group="settings",
+    ),
+    RowKind.SETTINGS_DEV_TOOLS_CRASH_LOG: RowSpec(
+        affordance=RowAffordance.VALUE_STEP,
+        panel_label="crash log",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_settings_dev_tools_crash_log,
+        apply_horizontal=_apply_settings_dev_tools_crash_log,
+        choice=bool_choice(lambda s, _d: s.settings.crash_log),
+        help_title="Crash Log",
+        help_entries=(("Left/Right", "off / on"),),
+        help_description=(
+            "When on, a crash writes where Cleave was to crash.log.",
+            "crash.log sits beside config.yaml:",
+            "Windows: %APPDATA%\\Cleave.",
+            "Linux: ~/.config/cleave.",
+            "The change takes effect the next time Cleave starts.",
+        ),
+        is_pinned=True,
+        parent_group="settings_dev_tools",
+    ),
+    RowKind.SETTINGS_DEV_TOOLS_OPEN_CRASH_LOG_FOLDER: RowSpec(
+        affordance=RowAffordance.COMMAND,
+        panel_label="Open crash log folder",
+        present_style=RowPresentStyle.FULL_LINE,
+        apply_action=_apply_settings_dev_tools_open_crash_log_folder,
+        fit_strategy=FitStrategy.NONE,
+        help_title="Open Crash Log Folder",
+        help_entries=(("Enter", "open the folder"),),
+        help_description=(
+            "Opens the folder that holds crash.log and config.yaml.",
+            "Once crash.log passes 1 MB, the next start keeps only its newest part.",
+        ),
+        is_pinned=True,
     ),
     RowKind.SETTINGS_UI_SCALE: RowSpec(
         affordance=RowAffordance.VALUE_STEP,

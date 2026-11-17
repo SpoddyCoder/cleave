@@ -463,6 +463,28 @@ def test_show_tooltips_defaults_on_round_trips_and_rejects_non_bool(
         load_user_config(config_path)
 
 
+def test_crash_log_defaults_off_round_trips_and_rejects_non_bool(
+    tmp_path: Path,
+) -> None:
+    from cleave.config_schema.editor import DEFAULT_CRASH_LOG
+
+    config_path = tmp_path / "config.yaml"
+    assert load_user_config(config_path).editor.crash_log is False
+    assert DEFAULT_CRASH_LOG is False
+
+    write_user_config(replace(default_editor_settings(), crash_log=True), config_path)
+    saved = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    assert saved["editor"]["crash_log"] is True
+    assert load_user_config(config_path).editor.crash_log is True
+
+    config_path.write_text(
+        yaml.safe_dump({"editor": {"crash_log": "yes"}}, sort_keys=False),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="editor.crash_log must be true or false"):
+        load_user_config(config_path)
+
+
 def test_first_run_state_defaults_when_missing_or_unreadable(tmp_path: Path) -> None:
     from cleave.config_schema.first_run import FirstRunState
     from cleave.user_config import saved_first_run_state

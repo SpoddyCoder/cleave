@@ -267,6 +267,15 @@ def _run_download_packages(controls: TuningControls) -> None:
     controls.prompt_welcome()
 
 
+def _run_open_crash_log_folder(controls: TuningControls) -> None:
+    from cleave.crash_log import open_crash_log_folder
+
+    try:
+        open_crash_log_folder(controls.cfg.user_config_path)
+    except OSError as exc:
+        controls.show_notification(f"Could not open the crash log folder: {exc}")
+
+
 def _run_about(controls: TuningControls) -> None:
     controls.prompt_about()
 
@@ -614,6 +623,14 @@ _DOWNLOAD_PACKAGES = Command(
     run=_run_download_packages,
 )
 
+_OPEN_CRASH_LOG_FOLDER = Command(
+    id="settings.open_crash_log_folder",
+    label="Open crash log folder",
+    kind="command",
+    enabled=_enabled,
+    run=_run_open_crash_log_folder,
+)
+
 _HELP_OVERLAY = Command(
     id="help.overlay",
     label="Help",
@@ -758,7 +775,18 @@ def layer_focus_commands(
 
 
 _PROJECT_PAGES = _page_commands("Project")
-_SETTINGS_PAGES = _page_commands("Settings")
+# Dev Tools sits at the foot of the Settings menu, after the commands.
+_DEV_TOOLS_PAGE_ID = "settings.dev_tools"
+_SETTINGS_PAGES = tuple(
+    command
+    for command in _page_commands("Settings")
+    if command.id != page_command_id(_DEV_TOOLS_PAGE_ID)
+)
+_DEV_TOOLS_PAGE = next(
+    command
+    for command in _page_commands("Settings")
+    if command.id == page_command_id(_DEV_TOOLS_PAGE_ID)
+)
 
 
 def build_menus(
@@ -799,7 +827,15 @@ def build_menus(
             ),
             Menu(
                 "Settings",
-                (*_SETTINGS_PAGES, SEPARATOR, _MEASURE_LATENCY, SEPARATOR, _DOWNLOAD_PACKAGES),
+                (
+                    *_SETTINGS_PAGES,
+                    SEPARATOR,
+                    _MEASURE_LATENCY,
+                    SEPARATOR,
+                    _DOWNLOAD_PACKAGES,
+                    SEPARATOR,
+                    _DEV_TOOLS_PAGE,
+                ),
             ),
             Menu("Help", (_HELP_OVERLAY, SEPARATOR, _ABOUT)),
         ),
@@ -821,6 +857,7 @@ _INSPECTOR_COMMANDS: tuple[Command, ...] = (
     _ADD_CURRENT_PRESET,
     _POPULATE_PRESETS,
     _RESUME_SWITCHING,
+    _OPEN_CRASH_LOG_FOLDER,
 )
 
 

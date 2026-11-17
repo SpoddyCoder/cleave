@@ -40,6 +40,7 @@ from cleave.viz.row_sections import (
     POST_FX_PAGE_SECTION,
     SETTINGS_PREVIEW_SECTION,
     SETTINGS_UI_SECTION,
+    SETTINGS_DEV_TOOLS_SECTION,
     SONG_MARKERS_SECTION,
     TIMELINE_CUTS_SECTION,
     TIMELINE_PAGE_SECTION,
@@ -84,6 +85,7 @@ DIVIDER_ROW = InspectorRow(
 _PAGE_SECTIONS: dict[str, SectionDef] = {
     "settings.preview": SETTINGS_PREVIEW_SECTION,
     "settings.ui": SETTINGS_UI_SECTION,
+    "settings.dev_tools": SETTINGS_DEV_TOOLS_SECTION,
     "project.projectm": PROJECT_MILKDROP_SECTION,
     "project.compositor": PROJECT_COMPOSITOR_SECTION,
     "project.resolution": PROJECT_RESOLUTION_SECTION,

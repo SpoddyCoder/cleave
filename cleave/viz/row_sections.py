@@ -149,6 +149,15 @@ SETTINGS_UI_SECTION = SectionDef(
     ),
 )
 
+SETTINGS_DEV_TOOLS_SECTION = SectionDef(
+    header_kind=RowKind.SETTINGS_DEV_TOOLS_HEADER,
+    context="global",
+    children=(
+        SectionNode(leaf_kind=RowKind.SETTINGS_DEV_TOOLS_CRASH_LOG),
+        SectionNode(commands=("settings.open_crash_log_folder",)),
+    ),
+)
+
 PROJECT_MILKDROP_SECTION = SectionDef(
     header_kind=RowKind.PROJECT_MILKDROP_HEADER,
     context="global",

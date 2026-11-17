@@ -225,6 +225,9 @@ def cmd_separate(args: argparse.Namespace) -> None:
 
 def cmd_play(args: argparse.Namespace) -> None:
     os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
+    from cleave.crash_log import start_crash_log
+
+    start_crash_log()
     from cleave.viz import LaunchError, open_loading_window
 
     try:

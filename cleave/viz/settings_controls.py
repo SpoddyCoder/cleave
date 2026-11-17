@@ -105,6 +105,13 @@ class SettingsControls:
         set_tooltips_enabled(on)
         persist_editor_settings(self.cfg)
 
+    def set_crash_log(self, on: bool) -> None:
+        """Save the crash log choice. It takes effect the next time the editor starts."""
+        if self.cfg.editor.crash_log == on:
+            return
+        self.cfg.editor = replace(self.cfg.editor, crash_log=on)
+        persist_editor_settings(self.cfg)
+
     def _step_column_side(self, field: str, *, forward: bool) -> None:
         current = getattr(self.cfg.editor, field)
         new_side = step_choice(COLUMN_SIDES, current, 1 if forward else -1)
