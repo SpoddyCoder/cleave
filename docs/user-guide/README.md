@@ -83,7 +83,7 @@ There are a few ways to start:
 
 Cleave reads wav, mp3, flac, m4a, aac, ogg, aiff, and aif files.
 
-The first time you open a song, Cleave prepares it. A loading screen shows each step and its progress:
+The first time you open a song, Cleave prepares it. A **Creating project** dialog shows each step and its progress:
 
 1. **Splitting the song** into drums, bass, vocals, and other. This is the slow part. A few minutes is normal without an NVIDIA graphics card.
 2. **Listening to the song** to find the beats, bars, and changes in loudness and pitch that drive the visuals.
@@ -523,7 +523,7 @@ When you are happy with your show, turn it into a video file.
 | high | Full size, best quality, slower. |
 | viz | Uses the preview's layer sizes. Faster, and looks just like the preview. |
 
-Cleave shows the render's progress in the window and tells you when it is done. The finished video (an MP4 file) is saved in the project's `renders` folder.
+A **Render project** dialog shows the render's progress and tells you when it is done. The finished video (an MP4 file) is saved in the project's `renders` folder.
 
 ---
 

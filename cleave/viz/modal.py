@@ -169,6 +169,12 @@ class TextFocusRegion(Enum):
     BUTTONS = "buttons"
 
 
+def _clamp_fraction(fraction: float | None) -> float | None:
+    if fraction is None:
+        return None
+    return max(0.0, min(1.0, float(fraction)))
+
+
 def clamp_modal_focus_index(index: int, option_count: int) -> int:
     """Return ``index`` when in range, otherwise ``0`` (first option)."""
     if option_count <= 0 or index < 0 or index >= option_count:
@@ -224,8 +230,6 @@ class ModalRequest:
     labeled_lines: tuple[ModalLabeledLine, ...] = ()
     progress_fraction: float | None = None
     body: str | None = None
-    # PROGRESS only: draw the text in the larger progress-label font.
-    large_text: bool = False
 
 
 @dataclass(frozen=True)
@@ -236,7 +240,6 @@ class ModalViewState:
     focus_index: int
     labeled_lines: tuple[ModalLabeledLine, ...] = ()
     progress_fraction: float | None = None
-    large_text: bool = False
     cta: str | None = None
     draft: str | None = None
     single_line: bool = False
@@ -337,7 +340,6 @@ class ModalHost:
             focus_index=self._focus_index,
             labeled_lines=self._request.labeled_lines,
             progress_fraction=self._request.progress_fraction,
-            large_text=self._request.large_text,
             body=self._request.body,
             option_roles=tuple(option.role for option in self._request.options),
             form_rows=form_rows,
@@ -463,45 +465,49 @@ class ModalHost:
 
     def prompt_progress(
         self,
-        message: str,
+        title: str,
         *,
+        body: str | None = None,
         labeled_lines: Sequence[ModalLabeledLine] = (),
-        fraction: float = 0.0,
+        fraction: float | None = 0.0,
         on_cancel: Callable[[], None] | None = None,
-        large_text: bool = True,
     ) -> None:
-        """Show a progress bar. With *on_cancel*, a Cancel button (and Esc) runs it.
+        """Show *title* over *body*, *labeled_lines*, and a progress bar.
 
-        *large_text* draws the message and lines in the larger progress-label
-        font; a dialog with several status lines passes False for body text.
+        A None *fraction* is a named wait with no bar. The panel has a fixed
+        width, so changing text never resizes it. With *on_cancel*, a Cancel
+        button (and Esc) runs it.
         """
         options = [] if on_cancel is None else [ModalOption("Cancel", on_cancel)]
         self.prompt(
             ModalRequest(
                 kind=ModalKind.PROGRESS,
-                message=message,
+                message=title,
                 options=options,
                 on_dismiss=on_cancel,
                 labeled_lines=tuple(labeled_lines),
-                progress_fraction=max(0.0, min(1.0, float(fraction))),
-                large_text=large_text,
+                progress_fraction=_clamp_fraction(fraction),
+                body=body,
             )
         )
 
     def update_progress(
         self,
-        fraction: float,
+        fraction: float | None,
         *,
-        message: str | None = None,
+        title: str | None = None,
+        body: str | None = None,
         labeled_lines: Sequence[ModalLabeledLine] | None = None,
     ) -> None:
-        """Move the bar. *message* and *labeled_lines* replace the text when given."""
+        """Move the bar (None hides it). Given text replaces the old."""
         request = self._request
         if request is None or request.kind != ModalKind.PROGRESS:
             return
-        request.progress_fraction = max(0.0, min(1.0, float(fraction)))
-        if message is not None:
-            request.message = message
+        request.progress_fraction = _clamp_fraction(fraction)
+        if title is not None:
+            request.message = title
+        if body is not None:
+            request.body = body
         if labeled_lines is not None:
             request.labeled_lines = tuple(labeled_lines)
 

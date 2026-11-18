@@ -65,6 +65,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- Every progress bar now shows in a dialog with a title, the current step, and the bar, in the same text size as the rest of the editor. This covers opening a project, preparing a new song, rendering, rescanning presets, and the welcome downloads. The dialog keeps the same width while the step changes, so the bar does not jump about. Rendering a video no longer shows its progress in oversized text.
 - Updated Python to 3.14, libprojectM to 4.2.0, FFmpeg to 9.0.2, and PyTorch to 2.15.0 with CUDA 13.2. The Demucs stem separation models now download from Hugging Face, so Cleave downloads Demucs again the first time you split a song after updating (about 80 MB, or 320 MB with Demucs HQ).
 - The latency setting is now called audio latency everywhere: Settings > Preview > audio latency, Settings > Measure audio latency, the Detected audio latency dialog, and the "Audio latency set" notification. The Measure audio latency dialog is titled Measure Audio Latency, with its instructions underneath. On Settings > Preview, audio latency sits below the divider with the Measure audio latency button.
 - The help column now opens wider by default, 460 pixels instead of 320, so more of each help page fits without wrapping. A width already saved in your settings is kept.

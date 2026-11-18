@@ -309,13 +309,14 @@ def test_handled_error_pauses_when_frozen_and_owns_console(
     with (
         patch("cleave.viz.open_loading_window", return_value=window),
         patch("cleave.viz.continue_launch"),
+        patch("cleave.viz.file_picker_host.show_picker_error") as show_picker_error,
         patch("builtins.input") as pause_input,
     ):
         with pytest.raises(SystemExit) as exc:
             main(["play", "missing-project"])
         assert exc.value.code == 1
     pause_input.assert_called_once_with("Press Enter to close…")
-    window.update.assert_called()
+    show_picker_error.assert_called_once()
 
 
 def test_separate_parser_uses_target_arg() -> None:
@@ -533,7 +534,9 @@ def test_cmd_play_opens_window_before_separate(
 
     assert order == ["window", "separate", "continue"]
     continue_launch.assert_called_once_with(window, project.resolve(), config=None)
-    assert run_separate.call_args.kwargs["on_progress"] is window.update
+    on_progress = run_separate.call_args.kwargs["on_progress"]
+    on_progress("Separating stems…", 0.5)
+    window.update.assert_called_with("Creating project", "Separating stems…", 0.5)
 
 
 def test_cmd_play_continues_into_existing_project(
@@ -596,7 +599,7 @@ def test_bare_file_runs_play(
         Path(str(audio)),
         high_quality=False,
         beat_detection_stem=None,
-        on_progress=window.update,
+        on_progress=ANY,
     )
     continue_launch.assert_called_once_with(window, project.resolve(), config=None)
 
@@ -980,7 +983,7 @@ def test_cmd_play_forwards_high_quality_to_run_separate(
         audio,
         high_quality=True,
         beat_detection_stem=None,
-        on_progress=window.update,
+        on_progress=ANY,
     )
 
 
@@ -1006,7 +1009,7 @@ def test_cmd_play_forwards_beat_detection_stem(
         audio,
         high_quality=False,
         beat_detection_stem="vocals",
-        on_progress=window.update,
+        on_progress=ANY,
     )
 
 

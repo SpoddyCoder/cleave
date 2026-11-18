@@ -31,6 +31,7 @@ from cleave.stem_pcm import StemPcmBank, load_stem_pcm, LIVE_PROJECTM_FPS
 from cleave.open_target import OpenTarget
 from cleave.paths import themes_dir
 from cleave.project import load_manifest
+from cleave.viz import OPENING_TITLE
 from cleave.viz.bootstrap import load_stem_signals
 from cleave.viz.controls import TuningControls
 from cleave.viz.session import TuningSession, session_from_cfg
@@ -660,10 +661,10 @@ class VisualizerApp:
             )
             window.compositor = compositor
             window.overlay_surface = overlay_surface
-            window.update("Loading…")
+            window.update(OPENING_TITLE, "Loading…")
 
             def on_progress(message: str) -> None:
-                window.update(message)
+                window.update(OPENING_TITLE, message)
 
             rt = init_gl_resources_heavy(
                 seed,

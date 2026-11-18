@@ -18,7 +18,6 @@ from cleave.viz.choice_widgets import (
     draw_segments,
     draw_stepper,
 )
-from cleave.viz.imgui_host import progress_label_font
 from cleave.viz.imgui_theme import floating_surface, rgba
 from cleave.viz.pointer_cursor import PointerShape, request_pointer
 from cleave.viz.progress_bar import draw_progress_bar, progress_bar_height
@@ -51,7 +50,10 @@ from cleave.viz.modal_layout import (
     measure_panel,
     measure_text_panel,
     message_lines,
+    body_lines,
     option_text,
+    panel_labeled_lines,
+    title_lines,
     panel_pad_x,
     panel_pad_y,
     single_line_scroll_x,
@@ -567,12 +569,6 @@ class ModalSurface:
         self._text_field_hit: _TextFieldHit | None = None
 
     def draw(self) -> Rect:
-        if self.view.kind == ModalKind.PROGRESS and self.view.large_text:
-            with progress_label_font():
-                return self._draw_panel()
-        return self._draw_panel()
-
-    def _draw_panel(self) -> Rect:
         self.intent = None
         self.panel_rect = None
         self.option_rects = ()
@@ -683,7 +679,7 @@ class ModalSurface:
         has_labeled = bool(view.labeled_lines)
         has_bar = view.progress_fraction is not None
         if view.message is not None:
-            lines = message_lines(measure, view.message, screen_w=screen_w)
+            lines = title_lines(measure, view, screen_w=screen_w)
             y = _draw_title_bar(
                 draw,
                 (ox, oy, panel_w),
@@ -700,7 +696,7 @@ class ModalSurface:
                 draw,
                 x,
                 y,
-                message_lines(measure, view.body, screen_w=screen_w),
+                body_lines(measure, view, screen_w=screen_w),
                 palette().value,
                 line_h,
                 line_gap,
@@ -714,7 +710,13 @@ class ModalSurface:
             if has_message:
                 y += line_h + line_gap
             y = _draw_labeled(
-                draw, x, y, view.labeled_lines, measure, line_h, line_gap
+                draw,
+                x,
+                y,
+                panel_labeled_lines(measure, view, screen_w=screen_w),
+                measure,
+                line_h,
+                line_gap,
             )
         if has_bar:
             if has_message or has_labeled:

@@ -245,7 +245,7 @@ class WelcomeFlow:
                 self._message = _downloading_message(event.item)
         self._host.update_progress(
             view.fraction,
-            message=None if self._cancelling else self._message,
+            body=None if self._cancelling else self._message,
             labeled_lines=view.lines(),
         )
 
@@ -307,10 +307,10 @@ class WelcomeFlow:
         self._cancelling = False
         self._message = _downloading_message(items[0])
         self._host.prompt_progress(
-            self._message,
+            WELCOME_TITLE,
+            body=self._message,
             labeled_lines=self._view.lines(),
             on_cancel=self._cancel,
-            large_text=False,
         )
         self._worker = _DownloadWorker(items)
 
@@ -322,10 +322,10 @@ class WelcomeFlow:
         worker.cancel.set()
         self._cancelling = True
         self._host.prompt_progress(
-            _CANCELLING,
+            WELCOME_TITLE,
+            body=_CANCELLING,
             labeled_lines=view.lines(),
             fraction=view.fraction,
-            large_text=False,
         )
 
     def _finish_downloads(self, result: FirstRunResult) -> None:

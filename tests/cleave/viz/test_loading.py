@@ -1,4 +1,4 @@
-"""Tests for visualizer boot loading screen."""
+"""Tests for the pre-project loading window and its progress dialog."""
 
 from __future__ import annotations
 
@@ -11,17 +11,12 @@ import pytest
 from OpenGL.GL import GL_COLOR_BUFFER_BIT, GL_FRAMEBUFFER
 from imgui_bundle import imgui
 
-from cleave.viz.imgui_theme import rgba
 from cleave.viz.loading import (
     LoadingWindow,
-    draw_loading_content,
-    loading_bar_width,
-    loading_content_layout,
     open_loading_window,
     present_frame,
 )
-from cleave.viz.modal_surface import ImGuiTextMeasure
-from cleave.viz.progress_bar import clamp_fraction, progress_bar_inset
+from cleave.viz.progress_bar import clamp_fraction
 from cleave.viz.theme import palette
 
 
@@ -33,158 +28,11 @@ def test_clamp_loading_fraction() -> None:
     assert clamp_fraction(1.5) == 1.0
 
 
-def test_message_only_layout_is_centered() -> None:
-    layout = loading_content_layout(1280, 720, (200, 40))
-    assert layout.message_xy == ((1280 - 200) // 2, (720 - 40) // 2)
-    assert layout.detail_xy is None
-    assert layout.bar_rect is None
-    assert layout.fill_rect is None
-
-
-def test_detail_stacks_under_message_and_recenters() -> None:
-    layout = loading_content_layout(
-        1280, 720, (200, 40), detail_size=(100, 20), line_gap=8
-    )
-    stack_h = 40 + 8 + 20
-    top = (720 - stack_h) // 2
-    assert layout.message_xy == ((1280 - 200) // 2, top)
-    assert layout.detail_xy == ((1280 - 100) // 2, top + 40 + 8)
-    assert layout.bar_rect is None
-
-
-def test_fraction_none_omits_bar() -> None:
-    layout = loading_content_layout(
-        1280, 720, (200, 40), detail_size=(80, 16), fraction=None
-    )
-    assert layout.bar_rect is None
-    assert layout.fill_rect is None
-
-
-def test_bar_below_text_when_fraction_set() -> None:
-    layout = loading_content_layout(
-        1280,
-        720,
-        (200, 40),
-        detail_size=(80, 16),
-        fraction=0.5,
-        line_gap=8,
-        bar_gap=16,
-        bar_width=400,
-        bar_height=20,
-    )
-    stack_h = 40 + 8 + 16 + 16 + 20
-    top = (720 - stack_h) // 2
-    bar_y = top + 40 + 8 + 16 + 16
-    bar_x = (1280 - 400) // 2
-    assert layout.bar_rect == (bar_x, bar_y, 400, 20)
-    inset = progress_bar_inset()
-    inner_w = 400 - 2 * inset
-    inner_h = 20 - 2 * inset
-    assert layout.fill_rect == (
-        bar_x + inset,
-        bar_y + inset,
-        int(round(inner_w * 0.5)),
-        inner_h,
-    )
-
-
-def test_zero_fraction_has_track_without_fill() -> None:
-    layout = loading_content_layout(
-        640, 360, (100, 20), fraction=0.0, bar_width=200, bar_height=20
-    )
-    assert layout.bar_rect is not None
-    assert layout.fill_rect is None
-
-
-def test_full_fraction_fill_matches_inner_width() -> None:
-    layout = loading_content_layout(
-        640, 360, (100, 20), fraction=1.0, bar_width=200, bar_height=20
-    )
-    assert layout.bar_rect is not None
-    assert layout.fill_rect is not None
-    _x, _y, bar_w, bar_h = layout.bar_rect
-    _fx, _fy, fill_w, fill_h = layout.fill_rect
-    assert fill_w == bar_w - 2 * progress_bar_inset()
-    assert fill_h == bar_h - 2 * progress_bar_inset()
-
-
-def test_out_of_range_fraction_clamps_fill() -> None:
-    over = loading_content_layout(
-        640, 360, (100, 20), fraction=2.0, bar_width=200, bar_height=20
-    )
-    full = loading_content_layout(
-        640, 360, (100, 20), fraction=1.0, bar_width=200, bar_height=20
-    )
-    under = loading_content_layout(
-        640, 360, (100, 20), fraction=-1.0, bar_width=200, bar_height=20
-    )
-    assert over.fill_rect == full.fill_rect
-    assert under.fill_rect is None
-    assert under.bar_rect is not None
-
-
-def test_default_bar_width_is_display_fraction() -> None:
-    assert loading_bar_width(1280) == int(round(1280 * 0.4))
-
-
-def _pack(role: tuple[int, int, int]) -> int:
-    return int(imgui.get_color_u32(rgba(role)))
-
-
 def _content_names() -> list[str]:
     lists = list(imgui.get_draw_data().cmd_lists)
     names = [str(draw_list._owner_name) for draw_list in lists]
     del lists
     return names
-
-
-def _loading_quads() -> list[tuple[float, float, float, float, int]]:
-    found: list[tuple[float, float, float, float, int]] = []
-    lists = list(imgui.get_draw_data().cmd_lists)
-    try:
-        for draw_list in lists:
-            if str(draw_list._owner_name) != "##loading":
-                continue
-            vtx = draw_list.vtx_buffer
-            idx = draw_list.idx_buffer
-            count = int(idx.size())
-            step = 0
-            while step + 6 <= count:
-                ids = [int(idx[step + offset]) for offset in range(6)]
-                unique = list(dict.fromkeys(ids))
-                if len(unique) == 4:
-                    xs = [float(vtx[vertex].pos.x) for vertex in unique]
-                    ys = [float(vtx[vertex].pos.y) for vertex in unique]
-                    colors = {int(vtx[vertex].col) for vertex in unique}
-                    if len(colors) == 1:
-                        found.append(
-                            (
-                                min(xs),
-                                min(ys),
-                                max(xs) - min(xs),
-                                max(ys) - min(ys),
-                                colors.pop(),
-                            )
-                        )
-                step += 6
-    finally:
-        del lists
-    return found
-
-
-def _loading_colors() -> set[int]:
-    found: set[int] = set()
-    lists = list(imgui.get_draw_data().cmd_lists)
-    try:
-        for draw_list in lists:
-            if str(draw_list._owner_name) != "##loading":
-                continue
-            vtx = draw_list.vtx_buffer
-            for index in range(int(vtx.size())):
-                found.add(int(vtx[index].col))
-    finally:
-        del lists
-    return found
 
 
 @contextmanager
@@ -207,70 +55,6 @@ def _host(size: tuple[int, int] = (640, 360)) -> Iterator[object]:
             host.end_frame()
         finally:
             host.destroy()
-
-
-def _draw_frame(
-    host: object,
-    message: str,
-    *,
-    fraction: float | None = None,
-    detail: str | None = None,
-    size: tuple[int, int] = (640, 360),
-) -> tuple[object, list[tuple[float, float, float, float, int]], set[int]]:
-    host.display_size = size
-    host.begin_frame(1.0 / 60.0)
-    measure = ImGuiTextMeasure()
-    detail_size = measure.size(detail) if detail else None
-    layout = loading_content_layout(
-        size[0],
-        size[1],
-        measure.size(message),
-        detail_size=detail_size,
-        fraction=fraction,
-    )
-    draw_loading_content(
-        message,
-        size[0],
-        size[1],
-        fraction=fraction,
-        detail=detail,
-    )
-    host.end_frame()
-    return layout, _loading_quads(), _loading_colors()
-
-
-def test_loading_content_bar_fraction_and_detail() -> None:
-    message = "Loading…"
-    with _host() as host:
-        half, quads, colors = _draw_frame(host, message, fraction=0.5)
-        assert half.fill_rect is not None
-        # The fill is the lit menu row's marker colour.
-        assert _pack(palette().highlight) in colors
-
-        empty, quads, empty_colors = _draw_frame(host, message, fraction=0.0)
-        assert empty.bar_rect is not None
-        assert empty.fill_rect is None
-        bar_x, bar_y, bar_w, bar_h = empty.bar_rect
-        tracks = [
-            quad
-            for quad in quads
-            if abs(quad[2] - bar_w) <= 1.0 and abs(quad[3] - bar_h) <= 1.0
-        ]
-        assert tracks, quads
-        assert _pack(palette().highlight) not in empty_colors
-
-        missing, quads, _colors = _draw_frame(host, message, fraction=None)
-        assert missing.bar_rect is None
-        bar_w = loading_bar_width(640)
-        assert not any(abs(quad[2] - bar_w) <= 1.0 for quad in quads)
-
-        _layout, _quads, colors = _draw_frame(
-            host, message, detail="Downloading htdemucs"
-        )
-        assert _pack(palette().label) in colors
-        _layout, _quads, colors = _draw_frame(host, message)
-        assert _pack(palette().label) not in colors
-    assert not imgui.get_current_context()
 
 
 @patch("cleave.viz.loading.pygame.display.flip")
@@ -335,7 +119,7 @@ def test_present_frame_without_imgui_skips_draw() -> None:
 @patch("cleave.viz.loading.glClearColor")
 @patch("cleave.viz.loading.glViewport")
 @patch("cleave.viz.loading.glBindFramebuffer")
-def test_present_frame_scrim_precedes_loading_content(
+def test_present_frame_scrim_precedes_drawn_content(
     _mock_bind: MagicMock,
     _mock_viewport: MagicMock,
     _mock_clear_color: MagicMock,
@@ -350,21 +134,54 @@ def test_present_frame_scrim_precedes_loading_content(
             overlay_surface=pygame.Surface((640, 360), pygame.SRCALPHA),
             imgui=host,
         )
-        present_frame(
-            window,
-            lambda: draw_loading_content("Loading…", 640, 360),
-            scrim=False,
-        )
-        assert "##loading-scrim" not in _content_names()
-        assert "##loading" in _content_names()
+        def draw() -> None:
+            imgui.set_next_window_size(imgui.ImVec2(100.0, 100.0))
+            imgui.begin("##content")
+            # Surfaces drawn over the scrim raise themselves, as dialogs do.
+            imgui.internal.bring_window_to_display_front(
+                imgui.internal.get_current_window()
+            )
+            imgui.text("x")
+            imgui.end()
 
-        present_frame(
-            window,
-            lambda: draw_loading_content("Loading…", 640, 360),
-            scrim=True,
-        )
+        present_frame(window, draw, scrim=False)
+        assert "##loading-scrim" not in _content_names()
+        assert "##content" in _content_names()
+
+        present_frame(window, draw, scrim=True)
         names = _content_names()
-        assert names.index("##loading-scrim") < names.index("##loading")
+        assert names.index("##loading-scrim") < names.index("##content")
+
+
+@patch("cleave.viz.loading.pygame.display.flip")
+@patch("cleave.viz.loading.glClear")
+@patch("cleave.viz.loading.glClearColor")
+@patch("cleave.viz.loading.glViewport")
+@patch("cleave.viz.loading.glBindFramebuffer")
+def test_update_draws_progress_dialog(
+    _mock_bind: MagicMock,
+    _mock_viewport: MagicMock,
+    _mock_clear_color: MagicMock,
+    _mock_clear: MagicMock,
+    _mock_flip: MagicMock,
+) -> None:
+    with _host() as host:
+        window = LoadingWindow(
+            compositor=MagicMock(),
+            display_width=640,
+            display_height=360,
+            overlay_surface=pygame.Surface((640, 360), pygame.SRCALPHA),
+            imgui=host,
+        )
+        with patch("cleave.viz.loading.pygame.event.get", return_value=[]):
+            assert window.update("Creating project", "Separating stems…", 0.5)
+        assert "##modal" in _content_names()
+
+        with patch("cleave.viz.loading.pygame.event.get", return_value=[]):
+            assert window.clear()
+        assert "##modal" not in _content_names()
+
+
 
 
 @patch("cleave.viz.imgui_host.ImGuiHost.create")
@@ -411,10 +228,6 @@ def test_open_loading_window_uses_default_window_geometry(
     assert window.imgui is host
     mock_draw.assert_called_once()
     assert mock_draw.call_args.args[0] is window
-    assert mock_draw.call_args.args[1].message == ""
-    assert mock_draw.call_args.args[1].fraction is None
-    assert mock_draw.call_args.args[1].detail is None
-    assert mock_draw.call_args.kwargs["scrim"] is False
     assert window.display_width == width
     assert window.display_height == height
     assert window.quit_requested is False
@@ -468,14 +281,13 @@ def test_loading_window_update_draws_and_returns_true(
         overlay_surface=pygame.Surface((640, 360), pygame.SRCALPHA),
     )
     with patch("cleave.viz.loading.pygame.event.get", return_value=[]):
-        assert window.update("Separating stems…", 0.4, "12 MB of 30 MB") is True
+        assert window.update("Creating project", "Separating stems…", 0.4) is True
     mock_draw.assert_called_once()
     assert mock_draw.call_args.args[0] is window
     drawn = mock_draw.call_args.args[1]
-    assert drawn.message == "Separating stems…"
+    assert drawn.title == "Creating project"
+    assert drawn.body == "Separating stems…"
     assert drawn.fraction == 0.4
-    assert drawn.detail == "12 MB of 30 MB"
-    assert mock_draw.call_args.kwargs["scrim"] is False
     compositor.upload_overlay_texture.assert_not_called()
     assert window.quit_requested is False
 
@@ -495,7 +307,7 @@ def test_loading_window_update_quit_skips_draw(
     quit_event = MagicMock()
     quit_event.type = pygame.QUIT
     with patch("cleave.viz.loading.pygame.event.get", return_value=[quit_event]):
-        assert window.update("Loading…") is False
+        assert window.update("Opening project", "Loading…") is False
     assert window.quit_requested is True
     mock_draw.assert_not_called()
 

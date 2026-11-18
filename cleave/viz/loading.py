@@ -1,11 +1,9 @@
-"""Centered loading message during visualizer boot.
-
-Optional detail line and determinate progress bar when a job reports a
-fraction. Indeterminate waits stay message-only.
+"""The pre-project window and its progress dialog.
 
 ``LoadingWindow`` is the pre-project pygame/GL handle: open the window,
-draw phase messages with ImGui, then hand the same display to
-``continue_launch``.
+show each phase as a progress dialog (the same panel the editor uses), then
+hand the same display to ``continue_launch``. A job that reports a fraction
+gets a bar; a named wait has none.
 """
 
 from __future__ import annotations
@@ -34,19 +32,11 @@ from cleave.config_schema.window import (
 from cleave.gl_color_format import RGBA8
 from cleave.gl_compositor import GlCompositor
 from cleave.paths import themes_dir
-from cleave.viz.progress_bar import (
-    clamp_fraction,
-    draw_progress_bar,
-    progress_bar_height,
-    progress_fill_rect,
-)
-from cleave.viz.text_fit import TextSizer, fit_text_to_width
 from cleave.viz.theme import (
     palette,
     palette_for_theme,
     set_palette,
     set_ui_scale_percent,
-    ui_px,
     ui_scale_percent,
 )
 from cleave.viz import sdl_window
@@ -66,23 +56,6 @@ def _imgui():
 
 
 @functools.cache
-def _loading_flags() -> int:
-    imgui = _imgui()
-    return (
-        int(imgui.WindowFlags_.no_title_bar)
-        | int(imgui.WindowFlags_.no_resize)
-        | int(imgui.WindowFlags_.no_move)
-        | int(imgui.WindowFlags_.no_saved_settings)
-        | int(imgui.WindowFlags_.no_focus_on_appearing)
-        | int(imgui.WindowFlags_.no_nav)
-        | int(imgui.WindowFlags_.no_bring_to_front_on_focus)
-        | int(imgui.WindowFlags_.no_scrollbar)
-        | int(imgui.WindowFlags_.no_scroll_with_mouse)
-        | int(imgui.WindowFlags_.no_background)
-    )
-
-
-@functools.cache
 def _scrim_flags() -> int:
     imgui = _imgui()
     return (
@@ -98,102 +71,7 @@ def _scrim_flags() -> int:
     )
 
 
-_BAR_WIDTH_FRACTION = 0.4
-_TEXT_MAX_WIDTH_FRACTION = 0.8
-# Base px at 100% UI scale; read through ui_px at layout time.
-_LINE_GAP_BASE = 8
-_BAR_GAP_BASE = 16
-_LOADING_WINDOW = "##loading"
 _SCRIM_WINDOW = "##loading-scrim"
-
-# Future separate/download hook: (message, fraction). fraction None = named wait, no bar.
-LoadingProgress = Callable[[str, float | None], None]
-
-
-@dataclass(frozen=True)
-class LoadingContentLayout:
-    """Centered stack of message, optional detail, and optional progress bar."""
-
-    message_xy: tuple[int, int]
-    detail_xy: tuple[int, int] | None
-    bar_rect: tuple[int, int, int, int] | None
-    fill_rect: tuple[int, int, int, int] | None
-
-
-def loading_bar_width(display_width: int) -> int:
-    return max(1, int(round(display_width * _BAR_WIDTH_FRACTION)))
-
-
-def loading_content_layout(
-    display_width: int,
-    display_height: int,
-    message_size: tuple[int, int],
-    *,
-    detail_size: tuple[int, int] | None = None,
-    fraction: float | None = None,
-    line_gap: int | None = None,
-    bar_gap: int | None = None,
-    bar_width: int | None = None,
-    bar_height: int | None = None,
-) -> LoadingContentLayout:
-    """Vertically stack message, detail, and bar; center the block in the viewport."""
-    if line_gap is None:
-        line_gap = ui_px(_LINE_GAP_BASE)
-    if bar_gap is None:
-        bar_gap = ui_px(_BAR_GAP_BASE)
-    if bar_height is None:
-        bar_height = progress_bar_height()
-    message_w, message_h = message_size
-    stack_h = message_h
-    if detail_size is not None:
-        stack_h += line_gap + detail_size[1]
-    show_bar = fraction is not None
-    if show_bar:
-        stack_h += bar_gap + bar_height
-
-    top = (display_height - stack_h) // 2
-    message_xy = ((display_width - message_w) // 2, top)
-    y = top + message_h
-
-    detail_xy: tuple[int, int] | None = None
-    if detail_size is not None:
-        y += line_gap
-        detail_xy = ((display_width - detail_size[0]) // 2, y)
-        y += detail_size[1]
-
-    bar_rect: tuple[int, int, int, int] | None = None
-    fill_rect: tuple[int, int, int, int] | None = None
-    if show_bar:
-        y += bar_gap
-        width = loading_bar_width(display_width) if bar_width is None else bar_width
-        bar_x = (display_width - width) // 2
-        bar_rect = (bar_x, y, width, bar_height)
-        fill_rect = progress_fill_rect(bar_rect, clamp_fraction(fraction))
-
-    return LoadingContentLayout(
-        message_xy=message_xy,
-        detail_xy=detail_xy,
-        bar_rect=bar_rect,
-        fill_rect=fill_rect,
-    )
-
-
-class _ImGuiTextSize:
-    """``TextSizer`` for the current ImGui font. Valid only inside a frame."""
-
-    def size(self, text: str) -> tuple[int, int]:
-        imgui = _imgui()
-        measured = imgui.calc_text_size(text)
-        return (int(measured.x), int(measured.y))
-
-
-def _packed(role: tuple[int, int, int]) -> int:
-    # imgui_theme imports imgui_bundle, whose package init loads matplotlib
-    # when that package is installed. Keep it off the play-path import graph.
-    from cleave.viz.imgui_theme import rgba
-
-    imgui = _imgui()
-    return int(imgui.get_color_u32(rgba(role)))
 
 
 def _style_color(slot: imgui.Col_) -> imgui.ImVec4:
@@ -207,19 +85,6 @@ def _raise_window(name: str) -> None:
     imgui.internal.bring_window_to_display_front(
         imgui.internal.find_window_by_name(name)
     )
-
-
-def _text(
-    draw: imgui.ImDrawList,
-    x: int,
-    y: int,
-    text: str,
-    role: tuple[int, int, int],
-) -> None:
-    if not text:
-        return
-    imgui = _imgui()
-    draw.add_text(imgui.ImVec2(float(x), float(y)), _packed(role), text)
 
 
 def _draw_scrim() -> None:
@@ -243,80 +108,6 @@ def _draw_scrim() -> None:
     finally:
         imgui.pop_style_var()
         imgui.pop_style_color()
-
-
-def _fitted_detail(detail: str, display_width: int, measure: TextSizer) -> str:
-    max_w = max(1, int(display_width * _TEXT_MAX_WIDTH_FRACTION))
-    return fit_text_to_width(measure, detail, max_w)
-
-
-def draw_loading_content(
-    message: str,
-    display_width: int,
-    display_height: int,
-    *,
-    fraction: float | None = None,
-    detail: str | None = None,
-) -> None:
-    """Draw the centred loading block into the current ImGui frame."""
-    from cleave.viz.imgui_host import progress_label_font
-
-    with progress_label_font():
-        _draw_loading_block(message, display_width, display_height, fraction, detail)
-
-
-def _draw_loading_block(
-    message: str,
-    display_width: int,
-    display_height: int,
-    fraction: float | None,
-    detail: str | None,
-) -> None:
-    imgui = _imgui()
-    measure = _ImGuiTextSize()
-    message_size = measure.size(message) if message else (0, 0)
-    fitted = ""
-    detail_size: tuple[int, int] | None = None
-    if detail:
-        fitted = _fitted_detail(detail, display_width, measure)
-        if fitted:
-            detail_size = measure.size(fitted)
-    layout = loading_content_layout(
-        display_width,
-        display_height,
-        message_size,
-        detail_size=detail_size,
-        fraction=fraction,
-    )
-
-    imgui.set_next_window_pos(imgui.ImVec2(0.0, 0.0), imgui.Cond_.always)
-    imgui.set_next_window_size(
-        imgui.ImVec2(float(display_width), float(display_height)),
-        imgui.Cond_.always,
-    )
-    pushed = 0
-    begun = False
-    try:
-        imgui.push_style_var(imgui.StyleVar_.window_padding, imgui.ImVec2(0.0, 0.0))
-        pushed += 1
-        imgui.push_style_var(imgui.StyleVar_.window_border_size, 0.0)
-        pushed += 1
-        imgui.begin(_LOADING_WINDOW, None, _loading_flags())
-        begun = True
-        _raise_window(_LOADING_WINDOW)
-        draw = imgui.get_window_draw_list()
-        _text(draw, layout.message_xy[0], layout.message_xy[1], message, palette().value)
-        if fitted and layout.detail_xy is not None:
-            _text(draw, layout.detail_xy[0], layout.detail_xy[1], fitted, palette().label)
-        if layout.bar_rect is not None:
-            draw_progress_bar(
-                draw, layout.bar_rect, fraction or 0.0, background=palette().background
-            )
-    finally:
-        if begun:
-            imgui.end()
-        if pushed:
-            imgui.pop_style_var(pushed)
 
 
 def _clear_display(width: int, height: int) -> None:
@@ -354,22 +145,30 @@ def present_frame(
     pygame.display.flip()
 
 
-@dataclass
-class _LoadingDraw:
-    message: str
-    display_width: int
-    display_height: int
-    fraction: float | None = None
-    detail: str | None = None
+@dataclass(frozen=True)
+class _ProgressDraw:
+    title: str
+    body: str | None
+    fraction: float | None
 
     def __call__(self) -> None:
-        draw_loading_content(
-            self.message,
-            self.display_width,
-            self.display_height,
-            fraction=self.fraction,
-            detail=self.detail,
+        from cleave.viz.modal import ModalKind, ModalViewState
+        from cleave.viz.modal_surface import ImGuiTextMeasure, ModalSurface
+        from cleave.viz.top_layer import TopLayer
+
+        view = ModalViewState(
+            kind=ModalKind.PROGRESS,
+            message=self.title,
+            options=(),
+            focus_index=0,
+            body=self.body,
+            progress_fraction=(
+                None if self.fraction is None else max(0.0, min(1.0, self.fraction))
+            ),
         )
+        layer = TopLayer()
+        layer.push(ModalSurface(view, ImGuiTextMeasure()))
+        layer.draw()
 
 
 _GL_DISPLAY_FLAGS = pygame.OPENGL | pygame.DOUBLEBUF | pygame.RESIZABLE
@@ -496,30 +295,33 @@ class LoadingWindow:
 
     def update(
         self,
-        message: str,
+        title: str,
+        body: str | None = None,
         fraction: float | None = None,
-        detail: str | None = None,
     ) -> bool:
-        """Draw the loading screen and pump events. False if the user quit."""
+        """Show *title* over *body* in a progress dialog and pump events.
+
+        *fraction* draws a bar; None is a named wait. False if the user quit.
+        """
+        if not self._pump():
+            return False
+        present_frame(self, _ProgressDraw(title, body, fraction))
+        return True
+
+    def clear(self) -> bool:
+        """Paint the empty window and pump events. False if the user quit."""
+        if not self._pump():
+            return False
+        present_frame(self, lambda: None)
+        return True
+
+    def _pump(self) -> bool:
         for event in pygame.event.get():
             self.note_event(event)
             if event.type == pygame.QUIT:
                 self.quit_requested = True
                 return False
-        if self.quit_requested:
-            return False
-        present_frame(
-            self,
-            _LoadingDraw(
-                message,
-                self.display_width,
-                self.display_height,
-                fraction,
-                detail,
-            ),
-            scrim=False,
-        )
-        return True
+        return not self.quit_requested
 
     def release_imgui(self) -> None:
         """Destroy the ImGui host. A second call is a no-op."""
@@ -626,5 +428,5 @@ def open_loading_window() -> LoadingWindow:
     if geometry.maximised:
         _maximise()
         window.maximised = True
-    window.update("")
+    window.clear()
     return window

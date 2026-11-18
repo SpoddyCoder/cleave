@@ -14,6 +14,9 @@ from cleave.stems import StemSource
 from cleave.viz.file_picker import PickerMode
 from cleave.viz.loading import LoadingWindow
 
+NEW_PROJECT_TITLE = "Creating project"
+"""Progress dialog title while a new project's stems are split."""
+
 
 def run_editor_sessions(
     window: LoadingWindow,
@@ -103,7 +106,9 @@ def _project_dir_for(
         target.path,
         high_quality=high_quality,
         beat_detection_stem=beat_detection_stem,
-        on_progress=window.update,
+        on_progress=lambda message, fraction: window.update(
+            NEW_PROJECT_TITLE, message, fraction
+        ),
     )
     if window.quit_requested:
         return None

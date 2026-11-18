@@ -261,9 +261,12 @@ def cmd_play(args: argparse.Namespace) -> None:
         try:
             play_target = _play_open_target(str(args.target))
         except (FileNotFoundError, ValueError, RuntimeError) as e:
-            window.update(f"error: {e}")
-            _exit_error(f"error: {e}")
-            return
+            from cleave.viz.file_picker_host import show_picker_error
+
+            show_picker_error(window, str(e))
+            window.close()
+            print(f"error: {e}", file=sys.stderr)
+            sys.exit(1)
 
     from cleave.viz.session_loop import run_editor_sessions
 

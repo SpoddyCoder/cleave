@@ -87,15 +87,11 @@ def draw_progress_bar(
     draw: imgui.ImDrawList,
     bar: Rect,
     fraction: float,
-    *,
-    background: tuple[int, int, int] | None = None,
 ) -> None:
-    """Draw track, fill, and border. ``background`` paints the whole track first."""
+    """Draw the fill and border over the panel behind."""
     x, y, width, height = bar
     if width <= 0 or height <= 0:
         return
-    if background is not None:
-        _fill(draw, bar, _packed(background))
     fill = progress_fill_rect(bar, fraction)
     if fill is not None:
         _fill(draw, fill, _packed(palette().highlight))

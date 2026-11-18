@@ -7,8 +7,7 @@ The shell decides which events reach this host. Keyboard stays in
 from __future__ import annotations
 
 import os
-from collections.abc import Callable, Iterator
-from contextlib import contextmanager
+from collections.abc import Callable
 from typing import Any
 
 import pygame
@@ -39,7 +38,6 @@ from cleave.viz.overlay_primitives import overlay_font_path
 from cleave.viz.navigator import TWISTY_EXPANDED
 from cleave.viz.pointer_cursor import PointerCursors, requested_pointer
 from cleave.viz.theme import (
-    PROGRESS_LABEL_FONT_SCALE,
     shell_scale,
     tuning_ui_metrics,
     ui_scale_generation,
@@ -243,16 +241,6 @@ def _load_shell_fonts() -> None:
 def _apply_shell_font_size() -> None:
     """Size every chrome font from the live UI scale."""
     imgui.get_style().font_size_base = _shell_font_size()
-
-
-@contextmanager
-def progress_label_font() -> Iterator[None]:
-    """Draw with the shell font at the progress-label size. Valid only inside a frame."""
-    imgui.push_font(None, _shell_font_size() * PROGRESS_LABEL_FONT_SCALE)
-    try:
-        yield
-    finally:
-        imgui.pop_font()
 
 
 def _keep_keyboard_nav_off() -> None:

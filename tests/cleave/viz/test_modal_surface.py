@@ -15,7 +15,6 @@ from cleave.viz.context_menu import ContextMenuState
 from cleave.viz.inline_edit import InlineEditController
 from cleave.viz.button_paint import ButtonState, ButtonTone, button_look
 from cleave.viz.commands import CommandContext
-from cleave.viz.imgui_host import progress_label_font
 from cleave.viz.imgui_theme import rgba
 from cleave.viz.menu_bar import MenuBarState
 from cleave.viz.text_edit import caret_line_column
@@ -205,7 +204,6 @@ def _progress() -> ModalViewState:
         focus_index=0,
         labeled_lines=(ModalLabeledLine("Stem", "drums"),),
         progress_fraction=0.5,
-        large_text=True,
     )
 
 
@@ -273,20 +271,6 @@ def test_kind_renders_with_idle_mouse(view: ModalViewState) -> None:
                 screen_w=screen_w,
                 screen_h=screen_h,
             )
-        elif view.kind == ModalKind.PROGRESS:
-            base = measure_panel(
-                surface.measure, view, line_gap=line_gap, screen_w=screen_w
-            )
-            host.imgui.begin_frame(1.0 / 60.0)
-            try:
-                with progress_label_font():
-                    expected = measure_panel(
-                        surface.measure, view, line_gap=line_gap, screen_w=screen_w
-                    )
-            finally:
-                host.imgui.end_frame()
-            _idle(host, surface)
-            assert expected[1] > base[1]
         else:
             expected = measure_panel(
                 surface.measure, view, line_gap=line_gap, screen_w=screen_w
@@ -1037,7 +1021,6 @@ def _cancellable_progress() -> tuple[ModalHost, list[bool]]:
         labeled_lines=(ModalLabeledLine("Demucs htdemucs", "Downloading 42%"),),
         fraction=0.42,
         on_cancel=lambda: cancelled.append(True),
-        large_text=False,
     )
     return modal, cancelled
 
@@ -1068,20 +1051,24 @@ def test_click_outside_cancellable_progress_records_nothing() -> None:
         assert surface.intent is None
 
 
-def test_progress_without_large_text_uses_body_font() -> None:
-    modal, _cancelled = _cancellable_progress()
-    view = modal.view_state()
-    assert view is not None
-    assert view.large_text is False
+def test_progress_panel_width_ignores_text() -> None:
+    from dataclasses import replace
+
+    from cleave.viz.modal_layout import progress_panel_width
+
+    short = replace(_progress(), message="Go", labeled_lines=())
+    long = replace(
+        _progress(),
+        message="A title far wider than any progress panel " * 4,
+        body="Status " * 60,
+        labeled_lines=(ModalLabeledLine("output", "x" * 400),),
+    )
     with headless_shell_host() as host:
-        surface = ModalSurface(view, ImGuiTextMeasure())
-        _idle(host, surface)
         screen_w, _screen_h = host.imgui.display_size
-        expected = measure_panel(
-            surface.measure,
-            view,
-            line_gap=tuning_ui_metrics().line_gap,
-            screen_w=screen_w,
-        )
-        assert surface.panel_rect is not None
-        assert surface.panel_rect[2:] == expected
+        widths = []
+        for view in (short, long):
+            surface = ModalSurface(view, ImGuiTextMeasure())
+            _idle(host, surface)
+            assert surface.panel_rect is not None
+            widths.append(surface.panel_rect[2])
+        assert widths == [progress_panel_width(screen_w)] * 2

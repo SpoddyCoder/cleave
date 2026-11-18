@@ -18,6 +18,7 @@ from pathlib import Path
 from cleave.preset_library import PresetIndex, PresetLibrary, build_index
 from cleave.viz.modal import ModalHost
 
+PROGRESS_TITLE = "Rescan presets"
 SCANNING_MESSAGE = "Scanning preset folders…"
 INDEXING_MESSAGE = "Indexing presets…"
 CANCELLING_MESSAGE = "Cancelling…"
@@ -114,7 +115,7 @@ class PresetRescanController:
         self._resume = self._hold_playback()
         self._cancelling = False
         self._modal.prompt_progress(
-            SCANNING_MESSAGE, on_cancel=self._cancel, large_text=False
+            PROGRESS_TITLE, body=SCANNING_MESSAGE, on_cancel=self._cancel
         )
         self._worker = _RescanWorker(self._library.database_uri, self._preset_root)
 
@@ -134,7 +135,7 @@ class PresetRescanController:
             latest = event
         if latest is not None and not self._cancelling:
             fraction = latest.done / latest.total if latest.total else 0.0
-            self._modal.update_progress(fraction, message=INDEXING_MESSAGE)
+            self._modal.update_progress(fraction, body=INDEXING_MESSAGE)
 
     def abort(self) -> None:
         """Stop without adopting anything (the window is closing)."""
@@ -151,7 +152,7 @@ class PresetRescanController:
             return
         worker.cancel.set()
         self._cancelling = True
-        self._modal.prompt_progress(CANCELLING_MESSAGE, large_text=False)
+        self._modal.prompt_progress(PROGRESS_TITLE, body=CANCELLING_MESSAGE)
 
     def _finish(self, event: _Finished) -> None:
         self._end()

@@ -200,7 +200,7 @@ def test_update_progress_replaces_message_and_lines() -> None:
     modal = ModalHost()
     modal.prompt_progress("One…", labeled_lines=(ModalLabeledLine("A", "Waiting"),))
     modal.update_progress(
-        0.5, message="Two…", labeled_lines=(ModalLabeledLine("A", "Done"),)
+        0.5, title="Two…", labeled_lines=(ModalLabeledLine("A", "Done"),)
     )
     view = modal.view_state()
     assert view.message == "Two…"
@@ -232,9 +232,15 @@ def test_form_cancel_label() -> None:
     assert modal.view_state().options == ("Go", "Skip")
 
 
-def test_progress_large_text_defaults_on() -> None:
+def test_progress_title_body_and_named_wait() -> None:
     modal = ModalHost()
-    modal.prompt_progress("Rendering…")
-    assert modal.view_state().large_text is True
-    modal.prompt_progress("Downloading…", large_text=False)
-    assert modal.view_state().large_text is False
+    modal.prompt_progress("Render project", body="Rendering…", fraction=None)
+    view = modal.view_state()
+    assert view.message == "Render project"
+    assert view.body == "Rendering…"
+    assert view.progress_fraction is None
+    modal.update_progress(0.5, body="Encoding…")
+    view = modal.view_state()
+    assert view.message == "Render project"
+    assert view.body == "Encoding…"
+    assert view.progress_fraction == 0.5

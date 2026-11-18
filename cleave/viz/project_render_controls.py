@@ -49,7 +49,7 @@ _FORM_HELP = (
     "Fps is saved with the project. Quality, start, and end last until the editor closes.",
 )
 _FPS_OPTIONS = tuple(range(RENDER_FPS_MIN, RENDER_FPS_MAX + 1))
-_PROGRESS_MESSAGE = "Rendering project…"
+_PROGRESS_MESSAGE = "Rendering…"
 _SUCCESS_MESSAGE = "Render complete"
 _FAILED_MESSAGE = "Render failed"
 
@@ -310,7 +310,8 @@ class ProjectRenderController:
         self._pause_playback()
         self._job = self._start_job(spec)
         self._modal.prompt_progress(
-            _PROGRESS_MESSAGE,
+            _FORM_TITLE,
+            body=_PROGRESS_MESSAGE,
             labeled_lines=project_render_labeled_lines(
                 self.session,
                 duration_sec=self.duration_sec,

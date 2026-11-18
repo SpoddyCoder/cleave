@@ -946,8 +946,6 @@ BORDER_WIDTH: int = 2
 # Progress bars: a thick surface_edge border and a gap before the accent fill.
 PROGRESS_BAR_BORDER_WIDTH: int = 2 * BORDER_WIDTH
 PROGRESS_BAR_FILL_GAP: int = 2
-# Text above a progress bar draws this much larger than the shell font.
-PROGRESS_LABEL_FONT_SCALE: float = 1.5
 # Marker bar width of a selected, focused, or lit row at shell scale 1.0.
 ROW_BAR_PX: float = 2.5
 

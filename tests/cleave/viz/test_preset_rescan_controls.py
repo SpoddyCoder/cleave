@@ -12,6 +12,7 @@ from cleave.viz.modal import ModalHost, ModalKind
 from cleave.viz.preset_rescan_controls import (
     CANCELLING_MESSAGE,
     FAILED_TITLE,
+    PROGRESS_TITLE,
     SCANNING_MESSAGE,
     PresetRescanController,
     done_message,
@@ -68,8 +69,8 @@ def test_rescan_adopts_new_presets_and_resumes_playback(tmp_path: Path) -> None:
     harness.controller.start()
     view = harness.modal.view_state()
     assert view is not None and view.kind == ModalKind.PROGRESS
-    assert view.message == SCANNING_MESSAGE
-    assert view.large_text is False
+    assert view.message == PROGRESS_TITLE
+    assert view.body == SCANNING_MESSAGE
     assert harness.holds == 1
     harness.run_until_idle()
 
@@ -114,8 +115,7 @@ def test_cancel_keeps_previous_index(tmp_path: Path, monkeypatch) -> None:
 
     harness.modal.cancel()
     view = harness.modal.view_state()
-    assert view is not None and view.message == CANCELLING_MESSAGE
-    assert view.large_text is False
+    assert view is not None and view.body == CANCELLING_MESSAGE
     harness.run_until_idle()
 
     assert library.revision == revision

@@ -9,7 +9,7 @@ import pytest
 
 from cleave.open_target import OpenTarget, OpenTargetKind
 from cleave.viz.file_picker import PickerMode
-from cleave.viz.session_loop import run_editor_sessions
+from cleave.viz.session_loop import NEW_PROJECT_TITLE, run_editor_sessions
 
 
 def _window() -> MagicMock:
@@ -39,7 +39,8 @@ def test_switch_relaunches_without_closing_between_sessions() -> None:
         assert path == audio.path
         assert kwargs["high_quality"] is True
         assert kwargs["beat_detection_stem"] == "vocals"
-        assert kwargs["on_progress"] is window.update
+        kwargs["on_progress"]("Separating stems…", 0.5)
+        window.update.assert_called_with(NEW_PROJECT_TITLE, "Separating stems…", 0.5)
         return project_dir
 
     def launch(host: MagicMock, project: Path, *, config: Path | None = None) -> OpenTarget | None:

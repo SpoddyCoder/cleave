@@ -20,8 +20,11 @@ __all__ = [
     "render",
 ]
 
+OPENING_TITLE = "Opening project"
+"""Progress dialog title while a project loads."""
+
 REINDEX_MESSAGE = "New Milkdrop presets found, re-indexing…"
-"""Loading screen status while the preset folder's top level has changed."""
+"""Opening status while the preset folder's top level has changed."""
 
 
 def __getattr__(name: str) -> Any:
@@ -86,7 +89,7 @@ def continue_launch(
         if not library.load_index(cfg.paths.preset_root) and not library.index(
             cfg.paths.preset_root,
             lambda done, total: window.update(
-                REINDEX_MESSAGE, done / total if total else None
+                OPENING_TITLE, REINDEX_MESSAGE, done / total if total else None
             ),
         ):
             return None
@@ -101,7 +104,6 @@ def continue_launch(
         FileNotFoundError,
         ValueError,
     ) as exc:
-        window.update(f"error: {exc}")
         raise LaunchError(str(exc)) from exc
 
 

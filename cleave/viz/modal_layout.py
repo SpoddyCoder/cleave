@@ -7,18 +7,22 @@ from typing import Protocol
 from cleave.viz.text_edit import caret_index_for_line_column, caret_line_column
 from cleave.viz.modal import (
     FormRowView,
+    ModalKind,
     ModalLabeledLine,
     ModalViewState,
 )
 from cleave.viz.choice_layout import choice_width, stepper_width
 from cleave.viz.progress_bar import progress_bar_height
-from cleave.viz.text_fit import TextSizer, wrap_text_to_width
+from cleave.viz.text_fit import TextSizer, fit_text_to_width, wrap_text_to_width
 from cleave.viz.theme import BORDER_WIDTH, tuning_ui_metrics, ui_px
 
 # Message wrap width and text-panel height cap, as a fraction of the viewport.
 MESSAGE_MAX_SCREEN_FRACTION = 0.5
 # Modal panel minimum width as a fraction of the viewport.
 PANEL_MIN_SCREEN_FRACTION = 0.2
+# Progress panel width as a fraction of the viewport, and its floor in base px.
+PROGRESS_PANEL_SCREEN_FRACTION = 0.4
+PROGRESS_PANEL_MIN_BASE = 420
 
 TEXT_BUTTON_LABELS = ("Confirm", "Cancel")
 EDITING_HINT = "Press Enter to confirm or ESC to cancel"
@@ -101,6 +105,53 @@ def panel_min_width(screen_w: int) -> int:
 
 def message_lines(measure: TextMeasure, message: str, *, screen_w: int) -> list[str]:
     return wrap_text_to_width(measure, message, message_max_width(screen_w))
+
+
+def progress_panel_width(screen_w: int) -> int:
+    """Fixed progress panel width: the bar's length, whatever the text says.
+
+    Text never widens it, so a changing status line cannot resize the panel.
+    """
+    width = max(int(screen_w * PROGRESS_PANEL_SCREEN_FRACTION), ui_px(PROGRESS_PANEL_MIN_BASE))
+    return max(1, min(width, screen_w))
+
+
+def progress_content_width(screen_w: int) -> int:
+    return max(1, progress_panel_width(screen_w) - panel_pad_x() * 2)
+
+
+def title_lines(measure: TextMeasure, state: ModalViewState, *, screen_w: int) -> list[str]:
+    """The title's lines. A progress title is one line, shortened to fit."""
+    message = state.message or ""
+    if state.kind == ModalKind.PROGRESS:
+        return [fit_text_to_width(measure, message, progress_content_width(screen_w))]
+    return message_lines(measure, message, screen_w=screen_w)
+
+
+def body_lines(measure: TextMeasure, state: ModalViewState, *, screen_w: int) -> list[str]:
+    """The body's lines. A progress body wraps inside the fixed panel width."""
+    body = state.body or ""
+    if state.kind == ModalKind.PROGRESS:
+        return wrap_text_to_width(measure, body, progress_content_width(screen_w))
+    return message_lines(measure, body, screen_w=screen_w)
+
+
+def panel_labeled_lines(
+    measure: TextMeasure, state: ModalViewState, *, screen_w: int
+) -> tuple[ModalLabeledLine, ...]:
+    """The labeled lines. A progress value is shortened to fit the panel."""
+    if state.kind != ModalKind.PROGRESS:
+        return state.labeled_lines
+    content_w = progress_content_width(screen_w)
+    return tuple(
+        ModalLabeledLine(
+            line.label,
+            fit_text_to_width(
+                measure, line.value, content_w - measure.size(line.prefix())[0]
+            ),
+        )
+        for line in state.labeled_lines
+    )
 
 
 def option_text(label: str) -> str:
@@ -191,7 +242,7 @@ def measure_panel(
     has_bar = state.progress_fraction is not None
 
     if state.message is not None:
-        lines = message_lines(measure, state.message, screen_w=screen_w)
+        lines = title_lines(measure, state, screen_w=screen_w)
         msg_w = max((measure.size(line)[0] for line in lines), default=0)
         content_w = max(content_w, msg_w)
         content_h += len(lines) * line_h + max(0, len(lines) - 1) * line_gap
@@ -200,7 +251,7 @@ def measure_panel(
     if state.body is not None:
         if state.message is not None:
             content_h += panel_pad_y()
-        lines = message_lines(measure, state.body, screen_w=screen_w)
+        lines = body_lines(measure, state, screen_w=screen_w)
         body_w = max((measure.size(line)[0] for line in lines), default=0)
         content_w = max(content_w, body_w)
         content_h += len(lines) * line_h + max(0, len(lines) - 1) * line_gap
@@ -215,7 +266,9 @@ def measure_panel(
         if has_message:
             content_h += line_h + line_gap
         labeled_w, labeled_h = measure_labeled_lines(
-            measure, state.labeled_lines, line_gap=line_gap
+            measure,
+            panel_labeled_lines(measure, state, screen_w=screen_w),
+            line_gap=line_gap,
         )
         content_w = max(content_w, labeled_w)
         content_h += labeled_h
@@ -239,6 +292,8 @@ def measure_panel(
         content_w = max(content_w, options_w)
         content_h += options_h
 
+    if state.kind == ModalKind.PROGRESS:
+        return progress_panel_width(screen_w), content_h + panel_pad_y() * 2
     return (
         max(content_w + panel_pad_x() * 2, panel_min_width(screen_w)),
         content_h + panel_pad_y() * 2,
