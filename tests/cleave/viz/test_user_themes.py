@@ -215,7 +215,7 @@ def test_reload_themes_applies_the_chosen_theme_and_reports(
 
 def test_user_guide_lists_every_theme_role() -> None:
     guide = (
-        Path(__file__).resolve().parents[3] / "docs" / "user-guide" / "user-themes.md"
+        Path(__file__).resolve().parents[3] / "docs" / "user-guide" / "custom-themes.md"
     ).read_text(encoding="utf-8")
     missing = [role for role in theme_roles() if f"`{role}`" not in guide]
     assert missing == []
@@ -227,7 +227,7 @@ def test_user_guide_starter_theme_matches_ultraviolet(tmp_path: Path) -> None:
     import yaml
 
     guide = (
-        Path(__file__).resolve().parents[3] / "docs" / "user-guide" / "user-themes.md"
+        Path(__file__).resolve().parents[3] / "docs" / "user-guide" / "custom-themes.md"
     ).read_text(encoding="utf-8")
     section = guide[guide.index("## Starter theme") :]
     block = re.search(r"```yaml\n(.*?)```", section, re.DOTALL)

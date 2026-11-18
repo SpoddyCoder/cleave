@@ -1,4 +1,4 @@
-# Your own colour themes
+# Custom Themes
 
 Cleave comes with four themes: Ultraviolet (the default), Chocolate, and Mint are dark, and Daylight is light. You can also make your own. Each theme is a small text file in the `themes` folder (see [Where your files live](README.md#where-your-files-live)). Choose **Settings > UI > Open themes folder** to open it.
 
