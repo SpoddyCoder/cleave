@@ -1,6 +1,6 @@
 # Dependency updates
 
-How to move Cleave's Python packages, libprojectM, and FFmpeg to newer versions on Linux and Windows. Do this on the pre-release branch before cutting a release, as its own change. The [update-dependencies skill](../../.claude/skills/update-dependencies/SKILL.md) walks through this page step by step. The [cut-release skill](../../.claude/skills/cut-release/SKILL.md) does not refresh pins; it only flags stale ones.
+How to move Cleave's Python version, Python packages, libprojectM, and FFmpeg to their latest versions on Linux and Windows. Do this on the pre-release branch before cutting a release, as its own change. The [update-dependencies skill](../../.claude/skills/update-dependencies/SKILL.md) walks through this page step by step. The [cut-release skill](../../.claude/skills/cut-release/SKILL.md) does not refresh pins; it only flags stale ones.
 
 Related: [windows-freeze.md](windows-freeze.md) (freeze design), [packaging/windows/README.md](../../packaging/windows/README.md) (committed DLLs), [structured-releases.md](structured-releases.md) (release process), [projectm-api-coverage.md](projectm-api-coverage.md) (projectM API in use).
 
@@ -8,7 +8,7 @@ Checklist:
 
 ```
 Dependency update:
-- [ ] Python pins (every copy)
+- [ ] Python version and pins (every copy)
 - [ ] CUDA extra wheels
 - [ ] FFmpeg Windows sidecar
 - [ ] GitHub Actions versions
@@ -23,13 +23,35 @@ Dependency update:
 
 ## Constraints
 
-- The Windows freeze and both CI workflows use CPython 3.10 (`cp310`). A package whose latest release drops 3.10 must be capped below that release, or the Python version moves everywhere at once (both workflows, the CUDA wheel tags, and the docs that say 3.10).
+- The goal is latest everything, Python included. Nothing we control (the Python version, the CUDA build, our own code) is a reason to hold a package back. Cap a package only when an upstream gap leaves no other choice, and record why in the proposal.
+- One CPython version runs everywhere: the Windows freeze, all three CI workflows, the CUDA wheel tags, and the dev env. It moves everywhere at once (see [Python version](#python-version)).
 - torch, torchaudio, and torchcodec are released as a matched set. Pick versions that PyTorch publishes together for the same CPU and CUDA indexes.
 - numpy is often held back by numba (pulled in by librosa). Check what the newest numba supports before raising numpy.
-- Demucs 4.0.1 is the last upstream release; leave it.
+- A major jump with API breaks (imgui-bundle, librosa, numpy) means code changes in the same update. Read the upstream changelog and grep Cleave's use of the package before proposing it; editor UI breakage from imgui-bundle shows only in the manual editor check, not in unit tests.
 - Never `pip install -r requirements.txt` in the Windows freeze venv. It has no torch extra index and can pull a CUDA wheel.
 
-## 1. Python pins
+## 1. Python version and pins
+
+### Python version
+
+Pick the Python version first; it decides which package releases are reachable.
+
+1. Target the newest CPython for which the latest release of every pinned package publishes `win_amd64` and `manylinux` `x86_64` wheels, and PyTorch publishes the torch set on both the CPU and the chosen CUDA index.
+2. If no version satisfies every package, pick the one that holds back the fewest, and list the blockers (package, newest Python it supports).
+3. When the version changes, update every copy in the same edit:
+
+| File | Holds |
+| --- | --- |
+| [.github/workflows/tests.yml](../../.github/workflows/tests.yml), [windows-freeze.yml](../../.github/workflows/windows-freeze.yml), [release.yml](../../.github/workflows/release.yml) | `python-version` |
+| [pyproject.toml](../../pyproject.toml) | `requires-python` |
+| [cleave/cuda_extra.py](../../cleave/cuda_extra.py) | Wheel filename tag (`cpXY-cpXY`) and its comment |
+| [README.md](../../README.md) | Requirements line and the `conda create` command |
+| [windows-freeze.md](windows-freeze.md) | CUDA extra wheel tags and filenames |
+| This page | [Local freeze](#local-freeze-optional) Python install |
+
+Changing the wheel tag means new CUDA wheels, so do section 2 as well. Existing CUDA installs re-download.
+
+### Pins
 
 Every version is written out in full. Change all copies of a pin in the same edit.
 
@@ -55,7 +77,7 @@ If PyTorch has moved to a newer CUDA build than cu130, rename `requirements-torc
 
 The editor's optional CUDA download uses fixed wheels, not a pip resolve. When torch, torchaudio, or torchcodec change:
 
-1. In [cleave/cuda_extra.py](../../cleave/cuda_extra.py), update each `CUDA_WHEELS` entry: version, SHA-256, and size in bytes, taken from the `cp310` `win_amd64` wheels on the PyTorch CUDA index.
+1. In [cleave/cuda_extra.py](../../cleave/cuda_extra.py), update each `CUDA_WHEELS` entry: version, SHA-256, and size in bytes, taken from the `win_amd64` wheels for the freeze CPython on the PyTorch CUDA index. A wheel published as `py3-none` instead of `cpXY-cpXY` needs the filename logic in `cuda_extra.py` changed to match.
 2. Change `CUDA_EXTRA_KEY` to match the new versions. That makes existing installs download the new set and remove the old folder.
 3. In [windows-freeze.md](windows-freeze.md) (CUDA extra section), update the wheel filenames, sizes, and the total in bytes and MiB. The welcome step shows that total.
 4. Confirm the Windows torch wheel still has no `nvidia-*` requirements (check its METADATA). If it gained some, the download design needs revisiting before release.
@@ -75,7 +97,17 @@ Bump `actions/checkout`, `actions/setup-python`, and `actions/upload-artifact` i
 
 ## 5. Local Linux / WSL
 
-1. Update the conda env from the new pins. Use the CPU torch file instead on a box without CUDA:
+1. If the Python version changed, rebuild the `cleave` env on it first, keeping the same name so its path stays `/home/fernpa/anaconda3/envs/cleave`:
+
+   ```bash
+   conda env remove -n cleave
+   ```
+
+   ```bash
+   conda create -n cleave python=X.Y
+   ```
+
+   Then update the env from the new pins. Use the CPU torch file instead on a box without CUDA:
 
    ```bash
    /home/fernpa/anaconda3/envs/cleave/bin/pip install -r requirements-torch-cu130.txt
@@ -195,7 +227,7 @@ Then commit from WSL as usual. Do not commit from a separate Windows checkout; i
 
 Only needed to test a freeze before pushing; CI builds the release.
 
-1. Install 64-bit Python 3.10 from python.org (the freeze targets `cp310`).
+1. Install 64-bit Python from python.org at the version in `python-version` of [windows-freeze.yml](../../.github/workflows/windows-freeze.yml).
 2. Install Inno Setup 6, for example `winget install JRSoftware.InnoSetup`.
 3. Install the [Visual C++ Redistributable for VS 2022 (x64)](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist) if the machine does not already have it. Visual Studio usually installs it.
 4. Follow the manual freeze steps in [packaging/windows/README.md](../../packaging/windows/README.md) from a native Windows checkout (not the WSL share). Use that checkout for building only; commit from WSL.

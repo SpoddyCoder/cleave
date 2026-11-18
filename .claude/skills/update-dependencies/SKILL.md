@@ -1,8 +1,8 @@
 ---
 name: update-dependencies
 description: >-
-  Walk the user through updating Cleave's dependencies to latest: Python
-  pins, PyTorch and the CUDA extra wheels, the Windows FFmpeg sidecar,
+  Walk the user through updating Cleave's dependencies to latest: the Python
+  version, Python pins, PyTorch and the CUDA extra wheels, the Windows FFmpeg sidecar,
   GitHub Actions versions, the local Linux/WSL env and native libs, the
   Windows libprojectM DLL rebuild, and CI verification. Explains the whole
   process first, then goes one step at a time, doing the in-repo edits and
@@ -29,16 +29,16 @@ Guided, interactive run of [docs/dev/dependency-updates.md](../../../docs/dev/de
 
 Before touching anything, give the user a short overview of the whole process in plain language:
 
-1. What gets updated: Python packages, PyTorch (CPU and CUDA), the CUDA download wheels, FFmpeg for Windows, GitHub Actions, libprojectM on Linux and Windows.
+1. What gets updated: the Python version, Python packages, PyTorch (CPU and CUDA), the CUDA download wheels, FFmpeg for Windows, GitHub Actions, libprojectM on Linux and Windows.
 2. Who does what: the agent edits files in the repo and looks up versions and hashes. The user refreshes their Linux/WSL env, rebuilds native libraries, builds the Windows DLLs on a Windows machine, runs the CI freeze, and checks the result on a GPU.
-3. The constraints from the doc (Python 3.10, matched torch set, numpy/numba, Demucs 4.0.1).
+3. The goal: latest everything, Python included. Only an upstream gap justifies holding something back, never something we control. The constraints from the doc (one Python version everywhere, matched torch set, numpy/numba, major jumps with API breaks).
 4. Roughly how long: the repo edits are quick; the Windows DLL build and the CI freeze (up to about three hours) are the slow parts.
 
 Then copy this checklist into the reply, ask whether any step should be skipped, and wait:
 
 ```
 Dependency update:
-- [ ] 1. Python pins (every copy)
+- [ ] 1. Python version and pins (every copy)
 - [ ] 2. CUDA extra wheels
 - [ ] 3. FFmpeg Windows sidecar
 - [ ] 4. GitHub Actions versions
@@ -51,19 +51,21 @@ Dependency update:
 
 Re-post the checklist with ticks at the start of each step, so the user always sees where they are.
 
-## 1. Python pins (agent)
+## 1. Python version and pins (agent)
 
-1. Read every file in the doc's section 1 table plus the three hand-typed analyse lines.
-2. Look up the latest release of each pinned package (PyPI JSON API, `https://pypi.org/pypi/<name>/json`; torch family from the PyTorch indexes). For each, check `requires_python` and wheel tags still allow CPython 3.10. For numpy, check what the latest numba supports.
-3. Show a table: package, current pin, latest, proposed pin, and a reason when proposed is not latest (drops 3.10, numba cap, torch set). Call out any major-version jump and suggest the user skim its changelog.
-4. If PyTorch's CUDA build has moved past cu130, say so and ask whether to move (doc section 1, last paragraph). That is a larger change; get explicit approval.
-5. After approval, edit every copy in one pass. Then grep the repo (only the files the doc names) to confirm no old version string of a changed package remains.
+1. Read every file in the doc's section 1 tables plus the three hand-typed analyse lines.
+2. Look up the latest release of each pinned package (PyPI JSON API, `https://pypi.org/pypi/<name>/json`; torch family from the PyTorch CPU and CUDA indexes). For each, record which CPython versions its latest release ships `win_amd64` and `manylinux` `x86_64` wheels for (a pure `py3-none-any` wheel covers all versions within `requires_python`). For numpy, check what the latest numba supports.
+3. Pick the target Python by the doc's "Python version" rule: the newest CPython every latest release covers. If none covers all, propose the one that holds back the fewest and name each blocker with the newest Python it supports. Never keep the current Python just because it is current.
+4. Pick the CUDA build: the newest PyTorch CUDA index with the matched torch set for the target Python on `win_amd64`. Moving it raises the NVIDIA driver minimum for users, so state the old and new driver minimum and get explicit approval (doc section 1, last paragraph).
+5. Show one table: package, current pin, latest, proposed pin, and a reason when proposed is not latest. The only acceptable reasons are upstream gaps (no wheel for the target Python, numba's numpy cap, torch set not published together). Show the Python and CUDA choices above the table. Call out any major-version jump; for one with API breaks, read the upstream changelog, grep Cleave's use of the package, and say what code will need to change.
+6. After approval, edit every copy in one pass: the Python version files (if it moved), the pin files, and the analyse lines. Then grep only the files the doc names to confirm no old version string of a changed package or Python remains.
+7. Code changes forced by the upgrades (API breaks) happen in step 5 against the refreshed env, not here.
 
 ## 2. CUDA extra wheels (agent)
 
-Skip if torch, torchaudio, and torchcodec did not change.
+Skip if torch, torchaudio, torchcodec, the CUDA build, and the Python version did not change.
 
-1. From the PyTorch CUDA index page, read the `cp310` `win_amd64` wheel filenames. The SHA-256 is in each link's `#sha256=` fragment. Get each size from the `Content-Length` of a HEAD request. Do not download the wheels.
+1. From the PyTorch CUDA index page, read the `win_amd64` wheel filenames for the freeze CPython. If a wheel is `py3-none` rather than `cpXY-cpXY`, change the filename logic in `cuda_extra.py` to match. The SHA-256 is in each link's `#sha256=` fragment. Get each size from the `Content-Length` of a HEAD request. Do not download the wheels.
 2. Edit `CUDA_WHEELS` and `CUDA_EXTRA_KEY` in [cleave/cuda_extra.py](../../../cleave/cuda_extra.py), then the wheel list and totals (bytes and MiB) in [docs/dev/windows-freeze.md](../../../docs/dev/windows-freeze.md).
 3. If the agent cannot reach the index or the fragment has no hash, give the user the commands to fetch them and wait.
 4. Tell the user step 2 of section 2 means existing CUDA installs will re-download.
@@ -81,13 +83,13 @@ List every `uses:` in [.github/workflows/](../../../.github/workflows/) with its
 
 ## 5. Local Linux / WSL (user)
 
-Hand the user the commands from the doc's section 5, one fenced `bash` block per command. Ask whether this box has CUDA to choose the torch file. Offer to run the pip refresh in the agent env (`/home/fernpa/anaconda3/envs/cleave/bin/pip`) if they approve; the wsl-builds rebuild is theirs.
+Hand the user the commands from the doc's section 5, one fenced `bash` block per command. If the Python version moved, the env rebuild comes first and is theirs (the agent never creates or removes envs). Ask whether this box has CUDA to choose the torch file. Offer to run the pip refresh in the agent env (`/home/fernpa/anaconda3/envs/cleave/bin/pip`) if they approve; the wsl-builds rebuild is theirs.
 
 Wait for them to report back, then:
 
 1. Ask for the output of `pkg-config --modversion libprojectM` and confirm it is the new version. If not, walk through the `PROJECTM_LIB` / pkg-config / system path order to find the stale copy.
 2. Run the full test suite yourself and report failures with output. Fix failures caused by the upgrades (API changes, deprecations) as part of this step, one at a time, explaining each.
-3. Ask the user to do the manual editor check from section 5 (play with layers, short render, split a new file) and report anything odd.
+3. Ask the user to do the manual editor check from section 5 (play with layers, short render, split a new file) and report anything odd. After an imgui-bundle jump, also ask them to open every menu, the inspector, and a modal, since unit tests do not draw the UI.
 
 ## 6. Windows libprojectM DLLs (user, then agent)
 
