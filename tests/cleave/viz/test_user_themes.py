@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from cleave.viz.theme import (
+    DAYLIGHT,
     ULTRAVIOLET,
     palette,
     palette_for_theme,
@@ -112,7 +113,7 @@ def test_bad_roles_and_values_keep_the_base_and_are_reported(tmp_path: Path) -> 
 def test_unreadable_files_are_skipped_and_reported(tmp_path: Path) -> None:
     _write(tmp_path, "a_broken.yaml", "label: [1, 2\n")
     _write(tmp_path, "b_list.yaml", "- label\n")
-    _write(tmp_path, "c_base.yaml", "base: daylight\n")
+    _write(tmp_path, "c_base.yaml", "base: dusk\n")
     _write(tmp_path, "ultraviolet.yaml", "")
     _write(tmp_path, "notes.txt", "label: nope\n")
     _write(tmp_path, "good.yaml", "")
@@ -122,10 +123,35 @@ def test_unreadable_files_are_skipped_and_reported(tmp_path: Path) -> None:
     problems = loaded.problems
     assert problems[0].startswith("a_broken.yaml: the file is not valid YAML")
     assert problems[1].startswith("b_list.yaml: ")
-    assert "unknown base theme 'daylight'" in problems[2]
+    assert "unknown base theme 'dusk'" in problems[2]
     assert "GOOD.yml" in problems[3] or "good.yaml" in problems[3]
     assert any("ultraviolet.yaml: a built-in theme" in p for p in problems)
     assert len(problems) == 5
+
+
+def test_a_theme_can_start_from_daylight(tmp_path: Path) -> None:
+    _write(tmp_path, "paper.yaml", 'base: daylight\nlabel: "#102030"\n')
+    loaded = load_user_themes(tmp_path)
+    assert loaded.problems == ()
+    (paper,) = loaded.palettes
+    assert paper.background == DAYLIGHT.background
+    assert paper.label == (16, 32, 48)
+
+
+def test_icon_lifts_may_darken_but_fractions_may_not(tmp_path: Path) -> None:
+    _write(
+        tmp_path,
+        "lifts.yaml",
+        "icon_lit_hover_lift: -0.2\nicon_lit_hover_edge_lift: -1.5\nbutton_sheen: -0.1\n",
+    )
+    loaded = load_user_themes(tmp_path)
+    (lifts,) = loaded.palettes
+    assert lifts.icon_lit_hover_lift == -0.2
+    assert lifts.icon_lit_hover_edge_lift == ULTRAVIOLET.icon_lit_hover_edge_lift
+    assert lifts.button_sheen == ULTRAVIOLET.button_sheen
+    assert len(loaded.problems) == 2
+    assert "icon_lit_hover_edge_lift: must be a number from -1 to 1" in loaded.problems[0]
+    assert "button_sheen: must be a number from 0 to 1" in loaded.problems[1]
 
 
 def test_theme_roles_exclude_id_and_name() -> None:
@@ -145,7 +171,7 @@ def test_parse_colour_accepts_hex_without_hash() -> None:
 def test_installed_themes_follow_the_built_ins(tmp_path: Path) -> None:
     _write(tmp_path, "zed.yaml", "name: Zed\n")
     assert install_user_themes(tmp_path) == ()
-    assert theme_ids() == ("ultraviolet", "zed")
+    assert theme_ids() == ("ultraviolet", "daylight", "zed")
     assert theme_label("zed") == "Zed"
     assert palette_for_theme("zed").id == "zed"
     set_user_palettes(())

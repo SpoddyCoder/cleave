@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from imgui_bundle import imgui
 
 from cleave.viz.icon_button import Band, FRect, glyph_x, icon_box, ink_origin
-from cleave.viz.imgui_theme import brighten, lighten, rgba
+from cleave.viz.imgui_theme import rgba, shift, shift_brightness
 from cleave.viz.pointer_cursor import PointerShape, request_pointer
 from cleave.viz.theme import palette
 from cleave.viz.tooltips import show_tooltip
@@ -79,9 +79,9 @@ def paint_box(
     """
     if fill is not None:
         if hovered:
-            lit = brighten(fill, palette().icon_lit_hover_lift)
+            lit = shift_brightness(fill, palette().icon_lit_hover_lift)
             paint_wash(box, lit, fill_alpha)
-            paint_edge(box, lighten(lit, 0.45))
+            paint_edge(box, shift(lit, palette().icon_lit_hover_edge_lift))
         else:
             paint_wash(box, fill, fill_alpha)
     elif hovered:

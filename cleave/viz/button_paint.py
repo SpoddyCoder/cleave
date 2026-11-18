@@ -6,7 +6,9 @@ lit primary or danger button a soft outer glow in its own hue. A plain button
 lights electric violet under the pointer; primary and danger brighten in their
 own blue and red. OFF is a control on a switched-off or locked page, or one
 that refuses a press: darker and recessed at rest so its text stays readable,
-and lit like a plain button under the pointer. ``button_look`` is pure colour; ``paint_button`` draws it
+and lit like a plain button under the pointer. OFF_CHOSEN is the chosen segment
+of such a control. Text on a lit or strong fill takes the fill's own role from
+``button_text_role``. ``button_look`` is pure colour; ``paint_button`` draws it
 with ImGui.
 """
 
@@ -29,6 +31,7 @@ class ButtonTone(Enum):
     PRIMARY = auto()
     DANGER = auto()
     OFF = auto()
+    OFF_CHOSEN = auto()
 
 
 class ButtonState(Enum):
@@ -45,13 +48,13 @@ class ButtonLook:
     glow: RGB | None = None
 
 
-def _tone_colours(tone: ButtonTone) -> tuple[RGB, RGB | None, RGB, RGB, RGB]:
+def _tone_colours(tone: ButtonTone) -> tuple[RGB, RGB, RGB, RGB, RGB]:
     """Rest fill, rest border, hover fill, hover border, and pressed fill."""
     p = palette()
     if tone is ButtonTone.PRIMARY:
         return (
             p.button_primary_bg,
-            None,
+            p.button_primary_border,
             p.button_primary_hover_bg,
             p.button_primary_hover_border,
             p.button_primary_active_bg,
@@ -59,39 +62,46 @@ def _tone_colours(tone: ButtonTone) -> tuple[RGB, RGB | None, RGB, RGB, RGB]:
     if tone is ButtonTone.DANGER:
         return (
             p.button_danger_bg,
-            None,
+            p.button_danger_border,
             p.button_danger_hover_bg,
             p.button_danger_hover_border,
             p.button_danger_active_bg,
         )
-    off = tone is ButtonTone.OFF
-    return (
-        p.button_off_bg if off else p.button_bg,
-        p.button_off_border if off else p.button_border,
-        p.button_hover_bg,
-        p.button_hover_border,
-        p.button_active_bg,
-    )
+    if tone is ButtonTone.OFF:
+        rest, rest_border = p.button_off_bg, p.button_off_border
+    elif tone is ButtonTone.OFF_CHOSEN:
+        rest, rest_border = p.button_off_chosen_bg, p.button_off_chosen_border
+    else:
+        rest, rest_border = p.button_bg, p.button_border
+    return rest, rest_border, p.button_hover_bg, p.button_hover_border, p.button_active_bg
 
 
-def button_look(
-    tone: ButtonTone, state: ButtonState, *, fill: RGB | None = None
-) -> ButtonLook:
+def button_look(tone: ButtonTone, state: ButtonState) -> ButtonLook:
     """Gradient, border, and glow for a button of *tone* in *state*.
 
-    *fill* replaces the rest fill (a dimmed chosen segment); its border is a
-    lighter shade of it. A pressed button sinks: the shade moves to the top.
+    A pressed button sinks: the shade moves to the top.
     """
     rest, rest_border, hover, hover_border, pressed = _tone_colours(tone)
     sheen, shade = palette().button_sheen, palette().button_shade
     if state is ButtonState.REST:
-        base = rest if fill is None else fill
-        border = rest_border if fill is None and rest_border else lighten(base, 0.18)
-        return ButtonLook(lighten(base, sheen), darken(base, shade * 0.5), border)
-    glow = None if tone in (ButtonTone.PLAIN, ButtonTone.OFF) else hover
+        return ButtonLook(lighten(rest, sheen), darken(rest, shade * 0.5), rest_border)
+    glow = hover if tone in (ButtonTone.PRIMARY, ButtonTone.DANGER) else None
     if state is ButtonState.PRESSED:
         return ButtonLook(darken(pressed, shade), pressed, hover_border, glow)
     return ButtonLook(lighten(hover, sheen), darken(hover, shade), hover_border, glow)
+
+
+def button_text_role(tone: ButtonTone, state: ButtonState) -> RGB | None:
+    """Text on a button of *tone* in *state*, or None where the caller's own role
+    (value, muted, off_control_text, ...) sits on a resting plain or off fill."""
+    p = palette()
+    if tone is ButtonTone.PRIMARY:
+        return p.on_primary
+    if tone is ButtonTone.DANGER:
+        return p.on_danger
+    if state is ButtonState.REST:
+        return None
+    return p.on_hover
 
 
 def _u32(rgb: RGB, alpha: float = 1.0) -> int:
@@ -123,8 +133,6 @@ def paint_button(
     rect: Rect,
     tone: ButtonTone,
     state: ButtonState,
-    *,
-    fill: RGB | None = None,
 ) -> None:
     """One framed button's background in *tone* and *state*."""
-    paint_look(draw, rect, button_look(tone, state, fill=fill))
+    paint_look(draw, rect, button_look(tone, state))

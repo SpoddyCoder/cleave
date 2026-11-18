@@ -41,6 +41,8 @@ _BASE_KEY = "base"
 # Palette fields a theme file cannot set: the id comes from the file name.
 _FIXED_FIELDS = frozenset({"id", "name"})
 _MAX_TRACK_COLOURS = 8
+# Number roles that may be negative (-1 to 1): a negative amount darkens.
+_SIGNED_FIELDS = frozenset({"icon_lit_hover_lift", "icon_lit_hover_edge_lift"})
 
 
 @dataclass(frozen=True)
@@ -165,7 +167,7 @@ def _theme_from_mapping(
             problems.append(_unknown_role(role, field_types))
             continue
         try:
-            overrides[role] = _parse_value(field_type, raw)
+            overrides[role] = _parse_value(role, field_type, raw)
         except ValueError as exc:
             problems.append(f"{role}: {exc}")
     return dataclasses.replace(
@@ -180,13 +182,13 @@ def _unknown_role(role: str, known: dict[str, str]) -> str:
     return f"unknown role '{role}'"
 
 
-def _parse_value(field_type: str, raw: Any) -> Any:
+def _parse_value(role: str, field_type: str, raw: Any) -> Any:
     if field_type == "RGB":
         return parse_colour(raw)
     if field_type == "int":
         return _parse_alpha(raw)
     if field_type == "float":
-        return _parse_fraction(raw)
+        return _parse_signed(raw) if role in _SIGNED_FIELDS else _parse_fraction(raw)
     if field_type == "tuple[float, float]":
         if not isinstance(raw, list) or len(raw) != 2:
             raise ValueError("must be two numbers from 0 to 1, like [0.3, 0.06]")
@@ -234,6 +236,12 @@ def _parse_fraction(raw: Any) -> float:
     if isinstance(raw, (int, float)) and not isinstance(raw, bool) and 0 <= raw <= 1:
         return float(raw)
     raise ValueError("must be a number from 0 to 1")
+
+
+def _parse_signed(raw: Any) -> float:
+    if isinstance(raw, (int, float)) and not isinstance(raw, bool) and -1 <= raw <= 1:
+        return float(raw)
+    raise ValueError("must be a number from -1 to 1")
 
 
 def _is_int(value: Any) -> bool:

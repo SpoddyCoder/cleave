@@ -38,7 +38,6 @@ from cleave.viz.timeline_strip_state import (
 from cleave.viz.row_paint import RowState, row_bar_px, row_look
 from cleave.viz.ui_tint import blit_hover, blit_row_band, draw_row_edge
 
-OFF_SEGMENT_COLOR: tuple[int, int, int] = (40, 40, 40)
 # Dim end of the level-bar colour ramp sits this far from off toward the
 # track colour (quarter beds stay readable).
 _BAR_LEVEL_DIM_MIX: float = 0.4
@@ -91,10 +90,10 @@ def _draw_level_bar(
     bar_rect: pygame.Rect,
     on_color: tuple[int, int, int],
 ) -> None:
-    pygame.draw.rect(panel, OFF_SEGMENT_COLOR, bar_rect)
+    pygame.draw.rect(panel, palette().timeline_off_segment, bar_rect)
     if view_end_sec <= view_start_sec or len(breakpoints) < 2:
         return
-    dim_color = _lerp_rgb(OFF_SEGMENT_COLOR, on_color, _BAR_LEVEL_DIM_MIX)
+    dim_color = _lerp_rgb(palette().timeline_off_segment, on_color, _BAR_LEVEL_DIM_MIX)
     # Polygon fills include their vertices; Rect.bottom/right are exclusive.
     bottom = bar_rect.bottom - 1
     right = bar_rect.right - 1
@@ -230,7 +229,7 @@ def build_static_panel(
         panel.blit(
             render_header_toggle(
                 SOLO_GLYPH,
-                color=palette().value if solo else header_rest_color(
+                color=palette().on_lit_icon if solo else header_rest_color(
                     hover_target == "solo"
                 ),
                 bg=palette().solo_bg if solo else None,

@@ -127,8 +127,7 @@ def draw_segments(
             if states[index] is not ButtonState.REST and hand:
                 request_pointer(PointerShape.HAND)
         if index == chosen:
-            chosen_tone, fill = _chosen_look(enabled=enabled, tone=tone)
-            paint_button(draw, rect, chosen_tone, ButtonState.REST, fill=fill)
+            paint_button(draw, rect, _chosen_tone(enabled=enabled, tone=tone), ButtonState.REST)
         else:
             paint_button(draw, rect, _rest_tone(enabled=enabled, tone=tone), states[index])
     for index, rect in enumerate(rects):
@@ -139,8 +138,9 @@ def draw_segments(
             border = button_look(ButtonTone.PLAIN, state).border
             draw.add_rect(_vec(rx, ry), _vec(rx + rw, ry + rh), _u32(border))
         role = _segment_text_role(index == chosen, enabled=enabled, tone=tone)
-        lit_role = palette().value if state is not ButtonState.REST else role
-        _centred_text(draw, measure, rect, labels[index], lit_role)
+        if state is not ButtonState.REST:
+            role = palette().on_hover
+        _centred_text(draw, measure, rect, labels[index], role)
     return rects
 
 
@@ -154,13 +154,11 @@ def _rest_tone(*, enabled: bool, tone: ChoiceTone) -> ButtonTone:
     return ButtonTone.OFF if _dimmed(enabled=enabled, tone=tone) else ButtonTone.PLAIN
 
 
-def _chosen_look(
-    *, enabled: bool, tone: ChoiceTone
-) -> tuple[ButtonTone, tuple[int, int, int] | None]:
-    """Tone and fill override of the chosen segment."""
+def _chosen_tone(*, enabled: bool, tone: ChoiceTone) -> ButtonTone:
+    """Button tone of the chosen segment."""
     if _dimmed(enabled=enabled, tone=tone):
-        return ButtonTone.PLAIN, palette().button_off_chosen_bg
-    return ButtonTone.PRIMARY, None
+        return ButtonTone.OFF_CHOSEN
+    return ButtonTone.PRIMARY
 
 
 def _segment_text_role(
@@ -171,7 +169,7 @@ def _segment_text_role(
         return palette().locked if chosen else palette().locked_muted
     if _dimmed(enabled=enabled, tone=tone):
         return palette().off_control_text if chosen else palette().off_control_muted
-    return palette().value if chosen else palette().muted
+    return palette().on_primary if chosen else palette().muted
 
 
 def _combo_text_roles(
@@ -217,7 +215,7 @@ def draw_combo(
     paint_button(draw, rect, rest_tone if state is ButtonState.REST else ButtonTone.PLAIN, state)
     role, caret_role = _combo_text_roles(enabled=enabled, tone=tone)
     if state is not ButtonState.REST:
-        role, caret_role = palette().value, palette().highlight
+        role, caret_role = palette().on_hover, palette().highlight
     th = measure.size(text)[1]
     text_y = y + (h - th) // 2
     draw.add_text(_vec(x + combo_pad_x(), text_y), _u32(role), text)
@@ -452,7 +450,11 @@ def _draw_list_rows(
         mark_w = measure.size(_CHOSEN_MARK)[0]
         draw.add_text(
             _vec(text_x + mark_w, text_y),
-            _u32(palette().value if lit or chosen else palette().surface_text),
+            _u32(
+                palette().on_hover
+                if lit
+                else palette().value if chosen else palette().surface_text
+            ),
             view.options[index],
         )
     picked = hovered if imgui.is_mouse_clicked(0) and not just_opened else None

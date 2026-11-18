@@ -11,7 +11,7 @@ from typing import Iterator
 from imgui_bundle import imgui
 
 from cleave.choice import ChoiceKind
-from cleave.viz.button_paint import ButtonState, ButtonTone, paint_button
+from cleave.viz.button_paint import ButtonState, ButtonTone, button_text_role, paint_button
 from cleave.viz.choice_widgets import (
     draw_choice_list,
     draw_combo,
@@ -276,7 +276,7 @@ def _draw_title_bar(
     *,
     clip_w: int | None = None,
 ) -> int:
-    """A modal's title in value on a title bar across the panel, from its top
+    """A modal's title in on_accent on a title bar across the panel, from its top
     border. *clip_w* cuts the title, not the bar. Returns the bar's bottom."""
     ox, oy, panel_w = panel
     bottom = title_bar_bottom(y, lines_block_height(len(lines), line_h, line_gap))
@@ -288,10 +288,10 @@ def _draw_title_bar(
         float(bottom),
     )
     if clip_w is None:
-        _draw_line_block(draw, x, y, lines, palette().value, line_h, line_gap)
+        _draw_line_block(draw, x, y, lines, palette().on_accent, line_h, line_gap)
     else:
         with _clipped(draw, (x, y, clip_w, bottom - y)):
-            _draw_line_block(draw, x, y, lines, palette().value, line_h, line_gap)
+            _draw_line_block(draw, x, y, lines, palette().on_accent, line_h, line_gap)
     return bottom
 
 
@@ -351,11 +351,13 @@ def draw_modal_button(
         held = _pointer_inside(rect) and imgui.is_mouse_down(0)
         state = ButtonState.PRESSED if held else ButtonState.HOVER
     resting_off = off and state is ButtonState.REST
-    paint_button(draw, rect, ButtonTone.OFF if resting_off else _BUTTON_TONES[role], state)
+    tone = ButtonTone.OFF if resting_off else _BUTTON_TONES[role]
+    paint_button(draw, rect, tone, state)
     text = option_text(label)
     text_w, text_h = measure.size(text)
-    lit_text = palette().off_control_text if resting_off else palette().value
-    _text(draw, x + (w - text_w) // 2, y + (h - text_h) // 2, text, lit_text)
+    rest_text = palette().off_control_text if resting_off else palette().value
+    text_role = button_text_role(tone, state) or rest_text
+    _text(draw, x + (w - text_w) // 2, y + (h - text_h) // 2, text, text_role)
 
 
 @dataclass(frozen=True)

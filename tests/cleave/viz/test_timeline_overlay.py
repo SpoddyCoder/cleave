@@ -1764,7 +1764,6 @@ def test_scrollbar_cannot_move_at_full_zoom() -> None:
 
 def test_playhead_and_cues_outside_the_window_are_not_drawn() -> None:
     from cleave.viz.theme import palette
-    from cleave.viz.timeline_strip_static import OFF_SEGMENT_COLOR
 
     pygame.init()
     overlay = TimelineOverlay()
@@ -1781,13 +1780,14 @@ def test_playhead_and_cues_outside_the_window_are_not_drawn() -> None:
         tuple(surface.get_at((px + bar_left + dx, y)))[:3] for dx in range(bar_width)
     }
     # The cue at 10s switched the layer off, so the window shows one flat bar.
-    assert row == {OFF_SEGMENT_COLOR}
+    assert row == {palette().timeline_off_segment}
     assert palette().playhead not in row and palette().playhead_flash not in row
     assert overlay._cache.last_playhead_rect is None
 
 
 def test_zoomed_level_bar_cuts_segments_at_the_window_edges() -> None:
-    from cleave.viz.timeline_strip_static import OFF_SEGMENT_COLOR, track_color
+    from cleave.viz.theme import palette
+    from cleave.viz.timeline_strip_static import track_color
 
     pygame.init()
     overlay = TimelineOverlay()
@@ -1810,7 +1810,7 @@ def test_zoomed_level_bar_cuts_segments_at_the_window_edges() -> None:
     assert tuple(surface.get_at((px + bar_left + bar_width // 4, y)))[:3] == track_color(0)
     assert (
         tuple(surface.get_at((px + bar_left + 3 * bar_width // 4, y)))[:3]
-        == OFF_SEGMENT_COLOR
+        == palette().timeline_off_segment
     )
 
 

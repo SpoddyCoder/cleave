@@ -1,5 +1,20 @@
-from cleave.viz.button_paint import ButtonState, ButtonTone, button_look
-from cleave.viz.theme import palette
+from collections.abc import Iterator
+from contextlib import contextmanager
+
+import pytest
+
+from cleave.viz.button_paint import ButtonState, ButtonTone, button_look, button_text_role
+from cleave.viz.theme import BUILTIN_PALETTES, Palette, palette, set_palette
+
+
+@contextmanager
+def _live(value: Palette) -> Iterator[None]:
+    previous = palette()
+    set_palette(value)
+    try:
+        yield
+    finally:
+        set_palette(previous)
 
 
 def _luma(rgb: tuple[int, int, int]) -> float:
@@ -35,10 +50,27 @@ def test_only_primary_and_danger_glow() -> None:
     assert button_look(ButtonTone.PRIMARY, ButtonState.HOVER).glow is not None
 
 
-def test_fill_override_borders_in_its_own_shade() -> None:
-    look = button_look(ButtonTone.PLAIN, ButtonState.REST, fill=palette().button_off_chosen_bg)
-    assert look.border != palette().button_border
-    assert _luma(look.border) > _luma(palette().button_off_chosen_bg)
+def test_rest_borders_are_their_tones_roles() -> None:
+    p = palette()
+    for tone, border in (
+        (ButtonTone.PLAIN, p.button_border),
+        (ButtonTone.OFF, p.button_off_border),
+        (ButtonTone.OFF_CHOSEN, p.button_off_chosen_border),
+        (ButtonTone.PRIMARY, p.button_primary_border),
+        (ButtonTone.DANGER, p.button_danger_border),
+    ):
+        assert button_look(tone, ButtonState.REST).border == border
+
+
+def test_text_role_follows_the_fill() -> None:
+    p = palette()
+    for state in ButtonState:
+        assert button_text_role(ButtonTone.PRIMARY, state) == p.on_primary
+        assert button_text_role(ButtonTone.DANGER, state) == p.on_danger
+    for tone in (ButtonTone.PLAIN, ButtonTone.OFF, ButtonTone.OFF_CHOSEN):
+        assert button_text_role(tone, ButtonState.REST) is None
+        assert button_text_role(tone, ButtonState.HOVER) == p.on_hover
+        assert button_text_role(tone, ButtonState.PRESSED) == p.on_hover
 
 
 def _contrast(a: tuple[int, int, int], b: tuple[int, int, int]) -> float:
@@ -63,12 +95,30 @@ def test_off_rests_darker_and_lights_like_plain() -> None:
         assert button_look(ButtonTone.OFF, state) == button_look(ButtonTone.PLAIN, state)
 
 
-def test_off_control_text_reads_on_its_fills() -> None:
-    """Dimmed text stays readable over the whole gradient of a dimmed control."""
-    from cleave.viz.theme import palette
+@pytest.mark.parametrize("theme", BUILTIN_PALETTES, ids=lambda theme: theme.id)
+def test_text_reads_over_every_button_gradient(theme: Palette) -> None:
+    """Each fill's text stays readable over the whole gradient, in every state."""
+    with _live(theme):
+        for tone in ButtonTone:
+            for state in ButtonState:
+                text = button_text_role(tone, state)
+                if text is None:
+                    continue
+                look = button_look(tone, state)
+                assert _contrast(text, look.top) >= 3.0, (tone, state)
+                assert _contrast(text, look.bottom) >= 3.0, (tone, state)
 
+
+@pytest.mark.parametrize("theme", BUILTIN_PALETTES, ids=lambda theme: theme.id)
+def test_off_control_text_reads_on_its_fills(theme: Palette) -> None:
+    """Dimmed text stays readable over the whole gradient of a dimmed control."""
+    with _live(theme):
+        _assert_off_control_text_reads()
+
+
+def _assert_off_control_text_reads() -> None:
     off = button_look(ButtonTone.OFF, ButtonState.REST)
-    chosen = button_look(ButtonTone.PLAIN, ButtonState.REST, fill=palette().button_off_chosen_bg)
+    chosen = button_look(ButtonTone.OFF_CHOSEN, ButtonState.REST)
     for text, look, floor in (
         (palette().off_control_text, off, 4.5),
         (palette().off_control_text, chosen, 3.5),

@@ -34,8 +34,7 @@ The strip edits clips (move, trim, split, cut in and cut out), and record keeps 
 
 ## Theme follow-ups
 
-Settings > UI > Theme picks the live `Palette` in [cleave/viz/theme.py](../../cleave/viz/theme.py). Ultraviolet is the only built-in; user theme files in the data folder's `themes/` add more ([cleave/viz/user_themes.py](../../cleave/viz/user_themes.py)). Draw code reads `palette()` at draw time, and `palette_generation()` rebuilds caches that hold drawn pixels.
+Settings > UI > Theme picks the live `Palette` in [cleave/viz/theme.py](../../cleave/viz/theme.py). The built-ins are Ultraviolet (dark) and Daylight (light); user theme files in the data folder's `themes/` add more ([cleave/viz/user_themes.py](../../cleave/viz/user_themes.py)). Draw code reads `palette()` at draw time, and `palette_generation()` rebuilds caches that hold drawn pixels.
 
 - **Colour-blind-safe built-in theme.** Hover (violet) and selection (blue) are hard to tell apart with red-green colour blindness, and the navigator on (green), solo (red), and lock (amber) icons have the same problem. Separate them by lightness too, not only hue.
-- **Light theme.** It will expose dark-only assumptions: hover uses `lighten` / `brighten`, the modal scrim is always black, `value` is white text on lit rows, and some glyph roles are fixed black (`notification_on_fill`, `nav_lock_glyph`, `override_glyph`). Some roles may need to lighten or darken depending on the theme.
 - **Pointer colours.** `pointer_cursor.py` still draws the mouse pointer in fixed black and white.

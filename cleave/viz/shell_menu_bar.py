@@ -161,7 +161,7 @@ class MenuBarPanel:
                     # the pointer. Idle hover is the theme's violet wash.
                     with row_band(RowState.LIT if active else None, bar=False) as mark_band:
                         if active:
-                            imgui.push_style_color(imgui.Col_.text, rgba(palette().value))
+                            imgui.push_style_color(imgui.Col_.text, rgba(palette().on_hover))
                         clicked, _selected = imgui.selectable(
                             menu.label,
                             active,
@@ -172,7 +172,7 @@ class MenuBarPanel:
                         if active:
                             imgui.pop_style_color()
                     label_y = selectable_label_origin()[1]
-                    underline = palette().value if active else palette().label
+                    underline = palette().on_hover if active else palette().label
                     _draw_mnemonic_underline(menu.label, underline)
                     # The dropdown's top border sits on the rule row. The
                     # title's item rect ends a few pixels above the bar

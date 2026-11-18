@@ -2,29 +2,41 @@
 
 A theme is a named ``Palette``: one frozen dataclass holding every colour role
 below plus its alphas and shading amounts. ``ULTRAVIOLET`` is the built-in
-theme. Draw code reads the live one with ``palette()`` at draw time, never at
-import; ``set_palette()`` switches it and bumps ``palette_generation()`` so
+theme and ``DAYLIGHT`` its light counterpart. Draw code reads the live one
+with ``palette()`` at draw time, never at import; ``set_palette()`` switches it and bumps ``palette_generation()`` so
 caches that hold drawn pixels rebuild. Roles are named for what they do, not
-their colour; the descriptions here are Ultraviolet's. User theme files
+their colour; the colours named here are Ultraviolet's. No role assumes a
+dark or light theme. User theme files
 (``user_themes.py``) add palettes after the built-ins through
 ``set_user_palettes()``.
 
-Typography roles for the live tuning overlay:
-  value    — white text for values and state indicators (default), and any
-             text on a selected, focused, or lit row
+Typography roles for the live tuning overlay (text on the panel background):
+  value    — emphasised text (white) for values and state indicators, and text
+             on a selected or focused row, whose band is see-through
   label    — periwinkle text for row labels and prefixes
   muted    — blue-grey text for headings, shortcuts, and unchosen options
-  disabled — cool grey text when a row, icon, or value on the black panel is inactive
+  disabled — cool grey text when a row, icon, or value on the panel is inactive
   off_control_text — the label, value, or chosen option on a switched-off,
              refused, or dimmed control (on button_off_bg / button_off_chosen_bg)
   off_control_muted — an unchosen option or combo caret on such a control
   locked   — tinted text for locked sub-rows that cannot be edited
   locked_muted — an unchosen option on a locked control
 
+Text on opaque fills. Text or a glyph on a solid fill uses that fill's on_ role,
+never value, so a light panel can carry dark text and a strong fill light text:
+  on_hover, on_hover_muted - a plain button under the pointer or held, an open
+    combo, and a LIT menu or choice list row (on_hover_muted is its shortcut)
+  on_primary - a primary fill: a chosen segment and a dialog's confirm button
+  on_danger - a destructive dialog's confirm button
+  on_accent - a heading on the accent gradient (title bars, the inspector title)
+  on_lit_icon - a glyph on a lit nav_on_bg, solo_bg, armed_bg, or rec_bg fill
+  notification_on_fill, nav_lock_glyph, override_glyph - glyphs and text on the
+    notification, lock, and override fills
+
 Accent colors for modes and icons (not label/value roles):
   highlight, error_notification, notification_on_fill, move_mode, lock_icon,
   preset_icon, preset_file_icon,
-  timeline_track_colors, bar_grid, song_bound, playhead, playhead_flash,
+  timeline_track_colors, timeline_off_segment, bar_grid, song_bound, playhead, playhead_flash,
   song_marker, song_marker_selected
 
 Buttons (fills, not text roles). Each tone has a rest fill, a lit hover fill
@@ -33,14 +45,15 @@ vertical gradient, border, and (primary and danger) an outer glow:
   button_bg, button_border - every plain panel button, segment, and combo box at rest
   button_hover_bg, button_hover_border, button_active_bg - a plain button, unchosen
     segment, or combo under the pointer (electric violet), and held down
-  button_primary_bg (+ _hover_bg, _hover_border, _active_bg) - the confirm button of
+  button_primary_bg (+ _border, _hover_bg, _hover_border, _active_bg) - the confirm button of
     a dialog, and a selected segment
   button_off_bg, button_off_border - the OFF tone: a button, segment, or combo on a
     switched-off or locked page, or one that refuses a press, at rest. Darker and
     recessed, so off_control_text stays readable on it; it lights like a plain
     button under the pointer
-  button_off_chosen_bg - the chosen segment of such a control, a dusky blue
-  button_danger_bg (+ _hover_bg, _hover_border, _active_bg) - the confirm button of
+  button_off_chosen_bg, button_off_chosen_border - the chosen segment of such a
+    control, a dusky blue
+  button_danger_bg (+ _border, _hover_bg, _hover_border, _active_bg) - the confirm button of
     a destructive dialog
   button_sheen, button_shade - how far the top lightens and the bottom darkens
   button_glow_alpha - the outer glow around a lit primary or danger button
@@ -64,19 +77,21 @@ Rows (row_paint.row_look turns them into a band, edge, and marker bar):
     (row_focus_edge also rings a focused panel button)
   ROW_BAR_PX - marker bar width at shell scale 1.0
   The LIT look (menu and choice list rows) is the plain button hover gradient
-  with a highlight bar. Text on a selected, focused, or lit row is value.
+  with a highlight bar. Text on a selected or focused row is value; on a lit
+  row it is on_hover.
 
 Floating surfaces (menus, context menus, the open choice list, dialogs, the
 file picker, info panels, tooltips):
   surface_bg, surface_edge - deep ink with a violet edge; surface_text is soft
     white for unlit choice list options
+  modal_scrim, modal_scrim_alpha - the wash over the shell behind a dialog
   floating_surface() in imgui_theme pushes them onto a window
 
 Accent gradient:
   accent_from, accent_to - blue into violet, left to right: progress bar fills
     and the inspector title's new-page swipe
   Title bars (title_bar.py) fill help column section titles and modal titles
-    with the full accent gradient, the title in value
+    with the full accent gradient, the title in on_accent
 
 Shell rules (not text roles):
   panel_edge - idle navigator, inspector, and strip outline
@@ -88,6 +103,9 @@ Shell rules (not text roles):
   icon_hover_bg, icon_hover_bg_alpha - violet wash behind it, complementary to the
     yellow glyph; icon_hover_edge is its opaque 1px outline
   icon_lit_hover_lift - how far a lit icon's own fill brightens under the pointer
+    (negative darkens)
+  icon_lit_hover_edge_lift - how far that hovered fill's outline lightens from it
+    (negative darkens)
 
 Layout scale:
   BASE_UI_SCALE (1.44) is the editor chrome at 100%. The Settings > UI > UI scale
@@ -276,6 +294,7 @@ class Palette:
     # Shell
     background: RGB
     background_alpha: int
+    modal_scrim: RGB
     modal_scrim_alpha: int
     transport_rule: RGB
     panel_edge: RGB
@@ -293,6 +312,14 @@ class Palette:
     highlight: RGB
     error_notification: RGB
     notification_on_fill: RGB
+
+    # Text on opaque fills
+    on_hover: RGB
+    on_hover_muted: RGB
+    on_primary: RGB
+    on_danger: RGB
+    on_accent: RGB
+    on_lit_icon: RGB
 
     # Icons and modes
     preset_icon: RGB
@@ -319,13 +346,16 @@ class Palette:
     button_hover_border: RGB
     button_active_bg: RGB
     button_primary_bg: RGB
+    button_primary_border: RGB
     button_primary_hover_bg: RGB
     button_primary_hover_border: RGB
     button_primary_active_bg: RGB
     button_off_bg: RGB
     button_off_border: RGB
     button_off_chosen_bg: RGB
+    button_off_chosen_border: RGB
     button_danger_bg: RGB
+    button_danger_border: RGB
     button_danger_hover_bg: RGB
     button_danger_hover_border: RGB
     button_danger_active_bg: RGB
@@ -357,10 +387,13 @@ class Palette:
     icon_hover_bg_alpha: int
     icon_hover_edge: RGB
     icon_lit_hover_lift: float
+    icon_lit_hover_edge_lift: float
 
     # Timeline strip
     # On-section fill of each timeline track's level bar, one per layer (max 8).
     timeline_track_colors: tuple[RGB, ...]
+    # Fill of a timeline track's level bar where the layer is off.
+    timeline_off_segment: RGB
     bar_grid: RGB
     # Song start and end lines below the ruler, through the timeline rows.
     song_bound: RGB
@@ -389,11 +422,14 @@ def _ultraviolet() -> Palette:
     blue: RGB = (58, 120, 215)
     button_hover_border: RGB = (170, 140, 255)
     song_bound: RGB = (58, 66, 84)
+    white: RGB = (255, 255, 255)
+    surface_text: RGB = (205, 212, 228)
     return Palette(
         id="ultraviolet",
         name="Ultraviolet",
         background=(0, 0, 0),
         background_alpha=255,
+        modal_scrim=(0, 0, 0),
         modal_scrim_alpha=int(0.55 * 255),
         transport_rule=(52, 58, 74),
         panel_edge=(52, 58, 74),
@@ -401,7 +437,7 @@ def _ultraviolet() -> Palette:
         navigator_tree_line=(72, 82, 108),
         inspector_divider=(44, 50, 64),
         label=(165, 198, 250),
-        value=(255, 255, 255),
+        value=white,
         disabled=disabled,
         off_control_text=(170, 177, 196),
         off_control_muted=(124, 130, 148),
@@ -409,6 +445,12 @@ def _ultraviolet() -> Palette:
         highlight=highlight,
         error_notification=(255, 140, 140),
         notification_on_fill=(0, 0, 0),
+        on_hover=white,
+        on_hover_muted=surface_text,
+        on_primary=white,
+        on_danger=white,
+        on_accent=white,
+        on_lit_icon=white,
         preset_icon=(255, 195, 90),
         preset_file_icon=(255, 250, 235),
         move_mode=(60, 120, 255),
@@ -431,13 +473,16 @@ def _ultraviolet() -> Palette:
         button_hover_border=button_hover_border,
         button_active_bg=(52, 36, 112),
         button_primary_bg=(45, 85, 150),
+        button_primary_border=(83, 116, 169),
         button_primary_hover_bg=(58, 120, 215),
         button_primary_hover_border=(150, 205, 255),
         button_primary_active_bg=(32, 64, 120),
         button_off_bg=(30, 33, 42),
         button_off_border=(62, 68, 84),
         button_off_chosen_bg=(40, 52, 78),
+        button_off_chosen_border=(79, 89, 110),
         button_danger_bg=solo,
+        button_danger_border=(210, 79, 79),
         button_danger_hover_bg=(238, 58, 52),
         button_danger_hover_border=(255, 175, 155),
         button_danger_active_bg=(150, 26, 26),
@@ -446,7 +491,7 @@ def _ultraviolet() -> Palette:
         button_glow_alpha=0.32,
         surface_bg=(20, 18, 34),
         surface_edge=(112, 88, 210),
-        surface_text=(205, 212, 228),
+        surface_text=surface_text,
         accent_from=blue,
         accent_to=violet,
         hover=violet,
@@ -462,6 +507,7 @@ def _ultraviolet() -> Palette:
         icon_hover_bg_alpha=120,
         icon_hover_edge=(122, 92, 220),
         icon_lit_hover_lift=0.25,
+        icon_lit_hover_edge_lift=0.45,
         timeline_track_colors=(
             (127, 209, 255),  # sky
             (183, 166, 255),  # lavender
@@ -472,6 +518,7 @@ def _ultraviolet() -> Palette:
             (212, 238, 138),  # lime
             (128, 232, 216),  # aqua
         ),
+        timeline_off_segment=(40, 40, 40),
         bar_grid=(70, 95, 130),
         song_bound=song_bound,
         playhead=(90, 50, 130),
@@ -486,9 +533,132 @@ def _ultraviolet() -> Palette:
     )
 
 
+def _daylight() -> Palette:
+    """Near-white chrome, ink text, pale violet pointer, blue selection, amber signals."""
+    white: RGB = (255, 255, 255)
+    ink: RGB = (20, 22, 30)
+    disabled: RGB = (128, 134, 150)
+    muted: RGB = (92, 100, 122)
+    highlight: RGB = (150, 92, 0)
+    solo: RGB = (200, 40, 40)
+    violet: RGB = (128, 84, 255)
+    blue: RGB = (45, 100, 200)
+    rule: RGB = (208, 213, 226)
+    song_bound: RGB = (190, 196, 210)
+    off_text: RGB = (80, 86, 104)
+    return Palette(
+        id="daylight",
+        name="Daylight",
+        background=(246, 247, 251),
+        background_alpha=255,
+        modal_scrim=(20, 22, 40),
+        modal_scrim_alpha=int(0.35 * 255),
+        transport_rule=rule,
+        panel_edge=rule,
+        panel_focus_edge=(58, 110, 210),
+        navigator_tree_line=(176, 184, 204),
+        inspector_divider=(222, 226, 236),
+        label=(38, 72, 150),
+        value=ink,
+        disabled=disabled,
+        off_control_text=off_text,
+        off_control_muted=disabled,
+        muted=muted,
+        highlight=highlight,
+        error_notification=(190, 30, 30),
+        notification_on_fill=white,
+        on_hover=(30, 20, 70),
+        on_hover_muted=(90, 80, 130),
+        on_primary=white,
+        on_danger=white,
+        on_accent=white,
+        on_lit_icon=white,
+        preset_icon=(200, 120, 0),
+        preset_file_icon=(120, 90, 40),
+        move_mode=(30, 90, 220),
+        lock_icon=(200, 40, 40),
+        locked=(170, 60, 60),
+        locked_muted=(160, 95, 95),
+        solo_bg=solo,
+        override_bg=(240, 180, 40),
+        nav_on_bg=(30, 130, 65),
+        nav_lock_bg=(225, 140, 40),
+        nav_lock_glyph=(0, 0, 0),
+        config_dirty=(200, 150, 0),
+        armed_bg=solo,
+        override_glyph=(0, 0, 0),
+        override_glyph_off=disabled,
+        rec_bg=(210, 0, 0),
+        button_bg=(230, 232, 240),
+        button_border=(182, 188, 204),
+        button_hover_bg=(222, 212, 255),
+        button_hover_border=(140, 110, 230),
+        button_active_bg=(196, 180, 250),
+        button_primary_bg=blue,
+        button_primary_border=(30, 80, 170),
+        button_primary_hover_bg=(52, 112, 212),
+        button_primary_hover_border=(20, 60, 150),
+        button_primary_active_bg=(32, 72, 160),
+        button_off_bg=(238, 240, 245),
+        button_off_border=(214, 218, 228),
+        button_off_chosen_bg=(208, 216, 236),
+        button_off_chosen_border=(160, 172, 204),
+        button_danger_bg=(190, 30, 30),
+        button_danger_border=(150, 20, 20),
+        button_danger_hover_bg=(215, 40, 36),
+        button_danger_hover_border=(120, 10, 10),
+        button_danger_active_bg=(150, 26, 26),
+        button_sheen=0.12,
+        button_shade=0.10,
+        button_glow_alpha=0.25,
+        surface_bg=white,
+        surface_edge=(128, 96, 230),
+        surface_text=(50, 56, 72),
+        accent_from=blue,
+        accent_to=(110, 70, 220),
+        hover=violet,
+        hover_bg_alpha=40,
+        row_select_tint=(58, 120, 215),
+        row_selected_alpha=(0.18, 0.04),
+        row_selected_bar=(58, 120, 215),
+        row_focused_alpha=(0.28, 0.08),
+        row_focused_bar=(40, 90, 190),
+        row_focus_edge=(70, 120, 210),
+        icon_hover_fg=(88, 40, 190),
+        icon_hover_bg=violet,
+        icon_hover_bg_alpha=50,
+        icon_hover_edge=(150, 120, 240),
+        icon_lit_hover_lift=-0.15,
+        icon_lit_hover_edge_lift=-0.35,
+        timeline_track_colors=(
+            (30, 120, 190),  # sky
+            (110, 80, 210),  # lavender
+            (190, 120, 0),  # amber
+            (30, 150, 80),  # mint
+            (200, 60, 130),  # pink
+            (210, 80, 50),  # coral
+            (110, 150, 20),  # lime
+            (0, 150, 140),  # aqua
+        ),
+        timeline_off_segment=(220, 223, 230),
+        bar_grid=(190, 200, 220),
+        song_bound=song_bound,
+        playhead=(120, 80, 200),
+        playhead_flash=(200, 150, 255),
+        song_marker=(200, 40, 40),
+        song_marker_selected=(230, 140, 0),
+        timeline_scroll_rail=song_bound,
+        timeline_scroll_thumb=muted,
+        scrollbar_track=(232, 234, 240),
+        scrollbar_thumb=(180, 186, 204),
+        scrollbar_thumb_hover=(140, 110, 230),
+    )
+
+
 ULTRAVIOLET: Palette = _ultraviolet()
+DAYLIGHT: Palette = _daylight()
 # Built-in themes, in the order the Theme setting lists them.
-BUILTIN_PALETTES: tuple[Palette, ...] = (ULTRAVIOLET,)
+BUILTIN_PALETTES: tuple[Palette, ...] = (ULTRAVIOLET, DAYLIGHT)
 
 _palette: Palette = ULTRAVIOLET
 _palette_generation: int = 0

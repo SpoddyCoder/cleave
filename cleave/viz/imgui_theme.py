@@ -41,7 +41,7 @@ def imgui_color_roles() -> dict[imgui.Col_, tuple[tuple[int, int, int], float]]:
         imgui.Col_.scrollbar_grab: (p.scrollbar_thumb, 1.0),
         imgui.Col_.scrollbar_grab_hovered: (p.scrollbar_thumb_hover, 1.0),
         imgui.Col_.scrollbar_grab_active: (p.scrollbar_thumb_hover, 1.0),
-        imgui.Col_.modal_window_dim_bg: (p.background, p.modal_scrim_alpha / 255.0),
+        imgui.Col_.modal_window_dim_bg: (p.modal_scrim, p.modal_scrim_alpha / 255.0),
     }
 
 
@@ -61,6 +61,16 @@ def darken(rgb: tuple[int, int, int], amount: float) -> tuple[int, int, int]:
     """Move *rgb* toward black by *amount* (0..1)."""
     r, g, b = (round(c * (1.0 - amount)) for c in rgb)
     return r, g, b
+
+
+def shift(rgb: tuple[int, int, int], amount: float) -> tuple[int, int, int]:
+    """Lighten *rgb* by a positive *amount*, darken it by a negative one (-1..1)."""
+    return lighten(rgb, amount) if amount >= 0 else darken(rgb, -amount)
+
+
+def shift_brightness(rgb: tuple[int, int, int], amount: float) -> tuple[int, int, int]:
+    """Brighten *rgb* by a positive *amount*, darken it by a negative one (-1..1)."""
+    return brighten(rgb, amount) if amount >= 0 else darken(rgb, -amount)
 
 
 def rgba(rgb: tuple[int, int, int], alpha: float = 1.0) -> imgui.ImVec4:

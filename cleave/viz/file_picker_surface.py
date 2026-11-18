@@ -543,7 +543,7 @@ class FilePickerSurface:
             float(bar_bottom),
         )
         for line in title_lines:
-            _text(draw, content_x, y, fit_text_to_width(measure, line, content_w), palette().value)
+            _text(draw, content_x, y, fit_text_to_width(measure, line, content_w), palette().on_accent)
             y += step
         y = bar_bottom + line_gap
 

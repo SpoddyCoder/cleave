@@ -70,7 +70,7 @@ def _draw_heading(text: str, wrap_x: float) -> None:
         origin.x + width + pad_x,
         origin.y + text_h + pad_y,
     )
-    _draw_wrapped(text, palette().value, wrap_x)
+    _draw_wrapped(text, palette().on_accent, wrap_x)
     imgui.set_cursor_pos_y(imgui.get_cursor_pos_y() + pad_y)
 
 

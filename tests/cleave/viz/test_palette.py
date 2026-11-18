@@ -11,9 +11,10 @@ from pathlib import Path
 from imgui_bundle import imgui
 
 from cleave.viz.button_paint import ButtonState, ButtonTone, button_look
-from cleave.viz.imgui_theme import imgui_color_roles
+from cleave.viz.imgui_theme import imgui_color_roles, lighten
 from cleave.viz.theme import (
     BUILTIN_PALETTES,
+    DAYLIGHT,
     ULTRAVIOLET,
     Palette,
     palette,
@@ -48,11 +49,11 @@ def _variant() -> Palette:
     )
 
 
-def test_ultraviolet_is_the_default_and_only_builtin() -> None:
+def test_ultraviolet_is_the_default_then_daylight() -> None:
     assert palette() is ULTRAVIOLET
-    assert BUILTIN_PALETTES == (ULTRAVIOLET,)
-    assert ULTRAVIOLET.id == "ultraviolet"
-    assert ULTRAVIOLET.name == "Ultraviolet"
+    assert BUILTIN_PALETTES == (ULTRAVIOLET, DAYLIGHT)
+    assert (ULTRAVIOLET.id, ULTRAVIOLET.name) == ("ultraviolet", "Ultraviolet")
+    assert (DAYLIGHT.id, DAYLIGHT.name) == ("daylight", "Daylight")
 
 
 def test_set_palette_bumps_generation_only_on_change() -> None:
@@ -70,9 +71,9 @@ def test_draw_helpers_follow_the_live_palette() -> None:
     with _live(variant):
         assert imgui_color_roles()[imgui.Col_.text] == ((1, 2, 3), 1.0)
         assert imgui_color_roles()[imgui.Col_.button] == ((4, 5, 6), 1.0)
+        assert imgui_color_roles()[imgui.Col_.modal_window_dim_bg][0] == variant.modal_scrim
         rest = button_look(ButtonTone.PLAIN, ButtonState.REST)
-        fill = button_look(ButtonTone.PLAIN, ButtonState.REST, fill=(4, 5, 6))
-        assert (rest.top, rest.bottom) == (fill.top, fill.bottom)
+        assert rest.top == lighten((4, 5, 6), variant.button_sheen)
         assert selected_clip_flash_color(None) == (7, 8, 9)
     assert imgui_color_roles()[imgui.Col_.text] == (ULTRAVIOLET.value, 1.0)
 
@@ -125,7 +126,7 @@ def test_default_theme_is_ultraviolet_and_unknown_ids_fall_back() -> None:
     from cleave.viz.theme import palette_for_theme, theme_ids, theme_label
 
     assert DEFAULT_THEME == ULTRAVIOLET.id
-    assert theme_ids() == ("ultraviolet",)
+    assert theme_ids() == ("ultraviolet", "daylight")
     assert palette_for_theme("ultraviolet") is ULTRAVIOLET
     assert palette_for_theme("deleted-user-theme") is ULTRAVIOLET
     assert theme_label("ultraviolet") == "Ultraviolet"
@@ -157,3 +158,67 @@ def test_theme_row_steps_live_palette_and_writes_user_config(
         press_main_row(controls, keydown(pygame.K_LEFT))
         assert controls.cfg.editor.theme == "ultraviolet"
         assert palette() is ULTRAVIOLET
+
+
+def _contrast(a: tuple[int, int, int], b: tuple[int, int, int]) -> float:
+    """WCAG contrast ratio between two colours."""
+
+    def channel(v: int) -> float:
+        c = v / 255.0
+        return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+
+    def lum(rgb: tuple[int, int, int]) -> float:
+        r, g, b = (channel(v) for v in rgb)
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+    hi, lo = sorted((lum(a), lum(b)), reverse=True)
+    return (hi + 0.05) / (lo + 0.05)
+
+
+def _text_pairs(p: Palette) -> list[tuple[str, str, float]]:
+    """(text role, fill role, minimum contrast) every built-in theme must meet."""
+    body = 4.5
+    # Labels on fills are short and bold enough for the WCAG UI floor.
+    fill = 3.0
+    return [
+        ("value", "background", body),
+        ("value", "surface_bg", body),
+        ("label", "background", body),
+        ("label", "surface_bg", body),
+        ("highlight", "background", body),
+        ("surface_text", "surface_bg", body),
+        ("muted", "background", 3.0),
+        ("disabled", "background", 3.0),
+        ("on_hover", "button_hover_bg", fill),
+        ("on_hover", "button_active_bg", fill),
+        ("on_primary", "button_primary_bg", fill),
+        ("on_primary", "button_primary_hover_bg", fill),
+        ("on_danger", "button_danger_bg", fill),
+        ("on_danger", "button_danger_hover_bg", fill),
+        ("on_accent", "accent_from", fill),
+        ("on_accent", "accent_to", fill),
+        ("on_lit_icon", "nav_on_bg", fill),
+        ("on_lit_icon", "solo_bg", fill),
+        ("on_lit_icon", "rec_bg", fill),
+        ("nav_lock_glyph", "nav_lock_bg", fill),
+        ("override_glyph", "override_bg", fill),
+        ("off_control_text", "button_off_bg", body),
+    ]
+
+
+def test_every_builtin_theme_keeps_its_text_readable() -> None:
+    failures = [
+        f"{p.id}: {text} on {fill} is {_contrast(getattr(p, text), getattr(p, fill)):.2f}"
+        for p in BUILTIN_PALETTES
+        for text, fill, floor in _text_pairs(p)
+        if _contrast(getattr(p, text), getattr(p, fill)) < floor
+    ]
+    assert failures == []
+
+
+def test_ultraviolet_on_fill_roles_match_its_panel_text() -> None:
+    """Ultraviolet's split roles keep the look it had with one text colour."""
+    for role in ("on_hover", "on_primary", "on_danger", "on_accent", "on_lit_icon"):
+        assert getattr(ULTRAVIOLET, role) == ULTRAVIOLET.value
+    assert ULTRAVIOLET.on_hover_muted == ULTRAVIOLET.surface_text
+    assert ULTRAVIOLET.modal_scrim == (0, 0, 0)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from pathlib import Path
 
 import pygame
@@ -29,6 +30,15 @@ def _isolated_user_config(tmp_path_factory, monkeypatch) -> None:
     config_home = tmp_path_factory.mktemp("user_config")
     monkeypatch.setenv("XDG_CONFIG_HOME", str(config_home))
     monkeypatch.setenv("APPDATA", str(config_home))
+
+
+@pytest.fixture(autouse=True)
+def _no_user_themes_between_tests() -> Iterator[None]:
+    """Drop themes a test loaded from a themes folder (the real one, on app setup)."""
+    from cleave.viz.theme import set_user_palettes
+
+    yield
+    set_user_palettes(())
 
 
 @pytest.fixture

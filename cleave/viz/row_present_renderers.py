@@ -219,7 +219,9 @@ def render_visibility_icon(
     glyph = VISIBILITY_GLYPH if enabled else VISIBILITY_OFF_GLYPH
     if override:
         color = palette().override_glyph if enabled else palette().override_glyph_off
-    elif enabled or solo:
+    elif solo:
+        color = palette().on_lit_icon
+    elif enabled:
         color = palette().value
     else:
         color = palette().disabled

@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 from imgui_bundle import imgui
 
-from cleave.viz.button_paint import ButtonState, ButtonTone, paint_button
+from cleave.viz.button_paint import ButtonState, ButtonTone, button_text_role, paint_button
 from cleave.viz.drag_reorder import DRAG_PRESET, RowDragGesture
 from cleave.viz.icon_button import text_box
 from cleave.viz.imgui_icon_button import box_button, paint_box
@@ -239,7 +239,7 @@ def draw_button(
     draw = imgui.get_window_draw_list()
     tone = ButtonTone.OFF if off and state is ButtonState.REST else ButtonTone.PLAIN
     paint_button(draw, (rect_min.x, rect_min.y, size.x, size.y), tone, state)
-    role = palette().value if state is not ButtonState.REST or text_role is None else text_role
+    role = button_text_role(tone, state) or text_role or palette().value
     draw.add_text(
         imgui.ImVec2(rect_min.x + pad.x, rect_min.y + pad.y), packed_color(role), text
     )

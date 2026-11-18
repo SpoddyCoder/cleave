@@ -210,7 +210,6 @@ def draw_inspector_title(
         elapsed_sec, hold_sec=attention_scroll_hold_sec(scroll_sec)
     )
     draw = imgui.get_window_draw_list()
-    color = packed_color(palette().value)
     fill = swipe_fill(
         bar_x1 - bar_x0, attention.fill_progress, from_left=attention.fill_from_left
     )
@@ -223,7 +222,7 @@ def draw_inspector_title(
         )
         try:
             # The accent gradient spans the whole bar, so the swipe reveals
-            # it rather than stretching it. The title stays white on it.
+            # it rather than stretching it.
             span_w = max(1.0, bar_x1 - bar_x0)
             left = packed_color(accent_at(fill_x / span_w))
             right = packed_color(accent_at((fill_x + fill_w) / span_w))
@@ -243,8 +242,21 @@ def draw_inspector_title(
         imgui.ImVec2(start.x + title_room, bar_y1),
         True,
     )
+    title_xy = imgui.ImVec2(start.x - offset, text_y)
     try:
-        draw.add_text(imgui.ImVec2(start.x - offset, text_y), color, title)
+        draw.add_text(title_xy, packed_color(palette().value), title)
+        if fill is not None:
+            # The part of the title over the swipe is in on_accent.
+            fill_x, fill_w = fill
+            draw.push_clip_rect(
+                imgui.ImVec2(bar_x0 + fill_x, bar_y0),
+                imgui.ImVec2(bar_x0 + fill_x + fill_w, bar_y1),
+                True,
+            )
+            try:
+                draw.add_text(title_xy, packed_color(palette().on_accent), title)
+            finally:
+                draw.pop_clip_rect()
     finally:
         draw.pop_clip_rect()
     return _draw_title_buttons(buttons, start, slot_xs, band)

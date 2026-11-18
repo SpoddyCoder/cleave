@@ -107,7 +107,7 @@ def navigator_toggle_color(toggle: NavToggle) -> tuple[int, int, int]:
         return palette().disabled if toggle.blocked else palette().value
     if not toggle.active:
         return palette().locked if toggle.blocked else palette().muted
-    return palette().nav_lock_glyph if toggle.id == TOGGLE_LOCK else palette().value
+    return palette().nav_lock_glyph if toggle.id == TOGGLE_LOCK else palette().on_lit_icon
 
 
 def navigator_toggle_tooltip(toggle: NavToggle) -> str:

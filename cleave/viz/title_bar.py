@@ -1,7 +1,7 @@
 """The accent bar behind a heading: help column section titles and modal titles.
 
 It is the inspector title's settled band: the accent gradient, blue into
-violet, across the full width, with the heading in ``value`` on it.
+violet, across the full width, with the heading in ``on_accent`` on it.
 """
 
 from __future__ import annotations

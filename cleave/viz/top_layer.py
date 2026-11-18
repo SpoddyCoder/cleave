@@ -126,7 +126,7 @@ def _draw_title(lines: tuple[str, ...]) -> None:
         )
     finally:
         draw.pop_clip_rect()
-    _draw_lines(lines, palette().value)
+    _draw_lines(lines, palette().on_accent)
     imgui.dummy(imgui.ImVec2(0.0, max(0.0, pad_y - border)))
 
 

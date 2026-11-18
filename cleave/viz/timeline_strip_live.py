@@ -363,11 +363,11 @@ def _draw_transport_buttons(
     play_rect, record_rect = layout.transport_rects()
     rec_text_color = palette().value
     if state.recording:
-        # Flash: red fill with white glyph and text, then a red glyph on
-        # no fill.
+        # Flash: red fill with an on_lit_icon glyph and text, then a red
+        # glyph on no fill.
         if rec_flash_visible():
             pygame.draw.rect(surface, palette().rec_bg, rec_fill_rect(record_rect))
-            record_color = palette().value
+            record_color = rec_text_color = palette().on_lit_icon
         else:
             record_color = palette().rec_bg
     elif state.locked:
@@ -451,7 +451,9 @@ def _draw_row_live_flash(
         armed_surf.fill((*palette().armed_bg, ARMED_BG_ALPHA))
         upload.blit(armed_surf, (arm_x, icon_y))
         upload.blit(
-            render_header_toggle(RECORD_GLYPH, color=palette().value, line_height=layout.icon_h),
+            render_header_toggle(
+                RECORD_GLYPH, color=palette().on_lit_icon, line_height=layout.icon_h
+            ),
             (arm_x, icon_y),
         )
     dirty.append(arm_rect)

@@ -179,9 +179,9 @@ def draw_menu_rows(
                 hovered = index
             if is_highlighted:
                 # Yellow ticks on the lit row, as in the open choice list.
-                label_color = rgba(palette().value if row.enabled else palette().muted)
+                label_color = rgba(palette().on_hover if row.enabled else palette().muted)
                 check_color = rgba(palette().highlight if row.enabled else palette().muted)
-                shortcut_color = rgba(palette().surface_text)
+                shortcut_color = rgba(palette().on_hover_muted)
             else:
                 label_rgb = row.color or palette().value
                 label_color = rgba(label_rgb if row.enabled else palette().disabled)
