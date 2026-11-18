@@ -94,6 +94,9 @@ _INSPECTOR_INDENT = 16.0
 _INSPECTOR_ROWS = "##inspector-rows"
 # Height of an inspector divider, as a fraction of the text line.
 _INSPECTOR_DIVIDER_LINES = 0.5
+# Extra space between the rule under the page title and the first row, in
+# shell pixels at a factor of 1.0.
+_TITLE_RULE_GAP_PX = 4.0
 
 
 def choice_tone(value_color: tuple[int, int, int]) -> ChoiceTone:
@@ -461,6 +464,10 @@ class InspectorPanel:
         elif pressed == TITLE_FORWARD:
             self._ctx.controls.navigator.go_forward()
         _draw_inspector_divider()
+        cursor = imgui.get_cursor_screen_pos()
+        imgui.set_cursor_screen_pos(
+            imgui.ImVec2(cursor.x, cursor.y + ui_chrome_px(_TITLE_RULE_GAP_PX))
+        )
         self.values.choice_rects = {}
         self.row_rects = {}
         # Only the rows scroll, so the title line stays in view and the
