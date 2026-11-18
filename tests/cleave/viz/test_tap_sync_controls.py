@@ -20,7 +20,8 @@ from cleave.viz.tap_sync_controls import (
     TapSyncUiSnapshot,
     latency_options_ms,
     tap_sync_info_panel,
-    _TAP_SYNC_CONFIRM_MESSAGE,
+    _TAP_SYNC_CONFIRM_BODY,
+    _TAP_SYNC_CONFIRM_TITLE,
 )
 from tests.support.viz import make_test_cfg
 from tests.support.viz import keydown
@@ -137,7 +138,8 @@ def test_prompt_start_opens_confirm_modal_without_signals() -> None:
 
     view = modal.view_state()
     assert view is not None
-    assert view.message == _TAP_SYNC_CONFIRM_MESSAGE
+    assert view.message == _TAP_SYNC_CONFIRM_TITLE
+    assert view.body == _TAP_SYNC_CONFIRM_BODY
     assert view.options == ("Start", "Cancel")
     assert not controls.active
     assert ui_log == []
@@ -447,7 +449,7 @@ def test_enter_records_tap_space_does_not() -> None:
 
     assert controls.handle_keydown(keydown(pygame.K_RETURN)) is True
     assert controls.progress_view().streak == 1
-    assert "Enter" in _TAP_SYNC_CONFIRM_MESSAGE
+    assert "Enter" in _TAP_SYNC_CONFIRM_BODY
 
 
 def test_tap_sync_info_panel_uses_dashes_when_estimate_and_spread_are_missing() -> None:

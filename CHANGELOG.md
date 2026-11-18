@@ -65,7 +65,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
-- The latency setting is now called audio latency everywhere: Settings > Preview > audio latency, Settings > Measure audio latency, the Detected audio latency dialog, and the "Audio latency set" notification.
+- The latency setting is now called audio latency everywhere: Settings > Preview > audio latency, Settings > Measure audio latency, the Detected audio latency dialog, and the "Audio latency set" notification. The Measure audio latency dialog is titled Measure Audio Latency, with its instructions underneath.
 - The help column now opens wider by default, 460 pixels instead of 320, so more of each help page fits without wrapping. A width already saved in your settings is kept.
 
 - Opening a project no longer re-reads every preset each time. Cleave re-indexes only when a preset pack folder is added, removed, or renamed in the presets folder, and the loading screen then says "New Milkdrop presets found, re-indexing". Otherwise a 135k preset collection opens in a fraction of a second. Changes inside an existing pack are picked up by Settings > Rescan presets.

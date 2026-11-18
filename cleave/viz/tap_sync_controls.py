@@ -28,10 +28,10 @@ from cleave.viz.tap_sync import (
 )
 from cleave.viz.transport_clock import MAX_RESIDUAL_LATENCY_SEC
 
-_TAP_SYNC_CONFIRM_MESSAGE = (
-    "Measure Audio Latency: "
+_TAP_SYNC_CONFIRM_TITLE = "Measure Audio Latency"
+_TAP_SYNC_CONFIRM_BODY = (
     "A 140 BPM click track will play: a long low tone, then three short clicks. "
-    "Tap Enter on each long low tone until the latency is detected."
+    "Press Enter on each long low tone until the latency is detected."
 )
 
 _APPLY_TITLE = "Detected audio latency"
@@ -160,9 +160,10 @@ class TapSyncControls:
     def prompt_start(self) -> None:
         self._pause_transport()
         self._modal_host.prompt_confirm(
-            _TAP_SYNC_CONFIRM_MESSAGE,
+            _TAP_SYNC_CONFIRM_TITLE,
             "Start",
             self._begin_calibration,
+            body=_TAP_SYNC_CONFIRM_BODY,
         )
 
     def _begin_calibration(self) -> None:
