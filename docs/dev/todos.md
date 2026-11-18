@@ -24,7 +24,7 @@ In priority order. The ImGui shell refactor is done; its plans, design page, and
 
 Rich cue levels, per-cue blend/role, stem conductor, visual limiter, and manual timeline-opacity nudges are shipped (see [plans-completed/improved-timeline-presets.md](plans-completed/improved-timeline-presets.md)).
 
-The strip edits clips (move, trim, split, cut in and cut out), and record keeps authored levels: [plans/timeline-clips-plan.md](plans/timeline-clips-plan.md), finished. Still open from that plan:
+The strip edits clips (move, trim, split, cut in and cut out), and record keeps authored levels: [plans-completed/timeline-clips-plan.md](plans-completed/timeline-clips-plan.md), finished. Still open from that plan:
 
 - **Bulk command names.** Snap cues, Snap cues to markers, and Set cut type on cues act on clip edges now; rename them for consistent wording.
 - **Recast toggle.** A control on butted clips for whether the boundary switches the preset.
